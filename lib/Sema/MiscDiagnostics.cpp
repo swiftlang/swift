@@ -19,6 +19,7 @@
 #include "TypeCheckAvailability.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/Pattern.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/SourceManager.h"
@@ -531,13 +532,15 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
       }
 
       DeclContext *topLevelContext = DC->getModuleScopeContext();
-      UnqualifiedLookup lookup(VD->getBaseName(), topLevelContext,
-                               /*Loc=*/SourceLoc(),
-                               UnqualifiedLookup::Flags::KnownPrivate);
+      auto descriptor = UnqualifiedLookupDescriptor(
+          VD->getBaseName(), topLevelContext, SourceLoc(),
+          UnqualifiedLookupFlags::KnownPrivate);
+      auto lookup = evaluateOrDefault(Ctx.evaluator,
+                                      UnqualifiedLookupRequest{descriptor}, {});
 
       // Group results by module. Pick an arbitrary result from each module.
       llvm::SmallDenseMap<const ModuleDecl*,const ValueDecl*,4> resultsByModule;
-      for (auto &result : lookup.Results) {
+      for (auto &result : lookup) {
         const ValueDecl *value = result.getValueDecl();
         resultsByModule.insert(std::make_pair(value->getModuleContext(),value));
       }
@@ -3417,7 +3420,20 @@ public:
           name = bestMethod->getFullName();
         }
 
-        out << nominal->getName().str() << "." << name.getBaseName();
+        auto typeName = nominal->getName().str();
+        // If we're inside a type Foo (or an extension of it) and the suggestion
+        // is going to be #selector(Foo.bar) (or #selector(SuperclassOfFoo.bar),
+        // then suggest the more natural #selector(self.bar) instead.
+        if (auto containingTypeContext = DC->getInnermostTypeContext()) {
+          auto methodNominalType = nominal->getDeclaredType();
+          auto outerNomType = containingTypeContext->getSelfNominalTypeDecl()
+                                                   ->getDeclaredType();
+          if (methodNominalType->isEqual(outerNomType) ||
+              methodNominalType->isExactSuperclassOf(outerNomType))
+            typeName = "self";
+        }
+
+        out << typeName << "." << name.getBaseName();
         auto argNames = name.getArgumentNames();
 
         // Only print the parentheses if there are some argument

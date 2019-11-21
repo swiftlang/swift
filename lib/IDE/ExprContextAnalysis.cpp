@@ -22,6 +22,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/Types.h"
@@ -61,10 +62,9 @@ void typeCheckContextImpl(DeclContext *DC, SourceLoc Loc) {
     if (auto *patternInit = dyn_cast<PatternBindingInitializer>(DC)) {
       if (auto *PBD = patternInit->getBinding()) {
         auto i = patternInit->getBindingIndex();
+        PBD->getPattern(i)->forEachVariable(
+            [](VarDecl *VD) { (void)VD->getInterfaceType(); });
         if (PBD->getInit(i)) {
-          PBD->getPattern(i)->forEachVariable([](VarDecl *VD) {
-            (void) VD->getInterfaceType();
-          });
           if (!PBD->isInitializerChecked(i))
             typeCheckPatternBinding(PBD, i);
         }
@@ -91,15 +91,29 @@ void typeCheckContextImpl(DeclContext *DC, SourceLoc Loc) {
 } // anonymous namespace
 
 void swift::ide::typeCheckContextUntil(DeclContext *DC, SourceLoc Loc) {
-  // The only time we have to explicitly check a TopLevelCodeDecl
-  // is when we're directly inside of one. In this case,
-  // performTypeChecking() did not type check it for us.
   while (isa<AbstractClosureExpr>(DC))
     DC = DC->getParent();
-  if (auto *TLCD = dyn_cast<TopLevelCodeDecl>(DC))
-    typeCheckTopLevelCodeDecl(TLCD);
-  else
+
+  if (auto *TLCD = dyn_cast<TopLevelCodeDecl>(DC)) {
+    // Typecheck all 'TopLevelCodeDecl's up to the target one.
+    // In theory, this is not needed, but it fails to resolve the type of
+    // 'guard'ed variable. e.g.
+    //
+    //   guard value = something() else { fatalError() }
+    //   <complete>
+    // Here, 'value' is '<error type>' unless we explicitly typecheck the
+    // 'guard' statement.
+    SourceFile *SF = DC->getParentSourceFile();
+    for (auto *D : SF->Decls) {
+      if (auto Code = dyn_cast<TopLevelCodeDecl>(D)) {
+        typeCheckTopLevelCodeDecl(Code);
+        if (Code == TLCD)
+          break;
+      }
+    }
+  } else {
     typeCheckContextImpl(DC, Loc);
+  }
 }
 
 //===----------------------------------------------------------------------===//
@@ -274,9 +288,6 @@ static void collectPossibleCalleesByQualifiedLookup(
     if (!isMemberDeclApplied(&DC, baseTy->getMetatypeInstanceType(), VD))
       continue;
     Type declaredMemberType = VD->getInterfaceType();
-    if (!declaredMemberType) {
-      continue;
-    }
     if (!declaredMemberType->is<AnyFunctionType>())
       continue;
     if (VD->getDeclContext()->isTypeContext()) {

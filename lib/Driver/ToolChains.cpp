@@ -214,6 +214,7 @@ static void addCommonFrontendArgs(const ToolChain &TC, const OutputInfo &OI,
   inputArgs.AddLastArg(arguments, options::OPT_profile_coverage_mapping);
   inputArgs.AddLastArg(arguments, options::OPT_warnings_as_errors);
   inputArgs.AddLastArg(arguments, options::OPT_sanitize_EQ);
+  inputArgs.AddLastArg(arguments, options::OPT_sanitize_recover_EQ);
   inputArgs.AddLastArg(arguments, options::OPT_sanitize_coverage_EQ);
   inputArgs.AddLastArg(arguments, options::OPT_static);
   inputArgs.AddLastArg(arguments, options::OPT_swift_version);
@@ -505,6 +506,8 @@ const char *ToolChain::JobContext::computeFrontendModeForCompile() const {
     return "-emit-ir";
   case file_types::TY_LLVM_BC:
     return "-emit-bc";
+  case file_types::TY_ClangModuleFile:
+    return "-emit-pcm";
   case file_types::TY_Assembly:
     return "-S";
   case file_types::TY_SwiftModuleFile:
@@ -528,7 +531,6 @@ const char *ToolChain::JobContext::computeFrontendModeForCompile() const {
   case file_types::TY_AutolinkFile:
   case file_types::TY_Dependencies:
   case file_types::TY_SwiftModuleDocFile:
-  case file_types::TY_ClangModuleFile:
   case file_types::TY_SerializedDiagnostics:
   case file_types::TY_ObjCHeader:
   case file_types::TY_Image:
@@ -764,6 +766,7 @@ ToolChain::constructInvocation(const BackendJobAction &job,
     case file_types::TY_SIL:
     case file_types::TY_SIB:
     case file_types::TY_PCH:
+    case file_types::TY_ClangModuleFile:
     case file_types::TY_IndexData:
       llvm_unreachable("Cannot be output from backend job");
     case file_types::TY_Swift:
@@ -771,7 +774,6 @@ ToolChain::constructInvocation(const BackendJobAction &job,
     case file_types::TY_AutolinkFile:
     case file_types::TY_Dependencies:
     case file_types::TY_SwiftModuleDocFile:
-    case file_types::TY_ClangModuleFile:
     case file_types::TY_SerializedDiagnostics:
     case file_types::TY_ObjCHeader:
     case file_types::TY_Image:

@@ -6535,7 +6535,6 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
   },
   {
     key.kind: source.lang.swift.decl.extension,
-    key.accessibility: source.lang.swift.accessibility.internal,
     key.name: "FooClassBase",
     key.offset: 5587,
     key.length: 66,
@@ -6565,7 +6564,6 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
   },
   {
     key.kind: source.lang.swift.decl.extension,
-    key.accessibility: source.lang.swift.accessibility.internal,
     key.name: "FooClassBase",
     key.offset: 5700,
     key.length: 107,
@@ -6612,7 +6610,6 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
   },
   {
     key.kind: source.lang.swift.decl.extension,
-    key.accessibility: source.lang.swift.accessibility.internal,
     key.name: "FooClassBase",
     key.offset: 5809,
     key.length: 66,

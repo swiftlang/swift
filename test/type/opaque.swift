@@ -122,7 +122,8 @@ func typeIdentity() {
     var af = alice
     af = alice
     af = bob // expected-error{{}}
-    af = grace // expected-error{{}}
+    af = grace // expected-error{{generic parameter 'T' could not be inferred}}
+    // expected-error@-1 {{cannot assign value of type '(T) -> some P' to type '() -> some P'}}
   }
 
   do {

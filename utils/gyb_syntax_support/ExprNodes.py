@@ -112,7 +112,11 @@ EXPR_NODES = [
 
     Node('ExprList', kind='SyntaxCollection',
          element='Expr',
-         element_name='Expression'),
+         element_name='Expression',
+         description='''
+         A list of expressions connected by operators. This list is contained
+         by a `SequenceExprSyntax`.
+         '''),
 
     # A #line expression.
     Node('PoundLineExpr', kind='Expr',

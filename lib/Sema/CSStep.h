@@ -234,7 +234,7 @@ protected:
   /// Check whether constraint solver is running in "debug" mode,
   /// which should output diagnostic information.
   bool isDebugMode() const {
-    return CS.getASTContext().LangOpts.DebugConstraintSolver;
+    return CS.getASTContext().TypeCheckerOpts.DebugConstraintSolver;
   }
 
   llvm::raw_ostream &getDebugLogger(bool indent = true) const {
@@ -601,7 +601,9 @@ public:
   StepResult resume(bool prevFailed) override;
 
   void print(llvm::raw_ostream &Out) override {
-    Out << "TypeVariableStep for " << TypeVar->getString() << " with #"
+    PrintOptions PO;
+    PO.PrintTypesForDebugging = true;
+    Out << "TypeVariableStep for " << TypeVar->getString(PO) << " with #"
         << InitialBindings.size() << " initial bindings\n";
   }
 

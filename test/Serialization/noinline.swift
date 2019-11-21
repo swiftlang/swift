@@ -8,9 +8,9 @@
 
 import def_noinline
 
-// SIL-LABEL: sil public_external [serialized] [noinline] [canonical] @$s12def_noinline12testNoinline1xS2b_tF : $@convention(thin) (Bool) -> Bool {
+// SIL-LABEL: sil public_external [serialized] [noinline] [canonical] [ossa] @$s12def_noinline12testNoinline1xS2b_tF : $@convention(thin) (Bool) -> Bool {
 
-// SIL-LABEL: sil public_external [serialized] [noinline] [canonical] @$s12def_noinline18NoInlineInitStructV1xACSb_tcfC : $@convention(method) (Bool, @thin NoInlineInitStruct.Type) -> NoInlineInitStruct {
+// SIL-LABEL: sil public_external [serialized] [noinline] [canonical] [ossa] @$s12def_noinline18NoInlineInitStructV1xACSb_tcfC : $@convention(method) (Bool, @thin NoInlineInitStruct.Type) -> NoInlineInitStruct {
 
 // SIL-LABEL: sil @main
 // SIL: [[RAW:%.+]] = global_addr @$s8noinline3rawSbvp : $*Bool

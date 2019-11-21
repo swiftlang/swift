@@ -133,8 +133,10 @@ public:
   /// reconstruct the use.
   UseWrapper(Operand *Use);
 
+  Operand *getOperand();
+
   /// Return the operand we wrap. Reconstructing branch operands.
-  operator Operand*();
+  operator Operand*() { return getOperand(); }
 };
 
 } // end namespace swift

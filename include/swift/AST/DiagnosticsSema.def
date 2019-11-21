@@ -911,8 +911,12 @@ ERROR(invalid_arg_count_for_operator,none,
       "operators must have one or two arguments", ())
 ERROR(operator_in_local_scope,none,
       "operator functions can only be declared at global or in type scope", ())
-ERROR(nonstatic_operator_in_type,none,
-      "operator %0 declared in type %1 must be 'static'", (Identifier, Type))
+ERROR(nonstatic_operator_in_nominal,none,
+      "operator %0 declared in type %1 must be 'static'",
+      (Identifier, DeclName))
+ERROR(nonstatic_operator_in_extension,none,
+      "operator %0 declared in extension of %1 must be 'static'",
+      (Identifier, TypeRepr*))
 ERROR(nonfinal_operator_in_class,none,
       "operator %0 declared in non-final class %1 must be 'final'",
       (Identifier, Type))
@@ -1493,8 +1497,6 @@ ERROR(indirect_case_without_payload,none,
       "enum case %0 without associated value cannot be 'indirect'", (Identifier))
 ERROR(indirect_case_in_indirect_enum,none,
       "enum case in 'indirect' enum cannot also be 'indirect'", ())
-WARNING(enum_frozen_nonresilient,none,
-        "%0 has no effect without -enable-library-evolution", (DeclAttribute))
 WARNING(enum_frozen_nonpublic,none,
         "%0 has no effect on non-public enums", (DeclAttribute))
 
@@ -3628,9 +3630,9 @@ ERROR(assignment_bang_has_immutable_subcomponent,none,
 NOTE(change_to_mutating,none,
      "mark %select{method|accessor}0 'mutating' to make 'self' mutable",
      (bool))
-NOTE(masked_instance_variable,none,
-     "add explicit 'self.' to refer to mutable property of %0",
-     (Type))
+NOTE(masked_mutable_property,none,
+     "add explicit '%0' to refer to mutable %1 of %2",
+     (StringRef, DescriptiveDeclKind, Type))
 
 ERROR(assignment_let_property_delegating_init,none,
       "'let' property %0 may not be initialized directly; use "
@@ -3784,8 +3786,6 @@ ERROR(single_tuple_parameter_mismatch_special,none,
 ERROR(single_tuple_parameter_mismatch_normal,none,
       "%0 %1 expects a single parameter of type %2%3",
       (DescriptiveDeclKind, DeclBaseName, Type, StringRef))
-NOTE(note_maybe_forgot_to_form_tuple,none,
-     "did you mean to pass a tuple?", ())
 ERROR(unknown_single_tuple_parameter_mismatch,none,
       "single parameter of type %0 is expected in call", (Type))
 ERROR(cannot_convert_single_tuple_into_multiple_arguments,none,

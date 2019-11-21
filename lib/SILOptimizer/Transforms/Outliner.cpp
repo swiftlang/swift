@@ -288,7 +288,10 @@ CanSILFunctionType BridgedProperty::getOutlinedFunctionType(SILModule &M) {
                       ResultConvention::Owned));
   auto ExtInfo =
       SILFunctionType::ExtInfo(SILFunctionType::Representation::Thin,
+<<<<<<< HEAD
                                // SWIFT_ENABLE_TENSORFLOW
+=======
+>>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
                                /*pseudogeneric*/ false, /*noescape*/ false,
                                DifferentiabilityKind::NonDifferentiable);
   auto FunctionType = SILFunctionType::get(
@@ -1110,12 +1113,19 @@ CanSILFunctionType ObjCMethodCall::getOutlinedFunctionType(SILModule &M) {
     OrigSigIdx++;
   }
 
+<<<<<<< HEAD
   auto ExtInfo =
       SILFunctionType::ExtInfo(SILFunctionType::Representation::Thin,
                                /*pseudogeneric*/ false,
                                // SWIFT_ENABLE_TENSORFLOW
                                /*noescape*/ false,
                                DifferentiabilityKind::NonDifferentiable);
+=======
+  auto ExtInfo = SILFunctionType::ExtInfo(
+      SILFunctionType::Representation::Thin,
+      /*pseudogeneric*/ false,
+      /*noescape*/ false, DifferentiabilityKind::NonDifferentiable);
+>>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
 
   SmallVector<SILResultInfo, 4> Results;
   // If we don't have a bridged return we changed from @autoreleased to @owned

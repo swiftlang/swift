@@ -426,6 +426,14 @@ public:
   CanSILFunctionType getLoweredFunctionType() const {
     return LoweredType;
   }
+  CanSILFunctionType
+  getLoweredFunctionTypeInContext(TypeExpansionContext context) const;
+
+  SILType getLoweredTypeInContext(TypeExpansionContext context) const {
+    return SILType::getPrimitiveObjectType(
+        getLoweredFunctionTypeInContext(context));
+  }
+
   SILFunctionConventions getConventions() const {
     return SILFunctionConventions(LoweredType, getModule());
   }
@@ -575,6 +583,11 @@ public:
             : ResilienceExpansion::Maximal);
   }
 
+  // Returns the type expansion context to be used inside this function.
+  TypeExpansionContext getTypeExpansionContext() const {
+    return TypeExpansionContext(*this);
+  }
+
   const Lowering::TypeLowering &
   getTypeLowering(Lowering::AbstractionPattern orig, Type subst);
 
@@ -585,6 +598,8 @@ public:
   SILType getLoweredType(Type t) const;
 
   SILType getLoweredLoadableType(Type t) const;
+
+  SILType getLoweredType(SILType t) const;
 
   const Lowering::TypeLowering &getTypeLowering(SILType type) const;
 

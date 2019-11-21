@@ -47,6 +47,10 @@ raw_ostream &llvm::operator<<(raw_ostream &OS, DeclName I) {
   return OS;
 }
 
+void swift::simple_display(llvm::raw_ostream &out, DeclName name) {
+  out << "'" << name << "'";
+}
+
 raw_ostream &llvm::operator<<(raw_ostream &OS, swift::ObjCSelector S) {
   unsigned n = S.getNumArgs();
   if (n == 0) {

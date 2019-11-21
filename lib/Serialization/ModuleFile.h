@@ -26,7 +26,7 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/TinyPtrVector.h"
-#include "llvm/Bitcode/BitstreamReader.h"
+#include "llvm/Bitstream/BitstreamReader.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/MemoryBuffer.h"
 
@@ -474,6 +474,15 @@ public:
   /// Emits one last diagnostic, logs the error, and then aborts for the stack
   /// trace.
   LLVM_ATTRIBUTE_NORETURN void fatal(llvm::Error error);
+  void fatalIfNotSuccess(llvm::Error error) {
+    if (error)
+      fatal(std::move(error));
+  }
+  template <typename T> T fatalIfUnexpected(llvm::Expected<T> expected) {
+    if (expected)
+      return std::move(expected.get());
+    fatal(expected.takeError());
+  }
 
   LLVM_ATTRIBUTE_NORETURN void fatal() {
     fatal(llvm::make_error<llvm::StringError>(

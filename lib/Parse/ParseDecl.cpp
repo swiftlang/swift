@@ -804,7 +804,10 @@ Parser::parseImplementsAttribute(SourceLoc AtLoc, SourceLoc Loc) {
                            ProtocolType.get(), MemberName, MemberNameLoc));
 }
 
+<<<<<<< HEAD
 /// SWIFT_ENABLE_TENSORFLOW
+=======
+>>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
 ParserResult<DifferentiableAttr>
 Parser::parseDifferentiableAttribute(SourceLoc atLoc, SourceLoc loc) {
   StringRef AttrName = "differentiable";
@@ -922,6 +925,7 @@ bool Parser::parseDifferentiationParametersClause(
   return false;
 }
 
+<<<<<<< HEAD
 bool Parser::parseTransposingParametersClause(
     SmallVectorImpl<ParsedAutoDiffParameter> &params, StringRef attrName) {
   // Set parse error, skip until ')' and parse it.
@@ -1000,6 +1004,8 @@ bool Parser::parseTransposingParametersClause(
   return false;
 }
 
+=======
+>>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
 bool Parser::parseDifferentiableAttributeArguments(
     bool &linear, SmallVectorImpl<ParsedAutoDiffParameter> &params,
     Optional<DeclNameWithLoc> &jvpSpec, Optional<DeclNameWithLoc> &vjpSpec,
@@ -1025,6 +1031,7 @@ bool Parser::parseDifferentiableAttributeArguments(
       diagnose(Tok, diag::unexpected_separator, ",");
       return true;
     }
+<<<<<<< HEAD
     // Check that token after comma is 'wrt' or a function specifier label.
     if (isIdentifier(Tok, "wrt") || isIdentifier(Tok, "jvp") ||
         isIdentifier(Tok, "vjp")) {
@@ -1032,6 +1039,15 @@ bool Parser::parseDifferentiableAttributeArguments(
     }
     diagnose(Tok, diag::attr_differentiable_expected_label);
     return true;
+=======
+    // Check that token after comma is 'wrt:' or a function specifier label.
+    if (!(isWRTIdentifier(Tok) || isJVPIdentifier(Tok) ||
+          isVJPIdentifier(Tok))) {
+      diagnose(Tok, diag::attr_differentiable_expected_label);
+      return true;
+    }
+    return false;
+>>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
   };
 
   // Store starting parser position.
@@ -1042,7 +1058,11 @@ bool Parser::parseDifferentiableAttributeArguments(
   // Parse optional differentiation parameters.
   // Parse 'linear' label (optional).
   linear = false;
+<<<<<<< HEAD
   if (isIdentifier(Tok, "linear")) {
+=======
+  if (Tok.is(tok::identifier) && Tok.getText() == "linear") {
+>>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
     linear = true;
     consumeToken(tok::identifier);
     // If no trailing comma or 'where' clause, terminate parsing arguments.
@@ -1053,15 +1073,23 @@ bool Parser::parseDifferentiableAttributeArguments(
   }
 
   // If 'withRespectTo' is used, make the user change it to 'wrt'.
+<<<<<<< HEAD
   if (isIdentifier(Tok, "withRespectTo")) {
+=======
+  if (Tok.is(tok::identifier) && Tok.getText() == "withRespectTo") {
+>>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
     SourceRange withRespectToRange(Tok.getLoc(), peekToken().getLoc());
     diagnose(Tok, diag::attr_differentiable_use_wrt_not_withrespectto)
         .highlight(withRespectToRange)
         .fixItReplace(withRespectToRange, "wrt:");
     return errorAndSkipToEnd();
   }
+<<<<<<< HEAD
   // Parse differentiation parameters' clause.
   if (isIdentifier(Tok, "wrt")) {
+=======
+  if (isWRTIdentifier(Tok)) {
+>>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
     if (parseDifferentiationParametersClause(params, AttrName))
       return true;
     // If no trailing comma or 'where' clause, terminate parsing arguments.
@@ -1099,7 +1127,11 @@ bool Parser::parseDifferentiableAttributeArguments(
   bool terminateParsingArgs = false;
 
   // Parse 'jvp: <func_name>' (optional).
+<<<<<<< HEAD
   if (isIdentifier(Tok, "jvp")) {
+=======
+  if (isJVPIdentifier(Tok)) {
+>>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
     SyntaxParsingContext JvpContext(
         SyntaxContext, SyntaxKind::DifferentiableAttributeFuncSpecifier);
     jvpSpec = DeclNameWithLoc();
@@ -1112,7 +1144,11 @@ bool Parser::parseDifferentiableAttributeArguments(
   }
 
   // Parse 'vjp: <func_name>' (optional).
+<<<<<<< HEAD
   if (isIdentifier(Tok, "vjp")) {
+=======
+  if (isVJPIdentifier(Tok)) {
+>>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
     SyntaxParsingContext VjpContext(
         SyntaxContext, SyntaxKind::DifferentiableAttributeFuncSpecifier);
     vjpSpec = DeclNameWithLoc();
@@ -1144,6 +1180,7 @@ bool Parser::parseDifferentiableAttributeArguments(
   return false;
 }
 
+<<<<<<< HEAD
 /// SWIFT_ENABLE_TENSORFLOW
 ParserResult<DifferentiatingAttr>
 Parser::parseDifferentiatingAttribute(SourceLoc atLoc, SourceLoc loc) {
@@ -1349,6 +1386,8 @@ ParserResult<QuotedAttr> Parser::parseQuotedAttribute(SourceLoc atLoc,
     return makeParserError();
   }
 }
+=======
+>>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
 
 void Parser::parseObjCSelector(SmallVector<Identifier, 4> &Names,
                                SmallVector<SourceLoc, 4> &NameLocs,
@@ -2149,7 +2188,10 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
     break;
   }
 
+<<<<<<< HEAD
   // SWIFT_ENABLE_TENSORFLOW
+=======
+>>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
   case DAK_Differentiable: {
     auto Attr = parseDifferentiableAttribute(AtLoc, Loc);
     if (Attr.isNonNull())
@@ -2157,6 +2199,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
     break;
   }
 
+<<<<<<< HEAD
   // SWIFT_ENABLE_TENSORFLOW
   case DAK_Differentiating: {
     auto Attr = parseDifferentiatingAttribute(AtLoc, Loc);
@@ -2173,6 +2216,8 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
     break;
   }
 
+=======
+>>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
   case DAK_ProjectedValueProperty: {
     if (!consumeIf(tok::l_paren)) {
       diagnose(Loc, diag::attr_expected_lparen, AttrName,
@@ -3323,9 +3368,10 @@ void Parser::consumeDecl(ParserPosition BeginParserPosition,
   backtrackToPosition(BeginParserPosition);
   SourceLoc BeginLoc = Tok.getLoc();
 
-  State->delayDecl(PersistentParserState::DelayedDeclKind::Decl, Flags.toRaw(),
-                   CurDeclContext, {BeginLoc, EndLoc},
-                   BeginParserPosition.PreviousLoc);
+  State->setCodeCompletionDelayedDeclState(
+      PersistentParserState::CodeCompletionDelayedDeclKind::Decl,
+      Flags.toRaw(), CurDeclContext, {BeginLoc, EndLoc},
+      BeginParserPosition.PreviousLoc);
 
   while (SourceMgr.isBeforeInBuffer(Tok.getLoc(), CurrentLoc))
     consumeToken();
@@ -3360,6 +3406,7 @@ void Parser::setLocalDiscriminatorToParamList(ParameterList *PL) {
   }
 }
 
+<<<<<<< HEAD
 void Parser::delayParseFromBeginningToHere(ParserPosition BeginParserPosition,
                                            ParseDeclOptions Flags) {
   auto CurLoc = Tok.getLoc();
@@ -3383,6 +3430,8 @@ static void setOriginalFunctionInDifferentiableAttributes(
 }
 // SWIFT_ENABLE_TENSORFLOW END
 
+=======
+>>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
 /// Parse a single syntactic declaration and return a list of decl
 /// ASTs.  This can return multiple results for var decls that bind to multiple
 /// values, structs that define a struct decl and a constructor, etc.
@@ -3752,26 +3801,23 @@ Parser::parseDecl(ParseDeclOptions Flags,
     consumeToken(tok::code_complete);
   }
 
-  if (AttrStatus.hasCodeCompletion()) {
-    if (CodeCompletion) {
+  if (AttrStatus.hasCodeCompletion() || DeclResult.hasCodeCompletion()) {
+    if (isCodeCompletionFirstPass() &&
+        !CurDeclContext->isModuleScopeContext() &&
+        !isa<TopLevelCodeDecl>(CurDeclContext) &&
+        !isa<AbstractClosureExpr>(CurDeclContext)) {
+      // Only consume non-toplevel decls.
+      consumeDecl(BeginParserPosition, Flags, /*IsTopLevel=*/false);
+
+      return makeParserError();
+    }
+    if (AttrStatus.hasCodeCompletion() && CodeCompletion) {
       Optional<DeclKind> DK;
       if (DeclResult.isNonNull())
         DK = DeclResult.get()->getKind();
       CodeCompletion->setAttrTargetDeclKind(DK);
-    } else {
-      delayParseFromBeginningToHere(BeginParserPosition, Flags);
-      return makeParserError();
     }
-  }
-
-  if (DeclResult.hasCodeCompletion() && isCodeCompletionFirstPass() &&
-      !CurDeclContext->isModuleScopeContext() &&
-      !isa<TopLevelCodeDecl>(CurDeclContext) &&
-      !isa<AbstractClosureExpr>(CurDeclContext)) {
-    // Only consume non-toplevel decls.
-    consumeDecl(BeginParserPosition, Flags, /*IsTopLevel=*/false);
-
-    return makeParserError();
+    DeclResult.setHasCodeCompletion();
   }
 
   if (auto SF = CurDeclContext->getParentSourceFile()) {
@@ -3958,48 +4004,6 @@ std::vector<Decl *> Parser::parseDeclListDelayed(IterableDeclContext *IDC) {
   bool hadError = false;
   ParseDeclOptions Options = getMemberParseDeclOptions(IDC);
   return parseDeclList(LBLoc, RBLoc, Id, Options, IDC, hadError);
-}
-
-void Parser::parseDeclDelayed() {
-  auto DelayedState = State->takeDelayedDeclState();
-  assert(DelayedState.get() && "should have delayed state");
-
-  auto BeginParserPosition = getParserPosition(DelayedState->BodyPos);
-  auto EndLexerState = L->getStateForEndOfTokenLoc(DelayedState->BodyEnd);
-
-  // ParserPositionRAII needs a primed parser to restore to.
-  if (Tok.is(tok::NUM_TOKENS))
-    consumeTokenWithoutFeedingReceiver();
-
-  // Ensure that we restore the parser state at exit.
-  ParserPositionRAII PPR(*this);
-
-  // Create a lexer that cannot go past the end state.
-  Lexer LocalLex(*L, BeginParserPosition.LS, EndLexerState);
-
-  // Temporarily swap out the parser's current lexer with our new one.
-  llvm::SaveAndRestore<Lexer *> T(L, &LocalLex);
-
-  // Rewind to the beginning of the decl.
-  restoreParserPosition(BeginParserPosition);
-
-  // Re-enter the lexical scope.
-  Scope S(this, DelayedState->takeScope());
-  ContextChange CC(*this, DelayedState->ParentContext);
-
-  parseDecl(ParseDeclOptions(DelayedState->Flags),
-            /*IsAtStartOfLineOrPreviousHadSemi=*/true,
-            [&](Decl *D) {
-    if (auto *parent = DelayedState->ParentContext) {
-      if (auto *NTD = dyn_cast<NominalTypeDecl>(parent)) {
-        NTD->addMember(D);
-      } else if (auto *ED = dyn_cast<ExtensionDecl>(parent)) {
-        ED->addMember(D);
-      } else if (auto *SF = dyn_cast<SourceFile>(parent)) {
-        SF->Decls.push_back(D);
-      }
-    }
-  });
 }
 
 /// Parse an 'import' declaration, doing no token skipping on error.
@@ -6036,9 +6040,9 @@ void Parser::consumeAbstractFunctionBody(AbstractFunctionDecl *AFD,
 
   if (isCodeCompletionFirstPass()) {
     if (SourceMgr.rangeContainsCodeCompletionLoc(BodyRange)) {
-      State->delayDecl(PersistentParserState::DelayedDeclKind::FunctionBody,
-                       PD_Default, AFD, BodyRange,
-                       BeginParserPosition.PreviousLoc);
+      State->setCodeCompletionDelayedDeclState(
+          PersistentParserState::CodeCompletionDelayedDeclKind::FunctionBody,
+          PD_Default, AFD, BodyRange, BeginParserPosition.PreviousLoc);
     } else {
       AFD->setBodySkipped(BodyRange);
     }
@@ -6351,20 +6355,6 @@ BraceStmt *Parser::parseAbstractFunctionBodyDelayed(AbstractFunctionDecl *AFD) {
   setLocalDiscriminatorToParamList(AFD->getParameters());
 
   return parseBraceItemList(diag::func_decl_without_brace).getPtrOrNull();
-}
-
-/// Parse a delayed function body from the 'PersistentParserState'.
-void Parser::parseAbstractFunctionBodyDelayed() {
-  auto DelayedState = State->takeDelayedDeclState();
-  assert(DelayedState.get() && "should have delayed state");
-  auto CD = DelayedState->ParentContext->getAsDecl();
-  auto AFD = cast<AbstractFunctionDecl>(CD);
-
-  // Eagarly parse local decls or nested function bodies inside the body.
-  llvm::SaveAndRestore<bool> DisableDelayedBody(DelayBodyParsing, false);
-
-  auto body = parseAbstractFunctionBodyDelayed(AFD);
-  AFD->setBodyParsed(body);
 }
 
 /// Parse a 'enum' declaration, returning true (and doing no token
@@ -7385,7 +7375,7 @@ Parser::parseDeclOperatorImpl(SourceLoc OperatorLoc, Identifier Name,
       return makeParserCodeCompletionResult<OperatorDecl>();
     }
 
-    if (Context.LangOpts.EnableOperatorDesignatedTypes) {
+    if (Context.TypeCheckerOpts.EnableOperatorDesignatedTypes) {
       if (Tok.is(tok::identifier)) {
         SyntaxParsingContext GroupCtxt(SyntaxContext,
                                        SyntaxKind::IdentifierList);

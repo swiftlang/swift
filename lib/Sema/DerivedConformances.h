@@ -46,7 +46,10 @@ public:
   DeclContext *getConformanceContext() const;
 
   /// Add \c children as members of the context that declares the conformance.
-  void addMembersToConformanceContext(ArrayRef<Decl *> children);
+  ///
+  /// \returns True if any of the added members were found to be invalid after type
+  /// checking.
+  bool addMembersToConformanceContext(ArrayRef<Decl *> children);
 
   /// Get the declared type of the protocol that this is conformance is for.
   Type getProtocolType() const;
@@ -316,6 +319,7 @@ public:
   /// Add a getter to a derived property.  The property becomes read-only.
   static AccessorDecl *
   addGetterToReadOnlyDerivedProperty(VarDecl *property,
+<<<<<<< HEAD
                                      Type propertyContextType);
 
   // SWIFT_ENABLE_TENSORFLOW
@@ -329,6 +333,9 @@ public:
   /// The getter will not be added to the property yet.
   static AccessorDecl *declareDerivedPropertyGetter(VarDecl *property,
                                                     Type propertyContextType);
+=======
+                                            Type propertyContextType);
+>>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
 
   /// SWIFT_ENABLE_TENSORFLOW
   /// Declare a setter for a derived property.

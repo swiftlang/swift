@@ -374,7 +374,8 @@ void MemoryLocations::initFieldsCounter(Location &loc) {
     }
     SILModule &module = function->getModule();
     for (VarDecl *field : decl->getStoredProperties()) {
-      loc.updateFieldCounters(ty.getFieldType(field, module), +1);
+      loc.updateFieldCounters(
+          ty.getFieldType(field, module, TypeExpansionContext(*function)), +1);
     }
     return;
   }

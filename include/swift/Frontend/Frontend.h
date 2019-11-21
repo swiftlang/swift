@@ -83,6 +83,7 @@ struct ModuleBuffers {
 /// which manages the actual compiler execution.
 class CompilerInvocation {
   LangOptions LangOpts;
+  TypeCheckerOptions TypeCheckerOpts;
   FrontendOptions FrontendOpts;
   ClangImporterOptions ClangImporterOpts;
   SearchPathOptions SearchPathOpts;
@@ -202,6 +203,12 @@ public:
 
   void setRuntimeResourcePath(StringRef Path);
 
+  /// Computes the runtime resource path relative to the given Swift
+  /// executable.
+  static void computeRuntimeResourcePathFromExecutablePath(
+      StringRef mainExecutablePath,
+      llvm::SmallString<128> &runtimeResourcePath);
+
   void setSDKPath(const std::string &Path);
 
   StringRef getSDKPath() const {
@@ -213,6 +220,11 @@ public:
   }
   const LangOptions &getLangOptions() const {
     return LangOpts;
+  }
+
+  TypeCheckerOptions &getTypeCheckerOptions() { return TypeCheckerOpts; }
+  const TypeCheckerOptions &getTypeCheckerOptions() const {
+    return TypeCheckerOpts;
   }
 
   FrontendOptions &getFrontendOptions() { return FrontendOpts; }
@@ -648,14 +660,11 @@ private:
   bool
   parsePartialModulesAndLibraryFiles(const ImplicitImports &implicitImports);
 
-  OptionSet<TypeCheckingFlags> computeTypeCheckingOptions();
-
   void forEachFileToTypeCheck(llvm::function_ref<void(SourceFile &)> fn);
 
-  void parseAndTypeCheckMainFileUpTo(SourceFile::ASTStage_t LimitStage,
-                                     OptionSet<TypeCheckingFlags> TypeCheckOptions);
+  void parseAndTypeCheckMainFileUpTo(SourceFile::ASTStage_t LimitStage);
 
-  void finishTypeChecking(OptionSet<TypeCheckingFlags> TypeCheckOptions);
+  void finishTypeChecking();
 
 public:
   const PrimarySpecificPaths &

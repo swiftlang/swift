@@ -15,11 +15,13 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTVisitor.h"
+#include "swift/AST/AutoDiff.h"
 #include "swift/AST/DiagnosticsCommon.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/FileSystem.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/IndexSubset.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/LinkLibrary.h"
@@ -44,8 +46,8 @@
 #include "swift/Strings.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringExtras.h"
-#include "llvm/Bitcode/BitstreamWriter.h"
 #include "llvm/Bitcode/RecordLayout.h"
+#include "llvm/Bitstream/BitstreamWriter.h"
 #include "llvm/Config/config.h"
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/Chrono.h"
@@ -2304,6 +2306,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       break;
     }
 
+<<<<<<< HEAD
     // SWIFT_ENABLE_TENSORFLOW
     case DAK_Differentiable: {
       auto abbrCode = S.DeclTypeAbbrCodes[DifferentiableDeclAttrLayout::Code];
@@ -2311,6 +2314,11 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       assert(attr->getOriginalDeclaration() &&
              "`@differentiable` attribute should have original declaration set "
              "during construction or parsing");
+=======
+    case DAK_Differentiable: {
+      auto abbrCode = S.DeclTypeAbbrCodes[DifferentiableDeclAttrLayout::Code];
+      auto *attr = cast<DifferentiableAttr>(DA);
+>>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
 
       IdentifierID jvpName = 0;
       DeclID jvpRef = 0;
@@ -2327,6 +2335,14 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
         vjpRef = S.addDeclRef(vjpFunction);
 
       auto paramIndices = attr->getParameterIndices();
+<<<<<<< HEAD
+=======
+      // TODO(TF-837): Implement `@differentiable` attribute serialization.
+      // Blocked by TF-828: `@differentiable` attribute type-checking, which
+      // resolves parameter indices (`IndexSubset *`).
+      if (!paramIndices)
+        return;
+>>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
       assert(paramIndices && "Checked parameter indices must be resolved");
       SmallVector<bool, 4> indices;
       for (unsigned i : range(paramIndices->getCapacity()))
@@ -2339,6 +2355,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
           indices);
       return;
     }
+<<<<<<< HEAD
 
     case DAK_Quoted: {
       auto abbrCode = S.DeclTypeAbbrCodes[QuotedDeclAttrLayout::Code];
@@ -2349,6 +2366,8 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
                                        S.addDeclRef(attr->getQuoteDecl()));
       return;
     }
+=======
+>>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
     }
   }
 
@@ -3650,6 +3669,18 @@ static uint8_t getRawStableFunctionTypeRepresentation(
   llvm_unreachable("bad calling convention");
 }
 
+/// Translate from the AST differentiability kind enum to the Serialization enum
+/// values, which are guaranteed to be stable.
+static uint8_t getRawStableDifferentiabilityKind(
+    swift::DifferentiabilityKind diffKind) {
+  switch (diffKind) {
+  SIMPLE_CASE(DifferentiabilityKind, NonDifferentiable)
+  SIMPLE_CASE(DifferentiabilityKind, Normal)
+  SIMPLE_CASE(DifferentiabilityKind, Linear)
+  }
+  llvm_unreachable("bad differentiability kind");
+}
+
 /// Translate from the AST function representation enum to the Serialization enum
 /// values, which are guaranteed to be stable.
 static uint8_t getRawStableSILFunctionTypeRepresentation(
@@ -3998,15 +4029,19 @@ public:
 
   void visitFunctionType(const FunctionType *fnTy) {
     using namespace decls_block;
-
     unsigned abbrCode = S.DeclTypeAbbrCodes[FunctionTypeLayout::Code];
     FunctionTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
         S.addTypeRef(fnTy->getResult()),
         getRawStableFunctionTypeRepresentation(fnTy->getRepresentation()),
         fnTy->isNoEscape(),
+<<<<<<< HEAD
         // SWIFT_ENABLE_TENSORFLOW
         fnTy->throws(),
         (uint8_t)fnTy->getDifferentiabilityKind());
+=======
+        fnTy->throws(),
+        getRawStableDifferentiabilityKind(fnTy->getDifferentiabilityKind()));
+>>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
 
     serializeFunctionTypeParams(fnTy);
   }
@@ -4014,14 +4049,18 @@ public:
   void visitGenericFunctionType(const GenericFunctionType *fnTy) {
     using namespace decls_block;
     assert(!fnTy->isNoEscape());
-
     auto genericSig = fnTy->getGenericSignature();
     unsigned abbrCode = S.DeclTypeAbbrCodes[GenericFunctionTypeLayout::Code];
     GenericFunctionTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
         S.addTypeRef(fnTy->getResult()),
         getRawStableFunctionTypeRepresentation(fnTy->getRepresentation()),
+<<<<<<< HEAD
         // SWIFT_ENABLE_TENSORFLOW
         fnTy->throws(), fnTy->isDifferentiable(),
+=======
+        fnTy->throws(),
+        getRawStableDifferentiabilityKind(fnTy->getDifferentiabilityKind()),
+>>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
         S.addGenericSignatureRef(genericSig));
 
     serializeFunctionTypeParams(fnTy);
@@ -4088,15 +4127,24 @@ public:
     auto stableCalleeConvention =
       getRawStableParameterConvention(fnTy->getCalleeConvention());
 
+    auto stableDiffKind =
+        getRawStableDifferentiabilityKind(fnTy->getDifferentiabilityKind());
+
     unsigned abbrCode = S.DeclTypeAbbrCodes[SILFunctionTypeLayout::Code];
     SILFunctionTypeLayout::emitRecord(
         S.Out, S.ScratchRecord, abbrCode,
         stableCoroutineKind, stableCalleeConvention,
         stableRepresentation, fnTy->isPseudogeneric(), fnTy->isNoEscape(),
+<<<<<<< HEAD
         // SWIFT_ENABLE_TENSORFLOW
         stableDifferentiabilityKind, fnTy->hasErrorResult(),
         fnTy->getParameters().size(), fnTy->getNumYields(),
         fnTy->getNumResults(), S.addGenericSignatureRef(sig), variableData);
+=======
+        stableDiffKind, fnTy->hasErrorResult(), fnTy->getParameters().size(),
+        fnTy->getNumYields(), fnTy->getNumResults(),
+        S.addGenericSignatureRef(sig), variableData);
+>>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
 
     if (auto conformance = fnTy->getWitnessMethodConformanceOrInvalid())
       S.writeConformance(conformance, S.DeclTypeAbbrCodes);
@@ -4878,7 +4926,8 @@ void swift::serializeToBuffers(
 
   assert(!StringRef::withNullAsEmpty(options.OutputPath).empty());
   {
-    SharedTimer timer("Serialization, swiftmodule, to buffer");
+    FrontendStatsTracer tracer(getContext(DC).Stats,
+                               "Serialization, swiftmodule, to buffer");
     llvm::SmallString<1024> buf;
     llvm::raw_svector_ostream stream(buf);
     Serializer::writeToStream(stream, DC, M, options);
@@ -4896,7 +4945,8 @@ void swift::serializeToBuffers(
   }
 
   if (!StringRef::withNullAsEmpty(options.DocOutputPath).empty()) {
-    SharedTimer timer("Serialization, swiftdoc, to buffer");
+    FrontendStatsTracer tracer(getContext(DC).Stats,
+                               "Serialization, swiftdoc, to buffer");
     llvm::SmallString<1024> buf;
     llvm::raw_svector_ostream stream(buf);
     writeDocToStream(stream, DC, options.GroupInfoPath);
@@ -4912,7 +4962,8 @@ void swift::serializeToBuffers(
   }
 
   if (!StringRef::withNullAsEmpty(options.SourceInfoOutputPath).empty()) {
-    SharedTimer timer("Serialization, swiftsourceinfo, to buffer");
+    FrontendStatsTracer tracer(getContext(DC).Stats,
+                               "Serialization, swiftsourceinfo, to buffer");
     llvm::SmallString<1024> buf;
     llvm::raw_svector_ostream stream(buf);
     writeSourceInfoToStream(stream, DC);
@@ -4967,7 +5018,8 @@ void swift::serialize(ModuleOrSourceFile DC,
   bool hadError = withOutputFile(getContext(DC).Diags,
                                  options.OutputPath,
                                  [&](raw_ostream &out) {
-    SharedTimer timer("Serialization, swiftmodule");
+    FrontendStatsTracer tracer(getContext(DC).Stats,
+                               "Serialization, swiftmodule");
     Serializer::writeToStream(out, DC, M, options);
     return false;
   });
@@ -4978,7 +5030,8 @@ void swift::serialize(ModuleOrSourceFile DC,
     (void)withOutputFile(getContext(DC).Diags,
                          options.DocOutputPath,
                          [&](raw_ostream &out) {
-      SharedTimer timer("Serialization, swiftdoc");
+      FrontendStatsTracer tracer(getContext(DC).Stats,
+                                 "Serialization, swiftdoc");
       writeDocToStream(out, DC, options.GroupInfoPath);
       return false;
     });
@@ -4988,7 +5041,8 @@ void swift::serialize(ModuleOrSourceFile DC,
     (void)withOutputFile(getContext(DC).Diags,
                          options.SourceInfoOutputPath,
                          [&](raw_ostream &out) {
-      SharedTimer timer("Serialization, swiftsourceinfo");
+      FrontendStatsTracer tracer(getContext(DC).Stats,
+                                 "Serialization, swiftsourceinfo");
       writeSourceInfoToStream(out, DC);
       return false;
     });

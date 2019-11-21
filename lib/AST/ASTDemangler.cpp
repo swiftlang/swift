@@ -495,11 +495,17 @@ Type ASTBuilder::createImplFunctionType(
     break;
   }
 
+<<<<<<< HEAD
   auto einfo = SILFunctionType::ExtInfo(representation,
                                         flags.isPseudogeneric(),
                                         !flags.isEscaping(),
                                         DifferentiabilityKind::
                                             NonDifferentiable);
+=======
+  auto einfo = SILFunctionType::ExtInfo(
+      representation, flags.isPseudogeneric(), !flags.isEscaping(),
+      DifferentiabilityKind::NonDifferentiable);
+>>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
 
   llvm::SmallVector<SILParameterInfo, 8> funcParams;
   llvm::SmallVector<SILYieldInfo, 8> funcYields;

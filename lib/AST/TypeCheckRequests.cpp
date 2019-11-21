@@ -13,6 +13,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsCommon.h"
 #include "swift/AST/DiagnosticsSema.h"
+#include "swift/AST/Initializer.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/PropertyWrappers.h"
@@ -1160,4 +1161,89 @@ void swift::simple_display(llvm::raw_ostream &out,
     out << "error";
     break;
   }
+}
+
+//----------------------------------------------------------------------------//
+// HasCircularInheritanceRequest computation.
+//----------------------------------------------------------------------------//
+
+void HasCircularInheritanceRequest::diagnoseCycle(
+    DiagnosticEngine &diags) const {
+  auto *decl = std::get<0>(getStorage());
+  diags.diagnose(decl, diag::circular_class_inheritance, decl->getName());
+}
+
+void HasCircularInheritanceRequest::noteCycleStep(
+    DiagnosticEngine &diags) const {
+  auto *decl = std::get<0>(getStorage());
+  diags.diagnose(decl, diag::kind_declname_declared_here,
+                 decl->getDescriptiveKind(), decl->getName());
+}
+
+//----------------------------------------------------------------------------//
+// HasCircularInheritedProtocolsRequest computation.
+//----------------------------------------------------------------------------//
+
+void HasCircularInheritedProtocolsRequest::diagnoseCycle(
+    DiagnosticEngine &diags) const {
+  auto *decl = std::get<0>(getStorage());
+  diags.diagnose(decl, diag::circular_protocol_def, decl->getName());
+}
+
+void HasCircularInheritedProtocolsRequest::noteCycleStep(
+    DiagnosticEngine &diags) const {
+  auto *decl = std::get<0>(getStorage());
+  diags.diagnose(decl, diag::kind_declname_declared_here,
+                 decl->getDescriptiveKind(), decl->getName());
+}
+
+//----------------------------------------------------------------------------//
+// HasCircularRawValueRequest computation.
+//----------------------------------------------------------------------------//
+
+void HasCircularRawValueRequest::diagnoseCycle(DiagnosticEngine &diags) const {
+  auto *decl = std::get<0>(getStorage());
+  diags.diagnose(decl, diag::circular_enum_inheritance, decl->getName());
+}
+
+void HasCircularRawValueRequest::noteCycleStep(DiagnosticEngine &diags) const {
+  auto *decl = std::get<0>(getStorage());
+  diags.diagnose(decl, diag::kind_declname_declared_here,
+                 decl->getDescriptiveKind(), decl->getName());
+}
+
+//----------------------------------------------------------------------------//
+// DefaultArgumentInitContextRequest computation.
+//----------------------------------------------------------------------------//
+
+Optional<Initializer *>
+DefaultArgumentInitContextRequest::getCachedResult() const {
+  auto *param = std::get<0>(getStorage());
+  return param->getCachedDefaultArgumentInitContext();
+}
+
+void DefaultArgumentInitContextRequest::cacheResult(Initializer *init) const {
+  auto *param = std::get<0>(getStorage());
+  param->setDefaultArgumentInitContext(init);
+}
+
+//----------------------------------------------------------------------------//
+// DefaultArgumentExprRequest computation.
+//----------------------------------------------------------------------------//
+
+Optional<Expr *> DefaultArgumentExprRequest::getCachedResult() const {
+  auto *param = std::get<0>(getStorage());
+  auto *defaultInfo = param->DefaultValueAndFlags.getPointer();
+  if (!defaultInfo)
+    return None;
+
+  if (!defaultInfo->InitContextAndIsTypeChecked.getInt())
+    return None;
+
+  return defaultInfo->DefaultArg.get<Expr *>();
+}
+
+void DefaultArgumentExprRequest::cacheResult(Expr *expr) const {
+  auto *param = std::get<0>(getStorage());
+  param->setDefaultExpr(expr, /*isTypeChecked*/ true);
 }

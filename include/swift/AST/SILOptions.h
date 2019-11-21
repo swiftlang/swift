@@ -56,6 +56,10 @@ public:
   /// Controls whether the SIL ARC optimizations are run.
   bool EnableARCOptimizations = true;
 
+  /// Controls whether specific OSSA optimizations are run. For benchmarking
+  /// purposes.
+  bool EnableOSSAOptimizations = true;
+
   /// Should we run any SIL performance optimizations
   ///
   /// Useful when you want to enable -O LLVM opts but not -O SIL opts.
@@ -147,7 +151,7 @@ public:
 
   /// Should the default pass pipelines strip ownership during the diagnostic
   /// pipeline or after serialization.
-  bool StripOwnershipAfterSerialization = false;
+  bool StripOwnershipAfterSerialization = true;
 
   /// The name of the file to which the backend should save YAML optimization
   /// records.

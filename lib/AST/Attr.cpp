@@ -20,14 +20,21 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/GenericEnvironment.h"
+<<<<<<< HEAD
 // SWIFT_ENABLE_TENSORFLOW
 #include "swift/AST/GenericSignatureBuilder.h"
+=======
+#include "swift/AST/IndexSubset.h"
+>>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
 #include "swift/AST/Module.h"
 #include "swift/AST/TypeRepr.h"
 // SWIFT_ENABLE_TENSORFLOW
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
+<<<<<<< HEAD
 // SWIFT_ENABLE_TENSORFLOW
+=======
+>>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
 #include "swift/AST/ParameterList.h"
 #include "swift/Basic/Defer.h"
 #include "llvm/ADT/SmallString.h"
@@ -357,6 +364,7 @@ static void printShortFormAvailable(ArrayRef<const DeclAttribute *> Attrs,
   Printer.printNewline();
 }
 
+<<<<<<< HEAD
 // Returns the differentiation parameters clause string for the given function,
 // parameter indices, and parsed parameters. Use the parameter indices if
 // specified; otherwise, use the parsed parameters.
@@ -371,6 +379,18 @@ static std::string getDifferentiationParametersClauseString(
   // Use the parameter indices, if specified.
   if (paramIndices) {
     auto parameters = paramIndices->getBitVector();
+=======
+static std::string getDifferentiationParametersClauseString(
+    const AbstractFunctionDecl *function, IndexSubset *indices,
+    ArrayRef<ParsedAutoDiffParameter> parsedParams) {
+  bool isInstanceMethod = function && function->isInstanceMember();
+  std::string result;
+  llvm::raw_string_ostream printer(result);
+
+  // Use parameter indices from `IndexSubset`, if specified.
+  if (indices) {
+    auto parameters = indices->getBitVector();
+>>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
     auto parameterCount = parameters.count();
     printer << "wrt: ";
     if (parameterCount > 1)
@@ -405,8 +425,12 @@ static std::string getDifferentiationParametersClauseString(
       case ParsedAutoDiffParameter::Kind::Ordered:
         auto *paramList = function->getParameters();
         assert(param.getIndex() <= paramList->size() &&
+<<<<<<< HEAD
                "'wrt:' parameter index should be less than the number "
                "of parameters");
+=======
+               "wrt parameter is out of range");
+>>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
         auto *funcParam = paramList->get(param.getIndex());
         printer << funcParam->getNameStr();
         break;
@@ -418,6 +442,7 @@ static std::string getDifferentiationParametersClauseString(
   return printer.str();
 }
 
+<<<<<<< HEAD
 // SWIFT_ENABLE_TENSORFLOW
 // Returns the transposed parameters clause string for the given function,
 // parameter indices, and parsed parameters. Use the parameter indices if
@@ -491,16 +516,30 @@ static void printDifferentiableAttrArguments(
     const Decl *D, bool omitWrtClause = false,
     bool omitDerivativeFunctions = false) {
   assert(D);
+=======
+// Print the arguments of the given `@differentiable` attribute.
+static void printDifferentiableAttrArguments(
+    const DifferentiableAttr *attr, ASTPrinter &printer, PrintOptions Options,
+    const Decl *D, bool omitWrtClause = false,
+    bool omitAssociatedFunctions = false) {
+>>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
   // Create a temporary string for the attribute argument text.
   std::string attrArgText;
   llvm::raw_string_ostream stream(attrArgText);
 
   // Get original function.
+<<<<<<< HEAD
   auto *original = dyn_cast<AbstractFunctionDecl>(D);
   // Handle stored/computed properties and subscript methods.
   if (auto *asd = dyn_cast<AbstractStorageDecl>(D))
     original = asd->getAccessor(AccessorKind::Get);
   assert(original && "Must resolve original declaration");
+=======
+  auto *original = dyn_cast_or_null<AbstractFunctionDecl>(D);
+  // Handle stored/computed properties and subscript methods.
+  if (auto *asd = dyn_cast_or_null<AbstractStorageDecl>(D))
+    original = asd->getAccessor(AccessorKind::Get);
+>>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
 
   // Print comma if not leading clause.
   bool isLeadingClause = true;
@@ -511,14 +550,22 @@ static void printDifferentiableAttrArguments(
     }
     stream << ", ";
   };
+<<<<<<< HEAD
   
+=======
+
+>>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
   // Print if the function is marked as linear.
   if (attr->isLinear()) {
     isLeadingClause = false;
     stream << "linear";
   }
 
+<<<<<<< HEAD
   // Print differentiation parameters clause, unless it is to be omitted.
+=======
+  // Print differentiation parameters, unless they are to be omitted.
+>>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
   if (!omitWrtClause) {
     auto diffParamsString = getDifferentiationParametersClauseString(
         original, attr->getParameterIndices(), attr->getParsedParameters());
@@ -531,8 +578,13 @@ static void printDifferentiableAttrArguments(
       stream << diffParamsString;
     }
   }
+<<<<<<< HEAD
   // Print derivative function names, unless they are to be omitted.
   if (!omitDerivativeFunctions) {
+=======
+  // Print associated function names, unless they are to be omitted.
+  if (!omitAssociatedFunctions) {
+>>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
     // Print jvp function name, if specified.
     if (auto jvp = attr->getJVP()) {
       printCommaIfNecessary();
@@ -550,6 +602,7 @@ static void printDifferentiableAttrArguments(
   ArrayRef<Requirement> derivativeRequirements;
   if (auto derivativeGenSig = attr->getDerivativeGenericSignature())
     derivativeRequirements = derivativeGenSig->getRequirements();
+<<<<<<< HEAD
   llvm::SmallVector<Requirement, 8> requirementsToPrint;
   std::copy_if(derivativeRequirements.begin(), derivativeRequirements.end(),
                std::back_inserter(requirementsToPrint),
@@ -560,6 +613,16 @@ static void printDifferentiableAttrArguments(
                  return true;
                });
   if (!requirementsToPrint.empty()) {
+=======
+  auto requirementsToPrint =
+    llvm::make_filter_range(derivativeRequirements, [&](Requirement req) {
+        if (const auto &originalGenSig = original->getGenericSignature())
+          if (originalGenSig->isRequirementSatisfied(req))
+            return false;
+        return true;
+      });
+  if (!llvm::empty(requirementsToPrint)) {
+>>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
     if (!isLeadingClause)
       stream << ' ';
     stream << "where ";
@@ -576,7 +639,11 @@ static void printDifferentiableAttrArguments(
       };
     }
     interleave(requirementsToPrint, [&](Requirement req) {
+<<<<<<< HEAD
       if (auto originalGenSig = original->getGenericSignature())
+=======
+      if (const auto &originalGenSig = original->getGenericSignature())
+>>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
         if (originalGenSig->isRequirementSatisfied(req))
           return;
       auto FirstTy = getInterfaceType(req.getFirstType());
@@ -975,6 +1042,13 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     Printer << ")";
     break;
 
+  case DAK_Differentiable: {
+    Printer.printAttrName("@differentiable");
+    auto *attr = cast<DifferentiableAttr>(this);
+    printDifferentiableAttrArguments(attr, Printer, Options, D);
+    break;
+  }
+
   case DAK_Count:
     llvm_unreachable("exceed declaration attribute kinds");
 
@@ -1105,6 +1179,7 @@ StringRef DeclAttribute::getAttrName() const {
     return "<<custom>>";
   case DAK_ProjectedValueProperty:
     return "_projectedValueProperty";
+<<<<<<< HEAD
   // SWIFT_ENABLE_TENSORFLOW
   case DAK_Differentiable:
     return "differentiable";
@@ -1114,6 +1189,10 @@ StringRef DeclAttribute::getAttrName() const {
     return "transposing";
   case DAK_Quoted:
     return "quoted";
+=======
+  case DAK_Differentiable:
+    return "differentiable";
+>>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
   }
   llvm_unreachable("bad DeclAttrKind");
 }
@@ -1449,8 +1528,11 @@ SpecializeAttr *SpecializeAttr::create(ASTContext &Ctx, SourceLoc atLoc,
                                   specializedSignature);
 }
 
+<<<<<<< HEAD
 
 // SWIFT_ENABLE_TENSORFLOW
+=======
+>>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
 DifferentiableAttr::DifferentiableAttr(ASTContext &context, bool implicit,
                                        SourceLoc atLoc, SourceRange baseRange,
                                        bool linear,
@@ -1459,23 +1541,40 @@ DifferentiableAttr::DifferentiableAttr(ASTContext &context, bool implicit,
                                        Optional<DeclNameWithLoc> vjp,
                                        TrailingWhereClause *clause)
   : DeclAttribute(DAK_Differentiable, atLoc, baseRange, implicit),
+<<<<<<< HEAD
     Linear(linear), NumParsedParameters(params.size()), JVP(std::move(jvp)),
+=======
+    linear(linear), NumParsedParameters(params.size()), JVP(std::move(jvp)),
+>>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
     VJP(std::move(vjp)), WhereClause(clause) {
   std::copy(params.begin(), params.end(),
             getTrailingObjects<ParsedAutoDiffParameter>());
 }
 
+<<<<<<< HEAD
 DifferentiableAttr::DifferentiableAttr(Decl *original, bool implicit,
                                        SourceLoc atLoc, SourceRange baseRange,
                                        bool linear, IndexSubset *indices,
+=======
+DifferentiableAttr::DifferentiableAttr(ASTContext &context, bool implicit,
+                                       SourceLoc atLoc, SourceRange baseRange,
+                                       bool linear,
+                                       IndexSubset *indices,
+>>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
                                        Optional<DeclNameWithLoc> jvp,
                                        Optional<DeclNameWithLoc> vjp,
                                        GenericSignature derivativeGenSig)
     : DeclAttribute(DAK_Differentiable, atLoc, baseRange, implicit),
+<<<<<<< HEAD
       Linear(linear), JVP(std::move(jvp)), VJP(std::move(vjp)) {
   setOriginalDeclaration(original);
   setParameterIndices(indices);
   setDerivativeGenericSignature(derivativeGenSig);
+=======
+      linear(linear), JVP(std::move(jvp)), VJP(std::move(vjp)),
+      ParameterIndices(indices) {
+  setDerivativeGenericSignature(context, derivativeGenSig);
+>>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
 }
 
 DifferentiableAttr *
@@ -1494,6 +1593,7 @@ DifferentiableAttr::create(ASTContext &context, bool implicit,
 }
 
 DifferentiableAttr *
+<<<<<<< HEAD
 DifferentiableAttr::create(Decl *original, bool implicit, SourceLoc atLoc,
                            SourceRange baseRange, bool linear,
                            IndexSubset *indices, Optional<DeclNameWithLoc> jvp,
@@ -1503,10 +1603,22 @@ DifferentiableAttr::create(Decl *original, bool implicit, SourceLoc atLoc,
   void *mem = ctx.Allocate(sizeof(DifferentiableAttr),
                            alignof(DifferentiableAttr));
   return new (mem) DifferentiableAttr(original, implicit, atLoc, baseRange,
+=======
+DifferentiableAttr::create(ASTContext &context, bool implicit,
+                           SourceLoc atLoc, SourceRange baseRange,
+                           bool linear, IndexSubset *indices,
+                           Optional<DeclNameWithLoc> jvp,
+                           Optional<DeclNameWithLoc> vjp,
+                           GenericSignature derivativeGenSig) {
+  void *mem = context.Allocate(sizeof(DifferentiableAttr),
+                               alignof(DifferentiableAttr));
+  return new (mem) DifferentiableAttr(context, implicit, atLoc, baseRange,
+>>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
                                       linear, indices, std::move(jvp),
                                       std::move(vjp), derivativeGenSig);
 }
 
+<<<<<<< HEAD
 void DifferentiableAttr::setOriginalDeclaration(Decl *decl) {
   assert(decl && "Original declaration must be non-null");
   assert(!OriginalDeclaration &&
@@ -1539,6 +1651,8 @@ void DifferentiableAttr::setParameterIndices(IndexSubset *paramIndices) {
       std::move(paramIndices));
 }
 
+=======
+>>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
 void DifferentiableAttr::setJVPFunction(FuncDecl *decl) {
   JVPFunction = decl;
   if (decl && !JVP)
@@ -1561,6 +1675,7 @@ GenericEnvironment *DifferentiableAttr::getDerivativeGenericEnvironment(
 
 void DifferentiableAttr::print(llvm::raw_ostream &OS, const Decl *D,
                                bool omitWrtClause,
+<<<<<<< HEAD
                                bool omitDerivativeFunctions) const {
   StreamPrinter P(OS);
   P << "@" << getAttrName();
@@ -1648,6 +1763,13 @@ TransposingAttr::create(ASTContext &context, bool implicit, SourceLoc atLoc,
       context.Allocate(sizeof(TransposingAttr), alignof(TransposingAttr));
   return new (mem) TransposingAttr(context, implicit, atLoc, baseRange,
                                    baseType, std::move(original), indices);
+=======
+                               bool omitAssociatedFunctions) const {
+  StreamPrinter P(OS);
+  P << "@" << getAttrName();
+  printDifferentiableAttrArguments(this, P, PrintOptions(), D, omitWrtClause,
+                                   omitAssociatedFunctions);
+>>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
 }
 
 ImplementsAttr::ImplementsAttr(SourceLoc atLoc, SourceRange range,

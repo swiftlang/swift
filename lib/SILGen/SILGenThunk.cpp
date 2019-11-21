@@ -191,7 +191,8 @@ getNextUncurryLevelRef(SILGenFunction &SGF, SILLocation loc, SILDeclRef thunk,
                                thunk.autoDiffDerivativeFunctionIdentifier);
   assert(!next.isCurried);
 
-  auto constantInfo = SGF.SGM.Types.getConstantInfo(next);
+  auto constantInfo =
+      SGF.SGM.Types.getConstantInfo(SGF.getTypeExpansionContext(), next);
 
   // If the function is natively foreign, reference its foreign entry point.
   if (requiresForeignToNativeThunk(vd))
@@ -212,7 +213,8 @@ getNextUncurryLevelRef(SILGenFunction &SGF, SILLocation loc, SILDeclRef thunk,
                 next};
       }
 
-      auto methodTy = SGF.SGM.Types.getConstantOverrideType(next);
+      auto methodTy = SGF.SGM.Types.getConstantOverrideType(
+          SGF.getTypeExpansionContext(), next);
       SILValue result =
           SGF.emitClassMethodRef(loc, selfArg.getValue(), next, methodTy);
       return {ManagedValue::forUnmanaged(result),
@@ -252,7 +254,7 @@ void SILGenFunction::emitCurryThunk(SILDeclRef thunk) {
   SILLocation loc(vd);
   Scope S(*this, vd);
 
-  auto thunkInfo = SGM.Types.getConstantInfo(thunk);
+  auto thunkInfo = SGM.Types.getConstantInfo(getTypeExpansionContext(), thunk);
   auto thunkFnTy = thunkInfo.SILFnType;
   SILFunctionConventions fromConv(thunkFnTy, SGM.M);
 
@@ -286,8 +288,9 @@ void SILGenFunction::emitCurryThunk(SILDeclRef thunk) {
       // just grab the pattern for the curried fn ref and "call" it.
       assert(!calleeRef.isCurried);
       calleeRef.isCurried = true;
-      auto appliedFnPattern = SGM.Types.getConstantInfo(calleeRef).FormalPattern
-                                       .getFunctionResultType();
+      auto appliedFnPattern =
+          SGM.Types.getConstantInfo(getTypeExpansionContext(), calleeRef)
+              .FormalPattern.getFunctionResultType();
 
       auto appliedThunkPattern =
         thunkInfo.FormalPattern.getFunctionResultType();
@@ -359,7 +362,7 @@ SILValue
 SILGenFunction::emitGlobalFunctionRef(SILLocation loc, SILDeclRef constant,
                                       SILConstantInfo constantInfo,
                                       bool callPreviousDynamicReplaceableImpl) {
-  assert(constantInfo == getConstantInfo(constant));
+  assert(constantInfo == getConstantInfo(getTypeExpansionContext(), constant));
 
   // Builtins must be fully applied at the point of reference.
   if (constant.hasDecl() &&
@@ -383,7 +386,8 @@ SILGenFunction::emitGlobalFunctionRef(SILLocation loc, SILDeclRef constant,
   }
 
   auto f = SGM.getFunction(constant, NotForDefinition);
-  assert(f->getLoweredFunctionType() == constantInfo.SILFnType);
+  assert(f->getLoweredFunctionTypeInContext(B.getTypeExpansionContext()) ==
+         constantInfo.SILFnType);
   if (callPreviousDynamicReplaceableImpl)
     return B.createPreviousDynamicFunctionRef(loc, f);
   else

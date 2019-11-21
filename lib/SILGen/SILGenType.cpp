@@ -87,6 +87,7 @@ SILGenModule::emitVTableMethod(ClassDecl *theClass,
        derived.kind != SILDeclRef::Kind::Allocator);
 
   if (usesObjCDynamicDispatch) {
+<<<<<<< HEAD
     implFn = getDynamicThunk(derived, Types.getConstantInfo(derived).SILFnType);
   // SWIFT_ENABLE_TENSORFLOW
   } else if (auto *adafi = derived.autoDiffDerivativeFunctionIdentifier) {
@@ -96,6 +97,11 @@ SILGenModule::emitVTableMethod(ClassDecl *theClass,
     implFn = getOrCreateAutoDiffClassMethodThunk(
         derived, Types.getConstantInfo(derived).SILFnType);
   // SWIFT_ENABLE_TENSORFLOW END
+=======
+    implFn = getDynamicThunk(
+        derived, Types.getConstantInfo(TypeExpansionContext::minimal(), derived)
+                     .SILFnType);
+>>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
   } else {
     implFn = getFunction(derived, NotForDefinition);
   }
@@ -114,11 +120,13 @@ SILGenModule::emitVTableMethod(ClassDecl *theClass,
 
   // Determine the derived thunk type by lowering the derived type against the
   // abstraction pattern of the base.
-  auto baseInfo = Types.getConstantInfo(base);
-  auto derivedInfo = Types.getConstantInfo(derived);
+  auto baseInfo = Types.getConstantInfo(TypeExpansionContext::minimal(), base);
+  auto derivedInfo =
+      Types.getConstantInfo(TypeExpansionContext::minimal(), derived);
   auto basePattern = AbstractionPattern(baseInfo.LoweredType);
-  
-  auto overrideInfo = M.Types.getConstantOverrideInfo(derived, base);
+
+  auto overrideInfo = M.Types.getConstantOverrideInfo(
+      TypeExpansionContext::minimal(), derived, base);
 
   // If base method's generic requirements are not satisfied by the derived
   // method then we need a thunk.
@@ -610,7 +618,8 @@ SILFunction *SILGenModule::emitProtocolWitness(
     ProtocolConformanceRef conformance, SILLinkage linkage,
     IsSerialized_t isSerialized, SILDeclRef requirement, SILDeclRef witnessRef,
     IsFreeFunctionWitness_t isFree, Witness witness) {
-  auto requirementInfo = Types.getConstantInfo(requirement);
+  auto requirementInfo =
+      Types.getConstantInfo(TypeExpansionContext::minimal(), requirement);
 
   // Work out the lowered function type of the SIL witness thunk.
   auto reqtOrigTy = cast<GenericFunctionType>(requirementInfo.LoweredType);
@@ -674,8 +683,9 @@ SILFunction *SILGenModule::emitProtocolWitness(
 
   // Lower the witness thunk type with the requirement's abstraction level.
   auto witnessSILFnType = getNativeSILFunctionType(
-      M.Types, AbstractionPattern(reqtOrigTy), reqtSubstTy,
-      requirement, witnessRef, witnessSubsForTypeLowering, conformance);
+      M.Types, TypeExpansionContext::minimal(), AbstractionPattern(reqtOrigTy),
+      reqtSubstTy, requirement, witnessRef, witnessSubsForTypeLowering,
+      conformance);
 
   // Mangle the name of the witness thunk.
   Mangle::ASTMangler NewMangler;
@@ -743,7 +753,8 @@ static SILFunction *emitSelfConformanceWitness(SILGenModule &SGM,
                                            SelfProtocolConformance *conformance,
                                                SILLinkage linkage,
                                                SILDeclRef requirement) {
-  auto requirementInfo = SGM.Types.getConstantInfo(requirement);
+  auto requirementInfo =
+      SGM.Types.getConstantInfo(TypeExpansionContext::minimal(), requirement);
 
   // Work out the lowered function type of the SIL witness thunk.
   auto reqtOrigTy = cast<GenericFunctionType>(requirementInfo.LoweredType);
@@ -772,8 +783,8 @@ static SILFunction *emitSelfConformanceWitness(SILGenModule &SGM,
     cast<AnyFunctionType>(reqtOrigTy.subst(reqtSubs)->getCanonicalType());
 
   // Substitute into the requirement type to get the type of the thunk.
-  auto witnessSILFnType =
-    requirementInfo.SILFnType->substGenericArgs(SGM.M, reqtSubs);
+  auto witnessSILFnType = requirementInfo.SILFnType->substGenericArgs(
+      SGM.M, reqtSubs, TypeExpansionContext::minimal());
 
   // Mangle the name of the witness thunk.
   std::string name = [&] {

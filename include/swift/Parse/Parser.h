@@ -43,6 +43,7 @@ namespace llvm {
 
 namespace swift {
   class CodeCompletionCallbacks;
+  class CodeCompletionCallbacksFactory;
   class DefaultArgumentInitializer;
   class DiagnosticEngine;
   class Expr;
@@ -716,6 +717,18 @@ public:
     return Tok.is(tok::identifier) && Tok.getText() == value;
   }
 
+<<<<<<< HEAD
+=======
+  /// Returns true if token is the identifier "wrt".
+  bool isWRTIdentifier(Token tok) { return isIdentifier(Tok, "wrt"); }
+
+  /// Returns true if token is the identifier "jvp".
+  bool isJVPIdentifier(Token Tok) { return isIdentifier(Tok, "jvp"); }
+
+  /// Returns true if token is the identifier "vjp".
+  bool isVJPIdentifier(Token Tok) { return isIdentifier(Tok, "vjp"); }
+
+>>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
   /// Consume the starting '<' of the current token, which may either
   /// be a complete '<' token or some kind of operator token starting with '<',
   /// e.g., '<>'.
@@ -801,6 +814,12 @@ public:
     return parseAnyIdentifier(Result, L, Diagnostic(ID, Args...));
   }
 
+  /// \brief Parse an unsigned integer and returns it in \p Result. On failure
+  /// emit the specified error diagnostic, and a note at the specified note
+  /// location.
+  bool parseUnsignedInteger(unsigned &Result, SourceLoc &Loc,
+                            const Diagnostic &D);
+
   /// The parser expects that \p K is next token in the input.  If so,
   /// it is consumed and false is returned.
   ///
@@ -859,8 +878,6 @@ public:
                                    BraceItemListKind::Brace);
   ParserResult<BraceStmt> parseBraceItemList(Diag<> ID);
   
-  void parseTopLevelCodeDeclDelayed();
-
   //===--------------------------------------------------------------------===//
   // Decl Parsing
 
@@ -887,8 +904,6 @@ public:
   /// Options that control the parsing of declarations.
   using ParseDeclOptions = OptionSet<ParseDeclFlags>;
 
-  void delayParseFromBeginningToHere(ParserPosition BeginParserPosition,
-                                     ParseDeclOptions Flags);
   void consumeDecl(ParserPosition BeginParserPosition, ParseDeclOptions Flags,
                    bool IsTopLevel);
 
@@ -912,8 +927,6 @@ public:
   ParserResult<Decl> parseDecl(ParseDeclOptions Flags,
                                bool IsAtStartOfLineOrPreviousHadSemi,
                                llvm::function_ref<void(Decl*)> Handler);
-
-  void parseDeclDelayed();
 
   std::vector<Decl *> parseDeclListDelayed(IterableDeclContext *IDC);
 
@@ -985,7 +998,10 @@ public:
   ParserResult<ImplementsAttr> parseImplementsAttribute(SourceLoc AtLoc,
                                                         SourceLoc Loc);
 
+<<<<<<< HEAD
   /// SWIFT_ENABLE_TENSORFLOW
+=======
+>>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
   /// Parse the @differentiable attribute.
   ParserResult<DifferentiableAttr> parseDifferentiableAttribute(SourceLoc AtLoc,
                                                                 SourceLoc Loc);
@@ -999,6 +1015,7 @@ public:
   /// Parse a differentiation parameters clause.
   bool parseDifferentiationParametersClause(
       SmallVectorImpl<ParsedAutoDiffParameter> &params, StringRef attrName);
+<<<<<<< HEAD
   
   /// Parse a transposing parameters clause.
   bool parseTransposingParametersClause(
@@ -1013,6 +1030,8 @@ public:
 
   /// Parse the @quoted attribute.
   ParserResult<QuotedAttr> parseQuotedAttribute(SourceLoc AtLoc, SourceLoc Loc);
+=======
+>>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
 
   /// Parse a specific attribute.
   ParserStatus parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc);
@@ -1098,7 +1117,6 @@ public:
                                        bool HasFuncKeyword = true);
   void parseAbstractFunctionBody(AbstractFunctionDecl *AFD);
   BraceStmt *parseAbstractFunctionBodyDelayed(AbstractFunctionDecl *AFD);
-  void parseAbstractFunctionBodyDelayed();
   ParserResult<ProtocolDecl> parseDeclProtocol(ParseDeclOptions Flags,
                                                DeclAttributes &Attributes);
 
@@ -1613,6 +1631,16 @@ public:
   parsePlatformVersionConstraintSpec();
   ParserResult<PlatformAgnosticVersionConstraintAvailabilitySpec>
   parsePlatformAgnosticVersionConstraintSpec();
+
+  //===--------------------------------------------------------------------===//
+  // Code completion second pass.
+
+  static void
+  performCodeCompletionSecondPass(PersistentParserState &ParserState,
+                                  CodeCompletionCallbacksFactory &Factory);
+
+  void performCodeCompletionSecondPassImpl(
+      PersistentParserState::CodeCompletionDelayedDeclState &info);
 };
 
 /// Describes a parsed declaration name.

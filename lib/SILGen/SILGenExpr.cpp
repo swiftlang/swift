@@ -1457,10 +1457,13 @@ RValueEmitter::visitBridgeToObjCExpr(BridgeToObjCExpr *E, SGFContext C) {
 RValue RValueEmitter::visitArchetypeToSuperExpr(ArchetypeToSuperExpr *E,
                                                 SGFContext C) {
   ManagedValue archetype = SGF.emitRValueAsSingleValue(E->getSubExpr());
+  auto loweredTy = SGF.getLoweredLoadableType(E->getType());
+  if (loweredTy == archetype.getType())
+    return RValue(SGF, E, archetype);
+
   // Replace the cleanup with a new one on the superclass value so we always use
   // concrete retain/release operations.
-  auto base = SGF.B.createUpcast(E, archetype,
-                                 SGF.getLoweredLoadableType(E->getType()));
+  auto base = SGF.B.createUpcast(E, archetype, loweredTy);
   return RValue(SGF, E, base);
 }
 
@@ -1554,7 +1557,8 @@ ManagedValue emitCFunctionPointer(SILGenFunction &SGF,
 
   // Produce a reference to the C-compatible entry point for the function.
   SILDeclRef constant(loc, /*curried*/ false, /*foreign*/ true);
-  SILConstantInfo constantInfo = SGF.getConstantInfo(constant);
+  SILConstantInfo constantInfo =
+      SGF.getConstantInfo(SGF.getTypeExpansionContext(), constant);
 
   // C function pointers cannot capture anything from their context.
   auto captures = SGF.SGM.Types.getLoweredLocalCaptures(constant);
@@ -1983,7 +1987,11 @@ RValue RValueEmitter::visitUnderlyingToOpaqueExpr(UnderlyingToOpaqueExpr *E,
                                            E->getSubExpr()->getType());
   
   auto &underlyingSubstTL = SGF.getTypeLowering(E->getSubExpr()->getType());
-  
+
+  if (underlyingSubstTL.getLoweredType() == opaqueTL.getLoweredType()) {
+    return SGF.emitRValue(E->getSubExpr(), C);
+  }
+
   // If the opaque type is address only, initialize in place.
   if (opaqueTL.getLoweredType().isAddress()) {
     auto opaqueAddr = SGF.getBufferForExprResult(
@@ -2022,15 +2030,18 @@ RValue RValueEmitter::visitUnderlyingToOpaqueExpr(UnderlyingToOpaqueExpr *E,
   
   // If the opaque type is loadable, emit the subexpression and bitcast it.
   auto value = SGF.emitRValueAsSingleValue(E->getSubExpr());
-  if (underlyingSubstTL.getLoweredType() == underlyingTL.getLoweredType()) {
+  if (underlyingSubstTL.getLoweredType() != underlyingTL.getLoweredType()) {
     value = SGF.emitSubstToOrigValue(E, value, AbstractionPattern::getOpaque(),
                                 E->getSubExpr()->getType()->getCanonicalType());
   }
-  
+
+  if (value.getType() == opaqueTL.getLoweredType())
+    return RValue(SGF, E, value);
+
   auto cast = SGF.B.createUncheckedBitCast(E, value.forward(SGF),
-                                       opaqueTL.getLoweredType());
+                                           opaqueTL.getLoweredType());
   value = SGF.emitManagedRValueWithCleanup(cast);
-  
+
   return RValue(SGF, E, value);
 }
 
@@ -2213,7 +2224,8 @@ SILGenFunction::emitApplyOfDefaultArgGenerator(SILLocation loc,
   if (fnType->isPolymorphic())
     subs = defaultArgsOwner.getSubstitutions();
 
-  auto substFnType = fnType->substGenericArgs(SGM.M, subs);
+  auto substFnType =
+      fnType->substGenericArgs(SGM.M, subs, getTypeExpansionContext());
 
   CalleeTypeInfo calleeTypeInfo(substFnType, origResultType, resultType);
   ResultPlanPtr resultPtr =
@@ -2240,7 +2252,8 @@ RValue SILGenFunction::emitApplyOfStoredPropertyInitializer(
   auto fnRef = ManagedValue::forUnmanaged(emitGlobalFunctionRef(loc, constant));
   auto fnType = fnRef.getType().castTo<SILFunctionType>();
 
-  auto substFnType = fnType->substGenericArgs(SGM.M, subs);
+  auto substFnType =
+      fnType->substGenericArgs(SGM.M, subs, getTypeExpansionContext());
 
   CalleeTypeInfo calleeTypeInfo(substFnType, origResultType, resultType);
   ResultPlanPtr resultPlan =
@@ -2677,8 +2690,10 @@ static SILFunction *getOrCreateKeyPathGetter(SILGenModule &SGM,
     GenericContextScope scope(SGM.Types, genericSig);
     AbstractionPattern opaque = AbstractionPattern::getOpaque();
 
-    loweredBaseTy = SGM.Types.getLoweredRValueType(opaque, baseType);
-    loweredPropTy = SGM.Types.getLoweredRValueType(opaque, propertyType);
+    loweredBaseTy = SGM.Types.getLoweredRValueType(
+        TypeExpansionContext::minimal(), opaque, baseType);
+    loweredPropTy = SGM.Types.getLoweredRValueType(
+        TypeExpansionContext::minimal(), opaque, propertyType);
   }
   
   auto paramConvention = ParameterConvention::Indirect_In_Guaranteed;
@@ -2696,7 +2711,10 @@ static SILFunction *getOrCreateKeyPathGetter(SILGenModule &SGM,
   auto signature = SILFunctionType::get(genericSig,
     SILFunctionType::ExtInfo(SILFunctionType::Representation::Thin,
                              /*pseudogeneric*/ false,
+<<<<<<< HEAD
                              // SWIFT_ENABLE_TENSORFLOW
+=======
+>>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
                              /*noescape*/ false,
                              DifferentiabilityKind::NonDifferentiable),
     SILCoroutineKind::None,
@@ -2815,8 +2833,10 @@ static SILFunction *getOrCreateKeyPathSetter(SILGenModule &SGM,
     GenericContextScope scope(SGM.Types, genericSig);
     AbstractionPattern opaque = AbstractionPattern::getOpaque();
 
-    loweredBaseTy = SGM.Types.getLoweredRValueType(opaque, baseType);
-    loweredPropTy = SGM.Types.getLoweredRValueType(opaque, propertyType);
+    loweredBaseTy = SGM.Types.getLoweredRValueType(
+        TypeExpansionContext::minimal(), opaque, baseType);
+    loweredPropTy = SGM.Types.getLoweredRValueType(
+        TypeExpansionContext::minimal(), opaque, propertyType);
   }
   
   auto &C = SGM.getASTContext();
@@ -2840,7 +2860,10 @@ static SILFunction *getOrCreateKeyPathSetter(SILGenModule &SGM,
   auto signature = SILFunctionType::get(genericSig,
     SILFunctionType::ExtInfo(SILFunctionType::Representation::Thin,
                              /*pseudogeneric*/ false,
+<<<<<<< HEAD
                              // SWIFT_ENABLE_TENSORFLOW
+=======
+>>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
                              /*noescape*/ false,
                              DifferentiabilityKind::NonDifferentiable),
     SILCoroutineKind::None,
@@ -2999,8 +3022,8 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
   RValue indexValue(indexTupleTy);
 
   auto indexLoweredTy =
-    SILType::getPrimitiveAddressType(
-      SGM.Types.getLoweredRValueType(indexTupleTy));
+      SILType::getPrimitiveAddressType(SGM.Types.getLoweredRValueType(
+          TypeExpansionContext::minimal(), indexTupleTy));
 
   // Get or create the equals witness
   [unsafeRawPointerTy, boolTy, genericSig, &C, &indexTypes, &equals, loc,
@@ -3018,7 +3041,10 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
     auto signature = SILFunctionType::get(genericSig,
       SILFunctionType::ExtInfo(SILFunctionType::Representation::Thin,
                                /*pseudogeneric*/ false,
+<<<<<<< HEAD
                                // SWIFT_ENABLE_TENSORFLOW
+=======
+>>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
                                /*noescape*/ false,
                                DifferentiabilityKind::NonDifferentiable),
       SILCoroutineKind::None,
@@ -3064,8 +3090,9 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
     auto equalsMethod = equatableProtocol->getSingleRequirement(
       C.Id_EqualsOperator);
     auto equalsRef = SILDeclRef(equalsMethod);
-    auto equalsTy = subSGF.SGM.Types.getConstantType(equalsRef);
-    
+    auto equalsTy = subSGF.SGM.Types.getConstantType(
+        TypeExpansionContext(subSGF.F), equalsRef);
+
     auto isFalseBB = subSGF.createBasicBlock();
     auto i1Ty = SILType::getBuiltinIntegerType(1, C);
     for (unsigned i : indices(indexes)) {
@@ -3097,8 +3124,8 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
         = SubstitutionMap::getProtocolSubstitutions(equatableProtocol,
                                                     formalCanTy,
                                                     equatable);
-      auto equalsSubstTy = equalsTy.castTo<SILFunctionType>()
-        ->substGenericArgs(SGM.M, equatableSub);
+      auto equalsSubstTy = equalsTy.castTo<SILFunctionType>()->substGenericArgs(
+          SGM.M, equatableSub, TypeExpansionContext(subSGF.F));
       auto equalsInfo = CalleeTypeInfo(equalsSubstTy,
                                        AbstractionPattern(boolTy), boolTy,
                                        None,
@@ -3195,7 +3222,10 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
     auto signature = SILFunctionType::get(genericSig,
       SILFunctionType::ExtInfo(SILFunctionType::Representation::Thin,
                                /*pseudogeneric*/ false,
+<<<<<<< HEAD
                                // SWIFT_ENABLE_TENSORFLOW
+=======
+>>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
                                /*noescape*/ false,
                                DifferentiabilityKind::NonDifferentiable),
       SILCoroutineKind::None,
@@ -3345,8 +3375,8 @@ lowerKeyPathSubscriptIndexTypes(
     }
 
     auto indexLoweredTy = SGM.Types.getLoweredType(
-                                                AbstractionPattern::getOpaque(),
-                                                indexTy, expansion);
+        AbstractionPattern::getOpaque(), indexTy,
+        TypeExpansionContext::noOpaqueTypeArchetypesSubstitution(expansion));
     indexLoweredTy = indexLoweredTy.mapTypeOutOfContext();
     indexPatterns.push_back({indexTy->mapTypeOutOfContext()
                                     ->getCanonicalType(),
@@ -3588,27 +3618,6 @@ RValue RValueEmitter::visitKeyPathExpr(KeyPathExpr *E, SGFContext C) {
   
   auto baseTy = rootTy;
   SmallVector<SILValue, 4> operands;
-  
-  auto lowerSubscriptOperands =
-    [this, &operands, E](const KeyPathExpr::Component &component) {
-      if (!component.getIndexExpr())
-        return;
-      
-      // Evaluate the index arguments.
-      SmallVector<RValue, 2> indexValues;
-      auto indexResult = visit(component.getIndexExpr(), SGFContext());
-      if (isa<TupleType>(indexResult.getType())) {
-        std::move(indexResult).extractElements(indexValues);
-      } else {
-        indexValues.push_back(std::move(indexResult));
-      }
-
-      for (auto &rv : indexValues) {
-        operands.push_back(
-          std::move(rv).forwardAsSingleValue(SGF, E));
-      }
-    };
-  
 
   for (auto &component : E->getComponents()) {
     switch (auto kind = component.getKind()) {
@@ -3628,11 +3637,18 @@ RValue RValueEmitter::visitKeyPathExpr(KeyPathExpr *E, SGFContext C) {
                             component.getSubscriptIndexHashableConformances(),
                             baseTy,
                             /*for descriptor*/ false));
-      lowerSubscriptOperands(component);
-    
-      assert(numOperands == operands.size()
-             && "operand count out of sync");
       baseTy = loweredComponents.back().getComponentType();
+      if (kind == KeyPathExpr::Component::Kind::Property)
+        break;
+
+      auto subscript = cast<SubscriptDecl>(decl);
+      auto loweredArgs = SGF.emitKeyPathSubscriptOperands(
+          subscript, component.getDeclRef().getSubstitutions(),
+          component.getIndexExpr());
+
+      for (auto &arg : loweredArgs) {
+        operands.push_back(arg.forward(SGF));
+      }
 
       break;
     }

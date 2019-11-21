@@ -76,8 +76,6 @@ cake: Protocol P4 is a new API without @available attribute
 cake: Struct C6 is now with @frozen
 cake: Var C1.CIIns1 changes from weak to strong
 cake: Var C1.CIIns2 changes from strong to weak
-cake: Var GlobalLetChangedToVar changes from let to var
-cake: Var GlobalVarChangedToLet changes from var to let
 cake: Var RequiementChanges.addedVar is a new API without @available attribute
 cake: Var fixedLayoutStruct.$__lazy_storage_$_lazy_d is a new API without @available attribute
 cake: Var fixedLayoutStruct.c is a new API without @available attribute

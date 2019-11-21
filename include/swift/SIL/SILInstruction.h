@@ -47,6 +47,7 @@
 
 namespace swift {
 
+class AllocationInst;
 class DeclRefExpr;
 class FloatLiteralExpr;
 class FuncDecl;
@@ -621,6 +622,15 @@ public:
   /// Returns true if the instruction may read from or write to memory.
   bool mayReadOrWriteMemory() const {
     return getMemoryBehavior() != MemoryBehavior::None;
+  }
+
+  /// Return true if the instruction is "pure" in the sense that it may execute
+  /// multiple times without affecting behavior. This implies that it can be
+  /// trivially cloned at multiple use sites without preserving path
+  /// equivalence.
+  bool isPure() const {
+    return !mayReadOrWriteMemory() && !mayTrap() && !isa<AllocationInst>(this)
+           && !isa<TermInst>(this);
   }
 
   /// Returns true if the result of this instruction is a pointer to stack
@@ -2396,7 +2406,7 @@ class FunctionRefBaseInst : public LiteralInst {
 
 protected:
   FunctionRefBaseInst(SILInstructionKind Kind, SILDebugLocation DebugLoc,
-                      SILFunction *F);
+                      SILFunction *F, TypeExpansionContext context);
 
 public:
   ~FunctionRefBaseInst();
@@ -2455,7 +2465,9 @@ class FunctionRefInst : public FunctionRefBaseInst {
   ///
   /// \param DebugLoc  The location of the reference.
   /// \param F         The function being referenced.
-  FunctionRefInst(SILDebugLocation DebugLoc, SILFunction *F);
+  /// \param context   The type expansion context of the function reference.
+  FunctionRefInst(SILDebugLocation DebugLoc, SILFunction *F,
+                  TypeExpansionContext context);
 
 public:
   static bool classof(const SILNode *node) {
@@ -2473,7 +2485,9 @@ class DynamicFunctionRefInst : public FunctionRefBaseInst {
   ///
   /// \param DebugLoc  The location of the reference.
   /// \param F         The function being referenced.
-  DynamicFunctionRefInst(SILDebugLocation DebugLoc, SILFunction *F);
+  /// \param context   The type expansion context of the function reference.
+  DynamicFunctionRefInst(SILDebugLocation DebugLoc, SILFunction *F,
+                         TypeExpansionContext context);
 
 public:
   static bool classof(const SILNode *node) {
@@ -2491,7 +2505,9 @@ class PreviousDynamicFunctionRefInst : public FunctionRefBaseInst {
   ///
   /// \param DebugLoc  The location of the reference.
   /// \param F         The function being referenced.
-  PreviousDynamicFunctionRefInst(SILDebugLocation DebugLoc, SILFunction *F);
+  /// \param context   The type expansion context of the function reference.
+  PreviousDynamicFunctionRefInst(SILDebugLocation DebugLoc, SILFunction *F,
+                                 TypeExpansionContext context);
 
 public:
   static bool classof(const SILNode *node) {
@@ -3156,14 +3172,16 @@ class GlobalAddrInst
                              GlobalAccessInst> {
   friend SILBuilder;
 
-  GlobalAddrInst(SILDebugLocation DebugLoc, SILGlobalVariable *Global);
+  GlobalAddrInst(SILDebugLocation DebugLoc, SILGlobalVariable *Global,
+                 TypeExpansionContext context);
+
 public:
   // FIXME: This constructor should be private but is currently used
   //        in the SILParser.
 
   /// Create a placeholder instruction with an unset global reference.
   GlobalAddrInst(SILDebugLocation DebugLoc, SILType Ty)
-      : InstructionBase(DebugLoc, Ty, nullptr) { }
+      : InstructionBase(DebugLoc, Ty, nullptr) {}
 };
 
 /// Gives the value of a global variable.
@@ -3175,7 +3193,8 @@ class GlobalValueInst
                              GlobalAccessInst> {
   friend SILBuilder;
 
-  GlobalValueInst(SILDebugLocation DebugLoc, SILGlobalVariable *Global);
+  GlobalValueInst(SILDebugLocation DebugLoc, SILGlobalVariable *Global,
+                  TypeExpansionContext context);
 };
 
 /// IntegerLiteralInst - Encapsulates an integer constant, as defined originally

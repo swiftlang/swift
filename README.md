@@ -26,8 +26,13 @@ several hours. Naturally, incremental builds are much faster.
 
 ### System Requirements
 
+<<<<<<< HEAD
 macOS and Ubuntu Linux LTS 18.04 are the current supported host development
 operating systems.
+=======
+macOS, Ubuntu Linux LTS, and the latest Ubuntu Linux release are currently
+supported as host development operating systems.
+>>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
 
 Please make sure you use Python 2.x. Python 3.x is not supported currently.
 
@@ -106,28 +111,46 @@ There are two primary build systems to use: Xcode and Ninja. The Xcode build
 system allows you to work in Xcode, but Ninja is a bit faster and supports
 more environments.
 
+First, make sure that you're in the swift directory:
+
+    cd swift
+
 To build using Ninja, run:
 
+<<<<<<< HEAD
     swift/utils/build-script --enable-tensorflow --release-debuginfo
+=======
+    utils/build-script --release-debuginfo
+>>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
 
 When developing Swift, it helps to build what you're working on in a debug
 configuration while building the rest of the project with optimizations. Below
 are some examples of using debug variants:
 
+<<<<<<< HEAD
     swift/utils/build-script --enable-tensorflow --release-debuginfo --debug-swift # Swift frontend built in debug
     swift/utils/build-script --enable-tensorflow --release-debuginfo --debug-swift-stdlib # Standard library built in debug
     swift/utils/build-script --enable-tensorflow --release-debuginfo --debug-swift --force-optimized-typechecker # Swift frontend sans type checker built in debug
+=======
+    utils/build-script --release-debuginfo --debug-swift # Swift frontend built in debug
+    utils/build-script --release-debuginfo --debug-swift-stdlib # Standard library built in debug
+    utils/build-script --release-debuginfo --debug-swift --force-optimized-typechecker # Swift frontend sans type checker built in debug
+>>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
 
 Limiting the amount of debug code in the compiler has a very large impact on
 Swift compile times, and in turn the test execution time. If you want to build
 the entire project in debug, you can run:
 
+<<<<<<< HEAD
     swift/utils/build-script  --enable-tensorflow --debug
+=======
+    utils/build-script --debug
+>>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
 
 For documentation of all available arguments, as well as additional usage
 information, see the inline help:
 
-    swift/utils/build-script -h
+    utils/build-script -h
 
 ### Customize TensorFlow support
 

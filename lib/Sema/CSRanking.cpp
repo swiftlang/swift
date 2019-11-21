@@ -35,7 +35,7 @@ void ConstraintSystem::increaseScore(ScoreKind kind, unsigned value) {
   unsigned index = static_cast<unsigned>(kind);
   CurrentScore.Data[index] += value;
 
-  if (getASTContext().LangOpts.DebugConstraintSolver && value > 0) {
+  if (getASTContext().TypeCheckerOpts.DebugConstraintSolver && value > 0) {
     auto &log = getASTContext().TypeCheckerDebug->getStream();
     if (solverState)
       log.indent(solverState->depth * 2);
@@ -91,7 +91,7 @@ void ConstraintSystem::increaseScore(ScoreKind kind, unsigned value) {
 }
 
 bool ConstraintSystem::worseThanBestSolution() const {
-  if (getASTContext().LangOpts.DisableConstraintSolverPerformanceHacks)
+  if (getASTContext().TypeCheckerOpts.DisableConstraintSolverPerformanceHacks)
     return false;
 
   if (retainAllSolutions())
@@ -101,7 +101,7 @@ bool ConstraintSystem::worseThanBestSolution() const {
       CurrentScore <= *solverState->BestScore)
     return false;
 
-  if (getASTContext().LangOpts.DebugConstraintSolver) {
+  if (getASTContext().TypeCheckerOpts.DebugConstraintSolver) {
     auto &log = getASTContext().TypeCheckerDebug->getStream();
     log.indent(solverState->depth * 2)
       << "(solution is worse than the best solution)\n";
@@ -389,7 +389,7 @@ llvm::Expected<bool> CompareDeclSpecializationRequest::evaluate(
     Evaluator &eval, DeclContext *dc, ValueDecl *decl1, ValueDecl *decl2,
     bool isDynamicOverloadComparison) const {
   auto &C = decl1->getASTContext();
-  if (C.LangOpts.DebugConstraintSolver) {
+  if (C.TypeCheckerOpts.DebugConstraintSolver) {
     auto &log = C.TypeCheckerDebug->getStream();
     log << "Comparing declarations\n";
     decl1->print(log); 
@@ -401,7 +401,7 @@ llvm::Expected<bool> CompareDeclSpecializationRequest::evaluate(
   }
 
   auto completeResult = [&C](bool result) {
-    if (C.LangOpts.DebugConstraintSolver) {
+    if (C.TypeCheckerOpts.DebugConstraintSolver) {
       auto &log = C.TypeCheckerDebug->getStream();
       log << "comparison result: " << (result ? "better" : "not better")
           << "\n";
@@ -710,9 +710,8 @@ static Type getUnlabeledType(Type type, ASTContext &ctx) {
 
 SolutionCompareResult ConstraintSystem::compareSolutions(
     ConstraintSystem &cs, ArrayRef<Solution> solutions,
-    const SolutionDiff &diff, unsigned idx1, unsigned idx2,
-    llvm::DenseMap<Expr *, std::pair<unsigned, Expr *>> &weights) {
-  if (cs.getASTContext().LangOpts.DebugConstraintSolver) {
+    const SolutionDiff &diff, unsigned idx1, unsigned idx2) {
+  if (cs.getASTContext().TypeCheckerOpts.DebugConstraintSolver) {
     auto &log = cs.getASTContext().TypeCheckerDebug->getStream();
     log.indent(cs.solverState->depth * 2)
       << "comparing solutions " << idx1 << " and " << idx2 <<"\n";
@@ -743,9 +742,9 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
 
   auto getWeight = [&](ConstraintLocator *locator) -> unsigned {
     if (auto *anchor = locator->getAnchor()) {
-      auto weight = weights.find(anchor);
-      if (weight != weights.end())
-        return weight->getSecond().first + 1;
+      auto weight = cs.getExprDepth(anchor);
+      if (weight)
+        return *weight + 1;
     }
 
     return 1;
@@ -1180,7 +1179,7 @@ ConstraintSystem::findBestSolution(SmallVectorImpl<Solution> &viable,
   if (viable.size() == 1)
     return 0;
 
-  if (getASTContext().LangOpts.DebugConstraintSolver) {
+  if (getASTContext().TypeCheckerOpts.DebugConstraintSolver) {
     auto &log = getASTContext().TypeCheckerDebug->getStream();
     log.indent(solverState->depth * 2)
         << "Comparing " << viable.size() << " viable solutions\n";
@@ -1197,7 +1196,7 @@ ConstraintSystem::findBestSolution(SmallVectorImpl<Solution> &viable,
   SmallVector<bool, 16> losers(viable.size(), false);
   unsigned bestIdx = 0;
   for (unsigned i = 1, n = viable.size(); i != n; ++i) {
-    switch (compareSolutions(*this, viable, diff, i, bestIdx, ExprWeights)) {
+    switch (compareSolutions(*this, viable, diff, i, bestIdx)) {
     case SolutionCompareResult::Identical:
       // FIXME: Might want to warn about this in debug builds, so we can
       // find a way to eliminate the redundancy in the search space.
@@ -1221,7 +1220,7 @@ ConstraintSystem::findBestSolution(SmallVectorImpl<Solution> &viable,
     if (i == bestIdx)
       continue;
 
-    switch (compareSolutions(*this, viable, diff, bestIdx, i, ExprWeights)) {
+    switch (compareSolutions(*this, viable, diff, bestIdx, i)) {
     case SolutionCompareResult::Identical:
       // FIXME: Might want to warn about this in debug builds, so we can
       // find a way to eliminate the redundancy in the search space.
@@ -1273,7 +1272,7 @@ ConstraintSystem::findBestSolution(SmallVectorImpl<Solution> &viable,
       if (losers[j])
         continue;
 
-      switch (compareSolutions(*this, viable, diff, i, j, ExprWeights)) {
+      switch (compareSolutions(*this, viable, diff, i, j)) {
       case SolutionCompareResult::Identical:
         // FIXME: Dub one of these the loser arbitrarily?
         break;

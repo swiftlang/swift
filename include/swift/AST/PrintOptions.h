@@ -270,6 +270,10 @@ struct PrintOptions {
   /// Whether to skip keywords with a prefix of underscore such as __consuming.
   bool SkipUnderscoredKeywords = false;
 
+  /// Prints type variables and unresolved types in an expanded notation suitable
+  /// for debugging.
+  bool PrintTypesForDebugging = false;
+  
   /// How to print opaque return types.
   enum class OpaqueReturnTypePrintingMode {
     /// 'some P1 & P2'.

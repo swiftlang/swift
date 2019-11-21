@@ -5,6 +5,9 @@
   enum _name _name; \
   enum __attribute__((enum_extensibility(closed))) _name
 
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wmicrosoft-enum-forward-reference"
 typedef MY_ENUM(RegularEnum) {
   RegularEnumA,
   RegularEnumB
@@ -47,3 +50,4 @@ enum __attribute__((enum_extensibility(closed))) UnavailableCases {
   UnavailableCasesB,
   UnavailableCasesThisIsTheUnavailableOne __attribute__((availability(swift, unavailable)))
 };
+#pragma clang diagnostic pop

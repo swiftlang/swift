@@ -904,10 +904,6 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
     pushStructureNode(SN, NTD);
 
   } else if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
-    // Normally bindExtension() would take care of computing the extended
-    // nominal. It must be done before asking for generic parameters.
-    if (!inInactiveClause || ASTScope::areInactiveIfConfigClausesSupported())
-      ED->computeExtendedNominal();
     SyntaxStructureNode SN;
     setDecl(SN, D);
     SN.Kind = SyntaxStructureKind::Extension;

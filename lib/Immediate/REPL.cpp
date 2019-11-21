@@ -20,6 +20,7 @@
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/AST/NameLookupRequests.h"
 #include "swift/Basic/LLVMContext.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/IDE/REPLCodeCompletion.h"
@@ -193,8 +194,7 @@ typeCheckREPLInput(ModuleDecl *MostRecentModule, StringRef Name,
         parseIntoSourceFile(REPLInputFile, BufferID, &Done, nullptr,
                             &PersistentState);
   } while (!Done);
-  performTypeChecking(REPLInputFile, PersistentState.getTopLevelContext(),
-                      /*Options*/None);
+  performTypeChecking(REPLInputFile);
   return REPLModule;
 }
 
@@ -1092,8 +1092,11 @@ public:
           ASTContext &ctx = CI.getASTContext();
           SourceFile &SF =
               MostRecentModule->getMainSourceFile(SourceFileKind::REPL);
-          UnqualifiedLookup lookup(ctx.getIdentifier(Tok.getText()), &SF);
-          for (auto result : lookup.Results) {
+          auto name = ctx.getIdentifier(Tok.getText());
+          auto descriptor = UnqualifiedLookupDescriptor(name, &SF);
+          auto lookup = evaluateOrDefault(
+              ctx.evaluator, UnqualifiedLookupRequest{descriptor}, {});
+          for (auto result : lookup) {
             printOrDumpDecl(result.getValueDecl(), doPrint);
               
             if (auto typeDecl = dyn_cast<TypeDecl>(result.getValueDecl())) {
@@ -1163,9 +1166,9 @@ public:
           if (Tok.getText() == "debug") {
             L.lex(Tok);
             if (Tok.getText() == "on") {
-              CI.getASTContext().LangOpts.DebugConstraintSolver = true;
+              CI.getASTContext().TypeCheckerOpts.DebugConstraintSolver = true;
             } else if (Tok.getText() == "off") {
-              CI.getASTContext().LangOpts.DebugConstraintSolver = false;
+              CI.getASTContext().TypeCheckerOpts.DebugConstraintSolver = false;
             } else {
               llvm::outs() << "Unknown :constraints debug command; try :help\n";
             }

@@ -546,7 +546,7 @@ PropertyWrapperBackingPropertyTypeRequest::evaluate(
 
   // Compute the type of the property to plug in to the wrapper type.
   Type propertyType = var->getType();
-  if (!propertyType || propertyType->hasError())
+  if (propertyType->hasError())
     return Type();
 
   using namespace constraints;

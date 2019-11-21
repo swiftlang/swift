@@ -3771,6 +3771,8 @@ namespace {
 } // end anonymous namespace
 
 Expr *ConstraintSystem::generateConstraints(Expr *expr, DeclContext *dc) {
+  InputExprs.insert(expr);
+
   // Remove implicit conversions from the expression.
   expr = expr->walk(SanitizeExpr(*this));
 
@@ -3793,7 +3795,7 @@ Type ConstraintSystem::generateConstraints(Pattern *pattern,
 }
 
 void ConstraintSystem::optimizeConstraints(Expr *e) {
-  if (getASTContext().LangOpts.DisableConstraintSolverPerformanceHacks)
+  if (getASTContext().TypeCheckerOpts.DisableConstraintSolverPerformanceHacks)
     return;
   
   SmallVector<Expr *, 16> linkedExprs;
@@ -3878,9 +3880,8 @@ getMemberDecls(InterestedMemberKind Kind) {
 ResolvedMemberResult
 swift::resolveValueMember(DeclContext &DC, Type BaseTy, DeclName Name) {
   ResolvedMemberResult Result;
-  // If the current ast context has no type checker, create one for it.
-  auto *TC = DC.getASTContext().getLegacyGlobalTypeChecker();
-  assert(TC && "Must have type checker to make global query!");
+  assert(DC.getASTContext().getLegacyGlobalTypeChecker() &&
+         "Must have type checker to make global query!");
   ConstraintSystem CS(&DC, None);
 
   // Look up all members of BaseTy with the given Name.

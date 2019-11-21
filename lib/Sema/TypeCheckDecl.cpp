@@ -75,7 +75,7 @@ namespace {
 /// Float and integer literals are additionally keyed by numeric equivalence.
 struct RawValueKey {
   enum class Kind : uint8_t {
-    String, Float, Int, Tombstone, Empty
+    String, Float, Int, Bool, Tombstone, Empty
   } kind;
   
   struct IntValueTy {
@@ -101,6 +101,7 @@ struct RawValueKey {
     StringRef stringValue;
     IntValueTy intValue;
     FloatValueTy floatValue;
+    bool boolValue;
   };
   
   explicit RawValueKey(LiteralExpr *expr) {
@@ -136,6 +137,12 @@ struct RawValueKey {
       kind = Kind::String;
       stringValue = cast<StringLiteralExpr>(expr)->getValue();
       return;
+
+    case ExprKind::BooleanLiteral:
+      kind = Kind::Bool;
+      boolValue = cast<BooleanLiteralExpr>(expr)->getValue();
+      return;
+
     default:
       llvm_unreachable("not a valid literal expr for raw value");
     }
@@ -183,6 +190,8 @@ public:
              DenseMapInfo<uint64_t>::getHashValue(k.intValue.v1);
     case RawValueKey::Kind::String:
       return DenseMapInfo<StringRef>::getHashValue(k.stringValue);
+    case RawValueKey::Kind::Bool:
+      return DenseMapInfo<uint64_t>::getHashValue(k.boolValue);
     case RawValueKey::Kind::Empty:
     case RawValueKey::Kind::Tombstone:
       return 0;
@@ -204,6 +213,8 @@ public:
              a.intValue.v1 == b.intValue.v1;
     case RawValueKey::Kind::String:
       return a.stringValue.equals(b.stringValue);
+    case RawValueKey::Kind::Bool:
+      return a.boolValue == b.boolValue;
     case RawValueKey::Kind::Empty:
     case RawValueKey::Kind::Tombstone:
       return true;
@@ -563,119 +574,75 @@ static void checkGenericParams(GenericContext *ownerCtx) {
                          [](Requirement, RequirementRepr *) { return false; });
 }
 
-/// Retrieve the set of protocols the given protocol inherits.
-static llvm::TinyPtrVector<ProtocolDecl *>
-getInheritedForCycleCheck(ProtocolDecl *proto, ProtocolDecl **scratch) {
-  TinyPtrVector<ProtocolDecl *> result;
+static bool canSkipCircularityCheck(NominalTypeDecl *decl) {
+  // Don't bother checking imported or deserialized decls.
+  return decl->hasClangNode() || decl->wasDeserialized();
+}
 
-  bool anyObject = false;
-  for (const auto &found :
-         getDirectlyInheritedNominalTypeDecls(proto, anyObject)) {
-    if (auto protoDecl = dyn_cast<ProtocolDecl>(found.second))
-      result.push_back(protoDecl);
+llvm::Expected<bool>
+HasCircularInheritanceRequest::evaluate(Evaluator &evaluator,
+                                        ClassDecl *decl) const {
+  if (canSkipCircularityCheck(decl) || !decl->hasSuperclass())
+    return false;
+
+  auto *superclass = decl->getSuperclassDecl();
+  auto result = evaluator(HasCircularInheritanceRequest{superclass});
+
+  // If we have a cycle, handle it and return true.
+  if (!result) {
+    using Error = CyclicalRequestError<HasCircularInheritanceRequest>;
+    llvm::handleAllErrors(result.takeError(), [](const Error &E) {});
+    return true;
   }
-
   return result;
 }
 
-/// Retrieve the superclass of the given class.
-static ArrayRef<ClassDecl *> getInheritedForCycleCheck(ClassDecl *classDecl,
-                                                       ClassDecl **scratch) {
-  if (classDecl->hasSuperclass()) {
-    *scratch = classDecl->getSuperclassDecl();
-    return *scratch;
+llvm::Expected<bool>
+HasCircularInheritedProtocolsRequest::evaluate(Evaluator &evaluator,
+                                               ProtocolDecl *decl) const {
+  if (canSkipCircularityCheck(decl))
+    return false;
+
+  bool anyObject = false;
+  auto inherited = getDirectlyInheritedNominalTypeDecls(decl, anyObject);
+  for (auto &found : inherited) {
+    auto *protoDecl = dyn_cast<ProtocolDecl>(found.second);
+    if (!protoDecl)
+      continue;
+
+    // If we have a cycle, handle it and return true.
+    auto result = evaluator(HasCircularInheritedProtocolsRequest{protoDecl});
+    if (!result) {
+      using Error = CyclicalRequestError<HasCircularInheritedProtocolsRequest>;
+      llvm::handleAllErrors(result.takeError(), [](const Error &E) {});
+      return true;
+    }
+
+    // If the underlying request handled a cycle and returned true, bail.
+    if (*result)
+      return true;
   }
-  return { };
+  return false;
 }
 
-/// Retrieve the raw type of the given enum.
-static ArrayRef<EnumDecl *> getInheritedForCycleCheck(EnumDecl *enumDecl,
-                                                      EnumDecl **scratch) {
-  if (enumDecl->hasRawType()) {
-    *scratch = enumDecl->getRawType()->getEnumOrBoundGenericEnum();
-    return *scratch ? ArrayRef<EnumDecl*>(*scratch) : ArrayRef<EnumDecl*>{};
+llvm::Expected<bool>
+HasCircularRawValueRequest::evaluate(Evaluator &evaluator,
+                                     EnumDecl *decl) const {
+  if (canSkipCircularityCheck(decl) || !decl->hasRawType())
+    return false;
+
+  auto *inherited = decl->getRawType()->getEnumOrBoundGenericEnum();
+  if (!inherited)
+    return false;
+
+  // If we have a cycle, handle it and return true.
+  auto result = evaluator(HasCircularRawValueRequest{inherited});
+  if (!result) {
+    using Error = CyclicalRequestError<HasCircularRawValueRequest>;
+    llvm::handleAllErrors(result.takeError(), [](const Error &E) {});
+    return true;
   }
-  return { };
-}
-
-/// Check for circular inheritance.
-template <typename T>
-static void checkCircularity(T *decl, Diag<Identifier> circularDiag,
-                             DescriptiveDeclKind declKind,
-                             SmallVectorImpl<T *> &path) {
-  switch (decl->getCircularityCheck()) {
-  case CircularityCheck::Checked:
-    return;
-
-  case CircularityCheck::Checking: {
-    // We're already checking this type, which means we have a cycle.
-
-    // The beginning of the path might not be part of the cycle, so find
-    // where the cycle starts.
-    assert(!path.empty());
-
-    auto cycleStart = path.end() - 1;
-    while (*cycleStart != decl) {
-      assert(cycleStart != path.begin() && "Missing cycle start?");
-      --cycleStart;
-    }
-
-    // If the path length is 1 the type directly references itself.
-    if (path.end() - cycleStart == 1) {
-      path.back()->diagnose(circularDiag, path.back()->getName());
-
-      break;
-    }
-
-    // Diagnose the cycle.
-    decl->diagnose(circularDiag, (*cycleStart)->getName());
-    for (auto i = cycleStart + 1, iEnd = path.end(); i != iEnd; ++i) {
-      (*i)->diagnose(diag::kind_declname_declared_here, declKind,
-                     (*i)->getName());
-    }
-
-    break;
-  }
-
-  case CircularityCheck::Unchecked: {
-    // Walk to the inherited class or protocols.
-    path.push_back(decl);
-    decl->setCircularityCheck(CircularityCheck::Checking);
-    T *scratch = nullptr;
-    for (auto inherited : getInheritedForCycleCheck(decl, &scratch)) {
-      checkCircularity(inherited, circularDiag, declKind, path);
-    }
-    decl->setCircularityCheck(CircularityCheck::Checked);
-    path.pop_back();
-    break;
-  }
-  }
-}
-
-/// Expose TypeChecker's handling of GenericParamList to SIL parsing.
-GenericEnvironment *
-TypeChecker::handleSILGenericParams(GenericParamList *genericParams,
-                                    DeclContext *DC) {
-  if (genericParams == nullptr)
-    return nullptr;
-
-  SmallVector<GenericParamList *, 2> nestedList;
-  for (; genericParams; genericParams = genericParams->getOuterParameters()) {
-    nestedList.push_back(genericParams);
-  }
-
-  std::reverse(nestedList.begin(), nestedList.end());
-
-  for (unsigned i = 0, e = nestedList.size(); i < e; ++i) {
-    auto genericParams = nestedList[i];
-    genericParams->setDepth(i);
-  }
-
-  auto sig = TypeChecker::checkGenericSignature(
-             nestedList.back(), DC,
-             /*parentSig=*/nullptr,
-             /*allowConcreteGenericParams=*/true);
-  return (sig ? sig->getGenericEnvironment() : nullptr);
+  return result;
 }
 
 /// Check whether \c current is a redeclaration.
@@ -754,16 +721,16 @@ static void checkRedeclaration(ASTContext &ctx, ValueDecl *current) {
     if (!conflicting(currentSig, otherSig))
       continue;
 
-    // Skip invalid declarations.
-    if (other->isInvalid())
-      continue;
-
     // Skip declarations in other files.
     // In practice, this means we will warn on a private declaration that
     // shadows a non-private one, but only in the file where the shadowing
     // happens. We will warn on conflicting non-private declarations in both
     // files.
     if (!other->isAccessibleFrom(currentDC))
+      continue;
+
+    // Skip invalid declarations.
+    if (other->isInvalid())
       continue;
 
     // Thwart attempts to override the same declaration more than once.
@@ -1302,10 +1269,18 @@ IsStaticRequest::evaluate(Evaluator &evaluator, FuncDecl *decl) const {
       decl->isOperator() &&
       dc->isTypeContext()) {
     auto operatorName = decl->getFullName().getBaseIdentifier();
-    decl->diagnose(diag::nonstatic_operator_in_type,
-                   operatorName, dc->getDeclaredInterfaceType())
-        .fixItInsert(decl->getAttributeInsertionLoc(/*forModifier=*/true),
-                     "static ");
+    if (auto ED = dyn_cast<ExtensionDecl>(dc->getAsDecl())) {
+      decl->diagnose(diag::nonstatic_operator_in_extension,
+                     operatorName, ED->getExtendedTypeRepr())
+          .fixItInsert(decl->getAttributeInsertionLoc(/*forModifier=*/true),
+                       "static ");
+    } else {
+      auto *NTD = cast<NominalTypeDecl>(dc->getAsDecl());
+      decl->diagnose(diag::nonstatic_operator_in_nominal, operatorName,
+                     NTD->getName())
+          .fixItInsert(decl->getAttributeInsertionLoc(/*forModifier=*/true),
+                       "static ");
+    }
     result = true;
   }
 
@@ -1684,11 +1659,10 @@ EnumRawValuesRequest::evaluate(Evaluator &eval, EnumDecl *ED,
 
     
     {
-      auto *TC = ED->getASTContext().getLegacyGlobalTypeChecker();
-      assert(TC && "Must have a global type checker set");
       Expr *exprToCheck = prevValue;
-      if (TC->typeCheckExpression(exprToCheck, ED, TypeLoc::withoutLoc(rawTy),
-                                  CTP_EnumCaseRawValue)) {
+      if (TypeChecker::typeCheckExpression(exprToCheck, ED,
+                                           TypeLoc::withoutLoc(rawTy),
+                                           CTP_EnumCaseRawValue)) {
         TypeChecker::checkEnumElementErrorHandling(elt, exprToCheck);
       }
     }
@@ -1699,6 +1673,7 @@ EnumRawValuesRequest::evaluate(Evaluator &eval, EnumDecl *ED,
       elt->setInvalid();
       continue;
     }
+
 
     // If the raw values of the enum case are fixed, then we trust our callers
     // to have set things up correctly.  This comes up with imported enums
@@ -1990,8 +1965,7 @@ getParamIndex(const ParameterList *paramList, const ParamDecl *decl) {
 }
 
 static void checkInheritedDefaultValueRestrictions(ParamDecl *PD) {
-  if (PD->getDefaultArgumentKind() != DefaultArgumentKind::Inherited)
-    return;
+  assert(PD->getDefaultArgumentKind() == DefaultArgumentKind::Inherited);
 
   auto *DC = PD->getInnermostDeclContext();
   const SourceFile *SF = DC->getParentSourceFile();
@@ -2027,30 +2001,78 @@ static void checkInheritedDefaultValueRestrictions(ParamDecl *PD) {
 
 /// Check the default arguments that occur within this pattern.
 static void checkDefaultArguments(ParameterList *params) {
-  for (auto *param : *params) {
+  // Force the default values in case they produce diagnostics.
+  for (auto *param : *params)
+    (void)param->getTypeCheckedDefaultExpr();
+}
+
+llvm::Expected<Expr *>
+DefaultArgumentExprRequest::evaluate(Evaluator &evaluator,
+                                     ParamDecl *param) const {
+  if (param->getDefaultArgumentKind() == DefaultArgumentKind::Inherited) {
+    // Inherited default arguments don't have expressions, but we need to
+    // perform a couple of semantic checks to make sure they're valid.
     checkInheritedDefaultValueRestrictions(param);
-    if (!param->getDefaultValue() ||
-        !param->hasInterfaceType() ||
-        param->getInterfaceType()->hasError())
+    return nullptr;
+  }
+
+  auto &ctx = param->getASTContext();
+  auto paramTy = param->getType();
+  auto *initExpr = param->getStructuralDefaultExpr();
+  assert(initExpr);
+
+  if (paramTy->hasError())
+    return new (ctx) ErrorExpr(initExpr->getSourceRange(), ErrorType::get(ctx));
+
+  auto *dc = param->getDefaultArgumentInitContext();
+  assert(dc);
+
+  if (!TypeChecker::typeCheckParameterDefault(initExpr, dc, paramTy,
+                                              param->isAutoClosure())) {
+    return new (ctx) ErrorExpr(initExpr->getSourceRange(), ErrorType::get(ctx));
+  }
+
+  TypeChecker::checkInitializerErrorHandling(dc, initExpr);
+
+  // Walk the checked initializer and contextualize any closures
+  // we saw there.
+  (void)TypeChecker::contextualizeInitializer(dc, initExpr);
+  return initExpr;
+}
+
+llvm::Expected<Initializer *>
+DefaultArgumentInitContextRequest::evaluate(Evaluator &eval,
+                                            ParamDecl *param) const {
+  auto &ctx = param->getASTContext();
+  auto *parentDC = param->getDeclContext();
+  auto *paramList = getParameterList(cast<ValueDecl>(parentDC->getAsDecl()));
+
+  // In order to compute the initializer context for this parameter, we need to
+  // know its index in the parameter list. Therefore iterate over the parameters
+  // looking for it and fill in the other parameter's contexts while we're here.
+  Initializer *result = nullptr;
+  for (auto idx : indices(*paramList)) {
+    auto *otherParam = paramList->get(idx);
+
+    // If this param doesn't need a context, we're done.
+    if (!otherParam->hasDefaultExpr() && !otherParam->getStoredProperty())
       continue;
 
-    Expr *e = param->getDefaultValue();
-    auto *initContext = param->getDefaultArgumentInitContext();
+    // If this param already has a context, continue using it.
+    if (otherParam->getCachedDefaultArgumentInitContext())
+      continue;
 
-    auto resultTy =
-        TypeChecker::typeCheckParameterDefault(e, initContext, param->getType(),
-                                               param->isAutoClosure());
-
-    if (resultTy) {
-      param->setDefaultValue(e);
-    }
-
-    TypeChecker::checkInitializerErrorHandling(initContext, e);
-
-    // Walk the checked initializer and contextualize any closures
-    // we saw there.
-    (void)TypeChecker::contextualizeInitializer(initContext, e);
+    // Create a new initializer context. If this is for the parameter that
+    // kicked off the request, make a note of it for when we return. Otherwise
+    // cache the result ourselves.
+    auto *initDC = new (ctx) DefaultArgumentInitializer(parentDC, idx);
+    if (param == otherParam)
+      result = initDC;
+    else
+      eval.cacheOutput(DefaultArgumentInitContextRequest{otherParam}, std::move(initDC));
   }
+  assert(result && "Didn't create init context?");
+  return result;
 }
 
 PrecedenceGroupDecl *TypeChecker::lookupPrecedenceGroup(DeclContext *dc,
@@ -2108,7 +2130,7 @@ llvm::Expected<PrecedenceGroupDecl *>
 OperatorPrecedenceGroupRequest::evaluate(Evaluator &evaluator,
                                          InfixOperatorDecl *IOD) const {
   auto enableOperatorDesignatedTypes =
-      IOD->getASTContext().LangOpts.EnableOperatorDesignatedTypes;
+      IOD->getASTContext().TypeCheckerOpts.EnableOperatorDesignatedTypes;
 
   auto &Diags = IOD->getASTContext().Diags;
   PrecedenceGroupDecl *group = nullptr;
@@ -2349,7 +2371,9 @@ public:
       (void)IOD->getPrecedenceGroup();
     } else {
       auto nominalTypes = OD->getDesignatedNominalTypes();
-      if (nominalTypes.empty() && Ctx.LangOpts.EnableOperatorDesignatedTypes) {
+      const auto wantsDesignatedTypes =
+          Ctx.TypeCheckerOpts.EnableOperatorDesignatedTypes;
+      if (nominalTypes.empty() && wantsDesignatedTypes) {
         auto identifiers = OD->getIdentifiers();
         auto identifierLocs = OD->getIdentifierLocs();
         if (checkDesignatedTypes(OD, identifiers, identifierLocs, Ctx))
@@ -2780,13 +2804,8 @@ public:
 
     checkGenericParams(ED);
 
-    {
-      // Check for circular inheritance of the raw type.
-      SmallVector<EnumDecl *, 8> path;
-      path.push_back(ED);
-      checkCircularity(ED, diag::circular_enum_inheritance,
-                       DescriptiveDeclKind::Enum, path);
-    }
+    // Check for circular inheritance of the raw type.
+    (void)ED->hasCircularRawValue();
 
     for (Decl *member : ED->getMembers())
       visit(member);
@@ -2952,13 +2971,8 @@ public:
 
     checkGenericParams(CD);
 
-    {
-      // Check for circular inheritance.
-      SmallVector<ClassDecl *, 8> path;
-      path.push_back(CD);
-      checkCircularity(CD, diag::circular_class_inheritance,
-                       DescriptiveDeclKind::Class, path);
-    }
+    // Check for circular inheritance.
+    (void)CD->hasCircularInheritance();
 
     // Force lowering of stored properties.
     (void) CD->getStoredProperties();
@@ -3102,21 +3116,15 @@ public:
   void visitProtocolDecl(ProtocolDecl *PD) {
     checkUnsupportedNestedType(PD);
 
-    auto *SF = PD->getParentSourceFile();
-    {
-      // Check for circular inheritance within the protocol.
-      SmallVector<ProtocolDecl *, 8> path;
-      path.push_back(PD);
-      checkCircularity(PD, diag::circular_protocol_def,
-                       DescriptiveDeclKind::Protocol, path);
+    // Check for circular inheritance within the protocol.
+    (void)PD->hasCircularInheritedProtocols();
 
-      if (SF) {
-        if (auto *tracker = SF->getReferencedNameTracker()) {
-          bool isNonPrivate =
-              (PD->getFormalAccess() > AccessLevel::FilePrivate);
-          for (auto *parentProto : PD->getInheritedProtocols())
-            tracker->addUsedMember({parentProto, Identifier()}, isNonPrivate);
-        }
+    auto *SF = PD->getParentSourceFile();
+    if (SF) {
+      if (auto *tracker = SF->getReferencedNameTracker()) {
+        bool isNonPrivate = (PD->getFormalAccess() > AccessLevel::FilePrivate);
+        for (auto *parentProto : PD->getInheritedProtocols())
+          tracker->addUsedMember({parentProto, Identifier()}, isNonPrivate);
       }
     }
 
@@ -3135,7 +3143,7 @@ public:
       if (!SF || SF->Kind != SourceFileKind::Interface)
         TypeChecker::inferDefaultWitnesses(PD);
 
-    if (PD->getASTContext().LangOpts.DebugGenericSignatures) {
+    if (PD->getASTContext().TypeCheckerOpts.DebugGenericSignatures) {
       auto requirementsSig =
         GenericSignature::get({PD->getProtocolSelfType()},
                               PD->getRequirementSignature());
@@ -3214,11 +3222,8 @@ public:
 
 
   bool shouldSkipBodyTypechecking(const AbstractFunctionDecl *AFD) {
-    // FIXME: Remove TypeChecker dependency.
-    auto &TC = *Ctx.getLegacyGlobalTypeChecker();
-
     // Make sure we're in the mode that's skipping function bodies.
-    if (!TC.canSkipNonInlinableBodies())
+    if (!getASTContext().TypeCheckerOpts.SkipNonInlinableFunctionBodies)
       return false;
 
     // Make sure there even _is_ a body that we can skip.
@@ -3675,6 +3680,7 @@ void TypeChecker::typeCheckDecl(Decl *D) {
 // Returns 'nullptr' if this is the setter's 'newValue' parameter;
 // otherwise, returns the corresponding parameter of the subscript
 // declaration.
+
 static ParamDecl *getOriginalParamFromAccessor(AbstractStorageDecl *storage,
                                                AccessorDecl *accessor,
                                                ParamDecl *param) {
@@ -3972,11 +3978,8 @@ bool swift::isMemberOperator(FuncDecl *decl, Type type) {
   // Check the parameters for a reference to 'Self'.
   bool isProtocol = selfNominal && isa<ProtocolDecl>(selfNominal);
   for (auto param : *decl->getParameters()) {
-    auto paramType = param->getInterfaceType();
-    if (!paramType) break;
-
     // Look through a metatype reference, if there is one.
-    paramType = paramType->getMetatypeInstanceType();
+    auto paramType = param->getInterfaceType()->getMetatypeInstanceType();
 
     auto nominal = paramType->getAnyNominal();
     if (type.isNull()) {
@@ -4120,7 +4123,7 @@ ParamSpecifierRequest::evaluate(Evaluator &evaluator,
   if (isa<InOutTypeRepr>(nestedRepr) &&
       param->isDefaultArgument()) {
     auto &ctx = param->getASTContext();
-    ctx.Diags.diagnose(param->getDefaultValue()->getLoc(),
+    ctx.Diags.diagnose(param->getStructuralDefaultExpr()->getLoc(),
                        swift::diag::cannot_provide_default_value_inout,
                        param->getName());
     return ParamSpecifier::Default;

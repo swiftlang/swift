@@ -1392,3 +1392,8 @@ const llvm::DataLayout &IRGenerator::getClangDataLayout() {
       ->getTargetInfo()
       .getDataLayout();
   }
+
+TypeExpansionContext IRGenModule::getMaximalTypeExpansionContext() const {
+  return TypeExpansionContext::maximal(getSwiftModule(),
+                                       getSILModule().isWholeModule());
+}

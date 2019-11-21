@@ -2670,8 +2670,10 @@ ReplaceOpaqueTypesWithUnderlyingTypes::shouldPerformSubstitution(
 
 static Type
 substOpaqueTypesWithUnderlyingTypes(Type ty, const DeclContext *inContext,
-                                    ResilienceExpansion contextExpansion) {
-  ReplaceOpaqueTypesWithUnderlyingTypes replacer(inContext, contextExpansion);
+                                    ResilienceExpansion contextExpansion,
+                                    bool isWholeModuleContext) {
+  ReplaceOpaqueTypesWithUnderlyingTypes replacer(inContext, contextExpansion,
+                                                 isWholeModuleContext);
   return ty.subst(replacer, replacer, SubstFlags::SubstituteOpaqueArchetypes);
 }
 
@@ -2682,7 +2684,8 @@ substOpaqueTypesWithUnderlyingTypes(Type ty, const DeclContext *inContext,
 /// will be accessible. It's not intended to enforce any rules about what
 /// opaque substitutions are or are not allowed.
 static bool canSubstituteTypeInto(Type ty, const DeclContext *dc,
-                                  OpaqueSubstitutionKind kind) {
+                                  OpaqueSubstitutionKind kind,
+                                  bool isContextWholeModule) {
   auto nominal = ty->getAnyNominal();
   if (!nominal)
     return true;
@@ -2695,6 +2698,10 @@ static bool canSubstituteTypeInto(Type ty, const DeclContext *dc,
     return true;
 
   case OpaqueSubstitutionKind::SubstituteSameModuleMaximalResilience:
+    // In whole module compilation private types are okay.
+    if (isContextWholeModule)
+      return true;
+
     // In the same file any visibility is okay.
     if (!dc->isModuleContext() &&
         nominal->getDeclContext()->getParentSourceFile() ==
@@ -2739,27 +2746,39 @@ operator()(SubstitutableType *maybeOpaqueType) const {
   // Check that we are allowed to substitute the underlying type into the
   // context.
   auto inContext = this->inContext;
-  if (substTy.findIf([inContext, substitutionKind](Type t) -> bool {
-        if (!canSubstituteTypeInto(t, inContext, substitutionKind))
-          return true;
-        return false;
-      }))
+  auto isContextWholeModule = this->isContextWholeModule;
+  if (substTy.findIf(
+          [inContext, substitutionKind, isContextWholeModule](Type t) -> bool {
+            if (!canSubstituteTypeInto(t, inContext, substitutionKind,
+                                       isContextWholeModule))
+              return true;
+            return false;
+          }))
     return maybeOpaqueType;
 
   // If the type still contains opaque types, recur.
   if (substTy->hasOpaqueArchetype()) {
-    return substOpaqueTypesWithUnderlyingTypes(substTy, inContext,
-                                               contextExpansion);
+    return ::substOpaqueTypesWithUnderlyingTypes(
+        substTy, inContext, contextExpansion, isContextWholeModule);
   }
 
   return substTy;
 }
 
-static ProtocolConformanceRef
-substOpaqueTypesWithUnderlyingTypes(ProtocolConformanceRef ref, Type origType,
-                                    const DeclContext *inContext,
-                                    ResilienceExpansion contextExpansion) {
-  ReplaceOpaqueTypesWithUnderlyingTypes replacer(inContext, contextExpansion);
+static ProtocolConformanceRef substOpaqueTypesWithUnderlyingTypes(
+    ProtocolConformanceRef ref, Type origType, const DeclContext *inContext,
+    ResilienceExpansion contextExpansion, bool isWholeModuleContext) {
+  ReplaceOpaqueTypesWithUnderlyingTypes replacer(inContext, contextExpansion,
+                                                 isWholeModuleContext);
+  return ref.subst(origType, replacer, replacer,
+                   SubstFlags::SubstituteOpaqueArchetypes);
+}
+
+ProtocolConformanceRef swift::substOpaqueTypesWithUnderlyingTypes(
+    ProtocolConformanceRef ref, Type origType, TypeExpansionContext context) {
+  ReplaceOpaqueTypesWithUnderlyingTypes replacer(
+      context.getContext(), context.getResilienceExpansion(),
+      context.isWholeModuleContext());
   return ref.subst(origType, replacer, replacer,
                    SubstFlags::SubstituteOpaqueArchetypes);
 }
@@ -2804,11 +2823,14 @@ operator()(CanType maybeOpaqueType, Type replacementType,
   // Check that we are allowed to substitute the underlying type into the
   // context.
   auto inContext = this->inContext;
-  if (substTy.findIf([inContext, substitutionKind](Type t) -> bool {
-        if (!canSubstituteTypeInto(t, inContext, substitutionKind))
-          return true;
-        return false;
-      }))
+  auto isContextWholeModule = this->isContextWholeModule;
+  if (substTy.findIf(
+          [inContext, substitutionKind, isContextWholeModule](Type t) -> bool {
+            if (!canSubstituteTypeInto(t, inContext, substitutionKind,
+                                       isContextWholeModule))
+              return true;
+            return false;
+          }))
     return abstractRef;
 
   auto substRef =
@@ -2816,8 +2838,8 @@ operator()(CanType maybeOpaqueType, Type replacementType,
 
   // If the type still contains opaque types, recur.
   if (substTy->hasOpaqueArchetype()) {
-    return substOpaqueTypesWithUnderlyingTypes(substRef, substTy, inContext,
-                                               contextExpansion);
+    return ::substOpaqueTypesWithUnderlyingTypes(
+        substRef, substTy, inContext, contextExpansion, isContextWholeModule);
   }
   return substRef;
 }
@@ -3436,6 +3458,11 @@ static Type substType(Type derivedType,
 
     // If we have a substitution for this type, use it.
     if (auto known = substitutions(substOrig)) {
+      if (options.contains(SubstFlags::SubstituteOpaqueArchetypes) &&
+          isa<OpaqueTypeArchetypeType>(substOrig) &&
+          known->getCanonicalType() == substOrig->getCanonicalType())
+        return None; // Recursively process the substitutions of the opaque type
+                     // archetype.
       return known;
     }
 
@@ -4479,9 +4506,12 @@ ReferenceCounting TypeBase::getReferenceCounting() {
   ASTContext &ctx = type->getASTContext();
 
   // In the absence of Objective-C interoperability, everything uses native
-  // reference counting.
-  if (!ctx.LangOpts.EnableObjCInterop)
-    return ReferenceCounting::Native;
+  // reference counting or is the builtin BridgeObject.
+  if (!ctx.LangOpts.EnableObjCInterop) {
+    return type->getKind() == TypeKind::BuiltinBridgeObject
+             ? ReferenceCounting::Bridge
+             : ReferenceCounting::Native;
+  }
 
   switch (type->getKind()) {
 #define SUGARED_TYPE(id, parent) case TypeKind::id:
@@ -4613,6 +4643,7 @@ Type TypeBase::openAnyExistentialType(OpenedArchetypeType *&opened) {
   return opened;
 }
 
+<<<<<<< HEAD
 // SWIFT_ENABLE_TENSORFLOW
 // Makes a function with the same generic signature and extinfo as `copy`, but
 // with `params` parameters and `retTy` return type.
@@ -4973,4 +5004,42 @@ AnyFunctionType *AnyFunctionType::getWithoutDifferentiability() const {
   assert(isa<GenericFunctionType>(this));
   return GenericFunctionType::get(getOptGenericSignature(), newParams,
                                   getResult(), nonDiffExtInfo);
+=======
+bool TypeBase::hasOpaqueArchetypePropertiesOrCases() {
+  if (auto *structDecl = getStructOrBoundGenericStruct()) {
+    for (auto *field : structDecl->getStoredProperties()) {
+      auto fieldTy = field->getInterfaceType()->getCanonicalType();
+      if (fieldTy->hasOpaqueArchetype() ||
+          fieldTy->hasOpaqueArchetypePropertiesOrCases())
+        return true;
+    }
+  }
+
+  if (auto *enumDecl = getEnumOrBoundGenericEnum()) {
+    for (auto *elt : enumDecl->getAllElements()) {
+      auto eltType = elt->getInterfaceType();
+      if (eltType->hasOpaqueArchetype() ||
+          eltType->getCanonicalType()->hasOpaqueArchetypePropertiesOrCases())
+        return true;
+    }
+  }
+  return false;
+}
+
+CanType swift::substOpaqueTypesWithUnderlyingTypes(CanType ty,
+                                                   TypeExpansionContext context,
+                                                   bool allowLoweredTypes) {
+  if (!context.shouldLookThroughOpaqueTypeArchetypes() ||
+      !ty->hasOpaqueArchetype())
+    return ty;
+
+  ReplaceOpaqueTypesWithUnderlyingTypes replacer(
+      context.getContext(), context.getResilienceExpansion(),
+      context.isWholeModuleContext());
+  SubstOptions flags = SubstFlags::SubstituteOpaqueArchetypes;
+  if (allowLoweredTypes)
+    flags =
+        SubstFlags::SubstituteOpaqueArchetypes | SubstFlags::AllowLoweredTypes;
+  return ty.subst(replacer, replacer, flags)->getCanonicalType();
+>>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
 }

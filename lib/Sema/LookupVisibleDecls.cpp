@@ -15,6 +15,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "TypeChecker.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/GenericSignatureBuilder.h"
@@ -24,6 +25,7 @@
 #include "swift/AST/ModuleNameLookup.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/STLExtras.h"
@@ -203,6 +205,9 @@ static void collectVisibleMemberDecls(const DeclContext *CurrDC, LookupState LS,
   }
 }
 
+static void
+synthesizePropertyWrapperStorageWrapperProperties(IterableDeclContext *IDC);
+
 /// Lookup members in extensions of \p LookupType, using \p BaseType as the
 /// underlying type when checking any constraints on the extensions.
 static void doGlobalExtensionLookup(Type BaseType,
@@ -219,6 +224,8 @@ static void doGlobalExtensionLookup(Type BaseType,
         IsDeclApplicableRequest(DeclApplicabilityOwner(CurrDC, BaseType,
                                                        extension)), false))
       continue;
+
+    synthesizePropertyWrapperStorageWrapperProperties(extension);
 
     collectVisibleMemberDecls(CurrDC, LS, BaseType, extension, FoundDecls);
   }
@@ -474,6 +481,49 @@ static void
   lookupTypeMembers(BaseTy, PT, Consumer, CurrDC, LS, Reason);
 }
 
+// Generate '$' and '_' prefixed variables that have attached property
+// wrappers.
+static void
+synthesizePropertyWrapperStorageWrapperProperties(IterableDeclContext *IDC) {
+  auto SF = IDC->getDecl()->getDeclContext()->getParentSourceFile();
+  if (!SF || SF->Kind == SourceFileKind::Interface)
+    return;
+
+  for (auto Member : IDC->getMembers())
+    if (auto var = dyn_cast<VarDecl>(Member))
+      if (var->hasAttachedPropertyWrapper())
+        (void)var->getPropertyWrapperBackingPropertyInfo();
+}
+
+/// Trigger synthesizing implicit member declarations to make them "visible".
+static void synthesizeMemberDeclsForLookup(NominalTypeDecl *NTD,
+                                           const DeclContext *DC) {
+  // Synthesize the memberwise initializer for structs or default initializer
+  // for classes.
+  if (!NTD->getASTContext().evaluator.hasActiveRequest(
+          SynthesizeMemberwiseInitRequest{NTD}))
+    TypeChecker::addImplicitConstructors(NTD);
+
+  // Check all conformances to trigger the synthesized decl generation.
+  // e.g. init(rawValue:) for RawRepresentable.
+  for (auto Conformance : NTD->getAllConformances()) {
+    auto Proto = Conformance->getProtocol();
+    if (!Proto->isAccessibleFrom(DC))
+      continue;
+    auto NormalConformance = dyn_cast<NormalProtocolConformance>(
+        Conformance->getRootConformance());
+    if (!NormalConformance)
+      continue;
+    NormalConformance->forEachTypeWitness(
+        [](AssociatedTypeDecl *, Type, TypeDecl *) { return false; },
+        /*useResolver=*/true);
+    NormalConformance->forEachValueWitness([](ValueDecl *, Witness) {},
+                                           /*useResolver=*/true);
+  }
+
+  synthesizePropertyWrapperStorageWrapperProperties(NTD);
+}
+
 static void lookupVisibleMemberDeclsImpl(
     Type BaseTy, VisibleDeclConsumer &Consumer, const DeclContext *CurrDC,
     LookupState LS, DeclVisibilityKind Reason, GenericSignatureBuilder *GSB,
@@ -582,6 +632,8 @@ static void lookupVisibleMemberDeclsImpl(
     NominalTypeDecl *CurNominal = BaseTy->getAnyNominal();
     if (!CurNominal)
       break;
+
+    synthesizeMemberDeclsForLookup(CurNominal, CurrDC);
 
     // Look in for members of a nominal type.
     lookupTypeMembers(BaseTy, BaseTy, Consumer, CurrDC, LS, Reason);
