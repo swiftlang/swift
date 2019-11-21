@@ -2136,7 +2136,7 @@ void DifferentiableActivityInfo::propagateUseful(
       return;
     // Propagate usefulness to non-`inout` arguments.
     // Skip `inout` arguments to avoid propagating usefulness from results to
-    // non-useful `inout` arguments (representing results).
+    // orthogonal results (represented by `inout` arguments).
     auto paramInfos = ai->getSubstCalleeConv().getParameters();
     auto arguments = ai->getArgumentsWithoutIndirectResults();
     assert(paramInfos.size() == arguments.size());
