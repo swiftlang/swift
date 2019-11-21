@@ -68,6 +68,29 @@
                 "swift-format": "master"
             }
         },
+       "swift-incremental-dependency-tracking": {
+            "aliases": ["swift-incremental-dependency-tracking"],
+            "repos": {
+                "llvm-project": "swift/master",
+                "swift": "swift-incremental-dependency-tracking",
+                "cmark": "master",
+                "llbuild": "master",
+                "swiftpm": "master",
+                "swift-syntax": "master",
+                "swift-stress-tester": "master",
+                "swift-corelibs-xctest": "master",
+                "swift-corelibs-foundation": "master",
+                "swift-corelibs-libdispatch": "master",
+                "swift-integration-tests": "master",
+                "swift-xcode-playground-support": "master",
+                "ninja": "release",
+                "icu": "release-65-1",
+                "cmake": "v3.15.1",
+                "indexstore-db": "master",
+                "sourcekit-lsp": "master",
+                "swift-format": "master"
+            }
+        },
         "next" : {
             "aliases": ["next", "master-next",
                         "stable-next", "upstream",
