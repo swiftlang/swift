@@ -581,6 +581,11 @@ public:
   /// compiler for the target platform.
   AvailabilityContext getSwift51Availability();
 
+  /// Get the runtime availability of
+  /// swift_getTypeByMangledNameInContextInMetadataState.
+  AvailabilityContext getTypesInAbstractMetadataStateAvailability();
+
+
   //===--------------------------------------------------------------------===//
   // Diagnostics Helper functions
   //===--------------------------------------------------------------------===//

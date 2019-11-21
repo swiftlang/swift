@@ -564,6 +564,16 @@ namespace RuntimeConstants {
     return RuntimeAvailability::AlwaysAvailable;
   }
 
+  RuntimeAvailability
+  GetTypesInAbstractMetadataStateAvailability(ASTContext &context) {
+    auto featureAvailability =
+        context.getTypesInAbstractMetadataStateAvailability();
+    if (!isDeploymentAvailabilityContainedIn(context, featureAvailability)) {
+      return RuntimeAvailability::ConditionallyAvailable;
+    }
+    return RuntimeAvailability::AlwaysAvailable;
+  }
+
   RuntimeAvailability DynamicReplacementAvailability(ASTContext &Context) {
     auto featureAvailability = Context.getSwift51Availability();
     if (!isDeploymentAvailabilityContainedIn(Context, featureAvailability)) {
