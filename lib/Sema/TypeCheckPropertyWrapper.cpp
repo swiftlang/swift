@@ -167,13 +167,13 @@ findSuitableWrapperInit(ASTContext &ctx, NominalTypeDecl *nominal,
       if (!argumentParam)
         continue;
 
-      if (!argumentParam->hasInterfaceType())
-        continue;
-
       if (argumentParam->isInOut() || argumentParam->isVariadic())
         continue;
 
       auto paramType = argumentParam->getInterfaceType();
+      if (paramType->is<ErrorType>())
+        continue;
+
       if (argumentParam->isAutoClosure()) {
         if (auto *fnType = paramType->getAs<FunctionType>())
           paramType = fnType->getResult();
