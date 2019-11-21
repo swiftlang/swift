@@ -48,16 +48,17 @@ namespace irgen {
                                CheckedCastMode mode);
 
   void emitScalarCheckedCast(IRGenFunction &IGF, Explosion &value,
-                             SILType valueType, SILType loweredTargetType,
+                             SILType sourceLoweredType,
+                             CanType sourceFormalType,
+                             SILType targetLoweredType,
+                             CanType targetFormalType,
                              CheckedCastMode mode, Explosion &out);
 
   /// Convert a class object to the given destination type,
   /// using a runtime-checked cast.
-  ///
-  /// FIXME: toType should be an AST CanType.
   llvm::Value *emitClassDowncast(IRGenFunction &IGF,
                                  llvm::Value *from,
-                                 SILType toType,
+                                 CanType toType,
                                  CheckedCastMode mode);
 
   /// A result of a cast generation function.

@@ -4834,7 +4834,11 @@ void IRGenSILFunction::visitUnconditionalCheckedCastInst(
                                        swift::UnconditionalCheckedCastInst *i) {
   Explosion value = getLoweredExplosion(i->getOperand());
   Explosion ex;
-  emitScalarCheckedCast(*this, value, i->getOperand()->getType(), i->getType(),
+  emitScalarCheckedCast(*this, value,
+                        i->getSourceLoweredType(),
+                        i->getSourceFormalType(),
+                        i->getTargetLoweredType(),
+                        i->getTargetFormalType(),
                         CheckedCastMode::Unconditional, ex);
   setLoweredExplosion(i, ex);
 }
@@ -5038,7 +5042,6 @@ void IRGenSILFunction::visitCheckedCastValueBranchInst(
 
 void IRGenSILFunction::visitCheckedCastBranchInst(
                                               swift::CheckedCastBranchInst *i) {
-  SILType destTy = i->getTargetLoweredType();
   FailableCastResult castResult;
   Explosion ex;
   if (i->isExact()) {
@@ -5046,12 +5049,14 @@ void IRGenSILFunction::visitCheckedCastBranchInst(
     Explosion source = getLoweredExplosion(operand);
     castResult = emitClassIdenticalCast(*this, source.claimNext(),
                                         i->getSourceLoweredType(),
-                                        destTy);
+                                        i->getTargetLoweredType());
   } else {
     Explosion value = getLoweredExplosion(i->getOperand());
     emitScalarCheckedCast(*this, value,
                           i->getSourceLoweredType(),
+                          i->getSourceFormalType(),
                           i->getTargetLoweredType(),
+                          i->getTargetFormalType(),
                           CheckedCastMode::Conditional, ex);
     auto val = ex.claimNext();
     castResult.casted = val;
@@ -5065,7 +5070,7 @@ void IRGenSILFunction::visitCheckedCastBranchInst(
 
 
   auto &successBB = getLoweredBB(i->getSuccessBB());
-  llvm::Type *toTy = IGM.getTypeInfo(destTy).getStorageType();
+  llvm::Type *toTy = IGM.getTypeInfo(i->getTargetLoweredType()).getStorageType();
   if (toTy->isPointerTy())
     castResult.casted = Builder.CreateBitCast(castResult.casted, toTy);
 
