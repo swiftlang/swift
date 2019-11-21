@@ -222,8 +222,6 @@ ERROR(self_inside_catch_superselfinit,none,
       "'self' used inside 'catch' block reachable from "
       "%select{super|self}0.init call",
       (unsigned))
-ERROR(return_from_init_without_initing_self,none,
-      "return from initializer before 'self.init' call or assignment to 'self'", ())
 ERROR(return_from_init_without_initing_stored_properties,none,
       "return from initializer without initializing all"
       " stored properties", ())
@@ -324,9 +322,6 @@ ERROR(integer_conversion_overflow_builtin_types,none,
 WARNING(integer_conversion_overflow_warn,none,
       "integer overflows when converted from %0 to %1",
       (Type, Type))
-ERROR(integer_conversion_sign_error,none,
-      "negative integer cannot be converted to unsigned type %0",
-      (Type))
 ERROR(negative_integer_literal_overflow_unsigned,none,
       "negative integer '%1' overflows when stored into unsigned type %0",
       (Type, StringRef))
