@@ -1536,8 +1536,13 @@ private:
   };
 
 public:
+  ConstraintSystemPhase getPhase() const { return Phase; }
+
   /// Move constraint system to a new phase of its lifetime.
   void setPhase(ConstraintSystemPhase newPhase) {
+    if (Phase == newPhase)
+      return;
+
 #ifndef NDEBUG
     switch (Phase) {
     case ConstraintSystemPhase::ConstraintGeneration:
@@ -1545,7 +1550,10 @@ public:
       break;
 
     case ConstraintSystemPhase::Solving:
-      assert(newPhase == ConstraintSystemPhase::Diagnostics ||
+      // We can come back to constraint generation phase while
+      // processing function builder body.
+      assert(newPhase == ConstraintSystemPhase::ConstraintGeneration ||
+             newPhase == ConstraintSystemPhase::Diagnostics ||
              newPhase == ConstraintSystemPhase::Finalization);
       break;
 
