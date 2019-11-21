@@ -579,7 +579,7 @@ void ToolChain::JobContext::addFrontendInputAndOutputArguments(
     Arguments.push_back("-primary-filelist");
     Arguments.push_back(getTemporaryFilePath("primaryInputs", ""));
     FilelistInfos.push_back({Arguments.back(), file_types::TY_Swift,
-                             FilelistInfo::WhichFiles::PrimaryInputs});
+                             FilelistInfo::WhichFiles::SourceInputActions});
   }
   if (!UseFileList || !UsePrimaryFileList) {
     addFrontendCommandLineInputArguments(MayHavePrimaryInputs, UseFileList,
@@ -876,7 +876,7 @@ ToolChain::constructInvocation(const MergeModuleJobAction &job,
     Arguments.push_back(context.getTemporaryFilePath("inputs", ""));
     II.FilelistInfos.push_back({Arguments.back(),
                                 file_types::TY_SwiftModuleFile,
-                                FilelistInfo::WhichFiles::Input});
+                                FilelistInfo::WhichFiles::InputJobs});
 
     addInputsOfType(Arguments, context.InputActions,
                     file_types::TY_SwiftModuleFile);

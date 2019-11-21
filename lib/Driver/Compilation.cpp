@@ -1356,6 +1356,51 @@ static void writeCompilationRecord(StringRef path, StringRef argsHash,
   }
 }
 
+static void writeInputJobsToFilelist(llvm::raw_fd_ostream &out, const Job *job,
+                                     const file_types::ID infoType) {
+  // FIXME: Duplicated from ToolChains.cpp.
+  for (const Job *input : job->getInputs()) {
+    const CommandOutput &outputInfo = input->getOutput();
+    if (outputInfo.getPrimaryOutputType() == infoType) {
+      for (auto &output : outputInfo.getPrimaryOutputFilenames())
+        out << output << "\n";
+    } else {
+      auto output = outputInfo.getAnyOutputForType(infoType);
+      if (!output.empty())
+        out << output << "\n";
+    }
+  }
+}
+static void writeSourceInputActionsToFilelist(llvm::raw_fd_ostream &out,
+                                              const Job *job,
+                                              const ArgList &args) {
+  // Ensure that -index-file-path works in conjunction with
+  // -driver-use-filelists. It needs to be the only primary.
+  if (Arg *A = args.getLastArg(options::OPT_index_file_path))
+    out << A->getValue() << "\n";
+  else {
+    // The normal case for non-single-compile jobs.
+    for (const Action *A : job->getSource().getInputs()) {
+      // A could be a GeneratePCHJobAction
+      if (!isa<InputAction>(A))
+        continue;
+      const auto *IA = cast<InputAction>(A);
+      out << IA->getInputArg().getValue() << "\n";
+    }
+  }
+}
+static void writeOutputToFilelist(llvm::raw_fd_ostream &out, const Job *job,
+                                  const file_types::ID infoType) {
+  const CommandOutput &outputInfo = job->getOutput();
+  assert(outputInfo.getPrimaryOutputType() == infoType);
+  for (auto &output : outputInfo.getPrimaryOutputFilenames())
+    out << output << "\n";
+}
+static void writeSupplementarOutputToFilelist(llvm::raw_fd_ostream &out,
+                                              const Job *job) {
+  job->getOutput().writeOutputFileMap(out);
+}
+
 static bool writeFilelistIfNecessary(const Job *job, const ArgList &args,
                                      DiagnosticEngine &diags) {
   bool ok = true;
@@ -1374,46 +1419,23 @@ static bool writeFilelistIfNecessary(const Job *job, const ArgList &args,
     }
 
     switch (filelistInfo.whichFiles) {
-    case FilelistInfo::WhichFiles::Input:
-      // FIXME: Duplicated from ToolChains.cpp.
-      for (const Job *input : job->getInputs()) {
-        const CommandOutput &outputInfo = input->getOutput();
-        if (outputInfo.getPrimaryOutputType() == filelistInfo.type) {
-          for (auto &output : outputInfo.getPrimaryOutputFilenames())
-            out << output << "\n";
-        } else {
-          auto output = outputInfo.getAnyOutputForType(filelistInfo.type);
-          if (!output.empty())
-            out << output << "\n";
-        }
-      }
+    case FilelistInfo::WhichFiles::InputJobs:
+      writeInputJobsToFilelist(out, job, filelistInfo.type);
       break;
-    case FilelistInfo::WhichFiles::PrimaryInputs:
-      // Ensure that -index-file-path works in conjunction with
-      // -driver-use-filelists. It needs to be the only primary.
-      if (Arg *A = args.getLastArg(options::OPT_index_file_path))
-        out << A->getValue() << "\n";
-      else {
-        // The normal case for non-single-compile jobs.
-        for (const Action *A : job->getSource().getInputs()) {
-          // A could be a GeneratePCHJobAction
-          if (!isa<InputAction>(A))
-            continue;
-          const auto *IA = cast<InputAction>(A);
-          out << IA->getInputArg().getValue() << "\n";
-        }
-      }
+    case FilelistInfo::WhichFiles::SourceInputActions:
+      writeSourceInputActionsToFilelist(out, job, args);
+      break;
+    case FilelistInfo::WhichFiles::InputJobsAndSourceInputActions:
+      writeInputJobsToFilelist(out, job, filelistInfo.type);
+      writeSourceInputActionsToFilelist(out, job, args);
       break;
     case FilelistInfo::WhichFiles::Output: {
-      const CommandOutput &outputInfo = job->getOutput();
-      assert(outputInfo.getPrimaryOutputType() == filelistInfo.type);
-      for (auto &output : outputInfo.getPrimaryOutputFilenames())
-        out << output << "\n";
+      writeOutputToFilelist(out, job, filelistInfo.type);
       break;
-    }
-    case FilelistInfo::WhichFiles::SupplementaryOutput:
-      job->getOutput().writeOutputFileMap(out);
-      break;
+      }
+      case FilelistInfo::WhichFiles::SupplementaryOutput:
+        writeSupplementarOutputToFilelist(out, job);
+        break;
     }
   }
   return ok;
