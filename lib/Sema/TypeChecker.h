@@ -1046,7 +1046,7 @@ public:
   static void computeCaptures(AnyFunctionRef AFR);
 
   /// Check for invalid captures from stored property initializers.
-  static void checkPatternBindingCaptures(NominalTypeDecl *typeDecl);
+  static void checkPatternBindingCaptures(IterableDeclContext *DC);
 
   /// Change the context of closures in the given initializer
   /// expression to the given context.
