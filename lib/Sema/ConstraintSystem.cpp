@@ -2452,6 +2452,8 @@ SolutionResult ConstraintSystem::salvage() {
     log << "---Attempting to salvage and emit diagnostics---\n";
   }
 
+  setPhase(ConstraintSystemPhase::Diagnostics);
+
   // Attempt to solve again, capturing all states that come from our attempts to
   // select overloads or bind type variables.
   //

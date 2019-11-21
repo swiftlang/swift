@@ -6049,7 +6049,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
     // subscript dispatch relies on presence of function application.
     if (result.ViableCandidates.size() == 1) {
       auto &choice = result.ViableCandidates.front();
-      if (!solverState && choice.isKeyPathDynamicMemberLookup() &&
+      if (Phase == ConstraintSystemPhase::ConstraintGeneration &&
+          choice.isKeyPathDynamicMemberLookup() &&
           member.getBaseName().isSubscript()) {
         // Let's move this constraint to the active
         // list so it could be picked up right after
