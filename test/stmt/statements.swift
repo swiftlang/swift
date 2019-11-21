@@ -43,7 +43,7 @@ func funcdecl5(_ a: Int, y: Int) {
   (1) = x      // expected-error {{cannot assign to value: literals are not mutable}}
   "string" = "other"    // expected-error {{cannot assign to value: literals are not mutable}}
   [1, 1, 1, 1] = [1, 1] // expected-error {{cannot assign to immutable expression of type '[Int]}}
-  1.0 = x               // expected-error {{cannot assign to a literal value}}
+  1.0 = x               // expected-error {{cannot assign to value: literals are not mutable}}
   nil = 1               // expected-error {{cannot assign to value: literals are not mutable}}
 
   (x:1).x = 1 // expected-error {{cannot assign to immutable expression of type 'Int'}}

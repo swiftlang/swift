@@ -268,9 +268,9 @@ static bool growingSubstitutions(SubstitutionMap Subs1,
     if (TypeCmp.isPartiallyContainedIn(Type2, Type1))
       continue;
     if (TypeCmp.isPartiallyContainedIn(Type1, Type2)) {
-      LLVM_DEBUG(llvm::dbgs() << "Type:\n"; Type1.dump();
+      LLVM_DEBUG(llvm::dbgs() << "Type:\n"; Type1.dump(llvm::dbgs());
                  llvm::dbgs() << "is (partially) contained in type:\n";
-                 Type2.dump();
+                 Type2.dump(llvm::dbgs());
                  llvm::dbgs() << "Replacements[" << idx
                               << "] has got bigger since last time.\n");
       return true;
@@ -327,7 +327,7 @@ static bool createsInfiniteSpecializationLoop(ApplySite Apply) {
                for (auto Replacement :
                      CurSpecializationInfo->getSubstitutions()
                        .getReplacementTypes()) {
-                 Replacement->dump();
+                 Replacement->dump(llvm::dbgs());
                });
 
     if (CurSpecializationInfo->getParent() == GenericFunc) {
@@ -994,7 +994,7 @@ static void collectRequirements(ArchetypeType *Archetype, GenericSignature Sig,
       if (UsedGenericParams.size() != 1) {
         llvm::dbgs() << "Strange requirement for "
                      << CurrentGP->getCanonicalType() << "\n";
-        Req.dump();
+        Req.dump(llvm::dbgs());
       }
       assert(UsedGenericParams.size() == 1);
       CollectedReqs.push_back(Req);
@@ -1077,7 +1077,7 @@ shouldBePartiallySpecialized(Type Replacement,
       LLVM_DEBUG(llvm::dbgs() << "Requirements of the archetype depend on "
                             "other caller's generic parameters! "
                             "It cannot be partially specialized:\n";
-                 UsedArchetype->dump();
+                 UsedArchetype->dump(llvm::dbgs());
                  llvm::dbgs() << "This archetype is used in the substitution: "
                               << Replacement << "\n");
       return false;
@@ -1326,11 +1326,11 @@ void FunctionSignaturePartialSpecializer::
       [&](SubstitutableType *type) -> Type {
         LLVM_DEBUG(llvm::dbgs() << "Mapping specialized interface type to "
                                    "caller archetype:\n";
-                   llvm::dbgs() << "Interface type: "; type->dump();
+                   llvm::dbgs() << "Interface type: "; type->dump(llvm::dbgs());
                    llvm::dbgs() << "Archetype: ";
                    auto Archetype =
                       SpecializedInterfaceToCallerArchetypeMapping.lookup(type);
-                   if (Archetype) Archetype->dump();
+                   if (Archetype) Archetype->dump(llvm::dbgs());
                    else llvm::dbgs() << "Not found!\n";);
         return SpecializedInterfaceToCallerArchetypeMapping.lookup(type);
       },
@@ -1363,10 +1363,10 @@ void FunctionSignaturePartialSpecializer::
     assert(CallerGenericParam->is<GenericTypeParamType>());
 
     LLVM_DEBUG(llvm::dbgs() << "\n\nChecking used caller archetype:\n";
-               CallerArchetype->dump();
+               CallerArchetype->dump(llvm::dbgs());
                llvm::dbgs() << "It corresponds to the caller generic "
                                "parameter:\n";
-               CallerGenericParam->dump());
+               CallerGenericParam->dump(llvm::dbgs()));
 
     // Create an equivalent generic parameter.
     auto SubstGenericParam = createGenericParam();
@@ -1382,7 +1382,7 @@ void FunctionSignaturePartialSpecializer::
 
     LLVM_DEBUG(llvm::dbgs() << "\nCreated a new specialized generic "
                                "parameter:\n";
-               SubstGenericParam->dump();
+               SubstGenericParam->dump(llvm::dbgs());
                llvm::dbgs() << "Created a mapping "
                                "(caller interface -> specialize interface):\n"
                             << CallerGenericParam << " -> "
@@ -1404,13 +1404,14 @@ void FunctionSignaturePartialSpecializer::
         CalleeGenericSig->getCanonicalTypeInContext(CanTy);
     auto Replacement = CanTyInContext.subst(CalleeInterfaceToCallerArchetypeMap);
     LLVM_DEBUG(llvm::dbgs() << "\n\nChecking callee generic parameter:\n";
-               CanTy->dump());
+               CanTy->dump(llvm::dbgs()));
     if (!Replacement) {
       LLVM_DEBUG(llvm::dbgs() << "No replacement found. Skipping.\n");
       continue;
     }
 
-    LLVM_DEBUG(llvm::dbgs() << "Replacement found:\n"; Replacement->dump());
+    LLVM_DEBUG(llvm::dbgs() << "Replacement found:\n";
+               Replacement->dump(llvm::dbgs()));
 
     bool ShouldSpecializeGP = shouldBePartiallySpecialized(
         Replacement, CallerGenericSig, CallerGenericEnv);
@@ -1432,7 +1433,7 @@ void FunctionSignaturePartialSpecializer::
 
     LLVM_DEBUG(llvm::dbgs() << "\nCreated a new specialized generic "
                                "parameter:\n";
-               SubstGenericParam->dump();
+               SubstGenericParam->dump(llvm::dbgs());
                llvm::dbgs() << "Created a mapping "
                                "(callee interface -> specialized interface):\n"
                             << CanTy << " -> "
@@ -1462,7 +1463,8 @@ void FunctionSignaturePartialSpecializer::
                     SpecializedReplacementCallerInterfaceTy);
     AllRequirements.push_back(Req);
 
-    LLVM_DEBUG(llvm::dbgs() << "Added a requirement:\n"; Req.dump());
+    LLVM_DEBUG(llvm::dbgs() << "Added a requirement:\n";
+               Req.dump(llvm::dbgs()));
 
     if (ReplacementCallerInterfaceTy->is<GenericTypeParamType>()) {
       // Remember that the new generic parameter corresponds
@@ -1502,7 +1504,7 @@ void FunctionSignaturePartialSpecializer::addRequirements(
     ArrayRef<Requirement> Reqs, SubstitutionMap &SubsMap) {
   for (auto &reqReq : Reqs) {
     LLVM_DEBUG(llvm::dbgs() << "\n\nRe-mapping the requirement:\n";
-               reqReq.dump());
+               reqReq.dump(llvm::dbgs()));
     AllRequirements.push_back(*reqReq.subst(SubsMap));
   }
 }
@@ -1518,7 +1520,7 @@ void FunctionSignaturePartialSpecializer::addCallerRequirements() {
     if (!CollectedReqs.empty()) {
       LLVM_DEBUG(llvm::dbgs() << "Adding caller archetype requirements:\n";
                  for (auto Req : CollectedReqs) {
-                   Req.dump();
+                   Req.dump(llvm::dbgs());
                  }
                  CallerInterfaceToSpecializedInterfaceMap.dump(llvm::dbgs());
                 );
@@ -1556,7 +1558,7 @@ SubstitutionMap FunctionSignaturePartialSpecializer::computeClonerParamSubs() {
       LLVM_DEBUG(llvm::dbgs() << "\ngetSubstitution for ClonerParamSubs:\n"
                               << Type(type) << "\n"
                               << "in generic signature:\n";
-                 CalleeGenericSig->dump());
+                 CalleeGenericSig->print(llvm::dbgs()));
       auto SpecializedInterfaceTy =
           Type(type).subst(CalleeInterfaceToSpecializedInterfaceMap);
       return SpecializedGenericEnv->mapTypeIntoContext(
@@ -1707,7 +1709,7 @@ void ReabstractionInfo::performPartialSpecializationPreparation(
   LLVM_DEBUG(llvm::dbgs() << "\n\nTrying partial specialization for: "
                           << Callee->getName() << "\n";
              llvm::dbgs() << "Callee generic signature is:\n";
-             CalleeGenericSig->dump());
+             CalleeGenericSig->print(llvm::dbgs()));
 
   FunctionSignaturePartialSpecializer FSPS(M,
                                            CallerGenericSig, CallerGenericEnv,
@@ -1734,7 +1736,8 @@ void ReabstractionInfo::finishPartialSpecializationPreparation(
 
   if (SpecializedGenericSig) {
     LLVM_DEBUG(llvm::dbgs() << "\nCreated SpecializedGenericSig:\n";
-               SpecializedGenericSig->dump(); SpecializedGenericEnv->dump());
+               SpecializedGenericSig->print(llvm::dbgs());
+               SpecializedGenericEnv->dump(llvm::dbgs()));
   }
 
   // Create substitution lists for the caller and cloner.

@@ -23,27 +23,27 @@ internal typealias _CocoaString = AnyObject
 // Foundation.
 
 @objc private protocol _StringSelectorHolder : _NSCopying {
-    
+
   @objc var length: Int { get }
-  
+
   @objc var hash: UInt { get }
-  
+
   @objc(characterAtIndex:)
   func character(at offset: Int) -> UInt16
-  
+
   @objc(getCharacters:range:)
   func getCharacters(
    _ buffer: UnsafeMutablePointer<UInt16>, range aRange: _SwiftNSRange
   )
- 
+
   @objc(_fastCStringContents:)
   func _fastCStringContents(
     _ requiresNulTermination: Int8
   ) -> UnsafePointer<CChar>?
-  
+
   @objc(_fastCharacterContents)
   func _fastCharacterContents() -> UnsafePointer<UInt16>?
-  
+
   @objc(getBytes:maxLength:usedLength:encoding:options:range:remainingRange:)
   func getBytes(_ buffer: UnsafeMutableRawPointer?,
    maxLength maxBufferCount: Int,
@@ -52,7 +52,7 @@ internal typealias _CocoaString = AnyObject
      options: UInt,
        range: _SwiftNSRange,
        remaining leftover: UnsafeMutablePointer<_SwiftNSRange>?) -> Int8
-  
+
   @objc(compare:options:range:locale:)
   func compare(_ string: _CocoaString,
                options: UInt,
@@ -60,7 +60,7 @@ internal typealias _CocoaString = AnyObject
                locale: AnyObject?) -> Int
 
   @objc(newTaggedNSStringWithASCIIBytes_:length_:)
-  func createTaggedString(bytes: UnsafePointer<UInt8>, 
+  func createTaggedString(bytes: UnsafePointer<UInt8>,
                           count: Int) -> AnyObject?
 }
 
@@ -68,9 +68,9 @@ internal typealias _CocoaString = AnyObject
  Passing a _CocoaString through _objc() lets you call ObjC methods that the
  compiler doesn't know about, via the protocol above. In order to get good
  performance, you need a double indirection like this:
- 
+
   func a -> _objc -> func a'
- 
+
  because any refcounting @_effects on 'a' will be lost when _objc breaks ARC's
  knowledge that the _CocoaString and _StringSelectorHolder are the same object.
  */
@@ -442,9 +442,9 @@ extension String {
   @_effects(releasenone)
   public // SPI(Foundation)
   func _bridgeToObjectiveCImpl() -> AnyObject {
-    
+
     _connectOrphanedFoundationSubclassesIfNeeded()
-    
+
     // Smol ASCII a) may bridge to tagged pointers, b) can't contain a BOM
     if _guts.isSmallASCII {
       let maybeTagged = _guts.asSmall.withUTF8 { bufPtr in
@@ -456,7 +456,7 @@ extension String {
       }
       if let tagged = maybeTagged { return tagged }
     }
-    
+
     if _guts.isSmall {
         // We can't form a tagged pointer String, so grow to a non-small String,
         // and bridge that instead. Also avoids CF deleting any BOM that may be

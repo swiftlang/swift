@@ -6,6 +6,9 @@
 
 // REQUIRES: objc_interop
 
+// rdar://problem/56959761
+// UNSUPPORTED: OS=watchos
+
 import Foundation
 
 /* FIXME: SwiftObject doesn't support -description

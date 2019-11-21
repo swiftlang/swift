@@ -23,6 +23,7 @@
 #include "swift/AST/FunctionRefKind.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Type.h"
+#include "swift/Basic/Debug.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/ilist.h"
 #include "llvm/ADT/ilist_node.h"
@@ -226,6 +227,22 @@ enum class ConversionRestrictionKind {
   /// Implicit conversion from an Objective-C class type to its
   /// toll-free-bridged CF type.
   ObjCTollFreeBridgeToCF,
+};
+
+/// Specifies whether a given conversion requires the creation of a temporary
+/// value which is only valid for a limited scope. For example, the
+/// array-to-pointer conversion produces a pointer that is only valid for the
+/// duration of the call that it's passed to. Such ephemeral conversions cannot
+/// be passed to non-ephemeral parameters.
+enum class ConversionEphemeralness {
+  /// The conversion requires the creation of a temporary value.
+  Ephemeral,
+  /// The conversion does not require the creation of a temporary value.
+  NonEphemeral,
+  /// It is not currently known whether the conversion will produce a temporary
+  /// value or not. This can occur for example with an inout-to-pointer
+  /// conversion of a member whose base type is an unresolved type variable.
+  Unresolved,
 };
 
 /// Return a string representation of a conversion restriction.
@@ -642,13 +659,9 @@ public:
 
   void print(llvm::raw_ostream &Out, SourceManager *sm) const;
 
-  LLVM_ATTRIBUTE_DEPRECATED(
-      void dump(SourceManager *SM) const LLVM_ATTRIBUTE_USED,
-      "only for use within the debugger");
+  SWIFT_DEBUG_DUMPER(dump(SourceManager *SM));
 
-  LLVM_ATTRIBUTE_DEPRECATED(
-      void dump(ConstraintSystem *CS) const LLVM_ATTRIBUTE_USED,
-    "only for use within the debugger");
+  SWIFT_DEBUG_DUMPER(dump(ConstraintSystem *CS));
 
   void *operator new(size_t bytes, ConstraintSystem& cs,
                      size_t alignment = alignof(Constraint));

@@ -473,10 +473,9 @@ final class TangentVectorWB : DummyAdditiveArithmetic, Differentiable {
     self.b = b
   }
 }
-// expected-error @+4 {{'Differentiable' requires the types 'VectorSpaceTypeAlias.TangentVector' (aka 'TangentVectorWB') and 'TangentVectorWB.TangentVector' be equivalent}}
-// expected-note @+3 {{requirement specified as 'Self.TangentVector' == 'Self.TangentVector.TangentVector' [with Self = VectorSpaceTypeAlias]}}
-// expected-error @+2 {{type 'VectorSpaceTypeAlias' does not conform to protocol 'Differentiable'}}
-// expected-note @+1 {{do you want to add protocol stubs?}}
+// expected-error @+3 {{'Differentiable' requires the types 'VectorSpaceTypeAlias.TangentVector' (aka 'TangentVectorWB') and 'TangentVectorWB.TangentVector' be equivalent}}
+// expected-note @+2 {{requirement specified as 'Self.TangentVector' == 'Self.TangentVector.TangentVector' [with Self = VectorSpaceTypeAlias]}}
+// expected-error @+1 {{type 'VectorSpaceTypeAlias' does not conform to protocol 'Differentiable'}}
 final class VectorSpaceTypeAlias : DummyAdditiveArithmetic, Differentiable {
   var w: Float
   var b: Float
@@ -487,8 +486,7 @@ final class VectorSpaceTypeAlias : DummyAdditiveArithmetic, Differentiable {
     self.b = b
   }
 }
-// expected-error @+2 {{type 'VectorSpaceCustomStruct' does not conform to protocol 'Differentiable'}}
-// expected-note @+1 {{do you want to add protocol stubs?}}
+// expected-error @+1 {{type 'VectorSpaceCustomStruct' does not conform to protocol 'Differentiable'}}
 final class VectorSpaceCustomStruct : DummyAdditiveArithmetic, Differentiable {
   var w: Float
   var b: Float
@@ -546,12 +544,10 @@ extension NoMemberwiseInitializerExtended: Differentiable
 
 // Test derived conformances in disallowed contexts.
 
-// expected-error @+3 {{type 'OtherFileNonconforming' does not conform to protocol 'Differentiable'}}
-// expected-error @+2 {{implementation of 'Differentiable' cannot be automatically synthesized in an extension in a different file to the type}}
-// expected-note @+1 {{do you want to add protocol stubs?}}
+// expected-error @+2 {{type 'OtherFileNonconforming' does not conform to protocol 'Differentiable'}}
+// expected-error @+1 {{implementation of 'Differentiable' cannot be automatically synthesized in an extension in a different file to the type}}
 extension OtherFileNonconforming : Differentiable {}
 
-// expected-error @+3 {{type 'GenericOtherFileNonconforming<T>' does not conform to protocol 'Differentiable'}}
-// expected-error @+2 {{implementation of 'Differentiable' cannot be automatically synthesized in an extension in a different file to the type}}
-// expected-note @+1 {{do you want to add protocol stubs?}}
+// expected-error @+2 {{type 'GenericOtherFileNonconforming<T>' does not conform to protocol 'Differentiable'}}
+// expected-error @+1 {{implementation of 'Differentiable' cannot be automatically synthesized in an extension in a different file to the type}}
 extension GenericOtherFileNonconforming : Differentiable {}

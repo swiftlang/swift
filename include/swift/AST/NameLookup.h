@@ -23,6 +23,7 @@
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Module.h"
 #include "swift/Basic/Compiler.h"
+#include "swift/Basic/Debug.h"
 #include "swift/Basic/NullablePtr.h"
 #include "swift/Basic/SourceLoc.h"
 
@@ -595,6 +596,8 @@ public:
   void
   buildEnoughOfTreeForTopLevelExpressionsButDontRequestGenericsOrExtendedNominals();
 
+  static void expandFunctionBody(AbstractFunctionDecl *);
+
   /// Flesh out the tree for dumping
   void buildFullyExpandedTree();
 
@@ -608,8 +611,7 @@ public:
   computeIsCascadingUse(ArrayRef<const ast_scope::ASTScopeImpl *> history,
                         Optional<bool> initialIsCascadingUse);
 
-  LLVM_ATTRIBUTE_DEPRECATED(void dump() const LLVM_ATTRIBUTE_USED,
-                            "only for use within the debugger");
+  SWIFT_DEBUG_DUMP;
   void print(llvm::raw_ostream &) const;
   void dumpOneScopeMapLocation(std::pair<unsigned, unsigned>);
 
@@ -627,8 +629,12 @@ public:
     return Mem;
   }
 
+  static bool areInactiveIfConfigClausesSupported();
+
 private:
   static ast_scope::ASTSourceFileScope *createScopeTree(SourceFile *);
+
+  void expandFunctionBodyImpl(AbstractFunctionDecl *);
 };
 
 } // end namespace swift

@@ -86,10 +86,10 @@ void InferredTypeWitnessesSolution::dump() const {
     auto &valueWitness = ValueWitnesses[i];
     llvm::errs() << i << ":  " << (Decl*)valueWitness.first
     << ' ' << valueWitness.first->getBaseName() << '\n';
-    valueWitness.first->getDeclContext()->dumpContext();
+    valueWitness.first->getDeclContext()->printContext(llvm::errs());
     llvm::errs() << "    for " << (Decl*)valueWitness.second
     << ' ' << valueWitness.second->getBaseName() << '\n';
-    valueWitness.second->getDeclContext()->dumpContext();
+    valueWitness.second->getDeclContext()->printContext(llvm::errs());
   }
 }
 
@@ -208,7 +208,7 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitnesses(
     // because those have to be explicitly declared on the type somewhere
     // so won't be affected by whatever answer inference comes up with.
     auto selfTy = extension->getSelfInterfaceType();
-    auto *tc = static_cast<TypeChecker *>(getASTContext().getLazyResolver());
+    auto *tc = getASTContext().getLegacyGlobalTypeChecker();
     for (const Requirement &reqt : extensionSig->getRequirements()) {
       switch (reqt.getKind()) {
       case RequirementKind::Conformance:

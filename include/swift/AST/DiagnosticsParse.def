@@ -904,6 +904,8 @@ ERROR(parameter_operator_keyword_argument,none,
 
 ERROR(parameter_unnamed,none,
       "unnamed parameters must be written with the empty name '_'", ())
+WARNING(parameter_unnamed_warn,none,
+        "unnamed parameters must be written with the empty name '_'", ())
 
 ERROR(parameter_curry_syntax_removed,none,
       "cannot have more than one parameter list", ())
@@ -1543,8 +1545,12 @@ ERROR(attr_specialize_expected_partial_or_full,none,
 ERROR(attr_implements_expected_member_name,PointsToFirstBadToken,
       "expected a member name as second parameter in '_implements' attribute", ())
 
-// SWIFT_ENABLE_TENSORFLOW
 // differentiable
+ERROR(differentiable_attribute_expected_rparen,none,
+      "expected ')' in '@differentiable' attribute", ())
+ERROR(unexpected_argument_differentiable,none,
+      "unexpected argument '%0' in '@differentiable' attribute", (StringRef))
+// SWIFT_ENABLE_TENSORFLOW
 ERROR(attr_differentiable_expected_function_name,PointsToFirstBadToken,
       "expected a %0 function name", (StringRef))
 ERROR(attr_differentiable_expected_parameter_list,PointsToFirstBadToken,
@@ -1556,10 +1562,6 @@ ERROR(attr_differentiable_missing_label,PointsToFirstBadToken,
 ERROR(attr_differentiable_expected_label,none,
       "expected either 'wrt:' or a function specifier label, e.g. 'jvp:', "
       "or 'vjp:'", ())
-ERROR(differentiable_attribute_expected_rparen,none,
-      "expected ')' after 'linear' in '@differentiable' attribute", ())
-ERROR(unexpected_argument_differentiable,none,
-      "unexpected argument '%0' in '@differentiable' attribute", (StringRef))
 
 // differentiating
 ERROR(attr_differentiating_expected_original_name,PointsToFirstBadToken,
@@ -1651,6 +1653,8 @@ ERROR(expected_generics_type_restriction,none,
       (Identifier))
 ERROR(requires_single_equal,none,
       "use '==' for same-type requirements rather than '='", ())
+ERROR(requires_comma,none,
+      "expected ',' to separate the requirements of this 'where' clause", ())
 ERROR(expected_requirement_delim,none,
       "expected ':' or '==' to indicate a conformance or same-type requirement",
       ())

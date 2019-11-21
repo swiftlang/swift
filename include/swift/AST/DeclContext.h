@@ -23,6 +23,7 @@
 #include "swift/AST/LookupKinds.h"
 #include "swift/AST/ResilienceExpansion.h"
 #include "swift/AST/TypeAlignments.h"
+#include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/SourceLoc.h"
@@ -49,7 +50,6 @@ namespace swift {
   class ExtensionDecl;
   class Expr;
   class GenericParamList;
-  class LazyResolver;
   class LazyMemberLoader;
   class GenericSignature;
   class GenericTypeParamDecl;
@@ -597,7 +597,7 @@ public:
   /// \returns true if traversal was aborted, false otherwise.
   bool walkContext(ASTWalker &Walker);
 
-  void dumpContext() const;
+  SWIFT_DEBUG_DUMPER(dumpContext());
   unsigned printContext(llvm::raw_ostream &OS, unsigned indent = 0,
                         bool onlyAPartialLine = false) const;
 

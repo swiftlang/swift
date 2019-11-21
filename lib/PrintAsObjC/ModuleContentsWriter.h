@@ -36,3 +36,4 @@ void printModuleContentsAsObjC(raw_ostream &os,
 } // end namespace swift
 
 #endif
+

@@ -110,75 +110,24 @@ using namespace swift::syntax;
 
 void SILParserTUStateBase::anchor() { }
 
-namespace {
-/// A visitor that does delayed parsing of function bodies.
-class ParseDelayedFunctionBodies : public ASTWalker {
-  PersistentParserState &ParserState;
-  CodeCompletionCallbacksFactory *CodeCompletionFactory;
-
-public:
-  ParseDelayedFunctionBodies(PersistentParserState &ParserState,
-                             CodeCompletionCallbacksFactory *Factory)
-    : ParserState(ParserState), CodeCompletionFactory(Factory) {}
-
-  bool walkToDeclPre(Decl *D) override {
-    if (auto AFD = dyn_cast<AbstractFunctionDecl>(D)) {
-      if (AFD->getBodyKind() != FuncDecl::BodyKind::Unparsed)
-        return false;
-      parseFunctionBody(AFD);
-      return true;
-    }
-    return true;
-  }
-
-private:
-  void parseFunctionBody(AbstractFunctionDecl *AFD) {
-    // FIXME: This duplicates the evaluation of
-    // ParseAbstractFunctionBodyRequest, but installs a code completion
-    // factory.
-    assert(AFD->getBodyKind() == FuncDecl::BodyKind::Unparsed);
-
-    SourceFile &SF = *AFD->getDeclContext()->getParentSourceFile();
-    SourceManager &SourceMgr = SF.getASTContext().SourceMgr;
-    unsigned BufferID = SourceMgr.findBufferContainingLoc(AFD->getLoc());
-    Parser TheParser(BufferID, SF, nullptr, &ParserState, nullptr,
-                     /*DelayBodyParsing=*/false);
-    TheParser.SyntaxContext->disable();
-    std::unique_ptr<CodeCompletionCallbacks> CodeCompletion;
-    if (CodeCompletionFactory) {
-      CodeCompletion.reset(
-          CodeCompletionFactory->createCodeCompletionCallbacks(TheParser));
-      TheParser.setCodeCompletionCallbacks(CodeCompletion.get());
-    }
-    auto body = TheParser.parseAbstractFunctionBodyDelayed(AFD);
-    AFD->setBodyParsed(body);
-
-    if (CodeCompletion)
-      CodeCompletion->doneParsing();
-  }
-};
-
-static void parseDelayedDecl(
-              PersistentParserState &ParserState,
-              CodeCompletionCallbacksFactory *CodeCompletionFactory) {
+void swift::performCodeCompletionSecondPass(
+    PersistentParserState &ParserState,
+    CodeCompletionCallbacksFactory &Factory) {
+  SharedTimer timer("CodeCompletionSecondPass");
   if (!ParserState.hasDelayedDecl())
     return;
 
-  SourceFile &SF = *ParserState.getDelayedDeclContext()->getParentSourceFile();
-  SourceManager &SourceMgr = SF.getASTContext().SourceMgr;
-  unsigned BufferID =
-    SourceMgr.findBufferContainingLoc(ParserState.getDelayedDeclLoc());
+  auto &SF = *ParserState.getDelayedDeclContext()->getParentSourceFile();
+  auto &SM = SF.getASTContext().SourceMgr;
+  auto BufferID = SM.findBufferContainingLoc(ParserState.getDelayedDeclLoc());
   Parser TheParser(BufferID, SF, nullptr, &ParserState, nullptr);
 
   // Disable libSyntax creation in the delayed parsing.
   TheParser.SyntaxContext->disable();
 
-  std::unique_ptr<CodeCompletionCallbacks> CodeCompletion;
-  if (CodeCompletionFactory) {
-    CodeCompletion.reset(
-      CodeCompletionFactory->createCodeCompletionCallbacks(TheParser));
-    TheParser.setCodeCompletionCallbacks(CodeCompletion.get());
-  }
+  std::unique_ptr<CodeCompletionCallbacks> CodeCompletion(
+      Factory.createCodeCompletionCallbacks(TheParser));
+  TheParser.setCodeCompletionCallbacks(CodeCompletion.get());
 
   switch (ParserState.getDelayedDeclKind()) {
   case PersistentParserState::DelayedDeclKind::TopLevelCodeDecl:
@@ -188,31 +137,22 @@ static void parseDelayedDecl(
   case PersistentParserState::DelayedDeclKind::Decl:
     TheParser.parseDeclDelayed();
     break;
+
+  case PersistentParserState::DelayedDeclKind::FunctionBody: {
+    TheParser.parseAbstractFunctionBodyDelayed();
+    break;
   }
+  }
+  assert(!ParserState.hasDelayedDecl());
 
-  if (CodeCompletion)
-    CodeCompletion->doneParsing();
+  CodeCompletion->doneParsing();
 }
-} // unnamed namespace
-
 
 swift::Parser::BacktrackingScope::~BacktrackingScope() {
   if (Backtrack) {
     P.backtrackToPosition(PP);
     DT.abort();
   }
-}
-
-void swift::performDelayedParsing(
-    DeclContext *DC, PersistentParserState &PersistentState,
-    CodeCompletionCallbacksFactory *CodeCompletionFactory) {
-  SharedTimer timer("Parsing");
-  ParseDelayedFunctionBodies Walker(PersistentState,
-                                    CodeCompletionFactory);
-  DC->walkContext(Walker);
-
-  if (CodeCompletionFactory)
-    parseDelayedDecl(PersistentState, CodeCompletionFactory);
 }
 
 /// Tokenizes a string literal, taking into account string interpolation.

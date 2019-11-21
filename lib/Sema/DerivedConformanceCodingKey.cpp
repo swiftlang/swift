@@ -143,9 +143,6 @@ static ValueDecl *deriveInitDecl(DerivedConformance &derived, Type paramType,
   // Synthesize the body.
   synthesizer(initDecl);
 
-  // Compute the interface type of the initializer.
-  (void)initDecl->getInterfaceType();
-
   initDecl->setAccess(derived.Nominal->getFormalAccess());
 
   C.addSynthesizedDecl(initDecl);

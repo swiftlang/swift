@@ -6,7 +6,7 @@
 // RUN: %FileCheck -check-prefix CHECK-DOT %s  < %t.dot
 
 // Check that we produced superclass type requests.
-// RUN: %{python} %utils/process-stats-dir.py --evaluate 'SuperclassTypeRequest == 17' %t/stats-dir
+// RUN: %{python} %utils/process-stats-dir.py --evaluate 'SuperclassTypeRequest == 18' %t/stats-dir
 
 class Left // expected-error {{circular reference}}
     : Right.Hand { // expected-note {{through reference here}}
@@ -71,4 +71,13 @@ class Circle : Initable & Circle {}
 func crash() {
   Circle()
   // expected-error@-1 {{'Circle' cannot be constructed because it has no accessible initializers}}
+}
+
+// FIXME: We shouldn't emit the redundant "circular reference" diagnostics here.
+class WithDesignatedInit : WithDesignatedInit {
+  // expected-error@-1 {{'WithDesignatedInit' inherits from itself}}
+  // expected-error@-2 {{circular reference}}
+  // expected-note@-3 {{through reference here}}
+
+  init(x: Int) {} // expected-error {{circular reference}}
 }

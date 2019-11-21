@@ -244,10 +244,8 @@ struct Initialization {
   @WrapperWithInitialValue
   var y = true
 
-  // FIXME: For some reason this is type-checked twice, second time around solver complains about <<error type>> argument
   @WrapperWithInitialValue<Int>
-  var y2 = true // expected-error{{cannot convert value of type 'Bool' to expected argument type 'Int'}}
-  // expected-error@-1 {{cannot convert value of type '<<error type>>' to expected argument type 'Int'}}
+  var y2 = true // expected-error{{Bool' is not convertible to 'Int}}
 
   mutating func checkTypes(s: String) {
     x2 = s // expected-error{{cannot assign value of type 'String' to type 'Double'}}
@@ -966,14 +964,21 @@ struct TestComposition {
   @WrapperD<WrapperC, Int, String> @WrapperC var p4: Int?
   @WrapperD<WrapperC, Int, String> @WrapperE var p5: Int // expected-error{{property type 'Int' does not match that of the 'wrappedValue' property of its wrapper type 'WrapperD<WrapperC, Int, String>'}}
 
-	func triggerErrors(d: Double) {
-		p1 = d // expected-error{{cannot assign value of type 'Double' to type 'Int?'}}
-		p2 = d // expected-error{{cannot assign value of type 'Double' to type 'String?'}}
-    p3 = d // expected-error{{cannot assign value of type 'Double' to type 'Int?'}}
+	func triggerErrors(d: Double) { // expected-note 6 {{mark method 'mutating' to make 'self' mutable}} {{2-2=mutating }}
+		p1 = d // expected-error{{cannot assign value of type 'Double' to type 'Int'}} {{8-8=Int(}} {{9-9=)}}
+    // expected-error@-1 {{cannot assign to property: 'self' is immutable}}
+		p2 = d // expected-error{{cannot assign value of type 'Double' to type 'String'}}
+    // expected-error@-1 {{cannot assign to property: 'self' is immutable}}
+    // TODO(diagnostics): Looks like source range for 'd' here is reported as starting at 10, but it should be 8
+    p3 = d // expected-error{{cannot assign value of type 'Double' to type 'Int'}} {{10-10=Int(}} {{11-11=)}}
+    // expected-error@-1 {{cannot assign to property: 'self' is immutable}}
 
 		_p1 = d // expected-error{{cannot assign value of type 'Double' to type 'WrapperA<WrapperB<WrapperC<Int>>>'}}
+    // expected-error@-1 {{cannot assign to property: 'self' is immutable}}
 		_p2 = d // expected-error{{cannot assign value of type 'Double' to type 'WrapperA<WrapperB<WrapperC<String>>>'}}
+    // expected-error@-1 {{cannot assign to property: 'self' is immutable}}
     _p3 = d // expected-error{{cannot assign value of type 'Double' to type 'WrapperD<WrapperE<Int?>, Int, String>'}}
+    // expected-error@-1 {{cannot assign to property: 'self' is immutable}}
 	}
 }
 
@@ -1584,9 +1589,7 @@ extension SR_11288_P4 where Self: AnyObject { // expected-note 2 {{where 'Self' 
 }
 
 struct SR_11288_S4: SR_11288_P4 {
-  // FIXME: We shouldn't diagnose the arg-to-param mismatch (rdar://problem/56345248)
   @SR_11288_Wrapper4 var answer = 42 // expected-error 2 {{referencing type alias 'SR_11288_Wrapper4' on 'SR_11288_P4' requires that 'SR_11288_S4' be a class type}}
-  // expected-error @-1 {{cannot convert value of type '<<error type>>' to expected argument type 'Int'}}
 }
 
 class SR_11288_C0: SR_11288_P4 {

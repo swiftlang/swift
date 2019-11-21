@@ -17,6 +17,7 @@
 #ifndef SWIFT_AST_CONCRETEDECLREF_H
 #define SWIFT_AST_CONCRETEDECLREF_H
 
+#include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/TypeAlignments.h"
@@ -81,8 +82,8 @@ public:
   }
   
   /// Dump a debug representation of this reference.
-  void dump(raw_ostream &os);
-  void dump() LLVM_ATTRIBUTE_USED;
+  void dump(raw_ostream &os) const;
+  SWIFT_DEBUG_DUMP;
 };
 
 } // end namespace swift

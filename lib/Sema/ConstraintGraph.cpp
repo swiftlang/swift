@@ -1319,7 +1319,7 @@ void ConstraintGraph::incrementConstraintsPerContractionCounter() {
 
 #pragma mark Debugging output
 
-void ConstraintGraphNode::print(llvm::raw_ostream &out, unsigned indent) {
+void ConstraintGraphNode::print(llvm::raw_ostream &out, unsigned indent) const {
   out.indent(indent);
   TypeVar->print(out);
   out << ":\n";
@@ -1351,7 +1351,7 @@ void ConstraintGraphNode::print(llvm::raw_ostream &out, unsigned indent) {
      out << ' ';
      adj->print(out);
 
-     auto &info = AdjacencyInfo[adj];
+     const auto info = AdjacencyInfo.lookup(adj);
      auto degree = info.NumConstraints;
      if (degree > 1) {
        out << " (" << degree << ")";
@@ -1394,7 +1394,7 @@ void ConstraintGraphNode::print(llvm::raw_ostream &out, unsigned indent) {
   }
 }
 
-void ConstraintGraphNode::dump() {
+void ConstraintGraphNode::dump() const {
   llvm::SaveAndRestore<bool>
     debug(TypeVar->getASTContext().LangOpts.DebugConstraintSolver, true);
   print(llvm::dbgs(), 0);

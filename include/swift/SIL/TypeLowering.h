@@ -255,7 +255,7 @@ public:
   void print(llvm::raw_ostream &os) const;
 
   /// Dump out the internal state of this type lowering to llvm::dbgs().
-  LLVM_ATTRIBUTE_DEPRECATED(void dump() const, "Only for use in the debugger");
+  SWIFT_DEBUG_DUMP;
 
   /// Are r-values of this type passed as arguments indirectly by formal
   /// convention?

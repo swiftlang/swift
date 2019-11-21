@@ -133,7 +133,7 @@ static bool canCreateProfilerForAST(ASTNode N, SILDeclRef forDecl) {
 
     if (isa<TopLevelCodeDecl>(D))
       return true;
-  } else if (auto *E = N.get<Expr *>()) {
+  } else if (N.get<Expr *>()) {
     if (forDecl.isStoredPropertyInitializer() ||
         forDecl.isPropertyWrapperBackingInitializer() ||
         forDecl.getAbstractClosureExpr())

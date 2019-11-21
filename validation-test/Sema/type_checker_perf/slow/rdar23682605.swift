@@ -1,5 +1,5 @@
 // RUN: %target-typecheck-verify-swift -solver-expression-time-threshold=1
-// REQUIRES: tools-release,no_asserts
+// REQUIRES: tools-release,no_asan
 
 func memoize<T: Hashable, U>( body: @escaping ((T)->U, T)->U ) -> (T)->U {
   var memo = Dictionary<T, U>()
@@ -14,7 +14,7 @@ func memoize<T: Hashable, U>( body: @escaping ((T)->U, T)->U ) -> (T)->U {
 }
 
 let fibonacci = memoize {
-  // expected-error@-1 {{expression was too complex to be solved in reasonable time; consider breaking up the expression into distinct sub-expressions}}
+  // expected-error@-1 {{reasonable time}}
   fibonacci, n in
   n < 2 ? Double(n) : fibonacci(n - 1) + fibonacci(n - 2)
 }

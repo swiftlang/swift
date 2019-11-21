@@ -70,7 +70,6 @@ namespace swift {
   class LazyContextData;
   class LazyIterableDeclContextData;
   class LazyMemberLoader;
-  class LazyResolver;
   class PatternBindingDecl;
   class PatternBindingInitializer;
   class SourceFile;
@@ -102,6 +101,7 @@ namespace swift {
   class SourceManager;
   class ValueDecl;
   class DiagnosticEngine;
+  class TypeChecker;
   class TypeCheckerDebugConsumer;
   struct RawComment;
   class DocComment;
@@ -273,6 +273,9 @@ public:
   /// Cache of remapped types (useful for diagnostics).
   llvm::StringMap<Type> RemappedTypes;
 
+  /// The # of times we have performed typo correction.
+  unsigned NumTypoCorrections = 0;
+
   /// Cache of autodiff-associated vector spaces.
   llvm::DenseMap<Type, Optional<VectorSpace>> AutoDiffVectorSpaces;
 
@@ -415,28 +418,14 @@ public:
   /// Set a new stats reporter.
   void setStatsReporter(UnifiedStatsReporter *stats);
 
-  /// Creates a new lazy resolver by passing the ASTContext and the other
-  /// given arguments to a newly-allocated instance of \c ResolverType.
-  ///
-  /// \returns true if a new lazy resolver was created, false if there was
-  /// already a lazy resolver registered.
-  template<typename ResolverType, typename ... Args>
-  bool createLazyResolverIfMissing(Args && ...args) {
-    if (getLazyResolver())
-      return false;
-
-    setLazyResolver(new ResolverType(*this, std::forward<Args>(args)...));
-    return true;
-  }
-
-  /// Retrieve the lazy resolver for this context.
-  LazyResolver *getLazyResolver() const;
-
 private:
-  /// Set the lazy resolver for this context.
-  void setLazyResolver(LazyResolver *resolver);
+  friend class TypeChecker;
 
+  void installGlobalTypeChecker(TypeChecker *TC);
 public:
+  /// Retrieve the global \c TypeChecker instance associated with this context.
+  TypeChecker *getLegacyGlobalTypeChecker() const;
+
   /// getIdentifier - Return the uniqued and AST-Context-owned version of the
   /// specified string.
   Identifier getIdentifier(StringRef Str) const;
@@ -498,17 +487,13 @@ public:
   /// Retrieve the type Swift.Never.
   CanType getNeverType() const;
 
-  /// Retrieve the declaration of ObjectiveC.ObjCBool.
-  StructDecl *getObjCBoolDecl() const;
-
-  /// Retrieve the declaration of Foundation.NSCopying.
-  ProtocolDecl *getNSCopyingDecl() const;
-  /// Retrieve the declaration of Foundation.NSError.
-  ClassDecl *getNSErrorDecl() const;
-  /// Retrieve the declaration of Foundation.NSNumber.
-  ClassDecl *getNSNumberDecl() const;
-  /// Retrieve the declaration of Foundation.NSValue.
-  ClassDecl *getNSValueDecl() const;
+#define KNOWN_OBJC_TYPE_DECL(MODULE, NAME, DECL_CLASS) \
+  /** Retrieve the declaration of MODULE.NAME. */ \
+  DECL_CLASS *get##NAME##Decl() const; \
+\
+  /** Retrieve the type of MODULE.NAME. */ \
+  Type get##NAME##Type() const;
+#include "swift/AST/KnownObjCTypes.def"
 
   // Declare accessors for the known declarations.
 #define FUNC_DECL(Name, Id) \
@@ -894,6 +879,11 @@ public:
   /// This guarantees that resulted \p names doesn't have duplicated names.
   void getVisibleTopLevelModuleNames(SmallVectorImpl<Identifier> &names) const;
 
+  /// Whether to perform typo correction given the pre-configured correction limit.
+  /// Increments \c NumTypoCorrections then checks this against the limit in
+  /// the language options.
+  bool shouldPerformTypoCorrection();
+  
 private:
   /// Register the given generic signature builder to be used as the canonical
   /// generic signature builder for the given signature, if we don't already
