@@ -74,7 +74,6 @@ SourceComparator::buildEquivalenceClasses() {
   return rhsMap;
 }
 
-
 std::pair<std::vector<SourceComparator::PRLink>,
           SourceComparator::SortedSequence>
 SourceComparator::buildDAGOfSubsequences(
@@ -113,16 +112,14 @@ SourceComparator::buildDAGOfSubsequences(
 }
 
 void SourceComparator::scanMatchedLines(
-    std::pair<std::vector<PRLink>, SortedSequence>
-        &&linksAndThres) {
+    std::pair<std::vector<PRLink>, SortedSequence> &&linksAndThres) {
   const auto &links = linksAndThres.first;
   const auto &thresh = linksAndThres.second;
 
   if (thresh.empty())
     return;
   // For every match put rhs index in matches[col2 index]
-  for (const auto *p = &links[thresh.size() - 1];
-       p;
+  for (const auto *p = &links[thresh.size() - 1]; p;
        p = p->next ? &links[p->next.getValue()] : nullptr)
     matches[p->lines.lhs()] = p->lines.rhs();
 }

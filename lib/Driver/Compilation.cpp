@@ -1967,8 +1967,7 @@ void Compilation::disableIncrementalBuild(Twine why) {
 }
 
 void Compilation::IncrementalSchemeComparator::update(
-    const CommandSet &depJobs,
-    const CommandSet &rangeJobs,
+    const CommandSet &depJobs, const CommandSet &rangeJobs,
     const CommandSet &lackingSuppJobs) {
   for (const auto *cmd : depJobs)
     DependencyCompileJobs.insert(cmd);
@@ -2018,22 +2017,26 @@ void Compilation::IncrementalSchemeComparator::outputComparison(
   }
   unsigned depsCount = DependencyCompileJobs.size();
   unsigned rangesCount =
-      UseSourceRangeDependencies ? SourceRangeCompileJobs.size()
-                                 : depsCount +
-                                       additionalDependencyJobsToCreateSupps;
+      UseSourceRangeDependencies
+          ? SourceRangeCompileJobs.size()
+          : depsCount + additionalDependencyJobsToCreateSupps;
 
-  const bool fellBack = EnableSourceRangeDependencies && !UseSourceRangeDependencies;
+  const bool fellBack =
+      EnableSourceRangeDependencies && !UseSourceRangeDependencies;
 
   const int rangeBenefit = depsCount - rangesCount;
-  const int rangeStageBenefit = DependencyCompileStages - SourceRangeCompileStages;
+  const int rangeStageBenefit =
+      DependencyCompileStages - SourceRangeCompileStages;
 
   out << "*** "
       << "Range benefit: " << rangeBenefit << " compilations, "
       << rangeStageBenefit << " stages, "
       << "deps: " << depsCount << ", "
-      << "ranges" << (fellBack ? " (falling back)" : "") << ": " << rangesCount << ", "
+      << "ranges" << (fellBack ? " (falling back)" : "") << ": " << rangesCount
+      << ", "
       << "total: " << SwiftInputCount << ", "
-      << "requested: " << (EnableSourceRangeDependencies ? "ranges" : "deps") << ", "
+      << "requested: " << (EnableSourceRangeDependencies ? "ranges" : "deps")
+      << ", "
       << "used: " << (UseSourceRangeDependencies ? "ranges" : "deps")
       << "***\n";
 }
