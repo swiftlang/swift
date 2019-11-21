@@ -12,21 +12,21 @@ struct S {}
 @objc class NSCloud {}
 
 // CHECK-LABEL: sil @dont_fold_unconditional_checked_cast_to_existentials
-// CHECK: unconditional_checked_cast %1 : $NSCloud to $AnyObject
+// CHECK: unconditional_checked_cast %1 : $NSCloud to AnyObject
 sil @dont_fold_unconditional_checked_cast_to_existentials : $@convention(thin) () -> AnyObject {
 entry:
   %0 = alloc_stack $NSCloud
   %1 = load %0 : $*NSCloud
-  %2 = unconditional_checked_cast %1 : $NSCloud to $AnyObject
+  %2 = unconditional_checked_cast %1 : $NSCloud to AnyObject
   dealloc_stack %0 : $*NSCloud
   return %2 : $AnyObject
 }
 
 // CHECK-LABEL: sil @dont_fold_unconditional_checked_cast_from_existentials
-// CHECK: unconditional_checked_cast %0 : $AnyObject to $NSCloud
+// CHECK: unconditional_checked_cast %0 : $AnyObject to NSCloud
 sil @dont_fold_unconditional_checked_cast_from_existentials : $@convention(thin) (AnyObject) -> NSCloud {
 entry (%0 : $AnyObject):
-  %1 = unconditional_checked_cast %0 : $AnyObject to $NSCloud
+  %1 = unconditional_checked_cast %0 : $AnyObject to NSCloud
   return %1 : $NSCloud
 }
 

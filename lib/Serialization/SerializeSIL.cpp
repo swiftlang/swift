@@ -1569,60 +1569,67 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   // Checked Conversion instructions.
   case SILInstructionKind::UnconditionalCheckedCastInst: {
     auto CI = cast<UnconditionalCheckedCastInst>(&SI);
-    SILInstCastLayout::emitRecord(Out, ScratchRecord,
-        SILAbbrCodes[SILInstCastLayout::Code],
-        (unsigned)SI.getKind(), /*attr*/ 0,
-        S.addTypeRef(CI->getType().getASTType()),
-        (unsigned)CI->getType().getCategory(),
-        S.addTypeRef(CI->getOperand()->getType().getASTType()),
-        (unsigned)CI->getOperand()->getType().getCategory(),
-        addValueRef(CI->getOperand()));
+    ValueID listOfValues[] = {
+      addValueRef(CI->getOperand()),
+      S.addTypeRef(CI->getSourceLoweredType().getASTType()),
+      (unsigned)CI->getSourceLoweredType().getCategory(),
+      S.addTypeRef(CI->getTargetFormalType())
+    };
+
+    SILOneTypeValuesLayout::emitRecord(Out, ScratchRecord,
+             SILAbbrCodes[SILOneTypeValuesLayout::Code], (unsigned)SI.getKind(),
+             S.addTypeRef(CI->getTargetLoweredType().getASTType()),
+             (unsigned)CI->getTargetLoweredType().getCategory(),
+             llvm::makeArrayRef(listOfValues));
     break;
   }
   case SILInstructionKind::UnconditionalCheckedCastAddrInst: {
     auto CI = cast<UnconditionalCheckedCastAddrInst>(&SI);
     ValueID listOfValues[] = {
-      S.addTypeRef(CI->getSourceType()),
+      S.addTypeRef(CI->getSourceFormalType()),
       addValueRef(CI->getSrc()),
-      S.addTypeRef(CI->getSrc()->getType().getASTType()),
-      (unsigned)CI->getSrc()->getType().getCategory(),
-      S.addTypeRef(CI->getTargetType()),
+      S.addTypeRef(CI->getSourceLoweredType().getASTType()),
+      (unsigned)CI->getSourceLoweredType().getCategory(),
+      S.addTypeRef(CI->getTargetFormalType()),
       addValueRef(CI->getDest())
     };
     SILOneTypeValuesLayout::emitRecord(Out, ScratchRecord,
              SILAbbrCodes[SILOneTypeValuesLayout::Code], (unsigned)SI.getKind(),
-             S.addTypeRef(CI->getDest()->getType().getASTType()),
-             (unsigned)CI->getDest()->getType().getCategory(),
+             S.addTypeRef(CI->getTargetLoweredType().getASTType()),
+             (unsigned)CI->getTargetLoweredType().getCategory(),
              llvm::makeArrayRef(listOfValues));
     break;
   }
   case SILInstructionKind::UnconditionalCheckedCastValueInst: {
     auto CI = cast<UnconditionalCheckedCastValueInst>(&SI);
-    SILInstCastLayout::emitRecord(
-        Out, ScratchRecord, SILAbbrCodes[SILInstCastLayout::Code],
-        (unsigned)SI.getKind(),
-        /*attr*/ 0,
-        S.addTypeRef(CI->getType().getASTType()),
-        (unsigned)CI->getType().getCategory(),
-        S.addTypeRef(CI->getOperand()->getType().getASTType()),
-        (unsigned)CI->getOperand()->getType().getCategory(),
-        addValueRef(CI->getOperand()));
+    ValueID listOfValues[] = {
+      S.addTypeRef(CI->getSourceFormalType()),
+      addValueRef(CI->getOperand()),
+      S.addTypeRef(CI->getSourceLoweredType().getASTType()),
+      (unsigned)CI->getSourceLoweredType().getCategory(),
+      S.addTypeRef(CI->getTargetFormalType())
+    };
+    SILOneTypeValuesLayout::emitRecord(Out, ScratchRecord,
+             SILAbbrCodes[SILOneTypeValuesLayout::Code], (unsigned)SI.getKind(),
+             S.addTypeRef(CI->getTargetLoweredType().getASTType()),
+             (unsigned)CI->getTargetLoweredType().getCategory(),
+             llvm::makeArrayRef(listOfValues));
     break;
   }
   case SILInstructionKind::UncheckedRefCastAddrInst: {
     auto CI = cast<UncheckedRefCastAddrInst>(&SI);
     ValueID listOfValues[] = {
-      S.addTypeRef(CI->getSourceType()),
+      S.addTypeRef(CI->getSourceFormalType()),
       addValueRef(CI->getSrc()),
-      S.addTypeRef(CI->getSrc()->getType().getASTType()),
-      (unsigned)CI->getSrc()->getType().getCategory(),
-      S.addTypeRef(CI->getTargetType()),
+      S.addTypeRef(CI->getSourceLoweredType().getASTType()),
+      (unsigned)CI->getSourceLoweredType().getCategory(),
+      S.addTypeRef(CI->getTargetFormalType()),
       addValueRef(CI->getDest())
     };
     SILOneTypeValuesLayout::emitRecord(Out, ScratchRecord,
              SILAbbrCodes[SILOneTypeValuesLayout::Code], (unsigned)SI.getKind(),
-             S.addTypeRef(CI->getDest()->getType().getASTType()),
-             (unsigned)CI->getDest()->getType().getCategory(),
+             S.addTypeRef(CI->getTargetLoweredType().getASTType()),
+             (unsigned)CI->getTargetLoweredType().getCategory(),
              llvm::makeArrayRef(listOfValues));
     break;
   }
@@ -2004,66 +2011,62 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     break;
   }
   case SILInstructionKind::CheckedCastBranchInst: {
-    // Format: the cast kind, a typed value, a BasicBlock ID for success,
-    // a BasicBlock ID for failure. Uses SILOneTypeValuesLayout.
     const CheckedCastBranchInst *CBI = cast<CheckedCastBranchInst>(&SI);
-    SmallVector<ValueID, 8> ListOfValues;
-    ListOfValues.push_back(CBI->isExact()),
-    ListOfValues.push_back(addValueRef(CBI->getOperand()));
-    ListOfValues.push_back(
-               S.addTypeRef(CBI->getOperand()->getType().getASTType()));
-    ListOfValues.push_back((unsigned)CBI->getOperand()->getType().getCategory());
-    ListOfValues.push_back(BasicBlockMap[CBI->getSuccessBB()]);
-    ListOfValues.push_back(BasicBlockMap[CBI->getFailureBB()]);
+    ValueID listOfValues[] = {
+      CBI->isExact(),
+      addValueRef(CBI->getOperand()),
+      S.addTypeRef(CBI->getSourceLoweredType().getASTType()),
+      (unsigned)CBI->getSourceLoweredType().getCategory(),
+      S.addTypeRef(CBI->getTargetFormalType()),
+      BasicBlockMap[CBI->getSuccessBB()],
+      BasicBlockMap[CBI->getFailureBB()]
+    };
 
     SILOneTypeValuesLayout::emitRecord(Out, ScratchRecord,
              SILAbbrCodes[SILOneTypeValuesLayout::Code], (unsigned)SI.getKind(),
-             S.addTypeRef(CBI->getCastType().getASTType()),
-             (unsigned)CBI->getCastType().getCategory(),
-             ListOfValues);
+             S.addTypeRef(CBI->getTargetLoweredType().getASTType()),
+             (unsigned)CBI->getTargetLoweredType().getCategory(),
+             llvm::makeArrayRef(listOfValues));
     break;
   }
   case SILInstructionKind::CheckedCastValueBranchInst: {
-    // Format: the cast kind, a typed value, a BasicBlock ID for success,
-    // a BasicBlock ID for failure. Uses SILOneTypeValuesLayout.
     const CheckedCastValueBranchInst *CBI =
         cast<CheckedCastValueBranchInst>(&SI);
-    SmallVector<ValueID, 8> ListOfValues;
-    ListOfValues.push_back(addValueRef(CBI->getOperand()));
-    ListOfValues.push_back(
-        S.addTypeRef(CBI->getOperand()->getType().getASTType()));
-    ListOfValues.push_back(
-        (unsigned)CBI->getOperand()->getType().getCategory());
-    ListOfValues.push_back(BasicBlockMap[CBI->getSuccessBB()]);
-    ListOfValues.push_back(BasicBlockMap[CBI->getFailureBB()]);
+    ValueID listOfValues[] = {
+      S.addTypeRef(CBI->getSourceFormalType()),
+      addValueRef(CBI->getOperand()),
+      S.addTypeRef(CBI->getSourceLoweredType().getASTType()),
+      (unsigned)CBI->getSourceLoweredType().getCategory(),
+      S.addTypeRef(CBI->getTargetFormalType()),
+      BasicBlockMap[CBI->getSuccessBB()],
+      BasicBlockMap[CBI->getFailureBB()]
+    };
 
     SILOneTypeValuesLayout::emitRecord(
         Out, ScratchRecord, SILAbbrCodes[SILOneTypeValuesLayout::Code],
         (unsigned)SI.getKind(),
-        S.addTypeRef(CBI->getCastType().getASTType()),
-        (unsigned)CBI->getCastType().getCategory(), ListOfValues);
+        S.addTypeRef(CBI->getTargetLoweredType().getASTType()),
+        (unsigned)CBI->getTargetLoweredType().getCategory(),
+        llvm::makeArrayRef(listOfValues));
     break;
   }
   case SILInstructionKind::CheckedCastAddrBranchInst: {
-    // Format: the cast kind, two typed values, a BasicBlock ID for
-    // success, a BasicBlock ID for failure.  Uses SILOneTypeValuesLayout;
-    // the type is the type of the second (dest) operand.
     auto CBI = cast<CheckedCastAddrBranchInst>(&SI);
     ValueID listOfValues[] = {
       toStableCastConsumptionKind(CBI->getConsumptionKind()),
-      S.addTypeRef(CBI->getSourceType()),
+      S.addTypeRef(CBI->getSourceFormalType()),
       addValueRef(CBI->getSrc()),
-      S.addTypeRef(CBI->getSrc()->getType().getASTType()),
-      (unsigned)CBI->getSrc()->getType().getCategory(),
-      S.addTypeRef(CBI->getTargetType()),
+      S.addTypeRef(CBI->getSourceLoweredType().getASTType()),
+      (unsigned)CBI->getSourceLoweredType().getCategory(),
+      S.addTypeRef(CBI->getTargetFormalType()),
       addValueRef(CBI->getDest()),
       BasicBlockMap[CBI->getSuccessBB()],
       BasicBlockMap[CBI->getFailureBB()]
     };
     SILOneTypeValuesLayout::emitRecord(Out, ScratchRecord,
              SILAbbrCodes[SILOneTypeValuesLayout::Code], (unsigned)SI.getKind(),
-             S.addTypeRef(CBI->getDest()->getType().getASTType()),
-             (unsigned)CBI->getDest()->getType().getCategory(),
+             S.addTypeRef(CBI->getTargetLoweredType().getASTType()),
+             (unsigned)CBI->getTargetLoweredType().getCategory(),
              llvm::makeArrayRef(listOfValues));
     break;
   }
@@ -2471,7 +2474,6 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
   registerSILAbbr<DefaultWitnessTableNoEntryLayout>();
   registerSILAbbr<PropertyLayout>();
 
-  registerSILAbbr<SILInstCastLayout>();
   registerSILAbbr<SILInstWitnessMethodLayout>();
   registerSILAbbr<SILSpecializeAttrLayout>();
 

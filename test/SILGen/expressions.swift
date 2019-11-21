@@ -234,7 +234,7 @@ class D : B {
 // CHECK-LABEL: sil hidden [ossa] @$s11expressions8downcast{{[_0-9a-zA-Z]*}}F
 func downcast(_ x: B) -> D {
   return x as! D
-  // CHECK: unconditional_checked_cast %{{[0-9]+}} : {{.*}} to $D
+  // CHECK: unconditional_checked_cast %{{[0-9]+}} : {{.*}} to D
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s11expressions6upcast{{[_0-9a-zA-Z]*}}F
@@ -253,7 +253,7 @@ func generic_upcast<T : B>(_ x: T) -> B {
 // CHECK-LABEL: sil hidden [ossa] @$s11expressions16generic_downcast{{[_0-9a-zA-Z]*}}F
 func generic_downcast<T : B>(_ x: T, y: B) -> T {
   return y as! T
-  // CHECK: unconditional_checked_cast %{{[0-9]+}} : {{.*}} to $T
+  // CHECK: unconditional_checked_cast %{{[0-9]+}} : {{.*}} to T
   // CHECK: return
 }
 

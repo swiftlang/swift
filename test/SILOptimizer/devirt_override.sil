@@ -114,7 +114,7 @@ sil @_TF1b3fooFT_T_ : $@convention(thin) () -> () {
 bb0:
   %0 = alloc_ref $E
   %1 = upcast %0 : $E to $C
-  %2 = unconditional_checked_cast %1 : $C to $D
+  %2 = unconditional_checked_cast %1 : $C to D
   %3 = class_method %2 : $D, #D.doIt!1 : (D) -> () -> (), $@convention(method) (@guaranteed D) -> ()
   %4 = apply %3(%2) : $@convention(method) (@guaranteed D) -> ()
   %5 = tuple ()

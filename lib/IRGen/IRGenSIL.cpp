@@ -4606,7 +4606,9 @@ void IRGenSILFunction::
 visitUncheckedRefCastAddrInst(swift::UncheckedRefCastAddrInst *i) {
   Address dest = getLoweredAddress(i->getDest());
   Address src = getLoweredAddress(i->getSrc());
-  emitCheckedCast(*this, src, i->getSourceType(), dest, i->getTargetType(),
+  emitCheckedCast(*this,
+                  src, i->getSourceFormalType(),
+                  dest, i->getTargetFormalType(),
                   CastConsumptionKind::TakeAlways,
                   CheckedCastMode::Unconditional);
 }
@@ -5017,7 +5019,9 @@ void IRGenSILFunction::visitUnconditionalCheckedCastAddrInst(
                                    swift::UnconditionalCheckedCastAddrInst *i) {
   Address dest = getLoweredAddress(i->getDest());
   Address src = getLoweredAddress(i->getSrc());
-  emitCheckedCast(*this, src, i->getSourceType(), dest, i->getTargetType(),
+  emitCheckedCast(*this,
+                  src, i->getSourceFormalType(),
+                  dest, i->getTargetFormalType(),
                   CastConsumptionKind::TakeAlways,
                   CheckedCastMode::Unconditional);
 }
@@ -5034,18 +5038,21 @@ void IRGenSILFunction::visitCheckedCastValueBranchInst(
 
 void IRGenSILFunction::visitCheckedCastBranchInst(
                                               swift::CheckedCastBranchInst *i) {
-  SILType destTy = i->getCastType();
+  SILType destTy = i->getTargetLoweredType();
   FailableCastResult castResult;
   Explosion ex;
   if (i->isExact()) {
     auto operand = i->getOperand();
     Explosion source = getLoweredExplosion(operand);
     castResult = emitClassIdenticalCast(*this, source.claimNext(),
-                                        operand->getType(), destTy);
+                                        i->getSourceLoweredType(),
+                                        destTy);
   } else {
     Explosion value = getLoweredExplosion(i->getOperand());
-    emitScalarCheckedCast(*this, value, i->getOperand()->getType(),
-                          i->getCastType(), CheckedCastMode::Conditional, ex);
+    emitScalarCheckedCast(*this, value,
+                          i->getSourceLoweredType(),
+                          i->getTargetLoweredType(),
+                          CheckedCastMode::Conditional, ex);
     auto val = ex.claimNext();
     castResult.casted = val;
     llvm::Value *nil =
@@ -5079,7 +5086,9 @@ void IRGenSILFunction::visitCheckedCastAddrBranchInst(
   Address dest = getLoweredAddress(i->getDest());
   Address src = getLoweredAddress(i->getSrc());
   llvm::Value *castSucceeded =
-    emitCheckedCast(*this, src, i->getSourceType(), dest, i->getTargetType(),
+    emitCheckedCast(*this,
+                    src, i->getSourceFormalType(),
+                    dest, i->getTargetFormalType(),
                     i->getConsumptionKind(), CheckedCastMode::Conditional);
   Builder.CreateCondBr(castSucceeded,
                        getLoweredBB(i->getSuccessBB()).bb,

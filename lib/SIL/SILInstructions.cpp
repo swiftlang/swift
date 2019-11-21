@@ -1963,65 +1963,77 @@ UncheckedBitwiseCastInst::create(SILDebugLocation DebugLoc, SILValue Operand,
 }
 
 UnconditionalCheckedCastInst *UnconditionalCheckedCastInst::create(
-    SILDebugLocation DebugLoc, SILValue Operand, SILType DestTy, SILFunction &F,
-    SILOpenedArchetypesState &OpenedArchetypes) {
+    SILDebugLocation DebugLoc, SILValue Operand,
+    SILType DestLoweredTy, CanType DestFormalTy,
+    SILFunction &F, SILOpenedArchetypesState &OpenedArchetypes) {
   SILModule &Mod = F.getModule();
   SmallVector<SILValue, 8> TypeDependentOperands;
   collectTypeDependentOperands(TypeDependentOperands, OpenedArchetypes, F,
-                               DestTy.getASTType());
+                               DestFormalTy);
   unsigned size =
       totalSizeToAlloc<swift::Operand>(1 + TypeDependentOperands.size());
   void *Buffer = Mod.allocateInst(size, alignof(UnconditionalCheckedCastInst));
   return ::new (Buffer) UnconditionalCheckedCastInst(DebugLoc, Operand,
-                                                     TypeDependentOperands, DestTy);
+                                                     TypeDependentOperands,
+                                                     DestLoweredTy,
+                                                     DestFormalTy);
 }
 
 UnconditionalCheckedCastValueInst *UnconditionalCheckedCastValueInst::create(
-    SILDebugLocation DebugLoc, SILValue Operand, SILType DestTy, SILFunction &F,
-    SILOpenedArchetypesState &OpenedArchetypes) {
+    SILDebugLocation DebugLoc,
+    SILValue Operand, CanType SrcFormalTy,
+    SILType DestLoweredTy, CanType DestFormalTy,
+    SILFunction &F, SILOpenedArchetypesState &OpenedArchetypes) {
   SILModule &Mod = F.getModule();
   SmallVector<SILValue, 8> TypeDependentOperands;
   collectTypeDependentOperands(TypeDependentOperands, OpenedArchetypes, F,
-                               DestTy.getASTType());
+                               DestFormalTy);
   unsigned size =
       totalSizeToAlloc<swift::Operand>(1 + TypeDependentOperands.size());
   void *Buffer =
       Mod.allocateInst(size, alignof(UnconditionalCheckedCastValueInst));
   return ::new (Buffer) UnconditionalCheckedCastValueInst(
-      DebugLoc, Operand, TypeDependentOperands, DestTy);
+      DebugLoc, Operand, SrcFormalTy, TypeDependentOperands,
+      DestLoweredTy, DestFormalTy);
 }
 
 CheckedCastBranchInst *CheckedCastBranchInst::create(
-    SILDebugLocation DebugLoc, bool IsExact, SILValue Operand, SILType DestTy,
+    SILDebugLocation DebugLoc, bool IsExact, SILValue Operand,
+    SILType DestLoweredTy, CanType DestFormalTy,
     SILBasicBlock *SuccessBB, SILBasicBlock *FailureBB, SILFunction &F,
     SILOpenedArchetypesState &OpenedArchetypes, ProfileCounter Target1Count,
     ProfileCounter Target2Count) {
   SILModule &Mod = F.getModule();
   SmallVector<SILValue, 8> TypeDependentOperands;
   collectTypeDependentOperands(TypeDependentOperands, OpenedArchetypes, F,
-                               DestTy.getASTType());
+                               DestFormalTy);
   unsigned size =
       totalSizeToAlloc<swift::Operand>(1 + TypeDependentOperands.size());
   void *Buffer = Mod.allocateInst(size, alignof(CheckedCastBranchInst));
   return ::new (Buffer) CheckedCastBranchInst(
-      DebugLoc, IsExact, Operand, TypeDependentOperands, DestTy, SuccessBB,
-      FailureBB, Target1Count, Target2Count);
+      DebugLoc, IsExact, Operand, TypeDependentOperands,
+      DestLoweredTy, DestFormalTy, SuccessBB, FailureBB,
+      Target1Count, Target2Count);
 }
 
 CheckedCastValueBranchInst *
-CheckedCastValueBranchInst::create(SILDebugLocation DebugLoc, SILValue Operand,
-                                   SILType DestTy, SILBasicBlock *SuccessBB,
-                                   SILBasicBlock *FailureBB, SILFunction &F,
+CheckedCastValueBranchInst::create(SILDebugLocation DebugLoc,
+                                   SILValue Operand, CanType SrcFormalTy,
+                                   SILType DestLoweredTy, CanType DestFormalTy,
+                                   SILBasicBlock *SuccessBB, SILBasicBlock *FailureBB,
+                                   SILFunction &F,
                                    SILOpenedArchetypesState &OpenedArchetypes) {
   SILModule &Mod = F.getModule();
   SmallVector<SILValue, 8> TypeDependentOperands;
   collectTypeDependentOperands(TypeDependentOperands, OpenedArchetypes, F,
-                               DestTy.getASTType());
+                               DestFormalTy);
   unsigned size =
       totalSizeToAlloc<swift::Operand>(1 + TypeDependentOperands.size());
   void *Buffer = Mod.allocateInst(size, alignof(CheckedCastValueBranchInst));
   return ::new (Buffer) CheckedCastValueBranchInst(
-      DebugLoc, Operand, TypeDependentOperands, DestTy, SuccessBB, FailureBB);
+      DebugLoc, Operand, SrcFormalTy, TypeDependentOperands,
+      DestLoweredTy, DestFormalTy,
+      SuccessBB, FailureBB);
 }
 
 MetatypeInst *MetatypeInst::create(SILDebugLocation Loc, SILType Ty,

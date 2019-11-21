@@ -375,7 +375,8 @@ void swift::replaceBranchTarget(TermInst *t, SILBasicBlock *oldDest,
     auto failureBB =
         oldDest == cbi->getFailureBB() ? newDest : cbi->getFailureBB();
     builder.createCheckedCastBranch(
-        cbi->getLoc(), cbi->isExact(), cbi->getOperand(), cbi->getCastType(),
+        cbi->getLoc(), cbi->isExact(), cbi->getOperand(),
+        cbi->getTargetLoweredType(), cbi->getTargetFormalType(),
         successBB, failureBB, cbi->getTrueBBCount(), cbi->getFalseBBCount());
     cbi->eraseFromParent();
     return;
@@ -389,9 +390,10 @@ void swift::replaceBranchTarget(TermInst *t, SILBasicBlock *oldDest,
         oldDest == cbi->getSuccessBB() ? newDest : cbi->getSuccessBB();
     auto failureBB =
         oldDest == cbi->getFailureBB() ? newDest : cbi->getFailureBB();
-    builder.createCheckedCastValueBranch(cbi->getLoc(), cbi->getOperand(),
-                                         cbi->getCastType(), successBB,
-                                         failureBB);
+    builder.createCheckedCastValueBranch(
+        cbi->getLoc(), cbi->getOperand(), cbi->getSourceFormalType(),
+        cbi->getTargetLoweredType(), cbi->getTargetFormalType(),
+        successBB, failureBB);
     cbi->eraseFromParent();
     return;
   }
@@ -407,9 +409,10 @@ void swift::replaceBranchTarget(TermInst *t, SILBasicBlock *oldDest,
     auto trueCount = cbi->getTrueBBCount();
     auto falseCount = cbi->getFalseBBCount();
     builder.createCheckedCastAddrBranch(
-        cbi->getLoc(), cbi->getConsumptionKind(), cbi->getSrc(),
-        cbi->getSourceType(), cbi->getDest(), cbi->getTargetType(), successBB,
-        failureBB, trueCount, falseCount);
+        cbi->getLoc(), cbi->getConsumptionKind(),
+        cbi->getSrc(), cbi->getSourceFormalType(),
+        cbi->getDest(), cbi->getTargetFormalType(),
+        successBB, failureBB, trueCount, falseCount);
     cbi->eraseFromParent();
     return;
   }
