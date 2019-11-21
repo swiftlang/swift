@@ -1073,6 +1073,10 @@ ClangImporter::create(ASTContext &ctx, const ClangImporterOptions &importerOpts,
   // read them later.
   instance.getLangOpts().NeededByPCHOrCompilationUsesPCH = true;
 
+  // Make sure to not trigger extra rebuilds on identical files with mismatching
+  // timestamps.
+  instance.getHeaderSearchOpts().ValidateASTInputFilesContent = true;
+
   if (importerOpts.Mode == ClangImporterOptions::Modes::PrecompiledModule)
     return importer;
 
