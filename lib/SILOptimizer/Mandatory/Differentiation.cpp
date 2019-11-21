@@ -356,9 +356,10 @@ findDifferentiabilityWitness(SILModule &module, SILDifferentiableAttr *attr) {
 /// Sets the differentiability witness JVP and VJP to the JVP and VJP in `attr`.
 ///
 /// `attr` must have a JVP and VJP.
-static void fillDifferentiabilityWitness(SILModule &module,
-                                         const SILDifferentiableAttr *attr,
-                                         SILDifferentiabilityWitness *witness) {
+static void
+canonicalizeDifferentiabilityWitness(SILModule &module,
+                                     const SILDifferentiableAttr *attr,
+                                     SILDifferentiabilityWitness *witness) {
   auto jvpName = attr->getJVPName();
   assert(!jvpName.empty() && "Expected JVP name");
   auto *jvpFn = module.lookUpFunction(attr->getJVPName());
@@ -388,7 +389,7 @@ createDifferentiabilityWitness(SILModule &module, SILLinkage linkage,
       module, linkage, attr->getOriginal(), attr->getIndices().parameters,
       resultIndices, attr->getDerivativeGenericSignature(), /*jvp*/ nullptr,
       /*vjp*/ nullptr, /*isSerialized*/ false);
-  fillDifferentiabilityWitness(module, attr, witness);
+  canonicalizeDifferentiabilityWitness(module, attr, witness);
   return witness;
 }
 
@@ -9013,7 +9014,7 @@ void Differentiation::run() {
         witness &&
         "SILGen should create a witness for every [differentiable] attribute");
     assert(witness->isDefinition());
-    fillDifferentiabilityWitness(module, attr, witness);
+    canonicalizeDifferentiabilityWitness(module, attr, witness);
   }
 
   // Iteratively process `differentiable_function` instruction worklist.
