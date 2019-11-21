@@ -962,40 +962,39 @@ runOnFunctionRecursively(SILOptFunctionBuilder &FuncBuilder,
 
 namespace {
 
-class MandatoryInlining : public SILModuleTransform {
+class MandatoryInlining : public SILFunctionTransform {
   /// The entry point to the transformation.
   void run() override {
+    SILFunction *F = getFunction();
     ClassHierarchyAnalysis *CHA = getAnalysis<ClassHierarchyAnalysis>();
-    SILModule *M = getModule();
     bool ShouldCleanup = !getOptions().DebugSerialization;
     bool SILVerifyAll = getOptions().VerifyAll;
     DenseFunctionSet FullyInlinedSet;
     ImmutableFunctionSet::Factory SetFactory;
 
     SILOptFunctionBuilder FuncBuilder(*this);
-    for (auto &F : *M) {
-      // Don't inline into thunks, even transparent callees.
-      if (F.isThunk())
-        continue;
+    
+    // Don't inline into thunks, even transparent callees.
+    if (F->isThunk())
+      return;
 
-      // Skip deserialized functions.
-      if (F.wasDeserializedCanonical())
-        continue;
+    // Skip deserialized functions.
+    if (F->wasDeserializedCanonical())
+      return;
 
-      runOnFunctionRecursively(FuncBuilder, &F,
-                               FullApplySite(), FullyInlinedSet, SetFactory,
-                               SetFactory.getEmptySet(), CHA);
+    runOnFunctionRecursively(FuncBuilder, F,
+                             FullApplySite(), FullyInlinedSet, SetFactory,
+                             SetFactory.getEmptySet(), CHA);
 
-      // The inliner splits blocks at call sites. Re-merge trivial branches
-      // to reestablish a canonical CFG.
-      mergeBasicBlocks(&F);
+    // The inliner splits blocks at call sites. Re-merge trivial branches
+    // to reestablish a canonical CFG.
+    mergeBasicBlocks(F);
 
-      // If we are asked to perform SIL verify all, perform that now so that we
-      // can discover the immediate inlining trigger of the problematic
-      // function.
-      if (SILVerifyAll) {
-        F.verify();
-      }
+    // If we are asked to perform SIL verify all, perform that now so that we
+    // can discover the immediate inlining trigger of the problematic
+    // function.
+    if (SILVerifyAll) {
+      F->verify();
     }
 
     if (!ShouldCleanup)
@@ -1007,30 +1006,26 @@ class MandatoryInlining : public SILModuleTransform {
     //
     // We do this with a simple linear scan, because transparent functions that
     // reference each other have already been flattened.
-    for (auto FI = M->begin(), E = M->end(); FI != E; ) {
-      SILFunction &F = *FI++;
+    invalidateAnalysis(SILAnalysis::InvalidationKind::Everything);
 
-      invalidateAnalysis(&F, SILAnalysis::InvalidationKind::Everything);
+    if (F->getRefCount() != 0) return;
 
-      if (F.getRefCount() != 0) continue;
+    // Leave non-transparent functions alone.
+    if (!F->isTransparent())
+     return;
 
-      // Leave non-transparent functions alone.
-      if (!F.isTransparent())
-        continue;
+    // We discard functions that don't have external linkage,
+    // e.g. deserialized functions, internal functions, and thunks.
+    // Being marked transparent controls this.
+    if (F->isPossiblyUsedExternally()) return;
 
-      // We discard functions that don't have external linkage,
-      // e.g. deserialized functions, internal functions, and thunks.
-      // Being marked transparent controls this.
-      if (F.isPossiblyUsedExternally()) continue;
+    // ObjC functions are called through the runtime and are therefore alive
+    // even if not referenced inside SIL.
+    if (F->getRepresentation() == SILFunctionTypeRepresentation::ObjCMethod)
+     return;
 
-      // ObjC functions are called through the runtime and are therefore alive
-      // even if not referenced inside SIL.
-      if (F.getRepresentation() == SILFunctionTypeRepresentation::ObjCMethod)
-        continue;
-
-      // Okay, just erase the function from the module.
-      FuncBuilder.eraseFunction(&F);
-    }
+    // Okay, just erase the function from the module.
+    FuncBuilder.eraseFunction(F);
   }
 
 };
