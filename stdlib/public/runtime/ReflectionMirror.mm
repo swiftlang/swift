@@ -199,9 +199,7 @@ static AnyReturn copyFieldContents(OpaqueValue *fieldData,
     // Clean up the buffer allocated above
     type->deallocateBufferIn(&outValue.Buffer);
     // Return an existential containing Void
-    Any emptyOutValue;
-    emptyOutValue.Type = &METADATA_SYM(EMPTY_TUPLE_MANGLING);
-    return AnyReturn(emptyOutValue);
+    outValue.Type = &METADATA_SYM(EMPTY_TUPLE_MANGLING);
   }
 
   return AnyReturn(outValue);
