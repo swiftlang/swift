@@ -138,7 +138,7 @@
 // RUN: head -1 %t/comparo | %FileCheck -check-prefix=CHECK-COMPARE-DISABLED-ARGUMENTS %s
 // RUN: tail -1 %t/comparo | %FileCheck -check-prefix=CHECK-COMPARE-0-0-3 %s
 
-// CHECK-COMPARE-0-0-3: *** Comparing incremental schemes: deps: 0, ranges: 0, total: 3,
+// CHECK-COMPARE-0-0-3: *** Range benefit: 0 compilations, 0 stages, deps: 0, ranges: 0, total: 3, requested: ranges, used: ranges***
 
 // RUN: %FileCheck -check-prefix=CHECK-INCREMENTAL-ENABLED %s < %t/output3
 // CHECK-INCREMENTAL-ENABLED-NOT: Incremental compilation has been disabled
@@ -163,7 +163,7 @@
 // RUN: %FileCheck -check-prefix=CHECK-FILEB-ONLY %s < %t/output4
 
 // RUN: %FileCheck -check-prefix=COMPARE-2-1-3 %s < %t/output4
-// COMPARE-2-1-3: *** Comparing incremental schemes: deps: 2, ranges: 1, total: 3, requested: ranges, using: ranges
+// COMPARE-2-1-3: *** Range benefit: 1 compilations, 1 stages, deps: 2, ranges: 1, total: 3, requested: ranges, used: ranges***
 
 // CHECK-FILEB-ONLY-NOT: Queuing{{.*}}<= main.swift
 // CHECK-FILEB-ONLY-NOT: Queuing{{.*}}<= fileA.swift
@@ -190,8 +190,7 @@
 // RUN: %FileCheck -check-prefix=CHECK-FILEA-AND-FILEB-ONLY %s < %t/output5
 
 // RUN: %FileCheck -check-prefix=COMPARE-2-2-3 %s < %t/output5
-// COMPARE-2-2-3: *** Comparing incremental schemes: deps: 2, ranges: 2, total: 3, requested: ranges, using: ranges
-
+// COMPARE-2-2-3: *** Range benefit: 0 compilations, 1 stages, deps: 2, ranges: 2, total: 3, requested: ranges, used: ranges***
 
 
 // CHECK-FILEA-AND-FILEB-ONLY-NOT: Queuing{{.*}}<= main.swift
@@ -231,7 +230,7 @@
 // RUN: %FileCheck -check-prefix=CHECK-INITIALLY-ABSENT-MAIN %s < %t/output6
 
 // RUN: %FileCheck -check-prefix=CHECK-COMPARE-3-3-3-RANGES %s < %t/output6
-// CHECK-COMPARE-3-3-3-RANGES: *** Comparing incremental schemes: deps: 3, ranges: 3, total: 3, requested: ranges, using: ranges
+// CHECK-COMPARE-3-3-3-RANGES: *** Range benefit: 0 compilations, 0 stages, deps: 3, ranges: 3, total: 3, requested: ranges, used: ranges***
 
 // CHECK-INITIALLY-ABSENT-MAIN-NOT: Queueing{{.*}}<= main.swift
 
@@ -263,7 +262,7 @@
 // RUN: %FileCheck -check-prefix=CHECK-HAS-NO-BATCHES  %s < %t/output7
 
 // RUN: %FileCheck -check-prefix=CHECK-COMPARE-4-4-4 %s < %t/output7
-// CHECK-COMPARE-4-4-4: *** Comparing incremental schemes: deps: 4, ranges: 4, total: 4, requested: ranges, using: deps
+// CHECK-COMPARE-4-4-4: *** Range benefit: 0 compilations, 0 stages, deps: 4, ranges (falling back): 4, total: 4, requested: ranges, used: deps***
 
 // RUN: cmp fileB.swift fileB.compiledsource
 
@@ -316,8 +315,8 @@
 // RUN: cp %t/fileB5.swift %t/fileB.swift
 // RUN: cd %t && not %swiftc_driver -driver-compare-incremental-schemes -enable-source-range-dependencies -output-file-map %t/output.json -incremental -enable-batch-mode ./main.swift ./fileA.swift ./fileB.swift -module-name main -j2 -driver-show-job-lifecycle -driver-show-incremental >& %t/output9
 
-// RUN: %FileCheck -check-prefix=CHECK-COMPARE-3-3-3-DEPS %s < %t/output9
-// CHECK-COMPARE-3-3-3-DEPS: *** Comparing incremental schemes: deps: 3, ranges: 3, total: 3, requested: ranges, using: deps
+// RUN: %FileCheck -check-prefix=CHECK-COMPARE-0-1-3-3-3-DEPS %s < %t/output9
+// CHECK-COMPARE-0-1-3-3-3-DEPS: *** Range benefit: 0 compilations, 1 stages, deps: 3, ranges (falling back): 3, total: 3, requested: ranges, used: deps***
 
 // RUN: %FileCheck -check-prefix=CHECK-HAS-NO-BATCHES  %s < %t/output9
 
@@ -329,7 +328,9 @@
 // RUN: cp %t/fileB4.swift %t/fileB.swift
 // RUN: cd %t &&  %swiftc_driver -driver-compare-incremental-schemes -enable-source-range-dependencies -output-file-map %t/output.json -incremental -enable-batch-mode ./main.swift ./fileA.swift ./fileB.swift -module-name main -j2 -driver-show-job-lifecycle -driver-show-incremental >& %t/output10
 
-// RUN: %FileCheck -check-prefix=CHECK-COMPARE-3-3-3-DEPS %s < %t/output10
+// RUN: %FileCheck -check-prefix=CHECK-COMPARE-0-0-3-3-3-DEPS %s < %t/output10
+// CHECK-COMPARE-0-0-3-3-3-DEPS: *** Range benefit: 0 compilations, 0 stages, deps: 3, ranges (falling back): 3, total: 3, requested: ranges, used: deps***
+
 // RUN: %FileCheck -check-prefix=CHECK-HAS-NO-BATCHES  %s < %t/output10
 
 
