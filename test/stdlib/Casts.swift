@@ -80,6 +80,39 @@ CastsTests.test("Optional<T>.none can be casted to Optional<U>.none in generic c
   expectEqual(type(of: test(Bool?.self)), Bool??.self)
 }
 
+// Test for SR-3871: Cannot cast from ObjC existential without going through AnyObject
+protocol P2 {}
+CastsTests.test("SR-3871: ObjC wrapper") {
+  struct S: P2 {}
+
+  class ObjCWrapper {
+    @objc dynamic let any: Any = S()
+    init() {}
+  }
+  let a = ObjCWrapper().any
+  let b = a as AnyObject
+  expectNotNil(b as? P2) // SR-3871: This succeeds
+  expectNotNil(a as? P2) // SR-3871: This fails
+}
+
+CastsTests.test("SR-3871: Swift wrapper") {
+  struct S: P2 {}
+
+  do {
+    class SwiftWrapper {
+      let any: Any = S()
+      init() {}
+    }
+    let a = SwiftWrapper().any
+    expectTrue(a is P2)
+    expectNotNil(a as? P2)
+    let b = a as AnyObject
+    expectTrue(b is P2)
+    expectNotNil(b as? P2)
+  }
+}
+
+
 #if _runtime(_ObjC)
 extension CFBitVector : P {
   static func makeImmutable(from values: Array<UInt8>) -> CFBitVector {

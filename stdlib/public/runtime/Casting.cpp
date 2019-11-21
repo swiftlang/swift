@@ -1928,12 +1928,38 @@ static bool tryDynamicCastBoxedSwiftValue(OpaqueValue *dest,
   assert(!(flags & DynamicCastFlags::Unconditional));
   assert(!(flags & DynamicCastFlags::DestroyOnFailure));
 
+  auto srcTypeName = swift_getTypeName(srcType, true); // UNUSED -- REMOVE -- FOR DEBUGGING ONLY
+  auto destTypeName = swift_getTypeName(targetType, true); // UNUSED -- REMOVE -- FOR DEBUGGING ONLY
+
   // Swift type should be AnyObject or a class type.
-  if (!srcType->isAnyClass()) {
-    auto existential = dyn_cast<ExistentialTypeMetadata>(srcType);
-    if (!existential || !isAnyObjectExistentialType(existential))
+  while (true) {
+    if (srcType->isAnyClass()) {
+      break;
+    }
+    auto existentialType = dyn_cast<ExistentialTypeMetadata>(srcType);
+    if (!existentialType)
       return false;
+    switch (existentialType->getRepresentation()) {
+    case ExistentialTypeRepresentation::Class: {
+      // If it's a Class object, it must be `AnyObject`
+      if (isAnyObjectExistentialType(existentialType)) {
+        goto validated;
+			}
+			return false;
+    }
+    case ExistentialTypeRepresentation::Opaque: {
+      // If it's an opaque existential, unwrap it and check again
+      auto opaqueContainer = reinterpret_cast<OpaqueExistentialContainer*>(src);
+      srcType = opaqueContainer->Type;
+      src = existentialType->projectValue(src);
+      break;
+    }
+    default: {
+      return false;
+    }
+    }
   }
+  validated:
   
 #if !SWIFT_OBJC_INTEROP // __SwiftValue is a native class:
   if (swift_unboxFromSwiftValueWithType(src, dest, targetType)) {
@@ -2286,7 +2312,7 @@ static bool swift_dynamicCastImpl(OpaqueValue *dest, OpaqueValue *src,
   {
     auto innerFlags = flags - DynamicCastFlags::Unconditional
                             - DynamicCastFlags::DestroyOnFailure;
-    if (tryDynamicCastBoxedSwiftValue(dest, src, srcType,
+    if (tryDynamicCastBoxedSwiftValue(dest, src, srcType,        // XXX succeeds for AnyObject, but not Any
                                       targetType, innerFlags)) {
       // TakeOnSuccess was handled inside tryDynamicCastBoxedSwiftValue().
       return true;
