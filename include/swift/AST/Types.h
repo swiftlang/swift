@@ -872,7 +872,19 @@ public:
   /// True if this type contains archetypes that could be substituted with
   /// concrete types to form the argument type.
   bool isBindableTo(Type ty);
+  
+  /// Visit this type and the argument type in parallel, invoking the callback
+  /// function with each archetype-to-substituted-type binding. The callback
+  /// may return a new type to substitute into the result type, or return
+  /// CanType() to error out of the operation.
+  ///
+  /// Returns the substituted type, or a null CanType() if this type
+  /// is not bindable to the substituted type, or the callback returns
+  /// CanType().
+  CanType substituteBindingsTo(Type ty,
+         llvm::function_ref<CanType(ArchetypeType*, CanType)> substFn);
 
+  
   /// Determines whether this type is similar to \p other as defined by
   /// \p matchOptions.
   bool matches(Type other, TypeMatchOptions matchOptions);
@@ -4274,6 +4286,10 @@ public:
   SILType substInterfaceType(SILModule &M,
                              SILType interfaceType) const;
 
+  /// Return the unsubstituted function type equivalent to this type; that is, the type that has the same
+  /// argument and result types as `this` type after substitutions, if any.
+  CanSILFunctionType getUnsubstitutedType(SILModule &M) const;
+                                    
   void Profile(llvm::FoldingSetNodeID &ID) {
     Profile(ID, getSubstGenericSignature(), getExtInfo(), getCoroutineKind(),
             getCalleeConvention(), getParameters(), getYields(), getResults(),
