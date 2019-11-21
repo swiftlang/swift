@@ -230,7 +230,8 @@ class PerformanceTestResult(object):
                 indices = [max(0, int(ceil(self.num_samples * float(q))) - 1)
                            for q in qs]
                 runtimes = [runtimes[indices.index(i)]
-                            for i in range(0, self.num_samples)]
+                            for i in range(0, self.num_samples)
+                            if i in indices]
 
             self.samples = PerformanceTestSamples(
                 self.name, [int(runtime) for runtime in runtimes])
