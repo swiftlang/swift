@@ -1243,6 +1243,7 @@ namespace {
       switch (expr->getKind()) {
       case MagicIdentifierLiteralExpr::Column:
       case MagicIdentifierLiteralExpr::File:
+      case MagicIdentifierLiteralExpr::FilePath:
       case MagicIdentifierLiteralExpr::Function:
       case MagicIdentifierLiteralExpr::Line:
         return visitLiteralExpr(expr);

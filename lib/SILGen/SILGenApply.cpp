@@ -4876,14 +4876,20 @@ getMagicFunctionString(SILGenFunction &SGF) {
   return SGF.MagicFunctionString;
 }
 
-static std::string getMagicFileString(SILGenFunction &SGF, SourceLoc loc) {
+static StringRef
+getMagicFilePathString(SILGenFunction &SGF, SourceLoc loc) {
   if (!loc.isValid())
     return "";
 
-  auto path = SGF.getASTContext().SourceMgr.getDisplayNameForLoc(loc);
-  if (SGF.getASTContext().LangOpts.MagicFileIdentifierEvaluatesToPath)
-    return path;
+  return SGF.getASTContext().SourceMgr.getDisplayNameForLoc(loc);
+}
 
+static std::string
+getConciseMagicFileString(SILGenFunction &SGF, SourceLoc loc) {
+  if (!loc.isValid())
+    return "";
+
+  auto path = getMagicFilePathString(SGF, loc);
   auto value = llvm::sys::path::filename(path).str();
   value += " (";
   value += SGF.getModule().getSwiftModule()->getNameStr();
@@ -5146,7 +5152,18 @@ RValue SILGenFunction::emitLiteral(LiteralExpr *literal, SGFContext C) {
     auto magicLiteral = cast<MagicIdentifierLiteralExpr>(literal);
     switch (magicLiteral->getKind()) {
     case MagicIdentifierLiteralExpr::File: {
-      std::string value = getMagicFileString(*this, loc);
+      std::string value = getASTContext().LangOpts.EnableConcisePoundFile
+                        ? getConciseMagicFileString(*this, loc)
+                        : getMagicFilePathString(*this, loc).str();
+      builtinLiteralArgs = emitStringLiteral(*this, literal, value, C,
+                                             magicLiteral->getStringEncoding());
+      builtinInit = magicLiteral->getBuiltinInitializer();
+      init = magicLiteral->getInitializer();
+      break;
+    }
+
+    case MagicIdentifierLiteralExpr::FilePath: {
+      StringRef value = getMagicFilePathString(*this, loc);
       builtinLiteralArgs = emitStringLiteral(*this, literal, value, C,
                                              magicLiteral->getStringEncoding());
       builtinInit = magicLiteral->getBuiltinInitializer();

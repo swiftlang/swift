@@ -267,14 +267,6 @@ def output_file_map_EQ : Joined<["-"], "output-file-map=">,
   Flags<[NoInteractiveOption, ArgumentIsPath]>,
   Alias<output_file_map>;
 
-def pound_file : Separate<["-"], "pound-file">,
-  Flags<[FrontendOption]>,
-  HelpText<"Specifies whether '#file' evaluates to a full path or a compact human-readable string">,
-  MetaVarName<"compact|path">;
-def pound_file_EQ : Joined<["-"], "pound-file=">,
-  Flags<[FrontendOption]>,
-  Alias<pound_file>;
-
 def save_temps : Flag<["-"], "save-temps">,
   Flags<[NoInteractiveOption,DoesNotAffectIncrementalBuild]>,
   HelpText<"Save intermediate compilation results">;
@@ -461,6 +453,11 @@ def disable_bridging_pch : Flag<["-"], "disable-bridging-pch">,
 def enable_experimental_differentiable_programming : Flag<["-"], "enable-experimental-differentiable-programming">,
   Flags<[FrontendOption]>,
   HelpText<"Enable experimental differentiable programming features">;
+
+def enable_experimental_concise_pound_file : Flag<["-"],
+    "enable-experimental-concise-pound-file">,
+  Flags<[FrontendOption]>,
+  HelpText<"Enable experimental concise '#file' identifier and '#filePath' alternative">;
 
 // Diagnostic control options
 def suppress_warnings : Flag<["-"], "suppress-warnings">,
