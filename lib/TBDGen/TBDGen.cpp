@@ -195,20 +195,9 @@ void TBDGenVisitor::addDifferentiabilityWitness(
       attr->getParameterIndices(),
       original->getInterfaceType()->castTo<AnyFunctionType>());
 
-  GenericSignature genericSignature = attr->getDerivativeGenericSignature();
-  if (auto *jvpDecl = attr->getJVPFunction()) {
-    assert(!genericSignature ||
-           jvpDecl->getGenericSignature()->isEqual(genericSignature));
-    genericSignature = jvpDecl->getGenericSignature();
-  }
-  if (auto *vjpDecl = attr->getVJPFunction()) {
-    assert(!genericSignature ||
-           vjpDecl->getGenericSignature()->isEqual(genericSignature));
-    genericSignature = vjpDecl->getGenericSignature();
-  }
-
   std::string originalMangledName = SILDeclRef(original).mangle();
-  AutoDiffConfig config{loweredParamIndices, resultIndices, genericSignature};
+  AutoDiffConfig config{loweredParamIndices, resultIndices,
+                        attr->getDerivativeGenericSignature()};
   SILDifferentiabilityWitnessKey key(originalMangledName, config);
 
   Mangle::ASTMangler mangle;
