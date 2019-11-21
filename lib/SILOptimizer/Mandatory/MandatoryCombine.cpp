@@ -312,10 +312,10 @@ class MandatoryCombine final : public SILFunctionTransform {
     
     // If the function can be removed, remove it and
     // don't do all the extra work below.
-    if (tryRemoveUnusedFunction(function)) {
-      invalidateAnalysis(SILAnalysis::InvalidationKind::Everything);
-      return;
-    }
+//    if (tryRemoveUnusedFunction(function)) {
+//      invalidateAnalysis(SILAnalysis::InvalidationKind::Everything);
+//      return;
+//    }
 
     // If this function is an external declaration, bail. We only want to visit
     // functions with bodies.

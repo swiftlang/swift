@@ -963,15 +963,104 @@ runOnFunctionRecursively(SILOptFunctionBuilder &FuncBuilder,
 namespace {
 
 class MandatoryInlining : public SILFunctionTransform {
+  size_t collectApplies(SILFunction *F, ClassHierarchyAnalysis *CHA,
+                        DominanceAnalysis *DA,
+                        SmallVector<FullApplySite, 8> &collection) {
+    DominanceInfo *DT = DA->get(F);
+    DominanceOrder domOrder(&F->front(), DT, F->size());
+    
+    while (SILBasicBlock *block = domOrder.getNext()) {
+      for (auto &inst : *block) {
+        FullApplySite apply = FullApplySite::isa(&inst);
+        if (!apply) continue;
+        
+        auto *devirtInst = tryDevirtualizeApplyHelper(apply, CHA);
+        apply = FullApplySite::isa(devirtInst);
+        if (!apply) continue;
+        
+        collection.push_back(apply);
+      }
+    }
+    
+    return collection.size();
+  }
+
+  bool inlineFunction(SILOptFunctionBuilder &funcBuilder, SILFunction *F,
+                      SmallVector<FullApplySite, 8> &collection) {
+    bool madeChange = false;
+    SmallVector<ParameterConvention, 16> capturedArgConventions;
+    SmallVector<SILValue, 16> fullArgs;
+    
+    for (auto &apply : collection) {
+      bool isThick;
+      PartialApplyInst *partialApply;
+      SILFunction *calleeFunc = getCalleeFunction(F, apply, isThick,
+                                                  capturedArgConventions,
+                                                  fullArgs, partialApply);
+      if (!calleeFunc) continue;
+      
+      auto subs = partialApply
+                  ? partialApply->getSubstitutionMap()
+                  : apply.getSubstitutionMap();
+      
+      SILOpenedArchetypesTracker archtypesTracker(F);
+      F->getModule().registerDeleteNotificationHandler(&archtypesTracker);
+      archtypesTracker.registerOpenedArchetypes(apply.getInstruction());
+      if (partialApply)
+        archtypesTracker.registerUsedOpenedArchetypes(partialApply);
+      
+      SILInliner inliner(funcBuilder, SILInliner::InlineKind::MandatoryInline,
+                         subs, archtypesTracker);
+      if (!inliner.canInlineApplySite(apply)) continue;
+      bool willNeedCleanup = inliner.needsUpdateStackNesting(apply);
+      
+      // If we intend to inline a partial_apply function that is not on the
+      // stack, then we need to balance the reference counts for correctness.
+      //
+      // NOTE: If our partial apply is on the stack, it only has point uses (and
+      // hopefully eventually guaranteed) uses of the captured arguments.
+      //
+      // NOTE: If we have a thin_to_thick_function, we do not need to worry
+      // about such things since a thin_to_thick_function does not capture any
+      // arguments.
+      if (partialApply &&
+          partialApply->isOnStack() == PartialApplyInst::NotOnStack) {
+        bool isCalleeGuaranteed = partialApply->getType().castTo<SILFunctionType>()->isCalleeGuaranteed();
+        auto capturedArgs = MutableArrayRef<SILValue>(fullArgs).take_back(capturedArgConventions.size());
+        // We need to insert the copies before the partial_apply since if we can
+        // not remove the partial_apply the captured values will be dead by the
+        // time we hit the call site.
+        fixupReferenceCounts(partialApply, apply, apply.getCallee(), capturedArgConventions, capturedArgs, isCalleeGuaranteed);
+      }
+      
+      inliner.inlineFunction(calleeFunc, apply, fullArgs);
+      madeChange = true;
+      
+      if (willNeedCleanup) {
+        StackNesting().correctStackNesting(F);
+      }
+      
+      // Add the callee function to the pass manager so we can try to
+      // inline it too. This also makes sure that we remove it if its dead.
+      addFunctionToPassManagerWorklist(calleeFunc, F);
+    }
+    
+    return madeChange;
+  }
+  
   /// The entry point to the transformation.
   void run() override {
     SILFunction *F = getFunction();
     ClassHierarchyAnalysis *CHA = getAnalysis<ClassHierarchyAnalysis>();
+    DominanceAnalysis *DA = PM->getAnalysis<DominanceAnalysis>();
     bool SILVerifyAll = getOptions().VerifyAll;
     DenseFunctionSet FullyInlinedSet;
     ImmutableFunctionSet::Factory SetFactory;
-
     SILOptFunctionBuilder FuncBuilder(*this);
+    bool madeChange = false;
+    
+    SmallVector<FullApplySite, 8> collection;
+
     
     // Don't inline into thunks, even transparent callees.
     if (F->isThunk())
@@ -980,14 +1069,11 @@ class MandatoryInlining : public SILFunctionTransform {
     // Skip deserialized functions.
     if (F->wasDeserializedCanonical())
       return;
-
-    runOnFunctionRecursively(FuncBuilder, F,
-                             FullApplySite(), FullyInlinedSet, SetFactory,
-                             SetFactory.getEmptySet(), CHA);
-
-    // The inliner splits blocks at call sites. Re-merge trivial branches
-    // to reestablish a canonical CFG.
-    mergeBasicBlocks(F);
+    
+    if (collectApplies(F, CHA, DA, collection))
+      madeChange = inlineFunction(FuncBuilder, F, collection);
+    
+    if (!madeChange) return;
 
     // If we are asked to perform SIL verify all, perform that now so that we
     // can discover the immediate inlining trigger of the problematic
@@ -1000,6 +1086,7 @@ class MandatoryInlining : public SILFunctionTransform {
 
     // If there are any transparent functions that are deserialized from
     // another module that are now unused, MandatoryCombine will remove them.
+    addFunctionToPassManagerWorklist(F, F);
   }
 
 };
