@@ -7342,6 +7342,8 @@ ConstraintSystem::simplifyApplicableFnConstraint(
     auto memberTy = createTypeVariable(memberLoc, /*options=*/0);
     // TODO: Revisit this if `static func callAsFunction` is to be supported.
     // Static member constraint requires `FunctionRefKind::DoubleApply`.
+    // TODO: Use a custom locator element to identify this member constraint
+    // instead of just pointing to the function expr.
     addValueMemberConstraint(origLValueType2, DeclName(ctx.Id_callAsFunction),
                              memberTy, DC, FunctionRefKind::SingleApply,
                              /*outerAlternatives*/ {}, locator);

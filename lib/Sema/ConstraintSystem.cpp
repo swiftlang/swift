@@ -478,16 +478,28 @@ ConstraintSystem::getCalleeLocator(ConstraintLocator *locator,
   if (lookThroughApply) {
     if (auto *applyExpr = dyn_cast<ApplyExpr>(anchor)) {
       auto *fnExpr = applyExpr->getFn();
+
+      // FIXME: We should probably assert that we don't get a type variable
+      // here to make sure we only retrieve callee locators for resolved calls,
+      // ensuring that callee locators don't change after binding a type.
+      // Unfortunately CSDiag currently calls into getCalleeLocator, so all bets
+      // are off. Once we remove that legacy diagnostic logic, we should be able
+      // to assert here.
+      auto fnTy = getFixedTypeRecursive(getType(fnExpr), /*wantRValue*/ true);
+
       // For an apply of a metatype, we have a short-form constructor. Unlike
       // other locators to callees, these are anchored on the apply expression
       // rather than the function expr.
-      auto fnTy = getFixedTypeRecursive(getType(fnExpr), /*wantRValue*/ true);
       if (fnTy->is<AnyMetatypeType>()) {
         auto *fnLocator =
             getConstraintLocator(applyExpr, ConstraintLocator::ApplyFunction);
         return getConstraintLocator(fnLocator,
                                     ConstraintLocator::ConstructorMember);
       }
+
+      // Handle an apply of a nominal type which supports callAsFunction.
+      if (fnTy->isCallableNominalType(DC))
+        return getConstraintLocator(anchor, ConstraintLocator::ApplyFunction);
 
       // Otherwise fall through and look for locators anchored on the function
       // expr. For CallExprs, this can look through things like parens and

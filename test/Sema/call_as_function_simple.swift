@@ -192,3 +192,15 @@ func testIUO(a: SimpleCallable!, b: MultipleArgsCallable!, c: Extended!,
   _ = try? h()
   _ = try? h { throw DummyError() }
 }
+
+// SR-11778
+struct DoubleANumber {
+  func callAsFunction(_ x: Int, completion: (Int) -> Void = { _ in }) {
+    completion(x + x)
+  }
+}
+
+func testDefaults(_ x: DoubleANumber) {
+  x(5)
+  x(5, completion: { _ in })
+}
