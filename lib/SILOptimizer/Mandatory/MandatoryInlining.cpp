@@ -969,17 +969,23 @@ class MandatoryInlining : public SILFunctionTransform {
     DominanceInfo *DT = DA->get(F);
     DominanceOrder domOrder(&F->front(), DT, F->size());
     
+    // First collect all the applies
+    SmallVector<FullApplySite, 12> applyInsts;
     while (SILBasicBlock *block = domOrder.getNext()) {
       for (auto &inst : *block) {
         FullApplySite apply = FullApplySite::isa(&inst);
         if (!apply) continue;
-        
-        auto *devirtInst = tryDevirtualizeApplyHelper(apply, CHA);
-        apply = FullApplySite::isa(devirtInst);
-        if (!apply) continue;
-        
-        collection.push_back(apply);
+        applyInsts.push_back(apply);
       }
+    }
+    
+    // Then try to devirtualize them and add them to our collections.
+    for (auto &apply : applyInsts) {
+      auto *devirtInst = tryDevirtualizeApplyHelper(apply, CHA);
+      apply = FullApplySite::isa(devirtInst);
+      if (!apply) continue;
+      
+      collection.push_back(apply);
     }
     
     return collection.size();
@@ -997,7 +1003,17 @@ class MandatoryInlining : public SILFunctionTransform {
       SILFunction *calleeFunc = getCalleeFunction(F, apply, isThick,
                                                   capturedArgConventions,
                                                   fullArgs, partialApply);
-      if (!calleeFunc) continue;
+      if (!calleeFunc || calleeFunc->getInlineStrategy() == NoInline)
+        continue;
+      
+      // Prevent circular inlining
+      if (calleeFunc == apply.getFunction()) {
+        SILLocation loc = apply.getLoc();
+        assert(loc && "Must have location for transparent inline apply");
+        diagnose(F->getModule().getASTContext(), loc.getStartSourceLoc(),
+                 diag::circular_transparent);
+        return false;
+      }
       
       auto subs = partialApply
                   ? partialApply->getSubstitutionMap()

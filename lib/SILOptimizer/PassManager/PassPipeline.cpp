@@ -666,6 +666,7 @@ SILPassPipelinePlan::getOnonePassPipeline(const SILOptions &Options) {
   SILPassPipelinePlan P(Options);
 
   P.startPipeline("Mandatory Combines");
+  P.addMandatoryInlining();
   P.addMandatoryCombine();
 
   // First serialize the SIL if we are asked to.
