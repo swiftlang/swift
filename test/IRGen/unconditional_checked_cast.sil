@@ -25,7 +25,7 @@ sil_vtable D {}
 sil @downcast_test : $@convention(thin) (@inout C) -> @out D {
 bb0(%0 : $*D, %1 : $*C):
   %a = load %1 : $*C
-  %2 = unconditional_checked_cast %a : $C to $D
+  %2 = unconditional_checked_cast %a : $C to D
   store %2 to %0 : $*D
   %33 = tuple()
   return %33 : $()

@@ -36,7 +36,7 @@ bb0(%0 : $Concrete, %1 : $SuperProto, %2 : $SuperProto & Concrete, %3 : $ProtoRe
   // CHECK-NEXT:        [[RESULT:%.*]] = call { i8*, i8** } @dynamic_cast_existential_1_unconditional(i8* [[OBJECT]], %swift.type* [[ISA]], {{.*}} @"$s24protocol_with_superclass17ProtoRefinesClassMp"
   // CHECK-NEXT:        [[FIRST:%.*]] = extractvalue { i8*, i8** } [[RESULT]], 0
   // CHECK-NEXT:        [[REFERENCE:%.*]] = bitcast i8* [[FIRST]] to %T24protocol_with_superclass8ConcreteC*
-  %5 = unconditional_checked_cast %0 : $Concrete to $ProtoRefinesClass
+  %5 = unconditional_checked_cast %0 : $Concrete to ProtoRefinesClass
 
   // CHECK:             call void bitcast (void (%swift.refcounted*)* @swift_release to void (%T24protocol_with_superclass8ConcreteC*)*)(%T24protocol_with_superclass8ConcreteC* [[REFERENCE]])
   strong_release %5 : $ProtoRefinesClass
@@ -47,7 +47,7 @@ bb0(%0 : $Concrete, %1 : $SuperProto, %2 : $SuperProto & Concrete, %3 : $ProtoRe
   // CHECK-NEXT:        [[RESULT:%.*]] = call { i8*, i8** } @dynamic_cast_existential_1_unconditional(i8* [[OBJECT]], %swift.type* [[ISA]], {{.*}} @"$s24protocol_with_superclass8SubProtoMp"
   // CHECK-NEXT:        [[FIRST:%.*]] = extractvalue { i8*, i8** } [[RESULT]], 0
   // CHECK-NEXT:        [[REFERENCE:%.*]] = bitcast i8* [[FIRST]] to %T24protocol_with_superclass8ConcreteC*
-  %6 = unconditional_checked_cast %0 : $Concrete to $SubProto
+  %6 = unconditional_checked_cast %0 : $Concrete to SubProto
 
   // CHECK:             call void bitcast (void (%swift.refcounted*)* @swift_release to void (%T24protocol_with_superclass8ConcreteC*)*)(%T24protocol_with_superclass8ConcreteC* [[REFERENCE]])
   strong_release %6 : $SubProto
@@ -60,7 +60,7 @@ bb0(%0 : $Concrete, %1 : $SuperProto, %2 : $SuperProto & Concrete, %3 : $ProtoRe
   // CHECK-NEXT:        [[RESULT:%.*]] = call { i8*, i8** } @dynamic_cast_existential_1_unconditional(i8* [[OBJECT]], %swift.type* [[ISA]], {{.*}} @"$s24protocol_with_superclass17ProtoRefinesClassMp"
   // CHECK-NEXT:        [[FIRST:%.*]] = extractvalue { i8*, i8** } [[RESULT]], 0
   // CHECK-NEXT:        [[REFERENCE:%.*]] = bitcast i8* [[FIRST]] to %T24protocol_with_superclass8ConcreteC*
-  %7 = unconditional_checked_cast %1 : $SuperProto to $ProtoRefinesClass
+  %7 = unconditional_checked_cast %1 : $SuperProto to ProtoRefinesClass
 
   // CHECK:             call void bitcast (void (%swift.refcounted*)* @swift_release to void (%T24protocol_with_superclass8ConcreteC*)*)(%T24protocol_with_superclass8ConcreteC* [[REFERENCE]])
   strong_release %7 : $ProtoRefinesClass
@@ -73,7 +73,7 @@ bb0(%0 : $Concrete, %1 : $SuperProto, %2 : $SuperProto & Concrete, %3 : $ProtoRe
   // CHECK-NEXT:        [[RESULT:%.*]] = call { i8*, i8** } @dynamic_cast_existential_1_unconditional(i8* [[OBJECT]], %swift.type* [[ISA]], {{.*}} @"$s24protocol_with_superclass8SubProtoMp"
   // CHECK-NEXT:        [[FIRST:%.*]] = extractvalue { i8*, i8** } [[RESULT]], 0
   // CHECK-NEXT:        [[REFERENCE:%.*]] = bitcast i8* [[FIRST]] to %T24protocol_with_superclass8ConcreteC*
-  %8 = unconditional_checked_cast %1 : $SuperProto to $SubProto
+  %8 = unconditional_checked_cast %1 : $SuperProto to SubProto
 
   // CHECK:             call void bitcast (void (%swift.refcounted*)* @swift_release to void (%T24protocol_with_superclass8ConcreteC*)*)(%T24protocol_with_superclass8ConcreteC* [[REFERENCE]])
   strong_release %8 : $SubProto
@@ -84,7 +84,7 @@ bb0(%0 : $Concrete, %1 : $SuperProto, %2 : $SuperProto & Concrete, %3 : $ProtoRe
   // CHECK-NEXT:        [[RESULT:%.*]] = call { i8*, i8** } @dynamic_cast_existential_1_unconditional(i8* [[OBJECT]], %swift.type* [[ISA]], {{.*}} @"$s24protocol_with_superclass17ProtoRefinesClassMp"
   // CHECK-NEXT:        [[FIRST:%.*]] = extractvalue { i8*, i8** } [[RESULT]], 0
   // CHECK-NEXT:        [[REFERENCE:%.*]] = bitcast i8* [[FIRST]] to %T24protocol_with_superclass8ConcreteC*
-  %9 = unconditional_checked_cast %2 : $SuperProto & Concrete to $ProtoRefinesClass
+  %9 = unconditional_checked_cast %2 : $SuperProto & Concrete to ProtoRefinesClass
 
   // CHECK:             call void bitcast (void (%swift.refcounted*)* @swift_release to void (%T24protocol_with_superclass8ConcreteC*)*)(%T24protocol_with_superclass8ConcreteC* [[REFERENCE]])
   strong_release %9 : $ProtoRefinesClass
@@ -95,7 +95,7 @@ bb0(%0 : $Concrete, %1 : $SuperProto, %2 : $SuperProto & Concrete, %3 : $ProtoRe
   // CHECK-NEXT:        [[RESULT:%.*]] = call { i8*, i8** } @dynamic_cast_existential_1_unconditional(i8* [[OBJECT]], %swift.type* [[ISA]], {{.*}} @"$s24protocol_with_superclass8SubProtoMp"
   // CHECK-NEXT:        [[FIRST:%.*]] = extractvalue { i8*, i8** } [[RESULT]], 0
   // CHECK-NEXT:        [[REFERENCE:%.*]] = bitcast i8* [[FIRST]] to %T24protocol_with_superclass8ConcreteC*
-  %10 = unconditional_checked_cast %2 : $SuperProto & Concrete to $SubProto
+  %10 = unconditional_checked_cast %2 : $SuperProto & Concrete to SubProto
 
   // CHECK:             call void bitcast (void (%swift.refcounted*)* @swift_release to void (%T24protocol_with_superclass8ConcreteC*)*)(%T24protocol_with_superclass8ConcreteC* [[REFERENCE]])
   strong_release %10 : $SubProto
@@ -106,7 +106,7 @@ bb0(%0 : $Concrete, %1 : $SuperProto, %2 : $SuperProto & Concrete, %3 : $ProtoRe
   // CHECK-NEXT:        [[METADATA_PTR:%.*]] = bitcast %swift.type* [[METADATA]] to i8*
   // CHECK-NEXT:        [[RESULT:%.*]] = call i8* @swift_dynamicCastClassUnconditional(i8* [[OBJECT]], i8* [[METADATA_PTR]], {{.*}})
   // CHECK-NEXT:        [[REFERENCE:%.*]] = bitcast i8* [[RESULT]] to %T24protocol_with_superclass7DerivedC*
-  %11 = unconditional_checked_cast %3 : $ProtoRefinesClass to $Derived
+  %11 = unconditional_checked_cast %3 : $ProtoRefinesClass to Derived
 
   // CHECK:             call void bitcast (void (%swift.refcounted*)* @swift_release to void (%T24protocol_with_superclass7DerivedC*)*)(%T24protocol_with_superclass7DerivedC* [[REFERENCE]])
   strong_release %11 : $Derived
@@ -117,7 +117,7 @@ bb0(%0 : $Concrete, %1 : $SuperProto, %2 : $SuperProto & Concrete, %3 : $ProtoRe
   // CHECK-NEXT:        [[METADATA_PTR:%.*]] = bitcast %swift.type* [[METADATA]] to i8*
   // CHECK-NEXT:        [[RESULT:%.*]] = call i8* @swift_dynamicCastClassUnconditional(i8* [[OBJECT]], i8* [[METADATA_PTR]], {{.*}})
   // CHECK-NEXT:        [[REFERENCE:%.*]] = bitcast i8* [[RESULT]] to %T24protocol_with_superclass10SubDerivedC*
-  %12 = unconditional_checked_cast %3 : $ProtoRefinesClass to $SubDerived
+  %12 = unconditional_checked_cast %3 : $ProtoRefinesClass to SubDerived
 
   // CHECK:             call void bitcast (void (%swift.refcounted*)* @swift_release to void (%T24protocol_with_superclass10SubDerivedC*)*)(%T24protocol_with_superclass10SubDerivedC* [[REFERENCE]])
   strong_release %12 : $SubDerived
@@ -128,7 +128,7 @@ bb0(%0 : $Concrete, %1 : $SuperProto, %2 : $SuperProto & Concrete, %3 : $ProtoRe
   // CHECK-NEXT:        [[RESULT:%.*]] = call { i8*, i8** } @dynamic_cast_existential_1_unconditional(i8* [[OBJECT]], %swift.type* [[ISA]], {{.*}} @"$s24protocol_with_superclass10OtherProtoMp"
   // CHECK-NEXT:        [[FIRST:%.*]] = extractvalue { i8*, i8** } [[RESULT]], 0
   // CHECK-NEXT:        [[REFERENCE:%.*]] = bitcast i8* [[FIRST]] to %T24protocol_with_superclass8ConcreteC*
-  %13 = unconditional_checked_cast %3 : $ProtoRefinesClass to $OtherProto & Concrete
+  %13 = unconditional_checked_cast %3 : $ProtoRefinesClass to OtherProto & Concrete
 
   // CHECK:             call void bitcast (void (%swift.refcounted*)* @swift_release to void (%T24protocol_with_superclass8ConcreteC*)*)(%T24protocol_with_superclass8ConcreteC* [[REFERENCE]])
   strong_release %13 : $OtherProto & Concrete
@@ -141,7 +141,7 @@ bb0(%0 : $Concrete, %1 : $SuperProto, %2 : $SuperProto & Concrete, %3 : $ProtoRe
   // CHECK-NEXT:        [[RESULT:%.*]] = call { i8*, i8** } @dynamic_cast_existential_1_superclass_unconditional(i8* [[OBJECT]], %swift.type* [[ISA]], %swift.type* [[METADATA]], {{.*}} @"$s24protocol_with_superclass10OtherProtoMp"
   // CHECK-NEXT:        [[FIRST:%.*]] = extractvalue { i8*, i8** } [[RESULT]], 0
   // CHECK-NEXT:        [[REFERENCE:%.*]] = bitcast i8* [[FIRST]] to %T24protocol_with_superclass11SubConcreteC*
-  %14 = unconditional_checked_cast %3 : $ProtoRefinesClass to $OtherProto & SubConcrete
+  %14 = unconditional_checked_cast %3 : $ProtoRefinesClass to OtherProto & SubConcrete
 
   // CHECK:             call void bitcast (void (%swift.refcounted*)* @swift_release to void (%T24protocol_with_superclass11SubConcreteC*)*)(%T24protocol_with_superclass11SubConcreteC* [[REFERENCE]])
   strong_release %14 : $OtherProto & SubConcrete
@@ -152,7 +152,7 @@ bb0(%0 : $Concrete, %1 : $SuperProto, %2 : $SuperProto & Concrete, %3 : $ProtoRe
   // CHECK-NEXT:        [[METADATA_PTR:%.*]] = bitcast %swift.type* [[METADATA]] to i8*
   // CHECK-NEXT:        [[RESULT:%.*]] = call i8* @swift_dynamicCastClassUnconditional(i8* [[OBJECT]], i8* [[METADATA_PTR]], {{.*}})
   // CHECK-NEXT:        [[REFERENCE:%.*]] = bitcast i8* [[RESULT]] to %T24protocol_with_superclass11MoreDerivedC*
-  %15 = unconditional_checked_cast %4 : $SubProto to $MoreDerived
+  %15 = unconditional_checked_cast %4 : $SubProto to MoreDerived
 
   // CHECK:             call void bitcast (void (%swift.refcounted*)* @swift_release to void (%T24protocol_with_superclass11MoreDerivedC*)*)(%T24protocol_with_superclass11MoreDerivedC* [[REFERENCE]])
   strong_release %15 : $MoreDerived
@@ -163,7 +163,7 @@ bb0(%0 : $Concrete, %1 : $SuperProto, %2 : $SuperProto & Concrete, %3 : $ProtoRe
   // CHECK-NEXT:        [[RESULT:%.*]] = call { i8*, i8** } @dynamic_cast_existential_1_unconditional(i8* [[OBJECT]], %swift.type* [[ISA]], {{.*}} @"$s24protocol_with_superclass10OtherProtoMp"
   // CHECK-NEXT:        [[FIRST:%.*]] = extractvalue { i8*, i8** } [[RESULT]], 0
   // CHECK-NEXT:        [[REFERENCE:%.*]] = bitcast i8* [[FIRST]] to %T24protocol_with_superclass8ConcreteC*
-  %16 = unconditional_checked_cast %4 : $SubProto to $OtherProto & Concrete
+  %16 = unconditional_checked_cast %4 : $SubProto to OtherProto & Concrete
 
   // CHECK:             call void bitcast (void (%swift.refcounted*)* @swift_release to void (%T24protocol_with_superclass8ConcreteC*)*)(%T24protocol_with_superclass8ConcreteC* [[REFERENCE]])
   strong_release %16 : $OtherProto & Concrete

@@ -25,7 +25,7 @@ protocol ClassProto : class {}
 sil hidden @checkedClassBoundCast : $@convention(thin) <T where T : NSObject> (@thick T.Type, @owned NSObject) -> @owned T {
 bb0(%unused : $@thick T.Type, %obj : $NSObject):
   strong_retain %obj : $NSObject
-  %result = unconditional_checked_cast %obj : $NSObject to $T
+  %result = unconditional_checked_cast %obj : $NSObject to T
   strong_release %obj : $NSObject
   return %result : $T
 }
@@ -41,7 +41,7 @@ bb0(%unused : $@thick T.Type, %obj : $NSObject):
 // CHECK-NEXT:  call i8* @swift_dynamicCastObjCClassUnconditional(i8* [[T1]], i8* [[T3]], {{.*}})
 sil hidden @metatype_to_objc_class : $@convention(thin) <T> (@thick T.Type) -> () {
 bb0(%metatype : $@thick T.Type):
-  %result = unconditional_checked_cast %metatype : $@thick T.Type to $Foo
+  %result = unconditional_checked_cast %metatype : $@thick T.Type to Foo
   %tuple = tuple ()
   return %tuple : $()
 }
@@ -57,7 +57,7 @@ bb0(%metatype : $@thick T.Type):
 // CHECK-NEXT:  call i8* @swift_dynamicCastObjCClassUnconditional(i8* [[T1]], i8* [[T3]], {{.*}})
 sil hidden @opt_metatype_to_objc_class : $@convention(thin) <T> (Optional<@thick T.Type>) -> () {
 bb0(%metatype : $Optional<@thick T.Type>):
-  %result = unconditional_checked_cast %metatype : $Optional<@thick T.Type> to $Foo
+  %result = unconditional_checked_cast %metatype : $Optional<@thick T.Type> to Foo
   %tuple = tuple ()
   return %tuple : $()
 }
@@ -70,7 +70,7 @@ bb0(%metatype : $Optional<@thick T.Type>):
 // CHECK-NEXT:  call { i8*, i8** } @dynamic_cast_existential_1_unconditional(i8* [[T0]], %swift.type* [[TYPE]], {{.*}} @"$s10objc_casts10ClassProtoMp"
 sil hidden @swift_class_bounded_to_cp : $@convention(thin) <T: SwiftClass> (@owned T) -> @owned ClassProto {
 entry(%a : $T):
-  %0 = unconditional_checked_cast %a : $T to $ClassProto
+  %0 = unconditional_checked_cast %a : $T to ClassProto
   return %0 : $ClassProto
 }
 
@@ -82,6 +82,6 @@ entry(%a : $T):
 // CHECK-NEXT:  call { i8*, i8** } @dynamic_cast_existential_1_unconditional(i8* [[T0]], %swift.type* [[TYPE]], {{.*}} @"$s10objc_casts10ClassProtoMp"
 sil hidden @objc_class_bounded_to_cp : $@convention(thin) <T: NSObject> (@owned T) -> @owned ClassProto {
 entry(%a : $T):
-  %0 = unconditional_checked_cast %a : $T to $ClassProto
+  %0 = unconditional_checked_cast %a : $T to ClassProto
   return %0 : $ClassProto
 }

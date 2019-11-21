@@ -377,8 +377,8 @@ sil_vtable Sub {}
 
 sil @parametric_casting_closure : $@convention(thin) <C where C : Base> (@owned Base) -> @owned C {
 bb0(%0 : $Base):
-  %1 = unconditional_checked_cast %0 : $Base to $C
-   return %1 : $C
+  %1 = unconditional_checked_cast %0 : $Base to C
+  return %1 : $C
 }
 
 sil public_external @receive_closure : $@convention(thin) <C where C : Base> (@owned @callee_owned () -> (@owned C)) -> ()
