@@ -85,7 +85,7 @@ ninja -C S:\b\toolchain check-swift
 ## Build swift-corelibs-libdispatch
 
 ```cmd
-cmake -B S:\b\libdispatch -G Ninja -S S:\toolchain\swift-corelibs-libdispatch -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_C_COMPILER=clang-cl -DCMAKE_CXX_COMPILER=clang-cl -DCMAKE_Swift_COMPILER=S:/b/toolchain/bin/swiftc.exe -DENABLE_SWIFT=YES
+cmake -B S:\b\libdispatch -G Ninja -S S:\toolchain\swift-corelibs-libdispatch -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_C_COMPILER=S:/b/toolchain/bin/clang-cl.exe -DCMAKE_CXX_COMPILER=S:/b/toolchain/bin/clang-cl.exe -DCMAKE_Swift_COMPILER=S:/b/toolchain/bin/swiftc.exe -DENABLE_SWIFT=YES
 ninja -C S:\b\libdispatch
 ```
 
@@ -98,7 +98,7 @@ ninja -C S:\b\libdispatch check
 ## Build swift-corelibs-foundation
 
 ```cmd
-cmake -B S:\b\foundation -G Ninja -S S:\toolchain\swift-corelibs-foundation -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_C_COMPILER=clang-cl -DCMAKE_Swift_COMPILER=S:/b/toolchain/bin/swiftc.exe -DCURL_LIBRARY="S:/Library/libcurl-development/usr/lib/libcurl.lib" -DCURL_INCLUDE_DIR="S:/Library/libcurl-development/usr/include" -DICU_ROOT="S:/Library/icu-64" -DICU_INCLUDE_DIR=S:/Library/icu-64/usr/include -DLIBXML2_LIBRARY="S:/Library/libxml2-development/usr/lib/libxml2s.lib" -DLIBXML2_INCLUDE_DIR="S:/Library/libxml2-development/usr/include/libxml2" -DENABLE_TESTING=NO -Ddispatch_DIR=S:/b/libdispatch/cmake/modules
+cmake -B S:\b\foundation -G Ninja -S S:\toolchain\swift-corelibs-foundation -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_C_COMPILER=S:/b/toolchain/clang-cl.exe -DCMAKE_Swift_COMPILER=S:/b/toolchain/bin/swiftc.exe -DCURL_LIBRARY="S:/Library/libcurl-development/usr/lib/libcurl.lib" -DCURL_INCLUDE_DIR="S:/Library/libcurl-development/usr/include" -DICU_ROOT="S:/Library/icu-64" -DICU_INCLUDE_DIR=S:/Library/icu-64/usr/include -DLIBXML2_LIBRARY="S:/Library/libxml2-development/usr/lib/libxml2s.lib" -DLIBXML2_INCLUDE_DIR="S:/Library/libxml2-development/usr/include/libxml2" -DENABLE_TESTING=NO -Ddispatch_DIR=S:/b/libdispatch/cmake/modules
 ninja -C S:\b\foundation
 ```
 
@@ -128,7 +128,7 @@ ninja -C S:\b\xctest check-xctest
 ## Rebuild Foundation
 
 ```cmd
-cmake -B S:\b\foundation -G Ninja -S S:\toolchain\swift-corelibs-foundation -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_C_COMPILER=clang-cl -DCMAKE_Swift_COMPILER=S:/b/toolchain/bin/swiftc.exe -DCURL_LIBRARY="S:/Library/libcurl-development/usr/lib/libcurl.lib" -DCURL_INCLUDE_DIR="S:/Library/libcurl-development/usr/include" -DICU_ROOT="S:/Library/icu-64" -DLIBXML2_LIBRARY="S:/Library/libxml2-development/usr/lib/libxml2.lib" -DLIBXML2_INCLUDE_DIR="S:/Library/libxml2-development/usr/include" -DENABLE_TESTING=YES -Ddisptch_DIR=S:/b/libdispatch/cmake/modules -DXCTest_DIR=S:/b/xctest/cmake/modules
+cmake -B S:\b\foundation -G Ninja -S S:\toolchain\swift-corelibs-foundation -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_C_COMPILER=S:/b/toolchain/bin/clang-cl.exe -DCMAKE_Swift_COMPILER=S:/b/toolchain/bin/swiftc.exe -DCURL_LIBRARY="S:/Library/libcurl-development/usr/lib/libcurl.lib" -DCURL_INCLUDE_DIR="S:/Library/libcurl-development/usr/include" -DICU_ROOT="S:/Library/icu-64" -DLIBXML2_LIBRARY="S:/Library/libxml2-development/usr/lib/libxml2.lib" -DLIBXML2_INCLUDE_DIR="S:/Library/libxml2-development/usr/include" -DENABLE_TESTING=YES -Ddisptch_DIR=S:/b/libdispatch/cmake/modules -DXCTest_DIR=S:/b/xctest/cmake/modules
 ninja -C S:\b\foundation
 ```
 
@@ -152,6 +152,14 @@ ninja -C S:\b\llbuild
 path S:\b\llbuild\bin;%PATH%
 ```
 
+## Build swift-tools-core-support
+
+```cmd
+md S:\b\tsc
+cmake -B S:\b\tsc -G Ninja -S S:\toolchain\swift-tools-support-core -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_C_COMPILER=cl -DCMAKE_Swift_COMPILER=S:/b/toolchain/bin/swiftc.exe -DFoundation_DIR=S:/b/foundation/cmake/modules -Ddispatch_DIR=S:/b/libdispatch/cmake/modules
+ninja -C S:\b\tsc
+```
+
 ## Build swift-package-manager
 
 ```cmd
@@ -169,11 +177,3 @@ ninja -C S:\b\toolchain install
 ```
 
 - Add the Swift on Windows binaries path (`C:\Library\Developer\Toolchains\unknown-Asserts-development.xctoolchain\usr\bin`)  to the `PATH` environment variable.
-
-## Resuming Builds
-
-If you resume development from a new shell, the path will need to be readjusted.  The following will add the correct search order to the path:
-
-```cmd
-path S:\Library\icu-64\bin;S:\b\llvm\bin;S:\b\swift\bin;S:\b\libdispatch;S:\b\libdispatch\src;S:\b\foundation;S:\b\xctest;S:\b\llbuild\bin;S:\b\sqlite;%PATH%;%ProgramFiles%\Git\usr\bin
-```
