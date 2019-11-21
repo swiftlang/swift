@@ -2995,7 +2995,7 @@ SourceLoc ValueDecl::getAttributeInsertionLoc(bool forModifier) const {
 /// Returns true if \p VD needs to be treated as publicly-accessible
 /// at the SIL, LLVM, and machine levels due to being @usableFromInline.
 bool ValueDecl::isUsableFromInline() const {
-  assert(getFormalAccess() == AccessLevel::Internal);
+  assert(getFormalAccess() <= AccessLevel::Internal);
 
   if (getAttrs().hasAttribute<UsableFromInlineAttr>() ||
       getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>() ||
@@ -3092,7 +3092,7 @@ static AccessLevel getAdjustedFormalAccess(const ValueDecl *VD,
     return getMaximallyOpenAccessFor(VD);
 
   if (treatUsableFromInlineAsPublic &&
-      access == AccessLevel::Internal &&
+      (access == AccessLevel::Internal || access == AccessLevel::Private) &&
       VD->isUsableFromInline()) {
     return AccessLevel::Public;
   }

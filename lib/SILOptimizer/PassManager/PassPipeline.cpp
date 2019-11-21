@@ -411,6 +411,8 @@ static void addPerfEarlyModulePassPipeline(SILPassPipelinePlan &P) {
 
   // Add the outliner pass (Osize).
   P.addOutliner();
+
+  P.addCrossModuleSerializationSetup();
 }
 
 static void addHighLevelEarlyLoopOptPipeline(SILPassPipelinePlan &P) {

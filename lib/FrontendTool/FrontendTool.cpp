@@ -1394,6 +1394,9 @@ static bool validateTBDIfNeeded(CompilerInvocation &Invocation,
   if (!astGuaranteedToCorrespondToSIL ||
       !inputFileKindCanHaveTBDValidated(Invocation.getInputKind()))
     return false;
+    
+  if (Invocation.getSILOptions().CrossModuleOptimization)
+    return false;
 
   const auto &frontendOpts = Invocation.getFrontendOptions();
   auto mode = frontendOpts.ValidateTBDAgainstIR;

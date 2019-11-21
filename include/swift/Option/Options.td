@@ -589,6 +589,10 @@ def Oplayground : Flag<["-"], "Oplayground">, Group<O_Group>,
   Flags<[HelpHidden, FrontendOption, ModuleInterfaceOption]>,
   HelpText<"Compile with optimizations appropriate for a playground">;
 
+def CrossModuleOptimization : Flag<["-"], "cross-module-optimization">,
+  Flags<[HelpHidden, FrontendOption]>,
+  HelpText<"Perform cross-module optimization">;
+
 def RemoveRuntimeAsserts : Flag<["-"], "remove-runtime-asserts">,
   Flags<[FrontendOption]>,
   HelpText<"Remove runtime safety checks.">;
