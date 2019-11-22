@@ -2689,7 +2689,7 @@ static StorageImplInfo classifyWithHasStorageAttr(VarDecl *var) {
       var->getParsedAccessor(AccessorKind::Set)) {
     // If we see `@_hasStorage var x: T { get set }`, then our property has
     // willSet/didSet observers.
-    writeImpl = var->getAttrs().hasAttribute<OverrideAttr>() ?
+    writeImpl = var->getOverriddenDecl() ?
       WriteImplKind::InheritedWithObservers :
       WriteImplKind::StoredWithObservers;
     readWriteImpl = ReadWriteImplKind::MaterializeToTemporary;
@@ -2770,7 +2770,7 @@ StorageImplInfoRequest::evaluate(Evaluator &evaluator,
 
   // Check if we have observers.
   } else if (hasWillSet || hasDidSet) {
-    if (storage->getAttrs().hasAttribute<OverrideAttr>()) {
+    if (storage->getOverriddenDecl()) {
       readImpl = ReadImplKind::Inherited;
     } else {
       readImpl = ReadImplKind::Stored;
