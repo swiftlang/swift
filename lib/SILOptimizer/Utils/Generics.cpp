@@ -676,7 +676,6 @@ void ReabstractionInfo::createSubstitutedAndSpecializedTypes() {
   CanGenericSignature CanSig;
   if (SpecializedGenericSig)
     CanSig = SpecializedGenericSig->getCanonicalSignature();
-  Lowering::GenericContextScope GenericScope(M.Types, CanSig);
 
   SILFunctionConventions substConv(SubstitutedType, M);
 
@@ -759,8 +758,6 @@ ReabstractionInfo::createSubstitutedType(SILFunction *OrigF,
   // First substitute concrete types into the existing function type.
   CanSILFunctionType FnTy;
   {
-    Lowering::GenericContextScope GenericScope(M.Types,
-                                               CanSpecializedGenericSig);
     FnTy = OrigF->getLoweredFunctionType()->substGenericArgs(
         M, SubstMap, getResilienceExpansion());
     // FIXME: Some of the added new requirements may not have been taken into
@@ -2091,11 +2088,6 @@ SILFunction *ReabstractionThunkGenerator::createThunk() {
     return Thunk;
 
   Thunk->setGenericEnvironment(ReInfo.getSpecializedGenericEnvironment());
-
-  // Set proper generic context scope for the type lowering.
-  CanSILFunctionType SpecType = SpecializedFunc->getLoweredFunctionType();
-  Lowering::GenericContextScope GenericScope(M.Types,
-                                     SpecType->getInvocationGenericSignature());
 
   SILBasicBlock *EntryBB = Thunk->createBasicBlock();
   SILBuilder Builder(EntryBB);

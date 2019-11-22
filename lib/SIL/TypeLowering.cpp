@@ -2144,26 +2144,6 @@ SILType TypeConverter::getSubstitutedStorageType(TypeExpansionContext context,
   return SILType::getPrimitiveAddressType(substLoweredType);
 }
 
-void TypeConverter::pushGenericContext(CanGenericSignature sig) {
-  // If the generic signature is empty, this is a no-op.
-  if (!sig)
-    return;
-
-  DependentTypeState state(sig);
-  DependentTypes.push_back(std::move(state));
-}
-
-void TypeConverter::popGenericContext(CanGenericSignature sig) {
-  // If the generic signature is empty, this is a no-op.
-  if (!sig)
-    return;
-
-  DependentTypeState &state = DependentTypes.back();
-  assert(state.Sig == sig && "unpaired push/pop");
-  
-  DependentTypes.pop_back();
-}
-
 ProtocolDispatchStrategy
 TypeConverter::getProtocolDispatchStrategy(ProtocolDecl *P) {
   // ObjC protocols use ObjC method dispatch, and Swift protocols
@@ -2668,8 +2648,6 @@ TypeConverter::getInterfaceBoxTypeForCapture(ValueDecl *captured,
 
   auto boxTy = SILBoxType::get(C, layout, subMap);
 #ifndef NDEBUG
-  // FIXME: Map the box type out of context when asserting the field so
-  // we don't need to push a GenericContextScope (which really ought to die).
   auto loweredContextType = loweredInterfaceType;
   auto contextBoxTy = boxTy;
   if (signature) {
@@ -2738,7 +2716,6 @@ CanSILBoxType TypeConverter::getBoxTypeForEnumElement(
 
   // Lower the enum element's argument in the box's context.
   auto eltIntfTy = elt->getArgumentInterfaceType();
-  GenericContextScope scope(*this, boxSignature);
 
   auto boxVarTy = getLoweredRValueType(context,
                                        getAbstractionPattern(elt), eltIntfTy);

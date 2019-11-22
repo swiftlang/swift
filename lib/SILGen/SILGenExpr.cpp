@@ -2796,7 +2796,6 @@ static SILFunction *getOrCreateKeyPathSetter(SILGenModule &SGM,
   // Build the signature of the thunk as expected by the keypath runtime.
   CanType loweredBaseTy, loweredPropTy;
   {
-    GenericContextScope scope(SGM.Types, genericSig);
     AbstractionPattern opaque = AbstractionPattern::getOpaque();
 
     loweredBaseTy = SGM.Types.getLoweredRValueType(

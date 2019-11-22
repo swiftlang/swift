@@ -422,7 +422,6 @@ SILResultInfo::getOwnershipKind(SILFunction &F) const {
   auto &M = F.getModule();
   auto FTy = F.getLoweredFunctionType();
   auto sig = FTy->getInvocationGenericSignature();
-  GenericContextScope GCS(M.Types, sig);
 
   bool IsTrivial = getSILStorageType(M, FTy).isTrivial(F);
   switch (getConvention()) {

@@ -4478,9 +4478,6 @@ public:
             "keypath value type should match value type of keypath pattern");
     
     {
-      Lowering::GenericContextScope scope(F.getModule().Types,
-                                          pattern->getGenericSignature());
-      
       for (auto &component : pattern->getComponents()) {
         bool hasIndices;
         switch (component.getKind()) {
@@ -5130,7 +5127,6 @@ void SILProperty::verify(const SILModule &M) const {
   }
 
   auto canSig = sig ? sig->getCanonicalSignature() : nullptr;
-  Lowering::GenericContextScope scope(M.Types, canSig);
 
   auto require = [&](bool reqt, StringRef message) {
       if (!reqt) {

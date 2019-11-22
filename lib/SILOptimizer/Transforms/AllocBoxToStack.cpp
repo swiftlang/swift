@@ -584,8 +584,6 @@ SILFunction *PromotedParamCloner::initCloned(SILOptFunctionBuilder &FuncBuilder,
       SILType paramTy;
       {
         auto &TC = Orig->getModule().Types;
-        Lowering::GenericContextScope scope(TC,
-                                      OrigFTI->getSubstGenericSignature());
         paramTy = getSILBoxFieldType(TypeExpansionContext(*Orig), boxTy, TC, 0);
       }
       auto promotedParam = SILParameterInfo(paramTy.getASTType(),

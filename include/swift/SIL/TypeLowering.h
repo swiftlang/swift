@@ -654,20 +654,6 @@ class TypeConverter {
   /// Mapping for types independent on contextual generic parameters.
   llvm::DenseMap<CachingTypeKey, const TypeLowering *> LoweredTypes;
 
-  struct DependentTypeState {
-    CanGenericSignature Sig;
-
-    explicit DependentTypeState(CanGenericSignature sig) : Sig(sig) {}
-
-    DependentTypeState(DependentTypeState &&) = default;
-
-    // No copy constructor or assignment.
-    DependentTypeState(const DependentTypeState &) = delete;
-    void operator=(const DependentTypeState &) = delete;
-  };
-
-  llvm::SmallVector<DependentTypeState, 1> DependentTypes;
-
   llvm::DenseMap<std::pair<TypeExpansionContext, SILDeclRef>, SILConstantInfo *>
       ConstantTypes;
 
@@ -950,26 +936,6 @@ public:
                                     AbstractStorageDecl *value,
                                     Type lvalueType);
 
-  /// Push a generic function context. See GenericContextScope for an RAII
-  /// interface to this function.
-  ///
-  /// Types containing generic parameter references must be lowered in a generic
-  /// context. There can be at most one level of generic context active at any
-  /// point in time.
-  void pushGenericContext(CanGenericSignature sig);
-
-  /// Return the current generic context.  This should only be used in
-  /// the type-conversion routines.
-  CanGenericSignature getCurGenericContext() const {
-    if (DependentTypes.empty())
-      return CanGenericSignature();
-    return DependentTypes.back().Sig;
-  }
-  
-  /// Pop a generic function context. See GenericContextScope for an RAII
-  /// interface to this function. There must be an active generic context.
-  void popGenericContext(CanGenericSignature sig);
-  
   /// Known types for bridging.
 #define BRIDGING_KNOWN_TYPE(BridgedModule,BridgedType) \
   CanType get##BridgedType##Type();
@@ -1078,26 +1044,6 @@ private:
                                CanType result,
                                Bridgeability bridging,
                                bool suppressOptional);
-};
-
-/// RAII interface to push a generic context.
-class GenericContextScope {
-  TypeConverter &TC;
-  CanGenericSignature Sig;
-public:
-  GenericContextScope(TypeConverter &TC, CanGenericSignature sig)
-    : TC(TC), Sig(sig)
-  {
-    TC.pushGenericContext(sig);
-  }
-  
-  ~GenericContextScope() {
-    TC.popGenericContext(Sig);
-  }
-  
-private:
-  GenericContextScope(const GenericContextScope&) = delete;
-  GenericContextScope &operator=(const GenericContextScope&) = delete;
 };
 
 } // namespace Lowering
