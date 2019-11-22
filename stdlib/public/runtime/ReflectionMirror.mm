@@ -197,7 +197,7 @@ static AnyReturn copyFieldContents(OpaqueValue *fieldData,
     // The field was declared with a reference type we don't understand.
     warning(0, "Value with unrecognized reference type is reflected as ()");
     // Clean up the buffer allocated above
-    type->deallocateBufferIn(&outValue.Buffer);
+    type->deallocateBoxForExistentialIn(&outValue.Buffer);
     // Return an existential containing Void
     outValue.Type = &METADATA_SYM(EMPTY_TUPLE_MANGLING);
   }
