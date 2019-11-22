@@ -150,11 +150,10 @@ void BasicBlockCloner::sinkAddressProjections() {
            && "canCloneInstruction should catch this.");
 
     auto nextII = std::next(ii);
-    recursivelyDeleteTriviallyDeadInstructions(
-        &*ii, false, [&nextII](SILInstruction *deadInst) {
-          if (deadInst->getIterator() == nextII)
-            ++nextII;
-        });
+    eliminateDeadInstruction(&*ii, [&nextII](SILInstruction *deadInst) {
+      if (deadInst->getIterator() == nextII)
+        ++nextII;
+    });
     ii = nextII;
   }
 }

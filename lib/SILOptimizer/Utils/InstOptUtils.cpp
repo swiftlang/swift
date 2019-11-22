@@ -12,8 +12,8 @@
 
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/AST/GenericSignature.h"
-#include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/SemanticAttrs.h"
+#include "swift/AST/SubstitutionMap.h"
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/DynamicCasts.h"
@@ -27,6 +27,7 @@
 #include "swift/SILOptimizer/Analysis/Analysis.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
+#include "swift/SILOptimizer/Utils/ConstExpr.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/StringSwitch.h"
@@ -171,9 +172,273 @@ bool swift::isIntermediateRelease(SILInstruction *inst,
   return false;
 }
 
+static bool hasOnlyEndOfScopeOrDestroyUses(SILInstruction *inst) {
+  for (SILValue result : inst->getResults()) {
+    for (Operand *use : result->getUses()) {
+      SILInstruction *user = use->getUser();
+      if (!isa<DestroyValueInst>(user) && !isEndOfScopeMarker(user))
+        return false;
+    }
+  }
+  return true;
+}
+
+/// Return true iff the \p applySite calls a constant evaluable function and if
+/// it is read-only which implies the following:
+///   (1) The call does not write into any memory location.
+///   (2) The call may destroy owned parameters, which are guaranteed to have
+///   value semantics as the call is constant evaluable. (3) The call does not
+///   throw or exit the program (modulo assertion failures).
+static bool isReadOnlyConstantEvaluableCall(FullApplySite applySite) {
+  assert(applySite);
+  SILFunction *callee = applySite.getCalleeFunction();
+  if (!callee || !isConstantEvaluable(callee)) {
+    return false;
+  }
+  // Here all effects of the call is restricted to its indirect results, which
+  // must have value semantics. If there are no indirect results, the call must
+  // be read-only.
+  return applySite.getNumIndirectSILResults() == 0;
+}
+
+/// A scope-affecting instruction is an instruction which may end the scope of
+/// its operand or may produce scoped results that require cleaning up. E.g.
+/// begin_borrow, begin_access, copy_value, a call that produces a owned value
+/// are scoped instructions. The scope of the results of the first two
+/// instructions end with an end_borrow/acess instruction, while those of the
+/// latter two end with a consuming operation like destroy_value instruction.
+/// These instruction may also end the scope of its operand e.g. a call could
+/// consume owned arguments thereby ending its scope. Dead-code eliminating a
+/// scope-affecting instruction requires fixing the lifetime of the non-trivial
+/// operands of the instruction and requires cleaning up the end-of-scope uses
+/// of non-trivial results.
+///
+/// \param inst instruction that checked for liveness.
+/// \param knownPureValueTypes a set of known non-trivial types that are known
+/// to have pure value value semantics. These types are populated when a
+/// constant_evaluable call is seen, as it would accept only types with value
+/// semantics.
+static bool
+isScopeAffectingInstructionDead(SILInstruction *inst,
+                                SmallPtrSetImpl<CanType> &knownPureValueTypes) {
+  SILFunction *fun = inst->getFunction();
+  assert(fun && "Instruction has no function.");
+  // Only support ownership SIL for scoped instructions.
+  if (!fun->hasOwnership()) {
+    return false;
+  }
+  // If the instruction has any use other than end of scope use or destroy_value
+  // use, bail out.
+  if (!hasOnlyEndOfScopeOrDestroyUses(inst)) {
+    return false;
+  }
+  // If inst is a copy or beginning of scope, inst is dead, since we know that
+  // it is used only in a destroy_value or end-of-scope instruction.
+  if (getSingleValueCopyOrCast(inst))
+    return true;
+
+  switch (inst->getKind()) {
+  case SILInstructionKind::LoadInst: {
+    LoadOwnershipQualifier loadOwnershipQual =
+        cast<LoadInst>(inst)->getOwnershipQualifier();
+    // If the load creates a copy, it is dead, since we know that if at all it
+    // is used, it is only in a destroy_value instruction.0
+    return (loadOwnershipQual == LoadOwnershipQualifier::Copy ||
+            loadOwnershipQual == LoadOwnershipQualifier::Trivial);
+  }
+  case SILInstructionKind::PartialApplyInst: {
+    // Partial applies that are only used in destroys cannot have any effect on
+    // the program state, provided the values they capture are explicitly
+    // destroyed.
+    return true;
+  }
+  case SILInstructionKind::StructInst:
+  case SILInstructionKind::EnumInst:
+  case SILInstructionKind::TupleInst:
+  case SILInstructionKind::ConvertFunctionInst:
+  case SILInstructionKind::DestructureStructInst:
+  case SILInstructionKind::DestructureTupleInst: {
+    // All these ownership forwarding instructions that are only used in
+    // destroys are dead provided the values they consume are destroyed
+    // explicitly.
+    return true;
+  }
+  case SILInstructionKind::ApplyInst: {
+    // A constant_evaluable call can only return a type with value semantics.
+    // The deinit of the returned type should be pure in the sense that it only
+    // affects its self and nothing else. Therefore, it should be safe to remove
+    // the call along with any destroys of the returned value, if the call
+    // itself doesn't have any side-effects i.e., if it is a read-only call.
+    // Nonetheless, the call is allowed to consume (i.e., destroy) the owned
+    // values passed to the call.
+    FullApplySite applySite(cast<ApplyInst>(inst));
+    if (isReadOnlyConstantEvaluableCall(applySite)) {
+      // Record that the non-trivial arguments of the call are pure values, so
+      // that they can be cleaned up effectively.
+      for (SILValue argument : applySite.getArguments()) {
+        SILType argumentType = argument->getType();
+        if (!argumentType.isTrivial(*fun))
+          knownPureValueTypes.insert(argumentType.getASTType());
+      }
+      return true;
+    }
+    return false;
+  }
+  default: {
+    // If the instruction doesn't have any side effects and all results of
+    // the instruction are pure values, the destroys of the results do not have
+    // any side-effects and therefore the instruction is dead.
+    return !inst->mayHaveSideEffects() &&
+           llvm::all_of(inst->getResults(), [&](SILValue result) {
+             SILType resultType = result->getType();
+             return resultType.isTrivial(*fun) ||
+                    knownPureValueTypes.count(resultType.getASTType());
+           });
+  }
+  }
+}
+
+void InstructionDeleter::trackIfDead(SILInstruction *inst) {
+  if (isInstructionTriviallyDead(inst) ||
+      isScopeAffectingInstructionDead(inst, knownPureValueTypes)) {
+    deadInstructions.insert(inst);
+  }
+}
+
+/// Given an \p operand that belongs to an instruction that will be removed,
+/// insert necessary destroy_value instructions to fix the lifetime of the
+/// operand. This function works only on ownership.
+static void fixLifetimeOfOperandOfDeadInst(Operand &operand) {
+  assert(operand.get() && operand.getUser());
+  SILInstruction *deadInst = operand.getUser();
+  SILFunction *fun = deadInst->getFunction();
+  assert(fun->hasOwnership());
+
+  SILValue operandValue = operand.get();
+  if (operandValue->getType().isTrivial(*fun))
+    return;
+  // A scope ending instruction cannot be delted in isolation without removing
+  // the instruction defining its operand as well.
+  assert(!isEndOfScopeMarker(deadInst) && !isa<DestroyValueInst>(deadInst) &&
+         "lifetime ending instruction is deleted without its operand");
+  ValueOwnershipKind operandOwnershipKind = operandValue.getOwnershipKind();
+  UseLifetimeConstraint lifetimeConstraint =
+      operand.getOwnershipKindMap().getLifetimeConstraint(operandOwnershipKind);
+  if (lifetimeConstraint == UseLifetimeConstraint::MustBeInvalidated) {
+    // Since deadInst cannot be an end-of-scope instruction (asserted above),
+    // this must be a consuming use of an owned value.
+    assert(operandOwnershipKind == ValueOwnershipKind::Owned);
+    SILBuilderWithScope builder(deadInst);
+    builder.emitDestroyValueOperation(deadInst->getLoc(), operandValue);
+  }
+}
+
 namespace {
 using CallbackTy = llvm::function_ref<void(SILInstruction *)>;
-} // end anonymous namespace
+} // namespace
+
+void InstructionDeleter::deleteInstruction(SILInstruction *inst,
+                                           CallbackTy callback,
+                                           bool fixOperandLifetimes) {
+  // We cannot fix operand lifetimes in non-ownership SIL.
+  assert(!fixOperandLifetimes || inst->getFunction()->hasOwnership());
+  // Collect instruction and its immediate uses and check if they are all
+  // incidental uses. Also, invoke the callback on the instruction and its uses.
+  SmallVector<SILInstruction *, 4> toDeleteInsts;
+  toDeleteInsts.push_back(inst);
+  callback(inst);
+  for (SILValue result : inst->getResults()) {
+    for (Operand *use : result->getUses()) {
+      SILInstruction *user = use->getUser();
+      assert(isIncidentalUse(user) || isa<DestroyValueInst>(user));
+      callback(user);
+      toDeleteInsts.push_back(user);
+    }
+  }
+  // Record definitions of instruction's operands. Also, in case an operand is
+  // consumed by inst, emit necessary compensation code.
+  SmallVector<SILInstruction *, 4> operandDefinitions;
+  for (Operand &operand : inst->getAllOperands()) {
+    SILValue operandValue = operand.get();
+    if (!operandValue)
+      continue;
+    SILInstruction *defInst = operandValue->getDefiningInstruction();
+    // If the operand has a defining instruction, it could be potentially
+    // dead. Therefore, record the definition.
+    if (defInst)
+      operandDefinitions.push_back(defInst);
+    // The scope of the operand could be ended by inst. Therefore, emit
+    // any compensating code needed to end the scope of the operand value
+    // once inst is deleted.
+    if (fixOperandLifetimes)
+      fixLifetimeOfOperandOfDeadInst(operand);
+  }
+  // Delete instruction and its users. The instruction must drop all references
+  // and must also be removed from the deadInsts set.
+  for (SILInstruction *inst : toDeleteInsts) {
+    inst->dropAllReferences();
+    deadInstructions.remove(inst);
+  }
+  for (SILInstruction *inst : toDeleteInsts) {
+    inst->eraseFromParent();
+  }
+  // Record operand definitions that become dead now.
+  for (SILInstruction *operandValInst : operandDefinitions) {
+    trackIfDead(operandValInst);
+  }
+}
+
+void InstructionDeleter::cleanUpDeadInstructions(CallbackTy callback) {
+  SILFunction *fun = nullptr;
+  if (!deadInstructions.empty())
+    fun = deadInstructions.front()->getFunction();
+  while (!deadInstructions.empty()) {
+    SILInstruction *deadInst = deadInstructions.front();
+    deadInstructions.erase(deadInstructions.begin());
+    deleteInstruction(deadInst, callback, /*Fix lifetime of operands*/
+                      fun->hasOwnership());
+  }
+}
+
+static bool hasOnlyIncidentalUses(SILInstruction *inst,
+                                  bool disallowDebugUses = false) {
+  for (SILValue result : inst->getResults()) {
+    for (Operand *use : result->getUses()) {
+      SILInstruction *user = use->getUser();
+      if (!isIncidentalUse(user))
+        return false;
+      if (disallowDebugUses && user->isDebugInstruction())
+        return false;
+    }
+  }
+  return true;
+}
+
+void InstructionDeleter::forceDeleteAndFixLifetimes(SILInstruction *inst,
+                                                    CallbackTy callback) {
+  SILFunction *fun = inst->getFunction();
+  assert(fun->hasOwnership());
+  bool disallowDebugUses =
+      fun->getEffectiveOptimizationMode() <= OptimizationMode::NoOptimization;
+  assert(hasOnlyIncidentalUses(inst, disallowDebugUses));
+  deleteInstruction(inst, callback, /*Fix lifetime of operands*/ true);
+}
+
+void InstructionDeleter::forceDelete(SILInstruction *inst,
+                                     CallbackTy callback) {
+  bool disallowDebugUses =
+      inst->getFunction()->getEffectiveOptimizationMode() <=
+      OptimizationMode::NoOptimization;
+  assert(hasOnlyIncidentalUses(inst, disallowDebugUses));
+  deleteInstruction(inst, callback, /*Fix lifetime of operands*/ false);
+}
+
+void swift::eliminateDeadInstruction(SILInstruction *inst,
+                                     CallbackTy callback) {
+  InstructionDeleter deleter;
+  deleter.trackIfDead(inst);
+  deleter.cleanUpDeadInstructions(callback);
+}
 
 void swift::recursivelyDeleteTriviallyDeadInstructions(
     ArrayRef<SILInstruction *> ia, bool force, CallbackTy callback) {
@@ -205,8 +470,8 @@ void swift::recursivelyDeleteTriviallyDeadInstructions(
         // If the operand is an instruction that is only used by the instruction
         // being deleted, delete it.
         if (auto *operandValInst = operandVal->getDefiningInstruction())
-          if (!deadInsts.count(operandValInst)
-              && isInstructionTriviallyDead(operandValInst))
+          if (!deadInsts.count(operandValInst) &&
+              isInstructionTriviallyDead(operandValInst))
             nextInsts.insert(operandValInst);
       }
 

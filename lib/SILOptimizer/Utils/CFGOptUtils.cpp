@@ -86,7 +86,7 @@ deleteTriviallyDeadOperandsOfDeadArgument(MutableArrayRef<Operand> termOperands,
   if (!i)
     return;
   op.set(SILUndef::get(op.get()->getType(), *i->getFunction()));
-  recursivelyDeleteTriviallyDeadInstructions(i);
+  eliminateDeadInstruction(i);
 }
 
 // Our implementation assumes that our caller is attempting to remove a dead
