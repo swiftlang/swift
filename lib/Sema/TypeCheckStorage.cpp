@@ -2770,7 +2770,8 @@ StorageImplInfoRequest::evaluate(Evaluator &evaluator,
 
   // Check if we have observers.
   } else if (hasWillSet || hasDidSet) {
-    if (storage->getAttrs().hasAttribute<OverrideAttr>()) {
+    if (storage->getAttrs().hasAttribute<OverrideAttr>() &&
+        storage->getDeclContext()->isTypeContext()) {
       readImpl = ReadImplKind::Inherited;
     } else {
       readImpl = ReadImplKind::Stored;
