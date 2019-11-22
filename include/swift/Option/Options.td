@@ -104,6 +104,12 @@ def driver_show_incremental : Flag<["-"], "driver-show-incremental">,
 def driver_show_job_lifecycle : Flag<["-"], "driver-show-job-lifecycle">,
   InternalDebugOpt,
   HelpText<"Show every step in the lifecycle of driver jobs">;
+def driver_dump_swift_ranges : Flag<["-"], "driver-dump-swift-ranges">,
+  InternalDebugOpt,
+  HelpText<"Show the unparsed ranges read upon startup">;
+def driver_dump_compiled_source_diffs : Flag<["-"], "driver-dump-compiled-source-diffs">,
+  InternalDebugOpt,
+  HelpText<"Show the compiled source diffs read upon startup">;
 def driver_use_filelists : Flag<["-"], "driver-use-filelists">,
   InternalDebugOpt, HelpText<"Pass input files as filelists whenever possible">;
 def driver_filelist_threshold : Separate<["-"], "driver-filelist-threshold">,
@@ -132,6 +138,25 @@ def driver_always_rebuild_dependents :
 def enable_experimental_dependencies :
 Flag<["-"], "enable-experimental-dependencies">, Flags<[FrontendOption, HelpHidden]>,
 HelpText<"Experimental work-in-progress to be more selective about incremental recompilation">;
+
+def enable_source_range_dependencies :
+Flag<["-"], "enable-source-range-dependencies">, Flags<[]>,
+HelpText<"Try using source range information">;
+
+
+def driver_compare_incremental_schemes :
+Flag<["-"], "driver-compare-incremental-schemes">, Flags<[DoesNotAffectIncrementalBuild]>,
+HelpText<"Print a simple message comparing dependencies with source ranges (w/ fallback)">;
+
+def driver_compare_incremental_schemes_path :
+Separate<["-"], "driver-compare-incremental-schemes-path">, Flags<[ArgumentIsPath,DoesNotAffectIncrementalBuild]>,
+HelpText<"Path to use for machine-readable comparision">,
+MetaVarName<"<path>">;
+
+def driver_compare_incremental_schemes_path_EQ :
+Joined<["-"], "driver-compare-incremental-schemes-path=">, Flags<[]>,
+Alias<driver_compare_incremental_schemes_path>;
+
 
 def driver_verify_experimental_dependency_graph_after_every_import :
 Flag<["-"], "driver-verify-experimental-dependency-graph-after-every-import">,

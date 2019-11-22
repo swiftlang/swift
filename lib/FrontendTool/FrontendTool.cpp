@@ -990,6 +990,43 @@ static void emitReferenceDependenciesForAllPrimaryInputsIfNeeded(
     }
   }
 }
+static void
+emitSwiftRangesForAllPrimaryInputsIfNeeded(CompilerInvocation &Invocation,
+                                           CompilerInstance &Instance) {
+  if (Invocation.getFrontendOptions().InputsAndOutputs.hasSwiftRangesPath() &&
+      Instance.getPrimarySourceFiles().empty()) {
+    Instance.getASTContext().Diags.diagnose(
+        SourceLoc(), diag::emit_swift_ranges_without_primary_file);
+    return;
+  }
+  for (auto *SF : Instance.getPrimarySourceFiles()) {
+    const std::string &swiftRangesFilePath =
+        Invocation.getSwiftRangesFilePathForPrimary(SF->getFilename());
+    if (!swiftRangesFilePath.empty()) {
+      (void)Instance.emitSwiftRanges(Instance.getASTContext().Diags, SF,
+                                     swiftRangesFilePath);
+    }
+  }
+}
+static void
+emitCompiledSourceForAllPrimaryInputsIfNeeded(CompilerInvocation &Invocation,
+                                              CompilerInstance &Instance) {
+  if (Invocation.getFrontendOptions()
+          .InputsAndOutputs.hasCompiledSourcePath() &&
+      Instance.getPrimarySourceFiles().empty()) {
+    Instance.getASTContext().Diags.diagnose(
+        SourceLoc(), diag::emit_compiled_source_without_primary_file);
+    return;
+  }
+  for (auto *SF : Instance.getPrimarySourceFiles()) {
+    const std::string &compiledSourceFilePath =
+        Invocation.getCompiledSourceFilePathForPrimary(SF->getFilename());
+    if (!compiledSourceFilePath.empty()) {
+      (void)Instance.emitCompiledSource(Instance.getASTContext().Diags, SF,
+                                        compiledSourceFilePath);
+    }
+  }
+}
 
 static bool writeTBDIfNeeded(CompilerInvocation &Invocation,
                              CompilerInstance &Instance) {
@@ -1226,6 +1263,8 @@ static bool performCompile(CompilerInstance &Instance,
     Context.getClangModuleLoader()->printStatistics();
 
   emitReferenceDependenciesForAllPrimaryInputsIfNeeded(Invocation, Instance);
+  emitSwiftRangesForAllPrimaryInputsIfNeeded(Invocation, Instance);
+  emitCompiledSourceForAllPrimaryInputsIfNeeded(Invocation, Instance);
 
   if (Context.hadError()) {
     //  Emit the index store data even if there were compiler errors.

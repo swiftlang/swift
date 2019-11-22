@@ -529,6 +529,8 @@ const char *ToolChain::JobContext::computeFrontendModeForCompile() const {
   case file_types::TY_ObjCHeader:
   case file_types::TY_Image:
   case file_types::TY_SwiftDeps:
+  case file_types::TY_SwiftRanges:
+  case file_types::TY_CompiledSource:
   case file_types::TY_ModuleTrace:
   case file_types::TY_TBD:
   case file_types::TY_OptRecord:
@@ -664,6 +666,10 @@ void ToolChain::JobContext::addFrontendSupplementaryOutputArguments(
                    "-emit-dependencies-path");
   addOutputsOfType(arguments, Output, Args, file_types::TY_SwiftDeps,
                    "-emit-reference-dependencies-path");
+  addOutputsOfType(arguments, Output, Args, file_types::TY_SwiftRanges,
+                   "-emit-swift-ranges-path");
+  addOutputsOfType(arguments, Output, Args, file_types::TY_CompiledSource,
+                   "-emit-compiled-source-path");
   addOutputsOfType(arguments, Output, Args, file_types::TY_ModuleTrace,
                    "-emit-loaded-module-trace-path");
   addOutputsOfType(arguments, Output, Args, file_types::TY_TBD,
@@ -772,6 +778,8 @@ ToolChain::constructInvocation(const BackendJobAction &job,
     case file_types::TY_ObjCHeader:
     case file_types::TY_Image:
     case file_types::TY_SwiftDeps:
+    case file_types::TY_SwiftRanges:
+    case file_types::TY_CompiledSource:
     case file_types::TY_Remapping:
     case file_types::TY_ModuleTrace:
     case file_types::TY_OptRecord:
