@@ -777,10 +777,12 @@ DefaultArgumentInitContextRequest::evaluate(Evaluator &eval,
     // kicked off the request, make a note of it for when we return. Otherwise
     // cache the result ourselves.
     auto *initDC = new (ctx) DefaultArgumentInitializer(parentDC, idx);
-    if (param == otherParam)
+    if (param == otherParam) {
       result = initDC;
-    else
-      eval.cacheOutput(DefaultArgumentInitContextRequest{otherParam}, std::move(initDC));
+    } else {
+      eval.cacheOutput(DefaultArgumentInitContextRequest{otherParam},
+                       std::move(initDC));
+    }
   }
   assert(result && "Didn't create init context?");
   return result;
