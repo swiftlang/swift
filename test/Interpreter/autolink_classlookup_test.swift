@@ -5,7 +5,7 @@
 // RUN: cp %S/../Inputs/ObjCClasses/ObjCClasses.h %t/ObjCClasses.framework/Headers
 // RUN: mkdir -p %t/ObjCClasses.framework/Modules
 // RUN: cp %S/../Inputs/ObjCClasses/framework.module.map %t/ObjCClasses.framework/Modules/module.modulemap
-// RUN: %target-clang -dynamiclib -fobjc-arc -fmodules %t/ObjCClasses.o -o %t/ObjCClasses.framework/ObjCClasses
+// RUN: %target-clang -dynamiclib -fobjc-arc -fmodules %t/ObjCClasses.o -o %t/ObjCClasses.framework/ObjCClasses -install_name @executable_path/ObjCClasses.framework/ObjCClasses
 // RUN: %target-codesign %t/ObjCClasses.framework/ObjCClasses
 
 // RUN: %target-build-swift -F %t %s -o %t/main
