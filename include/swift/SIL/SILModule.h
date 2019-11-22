@@ -194,6 +194,15 @@ private:
   /// The list of SILDefaultWitnessTables in the module.
   DefaultWitnessTableListType defaultWitnessTables;
 
+  /// Declarations which are externally visible.
+  ///
+  /// These are method declarations which are referenced from inlinable
+  /// functions due to cross-module-optimzation. Those declarations don't have
+  /// any attributes or linkage which mark them as externally visible by
+  /// default.
+  /// Currently this table is not serialized.
+  llvm::SetVector<ValueDecl *> externallyVisible;
+
   /// Lookup table for SIL Global Variables.
   llvm::StringMap<SILGlobalVariable *> GlobalVariableMap;
 
@@ -444,6 +453,13 @@ public:
   }
   iterator_range<default_witness_table_const_iterator> getDefaultWitnessTables() const {
     return {defaultWitnessTables.begin(), defaultWitnessTables.end()};
+  }
+
+  void addExternallyVisibleDecl(ValueDecl *decl) {
+    externallyVisible.insert(decl);
+  }
+  bool isExternallyVisibleDecl(ValueDecl *decl) {
+    return externallyVisible.count(decl) != 0;
   }
 
   using sil_global_iterator = GlobalListType::iterator;

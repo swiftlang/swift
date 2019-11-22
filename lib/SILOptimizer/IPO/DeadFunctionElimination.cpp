@@ -159,7 +159,8 @@ protected:
           auto methodWitness = entry.getMethodWitness();
           auto *fd = cast<AbstractFunctionDecl>(methodWitness.Requirement.
                                                 getDecl());
-          assert(fd == getBase(fd) && "key in witness table is overridden");
+          assert(fd == getBaseMethod(fd) &&
+                 "key in witness table is overridden");
           SILFunction *F = methodWitness.Witness;
           if (F) {
             MethodInfo *MI = getMethodInfo(fd, /*isWitnessMethod*/ true);
@@ -324,15 +325,6 @@ protected:
     }
   }
 
-  /// Gets the base implementation of a method.
-  /// We always use the most overridden function to describe a method.
-  AbstractFunctionDecl *getBase(AbstractFunctionDecl *FD) {
-    while (FD->getOverriddenDecl()) {
-      FD = FD->getOverriddenDecl();
-    }
-    return FD;
-  }
-
   /// Scans all references inside a function.
   void scanFunction(SILFunction *F) {
 
@@ -342,12 +334,12 @@ protected:
     for (SILBasicBlock &BB : *F) {
       for (SILInstruction &I : BB) {
         if (auto *WMI = dyn_cast<WitnessMethodInst>(&I)) {
-          auto *funcDecl = getBase(
+          auto *funcDecl = getBaseMethod(
               cast<AbstractFunctionDecl>(WMI->getMember().getDecl()));
           MethodInfo *mi = getMethodInfo(funcDecl, /*isWitnessTable*/ true);
           ensureAliveProtocolMethod(mi);
         } else if (auto *MI = dyn_cast<MethodInst>(&I)) {
-          auto *funcDecl = getBase(
+          auto *funcDecl = getBaseMethod(
               cast<AbstractFunctionDecl>(MI->getMember().getDecl()));
           assert(MI->getNumOperands() - MI->getNumTypeDependentOperands() == 1
                  && "method insts except witness_method must have 1 operand");
@@ -474,7 +466,8 @@ class DeadFunctionElimination : FunctionLivenessComputation {
           continue;
         }
         SILFunction *F = entry.Implementation;
-        auto *fd = getBase(cast<AbstractFunctionDecl>(entry.Method.getDecl()));
+        auto *fd = getBaseMethod(cast<AbstractFunctionDecl>(
+                                                    entry.Method.getDecl()));
         MethodInfo *mi = getMethodInfo(fd, /*isWitnessTable*/ false);
         mi->addClassMethodImpl(F, vTable.getClass());
       }
@@ -490,7 +483,8 @@ class DeadFunctionElimination : FunctionLivenessComputation {
         auto methodWitness = entry.getMethodWitness();
         auto *fd = cast<AbstractFunctionDecl>(methodWitness.Requirement.
                                               getDecl());
-        assert(fd == getBase(fd) && "key in witness table is overridden");
+        assert(fd == getBaseMethod(fd) &&
+               "key in witness table is overridden");
         SILFunction *F = methodWitness.Witness;
         if (!F)
           continue;
@@ -533,12 +527,14 @@ class DeadFunctionElimination : FunctionLivenessComputation {
         }
 
         SILFunction *F = entry.Implementation;
-        auto *fd = getBase(cast<AbstractFunctionDecl>(entry.Method.getDecl()));
+        auto *fd = getBaseMethod(cast<AbstractFunctionDecl>(
+                                                     entry.Method.getDecl()));
 
         if (// We also have to check the method declaration's access level.
             // Needed if it's a public base method declared in another
             // compilation unit (for this we have no SILFunction).
             isVisibleExternally(fd)
+            || Module->isExternallyVisibleDecl(fd)
             // Declarations are always accessible externally, so they are alive.
             || !F->isDefinition()) {
           MethodInfo *mi = getMethodInfo(fd, /*isWitnessTable*/ false);
@@ -550,24 +546,27 @@ class DeadFunctionElimination : FunctionLivenessComputation {
     // Check witness table methods.
     for (SILWitnessTable &WT : Module->getWitnessTableList()) {
       ProtocolConformance *Conf = WT.getConformance();
-      if (isVisibleExternally(Conf->getProtocol())) {
-        // The witness table is visible from "outside". Therefore all methods
-        // might be called and we mark all methods as alive.
-        for (const SILWitnessTable::Entry &entry : WT.getEntries()) {
-          if (entry.getKind() != SILWitnessTable::Method)
-            continue;
+      bool tableExternallyVisible = isVisibleExternally(Conf->getProtocol());
+      // The witness table is visible from "outside". Therefore all methods
+      // might be called and we mark all methods as alive.
+      for (const SILWitnessTable::Entry &entry : WT.getEntries()) {
+        if (entry.getKind() != SILWitnessTable::Method)
+          continue;
 
-          auto methodWitness = entry.getMethodWitness();
-          auto *fd = cast<AbstractFunctionDecl>(methodWitness.Requirement.
-                                                getDecl());
-          assert(fd == getBase(fd) && "key in witness table is overridden");
-          SILFunction *F = methodWitness.Witness;
-          if (!F)
-            continue;
+        auto methodWitness = entry.getMethodWitness();
+        auto *fd = cast<AbstractFunctionDecl>(methodWitness.Requirement.
+                                              getDecl());
+        assert(fd == getBaseMethod(fd) &&
+               "key in witness table is overridden");
+        SILFunction *F = methodWitness.Witness;
+        if (!F)
+          continue;
 
-          MethodInfo *mi = getMethodInfo(fd, /*isWitnessTable*/ true);
-          ensureAliveProtocolMethod(mi);
-        }
+        if (!tableExternallyVisible && !Module->isExternallyVisibleDecl(fd))
+          continue;
+
+        MethodInfo *mi = getMethodInfo(fd, /*isWitnessTable*/ true);
+        ensureAliveProtocolMethod(mi);
       }
 
       // We don't do dead witness table elimination right now. So we assume
@@ -588,7 +587,7 @@ class DeadFunctionElimination : FunctionLivenessComputation {
           auto *fd =
               cast<AbstractFunctionDecl>(
                 entry.getMethodWitness().Requirement.getDecl());
-          assert(fd == getBase(fd) &&
+          assert(fd == getBaseMethod(fd) &&
                  "key in default witness table is overridden");
           SILFunction *F = entry.getMethodWitness().Witness;
           if (!F)
