@@ -5646,6 +5646,7 @@ ParserResult<FuncDecl> Parser::parseDeclFunc(SourceLoc StaticLoc,
     }
   }
 
+  ParserStatus Status;
   SourceLoc FuncLoc =
       HasFuncKeyword ? consumeToken(tok::kw_func) : Tok.getLoc();
 
@@ -5702,12 +5703,13 @@ ParserResult<FuncDecl> Parser::parseDeclFunc(SourceLoc StaticLoc,
   Optional<Scope> GenericsScope;
   GenericsScope.emplace(this, ScopeKind::Generics);
   GenericParamList *GenericParams;
-  bool SignatureHasCodeCompletion = false;
   auto GenericParamResult = maybeParseGenericParams();
   GenericParams = GenericParamResult.getPtrOrNull();
-  SignatureHasCodeCompletion |= GenericParamResult.hasCodeCompletion();
-  if (SignatureHasCodeCompletion && !CodeCompletion)
-    return makeParserCodeCompletionStatus();
+  if (GenericParamResult.hasCodeCompletion()) {
+    Status.setHasCodeCompletion();
+    if (!CodeCompletion)
+      return Status;
+  }
 
   DefaultArgumentInfo DefaultArgs;
   TypeRepr *FuncRetTy = nullptr;
@@ -5715,14 +5717,11 @@ ParserResult<FuncDecl> Parser::parseDeclFunc(SourceLoc StaticLoc,
   ParameterList *BodyParams;
   SourceLoc throwsLoc;
   bool rethrows;
-  ParserStatus SignatureStatus =
-      parseFunctionSignature(SimpleName, FullName, BodyParams, DefaultArgs,
-                             throwsLoc, rethrows, FuncRetTy);
-
-  SignatureHasCodeCompletion |= SignatureStatus.hasCodeCompletion();
-  if (SignatureStatus.hasCodeCompletion() && !CodeCompletion) {
+  Status |= parseFunctionSignature(SimpleName, FullName, BodyParams,
+                                   DefaultArgs, throwsLoc, rethrows, FuncRetTy);
+  if (Status.hasCodeCompletion() && !CodeCompletion) {
     // Trigger delayed parsing, no need to continue.
-    return SignatureStatus;
+    return Status;
   }
 
   diagnoseWhereClauseInGenericParamList(GenericParams);
@@ -5747,11 +5746,10 @@ ParserResult<FuncDecl> Parser::parseDeclFunc(SourceLoc StaticLoc,
   if (Tok.is(tok::kw_where)) {
     ContextChange CC(*this, FD);
 
-    auto whereStatus = parseFreestandingGenericWhereClause(GenericParams);
-    SignatureHasCodeCompletion |= whereStatus.hasCodeCompletion();
-    if (whereStatus.hasCodeCompletion() && !CodeCompletion) {
+    Status |= parseFreestandingGenericWhereClause(GenericParams);
+    if (Status.hasCodeCompletion() && !CodeCompletion) {
       // Trigger delayed parsing, no need to continue.
-      return whereStatus;
+      return Status;
     }
   }
   
@@ -5772,8 +5770,10 @@ ParserResult<FuncDecl> Parser::parseDeclFunc(SourceLoc StaticLoc,
   FD->getAttrs() = Attributes;
 
   // Pass the function signature to code completion.
-  if (SignatureHasCodeCompletion)
+  if (Status.hasCodeCompletion()) {
+    assert(CodeCompletion && "must be code completion second pass");
     CodeCompletion->setParsedDecl(FD);
+  }
 
   DefaultArgs.setFunctionContext(FD, FD->getParameters());
   setLocalDiscriminator(FD);
@@ -5783,7 +5783,7 @@ ParserResult<FuncDecl> Parser::parseDeclFunc(SourceLoc StaticLoc,
       diagnose(Tok, diag::protocol_method_with_body);
       skipSingle();
     }
-  } else {
+  } else if (!Status.hasCodeCompletion()) {
     parseAbstractFunctionBody(FD);
   }
 
@@ -6545,14 +6545,14 @@ Parser::parseDeclSubscript(SourceLoc StaticLoc,
   Optional<Scope> GenericsScope;
   GenericsScope.emplace(this, ScopeKind::Generics);
   GenericParamList *GenericParams;
-  bool SignatureHasCodeCompletion = false;
 
   auto Result = maybeParseGenericParams();
   GenericParams = Result.getPtrOrNull();
-  SignatureHasCodeCompletion |= Result.hasCodeCompletion();
-
-  if (SignatureHasCodeCompletion && !CodeCompletion)
-    return makeParserCodeCompletionStatus();
+  if (Result.hasCodeCompletion()) {
+    Status.setHasCodeCompletion();
+    if (!CodeCompletion)
+      return Status;
+  }
 
   // Parse the parameter list.
   DefaultArgumentInfo DefaultArgs;
@@ -6561,10 +6561,8 @@ Parser::parseDeclSubscript(SourceLoc StaticLoc,
     = parseSingleParameterClause(ParameterContextKind::Subscript,
                                  &argumentNames, &DefaultArgs);
   Status |= Indices;
-
-  SignatureHasCodeCompletion |= Indices.hasCodeCompletion();
-  if (SignatureHasCodeCompletion && !CodeCompletion)
-    return makeParserCodeCompletionStatus();
+  if (Status.hasCodeCompletion() && !CodeCompletion)
+    return Status;
   
   SourceLoc ArrowLoc;
   ParserResult<TypeRepr> ElementTy;
@@ -6588,10 +6586,9 @@ Parser::parseDeclSubscript(SourceLoc StaticLoc,
     // type
     ElementTy = parseDeclResultType(diag::expected_type_subscript);
     Status |= ElementTy;
-    SignatureHasCodeCompletion |= ElementTy.hasCodeCompletion();
-    if (SignatureHasCodeCompletion && !CodeCompletion) {
-      return makeParserCodeCompletionStatus();
-    }
+    if (Status.hasCodeCompletion() && !CodeCompletion)
+      return Status;
+
     if (ElementTy.isNull()) {
       // Always set an element type.
       ElementTy = makeParserResult(ElementTy, new (Context) ErrorTypeRepr());
@@ -6625,16 +6622,16 @@ Parser::parseDeclSubscript(SourceLoc StaticLoc,
   if (Tok.is(tok::kw_where)) {
     ContextChange CC(*this, Subscript);
 
-    auto whereStatus = parseFreestandingGenericWhereClause(GenericParams);
-    SignatureHasCodeCompletion |= whereStatus.hasCodeCompletion();
-    if (whereStatus.hasCodeCompletion() && !CodeCompletion) {
+    Status |= parseFreestandingGenericWhereClause(GenericParams);
+    if (Status.hasCodeCompletion() && !CodeCompletion) {
       // Trigger delayed parsing, no need to continue.
-      return whereStatus;
+      return Status;
     }
   }
 
   // Pass the function signature to code completion.
-  if (SignatureHasCodeCompletion && CodeCompletion) {
+  if (Status.hasCodeCompletion()) {
+    assert(CodeCompletion && "must be code completion second pass");
     CodeCompletion->setParsedDecl(Subscript);
   }
 
@@ -6655,7 +6652,7 @@ Parser::parseDeclSubscript(SourceLoc StaticLoc,
       }
       Status.setIsParseError();
     }
-  } else {
+  } else if (!Status.hasCodeCompletion()) {
     Status |= parseGetSet(Flags, GenericParams, Indices.get(),
                           accessors, Subscript, StaticLoc);
   }
@@ -6680,6 +6677,7 @@ Parser::parseDeclSubscript(SourceLoc StaticLoc,
 ParserResult<ConstructorDecl>
 Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   assert(Tok.is(tok::kw_init));
+  ParserStatus Status;
   SourceLoc ConstructorLoc = consumeToken();
   bool Failable = false, IUO = false;
   SourceLoc FailabilityLoc;
@@ -6714,21 +6712,22 @@ Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   Scope S(this, ScopeKind::Generics);
   auto GPResult = maybeParseGenericParams();
   GenericParamList *GenericParams = GPResult.getPtrOrNull();
-  if (GPResult.hasCodeCompletion())
-    return makeParserCodeCompletionStatus();
+  if (GPResult.hasCodeCompletion()) {
+    Status.setHasCodeCompletion();
+    if (!CodeCompletion)
+      return Status;
+  }
 
   // Parse the parameters.
   DefaultArgumentInfo DefaultArgs;
   llvm::SmallVector<Identifier, 4> namePieces;
-  bool SignatureHasCodeCompletion = false;
   ParserResult<ParameterList> Params
     = parseSingleParameterClause(ParameterContextKind::Initializer,
                                  &namePieces, &DefaultArgs);
-
-  SignatureHasCodeCompletion |= Params.hasCodeCompletion();
-  if (Params.hasCodeCompletion() && !CodeCompletion) {
+  Status |= Params;
+  if (Status.hasCodeCompletion() && !CodeCompletion) {
     // Trigger delayed parsing, no need to continue.
-    return makeParserCodeCompletionStatus();
+    return Status;
   }
 
   // Protocol initializer arguments may not have default values.
@@ -6760,11 +6759,10 @@ Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   if (Tok.is(tok::kw_where)) {
     ContextChange(*this, CD);
 
-    auto whereStatus = parseFreestandingGenericWhereClause(GenericParams);
-    SignatureHasCodeCompletion |= whereStatus.hasCodeCompletion();
-    if (whereStatus.hasCodeCompletion() && !CodeCompletion) {
+    Status |= parseFreestandingGenericWhereClause(GenericParams);
+    if (Status.hasCodeCompletion() && !CodeCompletion) {
       // Trigger delayed parsing, no need to continue.
-      return whereStatus;
+      return Status;
     }
   }
 
@@ -6773,8 +6771,10 @@ Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   DefaultArgs.setFunctionContext(CD, CD->getParameters());
 
   // Pass the function signature to code completion.
-  if (SignatureHasCodeCompletion)
+  if (Status.hasCodeCompletion()) {
+    assert(CodeCompletion && "must be code completion second pass");
     CodeCompletion->setParsedDecl(CD);
+  }
 
   if (ConstructorsNotAllowed || Params.isParseError()) {
     // Tell the type checker not to touch this constructor.
@@ -6786,11 +6786,11 @@ Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
       diagnose(Tok, diag::protocol_init_with_body);
       skipSingle();
     }
-  } else {
+  } else if(!Status.hasCodeCompletion()) {
     parseAbstractFunctionBody(CD);
   }
 
-  return makeParserResult(CD);
+  return makeParserResult(Status, CD);
 }
 
 ParserResult<DestructorDecl> Parser::

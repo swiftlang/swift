@@ -74,7 +74,14 @@ void typeCheckContextImpl(DeclContext *DC, SourceLoc Loc) {
 
   case DeclContextKind::AbstractFunctionDecl: {
     auto *AFD = cast<AbstractFunctionDecl>(DC);
-    swift::typeCheckAbstractFunctionBodyUntil(AFD, Loc);
+    auto &SM = DC->getASTContext().SourceMgr;
+    auto bodyRange = AFD->getBodySourceRange();
+    if (SM.rangeContainsTokenLoc(bodyRange, Loc)) {
+      swift::typeCheckAbstractFunctionBodyUntil(AFD, Loc);
+    } else {
+      assert(bodyRange.isInvalid() && "The body should not be parsed if the "
+                                      "completion happens in the signature");
+    }
     break;
   }
 
