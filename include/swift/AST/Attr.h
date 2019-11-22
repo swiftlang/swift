@@ -52,6 +52,7 @@ class FuncDecl;
 class ClassDecl;
 class GenericFunctionType;
 class LazyConformanceLoader;
+class LazyMemberLoader;
 class PatternBindingInitializer;
 class TrailingWhereClause;
 
@@ -1010,18 +1011,31 @@ class DynamicReplacementAttr final
     : public DeclAttribute,
       private llvm::TrailingObjects<DynamicReplacementAttr, SourceLoc> {
   friend TrailingObjects;
+  friend class DynamicallyReplacedDeclRequest;
 
   DeclName ReplacedFunctionName;
-  AbstractFunctionDecl *ReplacedFunction;
+  LazyMemberLoader *Resolver = nullptr;
+  uint64_t ResolverContextData;
 
   /// Create an @_dynamicReplacement(for:) attribute written in the source.
   DynamicReplacementAttr(SourceLoc atLoc, SourceRange baseRange,
                          DeclName replacedFunctionName, SourceRange parenRange);
 
-  explicit DynamicReplacementAttr(DeclName name)
+  DynamicReplacementAttr(DeclName name, AbstractFunctionDecl *f)
       : DeclAttribute(DAK_DynamicReplacement, SourceLoc(), SourceRange(),
                       /*Implicit=*/false),
-        ReplacedFunctionName(name), ReplacedFunction(nullptr) {
+        ReplacedFunctionName(name),
+        Resolver(nullptr), ResolverContextData(0) {
+    Bits.DynamicReplacementAttr.HasTrailingLocationInfo = false;
+  }
+
+  DynamicReplacementAttr(DeclName name,
+                         LazyMemberLoader *Resolver = nullptr,
+                         uint64_t Data = 0)
+      : DeclAttribute(DAK_DynamicReplacement, SourceLoc(), SourceRange(),
+                      /*Implicit=*/false),
+        ReplacedFunctionName(name),
+        Resolver(Resolver), ResolverContextData(Data) {
     Bits.DynamicReplacementAttr.HasTrailingLocationInfo = false;
   }
 
@@ -1045,23 +1059,16 @@ public:
          SourceLoc LParenLoc, DeclName replacedFunction, SourceLoc RParenLoc);
 
   static DynamicReplacementAttr *create(ASTContext &ctx,
-                                        DeclName replacedFunction);
-
-  static DynamicReplacementAttr *create(ASTContext &ctx,
                                         DeclName replacedFunction,
                                         AbstractFunctionDecl *replacedFuncDecl);
 
+  static DynamicReplacementAttr *create(ASTContext &ctx,
+                                        DeclName replacedFunction,
+                                        LazyMemberLoader *Resolver,
+                                        uint64_t Data);
+
   DeclName getReplacedFunctionName() const {
     return ReplacedFunctionName;
-  }
-
-  AbstractFunctionDecl *getReplacedFunction() const {
-    return ReplacedFunction;
-  }
-
-  void setReplacedFunction(AbstractFunctionDecl *f) {
-    assert(ReplacedFunction == nullptr);
-    ReplacedFunction = f;
   }
 
   /// Retrieve the location of the opening parentheses, if there is one.

@@ -22,14 +22,14 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/IndexSubset.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/ParameterList.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/AST/Types.h"
-#include "swift/AST/ParameterList.h"
 #include "swift/Basic/Defer.h"
 #include "llvm/ADT/SmallString.h"
-#include "llvm/Support/raw_ostream.h"
-#include "llvm/Support/ErrorHandling.h"
 #include "llvm/ADT/StringSwitch.h"
+#include "llvm/Support/ErrorHandling.h"
+#include "llvm/Support/raw_ostream.h"
 using namespace swift;
 
 #define DECL_ATTR(_, Id, ...) \
@@ -1148,7 +1148,7 @@ DynamicReplacementAttr::DynamicReplacementAttr(SourceLoc atLoc,
                                                SourceRange parenRange)
     : DeclAttribute(DAK_DynamicReplacement, atLoc, baseRange,
                     /*Implicit=*/false),
-      ReplacedFunctionName(name), ReplacedFunction(nullptr) {
+      ReplacedFunctionName(name) {
   Bits.DynamicReplacementAttr.HasTrailingLocationInfo = true;
   getTrailingLocations()[0] = parenRange.Start;
   getTrailingLocations()[1] = parenRange.End;
@@ -1165,17 +1165,16 @@ DynamicReplacementAttr::create(ASTContext &Ctx, SourceLoc AtLoc,
       SourceRange(LParenLoc, RParenLoc));
 }
 
-DynamicReplacementAttr *DynamicReplacementAttr::create(ASTContext &Ctx,
-                                                       DeclName name) {
-  return new (Ctx) DynamicReplacementAttr(name);
+DynamicReplacementAttr *
+DynamicReplacementAttr::create(ASTContext &Ctx, DeclName name,
+                               AbstractFunctionDecl *f) {
+  return new (Ctx) DynamicReplacementAttr(name, f);
 }
 
 DynamicReplacementAttr *
 DynamicReplacementAttr::create(ASTContext &Ctx, DeclName name,
-                               AbstractFunctionDecl *f) {
-  auto res = new (Ctx) DynamicReplacementAttr(name);
-  res->setReplacedFunction(f);
-  return res;
+                               LazyMemberLoader *Resolver, uint64_t Data) {
+  return new (Ctx) DynamicReplacementAttr(name, Resolver, Data);
 }
 
 SourceLoc DynamicReplacementAttr::getLParenLoc() const {
