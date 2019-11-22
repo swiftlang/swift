@@ -764,9 +764,9 @@ static SILInstruction *tryDevirtualizeApplyHelper(FullApplySite InnerAI,
   return newApplyAI;
 }
 
-static size_t collectApplies(SILFunction *F, ClassHierarchyAnalysis *CHA,
+static bool collectApplies(SILFunction *F, ClassHierarchyAnalysis *CHA,
                              DominanceAnalysis *DA,
-                             SmallVector<FullApplySite, 8> &collection) {
+                             SmallVectorImpl<FullApplySite> &collection) {
   DominanceInfo *DT = DA->get(F);
   DominanceOrder domOrder(&F->front(), DT, F->size());
 
@@ -794,7 +794,7 @@ static size_t collectApplies(SILFunction *F, ClassHierarchyAnalysis *CHA,
     collection.push_back(apply);
   }
 
-  return collection.size();
+  return !collection.empty();
 }
 
 //===----------------------------------------------------------------------===//
@@ -806,7 +806,7 @@ namespace {
 class MandatoryInlining : public SILFunctionTransform {
   /// If possible, inlines each apply instruction in \param collection.
   bool inlineFunction(SILOptFunctionBuilder &funcBuilder, SILFunction *F,
-                      SmallVector<FullApplySite, 8> &collection) {
+                      SmallVectorImpl<FullApplySite> &collection) {
     bool madeChange = false;
     bool needUpdateStackNesting = false;
     SmallVector<ParameterConvention, 16> capturedArgConventions;
