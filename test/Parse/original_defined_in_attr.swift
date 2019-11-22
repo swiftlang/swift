@@ -20,5 +20,11 @@ class ToplevelClass3 {}
 
 @_originallyDefinedIn(module: "foo", * 13.13) // expected-warning {{* as platform name has no effect}} expected-error {{expected at least one platform version in @_originallyDefinedIn}}
 @_originallyDefinedIn(module: "foo", OSX 13.13, iOS 7.0)
-@_originallyDefinedIn(module: "foo", OSX 13.14, * 7.0) // expected-warning {{* as platform name has no effect}}
-class ToplevelClass4 {}
+@_originallyDefinedIn(module: "foo", OSX 13.14, * 7.0) // expected-warning {{* as platform name has no effect}} expected-error {{duplicate version number for platform OSX}}
+class ToplevelClass4 {
+	@_originallyDefinedIn(module: "foo", OSX 13.13) // expected-error {{'@_originallyDefinedIn' attribute cannot be applied to this declaration}}
+	subscript(index: Int) -> Int {
+        get { return 1 }
+        set(newValue) {}
+	}
+}
