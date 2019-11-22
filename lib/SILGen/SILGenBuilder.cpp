@@ -767,14 +767,15 @@ ManagedValue SILGenBuilder::createTuple(SILLocation loc, SILType type,
     return ManagedValue::forUnmanaged(result);
   }
 
-  // We need to look for the first non-trivial value and use that as our cleanup
-  // cloner value.
+  // We need to look for the first value without .none ownership and use that as
+  // our cleanup cloner value.
   auto iter = find_if(elements, [&](ManagedValue mv) -> bool {
-    return !mv.getType().isTrivial(getFunction());
+    return mv.getOwnershipKind() != ValueOwnershipKind::None;
   });
 
   llvm::SmallVector<SILValue, 8> forwardedValues;
-  // If we have all trivial values, then just create the tuple and return. No
+
+  // If we have all .none values, then just create the tuple and return. No
   // cleanups need to be cloned.
   if (iter == elements.end()) {
     llvm::transform(elements, std::back_inserter(forwardedValues),
