@@ -2129,7 +2129,12 @@ bool swift::isKnownConstantEvaluableFunction(SILFunction *fun) {
   return classifyFunction(fun).hasValue();
 }
 
-bool swift::isConstantEvaluable(SILFunction *fun) {
+bool swift::hasConstantEvaluableAnnotation(SILFunction *fun) {
   assert(fun && "fun should not be nullptr");
   return fun->hasSemanticsAttr("constant_evaluable");
+}
+
+bool swift::isConstantEvaluable(SILFunction *fun) {
+  return hasConstantEvaluableAnnotation(fun) ||
+         isKnownConstantEvaluableFunction(fun);
 }
