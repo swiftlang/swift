@@ -523,6 +523,12 @@ SIMPLE_DECL_ATTR(IBSegueAction, IBSegueAction,
   ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
   95)
 
+DECL_ATTR(_originallyDefinedIn, OriginallyDefinedIn,
+  OnNominalType | OnFunc | OnVar | OnExtension | UserInaccessible |
+  AllowMultipleAttributes |
+  ABIBreakingToAdd | ABIBreakingToRemove | APIStableToAdd | APIStableToRemove,
+  96)
+
 #undef TYPE_ATTR
 #undef DECL_ATTR_ALIAS
 #undef CONTEXTUAL_DECL_ATTR_ALIAS

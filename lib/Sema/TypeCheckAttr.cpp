@@ -113,6 +113,7 @@ public:
   IGNORED_ATTR(DisfavoredOverload)
   IGNORED_ATTR(ProjectedValueProperty)
   IGNORED_ATTR(ReferenceOwnership)
+  IGNORED_ATTR(OriginallyDefinedIn)
 
   // TODO(TF-828): Upstream `@differentiable` attribute type-checking from
   // tensorflow branch.
@@ -248,6 +249,7 @@ public:
 
   void visitImplementationOnlyAttr(ImplementationOnlyAttr *attr);
   void visitNonEphemeralAttr(NonEphemeralAttr *attr);
+  void checkOriginalDefinedInAttrs(ArrayRef<OriginallyDefinedInAttr*> Attrs);
 };
 } // end anonymous namespace
 
@@ -1014,14 +1016,21 @@ void AttributeChecker::visitOptionalAttr(OptionalAttr *attr) {
 
 void TypeChecker::checkDeclAttributes(Decl *D) {
   AttributeChecker Checker(D);
+  // We need to check all OriginallyDefinedInAttr relative to each other, so
+  // collect them and check in batch later.
+  llvm::SmallVector<OriginallyDefinedInAttr*, 4> ODIAttrs;
   for (auto attr : D->getAttrs()) {
     if (!attr->isValid()) continue;
 
     // If Attr.def says that the attribute cannot appear on this kind of
     // declaration, diagnose it and disable it.
     if (attr->canAppearOnDecl(D)) {
-      // Otherwise, check it.
-      Checker.visit(attr);
+      if (auto *ODI = dyn_cast<OriginallyDefinedInAttr>(attr)) {
+        ODIAttrs.push_back(ODI);
+      } else {
+        // Otherwise, check it.
+        Checker.visit(attr);
+      }
       continue;
     }
 
@@ -1058,6 +1067,7 @@ void TypeChecker::checkDeclAttributes(Decl *D) {
     else
       Checker.diagnoseAndRemoveAttr(attr, diag::invalid_decl_attribute, attr);
   }
+  Checker.checkOriginalDefinedInAttrs(ODIAttrs);
 }
 
 /// Returns true if the given method is an valid implementation of a
@@ -2684,6 +2694,23 @@ void AttributeChecker::visitNonEphemeralAttr(NonEphemeralAttr *attr) {
 void TypeChecker::checkParameterAttributes(ParameterList *params) {
   for (auto param: *params) {
     checkDeclAttributes(param);
+  }
+}
+
+void
+AttributeChecker::checkOriginalDefinedInAttrs(
+    ArrayRef<OriginallyDefinedInAttr*> Attrs) {
+  llvm::SmallSet<PlatformKind, 4> AllPlatforms;
+  // Attrs are in the reverse order of the source order. We need to visit them
+  // in source order to diagnose the later attribute.
+  for (auto It = Attrs.rbegin(), End = Attrs.rend(); It != End; ++ It) {
+    auto *Attr = *It;
+    auto CurPlat = Attr->Platform;
+    if (!AllPlatforms.insert(CurPlat).second) {
+      // Only one version number is allowed for one platform name.
+      diagnose(Attr->AtLoc, diag::originally_defined_in_dupe_platform,
+               platformString(Attr->Platform));
+    }
   }
 }
 

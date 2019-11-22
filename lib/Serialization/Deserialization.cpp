@@ -3977,6 +3977,28 @@ llvm::Error DeclDeserializer::deserializeDeclAttributes() {
         Attr = new (ctx) EffectsAttr((EffectsKind)kind);
         break;
       }
+      case decls_block::OriginallyDefinedIn_DECL_ATTR: {
+        bool isImplicit;
+        unsigned Platform;
+        DEF_VER_TUPLE_PIECES(MovedVer);
+        // Decode the record, pulling the version tuple information.
+        serialization::decls_block::OriginallyDefinedInDeclAttrLayout::readRecord(
+           scratch,
+           isImplicit,
+           LIST_VER_TUPLE_PIECES(MovedVer),
+           Platform);
+        llvm::VersionTuple MovedVer;
+        DECODE_VER_TUPLE(MovedVer)
+        auto ModuleNameEnd = blobData.find('\0');
+        assert(ModuleNameEnd != StringRef::npos);
+        auto ModuleName = blobData.slice(0, ModuleNameEnd);
+        Attr = new (ctx) OriginallyDefinedInAttr(SourceLoc(), SourceRange(),
+                                                 ModuleName,
+                                                 (PlatformKind)Platform,
+                                                 MovedVer,
+                                                 isImplicit);
+        break;
+      }
 
       case decls_block::Available_DECL_ATTR: {
         bool isImplicit;

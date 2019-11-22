@@ -1397,6 +1397,32 @@ WARNING(attr_availability_nonspecific_platform_unexpected_version,none,
       "unexpected version number in '%0' attribute for non-specific platform "
       "'*'", (StringRef))
 
+// originallyDefinedIn
+ERROR(originally_defined_in_missing_rparen,none,
+      "expected ')' in @_originallyDefinedIn argument list", ())
+
+ERROR(originally_defined_in_unrecognized_platform,none,
+      "unrecognized platform name in @_originallyDefinedIn argument list", ())
+
+ERROR(originally_defined_in_unrecognized_property,none,
+      "unrecognized property in @_originallyDefinedIn argument list", ())
+
+ERROR(originally_defined_in_need_original_module_name,none,
+      "expected 'module: \"original\"' in the first argument to "
+      "@_originallyDefinedIn", ())
+
+ERROR(originally_defined_in_need_nonempty_module_name,none,
+      "original module name cannot be empty in @_originallyDefinedIn", ())
+
+ERROR(originally_defined_in_need_platform_version,none,
+     "expected at least one platform version in @_originallyDefinedIn", ())
+
+WARNING(originally_defined_in_major_minor_only,none,
+        "@_originallyDefinedIn only uses major and minor version number", ())
+
+WARNING(originally_defined_in_missing_platform_name,none,
+        "* as platform name has no effect", ())
+
 // convention
 ERROR(convention_attribute_expected_lparen,none,
       "expected '(' after 'convention' attribute", ())

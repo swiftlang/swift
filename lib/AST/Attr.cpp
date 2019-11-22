@@ -691,6 +691,17 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     Printer << "(\"" << cast<SILGenNameAttr>(this)->Name << "\")";
     break;
 
+  case DAK_OriginallyDefinedIn: {
+    Printer.printAttrName("@_originallyDefinedIn");
+    Printer << "(module: ";
+    auto Attr = cast<OriginallyDefinedInAttr>(this);
+    Printer << "\"" << Attr->OriginalModuleName << "\", ";
+    Printer << platformString(Attr->Platform) << " " <<
+      Attr->MovedVersion.getAsString();
+    Printer << ")";
+    break;
+  }
+
   case DAK_Available: {
     Printer.printAttrName("@available");
     Printer << "(";
@@ -1005,6 +1016,8 @@ StringRef DeclAttribute::getAttrName() const {
     return "_projectedValueProperty";
   case DAK_Differentiable:
     return "differentiable";
+  case DAK_OriginallyDefinedIn:
+    return "_originallyDefinedIn";
   }
   llvm_unreachable("bad DeclAttrKind");
 }

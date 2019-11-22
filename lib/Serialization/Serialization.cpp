@@ -2180,6 +2180,22 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       return;
     }
 
+    case DAK_OriginallyDefinedIn: {
+      auto *theAttr = cast<OriginallyDefinedInAttr>(DA);
+      ENCODE_VER_TUPLE(Moved, llvm::Optional<llvm::VersionTuple>(theAttr->MovedVersion));
+      auto abbrCode = S.DeclTypeAbbrCodes[OriginallyDefinedInDeclAttrLayout::Code];
+      llvm::SmallString<32> blob;
+      blob.append(theAttr->OriginalModuleName.str());
+      blob.push_back('\0');
+      OriginallyDefinedInDeclAttrLayout::emitRecord(
+          S.Out, S.ScratchRecord, abbrCode,
+          theAttr->isImplicit(),
+          LIST_VER_TUPLE_PIECES(Moved),
+          static_cast<unsigned>(theAttr->Platform),
+          blob);
+      return;
+    }
+
     case DAK_Available: {
       auto *theAttr = cast<AvailableAttr>(DA);
       ENCODE_VER_TUPLE(Introduced, theAttr->Introduced)
