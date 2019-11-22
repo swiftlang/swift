@@ -415,9 +415,6 @@ public:
   void setStatsReporter(UnifiedStatsReporter *stats);
 
 private:
-  /// Set the lazy resolver for this context.
-  void setLazyResolver(LazyResolver *resolver);
-  
   // get `<` or `==`
   FuncDecl *getBinaryComparisonOperatorIntDecl(StringRef op, FuncDecl **cached) const;
   

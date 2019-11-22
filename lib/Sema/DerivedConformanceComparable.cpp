@@ -306,15 +306,16 @@ deriveComparable_lt(
     DerivedConformance &derived,
     std::pair<BraceStmt *, bool> (*bodySynthesizer)(AbstractFunctionDecl *,
                                                     void *)) {
-  ASTContext &C = derived.TC.Context;
+  ASTContext &C = derived.Context;
 
   auto parentDC = derived.getConformanceContext();
   auto selfIfaceTy = parentDC->getDeclaredInterfaceType();
 
   auto getParamDecl = [&](StringRef s) -> ParamDecl * {
-    auto *param = new (C) ParamDecl(ParamDecl::Specifier::Default, SourceLoc(),
+    auto *param = new (C) ParamDecl(SourceLoc(),
                                     SourceLoc(), Identifier(), SourceLoc(),
                                     C.getIdentifier(s), parentDC);
+    param->setSpecifier(ParamSpecifier::Default);
     param->setInterfaceType(selfIfaceTy);
     return param;
   };
@@ -356,28 +357,20 @@ deriveComparable_lt(
     auto comparableDeclName = DeclName(C, DeclBaseName(C.Id_LessThanOperator),
                                    argumentLabels);
     comparableDecl->getAttrs().add(new (C) ImplementsAttr(SourceLoc(),
-                                                  SourceRange(),
-                                                  comparableTypeLoc,
-                                                  comparableDeclName,
-                                                  DeclNameLoc()));
+                                                          SourceRange(),
+                                                          comparableTypeLoc,
+                                                          comparableDeclName,
+                                                          DeclNameLoc()));
   }
 
   if (!C.getLessThanIntDecl()) {
-    derived.TC.diagnose(derived.ConformanceDecl->getLoc(),
-                        diag::no_less_than_overload_for_int);
+    derived.ConformanceDecl->diagnose(diag::no_less_than_overload_for_int);
     return nullptr;
   }
 
   comparableDecl->setBodySynthesizer(bodySynthesizer);
 
-  // Compute the interface type.
-  comparableDecl->setGenericSignature(parentDC->getGenericSignatureOfContext());
-  comparableDecl->computeType();
-
   comparableDecl->copyFormalAccessFrom(derived.Nominal, /*sourceIsParentContext*/ true);
-  comparableDecl->setValidationToChecked();
-
-  C.addSynthesizedDecl(comparableDecl);
 
   // Add the operator to the parent scope.
   derived.addMembersToConformanceContext({comparableDecl});
@@ -413,6 +406,6 @@ ValueDecl *DerivedConformance::deriveComparable(ValueDecl *requirement) {
       llvm_unreachable("todo");
     }
   }
-  TC.diagnose(requirement->getLoc(), diag::broken_comparable_requirement);
+  requirement->diagnose(diag::broken_comparable_requirement);
   return nullptr;
 }

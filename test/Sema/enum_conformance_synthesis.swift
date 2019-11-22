@@ -337,12 +337,12 @@ func pit(_ a: Angel, against b: Angel) -> Bool {
 }
 
 // enums with non-conforming payloads don’t get synthesized Comparable 
-enum Notice: Comparable { // expected-error{{type 'Notice' does not conform to protocol 'Comparable'}} expected-error{{type 'Notice' does not conform to protocol 'Equatable'}} expected-note {{do you want to add protocol stubs?}} expected-note {{do you want to add protocol stubs?}}
+enum Notice: Comparable { // expected-error{{type 'Notice' does not conform to protocol 'Comparable'}} expected-error{{type 'Notice' does not conform to protocol 'Equatable'}} 
   case taylor((Int, Int)), taylornation(Int) // expected-note{{associated value type '(Int, Int)' does not conform to protocol 'Equatable', preventing synthesized conformance of 'Notice' to 'Equatable'}} 
 }
 
 // neither do enums with raw values 
-enum Track: Int, Comparable { // expected-error{{type 'Track' does not conform to protocol 'Comparable'}} expected-note {{do you want to add protocol stubs?}}
+enum Track: Int, Comparable { // expected-error{{type 'Track' does not conform to protocol 'Comparable'}} 
   case four = 4
   case five = 5 
   case six  = 6
