@@ -4965,9 +4965,9 @@ bool AbstractStorageDecl::hasPrivateAccessor() const {
 
 bool AbstractStorageDecl::hasDidSetOrWillSetDynamicReplacement() const {
   if (auto *func = getParsedAccessor(AccessorKind::DidSet))
-    return func->getAttrs().hasAttribute<DynamicReplacementAttr>();
+    return (bool)func->getDynamicallyReplacedDecl();
   if (auto *func = getParsedAccessor(AccessorKind::WillSet))
-    return func->getAttrs().hasAttribute<DynamicReplacementAttr>();
+    return (bool)func->getDynamicallyReplacedDecl();
   return false;
 }
 
