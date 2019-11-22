@@ -326,6 +326,8 @@ do {
     case MyEnum.foo: break
     case let a as Int: break
     case let a?: break
+    case let b: try break
+    case let c: LABEL: break
   }
 }
 
@@ -357,6 +359,8 @@ func statementTests() {
       continue
     } else {
       continue LABEL
+    } else {
+      LABEL: continue  
     }
   }
 

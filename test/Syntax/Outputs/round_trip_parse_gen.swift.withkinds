@@ -325,7 +325,9 @@ do <CodeBlock>{<SwitchStmt>
     case <CaseItem><ValueBindingPattern>let <ExpressionPattern><FunctionCallExpr><MemberAccessExpr>.bar</MemberAccessExpr>(<TupleExprElement><UnresolvedPatternExpr><IdentifierPattern>x</IdentifierPattern></UnresolvedPatternExpr></TupleExprElement>)</FunctionCallExpr></ExpressionPattern></ValueBindingPattern></CaseItem>: </SwitchCaseLabel><BreakStmt>break</BreakStmt></SwitchCase><SwitchCase><SwitchCaseLabel>
     case <CaseItem><ExpressionPattern><MemberAccessExpr><IdentifierExpr>MyEnum</IdentifierExpr>.foo</MemberAccessExpr></ExpressionPattern></CaseItem>: </SwitchCaseLabel><BreakStmt>break</BreakStmt></SwitchCase><SwitchCase><SwitchCaseLabel>
     case <CaseItem><ValueBindingPattern>let <ExpressionPattern><SequenceExpr><UnresolvedPatternExpr><IdentifierPattern>a </IdentifierPattern></UnresolvedPatternExpr><AsExpr>as <SimpleTypeIdentifier>Int</SimpleTypeIdentifier></AsExpr></SequenceExpr></ExpressionPattern></ValueBindingPattern></CaseItem>: </SwitchCaseLabel><BreakStmt>break</BreakStmt></SwitchCase><SwitchCase><SwitchCaseLabel>
-    case <CaseItem><ValueBindingPattern>let <ExpressionPattern><OptionalChainingExpr><UnresolvedPatternExpr><IdentifierPattern>a</IdentifierPattern></UnresolvedPatternExpr>?</OptionalChainingExpr></ExpressionPattern></ValueBindingPattern></CaseItem>: </SwitchCaseLabel><BreakStmt>break</BreakStmt></SwitchCase>
+    case <CaseItem><ValueBindingPattern>let <ExpressionPattern><OptionalChainingExpr><UnresolvedPatternExpr><IdentifierPattern>a</IdentifierPattern></UnresolvedPatternExpr>?</OptionalChainingExpr></ExpressionPattern></ValueBindingPattern></CaseItem>: </SwitchCaseLabel><BreakStmt>break</BreakStmt></SwitchCase><SwitchCase><SwitchCaseLabel>
+    case <CaseItem><ValueBindingPattern>let <IdentifierPattern>b</IdentifierPattern></ValueBindingPattern></CaseItem>: </SwitchCaseLabel>try <BreakStmt>break</BreakStmt></SwitchCase><SwitchCase><SwitchCaseLabel>
+    case <CaseItem><ValueBindingPattern>let <IdentifierPattern>c</IdentifierPattern></ValueBindingPattern></CaseItem>: </SwitchCaseLabel>LABEL: <BreakStmt>break</BreakStmt></SwitchCase>
   }</SwitchStmt>
 }</CodeBlock></DoStmt><FunctionDecl>
 
@@ -357,7 +359,9 @@ func statementTests<FunctionSignature><ParameterClause>() </ParameterClause></Fu
       continue</ContinueStmt>
     } </CodeBlock>else <CodeBlock>{<ContinueStmt>
       continue LABEL</ContinueStmt>
-    }</CodeBlock></IfStmt>
+    } </CodeBlock></IfStmt>else <ClosureExpr>{
+      LABEL: <ContinueStmt>continue  </ContinueStmt>
+    }</ClosureExpr>
   }</CodeBlock></ForInStmt><IfStmt>
 
   if<ConditionElement><IdentifierExpr>

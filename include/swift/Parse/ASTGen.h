@@ -77,7 +77,15 @@ private:
                                 const syntax::GenericWhereClauseSyntax &syntax,
                                 const SourceLoc Loc,
                                 GenericParamList *genericParams);
+    
+public:
+  //===--------------------------------------------------------------------===//
+  // Stmts.
 
+  Stmt *generate(const syntax::StmtSyntax &Stmt, const SourceLoc Loc);
+  Stmt *generate(const syntax::BreakStmtSyntax &Stmt, const SourceLoc Loc);
+  Stmt *generate(const syntax::ContinueStmtSyntax &Stmt, const SourceLoc Loc);
+    
 public:
   //===--------------------------------------------------------------------===//
   // Expressions.
