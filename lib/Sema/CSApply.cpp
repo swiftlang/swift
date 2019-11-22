@@ -384,9 +384,9 @@ namespace {
 
   public:
     /// Build a reference to the given declaration.
-    Expr *buildDeclRef(OverloadChoice choice, DeclNameLoc loc, Type openedType,
-                       ConstraintLocatorBuilder locator, bool implicit,
-                       AccessSemantics semantics) {
+    Expr *buildDeclRef(OverloadChoice choice, DeclNameLoc loc,
+                       Type openedFullType, ConstraintLocatorBuilder locator,
+                       bool implicit, AccessSemantics semantics) {
       assert(choice.getKind() != OverloadChoiceKind::DeclViaDynamic);
       auto *decl = choice.getDecl();
 
@@ -398,7 +398,7 @@ namespace {
       if (decl->getDeclContext()->isTypeContext() && isa<FuncDecl>(decl)) {
         assert(cast<FuncDecl>(decl)->isOperator() && "Must be an operator");
 
-        auto openedFnType = openedType->castTo<FunctionType>();
+        auto openedFnType = openedFullType->castTo<FunctionType>();
         auto simplifiedFnType
           = simplifyType(openedFnType)->castTo<FunctionType>();
         auto baseTy = getBaseType(simplifiedFnType);
@@ -463,12 +463,12 @@ namespace {
           TypeExpr::createImplicitHack(loc.getBaseNameLoc(), baseTy, ctx);
         cs.cacheExprTypes(base);
 
-        return buildMemberRef(base, openedType, SourceLoc(), choice, loc,
+        return buildMemberRef(base, openedFullType, SourceLoc(), choice, loc,
                               openedFnType->getResult(), locator, locator,
                               implicit, semantics);
       }
 
-      auto type = solution.simplifyType(openedType);
+      auto type = solution.simplifyType(openedFullType);
 
       if (isa<TypeDecl>(decl) && !isa<ModuleDecl>(decl)) {
         auto typeExpr = TypeExpr::createImplicitHack(
@@ -2511,7 +2511,7 @@ namespace {
     Expr *applyCtorRefExpr(Expr *expr, Expr *base, SourceLoc dotLoc,
                            DeclNameLoc nameLoc, bool implicit,
                            ConstraintLocator *ctorLocator,
-                           OverloadChoice choice, Type openedType) {
+                           OverloadChoice choice, Type openedFullType) {
       assert(choice.getKind() != OverloadChoiceKind::DeclViaDynamic);
       auto *ctor = cast<ConstructorDecl>(choice.getDecl());
 
@@ -2519,7 +2519,7 @@ namespace {
       // constructor.
       if (cs.getType(base)->is<AnyMetatypeType>()) {
         return buildMemberRef(
-            base, openedType, dotLoc, choice, nameLoc, cs.getType(expr),
+            base, openedFullType, dotLoc, choice, nameLoc, cs.getType(expr),
             ConstraintLocatorBuilder(cs.getConstraintLocator(expr)),
             ctorLocator, implicit, AccessSemantics::Ordinary);
       }
@@ -2565,7 +2565,7 @@ namespace {
 
       // Build a partial application of the delegated initializer.
       auto callee = resolveConcreteDeclRef(ctor, ctorLocator);
-      Expr *ctorRef = buildOtherConstructorRef(openedType, callee, base,
+      Expr *ctorRef = buildOtherConstructorRef(openedFullType, callee, base,
                                                nameLoc, ctorLocator, implicit);
       auto *call = new (cs.getASTContext()) DotSyntaxCallExpr(ctorRef, dotLoc,
                                                               base);
