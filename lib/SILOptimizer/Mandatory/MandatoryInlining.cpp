@@ -764,206 +764,37 @@ static SILInstruction *tryDevirtualizeApplyHelper(FullApplySite InnerAI,
   return newApplyAI;
 }
 
-/// Inlines all mandatory inlined functions into the body of a function,
-/// first recursively inlining all mandatory apply instructions in those
-/// functions into their bodies if necessary.
-///
-/// \param F the function to be processed
-/// \param AI nullptr if this is being called from the top level; the relevant
-///   ApplyInst requiring the recursive call when non-null
-/// \param FullyInlinedSet the set of all functions already known to be fully
-///   processed, to avoid processing them over again
-/// \param SetFactory an instance of ImmutableFunctionSet::Factory
-/// \param CurrentInliningSet the set of functions currently being inlined in
-///   the current call stack of recursive calls
-///
-/// \returns true if successful, false if failed due to circular inlining.
-static bool
-runOnFunctionRecursively(SILOptFunctionBuilder &FuncBuilder,
-			 SILFunction *F, FullApplySite AI,
-                         DenseFunctionSet &FullyInlinedSet,
-                         ImmutableFunctionSet::Factory &SetFactory,
-                         ImmutableFunctionSet CurrentInliningSet,
-                         ClassHierarchyAnalysis *CHA) {
-  // Avoid reprocessing functions needlessly.
-  if (FullyInlinedSet.count(F))
-    return true;
+static size_t collectApplies(SILFunction *F, ClassHierarchyAnalysis *CHA,
+                             DominanceAnalysis *DA,
+                             SmallVector<FullApplySite, 8> &collection) {
+  DominanceInfo *DT = DA->get(F);
+  DominanceOrder domOrder(&F->front(), DT, F->size());
 
-  // Prevent attempt to circularly inline.
-  if (CurrentInliningSet.contains(F)) {
-    // This cannot happen on a top-level call, so AI should be non-null.
-    assert(AI && "Cannot have circular inline without apply");
-    SILLocation L = AI.getLoc();
-    assert(L && "Must have location for transparent inline apply");
-    diagnose(F->getModule().getASTContext(), L.getStartSourceLoc(),
-             diag::circular_transparent);
-    return false;
-  }
-
-  // Add to the current inlining set (immutably, so we only affect the set
-  // during this call and recursive subcalls).
-  CurrentInliningSet = SetFactory.add(CurrentInliningSet, F);
-
-  SmallVector<ParameterConvention, 16> CapturedArgConventions;
-  SmallVector<SILValue, 32> FullArgs;
-  bool needUpdateStackNesting = false;
-
-  // Visiting blocks in reverse order avoids revisiting instructions after block
-  // splitting, which would be quadratic.
-  for (auto BI = F->rbegin(), BE = F->rend(), nextBB = BI; BI != BE;
-       BI = nextBB) {
-    // After inlining, the block iterator will be adjusted to point to the last
-    // block containing inlined instructions. This way, the inlined function
-    // body will be reprocessed within the caller's context without revisiting
-    // any original instructions.
-    nextBB = std::next(BI);
-
-    // While iterating over this block, instructions are inserted and deleted.
-    // To avoid quadratic block splitting, instructions must be processed in
-    // reverse order (block splitting reassigned the parent pointer of all
-    // instructions below the split point).
-    for (auto II = BI->rbegin(); II != BI->rend(); ++II) {
-      FullApplySite InnerAI = FullApplySite::isa(&*II);
-      if (!InnerAI)
+  // First collect all the applies
+  SmallVector<FullApplySite, 12> applyInsts;
+  while (SILBasicBlock *block = domOrder.getNext()) {
+    for (auto &inst : *block) {
+      FullApplySite apply = FullApplySite::isa(&inst);
+      if (!apply)
         continue;
-
-      // *NOTE* If devirtualization succeeds, devirtInst may not be InnerAI,
-      // but a casted result of InnerAI or even a block argument due to
-      // abstraction changes when calling the witness or class method.
-      auto *devirtInst = tryDevirtualizeApplyHelper(InnerAI, CHA);
-      // Restore II to the current apply site.
-      II = devirtInst->getReverseIterator();
-      // If the devirtualized call result is no longer a invalid FullApplySite,
-      // then it has succeeded, but the result is not immediately inlinable.
-      InnerAI = FullApplySite::isa(devirtInst);
-      if (!InnerAI)
-        continue;
-
-      SILValue CalleeValue = InnerAI.getCallee();
-      bool IsThick;
-      PartialApplyInst *PAI;
-      SILFunction *CalleeFunction = getCalleeFunction(
-          F, InnerAI, IsThick, CapturedArgConventions, FullArgs, PAI);
-
-      if (!CalleeFunction)
-        continue;
-
-      // Then recursively process it first before trying to inline it.
-      if (!runOnFunctionRecursively(FuncBuilder, CalleeFunction, InnerAI,
-                                    FullyInlinedSet, SetFactory,
-                                    CurrentInliningSet, CHA)) {
-        // If we failed due to circular inlining, then emit some notes to
-        // trace back the failure if we have more information.
-        // FIXME: possibly it could be worth recovering and attempting other
-        // inlines within this same recursive call rather than simply
-        // propagating the failure.
-        if (AI) {
-          SILLocation L = AI.getLoc();
-          assert(L && "Must have location for transparent inline apply");
-          diagnose(F->getModule().getASTContext(), L.getStartSourceLoc(),
-                   diag::note_while_inlining);
-        }
-        return false;
-      }
-
-      // Get our list of substitutions.
-      auto Subs = (PAI
-                   ? PAI->getSubstitutionMap()
-                   : InnerAI.getSubstitutionMap());
-
-      SILOpenedArchetypesTracker OpenedArchetypesTracker(F);
-      F->getModule().registerDeleteNotificationHandler(
-          &OpenedArchetypesTracker);
-      // The callee only needs to know about opened archetypes used in
-      // the substitution list.
-      OpenedArchetypesTracker.registerUsedOpenedArchetypes(
-          InnerAI.getInstruction());
-      if (PAI) {
-        OpenedArchetypesTracker.registerUsedOpenedArchetypes(PAI);
-      }
-
-      SILInliner Inliner(FuncBuilder, SILInliner::InlineKind::MandatoryInline,
-                         Subs, OpenedArchetypesTracker);
-      if (!Inliner.canInlineApplySite(InnerAI))
-        continue;
-
-      // Inline function at I, which also changes I to refer to the first
-      // instruction inlined in the case that it succeeds. We purposely
-      // process the inlined body after inlining, because the inlining may
-      // have exposed new inlining opportunities beyond those present in
-      // the inlined function when processed independently.
-      LLVM_DEBUG(llvm::errs() << "Inlining @" << CalleeFunction->getName()
-                              << " into @" << InnerAI.getFunction()->getName()
-                              << "\n");
-
-      // If we intend to inline a partial_apply function that is not on the
-      // stack, then we need to balance the reference counts for correctness.
-      //
-      // NOTE: If our partial apply is on the stack, it only has point uses (and
-      // hopefully eventually guaranteed) uses of the captured arguments.
-      //
-      // NOTE: If we have a thin_to_thick_function, we do not need to worry
-      // about such things since a thin_to_thick_function does not capture any
-      // arguments.
-      if (PAI && PAI->isOnStack() == PartialApplyInst::NotOnStack) {
-        bool IsCalleeGuaranteed =
-            PAI->getType().castTo<SILFunctionType>()->isCalleeGuaranteed();
-        auto CapturedArgs = MutableArrayRef<SILValue>(FullArgs).take_back(
-            CapturedArgConventions.size());
-        // We need to insert the copies before the partial_apply since if we can
-        // not remove the partial_apply the captured values will be dead by the
-        // time we hit the call site.
-        fixupReferenceCounts(PAI, InnerAI, CalleeValue, CapturedArgConventions,
-                             CapturedArgs, IsCalleeGuaranteed);
-      }
-
-      // Register a callback to record potentially unused function values after
-      // inlining.
-      ClosureCleanup closureCleanup;
-      Inliner.setDeletionCallback([&closureCleanup](SILInstruction *I) {
-        closureCleanup.recordDeadFunction(I);
-      });
-
-      needUpdateStackNesting |= Inliner.needsUpdateStackNesting(InnerAI);
-
-      // Inlining deletes the apply, and can introduce multiple new basic
-      // blocks. After this, CalleeValue and other instructions may be invalid.
-      // nextBB will point to the last inlined block
-      auto firstInlinedInstAndLastBB =
-          Inliner.inlineFunction(CalleeFunction, InnerAI, FullArgs);
-      nextBB = firstInlinedInstAndLastBB.second->getReverseIterator();
-      ++NumMandatoryInlines;
-
-      // The IR is now valid, and trivial dead arguments are removed. However,
-      // we may be able to remove dead callee computations (e.g. dead
-      // partial_apply closures).
-      closureCleanup.cleanupDeadClosures(F);
-
-      // Resume inlining within nextBB, which contains only the inlined
-      // instructions and possibly instructions in the original call block that
-      // have not yet been visited.
-      break;
+      applyInsts.push_back(apply);
     }
   }
 
-  if (needUpdateStackNesting) {
-    StackNesting().correctStackNesting(F);
+  // Then try to devirtualize them and add them to our collections.
+  for (auto &apply : applyInsts) {
+    // *NOTE* If devirtualization succeeds, devirtInst may not be apply,
+    // but a casted result of apply or even a block argument due to
+    // abstraction changes when calling the witness or class method.
+    auto *devirtInst = tryDevirtualizeApplyHelper(apply, CHA);
+    apply = FullApplySite::isa(devirtInst);
+    if (!apply)
+      continue;
+
+    collection.push_back(apply);
   }
 
-  // Keep track of full inlined functions so we don't waste time recursively
-  // reprocessing them.
-  FullyInlinedSet.insert(F);
-  return true;
-}
-
-static void handleClosureCleanup(SILFunction *F,
-                                 ArrayRef<SILInstruction *> deadFunctions) {
-  ClosureCleanup closureCleanup;
-  for (auto *inst : deadFunctions) {
-    if (!inst) continue; // TODO: bad
-    closureCleanup.recordDeadFunction(inst);
-  }
-  closureCleanup.cleanupDeadClosures(F);
+  return collection.size();
 }
 
 //===----------------------------------------------------------------------===//
@@ -973,49 +804,26 @@ static void handleClosureCleanup(SILFunction *F,
 namespace {
 
 class MandatoryInlining : public SILFunctionTransform {
-  size_t collectApplies(SILFunction *F, ClassHierarchyAnalysis *CHA,
-                        DominanceAnalysis *DA,
-                        SmallVector<FullApplySite, 8> &collection) {
-    DominanceInfo *DT = DA->get(F);
-    DominanceOrder domOrder(&F->front(), DT, F->size());
-    
-    // First collect all the applies
-    SmallVector<FullApplySite, 12> applyInsts;
-    while (SILBasicBlock *block = domOrder.getNext()) {
-      for (auto &inst : *block) {
-        FullApplySite apply = FullApplySite::isa(&inst);
-        if (!apply) continue;
-        applyInsts.push_back(apply);
-      }
-    }
-    
-    // Then try to devirtualize them and add them to our collections.
-    for (auto &apply : applyInsts) {
-      auto *devirtInst = tryDevirtualizeApplyHelper(apply, CHA);
-      apply = FullApplySite::isa(devirtInst);
-      if (!apply) continue;
-      
-      collection.push_back(apply);
-    }
-    
-    return collection.size();
-  }
-
+  /// If possible, inlines each apply instruction in \param collection.
   bool inlineFunction(SILOptFunctionBuilder &funcBuilder, SILFunction *F,
                       SmallVector<FullApplySite, 8> &collection) {
     bool madeChange = false;
+    bool needUpdateStackNesting = false;
     SmallVector<ParameterConvention, 16> capturedArgConventions;
     SmallVector<SILValue, 16> fullArgs;
-    
+
+    // Try to inline every apply that we collected.
     for (auto &apply : collection) {
+      // TODO: remove isThick.
       bool isThick;
       PartialApplyInst *partialApply;
-      SILFunction *calleeFunc = getCalleeFunction(F, apply, isThick,
-                                                  capturedArgConventions,
-                                                  fullArgs, partialApply);
+      SILFunction *calleeFunc = getCalleeFunction(
+          F, apply, isThick, capturedArgConventions, fullArgs, partialApply);
+      // If we couldn't find the callee function or we shouldn't inline the
+      // callee function (@inline(none)) then bail.
       if (!calleeFunc || calleeFunc->getInlineStrategy() == NoInline)
         continue;
-      
+
       // Prevent circular inlining
       if (calleeFunc == apply.getFunction()) {
         SILLocation loc = apply.getLoc();
@@ -1024,22 +832,22 @@ class MandatoryInlining : public SILFunctionTransform {
                  diag::circular_transparent);
         return false;
       }
-      
-      auto subs = partialApply
-                  ? partialApply->getSubstitutionMap()
-                  : apply.getSubstitutionMap();
-      
+
+      auto subs = partialApply ? partialApply->getSubstitutionMap()
+                               : apply.getSubstitutionMap();
+
       SILOpenedArchetypesTracker archtypesTracker(F);
       F->getModule().registerDeleteNotificationHandler(&archtypesTracker);
       archtypesTracker.registerOpenedArchetypes(apply.getInstruction());
       if (partialApply)
         archtypesTracker.registerUsedOpenedArchetypes(partialApply);
-      
+
       SILInliner inliner(funcBuilder, SILInliner::InlineKind::MandatoryInline,
                          subs, archtypesTracker);
-      if (!inliner.canInlineApplySite(apply)) continue;
-      bool willNeedCorrection = inliner.needsUpdateStackNesting(apply);
-      
+      if (!inliner.canInlineApplySite(apply))
+        continue;
+      needUpdateStackNesting |= inliner.needsUpdateStackNesting(apply);
+
       // If we intend to inline a partial_apply function that is not on the
       // stack, then we need to balance the reference counts for correctness.
       //
@@ -1051,37 +859,48 @@ class MandatoryInlining : public SILFunctionTransform {
       // arguments.
       if (partialApply &&
           partialApply->isOnStack() == PartialApplyInst::NotOnStack) {
-        bool isCalleeGuaranteed = partialApply->getType().castTo<SILFunctionType>()->isCalleeGuaranteed();
-        auto capturedArgs = MutableArrayRef<SILValue>(fullArgs).take_back(capturedArgConventions.size());
+        bool isCalleeGuaranteed = partialApply->getType()
+                                      .castTo<SILFunctionType>()
+                                      ->isCalleeGuaranteed();
+        auto capturedArgs = MutableArrayRef<SILValue>(fullArgs).take_back(
+            capturedArgConventions.size());
         // We need to insert the copies before the partial_apply since if we can
         // not remove the partial_apply the captured values will be dead by the
         // time we hit the call site.
-        fixupReferenceCounts(partialApply, apply, apply.getCallee(), capturedArgConventions, capturedArgs, isCalleeGuaranteed);
+        fixupReferenceCounts(partialApply, apply, apply.getCallee(),
+                             capturedArgConventions, capturedArgs,
+                             isCalleeGuaranteed);
       }
-      
+
+      // TODO: move closure cleanup into its own pass
+      // Record potentailly unused function_refs / applys after inlining.
       ClosureCleanup closureCleanup;
       inliner.setDeletionCallback([&closureCleanup](SILInstruction *inst) {
         closureCleanup.recordDeadFunction(inst);
       });
-      
+
       inliner.inlineFunction(calleeFunc, apply, fullArgs);
       mergeBasicBlocks(F);
       madeChange = true;
-      
+      (void)++NumMandatoryInlines;
+
+      // The IR is now valid, and trivial dead arguments are removed. However,
+      // we may be able to remove dead callee computations (e.g. dead
+      // partial_apply closures).
       closureCleanup.cleanupDeadClosures(F);
-      
-      if (willNeedCorrection) {
-        StackNesting().correctStackNesting(F);
-      }
-      
+
       // Add the callee function to the pass manager so we can try to
       // inline it too. This also makes sure that we remove it if its dead.
       addFunctionToPassManagerWorklist(calleeFunc, F);
     }
-    
+
+    if (needUpdateStackNesting) {
+      StackNesting().correctStackNesting(F);
+    }
+
     return madeChange;
   }
-  
+
   /// The entry point to the transformation.
   void run() override {
     SILFunction *F = getFunction();
@@ -1092,10 +911,9 @@ class MandatoryInlining : public SILFunctionTransform {
     ImmutableFunctionSet::Factory SetFactory;
     SILOptFunctionBuilder FuncBuilder(*this);
     bool madeChange = false;
-    
+
     SmallVector<FullApplySite, 8> collection;
 
-    
     // Don't inline into thunks, even transparent callees.
     if (F->isThunk())
       return;
@@ -1103,11 +921,12 @@ class MandatoryInlining : public SILFunctionTransform {
     // Skip deserialized functions.
     if (F->wasDeserializedCanonical())
       return;
-    
+
     if (collectApplies(F, CHA, DA, collection))
       madeChange = inlineFunction(FuncBuilder, F, collection);
-    
-    if (!madeChange) return;
+
+    if (!madeChange)
+      return;
 
     // If we are asked to perform SIL verify all, perform that now so that we
     // can discover the immediate inlining trigger of the problematic
@@ -1122,7 +941,6 @@ class MandatoryInlining : public SILFunctionTransform {
     // another module that are now unused, MandatoryCombine will remove them.
     addFunctionToPassManagerWorklist(F, F);
   }
-
 };
 } // end anonymous namespace
 
