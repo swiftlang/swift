@@ -137,6 +137,7 @@ limitXY(someInt, toGamut: intArray) {}  // expected-error{{extra trailing closur
 // <rdar://problem/23036383> QoI: Invalid trailing closures in stmt-conditions produce lowsy diagnostics
 func retBool(x: () -> Int) -> Bool {}
 func maybeInt(_: () -> Int) -> Int? {}
+func twoClosureArgs(_:()->Void, _:()->Void) -> Bool {}
 class Foo23036383 {
   init() {}
   func map(_: (Int) -> Int) -> Int? {}
@@ -153,55 +154,130 @@ func r23036383(foo: Foo23036383?, obj: Foo23036383) {
   if retBool(x: { 1 }) { } // OK
   if (retBool { 1 }) { } // OK
 
-  if retBool{ 1 } {  // expected-error {{trailing closure requires parentheses for disambiguation in this context}} {{13-13=(x: }} {{18-18=)}}
+  if retBool{ 1 } {  // expected-warning {{trailing closure in this context is confusable with the body of the statement; pass as a parenthesized argument to silence this warning}} {{13-13=(x: }} {{18-18=)}}
   }
-  if retBool { 1 } {  // expected-error {{trailing closure requires parentheses for disambiguation in this context}} {{13-14=(x: }} {{19-19=)}}
+  if retBool { 1 } {  // expected-warning {{trailing closure in this context is confusable with the body of the statement; pass as a parenthesized argument to silence this warning}} {{13-14=(x: }} {{19-19=)}}
   }
-  if retBool() { 1 } {  // expected-error {{trailing closure requires parentheses for disambiguation in this context}} {{14-16=x: }} {{21-21=)}}
-  } else if retBool( ) { 0 } {  // expected-error {{trailing closure requires parentheses for disambiguation in this context}} {{21-24=x: }} {{29-29=)}}
-  }
-
-  if let _ = maybeInt { 1 } {  // expected-error {{trailing closure requires parentheses for disambiguation in this context}} {{22-23=(}} {{28-28=)}}
-  }
-  if let _ = maybeInt { 1 } , true {  // expected-error {{trailing closure requires parentheses for disambiguation in this context}} {{22-23=(}} {{28-28=)}}
+  if retBool() { 1 } {  // expected-warning {{trailing closure in this context is confusable with the body of the statement; pass as a parenthesized argument to silence this warning}} {{14-16=x: }} {{21-21=)}}
+  } else if retBool( ) { 0 } {  // expected-warning {{trailing closure in this context is confusable with the body of the statement; pass as a parenthesized argument to silence this warning}} {{21-24=x: }} {{29-29=)}}
   }
 
-  if let _ = foo?.map {$0+1} {  // expected-error {{trailing closure requires parentheses for disambiguation in this context}} {{22-23=(}} {{29-29=)}}
+  if let _ = maybeInt { 1 } {  // expected-warning {{trailing closure in this context is confusable with the body of the statement; pass as a parenthesized argument to silence this warning}} {{22-23=(}} {{28-28=)}}
   }
-  if let _ = foo?.map() {$0+1} {  // expected-error {{trailing closure requires parentheses for disambiguation in this context}} {{23-25=}} {{31-31=)}}
-  }
-  if let _ = foo, retBool { 1 } {  // expected-error {{trailing closure requires parentheses for disambiguation in this context}} {{26-27=(x: }} {{32-32=)}}
+  if let _ = maybeInt { 1 } , true {  // expected-warning {{trailing closure in this context is confusable with the body of the statement; pass as a parenthesized argument to silence this warning}} {{22-23=(}} {{28-28=)}}
   }
 
-  if obj.meth1(x: 1) { 0 } {  // expected-error {{trailing closure requires parentheses for disambiguation in this context}} {{20-22=, }} {{27-27=)}}
+  if let _ = foo?.map {$0+1} {  // expected-warning {{trailing closure in this context is confusable with the body of the statement; pass as a parenthesized argument to silence this warning}} {{22-23=(}} {{29-29=)}}
   }
-  if obj.meth2(1) { 0 } {  // expected-error {{trailing closure requires parentheses for disambiguation in this context}} {{17-19=, y: }} {{24-24=)}}
+  if let _ = foo?.map() {$0+1} {  // expected-warning {{trailing closure in this context is confusable with the body of the statement; pass as a parenthesized argument to silence this warning}} {{23-25=}} {{31-31=)}}
   }
-
-  for _ in obj.filter {$0 > 4} {  // expected-error {{trailing closure requires parentheses for disambiguation in this context}} {{22-23=(by: }} {{31-31=)}}
-  }
-  for _ in obj.filter {$0 > 4} where true {  // expected-error {{trailing closure requires parentheses for disambiguation in this context}} {{22-23=(by: }} {{31-31=)}}
-  }
-  for _ in [1,2] where retBool { 1 } {  // expected-error {{trailing closure requires parentheses for disambiguation in this context}} {{31-32=(x: }} {{37-37=)}}
+  if let _ = foo, retBool { 1 } {  // expected-warning {{trailing closure in this context is confusable with the body of the statement; pass as a parenthesized argument to silence this warning}} {{26-27=(x: }} {{32-32=)}}
   }
 
-  while retBool { 1 } { // expected-error {{trailing closure requires parentheses for disambiguation in this context}} {{16-17=(x: }} {{22-22=)}}
+  if obj.meth1(x: 1) { 0 } {  // expected-warning {{trailing closure in this context is confusable with the body of the statement; pass as a parenthesized argument to silence this warning}} {{20-22=, }} {{27-27=)}}
   }
-  while let _ = foo, retBool { 1 } { // expected-error {{trailing closure requires parentheses for disambiguation in this context}} {{29-30=(x: }} {{35-35=)}}
+  if obj.meth2(1) { 0 } {  // expected-warning {{trailing closure in this context is confusable with the body of the statement; pass as a parenthesized argument to silence this warning}} {{17-19=, y: }} {{24-24=)}}
   }
 
-  switch retBool { return 1 } {  // expected-error {{trailing closure requires parentheses for disambiguation in this context}} {{17-18=(x: }} {{30-30=)}}
+  for _ in obj.filter {$0 > 4} {  // expected-warning {{trailing closure in this context is confusable with the body of the statement; pass as a parenthesized argument to silence this warning}} {{22-23=(by: }} {{31-31=)}}
+  }
+  for _ in obj.filter {$0 > 4} where true {  // expected-warning {{trailing closure in this context is confusable with the body of the statement; pass as a parenthesized argument to silence this warning}} {{22-23=(by: }} {{31-31=)}}
+  }
+  for _ in [1,2] where retBool { 1 } {  // expected-warning {{trailing closure in this context is confusable with the body of the statement; pass as a parenthesized argument to silence this warning}} {{31-32=(x: }} {{37-37=)}}
+  }
+
+  while retBool { 1 } { // expected-warning {{trailing closure in this context is confusable with the body of the statement; pass as a parenthesized argument to silence this warning}} {{16-17=(x: }} {{22-22=)}}
+  }
+  while let _ = foo, retBool { 1 } { // expected-warning {{trailing closure in this context is confusable with the body of the statement; pass as a parenthesized argument to silence this warning}} {{29-30=(x: }} {{35-35=)}}
+  }
+
+  switch retBool { return 1 } {  // expected-warning {{trailing closure in this context is confusable with the body of the statement; pass as a parenthesized argument to silence this warning}} {{17-18=(x: }} {{30-30=)}}
     default: break
   }
 
   do {
     throw MyErr.A;
-  } catch MyErr.A where retBool { 1 } {  // expected-error {{trailing closure requires parentheses for disambiguation in this context}} {{32-33=(x: }} {{38-38=)}}
+  } catch MyErr.A where retBool { 1 } {  // expected-warning {{trailing closure in this context is confusable with the body of the statement; pass as a parenthesized argument to silence this warning}} {{32-33=(x: }} {{38-38=)}}
   } catch { }
 
   if let _ = maybeInt { 1 }, retBool { 1 } { }
-  // expected-error@-1 {{trailing closure requires parentheses for disambiguation in this context}} {{22-23=(}} {{28-28=)}} 
-  // expected-error@-2 {{trailing closure requires parentheses for disambiguation in this context}} {{37-38=(x: }} {{43-43=)}} 
+  // expected-warning@-1 {{trailing closure in this context is confusable with the body of the statement; pass as a parenthesized argument to silence this warning}} {{22-23=(}} {{28-28=)}}
+  // expected-warning@-2 {{trailing closure in this context is confusable with the body of the statement; pass as a parenthesized argument to silence this warning}} {{37-38=(x: }} {{43-43=)}}
+
+  if let _ = foo?.map {$0+1}.map {$0+1} {} // expected-warning {{trailing closure in this context is confusable with the body of the statement; pass as a parenthesized argument to silence this warning}}  {{33-34=(}} {{40-40=)}}
+  // expected-warning@-1 {{trailing closure in this context is confusable with the body of the statement; pass as a parenthesized argument to silence this warning}} {{22-23=(}} {{29-29=)}}
+
+  if let _ = foo?.map {$0+1}.map({$0+1}) {} // expected-warning {{trailing closure in this context is confusable with the body of the statement; pass as a parenthesized argument to silence this warning}} {{22-23=(}} {{29-29=)}}
+
+  if let _ = foo?.map {$0+1}.map({$0+1}).map{$0+1} {} // expected-warning {{trailing closure in this context is confusable with the body of the statement; pass as a parenthesized argument to silence this warning}} {{45-45=(}} {{51-51=)}}
+  // expected-warning@-1 {{trailing closure in this context is confusable with the body of the statement; pass as a parenthesized argument to silence this warning}} {{22-23=(}} {{29-29=)}}
+
+  if twoClosureArgs({}) {} {} // expected-warning {{trailing closure in this context is confusable with the body of the statement; pass as a parenthesized argument to silence this warning}} {{23-25=, }} {{27-27=)}}
+
+  if let _ = (foo?.map {$0+1}.map({$0+1}).map{$0+1}) {} // OK
+
+  if let _ = (foo?.map {$0+1}.map({$0+1})).map({$0+1}) {} // OK
+}
+
+func id<T>(fn: () -> T) -> T { return fn() }
+func any<T>(fn: () -> T) -> Any { return fn() }
+
+func testSR8736() {
+  if !id { true } { return } // expected-warning {{trailing closure in this context is confusable with the body of the statement; pass as a parenthesized argument to silence this warning}}
+  
+  if id { true } == true { return } // expected-warning {{trailing closure in this context is confusable with the body of the statement; pass as a parenthesized argument to silence this warning}}
+  
+  if true == id { true } { return } // expected-warning {{trailing closure in this context is confusable with the body of the statement; pass as a parenthesized argument to silence this warning}}
+  
+  if id { true } ? true : false { return } // expected-warning {{trailing closure in this context is confusable with the body of the statement; pass as a parenthesized argument to silence this warning}}
+  
+  if true ? id { true } : false { return } // expected-warning {{trailing closure in this context is confusable with the body of the statement; pass as a parenthesized argument to silence this warning}}
+  
+  if true ? true : id { false } { return } // expected-warning {{trailing closure in this context is confusable with the body of the statement; pass as a parenthesized argument to silence this warning}}
+  
+  if id { [false,true] }[0] { return } // expected-warning {{trailing closure in this context is confusable with the body of the statement; pass as a parenthesized argument to silence this warning}}
+  
+  if id { { true } } () { return } // expected-warning {{trailing closure in this context is confusable with the body of the statement; pass as a parenthesized argument to silence this warning}}
+  
+  if any { true } as! Bool { return } // expected-warning {{trailing closure in this context is confusable with the body of the statement; pass as a parenthesized argument to silence this warning}}
+  
+  if let _ = any { "test" } as? Int { return } // expected-warning {{trailing closure in this context is confusable with the body of the statement; pass as a parenthesized argument to silence this warning}}
+  
+  if any { "test" } is Int { return } // expected-warning {{trailing closure in this context is confusable with the body of the statement; pass as a parenthesized argument to silence this warning}}
+  
+  if let _ = id { [] as [Int]? }?.first { return } // expected-warning {{trailing closure in this context is confusable with the body of the statement; pass as a parenthesized argument to silence this warning}}
+  
+  if id { true as Bool? }! { return } // expected-warning {{trailing closure in this context is confusable with the body of the statement; pass as a parenthesized argument to silence this warning}}
+  
+  if case id { 1 } = 1 { return } // expected-warning {{trailing closure in this context is confusable with the body of the statement; pass as a parenthesized argument to silence this warning}}
+  
+  if case 1 = id { 1 } { return } // expected-warning {{trailing closure in this context is confusable with the body of the statement; pass as a parenthesized argument to silence this warning}}
+  
+  if case 1 = id { 1 } /*comment*/ { return } // expected-warning {{trailing closure in this context is confusable with the body of the statement; pass as a parenthesized argument to silence this warning}}
+  
+  if case (id { 1 }) = 1 { return } // OK
+  
+  if case 1 = (id { 1 }) { return } // OK
+  
+  if [id { true }].count == 0 { return } // OK
+  
+  if [id { true } : "test"].keys.count == 0 { return } // OK
+  
+  if "\(id { true })" == "foo" { return } // OK
+  
+  if (id { true }) { return } // OK
+  
+  if (id { true }) { }
+  [1, 2, 3].count // expected-warning {{expression of type 'Int' is unused}}
+  
+  if true { }
+  () // OK
+  
+  if true
+  {
+    
+  }
+  () // OK
 }
 
 func overloadOnLabel(a: () -> Void) {}
