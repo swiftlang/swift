@@ -554,12 +554,14 @@ public:
         NormalDifferentiableFunctionTypeComponent::Original, TheFunction));
   }
 
-  DifferentiabilityWitnessFunctionInst *
-  createDifferentiabilityWitnessFunction(
+  /// Note: explicit function type may be specified only in lowered SIL.
+  DifferentiabilityWitnessFunctionInst *createDifferentiabilityWitnessFunction(
       SILLocation Loc, DifferentiabilityWitnessFunctionKind WitnessKind,
-      SILDifferentiabilityWitness *Witness) {
+      SILDifferentiabilityWitness *Witness,
+      Optional<SILType> FunctionType = None) {
     return insert(new (getModule()) DifferentiabilityWitnessFunctionInst(
-        getModule(), getSILDebugLocation(Loc), WitnessKind, Witness));
+        getModule(), getSILDebugLocation(Loc), WitnessKind, Witness,
+        FunctionType));
   }
   // SWIFT_ENABLE_TENSORFLOW END
 

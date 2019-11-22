@@ -1,4 +1,4 @@
-// RUN: not --crash %target-swift-frontend -O -emit-ir %s
+// RUN: %target-swift-frontend -O -emit-ir %s
 // REQUIRES: asserts
 
 public protocol Protocol: Differentiable {

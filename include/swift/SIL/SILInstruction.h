@@ -8118,15 +8118,11 @@ private:
       SILDifferentiabilityWitness *witness);
 
 public:
+  /// Note: explicit function type may be specified only in lowered SIL.
   DifferentiabilityWitnessFunctionInst(
       SILModule &module, SILDebugLocation loc,
       DifferentiabilityWitnessFunctionKind witnessKind,
-      SILDifferentiabilityWitness *witness);
-
-  static DifferentiabilityWitnessFunctionInst *create(
-      SILModule &module, SILDebugLocation loc,
-      DifferentiabilityWitnessFunctionKind witnessKind,
-      SILDifferentiabilityWitness *witness);
+      SILDifferentiabilityWitness *witness, Optional<SILType> FunctionType);
 
   DifferentiabilityWitnessFunctionKind getWitnessKind() const {
     return witnessKind;

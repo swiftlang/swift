@@ -35,6 +35,8 @@ SILDifferentiabilityWitness *SILDifferentiabilityWitness::createDeclaration(
   assert(!module.DifferentiabilityWitnessMap.count(mangledKey) &&
          "Cannot create duplicate differentiability witness in a module");
   module.DifferentiabilityWitnessMap[mangledKey] = diffWitness;
+  module.DifferentiabilityWitnessesByFunction[originalFunction->getName()]
+      .push_back(diffWitness);
   module.getDifferentiabilityWitnessList().push_back(diffWitness);
   return diffWitness;
 }
@@ -56,6 +58,8 @@ SILDifferentiabilityWitness *SILDifferentiabilityWitness::createDefinition(
   assert(!module.DifferentiabilityWitnessMap.count(mangledKey) &&
          "Cannot create duplicate differentiability witness in a module");
   module.DifferentiabilityWitnessMap[mangledKey] = diffWitness;
+  module.DifferentiabilityWitnessesByFunction[originalFunction->getName()]
+      .push_back(diffWitness);
   module.getDifferentiabilityWitnessList().push_back(diffWitness);
   return diffWitness;
 }

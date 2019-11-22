@@ -1675,6 +1675,10 @@ private:
   bool fixStoreToBlockStorageInstr(SILInstruction &I,
                          SmallVectorImpl<SILInstruction *> &Delete);
 
+  // SWIFT_ENABLE_TENSORFLOW
+  bool recreateDifferentiabilityWitnessFunction(
+      SILInstruction &I, SmallVectorImpl<SILInstruction *> &Delete);
+
 private:
   llvm::SetVector<SILFunction *> modFuncs;
   llvm::SetVector<SingleValueInstruction *> conversionInstrs;
@@ -2672,6 +2676,36 @@ bool LoadableByAddress::fixStoreToBlockStorageInstr(
   return true;
 }
 
+// SWIFT_ENABLE_TENSORFLOW
+bool LoadableByAddress::recreateDifferentiabilityWitnessFunction(
+    SILInstruction &I, SmallVectorImpl<SILInstruction *> &Delete) {
+  auto *instr = dyn_cast<DifferentiabilityWitnessFunctionInst>(&I);
+  if (!instr)
+    return false;
+
+  // If the witness is a declaration, then LoadableByAddress cannot have changed
+  // the type because the function is in a different module.
+  if (instr->getWitness()->isDeclaration())
+    return true;
+
+  // Otherwise, update the instruction if the function type changed.
+  auto resultTy = instr->getType();
+  auto *referencedFn = instr->getWitness()->getDerivative(
+      *instr->getWitnessKind().getAsDerivativeFunctionKind());
+  assert(referencedFn && "diff witness should be canonicalized");
+  auto newResultTy = referencedFn->getLoweredType();
+  if (resultTy == newResultTy)
+    return true;
+
+  SILBuilderWithScope builder(instr);
+  auto *newInstr = builder.createDifferentiabilityWitnessFunction(
+      instr->getLoc(), instr->getWitnessKind(), instr->getWitness(),
+      newResultTy);
+  instr->replaceAllUsesWith(newInstr);
+  Delete.push_back(instr);
+  return true;
+}
+
 bool LoadableByAddress::recreateTupleInstr(
     SILInstruction &I, SmallVectorImpl<SILInstruction *> &Delete) {
   auto *tupleInstr = dyn_cast<TupleInst>(&I);
@@ -2993,6 +3027,9 @@ void LoadableByAddress::run() {
         else if (recreateLoadInstr(I, Delete))
           continue;
         else if (recreateApply(I, Delete))
+          continue;
+        // SWIFT_ENABLE_TENSORFLOW
+        else if (recreateDifferentiabilityWitnessFunction(I, Delete))
           continue;
         else
           fixStoreToBlockStorageInstr(I, Delete);

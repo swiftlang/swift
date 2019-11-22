@@ -22,6 +22,8 @@
 #define DEBUG_TYPE "differentiation"
 
 #include "Differentiation.h"
+#include "Differentiation/DerivativeLookup.h"
+
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/AnyFunctionRef.h"
@@ -345,8 +347,10 @@ static Inst *peerThroughFunctionConversions(SILValue value) {
 /// Finds the differentiability witness corresponding to `attr` in `module`.
 static SILDifferentiabilityWitness *
 findDifferentiabilityWitness(SILModule &module, SILDifferentiableAttr *attr) {
-  auto *resultIndices =
-      IndexSubset::get(module.getASTContext(), 1, {attr->getIndices().source});
+  auto *resultIndices = IndexSubset::get(
+      module.getASTContext(),
+      attr->getOriginal()->getLoweredFunctionType()->getNumResults(),
+      {attr->getIndices().source});
   AutoDiffConfig config(attr->getIndices().parameters, resultIndices,
                         attr->getDerivativeGenericSignature());
   return module.lookUpDifferentiabilityWitness(
@@ -383,8 +387,10 @@ canonicalizeDifferentiabilityWitness(SILModule &module,
 static SILDifferentiabilityWitness *
 createDifferentiabilityWitness(SILModule &module, SILLinkage linkage,
                                SILDifferentiableAttr *attr) {
-  auto *resultIndices =
-      IndexSubset::get(module.getASTContext(), 1, {attr->getIndices().source});
+  auto *resultIndices = IndexSubset::get(
+      module.getASTContext(),
+      attr->getOriginal()->getLoweredFunctionType()->getNumResults(),
+      {attr->getIndices().source});
   auto *witness = SILDifferentiabilityWitness::createDefinition(
       module, linkage, attr->getOriginal(), attr->getIndices().parameters,
       resultIndices, attr->getDerivativeGenericSignature(), /*jvp*/ nullptr,
@@ -1081,78 +1087,6 @@ public:
       if (attr->getIndices() == indices)
         return attr;
     return nullptr;
-  }
-
-  /// Finds the `[differentiable]` attribute on the specified original function
-  /// whose parameter indices are a minimal superset of the specified parameter
-  /// indices. Returns nullptr if no such attribute exists.
-  SILDifferentiableAttr *lookUpMinimalDifferentiableAttr(
-      SILFunction *original, const SILAutoDiffIndices &indices) const {
-    auto *minimalIndexSet = IndexSubset::getDefault(
-        getASTContext(),
-        original->getLoweredFunctionType()->getNumParameters(), false);
-    auto *indexSet = indices.parameters;
-    if (auto *exactAttr = lookUpDifferentiableAttr(original, indices))
-      return exactAttr;
-    SILDifferentiableAttr *minimalAttr = nullptr;
-    for (auto *da : original->getDifferentiableAttrs()) {
-      if (da->getIndices().source != indices.source)
-        continue;
-      auto *daIndexSet = da->getIndices().parameters;
-      // If all indices in `indexSet` are in `daIndexSet`, and it has fewer
-      // indices than our current candidate and a primitive VJP, then `da` is
-      // our new candidate.
-      //
-      // NOTE(TF-642): `da` may come from a un-partial-applied function and
-      // have larger capacity than the desired indices. We expect this logic to
-      // go away when `partial_apply` supports `@differentiable` callees.
-      if (daIndexSet->isSupersetOf(indexSet->extendingCapacity(
-              getASTContext(), daIndexSet->getCapacity())) &&
-          // fewer parameters than before
-          (minimalIndexSet->isEmpty() ||
-           daIndexSet->getNumIndices() < minimalIndexSet->getNumIndices())) {
-        minimalAttr = da;
-        minimalIndexSet = daIndexSet;
-      }
-    }
-    return minimalAttr;
-  }
-
-  /// Finds the `@differentiable` attribute (and its parameter indices) on the
-  /// specified original function whose parameter indices are a minimal
-  /// superset of the specified parameter indices. Returns nullptr if no such
-  /// attribute exists.
-  std::pair<const DifferentiableAttr *, IndexSubset *>
-  lookUpMinimalASTDifferentiableAttrAndIndexSubset(
-      SILDeclRef originalDeclRef, CanSILFunctionType originalFnType,
-      const SILAutoDiffIndices &indices) {
-    auto *original = originalDeclRef.getDecl();
-    const DifferentiableAttr *minimalAttr = nullptr;
-    auto *minimalIndexSet = IndexSubset::getDefault(
-        getASTContext(), originalFnType->getNumParameters(), false);
-    auto *indexSet = indices.parameters;
-    for (auto *da : original->getAttrs().getAttributes<DifferentiableAttr>()) {
-      auto *daParamIndices = da->getParameterIndices();
-      auto *daIndexSet = autodiff::getLoweredParameterIndices(
-          daParamIndices,
-          original->getInterfaceType()->castTo<AnyFunctionType>());
-      // If all indices in `indexSet` are in `daIndexSet`, and it has fewer
-      // indices than our current candidate and a primitive VJP, then `da` is
-      // our new candidate.
-      //
-      // NOTE(TF-642): `da` may come from a un-partial-applied function and
-      // have larger capacity than the desired indices. We expect this logic to
-      // go away when `partial_apply` supports `@differentiable` callees.
-      if (daIndexSet->isSupersetOf(indexSet->extendingCapacity(getASTContext(),
-              daIndexSet->getCapacity())) &&
-          // fewer parameters than before
-          (minimalIndexSet->isEmpty() ||
-           daIndexSet->getNumIndices() < minimalIndexSet->getNumIndices())) {
-        minimalAttr = da;
-        minimalIndexSet = daIndexSet;
-      }
-    }
-    return std::make_pair(minimalAttr, minimalIndexSet);
   }
 
   /// Creates a `[differentiable]` attribute on the specified original function
@@ -2701,14 +2635,28 @@ emitDerivativeFunctionReference(
           peerThroughFunctionConversions<FunctionRefInst>(original)) {
     auto loc = originalFRI->getLoc();
     auto *originalFn = originalFRI->getReferencedFunctionOrNull();
-    // Attempt to look up a `[differentiable]` attribute that minimally
-    // satisfies the specified indices.
-    // TODO(TF-482): Change `lookUpMinimalDifferentiableAttr` to additionally
-    // check whether `[differentiable]` attribute generic requirements are
-    // satisfied.
-    auto *minimalAttr =
-        context.lookUpMinimalDifferentiableAttr(originalFn, desiredIndices);
-    if (!minimalAttr) {
+    auto originalFnTy = originalFn->getLoweredFunctionType();
+    auto *desiredResultIndices =
+        IndexSubset::get(context.getASTContext(), originalFnTy->getNumResults(),
+                         {desiredIndices.source});
+    auto *desiredParameterIndices = desiredIndices.parameters;
+    // NOTE(TF-893): Extending capacity is necessary when `originalFnTy` has
+    // parameters corresponding to captured variables.
+    // TODO: If posssible, change `autodiff::getLoweredParameterIndices` to
+    // take `CaptureInfo` into account.
+    if (originalFnTy->getNumParameters() >
+        desiredParameterIndices->getCapacity()) {
+      desiredParameterIndices = desiredParameterIndices->extendingCapacity(
+          context.getASTContext(), originalFnTy->getNumParameters());
+    }
+    auto *minimalWitness = getExactDifferentiabilityWitness(
+        context.getModule(), originalFn, desiredParameterIndices,
+        desiredResultIndices);
+    if (!minimalWitness)
+      minimalWitness = getOrCreateMinimalASTDifferentiabilityWitness(
+          context.getModule(), originalFn, desiredParameterIndices,
+          desiredResultIndices);
+    if (!minimalWitness) {
       // If the function is intentionally marked as being opaque to
       // differentiation, then we should not create a task for it.
       if (originalFn->hasSemanticsAttr("autodiff.opaque")) {
@@ -2751,16 +2699,18 @@ emitDerivativeFunctionReference(
         contextualDerivativeGenSig = invoker.getIndirectDifferentiation().second
             ->getDerivativeGenericSignature();
       auto *newAttr = context.getOrCreateDifferentiableAttr(
-          originalFn, desiredIndices, contextualDerivativeGenSig);
+          originalFn,
+          SILAutoDiffIndices(desiredIndices.source, desiredParameterIndices),
+          contextualDerivativeGenSig);
       if (context.processDifferentiableAttribute(originalFn, newAttr, invoker))
         return None;
-      createDifferentiabilityWitness(context.getModule(), SILLinkage::Hidden,
-                                     newAttr);
-      minimalAttr = newAttr;
+      minimalWitness = createDifferentiabilityWitness(
+          context.getModule(), SILLinkage::Hidden, newAttr);
     }
-    assert(minimalAttr);
+    assert(minimalWitness);
     // TODO(TF-482): Move generic requirement checking logic to
-    // `lookUpMinimalDifferentiableAttr`.
+    // `getExactDifferentiabilityWitness` &
+    // `getOrCreateMinimalASTDifferentiabilityWitness`.
     // Get the substitution map for checking unmet generic requirements.
     // By default, use the forwarding substitution map of the original function.
     // If the original callee is a `partial_apply` or `apply` instruction, use
@@ -2772,35 +2722,37 @@ emitDerivativeFunctionReference(
       substMap = ai->getSubstitutionMap();
     }
     if (diagnoseUnsatisfiedRequirements(
-            context, minimalAttr->getDerivativeGenericSignature(), originalFn,
-            substMap, invoker, original.getLoc().getSourceLoc()))
+            context, minimalWitness->getDerivativeGenericSignature(),
+            originalFn, substMap, invoker, original.getLoc().getSourceLoc()))
       return None;
-    if (context.processDifferentiableAttribute(
-            originalFn, minimalAttr, invoker))
-      return None;
-    SILFunction *derivativeFn = nullptr;
+    DifferentiabilityWitnessFunctionKind witnessKind;
     switch (kind) {
     case AutoDiffDerivativeFunctionKind::JVP:
-      assert(!minimalAttr->getJVPName().empty() && "Expected JVP name");
-      derivativeFn = context.getModule().lookUpFunction(minimalAttr->getJVPName());
+      witnessKind = DifferentiabilityWitnessFunctionKind::JVP;
       break;
     case AutoDiffDerivativeFunctionKind::VJP:
-      assert(!minimalAttr->getVJPName().empty() && "Expected VJP name");
-      derivativeFn = context.getModule().lookUpFunction(minimalAttr->getVJPName());
+      witnessKind = DifferentiabilityWitnessFunctionKind::VJP;
       break;
     }
-    auto *derivativeFnRef = builder.createFunctionRef(loc, derivativeFn);
+    auto *derivativeFnRef = builder.createDifferentiabilityWitnessFunction(
+        loc, witnessKind, minimalWitness);
     // FIXME(TF-201): Handle direct differentiation of reabstraction thunks.
     // Tentative solution: clone a new reabstraction thunk where function
     // argument has a `@differentiable` function type.
     if (originalFn->isThunk() == IsReabstractionThunk) {
       // Handle here.
     }
-    auto convertedRef = reapplyFunctionConversion(
-        derivativeFnRef, originalFRI, original, builder, loc,
-        newBuffersToDealloc,
-        derivativeFn->getLoweredFunctionType()->getSubstGenericSignature());
-    return std::make_pair(convertedRef, minimalAttr->getIndices());
+    auto convertedRef =
+        reapplyFunctionConversion(derivativeFnRef, originalFRI, original,
+                                  builder, loc, newBuffersToDealloc,
+                                  derivativeFnRef->getType()
+                                      .getASTType()
+                                      ->castTo<SILFunctionType>()
+                                      ->getSubstGenericSignature());
+    return std::make_pair(
+        convertedRef,
+        SILAutoDiffIndices(desiredIndices.source,
+                           minimalWitness->getParameterIndices()));
   }
 
   // Find witness method retrieval.
@@ -2808,8 +2760,7 @@ emitDerivativeFunctionReference(
           peerThroughFunctionConversions<WitnessMethodInst>(original)) {
     auto loc = witnessMethod->getLoc();
     auto requirementDeclRef = witnessMethod->getMember();
-    auto *requirementDecl = requirementDeclRef.getDecl();
-    auto witnessMethodType = witnessMethod->getType().castTo<SILFunctionType>();
+    auto *requirementDecl = requirementDeclRef.getAbstractFunctionDecl();
     // If requirement declaration does not have any `@differentiable`
     // attributes, produce an error.
     if (!requirementDecl->getAttrs().hasAttribute<DifferentiableAttr>()) {
@@ -2818,11 +2769,9 @@ emitDerivativeFunctionReference(
       return None;
     }
     // Get the minimal `@differentiable` attribute and parameter index subset.
-    const DifferentiableAttr *minimalAttr;
-    IndexSubset *minimalParamIndexSet;
-    std::tie(minimalAttr, minimalParamIndexSet) =
-        context.lookUpMinimalASTDifferentiableAttrAndIndexSubset(
-            requirementDeclRef, witnessMethodType, desiredIndices);
+    IndexSubset *minimalParamIndexSet = nullptr;
+    const auto *minimalAttr = getMinimalASTDifferentiableAttr(
+        requirementDecl, desiredIndices.parameters, minimalParamIndexSet);
     SILAutoDiffIndices minimalIndices(/*source*/ 0, minimalParamIndexSet);
     // If minimal `@differentiable` attribute does not exist, then no attribute
     // exists with a superset of the desired indices. Produce an error.
@@ -2855,8 +2804,7 @@ emitDerivativeFunctionReference(
           peerThroughFunctionConversions<ClassMethodInst>(original)) {
     auto loc = classMethodInst->getLoc();
     auto methodDeclRef = classMethodInst->getMember();
-    auto *methodDecl = methodDeclRef.getDecl();
-    auto classMethodType = classMethodInst->getType().castTo<SILFunctionType>();
+    auto *methodDecl = methodDeclRef.getAbstractFunctionDecl();
     // If method declaration does not have any `@differentiable` attributes,
     // produce an error.
     if (!methodDecl->getAttrs().hasAttribute<DifferentiableAttr>()) {
@@ -2865,11 +2813,9 @@ emitDerivativeFunctionReference(
       return None;
     }
     // Get the minimal `@differentiable` attribute and parameter index subset.
-    const DifferentiableAttr *minimalAttr;
-    IndexSubset *minimalParamIndexSet;
-    std::tie(minimalAttr, minimalParamIndexSet) =
-        context.lookUpMinimalASTDifferentiableAttrAndIndexSubset(
-            methodDeclRef, classMethodType, desiredIndices);
+    IndexSubset *minimalParamIndexSet = nullptr;
+    const auto *minimalAttr = getMinimalASTDifferentiableAttr(
+        methodDecl, desiredIndices.parameters, minimalParamIndexSet);
     SILAutoDiffIndices minimalIndices(/*source*/ 0, minimalParamIndexSet);
     // If minimal `@differentiable` attribute does not exist, then no attribute
     // exists with a superset of the desired indices. Produce an error.
@@ -8618,6 +8564,10 @@ ADContext::getOrCreateSubsetParametersThunkForDerivativeFunction(
     assocRef = builder.createClassMethod(
         loc, classOperand, assocMethodInst->getMember(),
         thunk->mapTypeIntoContext(assocMethodInst->getType()));
+  } else if (auto *diffWitFn = peerThroughFunctionConversions<
+                 DifferentiabilityWitnessFunctionInst>(derivativeFn)) {
+    assocRef = builder.createDifferentiabilityWitnessFunction(
+        loc, diffWitFn->getWitnessKind(), diffWitFn->getWitness());
   }
   assert(assocRef && "Expected derivative function to be resolved");
 

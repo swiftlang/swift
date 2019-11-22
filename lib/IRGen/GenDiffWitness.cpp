@@ -37,21 +37,13 @@ void IRGenModule::emitSILDifferentiabilityWitness(
   ConstantInitBuilder builder(*this);
   auto diffWitnessContents = builder.beginStruct();
 
-  // TODO(TF-894): When the differentiation transform canonicalizes all
-  // differentiability witnesses to have JVP/VJP functions, remove the nullptr
-  // cases and assert that JVP/VJP functions exist.
-  if (dw->getJVP()) {
-    diffWitnessContents.addBitCast(
-        getAddrOfSILFunction(dw->getJVP(), NotForDefinition), Int8PtrTy);
-  } else {
-    diffWitnessContents.addNullPointer(Int8PtrTy);
-  }
-  if (dw->getVJP()) {
-    diffWitnessContents.addBitCast(
-        getAddrOfSILFunction(dw->getVJP(), NotForDefinition), Int8PtrTy);
-  } else {
-    diffWitnessContents.addNullPointer(Int8PtrTy);
-  }
+  assert(dw->getJVP() && "diff witness should be canonicalized");
+  assert(dw->getVJP() && "diff witness should be canonicalized");
+
+  diffWitnessContents.addBitCast(
+      getAddrOfSILFunction(dw->getJVP(), NotForDefinition), Int8PtrTy);
+  diffWitnessContents.addBitCast(
+      getAddrOfSILFunction(dw->getVJP(), NotForDefinition), Int8PtrTy);
 
   getAddrOfDifferentiabilityWitness(
       dw, diffWitnessContents.finishAndCreateFuture());

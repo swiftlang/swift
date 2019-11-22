@@ -207,6 +207,11 @@ private:
   /// Lookup table for SIL differentiability witnesses, keyed by mangled name.
   llvm::StringMap<SILDifferentiabilityWitness *> DifferentiabilityWitnessMap;
 
+  /// Lookup table for SILDifferentiabilityWitnesses, keyed by original
+  /// function name.
+  llvm::StringMap<llvm::SmallVector<SILDifferentiabilityWitness *, 1>>
+      DifferentiabilityWitnessesByFunction;
+
   /// The list of SILDifferentiabilityWitnesses in the module.
   DifferentiabilityWitnessListType differentiabilityWitnesses;
   // SWIFT_ENABLE_TENSORFLOW END
@@ -613,6 +618,11 @@ public:
   /// Look up the differentiability witness corresponding to the given key.
   SILDifferentiabilityWitness *
   lookUpDifferentiabilityWitness(SILDifferentiabilityWitnessKey key);
+
+  /// Look up the differentiability witness corresponding to the given function.
+  llvm::ArrayRef<SILDifferentiabilityWitness *>
+  lookUpDifferentiabilityWitnessesForFunction(StringRef name);
+
   // SWIFT_ENABLE_TENSORFLOW_END
 
   // Given a protocol, attempt to create a default witness table declaration
