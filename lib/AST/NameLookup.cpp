@@ -1565,8 +1565,11 @@ bool DeclContext::lookupQualified(Type type,
   assert(decls.empty() && "additive lookup not supported");
 
   // Handle AnyObject lookup.
-  if (type->isAnyObject())
-    return lookupAnyObject(member, options, decls);
+  if (type->isAnyObject()) {
+    AnyObjectLookupRequest req(this, member, options);
+    decls = evaluateOrDefault(getASTContext().evaluator, req, {});
+    return !decls.empty();
+  }
 
   // Handle lookup in a module.
   if (auto moduleTy = type->getAs<ModuleType>())
@@ -1798,15 +1801,16 @@ bool DeclContext::lookupQualified(ModuleDecl *module, DeclName member,
   return !decls.empty();
 }
 
-bool DeclContext::lookupAnyObject(DeclName member, NLOptions options,
-                                  SmallVectorImpl<ValueDecl *> &decls) const {
+llvm::Expected<QualifiedLookupResult>
+AnyObjectLookupRequest::evaluate(Evaluator &evaluator, const DeclContext *dc,
+                                 DeclName member, NLOptions options) const {
   using namespace namelookup;
-  assert(decls.empty() && "additive lookup not supported");
+  QualifiedLookupResult decls;
 
   // Configure lookup and dig out the tracker.
   ReferencedNameTracker *tracker = nullptr;
   bool isLookupCascading;
-  configureLookup(this, options, tracker, isLookupCascading);
+  configureLookup(dc, options, tracker, isLookupCascading);
 
   // Record this lookup.
   if (tracker)
@@ -1814,15 +1818,11 @@ bool DeclContext::lookupAnyObject(DeclName member, NLOptions options,
 
   // Type-only lookup won't find anything on AnyObject.
   if (options & NL_OnlyTypes)
-    return false;
-
-  auto *stats = getASTContext().Stats;
-  if (stats)
-    stats->getFrontendCounters().NumLookupQualifiedInAnyObject++;
+    return decls;
 
   // Collect all of the visible declarations.
   SmallVector<ValueDecl *, 4> allDecls;
-  for (auto import : namelookup::getAllImports(this)) {
+  for (auto import : namelookup::getAllImports(dc)) {
     import.second->lookupClassMember(import.first, member, allDecls);
   }
 
@@ -1840,26 +1840,23 @@ bool DeclContext::lookupAnyObject(DeclName member, NLOptions options,
     if (decl->getOverriddenDecl())
       continue;
 
-    auto dc = decl->getDeclContext();
-    auto nominal = dc->getSelfNominalTypeDecl();
-    assert(nominal && "Couldn't find nominal type?");
-    (void)nominal;
+    assert(decl->getDeclContext()->isTypeContext() &&
+           "Couldn't find nominal type?");
 
     // If we didn't see this declaration before, and it's an acceptable
     // result, add it to the list.
     // declaration to the list.
     if (knownDecls.insert(decl).second &&
-        isAcceptableLookupResult(this, options, decl,
+        isAcceptableLookupResult(dc, options, decl,
                                  /*onlyCompleteObjectInits=*/false))
       decls.push_back(decl);
   }
 
-  pruneLookupResultSet(this, options, decls);
-  if (auto *debugClient = this->getParentModule()->getDebugClient()) {
-    debugClient->finishLookupInAnyObject(this, member, options, decls);
+  pruneLookupResultSet(dc, options, decls);
+  if (auto *debugClient = dc->getParentModule()->getDebugClient()) {
+    debugClient->finishLookupInAnyObject(dc, member, options, decls);
   }
-  // We're done. Report success/failure.
-  return !decls.empty();
+  return decls;
 }
 
 void DeclContext::lookupAllObjCMethods(
@@ -2634,4 +2631,41 @@ void FindLocalVal::visitCatchStmt(CatchStmt *S) {
   if (!isReferencePointInRange(S->getErrorPattern()->getSourceRange()))
     checkPattern(S->getErrorPattern(), DeclVisibilityKind::LocalVariable);
   visit(S->getBody());
+}
+
+void swift::simple_display(llvm::raw_ostream &out, NLKind kind) {
+  switch (kind) {
+  case NLKind::QualifiedLookup:
+    out << "QualifiedLookup";
+    return;
+  case NLKind::UnqualifiedLookup:
+    out << "UnqualifiedLookup";
+    return;
+  }
+  llvm_unreachable("Unhandled case in switch");
+}
+
+void swift::simple_display(llvm::raw_ostream &out, NLOptions options) {
+  using Flag = std::pair<NLOptions, StringRef>;
+  Flag possibleFlags[] = {
+#define FLAG(Name) {Name, #Name},
+    FLAG(NL_ProtocolMembers)
+    FLAG(NL_RemoveNonVisible)
+    FLAG(NL_RemoveOverridden)
+    FLAG(NL_IgnoreAccessControl)
+    FLAG(NL_KnownNonCascadingDependency)
+    FLAG(NL_KnownCascadingDependency)
+    FLAG(NL_OnlyTypes)
+    FLAG(NL_IncludeAttributeImplements)
+#undef FLAG
+  };
+
+  auto flagsToPrint = llvm::make_filter_range(
+      possibleFlags, [&](Flag flag) { return options & flag.first; });
+
+  out << "{ ";
+  interleave(
+      flagsToPrint, [&](Flag flag) { out << flag.second; },
+      [&] { out << ", "; });
+  out << " }";
 }
