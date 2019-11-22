@@ -1,4 +1,5 @@
 // RUN: %target-swift-emit-sil -verify -Xllvm -debug-only=differentiation 2>&1 %s | %FileCheck %s
+// REQUIRES: asserts
 
 // Check that `@noDerivative` struct projections have "NONE" activity.
 
