@@ -831,6 +831,10 @@ public:
   virtual Type loadAssociatedTypeDefault(const AssociatedTypeDecl *ATD,
                                          uint64_t contextData) override;
 
+  virtual ValueDecl *
+  loadDynamicallyReplacedFunctionDecl(const DynamicReplacementAttr *DRA,
+                                      uint64_t contextData) override;
+
   virtual void finishNormalConformance(NormalProtocolConformance *conformance,
                                        uint64_t contextData) override;
 

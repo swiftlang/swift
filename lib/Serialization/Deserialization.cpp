@@ -5415,6 +5415,11 @@ ModuleFile::loadAssociatedTypeDefault(const swift::AssociatedTypeDecl *ATD,
   return getType(contextData);
 }
 
+ValueDecl *ModuleFile::loadDynamicallyReplacedFunctionDecl(
+    const DynamicReplacementAttr *DRA, uint64_t contextData) {
+  return cast<ValueDecl>(getDecl(contextData));
+}
+
 void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
                                          uint64_t contextData) {
   using namespace decls_block;
