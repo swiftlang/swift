@@ -2369,7 +2369,7 @@ static void emitDynamicallyReplaceableThunk(IRGenModule &IGM,
 void IRGenModule::emitOpaqueTypeDescriptorAccessor(OpaqueTypeDecl *opaque) {
   auto *namingDecl = opaque->getNamingDecl();
   auto *abstractStorage = dyn_cast<AbstractStorageDecl>(namingDecl);
-  
+
   bool isNativeDynamic = false;
   const bool isDynamicReplacement = namingDecl->getDynamicallyReplacedDecl();
 
