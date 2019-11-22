@@ -1048,9 +1048,6 @@ Optional<ObjCReason> shouldMarkAsObjC(const ValueDecl *VD, bool allowImplicit) {
       if (auto *replaced = VD->getDynamicallyReplacedDecl()) {
         if (replaced->isObjC())
           return ObjCReason(ObjCReason::ImplicitlyObjC);
-      } else if (auto *replaced = VD->getDynamicallyReplacedDecl()) {
-        if (replaced->isObjC())
-          return ObjCReason(ObjCReason::ImplicitlyObjC);
       }
     }
 
