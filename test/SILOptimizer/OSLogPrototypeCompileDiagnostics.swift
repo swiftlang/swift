@@ -41,6 +41,7 @@ if #available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *) {
 
   func testNoninlinedOSLogMessageComplex(h: Logger, b: Bool) {
     let logMessage: OSLogMessage = "Maximum integer value: \(Int.max)"
+      // expected-error @-1 {{OSLogMessage instance must not be explicitly created and must be deletable}}
     if !b {
       return;
     }

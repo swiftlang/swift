@@ -528,6 +528,9 @@ ERROR(oslog_non_constant_interpolation, none, "'OSLogInterpolation' instance "
 ERROR(oslog_property_not_constant, none, "'OSLogInterpolation.%0' is not a "
       "constant", (StringRef))
 
+ERROR(oslog_message_alive_after_opts, none, "OSLogMessage instance must not "
+      "be explicitly created and must be deletable", ())
+
 ERROR(global_string_pointer_on_non_constant, none, "globalStringTablePointer "
       "builtin must used only on string literals", ())
 
