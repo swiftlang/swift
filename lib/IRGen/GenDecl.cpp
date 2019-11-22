@@ -2369,15 +2369,14 @@ static void emitDynamicallyReplaceableThunk(IRGenModule &IGM,
 void IRGenModule::emitOpaqueTypeDescriptorAccessor(OpaqueTypeDecl *opaque) {
   auto *namingDecl = opaque->getNamingDecl();
   auto *abstractStorage = dyn_cast<AbstractStorageDecl>(namingDecl);
-
+  
   bool isNativeDynamic = false;
-  bool isDynamicReplacement = false;
+  const bool isDynamicReplacement = namingDecl->getDynamicallyReplacedDecl();
 
   // Don't emit accessors for abstract storage that is not dynamic or a dynamic
   // replacement.
   if (abstractStorage) {
     isNativeDynamic = abstractStorage->hasAnyNativeDynamicAccessors();
-    isDynamicReplacement = abstractStorage->hasAnyDynamicReplacementAccessors();
     if (!isNativeDynamic && !isDynamicReplacement)
       return;
   }
@@ -2385,10 +2384,7 @@ void IRGenModule::emitOpaqueTypeDescriptorAccessor(OpaqueTypeDecl *opaque) {
   // Don't emit accessors for functions that are not dynamic or dynamic
   // replacements.
   if (!abstractStorage) {
-    isNativeDynamic = opaque->getNamingDecl()->isNativeDynamic();
-    isDynamicReplacement = opaque->getNamingDecl()
-                               ->getAttrs()
-                               .hasAttribute<DynamicReplacementAttr>();
+    isNativeDynamic = namingDecl->isNativeDynamic();
     if (!isNativeDynamic && !isDynamicReplacement)
       return;
   }

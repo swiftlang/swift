@@ -4979,13 +4979,6 @@ bool AbstractStorageDecl::hasAnyNativeDynamicAccessors() const {
   return false;
 }
 
-bool AbstractStorageDecl::hasAnyDynamicReplacementAccessors() const {
-  for (auto accessor : getAllAccessors()) {
-    if (accessor->getAttrs().hasAttribute<DynamicReplacementAttr>())
-      return true;
-  }
-  return false;
-}
 void AbstractStorageDecl::setAccessors(SourceLoc lbraceLoc,
                                        ArrayRef<AccessorDecl *> accessors,
                                        SourceLoc rbraceLoc) {

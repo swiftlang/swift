@@ -4774,8 +4774,6 @@ public:
 
   bool hasAnyNativeDynamicAccessors() const;
 
-  bool hasAnyDynamicReplacementAccessors() const;
-
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
     return D->getKind() >= DeclKind::First_AbstractStorageDecl &&
