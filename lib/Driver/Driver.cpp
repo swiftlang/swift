@@ -375,7 +375,7 @@ static bool getCompilationRecordPath(std::string &buildRecordPath,
   return false;
 }
 
-static StringRef failedToReadOutOfDateMap(bool ShowIncrementalBuildDecisions,
+static std::string failedToReadOutOfDateMap(bool ShowIncrementalBuildDecisions,
                                           StringRef buildRecordPath,
                                           StringRef reason = "") {
   std::string why = "malformed build record file";
@@ -398,7 +398,7 @@ static void dealWithRemovedInputs(ArrayRef<StringRef> removedInputs,
                                   bool ShowIncrementalBuildDecisions);
 
 /// Returns why ignore incrementality
-static StringRef
+static std::string
 populateOutOfDateMap(InputInfoMap &map, llvm::sys::TimePoint<> &LastBuildTime,
                      StringRef argsHashStr, const InputFileList &inputs,
                      StringRef buildRecordPath,
@@ -893,7 +893,7 @@ Driver::buildCompilation(const ToolChain &TC,
   computeArgsHash(ArgsHash, *TranslatedArgList);
   llvm::sys::TimePoint<> LastBuildTime = llvm::sys::TimePoint<>::min();
   InputInfoMap outOfDateMap;
-  StringRef whyIgnoreIncrementallity =
+  std::string whyIgnoreIncrementallity =
       !Incremental
           ? ""
           : buildRecordPath.empty()
@@ -1027,7 +1027,7 @@ Driver::buildCompilation(const ToolChain &TC,
   // This has to happen after building jobs, because otherwise we won't even
   // emit .swiftdeps files for the next build.
   if (!whyIgnoreIncrementallity.empty())
-    C->disableIncrementalBuild(whyIgnoreIncrementallity.str());
+    C->disableIncrementalBuild(whyIgnoreIncrementallity);
 
   if (Diags.hadAnyError())
     return nullptr;
