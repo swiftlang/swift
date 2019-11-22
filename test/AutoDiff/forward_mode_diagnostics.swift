@@ -109,7 +109,7 @@ extension Mut {
   }
 }
 
-// FIXME(TF-985): Forward-mode crash due to unset tangent buffer.
+// FIXME(TF-984): Forward-mode crash due to unset tangent buffer.
 /*
 @differentiable(wrt: x)
 func nonActiveInoutArg(_ nonactive: inout Mut, _ x: Mut) -> Mut {
@@ -117,7 +117,7 @@ func nonActiveInoutArg(_ nonactive: inout Mut, _ x: Mut) -> Mut {
 }
 */
 
-// FIXME(TF-985): Forward-mode crash due to unset tangent buffer.
+// FIXME(TF-984): Forward-mode crash due to unset tangent buffer.
 /*
 @differentiable(wrt: x)
 func activeInoutArgMutatingMethod(_ x: Mut) -> Mut {
@@ -127,7 +127,7 @@ func activeInoutArgMutatingMethod(_ x: Mut) -> Mut {
 }
 */
 
-// FIXME(TF-985): Forward-mode crash due to unset tangent buffer.
+// FIXME(TF-984): Forward-mode crash due to unset tangent buffer.
 /*
 @differentiable(wrt: x)
 func activeInoutArgMutatingMethodVar(_ nonactive: inout Mut, _ x: Mut) -> Mut {
@@ -137,7 +137,7 @@ func activeInoutArgMutatingMethodVar(_ nonactive: inout Mut, _ x: Mut) -> Mut {
 }
 */
 
-// FIXME(TF-985): Forward-mode crash due to unset tangent buffer.
+// FIXME(TF-984): Forward-mode crash due to unset tangent buffer.
 /*
 @differentiable(wrt: x)
 func activeInoutArgMutatingMethodTuple(_ nonactive: inout Mut, _ x: Mut) -> Mut {
