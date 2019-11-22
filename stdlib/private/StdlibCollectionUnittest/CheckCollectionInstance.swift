@@ -906,7 +906,6 @@ public func checkOneLevelOfRandomAccessCollection<
   //===------------------------------------------------------------------===//
 
   let succ = { collection.index(after: $0) }
-  let pred = { collection.index(before: $0) }
   // Advances up to 1 positions without passing endIndex.  Don't use
   // advanced(by: n) to do this because it's under test here.
   let next = { $0 == collection.endIndex ? $0 : succ($0) }
@@ -924,7 +923,6 @@ public func checkOneLevelOfRandomAccessCollection<
   let count: Distance  = collection.count
   let offset0 = min(5, count)
   let offset1 = min(10, count)
-  let offset2 = min(15, count)
 
   let distanceCandidates: [Distance] = [
     -11, -7, -5, -3, -2, -1, 0, 1, 2, 3, 5, 7, 11]
@@ -1676,7 +1674,6 @@ public func checkOneLevelOfRandomAccessCollection<
   //===------------------------------------------------------------------===//
 
   let succ = { collection.index(after: $0) }
-  let pred = { collection.index(before: $0) }
   // Advances up to 1 positions without passing endIndex.  Don't use
   // advanced(by: n) to do this because it's under test here.
   let next = { $0 == collection.endIndex ? $0 : succ($0) }
@@ -1694,7 +1691,6 @@ public func checkOneLevelOfRandomAccessCollection<
   let count: Distance  = collection.count
   let offset0 = min(5, count)
   let offset1 = min(10, count)
-  let offset2 = min(15, count)
 
   let distanceCandidates: [Distance] = [
     -11, -7, -5, -3, -2, -1, 0, 1, 2, 3, 5, 7, 11]
@@ -1871,7 +1867,7 @@ public func checkRangeReplaceable<C, N>(
   let source = Array<A.Element>(makeCollection())
 
   for (ix, i) in source.indices.enumerated() {
-    for (jx_, j) in (i..<source.endIndex).enumerated() {
+    for (jx_, _) in (i..<source.endIndex).enumerated() {
       let jx = jx_ + ix
 
       let oldCount = jx - ix
