@@ -1045,11 +1045,10 @@ Optional<ObjCReason> shouldMarkAsObjC(const ValueDecl *VD, bool allowImplicit) {
   if (isa<AbstractFunctionDecl>(VD) || isa<AbstractStorageDecl>(VD))
     if (auto *replacementAttr =
             VD->getAttrs().getAttribute<DynamicReplacementAttr>()) {
-      if (auto *replaced = replacementAttr->getReplacedFunction()) {
+      if (auto *replaced = VD->getDynamicallyReplacedDecl()) {
         if (replaced->isObjC())
           return ObjCReason(ObjCReason::ImplicitlyObjC);
-      } else if (auto *replaced =
-                     TypeChecker::findReplacedDynamicFunction(VD)) {
+      } else if (auto *replaced = VD->getDynamicallyReplacedDecl()) {
         if (replaced->isObjC())
           return ObjCReason(ObjCReason::ImplicitlyObjC);
       }
