@@ -386,6 +386,24 @@ private:
            const DeclContext *moduleScopeContext) const;
 };
 
+/// Perform \c AnyObject lookup for a given member.
+class AnyObjectLookupRequest
+    : public SimpleRequest<AnyObjectLookupRequest,
+                           QualifiedLookupResult(const DeclContext *, DeclName,
+                                                 NLOptions),
+                           CacheKind::Uncached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  llvm::Expected<QualifiedLookupResult> evaluate(Evaluator &evaluator,
+                                                 const DeclContext *dc,
+                                                 DeclName name,
+                                                 NLOptions options) const;
+};
+
 #define SWIFT_TYPEID_ZONE NameLookup
 #define SWIFT_TYPEID_HEADER "swift/AST/NameLookupTypeIDZone.def"
 #include "swift/Basic/DefineTypeIDZone.h"

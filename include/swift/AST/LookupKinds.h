@@ -105,6 +105,8 @@ static inline NLOptions operator~(NLOptions value) {
   return NLOptions(~(unsigned)value);
 }
 
+void simple_display(llvm::raw_ostream &out, NLOptions options);
+
 } // end namespace swift
 
 #endif
