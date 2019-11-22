@@ -3975,10 +3975,17 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
 
       auto result = matchFunctionTypes(func1, func2, kind, flags, locator);
 
-      // If this is a type mismatch in assignment, we don't really care
-      // (yet) was it argument or result type mismatch, let's produce a
-      // diagnostic which means both function types.
       if (shouldAttemptFixes() && result.isFailure()) {
+        // If this is a contextual type mismatch failure
+        // let's give the solver a chance to "fix" it.
+        if (auto last = locator.last()) {
+          if (last->is<LocatorPathElt::ContextualType>())
+            break;
+        }
+
+        // If this is a type mismatch in assignment, we don't really care
+        // (yet) was it argument or result type mismatch, let's produce a
+        // diagnostic which mentions both function types.
         auto *anchor = locator.getAnchor();
         if (anchor && isa<AssignExpr>(anchor))
           break;
@@ -8464,15 +8471,24 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
     if (recordFix(fix))
       return SolutionKind::Error;
 
-    // If type produced by expression is a function type
-    // with result type matching contextual, it should have
-    // been diagnosed as "missing explicit call", let's
-    // increase the score to make sure that we don't impede that.
-    if (auto *fnType = type1->getAs<FunctionType>()) {
-      auto result = matchTypes(fnType->getResult(), type2, matchKind,
-                               TMF_ApplyingFix, locator);
-      if (result == SolutionKind::Solved)
-        increaseScore(SK_Fix);
+    if (auto *fnType1 = type1->getAs<FunctionType>()) {
+      // If this is a contextual mismatch between two
+      // function types which we couldn't find a more
+      // speficit fix for. Let's assume that such types
+      // are competely disjoint and adjust impact of
+      // the fix accordingly.
+      if (auto *fnType2 = type2->getAs<FunctionType>()) {
+        increaseScore(SK_Fix, 10);
+      } else {
+        // If type produced by expression is a function type
+        // with result type matching contextual, it should have
+        // been diagnosed as "missing explicit call", let's
+        // increase the score to make sure that we don't impede that.
+        auto result = matchTypes(fnType1->getResult(), type2, matchKind,
+                                 TMF_ApplyingFix, locator);
+        if (result == SolutionKind::Solved)
+          increaseScore(SK_Fix);
+      }
     }
 
     return SolutionKind::Solved;
