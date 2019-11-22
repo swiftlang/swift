@@ -956,6 +956,16 @@ runOnFunctionRecursively(SILOptFunctionBuilder &FuncBuilder,
   return true;
 }
 
+static void handleClosureCleanup(SILFunction *F,
+                                 ArrayRef<SILInstruction *> deadFunctions) {
+  ClosureCleanup closureCleanup;
+  for (auto *inst : deadFunctions) {
+    if (!inst) continue; // TODO: bad
+    closureCleanup.recordDeadFunction(inst);
+  }
+  closureCleanup.cleanupDeadClosures(F);
+}
+
 //===----------------------------------------------------------------------===//
 //                          Top Level Driver
 //===----------------------------------------------------------------------===//
@@ -1028,7 +1038,7 @@ class MandatoryInlining : public SILFunctionTransform {
       SILInliner inliner(funcBuilder, SILInliner::InlineKind::MandatoryInline,
                          subs, archtypesTracker);
       if (!inliner.canInlineApplySite(apply)) continue;
-      bool willNeedCleanup = inliner.needsUpdateStackNesting(apply);
+      bool willNeedCorrection = inliner.needsUpdateStackNesting(apply);
       
       // If we intend to inline a partial_apply function that is not on the
       // stack, then we need to balance the reference counts for correctness.
@@ -1049,10 +1059,18 @@ class MandatoryInlining : public SILFunctionTransform {
         fixupReferenceCounts(partialApply, apply, apply.getCallee(), capturedArgConventions, capturedArgs, isCalleeGuaranteed);
       }
       
+      ClosureCleanup closureCleanup;
+      inliner.setDeletionCallback([&closureCleanup](SILInstruction *inst) {
+        closureCleanup.recordDeadFunction(inst);
+      });
+      
       inliner.inlineFunction(calleeFunc, apply, fullArgs);
+      mergeBasicBlocks(F);
       madeChange = true;
       
-      if (willNeedCleanup) {
+      closureCleanup.cleanupDeadClosures(F);
+      
+      if (willNeedCorrection) {
         StackNesting().correctStackNesting(F);
       }
       

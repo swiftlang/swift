@@ -607,6 +607,7 @@ SILPassPipelinePlan::getSILOptPreparePassPipeline(const SILOptions &Options) {
   }
 
   P.startPipeline("SILOpt Prepare Passes");
+  P.addMandatoryInlining();
   P.addMandatoryCombine();
   P.addAccessMarkerElimination();
 
