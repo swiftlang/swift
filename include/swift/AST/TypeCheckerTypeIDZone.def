@@ -41,6 +41,9 @@ SWIFT_REQUEST(TypeChecker, DefaultDefinitionTypeRequest,
 SWIFT_REQUEST(TypeChecker, DefaultTypeRequest,
               Type(KnownProtocolKind, const DeclContext *), SeparatelyCached,
               NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, DynamicallyReplacedDeclRequest,
+              ValueDecl *(ValueDecl *),
+              Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, EmittedMembersRequest, DeclRange(ClassDecl *),
               SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, EnumRawValuesRequest,

@@ -2817,6 +2817,13 @@ void ValueDecl::setIsDynamic(bool value) {
   LazySemanticInfo.isDynamic = value;
 }
 
+ValueDecl *ValueDecl::getDynamicallyReplacedDecl() const {
+  return evaluateOrDefault(getASTContext().evaluator,
+                           DynamicallyReplacedDeclRequest{
+                               const_cast<ValueDecl *>(this)},
+                           nullptr);
+}
+
 bool ValueDecl::canBeAccessedByDynamicLookup() const {
   if (!hasName())
     return false;
