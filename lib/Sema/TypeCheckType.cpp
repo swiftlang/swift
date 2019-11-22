@@ -2204,14 +2204,6 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
         }
       }
       
-      // SWIFT_ENABLE_TENSORFLOW
-      DifferentiabilityKind diffkind = DifferentiabilityKind::NonDifferentiable;
-      if (attrs.has(TAK_differentiable)) {
-        diffkind = attrs.linear
-            ? DifferentiabilityKind::Linear
-            : DifferentiabilityKind::Normal;
-      }
-
       if (attrs.has(TAK_differentiable) &&
           !Context.LangOpts.EnableExperimentalDifferentiableProgramming) {
         diagnose(attrs.getLoc(TAK_differentiable),
@@ -2226,13 +2218,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
 
       // Resolve the function type directly with these attributes.
       SILFunctionType::ExtInfo extInfo(rep, attrs.has(TAK_pseudogeneric),
-<<<<<<< HEAD
-                                       // SWIFT_ENABLE_TENSORFLOW
-                                       attrs.has(TAK_noescape),
-                                       diffkind);
-=======
                                        attrs.has(TAK_noescape), diffKind);
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
 
       ty = resolveSILFunctionType(fnRepr, options, coroutineKind, extInfo,
                                   calleeConvention, witnessMethodProtocol);
@@ -2278,17 +2264,10 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
         attrs.clearAttribute(TAK_autoclosure);
       }
       
-      // SWIFT_ENABLE_TENSORFLOW
-      DifferentiabilityKind diffkind = DifferentiabilityKind::NonDifferentiable;
-      if (attrs.has(TAK_differentiable)) {
-        if(!Context.LangOpts.EnableExperimentalDifferentiableProgramming) {
-          diagnose(attrs.getLoc(TAK_differentiable),
-                   diag::experimental_differentiable_programming_disabled);
-        } else {
-          diffkind = attrs.linear
-            ? DifferentiabilityKind::Linear
-            : DifferentiabilityKind::Normal;
-        }
+      if (attrs.has(TAK_differentiable) &&
+          !Context.LangOpts.EnableExperimentalDifferentiableProgramming) {
+        diagnose(attrs.getLoc(TAK_differentiable),
+                 diag::experimental_differentiable_programming_disabled);
       }
 
       DifferentiabilityKind diffKind = DifferentiabilityKind::NonDifferentiable;
@@ -2298,15 +2277,8 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
       }
 
       // Resolve the function type directly with these attributes.
-<<<<<<< HEAD
-      FunctionType::ExtInfo extInfo(rep, /*noescape=*/false,
-                                    // SWIFT_ENABLE_TENSORFLOW
-                                    fnRepr->throws(),
-                                    diffkind);
-=======
       FunctionType::ExtInfo extInfo(rep, /*noescape=*/false, fnRepr->throws(),
                                     diffKind);
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
 
       ty = resolveASTFunctionType(fnRepr, options, extInfo);
       if (!ty || ty->hasError())

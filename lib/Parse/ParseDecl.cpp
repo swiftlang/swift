@@ -804,10 +804,6 @@ Parser::parseImplementsAttribute(SourceLoc AtLoc, SourceLoc Loc) {
                            ProtocolType.get(), MemberName, MemberNameLoc));
 }
 
-<<<<<<< HEAD
-/// SWIFT_ENABLE_TENSORFLOW
-=======
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
 ParserResult<DifferentiableAttr>
 Parser::parseDifferentiableAttribute(SourceLoc atLoc, SourceLoc loc) {
   StringRef AttrName = "differentiable";
@@ -925,7 +921,7 @@ bool Parser::parseDifferentiationParametersClause(
   return false;
 }
 
-<<<<<<< HEAD
+// SWIFT_ENABLE_TENSORFLOW
 bool Parser::parseTransposingParametersClause(
     SmallVectorImpl<ParsedAutoDiffParameter> &params, StringRef attrName) {
   // Set parse error, skip until ')' and parse it.
@@ -1003,9 +999,8 @@ bool Parser::parseTransposingParametersClause(
   }
   return false;
 }
+// SWIFT_ENABLE_TENSORFLOW END
 
-=======
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
 bool Parser::parseDifferentiableAttributeArguments(
     bool &linear, SmallVectorImpl<ParsedAutoDiffParameter> &params,
     Optional<DeclNameWithLoc> &jvpSpec, Optional<DeclNameWithLoc> &vjpSpec,
@@ -1031,7 +1026,6 @@ bool Parser::parseDifferentiableAttributeArguments(
       diagnose(Tok, diag::unexpected_separator, ",");
       return true;
     }
-<<<<<<< HEAD
     // Check that token after comma is 'wrt' or a function specifier label.
     if (isIdentifier(Tok, "wrt") || isIdentifier(Tok, "jvp") ||
         isIdentifier(Tok, "vjp")) {
@@ -1039,15 +1033,6 @@ bool Parser::parseDifferentiableAttributeArguments(
     }
     diagnose(Tok, diag::attr_differentiable_expected_label);
     return true;
-=======
-    // Check that token after comma is 'wrt:' or a function specifier label.
-    if (!(isWRTIdentifier(Tok) || isJVPIdentifier(Tok) ||
-          isVJPIdentifier(Tok))) {
-      diagnose(Tok, diag::attr_differentiable_expected_label);
-      return true;
-    }
-    return false;
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
   };
 
   // Store starting parser position.
@@ -1058,11 +1043,7 @@ bool Parser::parseDifferentiableAttributeArguments(
   // Parse optional differentiation parameters.
   // Parse 'linear' label (optional).
   linear = false;
-<<<<<<< HEAD
   if (isIdentifier(Tok, "linear")) {
-=======
-  if (Tok.is(tok::identifier) && Tok.getText() == "linear") {
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
     linear = true;
     consumeToken(tok::identifier);
     // If no trailing comma or 'where' clause, terminate parsing arguments.
@@ -1073,23 +1054,15 @@ bool Parser::parseDifferentiableAttributeArguments(
   }
 
   // If 'withRespectTo' is used, make the user change it to 'wrt'.
-<<<<<<< HEAD
   if (isIdentifier(Tok, "withRespectTo")) {
-=======
-  if (Tok.is(tok::identifier) && Tok.getText() == "withRespectTo") {
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
     SourceRange withRespectToRange(Tok.getLoc(), peekToken().getLoc());
     diagnose(Tok, diag::attr_differentiable_use_wrt_not_withrespectto)
         .highlight(withRespectToRange)
         .fixItReplace(withRespectToRange, "wrt:");
     return errorAndSkipToEnd();
   }
-<<<<<<< HEAD
   // Parse differentiation parameters' clause.
   if (isIdentifier(Tok, "wrt")) {
-=======
-  if (isWRTIdentifier(Tok)) {
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
     if (parseDifferentiationParametersClause(params, AttrName))
       return true;
     // If no trailing comma or 'where' clause, terminate parsing arguments.
@@ -1127,11 +1100,7 @@ bool Parser::parseDifferentiableAttributeArguments(
   bool terminateParsingArgs = false;
 
   // Parse 'jvp: <func_name>' (optional).
-<<<<<<< HEAD
   if (isIdentifier(Tok, "jvp")) {
-=======
-  if (isJVPIdentifier(Tok)) {
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
     SyntaxParsingContext JvpContext(
         SyntaxContext, SyntaxKind::DifferentiableAttributeFuncSpecifier);
     jvpSpec = DeclNameWithLoc();
@@ -1144,11 +1113,7 @@ bool Parser::parseDifferentiableAttributeArguments(
   }
 
   // Parse 'vjp: <func_name>' (optional).
-<<<<<<< HEAD
   if (isIdentifier(Tok, "vjp")) {
-=======
-  if (isVJPIdentifier(Tok)) {
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
     SyntaxParsingContext VjpContext(
         SyntaxContext, SyntaxKind::DifferentiableAttributeFuncSpecifier);
     vjpSpec = DeclNameWithLoc();
@@ -1180,8 +1145,7 @@ bool Parser::parseDifferentiableAttributeArguments(
   return false;
 }
 
-<<<<<<< HEAD
-/// SWIFT_ENABLE_TENSORFLOW
+// SWIFT_ENABLE_TENSORFLOW
 ParserResult<DifferentiatingAttr>
 Parser::parseDifferentiatingAttribute(SourceLoc atLoc, SourceLoc loc) {
   StringRef AttrName = "differentiating";
@@ -1254,8 +1218,9 @@ Parser::parseDifferentiatingAttribute(SourceLoc atLoc, SourceLoc loc) {
                                   SourceRange(loc, rParenLoc),
                                   original, linear, params));
 }
+// SWIFT_ENABLE_TENSORFLOW END
 
-/// SWIFT_ENABLE_TENSORFLOW
+// SWIFT_ENABLE_TENSORFLOW
 /// Helper function that parses 'type-identifier' for `parseQualifiedDeclName`.
 /// Returns true on error. Sets `baseType` to the parsed type, if present, or to
 /// `nullptr` if not. A missing base type is not considered an error.
@@ -1278,8 +1243,9 @@ static bool parseBaseTypeForQualifiedDeclName(Parser &P, TypeRepr *&baseType) {
   baseType = result.getPtrOrNull();
   return false;
 }
+// SWIFT_ENABLE_TENSORFLOW END
 
-/// SWIFT_ENABLE_TENSORFLOW
+// SWIFT_ENABLE_TENSORFLOW
 /// parseQualifiedDeclName
 ///
 ///   qualified-decl-name:
@@ -1312,7 +1278,9 @@ bool parseQualifiedDeclName(Parser &P, Diag<> nameParseError,
   // If name could not be parsed, return true for error.
   return !original.Name;
 }
+// SWIFT_ENABLE_TENSORFLOW END
 
+// SWIFT_ENABLE_TENSORFLOW
 ParserResult<TransposingAttr> Parser::parseTransposingAttribute(SourceLoc atLoc,
                                                                 SourceLoc loc) {
   StringRef AttrName = "transposing";
@@ -1375,7 +1343,9 @@ ParserResult<TransposingAttr> Parser::parseTransposingAttribute(SourceLoc atLoc,
       Context, /*implicit*/ false, atLoc, SourceRange(loc, rParenLoc), baseType,
       original, params));
 }
+// SWIFT_ENABLE_TENSORFLOW END
 
+// SWIFT_ENABLE_TENSORFLOW
 ParserResult<QuotedAttr> Parser::parseQuotedAttribute(SourceLoc atLoc,
                                                       SourceLoc loc) {
   if (Context.LangOpts.EnableExperimentalQuasiquotes) {
@@ -1386,8 +1356,7 @@ ParserResult<QuotedAttr> Parser::parseQuotedAttribute(SourceLoc atLoc,
     return makeParserError();
   }
 }
-=======
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
+// SWIFT_ENABLE_TENSORFLOW END
 
 void Parser::parseObjCSelector(SmallVector<Identifier, 4> &Names,
                                SmallVector<SourceLoc, 4> &NameLocs,
@@ -2188,10 +2157,6 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
     break;
   }
 
-<<<<<<< HEAD
-  // SWIFT_ENABLE_TENSORFLOW
-=======
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
   case DAK_Differentiable: {
     auto Attr = parseDifferentiableAttribute(AtLoc, Loc);
     if (Attr.isNonNull())
@@ -2199,7 +2164,6 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
     break;
   }
 
-<<<<<<< HEAD
   // SWIFT_ENABLE_TENSORFLOW
   case DAK_Differentiating: {
     auto Attr = parseDifferentiatingAttribute(AtLoc, Loc);
@@ -2216,8 +2180,6 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
     break;
   }
 
-=======
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
   case DAK_ProjectedValueProperty: {
     if (!consumeIf(tok::l_paren)) {
       diagnose(Loc, diag::attr_expected_lparen, AttrName,
@@ -3406,22 +3368,6 @@ void Parser::setLocalDiscriminatorToParamList(ParameterList *PL) {
   }
 }
 
-<<<<<<< HEAD
-void Parser::delayParseFromBeginningToHere(ParserPosition BeginParserPosition,
-                                           ParseDeclOptions Flags) {
-  auto CurLoc = Tok.getLoc();
-  backtrackToPosition(BeginParserPosition);
-  SourceLoc BeginLoc = Tok.getLoc();
-  SourceLoc EndLoc = CurLoc;
-  State->delayDecl(PersistentParserState::DelayedDeclKind::Decl,
-                   Flags.toRaw(),
-                   CurDeclContext, {BeginLoc, EndLoc},
-                   BeginParserPosition.PreviousLoc);
-
-  while (Tok.isNot(tok::eof))
-    consumeToken();
-}
-
 // SWIFT_ENABLE_TENSORFLOW
 static void setOriginalFunctionInDifferentiableAttributes(
     DeclAttributes Attributes, Decl *D) {
@@ -3430,8 +3376,6 @@ static void setOriginalFunctionInDifferentiableAttributes(
 }
 // SWIFT_ENABLE_TENSORFLOW END
 
-=======
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
 /// Parse a single syntactic declaration and return a list of decl
 /// ASTs.  This can return multiple results for var decls that bind to multiple
 /// values, structs that define a struct decl and a constructor, etc.

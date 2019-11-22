@@ -52,11 +52,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-<<<<<<< HEAD
-const uint16_t SWIFTMODULE_VERSION_MINOR = 524; // differentiable_function_extract explicit extractee type
-=======
-const uint16_t SWIFTMODULE_VERSION_MINOR = 524; // function type differentiability
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
+const uint16_t SWIFTMODULE_VERSION_MINOR = 525; // tensorflow merge; function type differentiability
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -338,16 +334,6 @@ enum class ParameterConvention : uint8_t {
   Indirect_In_Constant,
 };
 using ParameterConventionField = BCFixed<4>;
-
-// SWIFT_ENABLE_TENSORFLOW
-// These IDs must \em not be renumbered or reordered without incrementing the
-// module version.
-enum class DifferentiabilityKind : uint8_t {
-  NonDifferentiable = 0,
-  Normal = 1,
-  Linear = 2
-};
-using DifferentiabilityKindField = BCFixed<2>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
 // the module version.
@@ -905,15 +891,8 @@ namespace decls_block {
     TypeIDField, // output
     FunctionTypeRepresentationField, // representation
     BCFixed<1>,  // noescape?
-<<<<<<< HEAD
-    // SWIFT_ENABLE_TENSORFLOW
-    BCFixed<1>,  // throws?
-    BCFixed<2> // differentiability kind
-=======
     BCFixed<1>,   // throws?
     DifferentiabilityKindField // differentiability kind
-
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
     // trailed by parameters
   >;
 
@@ -987,12 +966,7 @@ namespace decls_block {
     TypeIDField,         // output
     FunctionTypeRepresentationField, // representation
     BCFixed<1>,          // throws?
-<<<<<<< HEAD
-    // SWIFT_ENABLE_TENSORFLOW
-    BCFixed<2>,          // differentiable & linear?
-=======
     DifferentiabilityKindField, // differentiability kind
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
     GenericSignatureIDField // generic signture
 
     // trailed by parameters
@@ -1005,10 +979,6 @@ namespace decls_block {
     SILFunctionTypeRepresentationField, // representation
     BCFixed<1>,            // pseudogeneric?
     BCFixed<1>,            // noescape?
-<<<<<<< HEAD
-    // SWIFT_ENABLE_TENSORFLOW
-=======
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
     DifferentiabilityKindField, // differentiability kind
     BCFixed<1>,            // error result?
     BCVBR<6>,              // number of parameters
@@ -1784,10 +1754,6 @@ namespace decls_block {
     GenericSignatureIDField // specialized signature
   >;
 
-<<<<<<< HEAD
-  // SWIFT_ENABLE_TENSORFLOW
-=======
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
   using DifferentiableDeclAttrLayout = BCRecordLayout<
     Differentiable_DECL_ATTR,
     BCFixed<1>, // Implicit flag.
@@ -1800,7 +1766,6 @@ namespace decls_block {
     BCArray<BCFixed<1>> // Differentiation parameter indices' bitvector.
   >;
 
-<<<<<<< HEAD
   // SWIFT_ENABLE_TENSORFLOW
   using DifferentiatingDeclAttrLayout = BCRecordLayout<
     Differentiating_DECL_ATTR,
@@ -1819,10 +1784,7 @@ namespace decls_block {
     BCArray<BCFixed<1>> // Differentiation parameter indices' bitvector.
   >;
 
-#define SIMPLE_DECL_ATTR(X, CLASS, ...) \
-=======
 #define SIMPLE_DECL_ATTR(X, CLASS, ...)         \
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
   using CLASS##DeclAttrLayout = BCRecordLayout< \
     CLASS##_DECL_ATTR, \
     BCFixed<1> /* implicit flag */ \

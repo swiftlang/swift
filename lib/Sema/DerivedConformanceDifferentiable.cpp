@@ -337,8 +337,6 @@ static ValueDecl *deriveDifferentiable_method(
   funcDecl->copyFormalAccessFrom(nominal, /*sourceIsParentContext*/ true);
 
   derived.addMembersToConformanceContext({funcDecl});
-  C.addSynthesizedDecl(funcDecl);
-
   return funcDecl;
 }
 
@@ -602,8 +600,6 @@ getOrSynthesizeTangentVectorStruct(DerivedConformance &derived, Identifier id) {
     structDecl->addMember(memberBinding);
     newMember->copyFormalAccessFrom(member, /*sourceIsParentContext*/ true);
     newMember->setSetterAccess(member->getFormalAccess());
-    C.addSynthesizedDecl(newMember);
-    C.addSynthesizedDecl(memberBinding);
 
     // Now that this member is in the `TangentVector` type, it should be marked
     // `@differentiable` so that the differentiation transform will synthesize
@@ -644,15 +640,12 @@ getOrSynthesizeTangentVectorStruct(DerivedConformance &derived, Identifier id) {
   // the memberwise constructor is synthesized during SILGen, which is too late.
   auto *initDecl = createMemberwiseImplicitConstructor(C, structDecl);
   structDecl->addMember(initDecl);
-  C.addSynthesizedDecl(initDecl);
 
   // After memberwise initializer is synthesized, mark members as implicit.
   for (auto *member : structDecl->getStoredProperties())
     member->setImplicit();
 
   derived.addMembersToConformanceContext({structDecl});
-  C.addSynthesizedDecl(structDecl);
-
   return structDecl;
 }
 
@@ -683,7 +676,6 @@ static void addAssociatedTypeAliasDecl(Identifier name,
   aliasDecl->setGenericSignature(sourceDC->getGenericSignatureOfContext());
   cast<IterableDeclContext>(sourceDC->getAsDecl())->addMember(aliasDecl);
   aliasDecl->copyFormalAccessFrom(nominal, /*sourceIsParentContext*/ true);
-  Context.addSynthesizedDecl(aliasDecl);
 };
 
 /// Diagnose stored properties in the nominal that do not have an explicit
@@ -823,7 +815,6 @@ deriveDifferentiable_TangentVectorStruct(DerivedConformance &derived) {
     aliasDecl->setImplicit();
     aliasDecl->copyFormalAccessFrom(nominal, /*sourceIsParentContext*/ true);
     derived.addMembersToConformanceContext({aliasDecl});
-    C.addSynthesizedDecl(aliasDecl);
     return selfType;
   }
 

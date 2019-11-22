@@ -717,18 +717,6 @@ public:
     return Tok.is(tok::identifier) && Tok.getText() == value;
   }
 
-<<<<<<< HEAD
-=======
-  /// Returns true if token is the identifier "wrt".
-  bool isWRTIdentifier(Token tok) { return isIdentifier(Tok, "wrt"); }
-
-  /// Returns true if token is the identifier "jvp".
-  bool isJVPIdentifier(Token Tok) { return isIdentifier(Tok, "jvp"); }
-
-  /// Returns true if token is the identifier "vjp".
-  bool isVJPIdentifier(Token Tok) { return isIdentifier(Tok, "vjp"); }
-
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
   /// Consume the starting '<' of the current token, which may either
   /// be a complete '<' token or some kind of operator token starting with '<',
   /// e.g., '<>'.
@@ -841,13 +829,6 @@ public:
   /// error diagnostic,  a note at the specified note location, and return the location of the previous token.
   bool parseMatchingToken(tok K, SourceLoc &TokLoc, Diag<> ErrorDiag,
                           SourceLoc OtherLoc);
-
-  /// SWIFT_ENABLE_TENSORFLOW
-  /// \brief Parse an unsigned integer and returns it in \p Result. On failure
-  /// emit the specified error diagnostic, and a note at the specified note
-  /// location.
-  bool parseUnsignedInteger(unsigned &Result, SourceLoc &Loc,
-                            const Diagnostic &D);
 
   /// Returns the proper location for a missing right brace, parenthesis, etc.
   SourceLoc getLocForMissingMatchingToken() const;
@@ -998,10 +979,6 @@ public:
   ParserResult<ImplementsAttr> parseImplementsAttribute(SourceLoc AtLoc,
                                                         SourceLoc Loc);
 
-<<<<<<< HEAD
-  /// SWIFT_ENABLE_TENSORFLOW
-=======
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
   /// Parse the @differentiable attribute.
   ParserResult<DifferentiableAttr> parseDifferentiableAttribute(SourceLoc AtLoc,
                                                                 SourceLoc Loc);
@@ -1015,7 +992,6 @@ public:
   /// Parse a differentiation parameters clause.
   bool parseDifferentiationParametersClause(
       SmallVectorImpl<ParsedAutoDiffParameter> &params, StringRef attrName);
-<<<<<<< HEAD
   
   /// Parse a transposing parameters clause.
   bool parseTransposingParametersClause(
@@ -1030,8 +1006,6 @@ public:
 
   /// Parse the @quoted attribute.
   ParserResult<QuotedAttr> parseQuotedAttribute(SourceLoc AtLoc, SourceLoc Loc);
-=======
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
 
   /// Parse a specific attribute.
   ParserStatus parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc);

@@ -234,10 +234,6 @@ SYNTAX_NODE_SERIALIZATION_CODES = {
     'SomeType': 230,
     'CustomAttribute': 231,
     'GenericRequirement': 232,
-<<<<<<< HEAD
-    # SWIFT_ENABLE_TENSORFLOW
-=======
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
     'DifferentiableAttributeArguments': 233,
     'DifferentiationParamsClause': 234,
     'DifferentiationParams': 235,
@@ -245,13 +241,12 @@ SYNTAX_NODE_SERIALIZATION_CODES = {
     'DifferentiationParam': 237,
     'DifferentiableAttributeFuncSpecifier': 238,
     'FunctionDeclName': 239,
-<<<<<<< HEAD
+    # SWIFT_ENABLE_TENSORFLOW
     'DifferentiatingAttributeArguments': 240,
     'TransposingAttributeArguments': 241,
     'QuoteLiteralExpr': 242,
     'UnquoteExpr': 243,
-=======
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
+    # SWIFT_ENABLE_TENSORFLOW END
 }
 
 

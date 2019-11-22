@@ -319,8 +319,7 @@ public:
   /// Add a getter to a derived property.  The property becomes read-only.
   static AccessorDecl *
   addGetterToReadOnlyDerivedProperty(VarDecl *property,
-<<<<<<< HEAD
-                                     Type propertyContextType);
+                                            Type propertyContextType);
 
   // SWIFT_ENABLE_TENSORFLOW
   /// Add a getter and setter to a derived property. The property becomes
@@ -329,19 +328,11 @@ public:
   addGetterAndSetterToMutableDerivedProperty(VarDecl *property,
                                              Type propertyContextType);
 
-  /// Declare a getter for a derived property.
-  /// The getter will not be added to the property yet.
-  static AccessorDecl *declareDerivedPropertyGetter(VarDecl *property,
-                                                    Type propertyContextType);
-=======
-                                            Type propertyContextType);
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
-
-  /// SWIFT_ENABLE_TENSORFLOW
   /// Declare a setter for a derived property.
   /// The setter will not be added to the property yet.
   static AccessorDecl *declareDerivedPropertySetter(VarDecl *property,
                                                     Type propertyContextType);
+  // SWIFT_ENABLE_TENSORFLOW END
 
   /// Build a reference to the 'self' decl of a derived function.
   static DeclRefExpr *createSelfDeclRef(AbstractFunctionDecl *fn);

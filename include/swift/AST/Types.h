@@ -17,13 +17,7 @@
 #ifndef SWIFT_TYPES_H
 #define SWIFT_TYPES_H
 
-<<<<<<< HEAD
-// SWIFT_ENABLE_TENSORFLOW
 #include "swift/AST/AutoDiff.h"
-#include "swift/AST/Attr.h"
-=======
-#include "swift/AST/AutoDiff.h"
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/GenericParamKey.h"
 #include "swift/AST/Identifier.h"
@@ -315,10 +309,6 @@ class alignas(1 << TypeAlignInBits) TypeBase {
   }
 
 protected:
-<<<<<<< HEAD
-  // SWIFT_ENABLE_TENSORFLOW
-=======
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
   enum { NumAFTExtInfoBits = 8 };
   enum { NumSILExtInfoBits = 8 };
   union { uint64_t OpaqueBits;
@@ -2935,31 +2925,19 @@ public:
     // If bits are added or removed, then TypeBase::AnyFunctionTypeBits
     // and NumMaskBits must be updated, and they must match.
     //
-<<<<<<< HEAD
-    //   SWIFT_ENABLE_TENSORFLOW
-=======
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
     //   |representation|noEscape|throws|differentiability|
     //   |    0 .. 3    |    4   |   5  |      6 .. 7     |
     //
     enum : unsigned {
-<<<<<<< HEAD
       RepresentationMask           = 0xF << 0,
       NoEscapeMask                 = 1 << 4,
       ThrowsMask                   = 1 << 5,
-      // SWIFT_ENABLE_TENSORFLOW
       DifferentiabilityMaskOffset  = 6,
       DifferentiabilityMask        = 0x3 << DifferentiabilityMaskOffset,
+      // SWIFT_ENABLE_TENSORFLOW
       NumDifferentiabilityMaskBits = 2,
+      // SWIFT_ENABLE_TENSORFLOW END
       NumMaskBits                  = 8
-=======
-      RepresentationMask          = 0xF << 0,
-      NoEscapeMask                = 1 << 4,
-      ThrowsMask                  = 1 << 5,
-      DifferentiabilityMaskOffset = 6,
-      DifferentiabilityMask       = 0x3 << DifferentiabilityMaskOffset,
-      NumMaskBits                 = 8
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
     };
 
     unsigned Bits; // Naturally sized for speed.
@@ -2982,35 +2960,20 @@ public:
     // Constructor with no defaults.
     ExtInfo(Representation Rep,
             bool IsNoEscape,
-<<<<<<< HEAD
-            // SWIFT_ENABLE_TENSORFLOW
-            bool Throws, DifferentiabilityKind diffKind)
-      : ExtInfo(Rep, Throws) {
-      Bits |= (IsNoEscape ? NoEscapeMask : 0);
-      // SWIFT_ENABLE_TENSORFLOW
-      Bits |= ((unsigned)diffKind << DifferentiabilityMaskOffset)
-              & DifferentiabilityMask;
-=======
             bool Throws,
             DifferentiabilityKind DiffKind)
       : ExtInfo(Rep, Throws) {
       Bits |= (IsNoEscape ? NoEscapeMask : 0);
       Bits |= ((unsigned)DiffKind << DifferentiabilityMaskOffset) &
               DifferentiabilityMask;
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
     }
 
     bool isNoEscape() const { return Bits & NoEscapeMask; }
     bool throws() const { return Bits & ThrowsMask; }
-<<<<<<< HEAD
-    // SWIFT_ENABLE_TENSORFLOW
     bool isDifferentiable() const {
-      return getDifferentiabilityKind() >= DifferentiabilityKind::Normal;
-=======
-    bool isDifferentiable() const {
+      // return getDifferentiabilityKind() >= DifferentiabilityKind::Normal;
       return getDifferentiabilityKind() >
              DifferentiabilityKind::NonDifferentiable;
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
     }
     DifferentiabilityKind getDifferentiabilityKind() const {
       return DifferentiabilityKind((Bits & DifferentiabilityMask) >>
@@ -3215,14 +3178,6 @@ public:
 
   bool throws() const {
     return getExtInfo().throws();
-  }
-  
-  // SWIFT_ENABLE_TENSORFLOW
-  bool isDifferentiable() const {
-    return getExtInfo().isDifferentiable();
-  }
-  DifferentiabilityKind getDifferentiabilityKind() const {
-    return getExtInfo().getDifferentiabilityKind();
   }
 
   bool isDifferentiable() const { return getExtInfo().isDifferentiable(); }
@@ -3923,21 +3878,6 @@ public:
     // If bits are added or removed, then TypeBase::SILFunctionTypeBits
     // and NumMaskBits must be updated, and they must match.
 
-<<<<<<< HEAD
-    // SWIFT_ENABLE_TENSORFLOW
-    //   |representation|pseudogeneric|noescape|differentiability|
-    //   |    0 .. 3    |      4      |     5  |      6 .. 7     |
-    //
-    enum : unsigned {
-      RepresentationMask           = 0xF << 0,
-      PseudogenericMask            = 1 << 4,
-      NoEscapeMask                 = 1 << 5,
-      // SWIFT_ENABLE_TENSORFLOW
-      DifferentiabilityMaskOffset  = 6,
-      DifferentiabilityMask        = 0x3 << DifferentiabilityMaskOffset,
-      NumDifferentiabilityMaskBits = 2,
-      NumMaskBits                  = 8
-=======
     //   |representation|pseudogeneric| noescape |differentiability|
     //   |    0 .. 3    |      4      |     5    |      6 .. 7     |
     //
@@ -3947,8 +3887,10 @@ public:
       NoEscapeMask       = 1 << 5,
       DifferentiabilityMaskOffset = 6,
       DifferentiabilityMask       = 0x3 << DifferentiabilityMaskOffset,
+      // SWIFT_ENABLE_TENSORFLOW
+      NumDifferentiabilityMaskBits = 2,
+      // SWIFT_ENABLE_TENSORFLOW END
       NumMaskBits                 = 8
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
     };
     unsigned Bits; // Naturally sized for speed.
 
@@ -3961,24 +3903,13 @@ public:
     ExtInfo() : Bits(0) { }
 
     // Constructor for polymorphic type.
-<<<<<<< HEAD
-    // SWIFT_ENABLE_TENSORFLOW
-=======
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
     ExtInfo(Representation rep, bool isPseudogeneric, bool isNoEscape,
             DifferentiabilityKind diffKind) {
       Bits = ((unsigned) rep) |
              (isPseudogeneric ? PseudogenericMask : 0) |
-<<<<<<< HEAD
-             // SWIFT_ENABLE_TENSORFLOW
-             (isNoEscape ? NoEscapeMask : 0) |
-             (((unsigned)diffKind << DifferentiabilityMaskOffset)
-              & DifferentiabilityMask);
-=======
              (isNoEscape ? NoEscapeMask : 0) |
              (((unsigned)diffKind << DifferentiabilityMaskOffset) &
               DifferentiabilityMask);
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
     }
 
     /// Is this function pseudo-generic?  A pseudo-generic function
@@ -3987,16 +3918,6 @@ public:
 
     // Is this function guaranteed to be no-escape by the type system?
     bool isNoEscape() const { return Bits & NoEscapeMask; }
-    
-    // SWIFT_ENABLE_TENSORFLOW
-    bool isDifferentiable() const {
-      return getDifferentiabilityKind() >= DifferentiabilityKind::Normal;
-    }
-    
-    DifferentiabilityKind getDifferentiabilityKind() const {
-      return DifferentiabilityKind((Bits & DifferentiabilityMask) >>
-                                   DifferentiabilityMaskOffset);
-    }
 
     bool isDifferentiable() const {
       return getDifferentiabilityKind() !=
@@ -4444,22 +4365,12 @@ public:
            getRepresentation() == SILFunctionTypeRepresentation::Thick;
   }
 
-<<<<<<< HEAD
-  // SWIFT_ENABLE_TENSORFLOW
-=======
   bool isDifferentiable() const { return getExtInfo().isDifferentiable(); }
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
+
   DifferentiabilityKind getDifferentiabilityKind() const {
     return getExtInfo().getDifferentiabilityKind();
   }
 
-<<<<<<< HEAD
-  bool isDifferentiable() const {
-    return getExtInfo().isDifferentiable();
-  }
-
-=======
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
   bool isNoReturnFunction(SILModule &M) const; // Defined in SILType.cpp
                                     
   /// Create a SILFunctionType with the same parameters, results, and attributes as this one, but with

@@ -1431,17 +1431,14 @@ namespace  {
     UNINTERESTING_ATTR(DynamicReplacement)
     UNINTERESTING_ATTR(PrivateImport)
 
-<<<<<<< HEAD
-    // SWIFT_ENABLE_TENSORFLOW
+    // Differentiation-related attributes.
     UNINTERESTING_ATTR(Differentiable)
+    // SWIFT_ENABLE_TENSORFLOW
     UNINTERESTING_ATTR(Differentiating)
     UNINTERESTING_ATTR(CompilerEvaluable)
     UNINTERESTING_ATTR(NoDerivative)
     UNINTERESTING_ATTR(Transposing)
-=======
-    // Differentiation-related attributes.
-    UNINTERESTING_ATTR(Differentiable)
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
+    // SWIFT_ENABLE_TENSORFLOW END
 
     // These can't appear on overridable declarations.
     UNINTERESTING_ATTR(Prefix)

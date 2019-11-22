@@ -4495,23 +4495,6 @@ Optional<swift::ParameterConvention> getActualParameterConvention(uint8_t raw) {
   return None;
 }
 
-// SWIFT_ENABLE_TENSORFLOW
-/// Translate from the serialization DifferentiabilityKind enumerators,
-/// which are guaranteed to be stable, to the AST ones.
-static Optional<swift::DifferentiabilityKind>
-getActualDifferentiabilityKind(uint8_t raw) {
-  switch (serialization::DifferentiabilityKind(raw)) {
-#define CASE(ID)                                                               \
-  case serialization::DifferentiabilityKind::ID:                               \
-    return swift::DifferentiabilityKind::ID;
-  CASE(NonDifferentiable)
-  CASE(Normal)
-  CASE(Linear)
-#undef CASE
-  }
-  return None;
-}
-
 /// Translate from the serialization SILParameterDifferentiability enumerators,
 /// which are guaranteed to be stable, to the AST ones.
 static Optional<swift::SILParameterDifferentiability>
@@ -4761,34 +4744,6 @@ public:
                                             StringRef blobData,
                                             bool isGeneric) {
     TypeID resultID;
-<<<<<<< HEAD
-    uint8_t rawRepresentation;
-
-    // SWIFT_ENABLE_TENSORFLOW
-    bool noescape = false, throws = false;
-    uint8_t rawDiffKind = 0;
-    auto diffKind = DifferentiabilityKind::NonDifferentiable;
-    GenericSignature genericSig = GenericSignature();
-
-    if (!isGeneric) {
-      decls_block::FunctionTypeLayout::readRecord(scratch, resultID,
-                                                  rawRepresentation,
-                                                  noescape,
-                                                  // SWIFT_ENABLE_TENSORFLOW
-                                                  throws,
-                                                  rawDiffKind);
-      diffKind = DifferentiabilityKind(rawDiffKind);
-    } else {
-      GenericSignatureID rawGenericSig;
-      decls_block::GenericFunctionTypeLayout::readRecord(scratch,
-                                                         resultID,
-                                                         rawRepresentation,
-                                                         throws,
-                                                         // SWIFT_ENABLE_TENSORFLOW
-                                                         rawDiffKind,
-                                                         rawGenericSig);
-      diffKind = DifferentiabilityKind(rawDiffKind);
-=======
     uint8_t rawRepresentation, rawDiffKind;
     bool noescape = false, throws;
     GenericSignature genericSig = GenericSignature();
@@ -4801,7 +4756,6 @@ public:
       decls_block::GenericFunctionTypeLayout::readRecord(
           scratch, resultID, rawRepresentation, throws, rawDiffKind,
           rawGenericSig);
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
       genericSig = MF.getGenericSignature(rawGenericSig);
     }
 
@@ -4809,18 +4763,12 @@ public:
     if (!representation.hasValue())
       MF.fatal();
 
-<<<<<<< HEAD
-    auto info = FunctionType::ExtInfo(*representation, noescape,
-                                      // SWIFT_ENABLE_TENSORFLOW
-                                      throws, diffKind);
-=======
     auto diffKind = getActualDifferentiabilityKind(rawDiffKind);
     if (!diffKind.hasValue())
       MF.fatal();
 
     auto info =
         FunctionType::ExtInfo(*representation, noescape, throws, *diffKind);
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
 
     auto resultTy = MF.getTypeChecked(resultID);
     if (!resultTy)
@@ -5150,8 +5098,6 @@ public:
     uint8_t rawDiffKind;
     bool pseudogeneric = false;
     bool noescape;
-    // SWIFT_ENABLE_TENSORFLOW
-    uint8_t rawDifferentiabilityKind;
     bool hasErrorResult;
     unsigned numParams;
     unsigned numYields;
@@ -5165,12 +5111,7 @@ public:
                                              rawRepresentation,
                                              pseudogeneric,
                                              noescape,
-<<<<<<< HEAD
-                                             // SWIFT_ENABLE_TENSORFLOW
-                                             rawDifferentiabilityKind,
-=======
                                              rawDiffKind,
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
                                              hasErrorResult,
                                              numParams,
                                              numYields,
@@ -5183,20 +5124,11 @@ public:
       = getActualSILFunctionTypeRepresentation(rawRepresentation);
     if (!representation.hasValue())
       MF.fatal();
-<<<<<<< HEAD
-    auto differentiabilityKind =
-        getActualDifferentiabilityKind(rawDifferentiabilityKind);
-    if (!differentiabilityKind.hasValue())
-      MF.fatal();
-    SILFunctionType::ExtInfo extInfo(*representation, pseudogeneric,
-                                     noescape, *differentiabilityKind);
-=======
     auto diffKind = getActualDifferentiabilityKind(rawDiffKind);
     if (!diffKind.hasValue())
       MF.fatal();
     SILFunctionType::ExtInfo extInfo(*representation, pseudogeneric, noescape,
                                      *diffKind);
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
 
     // Process the coroutine kind.
     auto coroutineKind = getActualSILCoroutineKind(rawCoroutineKind);
@@ -5221,7 +5153,7 @@ public:
       // SWIFT_ENABLE_TENSORFLOW
       auto paramDiff =
           swift::SILParameterDifferentiability::DifferentiableOrNotApplicable;
-      if (differentiabilityKind != DifferentiabilityKind::NonDifferentiable) {
+      if (diffKind != DifferentiabilityKind::NonDifferentiable) {
         auto paramDiffOpt =
             getActualSILParameterDifferentiability(rawParamDiff);
         if (!paramDiffOpt) {
@@ -5259,8 +5191,7 @@ public:
     // Bounds check.  FIXME: overflow
     // SWIFT_ENABLE_TENSORFLOW
     unsigned entriesPerParam =
-        differentiabilityKind != DifferentiabilityKind::NonDifferentiable
-            ? 3 : 2;
+        diffKind != DifferentiabilityKind::NonDifferentiable ? 3 : 2;
     if (entriesPerParam * numParams + 2 * numResults +
             2 * unsigned(hasErrorResult) >
         variableData.size()) {
@@ -5277,7 +5208,7 @@ public:
       auto rawConvention = variableData[nextVariableDataIndex++];
       // SWIFT_ENABLE_TENSORFLOW
       uint64_t paramDiff = 0;
-      if (differentiabilityKind != DifferentiabilityKind::NonDifferentiable)
+      if (diffKind != DifferentiabilityKind::NonDifferentiable)
         paramDiff = variableData[nextVariableDataIndex++];
       auto param = processParameter(typeID, rawConvention, paramDiff);
       if (!param)

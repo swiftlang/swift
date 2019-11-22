@@ -983,10 +983,6 @@ bool Parser::parseMatchingToken(tok K, SourceLoc &TokLoc, Diag<> ErrorDiag,
   return false;
 }
 
-<<<<<<< HEAD
-// SWIFT_ENABLE_TENSORFLOW
-=======
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
 bool Parser::parseUnsignedInteger(unsigned &Result, SourceLoc &Loc,
                                   const Diagnostic &D) {
   auto IntTok = Tok;

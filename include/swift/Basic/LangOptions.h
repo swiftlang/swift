@@ -285,7 +285,7 @@ namespace swift {
     /// Whether to enable experimental differentiable programming features:
     /// `@differentiable` declaration attribute, etc.
     // SWIFT_ENABLE_TENSORFLOW
-    // Use default value to true on `tensorflow` branch.
+    // Use default value true on `tensorflow` branch.
     bool EnableExperimentalDifferentiableProgramming = true;
     // SWIFT_ENABLE_TENSORFLOW END
 

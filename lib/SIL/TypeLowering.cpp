@@ -935,7 +935,7 @@ namespace {
       auto paramIndices = fnTy->getDifferentiationParameterIndices();
       children.push_back(Child{
         NormalDifferentiableFunctionTypeComponent::Original,
-        TC.getTypeLowering(origFnTy, getResilienceExpansion())
+        TC.getTypeLowering(origFnTy, getExpansionContext())
       });
       for (AutoDiffDerivativeFunctionKind kind :
                {AutoDiffDerivativeFunctionKind::JVP,
@@ -951,7 +951,7 @@ namespace {
         // wrong extractee.
         assert(extractee.getAsDerivativeFunctionKind() == kind);
         children.push_back(Child{
-            extractee, TC.getTypeLowering(silTy, getResilienceExpansion())});
+            extractee, TC.getTypeLowering(silTy, getExpansionContext())});
       }
       assert(children.size() == 3);
     }
@@ -987,14 +987,14 @@ namespace {
       auto paramIndices = fnTy->getDifferentiationParameterIndices();
       children.push_back(Child{
         LinearDifferentiableFunctionTypeComponent::Original,
-        TC.getTypeLowering(origFnTy, getResilienceExpansion())
+        TC.getTypeLowering(origFnTy, getExpansionContext())
       });
       auto transposeFnTy = origFnTy->getAutoDiffTransposeFunctionType(
           paramIndices, TC, LookUpConformanceInModule(&TC.M));
       auto transposeSILFnTy = SILType::getPrimitiveObjectType(transposeFnTy);
       children.push_back(Child{
         LinearDifferentiableFunctionTypeComponent::Transpose,
-        TC.getTypeLowering(transposeSILFnTy, getResilienceExpansion())
+        TC.getTypeLowering(transposeSILFnTy, getExpansionContext())
       });
       assert(children.size() == 2);
     }

@@ -246,7 +246,7 @@ CanSILFunctionType SILFunctionType::getAutoDiffDerivativeFunctionType(
   // Given a type, returns its formal SIL parameter info.
   auto getTangentParameterInfoForOriginalResult = [&](
       CanType tanType, ResultConvention origResConv) -> SILParameterInfo {
-    auto &tl = TC.getTypeLowering(tanType, ResilienceExpansion::Minimal);
+    auto &tl = TC.getTypeLowering(tanType, TypeExpansionContext::minimal());
     ParameterConvention conv;
     switch (origResConv) {
     case ResultConvention::Owned:
@@ -269,7 +269,8 @@ CanSILFunctionType SILFunctionType::getAutoDiffDerivativeFunctionType(
   // Given a type, returns its formal SIL result info.
   auto getTangentResultInfoForOriginalParameter = [&](
       CanType tanType, ParameterConvention origParamConv) -> SILResultInfo {
-    auto &tl = TC.getTypeLowering(tanType, ResilienceExpansion::Minimal);
+    auto &tl =
+        TC.getTypeLowering(tanType, TypeExpansionContext::minimal());
     ResultConvention conv;
     switch (origParamConv) {
     case ParameterConvention::Direct_Owned:
@@ -370,7 +371,7 @@ CanSILFunctionType SILFunctionType::getAutoDiffTransposeFunctionType(
   auto getParameterInfoForOriginalResult = [&](
       const SILResultInfo &result) -> SILParameterInfo {
     auto &tl = TC.getTypeLowering(
-        result.getInterfaceType(), ResilienceExpansion::Minimal);
+        result.getInterfaceType(), TypeExpansionContext::minimal());
     ParameterConvention newConv;
     switch (result.getConvention()) {
     case ResultConvention::Owned:
@@ -394,7 +395,7 @@ CanSILFunctionType SILFunctionType::getAutoDiffTransposeFunctionType(
   auto getResultInfoForOriginalParameter = [&](
       const SILParameterInfo &param) -> SILResultInfo {
     auto &tl = TC.getTypeLowering(
-        param.getInterfaceType(), ResilienceExpansion::Minimal);
+        param.getInterfaceType(), TypeExpansionContext::minimal());
     ResultConvention newConv;
     switch (param.getConvention()) {
     case ParameterConvention::Direct_Owned:
@@ -2636,8 +2637,8 @@ TypeConverter::getConstantInfo(TypeExpansionContext expansion,
   //
   // We hackily fix this problem by redoing the computation in the right order.
   if (auto *autoDiffFuncId = constant.autoDiffDerivativeFunctionIdentifier) {
-    auto origFnConstantInfo =
-        getConstantInfo(constant.asAutoDiffOriginalFunction());
+    auto origFnConstantInfo = getConstantInfo(
+        TypeExpansionContext::minimal(), constant.asAutoDiffOriginalFunction());
     auto loweredIndices = autodiff::getLoweredParameterIndices(
         autoDiffFuncId->getParameterIndices(), formalInterfaceType);
     silFnType = origFnConstantInfo.SILFnType->getAutoDiffDerivativeFunctionType(

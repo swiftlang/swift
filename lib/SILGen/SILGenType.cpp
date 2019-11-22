@@ -87,21 +87,18 @@ SILGenModule::emitVTableMethod(ClassDecl *theClass,
        derived.kind != SILDeclRef::Kind::Allocator);
 
   if (usesObjCDynamicDispatch) {
-<<<<<<< HEAD
-    implFn = getDynamicThunk(derived, Types.getConstantInfo(derived).SILFnType);
+    implFn = getDynamicThunk(
+        derived, Types.getConstantInfo(TypeExpansionContext::minimal(), derived)
+                     .SILFnType);
   // SWIFT_ENABLE_TENSORFLOW
   } else if (auto *adafi = derived.autoDiffDerivativeFunctionIdentifier) {
     // For JVP/VJP methods, create a vtable entry thunk. The thunk contains an
     // `differentiable_function` instruction, which is later filled during the
     // differentiation transform.
-    implFn = getOrCreateAutoDiffClassMethodThunk(
-        derived, Types.getConstantInfo(derived).SILFnType);
+    auto derivedFnType = Types.getConstantInfo(
+        TypeExpansionContext::minimal(), derived).SILFnType;
+    implFn = getOrCreateAutoDiffClassMethodThunk(derived, derivedFnType);
   // SWIFT_ENABLE_TENSORFLOW END
-=======
-    implFn = getDynamicThunk(
-        derived, Types.getConstantInfo(TypeExpansionContext::minimal(), derived)
-                     .SILFnType);
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
   } else {
     implFn = getFunction(derived, NotForDefinition);
   }

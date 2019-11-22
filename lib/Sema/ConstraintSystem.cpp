@@ -1699,10 +1699,6 @@ resolveOverloadForDeclWithSpecialTypeCheckingSemantics(ConstraintSystem &CS,
     auto bodyClosure = FunctionType::get(arg, result,
         FunctionType::ExtInfo(FunctionType::Representation::Swift,
                               /*noescape*/ true,
-<<<<<<< HEAD
-                              // SWIFT_ENABLE_TENSORFLOW
-=======
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
                               /*throws*/ true,
                               DifferentiabilityKind::NonDifferentiable));
     FunctionType::Param args[] = {
@@ -1713,10 +1709,6 @@ resolveOverloadForDeclWithSpecialTypeCheckingSemantics(ConstraintSystem &CS,
     refType = FunctionType::get(args, result,
       FunctionType::ExtInfo(FunctionType::Representation::Swift,
                             /*noescape*/ false,
-<<<<<<< HEAD
-                            // SWIFT_ENABLE_TENSORFLOW
-=======
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
                             /*throws*/ true,
                             DifferentiabilityKind::NonDifferentiable));
     openedFullType = refType;
@@ -1741,10 +1733,6 @@ resolveOverloadForDeclWithSpecialTypeCheckingSemantics(ConstraintSystem &CS,
     auto bodyClosure = FunctionType::get(bodyArgs, result,
         FunctionType::ExtInfo(FunctionType::Representation::Swift,
                               /*noescape*/ true,
-<<<<<<< HEAD
-                              // SWIFT_ENABLE_TENSORFLOW
-=======
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
                               /*throws*/ true,
                               DifferentiabilityKind::NonDifferentiable));
     FunctionType::Param args[] = {
@@ -1754,10 +1742,6 @@ resolveOverloadForDeclWithSpecialTypeCheckingSemantics(ConstraintSystem &CS,
     refType = FunctionType::get(args, result,
       FunctionType::ExtInfo(FunctionType::Representation::Swift,
                             /*noescape*/ false,
-<<<<<<< HEAD
-                            // SWIFT_ENABLE_TENSORFLOW
-=======
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
                             /*throws*/ true,
                             DifferentiabilityKind::NonDifferentiable));
     openedFullType = refType;
@@ -2471,21 +2455,6 @@ SolutionResult ConstraintSystem::salvage() {
     log << "---Attempting to salvage and emit diagnostics---\n";
   }
 
-  // SWIFT_ENABLE_TENSORFLOW
-  if (DC->getParentModule()->getNameStr().startswith("__lldb_expr") &&
-      viable.size() > 1) {
-    // TODO(https://bugs.swift.org/browse/SR-9814):
-    // If in LLDB repl mode, patch up the solution if we have ambiguity.
-    //
-    // This is a *temporary* short-term hack that simply returns the last
-    // solution.  It seems to work for now and returns the lastly added
-    // definition during the repl session. However, this is extremely brittle and
-    // is not expected to work correctly all the time.
-    viable[0] = std::move(viable.back());
-    viable.erase(viable.begin() + 1, viable.end());
-    return false;
-  }
-
   // Attempt to solve again, capturing all states that come from our attempts to
   // select overloads or bind type variables.
   //
@@ -2527,6 +2496,21 @@ SolutionResult ConstraintSystem::salvage() {
 
     // If there are multiple solutions, try to diagnose an ambiguity.
     if (viable.size() > 1) {
+      // SWIFT_ENABLE_TENSORFLOW
+      if (DC->getParentModule()->getNameStr().startswith("__lldb_expr")) {
+        // TODO(https://bugs.swift.org/browse/SR-9814):
+        // If in LLDB repl mode, patch up the solution if we have ambiguity.
+        //
+        // This is a *temporary* short-term hack that simply returns the last
+        // solution.  It seems to work for now and returns the lastly added
+        // definition during the repl session. However, this is extremely brittle and
+        // is not expected to work correctly all the time.
+        viable[0] = std::move(viable.back());
+        viable.erase(viable.begin() + 1, viable.end());
+        return SolutionResult::forSolved(std::move(viable[0]));
+      }
+      // SWIFT_ENABLE_TENSORFLOW
+
       if (getASTContext().TypeCheckerOpts.DebugConstraintSolver) {
         auto &log = getASTContext().TypeCheckerDebug->getStream();
         log << "---Ambiguity error: " << viable.size()

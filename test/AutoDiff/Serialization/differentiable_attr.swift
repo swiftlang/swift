@@ -8,7 +8,11 @@
 
 // TODO(TF-836): Enable this test.
 // Blocked by TF-828: `@differentiating` attribute type-checking.
-// XFAIL: *
+// SWIFT_ENABLE_TENSORFLOW
+// This test currently only fails on `master` branch.
+// Disable the XFAIL on `tensorflow` branch.
+// XFAI: *
+// SWIFT_ENABLE_TENSORFLOW END
 
 // BCANALYZER-NOT: UnknownCode
 

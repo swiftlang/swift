@@ -2306,19 +2306,12 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       break;
     }
 
-<<<<<<< HEAD
-    // SWIFT_ENABLE_TENSORFLOW
     case DAK_Differentiable: {
       auto abbrCode = S.DeclTypeAbbrCodes[DifferentiableDeclAttrLayout::Code];
       auto *attr = cast<DifferentiableAttr>(DA);
       assert(attr->getOriginalDeclaration() &&
              "`@differentiable` attribute should have original declaration set "
              "during construction or parsing");
-=======
-    case DAK_Differentiable: {
-      auto abbrCode = S.DeclTypeAbbrCodes[DifferentiableDeclAttrLayout::Code];
-      auto *attr = cast<DifferentiableAttr>(DA);
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
 
       IdentifierID jvpName = 0;
       DeclID jvpRef = 0;
@@ -2335,14 +2328,6 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
         vjpRef = S.addDeclRef(vjpFunction);
 
       auto paramIndices = attr->getParameterIndices();
-<<<<<<< HEAD
-=======
-      // TODO(TF-837): Implement `@differentiable` attribute serialization.
-      // Blocked by TF-828: `@differentiable` attribute type-checking, which
-      // resolves parameter indices (`IndexSubset *`).
-      if (!paramIndices)
-        return;
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
       assert(paramIndices && "Checked parameter indices must be resolved");
       SmallVector<bool, 4> indices;
       for (unsigned i : range(paramIndices->getCapacity()))
@@ -2355,7 +2340,6 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
           indices);
       return;
     }
-<<<<<<< HEAD
 
     case DAK_Quoted: {
       auto abbrCode = S.DeclTypeAbbrCodes[QuotedDeclAttrLayout::Code];
@@ -2366,8 +2350,6 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
                                        S.addDeclRef(attr->getQuoteDecl()));
       return;
     }
-=======
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
     }
   }
 
@@ -3710,19 +3692,6 @@ static uint8_t getRawStableSILCoroutineKind(
   llvm_unreachable("bad kind");
 }
 
-// SWIFT_ENABLE_TENSORFLOW
-/// Translate from the AST differentiability kind enum to the Serialization enum
-/// values, which are guaranteed to be stable.
-static uint8_t getRawStableDifferentiabilityKind(
-    swift::DifferentiabilityKind kind) {
-  switch (kind) {
-  SIMPLE_CASE(DifferentiabilityKind, NonDifferentiable)
-  SIMPLE_CASE(DifferentiabilityKind, Normal)
-  SIMPLE_CASE(DifferentiabilityKind, Linear)
-  }
-  llvm_unreachable("bad differentiability kind");
-}
-
 /// Translate from the AST ownership enum to the Serialization enum
 /// values, which are guaranteed to be stable.
 static uint8_t
@@ -4034,14 +4003,8 @@ public:
         S.addTypeRef(fnTy->getResult()),
         getRawStableFunctionTypeRepresentation(fnTy->getRepresentation()),
         fnTy->isNoEscape(),
-<<<<<<< HEAD
-        // SWIFT_ENABLE_TENSORFLOW
-        fnTy->throws(),
-        (uint8_t)fnTy->getDifferentiabilityKind());
-=======
         fnTy->throws(),
         getRawStableDifferentiabilityKind(fnTy->getDifferentiabilityKind()));
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
 
     serializeFunctionTypeParams(fnTy);
   }
@@ -4054,13 +4017,8 @@ public:
     GenericFunctionTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
         S.addTypeRef(fnTy->getResult()),
         getRawStableFunctionTypeRepresentation(fnTy->getRepresentation()),
-<<<<<<< HEAD
-        // SWIFT_ENABLE_TENSORFLOW
-        fnTy->throws(), fnTy->isDifferentiable(),
-=======
         fnTy->throws(),
         getRawStableDifferentiabilityKind(fnTy->getDifferentiabilityKind()),
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
         S.addGenericSignatureRef(genericSig));
 
     serializeFunctionTypeParams(fnTy);
@@ -4086,11 +4044,8 @@ public:
     using namespace decls_block;
 
     auto representation = fnTy->getRepresentation();
-    // SWIFT_ENABLE_TENSORFLOW
     auto stableRepresentation =
-        getRawStableSILFunctionTypeRepresentation(representation);
-    auto stableDifferentiabilityKind =
-        getRawStableDifferentiabilityKind(fnTy->getDifferentiabilityKind());
+      getRawStableSILFunctionTypeRepresentation(representation);
 
     SmallVector<TypeID, 8> variableData;
     for (auto param : fnTy->getParameters()) {
@@ -4135,16 +4090,9 @@ public:
         S.Out, S.ScratchRecord, abbrCode,
         stableCoroutineKind, stableCalleeConvention,
         stableRepresentation, fnTy->isPseudogeneric(), fnTy->isNoEscape(),
-<<<<<<< HEAD
-        // SWIFT_ENABLE_TENSORFLOW
-        stableDifferentiabilityKind, fnTy->hasErrorResult(),
-        fnTy->getParameters().size(), fnTy->getNumYields(),
-        fnTy->getNumResults(), S.addGenericSignatureRef(sig), variableData);
-=======
         stableDiffKind, fnTy->hasErrorResult(), fnTy->getParameters().size(),
         fnTy->getNumYields(), fnTy->getNumResults(),
         S.addGenericSignatureRef(sig), variableData);
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
 
     if (auto conformance = fnTy->getWitnessMethodConformanceOrInvalid())
       S.writeConformance(conformance, S.DeclTypeAbbrCodes);

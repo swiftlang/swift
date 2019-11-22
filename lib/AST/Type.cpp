@@ -4643,7 +4643,6 @@ Type TypeBase::openAnyExistentialType(OpenedArchetypeType *&opened) {
   return opened;
 }
 
-<<<<<<< HEAD
 // SWIFT_ENABLE_TENSORFLOW
 // Makes a function with the same generic signature and extinfo as `copy`, but
 // with `params` parameters and `retTy` return type.
@@ -4888,6 +4887,44 @@ AnyFunctionType::getAutoDiffOriginalFunctionType() {
   return originalType;
 }
 
+bool TypeBase::hasOpaqueArchetypePropertiesOrCases() {
+  if (auto *structDecl = getStructOrBoundGenericStruct()) {
+    for (auto *field : structDecl->getStoredProperties()) {
+      auto fieldTy = field->getInterfaceType()->getCanonicalType();
+      if (fieldTy->hasOpaqueArchetype() ||
+          fieldTy->hasOpaqueArchetypePropertiesOrCases())
+        return true;
+    }
+  }
+
+  if (auto *enumDecl = getEnumOrBoundGenericEnum()) {
+    for (auto *elt : enumDecl->getAllElements()) {
+      auto eltType = elt->getInterfaceType();
+      if (eltType->hasOpaqueArchetype() ||
+          eltType->getCanonicalType()->hasOpaqueArchetypePropertiesOrCases())
+        return true;
+    }
+  }
+  return false;
+}
+
+CanType swift::substOpaqueTypesWithUnderlyingTypes(CanType ty,
+                                                   TypeExpansionContext context,
+                                                   bool allowLoweredTypes) {
+  if (!context.shouldLookThroughOpaqueTypeArchetypes() ||
+      !ty->hasOpaqueArchetype())
+    return ty;
+
+  ReplaceOpaqueTypesWithUnderlyingTypes replacer(
+      context.getContext(), context.getResilienceExpansion(),
+      context.isWholeModuleContext());
+  SubstOptions flags = SubstFlags::SubstituteOpaqueArchetypes;
+  if (allowLoweredTypes)
+    flags =
+        SubstFlags::SubstituteOpaqueArchetypes | SubstFlags::AllowLoweredTypes;
+  return ty.subst(replacer, replacer, flags)->getCanonicalType();
+}
+
 // SWIFT_ENABLE_TENSORFLOW
 static AnyFunctionType *
 makeFunctionType(ArrayRef<AnyFunctionType::Param> params, Type retTy,
@@ -5004,42 +5041,5 @@ AnyFunctionType *AnyFunctionType::getWithoutDifferentiability() const {
   assert(isa<GenericFunctionType>(this));
   return GenericFunctionType::get(getOptGenericSignature(), newParams,
                                   getResult(), nonDiffExtInfo);
-=======
-bool TypeBase::hasOpaqueArchetypePropertiesOrCases() {
-  if (auto *structDecl = getStructOrBoundGenericStruct()) {
-    for (auto *field : structDecl->getStoredProperties()) {
-      auto fieldTy = field->getInterfaceType()->getCanonicalType();
-      if (fieldTy->hasOpaqueArchetype() ||
-          fieldTy->hasOpaqueArchetypePropertiesOrCases())
-        return true;
-    }
-  }
-
-  if (auto *enumDecl = getEnumOrBoundGenericEnum()) {
-    for (auto *elt : enumDecl->getAllElements()) {
-      auto eltType = elt->getInterfaceType();
-      if (eltType->hasOpaqueArchetype() ||
-          eltType->getCanonicalType()->hasOpaqueArchetypePropertiesOrCases())
-        return true;
-    }
-  }
-  return false;
 }
-
-CanType swift::substOpaqueTypesWithUnderlyingTypes(CanType ty,
-                                                   TypeExpansionContext context,
-                                                   bool allowLoweredTypes) {
-  if (!context.shouldLookThroughOpaqueTypeArchetypes() ||
-      !ty->hasOpaqueArchetype())
-    return ty;
-
-  ReplaceOpaqueTypesWithUnderlyingTypes replacer(
-      context.getContext(), context.getResilienceExpansion(),
-      context.isWholeModuleContext());
-  SubstOptions flags = SubstFlags::SubstituteOpaqueArchetypes;
-  if (allowLoweredTypes)
-    flags =
-        SubstFlags::SubstituteOpaqueArchetypes | SubstFlags::AllowLoweredTypes;
-  return ty.subst(replacer, replacer, flags)->getCanonicalType();
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
-}
+// SWIFT_ENABLE_TENSORFLOW END

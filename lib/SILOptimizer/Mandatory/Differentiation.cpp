@@ -817,7 +817,7 @@ public:
     auto linMapStructType =
         linMapStruct->getDeclaredInterfaceType()->getCanonicalType();
     return typeConverter.getLoweredType(linMapStructType,
-                                        ResilienceExpansion::Minimal);
+                                        TypeExpansionContext::minimal());
   }
 
   /// Returns the branching trace enum associated with the given original block.
@@ -832,7 +832,7 @@ public:
     auto traceDeclType =
         traceDecl->getDeclaredInterfaceType()->getCanonicalType();
     return typeConverter.getLoweredType(traceDeclType,
-                                        ResilienceExpansion::Minimal);
+                                        TypeExpansionContext::minimal());
   }
 
   /// Returns the enum element in the given successor block's branching trace
@@ -2924,7 +2924,8 @@ static void emitZeroIntoBuffer(
   assert(zeroDecl->isProtocolRequirement());
   auto *accessorDecl = zeroDecl->getAccessor(AccessorKind::Get);
   SILDeclRef accessorDeclRef(accessorDecl, SILDeclRef::Kind::Func);
-  auto silFnType = typeConverter.getConstantType(accessorDeclRef);
+  auto silFnType = typeConverter.getConstantType(
+      TypeExpansionContext::minimal(), accessorDeclRef);
   // %wm = witness_method ...
   auto *getter = builder.createWitnessMethod(
       loc, type, confRef, accessorDeclRef, silFnType);
@@ -3210,8 +3211,12 @@ static SILFunction *getOrCreateReabstractionThunk(SILOptFunctionBuilder &fb,
       thunkType, fromInterfaceType, toInterfaceType,
       Type(), module.getSwiftModule());
 
+  // FIXME(TF-989): Mark reabstraction thunks as transparent. This requires
+  // generating ossa reabstraction thunks so that they can be inlined during
+  // mandatory inlining when `-enable-strip-ownership-after-serialization` is
+  // true and ownership model eliminator is not run after differentiation.
   auto *thunk = fb.getOrCreateSharedFunction(
-      loc, name, thunkDeclType, IsBare, IsTransparent, IsSerialized,
+      loc, name, thunkDeclType, IsBare, IsNotTransparent, IsSerialized,
       ProfileCounter(), IsReabstractionThunk, IsNotDynamic);
   if (!thunk->empty())
     return thunk;
@@ -3473,7 +3478,7 @@ public:
     auto getTangentParameterInfoForOriginalResult = [&](
         CanType tanType, ResultConvention origResConv) -> SILParameterInfo {
       auto &tl = context.getTypeConverter().getTypeLowering(
-          tanType, ResilienceExpansion::Minimal);
+          tanType, TypeExpansionContext::minimal());
       ParameterConvention conv;
       switch (origResConv) {
       case ResultConvention::Owned:
@@ -3497,7 +3502,7 @@ public:
     auto getTangentResultInfoForOriginalParameter = [&](
         CanType tanType, ParameterConvention origParamConv) -> SILResultInfo {
       auto &tl = context.getTypeConverter().getTypeLowering(
-          tanType, ResilienceExpansion::Minimal);
+          tanType, TypeExpansionContext::minimal());
       ResultConvention conv;
       switch (origParamConv) {
       case ParameterConvention::Direct_Owned:
@@ -3601,7 +3606,7 @@ public:
     auto enumTy = getOpASTType(predEnum->getDeclaredInterfaceType()
                                  ->getCanonicalType());
     auto enumLoweredTy = context.getTypeConverter().getLoweredType(
-        enumTy, ResilienceExpansion::Minimal);
+        enumTy, TypeExpansionContext::minimal());
     vjpBB->createPhiArgument(enumLoweredTy, ValueOwnershipKind::Owned);
     remappedBasicBlocks.insert(bb);
     return vjpBB;
@@ -3627,7 +3632,7 @@ private:
     auto nomType = getOpASTType(
         nominal->getDeclaredInterfaceType()->getCanonicalType());
     auto nomSILType = context.getTypeConverter().getLoweredType(
-        nomType, ResilienceExpansion::Minimal);
+        nomType, TypeExpansionContext::minimal());
     return nomSILType;
   }
 
@@ -3659,8 +3664,8 @@ private:
     auto enumLoweredTy = getNominalDeclLoweredType(succEnum);
     auto *enumEltDecl =
         pullbackInfo.lookUpBranchingTraceEnumElement(predBB, succBB);
-    auto enumEltType = getOpType(
-        enumLoweredTy.getEnumElementType(enumEltDecl, getModule()));
+    auto enumEltType = getOpType(enumLoweredTy.getEnumElementType(
+        enumEltDecl, getModule(), TypeExpansionContext::minimal()));
     // If the enum element type does not have a box type (i.e. the enum case is
     // not indirect), then directly create an enum.
     auto boxType = dyn_cast<SILBoxType>(enumEltType.getASTType());
@@ -4043,7 +4048,7 @@ public:
     auto loweredPullbackType =
         getOpType(context.getTypeConverter().getLoweredType(
                       pullbackDecl->getInterfaceType()->getCanonicalType(),
-                      ResilienceExpansion::Minimal))
+                      TypeExpansionContext::minimal()))
             .castTo<SILFunctionType>();
     if (!loweredPullbackType->isEqual(actualPullbackType)) {
       // Set non-reabstracted original pullback type in nested apply info.
@@ -4415,7 +4420,7 @@ private:
     auto nomType =
         getOpASTType(nominal->getDeclaredInterfaceType()->getCanonicalType());
     auto nomSILType = context.getTypeConverter().getLoweredType(
-        nomType, ResilienceExpansion::Minimal);
+        nomType, TypeExpansionContext::minimal());
     return nomSILType;
   }
 
@@ -4485,7 +4490,7 @@ private:
   SILValue emitZeroDirect(CanType type, SILLocation loc) {
     auto diffBuilder = getDifferentialBuilder();
     auto silType = getModule().Types.getLoweredLoadableType(
-        type, ResilienceExpansion::Minimal, getModule());
+        type, TypeExpansionContext::minimal(), getModule());
     auto *buffer = diffBuilder.createAllocStack(loc, silType);
     emitZeroIndirect(type, buffer, loc);
     auto loaded = diffBuilder.emitLoadValueOperation(
@@ -5720,7 +5725,7 @@ public:
     auto loweredDifferentialType =
         getOpType(context.getTypeConverter().getLoweredType(
             differentialDecl->getInterfaceType()->getCanonicalType(),
-            ResilienceExpansion::Minimal))
+            TypeExpansionContext::minimal()))
             .castTo<SILFunctionType>();
     // If actual differential type does not match lowered differential type,
     // reabstract the differential using a thunk.
@@ -6444,8 +6449,8 @@ public:
             getPullbackInfo().getBranchingTraceEnumLoweredType(succBB);
         auto *enumEltDecl =
             getPullbackInfo().lookUpBranchingTraceEnumElement(origBB, succBB);
-        auto enumEltType = remapType(
-            enumLoweredTy.getEnumElementType(enumEltDecl, getModule()));
+        auto enumEltType = remapType(enumLoweredTy.getEnumElementType(
+            enumEltDecl, getModule(), TypeExpansionContext::minimal()));
         pullbackTrampolineBB->createPhiArgument(enumEltType,
                                                 ValueOwnershipKind::Owned);
       }
@@ -7123,7 +7128,7 @@ public:
       auto tangentVectorTy =
           getTangentSpace(structTy)->getType()->getCanonicalType();
       assert(!getModule().Types.getTypeLowering(
-                 tangentVectorTy, ResilienceExpansion::Minimal)
+                 tangentVectorTy, TypeExpansionContext::minimal())
                      .isAddressOnly());
       auto *tangentVectorDecl =
           tangentVectorTy->getStructOrBoundGenericStruct();
@@ -7187,7 +7192,7 @@ public:
     auto tangentVectorTy =
         getTangentSpace(structTy)->getType()->getCanonicalType();
     assert(!getModule().Types.getTypeLowering(
-               tangentVectorTy, ResilienceExpansion::Minimal)
+               tangentVectorTy, TypeExpansionContext::minimal())
                    .isAddressOnly());
     auto tangentVectorSILTy =
         SILType::getPrimitiveObjectType(tangentVectorTy);
@@ -7233,7 +7238,7 @@ public:
           auto fieldTy = field->getType().subst(substMap);
           auto fieldSILTy =
               getContext().getTypeConverter().getLoweredType(
-                  fieldTy, ResilienceExpansion::Minimal);
+                  fieldTy, TypeExpansionContext::minimal());
           assert(fieldSILTy.isObject());
           eltVals.push_back(makeZeroAdjointValue(fieldSILTy));
         }
@@ -7681,7 +7686,7 @@ void PullbackEmitter::emitZeroIndirect(CanType type, SILValue bufferAccess,
 
 SILValue PullbackEmitter::emitZeroDirect(CanType type, SILLocation loc) {
   auto silType = getModule().Types.getLoweredLoadableType(
-      type, ResilienceExpansion::Minimal, getModule());
+      type, TypeExpansionContext::minimal(), getModule());
   auto *buffer = builder.createAllocStack(loc, silType);
   emitZeroIndirect(type, buffer, loc);
   auto loaded = builder.emitLoadValueOperation(
@@ -7849,7 +7854,8 @@ void PullbackEmitter::accumulateIndirect(
                                                            proto);
     assert(!confRef.isInvalid() && "Missing conformance to `AdditiveArithmetic`");
     SILDeclRef declRef(combinerFuncDecl, SILDeclRef::Kind::Func);
-    auto silFnTy = getContext().getTypeConverter().getConstantType(declRef);
+    auto silFnTy = getContext().getTypeConverter().getConstantType(
+        TypeExpansionContext::minimal(), declRef);
     // %0 = witness_method @+
     auto witnessMethod = builder.createWitnessMethod(loc, adjointASTTy,
                                                      confRef, declRef,
@@ -7906,7 +7912,8 @@ void PullbackEmitter::accumulateIndirect(SILValue lhsDestAccess,
     auto confRef = swiftMod->lookupConformance(astType, proto);
     assert(!confRef.isInvalid() && "Missing conformance to `AdditiveArithmetic`");
     SILDeclRef declRef(accumulatorFuncDecl, SILDeclRef::Kind::Func);
-    auto silFnTy = getContext().getTypeConverter().getConstantType(declRef);
+    auto silFnTy = getContext().getTypeConverter().getConstantType(
+        TypeExpansionContext::minimal(), declRef);
     // %0 = witness_method @+=
     auto witnessMethod =
         builder.createWitnessMethod(loc, astType, confRef, declRef, silFnTy);

@@ -1561,18 +1561,13 @@ ERROR(differentiable_attribute_expected_rparen,none,
       "expected ')' in '@differentiable' attribute", ())
 ERROR(unexpected_argument_differentiable,none,
       "unexpected argument '%0' in '@differentiable' attribute", (StringRef))
-// SWIFT_ENABLE_TENSORFLOW
-ERROR(attr_differentiable_expected_function_name,PointsToFirstBadToken,
-      "expected a %0 function name", (StringRef))
-ERROR(attr_differentiable_expected_parameter_list,PointsToFirstBadToken,
-      "expected a list of parameters to differentiate with respect to", ())
-ERROR(attr_differentiable_use_wrt_not_withrespectto,none,
-      "use 'wrt:' to specify parameters to differentiate with respect to", ())
-ERROR(attr_differentiable_missing_label,PointsToFirstBadToken,
-      "missing label '%0:' in '@differentiable' attribute", (StringRef))
-ERROR(attr_differentiable_expected_label,none,
-      "expected either 'wrt:' or a function specifier label, e.g. 'jvp:', "
-      "or 'vjp:'", ())
+
+// differentiation `wrt` parameters clause
+ERROR(expected_colon_after_label,PointsToFirstBadToken,
+      "expected a colon ':' after '%0'", (StringRef))
+ERROR(diff_params_clause_expected_parameter,PointsToFirstBadToken,
+      "expected a parameter, which can be a function parameter name, "
+      "parameter index, or 'self'", ())
 
 // differentiating
 ERROR(attr_differentiating_expected_original_name,PointsToFirstBadToken,
@@ -1590,14 +1585,6 @@ ERROR(attr_transposing_expected_label_linear_or_wrt,none,
 ERROR(transposing_params_clause_expected_parameter,PointsToFirstBadToken,
       "expected a parameter, which can be a 'unsigned int' parameter number "
       "or 'self'", ())
-
-// differentiation `wrt` parameters clause
-ERROR(expected_colon_after_label,PointsToFirstBadToken,
-      "expected a colon ':' after '%0'", (StringRef))
-ERROR(diff_params_clause_expected_parameter,PointsToFirstBadToken,
-      "expected a parameter, which can be a function parameter name, "
-      "parameter index, or 'self'", ())
-
 // [differentiable ...] (sil-decl attr)
 ERROR(sil_attr_differentiable_expected_keyword,PointsToFirstBadToken,
       "expected '%0' in 'differentiable' attribute", (StringRef))
@@ -1647,13 +1634,6 @@ ERROR(sil_inst_autodiff_invalid_witness_generic_signature,PointsToFirstBadToken,
 ERROR(attr_quoted_enable_experimental_quasiquotes,PointsToFirstBadToken,
       "'@quoted' is unsupported; pass -enable-experimental-quasiquotes to "
       "enable support for quasiquotes", ())
-
-// differentiation `wrt` parameters clause
-ERROR(expected_colon_after_label,PointsToFirstBadToken,
-      "expected a colon ':' after '%0'", (StringRef))
-ERROR(diff_params_clause_expected_parameter,PointsToFirstBadToken,
-      "expected a parameter, which can be a function parameter name, "
-      "parameter index, or 'self'", ())
 
 //------------------------------------------------------------------------------
 // MARK: Generics parsing diagnostics

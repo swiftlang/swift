@@ -111,16 +111,9 @@ class AttributeChecker : public AttributeVisitor<AttributeChecker> {
   IGNORED_ATTR(DisfavoredOverload)
   IGNORED_ATTR(ProjectedValueProperty)
   IGNORED_ATTR(ReferenceOwnership)
-<<<<<<< HEAD
   // SWIFT_ENABLE_TENSORFLOW
   // TODO(TF-715): Allow @quoted on more decls.
   IGNORED_ATTR(Quoted)
-=======
-
-  // TODO(TF-828): Upstream `@differentiable` attribute type-checking from
-  // tensorflow branch.
-  IGNORED_ATTR(Differentiable)
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
 #undef IGNORED_ATTR
 
   void visitAlignmentAttr(AlignmentAttr *attr) {

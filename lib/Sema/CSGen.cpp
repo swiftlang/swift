@@ -1331,7 +1331,7 @@ namespace {
 
     Type visitDeclQuoteExpr(DeclQuoteExpr *expr) {
       auto &tc = CS.getTypeChecker();
-      return tc.getTypeOfQuoteDecl(expr->getLoc());
+      return tc.getTypeOfQuoteDecl(CS.getASTContext(), expr->getLoc());
     }
 
     Type visitDeclRefExpr(DeclRefExpr *E) {

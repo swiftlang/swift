@@ -2207,8 +2207,7 @@ parseSILDifferentiabilityWitnessConfigAndFunction(Parser &P, SILParser &SP,
     Scope genericsScope(&P, ScopeKind::Generics);
     auto *genericParams = P.maybeParseGenericParams().getPtrOrNull();
     if (genericParams) {
-      auto *witnessGenEnv =
-          handleSILGenericParams(P.Context, genericParams, &P.SF);
+      auto *witnessGenEnv = handleSILGenericParams(genericParams, &P.SF);
       witnessGenSig = witnessGenEnv->getGenericSignature();
     }
   }

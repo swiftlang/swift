@@ -945,7 +945,7 @@ public:
   ///
   /// TODO(TF-736): In the future, we may want to infer more precise type
   /// based on the shape of the quoted declaration.
-  Type getTypeOfQuoteDecl(SourceLoc loc);
+  Type getTypeOfQuoteDecl(ASTContext &ctx, SourceLoc loc);
 
 private:
   Type typeCheckExpressionImpl(Expr *&expr, DeclContext *dc,

@@ -715,11 +715,18 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
   // SWIFT_ENABLE_TENSORFLOW
   // Read and instantiate the differentiable attributes.
   while (numDifferentiableAttrs--) {
-    auto next = SILCursor.advance(AF_DontPopBlockAtEnd);
+    llvm::Expected<llvm::BitstreamEntry> maybeNext =
+        SILCursor.advance(AF_DontPopBlockAtEnd);
+    if (!maybeNext)
+      return maybeNext.takeError();
+    llvm::BitstreamEntry next = maybeNext.get();
     assert(next.Kind == llvm::BitstreamEntry::Record);
 
     scratch.clear();
-    kind = SILCursor.readRecord(next.ID, scratch);
+    llvm::Expected<unsigned> maybeKind = SILCursor.readRecord(next.ID, scratch);
+    if (!maybeKind)
+      return maybeKind.takeError();
+    unsigned kind = maybeKind.get();
     assert(kind == SIL_DIFFERENTIABLE_ATTR &&
            "Missing differentiable attribute");
 
@@ -1622,7 +1629,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     for (auto i = numParamIndices;
          i < numParamIndices + numOperands * 3; i += 3) {
       auto astTy = MF->getType(ListOfValues[i]);
-      auto silTy = getSILType(astTy, (SILValueCategory)ListOfValues[i+1]);
+      auto silTy = getSILType(astTy, (SILValueCategory)ListOfValues[i+1], Fn);
       operands.push_back(getLocalValue(ListOfValues[i+2], silTy));
     }
     Optional<std::pair<SILValue, SILValue>> derivativeFunctions = None;
@@ -1647,7 +1654,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     for (auto i = numParamIndices;
          i < numParamIndices + numOperands * 3; i += 3) {
       auto astTy = MF->getType(ListOfValues[i]);
-      auto silTy = getSILType(astTy, (SILValueCategory)ListOfValues[i+1]);
+      auto silTy = getSILType(astTy, (SILValueCategory)ListOfValues[i+1], Fn);
       operands.push_back(getLocalValue(ListOfValues[i+2], silTy));
     }
     Optional<SILValue> transposeFunction = None;
@@ -1659,7 +1666,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   }
   case SILInstructionKind::DifferentiableFunctionExtractInst: {
     auto astTy = MF->getType(TyID);
-    auto silTy = getSILType(astTy, SILValueCategory::Object);
+    auto silTy = getSILType(astTy, SILValueCategory::Object, Fn);
     auto val = getLocalValue(ValID, silTy);
     NormalDifferentiableFunctionTypeComponent extractee(Attr);
     Optional<SILType> explicitExtracteeType = None;
@@ -1672,7 +1679,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   }
   case SILInstructionKind::LinearFunctionExtractInst: {
     auto astTy = MF->getType(TyID);
-    auto silTy = getSILType(astTy, SILValueCategory::Object);
+    auto silTy = getSILType(astTy, SILValueCategory::Object, Fn);
     auto val = getLocalValue(ValID, silTy);
     LinearDifferentiableFunctionTypeComponent extractee(Attr);
     ResultVal = Builder.createLinearFunctionExtract(Loc, extractee, val);
@@ -3533,17 +3540,26 @@ SILDeserializer::readDifferentiabilityWitness(DeclID DId) {
     return diffWitnessOrOffset.get();
 
   BCOffsetRAII restoreOffset(SILCursor);
-  SILCursor.JumpToBit(diffWitnessOrOffset.getOffset());
-  auto entry = SILCursor.advance(AF_DontPopBlockAtEnd);
+  if (auto err = SILCursor.JumpToBit(diffWitnessOrOffset.getOffset()))
+    MF->fatal(std::move(err));
+  llvm::Expected<llvm::BitstreamEntry> maybeEntry =
+      SILCursor.advance(AF_DontPopBlockAtEnd);
+  if (!maybeEntry)
+    MF->fatal(maybeEntry.takeError());
+  auto entry = maybeEntry.get();
   if (entry.Kind == llvm::BitstreamEntry::Error) {
-    LLVM_DEBUG(llvm::dbgs()
-               << "Cursor advance error in readDifferentiabilityWitness.\n");
+    LLVM_DEBUG(llvm::dbgs() << "Cursor advance error in "
+                               "readDefaultWitnessTable.\n");
     return nullptr;
   }
 
   SmallVector<uint64_t, 64> scratch;
   StringRef blobData;
-  unsigned kind = SILCursor.readRecord(entry.ID, scratch, &blobData);
+  llvm::Expected<unsigned> maybeKind =
+      SILCursor.readRecord(entry.ID, scratch, &blobData);
+  if (!maybeKind)
+    MF->fatal(maybeKind.takeError());
+  unsigned kind = maybeKind.get();
   assert(kind == SIL_DIFFERENTIABILITY_WITNESS &&
          "Expected sil_differentiability_witness");
   (void)kind;

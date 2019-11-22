@@ -1224,7 +1224,8 @@ Expr *TypeChecker::quoteExpr(Expr *expr, DeclContext *dc) {
   assert(expr->getType());
 
   Breadcrumbs bcs;
-  ASTQuoter astQuoter(*this, Context, bcs);
+  auto &ctx = dc->getASTContext();
+  ASTQuoter astQuoter(*this, ctx, bcs);
   Expr *quotedExpr = astQuoter.visit(expr);
   if (!quotedExpr) {
     return nullptr;
@@ -1240,19 +1241,18 @@ Expr *TypeChecker::quoteExpr(Expr *expr, DeclContext *dc) {
     return nullptr;
   }
 
-  auto quoteRef =
-      new (Context) UnresolvedDeclRefExpr(quoteClassType->getDecl()->getName(),
-                                          DeclRefKind::Ordinary, DeclNameLoc());
+  auto quoteRef = new (ctx) UnresolvedDeclRefExpr(
+      quoteClassType->getDecl()->getName(), DeclRefKind::Ordinary,
+      DeclNameLoc());
   SmallVector<TypeLoc, 4> quoteTargs;
   for (auto targ : quoteClassType->getGenericArgs()) {
-    auto targRepr = new (Context) FixedTypeRepr(targ, SourceLoc());
+    auto targRepr = new (ctx) FixedTypeRepr(targ, SourceLoc());
     quoteTargs.push_back(TypeLoc(targRepr));
   }
   auto quoteInit = UnresolvedSpecializeExpr::create(
-      Context, quoteRef, SourceLoc(), quoteTargs, SourceLoc());
+      ctx, quoteRef, SourceLoc(), quoteTargs, SourceLoc());
   quoteInit->setImplicit();
-  Expr *quoteCall =
-      CallExpr::createImplicit(Context, quoteInit, {quotedExpr}, {});
+  Expr *quoteCall = CallExpr::createImplicit(ctx, quoteInit, {quotedExpr}, {});
 
   // TODO(TF-727): Improve error reporting when quoting fails.
   if (!typeCheckExpression(quoteCall, dc)) {
@@ -1272,16 +1272,16 @@ Expr *TypeChecker::quoteExpr(Expr *expr, DeclContext *dc) {
 
 Type TypeChecker::getTypeOfQuoteExpr(Type exprType, SourceLoc loc) {
   assert(exprType);
-  if (!Context.getQuoteModule()) {
-    Context.Diags.diagnose(loc, diag::quote_literal_no_quote_module);
+  auto &ctx = exprType->getASTContext();
+  if (!ctx.getQuoteModule()) {
+    ctx.Diags.diagnose(loc, diag::quote_literal_no_quote_module);
     return Type();
   }
   if (auto fnExprType = exprType->getAs<FunctionType>()) {
     auto n = fnExprType->getParams().size();
-    auto quoteClass = Context.getFunctionQuoteDecl(n);
+    auto quoteClass = ctx.getFunctionQuoteDecl(n);
     if (!quoteClass) {
-      Context.Diags.diagnose(loc, diag::quote_literal_no_function_quote_class,
-                             n);
+      ctx.Diags.diagnose(loc, diag::quote_literal_no_function_quote_class, n);
       return Type();
     }
     SmallVector<Type, 4> typeArgs;
@@ -1295,9 +1295,9 @@ Type TypeChecker::getTypeOfQuoteExpr(Type exprType, SourceLoc loc) {
     typeArgs.push_back(fnExprType->getResult());
     return BoundGenericClassType::get(quoteClass, Type(), typeArgs);
   } else {
-    auto quoteClass = Context.getQuoteDecl();
+    auto quoteClass = ctx.getQuoteDecl();
     if (!quoteClass) {
-      Context.Diags.diagnose(loc, diag::quote_literal_no_quote_class);
+      ctx.Diags.diagnose(loc, diag::quote_literal_no_quote_class);
       return Type();
     }
     if (auto lvalueExprType = exprType->getAs<LValueType>()) {
@@ -1309,19 +1309,19 @@ Type TypeChecker::getTypeOfQuoteExpr(Type exprType, SourceLoc loc) {
 
 Type TypeChecker::getTypeOfUnquoteExpr(Type exprType, SourceLoc loc) {
   assert(exprType);
+  auto &ctx = exprType->getASTContext();
   if (auto genericType = exprType->getAs<BoundGenericClassType>()) {
     auto classDecl = genericType->getDecl();
     auto typeArgs = genericType->getGenericArgs();
-    if (classDecl == Context.getQuoteDecl()) {
+    if (classDecl == ctx.getQuoteDecl()) {
       return typeArgs[0];
-    } else if (classDecl == Context.getFunctionQuoteDecl(typeArgs.size() - 1)) {
+    } else if (classDecl == ctx.getFunctionQuoteDecl(typeArgs.size() - 1)) {
       SmallVector<AnyFunctionType::Param, 4> paramTypes;
       for (unsigned i = 0; i < typeArgs.size() - 1; ++i) {
         auto typeArg = typeArgs[i];
         auto flags = ParameterTypeFlags();
         if (auto genericTypeArg = typeArg->getAs<BoundGenericClassType>()) {
-          if (genericTypeArg->getDecl() ==
-              Context.getUnsafeMutablePointerDecl()) {
+          if (genericTypeArg->getDecl() == ctx.getUnsafeMutablePointerDecl()) {
             flags = flags.withInOut(true);
           }
         }
@@ -1330,18 +1330,18 @@ Type TypeChecker::getTypeOfUnquoteExpr(Type exprType, SourceLoc loc) {
       }
       return FunctionType::get(paramTypes, typeArgs[typeArgs.size() - 1]);
     } else {
-      Context.Diags.diagnose(loc, diag::unquote_wrong_type);
+      ctx.Diags.diagnose(loc, diag::unquote_wrong_type);
       return Type();
     }
   } else {
-    Context.Diags.diagnose(loc, diag::unquote_wrong_type);
+    ctx.Diags.diagnose(loc, diag::unquote_wrong_type);
     return Type();
   }
 }
 
 Expr *TypeChecker::quoteDecl(Decl *decl, DeclContext *dc) {
   Breadcrumbs bcs;
-  ASTQuoter astQuoter(*this, Context, bcs);
+  ASTQuoter astQuoter(*this, dc->getASTContext(), bcs);
   Expr *quotedDecl = astQuoter.visit(decl);
   if (!quotedDecl) {
     return nullptr;
@@ -1355,14 +1355,14 @@ Expr *TypeChecker::quoteDecl(Decl *decl, DeclContext *dc) {
   return quotedDecl;
 }
 
-Type TypeChecker::getTypeOfQuoteDecl(SourceLoc loc) {
-  if (!Context.getQuoteModule()) {
-    Context.Diags.diagnose(loc, diag::quote_literal_no_quote_module);
+Type TypeChecker::getTypeOfQuoteDecl(ASTContext &ctx, SourceLoc loc) {
+  if (!ctx.getQuoteModule()) {
+    ctx.Diags.diagnose(loc, diag::quote_literal_no_quote_module);
     return Type();
   }
-  auto treeProto = Context.getTreeDecl();
+  auto treeProto = ctx.getTreeDecl();
   if (!treeProto) {
-    Context.Diags.diagnose(loc, diag::quote_literal_no_tree_proto);
+    ctx.Diags.diagnose(loc, diag::quote_literal_no_tree_proto);
     return Type();
   }
   return treeProto->getDeclaredType();

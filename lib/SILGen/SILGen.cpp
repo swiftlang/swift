@@ -416,19 +416,10 @@ SILGenModule::getKeyPathProjectionCoroutine(bool isReadAccess,
                     : ParameterConvention::Indirect_In_Guaranteed },
   };
 
-<<<<<<< HEAD
-  auto extInfo =
-    SILFunctionType::ExtInfo(SILFunctionTypeRepresentation::Thin,
-                             /*pseudogeneric*/false,
-                             // SWIFT_ENABLE_TENSORFLOW
-                             /*non-escaping*/false,
-                             DifferentiabilityKind::NonDifferentiable);
-=======
   auto extInfo = SILFunctionType::ExtInfo(
       SILFunctionTypeRepresentation::Thin,
       /*pseudogeneric*/ false,
       /*non-escaping*/ false, DifferentiabilityKind::NonDifferentiable);
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
 
   auto functionTy = SILFunctionType::get(sig, extInfo,
                                          SILCoroutineKind::YieldOnce,

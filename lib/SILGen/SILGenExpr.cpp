@@ -2711,10 +2711,6 @@ static SILFunction *getOrCreateKeyPathGetter(SILGenModule &SGM,
   auto signature = SILFunctionType::get(genericSig,
     SILFunctionType::ExtInfo(SILFunctionType::Representation::Thin,
                              /*pseudogeneric*/ false,
-<<<<<<< HEAD
-                             // SWIFT_ENABLE_TENSORFLOW
-=======
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
                              /*noescape*/ false,
                              DifferentiabilityKind::NonDifferentiable),
     SILCoroutineKind::None,
@@ -2860,10 +2856,6 @@ static SILFunction *getOrCreateKeyPathSetter(SILGenModule &SGM,
   auto signature = SILFunctionType::get(genericSig,
     SILFunctionType::ExtInfo(SILFunctionType::Representation::Thin,
                              /*pseudogeneric*/ false,
-<<<<<<< HEAD
-                             // SWIFT_ENABLE_TENSORFLOW
-=======
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
                              /*noescape*/ false,
                              DifferentiabilityKind::NonDifferentiable),
     SILCoroutineKind::None,
@@ -3041,10 +3033,6 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
     auto signature = SILFunctionType::get(genericSig,
       SILFunctionType::ExtInfo(SILFunctionType::Representation::Thin,
                                /*pseudogeneric*/ false,
-<<<<<<< HEAD
-                               // SWIFT_ENABLE_TENSORFLOW
-=======
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
                                /*noescape*/ false,
                                DifferentiabilityKind::NonDifferentiable),
       SILCoroutineKind::None,
@@ -3222,10 +3210,6 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
     auto signature = SILFunctionType::get(genericSig,
       SILFunctionType::ExtInfo(SILFunctionType::Representation::Thin,
                                /*pseudogeneric*/ false,
-<<<<<<< HEAD
-                               // SWIFT_ENABLE_TENSORFLOW
-=======
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
                                /*noescape*/ false,
                                DifferentiabilityKind::NonDifferentiable),
       SILCoroutineKind::None,

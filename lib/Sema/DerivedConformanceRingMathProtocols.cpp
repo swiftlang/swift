@@ -79,13 +79,11 @@ static ValueDecl *getProtocolRequirement(ProtocolDecl *proto, Identifier name) {
 // it if it does not exist.
 static ConstructorDecl *getOrCreateEffectiveMemberwiseInitializer(
     ASTContext &ctx, NominalTypeDecl *nominal) {
-  auto &C = nominal->getASTContext();
   if (auto *initDecl = nominal->getEffectiveMemberwiseInitializer())
     return initDecl;
   auto *initDecl = createMemberwiseImplicitConstructor(
       ctx, nominal);
   nominal->addMember(initDecl);
-  C.addSynthesizedDecl(initDecl);
   return initDecl;
 }
 
@@ -256,8 +254,6 @@ static ValueDecl *deriveMathOperator(DerivedConformance &derived,
   operatorDecl->copyFormalAccessFrom(nominal, /*sourceIsParentContext*/ true);
 
   derived.addMembersToConformanceContext({operatorDecl});
-  C.addSynthesizedDecl(operatorDecl);
-
   return operatorDecl;
 }
 

@@ -279,7 +279,11 @@ public:
   /// The # of times we have performed typo correction.
   unsigned NumTypoCorrections = 0;
 
-<<<<<<< HEAD
+  /// The next auto-closure discriminator.  This needs to be preserved
+  /// across invocations of both the parser and the type-checker.
+  unsigned NextAutoClosureDiscriminator = 0;
+
+  // SWIFT_ENABLE_TENSORFLOW
   /// Cache of autodiff-associated vector spaces.
   llvm::DenseMap<Type, Optional<VectorSpace>> AutoDiffVectorSpaces;
 
@@ -288,11 +292,7 @@ public:
   /// same set of parameters.
   llvm::DenseMap<std::pair<Decl *, IndexSubset *>, DifferentiableAttr *>
       DifferentiableAttrs;
-=======
-  /// The next auto-closure discriminator.  This needs to be preserved
-  /// across invocations of both the parser and the type-checker.
-  unsigned NextAutoClosureDiscriminator = 0;
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
+  // SWIFT_ENABLE_TENSORFLOW END
 
 private:
   /// The current generation number, which reflects the number of

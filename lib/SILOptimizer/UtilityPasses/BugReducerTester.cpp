@@ -83,19 +83,10 @@ class BugReducerTester : public SILFunctionTransform {
     ResultInfoArray.push_back(
         SILResultInfo(EmptyTupleCanType, ResultConvention::Unowned));
     auto FuncType = SILFunctionType::get(
-<<<<<<< HEAD
-        nullptr, SILFunctionType::ExtInfo(SILFunctionType::Representation::Thin,
-                                          false /*isPseudoGeneric*/,
-                                          // SWIFT_ENABLE_TENSORFLOW
-                                          false /*noescape*/,
-                                          DifferentiabilityKind
-                                              ::NonDifferentiable),
-=======
         nullptr,
         SILFunctionType::ExtInfo(SILFunctionType::Representation::Thin,
                                  false /*isPseudoGeneric*/, false /*noescape*/,
                                  DifferentiabilityKind::NonDifferentiable),
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
         SILCoroutineKind::None, ParameterConvention::Direct_Unowned,
         ArrayRef<SILParameterInfo>(), ArrayRef<SILYieldInfo>(), ResultInfoArray,
         None, SubstitutionMap(), false,

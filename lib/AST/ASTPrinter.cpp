@@ -3801,13 +3801,8 @@ public:
     if (Options.SkipAttributes)
       return;
 
-<<<<<<< HEAD
-    // SWIFT_ENABLE_TENSORFLOW
-    if (!Options.excludeAttrKind(TAK_differentiable) && info.isDifferentiable()) {
-=======
     if (!Options.excludeAttrKind(TAK_differentiable) &&
         info.isDifferentiable()) {
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
       if (info.getDifferentiabilityKind() == DifferentiabilityKind::Linear) {
         Printer << "@differentiable(linear) ";
       } else {
@@ -3858,13 +3853,8 @@ public:
     if (Options.SkipAttributes)
       return;
 
-<<<<<<< HEAD
-    // SWIFT_ENABLE_TENSORFLOW
-    if (!Options.excludeAttrKind(TAK_differentiable) && info.isDifferentiable()) {
-=======
     if (!Options.excludeAttrKind(TAK_differentiable) &&
         info.isDifferentiable()) {
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
       if (info.getDifferentiabilityKind() == DifferentiabilityKind::Linear) {
         Printer << "@differentiable(linear) ";
       } else {

@@ -1,16 +1,8 @@
-<<<<<<< HEAD
-//===--- AutoDiff.h - Swift Differentiable Programming --------------------===//
-//
-// This source file is part of the Swift.org open source project
-//
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
-=======
 //===--- AutoDiff.h - Swift Automatic Differentiation ---------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
 // Copyright (c) 2019 Apple Inc. and the Swift project authors
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -18,20 +10,95 @@
 //
 //===----------------------------------------------------------------------===//
 //
-<<<<<<< HEAD
-//  SWIFT_ENABLE_TENSORFLOW
-//  This file defines AST support for the experimental differentiable
-//  programming feature.
-=======
 //  This file defines AST support for automatic differentiation.
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
 //
 //===----------------------------------------------------------------------===//
 
 #ifndef SWIFT_AST_AUTODIFF_H
 #define SWIFT_AST_AUTODIFF_H
 
-<<<<<<< HEAD
+#include <cstdint>
+
+#include "swift/AST/Identifier.h"
+#include "swift/AST/IndexSubset.h"
+#include "swift/Basic/SourceLoc.h"
+#include "swift/Basic/Range.h"
+
+namespace swift {
+
+class ParsedAutoDiffParameter {
+public:
+  enum class Kind { Named, Ordered, Self };
+
+private:
+  SourceLoc loc;
+  Kind kind;
+  union Value {
+    struct { Identifier name; } Named;
+    struct { unsigned index; } Ordered;
+    struct {} self;
+    Value(Identifier name) : Named({name}) {}
+    Value(unsigned index) : Ordered({index}) {}
+    Value() {}
+  } value;
+
+public:
+  ParsedAutoDiffParameter(SourceLoc loc, Kind kind, Value value)
+    : loc(loc), kind(kind), value(value) {}
+
+  ParsedAutoDiffParameter(SourceLoc loc, Kind kind, unsigned index)
+    : loc(loc), kind(kind), value(index) {}
+
+  static ParsedAutoDiffParameter getNamedParameter(SourceLoc loc,
+                                                   Identifier name) {
+    return { loc, Kind::Named, name };
+  }
+
+  static ParsedAutoDiffParameter getOrderedParameter(SourceLoc loc,
+                                                     unsigned index) {
+    return { loc, Kind::Ordered, index };
+  }
+
+  static ParsedAutoDiffParameter getSelfParameter(SourceLoc loc) {
+    return { loc, Kind::Self, {} };
+  }
+
+  Identifier getName() const {
+    assert(kind == Kind::Named);
+    return value.Named.name;
+  }
+
+  unsigned getIndex() const {
+    return value.Ordered.index;
+  }
+
+  Kind getKind() const {
+    return kind;
+  }
+
+  SourceLoc getLoc() const {
+    return loc;
+  }
+
+  bool isEqual(const ParsedAutoDiffParameter &other) const {
+    if (getKind() != other.getKind())
+      return false;
+    if (getKind() == Kind::Named)
+      return getName() == other.getName();
+    return getKind() == Kind::Self;
+  }
+};
+
+enum class DifferentiabilityKind : uint8_t {
+  NonDifferentiable = 0,
+  Normal = 1,
+  Linear = 2
+};
+
+} // end namespace swift
+
+// SWIFT_ENABLE_TENSORFLOW
+// Not-yet-upstreamed additions on `tensorflow` branch is below.
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/IndexSubset.h"
@@ -52,12 +119,6 @@ class AnyFunctionType;
 class SILFunctionType;
 typedef CanTypeWrapper<SILFunctionType> CanSILFunctionType;
 enum class SILLinkage : uint8_t;
-
-enum class DifferentiabilityKind : uint8_t {
-  NonDifferentiable = 0,
-  Normal = 1,
-  Linear = 2
-};
 
 /// The kind of an linear map.
 struct AutoDiffLinearMapKind {
@@ -149,89 +210,6 @@ struct LinearDifferentiableFunctionTypeComponent {
   operator innerty() const { return rawValue; }
 };
 
-=======
-#include <cstdint>
-
-#include "swift/AST/Identifier.h"
-#include "swift/AST/IndexSubset.h"
-#include "swift/Basic/SourceLoc.h"
-#include "swift/Basic/Range.h"
-
-namespace swift {
-
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
-class ParsedAutoDiffParameter {
-public:
-  enum class Kind { Named, Ordered, Self };
-
-private:
-  SourceLoc loc;
-  Kind kind;
-  union Value {
-    struct { Identifier name; } Named;
-    struct { unsigned index; } Ordered;
-    struct {} self;
-    Value(Identifier name) : Named({name}) {}
-    Value(unsigned index) : Ordered({index}) {}
-    Value() {}
-  } value;
-
-public:
-  ParsedAutoDiffParameter(SourceLoc loc, Kind kind, Value value)
-    : loc(loc), kind(kind), value(value) {}
-
-  ParsedAutoDiffParameter(SourceLoc loc, Kind kind, unsigned index)
-    : loc(loc), kind(kind), value(index) {}
-
-  static ParsedAutoDiffParameter getNamedParameter(SourceLoc loc,
-                                                   Identifier name) {
-    return { loc, Kind::Named, name };
-  }
-<<<<<<< HEAD
-  
-=======
-
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
-  static ParsedAutoDiffParameter getOrderedParameter(SourceLoc loc,
-                                                     unsigned index) {
-    return { loc, Kind::Ordered, index };
-  }
-
-  static ParsedAutoDiffParameter getSelfParameter(SourceLoc loc) {
-    return { loc, Kind::Self, {} };
-  }
-
-  Identifier getName() const {
-    assert(kind == Kind::Named);
-    return value.Named.name;
-  }
-<<<<<<< HEAD
-  
-=======
-
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
-  unsigned getIndex() const {
-    return value.Ordered.index;
-  }
-
-  Kind getKind() const {
-    return kind;
-  }
-
-  SourceLoc getLoc() const {
-    return loc;
-  }
-
-  bool isEqual(const ParsedAutoDiffParameter &other) const {
-    if (getKind() != other.getKind())
-      return false;
-    if (getKind() == Kind::Named)
-      return getName() == other.getName();
-    return getKind() == Kind::Self;
-  }
-};
-
-<<<<<<< HEAD
 /// SIL-level automatic differentiation indices. Consists of a source index,
 /// i.e. index of the dependent result to differentiate from, and parameter
 /// indices, i.e. index of independent parameters to differentiate with
@@ -468,17 +446,10 @@ public:
   Type getType() const;
   CanType getCanonicalType() const;
   NominalTypeDecl *getNominal() const;
-=======
-enum class DifferentiabilityKind : uint8_t {
-  NonDifferentiable = 0,
-  Normal = 1,
-  Linear = 2
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
 };
 
 } // end namespace swift
 
-<<<<<<< HEAD
 namespace llvm {
 
 using swift::AutoDiffConfig;
@@ -543,7 +514,6 @@ template<> struct DenseMapInfo<SILAutoDiffIndices> {
 };
 
 } // end namespace llvm
+// SWIFT_ENABLE_TENSORFLOW END
 
-=======
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-11-20-a
 #endif // SWIFT_AST_AUTODIFF_H
