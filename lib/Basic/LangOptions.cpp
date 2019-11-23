@@ -209,6 +209,7 @@ std::pair<bool, bool> LangOptions::setTarget(llvm::Triple triple) {
 
   // Set the "os" platform condition.
   switch (Target.getOS()) {
+  case llvm::Triple::Darwin:
   case llvm::Triple::MacOSX:
     addPlatformConditionValue(PlatformConditionKind::OS, "OSX");
     break;
@@ -285,30 +286,19 @@ std::pair<bool, bool> LangOptions::setTarget(llvm::Triple triple) {
 
   // Set the "_endian" platform condition.
   switch (Target.getArch()) {
+  default: llvm_unreachable("undefined architecture endianness");
   case llvm::Triple::ArchType::arm:
   case llvm::Triple::ArchType::thumb:
-    addPlatformConditionValue(PlatformConditionKind::Endianness, "little");
-    break;
   case llvm::Triple::ArchType::aarch64:
-    addPlatformConditionValue(PlatformConditionKind::Endianness, "little");
-    break;
-  case llvm::Triple::ArchType::ppc64:
-    addPlatformConditionValue(PlatformConditionKind::Endianness, "big");
-    break;
   case llvm::Triple::ArchType::ppc64le:
-    addPlatformConditionValue(PlatformConditionKind::Endianness, "little");
-    break;
   case llvm::Triple::ArchType::x86:
-    addPlatformConditionValue(PlatformConditionKind::Endianness, "little");
-    break;
   case llvm::Triple::ArchType::x86_64:
     addPlatformConditionValue(PlatformConditionKind::Endianness, "little");
     break;
+  case llvm::Triple::ArchType::ppc64:
   case llvm::Triple::ArchType::systemz:
     addPlatformConditionValue(PlatformConditionKind::Endianness, "big");
     break;
-  default:
-    llvm_unreachable("undefined architecture endianness");
   }
 
   // Set the "runtime" platform condition.
