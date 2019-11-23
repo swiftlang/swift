@@ -208,30 +208,47 @@ std::pair<bool, bool> LangOptions::setTarget(llvm::Triple triple) {
   bool UnsupportedOS = false;
 
   // Set the "os" platform condition.
-  if (Target.isMacOSX())
+  switch (Target.getOS()) {
+  case llvm::Triple::MacOSX:
     addPlatformConditionValue(PlatformConditionKind::OS, "OSX");
-  else if (Target.isTvOS())
+    break;
+  case llvm::Triple::TvOS:
     addPlatformConditionValue(PlatformConditionKind::OS, "tvOS");
-  else if (Target.isWatchOS())
+    break;
+  case llvm::Triple::WatchOS:
     addPlatformConditionValue(PlatformConditionKind::OS, "watchOS");
-  else if (Target.isiOS())
+    break;
+  case llvm::Triple::IOS:
     addPlatformConditionValue(PlatformConditionKind::OS, "iOS");
-  else if (Target.isAndroid())
-    addPlatformConditionValue(PlatformConditionKind::OS, "Android");
-  else if (Target.isOSLinux())
-    addPlatformConditionValue(PlatformConditionKind::OS, "Linux");
-  else if (Target.isOSFreeBSD())
+    break;
+  case llvm::Triple::Linux:
+    if (Target.getEnvironment() == llvm::Triple::Android)
+      addPlatformConditionValue(PlatformConditionKind::OS, "Android");
+    else
+      addPlatformConditionValue(PlatformConditionKind::OS, "Linux");
+    break;
+  case llvm::Triple::FreeBSD:
     addPlatformConditionValue(PlatformConditionKind::OS, "FreeBSD");
-  else if (Target.isWindowsCygwinEnvironment())
-    addPlatformConditionValue(PlatformConditionKind::OS, "Cygwin");
-  else if (Target.isOSWindows())
-    addPlatformConditionValue(PlatformConditionKind::OS, "Windows");
-  else if (Target.isPS4())
-    addPlatformConditionValue(PlatformConditionKind::OS, "PS4");
-  else if (Target.isOSHaiku())
+    break;
+  case llvm::Triple::Win32:
+    if (Target.getEnvironment() == llvm::Triple::Cygnus)
+      addPlatformConditionValue(PlatformConditionKind::OS, "Cygwin");
+    else
+      addPlatformConditionValue(PlatformConditionKind::OS, "Windows");
+    break;
+  case llvm::Triple::PS4:
+    if (Target.getVendor() == llvm::Triple::SCEI)
+      addPlatformConditionValue(PlatformConditionKind::OS, "PS4");
+    else
+      UnsupportedOS = false;
+    break;
+  case llvm::Triple::Haiku:
     addPlatformConditionValue(PlatformConditionKind::OS, "Haiku");
-  else
+    break;
+  default:
     UnsupportedOS = true;
+    break;
+  }
 
   bool UnsupportedArch = false;
 
