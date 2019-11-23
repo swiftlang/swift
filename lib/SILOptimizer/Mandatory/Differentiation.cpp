@@ -1579,20 +1579,6 @@ public:
                        const SILAutoDiffIndices &indices) const;
 };
 
-/// Given a parameter argument (not indirect result) and some differentiation
-/// indices, figure out whether the parent function is being differentiated with
-/// respect to this parameter, according to the indices.
-static bool isDifferentiationParameter(SILArgument *argument,
-                                       IndexSubset *indices) {
-  if (!argument) return false;
-  auto *function = argument->getFunction();
-  auto paramArgs = function->getArgumentsWithoutIndirectResults();
-  for (unsigned i : indices->getIndices())
-    if (paramArgs[i] == argument)
-      return true;
-  return false;
-}
-
 /// For an `apply` instruction with active results, compute:
 /// - The results of the `apply` instruction, in type order.
 /// - The set of minimal parameter and result indices for differentiating the
@@ -1609,9 +1595,7 @@ static void collectMinimalIndicesForFunctionCall(
   // Record all parameter indices in type order.
   unsigned currentParamIdx = 0;
   for (auto applyArg : ai->getArgumentsWithoutIndirectResults()) {
-    if (activityInfo.isVaried(applyArg, parentIndices.parameters) ||
-        isDifferentiationParameter(dyn_cast<SILArgument>(applyArg),
-                                   parentIndices.parameters))
+    if (activityInfo.isActive(applyArg, parentIndices))
       paramIndices.push_back(currentParamIdx);
     ++currentParamIdx;
   }
@@ -1632,13 +1616,12 @@ static void collectMinimalIndicesForFunctionCall(
     if (res.isFormalDirect()) {
       results.push_back(directResults[dirResIdx]);
       if (auto dirRes = directResults[dirResIdx])
-        if (dirRes && activityInfo.isUseful(dirRes, parentIndices.source))
+        if (dirRes && activityInfo.isActive(dirRes, parentIndices))
           resultIndices.push_back(idx);
       ++dirResIdx;
     } else {
       results.push_back(indirectResults[indResIdx]);
-      if (activityInfo.isUseful(indirectResults[indResIdx],
-                                parentIndices.source))
+      if (activityInfo.isActive(indirectResults[indResIdx], parentIndices))
         resultIndices.push_back(idx);
       ++indResIdx;
     }
@@ -3872,10 +3855,12 @@ public:
                    activeResultIndices.begin(), activeResultIndices.end(),
                    [&s](unsigned i) { s << i; }, [&s] { s << ", "; });
                s << "}\n";);
-    // FIXME: We don't support multiple active results yet.
+    // Diagnose multiple active results.
+    // TODO(TF-983): Support multiple active results.
     if (activeResultIndices.size() > 1) {
       context.emitNondifferentiabilityError(
-          ai, invoker, diag::autodiff_expression_not_differentiable_note);
+          ai, invoker,
+          diag::autodiff_cannot_differentiate_through_multiple_results);
       errorOccurred = true;
       return;
     }
@@ -5551,13 +5536,16 @@ public:
                    activeResultIndices.begin(), activeResultIndices.end(),
                    [&s](unsigned i) { s << i; }, [&s] { s << ", "; });
                s << "}\n";);
-    // FIXME: We don't support multiple active results yet.
+    // Diagnose multiple active results.
+    // TODO(TF-983): Support multiple active results.
     if (activeResultIndices.size() > 1) {
       context.emitNondifferentiabilityError(
-          ai, invoker, diag::autodiff_expression_not_differentiable_note);
+          ai, invoker,
+          diag::autodiff_cannot_differentiate_through_multiple_results);
       errorOccurred = true;
       return;
     }
+
     // Form expected indices, assuming there's only one result.
     SILAutoDiffIndices indices(
         activeResultIndices.front(),
@@ -6316,6 +6304,8 @@ public:
     // Adjoint values of dominated active values are passed as pullback block
     // arguments.
     DominanceOrder domOrder(original.getEntryBlock(), domInfo);
+    // Keep track of visited values.
+    SmallPtrSet<SILValue, 8> visited;
     while (auto *bb = domOrder.getNext()) {
       auto &bbActiveValues = activeValues[bb];
       // If the current block has an immediate dominator, append the immediate
@@ -6325,13 +6315,12 @@ public:
         bbActiveValues.append(domBBActiveValues.begin(),
                               domBBActiveValues.end());
       }
-      SmallPtrSet<SILValue, 8> visited(bbActiveValues.begin(),
-                                       bbActiveValues.end());
-      // Register a value as active if it has not yet been visited.
       bool diagnosedActiveEnumValue = false;
-      auto addActiveValue = [&](SILValue v) {
+      // Mark the activity of a value if it has not yet been visited.
+      auto markValueActivity = [&](SILValue v) {
         if (visited.count(v))
           return;
+        visited.insert(v);
         // Diagnose active enum values. Differentiation of enum values requires
         // special adjoint value handling and is not yet supported. Diagnose
         // only the first active enum value to prevent too many diagnostics.
@@ -6347,17 +6336,19 @@ public:
         // become projections into their adjoint base buffer.
         if (Projection::isAddressProjection(v))
           return;
-        visited.insert(v);
         bbActiveValues.push_back(v);
       };
-      // Register bb arguments and all instruction operands/results.
+      // Visit bb arguments and all instruction operands/results.
+      for (auto *arg : bb->getArguments())
+        if (getActivityInfo().isActive(arg, getIndices()))
+          markValueActivity(arg);
       for (auto &inst : *bb) {
         for (auto op : inst.getOperandValues())
           if (getActivityInfo().isActive(op, getIndices()))
-            addActiveValue(op);
+            markValueActivity(op);
         for (auto result : inst.getResults())
           if (getActivityInfo().isActive(result, getIndices()))
-            addActiveValue(result);
+            markValueActivity(result);
       }
       domOrder.pushChildren(bb);
       if (errorOccurred)

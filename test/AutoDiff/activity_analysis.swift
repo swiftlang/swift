@@ -1,4 +1,5 @@
 // RUN: %target-swift-emit-sil -verify -Xllvm -debug-only=differentiation 2>&1 %s | %FileCheck %s
+// REQUIRES: asserts
 
 // Check that `@noDerivative` struct projections have "NONE" activity.
 
@@ -203,6 +204,106 @@ func TF_954(_ x: Float) -> Float {
 // CHECK: bb5:
 // CHECK: [ACTIVE]   %40 = begin_access [read] [static] %2 : $*Float
 // CHECK: [ACTIVE]   %41 = load [trivial] %40 : $*Float
+
+// Check `inout` argument activity.
+
+struct Mut: Differentiable {}
+extension Mut {
+  @differentiable(wrt: x)
+  mutating func mutatingMethod(_ x: Mut) -> Mut {
+    return x
+  }
+}
+
+// CHECK-LABEL: [AD] Activity info for $s17activity_analysis3MutV14mutatingMethodyA2CF at (source=0 parameters=(0))
+// CHECK: [ACTIVE] %0 = argument of bb0 : $Mut
+// CHECK: [NONE] %1 = argument of bb0 : $*Mut
+
+// TODO(TF-985): Find workaround to avoid marking non-wrt `inout` argument as
+// active.
+// expected-error @+1 {{function is not differentiable}}
+@differentiable(wrt: x)
+// expected-note @+1 {{when differentiating this function definition}}
+func nonActiveInoutArg(_ nonactive: inout Mut, _ x: Mut) -> Mut {
+  // expected-note @+1 {{cannot differentiate through 'inout' arguments}}
+  return nonactive.mutatingMethod(x)
+}
+
+// CHECK-LABEL: [AD] Activity info for $s17activity_analysis17nonActiveInoutArgyAA3MutVADz_ADtF at (source=0 parameters=(1))
+// CHECK: [ACTIVE] %0 = argument of bb0 : $*Mut
+// CHECK: [ACTIVE] %1 = argument of bb0 : $Mut
+// CHECK: [ACTIVE]   %4 = begin_access [modify] [static] %0 : $*Mut
+// CHECK: [NONE]   // function_ref Mut.mutatingMethod(_:)
+// CHECK: [ACTIVE]   %6 = apply %5(%1, %4) : $@convention(method) (Mut, @inout Mut) -> Mut
+
+// expected-error @+1 {{function is not differentiable}}
+@differentiable(wrt: x)
+// expected-note @+1 {{when differentiating this function definition}}
+func activeInoutArgMutatingMethod(_ x: Mut) -> Mut {
+  var result = x
+  // expected-note @+1 {{cannot differentiate through 'inout' arguments}}
+  result = result.mutatingMethod(result)
+  return result
+}
+
+// CHECK-LABEL: [AD] Activity info for $s17activity_analysis28activeInoutArgMutatingMethodyAA3MutVADF at (source=0 parameters=(0))
+// CHECK: [ACTIVE] %0 = argument of bb0 : $Mut
+// CHECK: [ACTIVE]   %2 = alloc_stack $Mut, var, name "result"
+// CHECK: [ACTIVE]   %4 = begin_access [read] [static] %2 : $*Mut
+// CHECK: [ACTIVE]   %5 = load [trivial] %4 : $*Mut
+// CHECK: [ACTIVE]   %7 = begin_access [modify] [static] %2 : $*Mut
+// CHECK: [NONE]   // function_ref Mut.mutatingMethod(_:)
+// CHECK: [ACTIVE]   %9 = apply %8(%5, %7) : $@convention(method) (Mut, @inout Mut) -> Mut
+// CHECK: [ACTIVE]   %11 = begin_access [modify] [static] %2 : $*Mut
+// CHECK: [ACTIVE]   %14 = begin_access [read] [static] %2 : $*Mut
+// CHECK: [ACTIVE]   %15 = load [trivial] %14 : $*Mut
+
+// expected-error @+1 {{function is not differentiable}}
+@differentiable(wrt: x)
+// expected-note @+1 {{when differentiating this function definition}}
+func activeInoutArgMutatingMethodVar(_ nonactive: inout Mut, _ x: Mut) -> Mut {
+  var result = nonactive
+  // expected-note @+1 {{cannot differentiate through 'inout' arguments}}
+  result = result.mutatingMethod(x)
+  return result
+}
+
+// CHECK_LABEL: [AD] Activity info for $s17activity_analysis31activeInoutArgMutatingMethodVaryAA3MutVADz_ADtF at (source=0 parameters=(1))
+// CHECK: [USEFUL] %0 = argument of bb0 : $*Mut
+// CHECK: [ACTIVE] %1 = argument of bb0 : $Mut
+// CHECK: [ACTIVE]   %4 = alloc_stack $Mut, var, name "result"
+// CHECK: [USEFUL]   %5 = begin_access [read] [static] %0 : $*Mut
+// CHECK: [ACTIVE]   %8 = begin_access [modify] [static] %4 : $*Mut
+// CHECK: [NONE]   // function_ref Mut.mutatingMethod(_:)
+// CHECK: [ACTIVE]   %10 = apply %9(%1, %8) : $@convention(method) (Mut, @inout Mut) -> Mut
+// CHECK: [ACTIVE]   %12 = begin_access [modify] [static] %4 : $*Mut
+// CHECK: [ACTIVE]   %15 = begin_access [read] [static] %4 : $*Mut
+// CHECK: [ACTIVE]   %16 = load [trivial] %15 : $*Mut
+
+// expected-error @+1 {{function is not differentiable}}
+@differentiable(wrt: x)
+// expected-note @+1 {{when differentiating this function definition}}
+func activeInoutArgMutatingMethodTuple(_ nonactive: inout Mut, _ x: Mut) -> Mut {
+  var result = (nonactive, x)
+  // expected-note @+1 {{cannot differentiate through 'inout' arguments}}
+  let result2 = result.0.mutatingMethod(result.0)
+  return result2
+}
+
+// CHECK-LABEL: [AD] Activity info for $s17activity_analysis33activeInoutArgMutatingMethodTupleyAA3MutVADz_ADtF at (source=0 parameters=(1))
+// CHECK: [USEFUL] %0 = argument of bb0 : $*Mut
+// CHECK: [ACTIVE] %1 = argument of bb0 : $Mut
+// CHECK: [ACTIVE]   %4 = alloc_stack $(Mut, Mut), var, name "result"
+// CHECK: [ACTIVE]   %5 = tuple_element_addr %4 : $*(Mut, Mut), 0
+// CHECK: [ACTIVE]   %6 = tuple_element_addr %4 : $*(Mut, Mut), 1
+// CHECK: [USEFUL]   %7 = begin_access [read] [static] %0 : $*Mut
+// CHECK: [ACTIVE]   %11 = begin_access [read] [static] %4 : $*(Mut, Mut)
+// CHECK: [ACTIVE]   %12 = tuple_element_addr %11 : $*(Mut, Mut), 0
+// CHECK: [ACTIVE]   %13 = load [trivial] %12 : $*Mut
+// CHECK: [ACTIVE]   %15 = begin_access [modify] [static] %4 : $*(Mut, Mut)
+// CHECK: [ACTIVE]   %16 = tuple_element_addr %15 : $*(Mut, Mut), 0
+// CHECK: [NONE]   // function_ref Mut.mutatingMethod(_:)
+// CHECK: [ACTIVE]   %18 = apply %17(%13, %16) : $@convention(method) (Mut, @inout Mut) -> Mut
 
 //===----------------------------------------------------------------------===//
 // Non-differentiable functions
