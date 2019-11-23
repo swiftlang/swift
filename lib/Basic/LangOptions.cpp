@@ -302,10 +302,8 @@ std::pair<bool, bool> LangOptions::setTarget(llvm::Triple triple) {
   }
 
   // Set the "runtime" platform condition.
-  if (EnableObjCInterop)
-    addPlatformConditionValue(PlatformConditionKind::Runtime, "_ObjC");
-  else
-    addPlatformConditionValue(PlatformConditionKind::Runtime, "_Native");
+  addPlatformConditionValue(PlatformConditionKind::Runtime,
+                            EnableObjCInterop ? "_ObjC" : "_Native");
 
   // Set the "targetEnvironment" platform condition if targeting a simulator
   // environment. Otherwise _no_ value is present for targetEnvironment; it's
