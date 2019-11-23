@@ -79,6 +79,7 @@ using CommandSet = llvm::SmallPtrSet<const Job *, 16>;
 class Compilation {
 public:
   class IncrementalSchemeComparator {
+    const bool EnableIncrementalBuildWhenConstructed;
     const bool &EnableIncrementalBuild;
     const bool EnableSourceRangeDependencies;
     const bool &UseSourceRangeDependencies;
@@ -108,7 +109,8 @@ public:
                                 const StringRef CompareIncrementalSchemesPath,
                                 unsigned SwiftInputCount,
                                 DiagnosticEngine &Diags)
-        : EnableIncrementalBuild(EnableIncrementalBuild),
+        : EnableIncrementalBuildWhenConstructed(EnableIncrementalBuild),
+          EnableIncrementalBuild(EnableIncrementalBuild),
           EnableSourceRangeDependencies(EnableSourceRangeDependencies),
           UseSourceRangeDependencies(UseSourceRangeDependencies),
           CompareIncrementalSchemesPath(CompareIncrementalSchemesPath),
