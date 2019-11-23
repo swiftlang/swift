@@ -94,7 +94,35 @@ extension _AbstractStringStorage {
       return _cocoaCStringUsingEncodingTrampoline(self, encoding)
     }
   }
-
+  
+  @inline(__always)
+  @_effects(readonly)
+  internal func _nativeIsEqual(
+    _ ourStart: UnsafePointer<UInt8>,
+    _ otherStart: UnsafePointer<UInt8>,
+    _ count: Int
+  ) -> Int8 {
+    return (ourStart == otherStart ||
+    (memcmp(ourStart, otherStart, count) == 0)) ? 1 : 0
+  }
+  
+  @inline(__always)
+  @_effects(readonly)
+  internal func _nativeIsEqual<T:_AbstractStringStorage>(
+    _ ourStart: UnsafePointer<UInt8>,
+    _ nativeOther: T,
+    _ count: Int
+  ) -> Int8 {
+    if let otherStart = nativeOther.start {
+      return _nativeIsEqual(ourStart, nativeStart, count)
+    }
+    return nativeOther.withFastUTF8 {
+      let otherStart = $0.baseAddress._unsafelyUnwrappedUnchecked
+      return _nativeIsEqual(ourStart, nativeStart, count)
+    }
+  }
+  
+  @inline(__always)
   @_effects(readonly)
   internal func _nativeIsEqual<T:_AbstractStringStorage>(
     _ nativeOther: T
@@ -102,13 +130,12 @@ extension _AbstractStringStorage {
     if count != nativeOther.count {
       return 0
     }
-    return withFastUTF8 { (buffer) in
-      let ourStart = buffer.baseAddress._unsafelyUnwrappedUnchecked
-      return nativeOther.withFastUTF8 { (otherBuffer) in
-        let otherStart = otherBuffer.baseAddress._unsafelyUnwrappedUnchecked
-        return (ourStart == otherStart ||
-          (memcmp(ourStart, otherStart, count) == 0)) ? 1 : 0
-      }
+    if let ourStart = start {
+      return _nativeIsEqual(ourStart, nativeOther, count)
+    }
+    return withFastUTF8 {
+      let ourStart = $0.baseAddress._unsafelyUnwrappedUnchecked
+      return _nativeIsEqual(ourStart, nativeOther, count)
     }
   }
 
@@ -125,21 +152,27 @@ extension _AbstractStringStorage {
     
     // Handle the case where both strings were bridged from Swift.
     // We can't use String.== because it doesn't match NSString semantics.
+    var isNSString = false
     switch _KnownCocoaString(other) {
     case .storage(let storage):
       return _nativeIsEqual(storage)
     case .shared(let storage):
       return _nativeIsEqual(storage)
     case .mutable(let storage):
-      return _nativeIsEqual(storage)
+      if isStringBacked {
+        return _nativeIsEqual(storage)
+      }
+      isNSString = true
+      fallthrough //treat UTF16 backed mutable as Cocoa
       #if !(arch(i386) || arch(arm))
     case .tagged(let otherStr):
+      isNSString = true
       fallthrough
       #endif
     case .cocoa(let otherStr):
       // We're allowed to crash, but for compatibility reasons NSCFString allows
       // non-strings here.
-      guard _isNSString(otherStr) == 1 else {
+      guard isNSString || _isNSString(otherStr) == 1 else {
         return 0
       }
       
@@ -401,7 +434,7 @@ extension __SharedStringStorage {
   // Array of UTF16, which we largely leave up to NSString to interpret
   private enum Contents {
     case native(String)
-    case utf16([UTF16.CodeUnit])
+    case utf16(ContiguousArray<UTF16.CodeUnit>)
     
     var asString: String {
       @_effects(readonly) @inline(__always) get {
@@ -420,7 +453,7 @@ extension __SharedStringStorage {
         case .native(let str):
           let guts = str._guts
           guard !guts.isSmall else { return nil }
-          return guts._object.fastUTF8.baseAddress!
+          return guts._object.fastUTF8.baseAddress
         default:
           return nil
         }
@@ -484,7 +517,7 @@ extension __SharedStringStorage {
       _ replacementBytes: UnsafeBufferPointer<UTF16.CodeUnit>
     ) {
       if case .native(let str) = self, !_validUTF16(replacementBytes) {
-        self = .utf16(Array(str.utf16))
+        self = .utf16(ContiguousArray(str.utf16))
       }
     }
     
@@ -503,7 +536,7 @@ extension __SharedStringStorage {
             (re._isScalarAligned || re.transcodedOffset == 0)
         
         if _slowPath(!scalarAligned) {
-          self = .utf16(Array(str.utf16))
+          self = .utf16(ContiguousArray(str.utf16))
           return nil
         }
         return range
@@ -678,14 +711,11 @@ extension __SharedStringStorage {
                        "Range out of bounds")
       let range = Range(
         uncheckedBounds: (aRange.location, aRange.location+aRange.length))
-      arr.withUnsafeBufferPointer {
-        let toCopy = UnsafeBufferPointer(rebasing: $0[range])
-        let bufPtr = UnsafeMutableBufferPointer(
-          start: buffer,
-          count: toCopy.count
-        )
-        _ = bufPtr.initialize(from: toCopy)
-      }
+      let bufPtr = UnsafeMutableBufferPointer(
+        start: buffer,
+        count: range.count
+      )
+      arr[range]._copyContents(initializing: bufPtr)
     }
   }
 
@@ -751,10 +781,10 @@ extension __SharedStringStorage {
    
    To handle that, we have two "modes" for _SwiftNSMutableString:
     • String-backed, where we know we have valid contents
-    • Byte-Array-backed, where we're just a buffer
+    • UTF16-Codepoint-Array-backed, where we're just a buffer
    
-   We switch from String to Byte-Array backing when we encounter either of the
-   following situations:
+   We switch from String to UTF16-Codepoint-Array backing when we encounter
+   either of the following situations:
     • The range of a mutation splits a unicode scalar
     • The replacement bytes of a mutation are not themselves valid UTF-16
    */

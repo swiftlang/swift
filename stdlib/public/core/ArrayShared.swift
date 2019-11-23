@@ -129,7 +129,7 @@ internal func _expectEnd<C: Collection>(of s: C, is i: C.Index) {
 
 @inlinable
 internal func _growArrayCapacity(_ capacity: Int) -> Int {
-  return capacity * 2
+  return ((capacity * 3) + 1) / 2
 }
 
 //===--- generic helpers --------------------------------------------------===//
