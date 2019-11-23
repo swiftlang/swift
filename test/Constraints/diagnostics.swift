@@ -920,13 +920,13 @@ class NSCache<K, V> {
 }
 
 class CacheValue {
-  func value(x: Int) -> Int {} // expected-note {{found this candidate}}
-  func value(y: String) -> String {} // expected-note {{found this candidate}}
+  func value(x: Int) -> Int {} // expected-note {{found candidate with type '(Int) -> Int'}}
+  func value(y: String) -> String {} // expected-note {{found candidate with type '(String) -> String'}}
 }
 
 func valueForKey<K>(_ key: K) -> CacheValue? {
   let cache = NSCache<K, CacheValue>()
-  return cache.object(forKey: key)?.value // expected-error {{ambiguous reference to member 'value(x:)'}}
+  return cache.object(forKey: key)?.value // expected-error {{no exact matches in call to instance method 'value'}}
 }
 
 // SR-2242: poor diagnostic when argument label is omitted

@@ -2846,6 +2846,22 @@ bool ConstraintSystem::repairFailures(
       }
     }
 
+    if (auto *OEE = dyn_cast<OptionalEvaluationExpr>(anchor)) {
+      // If concrete type of the sub-expression can't be converted to the
+      // type associated with optional evaluation result it could only be
+      // contextual mismatch where type of the top-level expression
+      // comes from contextual type or its parent expression.
+      //
+      // Because result type of the optional evaluation is supposed to
+      // represent the type of its sub-expression with added level of
+      // optionality if needed.
+      if (!lhs->getOptionalObjectType() && !lhs->hasTypeVariable()) {
+        conversionsOrFixes.push_back(IgnoreContextualType::create(
+            *this, lhs, rhs, getConstraintLocator(OEE->getSubExpr())));
+        return true;
+      }
+    }
+
     if (auto *AE = dyn_cast<AssignExpr>(anchor)) {
       if (repairByInsertingExplicitCall(lhs, rhs))
         return true;
