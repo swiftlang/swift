@@ -356,16 +356,14 @@ SILDeserializer::getSILDifferentiabilityWitnessForReference(
     StringRef mangledKey) {
   // Check to see if we have a witness under this key already.
   auto *witness = SILMod.lookUpDifferentiabilityWitness(mangledKey);
-  if (witness) {
+  if (witness)
     return witness;
-  }
-
   // Otherwise, look for a witness under this key in the module.
-  auto iter = DifferentiabilityWitnessList->find(mangledKey);
-  if (iter == DifferentiabilityWitnessList->end()) {
+  if (!DifferentiabilityWitnessList)
     return nullptr;
-  }
-
+  auto iter = DifferentiabilityWitnessList->find(mangledKey);
+  if (iter == DifferentiabilityWitnessList->end())
+    return nullptr;
   return readDifferentiabilityWitness(*iter);
 }
 
