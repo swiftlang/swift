@@ -42,7 +42,7 @@ Backticks were added manually.
     *   [The `Differentiable` protocol](#the-differentiable-protocol)
     *   [The `@differentiable` declaration attribute](#the-differentiable-declaration-attribute)
     *   [`@differentiable` function types](#differentiable-function-types)
-    *   [`@derivative` and `@transpose` attributes](#differentiating-and-transposing-attributes)
+    *   [`@derivative` and `@transpose` attributes](#derivative-and-transpose-attributes)
     *   [Differential operators](#differential-operators)
 *   [Detailed design](#detailed-design)
     *   [Differentiable data structures](#differentiable-data-structures)
@@ -58,7 +58,7 @@ Backticks were added manually.
             *   [Protocol dispatch](#protocol-dispatch)
             *   [Class dispatch](#class-dispatch)
     *   [Make a function differentiable using `@derivative` or
-        `@transpose`](#make-a-function-differentiable-using-differentiating-or-transposing)
+        `@transpose`](#make-a-function-differentiable-using-derivative-or-transpose)
         *   [Linear maps](#linear-maps)
             *   [Examples](#examples)
         *   [Derivative functions](#derivative-functions)
