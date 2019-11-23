@@ -114,11 +114,11 @@ extension _AbstractStringStorage {
     _ count: Int
   ) -> Int8 {
     if let otherStart = nativeOther.start {
-      return _nativeIsEqual(ourStart, nativeStart, count)
+      return _nativeIsEqual(ourStart, otherStart, count)
     }
     return nativeOther.withFastUTF8 {
       let otherStart = $0.baseAddress._unsafelyUnwrappedUnchecked
-      return _nativeIsEqual(ourStart, nativeStart, count)
+      return _nativeIsEqual(ourStart, otherStart, count)
     }
   }
   
@@ -136,6 +136,50 @@ extension _AbstractStringStorage {
     return withFastUTF8 {
       let ourStart = $0.baseAddress._unsafelyUnwrappedUnchecked
       return _nativeIsEqual(ourStart, nativeOther, count)
+    }
+  }
+  
+  @_effects(readonly)
+  internal func _fallbackIsEqual(
+    _ otherStr: AnyObject,
+    _ isNSString:Bool
+  ) -> Int8 {
+    // We're allowed to crash, but for compatibility reasons NSCFString allows
+    // non-strings here.
+    guard isNSString || _isNSString(otherStr) == 1 else {
+      return 0
+    }
+    
+    // At this point we've proven that it is an NSString of some sort, but not
+    // one of ours.
+    defer { _fixLifetime(otherStr) }
+    
+    let otherUTF16Length = _stdlib_binary_CFStringGetLength(otherStr)
+    
+    // CFString will only give us ASCII bytes here, but that's fine.
+    // We already handled non-ASCII UTF8 strings earlier since they're Swift.
+    guard let otherStart = _cocoaASCIIPointer(otherStr) else {
+      if UTF16Length != otherUTF16Length {
+        return 0
+      }
+      
+      /*
+       The abstract implementation of -isEqualToString: falls back to compare:
+       immediately, so when we run out of fast options to try, do the same.
+       We can likely be more clever here if need be
+       */
+      return _cocoaStringCompare(self, other) == 0 ? 1 : 0
+    }
+    
+    //We know that otherUTF16Length is also its byte count at this point
+    guard count == otherUTF16Length else {
+      return 0
+    }
+    
+    return withFastUTF8 {
+      let ourStart = $0.baseAddress._unsafelyUnwrappedUnchecked
+      return (ourStart == otherStart ||
+        memcmp(ourStart, otherStart, count) == 0) ? 1 : 0
     }
   }
 
@@ -159,54 +203,16 @@ extension _AbstractStringStorage {
     case .shared(let storage):
       return _nativeIsEqual(storage)
     case .mutable(let storage):
-      if isStringBacked {
+      if storage.isStringBacked {
         return _nativeIsEqual(storage)
       }
-      isNSString = true
-      fallthrough //treat UTF16 backed mutable as Cocoa
+      return _fallbackIsEqual(other, true)
       #if !(arch(i386) || arch(arm))
     case .tagged(let otherStr):
-      isNSString = true
-      fallthrough
+      return _fallbackIsEqual(other, true)
       #endif
     case .cocoa(let otherStr):
-      // We're allowed to crash, but for compatibility reasons NSCFString allows
-      // non-strings here.
-      guard isNSString || _isNSString(otherStr) == 1 else {
-        return 0
-      }
-      
-      // At this point we've proven that it is an NSString of some sort, but not
-      // one of ours.
-      defer { _fixLifetime(otherStr) }
-      
-      let otherUTF16Length = _stdlib_binary_CFStringGetLength(otherStr)
-      
-      // CFString will only give us ASCII bytes here, but that's fine.
-      // We already handled non-ASCII UTF8 strings earlier since they're Swift.
-      guard let otherStart = _cocoaASCIIPointer(otherStr) else {
-        if UTF16Length != otherUTF16Length {
-          return 0
-        }
-        
-        /*
-         The abstract implementation of -isEqualToString: falls back to compare:
-         immediately, so when we run out of fast options to try, do the same.
-         We can likely be more clever here if need be
-         */
-        return _cocoaStringCompare(self, other) == 0 ? 1 : 0
-      }
-      
-      //We know that otherUTF16Length is also its byte count at this point
-      guard count == otherUTF16Length else {
-        return 0
-      }
-      
-      return withFastUTF8 {
-        let ourStart = $0.baseAddress._unsafelyUnwrappedUnchecked
-        return (ourStart == otherStart ||
-          memcmp(ourStart, otherStart, count) == 0) ? 1 : 0
-      }
+      return _fallbackIsEqual(other, false)
     }
   }
   
@@ -636,7 +642,7 @@ extension __SharedStringStorage {
     _internalInvariant(asString._guts.isFastUTF8)
   }
   
-  internal init(brokenContents arr: [UTF16.CodeUnit]) {
+  internal init(brokenContents arr: ContiguousArray<UTF16.CodeUnit>) {
     _contents = .utf16(arr)
     super.init()
   }
