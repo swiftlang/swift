@@ -47,6 +47,7 @@
 #include "swift/SILOptimizer/Analysis/LoopAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/LoopUtils.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "llvm/ADT/APSInt.h"
@@ -3380,19 +3381,6 @@ private:
   /// predecessor enum argument).
   SmallPtrSet<SILBasicBlock *, 4> remappedBasicBlocks;
 
-  /// A pair of a trampoline block phi argument and its corresponding
-  /// destination block phi argument.
-  struct TrampolinedArgumentPair {
-    SILPhiArgument *trampolineArgument;
-    SILPhiArgument *destinationArgument;
-  };
-  /// An array that keeps track of all `@guaranteed` phi arguments in any
-  /// trampoline blocks we've added. Each of these arguments needs to have a
-  /// lifetime-ending use past its destination argument's lifetime-ending use,
-  /// so we keep track of these pairs of arguments and emit `end_borrow`s when
-  /// function cloning is finished.
-  SmallVector<TrampolinedArgumentPair, 8> trampolinedGuaranteedPhiArguments;
-
   bool errorOccurred = false;
 
   /// Mapping from original blocks to pullback values. Used to build pullback
@@ -3771,18 +3759,9 @@ public:
       auto *vjpSuccBB = getOpBasicBlock(origSuccBB);
       // Create the trampoline block.
       auto *trampolineBB = vjp->createBasicBlockBefore(vjpSuccBB);
-      for (auto *destArg : vjpSuccBB->getArguments().drop_back()) {
-        auto *trampolineArg = trampolineBB->createPhiArgument(
+      for (auto *destArg : vjpSuccBB->getArguments().drop_back())
+        trampolineBB->createPhiArgument(
             destArg->getType(), destArg->getOwnershipKind());
-        // Each `@guaranteed` trampoline argument needs to have a
-        // lifetime-ending use past its destination argument's lifetime-ending
-        // uses, so we keep track of these pairs of arguments in
-        // `trampolinedGuaranteedPhiArguments` and emit `end_borrow`s when
-        // function cloning is finished.
-        if (trampolineArg->getOwnershipKind() == ValueOwnershipKind::Guaranteed)
-          trampolinedGuaranteedPhiArguments.push_back(
-              {trampolineArg, cast<SILPhiArgument>(destArg)});
-      }
       // Build predecessor enum value for successor block and branch to it.
       SILBuilder trampolineBuilder(trampolineBB);
       auto *succEnumVal = buildPredecessorEnumValue(
@@ -7956,21 +7935,12 @@ bool VJPEmitter::run() {
   if (errorOccurred)
     return true;
 
-  // Each `@guaranteed` trampoline argument needs to have a lifetime-ending use
-  // past its destination argument's lifetime-ending uses (aka. `end_borrow`).
-  // `trampolinedGuaranteedPhiArguments` tracks all `@guaranteed` trampoline
-  // arguments. We emit an `end_borrow` immediately past each destination
-  // argument's lifetime-ending uses.
-  for (auto &trampolinedArgPair : trampolinedGuaranteedPhiArguments) {
-    for (auto *destArgUse : trampolinedArgPair.destinationArgument->getUses()) {
-      if (auto *lifetimeEnd = dyn_cast<EndBorrowInst>(destArgUse->getUser())) {
-        getBuilder().setInsertionPoint(lifetimeEnd->getParentBlock(),
-                                       std::next(lifetimeEnd->getIterator()));
-        getBuilder().emitEndBorrowOperation(
-            lifetimeEnd->getLoc(), trampolinedArgPair.trampolineArgument);
-      }
-    }
-  }
+  // Merge VJP basic blocks. This is significant for control flow
+  // differentiation: trampoline destination bbs are merged into trampoline bbs.
+  // NOTE(TF-990): Merging basic blocks ensures that `@guaranteed` trampoline
+  // bb arguments have a lifetime-ending `end_borrow` use, and is robust when
+  // `-enable-strip-ownership-after-serialization` is true.
+  mergeBasicBlocks(vjp);
 
   // Generate pullback code.
   PullbackEmitter PullbackEmitter(*this);
