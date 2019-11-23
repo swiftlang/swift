@@ -168,7 +168,7 @@ extension _AbstractStringStorage {
        immediately, so when we run out of fast options to try, do the same.
        We can likely be more clever here if need be
        */
-      return _cocoaStringCompare(self, other) == 0 ? 1 : 0
+      return _cocoaStringCompare(self, otherStr) == 0 ? 1 : 0
     }
     
     //We know that otherUTF16Length is also its byte count at this point
@@ -196,7 +196,6 @@ extension _AbstractStringStorage {
     
     // Handle the case where both strings were bridged from Swift.
     // We can't use String.== because it doesn't match NSString semantics.
-    var isNSString = false
     switch _KnownCocoaString(other) {
     case .storage(let storage):
       return _nativeIsEqual(storage)
@@ -209,10 +208,10 @@ extension _AbstractStringStorage {
       return _fallbackIsEqual(other, true)
       #if !(arch(i386) || arch(arm))
     case .tagged(let otherStr):
-      return _fallbackIsEqual(other, true)
+      return _fallbackIsEqual(otherStr, true)
       #endif
     case .cocoa(let otherStr):
-      return _fallbackIsEqual(other, false)
+      return _fallbackIsEqual(otherStr, false)
     }
   }
   
