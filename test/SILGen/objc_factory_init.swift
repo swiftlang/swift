@@ -42,6 +42,40 @@ extension Hive {
   convenience init(otherQueen other: Bee) {
     self.init(queen: other)
   }
+
+  // CHECK-LABEL: sil hidden [ossa] @$sSo4HiveC17objc_factory_initE15otherFlakyQueenABSo3BeeC_tKcfC
+  // CHECK: bb0([[QUEEN:%.*]] : @owned $Bee, [[META:%.*]] : $@thick Hive.Type):
+  // CHECK:   [[SELF_BOX:%.*]] = alloc_box ${ var Hive }, let, name "self"
+  // CHECK:   [[MU:%.*]] = mark_uninitialized [delegatingself] [[SELF_BOX]]
+  // CHECK:   [[PB_BOX:%.*]] = project_box [[MU]] : ${ var Hive }, 0
+  // CHECK:   [[FOREIGN_ERROR_STACK:%.*]] = alloc_stack $Optional<NSError>
+  // CHECK:   [[OBJC_META:%[0-9]+]] = thick_to_objc_metatype [[META]] : $@thick Hive.Type to $@objc_metatype Hive.Type
+  // CHECK:   [[BORROWED_QUEEN:%.*]] = begin_borrow [[QUEEN]]
+  // CHECK:   [[COPIED_BORROWED_QUEEN:%.*]] = copy_value [[BORROWED_QUEEN]]
+  // CHECK:   [[OPT_COPIED_BORROWED_QUEEN:%.*]] = enum $Optional<Bee>, #Optional.some!enumelt.1, [[COPIED_BORROWED_QUEEN]]
+  // CHECK:   [[FACTORY:%[0-9]+]] = objc_method [[OBJC_META]] : $@objc_metatype Hive.Type, #Hive.init!allocator.1.foreign : (Hive.Type) -> (Bee?) throws -> Hive, $@convention(objc_method) (Optional<Bee>, Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>, @objc_metatype Hive.Type) -> @autoreleased Optional<Hive> // user: %25
+  // CHECK:   [[ERROR_PTR_STACK:%.*]] = alloc_stack $AutoreleasingUnsafeMutablePointer<Optional<NSError>>
+  // CHECK:   [[ERROR_PTR:%.*]] = load [trivial] [[ERROR_PTR_STACK]]
+  // CHECK:   [[OPT_ERROR_PTR:%.*]] = enum $Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>, #Optional.some!enumelt.1, [[ERROR_PTR]]
+  // CHECK:   [[OPT_NEW_HIVE:%.*]] = apply [[FACTORY]]([[OPT_COPIED_BORROWED_QUEEN]], [[OPT_ERROR_PTR]], [[OBJC_META]]) : $@convention(objc_method) (Optional<Bee>, Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>, @objc_metatype Hive.Type) -> @autoreleased Optional<Hive>
+  // CHECK:   switch_enum [[OPT_NEW_HIVE]] : $Optional<Hive>, case #Optional.some!enumelt.1: [[NORMAL_BB:bb[0-9]+]], case #Optional.none!enumelt: [[ERROR_BB:bb[0-9]+]] // id: %34
+  //
+  // CHECK: bb1([[HIVE:%.*]] : @owned $Hive):
+  // CHECK:   assign [[HIVE]] to [[PB_BOX]]
+  // CHECK:   dealloc_stack [[FOREIGN_ERROR_STACK]]
+  // CHECK:   [[HIVE_COPY:%.*]] = load [copy] [[PB_BOX]]
+  // CHECK:   return [[HIVE_COPY]]
+  // CHECK: bb2:
+  // CHECK:   [[OPTIONAL_NSERROR:%.*]] = load [take] [[FOREIGN_ERROR_STACK]] : $*Optional<NSError>
+  // CHECK:   [[CONVERT_NSERROR_TO_ERROR_FUNC:%.*]] = function_ref @$s10Foundation22_convertNSErrorToErrorys0E0_pSo0C0CSgF : $@convention(thin) (@guaranteed Optional<NSError>) -> @owned Error
+  // CHECK:   [[ERROR:%.*]] = apply [[CONVERT_NSERROR_TO_ERROR_FUNC]]([[OPTIONAL_NSERROR]]) : $@convention(thin) (@guaranteed Optional<NSError>) -> @owned Error
+  // CHECK:   "willThrow"([[ERROR]] : $Error)
+  // CHECK:   dealloc_stack [[FOREIGN_ERROR_STACK]]
+  // CHECK:   throw [[ERROR]] : $Error
+  // CHECK: } // end sil function '$sSo4HiveC17objc_factory_initE15otherFlakyQueenABSo3BeeC_tKcfC'
+  convenience init(otherFlakyQueen other: Bee) throws {
+    try self.init(flakyQueen: other)
+  }
 }
 
 extension SomeClass {

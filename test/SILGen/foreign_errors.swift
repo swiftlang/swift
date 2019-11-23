@@ -51,6 +51,7 @@ func test0() throws {
   // CHECK: [[T0:%.*]] = load [take] [[ERR_TEMP0]]
   // CHECK: [[T1:%.*]] = function_ref @$s10Foundation22_convertNSErrorToErrorys0E0_pSo0C0CSgF : $@convention(thin) (@guaranteed Optional<NSError>) -> @owned Error
   // CHECK: [[T2:%.*]] = apply [[T1]]([[T0]])
+  // CHECK: "willThrow"([[T2]] : $Error)
   // CHECK: throw [[T2]] : $Error
 }
 
@@ -161,6 +162,7 @@ let fn = ErrorProne.fail
 // CHECK:      return
 // CHECK:      [[T0:%.*]] = load [take] [[TEMP]]
 // CHECK:      [[T1:%.*]] = apply {{%.*}}([[T0]])
+// CHECK:      "willThrow"([[T1]] : $Error)
 // CHECK:      throw [[T1]]
 
 func testArgs() throws {
