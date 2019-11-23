@@ -2382,6 +2382,7 @@ class ValueDecl : public Decl {
     unsigned isIUO : 1;
   } LazySemanticInfo = { };
 
+  friend class DynamicallyReplacedDeclRequest;
   friend class OverriddenDeclsRequest;
   friend class IsObjCRequest;
   friend class IsFinalRequest;
@@ -2742,6 +2743,11 @@ public:
   /// Retrieve the @functionBuilder type attached to this declaration,
   /// if there is one.
   Type getFunctionBuilderType() const;
+
+  /// If this value or its backing storage is annotated
+  /// @_dynamicReplacement(for: ...), compute the original declaration
+  /// that this declaration dynamically replaces.
+  ValueDecl *getDynamicallyReplacedDecl() const;
 };
 
 /// This is a common base class for declarations which declare a type.
@@ -4760,8 +4766,6 @@ public:
   bool hasDidSetOrWillSetDynamicReplacement() const;
 
   bool hasAnyNativeDynamicAccessors() const;
-
-  bool hasAnyDynamicReplacementAccessors() const;
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {

@@ -1886,6 +1886,25 @@ public:
   void cacheResult(Expr *expr) const;
 };
 
+class DynamicallyReplacedDeclRequest
+    : public SimpleRequest<DynamicallyReplacedDeclRequest,
+                           ValueDecl *(ValueDecl *),
+                           CacheKind::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<ValueDecl *>
+  evaluate(Evaluator &evaluator, ValueDecl *VD) const;
+
+public:
+  // Caching.
+  bool isCached() const { return true; }
+};
+
 // Allow AnyValue to compare two Type values, even though Type doesn't
 // support ==.
 template<>
