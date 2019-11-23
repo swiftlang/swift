@@ -1,0 +1,18 @@
+// RUN: mkdir -p %t
+// RUN: %target-swift-frontend -emit-module -emit-module-path %t/test.swiftmodule -module-name test %s
+// RUN: %target-sil-opt %t/test.swiftmodule
+
+sil_stage raw
+
+import Swift
+import Builtin
+
+sil_differentiability_witness [parameters 0] [results 0] @referenced_from_serialized : $@convention(thin) (Float, Float, Float) -> Float
+
+sil @referenced_from_serialized : $@convention(thin) (Float, Float, Float) -> Float
+
+sil [serialized] @test_serialized : $@convention(thin) () -> () {
+bb0:
+  %referenced_from_serialized_jvp_wrt_0 = differentiability_witness_function [jvp] [parameters 0] [results 0] @referenced_from_serialized : $@convention(thin) (Float, Float, Float) -> Float
+  return undef : $()
+}
