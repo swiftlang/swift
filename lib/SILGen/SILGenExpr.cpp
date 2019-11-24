@@ -52,8 +52,6 @@
 
 #include "swift/AST/DiagnosticsSIL.h"
 
-#include <iostream>
-
 using namespace swift;
 using namespace Lowering;
 
@@ -3069,11 +3067,6 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
                                                            hashable);
       auto formalCanTy = formalTy->getCanonicalType(genericSig);
       
-      formalTy.dump();
-      index.FormalType.dump();
-      equatableProtocol->dump();
-      hashable.dump();
-      
       // Get the Equatable conformance from the Hashable conformance.
       auto equatable = hashable.getAssociatedConformance(formalTy,
         GenericTypeParamType::get(0, 0, C),
@@ -3348,49 +3341,40 @@ lowerKeyPathSubscriptIndexTypes(
   }
 };
 
-static void
-lowerKeyPathSubscriptEqualsIndexPatterns(
-                 SmallVectorImpl<KeyPathPatternComponent::Index> &indexPatterns,
-                 ArrayRef<IndexTypePair> indexTypes,
-                 ArrayRef<ProtocolConformanceRef> indexHashables,
-                 unsigned baseOperand,
-                 SILGenModule &SGM,
-                 ResilienceExpansion expansion) {
+static void lowerKeyPathSubscriptEqualsIndexPatterns(
+    SmallVectorImpl<KeyPathPatternComponent::Index> &indexPatterns,
+    ArrayRef<IndexTypePair> indexTypes,
+    ArrayRef<ProtocolConformanceRef> indexHashables, unsigned baseOperand,
+    SILGenModule &SGM, ResilienceExpansion expansion) {
   for (unsigned i : indices(indexTypes)) {
     CanType formalTy;
     SILType loweredTy;
     std::tie(formalTy, loweredTy) = indexTypes[i];
     auto hashable = indexHashables[i].mapConformanceOutOfContext();
-    // TODO: this only works if varaidic parameters must come last
     // We have an array of variadic parameters...
     if (!hashable.getConcrete()->getType()->isEqual(formalTy)) {
-      // Add all the hashable types
+      // Use the element type instead of the array type for hash/equals.
       auto arrayTy = cast<BoundGenericStructType>(formalTy.getPointer());
       auto elementTy = arrayTy->getGenericArgs()[0];
-//      for (unsigned hashableIndex = i; hashableIndex < indexHashables.size(); ++hashableIndex);
-      
+
+      // Make sure that we aren't leaving out any hashables.
       assert(indexTypes.size() == indexHashables.size());
-      
+
+      // Make sure the element type matches the hashable.
       assert(hashable.getConcrete()->getType()->isEqual(elementTy));
       auto newLoweredTy = SGM.Types.getLoweredType(
           AbstractionPattern::getOpaque(), elementTy,
           TypeExpansionContext::noOpaqueTypeArchetypesSubstitution(expansion));
       newLoweredTy = newLoweredTy.mapTypeOutOfContext();
-      auto newFormalTy = elementTy->mapTypeOutOfContext()
-                                  ->getCanonicalType();
-      
-      std::cout << "lowered variadic arg formal type: " << std::endl;
-      newFormalTy.dump();
-      loweredTy.dump();
-      
-      indexPatterns.push_back({baseOperand++, newFormalTy,
-                               newLoweredTy, hashable});
+      auto newFormalTy = elementTy->mapTypeOutOfContext()->getCanonicalType();
+
+      indexPatterns.push_back(
+          {baseOperand++, newFormalTy, newLoweredTy, hashable});
+
+      // We're done because variadics must come last.
       break;
     }
-//    hashable.dump(); // Int
-//    hashable.getConcrete()->getType().dump(); // Int
-//    formalTy.dump(); // Array<Int>
-//    loweredTy.dump(); // $Array<Int>
+
     assert(hashable.isAbstract() ||
            hashable.getConcrete()->getType()->isEqual(formalTy));
 
@@ -3398,12 +3382,10 @@ lowerKeyPathSubscriptEqualsIndexPatterns(
   }
 };
 
-static void
-lowerKeyPathSubscriptIndexPatterns(
-                 SmallVectorImpl<KeyPathPatternComponent::Index> &indexPatterns,
-                 ArrayRef<IndexTypePair> indexTypes,
-                 ArrayRef<ProtocolConformanceRef> indexHashables,
-                 unsigned &baseOperand) {
+static void lowerKeyPathSubscriptIndexPatterns(
+    SmallVectorImpl<KeyPathPatternComponent::Index> &indexPatterns,
+    ArrayRef<IndexTypePair> indexTypes,
+    ArrayRef<ProtocolConformanceRef> indexHashables, unsigned &baseOperand) {
   for (unsigned i : indices(indexTypes)) {
     CanType formalTy;
     SILType loweredTy;
@@ -3554,24 +3536,24 @@ SILGenModule::emitKeyPathComponentForDecl(SILLocation loc,
                                     decl, subs,
                                     expansion,
                                     needsGenericContext);
-    
+
     SmallVector<KeyPathPatternComponent::Index, 4> equalsIndexPatterns;
-    SmallVector<KeyPathPatternComponent::Index, 4> xIndexPatterns;
+    SmallVector<KeyPathPatternComponent::Index, 4> indexPatterns;
     SILFunction *indexEquals = nullptr, *indexHash = nullptr;
     // Property descriptors get their index information from the client.
     if (!forPropertyDescriptor) {
-      lowerKeyPathSubscriptEqualsIndexPatterns(equalsIndexPatterns,
-                                               indexTypes, indexHashables,
-                                               baseOperand, *this, expansion);
-      lowerKeyPathSubscriptIndexPatterns(xIndexPatterns,
+      // Gather the index patters that we will use for the component.
+      lowerKeyPathSubscriptEqualsIndexPatterns(equalsIndexPatterns, indexTypes,
+                                               indexHashables, baseOperand,
+                                               *this, expansion);
+      // Gather the index patterns that we will use for equals and hash.
+      lowerKeyPathSubscriptIndexPatterns(indexPatterns,
                                          indexTypes, indexHashables,
                                          baseOperand);
-      
-      getOrCreateKeyPathEqualsAndHash(*this, loc,
-               needsGenericContext ? genericEnv : nullptr,
-               expansion,
-               equalsIndexPatterns,
-               indexEquals, indexHash);
+
+      getOrCreateKeyPathEqualsAndHash(
+          *this, loc, needsGenericContext ? genericEnv : nullptr, expansion,
+          equalsIndexPatterns, indexEquals, indexHash);
     }
     
     auto id = getIdForKeyPathComponentComputedProperty(*this, decl, strategy);
@@ -3582,7 +3564,7 @@ SILGenModule::emitKeyPathComponentForDecl(SILLocation loc,
              indexTypes,
              baseTy, componentTy);
   
-    auto indexPatternsCopy = getASTContext().AllocateCopy(xIndexPatterns);
+    auto indexPatternsCopy = getASTContext().AllocateCopy(indexPatterns);
     if (isSettableInComponent()) {
       auto setter = getOrCreateKeyPathSetter(*this, loc,
              decl, subs,
@@ -3599,13 +3581,6 @@ SILGenModule::emitKeyPathComponentForDecl(SILLocation loc,
                                                            externalSubs,
                                                            componentTy);
     } else {
-      for (auto &i : indexPatternsCopy) {
-        std::cout << "formal type: " << std::endl;
-        i.FormalType.dump();
-        std::cout << "lowered type: " << std::endl;
-        i.LoweredType.dump();
-        std::cout << std::endl;
-      }
       return KeyPathPatternComponent::forComputedGettableProperty(id,
                                                            getter,
                                                            indexPatternsCopy,
@@ -3647,10 +3622,7 @@ RValue RValueEmitter::visitKeyPathExpr(KeyPathExpr *E, SGFContext C) {
     case KeyPathExpr::Component::Kind::Property:
     case KeyPathExpr::Component::Kind::Subscript: {
       auto decl = cast<AbstractStorageDecl>(component.getDeclRef().getDecl());
-      
-      decl->dump();
-      component.getIndexExpr()->dump();
-      
+
       unsigned numOperands = operands.size();
       loweredComponents.push_back(
         SGF.SGM.emitKeyPathComponentForDecl(SILLocation(E),
@@ -3673,7 +3645,6 @@ RValue RValueEmitter::visitKeyPathExpr(KeyPathExpr *E, SGFContext C) {
           component.getIndexExpr());
 
       for (auto &arg : loweredArgs) {
-        arg.dump();
         operands.push_back(arg.forward(SGF));
       }
 
@@ -3744,9 +3715,6 @@ RValue RValueEmitter::visitKeyPathExpr(KeyPathExpr *E, SGFContext C) {
                                      rootTy, baseTy,
                                      loweredComponents,
                                      objcString);
-
-  std::cout << "[pattern] num operands: " << pattern->getNumOperands() << std::endl;
-  std::cout << "[operand] num operands: " << operands.size() << std::endl;
   auto keyPath = SGF.B.createKeyPath(SILLocation(E), pattern,
                                      needsGenericContext
                                        ? SGF.F.getForwardingSubstitutionMap()

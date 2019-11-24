@@ -4589,8 +4589,6 @@ namespace {
       auto fnType = overload.openedType->castTo<FunctionType>();
       SmallVector<Identifier, 4> newLabels;
       for (auto &param : fnType->getParams()) {
-        param.getParameterType().dump();
-        
         newLabels.push_back(param.getLabel());
 
         auto indexType = simplifyType(param.getPlainType());
