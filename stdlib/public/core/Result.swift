@@ -187,7 +187,7 @@ extension Result {
     /// - Parameter transform: A closure that transforms the failure with a replacement success.
     /// - Returns: A `Result` instance with the result of evaluating `transform`
     ///   as the new success value if this instance represents a failure.
-    func replaceFailure(_ transform: (Failure) -> Success) -> Result<Success, Never> {
+    public func replaceFailure(_ transform: (Failure) -> Success) -> Result<Success, Never> {
         switch self {
         case let .success(success):
             return .success(success)
@@ -207,7 +207,7 @@ extension Result where Failure == Never {
     ///     // value == 5
     ///
     /// - Returns: The success value.
-    func get() -> Success {
+    public func get() -> Success {
         switch self {
         case let .success(success):
             return success
