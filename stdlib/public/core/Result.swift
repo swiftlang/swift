@@ -179,19 +179,20 @@ extension Result {
     ///
     ///     let integerResult = getNextInteger()
     ///     // integerResult == .failure(/* some Error */)
-    ///     let nonFailingIntResult = integerResult.replaceFailure(with: replacementInt)
+    ///     let nonFailingIntResult = integerResult.replaceFailure { failure in return replacementInt }
     ///     // stringResult == .success(42)
     ///     let safeInt = nonFailingIntResult.get()
     ///     // safeInt == 42
     ///
-    /// - Parameter replacement: A success value to replace any failure value
-    /// - Returns: A `Result` instance with the result of a success or the replacement value.
-    func replaceFailure(with replacement: Success) -> Result<Success, Never> {
+    /// - Parameter transform: A closure that transforms the failure with a replacement success.
+    /// - Returns: A `Result` instance with the result of evaluating `transform`
+    ///   as the new success value if this instance represents a failure.
+    func replaceFailure(_ transform: (Failure) -> Success) -> Result<Success, Never> {
         switch self {
         case let .success(success):
             return .success(success)
-        case .failure:
-            return .success(replacement)
+        case let .failure(failure):
+            return .success(transform(failure))
         }
     }
 }
