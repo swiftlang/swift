@@ -1,13 +1,13 @@
 // Round-trip parsing/printing test.
 
-// RUN: %target-sil-opt %s | %target-sil-opt | %FileCheck --check-prefix=ROUNDTRIP %s
+// RUN: %target-sil-opt %s | %target-sil-opt -emit-sorted-sil | %FileCheck --check-prefix=ROUNDTRIP %s
 
 // Round-trip serialization-deserialization test.
 
 // RUN: %empty-directory(%t)
 // RUN: %target-sil-opt %s -emit-sib -o %t/tmp.sib -module-name main
 // RUN: %target-sil-opt %t/tmp.sib -o %t/tmp.2.sib -module-name main
-// RUN: %target-sil-opt %t/tmp.2.sib -module-name main | %FileCheck --check-prefix=ROUNDTRIP %s
+// RUN: %target-sil-opt %t/tmp.2.sib -module-name main -emit-sorted-sil | %FileCheck --check-prefix=ROUNDTRIP %s
 
 // IRGen test.
 
@@ -18,6 +18,71 @@ sil_stage raw
 import Builtin
 import Swift
 import SwiftShims
+
+// Test SIL differentiability witness for bodiless original function, with defined jvp/vjp.
+
+sil @externalFn1 : $@convention(thin) (Float) -> Float
+
+sil @AD__externalFn1__jvp_src_0_wrt_0 : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float) {
+bb0(%0 : $Float):
+  return undef : $(Float, @callee_guaranteed (Float) -> Float)
+}
+
+sil @AD__externalFn1__vjp_src_0_wrt_0 : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float) {
+bb0(%0 : $Float):
+  return undef : $(Float, @callee_guaranteed (Float) -> Float)
+}
+
+sil_differentiability_witness [parameters 0] [results 0] @externalFn1 : $@convention(thin) (Float) -> Float {
+  jvp: @AD__externalFn1__jvp_src_0_wrt_0 : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)
+  vjp: @AD__externalFn1__vjp_src_0_wrt_0 : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)
+}
+
+// ROUNDTRIP-LABEL: // differentiability witness for externalFn1
+// ROUNDTRIP: sil_differentiability_witness [parameters 0] [results 0] @externalFn1 : $@convention(thin) (Float) -> Float {
+// ROUNDTRIP:   jvp: @AD__externalFn1__jvp_src_0_wrt_0 : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)
+// ROUNDTRIP:   vjp: @AD__externalFn1__vjp_src_0_wrt_0 : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)
+// ROUNDTRIP: }
+
+// IRGEN-LABEL: @AD__externalFn1_PSRS ={{( protected)?}} global { i8*, i8* } {
+// IRGEN-SAME: @AD__externalFn1__jvp_src_0_wrt_0
+// IRGEN-SAME: @AD__externalFn1__vjp_src_0_wrt_0
+// IRGEN-SAME: }
+
+// Test SIL differentiability witness for bodiless original function, with bodiless jvp/vjp.
+
+sil @externalFn2 : $@convention(thin) (Float) -> Float
+
+sil @AD__externalFn2__jvp_src_0_wrt_0 : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)
+
+sil @AD__externalFn2__vjp_src_0_wrt_0 : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)
+
+sil_differentiability_witness [parameters 0] [results 0] @externalFn2 : $@convention(thin) (Float) -> Float {
+  jvp: @AD__externalFn2__jvp_src_0_wrt_0 : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)
+  vjp: @AD__externalFn2__vjp_src_0_wrt_0 : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)
+}
+
+// ROUNDTRIP-LABEL: // differentiability witness for externalFn2
+// ROUNDTRIP: sil_differentiability_witness [parameters 0] [results 0] @externalFn2 : $@convention(thin) (Float) -> Float {
+// ROUNDTRIP:   jvp: @AD__externalFn2__jvp_src_0_wrt_0 : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)
+// ROUNDTRIP:   vjp: @AD__externalFn2__vjp_src_0_wrt_0 : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)
+// ROUNDTRIP: }
+
+// IRGEN-LABEL: @AD__externalFn2_PSRS ={{( protected)?}} global { i8*, i8* } {
+// IRGEN-SAME: @AD__externalFn2__jvp_src_0_wrt_0
+// IRGEN-SAME: @AD__externalFn2__vjp_src_0_wrt_0
+// IRGEN-SAME: }
+
+// Test SIL differentiability witness declaration.
+
+sil @externalFn3 : $@convention(thin) (Float) -> Float
+
+sil_differentiability_witness [parameters 0] [results 0] @externalFn3 : $@convention(thin) (Float) -> Float
+
+// ROUNDTRIP-LABEL: // differentiability witness for externalFn3
+// ROUNDTRIP: sil_differentiability_witness [parameters 0] [results 0] @externalFn3 : $@convention(thin) (Float) -> Float{{[^{]*$}}
+
+// IRGEN-NOT: @AD__externalFn3{{.*}}={{.*}}{ i8*, i8* }
 
 // Test public non-generic function.
 // SIL differentiability witness:
@@ -92,68 +157,3 @@ sil_differentiability_witness hidden [parameters 0 1] [results 0] <τ_0_0 where 
 // IRGEN-SAME: @AD__generic__jvp_src_0_wrt_0_1
 // IRGEN-SAME: @AD__generic__vjp_src_0_wrt_0_1
 // IRGEN-SAME: }
-
-// Test SIL differentiability witness for bodiless original function, with defined jvp/vjp.
-
-sil @externalFn1 : $@convention(thin) (Float) -> Float
-
-sil @AD__externalFn1__jvp_src_0_wrt_0 : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float) {
-bb0(%0 : $Float):
-  return undef : $(Float, @callee_guaranteed (Float) -> Float)
-}
-
-sil @AD__externalFn1__vjp_src_0_wrt_0 : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float) {
-bb0(%0 : $Float):
-  return undef : $(Float, @callee_guaranteed (Float) -> Float)
-}
-
-sil_differentiability_witness [parameters 0] [results 0] @externalFn1 : $@convention(thin) (Float) -> Float {
-  jvp: @AD__externalFn1__jvp_src_0_wrt_0 : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)
-  vjp: @AD__externalFn1__vjp_src_0_wrt_0 : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)
-}
-
-// ROUNDTRIP-LABEL: // differentiability witness for externalFn1
-// ROUNDTRIP: sil_differentiability_witness [parameters 0] [results 0] @externalFn1 : $@convention(thin) (Float) -> Float {
-// ROUNDTRIP:   jvp: @AD__externalFn1__jvp_src_0_wrt_0 : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)
-// ROUNDTRIP:   vjp: @AD__externalFn1__vjp_src_0_wrt_0 : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)
-// ROUNDTRIP: }
-
-// IRGEN-LABEL: @AD__externalFn1_PSRS ={{( protected)?}} global { i8*, i8* } {
-// IRGEN-SAME: @AD__externalFn1__jvp_src_0_wrt_0
-// IRGEN-SAME: @AD__externalFn1__vjp_src_0_wrt_0
-// IRGEN-SAME: }
-
-// Test SIL differentiability witness for bodiless original function, with bodiless jvp/vjp.
-
-sil @externalFn2 : $@convention(thin) (Float) -> Float
-
-sil @AD__externalFn2__jvp_src_0_wrt_0 : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)
-
-sil @AD__externalFn2__vjp_src_0_wrt_0 : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)
-
-sil_differentiability_witness [parameters 0] [results 0] @externalFn2 : $@convention(thin) (Float) -> Float {
-  jvp: @AD__externalFn2__jvp_src_0_wrt_0 : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)
-  vjp: @AD__externalFn2__vjp_src_0_wrt_0 : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)
-}
-
-// ROUNDTRIP-LABEL: // differentiability witness for externalFn2
-// ROUNDTRIP: sil_differentiability_witness [parameters 0] [results 0] @externalFn2 : $@convention(thin) (Float) -> Float {
-// ROUNDTRIP:   jvp: @AD__externalFn2__jvp_src_0_wrt_0 : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)
-// ROUNDTRIP:   vjp: @AD__externalFn2__vjp_src_0_wrt_0 : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)
-// ROUNDTRIP: }
-
-// IRGEN-LABEL: @AD__externalFn2_PSRS ={{( protected)?}} global { i8*, i8* } {
-// IRGEN-SAME: @AD__externalFn2__jvp_src_0_wrt_0
-// IRGEN-SAME: @AD__externalFn2__vjp_src_0_wrt_0
-// IRGEN-SAME: }
-
-// Test SIL differentiability witness declaration.
-
-sil @externalFn3 : $@convention(thin) (Float) -> Float
-
-sil_differentiability_witness [parameters 0] [results 0] @externalFn3 : $@convention(thin) (Float) -> Float
-
-// ROUNDTRIP-LABEL: // differentiability witness for externalFn3
-// ROUNDTRIP: sil_differentiability_witness [parameters 0] [results 0] @externalFn3 : $@convention(thin) (Float) -> Float{{[^{]*$}}
-
-// IRGEN-NOT: @AD__externalFn3{{.*}}={{.*}}{ i8*, i8* }

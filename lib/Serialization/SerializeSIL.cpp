@@ -201,6 +201,12 @@ namespace {
     /// Global variables that we've emitted a reference to.
     llvm::DenseSet<const SILGlobalVariable *> GlobalsToEmit;
 
+    // SWIFT_ENABLE_TENSORFLOW
+    /// Referenced differentiability witnesses that need to be emitted.
+    llvm::DenseSet<const SILDifferentiabilityWitness *>
+        DifferentiabilityWitnessesToEmit;
+    // SWIFT_ENABLE_TENSORFLOW END
+
     /// Additional functions we might need to serialize.
     llvm::SmallVector<const SILFunction *, 16> Worklist;
 
@@ -1061,6 +1067,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case SILInstructionKind::DifferentiabilityWitnessFunctionInst: {
     auto *dwfi = cast<DifferentiabilityWitnessFunctionInst>(&SI);
     auto *witness = dwfi->getWitness();
+    DifferentiabilityWitnessesToEmit.insert(witness);
     Mangle::ASTMangler mangler;
     auto mangledKey = mangler.mangleSILDifferentiabilityWitnessKey(
         witness->getKey());
@@ -2718,17 +2725,6 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
       writeSILDefaultWitnessTable(wt);
   }
 
-  // SWIFT_ENABLE_TENSORFLOW
-  // Write out differentiability witnesses.
-  for (const auto &diffWitness : SILMod->getDifferentiabilityWitnessList()) {
-    // TODO(TF-893): Consider checking
-    // `SILMod->shouldSerializeEntitiesAssociatedWithDeclContext` on the JVP/VJP
-    // functions.
-    if ((ShouldSerializeAll || diffWitness.isSerialized()))
-      writeSILDifferentiabilityWitness(diffWitness);
-  }
-  // SWIFT_ENABLE_TENSORFLOW END
-
   // Emit only declarations if it is a module with pre-specializations.
   // And only do it in optimized builds.
   bool emitDeclarationsForOnoneSupport =
@@ -2750,6 +2746,26 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
     addMandatorySILFunction(&F, emitDeclarationsForOnoneSupport);
     processSILFunctionWorklist();
   }
+
+  // SWIFT_ENABLE_TENSORFLOW
+  // Write out differentiability witnesses.
+  // Note: this must be done after visiting SIL functions above so that
+  // differentiability witness references (`differentiability_witness_function`
+  // instructions) have been tracked.
+  for (const auto &diffWitness : SILMod->getDifferentiabilityWitnessList()) {
+    // TODO(TF-893): Consider checking
+    // `SILMod->shouldSerializeEntitiesAssociatedWithDeclContext` on the JVP/VJP
+    // functions.
+    if ((ShouldSerializeAll || diffWitness.isSerialized()))
+      DifferentiabilityWitnessesToEmit.insert(&diffWitness);
+  }
+  for (auto *diffWitness : DifferentiabilityWitnessesToEmit)
+    writeSILDifferentiabilityWitness(*diffWitness);
+  // Process SIL functions referenced by differentiability witnesses.
+  // Note: this is necessary despite processing `FuncsToEmit` below because
+  // `Worklist` is processed separately.
+  processSILFunctionWorklist();
+  // SWIFT_ENABLE_TENSORFLOW END
 
   // Now write function declarations for every function we've
   // emitted a reference to without emitting a function body for.
