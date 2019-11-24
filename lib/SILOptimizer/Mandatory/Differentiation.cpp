@@ -17,12 +17,13 @@
 // NOTE: Although the AD feature is developed as part of the Swift for
 // TensorFlow project, it is completely independent from TensorFlow support.
 //
+// TODO(TF-993): Organize Differentiation.cpp into smaller files.
+//
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "differentiation"
 
 #include "Differentiation.h"
-#include "Differentiation/DerivativeLookup.h"
 
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTPrinter.h"
@@ -49,6 +50,7 @@
 #include "swift/SILOptimizer/Analysis/LoopAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SILOptimizer/Utils/DerivativeLookup.h"
 #include "swift/SILOptimizer/Utils/LoopUtils.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "llvm/ADT/APSInt.h"

@@ -16,7 +16,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "DerivativeLookup.h"
+#include "swift/SILOptimizer/Utils/DerivativeLookup.h"
 
 namespace swift {
 

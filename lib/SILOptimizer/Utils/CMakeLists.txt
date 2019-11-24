@@ -6,6 +6,9 @@ silopt_register_sources(
   CheckedCastBrJumpThreading.cpp
   ConstantFolding.cpp
   ConstExpr.cpp
+  # SWIFT_ENABLE_TENSORFLOW
+  DerivativeLookup.cpp
+  # SWIFT_ENABLE_TENSORFLOW END
   Devirtualize.cpp
   Existential.cpp
   GenericCloner.cpp

@@ -7,7 +7,7 @@ silopt_register_sources(
   DefiniteInitialization.cpp
   # SWIFT_ENABLE_TENSORFLOW
   Differentiation.cpp
-  Differentiation/DerivativeLookup.cpp
+  # SWIFT_ENABLE_TENSORFLOW END
   DIMemoryUseCollector.cpp
   DataflowDiagnostics.cpp
   DiagnoseInfiniteRecursion.cpp
