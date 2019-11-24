@@ -2242,6 +2242,7 @@ KeyPathPattern::get(SILModule &M, CanGenericSignature signature,
     case KeyPathPatternComponent::Kind::GettableProperty:
     case KeyPathPatternComponent::Kind::SettableProperty:
       for (auto &index : component.getSubscriptIndices()) {
+        index.FormalType.dump();
         maxOperandNo = std::max(maxOperandNo, (int)index.Operand);
       }
     }
