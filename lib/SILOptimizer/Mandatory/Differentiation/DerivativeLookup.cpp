@@ -22,15 +22,13 @@ namespace swift {
 
 /// Returns the AbstractFunctionDecl corresponding to `F`. If there isn't one,
 /// returns `nullptr`.
-static AbstractFunctionDecl *getAFDOrNull(SILFunction *F) {
+static AbstractFunctionDecl *findAbstractFunctionDecl(SILFunction *F) {
   auto *DC = F->getDeclContext();
   if (!DC)
     return nullptr;
-
   auto *D = DC->getAsDecl();
   if (!D)
     return nullptr;
-
   return dyn_cast<AbstractFunctionDecl>(D);
 }
 
@@ -86,7 +84,7 @@ SILDifferentiabilityWitness *getOrCreateMinimalASTDifferentiabilityWitness(
 
   // Explicit differentiability witnesses only exist on SILFunctions that come
   // from AST functions.
-  auto *originalAFD = getAFDOrNull(original);
+  auto *originalAFD = findAbstractFunctionDecl(original);
   if (!originalAFD)
     return nullptr;
 
