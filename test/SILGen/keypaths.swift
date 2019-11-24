@@ -369,6 +369,18 @@ struct SubscriptDefaults5 {
   }
 }
 
+struct SubscriptVariadic1 {
+  subscript(x: Int...) -> Int { x[0] }
+}
+
+struct SubscriptVariadic2 {
+  subscript<T : ExpressibleByStringLiteral>(x: T...) -> T { x[0] }
+}
+
+struct SubscriptVariadic3<T : ExpressibleByStringLiteral> {
+  subscript(x: T...) -> T { x[0] }
+}
+
 // CHECK-LABEL: sil hidden [ossa] @{{.*}}10subscripts1x1y1syx_q_SStSHRzSHR_r0_lF
 func subscripts<T: Hashable, U: Hashable>(x: T, y: U, s: String) {
   _ = \Subscripts<T>.[]
@@ -417,6 +429,18 @@ func subscripts<T: Hashable, U: Hashable>(x: T, y: U, s: String) {
   _ = \SubscriptDefaults4.[x: 0, y: 0]
   _ = \SubscriptDefaults5.[x: ""]
   _ = \SubscriptDefaults5.[x: "", y: ""]
+  
+  _ = \SubscriptVariadic1.[1, 2, 3]
+  _ = \SubscriptVariadic1.[1]
+  _ = \SubscriptVariadic1.[]
+  
+  _ = \SubscriptVariadic2.["", "1"]
+  _ = \SubscriptVariadic2.[""]
+  _ = \SubscriptVariadic2.["", #function]
+  
+  _ = \SubscriptVariadic3<String>.[""]
+  _ = \SubscriptVariadic3<String>.["", "1"]
+  _ = \SubscriptVariadic3<String>.[]
 }
 
 // CHECK-LABEL: sil hidden [ossa] @{{.*}}check_default_subscripts
