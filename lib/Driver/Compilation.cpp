@@ -432,8 +432,7 @@ namespace driver {
     /// fails, this can cause deferred jobs to be immediately scheduled.
 
     template <unsigned N>
-    void reloadAndRemarkDeps(const Job *FinishedCmd,
-                             int ReturnCode,
+    void reloadAndRemarkDeps(const Job *FinishedCmd, int ReturnCode,
                              SmallVector<const Job *, N> &Dependents) {
 
       const CommandOutput &Output = FinishedCmd->getOutput();
@@ -462,7 +461,7 @@ namespace driver {
           bool wasCascading = isMarkedInDepGraph(FinishedCmd);
 
           switch (loadDepGraphFromPath(FinishedCmd, DependenciesFile,
-                                        Comp.getDiags())) {
+                                       Comp.getDiags())) {
           case DependencyGraphImpl::LoadResult::HadError:
             if (ReturnCode == EXIT_SUCCESS) {
               dependencyLoadFailed(DependenciesFile);
@@ -479,7 +478,7 @@ namespace driver {
             LLVM_FALLTHROUGH;
           case DependencyGraphImpl::LoadResult::AffectsDownstream:
             markTransitiveInDepGraph(Dependents, FinishedCmd,
-                                    IncrementalTracer);
+                                     IncrementalTracer);
             break;
           }
         } else {
@@ -490,7 +489,7 @@ namespace driver {
             // mark it as affecting other jobs, because some of them may have
             // completed already.
             markTransitiveInDepGraph(Dependents, FinishedCmd,
-                                    IncrementalTracer);
+                                     IncrementalTracer);
             break;
           case Job::Condition::Always:
             // Any incremental task that shows up here has already been marked;
@@ -505,7 +504,7 @@ namespace driver {
             // have to conservatively assume the changes could affect other
             // files.
             markTransitiveInDepGraph(Dependents, FinishedCmd,
-                                    IncrementalTracer);
+                                     IncrementalTracer);
             break;
           case Job::Condition::CheckDependencies:
             // If the only reason we're running this is because something else
@@ -960,8 +959,7 @@ namespace driver {
     /// Return both the jobs to compile if using ranges, and also any jobs that
     /// must be compiled to use ranges in the future (because they were lacking
     /// supplementary output files). May include duplicates.
-    std::pair<CommandSet, CommandSet>
-    computeRangesAndGetNeededCompileJobs() {
+    std::pair<CommandSet, CommandSet> computeRangesAndGetNeededCompileJobs() {
       using namespace incremental_ranges;
 
       const bool dumpSwiftRanges =
@@ -1016,8 +1014,7 @@ namespace driver {
     }
 
     /// Return jobs to run if using dependencies, may include duplicates.
-    CommandSet
-    computeDependenciesAndGetNeededCompileJobs() {
+    CommandSet computeDependenciesAndGetNeededCompileJobs() {
       CommandSet jobsToSchedule;
       for (const Job *Cmd : Comp.getJobs()) {
         if (Cmd->getFirstSwiftPrimaryInput().empty())
@@ -1053,8 +1050,7 @@ namespace driver {
     isCompileJobInitiallyNeededForDependencyBasedIncrementalCompilation(
         const Job *Cmd) {
 
-      auto CondAndHasDepsIfNoError =
-          loadDependenciesAndComputeCondition(Cmd);
+      auto CondAndHasDepsIfNoError = loadDependenciesAndComputeCondition(Cmd);
       if (!CondAndHasDepsIfNoError)
         return None; // swiftdeps read error, abandon dependencies
 
@@ -1162,17 +1158,16 @@ namespace driver {
     SmallVector<const Job *, 16>
     externallyDependentJobsForRangeBasedIncrementalCompilation() {
       SmallVector<const Job *, 16> results;
-      forEachOutOfDateExternalDependency(
-          [&](StringRef externalSwiftDeps) {
-            forEachUnmarkedJobDirectlyDependentOnExternalSwiftdeps(
-                externalSwiftDeps, [&](const void *node) {
-                  // Sadly, the non-experimental dependency graph is type-unsafe
-                  const Job *externalCmd = reinterpret_cast<const Job *>(node);
-                  noteBuilding(externalCmd, true, true,
-                               "because of external dependencies");
-                  results.push_back(externalCmd);
-                });
-          });
+      forEachOutOfDateExternalDependency([&](StringRef externalSwiftDeps) {
+        forEachUnmarkedJobDirectlyDependentOnExternalSwiftdeps(
+            externalSwiftDeps, [&](const void *node) {
+              // Sadly, the non-experimental dependency graph is type-unsafe
+              const Job *externalCmd = reinterpret_cast<const Job *>(node);
+              noteBuilding(externalCmd, true, true,
+                           "because of external dependencies");
+              results.push_back(externalCmd);
+            });
+      });
       return results;
     }
 
@@ -1189,15 +1184,14 @@ namespace driver {
       }
     }
 
-    SmallVector<const Job *, 16>
-    collectSecondaryJobsFromDependencyGraph() {
+    SmallVector<const Job *, 16> collectSecondaryJobsFromDependencyGraph() {
       SmallVector<const Job *, 16> AdditionalOutOfDateCommands;
       // We scheduled all of the files that have actually changed. Now add the
       // files that haven't changed, so that they'll get built in parallel if
       // possible and after the first set of files if it's not.
       for (auto *Cmd : InitialCascadingCommands) {
         markTransitiveInDepGraph(AdditionalOutOfDateCommands, Cmd,
-                                IncrementalTracer);
+                                 IncrementalTracer);
       }
       for (auto *transitiveCmd : AdditionalOutOfDateCommands)
         noteBuilding(transitiveCmd, true, false, "because of the initial set");
@@ -1618,8 +1612,9 @@ namespace driver {
 
     // MARK: dependency graph interface
 
-    bool isMarkedInDepGraph(const Job*const Cmd) {
-      return ExpDepGraph ? ExpDepGraph->isMarked(Cmd) : StandardDepGraph.isMarked(Cmd);
+    bool isMarkedInDepGraph(const Job *const Cmd) {
+      return ExpDepGraph ? ExpDepGraph->isMarked(Cmd)
+                         : StandardDepGraph.isMarked(Cmd);
     }
 
     std::vector<StringRef> getExternalDependencies() const {
@@ -1631,50 +1626,52 @@ namespace driver {
 
     template <unsigned N>
     void markExternalInDepGraph(SmallVector<const driver::Job *, N> &uses,
-    StringRef externalDependency) {
+                                StringRef externalDependency) {
       if (ExpDepGraph)
         ExpDepGraph->markExternal(uses, externalDependency);
       else
         StandardDepGraph.markExternal(uses, externalDependency);
     }
 
-    bool markIntransitiveInDepGraph(const Job* Cmd) {
-      return ExpDepGraph
-      ? ExpDepGraph->markIntransitive(Cmd)
-      : StandardDepGraph.markIntransitive(Cmd);
+    bool markIntransitiveInDepGraph(const Job *Cmd) {
+      return ExpDepGraph ? ExpDepGraph->markIntransitive(Cmd)
+                         : StandardDepGraph.markIntransitive(Cmd);
     }
 
-    DependencyGraph::LoadResult loadDepGraphFromPath(const Job *Cmd, StringRef path, DiagnosticEngine &diags) {
-    return  ExpDepGraph
-         ? ExpDepGraph->loadFromPath(Cmd, path, diags)
-         : StandardDepGraph.loadFromPath(Cmd, path, diags);
+    DependencyGraph::LoadResult loadDepGraphFromPath(const Job *Cmd,
+                                                     StringRef path,
+                                                     DiagnosticEngine &diags) {
+      return ExpDepGraph ? ExpDepGraph->loadFromPath(Cmd, path, diags)
+                         : StandardDepGraph.loadFromPath(Cmd, path, diags);
     }
 
     template <unsigned N>
-    void markTransitiveInDepGraph(SmallVector<const Job *, N> &visited,
-                                  const Job *Cmd, DependencyGraph::MarkTracer *tracer = nullptr) {
+    void
+    markTransitiveInDepGraph(SmallVector<const Job *, N> &visited,
+                             const Job *Cmd,
+                             DependencyGraph::MarkTracer *tracer = nullptr) {
       if (ExpDepGraph)
         ExpDepGraph->markTransitive(visited, Cmd, tracer);
       else
         StandardDepGraph.markTransitive(visited, Cmd, tracer);
     }
 
-    void addIndependentNodeToDepGraph(const Job* Cmd) {
+    void addIndependentNodeToDepGraph(const Job *Cmd) {
       if (ExpDepGraph)
         ExpDepGraph->addIndependentNode(Cmd);
-        else
-          StandardDepGraph.addIndependentNode(Cmd);
+      else
+        StandardDepGraph.addIndependentNode(Cmd);
     }
 
     void forEachUnmarkedJobDirectlyDependentOnExternalSwiftdeps(
-    StringRef externalDependency, function_ref<void(const void *)> fn) {
+        StringRef externalDependency, function_ref<void(const void *)> fn) {
       if (ExpDepGraph)
-      ExpDepGraph->forEachUnmarkedJobDirectlyDependentOnExternalSwiftdeps(externalDependency, fn);
+        ExpDepGraph->forEachUnmarkedJobDirectlyDependentOnExternalSwiftdeps(
+            externalDependency, fn);
       else
-        StandardDepGraph.forEachUnmarkedJobDirectlyDependentOnExternalSwiftdeps(externalDependency, fn);
+        StandardDepGraph.forEachUnmarkedJobDirectlyDependentOnExternalSwiftdeps(
+            externalDependency, fn);
     }
-
-
   };
 } // namespace driver
 } // namespace swift
@@ -2076,4 +2073,3 @@ unsigned Compilation::countSwiftInputs() const {
       ++inputCount;
   return inputCount;
 }
-
