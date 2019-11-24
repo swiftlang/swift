@@ -14,7 +14,7 @@ Currently there are two supported ways to build Swift for Windows.
 
 [Windows Subsystem for Linux](https://docs.microsoft.com/en-us/windows/wsl/about) is an Ubuntu environment.  Follow the instructions for building on [Linux](../README.md#linux)
 
-There two versions of WSL as of november 23, 2019:
+There two versions of WSL as of November 23, 2019:
 
-- WSL1: is the current stable version. Swift compilation and execution works but REPL and debugging (LLDB) hangs on startup.
-- WSL2: Both REPL and debugging work in this verion. WSL2 is still in development and is available by downloading an insider build. Fortunately, installing WSL2 is ppretty simple (switch to insider, download an insider build and run some scripts). WSL2 can be installed [by following this link](https://docs.microsoft.com/windows/wsl/wsl2-install).
+- WSL1: is the current stable version. Both Swift compilation and execution work but REPL and debugging (LLDB) hang on startup.
+- WSL2: Both REPL and debugging work with WSL2. Although, WSL2 is still in development, it is available by downloading an insider build. Installing WSL2 is pretty simple if WSL1 was already installed (switch to insider, download an insider build and run some scripts). WSL2 can be installed [by following this link](https://docs.microsoft.com/windows/wsl/wsl2-install).
