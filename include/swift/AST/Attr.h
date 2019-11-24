@@ -1683,38 +1683,31 @@ class DifferentiatingAttr final
   DeclNameWithLoc Original;
   /// The original function, resolved by the type checker.
   FuncDecl *OriginalFunction = nullptr;
-  /// Whether this function is linear.
-  bool Linear;
   /// The number of parsed parameters specified in 'wrt:'.
   unsigned NumParsedParameters = 0;
   /// The differentiation parameters' indices, resolved by the type checker.
   IndexSubset *ParameterIndices = nullptr;
 
-  explicit DifferentiatingAttr(ASTContext &context, bool implicit,
-                               SourceLoc atLoc, SourceRange baseRange,
-                               DeclNameWithLoc original, bool linear,
+  explicit DifferentiatingAttr(bool implicit, SourceLoc atLoc,
+                               SourceRange baseRange, DeclNameWithLoc original,
                                ArrayRef<ParsedAutoDiffParameter> params);
 
-  explicit DifferentiatingAttr(ASTContext &context, bool implicit,
-                               SourceLoc atLoc, SourceRange baseRange,
-                               DeclNameWithLoc original, bool linear,
+  explicit DifferentiatingAttr(bool implicit, SourceLoc atLoc,
+                               SourceRange baseRange, DeclNameWithLoc original,
                                IndexSubset *indices);
 
 public:
   static DifferentiatingAttr *create(ASTContext &context, bool implicit,
                                      SourceLoc atLoc, SourceRange baseRange,
-                                     DeclNameWithLoc original, bool linear,
+                                     DeclNameWithLoc original,
                                      ArrayRef<ParsedAutoDiffParameter> params);
 
   static DifferentiatingAttr *create(ASTContext &context, bool implicit,
                                      SourceLoc atLoc, SourceRange baseRange,
-                                     DeclNameWithLoc original, bool linear,
+                                     DeclNameWithLoc original,
                                      IndexSubset *indices);
 
   DeclNameWithLoc getOriginal() const { return Original; }
-                                      
-  bool isLinear() const { return Linear; }
-
   FuncDecl *getOriginalFunction() const { return OriginalFunction; }
   void setOriginalFunction(FuncDecl *decl) { OriginalFunction = decl; }
 
@@ -1765,34 +1758,34 @@ class TransposingAttr final
   unsigned NumParsedParameters = 0;
   /// The differentiation parameters' indices, resolved by the type checker.
   IndexSubset *ParameterIndices = nullptr;
-  
+
   explicit TransposingAttr(ASTContext &context, bool implicit,
                            SourceLoc atLoc, SourceRange baseRange,
                            TypeRepr *baseType, DeclNameWithLoc original,
                            ArrayRef<ParsedAutoDiffParameter> params);
-  
+
   explicit TransposingAttr(ASTContext &context, bool implicit,
                            SourceLoc atLoc, SourceRange baseRange,
                            TypeRepr *baseType, DeclNameWithLoc original,
                            IndexSubset *indices);
-  
+
 public:
   static TransposingAttr *create(ASTContext &context, bool implicit,
                                  SourceLoc atLoc, SourceRange baseRange,
                                  TypeRepr *baseType, DeclNameWithLoc original,
                                  ArrayRef<ParsedAutoDiffParameter> params);
-  
+
   static TransposingAttr *create(ASTContext &context, bool implicit,
                                  SourceLoc atLoc, SourceRange baseRange,
                                  TypeRepr *baseType, DeclNameWithLoc original,
                                  IndexSubset *indices);
-  
+
   TypeRepr *getBaseType() const { return BaseType; }
   DeclNameWithLoc getOriginal() const { return Original; }
-  
+
   FuncDecl *getOriginalFunction() const { return OriginalFunction; }
   void setOriginalFunction(FuncDecl *decl) { OriginalFunction = decl; }
-  
+
   /// The parsed transposing parameters, i.e. the list of parameters
   /// specified in 'wrt:'.
   ArrayRef<ParsedAutoDiffParameter> getParsedParameters() const {
@@ -1804,14 +1797,14 @@ public:
   size_t numTrailingObjects(OverloadToken<ParsedAutoDiffParameter>) const {
     return NumParsedParameters;
   }
-  
+
   IndexSubset *getParameterIndices() const {
     return ParameterIndices;
   }
   void setParameterIndices(IndexSubset *pi) {
     ParameterIndices = pi;
   }
-  
+
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_Transposing;
   }

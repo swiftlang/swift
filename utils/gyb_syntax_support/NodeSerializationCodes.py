@@ -242,10 +242,9 @@ SYNTAX_NODE_SERIALIZATION_CODES = {
     'DifferentiationParam': 237,
     'DifferentiableAttributeFuncSpecifier': 238,
     'FunctionDeclName': 239,
-    'DifferentiatingAttributeArguments': 240,
-    'TransposingAttributeArguments': 241,
-    'QuoteLiteralExpr': 242,
-    'UnquoteExpr': 243,
+    'DerivativeRegistrationAttributeArguments': 240,
+    'QuoteLiteralExpr': 241,
+    'UnquoteExpr': 242,
 }
 
 
