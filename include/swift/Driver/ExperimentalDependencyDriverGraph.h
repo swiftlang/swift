@@ -313,7 +313,7 @@ public:
   /// Record a new (to this graph) Job.
   void addIndependentNode(const driver::Job *);
 
-  std::vector<std::string> getExternalDependencies() const;
+  std::vector<StringRef> getExternalDependencies() const;
 
   void markExternal(SmallVectorImpl<const driver::Job *> &uses,
                     StringRef externalDependency);

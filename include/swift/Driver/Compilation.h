@@ -286,7 +286,7 @@ private:
   const bool EnableSourceRangeDependencies;
 
   /// May not actually use them if e.g. there is a new input
-  bool UseSourceRangeDependencies = false;
+  bool UseSourceRangeDependencies;
 
 public:
   /// Will contain a comparator if an argument demands it.
