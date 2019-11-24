@@ -13,10 +13,6 @@
 //
 // FIXME: <rdar://problem/39193272> A false negative that happens only in REPL
 
-// SWIFT_ENABLE_TENSORFLOW
-// TODO(TF-799): Re-enable test after SR-11336 is fixed.
-// XFAIL: *
-
 import StdlibUnittest
 
 func testArithmeticOverflow_Int_64bit() {

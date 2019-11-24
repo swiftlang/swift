@@ -7,10 +7,6 @@
 // whether specific compile-time constants such as the format string,
 // the size of the byte buffer etc. are literals after the mandatory pipeline.
 
-// SWIFT_ENABLE_TENSORFLOW
-// TODO(TF-799): Re-enable test after SR-11336 is fixed.
-// XFAIL: *
-
 import OSLogPrototype
 
 if #available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *) {

@@ -1,4 +1,3 @@
-// SWIFT_ENABLE_TENSORFLOW
 // RUN: %target-swift-frontend %s -module-name A -emit-ir -g -o - | %FileCheck %s
 // REQUIRES: CPU=x86_64
 public struct Continuation<A> {

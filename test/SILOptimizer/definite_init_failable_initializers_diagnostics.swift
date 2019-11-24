@@ -1,10 +1,6 @@
 // RUN: %target-swift-frontend -emit-sil -disable-objc-attr-requires-foundation-module -verify %s
 // RUN: %target-swift-frontend -emit-sil -disable-objc-attr-requires-foundation-module -verify %s -enable-ownership-stripping-after-serialization
 
-// SWIFT_ENABLE_TENSORFLOW
-// TODO(TF-799): Re-enable test after SR-11336 is fixed.
-// XFAIL: *
-
 // High-level tests that DI rejects certain invalid idioms for early
 // return from initializers.
 

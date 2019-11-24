@@ -18,10 +18,6 @@
 //
 // RUN: %FileCheck %s < %t/error-output-mandatory
 
-// SWIFT_ENABLE_TENSORFLOW
-// TODO(TF-799): Re-enable test after SR-11336 is fixed.
-// XFAIL: *
-
 // Test Swift code snippets that are expected to be constant evaluable and those
 // that are not. If any of the test here fails, it indicates a change in the
 // output of SILGen or the mandatory passes that affects the constant
