@@ -1570,9 +1570,8 @@ class DifferentiableAttr final
   /// has a where clause.
   GenericSignature DerivativeGenericSignature = GenericSignature();
 
-  explicit DifferentiableAttr(ASTContext &context, bool implicit,
-                              SourceLoc atLoc, SourceRange baseRange,
-                              bool linear,
+  explicit DifferentiableAttr(bool implicit, SourceLoc atLoc,
+                              SourceRange baseRange, bool linear,
                               ArrayRef<ParsedAutoDiffParameter> parameters,
                               Optional<DeclNameWithLoc> jvp,
                               Optional<DeclNameWithLoc> vjp,
