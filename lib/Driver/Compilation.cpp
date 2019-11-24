@@ -432,21 +432,9 @@ namespace driver {
     /// fails, this can cause deferred jobs to be immediately scheduled.
 
     template <unsigned N>
-    void reloadAndRemarkDeps(const Job *FinishedCmd, int ReturnCode,
-                             SmallVector<const Job *, N> &Dependents) {
-      if (Comp.getEnableExperimentalDependencies())
-        reloadAndRemarkDeps(FinishedCmd, ReturnCode, Dependents,
-                            ExpDepGraph.getValue());
-      else
-        reloadAndRemarkDeps(FinishedCmd, ReturnCode, Dependents,
-                            StandardDepGraph);
-    }
-
-    template <unsigned N, typename DependencyGraphT>
     void reloadAndRemarkDeps(const Job *FinishedCmd,
                              int ReturnCode,
-                             SmallVector<const Job *, N> &Dependents,
-                             DependencyGraphT &DepGraph) {
+                             SmallVector<const Job *, N> &Dependents) {
 
       const CommandOutput &Output = FinishedCmd->getOutput();
       StringRef DependenciesFile =
@@ -471,9 +459,9 @@ namespace driver {
           // other recompilations. It is possible that the current code marks
           // things that do not need to be marked. Unecessary compilation would
           // result if that were the case.
-          bool wasCascading = DepGraph.isMarked(FinishedCmd);
+          bool wasCascading = isMarkedInDepGraph(FinishedCmd);
 
-          switch (DepGraph.loadFromPath(FinishedCmd, DependenciesFile,
+          switch (loadDepGraphFromPath(FinishedCmd, DependenciesFile,
                                         Comp.getDiags())) {
           case DependencyGraphImpl::LoadResult::HadError:
             if (ReturnCode == EXIT_SUCCESS) {
@@ -490,7 +478,7 @@ namespace driver {
               break;
             LLVM_FALLTHROUGH;
           case DependencyGraphImpl::LoadResult::AffectsDownstream:
-            DepGraph.markTransitive(Dependents, FinishedCmd,
+            markTransitiveInDepGraph(Dependents, FinishedCmd,
                                     IncrementalTracer);
             break;
           }
@@ -501,14 +489,14 @@ namespace driver {
             // The job won't be treated as newly added next time. Conservatively
             // mark it as affecting other jobs, because some of them may have
             // completed already.
-            DepGraph.markTransitive(Dependents, FinishedCmd,
+            markTransitiveInDepGraph(Dependents, FinishedCmd,
                                     IncrementalTracer);
             break;
           case Job::Condition::Always:
             // Any incremental task that shows up here has already been marked;
             // we didn't need to wait for it to finish to start downstream
             // tasks.
-            assert(DepGraph.isMarked(FinishedCmd));
+            assert(isMarkedInDepGraph(FinishedCmd));
             break;
           case Job::Condition::RunWithoutCascading:
             // If this file changed, it might have been a non-cascading change
@@ -516,7 +504,7 @@ namespace driver {
             // updated or compromised, so we don't actually know anymore; we
             // have to conservatively assume the changes could affect other
             // files.
-            DepGraph.markTransitive(Dependents, FinishedCmd,
+            markTransitiveInDepGraph(Dependents, FinishedCmd,
                                     IncrementalTracer);
             break;
           case Job::Condition::CheckDependencies:
@@ -860,19 +848,17 @@ namespace driver {
     }
 
     /// Schedule and run initial, additional, and batch jobs.
-    template <typename DependencyGraphT>
-    void runJobs(DependencyGraphT &DepGraph) {
-      scheduleJobsBeforeBatching(DepGraph);
+    void runJobs() {
+      scheduleJobsBeforeBatching();
       formBatchJobsAndAddPendingJobsToTaskQueue();
       runTaskQueueToCompletion();
-      checkUnfinishedJobs(DepGraph);
+      checkUnfinishedJobs();
     }
 
   private:
-    template <typename DependencyGraphT>
-    void scheduleJobsBeforeBatching(DependencyGraphT &DepGraph) {
+    void scheduleJobsBeforeBatching() {
       if (Comp.getIncrementalBuildEnabled())
-        scheduleFirstRoundJobsForIncrementalCompilation(DepGraph);
+        scheduleFirstRoundJobsForIncrementalCompilation();
       else
         scheduleJobsForNonIncrementalCompilation();
     }
@@ -882,12 +868,10 @@ namespace driver {
         scheduleCommandIfNecessaryAndPossible(Cmd);
     }
 
-    template <typename DependencyGraphT>
-    void scheduleFirstRoundJobsForIncrementalCompilation(
-        DependencyGraphT &DepGraph) {
+    void scheduleFirstRoundJobsForIncrementalCompilation() {
 
       CommandSet compileJobsToSchedule =
-          computeFirstRoundCompileJobsForIncrementalCompilation(DepGraph);
+          computeFirstRoundCompileJobsForIncrementalCompilation();
 
       for (const Job *Cmd : Comp.getJobs()) {
         if (Cmd->getFirstSwiftPrimaryInput().empty() ||
@@ -900,11 +884,9 @@ namespace driver {
 
     /// Figure out the best strategy and return those jobs. May return
     /// duplicates.
-    template <typename DependencyGraphT>
-    CommandSet computeFirstRoundCompileJobsForIncrementalCompilation(
-        DependencyGraphT &DepGraph) {
+    CommandSet computeFirstRoundCompileJobsForIncrementalCompilation() {
       auto compileJobsToScheduleViaDependencies =
-          computeDependenciesAndGetNeededCompileJobs(DepGraph);
+          computeDependenciesAndGetNeededCompileJobs();
 
       const bool mustConsultRanges =
           Comp.getEnableSourceRangeDependencies() || Comp.IncrementalComparator;
@@ -912,7 +894,7 @@ namespace driver {
       if (!mustConsultRanges)
         return compileJobsToScheduleViaDependencies;
 
-      auto jobs = computeRangesAndGetNeededCompileJobs(DepGraph);
+      auto jobs = computeRangesAndGetNeededCompileJobs();
       CommandSet &compileJobsToScheduleViaSourceRanges = jobs.first;
       CommandSet &jobsLackingSourceRangeSupplementaryOutputs = jobs.second;
 
@@ -978,9 +960,8 @@ namespace driver {
     /// Return both the jobs to compile if using ranges, and also any jobs that
     /// must be compiled to use ranges in the future (because they were lacking
     /// supplementary output files). May include duplicates.
-    template <typename DependencyGraphT>
     std::pair<CommandSet, CommandSet>
-    computeRangesAndGetNeededCompileJobs(DependencyGraphT &DepGraph) {
+    computeRangesAndGetNeededCompileJobs() {
       using namespace incremental_ranges;
 
       const bool dumpSwiftRanges =
@@ -1026,7 +1007,7 @@ namespace driver {
       }
 
       for (const Job *Cmd :
-           externallyDependentJobsForRangeBasedIncrementalCompilation(DepGraph))
+           externallyDependentJobsForRangeBasedIncrementalCompilation())
         neededJobs.insert(Cmd);
 
       assert(neededJobs.size() <= Comp.countSwiftInputs());
@@ -1035,16 +1016,15 @@ namespace driver {
     }
 
     /// Return jobs to run if using dependencies, may include duplicates.
-    template <typename DependencyGraphT>
     CommandSet
-    computeDependenciesAndGetNeededCompileJobs(DependencyGraphT &DepGraph) {
+    computeDependenciesAndGetNeededCompileJobs() {
       CommandSet jobsToSchedule;
       for (const Job *Cmd : Comp.getJobs()) {
         if (Cmd->getFirstSwiftPrimaryInput().empty())
           continue; // not Compile
         const Optional<bool> shouldSched =
             isCompileJobInitiallyNeededForDependencyBasedIncrementalCompilation(
-                Cmd, DepGraph);
+                Cmd);
         if (!shouldSched) {
           // Dependency load error, just run them all
           for (const Job *Cmd : Comp.getJobs()) {
@@ -1058,8 +1038,7 @@ namespace driver {
       }
       {
         const auto additionalJobs =
-            additionalJobsToScheduleForDependencyBasedIncrementalCompilation(
-                DepGraph);
+            additionalJobsToScheduleForDependencyBasedIncrementalCompilation();
         for (const auto *Cmd : additionalJobs)
           jobsToSchedule.insert(Cmd);
       }
@@ -1070,13 +1049,12 @@ namespace driver {
     /// Return whether job should be scheduled when using dependencies.
     /// Or if there was a dependency-read error, return None to indicate
     /// don't-know.
-    template <typename DependencyGraphT>
     Optional<bool>
     isCompileJobInitiallyNeededForDependencyBasedIncrementalCompilation(
-        const Job *Cmd, DependencyGraphT &DepGraph) {
+        const Job *Cmd) {
 
       auto CondAndHasDepsIfNoError =
-          loadDependenciesAndComputeCondition(Cmd, DepGraph);
+          loadDependenciesAndComputeCondition(Cmd);
       if (!CondAndHasDepsIfNoError)
         return None; // swiftdeps read error, abandon dependencies
 
@@ -1086,7 +1064,7 @@ namespace driver {
           CondAndHasDepsIfNoError.getValue();
 
       const bool shouldSched = shouldScheduleCompileJobAccordingToCondition(
-          Cmd, Cond, HasDependenciesFileName, DepGraph);
+          Cmd, Cond, HasDependenciesFileName);
       if (ExpDepGraph.hasValue())
         assert(ExpDepGraph.getValue().emitDotFileAndVerify(Comp.getDiags()));
       return shouldSched;
@@ -1094,10 +1072,8 @@ namespace driver {
 
     /// Returns job condition, and whether a dependency file was specified.
     /// But returns None if there was a dependency read error.
-    template <typename DependencyGraphT>
     Optional<std::pair<Job::Condition, bool>>
-    loadDependenciesAndComputeCondition(const Job *const Cmd,
-                                        DependencyGraphT &DepGraph) {
+    loadDependenciesAndComputeCondition(const Job *const Cmd) {
       // Try to load the dependencies file for this job. If there isn't one, we
       // always have to run the job, but it doesn't affect any other jobs. If
       // there should be one but it's not present or can't be loaded, we have to
@@ -1109,12 +1085,12 @@ namespace driver {
       if (DependenciesFile.empty())
         return std::make_pair(Job::Condition::Always, false);
       if (Cmd->getCondition() == Job::Condition::NewlyAdded) {
-        DepGraph.addIndependentNode(Cmd);
+        addIndependentNodeToDepGraph(Cmd);
         return std::make_pair(Job::Condition::NewlyAdded, true);
       }
 
       const auto loadResult =
-          DepGraph.loadFromPath(Cmd, DependenciesFile, Comp.getDiags());
+          loadDepGraphFromPath(Cmd, DependenciesFile, Comp.getDiags());
       switch (loadResult) {
       case DependencyGraphImpl::LoadResult::HadError:
         dependencyLoadFailed(DependenciesFile, /*Warn=*/true);
@@ -1131,10 +1107,9 @@ namespace driver {
       }
     }
 
-    template <typename DependencyGraphT>
     bool shouldScheduleCompileJobAccordingToCondition(
         const Job *const Cmd, const Job::Condition Condition,
-        const bool hasDependenciesFileName, DependencyGraphT &DepGraph) {
+        const bool hasDependenciesFileName) {
       switch (Condition) {
       case Job::Condition::Always:
       case Job::Condition::NewlyAdded:
@@ -1148,7 +1123,7 @@ namespace driver {
           // using markIntransitive and having later functions call
           // markTransitive. That way markIntransitive would be an
           // implementation detail of DependencyGraph.
-          DepGraph.markIntransitive(Cmd);
+          markIntransitiveInDepGraph(Cmd);
         }
         LLVM_FALLTHROUGH;
       case Job::Condition::RunWithoutCascading:
@@ -1161,21 +1136,19 @@ namespace driver {
     }
 
     /// Schedule transitive closure of initial jobs, and external jobs.
-    template <typename DependencyGraphT>
     SmallVector<const Job *, 16>
-    additionalJobsToScheduleForDependencyBasedIncrementalCompilation(
-        DependencyGraphT &DepGraph) {
+    additionalJobsToScheduleForDependencyBasedIncrementalCompilation() {
       auto AdditionalOutOfDateCommands =
-          collectSecondaryJobsFromDependencyGraph(DepGraph);
+          collectSecondaryJobsFromDependencyGraph();
 
       size_t firstSize = AdditionalOutOfDateCommands.size();
 
       // Check all cross-module dependencies as well.
-      forEachOutOfDateExternalDependency(DepGraph, [&](StringRef dependency) {
+      forEachOutOfDateExternalDependency([&](StringRef dependency) {
         // If the dependency has been modified since the oldest built file,
         // or if we can't stat it for some reason (perhaps it's been
         // deleted?), trigger rebuilds through the dependency graph.
-        DepGraph.markExternal(AdditionalOutOfDateCommands, dependency);
+        markExternalInDepGraph(AdditionalOutOfDateCommands, dependency);
       });
 
       for (auto *externalCmd :
@@ -1186,14 +1159,12 @@ namespace driver {
       return AdditionalOutOfDateCommands;
     }
 
-    template <typename DependencyGraphT>
     SmallVector<const Job *, 16>
-    externallyDependentJobsForRangeBasedIncrementalCompilation(
-        DependencyGraphT &DepGraph) {
+    externallyDependentJobsForRangeBasedIncrementalCompilation() {
       SmallVector<const Job *, 16> results;
       forEachOutOfDateExternalDependency(
-          DepGraph, [&](StringRef externalSwiftDeps) {
-            DepGraph.forEachUnmarkedJobDirectlyDependentOnExternalSwiftdeps(
+          [&](StringRef externalSwiftDeps) {
+            forEachUnmarkedJobDirectlyDependentOnExternalSwiftdeps(
                 externalSwiftDeps, [&](const void *node) {
                   // Sadly, the non-experimental dependency graph is type-unsafe
                   const Job *externalCmd = reinterpret_cast<const Job *>(node);
@@ -1205,11 +1176,9 @@ namespace driver {
       return results;
     }
 
-    template <typename DependencyGraphT>
     void forEachOutOfDateExternalDependency(
-        DependencyGraphT &DepGraph,
         function_ref<void(StringRef)> consumeExternalSwiftDeps) {
-      for (StringRef dependency : DepGraph.getExternalDependencies()) {
+      for (StringRef dependency : getExternalDependencies()) {
         // If the dependency has been modified since the oldest built file,
         // or if we can't stat it for some reason (perhaps it's been
         // deleted?), trigger rebuilds through the dependency graph.
@@ -1220,15 +1189,14 @@ namespace driver {
       }
     }
 
-    template <typename DependencyGraphT>
     SmallVector<const Job *, 16>
-    collectSecondaryJobsFromDependencyGraph(DependencyGraphT &DepGraph) {
+    collectSecondaryJobsFromDependencyGraph() {
       SmallVector<const Job *, 16> AdditionalOutOfDateCommands;
       // We scheduled all of the files that have actually changed. Now add the
       // files that haven't changed, so that they'll get built in parallel if
       // possible and after the first set of files if it's not.
       for (auto *Cmd : InitialCascadingCommands) {
-        DepGraph.markTransitive(AdditionalOutOfDateCommands, Cmd,
+        markTransitiveInDepGraph(AdditionalOutOfDateCommands, Cmd,
                                 IncrementalTracer);
       }
       for (auto *transitiveCmd : AdditionalOutOfDateCommands)
@@ -1560,8 +1528,7 @@ namespace driver {
       } while (Result == 0 && TQ->hasRemainingTasks());
     }
 
-    template <typename DependencyGraphT>
-    void checkUnfinishedJobs(DependencyGraphT &DepGraph) {
+    void checkUnfinishedJobs() {
       if (Result == 0) {
         assert(BlockingCommands.empty() &&
                "some blocking commands never finished properly");
@@ -1586,7 +1553,7 @@ namespace driver {
 
           bool isCascading = true;
           if (Comp.getIncrementalBuildEnabled())
-            isCascading = DepGraph.isMarked(Cmd);
+            isCascading = isMarkedInDepGraph(Cmd);
           UnfinishedCommands.insert({Cmd, isCascading});
         }
       }
@@ -1648,6 +1615,66 @@ namespace driver {
     bool hadAnyAbnormalExit() {
       return AnyAbnormalExit;
     }
+
+    // MARK: dependency graph interface
+
+    bool isMarkedInDepGraph(const Job*const Cmd) {
+      return ExpDepGraph ? ExpDepGraph->isMarked(Cmd) : StandardDepGraph.isMarked(Cmd);
+    }
+
+    std::vector<StringRef> getExternalDependencies() const {
+      if (ExpDepGraph)
+        return ExpDepGraph->getExternalDependencies();
+      const auto deps = StandardDepGraph.getExternalDependencies();
+      return std::vector<StringRef>(deps.begin(), deps.end());
+    }
+
+    template <unsigned N>
+    void markExternalInDepGraph(SmallVector<const driver::Job *, N> &uses,
+    StringRef externalDependency) {
+      if (ExpDepGraph)
+        ExpDepGraph->markExternal(uses, externalDependency);
+      else
+        StandardDepGraph.markExternal(uses, externalDependency);
+    }
+
+    bool markIntransitiveInDepGraph(const Job* Cmd) {
+      return ExpDepGraph
+      ? ExpDepGraph->markIntransitive(Cmd)
+      : StandardDepGraph.markIntransitive(Cmd);
+    }
+
+    DependencyGraph::LoadResult loadDepGraphFromPath(const Job *Cmd, StringRef path, DiagnosticEngine &diags) {
+    return  ExpDepGraph
+         ? ExpDepGraph->loadFromPath(Cmd, path, diags)
+         : StandardDepGraph.loadFromPath(Cmd, path, diags);
+    }
+
+    template <unsigned N>
+    void markTransitiveInDepGraph(SmallVector<const Job *, N> &visited,
+                                  const Job *Cmd, DependencyGraph::MarkTracer *tracer = nullptr) {
+      if (ExpDepGraph)
+        ExpDepGraph->markTransitive(visited, Cmd, tracer);
+      else
+        StandardDepGraph.markTransitive(visited, Cmd, tracer);
+    }
+
+    void addIndependentNodeToDepGraph(const Job* Cmd) {
+      if (ExpDepGraph)
+        ExpDepGraph->addIndependentNode(Cmd);
+        else
+          StandardDepGraph.addIndependentNode(Cmd);
+    }
+
+    void forEachUnmarkedJobDirectlyDependentOnExternalSwiftdeps(
+    StringRef externalDependency, function_ref<void(const void *)> fn) {
+      if (ExpDepGraph)
+      ExpDepGraph->forEachUnmarkedJobDirectlyDependentOnExternalSwiftdeps(externalDependency, fn);
+      else
+        StandardDepGraph.forEachUnmarkedJobDirectlyDependentOnExternalSwiftdeps(externalDependency, fn);
+    }
+
+
   };
 } // namespace driver
 } // namespace swift
@@ -1804,10 +1831,7 @@ int Compilation::performJobsImpl(bool &abnormalExit,
                                  std::unique_ptr<TaskQueue> &&TQ) {
   PerformJobsState State(*this, std::move(TQ));
 
-  if (getEnableExperimentalDependencies())
-    State.runJobs(State.ExpDepGraph.getValue());
-  else
-    State.runJobs(State.StandardDepGraph);
+  State.runJobs();
 
   if (!CompilationRecordPath.empty()) {
     InputInfoMap InputInfo;
@@ -2052,3 +2076,4 @@ unsigned Compilation::countSwiftInputs() const {
       ++inputCount;
   return inputCount;
 }
+
