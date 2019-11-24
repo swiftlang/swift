@@ -1758,15 +1758,14 @@ class TransposingAttr final
   /// The differentiation parameters' indices, resolved by the type checker.
   IndexSubset *ParameterIndices = nullptr;
 
-  explicit TransposingAttr(ASTContext &context, bool implicit,
-                           SourceLoc atLoc, SourceRange baseRange,
-                           TypeRepr *baseType, DeclNameWithLoc original,
+  explicit TransposingAttr(bool implicit, SourceLoc atLoc,
+                           SourceRange baseRange, TypeRepr *baseType,
+                           DeclNameWithLoc original,
                            ArrayRef<ParsedAutoDiffParameter> params);
 
-  explicit TransposingAttr(ASTContext &context, bool implicit,
-                           SourceLoc atLoc, SourceRange baseRange,
-                           TypeRepr *baseType, DeclNameWithLoc original,
-                           IndexSubset *indices);
+  explicit TransposingAttr(bool implicit, SourceLoc atLoc,
+                           SourceRange baseRange, TypeRepr *baseType,
+                           DeclNameWithLoc original, IndexSubset *indices);
 
 public:
   static TransposingAttr *create(ASTContext &context, bool implicit,
