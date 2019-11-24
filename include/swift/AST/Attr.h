@@ -64,8 +64,24 @@ public:
   /// AtLoc - This is the location of the first '@' in the attribute specifier.
   /// If this is an empty attribute specifier, then this will be an invalid loc.
   SourceLoc AtLoc;
-  Optional<StringRef> convention = None;
-  Optional<StringRef> conventionWitnessMethodProtocol = None;
+
+  struct Convention {
+    StringRef Name = {};
+    StringRef WitnessMethodProtocol = {};
+    StringRef ClangType = {};
+    // Carry the source location for diagnostics.
+    SourceLoc ClangTypeLoc = {};
+
+    /// Convenience factory function to create a Swift convention.
+    ///
+    /// Don't use this function if you are creating a C convention as you
+    /// probably need a ClangType field as well.
+    static Convention makeSwiftConvention(StringRef name) {
+      return {name, "", "", {}};
+    }
+  };
+
+  Optional<Convention> ConventionArguments;
 
   // Indicates whether the type's '@differentiable' attribute has a 'linear'
   // argument.
@@ -134,8 +150,14 @@ public:
     return true;
   }
   
-  bool hasConvention() const { return convention.hasValue(); }
-  StringRef getConvention() const { return *convention; }
+  bool hasConvention() const { return ConventionArguments.hasValue(); }
+
+  /// Returns the primary calling convention string.
+  ///
+  /// Note: For C conventions, this may not represent the full convention.
+  StringRef getConventionName() const {
+    return ConventionArguments.getValue().Name;
+  }
 
   bool hasOwnership() const {
     return getOwnership() != ReferenceOwnership::Strong;

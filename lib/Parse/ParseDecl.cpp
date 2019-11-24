@@ -2252,6 +2252,91 @@ static bool parseDifferentiableAttributeArgument(Parser &P,
   return false;
 }
 
+/// Parse the inside of a convention attribute '(...)'.
+///
+/// The '@convention' prefix should've been parsed by the caller.
+/// See `Parser::parseTypeAttribute` for the justChecking argument.
+///
+/// Returns true if there was an error.
+bool Parser::parseConventionAttributeInternal(
+    bool justChecking, TypeAttributes::Convention &convention) {
+  SourceLoc LPLoc;
+  if (!consumeIfNotAtStartOfLine(tok::l_paren)) {
+    if (!justChecking)
+      diagnose(Tok, diag::convention_attribute_expected_lparen);
+    return true;
+  }
+
+  if (Tok.isNot(tok::identifier)) {
+    if (!justChecking)
+      diagnose(Tok, diag::convention_attribute_expected_name);
+    return true;
+  }
+
+  convention.Name = Tok.getText();
+  consumeToken(tok::identifier);
+
+  // Consume extra (optional) ', cType: " blah blah "'
+  if (consumeIf(tok::comma)) {
+    if (Tok.isNot(tok::identifier)) {
+      if (!justChecking)
+        diagnose(Tok, diag::convention_attribute_ctype_expected_label);
+      return true;
+    }
+    auto cTypeLabel = Tok.getText();
+    consumeToken(tok::identifier);
+    if (cTypeLabel != "cType") {
+      if (!justChecking)
+        diagnose(Tok, diag::convention_attribute_ctype_expected_label);
+      return true;
+    }
+    if (!consumeIf(tok::colon)) {
+      if (!justChecking)
+        diagnose(Tok, diag::convention_attribute_ctype_expected_colon);
+      return true;
+    }
+    if (Tok.isNot(tok::string_literal)) {
+      if (!justChecking)
+        diagnose(Tok, diag::convention_attribute_ctype_expected_string);
+      return true;
+    }
+    if (auto ty = getStringLiteralIfNotInterpolated(Tok.getLoc(), "(C type)")) {
+      convention.ClangType = ty.getValue();
+      convention.ClangTypeLoc = Tok.getLoc();
+    }
+    consumeToken(tok::string_literal);
+  }
+
+  if (convention.Name == "witness_method") {
+    if (!consumeIf(tok::colon)) {
+      if (!justChecking)
+        diagnose(Tok,
+                 diag::convention_attribute_witness_method_expected_colon);
+      return true;
+    }
+    if (Tok.isNot(tok::identifier)) {
+      if (!justChecking)
+        diagnose(Tok,
+                 diag::convention_attribute_witness_method_expected_protocol);
+      return true;
+    }
+
+    convention.WitnessMethodProtocol = Tok.getText();
+    consumeToken(tok::identifier);
+  }
+  
+  // Parse the ')'.  We can't use parseMatchingToken if we're in
+  // just-checking mode.
+  if (justChecking && Tok.isNot(tok::r_paren))
+    return true;
+
+  SourceLoc RPLoc;
+  parseMatchingToken(tok::r_paren, RPLoc,
+                     diag::convention_attribute_expected_rparen,
+                     LPLoc);
+  return false;
+}
+
 /// \verbatim
 ///   attribute-type:
 ///     'noreturn'
@@ -2325,56 +2410,16 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, SourceLoc AtLoc,
   StringRef Text = Tok.getText();
   consumeToken();
   
-  StringRef conventionName;
-  StringRef witnessMethodProtocol;
-
+  TypeAttributes::Convention convention;
   if (attr == TAK_convention) {
-    SourceLoc LPLoc;
-    if (!consumeIfNotAtStartOfLine(tok::l_paren)) {
-      if (!justChecking)
-        diagnose(Tok, diag::convention_attribute_expected_lparen);
+    bool failedToParse =
+      parseConventionAttributeInternal(justChecking, convention);
+    if (failedToParse) {
+      if (Tok.is(tok::r_paren))
+        consumeToken();
       return true;
     }
-
-    if (Tok.isNot(tok::identifier)) {
-      if (!justChecking)
-        diagnose(Tok, diag::convention_attribute_expected_name);
-      return true;
-    }
-
-    conventionName = Tok.getText();
-    consumeToken(tok::identifier);
-
-    if (conventionName == "witness_method") {
-      if (Tok.isNot(tok::colon)) {
-        if (!justChecking)
-          diagnose(Tok,
-                   diag::convention_attribute_witness_method_expected_colon);
-        return true;
-      }
-      consumeToken(tok::colon);
-      if (Tok.isNot(tok::identifier)) {
-        if (!justChecking)
-          diagnose(Tok,
-                   diag::convention_attribute_witness_method_expected_protocol);
-        return true;
-      }
-
-      witnessMethodProtocol = Tok.getText();
-      consumeToken(tok::identifier);
-    }
-
-    // Parse the ')'.  We can't use parseMatchingToken if we're in
-    // just-checking mode.
-    if (justChecking && Tok.isNot(tok::r_paren))
-      return true;
-
-    SourceLoc RPLoc;
-    parseMatchingToken(tok::r_paren, RPLoc,
-                       diag::convention_attribute_expected_rparen,
-                       LPLoc);
   }
-
 
   // In just-checking mode, we only need to consume the tokens, and we don't
   // want to do any other analysis.
@@ -2474,8 +2519,7 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, SourceLoc AtLoc,
 
   // Convention attribute.
   case TAK_convention:
-    Attributes.convention = conventionName;
-    Attributes.conventionWitnessMethodProtocol = witnessMethodProtocol;
+    Attributes.ConventionArguments = convention;
     break;
       
   case TAK__opaqueReturnTypeOf: {

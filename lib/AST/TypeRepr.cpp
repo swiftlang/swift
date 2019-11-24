@@ -312,10 +312,11 @@ void AttributedTypeRepr::printAttrs(ASTPrinter &Printer,
   if (hasAttr(TAK_thick))
     Printer.printSimpleAttr("@thick") << " ";
 
-  if (hasAttr(TAK_convention) && Attrs.convention.hasValue()) {
+  if (hasAttr(TAK_convention) && Attrs.hasConvention()) {
+    // TODO: (Varun) Print clang type here!
     Printer.callPrintStructurePre(PrintStructureKind::BuiltinAttribute);
     Printer.printAttrName("@convention");
-    Printer << "(" << Attrs.convention.getValue() << ")";
+    Printer << "(" << Attrs.getConvention() << ")";
     Printer.printStructurePost(PrintStructureKind::BuiltinAttribute);
     Printer << " ";
   }

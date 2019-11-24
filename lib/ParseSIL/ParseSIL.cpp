@@ -1272,7 +1272,8 @@ bool SILParser::parseSILType(SILType &Result,
   if (IsFuncDecl && !attrs.has(TAK_convention)) {
     // Use a random location.
     attrs.setAttr(TAK_convention, P.PreviousLoc);
-    attrs.convention = "thin";
+    attrs.ConventionArguments =
+      TypeAttributes::Convention::makeSwiftConvention("thin");
   }
 
   ParserResult<TypeRepr> TyR = P.parseType(diag::expected_sil_type,

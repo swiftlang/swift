@@ -1404,6 +1404,13 @@ ERROR(convention_attribute_expected_name,none,
       "expected convention name identifier in 'convention' attribute", ())
 ERROR(convention_attribute_expected_rparen,none,
       "expected ')' after convention name for 'convention' attribute", ())
+ERROR(convention_attribute_ctype_expected_label,none,
+      "expected 'cType' label in 'convention' attribute", ())
+ERROR(convention_attribute_ctype_expected_colon,none,
+      "expected ':' after 'cType' for 'convention' attribute", ())
+ERROR(convention_attribute_ctype_expected_string,none,
+      "expected string literal containing clang type for 'cType' in "
+      "'convention' attribute", ())
 ERROR(convention_attribute_witness_method_expected_colon,none,
       "expected ':' after 'witness_method' for 'convention' attribute", ())
 ERROR(convention_attribute_witness_method_expected_protocol,none,
