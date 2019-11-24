@@ -133,9 +133,9 @@ void ModuleDepGraph::addIndependentNode(const Job *job) {
   jobsBySwiftDeps.insert(std::make_pair(getSwiftDeps(job), job));
 }
 
-std::vector<std::string> ModuleDepGraph::getExternalDependencies() const {
-  return std::vector<std::string>(externalDependencies.begin(),
-                                  externalDependencies.end());
+std::vector<StringRef> ModuleDepGraph::getExternalDependencies() const {
+  return std::vector<StringRef>(externalDependencies.begin(),
+                                externalDependencies.end());
 }
 
 // Add every (swiftdeps) use of the external dependency to uses.
