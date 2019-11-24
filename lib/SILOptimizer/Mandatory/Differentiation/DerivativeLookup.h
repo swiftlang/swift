@@ -42,8 +42,7 @@ getExactDifferentiabilityWitness(SILModule &module, SILFunction *original,
 ///
 /// \param parameterIndices must be lowered to SIL.
 /// \param minimalParameterIndices is an output parameter that is set to the SIL
-/// indices
-///        of the minimal attribute, or to `nullptr` if no attribute exists.
+/// indices of the minimal attribute, or to `nullptr` if no attribute exists.
 const DifferentiableAttr *
 getMinimalASTDifferentiableAttr(AbstractFunctionDecl *original,
                                 IndexSubset *parameterIndices,
