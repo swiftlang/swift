@@ -5069,19 +5069,31 @@ public:
     }
 
     // SWIFT_ENABLE_TENSORFLOW
+    // Infer `Differentiable` or `Differentiable & AdditiveArithmetic` generic
+    // constraints from `@differentiable` or `@differentiable(linear)`.
     if (auto *fnTy = ty->getAs<AnyFunctionType>()) {
-      if (fnTy->getExtInfo().isDifferentiable()) {
-        auto *diffableProto = Builder.getASTContext()
-            .getProtocol(KnownProtocolKind::Differentiable);
-        auto constrainToDifferentiable = [&](Type typeToConstrain) {
+      if (fnTy->isDifferentiable()) {
+        auto addConstraint = [&](Type typeToConstrain, ProtocolDecl *protocol) {
           Requirement req(RequirementKind::Conformance, typeToConstrain,
-                          diffableProto->getDeclaredType());
+                          protocol->getDeclaredType());
           Builder.addRequirement(req, source, nullptr);
         };
-        for (auto &param : fnTy->getParams())
-          if (!param.isNonDifferentiable())
-            constrainToDifferentiable(param.getPlainType());
-        constrainToDifferentiable(fnTy->getResult());
+        auto constrainParametersAndResult = [&](ProtocolDecl *protocol) {
+          for (auto &param : fnTy->getParams())
+            if (!param.isNonDifferentiable())
+              addConstraint(param.getPlainType(), protocol);
+          addConstraint(fnTy->getResult(), protocol);
+        };
+        // Add `Differentiable` constraints.
+        constrainParametersAndResult(
+            Builder.getASTContext()
+                .getProtocol(KnownProtocolKind::Differentiable));
+        // Add `AdditiveArithmetic` constraints if the function is linear.
+        if (fnTy->getDifferentiabilityKind() == DifferentiabilityKind::Linear) {
+          constrainParametersAndResult(
+              Builder.getASTContext()
+                  .getProtocol(KnownProtocolKind::AdditiveArithmetic));
+        }
       }
     }
 
