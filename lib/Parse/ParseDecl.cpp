@@ -835,25 +835,32 @@ Parser::parseDifferentiableAttribute(SourceLoc atLoc, SourceLoc loc) {
                                  params, jvpSpec, vjpSpec, whereClause));
 }
 
+// SWIFT_ENABLE_TENSORFLOW
+// Attribute parsing error helper.
+// For the given parentheses depth, skip until ')' and consume it if possible.
+// If no ')' is found, produce error.
+// Always returns true to indicate a parsing error has occurred.
+static bool errorAndSkipUntilConsumeRightParen(Parser &P, StringRef attrName,
+                                               int parenDepth = 1) {
+  for (int i = 0; i < parenDepth; ++i) {
+    P.skipUntil(tok::r_paren);
+    if (!P.consumeIf(tok::r_paren)) {
+      P.diagnose(P.Tok, diag::attr_expected_rparen, attrName,
+                 /*DeclModifier=*/false);
+      return true;
+    }
+  }
+  return true;
+};
+
 bool Parser::parseDifferentiationParametersClause(
     SmallVectorImpl<ParsedAutoDiffParameter> &params, StringRef attrName) {
-  // Set parse error, skip until ')' and parse it.
-  auto errorAndSkipToEnd = [&](int parenDepth = 1) -> bool {
-    for (int i = 0; i < parenDepth; i++) {
-      skipUntil(tok::r_paren);
-      if (!consumeIf(tok::r_paren))
-        diagnose(Tok, diag::attr_expected_rparen, attrName,
-                 /*DeclModifier=*/false);
-    }
-    return true;
-  };
-
   SyntaxParsingContext DiffParamsClauseContext(
        SyntaxContext, SyntaxKind::DifferentiationParamsClause);
   consumeToken(tok::identifier);
   if (!consumeIf(tok::colon)) {
     diagnose(Tok, diag::expected_colon_after_label, "wrt");
-    return errorAndSkipToEnd();
+    return errorAndSkipUntilConsumeRightParen(*this, attrName);
   }
 
   // Function that parses a parameter into `params`. Returns true if error
@@ -905,11 +912,11 @@ bool Parser::parseDifferentiationParametersClause(
     consumeToken(tok::l_paren);
     // Parse first parameter. At least one is required.
     if (parseParam())
-      return errorAndSkipToEnd(2);
+      return errorAndSkipUntilConsumeRightParen(*this, attrName, 2);
     // Parse remaining parameters until ')'.
     while (Tok.isNot(tok::r_paren))
       if (parseParam())
-        return errorAndSkipToEnd(2);
+        return errorAndSkipUntilConsumeRightParen(*this, attrName, 2);
     SyntaxContext->collectNodesInPlace(SyntaxKind::DifferentiationParamList);
     // Parse closing ')' of the parameter list.
     consumeToken(tok::r_paren);
@@ -917,30 +924,19 @@ bool Parser::parseDifferentiationParametersClause(
   // If no opening '(' for parameter list, parse a single parameter.
   else {
     if (parseParam(/*parseTrailingComma*/ false))
-      return errorAndSkipToEnd();
+      return errorAndSkipUntilConsumeRightParen(*this, attrName);
   }
   return false;
 }
 
 bool Parser::parseTransposingParametersClause(
     SmallVectorImpl<ParsedAutoDiffParameter> &params, StringRef attrName) {
-  // Set parse error, skip until ')' and parse it.
-  auto errorAndSkipToEnd = [&](int parenDepth = 1) -> bool {
-    for (int i = 0; i < parenDepth; i++) {
-      skipUntil(tok::r_paren);
-      if (!consumeIf(tok::r_paren))
-        diagnose(Tok, diag::attr_expected_rparen, attrName,
-                 /*DeclModifier=*/false);
-    }
-    return true;
-  };
-
-  SyntaxParsingContext DiffParamsClauseContext(
+  SyntaxParsingContext TransposeParamsClauseContext(
       SyntaxContext, SyntaxKind::DifferentiationParamsClause);
   consumeToken(tok::identifier);
   if (!consumeIf(tok::colon)) {
     diagnose(Tok, diag::expected_colon_after_label, "wrt");
-    return errorAndSkipToEnd();
+    return errorAndSkipUntilConsumeRightParen(*this, attrName);
   }
 
   // Function that parses a parameter into `params`. Returns true if error
@@ -983,11 +979,11 @@ bool Parser::parseTransposingParametersClause(
     consumeToken(tok::l_paren);
     // Parse first parameter. At least one is required.
     if (parseParam())
-      return errorAndSkipToEnd(2);
+      return errorAndSkipUntilConsumeRightParen(*this, attrName, 2);
     // Parse remaining parameters until ')'.
     while (Tok.isNot(tok::r_paren))
       if (parseParam())
-        return errorAndSkipToEnd(2);
+        return errorAndSkipUntilConsumeRightParen(*this, attrName, 2);
     SyntaxContext->collectNodesInPlace(SyntaxKind::DifferentiationParamList);
     // Parse closing ')' of the parameter list.
     consumeToken(tok::r_paren);
@@ -995,7 +991,7 @@ bool Parser::parseTransposingParametersClause(
   // If no opening '(' for parameter list, parse a single parameter.
   else {
     if (parseParam(/*parseTrailingComma*/ false))
-      return errorAndSkipToEnd();
+      return errorAndSkipUntilConsumeRightParen(*this, attrName);
   }
   return false;
 }
@@ -1005,17 +1001,6 @@ bool Parser::parseDifferentiableAttributeArguments(
     Optional<DeclNameWithLoc> &jvpSpec, Optional<DeclNameWithLoc> &vjpSpec,
     TrailingWhereClause *&whereClause) {
   StringRef AttrName = "differentiable";
-
-  // Set parse error, skip until ')' and parse it.
-  auto errorAndSkipToEnd = [&](int parenDepth = 1) -> bool {
-    for (int i = 0; i < parenDepth; i++) {
-      skipUntil(tok::r_paren);
-      if (!consumeIf(tok::r_paren))
-        diagnose(Tok, diag::attr_expected_rparen, AttrName,
-                 /*DeclModifier=*/false);
-    }
-    return true;
-  };
 
   // Parse trailing comma, if it exists, and check for errors.
   auto consumeIfTrailingComma = [&]() -> bool {
@@ -1049,7 +1034,7 @@ bool Parser::parseDifferentiableAttributeArguments(
     if (Tok.isNot(tok::comma, tok::kw_where))
       return false;
     if (consumeIfTrailingComma())
-      return errorAndSkipToEnd();
+      return errorAndSkipUntilConsumeRightParen(*this, AttrName);
   }
 
   // If 'withRespectTo' is used, make the user change it to 'wrt'.
@@ -1058,7 +1043,7 @@ bool Parser::parseDifferentiableAttributeArguments(
     diagnose(Tok, diag::attr_differentiable_use_wrt_not_withrespectto)
         .highlight(withRespectToRange)
         .fixItReplace(withRespectToRange, "wrt:");
-    return errorAndSkipToEnd();
+    return errorAndSkipUntilConsumeRightParen(*this, AttrName);
   }
   // Parse differentiation parameters' clause.
   if (isIdentifier(Tok, "wrt")) {
@@ -1068,7 +1053,7 @@ bool Parser::parseDifferentiableAttributeArguments(
     if (Tok.isNot(tok::comma, tok::kw_where))
       return false;
     if (consumeIfTrailingComma())
-      return errorAndSkipToEnd();
+      return errorAndSkipUntilConsumeRightParen(*this, AttrName);
   }
 
   // Function that parses a label and a function specifier, e.g. 'vjp: foo(_:)'.
@@ -1076,15 +1061,15 @@ bool Parser::parseDifferentiableAttributeArguments(
   auto parseFuncSpec = [&](StringRef label, DeclNameWithLoc &result,
                            bool &terminateParsingArgs) -> bool {
     // Parse label.
-    if (parseSpecificIdentifier(label,
-            diag::attr_differentiable_missing_label, label) ||
+    if (parseSpecificIdentifier(label, diag::attr_missing_label, label,
+                                AttrName) ||
         parseToken(tok::colon, diag::expected_colon_after_label, label))
       return true;
     // Parse the name of the function.
     SyntaxParsingContext FuncDeclNameContext(
          SyntaxContext, SyntaxKind::FunctionDeclName);
     Diagnostic funcDiag(diag::attr_differentiable_expected_function_name.ID,
-                        { label });
+                        {label});
     result.Name =
         parseUnqualifiedDeclName(/*afterDot=*/false, result.Loc,
                                  funcDiag, /*allowOperators=*/true,
@@ -1104,11 +1089,11 @@ bool Parser::parseDifferentiableAttributeArguments(
         SyntaxContext, SyntaxKind::DifferentiableAttributeFuncSpecifier);
     jvpSpec = DeclNameWithLoc();
     if (parseFuncSpec("jvp", *jvpSpec, terminateParsingArgs))
-      return errorAndSkipToEnd();
+      return errorAndSkipUntilConsumeRightParen(*this, AttrName);
     if (terminateParsingArgs)
       return false;
     if (consumeIfTrailingComma())
-      return errorAndSkipToEnd();
+      return errorAndSkipUntilConsumeRightParen(*this, AttrName);
   }
 
   // Parse 'vjp: <func_name>' (optional).
@@ -1117,19 +1102,19 @@ bool Parser::parseDifferentiableAttributeArguments(
         SyntaxContext, SyntaxKind::DifferentiableAttributeFuncSpecifier);
     vjpSpec = DeclNameWithLoc();
     if (parseFuncSpec("vjp", *vjpSpec, terminateParsingArgs))
-      return errorAndSkipToEnd();
+      return errorAndSkipUntilConsumeRightParen(*this, AttrName);
     if (terminateParsingArgs)
       return false;
     // Note: intentionally parse trailing comma here, even though it's the last
     // function specifier. `consumeIfTrailingComma` will emit an error.
     if (consumeIfTrailingComma())
-      return errorAndSkipToEnd();
+      return errorAndSkipUntilConsumeRightParen(*this, AttrName);
   }
 
   // If parser has not advanced and token is not 'where' or ')', emit error.
   if (Tok.getLoc() == startingLoc && Tok.isNot(tok::kw_where, tok::r_paren)) {
     diagnose(Tok, diag::attr_differentiable_expected_label);
-    return errorAndSkipToEnd();
+    return errorAndSkipUntilConsumeRightParen(*this, AttrName);
   }
 
   // Parse a trailing 'where' clause if any.
@@ -1150,7 +1135,6 @@ Parser::parseDifferentiatingAttribute(SourceLoc atLoc, SourceLoc loc) {
   StringRef AttrName = "differentiating";
   SourceLoc lParenLoc = loc, rParenLoc = loc;
   DeclNameWithLoc original;
-  bool linear = false;
   SmallVector<ParsedAutoDiffParameter, 8> params;
 
   // Parse trailing comma, if it exists, and check for errors.
@@ -1159,13 +1143,13 @@ Parser::parseDifferentiatingAttribute(SourceLoc atLoc, SourceLoc loc) {
     // Diagnose trailing comma before ')'.
     if (Tok.is(tok::r_paren)) {
       diagnose(Tok, diag::unexpected_separator, ",");
-      return true;
+      return errorAndSkipUntilConsumeRightParen(*this, AttrName);
     }
-    // Check that token after comma is 'linear' or 'wrt:'.
-    if (isIdentifier(Tok, "linear") || isIdentifier(Tok, "wrt"))
+    // Check that token after comma is 'wrt:'.
+    if (isIdentifier(Tok, "wrt"))
       return false;
-    diagnose(Tok, diag::attr_differentiating_expected_label_linear_or_wrt);
-    return true;
+    diagnose(Tok, diag::attr_expected_label, "wrt", AttrName);
+    return errorAndSkipUntilConsumeRightParen(*this, AttrName);
   };
 
   // Parse '('.
@@ -1174,48 +1158,38 @@ Parser::parseDifferentiatingAttribute(SourceLoc atLoc, SourceLoc loc) {
              /*DeclModifier*/ false);
     return makeParserError();
   }
-
   {
     SyntaxParsingContext ContentContext(
-        SyntaxContext, SyntaxKind::DifferentiatingAttributeArguments);
-
+        SyntaxContext, SyntaxKind::DerivativeRegistrationAttributeArguments);
     {
       // Parse the name of the function.
       SyntaxParsingContext FuncDeclNameContext(
           SyntaxContext, SyntaxKind::FunctionDeclName);
+      // NOTE: Use `afterDot = true` and `allowDeinitAndSubscript = true` to
+      // enable, e.g. `@differentiating(init)` and
+      // `@differentiating(subscript)`.
       original.Name = parseUnqualifiedDeclName(
-          /*afterDot*/ false, original.Loc,
+          /*afterDot*/ true, original.Loc,
           diag::attr_differentiating_expected_original_name,
-          /*allowOperators*/ true, /*allowZeroArgCompoundNames*/ true);
-
+          /*allowOperators*/ true, /*allowZeroArgCompoundNames*/ true,
+          /*allowDeinitAndSubscript*/ true);
       if (consumeIfTrailingComma())
         return makeParserError();
     }
-
-    // Parse the optional 'linear' differentiation flag.
-    if (isIdentifier(Tok, "linear")) {
-      linear = true;
-      consumeToken(tok::identifier);
-      if (consumeIfTrailingComma())
-        return makeParserError();
-    }
-
     // Parse the optional 'wrt' differentiation parameters clause.
     if (isIdentifier(Tok, "wrt") &&
         parseDifferentiationParametersClause(params, AttrName))
       return makeParserError();
   }
-
   // Parse ')'.
   if (!consumeIf(tok::r_paren, rParenLoc)) {
     diagnose(getEndOfPreviousLoc(), diag::attr_expected_rparen, AttrName,
              /*DeclModifier*/ false);
     return makeParserError();
   }
-  return ParserResult<DifferentiatingAttr>(
-      DifferentiatingAttr::create(Context, /*implicit*/ false, atLoc,
-                                  SourceRange(loc, rParenLoc),
-                                  original, linear, params));
+  return ParserResult<DifferentiatingAttr>(DifferentiatingAttr::create(
+      Context, /*implicit*/ false, atLoc, SourceRange(loc, rParenLoc), original,
+      params));
 }
 
 /// SWIFT_ENABLE_TENSORFLOW
@@ -1257,19 +1231,13 @@ bool parseQualifiedDeclName(Parser &P, Diag<> nameParseError,
   if (parseBaseTypeForQualifiedDeclName(P, baseType))
     return true;
 
-  // If base type was parsed and has at least one component, then there was a
-  // dot before the current token.
-  bool afterDot = false;
-  if (baseType) {
-    if (auto ident = dyn_cast<IdentTypeRepr>(baseType)) {
-      auto components = ident->getComponentRange();
-      afterDot = std::distance(components.begin(), components.end()) > 0;
-    }
-  }
+  // NOTE: Use `afterDot = true` and `allowDeinitAndSubscript = true` to enable
+  // initializer and subscript lookup.
   original.Name =
-      P.parseUnqualifiedDeclName(afterDot, original.Loc, nameParseError,
-                                 /*allowOperators*/ true,
-                                 /*allowZeroArgCompoundNames*/ true);
+      P.parseUnqualifiedDeclName(/*afterDot*/ true, original.Loc,
+                                 nameParseError, /*allowOperators*/ true,
+                                 /*allowZeroArgCompoundNames*/ true,
+                                 /*allowDeinitAndSubscript*/ true);
 
   // The base type is optional, but the final unqualified decl name is not.
   // If name could not be parsed, return true for error.
@@ -1290,14 +1258,13 @@ ParserResult<TransposingAttr> Parser::parseTransposingAttribute(SourceLoc atLoc,
     // Diagnose trailing comma before ')'.
     if (Tok.is(tok::r_paren)) {
       diagnose(Tok, diag::unexpected_separator, ",");
-      return true;
+      return errorAndSkipUntilConsumeRightParen(*this, AttrName);
     }
     // Check that token after comma is 'wrt:'.
-    if (!Tok.is(tok::identifier) || !(Tok.getText() == "wrt")) {
-      diagnose(Tok, diag::attr_transposing_expected_label_linear_or_wrt);
-      return true;
-    }
-    return false;
+    if (isIdentifier(Tok, "wrt"))
+      return false;
+    diagnose(Tok, diag::attr_expected_label, "wrt", AttrName);
+    return errorAndSkipUntilConsumeRightParen(*this, AttrName);
   };
 
   // Parse '('.
@@ -1306,28 +1273,23 @@ ParserResult<TransposingAttr> Parser::parseTransposingAttribute(SourceLoc atLoc,
              /*DeclModifier*/ false);
     return makeParserError();
   }
-
   {
     SyntaxParsingContext ContentContext(
-        SyntaxContext, SyntaxKind::TransposingAttributeArguments);
-  
+        SyntaxContext, SyntaxKind::DerivativeRegistrationAttributeArguments);
     {
       // Parse the optionally qualified function.
       if (parseQualifiedDeclName(*this,
                                  diag::attr_transposing_expected_original_name,
                                  baseType, original))
         return makeParserError();
-      
       if (consumeIfTrailingComma())
         return makeParserError();
     }
-
     // Parse the optional 'wrt' differentiation parameters clause.
     if (Tok.is(tok::identifier) && Tok.getText() == "wrt" &&
         parseTransposingParametersClause(params, AttrName))
       return makeParserError();
   }
-
   // Parse ')'.
   if (!consumeIf(tok::r_paren, rParenLoc)) {
     diagnose(getEndOfPreviousLoc(), diag::attr_expected_rparen, AttrName,

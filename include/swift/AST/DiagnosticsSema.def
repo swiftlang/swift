@@ -2954,9 +2954,8 @@ NOTE(differentiable_attr_duplicate_note,none,
      "other attribute declared here", ())
 ERROR(differentiable_attr_function_not_same_type_context,none,
       "%0 is not defined in the current type context", (DeclName))
-ERROR(differentiable_attr_specified_not_function,none,
-      "%0 is not a function to be used as derivative function",
-      (DeclName))
+ERROR(differentiable_attr_derivative_not_function,none,
+      "registered derivative %0 must be a 'func' declaration", (DeclName))
 ERROR(differentiable_attr_class_derivative_not_final,none,
       "class member derivative must be final", ())
 ERROR(differentiable_attr_ambiguous_function_identifier,none,
@@ -3020,6 +3019,8 @@ ERROR(differentiating_attr_overload_not_found,none,
       "could not find function %0 with expected type %1", (DeclName, Type))
 ERROR(differentiating_attr_not_in_same_file_as_original,none,
       "derivative not in the same file as the original function", ())
+ERROR(differentiating_attr_original_stored_property_unsupported,none,
+      "cannot register derivative for stored property %0", (DeclName))
 ERROR(differentiating_attr_original_already_has_derivative,none,
       "a derivative already exists for %0", (DeclName))
 
@@ -3033,7 +3034,7 @@ ERROR(transposing_attr_cannot_use_named_wrt_params,none,
       "cannot use named 'wrt' parameters in '@transposing' attribute, found %0",
       (Identifier))
 ERROR(transposing_attr_result_value_not_differentiable,none,
-      "'@transposing' attribute requires original function result to "
+      "'@transposing' attribute requires original function result %0 to "
       "conform to 'Differentiable'", (Type))
 
 // differentiation `wrt` parameters clause

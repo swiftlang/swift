@@ -1007,7 +1007,8 @@ public:
   /// Parse the @differentiating attribute.
   ParserResult<DifferentiatingAttr>
   parseDifferentiatingAttribute(SourceLoc AtLoc, SourceLoc Loc);
-  
+
+  /// Parse the @transposing attribute.
   ParserResult<TransposingAttr> parseTransposingAttribute(SourceLoc AtLoc,
                                                           SourceLoc Loc);
 

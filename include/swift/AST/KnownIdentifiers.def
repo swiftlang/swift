@@ -130,6 +130,9 @@ IDENTIFIER(withKeywordArguments)
 IDENTIFIER(wrapped)
 IDENTIFIER(wrappedValue)
 IDENTIFIER(wrapperValue)
+// SWIFT_ENABLE_TENSORFLOW
+IDENTIFIER(differential)
+IDENTIFIER(pullback)
 
 // SWIFT_ENABLE_TENSORFLOW
 IDENTIFIER(TensorFlow)
