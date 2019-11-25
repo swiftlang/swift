@@ -9,12 +9,12 @@
 
 public func foo(_ x: Float) -> Float { x }
 
-@differentiating(foo)
+@derivative(of: foo)
 public func foo_jvp(_ x: Float) -> (value: Float, differential: (Float) -> Float) {
   (x, { $0 })
 }
 
-@differentiating(foo)
+@derivative(of: foo)
 public func foo_vjp(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
   (x, { $0 })
 }
@@ -33,7 +33,7 @@ public func foo_vjp(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
 
 func bar<T>(_ x: Float, _ y: T) -> Float { x }
 
-@differentiating(bar)
+@derivative(of: bar)
 public func bar_jvp<T>(_ x: Float, _ y: T) -> (value: Float, differential: (Float) -> Float) {
   (x, { $0 })
 }
@@ -51,14 +51,14 @@ public func bar_jvp<T>(_ x: Float, _ y: T) -> (value: Float, differential: (Floa
 @differentiable(where T: Differentiable)
 func generic<T>(_ x: T, _ y: Float) -> T { x }
 
-@differentiating(generic)
+@derivative(of: generic)
 func generic_jvp<T: Differentiable>(_ x: T, _ y: Float) -> (
   value: T, differential: (T.TangentVector, Float) -> T.TangentVector
 ) {
   (x, { dx, dy in dx })
 }
 
-@differentiating(generic)
+@derivative(of: generic)
 func generic_vjp<T: Differentiable>(_ x: T, _ y: Float) -> (
   value: T, pullback: (T.TangentVector) -> (T.TangentVector, Float)
 ) {
@@ -127,22 +127,22 @@ public func wrt_subset(_ tup: (Int, Int), _ x: Float, _ y: Float) -> Float {
   return 0
 }
 
-@differentiating(wrt_subset, wrt: y)
+@derivative(of: wrt_subset, wrt: y)
 public func wrt_subset_jvp_wrt_y(_ tup: (Int, Int), _ x: Float, _ y: Float) -> (value: Float, differential: (Float) -> Float) {
   return (0, { $0 })
 }
 
-@differentiating(wrt_subset, wrt: y)
+@derivative(of: wrt_subset, wrt: y)
 public func wrt_subset_vjp_wrt_y(_ tup: (Int, Int), _ x: Float, _ y: Float) -> (value: Float, pullback: (Float) -> Float) {
   return (0, { $0 })
 }
 
-@differentiating(wrt_subset)
+@derivative(of: wrt_subset)
 public func wrt_subset_jvp_wrt_x_y(_ tup: (Int, Int), _ x: Float, _ y: Float) -> (value: Float, differential: (Float, Float) -> Float) {
   return (0, { $0 + $1 })
 }
 
-@differentiating(wrt_subset)
+@derivative(of: wrt_subset)
 public func wrt_subset_vjp_wrt_x_y(_ tup: (Int, Int), _ x: Float, _ y: Float) -> (value: Float, pullback: (Float) -> (Float, Float)) {
   return (0, { ($0, $0) })
 }

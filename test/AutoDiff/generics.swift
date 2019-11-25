@@ -281,7 +281,7 @@ struct TF_817<T> {
   }
 }
 extension TF_817: Differentiable where T: Differentiable {
-  @differentiating(foo)
+  @derivative(of: foo)
   func vjpFoo(index: Int) -> (value: T, pullback: (T.TangentVector) -> (TangentVector)) {
     fatalError()
   }

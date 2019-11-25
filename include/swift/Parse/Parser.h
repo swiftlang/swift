@@ -1004,9 +1004,14 @@ public:
   bool parseTransposingParametersClause(
       SmallVectorImpl<ParsedAutoDiffParameter> &params, StringRef attrName);
 
-  /// Parse the @differentiating attribute.
-  ParserResult<DifferentiatingAttr>
-  parseDifferentiatingAttribute(SourceLoc AtLoc, SourceLoc Loc);
+  /// Parse the @derivative attribute.
+  ParserResult<DerivativeAttr> parseDerivativeAttribute(SourceLoc AtLoc,
+                                                        SourceLoc Loc);
+
+  /// Parse the deprecated @differentiating attribute.
+  // TODO(TF-999): Remove the deprecated `@differentiating` attribute.
+  ParserResult<DerivativeAttr> parseDifferentiatingAttribute(SourceLoc AtLoc,
+                                                             SourceLoc Loc);
 
   /// Parse the @transposing attribute.
   ParserResult<TransposingAttr> parseTransposingAttribute(SourceLoc AtLoc,

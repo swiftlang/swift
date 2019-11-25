@@ -2124,10 +2124,11 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
     case DAK_PrivateImport:
       llvm_unreachable("cannot serialize attribute");
     // SWIFT_ENABLE_TENSORFLOW
+    case DAK_Derivative:
     case DAK_Differentiating:
-      llvm_unreachable("cannot serialize attribute");
     case DAK_Transposing:
       llvm_unreachable("cannot serialize attribute");
+    // SWIFT_ENABLE_TENSORFLOW END
 
     case DAK_Count:
       llvm_unreachable("not a real attribute");

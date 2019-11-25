@@ -15,7 +15,7 @@
 // indices, derivative generic signature) to derivative functions (JVP and VJP).
 //
 // SIL differentiability witnesses are generated from the `@differentiable`
-// and `@differentiating` attributes AST declaration attributes.
+// and `@derivative` attribute AST declaration attributes.
 // Differentiability witnesses are canonicalized by the differentiation SIL
 // transform, which fills in missing derivative functions. Canonical
 // differentiability witnesses from other modules can be deserialized to look up
@@ -60,7 +60,7 @@ private:
   /// Whether or not this differentiability witness is serialized, which allows
   /// devirtualization from another module.
   bool IsSerialized;
-  /// The AST `@differentiable` or `@differentiating` attribute from which the
+  /// The AST `@differentiable` or `@derivative` attribute from which the
   /// differentiability witness is generated. Used for diagnostics.
   /// Null if the differentiability witness is parsed from SIL or if it is
   /// deserialized.

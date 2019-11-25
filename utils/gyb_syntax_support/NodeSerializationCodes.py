@@ -245,6 +245,7 @@ SYNTAX_NODE_SERIALIZATION_CODES = {
     'DerivativeRegistrationAttributeArguments': 240,
     'QuoteLiteralExpr': 241,
     'UnquoteExpr': 242,
+    'DeprecatedDerivativeRegistrationAttributeArguments': 243,
 }
 
 

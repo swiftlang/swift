@@ -921,10 +921,10 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
   }
 
   // SWIFT_ENABLE_TENSORFLOW
-  case DAK_Differentiating: {
-    Printer.printAttrName("@differentiating");
-    Printer << '(';
-    auto *attr = cast<DifferentiatingAttr>(this);
+  case DAK_Derivative: {
+    Printer.printAttrName("@derivative");
+    Printer << "(of: ";
+    auto *attr = cast<DerivativeAttr>(this);
     auto *derivative = cast<AbstractFunctionDecl>(D);
     Printer << attr->getOriginalFunctionName().Name;
     auto diffParamsString = getDifferentiationParametersClauseString(
@@ -934,7 +934,7 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     Printer << ')';
     break;
   }
-      
+
   // SWIFT_ENABLE_TENSORFLOW
   case DAK_Transposing: {
     Printer.printAttrName("@transposing");
@@ -1108,6 +1108,8 @@ StringRef DeclAttribute::getAttrName() const {
   // SWIFT_ENABLE_TENSORFLOW
   case DAK_Differentiable:
     return "differentiable";
+  case DAK_Derivative:
+    return "derivative";
   case DAK_Differentiating:
     return "differentiating";
   case DAK_Transposing:
@@ -1568,43 +1570,42 @@ void DifferentiableAttr::print(llvm::raw_ostream &OS, const Decl *D,
 }
 
 // SWIFT_ENABLE_TENSORFLOW
-DifferentiatingAttr::DifferentiatingAttr(
-    bool implicit, SourceLoc atLoc, SourceRange baseRange,
-    DeclNameWithLoc originalName, ArrayRef<ParsedAutoDiffParameter> params)
-    : DeclAttribute(DAK_Differentiating, atLoc, baseRange, implicit),
+DerivativeAttr::DerivativeAttr(bool implicit, SourceLoc atLoc,
+                               SourceRange baseRange,
+                               DeclNameWithLoc originalName,
+                               ArrayRef<ParsedAutoDiffParameter> params)
+    : DeclAttribute(DAK_Derivative, atLoc, baseRange, implicit),
       OriginalFunctionName(std::move(originalName)),
       NumParsedParameters(params.size()) {
   std::copy(params.begin(), params.end(),
             getTrailingObjects<ParsedAutoDiffParameter>());
 }
 
-DifferentiatingAttr::DifferentiatingAttr(bool implicit, SourceLoc atLoc,
-                                         SourceRange baseRange,
-                                         DeclNameWithLoc originalName,
-                                         IndexSubset *indices)
-    : DeclAttribute(DAK_Differentiating, atLoc, baseRange, implicit),
+DerivativeAttr::DerivativeAttr(bool implicit, SourceLoc atLoc,
+                               SourceRange baseRange,
+                               DeclNameWithLoc originalName,
+                               IndexSubset *indices)
+    : DeclAttribute(DAK_Derivative, atLoc, baseRange, implicit),
       OriginalFunctionName(std::move(originalName)), ParameterIndices(indices) {
 }
 
-DifferentiatingAttr *
-DifferentiatingAttr::create(ASTContext &context, bool implicit, SourceLoc atLoc,
-                            SourceRange baseRange, DeclNameWithLoc original,
-                            ArrayRef<ParsedAutoDiffParameter> params) {
+DerivativeAttr *
+DerivativeAttr::create(ASTContext &context, bool implicit, SourceLoc atLoc,
+                       SourceRange baseRange, DeclNameWithLoc originalName,
+                       ArrayRef<ParsedAutoDiffParameter> params) {
   unsigned size = totalSizeToAlloc<ParsedAutoDiffParameter>(params.size());
-  void *mem = context.Allocate(size, alignof(DifferentiatingAttr));
-  return new (mem) DifferentiatingAttr(implicit, atLoc, baseRange,
-                                       std::move(original), params);
+  void *mem = context.Allocate(size, alignof(DerivativeAttr));
+  return new (mem) DerivativeAttr(implicit, atLoc, baseRange,
+                                  std::move(originalName), params);
 }
 
-DifferentiatingAttr *DifferentiatingAttr::create(ASTContext &context,
-                                                 bool implicit, SourceLoc atLoc,
-                                                 SourceRange baseRange,
-                                                 DeclNameWithLoc original,
-                                                 IndexSubset *indices) {
-  void *mem = context.Allocate(sizeof(DifferentiatingAttr),
-                               alignof(DifferentiatingAttr));
-  return new (mem) DifferentiatingAttr(implicit, atLoc, baseRange,
-                                       std::move(original), indices);
+DerivativeAttr *DerivativeAttr::create(ASTContext &context, bool implicit,
+                                       SourceLoc atLoc, SourceRange baseRange,
+                                       DeclNameWithLoc originalName,
+                                       IndexSubset *indices) {
+  void *mem = context.Allocate(sizeof(DerivativeAttr), alignof(DerivativeAttr));
+  return new (mem) DerivativeAttr(implicit, atLoc, baseRange,
+                                  std::move(originalName), indices);
 }
 
 TransposingAttr::TransposingAttr(bool implicit, SourceLoc atLoc,

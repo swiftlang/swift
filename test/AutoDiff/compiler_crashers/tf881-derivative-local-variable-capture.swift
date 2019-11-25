@@ -13,7 +13,7 @@ do {
 
   func original(_ x: Float) -> Float { x }
 
-  @differentiating(original)
+  @derivative(of: original)
   func vjp(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
     // Reference a local variable.
     // This causes the top-level SIL function @vjp to have extra arguments.

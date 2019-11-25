@@ -10,7 +10,7 @@ var DerivativeRegistrationTests = TestSuite("DerivativeRegistration")
 func unary(x: Tracked<Float>) -> Tracked<Float> {
   return x
 }
-@differentiating(unary)
+@derivative(of: unary)
 func _vjpUnary(x: Tracked<Float>) -> (value: Tracked<Float>, pullback: (Tracked<Float>) -> Tracked<Float>) {
   return (value: x, pullback: { v in v })
 }
@@ -22,7 +22,7 @@ DerivativeRegistrationTests.testWithLeakChecking("UnaryFreeFunction") {
 func multiply(_ x: Tracked<Float>, _ y: Tracked<Float>) -> Tracked<Float> {
   return x * y
 }
-@differentiating(multiply)
+@derivative(of: multiply)
 func _vjpMultiply(_ x: Tracked<Float>, _ y: Tracked<Float>)
   -> (value: Tracked<Float>, pullback: (Tracked<Float>) -> (Tracked<Float>, Tracked<Float>)) {
   return (x * y, { v in (v * y, v * x) })
@@ -41,7 +41,7 @@ extension Wrapper {
     self.float = x * y
   }
 
-  @differentiating(init(_:_:))
+  @derivative(of: init(_:_:))
   static func _vjpInit(_ x: Tracked<Float>, _ y: Tracked<Float>)
     -> (value: Self, pullback: (TangentVector) -> (Tracked<Float>, Tracked<Float>)) {
     return (.init(x, y), { v in (v.float * y, v.float * x) })
@@ -60,7 +60,7 @@ extension Wrapper {
     return x * y
   }
 
-  @differentiating(multiply)
+  @derivative(of: multiply)
   static func _vjpMultiply(_ x: Tracked<Float>, _ y: Tracked<Float>)
     -> (value: Tracked<Float>, pullback: (Tracked<Float>) -> (Tracked<Float>, Tracked<Float>)) {
     return (x * y, { v in (v * y, v * x) })
@@ -76,7 +76,7 @@ extension Wrapper {
     return float * x
   }
 
-  @differentiating(multiply)
+  @derivative(of: multiply)
   func _vjpMultiply(_ x: Tracked<Float>)
     -> (value: Tracked<Float>, pullback: (Tracked<Float>) -> (Wrapper.TangentVector, Tracked<Float>)) {
     return (float * x, { v in
@@ -99,7 +99,7 @@ extension Wrapper {
     set {}
   }
 
-  @differentiating(subscript(_:))
+  @derivative(of: subscript(_:))
   func _vjpSubscript(_ x: Tracked<Float>)
     -> (value: Tracked<Float>, pullback: (Tracked<Float>) -> (Wrapper.TangentVector, Tracked<Float>)) {
     return (self[x], { v in
@@ -122,7 +122,7 @@ extension Wrapper {
     set {}
   }
 
-  @differentiating(computedProperty)
+  @derivative(of: computedProperty)
   func _vjpComputedProperty()
     -> (value: Tracked<Float>, pullback: (Tracked<Float>) -> Wrapper.TangentVector) {
     return (computedProperty, { [f = self.float] v in

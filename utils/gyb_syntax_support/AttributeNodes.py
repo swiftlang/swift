@@ -67,6 +67,8 @@ ATTRIBUTE_NODES = [
                        # SWIFT_ENABLE_TENSORFLOW
                        Child('DerivativeRegistrationArguments',
                              kind='DerivativeRegistrationAttributeArguments'),
+                       Child('DeprecatedDerivativeRegistrationArguments',
+                             kind='DeprecatedDerivativeRegistrationAttributeArguments'),
                        # SWIFT_ENABLE_TENSORFLOW END
                        Child('NamedAttributeString',
                              kind='NamedAttributeStringArgument'),
@@ -307,13 +309,40 @@ ATTRIBUTE_NODES = [
          ]),
 
     # SWIFT_ENABLE_TENSORFLOW
-    # The argument of the derivative registration attributes
-    # '@differentiating' and '@transposing'.
+    # The argument of the derivative registration attribute
+    # '@derivative(of: ...)'.
     # derivative-registration-attr-arguments ->
     #     'of' ':' func-decl-name ','? differentiation-params-clause?
     Node('DerivativeRegistrationAttributeArguments', kind='Syntax',
          description='''
-         The arguments for the `@differentiating` and `@transposing` attributes:
+         The arguments for the '@derivative(of:)' attribute: the 'of:' label,
+         the original declaration name, and an optional differentiation
+         parameter list.
+         ''',
+         children=[
+             Child('OfLabel', kind='IdentifierToken', text_choices=['of'],
+                   description='The "of" label.'),
+             Child('Colon', kind='ColonToken', description='''
+                   The colon separating the "of" label and the original
+                   declaration name.
+                   '''),
+             Child('Original', kind='FunctionDeclName',
+                   description='The referenced original declaration.'),
+             Child('Comma', kind='CommaToken', is_optional=True),
+             Child('DiffParams', kind='DifferentiationParamsClause',
+                   is_optional=True),
+         ]),
+
+    # SWIFT_ENABLE_TENSORFLOW
+    # The argument of the deprecated derivative registration attributes
+    # '@differentiating' and '@transposing'.
+    # derivative-registration-attr-arguments ->
+    #     func-decl-name ','? differentiation-params-clause?
+    # TODO(TF-999): Remove deprecated `@differentiating` and `@transposing`
+    # attributes.
+    Node('DeprecatedDerivativeRegistrationAttributeArguments', kind='Syntax',
+         description='''
+         The arguments for the '@differentiating' and '@transposing' attributes:
          the original declaration name and an optional differentiation parameter
          list.
          ''',
