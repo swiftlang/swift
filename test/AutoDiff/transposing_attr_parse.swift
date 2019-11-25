@@ -27,8 +27,7 @@ extension AdditiveArithmetic where Self : Differentiable {
 
 /// Bad
 
-// expected-error @+2 {{expected 'wrt:'}}
-// expected-error @+1 {{expected declaration}}
+// expected-error @+1 {{expected label 'wrt:' in '@transposing' attribute}}
 @transposing(linearFunc, linear)
 func tfoo(t: Float) -> Float {
   return t
@@ -41,8 +40,7 @@ func tfoo(t: Float) -> Float {
   return t
 }
 
-// expected-error @+2 {{unexpected ',' separator}}
-// expected-error @+1 {{expected declaration}}
+// expected-error @+1 {{unexpected ',' separator}}
 @transposing(foo,)
 func tfoo(t: Float) -> Float {
   return t

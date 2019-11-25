@@ -985,7 +985,7 @@ static ValueDecl *getGetObjCTypeEncodingOperation(ASTContext &Context,
 // SWIFT_ENABLE_TENSORFLOW
 static ValueDecl *getAutoDiffApplyDerivativeFunction(
     ASTContext &Context, Identifier Id, AutoDiffDerivativeFunctionKind kind,
-    unsigned arity, bool rethrows) {
+    unsigned arity, bool throws) {
   assert(arity >= 1);
   // JVP:
   //   <...T...(arity), R> (@differentiable (...T) throws -> R, ...T)
@@ -1014,7 +1014,7 @@ static ValueDecl *getAutoDiffApplyDerivativeFunction(
       FunctionType::ExtInfo ext;
       auto extInfo = FunctionType::ExtInfo()
           .withDifferentiabilityKind(DifferentiabilityKind::Normal)
-          .withNoEscape().withThrows(rethrows);
+          .withNoEscape().withThrows(throws);
       SmallVector<FunctionType::Param, 2> params;
       for (auto &paramGen : fnParamGens)
         params.push_back(FunctionType::Param(paramGen.build(builder)));
@@ -1042,14 +1042,14 @@ static ValueDecl *getAutoDiffApplyDerivativeFunction(
   builder.addParameter(firstArgGen);
   for (auto argGen : fnParamGens)
     builder.addParameter(argGen);
-  if (rethrows)
+  if (throws)
     builder.setRethrows();
   builder.setResult(resultGen);
   return builder.build(Id);
 }
 
 static ValueDecl *getAutoDiffApplyTransposeFunction(
-    ASTContext &Context, Identifier Id, unsigned arity, bool rethrows) {
+    ASTContext &Context, Identifier Id, unsigned arity, bool throws) {
   assert(arity >= 1);
   // <...T...(arity), R>
   //     (@differentiable (...T) throws -> R, ...R.TangentVector)
@@ -1079,7 +1079,7 @@ static ValueDecl *getAutoDiffApplyTransposeFunction(
       FunctionType::ExtInfo ext;
       auto extInfo = FunctionType::ExtInfo()
           .withDifferentiabilityKind(DifferentiabilityKind::Linear)
-          .withNoEscape().withThrows(rethrows);
+          .withNoEscape().withThrows(throws);
       SmallVector<FunctionType::Param, 2> params;
       for (auto &paramGen : linearFnParamGens)
         params.push_back(FunctionType::Param(paramGen.build(builder)));
@@ -1090,7 +1090,7 @@ static ValueDecl *getAutoDiffApplyTransposeFunction(
   };
   builder.addParameter(firstArgGen);
   builder.addParameter(linearFnResultGen);
-  if (rethrows)
+  if (throws)
     builder.setRethrows();
   if (arity == 1)
     builder.setResult(linearFnParamGens.front());
@@ -2055,20 +2055,20 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
   if (OperationName.startswith("applyDerivative_")) {
     AutoDiffDerivativeFunctionKind kind;
     unsigned arity;
-    bool rethrows;
+    bool throws;
     if (!autodiff::getBuiltinApplyDerivativeConfig(
-            OperationName, kind, arity, rethrows))
+            OperationName, kind, arity, throws))
       return nullptr;
     return getAutoDiffApplyDerivativeFunction(Context, Id, kind, arity,
-                                              rethrows);
+                                              throws);
   }
   if (OperationName.startswith("applyTranspose_")) {
     unsigned arity;
-    bool rethrows;
+    bool throws;
     if (!autodiff::getBuiltinApplyTransposeConfig(
-            OperationName, arity, rethrows))
+            OperationName, arity, throws))
       return nullptr;
-    return getAutoDiffApplyTransposeFunction(Context, Id, arity, rethrows);
+    return getAutoDiffApplyTransposeFunction(Context, Id, arity, throws);
   }
   if (OperationName.startswith("differentiableFunction_")) {
     unsigned arity;

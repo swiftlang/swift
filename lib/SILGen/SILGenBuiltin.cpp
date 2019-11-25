@@ -1031,12 +1031,14 @@ static ManagedValue emitBuiltinTypeTrait(SILGenFunction &SGF,
 }
 
 // SWIFT_ENABLE_TENSORFLOW
+// FIXME(SR-11852): This should not perform curry-level unwrapping. Clean up
+// this function.
 static ManagedValue emitBuiltinAutoDiffApplyDerivativeFunction(
     AutoDiffDerivativeFunctionKind kind, unsigned arity,
-    bool rethrows, SILGenFunction &SGF, SILLocation loc,
+    bool throws, SILGenFunction &SGF, SILLocation loc,
     SubstitutionMap substitutions, ArrayRef<ManagedValue> args, SGFContext C) {
   // FIXME(SR-11853): Support throwing functions.
-  assert(!rethrows && "Thowing functions are not yet supported");
+  assert(!throws && "Thowing functions are not yet supported");
 
   auto origFnVal = args[0].getValue();
   SmallVector<SILValue, 2> origFnArgVals;
@@ -1138,10 +1140,10 @@ static ManagedValue emitBuiltinAutoDiffApplyDerivativeFunction(
 
 // SWIFT_ENABLE_TENSORFLOW
 static ManagedValue emitBuiltinAutoDiffApplyTransposeFunction(
-    unsigned arity, bool rethrows, SILGenFunction &SGF, SILLocation loc,
+    unsigned arity, bool throws, SILGenFunction &SGF, SILLocation loc,
     SubstitutionMap substitutions, ArrayRef<ManagedValue> args, SGFContext C) {
   // FIXME(SR-11853): Support throwing functions.
-  assert(!rethrows && "Thowing functions are not yet supported");
+  assert(!throws && "Thowing functions are not yet supported");
 
   auto origFnVal = args.front().getValue();
   SmallVector<SILValue, 2> origFnArgVals;
@@ -1182,12 +1184,12 @@ static ManagedValue emitBuiltinApplyDerivative(
   auto builtinName = builtinDecl->getName().str();
   AutoDiffDerivativeFunctionKind kind;
   unsigned arity;
-  bool rethrows;
+  bool throws;
   auto successfullyParsed = autodiff::getBuiltinApplyDerivativeConfig(
-      builtinName, kind, arity, rethrows);
+      builtinName, kind, arity, throws);
   assert(successfullyParsed);
   return emitBuiltinAutoDiffApplyDerivativeFunction(
-      kind, arity, rethrows, SGF, loc, substitutions, args, C);
+      kind, arity, throws, SGF, loc, substitutions, args, C);
 }
 
 // SWIFT_ENABLE_TENSORFLOW
@@ -1200,12 +1202,12 @@ static ManagedValue emitBuiltinApplyTranspose(
           ->getDecl());
   auto builtinName = builtinDecl->getName().str();
   unsigned arity;
-  bool rethrows;
+  bool throws;
   auto successfullyParsed = autodiff::getBuiltinApplyTransposeConfig(
-      builtinName, arity, rethrows);
+      builtinName, arity, throws);
   assert(successfullyParsed);
   return emitBuiltinAutoDiffApplyTransposeFunction(
-      arity, rethrows, SGF, loc, substitutions, args, C);
+      arity, throws, SGF, loc, substitutions, args, C);
 }
 
 // SWIFT_ENABLE_TENSORFLOW

@@ -40,5 +40,5 @@ public func blackHole<T, U>(_: (T) -> U) {}
 public func pullback<T, R>(
   at x: T, in tf597ProblematicVarDecl: @differentiable (T) -> R
 ) {
-  let _ = Builtin.autodiffApply_vjp(tf597ProblematicVarDecl, x)
+  let _ = Builtin.applyDerivative_vjp(tf597ProblematicVarDecl, x)
 }
