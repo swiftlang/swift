@@ -212,39 +212,36 @@ public func withoutDerivative<T, R>(at x: T, in body: (T) -> R) -> R {
 /// Create a differentiable function from a vector-Jacobian products function.
 @inlinable
 public func differentiableFunction<T : Differentiable, R : Differentiable>(
-  from vjp: @escaping (T)
+  from vjp: __owned @escaping (T)
            -> (value: R, pullback: (R.TangentVector) -> T.TangentVector)
 ) -> @differentiable (T) -> R {
-  func original(_ x: T) -> R {
-    return vjp(x).value
-  }
-  @differentiating(original)
-  func derivative(_ x: T)
-    -> (value: R, pullback: (R.TangentVector) -> T.TangentVector) {
-    return vjp(x)
-  }
-  return original
+  Builtin.differentiableFunction_arity1(
+    /*original*/ { vjp($0).value },
+    /*jvp*/ { _ in
+      fatalError("""
+        Functions formed with `differentiableFunction(from:)` cannot yet \
+        be used with differential-producing differential operators.
+        """)
+    },
+    /*vjp*/ vjp)
 }
 
 /// Create a differentiable function from a vector-Jacobian products function.
 @inlinable
 public func differentiableFunction<T, U, R>(
-  from vjp: @escaping (T, U)
+  from vjp: __owned @escaping (T, U)
            -> (value: R, pullback: (R.TangentVector)
              -> (T.TangentVector, U.TangentVector))
-) -> @differentiable (T, U) -> R
-  where T : Differentiable, U : Differentiable, R : Differentiable {
-  func original(_ x: T, _ y: U) -> R {
-    return vjp(x, y).value
-  }
-  @differentiating(original)
-  func derivative(_ x: T, _ y: U)
-    -> (value: R,
-        pullback: (R.TangentVector)
-                    -> (T.TangentVector, U.TangentVector)) {
-    return vjp(x, y)
-  }
-  return original
+) -> @differentiable (T, U) -> R {
+  Builtin.differentiableFunction_arity2(
+    /*original*/ { vjp($0, $1).value },
+    /*jvp*/ { _, _ in
+      fatalError("""
+        Functions formed with `differentiableFunction(from:)` cannot yet \
+        be used with differential-producing differential operators.
+        """)
+    },
+    /*vjp*/ vjp)
 }
 
 public extension Differentiable {
