@@ -1069,7 +1069,7 @@ bool Parser::parseDifferentiableAttributeArguments(
     SyntaxParsingContext FuncDeclNameContext(
          SyntaxContext, SyntaxKind::FunctionDeclName);
     Diagnostic funcDiag(diag::attr_differentiable_expected_function_name.ID,
-                        { label });
+                        {label});
     result.Name =
         parseUnqualifiedDeclName(/*afterDot=*/false, result.Loc,
                                  funcDiag, /*allowOperators=*/true,
@@ -1165,11 +1165,14 @@ Parser::parseDifferentiatingAttribute(SourceLoc atLoc, SourceLoc loc) {
       // Parse the name of the function.
       SyntaxParsingContext FuncDeclNameContext(
           SyntaxContext, SyntaxKind::FunctionDeclName);
+      // NOTE: Use `afterDot = true` and `allowDeinitAndSubscript = true` to
+      // enable, e.g. `@differentiating(init)` and
+      // `@differentiating(subscript)`.
       original.Name = parseUnqualifiedDeclName(
-          /*afterDot*/ false, original.Loc,
+          /*afterDot*/ true, original.Loc,
           diag::attr_differentiating_expected_original_name,
-          /*allowOperators*/ true, /*allowZeroArgCompoundNames*/ true);
-
+          /*allowOperators*/ true, /*allowZeroArgCompoundNames*/ true,
+          /*allowDeinitAndSubscript*/ true);
       if (consumeIfTrailingComma())
         return makeParserError();
     }
@@ -1228,19 +1231,13 @@ bool parseQualifiedDeclName(Parser &P, Diag<> nameParseError,
   if (parseBaseTypeForQualifiedDeclName(P, baseType))
     return true;
 
-  // If base type was parsed and has at least one component, then there was a
-  // dot before the current token.
-  bool afterDot = false;
-  if (baseType) {
-    if (auto ident = dyn_cast<IdentTypeRepr>(baseType)) {
-      auto components = ident->getComponentRange();
-      afterDot = std::distance(components.begin(), components.end()) > 0;
-    }
-  }
+  // NOTE: Use `afterDot = true` and `allowDeinitAndSubscript = true` to enable
+  // initializer and subscript lookup.
   original.Name =
-      P.parseUnqualifiedDeclName(afterDot, original.Loc, nameParseError,
-                                 /*allowOperators*/ true,
-                                 /*allowZeroArgCompoundNames*/ true);
+      P.parseUnqualifiedDeclName(/*afterDot*/ true, original.Loc,
+                                 nameParseError, /*allowOperators*/ true,
+                                 /*allowZeroArgCompoundNames*/ true,
+                                 /*allowDeinitAndSubscript*/ true);
 
   // The base type is optional, but the final unqualified decl name is not.
   // If name could not be parsed, return true for error.
@@ -1285,7 +1282,6 @@ ParserResult<TransposingAttr> Parser::parseTransposingAttribute(SourceLoc atLoc,
                                  diag::attr_transposing_expected_original_name,
                                  baseType, original))
         return makeParserError();
-      
       if (consumeIfTrailingComma())
         return makeParserError();
     }

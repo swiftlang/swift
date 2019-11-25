@@ -296,26 +296,6 @@ func vjpConsistent(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
   return (x, { $0 })
 }
 
-// Test usage of `@differentiable` on a stored property
-struct PropertyDiff : Differentiable & AdditiveArithmetic {
-    // expected-error @+1 {{'@differentiable' attribute on stored property cannot specify 'jvp:' or 'vjp:'}}
-    @differentiable(vjp: vjpPropertyA)
-    var a: Float = 1
-    typealias TangentVector = PropertyDiff
-    typealias AllDifferentiableVariables = PropertyDiff
-    func vjpPropertyA() -> (Float, (Float) -> PropertyDiff) {
-        (.zero, { _ in .zero })
-    }
-}
-
-@differentiable
-func f(_ x: PropertyDiff) -> Float {
-    return x.a
-}
-
-let a = gradient(at: PropertyDiff(), in: f)
-print(a)
-
 // Index based 'wrt:'
 
 func add2(x: Float, y: Float) -> Float {
@@ -368,5 +348,81 @@ class Sub : Super {
   @differentiating(foo)
   override func vjpFoo(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
     return (foo(x), { v in v })
+  }
+}
+
+// Test non-`func` original declarations.
+
+struct Struct<T> {
+  var x: T
+}
+extension Struct: Equatable where T: Equatable {}
+extension Struct: Differentiable & AdditiveArithmetic
+where T: Differentiable & AdditiveArithmetic {}
+
+// Test computed properties.
+extension Struct {
+  var computedProperty: T { x }
+}
+extension Struct where T: Differentiable & AdditiveArithmetic {
+  @differentiating(computedProperty)
+  func vjpProperty() -> (value: T, pullback: (T.TangentVector) -> TangentVector) {
+    (x, { v in .init(x: v) })
+  }
+}
+
+// Test initializers.
+extension Struct {
+  init(_ x: Float) {}
+  init(_ x: T, y: Float) {}
+}
+extension Struct where T: Differentiable & AdditiveArithmetic {
+  @differentiating(init)
+  static func vjpInit(_ x: Float) -> (value: Struct, pullback: (TangentVector) -> Float) {
+    (.init(x), { _ in .zero })
+  }
+
+  @differentiating(init(_:y:))
+  static func vjpInit2(_ x: T, _ y: Float) -> (value: Struct, pullback: (TangentVector) -> (T.TangentVector, Float)) {
+    (.init(x, y: y), { _ in (.zero, .zero) })
+  }
+}
+
+// Test subscripts.
+extension Struct {
+  subscript() -> Float {
+    get { 1 }
+    set {}
+  }
+  subscript(float float: Float) -> Float { 1 }
+  subscript<T: Differentiable>(x: T) -> T { x }
+}
+
+extension Struct where T: Differentiable & AdditiveArithmetic {
+  @differentiating(subscript)
+  func vjpSubscript() -> (value: Float, pullback: (Float) -> TangentVector) {
+    (1, { _ in .zero })
+  }
+
+  @differentiating(subscript(float:), wrt: self)
+  func vjpSubscriptLabelled(float: Float) -> (value: Float, pullback: (Float) -> TangentVector) {
+    (1, { _ in .zero })
+  }
+
+  @differentiating(subscript(_:), wrt: self)
+  func vjpSubscriptGeneric<T: Differentiable>(x: T) -> (value: T, pullback: (T.TangentVector) -> TangentVector) {
+    (x, { _ in .zero })
+  }
+}
+
+// Check that `@differentiating` attribute rejects stored property original declarations.
+
+struct StoredProperty: Differentiable {
+  // expected-note @+1 {{'stored' declared here}}
+  var stored: Float
+  // expected-error @+1 {{cannot register derivative for stored property 'stored'}}
+  @differentiating(stored)
+  func vjpStored() -> (value: Float, pullback: (Float) -> TangentVector) {
+    (stored, { _ in .zero })
   }
 }

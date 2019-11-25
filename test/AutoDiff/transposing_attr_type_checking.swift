@@ -155,7 +155,7 @@ func missingDiffSelfRequirement<T: AdditiveArithmetic>(x: T) -> T {
   return x
 }
 
-// expected-error @+1 {{'@transposing' attribute requires original function result to conform to 'Differentiable'}}
+// expected-error @+1 {{'@transposing' attribute requires original function result 'T' to conform to 'Differentiable'}}
 @transposing(missingDiffSelfRequirement, wrt: 0)
 func missingDiffSelfRequirementT<T: AdditiveArithmetic>(x: T) -> T {
   return x
@@ -202,7 +202,7 @@ func transposingIntT1(x: Float, t: Float) -> Int {
   return Int(x)
 }
 
-// expected-error @+1 {{'@transposing' attribute requires original function result to conform to 'Differentiable'}}
+// expected-error @+1 {{'@transposing' attribute requires original function result 'Int' to conform to 'Differentiable'}}
 @transposing(transposingInt, wrt: 0)
 func tangentNotLast(t: Float, y: Int) -> Float {
   return t
@@ -460,5 +460,84 @@ extension Float {
     T: Differentiable & BinaryFloatingPoint
   >() -> (Float, T, Float) where T == T.TangentVector {
     return (1, T(1), 1)
+  }
+}
+
+// Test non-`func` original declarations.
+
+struct Struct<T> {}
+extension Struct: Equatable where T: Equatable {}
+extension Struct: Differentiable & AdditiveArithmetic
+where T: Differentiable & AdditiveArithmetic {}
+
+// Test computed properties.
+extension Struct {
+  var computedProperty: Struct { self }
+}
+extension Struct where T: Differentiable & AdditiveArithmetic {
+  @transposing(computedProperty, wrt: self)
+  func transposeProperty() -> Self {
+    self
+  }
+}
+
+// Test initializers.
+extension Struct {
+  init(_ x: Float) {}
+  init(_ x: T, y: Float) {}
+}
+
+extension Struct where T: Differentiable & AdditiveArithmetic {
+  // TODO(TF-997): Support `@transposing` attribute with initializer original declaration.
+  // expected-error @+1 {{'@transposing' attribute requires original function result 'Struct<T>.Type' to conform to 'Differentiable'}}
+  @transposing(init, wrt: 0)
+  static func vjpInit(_ x: Self) -> Float {
+    fatalError()
+  }
+
+  // TODO(TF-997): Support `@transposing` attribute with initializer original declaration.
+  // expected-error @+1 {{'@transposing' attribute requires original function result 'Struct<T>.Type' to conform to 'Differentiable'}}
+  @transposing(init(_:y:), wrt: (0, 1))
+  static func vjpInit2(_ x: Self) -> (T, Float) {
+    fatalError()
+  }
+}
+
+// Test subscripts.
+extension Struct {
+  subscript() -> Self {
+    get { self }
+    set {}
+  }
+  subscript(float float: Float) -> Self { self }
+  subscript<U: Differentiable>(x: U) -> Self { self }
+}
+
+extension Struct where T: Differentiable & AdditiveArithmetic {
+  @transposing(subscript, wrt: self)
+  func vjpSubscript() -> Self {
+    self
+  }
+
+  @transposing(subscript(float:), wrt: self)
+  func vjpSubscriptLabelled(_ float: Float) -> Self {
+    self
+  }
+
+  @transposing(subscript(_:), wrt: self)
+  func vjpSubscriptGeneric<U: Differentiable>(x: U) -> Self {
+    self
+  }
+}
+
+// Check that `@transposing` attribute rejects stored property original declarations.
+
+struct StoredProperty: Differentiable {
+  var stored: Float
+
+  // expected-error @+1 {{could not find function 'stored' with expected type '(Float) -> () -> StoredProperty'}}
+  @transposing(stored, wrt: self)
+  func vjpStored() -> Float {
+    fatalError()
   }
 }
