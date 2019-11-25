@@ -57,7 +57,7 @@ BuiltinDifferentiableFunctionConstructorTests.test("UnaryLinear") {
   // expectEqual(2, trans_foo(2))
 }
 
-BuiltinDifferentiableFunctionConstructorTests.test("UnaryLinear") {
+BuiltinDifferentiableFunctionConstructorTests.test("BinaryLinear") {
   func foo(_ x: Float, _ y: Float) -> Float {
     return x + y
   }
