@@ -807,8 +807,8 @@ bool ClangImporter::canReadPCH(StringRef PCHFilename) {
   // constructor and the right one for reading a PCH.
   CI.createPreprocessor(clang::TU_Complete);
   CI.createASTContext();
-  CI.createModuleManager();
-  clang::ASTReader &Reader = *CI.getModuleManager();
+  CI.createASTReader();
+  clang::ASTReader &Reader = *CI.getASTReader();
 
   auto failureCapabilities =
     clang::ASTReader::ARR_Missing |
@@ -1093,7 +1093,7 @@ ClangImporter::create(ASTContext &ctx, const ClangImporterOptions &importerOpts,
   auto ppTracker = std::make_unique<BridgingPPTracker>(importer->Impl);
   clangPP.addPPCallbacks(std::move(ppTracker));
 
-  instance.createModuleManager();
+  instance.createASTReader();
 
   // Manually run the action, so that the TU stays open for additional parsing.
   instance.createSema(action->getTranslationUnitKind(), nullptr);
@@ -1825,7 +1825,7 @@ ModuleDecl *ClangImporter::Implementation::finishLoadingClangModule(
 // finishLoadingClangModule on each.
 void ClangImporter::Implementation::handleDeferredImports()
 {
-  clang::ASTReader &R = *Instance->getModuleManager();
+  clang::ASTReader &R = *Instance->getASTReader();
   llvm::SmallSet<clang::serialization::SubmoduleID, 32> seenSubmodules;
   for (clang::serialization::SubmoduleID ID : PCHImportedSubmodules) {
     if (!seenSubmodules.insert(ID).second)
@@ -3221,7 +3221,7 @@ Decl *ClangImporter::importDeclCached(const clang::NamedDecl *ClangDecl) {
 }
 
 void ClangImporter::printStatistics() const {
-  Impl.Instance->getModuleManager()->PrintStats();
+  Impl.Instance->getASTReader()->PrintStats();
 }
 
 void ClangImporter::verifyAllModules() {
