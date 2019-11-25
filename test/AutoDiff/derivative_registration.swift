@@ -37,6 +37,25 @@ struct Wrapper : Differentiable {
 
 extension Wrapper {
   @_semantics("autodiff.opaque")
+  init(_ x: Tracked<Float>, _ y: Tracked<Float>) {
+    self.float = x * y
+  }
+
+  @differentiating(init(_:_:))
+  static func _vjpInit(_ x: Tracked<Float>, _ y: Tracked<Float>)
+    -> (value: Self, pullback: (TangentVector) -> (Tracked<Float>, Tracked<Float>)) {
+    return (.init(x, y), { v in (v.float * y, v.float * x) })
+  }
+}
+DerivativeRegistrationTests.testWithLeakChecking("Initializer") {
+  let v = Wrapper.TangentVector(float: 1)
+  let (𝛁x, 𝛁y) = pullback(at: 3, 4, in: { x, y in Wrapper(x, y) })(v)
+  expectEqual(4, 𝛁x)
+  expectEqual(3, 𝛁y)
+}
+
+extension Wrapper {
+  @_semantics("autodiff.opaque")
   static func multiply(_ x: Tracked<Float>, _ y: Tracked<Float>) -> Tracked<Float> {
     return x * y
   }
@@ -61,16 +80,60 @@ extension Wrapper {
   func _vjpMultiply(_ x: Tracked<Float>)
     -> (value: Tracked<Float>, pullback: (Tracked<Float>) -> (Wrapper.TangentVector, Tracked<Float>)) {
     return (float * x, { v in
-      (Wrapper.TangentVector(float: v * x), v * self.float)
+      (TangentVector(float: v * x), v * self.float)
     })
   }
 }
 DerivativeRegistrationTests.testWithLeakChecking("InstanceMethod") {
   let x: Tracked<Float> = 2
   let wrapper = Wrapper(float: 3)
-  let (𝛁wrapper, 𝛁x) = wrapper.gradient(at: x) { wrapper, x in wrapper.multiply(x) }
+  let (𝛁wrapper, 𝛁x) = gradient(at: wrapper, x) { wrapper, x in wrapper.multiply(x) }
   expectEqual(Wrapper.TangentVector(float: 2), 𝛁wrapper)
   expectEqual(3, 𝛁x)
+}
+
+extension Wrapper {
+  subscript(_ x: Tracked<Float>) -> Tracked<Float> {
+    @_semantics("autodiff.opaque")
+    get { float * x }
+    set {}
+  }
+
+  @differentiating(subscript(_:))
+  func _vjpSubscript(_ x: Tracked<Float>)
+    -> (value: Tracked<Float>, pullback: (Tracked<Float>) -> (Wrapper.TangentVector, Tracked<Float>)) {
+    return (self[x], { v in
+      (TangentVector(float: v * x), v * self.float)
+    })
+  }
+}
+DerivativeRegistrationTests.testWithLeakChecking("Subscript") {
+  let x: Tracked<Float> = 2
+  let wrapper = Wrapper(float: 3)
+  let (𝛁wrapper, 𝛁x) = gradient(at: wrapper, x) { wrapper, x in wrapper[x] }
+  expectEqual(Wrapper.TangentVector(float: 2), 𝛁wrapper)
+  expectEqual(3, 𝛁x)
+}
+
+extension Wrapper {
+  var computedProperty: Tracked<Float> {
+    @_semantics("autodiff.opaque")
+    get { float * float }
+    set {}
+  }
+
+  @differentiating(computedProperty)
+  func _vjpComputedProperty()
+    -> (value: Tracked<Float>, pullback: (Tracked<Float>) -> Wrapper.TangentVector) {
+    return (computedProperty, { [f = self.float] v in
+      TangentVector(float: v * (f + f))
+    })
+  }
+}
+DerivativeRegistrationTests.testWithLeakChecking("ComputedProperty") {
+  let wrapper = Wrapper(float: 3)
+  let 𝛁wrapper = gradient(at: wrapper) { wrapper in wrapper.computedProperty }
+  expectEqual(Wrapper.TangentVector(float: 6), 𝛁wrapper)
 }
 
 runAllTests()

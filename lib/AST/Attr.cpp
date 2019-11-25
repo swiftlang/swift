@@ -926,7 +926,7 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     Printer << '(';
     auto *attr = cast<DifferentiatingAttr>(this);
     auto *derivative = cast<AbstractFunctionDecl>(D);
-    Printer << attr->getOriginal().Name;
+    Printer << attr->getOriginalFunctionName().Name;
     auto diffParamsString = getDifferentiationParametersClauseString(
         derivative, attr->getParameterIndices(), attr->getParsedParameters());
     if (!diffParamsString.empty())
@@ -941,7 +941,7 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     Printer << '(';
     auto *attr = cast<TransposingAttr>(this);
     auto *transpose = cast<AbstractFunctionDecl>(D);
-    Printer << attr->getOriginal().Name;
+    Printer << attr->getOriginalFunctionName().Name;
     auto transParamsString = getTransposedParametersClauseString(
         transpose, attr->getParameterIndices(), attr->getParsedParameters());
     if (!transParamsString.empty())
@@ -1570,19 +1570,21 @@ void DifferentiableAttr::print(llvm::raw_ostream &OS, const Decl *D,
 // SWIFT_ENABLE_TENSORFLOW
 DifferentiatingAttr::DifferentiatingAttr(
     bool implicit, SourceLoc atLoc, SourceRange baseRange,
-    DeclNameWithLoc original, ArrayRef<ParsedAutoDiffParameter> params)
+    DeclNameWithLoc originalName, ArrayRef<ParsedAutoDiffParameter> params)
     : DeclAttribute(DAK_Differentiating, atLoc, baseRange, implicit),
-      Original(std::move(original)), NumParsedParameters(params.size()) {
+      OriginalFunctionName(std::move(originalName)),
+      NumParsedParameters(params.size()) {
   std::copy(params.begin(), params.end(),
             getTrailingObjects<ParsedAutoDiffParameter>());
 }
 
 DifferentiatingAttr::DifferentiatingAttr(bool implicit, SourceLoc atLoc,
                                          SourceRange baseRange,
-                                         DeclNameWithLoc original,
+                                         DeclNameWithLoc originalName,
                                          IndexSubset *indices)
     : DeclAttribute(DAK_Differentiating, atLoc, baseRange, implicit),
-      Original(std::move(original)), ParameterIndices(indices) {}
+      OriginalFunctionName(std::move(originalName)), ParameterIndices(indices) {
+}
 
 DifferentiatingAttr *
 DifferentiatingAttr::create(ASTContext &context, bool implicit, SourceLoc atLoc,
@@ -1607,10 +1609,10 @@ DifferentiatingAttr *DifferentiatingAttr::create(ASTContext &context,
 
 TransposingAttr::TransposingAttr(bool implicit, SourceLoc atLoc,
                                  SourceRange baseRange, TypeRepr *baseType,
-                                 DeclNameWithLoc original,
+                                 DeclNameWithLoc originalName,
                                  ArrayRef<ParsedAutoDiffParameter> params)
     : DeclAttribute(DAK_Transposing, atLoc, baseRange, implicit),
-      BaseType(baseType), Original(std::move(original)),
+      BaseType(baseType), OriginalFunctionName(std::move(originalName)),
       NumParsedParameters(params.size()) {
   std::uninitialized_copy(params.begin(), params.end(),
                           getTrailingObjects<ParsedAutoDiffParameter>());
@@ -1618,9 +1620,10 @@ TransposingAttr::TransposingAttr(bool implicit, SourceLoc atLoc,
 
 TransposingAttr::TransposingAttr(bool implicit, SourceLoc atLoc,
                                  SourceRange baseRange, TypeRepr *baseType,
-                                 DeclNameWithLoc original, IndexSubset *indices)
+                                 DeclNameWithLoc originalName,
+                                 IndexSubset *indices)
     : DeclAttribute(DAK_Transposing, atLoc, baseRange, implicit),
-      BaseType(baseType), Original(std::move(original)),
+      BaseType(baseType), OriginalFunctionName(std::move(originalName)),
       ParameterIndices(indices) {}
 
 TransposingAttr *

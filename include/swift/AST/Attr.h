@@ -1679,9 +1679,9 @@ class DifferentiatingAttr final
   friend TrailingObjects;
 
   /// The original function name.
-  DeclNameWithLoc Original;
-  /// The original function, resolved by the type checker.
-  FuncDecl *OriginalFunction = nullptr;
+  DeclNameWithLoc OriginalFunctionName;
+  /// The original function declaration, resolved by the type checker.
+  AbstractFunctionDecl *OriginalFunction = nullptr;
   /// The number of parsed parameters specified in 'wrt:'.
   unsigned NumParsedParameters = 0;
   /// The differentiation parameters' indices, resolved by the type checker.
@@ -1706,9 +1706,15 @@ public:
                                      DeclNameWithLoc original,
                                      IndexSubset *indices);
 
-  DeclNameWithLoc getOriginal() const { return Original; }
-  FuncDecl *getOriginalFunction() const { return OriginalFunction; }
-  void setOriginalFunction(FuncDecl *decl) { OriginalFunction = decl; }
+  DeclNameWithLoc getOriginalFunctionName() const {
+    return OriginalFunctionName;
+  }
+  AbstractFunctionDecl *getOriginalFunction() const {
+    return OriginalFunction;
+  }
+  void setOriginalFunction(AbstractFunctionDecl *decl) {
+    OriginalFunction = decl;
+  }
 
   /// The parsed differentiation parameters, i.e. the list of parameters
   /// specified in 'wrt:'.
@@ -1750,9 +1756,9 @@ class TransposingAttr final
   /// is an instance/static method).
   TypeRepr *BaseType;
   /// The original function name.
-  DeclNameWithLoc Original;
-  /// The original function, resolved by the type checker.
-  FuncDecl *OriginalFunction = nullptr;
+  DeclNameWithLoc OriginalFunctionName;
+  /// The original function declaration, resolved by the type checker.
+  AbstractFunctionDecl *OriginalFunction = nullptr;
   /// The number of parsed parameters specified in 'wrt:'.
   unsigned NumParsedParameters = 0;
   /// The differentiation parameters' indices, resolved by the type checker.
@@ -1779,10 +1785,15 @@ public:
                                  IndexSubset *indices);
 
   TypeRepr *getBaseType() const { return BaseType; }
-  DeclNameWithLoc getOriginal() const { return Original; }
-
-  FuncDecl *getOriginalFunction() const { return OriginalFunction; }
-  void setOriginalFunction(FuncDecl *decl) { OriginalFunction = decl; }
+  DeclNameWithLoc getOriginalFunctionName() const {
+    return OriginalFunctionName;
+  }
+  AbstractFunctionDecl *getOriginalFunction() const {
+    return OriginalFunction;
+  }
+  void setOriginalFunction(AbstractFunctionDecl *decl) {
+    OriginalFunction = decl;
+  }
 
   /// The parsed transposing parameters, i.e. the list of parameters
   /// specified in 'wrt:'.
