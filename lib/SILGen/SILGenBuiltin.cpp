@@ -1038,7 +1038,7 @@ static ManagedValue emitBuiltinAutoDiffApplyDerivativeFunction(
     bool throws, SILGenFunction &SGF, SILLocation loc,
     SubstitutionMap substitutions, ArrayRef<ManagedValue> args, SGFContext C) {
   // FIXME(SR-11853): Support throwing functions.
-  assert(!throws && "Thowing functions are not yet supported");
+  assert(!throws && "Throwing functions are not yet supported");
 
   auto origFnVal = args[0].getValue();
   SmallVector<SILValue, 2> origFnArgVals;
@@ -1143,7 +1143,7 @@ static ManagedValue emitBuiltinAutoDiffApplyTransposeFunction(
     unsigned arity, bool throws, SILGenFunction &SGF, SILLocation loc,
     SubstitutionMap substitutions, ArrayRef<ManagedValue> args, SGFContext C) {
   // FIXME(SR-11853): Support throwing functions.
-  assert(!throws && "Thowing functions are not yet supported");
+  assert(!throws && "Throwing functions are not yet supported");
 
   auto origFnVal = args.front().getValue();
   SmallVector<SILValue, 2> origFnArgVals;
