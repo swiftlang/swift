@@ -35,6 +35,7 @@ ATTRIBUTE_NODES = [
     #                | specialize-attr-spec-list
     #                | implements-attr-arguments
     #                | differentiable-attr-arguments
+    #                | derivative-registration-attr-arguments
     #                | named-attribute-string-argument
     #              )? ')'?
     Node('Attribute', kind='Syntax',
@@ -61,15 +62,12 @@ ATTRIBUTE_NODES = [
                        Child('ObjCName', kind='ObjCSelector'),
                        Child('ImplementsArguments',
                              kind='ImplementsAttributeArguments'),
-                       # SWIFT_ENABLE_TENSORFLOW
                        Child('DifferentiableArguments',
                              kind='DifferentiableAttributeArguments'),
                        # SWIFT_ENABLE_TENSORFLOW
-                       Child('DifferentiatingArguments',
-                             kind='DifferentiatingAttributeArguments'),
-                       # SWIFT_ENABLE_TENSORFLOW
-                       Child('TransposingArguments',
-                             kind='DifferentiatingAttributeArguments'),
+                       Child('DerivativeRegistrationArguments',
+                             kind='DerivativeRegistrationAttributeArguments'),
+                       # SWIFT_ENABLE_TENSORFLOW END
                        Child('NamedAttributeString',
                              kind='NamedAttributeStringArgument'),
                    ], description='''
@@ -198,16 +196,9 @@ ATTRIBUTE_NODES = [
     # The argument of '@differentiable(...)'.
     # differentiable-attr-arguments ->
     #     differentiation-params-clause? ','?
-    #     differentiable-attr-func-specifier? # primal
-    #     differentiable-attr-func-specifier? # adjoint
     #     differentiable-attr-func-specifier? # jvp
     #     differentiable-attr-func-specifier? # vjp
     #     generic-where-clause?
-    # FIXME: There is currently no guarantee that 'MaybePrimal' is in fact
-    # the primal specifier, it could be any specifier. The current syntax
-    # definitions only ensure that there are between 0 and 4 function
-    # specifiers. A more robust definition would enforce that specific function
-    # specifiers appear only once, in order.
     Node('DifferentiableAttributeArguments', kind='Syntax',
          description='''
          The arguments for the `@differentiable` attribute: an optional
@@ -316,38 +307,23 @@ ATTRIBUTE_NODES = [
          ]),
 
     # SWIFT_ENABLE_TENSORFLOW
-    # The argument of '@differentiating(...)'.
-    # differentiating-attr-arguments ->
-    #     func-decl-name ','? differentiable-attr-parameters?
-    Node('DifferentiatingAttributeArguments', kind='Syntax',
+    # The argument of the derivative registration attributes
+    # '@differentiating' and '@transposing'.
+    # derivative-registration-attr-arguments ->
+    #     'of' ':' func-decl-name ','? differentiation-params-clause?
+    Node('DerivativeRegistrationAttributeArguments', kind='Syntax',
          description='''
-         The arguments for the `@differentiating` attribute: the original
-         function and an optional differentiation parameter list.
+         The arguments for the `@differentiating` and `@transposing` attributes:
+         the original declaration name and an optional differentiation parameter
+         list.
          ''',
          children=[
              Child('Original', kind='FunctionDeclName',
-                   description='The referenced original function.'),
+                   description='The referenced original declaration.'),
              Child('Comma', kind='CommaToken', is_optional=True),
              Child('DiffParams', kind='DifferentiationParamsClause',
                    is_optional=True),
          ]),
-
-     # SWIFT_ENABLE_TENSORFLOW
-     # The argument of '@transposing(...)'.
-     # transposing-attr-arguments ->
-     #     func-decl-name ','? differentiable-attr-parameters?
-     Node('TransposingAttributeArguments', kind='Syntax',
-          description='''
-            The arguments for the `@transposing` attribute: the original
-            function and an optional differentiation parameter list.
-            ''',
-          children=[
-                    Child('Original', kind='FunctionDeclName',
-                          description='The referenced original function.'),
-                    Child('Comma', kind='CommaToken', is_optional=True),
-                    Child('DiffParams', kind='DifferentiationParamsClause',
-                          is_optional=True),
-                    ]),
 
     # objc-selector-piece -> identifier? ':'?
     Node('ObjCSelectorPiece', kind='Syntax',

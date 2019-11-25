@@ -3791,11 +3791,10 @@ void AttributeChecker::visitDifferentiatingAttr(DifferentiatingAttr *attr) {
   // If the original function does not have a `@differentiable` attribute with
   // the same differentiation parameters, create one.
   if (!da) {
-    da = DifferentiableAttr::create(originalFn, /*implicit*/ true, attr->AtLoc,
-                                    attr->getRange(), attr->isLinear(),
-                                    checkedWrtParamIndices, /*jvp*/ None,
-                                    /*vjp*/ None,
-                                    derivative->getGenericSignature());
+    da = DifferentiableAttr::create(
+        originalFn, /*implicit*/ true, attr->AtLoc, attr->getRange(),
+        /*linear*/ false, checkedWrtParamIndices, /*jvp*/ None,
+        /*vjp*/ None, derivative->getGenericSignature());
     switch (kind) {
     case AutoDiffDerivativeFunctionKind::JVP:
       da->setJVPFunction(derivative);
