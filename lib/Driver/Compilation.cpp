@@ -460,10 +460,11 @@ namespace driver {
           // other recompilations. It is possible that the current code marks
           // things that do not need to be marked. Unecessary compilation would
           // result if that were the case.
-          bool wasCascading = isMarkedInDepGraph(FinishedCmd, /*forRanges=*/ false);
+          bool wasCascading =
+              isMarkedInDepGraph(FinishedCmd, /*forRanges=*/false);
 
           switch (loadDepGraphFromPath(FinishedCmd, DependenciesFile,
-                                       Comp.getDiags(), /*forRanges=*/ false)) {
+                                       Comp.getDiags(), /*forRanges=*/false)) {
           case DependencyGraphImpl::LoadResult::HadError:
             if (ReturnCode == EXIT_SUCCESS) {
               dependencyLoadFailed(DependenciesFile);
@@ -497,7 +498,7 @@ namespace driver {
             // Any incremental task that shows up here has already been marked;
             // we didn't need to wait for it to finish to start downstream
             // tasks.
-            assert(isMarkedInDepGraph(FinishedCmd, /*forRanges=*/ false));
+            assert(isMarkedInDepGraph(FinishedCmd, /*forRanges=*/false));
             break;
           case Job::Condition::RunWithoutCascading:
             // If this file changed, it might have been a non-cascading change
@@ -626,28 +627,33 @@ namespace driver {
 
       CommandSet DependentsForDeps, DependentsForRanges;
       if (Comp.IncrementalComparator) {
-        DependentsForDeps = subsequentJobsNeededForDeps(FinishedCmd, ReturnCode);
-        DependentsForRanges = subsequentJobsNeededForRanges(FinishedCmd, ReturnCode);
-        Comp.updateIncrementalComparison(DependentsForDeps, DependentsForRanges, {});
-      }
-      else if (Comp.getUseSourceRangeDependencies())
-        DependentsForRanges = subsequentJobsNeededForRanges(FinishedCmd, ReturnCode);
+        DependentsForDeps =
+            subsequentJobsNeededForDeps(FinishedCmd, ReturnCode);
+        DependentsForRanges =
+            subsequentJobsNeededForRanges(FinishedCmd, ReturnCode);
+        Comp.updateIncrementalComparison(DependentsForDeps, DependentsForRanges,
+                                         {});
+      } else if (Comp.getUseSourceRangeDependencies())
+        DependentsForRanges =
+            subsequentJobsNeededForRanges(FinishedCmd, ReturnCode);
       else
-      DependentsForDeps = subsequentJobsNeededForDeps(FinishedCmd, ReturnCode);
+        DependentsForDeps =
+            subsequentJobsNeededForDeps(FinishedCmd, ReturnCode);
 
-      if (Comp.getShowIncrementalBuildDecisions() && Comp.IncrementalComparator && Comp.getUseSourceRangeDependencies() &&
+      if (Comp.getShowIncrementalBuildDecisions() &&
+          Comp.IncrementalComparator && Comp.getUseSourceRangeDependencies() &&
           (!DependentsForDeps.empty() || !DependentsForRanges.empty())) {
-        llvm::outs() << "After completion of " << LogJob(FinishedCmd)
-        << ": \n";
+        llvm::outs() << "After completion of " << LogJob(FinishedCmd) << ": \n";
         for (auto const *Cmd : DependentsForDeps)
           llvm::outs() << "- Dependencies would now schedule: " << LogJob(Cmd)
-          << "\n";
+                       << "\n";
         for (auto const *Cmd : DependentsForRanges)
           llvm::outs() << "- Source ranges will now schedule: " << LogJob(Cmd)
-          << "\n";
+                       << "\n";
         if (DependentsForDeps.size() > 1 || DependentsForRanges.size() > 1)
           llvm::outs() << "For an additional " << DependentsForDeps.size()
-          << " (deps) vs " << DependentsForRanges.size() << " (ranges)\n";
+                       << " (deps) vs " << DependentsForRanges.size()
+                       << " (ranges)\n";
       }
 
       if (ReturnCode != EXIT_SUCCESS)
@@ -657,7 +663,9 @@ namespace driver {
       // might have been blocked.
       markFinished(FinishedCmd);
 
-      const CommandSet & DependentsInEffect = Comp.getUseSourceRangeDependencies() ? DependentsForRanges : DependentsForDeps;
+      const CommandSet &DependentsInEffect =
+          Comp.getUseSourceRangeDependencies() ? DependentsForRanges
+                                               : DependentsForDeps;
       for (const Job *Cmd : DependentsInEffect) {
         DeferredCommands.erase(Cmd);
         noteBuilding(Cmd, true, Comp.getUseSourceRangeDependencies(),
@@ -741,22 +749,27 @@ namespace driver {
     }
 
     // Returns a pair of jobs needed when using ranges.
-    CommandSet
-    subsequentJobsNeededForRanges(const Job *FinishedCmd,
-                                        const int ReturnCode) {
+    CommandSet subsequentJobsNeededForRanges(const Job *FinishedCmd,
+                                             const int ReturnCode) {
 
       if (!Comp.getIncrementalBuildEnabled())
         return {};
       // FIXME: crude, could just use dependencies to schedule only those jobs
       // depending on the added tops
-      const size_t topsBefore = countTopLevelProvides(FinishedCmd, /*forRanges=*/true);
+      const size_t topsBefore =
+          countTopLevelProvides(FinishedCmd, /*forRanges=*/true);
 
       StringRef DependenciesFile =
-               FinishedCmd->getOutput().getAdditionalOutputForType(file_types::TY_SwiftDeps);
-      if (DependenciesFile.empty() || loadDepGraphFromPath(FinishedCmd, DependenciesFile, Comp.getDiags(), /*forRanges=*/true) == DependencyGraphImpl::LoadResult::HadError)
+          FinishedCmd->getOutput().getAdditionalOutputForType(
+              file_types::TY_SwiftDeps);
+      if (DependenciesFile.empty() ||
+          loadDepGraphFromPath(FinishedCmd, DependenciesFile, Comp.getDiags(),
+                               /*forRanges=*/true) ==
+              DependencyGraphImpl::LoadResult::HadError)
         return DeferredCommands;
 
-      const size_t topsAfter = countTopLevelProvides(FinishedCmd, /*forRanges=*/true);
+      const size_t topsAfter =
+          countTopLevelProvides(FinishedCmd, /*forRanges=*/true);
       // TODO: see if new type was added outside of a struct (etc) body
       const bool userAddedTopLevel = topsAfter > topsBefore;
 
@@ -767,7 +780,7 @@ namespace driver {
       return userAddedTopLevel ? DeferredCommands : CommandSet();
     }
 
-  TaskFinishedResponse taskSignalled(ProcessId Pid, StringRef ErrorMsg,
+    TaskFinishedResponse taskSignalled(ProcessId Pid, StringRef ErrorMsg,
                                        StringRef Output, StringRef Errors,
                                        void *Context, Optional<int> Signal,
                                        TaskProcessInformation ProcInfo) {
@@ -820,23 +833,19 @@ namespace driver {
 
   public:
     PerformJobsState(Compilation &Comp, std::unique_ptr<TaskQueue> &&TaskQueue)
-      : Comp(Comp),
-        ExpDepGraph(
-                    Comp.getVerifyExperimentalDependencyGraphAfterEveryImport(),
-                    Comp.getEmitExperimentalDependencyDotFileAfterEveryImport(),
-                    Comp.getTraceDependencies(),
-                    Comp.getStatsReporter()
-                    ),
-    ExpDepGraphForRanges(
-                Comp.getVerifyExperimentalDependencyGraphAfterEveryImport(),
-                Comp.getEmitExperimentalDependencyDotFileAfterEveryImport(),
-                Comp.getTraceDependencies(),
-                Comp.getStatsReporter()
-                ),
-    ActualIncrementalTracer(Comp.getStatsReporter()),
-    TQ(std::move(TaskQueue))
-{
-      if (!Comp.getEnableExperimentalDependencies() && Comp.getTraceDependencies())
+        : Comp(Comp),
+          ExpDepGraph(
+              Comp.getVerifyExperimentalDependencyGraphAfterEveryImport(),
+              Comp.getEmitExperimentalDependencyDotFileAfterEveryImport(),
+              Comp.getTraceDependencies(), Comp.getStatsReporter()),
+          ExpDepGraphForRanges(
+              Comp.getVerifyExperimentalDependencyGraphAfterEveryImport(),
+              Comp.getEmitExperimentalDependencyDotFileAfterEveryImport(),
+              Comp.getTraceDependencies(), Comp.getStatsReporter()),
+          ActualIncrementalTracer(Comp.getStatsReporter()),
+          TQ(std::move(TaskQueue)) {
+      if (!Comp.getEnableExperimentalDependencies() &&
+          Comp.getTraceDependencies())
         IncrementalTracer = &ActualIncrementalTracer;
     }
 
@@ -986,13 +995,14 @@ namespace driver {
         if (pri.empty())
           continue;
         if (allSourceRangeInfo.count(pri) && !loadSwiftDepsForRanges(Cmd)) {
-          noteBuilding(
-                       Cmd, false, true,
-                       "already have swiftdeps, source-range, and compiled-source files.");
+          noteBuilding(Cmd, false, true,
+                       "already have swiftdeps, source-range, and "
+                       "compiled-source files.");
           continue;
         }
         noteBuilding(Cmd, true, true,
-                     "to create swiftdeps, source-range, and compiled-source files for the "
+                     "to create swiftdeps, source-range, and compiled-source "
+                     "files for the "
                      "next time when falling back from source-ranges");
         jobsLackingSupplementaryOutputs.insert(Cmd);
       }
@@ -1007,13 +1017,13 @@ namespace driver {
     }
 
     /// Return hadError
-    bool loadSwiftDepsForRanges(const Job*const Cmd) {
+    bool loadSwiftDepsForRanges(const Job *const Cmd) {
       const StringRef DependenciesFile =
-      Cmd->getOutput().getAdditionalOutputForType(file_types::TY_SwiftDeps);
+          Cmd->getOutput().getAdditionalOutputForType(file_types::TY_SwiftDeps);
       if (DependenciesFile.empty())
         return true;
-      const auto loadResult =
-      loadDepGraphFromPath(Cmd, DependenciesFile, Comp.getDiags(), /*forRanges=*/true);
+      const auto loadResult = loadDepGraphFromPath(
+          Cmd, DependenciesFile, Comp.getDiags(), /*forRanges=*/true);
       return loadResult == DependencyGraphImpl::LoadResult::HadError;
     }
 
@@ -1054,7 +1064,8 @@ namespace driver {
     isCompileJobInitiallyNeededForDependencyBasedIncrementalCompilation(
         const Job *Cmd) {
 
-      auto CondAndHasDepsIfNoError = loadDependenciesAndComputeCondition(Cmd, /*forRanges=*/ false);
+      auto CondAndHasDepsIfNoError =
+          loadDependenciesAndComputeCondition(Cmd, /*forRanges=*/false);
       if (!CondAndHasDepsIfNoError)
         return None; // swiftdeps read error, abandon dependencies
 
@@ -1066,7 +1077,8 @@ namespace driver {
       const bool shouldSched = shouldScheduleCompileJobAccordingToCondition(
           Cmd, Cond, HasDependenciesFileName, /*forRanges=*/false);
       if (Comp.getEnableExperimentalDependencies())
-        assert(getExpDepGraph(/*forRanges=*/ false).emitDotFileAndVerify(Comp.getDiags()));
+        assert(getExpDepGraph(/*forRanges=*/false)
+                   .emitDotFileAndVerify(Comp.getDiags()));
       return shouldSched;
     }
 
@@ -1089,8 +1101,8 @@ namespace driver {
         return std::make_pair(Job::Condition::NewlyAdded, true);
       }
 
-      const auto loadResult =
-          loadDepGraphFromPath(Cmd, DependenciesFile, Comp.getDiags(), forRanges);
+      const auto loadResult = loadDepGraphFromPath(Cmd, DependenciesFile,
+                                                   Comp.getDiags(), forRanges);
       switch (loadResult) {
       case DependencyGraphImpl::LoadResult::HadError:
         dependencyLoadFailed(DependenciesFile, /*Warn=*/true);
@@ -1144,12 +1156,14 @@ namespace driver {
       size_t firstSize = AdditionalOutOfDateCommands.size();
 
       // Check all cross-module dependencies as well.
-      forEachOutOfDateExternalDependency( /*forRanges=*/ false, [&](StringRef dependency) {
-        // If the dependency has been modified since the oldest built file,
-        // or if we can't stat it for some reason (perhaps it's been
-        // deleted?), trigger rebuilds through the dependency graph.
-        markExternalInDepGraph(AdditionalOutOfDateCommands, dependency, /*forRanges=*/ false);
-      });
+      forEachOutOfDateExternalDependency(
+          /*forRanges=*/false, [&](StringRef dependency) {
+            // If the dependency has been modified since the oldest built file,
+            // or if we can't stat it for some reason (perhaps it's been
+            // deleted?), trigger rebuilds through the dependency graph.
+            markExternalInDepGraph(AdditionalOutOfDateCommands, dependency,
+                                   /*forRanges=*/false);
+          });
 
       for (auto *externalCmd :
            llvm::makeArrayRef(AdditionalOutOfDateCommands).slice(firstSize)) {
@@ -1162,22 +1176,22 @@ namespace driver {
     SmallVector<const Job *, 16>
     externallyDependentJobsForRangeBasedIncrementalCompilation() {
       SmallVector<const Job *, 16> results;
-      forEachOutOfDateExternalDependency(/*forRanges=*/ true,
-      [&](StringRef externalSwiftDeps) {
-        forEachUnmarkedJobDirectlyDependentOnExternalSwiftdeps(
-            externalSwiftDeps, /*forRanges=*/ true,
-            [&](const void *node) {
-              // Sadly, the non-experimental dependency graph is type-unsafe
-              const Job *externalCmd = reinterpret_cast<const Job *>(node);
-              noteBuilding(externalCmd, true, true,
-                           "because of external dependencies");
-              results.push_back(externalCmd);
-            });
-      });
+      forEachOutOfDateExternalDependency(
+          /*forRanges=*/true, [&](StringRef externalSwiftDeps) {
+            forEachUnmarkedJobDirectlyDependentOnExternalSwiftdeps(
+                externalSwiftDeps, /*forRanges=*/true, [&](const void *node) {
+                  // Sadly, the non-experimental dependency graph is type-unsafe
+                  const Job *externalCmd = reinterpret_cast<const Job *>(node);
+                  noteBuilding(externalCmd, true, true,
+                               "because of external dependencies");
+                  results.push_back(externalCmd);
+                });
+          });
       return results;
     }
 
-    void forEachOutOfDateExternalDependency(const bool forRanges,
+    void forEachOutOfDateExternalDependency(
+        const bool forRanges,
         function_ref<void(StringRef)> consumeExternalSwiftDeps) {
       for (StringRef dependency : getExternalDependencies(forRanges)) {
         // If the dependency has been modified since the oldest built file,
@@ -1196,8 +1210,8 @@ namespace driver {
       // files that haven't changed, so that they'll get built in parallel if
       // possible and after the first set of files if it's not.
       for (auto *Cmd : InitialCascadingCommands) {
-        markTransitiveInDepGraph(AdditionalOutOfDateCommands, Cmd, /*forRanges=*/ false,
-                                 IncrementalTracer);
+        markTransitiveInDepGraph(AdditionalOutOfDateCommands, Cmd,
+                                 /*forRanges=*/false, IncrementalTracer);
       }
       for (auto *transitiveCmd : AdditionalOutOfDateCommands)
         noteBuilding(transitiveCmd, true, false, "because of the initial set");
@@ -1553,7 +1567,8 @@ namespace driver {
 
           // Be conservative, in case we use ranges this time but not next.
           bool isCascading = true;
-          if (Comp.getIncrementalBuildEnabled() && !Comp.getUseSourceRangeDependencies())
+          if (Comp.getIncrementalBuildEnabled() &&
+              !Comp.getUseSourceRangeDependencies())
             isCascading = isMarkedInDepGraph(Cmd, /*forRanges=*/false);
           UnfinishedCommands.insert({Cmd, isCascading});
         }
@@ -1619,15 +1634,16 @@ namespace driver {
 
     // MARK: dependency graph interface
 
-      size_t countTopLevelProvides(const Job *Cmd, const bool forRanges) {
-        return Comp.getEnableExperimentalDependencies()
-                   ? getExpDepGraph(forRanges).countTopLevelProvides(Cmd)
-                   : getDepGraph(forRanges).countTopLevelProvides(Cmd);
-      }
+    size_t countTopLevelProvides(const Job *Cmd, const bool forRanges) {
+      return Comp.getEnableExperimentalDependencies()
+                 ? getExpDepGraph(forRanges).countTopLevelProvides(Cmd)
+                 : getDepGraph(forRanges).countTopLevelProvides(Cmd);
+    }
 
     bool isMarkedInDepGraph(const Job *const Cmd, const bool forRanges) {
-      return Comp.getEnableExperimentalDependencies() ? getExpDepGraph(forRanges).isMarked(Cmd)
-                         : getDepGraph(forRanges).isMarked(Cmd);
+      return Comp.getEnableExperimentalDependencies()
+                 ? getExpDepGraph(forRanges).isMarked(Cmd)
+                 : getDepGraph(forRanges).isMarked(Cmd);
     }
 
     std::vector<StringRef> getExternalDependencies(const bool forRanges) const {
@@ -1639,7 +1655,8 @@ namespace driver {
 
     template <unsigned N>
     void markExternalInDepGraph(SmallVector<const driver::Job *, N> &uses,
-                                StringRef externalDependency, const bool forRanges) {
+                                StringRef externalDependency,
+                                const bool forRanges) {
       if (Comp.getEnableExperimentalDependencies())
         getExpDepGraph(forRanges).markExternal(uses, externalDependency);
       else
@@ -1647,15 +1664,18 @@ namespace driver {
     }
 
     bool markIntransitiveInDepGraph(const Job *Cmd, const bool forRanges) {
-      return Comp.getEnableExperimentalDependencies() ? getExpDepGraph(forRanges).markIntransitive(Cmd)
-                         : getDepGraph(forRanges).markIntransitive(Cmd);
+      return Comp.getEnableExperimentalDependencies()
+                 ? getExpDepGraph(forRanges).markIntransitive(Cmd)
+                 : getDepGraph(forRanges).markIntransitive(Cmd);
     }
 
     DependencyGraph::LoadResult loadDepGraphFromPath(const Job *Cmd,
                                                      StringRef path,
-                                                     DiagnosticEngine &diags, const bool forRanges) {
-      return Comp.getEnableExperimentalDependencies() ? getExpDepGraph(forRanges).loadFromPath(Cmd, path, diags)
-                         : getDepGraph(forRanges).loadFromPath(Cmd, path, diags);
+                                                     DiagnosticEngine &diags,
+                                                     const bool forRanges) {
+      return Comp.getEnableExperimentalDependencies()
+                 ? getExpDepGraph(forRanges).loadFromPath(Cmd, path, diags)
+                 : getDepGraph(forRanges).loadFromPath(Cmd, path, diags);
     }
 
     template <unsigned N>
@@ -1677,28 +1697,33 @@ namespace driver {
     }
 
     void forEachUnmarkedJobDirectlyDependentOnExternalSwiftdeps(
-        StringRef externalDependency, const bool forRanges, function_ref<void(const void *)> fn) {
+        StringRef externalDependency, const bool forRanges,
+        function_ref<void(const void *)> fn) {
       if (Comp.getEnableExperimentalDependencies())
-        getExpDepGraph(forRanges).forEachUnmarkedJobDirectlyDependentOnExternalSwiftdeps(
-            externalDependency, fn);
+        getExpDepGraph(forRanges)
+            .forEachUnmarkedJobDirectlyDependentOnExternalSwiftdeps(
+                externalDependency, fn);
       else
-        getDepGraph(forRanges).forEachUnmarkedJobDirectlyDependentOnExternalSwiftdeps(
-            externalDependency, fn);
+        getDepGraph(forRanges)
+            .forEachUnmarkedJobDirectlyDependentOnExternalSwiftdeps(
+                externalDependency, fn);
     }
 
-    experimental_dependencies::ModuleDepGraph &getExpDepGraph(const bool forRanges) {
+    experimental_dependencies::ModuleDepGraph &
+    getExpDepGraph(const bool forRanges) {
       return forRanges ? ExpDepGraphForRanges : ExpDepGraph;
     }
     DependencyGraph &getDepGraph(const bool forRanges) {
       return forRanges ? StandardDepGraphForRanges : StandardDepGraph;
     }
-       const experimental_dependencies::ModuleDepGraph &getExpDepGraph(const bool forRanges) const {
-         return forRanges ? ExpDepGraphForRanges : ExpDepGraph;
-       }
-       const DependencyGraph &getDepGraph(const bool forRanges) const {
-         return forRanges ? StandardDepGraphForRanges : StandardDepGraph;
-       }
-    };
+    const experimental_dependencies::ModuleDepGraph &
+    getExpDepGraph(const bool forRanges) const {
+      return forRanges ? ExpDepGraphForRanges : ExpDepGraph;
+    }
+    const DependencyGraph &getDepGraph(const bool forRanges) const {
+      return forRanges ? StandardDepGraphForRanges : StandardDepGraph;
+    }
+  };
 } // namespace driver
 } // namespace swift
 
