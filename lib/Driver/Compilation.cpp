@@ -235,7 +235,17 @@ namespace driver {
     SmallVector<const Job *, 16> InitialCascadingCommands;
 
   public:
-    /// Dependency graph for deciding which jobs are dirty (need running)
+    /// Why are we keeping four dependency graphs?
+    /// One dimension for standard vs experimental (fine-grained) dependencies.
+    /// The other dimension because we want to compare what dependency-based
+    /// incrementalism would do vs range-based incrementalism. Unfortuneatly,
+    /// the dependency graph includes marks that record if a node (Job) has ever
+    /// been traversed (i.e. marked for cascading). So, in order to find
+    /// externally-dependent jobs for range based incrementality, the
+    /// range-based computation needs its own graph when both strategies are
+    /// used for comparison purposes. Sigh.
+    ///
+    /// Dependency graphs for deciding which jobs are dirty (need running)
     /// or clean (can be skipped).
     using DependencyGraph = DependencyGraph<const Job *>;
     DependencyGraph StandardDepGraph;
