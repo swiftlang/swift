@@ -535,9 +535,12 @@ extension Struct where T: Differentiable & AdditiveArithmetic {
 struct StoredProperty: Differentiable {
   var stored: Float
 
-  // expected-error @+1 {{could not find function 'stored' with expected type '(Float) -> () -> StoredProperty'}}
+  // Note: `@transposing` support for instance members is currently too limited
+  // to properly register a transpose for a non-`Self`-typed member.
+
+  // expected-error @+1 {{could not find function 'stored' with expected type '(StoredProperty) -> () -> StoredProperty'}}
   @transposing(stored, wrt: self)
-  func vjpStored() -> Float {
+  func vjpStored() -> Self {
     fatalError()
   }
 }
