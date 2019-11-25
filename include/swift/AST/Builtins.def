@@ -448,6 +448,12 @@ BUILTIN_SIL_OPERATION(ProjectTailElems, "projectTailElems", Special)
 /// autodiffApply
 BUILTIN_SIL_OPERATION(AutoDiffApply, "autodiffApply", Special)
 
+/// differentiableFunction
+BUILTIN_SIL_OPERATION(DifferentiableFunction, "differentiableFunction", Special)
+
+/// linearFunction
+BUILTIN_SIL_OPERATION(LinearFunction, "linearFunction", Special)
+
 #undef BUILTIN_SIL_OPERATION
 
 // BUILTIN_RUNTIME_CALL - A call into a runtime function.

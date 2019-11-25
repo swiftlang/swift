@@ -209,18 +209,22 @@ void autodiff::getSubsetParameterTypes(IndexSubset *subset,
 bool autodiff::getBuiltinAutoDiffApplyConfig(
     StringRef operationName, AutoDiffDerivativeFunctionKind &kind,
     unsigned &arity, bool &rethrows) {
-  if (!operationName.startswith("autodiffApply_"))
+  constexpr char prefix[] = "autodiffApply";
+  if (!operationName.startswith(prefix))
     return false;
-  operationName = operationName.drop_front(strlen("autodiffApply_"));
+  operationName = operationName.drop_front(sizeof(prefix) - 1);
   // Parse 'jvp' or 'vjp'.
-  if (operationName.startswith("jvp"))
+  constexpr char jvpPrefix[] = "_jvp";
+  constexpr char vjpPrefix[] = "_vjp";
+  if (operationName.startswith(jvpPrefix))
     kind = AutoDiffDerivativeFunctionKind::JVP;
-  else if (operationName.startswith("vjp"))
+  else if (operationName.startswith(vjpPrefix))
     kind = AutoDiffDerivativeFunctionKind::VJP;
-  operationName = operationName.drop_front(3);
+  operationName = operationName.drop_front(sizeof(jvpPrefix) - 1);
   // Parse '_arity'.
-  if (operationName.startswith("_arity")) {
-    operationName = operationName.drop_front(strlen("_arity"));
+  constexpr char arityPrefix[] = "_arity";
+  if (operationName.startswith(arityPrefix)) {
+    operationName = operationName.drop_front(sizeof(arityPrefix) - 1);
     auto arityStr = operationName.take_while(llvm::isDigit);
     operationName = operationName.drop_front(arityStr.size());
     auto converted = llvm::to_integer(arityStr, arity);
@@ -230,11 +234,45 @@ bool autodiff::getBuiltinAutoDiffApplyConfig(
     arity = 1;
   }
   // Parse '_rethrows'.
-  if (operationName.startswith("_rethrows")) {
-    operationName = operationName.drop_front(strlen("_rethrows"));
+  constexpr char rethrowsPrefix[] = "_rethrows";
+  if (operationName.startswith(rethrowsPrefix)) {
+    operationName = operationName.drop_front(sizeof(rethrowsPrefix) - 1);
     rethrows = true;
   } else {
     rethrows = false;
+  }
+  return operationName.empty();
+}
+
+bool autodiff::getBuiltinDifferentiableOrLinearFunctionConfig(
+    StringRef operationName, unsigned &arity, bool &throws) {
+  constexpr char differentiablePrefix[] = "differentiableFunction";
+  constexpr char linearPrefix[] = "linearFunction";
+  if (operationName.startswith(differentiablePrefix))
+    operationName = operationName.drop_front(sizeof(differentiablePrefix) - 1);
+  else if (operationName.startswith(linearPrefix))
+    operationName = operationName.drop_front(sizeof(linearPrefix) - 1);
+  else
+    return false;
+  // Parse '_arity'.
+  constexpr char arityPrefix[] = "_arity";
+  if (operationName.startswith(arityPrefix)) {
+    operationName = operationName.drop_front(sizeof(arityPrefix) - 1);
+    auto arityStr = operationName.take_while(llvm::isDigit);
+    operationName = operationName.drop_front(arityStr.size());
+    auto converted = llvm::to_integer(arityStr, arity);
+    assert(converted); (void)converted;
+    assert(arity > 0);
+  } else {
+    arity = 1;
+  }
+  // Parse '_throws'.
+  constexpr char throwsPrefix[] = "_throws";
+  if (operationName.startswith(throwsPrefix)) {
+    operationName = operationName.drop_front(sizeof(throwsPrefix) - 1);
+    throws = true;
+  } else {
+    throws = false;
   }
   return operationName.empty();
 }
