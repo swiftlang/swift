@@ -39,6 +39,7 @@ static const StringRef SupportedConditionalCompilationOSs[] = {
   "PS4",
   "Cygwin",
   "Haiku",
+  "WASI",
 };
 
 static const StringRef SupportedConditionalCompilationArches[] = {
@@ -48,7 +49,8 @@ static const StringRef SupportedConditionalCompilationArches[] = {
   "x86_64",
   "powerpc64",
   "powerpc64le",
-  "s390x"
+  "s390x",
+  "wasm32",
 };
 
 static const StringRef SupportedConditionalCompilationEndianness[] = {
@@ -246,6 +248,9 @@ std::pair<bool, bool> LangOptions::setTarget(llvm::Triple triple) {
   case llvm::Triple::Haiku:
     addPlatformConditionValue(PlatformConditionKind::OS, "Haiku");
     break;
+  case llvm::Triple::WASI:
+    addPlatformConditionValue(PlatformConditionKind::OS, "WASI");
+    break;
   default:
     UnsupportedOS = true;
     break;
@@ -277,6 +282,9 @@ std::pair<bool, bool> LangOptions::setTarget(llvm::Triple triple) {
   case llvm::Triple::ArchType::systemz:
     addPlatformConditionValue(PlatformConditionKind::Arch, "s390x");
     break;
+  case llvm::Triple::ArchType::wasm32:
+    addPlatformConditionValue(PlatformConditionKind::Arch, "wasm32");
+    break;
   default:
     UnsupportedArch = true;
   }
@@ -291,6 +299,7 @@ std::pair<bool, bool> LangOptions::setTarget(llvm::Triple triple) {
   case llvm::Triple::ArchType::thumb:
   case llvm::Triple::ArchType::aarch64:
   case llvm::Triple::ArchType::ppc64le:
+  case llvm::Triple::ArchType::wasm32:
   case llvm::Triple::ArchType::x86:
   case llvm::Triple::ArchType::x86_64:
     addPlatformConditionValue(PlatformConditionKind::Endianness, "little");
