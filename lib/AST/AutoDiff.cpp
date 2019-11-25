@@ -206,21 +206,12 @@ void autodiff::getSubsetParameterTypes(IndexSubset *subset,
   }
 }
 
-bool autodiff::getBuiltinAutoDiffApplyConfig(
-    StringRef operationName, AutoDiffDerivativeFunctionKind &kind,
-    unsigned &arity, bool &rethrows) {
-  constexpr char prefix[] = "autodiffApply";
-  if (!operationName.startswith(prefix))
-    return false;
-  operationName = operationName.drop_front(sizeof(prefix) - 1);
-  // Parse 'jvp' or 'vjp'.
-  constexpr char jvpPrefix[] = "_jvp";
-  constexpr char vjpPrefix[] = "_vjp";
-  if (operationName.startswith(jvpPrefix))
-    kind = AutoDiffDerivativeFunctionKind::JVP;
-  else if (operationName.startswith(vjpPrefix))
-    kind = AutoDiffDerivativeFunctionKind::VJP;
-  operationName = operationName.drop_front(sizeof(jvpPrefix) - 1);
+// Given the rest of a `Builtin.applyDerivative_{jvp|vjp}` or
+// `Builtin.applyTranspose` operation name, attempts to parse the arity and
+// throwing-ness from the operation name. Modifies the operation name argument
+// in place as substrings get dropped.
+static void parseBuiltinApplyCommonConfig(
+    StringRef &operationName, unsigned &arity, bool &rethrows) {
   // Parse '_arity'.
   constexpr char arityPrefix[] = "_arity";
   if (operationName.startswith(arityPrefix)) {
@@ -241,6 +232,34 @@ bool autodiff::getBuiltinAutoDiffApplyConfig(
   } else {
     rethrows = false;
   }
+}
+
+bool autodiff::getBuiltinApplyDerivativeConfig(
+    StringRef operationName, AutoDiffDerivativeFunctionKind &kind,
+    unsigned &arity, bool &rethrows) {
+  constexpr char prefix[] = "applyDerivative";
+  if (!operationName.startswith(prefix))
+    return false;
+  operationName = operationName.drop_front(sizeof(prefix) - 1);
+  // Parse 'jvp' or 'vjp'.
+  constexpr char jvpPrefix[] = "_jvp";
+  constexpr char vjpPrefix[] = "_vjp";
+  if (operationName.startswith(jvpPrefix))
+    kind = AutoDiffDerivativeFunctionKind::JVP;
+  else if (operationName.startswith(vjpPrefix))
+    kind = AutoDiffDerivativeFunctionKind::VJP;
+  operationName = operationName.drop_front(sizeof(jvpPrefix) - 1);
+  parseBuiltinApplyCommonConfig(operationName, arity, rethrows);
+  return operationName.empty();
+}
+
+bool autodiff::getBuiltinApplyTransposeConfig(
+    StringRef operationName, unsigned &arity, bool &rethrows) {
+  constexpr char prefix[] = "applyTranspose";
+  if (!operationName.startswith(prefix))
+    return false;
+  operationName = operationName.drop_front(sizeof(prefix) - 1);
+  parseBuiltinApplyCommonConfig(operationName, arity, rethrows);
   return operationName.empty();
 }
 

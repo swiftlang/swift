@@ -1000,23 +1000,23 @@ static ValueDecl *getAutoDiffApplyDerivativeFunction(
   // Create type parameters and add conformance constraints.
   auto fnResultGen = makeGenericParam(arity);
   builder.addConformanceRequirement(fnResultGen, diffableProto);
-  SmallVector<decltype(fnResultGen), 2> fnArgGens;
+  SmallVector<decltype(fnResultGen), 2> fnParamGens;
   for (auto i : range(arity)) {
     auto T = makeGenericParam(i);
     builder.addConformanceRequirement(T, diffableProto);
-    fnArgGens.push_back(T);
+    fnParamGens.push_back(T);
   }
-  // Generator for the first argument, i.e. the @differentiable function.
+  // Generator for the first argument, i.e. the `@differentiable` function.
   BuiltinFunctionBuilder::LambdaGenerator firstArgGen {
     // Generator for the function type at the argument position, i.e. the
     // function being differentiated.
-    [=, &fnArgGens](BuiltinFunctionBuilder &builder) -> Type {
+    [=, &fnParamGens](BuiltinFunctionBuilder &builder) -> Type {
       FunctionType::ExtInfo ext;
       auto extInfo = FunctionType::ExtInfo()
           .withDifferentiabilityKind(DifferentiabilityKind::Normal)
           .withNoEscape().withThrows(rethrows);
       SmallVector<FunctionType::Param, 2> params;
-      for (auto &paramGen : fnArgGens)
+      for (auto &paramGen : fnParamGens)
         params.push_back(FunctionType::Param(paramGen.build(builder)));
       auto innerFunction = FunctionType::get(params,
                                              fnResultGen.build(builder));
@@ -1024,27 +1024,87 @@ static ValueDecl *getAutoDiffApplyDerivativeFunction(
     }
   };
   // Eagerly build the type of the first arg, then use that to compute the type
-  // of the derivative function type.
-  auto *origFnTy =
+  // of the result.
+  auto *diffFnType =
       firstArgGen.build(builder)->castTo<AnyFunctionType>();
-  origFnTy = origFnTy->getWithoutDifferentiability()->withExtInfo(
-      origFnTy->getExtInfo().withNoEscape(false));
+  diffFnType = diffFnType->getWithoutDifferentiability()->withExtInfo(
+      diffFnType->getExtInfo().withNoEscape(false));
   auto *paramIndices = IndexSubset::get(
-      Context, SmallBitVector(origFnTy->getNumParams(), true));
+      Context, SmallBitVector(diffFnType->getNumParams(), true));
   // Generator for the resultant function type, i.e. the AD derivative function.
   BuiltinFunctionBuilder::LambdaGenerator resultGen{
       [=, &Context](BuiltinFunctionBuilder &builder) -> Type {
-        auto derivativeFnTy = origFnTy->getAutoDiffDerivativeFunctionType(
+        auto derivativeFnTy = diffFnType->getAutoDiffDerivativeFunctionType(
             paramIndices, /*resultIndex*/ 0, kind,
             LookUpConformanceInModule(Context.TheBuiltinModule));
         return derivativeFnTy->getResult();
       }};
   builder.addParameter(firstArgGen);
-  for (auto argGen : fnArgGens)
+  for (auto argGen : fnParamGens)
     builder.addParameter(argGen);
   if (rethrows)
     builder.setRethrows();
   builder.setResult(resultGen);
+  return builder.build(Id);
+}
+
+static ValueDecl *getAutoDiffApplyTransposeFunction(
+    ASTContext &Context, Identifier Id, unsigned arity, bool rethrows) {
+  assert(arity >= 1);
+  // <...T...(arity), R>
+  //     (@differentiable (...T) throws -> R, ...R.TangentVector)
+  //         rethrows -> (...T.TangentVector)
+  unsigned numGenericParams = 1 + arity;
+  BuiltinFunctionBuilder builder(Context, numGenericParams);
+  auto *diffableProto = Context.getProtocol(KnownProtocolKind::Differentiable);
+  auto *addArithProto =
+      Context.getProtocol(KnownProtocolKind::AdditiveArithmetic);
+  // Create type parameters and add conformance constraints.
+  auto linearFnResultGen = makeGenericParam(arity);
+  builder.addConformanceRequirement(linearFnResultGen, diffableProto);
+  builder.addConformanceRequirement(linearFnResultGen, addArithProto);
+  SmallVector<decltype(linearFnResultGen), 2> linearFnParamGens;
+  for (auto i : range(arity)) {
+    auto T = makeGenericParam(i);
+    builder.addConformanceRequirement(T, diffableProto);
+    builder.addConformanceRequirement(T, addArithProto);
+    linearFnParamGens.push_back(T);
+  }
+  // Generator for the first argument, i.e. the `@differentiable(linear)`
+  // function.
+  BuiltinFunctionBuilder::LambdaGenerator firstArgGen {
+    // Generator for the function type at the argument position, i.e. the
+    // function being differentiated.
+    [=, &linearFnParamGens](BuiltinFunctionBuilder &builder) -> Type {
+      FunctionType::ExtInfo ext;
+      auto extInfo = FunctionType::ExtInfo()
+          .withDifferentiabilityKind(DifferentiabilityKind::Linear)
+          .withNoEscape().withThrows(rethrows);
+      SmallVector<FunctionType::Param, 2> params;
+      for (auto &paramGen : linearFnParamGens)
+        params.push_back(FunctionType::Param(paramGen.build(builder)));
+      auto innerFunction = FunctionType::get(params,
+                                             linearFnResultGen.build(builder));
+      return innerFunction->withExtInfo(extInfo);
+    }
+  };
+  builder.addParameter(firstArgGen);
+  builder.addParameter(linearFnResultGen);
+  if (rethrows)
+    builder.setRethrows();
+  if (arity == 1)
+    builder.setResult(linearFnParamGens.front());
+  else {
+    BuiltinFunctionBuilder::LambdaGenerator tupleResultGen {
+      [&](BuiltinFunctionBuilder &builder) -> Type {
+        SmallVector<TupleTypeElt, 2> tupleElts;
+        for (auto linearFnParamGen : linearFnParamGens)
+          tupleElts.push_back(linearFnParamGen.build(builder));
+        return TupleType::get(tupleElts, Context);
+      }
+    };
+    builder.setResult(tupleResultGen);
+  }
   return builder.build(Id);
 }
 
@@ -1992,15 +2052,23 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
     return getAllocWithTailElemsOperation(Context, Id, NumTailTypes);
   }
   // SWIFT_ENABLE_TENSORFLOW
-  if (OperationName.startswith("autodiffApply_")) {
+  if (OperationName.startswith("applyDerivative_")) {
     AutoDiffDerivativeFunctionKind kind;
     unsigned arity;
     bool rethrows;
-    if (!autodiff::getBuiltinAutoDiffApplyConfig(OperationName, kind, arity,
-                                                 rethrows))
+    if (!autodiff::getBuiltinApplyDerivativeConfig(
+            OperationName, kind, arity, rethrows))
       return nullptr;
     return getAutoDiffApplyDerivativeFunction(Context, Id, kind, arity,
                                               rethrows);
+  }
+  if (OperationName.startswith("applyTranspose_")) {
+    unsigned arity;
+    bool rethrows;
+    if (!autodiff::getBuiltinApplyTransposeConfig(
+            OperationName, arity, rethrows))
+      return nullptr;
+    return getAutoDiffApplyTransposeFunction(Context, Id, arity, rethrows);
   }
   if (OperationName.startswith("differentiableFunction_")) {
     unsigned arity;
@@ -2288,7 +2356,8 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
     return getUnsafeGuaranteedEnd(Context, Id);
 
   // SWIFT_ENABLE_TENSORFLOW
-  case BuiltinValueKind::AutoDiffApply:
+  case BuiltinValueKind::ApplyDerivative:
+  case BuiltinValueKind::ApplyTranspose:
   case BuiltinValueKind::DifferentiableFunction:
   case BuiltinValueKind::LinearFunction:
     llvm_unreachable("Handled above");

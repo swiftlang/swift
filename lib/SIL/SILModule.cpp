@@ -310,8 +310,10 @@ const BuiltinInfo &SILModule::getBuiltinInfo(Identifier ID) {
   else if (OperationName.startswith("allocWithTailElems_"))
     Info.ID = BuiltinValueKind::AllocWithTailElems;
   // SWIFT_ENABLE_TENSORFLOW
-  else if (OperationName.startswith("autodiffApply_"))
-    Info.ID = BuiltinValueKind::AutoDiffApply;
+  else if (OperationName.startswith("applyDerivative_"))
+    Info.ID = BuiltinValueKind::ApplyDerivative;
+  else if (OperationName.startswith("applyTranspose_"))
+    Info.ID = BuiltinValueKind::ApplyTranspose;
   else if (OperationName.startswith("differentiableFunction_"))
     Info.ID = BuiltinValueKind::DifferentiableFunction;
   else if (OperationName.startswith("linearFunction_"))
