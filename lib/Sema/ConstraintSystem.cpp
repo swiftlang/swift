@@ -2250,7 +2250,7 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
         // Hashable, because it would be used as a component inside key path.
         for (auto index : indices(subscriptTy->getParams())) {
           const auto &param = subscriptTy->getParams()[index];
-          verifyThatArgumentIsHashable(index, param.getPlainType(), locator);
+          verifyThatArgumentIsHashable(index, param.getParameterType(), locator);
         }
       }
     }

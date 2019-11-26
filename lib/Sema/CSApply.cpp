@@ -4591,7 +4591,7 @@ namespace {
       for (auto &param : fnType->getParams()) {
         newLabels.push_back(param.getLabel());
 
-        auto indexType = simplifyType(param.getPlainType());
+        auto indexType = simplifyType(param.getParameterType());
         // Index type conformance to Hashable protocol has been
         // verified by the solver, we just need to get it again
         // with all of the generic parameters resolved.

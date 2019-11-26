@@ -2560,8 +2560,7 @@ emitKeyPathRValueBase(SILGenFunction &subSGF,
   return paramSubstValue;
 }
 
-/// formal, lowered, isVariadic
-using IndexTypeTuple = std::tuple<CanType, SILType, bool>;
+using IndexTypePair = std::pair<CanType, SILType>;
 
 /// Helper function to load the captured indexes out of a key path component
 /// in order to invoke the accessors on that key path. A component with captured
@@ -2571,7 +2570,7 @@ using IndexTypeTuple = std::tuple<CanType, SILType, bool>;
 static PreparedArguments
 loadIndexValuesForKeyPathComponent(SILGenFunction &SGF, SILLocation loc,
                                    AbstractStorageDecl *storage,
-                                   ArrayRef<IndexTypeTuple> indexes,
+                                   ArrayRef<IndexTypePair> indexes,
                                    SILValue pointer) {
   // If not a subscript, do nothing.
   if (!isa<SubscriptDecl>(storage))
@@ -2580,7 +2579,7 @@ loadIndexValuesForKeyPathComponent(SILGenFunction &SGF, SILLocation loc,
   SmallVector<AnyFunctionType::Param, 8> indexParams;
   for (auto &elt : indexes) {
     // FIXME: Varargs?
-    indexParams.emplace_back(SGF.F.mapTypeIntoContext(std::get<0>(elt)));
+    indexParams.emplace_back(SGF.F.mapTypeIntoContext(elt.first));
   }
   
   PreparedArguments indexValues(indexParams);
@@ -2603,12 +2602,12 @@ loadIndexValuesForKeyPathComponent(SILGenFunction &SGF, SILLocation loc,
     if (indexes.size() > 1) {
       eltAddr = SGF.B.createTupleElementAddr(loc, eltAddr, i);
     }
-    auto ty = SGF.F.mapTypeIntoContext(std::get<1>(indexes[i]));
+    auto ty = SGF.F.mapTypeIntoContext(indexes[i].second);
     auto value = SGF.emitLoad(loc, eltAddr,
                               SGF.getTypeLowering(ty),
                               SGFContext(), IsNotTake);
     auto substType =
-      SGF.F.mapTypeIntoContext(std::get<0>(indexes[i]))->getCanonicalType();
+      SGF.F.mapTypeIntoContext(indexes[i].first)->getCanonicalType();
     indexValues.add(loc, RValue(SGF, loc, substType, value));
   }
 
@@ -2630,7 +2629,7 @@ static SILFunction *getOrCreateKeyPathGetter(SILGenModule &SGM,
                          SubstitutionMap subs,
                          GenericEnvironment *genericEnv,
                          ResilienceExpansion expansion,
-                         ArrayRef<IndexTypeTuple> indexes,
+                         ArrayRef<IndexTypePair> indexes,
                          CanType baseType,
                          CanType propertyType) {
   // If the storage declaration is from a protocol, chase the override chain
@@ -2768,7 +2767,7 @@ static SILFunction *getOrCreateKeyPathSetter(SILGenModule &SGM,
                           SubstitutionMap subs,
                           GenericEnvironment *genericEnv,
                           ResilienceExpansion expansion,
-                          ArrayRef<IndexTypeTuple> indexes,
+                          ArrayRef<IndexTypePair> indexes,
                           CanType baseType,
                           CanType propertyType) {
   // If the storage declaration is from a protocol, chase the override chain
@@ -3311,7 +3310,7 @@ getIdForKeyPathComponentComputedProperty(SILGenModule &SGM,
 static void
 lowerKeyPathSubscriptIndexTypes(
                  SILGenModule &SGM,
-                 SmallVectorImpl<IndexTypeTuple> &indexPatterns,
+                 SmallVectorImpl<IndexTypePair> &indexPatterns,
                  SubscriptDecl *subscript,
                  SubstitutionMap subscriptSubs,
                  ResilienceExpansion expansion,
@@ -3338,62 +3337,23 @@ lowerKeyPathSubscriptIndexTypes(
     indexLoweredTy = indexLoweredTy.mapTypeOutOfContext();
     indexPatterns.push_back({indexTy->mapTypeOutOfContext()
                                     ->getCanonicalType(),
-                             indexLoweredTy, index->isVariadic()});
+                             indexLoweredTy});
   }
 };
 
-static void lowerKeyPathSubscriptEqualsIndexPatterns(
-    SmallVectorImpl<KeyPathPatternComponent::Index> &indexPatterns,
-    ArrayRef<IndexTypeTuple> indexTypes,
-    ArrayRef<ProtocolConformanceRef> indexHashables, unsigned baseOperand,
-    SILGenModule &SGM, ResilienceExpansion expansion) {
+static void
+lowerKeyPathSubscriptIndexPatterns(
+                 SmallVectorImpl<KeyPathPatternComponent::Index> &indexPatterns,
+                 ArrayRef<IndexTypePair> indexTypes,
+                 ArrayRef<ProtocolConformanceRef> indexHashables,
+                 unsigned &baseOperand) {
   for (unsigned i : indices(indexTypes)) {
     CanType formalTy;
     SILType loweredTy;
-    bool isVariadic;
-    std::tie(formalTy, loweredTy, isVariadic) = indexTypes[i];
+    std::tie(formalTy, loweredTy) = indexTypes[i];
     auto hashable = indexHashables[i].mapConformanceOutOfContext();
-    // We have an array of variadic parameters...
-    if (isVariadic) {
-      // Use the element type instead of the array type for hash/equals.
-      auto arrayTy = cast<BoundGenericStructType>(formalTy.getPointer());
-      auto elementTy = arrayTy->getGenericArgs()[0];
-
-      // Make sure that we aren't leaving out any hashables.
-      assert(indexTypes.size() == indexHashables.size());
-
-      // Make sure the element type matches the hashable.
-      assert(hashable.getConcrete()->getType()->isEqual(elementTy));
-      auto newLoweredTy = SGM.Types.getLoweredType(
-          AbstractionPattern::getOpaque(), elementTy,
-          TypeExpansionContext::noOpaqueTypeArchetypesSubstitution(expansion));
-      newLoweredTy = newLoweredTy.mapTypeOutOfContext();
-      auto newFormalTy = elementTy->mapTypeOutOfContext()->getCanonicalType();
-
-      indexPatterns.push_back(
-          {baseOperand++, newFormalTy, newLoweredTy, hashable});
-
-      // We're done because variadics must come last.
-      break;
-    }
-
     assert(hashable.isAbstract() ||
            hashable.getConcrete()->getType()->isEqual(formalTy));
-
-    indexPatterns.push_back({baseOperand++, formalTy, loweredTy, hashable});
-  }
-};
-
-static void lowerKeyPathSubscriptIndexPatterns(
-    SmallVectorImpl<KeyPathPatternComponent::Index> &indexPatterns,
-    ArrayRef<IndexTypeTuple> indexTypes,
-    ArrayRef<ProtocolConformanceRef> indexHashables, unsigned &baseOperand) {
-  for (unsigned i : indices(indexTypes)) {
-    CanType formalTy;
-    SILType loweredTy;
-    bool isVariadic;
-    std::tie(formalTy, loweredTy, isVariadic) = indexTypes[i];
-    auto hashable = indexHashables[i].mapConformanceOutOfContext();
 
     indexPatterns.push_back({baseOperand++, formalTy, loweredTy, hashable});
   }
@@ -3534,29 +3494,25 @@ SILGenModule::emitKeyPathComponentForDecl(SILLocation loc,
       baseSubscriptTy->mapTypeOutOfContext()->getCanonicalType());
     auto componentTy = baseSubscriptInterfaceTy.getResult();
   
-    SmallVector<IndexTypeTuple, 4> indexTypes;
+    SmallVector<IndexTypePair, 4> indexTypes;
     lowerKeyPathSubscriptIndexTypes(*this, indexTypes,
                                     decl, subs,
                                     expansion,
                                     needsGenericContext);
-
-    SmallVector<KeyPathPatternComponent::Index, 4> equalsIndexPatterns;
+    
     SmallVector<KeyPathPatternComponent::Index, 4> indexPatterns;
     SILFunction *indexEquals = nullptr, *indexHash = nullptr;
     // Property descriptors get their index information from the client.
     if (!forPropertyDescriptor) {
-      // Gather the index patters that we will use for the component.
-      lowerKeyPathSubscriptEqualsIndexPatterns(equalsIndexPatterns, indexTypes,
-                                               indexHashables, baseOperand,
-                                               *this, expansion);
-      // Gather the index patterns that we will use for equals and hash.
       lowerKeyPathSubscriptIndexPatterns(indexPatterns,
                                          indexTypes, indexHashables,
                                          baseOperand);
-
-      getOrCreateKeyPathEqualsAndHash(
-          *this, loc, needsGenericContext ? genericEnv : nullptr, expansion,
-          equalsIndexPatterns, indexEquals, indexHash);
+      
+      getOrCreateKeyPathEqualsAndHash(*this, loc,
+               needsGenericContext ? genericEnv : nullptr,
+               expansion,
+               indexPatterns,
+               indexEquals, indexHash);
     }
     
     auto id = getIdForKeyPathComponentComputedProperty(*this, decl, strategy);
