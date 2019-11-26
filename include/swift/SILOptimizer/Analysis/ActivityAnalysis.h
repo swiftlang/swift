@@ -54,8 +54,8 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseSet.h"
 
-using llvm::SmallDenseSet;
 using llvm::SmallDenseMap;
+using llvm::SmallDenseSet;
 
 namespace swift {
 
@@ -139,8 +139,8 @@ private:
     // Look up conformance in the current module.
     auto lookupConformance =
         LookUpConformanceInModule(getFunction().getModule().getSwiftModule());
-    return type->getAutoDiffAssociatedTangentSpace(
-        lookupConformance).hasValue();
+    return type->getAutoDiffAssociatedTangentSpace(lookupConformance)
+        .hasValue();
   }
 
   /// Perform analysis and populate variedness and usefulness sets.
@@ -154,8 +154,9 @@ private:
   /// Marks the given value as varied and recursively propagates variedness
   /// inwards (to operands) through projections. Skips `@noDerivative` struct
   /// field projections.
-  void propagateVariedInwardsThroughProjections(
-      SILValue value, unsigned independentVariableIndex);
+  void
+  propagateVariedInwardsThroughProjections(SILValue value,
+                                           unsigned independentVariableIndex);
 
   /// Marks the given value as useful for the given dependent variable index.
   void setUseful(SILValue value, unsigned dependentVariableIndex);
@@ -199,8 +200,7 @@ public:
 
   /// Returns the activity of the given value for the given `SILAutoDiffIndices`
   /// (parameter indices and result index).
-  Activity getActivity(SILValue value,
-                       const SILAutoDiffIndices &indices) const;
+  Activity getActivity(SILValue value, const SILAutoDiffIndices &indices) const;
 };
 
 class DifferentiableActivityCollection {
@@ -210,8 +210,9 @@ public:
   DominanceInfo *domInfo;
   PostDominanceInfo *postDomInfo;
 
-  DifferentiableActivityInfo &getActivityInfo(
-      GenericSignature assocGenSig, AutoDiffDerivativeFunctionKind kind) {
+  DifferentiableActivityInfo &
+  getActivityInfo(GenericSignature assocGenSig,
+                  AutoDiffDerivativeFunctionKind kind) {
     auto activityInfoLookup = activityInfoMap.find(assocGenSig);
     if (activityInfoLookup != activityInfoMap.end())
       return activityInfoLookup->getSecond();
@@ -220,8 +221,7 @@ public:
     return insertion.first->getSecond();
   }
 
-  explicit DifferentiableActivityCollection(SILFunction &f,
-                                            DominanceInfo *di,
+  explicit DifferentiableActivityCollection(SILFunction &f, DominanceInfo *di,
                                             PostDominanceInfo *pdi);
 };
 

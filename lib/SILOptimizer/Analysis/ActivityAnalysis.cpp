@@ -11,9 +11,9 @@
 //===----------------------------------------------------------------------===//
 #define DEBUG_TYPE "differentiation"
 
-#include "swift/SIL/SILArgument.h"
-#include "swift/SIL/Projection.h"
 #include "swift/SILOptimizer/Analysis/ActivityAnalysis.h"
+#include "swift/SIL/Projection.h"
+#include "swift/SIL/SILArgument.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/PassManager/PassManager.h"
 #include "swift/SILOptimizer/Utils/Differentiation.h"
@@ -144,10 +144,10 @@ void DifferentiableActivityInfo::propagateVaried(
   }
   // Handle store-like instructions:
   //   `store`, `store_borrow`, `copy_addr`, `unconditional_checked_cast`
-#define PROPAGATE_VARIED_THROUGH_STORE(INST) \
-  else if (auto *si = dyn_cast<INST##Inst>(inst)) { \
-    if (isVaried(si->getSrc(), i)) \
-      propagateVariedInwardsThroughProjections(si->getDest(), i); \
+#define PROPAGATE_VARIED_THROUGH_STORE(INST)                                   \
+  else if (auto *si = dyn_cast<INST##Inst>(inst)) {                            \
+    if (isVaried(si->getSrc(), i))                                             \
+      propagateVariedInwardsThroughProjections(si->getDest(), i);              \
   }
   PROPAGATE_VARIED_THROUGH_STORE(Store)
   PROPAGATE_VARIED_THROUGH_STORE(StoreBorrow)
@@ -167,11 +167,11 @@ void DifferentiableActivityInfo::propagateVaried(
   // - If the field is marked `@noDerivative`, do not set the result as
   //   varied because it does not need a derivative.
   // - Otherwise, propagate variedness from operand to result as usual.
-#define PROPAGATE_VARIED_FOR_STRUCT_EXTRACTION(INST) \
-  else if (auto *sei = dyn_cast<INST##Inst>(inst)) { \
-    if (isVaried(sei->getOperand(), i) && \
-        !sei->getField()->getAttrs().hasAttribute<NoDerivativeAttr>()) \
-      setVariedAndPropagateToUsers(sei, i); \
+#define PROPAGATE_VARIED_FOR_STRUCT_EXTRACTION(INST)                           \
+  else if (auto *sei = dyn_cast<INST##Inst>(inst)) {                           \
+    if (isVaried(sei->getOperand(), i) &&                                      \
+        !sei->getField()->getAttrs().hasAttribute<NoDerivativeAttr>())         \
+      setVariedAndPropagateToUsers(sei, i);                                    \
   }
   PROPAGATE_VARIED_FOR_STRUCT_EXTRACTION(StructExtract)
   PROPAGATE_VARIED_FOR_STRUCT_EXTRACTION(StructElementAddr)
@@ -207,9 +207,9 @@ void DifferentiableActivityInfo::propagateVaried(
 void DifferentiableActivityInfo::propagateVariedInwardsThroughProjections(
     SILValue value, unsigned independentVariableIndex) {
   // Skip `@noDerivative` struct projections.
-#define SKIP_NODERIVATIVE(INST) \
-  if (auto *sei = dyn_cast<INST##Inst>(value)) \
-    if (sei->getField()->getAttrs().hasAttribute<NoDerivativeAttr>()) \
+#define SKIP_NODERIVATIVE(INST)                                                \
+  if (auto *sei = dyn_cast<INST##Inst>(value))                                 \
+    if (sei->getField()->getAttrs().hasAttribute<NoDerivativeAttr>())          \
       return;
   SKIP_NODERIVATIVE(StructExtract)
   SKIP_NODERIVATIVE(StructElementAddr)
@@ -221,8 +221,8 @@ void DifferentiableActivityInfo::propagateVariedInwardsThroughProjections(
     return;
   // Standard propagation.
   for (auto &op : inst->getAllOperands())
-    propagateVariedInwardsThroughProjections(
-        op.get(), independentVariableIndex);
+    propagateVariedInwardsThroughProjections(op.get(),
+                                             independentVariableIndex);
 }
 
 void DifferentiableActivityInfo::setUseful(SILValue value,
@@ -270,9 +270,9 @@ void DifferentiableActivityInfo::propagateUseful(
   }
   // Handle store-like instructions:
   //   `store`, `store_borrow`, `copy_addr`, `unconditional_checked_cast`
-#define PROPAGATE_USEFUL_THROUGH_STORE(INST) \
-  else if (auto *si = dyn_cast<INST##Inst>(inst)) { \
-    setUsefulAndPropagateToOperands(si->getSrc(), i); \
+#define PROPAGATE_USEFUL_THROUGH_STORE(INST)                                   \
+  else if (auto *si = dyn_cast<INST##Inst>(inst)) {                            \
+    setUsefulAndPropagateToOperands(si->getSrc(), i);                          \
   }
   PROPAGATE_USEFUL_THROUGH_STORE(Store)
   PROPAGATE_USEFUL_THROUGH_STORE(StoreBorrow)
@@ -281,10 +281,10 @@ void DifferentiableActivityInfo::propagateUseful(
 #undef PROPAGATE_USEFUL_THROUGH_STORE
   // Handle struct element extraction, skipping `@noDerivative` fields:
   //   `struct_extract`, `struct_element_addr`.
-#define PROPAGATE_USEFUL_THROUGH_STRUCT_EXTRACTION(INST) \
-  else if (auto *sei = dyn_cast<INST##Inst>(inst)) { \
-    if (!sei->getField()->getAttrs().hasAttribute<NoDerivativeAttr>()) \
-      setUsefulAndPropagateToOperands(sei->getOperand(), i); \
+#define PROPAGATE_USEFUL_THROUGH_STRUCT_EXTRACTION(INST)                       \
+  else if (auto *sei = dyn_cast<INST##Inst>(inst)) {                           \
+    if (!sei->getField()->getAttrs().hasAttribute<NoDerivativeAttr>())         \
+      setUsefulAndPropagateToOperands(sei->getOperand(), i);                   \
   }
   PROPAGATE_USEFUL_THROUGH_STRUCT_EXTRACTION(StructExtract)
   PROPAGATE_USEFUL_THROUGH_STRUCT_EXTRACTION(StructElementAddr)
@@ -312,9 +312,9 @@ void DifferentiableActivityInfo::propagateUsefulThroughAddress(
     propagateUseful(use->getUser(), dependentVariableIndex);
     for (auto res : use->getUser()->getResults()) {
 #define SKIP_NODERIVATIVE(INST)                                                \
-      if (auto *sei = dyn_cast<INST##Inst>(res))                               \
-        if (sei->getField()->getAttrs().hasAttribute<NoDerivativeAttr>())      \
-          continue;
+  if (auto *sei = dyn_cast<INST##Inst>(res))                                   \
+    if (sei->getField()->getAttrs().hasAttribute<NoDerivativeAttr>())          \
+      continue;
       SKIP_NODERIVATIVE(StructExtract)
       SKIP_NODERIVATIVE(StructElementAddr)
 #undef SKIP_NODERIVATIVE
@@ -329,10 +329,12 @@ void DifferentiableActivityInfo::setUsefulThroughArrayInitialization(
   // Array initializer syntax is lowered to an intrinsic and one or more
   // stores to a `RawPointer` returned by the intrinsic.
   auto *uai = getAllocateUninitializedArrayIntrinsic(value);
-  if (!uai) return;
+  if (!uai)
+    return;
   for (auto use : value->getUses()) {
     auto *dti = dyn_cast<DestructureTupleInst>(use->getUser());
-    if (!dti) continue;
+    if (!dti)
+      continue;
     // The second tuple field of the return value is the `RawPointer`.
     for (auto use : dti->getResult(1)->getUses()) {
       // The `RawPointer` passes through a `pointer_to_address`. That

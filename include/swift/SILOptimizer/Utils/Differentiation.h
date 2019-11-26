@@ -130,8 +130,8 @@ inline void createEntryArguments(SILFunction *f) {
     // Create a dummy parameter declaration.
     // Necessary to prevent crash during argument explosion optimization.
     auto loc = f->getLocation().getSourceLoc();
-    auto *decl = new (ctx) ParamDecl(loc, loc, Identifier(), loc,
-                                     Identifier(), moduleDecl);
+    auto *decl = new (ctx)
+        ParamDecl(loc, loc, Identifier(), loc, Identifier(), moduleDecl);
     decl->setSpecifier(ParamDecl::Specifier::Default);
     entry->createFunctionArgument(type, decl);
   };

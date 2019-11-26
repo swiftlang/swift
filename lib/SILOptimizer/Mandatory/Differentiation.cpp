@@ -23,6 +23,7 @@
 
 #define DEBUG_TYPE "differentiation"
 
+#include "swift/SILOptimizer/Utils/Differentiation.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/AnyFunctionRef.h"
@@ -34,8 +35,8 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/LazyResolver.h"
-#include "swift/AST/SourceFile.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/SIL/FormalLinkage.h"
