@@ -248,12 +248,15 @@ class AttributeChecker : public AttributeVisitor<AttributeChecker> {
 
   // SWIFT_ENABLE_TENSORFLOW
   void visitDifferentiableAttr(DifferentiableAttr *attr);
+  void visitDerivativeAttr(DerivativeAttr *attr);
+  void visitTransposeAttr(TransposeAttr *attr);
   // TODO(TF-999): Remove deprecated `@differentiating` attribute.
   void visitDifferentiatingAttr(DerivativeAttr *attr);
-  void visitDerivativeAttr(DerivativeAttr *attr);
+  // TODO(TF-999): Remove deprecated `@transposing` attribute.
+  void visitTransposingAttr(TransposeAttr *attr);
   void visitCompilerEvaluableAttr(CompilerEvaluableAttr *attr);
   void visitNoDerivativeAttr(NoDerivativeAttr *attr);
-  void visitTransposingAttr(TransposingAttr *attr);
+  // SWIFT_ENABLE_TENSORFLOW END
 };
 } // end anonymous namespace
 
@@ -3108,8 +3111,8 @@ static IndexSubset *computeTransposingParameters(
       transposeFunction->getInterfaceType()->castTo<AnyFunctionType>();
   
   ArrayRef<TupleTypeElt> transposeResultTypes;
-  // Return type of '@transposing' function can have single type or tuple
-  // of types.
+  // Return type of '@transpose' function can be a singular type or a tuple
+  // type.
   auto transposeResultType = transposeFunctionType->getResult();
   if (isCurried)
     transposeResultType =
@@ -3134,8 +3137,7 @@ static IndexSubset *computeTransposingParameters(
     auto paramLoc = parsedWrtParams[i].getLoc();
     switch (parsedWrtParams[i].getKind()) {
     case ParsedAutoDiffParameter::Kind::Named: {
-      diags.diagnose(paramLoc,
-                     diag::transposing_attr_cannot_use_named_wrt_params,
+      diags.diagnose(paramLoc, diag::transpose_attr_cannot_use_named_wrt_params,
                      parsedWrtParams[i].getName());
       return nullptr;
     }
@@ -3981,11 +3983,7 @@ void AttributeChecker::visitDerivativeAttr(DerivativeAttr *attr) {
   }
 }
 
-void AttributeChecker::visitDifferentiatingAttr(DerivativeAttr *attr) {
-  visitDerivativeAttr(attr);
-}
-
-void AttributeChecker::visitTransposingAttr(TransposingAttr *attr) {
+void AttributeChecker::visitTransposeAttr(TransposeAttr *attr) {
   auto *transpose = cast<FuncDecl>(D);
   auto lookupConformance =
       LookUpConformanceInModule(D->getDeclContext()->getParentModule());
@@ -4047,7 +4045,7 @@ void AttributeChecker::visitTransposingAttr(TransposingAttr *attr) {
 
   if (!valueResultConf) {
     diagnose(attr->getLocation(),
-             diag::transposing_attr_result_value_not_differentiable,
+             diag::transpose_attr_result_value_not_differentiable,
              expectedOriginalResultType);
     D->getAttrs().removeAttribute(attr);
     attr->setInvalid();
@@ -4158,6 +4156,14 @@ void AttributeChecker::visitTransposingAttr(TransposingAttr *attr) {
 
   // Set the checked differentiation parameter indices in the attribute.
   attr->setParameterIndices(wrtParamIndices);
+}
+
+void AttributeChecker::visitDifferentiatingAttr(DerivativeAttr *attr) {
+  visitDerivativeAttr(attr);
+}
+
+void AttributeChecker::visitTransposingAttr(TransposeAttr *attr) {
+  visitTransposeAttr(attr);
 }
 
 static bool

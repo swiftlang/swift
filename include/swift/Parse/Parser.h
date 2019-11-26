@@ -1013,9 +1013,14 @@ public:
   ParserResult<DerivativeAttr> parseDifferentiatingAttribute(SourceLoc AtLoc,
                                                              SourceLoc Loc);
 
-  /// Parse the @transposing attribute.
-  ParserResult<TransposingAttr> parseTransposingAttribute(SourceLoc AtLoc,
-                                                          SourceLoc Loc);
+  /// Parse the @transpose attribute.
+  ParserResult<TransposeAttr> parseTransposeAttribute(SourceLoc AtLoc,
+                                                      SourceLoc Loc);
+
+  /// Parse the deprecated @transposing attribute.
+  // TODO(TF-999): Remove the deprecated `@transposing` attribute.
+  ParserResult<TransposeAttr> parseTransposingAttribute(SourceLoc AtLoc,
+                                                        SourceLoc Loc);
 
   /// Parse the @quoted attribute.
   ParserResult<QuotedAttr> parseQuotedAttribute(SourceLoc AtLoc, SourceLoc Loc);

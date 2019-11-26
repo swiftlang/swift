@@ -1572,11 +1572,14 @@ WARNING(attr_differentiating_deprecated,PointsToFirstBadToken,
         "'@differentiating' attribute is deprecated; use '@derivative(of:)' "
         "instead", ())
 
-// transposing
-ERROR(attr_transposing_expected_original_name,PointsToFirstBadToken,
+// transpose
+ERROR(attr_transpose_expected_original_name,PointsToFirstBadToken,
       "expected an original function name", ())
-ERROR(attr_transposing_expected_label_linear_or_wrt,none,
+ERROR(attr_transpose_expected_label_linear_or_wrt,none,
       "expected 'wrt:'", ())
+WARNING(attr_transposing_deprecated,PointsToFirstBadToken,
+        "'@transposing' attribute is deprecated; use '@transpose(of:)' instead",
+        ())
 
 // transposing `wrt` parameters clause
 ERROR(transposing_params_clause_expected_parameter,PointsToFirstBadToken,

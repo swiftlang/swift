@@ -4897,8 +4897,7 @@ AnyFunctionType *AnyFunctionType::getTransposeOriginalFunctionType(
   assert(originalResult);
 
   SmallVector<TupleTypeElt, 4> transposeResultTypes;
-  // Return type of '@transposing' function can have single type or tuples
-  // of types.
+  // Return type of transpose function can be a singular type or a tuple type.
   if (auto transposeResultTupleType = transposeResult->getAs<TupleType>()) {
     transposeResultTypes.append(transposeResultTupleType->getElements().begin(),
                                 transposeResultTupleType->getElements().end());
