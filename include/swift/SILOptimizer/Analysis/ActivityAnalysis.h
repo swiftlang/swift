@@ -10,6 +10,11 @@
 //
 //===----------------------------------------------------------------------===//
 //
+// SWIFT_ENABLE_TENSORFLOW
+//
+// This file implements activity analysis: a dataflow analysis used for automatic
+// differentiation.
+//
 // In many real situations, the end-users of AD need only the derivatives of
 // some selected outputs of `P` with respect to some selected inputs of `P`.
 // Whatever the differentiation mode (tangent, reverse,...), these restrictions

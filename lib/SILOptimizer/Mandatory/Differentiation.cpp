@@ -14,8 +14,10 @@
 //
 // This file implements automatic differentiation.
 //
-// NOTE: Although the AD feature is developed as part of the Swift for
-// TensorFlow project, it is completely independent from TensorFlow support.
+// NOTE: Though automatic differentiation is developed as part of the Swift for
+// TensorFlow project, it is completely independent from TensorFlow.
+// Read the differentiable programming manifesto for more information:
+// docs/DifferentiableProgramming.md.
 //
 // TODO(TF-993): Organize Differentiation.cpp into smaller files.
 //

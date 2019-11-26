@@ -12,10 +12,12 @@
 //
 // SWIFT_ENABLE_TENSORFLOW
 //
-// Reverse-mode automatic differentiation utilities.
+// Automatic differentiation utilities.
 //
-// NOTE: Although the AD feature is developed as part of the Swift for
-// TensorFlow project, it is completely independent from TensorFlow support.
+// NOTE: Though automatic differentiation is developed as part of the Swift for
+// TensorFlow project, it is completely independent from TensorFlow.
+// Read the differentiable programming manifesto for more information:
+// docs/DifferentiableProgramming.md.
 //
 // TODO: Move definitions from lib/SILOptimizer/Mandatory/Differentiation.cpp.
 //
