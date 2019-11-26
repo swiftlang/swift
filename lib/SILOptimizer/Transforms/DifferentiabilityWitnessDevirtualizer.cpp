@@ -1,4 +1,4 @@
-//===--- DifferentiabilityWitnessInliner.cpp ------------------------------===//
+//===--- DifferentiabilityWitnessDevirtualizer.cpp ------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// "Inlines" differentiability witnesses whose bodies are availabe, by turning
-// "differentiability_witness_function" instructions into "function_ref"
+// Devirtualized differentiability witnesses whose bodies are availabe, by
+// turning "differentiability_witness_function" instructions into "function_ref"
 // instructions referencing the appropriate function.
 //
 //===----------------------------------------------------------------------===//
@@ -24,21 +24,21 @@
 using namespace swift;
 
 namespace {
-class DifferentiabilityWitnessInliner : public SILFunctionTransform {
+class DifferentiabilityWitnessDevirtualizer : public SILFunctionTransform {
 
   /// Returns true if and changes were made.
-  bool inlineDifferentiabilityWitnessesInFunction(SILFunction &f);
+  bool devirtualizeDifferentiabilityWitnessesInFunction(SILFunction &f);
 
   /// The entry point to the transformation.
   void run() override {
-    if (inlineDifferentiabilityWitnessesInFunction(*getFunction()))
+    if (devirtualizeDifferentiabilityWitnessesInFunction(*getFunction()))
       invalidateAnalysis(SILAnalysis::InvalidationKind::CallsAndInstructions);
   }
 };
 } // end anonymous namespace
 
-bool DifferentiabilityWitnessInliner::
-    inlineDifferentiabilityWitnessesInFunction(SILFunction &f) {
+bool DifferentiabilityWitnessDevirtualizer::
+    devirtualizeDifferentiabilityWitnessesInFunction(SILFunction &f) {
   bool changed = false;
   llvm::SmallVector<DifferentiabilityWitnessFunctionInst *, 8> insts;
   for (auto &bb : f) {
@@ -67,6 +67,6 @@ bool DifferentiabilityWitnessInliner::
   return changed;
 }
 
-SILTransform *swift::createDifferentiabilityWitnessInliner() {
-  return new DifferentiabilityWitnessInliner();
+SILTransform *swift::createDifferentiabilityWitnessDevirtualizer() {
+  return new DifferentiabilityWitnessDevirtualizer();
 }
