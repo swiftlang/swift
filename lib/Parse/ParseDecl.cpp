@@ -2257,11 +2257,24 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
     auto Attr = parseDifferentiableAttribute(AtLoc, Loc);
     if (Attr.isNonNull())
       Attributes.add(Attr.get());
+
+    // TODO(TF-1001): Remove 'jvp:' and 'vjp:' parameters from '@differentiable'
+    // attribute, and remove the following check.
+    // `@differentiable` with derivative registration in a local scope is not
+    // allowed.
+    if (Attr.isNonNull() && CurDeclContext->isLocalContext() &&
+        (Attr.get()->getJVP() || Attr.get()->getVJP()))
+      diagnose(Loc, diag::attr_only_at_non_local_scope,
+               '@' + AttrName.str() + "(jvp:vjp:)");
     break;
   }
 
   // SWIFT_ENABLE_TENSORFLOW
   case DAK_Derivative: {
+    // `@derivative` in a local scope is not allowed.
+    if (CurDeclContext->isLocalContext())
+      diagnose(Loc, diag::attr_only_at_non_local_scope, '@' + AttrName.str());
+
     auto Attr = parseDerivativeAttribute(AtLoc, Loc);
     if (Attr.isNonNull())
       Attributes.add(Attr.get());
@@ -2270,6 +2283,10 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
 
   // SWIFT_ENABLE_TENSORFLOW
   case DAK_Transpose: {
+    // `@transpose` in a local scope is not allowed.
+    if (CurDeclContext->isLocalContext())
+      diagnose(Loc, diag::attr_only_at_non_local_scope, '@' + AttrName.str());
+
     auto Attr = parseTransposeAttribute(AtLoc, Loc);
     if (Attr.isNonNull())
       Attributes.add(Attr.get());
@@ -2280,6 +2297,11 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
   case DAK_Differentiating: {
     // Diagnose deprecated `@differentiating` attribute.
     diagnose(Loc, diag::attr_differentiating_deprecated);
+
+    // `@differentiating` in a local scope is not allowed.
+    if (CurDeclContext->isLocalContext())
+      diagnose(Loc, diag::attr_only_at_non_local_scope, '@' + AttrName.str());
+
     auto Attr = parseDifferentiatingAttribute(AtLoc, Loc);
     if (Attr.isNonNull())
       Attributes.add(Attr.get());
@@ -2290,6 +2312,11 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
   case DAK_Transposing: {
     // Diagnose deprecated `@transposing` attribute.
     diagnose(Loc, diag::attr_transposing_deprecated);
+
+    // `@transposing` in a local scope is not allowed.
+    if (CurDeclContext->isLocalContext())
+      diagnose(Loc, diag::attr_only_at_non_local_scope, '@' + AttrName.str());
+
     auto Attr = parseTransposingAttribute(AtLoc, Loc);
     if (Attr.isNonNull())
       Attributes.add(Attr.get());

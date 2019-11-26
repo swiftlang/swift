@@ -63,3 +63,10 @@ func tfoo(t: Float) -> Float {
 func tfoo(t: Float) -> Float {
   return t
 }
+
+func localTransposeRegistration() {
+  // Not okay. Transpose registration can only be non-local.
+  // expected-error @+1 {{attribute '@transpose' can only be used in a non-local scope}}
+  @transpose(of: +)
+  func foo(_ x: Float) -> (Float, Float)
+}

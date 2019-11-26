@@ -91,3 +91,9 @@ func dfoo(x: Float) -> (value: Float, differential: (Float) -> (Float)) {
 func dfoo(x: Float) -> (value: Float, differential: (Float) -> (Float)) {
   return (x, { $0 })
 }
+
+func localDerivativeRegistration() {
+  // expected-error @+1 {{attribute '@derivative' can only be used in a non-local scope}}
+  @derivative(of: sin)
+  func dsin()
+}

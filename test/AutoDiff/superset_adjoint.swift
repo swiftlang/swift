@@ -63,17 +63,17 @@ SupersetVJPTests.test("ApplySubset") {
 //   expectEqual(Float(1), grad)
 // }
 
+@differentiable(wrt: (x, y), vjp: dx_T)
+func x_T<T : Differentiable>(_ x: Tracked<Float>, _ y: T) -> Tracked<Float> {
+  if x > 1000 { return x }
+  return x
+}
+func dx_T<T : Differentiable>(
+  _ x: Tracked<Float>, _ y: T
+) -> (Tracked<Float>, (Tracked<Float>) -> (Tracked<Float>, T.TangentVector)) {
+  return (x_T(x, y), { v in (x * v, .zero) })
+}
 SupersetVJPTests.testWithLeakChecking("IndirectResults") {
-  @differentiable(wrt: (x, y), vjp: dx_T)
-  func x_T<T : Differentiable>(_ x: Tracked<Float>, _ y: T) -> Tracked<Float> {
-    if x > 1000 { return x }
-    return x
-  }
-  func dx_T<T : Differentiable>(
-    _ x: Tracked<Float>, _ y: T
-  ) -> (Tracked<Float>, (Tracked<Float>) -> (Tracked<Float>, T.TangentVector)) {
-    return (x_T(x, y), { v in (x * v, .zero) })
-  }
   expectEqual(2, gradient(at: 2) { x in x_T(x, Tracked<Float>(3)) })
 }
 
