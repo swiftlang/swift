@@ -491,8 +491,6 @@ public:
   void print(llvm::raw_ostream &os) const;
 };
 
-// class DifferentiableActivityInfo;
-
 /// Linear map struct and branching trace enum information for an original
 /// function and and derivative function (JVP or VJP).
 ///

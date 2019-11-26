@@ -51,7 +51,6 @@ raw_ostream &getADDebugStream();
 /// `ApplyInst`. Otherwise, returns `nullptr`.
 ApplyInst *getAllocateUninitializedArrayIntrinsic(SILValue v);
 
-
 /// Given an `apply` instruction, apply the given callback to each of its
 /// direct results. If the `apply` instruction has a single `destructure_tuple`
 /// user, apply the callback to the results of the `destructure_tuple` user.

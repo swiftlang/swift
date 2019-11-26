@@ -1,4 +1,4 @@
-//===--- ActivityAnalysis.h - SIL Activity Analysis -*- C++ -*-===//
+//===--- ActivityAnalysis.h - SIL Activity Analysis -------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -9,37 +9,39 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-/// In many real situations, the end-users of AD need only the derivatives of
-/// some selected outputs of `P` with respect to some selected inputs of `P`.
-/// Whatever the differentiation mode (tangent, reverse,...), these restrictions
-/// allow the AD tool to produce a much more efficient differentiated program.
-/// Essentially, fixing some inputs and neglecting some outputs allows AD to
-/// just forget about several intermediate differentiated variables.
-///
-/// Activity analysis is the specific analysis that detects these situations,
-/// therefore allowing for a better differentiated code. Activity analysis is
-/// present in all transformation-based AD tools.
-///
-/// To begin with, the end-user specifies that only some output variables (the
-/// “dependent”) must be differentiated with respect to only some input
-/// variables (the “independent”). We say that variable `y` depends on `x` when
-/// the derivative of `y` with respect to `x` is not trivially null. We say that
-/// a variable is “varied” if it depends on at least one independent. Conversely
-/// we say that a variable is “useful” if at least one dependent depends on it.
-/// Finally, we say that a variable is “active” if it is at the same time varied
-/// and useful. In the special case of the tangent mode, it is easy to check
-/// that when variable `v` is not varied at some place in the program, then its
-/// derivative `v̇` at this place is certainly null. Conversely when variable `v`
-/// is not useful, then whatever the value of `v̇`, this value does not matter
-/// for the final result. Symmetric reasoning applies for the reverse mode of
-/// AD: observing that differentiated variables go upstream, we see that a
-/// useless variable has a null derivative, in other words the partial
-/// derivative of the output with respect to this variable is null. Conversely
-/// when variable `v` is not varied, then whatever the value of `v`, this value
-/// does not matter for the final result.
-///
-/// Reference:
-/// Laurent Hascoët. Automatic Differentiation by Program Transformation. 2007.
+//
+// In many real situations, the end-users of AD need only the derivatives of
+// some selected outputs of `P` with respect to some selected inputs of `P`.
+// Whatever the differentiation mode (tangent, reverse,...), these restrictions
+// allow the AD tool to produce a much more efficient differentiated program.
+// Essentially, fixing some inputs and neglecting some outputs allows AD to
+// just forget about several intermediate differentiated variables.
+//
+// Activity analysis is the specific analysis that detects these situations,
+// therefore allowing for a better differentiated code. Activity analysis is
+// present in all transformation-based AD tools.
+//
+// To begin with, the end-user specifies that only some output variables (the
+// “dependent”) must be differentiated with respect to only some input
+// variables (the “independent”). We say that variable `y` depends on `x` when
+// the derivative of `y` with respect to `x` is not trivially null. We say that
+// a variable is “varied” if it depends on at least one independent. Conversely
+// we say that a variable is “useful” if at least one dependent depends on it.
+// Finally, we say that a variable is “active” if it is at the same time varied
+// and useful. In the special case of the tangent mode, it is easy to check
+// that when variable `v` is not varied at some place in the program, then its
+// derivative `v̇` at this place is certainly null. Conversely when variable `v`
+// is not useful, then whatever the value of `v̇`, this value does not matter
+// for the final result. Symmetric reasoning applies for the reverse mode of
+// AD: observing that differentiated variables go upstream, we see that a
+// useless variable has a null derivative, in other words the partial
+// derivative of the output with respect to this variable is null. Conversely
+// when variable `v` is not varied, then whatever the value of `v`, this value
+// does not matter for the final result.
+//
+// Reference:
+// Laurent Hascoët. Automatic Differentiation by Program Transformation. 2007.
+
 #ifndef SWIFT_SILOPTIMIZER_ANALYSIS_ACTIVITYANALYSIS_H_
 #define SWIFT_SILOPTIMIZER_ANALYSIS_ACTIVITYANALYSIS_H_
 
@@ -223,8 +225,6 @@ public:
                                             PostDominanceInfo *pdi);
 };
 
-
 } // end namespace swift
-
 
 #endif // SWIFT_SILOPTIMIZER_ANALYSIS_ACTIVITYANALYSIS_H_
