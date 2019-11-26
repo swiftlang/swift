@@ -3,17 +3,17 @@
 /// Good
 
 @transpose(of: linearFunc) // ok
-func jvpLinearFunc(x: @nondiff Float) -> Float {
+func transpose(x: @nondiff Float) -> Float {
   return (x, { 2 * $0 })
 }
 
 @transpose(of: linearFunc, wrt: 0) // ok
-func jvpLinearFunc(t: @nondiff Float) -> Float {
+func transposeWrt(t: @nondiff Float) -> Float {
   return 2 * t
 }
 
 @transpose(of: add, wrt: (0, 1)) // ok
-func vjpAdd(t: Float) -> (Float, Float) {
+func transposeWrtList(t: Float) -> (Float, Float) {
   return (t, t)
 }
 
@@ -69,4 +69,11 @@ func localTransposeRegistration() {
   // expected-error @+1 {{attribute '@transpose' can only be used in a non-local scope}}
   @transpose(of: +)
   func foo(_ x: Float) -> (Float, Float)
+}
+
+// Test deprecated `@transposing` attribute.
+// expected-warning @+1 {{'@transposing' attribute is deprecated; use '@transpose(of:)' instead}}
+@transposing(linearFunc)
+func transpose(x: @nondiff Float) -> Float {
+  return (x, { 2 * $0 })
 }

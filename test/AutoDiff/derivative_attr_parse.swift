@@ -97,3 +97,10 @@ func localDerivativeRegistration() {
   @derivative(of: sin)
   func dsin()
 }
+
+// Test deprecated `@differentiating` attribute.
+// expected-warning @+1 {{'@differentiating' attribute is deprecated; use '@derivative(of:)' instead}}
+@differentiating(sin)
+func vjpSin(x: Float) -> (value: Float, pullback: (Float) -> Float) {
+  return (x, { $0 })
+}
