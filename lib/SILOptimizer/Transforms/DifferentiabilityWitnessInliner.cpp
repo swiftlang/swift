@@ -27,7 +27,7 @@ namespace {
 class DifferentiabilityWitnessInliner : public SILFunctionTransform {
 
   /// Returns true if and changes were made.
-  bool inlineDifferentiabilityWitnessesInFunction(SILFunction &F);
+  bool inlineDifferentiabilityWitnessesInFunction(SILFunction &f);
 
   /// The entry point to the transformation.
   void run() override {
@@ -38,31 +38,33 @@ class DifferentiabilityWitnessInliner : public SILFunctionTransform {
 } // end anonymous namespace
 
 bool DifferentiabilityWitnessInliner::
-    inlineDifferentiabilityWitnessesInFunction(SILFunction &F) {
-  bool Changed = false;
-  llvm::SmallVector<DifferentiabilityWitnessFunctionInst *, 8> Insts;
-  for (auto &BB : F) {
-    for (auto &I : BB) {
-      auto *DFWI = dyn_cast<DifferentiabilityWitnessFunctionInst>(&I);
-      if (!DFWI)
+    inlineDifferentiabilityWitnessesInFunction(SILFunction &f) {
+  bool changed = false;
+  llvm::SmallVector<DifferentiabilityWitnessFunctionInst *, 8> insts;
+  for (auto &bb : f) {
+    for (auto &inst : bb) {
+      auto *dfwi = dyn_cast<DifferentiabilityWitnessFunctionInst>(&inst);
+      if (!dfwi)
         continue;
-      Insts.push_back(DFWI);
+      Insts.push_back(dfwi);
     }
   }
-  for (auto *I : Insts) {
-    auto *W = I->getWitness();
-    if (W->isDeclaration())
-      F.getModule().loadDifferentiabilityWitness(W);
-    if (W->isDeclaration())
+  for (auto *inst : insts) {
+    auto *wit = inst->getWitness();
+    if (wit->isDeclaration())
+      f.getModule().loadDifferentiabilityWitness(wit);
+    if (wit->isDeclaration())
       continue;
-    SILBuilderWithScope B(I);
-    auto Kind = I->getWitnessKind().getAsDerivativeFunctionKind();
-    assert(Kind.hasValue());
-    auto *NewI = B.createFunctionRefFor(I->getLoc(), W->getDerivative(*Kind));
-    I->replaceAllUsesWith(NewI);
-    I->getParent()->erase(I);
+    changed = true;
+    SILBuilderWithScope builder(inst);
+    auto kind = inst->getWitnessKind().getAsDerivativeFunctionKind();
+    assert(kind.hasValue());
+    auto *newInst = builder.createFunctionRefFor(inst->getLoc(),
+                                                 wit->getDerivative(*kind));
+    inst->replaceAllUsesWith(newInst);
+    inst->getParent()->erase(inst);
   }
-  return Changed;
+  return changed;
 }
 
 SILTransform *swift::createDifferentiabilityWitnessInliner() {
