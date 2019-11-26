@@ -159,6 +159,11 @@ public:
     return ConventionArguments.getValue().Name;
   }
 
+  /// Show the string enclosed between @convention(..)'s parentheses.
+  ///
+  /// For example, @convention(foo, bar) will give the string "foo, bar".
+  void getConventionArguments(SmallVectorImpl<char> &buffer) const;
+
   bool hasOwnership() const {
     return getOwnership() != ReferenceOwnership::Strong;
   }
