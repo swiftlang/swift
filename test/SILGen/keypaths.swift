@@ -369,18 +369,6 @@ struct SubscriptDefaults5 {
   }
 }
 
-struct SubscriptVariadic1 {
-  subscript(x: Int...) -> Int { x[0] }
-}
-
-struct SubscriptVariadic2 {
-  subscript<T : ExpressibleByStringLiteral>(x: T...) -> T { x[0] }
-}
-
-struct SubscriptVariadic3<T : ExpressibleByStringLiteral> {
-  subscript(x: T...) -> T { x[0] }
-}
-
 // CHECK-LABEL: sil hidden [ossa] @{{.*}}10subscripts1x1y1syx_q_SStSHRzSHR_r0_lF
 func subscripts<T: Hashable, U: Hashable>(x: T, y: U, s: String) {
   _ = \Subscripts<T>.[]
@@ -429,18 +417,6 @@ func subscripts<T: Hashable, U: Hashable>(x: T, y: U, s: String) {
   _ = \SubscriptDefaults4.[x: 0, y: 0]
   _ = \SubscriptDefaults5.[x: ""]
   _ = \SubscriptDefaults5.[x: "", y: ""]
-  
-  _ = \SubscriptVariadic1.[1, 2, 3]
-  _ = \SubscriptVariadic1.[1]
-  _ = \SubscriptVariadic1.[]
-  
-  _ = \SubscriptVariadic2.["", "1"]
-  _ = \SubscriptVariadic2.[""]
-  _ = \SubscriptVariadic2.["", #function]
-  
-  _ = \SubscriptVariadic3<String>.[""]
-  _ = \SubscriptVariadic3<String>.["", "1"]
-  _ = \SubscriptVariadic3<String>.[]
 }
 
 // CHECK-LABEL: sil hidden [ossa] @{{.*}}check_default_subscripts
@@ -474,6 +450,53 @@ func check_default_subscripts() {
   // CHECK: [[STRY:%[0-9]+]] = apply %{{[0-9]+}}([[STRY_LIT]], {{.*}}
   // CHECK: keypath $WritableKeyPath<SubscriptDefaults5, String>, (root $SubscriptDefaults5; settable_property $String, id @$s8keypaths18SubscriptDefaults5V1x1yxx_xtcs26ExpressibleByStringLiteralRzluig : $@convention(method) <τ_0_0 where τ_0_0 : ExpressibleByStringLiteral> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_0, SubscriptDefaults5) -> @out τ_0_0, getter @$s8keypaths18SubscriptDefaults5V1x1yxx_xtcs26ExpressibleByStringLiteralRzluipACSSTK : $@convention(thin) (@in_guaranteed SubscriptDefaults5, UnsafeRawPointer) -> @out String, setter @$s8keypaths18SubscriptDefaults5V1x1yxx_xtcs26ExpressibleByStringLiteralRzluipACSSTk : $@convention(thin) (@in_guaranteed String, @inout SubscriptDefaults5, UnsafeRawPointer) -> (), indices [%$0 : $String : $String, %$1 : $String : $String], indices_equals @$sS2STH : $@convention(thin) (UnsafeRawPointer, UnsafeRawPointer) -> Bool, indices_hash @$sS2STh : $@convention(thin) (UnsafeRawPointer) -> Int) ([[STRX]], [[STRY]])
   _ = \SubscriptDefaults5.[x: "", y: ""]
+}
+
+struct SubscriptVariadic1 {
+  subscript(x: Int...) -> Int { x[0] }
+}
+
+struct SubscriptVariadic2 {
+  subscript<T : ExpressibleByStringLiteral>(x: T...) -> T { x[0] }
+}
+
+struct SubscriptVariadic3<T : ExpressibleByStringLiteral> {
+  subscript(x: T...) -> T { x[0] }
+}
+
+// CHECK-LABEL: sil hidden [ossa] @{{.*}}test_variadics
+func test_variadics() {
+  // CHECK: [[ARR_COUNT:%[0-9]+]] = integer_literal $Builtin.Word, 3
+  // CHECK: [[FN_REF:%[0-9]+]] = function_ref @$ss27_allocateUninitializedArrayySayxG_BptBwlF
+  // CHECK: [[MAKE_ARR:%[0-9]+]] = apply [[FN_REF]]<Int>([[ARR_COUNT]])
+  // CHECK: ([[ARR:%[0-9]+]], %{{[0-9]+}}) = destructure_tuple [[MAKE_ARR]] : $(Array<Int>, Builtin.RawPointer)
+  // CHECK: keypath $KeyPath<SubscriptVariadic1, Int>, (root $SubscriptVariadic1; gettable_property $Int,  id @$s8keypaths18SubscriptVariadic1VyS2id_tcig : $@convention(method) (@guaranteed Array<Int>, SubscriptVariadic1) -> Int, getter @$s8keypaths18SubscriptVariadic1VyS2id_tcipACTK : $@convention(thin) (@in_guaranteed SubscriptVariadic1, UnsafeRawPointer) -> @out Int, indices [%$0 : $Array<Int> : $Array<Int>], indices_equals @$sSaySiGTH : $@convention(thin) (UnsafeRawPointer, UnsafeRawPointer) -> Bool, indices_hash @$sSaySiGTh : $@convention(thin) (UnsafeRawPointer) -> Int) ([[ARR]])
+  _ = \SubscriptVariadic1.[1, 2, 3]
+  // CHECK: [[ARR_COUNT:%[0-9]+]] = integer_literal $Builtin.Word, 1
+  // CHECK: [[FN_REF:%[0-9]+]] = function_ref @$ss27_allocateUninitializedArrayySayxG_BptBwlF
+  // CHECK: [[MAKE_ARR:%[0-9]+]] = apply [[FN_REF]]<Int>([[ARR_COUNT]])
+  // CHECK: ([[ARR:%[0-9]+]], %{{[0-9]+}}) = destructure_tuple [[MAKE_ARR]] : $(Array<Int>, Builtin.RawPointer)
+  // CHECK: keypath $KeyPath<SubscriptVariadic1, Int>, (root $SubscriptVariadic1; gettable_property $Int,  id @$s8keypaths18SubscriptVariadic1VyS2id_tcig : $@convention(method) (@guaranteed Array<Int>, SubscriptVariadic1) -> Int, getter @$s8keypaths18SubscriptVariadic1VyS2id_tcipACTK : $@convention(thin) (@in_guaranteed SubscriptVariadic1, UnsafeRawPointer) -> @out Int, indices [%$0 : $Array<Int> : $Array<Int>], indices_equals @$sSaySiGTH : $@convention(thin) (UnsafeRawPointer, UnsafeRawPointer) -> Bool, indices_hash @$sSaySiGTh : $@convention(thin) (UnsafeRawPointer) -> Int) ([[ARR]])
+  _ = \SubscriptVariadic1.[1]
+  // CHECK: [[ARR_COUNT:%[0-9]+]] = integer_literal $Builtin.Word, 0
+  // CHECK: [[FN_REF:%[0-9]+]] = function_ref @$ss27_allocateUninitializedArrayySayxG_BptBwlF
+  // CHECK: [[MAKE_ARR:%[0-9]+]] = apply [[FN_REF]]<Int>([[ARR_COUNT]])
+  // CHECK: ([[ARR:%[0-9]+]], %{{[0-9]+}}) = destructure_tuple [[MAKE_ARR]] : $(Array<Int>, Builtin.RawPointer)
+  // CHECK: keypath $KeyPath<SubscriptVariadic1, Int>, (root $SubscriptVariadic1; gettable_property $Int,  id @$s8keypaths18SubscriptVariadic1VyS2id_tcig : $@convention(method) (@guaranteed Array<Int>, SubscriptVariadic1) -> Int, getter @$s8keypaths18SubscriptVariadic1VyS2id_tcipACTK : $@convention(thin) (@in_guaranteed SubscriptVariadic1, UnsafeRawPointer) -> @out Int, indices [%$0 : $Array<Int> : $Array<Int>], indices_equals @$sSaySiGTH : $@convention(thin) (UnsafeRawPointer, UnsafeRawPointer) -> Bool, indices_hash @$sSaySiGTh : $@convention(thin) (UnsafeRawPointer) -> Int) ([[ARR]])
+  _ = \SubscriptVariadic1.[]
+  
+  _ = \SubscriptVariadic2.["", "1"]
+  _ = \SubscriptVariadic2.[""]
+  // CHECK: [[ARR_COUNT:%[0-9]+]] = integer_literal $Builtin.Word, 2
+  // CHECK: [[FN_REF:%[0-9]+]] = function_ref @$ss27_allocateUninitializedArrayySayxG_BptBwlF
+  // CHECK: [[MAKE_ARR:%[0-9]+]] = apply [[FN_REF]]<String>([[ARR_COUNT]])
+  // CHECK: ([[ARR:%[0-9]+]], %{{[0-9]+}}) = destructure_tuple [[MAKE_ARR]] : $(Array<String>, Builtin.RawPointer)
+  // CHECK: keypath $KeyPath<SubscriptVariadic2, String>, (root $SubscriptVariadic2; gettable_property $String,  id @$s8keypaths18SubscriptVariadic2Vyxxd_tcs26ExpressibleByStringLiteralRzluig : $@convention(method) <τ_0_0 where τ_0_0 : ExpressibleByStringLiteral> (@guaranteed Array<τ_0_0>, SubscriptVariadic2) -> @out τ_0_0, getter @$s8keypaths18SubscriptVariadic2Vyxxd_tcs26ExpressibleByStringLiteralRzluipACSSTK : $@convention(thin) (@in_guaranteed SubscriptVariadic2, UnsafeRawPointer) -> @out String, indices [%$0 : $Array<String> : $Array<String>], indices_equals @$sSaySSGTH : $@convention(thin) (UnsafeRawPointer, UnsafeRawPointer) -> Bool, indices_hash @$sSaySSGTh : $@convention(thin) (UnsafeRawPointer) -> Int) ([[ARR]])
+  _ = \SubscriptVariadic2.["", #function]
+  
+  _ = \SubscriptVariadic3<String>.[""]
+  _ = \SubscriptVariadic3<String>.["", "1"]
+  _ = \SubscriptVariadic3<String>.[]
 }
 
 // CHECK-LABEL: sil hidden [ossa] @{{.*}}subclass_generics
