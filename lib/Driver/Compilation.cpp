@@ -156,7 +156,8 @@ Compilation::Compilation(DiagnosticEngine &Diags,
       EmitExperimentalDependencyDotFileAfterEveryImport),
     ExperimentalDependenciesIncludeIntrafileOnes(
       ExperimentalDependenciesIncludeIntrafileOnes),
-    EnableSourceRangeDependencies(EnableSourceRangeDependencies) {
+    EnableSourceRangeDependencies(EnableSourceRangeDependencies),
+    UseSourceRangeDependencies(EnableSourceRangeDependencies) {
     if (CompareIncrementalSchemes)
       IncrementalComparator.emplace(
       // Ensure the references are to inst vars, NOT arguments
@@ -284,7 +285,7 @@ namespace driver {
           !Comp.IncrementalComparator && !willBeBuilding)
         return; // preserve legacy behavior
       const bool isHypothetical =
-          Comp.getUseSourceRangeDependencies() == forRanges;
+          Comp.getUseSourceRangeDependencies() != forRanges;
       llvm::outs() << (isHypothetical ? "Hypothetically: " : "")
                    << (willBeBuilding ? "Queuing " : "Skipping ")
                    << (forRanges ? "<Ranges> "
@@ -444,8 +445,10 @@ namespace driver {
     /// fails, this can cause deferred jobs to be immediately scheduled.
 
     template <unsigned N>
-    void reloadAndRemarkDeps(const Job *FinishedCmd, int ReturnCode,
+    void reloadAndRemarkDepsForDependencyStrategy(const Job *FinishedCmd, int ReturnCode,
                              SmallVector<const Job *, N> &Dependents) {
+      assert((Comp.IncrementalComparator || !Comp.getUseSourceRangeDependencies())
+      && "Should only be here if needing to calculate dep-strategy jobs");
 
       const CommandOutput &Output = FinishedCmd->getOutput();
       StringRef DependenciesFile =
@@ -459,7 +462,8 @@ namespace driver {
         // not using either of those right now, and this logic should probably
         // be revisited when we are.
         assert(FinishedCmd->getCondition() == Job::Condition::Always);
-      } else {
+        return;
+      }
         // If we have a dependency file /and/ the frontend task exited normally,
         // we can be discerning about what downstream files to rebuild.
         if (ReturnCode == EXIT_SUCCESS || ReturnCode == EXIT_FAILURE) {
@@ -490,7 +494,7 @@ namespace driver {
               break;
             LLVM_FALLTHROUGH;
           case DependencyGraphImpl::LoadResult::AffectsDownstream:
-            markTransitiveInDepGraph(Dependents, FinishedCmd,
+            markTransitiveInDepGraph(Dependents, FinishedCmd, /*forRanges=*/false,
                                      IncrementalTracer);
             break;
           }
@@ -501,7 +505,7 @@ namespace driver {
             // The job won't be treated as newly added next time. Conservatively
             // mark it as affecting other jobs, because some of them may have
             // completed already.
-            markTransitiveInDepGraph(Dependents, FinishedCmd,
+            markTransitiveInDepGraph(Dependents, FinishedCmd, /*forRanges=*/false,
                                      IncrementalTracer);
             break;
           case Job::Condition::Always:
@@ -516,7 +520,7 @@ namespace driver {
             // updated or compromised, so we don't actually know anymore; we
             // have to conservatively assume the changes could affect other
             // files.
-            markTransitiveInDepGraph(Dependents, FinishedCmd,
+            markTransitiveInDepGraph(Dependents, FinishedCmd, /*forRanges=*/false,
                                      IncrementalTracer);
             break;
           case Job::Condition::CheckDependencies:
@@ -530,7 +534,6 @@ namespace driver {
             break;
           }
         }
-      }
     }
 
     /// Check to see if a job produced a zero-length serialized diagnostics
@@ -653,7 +656,7 @@ namespace driver {
       if (Comp.getShowIncrementalBuildDecisions() &&
           Comp.IncrementalComparator && Comp.getUseSourceRangeDependencies() &&
           (!DependentsForDeps.empty() || !DependentsForRanges.empty())) {
-        llvm::outs() << "After completion of " << LogJob(FinishedCmd) << ": \n";
+        llvm::outs() << "\nAfter completion of " << LogJob(FinishedCmd) << ": \n";
         for (auto const *Cmd : DependentsForDeps)
           llvm::outs() << "- Dependencies would now schedule: " << LogJob(Cmd)
                        << "\n";
@@ -751,7 +754,7 @@ namespace driver {
       if (!Comp.getIncrementalBuildEnabled())
         return {};
       SmallVector<const Job *, 16> Dependents;
-      reloadAndRemarkDeps(FinishedCmd, ReturnCode, Dependents);
+      reloadAndRemarkDepsForDependencyStrategy(FinishedCmd, ReturnCode, Dependents);
       CommandSet DepSet;
       for (const Job *Cmd : Dependents)
         DepSet.insert(Cmd);
@@ -949,7 +952,7 @@ namespace driver {
                          ->getFirstSwiftPrimaryInput())
               << "') lacks a supplementary output needed for the source "
                  "range strategy.\n Maybe dependencies can do better than "
-                 "recompiling every file.\n";
+                 "recompiling every file.\n\n";
         }
         return true;
       }
@@ -958,13 +961,13 @@ namespace driver {
       if (compileJobsToScheduleViaSourceRanges.size() <
           Comp.countSwiftInputs()) {
         if (Comp.getShowIncrementalBuildDecisions())
-          llvm::outs() << "Using ranges\n";
+          llvm::outs() << "Using ranges\n\n";
         return false;
       }
       if (Comp.getShowIncrementalBuildDecisions())
         llvm::outs() << "Using dependencies: Range strategy would compile "
                         "every input; dependencies cannot be "
-                        "any worse.";
+                        "any worse.\n\n";
       return true;
     }
 
@@ -1152,7 +1155,7 @@ namespace driver {
         noteBuilding(Cmd, true, false, "(initial)");
         return true;
       case Job::Condition::CheckDependencies:
-        noteBuilding(Cmd, false, false, "flie is up-to-date and output exists");
+        noteBuilding(Cmd, false, false, "file is up-to-date and output exists");
         return false;
       }
     }
