@@ -445,10 +445,12 @@ namespace driver {
     /// fails, this can cause deferred jobs to be immediately scheduled.
 
     template <unsigned N>
-    void reloadAndRemarkDepsForDependencyStrategy(const Job *FinishedCmd, int ReturnCode,
-                             SmallVector<const Job *, N> &Dependents) {
-      assert((Comp.IncrementalComparator || !Comp.getUseSourceRangeDependencies())
-      && "Should only be here if needing to calculate dep-strategy jobs");
+    void reloadAndRemarkDepsForDependencyStrategy(
+        const Job *FinishedCmd, int ReturnCode,
+        SmallVector<const Job *, N> &Dependents) {
+      assert((Comp.IncrementalComparator ||
+              !Comp.getUseSourceRangeDependencies()) &&
+             "Should only be here if needing to calculate dep-strategy jobs");
 
       const CommandOutput &Output = FinishedCmd->getOutput();
       StringRef DependenciesFile =
@@ -464,40 +466,40 @@ namespace driver {
         assert(FinishedCmd->getCondition() == Job::Condition::Always);
         return;
       }
-        // If we have a dependency file /and/ the frontend task exited normally,
-        // we can be discerning about what downstream files to rebuild.
-        if (ReturnCode == EXIT_SUCCESS || ReturnCode == EXIT_FAILURE) {
-          // "Marked" means that everything provided by this node (i.e. Job) is
-          // dirty. Thus any file using any of these provides must be
-          // recompiled. (Only non-private entities are output as provides.) In
-          // other words, this Job "cascades"; the need to recompile it causes
-          // other recompilations. It is possible that the current code marks
-          // things that do not need to be marked. Unecessary compilation would
-          // result if that were the case.
-          bool wasCascading =
-              isMarkedInDepGraph(FinishedCmd, /*forRanges=*/false);
+      // If we have a dependency file /and/ the frontend task exited normally,
+      // we can be discerning about what downstream files to rebuild.
+      if (ReturnCode == EXIT_SUCCESS || ReturnCode == EXIT_FAILURE) {
+        // "Marked" means that everything provided by this node (i.e. Job) is
+        // dirty. Thus any file using any of these provides must be
+        // recompiled. (Only non-private entities are output as provides.) In
+        // other words, this Job "cascades"; the need to recompile it causes
+        // other recompilations. It is possible that the current code marks
+        // things that do not need to be marked. Unecessary compilation would
+        // result if that were the case.
+        bool wasCascading =
+            isMarkedInDepGraph(FinishedCmd, /*forRanges=*/false);
 
-          switch (loadDepGraphFromPath(FinishedCmd, DependenciesFile,
-                                       Comp.getDiags(), /*forRanges=*/false)) {
-          case DependencyGraphImpl::LoadResult::HadError:
-            if (ReturnCode == EXIT_SUCCESS) {
-              dependencyLoadFailed(DependenciesFile);
-              // Better try compiling whatever was waiting on more info.
-              for (const Job *Cmd : DeferredCommands)
-                scheduleCommandIfNecessaryAndPossible(Cmd);
-              DeferredCommands.clear();
-              Dependents.clear();
-            } // else, let the next build handle it.
+        switch (loadDepGraphFromPath(FinishedCmd, DependenciesFile,
+                                     Comp.getDiags(), /*forRanges=*/false)) {
+        case DependencyGraphImpl::LoadResult::HadError:
+          if (ReturnCode == EXIT_SUCCESS) {
+            dependencyLoadFailed(DependenciesFile);
+            // Better try compiling whatever was waiting on more info.
+            for (const Job *Cmd : DeferredCommands)
+              scheduleCommandIfNecessaryAndPossible(Cmd);
+            DeferredCommands.clear();
+            Dependents.clear();
+          } // else, let the next build handle it.
+          break;
+        case DependencyGraphImpl::LoadResult::UpToDate:
+          if (!wasCascading)
             break;
-          case DependencyGraphImpl::LoadResult::UpToDate:
-            if (!wasCascading)
-              break;
-            LLVM_FALLTHROUGH;
-          case DependencyGraphImpl::LoadResult::AffectsDownstream:
-            markTransitiveInDepGraph(Dependents, FinishedCmd, /*forRanges=*/false,
-                                     IncrementalTracer);
-            break;
-          }
+          LLVM_FALLTHROUGH;
+        case DependencyGraphImpl::LoadResult::AffectsDownstream:
+          markTransitiveInDepGraph(Dependents, FinishedCmd, /*forRanges=*/false,
+                                   IncrementalTracer);
+          break;
+        }
         } else {
           // If there's an abnormal exit (a crash), assume the worst.
           switch (FinishedCmd->getCondition()) {
@@ -505,8 +507,8 @@ namespace driver {
             // The job won't be treated as newly added next time. Conservatively
             // mark it as affecting other jobs, because some of them may have
             // completed already.
-            markTransitiveInDepGraph(Dependents, FinishedCmd, /*forRanges=*/false,
-                                     IncrementalTracer);
+            markTransitiveInDepGraph(Dependents, FinishedCmd,
+                                     /*forRanges=*/false, IncrementalTracer);
             break;
           case Job::Condition::Always:
             // Any incremental task that shows up here has already been marked;
@@ -520,8 +522,8 @@ namespace driver {
             // updated or compromised, so we don't actually know anymore; we
             // have to conservatively assume the changes could affect other
             // files.
-            markTransitiveInDepGraph(Dependents, FinishedCmd, /*forRanges=*/false,
-                                     IncrementalTracer);
+            markTransitiveInDepGraph(Dependents, FinishedCmd,
+                                     /*forRanges=*/false, IncrementalTracer);
             break;
           case Job::Condition::CheckDependencies:
             // If the only reason we're running this is because something else
@@ -656,7 +658,8 @@ namespace driver {
       if (Comp.getShowIncrementalBuildDecisions() &&
           Comp.IncrementalComparator && Comp.getUseSourceRangeDependencies() &&
           (!DependentsForDeps.empty() || !DependentsForRanges.empty())) {
-        llvm::outs() << "\nAfter completion of " << LogJob(FinishedCmd) << ": \n";
+        llvm::outs() << "\nAfter completion of " << LogJob(FinishedCmd)
+                     << ": \n";
         for (auto const *Cmd : DependentsForDeps)
           llvm::outs() << "- Dependencies would now schedule: " << LogJob(Cmd)
                        << "\n";
@@ -754,7 +757,8 @@ namespace driver {
       if (!Comp.getIncrementalBuildEnabled())
         return {};
       SmallVector<const Job *, 16> Dependents;
-      reloadAndRemarkDepsForDependencyStrategy(FinishedCmd, ReturnCode, Dependents);
+      reloadAndRemarkDepsForDependencyStrategy(FinishedCmd, ReturnCode,
+                                               Dependents);
       CommandSet DepSet;
       for (const Job *Cmd : Dependents)
         DepSet.insert(Cmd);

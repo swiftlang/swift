@@ -8,8 +8,7 @@
 
 
 // =============================================================================
-// First, build without range dependencies to simulate the transition to turning
-// them on.
+// First, build without range dependencies with no new options.
 // =============================================================================
 
 
@@ -39,9 +38,9 @@
 
 // RUN: %t/main | tee run0 | grep Any > /dev/null && rm %t/main
 
+
 // =============================================================================
-// Again, build without range dependencies to simulate the transition to turning
-// them on, with -driver-compare-incremental-schemes
+// Same, except force the driver to compute both strategies via -driver-compare-incremental-schemes
 // =============================================================================
 
 
@@ -128,7 +127,7 @@
 // RUN: %t/main | tee run2 | grep Any > /dev/null && rm %t/main
 
 // =============================================================================
-// Now, do it again with range dependencies enabled:
+// Steady-state: Now, do it again with range dependencies enabled:
 // =============================================================================
 
 
