@@ -5991,11 +5991,10 @@ private:
   AdjointValue accumulateAdjointsDirect(AdjointValue lhs, AdjointValue rhs,
                                         SILLocation loc);
 
-  /// Given two adjoint values, where one is a concrete value and another
-  /// is an aggregate, accumulate them.
-  AdjointValue accumulateAdjointsDirect(SILValue concrete,
-                                        AdjointValue aggregate,
-                                        SILLocation loc);
+  /// Given two adjoint values, where one is concrete and another is a symbolic
+  /// aggregate, accumulate them.
+  AdjointValue accumulateConcreteAndAggregateAdjointsDirect(
+      SILValue concrete, AdjointValue aggregate, SILLocation loc);
 
   /// Given two materialized adjoint values, accumulate them. These two
   /// adjoints must be objects of loadable type.
@@ -7687,10 +7686,8 @@ SILValue PullbackEmitter::emitZeroDirect(CanType type, SILLocation loc) {
   return loaded;
 }
 
-AdjointValue
-PullbackEmitter::accumulateAdjointsDirect(SILValue concrete,
-                                          AdjointValue aggregate,
-                                          SILLocation loc) {
+AdjointValue PullbackEmitter::accumulateConcreteAndAggregateAdjointsDirect(
+    SILValue concrete, AdjointValue aggregate, SILLocation loc) {
   assert(aggregate.isAggregate());
   SmallVector<AdjointValue, 8> newElements;
   auto concreteTy = concrete->getType().getASTType();
@@ -7744,7 +7741,7 @@ PullbackEmitter::accumulateAdjointsDirect(AdjointValue lhs, AdjointValue rhs,
       return lhs;
     // x + (y, z) => (x.0 + y, x.1 + z)
     case AdjointValueKind::Aggregate:
-      return accumulateAdjointsDirect(lhsVal, rhs, loc);
+      return accumulateConcreteAndAggregateAdjointsDirect(lhsVal, rhs, loc);
     }
   }
   // 0
@@ -7756,7 +7753,8 @@ PullbackEmitter::accumulateAdjointsDirect(AdjointValue lhs, AdjointValue rhs,
     switch (rhs.getKind()) {
     // (x, y) + z => (z.0 + x, z.1 + y)
     case AdjointValueKind::Concrete:
-      return accumulateAdjointsDirect(rhs.getConcreteValue(), lhs, loc);
+      return accumulateConcreteAndAggregateAdjointsDirect(
+          rhs.getConcreteValue(), lhs, loc);
     // x + 0 => x
     case AdjointValueKind::Zero:
       return lhs;

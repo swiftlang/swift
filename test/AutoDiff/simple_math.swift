@@ -353,40 +353,31 @@ SimpleMathTests.test("ForceUnwrapping") {
 
 // CHECK-LABEL: sil hidden [ossa] @AD__${{.*}}jumpTimesTwo{{.*}}pullback_src_0_wrt_0 : $@convention(thin) (Float, @owned _AD__$s4nullyycfU18_12jumpTimesTwoL_5modelSfAAyycfU18_14SmallTestModelL_V_tF_bb0__PB__src_0_wrt_0) -> SmallTestModel.TangentVector {
 // CHECK: bb0([[DX:%.*]] : $Float,  [[PB_STRUCT:%.*]] : {{.*}}):
-// CHECK-NEXT:   ([[PB0:%.*]], [[PB1:%.*]]) = destructure_struct [[PB_STRUCT]]
-// CHECK-NEXT:   [[ADJ_TUPLE:%.*]] = apply [[PB1]]([[DX]]) : $@callee_guaranteed (Float) -> (Float, Float)
-// CHECK-NEXT:   destroy_value [[PB1]] : $@callee_guaranteed (Float) -> (Float, Float)
-// CHECK-NEXT:   ([[TMP0:%.*]], [[ADJ_CONCRETE:%.*]]) = destructure_tuple [[ADJ_TUPLE]] : $(Float, Float)
-// CHECK-NEXT:   [[TMP1:%.*]] = apply [[PB0]]([[TMP0]]) : $@callee_guaranteed (Float) -> SmallTestModel.TangentVector
-// CHECK-NEXT:   destroy_value [[PB0]] : $@callee_guaranteed (Float) -> SmallTestModel.TangentVector
-// CHECK-NEXT:   [[ADJ_STRUCT_FIELD:%.*]] = destructure_struct [[TMP1]] : $SmallTestModel.TangentVector
-// CHECK-NEXT:   [[TMP_RES:%.*]] = alloc_stack $Float
-// CHECK-NEXT:   [[TMP_ADJ_STRUCT_FIELD:%.*]] = alloc_stack $Float
-// CHECK-NEXT:   [[TMP_ADJ_CONCRETE:%.*]] = alloc_stack $Float
-// CHECK-NEXT:   store [[ADJ_STRUCT_FIELD]] to [trivial] [[TMP_ADJ_STRUCT_FIELD]] : $*Float
-// CHECK-NEXT:   store [[ADJ_CONCRETE]] to [trivial] [[TMP_ADJ_CONCRETE]] : $*Float
-// CHECK-NEXT:   [[PLUS_EQUAL:%.*]] = witness_method $Float, #AdditiveArithmetic."+"!1 : <Self where Self : AdditiveArithmetic> (Self.Type) -> (Self, Self) -> Self : $@convention(witness_method: AdditiveArithmetic) <τ_0_0 where τ_0_0 : AdditiveArithmetic> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_0, @thick τ_0_0.Type) -> @out τ_0_0
-// CHECK-NEXT:   [[METATYPE:%.*]] = metatype $@thick Float.Type
-// CHECK-NEXT:   %{{.*}} = apply [[PLUS_EQUAL]]<Float>([[TMP_RES]], [[TMP_ADJ_CONCRETE]], [[TMP_ADJ_STRUCT_FIELD]], [[METATYPE]]) : $@convention(witness_method: AdditiveArithmetic) <τ_0_0 where τ_0_0 : AdditiveArithmetic> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_0, @thick τ_0_0.Type) -> @out τ_0_0
-// CHECK-NEXT:   destroy_addr [[TMP_ADJ_STRUCT_FIELD]] : $*Float
-// CHECK-NEXT:   destroy_addr [[TMP_ADJ_CONCRETE]] : $*Float
-// CHECK-NEXT:   dealloc_stack [[TMP_ADJ_CONCRETE]] : $*Float
-// CHECK-NEXT:   dealloc_stack [[TMP_ADJ_STRUCT_FIELD]] : $*Float
-// CHECK-NEXT:   [[RES:%.*]] = load [trivial] [[TMP_RES]] : $*Float
-// CHECK-NEXT:   dealloc_stack [[TMP_RES]] : $*Float
-// CHECK-NEXT:   [[RES_STRUCT:%.*]] = struct $SmallTestModel.TangentVector ([[RES]] : $Float)
-// CHECK-NEXT:   return [[RES_STRUCT]] : $SmallTestModel.TangentVector
-// CHECK-NEXT: }
+// CHECK:   ([[PB0:%.*]], [[PB1:%.*]]) = destructure_struct [[PB_STRUCT]]
+// CHECK:   [[ADJ_TUPLE:%.*]] = apply [[PB1]]([[DX]]) : $@callee_guaranteed (Float) -> (Float, Float)
+// CHECK:   ([[TMP0:%.*]], [[ADJ_CONCRETE:%.*]]) = destructure_tuple [[ADJ_TUPLE]] : $(Float, Float)
+// CHECK:   [[TMP1:%.*]] = apply [[PB0]]([[TMP0]]) : $@callee_guaranteed (Float) -> SmallTestModel.TangentVector
+// CHECK:   [[ADJ_STRUCT_FIELD:%.*]] = destructure_struct [[TMP1]] : $SmallTestModel.TangentVector
+// CHECK:   [[TMP_RES:%.*]] = alloc_stack $Float
+// CHECK:   [[TMP_ADJ_STRUCT_FIELD:%.*]] = alloc_stack $Float
+// CHECK:   [[TMP_ADJ_CONCRETE:%.*]] = alloc_stack $Float
+// CHECK:   store [[ADJ_STRUCT_FIELD]] to [trivial] [[TMP_ADJ_STRUCT_FIELD]] : $*Float
+// CHECK:   store [[ADJ_CONCRETE]] to [trivial] [[TMP_ADJ_CONCRETE]] : $*Float
+// CHECK:   [[PLUS_EQUAL:%.*]] = witness_method $Float, #AdditiveArithmetic."+"
+// CHECK:   %{{.*}} = apply [[PLUS_EQUAL]]<Float>([[TMP_RES]], [[TMP_ADJ_CONCRETE]], [[TMP_ADJ_STRUCT_FIELD]], {{.*}})
+// CHECK:   [[RES:%.*]] = load [trivial] [[TMP_RES]] : $*Float
+// CHECK:   [[RES_STRUCT:%.*]] = struct $SmallTestModel.TangentVector ([[RES]] : $Float)
+// CHECK:   return [[RES_STRUCT]] : $SmallTestModel.TangentVector
+// CHECK: }
 
 SimpleMathTests.test("Struct") {
-  // TF-943: Test adjoint value accumulation for aggregate lhs and concrete rhs.b
+  // TF-943: Test adjoint value accumulation for aggregate lhs and concrete rhs.
   struct SmallTestModel : Differentiable {
     public var jump: Float = 3.0
     @differentiable public func callAsFunction() -> Float { return jump }
   }
 
   func jumpTimesTwo(model: SmallTestModel) -> Float{
-    // Add an aggregate and a concrete value.
     return model() + model.jump
   }
   let grads = gradient(at: SmallTestModel(), in: jumpTimesTwo)
