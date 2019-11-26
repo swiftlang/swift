@@ -40,6 +40,7 @@ class ApplyInst;
 //===----------------------------------------------------------------------===//
 // Helpers
 //===----------------------------------------------------------------------===//
+
 namespace autodiff {
 
 /// Prints an "[AD] " prefix to `llvm::dbgs()` and returns the debug stream.
