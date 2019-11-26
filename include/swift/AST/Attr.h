@@ -1760,7 +1760,7 @@ class TransposeAttr final
   AbstractFunctionDecl *OriginalFunction = nullptr;
   /// The number of parsed parameters specified in 'wrt:'.
   unsigned NumParsedParameters = 0;
-  /// The differentiation parameters' indices, resolved by the type checker.
+  /// The transposed parameters' indices, resolved by the type checker.
   IndexSubset *ParameterIndices = nullptr;
 
   explicit TransposeAttr(bool implicit, SourceLoc atLoc, SourceRange baseRange,
@@ -1793,8 +1793,8 @@ public:
     OriginalFunction = decl;
   }
 
-  /// The parsed transposing parameters, i.e. the list of parameters
-  /// specified in 'wrt:'.
+  /// The parsed transposed parameters, i.e. the list of parameters specified in
+  /// 'wrt:'.
   ArrayRef<ParsedAutoDiffParameter> getParsedParameters() const {
     return {getTrailingObjects<ParsedAutoDiffParameter>(), NumParsedParameters};
   }
@@ -1816,9 +1816,6 @@ public:
     return DA->getKind() == DAK_Transpose;
   }
 };
-
-// TODO(TF-999): Remove deprecated `@transposing` attribute.
-using TransposingAttr = TransposeAttr;
 
 /// Relates a property to its projection value property, as described by a property wrapper. For
 /// example, given

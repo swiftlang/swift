@@ -622,11 +622,6 @@ func addTranspose<FunctionSignature><ParameterClause>(<FunctionParameter>_ v: <S
 func bazDerivative<FunctionSignature><ParameterClause>(<FunctionParameter>_ x: <SimpleTypeIdentifier>Float</SimpleTypeIdentifier>, </FunctionParameter><FunctionParameter>y: <SimpleTypeIdentifier>Float</SimpleTypeIdentifier></FunctionParameter>)</ParameterClause><ReturnClause>
     -> <TupleType>(<TupleTypeElement>value: <SimpleTypeIdentifier>Float</SimpleTypeIdentifier>, </TupleTypeElement><TupleTypeElement>pullback: <FunctionType>(<TupleTypeElement><SimpleTypeIdentifier>Float</SimpleTypeIdentifier></TupleTypeElement>) -> <TupleType>(<TupleTypeElement><SimpleTypeIdentifier>Float</SimpleTypeIdentifier>, </TupleTypeElement><TupleTypeElement><SimpleTypeIdentifier>Float</SimpleTypeIdentifier></TupleTypeElement>)</TupleType></FunctionType></TupleTypeElement>) </TupleType></ReturnClause></FunctionSignature><CodeBlock>{<ReturnStmt>
   return <TupleExpr>(<TupleExprElement><IdentifierExpr>x</IdentifierExpr>, </TupleExprElement><TupleExprElement><ClosureExpr>{ <ClosureSignature><ClosureParam>v </ClosureParam>in </ClosureSignature><IdentifierExpr>v </IdentifierExpr>}</ClosureExpr></TupleExprElement>)</TupleExpr></ReturnStmt>
-}</CodeBlock></FunctionDecl><FunctionDecl><Attribute>
-
-@transposing(<DeprecatedDerivativeRegistrationAttributeArguments><FunctionDeclName>+</FunctionDeclName></DeprecatedDerivativeRegistrationAttributeArguments>)</Attribute>
-func addTranspose<FunctionSignature><ParameterClause>(<FunctionParameter>_ v: <SimpleTypeIdentifier>Float</SimpleTypeIdentifier></FunctionParameter>) </ParameterClause><ReturnClause>-> <TupleType>(<TupleTypeElement><SimpleTypeIdentifier>Float</SimpleTypeIdentifier>, </TupleTypeElement><TupleTypeElement><SimpleTypeIdentifier>Float</SimpleTypeIdentifier></TupleTypeElement>) </TupleType></ReturnClause></FunctionSignature><CodeBlock>{<ReturnStmt>
-  return <TupleExpr>(<TupleExprElement><IdentifierExpr>v</IdentifierExpr>, </TupleExprElement><TupleExprElement><IdentifierExpr>v</IdentifierExpr></TupleExprElement>)</TupleExpr></ReturnStmt>
 }</CodeBlock></FunctionDecl>
 
 // TODO(TF-1009): Add syntax support for dot-separated qualified names in

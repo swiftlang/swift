@@ -996,12 +996,9 @@ public:
       Optional<DeclNameWithLoc> &jvpSpec, Optional<DeclNameWithLoc> &vjpSpec,
       TrailingWhereClause *&whereClause);
 
-  /// Parse a differentiation parameters clause.
+  /// Parse a differentiation parameters clause, i.e. the "wrt:" clause in
+  /// @differentiable and @derivative attributes.
   bool parseDifferentiationParametersClause(
-      SmallVectorImpl<ParsedAutoDiffParameter> &params, StringRef attrName);
-  
-  /// Parse a transposing parameters clause.
-  bool parseTransposingParametersClause(
       SmallVectorImpl<ParsedAutoDiffParameter> &params, StringRef attrName);
 
   /// Parse the @derivative attribute.
@@ -1013,14 +1010,14 @@ public:
   ParserResult<DerivativeAttr> parseDifferentiatingAttribute(SourceLoc AtLoc,
                                                              SourceLoc Loc);
 
+  /// Parse a transposed parameters clause, i.e. the "wrt:" clause in @transpose
+  /// attributes.
+  bool parseTransposedParametersClause(
+      SmallVectorImpl<ParsedAutoDiffParameter> &params, StringRef attrName);
+
   /// Parse the @transpose attribute.
   ParserResult<TransposeAttr> parseTransposeAttribute(SourceLoc AtLoc,
                                                       SourceLoc Loc);
-
-  /// Parse the deprecated @transposing attribute.
-  // TODO(TF-999): Remove the deprecated `@transposing` attribute.
-  ParserResult<TransposeAttr> parseTransposingAttribute(SourceLoc AtLoc,
-                                                        SourceLoc Loc);
 
   /// Parse the @quoted attribute.
   ParserResult<QuotedAttr> parseQuotedAttribute(SourceLoc AtLoc, SourceLoc Loc);

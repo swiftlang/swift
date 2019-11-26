@@ -70,10 +70,3 @@ func localTransposeRegistration() {
   @transpose(of: +)
   func foo(_ x: Float) -> (Float, Float)
 }
-
-// Test deprecated `@transposing` attribute.
-// expected-warning @+1 {{'@transposing' attribute is deprecated; use '@transpose(of:)' instead}}
-@transposing(linearFunc)
-func transpose(x: @nondiff Float) -> Float {
-  return (x, { 2 * $0 })
-}

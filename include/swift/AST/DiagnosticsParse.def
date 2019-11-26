@@ -1577,12 +1577,9 @@ ERROR(attr_transpose_expected_original_name,PointsToFirstBadToken,
       "expected an original function name", ())
 ERROR(attr_transpose_expected_label_linear_or_wrt,none,
       "expected 'wrt:'", ())
-WARNING(attr_transposing_deprecated,PointsToFirstBadToken,
-        "'@transposing' attribute is deprecated; use '@transpose(of:)' instead",
-        ())
 
-// transposing `wrt` parameters clause
-ERROR(transposing_params_clause_expected_parameter,PointsToFirstBadToken,
+// transpose `wrt` parameters clause
+ERROR(transpose_params_clause_expected_parameter,PointsToFirstBadToken,
       "expected a parameter, which can be a 'unsigned int' parameter number "
       "or 'self'", ())
 

@@ -936,10 +936,10 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
   }
 
   // SWIFT_ENABLE_TENSORFLOW
-  case DAK_Transposing: {
-    Printer.printAttrName("@transposing");
+  case DAK_Transpose: {
+    Printer.printAttrName("@transpose");
     Printer << '(';
-    auto *attr = cast<TransposingAttr>(this);
+    auto *attr = cast<TransposeAttr>(this);
     auto *transpose = cast<AbstractFunctionDecl>(D);
     Printer << attr->getOriginalFunctionName().Name;
     auto transParamsString = getTransposedParametersClauseString(
@@ -1114,10 +1114,9 @@ StringRef DeclAttribute::getAttrName() const {
     return "transpose";
   case DAK_Differentiating:
     return "differentiating";
-  case DAK_Transposing:
-    return "transposing";
   case DAK_Quoted:
     return "quoted";
+  // SWIFT_ENABLE_TENSORFLOW END
   }
   llvm_unreachable("bad DeclAttrKind");
 }

@@ -70,7 +70,6 @@ struct MyStruct {}
 // KEYWORD2-NEXT:             Keyword/None:                       IBSegueAction[#Func Attribute#]; name=IBSegueAction{{$}}
 // KEYWORD2-NEXT:             Keyword/None:                       quoted[#Func Attribute#]; name=quoted
 // KEYWORD2-NEXT:             Keyword/None:                       differentiating[#Func Attribute#]; name=differentiating
-// KEYWORD2-NEXT:             Keyword/None:                       transposing[#Func Attribute#]; name=transposing
 // SWIFT_ENABLE_TENSORFLOW END
 // KEYWORD2-NOT:              Keyword
 // KEYWORD2:                  Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct
@@ -191,7 +190,6 @@ struct _S {
 // ON_METHOD-DAG: Keyword/None:                       differentiable[#Func Attribute#]; name=differentiable
 // ON_METHOD-DAG: Keyword/None:                       derivative[#Func Attribute#]; name=derivative
 // ON_METHOD-DAG: Keyword/None:                       compilerEvaluable[#Func Attribute#]; name=compilerEvaluable
-// ON_METHOD-DAG: Keyword/None:                       transposing[#Func Attribute#]; name=transposing
 // ON_METHOD-DAG: Keyword/None:                       quoted[#Func Attribute#]; name=quoted
 // ON_METHOD-DAG: Keyword/None:                       differentiating[#Func Attribute#]; name=differentiating
 // SWIFT_ENABLE_TENSORFLOW END
@@ -255,7 +253,6 @@ struct _S {
 // ON_MEMBER_LAST-DAG: Keyword/None:                       differentiating[#Declaration Attribute#]; name=differentiating
 // ON_MEMBER_LAST-DAG: Keyword/None:                       compilerEvaluable[#Declaration Attribute#]; name=compilerEvaluable
 // ON_MEMBER_LAST-DAG: Keyword/None:                       noDerivative[#Declaration Attribute#]; name=noDerivative
-// ON_MEMBER_LAST-DAG: Keyword/None:                       transposing[#Declaration Attribute#]; name=transposing
 // ON_MEMBER_LAST-DAG: Keyword/None:                       quoted[#Declaration Attribute#]; name=quoted
 // SWIFT_ENABLE_TENSORFLOW END
 // ON_MEMBER_LAST-NOT: Keyword
@@ -309,7 +306,6 @@ func dummy2() {}
 // KEYWORD_LAST-NEXT:             Keyword/None:                       IBSegueAction[#Declaration Attribute#]; name=IBSegueAction{{$}}
 // KEYWORD_LAST-NEXT:             Keyword/None:                       quoted[#Declaration Attribute#]; name=quoted
 // KEYWORD_LAST-NEXT:             Keyword/None:                       differentiating[#Declaration Attribute#]; name=differentiating
-// KEYWORD_LAST-NEXT:             Keyword/None:                       transposing[#Declaration Attribute#]; name=transposing
 // SWIFT_ENABLE_TENSORFLOW END
 // KEYWORD_LAST-NOT:              Keyword
 // KEYWORD_LAST: Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct

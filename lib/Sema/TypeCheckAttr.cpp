@@ -252,8 +252,6 @@ class AttributeChecker : public AttributeVisitor<AttributeChecker> {
   void visitTransposeAttr(TransposeAttr *attr);
   // TODO(TF-999): Remove deprecated `@differentiating` attribute.
   void visitDifferentiatingAttr(DerivativeAttr *attr);
-  // TODO(TF-999): Remove deprecated `@transposing` attribute.
-  void visitTransposingAttr(TransposeAttr *attr);
   void visitCompilerEvaluableAttr(CompilerEvaluableAttr *attr);
   void visitNoDerivativeAttr(NoDerivativeAttr *attr);
   // SWIFT_ENABLE_TENSORFLOW END
@@ -3094,15 +3092,13 @@ static IndexSubset *computeDifferentiationParameters(
 }
 
 // SWIFT_ENABLE_TENSORFLOW
-// Computes `IndexSubset` from the given parsed transposing parameters
-// (possibly empty) for the given function, then verifies that the parameter
-// indices are valid.
-// The attribute name/location are used in diagnostics.
-static IndexSubset *computeTransposingParameters(
+// Computes `IndexSubset` from the given parsed transposed parameters (possibly
+// empty) for the given function, then verifies that the parameter indices are
+// valid. The attribute name/location are used in diagnostics.
+static IndexSubset *computeTransposedParameters(
     ArrayRef<ParsedAutoDiffParameter> parsedWrtParams,
     AbstractFunctionDecl *transposeFunction, bool isCurried,
-    GenericEnvironment *derivativeGenEnv, SourceLoc attrLoc
-) {
+    GenericEnvironment *derivativeGenEnv, SourceLoc attrLoc) {
   auto &ctx = transposeFunction->getASTContext();
   auto &diags = ctx.Diags;
 
@@ -3248,11 +3244,10 @@ static bool checkDifferentiationParameters(
 // context. Returns true on error.
 // The parsed differentiation parameters and attribute location are used in
 // diagnostics.
-static bool checkTransposingParameters(
-    AbstractFunctionDecl *AFD,
-    SmallVector<Type, 4> wrtParamTypes, GenericEnvironment *derivativeGenEnv,
-    ModuleDecl *module, ArrayRef<ParsedAutoDiffParameter> parsedWrtParams,
-    SourceLoc attrLoc) {
+static bool checkTransposedParameters(
+    AbstractFunctionDecl *AFD, SmallVector<Type, 4> wrtParamTypes,
+    GenericEnvironment *derivativeGenEnv, ModuleDecl *module,
+    ArrayRef<ParsedAutoDiffParameter> parsedWrtParams, SourceLoc attrLoc) {
   auto &ctx = AFD->getASTContext();
   auto &diags = ctx.Diags;
 
@@ -4001,7 +3996,7 @@ void AttributeChecker::visitTransposeAttr(TransposeAttr *attr) {
   // If checked wrt param indices are not specified, compute them.
   bool isCurried = transposeInterfaceType->getResult()->is<AnyFunctionType>();
   if (!wrtParamIndices)
-    wrtParamIndices = computeTransposingParameters(
+    wrtParamIndices = computeTransposedParameters(
         parsedWrtParams, transpose, isCurried,
         transpose->getGenericEnvironment(), attr->getLocation());
   if (!wrtParamIndices) {
@@ -4009,9 +4004,9 @@ void AttributeChecker::visitTransposeAttr(TransposeAttr *attr) {
     attr->setInvalid();
     return;
   }
-  
+
   // Diagnose empty parameter indices. This occurs when no `wrt` clause is
-  // declared and no differentiation parameters can be inferred.
+  // declared and no transposed parameters can be inferred.
   if (wrtParamIndices->isEmpty()) {
     diagnose(attr->getLocation(),
              diag::diff_params_clause_no_inferred_parameters);
@@ -4104,8 +4099,8 @@ void AttributeChecker::visitTransposeAttr(TransposeAttr *attr) {
              originalName.Name);
   };
 
-  // Returns true if the derivative function and original function candidate are
-  // defined in compatible type contexts. If the derivative function and the
+  // Returns true if the transpose function and original function candidate are
+  // defined in compatible type contexts. If the transpose function and the
   // original function candidate have different parents, return false.
   std::function<bool(AbstractFunctionDecl *)> hasValidTypeContext =
       [&](AbstractFunctionDecl *decl) { return true; };
@@ -4138,32 +4133,27 @@ void AttributeChecker::visitTransposeAttr(TransposeAttr *attr) {
 
   attr->setOriginalFunction(originalAFD);
 
-  // Gather differentiation parameters.
-  // Differentiation parameters are with respect to the original function.
+  // Get the transposed parameter types.
   SmallVector<Type, 4> wrtParamTypes;
   autodiff::getSubsetParameterTypes(wrtParamIndices, expectedOriginalFnType,
                                     wrtParamTypes);
 
-  // Check if differentiation parameter indices are valid.
-  if (checkTransposingParameters(originalAFD, wrtParamTypes,
-                                 transpose->getGenericEnvironment(),
-                                 transpose->getModuleContext(), parsedWrtParams,
-                                 attr->getLocation())) {
+  // Check if transposed parameter indices are valid.
+  if (checkTransposedParameters(originalAFD, wrtParamTypes,
+                                transpose->getGenericEnvironment(),
+                                transpose->getModuleContext(), parsedWrtParams,
+                                attr->getLocation())) {
     D->getAttrs().removeAttribute(attr);
     attr->setInvalid();
     return;
   }
 
-  // Set the checked differentiation parameter indices in the attribute.
+  // Set the checked transposed parameter indices in the attribute.
   attr->setParameterIndices(wrtParamIndices);
 }
 
 void AttributeChecker::visitDifferentiatingAttr(DerivativeAttr *attr) {
   visitDerivativeAttr(attr);
-}
-
-void AttributeChecker::visitTransposingAttr(TransposeAttr *attr) {
-  visitTransposeAttr(attr);
 }
 
 static bool

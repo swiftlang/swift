@@ -1792,9 +1792,6 @@ namespace decls_block {
     BCArray<BCFixed<1>> // Differentiation parameter indices' bitvector.
   >;
 
-  // TODO(TF-999): Remove deprecated `@transposing` attribute.
-  using TransposingDeclAttrLayout = TransposeDeclAttrLayout;
-
 #define SIMPLE_DECL_ATTR(X, CLASS, ...) \
   using CLASS##DeclAttrLayout = BCRecordLayout< \
     CLASS##_DECL_ATTR, \

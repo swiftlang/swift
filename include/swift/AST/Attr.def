@@ -545,11 +545,6 @@ DECL_ATTR(differentiating, Differentiating,
   OnFunc | LongAttribute | AllowMultipleAttributes |
   ABIStableToAdd | ABIBreakingToRemove | APIStableToAdd | APIBreakingToRemove |
   NotSerialized, 98)
-// TODO(TF-999): Remove deprecated `@transposing` attribute.
-DECL_ATTR(transposing, Transposing,
-  OnFunc | LongAttribute | AllowMultipleAttributes |
-  ABIStableToAdd | ABIBreakingToRemove | APIStableToAdd | APIBreakingToRemove |
-  NotSerialized, 99)
 // SWIFT_ENABLE_TENSORFLOW END
 
 #undef TYPE_ATTR

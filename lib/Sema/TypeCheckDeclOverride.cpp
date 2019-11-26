@@ -1429,7 +1429,6 @@ namespace  {
     UNINTERESTING_ATTR(Derivative)
     UNINTERESTING_ATTR(Transpose)
     UNINTERESTING_ATTR(Differentiating)
-    UNINTERESTING_ATTR(Transposing)
     UNINTERESTING_ATTR(NoDerivative)
     UNINTERESTING_ATTR(CompilerEvaluable)
     // SWIFT_ENABLE_TENSORFLOW END
