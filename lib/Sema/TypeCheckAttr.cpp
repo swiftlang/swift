@@ -248,7 +248,9 @@ class AttributeChecker : public AttributeVisitor<AttributeChecker> {
 
   // SWIFT_ENABLE_TENSORFLOW
   void visitDifferentiableAttr(DifferentiableAttr *attr);
-  void visitDifferentiatingAttr(DifferentiatingAttr *attr);
+  // TODO(TF-999): Remove deprecated `@differentiating` attribute.
+  void visitDifferentiatingAttr(DerivativeAttr *attr);
+  void visitDerivativeAttr(DerivativeAttr *attr);
   void visitCompilerEvaluableAttr(CompilerEvaluableAttr *attr);
   void visitNoDerivativeAttr(NoDerivativeAttr *attr);
   void visitTransposingAttr(TransposingAttr *attr);
@@ -3641,7 +3643,7 @@ DifferentiableAttributeParameterIndicesRequest::evaluate(
 }
 
 // SWIFT_ENABLE_TENSORFLOW
-void AttributeChecker::visitDifferentiatingAttr(DifferentiatingAttr *attr) {
+void AttributeChecker::visitDerivativeAttr(DerivativeAttr *attr) {
   FuncDecl *derivative = cast<FuncDecl>(D);
   auto lookupConformance =
       LookUpConformanceInModule(D->getDeclContext()->getParentModule());
@@ -3661,8 +3663,7 @@ void AttributeChecker::visitDifferentiatingAttr(DifferentiatingAttr *attr) {
   auto derivativeResultTupleType = derivativeResultType->getAs<TupleType>();
   if (!derivativeResultTupleType ||
       derivativeResultTupleType->getNumElements() != 2) {
-    diagnose(attr->getLocation(),
-             diag::differentiating_attr_expected_result_tuple);
+    diagnose(attr->getLocation(), diag::derivative_attr_expected_result_tuple);
     attr->setInvalid();
     return;
   }
@@ -3672,7 +3673,7 @@ void AttributeChecker::visitDifferentiatingAttr(DifferentiatingAttr *attr) {
   AutoDiffDerivativeFunctionKind kind;
   if (valueResultElt.getName().str() != "value") {
     diagnose(attr->getLocation(),
-             diag::differentiating_attr_invalid_result_tuple_value_label);
+             diag::derivative_attr_invalid_result_tuple_value_label);
     attr->setInvalid();
     return;
   }
@@ -3682,7 +3683,7 @@ void AttributeChecker::visitDifferentiatingAttr(DifferentiatingAttr *attr) {
     kind = AutoDiffDerivativeFunctionKind::VJP;
   } else {
     diagnose(attr->getLocation(),
-             diag::differentiating_attr_invalid_result_tuple_func_label);
+             diag::derivative_attr_invalid_result_tuple_func_label);
     attr->setInvalid();
     return;
   }
@@ -3695,7 +3696,7 @@ void AttributeChecker::visitDifferentiatingAttr(DifferentiatingAttr *attr) {
       valueResultType, diffableProto, derivative->getDeclContext(), None);
   if (!valueResultConf) {
     diagnose(attr->getLocation(),
-             diag::differentiating_attr_result_value_not_differentiable,
+             diag::derivative_attr_result_value_not_differentiable,
              valueResultElt.getType());
     attr->setInvalid();
     return;
@@ -3737,7 +3738,7 @@ void AttributeChecker::visitDifferentiatingAttr(DifferentiatingAttr *attr) {
   // diagnostics. Rename compatible diagnostics so that they're not
   // attribute-specific.
   auto overloadDiagnostic = [&]() {
-    diagnose(originalName.Loc, diag::differentiating_attr_overload_not_found,
+    diagnose(originalName.Loc, diag::derivative_attr_overload_not_found,
              originalName.Name, originalFnType);
   };
   auto ambiguousDiagnostic = [&]() {
@@ -3796,7 +3797,7 @@ void AttributeChecker::visitDifferentiatingAttr(DifferentiatingAttr *attr) {
     auto *asd = accessorDecl->getStorage();
     if (asd->hasStorage()) {
       diagnose(originalName.Loc,
-               diag::differentiating_attr_original_stored_property_unsupported,
+               diag::derivative_attr_original_stored_property_unsupported,
                originalName.Name);
       diagnose(originalAFD->getLoc(), diag::decl_declared_here,
                asd->getFullName());
@@ -3879,7 +3880,7 @@ void AttributeChecker::visitDifferentiatingAttr(DifferentiatingAttr *attr) {
   if (!funcEltType->isEqual(expectedFuncEltType)) {
     // Emit differential/pullback type mismatch error on attribute.
     diagnose(attr->getLocation(),
-             diag::differentiating_attr_result_func_type_mismatch,
+             diag::derivative_attr_result_func_type_mismatch,
              funcResultElt.getName(), originalAFD->getFullName());
     // Emit note with expected differential/pullback type on actual type
     // location.
@@ -3887,13 +3888,13 @@ void AttributeChecker::visitDifferentiatingAttr(DifferentiatingAttr *attr) {
         cast<TupleTypeRepr>(derivative->getBodyResultTypeLoc().getTypeRepr());
     auto *funcEltTypeRepr = tupleReturnTypeRepr->getElementType(1);
     diagnose(funcEltTypeRepr->getStartLoc(),
-             diag::differentiating_attr_result_func_type_mismatch_note,
+             diag::derivative_attr_result_func_type_mismatch_note,
              funcResultElt.getName(), expectedFuncEltType)
         .highlight(funcEltTypeRepr->getSourceRange());
     // Emit note showing original function location, if possible.
     if (originalAFD->getLoc().isValid())
       diagnose(originalAFD->getLoc(),
-               diag::differentiating_attr_result_func_original_note,
+               diag::derivative_attr_result_func_original_note,
                originalAFD->getFullName());
     attr->setInvalid();
     return;
@@ -3904,8 +3905,8 @@ void AttributeChecker::visitDifferentiatingAttr(DifferentiatingAttr *attr) {
   // differentiability will require SIL differentiability witnesses and lots of
   // plumbing.
   if (originalAFD->getParentSourceFile() != derivative->getParentSourceFile()) {
-    diagnoseAndRemoveAttr(
-        attr, diag::differentiating_attr_not_in_same_file_as_original);
+    diagnoseAndRemoveAttr(attr,
+                          diag::derivative_attr_not_in_same_file_as_original);
     return;
   }
 
@@ -3917,6 +3918,9 @@ void AttributeChecker::visitDifferentiatingAttr(DifferentiatingAttr *attr) {
       da = const_cast<DifferentiableAttr *>(cda);
   // If the original function does not have a `@differentiable` attribute with
   // the same differentiation parameters, create one.
+  // TODO(TF-835): Lower `@derivative` attributes directly to SIL
+  // differentiability witnesses during SILGen instead of generating implicit
+  // `@differentiable` attributes.
   if (!da) {
     da = DifferentiableAttr::create(
         originalAFD, /*implicit*/ true, attr->AtLoc, attr->getRange(),
@@ -3947,7 +3951,7 @@ void AttributeChecker::visitDifferentiatingAttr(DifferentiatingAttr *attr) {
   // If the original function has a `@differentiable` attribute with the same
   // differentiation parameters, check if the `@differentiable` attribute
   // already has a different registered derivative. If so, emit an error on the
-  // `@differentiating` attribute. Otherwise, register the derivative in the
+  // `@derivative` attribute. Otherwise, register the derivative in the
   // `@differentiable` attribute.
   switch (kind) {
   case AutoDiffDerivativeFunctionKind::JVP:
@@ -3956,7 +3960,7 @@ void AttributeChecker::visitDifferentiatingAttr(DifferentiatingAttr *attr) {
          da->getJVP()->Name.getBaseName() != derivative->getBaseName()) ||
         (da->getJVPFunction() && da->getJVPFunction() != derivative)) {
       diagnoseAndRemoveAttr(
-          attr, diag::differentiating_attr_original_already_has_derivative,
+          attr, diag::derivative_attr_original_already_has_derivative,
           originalAFD->getFullName());
       return;
     }
@@ -3968,13 +3972,17 @@ void AttributeChecker::visitDifferentiatingAttr(DifferentiatingAttr *attr) {
          da->getVJP()->Name.getBaseName() != derivative->getBaseName()) ||
         (da->getVJPFunction() && da->getVJPFunction() != derivative)) {
       diagnoseAndRemoveAttr(
-          attr, diag::differentiating_attr_original_already_has_derivative,
+          attr, diag::derivative_attr_original_already_has_derivative,
           originalAFD->getFullName());
       return;
     }
     da->setVJPFunction(derivative);
     break;
   }
+}
+
+void AttributeChecker::visitDifferentiatingAttr(DerivativeAttr *attr) {
+  visitDerivativeAttr(attr);
 }
 
 void AttributeChecker::visitTransposingAttr(TransposingAttr *attr) {
@@ -4079,7 +4087,7 @@ void AttributeChecker::visitTransposingAttr(TransposingAttr *attr) {
   // diagnostics. Rename compatible diagnostics so that they're not
   // attribute-specific.
   auto overloadDiagnostic = [&]() {
-    diagnose(originalName.Loc, diag::differentiating_attr_overload_not_found,
+    diagnose(originalName.Loc, diag::derivative_attr_overload_not_found,
              originalName.Name, expectedOriginalFnType);
   };
   auto ambiguousDiagnostic = [&]() {

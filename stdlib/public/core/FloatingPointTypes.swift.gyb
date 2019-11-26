@@ -1012,7 +1012,7 @@ extension ${Self} {
   @usableFromInline
   @_transparent
   // SWIFT_ENABLE_TENSORFLOW
-  @differentiating(-)
+  @derivative(of: -)
   static func _vjpNegate(x: ${Self})
     -> (value: ${Self}, pullback: (${Self}) -> ${Self}) {
     return (-x, { v in -v })
@@ -1021,7 +1021,7 @@ extension ${Self} {
   @usableFromInline
   @_transparent
   // SWIFT_ENABLE_TENSORFLOW
-  @differentiating(-)
+  @derivative(of: -)
   static func _jvpNegate(x: ${Self})
   -> (value: ${Self}, differential: (${Self}) -> ${Self}) {
     return (-x, { dx in -dx })
@@ -1182,7 +1182,7 @@ extension ${Self} {
 extension ${Self} {
   @inlinable // FIXME(sil-serialize-all)
   @_transparent
-  @differentiating(+)
+  @derivative(of: +)
   static func _vjpAdd(
     lhs: ${Self}, rhs: ${Self}
   ) -> (value: ${Self}, pullback: (${Self}) -> (${Self}, ${Self})) {
@@ -1191,7 +1191,7 @@ extension ${Self} {
 
   @inlinable // FIXME(sil-serialize-all)
   @_transparent
-  @differentiating(+)
+  @derivative(of: +)
   static func _jvpAdd(
     lhs: ${Self}, rhs: ${Self}
   ) -> (value: ${Self}, differential: (${Self}, ${Self}) -> ${Self}) {
@@ -1200,7 +1200,7 @@ extension ${Self} {
 
   @inlinable // FIXME(sil-serialize-all)
   @_transparent
-  @differentiating(-)
+  @derivative(of: -)
   static func _vjpSubtract(
     lhs: ${Self}, rhs: ${Self}
   ) -> (value: ${Self}, pullback: (${Self}) -> (${Self}, ${Self})) {
@@ -1209,7 +1209,7 @@ extension ${Self} {
 
   @inlinable // FIXME(sil-serialize-all)
   @_transparent
-  @differentiating(-)
+  @derivative(of: -)
   static func _jvpSubtract(
     lhs: ${Self}, rhs: ${Self}
   ) -> (value: ${Self}, differential: (${Self}, ${Self}) -> ${Self}) {
@@ -1218,7 +1218,7 @@ extension ${Self} {
 
   @inlinable // FIXME(sil-serialize-all)
   @_transparent
-  @differentiating(*)
+  @derivative(of: *)
   static func _vjpMultiply(
     lhs: ${Self}, rhs: ${Self}
   ) -> (value: ${Self}, pullback: (${Self}) -> (${Self}, ${Self})) {
@@ -1227,7 +1227,7 @@ extension ${Self} {
 
   @inlinable // FIXME(sil-serialize-all)
   @_transparent
-  @differentiating(*)
+  @derivative(of: *)
   static func _jvpMultiply(
     lhs: ${Self}, rhs: ${Self}
   ) -> (value: ${Self}, differential: (${Self}, ${Self}) -> ${Self}) {
@@ -1236,7 +1236,7 @@ extension ${Self} {
 
   @inlinable // FIXME(sil-serialize-all)
   @_transparent
-  @differentiating(/)
+  @derivative(of: /)
   static func _vjpDivide(
     lhs: ${Self}, rhs: ${Self}
   ) -> (value: ${Self}, pullback: (${Self}) -> (${Self}, ${Self})) {
@@ -1245,7 +1245,7 @@ extension ${Self} {
 
   @inlinable // FIXME(sil-serialize-all)
   @_transparent
-  @differentiating(/)
+  @derivative(of: /)
   static func _jvpDivide(
     lhs: ${Self}, rhs: ${Self}
   ) -> (value: ${Self}, differential: (${Self}, ${Self}) -> ${Self}) {

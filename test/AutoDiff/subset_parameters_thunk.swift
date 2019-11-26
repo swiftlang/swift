@@ -3,7 +3,7 @@
 @differentiable(where T: Differentiable)
 func foo<T: Numeric>(_ x: T, _ y: T) -> T { x * y }
 
-@differentiating(foo)
+@derivative(of: foo)
 func foo_vjp<T: Numeric & Differentiable>(_ x: T, _ y: T) -> (value: T, pullback: (T.TangentVector) -> (T.TangentVector, T.TangentVector)) {
   (foo(x, y), { _ in (.zero, .zero) })
 }

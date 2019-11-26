@@ -756,9 +756,9 @@ void SILGenModule::postEmitFunction(SILDeclRef constant,
   // SWIFT_ENABLE_TENSORFLOW
   // Visit `@differentiable` attributes and generate SIL differentiability
   // witnesses.
-  // TODO(TF-835): Visit `@differentiating` attributes when type-checking no
-  // longer generates implicit `@differentiable` attributes. See TF-835 for
-  // replacement code.
+  // TODO(TF-835): Visit `@derivative` attributes when type-checking no longer
+  // generates implicit `@differentiable` attributes. See TF-835 for replacement
+  // code.
   // Skip if the SILDeclRef is a:
   // - Default argument generator function.
   // - Thunk.
@@ -856,7 +856,7 @@ void SILGenModule::emitDifferentiabilityWitness(
     }
     // Check for existing same derivative.
     // TODO(TF-835): Remove condition below and simplify assertion to
-    // `!diffWitness->getDerivative(kind)` after `@differentiating` attribute
+    // `!diffWitness->getDerivative(kind)` after `@derivative` attribute
     // type-checking no longer generates implicit `@differentiable` attributes.
     auto *existingDerivative = diffWitness->getDerivative(kind);
     if (existingDerivative && existingDerivative == derivativeThunk)

@@ -1670,12 +1670,11 @@ public:
 /// Attribute that registers a function as a derivative of another function.
 ///
 /// Examples:
-///   @differentiating(sin(_:))
-///   @differentiating(+, wrt: (lhs, rhs))
-class DifferentiatingAttr final
+///   @derivative(of: sin(_:))
+///   @derivative(of: +, wrt: (lhs, rhs))
+class DerivativeAttr final
     : public DeclAttribute,
-      private llvm::TrailingObjects<DifferentiatingAttr,
-                                    ParsedAutoDiffParameter> {
+      private llvm::TrailingObjects<DerivativeAttr, ParsedAutoDiffParameter> {
   friend TrailingObjects;
 
   /// The original function name.
@@ -1687,24 +1686,22 @@ class DifferentiatingAttr final
   /// The differentiation parameters' indices, resolved by the type checker.
   IndexSubset *ParameterIndices = nullptr;
 
-  explicit DifferentiatingAttr(bool implicit, SourceLoc atLoc,
-                               SourceRange baseRange, DeclNameWithLoc original,
-                               ArrayRef<ParsedAutoDiffParameter> params);
+  explicit DerivativeAttr(bool implicit, SourceLoc atLoc, SourceRange baseRange,
+                          DeclNameWithLoc original,
+                          ArrayRef<ParsedAutoDiffParameter> params);
 
-  explicit DifferentiatingAttr(bool implicit, SourceLoc atLoc,
-                               SourceRange baseRange, DeclNameWithLoc original,
-                               IndexSubset *indices);
+  explicit DerivativeAttr(bool implicit, SourceLoc atLoc, SourceRange baseRange,
+                          DeclNameWithLoc original, IndexSubset *indices);
 
 public:
-  static DifferentiatingAttr *create(ASTContext &context, bool implicit,
-                                     SourceLoc atLoc, SourceRange baseRange,
-                                     DeclNameWithLoc original,
-                                     ArrayRef<ParsedAutoDiffParameter> params);
+  static DerivativeAttr *create(ASTContext &context, bool implicit,
+                                SourceLoc atLoc, SourceRange baseRange,
+                                DeclNameWithLoc original,
+                                ArrayRef<ParsedAutoDiffParameter> params);
 
-  static DifferentiatingAttr *create(ASTContext &context, bool implicit,
-                                     SourceLoc atLoc, SourceRange baseRange,
-                                     DeclNameWithLoc original,
-                                     IndexSubset *indices);
+  static DerivativeAttr *create(ASTContext &context, bool implicit,
+                                SourceLoc atLoc, SourceRange baseRange,
+                                DeclNameWithLoc original, IndexSubset *indices);
 
   DeclNameWithLoc getOriginalFunctionName() const {
     return OriginalFunctionName;
@@ -1736,10 +1733,13 @@ public:
   }
 
   static bool classof(const DeclAttribute *DA) {
-    return DA->getKind() == DAK_Differentiating;
+    return DA->getKind() == DAK_Derivative;
   }
 };
-  
+
+// TODO(TF-999): Remove deprecated `@differentiating` attribute.
+using DifferentiatingAttr = DerivativeAttr;
+
 /// Attribute that registers a function as a transpose of another function.
 ///
 /// Examples:

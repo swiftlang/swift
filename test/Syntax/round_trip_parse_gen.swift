@@ -601,10 +601,16 @@ func bar(_ x: Float, y: Float) -> Float { return 1 }
 @differentiable(wrt: (self, x, y), jvp: bar, vjp: foo(_:_:) where T : FloatingPoint)
 func bar<T : Numeric>(_ x: T, y: T) -> T { return 1 }
 
-@differentiating(-)
+@derivative(of: -)
 func negateDerivative(_ x: Float)
     -> (value: Float, pullback: (Float) -> Float) {
   return (-x, { v in -v })
+}
+
+@derivative(of: baz(label:_:))
+func bazDerivative(_ x: Float, y: Float)
+    -> (value: Float, pullback: (Float) -> (Float, Float)) {
+  return (x, { v in v })
 }
 
 @differentiating(baz(label:_:))

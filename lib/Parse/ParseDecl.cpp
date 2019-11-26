@@ -1130,9 +1130,9 @@ bool Parser::parseDifferentiableAttributeArguments(
 }
 
 /// SWIFT_ENABLE_TENSORFLOW
-ParserResult<DifferentiatingAttr>
-Parser::parseDifferentiatingAttribute(SourceLoc atLoc, SourceLoc loc) {
-  StringRef AttrName = "differentiating";
+ParserResult<DerivativeAttr> Parser::parseDerivativeAttribute(SourceLoc atLoc,
+                                                              SourceLoc loc) {
+  StringRef AttrName = "derivative";
   SourceLoc lParenLoc = loc, rParenLoc = loc;
   DeclNameWithLoc original;
   SmallVector<ParsedAutoDiffParameter, 8> params;
@@ -1151,7 +1151,6 @@ Parser::parseDifferentiatingAttribute(SourceLoc atLoc, SourceLoc loc) {
     diagnose(Tok, diag::attr_expected_label, "wrt", AttrName);
     return errorAndSkipUntilConsumeRightParen(*this, AttrName);
   };
-
   // Parse '('.
   if (!consumeIf(tok::l_paren, lParenLoc)) {
     diagnose(getEndOfPreviousLoc(), diag::attr_expected_lparen, AttrName,
@@ -1161,18 +1160,22 @@ Parser::parseDifferentiatingAttribute(SourceLoc atLoc, SourceLoc loc) {
   {
     SyntaxParsingContext ContentContext(
         SyntaxContext, SyntaxKind::DerivativeRegistrationAttributeArguments);
+    // Parse the 'of:' label and colon.
+    if (parseSpecificIdentifier("of", diag::attr_missing_label, "of",
+                                AttrName) ||
+        parseToken(tok::colon, diag::expected_colon_after_label, "of")) {
+      return makeParserError();
+    }
     {
       // Parse the name of the function.
-      SyntaxParsingContext FuncDeclNameContext(
-          SyntaxContext, SyntaxKind::FunctionDeclName);
+      SyntaxParsingContext FuncDeclNameContext(SyntaxContext,
+                                               SyntaxKind::FunctionDeclName);
       // NOTE: Use `afterDot = true` and `allowDeinitAndSubscript = true` to
-      // enable, e.g. `@differentiating(init)` and
-      // `@differentiating(subscript)`.
+      // enable, e.g. `@derivative(of: init)` and `@derivative(of: subscript)`.
       original.Name = parseUnqualifiedDeclName(
           /*afterDot*/ true, original.Loc,
-          diag::attr_differentiating_expected_original_name,
-          /*allowOperators*/ true, /*allowZeroArgCompoundNames*/ true,
-          /*allowDeinitAndSubscript*/ true);
+          diag::attr_derivative_expected_original_name, /*allowOperators*/ true,
+          /*allowZeroArgCompoundNames*/ true, /*allowDeinitAndSubscript*/ true);
       if (consumeIfTrailingComma())
         return makeParserError();
     }
@@ -1187,9 +1190,72 @@ Parser::parseDifferentiatingAttribute(SourceLoc atLoc, SourceLoc loc) {
              /*DeclModifier*/ false);
     return makeParserError();
   }
-  return ParserResult<DifferentiatingAttr>(DifferentiatingAttr::create(
-      Context, /*implicit*/ false, atLoc, SourceRange(loc, rParenLoc), original,
-      params));
+  return ParserResult<DerivativeAttr>(
+      DerivativeAttr::create(Context, /*implicit*/ false, atLoc,
+                             SourceRange(loc, rParenLoc), original, params));
+}
+
+/// SWIFT_ENABLE_TENSORFLOW
+ParserResult<DerivativeAttr>
+Parser::parseDifferentiatingAttribute(SourceLoc atLoc, SourceLoc loc) {
+  StringRef AttrName = "differentiating";
+  SourceLoc lParenLoc = loc, rParenLoc = loc;
+  DeclNameWithLoc original;
+  SmallVector<ParsedAutoDiffParameter, 8> params;
+
+  // Parse trailing comma, if it exists, and check for errors.
+  auto consumeIfTrailingComma = [&]() -> bool {
+    if (!consumeIf(tok::comma))
+      return false;
+    // Diagnose trailing comma before ')'.
+    if (Tok.is(tok::r_paren)) {
+      diagnose(Tok, diag::unexpected_separator, ",");
+      return errorAndSkipUntilConsumeRightParen(*this, AttrName);
+    }
+    // Check that token after comma is 'wrt:'.
+    if (isIdentifier(Tok, "wrt"))
+      return false;
+    diagnose(Tok, diag::attr_expected_label, "wrt", AttrName);
+    return errorAndSkipUntilConsumeRightParen(*this, AttrName);
+  };
+  // Parse '('.
+  if (!consumeIf(tok::l_paren, lParenLoc)) {
+    diagnose(getEndOfPreviousLoc(), diag::attr_expected_lparen, AttrName,
+             /*DeclModifier*/ false);
+    return makeParserError();
+  }
+  {
+    SyntaxParsingContext ContentContext(
+        SyntaxContext,
+        SyntaxKind::DeprecatedDerivativeRegistrationAttributeArguments);
+    {
+      // Parse the name of the function.
+      SyntaxParsingContext FuncDeclNameContext(
+          SyntaxContext, SyntaxKind::FunctionDeclName);
+      // NOTE: Use `afterDot = true` and `allowDeinitAndSubscript = true` to
+      // enable, e.g. `@differentiating(init)` and
+      // `@differentiating(subscript)`.
+      original.Name = parseUnqualifiedDeclName(
+          /*afterDot*/ true, original.Loc,
+          diag::attr_derivative_expected_original_name, /*allowOperators*/ true,
+          /*allowZeroArgCompoundNames*/ true, /*allowDeinitAndSubscript*/ true);
+      if (consumeIfTrailingComma())
+        return makeParserError();
+    }
+    // Parse the optional 'wrt' differentiation parameters clause.
+    if (isIdentifier(Tok, "wrt") &&
+        parseDifferentiationParametersClause(params, AttrName))
+      return makeParserError();
+  }
+  // Parse ')'.
+  if (!consumeIf(tok::r_paren, rParenLoc)) {
+    diagnose(getEndOfPreviousLoc(), diag::attr_expected_rparen, AttrName,
+             /*DeclModifier*/ false);
+    return makeParserError();
+  }
+  return ParserResult<DerivativeAttr>(
+      DerivativeAttr::create(Context, /*implicit*/ false, atLoc,
+                             SourceRange(loc, rParenLoc), original, params));
 }
 
 /// SWIFT_ENABLE_TENSORFLOW
@@ -2120,7 +2186,16 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
   }
 
   // SWIFT_ENABLE_TENSORFLOW
+  case DAK_Derivative: {
+    auto Attr = parseDerivativeAttribute(AtLoc, Loc);
+    if (Attr.isNonNull())
+      Attributes.add(Attr.get());
+    break;
+  }
+
+  // SWIFT_ENABLE_TENSORFLOW
   case DAK_Differentiating: {
+    diagnose(Loc, diag::attr_differentiating_deprecated);
     auto Attr = parseDifferentiatingAttribute(AtLoc, Loc);
     if (Attr.isNonNull())
       Attributes.add(Attr.get());

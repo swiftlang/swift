@@ -2,44 +2,44 @@
 
 /// Good
 
-@differentiating(sin) // ok
+@derivative(of: sin) // ok
 func jvpSin(x: @nondiff Float)
 -> (value: Float, differential: (Float)-> (Float)) {
   return (x, { $0 })
 }
 
-@differentiating(sin, wrt: x) // ok
+@derivative(of: sin, wrt: x) // ok
 func vjpSin(x: Float) -> (value: Float, pullback: (Float) -> Float) {
   return (x, { $0 })
 }
 
-@differentiating(add, wrt: (x, y)) // ok
+@derivative(of: add, wrt: (x, y)) // ok
 func vjpAdd(x: Float, y: Float)
 -> (value: Float, pullback: (Float) -> (Float, Float)) {
   return (x + y, { ($0, $0) })
 }
 
 extension AdditiveArithmetic where Self : Differentiable {
-  @differentiating(+) // ok
+  @derivative(of: +) // ok
   static func vjpPlus(x: Self, y: Self) -> (value: Self, 
   pullback: (Self.TangentVector) -> (Self.TangentVector, Self.TangentVector)) {
     return (x + y, { v in (v, v) })
   }
 }
 
-@differentiating(linear) // ok
+@derivative(of: linear) // ok
 func dfoo(x: Float) -> (value: Float, differential: (Float) -> (Float)) {
   return (x, { $0 })
 }
 
-// expected-error @+1 {{expected label 'wrt:' in '@differentiating' attribute}}
-@differentiating(linear, linear) // ok
+// expected-error @+1 {{expected label 'wrt:' in '@derivative' attribute}}
+@derivative(of: linear, linear) // ok
 func dfoo(x: Float) -> (value: Float, differential: (Float) -> (Float)) {
   return (x, { $0 })
 }
 
-// expected-error @+1 {{expected label 'wrt:' in '@differentiating' attribute}}
-@differentiating(foo, linear, wrt: x) // ok
+// expected-error @+1 {{expected label 'wrt:' in '@derivative' attribute}}
+@derivative(of: foo, linear, wrt: x) // ok
 func dfoo(x: Float) -> (value: Float, differential: (Float) -> (Float)) {
   return (x, { $0 })
 }
@@ -47,47 +47,47 @@ func dfoo(x: Float) -> (value: Float, differential: (Float) -> (Float)) {
 /// Bad
 
 // expected-error @+3 {{expected an original function name}}
-// expected-error @+2 {{expected ')' in 'differentiating' attribute}}
+// expected-error @+2 {{expected ')' in 'derivative' attribute}}
 // expected-error @+1 {{expected declaration}}
-@differentiating(3)
+@derivative(of: 3)
 func dfoo(x: Float) -> (value: Float, differential: (Float) -> (Float)) {
   return (x, { $0 })
 }
 
-// expected-error @+1 {{expected label 'wrt:' in '@differentiating' attribute}}
-@differentiating(linear, foo)
+// expected-error @+1 {{expected label 'wrt:' in '@derivative' attribute}}
+@derivative(of: linear, foo)
 func dfoo(x: Float) -> (value: Float, differential: (Float) -> (Float)) {
   return (x, { $0 })
 }
 
-// expected-error @+2 {{expected ')' in 'differentiating' attribute}}
+// expected-error @+2 {{expected ')' in 'derivative' attribute}}
 // expected-error @+1 {{expected declaration}}
-@differentiating(foo, wrt: x, linear)
+@derivative(of: foo, wrt: x, linear)
 func dfoo(x: Float) -> (value: Float, differential: (Float) -> (Float)) {
     return (x, { $0 })
 }
 
 // expected-error @+1 {{unexpected ',' separator}}
-@differentiating(foo,)
+@derivative(of: foo,)
 func dfoo(x: Float) -> (value: Float, differential: (Float) -> (Float)) {
   return (x, { $0 })
 }
 
-// expected-error @+2 {{expected ')' in 'differentiating' attribute}}
+// expected-error @+2 {{expected ')' in 'derivative' attribute}}
 // expected-error @+1 {{expected declaration}}
-@differentiating(foo, wrt: x,)
+@derivative(of: foo, wrt: x,)
 func dfoo(x: Float) -> (value: Float, differential: (Float) -> (Float)) {
   return (x, { $0 })
 }
 
-// expected-error @+1 {{expected label 'wrt:' in '@differentiating' attribute}}
-@differentiating(linear, foo,)
+// expected-error @+1 {{expected label 'wrt:' in '@derivative' attribute}}
+@derivative(of: linear, foo,)
 func dfoo(x: Float) -> (value: Float, differential: (Float) -> (Float)) {
   return (x, { $0 })
 }
 
 // expected-error @+1 {{unexpected ',' separator}}
-@differentiating(linear,)
+@derivative(of: linear,)
 func dfoo(x: Float) -> (value: Float, differential: (Float) -> (Float)) {
   return (x, { $0 })
 }
