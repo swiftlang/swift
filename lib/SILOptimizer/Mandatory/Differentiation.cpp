@@ -23,8 +23,6 @@
 
 #define DEBUG_TYPE "differentiation"
 
-#include "Differentiation.h"
-
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/AnyFunctionRef.h"
@@ -46,11 +44,13 @@
 #include "swift/SIL/Projection.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/TypeSubstCloner.h"
+#include "swift/SILOptimizer/Analysis/ActivityAnalysis.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/Analysis/LoopAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/DerivativeLookup.h"
+#include "swift/SILOptimizer/Utils/Differentiation.h"
 #include "swift/SILOptimizer/Utils/LoopUtils.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "llvm/ADT/APSInt.h"
@@ -58,6 +58,7 @@
 #include "llvm/ADT/DenseSet.h"
 
 using namespace swift;
+using namespace swift::autodiff;
 using llvm::DenseMap;
 using llvm::SmallDenseMap;
 using llvm::SmallDenseSet;
@@ -74,9 +75,6 @@ static llvm::cl::opt<bool> SkipFoldingDifferentiableFunctionExtraction(
 // Helpers
 //===----------------------------------------------------------------------===//
 
-/// Prints an "[AD] " prefix to `llvm::dbgs()` and returns the debug stream.
-/// This is being used to print short debug messages within the AD pass.
-static raw_ostream &getADDebugStream() { return llvm::dbgs() << "[AD] "; }
 
 /// Given a dumpable value, dumps it to `llvm::dbgs()`.
 template <typename T> static inline void debugDump(T &v) {
@@ -84,18 +82,16 @@ template <typename T> static inline void debugDump(T &v) {
                           << v << "\n==== END DEBUG DUMP ====\n");
 }
 
-static bool isWithoutDerivative(SILValue v) {
-  if (auto *fnRef = dyn_cast<FunctionRefInst>(v))
-    return fnRef->getReferencedFunctionOrNull()->hasSemanticsAttr(
-        "autodiff.nonvarying");
-  return false;
-}
+namespace swift {
+namespace autodiff {
+
+raw_ostream &getADDebugStream() { return llvm::dbgs() << "[AD] "; }
 
 static bool isArrayLiteralIntrinsic(ApplyInst *ai) {
   return ai->hasSemantics("array.uninitialized_intrinsic");
 }
 
-static ApplyInst *getAllocateUninitializedArrayIntrinsic(SILValue v) {
+ApplyInst *getAllocateUninitializedArrayIntrinsic(SILValue v) {
   if (auto *ai = dyn_cast<ApplyInst>(v))
     if (isArrayLiteralIntrinsic(ai))
       return ai;
@@ -148,10 +144,7 @@ static DestructureTupleInst *getSingleDestructureTupleUser(SILValue value) {
   return result;
 }
 
-/// Given an `apply` instruction, apply the given callback to each of its
-/// direct results. If the `apply` instruction has a single `destructure_tuple`
-/// user, apply the callback to the results of the `destructure_tuple` user.
-static void forEachApplyDirectResult(
+void forEachApplyDirectResult(
     ApplyInst *ai, llvm::function_ref<void(SILValue)> resultCallback) {
   if (!ai->getType().is<TupleType>()) {
     resultCallback(ai);
@@ -162,12 +155,8 @@ static void forEachApplyDirectResult(
       resultCallback(result);
 }
 
-/// Given a function, gathers all of its formal results (both direct and
-/// indirect) in an order defined by its result type. Note that "formal results"
-/// refer to result values in the body of the function, not at call sites.
-static void
-collectAllFormalResultsInTypeOrder(SILFunction &function,
-                                   SmallVectorImpl<SILValue> &results) {
+void collectAllFormalResultsInTypeOrder(SILFunction &function,
+                                        SmallVectorImpl<SILValue> &results) {
   SILFunctionConventions convs(function.getLoweredFunctionType(),
                                function.getModule());
   auto indResults = function.getIndirectResults();
@@ -185,6 +174,9 @@ collectAllFormalResultsInTypeOrder(SILFunction &function,
     results.push_back(resInfo.isFormalDirect() ? dirResults[dirResIdx++]
                                                : indResults[indResIdx++]);
 }
+
+} // end namespace autodiff
+} // end namespace swift
 
 /// Given a function, gathers all of its direct results in an order defined by
 /// its result type. Note that "formal results" refer to result values in the
@@ -499,7 +491,7 @@ public:
   void print(llvm::raw_ostream &os) const;
 };
 
-class DifferentiableActivityInfo;
+// class DifferentiableActivityInfo;
 
 /// Linear map struct and branching trace enum information for an original
 /// function and and derivative function (JVP or VJP).
@@ -1340,182 +1332,8 @@ ADContext::emitNondifferentiabilityError(SourceLoc loc,
   }
 }
 
-//===----------------------------------------------------------------------===//
-// Activity Analysis
-//===----------------------------------------------------------------------===//
 
 namespace {
-class DifferentiableActivityCollection;
-
-/// In many real situations, the end-users of AD need only the derivatives of
-/// some selected outputs of `P` with respect to some selected inputs of `P`.
-/// Whatever the differentiation mode (tangent, reverse,...), these restrictions
-/// allow the AD tool to produce a much more efficient differentiated program.
-/// Essentially, fixing some inputs and neglecting some outputs allows AD to
-/// just forget about several intermediate differentiated variables.
-///
-/// Activity analysis is the specific analysis that detects these situations,
-/// therefore allowing for a better differentiated code. Activity analysis is
-/// present in all transformation-based AD tools.
-///
-/// To begin with, the end-user specifies that only some output variables (the
-/// “dependent”) must be differentiated with respect to only some input
-/// variables (the “independent”). We say that variable `y` depends on `x` when
-/// the derivative of `y` with respect to `x` is not trivially null. We say that
-/// a variable is “varied” if it depends on at least one independent. Conversely
-/// we say that a variable is “useful” if at least one dependent depends on it.
-/// Finally, we say that a variable is “active” if it is at the same time varied
-/// and useful. In the special case of the tangent mode, it is easy to check
-/// that when variable `v` is not varied at some place in the program, then its
-/// derivative `v̇` at this place is certainly null. Conversely when variable `v`
-/// is not useful, then whatever the value of `v̇`, this value does not matter
-/// for the final result. Symmetric reasoning applies for the reverse mode of
-/// AD: observing that differentiated variables go upstream, we see that a
-/// useless variable has a null derivative, in other words the partial
-/// derivative of the output with respect to this variable is null. Conversely
-/// when variable `v` is not varied, then whatever the value of `v`, this value
-/// does not matter for the final result.
-///
-/// Reference:
-/// Laurent Hascoët. Automatic Differentiation by Program Transformation. 2007.
-class DifferentiableActivityAnalysis
-    : public FunctionAnalysisBase<DifferentiableActivityCollection> {
-private:
-  DominanceAnalysis *dominanceAnalysis = nullptr;
-  PostDominanceAnalysis *postDominanceAnalysis = nullptr;
-
-public:
-  explicit DifferentiableActivityAnalysis()
-      : FunctionAnalysisBase(SILAnalysisKind::DifferentiableActivity) {}
-
-  static bool classof(const SILAnalysis *s) {
-    return s->getKind() == SILAnalysisKind::DifferentiableActivity;
-  }
-
-  virtual bool shouldInvalidate(SILAnalysis::InvalidationKind k) override {
-    return k & InvalidationKind::Everything;
-  }
-
-  virtual std::unique_ptr<DifferentiableActivityCollection>
-  newFunctionAnalysis(SILFunction *f) override;
-
-  virtual void initialize(SILPassManager *pm) override;
-};
-} // end anonymous namespace
-
-namespace {
-/// Represents the differentiation activity associated with a SIL value.
-enum class ActivityFlags : unsigned {
-  /// The value depends on a function parameter.
-  Varied = 1 << 1,
-  /// The value contributes to a result.
-  Useful = 1 << 2,
-  /// The value is both varied and useful.
-  Active = Varied | Useful,
-};
-
-using Activity = OptionSet<ActivityFlags>;
-
-/// Result of activity analysis on a function. Accepts queries for whether a
-/// value is "varied", "useful" or "active" against certain differentiation
-/// indices.
-class DifferentiableActivityInfo {
-private:
-  DifferentiableActivityCollection &parent;
-
-  /// The derivative generic signature.
-  GenericSignature derivativeGenericSignature;
-
-  /// Input values, i.e. parameters (both direct and indirect).
-  SmallVector<SILValue, 4> inputValues;
-  /// Output values, i.e. individual values (not the final tuple) being returned
-  /// by the `return` instruction.
-  SmallVector<SILValue, 4> outputValues;
-
-  /// The set of varied variables, indexed by the corresponding independent
-  /// value (input) index.
-  SmallVector<SmallDenseSet<SILValue>, 4> variedValueSets;
-  /// The set of useful variables, indexed by the corresponding dependent value
-  /// (output) index.
-  SmallVector<SmallDenseSet<SILValue>, 4> usefulValueSets;
-
-  /// The original function.
-  SILFunction &getFunction();
-
-  /// Returns true if the given SILValue has a tangent space.
-  bool hasTangentSpace(SILValue value) {
-    auto type = value->getType().getASTType();
-    // Remap archetypes in the derivative generic signature, if it exists.
-    if (derivativeGenericSignature && type->hasArchetype()) {
-      type = derivativeGenericSignature->getCanonicalTypeInContext(
-          type->mapTypeOutOfContext());
-    }
-    // Look up conformance in the current module.
-    auto lookupConformance =
-        LookUpConformanceInModule(getFunction().getModule().getSwiftModule());
-    return type->getAutoDiffAssociatedTangentSpace(
-        lookupConformance).hasValue();
-  }
-
-  /// Perform analysis and populate variedness and usefulness sets.
-  void analyze(DominanceInfo *di, PostDominanceInfo *pdi);
-
-  /// Marks the given value as varied and propagates variedness to users.
-  void setVariedAndPropagateToUsers(SILValue value,
-                                    unsigned independentVariableIndex);
-  /// Propagates variedness from the given operand to its user's results.
-  void propagateVaried(Operand *operand, unsigned independentVariableIndex);
-  /// Marks the given value as varied and recursively propagates variedness
-  /// inwards (to operands) through projections. Skips `@noDerivative` struct
-  /// field projections.
-  void propagateVariedInwardsThroughProjections(
-      SILValue value, unsigned independentVariableIndex);
-
-  /// Marks the given value as useful for the given dependent variable index.
-  void setUseful(SILValue value, unsigned dependentVariableIndex);
-  /// Marks the given value as useful and recursively propagates usefulness to:
-  /// - Defining instruction operands, if the value has a defining instruction.
-  /// - Incoming values, if the value is a basic block argument.
-  void setUsefulAndPropagateToOperands(SILValue value,
-                                       unsigned dependentVariableIndex);
-  /// Propagates usefulnesss to the operands of the given instruction.
-  void propagateUseful(SILInstruction *inst, unsigned dependentVariableIndex);
-  /// Marks the given address as useful and recursively propagates usefulness
-  /// inwards (to operands) through projections. Skips `@noDerivative` struct
-  /// field projections.
-  void propagateUsefulThroughAddress(SILValue value,
-                                     unsigned dependentVariableIndex);
-  /// If the given value is an `array.uninitialized_intrinsic` application,
-  /// selectively propagate usefulness through its `RawPointer` result.
-  void setUsefulThroughArrayInitialization(SILValue value,
-                                           unsigned dependentVariableIndex);
-
-public:
-  explicit DifferentiableActivityInfo(
-      DifferentiableActivityCollection &parent,
-      GenericSignature derivativeGenericSignature);
-
-  /// Returns true if the given value is varied for the given independent
-  /// variable index.
-  bool isVaried(SILValue value, unsigned independentVariableIndex) const;
-
-  /// Returns true if the given value is varied for any of the given parameter
-  /// (independent variable) indices.
-  bool isVaried(SILValue value, IndexSubset *parameterIndices) const;
-
-  /// Returns true if the given value is useful for the given dependent variable
-  /// index.
-  bool isUseful(SILValue value, unsigned dependentVariableIndex) const;
-
-  /// Returns true if the given value is active for the given
-  /// `SILAutoDiffIndices` (parameter indices and result index).
-  bool isActive(SILValue value, const SILAutoDiffIndices &indices) const;
-
-  /// Returns the activity of the given value for the given `SILAutoDiffIndices`
-  /// (parameter indices and result index).
-  Activity getActivity(SILValue value,
-                       const SILAutoDiffIndices &indices) const;
-};
 
 /// For an `apply` instruction with active results, compute:
 /// - The results of the `apply` instruction, in type order.
@@ -1849,417 +1667,7 @@ void LinearMapInfo::generateDifferentiationDataStructures(
   });
 }
 
-class DifferentiableActivityCollection {
-public:
-  SmallDenseMap<GenericSignature, DifferentiableActivityInfo> activityInfoMap;
-  SILFunction &function;
-  DominanceInfo *domInfo;
-  PostDominanceInfo *postDomInfo;
-
-  DifferentiableActivityInfo &getActivityInfo(
-      GenericSignature assocGenSig, AutoDiffDerivativeFunctionKind kind) {
-    auto activityInfoLookup = activityInfoMap.find(assocGenSig);
-    if (activityInfoLookup != activityInfoMap.end())
-      return activityInfoLookup->getSecond();
-    auto insertion = activityInfoMap.insert(
-        {assocGenSig, DifferentiableActivityInfo(*this, assocGenSig)});
-    return insertion.first->getSecond();
-  }
-
-  explicit DifferentiableActivityCollection(SILFunction &f,
-                                            DominanceInfo *di,
-                                            PostDominanceInfo *pdi);
-};
-
 } // end anonymous namespace
-
-std::unique_ptr<DifferentiableActivityCollection>
-DifferentiableActivityAnalysis::newFunctionAnalysis(SILFunction *f) {
-  assert(dominanceAnalysis && "Expect a valid dominance anaysis");
-  assert(postDominanceAnalysis && "Expect a valid post-dominance anaysis");
-  return llvm::make_unique<DifferentiableActivityCollection>(
-      *f, dominanceAnalysis->get(f), postDominanceAnalysis->get(f));
-}
-
-void DifferentiableActivityAnalysis::initialize(SILPassManager *pm) {
-  dominanceAnalysis = pm->getAnalysis<DominanceAnalysis>();
-  postDominanceAnalysis = pm->getAnalysis<PostDominanceAnalysis>();
-}
-
-SILAnalysis *swift::createDifferentiableActivityAnalysis(SILModule *m) {
-  return new DifferentiableActivityAnalysis();
-}
-
-DifferentiableActivityCollection::DifferentiableActivityCollection(
-    SILFunction &f, DominanceInfo *di, PostDominanceInfo *pdi)
-    : function(f), domInfo(di), postDomInfo(pdi) {}
-
-DifferentiableActivityInfo::DifferentiableActivityInfo(
-    DifferentiableActivityCollection &parent, GenericSignature derivGenSig)
-    : parent(parent), derivativeGenericSignature(derivGenSig) {
-  analyze(parent.domInfo, parent.postDomInfo);
-}
-
-SILFunction &DifferentiableActivityInfo::getFunction() {
-  return parent.function;
-}
-
-void DifferentiableActivityInfo::analyze(DominanceInfo *di,
-                                         PostDominanceInfo *pdi) {
-  auto &function = getFunction();
-  LLVM_DEBUG(getADDebugStream()
-             << "Running activity analysis on @" << function.getName() << '\n');
-  // Inputs are just function's arguments, count `n`.
-  auto paramArgs = function.getArgumentsWithoutIndirectResults();
-  for (auto value : paramArgs)
-    inputValues.push_back(value);
-  LLVM_DEBUG({
-    auto &s = getADDebugStream();
-    s << "Inputs in @" << function.getName() << ":\n";
-    for (auto val : inputValues)
-      s << val << '\n';
-  });
-  // Outputs are indirect result buffers and return values, count `m`.
-  collectAllFormalResultsInTypeOrder(function, outputValues);
-  LLVM_DEBUG({
-    auto &s = getADDebugStream();
-    s << "Outputs in @" << function.getName() << ":\n";
-    for (auto val : outputValues)
-      s << val << '\n';
-  });
-
-  // Propagate variedness starting from the inputs.
-  assert(variedValueSets.empty());
-  for (auto inputAndIdx : enumerate(inputValues)) {
-    auto input = inputAndIdx.value();
-    unsigned i = inputAndIdx.index();
-    variedValueSets.push_back({});
-    setVariedAndPropagateToUsers(input, i);
-  }
-
-  // Mark differentiable outputs as useful.
-  assert(usefulValueSets.empty());
-  for (auto outputAndIdx : enumerate(outputValues)) {
-    auto output = outputAndIdx.value();
-    unsigned i = outputAndIdx.index();
-    usefulValueSets.push_back({});
-    setUsefulAndPropagateToOperands(output, i);
-  }
-}
-
-void DifferentiableActivityInfo::setVariedAndPropagateToUsers(
-    SILValue value, unsigned independentVariableIndex) {
-  // Skip already-varied values to prevent infinite recursion.
-  if (isVaried(value, independentVariableIndex))
-    return;
-  // Set the value as varied.
-  variedValueSets[independentVariableIndex].insert(value);
-  // Propagate variedness to users.
-  for (auto *use : value->getUses())
-    propagateVaried(use, independentVariableIndex);
-}
-
-void DifferentiableActivityInfo::propagateVaried(
-    Operand *operand, unsigned independentVariableIndex) {
-  auto *inst = operand->getUser();
-  // Propagate variedness for the given operand.
-  // General rule: mark results as varied and recursively propagate variedness
-  // to users of results.
-  auto i = independentVariableIndex;
-  // Handle `apply`.
-  if (auto *ai = dyn_cast<ApplyInst>(inst)) {
-    // If callee is non-varying, skip.
-    if (isWithoutDerivative(ai->getCallee()))
-      return;
-    // If operand is varied, set all direct/indirect results and inout arguments
-    // as varied.
-    if (isVaried(operand->get(), i)) {
-      for (auto indRes : ai->getIndirectSILResults())
-        propagateVariedInwardsThroughProjections(indRes, i);
-      for (auto inoutArg : ai->getInoutArguments())
-        propagateVariedInwardsThroughProjections(inoutArg, i);
-      forEachApplyDirectResult(ai, [&](SILValue directResult) {
-        setVariedAndPropagateToUsers(directResult, i);
-      });
-    }
-  }
-  // Handle store-like instructions:
-  //   `store`, `store_borrow`, `copy_addr`, `unconditional_checked_cast`
-#define PROPAGATE_VARIED_THROUGH_STORE(INST) \
-  else if (auto *si = dyn_cast<INST##Inst>(inst)) { \
-    if (isVaried(si->getSrc(), i)) \
-      propagateVariedInwardsThroughProjections(si->getDest(), i); \
-  }
-  PROPAGATE_VARIED_THROUGH_STORE(Store)
-  PROPAGATE_VARIED_THROUGH_STORE(StoreBorrow)
-  PROPAGATE_VARIED_THROUGH_STORE(CopyAddr)
-  PROPAGATE_VARIED_THROUGH_STORE(UnconditionalCheckedCastAddr)
-#undef PROPAGATE_VARIED_THROUGH_STORE
-  // Handle `tuple_element_addr`.
-  else if (auto *teai = dyn_cast<TupleElementAddrInst>(inst)) {
-    if (isVaried(teai->getOperand(), i)) {
-      // Propagate variedness only if the `tuple_element_addr` result has a
-      // tangent space. Otherwise, the result does not need a derivative.
-      if (hasTangentSpace(teai))
-        setVariedAndPropagateToUsers(teai, i);
-    }
-  }
-  // Handle `struct_extract` and `struct_element_addr` instructions.
-  // - If the field is marked `@noDerivative`, do not set the result as
-  //   varied because it does not need a derivative.
-  // - Otherwise, propagate variedness from operand to result as usual.
-#define PROPAGATE_VARIED_FOR_STRUCT_EXTRACTION(INST) \
-  else if (auto *sei = dyn_cast<INST##Inst>(inst)) { \
-    if (isVaried(sei->getOperand(), i) && \
-        !sei->getField()->getAttrs().hasAttribute<NoDerivativeAttr>()) \
-      setVariedAndPropagateToUsers(sei, i); \
-  }
-  PROPAGATE_VARIED_FOR_STRUCT_EXTRACTION(StructExtract)
-  PROPAGATE_VARIED_FOR_STRUCT_EXTRACTION(StructElementAddr)
-#undef PROPAGATE_VARIED_FOR_STRUCT_EXTRACTION
-  // Handle `br`.
-  else if (auto *bi = dyn_cast<BranchInst>(inst)) {
-    if (isVaried(operand->get(), i))
-      setVariedAndPropagateToUsers(bi->getArgForOperand(operand), i);
-  }
-  // Handle `cond_br`.
-  else if (auto *cbi = dyn_cast<CondBranchInst>(inst)) {
-    if (isVaried(operand->get(), i))
-      if (auto *destBBArg = cbi->getArgForOperand(operand))
-        setVariedAndPropagateToUsers(destBBArg, i);
-  }
-  // Handle `switch_enum`.
-  else if (auto *sei = dyn_cast<SwitchEnumInst>(inst)) {
-    if (isVaried(sei->getOperand(), i))
-      for (auto *succBB : sei->getSuccessorBlocks())
-        for (auto *arg : succBB->getArguments())
-          setVariedAndPropagateToUsers(arg, i);
-  }
-  // Handle everything else.
-  else {
-    for (auto &op : inst->getAllOperands()) {
-      if (isVaried(op.get(), i))
-        for (auto result : inst->getResults())
-          setVariedAndPropagateToUsers(result, i);
-    }
-  }
-}
-
-void DifferentiableActivityInfo::propagateVariedInwardsThroughProjections(
-    SILValue value, unsigned independentVariableIndex) {
-  // Skip `@noDerivative` struct projections.
-#define SKIP_NODERIVATIVE(INST) \
-  if (auto *sei = dyn_cast<INST##Inst>(value)) \
-    if (sei->getField()->getAttrs().hasAttribute<NoDerivativeAttr>()) \
-      return;
-  SKIP_NODERIVATIVE(StructExtract)
-  SKIP_NODERIVATIVE(StructElementAddr)
-#undef SKIP_NODERIVATIVE
-  // Set value as varied and propagate to users.
-  setVariedAndPropagateToUsers(value, independentVariableIndex);
-  auto *inst = value->getDefiningInstruction();
-  if (!inst || isa<ApplyInst>(inst))
-    return;
-  // Standard propagation.
-  for (auto &op : inst->getAllOperands())
-    propagateVariedInwardsThroughProjections(
-        op.get(), independentVariableIndex);
-}
-
-void DifferentiableActivityInfo::setUseful(SILValue value,
-                                           unsigned dependentVariableIndex) {
-  usefulValueSets[dependentVariableIndex].insert(value);
-  setUsefulThroughArrayInitialization(value, dependentVariableIndex);
-}
-
-void DifferentiableActivityInfo::setUsefulAndPropagateToOperands(
-    SILValue value, unsigned dependentVariableIndex) {
-  // Skip already-useful values to prevent infinite recursion.
-  if (isUseful(value, dependentVariableIndex))
-    return;
-  if (value->getType().isAddress()) {
-    propagateUsefulThroughAddress(value, dependentVariableIndex);
-    return;
-  }
-  setUseful(value, dependentVariableIndex);
-  // If the given value is a basic block argument, propagate usefulness to
-  // incoming values.
-  if (auto *bbArg = dyn_cast<SILPhiArgument>(value)) {
-    SmallVector<SILValue, 4> incomingValues;
-    bbArg->getSingleTerminatorOperands(incomingValues);
-    for (auto incomingValue : incomingValues)
-      setUsefulAndPropagateToOperands(incomingValue, dependentVariableIndex);
-    return;
-  }
-  auto *inst = value->getDefiningInstruction();
-  if (!inst)
-    return;
-  propagateUseful(inst, dependentVariableIndex);
-}
-
-void DifferentiableActivityInfo::propagateUseful(
-    SILInstruction *inst, unsigned dependentVariableIndex) {
-  // Propagate usefulness for the given instruction: mark operands as useful and
-  // recursively propagate usefulness to defining instructions of operands.
-  auto i = dependentVariableIndex;
-  // Handle indirect results in `apply`.
-  if (auto *ai = dyn_cast<ApplyInst>(inst)) {
-    if (isWithoutDerivative(ai->getCallee()))
-      return;
-    for (auto arg : ai->getArgumentsWithoutIndirectResults())
-      setUsefulAndPropagateToOperands(arg, i);
-  }
-  // Handle store-like instructions:
-  //   `store`, `store_borrow`, `copy_addr`, `unconditional_checked_cast`
-#define PROPAGATE_USEFUL_THROUGH_STORE(INST) \
-  else if (auto *si = dyn_cast<INST##Inst>(inst)) { \
-    setUsefulAndPropagateToOperands(si->getSrc(), i); \
-  }
-  PROPAGATE_USEFUL_THROUGH_STORE(Store)
-  PROPAGATE_USEFUL_THROUGH_STORE(StoreBorrow)
-  PROPAGATE_USEFUL_THROUGH_STORE(CopyAddr)
-  PROPAGATE_USEFUL_THROUGH_STORE(UnconditionalCheckedCastAddr)
-#undef PROPAGATE_USEFUL_THROUGH_STORE
-  // Handle struct element extraction, skipping `@noDerivative` fields:
-  //   `struct_extract`, `struct_element_addr`.
-#define PROPAGATE_USEFUL_THROUGH_STRUCT_EXTRACTION(INST) \
-  else if (auto *sei = dyn_cast<INST##Inst>(inst)) { \
-    if (!sei->getField()->getAttrs().hasAttribute<NoDerivativeAttr>()) \
-      setUsefulAndPropagateToOperands(sei->getOperand(), i); \
-  }
-  PROPAGATE_USEFUL_THROUGH_STRUCT_EXTRACTION(StructExtract)
-  PROPAGATE_USEFUL_THROUGH_STRUCT_EXTRACTION(StructElementAddr)
-#undef PROPAGATE_USEFUL_THROUGH_STRUCT_EXTRACTION
-  // Handle everything else.
-  else {
-    for (auto &op : inst->getAllOperands())
-      setUsefulAndPropagateToOperands(op.get(), i);
-  }
-}
-
-void DifferentiableActivityInfo::propagateUsefulThroughAddress(
-    SILValue value, unsigned dependentVariableIndex) {
-  assert(value->getType().isAddress());
-  // Skip already-useful values to prevent infinite recursion.
-  if (isUseful(value, dependentVariableIndex))
-    return;
-  setUseful(value, dependentVariableIndex);
-  if (auto *inst = value->getDefiningInstruction())
-    propagateUseful(inst, dependentVariableIndex);
-  // Recursively propagate usefulness through users that are projections or
-  // `begin_access` instructions.
-  for (auto use : value->getUses()) {
-    // Propagate usefulness through user's operands.
-    propagateUseful(use->getUser(), dependentVariableIndex);
-    for (auto res : use->getUser()->getResults()) {
-#define SKIP_NODERIVATIVE(INST)                                                \
-      if (auto *sei = dyn_cast<INST##Inst>(res))                               \
-        if (sei->getField()->getAttrs().hasAttribute<NoDerivativeAttr>())      \
-          continue;
-      SKIP_NODERIVATIVE(StructExtract)
-      SKIP_NODERIVATIVE(StructElementAddr)
-#undef SKIP_NODERIVATIVE
-      if (Projection::isAddressProjection(res) || isa<BeginAccessInst>(res))
-        propagateUsefulThroughAddress(res, dependentVariableIndex);
-    }
-  }
-}
-
-void DifferentiableActivityInfo::setUsefulThroughArrayInitialization(
-    SILValue value, unsigned dependentVariableIndex) {
-  // Array initializer syntax is lowered to an intrinsic and one or more
-  // stores to a `RawPointer` returned by the intrinsic.
-  auto *uai = getAllocateUninitializedArrayIntrinsic(value);
-  if (!uai) return;
-  for (auto use : value->getUses()) {
-    auto *dti = dyn_cast<DestructureTupleInst>(use->getUser());
-    if (!dti) continue;
-    // The second tuple field of the return value is the `RawPointer`.
-    for (auto use : dti->getResult(1)->getUses()) {
-      // The `RawPointer` passes through a `pointer_to_address`. That
-      // instruction's first use is a `store` whose source is useful; its
-      // subsequent uses are `index_addr`s whose only use is a useful `store`.
-      auto *ptai = dyn_cast<PointerToAddressInst>(use->getUser());
-      assert(ptai && "Expected `pointer_to_address` user for uninitialized "
-                     "array intrinsic");
-      // Propagate usefulness through array element addresses.
-      // - Find `store` and `copy_addr` instructions with array element
-      //   address destinations.
-      // - For each instruction, set destination (array element address) as
-      //   useful and propagate usefulness through source.
-      //
-      // Note: `propagateUseful(use->getUser(), ...)` is intentionally not used
-      // because it marks more values than necessary as useful, including:
-      // - The `RawPointer` result of the intrinsic.
-      // - The `pointer_to_address` user of the `RawPointer`.
-      // - `index_addr` and `integer_literal` instructions for indexing the
-      //   `RawPointer`.
-      for (auto use : ptai->getUses()) {
-        auto *user = use->getUser();
-        if (auto *si = dyn_cast<StoreInst>(user)) {
-          setUseful(si->getDest(), dependentVariableIndex);
-          setUsefulAndPropagateToOperands(si->getSrc(), dependentVariableIndex);
-        } else if (auto *cai = dyn_cast<CopyAddrInst>(user)) {
-          setUseful(cai->getDest(), dependentVariableIndex);
-          setUsefulAndPropagateToOperands(cai->getSrc(),
-                                          dependentVariableIndex);
-        } else if (auto *iai = dyn_cast<IndexAddrInst>(user)) {
-          for (auto use : iai->getUses()) {
-            auto *user = use->getUser();
-            if (auto si = dyn_cast<StoreInst>(user)) {
-              setUseful(si->getDest(), dependentVariableIndex);
-              setUsefulAndPropagateToOperands(si->getSrc(),
-                                              dependentVariableIndex);
-            } else if (auto *cai = dyn_cast<CopyAddrInst>(user)) {
-              setUseful(cai->getDest(), dependentVariableIndex);
-              setUsefulAndPropagateToOperands(cai->getSrc(),
-                                              dependentVariableIndex);
-            }
-          }
-        }
-      }
-    }
-  }
-}
-
-bool DifferentiableActivityInfo::isVaried(
-    SILValue value, unsigned independentVariableIndex) const {
-  assert(independentVariableIndex < variedValueSets.size() &&
-         "Independent variable index out of range");
-  auto &set = variedValueSets[independentVariableIndex];
-  return set.count(value);
-}
-
-bool DifferentiableActivityInfo::isVaried(
-    SILValue value, IndexSubset *independentVariableIndices) const {
-  for (auto i : independentVariableIndices->getIndices())
-    if (isVaried(value, i))
-      return true;
-  return false;
-}
-
-bool DifferentiableActivityInfo::isUseful(
-    SILValue value, unsigned dependentVariableIndex) const {
-  assert(dependentVariableIndex < usefulValueSets.size() &&
-         "Dependent variable index out of range");
-  auto &set = usefulValueSets[dependentVariableIndex];
-  return set.count(value);
-}
-
-bool DifferentiableActivityInfo::isActive(
-    SILValue value, const SILAutoDiffIndices &indices) const {
-  return isVaried(value, indices.parameters) && isUseful(value, indices.source);
-}
-
-Activity DifferentiableActivityInfo::getActivity(
-    SILValue value, const SILAutoDiffIndices &indices) const {
-  Activity activity;
-  if (isVaried(value, indices.parameters))
-    activity |= ActivityFlags::Varied;
-  if (isUseful(value, indices.source))
-    activity |= ActivityFlags::Useful;
-  return activity;
-}
 
 static void dumpActivityInfo(SILValue value,
                              const SILAutoDiffIndices &indices,

@@ -2,6 +2,7 @@ silopt_register_sources(
   ARCAnalysis.cpp
   AccessSummaryAnalysis.cpp
   AccessedStorageAnalysis.cpp
+  ActivityAnalysis.cpp
   AliasAnalysis.cpp
   Analysis.cpp
   ArraySemantic.cpp
