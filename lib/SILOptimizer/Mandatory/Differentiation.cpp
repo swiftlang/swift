@@ -5991,11 +5991,6 @@ private:
   AdjointValue accumulateAdjointsDirect(AdjointValue lhs, AdjointValue rhs,
                                         SILLocation loc);
 
-  /// Given two adjoint values, where one is concrete and another is a symbolic
-  /// aggregate, accumulate them.
-  AdjointValue accumulateConcreteAndAggregateAdjointsDirect(
-      SILValue concrete, AdjointValue aggregate, SILLocation loc);
-
   /// Given two materialized adjoint values, accumulate them. These two
   /// adjoints must be objects of loadable type.
   SILValue accumulateDirect(SILValue lhs, SILValue rhs, SILLocation loc);
@@ -7686,38 +7681,6 @@ SILValue PullbackEmitter::emitZeroDirect(CanType type, SILLocation loc) {
   return loaded;
 }
 
-AdjointValue PullbackEmitter::accumulateConcreteAndAggregateAdjointsDirect(
-    SILValue concrete, AdjointValue aggregate, SILLocation loc) {
-  assert(aggregate.isAggregate());
-  SmallVector<AdjointValue, 8> newElements;
-  auto concreteTy = concrete->getType().getASTType();
-  auto concreteCopy = builder.emitCopyValueOperation(loc, concrete);
-  if (auto *tupTy = concreteTy->getAs<TupleType>()) {
-    auto elts = builder.createDestructureTuple(loc, concreteCopy);
-    llvm::for_each(elts->getResults(),
-                   [this](SILValue result) { recordTemporary(result); });
-    for (auto i : indices(elts->getResults())) {
-      auto aggregateElt = aggregate.getAggregateElement(i);
-      newElements.push_back(accumulateAdjointsDirect(
-          makeConcreteAdjointValue(elts->getResult(i)), aggregateElt, loc));
-    }
-  } else if (auto *structDecl = concreteTy->getStructOrBoundGenericStruct()) {
-    auto elts =
-        builder.createDestructureStruct(concrete.getLoc(), concreteCopy);
-    llvm::for_each(elts->getResults(),
-                   [this](SILValue result) { recordTemporary(result); });
-    for (unsigned i : indices(elts->getResults())) {
-      auto aggregateElt = aggregate.getAggregateElement(i);
-      newElements.push_back(
-          accumulateAdjointsDirect(
-              makeConcreteAdjointValue(elts->getResult(i)), aggregateElt, loc));
-    }
-  } else {
-    llvm_unreachable("Not an aggregate type");
-  }
-  return makeAggregateAdjointValue(concrete->getType(), newElements);
-}
-
 AdjointValue
 PullbackEmitter::accumulateAdjointsDirect(AdjointValue lhs, AdjointValue rhs,
                                           SILLocation loc) {
@@ -7741,7 +7704,33 @@ PullbackEmitter::accumulateAdjointsDirect(AdjointValue lhs, AdjointValue rhs,
       return lhs;
     // x + (y, z) => (x.0 + y, x.1 + z)
     case AdjointValueKind::Aggregate:
-      return accumulateConcreteAndAggregateAdjointsDirect(lhsVal, rhs, loc);
+      SmallVector<AdjointValue, 8> newElements;
+      auto lhsTy = lhsVal->getType().getASTType();
+      auto lhsValCopy = builder.emitCopyValueOperation(loc, lhsVal);
+      if (auto *tupTy = lhsTy->getAs<TupleType>()) {
+        auto elts = builder.createDestructureTuple(loc, lhsValCopy);
+        llvm::for_each(elts->getResults(),
+                       [this](SILValue result) { recordTemporary(result); });
+        for (auto i : indices(elts->getResults())) {
+          auto rhsElt = rhs.getAggregateElement(i);
+          newElements.push_back(accumulateAdjointsDirect(
+              makeConcreteAdjointValue(elts->getResult(i)), rhsElt, loc));
+        }
+      } else if (auto *structDecl = lhsTy->getStructOrBoundGenericStruct()) {
+        auto elts =
+            builder.createDestructureStruct(lhsVal.getLoc(), lhsValCopy);
+        llvm::for_each(elts->getResults(),
+                       [this](SILValue result) { recordTemporary(result); });
+        for (unsigned i : indices(elts->getResults())) {
+          auto rhsElt = rhs.getAggregateElement(i);
+          newElements.push_back(
+              accumulateAdjointsDirect(
+                  makeConcreteAdjointValue(elts->getResult(i)), rhsElt, loc));
+        }
+      } else {
+        llvm_unreachable("Not an aggregate type");
+      }
+      return makeAggregateAdjointValue(lhsVal->getType(), newElements);
     }
   }
   // 0
@@ -7753,8 +7742,7 @@ PullbackEmitter::accumulateAdjointsDirect(AdjointValue lhs, AdjointValue rhs,
     switch (rhs.getKind()) {
     // (x, y) + z => (z.0 + x, z.1 + y)
     case AdjointValueKind::Concrete:
-      return accumulateConcreteAndAggregateAdjointsDirect(
-          rhs.getConcreteValue(), lhs, loc);
+      return accumulateAdjointsDirect(rhs, lhs, loc);
     // x + 0 => x
     case AdjointValueKind::Zero:
       return lhs;
