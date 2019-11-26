@@ -1005,9 +1005,6 @@ namespace {
 
       return finishApply(apply, memberRef, openedType, locator);
     }
-    
-    /// Describes either a type or the name of a type to be resolved.
-    using TypeOrName = llvm::PointerUnion<Identifier, Type>;
 
     /// Convert the given literal expression via a protocol pair.
     ///
