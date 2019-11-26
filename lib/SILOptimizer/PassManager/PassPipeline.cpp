@@ -404,6 +404,11 @@ static void addPerfEarlyModulePassPipeline(SILPassPipelinePlan &P) {
   // we do not spend time optimizing them.
   P.addDeadFunctionElimination();
 
+  // SWIFT_ENABLE_TENSORFLOW
+  // This unblocks many other passes' optimizations (e.g. inlining) and this is
+  // not blocked by any other passes' optimizations, so do it early.
+  P.addDifferentiabilityWitnessDevirtualizer();
+
   // Strip ownership from non-transparent functions.
   if (P.getOptions().StripOwnershipAfterSerialization)
     P.addNonTransparentFunctionOwnershipModelEliminator();

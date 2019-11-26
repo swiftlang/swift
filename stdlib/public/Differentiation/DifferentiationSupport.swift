@@ -906,7 +906,7 @@ public struct AnyDerivative : EuclideanDifferentiable & AdditiveArithmetic {
     return AnyDerivative(_box: lhs._box._adding(rhs._box))
   }
 
-  @differentiating(+)
+  @derivative(of: +)
   @usableFromInline internal static func _vjpAdd(
     lhs: AnyDerivative, rhs: AnyDerivative
   ) -> (value: AnyDerivative,
@@ -914,7 +914,7 @@ public struct AnyDerivative : EuclideanDifferentiable & AdditiveArithmetic {
     return (lhs + rhs, { v in (v, v) })
   }
 
-  @differentiating(+)
+  @derivative(of: +)
   @usableFromInline internal static func _jvpAdd(
     lhs: AnyDerivative, rhs: AnyDerivative
   ) -> (value: AnyDerivative,
@@ -928,7 +928,7 @@ public struct AnyDerivative : EuclideanDifferentiable & AdditiveArithmetic {
     return AnyDerivative(_box: lhs._box._subtracting(rhs._box))
   }
 
-  @differentiating(-)
+  @derivative(of: -)
   @usableFromInline internal static func _vjpSubtract(
     lhs: AnyDerivative, rhs: AnyDerivative
   ) -> (value: AnyDerivative,
@@ -936,7 +936,7 @@ public struct AnyDerivative : EuclideanDifferentiable & AdditiveArithmetic {
     return (lhs - rhs, { v in (v, .zero - v) })
   }
 
-  @differentiating(-)
+  @derivative(of: -)
   @usableFromInline internal static func _jvpSubtract(
     lhs: AnyDerivative, rhs: AnyDerivative
   ) -> (value: AnyDerivative,

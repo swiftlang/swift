@@ -148,6 +148,9 @@ PASS(DiagnoseUnreachable, "diagnose-unreachable",
      "Diagnose Unreachable Code")
 PASS(DiagnosticConstantPropagation, "diagnostic-constant-propagation",
      "Constants Propagation for Diagnostics")
+PASS(DifferentiabilityWitnessDevirtualizer,
+     "differentiability-witness-devirtualizer",
+     "Inlines Differentiability Witnesses")
 PASS(EagerSpecializer, "eager-specializer",
      "Eager Specialization via @_specialize")
 PASS(EarlyCodeMotion, "early-codemotion",

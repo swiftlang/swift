@@ -467,7 +467,7 @@ public:
         // necessary to avoid verification failure:
         // `ASTScopeImpl::verifyThatChildrenAreContainedWithin`.
         // Perhaps this check is no longer necessary after TF-835: robust
-        // `@differentiating` attribute lowering.
+        // `@derivative` attribute lowering.
         if (!diffAttr->isImplicit())
           sortedDifferentiableAttrs.push_back(diffAttr);
     for (auto *diffAttr : sortBySourceRange(sortedDifferentiableAttrs))

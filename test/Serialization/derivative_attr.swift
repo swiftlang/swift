@@ -2,8 +2,8 @@
 
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend %s -emit-module -parse-as-library -o %t
-// RUN: llvm-bcanalyzer %t/differentiating_attr.swiftmodule | %FileCheck %s -check-prefix=BCANALYZER
-// RUN: %target-sil-opt -disable-sil-linking -enable-sil-verify-all %t/differentiating_attr.swiftmodule -o - | %FileCheck %s
+// RUN: llvm-bcanalyzer %t/derivative_attr.swiftmodule | %FileCheck %s -check-prefix=BCANALYZER
+// RUN: %target-sil-opt -disable-sil-linking -enable-sil-verify-all %t/derivative_attr.swiftmodule -o - | %FileCheck %s
 
 // BCANALYZER-NOT: UnknownCode
 
@@ -12,11 +12,11 @@
 func add(x: Float, y: Float) -> Float {
   return x + y
 }
-@differentiating(add, wrt: x)
+@derivative(of: add, wrt: x)
 func jvpAddWrtX(x: Float, y: Float) -> (value: Float, differential: (Float) -> (Float)) {
   return (x + y, { $0 })
 }
-@differentiating(add)
+@derivative(of: add)
 func vjpAdd(x: Float, y: Float) -> (value: Float, pullback: (Float) -> (Float, Float)) {
   return (x + y, { ($0, $0) })
 }
@@ -25,7 +25,7 @@ func vjpAdd(x: Float, y: Float) -> (value: Float, pullback: (Float) -> (Float, F
 func generic<T : Numeric>(x: T) -> T {
   return x
 }
-@differentiating(generic)
+@derivative(of: generic)
 func vjpGeneric<T>(x: T) -> (value: T, pullback: (T.TangentVector) -> T.TangentVector)
   where T : Numeric, T : Differentiable
 {
@@ -39,12 +39,12 @@ protocol InstanceMethod : Differentiable {
   func bar<T : Differentiable>(_ x: T) -> Self
 }
 extension InstanceMethod {
-  @differentiating(foo)
+  @derivative(of: foo)
   func vjpFoo(x: Self) -> (value: Self, pullback: (Self.TangentVector) -> (Self.TangentVector, Self.TangentVector)) {
     return (x, { ($0, $0) })
   }
 
-  @differentiating(bar, wrt: (self, x))
+  @derivative(of: bar, wrt: (self, x))
   func jvpBarWrt<T : Differentiable>(_ x: T) -> (value: Self, differential: (Self.TangentVector, T) -> Self.TangentVector)
     where T == T.TangentVector
   {

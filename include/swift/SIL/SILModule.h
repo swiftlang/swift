@@ -623,6 +623,9 @@ public:
   llvm::ArrayRef<SILDifferentiabilityWitness *>
   lookUpDifferentiabilityWitnessesForFunction(StringRef name);
 
+  /// Attempt to deserialize the SILDifferentiabilityWitness. Returns true if
+  /// deserialization succeeded, false otherwise.
+  bool loadDifferentiabilityWitness(SILDifferentiabilityWitness *W);
   // SWIFT_ENABLE_TENSORFLOW_END
 
   // Given a protocol, attempt to create a default witness table declaration

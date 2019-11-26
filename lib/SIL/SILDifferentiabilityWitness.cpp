@@ -64,6 +64,16 @@ SILDifferentiabilityWitness *SILDifferentiabilityWitness::createDefinition(
   return diffWitness;
 }
 
+void SILDifferentiabilityWitness::convertToDefinition(SILFunction *jvp,
+                                                      SILFunction *vjp,
+                                                      bool isSerialized) {
+  assert(IsDeclaration);
+  IsDeclaration = false;
+  JVP = jvp;
+  VJP = vjp;
+  IsSerialized = isSerialized;
+}
+
 SILDifferentiabilityWitnessKey SILDifferentiabilityWitness::getKey() const {
   return std::make_pair(getOriginalFunction()->getName(), getConfig());
 }

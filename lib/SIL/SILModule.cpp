@@ -605,6 +605,15 @@ SILModule::lookUpDifferentiabilityWitnessesForFunction(StringRef name) {
   return DifferentiabilityWitnessesByFunction[name];
 }
 
+bool SILModule::loadDifferentiabilityWitness(SILDifferentiabilityWitness *W) {
+  auto *NewW = getSILLoader()->lookupDifferentiabilityWitness(W->getKey());
+  if (!NewW)
+    return false;
+
+  assert(W == NewW);
+  return true;
+}
+
 void SILModule::registerDeserializationNotificationHandler(
     std::unique_ptr<DeserializationNotificationHandler> &&handler) {
   deserializationNotificationHandlers.add(std::move(handler));
