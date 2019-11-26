@@ -259,27 +259,42 @@ ForwardModeTests.testWithLeakChecking("TrackedWithLets") {
 // Tuples
 //===----------------------------------------------------------------------===//
 
-ForwardModeTests.test("SimpleTupleExtractLet") {
-  func foo(_ x: Float) -> Float {
-    let tuple = (2*x, x)
-    return tuple.0
+ForwardModeTests.test("TupleLet") {
+  do {
+    func tupleLet(_ x: Float) -> Float {
+      let tuple = (2 * x, x)
+      return tuple.0
+    }
+    let (value, derivative) = valueWithDerivative(at: 4, in: tupleLet)
+    expectEqual(8, value)
+    expectEqual(2, derivative)
   }
-  let (y, differential) = valueWithDifferential(at: 4, in: foo)
-  expectEqual(8, y)
-  expectEqual(2, differential(1))
 }
 
-ForwardModeTests.test("SimpleTupleExtractVar") {
-  func foo(_ x: Float) -> Float {
-    let tuple = (2*x, x)
-    return tuple.0
+ForwardModeTests.test("TupleVar") {
+  do {
+    func tupleVar(_ x: Float) -> Float {
+      var tuple = (2 * x, x)
+      return tuple.0
+    }
+    let (value, derivative) = valueWithDerivative(at: 4, in: tupleVar)
+    expectEqual(8, value)
+    expectEqual(2, derivative)
   }
-  let (y, differential) = valueWithDifferential(at: 4, in: foo)
-  expectEqual(8, y)
-  expectEqual(2, differential(1))
+
+  do {
+    // TF-964: Test tuple with non-tuple-typed adjoint value.
+    func TF_964(_ x: Float) -> Float {
+      var tuple = (2 * x, 1)
+      return tuple.0
+    }
+    let (value, derivative) = valueWithDerivative(at: 4, in: TF_964)
+    expectEqual(8, value)
+    expectEqual(2, derivative)
+  }
 }
 
-ForwardModeTests.test("TupleSideEffects") {
+ForwardModeTests.test("TupleMutation") {
   func foo(_ x: Float) -> Float {
     var tuple = (x, x)
     tuple.0 = tuple.0 * x
@@ -317,23 +332,31 @@ ForwardModeTests.test("TupleSideEffects") {
 
 // Tests TF-321.
 ForwardModeTests.test("TupleNonDifferentiableElements") {
-  // @differentiable
-  func foo(_ x: Float) -> Float {
+  // TF-964: Test tuple with non-tuple-typed adjoint value.
+  func tupleLet(_ x: Tracked<Float>) -> Tracked<Float> {
+    let tuple = (2 * x, 1)
+    return tuple.0
+  }
+  expectEqual((8, 2), valueWithDerivative(at: 4, in: tupleLet))
+
+  func tupleVar(_ x: Tracked<Float>) -> Tracked<Float> {
     var tuple = (x, 1)
     tuple.0 = x
     tuple.1 = 1
     return tuple.0
   }
-  expectEqual(1, derivative(at: 1, in: foo))
+  expectEqual((3, 1), valueWithDerivative(at: 3, in: tupleVar))
 
-  func bar(_ x: Float) -> Float {
-    var tuple: (Int, Int, Float, Float) = (1, 1, x, x)
+  func nested(_ x: Tracked<Float>) -> Tracked<Float> {
+    // Convoluted function computing `x * x`.
+    var tuple: (Int, (Int, Tracked<Float>), Tracked<Float>) = (1, (1, 0), 0)
     tuple.0 = 1
-    tuple.1 = 1
-    tuple.3 = x
-    return tuple.3
+    tuple.1.0 = 1
+    tuple.1.1 = x
+    tuple.2 = x
+    return tuple.1.1 * tuple.2
   }
-  expectEqual(1, derivative(at: 1, in: bar))
+  expectEqual((16, 8), valueWithDerivative(at: 4, in: nested))
 
   struct Wrapper<T> {
     @differentiable(where T : Differentiable)
@@ -345,10 +368,11 @@ ForwardModeTests.test("TupleNonDifferentiableElements") {
       return tuple.2
     }
   }
-  expectEqual(1, derivative(at: Float(1), in: { x -> Float in
-    let wrapper = Wrapper<Float>()
-    return wrapper.baz(x)
-  }))
+  func wrapper(_ x: Tracked<Float>) -> Tracked<Float> {
+    let w = Wrapper<Tracked<Float>>()
+    return w.baz(x)
+  }
+  expectEqual((3, 1), valueWithDerivative(at: 3, in: wrapper))
 }
 
 //===----------------------------------------------------------------------===//
@@ -1058,7 +1082,7 @@ ForwardModeTests.test("CaptureGlobal") {
   expectEqual(30, derivative(at: 0, in: foo))
 }
 
-ForwardModeTests.test("SideEffects") {
+ForwardModeTests.test("Mutation") {
   func fourthPower(x: Float) -> Float {
     var a = x
     a = a * x
@@ -1066,77 +1090,6 @@ ForwardModeTests.test("SideEffects") {
     return a * x
   }
   expectEqual(4 * 27, derivative(at: 3, in: fourthPower))
-}
-
-ForwardModeTests.test("TupleSideEffects") {
-  func foo(_ x: Float) -> Float {
-    var tuple = (x, x)
-    tuple.0 = tuple.0 * x
-    return x * tuple.0
-  }
-  expectEqual(27, derivative(at: 3, in: foo))
-
-  func fifthPower(_ x: Float) -> Float {
-    var tuple = (x, x)
-    tuple.0 = tuple.0 * x
-    tuple.1 = tuple.0 * x
-    return tuple.0 * tuple.1
-  }
-  expectEqual(405, derivative(at: 3, in: fifthPower))
-
-  func nested(_ x: Float) -> Float {
-    var tuple = ((x, x), x)
-    tuple.0.0 = tuple.0.0 * x
-    tuple.0.1 = tuple.0.0 * x
-    return tuple.0.0 * tuple.0.1
-  }
-  expectEqual(405, derivative(at: 3, in: nested))
-
-  // FIXME(TF-201): Update after reabstraction thunks can be directly differentiated.
-  /*
-  func generic<T : Differentiable & AdditiveArithmetic>(_ x: T) -> T {
-    var tuple = (x, x)
-    tuple.0 += x
-    tuple.1 += x
-    return tuple.0 + tuple.0
-  }
-  expectEqual(1, derivative(at: 3.0, in: generic))
-  */
-}
-
-// Tests TF-321.
-ForwardModeTests.test("TupleNonDifferentiableElements") {
-  func foo(_ x: Float) -> Float {
-    var tuple = (x, 1)
-    tuple.0 = x
-    tuple.1 = 1
-    return tuple.0
-  }
-  expectEqual(1, derivative(at: 1, in: foo))
-
-  func bar(_ x: Float) -> Float {
-    var tuple: (Int, Int, Float, Float) = (1, 1, x, x)
-    tuple.0 = 1
-    tuple.1 = 1
-    tuple.3 = x
-    return tuple.3
-  }
-  expectEqual(1, derivative(at: 1, in: bar))
-
-  struct Wrapper<T> {
-    @differentiable(where T : Differentiable)
-    func baz(_ x: T) -> T {
-      var tuple = (1, 1, x, 1)
-      tuple.0 = 1
-      tuple.2 = x
-      tuple.3 = 1
-      return tuple.2
-    }
-  }
-  expectEqual(1, derivative(at: Float(1), in: { x -> Float in
-    let wrapper = Wrapper<Float>()
-    return wrapper.baz(x)
-  }))
 }
 
 // Tests TF-21.
@@ -1209,7 +1162,7 @@ ForwardModeTests.test("StructConstantStoredProperty") {
   expectEqual(20, derivative(at: 3, in: testStructInit))
 }
 
-ForwardModeTests.test("StructSideEffects") {
+ForwardModeTests.test("StructMutation") {
   struct Point : AdditiveArithmetic, Differentiable {
     var x: Float
     var y: Float

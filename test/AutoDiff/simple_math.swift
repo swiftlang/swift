@@ -5,6 +5,7 @@
 // REQUIRES: executable_test
 
 import StdlibUnittest
+import DifferentiationUnittest
 #if os(macOS)
 import Darwin.C
 #else
@@ -88,7 +89,7 @@ SimpleMathTests.test("GlobalDiffableFunc") {
   expectEqual(1, gradient(at: 1, in: foo_diffable))
 }
 
-SimpleMathTests.test("SideEffects") {
+SimpleMathTests.test("Mutation") {
   func fourthPower(x: Float) -> Float {
     var a = x
     a = a * x
@@ -107,7 +108,7 @@ SimpleMathTests.test("Tuple") {
   expectEqual(1, gradient(at: 3, in: nested))
 }
 
-SimpleMathTests.test("TupleSideEffects") {
+SimpleMathTests.test("TupleMutation") {
   func foo(_ x: Float) -> Float {
     var tuple = (x, x)
     tuple.0 = tuple.0 * x
@@ -145,22 +146,31 @@ SimpleMathTests.test("TupleSideEffects") {
 
 // Tests TF-321.
 SimpleMathTests.test("TupleNonDifferentiableElements") {
-  func foo(_ x: Float) -> Float {
+  // TF-964: Test tuple with non-tuple-typed adjoint value.
+  func tupleLet(_ x: Tracked<Float>) -> Tracked<Float> {
+    let tuple = (2 * x, 1)
+    return tuple.0
+  }
+  expectEqual((8, 2), valueWithGradient(at: 4, in: tupleLet))
+
+  func tupleVar(_ x: Tracked<Float>) -> Tracked<Float> {
     var tuple = (x, 1)
     tuple.0 = x
     tuple.1 = 1
     return tuple.0
   }
-  expectEqual(1, gradient(at: 1, in: foo))
+  expectEqual((3, 1), valueWithGradient(at: 3, in: tupleVar))
 
-  func bar(_ x: Float) -> Float {
-    var tuple: (Int, Int, Float, Float) = (1, 1, x, x)
+  func nested(_ x: Tracked<Float>) -> Tracked<Float> {
+    // Convoluted function computing `x * x`.
+    var tuple: (Int, (Int, Tracked<Float>), Tracked<Float>) = (1, (1, 0), 0)
     tuple.0 = 1
-    tuple.1 = 1
-    tuple.3 = x
-    return tuple.3
+    tuple.1.0 = 1
+    tuple.1.1 = x
+    tuple.2 = x
+    return tuple.1.1 * tuple.2
   }
-  expectEqual(1, gradient(at: 1, in: bar))
+  expectEqual((16, 8), valueWithGradient(at: 4, in: nested))
 
   struct Wrapper<T> {
     @differentiable(where T : Differentiable)
@@ -172,10 +182,11 @@ SimpleMathTests.test("TupleNonDifferentiableElements") {
       return tuple.2
     }
   }
-  expectEqual(1, gradient(at: Float(1), in: { x -> Float in
-    let wrapper = Wrapper<Float>()
-    return wrapper.baz(x)
-  }))
+  func wrapper(_ x: Tracked<Float>) -> Tracked<Float> {
+    let w = Wrapper<Tracked<Float>>()
+    return w.baz(x)
+  }
+  expectEqual((3, 1), valueWithGradient(at: 3, in: wrapper))
 }
 
 // Tests TF-21.
@@ -249,7 +260,7 @@ SimpleMathTests.test("StructConstantStoredProperty") {
   expectEqual(20, gradient(at: 3, in: testStructInit))
 }
 
-SimpleMathTests.test("StructSideEffects") {
+SimpleMathTests.test("StructMutation") {
   struct Point : AdditiveArithmetic, Differentiable {
     var x: Float
     var y: Float
