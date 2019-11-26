@@ -66,7 +66,7 @@ func tfoo(t: Float) -> Float {
 }
 
 func localTransposeRegistration() {
-  // Not okay. Derivative registration can only be non-local.
+  // Not okay. Transpose registration can only be non-local.
   // expected-error @+1 {{attribute '@transposing' can only be used in a non-local scope}}
   @transposing(+)
   func foo(_ x: Float) -> (Float, Float)
