@@ -7740,8 +7740,9 @@ PullbackEmitter::accumulateAdjointsDirect(AdjointValue lhs, AdjointValue rhs,
   // (x, y)
   case AdjointValueKind::Aggregate:
     switch (rhs.getKind()) {
-    // (x, y) + z => (x + z.0, y + z.1)
+    // (x, y) + z => (z.0 + x, z.1 + y)
     case AdjointValueKind::Concrete:
+      return accumulateAdjointsDirect(rhs, lhs, loc);
     // x + 0 => x
     case AdjointValueKind::Zero:
       return lhs;
