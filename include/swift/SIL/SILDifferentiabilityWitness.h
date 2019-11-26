@@ -91,6 +91,9 @@ public:
       GenericSignature derivativeGenSig, SILFunction *jvp, SILFunction *vjp,
       bool isSerialized, DeclAttribute *attribute = nullptr);
 
+  void convertToDefinition(SILFunction *jvp, SILFunction *vjp,
+                           bool isSerialized);
+
   SILDifferentiabilityWitnessKey getKey() const;
   SILModule &getModule() const { return Module; }
   SILLinkage getLinkage() const { return Linkage; }

@@ -3459,18 +3459,17 @@ SILDeserializer::readDifferentiabilityWitness(DeclID DId) {
       ArrayRef<unsigned>(parameterAndResultIndices)
           .take_back(numResultIndices));
 
-  if (isDeclaration) {
-    auto *diffWitness = SILDifferentiabilityWitness::createDeclaration(
+  AutoDiffConfig config(parameterIndices, resultIndices, derivativeGenSig);
+  auto *diffWitness =
+      SILMod.lookUpDifferentiabilityWitness({originalName, config});
+  if (!diffWitness)
+    diffWitness = SILDifferentiabilityWitness::createDeclaration(
         SILMod, *linkage, original, parameterIndices, resultIndices,
         derivativeGenSig);
-    diffWitnessOrOffset.set(diffWitness, /*isFullyDeserialized*/ true);
-    return diffWitness;
-  }
-
-  auto *diffWitness = SILDifferentiabilityWitness::createDefinition(
-      SILMod, *linkage, original, parameterIndices, resultIndices,
-      derivativeGenSig, jvp, vjp, isSerialized);
-  diffWitnessOrOffset.set(diffWitness, /*isFullyDeserialized*/ true);
+  if (diffWitness->isDeclaration() && !isDeclaration)
+    diffWitness->convertToDefinition(jvp, vjp, isSerialized);
+  diffWitnessOrOffset.set(diffWitness,
+                          /*isFullyDeserialized*/ diffWitness->isDefinition());
   return diffWitness;
 }
 

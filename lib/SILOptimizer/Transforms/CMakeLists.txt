@@ -17,6 +17,9 @@ silopt_register_sources(
   DeadStoreElimination.cpp
   DestroyHoisting.cpp
   Devirtualizer.cpp
+  # SWIFT_ENABLE_TENSORFLOW
+  DifferentiabilityWitnessInliner.cpp
+  # SWIFT_ENABLE_TENSORFLOW_END
   GenericSpecializer.cpp
   MergeCondFail.cpp
   Outliner.cpp
