@@ -46,7 +46,7 @@ bool DifferentiabilityWitnessDevirtualizer::
       auto *dfwi = dyn_cast<DifferentiabilityWitnessFunctionInst>(&inst);
       if (!dfwi)
         continue;
-      Insts.push_back(dfwi);
+      insts.push_back(dfwi);
     }
   }
   for (auto *inst : insts) {
