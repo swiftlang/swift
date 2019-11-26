@@ -51,9 +51,10 @@ bool DifferentiabilityWitnessInliner::
   }
   for (auto *I : Insts) {
     auto *W = I->getWitness();
-    if (W->isDeclaration() && !F.getModule().loadDifferentiabilityWitness(W))
+    if (W->isDeclaration())
+      F.getModule().loadDifferentiabilityWitness(W);
+    if (W->isDeclaration())
       continue;
-    assert(W->isDefinition());
     SILBuilderWithScope B(I);
     auto Kind = I->getWitnessKind().getAsDerivativeFunctionKind();
     assert(Kind.hasValue());
