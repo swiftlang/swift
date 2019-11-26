@@ -2124,7 +2124,7 @@ void Compilation::IncrementalSchemeComparator::outputComparison(
       << "requested: " << (EnableSourceRangeDependencies ? "ranges" : "deps")
       << ", "
       << "used: " << (UseSourceRangeDependencies ? "ranges" : "deps")
-      << "***\n";
+      << " ***\n";
 }
 
 unsigned Compilation::countSwiftInputs() const {
