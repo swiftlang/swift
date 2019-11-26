@@ -75,7 +75,7 @@ public struct Foo: Differentiable {
   public var x: Float
 
 // CHECK-LABEL: // differentiability witness for Foo.x.getter
-// CHECK-NEXT: sil_differentiability_witness [parameters 0] [results 0] @$s36sil_differentiability_witness_silgen3FooV1xSfvg : $@convention(method) (Foo) -> Float {
+// CHECK-NEXT: sil_differentiability_witness [serialized] [parameters 0] [results 0] @$s36sil_differentiability_witness_silgen3FooV1xSfvg : $@convention(method) (Foo) -> Float {
 // CHECK-NEXT: }
 
   @differentiable

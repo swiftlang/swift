@@ -133,10 +133,15 @@ SerializedSILLoader::lookupDifferentiabilityWitness(
     SILDifferentiabilityWitnessKey key) {
   Mangle::ASTMangler mangler;
   std::string mangledKey = mangler.mangleSILDifferentiabilityWitnessKey(key);
-  for (auto &Des : LoadedSILSections)
-    if (auto *diffWitness = Des->lookupDifferentiabilityWitness(mangledKey))
-      return diffWitness;
-  return nullptr;
+  // It is possible that one module has a declaration of a
+  // SILDifferentiabilityWitness, while another has the full definition.
+  SILDifferentiabilityWitness *wit = nullptr;
+  for (auto &Des : LoadedSILSections) {
+    wit = Des->lookupDifferentiabilityWitness(mangledKey);
+    if (wit && wit->isDefinition())
+      return wit;
+  }
+  return wit;
 }
 // SWIFT_ENABLE_TENSORFLOW END
 
