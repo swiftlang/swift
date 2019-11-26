@@ -1,4 +1,4 @@
-//===--- ActivityAnalysis.h - SIL Activity Analysis -*- C++ -*-===//
+//===--- ActivityAnalysis.h - Differentiable Activity Analysis -*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //

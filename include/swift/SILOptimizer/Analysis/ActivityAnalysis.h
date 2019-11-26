@@ -1,4 +1,4 @@
-//===--- ActivityAnalysis.h - SIL Activity Analysis -------------*- C++ -*-===//
+//===--- ActivityAnalysis.h - Differentiable Activity Analysis --*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -12,8 +12,8 @@
 //
 // SWIFT_ENABLE_TENSORFLOW
 //
-// This file implements activity analysis: a dataflow analysis used for automatic
-// differentiation.
+// This file implements activity analysis: a dataflow analysis used for
+// automatic differentiation.
 //
 // In many real situations, the end-users of AD need only the derivatives of
 // some selected outputs of `P` with respect to some selected inputs of `P`.
