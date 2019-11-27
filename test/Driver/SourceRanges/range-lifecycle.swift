@@ -1,79 +1,24 @@
 // REQUIRES: executable_test
 
-// Tests how range-based incremental compilation copes wtih various changes.
-// Tests how range-based incremental compilation copes wtih various changes.
-// No "-c" in stages where we need to be sure it links,
-// for instance when removing a file, if not enough recompilation happens
-// this program will not link.
 
 
-// =============================================================================
-// First, build without range dependencies with no new options.
-// =============================================================================
-
-
-// Copy in the inputs.
-// The lack of a build record or swiftdeps files should disable incremental compilation
-
-
-// Ensure that the extra outputs are not generated when they should not be:
 // RUN: %empty-directory(%t)
-// RUN: cp -r %S/Inputs/range-lifecycle/* %t
-// RUN: cd %t && %swiftc_driver -output-file-map %t/output.json -incremental -enable-batch-mode ./main.swift ./fileA.swift ./fileB.swift -module-name main -j2 -driver-show-job-lifecycle -driver-show-incremental  >& %t/output0
-
-// RUN: %FileCheck -match-full-lines -check-prefix=CHECK-NO-BUILD-REC %s < %t/output0
-// CHECK-NO-BUILD-REC: Incremental compilation could not read build record.
-
-
-// RUN: ls %t | %FileCheck -check-prefix=CHECK-NO-RANGE-OUTPUTS %s
-// CHECK-NO-RANGE-OUTPUTS-NOT: .swiftranges
-// CHECK-NO-RANGE-OUTPUTS-NOT: .compiledsource
-// CHECK-NO-RANGE-OUTPUTS: .swiftdeps
-// CHECK-NO-RANGE-OUTPUTS-NOT: .swiftranges
-// CHECK-NO-RANGE-OUTPUTS-NOT: .compiledsource
-
-// RUN: %FileCheck -check-prefix=CHECK-HAS-BATCHES %s < %t/output0
-
-// CHECK-HAS-BATCHES: Batchable: {compile:
-
-// RUN: %t/main | tee run0 | grep Any > /dev/null && rm %t/main
-
+// RUN: cp -r %S/Inputs/common/* %t
 
 // =============================================================================
-// Same, except force the driver to compute both strategies via -driver-compare-incremental-schemes
+// Now, do it again with range dependencies enabled after being disabled,
+// and logging the comparison to comparo
 // =============================================================================
 
-
-// Copy in the inputs.
-// The lack of a build record or swiftdeps files should disable incremental compilation
-
-
-// Ensure that the extra outputs are not generated when they should not be:
-// RUN: %empty-directory(%t)
-// RUN: cp -r %S/Inputs/range-lifecycle/* %t
-// RUN: cd %t && %swiftc_driver -driver-compare-incremental-schemes -output-file-map %t/output.json -incremental -enable-batch-mode ./main.swift ./fileA.swift ./fileB.swift -module-name main -j2 -driver-show-job-lifecycle -driver-show-incremental  >& %t/output1
-
-// RUN: %FileCheck -match-full-lines -check-prefix=CHECK-NO-BUILD-REC %s < %t/output1
-
-// RUN: %FileCheck -match-full-lines -check-prefix=CHECK-HAS-NO-BATCHES %s < %t/output1
-// CHECK-HAS-NO-BATCHES-NOT: Batchable: {compile:
-
-// RUN: %FileCheck -match-full-lines -check-prefix=CHECK-COMPARE-DISABLED-NO-BUILD-RECORD %s < %t/output1
-// CHECK-COMPARE-DISABLED-NO-BUILD-RECORD: *** Incremental build disabled because could not read build record, cannot compare ***
-
-// RUN: %t/main | tee run1 | grep Any > /dev/null && rm %t/main
-
-
-// =============================================================================
-// Now, do it again with range dependencies enabled:
-// =============================================================================
+// RUN: cd %t && %swiftc_driver -output-file-map %t/output.json -incremental -enable-batch-mode ./main.swift ./fileA.swift ./fileB.swift -module-name main -j2  >& /dev/null
 
 // RUN: cd %t && %swiftc_driver -driver-compare-incremental-schemes-path=./comparo -enable-source-range-dependencies -output-file-map %t/output.json -incremental -enable-batch-mode ./main.swift ./fileA.swift ./fileB.swift -module-name main -j2 -driver-show-job-lifecycle -driver-show-incremental  >& %t/output2
 
 // RUN: %FileCheck -match-full-lines -check-prefix=CHECK-HAS-NO-BATCHES  %s < %t/output2
+// CHECK-HAS-NO-BATCHES-NOT: Batchable: {compile:
 
-// RUN: tail -1 %t/comparo | %FileCheck -match-full-lines -check-prefix=CHECK-COMPARE-DISABLED-ARGUMENTS %s
-// CHECK-COMPARE-DISABLED-ARGUMENTS: *** Incremental build disabled because different arguments passed to compiler, cannot compare ***
+// RUN: %FileCheck -match-full-lines -check-prefix=CHECK-COMPARO-1 %s < %t/comparo
+// CHECK-COMPARO-1: *** Incremental build disabled because different arguments passed to compiler, cannot compare ***
 
 // RUN: %FileCheck -match-full-lines -check-prefix=CHECK-TURN-ON %s < %t/output2
 
@@ -122,23 +67,20 @@
 // CHECK-FILEB-1:  - { start: { line: 5, column: 50 }, end: { line: 5, column: 67 } }
 // CHECK-FILEB-1: ...
 
-
-
 // RUN: %t/main | tee run2 | grep Any > /dev/null && rm %t/main
 
 // =============================================================================
-// Steady-state: Now, do it again with range dependencies enabled:
+// Steady-state: Now, do it again with range dependencies enabled.
 // =============================================================================
-
 
 // RUN: cd %t && %swiftc_driver -driver-compare-incremental-schemes-path ./comparo -enable-source-range-dependencies -output-file-map %t/output.json -incremental -enable-batch-mode ./main.swift ./fileA.swift ./fileB.swift -module-name main -j2 -driver-show-job-lifecycle -driver-show-incremental >& %t/output3
 
+// RUN: %FileCheck -match-full-lines -check-prefix=CHECK-COMPARO-2 %s < %t/comparo
+// CHECK-COMPARO-2: *** Incremental build disabled because different arguments passed to compiler, cannot compare ***
+// CHECK-COMPARO-2: *** Range benefit: 0 compilations, 0 stages, deps: 0, ranges: 0, total: 3, requested: ranges, used: ranges ***
+
 // RUN: %FileCheck -match-full-lines -check-prefix=CHECK-HAS-NO-BATCHES  %s < %t/output3
-// RUN: head -1 %t/comparo | %FileCheck -match-full-lines -check-prefix=CHECK-COMPARE-DISABLED-ARGUMENTS %s
 
-// RUN: tail -1 %t/comparo | %FileCheck -match-full-lines -check-prefix=CHECK-COMPARE-0-0-0-0-3 %s
-
-// CHECK-COMPARE-0-0-0-0-3: *** Range benefit: 0 compilations, 0 stages, deps: 0, ranges: 0, total: 3, requested: ranges, used: ranges ***
 
 // RUN: %FileCheck -match-full-lines -check-prefix=CHECK-INCREMENTAL-ENABLED %s < %t/output3
 // CHECK-INCREMENTAL-ENABLED-NOT: Incremental compilation has been disabled
@@ -155,8 +97,13 @@
 // Add an attribute to: a structure that no other file uses
 // =============================================================================
 
+// RUN: cp %t/comparo %t/saved-comparo
+
+
 // RUN: cp %t/fileB2.swift %t/fileB.swift
 // RUN: cd %t && %swiftc_driver -driver-compare-incremental-schemes -enable-source-range-dependencies -output-file-map %t/output.json -incremental -enable-batch-mode ./main.swift ./fileA.swift ./fileB.swift -module-name main -j2 -driver-show-job-lifecycle -driver-show-incremental >& %t/output4
+
+// RUN: cmp %t/comparo %t/saved-comparo
 
 // RUN: %FileCheck -match-full-lines -check-prefix=CHECK-HAS-NO-BATCHES  %s < %t/output4
 
