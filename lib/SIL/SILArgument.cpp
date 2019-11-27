@@ -72,7 +72,7 @@ SILModule &SILArgument::getModule() const {
 // expensive to call this helper instead of simply specifying phis with an
 // opcode. It results in repeated CFG traversals and repeated, unnecessary
 // switching over terminator opcodes.
-bool SILPhiArgument::isPhiArgument() {
+bool SILPhiArgument::isPhiArgument() const {
   // No predecessors indicates an unreachable block.
   if (getParent()->pred_empty())
     return false;
@@ -101,7 +101,7 @@ static SILValue getIncomingPhiValueForPred(const SILBasicBlock *parentBlock,
       ->getArgForDestBB(parentBlock, argIndex);
 }
 
-SILValue SILPhiArgument::getIncomingPhiValue(SILBasicBlock *predBlock) {
+SILValue SILPhiArgument::getIncomingPhiValue(SILBasicBlock *predBlock) const {
   if (!isPhiArgument())
     return SILValue();
 
@@ -118,7 +118,7 @@ SILValue SILPhiArgument::getIncomingPhiValue(SILBasicBlock *predBlock) {
 }
 
 bool SILPhiArgument::getIncomingPhiValues(
-    SmallVectorImpl<SILValue> &returnedPhiValues) {
+    SmallVectorImpl<SILValue> &returnedPhiValues) const {
   if (!isPhiArgument())
     return false;
 
@@ -137,7 +137,7 @@ bool SILPhiArgument::getIncomingPhiValues(
 
 bool SILPhiArgument::getIncomingPhiValues(
     SmallVectorImpl<std::pair<SILBasicBlock *, SILValue>>
-        &returnedPredBBAndPhiValuePairs) {
+        &returnedPredBBAndPhiValuePairs) const {
   if (!isPhiArgument())
     return false;
 
@@ -189,7 +189,7 @@ getSingleTerminatorOperandForPred(const SILBasicBlock *parentBlock,
 }
 
 bool SILPhiArgument::getSingleTerminatorOperands(
-    SmallVectorImpl<SILValue> &returnedSingleTermOperands) {
+    SmallVectorImpl<SILValue> &returnedSingleTermOperands) const {
   const auto *parentBlock = getParent();
 
   if (parentBlock->pred_empty())
@@ -209,7 +209,7 @@ bool SILPhiArgument::getSingleTerminatorOperands(
 
 bool SILPhiArgument::getSingleTerminatorOperands(
     SmallVectorImpl<std::pair<SILBasicBlock *, SILValue>>
-        &returnedSingleTermOperands) {
+        &returnedSingleTermOperands) const {
   const auto *parentBlock = getParent();
 
   if (parentBlock->pred_empty())

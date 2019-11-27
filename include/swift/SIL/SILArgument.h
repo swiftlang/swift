@@ -127,22 +127,22 @@ public:
 
   /// Return true if this block argument is actually a phi argument as
   /// opposed to a cast or projection.
-  bool isPhiArgument();
+  bool isPhiArgument() const;
 
   /// If this argument is a phi, return the incoming phi value for the given
   /// predecessor BB. If this argument is not a phi, return an invalid SILValue.
-  SILValue getIncomingPhiValue(SILBasicBlock *predBlock);
+  SILValue getIncomingPhiValue(SILBasicBlock *predBlock) const;
 
   /// If this argument is a phi, populate `OutArray` with the incoming phi
   /// values for each predecessor BB. If this argument is not a phi, return
   /// false.
-  bool getIncomingPhiValues(SmallVectorImpl<SILValue> &returnedPhiValues);
+  bool getIncomingPhiValues(SmallVectorImpl<SILValue> &returnedPhiValues) const;
 
   /// If this argument is a phi, populate `OutArray` with each predecessor block
   /// and its incoming phi value. If this argument is not a phi, return false.
   bool
   getIncomingPhiValues(SmallVectorImpl<std::pair<SILBasicBlock *, SILValue>>
-                           &returnedPredAndPhiValuePairs);
+                           &returnedPredAndPhiValuePairs) const;
 
   /// Returns true if we were able to find a single terminator operand value for
   /// each predecessor of this arguments basic block. The found values are
@@ -152,7 +152,7 @@ public:
   /// terminator. e.g. the incoming value for a switch_enum payload argument is
   /// the enum itself (the operand of the switch_enum).
   bool getSingleTerminatorOperands(
-      SmallVectorImpl<SILValue> &returnedSingleTermOperands);
+      SmallVectorImpl<SILValue> &returnedSingleTermOperands) const;
 
   /// Returns true if we were able to find single terminator operand values for
   /// each predecessor of this arguments basic block. The found values are
@@ -163,7 +163,7 @@ public:
   /// the enum itself (the operand of the switch_enum).
   bool getSingleTerminatorOperands(
       SmallVectorImpl<std::pair<SILBasicBlock *, SILValue>>
-          &returnedSingleTermOperands);
+          &returnedSingleTermOperands) const;
 
   /// If this SILArgument's parent block has a single predecessor whose
   /// terminator has a single operand, return the incoming operand of the
@@ -209,14 +209,14 @@ class SILPhiArgument : public SILArgument {
 public:
   /// Return true if this is block argument is actually a phi argument as
   /// opposed to a cast or projection.
-  bool isPhiArgument();
+  bool isPhiArgument() const;
 
   /// If this argument is a phi, return the incoming phi value for the given
   /// predecessor BB. If this argument is not a phi, return an invalid SILValue.
   ///
   /// FIXME: Once SILPhiArgument actually implies that it is a phi argument,
   /// this will be guaranteed to return a valid SILValue.
-  SILValue getIncomingPhiValue(SILBasicBlock *predBlock);
+  SILValue getIncomingPhiValue(SILBasicBlock *predBlock) const;
 
   /// If this argument is a phi, populate `OutArray` with the incoming phi
   /// values for each predecessor BB. If this argument is not a phi, return
@@ -224,7 +224,7 @@ public:
   ///
   /// FIXME: Once SILPhiArgument actually implies that it is a phi argument,
   /// this will always succeed.
-  bool getIncomingPhiValues(SmallVectorImpl<SILValue> &returnedPhiValues);
+  bool getIncomingPhiValues(SmallVectorImpl<SILValue> &returnedPhiValues) const;
 
   /// If this argument is a phi, populate `OutArray` with each predecessor block
   /// and its incoming phi value. If this argument is not a phi, return false.
@@ -233,7 +233,7 @@ public:
   /// this will always succeed.
   bool
   getIncomingPhiValues(SmallVectorImpl<std::pair<SILBasicBlock *, SILValue>>
-                           &returnedPredAndPhiValuePairs);
+                           &returnedPredAndPhiValuePairs) const;
 
   /// Returns true if we were able to find a single terminator operand value for
   /// each predecessor of this arguments basic block. The found values are
@@ -243,7 +243,7 @@ public:
   /// terminator. e.g. the incoming value for a switch_enum payload argument is
   /// the enum itself (the operand of the switch_enum).
   bool getSingleTerminatorOperands(
-      SmallVectorImpl<SILValue> &returnedSingleTermOperands);
+      SmallVectorImpl<SILValue> &returnedSingleTermOperands) const;
 
   /// Returns true if we were able to find single terminator operand values for
   /// each predecessor of this arguments basic block. The found values are
@@ -254,7 +254,7 @@ public:
   /// the enum itself (the operand of the switch_enum).
   bool getSingleTerminatorOperands(
       SmallVectorImpl<std::pair<SILBasicBlock *, SILValue>>
-          &returnedSingleTermOperands);
+          &returnedSingleTermOperands) const;
 
   /// If this SILArgument's parent block has a single predecessor whose
   /// terminator has a single operand, return the incoming operand of the
@@ -333,21 +333,22 @@ public:
 // Out of line Definitions for SILArgument to avoid Forward Decl issues
 //===----------------------------------------------------------------------===//
 
-inline bool SILArgument::isPhiArgument() {
+inline bool SILArgument::isPhiArgument() const {
   if (auto *phiArg = dyn_cast<SILPhiArgument>(this))
     return phiArg->isPhiArgument();
 
   return false;
 }
 
-inline SILValue SILArgument::getIncomingPhiValue(SILBasicBlock *predBlock) {
+inline SILValue
+SILArgument::getIncomingPhiValue(SILBasicBlock *predBlock) const {
   if (isa<SILFunctionArgument>(this))
     return SILValue();
   return cast<SILPhiArgument>(this)->getIncomingPhiValue(predBlock);
 }
 
 inline bool SILArgument::getIncomingPhiValues(
-    SmallVectorImpl<SILValue> &returnedPhiValues) {
+    SmallVectorImpl<SILValue> &returnedPhiValues) const {
   if (isa<SILFunctionArgument>(this))
     return false;
   return cast<SILPhiArgument>(this)->getIncomingPhiValues(returnedPhiValues);
@@ -355,7 +356,7 @@ inline bool SILArgument::getIncomingPhiValues(
 
 inline bool SILArgument::getIncomingPhiValues(
     SmallVectorImpl<std::pair<SILBasicBlock *, SILValue>>
-        &returnedPredAndPhiValuePairs) {
+        &returnedPredAndPhiValuePairs) const {
   if (isa<SILFunctionArgument>(this))
     return false;
   return cast<SILPhiArgument>(this)->getIncomingPhiValues(
@@ -363,7 +364,7 @@ inline bool SILArgument::getIncomingPhiValues(
 }
 
 inline bool SILArgument::getSingleTerminatorOperands(
-    SmallVectorImpl<SILValue> &returnedSingleTermOperands) {
+    SmallVectorImpl<SILValue> &returnedSingleTermOperands) const {
   if (isa<SILFunctionArgument>(this))
     return false;
   return cast<SILPhiArgument>(this)->getSingleTerminatorOperands(
@@ -372,7 +373,7 @@ inline bool SILArgument::getSingleTerminatorOperands(
 
 inline bool SILArgument::getSingleTerminatorOperands(
     SmallVectorImpl<std::pair<SILBasicBlock *, SILValue>>
-        &returnedSingleTermOperands) {
+        &returnedSingleTermOperands) const {
   if (isa<SILFunctionArgument>(this))
     return false;
   return cast<SILPhiArgument>(this)->getSingleTerminatorOperands(
