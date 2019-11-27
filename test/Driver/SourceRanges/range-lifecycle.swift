@@ -6,11 +6,16 @@
 // RUN: cp -r %S/Inputs/common/* %t
 
 // =============================================================================
-// Now, do it again with range dependencies enabled after being disabled,
-// and logging the comparison to comparo
+// Without range dependencies, but logging comparison
 // =============================================================================
 
-// RUN: cd %t && %swiftc_driver -output-file-map %t/output.json -incremental -enable-batch-mode ./main.swift ./fileA.swift ./fileB.swift -module-name main -j2  >& /dev/null
+// RUN: cd %t && %swiftc_driver -output-file-map %t/output.json -incremental -enable-batch-mode ./main.swift ./fileA.swift ./fileB.swift -module-name main -j2  >& output1
+
+// =============================================================================
+// Compile with range dependencies enabled
+// and logging the comparison to comparo.
+// =============================================================================
+
 
 // RUN: cd %t && %swiftc_driver -driver-compare-incremental-schemes-path=./comparo -enable-source-range-dependencies -output-file-map %t/output.json -incremental -enable-batch-mode ./main.swift ./fileA.swift ./fileB.swift -module-name main -j2 -driver-show-job-lifecycle -driver-show-incremental  >& %t/output2
 
