@@ -114,18 +114,18 @@ bb0(%0 : @owned $Builtin.NativeObject):
   return %9999 : $()
 }
 
-// We no longer lower copy_unowned_value. So make sure that we actually don't.
+// We no longer lower strong_copy_unowned_value. So make sure that we actually don't.
 //
-// CHECK-LABEL: sil @copy_unowned_value_test : $@convention(thin) (@owned @sil_unowned Builtin.NativeObject) -> () {
+// CHECK-LABEL: sil @strong_copy_unowned_value_test : $@convention(thin) (@owned @sil_unowned Builtin.NativeObject) -> () {
 // CHECK: bb0([[ARG:%.*]] : $@sil_unowned Builtin.NativeObject):
-// CHECK-NEXT: [[STRONG:%.*]] = copy_unowned_value [[ARG]] : $@sil_unowned Builtin.NativeObject
+// CHECK-NEXT: [[STRONG:%.*]] = strong_copy_unowned_value [[ARG]] : $@sil_unowned Builtin.NativeObject
 // CHECK-NEXT: strong_release [[STRONG]] : $Builtin.NativeObject
 // CHECK-NEXT: unowned_release [[ARG]] : $@sil_unowned Builtin.NativeObject
 // CHECK-NEXT: tuple ()
 // CHECK-NEXT: return
-sil [ossa] @copy_unowned_value_test : $@convention(thin) (@owned @sil_unowned Builtin.NativeObject) -> () {
+sil [ossa] @strong_copy_unowned_value_test : $@convention(thin) (@owned @sil_unowned Builtin.NativeObject) -> () {
 bb0(%0 : @owned $@sil_unowned Builtin.NativeObject):
-  %1 = copy_unowned_value %0 : $@sil_unowned Builtin.NativeObject
+  %1 = strong_copy_unowned_value %0 : $@sil_unowned Builtin.NativeObject
   destroy_value %1 : $Builtin.NativeObject
   destroy_value %0 : $@sil_unowned Builtin.NativeObject
   %9999 = tuple()
@@ -155,7 +155,7 @@ bb1:
 
 // CHECK-LABEL: sil @checked_cast_br_lowered : $@convention(thin) (@owned Builtin.NativeObject) -> () {
 // CHECK: bb0([[ARG:%.*]] : $Builtin.NativeObject):
-// CHECK:   checked_cast_br [[ARG]] : $Builtin.NativeObject to $C, [[SUCCBB:bb[0-9]+]], [[FAILBB:bb[0-9]+]]
+// CHECK:   checked_cast_br [[ARG]] : $Builtin.NativeObject to C, [[SUCCBB:bb[0-9]+]], [[FAILBB:bb[0-9]+]]
 //
 // CHECK: [[SUCCBB]]([[CASTED_VALUE:%.*]] : $C):
 // CHECK-NEXT:   strong_release [[CASTED_VALUE]]
@@ -166,7 +166,7 @@ bb1:
 // CHECK-NEXT:   br bb3
 sil [ossa] @checked_cast_br_lowered : $@convention(thin) (@owned Builtin.NativeObject) -> () {
 bb0(%0 : @owned $Builtin.NativeObject):
-  checked_cast_br %0 : $Builtin.NativeObject to $C, bb1, bb2
+  checked_cast_br %0 : $Builtin.NativeObject to C, bb1, bb2
 
 bb1(%1 : @owned $C):
   destroy_value %1 : $C

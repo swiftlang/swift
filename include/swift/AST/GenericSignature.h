@@ -21,6 +21,7 @@
 #include "swift/AST/Requirement.h"
 #include "swift/AST/Type.h"
 #include "swift/Basic/AnyValue.h"
+#include "swift/Basic/Debug.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/FoldingSet.h"
 #include "llvm/ADT/SmallVector.h"
@@ -89,7 +90,7 @@ public:
 
   void print(raw_ostream &OS) const;
 
-  LLVM_ATTRIBUTE_DEPRECATED(void dump() const, "only for use in a debugger");
+  SWIFT_DEBUG_DUMP;
 };
 
 class GenericSignatureImpl;
@@ -136,7 +137,7 @@ public:
 
   void print(raw_ostream &OS, PrintOptions Options = PrintOptions()) const;
   void print(ASTPrinter &Printer, PrintOptions Opts = PrintOptions()) const;
-  void dump() const;
+  SWIFT_DEBUG_DUMP;
   std::string getAsString() const;
 
   // Support for FoldingSet.
@@ -269,8 +270,8 @@ public:
   /// Look up a stored conformance in the generic signature. These are formed
   /// from same-type constraints placed on associated types of generic
   /// parameters which have conformance constraints on them.
-  Optional<ProtocolConformanceRef>
-  lookupConformance(CanType depTy, ProtocolDecl *proto) const;
+  ProtocolConformanceRef lookupConformance(CanType depTy,
+                                           ProtocolDecl *proto) const;
 
   /// Iterate over all generic parameters, passing a flag to the callback
   /// indicating if the generic parameter is canonical or not.
@@ -408,7 +409,7 @@ public:
   
   void print(raw_ostream &OS, PrintOptions Options = PrintOptions()) const;
   void print(ASTPrinter &Printer, PrintOptions Opts = PrintOptions()) const;
-  void dump() const;
+  SWIFT_DEBUG_DUMP;
   std::string getAsString() const;
 };
 

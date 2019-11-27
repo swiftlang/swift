@@ -79,6 +79,20 @@ IndexSubset *IndexSubset::extendingCapacity(
   return IndexSubset::get(ctx, indices);
 }
 
+void IndexSubset::print(llvm::raw_ostream &s) const {
+  s << '{';
+  interleave(range(capacity), [this, &s](unsigned i) { s << contains(i); },
+             [&s] { s << ", "; });
+  s << '}';
+}
+
+void IndexSubset::dump(llvm::raw_ostream &s) const {
+  s << "(index_subset capacity=" << capacity << " indices=(";
+  interleave(getIndices(), [&s](unsigned i) { s << i; },
+             [&s] { s << ", "; });
+  s << "))\n";
+}
+
 int IndexSubset::findNext(int startIndex) const {
   assert(startIndex < (int)capacity && "Start index cannot be past the end");
   unsigned bitWordIndex = 0, offset = 0;

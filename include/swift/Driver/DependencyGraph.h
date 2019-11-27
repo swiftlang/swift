@@ -165,6 +165,13 @@ protected:
   void markExternal(SmallVectorImpl<const void *> &visited,
                     StringRef externalDependency);
 
+public: // for ranges
+  size_t countTopLevelProvides(const void *) const;
+
+  void forEachUnmarkedJobDirectlyDependentOnExternalSwiftdeps(
+      StringRef externalDependency, function_ref<void(const void *)> fn);
+
+protected:
   bool isMarked(const void *node) const {
     assert(Provides.count(node) && "node is not in the graph");
     return Marked.count(node);

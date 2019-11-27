@@ -625,11 +625,9 @@ ManagedValue SILGenFunction::emitExistentialErasure(
   if (ctx.LangOpts.EnableObjCInterop && conformances.size() == 1 &&
       conformances[0].getRequirement() == ctx.getErrorDecl() &&
       ctx.getNSErrorDecl()) {
-    auto nsErrorDecl = ctx.getNSErrorDecl();
-
     // If the concrete type is NSError or a subclass thereof, just erase it
     // directly.
-    auto nsErrorType = nsErrorDecl->getDeclaredType()->getCanonicalType();
+    auto nsErrorType = ctx.getNSErrorType()->getCanonicalType();
     if (nsErrorType->isExactSuperclassOf(concreteFormalType)) {
       ManagedValue nsError =  F(SGFContext());
       if (nsErrorType != concreteFormalType) {
@@ -641,8 +639,9 @@ ManagedValue SILGenFunction::emitExistentialErasure(
     // If the concrete type is known to conform to _BridgedStoredNSError,
     // call the _nsError witness getter to extract the NSError directly,
     // then just erase the NSError.
-    if (auto storedNSErrorConformance =
-          SGM.getConformanceToBridgedStoredNSError(loc, concreteFormalType)) {
+    auto storedNSErrorConformance =
+        SGM.getConformanceToBridgedStoredNSError(loc, concreteFormalType);
+    if (storedNSErrorConformance) {
       auto nsErrorVar = SGM.getNSErrorRequirement(loc);
       if (!nsErrorVar) return emitUndef(existentialTL.getLoweredType());
 
@@ -650,9 +649,9 @@ ManagedValue SILGenFunction::emitExistentialErasure(
 
       // Devirtualize.  Maybe this should be done implicitly by
       // emitPropertyLValue?
-      if (storedNSErrorConformance->isConcrete()) {
+      if (storedNSErrorConformance.isConcrete()) {
         if (auto normal = dyn_cast<NormalProtocolConformance>(
-                                    storedNSErrorConformance->getConcrete())) {
+                storedNSErrorConformance.getConcrete())) {
           if (auto witnessVar = normal->getWitness(nsErrorVar)) {
             nsErrorVar = cast<VarDecl>(witnessVar.getDecl());
             nsErrorVarSubstitutions = witnessVar.getSubstitutions();
@@ -993,7 +992,7 @@ ManagedValue SILGenFunction::manageOpaqueValue(ManagedValue value,
                                                SGFContext C) {
   // If the opaque value is consumable, we can just return the
   // value with a cleanup. There is no need to retain it separately.
-  if (value.hasCleanup())
+  if (value.isPlusOne(*this))
     return value;
 
   // If the context wants a +0 value, guaranteed or immediate, we can

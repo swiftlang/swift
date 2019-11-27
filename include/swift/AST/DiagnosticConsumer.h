@@ -45,10 +45,20 @@ struct DiagnosticInfo {
   DiagnosticKind Kind;
   StringRef FormatString;
   ArrayRef<DiagnosticArgument> FormatArgs;
+
+  /// Only used when directing diagnostics to different outputs.
+  /// In batch mode a diagnostic may be
+  /// located in a non-primary file, but there will be no .dia file for a
+  /// non-primary. If valid, this argument contains a location within a buffer
+  /// that corresponds to a primary input. The .dia file for that primary can be
+  /// used for the diagnostic, as if it had occurred at this location.
   SourceLoc BufferIndirectlyCausingDiagnostic;
 
   /// DiagnosticInfo of notes which are children of this diagnostic, if any
   ArrayRef<DiagnosticInfo *> ChildDiagnosticInfo;
+
+  /// Paths to "educational note" diagnostic documentation in the toolchain.
+  ArrayRef<std::string> EducationalNotePaths;
 
   /// Represents a fix-it, a replacement of one range of text with another.
   class FixIt {
@@ -109,29 +119,9 @@ public:
   /// \param SM The source manager associated with the source locations in
   /// this diagnostic.
   ///
-  /// \param Loc The source location associated with this diagnostic. This
-  /// location may be invalid, if the diagnostic is not directly related to
-  /// the source (e.g., if it comes from command-line parsing).
-  ///
-  /// \param Kind The severity of the diagnostic (error, warning, note).
-  ///
-  /// \param FormatArgs The diagnostic format string arguments.
-  ///
-  /// \param Info Extra information associated with the diagnostic.
-  ///
-  /// \param bufferIndirectlyCausingDiagnostic Only used when directing
-  /// diagnostics to different outputs.
-  /// In batch mode a diagnostic may be
-  /// located in a non-primary file, but there will be no .dia file for a
-  /// non-primary. If valid, this argument contains a location within a buffer
-  /// that corresponds to a primary input. The .dia file for that primary can be
-  /// used for the diagnostic, as if it had occurred at this location.
-  virtual void
-  handleDiagnostic(SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind,
-                   StringRef FormatString,
-                   ArrayRef<DiagnosticArgument> FormatArgs,
-                   const DiagnosticInfo &Info,
-                   SourceLoc bufferIndirectlyCausingDiagnostic) = 0;
+  /// \param Info Information describing the diagnostic.
+  virtual void handleDiagnostic(SourceManager &SM,
+                                const DiagnosticInfo &Info) = 0;
 
   /// \returns true if an error occurred while finishing-up.
   virtual bool finishProcessing() { return false; }
@@ -149,11 +139,7 @@ public:
 /// DiagnosticConsumer that discards all diagnostics.
 class NullDiagnosticConsumer : public DiagnosticConsumer {
 public:
-  void handleDiagnostic(SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind,
-                        StringRef FormatString,
-                        ArrayRef<DiagnosticArgument> FormatArgs,
-                        const DiagnosticInfo &Info,
-                        SourceLoc bufferIndirectlyCausingDiagnostic) override;
+  void handleDiagnostic(SourceManager &SM, const DiagnosticInfo &Info) override;
 };
 
 /// DiagnosticConsumer that forwards diagnostics to the consumers of
@@ -162,11 +148,7 @@ class ForwardingDiagnosticConsumer : public DiagnosticConsumer {
   DiagnosticEngine &TargetEngine;
 public:
   ForwardingDiagnosticConsumer(DiagnosticEngine &Target);
-  void handleDiagnostic(SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind,
-                        StringRef FormatString,
-                        ArrayRef<DiagnosticArgument> FormatArgs,
-                        const DiagnosticInfo &Info,
-                        SourceLoc bufferIndirectlyCausingDiagnostic) override;
+  void handleDiagnostic(SourceManager &SM, const DiagnosticInfo &Info) override;
 };
 
 /// DiagnosticConsumer that funnels diagnostics in certain files to
@@ -228,18 +210,13 @@ public:
                 std::unique_ptr<DiagnosticConsumer> consumer)
         : inputFileName(inputFileName), consumer(std::move(consumer)) {}
 
-    void handleDiagnostic(SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind,
-                          StringRef FormatString,
-                          ArrayRef<DiagnosticArgument> FormatArgs,
-                          const DiagnosticInfo &Info,
-                          const SourceLoc bufferIndirectlyCausingDiagnostic) {
+    void handleDiagnostic(SourceManager &SM, const DiagnosticInfo &Info) {
       if (!getConsumer())
         return;
-      hasAnErrorBeenConsumed |= Kind == DiagnosticKind::Error;
-      getConsumer()->handleDiagnostic(SM, Loc, Kind, FormatString, FormatArgs,
-                                      Info, bufferIndirectlyCausingDiagnostic);
+      hasAnErrorBeenConsumed |= Info.Kind == DiagnosticKind::Error;
+      getConsumer()->handleDiagnostic(SM, Info);
     }
-    
+
     void informDriverOfIncompleteBatchModeCompilation() {
       if (!hasAnErrorBeenConsumed && getConsumer())
         getConsumer()->informDriverOfIncompleteBatchModeCompilation();
@@ -324,11 +301,7 @@ private:
       SmallVectorImpl<Subconsumer> &consumers);
 
 public:
-  void handleDiagnostic(SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind,
-                        StringRef FormatString,
-                        ArrayRef<DiagnosticArgument> FormatArgs,
-                        const DiagnosticInfo &Info,
-                        SourceLoc bufferIndirectlyCausingDiagnostic) override;
+  void handleDiagnostic(SourceManager &SM, const DiagnosticInfo &Info) override;
 
   bool finishProcessing() override;
 
@@ -348,12 +321,10 @@ private:
   subconsumerForLocation(SourceManager &SM, SourceLoc loc);
 
   Optional<FileSpecificDiagnosticConsumer::Subconsumer *>
-  findSubconsumer(SourceManager &SM, SourceLoc loc, DiagnosticKind Kind,
-                  SourceLoc bufferIndirectlyCausingDiagnostic);
+  findSubconsumer(SourceManager &SM, const DiagnosticInfo &Info);
 
   Optional<FileSpecificDiagnosticConsumer::Subconsumer *>
-  findSubconsumerForNonNote(SourceManager &SM, SourceLoc loc,
-                            SourceLoc bufferIndirectlyCausingDiagnostic);
+  findSubconsumerForNonNote(SourceManager &SM, const DiagnosticInfo &Info);
 };
   
 } // end namespace swift

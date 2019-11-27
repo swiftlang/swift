@@ -26,6 +26,54 @@ CHANGELOG
 Swift 5.2
 ---------
 
+* [SR-2790][]:
+
+  The compiler will now emit a warning when attempting to pass a temporary
+  pointer argument produced from an array, string, or inout argument to a
+  parameter which is known to escape it. This includes the various initializers 
+  for the `UnsafePointer`/`UnsafeBufferPointer` family of types, as well as
+  memberwise initializers.
+
+  ```swift
+  struct S {
+    var ptr: UnsafePointer<Int8>
+  }
+
+  func foo() {
+    var i: Int8 = 0
+    let ptr = UnsafePointer(&i)
+    // warning: initialization of 'UnsafePointer<Int8>' results in a 
+    // dangling pointer
+    
+    let s1 = S(ptr: [1, 2, 3]) 
+    // warning: passing '[Int8]' to parameter, but argument 'ptr' should be a
+    // pointer that outlives the call to 'init(ptr:)'
+    
+    let s2 = S(ptr: "hello")
+    // warning: passing 'String' to parameter, but argument 'ptr' should be a
+    // pointer that outlives the call to 'init(ptr:)'
+  }
+  ```
+
+  All 3 of the above examples are unsound because each argument produces a
+  temporary pointer only valid for the duration of the call they are passed to.
+  Therefore the returned value in each case references a dangling pointer.
+
+* [SR-2189][]:
+
+  The compiler now supports local functions whose default arguments capture
+  values from outer scopes.
+
+  ```swift
+  func outer(x: Int) -> (Int, Int) {
+    func inner(y: Int = x) -> Int {
+      return y
+    }
+
+    return (inner(), inner(y: 0))
+  }
+  ```
+
 * [SR-11429][]:
 
   The compiler will now correctly strip argument labels from function references
@@ -7803,11 +7851,13 @@ Swift 1.0
 [SR-1529]: <https://bugs.swift.org/browse/SR-1529>
 [SR-2131]: <https://bugs.swift.org/browse/SR-2131>
 [SR-2176]: <https://bugs.swift.org/browse/SR-2176>
+[SR-2189]: <https://bugs.swift.org/browse/SR-2189>
 [SR-2388]: <https://bugs.swift.org/browse/SR-2388>
 [SR-2394]: <https://bugs.swift.org/browse/SR-2394>
 [SR-2608]: <https://bugs.swift.org/browse/SR-2608>
 [SR-2672]: <https://bugs.swift.org/browse/SR-2672>
 [SR-2688]: <https://bugs.swift.org/browse/SR-2688>
+[SR-2790]: <https://bugs.swift.org/browse/SR-2790>
 [SR-4206]: <https://bugs.swift.org/browse/SR-4206>
 [SR-4248]: <https://bugs.swift.org/browse/SR-4248>
 [SR-5581]: <https://bugs.swift.org/browse/SR-5581>

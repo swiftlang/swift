@@ -22,6 +22,7 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallVector.h"
 #include <iterator>
@@ -53,7 +54,7 @@ private:
   Expr *buildCallIfWanted(SourceLoc loc,
                           Identifier fnName, ArrayRef<Expr *> args,
                           ArrayRef<Identifier> argLabels,
-                          bool allowOneWay) {
+                          bool oneWay) {
     if (!wantExpr)
       return nullptr;
 
@@ -87,7 +88,7 @@ private:
                                     /*trailing closure*/ nullptr,
                                     /*implicit*/true);
 
-    if (allowOneWay) {
+    if (oneWay) {
       // Form a one-way constraint to prevent backward propagation.
       result = new (ctx) OneWayExpr(result);
     }
@@ -173,10 +174,10 @@ public:
         if (builderSupports(ctx.Id_buildExpression)) {
           expr = buildCallIfWanted(expr->getLoc(), ctx.Id_buildExpression,
                                    { expr }, { Identifier() },
-                                   /*allowOneWay=*/true);
-        } else {
-          expr = new (ctx) OneWayExpr(expr);
+                                   /*oneWay=*/false);
         }
+
+        expr = new (ctx) OneWayExpr(expr);
       }
 
       expressions.push_back(expr);
@@ -186,7 +187,7 @@ public:
     return buildCallIfWanted(braceStmt->getStartLoc(),
                              ctx.Id_buildBlock, expressions,
                              /*argLabels=*/{ },
-                             /*allowOneWay=*/true);
+                             /*oneWay=*/true);
   }
 
   Expr *visitReturnStmt(ReturnStmt *stmt) {
@@ -212,7 +213,7 @@ public:
       return nullptr;
 
     return buildCallIfWanted(doStmt->getStartLoc(), ctx.Id_buildDo, arg,
-                             /*argLabels=*/{ }, /*allowOneWay=*/true);
+                             /*argLabels=*/{ }, /*oneWay=*/true);
   }
 
   CONTROL_FLOW_STMT(Yield)
@@ -299,7 +300,7 @@ public:
       chainExpr = buildCallIfWanted(ifStmt->getStartLoc(),
                                     ctx.Id_buildIf, chainExpr,
                                     /*argLabels=*/{ },
-                                    /*allowOneWay=*/true);
+                                    /*oneWay=*/true);
     } else {
       // Form a one-way constraint to prevent backward propagation.
       chainExpr = new (ctx) OneWayExpr(chainExpr);
@@ -423,7 +424,7 @@ public:
       operand = buildCallIfWanted(operand->getStartLoc(),
                                   ctx.Id_buildEither, operand,
                                   {isSecond ? ctx.Id_second : ctx.Id_first},
-                                  /*allowOneWay=*/false);
+                                  /*oneWay=*/false);
     }
 
     // Inject into Optional if required.  We'll be adding the call to
@@ -484,7 +485,8 @@ TypeChecker::applyFunctionBuilderBodyTransform(FuncDecl *FD,
                                                BraceStmt *body,
                                                Type builderType) {
   // Try to build a single result expression.
-  BuilderClosureVisitor visitor(Context, nullptr,
+  auto &ctx = FD->getASTContext();
+  BuilderClosureVisitor visitor(ctx, nullptr,
                                 /*wantExpr=*/true, builderType);
   Expr *returnExpr = visitor.visit(body);
   if (!returnExpr)
@@ -496,9 +498,8 @@ TypeChecker::applyFunctionBuilderBodyTransform(FuncDecl *FD,
     return nullptr;
 
   auto loc = returnExpr->getStartLoc();
-  auto returnStmt =
-    new (Context) ReturnStmt(loc, returnExpr, /*implicit*/ true);
-  return BraceStmt::create(Context, body->getLBraceLoc(), { returnStmt },
+  auto returnStmt = new (ctx) ReturnStmt(loc, returnExpr, /*implicit*/ true);
+  return BraceStmt::create(ctx, body->getLBraceLoc(), { returnStmt },
                            body->getRBraceLoc());
 }
 
@@ -516,7 +517,9 @@ ConstraintSystem::TypeMatchResult ConstraintSystem::applyFunctionBuilder(
 
   // Pre-check the closure body: pre-check any expressions in it and look
   // for return statements.
-  switch (TC.preCheckFunctionBuilderClosureBody(closure)) {
+  auto request = PreCheckFunctionBuilderRequest{closure};
+  switch (evaluateOrDefault(getASTContext().evaluator, request,
+                            FunctionBuilderClosurePreCheck::Error)) {
   case FunctionBuilderClosurePreCheck::Okay:
     // If the pre-check was okay, apply the function-builder transform.
     break;
@@ -582,7 +585,7 @@ ConstraintSystem::TypeMatchResult ConstraintSystem::applyFunctionBuilder(
   // that CSGen might have.
   //
   // TODO: just build the AST the way we want it in the first place.
-  if (TC.preCheckExpression(singleExpr, closure))
+  if (ConstraintSystem::preCheckExpression(singleExpr, closure))
     return getTypeMatchFailure(locator);
 
   singleExpr = generateConstraints(singleExpr, closure);
@@ -617,13 +620,12 @@ namespace {
 
 /// Pre-check all the expressions in the closure body.
 class PreCheckFunctionBuilderClosure : public ASTWalker {
-  TypeChecker &TC;
   ClosureExpr *Closure;
   bool HasReturnStmt = false;
   bool HasError = false;
 public:
-  PreCheckFunctionBuilderClosure(TypeChecker &tc, ClosureExpr *closure)
-    : TC(tc), Closure(closure) {}
+  PreCheckFunctionBuilderClosure(ClosureExpr *closure)
+    : Closure(closure) {}
 
   FunctionBuilderClosurePreCheck run() {
     Stmt *oldBody = Closure->getBody();
@@ -649,7 +651,7 @@ public:
     // Pre-check the expression.  If this fails, abort the walk immediately.
     // Otherwise, replace the expression with the result of pre-checking.
     // In either case, don't recurse into the expression.
-    if (TC.preCheckExpression(E, /*DC*/ Closure)) {
+    if (ConstraintSystem::preCheckExpression(E, /*DC*/ Closure)) {
       HasError = true;
       return std::make_pair(false, nullptr);
     }
@@ -671,21 +673,12 @@ public:
 
 }
 
-FunctionBuilderClosurePreCheck
-TypeChecker::preCheckFunctionBuilderClosureBody(ClosureExpr *closure) {
+llvm::Expected<FunctionBuilderClosurePreCheck>
+PreCheckFunctionBuilderRequest::evaluate(Evaluator &eval,
+                                         ClosureExpr *closure) const {
   // Single-expression closures should already have been pre-checked.
   if (closure->hasSingleExpressionBody())
     return FunctionBuilderClosurePreCheck::Okay;
 
-  // Check whether we've already done this analysis.
-  auto it = precheckedFunctionBuilderClosures.find(closure);
-  if (it != precheckedFunctionBuilderClosures.end())
-    return it->second;
-
-  auto result = PreCheckFunctionBuilderClosure(*this, closure).run();
-
-  // Cache the result.
-  precheckedFunctionBuilderClosures.insert(std::make_pair(closure, result));
-
-  return result;
+  return PreCheckFunctionBuilderClosure(closure).run();
 }

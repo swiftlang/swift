@@ -115,13 +115,13 @@ public:
                                            ManagedValue originalValue);
 
 #define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...)            \
-  using SILBuilder::createCopy##Name##Value;                             \
-  ManagedValue createCopy##Name##Value(SILLocation loc,                        \
-                                       ManagedValue originalValue);
+  using SILBuilder::createStrongCopy##Name##Value;                             \
+  ManagedValue createStrongCopy##Name##Value(SILLocation loc,                  \
+                                             ManagedValue originalValue);
 #define UNCHECKED_REF_STORAGE(Name, ...)                                       \
-  using SILBuilder::createCopy##Name##Value;                                   \
-  ManagedValue createCopy##Name##Value(SILLocation loc,                        \
-                                       ManagedValue originalValue);
+  using SILBuilder::createStrongCopy##Name##Value;                             \
+  ManagedValue createStrongCopy##Name##Value(SILLocation loc,                  \
+                                             ManagedValue originalValue);
 #include "swift/AST/ReferenceStorage.def"
 
   ManagedValue createOwnedPhiArgument(SILType type);
@@ -223,23 +223,33 @@ public:
   using SILBuilder::createUnconditionalCheckedCastValue;
   ManagedValue
   createUnconditionalCheckedCastValue(SILLocation loc,
-                                      ManagedValue operand, SILType type);
+                                      ManagedValue op,
+                                      CanType srcFormalTy,
+                                      SILType destLoweredTy,
+                                      CanType destFormalTy);
   using SILBuilder::createUnconditionalCheckedCast;
   ManagedValue createUnconditionalCheckedCast(SILLocation loc,
-                                              ManagedValue operand,
-                                              SILType type);
+                                              ManagedValue op,
+                                              SILType destLoweredTy,
+                                              CanType destFormalTy);
 
   using SILBuilder::createCheckedCastBranch;
   void createCheckedCastBranch(SILLocation loc, bool isExact,
-                               ManagedValue operand, SILType type,
+                               ManagedValue op,
+                               SILType destLoweredTy,
+                               CanType destFormalTy,
                                SILBasicBlock *trueBlock,
                                SILBasicBlock *falseBlock,
                                ProfileCounter Target1Count,
                                ProfileCounter Target2Count);
 
   using SILBuilder::createCheckedCastValueBranch;
-  void createCheckedCastValueBranch(SILLocation loc, ManagedValue operand,
-                                    SILType type, SILBasicBlock *trueBlock,
+  void createCheckedCastValueBranch(SILLocation loc,
+                                    ManagedValue op,
+                                    CanType srcFormalTy,
+                                    SILType destLoweredTy,
+                                    CanType destFormalTy,
+                                    SILBasicBlock *trueBlock,
                                     SILBasicBlock *falseBlock);
 
   using SILBuilder::createUpcast;
@@ -247,7 +257,8 @@ public:
                             SILType type);
 
   using SILBuilder::tryCreateUncheckedRefCast;
-  ManagedValue tryCreateUncheckedRefCast(SILLocation loc, ManagedValue original,
+  ManagedValue tryCreateUncheckedRefCast(SILLocation loc,
+                                         ManagedValue op,
                                          SILType type);
 
   using SILBuilder::createUncheckedTrivialBitCast;

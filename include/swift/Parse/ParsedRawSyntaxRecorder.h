@@ -73,6 +73,10 @@ public:
   /// Used for incremental re-parsing.
   ParsedRawSyntaxNode lookupNode(size_t lexerOffset, SourceLoc loc,
                                  syntax::SyntaxKind kind);
+
+  #ifndef NDEBUG
+  static void verifyElementRanges(ArrayRef<ParsedRawSyntaxNode> elements);
+  #endif
 };
 
 } // end namespace swift

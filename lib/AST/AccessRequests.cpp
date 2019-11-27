@@ -81,7 +81,7 @@ AccessLevelRequest::evaluate(Evaluator &evaluator, ValueDecl *D) const {
   // Special case for dtors and enum elements: inherit from container
   if (D->getKind() == DeclKind::Destructor ||
       D->getKind() == DeclKind::EnumElement) {
-    if (D->isInvalid()) {
+    if (D->hasInterfaceType() && D->isInvalid()) {
       return AccessLevel::Private;
     } else {
       auto container = cast<NominalTypeDecl>(D->getDeclContext());

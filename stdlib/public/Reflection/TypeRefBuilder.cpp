@@ -44,8 +44,9 @@ RemoteRef<char> TypeRefBuilder::readTypeRef(uint64_t remoteAddr) {
     }
   }
   // TODO: Try using MetadataReader to read the string here?
-  fputs("invalid type ref pointer\n", stderr);
-  abort();
+  
+  // Invalid type ref pointer.
+  return nullptr;
 
 found_type_ref:
   // Make sure there's a valid mangled string within the bounds of the
@@ -57,16 +58,16 @@ found_type_ref:
       goto valid_type_ref;
       
     if (c >= '\1' && c <= '\x17')
-      i = i.atByteOffset(4);
+      i = i.atByteOffset(5);
     else if (c >= '\x18' && c <= '\x1F') {
-      i = i.atByteOffset(PointerSize);
+      i = i.atByteOffset(PointerSize + 1);
     } else {
       i = i.atByteOffset(1);
     }
   }
   
-  fputs("unterminated type ref\n", stderr);
-  abort();
+  // Unterminated string.
+  return nullptr;
   
 valid_type_ref:
   // Look past the $s prefix if the string has one.
@@ -252,11 +253,18 @@ TypeRefBuilder::getBuiltinTypeInfo(const TypeRef *TR) {
 
   for (auto Info : ReflectionInfos) {
     for (auto BuiltinTypeDescriptor : Info.Builtin) {
-      assert(BuiltinTypeDescriptor->Size > 0);
-      assert(BuiltinTypeDescriptor->getAlignment() > 0);
-      assert(BuiltinTypeDescriptor->Stride > 0);
+      if (BuiltinTypeDescriptor->Stride <= 0)
+        continue;
       if (!BuiltinTypeDescriptor->hasMangledTypeName())
         continue;
+
+      auto Alignment = BuiltinTypeDescriptor->getAlignment();
+      if (Alignment <= 0)
+        continue;
+      // Reject any alignment that's not a power of two.
+      if (Alignment & (Alignment - 1))
+        continue;
+
       auto CandidateMangledName =
         readTypeRef(BuiltinTypeDescriptor, BuiltinTypeDescriptor->TypeName);
       if (!reflectionNameMatches(CandidateMangledName, MangledName))

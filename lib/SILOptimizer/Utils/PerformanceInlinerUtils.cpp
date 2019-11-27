@@ -303,10 +303,10 @@ SILBasicBlock *ConstantTracker::getTakenBlock(TermInst *term) {
     if (SILInstruction *def = getDefInCaller(CCB->getOperand())) {
       if (auto *UCI = dyn_cast<UpcastInst>(def)) {
         SILType castType = UCI->getOperand()->getType();
-        if (CCB->getCastType().isExactSuperclassOf(castType)) {
+        if (CCB->getTargetLoweredType().isExactSuperclassOf(castType)) {
           return CCB->getSuccessBB();
         }
-        if (!castType.isBindableToSuperclassOf(CCB->getCastType())) {
+        if (!castType.isBindableToSuperclassOf(CCB->getTargetLoweredType())) {
           return CCB->getFailureBB();
         }
       }
@@ -633,7 +633,8 @@ static bool isCallerAndCalleeLayoutConstraintsCompatible(FullApplySite AI) {
   SILFunction *Callee = AI.getReferencedFunctionOrNull();
   assert(Callee && "Trying to optimize a dynamic function!?");
 
-  auto CalleeSig = Callee->getLoweredFunctionType()->getGenericSignature();
+  auto CalleeSig = Callee->getLoweredFunctionType()
+                         ->getInvocationGenericSignature();
   auto AISubs = AI.getSubstitutionMap();
 
   SmallVector<GenericTypeParamType *, 4> SubstParams;

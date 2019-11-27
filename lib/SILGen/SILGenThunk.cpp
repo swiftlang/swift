@@ -97,7 +97,8 @@ getNextUncurryLevelRef(SILGenFunction &SGF, SILLocation loc, SILDeclRef thunk,
   SILDeclRef next = SILDeclRef(vd, thunk.kind);
   assert(!next.isCurried);
 
-  auto constantInfo = SGF.SGM.Types.getConstantInfo(next);
+  auto constantInfo =
+      SGF.SGM.Types.getConstantInfo(SGF.getTypeExpansionContext(), next);
 
   // If the function is natively foreign, reference its foreign entry point.
   if (requiresForeignToNativeThunk(vd))
@@ -118,7 +119,8 @@ getNextUncurryLevelRef(SILGenFunction &SGF, SILLocation loc, SILDeclRef thunk,
                 next};
       }
 
-      auto methodTy = SGF.SGM.Types.getConstantOverrideType(next);
+      auto methodTy = SGF.SGM.Types.getConstantOverrideType(
+          SGF.getTypeExpansionContext(), next);
       SILValue result =
           SGF.emitClassMethodRef(loc, selfArg.getValue(), next, methodTy);
       return {ManagedValue::forUnmanaged(result),
@@ -133,7 +135,7 @@ getNextUncurryLevelRef(SILGenFunction &SGF, SILLocation loc, SILDeclRef thunk,
       auto origSelfType = protocol->getSelfInterfaceType()->getCanonicalType();
       auto substSelfType = origSelfType.subst(curriedSubs)->getCanonicalType();
       auto conformance = curriedSubs.lookupConformance(origSelfType, protocol);
-      auto result = SGF.B.createWitnessMethod(loc, substSelfType, *conformance,
+      auto result = SGF.B.createWitnessMethod(loc, substSelfType, conformance,
                                               next, constantInfo.getSILType());
       return {ManagedValue::forUnmanaged(result), next};
     }
@@ -158,7 +160,7 @@ void SILGenFunction::emitCurryThunk(SILDeclRef thunk) {
   SILLocation loc(vd);
   Scope S(*this, vd);
 
-  auto thunkInfo = SGM.Types.getConstantInfo(thunk);
+  auto thunkInfo = SGM.Types.getConstantInfo(getTypeExpansionContext(), thunk);
   auto thunkFnTy = thunkInfo.SILFnType;
   SILFunctionConventions fromConv(thunkFnTy, SGM.M);
 
@@ -185,15 +187,16 @@ void SILGenFunction::emitCurryThunk(SILDeclRef thunk) {
   if (resultTy != toClosure.getType()) {
     CanSILFunctionType resultFnTy = resultTy.castTo<SILFunctionType>();
     CanSILFunctionType closureFnTy = toClosure.getType().castTo<SILFunctionType>();
-    if (resultFnTy->isABICompatibleWith(closureFnTy).isCompatible()) {
+    if (resultFnTy->isABICompatibleWith(closureFnTy, F).isCompatible()) {
       toClosure = B.createConvertFunction(loc, toClosure, resultTy);
     } else {
       // Compute the partially-applied abstraction pattern for the callee:
       // just grab the pattern for the curried fn ref and "call" it.
       assert(!calleeRef.isCurried);
       calleeRef.isCurried = true;
-      auto appliedFnPattern = SGM.Types.getConstantInfo(calleeRef).FormalPattern
-                                       .getFunctionResultType();
+      auto appliedFnPattern =
+          SGM.Types.getConstantInfo(getTypeExpansionContext(), calleeRef)
+              .FormalPattern.getFunctionResultType();
 
       auto appliedThunkPattern =
         thunkInfo.FormalPattern.getFunctionResultType();
@@ -265,7 +268,7 @@ SILValue
 SILGenFunction::emitGlobalFunctionRef(SILLocation loc, SILDeclRef constant,
                                       SILConstantInfo constantInfo,
                                       bool callPreviousDynamicReplaceableImpl) {
-  assert(constantInfo == getConstantInfo(constant));
+  assert(constantInfo == getConstantInfo(getTypeExpansionContext(), constant));
 
   // Builtins must be fully applied at the point of reference.
   if (constant.hasDecl() &&
@@ -289,7 +292,8 @@ SILGenFunction::emitGlobalFunctionRef(SILLocation loc, SILDeclRef constant,
   }
 
   auto f = SGM.getFunction(constant, NotForDefinition);
-  assert(f->getLoweredFunctionType() == constantInfo.SILFnType);
+  assert(f->getLoweredFunctionTypeInContext(B.getTypeExpansionContext()) ==
+         constantInfo.SILFnType);
   if (callPreviousDynamicReplaceableImpl)
     return B.createPreviousDynamicFunctionRef(loc, f);
   else

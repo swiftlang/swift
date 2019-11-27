@@ -149,11 +149,11 @@ static inline bool isPerformingDSE(DSEKind Kind) {
 static bool isDeadStoreInertInstruction(SILInstruction *Inst) {
   switch (Inst->getKind()) {
 #define UNCHECKED_REF_STORAGE(Name, ...)                                       \
-  case SILInstructionKind::Copy##Name##ValueInst:
-#define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
-  case SILInstructionKind::Name##RetainInst: \
-  case SILInstructionKind::StrongRetain##Name##Inst: \
-  case SILInstructionKind::Copy##Name##ValueInst:
+  case SILInstructionKind::StrongCopy##Name##ValueInst:
+#define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...)            \
+  case SILInstructionKind::Name##RetainInst:                                   \
+  case SILInstructionKind::StrongRetain##Name##Inst:                           \
+  case SILInstructionKind::StrongCopy##Name##ValueInst:
 #include "swift/AST/ReferenceStorage.def"
   case SILInstructionKind::StrongRetainInst:
   case SILInstructionKind::RetainValueInst:
@@ -855,7 +855,8 @@ void DSEContext::processRead(SILInstruction *I, SILValue Mem, DSEKind Kind) {
   // Expand the given Mem into individual fields and process them as separate
   // reads.
   LSLocationList Locs;
-  LSLocation::expand(L, &I->getModule(), Locs, TE);
+  LSLocation::expand(L, &I->getModule(),
+                     TypeExpansionContext(*I->getFunction()), Locs, TE);
 
   // Are we building the genset and killset.
   if (isBuildingGenKillSet(Kind)) {
@@ -940,7 +941,7 @@ void DSEContext::processWrite(SILInstruction *I, SILValue Val, SILValue Mem,
   // writes.
   bool Dead = true;
   LSLocationList Locs;
-  LSLocation::expand(L, Mod, Locs, TE);
+  LSLocation::expand(L, Mod, TypeExpansionContext(*I->getFunction()), Locs, TE);
   SmallBitVector V(Locs.size());
 
   // Are we computing max store set.
@@ -997,7 +998,7 @@ void DSEContext::processWrite(SILInstruction *I, SILValue Val, SILValue Mem,
     }
 
     // Try to create as few aggregated stores as possible out of the locations.
-    LSLocation::reduce(L, Mod, Alives);
+    LSLocation::reduce(L, Mod, TypeExpansionContext(*I->getFunction()), Alives);
 
     // Oops, we have too many smaller stores generated, bail out.
     if (Alives.size() > MaxPartialStoreCount)

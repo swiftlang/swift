@@ -52,7 +52,6 @@ let r = Color.Red
 let c = MaybeIntPair.just(74, 75)
 // CHECK: !DICompositeType({{.*}}name: "Maybe",
 // CHECK-SAME:             line: [[@LINE-8]],
-// CHECK-SAME:             size: 8{{[,)]}}
 // CHECK-SAME:             identifier: "$s4enum5MaybeOyAA5ColorOGD"
 let movie : Maybe<Color> = .none
 
@@ -79,8 +78,12 @@ public enum Tuple<P> {
 
 func bar<T>(_ x : Tuple<T>) -> Tuple<T> { return x }
 
-// CHECK: ![[LIST:.*]] = !DICompositeType({{.*}}identifier: "$s4enum4ListOyxGD"
-// CHECK-DAG: ![[LET_LIST:.*]] = !DIDerivedType(tag: DW_TAG_const_type, baseType: ![[LIST]])
+// CHECK-DAG: ![[LIST:.*]] = !DICompositeType({{.*}}identifier: "$s4enum4ListOyxGD"
+// CHECK-DAG: ![[LIST_MEMBER:.*]] = !DIDerivedType(tag: DW_TAG_member, {{.*}} baseType: ![[LIST]]
+// CHECK-DAG: ![[LIST_ELTS:.*]] = !{![[LIST_MEMBER]]}
+// CHECK-DAG: ![[LIST_CONTAINER:.*]] = !DICompositeType({{.*}}elements: ![[LIST_ELTS]]
+
+// CHECK-DAG: ![[LET_LIST:.*]] = !DIDerivedType(tag: DW_TAG_const_type, baseType: ![[LIST_CONTAINER]])
 // CHECK-DAG: !DILocalVariable(name: "self", arg: 1, {{.*}} line: [[@LINE+4]], type: ![[LET_LIST]], flags: DIFlagArtificial)
 public enum List<T> {
        indirect case Tail(List, T)

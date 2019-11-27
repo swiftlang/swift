@@ -54,17 +54,18 @@ bool swift::tripleIsAnySimulator(const llvm::Triple &triple) {
     tripleIsAppleTVSimulator(triple);
 }
 
-
 bool swift::tripleRequiresRPathForSwiftInOS(const llvm::Triple &triple) {
   if (triple.isMacOSX()) {
     // macOS 10.14.4 contains a copy of Swift, but the linker will still use an
     // rpath-based install name until 10.15.
     return triple.isMacOSXVersionLT(10, 15);
+  }
 
-  } else if (triple.isiOS()) {
+  if (triple.isiOS()) {
     return triple.isOSVersionLT(12, 2);
+  }
 
-  } else if (triple.isWatchOS()) {
+  if (triple.isWatchOS()) {
     return triple.isOSVersionLT(5, 2);
   }
 
@@ -196,20 +197,16 @@ StringRef swift::getPlatformNameForTriple(const llvm::Triple &triple) {
 
 StringRef swift::getMajorArchitectureName(const llvm::Triple &Triple) {
   if (Triple.isOSLinux()) {
-    switch(Triple.getSubArch()) {
-    default:
-      return Triple.getArchName();
-      break;
+    switch (Triple.getSubArch()) {
     case llvm::Triple::SubArchType::ARMSubArch_v7:
       return "armv7";
-      break;
     case llvm::Triple::SubArchType::ARMSubArch_v6:
       return "armv6";
+    default:
       break;
     }
-  } else {
-    return Triple.getArchName();
   }
+  return Triple.getArchName();
 }
 
 // The code below is responsible for normalizing target triples into the form
@@ -345,9 +342,10 @@ llvm::Triple swift::getTargetSpecificModuleTriple(const llvm::Triple &triple) {
 }
 
 Optional<llvm::VersionTuple>
-swift::getSwiftRuntimeCompatibilityVersionForTarget(const llvm::Triple &Triple){
+swift::getSwiftRuntimeCompatibilityVersionForTarget(
+    const llvm::Triple &Triple) {
   unsigned Major, Minor, Micro;
-  
+
   if (Triple.isMacOSX()) {
     Triple.getMacOSXVersion(Major, Minor, Micro);
     if (Major == 10) {
@@ -355,11 +353,7 @@ swift::getSwiftRuntimeCompatibilityVersionForTarget(const llvm::Triple &Triple){
         return llvm::VersionTuple(5, 0);
       } else if (Minor <= 15) {
         return llvm::VersionTuple(5, 1);
-      } else {
-        return None;
       }
-    } else {
-      return None;
     }
   } else if (Triple.isiOS()) { // includes tvOS
     Triple.getiOSVersion(Major, Minor, Micro);
@@ -367,8 +361,6 @@ swift::getSwiftRuntimeCompatibilityVersionForTarget(const llvm::Triple &Triple){
       return llvm::VersionTuple(5, 0);
     } else if (Major <= 13) {
       return llvm::VersionTuple(5, 1);
-    } else {
-      return None;
     }
   } else if (Triple.isWatchOS()) {
     Triple.getWatchOSVersion(Major, Minor, Micro);
@@ -376,11 +368,8 @@ swift::getSwiftRuntimeCompatibilityVersionForTarget(const llvm::Triple &Triple){
       return llvm::VersionTuple(5, 0);
     } else if (Major <= 6) {
       return llvm::VersionTuple(5, 1);
-    } else {
-      return None;
     }
-  } else {
-    return None;
   }
-}
 
+  return None;
+}

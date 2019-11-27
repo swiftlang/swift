@@ -762,8 +762,8 @@ namespace {
         LLVM_FALLTHROUGH;
       default:
         if (!underlyingResult.AbstractType->isEqual(mappedType)) {
-          underlyingResult.AbstractType->dump();
-          mappedType->dump();
+          underlyingResult.AbstractType->dump(llvm::errs());
+          mappedType->dump(llvm::errs());
         }
         assert(underlyingResult.AbstractType->isEqual(mappedType) &&
                "typedef without special typedef kind was mapped "
@@ -1762,13 +1762,12 @@ static bool isObjCMethodResultAudited(const clang::Decl *decl) {
 
 DefaultArgumentKind ClangImporter::Implementation::inferDefaultArgument(
     clang::QualType type, OptionalTypeKind clangOptionality,
-    DeclBaseName baseName, unsigned numParams, StringRef argumentLabel,
-    bool isFirstParameter, bool isLastParameter, NameImporter &nameImporter) {
+    DeclBaseName baseName, StringRef argumentLabel, bool isFirstParameter,
+    bool isLastParameter, NameImporter &nameImporter) {
   auto baseNameStr = baseName.userFacingName();
 
-  // Don't introduce a default argument for setters with only a single
-  // parameter.
-  if (numParams == 1 && camel_case::getFirstWord(baseNameStr) == "set")
+  // Don't introduce a default argument for the first parameter of setters.
+  if (isFirstParameter && camel_case::getFirstWord(baseNameStr) == "set")
     return DefaultArgumentKind::None;
 
   // Some nullable parameters default to 'nil'.
@@ -1788,10 +1787,6 @@ DefaultArgumentKind ClangImporter::Implementation::inferDefaultArgument(
       }
     }
   }
-
-  // Don't introduce an empty options default arguments for setters.
-  if (isFirstParameter && camel_case::getFirstWord(baseNameStr) == "set")
-    return DefaultArgumentKind::None;
 
   // Option sets default to "[]" if they have "Options" in their name.
   if (const clang::EnumType *enumTy = type->getAs<clang::EnumType>()) {
@@ -2087,7 +2082,7 @@ ImportedType ClangImporter::Implementation::importMethodParamsAndReturnType(
     bool paramIsIUO;
     if (kind == SpecialMethodKind::NSDictionarySubscriptGetter &&
         paramTy->isObjCIdType()) {
-      swiftParamTy = SwiftContext.getNSCopyingDecl()->getDeclaredType();
+      swiftParamTy = SwiftContext.getNSCopyingType();
       if (optionalityOfParam != OTK_None)
         swiftParamTy = OptionalType::get(swiftParamTy);
 
@@ -2175,8 +2170,7 @@ ImportedType ClangImporter::Implementation::importMethodParamsAndReturnType(
 
       auto defaultArg = inferDefaultArgument(
           param->getType(), optionalityOfParam,
-          importedName.getDeclName().getBaseName(), numEffectiveParams,
-          name.empty() ? StringRef() : name.str(), paramIndex == 0,
+          importedName.getDeclName().getBaseName(), name.str(), paramIndex == 0,
           isLastParameter, getNameImporter());
       if (defaultArg != DefaultArgumentKind::None)
         paramInfo->setDefaultArgumentKind(defaultArg);
@@ -2194,14 +2188,20 @@ ImportedType ClangImporter::Implementation::importMethodParamsAndReturnType(
   if (importedName.hasCustomName() && argNames.size() != swiftParams.size()) {
     // Note carefully: we're emitting a warning in the /Clang/ buffer.
     auto &srcMgr = getClangASTContext().getSourceManager();
-    auto &rawDiagClient = Instance->getDiagnosticClient();
-    auto &diagClient = static_cast<ClangDiagnosticConsumer &>(rawDiagClient);
+    ClangSourceBufferImporter &bufferImporter =
+        getBufferImporterForDiagnostics();
     SourceLoc methodLoc =
-        diagClient.resolveSourceLocation(srcMgr, clangDecl->getLocation());
+        bufferImporter.resolveSourceLocation(srcMgr, clangDecl->getLocation());
     if (methodLoc.isValid()) {
       SwiftContext.Diags.diagnose(methodLoc, diag::invalid_swift_name_method,
                                   swiftParams.size() < argNames.size(),
                                   swiftParams.size(), argNames.size());
+      ModuleDecl *parentModule = dc->getParentModule();
+      if (parentModule != ImportedHeaderUnit->getParentModule()) {
+        SwiftContext.Diags.diagnose(
+            methodLoc, diag::unresolvable_clang_decl_is_a_framework_bug,
+            parentModule->getName().str());
+      }
     }
     return {Type(), false};
   }

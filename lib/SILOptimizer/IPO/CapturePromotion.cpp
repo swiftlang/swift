@@ -340,7 +340,7 @@ computeNewArgInterfaceTypes(SILFunction *F, IndicesSet &PromotableIndices,
   auto fnTy = F->getLoweredFunctionType();
 
   auto &Types = F->getModule().Types;
-  Lowering::GenericContextScope scope(Types, fnTy->getGenericSignature());
+  Lowering::GenericContextScope scope(Types, fnTy->getInvocationGenericSignature());
 
   // For each parameter in the old function...
   for (unsigned Index : indices(Parameters)) {
@@ -353,7 +353,7 @@ computeNewArgInterfaceTypes(SILFunction *F, IndicesSet &PromotableIndices,
 
     LLVM_DEBUG(llvm::dbgs() << "Index: " << Index << "; PromotableIndices: "
                << (PromotableIndices.count(ArgIndex)?"yes":"no")
-               << " Param: "; param.dump());
+               << " Param: "; param.print(llvm::dbgs()));
 
     if (!PromotableIndices.count(ArgIndex)) {
       OutTys.push_back(param);
@@ -363,12 +363,16 @@ computeNewArgInterfaceTypes(SILFunction *F, IndicesSet &PromotableIndices,
     // Perform the proper conversions and then add it to the new parameter list
     // for the type.
     assert(!param.isFormalIndirect());
-    auto paramTy = param.getSILStorageType();
+    auto paramTy = param.getSILStorageType(fnConv.silConv.getModule(),
+                                           fnConv.funcTy);
     auto paramBoxTy = paramTy.castTo<SILBoxType>();
     assert(paramBoxTy->getLayout()->getFields().size() == 1
            && "promoting compound box not implemented yet");
-    auto paramBoxedTy = getSILBoxFieldType(paramBoxTy, Types, 0);
-    auto &paramTL = Types.getTypeLowering(paramBoxedTy, expansion);
+    auto paramBoxedTy =
+        getSILBoxFieldType(TypeExpansionContext(*F), paramBoxTy, Types, 0);
+    assert(expansion == F->getResilienceExpansion());
+    auto &paramTL =
+        Types.getTypeLowering(paramBoxedTy, TypeExpansionContext(*F));
     ParameterConvention convention;
     if (paramTL.isAddressOnly()) {
       convention = ParameterConvention::Indirect_In;
@@ -424,11 +428,11 @@ ClosureCloner::initCloned(SILOptFunctionBuilder &FunctionBuilder,
 
   // Create the thin function type for the cloned closure.
   auto ClonedTy = SILFunctionType::get(
-      OrigFTI->getGenericSignature(), OrigFTI->getExtInfo(),
+      OrigFTI->getInvocationGenericSignature(), OrigFTI->getExtInfo(),
       OrigFTI->getCoroutineKind(), OrigFTI->getCalleeConvention(),
-      ClonedInterfaceArgTys, OrigFTI->getYields(),
-      OrigFTI->getResults(), OrigFTI->getOptionalErrorResult(),
-      M.getASTContext(), OrigFTI->getWitnessMethodConformanceOrNone());
+      ClonedInterfaceArgTys, OrigFTI->getYields(), OrigFTI->getResults(),
+      OrigFTI->getOptionalErrorResult(), SubstitutionMap(), false,
+      M.getASTContext(), OrigFTI->getWitnessMethodConformanceOrInvalid());
 
   assert((Orig->isTransparent() || Orig->isBare() || Orig->getLocation())
          && "SILFunction missing location");
@@ -479,8 +483,9 @@ ClosureCloner::populateCloned() {
     auto BoxTy = (*I)->getType().castTo<SILBoxType>();
     assert(BoxTy->getLayout()->getFields().size() == 1 &&
            "promoting compound box not implemented");
-    auto BoxedTy = getSILBoxFieldType(BoxTy, Cloned->getModule().Types, 0)
-      .getObjectType();
+    auto BoxedTy = getSILBoxFieldType(TypeExpansionContext(*Cloned), BoxTy,
+                                      Cloned->getModule().Types, 0)
+                       .getObjectType();
     SILValue MappedValue =
         ClonedEntryBB->createFunctionArgument(BoxedTy, (*I)->getDecl());
 
@@ -488,7 +493,7 @@ ClosureCloner::populateCloned() {
     // a non-trivial value. We know that our value is not written to and it does
     // not escape. The use of a borrow enforces this.
     if (Cloned->hasOwnership() &&
-        MappedValue.getOwnershipKind() != ValueOwnershipKind::Any) {
+        MappedValue.getOwnershipKind() != ValueOwnershipKind::None) {
       SILLocation Loc(const_cast<ValueDecl *>((*I)->getDecl()));
       MappedValue = getBuilder().emitBeginBorrowOperation(Loc, MappedValue);
     }
@@ -579,7 +584,7 @@ void ClosureCloner::visitDestroyValueInst(DestroyValueInst *Inst) {
       // If ownership is enabled, then we must emit a begin_borrow for any
       // non-trivial value.
       if (F.hasOwnership() &&
-          Value.getOwnershipKind() != ValueOwnershipKind::Any) {
+          Value.getOwnershipKind() != ValueOwnershipKind::None) {
         auto *BBI = cast<BeginBorrowInst>(Value);
         Value = BBI->getOperand();
         B.emitEndBorrowOperation(Inst->getLoc(), BBI);
@@ -998,7 +1003,8 @@ bool isPartialApplyNonEscapingUser(Operand *CurrentOp, PartialApplyInst *PAI,
   auto BoxTy = BoxArg->getType().castTo<SILBoxType>();
   assert(BoxTy->getLayout()->getFields().size() == 1 &&
          "promoting compound box not implemented yet");
-  if (getSILBoxFieldType(BoxTy, M.Types, 0).isAddressOnly(*F)) {
+  if (getSILBoxFieldType(TypeExpansionContext(*Fn), BoxTy, M.Types, 0)
+          .isAddressOnly(*F)) {
     LLVM_DEBUG(llvm::dbgs() << "        FAIL! Box is an address only "
                                "argument!\n");
     return false;
@@ -1272,8 +1278,8 @@ processPartialApplyInst(SILOptFunctionBuilder &FuncBuilder,
   auto CalleeFunctionTy = PAI->getCallee()->getType().castTo<SILFunctionType>();
   auto SubstCalleeFunctionTy = CalleeFunctionTy;
   if (PAI->hasSubstitutions())
-    SubstCalleeFunctionTy =
-        CalleeFunctionTy->substGenericArgs(M, PAI->getSubstitutionMap());
+    SubstCalleeFunctionTy = CalleeFunctionTy->substGenericArgs(
+        M, PAI->getSubstitutionMap(), TypeExpansionContext(*F));
   SILFunctionConventions calleeConv(SubstCalleeFunctionTy, M);
   auto CalleePInfo = SubstCalleeFunctionTy->getParameters();
   SILFunctionConventions paConv(PAI->getType().castTo<SILFunctionType>(), M);

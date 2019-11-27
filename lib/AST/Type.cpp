@@ -157,6 +157,10 @@ bool TypeBase::isAny() {
   return isEqual(getASTContext().TheAnyType);
 }
 
+bool TypeBase::isHole() {
+  return isEqual(getASTContext().TheUnresolvedType);
+}
+
 bool TypeBase::isAnyClassReferenceType() {
   return getCanonicalType().isAnyClassReferenceType();
 }
@@ -1146,8 +1150,6 @@ CanType TypeBase::computeCanonicalType() {
     // If we haven't set a depth for this generic parameter, try to do so.
     // FIXME: This is a dreadful hack.
     if (gpDecl->getDepth() == GenericTypeParamDecl::InvalidDepth) {
-      auto resolver = gpDecl->getASTContext().getLazyResolver();
-      assert(resolver && "Need to resolve generic parameter depth");
       if (auto decl =
             gpDecl->getDeclContext()->getInnermostDeclarationDeclContext())
         if (auto valueDecl = decl->getAsGenericContext())
@@ -1672,9 +1674,29 @@ bool TypeBase::isBindableTo(Type b) {
         if (func->getExtInfo() != substFunc->getExtInfo())
           return false;
         
-        // TODO: Generic signatures
-        if (func->getGenericSignature() || substFunc->getGenericSignature())
-          return false;
+        // Compare substituted function types.
+        if (func->getSubstGenericSignature()
+            || substFunc->getSubstGenericSignature()) {
+          if (func->getSubstGenericSignature()
+                != substFunc->getSubstGenericSignature())
+            return false;
+          
+          auto sig = func->getSubstGenericSignature();
+          
+          auto origSubs = func->getSubstitutions();
+          auto substSubs = substFunc->getSubstitutions();
+          
+          if (!origSubs || !substSubs)
+            return false;
+          
+          for (unsigned i : indices(origSubs.getReplacementTypes())) {
+            if (!visit(origSubs.getReplacementTypes()[i]->getCanonicalType(sig),
+                     substSubs.getReplacementTypes()[i]->getCanonicalType(sig)))
+              return false;
+          }
+          
+          return true;
+        }
         
         if (func->getParameters().size() != substFunc->getParameters().size())
           return false;
@@ -1685,8 +1707,8 @@ bool TypeBase::isBindableTo(Type b) {
           if (func->getParameters()[i].getConvention()
                 != substFunc->getParameters()[i].getConvention())
             return false;
-          if (!visit(func->getParameters()[i].getType(),
-                     substFunc->getParameters()[i].getType()))
+          if (!visit(func->getParameters()[i].getInterfaceType(),
+                     substFunc->getParameters()[i].getInterfaceType()))
             return false;
         }
 
@@ -1695,8 +1717,8 @@ bool TypeBase::isBindableTo(Type b) {
               != substFunc->getResults()[i].getConvention())
             return false;
 
-          if (!visit(func->getResults()[i].getType(),
-                     substFunc->getResults()[i].getType()))
+          if (!visit(func->getResults()[i].getInterfaceType(),
+                     substFunc->getResults()[i].getInterfaceType()))
             return false;
         }
         
@@ -1734,8 +1756,8 @@ bool TypeBase::isBindableTo(Type b) {
 
           auto canTy = req.getFirstType()->getCanonicalType();
           auto *proto = req.getSecondType()->castTo<ProtocolType>()->getDecl();
-          auto origConf = *origSubMap.lookupConformance(canTy, proto);
-          auto substConf = *substSubMap.lookupConformance(canTy, proto);
+          auto origConf = origSubMap.lookupConformance(canTy, proto);
+          auto substConf = substSubMap.lookupConformance(canTy, proto);
 
           if (origConf.isConcrete()) {
             if (!substConf.isConcrete())
@@ -2647,26 +2669,39 @@ ReplaceOpaqueTypesWithUnderlyingTypes::shouldPerformSubstitution(
 }
 
 static Type
-substOpaqueTypesWithUnderlyingTypes(Type ty, DeclContext *inContext,
-                                    ResilienceExpansion contextExpansion) {
-  ReplaceOpaqueTypesWithUnderlyingTypes replacer(inContext, contextExpansion);
+substOpaqueTypesWithUnderlyingTypes(Type ty, const DeclContext *inContext,
+                                    ResilienceExpansion contextExpansion,
+                                    bool isWholeModuleContext) {
+  ReplaceOpaqueTypesWithUnderlyingTypes replacer(inContext, contextExpansion,
+                                                 isWholeModuleContext);
   return ty.subst(replacer, replacer, SubstFlags::SubstituteOpaqueArchetypes);
 }
 
-bool canSubstituteTypeInto(Type ty, DeclContext *dc,
-                           OpaqueSubstitutionKind kind) {
+/// Checks that \p dc has access to \p ty for the purposes of an opaque
+/// substitution described by \p kind.
+///
+/// This is purely an implementation detail check about whether type metadata
+/// will be accessible. It's not intended to enforce any rules about what
+/// opaque substitutions are or are not allowed.
+static bool canSubstituteTypeInto(Type ty, const DeclContext *dc,
+                                  OpaqueSubstitutionKind kind,
+                                  bool isContextWholeModule) {
   auto nominal = ty->getAnyNominal();
   if (!nominal)
     return true;
 
   switch (kind) {
-  case DontSubstitute:
+  case OpaqueSubstitutionKind::DontSubstitute:
     return false;
 
-  case AlwaysSubstitute:
+  case OpaqueSubstitutionKind::AlwaysSubstitute:
     return true;
 
-  case SubstituteSameModuleMaximalResilience:
+  case OpaqueSubstitutionKind::SubstituteSameModuleMaximalResilience:
+    // In whole module compilation private types are okay.
+    if (isContextWholeModule)
+      return true;
+
     // In the same file any visibility is okay.
     if (!dc->isModuleContext() &&
         nominal->getDeclContext()->getParentSourceFile() ==
@@ -2674,7 +2709,7 @@ bool canSubstituteTypeInto(Type ty, DeclContext *dc,
       return true;
     return nominal->getEffectiveAccess() > AccessLevel::FilePrivate;
 
-  case SubstituteNonResilientModule:
+  case OpaqueSubstitutionKind::SubstituteNonResilientModule:
     // Can't access types that are not public from a different module.
     return nominal->getEffectiveAccess() > AccessLevel::Internal;
   }
@@ -2711,32 +2746,44 @@ operator()(SubstitutableType *maybeOpaqueType) const {
   // Check that we are allowed to substitute the underlying type into the
   // context.
   auto inContext = this->inContext;
-  if (substTy.findIf([inContext, substitutionKind](Type t) -> bool {
-        if (!canSubstituteTypeInto(t, inContext, substitutionKind))
-          return true;
-        return false;
-      }))
+  auto isContextWholeModule = this->isContextWholeModule;
+  if (substTy.findIf(
+          [inContext, substitutionKind, isContextWholeModule](Type t) -> bool {
+            if (!canSubstituteTypeInto(t, inContext, substitutionKind,
+                                       isContextWholeModule))
+              return true;
+            return false;
+          }))
     return maybeOpaqueType;
 
   // If the type still contains opaque types, recur.
   if (substTy->hasOpaqueArchetype()) {
-    return substOpaqueTypesWithUnderlyingTypes(substTy, inContext,
-                                               contextExpansion);
+    return ::substOpaqueTypesWithUnderlyingTypes(
+        substTy, inContext, contextExpansion, isContextWholeModule);
   }
 
   return substTy;
 }
 
-static ProtocolConformanceRef
-substOpaqueTypesWithUnderlyingTypes(ProtocolConformanceRef ref, Type origType,
-                                    DeclContext *inContext,
-                                    ResilienceExpansion contextExpansion) {
-  ReplaceOpaqueTypesWithUnderlyingTypes replacer(inContext, contextExpansion);
+static ProtocolConformanceRef substOpaqueTypesWithUnderlyingTypes(
+    ProtocolConformanceRef ref, Type origType, const DeclContext *inContext,
+    ResilienceExpansion contextExpansion, bool isWholeModuleContext) {
+  ReplaceOpaqueTypesWithUnderlyingTypes replacer(inContext, contextExpansion,
+                                                 isWholeModuleContext);
   return ref.subst(origType, replacer, replacer,
                    SubstFlags::SubstituteOpaqueArchetypes);
 }
 
-Optional<ProtocolConformanceRef> ReplaceOpaqueTypesWithUnderlyingTypes::
+ProtocolConformanceRef swift::substOpaqueTypesWithUnderlyingTypes(
+    ProtocolConformanceRef ref, Type origType, TypeExpansionContext context) {
+  ReplaceOpaqueTypesWithUnderlyingTypes replacer(
+      context.getContext(), context.getResilienceExpansion(),
+      context.isWholeModuleContext());
+  return ref.subst(origType, replacer, replacer,
+                   SubstFlags::SubstituteOpaqueArchetypes);
+}
+
+ProtocolConformanceRef ReplaceOpaqueTypesWithUnderlyingTypes::
 operator()(CanType maybeOpaqueType, Type replacementType,
            ProtocolDecl *protocol) const {
   auto abstractRef = ProtocolConformanceRef(protocol);
@@ -2776,11 +2823,14 @@ operator()(CanType maybeOpaqueType, Type replacementType,
   // Check that we are allowed to substitute the underlying type into the
   // context.
   auto inContext = this->inContext;
-  if (substTy.findIf([inContext, substitutionKind](Type t) -> bool {
-        if (!canSubstituteTypeInto(t, inContext, substitutionKind))
-          return true;
-        return false;
-      }))
+  auto isContextWholeModule = this->isContextWholeModule;
+  if (substTy.findIf(
+          [inContext, substitutionKind, isContextWholeModule](Type t) -> bool {
+            if (!canSubstituteTypeInto(t, inContext, substitutionKind,
+                                       isContextWholeModule))
+              return true;
+            return false;
+          }))
     return abstractRef;
 
   auto substRef =
@@ -2788,8 +2838,8 @@ operator()(CanType maybeOpaqueType, Type replacementType,
 
   // If the type still contains opaque types, recur.
   if (substTy->hasOpaqueArchetype()) {
-    return substOpaqueTypesWithUnderlyingTypes(substRef, substTy, inContext,
-                                               contextExpansion);
+    return ::substOpaqueTypesWithUnderlyingTypes(
+        substRef, substTy, inContext, contextExpansion, isContextWholeModule);
   }
   return substRef;
 }
@@ -3152,16 +3202,17 @@ static Type getMemberForBaseType(LookupConformanceFn lookupConformances,
   // If we know the associated type, look in the witness table.
   if (assocType) {
     auto proto = assocType->getProtocol();
-    Optional<ProtocolConformanceRef> conformance
-      = lookupConformances(origBase->getCanonicalType(),
-                           substBase, proto);
+    ProtocolConformanceRef conformance =
+        lookupConformances(origBase->getCanonicalType(), substBase, proto);
 
-    if (!conformance) return failed();
-    if (!conformance->isConcrete()) return failed();
+    if (conformance.isInvalid())
+      return failed();
+    if (!conformance.isConcrete())
+      return failed();
 
     // Retrieve the type witness.
     auto witness =
-      conformance->getConcrete()->getTypeWitness(assocType, options);
+        conformance.getConcrete()->getTypeWitness(assocType, options);
     if (!witness || witness->hasError())
       return failed();
 
@@ -3184,10 +3235,9 @@ static Type getMemberForBaseType(LookupConformanceFn lookupConformances,
   return failed();
 }
 
-Optional<ProtocolConformanceRef>
-LookUpConformanceInModule::operator()(CanType dependentType,
-                                      Type conformingReplacementType,
-                                      ProtocolDecl *conformedProtocol) const {
+ProtocolConformanceRef LookUpConformanceInModule::
+operator()(CanType dependentType, Type conformingReplacementType,
+           ProtocolDecl *conformedProtocol) const {
   if (conformingReplacementType->isTypeParameter())
     return ProtocolConformanceRef(conformedProtocol);
 
@@ -3195,17 +3245,15 @@ LookUpConformanceInModule::operator()(CanType dependentType,
                               conformedProtocol);
 }
 
-Optional<ProtocolConformanceRef>
-LookUpConformanceInSubstitutionMap::operator()(CanType dependentType,
-                                       Type conformingReplacementType,
-                                       ProtocolDecl *conformedProtocol) const {
+ProtocolConformanceRef LookUpConformanceInSubstitutionMap::
+operator()(CanType dependentType, Type conformingReplacementType,
+           ProtocolDecl *conformedProtocol) const {
   return Subs.lookupConformance(dependentType, conformedProtocol);
 }
 
-Optional<ProtocolConformanceRef>
-MakeAbstractConformanceForGenericType::operator()(CanType dependentType,
-                                       Type conformingReplacementType,
-                                       ProtocolDecl *conformedProtocol) const {
+ProtocolConformanceRef MakeAbstractConformanceForGenericType::
+operator()(CanType dependentType, Type conformingReplacementType,
+           ProtocolDecl *conformedProtocol) const {
   assert((conformingReplacementType->is<ErrorType>()
           || conformingReplacementType->is<SubstitutableType>()
           || conformingReplacementType->is<DependentMemberType>())
@@ -3213,10 +3261,9 @@ MakeAbstractConformanceForGenericType::operator()(CanType dependentType,
   return ProtocolConformanceRef(conformedProtocol);
 }
 
-Optional<ProtocolConformanceRef>
-LookUpConformanceInSignature::operator()(CanType dependentType,
-                                         Type conformingReplacementType,
-                                         ProtocolDecl *conformedProtocol) const {
+ProtocolConformanceRef LookUpConformanceInSignature::
+operator()(CanType dependentType, Type conformingReplacementType,
+           ProtocolDecl *conformedProtocol) const {
   // FIXME: Should pass dependentType instead, once
   // GenericSignature::lookupConformance() does the right thing
   return Sig->lookupConformance(conformingReplacementType->getCanonicalType(),
@@ -3411,6 +3458,11 @@ static Type substType(Type derivedType,
 
     // If we have a substitution for this type, use it.
     if (auto known = substitutions(substOrig)) {
+      if (options.contains(SubstFlags::SubstituteOpaqueArchetypes) &&
+          isa<OpaqueTypeArchetypeType>(substOrig) &&
+          known->getCanonicalType() == substOrig->getCanonicalType())
+        return None; // Recursively process the substitutions of the opaque type
+                     // archetype.
       return known;
     }
 
@@ -3572,8 +3624,6 @@ TypeBase::getContextSubstitutions(const DeclContext *dc,
   if (auto *ownerClass = dyn_cast<ClassDecl>(ownerNominal))
     baseTy = baseTy->getSuperclassForDecl(ownerClass);
 
-  assert(ownerNominal == baseTy->getAnyNominal());
-
   // Gather all of the substitutions for all levels of generic arguments.
   auto genericSig = dc->getGenericSignatureOfContext();
   if (!genericSig)
@@ -3583,6 +3633,9 @@ TypeBase::getContextSubstitutions(const DeclContext *dc,
   unsigned n = params.size();
 
   while (baseTy && n > 0) {
+    if (baseTy->is<ErrorType>())
+      break;
+
     // For a bound generic type, gather the generic parameter -> generic
     // argument substitutions.
     if (auto boundGeneric = baseTy->getAs<BoundGenericType>()) {
@@ -3753,13 +3806,13 @@ Identifier DependentMemberType::getName() const {
 static bool transformSILResult(
                            SILResultInfo &result, bool &changed,
                            llvm::function_ref<Optional<Type>(TypeBase *)> fn) {
-  Type transType = result.getType().transformRec(fn);
+  Type transType = result.getInterfaceType().transformRec(fn);
   if (!transType) return true;
 
   CanType canTransType = transType->getCanonicalType();
-  if (canTransType != result.getType()) {
+  if (canTransType != result.getInterfaceType()) {
     changed = true;
-    result = result.getWithType(canTransType);
+    result = result.getWithInterfaceType(canTransType);
   }
   return false;
 }
@@ -3767,13 +3820,13 @@ static bool transformSILResult(
 static bool transformSILYield(
                             SILYieldInfo &yield, bool &changed,
                             llvm::function_ref<Optional<Type>(TypeBase *)> fn) {
-  Type transType = yield.getType().transformRec(fn);
+  Type transType = yield.getInterfaceType().transformRec(fn);
   if (!transType) return true;
 
   CanType canTransType = transType->getCanonicalType();
-  if (canTransType != yield.getType()) {
+  if (canTransType != yield.getInterfaceType()) {
     changed = true;
-    yield = yield.getWithType(canTransType);
+    yield = yield.getWithInterfaceType(canTransType);
   }
   return false;
 }
@@ -3781,13 +3834,13 @@ static bool transformSILYield(
 static bool transformSILParameter(
                             SILParameterInfo &param, bool &changed,
                             llvm::function_ref<Optional<Type>(TypeBase *)> fn) {
-  Type transType = param.getType().transformRec(fn);
+  Type transType = param.getInterfaceType().transformRec(fn);
   if (!transType) return true;
 
   CanType canTransType = transType->getCanonicalType();
-  if (canTransType != param.getType()) {
+  if (canTransType != param.getInterfaceType()) {
     changed = true;
-    param = param.getWithType(canTransType);
+    param = param.getWithInterfaceType(canTransType);
   }
   return false;
 }
@@ -3881,6 +3934,19 @@ case TypeKind::Id:
   case TypeKind::SILFunction: {
     auto fnTy = cast<SILFunctionType>(base);
     bool changed = false;
+    
+    if (auto subs = fnTy->getSubstitutions()) {
+#ifndef NDEBUG
+      // This interface isn't suitable for updating the substitution map in a
+      // substituted SILFunctionType.
+      // TODO(SILFunctionType): Is it suitable for any SILFunctionType??
+      for (Type type : fnTy->getSubstitutions().getReplacementTypes()) {
+        assert(type->isEqual(type.transformRec(fn))
+               && "Substituted SILFunctionType can't be transformed");
+      }
+#endif
+      return fnTy;
+    }
 
     SmallVector<SILParameterInfo, 8> transInterfaceParams;
     for (SILParameterInfo param : fnTy->getParameters()) {
@@ -3909,16 +3975,19 @@ case TypeKind::Id:
 
     if (!changed) return *this;
 
-    return SILFunctionType::get(fnTy->getGenericSignature(),
-                                fnTy->getExtInfo(),
-                                fnTy->getCoroutineKind(),
-                                fnTy->getCalleeConvention(),
-                                transInterfaceParams,
-                                transInterfaceYields,
-                                transInterfaceResults,
-                                transErrorResult,
-                                Ptr->getASTContext(),
-                                fnTy->getWitnessMethodConformanceOrNone());
+    return SILFunctionType::get(
+        fnTy->getSubstGenericSignature(),
+        fnTy->getExtInfo(),
+        fnTy->getCoroutineKind(),
+        fnTy->getCalleeConvention(),
+        transInterfaceParams,
+        transInterfaceYields,
+        transInterfaceResults,
+        transErrorResult,
+        SubstitutionMap(),
+        /*genericSigIsImplied*/ false,
+        Ptr->getASTContext(),
+        fnTy->getWitnessMethodConformanceOrInvalid());
   }
 
 #define REF_STORAGE(Name, ...) \
@@ -4437,9 +4506,12 @@ ReferenceCounting TypeBase::getReferenceCounting() {
   ASTContext &ctx = type->getASTContext();
 
   // In the absence of Objective-C interoperability, everything uses native
-  // reference counting.
-  if (!ctx.LangOpts.EnableObjCInterop)
-    return ReferenceCounting::Native;
+  // reference counting or is the builtin BridgeObject.
+  if (!ctx.LangOpts.EnableObjCInterop) {
+    return type->getKind() == TypeKind::BuiltinBridgeObject
+             ? ReferenceCounting::Bridge
+             : ReferenceCounting::Native;
+  }
 
   switch (type->getKind()) {
 #define SUGARED_TYPE(id, parent) case TypeKind::id:
@@ -4569,4 +4641,42 @@ Type TypeBase::openAnyExistentialType(OpenedArchetypeType *&opened) {
   }
   opened = OpenedArchetypeType::get(this);
   return opened;
+}
+
+bool TypeBase::hasOpaqueArchetypePropertiesOrCases() {
+  if (auto *structDecl = getStructOrBoundGenericStruct()) {
+    for (auto *field : structDecl->getStoredProperties()) {
+      auto fieldTy = field->getInterfaceType()->getCanonicalType();
+      if (fieldTy->hasOpaqueArchetype() ||
+          fieldTy->hasOpaqueArchetypePropertiesOrCases())
+        return true;
+    }
+  }
+
+  if (auto *enumDecl = getEnumOrBoundGenericEnum()) {
+    for (auto *elt : enumDecl->getAllElements()) {
+      auto eltType = elt->getInterfaceType();
+      if (eltType->hasOpaqueArchetype() ||
+          eltType->getCanonicalType()->hasOpaqueArchetypePropertiesOrCases())
+        return true;
+    }
+  }
+  return false;
+}
+
+CanType swift::substOpaqueTypesWithUnderlyingTypes(CanType ty,
+                                                   TypeExpansionContext context,
+                                                   bool allowLoweredTypes) {
+  if (!context.shouldLookThroughOpaqueTypeArchetypes() ||
+      !ty->hasOpaqueArchetype())
+    return ty;
+
+  ReplaceOpaqueTypesWithUnderlyingTypes replacer(
+      context.getContext(), context.getResilienceExpansion(),
+      context.isWholeModuleContext());
+  SubstOptions flags = SubstFlags::SubstituteOpaqueArchetypes;
+  if (allowLoweredTypes)
+    flags =
+        SubstFlags::SubstituteOpaqueArchetypes | SubstFlags::AllowLoweredTypes;
+  return ty.subst(replacer, replacer, flags)->getCanonicalType();
 }

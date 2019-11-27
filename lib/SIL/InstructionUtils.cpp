@@ -38,6 +38,7 @@ SILValue swift::stripOwnershipInsts(SILValue v) {
 
 /// Strip off casts/indexing insts/address projections from V until there is
 /// nothing left to strip.
+///
 /// FIXME: Why don't we strip projections after stripping indexes?
 SILValue swift::getUnderlyingObject(SILValue v) {
   while (true) {
@@ -54,24 +55,24 @@ SILValue swift::getUnderlyingObject(SILValue v) {
 /// Strip off casts and address projections into the interior of a value. Unlike
 /// getUnderlyingObject, this does not find the root of a heap object--a class
 /// property is itself an address root.
-SILValue swift::getUnderlyingAddressRoot(SILValue V) {
+SILValue swift::getUnderlyingAddressRoot(SILValue v) {
   while (true) {
-    SILValue V2 = stripIndexingInsts(stripCasts(V));
-    switch (V2->getKind()) {
-      case ValueKind::StructElementAddrInst:
-      case ValueKind::TupleElementAddrInst:
-      case ValueKind::UncheckedTakeEnumDataAddrInst:
-        V2 = cast<SingleValueInstruction>(V2)->getOperand(0);
-        break;
-      default:
-        break;
+    SILValue v2 = stripIndexingInsts(stripCasts(v));
+    v2 = stripOwnershipInsts(v2);
+    switch (v2->getKind()) {
+    case ValueKind::StructElementAddrInst:
+    case ValueKind::TupleElementAddrInst:
+    case ValueKind::UncheckedTakeEnumDataAddrInst:
+      v2 = cast<SingleValueInstruction>(v2)->getOperand(0);
+      break;
+    default:
+      break;
     }
-    if (V2 == V)
-      return V2;
-    V = V2;
+    if (v2 == v)
+      return v2;
+    v = v2;
   }
 }
-
 
 SILValue swift::getUnderlyingObjectStopAtMarkDependence(SILValue v) {
   while (true) {
@@ -329,12 +330,12 @@ bool swift::onlyAffectsRefCount(SILInstruction *user) {
 #define UNCHECKED_REF_STORAGE(Name, ...)                                       \
   case SILInstructionKind::Name##RetainValueInst:                              \
   case SILInstructionKind::Name##ReleaseValueInst:                             \
-  case SILInstructionKind::Copy##Name##ValueInst:
+  case SILInstructionKind::StrongCopy##Name##ValueInst:
 #define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...)            \
   case SILInstructionKind::Name##RetainInst:                                   \
   case SILInstructionKind::Name##ReleaseInst:                                  \
   case SILInstructionKind::StrongRetain##Name##Inst:                           \
-  case SILInstructionKind::Copy##Name##ValueInst:
+  case SILInstructionKind::StrongCopy##Name##ValueInst:
 #include "swift/AST/ReferenceStorage.def"
     return true;
   }

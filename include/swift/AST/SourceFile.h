@@ -14,6 +14,7 @@
 #define SWIFT_AST_SOURCEFILE_H
 
 #include "swift/AST/FileUnit.h"
+#include "swift/Basic/Debug.h"
 
 namespace swift {
 
@@ -145,11 +146,6 @@ public:
 
   /// A set of synthesized declarations that need to be type checked.
   llvm::SmallVector<Decl *, 8> SynthesizedDecls;
-
-  /// We might perform type checking on the same source file more than once,
-  /// if its the main file or a REPL instance, so keep track of the last
-  /// checked synthesized declaration to avoid duplicating work.
-  unsigned LastCheckedSynthesizedDecl = 0;
 
   /// A mapping from Objective-C selectors to the methods that have
   /// those selectors.
@@ -323,7 +319,7 @@ public:
   /// Retrieve the scope that describes this source file.
   ASTScope &getScope();
 
-  void dump() const;
+  SWIFT_DEBUG_DUMP;
   void dump(raw_ostream &os) const;
 
   /// Pretty-print the contents of this source file.

@@ -63,53 +63,48 @@ namespace {
   };
 } // end anonymous namespace
 
-void PrintingDiagnosticConsumer::handleDiagnostic(
-    SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind,
-    StringRef FormatString, ArrayRef<DiagnosticArgument> FormatArgs,
-    const DiagnosticInfo &Info,
-    const SourceLoc bufferIndirectlyCausingDiagnostic) {
+void PrintingDiagnosticConsumer::handleDiagnostic(SourceManager &SM,
+                                                  const DiagnosticInfo &Info) {
   if (Info.IsChildNote)
     return;
 
-  printDiagnostic(SM, Loc, Kind, FormatString, FormatArgs, Info,
-                  bufferIndirectlyCausingDiagnostic);
+  printDiagnostic(SM, Info);
+  for (auto path : Info.EducationalNotePaths) {
+    if (auto buffer = SM.getFileSystem()->getBufferForFile(path))
+      Stream << buffer->get()->getBuffer() << "\n";
+  }
 
   for (auto ChildInfo : Info.ChildDiagnosticInfo) {
-    printDiagnostic(SM, ChildInfo->Loc, ChildInfo->Kind,
-                    ChildInfo->FormatString, ChildInfo->FormatArgs, *ChildInfo,
-                    ChildInfo->BufferIndirectlyCausingDiagnostic);
+    printDiagnostic(SM, *ChildInfo);
   }
 }
 
-void PrintingDiagnosticConsumer::printDiagnostic(
-    SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind,
-    StringRef FormatString, ArrayRef<DiagnosticArgument> FormatArgs,
-    const DiagnosticInfo &Info,
-    const SourceLoc bufferIndirectlyCausingDiagnostic) {
+void PrintingDiagnosticConsumer::printDiagnostic(SourceManager &SM,
+                                                 const DiagnosticInfo &Info) {
 
   // Determine what kind of diagnostic we're emitting.
   llvm::SourceMgr::DiagKind SMKind;
-  switch (Kind) {
-    case DiagnosticKind::Error:
-      SMKind = llvm::SourceMgr::DK_Error;
-      break;
-    case DiagnosticKind::Warning: 
-      SMKind = llvm::SourceMgr::DK_Warning; 
-      break;
+  switch (Info.Kind) {
+  case DiagnosticKind::Error:
+    SMKind = llvm::SourceMgr::DK_Error;
+    break;
+  case DiagnosticKind::Warning:
+    SMKind = llvm::SourceMgr::DK_Warning;
+    break;
 
-    case DiagnosticKind::Note:
-      SMKind = llvm::SourceMgr::DK_Note;
-      break;
+  case DiagnosticKind::Note:
+    SMKind = llvm::SourceMgr::DK_Note;
+    break;
 
-    case DiagnosticKind::Remark:
-      SMKind = llvm::SourceMgr::DK_Remark;
-      break;
+  case DiagnosticKind::Remark:
+    SMKind = llvm::SourceMgr::DK_Remark;
+    break;
   }
 
-  if (Kind == DiagnosticKind::Error) {
+  if (Info.Kind == DiagnosticKind::Error) {
     DidErrorOccur = true;
   }
-  
+
   // Translate ranges.
   SmallVector<llvm::SMRange, 2> Ranges;
   for (auto R : Info.Ranges)
@@ -129,10 +124,11 @@ void PrintingDiagnosticConsumer::printDiagnostic(
   llvm::SmallString<256> Text;
   {
     llvm::raw_svector_ostream Out(Text);
-    DiagnosticEngine::formatDiagnosticText(Out, FormatString, FormatArgs);
+    DiagnosticEngine::formatDiagnosticText(Out, Info.FormatString,
+                                           Info.FormatArgs);
   }
 
-  auto Msg = SM.GetMessage(Loc, SMKind, Text, Ranges, FixIts);
+  auto Msg = SM.GetMessage(Info.Loc, SMKind, Text, Ranges, FixIts);
   rawSM.PrintMessage(out, Msg, ForceColors);
 }
 

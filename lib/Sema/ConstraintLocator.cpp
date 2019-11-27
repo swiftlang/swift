@@ -52,24 +52,6 @@ void ConstraintLocator::Profile(llvm::FoldingSetNodeID &id, Expr *anchor,
       id.AddPointer(kpElt.getKeyPathDecl());
       break;
     }
-    case ApplyArgument:
-    case ApplyFunction:
-    case FunctionArgument:
-    case FunctionResult:
-    case OptionalPayload:
-    case Member:
-    case MemberRefBase:
-    case UnresolvedMember:
-    case SubscriptMember:
-    case ConstructorMember:
-    case LValueConversion:
-    case RValueAdjustment:
-    case ClosureResult:
-    case ParentType:
-    case ExistentialSuperclassType:
-    case InstanceType:
-    case SequenceElementType:
-    case AutoclosureResult:
     case GenericArgument:
     case NamedTupleElement:
     case TupleElement:
@@ -78,17 +60,16 @@ void ConstraintLocator::Profile(llvm::FoldingSetNodeID &id, Expr *anchor,
     case KeyPathComponent:
     case ConditionalRequirement:
     case TypeParameterRequirement:
-    case ImplicitlyUnwrappedDisjunctionChoice:
-    case DynamicLookupResult:
     case ContextualType:
-    case SynthesizedArgument:
-    case KeyPathType:
-    case KeyPathRoot:
-    case KeyPathValue:
-    case KeyPathComponentResult:
+    case SynthesizedArgument: {
       auto numValues = numNumericValuesInPathElement(elt.getKind());
       for (unsigned i = 0; i < numValues; ++i)
         id.AddInteger(elt.getValue(i));
+      break;
+    }
+#define SIMPLE_LOCATOR_PATH_ELT(Name) case Name :
+#include "ConstraintLocatorPathElts.def"
+      // Nothing to do for simple locator elements.
       break;
     }
   }
@@ -98,7 +79,6 @@ unsigned LocatorPathElt::getNewSummaryFlags() const {
   switch (getKind()) {
   case ConstraintLocator::ApplyArgument:
   case ConstraintLocator::ApplyFunction:
-  case ConstraintLocator::ApplyArgToParam:
   case ConstraintLocator::SequenceElementType:
   case ConstraintLocator::ClosureResult:
   case ConstraintLocator::ConstructorMember:
@@ -132,11 +112,17 @@ unsigned LocatorPathElt::getNewSummaryFlags() const {
   case ConstraintLocator::KeyPathRoot:
   case ConstraintLocator::KeyPathValue:
   case ConstraintLocator::KeyPathComponentResult:
+  case ConstraintLocator::Condition:
     return 0;
 
   case ConstraintLocator::FunctionArgument:
   case ConstraintLocator::FunctionResult:
     return IsFunctionConversion;
+
+  case ConstraintLocator::ApplyArgToParam: {
+    auto flags = castTo<LocatorPathElt::ApplyArgToParam>().getParameterFlags();
+    return flags.isNonEphemeral() ? IsNonEphemeralParam : 0;
+  }
   }
 
   llvm_unreachable("Unhandled PathElementKind in switch.");
@@ -238,21 +224,26 @@ bool ConstraintLocator::isForContextualType() const {
 }
 
 GenericTypeParamType *ConstraintLocator::getGenericParameter() const {
-  return castLastElementTo<LocatorPathElt::GenericParameter>().getType();
+  // Check whether we have a path that terminates at a generic parameter.
+  return isForGenericParameter() ?
+      castLastElementTo<LocatorPathElt::GenericParameter>().getType() : nullptr;
 }
 
-void ConstraintLocator::dump(SourceManager *sm) {
+void ConstraintLocator::dump(SourceManager *sm) const {
   dump(sm, llvm::errs());
   llvm::errs() << "\n";
 }
 
-void ConstraintLocator::dump(ConstraintSystem *CS) {
-  dump(&CS->TC.Context.SourceMgr, llvm::errs());
+void ConstraintLocator::dump(ConstraintSystem *CS) const {
+  dump(&CS->getASTContext().SourceMgr, llvm::errs());
   llvm::errs() << "\n";
 }
 
 
-void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) {
+void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) const {
+  PrintOptions PO;
+  PO.PrintTypesForDebugging = true;
+  
   out << "locator@" << (void*) this << " [";
 
   if (anchor) {
@@ -287,7 +278,7 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) {
     switch (elt.getKind()) {
     case GenericParameter: {
       auto gpElt = elt.castTo<LocatorPathElt::GenericParameter>();
-      out << "generic parameter '" << gpElt.getType()->getString() << "'";
+      out << "generic parameter '" << gpElt.getType()->getString(PO) << "'";
       break;
     }
     case ApplyArgument:
@@ -306,6 +297,8 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) {
       auto argElt = elt.castTo<LocatorPathElt::ApplyArgToParam>();
       out << "comparing call argument #" << llvm::utostr(argElt.getArgIdx())
           << " to parameter #" << llvm::utostr(argElt.getParamIdx());
+      if (argElt.getParameterFlags().isNonEphemeral())
+        out << " (non-ephemeral)";
       break;
     }
     case ClosureResult:
@@ -455,6 +448,10 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) {
 
     case KeyPathComponentResult:
       out << "key path component result";
+      break;
+
+    case Condition:
+      out << "condition expression";
       break;
     }
   }

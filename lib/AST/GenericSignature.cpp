@@ -358,8 +358,9 @@ ASTContext &GenericSignatureImpl::getASTContext() const {
   return GenericSignature::getASTContext(getGenericParams(), getRequirements());
 }
 
-Optional<ProtocolConformanceRef>
-GenericSignatureImpl::lookupConformance(CanType type, ProtocolDecl *proto) const {
+ProtocolConformanceRef
+GenericSignatureImpl::lookupConformance(CanType type,
+                                        ProtocolDecl *proto) const {
   // FIXME: Actually implement this properly.
   auto *M = proto->getParentModule();
 
@@ -813,6 +814,7 @@ getBestRequirementSource(GenericSignatureBuilder &builder,
     }
   }
 
+  assert(bestSource && "All sources were self-recursive?");
   return bestSource;
 }
 

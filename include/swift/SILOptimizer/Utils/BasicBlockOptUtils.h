@@ -22,9 +22,10 @@
 #ifndef SWIFT_SILOPTIMIZER_UTILS_BASICBLOCKOPTUTILS_H
 #define SWIFT_SILOPTIMIZER_UTILS_BASICBLOCKOPTUTILS_H
 
-#include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILCloner.h"
+#include "swift/SIL/SILInstruction.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 
 namespace swift {
 
@@ -61,12 +62,65 @@ bool rotateLoop(SILLoop *loop, DominanceInfo *domInfo, SILLoopInfo *loopInfo,
                 bool rotateSingleBlockLoops, SILBasicBlock *upToBB,
                 bool shouldVerify);
 
-/// Helper function to perform SSA updates in case of jump threading.
-void updateSSAAfterCloning(BasicBlockCloner &cloner, SILBasicBlock *srcBB,
-                           SILBasicBlock *destBB);
+/// Sink address projections to their out-of-block uses. This is
+/// required after cloning a block and before calling
+/// updateSSAAfterCloning to avoid address-type phis.
+///
+/// This clones address projections at their use points, but does not
+/// mutate the block containing the projections.
+///
+/// BasicBlockCloner handles this internally.
+class SinkAddressProjections {
+  // Projections ordered from last to first in the chain.
+  SmallVector<SingleValueInstruction *, 4> projections;
+  SmallSetVector<SILValue, 4> inBlockDefs;
+
+  // Transient per-projection data for use during cloning.
+  SmallVector<Operand *, 4> usesToReplace;
+  llvm::SmallDenseMap<SILBasicBlock *, Operand *, 4> firstBlockUse;
+
+public:
+  /// Check for an address projection chain ending at \p inst. Return true if
+  /// the given instruction is successfully analyzed.
+  ///
+  /// If \p inst does not produce an address, then return
+  /// true. getInBlockDefs() will contain \p inst if any of its
+  /// (non-address) values are used outside its block.
+  ///
+  /// If \p inst does produce an address, return true only of the
+  /// chain of address projections within this block is clonable at
+  /// their use sites. getInBlockDefs will return all non-address
+  /// operands in the chain that are also defined in this block. These
+  /// may require phis after cloning the projections.
+  bool analyzeAddressProjections(SILInstruction *inst);
+
+  /// After analyzing projections, returns the list of (non-address) values
+  /// defined in the same block as the projections which will have uses outside
+  /// the block after cloning.
+  ArrayRef<SILValue> getInBlockDefs() const {
+    return inBlockDefs.getArrayRef();
+  }
+  /// Clone the chain of projections at their use sites.
+  ///
+  /// Return true if anything was done.
+  ///
+  /// getInBlockProjectionOperandValues() can be called before or after cloning.
+  bool cloneProjections();
+};
 
 /// Clone a single basic block and any required successor edges within the same
 /// function.
+///
+/// Before cloning, call either canCloneBlock or call canCloneInstruction for
+/// every instruction in the original block.
+///
+/// To clone just the block, call cloneBlock. To also update the original
+/// block's branch to jump to the newly cloned block, call cloneBranchTarget
+/// instead.
+///
+/// After cloning, call splitCriticalEdges, then updateSSAAfterCloning. This is
+/// decoupled from cloning becaused some clients perform CFG edges updates after
+/// cloning but before splitting CFG edges.
 class BasicBlockCloner : public SILCloner<BasicBlockCloner> {
   using SuperTy = SILCloner<BasicBlockCloner>;
   friend class SILCloner<BasicBlockCloner>;
@@ -75,18 +129,56 @@ protected:
   /// The original block to be cloned.
   SILBasicBlock *origBB;
 
+  /// Will cloning require an SSA update?
+  bool needsSSAUpdate = false;
+
+  /// Transient object for analyzing a single address projction chain. It's
+  /// state is reset each time analyzeAddressProjections is called.
+  SinkAddressProjections sinkProj;
+
 public:
   /// An ordered list of old to new available value pairs.
   ///
   /// updateSSAAfterCloning() expects this public field to hold values that may
   /// be remapped in the cloned block and live out.
-  SmallVector<std::pair<SILValue, SILValue>, 16> AvailVals;
+  SmallVector<std::pair<SILValue, SILValue>, 16> availVals;
 
   // Clone blocks starting at `origBB`, within the same function.
   BasicBlockCloner(SILBasicBlock *origBB)
       : SILCloner(*origBB->getParent()), origBB(origBB) {}
 
+  bool canCloneBlock() {
+    for (auto &inst : *origBB) {
+      if (!canCloneInstruction(&inst))
+        return false;
+    }
+    return true;
+  }
+
+  /// Returns true if \p inst can be cloned.
+  ///
+  /// If canCloneBlock is not called, then this must be called for every
+  /// instruction in origBB, both to ensure clonability and to handle internal
+  /// book-keeping (needsSSAUpdate).
+  bool canCloneInstruction(SILInstruction *inst) {
+    assert(inst->getParent() == origBB);
+
+    if (!inst->isTriviallyDuplicatable())
+      return false;
+
+    if (!sinkProj.analyzeAddressProjections(inst))
+      return false;
+
+    // Check if any of the non-address defs in the cloned block (including the
+    // current instruction) will still have uses outside the block after sinking
+    // address projections.
+    needsSSAUpdate |= !sinkProj.getInBlockDefs().empty();
+    return true;
+  }
+
   void cloneBlock(SILBasicBlock *insertAfterBB = nullptr) {
+    sinkAddressProjections();
+
     SmallVector<SILBasicBlock *, 4> successorBBs;
     successorBBs.reserve(origBB->getSuccessors().size());
     llvm::copy(origBB->getSuccessors(), std::back_inserter(successorBBs));
@@ -95,6 +187,9 @@ public:
 
   /// Clone the given branch instruction's destination block, splitting
   /// its successors, and rewrite the branch instruction.
+  ///
+  /// Return false if the branch's destination block cannot be cloned. When
+  /// false is returned, no changes have been made.
   void cloneBranchTarget(BranchInst *bi) {
     assert(origBB == bi->getDestBB());
 
@@ -110,9 +205,15 @@ public:
     return remapBasicBlock(origBB);
   }
 
+  bool wasCloned() { return isBlockCloned(origBB); }
+
   /// Call this after processing all instructions to fix the control flow
   /// graph. The branch cloner may have left critical edges.
   bool splitCriticalEdges(DominanceInfo *domInfo, SILLoopInfo *loopInfo);
+
+  /// Helper function to perform SSA updates after calling both
+  /// cloneBranchTarget and splitCriticalEdges.
+  void updateSSAAfterCloning();
 
 protected:
   // MARK: CRTP overrides.
@@ -137,8 +238,10 @@ protected:
 
   void mapValue(SILValue origValue, SILValue mappedValue) {
     SuperTy::mapValue(origValue, mappedValue);
-    AvailVals.emplace_back(origValue, mappedValue);
+    availVals.emplace_back(origValue, mappedValue);
   }
+
+  void sinkAddressProjections();
 };
 
 // Helper class that provides a callback that can be used in
@@ -171,46 +274,6 @@ public:
   llvm::SmallVectorImpl<value_type> &getInstructionPairs() {
     return instructionpairs;
   }
-};
-
-/// Sink address projections to their out-of-block uses. This is
-/// required after cloning a block and before calling
-/// updateSSAAfterCloning to avoid address-type phis.
-///
-/// This clones address projections at their use points, but does not
-/// mutate the block containing the projections.
-class SinkAddressProjections {
-  // Projections ordered from last to first in the chain.
-  SmallVector<SingleValueInstruction *, 4> projections;
-  SmallSetVector<SILValue, 4> inBlockDefs;
-
-public:
-  /// Check for an address projection chain ending at \p inst. Return true if
-  /// the given instruction is successfully analyzed.
-  ///
-  /// If \p inst does not produce an address, then return
-  /// true. getInBlockDefs() will contain \p inst if any of its
-  /// (non-address) values are used outside its block.
-  ///
-  /// If \p inst does produce an address, return true only of the
-  /// chain of address projections within this block is clonable at
-  /// their use sites. getInBlockDefs will return all non-address
-  /// operands in the chain that are also defined in this block. These
-  /// may require phis after cloning the projections.
-  bool analyzeAddressProjections(SILInstruction *inst);
-
-  /// After analyzing projections, returns the list of (non-address) values
-  /// defined in the same block as the projections which will have uses outside
-  /// the block after cloning.
-  ArrayRef<SILValue> getInBlockDefs() const {
-    return inBlockDefs.getArrayRef();
-  }
-  /// Clone the chain of projections at their use sites.
-  ///
-  /// Return true if anything was done.
-  ///
-  /// getInBlockProjectionOperandValues() can be called before or after cloning.
-  bool cloneProjections();
 };
 
 /// Utility class for cloning init values into the static initializer of a

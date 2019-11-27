@@ -790,9 +790,8 @@ emitKeyPathComponent(IRGenModule &IGM,
       switch (getClassFieldAccess(IGM, loweredBaseContextTy, property)) {
       case FieldAccess::ConstantDirect: {
         // Known constant fixed offset.
-        auto offset = tryEmitConstantClassFragilePhysicalMemberOffset(IGM,
-                                                                loweredClassTy,
-                                                                property);
+        auto offset = tryEmitConstantClassFragilePhysicalMemberOffset(
+            IGM, loweredClassTy, property);
         assert(offset && "no constant offset for ConstantDirect field?!");
         addFixedOffset(/*struct*/ false, property->isLet(), offset);
         break;
@@ -857,10 +856,10 @@ emitKeyPathComponent(IRGenModule &IGM,
               // Protocol requirement.
               auto conformance = subs.lookupConformance(
                            reqt.TypeParameter->getCanonicalType(), reqt.Protocol);
-              externalSubArgs.push_back(
-                IGM.emitWitnessTableRefString(substType, *conformance,
-                      genericEnv ? genericEnv->getGenericSignature() : nullptr,
-                      /*shouldSetLowBit*/ true));
+              externalSubArgs.push_back(IGM.emitWitnessTableRefString(
+                  substType, conformance,
+                  genericEnv ? genericEnv->getGenericSignature() : nullptr,
+                  /*shouldSetLowBit*/ true));
             }
           });
       }

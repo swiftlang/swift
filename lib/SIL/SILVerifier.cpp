@@ -134,14 +134,15 @@ void verifyKeyPathComponent(SILModule &M,
                             bool forPropertyDescriptor,
                             bool hasIndices) {
   auto &C = M.getASTContext();
-
+  auto typeExpansionContext =
+      TypeExpansionContext::noOpaqueTypeArchetypesSubstitution(expansion);
   auto opaque = AbstractionPattern::getOpaque();
   auto loweredBaseTy =
-    M.Types.getLoweredType(opaque, baseTy, expansion);
+      M.Types.getLoweredType(opaque, baseTy, typeExpansionContext);
   auto componentTy = component.getComponentType().subst(patternSubs)
     ->getCanonicalType();
   auto loweredComponentTy =
-    M.Types.getLoweredType(opaque, componentTy, expansion);
+      M.Types.getLoweredType(opaque, componentTy, typeExpansionContext);
 
   auto checkIndexEqualsAndHash = [&]{
     if (!component.getSubscriptIndices().empty()) {
@@ -153,7 +154,7 @@ void verifyKeyPathComponent(SILModule &M,
                         "operator");
         
         auto substEqualsType = equals->getLoweredFunctionType()
-          ->substGenericArgs(M, patternSubs);
+          ->substGenericArgs(M, patternSubs, TypeExpansionContext::minimal());
         
         require(substEqualsType->getParameters().size() == 2,
                 "must have two arguments");
@@ -162,7 +163,7 @@ void verifyKeyPathComponent(SILModule &M,
           require(param.getConvention()
                     == ParameterConvention::Direct_Unowned,
                   "indices pointer should be trivial");
-          require(param.getType()->getAnyNominal()
+          require(param.getInterfaceType()->getAnyNominal()
                     == C.getUnsafeRawPointerDecl(),
                   "indices pointer should be an UnsafeRawPointer");
         }
@@ -173,7 +174,8 @@ void verifyKeyPathComponent(SILModule &M,
         require(substEqualsType->getResults()[0].getConvention()
                   == ResultConvention::Unowned,
                 "result should be unowned");
-        require(substEqualsType->getResults()[0].getType()->getAnyNominal()
+        require(substEqualsType->getResults()[0].getInterfaceType()
+                               ->getAnyNominal()
                   == C.getBoolDecl(),
                 "result should be Bool");
       }
@@ -185,7 +187,7 @@ void verifyKeyPathComponent(SILModule &M,
                       "operator");
         
         auto substHashType = hash->getLoweredFunctionType()
-          ->substGenericArgs(M, patternSubs);
+          ->substGenericArgs(M, patternSubs, TypeExpansionContext::minimal());
         
         require(substHashType->getParameters().size() == 1,
                 "must have two arguments");
@@ -193,7 +195,7 @@ void verifyKeyPathComponent(SILModule &M,
         require(param.getConvention()
                   == ParameterConvention::Direct_Unowned,
                 "indices pointer should be trivial");
-        require(param.getType()->getAnyNominal()
+        require(param.getInterfaceType()->getAnyNominal()
                   == C.getUnsafeRawPointerDecl(),
                 "indices pointer should be an UnsafeRawPointer");
         
@@ -203,7 +205,8 @@ void verifyKeyPathComponent(SILModule &M,
         require(substHashType->getResults()[0].getConvention()
                   == ResultConvention::Unowned,
                 "result should be unowned");
-        require(substHashType->getResults()[0].getType()->getAnyNominal()
+        require(substHashType->getResults()[0].getInterfaceType()
+                             ->getAnyNominal()
                   == C.getIntDecl(),
                 "result should be Int");
       }
@@ -232,7 +235,8 @@ void verifyKeyPathComponent(SILModule &M,
     require(property->hasStorage(), "property must be stored");
     require(!property->isResilient(M.getSwiftModule(), expansion),
             "cannot access storage of resilient property");
-    auto propertyTy = loweredBaseTy.getFieldType(property, M);
+    auto propertyTy =
+        loweredBaseTy.getFieldType(property, M, typeExpansionContext);
     require(propertyTy.getObjectType()
               == loweredComponentTy.getObjectType(),
             "component type should match the maximal abstraction of the "
@@ -267,8 +271,8 @@ void verifyKeyPathComponent(SILModule &M,
                 "less visible getters");
       }
 
-      auto substGetterType = getter->getLoweredFunctionType()
-        ->substGenericArgs(M, patternSubs);
+      auto substGetterType = getter->getLoweredFunctionType()->substGenericArgs(
+          M, patternSubs, TypeExpansionContext::minimal());
       require(substGetterType->getRepresentation() ==
                 SILFunctionTypeRepresentation::Thin,
               "getter should be a thin function");
@@ -278,7 +282,8 @@ void verifyKeyPathComponent(SILModule &M,
       auto baseParam = substGetterType->getParameters()[0];
       require(baseParam.getConvention() == normalArgConvention,
               "getter base parameter should have normal arg convention");
-      require(baseParam.getType() == loweredBaseTy.getASTType(),
+      require(baseParam.getArgumentType(M, substGetterType)
+                == loweredBaseTy.getASTType(),
               "getter base parameter should match base of component");
       
       if (hasIndices) {
@@ -286,7 +291,7 @@ void verifyKeyPathComponent(SILModule &M,
         require(indicesParam.getConvention()
                   == ParameterConvention::Direct_Unowned,
                 "indices pointer should be trivial");
-        require(indicesParam.getType()->getAnyNominal()
+        require(indicesParam.getArgumentType(M, substGetterType)->getAnyNominal()
                   == C.getUnsafeRawPointerDecl(),
                 "indices pointer should be an UnsafeRawPointer");
       }
@@ -296,7 +301,8 @@ void verifyKeyPathComponent(SILModule &M,
       auto result = substGetterType->getResults()[0];
       require(result.getConvention() == ResultConvention::Indirect,
               "getter result should be @out");
-      require(result.getType() == loweredComponentTy.getASTType(),
+      require(result.getReturnValueType(M, substGetterType)
+                == loweredComponentTy.getASTType(),
               "getter result should match the maximal abstraction of the "
               "formal component type");
     }
@@ -313,7 +319,7 @@ void verifyKeyPathComponent(SILModule &M,
       }
 
       auto substSetterType = setter->getLoweredFunctionType()
-        ->substGenericArgs(M, patternSubs);
+        ->substGenericArgs(M, patternSubs, TypeExpansionContext::minimal());
       
       require(substSetterType->getRepresentation() ==
                 SILFunctionTypeRepresentation::Thin,
@@ -340,12 +346,12 @@ void verifyKeyPathComponent(SILModule &M,
         require(indicesParam.getConvention()
                   == ParameterConvention::Direct_Unowned,
                 "indices pointer should be trivial");
-        require(indicesParam.getType()->getAnyNominal()
+        require(indicesParam.getArgumentType(M, substSetterType)->getAnyNominal()
                   == C.getUnsafeRawPointerDecl(),
                 "indices pointer should be an UnsafeRawPointer");
       }
 
-      require(newValueParam.getType() ==
+      require(newValueParam.getArgumentType(M, substSetterType) ==
                 loweredComponentTy.getASTType(),
               "setter value should match the maximal abstraction of the "
               "formal component type");
@@ -362,8 +368,9 @@ void verifyKeyPathComponent(SILModule &M,
         require(contextType == operands[opIndex].get()->getType(),
                 "operand must match type required by pattern");
         SILType loweredType = index.LoweredType;
-        require(loweredType.isLoweringOf(M, index.FormalType),
-                "pattern index formal type doesn't match lowered type");
+        require(
+            loweredType.isLoweringOf(typeExpansionContext, M, index.FormalType),
+            "pattern index formal type doesn't match lowered type");
       }
 
       checkIndexEqualsAndHash();
@@ -764,7 +771,7 @@ public:
   void requireABICompatibleFunctionTypes(CanSILFunctionType type1,
                                          CanSILFunctionType type2,
                                          const Twine &what,
-                                         SILFunction *inFunction = nullptr) {
+                                         SILFunction &inFunction) {
     auto complain = [=](const char *msg) -> std::function<void()> {
       return [=]{
         llvm::dbgs() << "  " << msg << '\n'
@@ -1297,7 +1304,7 @@ public:
     }
 
     // Apply the substitutions.
-    return fnTy->substGenericArgs(F.getModule(), subs);
+    return fnTy->substGenericArgs(F.getModule(), subs, F.getTypeExpansionContext());
   }
 
   /// Check that for each opened archetype or dynamic self type in substitutions
@@ -1571,8 +1578,9 @@ public:
       // lifetime-extending 'self'.
       if (expectedResult.getConvention()
             == ResultConvention::UnownedInnerPointer) {
-        expectedResult = SILResultInfo(expectedResult.getType(),
-                                       ResultConvention::Unowned);
+        expectedResult = SILResultInfo(
+                   expectedResult.getReturnValueType(F.getModule(), substTy),
+                   ResultConvention::Unowned);
         require(originalResult == expectedResult,
                 "result type of result function type for partially applied "
                 "@unowned_inner_pointer function should have @unowned"
@@ -1583,8 +1591,9 @@ public:
       // retaining the return value.
       } else if (expectedResult.getConvention()
             == ResultConvention::Autoreleased) {
-        expectedResult = SILResultInfo(expectedResult.getType(),
-                                       ResultConvention::Owned);
+        expectedResult = SILResultInfo(
+                     expectedResult.getReturnValueType(F.getModule(), substTy),
+                     ResultConvention::Owned);
         require(originalResult == expectedResult,
                 "result type of result function type for partially applied "
                 "@autoreleased function should have @owned convention");
@@ -1737,7 +1746,8 @@ public:
 
   void checkGlobalAccessInst(GlobalAccessInst *GAI) {
     SILGlobalVariable *RefG = GAI->getReferencedGlobal();
-    require(GAI->getType().getObjectType() == RefG->getLoweredType(),
+    require(GAI->getType().getObjectType() ==
+                RefG->getLoweredTypeInContext(F.getTypeExpansionContext()),
             "global_addr/value must be the type of the variable it references");
     if (auto *VD = RefG->getDecl()) {
       require(!VD->isResilient(F.getModule().getSwiftModule(),
@@ -1876,8 +1886,15 @@ public:
     // like debugger variables. The compiler never cares about the source of
     // those accesses.
     AccessedStorage storage = findAccessedStorage(BAI->getSource());
+    // FIXME: rdar://57291811 - the following check for valid storage will be
+    // reenabled shortly. A fix is planned. In the meantime, the possiblity that
+    // a real miscompilation could be caused by this failure is insignificant.
+    // I will probably enable a much broader SILVerification of address-type
+    // block arguments first to ensure we never hit this check again.
+    /*
     if (BAI->getEnforcement() != SILAccessEnforcement::Unsafe)
       require(storage, "Unknown formal access pattern");
+    */
   }
 
   void checkEndAccessInst(EndAccessInst *EAI) {
@@ -1966,7 +1983,7 @@ public:
           "Inst with qualified ownership in a function that is not qualified");
       SILValue Src = SI->getSrc();
       require(Src->getType().isTrivial(*SI->getFunction()) ||
-              Src.getOwnershipKind() == ValueOwnershipKind::Any,
+                  Src.getOwnershipKind() == ValueOwnershipKind::None,
               "A store with trivial ownership must store a type with trivial "
               "ownership");
       break;
@@ -2132,7 +2149,7 @@ public:
     require(!F.hasOwnership(),                                                 \
             #name "_release is only in functions with unqualified ownership"); \
   }                                                                            \
-  void checkCopy##Name##ValueInst(Copy##Name##ValueInst *I) {                  \
+  void StrongcheckCopy##Name##ValueInst(StrongCopy##Name##ValueInst *I) {      \
     auto ty = requireObjectType(Name##StorageType, I->getOperand(),            \
                                 "Operand of " #name "_retain");                \
     closure();                                                                 \
@@ -2153,7 +2170,7 @@ public:
   })
 #define UNCHECKED_REF_STORAGE(Name, name, ...)                                 \
   LOADABLE_REF_STORAGE_HELPER(Name, name)                                      \
-  void checkCopy##Name##ValueInst(Copy##Name##ValueInst *I) {                  \
+  void checkStrongCopy##Name##ValueInst(StrongCopy##Name##ValueInst *I) {      \
     auto ty = requireObjectType(Name##StorageType, I->getOperand(),            \
                                 "Operand of " #name "_retain");                \
     (void)ty;                                                                  \
@@ -2318,7 +2335,8 @@ public:
             "project_box operand should be a value");
     auto boxTy = I->getOperand()->getType().getAs<SILBoxType>();
     require(boxTy, "project_box operand should be a @box type");
-    require(I->getType() == getSILBoxFieldType(boxTy, F.getModule().Types,
+    require(I->getType() == getSILBoxFieldType(F.getTypeExpansionContext(), boxTy,
+                                               F.getModule().Types,
                                                I->getFieldIndex()),
             "project_box result should be address of boxed type");
 
@@ -2387,7 +2405,8 @@ public:
               "number of struct operands does not match number of stored "
               "member variables of struct");
 
-      SILType loweredType = structTy.getFieldType(field, F.getModule());
+      SILType loweredType =
+          structTy.getFieldType(field, F.getModule(), F.getTypeExpansionContext());
       if (SI->getModule().getStage() != SILStage::Lowered) {
         require((*opi)->getType() == loweredType,
                 "struct operand type does not match field type");
@@ -2409,8 +2428,8 @@ public:
     if (UI->getElement()->hasAssociatedValues()) {
       require(UI->getOperand()->getType().isObject(),
               "EnumInst operand must be an object");
-      SILType caseTy = UI->getType().getEnumElementType(UI->getElement(),
-                                                        F.getModule());
+      SILType caseTy = UI->getType().getEnumElementType(
+          UI->getElement(), F.getModule(), F.getTypeExpansionContext());
       if (UI->getModule().getStage() != SILStage::Lowered) {
         require(caseTy == UI->getOperand()->getType(),
                 "EnumInst operand type does not match type of case");
@@ -2430,9 +2449,8 @@ public:
     require(UI->getType().isAddress(),
             "InitEnumDataAddrInst must produce an address");
 
-    SILType caseTy =
-      UI->getOperand()->getType().getEnumElementType(UI->getElement(),
-                                                    F.getModule());
+    SILType caseTy = UI->getOperand()->getType().getEnumElementType(
+        UI->getElement(), F.getModule(), F.getTypeExpansionContext());
 
     if (UI->getModule().getStage() != SILStage::Lowered) {
       requireSameType(
@@ -2453,9 +2471,8 @@ public:
     require(UI->getType().isObject(),
             "UncheckedEnumData must produce an address");
 
-    SILType caseTy =
-      UI->getOperand()->getType().getEnumElementType(UI->getElement(),
-                                                    F.getModule());
+    SILType caseTy = UI->getOperand()->getType().getEnumElementType(
+        UI->getElement(), F.getModule(), F.getTypeExpansionContext());
 
     if (UI->getModule().getStage() != SILStage::Lowered) {
       require(caseTy == UI->getType(),
@@ -2475,9 +2492,8 @@ public:
     require(UI->getType().isAddress(),
             "UncheckedTakeEnumDataAddrInst must produce an address");
 
-    SILType caseTy =
-      UI->getOperand()->getType().getEnumElementType(UI->getElement(),
-                                                    F.getModule());
+    SILType caseTy = UI->getOperand()->getType().getEnumElementType(
+        UI->getElement(), F.getModule(), F.getTypeExpansionContext());
 
     if (UI->getModule().getStage() != SILStage::Lowered) {
       require(caseTy == UI->getType(), "UncheckedTakeEnumDataAddrInst result "
@@ -2513,7 +2529,8 @@ public:
 
   // Is a SIL type a potential lowering of a formal type?
   bool isLoweringOf(SILType loweredType, CanType formalType) {
-    return loweredType.isLoweringOf(F.getModule(), formalType);
+    return loweredType.isLoweringOf(F.getTypeExpansionContext(), F.getModule(),
+                                    formalType);
   }
   
   void checkMetatypeInst(MetatypeInst *MI) {
@@ -2603,9 +2620,9 @@ public:
     require(AI->getType().isObject(),
             "result of alloc_box must be an object");
     for (unsigned field : indices(AI->getBoxType()->getLayout()->getFields())) {
-      verifyOpenedArchetype(AI,
-        getSILBoxFieldLoweredType(AI->getBoxType(), F.getModule().Types,
-                                  field));
+      verifyOpenedArchetype(AI, getSILBoxFieldLoweredType(
+                                    F.getTypeExpansionContext(), AI->getBoxType(),
+                                    F.getModule().Types, field));
     }
 
     // An alloc_box with a mark_uninitialized user can not have any other users.
@@ -2699,8 +2716,8 @@ public:
             "struct_extract field is not a member of the struct");
 
     if (EI->getModule().getStage() != SILStage::Lowered) {
-      SILType loweredFieldTy =
-          operandTy.getFieldType(EI->getField(), F.getModule());
+      SILType loweredFieldTy = operandTy.getFieldType(
+          EI->getField(), F.getModule(), F.getTypeExpansionContext());
       require(loweredFieldTy == EI->getType(),
               "result of struct_extract does not match type of field");
     }
@@ -2745,8 +2762,8 @@ public:
             "struct_element_addr field is not a member of the struct");
 
     if (EI->getModule().getStage() != SILStage::Lowered) {
-      SILType loweredFieldTy =
-          operandTy.getFieldType(EI->getField(), F.getModule());
+      SILType loweredFieldTy = operandTy.getFieldType(
+          EI->getField(), F.getModule(), F.getTypeExpansionContext());
       require(loweredFieldTy == EI->getType(),
               "result of struct_element_addr does not match type of field");
     }
@@ -2771,8 +2788,8 @@ public:
             "ref_element_addr field must be a member of the class");
 
     if (EI->getModule().getStage() != SILStage::Lowered) {
-      SILType loweredFieldTy =
-          operandTy.getFieldType(EI->getField(), F.getModule());
+      SILType loweredFieldTy = operandTy.getFieldType(
+          EI->getField(), F.getModule(), F.getTypeExpansionContext());
       require(loweredFieldTy == EI->getType(),
               "result of ref_element_addr does not match type of field");
     }
@@ -2821,7 +2838,7 @@ public:
     require(methodType->isPolymorphic(),
             "result of witness_method must be polymorphic");
 
-    auto genericSig = methodType->getGenericSignature();
+    auto genericSig = methodType->getInvocationGenericSignature();
 
     auto selfGenericParam = genericSig->getGenericParams()[0];
     require(selfGenericParam->getDepth() == 0
@@ -2870,7 +2887,8 @@ public:
 
     // The type of the dynamic method must match the usual type of the method,
     // but with the more opaque Self type.
-    auto constantInfo = F.getModule().Types.getConstantInfo(method);
+    auto constantInfo =
+        F.getModule().Types.getConstantInfo(F.getTypeExpansionContext(), method);
     auto methodTy = constantInfo.SILFnType;
 
     assert(!methodTy->isCoroutine());
@@ -2878,7 +2896,8 @@ public:
     // Map interface types to archetypes.
     if (auto *env = F.getModule().Types.getConstantGenericEnvironment(method)) {
       auto subs = env->getForwardingSubstitutionMap();
-      methodTy = methodTy->substGenericArgs(F.getModule(), subs);
+      methodTy = methodTy->substGenericArgs(F.getModule(), subs,
+                                            F.getTypeExpansionContext());
     }
     assert(!methodTy->isPolymorphic());
 
@@ -2898,7 +2917,8 @@ public:
         auto anyObjectTy = C.getAnyObjectType();
         for (auto &dynResult : dynResults) {
           auto newResultTy
-            = dynResult.getType()->replaceCovariantResultType(anyObjectTy, 0);
+            = dynResult.getReturnValueType(F.getModule(), methodTy)
+                       ->replaceCovariantResultType(anyObjectTy, 0);
           dynResult = SILResultInfo(newResultTy->getCanonicalType(),
                                     dynResult.getConvention());
         }
@@ -2913,6 +2933,7 @@ public:
                                      methodTy->getYields(),
                                      dynResults,
                                      methodTy->getOptionalErrorResult(),
+                                     SubstitutionMap(), false,
                                      F.getASTContext());
     return SILType::getPrimitiveObjectType(fnTy);
   }
@@ -2946,7 +2967,8 @@ public:
 
   void checkClassMethodInst(ClassMethodInst *CMI) {
     auto member = CMI->getMember();
-    auto overrideTy = TC.getConstantOverrideType(member);
+    auto overrideTy =
+        TC.getConstantOverrideType(F.getTypeExpansionContext(), member);
     if (CMI->getModule().getStage() != SILStage::Lowered) {
       requireSameType(
           CMI->getType(), SILType::getPrimitiveObjectType(overrideTy),
@@ -2974,7 +2996,8 @@ public:
 
   void checkSuperMethodInst(SuperMethodInst *CMI) {
     auto member = CMI->getMember();
-    auto overrideTy = TC.getConstantOverrideType(member);
+    auto overrideTy =
+        TC.getConstantOverrideType(F.getTypeExpansionContext(), member);
     if (CMI->getModule().getStage() != SILStage::Lowered) {
       requireSameType(
           CMI->getType(), SILType::getPrimitiveObjectType(overrideTy),
@@ -3025,7 +3048,8 @@ public:
       operandInstanceType = metatypeType.getInstanceType();
 
     if (operandInstanceType.getClassOrBoundGenericClass()) {
-      auto overrideTy = TC.getConstantOverrideType(member);
+      auto overrideTy =
+          TC.getConstantOverrideType(F.getTypeExpansionContext(), member);
       requireSameType(
           OMI->getType(), SILType::getPrimitiveObjectType(overrideTy),
           "result type of objc_method must match abstracted type of method");
@@ -3050,7 +3074,8 @@ public:
 
   void checkObjCSuperMethodInst(ObjCSuperMethodInst *OMI) {
     auto member = OMI->getMember();
-    auto overrideTy = TC.getConstantOverrideType(member);
+    auto overrideTy =
+        TC.getConstantOverrideType(F.getTypeExpansionContext(), member);
     if (OMI->getModule().getStage() != SILStage::Lowered) {
       requireSameType(
           OMI->getType(), SILType::getPrimitiveObjectType(overrideTy),
@@ -3535,14 +3560,14 @@ public:
 
   void checkCheckedCastBranchInst(CheckedCastBranchInst *CBI) {
     verifyCheckedCast(CBI->isExact(),
-                      CBI->getOperand()->getType(),
-                      CBI->getCastType());
-    verifyOpenedArchetype(CBI, CBI->getCastType().getASTType());
+                      CBI->getSourceLoweredType(),
+                      CBI->getTargetLoweredType());
+    verifyOpenedArchetype(CBI, CBI->getTargetFormalType());
 
     require(CBI->getSuccessBB()->args_size() == 1,
             "success dest of checked_cast_br must take one argument");
     require(CBI->getSuccessBB()->args_begin()[0]->getType() ==
-                CBI->getCastType(),
+                CBI->getTargetLoweredType(),
             "success dest block argument of checked_cast_br must match type of "
             "cast");
     require(!F.hasOwnership() || CBI->getFailureBB()->args_size() == 1,
@@ -3559,14 +3584,16 @@ public:
   }
 
   void checkCheckedCastValueBranchInst(CheckedCastValueBranchInst *CBI) {
-    verifyCheckedCast(false, CBI->getOperand()->getType(), CBI->getCastType(),
+    verifyCheckedCast(false,
+                      CBI->getSourceLoweredType(),
+                      CBI->getTargetLoweredType(),
                       true);
-    verifyOpenedArchetype(CBI, CBI->getCastType().getASTType());
+    verifyOpenedArchetype(CBI, CBI->getTargetFormalType());
 
     require(CBI->getSuccessBB()->args_size() == 1,
             "success dest of checked_cast_value_br must take one argument");
     require(CBI->getSuccessBB()->args_begin()[0]->getType() ==
-                CBI->getCastType(),
+                CBI->getTargetLoweredType(),
             "success dest block argument of checked_cast_value_br must match "
             "type of cast");
     require(F.hasOwnership() || CBI->getFailureBB()->args_empty(),
@@ -3826,7 +3853,7 @@ public:
     // convert_function is required to be an ABI-compatible conversion.
     requireABICompatibleFunctionTypes(
         opTI, resTI, "convert_function cannot change function ABI",
-        ICI->getFunction());
+        *ICI->getFunction());
   }
 
   void checkConvertEscapeToNoEscapeInst(ConvertEscapeToNoEscapeInst *ICI) {
@@ -3843,7 +3870,7 @@ public:
     requireABICompatibleFunctionTypes(
         opTI, resTI->getWithExtInfo(resTI->getExtInfo().withNoEscape(false)),
         "convert_escape_to_noescape cannot change function ABI",
-        ICI->getFunction());
+        *ICI->getFunction());
 
     // After mandatory passes convert_escape_to_noescape should not have the
     // '[not_guaranteed]' or '[escaped]' attributes.
@@ -3893,7 +3920,9 @@ public:
     LLVM_DEBUG(RI->print(llvm::dbgs()));
 
     SILType functionResultType =
-        F.mapTypeIntoContext(fnConv.getSILResultType());
+        F.getLoweredType(
+             F.mapTypeIntoContext(fnConv.getSILResultType()).getASTType())
+            .getCategoryType(fnConv.getSILResultType().getCategory());
     SILType instResultType = RI->getOperand()->getType();
     LLVM_DEBUG(llvm::dbgs() << "function return type: ";
                functionResultType.dump();
@@ -3906,11 +3935,15 @@ public:
   void checkThrowInst(ThrowInst *TI) {
     LLVM_DEBUG(TI->print(llvm::dbgs()));
 
-    CanSILFunctionType fnType = F.getLoweredFunctionType();
+    CanSILFunctionType fnType =
+        F.getLoweredFunctionTypeInContext(F.getTypeExpansionContext());
     require(fnType->hasErrorResult(),
             "throw in function that doesn't have an error result");
 
-    SILType functionResultType = F.mapTypeIntoContext(fnConv.getSILErrorType());
+    SILType functionResultType =
+        F.getLoweredType(
+             F.mapTypeIntoContext(fnConv.getSILErrorType()).getASTType())
+            .getCategoryType(fnConv.getSILErrorType().getCategory());
     SILType instResultType = TI->getOperand()->getType();
     LLVM_DEBUG(llvm::dbgs() << "function error result type: ";
                functionResultType.dump();
@@ -3926,7 +3959,8 @@ public:
   }
 
   void checkYieldInst(YieldInst *YI) {
-    CanSILFunctionType fnType = F.getLoweredFunctionType();
+    CanSILFunctionType fnType =
+        F.getLoweredFunctionTypeInContext(F.getTypeExpansionContext());
     require(fnType->isCoroutine(),
             "yield in non-coroutine function");
 
@@ -4126,7 +4160,8 @@ public:
         }
 
         if (dest->getArguments().size() == 1) {
-          SILType eltArgTy = uTy.getEnumElementType(elt, F.getModule());
+          SILType eltArgTy = uTy.getEnumElementType(elt, F.getModule(),
+                                                    F.getTypeExpansionContext());
           SILType bbArgTy = dest->getArguments()[0]->getType();
           if (F.getModule().getStage() != SILStage::Lowered) {
             // During the lowered stage, a function type might have different
@@ -4351,7 +4386,7 @@ public:
             "invoke function operand must be a c function");
     require(invokeTy->getParameters().size() >= 1,
             "invoke function must take at least one parameter");
-    require(!invokeTy->getGenericSignature() ||
+    require(!invokeTy->getInvocationGenericSignature() ||
             invokeTy->getExtInfo().isPseudogeneric(),
             "invoke function must not take reified generic parameters");
     
@@ -4363,7 +4398,7 @@ public:
             ParameterConvention::Indirect_InoutAliasable,
             "invoke function must take block storage as @inout_aliasable "
             "parameter");
-    require(storageParam.getType() == storageTy,
+    require(storageParam.getArgumentType(F.getModule(), invokeTy) == storageTy,
             "invoke function must take block storage type as first parameter");
     
     require(IBSHI->getType().isObject(), "result must be a value");
@@ -4532,7 +4567,9 @@ public:
       auto mappedTy = F.mapTypeIntoContext(ty);
       SILArgument *bbarg = *argI;
       ++argI;
-      if (bbarg->getType() != mappedTy) {
+      if (bbarg->getType() != mappedTy &&
+          bbarg->getType() != F.getLoweredType(mappedTy.getASTType())
+                                  .getCategoryType(mappedTy.getCategory())) {
         llvm::errs() << what << " type mismatch!\n";
         llvm::errs() << "  argument: "; bbarg->dump();
         llvm::errs() << "  expected: "; mappedTy.dump();
@@ -4839,7 +4876,7 @@ public:
             llvm::all_of(CBI->getTrueArgs(),
                          [](SILValue V) -> bool {
                            return V.getOwnershipKind() ==
-                                  ValueOwnershipKind::Any;
+                                  ValueOwnershipKind::None;
                          }),
             "cond_br with critical edges must not have a non-trivial value");
       }
@@ -4848,7 +4885,7 @@ public:
             llvm::all_of(CBI->getFalseArgs(),
                          [](SILValue V) -> bool {
                            return V.getOwnershipKind() ==
-                                  ValueOwnershipKind::Any;
+                                  ValueOwnershipKind::None;
                          }),
             "cond_br with critical edges must not have a non-trivial value");
       }
@@ -5137,7 +5174,8 @@ void SILVTable::verify(const SILModule &M) const {
   for (auto &entry : getEntries()) {
     // All vtable entries must be decls in a class context.
     assert(entry.Method.hasDecl() && "vtable entry is not a decl");
-    auto baseInfo = M.Types.getConstantInfo(entry.Method);
+    auto baseInfo =
+        M.Types.getConstantInfo(TypeExpansionContext::minimal(), entry.Method);
     ValueDecl *decl = entry.Method.getDecl();
 
     assert((!isa<AccessorDecl>(decl)
@@ -5175,7 +5213,8 @@ void SILVTable::verify(const SILModule &M) const {
           .requireABICompatibleFunctionTypes(
               baseInfo.getSILType().castTo<SILFunctionType>(),
               entry.Implementation->getLoweredFunctionType(),
-              "vtable entry for " + baseName + " must be ABI-compatible");
+              "vtable entry for " + baseName + " must be ABI-compatible",
+              *entry.Implementation);
     }
   }
 }

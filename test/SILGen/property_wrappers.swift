@@ -519,6 +519,28 @@ extension UsesMyPublished {
   }
 }
 
+// SR-11603 - crash due to incorrect lvalue computation
+@propertyWrapper
+struct StructWrapper<T> {
+  var wrappedValue: T
+}
+
+@propertyWrapper
+class ClassWrapper<T> {
+  var wrappedValue: T
+  init(wrappedValue: T) {
+    self.wrappedValue = wrappedValue
+  }
+}
+
+struct SR_11603 {
+  @StructWrapper @ClassWrapper var prop: Int
+
+  func foo() {
+    prop = 1234
+  }
+}
+
 // CHECK-LABEL: sil_vtable ClassUsingWrapper {
 // CHECK-NEXT:  #ClassUsingWrapper.x!getter.1: (ClassUsingWrapper) -> () -> Int : @$s17property_wrappers17ClassUsingWrapperC1xSivg   // ClassUsingWrapper.x.getter
 // CHECK-NEXT:  #ClassUsingWrapper.x!setter.1: (ClassUsingWrapper) -> (Int) -> () : @$s17property_wrappers17ClassUsingWrapperC1xSivs // ClassUsingWrapper.x.setter

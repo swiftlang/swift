@@ -1066,7 +1066,8 @@ void SignatureExpansion::expandExternalSignatureTypes() {
   assert(FnType->getLanguage() == SILFunctionLanguage::C);
 
   // Convert the SIL result type to a Clang type.
-  auto clangResultTy = IGM.getClangType(FnType->getFormalCSemanticResult());
+  auto clangResultTy =
+    IGM.getClangType(FnType->getFormalCSemanticResult(IGM.getSILModule()));
 
   // Now convert the parameters to Clang types.
   auto params = FnType->getParameters();
@@ -1079,7 +1080,7 @@ void SignatureExpansion::expandExternalSignatureTypes() {
     // ObjC methods take their 'self' argument first, followed by an
     // implicit _cmd argument.
     auto &self = params.back();
-    auto clangTy = IGM.getClangType(self);
+    auto clangTy = IGM.getClangType(self, FnType);
     paramTys.push_back(clangTy);
     paramTys.push_back(clangCtx.VoidPtrTy);
     params = params.drop_back();
@@ -1110,7 +1111,7 @@ void SignatureExpansion::expandExternalSignatureTypes() {
 
   // Convert each parameter to a Clang type.
   for (auto param : params) {
-    auto clangTy = IGM.getClangType(param);
+    auto clangTy = IGM.getClangType(param, FnType);
     paramTys.push_back(clangTy);
   }
 
@@ -1310,7 +1311,7 @@ bool irgen::hasSelfContextParameter(CanSILFunctionType fnType) {
   }
 
   // Direct conventions depend on the type.
-  CanType type = param.getType();
+  CanType type = param.getInterfaceType();
 
   // Thick or @objc metatypes (but not existential metatypes).
   if (auto metatype = dyn_cast<MetatypeType>(type)) {
@@ -1471,7 +1472,7 @@ Signature SignatureExpansion::getSignature() {
 
 Signature Signature::getUncached(IRGenModule &IGM,
                                  CanSILFunctionType formalType) {
-  GenericContextScope scope(IGM, formalType->getGenericSignature());
+  GenericContextScope scope(IGM, formalType->getInvocationGenericSignature());
   SignatureExpansion expansion(IGM, formalType);
   expansion.expandFunctionType();
   return expansion.getSignature();
@@ -1534,7 +1535,7 @@ void CallEmission::emitToUnmappedExplosion(Explosion &out) {
   // Specially handle noreturn c function which would return a 'Never' SIL result
   // type.
   if (origFnType->getLanguage() == SILFunctionLanguage::C &&
-      origFnType->isNoReturnFunction()) {
+      origFnType->isNoReturnFunction(IGF.getSILModule())) {
     auto clangResultTy = result->getType();
     extractScalarResults(IGF, clangResultTy, result, out);
     return;
@@ -1680,8 +1681,10 @@ void CallEmission::emitToMemory(Address addr,
   // result that's actually being passed indirectly.
   //
   // TODO: SIL address lowering should be able to handle such cases earlier.
-  auto origResultType = origFnType->getDirectFormalResultsType().getASTType();
-  auto substResultType = substFnType->getDirectFormalResultsType().getASTType();
+  auto origResultType = origFnType->getDirectFormalResultsType(IGF.IGM.getSILModule())
+                                  .getASTType();
+  auto substResultType = substFnType->getDirectFormalResultsType(IGF.IGM.getSILModule())
+                                    .getASTType();
 
   if (origResultType->hasTypeParameter())
     origResultType = IGF.IGM.getGenericEnvironment()
@@ -1809,7 +1812,7 @@ void CallEmission::emitToExplosion(Explosion &out, bool isOutlined) {
   auto origFnType = getCallee().getOrigFunctionType();
   auto isNoReturnCFunction =
       origFnType->getLanguage() == SILFunctionLanguage::C &&
-      origFnType->isNoReturnFunction();
+      origFnType->isNoReturnFunction(IGF.getSILModule());
 
   // If the call is naturally to memory, emit it that way and then
   // explode that temporary.
@@ -1884,7 +1887,8 @@ Callee::Callee(CalleeInfo &&info, const FunctionPointer &fn,
     break;
   case SILFunctionTypeRepresentation::Method:
   case SILFunctionTypeRepresentation::WitnessMethod:
-    assert((FirstData != nullptr) == hasSelfContextParameter(Info.OrigFnType));
+    assert((FirstData != nullptr) ==
+           hasSelfContextParameter(Info.OrigFnType));
     assert(!SecondData);
     break;
   case SILFunctionTypeRepresentation::Thick:
@@ -2275,8 +2279,8 @@ static void externalizeArguments(IRGenFunction &IGF, const Callee &callee,
                                  Explosion &in, Explosion &out,
                                  TemporarySet &temporaries,
                                  bool isOutlined) {
-  auto silConv = IGF.IGM.silConv;
   auto fnType = callee.getOrigFunctionType();
+  auto silConv = SILFunctionConventions(fnType, IGF.IGM.silConv);
   auto params = fnType->getParameters();
 
   assert(callee.getForeignInfo().ClangInfo);
@@ -2384,7 +2388,9 @@ static void externalizeArguments(IRGenFunction &IGF, const Callee &callee,
 }
 
 /// Returns whether allocas are needed.
-bool irgen::addNativeArgument(IRGenFunction &IGF, Explosion &in,
+bool irgen::addNativeArgument(IRGenFunction &IGF,
+                              Explosion &in,
+                              CanSILFunctionType fnTy,
                               SILParameterInfo origParamInfo, Explosion &out,
                               bool isOutlined) {
   // Addresses consist of a single pointer argument.
@@ -2392,7 +2398,7 @@ bool irgen::addNativeArgument(IRGenFunction &IGF, Explosion &in,
     out.add(in.claimNext());
     return false;
   }
-  auto paramType = IGF.IGM.silConv.getSILType(origParamInfo);
+  auto paramType = IGF.IGM.silConv.getSILType(origParamInfo, fnTy);
   auto &ti = cast<LoadableTypeInfo>(IGF.getTypeInfo(paramType));
   auto schema = ti.getSchema();
   auto &nativeSchema = ti.nativeParameterValueSchema(IGF.IGM);
@@ -2646,7 +2652,8 @@ llvm::Value *irgen::emitYield(IRGenFunction &IGF,
   // Translate the arguments to an unsubstituted form.
   Explosion allComponents;
   for (auto yield : coroutineType->getYields())
-    addNativeArgument(IGF, substValues, yield, allComponents, false);
+    addNativeArgument(IGF, substValues, coroutineType,
+                      yield, allComponents, false);
 
   // Figure out which arguments need to be yielded directly.
   SmallVector<llvm::Value*, 8> yieldArgs;
@@ -2779,7 +2786,8 @@ void CallEmission::setArgs(Explosion &original, bool isOutlined,
       params = params.drop_back();
     }
     for (auto param : params) {
-      addNativeArgument(IGF, original, param, adjusted, isOutlined);
+      addNativeArgument(IGF, original,
+                        origCalleeType, param, adjusted, isOutlined);
     }
 
     // Anything else, just pass along.  This will include things like
@@ -3339,10 +3347,43 @@ Explosion NativeConventionSchema::mapIntoNative(IRGenModule &IGM,
   return nativeExplosion;
 }
 
-void IRGenFunction::emitScalarReturn(SILType resultType, Explosion &result,
+Explosion IRGenFunction::coerceValueTo(SILType fromTy, Explosion &from,
+                                       SILType toTy) {
+  if (fromTy == toTy)
+    return std::move(from);
+
+  auto &fromTI = cast<LoadableTypeInfo>(IGM.getTypeInfo(fromTy));
+  auto &toTI = cast<LoadableTypeInfo>(IGM.getTypeInfo(toTy));
+
+  Explosion result;
+  if (fromTI.getStorageType()->isPointerTy() &&
+      toTI.getStorageType()->isPointerTy()) {
+    auto ptr = from.claimNext();
+    ptr = Builder.CreateBitCast(ptr, toTI.getStorageType());
+    result.add(ptr);
+    return result;
+  }
+
+  auto temporary = toTI.allocateStack(*this, toTy, "coerce.temp");
+
+  auto addr =
+      Address(Builder.CreateBitCast(temporary.getAddressPointer(),
+                                    fromTI.getStorageType()->getPointerTo()),
+              temporary.getAlignment());
+  fromTI.initialize(*this, from, addr, false);
+
+  toTI.loadAsTake(*this, temporary.getAddress(), result);
+  toTI.deallocateStack(*this, temporary, toTy);
+  return result;
+}
+
+void IRGenFunction::emitScalarReturn(SILType returnResultType,
+                                     SILType funcResultType, Explosion &result,
                                      bool isSwiftCCReturn, bool isOutlined) {
   if (result.empty()) {
-    assert(IGM.getTypeInfo(resultType).nativeReturnValueSchema(IGM).empty() &&
+    assert(IGM.getTypeInfo(returnResultType)
+               .nativeReturnValueSchema(IGM)
+               .empty() &&
            "Empty explosion must match the native calling convention");
 
     Builder.CreateRetVoid();
@@ -3351,12 +3392,13 @@ void IRGenFunction::emitScalarReturn(SILType resultType, Explosion &result,
 
   // In the native case no coercion is needed.
   if (isSwiftCCReturn) {
+    result = coerceValueTo(returnResultType, result, funcResultType);
     auto &nativeSchema =
-        IGM.getTypeInfo(resultType).nativeReturnValueSchema(IGM);
+        IGM.getTypeInfo(funcResultType).nativeReturnValueSchema(IGM);
     assert(!nativeSchema.requiresIndirect());
 
-    Explosion native =
-        nativeSchema.mapIntoNative(IGM, *this, result, resultType, isOutlined);
+    Explosion native = nativeSchema.mapIntoNative(IGM, *this, result,
+                                                  funcResultType, isOutlined);
     if (native.size() == 1) {
       Builder.CreateRet(native.claimNext());
       return;
@@ -3383,7 +3425,7 @@ void IRGenFunction::emitScalarReturn(SILType resultType, Explosion &result,
     return;
   }
 
-  auto &resultTI = IGM.getTypeInfo(resultType);
+  auto &resultTI = IGM.getTypeInfo(returnResultType);
   auto schema = resultTI.getSchema();
   auto *bodyType = schema.getScalarResultType(IGM);
 

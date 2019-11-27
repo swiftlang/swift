@@ -14,17 +14,18 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/ProtocolConformance.h"
 #include "ConformanceLookupTable.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Availability.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/FileUnit.h"
-#include "swift/AST/LazyResolver.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/LazyResolver.h"
 #include "swift/AST/Module.h"
-#include "swift/AST/ProtocolConformance.h"
-#include "swift/AST/Types.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeWalker.h"
+#include "swift/AST/Types.h"
 #include "swift/Basic/Statistic.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/Statistic.h"
@@ -128,21 +129,17 @@ ProtocolConformanceRef::subst(Type origType,
 
   // If the type is an existential, it must be self-conforming.
   if (substType->isExistentialType()) {
-    if (auto optConformance =
-          proto->getModuleContext()->lookupExistentialConformance(
-            substType, proto))
-      return *optConformance;
+    auto optConformance =
+        proto->getModuleContext()->lookupExistentialConformance(substType,
+                                                                proto);
+    if (optConformance)
+      return optConformance;
 
     return ProtocolConformanceRef::forInvalid();
   }
 
   // Check the conformance map.
-  if (auto result = conformances(origType->getCanonicalType(),
-                                 substType, proto)) {
-    return *result;
-  }
-
-  return ProtocolConformanceRef::forInvalid();
+  return conformances(origType->getCanonicalType(), substType, proto);
 }
 
 ProtocolConformanceRef ProtocolConformanceRef::mapConformanceOutOfContext() const {
@@ -269,7 +266,7 @@ ProtocolConformance::hasTypeWitness(AssociatedTypeDecl *assocType) const {
   CONFORMANCE_SUBCLASS_DISPATCH(hasTypeWitness, (assocType));
 }
 
-std::pair<Type, TypeDecl *>
+TypeWitnessAndDecl
 ProtocolConformance::getTypeWitnessAndDecl(AssociatedTypeDecl *assocType,
                                            SubstOptions options) const {
   CONFORMANCE_SUBCLASS_DISPATCH(getTypeWitnessAndDecl,
@@ -278,7 +275,7 @@ ProtocolConformance::getTypeWitnessAndDecl(AssociatedTypeDecl *assocType,
 
 Type ProtocolConformance::getTypeWitness(AssociatedTypeDecl *assocType,
                                          SubstOptions options) const {
-  return getTypeWitnessAndDecl(assocType, options).first;
+  return getTypeWitnessAndDecl(assocType, options).getWitnessType();
 }
 
 ConcreteDeclRef
@@ -659,13 +656,12 @@ bool NormalProtocolConformance::hasTypeWitness(
 
   auto found = TypeWitnesses.find(assocType);
   if (found != TypeWitnesses.end()) {
-    return !found->getSecond().first.isNull();
+    return !found->getSecond().getWitnessType().isNull();
   }
 
   return false;
 }
 
-using TypeWitnessAndDecl = std::pair<Type, TypeDecl *>;
 TypeWitnessAndDecl
 NormalProtocolConformance::getTypeWitnessAndDecl(AssociatedTypeDecl *assocType,
                                                  SubstOptions options) const {
@@ -693,21 +689,23 @@ NormalProtocolConformance::getTypeWitnessAndDecl(AssociatedTypeDecl *assocType,
   // If the conditional requirements aren't known, we can't properly run
   // inference.
   if (!getConditionalRequirementsIfAvailable()) {
-    return {Type(), nullptr};
+    return TypeWitnessAndDecl();
   }
 
-  // Otherwise, resolve the type witness.
-  PrettyStackTraceRequirement trace("resolving", this, assocType);
-  auto *resolver = assocType->getASTContext().getLazyResolver();
-  assert(resolver && "Unable to resolve type witness");
+  return evaluateOrDefault(
+      assocType->getASTContext().evaluator,
+      TypeWitnessRequest{const_cast<NormalProtocolConformance *>(this),
+                         assocType},
+      TypeWitnessAndDecl());
+}
 
-  // Block recursive resolution of this type witness.
-  TypeWitnesses[assocType] = { Type(), nullptr };
-  resolver->resolveTypeWitness(this, assocType);
-
-  known = TypeWitnesses.find(assocType);
-  assert(known != TypeWitnesses.end() && "Didn't resolve witness?");
-  return known->second;
+TypeWitnessAndDecl NormalProtocolConformance::getTypeWitnessUncached(
+    AssociatedTypeDecl *requirement) const {
+  auto entry = TypeWitnesses.find(requirement);
+  if (entry == TypeWitnesses.end()) {
+    return TypeWitnessAndDecl();
+  }
+  return entry->second;
 }
 
 void NormalProtocolConformance::setTypeWitness(AssociatedTypeDecl *assocType,
@@ -716,11 +714,11 @@ void NormalProtocolConformance::setTypeWitness(AssociatedTypeDecl *assocType,
   assert(getProtocol() == cast<ProtocolDecl>(assocType->getDeclContext()) &&
          "associated type in wrong protocol");
   assert((TypeWitnesses.count(assocType) == 0 ||
-          TypeWitnesses[assocType].first.isNull()) &&
+          TypeWitnesses[assocType].getWitnessType().isNull()) &&
          "Type witness already known");
   assert((!isComplete() || isInvalid()) && "Conformance already complete?");
   assert(!type->hasArchetype() && "type witnesses must be interface types");
-  TypeWitnesses[assocType] = std::make_pair(type, typeDecl);
+  TypeWitnesses[assocType] = {type, typeDecl};
 }
 
 Type ProtocolConformance::getAssociatedType(Type assocType) const {
@@ -841,8 +839,8 @@ recursivelySubstituteBaseType(ModuleDecl *module,
 
   // If we have an inherited protocol just look up the conformance.
   if (reqProto != conformance->getProtocol()) {
-    reqConformance = module->lookupConformance(
-        conformance->getType(), reqProto)->getConcrete();
+    reqConformance = module->lookupConformance(conformance->getType(), reqProto)
+                         .getConcrete();
   }
 
   return reqConformance->getTypeWitness(depMemTy->getAssocType());
@@ -894,12 +892,8 @@ void NormalProtocolConformance::finishSignatureConformances() {
     if (substTy->hasTypeParameter())
       substTy = getDeclContext()->mapTypeIntoContext(substTy);
 
-    auto reqConformance = module->lookupConformance(substTy, reqProto);
-    if (!reqConformance)
-      reqConformance = ProtocolConformanceRef::forInvalid();
-
-    reqConformance = reqConformance->mapConformanceOutOfContext();
-    reqConformances.push_back(*reqConformance);
+    reqConformances.push_back(module->lookupConformance(substTy, reqProto)
+                                  .mapConformanceOutOfContext());
   }
   setSignatureConformances(reqConformances);
 }
@@ -916,20 +910,20 @@ Witness NormalProtocolConformance::getWitness(ValueDecl *requirement) const {
   if (Loader)
     resolveLazyInfo();
 
-  auto known = Mapping.find(requirement);
-  if (known == Mapping.end()) {
-    auto *resolver = requirement->getASTContext().getLazyResolver();
-    assert(resolver && "Unable to resolve witness without resolver");
-    resolver->resolveWitness(this, requirement);
-    known = Mapping.find(requirement);
-  }
-  if (known != Mapping.end()) {
-    return known->second;
-  } else {
-    assert((!isComplete() || isInvalid()) &&
-           "Resolver did not resolve requirement");
+  return evaluateOrDefault(
+      requirement->getASTContext().evaluator,
+      ValueWitnessRequest{const_cast<NormalProtocolConformance *>(this),
+                          requirement},
+      Witness());
+}
+
+Witness
+NormalProtocolConformance::getWitnessUncached(ValueDecl *requirement) const {
+  auto entry = Mapping.find(requirement);
+  if (entry == Mapping.end()) {
     return Witness();
   }
+  return entry->second;
 }
 
 Witness SelfProtocolConformance::getWitness(ValueDecl *requirement) const {
@@ -1020,7 +1014,7 @@ bool SpecializedProtocolConformance::hasTypeWitness(
          GenericConformance->hasTypeWitness(assocType);
 }
 
-std::pair<Type, TypeDecl *>
+TypeWitnessAndDecl
 SpecializedProtocolConformance::getTypeWitnessAndDecl(
                       AssociatedTypeDecl *assocType, 
                       SubstOptions options) const {
@@ -1048,16 +1042,16 @@ SpecializedProtocolConformance::getTypeWitnessAndDecl(
   auto genericWitnessAndDecl
     = GenericConformance->getTypeWitnessAndDecl(assocType, options);
 
-  auto genericWitness = genericWitnessAndDecl.first;
+  auto genericWitness = genericWitnessAndDecl.getWitnessType();
   if (!genericWitness)
     return { Type(), nullptr };
 
-  auto *typeDecl = genericWitnessAndDecl.second;
+  auto *typeDecl = genericWitnessAndDecl.getWitnessDecl();
 
   // Form the substitution.
   auto substitutionMap = getSubstitutionMap();
   if (substitutionMap.empty())
-    return {Type(), nullptr};
+    return TypeWitnessAndDecl();
 
   // Apply the substitution we computed above
   auto specializedType = genericWitness.subst(substitutionMap, options);
@@ -1070,7 +1064,7 @@ SpecializedProtocolConformance::getTypeWitnessAndDecl(
 
   // If we aren't in a case where we used the tentative type witness
   // information, cache the result.
-  auto specializedWitnessAndDecl = std::make_pair(specializedType, typeDecl);
+  auto specializedWitnessAndDecl = TypeWitnessAndDecl{specializedType, typeDecl};
   if (!isTentativeWitness() && !specializedType->hasError())
     TypeWitnesses[assocType] = specializedWitnessAndDecl;
 
@@ -1523,4 +1517,9 @@ template<>
 const UnifiedStatsReporter::TraceFormatter*
 FrontendStatsTracer::getTraceFormatter<const ProtocolConformance *>() {
   return &TF;
+}
+
+void swift::simple_display(llvm::raw_ostream &out,
+                           const ProtocolConformance *conf) {
+  conf->printName(out);
 }

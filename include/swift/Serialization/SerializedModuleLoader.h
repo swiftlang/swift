@@ -20,7 +20,6 @@
 
 namespace swift {
 class ModuleFile;
-class LazyResolver;
 
 /// Spceifies how to load modules when both a module interface and serialized
 /// AST are present, or whether to disallow one format or the other altogether.
@@ -94,10 +93,11 @@ protected:
                     std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer);
 
   void
-  openModuleSourceInfoFileIfPresent(AccessPathElem ModuleID,
-                                    StringRef ModulePath,
-                                    StringRef ModuleSourceInfoFileName,
-                  std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer);
+  openModuleSourceInfoFileIfPresent(
+      AccessPathElem ModuleID,
+      StringRef ModulePath,
+      StringRef ModuleSourceInfoFileName,
+      std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer);
 
   /// If the module loader subclass knows that all options have been tried for
   /// loading an architecture-specific file out of a swiftmodule bundle, try

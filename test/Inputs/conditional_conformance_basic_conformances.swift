@@ -83,9 +83,21 @@ public func single_concrete() {
 // CHECK-NEXT:    br i1 [[IS_NULL]], label %cacheIsNull, label %cont
 
 // CHECK:       cacheIsNull:
-// CHECK-NEXT:    [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s42conditional_conformance_basic_conformances6SingleVyAA4IsP2VGMa"(i64 255)
-// CHECK-NEXT:    [[Single_TYPE:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
-// CHECK-NEXT:    extractvalue %swift.metadata_response [[T0]], 1
+// macosx-NEXT:    [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s42conditional_conformance_basic_conformances6SingleVyAA4IsP2VGMa"(i64 255)
+// macosx-NEXT:    [[Single_TYPE:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
+// macosx-NEXT:    extractvalue %swift.metadata_response [[T0]], 1
+// ios-NEXT:    [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s42conditional_conformance_basic_conformances6SingleVyAA4IsP2VGMa"(i64 255)
+// ios-NEXT:    [[Single_TYPE:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
+// ios-NEXT:    extractvalue %swift.metadata_response [[T0]], 1
+// tvos-NEXT:    [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s42conditional_conformance_basic_conformances6SingleVyAA4IsP2VGMa"(i64 255)
+// tvos-NEXT:    [[Single_TYPE:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
+// tvos-NEXT:    extractvalue %swift.metadata_response [[T0]], 1
+// watchos-NEXT:    [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s42conditional_conformance_basic_conformances6SingleVyAA4IsP2VGMa"(i64 255)
+// watchos-NEXT:    [[Single_TYPE:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
+// watchos-NEXT:    extractvalue %swift.metadata_response [[T0]], 1
+// linux-gnu-NEXT:     [[T0:%.*]] = call %swift.type* @__swift_instantiateConcreteTypeFromMangledNameAbstract({ i32, i32 }* @"$s42conditional_conformance_basic_conformances6SingleVyAA4IsP2VGMD")
+// linux-android-NEXT: [[T0:%.*]] = call %swift.type* @__swift_instantiateConcreteTypeFromMangledNameAbstract({ i32, i32 }* @"$s42conditional_conformance_basic_conformances6SingleVyAA4IsP2VGMD")
+// windows-msvc-NEXT: [[T0:%.*]] = call %swift.type* @__swift_instantiateConcreteTypeFromMangledNameAbstract({ i32, i32 }* @"$s42conditional_conformance_basic_conformances6SingleVyAA4IsP2VGMD")
 
 // CHECK-NEXT:    [[CONDITIONAL_REQUIREMENTS:%.*]] = getelementptr inbounds [1 x i8**], [1 x i8**]* %conditional.requirement.buffer, i32 0, i32 0
 // CHECK-NEXT:    [[A_P2_PTR:%.*]] = getelementptr inbounds i8**, i8*** [[CONDITIONAL_REQUIREMENTS]], i32 0
@@ -99,6 +111,28 @@ public func single_concrete() {
 // CHECK-NEXT:    [[T0:%.*]] = phi i8** [ [[CACHE]], %entry ], [ [[Single_P1]], %cacheIsNull ]
 // CHECK-NEXT:    ret i8** [[T0]]
 // CHECK-NEXT:  }
+
+// TYPEBYNAME-LABEL: define linkonce_odr hidden i8** @"$s42conditional_conformance_basic_conformances6SingleVyAA4IsP2VGACyxGAA2P1A2A0G0RzlWl"()
+// TYPEBYNAME-NEXT:  entry:
+// TYPEBYNAME-NEXT:    %conditional.requirement.buffer = alloca [1 x i8**], align 8
+// TYPEBYNAME-NEXT:    [[CACHE:%.*]] = load i8**, i8*** @"$s42conditional_conformance_basic_conformances6SingleVyAA4IsP2VGACyxGAA2P1A2A0G0RzlWL", align 8
+// TYPEBYNAME-NEXT:    [[IS_NULL:%.*]] = icmp eq i8** [[CACHE]], null
+// TYPEBYNAME-NEXT:    br i1 [[IS_NULL]], label %cacheIsNull, label %cont
+
+// TYPEBYNAME:       cacheIsNull:
+// TYPEBYNAME-NEXT:    [[T0:%.*]] = call %swift.type* @__swift_instantiateConcreteTypeFromMangledNameAbstract({ i32, i32 }* @"$s42conditional_conformance_basic_conformances6SingleVyAA4IsP2VGMD")
+// TYPEBYNAME-NEXT:    [[CONDITIONAL_REQUIREMENTS:%.*]] = getelementptr inbounds [1 x i8**], [1 x i8**]* %conditional.requirement.buffer, i32 0, i32 0
+// TYPEBYNAME-NEXT:    [[A_P2_PTR:%.*]] = getelementptr inbounds i8**, i8*** [[CONDITIONAL_REQUIREMENTS]], i32 0
+// TYPEBYNAME-NEXT:    store i8** getelementptr inbounds ([1 x i8*], [1 x i8*]* @"$s42conditional_conformance_basic_conformances4IsP2VAA0F0AAWP", i32 0, i32 0), i8*** [[A_P2_PTR]], align 8
+
+// TYPEBYNAME-NEXT:    [[Single_P1:%.*]] = call i8** @swift_getWitnessTable
+// TYPEBYNAME-NEXT:    store atomic i8** [[Single_P1]], i8*** @"$s42conditional_conformance_basic_conformances6SingleVyAA4IsP2VGACyxGAA2P1A2A0G0RzlWL" release, align 8
+// TYPEBYNAME-NEXT:    br label %cont
+
+// TYPEBYNAME:       cont:
+// TYPEBYNAME-NEXT:    [[T0:%.*]] = phi i8** [ [[CACHE]], %entry ], [ [[Single_P1]], %cacheIsNull ]
+// TYPEBYNAME-NEXT:    ret i8** [[T0]]
+// TYPEBYNAME-NEXT:  }
 
 
 public struct Double<B, C> {}
@@ -218,9 +252,21 @@ public func double_concrete_concrete() {
 // CHECK-NEXT:    br i1 [[IS_NULL]], label %cacheIsNull, label %cont
 
 // CHECK:       cacheIsNull:
-// CHECK-NEXT:    [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s42conditional_conformance_basic_conformances6DoubleVyAA4IsP2VAA0F2P3VGMa"(i64 255)
-// CHECK-NEXT:    [[Double_TYPE:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
-// CHECK-NEXT:    extractvalue %swift.metadata_response [[T0]], 1
+// macosx-NEXT:    [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s42conditional_conformance_basic_conformances6DoubleVyAA4IsP2VAA0F2P3VGMa"(i64 255)
+// macosx-NEXT:    [[Double_TYPE:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
+// macosx-NEXT:    extractvalue %swift.metadata_response [[T0]], 1
+// ios-NEXT:    [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s42conditional_conformance_basic_conformances6DoubleVyAA4IsP2VAA0F2P3VGMa"(i64 255)
+// ios-NEXT:    [[Double_TYPE:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
+// ios-NEXT:    extractvalue %swift.metadata_response [[T0]], 1
+// tvos-NEXT:    [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s42conditional_conformance_basic_conformances6DoubleVyAA4IsP2VAA0F2P3VGMa"(i64 255)
+// tvos-NEXT:    [[Double_TYPE:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
+// tvos-NEXT:    extractvalue %swift.metadata_response [[T0]], 1
+// watchos-NEXT:    [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s42conditional_conformance_basic_conformances6DoubleVyAA4IsP2VAA0F2P3VGMa"(i64 255)
+// watchos-NEXT:    [[Double_TYPE:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
+// watchos-NEXT:    extractvalue %swift.metadata_response [[T0]], 1
+// linux-gnu-NEXT:     [[T0:%.*]] = call %swift.type* @__swift_instantiateConcreteTypeFromMangledNameAbstract({ i32, i32 }* @"$s42conditional_conformance_basic_conformances6DoubleVyAA4IsP2VAA0F2P3VGMD")
+// linux-android-NEXT: [[T0:%.*]] = call %swift.type* @__swift_instantiateConcreteTypeFromMangledNameAbstract({ i32, i32 }* @"$s42conditional_conformance_basic_conformances6DoubleVyAA4IsP2VAA0F2P3VGMD")
+// windows-msvc-NEXT: [[T0:%.*]] = call %swift.type* @__swift_instantiateConcreteTypeFromMangledNameAbstract({ i32, i32 }* @"$s42conditional_conformance_basic_conformances6DoubleVyAA4IsP2VAA0F2P3VGMD")
 
 // CHECK-NEXT:    [[CONDITIONAL_REQUIREMENTS:%.*]] = getelementptr inbounds [2 x i8**], [2 x i8**]* %conditional.requirement.buffer, i32 0, i32 0
 // CHECK-NEXT:    [[B_P2_PTR:%.*]] = getelementptr inbounds i8**, i8*** [[CONDITIONAL_REQUIREMENTS]], i32 0

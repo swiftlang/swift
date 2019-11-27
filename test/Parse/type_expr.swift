@@ -117,7 +117,7 @@ func genQualifiedType() {
 
 func typeOfShadowing() {
   // Try to shadow type(of:)
-  func type<T>(of t: T.Type, flag: Bool) -> T.Type {
+  func type<T>(of t: T.Type, flag: Bool) -> T.Type { // expected-note {{'type(of:flag:)' declared here}}
     return t
   }
 
@@ -133,8 +133,7 @@ func typeOfShadowing() {
     return t
   }
 
-  // TODO: Errors need improving here.
-  _ = type(of: Gen<Foo>.Bar) // expected-error{{incorrect argument label in call (have 'of:', expected 'fo:')}}
+  _ = type(of: Gen<Foo>.Bar) // expected-error{{missing argument for parameter 'flag' in call}} {{28-28=, flag: <#Bool#>}}
   _ = type(Gen<Foo>.Bar) // expected-error{{expected member name or constructor call after type name}}
   // expected-note@-1{{add arguments after the type to construct a value of the type}}
   // expected-note@-2{{use '.self' to reference the type object}}

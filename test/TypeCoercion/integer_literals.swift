@@ -31,9 +31,9 @@ func overflow_check() {
 }
 
 // Coercion chaining.
-struct meters : ExpressibleByIntegerLiteral { 
+struct meters : ExpressibleByIntegerLiteral {
   var value : Int8
-  
+
   init(_ value: Int8) {
     self.value = value
   }
@@ -44,9 +44,9 @@ struct meters : ExpressibleByIntegerLiteral {
   }
 }
 
-struct supermeters : ExpressibleByIntegerLiteral { // expected-error{{type 'supermeters' does not conform to protocol 'ExpressibleByIntegerLiteral'}} expected-note {{do you want to add protocol stubs?}}
+struct supermeters : ExpressibleByIntegerLiteral { // expected-error{{type 'supermeters' does not conform to protocol 'ExpressibleByIntegerLiteral'}}
   var value : meters
-  
+
   typealias IntegerLiteralType = meters // expected-note{{possibly intended match 'supermeters.IntegerLiteralType' (aka 'meters') does not conform to '_ExpressibleByBuiltinIntegerLiteral'}}
   init(_integerLiteral value: meters) {
     self.value = value
@@ -63,6 +63,6 @@ func chaining() {
 func memberaccess() {
   Int32(5._value) // expected-warning{{unused}}
   // This diagnostic is actually better than it looks, because the inner type is Builtin.Int32, not actually Int32.
-  let x : Int32 = 7._value // expected-error{{cannot convert value of type 'Builtin.Int32' to specified type 'Swift.Int32'}}
+  let x : Int32 = 7._value // expected-error{{cannot convert value of type 'Builtin.Int32' to specified type 'Int32'}}
   _ = x
 }

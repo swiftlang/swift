@@ -22,6 +22,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/Types.h"
@@ -61,10 +62,9 @@ void typeCheckContextImpl(DeclContext *DC, SourceLoc Loc) {
     if (auto *patternInit = dyn_cast<PatternBindingInitializer>(DC)) {
       if (auto *PBD = patternInit->getBinding()) {
         auto i = patternInit->getBindingIndex();
+        PBD->getPattern(i)->forEachVariable(
+            [](VarDecl *VD) { (void)VD->getInterfaceType(); });
         if (PBD->getInit(i)) {
-          PBD->getPattern(i)->forEachVariable([](VarDecl *VD) {
-            (void) VD->getInterfaceType();
-          });
           if (!PBD->isInitializerChecked(i))
             typeCheckPatternBinding(PBD, i);
         }
@@ -74,7 +74,7 @@ void typeCheckContextImpl(DeclContext *DC, SourceLoc Loc) {
 
   case DeclContextKind::AbstractFunctionDecl: {
     auto *AFD = cast<AbstractFunctionDecl>(DC);
-    typeCheckAbstractFunctionBodyUntil(AFD, Loc);
+    swift::typeCheckAbstractFunctionBodyUntil(AFD, Loc);
     break;
   }
 
@@ -91,15 +91,29 @@ void typeCheckContextImpl(DeclContext *DC, SourceLoc Loc) {
 } // anonymous namespace
 
 void swift::ide::typeCheckContextUntil(DeclContext *DC, SourceLoc Loc) {
-  // The only time we have to explicitly check a TopLevelCodeDecl
-  // is when we're directly inside of one. In this case,
-  // performTypeChecking() did not type check it for us.
   while (isa<AbstractClosureExpr>(DC))
     DC = DC->getParent();
-  if (auto *TLCD = dyn_cast<TopLevelCodeDecl>(DC))
-    typeCheckTopLevelCodeDecl(TLCD);
-  else
+
+  if (auto *TLCD = dyn_cast<TopLevelCodeDecl>(DC)) {
+    // Typecheck all 'TopLevelCodeDecl's up to the target one.
+    // In theory, this is not needed, but it fails to resolve the type of
+    // 'guard'ed variable. e.g.
+    //
+    //   guard value = something() else { fatalError() }
+    //   <complete>
+    // Here, 'value' is '<error type>' unless we explicitly typecheck the
+    // 'guard' statement.
+    SourceFile *SF = DC->getParentSourceFile();
+    for (auto *D : SF->Decls) {
+      if (auto Code = dyn_cast<TopLevelCodeDecl>(D)) {
+        typeCheckTopLevelCodeDecl(Code);
+        if (Code == TLCD)
+          break;
+      }
+    }
+  } else {
     typeCheckContextImpl(DC, Loc);
+  }
 }
 
 //===----------------------------------------------------------------------===//
@@ -160,13 +174,11 @@ Expr *swift::ide::findParsedExpr(const DeclContext *DC,
 
 Type swift::ide::getReturnTypeFromContext(const DeclContext *DC) {
   if (auto FD = dyn_cast<AbstractFunctionDecl>(DC)) {
-    if (FD->hasInterfaceType()) {
-      auto Ty = FD->getInterfaceType();
-      if (FD->getDeclContext()->isTypeContext())
-        Ty = FD->getMethodInterfaceType();
-      if (auto FT = Ty->getAs<AnyFunctionType>())
-        return DC->mapTypeIntoContext(FT->getResult());
-    }
+    auto Ty = FD->getInterfaceType();
+    if (FD->getDeclContext()->isTypeContext())
+      Ty = FD->getMethodInterfaceType();
+    if (auto FT = Ty->getAs<AnyFunctionType>())
+      return DC->mapTypeIntoContext(FT->getResult());
   } else if (auto ACE = dyn_cast<AbstractClosureExpr>(DC)) {
     if (ACE->getType() && !ACE->getType()->hasError())
       return ACE->getResultType();
@@ -276,9 +288,6 @@ static void collectPossibleCalleesByQualifiedLookup(
     if (!isMemberDeclApplied(&DC, baseTy->getMetatypeInstanceType(), VD))
       continue;
     Type declaredMemberType = VD->getInterfaceType();
-    if (!declaredMemberType) {
-      continue;
-    }
     if (!declaredMemberType->is<AnyFunctionType>())
       continue;
     if (VD->getDeclContext()->isTypeContext()) {
@@ -743,8 +752,7 @@ class ExprContextAnalyzer {
       if (!AFD)
         return;
       auto param = AFD->getParameters()->get(initDC->getIndex());
-      if (param->hasInterfaceType())
-        recordPossibleType(AFD->mapTypeIntoContext(param->getInterfaceType()));
+      recordPossibleType(AFD->mapTypeIntoContext(param->getInterfaceType()));
       break;
     }
     }
@@ -759,7 +767,7 @@ class ExprContextAnalyzer {
   /// in order to avoid a base expression affecting the type. However, now that
   /// we've typechecked, we will take the context type into account.
   static bool isSingleExpressionBodyForCodeCompletion(BraceStmt *body) {
-    return body->getNumElements() == 1 && body->getElements()[0].is<Expr *>();
+    return body->getNumElements() == 1 && body->getFirstElement().is<Expr *>();
   }
 
 public:

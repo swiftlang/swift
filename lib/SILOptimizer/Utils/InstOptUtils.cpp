@@ -13,6 +13,7 @@
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/SubstitutionMap.h"
+#include "swift/AST/SemanticAttrs.h"
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/DynamicCasts.h"
@@ -725,7 +726,7 @@ bool StringConcatenationOptimizer::extractStringConcatOperands() {
   if (!Fn)
     return false;
 
-  if (ai->getNumArguments() != 3 || !Fn->hasSemanticsAttr("string.concat"))
+  if (ai->getNumArguments() != 3 || !Fn->hasSemanticsAttr(semantics::STRING_CONCAT))
     return false;
 
   // Left and right operands of a string concatenation operation.
@@ -756,9 +757,9 @@ bool StringConcatenationOptimizer::extractStringConcatOperands() {
 
   // makeUTF8 should have following parameters:
   // (start: RawPointer, utf8CodeUnitCount: Word, isASCII: Int1)
-  if (!((friLeftFun->hasSemanticsAttr("string.makeUTF8")
+  if (!((friLeftFun->hasSemanticsAttr(semantics::STRING_MAKE_UTF8)
          && aiLeftOperandsNum == 5)
-        || (friRightFun->hasSemanticsAttr("string.makeUTF8")
+        || (friRightFun->hasSemanticsAttr(semantics::STRING_MAKE_UTF8)
             && aiRightOperandsNum == 5)))
     return false;
 
@@ -1224,7 +1225,7 @@ bool swift::simplifyUsers(SingleValueInstruction *inst) {
 /// True if a type can be expanded without a significant increase to code size.
 bool swift::shouldExpand(SILModule &module, SILType ty) {
   // FIXME: Expansion
-  auto expansion = ResilienceExpansion::Minimal;
+  auto expansion = TypeExpansionContext::minimal();
 
   if (module.Types.getTypeLowering(ty, expansion).isAddressOnly()) {
     return false;
@@ -1433,12 +1434,18 @@ bool swift::calleesAreStaticallyKnowable(SILModule &module, SILDeclRef decl) {
   if (decl.isForeign)
     return false;
 
+  auto *afd = decl.getAbstractFunctionDecl();
+  assert(afd && "Expected abstract function decl!");
+  return calleesAreStaticallyKnowable(module, afd);
+}
+
+/// Are the callees that could be called through Decl statically
+/// knowable based on the Decl and the compilation mode?
+bool swift::calleesAreStaticallyKnowable(SILModule &module,
+                                         AbstractFunctionDecl *afd) {
   const DeclContext *assocDC = module.getAssociatedContext();
   if (!assocDC)
     return false;
-
-  auto *afd = decl.getAbstractFunctionDecl();
-  assert(afd && "Expected abstract function decl!");
 
   // Only handle members defined within the SILModule's associated context.
   if (!afd->isChildContextOf(assocDC))

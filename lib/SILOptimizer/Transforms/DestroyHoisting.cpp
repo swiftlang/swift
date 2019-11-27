@@ -95,6 +95,8 @@ class DestroyHoisting {
 
   void getUsedLocationsOfAddr(Bits &bits, SILValue addr);
 
+  void getUsedLocationsOfOperands(Bits &bits, SILInstruction *I);
+
   void getUsedLocationsOfInst(Bits &bits, SILInstruction *Inst);
 
   void moveDestroys(MemoryDataflow &dataFlow);
@@ -206,9 +208,16 @@ void DestroyHoisting::expandStores(MemoryDataflow &dataFlow) {
 // Initialize the dataflow for moving destroys up the control flow.
 void DestroyHoisting::initDataflow(MemoryDataflow &dataFlow) {
   for (BlockState &st : dataFlow) {
-    st.entrySet.set();
     st.genSet.reset();
     st.killSet.reset();
+    if (st.isInInfiniteLoop()) {
+      // Ignore blocks which are in an infinite loop and prevent any destroy
+      // hoisting across such block borders.
+      st.entrySet.reset();
+      st.exitSet.reset();
+      continue;
+    }
+    st.entrySet.set();
     if (isa<UnreachableInst>(st.block->getTerminator())) {
       if (canIgnoreUnreachableBlock(st.block, dataFlow)) {
         st.exitSet.set();
@@ -282,7 +291,7 @@ bool DestroyHoisting::canIgnoreUnreachableBlock(SILBasicBlock *block,
   SILBasicBlock *singlePred = block->getSinglePredecessorBlock();
   if (!singlePred)
     return false;
-  if (!dataFlow.getState(singlePred)->exitReachable)
+  if (!dataFlow.getState(singlePred)->exitReachable())
     return false;
 
   // Check if none of the locations are touched in the unreachable-block.
@@ -308,6 +317,12 @@ void DestroyHoisting::getUsedLocationsOfAddr(Bits &bits, SILValue addr) {
   }
 }
 
+void DestroyHoisting::getUsedLocationsOfOperands(Bits &bits, SILInstruction *I) {
+  for (Operand &op : I->getAllOperands()) {
+    getUsedLocationsOfAddr(bits, op.get());
+  }
+}
+
 // Set all bits of locations which instruction \p I is using. It's including
 // parent and sub-locations (see comment in getUsedLocationsOfAddr).
 void DestroyHoisting::getUsedLocationsOfInst(Bits &bits, SILInstruction *I) {
@@ -318,15 +333,21 @@ void DestroyHoisting::getUsedLocationsOfInst(Bits &bits, SILInstruction *I) {
         getUsedLocationsOfAddr(bits, LBI->getOperand());
       }
       break;
+    case SILInstructionKind::EndApplyInst:
+      // Operands passed to begin_apply are alive throughout an end_apply ...
+      getUsedLocationsOfOperands(bits, cast<EndApplyInst>(I)->getBeginApply());
+      break;
+    case SILInstructionKind::AbortApplyInst:
+      // ... or abort_apply.
+      getUsedLocationsOfOperands(bits, cast<AbortApplyInst>(I)->getBeginApply());
+      break;
     case SILInstructionKind::LoadInst:
     case SILInstructionKind::StoreInst:
     case SILInstructionKind::CopyAddrInst:
     case SILInstructionKind::ApplyInst:
     case SILInstructionKind::TryApplyInst:
     case SILInstructionKind::YieldInst:
-      for (Operand &op : I->getAllOperands()) {
-        getUsedLocationsOfAddr(bits, op.get());
-      }
+      getUsedLocationsOfOperands(bits, I);
       break;
     case SILInstructionKind::DebugValueAddrInst:
     case SILInstructionKind::DestroyAddrInst:
@@ -358,6 +379,10 @@ void DestroyHoisting::moveDestroys(MemoryDataflow &dataFlow) {
 
     // Is it an unreachable-block we can ignore?
     if (isa<UnreachableInst>(block->getTerminator()) && state.exitSet.any())
+      continue;
+
+    // Ignore blocks which are in an infinite loop.
+    if (state.isInInfiniteLoop())
       continue;
 
     // Do the inner-block processing.
@@ -700,6 +725,10 @@ public:
       return;
 
     if (!F->hasOwnership())
+      return;
+
+    // If we are not supposed to perform ossa optimizations, bail.
+    if (!F->getModule().getOptions().EnableOSSAOptimizations)
       return;
 
     LLVM_DEBUG(llvm::dbgs() << "*** DestroyHoisting on function: "

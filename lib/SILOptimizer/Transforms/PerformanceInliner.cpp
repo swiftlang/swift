@@ -12,6 +12,7 @@
 
 #define DEBUG_TYPE "sil-inliner"
 #include "swift/AST/Module.h"
+#include "swift/AST/SemanticAttrs.h"
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/OptimizationRemark.h"
 #include "swift/SILOptimizer/Analysis/SideEffectAnalysis.h"
@@ -278,7 +279,8 @@ bool SILPerformanceInliner::isProfitableToInline(
 
     // Don't inline class methods.
     if (Callee->hasSelfParam()) {
-      auto SelfTy = Callee->getLoweredFunctionType()->getSelfInstanceType();
+      auto SelfTy = Callee->getLoweredFunctionType()
+                          ->getSelfInstanceType(FuncBuilder.getModule());
       if (SelfTy->mayHaveSuperclass() &&
           Callee->getRepresentation() == SILFunctionTypeRepresentation::Method)
         isClassMethodAtOsize = true;
@@ -643,7 +645,7 @@ bool SILPerformanceInliner::decideInColdBlock(FullApplySite AI,
 static void addWeightCorrection(FullApplySite FAS,
                         llvm::DenseMap<FullApplySite, int> &WeightCorrections) {
   SILFunction *Callee = FAS.getReferencedFunctionOrNull();
-  if (Callee && Callee->hasSemanticsAttr("array.uninitialized")) {
+  if (Callee && Callee->hasSemanticsAttr(semantics::ARRAY_UNINITIALIZED)) {
     // We want to inline the argument to an array.uninitialized call, because
     // this argument is most likely a call to a function which contains the
     // buffer allocation for the array. It is essential to inline it for stack

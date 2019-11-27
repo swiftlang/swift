@@ -19,6 +19,8 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/DiagnosticsSema.h"
+#include "swift/AST/FileSystem.h"
+#include "swift/AST/IncrementalRanges.h"
 #include "swift/AST/Module.h"
 #include "swift/Basic/FileTypes.h"
 #include "swift/Basic/SourceManager.h"
@@ -98,6 +100,16 @@ std::string CompilerInvocation::getReferenceDependenciesFilePathForPrimary(
     StringRef filename) const {
   return getPrimarySpecificPathsForPrimary(filename)
       .SupplementaryOutputs.ReferenceDependenciesFilePath;
+}
+std::string
+CompilerInvocation::getSwiftRangesFilePathForPrimary(StringRef filename) const {
+  return getPrimarySpecificPathsForPrimary(filename)
+      .SupplementaryOutputs.SwiftRangesFilePath;
+}
+std::string CompilerInvocation::getCompiledSourceFilePathForPrimary(
+    StringRef filename) const {
+  return getPrimarySpecificPathsForPrimary(filename)
+      .SupplementaryOutputs.CompiledSourceFilePath;
 }
 std::string
 CompilerInvocation::getSerializedDiagnosticsPathForAtMostOnePrimary() const {
@@ -190,9 +202,9 @@ bool CompilerInstance::setUpASTContextIfNeeded() {
     return false;
   }
 
-  Context.reset(ASTContext::get(Invocation.getLangOptions(),
-                                Invocation.getSearchPathOptions(), SourceMgr,
-                                Diagnostics));
+  Context.reset(ASTContext::get(
+      Invocation.getLangOptions(), Invocation.getTypeCheckerOptions(),
+      Invocation.getSearchPathOptions(), SourceMgr, Diagnostics));
   registerParseRequestFunctions(Context->evaluator);
   registerTypeCheckerRequestFunctions(Context->evaluator);
 
@@ -222,15 +234,26 @@ bool CompilerInstance::setup(const CompilerInvocation &Invok) {
   setUpLLVMArguments();
   setUpDiagnosticOptions();
 
+  const auto &frontendOpts = Invocation.getFrontendOptions();
+
   // If we are asked to emit a module documentation file, configure lexing and
   // parsing to remember comments.
-  if (Invocation.getFrontendOptions().InputsAndOutputs.hasModuleDocOutputPath())
+  if (frontendOpts.InputsAndOutputs.hasModuleDocOutputPath())
     Invocation.getLangOptions().AttachCommentsToDecls = true;
 
   // If we are doing index-while-building, configure lexing and parsing to
   // remember comments.
-  if (!Invocation.getFrontendOptions().IndexStorePath.empty()) {
+  if (!frontendOpts.IndexStorePath.empty()) {
     Invocation.getLangOptions().AttachCommentsToDecls = true;
+  }
+
+  // Set up the type checker options.
+  auto &typeCkOpts = Invocation.getTypeCheckerOptions();
+  if (isWholeModuleCompilation()) {
+    typeCkOpts.DelayWholeModuleChecking = true;
+  }
+  if (FrontendOptions::isActionImmediate(frontendOpts.RequestedAction)) {
+    typeCkOpts.InImmediateMode = true;
   }
 
   assert(Lexer::isIdentifier(Invocation.getModuleName()));
@@ -316,6 +339,11 @@ void CompilerInstance::setUpDiagnosticOptions() {
   if (Invocation.getDiagnosticOptions().PrintDiagnosticNames) {
     Diagnostics.setPrintDiagnosticNames(true);
   }
+  if (Invocation.getDiagnosticOptions().EnableDescriptiveDiagnostics) {
+    Diagnostics.setUseDescriptiveDiagnostics(true);
+  }
+  Diagnostics.setDiagnosticDocumentationPath(
+      Invocation.getDiagnosticOptions().DiagnosticDocumentationPath);
 }
 
 // The ordering of ModuleLoaders is important!
@@ -499,9 +527,7 @@ Optional<unsigned> CompilerInstance::getRecordedBufferID(const InputFile &input,
   // FIXME: The fact that this test happens twice, for some cases,
   // suggests that setupInputs could use another round of refactoring.
   if (serialization::isSerializedAST(buffers->ModuleBuffer->getBuffer())) {
-    PartialModules.push_back(
-        {std::move(buffers->ModuleBuffer), std::move(buffers->ModuleDocBuffer),
-         std::move(buffers->ModuleSourceInfoBuffer)});
+    PartialModules.push_back(std::move(*buffers));
     return None;
   }
   assert(buffers->ModuleDocBuffer.get() == nullptr);
@@ -513,7 +539,7 @@ Optional<unsigned> CompilerInstance::getRecordedBufferID(const InputFile &input,
   return bufferID;
 }
 
-Optional<CompilerInstance::ModuleBuffers> CompilerInstance::getInputBuffersIfPresent(
+Optional<ModuleBuffers> CompilerInstance::getInputBuffersIfPresent(
     const InputFile &input) {
   if (auto b = input.buffer()) {
     return ModuleBuffers(llvm::MemoryBuffer::getMemBufferCopy(b->getBuffer(),
@@ -822,14 +848,12 @@ void CompilerInstance::parseAndCheckTypesUpTo(
   if (hadLoadError)
     return;
 
-  OptionSet<TypeCheckingFlags> TypeCheckOptions = computeTypeCheckingOptions();
-
   // Type-check main file after parsing all other files so that
   // it can use declarations from other files.
   // In addition, the main file has parsing and type-checking
   // interwined.
   if (MainBufferID != NO_SUCH_BUFFER) {
-    parseAndTypeCheckMainFileUpTo(limitStage, TypeCheckOptions);
+    parseAndTypeCheckMainFileUpTo(limitStage);
   }
 
   assert(llvm::all_of(MainModule->getFiles(), [](const FileUnit *File) -> bool {
@@ -840,22 +864,16 @@ void CompilerInstance::parseAndCheckTypesUpTo(
   }) && "some files have not yet had their imports resolved");
   MainModule->setHasResolvedImports();
 
-  // If the limiting AST stage is name binding, we're done.
-  if (limitStage <= SourceFile::NameBound) {
-    return;
-  }
-
-  const auto &options = Invocation.getFrontendOptions();
   forEachFileToTypeCheck([&](SourceFile &SF) {
-    performTypeChecking(SF, PersistentState->getTopLevelContext(),
-                        TypeCheckOptions, /*curElem*/ 0,
-                        options.WarnLongFunctionBodies,
-                        options.WarnLongExpressionTypeChecking,
-                        options.SolverExpressionTimeThreshold,
-                        options.SwitchCheckingInvocationThreshold);
+    if (limitStage == SourceFile::NameBound) {
+      bindExtensions(SF);
+      return;
+    }
+
+    performTypeChecking(SF);
 
     if (!Context->hadError() && Invocation.getFrontendOptions().PCMacro) {
-      performPCMacro(SF, PersistentState->getTopLevelContext());
+      performPCMacro(SF);
     }
 
     // Playground transform knows to look out for PCMacro's changes and not
@@ -868,10 +886,17 @@ void CompilerInstance::parseAndCheckTypesUpTo(
   });
 
   if (Invocation.isCodeCompletion()) {
-    performDelayedParsing(MainModule, *PersistentState.get(),
-                          Invocation.getCodeCompletionFactory());
+    assert(limitStage == SourceFile::NameBound);
+    performCodeCompletionSecondPass(*PersistentState.get(),
+                                    *Invocation.getCodeCompletionFactory());
   }
-  finishTypeChecking(TypeCheckOptions);
+
+  // If the limiting AST stage is name binding, we're done.
+  if (limitStage <= SourceFile::NameBound) {
+    return;
+  }
+
+  finishTypeChecking();
 }
 
 void CompilerInstance::parseLibraryFile(
@@ -902,27 +927,6 @@ void CompilerInstance::parseLibraryFile(
   performNameBinding(*NextInput);
 }
 
-OptionSet<TypeCheckingFlags> CompilerInstance::computeTypeCheckingOptions() {
-  OptionSet<TypeCheckingFlags> TypeCheckOptions;
-  if (isWholeModuleCompilation()) {
-    TypeCheckOptions |= TypeCheckingFlags::DelayWholeModuleChecking;
-  }
-  const auto &options = Invocation.getFrontendOptions();
-  if (options.DebugTimeFunctionBodies) {
-    TypeCheckOptions |= TypeCheckingFlags::DebugTimeFunctionBodies;
-  }
-  if (FrontendOptions::isActionImmediate(options.RequestedAction)) {
-    TypeCheckOptions |= TypeCheckingFlags::ForImmediateMode;
-  }
-  if (options.DebugTimeExpressionTypeChecking) {
-    TypeCheckOptions |= TypeCheckingFlags::DebugTimeExpressions;
-  }
-  if (options.SkipNonInlinableFunctionBodies) {
-    TypeCheckOptions |= TypeCheckingFlags::SkipNonInlinableFunctionBodies;
-  }
-  return TypeCheckOptions;
-}
-
 bool CompilerInstance::parsePartialModulesAndLibraryFiles(
     const ImplicitImports &implicitImports) {
   FrontendStatsTracer tracer(Context->Stats,
@@ -948,8 +952,7 @@ bool CompilerInstance::parsePartialModulesAndLibraryFiles(
 }
 
 void CompilerInstance::parseAndTypeCheckMainFileUpTo(
-    SourceFile::ASTStage_t LimitStage,
-    OptionSet<TypeCheckingFlags> TypeCheckOptions) {
+    SourceFile::ASTStage_t LimitStage) {
   FrontendStatsTracer tracer(Context->Stats,
                              "parse-and-typecheck-main-file");
   bool mainIsPrimary =
@@ -984,13 +987,7 @@ void CompilerInstance::parseAndTypeCheckMainFileUpTo(
         performNameBinding(MainFile, CurTUElem);
         break;
       case SourceFile::TypeChecked:
-        const auto &options = Invocation.getFrontendOptions();
-        performTypeChecking(MainFile, PersistentState->getTopLevelContext(),
-                            TypeCheckOptions, CurTUElem,
-                            options.WarnLongFunctionBodies,
-                            options.WarnLongExpressionTypeChecking,
-                            options.SolverExpressionTimeThreshold,
-                            options.SwitchCheckingInvocationThreshold);
+        performTypeChecking(MainFile, CurTUElem);
         break;
       }
     }
@@ -1030,9 +1027,8 @@ void CompilerInstance::forEachFileToTypeCheck(
   }
 }
 
-void CompilerInstance::finishTypeChecking(
-    OptionSet<TypeCheckingFlags> TypeCheckOptions) {
-  if (TypeCheckOptions & TypeCheckingFlags::DelayWholeModuleChecking) {
+void CompilerInstance::finishTypeChecking() {
+  if (getASTContext().TypeCheckerOpts.DelayWholeModuleChecking) {
     forEachSourceFileIn(MainModule, [&](SourceFile &SF) {
       performWholeModuleTypeChecking(SF);
     });
@@ -1155,7 +1151,8 @@ static bool performMandatorySILPasses(CompilerInvocation &Invocation,
 /// These may change across compiler versions.
 static void performSILOptimizations(CompilerInvocation &Invocation,
                                     SILModule *SM) {
-  SharedTimer timer("SIL optimization");
+  FrontendStatsTracer tracer(SM->getASTContext().Stats,
+                             "SIL optimization");
   if (Invocation.getFrontendOptions().RequestedAction ==
       FrontendOptions::ActionType::MergeModules ||
       !Invocation.getSILOptions().shouldOptimize()) {
@@ -1198,7 +1195,8 @@ bool CompilerInstance::performSILProcessing(SILModule *silModule,
     return true;
 
   {
-    SharedTimer timer("SIL verification, pre-optimization");
+    FrontendStatsTracer tracer(silModule->getASTContext().Stats,
+                               "SIL verification, pre-optimization");
     silModule->verify();
   }
 
@@ -1208,7 +1206,8 @@ bool CompilerInstance::performSILProcessing(SILModule *silModule,
     countStatsPostSILOpt(*stats, *silModule);
 
   {
-    SharedTimer timer("SIL verification, post-optimization");
+    FrontendStatsTracer tracer(silModule->getASTContext().Stats,
+                               "SIL verification, post-optimization");
     silModule->verify();
   }
 
@@ -1234,4 +1233,22 @@ const PrimarySpecificPaths &
 CompilerInstance::getPrimarySpecificPathsForSourceFile(
     const SourceFile &SF) const {
   return Invocation.getPrimarySpecificPathsForSourceFile(SF);
+}
+
+bool CompilerInstance::emitSwiftRanges(DiagnosticEngine &diags,
+                                       SourceFile *primaryFile,
+                                       StringRef outputPath) const {
+  if (const auto *ps = PersistentState.get())
+    return incremental_ranges::SwiftRangesEmitter(outputPath, primaryFile, *ps,
+                                                  SourceMgr, diags)
+        .emit();
+  return false;
+}
+
+bool CompilerInstance::emitCompiledSource(DiagnosticEngine &diags,
+                                          const SourceFile *primaryFile,
+                                          StringRef outputPath) const {
+  return incremental_ranges::CompiledSourceEmitter(outputPath, primaryFile,
+                                                   SourceMgr, diags)
+      .emit();
 }

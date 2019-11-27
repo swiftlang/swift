@@ -80,6 +80,7 @@ const char *usage =
 #include <libkern/OSByteOrder.h>
 
 #include <algorithm>
+#include <vector>
 using namespace std;
 
 #include <Foundation/Foundation.h>
@@ -672,9 +673,10 @@ bool operator <= (const struct timespec &lhs, const struct timespec &rhs)
 NSString *self_executable = []() -> NSString * {
     uint32_t len = 0;
     _NSGetExecutablePath(nil, &len);
-    char buf[len];
-    _NSGetExecutablePath(buf, &len);
-    return [[NSString alloc] initWithUTF8String:buf];
+    std::vector<char> buffer;
+    buffer.reserve(len);
+    _NSGetExecutablePath(buffer.data(), &len);
+    return [[NSString alloc] initWithUTF8String:buffer.data()];
 }();
 
 

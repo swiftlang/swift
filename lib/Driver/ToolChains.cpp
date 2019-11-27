@@ -214,6 +214,7 @@ static void addCommonFrontendArgs(const ToolChain &TC, const OutputInfo &OI,
   inputArgs.AddLastArg(arguments, options::OPT_profile_coverage_mapping);
   inputArgs.AddLastArg(arguments, options::OPT_warnings_as_errors);
   inputArgs.AddLastArg(arguments, options::OPT_sanitize_EQ);
+  inputArgs.AddLastArg(arguments, options::OPT_sanitize_recover_EQ);
   inputArgs.AddLastArg(arguments, options::OPT_sanitize_coverage_EQ);
   inputArgs.AddLastArg(arguments, options::OPT_static);
   inputArgs.AddLastArg(arguments, options::OPT_swift_version);
@@ -499,6 +500,8 @@ const char *ToolChain::JobContext::computeFrontendModeForCompile() const {
     return "-emit-ir";
   case file_types::TY_LLVM_BC:
     return "-emit-bc";
+  case file_types::TY_ClangModuleFile:
+    return "-emit-pcm";
   case file_types::TY_Assembly:
     return "-S";
   case file_types::TY_SwiftModuleFile:
@@ -522,11 +525,12 @@ const char *ToolChain::JobContext::computeFrontendModeForCompile() const {
   case file_types::TY_AutolinkFile:
   case file_types::TY_Dependencies:
   case file_types::TY_SwiftModuleDocFile:
-  case file_types::TY_ClangModuleFile:
   case file_types::TY_SerializedDiagnostics:
   case file_types::TY_ObjCHeader:
   case file_types::TY_Image:
   case file_types::TY_SwiftDeps:
+  case file_types::TY_SwiftRanges:
+  case file_types::TY_CompiledSource:
   case file_types::TY_ModuleTrace:
   case file_types::TY_TBD:
   case file_types::TY_OptRecord:
@@ -577,7 +581,7 @@ void ToolChain::JobContext::addFrontendInputAndOutputArguments(
     Arguments.push_back("-primary-filelist");
     Arguments.push_back(getTemporaryFilePath("primaryInputs", ""));
     FilelistInfos.push_back({Arguments.back(), file_types::TY_Swift,
-                             FilelistInfo::WhichFiles::PrimaryInputs});
+                             FilelistInfo::WhichFiles::SourceInputActions});
   }
   if (!UseFileList || !UsePrimaryFileList) {
     addFrontendCommandLineInputArguments(MayHavePrimaryInputs, UseFileList,
@@ -662,6 +666,10 @@ void ToolChain::JobContext::addFrontendSupplementaryOutputArguments(
                    "-emit-dependencies-path");
   addOutputsOfType(arguments, Output, Args, file_types::TY_SwiftDeps,
                    "-emit-reference-dependencies-path");
+  addOutputsOfType(arguments, Output, Args, file_types::TY_SwiftRanges,
+                   "-emit-swift-ranges-path");
+  addOutputsOfType(arguments, Output, Args, file_types::TY_CompiledSource,
+                   "-emit-compiled-source-path");
   addOutputsOfType(arguments, Output, Args, file_types::TY_ModuleTrace,
                    "-emit-loaded-module-trace-path");
   addOutputsOfType(arguments, Output, Args, file_types::TY_TBD,
@@ -758,6 +766,7 @@ ToolChain::constructInvocation(const BackendJobAction &job,
     case file_types::TY_SIL:
     case file_types::TY_SIB:
     case file_types::TY_PCH:
+    case file_types::TY_ClangModuleFile:
     case file_types::TY_IndexData:
       llvm_unreachable("Cannot be output from backend job");
     case file_types::TY_Swift:
@@ -765,11 +774,12 @@ ToolChain::constructInvocation(const BackendJobAction &job,
     case file_types::TY_AutolinkFile:
     case file_types::TY_Dependencies:
     case file_types::TY_SwiftModuleDocFile:
-    case file_types::TY_ClangModuleFile:
     case file_types::TY_SerializedDiagnostics:
     case file_types::TY_ObjCHeader:
     case file_types::TY_Image:
     case file_types::TY_SwiftDeps:
+    case file_types::TY_SwiftRanges:
+    case file_types::TY_CompiledSource:
     case file_types::TY_Remapping:
     case file_types::TY_ModuleTrace:
     case file_types::TY_OptRecord:
@@ -874,7 +884,7 @@ ToolChain::constructInvocation(const MergeModuleJobAction &job,
     Arguments.push_back(context.getTemporaryFilePath("inputs", ""));
     II.FilelistInfos.push_back({Arguments.back(),
                                 file_types::TY_SwiftModuleFile,
-                                FilelistInfo::WhichFiles::Input});
+                                FilelistInfo::WhichFiles::InputJobs});
 
     addInputsOfType(Arguments, context.InputActions,
                     file_types::TY_SwiftModuleFile);

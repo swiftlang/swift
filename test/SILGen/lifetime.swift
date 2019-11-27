@@ -736,7 +736,7 @@ func downcast(_ b: B) {
   (b as! D).foo()
   // CHECK: [[READ:%.*]] = begin_access [read] [unknown] [[PB]]
   // CHECK: [[B:%[0-9]+]] = load [copy] [[READ]]
-  // CHECK: [[D:%[0-9]+]] = unconditional_checked_cast [[B]] : {{.*}} to $D
+  // CHECK: [[D:%[0-9]+]] = unconditional_checked_cast [[B]] : {{.*}} to D
   // CHECK: apply {{.*}}([[D]])
   // CHECK-NOT: destroy_value [[B]]
   // CHECK: destroy_value [[D]]

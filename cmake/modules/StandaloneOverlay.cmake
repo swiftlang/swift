@@ -10,7 +10,7 @@ endif()
 
 
 list(APPEND CMAKE_MODULE_PATH
-  "${SWIFT_SOURCE_ROOT}/llvm/cmake/modules"
+  "${SWIFT_SOURCE_ROOT}/llvm-project/llvm/cmake/modules"
   "${PROJECT_SOURCE_DIR}/../../../../cmake/modules"
   "${PROJECT_SOURCE_DIR}/../../../cmake/modules")
 

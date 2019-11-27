@@ -10,6 +10,9 @@ set(LLVM_EXPORTED_SYMBOL_FILE
 add_swift_host_library(libSwiftSyntaxParser SHARED
   c-include-check.c
   libSwiftSyntaxParser.cpp)
+if(NOT SWIFT_BUILT_STANDALONE AND NOT CMAKE_C_COMPILER_ID MATCHES Clang)
+  add_dependencies(libSwiftSyntaxParser clang)
+endif()
 target_link_libraries(libSwiftSyntaxParser PRIVATE
   swiftParse)
 set_target_properties(libSwiftSyntaxParser
@@ -42,8 +45,9 @@ endif()
 
 set_property(TARGET libSwiftSyntaxParser APPEND_STRING PROPERTY
   COMPILE_FLAGS " -fblocks")
-if(SWIFT_NEED_EXPLICIT_LIBDISPATCH)
-  target_link_libraries(libSwiftSyntaxParser PRIVATE BlocksRuntime)
+if(NOT CMAKE_SYSTEM_NAME STREQUAL Darwin)
+  target_link_libraries(libSwiftSyntaxParser PRIVATE
+    BlocksRuntime)
 endif()
 
 add_dependencies(parser-lib libSwiftSyntaxParser)

@@ -21,7 +21,6 @@
 #include "swift/Basic/Compiler.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/raw_ostream.h"
-#include "llvm/Support/SaveAndRestore.h"
 #include <algorithm>
 
 using namespace swift;
@@ -265,6 +264,10 @@ Constraint *Constraint::clone(ConstraintSystem &cs) const {
 }
 
 void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm) const {
+  // Print all type variables as $T0 instead of _ here.
+  PrintOptions PO;
+  PO.PrintTypesForDebugging = true;
+  
   if (Kind == ConstraintKind::Disjunction) {
     Out << "disjunction";
     if (shouldRememberChoice())
@@ -286,7 +289,7 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm) const {
     return;
   }
 
-  getFirstType()->print(Out);
+  Out << getFirstType()->getString(PO);
 
   bool skipSecond = false;
 
@@ -315,17 +318,17 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm) const {
   case ConstraintKind::OneWayEqual: Out << " one-way bind to "; break;
   case ConstraintKind::KeyPath:
       Out << " key path from ";
-      getSecondType()->print(Out);
+      Out << getSecondType()->getString(PO);
       Out << " -> ";
-      getThirdType()->print(Out);
+      Out << getThirdType()->getString(PO);
       skipSecond = true;
       break;
 
   case ConstraintKind::KeyPathApplication:
       Out << " key path projecting ";
-      getSecondType()->print(Out);
+      Out << getSecondType()->getString(PO);
       Out << " -> ";
-      getThirdType()->print(Out);
+      Out << getThirdType()->getString(PO);
       skipSecond = true;
       break;
   case ConstraintKind::OptionalObject:
@@ -396,7 +399,7 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm) const {
   }
 
   if (!skipSecond)
-    getSecondType()->print(Out);
+    Out << getSecondType()->getString(PO);
 
   if (auto restriction = getRestriction()) {
     Out << ' ' << getName(*restriction);
@@ -420,9 +423,6 @@ void Constraint::dump(SourceManager *sm) const {
 }
 
 void Constraint::dump(ConstraintSystem *CS) const {
-  // Print all type variables as $T0 instead of _ here.
-  llvm::SaveAndRestore<bool> X(CS->getASTContext().LangOpts.
-                               DebugConstraintSolver, true);
   // Disable MSVC warning: only for use within the debugger.
 #if SWIFT_COMPILER_IS_MSVC
 #pragma warning(push)

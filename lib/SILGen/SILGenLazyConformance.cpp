@@ -109,17 +109,15 @@ void SILGenModule::useConformancesFromObjectiveCType(CanType type) {
       return;
 
     if (objectiveCBridgeable) {
-      auto subConformance = SwiftModule->lookupConformance(
-          t, objectiveCBridgeable);
-      if (subConformance)
-        useConformance(*subConformance);
+      if (auto subConformance =
+              SwiftModule->lookupConformance(t, objectiveCBridgeable))
+        useConformance(subConformance);
     }
 
     if (bridgedStoredNSError) {
-      auto subConformance = SwiftModule->lookupConformance(
-          t, bridgedStoredNSError);
-      if (subConformance)
-        useConformance(*subConformance);
+      if (auto subConformance =
+              SwiftModule->lookupConformance(t, bridgedStoredNSError))
+        useConformance(subConformance);
     }
   });
 }
@@ -176,24 +174,24 @@ public:
   }
 
   void visitCheckedCastBranchInst(CheckedCastBranchInst *CCBI) {
-    SGM.useConformancesFromType(CCBI->getSourceType());
-    SGM.useConformancesFromType(CCBI->getTargetType());
-    SGM.useConformancesFromObjectiveCType(CCBI->getSourceType());
-    SGM.useConformancesFromObjectiveCType(CCBI->getTargetType());
+    SGM.useConformancesFromType(CCBI->getSourceFormalType());
+    SGM.useConformancesFromType(CCBI->getTargetFormalType());
+    SGM.useConformancesFromObjectiveCType(CCBI->getSourceFormalType());
+    SGM.useConformancesFromObjectiveCType(CCBI->getTargetFormalType());
   }
 
   void visitCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *CCABI) {
-    SGM.useConformancesFromType(CCABI->getSourceType());
-    SGM.useConformancesFromType(CCABI->getTargetType());
-    SGM.useConformancesFromObjectiveCType(CCABI->getSourceType());
-    SGM.useConformancesFromObjectiveCType(CCABI->getTargetType());
+    SGM.useConformancesFromType(CCABI->getSourceFormalType());
+    SGM.useConformancesFromType(CCABI->getTargetFormalType());
+    SGM.useConformancesFromObjectiveCType(CCABI->getSourceFormalType());
+    SGM.useConformancesFromObjectiveCType(CCABI->getTargetFormalType());
   }
 
   void visitCheckedCastValueBranchInst(CheckedCastValueBranchInst *CCVBI) {
-    SGM.useConformancesFromType(CCVBI->getSourceType());
-    SGM.useConformancesFromType(CCVBI->getTargetType());
-    SGM.useConformancesFromObjectiveCType(CCVBI->getSourceType());
-    SGM.useConformancesFromObjectiveCType(CCVBI->getTargetType());
+    SGM.useConformancesFromType(CCVBI->getSourceFormalType());
+    SGM.useConformancesFromType(CCVBI->getTargetFormalType());
+    SGM.useConformancesFromObjectiveCType(CCVBI->getSourceFormalType());
+    SGM.useConformancesFromObjectiveCType(CCVBI->getTargetFormalType());
   }
 
   void visitCopyAddrInst(CopyAddrInst *CAI) {
@@ -291,17 +289,17 @@ public:
   }
 
   void visitUnconditionalCheckedCastInst(UnconditionalCheckedCastInst *UCCI) {
-    SGM.useConformancesFromType(UCCI->getSourceType());
-    SGM.useConformancesFromType(UCCI->getTargetType());
-    SGM.useConformancesFromObjectiveCType(UCCI->getSourceType());
-    SGM.useConformancesFromObjectiveCType(UCCI->getTargetType());
+    SGM.useConformancesFromType(UCCI->getSourceFormalType());
+    SGM.useConformancesFromType(UCCI->getTargetFormalType());
+    SGM.useConformancesFromObjectiveCType(UCCI->getSourceFormalType());
+    SGM.useConformancesFromObjectiveCType(UCCI->getTargetFormalType());
   }
 
   void visitUnconditionalCheckedCastAddrInst(UnconditionalCheckedCastAddrInst *UCCAI) {
-    SGM.useConformancesFromType(UCCAI->getSourceType());
-    SGM.useConformancesFromType(UCCAI->getTargetType());
-    SGM.useConformancesFromObjectiveCType(UCCAI->getSourceType());
-    SGM.useConformancesFromObjectiveCType(UCCAI->getTargetType());
+    SGM.useConformancesFromType(UCCAI->getSourceFormalType());
+    SGM.useConformancesFromType(UCCAI->getTargetFormalType());
+    SGM.useConformancesFromObjectiveCType(UCCAI->getSourceFormalType());
+    SGM.useConformancesFromObjectiveCType(UCCAI->getTargetFormalType());
   }
 
   void visitUncheckedTakeEnumDataAddrInst(UncheckedTakeEnumDataAddrInst *UTEDAI) {

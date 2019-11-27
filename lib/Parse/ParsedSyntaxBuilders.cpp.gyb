@@ -74,7 +74,7 @@ Parsed${node.name}Builder::makeDeferred() {
 
 Parsed${node.name}
 Parsed${node.name}Builder::build() {
-  if (SPCtx.isBacktracking())
+  if (SPCtx.shouldDefer())
     return makeDeferred();
   return record();
 }

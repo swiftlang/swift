@@ -1692,7 +1692,7 @@ findCollapseNestedIfTarget(ResolvedCursorInfo CursorInfo) {
     return {};
 
   IfStmt *InnerIf =
-      dyn_cast_or_null<IfStmt>(Body->getElement(0).dyn_cast<Stmt *>());
+      dyn_cast_or_null<IfStmt>(Body->getFirstElement().dyn_cast<Stmt *>());
   if (!InnerIf)
     return {};
 
@@ -2119,8 +2119,8 @@ bool RefactoringActionConvertIfLetExprToGuardExpr::performChange() {
   auto Body = dyn_cast_or_null<BraceStmt>(If->getThenStmt());
   
   // Get if-let then body.
-  auto firstElement = Body->getElements()[0];
-  auto lastElement = Body->getElements().back();
+  auto firstElement = Body->getFirstElement();
+  auto lastElement = Body->getLastElement();
   SourceRange bodyRange = firstElement.getSourceRange();
   bodyRange.widen(lastElement.getSourceRange());
   auto BodyCharRange = Lexer::getCharSourceRangeFromSourceRange(SM, bodyRange);
@@ -2138,8 +2138,8 @@ bool RefactoringActionConvertIfLetExprToGuardExpr::performChange() {
   
   // Get if-let else body.
   if (auto *ElseBody = dyn_cast_or_null<BraceStmt>(If->getElseStmt())) {
-    auto firstElseElement = ElseBody->getElements()[0];
-    auto lastElseElement = ElseBody->getElements().back();
+    auto firstElseElement = ElseBody->getFirstElement();
+    auto lastElseElement = ElseBody->getLastElement();
     SourceRange elseBodyRange = firstElseElement.getSourceRange();
     elseBodyRange.widen(lastElseElement.getSourceRange());
     auto ElseBodyCharRange = Lexer::getCharSourceRangeFromSourceRange(SM, elseBodyRange);
@@ -2225,9 +2225,9 @@ bool RefactoringActionConvertGuardExprToIfLetExpr::performChange() {
   // Get guard body
   auto Body = dyn_cast_or_null<BraceStmt>(Guard->getBody());
   
-  if (Body && Body->getElements().size() > 1) {
-    auto firstElement = Body->getElements()[0];
-    auto lastElement = Body->getElements().back();
+  if (Body && Body->getNumElements() > 1) {
+    auto firstElement = Body->getFirstElement();
+    auto lastElement = Body->getLastElement();
     SourceRange bodyRange = firstElement.getSourceRange();
     bodyRange.widen(lastElement.getSourceRange());
     auto BodyCharRange = Lexer::getCharSourceRangeFromSourceRange(SM, bodyRange);
@@ -2939,30 +2939,36 @@ static NumberLiteralExpr *getTrailingNumberLiteral(ResolvedCursorInfo Tok) {
   // This cursor must point to the start of an expression.
   if (Tok.Kind != CursorInfoKind::ExprStart)
     return nullptr;
-  Expr *Parent = Tok.TrailingExpr;
-  assert(Parent);
 
-  // Check if an expression is a number literal.
-  auto IsLiteralNumber = [&](Expr *E) -> NumberLiteralExpr* {
-    if (auto *NL = dyn_cast<NumberLiteralExpr>(E)) {
-
-      // The sub-expression must have the same start loc with the outermost
-      // expression, i.e. the cursor position.
-      if (Parent->getStartLoc().getOpaquePointerValue() ==
-        E->getStartLoc().getOpaquePointerValue()) {
-        return NL;
-      }
-    }
-    return nullptr;
-  };
   // For every sub-expression, try to find the literal expression that matches
   // our criteria.
-  for (auto Pair: Parent->getDepthMap()) {
-    if (auto Result = IsLiteralNumber(Pair.getFirst())) {
-      return Result;
+  class FindLiteralNumber : public ASTWalker {
+    Expr * const parent;
+
+  public:
+    NumberLiteralExpr *found = nullptr;
+
+    explicit FindLiteralNumber(Expr *parent) : parent(parent) { }
+
+    std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+      if (auto *literal = dyn_cast<NumberLiteralExpr>(expr)) {
+        // The sub-expression must have the same start loc with the outermost
+        // expression, i.e. the cursor position.
+        if (!found &&
+            parent->getStartLoc().getOpaquePointerValue() ==
+              expr->getStartLoc().getOpaquePointerValue()) {
+          found = literal;
+        }
+      }
+
+      return { found == nullptr, expr };
     }
-  }
-  return nullptr;
+  };
+
+  auto parent = Tok.TrailingExpr;
+  FindLiteralNumber finder(parent);
+  parent->walk(finder);
+  return finder.found;
 }
 
 static std::string insertUnderscore(StringRef Text) {

@@ -438,7 +438,7 @@ UseWrapper::UseWrapper(Operand *Use) {
 }
 
 /// Return the operand we wrap. Reconstructing branch operands.
-UseWrapper::operator Operand *() {
+Operand *UseWrapper::getOperand() {
   switch (Type) {
   case kRegularUse:
     return U;

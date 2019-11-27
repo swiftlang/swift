@@ -78,7 +78,7 @@ public:
   bool isAddressOrTrivialType() const {
     if (getType().isAddress())
       return true;
-    return getOwnershipKind() == ValueOwnershipKind::Any;
+    return getOwnershipKind() == ValueOwnershipKind::None;
   }
 
   OperandOwnershipKindMap visitForwardingInst(SILInstruction *i,
@@ -161,73 +161,73 @@ CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, DeallocRef)
 CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, DestroyValue)
 CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, EndLifetime)
 CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, InitExistentialRef)
-CONSTANT_OWNERSHIP_INST(Any, MustBeLive, AbortApply)
-CONSTANT_OWNERSHIP_INST(Any, MustBeLive, AddressToPointer)
-CONSTANT_OWNERSHIP_INST(Any, MustBeLive, BeginAccess)
-CONSTANT_OWNERSHIP_INST(Any, MustBeLive, BeginUnpairedAccess)
-CONSTANT_OWNERSHIP_INST(Any, MustBeLive, BindMemory)
-CONSTANT_OWNERSHIP_INST(Any, MustBeLive, CheckedCastAddrBranch)
-CONSTANT_OWNERSHIP_INST(Any, MustBeLive, CondFail)
-CONSTANT_OWNERSHIP_INST(Any, MustBeLive, CopyAddr)
-CONSTANT_OWNERSHIP_INST(Any, MustBeLive, DeallocStack)
-CONSTANT_OWNERSHIP_INST(Any, MustBeLive, DebugValueAddr)
-CONSTANT_OWNERSHIP_INST(Any, MustBeLive, DeinitExistentialAddr)
-CONSTANT_OWNERSHIP_INST(Any, MustBeLive, DestroyAddr)
-CONSTANT_OWNERSHIP_INST(Any, MustBeLive, EndAccess)
-CONSTANT_OWNERSHIP_INST(Any, MustBeLive, EndApply)
-CONSTANT_OWNERSHIP_INST(Any, MustBeLive, EndUnpairedAccess)
-CONSTANT_OWNERSHIP_INST(Any, MustBeLive, IndexAddr)
-CONSTANT_OWNERSHIP_INST(Any, MustBeLive, IndexRawPointer)
-CONSTANT_OWNERSHIP_INST(Any, MustBeLive, InitBlockStorageHeader)
-CONSTANT_OWNERSHIP_INST(Any, MustBeLive, InitEnumDataAddr)
-CONSTANT_OWNERSHIP_INST(Any, MustBeLive, InitExistentialAddr)
-CONSTANT_OWNERSHIP_INST(Any, MustBeLive, InitExistentialMetatype)
-CONSTANT_OWNERSHIP_INST(Any, MustBeLive, InjectEnumAddr)
-CONSTANT_OWNERSHIP_INST(Any, MustBeLive, IsUnique)
-CONSTANT_OWNERSHIP_INST(Any, MustBeLive, Load)
-CONSTANT_OWNERSHIP_INST(Any, MustBeLive, LoadBorrow)
-CONSTANT_OWNERSHIP_INST(Any, MustBeLive, MarkFunctionEscape)
-CONSTANT_OWNERSHIP_INST(Any, MustBeLive, ObjCExistentialMetatypeToObject)
-CONSTANT_OWNERSHIP_INST(Any, MustBeLive, ObjCMetatypeToObject)
-CONSTANT_OWNERSHIP_INST(Any, MustBeLive, ObjCToThickMetatype)
-CONSTANT_OWNERSHIP_INST(Any, MustBeLive, OpenExistentialAddr)
-CONSTANT_OWNERSHIP_INST(Any, MustBeLive, OpenExistentialMetatype)
-CONSTANT_OWNERSHIP_INST(Any, MustBeLive, PointerToAddress)
-CONSTANT_OWNERSHIP_INST(Any, MustBeLive, PointerToThinFunction)
-CONSTANT_OWNERSHIP_INST(Any, MustBeLive, ProjectBlockStorage)
-CONSTANT_OWNERSHIP_INST(Any, MustBeLive, ProjectValueBuffer)
-CONSTANT_OWNERSHIP_INST(Any, MustBeLive, RawPointerToRef)
-CONSTANT_OWNERSHIP_INST(Any, MustBeLive, SelectEnumAddr)
-CONSTANT_OWNERSHIP_INST(Any, MustBeLive, SelectValue)
-CONSTANT_OWNERSHIP_INST(Any, MustBeLive, StructElementAddr)
-CONSTANT_OWNERSHIP_INST(Any, MustBeLive, SwitchEnumAddr)
-CONSTANT_OWNERSHIP_INST(Any, MustBeLive, SwitchValue)
-CONSTANT_OWNERSHIP_INST(Any, MustBeLive, TailAddr)
-CONSTANT_OWNERSHIP_INST(Any, MustBeLive, ThickToObjCMetatype)
-CONSTANT_OWNERSHIP_INST(Any, MustBeLive, ThinFunctionToPointer)
-CONSTANT_OWNERSHIP_INST(Any, MustBeLive, ThinToThickFunction)
-CONSTANT_OWNERSHIP_INST(Any, MustBeLive, TupleElementAddr)
-CONSTANT_OWNERSHIP_INST(Any, MustBeLive, UncheckedAddrCast)
-CONSTANT_OWNERSHIP_INST(Any, MustBeLive, UncheckedRefCastAddr)
-CONSTANT_OWNERSHIP_INST(Any, MustBeLive, UncheckedTakeEnumDataAddr)
-CONSTANT_OWNERSHIP_INST(Any, MustBeLive, UnconditionalCheckedCastAddr)
-CONSTANT_OWNERSHIP_INST(Any, MustBeLive, AllocValueBuffer)
-CONSTANT_OWNERSHIP_INST(Any, MustBeLive, DeallocValueBuffer)
+CONSTANT_OWNERSHIP_INST(None, MustBeLive, AbortApply)
+CONSTANT_OWNERSHIP_INST(None, MustBeLive, AddressToPointer)
+CONSTANT_OWNERSHIP_INST(None, MustBeLive, BeginAccess)
+CONSTANT_OWNERSHIP_INST(None, MustBeLive, BeginUnpairedAccess)
+CONSTANT_OWNERSHIP_INST(None, MustBeLive, BindMemory)
+CONSTANT_OWNERSHIP_INST(None, MustBeLive, CheckedCastAddrBranch)
+CONSTANT_OWNERSHIP_INST(None, MustBeLive, CondFail)
+CONSTANT_OWNERSHIP_INST(None, MustBeLive, CopyAddr)
+CONSTANT_OWNERSHIP_INST(None, MustBeLive, DeallocStack)
+CONSTANT_OWNERSHIP_INST(None, MustBeLive, DebugValueAddr)
+CONSTANT_OWNERSHIP_INST(None, MustBeLive, DeinitExistentialAddr)
+CONSTANT_OWNERSHIP_INST(None, MustBeLive, DestroyAddr)
+CONSTANT_OWNERSHIP_INST(None, MustBeLive, EndAccess)
+CONSTANT_OWNERSHIP_INST(None, MustBeLive, EndApply)
+CONSTANT_OWNERSHIP_INST(None, MustBeLive, EndUnpairedAccess)
+CONSTANT_OWNERSHIP_INST(None, MustBeLive, IndexAddr)
+CONSTANT_OWNERSHIP_INST(None, MustBeLive, IndexRawPointer)
+CONSTANT_OWNERSHIP_INST(None, MustBeLive, InitBlockStorageHeader)
+CONSTANT_OWNERSHIP_INST(None, MustBeLive, InitEnumDataAddr)
+CONSTANT_OWNERSHIP_INST(None, MustBeLive, InitExistentialAddr)
+CONSTANT_OWNERSHIP_INST(None, MustBeLive, InitExistentialMetatype)
+CONSTANT_OWNERSHIP_INST(None, MustBeLive, InjectEnumAddr)
+CONSTANT_OWNERSHIP_INST(None, MustBeLive, IsUnique)
+CONSTANT_OWNERSHIP_INST(None, MustBeLive, Load)
+CONSTANT_OWNERSHIP_INST(None, MustBeLive, LoadBorrow)
+CONSTANT_OWNERSHIP_INST(None, MustBeLive, MarkFunctionEscape)
+CONSTANT_OWNERSHIP_INST(None, MustBeLive, ObjCExistentialMetatypeToObject)
+CONSTANT_OWNERSHIP_INST(None, MustBeLive, ObjCMetatypeToObject)
+CONSTANT_OWNERSHIP_INST(None, MustBeLive, ObjCToThickMetatype)
+CONSTANT_OWNERSHIP_INST(None, MustBeLive, OpenExistentialAddr)
+CONSTANT_OWNERSHIP_INST(None, MustBeLive, OpenExistentialMetatype)
+CONSTANT_OWNERSHIP_INST(None, MustBeLive, PointerToAddress)
+CONSTANT_OWNERSHIP_INST(None, MustBeLive, PointerToThinFunction)
+CONSTANT_OWNERSHIP_INST(None, MustBeLive, ProjectBlockStorage)
+CONSTANT_OWNERSHIP_INST(None, MustBeLive, ProjectValueBuffer)
+CONSTANT_OWNERSHIP_INST(None, MustBeLive, RawPointerToRef)
+CONSTANT_OWNERSHIP_INST(None, MustBeLive, SelectEnumAddr)
+CONSTANT_OWNERSHIP_INST(None, MustBeLive, SelectValue)
+CONSTANT_OWNERSHIP_INST(None, MustBeLive, StructElementAddr)
+CONSTANT_OWNERSHIP_INST(None, MustBeLive, SwitchEnumAddr)
+CONSTANT_OWNERSHIP_INST(None, MustBeLive, SwitchValue)
+CONSTANT_OWNERSHIP_INST(None, MustBeLive, TailAddr)
+CONSTANT_OWNERSHIP_INST(None, MustBeLive, ThickToObjCMetatype)
+CONSTANT_OWNERSHIP_INST(None, MustBeLive, ThinFunctionToPointer)
+CONSTANT_OWNERSHIP_INST(None, MustBeLive, ThinToThickFunction)
+CONSTANT_OWNERSHIP_INST(None, MustBeLive, TupleElementAddr)
+CONSTANT_OWNERSHIP_INST(None, MustBeLive, UncheckedAddrCast)
+CONSTANT_OWNERSHIP_INST(None, MustBeLive, UncheckedRefCastAddr)
+CONSTANT_OWNERSHIP_INST(None, MustBeLive, UncheckedTakeEnumDataAddr)
+CONSTANT_OWNERSHIP_INST(None, MustBeLive, UnconditionalCheckedCastAddr)
+CONSTANT_OWNERSHIP_INST(None, MustBeLive, AllocValueBuffer)
+CONSTANT_OWNERSHIP_INST(None, MustBeLive, DeallocValueBuffer)
 #define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, ...)                          \
-  CONSTANT_OWNERSHIP_INST(Any, MustBeLive, Load##Name)
+  CONSTANT_OWNERSHIP_INST(None, MustBeLive, Load##Name)
 #define ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, ...)                         \
   CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, Name##Release)
 #define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...)                      \
   NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, "...")                              \
   ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, "...")
 #define UNCHECKED_REF_STORAGE(Name, ...)                                       \
-  CONSTANT_OWNERSHIP_INST(Any, MustBeLive, Name##ToRef)
+  CONSTANT_OWNERSHIP_INST(None, MustBeLive, Name##ToRef)
 #include "swift/AST/ReferenceStorage.def"
 #undef CONSTANT_OWNERSHIP_INST
 
 /// Instructions whose arguments are always compatible with one convention.
-#define CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(OWNERSHIP, USE_LIFETIME_CONSTRAINT, \
-                                           INST)                               \
+#define CONSTANT_OR_NONE_OWNERSHIP_INST(OWNERSHIP, USE_LIFETIME_CONSTRAINT,    \
+                                        INST)                                  \
   OperandOwnershipKindMap OperandOwnershipKindClassifier::visit##INST##Inst(   \
       INST##Inst *i) {                                                         \
     assert(i->getNumOperands() && "Expected to have non-zero operands");       \
@@ -235,15 +235,14 @@ CONSTANT_OWNERSHIP_INST(Any, MustBeLive, DeallocValueBuffer)
         ValueOwnershipKind::OWNERSHIP,                                         \
         UseLifetimeConstraint::USE_LIFETIME_CONSTRAINT);                       \
   }
-CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Owned, MustBeInvalidated,
-                                   CheckedCastValueBranch)
-CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Owned, MustBeInvalidated,
-                                   UnconditionalCheckedCastValue)
-CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Owned, MustBeInvalidated,
-                                   InitExistentialValue)
-CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Owned, MustBeInvalidated,
-                                   DeinitExistentialValue)
-#undef CONSTANT_OR_TRIVIAL_OWNERSHIP_INST
+CONSTANT_OR_NONE_OWNERSHIP_INST(Owned, MustBeInvalidated,
+                                CheckedCastValueBranch)
+CONSTANT_OR_NONE_OWNERSHIP_INST(Owned, MustBeInvalidated,
+                                UnconditionalCheckedCastValue)
+CONSTANT_OR_NONE_OWNERSHIP_INST(Owned, MustBeInvalidated, InitExistentialValue)
+CONSTANT_OR_NONE_OWNERSHIP_INST(Owned, MustBeInvalidated,
+                                DeinitExistentialValue)
+#undef CONSTANT_OR_NONE_OWNERSHIP_INST
 
 #define ACCEPTS_ANY_OWNERSHIP_INST(INST)                                       \
   OperandOwnershipKindMap OperandOwnershipKindClassifier::visit##INST##Inst(   \
@@ -283,10 +282,10 @@ ACCEPTS_ANY_OWNERSHIP_INST(ConvertEscapeToNoEscape)
 #define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...)            \
   ACCEPTS_ANY_OWNERSHIP_INST(RefTo##Name)                                      \
   ACCEPTS_ANY_OWNERSHIP_INST(Name##ToRef)                                      \
-  ACCEPTS_ANY_OWNERSHIP_INST(Copy##Name##Value)
+  ACCEPTS_ANY_OWNERSHIP_INST(StrongCopy##Name##Value)
 #define UNCHECKED_REF_STORAGE(Name, ...)                                       \
   ACCEPTS_ANY_OWNERSHIP_INST(RefTo##Name)                                      \
-  ACCEPTS_ANY_OWNERSHIP_INST(Copy##Name##Value)
+  ACCEPTS_ANY_OWNERSHIP_INST(StrongCopy##Name##Value)
 #include "swift/AST/ReferenceStorage.def"
 #undef ACCEPTS_ANY_OWNERSHIP_INST
 
@@ -312,7 +311,7 @@ OperandOwnershipKindClassifier::visitForwardingInst(SILInstruction *i,
     return Map();
 
   auto kind = optionalKind.getValue();
-  if (kind == ValueOwnershipKind::Any)
+  if (kind == ValueOwnershipKind::None)
     return Map::allLive();
   auto lifetimeConstraint = kind.getForwardingLifetimeConstraint();
   return Map::compatibilityMap(kind, lifetimeConstraint);
@@ -341,8 +340,8 @@ FORWARD_ANY_OWNERSHIP_INST(DestructureTuple)
 #undef FORWARD_ANY_OWNERSHIP_INST
 
 // An instruction that forwards a constant ownership or trivial ownership.
-#define FORWARD_CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(                            \
-    OWNERSHIP, USE_LIFETIME_CONSTRAINT, INST)                                  \
+#define FORWARD_CONSTANT_OR_NONE_OWNERSHIP_INST(OWNERSHIP,                     \
+                                                USE_LIFETIME_CONSTRAINT, INST) \
   OperandOwnershipKindMap OperandOwnershipKindClassifier::visit##INST##Inst(   \
       INST##Inst *i) {                                                         \
     assert(i->getNumOperands() && "Expected to have non-zero operands");       \
@@ -354,10 +353,9 @@ FORWARD_ANY_OWNERSHIP_INST(DestructureTuple)
         UseLifetimeConstraint::USE_LIFETIME_CONSTRAINT);                       \
     return map;                                                                \
   }
-FORWARD_CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Guaranteed, MustBeLive, TupleExtract)
-FORWARD_CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Guaranteed, MustBeLive,
-                                           StructExtract)
-#undef CONSTANT_OR_TRIVIAL_OWNERSHIP_INST
+FORWARD_CONSTANT_OR_NONE_OWNERSHIP_INST(Guaranteed, MustBeLive, TupleExtract)
+FORWARD_CONSTANT_OR_NONE_OWNERSHIP_INST(Guaranteed, MustBeLive, StructExtract)
+#undef CONSTANT_OR_NONE_OWNERSHIP_INST
 
 OperandOwnershipKindMap
 OperandOwnershipKindClassifier::visitDeallocPartialRefInst(
@@ -460,7 +458,7 @@ OperandOwnershipKindClassifier::visitSwitchEnumInst(SwitchEnumInst *sei) {
       [&](PhiArgumentArrayRef array) -> ValueOwnershipKind {
         // If the array is empty, we have a non-payloaded case. Return any.
         if (array.empty())
-          return ValueOwnershipKind::Any;
+          return ValueOwnershipKind::None;
 
         // Otherwise, we should have a single element since a payload is
         // a tuple.
@@ -475,7 +473,7 @@ OperandOwnershipKindClassifier::visitSwitchEnumInst(SwitchEnumInst *sei) {
   if (!mergedKind)
     return Map();
   auto kind = mergedKind.getValue();
-  if (kind == ValueOwnershipKind::Any)
+  if (kind == ValueOwnershipKind::None)
     return Map::allLive();
   auto lifetimeConstraint = kind.getForwardingLifetimeConstraint();
   return Map::compatibilityMap(kind, lifetimeConstraint);
@@ -603,12 +601,12 @@ OperandOwnershipKindMap OperandOwnershipKindClassifier::visitCallee(
   case ParameterConvention::Indirect_In:
   case ParameterConvention::Indirect_In_Constant:
     assert(!SILModuleConventions(mod).isSILIndirect(
-        SILParameterInfo(substCalleeType, conv)));
+                                      SILParameterInfo(substCalleeType, conv)));
     return Map::compatibilityMap(ValueOwnershipKind::Owned,
                                  UseLifetimeConstraint::MustBeInvalidated);
   case ParameterConvention::Indirect_In_Guaranteed:
     assert(!SILModuleConventions(mod).isSILIndirect(
-        SILParameterInfo(substCalleeType, conv)));
+                                      SILParameterInfo(substCalleeType, conv)));
     return Map::compatibilityMap(ValueOwnershipKind::Guaranteed,
                                  UseLifetimeConstraint::MustBeLive);
   case ParameterConvention::Indirect_Inout:
@@ -856,8 +854,8 @@ OperandOwnershipKindMap OperandOwnershipKindClassifier::visitMarkDependenceInst(
     MarkDependenceInst *mdi) {
   // If we are analyzing "the value", we forward ownership.
   if (getValue() == mdi->getValue()) {
-    auto kind = getValue().getOwnershipKind();
-    if (kind == ValueOwnershipKind::Any)
+    auto kind = mdi->getOwnershipKind();
+    if (kind == ValueOwnershipKind::None)
       return Map::allLive();
     auto lifetimeConstraint = kind.getForwardingLifetimeConstraint();
     return Map::compatibilityMap(kind, lifetimeConstraint);

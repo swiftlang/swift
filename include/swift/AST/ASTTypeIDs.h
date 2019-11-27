@@ -23,9 +23,12 @@ namespace swift {
 
 class AbstractFunctionDecl;
 class BraceStmt;
+class ClosureExpr;
+class ConstructorDecl;
 class CustomAttr;
 class Decl;
 class EnumDecl;
+enum class FunctionBuilderClosurePreCheck : uint8_t;
 class GenericParamList;
 class GenericSignature;
 class GenericTypeParamType;
@@ -50,10 +53,13 @@ enum class ResilienceExpansion : unsigned;
 class Type;
 class ValueDecl;
 class VarDecl;
+class Witness;
 class TypeAliasDecl;
 class Type;
 struct TypePair;
+struct TypeWitnessAndDecl;
 enum class AncestryFlags : uint8_t;
+enum class ImplicitMemberAction : uint8_t;
 
 // Define the AST type zone (zone 1)
 #define SWIFT_TYPEID_ZONE AST

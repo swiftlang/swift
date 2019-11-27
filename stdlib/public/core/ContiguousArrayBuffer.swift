@@ -79,6 +79,97 @@ internal final class _ContiguousArrayStorage<
   }
 
 #if _runtime(_ObjC)
+  
+  internal final override func withUnsafeBufferOfObjects<R>(
+    _ body: (UnsafeBufferPointer<AnyObject>) throws -> R
+  ) rethrows -> R {
+    _internalInvariant(_isBridgedVerbatimToObjectiveC(Element.self))
+    let count = countAndCapacity.count
+    let elements = UnsafeRawPointer(_elementPointer)
+      .assumingMemoryBound(to: AnyObject.self)
+    defer { _fixLifetime(self) }
+    return try body(UnsafeBufferPointer(start: elements, count: count))
+  }
+  
+  @objc(countByEnumeratingWithState:objects:count:)
+  @_effects(releasenone)
+  internal final override func countByEnumerating(
+    with state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
+    objects: UnsafeMutablePointer<AnyObject>?, count: Int
+  ) -> Int {
+    var enumerationState = state.pointee
+    
+    if enumerationState.state != 0 {
+      return 0
+    }
+    
+    return withUnsafeBufferOfObjects {
+      objects in
+      enumerationState.mutationsPtr = _fastEnumerationStorageMutationsPtr
+      enumerationState.itemsPtr =
+        AutoreleasingUnsafeMutablePointer(objects.baseAddress)
+      enumerationState.state = 1
+      state.pointee = enumerationState
+      return objects.count
+    }
+  }
+  
+  @inline(__always)
+  @_effects(readonly)
+  @nonobjc private func _objectAt(_ index: Int) -> Unmanaged<AnyObject> {
+    return withUnsafeBufferOfObjects {
+      objects in
+      _precondition(
+        _isValidArraySubscript(index, count: objects.count),
+        "Array index out of range")
+      return Unmanaged.passUnretained(objects[index])
+    }
+  }
+  
+  @objc(objectAtIndexedSubscript:)
+  @_effects(readonly)
+  final override internal func objectAtSubscript(_ index: Int) -> Unmanaged<AnyObject> {
+    return _objectAt(index)
+  }
+  
+  @objc(objectAtIndex:)
+  @_effects(readonly)
+  final override internal func objectAt(_ index: Int) -> Unmanaged<AnyObject> {
+    return _objectAt(index)
+  }
+  
+  @objc internal override final var count: Int {
+    @_effects(readonly) get {
+      return withUnsafeBufferOfObjects { $0.count }
+    }
+  }
+
+  @_effects(releasenone)
+  @objc internal override final func getObjects(
+    _ aBuffer: UnsafeMutablePointer<AnyObject>, range: _SwiftNSRange
+  ) {
+    return withUnsafeBufferOfObjects {
+      objects in
+      _precondition(
+        _isValidArrayIndex(range.location, count: objects.count),
+        "Array index out of range")
+
+      _precondition(
+        _isValidArrayIndex(
+          range.location + range.length, count: objects.count),
+        "Array index out of range")
+
+      if objects.isEmpty { return }
+
+      // These objects are "returned" at +0, so treat them as pointer values to
+      // avoid retains. Copy bytes via a raw pointer to circumvent reference
+      // counting while correctly aliasing with all other pointer types.
+      UnsafeMutableRawPointer(aBuffer).copyMemory(
+        from: objects.baseAddress! + range.location,
+        byteCount: range.length * MemoryLayout<AnyObject>.stride)
+    }
+  }
+  
   /// If the `Element` is bridged verbatim, invoke `body` on an
   /// `UnsafeBufferPointer` to the elements and return the result.
   /// Otherwise, return `nil`.
@@ -688,7 +779,7 @@ internal struct _UnsafePartiallyInitializedContiguousArrayBuffer<Element> {
       p = newResult.firstElementAddress + result.capacity
       remainingCapacity = newResult.capacity - result.capacity
       if !result.isEmpty {
-        // This check prevents a data race writting to _swiftEmptyArrayStorage
+        // This check prevents a data race writing to _swiftEmptyArrayStorage
         // Since count is always 0 there, this code does nothing anyway
         newResult.firstElementAddress.moveInitialize(
           from: result.firstElementAddress, count: result.capacity)

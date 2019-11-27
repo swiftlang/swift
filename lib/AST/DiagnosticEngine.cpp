@@ -116,6 +116,30 @@ static constexpr const char *const fixItStrings[] = {
     "<not a fix-it>",
 };
 
+#define EDUCATIONAL_NOTES(DIAG, ...)                                           \
+  static constexpr const char *const DIAG##_educationalNotes[] = {__VA_ARGS__, \
+                                                                  nullptr};
+#include "swift/AST/EducationalNotes.def"
+
+// NOTE: sadly, while GCC and Clang support array designators in C++, they are
+// not part of the standard at the moment, so Visual C++ doesn't support them.
+// This construct allows us to provide a constexpr array initialized to empty
+// values except in the cases that EducationalNotes.def are provided, similar to
+// what the C array would have looked like.
+template<int N>
+struct EducationalNotes {
+  constexpr EducationalNotes() : value() {
+    for (auto i = 0; i < N; ++i) value[i] = {};
+#define EDUCATIONAL_NOTES(DIAG, ...)                                           \
+  value[LocalDiagID::DIAG] = DIAG##_educationalNotes;
+#include "swift/AST/EducationalNotes.def"
+  }
+  const char *const *value[N];
+};
+
+static constexpr EducationalNotes<LocalDiagID::NumDiags> _EducationalNotes = EducationalNotes<LocalDiagID::NumDiags>();
+static constexpr auto educationalNotes = _EducationalNotes.value;
+
 DiagnosticState::DiagnosticState() {
   // Initialize our per-diagnostic state to default
   perDiagnosticBehavior.resize(LocalDiagID::NumDiags, Behavior::Unspecified);
@@ -669,9 +693,8 @@ void DiagnosticEngine::formatDiagnosticText(
     }
     
     if (Modifier == "error") {
-      assert(false && "encountered %error in diagnostic text");
-      Out << StringRef("<<ERROR>>");
-      break;
+      Out << StringRef("<<INTERNAL ERROR: encountered %error in diagnostic text>>");
+      continue;
     }
 
     // Parse the optional argument list for a modifier, which is brace-enclosed.
@@ -684,11 +707,19 @@ void DiagnosticEngine::formatDiagnosticText(
     // Find the digit sequence, and parse it into an argument index.
     size_t Length = InText.find_if_not(isdigit);
     unsigned ArgIndex;      
-    bool Result = InText.substr(0, Length).getAsInteger(10, ArgIndex);
-    assert(!Result && "Unparseable argument index value?");
-    (void)Result;
-    assert(ArgIndex < Args.size() && "Out-of-range argument index");
+    bool IndexParseFailed = InText.substr(0, Length).getAsInteger(10, ArgIndex);
+
+    if (IndexParseFailed) {
+      Out << StringRef("<<INTERNAL ERROR: unparseable argument index in diagnostic text>>");
+      continue;
+    }
+
     InText = InText.substr(Length);
+
+    if (ArgIndex >= Args.size()) {
+      Out << StringRef("<<INTERNAL ERROR: out-of-range argument index in diagnostic text>>");
+      continue;
+    }
 
     // Convert the argument to a string.
     formatDiagnosticArgument(Modifier, ModifierArguments, Args, ArgIndex,
@@ -951,10 +982,21 @@ void DiagnosticEngine::emitDiagnostic(const Diagnostic &diagnostic) {
       }
     }
     info->ChildDiagnosticInfo = childInfoPtrs;
+    
+    SmallVector<std::string, 1> educationalNotePaths;
+    if (useDescriptiveDiagnostics) {
+      auto associatedNotes = educationalNotes[(uint32_t)diagnostic.getID()];
+      while (associatedNotes && *associatedNotes) {
+        SmallString<128> notePath(getDiagnosticDocumentationPath());
+        llvm::sys::path::append(notePath, *associatedNotes);
+        educationalNotePaths.push_back(notePath.str());
+        associatedNotes++;
+      }
+      info->EducationalNotePaths = educationalNotePaths;
+    }
+
     for (auto &consumer : Consumers) {
-      consumer->handleDiagnostic(SourceMgr, info->Loc, info->Kind,
-                                 info->FormatString, info->FormatArgs, *info,
-                                 info->BufferIndirectlyCausingDiagnostic);
+      consumer->handleDiagnostic(SourceMgr, *info);
     }
   }
 
@@ -1028,7 +1070,7 @@ void DiagnosticEngine::onTentativeDiagnosticFlush(Diagnostic &diagnostic) {
     if (content.empty())
       continue;
 
-    auto I = TransactionStrings.insert(std::make_pair(content, char())).first;
+    auto I = TransactionStrings.insert(content).first;
     argument = DiagnosticArgument(StringRef(I->getKeyData()));
   }
 }

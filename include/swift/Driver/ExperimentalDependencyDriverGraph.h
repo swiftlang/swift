@@ -14,6 +14,7 @@
 #define ExperimentalDependencyGraph_h
 
 #include "swift/AST/ExperimentalDependencies.h"
+#include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/OptionSet.h"
 #include "swift/Driver/DependencyGraph.h"
@@ -89,7 +90,7 @@ public:
     return DepGraphNode::humanReadableName(where);
   }
 
-  void dump() const;
+  SWIFT_DEBUG_DUMP;
 
   bool assertProvidedEntityMustBeInAFile() const {
     assert((getSwiftDeps().hasValue() || !getKey().isImplementation()) &&
@@ -286,6 +287,10 @@ public:
                       function_ref<void(const ModuleDepGraphNode *)>) const;
 
 public:
+  // Interface to source-range incremental system
+  size_t countTopLevelProvides(const driver::Job *);
+
+public:
   // This section contains the interface to the status quo code in the driver.
 
   /// Interface to status quo code in the driver.
@@ -312,6 +317,9 @@ public:
 
   void markExternal(SmallVectorImpl<const driver::Job *> &uses,
                     StringRef externalDependency);
+
+  void forEachUnmarkedJobDirectlyDependentOnExternalSwiftdeps(
+      StringRef externalDependency, function_ref<void(const driver::Job *)> fn);
 
   /// Return true or abort
   bool verify() const;

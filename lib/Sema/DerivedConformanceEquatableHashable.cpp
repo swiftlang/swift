@@ -53,8 +53,9 @@ associatedValuesNotConformingToProtocol(DeclContext *DC, EnumDecl *theEnum,
 
     for (auto param : *PL) {
       auto type = param->getInterfaceType();
-      if (!TypeChecker::conformsToProtocol(DC->mapTypeIntoContext(type),
-                                           protocol, DC, None)) {
+      if (TypeChecker::conformsToProtocol(DC->mapTypeIntoContext(type),
+                                          protocol, DC, None)
+              .isInvalid()) {
         nonconformingAssociatedValues.push_back(param);
       }
     }
@@ -700,7 +701,7 @@ deriveEquatable_eq(
   //   }
   // }
 
-  ASTContext &C = derived.TC.Context;
+  ASTContext &C = derived.Context;
 
   auto parentDC = derived.getConformanceContext();
   auto selfIfaceTy = parentDC->getDeclaredInterfaceType();
@@ -760,19 +761,13 @@ deriveEquatable_eq(
   }
 
   if (!C.getEqualIntDecl()) {
-    derived.TC.diagnose(derived.ConformanceDecl->getLoc(),
-                        diag::no_equal_overload_for_int);
+    derived.ConformanceDecl->diagnose(diag::no_equal_overload_for_int);
     return nullptr;
   }
 
   eqDecl->setBodySynthesizer(bodySynthesizer);
 
-  // Compute the interface type.
-  eqDecl->computeType();
-
   eqDecl->copyFormalAccessFrom(derived.Nominal, /*sourceIsParentContext*/ true);
-
-  C.addSynthesizedDecl(eqDecl);
 
   // Add the operator to the parent scope.
   derived.addMembersToConformanceContext({eqDecl});
@@ -807,7 +802,7 @@ ValueDecl *DerivedConformance::deriveEquatable(ValueDecl *requirement) {
     else
       llvm_unreachable("todo");
   }
-  TC.diagnose(requirement->getLoc(), diag::broken_equatable_requirement);
+  requirement->diagnose(diag::broken_equatable_requirement);
   return nullptr;
 }
 
@@ -849,7 +844,7 @@ deriveHashable_hashInto(
                                                     void *)) {
   // @derived func hash(into hasher: inout Hasher)
 
-  ASTContext &C = derived.TC.Context;
+  ASTContext &C = derived.Context;
   auto parentDC = derived.getConformanceContext();
 
   // Expected type: (Self) -> (into: inout Hasher) -> ()
@@ -862,8 +857,7 @@ deriveHashable_hashInto(
   auto hasherDecl = C.getHasherDecl();
   if (!hasherDecl) {
     auto hashableProto = C.getProtocol(KnownProtocolKind::Hashable);
-    derived.TC.diagnose(hashableProto->getLoc(),
-                        diag::broken_hashable_no_hasher);
+    hashableProto->diagnose(diag::broken_hashable_no_hasher);
     return nullptr;
   }
   Type hasherType = hasherDecl->getDeclaredType();
@@ -892,12 +886,10 @@ deriveHashable_hashInto(
   hashDecl->setImplicit();
   hashDecl->setBodySynthesizer(bodySynthesizer);
 
-  hashDecl->computeType();
   hashDecl->copyFormalAccessFrom(derived.Nominal);
 
-  C.addSynthesizedDecl(hashDecl);
-
   derived.addMembersToConformanceContext({hashDecl});
+
   return hashDecl;
 }
 
@@ -1197,25 +1189,24 @@ static ValueDecl *deriveHashable_hashValue(DerivedConformance &derived) {
   // @derived var hashValue: Int {
   //   return _hashValue(for: self)
   // }
-  auto &tc = derived.TC;
-  ASTContext &C = tc.Context;
+  ASTContext &C = derived.Context;
 
   auto parentDC = derived.getConformanceContext();
   Type intType = C.getIntDecl()->getDeclaredType();
 
   // We can't form a Hashable conformance if Int isn't Hashable or
   // ExpressibleByIntegerLiteral.
-  if (!TypeChecker::conformsToProtocol(intType,
-                                       C.getProtocol(KnownProtocolKind::Hashable),
-                                       parentDC, None)) {
+  if (TypeChecker::conformsToProtocol(
+          intType, C.getProtocol(KnownProtocolKind::Hashable), parentDC, None)
+          .isInvalid()) {
     derived.ConformanceDecl->diagnose(diag::broken_int_hashable_conformance);
     return nullptr;
   }
 
   ProtocolDecl *intLiteralProto =
       C.getProtocol(KnownProtocolKind::ExpressibleByIntegerLiteral);
-  if (!TypeChecker::conformsToProtocol(intType, intLiteralProto,
-                                       parentDC, None)) {
+  if (TypeChecker::conformsToProtocol(intType, intLiteralProto, parentDC, None)
+          .isInvalid()) {
     derived.ConformanceDecl->diagnose(
       diag::broken_int_integer_literal_convertible_conformance);
     return nullptr;
@@ -1240,9 +1231,6 @@ static ValueDecl *deriveHashable_hashValue(DerivedConformance &derived) {
   getterDecl->setBodySynthesizer(&deriveBodyHashable_hashValue);
   getterDecl->setIsTransparent(false);
 
-  // Compute the interface type of hashValue().
-  getterDecl->computeType();
-
   getterDecl->copyFormalAccessFrom(derived.Nominal,
                                    /*sourceIsParentContext*/ true);
 
@@ -1262,10 +1250,12 @@ static ValueDecl *deriveHashable_hashValue(DerivedConformance &derived) {
   auto *patDecl = PatternBindingDecl::createImplicit(
       C, StaticSpellingKind::None, hashValuePat, /*InitExpr*/ nullptr,
       parentDC);
-  C.addSynthesizedDecl(hashValueDecl);
-  C.addSynthesizedDecl(getterDecl);
 
-  derived.addMembersToConformanceContext({hashValueDecl, patDecl});
+  // If any of the members we synthesized didn't typecheck, bail out.
+  if (derived.addMembersToConformanceContext({hashValueDecl, patDecl})) {
+    return nullptr;
+  }
+
   return hashValueDecl;
 }
 

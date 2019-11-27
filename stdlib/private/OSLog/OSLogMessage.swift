@@ -180,24 +180,13 @@ public struct OSLogInterpolation : StringInterpolationProtocol {
   // constant evaluation and folding. Note that these methods will be inlined,
   // constant evaluated/folded and optimized in the context of a caller.
 
-  @_transparent
+  @_semantics("oslog.interpolation.init")
+  @_semantics("constant_evaluable")
+  @inlinable
   @_optimize(none)
   public init(literalCapacity: Int, interpolationCount: Int) {
-    // Since the format string is fully constructed at compile time,
-    // the parameter `literalCapacity` is ignored.
-    formatString = ""
-    arguments = OSLogArguments(capacity: interpolationCount)
-    preamble = 0
-    argumentCount = 0
-    totalBytesForSerializingArguments = 0
-  }
-
-  /// An internal initializer that should be used only when there are no
-  /// interpolated expressions. This function must be constant evaluable.
-  @inlinable
-  @_semantics("constant_evaluable")
-  @_optimize(none)
-  internal init() {
+    // Since the format string and the arguments array are fully constructed
+    // at compile time, the parameters are ignored.
     formatString = ""
     arguments = OSLogArguments()
     preamble = 0
@@ -205,7 +194,8 @@ public struct OSLogInterpolation : StringInterpolationProtocol {
     totalBytesForSerializingArguments = 0
   }
 
-  @_transparent
+  @_semantics("constant_evaluable")
+  @inlinable
   @_optimize(none)
   public mutating func appendLiteral(_ literal: String) {
     formatString += literal.percentEscapedString
@@ -305,7 +295,7 @@ public struct OSLogMessage :
   @_semantics("oslog.message.init_stringliteral")
   @_semantics("constant_evaluable")
   public init(stringLiteral value: String) {
-    var s = OSLogInterpolation()
+    var s = OSLogInterpolation(literalCapacity: 1, interpolationCount: 0)
     s.appendLiteral(value)
     self.interpolation = s
   }
@@ -340,23 +330,18 @@ internal struct OSLogArguments {
   internal var argumentClosures: [(inout ByteBufferPointer,
     inout StorageObjects) -> ()]
 
-  /// This function must be constant evaluable.
-  @inlinable
   @_semantics("constant_evaluable")
+  @inlinable
   @_optimize(none)
   internal init() {
     argumentClosures = []
   }
 
-  @usableFromInline
-  internal init(capacity: Int) {
-    argumentClosures = []
-    argumentClosures.reserveCapacity(capacity)
-  }
-
   /// Append a byte-sized header, constructed by
   /// `OSLogMessage.appendInterpolation`, to the tracked array of closures.
-  @usableFromInline
+  @_semantics("constant_evaluable")
+  @inlinable
+  @_optimize(none)
   internal mutating func append(_ header: UInt8) {
     argumentClosures.append({ (position, _) in
       serialize(header, at: &position)
@@ -364,22 +349,6 @@ internal struct OSLogArguments {
   }
 
   /// `append` for other types must be implemented by extensions.
-
-  /// Serialize the arguments tracked by self in a byte buffer.
-  /// - Parameters:
-  ///   - bufferPosition: the pointer to a location within a byte buffer where
-  ///   the argument must be serialized. This will be incremented by the number
-  ///   of bytes used up to serialize the arguments.
-  ///   - storageObjects: An array to store references to objects representing
-  ///   auxiliary storage created during serialization. This is only used while
-  ///   serializing strings.
-  @usableFromInline
-  internal func serializeAt(
-    _ bufferPosition: inout ByteBufferPointer,
-    using storageObjects: inout StorageObjects
-  ) {
-    argumentClosures.forEach { $0(&bufferPosition, &storageObjects) }
-  }
 }
 
 /// Serialize a UInt8 value at the buffer location pointed to by `bufferPosition`,

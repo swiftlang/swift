@@ -253,8 +253,12 @@ static void fixupReferenceCounts(
 }
 
 static SILValue cleanupLoadedCalleeValue(SILValue calleeValue, LoadInst *li) {
-  auto *pbi = cast<ProjectBoxInst>(li->getOperand());
-  auto *abi = cast<AllocBoxInst>(pbi->getOperand());
+  auto *pbi = dyn_cast<ProjectBoxInst>(li->getOperand());
+  if (!pbi)
+    return SILValue();
+  auto *abi = dyn_cast<AllocBoxInst>(pbi->getOperand());
+  if (!abi)
+    return SILValue();
 
   // The load instruction must have no more uses or a single destroy left to
   // erase it.

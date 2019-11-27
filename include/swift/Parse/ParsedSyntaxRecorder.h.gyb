@@ -43,23 +43,22 @@ struct ParsedSyntaxRecorder {
 %     end
 %     child_params = ', '.join(child_params)
 private:
-  static Parsed${node.name} record${node.syntax_kind}(${child_params},
+  static Parsed${node.name} record${node.syntax_kind}(MutableArrayRef<ParsedRawSyntaxNode> layout,
                                               ParsedRawSyntaxRecorder &rec);
-public:
-  static Parsed${node.name} defer${node.syntax_kind}(${child_params},
+  static Parsed${node.name} defer${node.syntax_kind}(MutableArrayRef<ParsedRawSyntaxNode> layout,
                                               SyntaxParsingContext &SPCtx);
+public:
   static Parsed${node.name} make${node.syntax_kind}(${child_params},
                                               SyntaxParsingContext &SPCtx);
 %   elif node.is_syntax_collection():
 private:
   static Parsed${node.name} record${node.syntax_kind}(
-      MutableArrayRef<Parsed${node.collection_element_type}> elts,
+      MutableArrayRef<ParsedRawSyntaxNode> layout,
       ParsedRawSyntaxRecorder &rec);
-
-public:
   static Parsed${node.name} defer${node.syntax_kind}(
-      MutableArrayRef<Parsed${node.collection_element_type}> elts,
+      MutableArrayRef<ParsedRawSyntaxNode> layout,
       SyntaxParsingContext &SPCtx);
+public:
   static Parsed${node.name} make${node.syntax_kind}(
       MutableArrayRef<Parsed${node.collection_element_type}> elts,
       SyntaxParsingContext &SPCtx);

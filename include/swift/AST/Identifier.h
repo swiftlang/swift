@@ -18,6 +18,7 @@
 #define SWIFT_AST_IDENTIFIER_H
 
 #include "swift/Basic/EditorPlaceholder.h"
+#include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
 #include "llvm/ADT/FoldingSet.h"
 #include "llvm/ADT/PointerUnion.h"
@@ -427,7 +428,7 @@ class DeclName {
   // it is simple or compound), or a reference to a compound declaration name.
   llvm::PointerUnion<BaseNameAndCompound, CompoundDeclName *> SimpleOrCompound;
 
-  DeclName(void *Opaque)
+  explicit DeclName(void *Opaque)
     : SimpleOrCompound(decltype(SimpleOrCompound)::getFromOpaqueValue(Opaque))
   {}
 
@@ -570,6 +571,11 @@ public:
     return !(lhs == rhs);
   }
 
+  friend llvm::hash_code hash_value(DeclName name) {
+    using llvm::hash_value;
+    return hash_value(name.getOpaqueValue());
+  }
+
   friend bool operator<(DeclName lhs, DeclName rhs) {
     return lhs.compare(rhs) < 0;
   }
@@ -611,9 +617,10 @@ public:
   llvm::raw_ostream &printPretty(llvm::raw_ostream &os) const;
 
   /// Dump this name to standard error.
-  LLVM_ATTRIBUTE_DEPRECATED(void dump() const LLVM_ATTRIBUTE_USED,
-                            "only for use within the debugger");
+  SWIFT_DEBUG_DUMP;
 };
+
+void simple_display(llvm::raw_ostream &out, DeclName name);
 
 enum class ObjCSelectorFamily : unsigned {
   None,
@@ -693,8 +700,7 @@ public:
   }
 
   /// Dump this selector to standard error.
-  LLVM_ATTRIBUTE_DEPRECATED(void dump() const LLVM_ATTRIBUTE_USED,
-                            "only for use within the debugger");
+  SWIFT_DEBUG_DUMP;
 
   /// Compare two Objective-C selectors, producing -1 if \c *this comes before
   /// \c other,  1 if \c *this comes after \c other, and 0 if they are equal.

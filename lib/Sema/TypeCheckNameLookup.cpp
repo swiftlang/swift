@@ -20,52 +20,12 @@
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/Basic/TopCollection.h"
 #include <algorithm>
 
 using namespace swift;
-
-void LookupResult::filter(
-    llvm::function_ref<bool(LookupResultEntry, bool)> pred) {
-  size_t index = 0;
-  size_t originalFirstOuter = IndexOfFirstOuterResult;
-  Results.erase(std::remove_if(Results.begin(), Results.end(),
-                               [&](LookupResultEntry result) -> bool {
-                                 auto isInner = index < originalFirstOuter;
-                                 index++;
-                                 if (pred(result, !isInner))
-                                   return false;
-
-                                 // Need to remove this, which means, if it is
-                                 // an inner result, the outer results need to
-                                 // shift down.
-                                 if (isInner)
-                                   IndexOfFirstOuterResult--;
-                                 return true;
-                               }),
-                Results.end());
-}
-
-void LookupResult::shiftDownResults() {
-  // Remove inner results.
-  Results.erase(Results.begin(), Results.begin() + IndexOfFirstOuterResult);
-  IndexOfFirstOuterResult = 0;
-
-  if (Results.empty())
-    return;
-
-  // Compute IndexOfFirstOuterResult.
-  const DeclContext *dcInner = Results.front().getValueDecl()->getDeclContext();
-  for (auto &&result : Results) {
-    const DeclContext *dc = result.getValueDecl()->getDeclContext();
-    if (dc == dcInner ||
-        (dc->isModuleScopeContext() && dcInner->isModuleScopeContext()))
-      ++IndexOfFirstOuterResult;
-    else
-      break;
-  }
-}
 
 namespace {
   /// Builder that helps construct a lookup result from the raw lookup
@@ -200,7 +160,7 @@ namespace {
       auto conformance = TypeChecker::conformsToProtocol(conformingType,
                                                          foundProto, DC,
                                                          conformanceOptions);
-      if (!conformance) {
+      if (conformance.isInvalid()) {
         // If there's no conformance, we have an existential
         // and we found a member from one of the protocols, and
         // not a class constraint if any.
@@ -210,7 +170,7 @@ namespace {
         return;
       }
 
-      if (conformance->isAbstract()) {
+      if (conformance.isAbstract()) {
         assert(foundInType->is<ArchetypeType>() ||
                foundInType->isExistentialType());
         addResult(found);
@@ -219,10 +179,9 @@ namespace {
 
       // Dig out the witness.
       ValueDecl *witness = nullptr;
-      auto concrete = conformance->getConcrete();
+      auto concrete = conformance.getConcrete();
       if (auto assocType = dyn_cast<AssociatedTypeDecl>(found)) {
-        witness = concrete->getTypeWitnessAndDecl(assocType)
-          .second;
+        witness = concrete->getTypeWitnessAndDecl(assocType).getWitnessDecl();
       } else if (found->isProtocolRequirement()) {
         witness = concrete->getWitnessDecl(found);
 
@@ -249,17 +208,17 @@ namespace {
   };
 } // end anonymous namespace
 
-static UnqualifiedLookup::Options
+static UnqualifiedLookupOptions
 convertToUnqualifiedLookupOptions(NameLookupOptions options) {
-  UnqualifiedLookup::Options newOptions;
+  UnqualifiedLookupOptions newOptions;
   if (options.contains(NameLookupFlags::KnownPrivate))
-    newOptions |= UnqualifiedLookup::Flags::KnownPrivate;
+    newOptions |= UnqualifiedLookupFlags::KnownPrivate;
   if (options.contains(NameLookupFlags::ProtocolMembers))
-    newOptions |= UnqualifiedLookup::Flags::AllowProtocolMembers;
+    newOptions |= UnqualifiedLookupFlags::AllowProtocolMembers;
   if (options.contains(NameLookupFlags::IgnoreAccessControl))
-    newOptions |= UnqualifiedLookup::Flags::IgnoreAccessControl;
+    newOptions |= UnqualifiedLookupFlags::IgnoreAccessControl;
   if (options.contains(NameLookupFlags::IncludeOuterResults))
-    newOptions |= UnqualifiedLookup::Flags::IncludeOuterResults;
+    newOptions |= UnqualifiedLookupFlags::IncludeOuterResults;
 
   return newOptions;
 }
@@ -267,13 +226,17 @@ convertToUnqualifiedLookupOptions(NameLookupOptions options) {
 LookupResult TypeChecker::lookupUnqualified(DeclContext *dc, DeclName name,
                                             SourceLoc loc,
                                             NameLookupOptions options) {
-  UnqualifiedLookup lookup(name, dc, loc,
-                           convertToUnqualifiedLookupOptions(options));
+  auto ulOptions = convertToUnqualifiedLookupOptions(options);
+
+  auto &ctx = dc->getASTContext();
+  auto descriptor = UnqualifiedLookupDescriptor(name, dc, loc, ulOptions);
+  auto lookup = evaluateOrDefault(ctx.evaluator,
+                                  UnqualifiedLookupRequest{descriptor}, {});
 
   LookupResult result;
   LookupResultBuilder builder(result, dc, options);
-  for (auto idx : indices(lookup.Results)) {
-    const auto &found = lookup.Results[idx];
+  for (auto idx : indices(lookup.allResults())) {
+    const auto &found = lookup[idx];
     // Determine which type we looked through to find this result.
     Type foundInType;
 
@@ -296,7 +259,7 @@ LookupResult TypeChecker::lookupUnqualified(DeclContext *dc, DeclName name,
     }
 
     builder.add(found.getValueDecl(), found.getDeclContext(), foundInType,
-                /*isOuter=*/idx >= lookup.IndexOfFirstOuterResult);
+                /*isOuter=*/idx >= lookup.getIndexOfFirstOuterResult());
   }
   return result;
 }
@@ -305,18 +268,20 @@ LookupResult
 TypeChecker::lookupUnqualifiedType(DeclContext *dc, DeclName name,
                                    SourceLoc loc,
                                    NameLookupOptions options) {
+  auto &ctx = dc->getASTContext();
   auto ulOptions = convertToUnqualifiedLookupOptions(options) |
-                   UnqualifiedLookup::Flags::TypeLookup;
+                   UnqualifiedLookupFlags::TypeLookup;
   {
     // Try lookup without ProtocolMembers first.
-    UnqualifiedLookup lookup(
+    auto desc = UnqualifiedLookupDescriptor(
         name, dc, loc,
-        ulOptions - UnqualifiedLookup::Flags::AllowProtocolMembers);
+        ulOptions - UnqualifiedLookupFlags::AllowProtocolMembers);
 
-    if (!lookup.Results.empty() ||
-        !options.contains(NameLookupFlags::ProtocolMembers)) {
-      return LookupResult(lookup.Results, lookup.IndexOfFirstOuterResult);
-    }
+    auto lookup =
+        evaluateOrDefault(ctx.evaluator, UnqualifiedLookupRequest{desc}, {});
+    if (!lookup.allResults().empty() ||
+        !options.contains(NameLookupFlags::ProtocolMembers))
+      return lookup;
   }
 
   {
@@ -325,11 +290,10 @@ TypeChecker::lookupUnqualifiedType(DeclContext *dc, DeclName name,
     // FIXME: Fix the problem where if NominalTypeDecl::getAllProtocols()
     // is called too early, we start resolving extensions -- even those
     // which do provide not conformances.
-    UnqualifiedLookup lookup(
+    auto desc = UnqualifiedLookupDescriptor(
         name, dc, loc,
-        ulOptions | UnqualifiedLookup::Flags::AllowProtocolMembers);
-
-    return LookupResult(lookup.Results, lookup.IndexOfFirstOuterResult);
+        ulOptions | UnqualifiedLookupFlags::AllowProtocolMembers);
+    return evaluateOrDefault(ctx.evaluator, UnqualifiedLookupRequest{desc}, {});
   }
 }
 
@@ -438,9 +402,15 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
   for (auto decl : decls) {
     auto *typeDecl = cast<TypeDecl>(decl);
 
-    auto memberType = typeDecl->getDeclaredInterfaceType();
+    // HACK: Lookups rooted at a typealias are trying to look for its underlying
+    // type so they shouldn't also find that same typealias.
+    if (decl == dyn_cast<TypeAliasDecl>(dc)) {
+      continue;
+    }
 
     if (isUnsupportedMemberTypeAccess(type, typeDecl)) {
+      auto memberType = typeDecl->getDeclaredInterfaceType();
+
       // Add the type to the result set, so that we can diagnose the
       // reference instead of just saying the member does not exist.
       if (types.insert(memberType->getCanonicalType()).second)
@@ -485,8 +455,8 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
     }
 
     // Substitute the base into the member's type.
-    memberType = substMemberTypeWithBase(dc->getParentModule(),
-                                         typeDecl, type);
+    auto memberType = substMemberTypeWithBase(dc->getParentModule(),
+                                              typeDecl, type);
 
     // If we haven't seen this type result yet, add it to the result set.
     if (types.insert(memberType->getCanonicalType()).second)
@@ -514,7 +484,7 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
       }
 
       // Use the type witness.
-      auto concrete = conformance->getConcrete();
+      auto concrete = conformance.getConcrete();
 
       // This is the only case where NormalProtocolConformance::
       // getTypeWitnessAndDecl() returns a null type.
@@ -522,8 +492,8 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
           ProtocolConformanceState::CheckingTypeWitnesses)
         continue;
 
-      auto typeDecl =
-        concrete->getTypeWitnessAndDecl(assocType).second;
+      auto *typeDecl =
+        concrete->getTypeWitnessAndDecl(assocType).getWitnessDecl();
 
       // Circularity.
       if (!typeDecl)
@@ -606,12 +576,11 @@ void TypeChecker::performTypoCorrection(DeclContext *DC, DeclRefKind refKind,
                                         unsigned maxResults) {
   // Disable typo-correction if we won't show the diagnostic anyway or if
   // we've hit our typo correction limit.
-  if (NumTypoCorrections >= getLangOpts().TypoCorrectionLimit ||
-      (Diags.hasFatalErrorOccurred() &&
-       !Diags.getShowDiagnosticsAfterFatalError()))
+  auto &Ctx = DC->getASTContext();
+  if (!Ctx.shouldPerformTypoCorrection() ||
+      (Ctx.Diags.hasFatalErrorOccurred() &&
+       !Ctx.Diags.getShowDiagnosticsAfterFatalError()))
     return;
-
-  ++NumTypoCorrections;
 
   // Fill in a collection of the most reasonable entries.
   TopCollection<unsigned, ValueDecl *> entries(maxResults);
@@ -673,7 +642,7 @@ static Decl *findExplicitParentForImplicitDecl(ValueDecl *decl) {
 }
 
 static InFlightDiagnostic
-noteTypoCorrection(TypeChecker &tc, DeclNameLoc loc, ValueDecl *decl,
+noteTypoCorrection(DeclNameLoc loc, ValueDecl *decl,
                    bool wasClaimed) {
   if (auto var = dyn_cast<VarDecl>(decl)) {
     // Suggest 'self' at the use point instead of pointing at the start
@@ -685,8 +654,9 @@ noteTypoCorrection(TypeChecker &tc, DeclNameLoc loc, ValueDecl *decl,
         return InFlightDiagnostic();
       }
 
-      return tc.diagnose(loc.getBaseNameLoc(), diag::note_typo_candidate,
-                         var->getName().str());
+      auto &Diags = decl->getASTContext().Diags;
+      return Diags.diagnose(loc.getBaseNameLoc(), diag::note_typo_candidate,
+                            var->getName().str());
     }
   }
 
@@ -696,24 +666,24 @@ noteTypoCorrection(TypeChecker &tc, DeclNameLoc loc, ValueDecl *decl,
                       isa<FuncDecl>(decl) ? "method" :
                       "member");
 
-    return tc.diagnose(parentDecl,
+    return parentDecl->diagnose(
                        wasClaimed ? diag::implicit_member_declared_here
                                   : diag::note_typo_candidate_implicit_member,
                        decl->getBaseName().userFacingName(), kind);
   }
 
   if (wasClaimed) {
-    return tc.diagnose(decl, diag::decl_declared_here, decl->getBaseName());
+    return decl->diagnose(diag::decl_declared_here, decl->getBaseName());
   } else {
-    return tc.diagnose(decl, diag::note_typo_candidate,
-                       decl->getBaseName().userFacingName());
+    return decl->diagnose(diag::note_typo_candidate,
+                          decl->getBaseName().userFacingName());
   }
 }
 
 void TypoCorrectionResults::noteAllCandidates() const {
   for (auto candidate : Candidates) {
     auto &&diagnostic =
-      noteTypoCorrection(TC, Loc, candidate, ClaimedCorrection);
+      noteTypoCorrection(Loc, candidate, ClaimedCorrection);
 
     // Don't add fix-its if we claimed the correction for the primary
     // diagnostic.

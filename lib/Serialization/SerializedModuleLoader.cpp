@@ -267,10 +267,10 @@ std::error_code SerializedModuleLoaderBase::openModuleDocFile(
 
 void
 SerializedModuleLoaderBase::openModuleSourceInfoFileIfPresent(
-                                                      AccessPathElem ModuleID,
-                                                      StringRef ModulePath,
-                                            StringRef ModuleSourceInfoFilename,
-                              std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer) {
+    AccessPathElem ModuleID,
+    StringRef ModulePath,
+    StringRef ModuleSourceInfoFilename,
+    std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer) {
   if (!ModuleSourceInfoBuffer)
     return;
   llvm::vfs::FileSystem &FS = *Ctx.SourceMgr.getFileSystem();

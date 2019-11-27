@@ -1261,6 +1261,14 @@ function(_add_swift_library_single target name)
       "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/../lib/swift/${SWIFTLIB_SINGLE_SUBDIR}"
       "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/../lib/swift/${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_LIB_SUBDIR}")
 
+  # In certain cases when building, the environment variable SDKROOT is set to override
+  # where the sdk root is located in the system. If that environment variable has been
+  # set by the user, respect it and add the specified SDKROOT directory to the
+  # library_search_directories so we are able to link against those libraries
+  if(DEFINED ENV{SDKROOT} AND EXISTS "$ENV{SDKROOT}/usr/lib/swift")
+      list(APPEND library_search_directories "$ENV{SDKROOT}/usr/lib/swift")
+  endif()
+
   # Add variant-specific flags.
   if(SWIFTLIB_SINGLE_TARGET_LIBRARY)
     set(build_type "${SWIFT_STDLIB_BUILD_TYPE}")
@@ -1991,6 +1999,9 @@ function(add_swift_target_library name)
         DEPLOYMENT_VERSION_WATCHOS "${SWIFTLIB_DEPLOYMENT_VERSION_WATCHOS}"
         GYB_SOURCES ${SWIFTLIB_GYB_SOURCES}
       )
+    if(NOT SWIFT_BUILT_STANDALONE AND NOT "${CMAKE_C_COMPILER_ID}" MATCHES "Clang")
+      add_dependencies(${VARIANT_NAME} clang)
+    endif()
 
       if(sdk STREQUAL WINDOWS)
         if(SWIFT_COMPILER_IS_MSVC_LIKE)

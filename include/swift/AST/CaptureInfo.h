@@ -13,6 +13,7 @@
 #ifndef SWIFT_AST_CAPTURE_INFO_H
 #define SWIFT_AST_CAPTURE_INFO_H
 
+#include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/OptionSet.h"
 #include "swift/Basic/SourceLoc.h"
@@ -219,7 +220,7 @@ public:
     return StorageAndFlags.getPointer()->getOpaqueValue();
   }
 
-  void dump() const;
+  SWIFT_DEBUG_DUMP;
   void print(raw_ostream &OS) const;
 };
 

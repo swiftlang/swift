@@ -464,7 +464,7 @@ bb0:
   // function_ref readLine(strippingNewline:)
   %2 = function_ref @$ss8readLine16strippingNewlineSSSgSb_tF : $@convention(thin) (Bool) -> @owned Optional<String>
   %3 = apply %2(%1) : $@convention(thin) (Bool) -> @owned Optional<String>
-    // CHECK: {{.*}}:[[@LINE-1]]:{{.*}}: note: encountered call to 'Swift.readLine(strippingNewline: Swift.Bool) -> Swift.Optional<Swift.String>' whose body is not available
+    // CHECK: {{.*}}:[[@LINE-1]]:{{.*}}: note: encountered call to 'readLine(strippingNewline:)' whose body is not available
   release_value %3 : $Optional<String>
   %5 = tuple ()
   return %5 : $()

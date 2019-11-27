@@ -13,6 +13,7 @@
 #ifndef SWIFT_PARSE_PARSEDRAWSYNTAXNODE_H
 #define SWIFT_PARSE_PARSEDRAWSYNTAXNODE_H
 
+#include "swift/Basic/Debug.h"
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Parse/ParsedTrivia.h"
 #include "swift/Parse/Token.h"
@@ -52,6 +53,7 @@ class ParsedRawSyntaxNode {
   };
   struct DeferredLayoutNode {
     MutableArrayRef<ParsedRawSyntaxNode> Children;
+    CharSourceRange Range;
   };
   struct DeferredTokenNode {
     const ParsedTriviaPiece *TriviaPieces;
@@ -72,9 +74,9 @@ class ParsedRawSyntaxNode {
   /// Primary used for capturing a deferred missing token.
   bool IsMissing = false;
 
-  ParsedRawSyntaxNode(syntax::SyntaxKind k,
+  ParsedRawSyntaxNode(syntax::SyntaxKind k, CharSourceRange r,
                       MutableArrayRef<ParsedRawSyntaxNode> deferredNodes)
-    : DeferredLayout({deferredNodes}),
+    : DeferredLayout({deferredNodes, r}),
       SynKind(uint16_t(k)), TokKind(uint16_t(tok::unknown)),
       DK(DataKind::DeferredLayout) {
     assert(getKind() == k && "Syntax kind with too large value!");
@@ -109,10 +111,12 @@ public:
   }
 
   ParsedRawSyntaxNode(syntax::SyntaxKind k, tok tokKind,
-                      CharSourceRange r, OpaqueSyntaxNode n)
+                      CharSourceRange r, OpaqueSyntaxNode n,
+                      bool IsMissing = false)
     : RecordedData{n, r},
       SynKind(uint16_t(k)), TokKind(uint16_t(tokKind)),
-      DK(DataKind::Recorded) {
+      DK(DataKind::Recorded),
+      IsMissing(IsMissing) {
     assert(getKind() == k && "Syntax kind with too large value!");
     assert(getTokenKind() == tokKind && "Token kind with too large value!");
   }
@@ -209,9 +213,20 @@ public:
     return copy;
   }
 
+  CharSourceRange getDeferredRange() const {
+    switch (DK) {
+    case DataKind::DeferredLayout:
+      return getDeferredLayoutRange();
+    case DataKind::DeferredToken:
+      return getDeferredTokenRangeWithTrivia();
+    default:
+      llvm_unreachable("node not deferred");
+    }
+  }
+
   // Recorded Data ===========================================================//
 
-  CharSourceRange getRange() const {
+  CharSourceRange getRecordedRange() const {
     assert(isRecorded());
     return RecordedData.Range;
   }
@@ -228,6 +243,10 @@ public:
 
   // Deferred Layout Data ====================================================//
 
+  CharSourceRange getDeferredLayoutRange() const {
+    assert(DK == DataKind::DeferredLayout);
+    return DeferredLayout.Range;
+  }
   ArrayRef<ParsedRawSyntaxNode> getDeferredChildren() const {
     assert(DK == DataKind::DeferredLayout);
     return DeferredLayout.Children;
@@ -259,6 +278,19 @@ public:
 
   // Deferred Token Data =====================================================//
 
+  CharSourceRange getDeferredTokenRangeWithTrivia() const {
+    assert(DK == DataKind::DeferredToken);
+    auto leadTriviaPieces = getDeferredLeadingTriviaPieces();
+    auto trailTriviaPieces = getDeferredTrailingTriviaPieces();
+
+    auto leadTriviaLen = ParsedTriviaPiece::getTotalLength(leadTriviaPieces);
+    auto trailTriviaLen = ParsedTriviaPiece::getTotalLength(trailTriviaPieces);
+
+    SourceLoc begin = DeferredToken.TokLoc.getAdvancedLoc(-leadTriviaLen);
+    unsigned len = leadTriviaLen + DeferredToken.TokLength + trailTriviaLen;
+
+    return CharSourceRange{begin, len};
+  }
   CharSourceRange getDeferredTokenRange() const {
     assert(DK == DataKind::DeferredToken);
     return CharSourceRange{DeferredToken.TokLoc, DeferredToken.TokLength};
@@ -296,9 +328,7 @@ public:
   }
 
   /// Dump this piece of syntax recursively for debugging or testing.
-  LLVM_ATTRIBUTE_DEPRECATED(
-    void dump() const LLVM_ATTRIBUTE_USED,
-    "only for use within the debugger");
+  SWIFT_DEBUG_DUMP;
 
   /// Dump this piece of syntax recursively.
   void dump(raw_ostream &OS, unsigned Indent = 0) const;

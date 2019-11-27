@@ -22,6 +22,7 @@
 #include "swift/AST/DiagnosticConsumer.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/ImportCache.h"
+#include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/PrintOptions.h"
 #include "swift/AST/RawComment.h"
 #include "swift/AST/USRGeneration.h"
@@ -740,6 +741,10 @@ static int doTypeContextInfo(const CompilerInvocation &InitInvok,
 
   CompilerInvocation Invocation(InitInvok);
 
+  // Disable source location resolutions from .swiftsourceinfo file because
+  // they are somewhat heavy operations and are not needed for completions.
+  Invocation.getFrontendOptions().IgnoreSwiftSourceInfo = true;
+
   Invocation.setCodeCompletionPoint(CleanFile.get(), Offset);
 
   // Create a CodeCompletionConsumer.
@@ -766,7 +771,7 @@ static int doTypeContextInfo(const CompilerInvocation &InitInvok,
   if (CI.setup(Invocation))
     return 1;
   registerIDERequestFunctions(CI.getASTContext().evaluator);
-  CI.performSema();
+  CI.performParseAndResolveImportsOnly();
   return 0;
 }
 
@@ -801,6 +806,10 @@ doConformingMethodList(const CompilerInvocation &InitInvok,
 
   CompilerInvocation Invocation(InitInvok);
 
+  // Disable source location resolutions from .swiftsourceinfo file because
+  // they are somewhat heavy operations and are not needed for completions.
+  Invocation.getFrontendOptions().IgnoreSwiftSourceInfo = true;
+
   Invocation.setCodeCompletionPoint(CleanFile.get(), Offset);
 
   SmallVector<const char *, 4> typeNames;
@@ -831,7 +840,7 @@ doConformingMethodList(const CompilerInvocation &InitInvok,
   if (CI.setup(Invocation))
     return 1;
   registerIDERequestFunctions(CI.getASTContext().evaluator);
-  CI.performSema();
+  CI.performParseAndResolveImportsOnly();
   return 0;
 }
 
@@ -870,6 +879,13 @@ static int doCodeCompletion(const CompilerInvocation &InitInvok,
 
   Invocation.setCodeCompletionPoint(CleanFile.get(), CodeCompletionOffset);
 
+  // Disable source location resolutions from .swiftsourceinfo file because
+  // they are somewhat heavy operations and are not needed for completions.
+  Invocation.getFrontendOptions().IgnoreSwiftSourceInfo = true;
+
+  // Disable to build syntax tree because code-completion skips some portion of
+  // source text. That breaks an invariant of syntax tree building.
+  Invocation.getLangOptions().BuildSyntaxTree = false;
 
   std::unique_ptr<ide::OnDiskCodeCompletionCache> OnDiskCache;
   if (!options::CompletionCachePath.empty()) {
@@ -905,7 +921,7 @@ static int doCodeCompletion(const CompilerInvocation &InitInvok,
   if (CI.setup(Invocation))
     return 1;
   registerIDERequestFunctions(CI.getASTContext().evaluator);
-  CI.performSema();
+  CI.performParseAndResolveImportsOnly();
   return 0;
 }
 
@@ -2230,9 +2246,11 @@ static int doPrintDecls(const CompilerInvocation &InitInvok,
 
   for (const auto &name : DeclsToPrint) {
     ASTContext &ctx = CI.getASTContext();
-    UnqualifiedLookup lookup(ctx.getIdentifier(name),
-                             CI.getPrimarySourceFile());
-    for (auto result : lookup.Results) {
+    auto descriptor = UnqualifiedLookupDescriptor(ctx.getIdentifier(name),
+                                                  CI.getPrimarySourceFile());
+    auto lookup = evaluateOrDefault(ctx.evaluator,
+                                    UnqualifiedLookupRequest{descriptor}, {});
+    for (auto result : lookup) {
       result.getValueDecl()->print(*Printer, Options);
 
       if (auto typeDecl = dyn_cast<TypeDecl>(result.getValueDecl())) {
@@ -3356,12 +3374,11 @@ int main(int argc, char *argv[]) {
   for (auto &Arg : options::ClangXCC) {
     InitInvok.getClangImporterOptions().ExtraArgs.push_back(Arg);
   }
-  InitInvok.getLangOptions().DebugForbidTypecheckPrefix =
-    options::DebugForbidTypecheckPrefix;
   InitInvok.getLangOptions().EnableObjCAttrRequiresFoundation =
     !options::DisableObjCAttrRequiresFoundationModule;
-
-  InitInvok.getLangOptions().DebugConstraintSolver =
+  InitInvok.getTypeCheckerOptions().DebugForbidTypecheckPrefix =
+    options::DebugForbidTypecheckPrefix;
+  InitInvok.getTypeCheckerOptions().DebugConstraintSolver =
       options::DebugConstraintSolver;
 
   for (auto ConfigName : options::BuildConfigs)

@@ -274,12 +274,15 @@ public:
 
   ThreadInfo() = default;
 
-  void threadEdge() {
+  bool threadEdge() {
     LLVM_DEBUG(llvm::dbgs() << "thread edge from bb" << Src->getDebugID()
                             << " to bb" << Dest->getDebugID() << '\n');
     auto *SrcTerm = cast<BranchInst>(Src->getTerminator());
 
     BasicBlockCloner Cloner(SrcTerm->getDestBB());
+    if (!Cloner.canCloneBlock())
+      return false;
+
     Cloner.cloneBranchTarget(SrcTerm);
 
     // We have copied the threaded block into the edge.
@@ -313,7 +316,8 @@ public:
         auto EnumVal = SEI->getOperand();
         auto EnumTy = EnumVal->getType();
         auto Loc = SEI->getLoc();
-        auto Ty = EnumTy.getEnumElementType(EnumCase, SEI->getModule());
+        auto Ty = EnumTy.getEnumElementType(EnumCase, SEI->getModule(),
+                                            Builder.getTypeExpansionContext());
         SILValue UED(
             Builder.createUncheckedEnumData(Loc, EnumVal, EnumCase, Ty));
         assert(UED->getType() ==
@@ -328,7 +332,8 @@ public:
     // After rewriting the cloned branch, split the critical edge.
     // This does not currently update DominanceInfo.
     Cloner.splitCriticalEdges(nullptr, nullptr);
-    updateSSAAfterCloning(Cloner, Src, Dest);
+    Cloner.updateSSAAfterCloning();
+    return true;
   }
 };
 
@@ -358,7 +363,8 @@ static SILValue createEnumElement(SILBuilder &Builder,
   // Do we have a payload.
   auto EnumTy = EnumVal->getType();
   if (EnumElement->hasAssociatedValues()) {
-    auto Ty = EnumTy.getEnumElementType(EnumElement, SEI->getModule());
+    auto Ty = EnumTy.getEnumElementType(EnumElement, SEI->getModule(),
+                                        Builder.getTypeExpansionContext());
     SILValue UED(Builder.createUncheckedEnumData(SEI->getLoc(), EnumVal,
                                                  EnumElement, Ty));
     return Builder.createEnum(SEI->getLoc(), UED, EnumElement, EnumTy);
@@ -549,8 +555,8 @@ bool SimplifyCFG::dominatorBasedSimplifications(SILFunction &Fn,
     return Changed;
 
   for (auto &ThreadInfo : JumpThreadableEdges) {
-    ThreadInfo.threadEdge();
-    Changed = true;
+    if (ThreadInfo.threadEdge())
+      Changed = true;
   }
 
   return Changed;
@@ -781,7 +787,7 @@ static NullablePtr<EnumElementDecl> getEnumCase(SILValue Val,
 }
 
 static int getThreadingCost(SILInstruction *I) {
-  if (!isa<DeallocStackInst>(I) && !I->isTriviallyDuplicatable())
+  if (!I->isTriviallyDuplicatable())
     return 1000;
 
   // Don't jumpthread function calls.
@@ -920,16 +926,6 @@ bool SimplifyCFG::tryJumpThreading(BranchInst *BI) {
   if (DestBB->getTerminator()->isFunctionExiting())
     return false;
 
-  // We need to update SSA if a value duplicated is used outside of the
-  // duplicated block.
-  bool NeedToUpdateSSA = false;
-
-  // Are the arguments to this block used outside of the block.
-  for (auto Arg : DestBB->getArguments())
-    if ((NeedToUpdateSSA |= isUsedOutsideOfBlock(Arg))) {
-      break;
-    }
-
   // We don't have a great cost model at the SIL level, so we don't want to
   // blissly duplicate tons of code with a goal of improved performance (we'll
   // leave that to LLVM).  However, doing limited code duplication can lead to
@@ -976,36 +972,6 @@ bool SimplifyCFG::tryJumpThreading(BranchInst *BI) {
   if (ThreadingBudget <= 0)
     return false;
 
-  // If it looks potentially interesting, decide whether we *can* do the
-  // operation and whether the block is small enough to be worth duplicating.
-  int copyCosts = 0;
-  SinkAddressProjections sinkProj;
-  for (auto ii = DestBB->begin(), ie = DestBB->end(); ii != ie;) {
-    copyCosts += getThreadingCost(&*ii);
-    if (ThreadingBudget <= copyCosts)
-      return false;
-
-    // If this is an address projection with outside uses, sink it before
-    // checking for SSA update.
-    if (!sinkProj.analyzeAddressProjections(&*ii))
-      return false;
-
-    sinkProj.cloneProjections();
-    // After cloning check if any of the non-address defs in the cloned block
-    // (including the current instruction) now have uses outside the
-    // block. Do this even if nothing was cloned.
-    if (!sinkProj.getInBlockDefs().empty())
-      NeedToUpdateSSA = true;
-
-    auto nextII = std::next(ii);
-    recursivelyDeleteTriviallyDeadInstructions(
-        &*ii, false, [&nextII](SILInstruction *deadInst) {
-          if (deadInst->getIterator() == nextII)
-            ++nextII;
-        });
-    ii = nextII;
-  }
-
   // Don't jump thread through a potential header - this can produce irreducible
   // control flow. Still, we make an exception for switch_enum.
   bool DestIsLoopHeader = (LoopHeaders.count(DestBB) != 0);
@@ -1014,28 +980,37 @@ bool SimplifyCFG::tryJumpThreading(BranchInst *BI) {
       return false;
   }
 
+  // If it looks potentially interesting, decide whether we *can* do the
+  // operation and whether the block is small enough to be worth duplicating.
+  int copyCosts = 0;
+  BasicBlockCloner Cloner(DestBB);
+  for (auto &inst : *DestBB) {
+    copyCosts += getThreadingCost(&inst);
+    if (ThreadingBudget <= copyCosts)
+      return false;
+
+    // If this is an address projection with outside uses, sink it before
+    // checking for SSA update.
+    if (!Cloner.canCloneInstruction(&inst))
+      return false;
+  }
   LLVM_DEBUG(llvm::dbgs() << "jump thread from bb" << SrcBB->getDebugID()
                           << " to bb" << DestBB->getDebugID() << '\n');
 
   JumpThreadingCost[DestBB] += copyCosts;
 
-  // Okay, it looks like we want to do this and we can.  Duplicate the
-  // destination block into this one, rewriting uses of the BBArgs to use the
-  // branch arguments as we go.
-  BasicBlockCloner Cloner(DestBB);
+  // Duplicate the destination block into this one, rewriting uses of the BBArgs
+  // to use the branch arguments as we go.
   Cloner.cloneBranchTarget(BI);
-
   // Does not currently update DominanceInfo.
   Cloner.splitCriticalEdges(nullptr, nullptr);
+  Cloner.updateSSAAfterCloning();
 
   // Once all the instructions are copied, we can nuke BI itself.  We also add
   // the threaded and edge block to the worklist now that they (likely) can be
   // simplified.
   addToWorklist(SrcBB);
   addToWorklist(Cloner.getNewBB());
-
-  if (NeedToUpdateSSA)
-    updateSSAAfterCloning(Cloner, Cloner.getNewBB(), DestBB);
 
   // We may be able to simplify DestBB now that it has one fewer predecessor.
   simplifyAfterDroppingPredecessor(DestBB);
@@ -1702,7 +1677,8 @@ bool SimplifyCFG::simplifySwitchEnumUnreachableBlocks(SwitchEnumInst *SEI) {
 
   auto &Mod = SEI->getModule();
   auto OpndTy = SEI->getOperand()->getType();
-  auto Ty = OpndTy.getEnumElementType(Element, Mod);
+  auto Ty = OpndTy.getEnumElementType(
+      Element, Mod, TypeExpansionContext(*SEI->getFunction()));
   auto *UED = SILBuilderWithScope(SEI)
     .createUncheckedEnumData(SEI->getLoc(), SEI->getOperand(), Element, Ty);
 
@@ -2388,15 +2364,17 @@ bool SimplifyCFG::simplifyTryApplyBlock(TryApplyInst *TAI) {
 
     auto TargetFnTy = CalleeFnTy;
     if (TargetFnTy->isPolymorphic()) {
-      TargetFnTy = TargetFnTy->substGenericArgs(TAI->getModule(),
-                                                TAI->getSubstitutionMap());
+      TargetFnTy = TargetFnTy->substGenericArgs(
+          TAI->getModule(), TAI->getSubstitutionMap(),
+          Builder.getTypeExpansionContext());
     }
     SILFunctionConventions targetConv(TargetFnTy, TAI->getModule());
 
     auto OrigFnTy = TAI->getCallee()->getType().getAs<SILFunctionType>();
     if (OrigFnTy->isPolymorphic()) {
       OrigFnTy = OrigFnTy->substGenericArgs(TAI->getModule(),
-                                            TAI->getSubstitutionMap());
+                                            TAI->getSubstitutionMap(),
+                                            Builder.getTypeExpansionContext());
     }
     SILFunctionConventions origConv(OrigFnTy, TAI->getModule());
 
@@ -2737,21 +2715,23 @@ bool SimplifyCFG::tailDuplicateObjCMethodCallSuccessorBlocks() {
   for (auto *BB : ObjCBlocks) {
     auto *Branch = cast<BranchInst>(BB->getTerminator());
     auto *DestBB = Branch->getDestBB();
-    Changed = true;
 
     // Okay, it looks like we want to do this and we can.  Duplicate the
     // destination block into this one, rewriting uses of the BBArgs to use the
     // branch arguments as we go.
     BasicBlockCloner Cloner(DestBB);
+    if (!Cloner.canCloneBlock())
+      continue;
+
     Cloner.cloneBranchTarget(Branch);
 
     // Does not currently update DominanceInfo.
     Cloner.splitCriticalEdges(nullptr, nullptr);
+    Cloner.updateSSAAfterCloning();
 
-    updateSSAAfterCloning(Cloner, Cloner.getNewBB(), DestBB);
+    Changed = true;
     addToWorklist(Cloner.getNewBB());
   }
-
   return Changed;
 }
 
@@ -2857,7 +2837,8 @@ bool ArgumentSplitter::createNewArguments() {
     return false;
 
   // Get the first level projection for the struct or tuple type.
-  Projection::getFirstLevelProjections(Arg->getType(), Mod, Projections);
+  Projection::getFirstLevelProjections(Arg->getType(), Mod,
+                                       TypeExpansionContext(*F), Projections);
 
   // We do not want to split arguments with less than 2 projections.
   if (Projections.size() < 2)
@@ -2866,7 +2847,7 @@ bool ArgumentSplitter::createNewArguments() {
   // We do not want to split arguments that have less than 2 non-trivial
   // projections.
   if (count_if(Projections, [&](const Projection &P) {
-        return !P.getType(Ty, Mod).isTrivial(*F);
+        return !P.getType(Ty, Mod, TypeExpansionContext(*F)).isTrivial(*F);
       }) < 2)
     return false;
 
@@ -2878,8 +2859,9 @@ bool ArgumentSplitter::createNewArguments() {
   // old one.
   llvm::SmallVector<SILValue, 4> NewArgumentValues;
   for (auto &P : Projections) {
-    auto *NewArg = ParentBB->createPhiArgument(P.getType(Ty, Mod),
-                                               ValueOwnershipKind::Owned);
+    auto *NewArg = ParentBB->createPhiArgument(
+        P.getType(Ty, Mod, TypeExpansionContext(*F)),
+        ValueOwnershipKind::Owned);
     // This is unfortunate, but it feels wrong to put in an API into SILBuilder
     // that only takes in arguments.
     //

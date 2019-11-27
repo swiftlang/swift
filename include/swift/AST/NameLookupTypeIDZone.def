@@ -34,9 +34,6 @@ SWIFT_REQUEST(NameLookup, InheritedDeclsReferencedRequest,
               DirectlyReferencedTypeDecls(
                   llvm::PointerUnion<TypeDecl *, ExtensionDecl *>, unsigned),
               Uncached, HasNearestLocation)
-SWIFT_REQUEST(NameLookup, LookupPrecedenceGroupRequest,
-              PrecedenceGroupDecl *(DeclContext *, Identifier, SourceLoc),
-              Cached, NoLocationInfo)
 SWIFT_REQUEST(NameLookup, SelfBoundsFromWhereClauseRequest,
               SelfBounds(llvm::PointerUnion<TypeDecl *, ExtensionDecl *>),
               Uncached, NoLocationInfo)
@@ -47,4 +44,7 @@ SWIFT_REQUEST(NameLookup, TypeDeclsFromWhereClauseRequest,
               NoLocationInfo)
 SWIFT_REQUEST(NameLookup, UnderlyingTypeDeclsReferencedRequest,
               DirectlyReferencedTypeDecls(TypeAliasDecl *), Uncached,
+              NoLocationInfo)
+SWIFT_REQUEST(NameLookup, UnqualifiedLookupRequest,
+              LookupResult(UnqualifiedLookupDescriptor), Uncached,
               NoLocationInfo)

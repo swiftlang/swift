@@ -96,7 +96,9 @@ namespace irgen {
                                   SILType swiftType,
                                   const LoadableTypeInfo &swiftTI);
 
-  bool addNativeArgument(IRGenFunction &IGF, Explosion &in,
+  bool addNativeArgument(IRGenFunction &IGF,
+                         Explosion &in,
+                         CanSILFunctionType fnTy,
                          SILParameterInfo origParamInfo, Explosion &args,
                          bool isOutlined);
 

@@ -128,24 +128,23 @@ void GenericParamListRequest::cacheResult(GenericParamList *params) const {
   context->GenericParamsAndBit.setPointerAndInt(params, true);
 }
 
-
 //----------------------------------------------------------------------------//
-// LookupPrecedenceGroupRequest computation.
+// UnqualifiedLookupRequest computation.
 //----------------------------------------------------------------------------//
-
-SourceLoc LookupPrecedenceGroupRequest::getNearestLoc() const {
-  auto &desc = std::get<0>(getStorage());
-  return desc.getLoc();
-}
-
-SourceLoc PrecedenceGroupDescriptor::getLoc() const {
-  return nameLoc;
-}
 
 void swift::simple_display(llvm::raw_ostream &out,
-                           const PrecedenceGroupDescriptor &desc) {
-  out << "precedence group " << desc.ident << " at ";
-  desc.nameLoc.print(out, desc.dc->getASTContext().SourceMgr);
+                           const UnqualifiedLookupDescriptor &desc) {
+  out << "looking up ";
+  simple_display(out, desc.Name);
+  out << " from ";
+  simple_display(out, desc.DC);
+  out << " with options ";
+  simple_display(out, desc.Options);
+}
+
+SourceLoc
+swift::extractNearestSourceLoc(const UnqualifiedLookupDescriptor &desc) {
+  return extractNearestSourceLoc(desc.DC);
 }
 
 // Define request evaluation functions for each of the name lookup requests.

@@ -53,7 +53,8 @@ ParsedRawSyntaxNode
 ParsedRawSyntaxRecorder::recordMissingToken(tok tokenKind, SourceLoc loc) {
   CharSourceRange range{loc, 0};
   OpaqueSyntaxNode n = SPActions->recordMissingToken(tokenKind, loc);
-  return ParsedRawSyntaxNode{SyntaxKind::Token, tokenKind, range, n};
+  return ParsedRawSyntaxNode{SyntaxKind::Token, tokenKind, range, n,
+                             /*isMissing=*/true};
 }
 
 static ParsedRawSyntaxNode
@@ -74,6 +75,9 @@ getRecordedNode(ParsedRawSyntaxNode node, ParsedRawSyntaxRecorder &rec) {
 ParsedRawSyntaxNode
 ParsedRawSyntaxRecorder::recordRawSyntax(SyntaxKind kind,
                                          MutableArrayRef<ParsedRawSyntaxNode> elements) {
+#ifndef NDEBUG
+  ParsedRawSyntaxRecorder::verifyElementRanges(elements);
+#endif
   CharSourceRange range;
   SmallVector<OpaqueSyntaxNode, 16> subnodes;
   if (!elements.empty()) {
@@ -84,11 +88,11 @@ ParsedRawSyntaxRecorder::recordRawSyntax(SyntaxKind kind,
       if (subnode.isNull()) {
         subnodes.push_back(nullptr);
       } else if (subnode.isRecorded()) {
-        localRange = subnode.getRange();
+        localRange = subnode.getRecordedRange();
         subnodes.push_back(subnode.takeOpaqueNode());
       } else {
         auto recorded = getRecordedNode(subnode.copyDeferred(), *this);
-        localRange = recorded.getRange();
+        localRange = recorded.getRecordedRange();
         subnodes.push_back(recorded.takeOpaqueNode());
       }
 
@@ -128,3 +132,21 @@ ParsedRawSyntaxRecorder::lookupNode(size_t lexerOffset, SourceLoc loc,
   CharSourceRange range{loc, unsigned(length)};
   return ParsedRawSyntaxNode{kind, tok::unknown, range, n};
 }
+
+#ifndef NDEBUG
+void ParsedRawSyntaxRecorder::verifyElementRanges(ArrayRef<ParsedRawSyntaxNode> elements) {
+  SourceLoc prevEndLoc;
+  for (const auto &elem: elements) {
+    if (elem.isMissing() || elem.isNull())
+      continue;
+    CharSourceRange range = elem.isRecorded()
+      ? elem.getRecordedRange()
+      : elem.getDeferredRange();
+    if (range.isValid()) {
+      assert((prevEndLoc.isInvalid() || range.getStart() == prevEndLoc)
+             && "Non-contiguous child ranges?");
+      prevEndLoc = range.getEnd();
+    }
+  }
+}
+#endif

@@ -19,7 +19,7 @@ using namespace swift;
 
 bool swift::isValueAddressOrTrivial(SILValue v) {
   return v->getType().isAddress() ||
-         v.getOwnershipKind() == ValueOwnershipKind::Any;
+         v.getOwnershipKind() == ValueOwnershipKind::None;
 }
 
 // These operations forward both owned and guaranteed ownership.
@@ -44,6 +44,7 @@ bool swift::isOwnershipForwardingValueKind(SILNodeKind kind) {
   case SILNodeKind::CondBranchInst:
   case SILNodeKind::DestructureStructInst:
   case SILNodeKind::DestructureTupleInst:
+  case SILNodeKind::MarkDependenceInst:
     return true;
   default:
     return false;
@@ -162,6 +163,13 @@ bool swift::getUnderlyingBorrowIntroducingValues(
       continue;
     }
 
+    // If v produces .none ownership, then we can ignore it. It is important
+    // that we put this before checking for guaranteed forwarding instructions,
+    // since we want to ignore guaranteed forwarding instructions that in this
+    // specific case produce a .none value.
+    if (v.getOwnershipKind() == ValueOwnershipKind::None)
+      continue;
+
     // Otherwise if v is an ownership forwarding value, add its defining
     // instruction
     if (isGuaranteedForwardingValue(v)) {
@@ -172,10 +180,9 @@ bool swift::getUnderlyingBorrowIntroducingValues(
       continue;
     }
 
-    // If v produces any ownership, then we can ignore it. Otherwise, we need to
-    // return false since this is an introducer we do not understand.
-    if (v.getOwnershipKind() != ValueOwnershipKind::Any)
-      return false;
+    // Otherwise, this is an introducer we do not understand. Bail and return
+    // false.
+    return false;
   }
 
   return true;

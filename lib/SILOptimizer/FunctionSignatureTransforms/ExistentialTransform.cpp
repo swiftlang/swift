@@ -16,6 +16,7 @@
 
 #define DEBUG_TYPE "sil-existential-transform"
 #include "ExistentialTransform.h"
+#include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/SIL/OptimizationRemark.h"
@@ -114,11 +115,29 @@ void ExistentialSpecializerCloner::cloneAndPopulateFunction() {
   }
 }
 
+// Gather the conformances needed for an existential value based on an opened
+// archetype. This adds any conformances inherited from superclass constraints.
+static ArrayRef<ProtocolConformanceRef>
+collectExistentialConformances(ModuleDecl *M, CanType openedType,
+                               CanType existentialType) {
+  assert(!openedType.isAnyExistentialType());
+
+  auto layout = existentialType.getExistentialLayout();
+  auto protocols = layout.getProtocols();
+
+  SmallVector<ProtocolConformanceRef, 4> conformances;
+  for (auto proto : protocols) {
+    auto conformance = M->lookupConformance(openedType, proto->getDecl());
+    assert(conformance);
+    conformances.push_back(conformance);
+  }
+  return M->getASTContext().AllocateCopy(conformances);
+}
+
 // Create the entry basic block with the function arguments.
 void ExistentialSpecializerCloner::cloneArguments(
     SmallVectorImpl<SILValue> &entryArgs) {
   auto &M = OrigF->getModule();
-  auto &Ctx = M.getASTContext();
 
   // Create the new entry block.
   SILFunction &NewF = getBuilder().getFunction();
@@ -143,7 +162,7 @@ void ExistentialSpecializerCloner::cloneArguments(
     auto iter = ArgToGenericTypeMap.find(ArgDesc.Index);
     if (iter == ArgToGenericTypeMap.end()) {
       // Clone arguments that are not rewritten.
-      auto Ty = params[ArgDesc.Index].getType();
+      auto Ty = params[ArgDesc.Index].getArgumentType(M, NewFTy);
       auto LoweredTy = NewF.getLoweredType(NewF.mapTypeIntoContext(Ty));
       auto MappedTy =
           LoweredTy.getCategoryType(ArgDesc.Arg->getType().getCategory());
@@ -164,14 +183,10 @@ void ExistentialSpecializerCloner::cloneArguments(
     NewArg->setOwnershipKind(ValueOwnershipKind(
         NewF, GenericSILType, ArgDesc.Arg->getArgumentConvention()));
     // Determine the Conformances.
-    SmallVector<ProtocolConformanceRef, 1> NewConformances;
-    auto ContextTy = NewF.mapTypeIntoContext(GenericParam);
-    auto OpenedArchetype = ContextTy->castTo<ArchetypeType>();
-    for (auto proto : OpenedArchetype->getConformsTo()) {
-      NewConformances.push_back(ProtocolConformanceRef(proto));
-    }
-    ArrayRef<ProtocolConformanceRef> Conformances =
-        Ctx.AllocateCopy(NewConformances);
+    SILType ExistentialType = ArgDesc.Arg->getType().getObjectType();
+    CanType OpenedType = NewArg->getType().getASTType();
+    auto Conformances = collectExistentialConformances(
+        M.getSwiftModule(), OpenedType, ExistentialType.getASTType());
     auto ExistentialRepr =
         ArgDesc.Arg->getType().getPreferredExistentialRepresentation();
     auto &EAD = ExistentialArgDescriptor[ArgDesc.Index];
@@ -266,7 +281,7 @@ void ExistentialTransform::convertExistentialArgTypesToGenericArgTypes(
   auto FTy = F->getLoweredFunctionType();
 
   /// If the original function is generic, then maintain the same.
-  auto OrigGenericSig = FTy->getGenericSignature();
+  auto OrigGenericSig = FTy->getInvocationGenericSignature();
 
   /// Original list of parameters
   SmallVector<SILParameterInfo, 4> params;
@@ -285,7 +300,7 @@ void ExistentialTransform::convertExistentialArgTypesToGenericArgTypes(
   for (auto const &IdxIt : ExistentialArgDescriptor) {
     int Idx = IdxIt.first;
     auto &param = params[Idx];
-    auto PType = param.getType();
+    auto PType = param.getArgumentType(M, FTy);
     assert(PType.isExistentialType());
     /// Generate new generic parameter.
     auto *NewGenericParam = GenericTypeParamType::get(Depth, GPIdx++, Ctx);
@@ -310,7 +325,7 @@ ExistentialTransform::createExistentialSpecializedFunctionType() {
   GenericEnvironment *NewGenericEnv;
 
   /// If the original function is generic, then maintain the same.
-  auto OrigGenericSig = FTy->getGenericSignature();
+  auto OrigGenericSig = FTy->getInvocationGenericSignature();
 
   SmallVector<GenericTypeParamType *, 2> GenericParams;
   SmallVector<Requirement, 2> Requirements;
@@ -362,13 +377,15 @@ ExistentialTransform::createExistentialSpecializedFunctionType() {
   /// Finally the ExtInfo.
   auto ExtInfo = FTy->getExtInfo();
   ExtInfo = ExtInfo.withRepresentation(SILFunctionTypeRepresentation::Thin);
-  auto witnessMethodConformance = FTy->getWitnessMethodConformanceOrNone();
+  auto witnessMethodConformance = FTy->getWitnessMethodConformanceOrInvalid();
 
   /// Return the new signature.
   return SILFunctionType::get(
       NewGenericSig, ExtInfo, FTy->getCoroutineKind(),
       FTy->getCalleeConvention(), InterfaceParams, FTy->getYields(),
-      FTy->getResults(), InterfaceErrorResult, Ctx, witnessMethodConformance);
+      FTy->getResults(), InterfaceErrorResult,
+      SubstitutionMap(), false,
+      Ctx, witnessMethodConformance);
 }
 
 /// Create the Thunk Body with always_inline attribute.
@@ -405,9 +422,10 @@ void ExistentialTransform::populateThunkBody() {
   auto *FRI = Builder.createFunctionRefFor(Loc, NewF);
 
   auto GenCalleeType = NewF->getLoweredFunctionType();
-  auto CalleeGenericSig = GenCalleeType->getGenericSignature();
+  auto CalleeGenericSig = GenCalleeType->getInvocationGenericSignature();
   auto OrigGenCalleeType = F->getLoweredFunctionType();
-  auto OrigCalleeGenericSig = OrigGenCalleeType->getGenericSignature();
+  auto OrigCalleeGenericSig =
+    OrigGenCalleeType->getInvocationGenericSignature();
 
   /// Determine arguments to Apply.
   /// Generate opened existentials for generics.
@@ -514,7 +532,8 @@ void ExistentialTransform::populateThunkBody() {
       MakeAbstractConformanceForGenericType());
 
   /// Perform the substitutions.
-  auto SubstCalleeType = GenCalleeType->substGenericArgs(M, SubMap);
+  auto SubstCalleeType = GenCalleeType->substGenericArgs(
+      M, SubMap, Builder.getTypeExpansionContext());
 
   /// Obtain the Result Type.
   SILValue ReturnValue;
@@ -582,7 +601,7 @@ void ExistentialTransform::createExistentialSpecializedFunction() {
   /// Create devirtualized function type.
   auto NewFTy = createExistentialSpecializedFunctionType();
 
-  auto NewFGenericSig = NewFTy->getGenericSignature();
+  auto NewFGenericSig = NewFTy->getInvocationGenericSignature();
   auto NewFGenericEnv = NewFGenericSig->getGenericEnvironment();
 
   /// Step 1: Create the new protocol constrained generic function.

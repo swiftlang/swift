@@ -42,7 +42,7 @@ To follow along with this guide, you'll need:
    turn on remote debugging by following the official instructions:
    https://developer.chrome.com/devtools/docs/remote-debugging.
 
-## Part One: "Hello, world" on Android
+## "Hello, world" on Android
 
 ### 1. Downloading (or building) the Swift Android stdlib dependencies
 
@@ -189,7 +189,7 @@ Hello, Android
 
 Congratulations! You've just run your first Swift program on Android.
 
-## Part Two: Running the Swift test suite hosted on an Android device
+## Running the Swift test suite hosted on an Android device
 
 When running the test suite, build products are automatically pushed to your
 device. As in part one, you'll need to connect your Android device via USB:
@@ -212,4 +212,20 @@ $ utils/build-script \
   --android-icu-uc-include ~/libicu-android/armeabi-v7a/icu/source/common \
   --android-icu-i18n ~/libicu-android/armeabi-v7a/libicui18n.so \
   --android-icu-i18n-include ~/libicu-android/armeabi-v7a/icu/source/i18n/
+```
+
+## Build Android Toolchain
+
+This toolchain will generate the .so and .swiftmodule files of the Swift standard library and Foundation framework for the Android environment, armv7 architecture. Those files are needed when building any Swift library to be included in an application for Android.
+
+To build the toolchain run:
+
+```
+$ utils/android/build-toolchain
+```
+
+It will be built on:
+
+```
+path/to/swift-source/swift-android-toolchain
 ```

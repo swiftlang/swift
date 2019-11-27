@@ -209,3 +209,72 @@ bb1:
   destroy_addr %0 : $*Mixed
   return %v : $Int
 }
+
+sil @coro : $@yield_once @convention(thin) (@in S) -> @yields @inout Int
+
+// CHECK-LABEL: sil [ossa] @test_begin_apply
+// CHECK:        end_apply
+// CHECK-NEXT:   destroy_addr %0
+// CHECK-NEXT:   br bb1
+// CHECK:      bb1:
+// CHECK:        return
+sil [ossa] @test_begin_apply : $@convention(thin) (@in S, Int) -> () {
+bb0(%0 : $*S, %1 : $Int):
+  %f = function_ref @coro : $@yield_once @convention(thin) (@in S) -> @yields @inout Int
+  (%i, %t) = begin_apply %f(%0) : $@yield_once @convention(thin) (@in S) -> @yields @inout Int
+  store %1 to [trivial] %i : $*Int
+  end_apply %t
+  br bb1
+bb1:
+  destroy_addr %0 : $*S
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_abort_apply
+// CHECK:        abort_apply
+// CHECK-NEXT:   destroy_addr %0
+// CHECK-NEXT:   br bb1
+// CHECK:      bb1:
+// CHECK:        return
+sil [ossa] @test_abort_apply : $@convention(thin) (@in S, Int) -> () {
+bb0(%0 : $*S, %1 : $Int):
+  %f = function_ref @coro : $@yield_once @convention(thin) (@in S) -> @yields @inout Int
+  (%i, %t) = begin_apply %f(%0) : $@yield_once @convention(thin) (@in S) -> @yields @inout Int
+  abort_apply %t
+  br bb1
+bb1:
+  destroy_addr %0 : $*S
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_simple_infinite_loop
+// CHECK-NOT:     destroy_addr
+// CHECK:       } // end sil function 'test_simple_infinite_loop'
+sil [ossa] @test_simple_infinite_loop : $@convention(thin) (@in_guaranteed S) -> () {
+bb0(%0 : $*S):
+  br bb1
+bb1:
+  br bb1
+}
+
+// CHECK-LABEL: sil [ossa] @test_infinite_loop
+// CHECK-NOT:     destroy_addr
+// CHECK:       bb3:
+// CHECK-NEXT:    destroy_addr %1
+// CHECK-NOT:     destroy_addr
+// CHECK:       } // end sil function 'test_infinite_loop'
+sil [ossa] @test_infinite_loop : $@convention(thin) (@in_guaranteed S, @in S) -> () {
+bb0(%0 : $*S, %1 : $*S):
+  cond_br undef, bb1, bb2
+bb1:
+  br bb1
+bb2:
+  br bb3
+bb3:
+  destroy_addr %1 : $*S
+  %r = tuple ()
+  return %r : $()
+}
+

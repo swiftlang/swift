@@ -1272,11 +1272,11 @@ class WeakFixItTest {
 
 // SR-8811 (Warning)
 
-let sr8811a = fatalError() // expected-warning {{constant 'sr8811a' inferred to have type 'Never', which is an enum with no cases}} expected-note {{add an explicit type annotation to silence this warning}}
+let sr8811a = fatalError() // expected-warning {{constant 'sr8811a' inferred to have type 'Never', which is an enum with no cases}} expected-note {{add an explicit type annotation to silence this warning}} {{12-12=: Never}}
 
 let sr8811b: Never = fatalError() // Ok
 
-let sr8811c = (16, fatalError()) // expected-warning {{constant 'sr8811c' inferred to have type '(Int, Never)', which contains an enum with no cases}} expected-note {{add an explicit type annotation to silence this warning}}
+let sr8811c = (16, fatalError()) // expected-warning {{constant 'sr8811c' inferred to have type '(Int, Never)', which contains an enum with no cases}} expected-note {{add an explicit type annotation to silence this warning}} {{12-12=: (Int, Never)}}
 
 let sr8811d: (Int, Never) = (16, fatalError()) // Ok
 
@@ -1292,11 +1292,11 @@ class SR_10995 {
   }
 
   func sr_10995_foo() {
-    let doubleOptionalNever = makeDoubleOptionalNever() // expected-warning {{constant 'doubleOptionalNever' inferred to have type 'Never??', which may be unexpected}} 
-    // expected-note@-1 {{add an explicit type annotation to silence this warning}} 
+    let doubleOptionalNever = makeDoubleOptionalNever() // expected-warning {{constant 'doubleOptionalNever' inferred to have type 'Never??', which may be unexpected}}
+    // expected-note@-1 {{add an explicit type annotation to silence this warning}} {{28-28=: Never??}}
     // expected-warning@-2 {{initialization of immutable value 'doubleOptionalNever' was never used; consider replacing with assignment to '_' or removing it}}
     let singleOptionalNever = makeSingleOptionalNever() // expected-warning {{constant 'singleOptionalNever' inferred to have type 'Never?', which may be unexpected}} 
-    // expected-note@-1 {{add an explicit type annotation to silence this warning}} 
+    // expected-note@-1 {{add an explicit type annotation to silence this warning}} {{28-28=: Never?}}
     // expected-warning@-2 {{initialization of immutable value 'singleOptionalNever' was never used; consider replacing with assignment to '_' or removing it}}
   }
 }

@@ -479,9 +479,9 @@ Type ASTBuilder::createImplFunctionType(
     break;
   }
 
-  auto einfo = SILFunctionType::ExtInfo(representation,
-                                        flags.isPseudogeneric(),
-                                        !flags.isEscaping());
+  auto einfo = SILFunctionType::ExtInfo(
+      representation, flags.isPseudogeneric(), !flags.isEscaping(),
+      DifferentiabilityKind::NonDifferentiable);
 
   llvm::SmallVector<SILParameterInfo, 8> funcParams;
   llvm::SmallVector<SILYieldInfo, 8> funcYields;
@@ -505,10 +505,10 @@ Type ASTBuilder::createImplFunctionType(
     auto conv = getResultConvention(errorResult->getConvention());
     funcErrorResult.emplace(type, conv);
   }
-
   return SILFunctionType::get(genericSig, einfo, funcCoroutineKind,
                               funcCalleeConvention, funcParams, funcYields,
-                              funcResults, funcErrorResult, Ctx);
+                              funcResults, funcErrorResult,
+                              SubstitutionMap(), false, Ctx);
 }
 
 Type ASTBuilder::createProtocolCompositionType(

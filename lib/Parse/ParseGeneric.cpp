@@ -274,17 +274,23 @@ ParserStatus Parser::parseGenericWhereClause(
                                       SyntaxKind::GenericRequirementList);
   bool HasNextReq;
   do {
-    SyntaxParsingContext ReqContext(SyntaxContext, SyntaxContextKind::Syntax);
+    SyntaxParsingContext ReqContext(SyntaxContext,
+                                    SyntaxKind::GenericRequirement);
+    Optional<SyntaxParsingContext> BodyContext;
+    BodyContext.emplace(SyntaxContext);
+
     // Parse the leading type. It doesn't necessarily have to be just a type
     // identifier if we're dealing with a same-type constraint.
     ParserResult<TypeRepr> FirstType = parseType();
 
     if (FirstType.hasCodeCompletion()) {
+      BodyContext->setTransparent();
       Status.setHasCodeCompletion();
       FirstTypeInComplete = true;
     }
 
     if (FirstType.isNull()) {
+      BodyContext->setTransparent();
       Status.setIsParseError();
       break;
     }
@@ -292,7 +298,7 @@ ParserStatus Parser::parseGenericWhereClause(
     if (Tok.is(tok::colon)) {
       // A conformance-requirement.
       SourceLoc ColonLoc = consumeToken();
-      ReqContext.setCreateSyntax(SyntaxKind::ConformanceRequirement);
+      BodyContext->setCreateSyntax(SyntaxKind::ConformanceRequirement);
       if (Tok.is(tok::identifier) &&
           getLayoutConstraint(Context.getIdentifier(Tok.getText()), Context)
               ->isKnownLayout()) {
@@ -332,7 +338,7 @@ ParserStatus Parser::parseGenericWhereClause(
       }
     } else if ((Tok.isAnyOperator() && Tok.getText() == "==") ||
                Tok.is(tok::equal)) {
-      ReqContext.setCreateSyntax(SyntaxKind::SameTypeRequirement);
+      BodyContext->setCreateSyntax(SyntaxKind::SameTypeRequirement);
       // A same-type-requirement
       if (Tok.is(tok::equal)) {
         diagnose(Tok, diag::requires_single_equal)
@@ -354,12 +360,21 @@ ParserStatus Parser::parseGenericWhereClause(
                                                       EqualLoc,
                                                       SecondType.get()));
     } else {
+      BodyContext->setTransparent();
       diagnose(Tok, diag::expected_requirement_delim);
       Status.setIsParseError();
       break;
     }
+    BodyContext.reset();
     HasNextReq = consumeIf(tok::comma);
     // If there's a comma, keep parsing the list.
+    // If there's a "&&", diagnose replace with a comma and keep parsing
+    if (Tok.isBinaryOperator() && Tok.getText() == "&&" && !HasNextReq) {
+      diagnose(Tok, diag::requires_comma)
+        .fixItReplace(SourceRange(Tok.getLoc()), ",");
+      consumeToken();
+      HasNextReq = true;
+    }
   } while (HasNextReq);
 
   if (Requirements.empty())

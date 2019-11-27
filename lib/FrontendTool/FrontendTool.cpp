@@ -359,15 +359,15 @@ static void computeSwiftModuleTraceInfo(
     // FIXME: The behavior of fs::exists for relative paths is undocumented.
     // Use something else instead?
     if (fs::exists(moduleAdjacentInterfacePath)) {
-      err << "Found swiftinterface at\n" << moduleAdjacentInterfacePath
-          << "\nbut it was not recorded\n";
-      errorUnexpectedPath(err);
+      // This should be an error but it is not because of funkiness around
+      // compatible modules such as us having both armv7s.swiftinterface
+      // and armv7.swiftinterface in the dependency tracker.
+      continue;
     }
     buffer.clear();
 
-    err << "Don't know how to handle the dependency at:\n" << depPath
-        << "\nfor module trace emission.\n";
-    errorUnexpectedPath(err);
+    // We might land here when we have a arm.swiftmodule in the cache path
+    // which added a dependency on a arm.swiftinterface (which was not loaded).
   }
 
   // Almost a re-implementation of reversePathSortedFilenames :(.
@@ -605,13 +605,9 @@ public:
       FixitAll(DiagOpts.FixitCodeForAllDiagnostics) {}
 
 private:
-  void
-  handleDiagnostic(SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind,
-                   StringRef FormatString,
-                   ArrayRef<DiagnosticArgument> FormatArgs,
-                   const DiagnosticInfo &Info,
-                   const SourceLoc bufferIndirectlyCausingDiagnostic) override {
-    if (!(FixitAll || shouldTakeFixit(Kind, Info)))
+  void handleDiagnostic(SourceManager &SM,
+                        const DiagnosticInfo &Info) override {
+    if (!(FixitAll || shouldTakeFixit(Info)))
       return;
     for (const auto &Fix : Info.FixIts) {
       AllEdits.push_back({SM, Fix.getRange(), Fix.getText()});
@@ -762,6 +758,29 @@ static bool precompileBridgingHeader(CompilerInvocation &Invocation,
     return !PCH.hasValue();
   }
   return clangImporter->emitBridgingPCH(
+      Invocation.getFrontendOptions()
+          .InputsAndOutputs.getFilenameOfFirstInput(),
+      Invocation.getFrontendOptions()
+          .InputsAndOutputs.getSingleOutputFilename());
+}
+
+static bool precompileClangModule(CompilerInvocation &Invocation,
+                                  CompilerInstance &Instance) {
+  auto clangImporter = static_cast<ClangImporter *>(
+      Instance.getASTContext().getClangModuleLoader());
+  return clangImporter->emitPrecompiledModule(
+      Invocation.getFrontendOptions()
+          .InputsAndOutputs.getFilenameOfFirstInput(),
+      Invocation.getFrontendOptions().ModuleName,
+      Invocation.getFrontendOptions()
+          .InputsAndOutputs.getSingleOutputFilename());
+}
+
+static bool dumpPrecompiledClangModule(CompilerInvocation &Invocation,
+                                       CompilerInstance &Instance) {
+  auto clangImporter = static_cast<ClangImporter *>(
+      Instance.getASTContext().getClangModuleLoader());
+  return clangImporter->dumpPrecompiledModule(
       Invocation.getFrontendOptions()
           .InputsAndOutputs.getFilenameOfFirstInput(),
       Invocation.getFrontendOptions()
@@ -971,6 +990,43 @@ static void emitReferenceDependenciesForAllPrimaryInputsIfNeeded(
     }
   }
 }
+static void
+emitSwiftRangesForAllPrimaryInputsIfNeeded(CompilerInvocation &Invocation,
+                                           CompilerInstance &Instance) {
+  if (Invocation.getFrontendOptions().InputsAndOutputs.hasSwiftRangesPath() &&
+      Instance.getPrimarySourceFiles().empty()) {
+    Instance.getASTContext().Diags.diagnose(
+        SourceLoc(), diag::emit_swift_ranges_without_primary_file);
+    return;
+  }
+  for (auto *SF : Instance.getPrimarySourceFiles()) {
+    const std::string &swiftRangesFilePath =
+        Invocation.getSwiftRangesFilePathForPrimary(SF->getFilename());
+    if (!swiftRangesFilePath.empty()) {
+      (void)Instance.emitSwiftRanges(Instance.getASTContext().Diags, SF,
+                                     swiftRangesFilePath);
+    }
+  }
+}
+static void
+emitCompiledSourceForAllPrimaryInputsIfNeeded(CompilerInvocation &Invocation,
+                                              CompilerInstance &Instance) {
+  if (Invocation.getFrontendOptions()
+          .InputsAndOutputs.hasCompiledSourcePath() &&
+      Instance.getPrimarySourceFiles().empty()) {
+    Instance.getASTContext().Diags.diagnose(
+        SourceLoc(), diag::emit_compiled_source_without_primary_file);
+    return;
+  }
+  for (auto *SF : Instance.getPrimarySourceFiles()) {
+    const std::string &compiledSourceFilePath =
+        Invocation.getCompiledSourceFilePathForPrimary(SF->getFilename());
+    if (!compiledSourceFilePath.empty()) {
+      (void)Instance.emitCompiledSource(Instance.getASTContext().Diags, SF,
+                                        compiledSourceFilePath);
+    }
+  }
+}
 
 static bool writeTBDIfNeeded(CompilerInvocation &Invocation,
                              CompilerInstance &Instance) {
@@ -1137,10 +1193,14 @@ static bool performCompile(CompilerInstance &Instance,
     Instance.getASTContext().LangOpts.VerifySyntaxTree = true;
   }
 
-  // We've been asked to precompile a bridging header; we want to
+  // We've been asked to precompile a bridging header or module; we want to
   // avoid touching any other inputs and just parse, emit and exit.
   if (Action == FrontendOptions::ActionType::EmitPCH)
     return precompileBridgingHeader(Invocation, Instance);
+  if (Action == FrontendOptions::ActionType::EmitPCM)
+    return precompileClangModule(Invocation, Instance);
+  if (Action == FrontendOptions::ActionType::DumpPCM)
+    return dumpPrecompiledClangModule(Invocation, Instance);
 
   if (Action == FrontendOptions::ActionType::CompileModuleFromInterface)
     return buildModuleFromInterface(Invocation, Instance);
@@ -1203,6 +1263,8 @@ static bool performCompile(CompilerInstance &Instance,
     Context.getClangModuleLoader()->printStatistics();
 
   emitReferenceDependenciesForAllPrimaryInputsIfNeeded(Invocation, Instance);
+  emitSwiftRangesForAllPrimaryInputsIfNeeded(Invocation, Instance);
+  emitCompiledSourceForAllPrimaryInputsIfNeeded(Invocation, Instance);
 
   if (Context.hadError()) {
     //  Emit the index store data even if there were compiler errors.
@@ -1822,13 +1884,15 @@ int swift::performFrontend(ArrayRef<const char *> Args,
 
     SourceManager dummyMgr;
 
-    PDC.handleDiagnostic(dummyMgr, SourceLoc(), DiagnosticKind::Error,
-                         "fatal error encountered during compilation; please "
-                         "file a bug report with your project and the crash "
-                         "log",
-                         {}, DiagnosticInfo(), SourceLoc());
-    PDC.handleDiagnostic(dummyMgr, SourceLoc(), DiagnosticKind::Note, reason,
-                         {}, DiagnosticInfo(), SourceLoc());
+    DiagnosticInfo errorInfo(
+        DiagID(0), SourceLoc(), DiagnosticKind::Error,
+        "fatal error encountered during compilation; please file a bug report "
+        "with your project and the crash log",
+        {}, SourceLoc(), {}, {}, {}, false);
+    DiagnosticInfo noteInfo(DiagID(0), SourceLoc(), DiagnosticKind::Note,
+                            reason, {}, SourceLoc(), {}, {}, {}, false);
+    PDC.handleDiagnostic(dummyMgr, errorInfo);
+    PDC.handleDiagnostic(dummyMgr, noteInfo);
     if (shouldCrash)
       abort();
   };

@@ -246,6 +246,7 @@ void TypeChecker::checkProtocolSelfRequirements(ValueDecl *decl) {
   // For a generic requirement in a protocol, make sure that the requirement
   // set didn't add any requirements to Self or its associated types.
   if (auto *proto = dyn_cast<ProtocolDecl>(decl->getDeclContext())) {
+    auto &ctx = proto->getASTContext();
     auto protoSelf = proto->getSelfInterfaceType();
     auto sig = decl->getInnermostDeclContext()->getGenericSignatureOfContext();
     for (auto req : sig->getRequirements()) {
@@ -261,12 +262,12 @@ void TypeChecker::checkProtocolSelfRequirements(ValueDecl *decl) {
           req.getFirstType()->is<GenericTypeParamType>())
         continue;
 
-      diagnose(decl,
-               diag::requirement_restricts_self,
-               decl->getDescriptiveKind(), decl->getFullName(),
-               req.getFirstType().getString(),
-               static_cast<unsigned>(req.getKind()),
-               req.getSecondType().getString());
+      ctx.Diags.diagnose(decl,
+                         diag::requirement_restricts_self,
+                         decl->getDescriptiveKind(), decl->getFullName(),
+                         req.getFirstType().getString(),
+                         static_cast<unsigned>(req.getKind()),
+                         req.getSecondType().getString());
     }
   }
 }
@@ -437,9 +438,8 @@ void TypeChecker::checkReferencedGenericParams(GenericContext *dc) {
           continue;
       }
       // Produce an error that this generic parameter cannot be bound.
-      diagnose(paramDecl->getLoc(), diag::unreferenced_generic_parameter,
-               paramDecl->getNameStr());
-      decl->setInterfaceType(ErrorType::get(Context));
+      paramDecl->diagnose(diag::unreferenced_generic_parameter,
+                          paramDecl->getNameStr());
       decl->setInvalid();
     }
   }
@@ -467,7 +467,7 @@ GenericSignature TypeChecker::checkGenericSignature(
 
   // Debugging of the generic signature builder and generic signature
   // generation.
-  if (dc->getASTContext().LangOpts.DebugGenericSignatures) {
+  if (dc->getASTContext().TypeCheckerOpts.DebugGenericSignatures) {
     if (auto *VD = dyn_cast_or_null<ValueDecl>(dc->getAsDecl())) {
       VD->dumpRef(llvm::errs());
     } else {
@@ -589,7 +589,7 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
 
     // Debugging of the generic signature builder and generic signature
     // generation.
-    if (GC->getASTContext().LangOpts.DebugGenericSignatures) {
+    if (GC->getASTContext().TypeCheckerOpts.DebugGenericSignatures) {
       PD->printContext(llvm::errs());
       llvm::errs() << "\n";
       llvm::errs() << "Generic signature: ";
@@ -803,12 +803,10 @@ RequirementCheckResult TypeChecker::checkGenericArguments(
         // FIXME: Poor location information. How much better can we do here?
         // FIXME: This call should support listener to be able to properly
         //        diagnose problems with conformances.
-        auto result =
-            conformsToProtocol(firstType, proto->getDecl(), dc,
-                               conformanceOptions, loc);
+        auto conformance = conformsToProtocol(firstType, proto->getDecl(), dc,
+                                              conformanceOptions, loc);
 
-        if (result) {
-          auto conformance = *result;
+        if (conformance) {
           // Report the conformance.
           if (listener && valid && current.Parents.empty()) {
             listener->satisfiedConformance(rawFirstType, firstType,

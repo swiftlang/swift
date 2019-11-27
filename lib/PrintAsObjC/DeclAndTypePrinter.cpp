@@ -278,6 +278,10 @@ private:
     if (CD->getAttrs().hasAttribute<WeakLinkedAttr>())
       os << "SWIFT_WEAK_IMPORT\n";
 
+    if (CD->getAttrs().hasAttribute<IBDesignableAttr>()) {
+      os << "IB_DESIGNABLE\n";
+    }
+
     bool hasResilientAncestry =
       CD->checkAncestry().contains(AncestryFlags::ResilientOther);
     if (hasResilientAncestry) {
@@ -1189,6 +1193,10 @@ private:
     }
 
     os << ") ";
+    if (VD->getAttrs().hasAttribute<IBInspectableAttr>()) {
+      os << "IBInspectable ";
+    }
+
     if (VD->getAttrs().hasAttribute<IBOutletAttr>()) {
       if (!maybePrintIBOutletCollection(ty))
         os << "IBOutlet ";
@@ -1388,8 +1396,8 @@ private:
     // upper-bounded keys.
     else if (swiftNominal == ctx.getDictionaryDecl() &&
              isNSObjectOrAnyHashable(ctx, typeArgs[0])) {
-      if (auto proto = ctx.getNSCopyingDecl()) {
-        rewrittenArgsBuf[0] = proto->getDeclaredInterfaceType();
+      if (auto protoTy = ctx.getNSCopyingType()) {
+        rewrittenArgsBuf[0] = protoTy;
         rewrittenArgsBuf[1] = typeArgs[1];
         typeArgs = rewrittenArgsBuf;
       }

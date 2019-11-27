@@ -21,7 +21,7 @@
 #include "swift/AST/TypeLoc.h"
 #include "swift/AST/DeclNameLoc.h"
 #include "swift/AST/DiagnosticConsumer.h"
-#include "llvm/ADT/StringMap.h"
+#include "llvm/ADT/StringSet.h"
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/VersionTuple.h"
 
@@ -655,7 +655,7 @@ namespace swift {
     /// A set of all strings involved in current transactional chain.
     /// This is required because diagnostics are not directly emitted
     /// but rather stored until all transactions complete.
-    llvm::StringMap<char, llvm::BumpPtrAllocator &> TransactionStrings;
+    llvm::StringSet<llvm::BumpPtrAllocator &> TransactionStrings;
 
     /// The number of open diagnostic transactions. Diagnostics are only
     /// emitted once all transactions have closed.
@@ -669,6 +669,12 @@ namespace swift {
     
     /// Print diagnostic names after their messages
     bool printDiagnosticNames = false;
+
+    /// Use descriptive diagnostic style when available.
+    bool useDescriptiveDiagnostics = false;
+
+    /// Path to diagnostic documentation directory.
+    std::string diagnosticDocumentationPath = "";
 
     friend class InFlightDiagnostic;
     friend class DiagnosticTransaction;
@@ -711,6 +717,20 @@ namespace swift {
     }
     bool getPrintDiagnosticNames() const {
       return printDiagnosticNames;
+    }
+
+    void setUseDescriptiveDiagnostics(bool val) {
+       useDescriptiveDiagnostics = val;
+    }
+    bool getUseDescriptiveDiagnostics() const {
+      return useDescriptiveDiagnostics;
+    }
+
+    void setDiagnosticDocumentationPath(std::string path) {
+      diagnosticDocumentationPath = path;
+    }
+    StringRef getDiagnosticDocumentationPath() {
+      return diagnosticDocumentationPath;
     }
 
     void ignoreDiagnostic(DiagID id) {

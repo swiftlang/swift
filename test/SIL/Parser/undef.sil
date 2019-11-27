@@ -250,8 +250,8 @@ bb0:
 
   // Checked Conversions
 
-  // CHECK: unconditional_checked_cast undef : $C to $C
-  unconditional_checked_cast undef : $C to $C
+  // CHECK: unconditional_checked_cast undef : $C to C
+  unconditional_checked_cast undef : $C to C
   // CHECK: unconditional_checked_cast_addr C in undef : $*C to C in undef : $*C
   unconditional_checked_cast_addr C in undef : $*C to C in undef : $*C
 
@@ -351,8 +351,8 @@ bb3:
 
 sil @checked_cast_br_test : $() -> () {
 bb0:
-  // CHECK: checked_cast_br undef : $C to $C, bb1, bb2
-  checked_cast_br undef : $C to $C, bb1, bb2
+  // CHECK: checked_cast_br undef : $C to C, bb1, bb2
+  checked_cast_br undef : $C to C, bb1, bb2
 bb1(%x : $C):
   br bb3
 bb2:

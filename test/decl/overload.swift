@@ -368,6 +368,10 @@ struct Escaping {
 func autoclosure(f: () -> Int) { }
 func autoclosure(f: @autoclosure () -> Int) { }
 
+// @_nonEphemeral
+func nonEphemeral(x: UnsafeMutableRawPointer) {} // expected-note {{'nonEphemeral(x:)' previously declared here}}
+func nonEphemeral(@_nonEphemeral x: UnsafeMutableRawPointer) {} // expected-error {{invalid redeclaration of 'nonEphemeral(x:)'}}
+
 // inout
 func inout2(x: Int) { }
 func inout2(x: inout Int) { }
@@ -608,29 +612,4 @@ enum SR_10084_E_15 {
 enum SR_10084_E_16 {
   typealias Z = Int // expected-note {{'Z' previously declared here}}
   case Z // expected-error {{invalid redeclaration of 'Z'}}
-}
-
-// N.B. Validating the pattern binding initializer for `pickMe` used to cause
-// recursive validation of the VarDecl. Check that we don't regress now that
-// this isn't the case.
-public struct Cyclic {
-  static func pickMe(please: Bool) -> Int { return 42 }
-  public static let pickMe = Cyclic.pickMe(please: true)
-}
-
-struct Node {}
-struct Parameterized<Value, Format> {
-  func please<NewValue>(_ transform: @escaping (_ otherValue: NewValue) -> Value) -> Parameterized<NewValue, Format> {
-    fatalError()
-  }
-}
-
-extension Parameterized where Value == [Node], Format == String {
-  static var pickMe: Parameterized {
-    fatalError()
-  }
-}
-
-extension Parameterized where Value == Node, Format == String {
-  static let pickMe = Parameterized<[Node], String>.pickMe.please { [$0] }
 }

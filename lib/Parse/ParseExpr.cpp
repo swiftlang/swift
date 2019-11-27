@@ -965,23 +965,40 @@ static bool isValidTrailingClosure(bool isExprBasic, Parser &P){
   // the token after the { is on the same line as the {.
   if (P.peekToken().isAtStartOfLine())
     return false;
-  
-  
+
   // Determine if the {} goes with the expression by eating it, and looking
-  // to see if it is immediately followed by '{', 'where', or comma.  If so,
-  // we consider it to be part of the proceeding expression.
+  // to see if it is immediately followed by a token which indicates we should
+  // consider it part of the preceding expression
   Parser::BacktrackingScope backtrack(P);
   P.consumeToken(tok::l_brace);
   P.skipUntil(tok::r_brace);
   SourceLoc endLoc;
-  if (!P.consumeIf(tok::r_brace, endLoc) ||
-      P.Tok.isNot(tok::l_brace, tok::kw_where, tok::comma)) {
+  if (!P.consumeIf(tok::r_brace, endLoc))
+    return false;
+
+  switch (P.Tok.getKind()) {
+  case tok::l_brace:
+  case tok::kw_where:
+  case tok::comma:
+    return true;
+  case tok::l_square:
+  case tok::l_paren:
+  case tok::period:
+  case tok::period_prefix:
+  case tok::kw_is:
+  case tok::kw_as:
+  case tok::question_postfix:
+  case tok::question_infix:
+  case tok::exclaim_postfix:
+  case tok::colon:
+  case tok::equal:
+  case tok::oper_postfix:
+  case tok::oper_binary_spaced:
+  case tok::oper_binary_unspaced:
+    return !P.Tok.isAtStartOfLine();
+  default:
     return false;
   }
-
-  // Recoverable case. Just return true here and Sema will emit a diagnostic
-  // later. see: Sema/MiscDiagnostics.cpp#checkStmtConditionTrailingClosure
-  return true;
 }
 
 
@@ -1183,7 +1200,7 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
         // Add dummy blank argument list to the call expression syntax.
         SyntaxContext->addSyntax(
             ParsedSyntaxRecorder::makeBlankTupleExprElementList(
-                Tok.getLoc(), *SyntaxContext));
+                leadingTriviaLoc(), *SyntaxContext));
       }
 
       ParserResult<Expr> closure =
@@ -1466,6 +1483,7 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
         // name, not a binding, because it is the start of an enum pattern or
         // call pattern.
         peekToken().isNot(tok::period, tok::period_prefix, tok::l_paren)) {
+      DeferringContextRAII Deferring(*SyntaxContext);
       Identifier name;
       SourceLoc loc = consumeIdentifier(&name, /*allowDollarIdentifier=*/true);
       auto introducer = (InVarOrLetPattern != IVOLP_InVar
@@ -1474,10 +1492,10 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
       auto pattern = createBindingFromPattern(loc, name, introducer);
       if (SyntaxContext->isEnabled()) {
         ParsedPatternSyntax PatternNode =
-            ParsedSyntaxRecorder::deferIdentifierPattern(
+            ParsedSyntaxRecorder::makeIdentifierPattern(
                                     SyntaxContext->popToken(), *SyntaxContext);
         ParsedExprSyntax ExprNode =
-            ParsedSyntaxRecorder::deferUnresolvedPatternExpr(std::move(PatternNode),
+            ParsedSyntaxRecorder::makeUnresolvedPatternExpr(std::move(PatternNode),
                                                              *SyntaxContext);
         SyntaxContext->addSyntax(std::move(ExprNode));
       }
@@ -1587,7 +1605,7 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
         // Add dummy blank argument list to the call expression syntax.
         SyntaxContext->addSyntax(
             ParsedSyntaxRecorder::makeBlankTupleExprElementList(
-                Tok.getLoc(), *SyntaxContext));
+                leadingTriviaLoc(), *SyntaxContext));
       }
 
       ParserResult<Expr> closure =
@@ -2101,7 +2119,7 @@ DeclName Parser::parseUnqualifiedDeclName(bool afterDot,
     if (SyntaxContext->isEnabled())
       SyntaxContext->addSyntax(
           ParsedSyntaxRecorder::makeBlankDeclNameArgumentList(
-            Tok.getLoc(), *SyntaxContext));
+              leadingTriviaLoc(), *SyntaxContext));
     consumeToken(tok::r_paren);
     loc = DeclNameLoc(baseNameLoc);
     SmallVector<Identifier, 2> argumentLabels;
@@ -2669,11 +2687,10 @@ parseClosureSignatureIfPresent(SourceRange &bracketRange,
   // to detect any tuple splat or destructuring as early as
   // possible and give a proper fix-it. See SE-0110 for more details.
   auto isTupleDestructuring = [](ParamDecl *param) -> bool {
-    if (!param->isInvalid())
+    auto *typeRepr = param->getTypeRepr();
+    if (!(typeRepr && param->isDestructured()))
       return false;
-    if (auto *typeRepr = param->getTypeRepr())
-      return !param->hasName() && isa<TupleTypeRepr>(typeRepr);
-    return false;
+    return !param->hasName() && isa<TupleTypeRepr>(typeRepr);
   };
 
   for (unsigned i = 0, e = params->size(); i != e; ++i) {
@@ -2773,8 +2790,11 @@ ParserResult<Expr> Parser::parseExprClosure() {
 
   // Parse the closing '}'.
   SourceLoc rightBrace;
-  parseMatchingToken(tok::r_brace, rightBrace, diag::expected_closure_rbrace,
-                     leftBrace);
+  bool missingRBrace = parseMatchingToken(tok::r_brace, rightBrace,
+                                          diag::expected_closure_rbrace,
+                                          leftBrace);
+  if (missingRBrace)
+    Status.setIsParseError();
 
   // If we didn't have any parameters, create a parameter list from the
   // anonymous closure arguments.
@@ -2802,7 +2822,8 @@ ParserResult<Expr> Parser::parseExprClosure() {
   // may be incomplete and the type mismatch in return statement will just
   // confuse the type checker.
   bool hasSingleExpressionBody = false;
-  if (!Status.hasCodeCompletion() && bodyElements.size() == 1) {
+  if (!missingRBrace && !Status.hasCodeCompletion() &&
+      bodyElements.size() == 1) {
     // If the closure's only body element is a single return statement,
     // use that instead of creating a new wrapping return expression.
     Expr *returnExpr = nullptr;
@@ -3321,9 +3342,8 @@ ParserResult<Expr> Parser::parseExprCollection() {
   // [] is always an array.
   if (Tok.is(tok::r_square)) {
     if (SyntaxContext->isEnabled())
-      SyntaxContext->addSyntax(
-          ParsedSyntaxRecorder::makeBlankArrayElementList(
-                                Tok.getLoc(), *SyntaxContext));
+      SyntaxContext->addSyntax(ParsedSyntaxRecorder::makeBlankArrayElementList(
+          leadingTriviaLoc(), *SyntaxContext));
     RSquareLoc = consumeToken(tok::r_square);
     ArrayOrDictContext.setCreateSyntax(SyntaxKind::ArrayExpr);
     return makeParserResult(

@@ -133,6 +133,40 @@ class BuildScriptInvocation(object):
                 "a toolchain (%s)" % ", ".join(targets_needing_toolchain))
 
     @staticmethod
+    def default_stdlib_deployment_targets(args):
+        """
+        Return targets for the Swift stdlib, based on the build machine.
+        If the build machine is not one of the recognized ones, return None.
+        """
+
+        host_target = StdlibDeploymentTarget.host_target()
+        if host_target is None:
+            return None
+
+        # OS X build machines configure all Darwin platforms by default.
+        # Put iOS native targets last so that we test them last
+        # (it takes a long time).
+        if host_target == StdlibDeploymentTarget.OSX.x86_64:
+            targets = [host_target]
+            if args.build_ios and args.build_ios_simulator:
+                targets.extend(StdlibDeploymentTarget.iOSSimulator.targets)
+            if args.build_ios and args.build_ios_device:
+                targets.extend(StdlibDeploymentTarget.iOS.targets)
+            if args.build_tvos and args.build_tvos_simulator:
+                targets.extend(StdlibDeploymentTarget.AppleTVSimulator.targets)
+            if args.build_tvos and args.build_tvos_device:
+                targets.extend(StdlibDeploymentTarget.AppleTV.targets)
+            if args.build_watchos and args.build_watchos_simulator:
+                targets.extend(StdlibDeploymentTarget
+                               .AppleWatchSimulator.targets)
+            if args.build_watchos and args.build_watchos_device:
+                targets.extend(StdlibDeploymentTarget.AppleWatch.targets)
+            return targets
+        else:
+            # All other machines only configure their host stdlib by default.
+            return [host_target]
+
+    @staticmethod
     def apply_default_arguments(toolchain, args):
         # Infer if ninja is required
         ninja_required = (
@@ -144,7 +178,7 @@ class BuildScriptInvocation(object):
         # Set the default stdlib-deployment-targets, if none were provided.
         if args.stdlib_deployment_targets is None:
             stdlib_targets = \
-                StdlibDeploymentTarget.default_stdlib_deployment_targets()
+                BuildScriptInvocation.default_stdlib_deployment_targets(args)
             args.stdlib_deployment_targets = [
                 target.name for target in stdlib_targets]
 
@@ -303,10 +337,6 @@ class BuildScriptInvocation(object):
             "--libdispatch-build-type", args.libdispatch_build_variant,
             "--libicu-build-type", args.libicu_build_variant,
             "--xctest-build-type", args.build_variant,
-            "--swiftpm-build-type", args.build_variant,
-            "--swiftsyntax-build-type", args.build_variant,
-            "--skstresstester-build-type", args.build_variant,
-            "--swiftevolve-build-type", args.build_variant,
             "--llbuild-build-type", args.build_variant,
             "--swift-enable-assertions", str(args.swift_assertions).lower(),
             "--swift-stdlib-enable-assertions", str(
@@ -433,14 +463,6 @@ class BuildScriptInvocation(object):
             impl_args += ["--skip-build-libdispatch"]
         if not args.build_libicu:
             impl_args += ["--skip-build-libicu"]
-        if not args.build_swiftpm:
-            impl_args += ["--skip-build-swiftpm"]
-        if not args.build_swiftsyntax:
-            impl_args += ["--skip-build-swiftsyntax"]
-        if not args.build_skstresstester:
-            impl_args += ["--skip-build-skstresstester"]
-        if not args.build_swiftevolve:
-            impl_args += ["--skip-build-swiftevolve"]
         if not args.build_playgroundsupport:
             impl_args += ["--skip-build-playgroundsupport"]
         if args.build_swift_dynamic_stdlib:
@@ -483,10 +505,6 @@ class BuildScriptInvocation(object):
             impl_args += ["--skip-test-cmark",
                           "--skip-test-lldb",
                           "--skip-test-llbuild",
-                          "--skip-test-swiftpm",
-                          "--skip-test-swiftsyntax",
-                          "--skip-test-skstresstester",
-                          "--skip-test-swiftevolve",
                           "--skip-test-xctest",
                           "--skip-test-foundation",
                           "--skip-test-libdispatch",
@@ -526,6 +544,8 @@ class BuildScriptInvocation(object):
             impl_args += ["--long-test"]
         if args.stress_test:
             impl_args += ["--stress-test"]
+        if args.skip_local_build:
+            impl_args += ["--skip-local-build"]
         if args.only_executable_test:
             impl_args += ["--only-executable-test"]
         if not args.benchmark:
@@ -784,15 +804,27 @@ class BuildScriptInvocation(object):
                     continue
                 product_source = product_class.product_source_name()
                 product_name = product_class.product_name()
+                if product_class.is_swiftpm_unified_build_product():
+                    build_dir = self.workspace.swiftpm_unified_build_dir(
+                        host_target)
+                else:
+                    build_dir = self.workspace.build_dir(
+                        host_target, product_name)
                 product = product_class(
                     args=self.args,
                     toolchain=self.toolchain,
                     source_dir=self.workspace.source_dir(product_source),
-                    build_dir=self.workspace.build_dir(
-                        host_target, product_name))
-                product.build(host_target)
-                product.test(host_target)
-                product.install(host_target)
+                    build_dir=build_dir)
+                if product.should_build(host_target):
+                    print("--- Building %s ---" % product_name)
+                    product.build(host_target)
+                if product.should_test(host_target):
+                    print("--- Running tests for %s ---" % product_name)
+                    product.test(host_target)
+                    print("--- Finished tests for %s ---" % product_name)
+                if product.should_install(host_target):
+                    print("--- Installing %s ---" % product_name)
+                    product.install(host_target)
 
         # Extract symbols...
         for host_target in all_hosts:

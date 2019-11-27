@@ -327,6 +327,7 @@ class ClassConformingToRefinedProtocol: RefinedProtocol {}
 
 struct GenSubscriptFixitTest {
   subscript<T>(_ arg: T) -> Bool { return true } // expected-note 3 {{declared here}}
+  // expected-note@-1 2 {{in call to 'subscript(_:)'}}
 }
 
 func testGenSubscriptFixit(_ s0: GenSubscriptFixitTest) {
@@ -339,9 +340,11 @@ func testUnresolvedMemberSubscriptFixit(_ s0: GenSubscriptFixitTest) {
 
   _ = s0.subscript
   // expected-error@-1 {{value of type 'GenSubscriptFixitTest' has no property or method named 'subscript'; did you mean to use the subscript operator?}} {{9-19=[<#index#>]}}
+  // expected-error@-2 {{generic parameter 'T' could not be inferred}}
 
   s0.subscript = true
   // expected-error@-1 {{value of type 'GenSubscriptFixitTest' has no property or method named 'subscript'; did you mean to use the subscript operator?}} {{5-15=[<#index#>]}}
+  // expected-error@-2 {{generic parameter 'T' could not be inferred}}
 }
 
 struct SubscriptTest1 {

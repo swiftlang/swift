@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend %s -emit-ir -o /dev/null
+// RUN: %target-typecheck-verify-swift
+
 protocol VectorIndex {
     associatedtype Vector8 : Vector where Vector8.Index == Self, Vector8.Element == UInt8
 }
@@ -18,7 +19,7 @@ struct Vector1<Element> : Vector {
     init(elementForIndex: (VectorIndex1) -> Element) {
         e0 = elementForIndex(.i0)
     }
-    subscript(index: Index) -> Element {
+    subscript(index: Index) -> Element { // expected-error {{reference to invalid associated type 'Index' of type 'Vector1<Element>'}}
         get { return e0 }
         set { e0 = newValue }
     }

@@ -2807,13 +2807,13 @@ It is expected that the strong reference count of the object is one.
 Furthermore, no other thread may increment the strong reference count during
 execution of this instruction.
 
-copy_unowned_value
-``````````````````
+strong_copy_unowned_value
+`````````````````````````
 ::
 
-  sil-instruction ::= 'copy_unowned_value' sil-operand
+  sil-instruction ::= 'strong_copy_unowned_value' sil-operand
 
-  %1 = copy_unowned_value %0 : $@unowned T
+  %1 = strong_copy_unowned_value %0 : $@unowned T
   // %1 will be a strong @owned value of type $T.
   // $T must be a reference type
 
@@ -3732,20 +3732,23 @@ This instruction has the same local semantics as ``retain_value`` but:
 The intention is that this instruction is used to implement unmanaged
 constructs.
 
-copy_unmanaged_value
-``````````````````````
+strong_copy_unmanaged_value
+```````````````````````````
 
 ::
 
-  sil-instruction ::= 'copy_unmanaged_value' sil-value
+  sil-instruction ::= 'strong_copy_unmanaged_value' sil-value
 
-  %1 = copy_unmanaged_value %0 : $@sil_unmanaged A
+  %1 = strong_copy_unmanaged_value %0 : $@sil_unmanaged A
   // %1 will be a strong @owned $A.
 
 This instruction has the same semantics as ``copy_value`` except that its input
 is a trivial ``@sil_unmanaged`` type that doesn't require ref counting. This is
 intended to be used semantically as a "conversion" like instruction from
 ``unmanaged`` to ``strong`` and thus should never be removed by the optimizer.
+Since the returned value is a strong owned value, this instruction semantically
+should be treated as performing a strong copy of the underlying value as if by
+the value's type lowering.
 
 copy_value
 ``````````

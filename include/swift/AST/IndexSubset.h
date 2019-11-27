@@ -17,6 +17,7 @@
 #ifndef SWIFT_AST_INDEXSUBSET_H
 #define SWIFT_AST_INDEXSUBSET_H
 
+#include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Range.h"
 #include "swift/Basic/STLExtras.h"
@@ -57,6 +58,10 @@ private:
   /// The number of bit words in the index subset.
   unsigned numBitWords;
 
+  static unsigned getNumBytesNeededForCapacity(unsigned capacity) {
+    return getNumBitWordsNeededForCapacity(capacity) * bitWordSize;
+  }
+
   BitWord *getBitWordsData() {
     return reinterpret_cast<BitWord *>(this + 1);
   }
@@ -88,7 +93,7 @@ private:
     for (auto i : indices.set_bits()) {
       unsigned bitWordIndex, offset;
       std::tie(bitWordIndex, offset) = getBitWordIndexAndOffset(i);
-      getBitWord(bitWordIndex) |= (1 << offset);
+      getBitWord(bitWordIndex) |= (1ull << offset);
     }
   }
 
@@ -176,7 +181,7 @@ public:
   bool contains(unsigned index) const {
     unsigned bitWordIndex, offset;
     std::tie(bitWordIndex, offset) = getBitWordIndexAndOffset(index);
-    return getBitWord(bitWordIndex) & (1 << offset);
+    return getBitWord(bitWordIndex) & (1ull << offset);
   }
 
   bool isEmpty() const {
@@ -201,19 +206,8 @@ public:
       id.AddInteger(index);
   }
 
-  void print(llvm::raw_ostream &s = llvm::outs()) const {
-    s << '{';
-    interleave(range(capacity), [this, &s](unsigned i) { s << contains(i); },
-               [&s] { s << ", "; });
-    s << '}';
-  }
-
-  void dump(llvm::raw_ostream &s = llvm::errs()) const {
-    s << "(index_subset capacity=" << capacity << " indices=(";
-    interleave(getIndices(), [&s](unsigned i) { s << i; },
-               [&s] { s << ", "; });
-    s << "))";
-  }
+  void print(llvm::raw_ostream &s = llvm::outs()) const;
+  SWIFT_DEBUG_DUMPER(dump(llvm::raw_ostream &s = llvm::errs()));
 
   int findNext(int startIndex) const;
   int findFirst() const { return findNext(-1); }

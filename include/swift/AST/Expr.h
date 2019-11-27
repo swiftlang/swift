@@ -27,6 +27,7 @@
 #include "swift/AST/TypeAlignments.h"
 #include "swift/AST/TypeLoc.h"
 #include "swift/AST/Availability.h"
+#include "swift/Basic/Debug.h"
 #include "swift/Basic/InlineBitfield.h"
 #include "llvm/Support/TrailingObjects.h"
 #include <utility>
@@ -530,20 +531,7 @@ public:
   /// the parent map.
   llvm::DenseMap<Expr *, Expr *> getParentMap();
 
-  /// Produce a mapping from each subexpression to its depth and parent,
-  /// in the root expression. The root expression has depth 0, its children have
-  /// depth 1, etc.
-  llvm::DenseMap<Expr *, std::pair<unsigned, Expr *>> getDepthMap();
-
-  /// Produce a mapping from each expression to its index according to a
-  /// preorder traversal of the expressions. The parent has index 0, its first
-  /// child has index 1, its second child has index 2 if the first child is a
-  /// leaf node, etc.
-  llvm::DenseMap<Expr *, unsigned> getPreorderIndexMap();
-
-  LLVM_ATTRIBUTE_DEPRECATED(
-      void dump() const LLVM_ATTRIBUTE_USED,
-      "only for use within the debugger");
+  SWIFT_DEBUG_DUMP;
   void dump(raw_ostream &OS, unsigned Indent = 0) const;
   void dump(raw_ostream &OS, llvm::function_ref<Type(const Expr *)> getType,
             llvm::function_ref<Type(const TypeLoc &)> getTypeOfTypeLoc,
@@ -5433,6 +5421,9 @@ Expr *packSingleArgument(ASTContext &ctx, SourceLoc lParenLoc,
                               [](const Expr *E) -> Type {
                                 return E->getType();
                               });
+
+void simple_display(llvm::raw_ostream &out, const ClosureExpr *CE);
+
 } // end namespace swift
 
 #endif

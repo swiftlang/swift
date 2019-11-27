@@ -36,7 +36,7 @@ struct A: Hashable {
   func hash(into hasher: inout Hasher) { fatalError() }
 }
 struct B {}
-struct C<T> { // expected-note 2 {{'T' declared as parameter to type 'C'}}
+struct C<T> { // expected-note 3 {{'T' declared as parameter to type 'C'}}
   var value: T
   subscript() -> T { get { return value } }
   subscript(sub: Sub) -> T { get { return value } set { } }
@@ -230,9 +230,9 @@ func testDisembodiedStringInterpolation(x: Int) {
 
 func testNoComponents() {
   let _: KeyPath<A, A> = \A // expected-error{{must have at least one component}}
-  // FIXME(diagnostics): This should be diagnosed as `missing generic parameter 'T'` instead of a contextual failure.
   let _: KeyPath<C, A> = \C // expected-error{{must have at least one component}} expected-error{{}}
-  // expected-error@-1 {{cannot convert value of type 'KeyPath<Root, Value>' to specified type 'KeyPath<C<Any>, A>'}}
+  // expected-error@-1 {{generic parameter 'T' could not be inferred}}
+  // expected-error@-2 {{cannot convert value of type 'KeyPath<Root, Value>' to specified type 'KeyPath<C<T>, A>'}}
 }
 
 struct TupleStruct {
@@ -507,10 +507,10 @@ func testLabeledSubscript() {
   let k = \AA.[labeled: 0]
 
   // TODO: These ought to work without errors.
-  let _ = \AA.[keyPath: k] // expected-error {{incorrect argument label in call (have 'keyPath:', expected 'labeled:')}}
+  let _ = \AA.[keyPath: k] // expected-error {{extraneous argument label 'keyPath:' in call}}
   // expected-error@-1 {{cannot convert value of type 'KeyPath<AA, Int>' to expected argument type 'Int'}}
 
-  let _ = \AA.[keyPath: \AA.[labeled: 0]] // expected-error {{incorrect argument label in call (have 'keyPath:', expected 'labeled:')}}
+  let _ = \AA.[keyPath: \AA.[labeled: 0]] // expected-error {{extraneous argument label 'keyPath:' in call}}
   // expected-error@-1 {{cannot convert value of type 'KeyPath<AA, Int>' to expected argument type 'Int'}}
 }
 

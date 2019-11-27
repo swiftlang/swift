@@ -47,7 +47,7 @@ namespace tbdgen {
 class TBDGenVisitor : public ASTVisitor<TBDGenVisitor> {
 public:
   llvm::MachO::InterfaceFile &Symbols;
-  llvm::MachO::ArchitectureSet Archs;
+  llvm::MachO::TargetList Targets;
   StringSet *StringSymbols;
   const llvm::DataLayout &DataLayout;
 
@@ -76,11 +76,11 @@ private:
 
 public:
   TBDGenVisitor(llvm::MachO::InterfaceFile &symbols,
-                llvm::MachO::ArchitectureSet archs, StringSet *stringSymbols,
+                llvm::MachO::TargetList targets, StringSet *stringSymbols,
                 const llvm::DataLayout &dataLayout,
                 const UniversalLinkageInfo &universalLinkInfo,
                 ModuleDecl *swiftModule, const TBDGenOptions &opts)
-      : Symbols(symbols), Archs(archs), StringSymbols(stringSymbols),
+      : Symbols(symbols), Targets(targets), StringSymbols(stringSymbols),
         DataLayout(dataLayout), UniversalLinkInfo(universalLinkInfo),
         SwiftModule(swiftModule), Opts(opts) {}
 

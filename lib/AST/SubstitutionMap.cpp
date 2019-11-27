@@ -222,8 +222,7 @@ SubstitutionMap SubstitutionMap::get(GenericSignature genericSig,
     auto replacement = depTy.subst(subs, lookupConformance);
     auto protoType = req.getSecondType()->castTo<ProtocolType>();
     auto proto = protoType->getDecl();
-    auto conformance = lookupConformance(depTy, replacement, proto)
-                         .getValueOr(ProtocolConformanceRef::forInvalid());
+    auto conformance = lookupConformance(depTy, replacement, proto);
     conformances.push_back(conformance);
   }
 
@@ -301,9 +300,10 @@ Type SubstitutionMap::lookupSubstitution(CanSubstitutableType type) const {
   return replacementType;
 }
 
-Optional<ProtocolConformanceRef>
+ProtocolConformanceRef
 SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
-  if (empty()) return None;
+  if (empty())
+    return ProtocolConformanceRef::forInvalid();
 
   // If we have an archetype, map out of the context so we can compute a
   // conformance access path.
@@ -316,7 +316,7 @@ SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
   // Error path: if we don't have a type parameter, there is no conformance.
   // FIXME: Query concrete conformances in the generic signature?
   if (!type->isTypeParameter())
-    return None;
+    return ProtocolConformanceRef::forInvalid();
 
   auto genericSig = getGenericSignature();
 
@@ -334,23 +334,23 @@ SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
 
   // Retrieve the starting conformance from the conformance map.
   auto getInitialConformance =
-    [&](Type type, ProtocolDecl *proto) -> Optional<ProtocolConformanceRef> {
-      unsigned conformanceIndex = 0;
-      for (const auto &req : getGenericSignature()->getRequirements()) {
-        if (req.getKind() != RequirementKind::Conformance)
-          continue;
+      [&](Type type, ProtocolDecl *proto) -> ProtocolConformanceRef {
+    unsigned conformanceIndex = 0;
+    for (const auto &req : getGenericSignature()->getRequirements()) {
+      if (req.getKind() != RequirementKind::Conformance)
+        continue;
 
-        // Is this the conformance we're looking for?
-        if (req.getFirstType()->isEqual(type) &&
-            req.getSecondType()->castTo<ProtocolType>()->getDecl() == proto) {
-          return getConformances()[conformanceIndex];
-        }
-
-        ++conformanceIndex;
+      // Is this the conformance we're looking for?
+      if (req.getFirstType()->isEqual(type) &&
+          req.getSecondType()->castTo<ProtocolType>()->getDecl() == proto) {
+        return getConformances()[conformanceIndex];
       }
 
-      return None;
-    };
+      ++conformanceIndex;
+    }
+
+    return ProtocolConformanceRef::forInvalid();
+  };
 
   // Check whether the superclass conforms.
   if (auto superclass = genericSig->getSuperclassBound(type)) {
@@ -362,30 +362,30 @@ SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
   // If the type doesn't conform to this protocol, the result isn't formed
   // from these requirements.
   if (!genericSig->conformsToProtocol(type, proto))
-    return None;
+    return ProtocolConformanceRef::forInvalid();
 
   auto accessPath =
     genericSig->getConformanceAccessPath(type, proto);
 
   // Fall through because we cannot yet evaluate an access path.
-  Optional<ProtocolConformanceRef> conformance;
+  ProtocolConformanceRef conformance;
   for (const auto &step : accessPath) {
     // For the first step, grab the initial conformance.
-    if (!conformance) {
+    if (conformance.isInvalid()) {
       conformance = getInitialConformance(step.first, step.second);
-      if (!conformance)
-        return None;
+      if (conformance.isInvalid())
+        return ProtocolConformanceRef::forInvalid();
 
       continue;
     }
 
-    if (conformance->isInvalid())
+    if (conformance.isInvalid())
       return conformance;
 
     // If we've hit an abstract conformance, everything from here on out is
     // abstract.
     // FIXME: This may not always be true, but it holds for now.
-    if (conformance->isAbstract()) {
+    if (conformance.isAbstract()) {
       // FIXME: Rip this out once we can get a concrete conformance from
       // an archetype.
       auto substType = type.subst(*this);
@@ -405,7 +405,7 @@ SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
 
     // For the second step, we're looking into the requirement signature for
     // this protocol.
-    auto concrete = conformance->getConcrete();
+    auto concrete = conformance.getConcrete();
     auto normal = concrete->getRootNormalConformance();
 
     // If we haven't set the signature conformances yet, force the issue now.
@@ -415,7 +415,7 @@ SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
       // FIXME: Seems like we should be able to get at the intermediate state
       // to use that.
       if (normal->getState() == ProtocolConformanceState::CheckingTypeWitnesses)
-        return None;
+        return ProtocolConformanceRef::forInvalid();
     }
 
     // Get the associated conformance.
@@ -555,12 +555,8 @@ SubstitutionMap::getOverrideSubstitutions(const ClassDecl *baseClass,
   SubstitutionMap origSubMap;
   if (derivedSubs)
     origSubMap = *derivedSubs;
-  else if (derivedSig) {
-    origSubMap = get(
-        derivedSig,
-        [](SubstitutableType *type) -> Type { return type; },
-        MakeAbstractConformanceForGenericType());
-  }
+  else if (derivedSig)
+    origSubMap = derivedSig->getIdentitySubstitutionMap();
 
   return combineSubstitutionMaps(baseSubMap, origSubMap,
                                  CombineSubstitutionMaps::AtDepth,
@@ -603,17 +599,50 @@ SubstitutionMap::combineSubstitutionMaps(SubstitutionMap firstSubMap,
   return get(
     genericSig,
     [&](SubstitutableType *type) {
-      auto replacement = replaceGenericParameter(type);
-      if (replacement)
+      if (auto replacement = replaceGenericParameter(type))
         return Type(replacement).subst(secondSubMap);
       return Type(type).subst(firstSubMap);
     },
-    [&](CanType type, Type substType, ProtocolDecl *conformedProtocol) {
-      auto replacement = type.transform(replaceGenericParameter);
-      if (replacement)
+    [&](CanType type, Type substType, ProtocolDecl *proto) {
+      if (auto replacement = type.transform(replaceGenericParameter))
         return secondSubMap.lookupConformance(replacement->getCanonicalType(),
-                                              conformedProtocol);
-      return firstSubMap.lookupConformance(type, conformedProtocol);
+                                              proto);
+      if (auto conformance = firstSubMap.lookupConformance(type, proto))
+        return conformance;
+
+      // We might not have enough information in the substitution maps alone.
+      //
+      // Eg,
+      //
+      // class Base<T1> {
+      //   func foo<U1>(_: U1) where T1 : P {}
+      // }
+      //
+      // class Derived<T2> : Base<Foo<T2>> {
+      //   override func foo<U2>(_: U2) where T2 : Q {}
+      // }
+      //
+      // Suppose we're devirtualizing a call to Base.foo() on a value whose
+      // type is known to be Derived<Bar>. We start with substitutions written
+      // in terms of Base.foo()'s generic signature:
+      //
+      // <T1, U1 where T1 : P>
+      // T1 := Foo<Bar>
+      // T1 : P := Foo<Bar> : P
+      //
+      // We want to build substitutions in terms of Derived.foo()'s
+      // generic signature:
+      //
+      // <T2, U2 where T2 : Q>
+      // T2 := Bar
+      // T2 : Q := Bar : Q
+      //
+      // The conformance Bar : Q is difficult to recover in the general case.
+      //
+      // Some combination of storing substitution maps in BoundGenericTypes
+      // as well as for method overrides would solve this, but for now, just
+      // punt to module lookup.
+      return proto->getParentModule()->lookupConformance(substType, proto);
     });
 }
 
@@ -685,4 +714,12 @@ bool SubstitutionMap::isIdentity() const {
   assert(replacements.empty());
 
   return !hasNonIdentityReplacement;
+}
+
+SubstitutionMap SubstitutionMap::mapIntoTypeExpansionContext(
+    TypeExpansionContext context) const {
+  ReplaceOpaqueTypesWithUnderlyingTypes replacer(
+      context.getContext(), context.getResilienceExpansion(),
+      context.isWholeModuleContext());
+  return this->subst(replacer, replacer, SubstFlags::SubstituteOpaqueArchetypes);
 }

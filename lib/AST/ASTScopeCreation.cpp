@@ -29,6 +29,7 @@
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/TypeRepr.h"
+#include "swift/Basic/Debug.h"
 #include "swift/Basic/STLExtras.h"
 #include "llvm/Support/Compiler.h"
 #include <algorithm>
@@ -51,7 +52,9 @@ static bool rangeableIsIgnored(const Stmt *d) {
   return false; // ??
 }
 static bool rangeableIsIgnored(const ASTNode n) {
-  return n.is<Decl *>() && n.get<Decl *>()->isImplicit();
+  return (n.is<Decl *>() && rangeableIsIgnored(n.get<Decl *>())) ||
+         (n.is<Stmt *>() && rangeableIsIgnored(n.get<Stmt *>())) ||
+         (n.is<Expr *>() && rangeableIsIgnored(n.get<Expr *>()));
 }
 
 template <typename Rangeable>
@@ -599,25 +602,12 @@ private:
 
   template <typename Rangeable>
   bool isNotAfter(Rangeable n1, Rangeable n2) const {
-    auto cmpLoc = [&](const SourceLoc l1, const SourceLoc l2) {
-      return l1 == l2 ? 0 : ctx.SourceMgr.isBeforeInBuffer(l1, l2) ? -1 : 1;
-    };
     const auto r1 = getRangeableSourceRange(n1);
     const auto r2 = getRangeableSourceRange(n2);
-    const int startOrder = cmpLoc(r1.Start, r2.Start);
-    const int endOrder = cmpLoc(r1.End, r2.End);
 
-#ifndef NDEBUG
-    if (startOrder * endOrder == -1) {
-      llvm::errs() << "*** Start order contradicts end order between: ***\n";
-      dumpRangeable(n1, llvm::errs());
-      llvm::errs() << "\n*** and: ***\n";
-      dumpRangeable(n2, llvm::errs());
-    }
-#endif
-    ASTScopeAssert(startOrder * endOrder != -1,
-                   "Start order contradicts end order");
-    return startOrder + endOrder < 1;
+    const int signum = ASTScopeImpl::compare(r1, r2, ctx.SourceMgr,
+                                             /*ensureDisjoint=*/true);
+    return -1 == signum;
   }
 
   static bool isVarDeclInPatternBindingDecl(ASTNode n1, ASTNode n2) {
@@ -640,8 +630,7 @@ public:
     // Can occur in illegal code
     if (auto *const s = n.dyn_cast<Stmt *>()) {
       if (auto *const bs = dyn_cast<BraceStmt>(s))
-        ASTScopeAssert(bs->getNumElements() == 0,
-                       "Might mess up insertion point");
+        ASTScopeAssert(bs->empty(), "Might mess up insertion point");
     }
     return !n.isDecl(DeclKind::Var);
   }
@@ -670,7 +659,7 @@ public:
 
     auto printDecl = [&](const Decl *d) {
       llvm::errs() << "\ngetAsDecl() -> " << d << " ";
-      d->getSourceRange().dump(ctx.SourceMgr);
+      d->getSourceRange().print(llvm::errs(), ctx.SourceMgr);
       llvm::errs() << " : ";
       d->dump(llvm::errs());
       llvm::errs() << "\n";
@@ -710,7 +699,7 @@ private:
   findLocalizableDeclContextsInAST() const;
 
 public:
-  void dump() const { print(llvm::errs()); }
+  SWIFT_DEBUG_DUMP { print(llvm::errs()); }
 
   void print(raw_ostream &out) const {
     out << "(swift::ASTSourceFileScope*) " << sourceFileScope << "\n";
@@ -742,6 +731,20 @@ void ASTScope::
   impl->buildEnoughOfTreeForTopLevelExpressionsButDontRequestGenericsOrExtendedNominals();
 }
 
+bool ASTScope::areInactiveIfConfigClausesSupported() {
+  return ScopeCreator::includeInactiveIfConfigClauses;
+}
+
+void ASTScope::expandFunctionBody(AbstractFunctionDecl *AFD) {
+  auto *const SF = AFD->getParentSourceFile();
+  if (SF->isSuitableForASTScopes())
+    SF->getScope().expandFunctionBodyImpl(AFD);
+}
+
+void ASTScope::expandFunctionBodyImpl(AbstractFunctionDecl *AFD) {
+  impl->expandFunctionBody(AFD);
+}
+
 ASTSourceFileScope *ASTScope::createScopeTree(SourceFile *SF) {
   ScopeCreator *scopeCreator = new (SF->getASTContext()) ScopeCreator(SF);
   return scopeCreator->sourceFileScope;
@@ -759,6 +762,15 @@ void ASTSourceFileScope::
       expandAndBeCurrentDetectingRecursion(*scopeCreator);
 }
 
+void ASTSourceFileScope::expandFunctionBody(AbstractFunctionDecl *AFD) {
+  if (!AFD)
+    return;
+  auto sr = AFD->getBodySourceRange();
+  if (sr.isInvalid())
+    return;
+  ASTScopeImpl *bodyScope = findInnermostEnclosingScope(sr.Start, nullptr);
+  bodyScope->expandAndBeCurrentDetectingRecursion(*scopeCreator);
+}
 
 ASTSourceFileScope::ASTSourceFileScope(SourceFile *SF,
                                        ScopeCreator *scopeCreator)
@@ -1066,6 +1078,8 @@ void ASTScopeImpl::disownDescendants(ScopeCreator &scopeCreator) {
 
 ASTScopeImpl *
 ASTScopeImpl::expandAndBeCurrentDetectingRecursion(ScopeCreator &scopeCreator) {
+  assert(scopeCreator.getASTContext().LangOpts.EnableASTScopeLookup &&
+         "Should not be getting here if ASTScopes are disabled");
   return evaluateOrDefault(scopeCreator.getASTContext().evaluator,
                            ExpandASTScopeRequest{this, &scopeCreator}, nullptr);
 }
@@ -1198,7 +1212,7 @@ ParameterListScope::expandAScopeThatCreatesANewInsertionPoint(
   // Unlike generic parameters or pattern initializers, it cannot refer to a
   // previous parameter.
   for (ParamDecl *pd : params->getArray()) {
-    if (pd->getDefaultValue())
+    if (pd->hasDefaultExpr())
       scopeCreator
           .constructExpandAndInsertUncheckable<DefaultArgumentInitializerScope>(
               this, pd);
@@ -1359,8 +1373,8 @@ void AbstractFunctionDeclScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
   }
   // Create scope for the body.
   // We create body scopes when there is no body for source kit to complete
-  // erroneous code in bodies. But don't let compiler synthesize one.
-  if (decl->getBodySourceRange().isValid() && decl->getBody(false)) {
+  // erroneous code in bodies.
+  if (decl->getBodySourceRange().isValid()) {
     if (AbstractFunctionBodyScope::isAMethod(decl))
       scopeCreator.constructExpandAndInsertUncheckable<MethodBodyScope>(leaf,
                                                                         decl);
@@ -1521,7 +1535,7 @@ void ClosureBodyScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
 void DefaultArgumentInitializerScope::
     expandAScopeThatDoesNotCreateANewInsertionPoint(
         ScopeCreator &scopeCreator) {
-  auto *initExpr = decl->getDefaultValue();
+  auto *initExpr = decl->getStructuralDefaultExpr();
   ASTScopeAssert(initExpr,
                  "Default argument initializer must have an initializer.");
   scopeCreator.addToScopeTree(initExpr, this);
@@ -1901,6 +1915,7 @@ void AbstractFunctionBodyScope::beCurrent() {
   bodyWhenLastExpanded = decl->getBody(false);
 }
 bool AbstractFunctionBodyScope::isCurrentIfWasExpanded() const {
+  // Pass in false to keep the compiler from synthesizing one.
   return bodyWhenLastExpanded == decl->getBody(false);
 }
 
