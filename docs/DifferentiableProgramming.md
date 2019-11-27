@@ -72,7 +72,7 @@ Backticks were added manually.
             *   [Upcasting to non-`@differentiable` functions](#upcasting-to-non-differentiable-functions)
         *   [Implied generic constraints](#implied-generic-constraints)
         *   [Non-differentiable parameters](#non-differentiable-parameters)
-    *   [Differentiable operators](#differentiable-operators)
+    *   [Differential operators](#differential-operators)
         *   [Differential-producing differential operators](#differential-producing-differential-operators)
         *   [Pullback-producing differential operators](#pullback-producing-differential-operators)
         *   [Example usage](#example-usage)
@@ -2001,7 +2001,7 @@ _ = f0 as @differentiable (@noDerivative Float, Float) -> Float
 _ = f0 as @differentiable (@noDerivative Float, @noDerivative Float) -> Float
 ```
 
-### Differentiable operators
+### Differential operators
 
 The core differentiation APIs are the differential operators. Differential
 operators are higher-order functions that take `@differentiable` functions as
@@ -2085,7 +2085,7 @@ func valueWithGradient<T, R: FloatingPoint>(
 
 func gradient<T, R: FloatingPoint>(
     at x: T, in body: @differentiable (T) -> R
-) -> (value: R, gradient: T.TangentVector) where R.TangentVector: FloatingPoint {
+) -> T.TangentVector where R.TangentVector: FloatingPoint {
     return valueWithGradient(at: x, in: body).gradient
 }
 
