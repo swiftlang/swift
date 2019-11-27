@@ -393,10 +393,12 @@ createDifferentiabilityWitness(SILModule &module, SILLinkage linkage,
       module.getASTContext(),
       attr->getOriginal()->getLoweredFunctionType()->getNumResults(),
       {attr->getIndices().source});
+  bool isSerialized = attr->getOriginal()->isSerialized();
   auto *witness = SILDifferentiabilityWitness::createDefinition(
-      module, linkage, attr->getOriginal(), attr->getIndices().parameters,
-      resultIndices, attr->getDerivativeGenericSignature(), /*jvp*/ nullptr,
-      /*vjp*/ nullptr, /*isSerialized*/ false);
+      module, isSerialized ? SILLinkage::Shared : SILLinkage::Hidden,
+      attr->getOriginal(), attr->getIndices().parameters, resultIndices,
+      attr->getDerivativeGenericSignature(), /*jvp*/ nullptr,
+      /*vjp*/ nullptr, isSerialized);
   canonicalizeDifferentiabilityWitness(module, attr, witness);
   return witness;
 }
