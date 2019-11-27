@@ -361,6 +361,38 @@ struct ImplicitNoDerivativeWithSeparateTangent : Differentiable {
   var b: Bool // expected-warning {{stored property 'b' has no derivative because it does not conform to 'Differentiable'; add an explicit '@noDerivative' attribute}} {{3-3=@noDerivative }}
 }
 
+// TF-1018: verify that `@noDerivative` warnings are always silenceable, even
+// when the `Differentiable` conformance context is not the nominal type
+// declaration.
+
+struct ExtensionDifferentiableNoDerivative<T> {
+  // expected-warning @+2 {{stored property 'x' has no derivative because it does not conform to 'Differentiable'; add an explicit '@noDerivative' attribute}}
+  // expected-warning @+1 {{stored property 'y' has no derivative because it does not conform to 'Differentiable'; add an explicit '@noDerivative' attribute}}
+  var x, y: T
+  // expected-warning @+1 {{stored property 'nondiff' has no derivative because it does not conform to 'Differentiable'; add an explicit '@noDerivative' attribute}}
+  var nondiff: Bool
+}
+extension ExtensionDifferentiableNoDerivative: Differentiable {}
+
+struct ExtensionDifferentiableNoDerivativeFixed<T> {
+  @noDerivative var x, y: T
+  @noDerivative var nondiff: Bool
+}
+extension ExtensionDifferentiableNoDerivativeFixed: Differentiable {}
+
+struct ConditionalDifferentiableNoDerivative<T> {
+  var x, y: T
+  // expected-warning @+1 {{stored property 'nondiff' has no derivative because it does not conform to 'Differentiable'; add an explicit '@noDerivative' attribute}}
+  var nondiff: Bool
+}
+extension ConditionalDifferentiableNoDerivative: Differentiable where T: Differentiable {}
+
+struct ConditionalDifferentiableNoDerivativeFixed<T> {
+  var x, y: T
+  @noDerivative var nondiff: Bool
+}
+extension ConditionalDifferentiableNoDerivativeFixed: Differentiable where T: Differentiable {}
+
 // TF-265: Test invalid initializer (that uses a non-existent type).
 struct InvalidInitializer : Differentiable {
   init(filterShape: (Int, Int, Int, Int), blah: NonExistentType) {} // expected-error {{use of undeclared type 'NonExistentType'}}
