@@ -4919,18 +4919,23 @@ public:
   /// Handle `tuple` instruction.
   ///   Original: y = tuple (x0, x1, x2, ...)
   ///    Tangent: tan[y] = tuple (tan[x0], tan[x1], tan[x2], ...)
+  ///                                                        ^~~
+  ///                                      excluding non-differentiable elements
   CLONE_AND_EMIT_TANGENT(Tuple, ti) {
     auto diffBuilder = getDifferentialBuilder();
 
     // Get the tangents of all the tuple elements.
     SmallVector<SILValue, 8> tangentTupleElements;
     for (auto elem : ti->getElements()) {
+      if (!getTangentSpace(elem->getType().getASTType()))
+        continue;
       tangentTupleElements.push_back(
           materializeTangent(getTangentValue(elem), ti->getLoc()));
     }
 
     // Emit the instruction and add the tangent mapping.
-    auto tanTuple = diffBuilder.createTuple(ti->getLoc(), tangentTupleElements);
+    auto tanTuple =
+        joinElements(tangentTupleElements, diffBuilder, ti->getLoc());
     setTangentValue(ti->getParent(), ti, makeConcreteTangentValue(tanTuple));
   }
 
@@ -4998,30 +5003,31 @@ public:
   ///                                                                 ^~~~
   ///                              tuple tangent space index corresponding to n
   CLONE_AND_EMIT_TANGENT(DestructureTuple, dti) {
+    assert(llvm::any_of(dti->getResults(),
+                        [&](SILValue elt) {
+                          return activityInfo.isActive(elt, getIndices());
+                        }) &&
+           "`destructure_tuple` should have at least one active result");
+
     auto &diffBuilder = getDifferentialBuilder();
     auto *bb = dti->getParent();
     auto loc = dti->getLoc();
 
-    SmallVector<SILValue, 2> activeOrigResults;
-    bool hasActiveResult = false;
-    for (auto result : dti->getResults()) {
-      if (activityInfo.isActive(result, getIndices())) {
-        activeOrigResults.push_back(result);
-        hasActiveResult = true;
-        break;
-      }
-    }
-    assert(!activeOrigResults.empty() &&
-           "original 'destructure_tuple' should have at least one active "
-           "result");
-
     auto tanTuple =
         materializeTangent(getTangentValue(dti->getOperand()), loc);
-    auto *tupleElements = diffBuilder.createDestructureTuple(loc, tanTuple);
-    for (auto i : range(tupleElements->getNumResults())) {
-      auto origElem = dti->getResult(i);
-      auto tanElem = tupleElements->getResult(i);
-      setTangentValue(bb, origElem, makeConcreteTangentValue(tanElem));
+    SmallVector<SILValue, 4> tanElts;
+    if (tanTuple->getType().is<TupleType>()) {
+      auto *tanDti = diffBuilder.createDestructureTuple(loc, tanTuple);
+      tanElts.append(tanDti->getResults().begin(), tanDti->getResults().end());
+    } else {
+      tanElts.push_back(tanTuple);
+    }
+    unsigned tanIdx = 0;
+    for (auto i : range(dti->getNumResults())) {
+      auto origElt = dti->getResult(i);
+      if (!getTangentSpace(origElt->getType().getASTType()))
+        continue;
+      setTangentValue(bb, origElt, makeConcreteTangentValue(tanElts[tanIdx++]));
     }
   }
 
@@ -7246,27 +7252,37 @@ public:
     auto av = getAdjointValue(bb, ti);
     switch (av.getKind()) {
     case AdjointValueKind::Zero:
-      for (auto eltVal : ti->getElements()) {
-        if (!getTangentSpace(eltVal->getType().getASTType()))
+      for (auto elt : ti->getElements()) {
+        if (!getTangentSpace(elt->getType().getASTType()))
           continue;
-        addAdjointValue(bb, eltVal,
-            makeZeroAdjointValue(getRemappedTangentType(eltVal->getType())),
+        addAdjointValue(
+            bb, elt,
+            makeZeroAdjointValue(getRemappedTangentType(elt->getType())),
             ti->getLoc());
       }
       break;
     case AdjointValueKind::Concrete: {
-      auto val = av.getConcreteValue();
+      auto adjVal = av.getConcreteValue();
       unsigned adjIdx = 0;
-      auto valCopy = builder.emitCopyValueOperation(ti->getLoc(), val);
-      auto elts = builder.createDestructureTuple(ti->getLoc(), valCopy);
-      for (auto elt : elts->getResults())
-        recordTemporary(elt);
+      auto adjValCopy = builder.emitCopyValueOperation(ti->getLoc(), adjVal);
+      SmallVector<SILValue, 4> adjElts;
+      if (!adjVal->getType().getAs<TupleType>()) {
+        recordTemporary(adjValCopy);
+        adjElts.push_back(adjValCopy);
+      } else {
+        auto *dti = builder.createDestructureTuple(ti->getLoc(), adjValCopy);
+        for (auto adjElt : dti->getResults())
+          recordTemporary(adjElt);
+        adjElts.append(dti->getResults().begin(), dti->getResults().end());
+      }
+      // Accumulate adjoints for `tuple` operands, skipping the
+      // non-differentiable ones.
       for (auto i : range(ti->getNumOperands())) {
         if (!getTangentSpace(ti->getOperand(i)->getType().getASTType()))
           continue;
-        auto adjElt = elts->getResult(adjIdx++);
-        addAdjointValue(bb, ti->getOperand(i),
-                        makeConcreteAdjointValue(adjElt), ti->getLoc());
+        auto adjElt = adjElts[adjIdx++];
+        addAdjointValue(bb, ti->getOperand(i), makeConcreteAdjointValue(adjElt),
+                        ti->getLoc());
       }
       break;
     }

@@ -259,25 +259,43 @@ extension Tracked where T : Differentiable & FloatingPoint, T == T.TangentVector
 
 // Differential operators for `Tracked<T>`.
 
-public func gradient<T, U>(
-  at x: T, in f: @differentiable (T) -> Tracked<U>
-) -> T.TangentVector
-where U : FloatingPoint, U.TangentVector == U {
-  return pullback(at: x, in: f)(Tracked<U>(1))
+public func gradient<T, R: FloatingPoint>(
+  at x: T, in f: @differentiable (T) -> Tracked<R>
+) -> T.TangentVector where R.TangentVector == R {
+  return pullback(at: x, in: f)(1)
 }
 
-public func gradient<T, U, R>(
+public func gradient<T, U, R: FloatingPoint>(
   at x: T, _ y: U, in f: @differentiable (T, U) -> Tracked<R>
-) -> (T.TangentVector, U.TangentVector)
-  where R : FloatingPoint, R.TangentVector == R {
-  return pullback(at: x, y, in: f)(Tracked<R>(1))
+) -> (T.TangentVector, U.TangentVector) where R.TangentVector == R {
+  return pullback(at: x, y, in: f)(1)
 }
 
-public func valueWithGradient<T, U : FloatingPoint>(
-  at x: T, in f: @differentiable (T) -> Tracked<U>
-) -> (value: Tracked<U>, gradient: T.TangentVector) {
+public func derivative<T: FloatingPoint, R>(
+  at x: Tracked<T>, in f: @differentiable (Tracked<T>) -> R
+) -> R.TangentVector where T.TangentVector == T {
+  return differential(at: x, in: f)(1)
+}
+
+public func derivative<T: FloatingPoint, U: FloatingPoint, R>(
+  at x: Tracked<T>, _ y: Tracked<U>,
+  in f: @differentiable (Tracked<T>, Tracked<U>) -> R
+) -> R.TangentVector where T.TangentVector == T, U.TangentVector == U {
+  return differential(at: x, y, in: f)(1, 1)
+}
+
+public func valueWithGradient<T, R: FloatingPoint>(
+  at x: T, in f: @differentiable (T) -> Tracked<R>
+) -> (value: Tracked<R>, gradient: T.TangentVector) {
   let (y, pullback) = valueWithPullback(at: x, in: f)
-  return (y, pullback(Tracked<U>(1)))
+  return (y, pullback(1))
+}
+
+public func valueWithDerivative<T: FloatingPoint, R>(
+  at x: Tracked<T>, in f: @differentiable (Tracked<T>) -> R
+) -> (value: R, derivative: R.TangentVector) {
+  let (y, differential) = valueWithDifferential(at: x, in: f)
+  return (y, differential(1))
 }
 
 public extension Differentiable {
