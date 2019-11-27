@@ -3361,6 +3361,9 @@ DifferentiableAttributeParameterIndicesRequest::evaluate(
     return nullptr;
   }
 
+  // If the original declaration has an error interface type, return.
+  if (original->getInterfaceType()->hasError())
+    return nullptr;
   auto *originalFnTy = original->getInterfaceType()->castTo<AnyFunctionType>();
   bool isMethod = original->hasImplicitSelfDecl();
 
