@@ -79,7 +79,7 @@ FilterTests.test("chained filter order") {
   let lazyFilter = array.lazy
     .filter { _ in false }
     .filter { _ in
-      expectationFailure("Executed second filter before first")
+      expectUnreachable("Executed second filter before first")
       return true
     }
   let lazyResult = Array(lazyFilter)
@@ -87,7 +87,7 @@ FilterTests.test("chained filter order") {
   let result = array
     .filter { _ in false }
     .filter { _ in
-      expectationFailure("Executed second filter before first")
+      expectUnreachable("Executed second filter before first")
       return true
     }
   
