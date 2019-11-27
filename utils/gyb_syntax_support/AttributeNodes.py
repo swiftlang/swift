@@ -310,14 +310,17 @@ ATTRIBUTE_NODES = [
 
     # SWIFT_ENABLE_TENSORFLOW
     # The argument of the derivative registration attribute
-    # '@derivative(of: ...)'.
+    # '@derivative(of: ...)' and the transpose registration attribute
+    # '@transpose(of: ...)'.
     # derivative-registration-attr-arguments ->
     #     'of' ':' func-decl-name ','? differentiation-params-clause?
+    # TODO(TF-1009): Add syntax support for dot-separated qualified names in
+    # `@transpose(of:)` attributes.
     Node('DerivativeRegistrationAttributeArguments', kind='Syntax',
          description='''
-         The arguments for the '@derivative(of:)' attribute: the 'of:' label,
-         the original declaration name, and an optional differentiation
-         parameter list.
+         The arguments for the '@derivative(of:)' and '@transpose(of:)'
+         attributes: the 'of:' label, the original declaration name, and an
+         optional differentiation parameter list.
          ''',
          children=[
              Child('OfLabel', kind='IdentifierToken', text_choices=['of'],
@@ -336,7 +339,7 @@ ATTRIBUTE_NODES = [
     # SWIFT_ENABLE_TENSORFLOW
     # The argument of the deprecated derivative registration attributes
     # '@differentiating' and '@transposing'.
-    # derivative-registration-attr-arguments ->
+    # deprecated-derivative-registration-attr-arguments ->
     #     func-decl-name ','? differentiation-params-clause?
     # TODO(TF-999): Remove deprecated `@differentiating` and `@transposing`
     # attributes.

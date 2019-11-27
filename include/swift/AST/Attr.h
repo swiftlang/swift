@@ -1743,12 +1743,11 @@ using DifferentiatingAttr = DerivativeAttr;
 /// Attribute that registers a function as a transpose of another function.
 ///
 /// Examples:
-///   @transposing(foo)
-///   @transposing(+, wrt: (lhs, rhs))
-class TransposingAttr final
-      : public DeclAttribute,
-        private llvm::TrailingObjects<TransposingAttr,
-                                      ParsedAutoDiffParameter> {
+///   @transpose(of: foo)
+///   @transpose(of: +, wrt: (lhs, rhs))
+class TransposeAttr final
+    : public DeclAttribute,
+      private llvm::TrailingObjects<TransposeAttr, ParsedAutoDiffParameter> {
   friend TrailingObjects;
 
   /// The base type of the original function.
@@ -1761,28 +1760,27 @@ class TransposingAttr final
   AbstractFunctionDecl *OriginalFunction = nullptr;
   /// The number of parsed parameters specified in 'wrt:'.
   unsigned NumParsedParameters = 0;
-  /// The differentiation parameters' indices, resolved by the type checker.
+  /// The transposed parameters' indices, resolved by the type checker.
   IndexSubset *ParameterIndices = nullptr;
 
-  explicit TransposingAttr(bool implicit, SourceLoc atLoc,
-                           SourceRange baseRange, TypeRepr *baseType,
-                           DeclNameWithLoc original,
-                           ArrayRef<ParsedAutoDiffParameter> params);
+  explicit TransposeAttr(bool implicit, SourceLoc atLoc, SourceRange baseRange,
+                         TypeRepr *baseType, DeclNameWithLoc original,
+                         ArrayRef<ParsedAutoDiffParameter> params);
 
-  explicit TransposingAttr(bool implicit, SourceLoc atLoc,
-                           SourceRange baseRange, TypeRepr *baseType,
-                           DeclNameWithLoc original, IndexSubset *indices);
+  explicit TransposeAttr(bool implicit, SourceLoc atLoc, SourceRange baseRange,
+                         TypeRepr *baseType, DeclNameWithLoc original,
+                         IndexSubset *indices);
 
 public:
-  static TransposingAttr *create(ASTContext &context, bool implicit,
-                                 SourceLoc atLoc, SourceRange baseRange,
-                                 TypeRepr *baseType, DeclNameWithLoc original,
-                                 ArrayRef<ParsedAutoDiffParameter> params);
+  static TransposeAttr *create(ASTContext &context, bool implicit,
+                               SourceLoc atLoc, SourceRange baseRange,
+                               TypeRepr *baseType, DeclNameWithLoc original,
+                               ArrayRef<ParsedAutoDiffParameter> params);
 
-  static TransposingAttr *create(ASTContext &context, bool implicit,
-                                 SourceLoc atLoc, SourceRange baseRange,
-                                 TypeRepr *baseType, DeclNameWithLoc original,
-                                 IndexSubset *indices);
+  static TransposeAttr *create(ASTContext &context, bool implicit,
+                               SourceLoc atLoc, SourceRange baseRange,
+                               TypeRepr *baseType, DeclNameWithLoc original,
+                               IndexSubset *indices);
 
   TypeRepr *getBaseType() const { return BaseType; }
   DeclNameWithLoc getOriginalFunctionName() const {
@@ -1795,8 +1793,8 @@ public:
     OriginalFunction = decl;
   }
 
-  /// The parsed transposing parameters, i.e. the list of parameters
-  /// specified in 'wrt:'.
+  /// The parsed transposed parameters, i.e. the list of parameters specified in
+  /// 'wrt:'.
   ArrayRef<ParsedAutoDiffParameter> getParsedParameters() const {
     return {getTrailingObjects<ParsedAutoDiffParameter>(), NumParsedParameters};
   }
@@ -1815,7 +1813,7 @@ public:
   }
 
   static bool classof(const DeclAttribute *DA) {
-    return DA->getKind() == DAK_Transposing;
+    return DA->getKind() == DAK_Transpose;
   }
 };
 

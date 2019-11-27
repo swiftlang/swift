@@ -1572,14 +1572,14 @@ WARNING(attr_differentiating_deprecated,PointsToFirstBadToken,
         "'@differentiating' attribute is deprecated; use '@derivative(of:)' "
         "instead", ())
 
-// transposing
-ERROR(attr_transposing_expected_original_name,PointsToFirstBadToken,
+// transpose
+ERROR(attr_transpose_expected_original_name,PointsToFirstBadToken,
       "expected an original function name", ())
-ERROR(attr_transposing_expected_label_linear_or_wrt,none,
+ERROR(attr_transpose_expected_label_linear_or_wrt,none,
       "expected 'wrt:'", ())
 
-// transposing `wrt` parameters clause
-ERROR(transposing_params_clause_expected_parameter,PointsToFirstBadToken,
+// transpose `wrt` parameters clause
+ERROR(transpose_params_clause_expected_parameter,PointsToFirstBadToken,
       "expected a parameter, which can be a 'unsigned int' parameter number "
       "or 'self'", ())
 

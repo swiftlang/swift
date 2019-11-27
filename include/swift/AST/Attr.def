@@ -524,7 +524,7 @@ SIMPLE_DECL_ATTR(noDerivative, NoDerivative,
   OnVar |
   ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove,
   94)
-DECL_ATTR(transposing, Transposing,
+DECL_ATTR(transpose, Transpose,
   OnFunc | LongAttribute | AllowMultipleAttributes |
   ABIStableToAdd | ABIBreakingToRemove | APIStableToAdd | APIBreakingToRemove |
   NotSerialized, 96)

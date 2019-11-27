@@ -1780,11 +1780,12 @@ namespace decls_block {
     BCArray<BCFixed<1>> // Differentiation parameter indices' bitvector.
   >;
 
+  // TODO(TF-999): Remove deprecated `@differentiating` attribute.
   using DifferentiatingDeclAttrLayout = DerivativeDeclAttrLayout;
   
   // SWIFT_ENABLE_TENSORFLOW
-  using TransposingDeclAttrLayout = BCRecordLayout<
-    Transposing_DECL_ATTR,
+  using TransposeDeclAttrLayout = BCRecordLayout<
+    Transpose_DECL_ATTR,
     BCFixed<1>, // Implicit flag.
     IdentifierIDField, // Original name.
     DeclIDField, // Original function declaration.

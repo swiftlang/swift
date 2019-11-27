@@ -613,8 +613,20 @@ func bazDerivative(_ x: Float, y: Float)
   return (x, { v in v })
 }
 
+@transpose(of: +)
+func addTranspose(_ v: Float) -> (Float, Float) {
+  return (v, v)
+}
+
 @differentiating(baz(label:_:))
 func bazDerivative(_ x: Float, y: Float)
     -> (value: Float, pullback: (Float) -> (Float, Float)) {
   return (x, { v in v })
+}
+
+// TODO(TF-1009): Add syntax support for dot-separated qualified names in
+// `@transpose(of:)` attributes.
+@transpose(of: Float.-)
+func negateTranspose(_ v: Float) -> Float {
+  return -v
 }

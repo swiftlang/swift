@@ -929,7 +929,7 @@ bool Parser::parseDifferentiationParametersClause(
   return false;
 }
 
-bool Parser::parseTransposingParametersClause(
+bool Parser::parseTransposedParametersClause(
     SmallVectorImpl<ParsedAutoDiffParameter> &params, StringRef attrName) {
   SyntaxParsingContext TransposeParamsClauseContext(
       SyntaxContext, SyntaxKind::DifferentiationParamsClause);
@@ -950,7 +950,7 @@ bool Parser::parseTransposingParametersClause(
         unsigned int paramNum;
         if (parseUnsignedInteger(
                 paramNum, paramLoc,
-                diag::transposing_params_clause_expected_parameter))
+                diag::transpose_params_clause_expected_parameter))
           return true;
 
         params.push_back(
@@ -963,7 +963,7 @@ bool Parser::parseTransposingParametersClause(
         break;
       }
       default:
-        diagnose(Tok, diag::transposing_params_clause_expected_parameter);
+        diagnose(Tok, diag::transpose_params_clause_expected_parameter);
         return true;
     }
     if (parseTrailingComma && Tok.isNot(tok::r_paren))
@@ -1310,9 +1310,9 @@ bool parseQualifiedDeclName(Parser &P, Diag<> nameParseError,
   return !original.Name;
 }
 
-ParserResult<TransposingAttr> Parser::parseTransposingAttribute(SourceLoc atLoc,
-                                                                SourceLoc loc) {
-  StringRef AttrName = "transposing";
+ParserResult<TransposeAttr> Parser::parseTransposeAttribute(SourceLoc atLoc,
+                                                            SourceLoc loc) {
+  StringRef AttrName = "transpose";
   SourceLoc lParenLoc = loc, rParenLoc = loc;
   TypeRepr *baseType;
   DeclNameWithLoc original;
@@ -1342,18 +1342,29 @@ ParserResult<TransposingAttr> Parser::parseTransposingAttribute(SourceLoc atLoc,
   {
     SyntaxParsingContext ContentContext(
         SyntaxContext, SyntaxKind::DerivativeRegistrationAttributeArguments);
+    // Parse the 'of:' label and colon.
+    if (parseSpecificIdentifier("of", diag::attr_missing_label, "of",
+                                AttrName) ||
+        parseToken(tok::colon, diag::expected_colon_after_label, "of")) {
+      return makeParserError();
+    }
     {
-      // Parse the optionally qualified function.
+      // Parse the optionally qualified function name.
+      // TODO(TF-1009): Fix syntax support for dot-separated qualified names.
+      // Currently, `SyntaxKind::FunctionDeclName` only supports unqualified
+      // names.
+      SyntaxParsingContext FuncDeclNameContext(SyntaxContext,
+                                               SyntaxKind::FunctionDeclName);
       if (parseQualifiedDeclName(*this,
-                                 diag::attr_transposing_expected_original_name,
+                                 diag::attr_transpose_expected_original_name,
                                  baseType, original))
         return makeParserError();
       if (consumeIfTrailingComma())
         return makeParserError();
     }
-    // Parse the optional 'wrt' differentiation parameters clause.
+    // Parse the optional 'wrt' transposed parameters clause.
     if (Tok.is(tok::identifier) && Tok.getText() == "wrt" &&
-        parseTransposingParametersClause(params, AttrName))
+        parseTransposedParametersClause(params, AttrName))
       return makeParserError();
   }
   // Parse ')'.
@@ -1362,7 +1373,7 @@ ParserResult<TransposingAttr> Parser::parseTransposingAttribute(SourceLoc atLoc,
              /*DeclModifier*/ false);
     return makeParserError();
   }
-  return ParserResult<TransposingAttr>(TransposingAttr::create(
+  return ParserResult<TransposeAttr>(TransposeAttr::create(
       Context, /*implicit*/ false, atLoc, SourceRange(loc, rParenLoc), baseType,
       original, params));
 }
@@ -2207,21 +2218,27 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
   }
 
   // SWIFT_ENABLE_TENSORFLOW
-  case DAK_Differentiating: {
-    diagnose(Loc, diag::attr_differentiating_deprecated);
-    auto Attr = parseDifferentiatingAttribute(AtLoc, Loc);
+  case DAK_Transpose: {
+    // `@transpose` in a local scope is not allowed.
+    if (CurDeclContext->isLocalContext())
+      diagnose(Loc, diag::attr_only_at_non_local_scope, '@' + AttrName.str());
+
+    auto Attr = parseTransposeAttribute(AtLoc, Loc);
     if (Attr.isNonNull())
       Attributes.add(Attr.get());
     break;
   }
 
   // SWIFT_ENABLE_TENSORFLOW
-  case DAK_Transposing: {
-    // `@transposing` in a local scope is not allowed.
+  case DAK_Differentiating: {
+    // Diagnose deprecated `@differentiating` attribute.
+    diagnose(Loc, diag::attr_differentiating_deprecated);
+
+    // `@differentiating` in a local scope is not allowed.
     if (CurDeclContext->isLocalContext())
       diagnose(Loc, diag::attr_only_at_non_local_scope, '@' + AttrName.str());
 
-    auto Attr = parseTransposingAttribute(AtLoc, Loc);
+    auto Attr = parseDifferentiatingAttribute(AtLoc, Loc);
     if (Attr.isNonNull())
       Attributes.add(Attr.get());
     break;
