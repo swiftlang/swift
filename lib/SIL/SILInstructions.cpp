@@ -787,7 +787,9 @@ DifferentiabilityWitnessFunctionInst::DifferentiabilityWitnessFunctionInst(
                                     : getDifferentiabilityWitnessType(
                                           module, witnessKind, witness)),
       witnessKind(witnessKind), witness(witness),
-      hasExplicitFunctionType(FunctionType) {}
+      hasExplicitFunctionType(FunctionType) {
+  assert(witness && "Witness must not be null");
+}
 // SWIFT_ENABLE_TENSORFLOW END
 
 FunctionRefBaseInst::FunctionRefBaseInst(SILInstructionKind Kind,
