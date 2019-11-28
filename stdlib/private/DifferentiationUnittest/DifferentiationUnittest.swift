@@ -297,35 +297,3 @@ public func valueWithDerivative<T: FloatingPoint, R>(
   let (y, differential) = valueWithDifferential(at: x, in: f)
   return (y, differential(1))
 }
-
-public extension Differentiable {
-  @inlinable
-  func gradient(
-    in f: @differentiable (Self) -> Tracked<Float>
-  ) -> TangentVector {
-    return self.pullback(in: f)(1)
-  }
-
-  @inlinable
-  func gradient<T : Differentiable>(
-    at x: T, in f: @differentiable (Self, T) -> Tracked<Float>
-  ) -> (TangentVector, T.TangentVector) {
-    return self.pullback(at: x, in: f)(1)
-  }
-
-  @inlinable
-  func valueWithGradient(
-    in f: @differentiable (Self) -> Tracked<Float>
-  ) -> (value: Tracked<Float>, gradient: TangentVector) {
-    let (y, pb) = self.valueWithPullback(in: f)
-    return (y, pb(1))
-  }
-
-  @inlinable
-  func valueWithGradient<T : Differentiable>(
-    at x: T, in f: @differentiable (Self, T) -> Tracked<Float>
-  ) -> (value: Tracked<Float>, gradient: (TangentVector, T.TangentVector)) {
-    let (y, pb) = self.valueWithPullback(at: x, in: f)
-    return (y, pb(1))
-  }
-}

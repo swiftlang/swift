@@ -286,7 +286,9 @@ public extension Differentiable {
   internal func _vjp_withRecomputationInPullbacks<Result : Differentiable>(
     _ body: @escaping @differentiable (Self) -> Result
   ) -> (Result, (Result.TangentVector) -> TangentVector) {
-    return valueWithPullback(in: Swift.withRecomputationInPullbacks(body))
+    return Swift.valueWithPullback(
+      at: self, in: Swift.withRecomputationInPullbacks(body)
+    )
   }
 }
 
@@ -295,6 +297,10 @@ public extension Differentiable {
 //===----------------------------------------------------------------------===//
 
 public extension Differentiable {
+  @available(*, deprecated, message: """
+    Method-style differential operators are deprecated and will be removed; \
+    use top-level function 'Swift.valueWithPullback(at:in:)' instead
+    """)
   @inlinable
   func valueWithPullback<R>(
     in f: @differentiable (Self) -> R
@@ -302,6 +308,10 @@ public extension Differentiable {
     return Builtin.applyDerivative_vjp_arity1(f, self)
   }
 
+  @available(*, deprecated, message: """
+    Method-style differential operators are deprecated and will be removed; \
+    use top-level function 'Swift.pullback(at:in:)' instead
+    """)
   @inlinable
   func pullback<R>(
     in f: @differentiable (Self) -> R
@@ -309,23 +319,35 @@ public extension Differentiable {
     return Builtin.applyDerivative_vjp_arity1(f, self).1
   }
 
+  @available(*, deprecated, message: """
+    Method-style differential operators are deprecated and will be removed; \
+    use top-level function 'Swift.gradient(at:in:)' instead
+    """)
   @inlinable
   func gradient<R>(
     in f: @differentiable (Self) -> R
   ) -> TangentVector
     where R : FloatingPoint, R.TangentVector == R {
-    return self.pullback(in: f)(R(1))
+    return Swift.pullback(at: self, in: f)(R(1))
   }
 
+  @available(*, deprecated, message: """
+    Method-style differential operators are deprecated and will be removed; \
+    use top-level function 'Swift.valueWithGradient(at:in:)' instead
+    """)
   @inlinable
   func valueWithGradient<R>(
     in f: @differentiable (Self) -> R
   ) -> (value: R, gradient: TangentVector)
     where R : FloatingPoint, R.TangentVector == R {
-    let (y, pb) = self.valueWithPullback(in: f)
+    let (y, pb) = Swift.valueWithPullback(at: self, in: f)
     return (y, pb(R(1)))
   }
 
+  @available(*, deprecated, message: """
+    Method-style differential operators are deprecated and will be removed; \
+    use top-level function 'Swift.valueWithPullback(at:_:in:)' instead
+    """)
   @inlinable
   func valueWithPullback<T, R>(
     at x: T, in f: @differentiable (Self, T) -> R
@@ -334,6 +356,10 @@ public extension Differentiable {
     return Builtin.applyDerivative_vjp_arity2(f, self, x)
   }
 
+  @available(*, deprecated, message: """
+    Method-style differential operators are deprecated and will be removed; \
+    use top-level function 'Swift.pullback(at:_:in:)' instead
+    """)
   @inlinable
   func pullback<T, R>(
     at x: T, in f: @differentiable (Self, T) -> R
@@ -341,20 +367,28 @@ public extension Differentiable {
     return Builtin.applyDerivative_vjp_arity2(f, self, x).1
   }
 
+  @available(*, deprecated, message: """
+    Method-style differential operators are deprecated and will be removed; \
+    use top-level function 'Swift.gradient(at:_:in:)' instead
+    """)
   @inlinable
   func gradient<T, R>(
     at x: T, in f: @differentiable (Self, T) -> R
   ) -> (TangentVector, T.TangentVector)
     where R : FloatingPoint, R.TangentVector == R {
-    return self.pullback(at: x, in: f)(R(1))
+    return Swift.pullback(at: self, x, in: f)(R(1))
   }
 
+  @available(*, deprecated, message: """
+    Method-style differential operators are deprecated and will be removed; \
+    use top-level function 'Swift.valueWithGradient(at:_:in:)' instead
+    """)
   @inlinable
   func valueWithGradient<T, R>(
     at x: T, in f: @differentiable (Self, T) -> R
   ) -> (value: R, gradient: (TangentVector, T.TangentVector))
     where R : FloatingPoint, R.TangentVector == R {
-    let (y, pb) = self.valueWithPullback(at: x, in: f)
+    let (y, pb) = Swift.valueWithPullback(at: self, x, in: f)
     return (y, pb(R(1)))
   }
 }
