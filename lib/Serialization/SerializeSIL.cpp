@@ -1072,7 +1072,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     auto mangledKey = mangler.mangleSILDifferentiabilityWitnessKey(
         witness->getKey());
     auto rawWitnessKind = (unsigned)dwfi->getWitnessKind();
-    // We only store the type when the instruciton has an explicit type.
+    // We only store the type when the instruction has an explicit type.
     bool hasExplicitFnTy = dwfi->getHasExplicitFunctionType();
     SILOneOperandLayout::emitRecord(
         Out, ScratchRecord, SILAbbrCodes[SILOneOperandLayout::Code],
