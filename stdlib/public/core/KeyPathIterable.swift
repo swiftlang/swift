@@ -121,6 +121,6 @@ extension Array.DifferentiableView : _KeyPathIterableBase where Element : Differ
 extension Dictionary : KeyPathIterable {
   public typealias AllKeyPaths = [PartialKeyPath<Dictionary>]
   public var allKeyPaths: [PartialKeyPath<Dictionary>] {
-    return keys.map { \Dictionary[$0]! }
+    return values.indices.map { \Dictionary[$0].value }
   }
 }
