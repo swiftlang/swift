@@ -8111,6 +8111,8 @@ private:
   DifferentiabilityWitnessFunctionKind witnessKind;
   /// The referenced SIL differentiability witness.
   SILDifferentiabilityWitness *witness;
+  /// Whether the instruction has an explicit function type.
+  bool hasExplicitFunctionType;
 
   static SILType getDifferentiabilityWitnessType(
       SILModule &module,
@@ -8128,6 +8130,7 @@ public:
     return witnessKind;
   }
   SILDifferentiabilityWitness *getWitness() const { return witness; }
+  bool getHasExplicitFunctionType() const { return hasExplicitFunctionType; }
 
   ArrayRef<Operand> getAllOperands() const { return {}; }
   MutableArrayRef<Operand> getAllOperands() { return {}; }

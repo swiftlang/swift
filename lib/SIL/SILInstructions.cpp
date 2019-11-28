@@ -786,7 +786,8 @@ DifferentiabilityWitnessFunctionInst::DifferentiabilityWitnessFunctionInst(
                                     ? *FunctionType
                                     : getDifferentiabilityWitnessType(
                                           module, witnessKind, witness)),
-      witnessKind(witnessKind), witness(witness) {}
+      witnessKind(witnessKind), witness(witness),
+      hasExplicitFunctionType(FunctionType) {}
 // SWIFT_ENABLE_TENSORFLOW END
 
 FunctionRefBaseInst::FunctionRefBaseInst(SILInstructionKind Kind,

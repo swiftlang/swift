@@ -1644,8 +1644,11 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     auto *witness = getSILDifferentiabilityWitnessForReference(mangledKey);
     assert(witness && "SILDifferentiabilityWitness not found");
     DifferentiabilityWitnessFunctionKind witnessKind(Attr);
+    Optional<SILType> explicitFnTy = None;
+    if (TyID)
+      explicitFnTy = getSILType(MF->getType(TyID), SILValueCategory::Object);
     ResultVal = Builder.createDifferentiabilityWitnessFunction(
-        Loc, witnessKind, witness);
+        Loc, witnessKind, witness, explicitFnTy);
     break;
   }
   // SWIFT_ENABLE_TENSORFLOW END

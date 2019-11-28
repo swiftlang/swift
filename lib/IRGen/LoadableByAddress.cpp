@@ -2683,24 +2683,22 @@ bool LoadableByAddress::recreateDifferentiabilityWitnessFunction(
   if (!instr)
     return false;
 
-  // If the witness is a declaration, then LoadableByAddress cannot have changed
-  // the type because the function is in a different module.
-  if (instr->getWitness()->isDeclaration())
-    return true;
-
-  // Otherwise, update the instruction if the function type changed.
-  auto resultTy = instr->getType();
-  auto *referencedFn = instr->getWitness()->getDerivative(
-      *instr->getWitnessKind().getAsDerivativeFunctionKind());
-  assert(referencedFn && "diff witness should be canonicalized");
-  auto newResultTy = referencedFn->getLoweredType();
-  if (resultTy == newResultTy)
+  // Check if we need to recreate the instruction.
+  auto *currIRMod = getIRGenModule()->IRGen.getGenModule(instr->getFunction());
+  auto resultFnTy = instr->getType().castTo<SILFunctionType>();
+  auto genSig = resultFnTy->getSubstGenericSignature();
+  GenericEnvironment *genEnv = nullptr;
+  if (genSig)
+    genEnv = genSig->getGenericEnvironment();
+  auto newResultFnTy =
+      MapperCache.getNewSILFunctionType(genEnv, resultFnTy, *currIRMod);
+  if (resultFnTy == newResultFnTy)
     return true;
 
   SILBuilderWithScope builder(instr);
   auto *newInstr = builder.createDifferentiabilityWitnessFunction(
       instr->getLoc(), instr->getWitnessKind(), instr->getWitness(),
-      newResultTy);
+      SILType::getPrimitiveObjectType(newResultFnTy));
   instr->replaceAllUsesWith(newInstr);
   Delete.push_back(instr);
   return true;
