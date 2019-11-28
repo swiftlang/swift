@@ -860,10 +860,9 @@ public:
 
     unsigned newArgIdx = Arguments.size();
     auto *argLoc = CS.getConstraintLocator(
-        Locator
-            .withPathElement(LocatorPathElt::ApplyArgToParam(
-                newArgIdx, paramIdx, param.getParameterFlags()))
-            .withPathElement(LocatorPathElt::SynthesizedArgument(newArgIdx)));
+        Locator, {LocatorPathElt::ApplyArgToParam(newArgIdx, paramIdx,
+                                                  param.getParameterFlags()),
+                  LocatorPathElt::SynthesizedArgument(newArgIdx)});
 
     auto *argType =
         CS.createTypeVariable(argLoc, TVO_CanBindToInOut | TVO_CanBindToLValue |
@@ -4523,12 +4522,10 @@ ConstraintSystem::simplifyConstructionConstraint(
                                                  /*canonicalVararg=*/false);
     Type resultType = fnType->getResult();
 
-    if (matchTypes(resultType, desugarValueType,
-                   ConstraintKind::Bind,
-                   flags,
-                   ConstraintLocatorBuilder(locator)
-                     .withPathElement(ConstraintLocator::ApplyFunction))
-        .isFailure())
+    ConstraintLocatorBuilder builder(locator);
+    if (matchTypes(resultType, desugarValueType, ConstraintKind::Bind, flags,
+                   builder.withPathElement(ConstraintLocator::ApplyFunction))
+            .isFailure())
       return SolutionKind::Error;
 
     return matchTypes(argType, valueType, ConstraintKind::Conversion,

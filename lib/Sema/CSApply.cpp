@@ -1235,8 +1235,8 @@ namespace {
       if (selected->choice.getKind() == OverloadChoiceKind::DeclViaDynamic) {
         // Rewrite for implicit unwrapping if the solution requires it.
         auto *dynamicLocator = cs.getConstraintLocator(
-            locator.withPathElement(ConstraintLocator::SubscriptMember)
-                .withPathElement(ConstraintLocator::DynamicLookupResult));
+            locator, {ConstraintLocator::SubscriptMember,
+                      ConstraintLocator::DynamicLookupResult});
 
         if (solution.getDisjunctionChoice(dynamicLocator)) {
           auto *forceValue = new (cs.getASTContext())
@@ -6992,9 +6992,9 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, ConcreteDeclRef callee,
 
   // We're constructing a value of nominal type. Look for the constructor or
   // enum element to use.
-  auto ctorLocator = cs.getConstraintLocator(
-      locator.withPathElement(ConstraintLocator::ApplyFunction)
-             .withPathElement(ConstraintLocator::ConstructorMember));
+  auto *ctorLocator =
+      cs.getConstraintLocator(locator, {ConstraintLocator::ApplyFunction,
+                                        ConstraintLocator::ConstructorMember});
   auto selected = solution.getOverloadChoiceIfAvailable(ctorLocator);
   if (!selected) {
     assert(ty->hasError() || ty->hasUnresolvedType());
