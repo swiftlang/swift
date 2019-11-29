@@ -781,13 +781,21 @@ SILType DifferentiabilityWitnessFunctionInst::getDifferentiabilityWitnessType(
 DifferentiabilityWitnessFunctionInst::DifferentiabilityWitnessFunctionInst(
     SILModule &module, SILDebugLocation debugLoc,
     DifferentiabilityWitnessFunctionKind witnessKind,
-    SILDifferentiabilityWitness *witness, Optional<SILType> FunctionType)
-    : InstructionBase(debugLoc, FunctionType
-                                    ? *FunctionType
+    SILDifferentiabilityWitness *witness, Optional<SILType> functionType)
+    : InstructionBase(debugLoc, functionType
+                                    ? *functionType
                                     : getDifferentiabilityWitnessType(
                                           module, witnessKind, witness)),
       witnessKind(witnessKind), witness(witness),
-      hasExplicitFunctionType(FunctionType) {}
+      hasExplicitFunctionType(functionType) {
+  assert(witness && "Differentiability witness must not be null");
+#ifndef NDEBUG
+  if (functionType.hasValue()) {
+    assert(module.getStage() == SILStage::Lowered &&
+           "Explicit type is valid only in lowered SIL");
+  }
+#endif
+}
 // SWIFT_ENABLE_TENSORFLOW END
 
 FunctionRefBaseInst::FunctionRefBaseInst(SILInstructionKind Kind,
