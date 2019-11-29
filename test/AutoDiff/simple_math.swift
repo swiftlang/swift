@@ -1,7 +1,7 @@
-// RUN: %target-swift-frontend -Xllvm -sil-print-after=differentiation %s -emit-sil -o /dev/null 2>&1 | %FileCheck %s
 // RUN: %target-run-simple-swift
 // NOTE(TF-813): verify that enabling forward-mode does not affect reverse-mode.
 // RUN: %target_run_simple_swift_forward_mode_differentiation
+// RUN: %target-swift-frontend -Xllvm -sil-print-after=differentiation %s -emit-sil -o /dev/null 2>&1 | %FileCheck %s
 // REQUIRES: executable_test
 
 import StdlibUnittest
@@ -132,16 +132,13 @@ SimpleMathTests.test("TupleMutation") {
   }
   expectEqual(405, gradient(at: 3, in: nested))
 
-  // FIXME(TF-201): Update after reabstraction thunks can be directly differentiated.
-  /*
-  func generic<T : Differentiable & AdditiveArithmetic>(_ x: T) -> T {
-    var tuple = (x, x)
-    tuple.0 += x
-    tuple.1 += x
-    return tuple.0 + tuple.0
+  func generic<T: Differentiable & AdditiveArithmetic>(_ x: T) -> T {
+    var tuple = (T.zero, T.zero)
+    tuple.0 = x
+    tuple.1 = x
+    return tuple.0
   }
   expectEqual(1, gradient(at: 3.0, in: generic))
-  */
 }
 
 // Tests TF-321.

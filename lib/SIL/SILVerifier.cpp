@@ -5412,7 +5412,9 @@ void SILDifferentiabilityWitness::verify(const SILModule &M) const {
   // parameter/result conventions in lowered SIL.
   if (M.getStage() == SILStage::Lowered)
     return;
-  auto origFnType = getOriginalFunction()->getLoweredFunctionType();
+  auto *origFn = getOriginalFunction();
+  auto origFnType = origFn->getLoweredFunctionType();
+  bool origIsReabstractionThunk = origFn->isThunk() == IsReabstractionThunk;
   CanGenericSignature derivativeCanGenSig;
   if (auto derivativeGenSig = getDerivativeGenericSignature())
     derivativeCanGenSig = derivativeGenSig->getCanonicalSignature();
@@ -5438,7 +5440,8 @@ void SILDifferentiabilityWitness::verify(const SILModule &M) const {
     auto expectedJVPType = origFnType->getAutoDiffDerivativeFunctionType(
         getParameterIndices(), /*resultIndex*/ *getResultIndices()->begin(),
         AutoDiffDerivativeFunctionKind::JVP, M.Types,
-        LookUpConformanceInModule(M.getSwiftModule()), derivativeCanGenSig);
+        LookUpConformanceInModule(M.getSwiftModule()), derivativeCanGenSig,
+        origIsReabstractionThunk);
     requireSameType(jvp->getLoweredFunctionType(), expectedJVPType,
                     "JVP type does not match expected JVP type");
   }
@@ -5448,7 +5451,8 @@ void SILDifferentiabilityWitness::verify(const SILModule &M) const {
     auto expectedVJPType = origFnType->getAutoDiffDerivativeFunctionType(
         getParameterIndices(), /*resultIndex*/ *getResultIndices()->begin(),
         AutoDiffDerivativeFunctionKind::VJP, M.Types,
-        LookUpConformanceInModule(M.getSwiftModule()), derivativeCanGenSig);
+        LookUpConformanceInModule(M.getSwiftModule()), derivativeCanGenSig,
+        origIsReabstractionThunk);
     requireSameType(vjp->getLoweredFunctionType(), expectedVJPType,
                     "VJP type does not match expected VJP type");
   }
