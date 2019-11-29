@@ -1,0 +1,47 @@
+lit.py: /Users/ungar/s/exp-dep-3/swift/test/lit.cfg:247: note: using swift: /Users/ungar/s/exp-dep-3/build/Ninja-DebugAssert/swift-macosx-x86_64/bin/swift
+lit.py: /Users/ungar/s/exp-dep-3/swift/test/lit.cfg:247: note: using swiftc: /Users/ungar/s/exp-dep-3/build/Ninja-DebugAssert/swift-macosx-x86_64/bin/swiftc
+lit.py: /Users/ungar/s/exp-dep-3/swift/test/lit.cfg:247: note: using sil-opt: /Users/ungar/s/exp-dep-3/build/Ninja-DebugAssert/swift-macosx-x86_64/bin/sil-opt
+lit.py: /Users/ungar/s/exp-dep-3/swift/test/lit.cfg:247: note: using sil-func-extractor: /Users/ungar/s/exp-dep-3/build/Ninja-DebugAssert/swift-macosx-x86_64/bin/sil-func-extractor
+lit.py: /Users/ungar/s/exp-dep-3/swift/test/lit.cfg:247: note: using sil-llvm-gen: /Users/ungar/s/exp-dep-3/build/Ninja-DebugAssert/swift-macosx-x86_64/bin/sil-llvm-gen
+lit.py: /Users/ungar/s/exp-dep-3/swift/test/lit.cfg:247: note: using sil-nm: /Users/ungar/s/exp-dep-3/build/Ninja-DebugAssert/swift-macosx-x86_64/bin/sil-nm
+lit.py: /Users/ungar/s/exp-dep-3/swift/test/lit.cfg:247: note: using sil-passpipeline-dumper: /Users/ungar/s/exp-dep-3/build/Ninja-DebugAssert/swift-macosx-x86_64/bin/sil-passpipeline-dumper
+lit.py: /Users/ungar/s/exp-dep-3/swift/test/lit.cfg:247: note: using lldb-moduleimport-test: /Users/ungar/s/exp-dep-3/build/Ninja-DebugAssert/swift-macosx-x86_64/bin/lldb-moduleimport-test
+lit.py: /Users/ungar/s/exp-dep-3/swift/test/lit.cfg:247: note: using swift-ide-test: /Users/ungar/s/exp-dep-3/build/Ninja-DebugAssert/swift-macosx-x86_64/bin/swift-ide-test
+lit.py: /Users/ungar/s/exp-dep-3/swift/test/lit.cfg:247: note: using swift-syntax-test: /Users/ungar/s/exp-dep-3/build/Ninja-DebugAssert/swift-macosx-x86_64/bin/swift-syntax-test
+lit.py: /Users/ungar/s/exp-dep-3/swift/test/lit.cfg:247: note: using swift-syntax-parser-test: /Users/ungar/s/exp-dep-3/build/Ninja-DebugAssert/swift-macosx-x86_64/bin/swift-syntax-parser-test
+lit.py: /Users/ungar/s/exp-dep-3/swift/test/lit.cfg:247: note: using swift-reflection-dump: /Users/ungar/s/exp-dep-3/build/Ninja-DebugAssert/swift-macosx-x86_64/bin/swift-reflection-dump
+lit.py: /Users/ungar/s/exp-dep-3/swift/test/lit.cfg:247: note: using swift-remoteast-test: /Users/ungar/s/exp-dep-3/build/Ninja-DebugAssert/swift-macosx-x86_64/bin/swift-remoteast-test
+lit.py: /Users/ungar/s/exp-dep-3/swift/test/lit.cfg:247: note: using swift-indent: /Users/ungar/s/exp-dep-3/build/Ninja-DebugAssert/swift-macosx-x86_64/bin/swift-indent
+lit.py: /Users/ungar/s/exp-dep-3/swift/test/lit.cfg:247: note: using clang: /Users/ungar/s/exp-dep-3/build/Ninja-DebugAssert/llvm-macosx-x86_64/bin/clang
+lit.py: /Users/ungar/s/exp-dep-3/swift/test/lit.cfg:247: note: using llvm-link: /Users/ungar/s/exp-dep-3/build/Ninja-DebugAssert/llvm-macosx-x86_64/bin/llvm-link
+lit.py: /Users/ungar/s/exp-dep-3/swift/test/lit.cfg:247: note: using swift-llvm-opt: /Users/ungar/s/exp-dep-3/build/Ninja-DebugAssert/swift-macosx-x86_64/bin/swift-llvm-opt
+lit.py: /Users/ungar/s/exp-dep-3/swift/test/lit.cfg:247: note: using llvm-profdata: /Users/ungar/s/exp-dep-3/build/Ninja-DebugAssert/llvm-macosx-x86_64/bin/llvm-profdata
+lit.py: /Users/ungar/s/exp-dep-3/swift/test/lit.cfg:247: note: using llvm-cov: /Users/ungar/s/exp-dep-3/build/Ninja-DebugAssert/llvm-macosx-x86_64/bin/llvm-cov
+lit.py: /Users/ungar/s/exp-dep-3/swift/test/lit.cfg:247: note: using llvm-strings: /Users/ungar/s/exp-dep-3/build/Ninja-DebugAssert/llvm-macosx-x86_64/bin/llvm-strings
+lit.py: /Users/ungar/s/exp-dep-3/swift/test/lit.cfg:247: note: using FileCheck: /Users/ungar/s/exp-dep-3/build/Ninja-DebugAssert/llvm-macosx-x86_64/bin/FileCheck
+lit.py: /Users/ungar/s/exp-dep-3/swift/test/lit.cfg:247: note: using llvm-dwarfdump: /Users/ungar/s/exp-dep-3/build/Ninja-DebugAssert/llvm-macosx-x86_64/bin/llvm-dwarfdump
+lit.py: /Users/ungar/s/exp-dep-3/swift/test/lit.cfg:247: note: using llvm-dis: /Users/ungar/s/exp-dep-3/build/Ninja-DebugAssert/llvm-macosx-x86_64/bin/llvm-dis
+lit.py: /Users/ungar/s/exp-dep-3/swift/test/lit.cfg:247: note: using sourcekitd-test: /Users/ungar/s/exp-dep-3/build/Ninja-DebugAssert/swift-macosx-x86_64/bin/sourcekitd-test
+lit.py: /Users/ungar/s/exp-dep-3/swift/test/lit.cfg:247: note: using complete-test: /Users/ungar/s/exp-dep-3/build/Ninja-DebugAssert/swift-macosx-x86_64/bin/complete-test
+lit.py: /Users/ungar/s/exp-dep-3/swift/test/lit.cfg:247: note: using swift-api-digester: /Users/ungar/s/exp-dep-3/build/Ninja-DebugAssert/swift-macosx-x86_64/bin/swift-api-digester
+lit.py: /Users/ungar/s/exp-dep-3/swift/test/lit.cfg:247: note: using swift-refactor: /Users/ungar/s/exp-dep-3/build/Ninja-DebugAssert/swift-macosx-x86_64/bin/swift-refactor
+lit.py: /Users/ungar/s/exp-dep-3/swift/test/lit.cfg:247: note: using swift-demangle-yamldump: /Users/ungar/s/exp-dep-3/build/Ninja-DebugAssert/swift-macosx-x86_64/bin/swift-demangle-yamldump
+lit.py: /Users/ungar/s/exp-dep-3/swift/test/lit.cfg:250: warning: couldn't find 'Benchmark_O' program, try setting BENCHMARK_O in your environment
+lit.py: /Users/ungar/s/exp-dep-3/swift/test/lit.cfg:250: warning: couldn't find 'Benchmark_Driver' program, try setting BENCHMARK_DRIVER in your environment
+lit.py: /Users/ungar/s/exp-dep-3/swift/test/lit.cfg:317: note: Using resource dir: /Users/ungar/s/exp-dep-3/build/Ninja-DebugAssert/swift-macosx-x86_64/lib/swift
+lit.py: /Users/ungar/s/exp-dep-3/swift/test/lit.cfg:345: note: Compiling with -swift-version 4
+lit.py: /Users/ungar/s/exp-dep-3/swift/test/lit.cfg:368: note: Using Clang module cache: /Users/ungar/s/exp-dep-3/build/Ninja-DebugAssert/swift-macosx-x86_64/swift-test-results/x86_64-apple-macosx10.9/clang-module-cache
+lit.py: /Users/ungar/s/exp-dep-3/swift/test/lit.cfg:369: note: Using test results dir: /Users/ungar/s/exp-dep-3/build/Ninja-DebugAssert/swift-macosx-x86_64/./swift-test-results/x86_64-apple-macosx10.9
+lit.py: /Users/ungar/s/exp-dep-3/swift/test/lit.cfg:374: note: Using code completion cache: /Users/ungar/s/exp-dep-3/build/Ninja-DebugAssert/swift-macosx-x86_64/swift-test-results/x86_64-apple-macosx10.9/completion-cache
+lit.py: /Users/ungar/s/exp-dep-3/swift/test/lit.cfg:852: note: Testing OS X x86_64-apple-macosx10.9
+lit.py: /Users/ungar/s/exp-dep-3/swift/test/lit.cfg:883: note: Running tests on Mac OS X version 10.15 (19A582a)
+lit.py: /Users/ungar/s/exp-dep-3/swift/test/lit.cfg:1440: note: Using platform module dir: /Users/ungar/s/exp-dep-3/build/Ninja-DebugAssert/swift-macosx-x86_64/lib/swift/macosx
+lit.py: /Users/ungar/s/exp-dep-3/swift/test/lit.cfg:1460: note: Testing with the just-built libraries at /Users/ungar/s/exp-dep-3/build/Ninja-DebugAssert/swift-macosx-x86_64/lib/swift/macosx
+lit.py: /Users/ungar/s/exp-dep-3/swift/test/lit.cfg:247: note: using swift-reflection-test-macosx-x86_64: /Users/ungar/s/exp-dep-3/build/Ninja-DebugAssert/swift-macosx-x86_64/bin/swift-reflection-test-macosx-x86_64
+lit.py: /Users/ungar/s/exp-dep-3/swift/test/lit.cfg:1692: note: Available features: CMAKE_GENERATOR=Ninja, CODEGENERATOR=AArch64, CODEGENERATOR=ARM, CODEGENERATOR=Mips, CODEGENERATOR=PowerPC, CODEGENERATOR=SystemZ, CODEGENERATOR=X86, CPU=x86_64, OS=macosx, PTRSIZE=64, SWIFT_VERSION=4, VENDOR=apple, asan_runtime, asserts, c_runtime, crash-recovery, differentiable_programming, executable_test, foundation, fuzzer_runtime, libdispatch, libxml2, no_asan, no_lto, nonexecutable_test, objc_interop, profile_runtime, runtime_function_counters, sftp_server, shell, sourcekit, standalone_build, swift-remoteast-test, swift_ast_verifier, swift_interpreter, swift_repl, swift_stable_abi, swift_stdlib_asserts, swift_test_mode_optimize_none, swift_test_mode_optimize_none_x86_64, swift_tools_extra, syntax_parser_lib, tsan_runtime, ubsan_runtime
+-- Testing: 52 tests, 20 threads --
+Testing: 0 .. 10.. 20.. 30.. 40.. 50.. 60.. 70.. 80.. 90.. 
+
+2 warning(s) in tests.
+Testing Time: 61.27s
+  Expected Passes    : 52

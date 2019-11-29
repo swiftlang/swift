@@ -6,7 +6,7 @@
 
 
 // RUN: %empty-directory(%t)
-// RUN: cp -r %S/Inputs/disjoint-exposes-flaw/* %t
+// RUN: cp -r %S/Inputs/too-liberal/* %t
 
 // =============================================================================
 // Create the supplementary outputs & build record
@@ -28,8 +28,8 @@
 // source ranges won't.
 // =============================================================================
 
-// RUN: cp %S/Inputs/disjoint-exposes-flaw/fileA.swiftdeps %t
-// RUN: cp %S/Inputs/disjoint-exposes-flaw/fileB2.swift %t/fileB.swift
+// RUN: cp %S/Inputs/too-liberal/fileA.swiftdeps %t
+// RUN: cp %S/Inputs/too-liberal/fileB2.swift %t/fileB.swift
 
 // RUN: cd %t && %swiftc_driver -driver-compare-incremental-schemes -enable-source-range-dependencies -output-file-map %t/output.json -incremental -enable-batch-mode ./main.swift ./fileA.swift ./fileB.swift -module-name main -j2 -driver-show-job-lifecycle -driver-show-incremental  >& %t/output2
 // RUN: %FileCheck -match-full-lines -check-prefix=CHECK-2 %s < %t/output2
@@ -54,7 +54,7 @@
 // source ranges should, too.
 // =============================================================================
 
-// RUN: cp %S/Inputs/disjoint-exposes-flaw/{fileA.swiftdeps,fileB.swift,imported.swiftmodule} %t
+// RUN: cp %S/Inputs/too-liberal/{fileA.swiftdeps,fileB.swift,imported.swiftmodule} %t
 // RUN: cd %t && %swiftc_driver -driver-compare-incremental-schemes -enable-source-range-dependencies -output-file-map %t/output.json -incremental -enable-batch-mode ./main.swift ./fileA.swift ./fileB.swift -module-name main -j2 -driver-show-job-lifecycle -driver-show-incremental  >& %t/output3
 
 // RUN: %FileCheck -match-full-lines -check-prefix=CHECK-3 %s < %t/output3

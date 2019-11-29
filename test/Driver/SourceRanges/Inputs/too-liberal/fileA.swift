@@ -1,5 +1,5 @@
 func func1InA() {
-  _ = Struct1InB()
+  _ = Struct2InB()
   print(3)
 }
 func func2InA() {
