@@ -1223,9 +1223,9 @@ bool TermInst::isProgramTerminating() const {
 
 TermInst::SuccessorBlockArgumentsListTy
 TermInst::getSuccessorBlockArguments() const {
-  function_ref<PhiArgumentArrayRef(const SILSuccessor &)> op;
-  op = [](const SILSuccessor &succ) -> PhiArgumentArrayRef {
-    return succ.getBB()->getPhiArguments();
+  function_ref<SILPhiArgumentArrayRef(const SILSuccessor &)> op;
+  op = [](const SILSuccessor &succ) -> SILPhiArgumentArrayRef {
+    return succ.getBB()->getSILPhiArguments();
   };
   return SuccessorBlockArgumentsListTy(getSuccessors(), op);
 }

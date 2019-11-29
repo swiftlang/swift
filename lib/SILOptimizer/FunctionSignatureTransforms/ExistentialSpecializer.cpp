@@ -130,7 +130,7 @@ bool ExistentialSpecializer::canSpecializeExistentialArgsInFunction(
     llvm::SmallDenseMap<int, ExistentialTransformArgumentDescriptor>
         &ExistentialArgDescriptor) {
   auto *F = Apply.getReferencedFunctionOrNull();
-  auto CalleeArgs = F->begin()->getFunctionArguments();
+  auto CalleeArgs = F->begin()->getSILFunctionArguments();
   bool returnFlag = false;
 
   /// Analyze the argument for protocol conformance.  Iterator over the callee's
@@ -314,7 +314,7 @@ void ExistentialSpecializer::specializeExistentialArgsInAppliesWithinFunction(
       /// Save the arguments in a descriptor.
       llvm::SpecificBumpPtrAllocator<ProjectionTreeNode> Allocator;
       llvm::SmallVector<ArgumentDescriptor, 4> ArgumentDescList;
-      auto Args = Callee->begin()->getFunctionArguments();
+      auto Args = Callee->begin()->getSILFunctionArguments();
       for (unsigned i : indices(Args)) {
         ArgumentDescList.emplace_back(Args[i], Allocator);
       }

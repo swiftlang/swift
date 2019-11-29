@@ -221,7 +221,7 @@ SILValue SILSSAUpdater::GetValueInMiddleOfBlock(SILBasicBlock *BB) {
   if (!BB->getArguments().empty()) {
     llvm::SmallDenseMap<SILBasicBlock *, SILValue, 8> ValueMap(PredVals.begin(),
                                                                PredVals.end());
-    for (auto *Arg : BB->getPhiArguments())
+    for (auto *Arg : BB->getSILPhiArguments())
       if (isEquivalentPHI(Arg, ValueMap))
         return Arg;
 

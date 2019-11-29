@@ -843,7 +843,7 @@ void ConsumedArgToEpilogueReleaseMatcher::collectMatchingDestroyAddresses(
   SILFunction::iterator anotherEpilogueBB =
       (Kind == ExitKind::Return) ? F->findThrowBB() : F->findReturnBB();
 
-  for (auto *arg : F->begin()->getFunctionArguments()) {
+  for (auto *arg : F->begin()->getSILFunctionArguments()) {
     if (arg->isIndirectResult())
       continue;
     if (arg->getArgumentConvention() != SILArgumentConvention::Indirect_In)
