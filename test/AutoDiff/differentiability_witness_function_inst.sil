@@ -57,6 +57,10 @@ bb0:
 
   // Test "dependent" generic requirements: `T == T.TangentVector` depends on `T: Differentiable`.
   %generic_vjp_wrt_0_1_dependent_req = differentiability_witness_function [vjp] [parameters 0 1] [results 0] <T where T: Differentiable, T == T.TangentVector> @generic : $@convention(thin) <T> (@in_guaranteed T, Float) -> @out T
+
+  // Test explicit function types.
+  %explicit_fnty = differentiability_witness_function [jvp] [parameters 0] [results 0] @foo : $@convention(thin) (Float, Float, Float) -> Float as $@convention(thin) (Float, Float, Float) -> (Float, (Float) -> Float)
+
   return undef : $()
 }
 
@@ -68,6 +72,8 @@ bb0:
 // CHECK:   {{%.*}} = differentiability_witness_function [vjp] [parameters 0 1] [results 0 1] @bar : $@convention(thin) (Float, Float, Float) -> (Float, Float)
 // CHECK:   {{%.*}} = differentiability_witness_function [jvp] [parameters 0] [results 0] <τ_0_0 where τ_0_0 : Differentiable> @generic : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0, Float) -> @out τ_0_0
 // CHECK:   {{%.*}} = differentiability_witness_function [vjp] [parameters 0 1] [results 0] <τ_0_0 where τ_0_0 : AdditiveArithmetic, τ_0_0 : Differentiable> @generic : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0, Float) -> @out τ_0_0
+// CHECK:   {{%.*}} = differentiability_witness_function [vjp] [parameters 0 1] [results 0] <τ_0_0 where τ_0_0 : Differentiable, τ_0_0 == τ_0_0.TangentVector> @generic : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0, Float) -> @out τ_0_0
+// CHECK:   {{%.*}} = differentiability_witness_function [jvp] [parameters 0] [results 0] @foo : $@convention(thin) (Float, Float, Float) -> Float as $@convention(thin) (Float, Float, Float) -> (Float, (Float) -> Float)
 // CHECK: }
 
 // IRGEN: @AD__foo_PSUURS = external global %swift.differentiability_witness, align 8
@@ -100,3 +106,6 @@ bb0:
 
 // IRGEN: [[PTR7:%.*]] = load i8*, i8** getelementptr inbounds (%swift.differentiability_witness, %swift.differentiability_witness* @AD__generic_PSSRSs14DifferentiableRz13TangentVectorsAAPQzRszl, i32 0, i32 1), align 8
 // IRGEN: [[FNPTR7:%.*]] = bitcast i8* [[PTR7]] to { i8*, %swift.refcounted* } (%swift.opaque*, %swift.opaque*, float, %swift.type*, i8**)*
+
+// IRGEN: [[PTR8:%.*]] = load i8*, i8** getelementptr inbounds (%swift.differentiability_witness, %swift.differentiability_witness* @AD__foo_PSUURS, i32 0, i32 0), align 8
+// IRGEN: [[FNPTR8:%.*]] = bitcast i8* [[PTR8]] to { float, i8*, %swift.refcounted* } (float, float, float)*

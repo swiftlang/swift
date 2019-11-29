@@ -1675,6 +1675,10 @@ private:
   bool fixStoreToBlockStorageInstr(SILInstruction &I,
                          SmallVectorImpl<SILInstruction *> &Delete);
 
+  // SWIFT_ENABLE_TENSORFLOW
+  bool recreateDifferentiabilityWitnessFunction(
+      SILInstruction &I, SmallVectorImpl<SILInstruction *> &Delete);
+
 private:
   llvm::SetVector<SILFunction *> modFuncs;
   llvm::SetVector<SingleValueInstruction *> conversionInstrs;
@@ -2672,6 +2676,34 @@ bool LoadableByAddress::fixStoreToBlockStorageInstr(
   return true;
 }
 
+// SWIFT_ENABLE_TENSORFLOW
+bool LoadableByAddress::recreateDifferentiabilityWitnessFunction(
+    SILInstruction &I, SmallVectorImpl<SILInstruction *> &Delete) {
+  auto *instr = dyn_cast<DifferentiabilityWitnessFunctionInst>(&I);
+  if (!instr)
+    return false;
+
+  // Check if we need to recreate the instruction.
+  auto *currIRMod = getIRGenModule()->IRGen.getGenModule(instr->getFunction());
+  auto resultFnTy = instr->getType().castTo<SILFunctionType>();
+  auto genSig = resultFnTy->getSubstGenericSignature();
+  GenericEnvironment *genEnv = nullptr;
+  if (genSig)
+    genEnv = genSig->getGenericEnvironment();
+  auto newResultFnTy =
+      MapperCache.getNewSILFunctionType(genEnv, resultFnTy, *currIRMod);
+  if (resultFnTy == newResultFnTy)
+    return true;
+
+  SILBuilderWithScope builder(instr);
+  auto *newInstr = builder.createDifferentiabilityWitnessFunction(
+      instr->getLoc(), instr->getWitnessKind(), instr->getWitness(),
+      SILType::getPrimitiveObjectType(newResultFnTy));
+  instr->replaceAllUsesWith(newInstr);
+  Delete.push_back(instr);
+  return true;
+}
+
 bool LoadableByAddress::recreateTupleInstr(
     SILInstruction &I, SmallVectorImpl<SILInstruction *> &Delete) {
   auto *tupleInstr = dyn_cast<TupleInst>(&I);
@@ -2993,6 +3025,9 @@ void LoadableByAddress::run() {
         else if (recreateLoadInstr(I, Delete))
           continue;
         else if (recreateApply(I, Delete))
+          continue;
+        // SWIFT_ENABLE_TENSORFLOW
+        else if (recreateDifferentiabilityWitnessFunction(I, Delete))
           continue;
         else
           fixStoreToBlockStorageInstr(I, Delete);
