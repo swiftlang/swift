@@ -1,4 +1,4 @@
-//===--- ExperimentalDependencies.h -----------------------------*- C++ -*-===//
+//===--- FineDependencies.h -----------------------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_AST_EXPERIMENTAL_DEPENDENCIES_H
-#define SWIFT_AST_EXPERIMENTAL_DEPENDENCIES_H
+#ifndef SWIFT_AST_FINE_DEPENDENCIES_H
+#define SWIFT_AST_FINE_DEPENDENCIES_H
 
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
@@ -27,7 +27,7 @@
 #include <unordered_set>
 #include <vector>
 
-// Summary: The ExperimentalDependency* files contain infrastructure for a
+// Summary: The FineDependency* files contain infrastructure for a
 // dependency system that, in the future, will be finer-grained than the current
 // dependency system. At present--12/5/18--they are using the same input
 // information as the current system and expected to produce the same results.
@@ -36,14 +36,14 @@
 //
 // The frontend uses the information from the compiler to built a
 // SourceFileDepGraph consisting of SourceFileDepGraphNodes.
-// ExperimentalDependencies.* define these structures, and
-// ExperimentalDependenciesProducer has the frontend-unique code used to build
+// FineDependencies.* define these structures, and
+// FineDependenciesProducer has the frontend-unique code used to build
 // the SourceFileDepGraph.
 //
 // The driver reads the SourceFileDepGraph and integrates it into its dependency
 // graph, a ModuleDepGraph consisting of ModuleDepGraphNodes.
 
-// This file holds the declarations for the experimental dependency system
+// This file holds the declarations for the fine-grained dependency system
 // that are used by both the driver and frontend.
 // These include the graph structures common to both programs and also
 // the frontend graph, which must be read by the driver.
@@ -58,8 +58,8 @@ class DiagnosticEngine;
 class FrontendOptions;
 class SourceFile;
 
-/// Use a new namespace to help keep the experimental code from clashing.
-namespace experimental_dependencies {
+/// Use a new namespace to help keep the new code from clashing.
+namespace fine_dependencies {
 
 using StringVec = std::vector<std::string>;
 
@@ -318,7 +318,7 @@ private:
 // End of general declarations
 
 //==============================================================================
-// MARK: Start of experimental-dependency-specific code
+// MARK: Start of fine-dependency-specific code
 //==============================================================================
 
 /// The entry point into this system from the frontend:
@@ -517,20 +517,20 @@ private:
   // Name conversion helpers
   static std::string demangleTypeAsContext(StringRef);
 };
-} // namespace experimental_dependencies
+} // namespace fine_dependencies
 } // namespace swift
 
 template <>
-struct std::hash<typename swift::experimental_dependencies::DependencyKey> {
+struct std::hash<typename swift::fine_dependencies::DependencyKey> {
   size_t
-  operator()(const swift::experimental_dependencies::DependencyKey &key) const {
+  operator()(const swift::fine_dependencies::DependencyKey &key) const {
     return key.hash();
   }
 };
 template <>
-struct std::hash<typename swift::experimental_dependencies::DeclAspect> {
+struct std::hash<typename swift::fine_dependencies::DeclAspect> {
   size_t
-  operator()(const swift::experimental_dependencies::DeclAspect aspect) const {
+  operator()(const swift::fine_dependencies::DeclAspect aspect) const {
     return size_t(aspect);
   }
 };
@@ -539,7 +539,7 @@ struct std::hash<typename swift::experimental_dependencies::DeclAspect> {
 // MARK: DepGraphNode
 //==============================================================================
 
-/// Part of an experimental, new, infrastructure that can handle fine-grained
+/// Part of an fine-grained, new, infrastructure that can handle fine-grained
 /// dependencies. The basic idea is a graph, where each node represents the
 /// definition of entity in the program (a Decl or a source file/swiftdeps
 /// file). Each node will (eventually) have a fingerprint so that we can tell
@@ -559,7 +559,7 @@ struct std::hash<typename swift::experimental_dependencies::DeclAspect> {
 /// improving it.
 
 namespace swift {
-namespace experimental_dependencies {
+namespace fine_dependencies {
 class DepGraphNode {
   /// Def->use arcs go by DependencyKey. There may be >1 node for a given key.
   DependencyKey key;
@@ -705,7 +705,7 @@ public:
 //==============================================================================
 
 /// The dependency graph produced by the frontend and consumed by the driver.
-/// See \ref Node in ExperimentalDependencies.h
+/// See \ref Node in FinelDependencies.h
 class SourceFileDepGraph {
   /// Every node in the graph. Indices used for serialization.
   /// Use addNode instead of adding directly.
@@ -735,7 +735,7 @@ public:
   /// Goes at the start of an emitted YAML file to help tools recognize it.
   /// May vary in the future according to version, etc.
   std::string yamlProlog(const bool hadCompilationError) const {
-    return std::string("# Experimental\n") +
+    return std::string("# Fine-grained dependencies\n") +
            (!hadCompilationError ? ""
                                  : "# Dependencies are unknown because a "
                                    "compilation error occurred.\n");
@@ -936,7 +936,7 @@ private:
   }
 };
 
-} // end namespace experimental_dependencies
+} // end namespace fine_dependencies
 } // end namespace swift
 
 //==============================================================================
@@ -948,22 +948,22 @@ private:
 #if !(defined(__linux__) || defined(_WIN64))
 LLVM_YAML_DECLARE_SCALAR_TRAITS(size_t, QuotingType::None)
 #endif
-LLVM_YAML_DECLARE_ENUM_TRAITS(swift::experimental_dependencies::NodeKind)
-LLVM_YAML_DECLARE_ENUM_TRAITS(swift::experimental_dependencies::DeclAspect)
+LLVM_YAML_DECLARE_ENUM_TRAITS(swift::fine_dependencies::NodeKind)
+LLVM_YAML_DECLARE_ENUM_TRAITS(swift::fine_dependencies::DeclAspect)
 LLVM_YAML_DECLARE_MAPPING_TRAITS(
-    swift::experimental_dependencies::DependencyKey)
-LLVM_YAML_DECLARE_MAPPING_TRAITS(swift::experimental_dependencies::DepGraphNode)
+    swift::fine_dependencies::DependencyKey)
+LLVM_YAML_DECLARE_MAPPING_TRAITS(swift::fine_dependencies::DepGraphNode)
 
 namespace llvm {
 namespace yaml {
 template <>
 struct MappingContextTraits<
-    swift::experimental_dependencies::SourceFileDepGraphNode,
-    swift::experimental_dependencies::SourceFileDepGraph> {
+    swift::fine_dependencies::SourceFileDepGraphNode,
+    swift::fine_dependencies::SourceFileDepGraph> {
   using SourceFileDepGraphNode =
-      swift::experimental_dependencies::SourceFileDepGraphNode;
+      swift::fine_dependencies::SourceFileDepGraphNode;
   using SourceFileDepGraph =
-      swift::experimental_dependencies::SourceFileDepGraph;
+      swift::fine_dependencies::SourceFileDepGraph;
 
   static void mapping(IO &io, SourceFileDepGraphNode &node,
                       SourceFileDepGraph &g);
@@ -971,9 +971,9 @@ struct MappingContextTraits<
 
 template <>
 struct SequenceTraits<
-    std::vector<swift::experimental_dependencies::SourceFileDepGraphNode *>> {
+    std::vector<swift::fine_dependencies::SourceFileDepGraphNode *>> {
   using SourceFileDepGraphNode =
-      swift::experimental_dependencies::SourceFileDepGraphNode;
+      swift::fine_dependencies::SourceFileDepGraphNode;
   using NodeVec = std::vector<SourceFileDepGraphNode *>;
   static size_t size(IO &, NodeVec &vec);
   static SourceFileDepGraphNode &element(IO &, NodeVec &vec, size_t index);
@@ -983,6 +983,6 @@ struct SequenceTraits<
 } // namespace llvm
 
 LLVM_YAML_DECLARE_MAPPING_TRAITS(
-    swift::experimental_dependencies::SourceFileDepGraph)
+    swift::fine_dependencies::SourceFileDepGraph)
 
-#endif // SWIFT_AST_EXPERIMENTAL_DEPENDENCIES_H
+#endif // SWIFT_AST_FINE_DEPENDENCIES_H

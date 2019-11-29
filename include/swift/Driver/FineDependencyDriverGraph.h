@@ -1,4 +1,4 @@
-//===--- ExperimentalDependencyModuleDepGraph.h ------------------*- C++-*-===//
+//===--- FineDependencyModuleDepGraph.h ------------------*- C++-*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,10 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef ExperimentalDependencyGraph_h
-#define ExperimentalDependencyGraph_h
+#ifndef SWIFT_DRIVER_FINE_DEPENDENCIES_H
+#define SWIFT_DRIVER_FINE_DEPENDENCIES_H
 
-#include "swift/AST/ExperimentalDependencies.h"
+#include "swift/AST/FineDependencies.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/OptionSet.h"
@@ -34,11 +34,11 @@
 #include <unordered_set>
 #include <vector>
 
-// Declarations for the portion experimental dependency system used by the
+// Declarations for the portion of the fine dependency system used by the
 // driver.
 
 namespace swift {
-namespace experimental_dependencies {
+namespace fine_dependencies {
 
 //==============================================================================
 // MARK: ModuleDepGraphNode
@@ -105,7 +105,7 @@ public:
   bool getIsProvides() const { return getSwiftDeps().hasValue(); }
 };
 
-/// A placeholder allowing the experimental system to fit into the driver
+/// A placeholder allowing the fine dependency system to fit into the driver
 /// without changing as much code.
 class DependencyGraphImpl {
 public:
@@ -117,7 +117,7 @@ public:
 // MARK: ModuleDepGraph
 //==============================================================================
 
-/// See \ref Node in ExperimentalDependencies.h
+/// See \ref Node in FineDependencies.h
 class ModuleDepGraph {
 
   /// Find nodes, first by the swiftDeps file, then by key.
@@ -186,8 +186,8 @@ class ModuleDepGraph {
   /// files for the same name distinct, keep a sequence number for each name.
   std::unordered_map<std::string, unsigned> dotFileSequenceNumber;
 
-  const bool verifyExperimentalDependencyGraphAfterEveryImport;
-  const bool emitExperimentalDependencyDotFileAfterEveryImport;
+  const bool verifyFineDependencyGraphAfterEveryImport;
+  const bool emitFineDependencyDotFileAfterEveryImport;
 
   /// If tracing dependencies, holds the current node traversal path
   Optional<std::vector<const ModuleDepGraphNode *>> currentPathIfTracing;
@@ -250,14 +250,14 @@ public:
   using NodeType = ModuleDepGraphNode;
 
   /// \p stats may be null
-  ModuleDepGraph(const bool verifyExperimentalDependencyGraphAfterEveryImport,
-                 const bool emitExperimentalDependencyDotFileAfterEveryImport,
+  ModuleDepGraph(const bool verifyFineDependencyGraphAfterEveryImport,
+                 const bool emitFineDependencyDotFileAfterEveryImport,
                  const bool shouldTraceDependencies,
                  UnifiedStatsReporter *stats)
-      : verifyExperimentalDependencyGraphAfterEveryImport(
-            verifyExperimentalDependencyGraphAfterEveryImport),
-        emitExperimentalDependencyDotFileAfterEveryImport(
-            emitExperimentalDependencyDotFileAfterEveryImport),
+      : verifyFineDependencyGraphAfterEveryImport(
+            verifyFineDependencyGraphAfterEveryImport),
+        emitFineDependencyDotFileAfterEveryImport(
+            emitFineDependencyDotFileAfterEveryImport),
         currentPathIfTracing(
             shouldTraceDependencies
                 ? llvm::Optional<std::vector<const ModuleDepGraphNode *>>(
@@ -474,7 +474,7 @@ private:
     return !currentPathIfTracing.hasValue() || currentPathIfTracing->empty();
   }
 };
-} // namespace experimental_dependencies
+} // namespace fine_dependencies
 } // namespace swift
 
-#endif // ExperimentalDependencyGraph_h
+#endif // SWIFT_DRIVER_FINE_DEPENDENCIES_H

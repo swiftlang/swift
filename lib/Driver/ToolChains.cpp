@@ -228,9 +228,9 @@ static void addCommonFrontendArgs(const ToolChain &TC, const OutputInfo &OI,
   inputArgs.AddLastArg(arguments, options::OPT_RemoveRuntimeAsserts);
   inputArgs.AddLastArg(arguments, options::OPT_AssumeSingleThreaded);
   inputArgs.AddLastArg(arguments,
-                       options::OPT_enable_experimental_dependencies);
+                       options::OPT_enable_fine_dependencies);
   inputArgs.AddLastArg(arguments,
-                       options::OPT_experimental_dependency_include_intrafile);
+                       options::OPT_fine_dependencies_include_intrafile);
   inputArgs.AddLastArg(arguments, options::OPT_package_description_version);
   inputArgs.AddLastArg(arguments, options::OPT_serialize_diagnostics_path);
   inputArgs.AddLastArg(arguments, options::OPT_debug_diagnostic_names);

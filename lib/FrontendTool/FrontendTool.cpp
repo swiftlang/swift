@@ -28,7 +28,7 @@
 #include "swift/Subsystems.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/DiagnosticsSema.h"
-#include "swift/AST/ExperimentalDependencies.h"
+#include "swift/AST/FineDependencies.h"
 #include "swift/AST/FileSystem.h"
 #include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/IRGenOptions.h"
@@ -956,8 +956,8 @@ static void emitReferenceDependenciesForAllPrimaryInputsIfNeeded(
         Invocation.getReferenceDependenciesFilePathForPrimary(
             SF->getFilename());
     if (!referenceDependenciesFilePath.empty()) {
-      if (Invocation.getLangOptions().EnableExperimentalDependencies)
-        (void)experimental_dependencies::emitReferenceDependencies(
+      if (Invocation.getLangOptions().EnableFineDependencies)
+        (void)fine_dependencies::emitReferenceDependencies(
             Instance.getASTContext().Diags, SF,
             *Instance.getDependencyTracker(), referenceDependenciesFilePath);
       else

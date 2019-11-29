@@ -135,8 +135,8 @@ def driver_always_rebuild_dependents :
   Flag<["-"], "driver-always-rebuild-dependents">, InternalDebugOpt,
   HelpText<"Always rebuild dependents of files that have been modified">;
 
-def enable_experimental_dependencies :
-Flag<["-"], "enable-experimental-dependencies">, Flags<[FrontendOption, HelpHidden]>,
+def enable_fine_dependencies :
+Flag<["-"], "enable-fine-dependencies">, Flags<[FrontendOption, HelpHidden]>,
 HelpText<"Experimental work-in-progress to be more selective about incremental recompilation">;
 
 def enable_source_range_dependencies :
@@ -158,18 +158,18 @@ Joined<["-"], "driver-compare-incremental-schemes-path=">, Flags<[]>,
 Alias<driver_compare_incremental_schemes_path>;
 
 
-def driver_verify_experimental_dependency_graph_after_every_import :
-Flag<["-"], "driver-verify-experimental-dependency-graph-after-every-import">,
+def driver_verify_fine_dependencies_graph_after_every_import :
+Flag<["-"], "driver-verify-fine-dependencies-graph-after-every-import">,
 InternalDebugOpt,
 HelpText<"Debug DriverGraph by verifying it after every import">;
 
-def driver_emit_experimental_dependency_dot_file_after_every_import :
-Flag<["-"], "driver-emit-experimental-dependency-dot-file-after-every-import">,
+def driver_emit_fine_dependencies_dot_file_after_every_import :
+Flag<["-"], "driver-emit-fine-dependencies-dot-file-after-every-import">,
 InternalDebugOpt,
 HelpText<"Emit dot files every time driver imports an experimental swiftdeps file.">;
 
-def experimental_dependency_include_intrafile :
-Flag<["-"], "experimental-dependency-include-intrafile">,
+def fine_dependencies_include_intrafile :
+Flag<["-"], "fine-dependencies-include-intrafile">,
 InternalDebugOpt,
 HelpText<"Include within-file dependencies.">;
 

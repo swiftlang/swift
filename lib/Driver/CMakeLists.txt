@@ -6,7 +6,7 @@ set(swiftDriver_sources
   SourceComparator.cpp
   Driver.cpp
   DriverIncrementalRanges.cpp
-  ExperimentalDependencyDriverGraph.cpp
+  FineDependencyDriverGraph.cpp
   FrontendUtil.cpp
   Job.cpp
   ParseableOutput.cpp
