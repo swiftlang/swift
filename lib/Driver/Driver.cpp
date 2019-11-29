@@ -954,13 +954,11 @@ Driver::buildCompilation(const ToolChain &TC,
         ArgList->hasArg(options::OPT_enable_fine_dependencies);
 
     const bool VerifyFineDependencyGraphAfterEveryImport = ArgList->hasArg(
-        options::
-            OPT_driver_verify_fine_dependencies_graph_after_every_import);
+        options::OPT_driver_verify_fine_dependencies_graph_after_every_import);
     const bool EmitFineDependencyDotFileAfterEveryImport = ArgList->hasArg(
-        options::
-            OPT_driver_emit_fine_dependencies_dot_file_after_every_import);
-    const bool FineDependenciesIncludeIntrafileOnes = ArgList->hasArg(
-        options::OPT_fine_dependencies_include_intrafile);
+        options::OPT_driver_emit_fine_dependencies_dot_file_after_every_import);
+    const bool FineDependenciesIncludeIntrafileOnes =
+        ArgList->hasArg(options::OPT_fine_dependencies_include_intrafile);
 
     // clang-format off
     C = llvm::make_unique<Compilation>(

@@ -851,18 +851,16 @@ namespace driver {
   public:
     PerformJobsState(Compilation &Comp, std::unique_ptr<TaskQueue> &&TaskQueue)
         : Comp(Comp),
-          ExpDepGraph(
-              Comp.getVerifyFineDependencyGraphAfterEveryImport(),
-              Comp.getEmitFineDependencyDotFileAfterEveryImport(),
-              Comp.getTraceDependencies(), Comp.getStatsReporter()),
+          ExpDepGraph(Comp.getVerifyFineDependencyGraphAfterEveryImport(),
+                      Comp.getEmitFineDependencyDotFileAfterEveryImport(),
+                      Comp.getTraceDependencies(), Comp.getStatsReporter()),
           ExpDepGraphForRanges(
               Comp.getVerifyFineDependencyGraphAfterEveryImport(),
               Comp.getEmitFineDependencyDotFileAfterEveryImport(),
               Comp.getTraceDependencies(), Comp.getStatsReporter()),
           ActualIncrementalTracer(Comp.getStatsReporter()),
           TQ(std::move(TaskQueue)) {
-      if (!Comp.getEnableFineDependencies() &&
-          Comp.getTraceDependencies())
+      if (!Comp.getEnableFineDependencies() && Comp.getTraceDependencies())
         IncrementalTracer = &ActualIncrementalTracer;
     }
 
@@ -1726,8 +1724,7 @@ namespace driver {
                 externalDependency, fn);
     }
 
-    fine_dependencies::ModuleDepGraph &
-    getExpDepGraph(const bool forRanges) {
+    fine_dependencies::ModuleDepGraph &getExpDepGraph(const bool forRanges) {
       return forRanges ? ExpDepGraphForRanges : ExpDepGraph;
     }
     DependencyGraph &getDepGraph(const bool forRanges) {

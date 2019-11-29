@@ -227,8 +227,7 @@ static void addCommonFrontendArgs(const ToolChain &TC, const OutputInfo &OI,
   inputArgs.AddLastArg(arguments, options::OPT_O_Group);
   inputArgs.AddLastArg(arguments, options::OPT_RemoveRuntimeAsserts);
   inputArgs.AddLastArg(arguments, options::OPT_AssumeSingleThreaded);
-  inputArgs.AddLastArg(arguments,
-                       options::OPT_enable_fine_dependencies);
+  inputArgs.AddLastArg(arguments, options::OPT_enable_fine_dependencies);
   inputArgs.AddLastArg(arguments,
                        options::OPT_fine_dependencies_include_intrafile);
   inputArgs.AddLastArg(arguments, options::OPT_package_description_version);

@@ -182,7 +182,7 @@ std::string DependencyKey::asString() const {
 
 /// Needed for TwoStageMap::verify:
 raw_ostream &fine_dependencies::operator<<(raw_ostream &out,
-                                                   const DependencyKey &key) {
+                                           const DependencyKey &key) {
   out << key.asString();
   return out;
 }
@@ -230,9 +230,7 @@ void DependencyKey::verifyDeclAspectNames() {
 #undef CHECK_NAME
 }
 
-void DepGraphNode::dump() const {
-  dump(llvm::errs());
-}
+void DepGraphNode::dump() const { dump(llvm::errs()); }
 
 void DepGraphNode::dump(raw_ostream &os) const {
   key.dump(os);
@@ -279,8 +277,8 @@ StringRef ScalarTraits<size_t>::input(StringRef scalar, void *ctxt,
 }
 #endif
 
-void ScalarEnumerationTraits<swift::fine_dependencies::NodeKind>::
-    enumeration(IO &io, swift::fine_dependencies::NodeKind &value) {
+void ScalarEnumerationTraits<swift::fine_dependencies::NodeKind>::enumeration(
+    IO &io, swift::fine_dependencies::NodeKind &value) {
   using NodeKind = swift::fine_dependencies::NodeKind;
   io.enumCase(value, "topLevel", NodeKind::topLevel);
   io.enumCase(value, "nominal", NodeKind::nominal);

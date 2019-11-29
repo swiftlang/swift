@@ -361,7 +361,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.BuildSyntaxTree = true;
     Opts.VerifySyntaxTree = true;
   }
-  
+
   if (Args.hasArg(OPT_enable_fine_dependencies))
     Opts.EnableFineDependencies = true;
 

@@ -350,7 +350,7 @@ void ModuleDepGraph::findDependentNodesAndRecordCascadingOnes(
     std::unordered_set<const ModuleDepGraphNode *> &foundDependents,
     const ModuleDepGraphNode *definition) {
 
-    size_t pathLengthAfterArrival = traceArrival(definition);
+  size_t pathLengthAfterArrival = traceArrival(definition);
 
   // Moved this out of the following loop for effieciency.
   assert(definition->getSwiftDeps().hasValue() &&
@@ -444,8 +444,7 @@ bool ModuleDepGraph::verify() const {
 }
 
 void ModuleDepGraph::verifyNodeMapEntries() const {
-  FrontendStatsTracer tracer(stats,
-                             "fine-dependencies-verifyNodeMapEntries");
+  FrontendStatsTracer tracer(stats, "fine-dependencies-verifyNodeMapEntries");
   // TODO: disable when not debugging
   std::array<
       std::unordered_map<DependencyKey,
@@ -513,16 +512,14 @@ void ModuleDepGraph::verifyExternalDependencyUniqueness(
 }
 
 void ModuleDepGraph::verifyCanFindEachJob() const {
-  FrontendStatsTracer tracer(stats,
-                             "fine-dependencies-verifyCanFindEachJob");
+  FrontendStatsTracer tracer(stats, "fine-dependencies-verifyCanFindEachJob");
   for (const auto p : jobsBySwiftDeps) {
     getJob(p.first);
   }
 }
 
 void ModuleDepGraph::verifyEachJobInGraphIsTracked() const {
-  FrontendStatsTracer tracer(
-      stats, "fine-dependencies-verifyEachJobIsTracked");
+  FrontendStatsTracer tracer(stats, "fine-dependencies-verifyEachJobIsTracked");
   nodeMap.forEachKey1(
       [&](const std::string &swiftDeps, const typename NodeMap::Key2Map &) {
         ensureJobIsTracked(swiftDeps);

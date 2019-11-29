@@ -520,17 +520,13 @@ private:
 } // namespace fine_dependencies
 } // namespace swift
 
-template <>
-struct std::hash<typename swift::fine_dependencies::DependencyKey> {
-  size_t
-  operator()(const swift::fine_dependencies::DependencyKey &key) const {
+template <> struct std::hash<typename swift::fine_dependencies::DependencyKey> {
+  size_t operator()(const swift::fine_dependencies::DependencyKey &key) const {
     return key.hash();
   }
 };
-template <>
-struct std::hash<typename swift::fine_dependencies::DeclAspect> {
-  size_t
-  operator()(const swift::fine_dependencies::DeclAspect aspect) const {
+template <> struct std::hash<typename swift::fine_dependencies::DeclAspect> {
+  size_t operator()(const swift::fine_dependencies::DeclAspect aspect) const {
     return size_t(aspect);
   }
 };
@@ -950,20 +946,17 @@ LLVM_YAML_DECLARE_SCALAR_TRAITS(size_t, QuotingType::None)
 #endif
 LLVM_YAML_DECLARE_ENUM_TRAITS(swift::fine_dependencies::NodeKind)
 LLVM_YAML_DECLARE_ENUM_TRAITS(swift::fine_dependencies::DeclAspect)
-LLVM_YAML_DECLARE_MAPPING_TRAITS(
-    swift::fine_dependencies::DependencyKey)
+LLVM_YAML_DECLARE_MAPPING_TRAITS(swift::fine_dependencies::DependencyKey)
 LLVM_YAML_DECLARE_MAPPING_TRAITS(swift::fine_dependencies::DepGraphNode)
 
 namespace llvm {
 namespace yaml {
 template <>
-struct MappingContextTraits<
-    swift::fine_dependencies::SourceFileDepGraphNode,
-    swift::fine_dependencies::SourceFileDepGraph> {
+struct MappingContextTraits<swift::fine_dependencies::SourceFileDepGraphNode,
+                            swift::fine_dependencies::SourceFileDepGraph> {
   using SourceFileDepGraphNode =
       swift::fine_dependencies::SourceFileDepGraphNode;
-  using SourceFileDepGraph =
-      swift::fine_dependencies::SourceFileDepGraph;
+  using SourceFileDepGraph = swift::fine_dependencies::SourceFileDepGraph;
 
   static void mapping(IO &io, SourceFileDepGraphNode &node,
                       SourceFileDepGraph &g);
@@ -982,7 +975,6 @@ struct SequenceTraits<
 } // namespace yaml
 } // namespace llvm
 
-LLVM_YAML_DECLARE_MAPPING_TRAITS(
-    swift::fine_dependencies::SourceFileDepGraph)
+LLVM_YAML_DECLARE_MAPPING_TRAITS(swift::fine_dependencies::SourceFileDepGraph)
 
 #endif // SWIFT_AST_FINE_DEPENDENCIES_H

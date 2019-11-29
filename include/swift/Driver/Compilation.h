@@ -388,9 +388,7 @@ public:
   }
   void disableIncrementalBuild(Twine why);
 
-  bool getEnableFineDependencies() const {
-    return EnableFineDependencies;
-  }
+  bool getEnableFineDependencies() const { return EnableFineDependencies; }
 
   bool getVerifyFineDependencyGraphAfterEveryImport() const {
     return VerifyFineDependencyGraphAfterEveryImport;
