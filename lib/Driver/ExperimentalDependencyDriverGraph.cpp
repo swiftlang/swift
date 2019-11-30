@@ -115,18 +115,6 @@ bool ModuleDepGraph::markIntransitive(const Job *node) {
   return rememberThatJobCascades(getSwiftDeps(node));
 }
 
-size_t ModuleDepGraph::countTopLevelProvides(const Job *node) {
-  StringRef swiftDeps = getSwiftDeps(node);
-  size_t count = 0;
-  for (auto &keyAndNode : nodeMap[swiftDeps]) {
-    const DependencyKey &k = keyAndNode.first;
-    if (k.getKind() == NodeKind::topLevel &&
-        k.getAspect() == DeclAspect::interface)
-      ++count;
-  }
-  return count;
-}
-
 void ModuleDepGraph::addIndependentNode(const Job *job) {
   // No need to create any nodes; that will happen when the swiftdeps file is
   // read. Just record the correspondence.

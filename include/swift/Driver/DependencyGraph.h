@@ -165,9 +165,7 @@ protected:
   void markExternal(SmallVectorImpl<const void *> &visited,
                     StringRef externalDependency);
 
-public: // for ranges
-  size_t countTopLevelProvides(const void *) const;
-
+public:
   void forEachUnmarkedJobDirectlyDependentOnExternalSwiftdeps(
       StringRef externalDependency, function_ref<void(const void *)> fn);
 

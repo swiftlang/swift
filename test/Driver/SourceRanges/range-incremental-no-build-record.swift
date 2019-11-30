@@ -11,7 +11,7 @@
 
 // Ensure that the extra outputs are not generated when they should not be:
 // RUN: %empty-directory(%t)
-// RUN: cp -r %S/Inputs/common/* %t
+// RUN: cp -r %S/Inputs/range-incremental-no-build-record/* %t
 // RUN: cd %t && %swiftc_driver -output-file-map %t/output.json -incremental -enable-batch-mode ./main.swift ./fileA.swift ./fileB.swift -module-name main -j2 -driver-show-job-lifecycle -driver-show-incremental  >& %t/output0
 
 // RUN: %FileCheck -match-full-lines -check-prefix=CHECK-NO-BUILD-REC %s < %t/output0
@@ -31,7 +31,6 @@
 
 // RUN: %t/main | tee run0 | grep Any > /dev/null && rm %t/main
 
-
 // =============================================================================
 // Same, except force the driver to compute both strategies via -driver-compare-incremental-schemes
 // =============================================================================
@@ -43,13 +42,10 @@
 
 // Ensure that the extra outputs are not generated when they should not be:
 // RUN: %empty-directory(%t)
-// RUN: cp -r %S/Inputs/common/* %t
+// RUN: cp -r %S/Inputs/range-incremental-no-build-record/* %t
 // RUN: cd %t && %swiftc_driver -driver-compare-incremental-schemes -output-file-map %t/output.json -incremental -enable-batch-mode ./main.swift ./fileA.swift ./fileB.swift -module-name main -j2 -driver-show-job-lifecycle -driver-show-incremental  >& %t/output1
 
 // RUN: %FileCheck -match-full-lines -check-prefix=CHECK-NO-BUILD-REC %s < %t/output1
-
-// RUN: %FileCheck -match-full-lines -check-prefix=CHECK-HAS-NO-BATCHES %s < %t/output1
-// CHECK-HAS-NO-BATCHES-NOT: Batchable: {compile:
 
 // RUN: %FileCheck -match-full-lines -check-prefix=CHECK-COMPARE-DISABLED-NO-BUILD-RECORD %s < %t/output1
 // CHECK-COMPARE-DISABLED-NO-BUILD-RECORD: *** Incremental build disabled because could not read build record, cannot compare ***

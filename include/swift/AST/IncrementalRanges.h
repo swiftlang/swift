@@ -26,7 +26,6 @@
 #include <vector>
 
 namespace swift {
-class PersistentParserState;
 class SourceManager;
 class DiagnosticEngine;
 class SourceFile;
@@ -170,15 +169,12 @@ struct SwiftRangesFileContents {
   /// For each non-primary, the unparsed ranges in it.
   /// At present these represent the bodies of types defined in the nonprimary
   /// that are not used in the primary.
-  RangesByFilename unparsedRangesByNonPrimary;
   Ranges noninlinableFunctionBodies;
 
-  SwiftRangesFileContents() : SwiftRangesFileContents({}, {}) {}
+  SwiftRangesFileContents() = default;
 
-  SwiftRangesFileContents(RangesByFilename &&unparsedRangesByNonPrimary,
-                          Ranges &&noninlinableFunctionBodies)
-      : unparsedRangesByNonPrimary(std::move(unparsedRangesByNonPrimary)),
-        noninlinableFunctionBodies(std::move(noninlinableFunctionBodies)) {}
+  SwiftRangesFileContents(Ranges &&noninlinableFunctionBodies)
+      : noninlinableFunctionBodies(std::move(noninlinableFunctionBodies)) {}
 
   /// Return None for error.
   static Optional<SwiftRangesFileContents>
@@ -198,8 +194,6 @@ struct llvm::yaml::MappingTraits<
   static void
   mapping(llvm::yaml::IO &io,
           swift::incremental_ranges::SwiftRangesFileContents &srfc) {
-    io.mapRequired("unparsedRangesByNonPrimary",
-                   srfc.unparsedRangesByNonPrimary);
     io.mapRequired("noninlinableFunctionBodies",
                    srfc.noninlinableFunctionBodies);
   }
@@ -218,16 +212,14 @@ namespace incremental_ranges {
 class SwiftRangesEmitter {
   const StringRef outputPath;
   SourceFile *const primaryFile;
-  const PersistentParserState &persistentState;
   const SourceManager &sourceMgr;
   DiagnosticEngine &diags;
 
 public:
   SwiftRangesEmitter(StringRef outputPath, SourceFile *primaryFile,
-                     const PersistentParserState &persistentState,
                      const SourceManager &sourceMgr, DiagnosticEngine &diags)
-      : outputPath(outputPath), primaryFile(primaryFile),
-        persistentState(persistentState), sourceMgr(sourceMgr), diags(diags) {}
+      : outputPath(outputPath), primaryFile(primaryFile), sourceMgr(sourceMgr),
+        diags(diags) {}
 
   /// True for error
   bool emit() const;
@@ -236,13 +228,9 @@ public:
   void emitRanges(llvm::raw_ostream &out) const;
 
 private:
-  RangesByFilename collectSerializedUnparsedRangesByNonPrimary() const;
-
   Ranges collectSortedSerializedNoninlinableFunctionBodies() const;
   std::vector<CharSourceRange> collectNoninlinableFunctionBodies() const;
 
-  std::map<std::string, std::vector<CharSourceRange>>
-  collectUnparsedRanges() const;
   std::vector<CharSourceRange>
   sortRanges(std::vector<CharSourceRange> ranges) const;
 
