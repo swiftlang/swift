@@ -2645,7 +2645,8 @@ public:
 
           // Make sure that the replacement type only uses archetypes allowed
           // in the context where the normal conformance exists.
-          auto replacementType = normal->getTypeWitness(assocType);
+          auto replacementType =
+              normal->getTypeWitnessUncached(assocType).getWitnessType();
           Verifier(M, normal->getDeclContext())
             .verifyChecked(replacementType);
           continue;
@@ -2677,7 +2678,7 @@ public:
           }
 
           // Check the witness substitutions.
-          const auto &witness = normal->getWitness(req);
+          const auto &witness = normal->getWitnessUncached(req);
 
           if (auto *genericEnv = witness.getSyntheticEnvironment())
             Generics.push_back(genericEnv->getGenericSignature());
@@ -2865,15 +2866,6 @@ public:
 
     void verifyParsed(ConstructorDecl *CD) {
       PrettyStackTraceDecl debugStack("verifying ConstructorDecl", CD);
-
-      auto *DC = CD->getDeclContext();
-      if (!isa<NominalTypeDecl>(DC) && !isa<ExtensionDecl>(DC) &&
-          !CD->isInvalid()) {
-        Out << "ConstructorDecls outside nominal types and extensions "
-               "should be marked invalid";
-        abort();
-      }
-
       verifyParsedBase(CD);
     }
 
@@ -2954,15 +2946,6 @@ public:
         Out << "DestructorDecl cannot be generic";
         abort();
       }
-
-      auto *DC = DD->getDeclContext();
-      if (!isa<NominalTypeDecl>(DC) && !isa<ExtensionDecl>(DC) &&
-          !DD->isInvalid()) {
-        Out << "DestructorDecls outside nominal types and extensions "
-               "should be marked invalid";
-        abort();
-      }
-
       verifyParsedBase(DD);
     }
 

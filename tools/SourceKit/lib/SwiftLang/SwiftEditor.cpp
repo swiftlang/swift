@@ -700,6 +700,7 @@ public:
     Parser.reset(
                  new ParserUnit(SM, SourceFileKind::Main, BufferID,
                      CompInv.getLangOptions(),
+                     CompInv.getTypeCheckerOptions(),
                      CompInv.getModuleName(),
                      SynTreeCreator,
                      CompInv.getMainFileSyntaxParsingCache())
@@ -1119,6 +1120,76 @@ static UIdent getAccessLevelUID(AccessLevel Access) {
   llvm_unreachable("Unhandled access level in switch.");
 }
 
+static Optional<AccessLevel>
+inferDefaultAccessSyntactically(const ExtensionDecl *ED) {
+  // Check if the extension has an explicit access control attribute.
+  if (auto *AA = ED->getAttrs().getAttribute<AccessControlAttr>())
+    return std::min(std::max(AA->getAccess(), AccessLevel::FilePrivate),
+                    AccessLevel::Public);
+  return None;
+}
+
+/// Document structure is a purely syntactic request that shouldn't require name lookup
+/// or type-checking, so this is a best-effort computation, particularly where extensions
+/// are concerned.
+static Optional<AccessLevel> inferAccessSyntactically(const ValueDecl *D) {
+  assert(D);
+
+  // Check if the decl has an explicit access control attribute.
+  if (auto *AA = D->getAttrs().getAttribute<AccessControlAttr>())
+    return AA->getAccess();
+
+  DeclContext *DC = D->getDeclContext();
+
+  if (D->getKind() == DeclKind::Destructor ||
+      D->getKind() == DeclKind::EnumElement) {
+    if (auto container = dyn_cast<NominalTypeDecl>(D->getDeclContext())) {
+      if (auto containerAccess = inferAccessSyntactically(container))
+        return std::max(containerAccess.getValue(), AccessLevel::Internal);
+      return None;
+    }
+    return AccessLevel::Private;
+  }
+
+  switch (DC->getContextKind()) {
+  case DeclContextKind::TopLevelCodeDecl:
+    return AccessLevel::FilePrivate;
+  case DeclContextKind::SerializedLocal:
+  case DeclContextKind::AbstractClosureExpr:
+  case DeclContextKind::EnumElementDecl:
+  case DeclContextKind::Initializer:
+  case DeclContextKind::AbstractFunctionDecl:
+  case DeclContextKind::SubscriptDecl:
+    return AccessLevel::Private;
+  case DeclContextKind::Module:
+  case DeclContextKind::FileUnit:
+    return AccessLevel::Internal;
+  case DeclContextKind::GenericTypeDecl: {
+    auto generic = cast<GenericTypeDecl>(DC);
+    AccessLevel access = AccessLevel::Internal;
+    if (isa<ProtocolDecl>(generic)) {
+      if (auto protoAccess = inferAccessSyntactically(generic))
+        access = std::max(AccessLevel::FilePrivate, protoAccess.getValue());
+    }
+    return access;
+  }
+  case DeclContextKind::ExtensionDecl:
+    auto *ED = cast<ExtensionDecl>(DC);
+    return inferDefaultAccessSyntactically(ED);
+  }
+
+  llvm_unreachable("Unhandled DeclContextKind in switch.");
+}
+
+static Optional<AccessLevel>
+inferSetterAccessSyntactically(const AbstractStorageDecl *D) {
+  if (!D->isSettable(/*UseDC=*/nullptr))
+    return None;
+  if (auto *AA = D->getAttrs().getAttribute<SetterAccessAttr>())
+    return AA->getAccess();
+  return inferAccessSyntactically(D);
+}
+
 class SwiftDocumentStructureWalker: public ide::SyntaxModelWalker {
   SourceManager &SrcManager;
   EditorConsumer &Consumer;
@@ -1175,16 +1246,15 @@ public:
         Node.Kind != SyntaxStructureKind::LocalVariable &&
         Node.Kind != SyntaxStructureKind::GenericTypeParam) {
       if (auto *VD = dyn_cast_or_null<ValueDecl>(Node.Dcl)) {
-        AccessLevel = getAccessLevelUID(VD->getFormalAccess());
+        if (auto Access = inferAccessSyntactically(VD))
+          AccessLevel = getAccessLevelUID(Access.getValue());
       } else if (auto *ED = dyn_cast_or_null<ExtensionDecl>(Node.Dcl)) {
-        auto StrictAccess = ED->getDefaultAccessLevel();
-        AccessLevel = getAccessLevelUID(StrictAccess);
+        if (auto DefaultAccess = inferDefaultAccessSyntactically(ED))
+          AccessLevel = getAccessLevelUID(DefaultAccess.getValue());
       }
       if (auto *ASD = dyn_cast_or_null<AbstractStorageDecl>(Node.Dcl)) {
-        if (ASD->isSettable(/*UseDC=*/nullptr)) {
-          swift::AccessLevel SetAccess = ASD->getSetterFormalAccess();
-          SetterAccessLevel = getAccessLevelUID(SetAccess);
-        }
+        if (auto SetAccess = inferSetterAccessSyntactically(ASD))
+          SetterAccessLevel = getAccessLevelUID(SetAccess.getValue());
       }
     }
 

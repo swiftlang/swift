@@ -167,13 +167,13 @@ findSuitableWrapperInit(ASTContext &ctx, NominalTypeDecl *nominal,
       if (!argumentParam)
         continue;
 
-      if (!argumentParam->hasInterfaceType())
-        continue;
-
       if (argumentParam->isInOut() || argumentParam->isVariadic())
         continue;
 
       auto paramType = argumentParam->getInterfaceType();
+      if (paramType->is<ErrorType>())
+        continue;
+
       if (argumentParam->isAutoClosure()) {
         if (auto *fnType = paramType->getAs<FunctionType>())
           paramType = fnType->getResult();
@@ -491,7 +491,7 @@ AttachedPropertyWrapperTypeRequest::evaluate(Evaluator &evaluator,
     return Type();
 
   ASTContext &ctx = var->getASTContext();
-  if (!ctx.getLazyResolver())
+  if (!ctx.areSemanticQueriesEnabled())
     return nullptr;
 
   auto resolution =
@@ -499,8 +499,8 @@ AttachedPropertyWrapperTypeRequest::evaluate(Evaluator &evaluator,
   TypeResolutionOptions options(TypeResolverContext::PatternBindingDecl);
   options |= TypeResolutionFlags::AllowUnboundGenerics;
 
-  auto &tc = *static_cast<TypeChecker *>(ctx.getLazyResolver());
-  if (TypeChecker::validateType(tc.Context, customAttr->getTypeLoc(),
+  if (TypeChecker::validateType(var->getASTContext(),
+                                customAttr->getTypeLoc(),
                                 resolution, options))
     return ErrorType::get(ctx);
 
@@ -527,18 +527,17 @@ PropertyWrapperBackingPropertyTypeRequest::evaluate(
     return Type();
 
   ASTContext &ctx = var->getASTContext();
-  if (!ctx.getLazyResolver())
+  if (!ctx.areSemanticQueriesEnabled())
     return Type();
 
   // If there's an initializer of some sort, checking it will determine the
   // property wrapper type.
   unsigned index = binding->getPatternEntryIndexForVarDecl(var);
-  TypeChecker &tc = *static_cast<TypeChecker *>(ctx.getLazyResolver());
   if (binding->isInitialized(index)) {
     // FIXME(InterfaceTypeRequest): Remove this.
     (void)var->getInterfaceType();
     if (!binding->isInitializerChecked(index))
-      tc.typeCheckPatternBinding(binding, index);
+      TypeChecker::typeCheckPatternBinding(binding, index);
 
     Type type = ctx.getSideCachedPropertyWrapperBackingPropertyType(var);
     assert(type || ctx.Diags.hadAnyError());
@@ -547,12 +546,12 @@ PropertyWrapperBackingPropertyTypeRequest::evaluate(
 
   // Compute the type of the property to plug in to the wrapper type.
   Type propertyType = var->getType();
-  if (!propertyType || propertyType->hasError())
+  if (propertyType->hasError())
     return Type();
 
   using namespace constraints;
   auto dc = var->getInnermostDeclContext();
-  ConstraintSystem cs(tc, dc, None);
+  ConstraintSystem cs(dc, None);
   auto emptyLocator = cs.getConstraintLocator(nullptr);
   
   auto wrapperAttrs = var->getAttachedPropertyWrappers();
@@ -591,7 +590,7 @@ PropertyWrapperBackingPropertyTypeRequest::evaluate(
                    propertyType, emptyLocator);
 
   SmallVector<Solution, 4> solutions;
-  if (cs.solve(nullptr, solutions) || solutions.size() != 1) {
+  if (cs.solve(solutions) || solutions.size() != 1) {
     var->diagnose(diag::property_wrapper_incompatible_property,
                   propertyType, rawType);
     var->setInvalid();

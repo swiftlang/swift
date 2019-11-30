@@ -207,7 +207,6 @@ bool ExistentialSpecializer::canSpecializeExistentialArgsInFunction(
 
 /// Determine if this callee function can be specialized or not.
 bool ExistentialSpecializer::canSpecializeCalleeFunction(FullApplySite &Apply) {
-
   /// Determine the caller of the apply.
   auto *Callee = Apply.getReferencedFunctionOrNull();
   if (!Callee)
@@ -219,6 +218,13 @@ bool ExistentialSpecializer::canSpecializeCalleeFunction(FullApplySite &Apply) {
 
   /// External function definitions.
   if (!Callee->isDefinition())
+    return false;
+
+  // If the callee has ownership enabled, bail.
+  //
+  // FIXME: We should be able to handle callees that have ownership, but the
+  // pass has not been updated yet.
+  if (Callee->hasOwnership())
     return false;
 
   /// Ignore functions with indirect results.

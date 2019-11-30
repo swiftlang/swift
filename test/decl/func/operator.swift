@@ -243,7 +243,7 @@ struct S1 {
 }
 
 extension S1 {
-  func %%%%(lhs: S1, rhs: S1) -> S1 { return lhs } // expected-error{{operator '%%%%' declared in type 'S1' must be 'static'}}{{3-3=static }}
+  func %%%%(lhs: S1, rhs: S1) -> S1 { return lhs } // expected-error{{operator '%%%%' declared in extension of 'S1' must be 'static'}}{{3-3=static }}
 }
 
 class C0 {
@@ -375,8 +375,8 @@ class C6 {
   static func == (lhs: C6, rhs: C6) -> Bool { return false }
 
   func test1(x: C6) {
-    // FIXME: Better would be: use of '=' in a boolean context, did you mean '=='?
-    if x == x && x = x { } // expected-error{{cannot convert value of type 'C6' to expected argument type 'Bool'}}
+    if x == x && x = x { } // expected-error{{use of '=' in a boolean context, did you mean '=='?}} {{20-21===}}
+    // expected-error@-1 {{cannot convert value of type 'C6' to expected argument type 'Bool'}}
   }
 }
 

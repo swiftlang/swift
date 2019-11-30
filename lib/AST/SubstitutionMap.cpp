@@ -555,12 +555,8 @@ SubstitutionMap::getOverrideSubstitutions(const ClassDecl *baseClass,
   SubstitutionMap origSubMap;
   if (derivedSubs)
     origSubMap = *derivedSubs;
-  else if (derivedSig) {
-    origSubMap = get(
-        derivedSig,
-        [](SubstitutableType *type) -> Type { return type; },
-        MakeAbstractConformanceForGenericType());
-  }
+  else if (derivedSig)
+    origSubMap = derivedSig->getIdentitySubstitutionMap();
 
   return combineSubstitutionMaps(baseSubMap, origSubMap,
                                  CombineSubstitutionMaps::AtDepth,
@@ -603,17 +599,50 @@ SubstitutionMap::combineSubstitutionMaps(SubstitutionMap firstSubMap,
   return get(
     genericSig,
     [&](SubstitutableType *type) {
-      auto replacement = replaceGenericParameter(type);
-      if (replacement)
+      if (auto replacement = replaceGenericParameter(type))
         return Type(replacement).subst(secondSubMap);
       return Type(type).subst(firstSubMap);
     },
-    [&](CanType type, Type substType, ProtocolDecl *conformedProtocol) {
-      auto replacement = type.transform(replaceGenericParameter);
-      if (replacement)
+    [&](CanType type, Type substType, ProtocolDecl *proto) {
+      if (auto replacement = type.transform(replaceGenericParameter))
         return secondSubMap.lookupConformance(replacement->getCanonicalType(),
-                                              conformedProtocol);
-      return firstSubMap.lookupConformance(type, conformedProtocol);
+                                              proto);
+      if (auto conformance = firstSubMap.lookupConformance(type, proto))
+        return conformance;
+
+      // We might not have enough information in the substitution maps alone.
+      //
+      // Eg,
+      //
+      // class Base<T1> {
+      //   func foo<U1>(_: U1) where T1 : P {}
+      // }
+      //
+      // class Derived<T2> : Base<Foo<T2>> {
+      //   override func foo<U2>(_: U2) where T2 : Q {}
+      // }
+      //
+      // Suppose we're devirtualizing a call to Base.foo() on a value whose
+      // type is known to be Derived<Bar>. We start with substitutions written
+      // in terms of Base.foo()'s generic signature:
+      //
+      // <T1, U1 where T1 : P>
+      // T1 := Foo<Bar>
+      // T1 : P := Foo<Bar> : P
+      //
+      // We want to build substitutions in terms of Derived.foo()'s
+      // generic signature:
+      //
+      // <T2, U2 where T2 : Q>
+      // T2 := Bar
+      // T2 : Q := Bar : Q
+      //
+      // The conformance Bar : Q is difficult to recover in the general case.
+      //
+      // Some combination of storing substitution maps in BoundGenericTypes
+      // as well as for method overrides would solve this, but for now, just
+      // punt to module lookup.
+      return proto->getParentModule()->lookupConformance(substType, proto);
     });
 }
 
@@ -685,4 +714,12 @@ bool SubstitutionMap::isIdentity() const {
   assert(replacements.empty());
 
   return !hasNonIdentityReplacement;
+}
+
+SubstitutionMap SubstitutionMap::mapIntoTypeExpansionContext(
+    TypeExpansionContext context) const {
+  ReplaceOpaqueTypesWithUnderlyingTypes replacer(
+      context.getContext(), context.getResilienceExpansion(),
+      context.isWholeModuleContext());
+  return this->subst(replacer, replacer, SubstFlags::SubstituteOpaqueArchetypes);
 }

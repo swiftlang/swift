@@ -234,8 +234,7 @@ class Whatever<A: Numeric, B: Numeric> {  // expected-note 2 {{'A' declared as p
 Whatever.foo(a: 23) // expected-error {{generic parameter 'A' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}} {{9-9=<<#A: Numeric#>, Int>}}
 
 // <rdar://problem/21718955> Swift useless error: cannot invoke 'foo' with no arguments
-// TODO(diagnostics): We should try to produce a single note in this case.
-Whatever.bar()  // expected-error {{generic parameter 'A' could not be inferred}} expected-note 2 {{explicitly specify the generic arguments to fix this issue}} {{9-9=<<#A: Numeric#>, <#B: Numeric#>>}}
+Whatever.bar()  // expected-error {{generic parameter 'A' could not be inferred}} expected-note 1 {{explicitly specify the generic arguments to fix this issue}} {{9-9=<<#A: Numeric#>, <#B: Numeric#>>}}
 // expected-error@-1 {{generic parameter 'B' could not be inferred}}
 
 // <rdar://problem/27515965> Type checker doesn't enforce same-type constraint if associated type is Any

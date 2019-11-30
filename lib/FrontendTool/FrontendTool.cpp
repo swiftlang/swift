@@ -764,6 +764,29 @@ static bool precompileBridgingHeader(CompilerInvocation &Invocation,
           .InputsAndOutputs.getSingleOutputFilename());
 }
 
+static bool precompileClangModule(CompilerInvocation &Invocation,
+                                  CompilerInstance &Instance) {
+  auto clangImporter = static_cast<ClangImporter *>(
+      Instance.getASTContext().getClangModuleLoader());
+  return clangImporter->emitPrecompiledModule(
+      Invocation.getFrontendOptions()
+          .InputsAndOutputs.getFilenameOfFirstInput(),
+      Invocation.getFrontendOptions().ModuleName,
+      Invocation.getFrontendOptions()
+          .InputsAndOutputs.getSingleOutputFilename());
+}
+
+static bool dumpPrecompiledClangModule(CompilerInvocation &Invocation,
+                                       CompilerInstance &Instance) {
+  auto clangImporter = static_cast<ClangImporter *>(
+      Instance.getASTContext().getClangModuleLoader());
+  return clangImporter->dumpPrecompiledModule(
+      Invocation.getFrontendOptions()
+          .InputsAndOutputs.getFilenameOfFirstInput(),
+      Invocation.getFrontendOptions()
+          .InputsAndOutputs.getSingleOutputFilename());
+}
+
 static bool buildModuleFromInterface(CompilerInvocation &Invocation,
                                      CompilerInstance &Instance) {
   const FrontendOptions &FEOpts = Invocation.getFrontendOptions();
@@ -967,6 +990,43 @@ static void emitReferenceDependenciesForAllPrimaryInputsIfNeeded(
     }
   }
 }
+static void
+emitSwiftRangesForAllPrimaryInputsIfNeeded(CompilerInvocation &Invocation,
+                                           CompilerInstance &Instance) {
+  if (Invocation.getFrontendOptions().InputsAndOutputs.hasSwiftRangesPath() &&
+      Instance.getPrimarySourceFiles().empty()) {
+    Instance.getASTContext().Diags.diagnose(
+        SourceLoc(), diag::emit_swift_ranges_without_primary_file);
+    return;
+  }
+  for (auto *SF : Instance.getPrimarySourceFiles()) {
+    const std::string &swiftRangesFilePath =
+        Invocation.getSwiftRangesFilePathForPrimary(SF->getFilename());
+    if (!swiftRangesFilePath.empty()) {
+      (void)Instance.emitSwiftRanges(Instance.getASTContext().Diags, SF,
+                                     swiftRangesFilePath);
+    }
+  }
+}
+static void
+emitCompiledSourceForAllPrimaryInputsIfNeeded(CompilerInvocation &Invocation,
+                                              CompilerInstance &Instance) {
+  if (Invocation.getFrontendOptions()
+          .InputsAndOutputs.hasCompiledSourcePath() &&
+      Instance.getPrimarySourceFiles().empty()) {
+    Instance.getASTContext().Diags.diagnose(
+        SourceLoc(), diag::emit_compiled_source_without_primary_file);
+    return;
+  }
+  for (auto *SF : Instance.getPrimarySourceFiles()) {
+    const std::string &compiledSourceFilePath =
+        Invocation.getCompiledSourceFilePathForPrimary(SF->getFilename());
+    if (!compiledSourceFilePath.empty()) {
+      (void)Instance.emitCompiledSource(Instance.getASTContext().Diags, SF,
+                                        compiledSourceFilePath);
+    }
+  }
+}
 
 static bool writeTBDIfNeeded(CompilerInvocation &Invocation,
                              CompilerInstance &Instance) {
@@ -1133,10 +1193,14 @@ static bool performCompile(CompilerInstance &Instance,
     Instance.getASTContext().LangOpts.VerifySyntaxTree = true;
   }
 
-  // We've been asked to precompile a bridging header; we want to
+  // We've been asked to precompile a bridging header or module; we want to
   // avoid touching any other inputs and just parse, emit and exit.
   if (Action == FrontendOptions::ActionType::EmitPCH)
     return precompileBridgingHeader(Invocation, Instance);
+  if (Action == FrontendOptions::ActionType::EmitPCM)
+    return precompileClangModule(Invocation, Instance);
+  if (Action == FrontendOptions::ActionType::DumpPCM)
+    return dumpPrecompiledClangModule(Invocation, Instance);
 
   if (Action == FrontendOptions::ActionType::CompileModuleFromInterface)
     return buildModuleFromInterface(Invocation, Instance);
@@ -1199,6 +1263,8 @@ static bool performCompile(CompilerInstance &Instance,
     Context.getClangModuleLoader()->printStatistics();
 
   emitReferenceDependenciesForAllPrimaryInputsIfNeeded(Invocation, Instance);
+  emitSwiftRangesForAllPrimaryInputsIfNeeded(Invocation, Instance);
+  emitCompiledSourceForAllPrimaryInputsIfNeeded(Invocation, Instance);
 
   if (Context.hadError()) {
     //  Emit the index store data even if there were compiler errors.

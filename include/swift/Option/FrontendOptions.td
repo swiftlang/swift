@@ -58,6 +58,19 @@ def emit_reference_dependencies_path
   : Separate<["-"], "emit-reference-dependencies-path">, MetaVarName<"<path>">,
     HelpText<"Output Swift-style dependencies file to <path>">;
 
+
+def emit_swift_ranges : Flag<["-"], "emit-swift-ranges">,
+  HelpText<"Emit unparsed source ranges">;
+def emit_swift_ranges_path
+  : Separate<["-"], "emit-swift-ranges-path">, MetaVarName<"<path>">,
+    HelpText<"Output unparsed ranges to <path>">;
+
+def emit_compiled_source : Flag<["-"], "emit-compiled-source">,
+  HelpText<"Emit compiled source">;
+def emit_compiled_source_path
+  : Separate<["-"], "emit-compiled-source-path">, MetaVarName<"<path>">,
+    HelpText<"Output compiled source to <path>">;
+
 def emit_fixits_path
   : Separate<["-"], "emit-fixits-path">, MetaVarName<"<path>">,
     HelpText<"Output compiler fixits as source edits to <path>">;
@@ -115,6 +128,10 @@ def show_diagnostics_after_fatal : Flag<["-"], "show-diagnostics-after-fatal">,
   
 def enable_descriptive_diagnostics : Flag<["-"], "enable-descriptive-diagnostics">,
   HelpText<"Show descriptive diagnostic information, if available.">;
+  
+def diagnostic_documentation_path
+  : Separate<["-"], "diagnostic-documentation-path">, MetaVarName<"<path>">,
+  HelpText<"Path to diagnostic documentation resources">;
 
 def enable_swiftcall : Flag<["-"], "enable-swiftcall">,
   HelpText<"Enable the use of LLVM swiftcall support">;
@@ -250,6 +267,8 @@ def debugger_support : Flag<["-"], "debugger-support">,
 
 def disable_arc_opts : Flag<["-"], "disable-arc-opts">,
   HelpText<"Don't run SIL ARC optimization passes.">;
+def disable_ossa_opts : Flag<["-"], "disable-ossa-opts">,
+  HelpText<"Don't run SIL OSSA optimization passes.">;
 
 def disable_sil_partial_apply : Flag<["-"], "disable-sil-partial-apply">,
   HelpText<"Disable use of partial_apply in SIL generation">;
@@ -344,6 +363,10 @@ def enable_experimental_static_assert :
   Flag<["-"], "enable-experimental-static-assert">,
   HelpText<"Enable experimental #assert">;
 
+def enable_subst_sil_function_types_for_function_values :
+  Flag<["-"], "enable-subst-sil-function-types-for-function-values">,
+  HelpText<"Use substituted function types for SIL type lowering of function values">;
+  
 def enable_deserialization_recovery :
   Flag<["-"], "enable-deserialization-recovery">,
   HelpText<"Attempt to recover from missing xrefs (etc) in swiftmodules">;

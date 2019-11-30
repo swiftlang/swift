@@ -293,7 +293,8 @@ public:
   ///
   /// WARNING: This is not a constant time operation because it is implemented
   /// in terms of getVarDecl, which requests all BaseType's stored properties.
-  SILType getType(SILType BaseType, SILModule &M) const;
+  SILType getType(SILType BaseType, SILModule &M,
+                  TypeExpansionContext context) const;
 
   VarDecl *getVarDecl(SILType BaseType) const {
     assert(isValid());
@@ -402,6 +403,7 @@ public:
   /// Given a specific SILType, return all first level projections if it is an
   /// aggregate.
   static void getFirstLevelProjections(SILType V, SILModule &Mod,
+                                       TypeExpansionContext context,
                                        llvm::SmallVectorImpl<Projection> &Out);
 
   /// Is this cast which only allows for equality?
@@ -584,6 +586,7 @@ public:
   /// is a leaf node in the type tree.
   static void expandTypeIntoLeafProjectionPaths(SILType BaseType,
                                                 SILModule *Mod,
+                                                TypeExpansionContext context,
                                                 ProjectionPathList &P);
 
   /// Return true if the given projection paths in \p CPaths does not cover
@@ -626,26 +629,27 @@ public:
   SILType getBaseType() const { return BaseType; }
 
   /// Returns the most derived type of the projection path.
-  SILType getMostDerivedType(SILModule &M) {
+  SILType getMostDerivedType(SILModule &M, TypeExpansionContext context) {
     if (Path.empty())
       return getBaseType();
     if (MostDerivedType)
       return MostDerivedType;
-    MostDerivedType = getDerivedType(Path.size(), M);
+    MostDerivedType = getDerivedType(Path.size(), M, context);
     return MostDerivedType;
   }
 
   /// Returns the ith derived type of the path. This is zero indexed with 0
   /// being the base type and n consisting of applying the up to n projections
   /// to the base type.
-  SILType getDerivedType(unsigned i, SILModule &M) const {
+  SILType getDerivedType(unsigned i, SILModule &M,
+                         TypeExpansionContext context) const {
     assert(i <= Path.size());
     SILType IterTy = getBaseType();
     if (i == 0)
       return IterTy;
     for (unsigned j : range(i)) {
       auto &Proj = Path[j];
-      IterTy = Proj.getType(IterTy, M);
+      IterTy = Proj.getType(IterTy, M, context);
     }
     return IterTy;
   }
@@ -671,10 +675,11 @@ public:
   const_reverse_iterator rbegin() const { return Path.rbegin(); }
   const_reverse_iterator rend() const { return Path.rend(); }
 
-  void verify(SILModule &M);
+  void verify(SILModule &M, TypeExpansionContext context);
 
-  raw_ostream &print(raw_ostream &OS, SILModule &M) const;
-  void dump(SILModule &M) const;
+  raw_ostream &print(raw_ostream &OS, SILModule &M,
+                     TypeExpansionContext context) const;
+  void dump(SILModule &M, TypeExpansionContext context) const;
 };
 
 /// Returns the hashcode for the new projection path.
@@ -813,9 +818,11 @@ private:
                            llvm::SmallVectorImpl<ValueNodePair> &Worklist,
                            SILValue Value);
 
-  void createNextLevelChildren(ProjectionTree &Tree);
+  void createNextLevelChildren(ProjectionTree &Tree, TypeExpansionContext context);
 
-  void createNextLevelChildrenForStruct(ProjectionTree &Tree, StructDecl *SD);
+  void createNextLevelChildrenForStruct(ProjectionTree &Tree,
+                                        TypeExpansionContext context,
+                                        StructDecl *SD);
 
   void createNextLevelChildrenForTuple(ProjectionTree &Tree, TupleType *TT);
 };

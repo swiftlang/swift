@@ -220,3 +220,5 @@ func process(p: Any?) {
 
 func compare<T>(_: T, _: T) {} // expected-note {{'compare' declared here}}
 func compare<T>(_: T?, _: T?) {}
+
+_ = nil? as? Int?? // expected-error {{nil literal cannot be the source of a conditional cast}}

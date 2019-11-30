@@ -37,6 +37,29 @@ bool checkOverrides(ValueDecl *decl);
 // Implemented in TypeCheckStorage.cpp
 void setBoundVarsTypeError(Pattern *pattern, ASTContext &ctx);
 
+
+/// How to generate the raw value for each element of an enum that doesn't
+/// have one explicitly specified.
+enum class AutomaticEnumValueKind {
+  /// Raw values cannot be automatically generated.
+  None,
+  /// The raw value is the enum element's name.
+  String,
+  /// The raw value is the previous element's raw value, incremented.
+  ///
+  /// For the first element in the enum, the raw value is 0.
+  Integer,
+};
+
+Optional<AutomaticEnumValueKind> computeAutomaticEnumValueKind(EnumDecl *ED);
+
+void validatePrecedenceGroup(PrecedenceGroupDecl *PGD);
+
+bool checkDesignatedTypes(OperatorDecl *OD,
+                          ArrayRef<Identifier> identifiers,
+                          ArrayRef<SourceLoc> identifierLocs,
+                          ASTContext &ctx);
+
 }
 
 #endif

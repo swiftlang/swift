@@ -25,14 +25,12 @@ PersistentParserState::PersistentParserState() { }
 
 PersistentParserState::~PersistentParserState() { }
 
-void PersistentParserState::delayDecl(DelayedDeclKind Kind,
-                                      unsigned Flags,
-                                      DeclContext *ParentContext,
-                                      SourceRange BodyRange,
-                                      SourceLoc PreviousLoc) {
-  assert(!CodeCompletionDelayedDeclState.get() &&
+void PersistentParserState::setCodeCompletionDelayedDeclState(
+    CodeCompletionDelayedDeclKind Kind, unsigned Flags,
+    DeclContext *ParentContext, SourceRange BodyRange, SourceLoc PreviousLoc) {
+  assert(!CodeCompletionDelayedDeclStat.get() &&
          "only one decl can be delayed for code completion");
-  CodeCompletionDelayedDeclState.reset(new DelayedDeclState(
+  CodeCompletionDelayedDeclStat.reset(new CodeCompletionDelayedDeclState(
       Kind, Flags, ParentContext, BodyRange, PreviousLoc,
       ScopeInfo.saveCurrentScope()));
 }
@@ -46,9 +44,21 @@ void PersistentParserState::parseAllDelayedDeclLists() {
     IDC->loadAllMembers();
 }
 
-void PersistentParserState::delayTopLevel(TopLevelCodeDecl *TLCD,
-                                          SourceRange BodyRange,
-                                          SourceLoc PreviousLoc) {
-  delayDecl(DelayedDeclKind::TopLevelCodeDecl, 0U, TLCD, BodyRange,
-            PreviousLoc);
+void PersistentParserState::forEachDelayedSourceRange(
+    const SourceFile *primaryFile, function_ref<void(SourceRange)> fn) const {
+  // FIXME: separate out unparsed ranges by primary file
+  for (const auto *idc : DelayedDeclLists) {
+    // FIXME: better to check for the exact request (ParseMembersRequest)
+    // in the Evaluator cache
+    if (!idc->hasUnparsedMembers())
+      continue;
+    const auto *d = idc->getDecl();
+    SourceRange sr;
+    if (auto *nt = dyn_cast<NominalTypeDecl>(d))
+      sr = nt->getBraces();
+    else if (auto *e = dyn_cast<ExtensionDecl>(d))
+      sr = e->getBraces();
+    if (sr.isValid())
+      fn(sr);
+  }
 }

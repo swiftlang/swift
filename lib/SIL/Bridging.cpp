@@ -33,7 +33,8 @@ using namespace swift::Lowering;
 CanType TypeConverter::getLoweredTypeOfGlobal(VarDecl *var) {
   AbstractionPattern origType = getAbstractionPattern(var);
   assert(!origType.isTypeParameter());
-  return getLoweredRValueType(origType, origType.getType());
+  return getLoweredRValueType(TypeExpansionContext::minimal(), origType,
+                              origType.getType());
 }
 
 AnyFunctionType::Param
@@ -232,9 +233,9 @@ Type TypeConverter::getLoweredCBridgedType(AbstractionPattern pattern,
   }
 
   case ForeignRepresentableKind::BridgedError: {
-    auto nsErrorDecl = M.getASTContext().getNSErrorDecl();
-    assert(nsErrorDecl && "Cannot bridge when NSError isn't available");
-    return nsErrorDecl->getDeclaredInterfaceType();
+    auto nsErrorTy = M.getASTContext().getNSErrorType();
+    assert(nsErrorTy && "Cannot bridge when NSError isn't available");
+    return nsErrorTy;
   }
   }
 

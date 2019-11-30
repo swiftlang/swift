@@ -1,5 +1,5 @@
 // RUN: %scale-test --invert-result --begin 3 --end 7 --step 1 --select NumLeafScopes %s
-// REQUIRES: asserts
+// REQUIRES: asserts,no_asan
 
 func curry<T0
 %for i in range(1, N+2):

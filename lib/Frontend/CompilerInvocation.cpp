@@ -38,12 +38,25 @@ swift::CompilerInvocation::CompilerInvocation() {
   setTargetTriple(llvm::sys::getDefaultTargetTriple());
 }
 
+void CompilerInvocation::computeRuntimeResourcePathFromExecutablePath(
+    StringRef mainExecutablePath, llvm::SmallString<128> &runtimeResourcePath) {
+  runtimeResourcePath.assign(mainExecutablePath);
+  llvm::sys::path::remove_filename(runtimeResourcePath); // Remove /swift
+  llvm::sys::path::remove_filename(runtimeResourcePath); // Remove /bin
+  llvm::sys::path::append(runtimeResourcePath, "lib", "swift");
+}
+
 void CompilerInvocation::setMainExecutablePath(StringRef Path) {
-  llvm::SmallString<128> LibPath(Path);
-  llvm::sys::path::remove_filename(LibPath); // Remove /swift
-  llvm::sys::path::remove_filename(LibPath); // Remove /bin
-  llvm::sys::path::append(LibPath, "lib", "swift");
+  llvm::SmallString<128> LibPath;
+  computeRuntimeResourcePathFromExecutablePath(Path, LibPath);
   setRuntimeResourcePath(LibPath.str());
+
+  llvm::SmallString<128> DiagnosticDocsPath(Path);
+  llvm::sys::path::remove_filename(DiagnosticDocsPath); // Remove /swift
+  llvm::sys::path::remove_filename(DiagnosticDocsPath); // Remove /bin
+  llvm::sys::path::append(DiagnosticDocsPath, "share", "doc", "swift",
+                          "diagnostics");
+  DiagnosticOpts.DiagnosticDocumentationPath = DiagnosticDocsPath.str();
 }
 
 /// If we haven't explicitly passed -prebuilt-module-cache-path, set it to
@@ -274,17 +287,11 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.EnableExperimentalStaticAssert |=
     Args.hasArg(OPT_enable_experimental_static_assert);
 
-  Opts.EnableOperatorDesignatedTypes |=
-      Args.hasArg(OPT_enable_operator_designated_types);
+  Opts.EnableSubstSILFunctionTypesForFunctionValues |=
+    Args.hasArg(OPT_enable_subst_sil_function_types_for_function_values);
 
   Opts.DiagnoseInvalidEphemeralnessAsError |=
       Args.hasArg(OPT_enable_invalid_ephemeralness_as_error);
-
-  // Always enable operator designated types for the standard library.
-  Opts.EnableOperatorDesignatedTypes |= FrontendOpts.ParseStdlib;
-
-  Opts.SolverEnableOperatorDesignatedTypes |=
-      Args.hasArg(OPT_solver_enable_operator_designated_types);
 
   if (auto A = Args.getLastArg(OPT_enable_deserialization_recovery,
                                OPT_disable_deserialization_recovery)) {
@@ -343,9 +350,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.WarnIfASTScopeLookup |= Args.hasArg(OPT_warn_if_astscope_lookup);
   Opts.LazyASTScopes |= Args.hasArg(OPT_lazy_astscopes);
 
-  Opts.DebugConstraintSolver |= Args.hasArg(OPT_debug_constraints);
   Opts.NamedLazyMemberLoading &= !Args.hasArg(OPT_disable_named_lazy_member_loading);
-  Opts.DebugGenericSignatures |= Args.hasArg(OPT_debug_generic_signatures);
 
   if (Args.hasArg(OPT_verify_syntax_tree)) {
     Opts.BuildSyntaxTree = true;
@@ -357,6 +362,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   if (Args.hasArg(OPT_experimental_dependency_include_intrafile))
     Opts.ExperimentalDependenciesIncludeIntrafileOnes = true;
+
+  if (Args.hasArg(OPT_enable_experimental_differentiable_programming))
+    Opts.EnableExperimentalDifferentiableProgramming = true;
 
   Opts.DebuggerSupport |= Args.hasArg(OPT_debugger_support);
   if (Opts.DebuggerSupport)
@@ -377,34 +385,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.EnableTestableAttrRequiresTestableModule
       = A->getOption().matches(OPT_enable_testable_attr_requires_testable_module);
   }
-
-  if (const Arg *A = Args.getLastArg(OPT_debug_constraints_attempt)) {
-    unsigned attempt;
-    if (StringRef(A->getValue()).getAsInteger(10, attempt)) {
-      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
-                     A->getAsString(Args), A->getValue());
-      HadError = true;
-    } else {
-      Opts.DebugConstraintSolverAttempt = attempt;
-    }
-  }
-
-  for (const Arg *A : Args.filtered(OPT_debug_constraints_on_line)) {
-    unsigned line;
-    if (StringRef(A->getValue()).getAsInteger(10, line)) {
-      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
-                     A->getAsString(Args), A->getValue());
-      HadError = true;
-    } else {
-      Opts.DebugConstraintSolverOnLines.push_back(line);
-    }
-  }
-  llvm::sort(Opts.DebugConstraintSolverOnLines);
   
-  if (const Arg *A = Args.getLastArg(OPT_debug_forbid_typecheck_prefix)) {
-    Opts.DebugForbidTypecheckPrefix = A->getValue();
-  }
-
   if (Args.getLastArg(OPT_debug_cycles))
     Opts.DebugDumpCycles = true;
 
@@ -418,31 +399,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
       Opts.RequireExplicitAvailabilityTarget = A->getValue();
     }
   }
-
-  if (const Arg *A = Args.getLastArg(OPT_solver_memory_threshold)) {
-    unsigned threshold;
-    if (StringRef(A->getValue()).getAsInteger(10, threshold)) {
-      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
-                     A->getAsString(Args), A->getValue());
-      HadError = true;
-    } else {
-      Opts.SolverMemoryThreshold = threshold;
-    }
-  }
-
-  if (const Arg *A = Args.getLastArg(OPT_solver_shrink_unsolved_threshold)) {
-    unsigned threshold;
-    if (StringRef(A->getValue()).getAsInteger(10, threshold)) {
-      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
-                     A->getAsString(Args), A->getValue());
-      HadError = true;
-    } else {
-      Opts.SolverShrinkUnsolvedThreshold = threshold;
-    }
-  }
-
-  if (Args.getLastArg(OPT_solver_disable_shrink))
-    Opts.SolverDisableShrink = true;
 
   if (const Arg *A = Args.getLastArg(OPT_value_recursion_threshold)) {
     unsigned threshold;
@@ -515,9 +471,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     (Target.isTvOS() && Target.isOSVersionLT(12, 2)) ||
     (Target.isWatchOS() && Target.isOSVersionLT(5, 2));
 
-  Opts.DisableConstraintSolverPerformanceHacks |=
-      Args.hasArg(OPT_disable_constraint_solver_performance_hacks);
-
   // Must be processed after any other language options that could affect
   // platform conditions.
   bool UnsupportedOS, UnsupportedArch;
@@ -537,6 +490,88 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   }
 
   return HadError || UnsupportedOS || UnsupportedArch;
+}
+
+static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
+                                 DiagnosticEngine &Diags,
+                                 const FrontendOptions &FrontendOpts) {
+  using namespace options;
+
+  bool HadError = false;
+  auto setUnsignedIntegerArgument =
+      [&Args, &Diags, &HadError](options::ID optionID, unsigned &valueToSet) {
+        if (const Arg *A = Args.getLastArg(optionID)) {
+          unsigned attempt;
+          if (StringRef(A->getValue()).getAsInteger(/*radix*/ 10, attempt)) {
+            Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                           A->getAsString(Args), A->getValue());
+            HadError = true;
+          } else {
+            valueToSet = attempt;
+          }
+        }
+      };
+
+  setUnsignedIntegerArgument(OPT_warn_long_function_bodies,
+                             Opts.WarnLongFunctionBodies);
+  setUnsignedIntegerArgument(OPT_warn_long_expression_type_checking,
+                             Opts.WarnLongExpressionTypeChecking);
+  setUnsignedIntegerArgument(OPT_solver_expression_time_threshold_EQ,
+                             Opts.ExpressionTimeoutThreshold);
+  setUnsignedIntegerArgument(OPT_switch_checking_invocation_threshold_EQ,
+                             Opts.SwitchCheckingInvocationThreshold);
+  setUnsignedIntegerArgument(OPT_debug_constraints_attempt,
+                             Opts.DebugConstraintSolverAttempt);
+  setUnsignedIntegerArgument(OPT_solver_memory_threshold,
+                             Opts.SolverMemoryThreshold);
+  setUnsignedIntegerArgument(OPT_solver_shrink_unsolved_threshold,
+                             Opts.SolverShrinkUnsolvedThreshold);
+
+  Opts.DebugTimeFunctionBodies |= Args.hasArg(OPT_debug_time_function_bodies);
+  Opts.DebugTimeExpressions |=
+      Args.hasArg(OPT_debug_time_expression_type_checking);
+  Opts.SkipNonInlinableFunctionBodies |=
+      Args.hasArg(OPT_experimental_skip_non_inlinable_function_bodies);
+
+  // If asked to perform InstallAPI, go ahead and enable non-inlinable function
+  // body skipping.
+  Opts.SkipNonInlinableFunctionBodies |= Args.hasArg(OPT_tbd_is_installapi);
+
+  Opts.DisableConstraintSolverPerformanceHacks |=
+      Args.hasArg(OPT_disable_constraint_solver_performance_hacks);
+
+  Opts.EnableOperatorDesignatedTypes |=
+      Args.hasArg(OPT_enable_operator_designated_types);
+
+  // Always enable operator designated types for the standard library.
+  Opts.EnableOperatorDesignatedTypes |= FrontendOpts.ParseStdlib;
+
+  Opts.SolverEnableOperatorDesignatedTypes |=
+      Args.hasArg(OPT_solver_enable_operator_designated_types);
+
+  Opts.DebugConstraintSolver |= Args.hasArg(OPT_debug_constraints);
+  Opts.DebugGenericSignatures |= Args.hasArg(OPT_debug_generic_signatures);
+
+  for (const Arg *A : Args.filtered(OPT_debug_constraints_on_line)) {
+    unsigned line;
+    if (StringRef(A->getValue()).getAsInteger(/*radix*/ 10, line)) {
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getAsString(Args), A->getValue());
+      HadError = true;
+    } else {
+      Opts.DebugConstraintSolverOnLines.push_back(line);
+    }
+  }
+  llvm::sort(Opts.DebugConstraintSolverOnLines);
+
+  if (const Arg *A = Args.getLastArg(OPT_debug_forbid_typecheck_prefix)) {
+    Opts.DebugForbidTypecheckPrefix = A->getValue();
+  }
+
+  if (Args.getLastArg(OPT_solver_disable_shrink))
+    Opts.SolverDisableShrink = true;
+
+  return HadError;
 }
 
 static bool ParseClangImporterArgs(ClangImporterOptions &Opts,
@@ -583,6 +618,9 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts,
 
   if (Args.hasArg(OPT_embed_bitcode))
     Opts.Mode = ClangImporterOptions::Modes::EmbedBitcode;
+  else if (Args.hasArg(OPT_emit_pcm) || Args.hasArg(OPT_dump_pcm))
+    Opts.Mode = ClangImporterOptions::Modes::PrecompiledModule;
+
   if (auto *A = Args.getLastArg(OPT_import_objc_header))
     Opts.BridgingHeader = A->getValue();
   Opts.DisableSwiftBridgeAttr |= Args.hasArg(OPT_disable_swift_bridge_attr);
@@ -594,6 +632,8 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts,
     Opts.PCHDisableValidation |= Args.hasArg(OPT_pch_disable_validation);
   }
 
+  if (Args.hasArg(OPT_warnings_as_errors))
+    Opts.ExtraArgs.push_back("-Werror");
   Opts.DebuggerSupport |= Args.hasArg(OPT_debugger_support);
   return false;
 }
@@ -676,7 +716,9 @@ static bool ParseDiagnosticArgs(DiagnosticOptions &Opts, ArgList &Args,
   Opts.PrintDiagnosticNames |= Args.hasArg(OPT_debug_diagnostic_names);
   Opts.EnableDescriptiveDiagnostics |=
       Args.hasArg(OPT_enable_descriptive_diagnostics);
-
+  if (Arg *A = Args.getLastArg(OPT_diagnostic_documentation_path)) {
+    Opts.DiagnosticDocumentationPath = A->getValue();
+  }
   assert(!(Opts.WarningsAsErrors && Opts.SuppressWarnings) &&
          "conflicting arguments; should have been caught by driver");
 
@@ -826,7 +868,8 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   // -Ounchecked might also set removal of runtime asserts (cond_fail).
   Opts.RemoveRuntimeAsserts |= Args.hasArg(OPT_RemoveRuntimeAsserts);
 
-  Opts.EnableARCOptimizations |= !Args.hasArg(OPT_disable_arc_opts);
+  Opts.EnableARCOptimizations &= !Args.hasArg(OPT_disable_arc_opts);
+  Opts.EnableOSSAOptimizations &= !Args.hasArg(OPT_disable_ossa_opts);
   Opts.DisableSILPerfOptimizations |= Args.hasArg(OPT_disable_sil_perf_optzns);
   Opts.VerifyAll |= Args.hasArg(OPT_sil_verify_all);
   Opts.DebugSerialization |= Args.hasArg(OPT_sil_debug_serialization);
@@ -872,6 +915,12 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
           return true;
         });
     IRGenOpts.Sanitizers = Opts.Sanitizers;
+  }
+
+  if (const Arg *A = Args.getLastArg(options::OPT_sanitize_recover_EQ)) {
+    IRGenOpts.SanitizersWithRecoveryInstrumentation =
+        parseSanitizerRecoverArgValues(A, Opts.Sanitizers, Diags,
+                                       /*emitWarnings=*/true);
   }
 
   if (auto A = Args.getLastArg(OPT_enable_verify_exclusivity,
@@ -944,16 +993,11 @@ static bool ParseTBDGenArgs(TBDGenOptions &Opts, ArgList &Args,
   Opts.IsInstallAPI = Args.hasArg(OPT_tbd_is_installapi);
 
   if (const Arg *A = Args.getLastArg(OPT_tbd_compatibility_version)) {
-    if (auto vers = version::Version::parseVersionString(
-          A->getValue(), SourceLoc(), &Diags)) {
-      Opts.CompatibilityVersion = *vers;
-    }
+    Opts.CompatibilityVersion = A->getValue();
   }
+
   if (const Arg *A = Args.getLastArg(OPT_tbd_current_version)) {
-    if (auto vers = version::Version::parseVersionString(
-          A->getValue(), SourceLoc(), &Diags)) {
-      Opts.CurrentVersion = *vers;
-    }
+    Opts.CurrentVersion = A->getValue();
   }
   return false;
 }
@@ -1369,6 +1413,10 @@ bool CompilerInvocation::parseArgs(
   SaveModuleInterfaceArgs(ModuleInterfaceOpts, FrontendOpts, ParsedArgs, Diags);
 
   if (ParseLangArgs(LangOpts, ParsedArgs, Diags, FrontendOpts)) {
+    return true;
+  }
+
+  if (ParseTypeCheckerArgs(TypeCheckerOpts, ParsedArgs, Diags, FrontendOpts)) {
     return true;
   }
 

@@ -249,10 +249,10 @@ var _: (Int,Int) -> Int = {$0+$1+$2}  // expected-error {{contextual closure typ
 // Crash when re-typechecking bodies of non-single expression closures
 
 struct CC {}
-func callCC<U>(_ f: (CC) -> U) -> () {}
+func callCC<U>(_ f: (CC) -> U) -> () {} // expected-note {{in call to function 'callCC'}}
 
 func typeCheckMultiStmtClosureCrash() {
-  callCC { // expected-error {{unable to infer complex closure return type; add explicit type to disambiguate}} {{11-11= () -> Int in }}
+  callCC { // expected-error {{generic parameter 'U' could not be inferred}}
     _ = $0
     return 1
   }
@@ -313,7 +313,7 @@ struct Thing {
   init?() {}
 }
 // This throws a compiler error
-let things = Thing().map { thing in  // expected-error {{unable to infer complex closure return type; add explicit type to disambiguate}} {{34-34=-> Thing }}
+let things = Thing().map { thing in  // expected-error {{generic parameter 'U' could not be inferred}}
   // Commenting out this makes it compile
   _ = thing
   return thing
@@ -345,7 +345,7 @@ var afterMessageCount : Int?
 func uintFunc() -> UInt {}
 func takeVoidVoidFn(_ a : () -> ()) {}
 takeVoidVoidFn { () -> Void in
-  afterMessageCount = uintFunc()  // expected-error {{cannot assign value of type 'UInt' to type 'Int?'}}
+  afterMessageCount = uintFunc()  // expected-error {{cannot assign value of type 'UInt' to type 'Int'}}
 }
 
 // <rdar://problem/19997471> Swift: Incorrect compile error when calling a function inside a closure
@@ -360,7 +360,7 @@ func someGeneric19997471<T>(_ x: T) {
 
 
 // <rdar://problem/20921068> Swift fails to compile: [0].map() { _ in let r = (1,2).0; return r }
-[0].map {  // expected-error {{unable to infer complex closure return type; add explicit type to disambiguate}} {{5-5=-> Int }}
+[0].map {  // expected-error {{generic parameter 'T' could not be inferred}}
   _ in
   let r =  (1,2).0
   return r
@@ -371,8 +371,7 @@ func someGeneric19997471<T>(_ x: T) {
 func rdar21078316() {
   var foo : [String : String]?
   var bar : [(String, String)]?
-  bar = foo.map { ($0, $1) }  // expected-error {{contextual closure type '([String : String]) throws -> [(String, String)]' expects 1 argument, but 2 were used in closure body}}
-  // expected-error@-1:19 {{cannot convert value of type '([String : String], Any)' to closure result type '[(String, String)]'}}
+  bar = foo.map { ($0, $1) }  // expected-error {{contextual closure type '([String : String]) throws -> U' expects 1 argument, but 2 were used in closure body}}
 }
 
 
@@ -497,7 +496,9 @@ struct S_3520 {
   var number1: Int
 }
 func sr3520_set_via_closure<S, T>(_ closure: (inout S, T) -> ()) {} // expected-note {{in call to function 'sr3520_set_via_closure'}}
-sr3520_set_via_closure({ $0.number1 = $1 }) // expected-error {{generic parameter 'S' could not be inferred}}
+sr3520_set_via_closure({ $0.number1 = $1 })
+// expected-error@-1 {{generic parameter 'S' could not be inferred}}
+// expected-error@-2 {{generic parameter 'T' could not be inferred}}
 
 // SR-3073: UnresolvedDotExpr in single expression closure
 
@@ -764,7 +765,7 @@ overloaded { print("hi"); print("bye") } // multiple expression closure without 
 func not_overloaded(_ handler: () -> Int) {}
 
 not_overloaded { } // empty body
-// expected-error@-1 {{cannot convert value of type '() -> ()' to expected argument type '() -> Int'}}
+// expected-error@-1 {{cannot convert value of type '()' to closure result type 'Int'}}
 
 not_overloaded { print("hi") } // single-expression closure
 // expected-error@-1 {{cannot convert value of type '()' to closure result type 'Int'}}
@@ -785,7 +786,7 @@ func test() -> Int? {
 }
 
 var fn: () -> [Int] = {}
-// expected-error@-1 {{cannot convert value of type '() -> ()' to specified type '() -> [Int]'}}
+// expected-error@-1 {{cannot convert value of type '()' to closure result type '[Int]'}}
 
 fn = {}
 // expected-error@-1 {{cannot assign value of type '() -> ()' to type '() -> [Int]'}}
@@ -819,7 +820,7 @@ func rdar_40537960() {
   }
 
   var arr: [S] = []
-  _ = A(arr, fn: { L($0.v) }) // expected-error {{cannot convert value of type 'L' to closure result type 'R<Any>'}}
+  _ = A(arr, fn: { L($0.v) }) // expected-error {{cannot convert value of type 'L' to closure result type 'R<P>'}}
   // expected-error@-1 {{generic parameter 'P' could not be inferred}}
   // expected-note@-2 {{explicitly specify the generic arguments to fix this issue}} {{8-8=<[S], <#P: P_40537960#>>}}
 }

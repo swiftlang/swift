@@ -211,6 +211,7 @@ struct A<T> : PP {
 
 extension PP {
   func map<T>(_ f: (Self.E) -> T) -> T {}
+  // expected-note@-1 2 {{in call to function 'map'}}
 }
 
 enum EE {
@@ -230,14 +231,14 @@ func good(_ a: A<EE>) -> Int {
 }
 
 func bad(_ a: A<EE>) {
-  a.map { // expected-error {{unable to infer complex closure return type; add explicit type to disambiguate}} {{10-10= () -> Int in }}
+  a.map { // expected-error {{generic parameter 'T' could not be inferred}}
     let _: EE = $0
     return 1
   }
 }
 
 func ugly(_ a: A<EE>) {
-  a.map { // expected-error {{unable to infer complex closure return type; add explicit type to disambiguate}} {{10-10= () -> Int in }}
+  a.map { // expected-error {{generic parameter 'T' could not be inferred}}
     switch $0 {
     case .A:
       return 1
@@ -284,8 +285,8 @@ let staticMembers = StaticMembers()
 let optStaticMembers: Optional = StaticMembers()
 
 switch staticMembers {
-  case .init: break // expected-error{{cannot match values of type 'StaticMembers'}}
-  case .init(opt:): break // expected-error{{cannot match values of type 'StaticMembers'}}
+  case .init: break // expected-error{{member 'init(opt:)' expects argument of type 'Int'}}
+  case .init(opt:): break // expected-error{{member 'init(opt:)' expects argument of type 'Int'}}
   case .init(): break
 
   case .init(0): break
@@ -304,12 +305,12 @@ switch staticMembers {
   case .method(_): break // expected-error{{'_' can only appear in a pattern}}
   case .method(let x): break // expected-error{{cannot appear in an expression}}
 
-  case .method(withLabel:): break // expected-error{{cannot match}}
+  case .method(withLabel:): break // expected-error{{member 'method(withLabel:)' expects argument of type 'Int'}}
   case .method(withLabel: 0): break
   case .method(withLabel: _): break // expected-error{{'_' can only appear in a pattern}}
   case .method(withLabel: let x): break // expected-error{{cannot appear in an expression}}
 
-  case .optMethod: break // expected-error{{cannot match}}
+  case .optMethod: break // expected-error{{member 'optMethod' expects argument of type 'Int'}}
   case .optMethod(0): break
   // expected-error@-1 {{value of optional type 'StaticMembers?' must be unwrapped to a value of type 'StaticMembers'}}
   // expected-note@-2 {{coalesce}}

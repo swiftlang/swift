@@ -90,6 +90,25 @@ The Swift compiler has a setting (under LangOptions) called `DiagnosticsEditorMo
 
 Most diagnostics have no reason to change behavior under editor mode. An example of an exception is the "protocol requirements not satisfied diagnostic"; on the command line, it may be better to show all unsatisfied requirements, while in an IDE a single multi-line fix-it would be preferred.
 
+### Educational Notes ###
+
+**Note**: This feature is currently experimental. It can be enabled by passing the `-Xfrontend -enable-descriptive-diagnostics` flag.
+
+Educational notes are small snippets of documentation attached to a diagnostic which explain relevant language concepts. They are intended to further Swift's goal of progressive disclosure by providing a learning resource at the point of use for users encountering a new error message for the first time. In very limited circumstances, they also allow the main diagnostic message to use more precise and correct terminology (e.g. nominal types) which would otherwise be too unfriendly for beginners.
+
+When outputting diagnostics on the command line, educational notes will be printed after the main diagnostic body if descriptive diagnostics are enabled. When presented in an IDE, it's expected they will be collapsed under a disclosure arrow, info button, or similar to avoid cluttering output.
+
+Generally speaking, a diagnostic should try to provide educational notes for any concepts/terminology which is difficult to understand from context or is especially subtle. Educational notes should:
+- Explain a single language concept. This makes them easy to reuse across diagnostics and helps keep them clear, concise, and easy to understand.
+- Be written in unabbreviated English. These are longer form messages compared to the main diagnostic, so there is no need to omit needless words and punctuation.
+- Not generally exceed 3-4 paragraphs. Educational notes should be clear and easily digestible. Messages which are too long also have the potential to create diagnostics UX issues in some contexts.
+- Be accessible. Educational notes should be beginner friendly and avoid assuming unnecesary prior knowledge. The goal is not only to help users understand what a diagnostic is telling them, but also to turn errors and warnings into "teachable moments".
+- Include references to relevant chapters of _The Swift Programming Language_ if applicable.
+- Be written in Markdown, but avoid excessive markup to avoid impacting the terminal UX. 
+
+To add a new educational note:
+1. Add a new Markdown file in the `userdocs/diagnostics/` directory containing the contents of the note. 
+2. Associate the note with one or more diagnostics in EducationalNotes.def.
 
 ### Format Specifiers ###
 

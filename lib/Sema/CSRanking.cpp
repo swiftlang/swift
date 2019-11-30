@@ -35,7 +35,7 @@ void ConstraintSystem::increaseScore(ScoreKind kind, unsigned value) {
   unsigned index = static_cast<unsigned>(kind);
   CurrentScore.Data[index] += value;
 
-  if (getASTContext().LangOpts.DebugConstraintSolver && value > 0) {
+  if (getASTContext().TypeCheckerOpts.DebugConstraintSolver && value > 0) {
     auto &log = getASTContext().TypeCheckerDebug->getStream();
     if (solverState)
       log.indent(solverState->depth * 2);
@@ -91,7 +91,7 @@ void ConstraintSystem::increaseScore(ScoreKind kind, unsigned value) {
 }
 
 bool ConstraintSystem::worseThanBestSolution() const {
-  if (getASTContext().LangOpts.DisableConstraintSolverPerformanceHacks)
+  if (getASTContext().TypeCheckerOpts.DisableConstraintSolverPerformanceHacks)
     return false;
 
   if (retainAllSolutions())
@@ -101,7 +101,7 @@ bool ConstraintSystem::worseThanBestSolution() const {
       CurrentScore <= *solverState->BestScore)
     return false;
 
-  if (getASTContext().LangOpts.DebugConstraintSolver) {
+  if (getASTContext().TypeCheckerOpts.DebugConstraintSolver) {
     auto &log = getASTContext().TypeCheckerDebug->getStream();
     log.indent(solverState->depth * 2)
       << "(solution is worse than the best solution)\n";
@@ -313,8 +313,7 @@ static bool isDeclMoreConstrainedThan(ValueDecl *decl1, ValueDecl *decl2) {
 
 /// Determine whether one protocol extension is at least as specialized as
 /// another.
-static bool isProtocolExtensionAsSpecializedAs(TypeChecker &tc,
-                                               DeclContext *dc1,
+static bool isProtocolExtensionAsSpecializedAs(DeclContext *dc1,
                                                DeclContext *dc2) {
   assert(dc1->getExtendedProtocolDecl());
   assert(dc2->getExtendedProtocolDecl());
@@ -340,7 +339,7 @@ static bool isProtocolExtensionAsSpecializedAs(TypeChecker &tc,
 
   // Form a constraint system where we've opened up all of the requirements of
   // the second protocol extension.
-  ConstraintSystem cs(tc, dc1, None);
+  ConstraintSystem cs(dc1, None);
   OpenedTypeMap replacements;
   cs.openGeneric(dc2, sig2, ConstraintLocatorBuilder(nullptr), replacements);
 
@@ -390,10 +389,7 @@ llvm::Expected<bool> CompareDeclSpecializationRequest::evaluate(
     Evaluator &eval, DeclContext *dc, ValueDecl *decl1, ValueDecl *decl2,
     bool isDynamicOverloadComparison) const {
   auto &C = decl1->getASTContext();
-  // FIXME: Remove dependency on the lazy resolver.
-  auto *tc = static_cast<TypeChecker *>(C.getLazyResolver());
-
-  if (C.LangOpts.DebugConstraintSolver) {
+  if (C.TypeCheckerOpts.DebugConstraintSolver) {
     auto &log = C.TypeCheckerDebug->getStream();
     log << "Comparing declarations\n";
     decl1->print(log); 
@@ -405,7 +401,7 @@ llvm::Expected<bool> CompareDeclSpecializationRequest::evaluate(
   }
 
   auto completeResult = [&C](bool result) {
-    if (C.LangOpts.DebugConstraintSolver) {
+    if (C.TypeCheckerOpts.DebugConstraintSolver) {
       auto &log = C.TypeCheckerDebug->getStream();
       log << "comparison result: " << (result ? "better" : "not better")
           << "\n";
@@ -445,8 +441,8 @@ llvm::Expected<bool> CompareDeclSpecializationRequest::evaluate(
     // Both members are in protocol extensions.
     // Determine whether the 'Self' type from the first protocol extension
     // satisfies all of the requirements of the second protocol extension.
-    bool better1 = isProtocolExtensionAsSpecializedAs(*tc, outerDC1, outerDC2);
-    bool better2 = isProtocolExtensionAsSpecializedAs(*tc, outerDC2, outerDC1);
+    bool better1 = isProtocolExtensionAsSpecializedAs(outerDC1, outerDC2);
+    bool better2 = isProtocolExtensionAsSpecializedAs(outerDC2, outerDC1);
     if (better1 != better2) {
       return completeResult(better1);
     }
@@ -507,7 +503,7 @@ llvm::Expected<bool> CompareDeclSpecializationRequest::evaluate(
   };
 
   // Construct a constraint system to compare the two declarations.
-  ConstraintSystem cs(*tc, dc, ConstraintSystemOptions());
+  ConstraintSystem cs(dc, ConstraintSystemOptions());
   bool knownNonSubtype = false;
 
   auto *locator = cs.getConstraintLocator(nullptr);
@@ -714,9 +710,8 @@ static Type getUnlabeledType(Type type, ASTContext &ctx) {
 
 SolutionCompareResult ConstraintSystem::compareSolutions(
     ConstraintSystem &cs, ArrayRef<Solution> solutions,
-    const SolutionDiff &diff, unsigned idx1, unsigned idx2,
-    llvm::DenseMap<Expr *, std::pair<unsigned, Expr *>> &weights) {
-  if (cs.getASTContext().LangOpts.DebugConstraintSolver) {
+    const SolutionDiff &diff, unsigned idx1, unsigned idx2) {
+  if (cs.getASTContext().TypeCheckerOpts.DebugConstraintSolver) {
     auto &log = cs.getASTContext().TypeCheckerDebug->getStream();
     log.indent(cs.solverState->depth * 2)
       << "comparing solutions " << idx1 << " and " << idx2 <<"\n";
@@ -747,9 +742,9 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
 
   auto getWeight = [&](ConstraintLocator *locator) -> unsigned {
     if (auto *anchor = locator->getAnchor()) {
-      auto weight = weights.find(anchor);
-      if (weight != weights.end())
-        return weight->getSecond().first + 1;
+      auto weight = cs.getExprDepth(anchor);
+      if (weight)
+        return *weight + 1;
     }
 
     return 1;
@@ -846,7 +841,6 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
     }
 
     // The kinds of overload choice match, but the contents don't.
-    auto &tc = cs.getTypeChecker();
     switch (choice1.getKind()) {
     case OverloadChoiceKind::TupleIndex:
       continue;
@@ -905,9 +899,9 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
                 ctor2->getResultInterfaceType());
             
             if (!resType1->isEqual(resType2)) {
-              if (tc.isSubtypeOf(resType1, resType2, cs.DC)) {
+              if (TypeChecker::isSubtypeOf(resType1, resType2, cs.DC)) {
                 score1 += weight;
-              } else if (tc.isSubtypeOf(resType2, resType1, cs.DC)) {
+              } else if (TypeChecker::isSubtypeOf(resType2, resType1, cs.DC)) {
                 score2 += weight;
               }
             }
@@ -998,7 +992,7 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
     // compatibility under Swift 4 mode by ensuring we don't introduce any new
     // ambiguities. This will become a more general "is more specialised" rule
     // in Swift 5 mode.
-    if (!tc.Context.isSwiftVersionAtLeast(5) &&
+    if (!cs.getASTContext().isSwiftVersionAtLeast(5) &&
         choice1.getKind() != OverloadChoiceKind::DeclViaDynamic &&
         choice2.getKind() != OverloadChoiceKind::DeclViaDynamic &&
         isa<VarDecl>(decl1) && isa<VarDecl>(decl2)) {
@@ -1046,7 +1040,6 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
   }
 
   // Compare the type variable bindings.
-  auto &tc = cs.getTypeChecker();
   for (auto &binding : diff.typeBindings) {
     // If the type variable isn't one for which we should be looking at the
     // bindings, don't.
@@ -1072,8 +1065,8 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
     // If one type is a subtype of the other, but not vice-versa,
     // we prefer the system with the more-constrained type.
     // FIXME: Collapse this check into the second check.
-    auto type1Better = tc.isSubtypeOf(type1, type2, cs.DC);
-    auto type2Better = tc.isSubtypeOf(type2, type1, cs.DC);
+    auto type1Better = TypeChecker::isSubtypeOf(type1, type2, cs.DC);
+    auto type2Better = TypeChecker::isSubtypeOf(type2, type1, cs.DC);
     if (type1Better || type2Better) {
       if (type1Better)
         ++score1;
@@ -1158,7 +1151,7 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
   // All other things being equal, apply the Swift 4.1 compatibility hack for
   // preferring var members in concrete types over a protocol requirement
   // (see the comment above for the rationale of this hack).
-  if (!tc.Context.isSwiftVersionAtLeast(5) && score1 == score2) {
+  if (!cs.getASTContext().isSwiftVersionAtLeast(5) && score1 == score2) {
     score1 += isVarAndNotProtocol1;
     score2 += isVarAndNotProtocol2;
   }
@@ -1186,7 +1179,7 @@ ConstraintSystem::findBestSolution(SmallVectorImpl<Solution> &viable,
   if (viable.size() == 1)
     return 0;
 
-  if (getASTContext().LangOpts.DebugConstraintSolver) {
+  if (getASTContext().TypeCheckerOpts.DebugConstraintSolver) {
     auto &log = getASTContext().TypeCheckerDebug->getStream();
     log.indent(solverState->depth * 2)
         << "Comparing " << viable.size() << " viable solutions\n";
@@ -1203,7 +1196,7 @@ ConstraintSystem::findBestSolution(SmallVectorImpl<Solution> &viable,
   SmallVector<bool, 16> losers(viable.size(), false);
   unsigned bestIdx = 0;
   for (unsigned i = 1, n = viable.size(); i != n; ++i) {
-    switch (compareSolutions(*this, viable, diff, i, bestIdx, ExprWeights)) {
+    switch (compareSolutions(*this, viable, diff, i, bestIdx)) {
     case SolutionCompareResult::Identical:
       // FIXME: Might want to warn about this in debug builds, so we can
       // find a way to eliminate the redundancy in the search space.
@@ -1227,7 +1220,7 @@ ConstraintSystem::findBestSolution(SmallVectorImpl<Solution> &viable,
     if (i == bestIdx)
       continue;
 
-    switch (compareSolutions(*this, viable, diff, bestIdx, i, ExprWeights)) {
+    switch (compareSolutions(*this, viable, diff, bestIdx, i)) {
     case SolutionCompareResult::Identical:
       // FIXME: Might want to warn about this in debug builds, so we can
       // find a way to eliminate the redundancy in the search space.
@@ -1279,7 +1272,7 @@ ConstraintSystem::findBestSolution(SmallVectorImpl<Solution> &viable,
       if (losers[j])
         continue;
 
-      switch (compareSolutions(*this, viable, diff, i, j, ExprWeights)) {
+      switch (compareSolutions(*this, viable, diff, i, j)) {
       case SolutionCompareResult::Identical:
         // FIXME: Dub one of these the loser arbitrarily?
         break;

@@ -103,10 +103,10 @@ protocol P3 {
   func foo() -> Assoc
 }
 
-struct X3 : P3 { // expected-note{{'X3' declared here}}
+struct X3 : P3 {
 }
 
-extension X3.Assoc { // expected-error{{'Assoc' is not a member type of 'X3'}}
+extension X3.Assoc {
 }
 
 extension X3 {
@@ -340,4 +340,12 @@ extension Tree.LimbContent.Contents {
 
 extension Tree.BoughPayload.Contents {
  // expected-error@-1 {{constrained extension must be declared on the unspecialized generic type 'Nest'}}
+}
+
+// SR-10466 Check 'where' clause when referencing type defined inside extension
+struct SR_10466<T> {
+  var a : A // expected-error {{'SR_10466<T>.A' (aka 'Int') requires the types 'T' and 'Never' be equivalent}}
+}
+extension SR_10466 where T == Never { // expected-note {{requirement specified as 'T' == 'Never' [with T = T]}}
+  typealias A = Int
 }

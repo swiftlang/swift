@@ -101,7 +101,10 @@ llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &OS, AliasResult R) {
   llvm_unreachable("Unhandled AliasResult in switch.");
 }
 
-SILValue getAccessedMemory(SILInstruction *User) {
+// Return the address of the directly accessed memory. If either the address is
+// unknown, or any other memory is accessed via indirection, return an invalid
+// SILValue.
+SILValue getDirectlyAccessedMemory(SILInstruction *User) {
   if (auto *LI = dyn_cast<LoadInst>(User)) {
     return LI->getOperand();
   }
@@ -128,7 +131,7 @@ static bool isFunctionArgument(SILValue V) {
 static bool isIdentifiableObject(SILValue V) {
   if (isa<AllocationInst>(V) || isa<LiteralInst>(V))
     return true;
-  if (isNotAliasingArgument(V))
+  if (isExclusiveArgument(V))
     return true;
   return false;
 }
@@ -178,8 +181,7 @@ static bool isLocalLiteral(SILValue V) {
 /// Is this a value that can be unambiguously identified as being defined at the
 /// function level.
 static bool isIdentifiedFunctionLocal(SILValue V) {
-  return isa<AllocationInst>(*V) || isNotAliasingArgument(V) ||
-         isLocalLiteral(V);
+  return isa<AllocationInst>(*V) || isExclusiveArgument(V) || isLocalLiteral(V);
 }
 
 /// Returns true if we can prove that the two input SILValues which do not equal
@@ -473,8 +475,8 @@ static bool typedAccessTBAAMayAlias(SILType LTy, SILType RTy,
 
   // If one type is an aggregate and it contains the other type then the record
   // reference may alias the aggregate reference.
-  if (LTy.aggregateContainsRecord(RTy, Mod) ||
-      RTy.aggregateContainsRecord(LTy, Mod))
+  if (LTy.aggregateContainsRecord(RTy, Mod, F.getTypeExpansionContext()) ||
+      RTy.aggregateContainsRecord(LTy, Mod, F.getTypeExpansionContext()))
     return true;
 
   // FIXME: All the code following could be made significantly more aggressive
@@ -617,8 +619,12 @@ AliasResult AliasAnalysis::aliasInner(SILValue V1, SILValue V2,
   // non-escaping pointer with another (maybe escaping) pointer. Escape analysis
   // uses the connection graph to check if the pointers may point to the same
   // content.
-  // Note that escape analysis must work with the original pointers and not the
-  // underlying objects because it treats projections differently.
+  //
+  // canPointToSameMemory must take the original pointers used for memory
+  // access, not the underlying object, because objects projections can be
+  // modeled by escape analysis as different content, and canPointToSameMemory
+  // assumes that only the pointer itself may be accessed here, not any other
+  // address that can be derived from this pointer.
   if (!EA->canPointToSameMemory(V1, V2)) {
     LLVM_DEBUG(llvm::dbgs() << "            Found not-aliased objects based on "
                                "escape analysis\n");
@@ -711,24 +717,31 @@ bool AliasAnalysis::mayValueReleaseInterfereWithInstruction(SILInstruction *User
   if (!User->mayReadOrWriteMemory())
     return false;
 
-  // These instructions do read or write memory, get memory accessed.
-  SILValue V = getAccessedMemory(User);
+  // These instructions do read or write memory, get memory directly
+  // accessed. 'V' must be the only memory accessed by User, and it must be
+  // directly accessed. Any memory indirectly accessed via 'User' may have
+  // escaped.
+  SILValue V = getDirectlyAccessedMemory(User);
   if (!V)
     return true;
 
-  // Is this a local allocation ?
-  if (!pointsToLocalObject(V))
+  // If the 'User' instruction's memory is uniquely identified and does not
+  // escape in the local scope, then it can't be accessed by a deinit in the
+  // local scope. Note that an exclusive argument's content may have escaped in
+  // the caller, but the argument value itself can't be accessed via aliasing
+  // references and we know that User doesn't see through any indirection.
+  if (!isUniquelyIdentified(V))
     return true;
 
-  // This is a local allocation.
+  // This is a scoped allocation.
   // The most important check: does the object escape the current function?
   auto LO = getUnderlyingObject(V);
   auto *ConGraph = EA->getConnectionGraph(User->getFunction());
-  auto *Node = ConGraph->getNodeOrNull(LO, EA);
+  auto *Node = ConGraph->getNodeOrNull(LO);
   if (Node && !Node->escapes())
     return false;
 
-  // This is either a non-local allocation or a local allocation that escapes.
+  // This is either a non-local allocation or a scoped allocation that escapes.
   // We failed to prove anything, it could be read or written by the deinit.
   return true;
 }

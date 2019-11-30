@@ -355,7 +355,7 @@ bb0(%0 : @owned $DerivedClassWithIVars):
   %13 = upcast %11 : $DerivedClassWithIVars to $RootClassWithIVars
   %14 = function_ref @superinit : $@convention(method) (@owned RootClassWithIVars) -> @owned RootClassWithIVars
   %15 = apply %14(%13) : $@convention(method) (@owned RootClassWithIVars) -> @owned RootClassWithIVars
-  %16 = unconditional_checked_cast %15 : $RootClassWithIVars to $DerivedClassWithIVars
+  %16 = unconditional_checked_cast %15 : $RootClassWithIVars to DerivedClassWithIVars
   assign %16 to %3 : $*DerivedClassWithIVars
 
   %18 = load [copy] %3 : $*DerivedClassWithIVars
@@ -520,7 +520,7 @@ bb0(%0 : @owned $DerivedClassWithIVars, %i : $Builtin.Int32):
   %14 = function_ref @superinit : $@convention(method) (@owned RootClassWithIVars) -> @owned RootClassWithIVars
   %15 = apply %14(%b) : $@convention(method) (@owned RootClassWithIVars) -> @owned RootClassWithIVars
 
-  %16 = unconditional_checked_cast %15 : $RootClassWithIVars to $DerivedClassWithIVars
+  %16 = unconditional_checked_cast %15 : $RootClassWithIVars to DerivedClassWithIVars
   assign %16 to %3 : $*DerivedClassWithIVars
   %18 = load [copy] %3 : $*DerivedClassWithIVars
   destroy_value %1 : $<τ_0_0> { var τ_0_0 } <DerivedClassWithIVars>

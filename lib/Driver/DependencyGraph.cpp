@@ -296,18 +296,26 @@ LoadResult DependencyGraphImpl::loadFromBuffer(const void *node,
 
 void DependencyGraphImpl::markExternal(SmallVectorImpl<const void *> &visited,
                                        StringRef externalDependency) {
-  auto allDependents = Dependencies.find(externalDependency);
+  forEachUnmarkedJobDirectlyDependentOnExternalSwiftdeps(
+      externalDependency, [&](const void *node) {
+        visited.push_back(node);
+        markTransitive(visited, node);
+      });
+}
+
+void DependencyGraphImpl::
+    forEachUnmarkedJobDirectlyDependentOnExternalSwiftdeps(
+        StringRef externalSwiftDeps, function_ref<void(const void *node)> fn) {
+  auto allDependents = Dependencies.find(externalSwiftDeps);
   assert(allDependents != Dependencies.end() && "not a dependency!");
   allDependents->second.second |= DependencyKind::ExternalFile;
-
   for (const auto &dependent : allDependents->second.first) {
     if (!dependent.kindMask.contains(DependencyKind::ExternalFile))
       continue;
     if (isMarked(dependent.node))
       continue;
     assert(dependent.flags & DependencyFlags::IsCascading);
-    visited.push_back(dependent.node);
-    markTransitive(visited, dependent.node);
+    fn(dependent.node);
   }
 }
 
@@ -397,6 +405,17 @@ DependencyGraphImpl::markTransitive(SmallVectorImpl<const void *> &visited,
       continue;
     record(next);
   }
+}
+
+size_t DependencyGraphImpl::countTopLevelProvides(const void *node) const {
+  const auto iter = Provides.find(node);
+  if (iter == Provides.end())
+    return 0;
+  size_t count = 0;
+  for (const auto &entry : iter->getSecond())
+    if (entry.kindMask & DependencyKind::TopLevelName)
+      ++count;
+  return count;
 }
 
 void DependencyGraphImpl::MarkTracerImpl::countStatsForNodeMarking(

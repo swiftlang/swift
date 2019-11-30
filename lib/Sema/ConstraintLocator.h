@@ -63,34 +63,11 @@ public:
   /// element kind.
   static unsigned numNumericValuesInPathElement(PathElementKind kind) {
     switch (kind) {
-    case ApplyArgument:
-    case ApplyFunction:
+#define SIMPLE_LOCATOR_PATH_ELT(Name) case Name :
+#include "ConstraintLocatorPathElts.def"
     case GenericParameter:
-    case FunctionArgument:
-    case FunctionResult:
-    case OptionalPayload:
-    case Member:
-    case MemberRefBase:
-    case UnresolvedMember:
-    case SubscriptMember:
-    case ConstructorMember:
-    case LValueConversion:
-    case RValueAdjustment:
-    case ClosureResult:
-    case ParentType:
-    case InstanceType:
-    case ExistentialSuperclassType:
-    case SequenceElementType:
-    case AutoclosureResult:
     case ProtocolRequirement:
     case Witness:
-    case ImplicitlyUnwrappedDisjunctionChoice:
-    case DynamicLookupResult:
-    case KeyPathType:
-    case KeyPathRoot:
-    case KeyPathValue:
-    case KeyPathComponentResult:
-    case Condition:
       return 0;
 
     case ContextualType:

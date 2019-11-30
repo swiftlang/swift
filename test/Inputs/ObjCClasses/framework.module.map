@@ -1,0 +1,7 @@
+
+// Module map used only if ObjCClasses are compiled into a framework, not using
+// -import-objc-header.
+
+framework module ObjCClasses {
+  header "ObjCClasses.h"
+}

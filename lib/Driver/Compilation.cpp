@@ -25,6 +25,7 @@
 #include "swift/Driver/Action.h"
 #include "swift/Driver/DependencyGraph.h"
 #include "swift/Driver/Driver.h"
+#include "swift/Driver/DriverIncrementalRanges.h"
 #include "swift/Driver/ExperimentalDependencyDriverGraph.h"
 #include "swift/Driver/Job.h"
 #include "swift/Driver/ParseableOutput.h"
@@ -123,7 +124,10 @@ Compilation::Compilation(DiagnosticEngine &Diags,
                          bool EnableExperimentalDependencies,
                          bool VerifyExperimentalDependencyGraphAfterEveryImport,
                          bool EmitExperimentalDependencyDotFileAfterEveryImport,
-                         bool ExperimentalDependenciesIncludeIntrafileOnes)
+                         bool ExperimentalDependenciesIncludeIntrafileOnes,
+                         bool EnableSourceRangeDependencies,
+                         bool CompareIncrementalSchemes,
+                         StringRef CompareIncrementalSchemesPath)
   : Diags(Diags), TheToolChain(TC),
     TheOutputInfo(OI),
     Level(Level),
@@ -151,15 +155,21 @@ Compilation::Compilation(DiagnosticEngine &Diags,
     EmitExperimentalDependencyDotFileAfterEveryImport(
       EmitExperimentalDependencyDotFileAfterEveryImport),
     ExperimentalDependenciesIncludeIntrafileOnes(
-      ExperimentalDependenciesIncludeIntrafileOnes) {
-      
+      ExperimentalDependenciesIncludeIntrafileOnes),
+    EnableSourceRangeDependencies(EnableSourceRangeDependencies) {
+    if (CompareIncrementalSchemes)
+      IncrementalComparator.emplace(
+      // Ensure the references are to inst vars, NOT arguments
+      this->EnableIncrementalBuild,
+      EnableSourceRangeDependencies,
+      this->UseSourceRangeDependencies,
+      CompareIncrementalSchemesPath, countSwiftInputs(), getDiags());
 };
 // clang-format on
 
 static bool writeFilelistIfNecessary(const Job *job, const ArgList &args,
                                      DiagnosticEngine &diags);
 
-using CommandSet = llvm::SmallPtrSet<const Job *, 16>;
 using CommandSetVector = llvm::SetVector<const Job*>;
 using BatchPartition = std::vector<std::vector<const Job*>>;
 
@@ -220,7 +230,8 @@ namespace driver {
 
     /// Jobs in the initial set with Condition::Always, and having an existing
     /// .swiftdeps files.
-    /// Set by scheduleInitialJobs and used only by scheduleAdditionalJobs.
+    /// Set by scheduleInitialJobsForIncrementalCompilation and used only by
+    /// additionalJobsToScheduleForDependencyBasedIncrementalCompilation.
     SmallVector<const Job *, 16> InitialCascadingCommands;
 
   public:
@@ -251,12 +262,24 @@ namespace driver {
     llvm::SmallDenseMap<const Job *, std::unique_ptr<llvm::Timer>, 16>
     DriverTimers;
 
-    void noteBuilding(const Job *cmd, StringRef reason) {
+    void noteBuilding(const Job *cmd, const bool willBeBuilding,
+                      const bool forRanges, StringRef reason) {
       if (!Comp.getShowIncrementalBuildDecisions())
         return;
       if (ScheduledCommands.count(cmd))
         return;
-      llvm::outs() << "Queuing " << reason << ": " << LogJob(cmd) << "\n";
+      if (!Comp.getEnableSourceRangeDependencies() &&
+          !Comp.IncrementalComparator && !willBeBuilding)
+        return; // preserve legacy behavior
+      const bool isHypothetical =
+          Comp.getUseSourceRangeDependencies() == forRanges;
+      llvm::outs() << (isHypothetical ? "Hypothetically: " : "")
+                   << (willBeBuilding ? "Queuing " : "Skipping ")
+                   << (forRanges ? "<Ranges> "
+                                 : Comp.getEnableSourceRangeDependencies()
+                                       ? "<Dependencies> "
+                                       : "")
+                   << reason << ": " << LogJob(cmd) << "\n";
 
       if (Comp.getEnableExperimentalDependencies())
         ExpDepGraph.getValue().printPath(llvm::outs(), cmd);
@@ -398,16 +421,27 @@ namespace driver {
         Comp.getDiags().diagnose(SourceLoc(),
                                  diag::warn_unable_to_load_dependencies,
                                  DependenciesFile);
-      Comp.disableIncrementalBuild();
-      for (const Job *Cmd : DeferredCommands)
-        scheduleCommandIfNecessaryAndPossible(Cmd);
-      DeferredCommands.clear();
+      Comp.disableIncrementalBuild(
+          Twine("Malformed swift dependencies file ' ") + DependenciesFile +
+          "'");
     }
 
     /// Helper that attempts to reload a job's .swiftdeps file after the job
     /// exits, and re-run transitive marking to ensure everything is properly
     /// invalidated by any new dependency edges introduced by it. If reloading
     /// fails, this can cause deferred jobs to be immediately scheduled.
+
+    template <unsigned N>
+    void reloadAndRemarkDeps(const Job *FinishedCmd, int ReturnCode,
+                             SmallVector<const Job *, N> &Dependents) {
+      if (Comp.getEnableExperimentalDependencies())
+        reloadAndRemarkDeps(FinishedCmd, ReturnCode, Dependents,
+                            ExpDepGraph.getValue());
+      else
+        reloadAndRemarkDeps(FinishedCmd, ReturnCode, Dependents,
+                            StandardDepGraph);
+    }
+
     template <unsigned N, typename DependencyGraphT>
     void reloadAndRemarkDeps(const Job *FinishedCmd,
                              int ReturnCode,
@@ -444,6 +478,10 @@ namespace driver {
           case DependencyGraphImpl::LoadResult::HadError:
             if (ReturnCode == EXIT_SUCCESS) {
               dependencyLoadFailed(DependenciesFile);
+              // Better try compiling whatever was waiting on more info.
+              for (const Job *Cmd : DeferredCommands)
+                scheduleCommandIfNecessaryAndPossible(Cmd);
+              DeferredCommands.clear();
               Dependents.clear();
             } // else, let the next build handle it.
             break;
@@ -577,30 +615,15 @@ namespace driver {
                                       StringRef Output, StringRef Errors,
                                       TaskProcessInformation ProcInfo,
                                       void *Context) {
-      const Job *FinishedCmd = (const Job *)Context;
+      const Job *const FinishedCmd = (const Job *)Context;
 
       if (Pid != llvm::sys::ProcessInfo::InvalidPid) {
 
         if (Comp.getShowDriverTimeCompilation()) {
           DriverTimers[FinishedCmd]->stopTimer();
         }
-
-        switch (Comp.getOutputLevel()) {
-        case OutputLevel::PrintJobs:
-          // Only print the jobs, not the outputs
-          break;
-        case OutputLevel::Normal:
-        case OutputLevel::Verbose:
-          // Send the buffered output to stderr, though only if we
-          // support getting buffered output.
-          if (TaskQueue::supportsBufferingOutput())
-            llvm::errs() << Output;
-          break;
-        case OutputLevel::Parseable:
-          emitParseableOutputForEachFinishedJob(Pid, ReturnCode, Output,
-                                                FinishedCmd, ProcInfo);
-          break;
-        }
+        processOutputOfFinishedProcess(Pid, ReturnCode, FinishedCmd, Output,
+                                       ProcInfo);
       }
 
       if (Comp.getStatsReporter() && ProcInfo.getResourceUsage().hasValue())
@@ -612,45 +635,40 @@ namespace driver {
                                     static_cast<const BatchJob *>(FinishedCmd));
       }
 
-      // In order to handle both old dependencies that have disappeared and new
-      // dependencies that have arisen, we need to reload the dependency file.
-      // Do this whether or not the build succeeded.
-      SmallVector<const Job *, 16> Dependents;
-      if (Comp.getIncrementalBuildEnabled()) {
-        if (Comp.getEnableExperimentalDependencies())
-          reloadAndRemarkDeps(FinishedCmd, ReturnCode, Dependents,
-                              ExpDepGraph.getValue());
-        else
-          reloadAndRemarkDeps(FinishedCmd, ReturnCode, Dependents,
-                              StandardDepGraph);
-      }
-
-      if (ReturnCode != EXIT_SUCCESS) {
-        // The task failed, so return true without performing any further
-        // dependency analysis.
-
-        // Store this task's ReturnCode as our Result if we haven't stored
-        // anything yet.
-        if (Result == EXIT_SUCCESS)
-          Result = ReturnCode;
-
-        if (!isa<CompileJobAction>(FinishedCmd->getSource()) ||
-            ReturnCode != EXIT_FAILURE) {
-          Comp.getDiags().diagnose(SourceLoc(), diag::error_command_failed,
-                                   FinishedCmd->getSource().getClassName(),
-                                   ReturnCode);
+      CommandSet Dependents;
+      if (!Comp.getUseSourceRangeDependencies()) {
+        // Can just do the cheapest thing
+        if (!Comp.IncrementalComparator)
+          Dependents = subsequentJobsNeededForDeps(FinishedCmd, ReturnCode);
+        else {
+          CommandSet DependentsForDeps;
+          std::tie(Dependents, DependentsForDeps) =
+              subsequentJobsNeededForDepsOrRanges(FinishedCmd, ReturnCode);
+          Dependents = DependentsForDeps;
         }
+      } else {
+        CommandSet DependentsForDeps;
+        std::tie(Dependents, DependentsForDeps) =
+            subsequentJobsNeededForDepsOrRanges(FinishedCmd, ReturnCode);
 
-        // See how ContinueBuildingAfterErrors gets set up in Driver.cpp for
-        // more info.
-        assert((Comp.getContinueBuildingAfterErrors() ||
-                !Comp.getBatchModeEnabled()) &&
-               "batch mode diagnostics require ContinueBuildingAfterErrors");
-
-        return Comp.getContinueBuildingAfterErrors() ?
-          TaskFinishedResponse::ContinueExecution :
-          TaskFinishedResponse::StopExecution;
+        if (Comp.getShowIncrementalBuildDecisions() &&
+            (!DependentsForDeps.empty() || !Dependents.empty())) {
+          llvm::outs() << "After completion of " << LogJob(FinishedCmd)
+                       << ": \n";
+          for (auto const *Cmd : DependentsForDeps)
+            llvm::outs() << "- Dependencies would now schedule: " << LogJob(Cmd)
+                         << "\n";
+          for (auto const *Cmd : Dependents)
+            llvm::outs() << "- Source ranges will now schedule: " << LogJob(Cmd)
+                         << "\n";
+          if (DependentsForDeps.size() > 1 || Dependents.size() > 1)
+            llvm::outs() << "For an additional " << DependentsForDeps.size()
+                         << " (deps) vs " << Dependents.size() << " (ranges)\n";
+        }
       }
+
+      if (ReturnCode != EXIT_SUCCESS)
+        return taskFailed(FinishedCmd, ReturnCode);
 
       // When a task finishes, we need to reevaluate the other commands that
       // might have been blocked.
@@ -658,11 +676,121 @@ namespace driver {
 
       for (const Job *Cmd : Dependents) {
         DeferredCommands.erase(Cmd);
-        noteBuilding(Cmd, "because of dependencies discovered later");
+        noteBuilding(Cmd, true, Comp.getUseSourceRangeDependencies(),
+                     "because of dependencies discovered later");
         scheduleCommandIfNecessaryAndPossible(Cmd);
       }
 
       return TaskFinishedResponse::ContinueExecution;
+    }
+
+    TaskFinishedResponse taskFailed(const Job *FinishedCmd,
+                                    const int ReturnCode) {
+      // The task failed, so return true without performing any further
+      // dependency analysis.
+
+      // Store this task's ReturnCode as our Result if we haven't stored
+      // anything yet.
+      if (Result == EXIT_SUCCESS)
+        Result = ReturnCode;
+
+      if (!isa<CompileJobAction>(FinishedCmd->getSource()) ||
+          ReturnCode != EXIT_FAILURE) {
+        Comp.getDiags().diagnose(SourceLoc(), diag::error_command_failed,
+                                 FinishedCmd->getSource().getClassName(),
+                                 ReturnCode);
+      }
+
+      // See how ContinueBuildingAfterErrors gets set up in Driver.cpp for
+      // more info.
+      assert((Comp.getContinueBuildingAfterErrors() ||
+              !Comp.getBatchModeEnabled()) &&
+             "batch mode diagnostics require ContinueBuildingAfterErrors");
+
+      return Comp.getContinueBuildingAfterErrors()
+                 ? TaskFinishedResponse::ContinueExecution
+                 : TaskFinishedResponse::StopExecution;
+    }
+
+    void processOutputOfFinishedProcess(ProcessId Pid, int ReturnCode,
+                                        const Job *const FinishedCmd,
+                                        StringRef Output,
+                                        TaskProcessInformation ProcInfo) {
+      switch (Comp.getOutputLevel()) {
+      case OutputLevel::PrintJobs:
+        // Only print the jobs, not the outputs
+        break;
+      case OutputLevel::Normal:
+      case OutputLevel::Verbose:
+        // Send the buffered output to stderr, though only if we
+        // support getting buffered output.
+        if (TaskQueue::supportsBufferingOutput())
+          llvm::errs() << Output;
+        break;
+      case OutputLevel::Parseable:
+        emitParseableOutputForEachFinishedJob(Pid, ReturnCode, Output,
+                                              FinishedCmd, ProcInfo);
+        break;
+      }
+    }
+
+    /// In order to handle both old dependencies that have disappeared and new
+    /// dependencies that have arisen, we need to reload the dependency file.
+    /// Do this whether or not the build succeeded.
+    ///
+    /// Also need it when using source ranges to see if a new top-level
+    /// name were introduced, for instance by changing a
+    /// previously unparsed line to "} func foo() {".
+    ///
+    /// FIXME: too much global state floating around, e.g.
+    /// getIncrementalBuildEnabled
+    CommandSet subsequentJobsNeededForDeps(const Job *FinishedCmd,
+                                           const int ReturnCode) {
+      if (!Comp.getIncrementalBuildEnabled())
+        return {};
+      SmallVector<const Job *, 16> Dependents;
+      reloadAndRemarkDeps(FinishedCmd, ReturnCode, Dependents);
+      CommandSet DepSet;
+      for (const Job *Cmd : Dependents)
+        DepSet.insert(Cmd);
+      return DepSet;
+    }
+
+    // Returns a pair of jobs needed when using ranges, and jobs needed
+    // when using dependencies.
+    std::pair<CommandSet, CommandSet>
+    subsequentJobsNeededForDepsOrRanges(const Job *FinishedCmd,
+                                        const int ReturnCode) {
+
+      if (!Comp.getIncrementalBuildEnabled())
+        return {};
+      // FIXME: crude, could just use dependencies to schedule only those jobs
+      // depending on the added tops
+      const size_t topsBefore = countTopLevelProvides(FinishedCmd);
+
+      CommandSet jobsForDependencies =
+          subsequentJobsNeededForDeps(FinishedCmd, ReturnCode);
+
+      const size_t topsAfter = countTopLevelProvides(FinishedCmd);
+      // TODO: see if new type was added outside of a struct (etc) body
+      const bool userAddedTopLevel = topsAfter > topsBefore;
+
+      // TODO: instead of scheduling *all* the jobs, could figure out
+      // which ones use the introduced top-level names and only schedule those.
+      // However, as it stands, the caller will fall back to the old
+      // dependency scheme in this case anyway.
+      CommandSet jobsForRanges =
+          userAddedTopLevel ? jobsForDependencies : CommandSet();
+
+      Comp.updateIncrementalComparison(jobsForDependencies, jobsForRanges, {});
+
+      return {jobsForRanges, jobsForDependencies};
+    }
+
+    size_t countTopLevelProvides(const Job *Cmd) {
+      return Comp.getEnableExperimentalDependencies()
+                 ? ExpDepGraph.getValue().countTopLevelProvides(Cmd)
+                 : StandardDepGraph.countTopLevelProvides(Cmd);
     }
 
     TaskFinishedResponse taskSignalled(ProcessId Pid, StringRef ErrorMsg,
@@ -734,129 +862,379 @@ namespace driver {
     /// Schedule and run initial, additional, and batch jobs.
     template <typename DependencyGraphT>
     void runJobs(DependencyGraphT &DepGraph) {
-      scheduleInitialJobs(DepGraph);
-      scheduleAdditionalJobs(DepGraph);
+      scheduleJobsBeforeBatching(DepGraph);
       formBatchJobsAndAddPendingJobsToTaskQueue();
       runTaskQueueToCompletion();
       checkUnfinishedJobs(DepGraph);
     }
 
   private:
-    /// Schedule all jobs we can from the initial list provided by Compilation.
     template <typename DependencyGraphT>
-    void scheduleInitialJobs(DependencyGraphT &DepGraph) {
+    void scheduleJobsBeforeBatching(DependencyGraphT &DepGraph) {
+      if (Comp.getIncrementalBuildEnabled())
+        scheduleFirstRoundJobsForIncrementalCompilation(DepGraph);
+      else
+        scheduleJobsForNonIncrementalCompilation();
+    }
+
+    void scheduleJobsForNonIncrementalCompilation() {
+      for (const Job *Cmd : Comp.getJobs())
+        scheduleCommandIfNecessaryAndPossible(Cmd);
+    }
+
+    template <typename DependencyGraphT>
+    void scheduleFirstRoundJobsForIncrementalCompilation(
+        DependencyGraphT &DepGraph) {
+
+      CommandSet compileJobsToSchedule =
+          computeFirstRoundCompileJobsForIncrementalCompilation(DepGraph);
+
       for (const Job *Cmd : Comp.getJobs()) {
-        if (!Comp.getIncrementalBuildEnabled()) {
+        if (Cmd->getFirstSwiftPrimaryInput().empty() ||
+            compileJobsToSchedule.count(Cmd))
           scheduleCommandIfNecessaryAndPossible(Cmd);
+        else
+          DeferredCommands.insert(Cmd);
+      }
+    }
+
+    /// Figure out the best strategy and return those jobs. May return
+    /// duplicates.
+    template <typename DependencyGraphT>
+    CommandSet computeFirstRoundCompileJobsForIncrementalCompilation(
+        DependencyGraphT &DepGraph) {
+      auto compileJobsToScheduleViaDependencies =
+          computeDependenciesAndGetNeededCompileJobs(DepGraph);
+
+      const bool mustConsultRanges =
+          Comp.getEnableSourceRangeDependencies() || Comp.IncrementalComparator;
+
+      if (!mustConsultRanges)
+        return compileJobsToScheduleViaDependencies;
+
+      auto jobs = computeRangesAndGetNeededCompileJobs(DepGraph);
+      CommandSet &compileJobsToScheduleViaSourceRanges = jobs.first;
+      CommandSet &jobsLackingSourceRangeSupplementaryOutputs = jobs.second;
+
+      const bool shouldFallBack =
+          decideAndExplainWhetherToFallBackToDependencies(
+              compileJobsToScheduleViaSourceRanges,
+              jobsLackingSourceRangeSupplementaryOutputs);
+
+      Comp.updateIncrementalComparison(
+          compileJobsToScheduleViaDependencies,
+          compileJobsToScheduleViaSourceRanges,
+          jobsLackingSourceRangeSupplementaryOutputs);
+
+      if (!Comp.getEnableSourceRangeDependencies())
+        return compileJobsToScheduleViaDependencies;
+
+      Comp.setUseSourceRangeDependencies(!shouldFallBack);
+
+      if (!shouldFallBack)
+        return compileJobsToScheduleViaSourceRanges;
+
+      auto compileJobsToScheduleWhenFallingBack =
+          std::move(compileJobsToScheduleViaDependencies);
+      // Even if dependencies would not schedule these, we want them to run
+      // to create the supplementary outputs for next time.
+      for (const Job *Cmd : jobsLackingSourceRangeSupplementaryOutputs)
+        compileJobsToScheduleWhenFallingBack.insert(Cmd);
+
+      return compileJobsToScheduleWhenFallingBack;
+    }
+
+    bool decideAndExplainWhetherToFallBackToDependencies(
+        const CommandSet &compileJobsToScheduleViaSourceRanges,
+        const CommandSet &jobsLackingSourceRangeSupplementaryOutputs) {
+      if (!jobsLackingSourceRangeSupplementaryOutputs.empty()) {
+        if (Comp.getShowIncrementalBuildDecisions()) {
+          llvm::outs()
+              << "Using dependencies: At least one input ('"
+              << llvm::sys::path::filename(
+                     (*jobsLackingSourceRangeSupplementaryOutputs.begin())
+                         ->getFirstSwiftPrimaryInput())
+              << "') lacks a supplementary output needed for the source "
+                 "range strategy.\n Maybe dependencies can do better than "
+                 "recompiling every file.\n";
+        }
+        return true;
+      }
+      // Unless the source-range scheme would compile every file,
+      // it's likely a better bet.
+      if (compileJobsToScheduleViaSourceRanges.size() <
+          Comp.countSwiftInputs()) {
+        if (Comp.getShowIncrementalBuildDecisions())
+          llvm::outs() << "Using ranges\n";
+        return false;
+      }
+      if (Comp.getShowIncrementalBuildDecisions())
+        llvm::outs() << "Using dependencies: Range strategy would compile "
+                        "every input; dependencies cannot be "
+                        "any worse.";
+      return true;
+    }
+
+    /// Return both the jobs to compile if using ranges, and also any jobs that
+    /// must be compiled to use ranges in the future (because they were lacking
+    /// supplementary output files). May include duplicates.
+    template <typename DependencyGraphT>
+    std::pair<CommandSet, CommandSet>
+    computeRangesAndGetNeededCompileJobs(DependencyGraphT &DepGraph) {
+      using namespace incremental_ranges;
+
+      const bool dumpSwiftRanges =
+          Comp.getArgs().hasArg(options::OPT_driver_dump_swift_ranges);
+      const bool dumpCompiledSourceDiffs =
+          Comp.getArgs().hasArg(options::OPT_driver_dump_compiled_source_diffs);
+
+      const auto allSourceRangeInfo =
+          incremental_ranges::SourceRangeBasedInfo::loadAllInfo(Comp);
+
+      incremental_ranges::SourceRangeBasedInfo::dumpAllInfo(
+          allSourceRangeInfo, dumpCompiledSourceDiffs, dumpSwiftRanges);
+
+      // As is, returns true and caller will fall back to dependencies.
+      // But, since we register errors by recording massive changes to
+      // primaries, could just keep on.
+      // load dependencies for external dependencies and interfacehashes
+
+      CommandSet neededJobs;
+      for (const Job *Cmd : Comp.getJobs()) {
+        if (SourceRangeBasedInfo::shouldScheduleCompileJob(
+                allSourceRangeInfo, Cmd, [&](const bool willBuild, Twine why) {
+                  noteBuilding(Cmd, willBuild, true, why.str());
+                }))
+          neededJobs.insert(Cmd);
+      }
+
+      CommandSet jobsLackingSupplementaryOutputs;
+      for (const Job *Cmd : Comp.getJobs()) {
+        auto pri = Cmd->getFirstSwiftPrimaryInput();
+        if (pri.empty())
+          continue;
+        if (allSourceRangeInfo.count(pri)) {
+          noteBuilding(
+                       Cmd, false, true,
+                       "already have source-range and compiled-source files.");
           continue;
         }
-
-        // Try to load the dependencies file for this job. If there isn't one, we
-        // always have to run the job, but it doesn't affect any other jobs. If
-        // there should be one but it's not present or can't be loaded, we have to
-        // run all the jobs.
-        // FIXME: We can probably do better here!
-        Job::Condition Condition = Job::Condition::Always;
-        StringRef DependenciesFile =
-            Cmd->getOutput().getAdditionalOutputForType(
-                file_types::TY_SwiftDeps);
-        if (!DependenciesFile.empty()) {
-          if (Cmd->getCondition() == Job::Condition::NewlyAdded) {
-            DepGraph.addIndependentNode(Cmd);
-          } else {
-            switch (
-                DepGraph.loadFromPath(Cmd, DependenciesFile, Comp.getDiags())) {
-            case DependencyGraphImpl::LoadResult::HadError:
-              dependencyLoadFailed(DependenciesFile, /*Warn=*/false);
-              break;
-            case DependencyGraphImpl::LoadResult::UpToDate:
-              Condition = Cmd->getCondition();
-              break;
-            case DependencyGraphImpl::LoadResult::AffectsDownstream:
-              if (Comp.getEnableExperimentalDependencies()) {
-                // The experimental graph reports a change, since it lumps new
-                // files together with new "Provides".
-                Condition = Cmd->getCondition();
-                break;
-              }
-              llvm_unreachable("we haven't marked anything in this graph yet");
-            }
-          }
-        }
-
-        switch (Condition) {
-        case Job::Condition::Always:
-          if (Comp.getIncrementalBuildEnabled() && !DependenciesFile.empty()) {
-            // Ensure dependents will get recompiled.
-            InitialCascadingCommands.push_back(Cmd);
-            // Mark this job as cascading.
-            //
-            // It would probably be safe and simpler to markTransitive on the
-            // start nodes in the "Always" condition from the start instead of
-            // using markIntransitive and having later functions call
-            // markTransitive. That way markIntransitive would be an
-            // implementation detail of DependencyGraph.
-            DepGraph.markIntransitive(Cmd);
-          }
-          LLVM_FALLTHROUGH;
-        case Job::Condition::RunWithoutCascading:
-          noteBuilding(Cmd, "(initial)");
-          scheduleCommandIfNecessaryAndPossible(Cmd);
-          break;
-        case Job::Condition::CheckDependencies:
-          DeferredCommands.insert(Cmd);
-          break;
-        case Job::Condition::NewlyAdded:
-          llvm_unreachable("handled above");
-        }
+        noteBuilding(Cmd, true, true,
+                     "to create source-range and compiled-source files for the "
+                     "next time when falling back from source-ranges");
+        jobsLackingSupplementaryOutputs.insert(Cmd);
       }
+
+      for (const Job *Cmd :
+           externallyDependentJobsForRangeBasedIncrementalCompilation(DepGraph))
+        neededJobs.insert(Cmd);
+
+      assert(neededJobs.size() <= Comp.countSwiftInputs());
+      assert(jobsLackingSupplementaryOutputs.size() <= Comp.countSwiftInputs());
+      return {neededJobs, jobsLackingSupplementaryOutputs};
+    }
+
+    /// Return jobs to run if using dependencies, may include duplicates.
+    template <typename DependencyGraphT>
+    CommandSet
+    computeDependenciesAndGetNeededCompileJobs(DependencyGraphT &DepGraph) {
+      CommandSet jobsToSchedule;
+      for (const Job *Cmd : Comp.getJobs()) {
+        if (Cmd->getFirstSwiftPrimaryInput().empty())
+          continue; // not Compile
+        const Optional<bool> shouldSched =
+            isCompileJobInitiallyNeededForDependencyBasedIncrementalCompilation(
+                Cmd, DepGraph);
+        if (!shouldSched) {
+          // Dependency load error, just run them all
+          for (const Job *Cmd : Comp.getJobs()) {
+            if (!Cmd->getFirstSwiftPrimaryInput().empty())
+              jobsToSchedule.insert(Cmd);
+          }
+          return jobsToSchedule;
+        }
+        if (shouldSched.getValue())
+          jobsToSchedule.insert(Cmd);
+      }
+      {
+        const auto additionalJobs =
+            additionalJobsToScheduleForDependencyBasedIncrementalCompilation(
+                DepGraph);
+        for (const auto *Cmd : additionalJobs)
+          jobsToSchedule.insert(Cmd);
+      }
+      return jobsToSchedule;
+    }
+
+    /// Schedule all jobs we can from the initial list provided by Compilation.
+    /// Return whether job should be scheduled when using dependencies.
+    /// Or if there was a dependency-read error, return None to indicate
+    /// don't-know.
+    template <typename DependencyGraphT>
+    Optional<bool>
+    isCompileJobInitiallyNeededForDependencyBasedIncrementalCompilation(
+        const Job *Cmd, DependencyGraphT &DepGraph) {
+
+      auto CondAndHasDepsIfNoError =
+          loadDependenciesAndComputeCondition(Cmd, DepGraph);
+      if (!CondAndHasDepsIfNoError)
+        return None; // swiftdeps read error, abandon dependencies
+
+      Job::Condition Cond;
+      bool HasDependenciesFileName;
+      std::tie(Cond, HasDependenciesFileName) =
+          CondAndHasDepsIfNoError.getValue();
+
+      const bool shouldSched = shouldScheduleCompileJobAccordingToCondition(
+          Cmd, Cond, HasDependenciesFileName, DepGraph);
       if (ExpDepGraph.hasValue())
         assert(ExpDepGraph.getValue().emitDotFileAndVerify(Comp.getDiags()));
+      return shouldSched;
+    }
+
+    /// Returns job condition, and whether a dependency file was specified.
+    /// But returns None if there was a dependency read error.
+    template <typename DependencyGraphT>
+    Optional<std::pair<Job::Condition, bool>>
+    loadDependenciesAndComputeCondition(const Job *const Cmd,
+                                        DependencyGraphT &DepGraph) {
+      // Try to load the dependencies file for this job. If there isn't one, we
+      // always have to run the job, but it doesn't affect any other jobs. If
+      // there should be one but it's not present or can't be loaded, we have to
+      // run all the jobs.
+      // FIXME: We can probably do better here!
+
+      const StringRef DependenciesFile =
+          Cmd->getOutput().getAdditionalOutputForType(file_types::TY_SwiftDeps);
+      if (DependenciesFile.empty())
+        return std::make_pair(Job::Condition::Always, false);
+      if (Cmd->getCondition() == Job::Condition::NewlyAdded) {
+        DepGraph.addIndependentNode(Cmd);
+        return std::make_pair(Job::Condition::NewlyAdded, true);
+      }
+
+      const auto loadResult =
+          DepGraph.loadFromPath(Cmd, DependenciesFile, Comp.getDiags());
+      switch (loadResult) {
+      case DependencyGraphImpl::LoadResult::HadError:
+        dependencyLoadFailed(DependenciesFile, /*Warn=*/true);
+        return None;
+      case DependencyGraphImpl::LoadResult::UpToDate:
+        return std::make_pair(Cmd->getCondition(), true);
+      case DependencyGraphImpl::LoadResult::AffectsDownstream:
+        if (Comp.getEnableExperimentalDependencies()) {
+          // The experimental graph reports a change, since it lumps new
+          // files together with new "Provides".
+          return std::make_pair(Cmd->getCondition(), true);
+        }
+        llvm_unreachable("we haven't marked anything in this graph yet");
+      }
+    }
+
+    template <typename DependencyGraphT>
+    bool shouldScheduleCompileJobAccordingToCondition(
+        const Job *const Cmd, const Job::Condition Condition,
+        const bool hasDependenciesFileName, DependencyGraphT &DepGraph) {
+      switch (Condition) {
+      case Job::Condition::Always:
+      case Job::Condition::NewlyAdded:
+        if (Comp.getIncrementalBuildEnabled() && hasDependenciesFileName) {
+          // Ensure dependents will get recompiled.
+          InitialCascadingCommands.push_back(Cmd);
+          // Mark this job as cascading.
+          //
+          // It would probably be safe and simpler to markTransitive on the
+          // start nodes in the "Always" condition from the start instead of
+          // using markIntransitive and having later functions call
+          // markTransitive. That way markIntransitive would be an
+          // implementation detail of DependencyGraph.
+          DepGraph.markIntransitive(Cmd);
+        }
+        LLVM_FALLTHROUGH;
+      case Job::Condition::RunWithoutCascading:
+        noteBuilding(Cmd, true, false, "(initial)");
+        return true;
+      case Job::Condition::CheckDependencies:
+        noteBuilding(Cmd, false, false, "flie is up-to-date and output exists");
+        return false;
+      }
     }
 
     /// Schedule transitive closure of initial jobs, and external jobs.
     template <typename DependencyGraphT>
-    void scheduleAdditionalJobs(DependencyGraphT &DepGraph) {
-      if (Comp.getIncrementalBuildEnabled()) {
-        SmallVector<const Job *, 16> AdditionalOutOfDateCommands;
+    SmallVector<const Job *, 16>
+    additionalJobsToScheduleForDependencyBasedIncrementalCompilation(
+        DependencyGraphT &DepGraph) {
+      auto AdditionalOutOfDateCommands =
+          collectSecondaryJobsFromDependencyGraph(DepGraph);
 
-        // We scheduled all of the files that have actually changed. Now add the
-        // files that haven't changed, so that they'll get built in parallel if
-        // possible and after the first set of files if it's not.
-        for (auto *Cmd : InitialCascadingCommands) {
-          DepGraph.markTransitive(AdditionalOutOfDateCommands, Cmd,
-                                  IncrementalTracer);
-        }
+      size_t firstSize = AdditionalOutOfDateCommands.size();
 
-        for (auto *transitiveCmd : AdditionalOutOfDateCommands)
-          noteBuilding(transitiveCmd, "because of the initial set");
-        size_t firstSize = AdditionalOutOfDateCommands.size();
+      // Check all cross-module dependencies as well.
+      forEachOutOfDateExternalDependency(DepGraph, [&](StringRef dependency) {
+        // If the dependency has been modified since the oldest built file,
+        // or if we can't stat it for some reason (perhaps it's been
+        // deleted?), trigger rebuilds through the dependency graph.
+        DepGraph.markExternal(AdditionalOutOfDateCommands, dependency);
+      });
 
-        // Check all cross-module dependencies as well.
-        for (StringRef dependency : DepGraph.getExternalDependencies()) {
-          llvm::sys::fs::file_status depStatus;
-          if (!llvm::sys::fs::status(dependency, depStatus))
-            if (depStatus.getLastModificationTime() < Comp.getLastBuildTime())
-              continue;
-
-          // If the dependency has been modified since the oldest built file,
-          // or if we can't stat it for some reason (perhaps it's been deleted?),
-          // trigger rebuilds through the dependency graph.
-          DepGraph.markExternal(AdditionalOutOfDateCommands, dependency);
-        }
-
-        for (auto *externalCmd :
-               llvm::makeArrayRef(AdditionalOutOfDateCommands).slice(firstSize)) {
-          noteBuilding(externalCmd, "because of external dependencies");
-        }
-
-        for (auto *AdditionalCmd : AdditionalOutOfDateCommands) {
-          if (!DeferredCommands.count(AdditionalCmd))
-            continue;
-          scheduleCommandIfNecessaryAndPossible(AdditionalCmd);
-          DeferredCommands.erase(AdditionalCmd);
-        }
+      for (auto *externalCmd :
+           llvm::makeArrayRef(AdditionalOutOfDateCommands).slice(firstSize)) {
+        noteBuilding(externalCmd, true, false,
+                     "because of external dependencies");
       }
+      return AdditionalOutOfDateCommands;
+    }
+
+    template <typename DependencyGraphT>
+    SmallVector<const Job *, 16>
+    externallyDependentJobsForRangeBasedIncrementalCompilation(
+        DependencyGraphT &DepGraph) {
+      SmallVector<const Job *, 16> results;
+      forEachOutOfDateExternalDependency(
+          DepGraph, [&](StringRef externalSwiftDeps) {
+            DepGraph.forEachUnmarkedJobDirectlyDependentOnExternalSwiftdeps(
+                externalSwiftDeps, [&](const void *node) {
+                  // Sadly, the non-experimental dependency graph is type-unsafe
+                  const Job *externalCmd = reinterpret_cast<const Job *>(node);
+                  noteBuilding(externalCmd, true, true,
+                               "because of external dependencies");
+                  results.push_back(externalCmd);
+                });
+          });
+      return results;
+    }
+
+    template <typename DependencyGraphT>
+    void forEachOutOfDateExternalDependency(
+        DependencyGraphT &DepGraph,
+        function_ref<void(StringRef)> consumeExternalSwiftDeps) {
+      for (StringRef dependency : DepGraph.getExternalDependencies()) {
+        // If the dependency has been modified since the oldest built file,
+        // or if we can't stat it for some reason (perhaps it's been
+        // deleted?), trigger rebuilds through the dependency graph.
+        llvm::sys::fs::file_status depStatus;
+        if (llvm::sys::fs::status(dependency, depStatus) ||
+            Comp.getLastBuildTime() < depStatus.getLastModificationTime())
+          consumeExternalSwiftDeps(dependency);
+      }
+    }
+
+    template <typename DependencyGraphT>
+    SmallVector<const Job *, 16>
+    collectSecondaryJobsFromDependencyGraph(DependencyGraphT &DepGraph) {
+      SmallVector<const Job *, 16> AdditionalOutOfDateCommands;
+      // We scheduled all of the files that have actually changed. Now add the
+      // files that haven't changed, so that they'll get built in parallel if
+      // possible and after the first set of files if it's not.
+      for (auto *Cmd : InitialCascadingCommands) {
+        DepGraph.markTransitive(AdditionalOutOfDateCommands, Cmd,
+                                IncrementalTracer);
+      }
+      for (auto *transitiveCmd : AdditionalOutOfDateCommands)
+        noteBuilding(transitiveCmd, true, false, "because of the initial set");
+
+      return AdditionalOutOfDateCommands;
     }
 
     /// Insert all jobs in \p Cmds (of descriptive name \p Kind) to the \c
@@ -1191,10 +1569,13 @@ namespace driver {
         // Make sure we record any files that still need to be rebuilt.
         for (const Job *Cmd : Comp.getJobs()) {
           // Skip files that don't use dependency analysis.
-          StringRef DependenciesFile =
-              Cmd->getOutput().getAdditionalOutputForType(
-                  file_types::TY_SwiftDeps);
-          if (DependenciesFile.empty())
+          bool shouldHaveOutput = false;
+          file_types::forEachIncrementalOutputType(
+              [&](const file_types::ID type) {
+                shouldHaveOutput |=
+                    !Cmd->getOutput().getAdditionalOutputForType(type).empty();
+              });
+          if (!shouldHaveOutput)
             continue;
 
           // Don't worry about commands that finished or weren't going to run.
@@ -1356,6 +1737,51 @@ static void writeCompilationRecord(StringRef path, StringRef argsHash,
   }
 }
 
+static void writeInputJobsToFilelist(llvm::raw_fd_ostream &out, const Job *job,
+                                     const file_types::ID infoType) {
+  // FIXME: Duplicated from ToolChains.cpp.
+  for (const Job *input : job->getInputs()) {
+    const CommandOutput &outputInfo = input->getOutput();
+    if (outputInfo.getPrimaryOutputType() == infoType) {
+      for (auto &output : outputInfo.getPrimaryOutputFilenames())
+        out << output << "\n";
+    } else {
+      auto output = outputInfo.getAnyOutputForType(infoType);
+      if (!output.empty())
+        out << output << "\n";
+    }
+  }
+}
+static void writeSourceInputActionsToFilelist(llvm::raw_fd_ostream &out,
+                                              const Job *job,
+                                              const ArgList &args) {
+  // Ensure that -index-file-path works in conjunction with
+  // -driver-use-filelists. It needs to be the only primary.
+  if (Arg *A = args.getLastArg(options::OPT_index_file_path))
+    out << A->getValue() << "\n";
+  else {
+    // The normal case for non-single-compile jobs.
+    for (const Action *A : job->getSource().getInputs()) {
+      // A could be a GeneratePCHJobAction
+      if (!isa<InputAction>(A))
+        continue;
+      const auto *IA = cast<InputAction>(A);
+      out << IA->getInputArg().getValue() << "\n";
+    }
+  }
+}
+static void writeOutputToFilelist(llvm::raw_fd_ostream &out, const Job *job,
+                                  const file_types::ID infoType) {
+  const CommandOutput &outputInfo = job->getOutput();
+  assert(outputInfo.getPrimaryOutputType() == infoType);
+  for (auto &output : outputInfo.getPrimaryOutputFilenames())
+    out << output << "\n";
+}
+static void writeSupplementarOutputToFilelist(llvm::raw_fd_ostream &out,
+                                              const Job *job) {
+  job->getOutput().writeOutputFileMap(out);
+}
+
 static bool writeFilelistIfNecessary(const Job *job, const ArgList &args,
                                      DiagnosticEngine &diags) {
   bool ok = true;
@@ -1374,46 +1800,23 @@ static bool writeFilelistIfNecessary(const Job *job, const ArgList &args,
     }
 
     switch (filelistInfo.whichFiles) {
-    case FilelistInfo::WhichFiles::Input:
-      // FIXME: Duplicated from ToolChains.cpp.
-      for (const Job *input : job->getInputs()) {
-        const CommandOutput &outputInfo = input->getOutput();
-        if (outputInfo.getPrimaryOutputType() == filelistInfo.type) {
-          for (auto &output : outputInfo.getPrimaryOutputFilenames())
-            out << output << "\n";
-        } else {
-          auto output = outputInfo.getAnyOutputForType(filelistInfo.type);
-          if (!output.empty())
-            out << output << "\n";
-        }
-      }
+    case FilelistInfo::WhichFiles::InputJobs:
+      writeInputJobsToFilelist(out, job, filelistInfo.type);
       break;
-    case FilelistInfo::WhichFiles::PrimaryInputs:
-      // Ensure that -index-file-path works in conjunction with
-      // -driver-use-filelists. It needs to be the only primary.
-      if (Arg *A = args.getLastArg(options::OPT_index_file_path))
-        out << A->getValue() << "\n";
-      else {
-        // The normal case for non-single-compile jobs.
-        for (const Action *A : job->getSource().getInputs()) {
-          // A could be a GeneratePCHJobAction
-          if (!isa<InputAction>(A))
-            continue;
-          const auto *IA = cast<InputAction>(A);
-          out << IA->getInputArg().getValue() << "\n";
-        }
-      }
+    case FilelistInfo::WhichFiles::SourceInputActions:
+      writeSourceInputActionsToFilelist(out, job, args);
+      break;
+    case FilelistInfo::WhichFiles::InputJobsAndSourceInputActions:
+      writeInputJobsToFilelist(out, job, filelistInfo.type);
+      writeSourceInputActionsToFilelist(out, job, args);
       break;
     case FilelistInfo::WhichFiles::Output: {
-      const CommandOutput &outputInfo = job->getOutput();
-      assert(outputInfo.getPrimaryOutputType() == filelistInfo.type);
-      for (auto &output : outputInfo.getPrimaryOutputFilenames())
-        out << output << "\n";
+      writeOutputToFilelist(out, job, filelistInfo.type);
       break;
-    }
-    case FilelistInfo::WhichFiles::SupplementaryOutput:
-      job->getOutput().writeOutputFileMap(out);
-      break;
+      }
+      case FilelistInfo::WhichFiles::SupplementaryOutput:
+        writeSupplementarOutputToFilelist(out, job);
+        break;
     }
   }
   return ok;
@@ -1541,6 +1944,9 @@ int Compilation::performJobs(std::unique_ptr<TaskQueue> &&TQ) {
   bool abnormalExit;
   int result = performJobsImpl(abnormalExit, std::move(TQ));
 
+  if (IncrementalComparator)
+    IncrementalComparator->outputComparison();
+
   if (!SaveTemps) {
     for (const auto &pathPair : TempFilePaths) {
       if (!abnormalExit || pathPair.getValue() == PreserveOnSignal::No)
@@ -1571,4 +1977,96 @@ const char *Compilation::getAllSourcesPath() const {
     mutableThis->AllSourceFilesPath = getArgs().MakeArgString(Buffer);
   }
   return AllSourceFilesPath;
+}
+
+void Compilation::disableIncrementalBuild(Twine why) {
+  if (getShowIncrementalBuildDecisions())
+    llvm::outs() << "Disabling incremental build: " << why << "\n";
+
+  EnableIncrementalBuild = false;
+  if (IncrementalComparator)
+    IncrementalComparator->WhyIncrementalWasDisabled = why.str();
+}
+
+void Compilation::IncrementalSchemeComparator::update(
+    const CommandSet &depJobs, const CommandSet &rangeJobs,
+    const CommandSet &lackingSuppJobs) {
+  for (const auto *cmd : depJobs)
+    DependencyCompileJobs.insert(cmd);
+  for (const auto *cmd : rangeJobs)
+    SourceRangeCompileJobs.insert(cmd);
+  for (const auto *cmd : lackingSuppJobs)
+    SourceRangeLackingSuppJobs.insert(cmd);
+
+  if (!depJobs.empty())
+    ++DependencyCompileStages;
+  if (!rangeJobs.empty() || !lackingSuppJobs.empty())
+    ++SourceRangeCompileStages;
+}
+
+void Compilation::IncrementalSchemeComparator::outputComparison() const {
+  if (CompareIncrementalSchemesPath.empty()) {
+    outputComparison(llvm::outs());
+    return;
+  }
+
+  std::error_code EC;
+  using namespace llvm::sys::fs;
+  llvm::raw_fd_ostream OS(CompareIncrementalSchemesPath, EC, CD_OpenAlways,
+                          FA_Write, OF_Append | OF_Text);
+
+  if (EC) {
+    Diags.diagnose(SourceLoc(), diag::unable_to_open_incremental_comparison_log,
+                   CompareIncrementalSchemesPath);
+    return;
+  }
+  outputComparison(OS);
+}
+
+void Compilation::IncrementalSchemeComparator::outputComparison(
+    llvm::raw_ostream &out) const {
+  if (!EnableIncrementalBuild) {
+    // No stats will have been gathered
+    assert(!WhyIncrementalWasDisabled.empty() && "Must be a reason");
+    out << "*** Incremental build disabled because "
+        << WhyIncrementalWasDisabled << ", cannot compare ***\n";
+    return;
+  }
+  unsigned additionalDependencyJobsToCreateSupps = 0;
+  for (const Job *Cmd : SourceRangeLackingSuppJobs) {
+    if (!DependencyCompileJobs.count(Cmd))
+      ++additionalDependencyJobsToCreateSupps;
+  }
+  unsigned depsCount = DependencyCompileJobs.size();
+  unsigned rangesCount =
+      UseSourceRangeDependencies
+          ? SourceRangeCompileJobs.size()
+          : depsCount + additionalDependencyJobsToCreateSupps;
+
+  const bool fellBack =
+      EnableSourceRangeDependencies && !UseSourceRangeDependencies;
+
+  const int rangeBenefit = depsCount - rangesCount;
+  const int rangeStageBenefit =
+      DependencyCompileStages - SourceRangeCompileStages;
+
+  out << "*** "
+      << "Range benefit: " << rangeBenefit << " compilations, "
+      << rangeStageBenefit << " stages, "
+      << "deps: " << depsCount << ", "
+      << "ranges" << (fellBack ? " (falling back)" : "") << ": " << rangesCount
+      << ", "
+      << "total: " << SwiftInputCount << ", "
+      << "requested: " << (EnableSourceRangeDependencies ? "ranges" : "deps")
+      << ", "
+      << "used: " << (UseSourceRangeDependencies ? "ranges" : "deps")
+      << "***\n";
+}
+
+unsigned Compilation::countSwiftInputs() const {
+  unsigned inputCount = 0;
+  for (const auto &p : InputFilesWithTypes)
+    if (p.first == file_types::TY_Swift)
+      ++inputCount;
+  return inputCount;
 }

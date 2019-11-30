@@ -7,4 +7,7 @@
    <FileRef
       location = "group:../../../swift-stress-tester/SourceKitStressTester">
    </FileRef>
+   <FileRef
+      location = "group:../../../swift-stress-tester/SwiftEvolve">
+   </FileRef>
 </Workspace>

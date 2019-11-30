@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %clang %target-cc-options -isysroot %sdk -fobjc-arc %S/Inputs/ObjCClasses/ObjCClasses.m -c -o %t/ObjCClasses.o
-// RUN: %target-build-swift -I %S/Inputs/ObjCClasses/ %t/ObjCClasses.o %s -o %t/a.out
+// RUN: %clang %target-cc-options -isysroot %sdk -fobjc-arc %S/../Inputs/ObjCClasses/ObjCClasses.m -c -o %t/ObjCClasses.o
+// RUN: %target-build-swift -I %S/../Inputs/ObjCClasses/ %t/ObjCClasses.o %s -o %t/a.out
 // RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out
 

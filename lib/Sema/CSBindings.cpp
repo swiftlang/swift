@@ -85,7 +85,7 @@ ConstraintSystem::determineBestBindings() {
       }
     }
 
-    if (getASTContext().LangOpts.DebugConstraintSolver) {
+    if (getASTContext().TypeCheckerOpts.DebugConstraintSolver) {
       auto &log = getASTContext().TypeCheckerDebug->getStream();
       bindings.dump(typeVar, log, solverState->depth * 2);
     }
@@ -403,7 +403,6 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) const {
   SmallVector<Constraint *, 2> defaultableConstraints;
   SmallVector<PotentialBinding, 4> literalBindings;
   bool addOptionalSupertypeBindings = false;
-  auto &tc = getTypeChecker();
   bool hasNonDependentMemberRelationalConstraints = false;
   bool hasDependentMemberRelationalConstraints = false;
   for (auto constraint : constraints) {
@@ -523,7 +522,7 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) const {
     case ConstraintKind::SelfObjectOfProtocol:
       // Swift 3 allowed the use of default types for normal conformances
       // to expressible-by-literal protocols.
-      if (tc.Context.LangOpts.EffectiveLanguageVersion[0] >= 4)
+      if (getASTContext().LangOpts.EffectiveLanguageVersion[0] >= 4)
         continue;
 
       if (!constraint->getSecondType()->is<ProtocolType>())
@@ -541,7 +540,7 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) const {
 
       // If there is a default literal type for this protocol, it's a
       // potential binding.
-      auto defaultType = tc.getDefaultType(constraint->getProtocol(), DC);
+      auto defaultType = TypeChecker::getDefaultType(constraint->getProtocol(), DC);
       if (!defaultType)
         continue;
 
@@ -733,6 +732,15 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) const {
     result.addPotentialBinding({type, AllowedBindingKind::Exact,
                                 constraint->getKind(), nullptr,
                                 constraint->getLocator()});
+  }
+
+  // If there are no bindings, typeVar may be a hole.
+  if (shouldAttemptFixes() && result.Bindings.empty() &&
+      typeVar->getImpl().canBindToHole()) {
+    result.IsHole = true;
+    result.addPotentialBinding({getASTContext().TheUnresolvedType,
+        AllowedBindingKind::Exact, ConstraintKind::Defaultable, nullptr,
+        typeVar->getImpl().getLocator()});
   }
 
   // Determine if the bindings only constrain the type variable from above with
@@ -979,31 +987,18 @@ bool TypeVariableBinding::attempt(ConstraintSystem &cs) const {
 
   // If this was from a defaultable binding note that.
   if (Binding.isDefaultableBinding()) {
-    auto *locator = Binding.DefaultableBinding;
-    // If this default binding comes from a "hole"
-    // in the constraint system, we have to propagate
-    // this information and mark this type variable
-    // as well as mark everything adjacent to it as
-    // a potential "hole".
-    //
-    // Consider this example:
-    //
-    // func foo<T: BinaryInteger>(_: T) {}
-    // foo(.bar) <- Since `.bar` can't be inferred due to
-    //              luck of information about its base type,
-    //              it's member type is going to get defaulted
-    //              to `Any` which has to be propaged to type
-    //              variable associated with `T` and vice versa.
-    if (cs.shouldAttemptFixes() && cs.isHoleAt(locator)) {
-      auto &CG = cs.getConstraintGraph();
-      for (auto *constraint : CG.gatherConstraints(
-               TypeVar, ConstraintGraph::GatheringKind::EquivalenceClass)) {
-        for (auto *typeVar : constraint->getTypeVariables())
-          cs.recordHole(typeVar);
-      }
-    }
+    cs.DefaultedConstraints.push_back(Binding.DefaultableBinding);
 
-    cs.DefaultedConstraints.push_back(locator);
+    if (locator->isForGenericParameter() && type->isHole()) {
+      // Drop `generic parameter` locator element so that all missing
+      // generic parameters related to the same path can be coalesced later.
+      auto path = locator->getPath();
+      auto genericParam = locator->getGenericParameter();
+      auto *fix = DefaultGenericArgument::create(cs, genericParam,
+          cs.getConstraintLocator(locator->getAnchor(), path.drop_back()));
+      if (cs.recordFix(fix))
+        return true;
+    }
   }
 
   return !cs.failedConstraint && !cs.simplify();

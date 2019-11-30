@@ -205,7 +205,7 @@ bb0(%0 : $Builtin.Int1):
 // CHECK: <func=,param0=r;trap>
 sil @checkedcast : $@convention(thin) (Builtin.NativeObject) -> () {
 bb0(%0 : $Builtin.NativeObject):
-  unconditional_checked_cast %0 : $Builtin.NativeObject to $X
+  unconditional_checked_cast %0 : $Builtin.NativeObject to X
   %r = tuple ()
   return %r : $()
 }

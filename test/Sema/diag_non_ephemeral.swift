@@ -374,29 +374,29 @@ func testNonEphemeralInMembers() {
   // expected-note@-1 {{implicit argument conversion from '[Int]' to 'UnsafePointer<Int>' produces a pointer valid only for the duration of the call to 'takesConstStaticAndReturns'}}
   // expected-note@-2 {{use the 'withUnsafeBufferPointer' method on Array in order to explicitly convert argument to buffer pointer valid for a defined scope}}
 
-  S2.takesMutableRawStatic(ptr: &local) // expected-error {{cannot use inout expression here; argument #1 must be a pointer that outlives the call to 'takesMutableRawStatic(_:ptr:)'}}
+  S2.takesMutableRawStatic(ptr: &local) // expected-error {{cannot use inout expression here; argument 'ptr' must be a pointer that outlives the call to 'takesMutableRawStatic(_:ptr:)'}}
   // expected-note@-1 {{implicit argument conversion from 'Int' to 'UnsafeMutableRawPointer' produces a pointer valid only for the duration of the call to 'takesMutableRawStatic(_:ptr:)'}}
   // expected-note@-2 {{use 'withUnsafeMutableBytes' in order to explicitly convert argument to buffer pointer valid for a defined scope}}
 
-  S2.takesMutableRawStatic("", ptr: &local) // expected-error {{cannot use inout expression here; argument #2 must be a pointer that outlives the call to 'takesMutableRawStatic(_:ptr:)'}}
+  S2.takesMutableRawStatic("", ptr: &local) // expected-error {{cannot use inout expression here; argument 'ptr' must be a pointer that outlives the call to 'takesMutableRawStatic(_:ptr:)'}}
   // expected-note@-1 {{implicit argument conversion from 'Int' to 'UnsafeMutableRawPointer' produces a pointer valid only for the duration of the call to 'takesMutableRawStatic(_:ptr:)'}}
   // expected-note@-2 {{use 'withUnsafeMutableBytes' in order to explicitly convert argument to buffer pointer valid for a defined scope}}
 
   var s2 = S2()
   s2.takesMutableRaw()
-  s2.takesMutableRaw(ptr: &local) // expected-error {{cannot use inout expression here; argument #1 must be a pointer that outlives the call to 'takesMutableRaw(ptr:)'}}
+  s2.takesMutableRaw(ptr: &local) // expected-error {{cannot use inout expression here; argument 'ptr' must be a pointer that outlives the call to 'takesMutableRaw(ptr:)'}}
   // expected-note@-1 {{implicit argument conversion from 'Int' to 'UnsafeMutableRawPointer' produces a pointer valid only for the duration of the call to 'takesMutableRaw(ptr:)'}}
   // expected-note@-2 {{use 'withUnsafeMutableBytes' in order to explicitly convert argument to buffer pointer valid for a defined scope}}
 
-  _ = s2[takesConstInt8: ""] // expected-error {{cannot pass 'String' to parameter; argument #1 must be a pointer that outlives the call to 'subscript(takesConstInt8:)'}}
+  _ = s2[takesConstInt8: ""] // expected-error {{cannot pass 'String' to parameter; argument 'takesConstInt8' must be a pointer that outlives the call to 'subscript(takesConstInt8:)'}}
   // expected-note@-1 {{implicit argument conversion from 'String' to 'UnsafePointer<Int8>' produces a pointer valid only for the duration of the call to 'subscript(takesConstInt8:)'}}
   // expected-note@-2 {{use the 'withCString' method on String in order to explicitly convert argument to pointer valid for a defined scope}}
 
-  s2[takesConstInt8: ""] += 1 // expected-error {{cannot pass 'String' to parameter; argument #1 must be a pointer that outlives the call to 'subscript(takesConstInt8:)'}}
+  s2[takesConstInt8: ""] += 1 // expected-error {{cannot pass 'String' to parameter; argument 'takesConstInt8' must be a pointer that outlives the call to 'subscript(takesConstInt8:)'}}
   // expected-note@-1 {{implicit argument conversion from 'String' to 'UnsafePointer<Int8>' produces a pointer valid only for the duration of the call to 'subscript(takesConstInt8:)'}}
   // expected-note@-2 {{use the 'withCString' method on String in order to explicitly convert argument to pointer valid for a defined scope}}
 
-  _ = \S2.[takesConstInt8: ""] // expected-error {{cannot pass 'String' to parameter; argument #1 must be a pointer that outlives the call to 'subscript(takesConstInt8:)'}}
+  _ = \S2.[takesConstInt8: ""] // expected-error {{cannot pass 'String' to parameter; argument 'takesConstInt8' must be a pointer that outlives the call to 'subscript(takesConstInt8:)'}}
   // expected-note@-1 {{implicit argument conversion from 'String' to 'UnsafePointer<Int8>' produces a pointer valid only for the duration of the call to 'subscript(takesConstInt8:)'}}
   // expected-note@-2 {{use the 'withCString' method on String in order to explicitly convert argument to pointer valid for a defined scope}}
 }
@@ -451,11 +451,11 @@ enum E {
 func testNonEphemeralInMemberwiseInits() {
   var local = 0
 
-  _ = S3(ptr1: &topLevelS, ptr2: &local) // expected-error {{cannot use inout expression here; argument #2 must be a pointer that outlives the call to 'init(ptr1:ptr2:)'}}
+  _ = S3(ptr1: &topLevelS, ptr2: &local) // expected-error {{cannot use inout expression here; argument 'ptr2' must be a pointer that outlives the call to 'init(ptr1:ptr2:)'}}
   // expected-note@-1 {{implicit argument conversion from 'Int' to 'UnsafeMutableRawPointer?' produces a pointer valid only for the duration of the call to 'init(ptr1:ptr2:)'}}
   // expected-note@-2 {{use 'withUnsafeMutableBytes' in order to explicitly convert argument to buffer pointer valid for a defined scope}}
 
-  _ = S3.init(ptr1: &local, ptr2: &topLevelS) // expected-error {{cannot use inout expression here; argument #1 must be a pointer that outlives the call to 'init(ptr1:ptr2:)'}}
+  _ = S3.init(ptr1: &local, ptr2: &topLevelS) // expected-error {{cannot use inout expression here; argument 'ptr1' must be a pointer that outlives the call to 'init(ptr1:ptr2:)'}}
   // expected-note@-1 {{implicit argument conversion from 'Int' to 'UnsafeMutableRawPointer' produces a pointer valid only for the duration of the call to 'init(ptr1:ptr2:)'}}
   // expected-note@-2 {{use 'withUnsafeMutableBytes' in order to explicitly convert argument to buffer pointer valid for a defined scope}}
 
@@ -504,4 +504,19 @@ func testNonEphemeralErrorDoesntAffectOverloadResolution() {
   takesPointerOverload2(arr) // expected-error {{cannot pass '[Int]' to parameter; argument #1 must be a pointer that outlives the call to 'takesPointerOverload2'}}
   // expected-note@-1 {{implicit argument conversion from '[Int]' to 'UnsafePointer<Int>' produces a pointer valid only for the duration of the call to 'takesPointerOverload2'}}
   // expected-note@-2 {{use the 'withUnsafeBufferPointer' method on Array in order to explicitly convert argument to buffer pointer valid for a defined scope}}
+}
+
+func takesTwoPointers(@_nonEphemeral ptr _: UnsafePointer<Int>, @_nonEphemeral ptr _: UnsafePointer<Int>) {}
+
+func testArgumentLabelReferencing() {
+  // Because takesTwoPointers has two argument labels with the same name, refer
+  // to the argument by position.
+  var arr = [1, 2, 3]
+  takesTwoPointers(ptr: arr, ptr: arr)
+  // expected-error@-1 {{cannot pass '[Int]' to parameter; argument #1 must be a pointer that outlives the call to 'takesTwoPointers(ptr:ptr:)'}}
+  // expected-note@-2 {{implicit argument conversion from '[Int]' to 'UnsafePointer<Int>' produces a pointer valid only for the duration of the call to 'takesTwoPointers(ptr:ptr:)'}}
+  // expected-note@-3 {{use the 'withUnsafeBufferPointer' method on Array in order to explicitly convert argument to buffer pointer valid for a defined scope}}
+  // expected-error@-4 {{cannot pass '[Int]' to parameter; argument #2 must be a pointer that outlives the call to 'takesTwoPointers(ptr:ptr:)'}}
+  // expected-note@-5 {{implicit argument conversion from '[Int]' to 'UnsafePointer<Int>' produces a pointer valid only for the duration of the call to 'takesTwoPointers(ptr:ptr:)'}}
+  // expected-note@-6 {{use the 'withUnsafeBufferPointer' method on Array in order to explicitly convert argument to buffer pointer valid for a defined scope}}
 }

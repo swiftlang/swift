@@ -39,8 +39,11 @@ struct PropertyWrapperBackingPropertyInfo;
 struct PropertyWrapperMutability;
 class RequirementRepr;
 class SpecializeAttr;
+class TrailingWhereClause;
 class TypeAliasDecl;
 struct TypeLoc;
+class Witness;
+struct TypeWitnessAndDecl;
 class ValueDecl;
 enum class OpaqueReadOwnership: uint8_t;
 class StorageImplInfo;
@@ -367,9 +370,10 @@ struct WhereClauseOwner {
 
   /// The source of the where clause, which can be a generic parameter list
   /// or a declaration that can have a where clause.
-  llvm::PointerUnion<GenericParamList *, Decl *, SpecializeAttr *> source;
+  llvm::PointerUnion<GenericParamList *, TrailingWhereClause *, SpecializeAttr *> source;
 
-  WhereClauseOwner(Decl *decl);
+  WhereClauseOwner(GenericContext *genCtx);
+  WhereClauseOwner(AssociatedTypeDecl *atd);
 
   WhereClauseOwner(DeclContext *dc, GenericParamList *genericParams)
       : dc(dc), source(genericParams) {}
@@ -380,13 +384,12 @@ struct WhereClauseOwner {
   SourceLoc getLoc() const;
 
   friend hash_code hash_value(const WhereClauseOwner &owner) {
-    return llvm::hash_combine(owner.dc, owner.source.getOpaqueValue());
+    return llvm::hash_value(owner.source.getOpaqueValue());
   }
 
   friend bool operator==(const WhereClauseOwner &lhs,
                          const WhereClauseOwner &rhs) {
-    return lhs.dc == rhs.dc &&
-           lhs.source.getOpaqueValue() == rhs.source.getOpaqueValue();
+    return lhs.source.getOpaqueValue() == rhs.source.getOpaqueValue();
   }
 
   friend bool operator!=(const WhereClauseOwner &lhs,
@@ -1668,6 +1671,221 @@ public:
   void cacheResult(bool value) const;
 };
 
+// The actions this request takes are all huge layering violations.
+//
+// Please do not add any more.
+enum class ImplicitMemberAction : uint8_t {
+  ResolveImplicitInit,
+  ResolveCodingKeys,
+  ResolveEncodable,
+  ResolveDecodable,
+};
+
+class ResolveImplicitMemberRequest
+    : public SimpleRequest<ResolveImplicitMemberRequest,
+                           bool(NominalTypeDecl *, ImplicitMemberAction),
+                           CacheKind::Uncached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<bool> evaluate(Evaluator &evaluator, NominalTypeDecl *NTD,
+                                ImplicitMemberAction action) const;
+
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+};
+
+class TypeWitnessRequest
+    : public SimpleRequest<TypeWitnessRequest,
+                           TypeWitnessAndDecl(NormalProtocolConformance *,
+                                              AssociatedTypeDecl *),
+                           CacheKind::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<TypeWitnessAndDecl>
+  evaluate(Evaluator &evaluator, NormalProtocolConformance *conformance,
+           AssociatedTypeDecl *ATD) const;
+
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+  Optional<TypeWitnessAndDecl> getCachedResult() const;
+  void cacheResult(TypeWitnessAndDecl value) const;
+};
+
+class ValueWitnessRequest
+    : public SimpleRequest<ValueWitnessRequest,
+                           Witness(NormalProtocolConformance *, ValueDecl *),
+                           CacheKind::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<Witness> evaluate(Evaluator &evaluator,
+                                   NormalProtocolConformance *conformance,
+                                   ValueDecl *VD) const;
+
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+  Optional<Witness> getCachedResult() const;
+  void cacheResult(Witness value) const;
+};
+
+enum class FunctionBuilderClosurePreCheck : uint8_t {
+  /// There were no problems pre-checking the closure.
+  Okay,
+
+  /// There was an error pre-checking the closure.
+  Error,
+
+  /// The closure has a return statement.
+  HasReturnStmt,
+};
+
+class PreCheckFunctionBuilderRequest
+    : public SimpleRequest<PreCheckFunctionBuilderRequest,
+                           FunctionBuilderClosurePreCheck(ClosureExpr *),
+                           CacheKind::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<FunctionBuilderClosurePreCheck>
+  evaluate(Evaluator &evaluator, ClosureExpr *closure) const;
+
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+};
+
+/// Computes whether a class has a circular reference in its inheritance
+/// hierarchy.
+class HasCircularInheritanceRequest
+    : public SimpleRequest<HasCircularInheritanceRequest, bool(ClassDecl *),
+                           CacheKind::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<bool> evaluate(Evaluator &evaluator, ClassDecl *decl) const;
+
+public:
+  // Cycle handling.
+  void diagnoseCycle(DiagnosticEngine &diags) const;
+  void noteCycleStep(DiagnosticEngine &diags) const;
+
+  // Cached.
+  bool isCached() const { return true; }
+};
+
+/// Computes whether a protocol has a circular reference in its list of
+/// inherited protocols.
+class HasCircularInheritedProtocolsRequest
+    : public SimpleRequest<HasCircularInheritedProtocolsRequest,
+                           bool(ProtocolDecl *), CacheKind::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<bool> evaluate(Evaluator &evaluator, ProtocolDecl *decl) const;
+
+public:
+  // Cycle handling.
+  void diagnoseCycle(DiagnosticEngine &diags) const;
+  void noteCycleStep(DiagnosticEngine &diags) const;
+
+  // Cached.
+  bool isCached() const { return true; }
+};
+
+/// Computes whether an enum's raw value has a circular reference.
+class HasCircularRawValueRequest
+    : public SimpleRequest<HasCircularRawValueRequest, bool(EnumDecl *),
+                           CacheKind::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<bool> evaluate(Evaluator &evaluator, EnumDecl *decl) const;
+
+public:
+  // Cycle handling.
+  void diagnoseCycle(DiagnosticEngine &diags) const;
+  void noteCycleStep(DiagnosticEngine &diags) const;
+
+  // Cached.
+  bool isCached() const { return true; }
+};
+
+/// Computes an initializer context for a parameter with a default argument.
+class DefaultArgumentInitContextRequest
+    : public SimpleRequest<DefaultArgumentInitContextRequest,
+                           Initializer *(ParamDecl *),
+                           CacheKind::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<Initializer *> evaluate(Evaluator &evaluator,
+                                         ParamDecl *param) const;
+
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+  Optional<Initializer *> getCachedResult() const;
+  void cacheResult(Initializer *init) const;
+};
+
+/// Computes the fully type-checked default argument expression for a given
+/// parameter.
+class DefaultArgumentExprRequest
+    : public SimpleRequest<DefaultArgumentExprRequest, Expr *(ParamDecl *),
+                           CacheKind::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<Expr *> evaluate(Evaluator &evaluator, ParamDecl *param) const;
+
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+  Optional<Expr *> getCachedResult() const;
+  void cacheResult(Expr *expr) const;
+};
+
 // Allow AnyValue to compare two Type values, even though Type doesn't
 // support ==.
 template<>
@@ -1689,6 +1907,8 @@ AnyValue::Holder<GenericSignature>::equals(const HolderBase &other) const {
 
 void simple_display(llvm::raw_ostream &out, Type value);
 void simple_display(llvm::raw_ostream &out, const TypeRepr *TyR);
+void simple_display(llvm::raw_ostream &out, ImplicitMemberAction action);
+void simple_display(llvm::raw_ostream &out, FunctionBuilderClosurePreCheck pck);
 
 #define SWIFT_TYPEID_ZONE TypeChecker
 #define SWIFT_TYPEID_HEADER "swift/AST/TypeCheckerTypeIDZone.def"

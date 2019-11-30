@@ -115,6 +115,18 @@ bool ModuleDepGraph::markIntransitive(const Job *node) {
   return rememberThatJobCascades(getSwiftDeps(node));
 }
 
+size_t ModuleDepGraph::countTopLevelProvides(const Job *node) {
+  StringRef swiftDeps = getSwiftDeps(node);
+  size_t count = 0;
+  for (auto &keyAndNode : nodeMap[swiftDeps]) {
+    const DependencyKey &k = keyAndNode.first;
+    if (k.getKind() == NodeKind::topLevel &&
+        k.getAspect() == DeclAspect::interface)
+      ++count;
+  }
+  return count;
+}
+
 void ModuleDepGraph::addIndependentNode(const Job *job) {
   // No need to create any nodes; that will happen when the swiftdeps file is
   // read. Just record the correspondence.
@@ -130,19 +142,27 @@ std::vector<std::string> ModuleDepGraph::getExternalDependencies() const {
 void ModuleDepGraph::markExternal(SmallVectorImpl<const Job *> &uses,
                                   StringRef externalDependency) {
   FrontendStatsTracer tracer(stats, "experimental-dependencies-markExternal");
+  forEachUnmarkedJobDirectlyDependentOnExternalSwiftdeps(
+      externalDependency, [&](const Job *job) {
+        uses.push_back(job);
+        markTransitive(uses, job);
+      });
+}
+
+void ModuleDepGraph::forEachUnmarkedJobDirectlyDependentOnExternalSwiftdeps(
+    StringRef externalSwiftDeps, function_ref<void(const Job *)> fn) {
   // TODO move nameForDep into key
   // These nodes will depend on the *interface* of the external Decl.
   DependencyKey key =
       DependencyKey::createDependedUponKey<NodeKind::externalDepend>(
-          externalDependency.str());
+          externalSwiftDeps.str());
   // collect answers into useSet
   std::unordered_set<std::string> visitedSet;
   for (const ModuleDepGraphNode *useNode : usesByDef[key]) {
     const Job *job = getJob(useNode->getSwiftDeps());
     if (!isMarked(job))
       continue;
-    uses.push_back(job);
-    markTransitive(uses, job);
+    fn(job);
   }
 }
 

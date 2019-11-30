@@ -12,7 +12,7 @@ import Swift
 sil @archetype_metatype_cast : $@convention(thin) <T, U> () -> () {
 entry:
   %0 = metatype $@thick T.Type
-  checked_cast_br %0 : $@thick T.Type to $@thick U.Type, yes, no
+  checked_cast_br %0 : $@thick T.Type to @thick U.Type, yes, no
 yes(%1 : $@thick U.Type):
   br end
 
@@ -30,7 +30,7 @@ protocol P {}
 // CHECK:         [[T1:%.*]] = icmp ne %swift.type* [[T0]], null
 sil @existential_archetype_metatype_cast : $@convention(thin) <T> (@thick P.Type) -> () {
 entry(%0 : $@thick P.Type):
-  checked_cast_br %0 : $@thick P.Type to $@thick T.Type, yes, no
+  checked_cast_br %0 : $@thick P.Type to @thick T.Type, yes, no
 yes(%1 : $@thick T.Type):
   br end
 
@@ -77,7 +77,7 @@ sil_vtable OtherClass {}
 sil @value_metatype_cast : $@convention(thin) (SomeClass) -> () {
 entry(%0 : $SomeClass):
   %1 = value_metatype $@thick SomeClass.Type, %0 : $SomeClass
-  checked_cast_br [exact] %1 : $@thick SomeClass.Type to $@thick OtherClass.Type, yes, no
+  checked_cast_br [exact] %1 : $@thick SomeClass.Type to @thick OtherClass.Type, yes, no
 
 yes(%2 : $@thick OtherClass.Type):
   br end
@@ -97,7 +97,7 @@ end:
 // CHECK:         ret %swift.type* [[RESULT]]
 sil @checked_cast_to_anyobject_type : $@convention(thin) (@thick Any.Type) -> @thick AnyObject.Type {
 entry(%0 : $@thick Any.Type):
-  %2 = unconditional_checked_cast %0 : $@thick Any.Type to $@thick AnyObject.Type
+  %2 = unconditional_checked_cast %0 : $@thick Any.Type to @thick AnyObject.Type
   return %2 : $@thick AnyObject.Type
 }
 
@@ -111,6 +111,6 @@ entry(%0 : $@thick Any.Type):
 sil @checked_cast_class_to_anyobject_type : $@convention(thin) () -> @thick AnyObject.Type {
 entry:
   %1 = metatype $@thick SomeClass.Type
-  %2 = unconditional_checked_cast %1 : $@thick SomeClass.Type to $@thick AnyObject.Type
+  %2 = unconditional_checked_cast %1 : $@thick SomeClass.Type to @thick AnyObject.Type
   return %2 : $@thick AnyObject.Type
 }

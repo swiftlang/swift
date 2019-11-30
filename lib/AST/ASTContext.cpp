@@ -74,7 +74,6 @@ STATISTIC(NumCollapsedSpecializedProtocolConformances,
 /// GenericSignatureBuilder.
 #define SWIFT_GSB_EXPENSIVE_ASSERTIONS 0
 
-LazyResolver::~LazyResolver() = default;
 void ModuleLoader::anchor() {}
 void ClangModuleLoader::anchor() {}
 
@@ -98,12 +97,6 @@ namespace {
 using AssociativityCacheType =
   llvm::DenseMap<std::pair<PrecedenceGroupDecl *, PrecedenceGroupDecl *>,
                  Associativity>;
-
-#define FOR_KNOWN_FOUNDATION_TYPES(MACRO) \
-  MACRO(NSCopying, ProtocolDecl) \
-  MACRO(NSError, ClassDecl) \
-  MACRO(NSNumber, ClassDecl) \
-  MACRO(NSValue, ClassDecl)
 
 struct OverrideSignatureKey {
   GenericSignature baseMethodSig;
@@ -160,8 +153,8 @@ struct ASTContext::Implementation {
   /// The set of cleanups to be called when the ASTContext is destroyed.
   std::vector<std::function<void(void)>> Cleanups;
 
-  /// The last resolver.
-  LazyResolver *Resolver = nullptr;
+  /// A global type checker instance..
+  TypeChecker *Checker = nullptr;
 
   // FIXME: This is a StringMap rather than a StringSet because StringSet
   // doesn't allow passing in a pre-existing allocator.
@@ -191,6 +184,11 @@ struct ASTContext::Implementation {
   DECL_CLASS *NAME##Decl = nullptr;
 #include "swift/AST/KnownStdlibTypes.def"
 
+#define KNOWN_OBJC_TYPE_DECL(MODULE, NAME, DECL_CLASS) \
+  /** The declaration of MODULE.NAME. */ \
+  DECL_CLASS *NAME##Decl = nullptr;
+#include "swift/AST/KnownObjCTypes.def"
+
   /// The declaration of '+' function for two RangeReplaceableCollection.
   FuncDecl *PlusFunctionOnRangeReplaceableCollection = nullptr;
 
@@ -217,15 +215,6 @@ struct ASTContext::Implementation {
   
   /// The declaration of Swift.AutoreleasingUnsafeMutablePointer<T>.memory.
   VarDecl *AutoreleasingUnsafeMutablePointerMemoryDecl = nullptr;
-  
-  /// The declaration of ObjectiveC.ObjCBool.
-  StructDecl *ObjCBoolDecl = nullptr;
-
-#define CACHE_FOUNDATION_DECL(NAME, DECLTYPE) \
-  /** The declaration of Foundation.NAME. */ \
-  DECLTYPE *NAME##Decl = nullptr;
-FOR_KNOWN_FOUNDATION_TYPES(CACHE_FOUNDATION_DECL)
-#undef CACHE_FOUNDATION_DECL
 
   // Declare cached declarations for each of the known declarations.
 #define FUNC_DECL(Name, Id) FuncDecl *Get##Name = nullptr;
@@ -480,8 +469,6 @@ ASTContext::Implementation::Implementation()
     : IdentifierTable(Allocator),
       TheSyntaxArena(new syntax::SyntaxArena()) {}
 ASTContext::Implementation::~Implementation() {
-  delete Resolver;
-
   for (auto &cleanup : Cleanups)
     cleanup();
 }
@@ -517,6 +504,7 @@ void ASTContext::operator delete(void *Data) throw() {
 }
 
 ASTContext *ASTContext::get(LangOptions &langOpts,
+                            TypeCheckerOptions &typeckOpts,
                             SearchPathOptions &SearchPathOpts,
                             SourceManager &SourceMgr,
                             DiagnosticEngine &Diags) {
@@ -529,15 +517,16 @@ ASTContext *ASTContext::get(LangOptions &langOpts,
   auto impl = reinterpret_cast<void*>((char*)mem + sizeof(ASTContext));
   impl = reinterpret_cast<void*>(llvm::alignAddr(impl,alignof(Implementation)));
   new (impl) Implementation();
-  return new (mem) ASTContext(langOpts, SearchPathOpts, SourceMgr, Diags);
+  return new (mem)
+      ASTContext(langOpts, typeckOpts, SearchPathOpts, SourceMgr, Diags);
 }
 
-ASTContext::ASTContext(LangOptions &langOpts, SearchPathOptions &SearchPathOpts,
+ASTContext::ASTContext(LangOptions &langOpts, TypeCheckerOptions &typeckOpts,
+                       SearchPathOptions &SearchPathOpts,
                        SourceManager &SourceMgr, DiagnosticEngine &Diags)
   : LangOpts(langOpts),
-    SearchPathOpts(SearchPathOpts),
-    SourceMgr(SourceMgr),
-    Diags(Diags),
+    TypeCheckerOpts(typeckOpts),
+    SearchPathOpts(SearchPathOpts), SourceMgr(SourceMgr), Diags(Diags),
     evaluator(Diags, langOpts.DebugDumpCycles),
     TheBuiltinModule(createBuiltinModule(*this)),
     StdlibModuleName(getIdentifier(STDLIB_NAME)),
@@ -627,16 +616,17 @@ RC<syntax::SyntaxArena> ASTContext::getSyntaxArena() const {
   return getImpl().TheSyntaxArena;
 }
 
-LazyResolver *ASTContext::getLazyResolver() const {
-  return getImpl().Resolver;
+bool ASTContext::areSemanticQueriesEnabled() const {
+  return getLegacyGlobalTypeChecker() != nullptr;
 }
 
-/// Set the lazy resolver for this context.
-void ASTContext::setLazyResolver(LazyResolver *resolver) {
-  if (auto existing = getImpl().Resolver)
-    delete existing;
+TypeChecker *ASTContext::getLegacyGlobalTypeChecker() const {
+  return getImpl().Checker;
+}
 
-  getImpl().Resolver = resolver;
+void ASTContext::installGlobalTypeChecker(TypeChecker *TC) {
+  assert(!getImpl().Checker);
+  getImpl().Checker = TC;
 }
 
 /// getIdentifier - Return the uniqued and AST-Context-owned version of the
@@ -833,33 +823,12 @@ CanType ASTContext::getNeverType() const {
   return neverDecl->getDeclaredType()->getCanonicalType();
 }
 
-StructDecl *ASTContext::getObjCBoolDecl() const {
-  if (!getImpl().ObjCBoolDecl) {
-    SmallVector<ValueDecl *, 1> results;
-    auto *Context = const_cast<ASTContext *>(this);
-    if (ModuleDecl *M = Context->getModuleByName(Id_ObjectiveC.str())) {
-      M->lookupValue(getIdentifier("ObjCBool"), NLKind::UnqualifiedLookup,
-                     results);
-      for (auto result : results) {
-        if (auto structDecl = dyn_cast<StructDecl>(result)) {
-          if (structDecl->getGenericParams() == nullptr) {
-            getImpl().ObjCBoolDecl = structDecl;
-            break;
-          }
-        }
-      }
-    }
-  }
-
-  return getImpl().ObjCBoolDecl;
-}
-
-#define GET_FOUNDATION_DECL(NAME, DECLTYPE) \
+#define KNOWN_OBJC_TYPE_DECL(MODULE, NAME, DECLTYPE) \
 DECLTYPE *ASTContext::get##NAME##Decl() const { \
   if (!getImpl().NAME##Decl) { \
-    if (ModuleDecl *M = getLoadedModule(Id_Foundation)) { \
-      /* Note: lookupQualified() will search both the Foundation module \
-       * and the Clang Foundation module it imports. */ \
+    if (ModuleDecl *M = getLoadedModule(Id_##MODULE)) { \
+      /* Note: lookupQualified() will search both the Swift overlay \
+       * and the Clang module it imports. */ \
       SmallVector<ValueDecl *, 1> decls; \
       M->lookupQualified(M, getIdentifier(#NAME), NL_OnlyTypes, decls); \
       if (decls.size() == 1 && isa<DECLTYPE>(decls[0])) { \
@@ -872,11 +841,16 @@ DECLTYPE *ASTContext::get##NAME##Decl() const { \
   } \
   \
   return getImpl().NAME##Decl; \
+} \
+\
+Type ASTContext::get##NAME##Type() const { \
+  auto *decl = get##NAME##Decl(); \
+  if (!decl) \
+    return Type(); \
+  return decl->getDeclaredInterfaceType(); \
 }
 
-FOR_KNOWN_FOUNDATION_TYPES(GET_FOUNDATION_DECL)
-#undef GET_FOUNDATION_DECL
-#undef FOR_KNOWN_FOUNDATION_TYPES
+#include "swift/AST/KnownObjCTypes.def"
 
 ProtocolDecl *ASTContext::getProtocol(KnownProtocolKind kind) const {
   // Check whether we've already looked for and cached this protocol.
@@ -897,6 +871,9 @@ ProtocolDecl *ASTContext::getProtocol(KnownProtocolKind kind) const {
     break;
   case KnownProtocolKind::CFObject:
     M = getLoadedModule(Id_CoreFoundation);
+    break;
+  case KnownProtocolKind::Differentiable:
+    M = getLoadedModule(Id_Differentiation);
     break;
   default:
     M = getStdlibModule();
@@ -1395,12 +1372,6 @@ bool ASTContext::hasArrayLiteralIntrinsics() const {
     && getDeallocateUninitializedArray();
 }
 
-void ASTContext::addSynthesizedDecl(Decl *decl) {
-  auto *fileUnit = decl->getDeclContext()->getModuleScopeContext();
-  if (auto *sf = dyn_cast<SourceFile>(fileUnit))
-    sf->SynthesizedDecls.push_back(decl);
-}
-
 void ASTContext::addCleanup(std::function<void(void)> cleanup) {
   getImpl().Cleanups.push_back(std::move(cleanup));
 }
@@ -1741,6 +1712,11 @@ void ASTContext::getVisibleTopLevelModuleNames(
     return LHS.str().compare_lower(RHS.str()) < 0;
   });
   names.erase(std::unique(names.begin(), names.end()), names.end());
+}
+
+bool ASTContext::shouldPerformTypoCorrection() {
+  NumTypoCorrections += 1;
+  return NumTypoCorrections <= LangOpts.TypoCorrectionLimit;
 }
 
 bool ASTContext::canImportModule(std::pair<Identifier, SourceLoc> ModulePath) {
@@ -3717,8 +3693,8 @@ GenericEnvironment *OpenedArchetypeType::getGenericEnvironment() const {
   auto thisType = Type(const_cast<OpenedArchetypeType*>(this));
   auto &ctx = thisType->getASTContext();
   // Create a generic environment to represent the opened type.
-  auto signature = ctx.getExistentialSignature(Opened->getCanonicalType(),
-                                               nullptr);
+  auto signature =
+      ctx.getOpenedArchetypeSignature(Opened->getCanonicalType(), nullptr);
   auto *builder = signature->getGenericSignatureBuilder();
   auto *env = GenericEnvironment::getIncomplete(signature, builder);
   env->addMapping(signature->getGenericParams()[0], thisType);
@@ -4289,12 +4265,12 @@ Type ASTContext::getBridgedToObjC(const DeclContext *dc, Type type,
   // Check whether the type is an existential that contains
   // Error. If so, it's bridged to NSError.
   if (type->isExistentialWithError()) {
-    if (auto nsErrorDecl = getNSErrorDecl()) {
+    if (auto nsErrorTy = getNSErrorType()) {
       // The corresponding value type is Error.
       if (bridgedValueType)
         *bridgedValueType = getErrorDecl()->getDeclaredInterfaceType();
 
-      return nsErrorDecl->getDeclaredInterfaceType();
+      return nsErrorTy;
     }
   }
 
@@ -4332,8 +4308,8 @@ Type ASTContext::getBridgedToObjC(const DeclContext *dc, Type type,
       *bridgedValueType = getErrorDecl()->getDeclaredInterfaceType();
 
     // Bridge to NSError.
-    if (auto nsErrorDecl = getNSErrorDecl())
-      return nsErrorDecl->getDeclaredInterfaceType();
+    if (auto nsErrorTy = getNSErrorType())
+      return nsErrorTy;
   }
 
   // No special bridging to Objective-C, but this can become an 'Any'.
@@ -4351,8 +4327,15 @@ CanGenericSignature ASTContext::getSingleGenericParameterSignature() const {
   return canonicalSig;
 }
 
-CanGenericSignature ASTContext::getExistentialSignature(CanType existential,
-                                                        ModuleDecl *mod) {
+// Return the signature for an opened existential. The opened archetype may have
+// a different set of conformances from the corresponding existential. The
+// opened archetype conformances are dictated by the ABI for generic arguments,
+// while the existential value conformances are dictated by their layout (see
+// Type::getExistentialLayout()). In particular, the opened archetype signature
+// does not have requirements for conformances inherited from superclass
+// constraints while existential values do.
+CanGenericSignature ASTContext::getOpenedArchetypeSignature(CanType existential,
+                                                            ModuleDecl *mod) {
   auto found = getImpl().ExistentialSignatures.find(existential);
   if (found != getImpl().ExistentialSignatures.end())
     return found->second;
@@ -4384,42 +4367,28 @@ ASTContext::getOverrideGenericSignature(const ValueDecl *base,
   auto derivedGenericCtx = derived->getAsGenericContext();
   auto &ctx = base->getASTContext();
 
-  if (!baseGenericCtx) {
+  if (!baseGenericCtx || !derivedGenericCtx)
     return nullptr;
-  }
 
   auto baseClass = base->getDeclContext()->getSelfClassDecl();
-
-  if (!baseClass) {
+  if (!baseClass)
     return nullptr;
-  }
 
   auto derivedClass = derived->getDeclContext()->getSelfClassDecl();
+  if (!derivedClass)
+    return nullptr;
+
+  if (derivedClass->getSuperclass().isNull())
+    return nullptr;
+
+  if (baseGenericCtx->getGenericSignature().isNull() ||
+      derivedGenericCtx->getGenericSignature().isNull())
+    return nullptr;
+
   auto baseClassSig = baseClass->getGenericSignature();
-
-  if (!derivedClass) {
-    return nullptr;
-  }
-
-  if (derivedClass->getSuperclass().isNull()) {
-    return nullptr;
-  }
-
-  if (!derivedGenericCtx || !derivedGenericCtx->isGeneric()) {
-    return nullptr;
-  }
-
-  if (derivedClass->getGenericSignature().isNull() &&
-      !baseGenericCtx->isGeneric()) {
-    return nullptr;
-  }
-
   auto subMap = derivedClass->getSuperclass()->getContextSubstitutionMap(
       derivedClass->getModuleContext(), baseClass);
 
-  if (baseGenericCtx->getGenericSignature().isNull()) {
-    return nullptr;
-  }
   unsigned derivedDepth = 0;
 
   auto key = OverrideSignatureKey(baseGenericCtx->getGenericSignature(),
@@ -4435,9 +4404,11 @@ ASTContext::getOverrideGenericSignature(const ValueDecl *base,
     derivedDepth = derivedSig->getGenericParams().back()->getDepth() + 1;
 
   SmallVector<GenericTypeParamType *, 2> addedGenericParams;
-  for (auto gp : *derivedGenericCtx->getGenericParams()) {
-    addedGenericParams.push_back(
-        gp->getDeclaredInterfaceType()->castTo<GenericTypeParamType>());
+  if (auto *gpList = derivedGenericCtx->getGenericParams()) {
+    for (auto gp : *gpList) {
+      addedGenericParams.push_back(
+          gp->getDeclaredInterfaceType()->castTo<GenericTypeParamType>());
+    }
   }
 
   unsigned baseDepth = 0;

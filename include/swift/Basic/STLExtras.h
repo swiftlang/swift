@@ -638,6 +638,16 @@ inline T accumulate(const Container &C, T init, BinaryOperation op) {
   return std::accumulate(C.begin(), C.end(), init, op);
 }
 
+template <typename Container, typename T>
+inline bool binary_search(const Container &C, const T &value) {
+  return std::binary_search(C.begin(), C.end(), value);
+}
+
+template <typename Container, typename T, typename BinaryOperation>
+inline bool binary_search(const Container &C, const T &value, BinaryOperation op) {
+  return std::binary_search(C.begin(), C.end(), value, op);
+}
+
 /// Returns true if the range defined by \p mainBegin ..< \p mainEnd starts with
 /// the same elements as the range defined by \p prefixBegin ..< \p prefixEnd.
 ///

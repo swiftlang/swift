@@ -64,9 +64,15 @@
 
 // CHECK-E-NEG-NOT: Handled a.swift
 // CHECK-E-NEG-NOT: Handled b.swift
+// CHECK-E: Handled c.swift
+// CHECK-E-NEG-NOT: Handled a.swift
+// CHECK-E-NEG-NOT: Handled b.swift
+// CHECK-E: Handled d.swift
+// CHECK-E-NEG-NOT: Handled a.swift
+// CHECK-E-NEG-NOT: Handled b.swift
 // CHECK-E: Handled e.swift
-// CHECK-E-DAG: Handled c.swift
-// CHECK-E-DAG: Handled d.swift
+// CHECK-E-NEG-NOT: Handled a.swift
+// CHECK-E-NEG-NOT: Handled b.swift
 
 // RUN: touch -t 201401240007 %t/a.swift %t/e.swift
 // RUN: cd %t && %swiftc_driver -c -driver-use-frontend-path "%{python};%S/Inputs/update-dependencies.py" -output-file-map %t/output.json -incremental -driver-always-rebuild-dependents ./a.swift ./b.swift ./c.swift ./d.swift ./e.swift -module-name main -j1 -v > %t/ae.txt 2>&1
@@ -74,8 +80,8 @@
 // RUN: %FileCheck -check-prefix=CHECK-AE-NEG %s < %t/ae.txt
 
 // CHECK-AE: Handled a.swift
+// CHECK-AE: Handled b.swift
+// CHECK-AE: Handled c.swift
+// CHECK-AE: Handled d.swift
 // CHECK-AE: Handled e.swift
-// CHECK-AE-DAG: Handled b.swift
-// CHECK-AE-DAG: Handled c.swift
-// CHECK-AE-DAG: Handled d.swift
 // CHECK-AE-NEG: Handled

@@ -19,10 +19,9 @@ class OuterGenericClass<T> {
   }
 }
 
-protocol OuterProtocol {
+protocol OuterProtocol { // expected-note{{'OuterProtocol' declared here}}
   associatedtype Hen
   protocol InnerProtocol { // expected-error{{protocol 'InnerProtocol' cannot be nested inside another declaration}}
-  // expected-note@-1 {{did you mean 'InnerProtocol'?}}
     associatedtype Rooster
     func flip(_ r: Rooster)
     func flop(_ h: Hen) // expected-error{{use of undeclared type 'Hen'}}
@@ -107,8 +106,7 @@ func testLookup(_ x: OuterForUFI.Inner) {
   x.extMethod()
 }
 
-// N.B. Lookup fails here because OuterForUFI.Inner is marked invalid.
 func testLookup<T: OuterForUFI.Inner>(_ x: T) {
-  x.req() // expected-error {{value of type 'T' has no member 'req'}}
-  x.extMethod() // expected-error {{value of type 'T' has no member 'extMethod'}}
+  x.req()
+  x.extMethod()
 }

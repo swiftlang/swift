@@ -14,6 +14,7 @@
 
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/SemanticAttrs.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/PatternMatch.h"
 #include "swift/SIL/SILBuilder.h"
@@ -1492,7 +1493,7 @@ static bool isApplyOfBuiltin(SILInstruction &I, BuiltinValueKind kind) {
 static bool isApplyOfStringConcat(SILInstruction &I) {
   if (auto *AI = dyn_cast<ApplyInst>(&I))
     if (auto *Fn = AI->getReferencedFunctionOrNull())
-      if (Fn->hasSemanticsAttr("string.concat"))
+      if (Fn->hasSemanticsAttr(semantics::STRING_CONCAT))
         return true;
   return false;
 }
@@ -1561,7 +1562,7 @@ constantFoldGlobalStringTablePointerBuiltin(BuiltinInst *bi,
   FullApplySite stringInitSite = FullApplySite::isa(builtinOperand);
   if (!stringInitSite || !stringInitSite.getReferencedFunctionOrNull() ||
       !stringInitSite.getReferencedFunctionOrNull()->hasSemanticsAttr(
-          "string.makeUTF8")) {
+          semantics::STRING_MAKE_UTF8)) {
     // Emit diagnostics only on non-transparent functions.
     if (enableDiagnostics && !caller->isTransparent()) {
       diagnose(caller->getASTContext(), bi->getLoc().getSourceLoc(),

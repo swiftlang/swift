@@ -212,10 +212,9 @@ doCodeCompletion(SourceFile &SF, StringRef EnteredCode, unsigned *BufferID,
   do {
     parseIntoSourceFile(SF, *BufferID, &Done, nullptr, &PersistentState);
   } while (!Done);
-  performTypeChecking(SF, PersistentState.getTopLevelContext(), None,
-                      OriginalDeclCount);
+  performTypeChecking(SF, OriginalDeclCount);
 
-  performDelayedParsing(&SF, PersistentState, CompletionCallbacksFactory);
+  performCodeCompletionSecondPass(PersistentState, *CompletionCallbacksFactory);
 
   // Now we are done with code completion.  Remove the declarations we
   // temporarily inserted.
