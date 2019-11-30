@@ -267,27 +267,6 @@ static bool buildObjCKeyPathString(KeyPathExpr *E,
   return true;
 }
 
-/// Form a type checked expression for the index of a @dynamicMemberLookup
-/// subscript index parameter.
-/// The index expression will have a tuple type of `(dynamicMember: T)`.
-static Expr *buildDynamicMemberLookupIndexExpr(StringRef name, SourceLoc loc,
-                                               DeclContext *dc,
-                                               ConstraintSystem &cs) {
-  auto &ctx = cs.getASTContext();
-
-  auto *stringDecl = ctx.getStringDecl();
-  auto stringType = stringDecl->getDeclaredType();
-
-  // Build and type check the string literal index value to the specific
-  // string type expected by the subscript.
-  auto *nameExpr = new (ctx) StringLiteralExpr(name, loc, /*implicit*/true);
-  nameExpr->setBuiltinInitializer(ctx.getStringBuiltinInitDecl(stringDecl));
-  nameExpr->setType(stringType);
-
-  cs.cacheExprTypes(nameExpr);
-  return nameExpr;
-}
-
 namespace {
 
   /// Rewrites an expression by applying the solution of a constraint
@@ -2717,6 +2696,18 @@ namespace {
       llvm_unreachable("Unhandled OverloadChoiceKind in switch.");
     }
 
+    /// Form a type checked expression for the index of a @dynamicMemberLookup
+    /// subscript index parameter.
+    Expr *buildDynamicMemberLookupIndexExpr(StringRef name, SourceLoc loc,
+                                            Type literalTy) {
+      // Build and type check the string literal index value to the specific
+      // string type expected by the subscript.
+      auto &ctx = cs.getASTContext();
+      auto *nameExpr = new (ctx) StringLiteralExpr(name, loc, /*implicit*/true);
+      cs.setType(nameExpr, literalTy);
+      return handleStringLiteralExpr(nameExpr);
+    }
+
     Expr *buildDynamicMemberLookupRef(Expr *expr, Expr *base, SourceLoc dotLoc,
                                       SourceLoc nameLoc,
                                       const SelectedOverload &overload,
@@ -2737,7 +2728,8 @@ namespace {
         // Build and type check the string literal index value to the specific
         // string type expected by the subscript.
         auto fieldName = overload.choice.getName().getBaseIdentifier().str();
-        argExpr = buildDynamicMemberLookupIndexExpr(fieldName, nameLoc, dc, cs);
+        argExpr = buildDynamicMemberLookupIndexExpr(fieldName, nameLoc,
+                                                    paramTy);
       } else {
         argExpr = buildKeyPathDynamicMemberIndexExpr(
             paramTy->castTo<BoundGenericType>(), dotLoc, memberLocator);
@@ -4529,8 +4521,6 @@ namespace {
       auto subscript = cast<SubscriptDecl>(overload.choice.getDecl());
       assert(!subscript->isGetterMutating());
 
-      auto dc = subscript->getInnermostDeclContext();
-
       auto indexType = AnyFunctionType::composeInput(
           cs.getASTContext(),
           subscript->getInterfaceType()->castTo<AnyFunctionType>()->getParams(),
@@ -4556,15 +4546,15 @@ namespace {
 
         labels = cs.getASTContext().Id_dynamicMember;
 
+        auto indexType = getTypeOfDynamicMemberIndex(overload);
         if (overload.choice.getKind() ==
             OverloadChoiceKind::KeyPathDynamicMemberLookup) {
-          auto indexType = getTypeOfDynamicMemberIndex(overload);
           indexExpr = buildKeyPathDynamicMemberIndexExpr(
               indexType->castTo<BoundGenericType>(), componentLoc, locator);
         } else {
           auto fieldName = overload.choice.getName().getBaseIdentifier().str();
           indexExpr = buildDynamicMemberLookupIndexExpr(fieldName, componentLoc,
-                                                        dc, cs);
+                                                        indexType);
         }
       }
 
