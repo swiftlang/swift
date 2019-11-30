@@ -931,6 +931,8 @@ ERROR(statement_begins_with_closure,none,
       "top-level statement cannot begin with a closure expression", ())
 ERROR(statement_same_line_without_semi,none,
       "consecutive statements on a line must be separated by ';'", ())
+ERROR(statement_misspell,none,
+    "did you misspell '%0'", (StringRef))
 ERROR(invalid_label_on_stmt,none,
       "labels are only valid on loops, if, and switch statements", ())
 

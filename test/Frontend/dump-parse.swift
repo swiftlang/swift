@@ -18,13 +18,14 @@ func foo(_ n: Int) -> Int {
 // CHECK-AST-LABEL: (func_decl{{.*}}"bar()"
 func bar() {
   // CHECK: (brace_stmt
-  // CHECK-NEXT:   (unresolved_decl_ref_expr type='{{[^']+}}' name=foo
-  // CHECK-NEXT:   (unresolved_decl_ref_expr type='{{[^']+}}' name=foo
-  // CHECK-NEXT:   (unresolved_decl_ref_expr type='{{[^']+}}' name=foo
+  // CHECK:   (for_each_stmt
+  // CHECK-NEXT:   (pattern_named 'foo')
+  // CHECK-NEXT:   (pattern_named 'foo')
   // CHECK-AST: (brace_stmt
-  // CHECK-AST-NEXT:   (declref_expr type='{{[^']+}}' {{.*}} decl=main.(file).foo
-  // CHECK-AST-NEXT:   (declref_expr type='{{[^']+}}' {{.*}} decl=main.(file).foo
-  // CHECK-AST-NEXT:   (declref_expr type='{{[^']+}}' {{.*}} decl=main.(file).foo
+  // CHECK-AST-NEXT: (declref_expr type='{{[^']+}}'
+  // CHECK-AST-NEXT:   (for_each_stmt
+  // CHECK-AST-NEXT:   (pattern_named type='{{[^']+}}' 'foo')
+  // CHECK-AST-NEXT:   (pattern_named type='{{[^']+}}' 'foo')
   foo foo foo
 }
 
