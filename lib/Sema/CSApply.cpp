@@ -4521,14 +4521,8 @@ namespace {
       auto subscript = cast<SubscriptDecl>(overload.choice.getDecl());
       assert(!subscript->isGetterMutating());
 
-      auto indexType = AnyFunctionType::composeInput(
-          cs.getASTContext(),
-          subscript->getInterfaceType()->castTo<AnyFunctionType>()->getParams(),
-          /*canonicalVararg=*/false);
-
       // Compute substitutions to refer to the member.
       auto ref = resolveConcreteDeclRef(subscript, locator);
-      indexType = indexType.subst(ref.getSubstitutions());
 
       // If this is a @dynamicMemberLookup reference to resolve a property
       // through the subscript(dynamicMember:) member, restore the
