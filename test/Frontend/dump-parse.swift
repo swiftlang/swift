@@ -22,7 +22,6 @@ func bar() {
   // CHECK-NEXT:   (pattern_named 'foo')
   // CHECK-NEXT:   (pattern_named 'foo')
   // CHECK-AST: (brace_stmt
-  // CHECK-AST-NEXT: (declref_expr type='{{[^']+}}'
   // CHECK-AST-NEXT:   (for_each_stmt
   // CHECK-AST-NEXT:   (pattern_named type='{{[^']+}}' 'foo')
   // CHECK-AST-NEXT:   (pattern_named type='{{[^']+}}' 'foo')

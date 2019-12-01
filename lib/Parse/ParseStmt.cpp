@@ -344,6 +344,10 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
     const bool IsAtStartOfLineOrPreviousHadSemi =
         PreviousHadSemi || Tok.isAtStartOfLine();
     if (!IsAtStartOfLineOrPreviousHadSemi) {
+      SourceLoc EndOfPreviousLoc = getEndOfPreviousLoc();
+      diagnose(EndOfPreviousLoc, diag::statement_same_line_without_semi)
+        .fixItInsert(EndOfPreviousLoc, ";");
+      // FIXME: Add semicolon to the AST?
       Token previousToken = Lexer::getTokenAtLocation(SourceMgr, PreviousLoc);
       Optional<tok> stmtTokMatch = None;
       if (previousToken.getKind() == tok::identifier) {
@@ -354,6 +358,7 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
         }
       }
       if (stmtTokMatch) {
+        Entries.pop_back();
         ParserPosition parserPosition = ParserPosition(L->getStateForBeginningOfToken(previousToken), PreviousLoc);
         backtrackToPosition(parserPosition);
         Tok.setKind(*stmtTokMatch);
@@ -361,11 +366,6 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
         StringRef stmtTokenText = getTokenText(*stmtTokMatch);
         diagnose(PreviousLoc, diag::statement_misspell, stmtTokenText)
           .fixItReplace(PreviousLoc, stmtTokenText);
-      } else {
-        SourceLoc EndOfPreviousLoc = getEndOfPreviousLoc();
-        diagnose(EndOfPreviousLoc, diag::statement_same_line_without_semi)
-          .fixItInsert(EndOfPreviousLoc, ";");
-        // FIXME: Add semicolon to the AST?
       }
     }
 
@@ -2552,46 +2552,6 @@ ParserResult<Stmt> Parser::parseStmtPoundAssert() {
       SourceRange(startLoc, endLoc), conditionExprResult.get(), message));
 }
 
-//
-///// Produce a score (smaller is better) comparing a parameter name and
-///// potentially-typo'd argument name.
-/////
-///// \param identifier The name of the identifier.
-///// \param stmt The name of the argument.
-///// \param maxScore The maximum score permitted by this comparison, or
-///// 0 if there is no limit.
-/////
-///// \returns the score, if it is good enough to even consider this a match.
-///// Otherwise, an empty optional.
-/////
-static Optional<unsigned> scoreIdentifierAndStmtNameTypo(StringRef identifier,
-                                                          StringRef stmt,
-                                                          unsigned maxScore) {
-  // Compute the edit distance.
-  unsigned dist = stmt.edit_distance(identifier, /*AllowReplacements=*/true,
-                                        /*MaxEditDistance=*/maxScore);
-
-  // If the edit distance would be too long, we're done.
-  if (maxScore != 0 && dist > maxScore)
-    return None;
-
-  // The distance can be zero due to the "with" transformation above.
-  if (dist == 0)
-    return 1;
-
-  // If this is just a single character label on both sides,
-  // simply return distance.
-  if (identifier.size() == 1 && stmt.size() == 1)
-    return dist;
-
-  // Only allow about one typo for every two properly-typed characters, which
-  // prevents completely-wacky suggestions in many cases.
-  if (dist > (stmt.size() + 1) / 3)
-    return None;
-
-  return dist;
-}
-
 Optional<tok> Parser::closestMatchingStmtTokenForIdentifier(StringRef identifier) {
   SmallVector<std::pair<StringRef, tok>, 19> stmtKeywords;
   #define STMT_KEYWORD(kw) stmtKeywords.push_back({ #kw, tok::kw_##kw });
@@ -2602,13 +2562,15 @@ Optional<tok> Parser::closestMatchingStmtTokenForIdentifier(StringRef identifier
     std::pair<StringRef, tok> pair = stmtKeywords[i];
     StringRef potentialStatement = pair.first;
 
-    if (auto score = scoreIdentifierAndStmtNameTypo(identifier,
-                                            potentialStatement,
-                                            bestScore)) {
-      if (*score < bestScore || bestScore == 0) {
-        bestScore = *score;
-        best = pair.second;
-      }
+    unsigned dist = potentialStatement.edit_distance(identifier, /*AllowReplacements=*/true, /*MaxEditDistance=*/bestScore);
+
+    if (dist > (potentialStatement.size() + 1) / 3) {
+      continue;
+    }
+
+    if (dist < bestScore || bestScore == 0) {
+      bestScore = dist;
+      best = pair.second;
     }
   }
 
