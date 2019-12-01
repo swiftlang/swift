@@ -1673,7 +1673,6 @@ SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
   // a concrete type from init_existential_addr or init_existential_ref.
   if (auto *WMI = dyn_cast<WitnessMethodInst>(AI->getCallee())) {
     if (propagateConcreteTypeOfInitExistential(AI, WMI)) {
-      Builder.getFunction().dump();
       return nullptr;
     }
   }
