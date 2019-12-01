@@ -989,6 +989,12 @@ public struct AnyDerivative: EuclideanDifferentiable & AdditiveArithmetic {
   }
 }
 
+extension AnyDerivative: CustomStringConvertible {
+  public var description: String {
+    String(describing: base)
+  }
+}
+
 //===----------------------------------------------------------------------===//
 // Differentiable higher order functions for collections
 //===----------------------------------------------------------------------===//

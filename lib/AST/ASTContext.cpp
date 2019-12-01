@@ -180,6 +180,9 @@ struct ASTContext::Implementation {
   CanType AnyObjectType;
 
   // SWIFT_ENABLE_TENSORFLOW
+  /// The AnyDerivative type.
+  CanType AnyDerivativeType;
+
   /// The declaration of TensorFlow.TensorHandle<T>.
   ClassDecl *TensorHandleDecl = nullptr;
   /// The declaration of TensorFlow.TensorShape.
@@ -832,6 +835,15 @@ CanType ASTContext::getAnyObjectType() const {
     ProtocolCompositionType::get(
       *this, {}, /*HasExplicitAnyObject=*/true));
   return getImpl().AnyObjectType;
+}
+
+CanType ASTContext::getAnyDerivativeType() const {
+  if (auto type = getImpl().AnyDerivativeType)
+    return type;
+  auto type =
+      getAnyDerivativeDecl()->getDeclaredInterfaceType()->getCanonicalType();
+  getImpl().AnyDerivativeType = type;
+  return type;
 }
 
 // SWIFT_ENABLE_TENSORFLOW

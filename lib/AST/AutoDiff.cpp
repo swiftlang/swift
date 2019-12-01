@@ -307,8 +307,6 @@ Type VectorSpace::getType() const {
     return value.vectorType;
   case Kind::Tuple:
     return value.tupleType;
-  case Kind::Function:
-    return value.functionType;
   }
 }
 

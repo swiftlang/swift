@@ -217,10 +217,14 @@ CanSILFunctionType SILFunctionType::getAutoDiffDerivativeFunctionType(
     AutoDiffDerivativeFunctionKind kind, TypeConverter &TC,
     LookupConformanceFn lookupConformance,
     CanGenericSignature derivativeFnGenSig) {
-  // JVP: (T...) -> ((R...),
-  //                 (T.TangentVector...) -> (R.TangentVector...))
-  // VJP: (T...) -> ((R...),
-  //                 (R.TangentVector...) -> (T.TangentVector...))
+  // JVP: (T...) -> (
+  //    value: (R...),
+  //    pullback: (T.TangentVector..., AnyDerivative) -> (R.TangentVector...)
+  // )
+  // VJP: (T...) -> (
+  //    value: (R...),
+  //    pullback: (R.TangentVector...) -> (T.TangentVector..., AnyDerivative)
+  // )
 
   auto &ctx = getASTContext();
 
@@ -295,47 +299,53 @@ CanSILFunctionType SILFunctionType::getAutoDiffDerivativeFunctionType(
   case AutoDiffDerivativeFunctionKind::JVP: {
     SmallVector<SILParameterInfo, 8> differentialParams;
     for (auto &param : wrtParams) {
-      auto paramTan =
-          param.getInterfaceType()->getAutoDiffAssociatedTangentSpace(lookupConformance);
+      auto paramTan = param.getInterfaceType()
+          ->getAutoDiffAssociatedTangentSpace(lookupConformance);
       assert(paramTan && "Parameter type does not have a tangent space?");
       differentialParams.push_back(
           {paramTan->getCanonicalType(), param.getConvention()});
     }
+    differentialParams.push_back(
+        {ctx.getAnyDerivativeType(), ParameterConvention::Indirect_In});
     SmallVector<SILResultInfo, 8> differentialResults;
     auto &result = getResults()[resultIndex];
-    auto resultTan =
-        result.getInterfaceType()->getAutoDiffAssociatedTangentSpace(lookupConformance);
+    auto resultTan = result.getInterfaceType()
+        ->getAutoDiffAssociatedTangentSpace(lookupConformance);
     assert(resultTan && "Result type does not have a tangent space?");
     differentialResults.push_back(
         {resultTan->getCanonicalType(), result.getConvention()});
     closureType = SILFunctionType::get(
         /*genericSignature*/ nullptr, ExtInfo(), SILCoroutineKind::None,
         ParameterConvention::Direct_Guaranteed, differentialParams, {},
-        differentialResults, None, getSubstitutions(), isGenericSignatureImplied(), ctx);
+        differentialResults, None, getSubstitutions(),
+        isGenericSignatureImplied(), ctx);
     break;
   }
   case AutoDiffDerivativeFunctionKind::VJP: {
     SmallVector<SILParameterInfo, 8> pullbackParams;
     auto &origRes = getResults()[resultIndex];
-    auto resultTan =
-        origRes.getInterfaceType()->getAutoDiffAssociatedTangentSpace(lookupConformance);
+    auto resultTan = origRes.getInterfaceType()
+        ->getAutoDiffAssociatedTangentSpace(lookupConformance);
     assert(resultTan && "Result type does not have a tangent space?");
     pullbackParams.push_back(
         getTangentParameterInfoForOriginalResult(resultTan->getCanonicalType(),
                                                  origRes.getConvention()));
     SmallVector<SILResultInfo, 8> pullbackResults;
     for (auto &param : wrtParams) {
-      auto paramTan =
-          param.getInterfaceType()->getAutoDiffAssociatedTangentSpace(lookupConformance);
+      auto paramTan = param.getInterfaceType()
+          ->getAutoDiffAssociatedTangentSpace(lookupConformance);
       assert(paramTan && "Parameter type does not have a tangent space?");
       pullbackResults.push_back(
           getTangentResultInfoForOriginalParameter(paramTan->getCanonicalType(),
                                                    param.getConvention()));
     }
+    pullbackResults.push_back(
+        {ctx.getAnyDerivativeType(), ResultConvention::Indirect});
     closureType = SILFunctionType::get(
         /*genericSignature*/ nullptr, ExtInfo(), SILCoroutineKind::None,
         ParameterConvention::Direct_Guaranteed, pullbackParams, {},
-        pullbackResults, {}, getSubstitutions(), isGenericSignatureImplied(), ctx);
+        pullbackResults, {}, getSubstitutions(), isGenericSignatureImplied(),
+        ctx);
     break;
   }
   }
@@ -352,7 +362,8 @@ CanSILFunctionType SILFunctionType::getAutoDiffDerivativeFunctionType(
   return SILFunctionType::get(derivativeFnGenSig, getExtInfo(),
                               getCoroutineKind(), getCalleeConvention(),
                               getParameters(), getYields(), newResults,
-                              getOptionalErrorResult(), getSubstitutions(), isGenericSignatureImplied(), ctx,
+                              getOptionalErrorResult(), getSubstitutions(),
+                              isGenericSignatureImplied(), ctx,
                               getWitnessMethodConformanceOrInvalid());
 }
 

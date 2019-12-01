@@ -4642,16 +4642,9 @@ Optional<VectorSpace> TypeBase::getAutoDiffAssociatedTangentSpace(
     return vs;
   };
 
-  // Functions' tangent is the same function except the innermost return type
-  // being replaced by its tangent.
+  // Functions' tangent is `AnyDerivative`.
   if (auto *fnTy = getAs<AnyFunctionType>()) {
-    auto resultSpace = fnTy->getResult()->getAutoDiffAssociatedTangentSpace(
-        lookupConformance);
-    if (!resultSpace)
-      return cache(None);
-    return cache(VectorSpace::getFunction(
-        makeFunctionType(fnTy, fnTy->getParams(), resultSpace->getType(),
-                         fnTy->getOptGenericSignature())));
+    return cache(VectorSpace::getVector(ctx.getAnyDerivativeType()));
   }
 
   // Tuples' tangent is a tuple of each element's Tangent.

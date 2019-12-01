@@ -4410,10 +4410,6 @@ private:
       }
       return;
     }
-    case VectorSpace::Kind::Function: {
-      llvm_unreachable(
-          "Unimplemented: Emit thunks for abstracting zero initialization");
-    }
     }
   }
 
@@ -7629,10 +7625,6 @@ void PullbackEmitter::emitZeroIndirect(CanType type, SILValue bufferAccess,
     }
     return;
   }
-  case VectorSpace::Kind::Function: {
-    llvm_unreachable(
-      "Unimplemented: Emit thunks for abstracting zero initialization");
-  }
   }
 }
 
@@ -7773,10 +7765,6 @@ SILValue PullbackEmitter::accumulateDirect(SILValue lhs, SILValue rhs,
           accumulateDirect(std::get<0>(zipped), std::get<1>(zipped), loc));
     return builder.createTuple(loc, adjointTy, adjElements);
   }
-  case VectorSpace::Kind::Function: {
-    llvm_unreachable(
-        "Unimplemented: Emit thunks for abstracting adjoint accumulation");
-  }
   }
 }
 
@@ -7836,11 +7824,6 @@ void PullbackEmitter::accumulateIndirect(
     }
     return;
   }
-  case VectorSpace::Kind::Function: {
-    llvm_unreachable(
-        "Unimplemented: Emit thunks for abstracting adjoint value "
-        "accumulation");
-  }
   }
 }
 
@@ -7890,11 +7873,6 @@ void PullbackEmitter::accumulateIndirect(SILValue lhsDestAccess,
       accumulateIndirect(destAddr, eltAddrRHS, loc);
     }
     return;
-  }
-  case VectorSpace::Kind::Function: {
-    llvm_unreachable(
-        "Unimplemented: Emit thunks for abstracting adjoint value "
-        "accumulation");
   }
   }
 }
@@ -8315,9 +8293,6 @@ ADContext::getOrCreateSubsetParametersThunkForLinearMap(
       llvm_unreachable(
           "Unimplemented: Handle zero initialization for tuples");
     }
-    case VectorSpace::Kind::Function:
-      llvm_unreachable(
-          "Unimplemented: Emit thunks for abstracting zero initialization");
     }
   };
 
