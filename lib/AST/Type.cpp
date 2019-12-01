@@ -4690,7 +4690,8 @@ Optional<VectorSpace> TypeBase::getAutoDiffAssociatedTangentSpace(
 AnyFunctionType *AnyFunctionType::getAutoDiffDerivativeFunctionType(
     IndexSubset *indices, unsigned resultIndex,
     AutoDiffDerivativeFunctionKind kind, LookupConformanceFn lookupConformance,
-    GenericSignature whereClauseGenSig, bool makeSelfParamFirst) {
+    GenericSignature whereClauseGenSig, bool makeSelfParamFirst,
+    bool includeContextTangent) {
   // JVP: (T...) -> ((R...),
   //                 (T.TangentVector...) -> (R.TangentVector...))
   // VJP: (T...) -> ((R...),
@@ -4735,6 +4736,10 @@ AnyFunctionType *AnyFunctionType::getAutoDiffDerivativeFunctionType(
           AnyFunctionType::Param(
               wrtParamType->getAutoDiffAssociatedTangentSpace(lookupConformance)
                   ->getType()));
+    if (includeContextTangent)
+      differentialParams.push_back(
+          AnyFunctionType::Param(ctx.getAnyDerivativeType(), Identifier(),
+                                 ParameterTypeFlags().withOwned(true)));
 
     SmallVector<TupleTypeElt, 8> differentialResults;
     if (auto *resultTuple = originalResult->getAs<TupleType>()) {
@@ -4778,6 +4783,10 @@ AnyFunctionType *AnyFunctionType::getAutoDiffDerivativeFunctionType(
       pullbackResults.push_back(wrtParamType
           ->getAutoDiffAssociatedTangentSpace(lookupConformance)
               ->getType());
+    if (includeContextTangent)
+      pullbackResults.push_back(
+          TupleTypeElt(ctx.getAnyDerivativeType(), Identifier(),
+                       ParameterTypeFlags().withOwned(true)));
     Type pullbackResult = pullbackResults.size() > 1
                               ? TupleType::get(pullbackResults, ctx)
                               : pullbackResults[0].getType();

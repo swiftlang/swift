@@ -1036,7 +1036,9 @@ static ValueDecl *getAutoDiffApplyDerivativeFunction(
       [=, &Context](BuiltinFunctionBuilder &builder) -> Type {
         auto derivativeFnTy = diffFnType->getAutoDiffDerivativeFunctionType(
             paramIndices, /*resultIndex*/ 0, kind,
-            LookUpConformanceInModule(Context.TheBuiltinModule));
+            LookUpConformanceInModule(Context.TheBuiltinModule),
+            GenericSignature(), /*makeSelfParamFirst*/ false,
+            /*includeContextTangent*/ true);
         return derivativeFnTy->getResult();
       }};
   builder.addParameter(firstArgGen);
@@ -1152,6 +1154,8 @@ static ValueDecl *getDifferentiableFunctionConstructor(
             param.getPlainType(), tangentVectorDecl);
         differentialParams.push_back(FunctionType::Param(tanType));
       }
+      differentialParams.push_back(
+          FunctionType::Param(Context.getAnyDerivativeType()));
       auto differentialResultType = DependentMemberType::get(
           origResultType, tangentVectorDecl);
       auto differentialType =
@@ -1177,13 +1181,13 @@ static ValueDecl *getDifferentiableFunctionConstructor(
             param.getPlainType(), tangentVectorDecl);
         pullbackResultTupleElts.push_back(TupleTypeElt(tanType));
       }
+      pullbackResultTupleElts.push_back(
+          TupleTypeElt(Context.getAnyDerivativeType()));
+      assert(pullbackResultTupleElts.size() >= 2);
       auto pullbackParam = FunctionType::Param(
             DependentMemberType::get(origResultType, tangentVectorDecl));
       auto pullbackType = FunctionType::get(
-          {pullbackParam},
-          pullbackResultTupleElts.size() == 1
-              ? pullbackResultTupleElts.front().getType()
-              : TupleType::get(pullbackResultTupleElts, Context));
+          {pullbackParam}, TupleType::get(pullbackResultTupleElts, Context));
       auto vjpResultType = TupleType::get(
           {TupleTypeElt(origResultType, Context.Id_value),
            TupleTypeElt(pullbackType, Context.Id_pullback)}, Context);

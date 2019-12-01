@@ -223,7 +223,10 @@ public func differentiableFunction<T : Differentiable, R : Differentiable>(
         be used with differential-producing differential operators.
         """)
     },
-    /*vjp*/ vjp)
+    /*vjp*/ { x in
+      let (value, pullback) = vjp(x)
+      return (value, { v in (pullback(v), .zero) })
+    })
 }
 
 /// Create a differentiable function from a vector-Jacobian products function.
@@ -241,7 +244,13 @@ public func differentiableFunction<T, U, R>(
         be used with differential-producing differential operators.
         """)
     },
-    /*vjp*/ vjp)
+    /*vjp*/ { x, y in
+      let (value, pullback) = vjp(x, y)
+      return (value, { v in
+        let (vx, vy) = pullback(v)
+        return (vx, vy, .zero)
+      })
+    })
 }
 
 public extension Differentiable {
@@ -299,14 +308,15 @@ public extension Differentiable {
   func valueWithPullback<R>(
     in f: @differentiable (Self) -> R
   ) -> (value: R, pullback: (R.TangentVector) -> TangentVector) {
-    return Builtin.applyDerivative_vjp_arity1(f, self)
+    let (value, canonicalPullback) = Builtin.applyDerivative_vjp_arity1(f, self)
+    return (value, { v in canonicalPullback(v).0 })
   }
 
   @inlinable
   func pullback<R>(
     in f: @differentiable (Self) -> R
   ) -> (R.TangentVector) -> TangentVector {
-    return Builtin.applyDerivative_vjp_arity1(f, self).1
+    valueWithPullback(in: f).pullback
   }
 
   @inlinable
@@ -331,14 +341,19 @@ public extension Differentiable {
     at x: T, in f: @differentiable (Self, T) -> R
   ) -> (value: R,
         pullback: (R.TangentVector) -> (TangentVector, T.TangentVector)) {
-    return Builtin.applyDerivative_vjp_arity2(f, self, x)
+    let (value, canonicalPullback) =
+      Builtin.applyDerivative_vjp_arity2(f, self, x)
+    return (value, { v in
+      let (vx, vy, _) = canonicalPullback(v)
+      return (vx, vy)
+    })
   }
 
   @inlinable
   func pullback<T, R>(
     at x: T, in f: @differentiable (Self, T) -> R
   ) -> (R.TangentVector) -> (TangentVector, T.TangentVector) {
-    return Builtin.applyDerivative_vjp_arity2(f, self, x).1
+    valueWithPullback(at: x, in: f).pullback
   }
 
   @inlinable
@@ -380,7 +395,8 @@ public func transpose<T, R>(
 public func valueWithDifferential<T, R>(
   at x: T, in f: @differentiable (T) -> R
 ) -> (value: R, differential: (T.TangentVector) -> R.TangentVector) {
-  return Builtin.applyDerivative_jvp(f, x)
+  let (value, canonicalDifferential) = Builtin.applyDerivative_jvp(f, x)
+  return (value, { vx in canonicalDifferential(vx, .zero) })
 }
 
 @inlinable
@@ -388,7 +404,9 @@ public func valueWithDifferential<T, U, R>(
   at x: T, _ y: U, in f: @differentiable (T, U) -> R
 ) -> (value: R,
       differential: (T.TangentVector, U.TangentVector) -> R.TangentVector) {
-  return Builtin.applyDerivative_jvp_arity2(f, x, y)
+  let (value, canonicalDifferential) =
+    Builtin.applyDerivative_jvp_arity2(f, x, y)
+  return (value, { vx, vy in canonicalDifferential(vx, vy, .zero) })
 }
 
 @inlinable
@@ -397,7 +415,9 @@ public func valueWithDifferential<T, U, V, R>(
 ) -> (value: R,
       differential: (T.TangentVector, U.TangentVector, V.TangentVector)
         -> (R.TangentVector)) {
-  return Builtin.applyDerivative_jvp_arity3(f, x, y, z)
+  let (value, canonicalDifferential) =
+    Builtin.applyDerivative_jvp_arity3(f, x, y, z)
+  return (value, { vx, vy, vz in canonicalDifferential(vx, vy, vz, .zero) })
 }
 
 // Value with pullback
@@ -406,7 +426,8 @@ public func valueWithDifferential<T, U, V, R>(
 public func valueWithPullback<T, R>(
   at x: T, in f: @differentiable (T) -> R
 ) -> (value: R, pullback: (R.TangentVector) -> T.TangentVector) {
-  return Builtin.applyDerivative_vjp(f, x)
+  let (value, canonicalPullback) = Builtin.applyDerivative_vjp(f, x)
+  return (value, { v in canonicalPullback(v).0 })
 }
 
 @inlinable
@@ -414,7 +435,11 @@ public func valueWithPullback<T, U, R>(
   at x: T, _ y: U, in f: @differentiable (T, U) -> R
 ) -> (value: R,
       pullback: (R.TangentVector) -> (T.TangentVector, U.TangentVector)) {
-  return Builtin.applyDerivative_vjp_arity2(f, x, y)
+  let (value, canonicalPullback) = Builtin.applyDerivative_vjp_arity2(f, x, y)
+  return (value, { v in
+    let (vx, vy, _) = canonicalPullback(v)
+    return (vx, vy)
+  })
 }
 
 @inlinable
@@ -423,7 +448,12 @@ public func valueWithPullback<T, U, V, R>(
 ) -> (value: R,
       pullback: (R.TangentVector)
         -> (T.TangentVector, U.TangentVector, V.TangentVector)) {
-  return Builtin.applyDerivative_vjp_arity3(f, x, y, z)
+  let (value, canonicalPullback) =
+    Builtin.applyDerivative_vjp_arity3(f, x, y, z)
+  return (value, { v in
+    let (vx, vy, vz, _) = canonicalPullback(v)
+    return (vx, vy, vz)
+  })
 }
 
 // Differential
@@ -432,21 +462,21 @@ public func valueWithPullback<T, U, V, R>(
 public func differential<T, R>(
   at x: T, in f: @differentiable (T) -> R
 ) -> (T.TangentVector) -> R.TangentVector {
-  return valueWithDifferential(at: x, in: f).1
+  valueWithDifferential(at: x, in: f).differential
 }
 
 @inlinable
 public func differential<T, U, R>(
   at x: T, _ y: U, in f: @differentiable (T, U) -> R
 ) -> (T.TangentVector, U.TangentVector) -> R.TangentVector {
-  return valueWithDifferential(at: x, y, in: f).1
+  valueWithDifferential(at: x, y, in: f).differential
 }
 
 @inlinable
 public func differential<T, U, V, R>(
   at x: T, _ y: U, _ z: V, in f: @differentiable (T, U, V) -> R
 ) -> (T.TangentVector, U.TangentVector, V.TangentVector) -> (R.TangentVector) {
-  return valueWithDifferential(at: x, y, z, in: f).1
+  valueWithDifferential(at: x, y, z, in: f).differential
 }
 
 
@@ -456,14 +486,14 @@ public func differential<T, U, V, R>(
 public func pullback<T, R>(
   at x: T, in f: @differentiable (T) -> R
 ) -> (R.TangentVector) -> T.TangentVector {
-  return Builtin.applyDerivative_vjp(f, x).1
+  valueWithPullback(at: x, in: f).pullback
 }
 
 @inlinable
 public func pullback<T, U, R>(
   at x: T, _ y: U, in f: @differentiable (T, U) -> R
 ) -> (R.TangentVector) -> (T.TangentVector, U.TangentVector) {
-  return Builtin.applyDerivative_vjp_arity2(f, x, y).1
+  valueWithPullback(at: x, y, in: f).pullback
 }
 
 @inlinable
@@ -471,7 +501,7 @@ public func pullback<T, U, V, R>(
   at x: T, _ y: U, _ z: V, in f: @differentiable (T, U, V) -> R
 ) -> (R.TangentVector)
     -> (T.TangentVector, U.TangentVector, V.TangentVector) {
-  return Builtin.applyDerivative_vjp_arity3(f, x, y, z).1
+  valueWithPullback(at: x, y, z, in: f).pullback
 }
 
 // Derivative

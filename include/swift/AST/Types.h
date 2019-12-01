@@ -3152,7 +3152,8 @@ public:
       AutoDiffDerivativeFunctionKind kind,
       LookupConformanceFn lookupConformance,
       GenericSignature whereClauseGenericSignature = GenericSignature(),
-      bool makeSelfParamFirst = false);
+      bool makeSelfParamFirst = false,
+      bool includeContextTangent = false);
 
   /// Given the type of an autodiff derivative function, returns the
   /// corresponding original function type.
