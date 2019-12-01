@@ -404,6 +404,44 @@ private:
                                                  NLOptions options) const;
 };
 
+class ModuleQualifiedLookupRequest
+    : public SimpleRequest<ModuleQualifiedLookupRequest,
+                           QualifiedLookupResult(const DeclContext *,
+                                                 ModuleDecl *, DeclName,
+                                                 NLOptions),
+                           CacheKind::Uncached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<QualifiedLookupResult> evaluate(Evaluator &evaluator,
+                                                 const DeclContext *DC,
+                                                 ModuleDecl *mod, DeclName name,
+                                                 NLOptions opts) const;
+};
+
+class QualifiedLookupRequest
+    : public SimpleRequest<QualifiedLookupRequest,
+                           QualifiedLookupResult(const DeclContext *,
+                                                 SmallVector<NominalTypeDecl *, 4>,
+                                                 DeclName, NLOptions),
+                           CacheKind::Uncached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<QualifiedLookupResult>
+  evaluate(Evaluator &evaluator, const DeclContext *DC,
+           SmallVector<NominalTypeDecl *, 4> decls, DeclName name,
+           NLOptions opts) const;
+};
+
 #define SWIFT_TYPEID_ZONE NameLookup
 #define SWIFT_TYPEID_HEADER "swift/AST/NameLookupTypeIDZone.def"
 #include "swift/Basic/DefineTypeIDZone.h"
