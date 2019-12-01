@@ -3199,6 +3199,56 @@ strong reference count is greater than 1.
 A discussion of the semantics can be found here:
 :ref:`arcopts.is_unique`.
 
+begin_cow_mutation
+``````````````````
+
+::
+
+  sil-instruction ::= 'begin_cow_mutation' '[native]'? sil-operand
+
+  (%1, %2) = begin_cow_mutation %0 : $C
+  // $C must be a reference-counted type
+  // %1 will be of type Builtin.Int1
+  // %2 will be of type C
+
+Checks whether %0 is a unique reference to a memory object. Returns 1 in the
+first result if the strong reference count is 1, and 0 if the strong reference
+count is greater than 1.
+
+Returns the reference operand in the second result. The returned reference can
+be used to mutate the object. Technically, the returned reference is the same
+as the operand. But it's important that optimizations see the result as a
+different SSA value than the operand. This is important to ensure the
+correctness of ``ref_element_addr [immutable]``.
+
+The operand is consumed and the second result is returned as owned.
+
+The optional ``native`` attribute specifies that the operand has native Swift
+reference counting.
+
+end_cow_mutation
+````````````````
+
+::
+
+  sil-instruction ::= 'end_cow_mutation' '[keep_unique]'? sil-operand
+
+  %1 = end_cow_mutation %0 : $C
+  // $C must be a reference-counted type
+  // %1 will be of type C
+
+Marks the end of the mutation of a reference counted object.
+Returns the reference operand. Technically, the returned reference is the same
+as the operand. But it's important that optimizations see the result as a
+different SSA value than the operand. This is important to ensure the
+correctness of ``ref_element_addr [immutable]``.
+
+The operand is consumed and the result is returned as owned. The result is
+guaranteed to be uniquely referenced.
+
+The optional ``keep_unique`` attribute indicates that the optimizer must not
+replace this reference with a not uniquely reference object.
+
 is_escaping_closure
 ```````````````````
 
@@ -4193,7 +4243,7 @@ ref_element_addr
 ````````````````
 ::
 
-  sil-instruction ::= 'ref_element_addr' sil-operand ',' sil-decl-ref
+  sil-instruction ::= 'ref_element_addr' '[immutable]'? sil-operand ',' sil-decl-ref
 
   %1 = ref_element_addr %0 : $C, #C.field
   // %0 must be a value of class type $C
@@ -4205,11 +4255,15 @@ Given an instance of a class, derives the address of a physical instance
 variable inside the instance. It is undefined behavior if the class value
 is null.
 
+The ``immutable`` attribute specifies that all loads of the same instance
+variable from the same class reference operand are guaranteed to yield the
+same value.
+
 ref_tail_addr
 `````````````
 ::
 
-  sil-instruction ::= 'ref_tail_addr' sil-operand ',' sil-type
+  sil-instruction ::= 'ref_tail_addr' '[immutable]'? sil-operand ',' sil-type
 
   %1 = ref_tail_addr %0 : $C, $E
   // %0 must be a value of class type $C with tail-allocated elements $E
@@ -4221,6 +4275,10 @@ This instruction is used to project the first tail-allocated element from an
 object which is created by an ``alloc_ref`` with ``tail_elems``.
 It is undefined behavior if the class instance does not have tail-allocated
 arrays or if the element-types do not match.
+
+The ``immutable`` attribute specifies that all loads of the same instance
+variable from the same class reference operand are guaranteed to yield the
+same value.
 
 Enums
 ~~~~~

@@ -74,6 +74,7 @@ CONSTANT_OWNERSHIP_INST(None, AllocValueBuffer)
 CONSTANT_OWNERSHIP_INST(Owned, CopyBlock)
 CONSTANT_OWNERSHIP_INST(Owned, CopyBlockWithoutEscaping)
 CONSTANT_OWNERSHIP_INST(Owned, CopyValue)
+CONSTANT_OWNERSHIP_INST(Owned, EndCOWMutation)
 CONSTANT_OWNERSHIP_INST(Owned, KeyPath)
 CONSTANT_OWNERSHIP_INST(Owned, InitExistentialValue)
 CONSTANT_OWNERSHIP_INST(Owned, GlobalValue) // TODO: is this correct?
@@ -296,6 +297,11 @@ ValueOwnershipKind ValueOwnershipKindClassifier::visitDestructureTupleResult(
 
 ValueOwnershipKind ValueOwnershipKindClassifier::visitBeginApplyResult(
     BeginApplyResult *Result) {
+  return Result->getOwnershipKind();
+}
+
+ValueOwnershipKind ValueOwnershipKindClassifier::visitBeginCOWMutationResult(
+    BeginCOWMutationResult *Result) {
   return Result->getOwnershipKind();
 }
 

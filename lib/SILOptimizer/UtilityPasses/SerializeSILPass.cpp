@@ -332,6 +332,8 @@ static bool hasOpaqueArchetype(TypeExpansionContext context,
   case SILInstructionKind::LinearFunctionInst:
   case SILInstructionKind::LinearFunctionExtractInst:
   case SILInstructionKind::DifferentiabilityWitnessFunctionInst:
+  case SILInstructionKind::BeginCOWMutationInst:
+  case SILInstructionKind::EndCOWMutationInst:
     // Handle by operand and result check.
     break;
 
