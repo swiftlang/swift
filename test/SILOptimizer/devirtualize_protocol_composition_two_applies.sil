@@ -1,0 +1,301 @@
+// RUN: %target-build-swift %s -O -wmo -emit-sil | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+public class A {
+  @objc deinit
+  init()
+}
+
+public protocol P {
+  func foo() -> Int
+}
+
+public class B : A, P {
+  public func foo() -> Int
+  @objc deinit
+  override init()
+}
+
+public class C : A, P {
+  public func foo() -> Int
+  @objc deinit
+  override init()
+}
+
+func imp(x: A & P, y: A & P) -> Int
+
+public func test(x: B, y: C) -> Int
+
+// main
+sil @main : $@convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
+bb0(%0 : $Int32, %1 : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>):
+  %2 = integer_literal $Builtin.Int32, 0          // user: %3
+  %3 = struct $Int32 (%2 : $Builtin.Int32)        // user: %4
+  return %3 : $Int32                              // id: %4
+} // end sil function 'main'
+
+// A.deinit
+sil @$s3run1ACfd : $@convention(method) (@guaranteed A) -> @owned Builtin.NativeObject {
+// %0                                             // users: %2, %1
+bb0(%0 : $A):
+  debug_value %0 : $A, let, name "self", argno 1  // id: %1
+  %2 = unchecked_ref_cast %0 : $A to $Builtin.NativeObject // user: %3
+  return %2 : $Builtin.NativeObject               // id: %3
+} // end sil function '$s3run1ACfd'
+
+// A.__deallocating_deinit
+sil @$s3run1ACfD : $@convention(method) (@owned A) -> () {
+// %0                                             // users: %3, %1
+bb0(%0 : $A):
+  debug_value %0 : $A, let, name "self", argno 1  // id: %1
+  // function_ref A.deinit
+  %2 = function_ref @$s3run1ACfd : $@convention(method) (@guaranteed A) -> @owned Builtin.NativeObject // user: %3
+  %3 = apply %2(%0) : $@convention(method) (@guaranteed A) -> @owned Builtin.NativeObject // user: %4
+  %4 = unchecked_ref_cast %3 : $Builtin.NativeObject to $A // user: %5
+  dealloc_ref %4 : $A                             // id: %5
+  %6 = tuple ()                                   // user: %7
+  return %6 : $()                                 // id: %7
+} // end sil function '$s3run1ACfD'
+
+// A.__allocating_init()
+sil hidden [exact_self_class] @$s3run1ACACycfC : $@convention(method) (@thick A.Type) -> @owned A {
+bb0(%0 : $@thick A.Type):
+  %1 = alloc_ref $A                               // user: %3
+  // function_ref A.init()
+  %2 = function_ref @$s3run1ACACycfc : $@convention(method) (@owned A) -> @owned A // user: %3
+  %3 = apply %2(%1) : $@convention(method) (@owned A) -> @owned A // user: %4
+  return %3 : $A                                  // id: %4
+} // end sil function '$s3run1ACACycfC'
+
+// A.init()
+sil hidden @$s3run1ACACycfc : $@convention(method) (@owned A) -> @owned A {
+// %0                                             // users: %2, %1
+bb0(%0 : $A):
+  debug_value %0 : $A, let, name "self", argno 1  // id: %1
+  return %0 : $A                                  // id: %2
+} // end sil function '$s3run1ACACycfc'
+
+// B.foo()
+sil [noinline] @foo : $@convention(method) (@guaranteed B) -> Int {
+// %0                                             // user: %1
+bb0(%0 : $B):
+  debug_value %0 : $B, let, name "self", argno 1  // id: %1
+  %2 = integer_literal $Builtin.Int64, 1          // user: %3
+  %3 = struct $Int (%2 : $Builtin.Int64)          // user: %4
+  return %3 : $Int                                // id: %4
+} // end sil function '$s3run1BC3fooSiyF'
+
+// Int.init(_builtinIntegerLiteral:)
+sil public_external [transparent] [serialized] @$sSi22_builtinIntegerLiteralSiBI_tcfC : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int {
+// %0                                             // user: %2
+bb0(%0 : $Builtin.IntLiteral, %1 : $@thin Int.Type):
+  %2 = builtin "s_to_s_checked_trunc_IntLiteral_Int64"(%0 : $Builtin.IntLiteral) : $(Builtin.Int64, Builtin.Int1) // user: %3
+  %3 = tuple_extract %2 : $(Builtin.Int64, Builtin.Int1), 0 // user: %4
+  %4 = struct $Int (%3 : $Builtin.Int64)          // user: %5
+  return %4 : $Int                                // id: %5
+} // end sil function '$sSi22_builtinIntegerLiteralSiBI_tcfC'
+
+// B.deinit
+sil @$s3run1BCfd : $@convention(method) (@guaranteed B) -> @owned Builtin.NativeObject {
+// %0                                             // users: %2, %1
+bb0(%0 : $B):
+  debug_value %0 : $B, let, name "self", argno 1  // id: %1
+  %2 = upcast %0 : $B to $A                       // user: %4
+  // function_ref A.deinit
+  %3 = function_ref @$s3run1ACfd : $@convention(method) (@guaranteed A) -> @owned Builtin.NativeObject // user: %4
+  %4 = apply %3(%2) : $@convention(method) (@guaranteed A) -> @owned Builtin.NativeObject // users: %5, %6
+  %5 = unchecked_ref_cast %4 : $Builtin.NativeObject to $B
+  return %4 : $Builtin.NativeObject               // id: %6
+} // end sil function '$s3run1BCfd'
+
+// B.__deallocating_deinit
+sil @$s3run1BCfD : $@convention(method) (@owned B) -> () {
+// %0                                             // users: %3, %1
+bb0(%0 : $B):
+  debug_value %0 : $B, let, name "self", argno 1  // id: %1
+  // function_ref B.deinit
+  %2 = function_ref @$s3run1BCfd : $@convention(method) (@guaranteed B) -> @owned Builtin.NativeObject // user: %3
+  %3 = apply %2(%0) : $@convention(method) (@guaranteed B) -> @owned Builtin.NativeObject // user: %4
+  %4 = unchecked_ref_cast %3 : $Builtin.NativeObject to $B // user: %5
+  dealloc_ref %4 : $B                             // id: %5
+  %6 = tuple ()                                   // user: %7
+  return %6 : $()                                 // id: %7
+} // end sil function '$s3run1BCfD'
+
+// B.__allocating_init()
+sil hidden [exact_self_class] @$s3run1BCACycfC : $@convention(method) (@thick B.Type) -> @owned B {
+bb0(%0 : $@thick B.Type):
+  %1 = alloc_ref $B                               // user: %3
+  // function_ref B.init()
+  %2 = function_ref @$s3run1BCACycfc : $@convention(method) (@owned B) -> @owned B // user: %3
+  %3 = apply %2(%1) : $@convention(method) (@owned B) -> @owned B // user: %4
+  return %3 : $B                                  // id: %4
+} // end sil function '$s3run1BCACycfC'
+
+// B.init()
+sil hidden @$s3run1BCACycfc : $@convention(method) (@owned B) -> @owned B {
+// %0                                             // user: %2
+bb0(%0 : $B):
+  %1 = alloc_stack $B, let, name "self"           // users: %9, %3, %2, %10, %11
+  store %0 to %1 : $*B                            // id: %2
+  %3 = load %1 : $*B                              // user: %4
+  %4 = upcast %3 : $B to $A                       // user: %6
+  // function_ref A.init()
+  %5 = function_ref @$s3run1ACACycfc : $@convention(method) (@owned A) -> @owned A // user: %6
+  %6 = apply %5(%4) : $@convention(method) (@owned A) -> @owned A // user: %7
+  %7 = unchecked_ref_cast %6 : $A to $B           // users: %12, %9, %8
+  strong_retain %7 : $B                           // id: %8
+  store %7 to %1 : $*B                            // id: %9
+  destroy_addr %1 : $*B                           // id: %10
+  dealloc_stack %1 : $*B                          // id: %11
+  return %7 : $B                                  // id: %12
+} // end sil function '$s3run1BCACycfc'
+
+// C.foo()
+sil @bar : $@convention(method) (@guaranteed C) -> Int {
+// %0                                             // user: %1
+bb0(%0 : $C):
+  debug_value %0 : $C, let, name "self", argno 1  // id: %1
+  %2 = integer_literal $Builtin.Int64, 0          // user: %3
+  %3 = struct $Int (%2 : $Builtin.Int64)          // user: %4
+  return %3 : $Int                                // id: %4
+} // end sil function 'bar'
+
+// C.deinit
+sil @$s3run1CCfd : $@convention(method) (@guaranteed C) -> @owned Builtin.NativeObject {
+// %0                                             // users: %2, %1
+bb0(%0 : $C):
+  debug_value %0 : $C, let, name "self", argno 1  // id: %1
+  %2 = upcast %0 : $C to $A                       // user: %4
+  // function_ref A.deinit
+  %3 = function_ref @$s3run1ACfd : $@convention(method) (@guaranteed A) -> @owned Builtin.NativeObject // user: %4
+  %4 = apply %3(%2) : $@convention(method) (@guaranteed A) -> @owned Builtin.NativeObject // users: %5, %6
+  %5 = unchecked_ref_cast %4 : $Builtin.NativeObject to $C
+  return %4 : $Builtin.NativeObject               // id: %6
+} // end sil function '$s3run1CCfd'
+
+// C.__deallocating_deinit
+sil @$s3run1CCfD : $@convention(method) (@owned C) -> () {
+// %0                                             // users: %3, %1
+bb0(%0 : $C):
+  debug_value %0 : $C, let, name "self", argno 1  // id: %1
+  // function_ref C.deinit
+  %2 = function_ref @$s3run1CCfd : $@convention(method) (@guaranteed C) -> @owned Builtin.NativeObject // user: %3
+  %3 = apply %2(%0) : $@convention(method) (@guaranteed C) -> @owned Builtin.NativeObject // user: %4
+  %4 = unchecked_ref_cast %3 : $Builtin.NativeObject to $C // user: %5
+  dealloc_ref %4 : $C                             // id: %5
+  %6 = tuple ()                                   // user: %7
+  return %6 : $()                                 // id: %7
+} // end sil function '$s3run1CCfD'
+
+// C.__allocating_init()
+sil hidden [exact_self_class] @$s3run1CCACycfC : $@convention(method) (@thick C.Type) -> @owned C {
+bb0(%0 : $@thick C.Type):
+  %1 = alloc_ref $C                               // user: %3
+  // function_ref C.init()
+  %2 = function_ref @$s3run1CCACycfc : $@convention(method) (@owned C) -> @owned C // user: %3
+  %3 = apply %2(%1) : $@convention(method) (@owned C) -> @owned C // user: %4
+  return %3 : $C                                  // id: %4
+} // end sil function '$s3run1CCACycfC'
+
+// C.init()
+sil hidden @$s3run1CCACycfc : $@convention(method) (@owned C) -> @owned C {
+// %0                                             // user: %2
+bb0(%0 : $C):
+  %1 = alloc_stack $C, let, name "self"           // users: %9, %3, %2, %10, %11
+  store %0 to %1 : $*C                            // id: %2
+  %3 = load %1 : $*C                              // user: %4
+  %4 = upcast %3 : $C to $A                       // user: %6
+  // function_ref A.init()
+  %5 = function_ref @$s3run1ACACycfc : $@convention(method) (@owned A) -> @owned A // user: %6
+  %6 = apply %5(%4) : $@convention(method) (@owned A) -> @owned A // user: %7
+  %7 = unchecked_ref_cast %6 : $A to $C           // users: %12, %9, %8
+  strong_retain %7 : $C                           // id: %8
+  store %7 to %1 : $*C                            // id: %9
+  destroy_addr %1 : $*C                           // id: %10
+  dealloc_stack %1 : $*C                          // id: %11
+  return %7 : $C                                  // id: %12
+} // end sil function '$s3run1CCACycfc'
+
+// protocol witness for P.foo() in conformance B
+sil shared [transparent] [serialized] [thunk] @$s3run1BCAA1PA2aDP3fooSiyFTW : $@convention(witness_method: P) (@in_guaranteed B) -> Int {
+// %0                                             // user: %1
+bb0(%0 : $*B):
+  %1 = load %0 : $*B                              // users: %2, %3
+  %2 = class_method %1 : $B, #B.foo!1 : (B) -> () -> Int, $@convention(method) (@guaranteed B) -> Int // user: %3
+  %3 = apply %2(%1) : $@convention(method) (@guaranteed B) -> Int // user: %4
+  return %3 : $Int                                // id: %4
+} // end sil function '$s3run1BCAA1PA2aDP3fooSiyFTW'
+
+// CHECK-LABEL: sil shared [noinline] @${{.*}}impl{{.*}}
+// In the optimization pass we look for uses of alloc_stack (aka %5).
+// This test makes sure that we look at the correct uses with the
+// correct dominance order (store before apply before dealloc).
+// This function will be passed arguments of type B and C for arguments
+// %0 and %1 respectively. We want to make sure that we call B's foo method
+// and not C's foo method. 
+sil hidden [noinline] @impl : $@convention(thin) (@guaranteed A & P, @guaranteed A & P) -> Int {
+bb0(%0 : $A & P, %1 : $A & P):
+  %2 = open_existential_ref %0 : $A & P to $@opened("A1F1B526-1463-11EA-932F-ACBC329C418B") A & P
+  %3 = unchecked_ref_cast %1 : $A & P to $@opened("A1F1B526-1463-11EA-932F-ACBC329C418B") A & P
+
+  %5 = alloc_stack $@opened("A1F1B526-1463-11EA-932F-ACBC329C418B") A & P
+  store %2 to %5 : $*@opened("A1F1B526-1463-11EA-932F-ACBC329C418B") A & P
+  
+  // We want to make sure that we picked up on the FIRST store and not the second one.
+  // class C's foo method is named "bar" whereas class B's foo method is named "foo".
+  // We want to make sure that we call a function named "foo" not "bar".
+  // CHECK: [[FN:%[0-9]+]] = function_ref @${{.*}}foo{{.*}} : $@convention(thin) () -> Int
+  %7 = witness_method $@opened("A1F1B526-1463-11EA-932F-ACBC329C418B") A & P, #P.foo!1 : <Self where Self : P> (Self) -> () -> Int, %2 : $@opened("A1F1B526-1463-11EA-932F-ACBC329C418B") A & P : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int
+  // CHECK: apply [[FN]]
+  %8 = apply %7<@opened("A1F1B526-1463-11EA-932F-ACBC329C418B") A & P>(%5) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int
+  
+  store %3 to %5 : $*@opened("A1F1B526-1463-11EA-932F-ACBC329C418B") A & P
+  dealloc_stack %5 : $*@opened("A1F1B526-1463-11EA-932F-ACBC329C418B") A & P
+  return %8 : $Int
+} // end sil function 'impl'
+
+// test(x:y:)
+sil @test :$@convention(thin) (@guaranteed B, @guaranteed C) -> Int {
+// %0                                             // users: %5, %4, %2
+// %1                                             // users: %7, %6, %3
+bb0(%0 : $B, %1 : $C):
+  debug_value %0 : $B, let, name "x", argno 1     // id: %2
+  debug_value %1 : $C, let, name "y", argno 2     // id: %3
+  strong_retain %0 : $B                           // id: %4
+  %5 = init_existential_ref %0 : $B : $B, $A & P  // users: %11, %9
+  strong_retain %1 : $C                           // id: %6
+  %7 = init_existential_ref %1 : $C : $C, $A & P  // users: %10, %9
+  // function_ref imp(x:y:)
+  %8 = function_ref @impl : $@convention(thin) (@guaranteed A & P, @guaranteed A & P) -> Int // user: %9
+  %9 = apply %8(%5, %7) : $@convention(thin) (@guaranteed A & P, @guaranteed A & P) -> Int // user: %12
+  strong_release %7 : $A & P                      // id: %10
+  strong_release %5 : $A & P                      // id: %11
+  return %9 : $Int                                // id: %12
+} // end sil function 'test'
+
+sil_vtable [serialized] A {
+  #A.init!allocator.1: (A.Type) -> () -> A : @$s3run1ACACycfC  // A.__allocating_init()
+  #A.deinit!deallocator.1: @$s3run1ACfD  // A.__deallocating_deinit
+}
+
+sil_vtable [serialized] B {
+  #A.init!allocator.1: (A.Type) -> () -> A : @$s3run1BCACycfC [override]  // B.__allocating_init()
+  #B.foo!1: (B) -> () -> Int : @foo  // B.foo()
+  #B.deinit!deallocator.1: @$s3run1BCfD  // B.__deallocating_deinit
+}
+
+sil_vtable [serialized] C {
+  #A.init!allocator.1: (A.Type) -> () -> A : @$s3run1CCACycfC [override]  // C.__allocating_init()
+  #C.foo!1: (C) -> () -> Int : @bar  // C.foo()
+  #C.deinit!deallocator.1: @$s3run1CCfD  // C.__deallocating_deinit
+}
+
+sil_witness_table [serialized] B: P module run {
+  method #P.foo!1: <Self where Self : P> (Self) -> () -> Int : @$s3run1BCAA1PA2aDP3fooSiyFTW  // protocol witness for P.foo() in conformance B
+}

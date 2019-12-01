@@ -221,23 +221,30 @@ OpenedArchetypeInfo::OpenedArchetypeInfo(Operand &use) {
     //   apply <fn>(%5)
     // It's important that the only uses of %5 (instance) are in
     // a store and an apply.
-    StoreInst *store;
-    ApplyInst *apply;
+    StoreInst *store = nullptr;
+    ApplyInst *apply = nullptr;
+    DeallocStackInst *dealloc = nullptr;
     bool shouldOptimize = true;
 
     for (auto *use : instance->getUses()) {
-      if (auto *foundStore = dyn_cast<StoreInst>(use->getUser())) { store = foundStore; }
-      else if (auto *foundApply = dyn_cast<ApplyInst>(use->getUser())) { apply = foundApply; }
-      else if (auto *dealloc = dyn_cast<DeallocStackInst>(use->getUser())) {
-        shouldOptimize = store && apply;
+      if (auto *foundStore = dyn_cast<StoreInst>(use->getUser())) {
+        store = foundStore;
+      } else if (auto *foundApply = dyn_cast<ApplyInst>(use->getUser())) {
+        apply = foundApply;
+      } else if (auto *foundDealloc = dyn_cast<DeallocStackInst>(use->getUser())) {
+        dealloc = foundDealloc;
       } else {
         // TODO: this may be too harsh
         shouldOptimize = false;
       }
     }
 
-    if (shouldOptimize) {
-      openedVal = store->getSrc();
+    if (shouldOptimize && store && apply && dealloc) {
+      DominanceInfo domInfo(store->getFunction());
+      bool correctOrder = domInfo.dominates(store, apply) &&
+                          domInfo.dominates(apply, dealloc);
+      if (correctOrder)
+        openedVal = store->getSrc();
     }
   }
   if (auto *Open = dyn_cast<OpenExistentialAddrInst>(openedVal)) {
