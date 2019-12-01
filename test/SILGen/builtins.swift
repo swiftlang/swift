@@ -600,6 +600,32 @@ func castBitPatternFromBridgeObject(_ bo: Builtin.BridgeObject) -> Builtin.Word 
   return Builtin.castBitPatternFromBridgeObject(bo)
 }
 
+// CHECK-LABEL: sil hidden [ossa] @$s8builtins16beginCOWMutationySbAA1CCzF
+// CHECK:     [[L:%.*]] = load [take] [[ADDR:%[0-9]*]]
+// CHECK:     ([[U:%.*]], [[B:%.*]]) = begin_cow_mutation [[L]]
+// CHECK:     store [[B]] to [init] [[ADDR]]
+// CHECK:     apply {{%[0-9]*}}([[U]]
+func beginCOWMutation(_ c: inout C) -> Bool {
+  return Bool(_builtinBooleanLiteral: Builtin.beginCOWMutation(&c))
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s8builtins23beginCOWMutation_nativeySbAA1CCzF
+// CHECK:     [[L:%.*]] = load [take] [[ADDR:%[0-9]*]]
+// CHECK:     ([[U:%.*]], [[B:%.*]]) = begin_cow_mutation [native] [[L]]
+// CHECK:     store [[B]] to [init] [[ADDR]]
+// CHECK:     apply {{%[0-9]*}}([[U]]
+func beginCOWMutation_native(_ c: inout C) -> Bool {
+  return Bool(_builtinBooleanLiteral: Builtin.beginCOWMutation_native(&c))
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s8builtins14endCOWMutationyyAA1CCzF
+// CHECK:     [[L:%.*]] = load [take] [[ADDR:%[0-9]*]]
+// CHECK:     [[B:%.*]] = end_cow_mutation [[L]]
+// CHECK:     store [[B]] to [init] [[ADDR]]
+func endCOWMutation(_ c: inout C) {
+  Builtin.endCOWMutation(&c)
+}
+
 // ----------------------------------------------------------------------------
 // isUnique variants
 // ----------------------------------------------------------------------------

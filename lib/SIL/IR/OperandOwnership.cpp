@@ -1023,6 +1023,7 @@ ANY_OWNERSHIP_BUILTIN(TypePtrAuthDiscriminator)
         ValueOwnershipKind::OWNERSHIP,                                         \
         UseLifetimeConstraint::USE_LIFETIME_CONSTRAINT);                       \
   }
+CONSTANT_OWNERSHIP_BUILTIN(Owned, MustBeInvalidated, COWBufferForReading)
 CONSTANT_OWNERSHIP_BUILTIN(Owned, MustBeInvalidated, UnsafeGuaranteed)
 #undef CONSTANT_OWNERSHIP_BUILTIN
 

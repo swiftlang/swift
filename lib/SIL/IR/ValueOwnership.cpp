@@ -392,6 +392,7 @@ struct ValueOwnershipKindBuiltinVisitor
   }
 // This returns a value at +1 that is destroyed strictly /after/ the
 // UnsafeGuaranteedEnd. This provides the guarantee that we want.
+CONSTANT_OWNERSHIP_BUILTIN(Owned, COWBufferForReading)
 CONSTANT_OWNERSHIP_BUILTIN(Owned, UnsafeGuaranteed)
 CONSTANT_OWNERSHIP_BUILTIN(None, AShr)
 CONSTANT_OWNERSHIP_BUILTIN(None, GenericAShr)

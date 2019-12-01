@@ -109,6 +109,49 @@ SILInstruction *SILCombiner::optimizeBuiltinIsConcrete(BuiltinInst *BI) {
   return Builder.createIntegerLiteral(BI->getLoc(), BI->getType(), 1);
 }
 
+/// Replace
+/// \code
+///   %b = builtin "COWBufferForReading" %r
+///   %a = ref_element_addr %b
+/// \endcode
+/// with
+/// \code
+///   %a = ref_element_addr [immutable] %r
+/// \endcode
+/// The same for ref_tail_addr.
+SILInstruction *SILCombiner::optimizeBuiltinCOWBufferForReading(BuiltinInst *BI) {
+  auto useIter = BI->use_begin();
+  while (useIter != BI->use_end()) {
+    auto nextIter = std::next(useIter);
+    SILInstruction *user = useIter->getUser();
+    SILValue ref = BI->getOperand(0);
+    switch (user->getKind()) {
+      case SILInstructionKind::RefElementAddrInst: {
+        auto *REAI = cast<RefElementAddrInst>(user);
+        REAI->setOperand(ref);
+        REAI->setImmutable();
+        break;
+      }
+      case SILInstructionKind::RefTailAddrInst: {
+        auto *RTAI = cast<RefTailAddrInst>(user);
+        RTAI->setOperand(ref);
+        RTAI->setImmutable();
+        break;
+      }
+      case SILInstructionKind::StrongReleaseInst:
+        cast<StrongReleaseInst>(user)->setOperand(ref);
+        break;
+      default:
+        break;
+    }
+    useIter = nextIter;
+  }
+  // If there are unknown users, keep the builtin, and IRGen will handle it.
+  if (BI->use_empty())
+    return eraseInstFromFunction(*BI);
+  return nullptr;
+}
+
 static unsigned getTypeWidth(SILType Ty) {
   if (auto BuiltinIntTy = Ty.getAs<BuiltinIntegerType>()) {
     if (BuiltinIntTy->isFixedWidth()) {
@@ -541,6 +584,8 @@ SILInstruction *SILCombiner::visitBuiltinInst(BuiltinInst *I) {
     return optimizeBuiltinCanBeObjCClass(I);
   if (I->getBuiltinInfo().ID == BuiltinValueKind::IsConcrete)
     return optimizeBuiltinIsConcrete(I);
+  if (I->getBuiltinInfo().ID == BuiltinValueKind::COWBufferForReading)
+    return optimizeBuiltinCOWBufferForReading(I);
   if (I->getBuiltinInfo().ID == BuiltinValueKind::TakeArrayFrontToBack ||
       I->getBuiltinInfo().ID == BuiltinValueKind::TakeArrayBackToFront ||
       I->getBuiltinInfo().ID == BuiltinValueKind::TakeArrayNoAlias ||
