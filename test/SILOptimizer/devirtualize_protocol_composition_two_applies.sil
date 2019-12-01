@@ -31,6 +31,34 @@ func imp(x: A & P, y: A & P) -> Int
 
 public func test(x: B, y: C) -> Int
 
+// CHECK-LABEL: sil shared [noinline] @${{.*}}impl{{.*}}
+// In the optimization pass we look for uses of alloc_stack (aka %5).
+// This test makes sure that we look at the correct uses with the
+// correct dominance order (store before apply before dealloc).
+// This function will be passed arguments of type B and C for arguments
+// %0 and %1 respectively. We want to make sure that we call B's foo method
+// and not C's foo method.
+sil hidden [noinline] @impl : $@convention(thin) (@guaranteed A & P, @guaranteed A & P) -> Int {
+bb0(%0 : $A & P, %1 : $A & P):
+  %2 = open_existential_ref %0 : $A & P to $@opened("A1F1B526-1463-11EA-932F-ACBC329C418B") A & P
+  %3 = unchecked_ref_cast %1 : $A & P to $@opened("A1F1B526-1463-11EA-932F-ACBC329C418B") A & P
+
+  %5 = alloc_stack $@opened("A1F1B526-1463-11EA-932F-ACBC329C418B") A & P
+  store %2 to %5 : $*@opened("A1F1B526-1463-11EA-932F-ACBC329C418B") A & P
+  
+  // We want to make sure that we picked up on the FIRST store and not the second one.
+  // class C's foo method is named "bar" whereas class B's foo method is named "foo".
+  // We want to make sure that we call a function named "foo" not "bar".
+  // CHECK: [[FN:%[0-9]+]] = function_ref @${{.*}}foo{{.*}} : $@convention(thin) () -> Int
+  %7 = witness_method $@opened("A1F1B526-1463-11EA-932F-ACBC329C418B") A & P, #P.foo!1 : <Self where Self : P> (Self) -> () -> Int, %2 : $@opened("A1F1B526-1463-11EA-932F-ACBC329C418B") A & P : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int
+  // CHECK: apply [[FN]]
+  %8 = apply %7<@opened("A1F1B526-1463-11EA-932F-ACBC329C418B") A & P>(%5) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int
+  
+  store %3 to %5 : $*@opened("A1F1B526-1463-11EA-932F-ACBC329C418B") A & P
+  dealloc_stack %5 : $*@opened("A1F1B526-1463-11EA-932F-ACBC329C418B") A & P
+  return %8 : $Int
+} // end sil function 'impl'
+
 // main
 sil @main : $@convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
 bb0(%0 : $Int32, %1 : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>):
@@ -231,34 +259,6 @@ bb0(%0 : $*B):
   %3 = apply %2(%1) : $@convention(method) (@guaranteed B) -> Int // user: %4
   return %3 : $Int                                // id: %4
 } // end sil function '$s3run1BCAA1PA2aDP3fooSiyFTW'
-
-// CHECK-LABEL: sil shared [noinline] @${{.*}}impl{{.*}}
-// In the optimization pass we look for uses of alloc_stack (aka %5).
-// This test makes sure that we look at the correct uses with the
-// correct dominance order (store before apply before dealloc).
-// This function will be passed arguments of type B and C for arguments
-// %0 and %1 respectively. We want to make sure that we call B's foo method
-// and not C's foo method. 
-sil hidden [noinline] @impl : $@convention(thin) (@guaranteed A & P, @guaranteed A & P) -> Int {
-bb0(%0 : $A & P, %1 : $A & P):
-  %2 = open_existential_ref %0 : $A & P to $@opened("A1F1B526-1463-11EA-932F-ACBC329C418B") A & P
-  %3 = unchecked_ref_cast %1 : $A & P to $@opened("A1F1B526-1463-11EA-932F-ACBC329C418B") A & P
-
-  %5 = alloc_stack $@opened("A1F1B526-1463-11EA-932F-ACBC329C418B") A & P
-  store %2 to %5 : $*@opened("A1F1B526-1463-11EA-932F-ACBC329C418B") A & P
-  
-  // We want to make sure that we picked up on the FIRST store and not the second one.
-  // class C's foo method is named "bar" whereas class B's foo method is named "foo".
-  // We want to make sure that we call a function named "foo" not "bar".
-  // CHECK: [[FN:%[0-9]+]] = function_ref @${{.*}}foo{{.*}} : $@convention(thin) () -> Int
-  %7 = witness_method $@opened("A1F1B526-1463-11EA-932F-ACBC329C418B") A & P, #P.foo!1 : <Self where Self : P> (Self) -> () -> Int, %2 : $@opened("A1F1B526-1463-11EA-932F-ACBC329C418B") A & P : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int
-  // CHECK: apply [[FN]]
-  %8 = apply %7<@opened("A1F1B526-1463-11EA-932F-ACBC329C418B") A & P>(%5) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int
-  
-  store %3 to %5 : $*@opened("A1F1B526-1463-11EA-932F-ACBC329C418B") A & P
-  dealloc_stack %5 : $*@opened("A1F1B526-1463-11EA-932F-ACBC329C418B") A & P
-  return %8 : $Int
-} // end sil function 'impl'
 
 // test(x:y:)
 sil @test :$@convention(thin) (@guaranteed B, @guaranteed C) -> Int {
