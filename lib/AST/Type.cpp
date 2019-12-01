@@ -4738,8 +4738,7 @@ AnyFunctionType *AnyFunctionType::getAutoDiffDerivativeFunctionType(
                   ->getType()));
     if (includeContextTangent)
       differentialParams.push_back(
-          AnyFunctionType::Param(ctx.getAnyDerivativeType(), Identifier(),
-                                 ParameterTypeFlags().withOwned(true)));
+          AnyFunctionType::Param(ctx.getAnyDerivativeType()));
 
     SmallVector<TupleTypeElt, 8> differentialResults;
     if (auto *resultTuple = originalResult->getAs<TupleType>()) {
@@ -4784,9 +4783,7 @@ AnyFunctionType *AnyFunctionType::getAutoDiffDerivativeFunctionType(
           ->getAutoDiffAssociatedTangentSpace(lookupConformance)
               ->getType());
     if (includeContextTangent)
-      pullbackResults.push_back(
-          TupleTypeElt(ctx.getAnyDerivativeType(), Identifier(),
-                       ParameterTypeFlags().withOwned(true)));
+      pullbackResults.push_back(TupleTypeElt(ctx.getAnyDerivativeType()));
     Type pullbackResult = pullbackResults.size() > 1
                               ? TupleType::get(pullbackResults, ctx)
                               : pullbackResults[0].getType();

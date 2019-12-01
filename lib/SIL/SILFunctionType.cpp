@@ -306,7 +306,8 @@ CanSILFunctionType SILFunctionType::getAutoDiffDerivativeFunctionType(
           {paramTan->getCanonicalType(), param.getConvention()});
     }
     differentialParams.push_back(
-        {ctx.getAnyDerivativeType(), ParameterConvention::Indirect_In});
+        {ctx.getAnyDerivativeType(),
+        ParameterConvention::Indirect_In_Guaranteed});
     SmallVector<SILResultInfo, 8> differentialResults;
     auto &result = getResults()[resultIndex];
     auto resultTan = result.getInterfaceType()
