@@ -1587,17 +1587,24 @@ bool DeclContext::lookupQualified(ArrayRef<NominalTypeDecl *> typeDecls,
                                   DeclNameRef member,
                                   NLOptions options,
                                   SmallVectorImpl<ValueDecl *> &decls) const {
-  using namespace namelookup;
   assert(decls.empty() && "additive lookup not supported");
+  QualifiedLookupRequest req{this, {typeDecls.begin(), typeDecls.end()},
+                             member, options};
+  decls = evaluateOrDefault(getASTContext().evaluator, req, {});
+  return !decls.empty();
+}
 
-  auto *stats = getASTContext().Stats;
-  if (stats)
-    stats->getFrontendCounters().NumLookupQualifiedInNominal++;
+llvm::Expected<QualifiedLookupResult>
+QualifiedLookupRequest::evaluate(Evaluator &eval, const DeclContext *DC,
+                                 SmallVector<NominalTypeDecl *, 4> typeDecls,
+                                 DeclNameRef member, NLOptions options) const {
+  using namespace namelookup;
+  QualifiedLookupResult decls;
 
   // Configure lookup and dig out the tracker.
   ReferencedNameTracker *tracker = nullptr;
   bool isLookupCascading;
-  configureLookup(this, options, tracker, isLookupCascading);
+  configureLookup(DC, options, tracker, isLookupCascading);
 
   // Tracking for the nominal types we'll visit.
   SmallVector<NominalTypeDecl *, 4> stack;
@@ -1645,8 +1652,7 @@ bool DeclContext::lookupQualified(ArrayRef<NominalTypeDecl *> typeDecls,
       if ((options & NL_OnlyTypes) && !isa<TypeDecl>(decl))
         continue;
 
-      if (isAcceptableLookupResult(this, options, decl,
-                                   onlyCompleteObjectInits))
+      if (isAcceptableLookupResult(DC, options, decl, onlyCompleteObjectInits))
         decls.push_back(decl);
     }
 
@@ -1706,34 +1712,40 @@ bool DeclContext::lookupQualified(ArrayRef<NominalTypeDecl *> typeDecls,
     }
   }
 
-  pruneLookupResultSet(this, options, decls);
-  if (auto *debugClient = this->getParentModule()->getDebugClient()) {
-    debugClient->finishLookupInNominals(this, typeDecls, member.getFullName(),
+  pruneLookupResultSet(DC, options, decls);
+  if (auto *debugClient = DC->getParentModule()->getDebugClient()) {
+    debugClient->finishLookupInNominals(DC, typeDecls, member.getFullName(),
                                         options, decls);
   }
-  // We're done. Report success/failure.
-  return !decls.empty();
+
+  return decls;
 }
 
 bool DeclContext::lookupQualified(ModuleDecl *module, DeclNameRef member,
                                   NLOptions options,
                                   SmallVectorImpl<ValueDecl *> &decls) const {
-  using namespace namelookup;
+  assert(decls.empty() && "additive lookup not supported");
+  ModuleQualifiedLookupRequest req{this, module, member, options};
+  decls = evaluateOrDefault(getASTContext().evaluator, req, {});
+  return !decls.empty();
+}
 
-  auto &ctx = getASTContext();
-  auto *stats = ctx.Stats;
-  if (stats)
-    stats->getFrontendCounters().NumLookupQualifiedInModule++;
+llvm::Expected<QualifiedLookupResult>
+ModuleQualifiedLookupRequest::evaluate(Evaluator &eval, const DeclContext *DC,
+                                       ModuleDecl *module, DeclNameRef member,
+                                       NLOptions options) const {
+  using namespace namelookup;
+  QualifiedLookupResult decls;
 
   // Configure lookup and dig out the tracker.
   ReferencedNameTracker *tracker = nullptr;
   bool isLookupCascading;
-  configureLookup(this, options, tracker, isLookupCascading);
+  configureLookup(DC, options, tracker, isLookupCascading);
 
   auto kind = (options & NL_OnlyTypes
                ? ResolutionKind::TypesOnly
                : ResolutionKind::Overloadable);
-  auto topLevelScope = getModuleScopeContext();
+  auto topLevelScope = DC->getModuleScopeContext();
   if (module == topLevelScope->getParentModule()) {
     if (tracker) {
       recordLookupOfTopLevelName(topLevelScope, member.getFullName(),
@@ -1748,6 +1760,7 @@ bool DeclContext::lookupQualified(ModuleDecl *module, DeclNameRef member,
     // anything in this one.
 
     // Perform the lookup in all imports of this module.
+    auto &ctx = DC->getASTContext();
     auto accessPaths = ctx.getImportCache().getAllVisibleAccessPaths(
         module, topLevelScope);
     if (llvm::any_of(accessPaths,
@@ -1760,14 +1773,14 @@ bool DeclContext::lookupQualified(ModuleDecl *module, DeclNameRef member,
     }
   }
 
-  pruneLookupResultSet(this, options, decls);
+  pruneLookupResultSet(DC, options, decls);
 
-  if (auto *debugClient = this->getParentModule()->getDebugClient()) {
-    debugClient->finishLookupInModule(this, module, member.getFullName(),
+  if (auto *debugClient = DC->getParentModule()->getDebugClient()) {
+    debugClient->finishLookupInModule(DC, module, member.getFullName(),
                                       options, decls);
   }
-  // We're done. Report success/failure.
-  return !decls.empty();
+
+  return decls;
 }
 
 llvm::Expected<QualifiedLookupResult>
