@@ -90,7 +90,7 @@ SimpleModelTests.testWithLeakChecking("gradient") {
   let model = Model(l1: layer, l2: layer, l3: layer)
   let label: Tracked<Float> = 3
   let input: Tracked<Float> = 1
-  let gradModel = model.gradient { model -> Tracked<Float> in
+  let gradModel = gradient(at: model) { model -> Tracked<Float> in
     let pred = model.prediction(for: input)
     return model.loss(of: pred, from: label)
   }
