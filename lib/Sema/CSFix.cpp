@@ -1048,3 +1048,13 @@ std::string TreatEphemeralAsNonEphemeral::getName() const {
   name += ::getName(ConversionKind);
   return name;
 }
+
+bool SpecifyBaseTypeForContextualMember::diagnose(bool asNote) const {
+  return false;
+}
+
+SpecifyBaseTypeForContextualMember *SpecifyBaseTypeForContextualMember::create(
+    ConstraintSystem &cs, DeclName member, ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      SpecifyBaseTypeForContextualMember(cs, member, locator);
+}

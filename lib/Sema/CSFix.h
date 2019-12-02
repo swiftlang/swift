@@ -223,6 +223,10 @@ enum class FixKind : uint8_t {
   /// Allow an ephemeral argument conversion for a parameter marked as being
   /// non-ephemeral.
   TreatEphemeralAsNonEphemeral,
+
+  /// Base type in reference to the contextual member e.g. `.foo` couldn't be
+  /// inferred and has to be specified explicitly.
+  SpecifyBaseTypeForContextualMember,
 };
 
 class ConstraintFix {
@@ -1533,6 +1537,27 @@ public:
   create(ConstraintSystem &cs, ConstraintLocator *locator, Type srcType,
          Type dstType, ConversionRestrictionKind conversionKind,
          bool downgradeToWarning);
+};
+
+class SpecifyBaseTypeForContextualMember final : public ConstraintFix {
+  DeclName MemberName;
+
+  SpecifyBaseTypeForContextualMember(ConstraintSystem &cs, DeclName member,
+                                     ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::SpecifyBaseTypeForContextualMember, locator),
+        MemberName(member) {}
+
+public:
+  std::string getName() const {
+    const auto baseName = MemberName.getBaseName();
+    return "specify base type in reference to member '" +
+           baseName.userFacingName().str() + "'";
+  }
+
+  bool diagnose(bool asNote = false) const;
+
+  static SpecifyBaseTypeForContextualMember *
+  create(ConstraintSystem &cs, DeclName member, ConstraintLocator *locator);
 };
 
 } // end namespace constraints
