@@ -2025,6 +2025,10 @@ void Compilation::IncrementalSchemeComparator::outputComparison() const {
 
 void Compilation::IncrementalSchemeComparator::outputComparison(
     llvm::raw_ostream &out) const {
+  if (!EnableIncrementalBuildWhenConstructed) {
+    out << "*** Incremental build was not enabled in the command line ***\n";
+    return;
+  }
   if (!EnableIncrementalBuild) {
     // No stats will have been gathered
     assert(!WhyIncrementalWasDisabled.empty() && "Must be a reason");
