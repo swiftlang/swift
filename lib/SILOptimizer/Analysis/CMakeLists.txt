@@ -2,9 +2,6 @@ silopt_register_sources(
   ARCAnalysis.cpp
   AccessSummaryAnalysis.cpp
   AccessedStorageAnalysis.cpp
-  # SWIFT_ENABLE_TENSORFLOW
-  ActivityAnalysis.cpp
-  # SWIFT_ENABLE_TENSORFLOW END
   AliasAnalysis.cpp
   Analysis.cpp
   ArraySemantic.cpp
@@ -14,6 +11,9 @@ silopt_register_sources(
   ClosureScope.cpp
   ColdBlockInfo.cpp
   DestructorAnalysis.cpp
+  # SWIFT_ENABLE_TENSORFLOW
+  DifferentiableActivityAnalysis.cpp
+  # SWIFT_ENABLE_TENSORFLOW END
   EscapeAnalysis.cpp
   EpilogueARCAnalysis.cpp
   FunctionOrder.cpp

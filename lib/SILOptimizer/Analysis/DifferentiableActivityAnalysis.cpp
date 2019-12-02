@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 #define DEBUG_TYPE "differentiation"
 
-#include "swift/SILOptimizer/Analysis/ActivityAnalysis.h"
+#include "swift/SILOptimizer/Analysis/DifferentiableActivityAnalysis.h"
 #include "swift/SIL/Projection.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
