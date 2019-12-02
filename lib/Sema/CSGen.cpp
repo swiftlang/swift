@@ -1852,7 +1852,6 @@ namespace {
 
       // Introduce conversions from each element to the element type of the
       // array.
-      ConstraintLocatorBuilder builder(locator);
       unsigned index = 0;
       for (auto element : expr->getElements()) {
         CS.addConstraint(ConstraintKind::Conversion,

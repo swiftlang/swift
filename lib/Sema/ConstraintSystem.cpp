@@ -413,6 +413,25 @@ ConstraintLocator *ConstraintSystem::getConstraintLocator(
   return getConstraintLocator(anchor, path, builder.getSummaryFlags());
 }
 
+ConstraintLocator *ConstraintSystem::getConstraintLocator(
+    ConstraintLocator *locator,
+    ArrayRef<ConstraintLocator::PathElement> newElts) {
+  auto oldPath = locator->getPath();
+  SmallVector<ConstraintLocator::PathElement, 4> newPath;
+  newPath.append(oldPath.begin(), oldPath.end());
+  newPath.append(newElts.begin(), newElts.end());
+  return getConstraintLocator(locator->getAnchor(), newPath);
+}
+
+ConstraintLocator *ConstraintSystem::getConstraintLocator(
+    const ConstraintLocatorBuilder &builder,
+    ArrayRef<ConstraintLocator::PathElement> newElts) {
+  SmallVector<ConstraintLocator::PathElement, 4> newPath;
+  auto *anchor = builder.getLocatorParts(newPath);
+  newPath.append(newElts.begin(), newElts.end());
+  return getConstraintLocator(anchor, newPath);
+}
+
 ConstraintLocator *
 ConstraintSystem::getCalleeLocator(ConstraintLocator *locator,
                                    bool lookThroughApply) {
@@ -1218,11 +1237,11 @@ void ConstraintSystem::openGenericRequirements(
       break;
     }
 
-    addConstraint(
-        *openedReq,
-        locator.withPathElement(LocatorPathElt::OpenedGeneric(signature))
-            .withPathElement(
-                LocatorPathElt::TypeParameterRequirement(pos, kind)));
+    auto openedGenericLoc =
+        locator.withPathElement(LocatorPathElt::OpenedGeneric(signature));
+    addConstraint(*openedReq,
+                  openedGenericLoc.withPathElement(
+                      LocatorPathElt::TypeParameterRequirement(pos, kind)));
   }
 }
 
