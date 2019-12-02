@@ -917,13 +917,6 @@ runOnFunctionRecursively(SILOptFunctionBuilder &FuncBuilder,
                              CapturedArgs, IsCalleeGuaranteed);
       }
 
-      // Register a callback to record potentially unused function values after
-      // inlining.
-      ClosureCleanup closureCleanup;
-      Inliner.setDeletionCallback([&closureCleanup](SILInstruction *I) {
-        closureCleanup.recordDeadFunction(I);
-      });
-
       needUpdateStackNesting |= Inliner.needsUpdateStackNesting(InnerAI);
 
       // Inlining deletes the apply, and can introduce multiple new basic
@@ -936,8 +929,7 @@ runOnFunctionRecursively(SILOptFunctionBuilder &FuncBuilder,
 
       // The IR is now valid, and trivial dead arguments are removed. However,
       // we may be able to remove dead callee computations (e.g. dead
-      // partial_apply closures).
-      closureCleanup.cleanupDeadClosures(F);
+      // partial_apply closures). Those will be removed with mandatory combine.
 
       // Resume inlining within nextBB, which contains only the inlined
       // instructions and possibly instructions in the original call block that

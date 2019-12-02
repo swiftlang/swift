@@ -118,6 +118,7 @@ public:
   /// Base visitor that does not do anything.
   SILInstruction *visitSILInstruction(SILInstruction *) { return nullptr; }
   SILInstruction *visitApplyInst(ApplyInst *instruction);
+  SILInstruction *visitPartialApplyInst(PartialApplyInst *i);
 };
 
 } // end anonymous namespace
@@ -267,6 +268,17 @@ SILInstruction *MandatoryCombiner::visitApplyInst(ApplyInst *instruction) {
 #endif
   );
   tryDeleteDeadClosure(partialApply, instModCallbacks);
+  return nullptr;
+}
+
+SILInstruction *MandatoryCombiner::visitPartialApplyInst(PartialApplyInst *i) {
+  auto user = i->getSingleUse();
+  if (!user) return nullptr;
+  if (!isa<DeallocStackInst>(user->getUser())) return nullptr;
+  
+  instModCallbacks.deleteInst(user->getUser());
+  instModCallbacks.deleteInst(i);
+  instModCallbacks.deleteInst(cast<FunctionRefInst>(i->getCallee()));
   return nullptr;
 }
 
