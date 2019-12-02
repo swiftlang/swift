@@ -690,6 +690,7 @@ void ReabstractionInfo::createSubstitutedAndSpecializedTypes() {
       assert(RI.isFormalIndirect());
 
       auto ResultTy = substConv.getSILType(RI);
+      ResultTy = Callee->mapTypeIntoContext(ResultTy);
       auto &TL = M.Types.getTypeLowering(ResultTy,
                                          getResilienceExpansion());
 
@@ -709,6 +710,7 @@ void ReabstractionInfo::createSubstitutedAndSpecializedTypes() {
     ++IdxForParam;
 
     auto ParamTy = substConv.getSILType(PI);
+    ParamTy = Callee->mapTypeIntoContext(ParamTy);
     auto &TL = M.Types.getTypeLowering(ParamTy,
                                        getResilienceExpansion());
 
@@ -801,12 +803,10 @@ createSpecializedType(CanSILFunctionType SubstFTy, SILModule &M) const {
         // Convert the indirect result to a direct result.
         SILType SILResTy =
           SILType::getPrimitiveObjectType(RI.getReturnValueType(M, SubstFTy));
-        auto &TL = M.Types.getTypeLowering(SILResTy,
-                                           getResilienceExpansion());
 
         // Indirect results are passed as owned, so we also need to pass the
         // direct result as owned (except it's a trivial type).
-        auto C = (TL.isTrivial()
+        auto C = (SILResTy.isTrivial(*Callee)
                   ? ResultConvention::Unowned
                   : ResultConvention::Owned);
         SpecializedResults.push_back(SILResultInfo(RI.getReturnValueType(M, SubstFTy), C));
@@ -827,14 +827,12 @@ createSpecializedType(CanSILFunctionType SubstFTy, SILModule &M) const {
     // Convert the indirect parameter to a direct parameter.
     SILType SILParamTy =
       SILType::getPrimitiveObjectType(PI.getArgumentType(M, SubstFTy));
-    auto &TL = M.Types.getTypeLowering(SILParamTy,
-                                       getResilienceExpansion());
 
     // Indirect parameters are passed as owned/guaranteed, so we also
     // need to pass the direct/guaranteed parameter as
     // owned/guaranteed (except it's a trivial type).
     auto C = ParameterConvention::Direct_Unowned;
-    if (!TL.isTrivial()) {
+    if (!SILParamTy.isTrivial(*Callee)) {
       if (PI.isGuaranteed()) {
         C = ParameterConvention::Direct_Guaranteed;
       } else {

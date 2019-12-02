@@ -93,13 +93,6 @@ adjustFunctionType(CanSILFunctionType t, SILFunctionType::Representation rep,
                             witnessMethodConformance);
 }
 
-/// Flag used to place context-dependent TypeLowerings in their own arena which
-/// can be disposed when a generic context is exited.
-enum IsDependent_t : unsigned {
-  IsNotDependent = false,
-  IsDependent = true
-};
-
 /// Is a lowered SIL type trivial?  That is, are copies ultimately just
 /// bit-copies, and it takes no work to destroy a value?
 enum IsTrivial_t : bool {
@@ -182,6 +175,10 @@ public:
               (isFixedABI ? 0U : NonFixedABIFlag) |
               (isAddressOnly ? AddressOnlyFlag : 0U) |
               (isResilient ? ResilientFlag : 0U)) {}
+    
+    constexpr bool operator==(RecursiveProperties p) const {
+      return Flags == p.Flags;
+    }
 
     static constexpr RecursiveProperties forTrivial() {
       return {IsTrivial, IsFixedABI, IsNotAddressOnly, IsNotResilient};
@@ -502,10 +499,8 @@ public:
   }
 
   /// Allocate a new TypeLowering using the TypeConverter's allocator.
-  void *operator new(size_t size, TypeConverter &tc,
-                     IsDependent_t dependent);
-  void *operator new[](size_t size, TypeConverter &tc,
-                       IsDependent_t dependent);
+  void *operator new(size_t size, TypeConverter &tc);
+  void *operator new[](size_t size, TypeConverter &tc);
 
   // Forbid 'new FooTypeLowering' and try to forbid 'delete tl'.
   // The latter is made challenging because the existence of the
@@ -573,7 +568,7 @@ enum class CaptureKind {
 class TypeConverter {
   friend class TypeLowering;
 
-  llvm::BumpPtrAllocator IndependentBPA;
+  llvm::BumpPtrAllocator TypeLoweringBPA;
 
   struct CachingTypeKey {
     CanGenericSignature Sig;
@@ -617,11 +612,6 @@ class TypeConverter {
       return OrigType.hasCachingKey();
     }
     
-    IsDependent_t isDependent() const {
-      if (SubstType->hasTypeParameter())
-        return IsDependent;
-      return IsNotDependent;
-    }
     TypeKey getKeyForMinimalExpansion() const {
       return {OrigType, SubstType, TypeExpansionContext::minimal()};
     }
@@ -662,13 +652,10 @@ class TypeConverter {
 #endif
 
   /// Mapping for types independent on contextual generic parameters.
-  llvm::DenseMap<CachingTypeKey, const TypeLowering *> IndependentTypes;
+  llvm::DenseMap<CachingTypeKey, const TypeLowering *> LoweredTypes;
 
   struct DependentTypeState {
-    llvm::BumpPtrAllocator BPA;
     CanGenericSignature Sig;
-    llvm::DenseMap<TypeConverter::CachingTypeKey,
-                   const TypeLowering *> Map;
 
     explicit DependentTypeState(CanGenericSignature sig) : Sig(sig) {}
 
@@ -703,7 +690,8 @@ class TypeConverter {
 #include "swift/SIL/BridgedTypes.def"
 
   const TypeLowering &
-  getTypeLoweringForLoweredType(TypeKey key,
+  getTypeLoweringForLoweredType(AbstractionPattern origType,
+                                CanType loweredType,
                                 TypeExpansionContext forExpansion,
                                 bool origHadOpaqueTypeArchetype);
 
@@ -772,11 +760,14 @@ public:
     return isIndirectPlusZeroSelfParameter(T.getASTType());
   }
   
-  /// Lowers a Swift type to a SILType, and returns the SIL TypeLowering
+  /// Lowers a context-independent Swift type to a SILType, and returns the SIL TypeLowering
   /// for that type.
+  ///
+  /// If `t` contains generic parameters, then the overload that also takes an
+  /// `AbstractionPattern` must be used.
   const TypeLowering &
   getTypeLowering(Type t, TypeExpansionContext forExpansion) {
-    AbstractionPattern pattern(getCurGenericContext(), t->getCanonicalType());
+    AbstractionPattern pattern(t->getCanonicalType());
     return getTypeLowering(pattern, t, forExpansion);
   }
 
@@ -789,8 +780,18 @@ public:
   /// Returns the SIL TypeLowering for an already lowered SILType. If the
   /// SILType is an address, returns the TypeLowering for the pointed-to
   /// type.
+  ///
+  /// If `t` contains type parameters, then the generic signature for its context
+  /// must be provided.
   const TypeLowering &
-  getTypeLowering(SILType t, TypeExpansionContext forExpansion);
+  getTypeLowering(SILType t, TypeExpansionContext forExpansion,
+                  CanGenericSignature signature = nullptr);
+
+  /// Returns the SIL TypeLowering for an already lowered SILType. If the
+  /// SILType is an address, returns the TypeLowering for the pointed-to
+  /// type in the context of the given SILFunction.
+  const TypeLowering &
+  getTypeLowering(SILType t, SILFunction &F);
 
   // Returns the lowered SIL type for a Swift type.
   SILType getLoweredType(Type t, TypeExpansionContext forExpansion) {

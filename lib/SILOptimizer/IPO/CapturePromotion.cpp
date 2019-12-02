@@ -371,8 +371,7 @@ computeNewArgInterfaceTypes(SILFunction *F, IndicesSet &PromotableIndices,
     auto paramBoxedTy =
         getSILBoxFieldType(TypeExpansionContext(*F), paramBoxTy, Types, 0);
     assert(expansion == F->getResilienceExpansion());
-    auto &paramTL =
-        Types.getTypeLowering(paramBoxedTy, TypeExpansionContext(*F));
+    auto &paramTL = Types.getTypeLowering(paramBoxedTy, *F);
     ParameterConvention convention;
     if (paramTL.isAddressOnly()) {
       convention = ParameterConvention::Indirect_In;
