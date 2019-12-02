@@ -819,7 +819,8 @@ public:
   }
 
   /// Checks whether this is a type that supports being called through the
-  /// implementation of a \c callAsFunction method.
+  /// implementation of a \c callAsFunction method. Note that this does not
+  /// check access control.
   bool isCallableNominalType(DeclContext *dc);
 
   /// Retrieve the superclass of this type.

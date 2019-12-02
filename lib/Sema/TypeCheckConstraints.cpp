@@ -4575,6 +4575,7 @@ llvm::Expected<bool>
 IsCallableNominalTypeRequest::evaluate(Evaluator &evaluator, CanType ty,
                                        DeclContext *dc) const {
   auto options = defaultMemberLookupOptions;
+  options |= NameLookupFlags::IgnoreAccessControl;
   if (isa<AbstractFunctionDecl>(dc))
     options |= NameLookupFlags::KnownPrivate;
 

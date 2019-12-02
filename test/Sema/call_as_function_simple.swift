@@ -219,3 +219,12 @@ func testIUOCallAsFunction(_ x: IUOCallable) {
   let _: IUOCallable = .callable(5)
   let _: IUOCallable? = .callable(5)
 }
+
+// Test access control.
+struct PrivateCallable {
+  private func callAsFunction(_ x: Int) {} // expected-note {{'callAsFunction' declared here}}
+}
+
+func testAccessControl(_ x: PrivateCallable) {
+  x(5) // expected-error {{'callAsFunction' is inaccessible due to 'private' protection level}}
+}
