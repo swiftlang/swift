@@ -3484,6 +3484,9 @@ public:
               ->getAutoDiffAssociatedTangentSpace(lookupConformance)
               ->getCanonicalType(), origParam.getConvention()));
     }
+    // Add a pullback result for the closure context tangent.
+    adjResults.push_back(
+        {getASTContext().getAnyDerivativeType(), ResultConvention::Indirect});
 
     Mangle::ASTMangler mangler;
     auto pbName = original->getASTContext().getIdentifier(
@@ -5045,6 +5048,13 @@ public:
           return;
       }
     }
+    // The last argument is the closure context tangent.
+    // FIXME(SR-11882): Replace zero with `AnyDerivative(tan[f])`.
+    auto anyDerivType = getASTContext().getAnyDerivativeType();
+    auto *contextTanBuf = diffBuilder.createAllocStack(
+        loc, SILType::getPrimitiveObjectType(anyDerivType));
+    emitZeroIndirect(anyDerivType, contextTanBuf, loc);
+    diffArgs.push_back(contextTanBuf);
 
     // If callee differential was reabstracted in JVP, reabstract the callee
     // differential.
@@ -5068,6 +5078,11 @@ public:
     diffBuilder.emitDestroyValueOperation(loc, differential);
     assert(differentialCall->getNumResults() == 1 &&
            "Expected differential to return one result");
+
+    // FIXME(SR-11882): Remove when the zero context tangent buffer is replaced
+    // by `AnyDerivative(tan[f])`.
+    diffBuilder.emitDestroyAddr(loc, contextTanBuf);
+    diffBuilder.createDeallocStack(loc, contextTanBuf);
 
     // Get the original results of the `apply` instructions.
     SmallVector<SILValue, 8> origDirectResults;
@@ -5324,6 +5339,10 @@ public:
               ->getCanonicalType(),
           origParam.getConvention()));
     }
+    // Add a differential parameter for the closure context tangent.
+    dfParams.push_back(
+        {context.getASTContext().getAnyDerivativeType(),
+        ParameterConvention::Indirect_In_Guaranteed});
 
     // Accept a differential struct in the differential parameter list. This is
     // the returned differential's closure context.
@@ -6460,7 +6479,7 @@ public:
 
     // Copy them to adjoint indirect results.
     assert(indParamAdjoints.size() ==
-               getPullback().getIndirectResults().size() &&
+               getPullback().getIndirectResults().size() - 1 &&
            "Indirect parameter adjoint count mismatch");
     for (auto pair : zip(indParamAdjoints,
                              getPullback().getIndirectResults())) {
@@ -6471,6 +6490,9 @@ public:
       // value is moved.
       destroyedLocalAllocations.insert(source);
     }
+    // Emit a zero for the closure context tangent.
+    emitZeroIndirect(getASTContext().getAnyDerivativeType(),
+                     getPullback().getIndirectResults().back(), pbLoc);
 
     // Emit cleanups for all local values.
     cleanUpTemporariesForBlock(pbExit, pbLoc);
@@ -8382,6 +8404,11 @@ ADContext::getOrCreateSubsetParametersThunkForLinearMap(
       localAllocations.push_back(indirectResult);
       arguments.push_back(indirectResult);
     }
+    // Add an indirect result for the closure context tangent.
+    auto *contextTanBuf = builder.createAllocStack(
+        loc, SILType::getPrimitiveObjectType(astCtx.getAnyDerivativeType()));
+    localAllocations.push_back(contextTanBuf);
+    arguments.push_back(contextTanBuf);
     // Foward all actual non-indirect-result arguments.
     arguments.append(thunk->getArgumentsWithoutIndirectResults().begin(),
                      thunk->getArgumentsWithoutIndirectResults().end() - 1);
@@ -8394,49 +8421,52 @@ ADContext::getOrCreateSubsetParametersThunkForLinearMap(
   auto *ai = builder.createApply(
       loc, linearMap, SubstitutionMap(), arguments, /*isNonThrowing*/ false);
 
+  switch (kind) {
   // If differential thunk, deallocate local allocations and directly return
   // `apply` result.
-  if (kind == AutoDiffDerivativeFunctionKind::JVP) {
+  case AutoDiffDerivativeFunctionKind::JVP: {
     for (auto *alloc : llvm::reverse(localAllocations))
       builder.createDeallocStack(loc, alloc);
     builder.createReturn(loc, ai);
     return {thunk, interfaceSubs};
   }
-
   // If pullback thunk, return only the desired results and clean up the
   // undesired results.
-  SmallVector<SILValue, 8> pullbackDirectResults;
-  extractAllElements(ai, builder, pullbackDirectResults);
-  SmallVector<SILValue, 8> allResults;
-  collectAllActualResultsInTypeOrder(ai, pullbackDirectResults, allResults);
+  case AutoDiffDerivativeFunctionKind::VJP: {
+    SmallVector<SILValue, 8> pullbackDirectResults;
+    extractAllElements(ai, builder, pullbackDirectResults);
+    SmallVector<SILValue, 8> allResults;
+    collectAllActualResultsInTypeOrder(ai, pullbackDirectResults, allResults);
 
-  SmallVector<SILValue, 8> results;
-  for (unsigned i : actualIndices.parameters->getIndices()) {
-    // If result is desired:
-    // - Do nothing if result is indirect.
-    //   (It was already forwarded to the `apply` instruction).
-    // - Push it to `results` if result is direct.
-    auto result = allResults[mapOriginalParameterIndex(i)];
-    if (desiredIndices.isWrtParameter(i)) {
-      if (result->getType().isObject())
-        results.push_back(result);
+    SmallVector<SILValue, 8> directResults;
+    for (unsigned i : actualIndices.parameters->getIndices()) {
+      // If result is desired:
+      // - Do nothing if result is indirect.
+      //   (It was already forwarded to the `apply` instruction).
+      // - Push it to `results` if result is direct.
+      auto result = allResults[mapOriginalParameterIndex(i)];
+      if (desiredIndices.isWrtParameter(i)) {
+        if (result->getType().isObject())
+          directResults.push_back(result);
+      }
+      // Otherwise, cleanup the unused results.
+      else {
+        if (result->getType().isAddress())
+          builder.emitDestroyAddrAndFold(loc, result);
+        else
+          builder.emitDestroyValueOperation(loc, result);
+      }
     }
-    // Otherwise, cleanup the unused results.
-    else {
-      if (result->getType().isAddress())
-        builder.emitDestroyAddrAndFold(loc, result);
-      else
-        builder.emitDestroyValueOperation(loc, result);
-    }
+    // Deallocate local allocations and return final direct result.
+    for (auto *alloc : llvm::reverse(localAllocations))
+      builder.createDeallocStack(loc, alloc);
+    auto result = joinElements(directResults, builder, loc);
+    builder.createReturn(loc, result);
+
+    getGeneratedFunctions().push_back(thunk);
+    return {thunk, interfaceSubs};
   }
-  // Deallocate local allocations and return final direct result.
-  for (auto *alloc : llvm::reverse(localAllocations))
-    builder.createDeallocStack(loc, alloc);
-  auto result = joinElements(results, builder, loc);
-  builder.createReturn(loc, result);
-
-  getGeneratedFunctions().push_back(thunk);
-  return {thunk, interfaceSubs};
+  }
 }
 
 std::pair<SILFunction *, SubstitutionMap>
@@ -8700,7 +8730,7 @@ SILValue ADContext::promoteToDifferentiableFunction(
   SmallVector<SILValue, 2> derivativeFns;
   SmallVector<AllocStackInst *, 2> newBuffersToDealloc;
   for (auto derivativeFnKind : {AutoDiffDerivativeFunctionKind::JVP,
-                           AutoDiffDerivativeFunctionKind::VJP}) {
+                                AutoDiffDerivativeFunctionKind::VJP}) {
     auto derivativeFnAndIndices = emitDerivativeFunctionReference(
         *this, builder, desiredIndices, derivativeFnKind, origFnOperand, invoker,
         newBuffersToDealloc);
