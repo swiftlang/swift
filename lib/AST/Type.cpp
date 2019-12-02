@@ -1481,6 +1481,10 @@ bool TypeBase::satisfiesClassConstraint() {
 }
 
 bool TypeBase::isCallableNominalType(DeclContext *dc) {
+  // Don't allow callAsFunction to be used with dynamic lookup.
+  if (isAnyObject())
+    return false;
+
   // If the type cannot have members, we're done.
   if (!mayHaveMembers())
     return false;
