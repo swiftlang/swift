@@ -1,17 +1,19 @@
 # Building Swift on Windows
 
-Visual Studio 2017 or newer is needed to build swift on Windows. The following must take place in the developer command prompt (provided by Visual Studio). This shows up as "x64 Native Tools Command Prompt for VS2017" (or VS2019, VS2019 Preview depending on the Visual Studio that you are using) in the Start Menu.
+Visual Studio 2017 or newer is needed to build swift on Windows.
 
-![Visual Studio cmd](visual-studio-cmd.png)
+The following must take place in the **developer command prompt** (provided by Visual Studio). This shows up as "x64 Native Tools Command Prompt for VS2017" (or VS2019, VS2019 Preview depending on the Visual Studio that you are using) in the Start Menu.
 
 ## Install dependencies
 
 - Install the latest version of [Visual Studio](https://www.visualstudio.com/downloads/)
-- Make sure to include "Programming Languages|Visual C++" and "Windows and Web Development|Universal Windows App Development|Windows SDK" in your installation. The following components are required ([Find the name of components given its ID](https://docs.microsoft.com/fr-fr/visualstudio/install/workload-component-id-vs-build-tools?view=vs-2019)):
+- Make sure to include "Programming Languages|Visual C++" and "Windows and Web Development|Universal Windows App Development|Windows SDK" in your installation. The following components are required:
 
-1. Microsoft.VisualStudio.Component.Windows10SDK (Windows Universal C Runtime)
-2. Microsoft.VisualStudio.Component.Windows10SDK.17763 (Windows 10 SDK (version))
-3. Microsoft.VisualStudio.Component.VC.Tools.x86.x64 (MSVC vXXX - VS 20XX C++ x64/x86 build tools)
+1. Microsoft.VisualStudio.Component.Windows10SDK
+2. Microsoft.VisualStudio.Component.Windows10SDK.17763
+3. Microsoft.VisualStudio.Component.VC.Tools.x86.x64
+
+The following [link](https://docs.microsoft.com/visualstudio/install/workload-component-id-vs-build-tools?view=vs-2019)) helps in finding the component name given its ID for Visual Studio 2019.
 
 ## Clone the repositories
 
