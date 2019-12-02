@@ -6495,12 +6495,10 @@ static bool isValidDynamicCallableMethod(FuncDecl *method,
   return true;
 }
 
-// Resolve `callAsFunction` method applications.
-static Expr *finishApplyCallAsFunctionMethod(
+// Build a reference to a `callAsFunction` method.
+static Expr *buildCallAsFunctionMethodRef(
     ExprRewriter &rewriter, ApplyExpr *apply, SelectedOverload selected,
-    AnyFunctionType *openedMethodType,
     ConstraintLocatorBuilder applyFunctionLoc) {
-  auto &cs = rewriter.cs;
   auto *fn = apply->getFn();
   auto choice = selected.choice;
   // Create direct reference to `callAsFunction` method.
@@ -6512,21 +6510,7 @@ static Expr *finishApplyCallAsFunctionMethod(
   if (!declRef)
     return nullptr;
   declRef->setImplicit(apply->isImplicit());
-  apply->setFn(declRef);
-  // Coerce argument to input type of the `callAsFunction` method.
-  auto callee = rewriter.resolveConcreteDeclRef(choice.getDecl(),
-                                                applyFunctionLoc);
-  SmallVector<Identifier, 2> argLabelsScratch;
-  auto *arg = rewriter.coerceCallArguments(
-      apply->getArg(), openedMethodType, callee, apply,
-      apply->getArgumentLabels(argLabelsScratch), apply->hasTrailingClosure(),
-      applyFunctionLoc);
-  if (!arg)
-    return nullptr;
-  apply->setArg(arg);
-  cs.setType(apply, openedMethodType->getResult());
-  cs.cacheExprTypes(apply);
-  return apply;
+  return declRef;
 }
 
 // Resolve `@dynamicCallable` applications.
@@ -6768,12 +6752,19 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, ConcreteDeclRef callee,
     auto methodType =
         simplifyType(selected->openedType)->getAs<AnyFunctionType>();
     if (method && methodType) {
-      if (method->isCallAsFunctionMethod())
-        return finishApplyCallAsFunctionMethod(
-            *this, apply, *selected, methodType, applyFunctionLoc);
-      if (methodType && isValidDynamicCallableMethod(method, methodType))
+      // Handle a call to a @dynamicCallable method.
+      if (isValidDynamicCallableMethod(method, methodType))
         return finishApplyDynamicCallable(
             apply, *selected, method, methodType, applyFunctionLoc);
+
+      // If this is an implicit call to a callAsFunction method, build the
+      // appropriate member reference.
+      if (method->isCallAsFunctionMethod()) {
+        fn = buildCallAsFunctionMethodRef(*this, apply, *selected,
+                                          applyFunctionLoc);
+        if (!fn)
+          return nullptr;
+      }
     }
   }
 
