@@ -3540,7 +3540,7 @@ void Solution::dump(raw_ostream &out) const {
     out.indent(2);
     Type(typeVar).print(out, PO);
     out << " as ";
-    binding.second.print(out);
+    binding.second.print(out, PO);
     if (auto *locator = typeVar->getImpl().getLocator()) {
       out << " @ ";
       locator->dump(sm, out);
