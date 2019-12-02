@@ -897,6 +897,10 @@ public:
   /// If this returns true, the decl can be safely casted to ValueDecl.
   bool isPotentiallyOverridable() const;
 
+  /// If an alternative module name is specified for this decl, e.g. using
+  /// @_originalDefinedIn attribute, this function returns this module name.
+  StringRef getAlternateModuleName() const;
+
   /// Emit a diagnostic tied to this declaration.
   template<typename ...ArgTypes>
   InFlightDiagnostic diagnose(

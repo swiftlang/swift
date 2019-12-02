@@ -253,9 +253,9 @@ protected:
 
   void appendContextOf(const ValueDecl *decl);
 
-  void appendContext(const DeclContext *ctx);
+  void appendContext(const DeclContext *ctx, StringRef useModuleName);
 
-  void appendModule(const ModuleDecl *module);
+  void appendModule(const ModuleDecl *module, StringRef useModuleName);
 
   void appendProtocolName(const ProtocolDecl *protocol,
                           bool allowStandardSubstitution = true);
