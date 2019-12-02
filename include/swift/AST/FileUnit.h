@@ -159,9 +159,10 @@ public:
   ///
   /// \param Results Vector collecting the decls.
   ///
-  /// \param matchAttributes Check on the attributes of a decl to
-  /// filter which decls to fully deserialize. Only decls with accepted
-  /// attributes are deserialized and added to Results.
+  /// \param matchAttributes Check on the attributes of a decl to keep only
+  /// decls with matching attributes. The subclass SerializedASTFile checks the
+  /// attributes first to only deserialize decls with accepted attributes,
+  /// limiting deserialization work.
   virtual void
   getTopLevelDeclsWhereAttributesMatch(
               SmallVectorImpl<Decl*> &Results,
