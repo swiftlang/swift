@@ -709,6 +709,7 @@ public func valueWithGradient<T, U, V, R>(
 // Type-erased `AnyDerivative`
 //===----------------------------------------------------------------------===//
 
+@usableFromInline
 internal protocol _AnyDerivativeBox {
   // `Equatable` requirements (implied by `AdditiveArithmetic`).
   func _isEqual(to other: _AnyDerivativeBox) -> Bool
@@ -730,11 +731,12 @@ internal protocol _AnyDerivativeBox {
 
   /// Returns the underlying value unboxed to the given type, if possible.
   func _unboxed<U>(to type: U.Type) -> U?
-    where U : Differentiable, U.TangentVector == U
+    where U: Differentiable, U.TangentVector == U
 }
 
 extension _AnyDerivativeBox {
   /// Returns true if the underlying value has type `AnyDerivative.OpaqueZero`.
+  @inlinable
   func _isOpaqueZero() -> Bool {
     return _unboxed(to: AnyDerivative.OpaqueZero.self) != nil
   }
@@ -751,43 +753,51 @@ internal func _derivativeTypeMismatch(
     """, file: file, line: line)
 }
 
-internal struct _ConcreteDerivativeBox<T> : _AnyDerivativeBox
-  where T : Differentiable, T.TangentVector == T
+@frozen
+@usableFromInline
+internal struct _ConcreteDerivativeBox<T>: _AnyDerivativeBox
+  where T: Differentiable, T.TangentVector == T
 {
   /// The underlying base value.
+  @usableFromInline
   var _base: T
 
-  init(_ base: T) {
+  @inlinable
+  internal init(_ base: T) {
     self._base = base
   }
 
   /// The underlying base value, type-erased to `Any`.
+  @inlinable
   var _typeErasedBase: Any {
     return _base
   }
 
+  @inlinable
   func _unboxed<U>(to type: U.Type) -> U?
-    where U : Differentiable, U.TangentVector == U
+    where U: Differentiable, U.TangentVector == U
   {
     return (self as? _ConcreteDerivativeBox<U>)?._base
   }
 
   // `Equatable` requirements (implied by `AdditiveArithmetic`).
-
+  @inlinable
   func _isEqual(to other: _AnyDerivativeBox) -> Bool {
     return _base == other._unboxed(to: T.self)
   }
-
+  @inlinable
   func _isNotEqual(to other: _AnyDerivativeBox) -> Bool {
     return _base != other._unboxed(to: T.self)
   }
 
   // `AdditiveArithmetic` requirements.
 
+  @inlinable
   static var _zero: _AnyDerivativeBox {
     return _ConcreteDerivativeBox(T.zero)
   }
 
+  @inlinable
   func _adding(_ x: _AnyDerivativeBox) -> _AnyDerivativeBox {
     // 0 + x = x
     if _isOpaqueZero() {
@@ -803,6 +813,7 @@ internal struct _ConcreteDerivativeBox<T> : _AnyDerivativeBox
     return _ConcreteDerivativeBox(_base + xBase)
   }
 
+  @inlinable
   func _subtracting(_ x: _AnyDerivativeBox) -> _AnyDerivativeBox {
     // y - 0 = y
     if x._isOpaqueZero() {
@@ -819,7 +830,7 @@ internal struct _ConcreteDerivativeBox<T> : _AnyDerivativeBox
   }
 
   // `Differentiable` requirements.
-
+  @inlinable
   mutating func _move(along direction: _AnyDerivativeBox) {
     if direction._isOpaqueZero() {
       return
@@ -834,6 +845,7 @@ internal struct _ConcreteDerivativeBox<T> : _AnyDerivativeBox
   }
 
   // `EuclideanDifferentiable` requirements.
+  @inlinable
   var _differentiableVectorView: _AnyDerivativeBox {
     return self
   }
@@ -844,36 +856,43 @@ internal struct _ConcreteDerivativeBox<T> : _AnyDerivativeBox
 /// The `AnyDerivative` type forwards its operations to an arbitrary underlying
 /// base derivative value conforming to `Differentiable` and
 /// `AdditiveArithmetic`, hiding the specifics of the underlying value.
-public struct AnyDerivative : EuclideanDifferentiable & AdditiveArithmetic {
+@frozen
+public struct AnyDerivative: EuclideanDifferentiable & AdditiveArithmetic {
+  @usableFromInline
   internal var _box: _AnyDerivativeBox
 
+  @inlinable
   internal init(_box: _AnyDerivativeBox) {
     self._box = _box
   }
 
   /// The underlying base value.
+  @inlinable
   public var base: Any {
     return _box._typeErasedBase
   }
 
   /// Creates a type-erased derivative from the given derivative.
+  @inlinable
   @differentiable(jvp: _jvpInit(_:), vjp: _vjpInit(_:))
-  public init<T>(_ base: T) where T : Differentiable, T.TangentVector == T {
+  public init<T>(_ base: T) where T: Differentiable, T.TangentVector == T {
     self._box = _ConcreteDerivativeBox<T>(base)
   }
 
-  @usableFromInline internal static func _vjpInit<T>(
+  @inlinable
+  internal static func _vjpInit<T>(
     _ base: T
   ) -> (AnyDerivative, (AnyDerivative) -> T.TangentVector)
-    where T : Differentiable, T.TangentVector == T
+    where T: Differentiable, T.TangentVector == T
   {
     return (AnyDerivative(base), { v in v.base as! T.TangentVector })
   }
 
-  @usableFromInline internal static func _jvpInit<T>(
+  @inlinable
+  internal static func _jvpInit<T>(
     _ base: T
   ) -> (AnyDerivative, (T.TangentVector) -> AnyDerivative)
-    where T : Differentiable, T.TangentVector == T
+    where T: Differentiable, T.TangentVector == T
   {
     return (AnyDerivative(base), { dbase in AnyDerivative(dbase) })
   }
@@ -881,9 +900,11 @@ public struct AnyDerivative : EuclideanDifferentiable & AdditiveArithmetic {
   public typealias TangentVector = AnyDerivative
 
   // `Equatable` requirements (implied by `AdditiveArithmetic`).
+  @inlinable
   public static func == (lhs: AnyDerivative, rhs: AnyDerivative) -> Bool {
     return lhs._box._isEqual(to: rhs._box)
   }
+  @inlinable
   public static func != (lhs: AnyDerivative, rhs: AnyDerivative) -> Bool {
     return lhs._box._isNotEqual(to: rhs._box)
   }
@@ -893,13 +914,15 @@ public struct AnyDerivative : EuclideanDifferentiable & AdditiveArithmetic {
   /// Internal struct representing an opaque zero value.
   @frozen
   @usableFromInline
-  internal struct OpaqueZero : EuclideanDifferentiable & AdditiveArithmetic {}
+  internal struct OpaqueZero: EuclideanDifferentiable & AdditiveArithmetic {}
 
+  @inlinable
   public static var zero: AnyDerivative {
     return AnyDerivative(
       _box: _ConcreteDerivativeBox<OpaqueZero>(OpaqueZero.zero))
   }
 
+  @inlinable
   public static func + (
     lhs: AnyDerivative, rhs: AnyDerivative
   ) -> AnyDerivative {
@@ -907,7 +930,8 @@ public struct AnyDerivative : EuclideanDifferentiable & AdditiveArithmetic {
   }
 
   @derivative(of: +)
-  @usableFromInline internal static func _vjpAdd(
+  @inlinable
+  internal static func _vjpAdd(
     lhs: AnyDerivative, rhs: AnyDerivative
   ) -> (value: AnyDerivative,
         pullback: (AnyDerivative) -> (AnyDerivative, AnyDerivative)) {
@@ -915,13 +939,15 @@ public struct AnyDerivative : EuclideanDifferentiable & AdditiveArithmetic {
   }
 
   @derivative(of: +)
-  @usableFromInline internal static func _jvpAdd(
+  @inlinable
+  internal static func _jvpAdd(
     lhs: AnyDerivative, rhs: AnyDerivative
   ) -> (value: AnyDerivative,
     differential: (AnyDerivative, AnyDerivative) -> (AnyDerivative)) {
       return (lhs + rhs, { (dlhs, drhs) in dlhs + drhs })
   }
 
+  @inlinable
   public static func - (
     lhs: AnyDerivative, rhs: AnyDerivative
   ) -> AnyDerivative {
@@ -929,7 +955,8 @@ public struct AnyDerivative : EuclideanDifferentiable & AdditiveArithmetic {
   }
 
   @derivative(of: -)
-  @usableFromInline internal static func _vjpSubtract(
+  @inlinable
+  internal static func _vjpSubtract(
     lhs: AnyDerivative, rhs: AnyDerivative
   ) -> (value: AnyDerivative,
         pullback: (AnyDerivative) -> (AnyDerivative, AnyDerivative)) {
@@ -937,7 +964,8 @@ public struct AnyDerivative : EuclideanDifferentiable & AdditiveArithmetic {
   }
 
   @derivative(of: -)
-  @usableFromInline internal static func _jvpSubtract(
+  @inlinable
+  internal static func _jvpSubtract(
     lhs: AnyDerivative, rhs: AnyDerivative
   ) -> (value: AnyDerivative,
         differential: (AnyDerivative, AnyDerivative) -> AnyDerivative) {
@@ -945,6 +973,7 @@ public struct AnyDerivative : EuclideanDifferentiable & AdditiveArithmetic {
   }
 
   // `Differentiable` requirements.
+  @inlinable
   public mutating func move(along direction: TangentVector) {
     if _box._isOpaqueZero() {
       _box = direction._box
@@ -954,6 +983,7 @@ public struct AnyDerivative : EuclideanDifferentiable & AdditiveArithmetic {
   }
 
   // `EuclideanDifferentiable` requirements.
+  @inlinable
   public var differentiableVectorView: TangentVector {
     return self
   }
