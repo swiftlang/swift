@@ -3314,7 +3314,9 @@ static ManagedValue createAutoDiffThunk(SILGenFunction &SGF,
           -> CanAnyFunctionType {
         auto assocTy = fnTy->getAutoDiffDerivativeFunctionType(
             parameterIndices, /*resultIndex*/ 0,
-            kind, LookUpConformanceInModule(SGF.SGM.M.getSwiftModule()));
+            kind, LookUpConformanceInModule(SGF.SGM.M.getSwiftModule()),
+            GenericSignature(), /*makeSelfParamFirst*/ false,
+            /*includeContextTangent*/ true);
         return cast<AnyFunctionType>(assocTy->getCanonicalType());
       };
   auto getDerivativeFnPattern =
@@ -3593,7 +3595,6 @@ SILGenFunction::getThunkedAutoDiffLinearMap(
   // Handle indirect results.
   for (unsigned resIdx : range(toType->getNumResults())) {
     if (resIdx == fromType->getNumResults()) {
-      // FIXME: Write `AnyDerivative.zero` to buffer.
       emitZeroAnyDerivative(toArgIter->getValue());
       ++toArgIter;
       break;
@@ -3653,9 +3654,6 @@ SILGenFunction::getThunkedAutoDiffLinearMap(
     arguments.push_back(load.getValue());
   }
 
-  // All thunk arguments should have been processed now.
-//  assert(toArgIter == thunkArguments.end());
-
   auto *linearMapArg = thunk->getArgumentsWithoutIndirectResults().back();
   auto *apply = thunkSGF.B.createApply(
       loc, linearMapArg, SubstitutionMap(), arguments, /*isNonThrowing*/ false);
@@ -3687,7 +3685,6 @@ SILGenFunction::getThunkedAutoDiffLinearMap(
   // Reabstract results.
   for (unsigned resIdx : range(toType->getNumResults())) {
     if (resIdx == fromType->getNumResults()) {
-      // FIXME: Write `AnyDerivative.zero` to buffer.
       break;
     }
     auto fromRes = fromConv.getResults()[resIdx];
