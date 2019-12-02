@@ -77,10 +77,8 @@ func foo<T: Differentiable, U: Differentiable>(x: T) -> U {
 
 func test1<T: Differentiable, U: Differentiable>(_: @differentiable (T) -> @differentiable (U) -> Float) {}
 func test2<T: Differentiable, U: Differentiable>(_: @differentiable (T) -> (U) -> Float) {}
-// expected-error @+2 {{result is not differentiable, but the function type is marked '@differentiable'}}
 // expected-error @+1 {{result is not differentiable, but the function type is marked '@differentiable'}}
 func test3<T: Differentiable, U: Differentiable>(_: @differentiable (T) -> @differentiable (U) -> Int) {}
-// expected-error @+1 {{result is not differentiable, but the function type is marked '@differentiable'}}
 func test4<T: Differentiable, U: Differentiable>(_: @differentiable (T) -> (U) -> Int) {}
 
 let diffFunc: @differentiable (Float) -> Float

@@ -8351,6 +8351,7 @@ ADContext::getOrCreateSubsetParametersThunkForLinearMap(
   //   - Thunk arguments (when parameter index is in both desired and actual
   //     indices).
   //   - Zeros (when parameter is not in desired indices).
+  //   - Closure context tangent
   case AutoDiffDerivativeFunctionKind::JVP: {
     // Forward all indirect results.
     arguments.append(thunk->getIndirectResults().begin(),
@@ -8373,6 +8374,8 @@ ADContext::getOrCreateSubsetParametersThunkForLinearMap(
         buildZeroArgument(zeroSILType);
       }
     }
+    buildZeroArgument(SILType::getPrimitiveAddressType(
+        getASTContext().getAnyDerivativeType()));
     break;
   }
   // Pullback arguments are:
