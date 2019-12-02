@@ -196,22 +196,17 @@ protected:
   /// aren't yet.
   void
   ensureKeyPathComponentIsAlive(const KeyPathPatternComponent &component) {
-    switch (component.getKind()) {
-    case KeyPathPatternComponent::Kind::SettableProperty:
-      ensureAlive(component.getComputedPropertySetter());
-      LLVM_FALLTHROUGH;
-    case KeyPathPatternComponent::Kind::GettableProperty: {
-      ensureAlive(component.getComputedPropertyGetter());
-      auto id = component.getComputedPropertyId();
-      switch (id.getKind()) {
-      case KeyPathPatternComponent::ComputedPropertyId::DeclRef: {
-        auto declRef = id.getDeclRef();
-        if (declRef.isForeign) {
+    component.visitReferencedFunctionsAndMethods(
+      [this](SILFunction *F) {
+       ensureAlive(F);
+      },
+      [this](SILDeclRef method) {
+        if (method.isForeign) {
           // Nothing to do here: foreign functions aren't ours to be deleting.
           // (And even if they were, they're ObjC-dispatched and thus anchored
           // already: see isAnchorFunction)
         } else {
-          auto decl = cast<AbstractFunctionDecl>(declRef.getDecl());
+          auto decl = cast<AbstractFunctionDecl>(method.getDecl());
           if (auto clas = dyn_cast<ClassDecl>(decl->getDeclContext())) {
             ensureAliveClassMethod(getMethodInfo(decl, /*witness*/ false),
                                    dyn_cast<FuncDecl>(decl),
@@ -222,29 +217,8 @@ protected:
             llvm_unreachable("key path keyed by a non-class, non-protocol method");
           }
         }
-        break;
       }
-      case KeyPathPatternComponent::ComputedPropertyId::Function:
-        ensureAlive(id.getFunction());
-        break;
-      case KeyPathPatternComponent::ComputedPropertyId::Property:
-        break;
-      }
-
-      if (auto equals = component.getSubscriptIndexEquals())
-        ensureAlive(equals);
-      if (auto hash = component.getSubscriptIndexHash())
-        ensureAlive(hash);
-
-      break;
-    }
-    case KeyPathPatternComponent::Kind::StoredProperty:
-    case KeyPathPatternComponent::Kind::OptionalChain:
-    case KeyPathPatternComponent::Kind::OptionalForce:
-    case KeyPathPatternComponent::Kind::OptionalWrap:
-    case KeyPathPatternComponent::Kind::TupleElement:
-      break;
-    }
+    );
   }
 
   /// Marks a function as alive if it is not alive yet.

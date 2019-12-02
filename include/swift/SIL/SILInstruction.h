@@ -2892,6 +2892,10 @@ public:
     return KeyPathPatternComponent(tupleIndex, ty);
   }
   
+  void visitReferencedFunctionsAndMethods(
+      std::function<void (SILFunction *)> functionCallBack,
+      std::function<void (SILDeclRef)> methodCallBack) const;
+    
   void incrementRefCounts() const;
   void decrementRefCounts() const;
   
@@ -2948,6 +2952,15 @@ public:
   
   ArrayRef<KeyPathPatternComponent> getComponents() const;
   
+  void visitReferencedFunctionsAndMethods(
+      std::function<void (SILFunction *)> functionCallBack,
+      std::function<void (SILDeclRef)> methodCallBack) {
+    for (auto &component : getComponents()) {
+      component.visitReferencedFunctionsAndMethods(functionCallBack,
+                                                   methodCallBack);
+    }
+  }
+
   static KeyPathPattern *get(SILModule &M,
                              CanGenericSignature signature,
                              CanType rootType,
