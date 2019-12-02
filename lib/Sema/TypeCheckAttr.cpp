@@ -1219,7 +1219,7 @@ bool swift::isValidKeyPathDynamicMemberLookup(SubscriptDecl *decl,
     return false;
 
   const auto *param = decl->getIndices()->get(0);
-  if (auto NTD = param->getType()->getAnyNominal()) {
+  if (auto NTD = param->getInterfaceType()->getAnyNominal()) {
     return NTD == ctx.getKeyPathDecl() ||
            NTD == ctx.getWritableKeyPathDecl() ||
            NTD == ctx.getReferenceWritableKeyPathDecl();
