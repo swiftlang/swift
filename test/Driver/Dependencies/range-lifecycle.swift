@@ -277,8 +277,8 @@
 
 // RUN: %FileCheck -check-prefix=CHECK-ADD-NEW-FILE %s < %t/output7
 
-// CHECK-ADD-NEW-FILE-DAG: unable to load swift ranges file "./fileC.swiftranges", No such file or directory
-// CHECK-ADD-NEW-FILE-DAG: unable to determine when 'fileC.compiledsource' was last modified: No such file or directory
+// CHECK-ADD-NEW-FILE-DAG: unable to load swift ranges file "./fileC.swiftranges", {{N|n}}o such file or directory
+// CHECK-ADD-NEW-FILE-DAG: unable to determine when 'fileC.compiledsource' was last modified: {{N|n}}o such file or directory
 // CHECK-ADD-NEW-FILE-DAG: Queuing <Dependencies> (initial): {compile: fileC.o <= fileC.swift}
 // CHECK-ADD-NEW-FILE-DAG: Using dependencies: At least one input ('fileC.swift') lacks a supplementary output needed for the source range strategy.
 // CHECK-ADD-NEW-FILE-DAG: Queuing <Dependencies> because of dependencies discovered later: {compile: fileB.o <= fileB.swift}
