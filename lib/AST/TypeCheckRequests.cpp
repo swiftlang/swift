@@ -1218,3 +1218,23 @@ void DefaultArgumentExprRequest::cacheResult(Expr *expr) const {
   auto *param = std::get<0>(getStorage());
   param->setDefaultExpr(expr, /*isTypeChecked*/ true);
 }
+
+//----------------------------------------------------------------------------//
+// CallerSideDefaultArgExprRequest computation.
+//----------------------------------------------------------------------------//
+
+Optional<Expr *> CallerSideDefaultArgExprRequest::getCachedResult() const {
+  auto *defaultExpr = std::get<0>(getStorage());
+  auto storage = defaultExpr->ContextOrCallerSideExpr;
+  assert(!storage.isNull());
+
+  if (auto *expr = storage.dyn_cast<Expr *>())
+    return expr;
+
+  return None;
+}
+
+void CallerSideDefaultArgExprRequest::cacheResult(Expr *expr) const {
+  auto *defaultExpr = std::get<0>(getStorage());
+  defaultExpr->ContextOrCallerSideExpr = expr;
+}

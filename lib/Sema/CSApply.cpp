@@ -2997,10 +2997,6 @@ namespace {
       llvm_unreachable("Already type-checked");
     }
 
-    Expr *visitCallerDefaultArgumentExpr(CallerDefaultArgumentExpr *expr) {
-      llvm_unreachable("Already type-checked");
-    }
-
     Expr *visitApplyExpr(ApplyExpr *expr) {
       auto *calleeLoc = CalleeLocators[expr];
       assert(calleeLoc);
@@ -4690,87 +4686,15 @@ Solution::resolveLocatorToDecl(ConstraintLocator *locator) const {
   return resolveConcreteDeclRef(overload->choice.getDeclOrNull(), locator);
 }
 
-/// Produce the caller-side default argument for this default argument, or
-/// null if the default argument will be provided by the callee.
-static std::pair<Expr *, DefaultArgumentKind>
-getCallerDefaultArg(ConstraintSystem &cs, DeclContext *dc,
-                    SourceLoc loc, ConcreteDeclRef &owner,
-                    unsigned index) {
-  auto &ctx = cs.getASTContext();
-
-  const auto *param = getParameterAt(cast<ValueDecl>(owner.getDecl()), index);
-  Expr *init = nullptr;
-  switch (param->getDefaultArgumentKind()) {
-  case DefaultArgumentKind::None:
-    llvm_unreachable("No default argument here?");
-
-  case DefaultArgumentKind::StoredProperty:
-  case DefaultArgumentKind::Normal:
-    return {nullptr, param->getDefaultArgumentKind()};
-
-  case DefaultArgumentKind::Inherited:
-    // Update the owner to reflect inheritance here.
-    owner = owner.getOverriddenDecl();
-    return getCallerDefaultArg(cs, dc, loc, owner, index);
-
-  case DefaultArgumentKind::Column:
-    init = new (ctx)
-        MagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr::Column, loc,
-                                   /*implicit=*/true);
-    break;
-
-  case DefaultArgumentKind::File:
-    init = new (ctx)
-        MagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr::File, loc,
-                                   /*implicit=*/true);
-    break;
-    
-  case DefaultArgumentKind::Line:
-    init = new (ctx)
-        MagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr::Line, loc,
-                                   /*implicit=*/true);
-    break;
-      
-  case DefaultArgumentKind::Function:
-    init = new (ctx)
-        MagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr::Function, loc,
-                                   /*implicit=*/true);
-    break;
-
-  case DefaultArgumentKind::DSOHandle:
-    init = new (ctx)
-        MagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr::DSOHandle, loc,
-                                   /*implicit=*/true);
-    break;
-
-  case DefaultArgumentKind::NilLiteral:
-    init = new (ctx) NilLiteralExpr(loc, /*Implicit=*/true);
-    break;
-
-  case DefaultArgumentKind::EmptyArray:
-    init = ArrayExpr::create(ctx, loc, {}, {}, loc);
-    init->setImplicit();
-    break;
-
-  case DefaultArgumentKind::EmptyDictionary:
-    init = DictionaryExpr::create(ctx, loc, {}, {}, loc);
-    init->setImplicit();
-    break;
+/// Returns the concrete callee which 'owns' the default argument at a given
+/// index. This looks through inheritance for inherited default args.
+static ConcreteDeclRef getDefaultArgOwner(ConcreteDeclRef owner,
+                                          unsigned index) {
+  auto *param = getParameterAt(owner.getDecl(), index);
+  if (param->getDefaultArgumentKind() == DefaultArgumentKind::Inherited) {
+    return getDefaultArgOwner(owner.getOverriddenDecl(), index);
   }
-
-  // Convert the literal to the appropriate type.
-  auto defArgType =
-      param->getInterfaceType().subst(owner.getSubstitutions());
-  auto resultTy = TypeChecker::typeCheckParameterDefault(
-      init, dc, defArgType,
-      /*isAutoClosure=*/param->isAutoClosure(),
-      /*canFail=*/false);
-  assert(resultTy && "Conversion cannot fail");
-  (void)resultTy;
-
-  cs.cacheExprTypes(init);
-
-  return {init, param->getDefaultArgumentKind()};
+  return owner;
 }
 
 static bool canPeepholeTupleConversion(Expr *expr,
@@ -5306,22 +5230,10 @@ Expr *ExprRewriter::coerceCallArguments(Expr *arg, AnyFunctionType *funcType,
 
     // Handle default arguments.
     if (parameterBindings[paramIdx].empty()) {
-      Expr *defArg;
-      DefaultArgumentKind defArgKind;
-      std::tie(defArg, defArgKind) = getCallerDefaultArg(cs, dc, arg->getLoc(),
-                                                         callee, paramIdx);
-
-      // If we have a caller-side default argument, just add the magic literal
-      // expression to our argument list.
-      if (defArg) {
-        defArg = new (ctx) CallerDefaultArgumentExpr(defArg, arg->getStartLoc(),
-                                                     param.getParameterType());
-
-        // Otherwise, create a call of the default argument generator.
-      } else {
-        defArg = new (ctx) DefaultArgumentExpr(
-            callee, paramIdx, arg->getStartLoc(), param.getParameterType());
-      }
+      auto owner = getDefaultArgOwner(callee, paramIdx);
+      auto paramTy = param.getParameterType();
+      auto *defArg = new (ctx)
+          DefaultArgumentExpr(owner, paramIdx, arg->getStartLoc(), paramTy, dc);
 
       cs.cacheType(defArg);
       newArgs.push_back(defArg);
