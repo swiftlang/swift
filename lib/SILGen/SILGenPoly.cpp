@@ -3498,8 +3498,10 @@ SILGenFunction::getThunkedAutoDiffLinearMap(
       toResults.size() > 1) {
     auto toSelfResult = toResults.back();
     if (toSelfResult.isFormalIndirect() && numIndirectResults > 2) {
-      // Before: [ind_res1, ind_res2, ..., ind_res_self, ind_context_tan, arg1, arg2, ..., pb]
-      //  After: [ind_res_self, ind_res1, ind_res2, ..., ind_context_tan, arg1, arg2, ..., pb]
+      // Before: [ind_res1, ind_res2, ..., ind_res_self, ind_context_tan,
+      //          arg1, arg2, ..., pb]
+      //  After: [ind_res_self, ind_res1, ind_res2, ..., ind_context_tan,
+      //          arg1, arg2, ..., pb]
       std::rotate(thunkArguments.begin(),
                   thunkArguments.begin() + numIndirectResults - 2,
                   thunkArguments.begin() + numIndirectResults - 1);
@@ -3508,12 +3510,14 @@ SILGenFunction::getThunkedAutoDiffLinearMap(
       std::rotate(thunkIndirectResults.begin(), thunkIndirectResults.end() - 2,
                   thunkIndirectResults.end() - 1);
     }
-    std::rotate(toResults.begin(), toResults.end() - 1, toResults.end());
+    std::rotate(toResults.begin(), toResults.end() - 2, toResults.end() - 1);
   }
   if (reorderSelf && linearMapKind == AutoDiffLinearMapKind::Differential &&
       thunkArguments.size() > 2) {
-    // Before: [ind_res1, ind_res2, ..., arg1, arg2, ..., arg_self, ind_context_tan, df]
-    //  After: [ind_res1, ind_res2, ..., arg_self, arg1, arg2, ..., ind_context_tan, df]
+    // Before: [ind_res1, ind_res2, ..., arg1, arg2, ..., arg_self,
+    //          ind_context_tan, df]
+    //  After: [ind_res1, ind_res2, ..., arg_self, arg1, arg2, ...,
+    //          ind_context_tan, df]
     std::rotate(thunkArguments.begin() + numIndirectResults - 1,
                 thunkArguments.end() - 3, thunkArguments.end() - 2);
     // Before: [arg1, arg2, ..., arg_self, ind_context_tan]
@@ -3542,18 +3546,14 @@ SILGenFunction::getThunkedAutoDiffLinearMap(
   }
   // Use `zip` because `toConv` may have an extra parameter/result for the
   // context tangent.
-  for (auto pair :
-           llvm::zip(fromConv.getParameters(), toConv.getParameters())) {
+  for (auto pair : llvm::zip(fromConv.getParameters(), toParameters)) {
     auto &fromParam = std::get<0>(pair);
     auto &toParam = std::get<1>(pair);
     assert(fromParam.getInterfaceType() == toParam.getInterfaceType());
   }
-  for (auto pair : llvm::zip(fromConv.getResults(), toConv.getResults())) {
+  for (auto pair : llvm::zip(fromConv.getResults(), toResults)) {
     auto &fromRes = std::get<0>(pair);
     auto &toRes = std::get<1>(pair);
-    llvm::outs() << "*** FROM RES = " << fromRes.getInterfaceType() << '\n';
-    llvm::outs() << "*** TO RES = " << toRes.getInterfaceType() << '\n';
-    llvm::outs().flush();
     assert(fromRes.getInterfaceType() == toRes.getInterfaceType());
   }
 #endif // NDEBUG
@@ -3573,10 +3573,29 @@ SILGenFunction::getThunkedAutoDiffLinearMap(
     return alloc;
   };
 
+  auto emitZeroAnyDerivative = [&](SILValue resultBuffer) {
+    auto anyDerivType = getASTContext().getAnyDerivativeType();
+    auto *zeroDecl = cast<VarDecl>(
+        getASTContext().getAnyDerivativeDecl()
+            ->lookupDirect(getASTContext().Id_zero).front());
+    assert(zeroDecl->isStatic());
+    SILDeclRef zeroGetterConstant(
+        zeroDecl->getAccessor(AccessorKind::Get), SILDeclRef::Kind::Func);
+    auto zeroGetter = thunkSGF.emitGlobalFunctionRef(loc, zeroGetterConstant);
+    auto metatypeType = CanMetatypeType::get(
+        anyDerivType, MetatypeRepresentation::Thin);
+    auto metatype = thunkSGF.B.createMetatype(
+        loc, SILType::getPrimitiveObjectType(metatypeType));
+    thunkSGF.B.createApply(
+        loc, zeroGetter, SubstitutionMap(), {resultBuffer, metatype});
+  };
+
   // Handle indirect results.
   for (unsigned resIdx : range(toType->getNumResults())) {
-    if (resIdx == fromConv.getResults().size()) {
+    if (resIdx == fromType->getNumResults()) {
       // FIXME: Write `AnyDerivative.zero` to buffer.
+      emitZeroAnyDerivative(toArgIter->getValue());
+      ++toArgIter;
       break;
     }
     auto fromRes = fromConv.getResults()[resIdx];
@@ -3598,13 +3617,14 @@ SILGenFunction::getThunkedAutoDiffLinearMap(
     }
     // Convert direct result to indirect result.
     // Increment thunk argument iterator; reabstraction handled later.
-    toArgIter++;
+    ++toArgIter;
   }
 
   // Reabstract parameters.
   for (unsigned paramIdx : range(toType->getNumParameters())) {
-    if (paramIdx == fromConv.getNumParameters()) {
+    if (paramIdx == fromType->getNumParameters()) {
       // Skip the context tangent argument.
+      ++toArgIter;
       break;
     }
     auto fromParam = fromConv.getParameters()[paramIdx];
@@ -3632,6 +3652,9 @@ SILGenFunction::getThunkedAutoDiffLinearMap(
     auto load = thunkSGF.emitManagedLoadBorrow(loc, toArg);
     arguments.push_back(load.getValue());
   }
+
+  // All thunk arguments should have been processed now.
+//  assert(toArgIter == thunkArguments.end());
 
   auto *linearMapArg = thunk->getArgumentsWithoutIndirectResults().back();
   auto *apply = thunkSGF.B.createApply(
@@ -3663,7 +3686,7 @@ SILGenFunction::getThunkedAutoDiffLinearMap(
   auto toIndResultsIter = thunkIndirectResults.begin();
   // Reabstract results.
   for (unsigned resIdx : range(toType->getNumResults())) {
-    if (resIdx == fromConv.getResults().size()) {
+    if (resIdx == fromType->getNumResults()) {
       // FIXME: Write `AnyDerivative.zero` to buffer.
       break;
     }
