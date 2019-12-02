@@ -1677,9 +1677,18 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DLLVM_INCLUDE_DOCS:BOOL=TRUE
                     -DLLVM_ENABLE_LTO:STRING="${LLVM_ENABLE_LTO}"
                     -DCOMPILER_RT_INTERCEPT_LIBDISPATCH=ON
-                    -DLLVM_ENABLE_PROJECTS="clang;clang-tools-extra;compiler-rt;"
                     "${llvm_cmake_options[@]}"
                 )
+
+                if [[ "${SKIP_BUILD_COMPILER_RT}" ]]; then
+                    cmake_options+=(
+                    -DLLVM_ENABLE_PROJECTS="clang;clang-tools-extra;"
+                    )
+                else
+                    cmake_options+=(
+                    -DLLVM_ENABLE_PROJECTS="clang;clang-tools-extra;compiler-rt;"
+                    )
+                fi
 
                 cmake_options+=(
                   -DLLVM_TOOL_LLD_BUILD:BOOL=TRUE
