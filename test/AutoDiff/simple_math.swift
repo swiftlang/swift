@@ -362,12 +362,12 @@ SimpleMathTests.test("ForceUnwrapping") {
   expectEqual((1, 2), forceUnwrap(Float(2)))
 }
 
-// CHECK-LABEL: sil hidden [ossa] @AD__${{.*}}jumpTimesTwo{{.*}}pullback_src_0_wrt_0 : $@convention(thin) (Float, @owned _AD__$s4nullyycfU18_12jumpTimesTwoL_5modelSfAAyycfU18_14SmallTestModelL_V_tF_bb0__PB__src_0_wrt_0) -> SmallTestModel.TangentVector {
-// CHECK: bb0([[DX:%.*]] : $Float,  [[PB_STRUCT:%.*]] : {{.*}}):
+// CHECK-LABEL: sil hidden [ossa] @AD__${{.*}}jumpTimesTwo{{.*}}pullback_src_0_wrt_0 : $@convention(thin) (Float, @owned _AD__$s4nullyycfU18_12jumpTimesTwoL_5modelSfAAyycfU18_14SmallTestModelL_V_tF_bb0__PB__src_0_wrt_0) -> (SmallTestModel.TangentVector, @out AnyDerivative) {
+// CHECK: bb0({{%.*}} : $*AnyDerivative, [[DX:%.*]] : $Float,  [[PB_STRUCT:%.*]] : {{.*}}):
 // CHECK:   ([[PB0:%.*]], [[PB1:%.*]]) = destructure_struct [[PB_STRUCT]]
-// CHECK:   [[ADJ_TUPLE:%.*]] = apply [[PB1]]([[DX]]) : $@callee_guaranteed (Float) -> (Float, Float)
+// CHECK:   [[ADJ_TUPLE:%.*]] = apply [[PB1]]({{%.*}}, [[DX]]) : $@callee_guaranteed (Float) -> (Float, Float, @out AnyDerivative)
 // CHECK:   ([[TMP0:%.*]], [[ADJ_CONCRETE:%.*]]) = destructure_tuple [[ADJ_TUPLE]] : $(Float, Float)
-// CHECK:   [[TMP1:%.*]] = apply [[PB0]]([[TMP0]]) : $@callee_guaranteed (Float) -> SmallTestModel.TangentVector
+// CHECK:   [[TMP1:%.*]] = apply [[PB0]]({{%.*}}, [[TMP0]]) : $@callee_guaranteed (Float) -> (SmallTestModel.TangentVector, @out AnyDerivative)
 // CHECK:   [[ADJ_STRUCT_FIELD:%.*]] = destructure_struct [[TMP1]] : $SmallTestModel.TangentVector
 // CHECK:   [[TMP_RES:%.*]] = alloc_stack $Float
 // CHECK:   [[TMP_ADJ_STRUCT_FIELD:%.*]] = alloc_stack $Float
