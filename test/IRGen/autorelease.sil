@@ -50,7 +50,7 @@ bb0(%0 : @owned $C?):
 // aarch64:      [[T0:%.*]] = call swiftcc i64 @foo(i64 %0)
 // aarch64-NEXT: call void asm sideeffect "mov
 // aarch64-NEXT: [[T1:%.*]] = inttoptr i64 [[T0]] to i8*
-// aarch64-NEXT: [[T2:%.*]] = call i8* @objc_retainAutoreleasedReturnValue(i8* [[T1]])
+// aarch64-NEXT: [[T2:%.*]] = call i8* @llvm.objc.retainAutoreleasedReturnValue(i8* [[T1]])
 // aarch64-NEXT: [[T3:%.*]] = ptrtoint i8* [[T2]] to i64
 // aarch64-NEXT: ret i64 [[T3]]
 
