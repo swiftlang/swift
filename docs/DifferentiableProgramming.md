@@ -174,9 +174,9 @@ third-party libraries like [TensorFlow](https://github.com/tensorflow/swift).
 import TensorFlow
 
 let model = Sequential {
-    var layer1 = Dense<Float>(inputSize: 784, outputSize: 100, activation: relu)
-    var layer2 = Dense<Float>(inputSize: 100, outputSize: 30, activation: relu)
-    var layer3 = Dense<Float>(inputSize: 30, outputSize: 3, activation: identity)
+    Dense<Float>(inputSize: 784, outputSize: 100, activation: relu)
+    Dense<Float>(inputSize: 100, outputSize: 30, activation: relu)
+    Dense<Float>(inputSize: 30, outputSize: 3, activation: identity)
 }
 
 var classifier = Model()
@@ -238,12 +238,13 @@ Differentiation is the process of computing derivatives. See the
 ["Math Introduction"](#math-introduction) section below for more details.
 
 Derivatives are a fundamental tool in calculus and have applications in many
-domains, notably deep learning. Numerical computing in Swift is an expressive,
-high-performance language that is a great fit for numerical applications. Recent
-proposals have paved the way for low-level numerical computing in Swift:
-[AdditiveArithmetic][SE-0233], SIMD [[1][SE-0229]] [[2][SE-0251]], [generic math
-functions][SE-0246]. However, high-level numerical computing applications,
-including machine learning and artificial intelligence, require more work.
+domains, notably deep learning. As an expressive, high-performance language,
+Swift is a great fit for numerical applications. The [Swift Numerics
+library][swift-numerics] and recent Swift Evolution proposals have paved the way
+for low-level numerical computing in Swift: [AdditiveArithmetic][SE-0233], SIMD
+[[1][SE-0229]] [[2][SE-0251]], [generic math functions][SE-0246]. However,
+high-level numerical computing applications, including machine learning and
+artificial intelligence, require more work.
 
 We believe that first-class differentiable programming is a big step towards
 high-level numerical computing support and will make Swift a real contender in
@@ -362,7 +363,7 @@ like Python: these languages are concise and easy to use. However, some people
 prefer safer programming: features like type checking and static diagnostics
 help catch errors early and improve productivity.
 
-Differentiable programming in Swift enables safe, powerful machine learning.
+Differentiable programming in Swift enables safe, expressive machine learning.
 Custom differentiable data structures can be declared and checked at
 compile-time. Thanks to protocol-oriented programming, differentiable types are
 generalized by a protocol, enabling differential operators to be defined as
@@ -2640,6 +2641,8 @@ Parker Schuh, and Dimitrios Vytiniotis.
 [Dan Zheng]: https://github.com/dan-zheng
 [Marc Rasi]: https://github.com/marcrasi
 [Bart Chrzaszcz]: https://github.com/bartchr808
+
+[swift-numerics]: https://github.com/apple/swift-numerics
 [SE-0229]: https://github.com/apple/swift-evolution/blob/master/proposals/0229-simd.md
 [SE-0233]: https://github.com/apple/swift-evolution/blob/master/proposals/0233-additive-arithmetic-protocol.md
 [SE-0246]: https://github.com/apple/swift-evolution/blob/master/proposals/0246-mathable.md
