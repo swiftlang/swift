@@ -2090,13 +2090,17 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DFoundation_DIR:PATH=$(build_directory ${host} foundation)/cmake/modules
                 )
 
-                # Ensure on Darwin platforms that we prefer the SQLite from the SDK
-                # instead of picking one found elsewhere (e.g. in /usr/include )
+                # Ensure on Darwin platforms that we consider only the SQLite headers
+                # from the SDK instead of picking ones found elsewhere
+                # (e.g. in /usr/include )
+                # Also consider only the SQLite dylib shipped with the OS
+                # to avoid mismatch with the headers
                 if [[ "$(uname -s)" = "Darwin" ]]; then
                     cmake_options=(
                         "${cmake_options[@]}"
 
-                        -DSQLite3_ROOT:="$(xcrun -sdk macosx -show-sdk-path)/usr/include"
+                        -DSQLite3_INCLUDE_DIR:PATH="$(xcrun -sdk macosx -show-sdk-path)/usr/include"
+                        -DSQLite3_LIBRARY:PATH="/usr/lib/libsqlite3.dylib"
                     )
                 fi
                 ;;
