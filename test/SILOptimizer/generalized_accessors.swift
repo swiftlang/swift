@@ -3,10 +3,6 @@
 //
 // Tests for yield-once diagnostics emitted for generalized accessors.
 
-// SWIFT_ENABLE_TENSORFLOW
-// TODO(TF-799): Re-enable test after SR-11336 is fixed.
-// XFAIL: *
-
 struct TestNoYield {
   var computed: Int {
     _read {

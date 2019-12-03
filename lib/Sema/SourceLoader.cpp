@@ -106,8 +106,8 @@ ModuleDecl *SourceLoader::loadModule(SourceLoc importLoc,
                                      /*isSystem=*/false);
 
   // Turn off debugging while parsing other modules.
-  llvm::SaveAndRestore<bool> turnOffDebug(Ctx.LangOpts.DebugConstraintSolver,
-                                          false);
+  llvm::SaveAndRestore<bool>
+      turnOffDebug(Ctx.TypeCheckerOpts.DebugConstraintSolver, false);
 
   unsigned bufferID;
   if (auto BufID =

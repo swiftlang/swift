@@ -454,6 +454,7 @@ CurriedClass.method3(c)(1.0, b: 1)       // expected-error {{cannot convert valu
 CurriedClass.method3(c)(1)               // expected-error {{missing argument for parameter 'b' in call}}
 CurriedClass.method3(c)(c: 1.0)          // expected-error {{incorrect argument labels in call (have 'c:', expected '_:b:')}}
 // expected-error@-1 {{cannot convert value of type 'Double' to expected argument type 'Int'}}
+// expected-error@-2 {{missing argument for parameter #1 in call}}
 
 
 extension CurriedClass {
@@ -1295,6 +1296,7 @@ rdar43525641(1, c: 2, 3) // Ok
 
 struct Array {}
 let foo: Swift.Array = Array() // expected-error {{cannot convert value of type 'Array' to specified type 'Array<Element>'}}
+// expected-error@-1 {{generic parameter 'Element' could not be inferred}}
 
 struct Error {}
 let bar: Swift.Error = Error() //expected-error {{value of type 'diagnostics.Error' does not conform to specified type 'Swift.Error'}}

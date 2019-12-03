@@ -27,6 +27,7 @@
 #include "swift/Basic/Version.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/AttrKind.h"
+#include "swift/AST/AutoDiff.h"
 #include "swift/AST/ConcreteDeclRef.h"
 #include "swift/AST/DeclNameLoc.h"
 #include "swift/AST/KnownProtocols.h"
@@ -35,8 +36,6 @@
 #include "swift/AST/Requirement.h"
 #include "swift/AST/TrailingCallArguments.h"
 #include "swift/AST/TypeLoc.h"
-// SWIFT_ENABLE_TENSORFLOW
-#include "swift/AST/AutoDiff.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -167,7 +166,7 @@ public:
   static const char *getAttrName(TypeAttrKind kind);
 };
 
-class AttributeBase {
+class alignas(1 << AttrAlignInBits) AttributeBase {
 public:
   /// The location of the '@'.
   const SourceLoc AtLoc;
@@ -1523,13 +1522,276 @@ public:
   }
 };
 
-// SWIFT_ENABLE_TENSORFLOW
+/// Relates a property to its projection value property, as described by a property wrapper. For
+/// example, given
+/// \code
+/// @A var foo: Int
+/// \endcode
+///
+/// Where \c A is a property wrapper that has a \c projectedValue property, the compiler
+/// synthesizes a declaration $foo an attaches the attribute
+/// \c _projectedValuePropertyAttr($foo) to \c foo to record the link.
+class ProjectedValuePropertyAttr : public DeclAttribute {
+public:
+  ProjectedValuePropertyAttr(Identifier PropertyName,
+                              SourceLoc AtLoc, SourceRange Range,
+                              bool Implicit)
+    : DeclAttribute(DAK_ProjectedValueProperty, AtLoc, Range, Implicit),
+      ProjectionPropertyName(PropertyName) {}
+
+  // The projection property name.
+  const Identifier ProjectionPropertyName;
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DAK_ProjectedValueProperty;
+  }
+};
+
+/// Attribute that asks the compiler to generate a function that returns a
+/// quoted representation of the attributed declaration.
+///
+///     @quoted
+///     func identity(_ x: Int) -> Int {
+///         return x;
+///     }
+///
+/// The generated function, called "quote decl", looks along the following lines
+/// (the exact representation may change over time since quasiquotes are an
+/// experimental feature, e.g. the name may end up being mangled as per #13):
+///
+///     func _quotedIdentity() -> Tree {
+///         return #quote{
+///             func identity(_ x: Int) -> Int {
+///                 return x;
+///             }
+///         }
+///     }
+///
+/// Quote decls are not supposed to be called manually. Instead,  it is expected
+/// that #quote(...) will be used to obtain representations of @quoted
+/// declarations, by synthesizing calls to quote decls. This way users don't
+/// have to know the details of name mangling in the presence of overloads etc:
+///
+///     #quote(identity)
+///
+///     Unquote(
+///       Name(
+///         "foo",
+///         "s:4main3fooyS2fF",
+///         FunctionType(
+///           [],
+///           [TypeName("Int", "s:Si")],
+///           TypeName("Int", "s:Si"))),
+///       { () -> Tree in quotedIdentity() },
+///       FunctionType(
+///         [],
+///         [TypeName("Int", "s:Si")],
+///         TypeName("Int", "s:Si")))
+class QuotedAttr final : public DeclAttribute {
+  FuncDecl *QuoteDecl;
+
+  explicit QuotedAttr(FuncDecl *quoteDecl, SourceLoc atLoc, SourceRange range,
+                      bool implicit);
+
+public:
+  FuncDecl *getQuoteDecl() const { return QuoteDecl; }
+  void setQuoteDecl(FuncDecl *quoteDecl) { QuoteDecl = quoteDecl; }
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DAK_Quoted;
+  }
+
+  static QuotedAttr *create(ASTContext &context, SourceLoc atLoc,
+                            SourceRange range, bool implicit);
+
+  static QuotedAttr *create(ASTContext &context, FuncDecl *quoteDecl,
+                            SourceLoc atLoc, SourceRange range, bool implicit);
+};
+
+/// Attributes that may be applied to declarations.
+class DeclAttributes {
+  /// Linked list of declaration attributes.
+  DeclAttribute *DeclAttrs;
+
+public:
+  DeclAttributes() : DeclAttrs(nullptr) {}
+
+  bool isEmpty() const {
+    return DeclAttrs == nullptr;
+  }
+
+  void getAttrRanges(SmallVectorImpl<SourceRange> &Ranges) const {
+    for (auto Attr : *this) {
+      auto R = Attr->getRangeWithAt();
+      if (R.isValid())
+        Ranges.push_back(R);
+    }
+  }
+
+  /// If this attribute set has a prefix/postfix attribute on it, return this.
+  UnaryOperatorKind getUnaryOperatorKind() const {
+    if (hasAttribute<PrefixAttr>())
+      return UnaryOperatorKind::Prefix;
+    if (hasAttribute<PostfixAttr>())
+      return UnaryOperatorKind::Postfix;
+    return UnaryOperatorKind::None;
+  }
+
+  bool isUnavailable(const ASTContext &ctx) const {
+    return getUnavailable(ctx) != nullptr;
+  }
+
+  /// Determine whether there is a swiftVersionSpecific attribute that's
+  /// unavailable relative to the provided language version.
+  bool
+  isUnavailableInSwiftVersion(const version::Version &effectiveVersion) const;
+
+  /// Returns the first @available attribute that indicates
+  /// a declaration is unavailable, or the first one that indicates it's
+  /// potentially unavailable, or null otherwise.
+  const AvailableAttr *getPotentiallyUnavailable(const ASTContext &ctx) const;
+
+  /// Returns the first @available attribute that indicates
+  /// a declaration is unavailable, or null otherwise.
+  const AvailableAttr *getUnavailable(const ASTContext &ctx) const;
+
+  /// Returns the first @available attribute that indicates
+  /// a declaration is deprecated on all deployment targets, or null otherwise.
+  const AvailableAttr *getDeprecated(const ASTContext &ctx) const;
+
+  SWIFT_DEBUG_DUMPER(dump(const Decl *D = nullptr));
+  void print(ASTPrinter &Printer, const PrintOptions &Options,
+             const Decl *D = nullptr) const;
+  static void print(ASTPrinter &Printer, const PrintOptions &Options,
+                    ArrayRef<const DeclAttribute *> FlattenedAttrs,
+                    const Decl *D = nullptr);
+
+  template <typename T, typename DERIVED>
+  class iterator_base : public std::iterator<std::forward_iterator_tag, T *> {
+    T *Impl;
+  public:
+    explicit iterator_base(T *Impl) : Impl(Impl) {}
+    DERIVED &operator++() { Impl = Impl->Next; return (DERIVED&)*this; }
+    bool operator==(const iterator_base &X) const { return X.Impl == Impl; }
+    bool operator!=(const iterator_base &X) const { return X.Impl != Impl; }
+    T *operator*() const { return Impl; }
+    T &operator->() const { return *Impl; }
+  };
+
+  /// Add a constructed DeclAttribute to this list.
+  void add(DeclAttribute *Attr) {
+    Attr->Next = DeclAttrs;
+    DeclAttrs = Attr;
+  }
+
+  // Iterator interface over DeclAttribute objects.
+  class iterator : public iterator_base<DeclAttribute, iterator> {
+  public:
+    explicit iterator(DeclAttribute *Impl) : iterator_base(Impl) {}
+  };
+
+  class const_iterator : public iterator_base<const DeclAttribute,
+                                              const_iterator> {
+  public:
+    explicit const_iterator(const DeclAttribute *Impl)
+        : iterator_base(Impl) {}
+  };
+
+  iterator begin() { return iterator(DeclAttrs); }
+  iterator end() { return iterator(nullptr); }
+  const_iterator begin() const { return const_iterator(DeclAttrs); }
+  const_iterator end() const { return const_iterator(nullptr); }
+
+  /// Retrieve the first attribute of the given attribute class.
+  template <typename ATTR>
+  const ATTR *getAttribute(bool AllowInvalid = false) const {
+    return const_cast<DeclAttributes *>(this)->getAttribute<ATTR>(AllowInvalid);
+  }
+
+  template <typename ATTR>
+  ATTR *getAttribute(bool AllowInvalid = false) {
+    for (auto Attr : *this)
+      if (auto *SpecificAttr = dyn_cast<ATTR>(Attr))
+        if (SpecificAttr->isValid() || AllowInvalid)
+          return SpecificAttr;
+    return nullptr;
+  }
+
+  /// Determine whether there is an attribute with the given attribute class.
+  template <typename ATTR>
+  bool hasAttribute(bool AllowInvalid = false) const {
+    return getAttribute<ATTR>(AllowInvalid) != nullptr;
+  }
+
+  /// Retrieve the first attribute with the given kind.
+  const DeclAttribute *getAttribute(DeclAttrKind DK,
+                                    bool AllowInvalid = false) const {
+    for (auto Attr : *this)
+      if (Attr->getKind() == DK && (Attr->isValid() || AllowInvalid))
+        return Attr;
+    return nullptr;
+  }
+
+private:
+  /// Predicate used to filter MatchingAttributeRange.
+  template <typename ATTR, bool AllowInvalid> struct ToAttributeKind {
+    ToAttributeKind() {}
+
+    Optional<const ATTR *>
+    operator()(const DeclAttribute *Attr) const {
+      if (isa<ATTR>(Attr) && (Attr->isValid() || AllowInvalid))
+        return cast<ATTR>(Attr);
+      return None;
+    }
+  };
+
+public:
+  template <typename ATTR, bool AllowInvalid>
+  using AttributeKindRange =
+      OptionalTransformRange<iterator_range<const_iterator>,
+                             ToAttributeKind<ATTR, AllowInvalid>,
+                             const_iterator>;
+
+  /// Return a range with all attributes in DeclAttributes with AttrKind
+  /// ATTR.
+  template <typename ATTR, bool AllowInvalid = false>
+  AttributeKindRange<ATTR, AllowInvalid> getAttributes() const {
+    return AttributeKindRange<ATTR, AllowInvalid>(
+        make_range(begin(), end()), ToAttributeKind<ATTR, AllowInvalid>());
+  }
+
+  // Remove the given attribute from the list of attributes. Used when
+  // the attribute was semantically invalid.
+  void removeAttribute(const DeclAttribute *attr) {
+    // If it's the first attribute, remove it.
+    if (DeclAttrs == attr) {
+      DeclAttrs = attr->Next;
+      return;
+    }
+
+    // Otherwise, find it in the list. This is inefficient, but rare.
+    for (auto **prev = &DeclAttrs; *prev; prev = &(*prev)->Next) {
+      if ((*prev)->Next == attr) {
+        (*prev)->Next = attr->Next;
+        return;
+      }
+    }
+    llvm_unreachable("Attribute not found for removal");
+  }
+
+  /// Set the raw chain of attributes.  Used for deserialization.
+  void setRawAttributeChain(DeclAttribute *Chain) {
+    DeclAttrs = Chain;
+  }
+
+  SourceLoc getStartLoc(bool forModifiers = false) const;
+};
+
 struct DeclNameWithLoc {
   DeclName Name;
   DeclNameLoc Loc;
 };
 
-// SWIFT_ENABLE_TENSORFLOW
 /// Attribute that marks a function as differentiable and optionally specifies
 /// custom associated derivative functions: 'jvp' and 'vjp'.
 ///
@@ -1815,271 +2077,6 @@ public:
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_Transpose;
   }
-};
-
-/// Relates a property to its projection value property, as described by a property wrapper. For
-/// example, given
-/// \code
-/// @A var foo: Int
-/// \endcode
-///
-/// Where \c A is a property wrapper that has a \c projectedValue property, the compiler
-/// synthesizes a declaration $foo an attaches the attribute
-/// \c _projectedValuePropertyAttr($foo) to \c foo to record the link.
-class ProjectedValuePropertyAttr : public DeclAttribute {
-public:
-  ProjectedValuePropertyAttr(Identifier PropertyName,
-                              SourceLoc AtLoc, SourceRange Range,
-                              bool Implicit)
-    : DeclAttribute(DAK_ProjectedValueProperty, AtLoc, Range, Implicit),
-      ProjectionPropertyName(PropertyName) {}
-
-  // The projection property name.
-  const Identifier ProjectionPropertyName;
-
-  static bool classof(const DeclAttribute *DA) {
-    return DA->getKind() == DAK_ProjectedValueProperty;
-  }
-};
-
-/// Attribute that asks the compiler to generate a function that returns a
-/// quoted representation of the attributed declaration.
-///
-///     @quoted
-///     func identity(_ x: Int) -> Int {
-///         return x;
-///     }
-///
-/// The generated function, called "quote decl", looks along the following lines
-/// (the exact representation may change over time since quasiquotes are an
-/// experimental feature, e.g. the name may end up being mangled as per #13):
-///
-///     func _quotedIdentity() -> Tree {
-///         return #quote{
-///             func identity(_ x: Int) -> Int {
-///                 return x;
-///             }
-///         }
-///     }
-///
-/// Quote decls are not supposed to be called manually. Instead,  it is expected
-/// that #quote(...) will be used to obtain representations of @quoted
-/// declarations, by synthesizing calls to quote decls. This way users don't
-/// have to know the details of name mangling in the presence of overloads etc:
-///
-///     #quote(identity)
-///
-///     Unquote(
-///       Name(
-///         "foo",
-///         "s:4main3fooyS2fF",
-///         FunctionType(
-///           [],
-///           [TypeName("Int", "s:Si")],
-///           TypeName("Int", "s:Si"))),
-///       { () -> Tree in quotedIdentity() },
-///       FunctionType(
-///         [],
-///         [TypeName("Int", "s:Si")],
-///         TypeName("Int", "s:Si")))
-class QuotedAttr final : public DeclAttribute {
-  FuncDecl *QuoteDecl;
-
-  explicit QuotedAttr(FuncDecl *quoteDecl, SourceLoc atLoc, SourceRange range,
-                      bool implicit);
-
-public:
-  FuncDecl *getQuoteDecl() const { return QuoteDecl; }
-  void setQuoteDecl(FuncDecl *quoteDecl) { QuoteDecl = quoteDecl; }
-
-  static bool classof(const DeclAttribute *DA) {
-    return DA->getKind() == DAK_Quoted;
-  }
-
-  static QuotedAttr *create(ASTContext &context, SourceLoc atLoc,
-                            SourceRange range, bool implicit);
-
-  static QuotedAttr *create(ASTContext &context, FuncDecl *quoteDecl,
-                            SourceLoc atLoc, SourceRange range, bool implicit);
-};
-
-/// Attributes that may be applied to declarations.
-class DeclAttributes {
-  /// Linked list of declaration attributes.
-  DeclAttribute *DeclAttrs;
-
-public:
-  DeclAttributes() : DeclAttrs(nullptr) {}
-
-  bool isEmpty() const {
-    return DeclAttrs == nullptr;
-  }
-
-  void getAttrRanges(SmallVectorImpl<SourceRange> &Ranges) const {
-    for (auto Attr : *this) {
-      auto R = Attr->getRangeWithAt();
-      if (R.isValid())
-        Ranges.push_back(R);
-    }
-  }
-
-  /// If this attribute set has a prefix/postfix attribute on it, return this.
-  UnaryOperatorKind getUnaryOperatorKind() const {
-    if (hasAttribute<PrefixAttr>())
-      return UnaryOperatorKind::Prefix;
-    if (hasAttribute<PostfixAttr>())
-      return UnaryOperatorKind::Postfix;
-    return UnaryOperatorKind::None;
-  }
-
-  bool isUnavailable(const ASTContext &ctx) const {
-    return getUnavailable(ctx) != nullptr;
-  }
-
-  /// Determine whether there is a swiftVersionSpecific attribute that's
-  /// unavailable relative to the provided language version.
-  bool
-  isUnavailableInSwiftVersion(const version::Version &effectiveVersion) const;
-
-  /// Returns the first @available attribute that indicates
-  /// a declaration is unavailable, or the first one that indicates it's
-  /// potentially unavailable, or null otherwise.
-  const AvailableAttr *getPotentiallyUnavailable(const ASTContext &ctx) const;
-
-  /// Returns the first @available attribute that indicates
-  /// a declaration is unavailable, or null otherwise.
-  const AvailableAttr *getUnavailable(const ASTContext &ctx) const;
-
-  /// Returns the first @available attribute that indicates
-  /// a declaration is deprecated on all deployment targets, or null otherwise.
-  const AvailableAttr *getDeprecated(const ASTContext &ctx) const;
-
-  SWIFT_DEBUG_DUMPER(dump(const Decl *D = nullptr));
-  void print(ASTPrinter &Printer, const PrintOptions &Options,
-             const Decl *D = nullptr) const;
-  static void print(ASTPrinter &Printer, const PrintOptions &Options,
-                    ArrayRef<const DeclAttribute *> FlattenedAttrs,
-                    const Decl *D = nullptr);
-
-  template <typename T, typename DERIVED>
-  class iterator_base : public std::iterator<std::forward_iterator_tag, T *> {
-    T *Impl;
-  public:
-    explicit iterator_base(T *Impl) : Impl(Impl) {}
-    DERIVED &operator++() { Impl = Impl->Next; return (DERIVED&)*this; }
-    bool operator==(const iterator_base &X) const { return X.Impl == Impl; }
-    bool operator!=(const iterator_base &X) const { return X.Impl != Impl; }
-    T *operator*() const { return Impl; }
-    T &operator->() const { return *Impl; }
-  };
-
-  /// Add a constructed DeclAttribute to this list.
-  void add(DeclAttribute *Attr) {
-    Attr->Next = DeclAttrs;
-    DeclAttrs = Attr;
-  }
-
-  // Iterator interface over DeclAttribute objects.
-  class iterator : public iterator_base<DeclAttribute, iterator> {
-  public:
-    explicit iterator(DeclAttribute *Impl) : iterator_base(Impl) {}
-  };
-
-  class const_iterator : public iterator_base<const DeclAttribute,
-                                              const_iterator> {
-  public:
-    explicit const_iterator(const DeclAttribute *Impl)
-        : iterator_base(Impl) {}
-  };
-
-  iterator begin() { return iterator(DeclAttrs); }
-  iterator end() { return iterator(nullptr); }
-  const_iterator begin() const { return const_iterator(DeclAttrs); }
-  const_iterator end() const { return const_iterator(nullptr); }
-
-  /// Retrieve the first attribute of the given attribute class.
-  template <typename ATTR>
-  const ATTR *getAttribute(bool AllowInvalid = false) const {
-    return const_cast<DeclAttributes *>(this)->getAttribute<ATTR>(AllowInvalid);
-  }
-
-  template <typename ATTR>
-  ATTR *getAttribute(bool AllowInvalid = false) {
-    for (auto Attr : *this)
-      if (auto *SpecificAttr = dyn_cast<ATTR>(Attr))
-        if (SpecificAttr->isValid() || AllowInvalid)
-          return SpecificAttr;
-    return nullptr;
-  }
-
-  /// Determine whether there is an attribute with the given attribute class.
-  template <typename ATTR>
-  bool hasAttribute(bool AllowInvalid = false) const {
-    return getAttribute<ATTR>(AllowInvalid) != nullptr;
-  }
-
-  /// Retrieve the first attribute with the given kind.
-  const DeclAttribute *getAttribute(DeclAttrKind DK,
-                                    bool AllowInvalid = false) const {
-    for (auto Attr : *this)
-      if (Attr->getKind() == DK && (Attr->isValid() || AllowInvalid))
-        return Attr;
-    return nullptr;
-  }
-
-private:
-  /// Predicate used to filter MatchingAttributeRange.
-  template <typename ATTR, bool AllowInvalid> struct ToAttributeKind {
-    ToAttributeKind() {}
-
-    Optional<const ATTR *>
-    operator()(const DeclAttribute *Attr) const {
-      if (isa<ATTR>(Attr) && (Attr->isValid() || AllowInvalid))
-        return cast<ATTR>(Attr);
-      return None;
-    }
-  };
-
-public:
-  template <typename ATTR, bool AllowInvalid>
-  using AttributeKindRange =
-      OptionalTransformRange<iterator_range<const_iterator>,
-                             ToAttributeKind<ATTR, AllowInvalid>,
-                             const_iterator>;
-
-  /// Return a range with all attributes in DeclAttributes with AttrKind
-  /// ATTR.
-  template <typename ATTR, bool AllowInvalid = false>
-  AttributeKindRange<ATTR, AllowInvalid> getAttributes() const {
-    return AttributeKindRange<ATTR, AllowInvalid>(
-        make_range(begin(), end()), ToAttributeKind<ATTR, AllowInvalid>());
-  }
-
-  // Remove the given attribute from the list of attributes. Used when
-  // the attribute was semantically invalid.
-  void removeAttribute(const DeclAttribute *attr) {
-    // If it's the first attribute, remove it.
-    if (DeclAttrs == attr) {
-      DeclAttrs = attr->Next;
-      return;
-    }
-
-    // Otherwise, find it in the list. This is inefficient, but rare.
-    for (auto **prev = &DeclAttrs; *prev; prev = &(*prev)->Next) {
-      if ((*prev)->Next == attr) {
-        (*prev)->Next = attr->Next;
-        return;
-      }
-    }
-    llvm_unreachable("Attribute not found for removal");
-  }
-
-  /// Set the raw chain of attributes.  Used for deserialization.
-  void setRawAttributeChain(DeclAttribute *Chain) {
-    DeclAttrs = Chain;
-  }
-
-  SourceLoc getStartLoc(bool forModifiers = false) const;
 };
 
 void simple_display(llvm::raw_ostream &out, const DeclAttribute *attr);

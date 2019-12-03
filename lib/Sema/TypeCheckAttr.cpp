@@ -2083,12 +2083,13 @@ void lookupReplacedDecl(DeclName replacedDeclName,
 
   auto *moduleScopeCtxt = declCtxt->getModuleScopeContext();
   if (isa<FileUnit>(declCtxt)) {
-    UnqualifiedLookup lookup(replacedDeclName, moduleScopeCtxt,
-                             attr->getLocation());
-    if (lookup.isSuccess()) {
-      for (auto entry : lookup.Results) {
-        results.push_back(entry.getValueDecl());
-      }
+    auto &ctx = declCtxt->getASTContext();
+    auto descriptor = UnqualifiedLookupDescriptor(
+        replacedDeclName, moduleScopeCtxt, attr->getLocation());
+    auto lookup = evaluateOrDefault(ctx.evaluator,
+                                    UnqualifiedLookupRequest{descriptor}, {});
+    for (auto entry : lookup) {
+      results.push_back(entry.getValueDecl());
     }
     return;
   }
@@ -2474,7 +2475,7 @@ void AttributeChecker::visitImplementsAttr(ImplementsAttr *attr) {
 void AttributeChecker::visitFrozenAttr(FrozenAttr *attr) {
   if (auto *ED = dyn_cast<EnumDecl>(D)) {
     if (!ED->getModuleContext()->isResilient()) {
-      diagnoseAndRemoveAttr(attr, diag::enum_frozen_nonresilient, attr);
+      attr->setInvalid();
       return;
     }
 

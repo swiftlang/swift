@@ -4705,8 +4705,6 @@ namespace {
 
       Impl.ImportedDecls[{decl->getCanonicalDecl(), getVersion()}] = result;
 
-      result->setCircularityCheck(CircularityCheck::Checked);
-
       // Import protocols this protocol conforms to.
       SmallVector<TypeLoc, 4> inheritedTypes;
       importObjCProtocols(result, decl->getReferencedProtocols(),
@@ -4742,7 +4740,6 @@ namespace {
                                                         SourceLoc(), None,
                                                         nullptr, dc);
         Impl.ImportedDecls[{decl->getCanonicalDecl(), getVersion()}] = result;
-        result->setCircularityCheck(CircularityCheck::Checked);
         result->setSuperclass(Type());
         result->setAddedImplicitInitializers(); // suppress all initializers
         result->setHasMissingVTableEntries(false);
@@ -4848,7 +4845,6 @@ namespace {
       }
 
       Impl.ImportedDecls[{decl->getCanonicalDecl(), getVersion()}] = result;
-      result->setCircularityCheck(CircularityCheck::Checked);
       addObjCAttribute(result, Impl.importIdentifier(decl->getIdentifier()));
 
       if (declaredNative)
@@ -5325,7 +5321,6 @@ SwiftDeclConverter::importCFClassType(const clang::TypedefNameDecl *decl,
   auto theClass = Impl.createDeclWithClangNode<ClassDecl>(
       decl, AccessLevel::Public, SourceLoc(), className, SourceLoc(), None,
       nullptr, dc);
-  theClass->setCircularityCheck(CircularityCheck::Checked);
   theClass->setSuperclass(superclass);
   theClass->setAddedImplicitInitializers(); // suppress all initializers
   theClass->setHasMissingVTableEntries(false);

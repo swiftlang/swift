@@ -476,31 +476,17 @@ if(CMAKE_C_COMPILER_ID MATCHES Clang)
   add_compile_options($<$<OR:$<COMPILE_LANGUAGE:C>,$<COMPILE_LANGUAGE:CXX>>:-Werror=gnu>)
 endif()
 
-if(CMAKE_SYSTEM_NAME STREQUAL Darwin OR
-    EXISTS "${SWIFT_PATH_TO_LIBDISPATCH_SOURCE}")
-  set(SWIFT_BUILD_SYNTAXPARSERLIB_default TRUE)
-  set(SWIFT_BUILD_SOURCEKIT_default TRUE)
-else()
-  set(SWIFT_BUILD_SYNTAXPARSERLIB_default FALSE)
-  set(SWIFT_BUILD_SOURCEKIT_default FALSE)
-endif()
-option(SWIFT_BUILD_SYNTAXPARSERLIB
-    "Build the Swift Syntax Parser library"
-    ${SWIFT_BUILD_SYNTAXPARSERLIB_default})
-option(SWIFT_BUILD_ONLY_SYNTAXPARSERLIB
-    "Only build the Swift Syntax Parser library" FALSE)
-option(SWIFT_BUILD_SOURCEKIT
-    "Build SourceKit"
-    ${SWIFT_BUILD_SOURCEKIT_default})
-option(SWIFT_ENABLE_SOURCEKIT_TESTS
-    "Enable running SourceKit tests"
-    ${SWIFT_BUILD_SOURCEKIT_default})
+option(SWIFT_BUILD_SYNTAXPARSERLIB "Build the Swift Syntax Parser library" TRUE)
+option(SWIFT_BUILD_ONLY_SYNTAXPARSERLIB "Only build the Swift Syntax Parser library" FALSE)
+option(SWIFT_BUILD_SOURCEKIT "Build SourceKit" TRUE)
+option(SWIFT_ENABLE_SOURCEKIT_TESTS "Enable running SourceKit tests" ${SWIFT_BUILD_SOURCEKIT})
 
-if(NOT "${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin" AND
-  (SWIFT_BUILD_SYNTAXPARSERLIB OR SWIFT_BUILD_SOURCEKIT))
-  set(SWIFT_NEED_EXPLICIT_LIBDISPATCH TRUE)
-else()
-  set(SWIFT_NEED_EXPLICIT_LIBDISPATCH FALSE)
+if(SWIFT_BUILD_SYNTAXPARSERLIB OR SWIFT_BUILD_SOURCEKIT)
+  if(NOT CMAKE_SYSTEM_NAME STREQUAL Darwin)
+    if(NOT EXISTS "${SWIFT_PATH_TO_LIBDISPATCH_SOURCE}")
+      message(SEND_ERROR "SyntaxParserLib and SourceKit require libdispatch on non-Darwin hosts.  Please specify SWIFT_PATH_TO_LIBDISPATCH_SOURCE")
+    endif()
+  endif()
 endif()
 
 #
@@ -982,7 +968,7 @@ if (LLVM_ENABLE_DOXYGEN)
   message(STATUS "Doxygen: enabled")
 endif()
 
-if(SWIFT_NEED_EXPLICIT_LIBDISPATCH)
+if(NOT CMAKE_SYSTEM_NAME STREQUAL Darwin)
   if(CMAKE_C_COMPILER_ID STREQUAL Clang AND
      CMAKE_C_COMPILER_VERSION VERSION_GREATER 3.8
      OR LLVM_USE_SANITIZER)

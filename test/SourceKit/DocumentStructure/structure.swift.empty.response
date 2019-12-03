@@ -1,6 +1,6 @@
 {
   key.offset: 0,
-  key.length: 2259,
+  key.length: 2587,
   key.diagnostic_stage: source.diagnostic.stage.swift.parse,
   key.substructure: [
     {
@@ -223,7 +223,6 @@
     },
     {
       key.kind: source.lang.swift.decl.extension,
-      key.accessibility: source.lang.swift.accessibility.internal,
       key.name: "OuterCls",
       key.offset: 377,
       key.length: 45,
@@ -234,7 +233,6 @@
       key.substructure: [
         {
           key.kind: source.lang.swift.decl.class,
-          key.accessibility: source.lang.swift.accessibility.internal,
           key.name: "InnerCls2",
           key.offset: 402,
           key.length: 18,
@@ -558,7 +556,6 @@
     },
     {
       key.kind: source.lang.swift.decl.extension,
-      key.accessibility: source.lang.swift.accessibility.internal,
       key.name: "Foo",
       key.offset: 999,
       key.length: 58,
@@ -569,7 +566,6 @@
       key.substructure: [
         {
           key.kind: source.lang.swift.decl.function.method.instance,
-          key.accessibility: source.lang.swift.accessibility.internal,
           key.name: "anExtendedFooFunction()",
           key.offset: 1019,
           key.length: 36,
@@ -1403,6 +1399,222 @@
           ]
         }
       ]
+    },
+    {
+      key.kind: source.lang.swift.decl.class,
+      key.accessibility: source.lang.swift.accessibility.internal,
+      key.name: "Chain",
+      key.offset: 2260,
+      key.length: 87,
+      key.nameoffset: 2266,
+      key.namelength: 5,
+      key.bodyoffset: 2276,
+      key.bodylength: 70,
+      key.substructure: [
+        {
+          key.kind: source.lang.swift.decl.generic_type_param,
+          key.name: "A",
+          key.offset: 2272,
+          key.length: 1,
+          key.nameoffset: 2272,
+          key.namelength: 1
+        },
+        {
+          key.kind: source.lang.swift.decl.function.method.static,
+          key.accessibility: source.lang.swift.accessibility.internal,
+          key.name: "+(_:_:)",
+          key.offset: 2279,
+          key.length: 66,
+          key.typename: "Chain<A>",
+          key.nameoffset: 2284,
+          key.namelength: 32,
+          key.bodyoffset: 2330,
+          key.bodylength: 14,
+          key.substructure: [
+            {
+              key.kind: source.lang.swift.decl.var.parameter,
+              key.name: "lhs",
+              key.offset: 2287,
+              key.length: 13,
+              key.typename: "Chain<A>",
+              key.nameoffset: 0,
+              key.namelength: 0
+            },
+            {
+              key.kind: source.lang.swift.decl.var.parameter,
+              key.name: "rhs",
+              key.offset: 2302,
+              key.length: 13,
+              key.typename: "Chain<A>",
+              key.nameoffset: 0,
+              key.namelength: 0
+            },
+            {
+              key.kind: source.lang.swift.expr.call,
+              key.name: "fatalError",
+              key.offset: 2331,
+              key.length: 12,
+              key.nameoffset: 2331,
+              key.namelength: 10,
+              key.bodyoffset: 2342,
+              key.bodylength: 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      key.kind: source.lang.swift.decl.function.free,
+      key.accessibility: source.lang.swift.accessibility.public,
+      key.name: "init()",
+      key.offset: 2356,
+      key.length: 27,
+      key.nameoffset: 2356,
+      key.namelength: 6,
+      key.bodyoffset: 2364,
+      key.bodylength: 18,
+      key.attributes: [
+        {
+          key.offset: 2349,
+          key.length: 6,
+          key.attribute: source.decl.attribute.public
+        }
+      ],
+      key.substructure: [
+        {
+          key.kind: source.lang.swift.expr.call,
+          key.name: "fatalError",
+          key.offset: 2369,
+          key.length: 12,
+          key.nameoffset: 2369,
+          key.namelength: 10,
+          key.bodyoffset: 2380,
+          key.bodylength: 0
+        }
+      ]
+    },
+    {
+      key.kind: source.lang.swift.decl.function.free,
+      key.accessibility: source.lang.swift.accessibility.private,
+      key.name: "deinit",
+      key.offset: 2385,
+      key.length: 27,
+      key.nameoffset: 2385,
+      key.namelength: 6,
+      key.bodyoffset: 2393,
+      key.bodylength: 18,
+      key.substructure: [
+        {
+          key.kind: source.lang.swift.expr.call,
+          key.name: "fatalError",
+          key.offset: 2398,
+          key.length: 12,
+          key.nameoffset: 2398,
+          key.namelength: 10,
+          key.bodyoffset: 2409,
+          key.bodylength: 0
+        }
+      ]
+    },
+    {
+      key.kind: source.lang.swift.decl.extension,
+      key.name: "Result",
+      key.offset: 2424,
+      key.length: 36,
+      key.nameoffset: 2434,
+      key.namelength: 6,
+      key.bodyoffset: 2442,
+      key.bodylength: 17,
+      key.substructure: [
+        {
+          key.kind: source.lang.swift.decl.function.method.instance,
+          key.name: "foo()",
+          key.offset: 2445,
+          key.length: 13,
+          key.nameoffset: 2450,
+          key.namelength: 5,
+          key.bodyoffset: 2457,
+          key.bodylength: 0
+        }
+      ]
+    },
+    {
+      key.kind: source.lang.swift.decl.extension,
+      key.name: "Outer",
+      key.offset: 2462,
+      key.length: 53,
+      key.nameoffset: 2472,
+      key.namelength: 5,
+      key.bodyoffset: 2479,
+      key.bodylength: 35,
+      key.substructure: [
+        {
+          key.kind: source.lang.swift.decl.class,
+          key.name: "Inner",
+          key.offset: 2482,
+          key.length: 31,
+          key.nameoffset: 2488,
+          key.namelength: 5,
+          key.bodyoffset: 2495,
+          key.bodylength: 17,
+          key.substructure: [
+            {
+              key.kind: source.lang.swift.decl.function.method.instance,
+              key.name: "deinit",
+              key.offset: 2500,
+              key.length: 9,
+              key.nameoffset: 2500,
+              key.namelength: 6,
+              key.bodyoffset: 2508,
+              key.bodylength: 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      key.kind: source.lang.swift.decl.extension,
+      key.accessibility: source.lang.swift.accessibility.public,
+      key.name: "Outer2",
+      key.offset: 2524,
+      key.length: 55,
+      key.nameoffset: 2534,
+      key.namelength: 6,
+      key.bodyoffset: 2542,
+      key.bodylength: 36,
+      key.attributes: [
+        {
+          key.offset: 2517,
+          key.length: 6,
+          key.attribute: source.decl.attribute.public
+        }
+      ],
+      key.substructure: [
+        {
+          key.kind: source.lang.swift.decl.class,
+          key.accessibility: source.lang.swift.accessibility.public,
+          key.name: "Inner2",
+          key.offset: 2545,
+          key.length: 32,
+          key.nameoffset: 2551,
+          key.namelength: 6,
+          key.bodyoffset: 2559,
+          key.bodylength: 17,
+          key.substructure: [
+            {
+              key.kind: source.lang.swift.decl.function.method.instance,
+              key.accessibility: source.lang.swift.accessibility.public,
+              key.name: "deinit",
+              key.offset: 2564,
+              key.length: 9,
+              key.nameoffset: 2564,
+              key.namelength: 6,
+              key.bodyoffset: 2572,
+              key.bodylength: 0
+            }
+          ]
+        }
+      ]
     }
   ],
   key.diagnostics: [
@@ -1439,6 +1651,20 @@
           key.sourcetext: "func "
         }
       ]
+    },
+    {
+      key.line: 143,
+      key.column: 12,
+      key.severity: source.diagnostic.severity.error,
+      key.description: "initializers may only be declared within a type",
+      key.diagnostic_stage: source.diagnostic.stage.swift.parse
+    },
+    {
+      key.line: 147,
+      key.column: 1,
+      key.severity: source.diagnostic.severity.error,
+      key.description: "deinitializers may only be declared within a class",
+      key.diagnostic_stage: source.diagnostic.stage.swift.parse
     }
   ]
 }

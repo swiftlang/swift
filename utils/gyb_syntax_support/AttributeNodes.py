@@ -194,7 +194,21 @@ ATTRIBUTE_NODES = [
                    '''),
          ]),
 
-    # SWIFT_ENABLE_TENSORFLOW
+    # objc-selector-piece -> identifier? ':'?
+    Node('ObjCSelectorPiece', kind='Syntax',
+         description='''
+         A piece of an Objective-C selector. Either consisiting of just an
+         identifier for a nullary selector, an identifier and a colon for a
+         labeled argument or just a colon for an unlabeled argument
+         ''',
+         children=[
+             Child('Name', kind='IdentifierToken', is_optional=True),
+             Child('Colon', kind='ColonToken', is_optional=True),
+         ]),
+
+    # objc-selector -> objc-selector-piece objc-selector?
+    Node('ObjCSelector', kind='SyntaxCollection', element='ObjCSelectorPiece'),
+
     # The argument of '@differentiable(...)'.
     # differentiable-attr-arguments ->
     #     differentiation-params-clause? ','?
@@ -356,19 +370,4 @@ ATTRIBUTE_NODES = [
              Child('DiffParams', kind='DifferentiationParamsClause',
                    is_optional=True),
          ]),
-
-    # objc-selector-piece -> identifier? ':'?
-    Node('ObjCSelectorPiece', kind='Syntax',
-         description='''
-         A piece of an Objective-C selector. Either consisiting of just an
-         identifier for a nullary selector, an identifier and a colon for a
-         labeled argument or just a colon for an unlabeled argument
-         ''',
-         children=[
-             Child('Name', kind='IdentifierToken', is_optional=True),
-             Child('Colon', kind='ColonToken', is_optional=True),
-         ]),
-
-    # objc-selector -> objc-selector-piece objc-selector?
-    Node('ObjCSelector', kind='SyntaxCollection', element='ObjCSelectorPiece')
 ]

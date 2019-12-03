@@ -1,10 +1,6 @@
 // RUN: %target-swift-frontend -emit-sil %s -verify
 // RUN: %target-swift-frontend -emit-sil %s -verify -enable-ownership-stripping-after-serialization
 
-// SWIFT_ENABLE_TENSORFLOW
-// TODO(TF-799): Re-enable test after SR-11336 is fixed.
-// XFAIL: *
-
 func takesEscaping(_: @escaping () -> ()) {}
 
 func takesNonEscaping(_ fn: () -> ()) { fn() }

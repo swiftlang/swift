@@ -94,10 +94,12 @@ protected:
     PrintingDiagnosticConsumer printingConsumer;
     DiagnosticEngine diags(sourceMgr);
     diags.addConsumer(printingConsumer);
+    TypeCheckerOptions typeckOpts;
     LangOptions langOpts;
     langOpts.Target = llvm::Triple(llvm::sys::getDefaultTargetTriple());
     SearchPathOptions searchPathOpts;
-    auto ctx = ASTContext::get(langOpts, searchPathOpts, sourceMgr, diags);
+    auto ctx =
+        ASTContext::get(langOpts, typeckOpts, searchPathOpts, sourceMgr, diags);
 
     auto loader = ModuleInterfaceLoader::create(
         *ctx, cacheDir, prebuiltCacheDir,

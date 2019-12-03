@@ -107,7 +107,6 @@ Expr *swift::buildArgumentForwardingExpr(ArrayRef<ParamDecl*> params,
 }
 
 static void maybeAddMemberwiseDefaultArg(ParamDecl *arg, VarDecl *var,
-                    SmallVectorImpl<DefaultArgumentInitializer *> &defaultInits,
                                          unsigned paramSize, ASTContext &ctx) {
   // First and foremost, if this is a constant don't bother.
   if (var->isLet())
@@ -137,13 +136,6 @@ static void maybeAddMemberwiseDefaultArg(ParamDecl *arg, VarDecl *var,
     return;
 
   // We can add a default value now.
-
-  // Give this some bogus context right now, we'll fix it after making
-  // the constructor.
-  auto *initDC = new (ctx) DefaultArgumentInitializer(
-    arg->getDeclContext(), paramSize);
-
-  defaultInits.push_back(initDC);
 
   // If the variable has a type T? and no initial value, return a nil literal
   // default arg. All lazy variables return a nil literal as well. *Note* that
@@ -244,7 +236,7 @@ static ConstructorDecl *createImplicitConstructor(NominalTypeDecl *decl,
       // Don't allow the parameter to accept temporary pointer conversions.
       arg->setNonEphemeralIfPossible();
 
-      maybeAddMemberwiseDefaultArg(arg, var, defaultInits, params.size(), ctx);
+      maybeAddMemberwiseDefaultArg(arg, var, params.size(), ctx);
       
       params.push_back(arg);
     }
@@ -266,11 +258,6 @@ static ConstructorDecl *createImplicitConstructor(NominalTypeDecl *decl,
 
   if (ICK == ImplicitConstructorKind::Memberwise) {
     ctor->setIsMemberwiseInitializer();
-
-    // Fix default argument init contexts now that we have a constructor.
-    for (auto initDC : defaultInits) {
-      initDC->changeFunction(ctor, paramList);
-    }
   }
 
   // If we are defining a default initializer for a class that has a superclass,

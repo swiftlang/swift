@@ -82,7 +82,7 @@ in the following code snippet, ``a.aProperty``, ``a.doSomething()`` and
     dynamic doSomethingElse() { ... }
   }
 
-  class B : A {
+  class B: A {
     override var aProperty {
       get { ... }
       set { ... }
@@ -155,7 +155,7 @@ assuming ``E``, ``F`` do not have any overriding declarations in the same file:
   }
 
   class F {
-    fileprivate var myPrivateVar : Int
+    fileprivate var myPrivateVar: Int
   }
 
   func usingE(_ e: E) {
@@ -193,11 +193,11 @@ Array.
 
   // Don't use a class here.
   struct PhonebookEntry {
-    var name : String
-    var number : [Int]
+    var name: String
+    var number: [Int]
   }
 
-  var a : [PhonebookEntry]
+  var a: [PhonebookEntry]
 
 Keep in mind that there is a trade-off between using large value types and using
 reference types. In certain cases, the overhead of copying and moving around
@@ -277,9 +277,9 @@ safe.
 
 ::
 
-  a : [Int]
-  b : [Int]
-  c : [Int]
+  a: [Int]
+  b: [Int]
+  c: [Int]
 
   // Precondition: for all a[i], b[i]: a[i] + b[i] does not overflow!
   for i in 0 ... n {
@@ -368,12 +368,12 @@ represented as values, so this example is somewhat realistic.
 ::
 
   protocol P {}
-  struct Node : P {
-    var left, right : P?
+  struct Node: P {
+    var left, right: P?
   }
 
   struct Tree {
-    var node : P?
+    var node: P?
     init() { ... }
   }
 
@@ -402,8 +402,8 @@ argument drops from being O(n), depending on the size of the tree to O(1).
 
 ::
 
-  struct Tree : P {
-    var node : [P?]
+  struct Tree: P {
+    var node: [P?]
     init() {
       node = [thing]
     }
@@ -435,13 +435,13 @@ construct such a data structure:
 ::
 
   final class Ref<T> {
-    var val : T
-    init(_ v : T) {val = v}
+    var val: T
+    init(_ v: T) {val = v}
   }
 
   struct Box<T> {
-      var ref : Ref<T>
-      init(_ x : T) { ref = Ref(x) }
+      var ref: Ref<T>
+      init(_ x: T) { ref = Ref(x) }
 
       var value: T {
           get { return ref.val }
@@ -506,7 +506,7 @@ alive.
     withExtendedLifetime(Head) {
 
       // Create an Unmanaged reference.
-      var Ref : Unmanaged<Node> = Unmanaged.passUnretained(Head)
+      var Ref: Unmanaged<Node> = Unmanaged.passUnretained(Head)
 
       // Use the unmanaged reference in a call/variable access. The use of
       // _withUnsafeGuaranteedRef allows the compiler to remove the ultimate
@@ -540,7 +540,7 @@ protocols as class-only protocols to get better runtime performance.
 
 ::
 
-  protocol Pingable : AnyObject { func ping() -> Int }
+  protocol Pingable: AnyObject { func ping() -> Int }
 
 .. https://developer.apple.com/library/ios/documentation/Swift/Conceptual/Swift_Programming_Language/Protocols.html
 

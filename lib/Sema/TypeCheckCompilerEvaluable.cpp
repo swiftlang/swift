@@ -241,7 +241,7 @@ void TypeChecker::checkFunctionBodyCompilerEvaluable(AbstractFunctionDecl *D) {
   assert(D->getBodyKind() == AbstractFunctionDecl::BodyKind::TypeChecked &&
          "cannot check @compilerEvaluable body that is not type checked");
 
-  CheckCompilerEvaluableBody Checker(this->Context, D);
+  CheckCompilerEvaluableBody Checker(D->getASTContext(), D);
   D->getBody()->walk(Checker);
   if (!Checker.getCompilerEvaluable()) {
     compilerEvaluableAttr->setInvalid();

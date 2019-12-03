@@ -117,6 +117,9 @@ namespace swift {
     SILValue getLocalValue(serialization::ValueID Id,
                            SILType Type);
 
+    SILType getSILType(Type ty, SILValueCategory category,
+                       SILFunction *inContext);
+
     // SWIFT_ENABLE_TENSORFLOW
     SILDifferentiabilityWitness *getSILDifferentiabilityWitnessForReference(
         StringRef mangledKey);

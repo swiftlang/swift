@@ -222,6 +222,14 @@ EnableExperimentalStaticAssert(
     "enable-experimental-static-assert", llvm::cl::Hidden,
     llvm::cl::init(false), llvm::cl::desc("Enable experimental #assert"));
 
+static llvm::cl::opt<bool> EnableExperimentalDifferentiableProgramming(
+    "enable-experimental-differentiable-programming", llvm::cl::Hidden,
+    // SWIFT_ENABLE_TENSORFLOW
+    // Use default value true on `tensorflow` branch.
+    llvm::cl::init(true),
+    // SWIFT_ENABLE_TENSORFLOW END
+    llvm::cl::desc("Enable experimental differentiable programming"));
+
 /// Regular expression corresponding to the value given in one of the
 /// -pass-remarks* command line flags. Passes whose name matches this regexp
 /// will emit a diagnostic.
@@ -337,6 +345,9 @@ int main(int argc, char **argv) {
 
   Invocation.getLangOptions().EnableExperimentalStaticAssert =
       EnableExperimentalStaticAssert;
+
+  Invocation.getLangOptions().EnableExperimentalDifferentiableProgramming =
+      EnableExperimentalDifferentiableProgramming;
 
   // Setup the SIL Options.
   SILOptions &SILOpts = Invocation.getSILOptions();

@@ -22,12 +22,14 @@
 #include "swift/AST/GenericEnvironment.h"
 // SWIFT_ENABLE_TENSORFLOW
 #include "swift/AST/GenericSignatureBuilder.h"
+// SWIFT_ENABLE_TENSORFLOW END
+#include "swift/AST/IndexSubset.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/TypeRepr.h"
 // SWIFT_ENABLE_TENSORFLOW
 #include "swift/AST/TypeCheckRequests.h"
+// SWIFT_ENABLE_TENSORFLOW END
 #include "swift/AST/Types.h"
-// SWIFT_ENABLE_TENSORFLOW
 #include "swift/AST/ParameterList.h"
 #include "swift/Basic/Defer.h"
 #include "llvm/ADT/SmallString.h"
@@ -405,8 +407,7 @@ static std::string getDifferentiationParametersClauseString(
       case ParsedAutoDiffParameter::Kind::Ordered:
         auto *paramList = function->getParameters();
         assert(param.getIndex() <= paramList->size() &&
-               "'wrt:' parameter index should be less than the number "
-               "of parameters");
+               "wrt parameter is out of range");
         auto *funcParam = paramList->get(param.getIndex());
         printer << funcParam->getNameStr();
         break;
@@ -511,7 +512,7 @@ static void printDifferentiableAttrArguments(
     }
     stream << ", ";
   };
-  
+
   // Print if the function is marked as linear.
   if (attr->isLinear()) {
     isLeadingClause = false;
@@ -550,16 +551,14 @@ static void printDifferentiableAttrArguments(
   ArrayRef<Requirement> derivativeRequirements;
   if (auto derivativeGenSig = attr->getDerivativeGenericSignature())
     derivativeRequirements = derivativeGenSig->getRequirements();
-  llvm::SmallVector<Requirement, 8> requirementsToPrint;
-  std::copy_if(derivativeRequirements.begin(), derivativeRequirements.end(),
-               std::back_inserter(requirementsToPrint),
-               [&](Requirement req) {
-                 if (auto originalGenSig = original->getGenericSignature())
-                   if (originalGenSig->isRequirementSatisfied(req))
-                     return false;
-                 return true;
-               });
-  if (!requirementsToPrint.empty()) {
+  auto requirementsToPrint =
+    llvm::make_filter_range(derivativeRequirements, [&](Requirement req) {
+        if (const auto &originalGenSig = original->getGenericSignature())
+          if (originalGenSig->isRequirementSatisfied(req))
+            return false;
+        return true;
+      });
+  if (!llvm::empty(requirementsToPrint)) {
     if (!isLeadingClause)
       stream << ' ';
     stream << "where ";
@@ -576,7 +575,7 @@ static void printDifferentiableAttrArguments(
       };
     }
     interleave(requirementsToPrint, [&](Requirement req) {
-      if (auto originalGenSig = original->getGenericSignature())
+      if (const auto &originalGenSig = original->getGenericSignature())
         if (originalGenSig->isRequirementSatisfied(req))
           return;
       auto FirstTy = getInterfaceType(req.getFirstType());
@@ -912,7 +911,31 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     break;
   }
 
-  // SWIFT_ENABLE_TENSORFLOW
+  case DAK_DynamicReplacement: {
+    Printer.printAttrName("@_dynamicReplacement");
+    Printer << "(for: \"";
+    auto *attr = cast<DynamicReplacementAttr>(this);
+    Printer << attr->getReplacedFunctionName() << "\")";
+    break;
+  }
+
+  case DAK_Custom: {
+    Printer.printAttrName("@");
+    const TypeLoc &typeLoc = cast<CustomAttr>(this)->getTypeLoc();
+    if (auto type = typeLoc.getType())
+      type->print(Printer, Options);
+    else
+      typeLoc.getTypeRepr()->print(Printer, Options);
+    break;
+  }
+
+  case DAK_ProjectedValueProperty:
+    Printer.printAttrName("@_projectedValueProperty");
+    Printer << "(";
+    Printer << cast<ProjectedValuePropertyAttr>(this)->ProjectionPropertyName;
+    Printer << ")";
+    break;
+
   case DAK_Differentiable: {
     Printer.printAttrName("@differentiable");
     auto *attr = cast<DifferentiableAttr>(this);
@@ -949,31 +972,6 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     Printer << ')';
     break;
   }
-
-  case DAK_DynamicReplacement: {
-    Printer.printAttrName("@_dynamicReplacement");
-    Printer << "(for: \"";
-    auto *attr = cast<DynamicReplacementAttr>(this);
-    Printer << attr->getReplacedFunctionName() << "\")";
-    break;
-  }
-
-  case DAK_Custom: {
-    Printer.printAttrName("@");
-    const TypeLoc &typeLoc = cast<CustomAttr>(this)->getTypeLoc();
-    if (auto type = typeLoc.getType())
-      type->print(Printer, Options);
-    else
-      typeLoc.getTypeRepr()->print(Printer, Options);
-    break;
-  }
-
-  case DAK_ProjectedValueProperty:
-    Printer.printAttrName("@_projectedValueProperty");
-    Printer << "(";
-    Printer << cast<ProjectedValuePropertyAttr>(this)->ProjectionPropertyName;
-    Printer << ")";
-    break;
 
   case DAK_Count:
     llvm_unreachable("exceed declaration attribute kinds");
@@ -1105,9 +1103,9 @@ StringRef DeclAttribute::getAttrName() const {
     return "<<custom>>";
   case DAK_ProjectedValueProperty:
     return "_projectedValueProperty";
-  // SWIFT_ENABLE_TENSORFLOW
   case DAK_Differentiable:
     return "differentiable";
+  // SWIFT_ENABLE_TENSORFLOW
   case DAK_Derivative:
     return "derivative";
   case DAK_Transpose:
@@ -1452,8 +1450,6 @@ SpecializeAttr *SpecializeAttr::create(ASTContext &Ctx, SourceLoc atLoc,
                                   specializedSignature);
 }
 
-
-// SWIFT_ENABLE_TENSORFLOW
 DifferentiableAttr::DifferentiableAttr(bool implicit, SourceLoc atLoc,
                                        SourceRange baseRange, bool linear,
                                        ArrayRef<ParsedAutoDiffParameter> params,
@@ -1509,6 +1505,7 @@ DifferentiableAttr::create(Decl *original, bool implicit, SourceLoc atLoc,
                                       std::move(vjp), derivativeGenSig);
 }
 
+// SWIFT_ENABLE_TENSORFLOW
 void DifferentiableAttr::setOriginalDeclaration(Decl *decl) {
   assert(decl && "Original declaration must be non-null");
   assert(!OriginalDeclaration &&
@@ -1540,6 +1537,7 @@ void DifferentiableAttr::setParameterIndices(IndexSubset *paramIndices) {
           const_cast<DifferentiableAttr *>(this), getOriginalDeclaration()},
       std::move(paramIndices));
 }
+// SWIFT_ENABLE_TENSORFLOW END
 
 void DifferentiableAttr::setJVPFunction(FuncDecl *decl) {
   JVPFunction = decl;

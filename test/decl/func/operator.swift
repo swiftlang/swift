@@ -243,7 +243,7 @@ struct S1 {
 }
 
 extension S1 {
-  func %%%%(lhs: S1, rhs: S1) -> S1 { return lhs } // expected-error{{operator '%%%%' declared in type 'S1' must be 'static'}}{{3-3=static }}
+  func %%%%(lhs: S1, rhs: S1) -> S1 { return lhs } // expected-error{{operator '%%%%' declared in extension of 'S1' must be 'static'}}{{3-3=static }}
 }
 
 class C0 {

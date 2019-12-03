@@ -491,7 +491,7 @@ class SemanticContextDerived1 : SemanticContextBase1 {
 // SEMANTIC_CONTEXT_OVERRIDDEN_DECL_2-NEXT: Decl[InstanceMethod]/CurrNominal: instanceFunc1({#(a): Int#})[#Void#]{{; name=.+$}}
 // SEMANTIC_CONTEXT_OVERRIDDEN_DECL_2-NEXT: End completions
   }
-  func instanceFunc1() {
+  override func instanceFunc1() {
     #^SEMANTIC_CONTEXT_OVERRIDDEN_DECL_3^#
 // SEMANTIC_CONTEXT_OVERRIDDEN_DECL_3: Begin completions
 // SEMANTIC_CONTEXT_OVERRIDDEN_DECL_3-DAG: Decl[InstanceMethod]/CurrNominal: instanceFunc1()[#Void#]{{; name=.+$}}
@@ -504,7 +504,7 @@ class SemanticContextDerived1 : SemanticContextBase1 {
 // SEMANTIC_CONTEXT_OVERRIDDEN_DECL_4-NEXT: Decl[InstanceMethod]/CurrNominal:  instanceFunc1({#(a): Int#})[#Void#]{{; name=.+$}}
 // SEMANTIC_CONTEXT_OVERRIDDEN_DECL_4-NEXT: End completions
   }
-  func instanceFunc1(_ a: Int) {
+  override func instanceFunc1(_ a: Int) {
     super.#^SEMANTIC_CONTEXT_OVERRIDDEN_DECL_5^#
 // SEMANTIC_CONTEXT_OVERRIDDEN_DECL_5: Begin completions
 // SEMANTIC_CONTEXT_OVERRIDDEN_DECL_5-NEXT: Decl[InstanceMethod]/CurrNominal:  instanceFunc1()[#Void#]{{; name=.+$}}

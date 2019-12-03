@@ -17,6 +17,7 @@
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckRequests.h"
@@ -145,7 +146,7 @@ static bool parseIntoSourceFileImpl(SourceFile &SF,
   if (SIL)
     DelayBodyParsing = false;
 
-  SharedTimer timer("Parsing");
+  FrontendStatsTracer tracer(SF.getASTContext().Stats, "Parsing");
   Parser P(BufferID, SF, SIL ? SIL->Impl.get() : nullptr,
            PersistentState, STreeCreator, DelayBodyParsing);
   PrettyStackTraceParser StackTrace(P);
@@ -1196,14 +1197,16 @@ lookupTopDecl(Parser &P, DeclBaseName Name, bool typeLookup) {
   llvm::SaveAndRestore<SourceFile::ASTStage_t> ASTStage(P.SF.ASTStage,
                                                         SourceFile::Parsed);
 
-  UnqualifiedLookup::Options options;
+  UnqualifiedLookupOptions options;
   if (typeLookup)
-    options |= UnqualifiedLookup::Flags::TypeLookup;
+    options |= UnqualifiedLookupFlags::TypeLookup;
 
-  UnqualifiedLookup DeclLookup(Name, &P.SF, SourceLoc(), options);
-  assert(DeclLookup.isSuccess() && DeclLookup.Results.size() == 1);
-  ValueDecl *VD = DeclLookup.Results.back().getValueDecl();
-  return VD;
+  auto &ctx = P.SF.getASTContext();
+  auto descriptor = UnqualifiedLookupDescriptor(Name, &P.SF);
+  auto lookup = evaluateOrDefault(ctx.evaluator,
+                                  UnqualifiedLookupRequest{descriptor}, {});
+  assert(lookup.size() == 1);
+  return lookup.back().getValueDecl();
 }
 
 /// Find the ValueDecl given an interface type and a member name.
@@ -1296,24 +1299,20 @@ bool SILParser::parseSILType(SILType &Result,
   
   // Resolve the generic environments for parsed generic function and box types.
   class HandleSILGenericParamsWalker : public ASTWalker {
-    ASTContext &C;
     SourceFile *SF;
   public:
-    HandleSILGenericParamsWalker(ASTContext &C,
-                                 SourceFile *SF)
-      : C(C), SF(SF)
-    {}
-    
+    HandleSILGenericParamsWalker(SourceFile *SF) : SF(SF) {}
+
     bool walkToTypeReprPre(TypeRepr *T) override {
       if (auto fnType = dyn_cast<FunctionTypeRepr>(T)) {
         if (auto generics = fnType->getGenericParams()) {
-          auto env = handleSILGenericParams(C, generics, SF);
+          auto env = handleSILGenericParams(generics, SF);
           fnType->setGenericEnvironment(env);
         }
       }
       if (auto boxType = dyn_cast<SILBoxTypeRepr>(T)) {
         if (auto generics = boxType->getGenericParams()) {
-          auto env = handleSILGenericParams(C, generics, SF);
+          auto env = handleSILGenericParams(generics, SF);
           boxType->setGenericEnvironment(env);
         }
       }
@@ -1321,9 +1320,8 @@ bool SILParser::parseSILType(SILType &Result,
     }
   };
 
-  TyR.get()
-    ->walk(HandleSILGenericParamsWalker(P.Context, &P.SF));
-  
+  TyR.get()->walk(HandleSILGenericParamsWalker(&P.SF));
+
   // Save the top-level function generic environment if there was one.
   if (auto fnType = dyn_cast<FunctionTypeRepr>(TyR.get()))
     if (auto env = fnType->getGenericEnvironment())
@@ -2117,8 +2115,7 @@ parseSILDifferentiabilityWitnessConfigAndFunction(Parser &P, SILParser &SP,
     Scope genericsScope(&P, ScopeKind::Generics);
     auto *genericParams = P.maybeParseGenericParams().getPtrOrNull();
     if (genericParams) {
-      auto *witnessGenEnv =
-          handleSILGenericParams(P.Context, genericParams, &P.SF);
+      auto *witnessGenEnv = handleSILGenericParams(genericParams, &P.SF);
       witnessGenSig = witnessGenEnv->getGenericSignature();
     }
   }
@@ -2202,7 +2199,7 @@ bool SILParser::parseSILDeclRef(SILDeclRef &Member, bool FnTypeRequired) {
       if (auto generics = fnType->getGenericParams()) {
         assert(!Ty.wasValidated() && Ty.getType().isNull());
 
-        genericEnv = handleSILGenericParams(P.Context, generics, &P.SF);
+        genericEnv = handleSILGenericParams(generics, &P.SF);
         fnType->setGenericEnvironment(genericEnv);
       }
     }
@@ -3483,8 +3480,8 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     {
       Scope genericsScope(&P, ScopeKind::Generics);
       generics = P.maybeParseGenericParams().getPtrOrNull();
-      patternEnv = handleSILGenericParams(P.Context, generics, &P.SF);
-      
+      patternEnv = handleSILGenericParams(generics, &P.SF);
+
       if (P.parseToken(tok::l_paren, diag::expected_tok_in_sil_instr, "("))
         return true;
       
@@ -4457,8 +4454,9 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
       return true;
     
     EnumElementDecl *Elt = cast<EnumElementDecl>(EltRef.getDecl());
-    auto ResultTy = Operand->getType().getEnumElementType(Elt, SILMod);
-    
+    auto ResultTy = Operand->getType().getEnumElementType(
+        Elt, SILMod, B.getTypeExpansionContext());
+
     switch (Opcode) {
     case swift::SILInstructionKind::InitEnumDataAddrInst:
       ResultVal = B.createInitEnumDataAddr(InstLoc, Operand, Elt, ResultTy);
@@ -4806,7 +4804,8 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
 
     // FIXME: substitution means this type should be explicit to improve
     // performance.
-    auto ResultTy = Val->getType().getFieldType(Field, SILMod);
+    auto ResultTy =
+        Val->getType().getFieldType(Field, SILMod, B.getTypeExpansionContext());
     if (Opcode == SILInstructionKind::StructElementAddrInst)
       ResultVal = B.createStructElementAddr(InstLoc, Val, Field,
                                             ResultTy.getAddressType());
@@ -4828,7 +4827,8 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
       return true;
     }
     VarDecl *Field = cast<VarDecl>(FieldV);
-    auto ResultTy = Val->getType().getFieldType(Field, SILMod);
+    auto ResultTy =
+        Val->getType().getFieldType(Field, SILMod, B.getTypeExpansionContext());
     ResultVal = B.createRefElementAddr(InstLoc, Val, Field, ResultTy);
     break;
   }
@@ -5511,8 +5511,8 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
   CanSILFunctionType substFTI = FTI;
   if (!subs.empty()) {
     auto silFnTy = FnTy.castTo<SILFunctionType>();
-    substFTI
-      = silFnTy->substGenericArgs(SILMod, subs);
+    substFTI =
+        silFnTy->substGenericArgs(SILMod, subs, B.getTypeExpansionContext());
     FnTy = SILType::getPrimitiveObjectType(substFTI);
   }
   SILFunctionConventions substConv(substFTI, B.getModule());
@@ -6089,8 +6089,8 @@ bool SILParserTUState::parseSILProperty(Parser &P) {
   Scope toplevelScope(&P, ScopeKind::TopLevel);
   Scope genericsScope(&P, ScopeKind::Generics);
   generics = P.maybeParseGenericParams().getPtrOrNull();
-  patternEnv = handleSILGenericParams(P.Context, generics, &P.SF);
-  
+  patternEnv = handleSILGenericParams(generics, &P.SF);
+
   if (patternEnv) {
     if (patternEnv->getGenericSignature()->getCanonicalSignature()
            != VD->getInnermostDeclContext()->getGenericSignatureOfContext()
@@ -6400,7 +6400,7 @@ ProtocolConformanceRef SILParser::parseProtocolConformance(
 
   auto *genericParams = P.maybeParseGenericParams().getPtrOrNull();
   if (genericParams) {
-    genericEnv = handleSILGenericParams(P.Context, genericParams, &P.SF);
+    genericEnv = handleSILGenericParams(genericParams, &P.SF);
   }
 
   auto retVal = parseProtocolConformanceHelper(proto, genericEnv, context,

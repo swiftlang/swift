@@ -295,10 +295,6 @@ void addSSAPasses(SILPassPipelinePlan &P, OptimizationLevelKind OpLevel) {
   // Mainly for Array.append(contentsOf) optimization.
   P.addArrayElementPropagation();
 
-  // Specialize opaque archetypes.
-  // This can expose oportunities for the generic specializer.
-  P.addOpaqueArchetypeSpecializer();
-
   // Run the devirtualizer, specializer, and inliner. If any of these
   // makes a change we'll end up restarting the function passes on the
   // current function (after optimizing any new callees).
@@ -693,6 +689,20 @@ SILPassPipelinePlan::getOnonePassPipeline(const SILOptions &Options) {
   // Has only an effect if the -gsil option is specified.
   P.addSILDebugInfoGenerator();
 
+  return P;
+}
+
+//===----------------------------------------------------------------------===//
+//                        Serialize SIL Pass Pipeline
+//===----------------------------------------------------------------------===//
+
+// Add to P a new pipeline that just serializes SIL. Meant to be used in
+// situations where perf optzns are disabled, but we may need to serialize.
+SILPassPipelinePlan
+SILPassPipelinePlan::getSerializeSILPassPipeline(const SILOptions &Options) {
+  SILPassPipelinePlan P(Options);
+  P.startPipeline("Serialize SIL");
+  P.addSerializeSILPass();
   return P;
 }
 

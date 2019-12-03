@@ -203,8 +203,9 @@ class ASTContext final {
   ASTContext(const ASTContext&) = delete;
   void operator=(const ASTContext&) = delete;
 
-  ASTContext(LangOptions &langOpts, SearchPathOptions &SearchPathOpts,
-             SourceManager &SourceMgr, DiagnosticEngine &Diags);
+  ASTContext(LangOptions &langOpts, TypeCheckerOptions &typeckOpts,
+             SearchPathOptions &SearchPathOpts, SourceManager &SourceMgr,
+             DiagnosticEngine &Diags);
 
 public:
   // Members that should only be used by ASTContext.cpp.
@@ -215,10 +216,9 @@ public:
 
   void operator delete(void *Data) throw();
 
-  static ASTContext *get(LangOptions &langOpts,
+  static ASTContext *get(LangOptions &langOpts, TypeCheckerOptions &typeckOpts,
                          SearchPathOptions &SearchPathOpts,
-                         SourceManager &SourceMgr,
-                         DiagnosticEngine &Diags);
+                         SourceManager &SourceMgr, DiagnosticEngine &Diags);
   ~ASTContext();
 
   /// Optional table of counters to report, nullptr when not collecting.
@@ -229,6 +229,9 @@ public:
 
   /// The language options used for translation.
   LangOptions &LangOpts;
+
+  /// The type checker options.
+  TypeCheckerOptions &TypeCheckerOpts;
 
   /// The search path options used by this AST context.
   SearchPathOptions &SearchPathOpts;
@@ -276,6 +279,11 @@ public:
   /// The # of times we have performed typo correction.
   unsigned NumTypoCorrections = 0;
 
+  /// The next auto-closure discriminator.  This needs to be preserved
+  /// across invocations of both the parser and the type-checker.
+  unsigned NextAutoClosureDiscriminator = 0;
+
+  // SWIFT_ENABLE_TENSORFLOW
   /// Cache of autodiff-associated vector spaces.
   llvm::DenseMap<Type, Optional<VectorSpace>> AutoDiffVectorSpaces;
 
@@ -284,6 +292,7 @@ public:
   /// same set of parameters.
   llvm::DenseMap<std::pair<Decl *, IndexSubset *>, DifferentiableAttr *>
       DifferentiableAttrs;
+  // SWIFT_ENABLE_TENSORFLOW END
 
 private:
   /// The current generation number, which reflects the number of
@@ -592,10 +601,6 @@ public:
   getForeignRepresentationInfo(NominalTypeDecl *nominal,
                                ForeignLanguage language,
                                const DeclContext *dc);
-
-  /// Add a declaration that was synthesized to a per-source file list if
-  /// if is part of a source file.
-  void addSynthesizedDecl(Decl *decl);
 
   /// Add a cleanup function to be called when the ASTContext is deallocated.
   void addCleanup(std::function<void(void)> cleanup);

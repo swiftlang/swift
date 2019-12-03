@@ -765,7 +765,7 @@ overloaded { print("hi"); print("bye") } // multiple expression closure without 
 func not_overloaded(_ handler: () -> Int) {}
 
 not_overloaded { } // empty body
-// expected-error@-1 {{cannot convert value of type '() -> ()' to expected argument type '() -> Int'}}
+// expected-error@-1 {{cannot convert value of type '()' to closure result type 'Int'}}
 
 not_overloaded { print("hi") } // single-expression closure
 // expected-error@-1 {{cannot convert value of type '()' to closure result type 'Int'}}
@@ -786,7 +786,7 @@ func test() -> Int? {
 }
 
 var fn: () -> [Int] = {}
-// expected-error@-1 {{cannot convert value of type '() -> ()' to specified type '() -> [Int]'}}
+// expected-error@-1 {{cannot convert value of type '()' to closure result type '[Int]'}}
 
 fn = {}
 // expected-error@-1 {{cannot assign value of type '() -> ()' to type '() -> [Int]'}}

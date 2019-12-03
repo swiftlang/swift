@@ -27,6 +27,7 @@ endif()
 
 set_property(TARGET swift-syntax-parser-test APPEND_STRING PROPERTY
   COMPILE_FLAGS " -fblocks")
-if(SWIFT_NEED_EXPLICIT_LIBDISPATCH)
-  target_link_libraries(swift-syntax-parser-test PRIVATE BlocksRuntime)
+if(NOT CMAKE_SYSTEM_NAME STREQUAL Darwin)
+  target_link_libraries(swift-syntax-parser-test PRIVATE
+    BlocksRuntime)
 endif()

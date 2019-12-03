@@ -132,8 +132,8 @@ struct MyStruct {}
 // ON_GLOBALVAR-DAG: Keyword/None:                       inlinable[#Var Attribute#]; name=inlinable
 // ON_GLOBALVAR-DAG: Keyword/None:                       usableFromInline[#Var Attribute#]; name=usableFromInline
 // ON_GLOBALVAR-DAG: Keyword/None:                       GKInspectable[#Var Attribute#]; name=GKInspectable
-// SWIFT_ENABLE_TENSORFLOW
 // ON_GLOBALVAR-DAG: Keyword/None:                       differentiable[#Var Attribute#]; name=differentiable
+// SWIFT_ENABLE_TENSORFLOW
 // ON_GLOBALVAR-DAG: Keyword/None:                       noDerivative[#Var Attribute#]; name=noDerivative
 // ON_GLOBALVAR-NOT: Keyword
 // ON_GLOBALVAR: Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct
@@ -164,8 +164,8 @@ struct _S {
 // ON_PROPERTY-DAG: Keyword/None:                       inlinable[#Var Attribute#]; name=inlinable
 // ON_PROPERTY-DAG: Keyword/None:                       usableFromInline[#Var Attribute#]; name=usableFromInline
 // ON_PROPERTY-DAG: Keyword/None:                       GKInspectable[#Var Attribute#]; name=GKInspectable
-// SWIFT_ENABLE_TENSORFLOW
 // ON_PROPERTY-DAG: Keyword/None:                       differentiable[#Var Attribute#]; name=differentiable
+// SWIFT_ENABLE_TENSORFLOW
 // ON_PROPERTY-DAG: Keyword/None:                       noDerivative[#Var Attribute#]; name=noDerivative
 // ON_PROPERTY-NOT: Keyword
 // ON_PROPERTY: Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct
@@ -186,8 +186,8 @@ struct _S {
 // ON_METHOD-DAG: Keyword/None:                       usableFromInline[#Func Attribute#]; name=usableFromInline
 // ON_METHOD-DAG: Keyword/None:                       discardableResult[#Func Attribute#]; name=discardableResult
 // ON_METHOD-DAG: Keyword/None:                       IBSegueAction[#Func Attribute#]; name=IBSegueAction
-// SWIFT_ENABLE_TENSORFLOW
 // ON_METHOD-DAG: Keyword/None:                       differentiable[#Func Attribute#]; name=differentiable
+// SWIFT_ENABLE_TENSORFLOW
 // ON_METHOD-DAG: Keyword/None:                       derivative[#Func Attribute#]; name=derivative
 // ON_METHOD-DAG: Keyword/None:                       compilerEvaluable[#Func Attribute#]; name=compilerEvaluable
 // ON_METHOD-DAG: Keyword/None:                       quoted[#Func Attribute#]; name=quoted
@@ -247,8 +247,8 @@ struct _S {
 // ON_MEMBER_LAST-DAG: Keyword/None:                       IBSegueAction[#Declaration Attribute#]; name=IBSegueAction
 // ON_MEMBER_LAST-DAG: Keyword/None:                       propertyWrapper[#Declaration Attribute#]; name=propertyWrapper
 // ON_MEMBER_LAST-DAG: Keyword/None:                       _functionBuilder[#Declaration Attribute#]; name=_functionBuilder
-// SWIFT_ENABLE_TENSORFLOW
 // ON_MEMBER_LAST-DAG: Keyword/None:                       differentiable[#Declaration Attribute#]; name=differentiable
+// SWIFT_ENABLE_TENSORFLOW
 // ON_MEMBER_LAST-DAG: Keyword/None:                       derivative[#Declaration Attribute#]; name=derivative
 // ON_MEMBER_LAST-DAG: Keyword/None:                       differentiating[#Declaration Attribute#]; name=differentiating
 // ON_MEMBER_LAST-DAG: Keyword/None:                       compilerEvaluable[#Declaration Attribute#]; name=compilerEvaluable

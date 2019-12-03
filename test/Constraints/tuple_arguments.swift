@@ -69,12 +69,12 @@ func genericTuple<T, U>(_ x: (T, U)) {}
 
 do {
   generic(3)
-  generic(3, 4) // expected-error {{global function 'generic' expects a single parameter of type 'T' [with T = (Int, Int)]}} expected-note {{did you mean to pass a tuple?}} {{11-11=(}} {{15-15=)}}
+  generic(3, 4) // expected-error {{extra argument in call}}
   generic((3))
   generic((3, 4))
 
   genericLabeled(x: 3)
-  genericLabeled(x: 3, 4) // expected-error {{global function 'genericLabeled' expects a single parameter of type 'T' [with T = (Int, Int)]}} expected-note {{did you mean to pass a tuple?}} {{20-20=(}} {{25-25=)}}
+  genericLabeled(x: 3, 4) // expected-error {{extra argument in call}}
   genericLabeled(x: (3))
   genericLabeled(x: (3, 4))
 
@@ -92,7 +92,7 @@ do {
   let d = (a, b)
 
   generic(a)
-  generic(a, b) // expected-error {{global function 'generic' expects a single parameter of type 'T' [with T = (Int, Int)]}} expected-note {{did you mean to pass a tuple?}} {{11-11=(}} {{15-15=)}}
+  generic(a, b) // expected-error {{extra argument in call}}
   generic((a))
   generic(c)
   generic((a, b))
@@ -114,7 +114,7 @@ do {
   var d = (a, b)
 
   generic(a)
-  generic(a, b) // expected-error {{global function 'generic' expects a single parameter of type 'T' [with T = (Int, Int)]}} expected-note {{did you mean to pass a tuple?}} {{11-11=(}} {{15-15=)}}
+  generic(a, b) // expected-error {{extra argument in call}}
   generic((a))
   generic(c)
   generic((a, b))
@@ -256,12 +256,12 @@ do {
   let s = Concrete()
 
   s.generic(3)
-  s.generic(3, 4) // expected-error {{instance method 'generic' expects a single parameter of type 'T' [with T = (Int, Int)]}} expected-note {{did you mean to pass a tuple?}} {{13-13=(}} {{17-17=)}}
+  s.generic(3, 4) // expected-error {{extra argument in call}}
   s.generic((3))
   s.generic((3, 4))
 
   s.genericLabeled(x: 3)
-  s.genericLabeled(x: 3, 4) // expected-error {{instance method 'genericLabeled' expects a single parameter of type 'T' [with T = (Int, Int)]}} expected-note {{did you mean to pass a tuple?}} {{22-22=(}} {{27-27=)}}
+  s.genericLabeled(x: 3, 4) // expected-error {{extra argument in call}}
   s.genericLabeled(x: (3))
   s.genericLabeled(x: (3, 4))
 
@@ -281,7 +281,7 @@ do {
   let d = (a, b)
 
   s.generic(a)
-  s.generic(a, b) // expected-error {{instance method 'generic' expects a single parameter of type 'T' [with T = (Int, Int)]}} expected-note {{did you mean to pass a tuple?}} {{13-13=(}} {{17-17=)}}
+  s.generic(a, b) // expected-error {{extra argument in call}}
   s.generic((a))
   s.generic((a, b))
   s.generic(d)
@@ -304,7 +304,7 @@ do {
   var d = (a, b)
 
   s.generic(a)
-  s.generic(a, b) // expected-error {{instance method 'generic' expects a single parameter of type 'T' [with T = (Int, Int)]}} expected-note {{did you mean to pass a tuple?}} {{13-13=(}} {{17-17=)}}
+  s.generic(a, b) // expected-error {{extra argument in call}}
   s.generic((a))
   s.generic((a, b))
   s.generic(d)
@@ -390,12 +390,12 @@ do {
   var s = Concrete()
 
   s.mutatingGeneric(3)
-  s.mutatingGeneric(3, 4) // expected-error {{instance method 'mutatingGeneric' expects a single parameter of type 'T' [with T = (Int, Int)]}} expected-note {{did you mean to pass a tuple?}} {{21-21=(}} {{25-25=)}}
+  s.mutatingGeneric(3, 4) // expected-error {{extra argument in call}}
   s.mutatingGeneric((3))
   s.mutatingGeneric((3, 4))
 
   s.mutatingGenericLabeled(x: 3)
-  s.mutatingGenericLabeled(x: 3, 4) // expected-error {{instance method 'mutatingGenericLabeled' expects a single parameter of type 'T' [with T = (Int, Int)]}} expected-note {{did you mean to pass a tuple?}} {{30-30=(}} {{35-35=)}}
+  s.mutatingGenericLabeled(x: 3, 4) // expected-error {{extra argument in call}}
   s.mutatingGenericLabeled(x: (3))
   s.mutatingGenericLabeled(x: (3, 4))
 
@@ -415,7 +415,7 @@ do {
   let d = (a, b)
 
   s.mutatingGeneric(a)
-  s.mutatingGeneric(a, b) // expected-error {{instance method 'mutatingGeneric' expects a single parameter of type 'T' [with T = (Int, Int)]}} expected-note {{did you mean to pass a tuple?}} {{21-21=(}} {{25-25=)}}
+  s.mutatingGeneric(a, b) // expected-error {{extra argument in call}}
   s.mutatingGeneric((a))
   s.mutatingGeneric((a, b))
   s.mutatingGeneric(d)
@@ -438,7 +438,7 @@ do {
   var d = (a, b)
 
   s.mutatingGeneric(a)
-  s.mutatingGeneric(a, b) // expected-error {{instance method 'mutatingGeneric' expects a single parameter of type 'T' [with T = (Int, Int)]}} expected-note {{did you mean to pass a tuple?}} {{21-21=(}} {{25-25=)}}
+  s.mutatingGeneric(a, b) // expected-error {{extra argument in call}}
   s.mutatingGeneric((a))
   s.mutatingGeneric((a, b))
   s.mutatingGeneric(d)
@@ -929,10 +929,10 @@ struct GenericInitLabeledTuple<T> {
 }
 
 do {
-  _ = GenericInit(3, 4) // expected-error {{initializer expects a single parameter of type 'T' [with T = (Int, Int)]}} expected-note {{did you mean to pass a tuple?}} {{19-19=(}} {{23-23=)}}
+  _ = GenericInit(3, 4) // expected-error {{extra argument in call}}
   _ = GenericInit((3, 4))
 
-  _ = GenericInitLabeled(x: 3, 4) // expected-error {{initializer expects a single parameter of type 'T' [with T = (Int, Int)]}} expected-note {{did you mean to pass a tuple?}} {{28-28=(}} {{33-33=)}}
+  _ = GenericInitLabeled(x: 3, 4) // expected-error {{extra argument in call}}
   _ = GenericInitLabeled(x: (3, 4))
 
   _ = GenericInitTwo(3, 4)
@@ -967,7 +967,7 @@ do {
   let b = 4
   let c = (a, b)
 
-  _ = GenericInit(a, b) // expected-error {{initializer expects a single parameter of type 'T' [with T = (Int, Int)]}} expected-note {{did you mean to pass a tuple?}} {{19-19=(}} {{23-23=)}}
+  _ = GenericInit(a, b) // expected-error {{extra argument in call}}
   _ = GenericInit((a, b))
   _ = GenericInit(c)
 
@@ -1003,7 +1003,7 @@ do {
   var b = 4
   var c = (a, b)
 
-  _ = GenericInit(a, b) // expected-error {{initializer expects a single parameter of type 'T' [with T = (Int, Int)]}} expected-note {{did you mean to pass a tuple?}} {{19-19=(}} {{23-23=)}}
+  _ = GenericInit(a, b) // expected-error {{extra argument in call}}
   _ = GenericInit((a, b))
   _ = GenericInit(c)
 
@@ -1127,12 +1127,12 @@ enum GenericEnum<T> {
 }
 
 do {
-  _ = GenericEnum.one(3, 4) // expected-error {{enum case 'one' expects a single parameter of type 'T' [with T = (Int, Int)]}} expected-note {{did you mean to pass a tuple?}} {{23-23=(}} {{27-27=)}}
+  _ = GenericEnum.one(3, 4) // expected-error {{extra argument in call}}
   _ = GenericEnum.one((3, 4))
 
-  _ = GenericEnum.labeled(x: 3, 4) // expected-error {{enum case 'labeled' expects a single parameter of type 'T' [with T = (Int, Int)]}} expected-note {{did you mean to pass a tuple?}} {{29-29=(}} {{34-34=)}}
+  _ = GenericEnum.labeled(x: 3, 4) // expected-error {{extra argument in call}}
   _ = GenericEnum.labeled(x: (3, 4))
-  _ = GenericEnum.labeled(3, 4) // expected-error {{enum case 'labeled' expects a single parameter of type 'T' [with T = (Int, Int)]}} expected-note {{did you mean to pass a tuple?}} {{27-27=(}} {{31-31=)}}
+  _ = GenericEnum.labeled(3, 4) // expected-error {{extra argument in call}}
   _ = GenericEnum.labeled((3, 4)) // expected-error {{missing argument label 'x:' in call}}
 
   _ = GenericEnum.two(3, 4)
@@ -1163,7 +1163,7 @@ do {
   let b = 4
   let c = (a, b)
 
-  _ = GenericEnum.one(a, b) // expected-error {{enum case 'one' expects a single parameter of type 'T' [with T = (Int, Int)]}} expected-note {{did you mean to pass a tuple?}} {{23-23=(}} {{27-27=)}}
+  _ = GenericEnum.one(a, b) // expected-error {{extra argument in call}}
   _ = GenericEnum.one((a, b))
   _ = GenericEnum.one(c)
 
@@ -1199,7 +1199,7 @@ do {
   var b = 4
   var c = (a, b)
 
-  _ = GenericEnum.one(a, b) // expected-error {{enum case 'one' expects a single parameter of type 'T' [with T = (Int, Int)]}} expected-note {{did you mean to pass a tuple?}} {{23-23=(}} {{27-27=)}}
+  _ = GenericEnum.one(a, b) // expected-error {{extra argument in call}}
   _ = GenericEnum.one((a, b))
   _ = GenericEnum.one(c)
 

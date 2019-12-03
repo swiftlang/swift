@@ -35,10 +35,10 @@ class TrivialClass : TriviallyConstructible {
   // CHECK-NEXT:  [[FN:%.*]] = function_ref @$s023definite_init_protocol_B022TriviallyConstructiblePAAE6middlexSi_tcfC
   // CHECK-NEXT:  apply [[FN]]<@dynamic_self TrivialClass>([[RESULT]], %0, [[METATYPE]])
   // CHECK-NEXT:  [[NEW_SELF:%.*]] = load [[RESULT]]
-  // CHECK-NEXT:  store [[NEW_SELF]] to [[SELF_BOX]]
-  // CHECK-NEXT:  dealloc_stack [[RESULT]]
   // TODO: Once we restore arbitrary takes, the strong_retain/destroy_addr pair below will go away.
   // CHECK-NEXT:  strong_retain [[NEW_SELF]]
+  // CHECK-NEXT:  store [[NEW_SELF]] to [[SELF_BOX]]
+  // CHECK-NEXT:  dealloc_stack [[RESULT]]
   // CHECK-NEXT:  destroy_addr [[SELF_BOX]]
   // CHECK-NEXT:  dealloc_stack [[SELF_BOX]]
   // CHECK-NEXT:  return [[NEW_SELF]]

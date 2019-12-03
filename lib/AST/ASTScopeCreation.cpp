@@ -1260,7 +1260,7 @@ ParameterListScope::expandAScopeThatCreatesANewInsertionPoint(
   // Unlike generic parameters or pattern initializers, it cannot refer to a
   // previous parameter.
   for (ParamDecl *pd : params->getArray()) {
-    if (pd->getDefaultValue())
+    if (pd->hasDefaultExpr())
       scopeCreator
           .constructExpandAndInsertUncheckable<DefaultArgumentInitializerScope>(
               this, pd);
@@ -1594,7 +1594,7 @@ void ClosureBodyScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
 void DefaultArgumentInitializerScope::
     expandAScopeThatDoesNotCreateANewInsertionPoint(
         ScopeCreator &scopeCreator) {
-  auto *initExpr = decl->getDefaultValue();
+  auto *initExpr = decl->getStructuralDefaultExpr();
   ASTScopeAssert(initExpr,
                  "Default argument initializer must have an initializer.");
   scopeCreator.addToScopeTree(initExpr, this);

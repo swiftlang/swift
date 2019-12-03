@@ -67,7 +67,7 @@
                 "swift-integration-tests": "master",
                 "swift-xcode-playground-support": "master",
                 "ninja": "release",
-                "icu": "release-61-1",
+                "icu": "release-65-1",
                 "cmake": "v3.15.1",
                 "indexstore-db": "master",
                 "sourcekit-lsp": "master",
@@ -92,7 +92,7 @@
                 "swift-integration-tests": "master",
                 "swift-xcode-playground-support": "master",
                 "ninja": "release",
-                "icu": "release-61-1",
+                "icu": "release-65-1",
                 "cmake": "v3.15.1",
                 "indexstore-db": "master",
                 "sourcekit-lsp": "master",
@@ -250,7 +250,7 @@
         "tensorflow": {
             "aliases": ["tensorflow"],
             "repos": {
-                "llvm-project": "b3338d3f55b4eba6433be56c5e05f5c04f79dcd5",
+                "llvm-project": "13eb6eb7bacb8e7302e77527fe477130a5a0885a",
                 "swift": "tensorflow",
                 "cmark": "swift-DEVELOPMENT-SNAPSHOT-2019-11-11-a",
                 "llbuild": "swift-DEVELOPMENT-SNAPSHOT-2019-11-11-a",

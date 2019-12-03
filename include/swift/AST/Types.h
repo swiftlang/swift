@@ -17,9 +17,7 @@
 #ifndef SWIFT_TYPES_H
 #define SWIFT_TYPES_H
 
-// SWIFT_ENABLE_TENSORFLOW
 #include "swift/AST/AutoDiff.h"
-#include "swift/AST/Attr.h"
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/GenericParamKey.h"
 #include "swift/AST/Identifier.h"
@@ -30,6 +28,7 @@
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeAlignments.h"
+#include "swift/AST/TypeExpansionContext.h"
 #include "swift/Basic/ArrayRefView.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/InlineBitfield.h"
@@ -185,7 +184,7 @@ public:
 
   /// Does a type with these properties have an unresolved type somewhere in it?
   bool hasUnresolvedType() const { return Bits & HasUnresolvedType; }
-  
+
   /// Is a type with these properties an lvalue?
   bool isLValue() const { return Bits & IsLValue; }
 
@@ -310,7 +309,6 @@ class alignas(1 << TypeAlignInBits) TypeBase {
   }
 
 protected:
-  // SWIFT_ENABLE_TENSORFLOW
   enum { NumAFTExtInfoBits = 8 };
   enum { NumSILExtInfoBits = 8 };
   union { uint64_t OpaqueBits;
@@ -358,12 +356,10 @@ protected:
     NumProtocols : 16
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(TypeVariableType, TypeBase, 4+32,
-    : NumPadBits,
-
+  SWIFT_INLINE_BITFIELD_FULL(TypeVariableType, TypeBase, 5+32,
     /// Type variable options.
-    Options : 4,
-
+    Options : 5,
+    : NumPadBits,
     /// The unique number assigned to this type variable.
     ID : 32
   );
@@ -574,7 +570,12 @@ public:
   bool hasUnresolvedType() const {
     return getRecursiveProperties().hasUnresolvedType();
   }
-  
+
+  /// Determine whether this type involves a hole.
+  bool hasHole() const {
+    return getRecursiveProperties().hasUnresolvedType();
+  }
+
   /// Determine whether the type involves a context-dependent archetype.
   bool hasArchetype() const {
     return getRecursiveProperties().hasArchetype();
@@ -593,7 +594,10 @@ public:
   bool hasOpaqueArchetype() const {
     return getRecursiveProperties().hasOpaqueArchetype();
   }
-  
+  /// Determine whether the type has any stored properties or enum cases that
+  /// involve an opaque type.
+  bool hasOpaqueArchetypePropertiesOrCases();
+
   /// Determine whether the type is an opened existential type.
   ///
   /// To determine whether there is an opened existential type
@@ -2921,7 +2925,6 @@ public:
     // If bits are added or removed, then TypeBase::AnyFunctionTypeBits
     // and NumMaskBits must be updated, and they must match.
     //
-    //   SWIFT_ENABLE_TENSORFLOW
     //   |representation|noEscape|throws|differentiability|
     //   |    0 .. 3    |    4   |   5  |      6 .. 7     |
     //
@@ -2929,10 +2932,11 @@ public:
       RepresentationMask           = 0xF << 0,
       NoEscapeMask                 = 1 << 4,
       ThrowsMask                   = 1 << 5,
-      // SWIFT_ENABLE_TENSORFLOW
       DifferentiabilityMaskOffset  = 6,
       DifferentiabilityMask        = 0x3 << DifferentiabilityMaskOffset,
+      // SWIFT_ENABLE_TENSORFLOW
       NumDifferentiabilityMaskBits = 2,
+      // SWIFT_ENABLE_TENSORFLOW END
       NumMaskBits                  = 8
     };
 
@@ -2956,20 +2960,20 @@ public:
     // Constructor with no defaults.
     ExtInfo(Representation Rep,
             bool IsNoEscape,
-            // SWIFT_ENABLE_TENSORFLOW
-            bool Throws, DifferentiabilityKind diffKind)
+            bool Throws,
+            DifferentiabilityKind DiffKind)
       : ExtInfo(Rep, Throws) {
       Bits |= (IsNoEscape ? NoEscapeMask : 0);
-      // SWIFT_ENABLE_TENSORFLOW
-      Bits |= ((unsigned)diffKind << DifferentiabilityMaskOffset)
-              & DifferentiabilityMask;
+      Bits |= ((unsigned)DiffKind << DifferentiabilityMaskOffset) &
+              DifferentiabilityMask;
     }
 
     bool isNoEscape() const { return Bits & NoEscapeMask; }
     bool throws() const { return Bits & ThrowsMask; }
-    // SWIFT_ENABLE_TENSORFLOW
     bool isDifferentiable() const {
-      return getDifferentiabilityKind() >= DifferentiabilityKind::Normal;
+      // return getDifferentiabilityKind() >= DifferentiabilityKind::Normal;
+      return getDifferentiabilityKind() >
+             DifferentiabilityKind::NonDifferentiable;
     }
     DifferentiabilityKind getDifferentiabilityKind() const {
       return DifferentiabilityKind((Bits & DifferentiabilityMask) >>
@@ -3174,11 +3178,8 @@ public:
   bool throws() const {
     return getExtInfo().throws();
   }
-  
-  // SWIFT_ENABLE_TENSORFLOW
-  bool isDifferentiable() const {
-    return getExtInfo().isDifferentiable();
-  }
+
+  bool isDifferentiable() const { return getExtInfo().isDifferentiable(); }
   DifferentiabilityKind getDifferentiabilityKind() const {
     return getExtInfo().getDifferentiabilityKind();
   }
@@ -3836,6 +3837,17 @@ enum class SILCoroutineKind : uint8_t {
   
 class SILFunctionConventions;
 
+
+CanType substOpaqueTypesWithUnderlyingTypes(CanType type,
+                                            TypeExpansionContext context,
+                                            bool allowLoweredTypes = false);
+ProtocolConformanceRef
+substOpaqueTypesWithUnderlyingTypes(ProtocolConformanceRef ref, Type origType,
+                                    TypeExpansionContext context);
+namespace Lowering {
+  class TypeConverter;
+};
+
 /// SILFunctionType - The lowered type of a function value, suitable
 /// for use by SIL.
 ///
@@ -3865,19 +3877,19 @@ public:
     // If bits are added or removed, then TypeBase::SILFunctionTypeBits
     // and NumMaskBits must be updated, and they must match.
 
-    // SWIFT_ENABLE_TENSORFLOW
-    //   |representation|pseudogeneric|noescape|differentiability|
-    //   |    0 .. 3    |      4      |     5  |      6 .. 7     |
+    //   |representation|pseudogeneric| noescape |differentiability|
+    //   |    0 .. 3    |      4      |     5    |      6 .. 7     |
     //
     enum : unsigned {
-      RepresentationMask           = 0xF << 0,
-      PseudogenericMask            = 1 << 4,
-      NoEscapeMask                 = 1 << 5,
+      RepresentationMask = 0xF << 0,
+      PseudogenericMask  = 1 << 4,
+      NoEscapeMask       = 1 << 5,
+      DifferentiabilityMaskOffset = 6,
+      DifferentiabilityMask       = 0x3 << DifferentiabilityMaskOffset,
       // SWIFT_ENABLE_TENSORFLOW
-      DifferentiabilityMaskOffset  = 6,
-      DifferentiabilityMask        = 0x3 << DifferentiabilityMaskOffset,
       NumDifferentiabilityMaskBits = 2,
-      NumMaskBits                  = 8
+      // SWIFT_ENABLE_TENSORFLOW END
+      NumMaskBits                 = 8
     };
     unsigned Bits; // Naturally sized for speed.
 
@@ -3890,15 +3902,13 @@ public:
     ExtInfo() : Bits(0) { }
 
     // Constructor for polymorphic type.
-    // SWIFT_ENABLE_TENSORFLOW
     ExtInfo(Representation rep, bool isPseudogeneric, bool isNoEscape,
             DifferentiabilityKind diffKind) {
       Bits = ((unsigned) rep) |
              (isPseudogeneric ? PseudogenericMask : 0) |
-             // SWIFT_ENABLE_TENSORFLOW
              (isNoEscape ? NoEscapeMask : 0) |
-             (((unsigned)diffKind << DifferentiabilityMaskOffset)
-              & DifferentiabilityMask);
+             (((unsigned)diffKind << DifferentiabilityMaskOffset) &
+              DifferentiabilityMask);
     }
 
     /// Is this function pseudo-generic?  A pseudo-generic function
@@ -3907,12 +3917,12 @@ public:
 
     // Is this function guaranteed to be no-escape by the type system?
     bool isNoEscape() const { return Bits & NoEscapeMask; }
-    
-    // SWIFT_ENABLE_TENSORFLOW
+
     bool isDifferentiable() const {
-      return getDifferentiabilityKind() >= DifferentiabilityKind::Normal;
+      return getDifferentiabilityKind() !=
+             DifferentiabilityKind::NonDifferentiable;
     }
-    
+
     DifferentiabilityKind getDifferentiabilityKind() const {
       return DifferentiabilityKind((Bits & DifferentiabilityMask) >>
                                    DifferentiabilityMaskOffset);
@@ -4354,13 +4364,10 @@ public:
            getRepresentation() == SILFunctionTypeRepresentation::Thick;
   }
 
-  // SWIFT_ENABLE_TENSORFLOW
+  bool isDifferentiable() const { return getExtInfo().isDifferentiable(); }
+
   DifferentiabilityKind getDifferentiabilityKind() const {
     return getExtInfo().getDifferentiabilityKind();
-  }
-
-  bool isDifferentiable() const {
-    return getExtInfo().isDifferentiable();
   }
 
   bool isNoReturnFunction(SILModule &M) const; // Defined in SILType.cpp
@@ -4414,10 +4421,14 @@ public:
                       SILFunction &context) const;
 
   CanSILFunctionType substGenericArgs(SILModule &silModule,
-                                      SubstitutionMap subs);
+                                      SubstitutionMap subs,
+                                      TypeExpansionContext context);
   CanSILFunctionType substGenericArgs(SILModule &silModule,
                                       TypeSubstitutionFn subs,
-                                      LookupConformanceFn conformances);
+                                      LookupConformanceFn conformances,
+                                      TypeExpansionContext context);
+  CanSILFunctionType substituteOpaqueArchetypes(Lowering::TypeConverter &TC,
+                                                TypeExpansionContext context);
 
   SILType substInterfaceType(SILModule &M,
                              SILType interfaceType) const;
@@ -5172,9 +5183,12 @@ class ReplaceOpaqueTypesWithUnderlyingTypes {
 public:
   const DeclContext *inContext;
   ResilienceExpansion contextExpansion;
+  bool isContextWholeModule;
   ReplaceOpaqueTypesWithUnderlyingTypes(const DeclContext *inContext,
-                                        ResilienceExpansion contextExpansion)
-      : inContext(inContext), contextExpansion(contextExpansion) {}
+                                        ResilienceExpansion contextExpansion,
+                                        bool isWholeModuleContext)
+      : inContext(inContext), contextExpansion(contextExpansion),
+        isContextWholeModule(isWholeModuleContext) {}
 
   /// TypeSubstitutionFn
   Type operator()(SubstitutableType *maybeOpaqueType) const;
@@ -5965,5 +5979,5 @@ struct DenseMapInfo<swift::BuiltinIntegerWidth> {
 };
 
 }
-  
+
 #endif

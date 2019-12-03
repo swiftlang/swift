@@ -135,7 +135,7 @@ Array<Element>, ContiguousArray<Element>, and ArraySlice<Element>
 data-structures.
 
 We consider the array state to consist of a set of disjoint elements
-and a storage descriptor that encapsulates nonelement data such as the
+and a storage descriptor that encapsulates non-element data such as the
 element count and capacity. Operations that semantically write state
 are always *control dependent*. A control dependent operation is one
 that may only be executed on the control flow paths in which the

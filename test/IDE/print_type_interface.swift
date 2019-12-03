@@ -97,7 +97,7 @@ extension Array.Inner where Element: P2 {
 extension Int: P2 {}
 
 // Print interface for Array<Int>.Inner
-// RUN: %target-swift-ide-test -print-type-interface -usr=\$sSa20print_type_interfaceE5InnerVySi_GD -module-name print_type_interface -source-filename %s | %FileCheck %s -check-prefix=TYPE6
+// RUN: %target-swift-ide-test -print-type-interface -usr='$sSa20print_type_interfaceE5InnerVySi_GD' -module-name print_type_interface -source-filename %s | %FileCheck %s -check-prefix=TYPE6
 
 // TYPE6-LABEL: public struct Inner {
 // TYPE6:   public func innerFoo()

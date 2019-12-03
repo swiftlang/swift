@@ -339,8 +339,6 @@ static ValueDecl *deriveTensorGroup_constructor(
   initDecl->copyFormalAccessFrom(nominal, /*sourceIsParentContext*/ true);
 
   derived.addMembersToConformanceContext({initDecl});
-  C.addSynthesizedDecl(initDecl);
-
   return initDecl;
 }
 

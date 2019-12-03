@@ -800,8 +800,9 @@ void ClosureSpecCloner::populateCloned() {
     }
 
     // Otherwise, create a new argument which copies the original argument
+    auto typeInContext = Cloned->getLoweredType(Arg->getType());
     SILValue MappedValue =
-        ClonedEntryBB->createFunctionArgument(Arg->getType(), Arg->getDecl());
+        ClonedEntryBB->createFunctionArgument(typeInContext, Arg->getDecl());
     entryArgs.push_back(MappedValue);
   }
 
@@ -821,6 +822,8 @@ void ClosureSpecCloner::populateCloned() {
   unsigned idx = 0;
   for (auto &PInfo : ClosedOverFunConv.getParameters().slice(NumNotCaptured)) {
     auto paramTy = ClosedOverFunConv.getSILType(PInfo);
+    // Get the type in context of the new function.
+    paramTy = Cloned->getLoweredType(paramTy);
     SILValue MappedValue = ClonedEntryBB->createFunctionArgument(paramTy);
     NewPAIArgs.push_back(MappedValue);
     auto CapturedVal =

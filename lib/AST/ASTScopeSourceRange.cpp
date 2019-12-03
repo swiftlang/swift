@@ -232,7 +232,7 @@ SourceRange AbstractStmtScope::getSourceRangeOfThisASTNode(
 
 SourceRange DefaultArgumentInitializerScope::getSourceRangeOfThisASTNode(
     const bool omitAssertions) const {
-  if (auto *dv = decl->getDefaultValue())
+  if (auto *dv = decl->getStructuralDefaultExpr())
     return dv->getSourceRange();
   return SourceRange();
 }

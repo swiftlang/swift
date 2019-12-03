@@ -227,7 +227,6 @@ static ValueDecl *deriveVectorProtocol_method(
   funcDecl->copyFormalAccessFrom(nominal, /*sourceIsParentContext*/ true);
 
   derived.addMembersToConformanceContext({funcDecl});
-  C.addSynthesizedDecl(funcDecl);
 
   // Returned nominal type must define a memberwise initializer.
   // Add memberwise initializer if necessary.
@@ -237,7 +236,6 @@ static ValueDecl *deriveVectorProtocol_method(
     // constructor is synthesized during SILGen, which is too late.
     auto *initDecl = createMemberwiseImplicitConstructor(C, nominal);
     nominal->addMember(initDecl);
-    C.addSynthesizedDecl(initDecl);
   }
 
   return funcDecl;

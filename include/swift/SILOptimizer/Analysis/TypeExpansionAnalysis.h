@@ -12,6 +12,7 @@
 #ifndef SWIFT_SILOPTIMIZER_ANALYSIS_TYPEEXPANSIONANALYSIS_H
 #define SWIFT_SILOPTIMIZER_ANALYSIS_TYPEEXPANSIONANALYSIS_H
 
+#include "swift/AST/TypeExpansionContext.h"
 #include "swift/SIL/Projection.h"
 #include "swift/SIL/SILType.h"
 #include "swift/SIL/SILValue.h"
@@ -22,7 +23,9 @@ namespace swift {
 
 /// This analysis determines memory effects during destruction.
 class TypeExpansionAnalysis : public SILAnalysis {
-  llvm::DenseMap<SILType, ProjectionPathList> ExpansionCache;
+  llvm::DenseMap<std::pair<SILType, TypeExpansionContext>, ProjectionPathList>
+      ExpansionCache;
+
 public:
   TypeExpansionAnalysis(SILModule *M)
       : SILAnalysis(SILAnalysisKind::TypeExpansion) {}
@@ -32,7 +35,8 @@ public:
   }
 
   /// Return ProjectionPath to every leaf or intermediate node of the given type.
-  const ProjectionPathList &getTypeExpansion(SILType B, SILModule *Mod);
+  const ProjectionPathList &getTypeExpansion(SILType B, SILModule *Mod,
+                                             TypeExpansionContext context);
 
   /// Invalidate all information in this analysis.
   virtual void invalidate() override {

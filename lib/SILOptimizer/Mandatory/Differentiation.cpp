@@ -52,6 +52,7 @@
 #include "swift/SILOptimizer/Analysis/LoopAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/DerivativeLookup.h"
 #include "swift/SILOptimizer/Utils/Differentiation.h"
 #include "swift/SILOptimizer/Utils/LoopUtils.h"
@@ -667,7 +668,7 @@ public:
     auto linMapStructType =
         linMapStruct->getDeclaredInterfaceType()->getCanonicalType();
     return typeConverter.getLoweredType(linMapStructType,
-                                        ResilienceExpansion::Minimal);
+                                        TypeExpansionContext::minimal());
   }
 
   /// Returns the branching trace enum associated with the given original block.
@@ -682,7 +683,7 @@ public:
     auto traceDeclType =
         traceDecl->getDeclaredInterfaceType()->getCanonicalType();
     return typeConverter.getLoweredType(traceDeclType,
-                                        ResilienceExpansion::Minimal);
+                                        TypeExpansionContext::minimal());
   }
 
   /// Returns the enum element in the given successor block's branching trace
@@ -2053,7 +2054,8 @@ static void emitZeroIntoBuffer(
   assert(zeroDecl->isProtocolRequirement());
   auto *accessorDecl = zeroDecl->getAccessor(AccessorKind::Get);
   SILDeclRef accessorDeclRef(accessorDecl, SILDeclRef::Kind::Func);
-  auto silFnType = typeConverter.getConstantType(accessorDeclRef);
+  auto silFnType = typeConverter.getConstantType(
+      TypeExpansionContext::minimal(), accessorDeclRef);
   // %wm = witness_method ...
   auto *getter = builder.createWitnessMethod(
       loc, type, confRef, accessorDeclRef, silFnType);
@@ -2339,8 +2341,12 @@ static SILFunction *getOrCreateReabstractionThunk(SILOptFunctionBuilder &fb,
       thunkType, fromInterfaceType, toInterfaceType,
       Type(), module.getSwiftModule());
 
+  // FIXME(TF-989): Mark reabstraction thunks as transparent. This requires
+  // generating ossa reabstraction thunks so that they can be inlined during
+  // mandatory inlining when `-enable-strip-ownership-after-serialization` is
+  // true and ownership model eliminator is not run after differentiation.
   auto *thunk = fb.getOrCreateSharedFunction(
-      loc, name, thunkDeclType, IsBare, IsTransparent, IsSerialized,
+      loc, name, thunkDeclType, IsBare, IsNotTransparent, IsSerialized,
       ProfileCounter(), IsReabstractionThunk, IsNotDynamic);
   if (!thunk->empty())
     return thunk;
@@ -2521,19 +2527,6 @@ private:
   /// predecessor enum argument).
   SmallPtrSet<SILBasicBlock *, 4> remappedBasicBlocks;
 
-  /// A pair of a trampoline block phi argument and its corresponding
-  /// destination block phi argument.
-  struct TrampolinedArgumentPair {
-    SILPhiArgument *trampolineArgument;
-    SILPhiArgument *destinationArgument;
-  };
-  /// An array that keeps track of all `@guaranteed` phi arguments in any
-  /// trampoline blocks we've added. Each of these arguments needs to have a
-  /// lifetime-ending use past its destination argument's lifetime-ending use,
-  /// so we keep track of these pairs of arguments and emit `end_borrow`s when
-  /// function cloning is finished.
-  SmallVector<TrampolinedArgumentPair, 8> trampolinedGuaranteedPhiArguments;
-
   bool errorOccurred = false;
 
   /// Mapping from original blocks to pullback values. Used to build pullback
@@ -2605,7 +2598,7 @@ public:
     auto getTangentParameterInfoForOriginalResult = [&](
         CanType tanType, ResultConvention origResConv) -> SILParameterInfo {
       auto &tl = context.getTypeConverter().getTypeLowering(
-          tanType, ResilienceExpansion::Minimal);
+          tanType, TypeExpansionContext::minimal());
       ParameterConvention conv;
       switch (origResConv) {
       case ResultConvention::Owned:
@@ -2629,7 +2622,7 @@ public:
     auto getTangentResultInfoForOriginalParameter = [&](
         CanType tanType, ParameterConvention origParamConv) -> SILResultInfo {
       auto &tl = context.getTypeConverter().getTypeLowering(
-          tanType, ResilienceExpansion::Minimal);
+          tanType, TypeExpansionContext::minimal());
       ResultConvention conv;
       switch (origParamConv) {
       case ParameterConvention::Direct_Owned:
@@ -2733,7 +2726,7 @@ public:
     auto enumTy = getOpASTType(predEnum->getDeclaredInterfaceType()
                                  ->getCanonicalType());
     auto enumLoweredTy = context.getTypeConverter().getLoweredType(
-        enumTy, ResilienceExpansion::Minimal);
+        enumTy, TypeExpansionContext::minimal());
     vjpBB->createPhiArgument(enumLoweredTy, ValueOwnershipKind::Owned);
     remappedBasicBlocks.insert(bb);
     return vjpBB;
@@ -2759,7 +2752,7 @@ private:
     auto nomType = getOpASTType(
         nominal->getDeclaredInterfaceType()->getCanonicalType());
     auto nomSILType = context.getTypeConverter().getLoweredType(
-        nomType, ResilienceExpansion::Minimal);
+        nomType, TypeExpansionContext::minimal());
     return nomSILType;
   }
 
@@ -2791,8 +2784,8 @@ private:
     auto enumLoweredTy = getNominalDeclLoweredType(succEnum);
     auto *enumEltDecl =
         pullbackInfo.lookUpBranchingTraceEnumElement(predBB, succBB);
-    auto enumEltType = getOpType(
-        enumLoweredTy.getEnumElementType(enumEltDecl, getModule()));
+    auto enumEltType = getOpType(enumLoweredTy.getEnumElementType(
+        enumEltDecl, getModule(), TypeExpansionContext::minimal()));
     // If the enum element type does not have a box type (i.e. the enum case is
     // not indirect), then directly create an enum.
     auto boxType = dyn_cast<SILBoxType>(enumEltType.getASTType());
@@ -2915,18 +2908,9 @@ public:
       auto *vjpSuccBB = getOpBasicBlock(origSuccBB);
       // Create the trampoline block.
       auto *trampolineBB = vjp->createBasicBlockBefore(vjpSuccBB);
-      for (auto *destArg : vjpSuccBB->getArguments().drop_back()) {
-        auto *trampolineArg = trampolineBB->createPhiArgument(
+      for (auto *destArg : vjpSuccBB->getArguments().drop_back())
+        trampolineBB->createPhiArgument(
             destArg->getType(), destArg->getOwnershipKind());
-        // Each `@guaranteed` trampoline argument needs to have a
-        // lifetime-ending use past its destination argument's lifetime-ending
-        // uses, so we keep track of these pairs of arguments in
-        // `trampolinedGuaranteedPhiArguments` and emit `end_borrow`s when
-        // function cloning is finished.
-        if (trampolineArg->getOwnershipKind() == ValueOwnershipKind::Guaranteed)
-          trampolinedGuaranteedPhiArguments.push_back(
-              {trampolineArg, cast<SILPhiArgument>(destArg)});
-      }
       // Build predecessor enum value for successor block and branch to it.
       SILBuilder trampolineBuilder(trampolineBB);
       auto *succEnumVal = buildPredecessorEnumValue(
@@ -3177,7 +3161,7 @@ public:
     auto loweredPullbackType =
         getOpType(context.getTypeConverter().getLoweredType(
                       pullbackDecl->getInterfaceType()->getCanonicalType(),
-                      ResilienceExpansion::Minimal))
+                      TypeExpansionContext::minimal()))
             .castTo<SILFunctionType>();
     if (!loweredPullbackType->isEqual(actualPullbackType)) {
       // Set non-reabstracted original pullback type in nested apply info.
@@ -3551,7 +3535,7 @@ private:
     auto nomType =
         getOpASTType(nominal->getDeclaredInterfaceType()->getCanonicalType());
     auto nomSILType = context.getTypeConverter().getLoweredType(
-        nomType, ResilienceExpansion::Minimal);
+        nomType, TypeExpansionContext::minimal());
     return nomSILType;
   }
 
@@ -3621,7 +3605,7 @@ private:
   SILValue emitZeroDirect(CanType type, SILLocation loc) {
     auto diffBuilder = getDifferentialBuilder();
     auto silType = getModule().Types.getLoweredLoadableType(
-        type, ResilienceExpansion::Minimal, getModule());
+        type, TypeExpansionContext::minimal(), getModule());
     auto *buffer = diffBuilder.createAllocStack(loc, silType);
     emitZeroIndirect(type, buffer, loc);
     auto loaded = diffBuilder.emitLoadValueOperation(
@@ -4865,7 +4849,7 @@ public:
     auto loweredDifferentialType =
         getOpType(context.getTypeConverter().getLoweredType(
             differentialDecl->getInterfaceType()->getCanonicalType(),
-            ResilienceExpansion::Minimal))
+            TypeExpansionContext::minimal()))
             .castTo<SILFunctionType>();
     // If actual differential type does not match lowered differential type,
     // reabstract the differential using a thunk.
@@ -5592,8 +5576,8 @@ public:
             getPullbackInfo().getBranchingTraceEnumLoweredType(succBB);
         auto *enumEltDecl =
             getPullbackInfo().lookUpBranchingTraceEnumElement(origBB, succBB);
-        auto enumEltType = remapType(
-            enumLoweredTy.getEnumElementType(enumEltDecl, getModule()));
+        auto enumEltType = remapType(enumLoweredTy.getEnumElementType(
+            enumEltDecl, getModule(), TypeExpansionContext::minimal()));
         pullbackTrampolineBB->createPhiArgument(enumEltType,
                                                 ValueOwnershipKind::Owned);
       }
@@ -6271,7 +6255,7 @@ public:
       auto tangentVectorTy =
           getTangentSpace(structTy)->getType()->getCanonicalType();
       assert(!getModule().Types.getTypeLowering(
-                 tangentVectorTy, ResilienceExpansion::Minimal)
+                 tangentVectorTy, TypeExpansionContext::minimal())
                      .isAddressOnly());
       auto *tangentVectorDecl =
           tangentVectorTy->getStructOrBoundGenericStruct();
@@ -6335,7 +6319,7 @@ public:
     auto tangentVectorTy =
         getTangentSpace(structTy)->getType()->getCanonicalType();
     assert(!getModule().Types.getTypeLowering(
-               tangentVectorTy, ResilienceExpansion::Minimal)
+               tangentVectorTy, TypeExpansionContext::minimal())
                    .isAddressOnly());
     auto tangentVectorSILTy =
         SILType::getPrimitiveObjectType(tangentVectorTy);
@@ -6381,7 +6365,7 @@ public:
           auto fieldTy = field->getType().subst(substMap);
           auto fieldSILTy =
               getContext().getTypeConverter().getLoweredType(
-                  fieldTy, ResilienceExpansion::Minimal);
+                  fieldTy, TypeExpansionContext::minimal());
           assert(fieldSILTy.isObject());
           eltVals.push_back(makeZeroAdjointValue(fieldSILTy));
         }
@@ -6839,7 +6823,7 @@ void PullbackEmitter::emitZeroIndirect(CanType type, SILValue bufferAccess,
 
 SILValue PullbackEmitter::emitZeroDirect(CanType type, SILLocation loc) {
   auto silType = getModule().Types.getLoweredLoadableType(
-      type, ResilienceExpansion::Minimal, getModule());
+      type, TypeExpansionContext::minimal(), getModule());
   auto *buffer = builder.createAllocStack(loc, silType);
   emitZeroIndirect(type, buffer, loc);
   auto loaded = builder.emitLoadValueOperation(
@@ -7008,7 +6992,8 @@ void PullbackEmitter::accumulateIndirect(
                                                            proto);
     assert(!confRef.isInvalid() && "Missing conformance to `AdditiveArithmetic`");
     SILDeclRef declRef(combinerFuncDecl, SILDeclRef::Kind::Func);
-    auto silFnTy = getContext().getTypeConverter().getConstantType(declRef);
+    auto silFnTy = getContext().getTypeConverter().getConstantType(
+        TypeExpansionContext::minimal(), declRef);
     // %0 = witness_method @+
     auto witnessMethod = builder.createWitnessMethod(loc, adjointASTTy,
                                                      confRef, declRef,
@@ -7065,7 +7050,8 @@ void PullbackEmitter::accumulateIndirect(SILValue lhsDestAccess,
     auto confRef = swiftMod->lookupConformance(astType, proto);
     assert(!confRef.isInvalid() && "Missing conformance to `AdditiveArithmetic`");
     SILDeclRef declRef(accumulatorFuncDecl, SILDeclRef::Kind::Func);
-    auto silFnTy = getContext().getTypeConverter().getConstantType(declRef);
+    auto silFnTy = getContext().getTypeConverter().getConstantType(
+        TypeExpansionContext::minimal(), declRef);
     // %0 = witness_method @+=
     auto witnessMethod =
         builder.createWitnessMethod(loc, astType, confRef, declRef, silFnTy);
@@ -7118,21 +7104,12 @@ bool VJPEmitter::run() {
   if (errorOccurred)
     return true;
 
-  // Each `@guaranteed` trampoline argument needs to have a lifetime-ending use
-  // past its destination argument's lifetime-ending uses (aka. `end_borrow`).
-  // `trampolinedGuaranteedPhiArguments` tracks all `@guaranteed` trampoline
-  // arguments. We emit an `end_borrow` immediately past each destination
-  // argument's lifetime-ending uses.
-  for (auto &trampolinedArgPair : trampolinedGuaranteedPhiArguments) {
-    for (auto *destArgUse : trampolinedArgPair.destinationArgument->getUses()) {
-      if (auto *lifetimeEnd = dyn_cast<EndBorrowInst>(destArgUse->getUser())) {
-        getBuilder().setInsertionPoint(lifetimeEnd->getParentBlock(),
-                                       std::next(lifetimeEnd->getIterator()));
-        getBuilder().emitEndBorrowOperation(
-            lifetimeEnd->getLoc(), trampolinedArgPair.trampolineArgument);
-      }
-    }
-  }
+  // Merge VJP basic blocks. This is significant for control flow
+  // differentiation: trampoline destination bbs are merged into trampoline bbs.
+  // NOTE(TF-990): Merging basic blocks ensures that `@guaranteed` trampoline
+  // bb arguments have a lifetime-ending `end_borrow` use, and is robust when
+  // `-enable-strip-ownership-after-serialization` is true.
+  mergeBasicBlocks(vjp);
 
   // Generate pullback code.
   PullbackEmitter PullbackEmitter(*this);

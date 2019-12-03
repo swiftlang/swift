@@ -1410,6 +1410,11 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
       OI.CompilerOutputType = file_types::TY_PCH;
       break;
 
+    case options::OPT_emit_pcm:
+      OI.CompilerMode = OutputInfo::Mode::SingleCompile;
+      OI.CompilerOutputType = file_types::TY_ClangModuleFile;
+      break;
+
     case options::OPT_emit_imported_modules:
       OI.CompilerOutputType = file_types::TY_ImportedModules;
       // We want the imported modules from the module as a whole, not individual
@@ -1439,6 +1444,11 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
     case options::OPT_dump_interface_hash:
     case options::OPT_dump_type_info:
     case options::OPT_verify_debug_info:
+      OI.CompilerOutputType = file_types::TY_Nothing;
+      break;
+
+    case options::OPT_dump_pcm:
+      OI.CompilerMode = OutputInfo::Mode::SingleCompile;
       OI.CompilerOutputType = file_types::TY_Nothing;
       break;
 
@@ -1635,6 +1645,14 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
         [&](StringRef sanitizerName, bool shared) {
           return TC.sanitizerRuntimeLibExists(Args, sanitizerName, shared);
         });
+
+  if (const Arg *A = Args.getLastArg(options::OPT_sanitize_recover_EQ)) {
+    // Just validate the args. The frontend will parse these again and actually
+    // use them. To avoid emitting warnings multiple times we surpress warnings
+    // here but not in the frontend.
+    (void)parseSanitizerRecoverArgValues(A, OI.SelectedSanitizers, Diags,
+                                         /*emitWarnings=*/false);
+  }
 
   if (const Arg *A = Args.getLastArg(options::OPT_sanitize_coverage_EQ)) {
 
@@ -1842,6 +1860,11 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
   }
   case OutputInfo::Mode::SingleCompile: {
     if (Inputs.empty()) break;
+    if (Args.hasArg(options::OPT_emit_pcm) && Inputs.size() != 1) {
+      // -emit-pcm mode requires exactly one input (the module map).
+      Diags.diagnose(SourceLoc(), diag::error_mode_requires_one_input_file);
+      return;
+    }
     if (Args.hasArg(options::OPT_embed_bitcode)) {
       // Make sure we can handle the inputs.
       bool HandledHere = true;

@@ -258,7 +258,8 @@ static void splitDestructure(SILBuilder &B, SILInstruction *I, SILValue Op) {
   SILType OpType = Op->getType();
 
   llvm::SmallVector<Projection, 8> Projections;
-  Projection::getFirstLevelProjections(OpType, M, Projections);
+  Projection::getFirstLevelProjections(OpType, M, B.getTypeExpansionContext(),
+                                       Projections);
   assert(Projections.size() == I->getNumResults());
 
   auto Results = I->getResults();

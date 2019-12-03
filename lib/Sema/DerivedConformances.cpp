@@ -35,12 +35,16 @@ DeclContext *DerivedConformance::getConformanceContext() const {
   return cast<DeclContext>(ConformanceDecl);
 }
 
-void DerivedConformance::addMembersToConformanceContext(
+bool DerivedConformance::addMembersToConformanceContext(
     ArrayRef<Decl *> children) {
   auto IDC = cast<IterableDeclContext>(ConformanceDecl);
+  bool anyInvalid = false;
   for (auto child : children) {
     IDC->addMember(child);
+    TypeChecker::typeCheckDecl(child);
+    anyInvalid |= child->isInvalid();
   }
+  return anyInvalid;
 }
 
 Type DerivedConformance::getProtocolType() const {
@@ -136,7 +140,7 @@ bool DerivedConformance::derivesProtocolConformance(DeclContext *DC,
         }
 
         // hasOnlyCasesWithoutAssociatedValues will return true for empty enums;
-        // empty enumas are allowed to conform as well.
+        // empty enums are allowed to conform as well.
         return enumDecl->hasOnlyCasesWithoutAssociatedValues();
       }
 
@@ -486,8 +490,23 @@ DerivedConformance::createSelfDeclRef(AbstractFunctionDecl *fn) {
 AccessorDecl *DerivedConformance::
 addGetterToReadOnlyDerivedProperty(VarDecl *property,
                                    Type propertyContextType) {
-  auto getter =
-    declareDerivedPropertyGetter(property, propertyContextType);
+  auto &C = property->getASTContext();
+  auto parentDC = property->getDeclContext();
+  ParameterList *params = ParameterList::createEmpty(C);
+
+  Type propertyInterfaceType = property->getInterfaceType();
+
+  auto getter = AccessorDecl::create(C,
+    /*FuncLoc=*/SourceLoc(), /*AccessorKeywordLoc=*/SourceLoc(),
+    AccessorKind::Get, property,
+    /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
+    /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
+    /*GenericParams=*/nullptr, params,
+    TypeLoc::withoutLoc(propertyInterfaceType), parentDC);
+  getter->setImplicit();
+  getter->setIsTransparent(false);
+
+  getter->copyFormalAccessFrom(property);
 
   property->setImplInfo(StorageImplInfo::getImmutableComputed());
   property->setAccessors(SourceLoc(), {getter}, SourceLoc());
@@ -495,41 +514,17 @@ addGetterToReadOnlyDerivedProperty(VarDecl *property,
   return getter;
 }
 
+// SWIFT_ENABLE_TENSORFLOW
 std::pair<AccessorDecl *, AccessorDecl *>
 DerivedConformance::addGetterAndSetterToMutableDerivedProperty(
     VarDecl *property, Type propertyContextType) {
-  auto *getter = declareDerivedPropertyGetter(property, propertyContextType);
+  auto *getter = addGetterToReadOnlyDerivedProperty(property, propertyContextType);
   auto *setter = declareDerivedPropertySetter(property, propertyContextType);
   property->setImplInfo(StorageImplInfo::getMutableComputed());
   property->setAccessors(SourceLoc(), {getter, setter}, SourceLoc());
   return std::make_pair(getter, setter);
 }
-
-AccessorDecl *
-DerivedConformance::declareDerivedPropertyGetter(VarDecl *property,
-                                                 Type propertyContextType) {
-  auto &C = property->getASTContext();
-  auto parentDC = property->getDeclContext();
-  ParameterList *params = ParameterList::createEmpty(C);
-
-  Type propertyInterfaceType = property->getInterfaceType();
-  
-  auto getterDecl = AccessorDecl::create(C,
-    /*FuncLoc=*/SourceLoc(), /*AccessorKeywordLoc=*/SourceLoc(),
-    AccessorKind::Get, property,
-    /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
-    /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
-    /*GenericParams=*/nullptr, params,
-    TypeLoc::withoutLoc(propertyInterfaceType), parentDC);
-  getterDecl->setImplicit();
-  getterDecl->setIsTransparent(false);
-
-  getterDecl->copyFormalAccessFrom(property);
-
-  C.addSynthesizedDecl(getterDecl);
-
-  return getterDecl;
-}
+// SWIFT_ENABLE_TENSORFLOW END
 
 // SWIFT_ENABLE_TENSORFLOW
 AccessorDecl *
@@ -570,7 +565,6 @@ DerivedConformance::declareDerivedPropertySetter(VarDecl *property,
   setterDecl->setGenericSignature(parentDC->getGenericSignatureOfContext());
   setterDecl->copyFormalAccessFrom(property);
 
-  C.addSynthesizedDecl(setterDecl);
   return setterDecl;
 }
 

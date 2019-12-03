@@ -261,6 +261,9 @@ void ConstraintLocator::dump(ConstraintSystem *CS) const {
 
 
 void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) const {
+  PrintOptions PO;
+  PO.PrintTypesForDebugging = true;
+  
   out << "locator@" << (void*) this << " [";
 
   if (anchor) {
@@ -295,7 +298,7 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) const {
     switch (elt.getKind()) {
     case GenericParameter: {
       auto gpElt = elt.castTo<LocatorPathElt::GenericParameter>();
-      out << "generic parameter '" << gpElt.getType()->getString() << "'";
+      out << "generic parameter '" << gpElt.getType()->getString(PO) << "'";
       break;
     }
     case ApplyArgument:

@@ -106,6 +106,10 @@ There are two primary build systems to use: Xcode and Ninja. The Xcode build
 system allows you to work in Xcode, but Ninja is a bit faster and supports
 more environments.
 
+First, make sure that you're in the swift directory:
+
+    cd swift
+
 To build using Ninja, run:
 
     swift/utils/build-script --enable-tensorflow --release-debuginfo
@@ -127,7 +131,7 @@ the entire project in debug, you can run:
 For documentation of all available arguments, as well as additional usage
 information, see the inline help:
 
-    swift/utils/build-script -h
+    utils/build-script -h
 
 ### Customize TensorFlow support
 

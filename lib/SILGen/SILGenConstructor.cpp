@@ -49,7 +49,8 @@ static SILValue emitConstructorMetatypeArg(SILGenFunction &SGF,
   VD->setInterfaceType(metatype);
 
   SGF.AllocatorMetatype = SGF.F.begin()->createFunctionArgument(
-      SGF.getLoweredType(DC->mapTypeIntoContext(metatype)), VD);
+      SGF.getLoweredTypeForFunctionArgument(DC->mapTypeIntoContext(metatype)),
+      VD);
 
   return SGF.AllocatorMetatype;
 }
@@ -78,8 +79,7 @@ static RValue emitImplicitValueConstructorArg(SILGenFunction &SGF,
   VD->setSpecifier(ParamSpecifier::Default);
   VD->setInterfaceType(interfaceType);
 
-  auto argType = SGF.SGM.Types.getLoweredType(type,
-                                              ResilienceExpansion::Minimal);
+  auto argType = SGF.getLoweredTypeForFunctionArgument(type);
   auto *arg = SGF.F.begin()->createFunctionArgument(argType, VD);
   ManagedValue mvArg;
   if (arg->getArgumentConvention().isOwnedConvention()) {
@@ -129,7 +129,7 @@ static void emitImplicitValueConstructor(SILGenFunction &SGF,
   auto *paramList = ctor->getParameters();
   auto *selfDecl = ctor->getImplicitSelfDecl();
   auto selfIfaceTy = selfDecl->getInterfaceType();
-  SILType selfTy = SGF.getLoweredType(selfDecl->getType());
+  SILType selfTy = SGF.getLoweredTypeForFunctionArgument(selfDecl->getType());
 
   // Emit the indirect return argument, if any.
   SILValue resultSlot;
@@ -142,7 +142,8 @@ static void emitImplicitValueConstructor(SILGenFunction &SGF,
                                  ctor);
     VD->setSpecifier(ParamSpecifier::InOut);
     VD->setInterfaceType(selfIfaceTy);
-    resultSlot = SGF.F.begin()->createFunctionArgument(selfTy.getAddressType(), VD);
+    resultSlot =
+        SGF.F.begin()->createFunctionArgument(selfTy.getAddressType(), VD);
   }
 
   // Emit the elementwise arguments.
@@ -164,7 +165,8 @@ static void emitImplicitValueConstructor(SILGenFunction &SGF,
   if (resultSlot) {
     auto elti = elements.begin(), eltEnd = elements.end();
     for (VarDecl *field : decl->getStoredProperties()) {
-      auto fieldTy = selfTy.getFieldType(field, SGF.SGM.M);
+      auto fieldTy =
+          selfTy.getFieldType(field, SGF.SGM.M, SGF.getTypeExpansionContext());
       SILValue slot =
         SGF.B.createStructElementAddr(Loc, resultSlot, field,
                                       fieldTy.getAddressType());
@@ -201,7 +203,8 @@ static void emitImplicitValueConstructor(SILGenFunction &SGF,
 
   auto elti = elements.begin(), eltEnd = elements.end();
   for (VarDecl *field : decl->getStoredProperties()) {
-    auto fieldTy = selfTy.getFieldType(field, SGF.SGM.M);
+    auto fieldTy =
+        selfTy.getFieldType(field, SGF.SGM.M, SGF.getTypeExpansionContext());
     SILValue v;
 
     // If it's memberwise initialized, do so now.
@@ -416,8 +419,8 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
 void SILGenFunction::emitEnumConstructor(EnumElementDecl *element) {
   Type enumIfaceTy = element->getParentEnum()->getDeclaredInterfaceType();
   Type enumTy = F.mapTypeIntoContext(enumIfaceTy);
-  auto &enumTI = SGM.Types.getTypeLowering(enumTy,
-                                           ResilienceExpansion::Minimal);
+  auto &enumTI =
+      SGM.Types.getTypeLowering(enumTy, TypeExpansionContext::minimal());
 
   RegularLocation Loc(element);
   CleanupLocation CleanupLoc(element);

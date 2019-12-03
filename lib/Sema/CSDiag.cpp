@@ -3246,35 +3246,6 @@ bool FailureDiagnosis::diagnoseClosureExpr(
       return true;
   }
 
-  // If the body of the closure looked ok, then look for a contextual type
-  // error.  This is necessary because FailureDiagnosis::diagnoseExprFailure
-  // doesn't do this for closures.
-  if (contextualType) {
-    auto fnType = contextualType->getAs<AnyFunctionType>();
-    if (!fnType || fnType->isEqual(CS.getType(CE)))
-      return false;
-
-    auto contextualResultType = fnType->getResult();
-    // If the result type was unknown, it doesn't really make
-    // sense to diagnose from expected to unknown here.
-    if (isInvalidClosureResultType(contextualResultType))
-      return false;
-
-    // If the closure had an explicitly written return type incompatible with
-    // the contextual type, diagnose that.
-    if (CE->hasExplicitResultType() &&
-        CE->getExplicitResultTypeLoc().getTypeRepr()) {
-      auto explicitResultTy = CE->getExplicitResultTypeLoc().getType();
-      if (fnType && !explicitResultTy->isEqual(contextualResultType)) {
-        auto repr = CE->getExplicitResultTypeLoc().getTypeRepr();
-        diagnose(repr->getStartLoc(), diag::incorrect_explicit_closure_result,
-                 explicitResultTy, fnType->getResult())
-          .fixItReplace(repr->getSourceRange(),fnType->getResult().getString());
-        return true;
-      }
-    }
-  }
-
   // Otherwise, we can't produce a specific diagnostic.
   return false;
 }

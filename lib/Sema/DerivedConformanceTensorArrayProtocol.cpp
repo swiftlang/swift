@@ -245,8 +245,6 @@ static ValueDecl *deriveTensorArrayProtocol_method(
   funcDecl->copyFormalAccessFrom(nominal, /*sourceIsParentContext*/ true);
 
   derived.addMembersToConformanceContext({funcDecl});
-  C.addSynthesizedDecl(funcDecl);
-
   return funcDecl;
 }
 
@@ -643,8 +641,6 @@ static ValueDecl
   initDecl->copyFormalAccessFrom(nominal, /*sourceIsParentContext*/ true);
 
   derived.addMembersToConformanceContext({initDecl});
-  C.addSynthesizedDecl(initDecl);
-
   return initDecl;
 }
 
