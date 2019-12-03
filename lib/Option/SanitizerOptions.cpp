@@ -182,6 +182,36 @@ OptionSet<SanitizerKind> swift::parseSanitizerArgValues(
             + toStringRef(SanitizerKind::Thread)).toStringRef(b2));
   }
 
+  // Scudo can only be run with ubsan.
+  if (sanitizerSet & SanitizerKind::Scudo) {
+    OptionSet<SanitizerKind> allowedSet;
+    allowedSet |= SanitizerKind::Scudo;
+    allowedSet |= SanitizerKind::Undefined;
+
+    auto forbiddenOptions = sanitizerSet - allowedSet;
+
+    if (forbiddenOptions) {
+      SanitizerKind forbidden;
+
+      if (forbiddenOptions & SanitizerKind::Address) {
+        forbidden = SanitizerKind::Address;
+      } else if (forbiddenOptions & SanitizerKind::Thread) {
+          forbidden = SanitizerKind::Thread;
+      } else {
+        assert(forbiddenOptions & SanitizerKind::Fuzzer);
+        forbidden = SanitizerKind::Fuzzer;
+      }
+
+      SmallString<128> b1;
+      SmallString<128> b2;
+      Diags.diagnose(SourceLoc(), diag::error_argument_not_allowed_with,
+          (A->getOption().getPrefixedName()
+              + toStringRef(SanitizerKind::Scudo)).toStringRef(b1),
+          (A->getOption().getPrefixedName()
+              + toStringRef(forbidden)).toStringRef(b2));
+      }
+  }
+
   return sanitizerSet;
 }
 
