@@ -91,6 +91,13 @@ public:
   Type getType(Expr *expr, bool wantRValue = true) const;
   Type getType(const TypeLoc &loc, bool wantRValue = true) const;
 
+  /// For a given locator describing a function argument conversion, or a
+  /// constraint within an argument conversion, returns information about the
+  /// application of the argument to its parameter. If the locator is not
+  /// for an argument conversion, returns \c None.
+  static Optional<FunctionArgApplyInfo>
+  getFunctionArgApplyInfo(ConstraintSystem &cs, ConstraintLocator *locator);
+
   /// Resolve type variables present in the raw type, if any.
   Type resolveType(Type rawType, bool reconstituteSugar = false,
                    bool wantRValue = true) const {
@@ -112,10 +119,6 @@ public:
           return cs.getRepresentative(typeVar);
         });
   }
-
-  /// Resolve type variables present in the raw type, using generic parameter
-  /// types where possible.
-  Type resolveInterfaceType(Type type, bool reconstituteSugar = false) const;
 
   template <typename... ArgTypes>
   InFlightDiagnostic emitDiagnostic(ArgTypes &&... Args) const;
@@ -175,13 +178,6 @@ protected:
   /// \returns The overload choice made by the constraint system for the callee
   /// of a given locator's anchor, or \c None if no such choice can be found.
   Optional<SelectedOverload> getChoiceFor(ConstraintLocator *) const;
-
-  /// For a given locator describing a function argument conversion, or a
-  /// constraint within an argument conversion, returns information about the
-  /// application of the argument to its parameter. If the locator is not
-  /// for an argument conversion, returns \c None.
-  Optional<FunctionArgApplyInfo>
-  getFunctionArgApplyInfo(ConstraintLocator *locator) const;
 
   /// \returns A new type with all of the type variables associated with
   /// generic parameters substituted back into being generic parameter type.
@@ -978,16 +974,17 @@ protected:
 /// Diagnose mismatches relating to tuple destructuring.
 class TupleContextualFailure final : public ContextualFailure {
 public:
-  TupleContextualFailure(ConstraintSystem &cs, Type lhs, Type rhs,
-                         ConstraintLocator *locator)
-      : ContextualFailure(cs, lhs, rhs, locator) {}
+  TupleContextualFailure(ConstraintSystem &cs, ContextualTypePurpose purpose,
+                         Type lhs, Type rhs, ConstraintLocator *locator)
+      : ContextualFailure(cs, purpose, lhs, rhs, locator) {
+    assert(getFromType()->is<TupleType>() && getToType()->is<TupleType>());
+  }
 
   bool diagnoseAsError() override;
 
   bool isNumElementsMismatch() const {
     auto lhsTy = getFromType()->castTo<TupleType>();
     auto rhsTy = getToType()->castTo<TupleType>();
-    assert(lhsTy && rhsTy);
     return lhsTy->getNumElements() != rhsTy->getNumElements();
   }
 };
@@ -1819,7 +1816,7 @@ public:
   ArgumentMismatchFailure(ConstraintSystem &cs, Type argType,
                           Type paramType, ConstraintLocator *locator)
       : ContextualFailure(cs, argType, paramType, locator),
-        Info(getFunctionArgApplyInfo(getLocator())) {}
+        Info(getFunctionArgApplyInfo(cs, getLocator())) {}
 
   bool diagnoseAsError() override;
   bool diagnoseAsNote() override;

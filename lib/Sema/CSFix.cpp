@@ -255,17 +255,51 @@ ContextualMismatch *ContextualMismatch::create(ConstraintSystem &cs, Type lhs,
   return new (cs.getAllocator()) ContextualMismatch(cs, lhs, rhs, locator);
 }
 
-bool AllowTupleTypeMismatch::diagnose(bool asNote) const {
-  auto failure = TupleContextualFailure(
-      getConstraintSystem(), getFromType(), getToType(), getLocator());
+bool AllowTupleTypeMismatch::coalesceAndDiagnose(
+    ArrayRef<ConstraintFix *> fixes, bool asNote) const {
+  auto &cs = getConstraintSystem();
+  auto *locator = getLocator();
+  auto purpose = cs.getContextualTypePurpose();
+  Type fromType;
+  Type toType;
+
+  if (getFromType()->is<TupleType>() && getToType()->is<TupleType>()) {
+    fromType = getFromType();
+    toType = getToType();
+  } else if (auto contextualType = cs.getContextualType()) {
+    auto *tupleExpr = simplifyLocatorToAnchor(locator);
+    if (!tupleExpr)
+      return false;
+    fromType = cs.getType(tupleExpr);
+    toType = contextualType;
+  } else if (auto argApplyInfo =
+                 FailureDiagnostic::getFunctionArgApplyInfo(cs, locator)) {
+    purpose = CTP_CallArgument;
+    fromType = argApplyInfo->getArgType();
+    toType = argApplyInfo->getParamType();
+  } else if (auto *coerceExpr = dyn_cast<CoerceExpr>(locator->getAnchor())) {
+    purpose = CTP_CoerceOperand;
+    fromType = cs.getType(coerceExpr->getSubExpr());
+    toType = cs.getType(coerceExpr);
+  } else if (auto *assignExpr = dyn_cast<AssignExpr>(locator->getAnchor())) {
+    purpose = CTP_AssignSource;
+    fromType = cs.getType(assignExpr->getSrc());
+    toType = cs.getType(assignExpr->getDest());
+  } else {
+    return false;
+  }
+
+  TupleContextualFailure failure(cs, purpose, fromType, toType, locator);
   return failure.diagnose(asNote);
+}
+
+bool AllowTupleTypeMismatch::diagnose(bool asNote) const {
+  return coalesceAndDiagnose({}, asNote);
 }
 
 AllowTupleTypeMismatch *
 AllowTupleTypeMismatch::create(ConstraintSystem &cs, Type lhs, Type rhs,
                                ConstraintLocator *locator) {
-  assert(lhs->is<TupleType>() && rhs->is<TupleType>() &&
-         "lhs and rhs must be tuple types");
   return new (cs.getAllocator()) AllowTupleTypeMismatch(cs, lhs, rhs, locator);
 }
 

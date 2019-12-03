@@ -512,7 +512,7 @@ let _: Color = .Unknown(42) // expected-error {{missing argument label 'descript
 // expected-error@-1 {{cannot convert value of type 'Int' to expected argument type 'String'}}
 let _ : Color = .rainbow(42)  // expected-error {{argument passed to call that takes no arguments}}
 
-let _ : (Int, Float) = (42.0, 12)  // expected-error {{cannot convert value of type 'Double' to specified type 'Int'}}
+let _ : (Int, Float) = (42.0, 12)  // expected-error {{cannot convert value of type '(Double, Float)' to specified type '(Int, Float)'}}
 
 let _ : Color = .rainbow  // expected-error {{member 'rainbow()' is a function; did you mean to call it?}} {{25-25=()}}
 

@@ -255,8 +255,7 @@ private:
   bool visitExpr(Expr *E);
   bool visitIdentityExpr(IdentityExpr *E);
   bool visitTryExpr(TryExpr *E);
-  bool visitTupleExpr(TupleExpr *E);
-  
+
   bool visitUnresolvedMemberExpr(UnresolvedMemberExpr *E);
   bool visitUnresolvedDotExpr(UnresolvedDotExpr *UDE);
   bool visitArrayExpr(ArrayExpr *E);
@@ -2934,58 +2933,6 @@ bool FailureDiagnosis::visitUnresolvedDotExpr(UnresolvedDotExpr *UDE) {
   return diagnoseMemberFailures(UDE, baseExpr, ConstraintKind::ValueMember,
                                 UDE->getName(), UDE->getFunctionRefKind(),
                                 locator);
-}
-
-/// A TupleExpr propagate contextual type information down to its children and
-/// can be erroneous when there is a label mismatch etc.
-bool FailureDiagnosis::visitTupleExpr(TupleExpr *TE) {
-  // If we know the requested argType to use, use computeTupleShuffle to produce
-  // the shuffle of input arguments to destination values.  It requires a
-  // TupleType to compute the mapping from argExpr.  Conveniently, it doesn't
-  // care about the actual types though, so we can just use 'void' for them.
-  if (!CS.getContextualType() || !CS.getContextualType()->is<TupleType>())
-    return visitExpr(TE);
-
-  auto contextualTT = CS.getContextualType()->castTo<TupleType>();
-
-  SmallVector<TupleTypeElt, 4> ArgElts;
-  auto voidTy = CS.getASTContext().TheEmptyTupleType;
-
-  for (unsigned i = 0, e = TE->getNumElements(); i != e; ++i)
-    ArgElts.push_back({ voidTy, TE->getElementName(i) });
-  auto TEType = TupleType::get(ArgElts, CS.getASTContext());
-
-  if (!TEType->is<TupleType>())
-    return visitExpr(TE);
-
-  SmallVector<unsigned, 4> sources;
-  
-  // If the shuffle is invalid, then there is a type error.  We could diagnose
-  // it specifically here, but the general logic does a fine job so we let it
-  // do it.
-  if (computeTupleShuffle(TEType->castTo<TupleType>()->getElements(),
-                          contextualTT->getElements(), sources))
-    return visitExpr(TE);
-
-  // If we got a correct shuffle, we can perform the analysis of all of
-  // the input elements, with their expected types.
-  for (unsigned i = 0, e = sources.size(); i != e; ++i) {
-    // Otherwise, it must match the corresponding expected argument type.
-    unsigned inArgNo = sources[i];
-
-    TCCOptions options;
-    if (contextualTT->getElement(i).isInOut())
-      options |= TCC_AllowLValue;
-
-    auto actualType = contextualTT->getElementType(i);
-    auto exprResult =
-        typeCheckChildIndependently(TE->getElement(inArgNo), actualType,
-                                    CS.getContextualTypePurpose(), options);
-    // If there was an error type checking this argument, then we're done.
-    if (!exprResult) return true;
-  }
-  
-  return false;
 }
 
 /// An IdentityExpr doesn't change its argument, but it *can* propagate its

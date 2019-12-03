@@ -131,9 +131,7 @@ FailureDiagnostic::getChoiceFor(ConstraintLocator *locator) const {
   return getOverloadChoiceIfAvailable(cs.getCalleeLocator(locator));
 }
 
-Type FailureDiagnostic::resolveInterfaceType(Type type,
-                                             bool reconstituteSugar) const {
-  auto &cs = getConstraintSystem();
+static Type resolveInterfaceType(ConstraintSystem &cs, Type type) {
   auto resolvedType = type.transform([&](Type type) -> Type {
     if (auto *tvt = type->getAs<TypeVariableType>()) {
       // If this type variable is for a generic parameter, return that.
@@ -142,13 +140,13 @@ Type FailureDiagnostic::resolveInterfaceType(Type type,
 
       // Otherwise resolve its fixed type, mapped out of context.
       if (auto fixed = cs.getFixedType(tvt))
-        return resolveInterfaceType(fixed->mapTypeOutOfContext());
+        return resolveInterfaceType(cs, fixed->mapTypeOutOfContext());
 
       return cs.getRepresentative(tvt);
     }
     if (auto *dmt = type->getAs<DependentMemberType>()) {
       // For a dependent member, first resolve the base.
-      auto newBase = resolveInterfaceType(dmt->getBase());
+      auto newBase = resolveInterfaceType(cs, dmt->getBase());
 
       // Then reconstruct using its associated type.
       assert(dmt->getAssocType());
@@ -158,8 +156,7 @@ Type FailureDiagnostic::resolveInterfaceType(Type type,
   });
 
   assert(!resolvedType->hasArchetype());
-  return reconstituteSugar ? resolvedType->reconstituteSugar(/*recursive*/ true)
-                           : resolvedType;
+  return resolvedType;
 }
 
 /// Given an apply expr, returns true if it is expected to have a direct callee
@@ -192,8 +189,8 @@ static bool shouldHaveDirectCalleeOverload(const CallExpr *callExpr) {
 }
 
 Optional<FunctionArgApplyInfo>
-FailureDiagnostic::getFunctionArgApplyInfo(ConstraintLocator *locator) const {
-  auto &cs = getConstraintSystem();
+FailureDiagnostic::getFunctionArgApplyInfo(ConstraintSystem &cs,
+                                           ConstraintLocator *locator) {
   auto *anchor = locator->getAnchor();
   auto path = locator->getPath();
 
@@ -225,7 +222,8 @@ FailureDiagnostic::getFunctionArgApplyInfo(ConstraintLocator *locator) const {
 
   Optional<OverloadChoice> choice;
   Type rawFnType;
-  if (auto overload = getChoiceFor(argLocator)) {
+  auto *calleeLocator = cs.getCalleeLocator(argLocator);
+  if (auto overload = cs.findSelectedOverloadFor(calleeLocator)) {
     // If we have resolved an overload for the callee, then use that to get the
     // function type and callee.
     choice = overload->choice;
@@ -249,7 +247,8 @@ FailureDiagnostic::getFunctionArgApplyInfo(ConstraintLocator *locator) const {
 
   // Try to resolve the function type by loading lvalues and looking through
   // optional types, which can occur for expressions like `fn?(5)`.
-  auto *fnType = resolveType(rawFnType)
+  auto *fnType = cs.simplifyType(rawFnType)
+                     ->getRValueType()
                      ->lookThroughAllOptionalTypes()
                      ->getAs<FunctionType>();
   if (!fnType)
@@ -280,13 +279,14 @@ FailureDiagnostic::getFunctionArgApplyInfo(ConstraintLocator *locator) const {
       (void)fn;
     }
   } else {
-    fnInterfaceType = resolveInterfaceType(rawFnType);
+    fnInterfaceType = resolveInterfaceType(cs, rawFnType);
   }
 
   auto argIdx = applyArgElt->getArgIdx();
   auto paramIdx = applyArgElt->getParamIdx();
 
-  return FunctionArgApplyInfo(cs, argExpr, argIdx, getType(argExpr),
+  return FunctionArgApplyInfo(cs, argExpr, argIdx,
+                              cs.simplifyType(cs.getType(argExpr)),
                               paramIdx, fnInterfaceType, fnType, callee);
 }
 
@@ -929,7 +929,8 @@ bool NoEscapeFuncToTypeConversionFailure::diagnoseParameterUse() const {
     // Let's check whether this is a function parameter passed
     // as an argument to another function which accepts @escaping
     // function at that position.
-    if (auto argApplyInfo = getFunctionArgApplyInfo(getLocator())) {
+    auto &cs = getConstraintSystem();
+    if (auto argApplyInfo = getFunctionArgApplyInfo(cs, getLocator())) {
       auto paramInterfaceTy = argApplyInfo->getParamInterfaceType();
       if (paramInterfaceTy->isTypeParameter()) {
         auto diagnoseGenericParamFailure = [&](GenericTypeParamDecl *decl) {
@@ -1137,7 +1138,8 @@ void MissingOptionalUnwrapFailure::offerDefaultValueUnwrapFixIt(
   if (isa<InOutExpr>(anchor))
     return;
 
-  if (auto argApplyInfo = getFunctionArgApplyInfo(getLocator()))
+  auto &cs = getConstraintSystem();
+  if (auto argApplyInfo = getFunctionArgApplyInfo(cs, getLocator()))
     if (argApplyInfo->getParameterFlags().isInOut())
       return;
 
@@ -2963,8 +2965,12 @@ ContextualFailure::getDiagnosticFor(ContextualTypePurpose context,
 bool TupleContextualFailure::diagnoseAsError() {
   auto diagnostic = isNumElementsMismatch()
                         ? diag::tuple_types_not_convertible_nelts
-                        : diag::tuple_types_not_convertible;
-  emitDiagnostic(getAnchor()->getLoc(), diagnostic, getFromType(), getToType());
+                        : getDiagnosticFor(getContextualTypePurpose(),
+                                           /*forProtocol=*/false);
+  if (!diagnostic)
+    return false;
+
+  emitDiagnostic(getAnchor()->getLoc(), *diagnostic, getFromType(), getToType());
   return true;
 }
 
@@ -3796,7 +3802,7 @@ bool MissingArgumentsFailure::diagnoseAsError() {
   // foo(bar) // `() -> Void` vs. `(Int) -> Void`
   // ```
   if (locator->isLastElement<LocatorPathElt::ApplyArgToParam>()) {
-    auto info = *getFunctionArgApplyInfo(locator);
+    auto info = *getFunctionArgApplyInfo(cs, locator);
 
     auto *argExpr = info.getArgExpr();
     emitDiagnostic(argExpr->getLoc(), diag::cannot_convert_argument_value,
@@ -4012,7 +4018,7 @@ bool MissingArgumentsFailure::diagnoseClosure(ClosureExpr *closure) {
   auto *locator = getLocator();
   if (locator->isForContextualType()) {
     funcType = cs.getContextualType()->getAs<FunctionType>();
-  } else if (auto info = getFunctionArgApplyInfo(locator)) {
+  } else if (auto info = getFunctionArgApplyInfo(cs, locator)) {
     funcType = info->getParamType()->getAs<FunctionType>();
   } else if (locator->isLastElement<LocatorPathElt::ClosureResult>()) {
     // Based on the locator we know this this is something like this:
@@ -4725,7 +4731,8 @@ SourceLoc InvalidUseOfAddressOf::getLoc() const {
 }
 
 bool InvalidUseOfAddressOf::diagnoseAsError() {
-  if (auto argApplyInfo = getFunctionArgApplyInfo(getLocator())) {
+  auto &cs = getConstraintSystem();
+  if (auto argApplyInfo = getFunctionArgApplyInfo(cs, getLocator())) {
     if (!argApplyInfo->getParameterFlags().isInOut()) {
       auto anchor = getAnchor();
       emitDiagnostic(anchor->getLoc(), diag::extra_address_of, getToType())
@@ -5245,18 +5252,19 @@ bool ThrowingFunctionConversionFailure::diagnoseAsError() {
 }
 
 bool InOutConversionFailure::diagnoseAsError() {
+  auto &cs = getConstraintSystem();
   auto *anchor = getAnchor();
   auto *locator = getLocator();
   auto path = locator->getPath();
 
   if (!path.empty() &&
       path.back().getKind() == ConstraintLocator::FunctionArgument) {
-    if (auto argApplyInfo = getFunctionArgApplyInfo(locator)) {
+    if (auto argApplyInfo = getFunctionArgApplyInfo(cs, locator)) {
       emitDiagnostic(anchor->getLoc(), diag::cannot_convert_argument_value,
           argApplyInfo->getArgType(), argApplyInfo->getParamType());
     } else {
       assert(locator->findLast<LocatorPathElt::ContextualType>());
-      auto contextualType = getConstraintSystem().getContextualType();
+      auto contextualType = cs.getContextualType();
       auto purpose = getContextualTypePurpose();
       auto diagnostic = getDiagnosticFor(purpose, /*forProtocol=*/false);
 

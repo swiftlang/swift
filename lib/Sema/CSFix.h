@@ -963,9 +963,16 @@ public:
   static AllowTupleTypeMismatch *create(ConstraintSystem &cs, Type lhs,
                                         Type rhs, ConstraintLocator *locator);
 
+  static bool classof(const ConstraintFix *fix) {
+    return fix->getKind() == FixKind::AllowTupleTypeMismatch;
+  }
+
   std::string getName() const override {
     return "fix tuple mismatches in type and arity";
   }
+
+  bool coalesceAndDiagnose(ArrayRef<ConstraintFix *> secondaryFixes,
+                           bool asNote = false) const override;
 
   bool diagnose(bool asNote = false) const override;
 };
