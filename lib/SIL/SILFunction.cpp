@@ -258,7 +258,7 @@ SILType SILFunction::getLoweredLoadableType(Type t) const {
 }
 
 const TypeLowering &SILFunction::getTypeLowering(SILType type) const {
-  return getModule().Types.getTypeLowering(type, TypeExpansionContext(*this));
+  return getModule().Types.getTypeLowering(type, *this);
 }
 
 SILType SILFunction::getLoweredType(SILType t) const {
