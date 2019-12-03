@@ -1539,9 +1539,9 @@ void PatternBindingEntry::setOriginalInit(Expr *E) {
                              PatternFlags::IsText);
 }
 
-bool PatternBindingEntry::isInitialized() const {
+bool PatternBindingEntry::isInitialized(bool onlyExplicit) const {
   // Directly initialized.
-  if (getInit())
+  if (getInit() && (!onlyExplicit || getEqualLoc().isValid()))
     return true;
 
   // Initialized via a property wrapper.
@@ -1833,7 +1833,7 @@ bool PatternBindingDecl::isComputingPatternBindingEntry(
 
 bool PatternBindingDecl::isExplicitlyInitialized(unsigned i) const {
   const auto &entry = getPatternList()[i];
-  return entry.isInitialized() && entry.getEqualLoc().isValid();
+  return entry.isInitialized(/*onlyExplicit=*/true);
 }
 
 SourceLoc PatternBindingDecl::getEqualLoc(unsigned i) const {
