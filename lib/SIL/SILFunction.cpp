@@ -50,52 +50,6 @@ void SILFunction::addSpecializeAttr(SILSpecializeAttr *Attr) {
   }
 }
 
-/// SWIFT_ENABLE_TENSORFLOW
-SILDifferentiableAttr::
-SILDifferentiableAttr(const SILAutoDiffIndices &indices,
-                      StringRef jvpName,
-                      StringRef vjpName,
-                      TrailingWhereClause *whereClause)
-  : indices(indices), JVPName(jvpName), VJPName(vjpName),
-    WhereClause(whereClause) {}
-
-SILDifferentiableAttr::
-SILDifferentiableAttr(const SILAutoDiffIndices &indices,
-                      StringRef jvpName,
-                      StringRef vjpName,
-                      GenericSignature derivativeGenSig)
-  : indices(indices), JVPName(jvpName), VJPName(vjpName),
-    DerivativeGenericSignature(derivativeGenSig) {}
-
-SILDifferentiableAttr *
-SILDifferentiableAttr::create(SILModule &M,
-                              const SILAutoDiffIndices &indices,
-                              StringRef jvpName,
-                              StringRef vjpName,
-                              TrailingWhereClause *whereClause) {
-  void *mem =
-      M.allocate(sizeof(SILDifferentiableAttr), alignof(SILDifferentiableAttr));
-  return ::new (mem)
-      SILDifferentiableAttr(indices, jvpName, vjpName, whereClause);
-}
-
-SILDifferentiableAttr *
-SILDifferentiableAttr::create(SILModule &M,
-                              const SILAutoDiffIndices &indices,
-                              StringRef jvpName,
-                              StringRef vjpName,
-                              GenericSignature derivativeGenSig) {
-  void *mem =
-      M.allocate(sizeof(SILDifferentiableAttr), alignof(SILDifferentiableAttr));
-  return ::new (mem)
-      SILDifferentiableAttr(indices, jvpName, vjpName, derivativeGenSig);
-}
-
-void SILFunction::addDifferentiableAttr(SILDifferentiableAttr *attr) {
-  attr->Original = this;
-  DifferentiableAttrs.push_back(attr);
-}
-
 SILFunction *
 SILFunction::create(SILModule &M, SILLinkage linkage, StringRef name,
                     CanSILFunctionType loweredType,

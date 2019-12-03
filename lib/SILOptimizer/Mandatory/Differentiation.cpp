@@ -294,12 +294,10 @@ static GenericSignature getConstrainedDerivativeGenericSignature(
       nullptr);
 }
 
-/// Returns the canonical derivative generic signature for the given
-/// `[differentiable]` attribute and original function.
-/// - Return the `[differentiable]` attribute derivative generic signature if
-///   it exists.
+/// Returns the canonical derivative generic signature for the given witness
+/// and original function.
+/// - Return the witness derivative generic signature if it exists.
 /// - Otherwise, return the original function's generic signature.
-// TODO: Document this, delete above.
 static CanGenericSignature getDerivativeGenericSignature(
     SILDifferentiabilityWitness *witness, SILFunction *original) {
   if (auto sig = witness->getDerivativeGenericSignature())
@@ -368,13 +366,14 @@ public:
     DifferentiableFunctionInst,
 
     // Invoked by the indirect application of differentiation. This case has an
-    // associated original `apply` instruction and `[differentiable]` attribute.
+    // associated original `apply` instruction and
+    // `SILDifferentiabilityWitness`.
     IndirectDifferentiation,
 
-    // Invoker by a `[differentiable]` attribute in SIL **without** being linked
-    // to a Swift AST attribute. This case has an associated `[differentiable]`
-    // attribute.
-    SILDifferentiableAttribute
+    // Invoked by a `SILDifferentiabilityWitness` **without** being linked to a
+    // Swift AST attribute. This case has an associated
+    // `SILDifferentiabilityWitness`.
+    SILDifferentiabilityWitnessInvoker
   };
 
 private:
@@ -384,17 +383,17 @@ private:
     DifferentiableFunctionInst *diffFuncInst;
     Value(DifferentiableFunctionInst *inst) : diffFuncInst(inst) {}
 
-    /// The parent `apply` instruction and `[differentiable]` attribute
-    /// associated with the `IndirectDifferentiation` case.
+    /// The parent `apply` instruction and the witness associated with the
+    /// `IndirectDifferentiation` case.
     std::pair<ApplyInst *, SILDifferentiabilityWitness *>
         indirectDifferentiation;
     Value(ApplyInst *applyInst, SILDifferentiabilityWitness *witness)
         : indirectDifferentiation({applyInst, witness}) {}
 
-    /// The `[differentiable]` attribute associated with the
-    /// `SILDifferentiableAttribute` case.
-    SILDifferentiabilityWitness *silDifferentiableAttribute;
-    Value(SILDifferentiabilityWitness *witness) : silDifferentiableAttribute(witness) {}
+    /// The witness associated with the `SILDifferentiabilityWitnessInvoker`
+    /// case.
+    SILDifferentiabilityWitness *witness;
+    Value(SILDifferentiabilityWitness *witness) : witness(witness) {}
   } value;
 
   /*implicit*/
@@ -407,7 +406,7 @@ public:
       : kind(Kind::IndirectDifferentiation),
         value({applyInst, witness}) {}
   DifferentiationInvoker(SILDifferentiabilityWitness *witness)
-      : kind(Kind::SILDifferentiableAttribute), value(witness) {}
+      : kind(Kind::SILDifferentiabilityWitnessInvoker), value(witness) {}
 
   Kind getKind() const { return kind; }
 
@@ -423,9 +422,9 @@ public:
   }
 
 
-  SILDifferentiabilityWitness *getSILDifferentiableAttribute() const {
-    assert(kind == Kind::SILDifferentiableAttribute);
-    return value.silDifferentiableAttribute;
+  SILDifferentiabilityWitness *getSILDifferentiabilityWitnessInvoker() const {
+    assert(kind == Kind::SILDifferentiabilityWitnessInvoker);
+    return value.witness;
   }
 
   SourceLoc getLocation() const {
@@ -434,8 +433,8 @@ public:
       return getDifferentiableFunctionInst()->getLoc().getSourceLoc();
     case Kind::IndirectDifferentiation:
       return getIndirectDifferentiation().first->getLoc().getSourceLoc();
-    case Kind::SILDifferentiableAttribute:
-      return getSILDifferentiableAttribute()->getOriginalFunction()
+    case Kind::SILDifferentiabilityWitnessInvoker:
+      return getSILDifferentiabilityWitnessInvoker()->getOriginalFunction()
           ->getLocation().getSourceLoc();
     }
   }
@@ -860,11 +859,11 @@ void DifferentiationInvoker::print(llvm::raw_ostream &os) const {
     */
     break;
   }
-  case Kind::SILDifferentiableAttribute: {
-    auto diffAttr = getSILDifferentiableAttribute();
-    os << "sil_differentiable_attribute=(attr=(";
-    diffAttr->print(os);
-    os << ") function=" << diffAttr->getOriginalFunction()->getName();
+  case Kind::SILDifferentiabilityWitnessInvoker: {
+    auto witness = getSILDifferentiabilityWitnessInvoker();
+    os << "sil_differentiability_witness_invoker=(witness=(";
+    witness->print(os);
+    os << ") function=" << witness->getOriginalFunction()->getName();
     break;
   }
   }
@@ -898,7 +897,7 @@ private:
   SmallPtrSet<DifferentiableFunctionInst *, 32>
       processedDifferentiableFunctionInsts;
 
-  /// Mapping from `[differentiable]` attributes to invokers.
+  /// Mapping from witnesses to invokers.
   /// `SmallMapVector` is used for deterministic insertion order iteration.
   SmallMapVector<SILDifferentiabilityWitness *, DifferentiationInvoker, 32>
       invokers;
@@ -995,14 +994,6 @@ public:
   }
 
   void cleanUp() {
-    // for (auto invokerPair : invokers) {
-    //   auto *attr = std::get<0>(invokerPair);
-    //   auto *original = attr->getOriginal();
-    //   LLVM_DEBUG(getADDebugStream()
-    //              << "Removing [differentiable] attribute for "
-    //              << original->getName() << '\n');
-    //   original->removeDifferentiableAttr(attr);
-    // }
     // Delete all references to generated functions.
     for (auto fnRef : generatedFunctionReferences) {
       if (auto *fnRefInst =
@@ -1044,8 +1035,7 @@ private:
       DifferentiationInvoker invoker);
 
 public:
-  /// Process the given `[differentiable]` attribute, filling in JVP/VJPs if
-  /// missing.
+  /// Canonicalize the given witness, filling in JVP/VJPs if missing.
   bool canonicalizeDifferentiabilityWitness(
       SILFunction *original, SILDifferentiabilityWitness *witness,
       DifferentiationInvoker invoker);
@@ -1187,12 +1177,12 @@ ADContext::emitNondifferentiabilityError(SourceLoc loc,
     return diagnose(loc, diag, std::forward<U>(args)...);
   }
 
-  // For `[differentiable]` attributes, try to find an AST function declaration
-  // and `@differentiable` attribute. If they are found, emit an error on the
-  // `@differentiable` attribute; otherwise, emit an error on the SIL function.
-  // Emit a note at the non-differentiable operation.
-  case DifferentiationInvoker::Kind::SILDifferentiableAttribute: {
-    auto *witness = invoker.getSILDifferentiableAttribute();
+  // For `SILDifferentiabilityWitness`es, try to find an AST function
+  // declaration and `@differentiable` attribute. If they are found, emit an
+  // error on the `@differentiable` attribute; otherwise, emit an error on the
+  // SIL function. Emit a note at the non-differentiable operation.
+  case DifferentiationInvoker::Kind::SILDifferentiabilityWitnessInvoker: {
+    auto *witness = invoker.getSILDifferentiabilityWitnessInvoker();
     auto *original = witness->getOriginalFunction();
     if (auto *diffAttr = witness->getAttribute()) {
       diagnose(diffAttr->getLocation(),
@@ -3767,7 +3757,7 @@ public:
     // the transform main loop.
     if (!vjpValue) {
       // FIXME: Handle indirect differentiation invokers. This may require some
-      // redesign: currently, each original function + attribute pair is mapped
+      // redesign: currently, each original function + witness pair is mapped
       // only to one invoker.
       /*
       DifferentiationInvoker indirect(ai, attr);
@@ -5424,7 +5414,7 @@ public:
     // the transform main loop.
     if (!jvpValue) {
       // FIXME: Handle indirect differentiation invokers. This may require some
-      // redesign: currently, each original function + attribute pair is mapped
+      // redesign: currently, each original function + witness pair is mapped
       // only to one invoker.
       /*
        DifferentiationInvoker indirect(ai, attr);
@@ -7873,9 +7863,7 @@ static SILFunction *createEmptyVJP(
       vjpGenericSig);
 
   SILOptFunctionBuilder fb(context.getTransform());
-  auto linkage = autodiff::getAutoDiffDerivativeFunctionLinkage(
-      original->getLinkage(), /*isExported*/ false);
-  auto *vjp = fb.createFunction(linkage, vjpName, vjpType, vjpGenericEnv,
+  auto *vjp = fb.createFunction(SILLinkage::Hidden, vjpName, vjpType, vjpGenericEnv,
                                 original->getLocation(), original->isBare(),
                                 IsNotTransparent, original->isSerialized(),
                                 original->isDynamicallyReplaceable());
@@ -7921,9 +7909,7 @@ static SILFunction *createEmptyJVP(
       LookUpConformanceInModule(module.getSwiftModule()), jvpGenericSig);
 
   SILOptFunctionBuilder fb(context.getTransform());
-  auto linkage = autodiff::getAutoDiffDerivativeFunctionLinkage(
-      original->getLinkage(), /*isExported*/ false);
-  auto *jvp = fb.createFunction(linkage, jvpName, jvpType, jvpGenericEnv,
+  auto *jvp = fb.createFunction(SILLinkage::Hidden, jvpName, jvpType, jvpGenericEnv,
                                 original->getLocation(), original->isBare(),
                                 IsNotTransparent, original->isSerialized(),
                                 original->isDynamicallyReplaceable());
@@ -8797,7 +8783,7 @@ void Differentiation::run() {
     errorOccurred |= context.processDifferentiableFunctionInst(dfi);
   }
 
-  // If any error occurred while processing `[differentiable]` attributes or
+  // If any error occurred while processing witnesses or
   // `differentiable_function` instructions, clean up.
   if (errorOccurred) {
     context.cleanUp();

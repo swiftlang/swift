@@ -428,7 +428,6 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
         S.addUniquedStringRef(F.getObjCReplacement().str());
   }
   unsigned numSpecAttrs = NoBody ? 0 : F.getSpecializeAttrs().size();
-  unsigned numDiffAttrs = NoBody ? 0 : F.getDifferentiableAttrs().size();
 
   Optional<llvm::VersionTuple> available;
   auto availability = F.getAvailabilityForLinkage();
@@ -443,8 +442,7 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
       (unsigned)F.isThunk(), (unsigned)F.isWithoutActuallyEscapingThunk(),
       (unsigned)F.isGlobalInit(), (unsigned)F.getInlineStrategy(),
       (unsigned)F.getOptimizationMode(), (unsigned)F.getEffectsKind(),
-      // SWIFT_ENABLE_TENSORFLOW
-      (unsigned)numSpecAttrs, (unsigned)numDiffAttrs,
+      (unsigned)numSpecAttrs,
       (unsigned)F.hasOwnership(),
       F.isAlwaysWeakImported(), LIST_VER_TUPLE_PIECES(available),
       (unsigned)F.isDynamicallyReplaceable(),
@@ -461,31 +459,6 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
         (unsigned)SA->isExported(),
         (unsigned)SA->getSpecializationKind(),
         S.addGenericSignatureRef(SA->getSpecializedSignature()));
-  }
-
-  // SWIFT_ENABLE_TENSORFLOW
-  auto &Ctx = F.getASTContext();
-  for (auto *DA : F.getDifferentiableAttrs()) {
-    unsigned differentiableAttrAbbrCode =
-        SILAbbrCodes[SILDifferentiableAttrLayout::Code];
-
-    if (F.getModule().getStage() == SILStage::Canonical)
-      assert(DA->hasJVP() && DA->hasVJP() &&
-             "JVP and VJP must exist in canonical SIL");
-
-    auto &indices = DA->getIndices();
-    SmallVector<unsigned, 8> parameters(indices.parameters->begin(),
-                                        indices.parameters->end());
-    SILDifferentiableAttrLayout::emitRecord(
-        Out, ScratchRecord, differentiableAttrAbbrCode,
-        DA->hasJVP()
-            ? S.addDeclBaseNameRef(Ctx.getIdentifier(DA->getJVPName()))
-            : IdentifierID(),
-        DA->hasVJP()
-            ? S.addDeclBaseNameRef(Ctx.getIdentifier(DA->getVJPName()))
-            : IdentifierID(),
-        S.addGenericSignatureRef(DA->getDerivativeGenericSignature()),
-        indices.source, parameters);
   }
 
   // Assign a unique ID to each basic block of the SILFunction.
@@ -2669,7 +2642,6 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
   registerSILAbbr<SILInstWitnessMethodLayout>();
   registerSILAbbr<SILSpecializeAttrLayout>();
   // SWIFT_ENABLE_TENSORFLOW
-  registerSILAbbr<SILDifferentiableAttrLayout>();
   registerSILAbbr<SILInstDifferentiableFunctionLayout>();
   registerSILAbbr<SILInstLinearFunctionLayout>();
   registerSILAbbr<SILInstDifferentiableFunctionExtractLayout>();

@@ -282,30 +282,6 @@ bool autodiff::getBuiltinDifferentiableOrLinearFunctionConfig(
   return operationName.empty();
 }
 
-SILLinkage autodiff::getAutoDiffDerivativeFunctionLinkage(
-    SILLinkage originalLinkage, bool isDerivativeFnExported) {
-  // If the original is defined externally, then the AD pass is just generating
-  // derivative functions for use in the current module and therefore these
-  // derivative functions should not be visible outside the module.
-  if (isAvailableExternally(originalLinkage))
-    return SILLinkage::Hidden;
-
-  // If the original is public, then external modules may need to link the
-  // derivative function. Return the linkage of the original function, unless
-  // the derivative function is not exported (i.e. differentiation is not
-  // explicitly requested via a `[differentiable]` attribute on the original
-  // function).
-  if (originalLinkage == SILLinkage::Public ||
-      originalLinkage == SILLinkage::PublicNonABI ||
-      originalLinkage == SILLinkage::Shared)
-    return isDerivativeFnExported ? originalLinkage : SILLinkage::Hidden;
-
-  // Otherwise, the original function is defined and used only in the current
-  // module, so external modules will never try to access the associated
-  // function. Make the derivative function hidden.
-  return SILLinkage::Hidden;
-}
-
 Type VectorSpace::getType() const {
   switch (kind) {
   case Kind::Vector:

@@ -366,7 +366,7 @@ public:
   void emitDifferentiabilityWitness(AbstractFunctionDecl *originalAFD,
                                     SILFunction *originalFunction,
                                     const AutoDiffConfig &config,
-                                    SILFunction *jvp, SILFunction *vjp);
+                                    SILFunction *jvp, SILFunction *vjp, const DeclAttribute *diffAttr);
   // SWIFT_ENABLE_TENSORFLOW END
 
   /// Emit the lazy initializer function for a global pattern binding

@@ -315,8 +315,6 @@ namespace sil_block {
                      BCFixed<2>,  // optimizationMode
                      BCFixed<3>,  // side effect info.
                      BCVBR<8>,    // number of specialize attributes
-                     // SWIFT_ENABLE_TENSORFLOW
-                     BCVBR<8>,    // number of differentiable attributes
                      BCFixed<1>,  // has qualified ownership
                      BCFixed<1>,  // force weak linking
                      BC_AVAIL_TUPLE, // availability for weak linking
@@ -339,16 +337,6 @@ namespace sil_block {
                      BCFixed<1>, // specialization kind
                      GenericSignatureIDField // specialized signature
                      >;
-
-  // SWIFT_ENABLE_TENSORFLOW
-  using SILDifferentiableAttrLayout = BCRecordLayout<
-    SIL_DIFFERENTIABLE_ATTR,
-    IdentifierIDField,    // JVP name.
-    IdentifierIDField,    // VJP name.
-    GenericSignatureIDField, // Derivative function generic signature.
-    BCVBR<8>,             // Result index.
-    BCArray<ValueIDField> // Parameter indices.
-  >;
 
   // Has an optional argument list where each argument is a typed valueref.
   using SILBasicBlockLayout = BCRecordLayout<

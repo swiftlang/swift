@@ -177,14 +177,6 @@ void TBDGenVisitor::addConformances(DeclContext *DC) {
 }
 
 // SWIFT_ENABLE_TENSORFLOW
-void TBDGenVisitor::addAutoDiffDerivativeFunction(
-    AbstractFunctionDecl *original, const DifferentiableAttr *attr,
-    AutoDiffDerivativeFunctionKind kind) {
-  auto *assocFnId = AutoDiffDerivativeFunctionIdentifier::get(
-      kind, attr->getParameterIndices(), original->getASTContext());
-  addSymbol(SILDeclRef(original).asAutoDiffDerivativeFunction(assocFnId));
-}
-
 void TBDGenVisitor::addDifferentiabilityWitness(
     AbstractFunctionDecl *original, const DifferentiableAttr *attr) {
   if (SILDeclRef(original).getLinkage(ForDefinition) != SILLinkage::Public)
@@ -203,15 +195,6 @@ void TBDGenVisitor::addDifferentiabilityWitness(
   Mangle::ASTMangler mangle;
   std::string mangledName = mangle.mangleSILDifferentiabilityWitnessKey(key);
   addSymbol(mangledName);
-}
-
-void TBDGenVisitor::addDifferentiableAttr(AbstractFunctionDecl *original,
-                                          const DifferentiableAttr *attr) {
-  addAutoDiffDerivativeFunction(original, attr,
-                                AutoDiffDerivativeFunctionKind::JVP);
-  addAutoDiffDerivativeFunction(original, attr,
-                                AutoDiffDerivativeFunctionKind::VJP);
-  addDifferentiabilityWitness(original, attr);
 }
 
 /// Determine whether dynamic replacement should be emitted for the allocator or
@@ -280,7 +263,7 @@ void TBDGenVisitor::visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
   // SWIFT_ENABLE_TENSORFLOW
   auto diffAttrs = AFD->getAttrs().getAttributes<DifferentiableAttr>();
   for (auto *DA : diffAttrs) {
-    addDifferentiableAttr(AFD, DA);
+    addDifferentiabilityWitness(AFD, DA);
   }
 
   visitDefaultArguments(AFD, AFD->getParameters());
@@ -334,7 +317,7 @@ void TBDGenVisitor::visitAbstractStorageDecl(AbstractStorageDecl *ASD) {
   // SWIFT_ENABLE_TENSORFLOW
   auto diffAttrs = ASD->getAttrs().getAttributes<DifferentiableAttr>();
   for (auto *DA : diffAttrs) {
-    addDifferentiableAttr(ASD->getAccessor(AccessorKind::Get), DA);
+    addDifferentiabilityWitness(ASD->getAccessor(AccessorKind::Get), DA);
   }
 
   // Explicitly look at each accessor here: see visitAccessorDecl.

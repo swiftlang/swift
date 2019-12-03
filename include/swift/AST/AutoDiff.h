@@ -383,13 +383,6 @@ bool getBuiltinDifferentiableOrLinearFunctionConfig(
 bool getBuiltinDifferentiableOrLinearFunctionConfig(
     StringRef operationName, unsigned &arity, bool &throws);
 
-/// Computes the correct linkage for a derivative function given the linkage of
-/// the original function. If the original linkage is not external and
-/// `isDerivativeFnExported` is true, use the original function's linkage.
-/// Otherwise, return hidden linkage.
-SILLinkage getAutoDiffDerivativeFunctionLinkage(SILLinkage originalLinkage,
-                                                bool isDerivativeFnExported);
-
 } // end namespace autodiff
 
 class BuiltinFloatType;
