@@ -1,4 +1,4 @@
-//===--- Differentiation.h - SIL Automatic Differentiation ----*- C++ -*---===//
+//===--- Differentiation.cpp - SIL Automatic Differentiation --*- C++ -*---===//
 //
 // This source file is part of the Swift.org open source project
 //
