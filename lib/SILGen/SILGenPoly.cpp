@@ -3714,10 +3714,10 @@ SILGenModule::getOrCreateAutoDiffDerivativeReabstractionThunk(
   // This thunk is publicly exposed and cannot be transparent.
   // Instead, mark it as "always inline" for optimization.
   auto *thunk = fb.getOrCreateFunction(
-      loc, name, SILLinkage::Hidden, origDerivativeFnType, IsBare, IsNotTransparent,
-      derivativeFn->isSerialized(), derivativeFn->isDynamicallyReplaceable(),
-      derivativeFn->getEntryCount(), derivativeFn->isThunk(),
-      derivativeFn->getClassSubclassScope());
+      loc, name, SILLinkage::Hidden, origDerivativeFnType, IsBare,
+      IsNotTransparent, derivativeFn->isSerialized(),
+      derivativeFn->isDynamicallyReplaceable(), derivativeFn->getEntryCount(),
+      derivativeFn->isThunk(), derivativeFn->getClassSubclassScope());
   thunk->setInlineStrategy(AlwaysInline);
   if (!thunk->empty())
     return thunk;

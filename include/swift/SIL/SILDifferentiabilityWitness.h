@@ -66,24 +66,23 @@ private:
   /// deserialized.
   const DeclAttribute *Attribute = nullptr;
 
-  SILDifferentiabilityWitness(SILModule &module, SILLinkage linkage,
-                              SILFunction *originalFunction,
-                              IndexSubset *parameterIndices,
-                              IndexSubset *resultIndices,
-                              GenericSignature derivativeGenSig,
-                              SILFunction *jvp, SILFunction *vjp,
-                              bool isDeclaration, bool isSerialized,
-                              const DeclAttribute *attribute)
-    : Module(module), Linkage(linkage), OriginalFunction(originalFunction),
-      Config(parameterIndices, resultIndices, derivativeGenSig.getPointer()),
-      JVP(jvp), VJP(vjp), IsDeclaration(isDeclaration),
-      IsSerialized(isSerialized), Attribute(attribute) {}
-
-public:
-  static SILDifferentiabilityWitness *createDeclaration(
+  SILDifferentiabilityWitness(
       SILModule &module, SILLinkage linkage, SILFunction *originalFunction,
       IndexSubset *parameterIndices, IndexSubset *resultIndices,
-      GenericSignature derivativeGenSig, const DeclAttribute *attribute = nullptr);
+      GenericSignature derivativeGenSig, SILFunction *jvp, SILFunction *vjp,
+      bool isDeclaration, bool isSerialized, const DeclAttribute *attribute)
+      : Module(module), Linkage(linkage), OriginalFunction(originalFunction),
+        Config(parameterIndices, resultIndices, derivativeGenSig.getPointer()),
+        JVP(jvp), VJP(vjp), IsDeclaration(isDeclaration),
+        IsSerialized(isSerialized), Attribute(attribute) {}
+
+public:
+  static SILDifferentiabilityWitness *
+  createDeclaration(SILModule &module, SILLinkage linkage,
+                    SILFunction *originalFunction,
+                    IndexSubset *parameterIndices, IndexSubset *resultIndices,
+                    GenericSignature derivativeGenSig,
+                    const DeclAttribute *attribute = nullptr);
 
   static SILDifferentiabilityWitness *createDefinition(
       SILModule &module, SILLinkage linkage, SILFunction *originalFunction,

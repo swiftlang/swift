@@ -790,7 +790,8 @@ void SILGenModule::postEmitFunction(SILDeclRef constant,
 
 void SILGenModule::emitDifferentiabilityWitness(
     AbstractFunctionDecl *originalAFD, SILFunction *originalFunction,
-    const AutoDiffConfig &config, SILFunction *jvp, SILFunction *vjp, const DeclAttribute *diffAttr) {
+    const AutoDiffConfig &config, SILFunction *jvp, SILFunction *vjp,
+    const DeclAttribute *diffAttr) {
   auto *origFnType = originalAFD->getInterfaceType()->castTo<AnyFunctionType>();
   auto origSilFnType = originalFunction->getLoweredFunctionType();
   auto *loweredParamIndices = autodiff::getLoweredParameterIndices(
