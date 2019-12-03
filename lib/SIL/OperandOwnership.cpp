@@ -455,7 +455,7 @@ OperandOwnershipKindClassifier::visitSwitchEnumInst(SwitchEnumInst *sei) {
   // and merge them.
   auto mergedKind = ValueOwnershipKind::merge(makeTransformRange(
       sei->getSuccessorBlockArguments(),
-      [&](PhiArgumentArrayRef array) -> ValueOwnershipKind {
+      [&](SILPhiArgumentArrayRef array) -> ValueOwnershipKind {
         // If the array is empty, we have a non-payloaded case. Return any.
         if (array.empty())
           return ValueOwnershipKind::None;
