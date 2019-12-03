@@ -11,6 +11,9 @@ silopt_register_sources(
   ClosureScope.cpp
   ColdBlockInfo.cpp
   DestructorAnalysis.cpp
+  # SWIFT_ENABLE_TENSORFLOW
+  DifferentiableActivityAnalysis.cpp
+  # SWIFT_ENABLE_TENSORFLOW END
   EscapeAnalysis.cpp
   EpilogueARCAnalysis.cpp
   FunctionOrder.cpp
