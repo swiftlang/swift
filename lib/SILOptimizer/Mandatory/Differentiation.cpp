@@ -5708,7 +5708,6 @@ private:
   ASTContext &getASTContext() const { return getPullback().getASTContext(); }
   SILFunction &getOriginal() const { return *vjpEmitter.original; }
   SILFunction &getPullback() const { return *vjpEmitter.pullback; }
-  // SILDifferentiableAttr *getAttr() const { return vjpEmitter.attr; }
   SILDifferentiabilityWitness *getWitness() const { return vjpEmitter.witness; }
   DifferentiationInvoker getInvoker() const { return vjpEmitter.invoker; }
   LinearMapInfo &getPullbackInfo() { return vjpEmitter.pullbackInfo; }
