@@ -86,9 +86,10 @@ SILGenModule::getOrCreateAutoDiffDerivativeForwardingThunk(
   // This thunk is publicly exposed and cannot be transparent.
   // Instead, mark it as "always inline" for optimization.
   auto *thunk = builder.getOrCreateFunction(
-      derivativeFnDecl, name, SILLinkage::Hidden, derivativeFnTy, IsBare,
-      IsNotTransparent, derivativeFnDeclRef.isSerialized(), IsNotDynamic,
-      ProfileCounter(), IsThunk);
+      derivativeFnDecl, name, originalFn.getLinkage(ForDefinition),
+      derivativeFnTy, IsBare, IsNotTransparent,
+      derivativeFnDeclRef.isSerialized(), IsNotDynamic, ProfileCounter(),
+      IsThunk);
   thunk->setInlineStrategy(AlwaysInline);
   if (!thunk->empty())
     return thunk;
@@ -124,8 +125,8 @@ SILFunction *SILGenModule::getOrCreateAutoDiffClassMethodThunk(
   // Do not simply reuse reabstraction thunk mangling.
   auto name = derivativeFnDeclRef.mangle() + "_vtable_entry_thunk";
   auto *thunk = builder.getOrCreateFunction(
-      derivativeFnDecl, name, SILLinkage::Hidden, constantTy, IsBare,
-      IsTransparent, derivativeFnDeclRef.isSerialized(), IsNotDynamic,
+      derivativeFnDecl, name, originalFn.getLinkage(ForDefinition), constantTy,
+      IsBare, IsTransparent, derivativeFnDeclRef.isSerialized(), IsNotDynamic,
       ProfileCounter(), IsThunk);
   if (!thunk->empty())
     return thunk;

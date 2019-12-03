@@ -934,10 +934,14 @@ private:
 
 public:
   /// Canonicalize the given witness, filling in JVP/VJPs if missing.
-  bool
-  canonicalizeDifferentiabilityWitness(SILFunction *original,
-                                       SILDifferentiabilityWitness *witness,
-                                       DifferentiationInvoker invoker);
+  ///
+  /// \param explicitDifferentiable specifies whether the witness comes from an
+  ///        explicit `@differentiable` or `@derivative` attribute in the AST.
+  ///        If it does, we emit JVP/VJPs with the same linkage as the original
+  ///        so that they are linkable from other modules.
+  bool canonicalizeDifferentiabilityWitness(
+      SILFunction *original, SILDifferentiabilityWitness *witness,
+      DifferentiationInvoker invoker, bool explicitDifferentiable);
 
   /// Process the given `differentiable_function` instruction, filling in
   /// missing derivative functions if necessary.
@@ -1881,8 +1885,9 @@ emitDerivativeFunctionReference(
           originalFn, desiredParameterIndices, desiredResultIndices,
           derivativeConstrainedGenSig, /*jvp*/ nullptr,
           /*vjp*/ nullptr, originalFn->isSerialized());
-      if (context.canonicalizeDifferentiabilityWitness(originalFn,
-                                                       minimalWitness, invoker))
+      if (context.canonicalizeDifferentiabilityWitness(
+              originalFn, minimalWitness, invoker,
+              /*explicitDifferentiable*/ false))
         return None;
     }
     assert(minimalWitness);
@@ -7145,7 +7150,8 @@ bool VJPEmitter::run() {
 //===----------------------------------------------------------------------===//
 
 static SILFunction *createEmptyVJP(ADContext &context, SILFunction *original,
-                                   SILDifferentiabilityWitness *witness) {
+                                   SILDifferentiabilityWitness *witness,
+                                   SILLinkage linkage) {
   LLVM_DEBUG({
     auto &s = getADDebugStream();
     s << "Creating VJP:\n\t";
@@ -7179,10 +7185,10 @@ static SILFunction *createEmptyVJP(ADContext &context, SILFunction *original,
       vjpGenericSig);
 
   SILOptFunctionBuilder fb(context.getTransform());
-  auto *vjp = fb.createFunction(
-      SILLinkage::Hidden, vjpName, vjpType, vjpGenericEnv,
-      original->getLocation(), original->isBare(), IsNotTransparent,
-      original->isSerialized(), original->isDynamicallyReplaceable());
+  auto *vjp = fb.createFunction(linkage, vjpName, vjpType, vjpGenericEnv,
+                                original->getLocation(), original->isBare(),
+                                IsNotTransparent, original->isSerialized(),
+                                original->isDynamicallyReplaceable());
   vjp->setDebugScope(new (module) SILDebugScope(original->getLocation(), vjp));
 
   LLVM_DEBUG(llvm::dbgs() << "VJP type: " << vjp->getLoweredFunctionType()
@@ -7191,7 +7197,8 @@ static SILFunction *createEmptyVJP(ADContext &context, SILFunction *original,
 }
 
 static SILFunction *createEmptyJVP(ADContext &context, SILFunction *original,
-                                   SILDifferentiabilityWitness *witness) {
+                                   SILDifferentiabilityWitness *witness,
+                                   SILLinkage linkage) {
   LLVM_DEBUG({
     auto &s = getADDebugStream();
     s << "Creating JVP:\n\t";
@@ -7225,10 +7232,10 @@ static SILFunction *createEmptyJVP(ADContext &context, SILFunction *original,
       LookUpConformanceInModule(module.getSwiftModule()), jvpGenericSig);
 
   SILOptFunctionBuilder fb(context.getTransform());
-  auto *jvp = fb.createFunction(
-      SILLinkage::Hidden, jvpName, jvpType, jvpGenericEnv,
-      original->getLocation(), original->isBare(), IsNotTransparent,
-      original->isSerialized(), original->isDynamicallyReplaceable());
+  auto *jvp = fb.createFunction(linkage, jvpName, jvpType, jvpGenericEnv,
+                                original->getLocation(), original->isBare(),
+                                IsNotTransparent, original->isSerialized(),
+                                original->isDynamicallyReplaceable());
   jvp->setDebugScope(new (module) SILDebugScope(original->getLocation(), jvp));
 
   LLVM_DEBUG(llvm::dbgs() << "JVP type: " << jvp->getLoweredFunctionType()
@@ -7239,7 +7246,7 @@ static SILFunction *createEmptyJVP(ADContext &context, SILFunction *original,
 /// Returns true on error.
 bool ADContext::canonicalizeDifferentiabilityWitness(
     SILFunction *original, SILDifferentiabilityWitness *witness,
-    DifferentiationInvoker invoker) {
+    DifferentiationInvoker invoker, bool explicitDifferentiable) {
   std::string traceMessage;
   llvm::raw_string_ostream OS(traceMessage);
   OS << "processing ";
@@ -7249,6 +7256,9 @@ bool ADContext::canonicalizeDifferentiabilityWitness(
   PrettyStackTraceSILFunction trace(traceMessage.c_str(), original);
 
   assert(witness->isDefinition());
+
+  auto derivativeFunctionLinkage =
+      explicitDifferentiable ? original->getLinkage() : SILLinkage::Hidden;
 
   // If the JVP doesn't exist, need to synthesize it.
   if (!witness->getJVP()) {
@@ -7260,7 +7270,8 @@ bool ADContext::canonicalizeDifferentiabilityWitness(
          diagnoseUnsupportedControlFlow(*this, original, invoker)))
       return true;
 
-    witness->setJVP(createEmptyJVP(*this, original, witness));
+    witness->setJVP(
+        createEmptyJVP(*this, original, witness, derivativeFunctionLinkage));
     getGeneratedFunctions().push_back(witness->getJVP());
 
     // For now, only do JVP generation if the flag is enabled and if custom VJP
@@ -7330,7 +7341,8 @@ bool ADContext::canonicalizeDifferentiabilityWitness(
         diagnoseUnsupportedControlFlow(*this, original, invoker))
       return true;
 
-    witness->setVJP(createEmptyVJP(*this, original, witness));
+    witness->setVJP(
+        createEmptyVJP(*this, original, witness, derivativeFunctionLinkage));
     getGeneratedFunctions().push_back(witness->getVJP());
     VJPEmitter emitter(*this, original, witness, witness->getVJP(), invoker);
     return emitter.run();
@@ -8088,8 +8100,8 @@ void Differentiation::run() {
     auto *original = witness->getOriginalFunction();
     auto invoker = invokerPair.second;
 
-    if (context.canonicalizeDifferentiabilityWitness(original, witness,
-                                                     invoker))
+    if (context.canonicalizeDifferentiabilityWitness(
+            original, witness, invoker, /*explicitDifferentiable*/ true))
       errorOccurred = true;
   }
 
