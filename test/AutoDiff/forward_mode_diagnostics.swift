@@ -18,8 +18,8 @@ _ = derivative(at: 0, in: one_to_one_0) // okay!
 //===----------------------------------------------------------------------===//
 
 func base(_ x: Float) -> Float {
-  // expected-error @+2 2 {{expression is not differentiable}}
-  // expected-note @+1 2 {{cannot differentiate through a non-differentiable result; do you want to use 'withoutDerivative(at:)'?}}
+  // expected-error @+2 {{expression is not differentiable}}
+  // expected-note @+1 {{cannot differentiate through a non-differentiable result; do you want to use 'withoutDerivative(at:)'?}}
   return Float(Int(x))
 }
 

@@ -288,6 +288,11 @@ struct AutoDiffConfig {
       : parameterIndices(parameterIndices), resultIndices(resultIndices),
         derivativeGenericSignature(derivativeGenericSignature) {}
 
+  /// Returns the `SILAutoDiffIndices` corresponding to this config's indices.
+  // TODO(TF-893): This is a temporary shim for incremental removal of
+  // `SILAutoDiffIndices`. Eventually remove this.
+  SILAutoDiffIndices getSILAutoDiffIndices() const;
+
   void print(llvm::raw_ostream &s = llvm::outs()) const;
   LLVM_ATTRIBUTE_DEPRECATED(void dump() const LLVM_ATTRIBUTE_USED,
                             "only for use within the debugger");
@@ -388,13 +393,6 @@ bool getBuiltinDifferentiableOrLinearFunctionConfig(
 /// Returns true if the function name is parsed successfully.
 bool getBuiltinDifferentiableOrLinearFunctionConfig(
     StringRef operationName, unsigned &arity, bool &throws);
-
-/// Computes the correct linkage for a derivative function given the linkage of
-/// the original function. If the original linkage is not external and
-/// `isDerivativeFnExported` is true, use the original function's linkage.
-/// Otherwise, return hidden linkage.
-SILLinkage getAutoDiffDerivativeFunctionLinkage(SILLinkage originalLinkage,
-                                                bool isDerivativeFnExported);
 
 } // end namespace autodiff
 

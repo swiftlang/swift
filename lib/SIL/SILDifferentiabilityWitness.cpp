@@ -23,7 +23,7 @@ using namespace swift;
 SILDifferentiabilityWitness *SILDifferentiabilityWitness::createDeclaration(
     SILModule &module, SILLinkage linkage, SILFunction *originalFunction,
     IndexSubset *parameterIndices, IndexSubset *resultIndices,
-    GenericSignature derivativeGenSig, DeclAttribute *attribute) {
+    GenericSignature derivativeGenSig, const DeclAttribute *attribute) {
   auto *diffWitness = new (module) SILDifferentiabilityWitness(
       module, linkage, originalFunction, parameterIndices, resultIndices,
       derivativeGenSig, /*jvp*/ nullptr, /*vjp*/ nullptr,
@@ -45,7 +45,7 @@ SILDifferentiabilityWitness *SILDifferentiabilityWitness::createDefinition(
     SILModule &module, SILLinkage linkage, SILFunction *originalFunction,
     IndexSubset *parameterIndices, IndexSubset *resultIndices,
     GenericSignature derivativeGenSig, SILFunction *jvp, SILFunction *vjp,
-    bool isSerialized, DeclAttribute *attribute) {
+    bool isSerialized, const DeclAttribute *attribute) {
   auto *diffWitness = new (module) SILDifferentiabilityWitness(
       module, linkage, originalFunction, parameterIndices, resultIndices,
       derivativeGenSig, jvp, vjp, /*isDeclaration*/ false, isSerialized,
@@ -76,4 +76,8 @@ void SILDifferentiabilityWitness::convertToDefinition(SILFunction *jvp,
 
 SILDifferentiabilityWitnessKey SILDifferentiabilityWitness::getKey() const {
   return std::make_pair(getOriginalFunction()->getName(), getConfig());
+}
+
+SILAutoDiffIndices SILDifferentiabilityWitness::getSILAutoDiffIndices() const {
+  return getConfig().getSILAutoDiffIndices();
 }

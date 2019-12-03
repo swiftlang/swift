@@ -543,8 +543,8 @@ SourceRange Decl::getSourceRangeIncludingAttrs() const {
     // Skip implicitly `@differentiable` attribute generated during
     // `@derivative` attribute type-checking.
     // TODO(TF-835): Instead of generating implicit `@differentiable`
-    // attributes, lower `@derivative` attributes to `[differentiable]`
-    // attributes on the referenced declaration.
+    // attributes, lower `@derivative` attributes to differentiability witnesses
+    // for the referenced declaration.
     if (auto *diffAttr = dyn_cast<DifferentiableAttr>(Attr))
       if (diffAttr->isImplicit())
         continue;

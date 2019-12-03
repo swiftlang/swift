@@ -3719,15 +3719,13 @@ SILGenModule::getOrCreateAutoDiffDerivativeReabstractionThunk(
 
   auto loc = derivativeFn->getLocation();
   SILGenFunctionBuilder fb(*this);
-  auto linkage = autodiff::getAutoDiffDerivativeFunctionLinkage(
-      original->getLinkage(), /*isDerivativeFnExported*/ true);
   // This thunk is publicly exposed and cannot be transparent.
   // Instead, mark it as "always inline" for optimization.
   auto *thunk = fb.getOrCreateFunction(
-      loc, name, linkage, origDerivativeFnType, IsBare, IsNotTransparent,
-      derivativeFn->isSerialized(), derivativeFn->isDynamicallyReplaceable(),
-      derivativeFn->getEntryCount(), derivativeFn->isThunk(),
-      derivativeFn->getClassSubclassScope());
+      loc, name, original->getLinkage(), origDerivativeFnType, IsBare,
+      IsNotTransparent, derivativeFn->isSerialized(),
+      derivativeFn->isDynamicallyReplaceable(), derivativeFn->getEntryCount(),
+      derivativeFn->isThunk(), derivativeFn->getClassSubclassScope());
   thunk->setInlineStrategy(AlwaysInline);
   if (!thunk->empty())
     return thunk;

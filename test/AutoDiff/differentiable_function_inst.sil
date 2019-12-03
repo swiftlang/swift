@@ -49,7 +49,7 @@ bb0(%0 : $Float, %1 : $Float, %2 : $Float):
 }
 
 // The original function with an attribute that specifies the compiler-emitted pullback.
-sil hidden [differentiable source 0 wrt 0] @foo : $@convention(thin) (Float) -> Float {
+sil hidden @foo : $@convention(thin) (Float) -> Float {
 bb0(%0 : $Float):
   return %0 : $Float
 }
