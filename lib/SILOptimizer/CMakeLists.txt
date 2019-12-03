@@ -32,6 +32,9 @@ add_subdirectory(SILCombiner)
 add_subdirectory(Transforms)
 add_subdirectory(UtilityPasses)
 add_subdirectory(Utils)
+# SWIFT_ENABLE_TENSORFLOW
+add_subdirectory(Utils/Differentiation)
+# SWIFT_ENABLE_TENSORFLOW END
 
 add_swift_host_library(swiftSILOptimizer STATIC
   ${SILOPTIMIZER_SOURCES})
