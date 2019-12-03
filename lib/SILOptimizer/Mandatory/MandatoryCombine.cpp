@@ -271,11 +271,15 @@ SILInstruction *MandatoryCombiner::visitApplyInst(ApplyInst *instruction) {
   return nullptr;
 }
 
+/// Try to remove partial applies that are no longer used
 SILInstruction *MandatoryCombiner::visitPartialApplyInst(PartialApplyInst *i) {
   auto user = i->getSingleUse();
+  // If there are zero uses, this will be removed by dead code elimination.
+  // If there are more than one uses, we don't want to remove this.
   if (!user) return nullptr;
   if (!isa<DeallocStackInst>(user->getUser())) return nullptr;
   
+  // Remove the stack dealloc, then the partial apply, then the function ref.
   instModCallbacks.deleteInst(user->getUser());
   instModCallbacks.deleteInst(i);
   instModCallbacks.deleteInst(cast<FunctionRefInst>(i->getCallee()));
