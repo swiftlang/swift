@@ -180,7 +180,7 @@ AllocStackInst::create(SILDebugLocation Loc,
                      hasDynamicLifetime);
 }
 
-VarDecl *AllocStackInst::getDecl() const {
+VarDecl *AllocationInst::getDecl() const {
   return getLoc().getAsASTNode<VarDecl>();
 }
 
@@ -288,10 +288,6 @@ SILType AllocBoxInst::getAddressType() const {
   return getSILBoxFieldType(TypeExpansionContext(*this->getFunction()),
                             getBoxType(), getModule().Types, 0)
       .getAddressType();
-}
-
-VarDecl *AllocBoxInst::getDecl() const {
-  return getLoc().getAsASTNode<VarDecl>();
 }
 
 DebugValueInst::DebugValueInst(SILDebugLocation DebugLoc, SILValue Operand,
