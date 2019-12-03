@@ -61,8 +61,6 @@ class CrossModuleSerializationSetup {
 
   void makeSubstUsableFromInline(const SubstitutionMap &substs);
 
-  bool markAsEmitIntoClient(SILFunction *F);
-
 public:
   CrossModuleSerializationSetup(SILModule &M) : M(M) { }
 
@@ -313,12 +311,7 @@ void CrossModuleSerializationSetup::scanModule() {
 
         // As a code size optimization, make serialized functions
         // @alwaysEmitIntoClient.
-        if (!markAsEmitIntoClient(F)) {
-          // We don't have a declaration to put the attribute on (e.g. in case
-          // the function is a closure). Just make the function public instead
-          // of @alwaysEmitIntoClient.
-          F->setLinkage(SILLinkage::Public);
-        }
+        F->setLinkage(SILLinkage::PublicNonABI);
       } else {
         // If for some reason the function cannot be serialized, we mark it as
         // usable-from-inline.
@@ -326,36 +319,6 @@ void CrossModuleSerializationSetup::scanModule() {
       }
     }
   }
-}
-
-/// Marks a function as @alwaysEmitIntoClient and returns true if this is
-/// successful.
-bool CrossModuleSerializationSetup::markAsEmitIntoClient(SILFunction *F) {
-  auto *DC = F->getDeclContext();
-  if (!DC)
-    return false;
-
-  Decl *decl = DC->getAsDecl();
-  if (!decl)
-    return false;
-
-  if (!isa<AbstractFunctionDecl>(decl))
-    return false;
-
-  F->setLinkage(SILLinkage::PublicNonABI);
-
-  // Adding the attribute is only needed to be able to compile the
-  // client module with -Onone. For optimized builds, setting the
-  // SILLinkage is enough, because with optimization, the client module
-  // eagerly de-serializes all functions and therefore gets the
-  // linkage right. But with -Onone, the linkage is derived purly from
-  // the AST.
-  // TODO: also here, we should find a way to not modify the AST.
-  auto &ctx = M.getASTContext();
-  auto *attr = new (ctx) AlwaysEmitIntoClientAttr(/*implicit=*/true);
-  decl->getAttrs().add(attr);
-
-  return true;
 }
 
 class CrossModuleSerializationSetupPass: public SILModuleTransform {

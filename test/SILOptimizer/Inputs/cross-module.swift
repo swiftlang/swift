@@ -92,6 +92,11 @@ private protocol PrivateProtocol {
 
 open class OpenClass<T> {
   public init() { }
+
+  @inline(never)
+  fileprivate func bar(_ t: T) {
+    print(t)
+  }
 }
 
 extension OpenClass {
@@ -112,6 +117,12 @@ public func checkIfClassConforms<T>(_ t: T) {
 public func checkIfClassConforms_gen<T>(_ t: T) {
   let x = OpenClass<T>()
   print(x.testit())
+}
+
+@inline(never)
+public func callClassMethod<T>(_ t: T) {
+  let k = OpenClass<T>()
+  k.bar(t)
 }
 
 extension Int : PrivateProtocol {
