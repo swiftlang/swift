@@ -100,6 +100,11 @@ void SILAutoDiffIndices::dump() const {
   llvm::errs() << '\n';
 }
 
+SILAutoDiffIndices AutoDiffConfig::getSILAutoDiffIndices() const {
+  assert(resultIndices->getNumIndices() == 1);
+  return SILAutoDiffIndices(*resultIndices->begin(), parameterIndices);
+}
+
 void AutoDiffConfig::print(llvm::raw_ostream &s) const {
   s << "(parameters=";
   parameterIndices->print(s);

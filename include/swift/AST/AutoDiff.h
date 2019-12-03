@@ -277,6 +277,11 @@ struct AutoDiffConfig {
       : parameterIndices(parameterIndices), resultIndices(resultIndices),
         derivativeGenericSignature(derivativeGenericSignature) {}
 
+  /// Returns the `SILAutoDiffIndices` corresponding to this config's indices.
+  // TODO(TF-893): This is a temporary shim for incremental removal of
+  // `SILAutoDiffIndices`. Eventually remove this.
+  SILAutoDiffIndices getSILAutoDiffIndices() const;
+
   void print(llvm::raw_ostream &s = llvm::outs()) const;
   LLVM_ATTRIBUTE_DEPRECATED(void dump() const LLVM_ATTRIBUTE_USED,
                             "only for use within the debugger");

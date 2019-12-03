@@ -5153,8 +5153,8 @@ public:
     verifySILFunctionType(FTy);
 
     // SWIFT_ENABLE_TENSORFLOW
-    for (auto *DiffAttr : F->getDifferentiableAttrs())
-      verifyDifferentiableAttr(F, *DiffAttr);
+    //for (auto *DiffAttr : F->getDifferentiableAttrs())
+    //  verifyDifferentiableAttr(F, *DiffAttr);
 
     if (F->isExternalDeclaration()) {
       if (F->hasForeignBody())

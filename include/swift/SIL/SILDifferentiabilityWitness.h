@@ -130,6 +130,11 @@ public:
   bool isSerialized() const { return IsSerialized; }
   DeclAttribute *getAttribute() const { return Attribute; }
 
+  /// Returns the `SILAutoDiffIndices` corresponding to this config's indices.
+  // TODO(TF-893): This is a temporary shim for incremental removal of
+  // `SILAutoDiffIndices`. Eventually remove this.
+  SILAutoDiffIndices getSILAutoDiffIndices() const;
+
   /// Verify that the differentiability witness is well-formed.
   void verify(const SILModule &module) const;
 
