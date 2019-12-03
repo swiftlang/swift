@@ -138,11 +138,6 @@ static StringRef getPlatformNameForDarwin(const DarwinPlatformKind platform) {
 StringRef swift::getPlatformNameForTriple(const llvm::Triple &triple) {
   switch (triple.getOS()) {
   case llvm::Triple::UnknownOS:
-    // NOTE: WebAssembly doesn't yet have a defined OS convention in triples.
-    if (triple.isOSBinFormatWasm()) {
-      return "wasm";
-    }
-  
     llvm_unreachable("unknown OS");
   case llvm::Triple::Ananas:
   case llvm::Triple::CloudABI:
@@ -168,8 +163,6 @@ StringRef swift::getPlatformNameForTriple(const llvm::Triple &triple) {
   case llvm::Triple::AMDPAL:
   case llvm::Triple::HermitCore:
   case llvm::Triple::Hurd:
-  case llvm::Triple::WASI:
-    return "";
   case llvm::Triple::Darwin:
   case llvm::Triple::MacOSX:
   case llvm::Triple::IOS:
@@ -196,6 +189,8 @@ StringRef swift::getPlatformNameForTriple(const llvm::Triple &triple) {
     return "ps4";
   case llvm::Triple::Haiku:
     return "haiku";
+  case llvm::Triple::WASI:
+    return "wasi";
   }
   llvm_unreachable("unsupported OS");
 }

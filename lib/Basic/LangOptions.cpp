@@ -230,8 +230,8 @@ std::pair<bool, bool> LangOptions::setTarget(llvm::Triple triple) {
     addPlatformConditionValue(PlatformConditionKind::OS, "PS4");
   else if (Target.isOSHaiku())
     addPlatformConditionValue(PlatformConditionKind::OS, "Haiku");
-  else if (Target.isOSBinFormatWasm())
-    addPlatformConditionValue(PlatformConditionKind::OS, "WebAssembly");
+  else if (Target.isOSWASI())
+    addPlatformConditionValue(PlatformConditionKind::OS, "WASI");
   else
     UnsupportedOS = true;
 
