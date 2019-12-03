@@ -1,4 +1,4 @@
-// RUN: not --crash %target-swift-emit-silgen %s
+// RUN: %target-swift-emit-silgen %s -verify
 // REQUIRES: asserts
 
 // TF-881: User-defined Swift derivative functions cannot capture local values.
@@ -13,7 +13,8 @@ do {
 
   func original(_ x: Float) -> Float { x }
 
-  @differentiating(original)
+  // expected-error @+1 {{attribute '@derivative' can only be used in a non-local scope}}
+  @derivative(of: original)
   func vjp(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
     // Reference a local variable.
     // This causes the top-level SIL function @vjp to have extra arguments.
@@ -22,6 +23,7 @@ do {
   }
 }
 
+// Original crasher:
 // SIL verification failed: apply doesn't have right number of arguments for function: site.getNumArguments() == substConv.getNumSILArguments()
 // Verifying instruction:
 //    %0 = argument of bb0 : $Float                  // user: %2

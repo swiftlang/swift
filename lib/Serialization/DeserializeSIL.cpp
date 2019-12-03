@@ -837,7 +837,9 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
   // SIL_VTABLE or SIL_GLOBALVAR or SIL_WITNESS_TABLE record also means the end
   // of this SILFunction.
   while (kind != SIL_FUNCTION && kind != SIL_VTABLE && kind != SIL_GLOBALVAR &&
-         kind != SIL_WITNESS_TABLE) {
+         // SWIFT_ENABLE_TENSORFLOW
+         kind != SIL_WITNESS_TABLE && kind != SIL_DIFFERENTIABILITY_WITNESS) {
+         // SWIFT_ENABLE_TENSORFLOW END
     if (kind == SIL_BASIC_BLOCK)
       // Handle a SILBasicBlock record.
       CurrentBB = readSILBasicBlock(fn, CurrentBB, scratch);
@@ -3613,18 +3615,29 @@ SILDeserializer::readDifferentiabilityWitness(DeclID DId) {
       ArrayRef<unsigned>(parameterAndResultIndices)
           .take_back(numResultIndices));
 
-  if (isDeclaration) {
-    auto *diffWitness = SILDifferentiabilityWitness::createDeclaration(
+  AutoDiffConfig config(parameterIndices, resultIndices, derivativeGenSig);
+  auto *diffWitness =
+      SILMod.lookUpDifferentiabilityWitness({originalName, config});
+
+  // If there is no existing differentiability witness, create one.
+  if (!diffWitness)
+    diffWitness = SILDifferentiabilityWitness::createDeclaration(
         SILMod, *linkage, original, parameterIndices, resultIndices,
         derivativeGenSig);
-    diffWitnessOrOffset.set(diffWitness, /*isFullyDeserialized*/ true);
-    return diffWitness;
-  }
 
-  auto *diffWitness = SILDifferentiabilityWitness::createDefinition(
-      SILMod, *linkage, original, parameterIndices, resultIndices,
-      derivativeGenSig, jvp, vjp, isSerialized);
-  diffWitnessOrOffset.set(diffWitness, /*isFullyDeserialized*/ true);
+  // If the current differentiability witness is merely a declaration, and the
+  // deserialized witness is a definition, upgrade the current differentiability
+  // witness to a definition. This can happen in the following situations:
+  // 1. The witness was just created above.
+  // 2. The witness started out as a declaration (e.g. the differentiation
+  //    pass emitted a witness for an external function) and now we're loading
+  //    the definition (e.g. an optimization pass asked for the definition and
+  //    we found the definition serialized in this module).
+  if (diffWitness->isDeclaration() && !isDeclaration)
+    diffWitness->convertToDefinition(jvp, vjp, isSerialized);
+
+  diffWitnessOrOffset.set(diffWitness,
+                          /*isFullyDeserialized*/ diffWitness->isDefinition());
   return diffWitness;
 }
 

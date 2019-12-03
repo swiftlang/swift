@@ -541,9 +541,9 @@ SourceRange Decl::getSourceRangeIncludingAttrs() const {
   for (auto Attr : getAttrs()) {
     // SWIFT_ENABLE_TENSORFLOW
     // Skip implicitly `@differentiable` attribute generated during
-    // `@differentiating` attribute type-checking.
+    // `@derivative` attribute type-checking.
     // TODO(TF-835): Instead of generating implicit `@differentiable`
-    // attributes, lower `@differentiating` attributes to `[differentiable]`
+    // attributes, lower `@derivative` attributes to `[differentiable]`
     // attributes on the referenced declaration.
     if (auto *diffAttr = dyn_cast<DifferentiableAttr>(Attr))
       if (diffAttr->isImplicit())

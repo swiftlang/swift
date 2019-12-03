@@ -196,28 +196,28 @@ extension Tracked where T : Differentiable, T == T.TangentVector {
 
 extension Tracked where T : Differentiable, T == T.TangentVector {
   @usableFromInline
-  @differentiating(+)
+  @derivative(of: +)
   internal static func _vjpAdd(lhs: Self, rhs: Self)
       -> (value: Self, pullback: (Self) -> (Self, Self)) {
     return (lhs + rhs, { v in (v, v) })
   }
 
   @usableFromInline
-  @differentiating(+)
+  @derivative(of: +)
   internal static func _jvpAdd(lhs: Self, rhs: Self)
       -> (value: Self, differential: (Self, Self) -> Self) {
     return (lhs + rhs, { $0 + $1 })
   }
 
   @usableFromInline
-  @differentiating(-)
+  @derivative(of: -)
   internal static func _vjpSubtract(lhs: Self, rhs: Self)
       -> (value: Self, pullback: (Self) -> (Self, Self)) {
     return (lhs - rhs, { v in (v, .zero - v) })
   }
 
   @usableFromInline
-  @differentiating(-)
+  @derivative(of: -)
   internal static func _jvpSubtract(lhs: Self, rhs: Self)
       -> (value: Self, differential: (Self, Self) -> Self) {
     return (lhs - rhs, { $0 - $1 })
@@ -227,14 +227,14 @@ extension Tracked where T : Differentiable, T == T.TangentVector {
 extension Tracked where T : Differentiable & SignedNumeric, T == T.Magnitude,
                         T == T.TangentVector {
   @usableFromInline
-  @differentiating(*)
+  @derivative(of: *)
   internal static func _vjpMultiply(lhs: Self, rhs: Self)
       -> (value: Self, pullback: (Self) -> (Self, Self)) {
     return (lhs * rhs, { v in (v * rhs, v * lhs) })
   }
 
   @usableFromInline
-  @differentiating(*)
+  @derivative(of: *)
   internal static func _jvpMultiply(lhs: Self, rhs: Self)
       -> (value: Self, differential: (Self, Self) -> (Self)) {
     return (lhs * rhs, { (dx, dy) in dx * rhs + dy * lhs })
@@ -243,14 +243,14 @@ extension Tracked where T : Differentiable & SignedNumeric, T == T.Magnitude,
 
 extension Tracked where T : Differentiable & FloatingPoint, T == T.TangentVector {
   @usableFromInline
-  @differentiating(/)
+  @derivative(of: /)
   internal static func _vjpDivide(lhs: Self, rhs: Self)
       -> (value: Self, pullback: (Self) -> (Self, Self)) {
     return (lhs / rhs, { v in (v / rhs, -lhs / (rhs * rhs) * v) })
   }
 
   @usableFromInline
-  @differentiating(/)
+  @derivative(of: /)
   internal static func _jvpDivide(lhs: Self, rhs: Self)
       -> (value: Self, differential: (Self, Self) -> (Self)) {
     return (lhs / rhs, { (dx, dy) in dx / rhs - lhs / (rhs * rhs) * dy })

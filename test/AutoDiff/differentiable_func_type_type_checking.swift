@@ -84,28 +84,43 @@ func test3<T: Differentiable, U: Differentiable>(_: @differentiable (T) -> @diff
 func test4<T: Differentiable, U: Differentiable>(_: @differentiable (T) -> (U) -> Int) {}
 
 let diffFunc: @differentiable (Float) -> Float
+let linearFunc: @differentiable(linear) (Float) -> Float
 func inferredConformances<T, U>(_: @differentiable (T) -> U) {}
+func inferredConformancesLinear<T, U>(_: @differentiable(linear) (T) -> U) {}
 inferredConformances(diffFunc)
+inferredConformancesLinear(linearFunc)
 
 func inferredConformancesResult<T, U>() -> @differentiable (T) -> U {}
+func inferredConformancesResultLinear<T, U>() -> @differentiable(linear) (T) -> U {}
 
 let diffFuncWithNondiff: @differentiable (Float, @nondiff Int) -> Float
+let linearFuncWithNondiff: @differentiable(linear) (Float, @nondiff Int) -> Float
 func inferredConformances<T, U, V>(_: @differentiable (T, @nondiff U) -> V) {}
+func inferredConformancesLinear<T, U, V>(_: @differentiable(linear) (T, @nondiff U) -> V) {}
 inferredConformances(diffFuncWithNondiff)
+inferredConformancesLinear(linearFuncWithNondiff)
 
 struct Vector<T> {
   var x, y: T
 }
+extension Vector: Equatable where T: Equatable {}
 extension Vector: Differentiable where T: Differentiable {}
+extension Vector: AdditiveArithmetic where T: AdditiveArithmetic {}
 
 // expected-note @+1 {{where 'T' = 'Int'}}
 func inferredConformancesGeneric<T, U>(_: @differentiable (Vector<T>) -> Vector<U>) {}
 
+// expected-note @+1 {{where 'T' = 'Int'}}
+func inferredConformancesGenericLinear<T, U>(_: @differentiable(linear) (Vector<T>) -> Vector<U>) {}
+
 func nondiffVectorFunc(x: Vector<Int>) -> Vector<Int> {}
 // expected-error @+1 {{global function 'inferredConformancesGeneric' requires that 'Int' conform to 'Differentiable}}
 inferredConformancesGeneric(nondiffVectorFunc)
+// expected-error @+1 {{global function 'inferredConformancesGenericLinear' requires that 'Int' conform to 'Differentiable}}
+inferredConformancesGenericLinear(nondiffVectorFunc)
 
 func diffVectorFunc(x: Vector<Float>) -> Vector<Float> {}
 inferredConformancesGeneric(diffVectorFunc) // okay!
 
 func inferredConformancesGenericResult<T, U>() -> @differentiable (Vector<T>) -> Vector<U> {}
+func inferredConformancesGenericResultLinear<T, U>() -> @differentiable(linear) (Vector<T>) -> Vector<U> {}

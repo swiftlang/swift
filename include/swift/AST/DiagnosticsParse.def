@@ -1552,8 +1552,6 @@ ERROR(attr_differentiable_expected_parameter_list,PointsToFirstBadToken,
       "expected a list of parameters to differentiate with respect to", ())
 ERROR(attr_differentiable_use_wrt_not_withrespectto,none,
       "use 'wrt:' to specify parameters to differentiate with respect to", ())
-ERROR(attr_differentiable_missing_label,PointsToFirstBadToken,
-      "missing label '%0:' in '@differentiable' attribute", (StringRef))
 ERROR(attr_differentiable_expected_label,none,
       "expected either 'wrt:' or a function specifier label, e.g. 'jvp:', "
       "or 'vjp:'", ())
@@ -1569,20 +1567,25 @@ ERROR(diff_params_clause_expected_parameter,PointsToFirstBadToken,
       "expected a parameter, which can be a function parameter name, "
       "parameter index, or 'self'", ())
 
-// differentiating
-ERROR(attr_differentiating_expected_original_name,PointsToFirstBadToken,
+// derivative
+ERROR(attr_derivative_expected_original_name,PointsToFirstBadToken,
       "expected an original function name", ())
-ERROR(attr_differentiating_expected_label_linear_or_wrt,none,
-      "expected either 'linear' or 'wrt:'", ())
+ERROR(attr_missing_label,PointsToFirstBadToken,
+      "missing label '%0:' in '@%1' attribute", (StringRef, StringRef))
+ERROR(attr_expected_label,none,
+      "expected label '%0:' in '@%1' attribute", (StringRef, StringRef))
+WARNING(attr_differentiating_deprecated,PointsToFirstBadToken,
+        "'@differentiating' attribute is deprecated; use '@derivative(of:)' "
+        "instead", ())
 
-// transposing
-ERROR(attr_transposing_expected_original_name,PointsToFirstBadToken,
+// transpose
+ERROR(attr_transpose_expected_original_name,PointsToFirstBadToken,
       "expected an original function name", ())
-ERROR(attr_transposing_expected_label_linear_or_wrt,none,
+ERROR(attr_transpose_expected_label_linear_or_wrt,none,
       "expected 'wrt:'", ())
 
-// transposing `wrt` parameters clause
-ERROR(transposing_params_clause_expected_parameter,PointsToFirstBadToken,
+// transpose `wrt` parameters clause
+ERROR(transpose_params_clause_expected_parameter,PointsToFirstBadToken,
       "expected a parameter, which can be a 'unsigned int' parameter number "
       "or 'self'", ())
 // [differentiable ...] (sil-decl attr)

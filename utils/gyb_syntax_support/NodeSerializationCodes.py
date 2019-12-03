@@ -242,10 +242,10 @@ SYNTAX_NODE_SERIALIZATION_CODES = {
     'DifferentiableAttributeFuncSpecifier': 238,
     'FunctionDeclName': 239,
     # SWIFT_ENABLE_TENSORFLOW
-    'DifferentiatingAttributeArguments': 240,
-    'TransposingAttributeArguments': 241,
-    'QuoteLiteralExpr': 242,
-    'UnquoteExpr': 243,
+    'DerivativeRegistrationAttributeArguments': 240,
+    'QuoteLiteralExpr': 241,
+    'UnquoteExpr': 242,
+    'DeprecatedDerivativeRegistrationAttributeArguments': 243,
     # SWIFT_ENABLE_TENSORFLOW END
 }
 

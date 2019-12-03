@@ -973,7 +973,7 @@ namespace {
 
     SILValue rebuildAggregate(SILBuilder &B, SILLocation loc,
                               ArrayRef<SILValue> values) const override {
-      assert(values.size() == 3);
+      assert(values.size() == 2);
       auto fnTy = getLoweredType().castTo<SILFunctionType>();
       auto paramIndices = fnTy->getDifferentiationParameterIndices();
       return B.createLinearFunction(loc, paramIndices, values[0], values[1]);

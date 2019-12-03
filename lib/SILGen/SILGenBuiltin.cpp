@@ -1031,10 +1031,15 @@ static ManagedValue emitBuiltinTypeTrait(SILGenFunction &SGF,
 }
 
 // SWIFT_ENABLE_TENSORFLOW
+// FIXME(SR-11852): This should not perform curry-level unwrapping. Clean up
+// this function.
 static ManagedValue emitBuiltinAutoDiffApplyDerivativeFunction(
     AutoDiffDerivativeFunctionKind kind, unsigned arity,
-    bool rethrows, SILGenFunction &SGF, SILLocation loc,
+    bool throws, SILGenFunction &SGF, SILLocation loc,
     SubstitutionMap substitutions, ArrayRef<ManagedValue> args, SGFContext C) {
+  // FIXME(SR-11853): Support throwing functions.
+  assert(!throws && "Throwing functions are not yet supported");
+
   auto origFnVal = args[0].getValue();
   SmallVector<SILValue, 2> origFnArgVals;
   for (auto& arg : args.drop_front(1))
@@ -1133,11 +1138,45 @@ static ManagedValue emitBuiltinAutoDiffApplyDerivativeFunction(
   return SGF.emitManagedRValueWithCleanup(resultTuple);
 }
 
-static ManagedValue emitBuiltinAutoDiffApply(SILGenFunction &SGF,
-                                             SILLocation loc,
-                                             SubstitutionMap substitutions,
-                                             ArrayRef<ManagedValue> args,
-                                             SGFContext C) {
+// SWIFT_ENABLE_TENSORFLOW
+static ManagedValue emitBuiltinAutoDiffApplyTransposeFunction(
+    unsigned arity, bool throws, SILGenFunction &SGF, SILLocation loc,
+    SubstitutionMap substitutions, ArrayRef<ManagedValue> args, SGFContext C) {
+  // FIXME(SR-11853): Support throwing functions.
+  assert(!throws && "Throwing functions are not yet supported");
+
+  auto origFnVal = args.front().getValue();
+  SmallVector<SILValue, 2> origFnArgVals;
+  for (auto &arg : args.drop_front(1))
+    origFnArgVals.push_back(arg.getValue());
+
+  // Get the transpose function.
+  SILValue transposeFn = SGF.B.createLinearFunctionExtract(
+      loc, LinearDifferentiableFunctionTypeComponent::Transpose, origFnVal);
+  auto transposeFnType = transposeFn->getType().castTo<SILFunctionType>();
+
+  SmallVector<SILValue, 2> applyArgs;
+  if (transposeFnType->hasIndirectFormalResults())
+    applyArgs.push_back(
+        SGF.getBufferForExprResult(
+            loc, transposeFnType->getAllResultsInterfaceType(), C));
+  for (auto paramArg : args.drop_front()) {
+    applyArgs.push_back(paramArg.getValue());
+  }
+  auto *apply = SGF.B.createApply(
+      loc, transposeFn, SubstitutionMap(), applyArgs);
+  if (transposeFnType->hasIndirectFormalResults()) {
+    auto resBuffer = applyArgs.front();
+    return SGF.manageBufferForExprResult(
+        resBuffer, SGF.getTypeLowering(resBuffer->getType()), C);
+  } else {
+    return SGF.emitManagedRValueWithCleanup(apply);
+  }
+}
+
+static ManagedValue emitBuiltinApplyDerivative(
+    SILGenFunction &SGF, SILLocation loc, SubstitutionMap substitutions,
+    ArrayRef<ManagedValue> args, SGFContext C) {
   auto *callExpr = loc.castToASTNode<CallExpr>();
   auto builtinDecl = cast<FuncDecl>(cast<DeclRefExpr>(
       cast<DotSyntaxBaseIgnoredExpr>(callExpr->getDirectCallee())->getRHS())
@@ -1145,13 +1184,63 @@ static ManagedValue emitBuiltinAutoDiffApply(SILGenFunction &SGF,
   auto builtinName = builtinDecl->getName().str();
   AutoDiffDerivativeFunctionKind kind;
   unsigned arity;
-  bool rethrows;
-  auto successfullyParsed = autodiff::getBuiltinAutoDiffApplyConfig(
-      builtinName, kind, arity, rethrows);
+  bool throws;
+  auto successfullyParsed = autodiff::getBuiltinApplyDerivativeConfig(
+      builtinName, kind, arity, throws);
   assert(successfullyParsed);
-  return emitBuiltinAutoDiffApplyDerivativeFunction(kind, arity,
-                                                    rethrows, SGF, loc,
-                                                    substitutions, args, C);
+  return emitBuiltinAutoDiffApplyDerivativeFunction(
+      kind, arity, throws, SGF, loc, substitutions, args, C);
+}
+
+// SWIFT_ENABLE_TENSORFLOW
+static ManagedValue emitBuiltinApplyTranspose(
+    SILGenFunction &SGF, SILLocation loc, SubstitutionMap substitutions,
+    ArrayRef<ManagedValue> args, SGFContext C) {
+  auto *callExpr = loc.castToASTNode<CallExpr>();
+  auto builtinDecl = cast<FuncDecl>(cast<DeclRefExpr>(
+      cast<DotSyntaxBaseIgnoredExpr>(callExpr->getDirectCallee())->getRHS())
+          ->getDecl());
+  auto builtinName = builtinDecl->getName().str();
+  unsigned arity;
+  bool throws;
+  auto successfullyParsed = autodiff::getBuiltinApplyTransposeConfig(
+      builtinName, arity, throws);
+  assert(successfullyParsed);
+  return emitBuiltinAutoDiffApplyTransposeFunction(
+      arity, throws, SGF, loc, substitutions, args, C);
+}
+
+// SWIFT_ENABLE_TENSORFLOW
+static ManagedValue emitBuiltinDifferentiableFunction(
+    SILGenFunction &SGF, SILLocation loc, SubstitutionMap substitutions,
+    ArrayRef<ManagedValue> args, SGFContext C) {
+  assert(args.size() == 3);
+  auto origFn = args.front();
+  auto origType = origFn.getType().castTo<SILFunctionType>();
+  auto diffFn = SGF.B.createDifferentiableFunction(
+      loc,
+      IndexSubset::getDefault(
+          SGF.getASTContext(), origType->getNumParameters(),
+          /*includeAll*/ true),
+      origFn.forward(SGF),
+      std::make_pair(args[1].forward(SGF), args[2].forward(SGF)));
+  return SGF.emitManagedRValueWithCleanup(diffFn);
+}
+
+// SWIFT_ENABLE_TENSORFLOW
+static ManagedValue emitBuiltinLinearFunction(
+    SILGenFunction &SGF, SILLocation loc, SubstitutionMap substitutions,
+    ArrayRef<ManagedValue> args, SGFContext C) {
+  assert(args.size() == 2);
+  auto origFn = args.front();
+  auto origType = origFn.getType().castTo<SILFunctionType>();
+  auto linearFn = SGF.B.createLinearFunction(
+      loc,
+      IndexSubset::getDefault(
+          SGF.getASTContext(), origType->getNumParameters(),
+          /*includeAll*/ true),
+      origFn.forward(SGF), args[1].forward(SGF));
+  return SGF.emitManagedRValueWithCleanup(linearFn);
 }
 
 /// Emit SIL for the named builtin: globalStringTablePointer. Unlike the default

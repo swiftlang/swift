@@ -826,6 +826,39 @@ func slope3(_ x: Float) -> Float {
   return 3 * x
 }
 
+// Check that `@differentiable` attribute rejects stored properties.
+struct StoredProperty : Differentiable {
+  // expected-error @+1 {{'@differentiable' attribute on stored property cannot specify 'jvp:' or 'vjp:'}}
+  @differentiable(vjp: vjpStored)
+  var stored: Float
+
+  func vjpStored() -> (Float, (Float) -> TangentVector) {
+    (stored, { _ in .zero })
+  }
+}
+
+// Check that `@differentiable` attribute rejects non-`func` derivatives.
+struct Struct: Differentiable {
+  // expected-error @+1 {{registered derivative 'computedPropertyVJP' must be a 'func' declaration}}
+  @differentiable(vjp: computedPropertyVJP)
+  func testComputedProperty() -> Float { 1 }
+  var computedPropertyVJP: (Float, (Float) -> TangentVector) {
+    (1, { _ in .zero })
+  }
+
+  // expected-error @+1 {{expected a vjp function name}}
+  @differentiable(vjp: init)
+  func testInitializer() -> Struct { self }
+  init(_ x: Struct) {}
+
+  // expected-error @+1 {{expected a vjp function name}}
+  @differentiable(vjp: subscript)
+  func testSubscript() -> Float { 1 }
+  subscript() -> (Float, (Float) -> TangentVector) {
+    (1, { _ in .zero })
+  }
+}
+
 // Index based 'wrt:'
 
 struct NumberWrtStruct: Differentiable {

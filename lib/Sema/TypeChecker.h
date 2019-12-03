@@ -1672,21 +1672,6 @@ public:
   getDeclTypeCheckingSemantics(ValueDecl *decl);
 
   /// SWIFT_ENABLE_TENSORFLOW
-  // Returns the function declaration corresponding to the given function name
-  // and lookup context. If the function declaration cannot be resolved, emits a
-  // diagnostic and returns nullptr.
-  static FuncDecl *lookupFuncDecl(
-      DeclName funcName, SourceLoc funcNameLoc, Type baseType,
-      DeclContext *lookupContext,
-      const std::function<bool(FuncDecl *)> &isValidFuncDecl,
-      const std::function<void()> &overloadDiagnostic,
-      const std::function<void()> &ambiguousDiagnostic,
-      const std::function<void()> &notFunctionDiagnostic,
-      NameLookupOptions lookupOptions = defaultMemberLookupOptions,
-      const Optional<std::function<bool(FuncDecl *)>> &hasValidTypeCtx = None,
-      const Optional<std::function<void()>> &invalidTypeCtxDiagnostic = None);
-
-  /// SWIFT_ENABLE_TENSORFLOW
   /// Creates an `IndexSubset` for the given function type, representing
   /// all inferred differentiation parameters.
   /// The differentiation parameters are inferred to be:

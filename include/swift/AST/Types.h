@@ -3146,7 +3146,7 @@ public:
   ///
   /// If `makeSelfParamFirst` is true, self's tangent is reordered to appear
   /// first. This should be used during type-checking, e.g. type-checking
-  /// `@differentiable`, `@differentiating`, and `@transposing` attributes.
+  /// `@differentiable`, `@derivative`, and `@transpose` attributes.
   ///
   /// \note The original function type (`self`) need not be `@differentiable`.
   /// The resulting function will preserve all `ExtInfo` of the original
@@ -3162,11 +3162,10 @@ public:
   /// corresponding original function type.
   AnyFunctionType *getAutoDiffOriginalFunctionType();
 
-  /// Given the type of a transposing derivative function, returns the
-  /// corresponding original function type.
+  /// Given the type of a transpose function, returns the corresponding original
+  /// function type.
   AnyFunctionType *
-  getTransposeOriginalFunctionType(IndexSubset *wrtParamIndices,
-                                   bool wrtSelf);
+  getTransposeOriginalFunctionType(IndexSubset *wrtParamIndices, bool wrtSelf);
 
   AnyFunctionType *getWithoutDifferentiability() const;
 

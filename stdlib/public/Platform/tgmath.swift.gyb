@@ -84,7 +84,7 @@ public func frexp<T: BinaryFloatingPoint>(_ x: T) -> (T, Int) {
 
 // SWIFT_ENABLE_TENSORFLOW
 @usableFromInline
-@differentiating(sqrt)
+@derivative(of: sqrt)
 func _vjpSqrt<T: FloatingPoint & Differentiable> (
   _ x: T
 ) -> (value: T, pullback: (T) -> T) where T == T.TangentVector {
@@ -93,7 +93,7 @@ func _vjpSqrt<T: FloatingPoint & Differentiable> (
 }
 
 @usableFromInline
-@differentiating(fma)
+@derivative(of: fma)
 func _vjpFma<T: FloatingPoint & Differentiable> (
   _ x: T,
   _ y: T,
@@ -103,7 +103,7 @@ func _vjpFma<T: FloatingPoint & Differentiable> (
 }
 
 @usableFromInline
-@differentiating(remainder)
+@derivative(of: remainder)
 func _vjpRemainder<T: FloatingPoint & Differentiable> (
   _ x: T,
   _ y: T
@@ -112,7 +112,7 @@ func _vjpRemainder<T: FloatingPoint & Differentiable> (
 }
 
 @usableFromInline
-@differentiating(fmod)
+@derivative(of: fmod)
 func _vjpFmod<T: FloatingPoint & Differentiable> (
   _ x: T,
   _ y: T
@@ -121,7 +121,7 @@ func _vjpFmod<T: FloatingPoint & Differentiable> (
 }
 
 @usableFromInline
-@differentiating(ceil)
+@derivative(of: ceil)
 func _vjpCeil<T: FloatingPoint & Differentiable> (
   _ x: T
 ) -> (value: T, pullback: (T) -> T) where T == T.TangentVector {
@@ -129,7 +129,7 @@ func _vjpCeil<T: FloatingPoint & Differentiable> (
 }
 
 @usableFromInline
-@differentiating(floor)
+@derivative(of: floor)
 func _vjpFloor<T: FloatingPoint & Differentiable> (
   _ x: T
 ) -> (value: T, pullback: (T) -> T) where T == T.TangentVector {
@@ -137,7 +137,7 @@ func _vjpFloor<T: FloatingPoint & Differentiable> (
 }
 
 @usableFromInline
-@differentiating(round)
+@derivative(of: round)
 func _vjpRound<T: FloatingPoint & Differentiable> (
   _ x: T
 ) -> (value: T, pullback: (T) -> T) where T == T.TangentVector {
@@ -145,7 +145,7 @@ func _vjpRound<T: FloatingPoint & Differentiable> (
 }
 
 @usableFromInline
-@differentiating(trunc)
+@derivative(of: trunc)
 func _vjpTrunc<T: FloatingPoint & Differentiable> (
   _ x: T
 ) -> (value: T, pullback: (T) -> T) where T == T.TangentVector {

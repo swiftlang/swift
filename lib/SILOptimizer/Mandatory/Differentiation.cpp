@@ -7724,8 +7724,9 @@ PullbackEmitter::accumulateAdjointsDirect(AdjointValue lhs, AdjointValue rhs,
   // (x, y)
   case AdjointValueKind::Aggregate:
     switch (rhs.getKind()) {
-    // (x, y) + z => (x + z.0, y + z.1)
+    // (x, y) + z => (z.0 + x, z.1 + y)
     case AdjointValueKind::Concrete:
+      return accumulateAdjointsDirect(rhs, lhs, loc);
     // x + 0 => x
     case AdjointValueKind::Zero:
       return lhs;
@@ -8938,11 +8939,15 @@ void Differentiation::run() {
       for (SILInstruction &i : bb) {
         if (auto *dfi = dyn_cast<DifferentiableFunctionInst>(&i))
           context.getDifferentiableFunctionInsts().push_back(dfi);
+        // Reject uncanonical `linear_function` instructions.
+        // FIXME(SR-11850): Add support for linear map transposition.
         else if (auto *lfi = dyn_cast<LinearFunctionInst>(&i)) {
-          astCtx.Diags.diagnose(
-              lfi->getLoc().getSourceLoc(),
-              diag::autodiff_conversion_to_linear_function_not_supported);
-          errorOccurred = true;
+          if (!lfi->hasTransposeFunction()) {
+            astCtx.Diags.diagnose(
+                lfi->getLoc().getSourceLoc(),
+                diag::autodiff_conversion_to_linear_function_not_supported);
+            errorOccurred = true;
+          }
         }
       }
     }
