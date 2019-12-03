@@ -6059,6 +6059,23 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
   Type baseObjTy = baseTy->getRValueType();
 
   auto locator = getConstraintLocator(locatorB);
+
+  // If this is an unresolved member ref e.g. `.foo` and its contextual base
+  // type has been determined to be a "hole", let's mark the resulting member
+  // type as a potential hole and continue solving.
+  if (shouldAttemptFixes() && kind == ConstraintKind::UnresolvedValueMember &&
+      baseObjTy->getMetatypeInstanceType()->isHole()) {
+    auto *fix =
+        SpecifyBaseTypeForContextualMember::create(*this, member, locator);
+    if (recordFix(fix))
+      return SolutionKind::Error;
+
+    if (auto *typeVar = memberTy->getAs<TypeVariableType>())
+      recordPotentialHole(typeVar);
+
+    return SolutionKind::Solved;
+  }
+
   MemberLookupResult result =
       performMemberLookup(kind, member, baseTy, functionRefKind, locator,
                           /*includeInaccessibleMembers*/ shouldAttemptFixes());
@@ -8449,6 +8466,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::ExpandArrayIntoVarargs:
   case FixKind::UseValueTypeOfRawRepresentative:
   case FixKind::ExplicitlyConstructRawRepresentable:
+  case FixKind::SpecifyBaseTypeForContextualMember:
   case FixKind::CoerceToCheckedCast: {
     return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
   }

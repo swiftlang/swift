@@ -498,8 +498,8 @@ enum Color {
   static var svar: Color { return .Red }
 }
 
-// FIXME: This used to be better: "'map' produces '[T]', not the expected contextual result type '(Int, Color)'"
-let _: (Int, Color) = [1,2].map({ ($0, .Unknown("")) }) // expected-error {{expression type '((Int) throws -> _) throws -> Array<_>' is ambiguous without more context}}
+let _: (Int, Color) = [1,2].map({ ($0, .Unknown("")) }) // expected-error {{cannot convert value of type 'Array<(Int, _)>' to specified type '(Int, Color)'}}
+// expected-error@-1 {{cannot infer contextual base in reference to member 'Unknown'}}
 
 let _: [(Int, Color)] = [1,2].map({ ($0, .Unknown("")) })// expected-error {{missing argument label 'description:' in call}}
 
