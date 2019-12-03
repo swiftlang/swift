@@ -3044,6 +3044,8 @@ ERROR(collection_literal_empty,none,
 ERROR(unresolved_member_no_inference,none,
       "reference to member %0 cannot be resolved without a contextual type",
       (DeclName))
+ERROR(cannot_infer_base_of_unresolved_member,none,
+      "cannot infer contextual base in reference to member %0", (DeclName))
 ERROR(unresolved_collection_literal,none,
       "cannot infer type for empty collection literal without a "
       "contextual type", ())

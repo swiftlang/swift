@@ -1050,7 +1050,9 @@ std::string TreatEphemeralAsNonEphemeral::getName() const {
 }
 
 bool SpecifyBaseTypeForContextualMember::diagnose(bool asNote) const {
-  return false;
+  auto &cs = getConstraintSystem();
+  MissingContextualBaseInMemberRefFailure failure(cs, MemberName, getLocator());
+  return failure.diagnose(asNote);
 }
 
 SpecifyBaseTypeForContextualMember *SpecifyBaseTypeForContextualMember::create(

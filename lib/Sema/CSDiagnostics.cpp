@@ -5976,3 +5976,26 @@ bool AssignmentTypeMismatchFailure::diagnoseAsNote() {
   return false;
 }
 
+bool MissingContextualBaseInMemberRefFailure::diagnoseAsError() {
+  auto *anchor = getAnchor();
+  auto &cs = getConstraintSystem();
+
+  // Member reference could be wrapped into a number of parens
+  // e.g. `((.foo))`.
+  auto *parentExpr = findParentExpr(anchor);
+  do {
+    // If we have found something which isn't a paren let's stop,
+    // otherwise let's keep unwrapping until there are either no
+    // more parens or no more parents...
+    if (!parentExpr || !isa<ParenExpr>(parentExpr))
+      break;
+  } while ((parentExpr = findParentExpr(parentExpr)));
+
+  auto diagnostic = parentExpr || cs.getContextualType(anchor)
+                        ? diag::cannot_infer_base_of_unresolved_member
+                        : diag::unresolved_member_no_inference;
+
+  emitDiagnostic(anchor->getLoc(), diagnostic, MemberName)
+      .highlight(anchor->getSourceRange());
+  return true;
+}
