@@ -296,20 +296,13 @@ namespace swift {
     /// This is only implemented on certain OSs. If no target has been
     /// configured, returns v0.0.0.
     llvm::VersionTuple getMinPlatformVersion() const {
-      unsigned major, minor, revision;
+      unsigned major = 0, minor = 0, revision = 0;
       if (Target.isMacOSX()) {
         Target.getMacOSXVersion(major, minor, revision);
       } else if (Target.isiOS()) {
         Target.getiOSVersion(major, minor, revision);
       } else if (Target.isWatchOS()) {
         Target.getOSVersion(major, minor, revision);
-      } else if (Target.isOSLinux() || Target.isOSFreeBSD() ||
-                 Target.isAndroid() || Target.isOSWindows() ||
-                 Target.isPS4() || Target.isOSHaiku() ||
-                 Target.getTriple().empty()) {
-        major = minor = revision = 0;
-      } else {
-        llvm_unreachable("Unsupported target OS");
       }
       return llvm::VersionTuple(major, minor, revision);
     }
