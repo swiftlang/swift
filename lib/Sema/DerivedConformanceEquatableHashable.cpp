@@ -1251,10 +1251,7 @@ static ValueDecl *deriveHashable_hashValue(DerivedConformance &derived) {
       C, StaticSpellingKind::None, hashValuePat, /*InitExpr*/ nullptr,
       parentDC);
 
-  // If any of the members we synthesized didn't typecheck, bail out.
-  if (derived.addMembersToConformanceContext({hashValueDecl, patDecl})) {
-    return nullptr;
-  }
+  derived.addMembersToConformanceContext({hashValueDecl, patDecl});
 
   return hashValueDecl;
 }

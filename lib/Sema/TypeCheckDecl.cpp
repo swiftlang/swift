@@ -1550,7 +1550,6 @@ bool TypeChecker::isAvailabilitySafeForConformance(
 // Returns 'nullptr' if this is the setter's 'newValue' parameter;
 // otherwise, returns the corresponding parameter of the subscript
 // declaration.
-
 static ParamDecl *getOriginalParamFromAccessor(AbstractStorageDecl *storage,
                                                AccessorDecl *accessor,
                                                ParamDecl *param) {
