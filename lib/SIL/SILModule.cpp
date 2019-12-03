@@ -599,6 +599,12 @@ SILModule::lookUpDifferentiabilityWitness(SILDifferentiabilityWitnessKey key) {
       mangler.mangleSILDifferentiabilityWitnessKey(key));
 }
 
+/// Look up the differentiability witness corresponding to the given indices.
+llvm::ArrayRef<SILDifferentiabilityWitness *>
+SILModule::lookUpDifferentiabilityWitnessesForFunction(StringRef name) {
+  return DifferentiabilityWitnessesByFunction[name];
+}
+
 bool SILModule::loadDifferentiabilityWitness(SILDifferentiabilityWitness *W) {
   auto *NewW = getSILLoader()->lookupDifferentiabilityWitness(W->getKey());
   if (!NewW)

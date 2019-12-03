@@ -9,8 +9,16 @@
 // Assertion failed: (newCapacity >= capacity), function extendingCapacity
 // ... ADContext::promoteToDifferentiableFunction
 
+// NOTE: We cannot differentiate external functions in roundtrip SIL tests.
+// Reason: When we print then parse the SIL we lose the information that the
+// external function is associated with an AST decl. So the differentiation
+// pass can't see the AST differentiable attrs, and the differentiation pass
+// thinks that we're trying to differentiate an external function without
+// explicit AST differentiable attrs.
+// TODO(TF-988): This can probably be fixed.
+
 @differentiable(wrt: x)
 func TF_656(_ x: Float, _ y: Float) -> Float {
-  return x + y
+  return 0
 }
 _ = gradient(at: 1, in: { x in TF_656(x, 2) })

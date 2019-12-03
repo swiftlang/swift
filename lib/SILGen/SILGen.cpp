@@ -774,9 +774,8 @@ void SILGenModule::postEmitFunction(SILDeclRef constant,
         if (auto *vjpDecl = diffAttr->getVJPFunction())
           vjp = getFunction(SILDeclRef(vjpDecl), NotForDefinition);
         auto *resultIndices = IndexSubset::get(getASTContext(), 1, {0});
-        AutoDiffConfig config(
-            diffAttr->getParameterIndices(), resultIndices,
-            diffAttr->getDerivativeGenericSignature().getPointer());
+        AutoDiffConfig config(diffAttr->getParameterIndices(), resultIndices,
+                              diffAttr->getDerivativeGenericSignature());
         emitDifferentiabilityWitness(AFD, F, config, jvp, vjp);
       }
     };
@@ -818,14 +817,11 @@ void SILGenModule::emitDifferentiabilityWitness(
   };
   bool reorderSelf = shouldReorderSelf();
 
-  CanGenericSignature derivativeCanGenSig;
-  if (auto derivativeGenSig = config.derivativeGenericSignature)
-    derivativeCanGenSig = derivativeGenSig->getCanonicalSignature();
   // Create new SIL differentiability witness.
   // Witness JVP and VJP are set below.
   auto *diffWitness = SILDifferentiabilityWitness::createDefinition(
       M, originalFunction->getLinkage(), originalFunction, loweredParamIndices,
-      config.resultIndices, derivativeCanGenSig,
+      config.resultIndices, config.derivativeGenericSignature,
       /*jvp*/ nullptr, /*vjp*/ nullptr, originalFunction->isSerialized());
 
   // Set derivative function in differentiability witness.

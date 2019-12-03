@@ -12,17 +12,19 @@
 //
 // SWIFT_ENABLE_TENSORFLOW
 //
-// Reverse-mode automatic differentiation utilities.
+// Automatic differentiation utilities.
 //
-// NOTE: Although the AD feature is developed as part of the Swift for
-// TensorFlow project, it is completely independent from TensorFlow support.
+// NOTE: Though automatic differentiation is developed as part of the Swift for
+// TensorFlow project, it is completely independent from TensorFlow.
+// Read the differentiable programming manifesto for more information:
+// docs/DifferentiableProgramming.md.
 //
-// TODO: Move definitions here from Differentiation.cpp.
+// TODO: Move definitions from lib/SILOptimizer/Mandatory/Differentiation.cpp.
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_SILOPTIMIZER_MANDATORY_DIFFERENTIATION_H
-#define SWIFT_SILOPTIMIZER_MANDATORY_DIFFERENTIATION_H
+#ifndef SWIFT_SILOPTIMIZER_UTILS_DIFFERENTIATION_H
+#define SWIFT_SILOPTIMIZER_UTILS_DIFFERENTIATION_H
 
 #include "swift/SIL/TypeSubstCloner.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
@@ -34,6 +36,58 @@ using llvm::SmallDenseMap;
 using llvm::SmallDenseSet;
 using llvm::SmallMapVector;
 using llvm::SmallSet;
+
+class ApplyInst;
+
+//===----------------------------------------------------------------------===//
+// Helpers
+//===----------------------------------------------------------------------===//
+
+namespace autodiff {
+
+/// Prints an "[AD] " prefix to `llvm::dbgs()` and returns the debug stream.
+/// This is being used to print short debug messages within the AD pass.
+raw_ostream &getADDebugStream();
+
+/// Returns true if this is an `ApplyInst` with `array.uninitialized_intrinsic`
+/// semantics.
+bool isArrayLiteralIntrinsic(ApplyInst *ai);
+
+/// If the given value `v` corresponds to an `ApplyInst` with
+/// `array.uninitialized_intrinsic` semantics, returns the corresponding
+/// `ApplyInst`. Otherwise, returns `nullptr`.
+ApplyInst *getAllocateUninitializedArrayIntrinsic(SILValue v);
+
+/// Given an element address from an `array.uninitialized_intrinsic` `apply`
+/// instruction, returns the `apply` instruction. The element address is either
+/// a `pointer_to_address` or `index_addr` instruction to the `RawPointer`
+/// result of the instrinsic:
+///
+///     %result = apply %array.uninitialized_intrinsic : $(Array<T>, RawPointer)
+///     (%array, %ptr) = destructure_tuple %result
+///     %elt0 = pointer_to_address %ptr to $*T       // element address
+///     %index_1 = integer_literal $Builtin.Word, 1
+///     %elt1 = index_addr %elt0, %index_1           // element address
+///     ...
+ApplyInst *getAllocateUninitializedArrayIntrinsicElementAddress(SILValue v);
+
+/// Given a value, finds its single `destructure_tuple` user if the value is
+/// tuple-typed and such a user exists.
+DestructureTupleInst *getSingleDestructureTupleUser(SILValue value);
+
+/// Given an `apply` instruction, apply the given callback to each of its
+/// direct results. If the `apply` instruction has a single `destructure_tuple`
+/// user, apply the callback to the results of the `destructure_tuple` user.
+void forEachApplyDirectResult(
+    ApplyInst *ai, llvm::function_ref<void(SILValue)> resultCallback);
+
+/// Given a function, gathers all of its formal results (both direct and
+/// indirect) in an order defined by its result type. Note that "formal results"
+/// refer to result values in the body of the function, not at call sites.
+void collectAllFormalResultsInTypeOrder(SILFunction &function,
+                                        SmallVectorImpl<SILValue> &results);
+
+} // end namespace autodiff
 
 /// Helper class for visiting basic blocks in post-order post-dominance order,
 /// based on a worklist algorithm.
@@ -100,8 +154,8 @@ inline void createEntryArguments(SILFunction *f) {
     // Create a dummy parameter declaration.
     // Necessary to prevent crash during argument explosion optimization.
     auto loc = f->getLocation().getSourceLoc();
-    auto *decl = new (ctx) ParamDecl(loc, loc, Identifier(), loc,
-                                     Identifier(), moduleDecl);
+    auto *decl = new (ctx)
+        ParamDecl(loc, loc, Identifier(), loc, Identifier(), moduleDecl);
     decl->setSpecifier(ParamDecl::Specifier::Default);
     entry->createFunctionArgument(type, decl);
   };

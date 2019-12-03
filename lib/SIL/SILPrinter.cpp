@@ -1299,6 +1299,10 @@ public:
       *this << " ";
     }
     printSILFunctionNameAndType(PrintState.OS, witness->getOriginalFunction());
+    if (dwfi->getHasExplicitFunctionType()) {
+      *this << " as ";
+      *this << dwfi->getType();
+    }
   }
   // SWIFT_ENABLE_TENSORFLOW END
 

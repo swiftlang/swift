@@ -3214,8 +3214,15 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
       P.diagnose(keyStartLoc, diag::sil_diff_witness_undefined);
       return true;
     }
-    ResultVal = B.createDifferentiabilityWitnessFunction(
-        InstLoc, witnessKind, witness);
+    // Parse an optional explicit function type.
+    Optional<SILType> functionType = None;
+    if (P.consumeIf(tok::kw_as)) {
+      functionType = SILType();
+      if (parseSILType(*functionType))
+        return true;
+    }
+    ResultVal = B.createDifferentiabilityWitnessFunction(InstLoc, witnessKind,
+                                                         witness, functionType);
     break;
   }
   // SWIFT_ENABLE_TENSORFLOW END

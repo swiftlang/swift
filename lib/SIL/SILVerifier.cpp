@@ -1579,6 +1579,28 @@ public:
             "The function operand must be a '@differentiable(linear)' "
             "function");
   }
+
+  void checkDifferentiabilityWitnessFunctionInst(
+      DifferentiabilityWitnessFunctionInst *dwfi) {
+    auto witnessFnTy = dwfi->getType().castTo<SILFunctionType>();
+    auto *witness = dwfi->getWitness();
+    // `DifferentiabilityWitnessFunctionInst` constructor asserts that
+    // `witness` is non-null.
+    auto witnessKind = dwfi->getWitnessKind();
+    // Return if not witnessing a derivative function.
+    auto derivKind = witnessKind.getAsDerivativeFunctionKind();
+    if (!derivKind)
+      return;
+    // Return if witness does not define the referenced derivative.
+    auto *derivativeFn = witness->getDerivative(*derivKind);
+    if (!derivativeFn)
+      return;
+    auto derivativeFnTy = derivativeFn->getLoweredFunctionType();
+    requireSameType(SILType::getPrimitiveObjectType(witnessFnTy),
+                    SILType::getPrimitiveObjectType(derivativeFnTy),
+                    "Type of witness instruction does not match actual type of "
+                    "witnessed function");
+  }
   // SWIFT_ENABLE_TENSORFLOW END
 
   void verifyLLVMIntrinsic(BuiltinInst *BI, llvm::Intrinsic::ID ID) {

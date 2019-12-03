@@ -525,6 +525,42 @@ class ImplicitNoDerivativeWithSeparateTangent : Differentiable {
   }
 }
 
+// TF-1018: verify that `@noDerivative` warnings are always silenceable, even
+// when the `Differentiable` conformance context is not the nominal type
+// declaration.
+
+class ExtensionDifferentiableNoDerivative<T> {
+  // expected-warning @+2 {{stored property 'x' has no derivative because it does not conform to 'Differentiable'; add an explicit '@noDerivative' attribute}}
+  // expected-warning @+1 {{stored property 'y' has no derivative because it does not conform to 'Differentiable'; add an explicit '@noDerivative' attribute}}
+  var x, y: T
+  // expected-warning @+1 {{stored property 'nondiff' has no derivative because it does not conform to 'Differentiable'; add an explicit '@noDerivative' attribute}}
+  var nondiff: Bool
+  init() { fatalError() }
+}
+extension ExtensionDifferentiableNoDerivative: Differentiable {}
+
+class ExtensionDifferentiableNoDerivativeFixed<T> {
+  @noDerivative var x, y: T
+  @noDerivative var nondiff: Bool
+  init() { fatalError() }
+}
+extension ExtensionDifferentiableNoDerivativeFixed: Differentiable {}
+
+class ConditionalDifferentiableNoDerivative<T> {
+  var x, y: T
+  // expected-warning @+1 {{stored property 'nondiff' has no derivative because it does not conform to 'Differentiable'; add an explicit '@noDerivative' attribute}}
+  var nondiff: Bool
+  init() { fatalError() }
+}
+extension ConditionalDifferentiableNoDerivative: Differentiable where T: Differentiable {}
+
+class ConditionalDifferentiableNoDerivativeFixed<T> {
+  var x, y: T
+  @noDerivative var nondiff: Bool
+  init() { fatalError() }
+}
+extension ConditionalDifferentiableNoDerivativeFixed: Differentiable where T: Differentiable {}
+
 // TF-265: Test invalid initializer (that uses a non-existent type).
 class InvalidInitializer : Differentiable {
   init(filterShape: (Int, Int, Int, Int), blah: NonExistentType) {} // expected-error {{use of undeclared type 'NonExistentType'}}

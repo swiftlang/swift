@@ -478,6 +478,7 @@ class LinkEntity {
   setForDifferentiabilityWitness(Kind kind,
                                  const SILDifferentiabilityWitness *witness) {
     Pointer = const_cast<void *>(static_cast<const void *>(witness));
+    SecondaryPointer = nullptr;
     Data = LINKENTITY_SET_FIELD(Kind, unsigned(kind));
   }
   // SWIFT_ENABLE_TENSORFLOW_END
