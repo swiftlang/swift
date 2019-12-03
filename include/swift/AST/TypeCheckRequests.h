@@ -1910,6 +1910,26 @@ public:
   void cacheResult(Expr *expr) const;
 };
 
+/// Computes whether this is a type that supports being called through the
+/// implementation of a \c callAsFunction method.
+class IsCallableNominalTypeRequest
+    : public SimpleRequest<IsCallableNominalTypeRequest,
+                           bool(CanType, DeclContext *), CacheKind::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<bool> evaluate(Evaluator &evaluator, CanType ty,
+                                DeclContext *dc) const;
+
+public:
+  // Cached.
+  bool isCached() const { return true; }
+};
+
 // Allow AnyValue to compare two Type values, even though Type doesn't
 // support ==.
 template<>

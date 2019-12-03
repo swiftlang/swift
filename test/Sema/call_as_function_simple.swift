@@ -192,3 +192,39 @@ func testIUO(a: SimpleCallable!, b: MultipleArgsCallable!, c: Extended!,
   _ = try? h()
   _ = try? h { throw DummyError() }
 }
+
+// SR-11778
+struct DoubleANumber {
+  func callAsFunction(_ x: Int, completion: (Int) -> Void = { _ in }) {
+    completion(x + x)
+  }
+}
+
+func testDefaults(_ x: DoubleANumber) {
+  x(5)
+  x(5, completion: { _ in })
+}
+
+// SR-11881
+struct IUOCallable {
+  static var callable: IUOCallable { IUOCallable() }
+  func callAsFunction(_ x: Int) -> IUOCallable! { nil }
+}
+
+func testIUOCallAsFunction(_ x: IUOCallable) {
+  let _: IUOCallable = x(5)
+  let _: IUOCallable? = x(5)
+  let _ = x(5)
+
+  let _: IUOCallable = .callable(5)
+  let _: IUOCallable? = .callable(5)
+}
+
+// Test access control.
+struct PrivateCallable {
+  private func callAsFunction(_ x: Int) {} // expected-note {{'callAsFunction' declared here}}
+}
+
+func testAccessControl(_ x: PrivateCallable) {
+  x(5) // expected-error {{'callAsFunction' is inaccessible due to 'private' protection level}}
+}

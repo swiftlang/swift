@@ -36,6 +36,7 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/TypeCheckerDebugConsumer.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Parse/Confusables.h"
 #include "swift/Parse/Lexer.h"
@@ -4568,4 +4569,23 @@ ForcedCheckedCastExpr *swift::findForcedDowncast(ASTContext &ctx, Expr *expr) {
   }
 
   return nullptr;
+}
+
+llvm::Expected<bool>
+IsCallableNominalTypeRequest::evaluate(Evaluator &evaluator, CanType ty,
+                                       DeclContext *dc) const {
+  auto options = defaultMemberLookupOptions;
+  options |= NameLookupFlags::IgnoreAccessControl;
+  if (isa<AbstractFunctionDecl>(dc))
+    options |= NameLookupFlags::KnownPrivate;
+
+  // Look for a callAsFunction method.
+  auto &ctx = ty->getASTContext();
+  auto results =
+      TypeChecker::lookupMember(dc, ty, ctx.Id_callAsFunction, options);
+  return llvm::any_of(results, [](LookupResultEntry entry) -> bool {
+    if (auto *fd = dyn_cast<FuncDecl>(entry.getValueDecl()))
+      return fd->isCallAsFunctionMethod();
+    return false;
+  });
 }
