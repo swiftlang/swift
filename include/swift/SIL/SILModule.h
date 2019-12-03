@@ -526,6 +526,13 @@ public:
   /// succeeded, false otherwise.
   bool loadFunction(SILFunction *F);
 
+  /// Update the linkage of the SILFunction with the linkage of the serialized
+  /// function.
+  ///
+  /// The serialized SILLinkage can differ from the linkage derived from the
+  /// AST, e.g. cross-module-optimization can change the SIL linkages.
+  void updateFunctionLinkage(SILFunction *F);
+
   /// Attempt to link the SILFunction. Returns true if linking succeeded, false
   /// otherwise.
   ///
