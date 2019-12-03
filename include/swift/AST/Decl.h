@@ -1889,7 +1889,10 @@ private:
   void setPattern(Pattern *P) { PatternAndFlags.setPointer(P); }
 
   /// Whether the given pattern binding entry is initialized.
-  bool isInitialized() const;
+  ///
+  /// \param onlyExplicit Only consider explicit initializations (rather
+  /// than implicitly-generated ones).
+  bool isInitialized(bool onlyExplicit = false) const;
 
   Expr *getInit() const {
     if (PatternAndFlags.getInt().contains(Flags::Removed) ||

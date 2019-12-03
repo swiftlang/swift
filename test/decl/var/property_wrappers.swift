@@ -1809,3 +1809,25 @@ func test_rdar56350060() {
     }
   }
 }
+
+// rdar://problem/57411331 - crash due to incorrectly synthesized "nil" default
+// argument.
+@propertyWrapper
+struct Blah<Value> {
+  init(blah _: Int) { }
+
+  var wrappedValue: Value {
+    let val: Value? = nil
+    return val!
+  }
+}
+
+struct UseRdar57411331 {
+  let x = Rdar57411331(other: 5)
+}
+
+struct Rdar57411331 {
+  @Blah(blah: 17) var something: Int?
+
+  var other: Int
+}
