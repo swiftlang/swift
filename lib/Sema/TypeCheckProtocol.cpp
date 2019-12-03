@@ -253,14 +253,6 @@ static bool checkObjCWitnessSelector(ValueDecl *req, ValueDecl *witness) {
   return false;
 }
 
-static ParameterList *getParameterList(ValueDecl *value) {
-  if (auto func = dyn_cast<AbstractFunctionDecl>(value))
-    return func->getParameters();
-
-  auto subscript = cast<SubscriptDecl>(value);
-  return subscript->getIndices();
-}
-
 // Find a standin declaration to place the diagnostic at for the
 // given accessor kind.
 static ValueDecl *getStandinForAccessor(AbstractStorageDecl *witness,
@@ -634,8 +626,7 @@ static Optional<RequirementMatch> findMissingGenericRequirementForSolutionFix(
 }
 
 RequirementMatch
-swift::matchWitness(TypeChecker &tc,
-                    WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
+swift::matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
                     ProtocolDecl *proto, ProtocolConformance *conformance,
                     DeclContext *dc, ValueDecl *req, ValueDecl *witness) {
   using namespace constraints;
@@ -713,7 +704,7 @@ swift::matchWitness(TypeChecker &tc,
   auto setup = [&]() -> std::tuple<Optional<RequirementMatch>, Type, Type> {
     // Construct a constraint system to use to solve the equality between
     // the required type and the witness type.
-    cs.emplace(tc, dc, ConstraintSystemFlags::AllowFixes);
+    cs.emplace(dc, ConstraintSystemFlags::AllowFixes);
 
     auto reqGenericEnv = reqEnvironment.getSyntheticEnvironment();
     auto reqSubMap = reqEnvironment.getRequirementToSyntheticMap();
@@ -981,9 +972,6 @@ bool WitnessChecker::findBestWitness(
 
   bool anyFromUnconstrainedExtension;
   numViable = 0;
-
-  // FIXME: Remove dependency on the global type checker.
-  auto *TC = requirement->getASTContext().getLegacyGlobalTypeChecker();
   for (Attempt attempt = Regular; numViable == 0 && attempt != Done;
        attempt = static_cast<Attempt>(attempt + 1)) {
     SmallVector<ValueDecl *, 4> witnesses;
@@ -1031,7 +1019,7 @@ bool WitnessChecker::findBestWitness(
         continue;
       }
 
-      auto match = matchWitness(*TC, ReqEnvironmentCache, Proto, conformance,
+      auto match = matchWitness(ReqEnvironmentCache, Proto, conformance,
                                 DC, requirement, witness);
       if (match.isViable()) {
         ++numViable;
@@ -1056,7 +1044,7 @@ bool WitnessChecker::findBestWitness(
     if (conformance && !conformance->isInvalid()) {
       if (auto *SF = DC->getParentSourceFile()) {
         if (SF->Kind == SourceFileKind::Interface) {
-          auto match = matchWitness(*TC, ReqEnvironmentCache, Proto,
+          auto match = matchWitness(ReqEnvironmentCache, Proto,
                                     conformance, DC, requirement, requirement);
           assert(match.isViable());
           numViable = 1;
@@ -2219,16 +2207,39 @@ ConformanceChecker::getReferencedAssociatedTypes(ValueDecl *req) {
     return known->second;
 
   // Collect the set of associated types rooted on Self in the
-  // signature.
+  // signature. Note that for references to nested types, we only
+  // want to consider the outermost dependent member type.
+  //
+  // For example, a requirement typed '(Iterator.Element) -> ()'
+  // is not considered to reference the associated type 'Iterator'.
   auto &assocTypes = ReferencedAssociatedTypes[req];
-  llvm::SmallPtrSet<AssociatedTypeDecl *, 4> knownAssocTypes;
-  req->getInterfaceType()->getCanonicalType().visit([&](CanType type) {
-      if (auto assocType = getReferencedAssocTypeOfProtocol(type, Proto)) {
-        if (knownAssocTypes.insert(assocType).second) {
-          assocTypes.push_back(assocType);
+
+  class Walker : public TypeWalker {
+    ProtocolDecl *Proto;
+    llvm::SmallVectorImpl<AssociatedTypeDecl *> &assocTypes;
+    llvm::SmallPtrSet<AssociatedTypeDecl *, 4> knownAssocTypes;
+
+  public:
+    Walker(ProtocolDecl *Proto,
+           llvm::SmallVectorImpl<AssociatedTypeDecl *> &assocTypes)
+      : Proto(Proto), assocTypes(assocTypes) {}
+
+    Action walkToTypePre(Type type) override {
+      if (type->is<DependentMemberType>()) {
+        if (auto assocType = getReferencedAssocTypeOfProtocol(type, Proto)) {
+          if (knownAssocTypes.insert(assocType).second)
+            assocTypes.push_back(assocType);
         }
+
+        return Action::SkipChildren;
       }
-    });
+
+      return Action::Continue;
+    }
+  };
+
+  Walker walker(Proto, assocTypes);
+  req->getInterfaceType()->getCanonicalType().walk(walker);
 
   return assocTypes;
 }
@@ -2392,11 +2403,8 @@ static void diagnoseWitnessFixAccessLevel(DiagnosticEngine &diags,
       if (extAccess < requiredAccess) {
         shouldMoveToAnotherExtension = true;
       } else if (extAccess == requiredAccess) {
-        auto declAttr = decl->getAttrs().getAttribute<AccessControlAttr>();
-        assert(declAttr && declAttr->getAccess() < requiredAccess &&
-            "expect an explicitly specified access control level which is "
-            "less accessible than required.");
-        (void)declAttr;
+        assert(decl->getFormalAccess() < requiredAccess &&
+              "witness is accessible?");
         shouldUseDefaultAccess = true;
       }
     }
@@ -3375,8 +3383,7 @@ ResolveWitnessResult ConformanceChecker::resolveWitnessViaDerivation(
     return ResolveWitnessResult::ExplicitFailed;
 
   // Try to match the derived requirement.
-  auto *TC = getASTContext().getLegacyGlobalTypeChecker();
-  auto match = matchWitness(*TC, ReqEnvironmentCache, Proto, Conformance, DC,
+  auto match = matchWitness(ReqEnvironmentCache, Proto, Conformance, DC,
                             requirement, derived);
   if (match.isViable()) {
     recordWitness(requirement, match);
@@ -4544,9 +4551,7 @@ static void diagnosePotentialWitness(NormalProtocolConformance *conformance,
   // Describe why the witness didn't satisfy the requirement.
   WitnessChecker::RequirementEnvironmentCache oneUseCache;
   auto dc = conformance->getDeclContext();
-  // FIXME: Remove dependency on the global type checker.
-  auto *TC = req->getASTContext().getLegacyGlobalTypeChecker();
-  auto match = matchWitness(*TC, oneUseCache, conformance->getProtocol(),
+  auto match = matchWitness(oneUseCache, conformance->getProtocol(),
                             conformance, dc, req, witness);
   if (match.Kind == MatchKind::ExactMatch &&
       req->isObjC() && !witness->isObjC()) {
@@ -4865,7 +4870,7 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
   // Check all conformances.
   groupChecker.checkAllConformances();
 
-  if (Context.LangOpts.DebugGenericSignatures) {
+  if (Context.TypeCheckerOpts.DebugGenericSignatures) {
     // Now that they're filled out, print out information about the conformances
     // here, when requested.
     for (auto conformance : conformances) {
@@ -5176,9 +5181,7 @@ swift::findWitnessedObjCRequirements(const ValueDecl *witness,
         if (accessorKind)
           witnessToMatch = cast<AccessorDecl>(witness)->getStorage();
 
-        auto *TC = ctx.getLegacyGlobalTypeChecker();
-        assert(TC && "Need a type checker to match witnesses");
-        if (matchWitness(*TC, reqEnvCache, proto, *conformance,
+        if (matchWitness(reqEnvCache, proto, *conformance,
                          witnessToMatch->getDeclContext(), req,
                          const_cast<ValueDecl *>(witnessToMatch))
               .Kind == MatchKind::ExactMatch) {

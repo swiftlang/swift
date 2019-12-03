@@ -996,14 +996,14 @@ namespace {
                    getDefaultArgumentKindString(P->getDefaultArgumentKind()));
       }
 
-      if (P->getDefaultValue() &&
-        !P->getDefaultArgumentCaptureInfo().isTrivial()) {
+      if (P->hasDefaultExpr() &&
+          !P->getDefaultArgumentCaptureInfo().isTrivial()) {
         OS << " ";
         P->getDefaultArgumentCaptureInfo().print(
           PrintWithColorRAII(OS, CapturesColor).getOS());
       }
 
-      if (auto init = P->getDefaultValue()) {
+      if (auto init = P->getStructuralDefaultExpr()) {
         OS << " expression=\n";
         printRec(init);
       }
@@ -1262,15 +1262,6 @@ void ParameterList::dump() const {
 }
 
 void ParameterList::dump(raw_ostream &OS, unsigned Indent) const {
-  llvm::Optional<llvm::SaveAndRestore<bool>> X;
-  
-  // Make sure to print type variables if we can get to ASTContext.
-  if (size() != 0 && get(0)) {
-    auto &ctx = get(0)->getASTContext();
-    X.emplace(llvm::SaveAndRestore<bool>(ctx.LangOpts.DebugConstraintSolver,
-                                         true));
-  }
-  
   PrintDecl(OS, Indent).printParameterList(this);
   llvm::errs() << '\n';
 }
@@ -1293,9 +1284,6 @@ void Decl::dump(const char *filename) const {
 }
 
 void Decl::dump(raw_ostream &OS, unsigned Indent) const {
-  // Make sure to print type variables.
-  llvm::SaveAndRestore<bool> X(getASTContext().LangOpts.DebugConstraintSolver,
-                               true);
   PrintDecl(OS, Indent).visit(const_cast<Decl *>(this));
   OS << '\n';
 }
@@ -1407,8 +1395,6 @@ void SourceFile::dump() const {
 }
 
 void SourceFile::dump(llvm::raw_ostream &OS) const {
-  llvm::SaveAndRestore<bool> X(getASTContext().LangOpts.DebugConstraintSolver,
-                               true);
   PrintDecl(OS).visitSourceFile(*this);
   llvm::errs() << '\n';
 }
@@ -1826,13 +1812,17 @@ public:
   }
 
   raw_ostream &printCommon(Expr *E, const char *C) {
+    PrintOptions PO;
+    PO.PrintTypesForDebugging = true;
+
     OS.indent(Indent);
     PrintWithColorRAII(OS, ParenthesisColor) << '(';
     PrintWithColorRAII(OS, ExprColor) << C;
 
     if (E->isImplicit())
       PrintWithColorRAII(OS, ExprModifierColor) << " implicit";
-    PrintWithColorRAII(OS, TypeColor) << " type='" << GetTypeOfExpr(E) << '\'';
+    PrintWithColorRAII(OS, TypeColor) << " type='";
+    PrintWithColorRAII(OS, TypeColor) << GetTypeOfExpr(E).getString(PO) << '\'';
 
     // If we have a source range and an ASTContext, print the source range.
     if (auto Ty = GetTypeOfExpr(E)) {
@@ -2997,6 +2987,41 @@ public:
     printRec(T->getBase());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
+
+  void visitOptionalTypeRepr(OptionalTypeRepr *T) {
+    printCommon("type_optional") << '\n';
+    printRec(T->getBase());
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
+
+  void visitImplicitlyUnwrappedOptionalTypeRepr(
+      ImplicitlyUnwrappedOptionalTypeRepr *T) {
+    printCommon("type_implicitly_unwrapped_optional") << '\n';
+    printRec(T->getBase());
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
+
+  void visitOpaqueReturnTypeRepr(OpaqueReturnTypeRepr *T) {
+    printCommon("type_opaque_return");
+    printRec(T->getConstraint());
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
+
+  void visitFixedTypeRepr(FixedTypeRepr *T) {
+    printCommon("type_fixed");
+    auto Ty = T->getType();
+    if (Ty) {
+      auto &srcMgr =  Ty->getASTContext().SourceMgr;
+      if (T->getLoc().isValid()) {
+        OS << " location=@";
+        T->getLoc().print(OS, srcMgr);
+      } else {
+        OS << " location=<<invalid>>";
+      }
+    }
+    OS << " type="; Ty.dump(OS);
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
 };
 
 } // end anonymous namespace
@@ -3749,14 +3774,10 @@ namespace {
 } // end anonymous namespace
 
 void Type::dump() const {
-  // Make sure to print type variables.
   dump(llvm::errs());
 }
 
 void Type::dump(raw_ostream &os, unsigned indent) const {
-  // Make sure to print type variables.
-  llvm::SaveAndRestore<bool> X(getPointer()->getASTContext().LangOpts.
-                               DebugConstraintSolver, true);
   PrintType(os, indent).visit(*this, "");
   os << "\n";
 }
@@ -3767,10 +3788,6 @@ void TypeBase::dump() const {
 }
 
 void TypeBase::dump(raw_ostream &os, unsigned indent) const {
-  auto &ctx = const_cast<TypeBase*>(this)->getASTContext();
-  
-  // Make sure to print type variables.
-  llvm::SaveAndRestore<bool> X(ctx.LangOpts.DebugConstraintSolver, true);
   Type(const_cast<TypeBase *>(this)).dump(os, indent);
 }
 

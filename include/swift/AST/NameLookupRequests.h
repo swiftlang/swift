@@ -25,11 +25,16 @@
 namespace swift {
 
 class ClassDecl;
+class DeclContext;
+class DeclName;
 class DestructorDecl;
 class GenericContext;
 class GenericParamList;
+class LookupResult;
+class SourceLoc;
 class TypeAliasDecl;
 class TypeDecl;
+enum class UnqualifiedLookupFlags;
 namespace ast_scope {
 class ASTScopeImpl;
 class ScopeCreator;
@@ -300,6 +305,59 @@ public:
   bool isCached() const;
   Optional<ast_scope::ASTScopeImpl *> getCachedResult() const;
   void cacheResult(ast_scope::ASTScopeImpl *) const {}
+};
+
+/// The input type for an unqualified lookup request.
+class UnqualifiedLookupDescriptor {
+  using LookupOptions = OptionSet<UnqualifiedLookupFlags>;
+
+public:
+  DeclName Name;
+  DeclContext *DC;
+  SourceLoc Loc;
+  LookupOptions Options;
+
+  UnqualifiedLookupDescriptor(DeclName name, DeclContext *dc,
+                              SourceLoc loc = SourceLoc(),
+                              LookupOptions options = {})
+      : Name(name), DC(dc), Loc(loc), Options(options) {}
+
+  friend llvm::hash_code hash_value(const UnqualifiedLookupDescriptor &desc) {
+    return llvm::hash_combine(desc.Name, desc.DC, desc.Loc,
+                              desc.Options.toRaw());
+  }
+
+  friend bool operator==(const UnqualifiedLookupDescriptor &lhs,
+                         const UnqualifiedLookupDescriptor &rhs) {
+    return lhs.Name == rhs.Name && lhs.DC == rhs.DC && lhs.Loc == rhs.Loc &&
+           lhs.Options.toRaw() == rhs.Options.toRaw();
+  }
+
+  friend bool operator!=(const UnqualifiedLookupDescriptor &lhs,
+                         const UnqualifiedLookupDescriptor &rhs) {
+    return !(lhs == rhs);
+  }
+};
+
+void simple_display(llvm::raw_ostream &out,
+                    const UnqualifiedLookupDescriptor &desc);
+
+SourceLoc extractNearestSourceLoc(const UnqualifiedLookupDescriptor &desc);
+
+/// Performs unqualified lookup for a DeclName from a given context.
+class UnqualifiedLookupRequest
+    : public SimpleRequest<UnqualifiedLookupRequest,
+                           LookupResult(UnqualifiedLookupDescriptor),
+                           CacheKind::Uncached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<LookupResult> evaluate(Evaluator &evaluator,
+                                        UnqualifiedLookupDescriptor desc) const;
 };
 
 #define SWIFT_TYPEID_ZONE NameLookup

@@ -4102,6 +4102,10 @@ ConstraintResult GenericSignatureBuilder::expandConformanceRequirement(
         auto type = dyn_cast<TypeDecl>(found);
         if (!type || isa<AssociatedTypeDecl>(type)) continue;
 
+        // Ignore nominal types. They're always invalid declarations.
+        if (isa<NominalTypeDecl>(type))
+          continue;
+
         // ... from the same module as the protocol.
         if (type->getModuleContext() != proto->getModuleContext()) continue;
 

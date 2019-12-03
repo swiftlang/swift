@@ -1466,25 +1466,25 @@ const TypeInfo &IRGenFunction::getTypeInfo(SILType T) {
 
 /// Return the SIL-lowering of the given type.
 SILType IRGenModule::getLoweredType(AbstractionPattern orig, Type subst) const {
-  return getSILTypes().getLoweredType(orig, subst,
-                                      ResilienceExpansion::Maximal);
+  return getSILTypes().getLoweredType(
+      orig, subst, TypeExpansionContext::maximalResilienceExpansionOnly());
 }
 
 /// Return the SIL-lowering of the given type.
 SILType IRGenModule::getLoweredType(Type subst) const {
-  return getSILTypes().getLoweredType(subst,
-                                      ResilienceExpansion::Maximal);
+  return getSILTypes().getLoweredType(
+      subst, TypeExpansionContext::maximalResilienceExpansionOnly());
 }
 
 /// Return the SIL-lowering of the given type.
 const Lowering::TypeLowering &IRGenModule::getTypeLowering(SILType type) const {
-  return getSILTypes().getTypeLowering(type,
-                                       ResilienceExpansion::Maximal);
+  return getSILTypes().getTypeLowering(
+      type, TypeExpansionContext::maximalResilienceExpansionOnly());
 }
 
 bool IRGenModule::isTypeABIAccessible(SILType type) const {
-  return getSILModule().isTypeABIAccessible(type,
-                                            ResilienceExpansion::Maximal);
+  return getSILModule().isTypeABIAccessible(
+      type, TypeExpansionContext::maximalResilienceExpansionOnly());
 }
 
 /// Get a pointer to the storage type for the given type.  Note that,
@@ -2307,7 +2307,10 @@ SILType irgen::getSingletonAggregateFieldType(IRGenModule &IGM, SILType t,
     auto allFields = structDecl->getStoredProperties();
     
     if (allFields.size() == 1) {
-      auto fieldTy = t.getFieldType(allFields[0], IGM.getSILModule());
+      auto fieldTy = t.getFieldType(
+          allFields[0], IGM.getSILModule(),
+          TypeExpansionContext(expansion, IGM.getSwiftModule(),
+                               IGM.getSILModule().isWholeModule()));
       if (!IGM.isTypeABIAccessible(fieldTy))
         return SILType();
       return fieldTy;
@@ -2327,7 +2330,10 @@ SILType irgen::getSingletonAggregateFieldType(IRGenModule &IGM, SILType t,
     auto theCase = allCases.begin();
     if (!allCases.empty() && std::next(theCase) == allCases.end()
         && (*theCase)->hasAssociatedValues()) {
-      auto enumEltTy = t.getEnumElementType(*theCase, IGM.getSILModule());
+      auto enumEltTy = t.getEnumElementType(
+          *theCase, IGM.getSILModule(),
+          TypeExpansionContext(expansion, IGM.getSwiftModule(),
+                               IGM.getSILModule().isWholeModule()));
       if (!IGM.isTypeABIAccessible(enumEltTy))
         return SILType();
       return enumEltTy;

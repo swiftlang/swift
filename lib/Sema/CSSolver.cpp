@@ -16,6 +16,7 @@
 #include "CSStep.h"
 #include "ConstraintGraph.h"
 #include "ConstraintSystem.h"
+#include "SolutionResult.h"
 #include "TypeCheckType.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/TypeWalker.h"
@@ -68,8 +69,9 @@ Solution ConstraintSystem::finalize() {
   Solution solution(*this, CurrentScore);
 
   // Update the best score we've seen so far.
+  auto &ctx = getASTContext();
   if (!retainAllSolutions()) {
-    assert(getASTContext().LangOpts.DisableConstraintSolverPerformanceHacks ||
+    assert(ctx.TypeCheckerOpts.DisableConstraintSolverPerformanceHacks ||
            !solverState->BestScore || CurrentScore <= *solverState->BestScore);
 
     if (!solverState->BestScore || CurrentScore <= *solverState->BestScore) {
@@ -89,7 +91,7 @@ Solution ConstraintSystem::finalize() {
       break;
         
     case FreeTypeVariableBinding::UnresolvedType:
-      assignFixedType(tv, getASTContext().TheUnresolvedType);
+      assignFixedType(tv, ctx.TheUnresolvedType);
       break;
     }
   }
@@ -283,7 +285,7 @@ bool ConstraintSystem::simplify(bool ContinueAfterFailures) {
         failedConstraint = constraint;
       }
 
-      if (getASTContext().LangOpts.DebugConstraintSolver) {
+      if (getASTContext().TypeCheckerOpts.DebugConstraintSolver) {
         auto &log = getASTContext().TypeCheckerDebug->getStream();
         log.indent(solverState ? solverState->depth * 2 : 0)
             << "(failed constraint ";
@@ -361,12 +363,12 @@ ConstraintSystem::SolverState::SolverState(
 
   // If we're supposed to debug a specific constraint solver attempt,
   // turn on debugging now.
-  ASTContext &ctx = CS.getTypeChecker().Context;
-  LangOptions &langOpts = ctx.LangOpts;
-  OldDebugConstraintSolver = langOpts.DebugConstraintSolver;
-  if (langOpts.DebugConstraintSolverAttempt &&
-      langOpts.DebugConstraintSolverAttempt == SolutionAttempt) {
-    langOpts.DebugConstraintSolver = true;
+  ASTContext &ctx = CS.getASTContext();
+  auto &tyOpts = ctx.TypeCheckerOpts;
+  OldDebugConstraintSolver = tyOpts.DebugConstraintSolver;
+  if (tyOpts.DebugConstraintSolverAttempt &&
+      tyOpts.DebugConstraintSolverAttempt == SolutionAttempt) {
+    tyOpts.DebugConstraintSolver = true;
     llvm::raw_ostream &dbgOut = ctx.TypeCheckerDebug->getStream();
     dbgOut << "---Constraint system #" << SolutionAttempt << "---\n";
     CS.print(dbgOut);
@@ -408,8 +410,8 @@ ConstraintSystem::SolverState::~SolverState() {
   }
 
   // Restore debugging state.
-  LangOptions &langOpts = CS.getTypeChecker().Context.LangOpts;
-  langOpts.DebugConstraintSolver = OldDebugConstraintSolver;
+  TypeCheckerOptions &tyOpts = CS.getASTContext().TypeCheckerOpts;
+  tyOpts.DebugConstraintSolver = OldDebugConstraintSolver;
 
   // Write our local statistics back to the overall statistics.
   #define CS_STATISTIC(Name, Description) JOIN2(Overall,Name) += Name;
@@ -436,7 +438,6 @@ ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
   numSavedBindings = cs.solverState->savedBindings.size();
   numConstraintRestrictions = cs.ConstraintRestrictions.size();
   numFixes = cs.Fixes.size();
-  numHoles = cs.Holes.size();
   numFixedRequirements = cs.FixedRequirements.size();
   numDisjunctionChoices = cs.DisjunctionChoices.size();
   numOpenedTypes = cs.OpenedTypes.size();
@@ -483,9 +484,6 @@ ConstraintSystem::SolverScope::~SolverScope() {
 
   // Remove any fixes.
   truncate(cs.Fixes, numFixes);
-
-  // Remove any holes encountered along the current path.
-  truncate(cs.Holes, numHoles);
 
   // Remove any disjunction choices.
   truncate(cs.DisjunctionChoices, numDisjunctionChoices);
@@ -573,7 +571,7 @@ bool ConstraintSystem::Candidate::solve(
   };
 
   // Allocate new constraint system for sub-expression.
-  ConstraintSystem cs(BaseCS.getTypeChecker(), DC, None, E);
+  ConstraintSystem cs(DC, None);
   cs.baseCS = &BaseCS;
 
   // Set up expression type checker timer for the candidate.
@@ -595,7 +593,7 @@ bool ConstraintSystem::Candidate::solve(
     return false;
 
   auto &ctx = cs.getASTContext();
-  if (ctx.LangOpts.DebugConstraintSolver) {
+  if (ctx.TypeCheckerOpts.DebugConstraintSolver) {
     auto &log = cs.getASTContext().TypeCheckerDebug->getStream();
     log << "--- Solving candidate for shrinking at ";
     auto R = E->getSourceRange();
@@ -632,7 +630,7 @@ bool ConstraintSystem::Candidate::solve(
     cs.solveImpl(solutions);
   }
 
-  if (ctx.LangOpts.DebugConstraintSolver) {
+  if (ctx.TypeCheckerOpts.DebugConstraintSolver) {
     auto &log = cs.getASTContext().TypeCheckerDebug->getStream();
     if (solutions.empty()) {
       log << "--- No Solutions ---\n";
@@ -716,7 +714,7 @@ void ConstraintSystem::Candidate::applySolutions(
 }
 
 void ConstraintSystem::shrink(Expr *expr) {
-  if (getASTContext().LangOpts.SolverDisableShrink)
+  if (getASTContext().TypeCheckerOpts.SolverDisableShrink)
     return;
 
   using DomainMap = llvm::SmallDenseMap<Expr *, ArrayRef<ValueDecl *>>;
@@ -1063,10 +1061,10 @@ void ConstraintSystem::shrink(Expr *expr) {
 }
 
 static bool debugConstraintSolverForExpr(ASTContext &C, Expr *expr) {
-  if (C.LangOpts.DebugConstraintSolver)
+  if (C.TypeCheckerOpts.DebugConstraintSolver)
     return true;
 
-  if (C.LangOpts.DebugConstraintSolverOnLines.empty())
+  if (C.TypeCheckerOpts.DebugConstraintSolverOnLines.empty())
     // No need to compute the line number to find out it's not present.
     return false;
 
@@ -1082,7 +1080,7 @@ static bool debugConstraintSolverForExpr(ASTContext &C, Expr *expr) {
 
   assert(startLine <= endLine && "expr ends before it starts?");
 
-  auto &lines = C.LangOpts.DebugConstraintSolverOnLines;
+  auto &lines = C.TypeCheckerOpts.DebugConstraintSolverOnLines;
   assert(std::is_sorted(lines.begin(), lines.end()) &&
          "DebugConstraintSolverOnLines sorting invariant violated");
 
@@ -1101,7 +1099,7 @@ bool ConstraintSystem::solve(Expr *&expr,
                              SmallVectorImpl<Solution> &solutions,
                              FreeTypeVariableBinding allowFreeTypeVariables) {
   llvm::SaveAndRestore<bool> debugForExpr(
-      getASTContext().LangOpts.DebugConstraintSolver,
+      getASTContext().TypeCheckerOpts.DebugConstraintSolver,
       debugConstraintSolverForExpr(getASTContext(), expr));
 
   // Attempt to solve the constraint system.
@@ -1124,10 +1122,27 @@ bool ConstraintSystem::solve(Expr *&expr,
     if (shouldSuppressDiagnostics())
       return true;
 
-    // Try to provide a decent diagnostic.
-    if (salvage(solutions, expr)) {
-      // If salvage produced an error message, then it failed to salvage the
-      // expression, just bail out having reported the error.
+    // Try to fix the system or provide a decent diagnostic.
+    auto salvagedResult = salvage();
+    switch (salvagedResult.getKind()) {
+    case SolutionResult::Kind::Success:
+      solutions.clear();
+      solutions.push_back(std::move(salvagedResult).takeSolution());
+      break;
+
+    case SolutionResult::Kind::Error:
+    case SolutionResult::Kind::Ambiguous:
+      return true;
+
+    case SolutionResult::Kind::UndiagnosedError:
+      diagnoseFailureForExpr(expr);
+      salvagedResult.markAsDiagnosed();
+      return true;
+
+    case SolutionResult::Kind::TooComplex:
+      getASTContext().Diags.diagnose(expr->getLoc(), diag::expression_too_complex)
+        .highlight(expr->getSourceRange());
+      salvagedResult.markAsDiagnosed();
       return true;
     }
 
@@ -1140,7 +1155,7 @@ bool ConstraintSystem::solve(Expr *&expr,
     return true;
   }
 
-  if (getASTContext().LangOpts.DebugConstraintSolver) {
+  if (getASTContext().TypeCheckerOpts.DebugConstraintSolver) {
     auto &log = getASTContext().TypeCheckerDebug->getStream();
     if (solutions.size() == 1) {
       log << "---Solution---\n";
@@ -1162,7 +1177,7 @@ ConstraintSystem::solveImpl(Expr *&expr,
                             ExprTypeCheckListener *listener,
                             SmallVectorImpl<Solution> &solutions,
                             FreeTypeVariableBinding allowFreeTypeVariables) {
-  if (getASTContext().LangOpts.DebugConstraintSolver) {
+  if (getASTContext().TypeCheckerOpts.DebugConstraintSolver) {
     auto &log = getASTContext().TypeCheckerDebug->getStream();
     log << "---Constraint solving for the expression at ";
     auto R = expr->getSourceRange();
@@ -1234,7 +1249,7 @@ ConstraintSystem::solveImpl(Expr *&expr,
     return SolutionKind::Error;
   }
 
-  if (getASTContext().LangOpts.DebugConstraintSolver) {
+  if (getASTContext().TypeCheckerOpts.DebugConstraintSolver) {
     auto &log = getASTContext().TypeCheckerDebug->getStream();
     log << "---Initial constraints for the given expression---\n";
     print(log, expr);
@@ -1258,7 +1273,7 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
   // Solve the system.
   solveImpl(solutions);
 
-  if (getASTContext().LangOpts.DebugConstraintSolver) {
+  if (getASTContext().TypeCheckerOpts.DebugConstraintSolver) {
     auto &log = getASTContext().TypeCheckerDebug->getStream();
     log << "---Solver statistics---\n";
     log << "Total number of scopes explored: " << solverState->NumStatesExplored << "\n";
@@ -1282,6 +1297,10 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
 
 void ConstraintSystem::solveImpl(SmallVectorImpl<Solution> &solutions) {
   assert(solverState);
+
+  setPhase(ConstraintSystemPhase::Solving);
+
+  SWIFT_DEFER { setPhase(ConstraintSystemPhase::Finalization); };
 
   // If constraint system failed while trying to
   // genenerate constraints, let's stop right here.
@@ -1392,7 +1411,7 @@ ConstraintSystem::filterDisjunction(
       continue;
     }
 
-    if (ctx.LangOpts.DebugConstraintSolver) {
+    if (ctx.TypeCheckerOpts.DebugConstraintSolver) {
       auto &log = ctx.TypeCheckerDebug->getStream();
       log.indent(solverState ? solverState->depth * 2 + 2 : 0)
         << "(disabled disjunction term ";
@@ -1434,7 +1453,7 @@ ConstraintSystem::filterDisjunction(
       // Early simplification of the "keypath dynamic member lookup" choice
       // is impossible because it requires constraints associated with
       // subscript index expression to be present.
-      if (!solverState)
+      if (Phase == ConstraintSystemPhase::ConstraintGeneration)
         return SolutionKind::Unsolved;
 
       for (auto *currentChoice : disjunction->getNestedConstraints()) {
@@ -1453,7 +1472,7 @@ ConstraintSystem::filterDisjunction(
       recordDisjunctionChoice(disjunction->getLocator(), choiceIdx);
     }
 
-    if (ctx.LangOpts.DebugConstraintSolver) {
+    if (ctx.TypeCheckerOpts.DebugConstraintSolver) {
       auto &log = ctx.TypeCheckerDebug->getStream();
       log.indent(solverState ? solverState->depth * 2 + 2 : 0)
         << "(introducing single enabled disjunction term ";
@@ -2150,7 +2169,7 @@ void ConstraintSystem::partitionDisjunction(
   }
 
   // Partition SIMD operators.
-  if (!getASTContext().LangOpts.SolverEnableOperatorDesignatedTypes &&
+  if (!getASTContext().TypeCheckerOpts.SolverEnableOperatorDesignatedTypes &&
       isOperatorBindOverload(Choices[0])) {
     forEachChoice(Choices, [&](unsigned index, Constraint *constraint) -> bool {
       if (!isOperatorBindOverload(constraint))
@@ -2175,7 +2194,7 @@ void ConstraintSystem::partitionDisjunction(
         }
       };
 
-  if (getASTContext().LangOpts.SolverEnableOperatorDesignatedTypes &&
+  if (getASTContext().TypeCheckerOpts.SolverEnableOperatorDesignatedTypes &&
       isOperatorBindOverload(Choices[0])) {
     partitionForDesignatedTypes(Choices, forEachChoice, appendPartition);
   }
@@ -2210,7 +2229,7 @@ Constraint *ConstraintSystem::selectDisjunction() {
   // disjunctions that we may not be able to short-circuit, allowing
   // us to eliminate behavior that is exponential in the number of
   // operators in the expression.
-  if (getASTContext().LangOpts.SolverEnableOperatorDesignatedTypes) {
+  if (getASTContext().TypeCheckerOpts.SolverEnableOperatorDesignatedTypes) {
     if (auto *disjunction = selectApplyDisjunction())
       return disjunction;
   }

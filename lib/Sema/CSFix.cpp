@@ -69,16 +69,14 @@ ForceDowncast *ForceDowncast::create(ConstraintSystem &cs, Type fromType,
 }
 
 bool ForceOptional::diagnose(bool asNote) const {
-  MissingOptionalUnwrapFailure failure(getConstraintSystem(), BaseType,
-                                       UnwrappedType, getLocator());
+  MissingOptionalUnwrapFailure failure(getConstraintSystem(), getFromType(),
+                                       getToType(), getLocator());
   return failure.diagnose(asNote);
 }
 
-ForceOptional *ForceOptional::create(ConstraintSystem &cs, Type baseType,
-                                     Type unwrappedType,
-                                     ConstraintLocator *locator) {
-  return new (cs.getAllocator())
-      ForceOptional(cs, baseType, unwrappedType, locator);
+ForceOptional *ForceOptional::create(ConstraintSystem &cs, Type fromType,
+                                     Type toType, ConstraintLocator *locator) {
+  return new (cs.getAllocator()) ForceOptional(cs, fromType, toType, locator);
 }
 
 bool UnwrapOptionalBase::diagnose(bool asNote) const {
@@ -138,8 +136,6 @@ CoerceToCheckedCast *CoerceToCheckedCast::attempt(ConstraintSystem &cs,
   if (fromType->hasTypeVariable() || toType->hasTypeVariable())
     return nullptr;
 
-  auto &TC = cs.getTypeChecker();
-
   auto *expr = locator->getAnchor();
   if (auto *assignExpr = dyn_cast<AssignExpr>(expr))
     expr = assignExpr->getSrc();
@@ -149,9 +145,10 @@ CoerceToCheckedCast *CoerceToCheckedCast::attempt(ConstraintSystem &cs,
 
   auto subExpr = coerceExpr->getSubExpr();
   auto castKind =
-      TC.typeCheckCheckedCast(fromType, toType, CheckedCastContextKind::None,
-                              cs.DC, coerceExpr->getLoc(), subExpr,
-                              coerceExpr->getCastTypeLoc().getSourceRange());
+      TypeChecker::typeCheckCheckedCast(fromType, toType,
+                                        CheckedCastContextKind::None, cs.DC,
+                                        coerceExpr->getLoc(), subExpr,
+                                        coerceExpr->getCastTypeLoc().getSourceRange());
 
   // Invalid cast.
   if (castKind == CheckedCastKind::Unresolved)
@@ -703,39 +700,28 @@ CollectionElementContextualMismatch::create(ConstraintSystem &cs, Type srcType,
       CollectionElementContextualMismatch(cs, srcType, dstType, locator);
 }
 
-bool ExplicitlySpecifyGenericArguments::diagnose(bool asNote) const {
+bool DefaultGenericArgument::coalesceAndDiagnose(
+    ArrayRef<ConstraintFix *> fixes, bool asNote) const {
+  llvm::SmallVector<GenericTypeParamType *, 4> missingParams{Param};
+
+  for (auto *otherFix : fixes) {
+    if (auto *fix = otherFix->getAs<DefaultGenericArgument>())
+      missingParams.push_back(fix->Param);
+  }
+
   auto &cs = getConstraintSystem();
-  MissingGenericArgumentsFailure failure(cs, getParameters(),
-                                         getLocator());
+  MissingGenericArgumentsFailure failure(cs, missingParams, getLocator());
   return failure.diagnose(asNote);
 }
 
-ConstraintFix *
-ExplicitlySpecifyGenericArguments::coalescedWith(ArrayRef<ConstraintFix *> fixes) {
-  if (fixes.empty())
-    return this;
-
-  auto params = getParameters();
-  llvm::SmallVector<GenericTypeParamType *, 4> missingParams{params.begin(),
-                                                             params.end()};
-  for (auto *otherFix : fixes) {
-    if (auto *fix = otherFix->getAs<ExplicitlySpecifyGenericArguments>()) {
-      auto additionalParams = fix->getParameters();
-      missingParams.append(additionalParams.begin(), additionalParams.end());
-    }
-  }
-
-  return ExplicitlySpecifyGenericArguments::create(getConstraintSystem(),
-                                                   missingParams, getLocator());
+bool DefaultGenericArgument::diagnose(bool asNote) const {
+  return coalesceAndDiagnose({}, asNote);
 }
 
-ExplicitlySpecifyGenericArguments *ExplicitlySpecifyGenericArguments::create(
-    ConstraintSystem &cs, ArrayRef<GenericTypeParamType *> params,
-    ConstraintLocator *locator) {
-  unsigned size = totalSizeToAlloc<GenericTypeParamType *>(params.size());
-  void *mem = cs.getAllocator().Allocate(
-      size, alignof(ExplicitlySpecifyGenericArguments));
-  return new (mem) ExplicitlySpecifyGenericArguments(cs, params, locator);
+DefaultGenericArgument *
+DefaultGenericArgument::create(ConstraintSystem &cs, GenericTypeParamType *param,
+                               ConstraintLocator *locator) {
+  return new (cs.getAllocator()) DefaultGenericArgument(cs, param, locator);
 }
 
 SkipUnhandledConstructInFunctionBuilder *
@@ -791,8 +777,7 @@ bool AllowTupleSplatForSingleParameter::attempt(
   // Parameter type has to be either a tuple (with the same arity as
   // argument list), or a type variable.
   if (!(paramTy->is<TupleType>() &&
-        paramTy->castTo<TupleType>()->getNumElements() == args.size()) &&
-      !paramTy->is<TypeVariableType>())
+        paramTy->castTo<TupleType>()->getNumElements() == args.size()))
     return true;
 
   SmallVector<TupleTypeElt, 4> argElts;
@@ -804,9 +789,9 @@ bool AllowTupleSplatForSingleParameter::attempt(
     auto flags = arg.getParameterFlags();
 
     // In situations where there is a single labeled parameter
-    // we need to form a tuple with omits first label e.g.
+    // we need to form a tuple which omits the label e.g.
     //
-    // func foo<T>(x: T) {}
+    // func foo<T>(x: (T, T)) {}
     // foo(x: 0, 1)
     //
     // We'd want to suggest argument list to be `x: (0, 1)` instead

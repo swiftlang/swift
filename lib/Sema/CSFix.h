@@ -47,9 +47,11 @@ class Solution;
 
 /// Describes the kind of fix to apply to the given constraint before
 /// visiting it.
+///
+/// Note: values 0 and 1 are reserved for empty and tombstone kinds.
 enum class FixKind : uint8_t {
   /// Introduce a '!' to force an optional unwrap.
-  ForceOptional,
+  ForceOptional = 2,
 
   /// Unwrap an optional base when we have a member access.
   UnwrapOptionalBase,
@@ -181,10 +183,8 @@ enum class FixKind : uint8_t {
   /// function to `Void` to conform to expected result type.
   RemoveReturn,
 
-  /// Generic parameters could not be inferred and have to be explicitly
-  /// specified in the source. This fix groups all of the missing arguments
-  /// associated with single declaration.
-  ExplicitlySpecifyGenericArguments,
+  /// Default ambiguous generic arguments to \c Any
+  DefaultGenericArgument,
 
   /// Skip any unhandled constructs that occur within a closure argument that
   /// matches up with a
@@ -252,13 +252,17 @@ public:
 
   virtual std::string getName() const = 0;
 
-  /// Diagnose a failure associated with this fix given
-  /// root expression and information from constraint system.
-  virtual bool diagnose(bool asNote = false) const = 0;
-
-  virtual ConstraintFix *coalescedWith(ArrayRef<ConstraintFix *> fixes) {
-    return this;
+  /// Coalesce this fix with the given secondary fixes and diagnose the failure.
+  ///
+  /// The default implementation ignores \c secondaryFixes and calls
+  /// \c diagnose.
+  virtual bool coalesceAndDiagnose(ArrayRef<ConstraintFix *> secondaryFixes,
+                                   bool asNote = false) const {
+    return diagnose(asNote);
   }
+
+  /// Diagnose a failure associated with this fix.
+  virtual bool diagnose(bool asNote = false) const = 0;
 
   void print(llvm::raw_ostream &Out) const;
 
@@ -272,28 +276,6 @@ public:
 
 protected:
   ConstraintSystem &getConstraintSystem() const { return CS; }
-};
-
-/// Introduce a '!' to force an optional unwrap.
-class ForceOptional final : public ConstraintFix {
-  Type BaseType;
-  Type UnwrappedType;
-
-  ForceOptional(ConstraintSystem &cs, Type baseType, Type unwrappedType,
-                ConstraintLocator *locator)
-      : ConstraintFix(cs, FixKind::ForceOptional, locator), BaseType(baseType),
-        UnwrappedType(unwrappedType) {
-    assert(baseType && "Base type must not be null");
-    assert(unwrappedType && "Unwrapped type must not be null");
-  }
-
-public:
-  std::string getName() const override { return "force optional"; }
-
-  bool diagnose(bool asNote = false) const override;
-
-  static ForceOptional *create(ConstraintSystem &cs, Type baseType,
-                               Type unwrappedType, ConstraintLocator *locator);
 };
 
 /// Unwrap an optional base when we have a member access.
@@ -508,6 +490,26 @@ public:
 
   static ContextualMismatch *create(ConstraintSystem &cs, Type lhs, Type rhs,
                                     ConstraintLocator *locator);
+};
+
+/// Introduce a '!' to force an optional unwrap.
+class ForceOptional final : public ContextualMismatch {
+  ForceOptional(ConstraintSystem &cs, Type fromType, Type toType,
+                ConstraintLocator *locator)
+      : ContextualMismatch(cs, FixKind::ForceOptional, fromType, toType,
+                           locator) {
+    assert(fromType && "Base type must not be null");
+    assert(fromType->getOptionalObjectType() &&
+           "Unwrapped type must not be null");
+  }
+
+public:
+  std::string getName() const override { return "force optional"; }
+
+  bool diagnose(bool asNote = false) const override;
+
+  static ForceOptional *create(ConstraintSystem &cs, Type fromType, Type toType,
+                               ConstraintLocator *locator);
 };
 
 /// This is a contextual mismatch between throwing and non-throwing
@@ -1249,49 +1251,32 @@ public:
          ConstraintLocator *locator);
 };
 
-class ExplicitlySpecifyGenericArguments final
-    : public ConstraintFix,
-      private llvm::TrailingObjects<ExplicitlySpecifyGenericArguments,
-                                    GenericTypeParamType *> {
-  friend TrailingObjects;
+class DefaultGenericArgument final : public ConstraintFix {
+  GenericTypeParamType *Param;
 
-  unsigned NumMissingParams;
-
-  ExplicitlySpecifyGenericArguments(ConstraintSystem &cs,
-                                    ArrayRef<GenericTypeParamType *> params,
-                                    ConstraintLocator *locator)
-      : ConstraintFix(cs, FixKind::ExplicitlySpecifyGenericArguments, locator),
-        NumMissingParams(params.size()) {
-    assert(!params.empty());
-    std::uninitialized_copy(params.begin(), params.end(),
-                            getParametersBuf().begin());
-  }
+  DefaultGenericArgument(ConstraintSystem &cs, GenericTypeParamType *param,
+                         ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::DefaultGenericArgument, locator),
+        Param(param) {}
 
 public:
   static bool classof(const ConstraintFix *fix) {
-    return fix->getKind() == FixKind::ExplicitlySpecifyGenericArguments;
+    return fix->getKind() == FixKind::DefaultGenericArgument;
   }
 
   std::string getName() const override {
-    return "default missing generic arguments to `Any`";
+    auto paramName = Param->getString();
+    return "default generic argument '" + paramName + "' to 'Any'";
   }
 
-  ArrayRef<GenericTypeParamType *> getParameters() const {
-    return {getTrailingObjects<GenericTypeParamType *>(), NumMissingParams};
-  }
+  bool coalesceAndDiagnose(ArrayRef<ConstraintFix *> secondaryFixes,
+                           bool asNote = false) const override;
 
   bool diagnose(bool asNote = false) const override;
 
-  ConstraintFix *coalescedWith(ArrayRef<ConstraintFix *> fixes) override;
-
-  static ExplicitlySpecifyGenericArguments *
-  create(ConstraintSystem &cs, ArrayRef<GenericTypeParamType *> params,
-         ConstraintLocator *locator);
-
-private:
-  MutableArrayRef<GenericTypeParamType *> getParametersBuf() {
-    return {getTrailingObjects<GenericTypeParamType *>(), NumMissingParams};
-  }
+  static DefaultGenericArgument *create(ConstraintSystem &cs,
+                                        GenericTypeParamType *param,
+                                        ConstraintLocator *locator);
 };
 
 class SkipUnhandledConstructInFunctionBuilder final : public ConstraintFix {
@@ -1552,5 +1537,24 @@ public:
 
 } // end namespace constraints
 } // end namespace swift
+
+namespace llvm {
+  template <>
+  struct DenseMapInfo<swift::constraints::FixKind> {
+    using FixKind = swift::constraints::FixKind;
+    static inline FixKind getEmptyKey() {
+      return static_cast<FixKind>(0);
+    }
+    static inline FixKind getTombstoneKey() {
+      return static_cast<FixKind>(1);
+    }
+    static unsigned getHashValue(FixKind kind) {
+      return static_cast<unsigned>(kind);
+    }
+    static bool isEqual(FixKind lhs, FixKind rhs) {
+      return lhs == rhs;
+    }
+  };
+}
 
 #endif // SWIFT_SEMA_CSFIX_H

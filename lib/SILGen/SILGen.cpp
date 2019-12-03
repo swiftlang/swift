@@ -110,11 +110,12 @@ getBridgingFn(Optional<SILDeclRef> &cacheSlot,
     // Check that the function takes the expected arguments and returns the
     // expected result type.
     SILDeclRef c(fd);
-    auto funcTy = SGM.Types.getConstantFunctionType(c);
+    auto funcTy =
+        SGM.Types.getConstantFunctionType(TypeExpansionContext::minimal(), c);
     SILFunctionConventions fnConv(funcTy, SGM.M);
 
     auto toSILType = [&SGM](Type ty) {
-      return SGM.Types.getLoweredType(ty, ResilienceExpansion::Minimal);
+      return SGM.Types.getLoweredType(ty, TypeExpansionContext::minimal());
     };
 
     if (inputTypes) {
@@ -415,10 +416,10 @@ SILGenModule::getKeyPathProjectionCoroutine(bool isReadAccess,
                     : ParameterConvention::Indirect_In_Guaranteed },
   };
 
-  auto extInfo =
-    SILFunctionType::ExtInfo(SILFunctionTypeRepresentation::Thin,
-                             /*pseudogeneric*/false,
-                             /*non-escaping*/false);
+  auto extInfo = SILFunctionType::ExtInfo(
+      SILFunctionTypeRepresentation::Thin,
+      /*pseudogeneric*/ false,
+      /*non-escaping*/ false, DifferentiabilityKind::NonDifferentiable);
 
   auto functionTy = SILFunctionType::get(sig, extInfo,
                                          SILCoroutineKind::YieldOnce,
@@ -916,7 +917,6 @@ SILFunction *SILGenModule::emitClosure(AbstractClosureExpr *ce) {
   // initializer of the containing type.
   if (!f->isExternalDeclaration())
     return f;
-
   preEmitFunction(constant, ce, f, ce);
   PrettyStackTraceSILFunction X("silgen closureexpr", f);
   SILGenFunction(*this, *f, ce).emitClosure(ce);
@@ -947,8 +947,8 @@ bool SILGenModule::hasNonTrivialIVars(ClassDecl *cd) {
     auto *vd = dyn_cast<VarDecl>(member);
     if (!vd || !vd->hasStorage()) continue;
 
-    auto &ti = Types.getTypeLowering(vd->getType(),
-                                     ResilienceExpansion::Maximal);
+    auto &ti = Types.getTypeLowering(
+        vd->getType(), TypeExpansionContext::maximalResilienceExpansionOnly());
     if (!ti.isTrivial())
       return true;
   }
@@ -1060,7 +1060,7 @@ void SILGenModule::emitDefaultArgGenerator(SILDeclRef constant,
     llvm_unreachable("No default argument here?");
 
   case DefaultArgumentKind::Normal: {
-    auto arg = param->getDefaultValue();
+    auto arg = param->getTypeCheckedDefaultExpr();
     emitOrDelayFunction(*this, constant,
         [this,constant,arg,initDC](SILFunction *f) {
       preEmitFunction(constant, arg, f, arg);
@@ -1170,7 +1170,7 @@ SILFunction *SILGenModule::emitLazyGlobalInitializer(StringRef funcName,
   Type initType = FunctionType::get({}, TupleType::getEmpty(C),
                                     type->getExtInfo());
   auto initSILType = cast<SILFunctionType>(
-      Types.getLoweredRValueType(initType));
+      Types.getLoweredRValueType(TypeExpansionContext::minimal(), initType));
 
   SILGenFunctionBuilder builder(*this);
   auto *f = builder.createFunction(
@@ -1354,11 +1354,12 @@ SILGenModule::canStorageUseStoredKeyPathComponent(AbstractStorageDecl *decl,
     if (auto genericEnv =
               decl->getInnermostDeclContext()->getGenericEnvironmentOfContext())
       componentObjTy = genericEnv->mapTypeIntoContext(componentObjTy);
-    auto storageTy = M.Types.getSubstitutedStorageType(decl, componentObjTy);
-    auto opaqueTy =
-      M.Types.getLoweredRValueType(AbstractionPattern::getOpaque(),
-                                   componentObjTy);
-    
+    auto storageTy = M.Types.getSubstitutedStorageType(
+        TypeExpansionContext::minimal(), decl, componentObjTy);
+    auto opaqueTy = M.Types.getLoweredRValueType(
+        TypeExpansionContext::noOpaqueTypeArchetypesSubstitution(expansion),
+        AbstractionPattern::getOpaque(), componentObjTy);
+
     return storageTy.getASTType() == opaqueTy;
   }
   case AccessStrategy::DirectToAccessor:
@@ -1688,7 +1689,7 @@ void SILGenModule::emitSourceFile(SourceFile *sf) {
 std::unique_ptr<SILModule>
 SILModule::constructSIL(ModuleDecl *mod, TypeConverter &tc,
                         SILOptions &options, FileUnit *SF) {
-  SharedTimer timer("SILGen");
+  FrontendStatsTracer tracer(mod->getASTContext().Stats, "SILGen");
   const DeclContext *DC;
   if (SF) {
     DC = SF;

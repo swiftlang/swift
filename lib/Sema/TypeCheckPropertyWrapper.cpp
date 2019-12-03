@@ -167,13 +167,13 @@ findSuitableWrapperInit(ASTContext &ctx, NominalTypeDecl *nominal,
       if (!argumentParam)
         continue;
 
-      if (!argumentParam->hasInterfaceType())
-        continue;
-
       if (argumentParam->isInOut() || argumentParam->isVariadic())
         continue;
 
       auto paramType = argumentParam->getInterfaceType();
+      if (paramType->is<ErrorType>())
+        continue;
+
       if (argumentParam->isAutoClosure()) {
         if (auto *fnType = paramType->getAs<FunctionType>())
           paramType = fnType->getResult();
@@ -491,7 +491,7 @@ AttachedPropertyWrapperTypeRequest::evaluate(Evaluator &evaluator,
     return Type();
 
   ASTContext &ctx = var->getASTContext();
-  if (!ctx.getLegacyGlobalTypeChecker())
+  if (!ctx.areSemanticQueriesEnabled())
     return nullptr;
 
   auto resolution =
@@ -527,18 +527,17 @@ PropertyWrapperBackingPropertyTypeRequest::evaluate(
     return Type();
 
   ASTContext &ctx = var->getASTContext();
-  if (!ctx.getLegacyGlobalTypeChecker())
+  if (!ctx.areSemanticQueriesEnabled())
     return Type();
 
   // If there's an initializer of some sort, checking it will determine the
   // property wrapper type.
   unsigned index = binding->getPatternEntryIndexForVarDecl(var);
-  TypeChecker &tc = *ctx.getLegacyGlobalTypeChecker();
   if (binding->isInitialized(index)) {
     // FIXME(InterfaceTypeRequest): Remove this.
     (void)var->getInterfaceType();
     if (!binding->isInitializerChecked(index))
-      tc.typeCheckPatternBinding(binding, index);
+      TypeChecker::typeCheckPatternBinding(binding, index);
 
     Type type = ctx.getSideCachedPropertyWrapperBackingPropertyType(var);
     assert(type || ctx.Diags.hadAnyError());
@@ -547,12 +546,12 @@ PropertyWrapperBackingPropertyTypeRequest::evaluate(
 
   // Compute the type of the property to plug in to the wrapper type.
   Type propertyType = var->getType();
-  if (!propertyType || propertyType->hasError())
+  if (propertyType->hasError())
     return Type();
 
   using namespace constraints;
   auto dc = var->getInnermostDeclContext();
-  ConstraintSystem cs(tc, dc, None);
+  ConstraintSystem cs(dc, None);
   auto emptyLocator = cs.getConstraintLocator(nullptr);
   
   auto wrapperAttrs = var->getAttachedPropertyWrappers();

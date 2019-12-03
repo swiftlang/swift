@@ -322,7 +322,54 @@ struct Subscripts<T> {
   }
 }
 
-// CHECK-LABEL: sil hidden [ossa] @{{.*}}10subscripts
+struct SubscriptDefaults1 {
+  subscript(x: Int = 0) -> Int {
+    get { fatalError() }
+    set { fatalError() }
+  }
+  subscript(x: Int, y: Int, z: Int = 0) -> Int {
+    get { fatalError() }
+    set { fatalError() }
+  }
+  subscript(x: Bool, bool y: Bool = false) -> Bool {
+    get { fatalError() }
+    set { fatalError() }
+  }
+  subscript(bool x: Bool, y: Int, z: Int = 0) -> Int {
+    get { fatalError() }
+    set { fatalError() }
+  }
+}
+
+struct SubscriptDefaults2 {
+  subscript(x: Int? = nil) -> Int {
+    get { fatalError() }
+    set { fatalError() }
+  }
+}
+
+struct SubscriptDefaults3 {
+  subscript(x: Int = #line) -> Int {
+    get { fatalError() }
+    set { fatalError() }
+  }
+}
+
+struct SubscriptDefaults4 {
+  subscript<T : Numeric>(x x: T, y y: T = 0) -> T {
+    get { fatalError() }
+    set { fatalError() }
+  }
+}
+
+struct SubscriptDefaults5 {
+  subscript<T : ExpressibleByStringLiteral>(x x: T, y y: T =  #function) -> T {
+    get { fatalError() }
+    set { fatalError() }
+  }
+}
+
+// CHECK-LABEL: sil hidden [ossa] @{{.*}}10subscripts1x1y1syx_q_SStSHRzSHR_r0_lF
 func subscripts<T: Hashable, U: Hashable>(x: T, y: U, s: String) {
   _ = \Subscripts<T>.[]
   _ = \Subscripts<T>.[generic: x]
@@ -352,6 +399,57 @@ func subscripts<T: Hashable, U: Hashable>(x: T, y: U, s: String) {
 
   _ = \Subscripts<T>.[Bass()]
   _ = \Subscripts<T>.[Treble()]
+
+  _ = \SubscriptDefaults1.[]
+  _ = \SubscriptDefaults1.[0]
+  _ = \SubscriptDefaults1.[0, 0]
+  _ = \SubscriptDefaults1.[0, 0, 0]
+  _ = \SubscriptDefaults1.[false]
+  _ = \SubscriptDefaults1.[false, bool: false]
+  _ = \SubscriptDefaults1.[bool: false, 0]
+  _ = \SubscriptDefaults1.[bool: false, 0, 0]
+  
+  _ = \SubscriptDefaults2.[]
+  _ = \SubscriptDefaults2.[0]
+  _ = \SubscriptDefaults3.[]
+  _ = \SubscriptDefaults3.[0]
+  _ = \SubscriptDefaults4.[x: 0]
+  _ = \SubscriptDefaults4.[x: 0, y: 0]
+  _ = \SubscriptDefaults5.[x: ""]
+  _ = \SubscriptDefaults5.[x: "", y: ""]
+}
+
+// CHECK-LABEL: sil hidden [ossa] @{{.*}}check_default_subscripts
+func check_default_subscripts() {
+  // CHECK: [[INTX:%[0-9]+]] = integer_literal $Builtin.IntLiteral, 0
+  // CHECK: [[IX:%[0-9]+]] = apply %{{[0-9]+}}([[INTX]], {{.*}}
+  // CHECK: [[INTY:%[0-9]+]] = integer_literal $Builtin.IntLiteral, 0
+  // CHECK: [[IY:%[0-9]+]] = apply %{{[0-9]+}}([[INTY]], {{.*}}
+  // CHECK: [[KEYPATH:%[0-9]+]] = keypath $WritableKeyPath<SubscriptDefaults4, Int>, (root $SubscriptDefaults4; settable_property $Int, id @$s8keypaths18SubscriptDefaults4V1x1yxx_xtcSjRzluig : $@convention(method) <τ_0_0 where τ_0_0 : Numeric> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_0, SubscriptDefaults4) -> @out τ_0_0, getter @$s8keypaths18SubscriptDefaults4V1x1yxx_xtcSjRzluipACSiTK : $@convention(thin) (@in_guaranteed SubscriptDefaults4, UnsafeRawPointer) -> @out Int, setter @$s8keypaths18SubscriptDefaults4V1x1yxx_xtcSjRzluipACSiTk : $@convention(thin) (@in_guaranteed Int, @inout SubscriptDefaults4, UnsafeRawPointer) -> (), indices [%$0 : $Int : $Int, %$1 : $Int : $Int], indices_equals @$sS2iTH : $@convention(thin) (UnsafeRawPointer, UnsafeRawPointer) -> Bool, indices_hash @$sS2iTh : $@convention(thin) (UnsafeRawPointer) -> Int) ([[IX]], [[IY]])
+  _ = \SubscriptDefaults4.[x: 0, y: 0]
+
+  // CHECK: [[INTINIT:%[0-9]+]] = integer_literal $Builtin.IntLiteral, 0
+  // CHECK: [[I:%[0-9]+]] = apply %{{[0-9]+}}([[INTINIT]], {{.*}}
+  // CHECK: [[DFN:%[0-9]+]] = function_ref @$s8keypaths18SubscriptDefaults4V1x1yxx_xtcSjRzluipfA0_ : $@convention(thin) <τ_0_0 where τ_0_0 : Numeric> () -> @out τ_0_0
+  // CHECK: [[ALLOC:%[0-9]+]] = alloc_stack $Int
+  // CHECK: apply [[DFN]]<Int>([[ALLOC]]) : $@convention(thin) <τ_0_0 where τ_0_0 : Numeric> () -> @out τ_0_0
+  // CHECK: [[LOAD:%[0-9]+]] = load [trivial] [[ALLOC]] : $*Int
+  // CHECK: [[KEYPATH:%[0-9]+]] = keypath $WritableKeyPath<SubscriptDefaults4, Int>, (root $SubscriptDefaults4; settable_property $Int, id @$s8keypaths18SubscriptDefaults4V1x1yxx_xtcSjRzluig : $@convention(method) <τ_0_0 where τ_0_0 : Numeric> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_0, SubscriptDefaults4) -> @out τ_0_0, getter @$s8keypaths18SubscriptDefaults4V1x1yxx_xtcSjRzluipACSiTK : $@convention(thin) (@in_guaranteed SubscriptDefaults4, UnsafeRawPointer) -> @out Int, setter @$s8keypaths18SubscriptDefaults4V1x1yxx_xtcSjRzluipACSiTk : $@convention(thin) (@in_guaranteed Int, @inout SubscriptDefaults4, UnsafeRawPointer) -> (), indices [%$0 : $Int : $Int, %$1 : $Int : $Int], indices_equals @$sS2iTH : $@convention(thin) (UnsafeRawPointer, UnsafeRawPointer) -> Bool, indices_hash @$sS2iTh : $@convention(thin) (UnsafeRawPointer) -> Int) ([[I]], [[LOAD]])
+  _ = \SubscriptDefaults4.[x: 0]
+  
+  // CHECK: [[STRX_LIT:%[0-9]+]] = string_literal utf8 ""
+  // CHECK: [[STRX:%[0-9]+]] = apply %{{[0-9]+}}([[STRX_LIT]], {{.*}}
+  // CHECK: [[STRY_LIT:%[0-9]+]] = string_literal utf8 "check_default_subscripts()"
+  // CHECK: [[DEF_ARG:%[0-9]+]] = apply %{{[0-9]+}}([[STRY_LIT]], {{.*}}
+  // CHECK: keypath $WritableKeyPath<SubscriptDefaults5, String>, (root $SubscriptDefaults5; settable_property $String, id @$s8keypaths18SubscriptDefaults5V1x1yxx_xtcs26ExpressibleByStringLiteralRzluig : $@convention(method) <τ_0_0 where τ_0_0 : ExpressibleByStringLiteral> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_0, SubscriptDefaults5) -> @out τ_0_0, getter @$s8keypaths18SubscriptDefaults5V1x1yxx_xtcs26ExpressibleByStringLiteralRzluipACSSTK : $@convention(thin) (@in_guaranteed SubscriptDefaults5, UnsafeRawPointer) -> @out String, setter @$s8keypaths18SubscriptDefaults5V1x1yxx_xtcs26ExpressibleByStringLiteralRzluipACSSTk : $@convention(thin) (@in_guaranteed String, @inout SubscriptDefaults5, UnsafeRawPointer) -> (), indices [%$0 : $String : $String, %$1 : $String : $String], indices_equals @$sS2STH : $@convention(thin) (UnsafeRawPointer, UnsafeRawPointer) -> Bool, indices_hash @$sS2STh : $@convention(thin) (UnsafeRawPointer) -> Int) ([[STRX]], [[DEF_ARG]])
+  _ = \SubscriptDefaults5.[x: ""]
+  
+  // CHECK: [[STRX_LIT:%[0-9]+]] = string_literal utf8 ""
+  // CHECK: [[STRX:%[0-9]+]] = apply %{{[0-9]+}}([[STRX_LIT]], {{.*}}
+  // CHECK: [[STRY_LIT:%[0-9]+]] = string_literal utf8 ""
+  // CHECK: [[STRY:%[0-9]+]] = apply %{{[0-9]+}}([[STRY_LIT]], {{.*}}
+  // CHECK: keypath $WritableKeyPath<SubscriptDefaults5, String>, (root $SubscriptDefaults5; settable_property $String, id @$s8keypaths18SubscriptDefaults5V1x1yxx_xtcs26ExpressibleByStringLiteralRzluig : $@convention(method) <τ_0_0 where τ_0_0 : ExpressibleByStringLiteral> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_0, SubscriptDefaults5) -> @out τ_0_0, getter @$s8keypaths18SubscriptDefaults5V1x1yxx_xtcs26ExpressibleByStringLiteralRzluipACSSTK : $@convention(thin) (@in_guaranteed SubscriptDefaults5, UnsafeRawPointer) -> @out String, setter @$s8keypaths18SubscriptDefaults5V1x1yxx_xtcs26ExpressibleByStringLiteralRzluipACSSTk : $@convention(thin) (@in_guaranteed String, @inout SubscriptDefaults5, UnsafeRawPointer) -> (), indices [%$0 : $String : $String, %$1 : $String : $String], indices_equals @$sS2STH : $@convention(thin) (UnsafeRawPointer, UnsafeRawPointer) -> Bool, indices_hash @$sS2STh : $@convention(thin) (UnsafeRawPointer) -> Int) ([[STRX]], [[STRY]])
+  _ = \SubscriptDefaults5.[x: "", y: ""]
 }
 
 // CHECK-LABEL: sil hidden [ossa] @{{.*}}subclass_generics

@@ -19,6 +19,7 @@
 
 #include "swift/Basic/ArrayRefView.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/NullablePtr.h"
 #include "swift/Basic/OutputFileMap.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Driver/Driver.h"
@@ -73,7 +74,66 @@ enum class PreserveOnSignal : bool {
   Yes
 };
 
+using CommandSet = llvm::SmallPtrSet<const Job *, 16>;
+
 class Compilation {
+public:
+  class IncrementalSchemeComparator {
+    const bool &EnableIncrementalBuild;
+    const bool EnableSourceRangeDependencies;
+    const bool &UseSourceRangeDependencies;
+
+    /// If not empty, the path to use to log the comparision.
+    const StringRef CompareIncrementalSchemesPath;
+
+    const unsigned SwiftInputCount;
+
+  public:
+    std::string WhyIncrementalWasDisabled = "";
+
+  private:
+    DiagnosticEngine &Diags;
+
+    CommandSet DependencyCompileJobs;
+    CommandSet SourceRangeCompileJobs;
+    CommandSet SourceRangeLackingSuppJobs;
+
+    unsigned DependencyCompileStages = 0;
+    unsigned SourceRangeCompileStages = 0;
+
+  public:
+    IncrementalSchemeComparator(const bool &EnableIncrementalBuild,
+                                bool EnableSourceRangeDependencies,
+                                const bool &UseSourceRangeDependencies,
+                                const StringRef CompareIncrementalSchemesPath,
+                                unsigned SwiftInputCount,
+                                DiagnosticEngine &Diags)
+        : EnableIncrementalBuild(EnableIncrementalBuild),
+          EnableSourceRangeDependencies(EnableSourceRangeDependencies),
+          UseSourceRangeDependencies(UseSourceRangeDependencies),
+          CompareIncrementalSchemesPath(CompareIncrementalSchemesPath),
+          SwiftInputCount(SwiftInputCount), Diags(Diags) {}
+
+    /// Record scheduled jobs in support of the
+    /// -compare-incremental-schemes[-path] options
+    ///
+    /// \param depJobs A vector-like collection of jobs that the dependency
+    /// scheme would run \param rangeJobs A vector-like collection of jobs that
+    /// the range scheme would run because of changes \param lackingSuppJobs A
+    /// vector-like collection of jobs that the range scheme would run because
+    /// there are no incremental supplementary outputs such as swiftdeps,
+    /// swiftranges, compiledsource
+    void update(const CommandSet &depJobs, const CommandSet &rangeJobs,
+                const CommandSet &lackingSuppJobs);
+
+    /// Write the information for the -compare-incremental-schemes[-path]
+    /// options
+    void outputComparison() const;
+
+  private:
+    void outputComparison(llvm::raw_ostream &) const;
+  };
+
 public:
   /// The filelist threshold value to pass to ensure file lists are never used
   static const size_t NEVER_USE_FILELIST = SIZE_MAX;
@@ -220,6 +280,17 @@ private:
   /// Experiment with inter-file dependencies
   const bool ExperimentalDependenciesIncludeIntrafileOnes;
 
+  /// Experiment with source-range-based dependencies
+  const bool EnableSourceRangeDependencies;
+
+  /// May not actually use them if e.g. there is a new input
+  bool UseSourceRangeDependencies = false;
+
+public:
+  /// Will contain a comparator if an argument demands it.
+  Optional<IncrementalSchemeComparator> IncrementalComparator;
+
+private:
   template <typename T>
   static T *unwrap(const std::unique_ptr<T> &p) {
     return p.get();
@@ -253,7 +324,10 @@ public:
               bool EnableExperimentalDependencies = false,
               bool VerifyExperimentalDependencyGraphAfterEveryImport = false,
               bool EmitExperimentalDependencyDotFileAfterEveryImport = false,
-              bool ExperimentalDependenciesIncludeIntrafileOnes = false);
+              bool ExperimentalDependenciesIncludeIntrafileOnes = false,
+              bool EnableSourceRangeDependencies = false,
+              bool CompareIncrementalSchemes = false,
+              StringRef CompareIncrementalSchemesPath = "");
   // clang-format on
   ~Compilation();
 
@@ -285,6 +359,11 @@ public:
   }
   Job *addJob(std::unique_ptr<Job> J);
 
+  /// To send job list to places that don't truck in fancy array views.
+  std::vector<const Job *> getJobsSimply() const {
+    return std::vector<const Job *>(getJobs().begin(), getJobs().end());
+  }
+
   void addTemporaryFile(StringRef file,
                         PreserveOnSignal preserve = PreserveOnSignal::No) {
     TempFilePaths[file] = preserve;
@@ -305,9 +384,7 @@ public:
   bool getIncrementalBuildEnabled() const {
     return EnableIncrementalBuild;
   }
-  void disableIncrementalBuild() {
-    EnableIncrementalBuild = false;
-  }
+  void disableIncrementalBuild(Twine why);
 
   bool getEnableExperimentalDependencies() const {
     return EnableExperimentalDependencies;
@@ -323,6 +400,18 @@ public:
 
   bool getExperimentalDependenciesIncludeIntrafileOnes() const {
     return ExperimentalDependenciesIncludeIntrafileOnes;
+  }
+
+  bool getEnableSourceRangeDependencies() const {
+    return EnableSourceRangeDependencies;
+  }
+
+  bool getUseSourceRangeDependencies() const {
+    return UseSourceRangeDependencies;
+  }
+
+  void setUseSourceRangeDependencies(bool use) {
+    UseSourceRangeDependencies = use;
   }
 
   bool getBatchModeEnabled() const {
@@ -419,6 +508,17 @@ public:
       PassedEmitLoadedModuleTraceToFrontendJob = true;
       return true;
     }
+  }
+
+  /// How many .swift input files?
+  unsigned countSwiftInputs() const;
+
+  void updateIncrementalComparison(const CommandSet &depJobs,
+                                   const CommandSet &rangeJobs,
+                                   const CommandSet &lackingSuppJobs) {
+    if (IncrementalComparator.hasValue())
+      IncrementalComparator.getValue().update(depJobs, rangeJobs,
+                                              lackingSuppJobs);
   }
 
 private:

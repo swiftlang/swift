@@ -1409,6 +1409,20 @@ FUNCTION(GetTypeByMangledNameInContext, swift_getTypeByMangledNameInContext,
          ARGS(Int8PtrTy, SizeTy, TypeContextDescriptorPtrTy, Int8PtrPtrTy),
          ATTRS(NoUnwind, ArgMemOnly))
 
+// const Metadata *swift_getTypeByMangledNameInContextInMetadataState(
+//                        size_t metadataState,
+//                        const char *typeNameStart,
+//                        size_t typeNameLength,
+//                        const TargetContextDescriptor<InProcess> *context,
+//                        const void * const *genericArgs)
+FUNCTION(GetTypeByMangledNameInContextInMetadataState,
+         swift_getTypeByMangledNameInContextInMetadataState, SwiftCC,
+         GetTypesInAbstractMetadataStateAvailability,
+         RETURNS(TypeMetadataPtrTy),
+         ARGS(SizeTy, Int8PtrTy, SizeTy, TypeContextDescriptorPtrTy,
+              Int8PtrPtrTy),
+         ATTRS(NoUnwind, ArgMemOnly))
+
 #undef RETURNS
 #undef ARGS
 #undef ATTRS

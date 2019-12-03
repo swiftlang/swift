@@ -18,6 +18,7 @@
 
 #include "ConstraintSystem.h"
 #include "MiscDiagnostics.h"
+#include "SolutionResult.h"
 #include "TypeChecker.h"
 #include "TypeCheckType.h"
 #include "TypoCorrection.h"
@@ -68,13 +69,12 @@ void TypeVariableType::Implementation::print(llvm::raw_ostream &OS) {
 }
 
 SavedTypeVariableBinding::SavedTypeVariableBinding(TypeVariableType *typeVar)
-  : TypeVarAndOptions(typeVar, typeVar->getImpl().getRawOptions()),
+  : TypeVar(typeVar), Options(typeVar->getImpl().getRawOptions()),
     ParentOrFixed(typeVar->getImpl().ParentOrFixed) { }
 
 void SavedTypeVariableBinding::restore() {
-  auto *typeVar = getTypeVariable();
-  typeVar->getImpl().setRawOptions(getOptions());
-  typeVar->getImpl().ParentOrFixed = ParentOrFixed;
+  TypeVar->getImpl().setRawOptions(Options);
+  TypeVar->getImpl().ParentOrFixed = ParentOrFixed;
 }
 
 GenericTypeParamType *
@@ -911,7 +911,8 @@ namespace {
   class PreCheckExpression : public ASTWalker {
     ASTContext &Ctx;
     DeclContext *DC;
-
+    ConstraintSystem *BaseCS;
+    
     Expr *ParentExpr;
 
     /// A stack of expressions being walked, used to determine where to
@@ -1053,17 +1054,14 @@ namespace {
     }
 
   public:
-    PreCheckExpression(DeclContext *dc, Expr *parent)
-        : Ctx(dc->getASTContext()), DC(dc), ParentExpr(parent) {}
+    PreCheckExpression(DeclContext *dc, Expr *parent, ConstraintSystem *base)
+        : Ctx(dc->getASTContext()), DC(dc), BaseCS(base), ParentExpr(parent) {}
 
     ASTContext &getASTContext() const { return Ctx; }
 
     bool walkToClosureExprPre(ClosureExpr *expr);
 
     std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
-      // FIXME: Remove TypeChecker dependencies below.
-      auto &TC = *Ctx.getLegacyGlobalTypeChecker();
-
       // If this is a call, record the argument expression.
       if (auto call = dyn_cast<ApplyExpr>(expr)) {
         if (!isa<SelfApplyExpr>(expr)) {
@@ -1116,8 +1114,8 @@ namespace {
       if (auto captureList = dyn_cast<CaptureListExpr>(expr)) {
         // Validate the capture list.
         for (auto capture : captureList->getCaptureList()) {
-          TC.typeCheckDecl(capture.Init);
-          TC.typeCheckDecl(capture.Var);
+          TypeChecker::typeCheckDecl(capture.Init);
+          TypeChecker::typeCheckDecl(capture.Var);
         }
 
         // Since closure expression is contained by capture list
@@ -1160,8 +1158,8 @@ namespace {
         if (expr->isImplicit())
           return finish(true, expr);
 
-        if (TC.isExprBeingDiagnosed(ParentExpr) ||
-            TC.isExprBeingDiagnosed(expr))
+        if (BaseCS && (BaseCS->isExprBeingDiagnosed(ParentExpr) ||
+                       BaseCS->isExprBeingDiagnosed(expr)))
           return finish(true, expr);
 
         auto parents = ParentExpr->getParentMap();
@@ -2013,8 +2011,9 @@ Expr *PreCheckExpression::simplifyTypeConstructionWithLiteralArg(Expr *E) {
 
 /// Pre-check the expression, validating any types that occur in the
 /// expression and folding sequence expressions.
-bool TypeChecker::preCheckExpression(Expr *&expr, DeclContext *dc) {
-  PreCheckExpression preCheck(dc, expr);
+bool ConstraintSystem::preCheckExpression(Expr *&expr, DeclContext *dc,
+                                          ConstraintSystem *baseCS) {
+  PreCheckExpression preCheck(dc, expr, baseCS);
   // Perform the pre-check.
   if (auto result = expr->walk(preCheck)) {
     expr = result;
@@ -2159,6 +2158,7 @@ Type TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
                                       TypeCheckExprOptions options,
                                       ExprTypeCheckListener *listener,
                                       ConstraintSystem *baseCS) {
+  auto &Context = dc->getASTContext();
   FallbackDiagnosticListener diagListener(Context, options, listener);
   return typeCheckExpressionImpl(expr, dc, convertType, convertTypePurpose,
                                  options, diagListener, baseCS);
@@ -2170,12 +2170,13 @@ Type TypeChecker::typeCheckExpressionImpl(Expr *&expr, DeclContext *dc,
                                           TypeCheckExprOptions options,
                                           ExprTypeCheckListener &listener,
                                           ConstraintSystem *baseCS) {
+  auto &Context = dc->getASTContext();
   FrontendStatsTracer StatsTracer(Context.Stats, "typecheck-expr", expr);
   PrettyStackTraceExpr stackTrace(Context, "type-checking", expr);
 
   // First, pre-check the expression, validating any types that occur in the
   // expression and folding sequence expressions.
-  if (preCheckExpression(expr, dc)) {
+  if (ConstraintSystem::preCheckExpression(expr, dc, baseCS)) {
     listener.preCheckFailed(expr);
     return Type();
   }
@@ -2183,7 +2184,7 @@ Type TypeChecker::typeCheckExpressionImpl(Expr *&expr, DeclContext *dc,
   // Construct a constraint system from this expression.
   ConstraintSystemOptions csOptions = ConstraintSystemFlags::AllowFixes;
 
-  if (DiagnosticSuppression::isEnabled(Diags))
+  if (DiagnosticSuppression::isEnabled(Context.Diags))
     csOptions |= ConstraintSystemFlags::SuppressDiagnostics;
 
   if (options.contains(TypeCheckExprFlags::AllowUnresolvedTypeVariables))
@@ -2195,7 +2196,7 @@ Type TypeChecker::typeCheckExpressionImpl(Expr *&expr, DeclContext *dc,
   if (options.contains(TypeCheckExprFlags::SubExpressionDiagnostics))
     csOptions |= ConstraintSystemFlags::SubExpressionDiagnostics;
 
-  ConstraintSystem cs(*this, dc, csOptions, expr);
+  ConstraintSystem cs(dc, csOptions);
   cs.baseCS = baseCS;
 
   // Verify that a purpose was specified if a convertType was.  Note that it is
@@ -2259,6 +2260,9 @@ Type TypeChecker::typeCheckExpressionImpl(Expr *&expr, DeclContext *dc,
   if (!result)
     return Type();
 
+  // Apply this solution to the constraint system.
+  cs.applySolution(solution);
+
   // Apply the solution to the expression.
   result = cs.applySolution(
       solution, result, convertType.getType(),
@@ -2276,7 +2280,7 @@ Type TypeChecker::typeCheckExpressionImpl(Expr *&expr, DeclContext *dc,
   if (!result)
     return Type();
 
-  if (getLangOpts().DebugConstraintSolver) {
+  if (Context.TypeCheckerOpts.DebugConstraintSolver) {
     auto &log = Context.TypeCheckerDebug->getStream();
     log << "---Type-checked expression---\n";
     result->dump(log);
@@ -2302,24 +2306,21 @@ Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
 
   if (isAutoClosure) {
     class AutoClosureListener : public ExprTypeCheckListener {
-      DeclContext *DC;
       FunctionType *ParamType;
 
     public:
-      AutoClosureListener(DeclContext *DC, FunctionType *paramType)
-          : DC(DC), ParamType(paramType) {}
+      AutoClosureListener(FunctionType *paramType)
+          : ParamType(paramType) {}
 
       Expr *appliedSolution(constraints::Solution &solution,
                             Expr *expr) override {
         auto &cs = solution.getConstraintSystem();
-        auto *closure = cs.TC.buildAutoClosureExpr(DC, expr, ParamType);
-        cs.cacheExprTypes(closure);
-        return closure;
+        return cs.buildAutoClosureExpr(expr, ParamType);
       }
     };
 
     auto *fnType = paramType->castTo<FunctionType>();
-    AutoClosureListener listener(DC, fnType);
+    AutoClosureListener listener(fnType);
     return typeCheckExpression(defaultValue, DC,
                                TypeLoc::withoutLoc(fnType->getResult()),
                                canFail ? CTP_DefaultParameter : CTP_CannotFail,
@@ -2335,12 +2336,13 @@ getTypeOfExpressionWithoutApplying(Expr *&expr, DeclContext *dc,
                                    ConcreteDeclRef &referencedDecl,
                                  FreeTypeVariableBinding allowFreeTypeVariables,
                                    ExprTypeCheckListener *listener) {
+  auto &Context = dc->getASTContext();
   FrontendStatsTracer StatsTracer(Context.Stats, "typecheck-expr-no-apply", expr);
   PrettyStackTraceExpr stackTrace(Context, "type-checking", expr);
   referencedDecl = nullptr;
 
   // Construct a constraint system from this expression.
-  ConstraintSystem cs(*this, dc, ConstraintSystemFlags::SuppressDiagnostics);
+  ConstraintSystem cs(dc, ConstraintSystemFlags::SuppressDiagnostics);
 
   // Attempt to solve the constraint system.
   SmallVector<Solution, 4> viable;
@@ -2417,6 +2419,7 @@ void TypeChecker::getPossibleTypesOfExpressionWithoutApplying(
     Expr *&expr, DeclContext *dc, SmallPtrSetImpl<TypeBase *> &types,
     FreeTypeVariableBinding allowFreeTypeVariables,
     ExprTypeCheckListener *listener) {
+  auto &Context = dc->getASTContext();
   FrontendStatsTracer StatsTracer(Context.Stats, "get-possible-types-no-apply", expr);
   PrettyStackTraceExpr stackTrace(Context, "type-checking", expr);
 
@@ -2425,7 +2428,7 @@ void TypeChecker::getPossibleTypesOfExpressionWithoutApplying(
   options |= ConstraintSystemFlags::ReturnAllDiscoveredSolutions;
   options |= ConstraintSystemFlags::SuppressDiagnostics;
 
-  ConstraintSystem cs(*this, dc, options);
+  ConstraintSystem cs(dc, options);
 
   // Attempt to solve the constraint system.
   SmallVector<Solution, 4> viable;
@@ -2445,7 +2448,7 @@ void TypeChecker::getPossibleTypesOfExpressionWithoutApplying(
 }
 
 static FunctionType *
-getTypeOfCompletionOperatorImpl(TypeChecker &TC, DeclContext *DC, Expr *expr,
+getTypeOfCompletionOperatorImpl(DeclContext *DC, Expr *expr,
                                 ConcreteDeclRef &referencedDecl) {
   auto &Context = DC->getASTContext();
 
@@ -2458,12 +2461,12 @@ getTypeOfCompletionOperatorImpl(TypeChecker &TC, DeclContext *DC, Expr *expr,
   options |= ConstraintSystemFlags::ReusePrecheckedType;
 
   // Construct a constraint system from this expression.
-  ConstraintSystem CS(TC, DC, options);
+  ConstraintSystem CS(DC, options);
   expr = CS.generateConstraints(expr);
   if (!expr)
     return nullptr;
 
-  if (TC.getLangOpts().DebugConstraintSolver) {
+  if (Context.TypeCheckerOpts.DebugConstraintSolver) {
     auto &log = Context.TypeCheckerDebug->getStream();
     log << "---Initial constraints for the given expression---\n";
     expr->dump(log);
@@ -2477,7 +2480,7 @@ getTypeOfCompletionOperatorImpl(TypeChecker &TC, DeclContext *DC, Expr *expr,
     return nullptr;
 
   auto &solution = viable[0];
-  if (TC.getLangOpts().DebugConstraintSolver) {
+  if (Context.TypeCheckerOpts.DebugConstraintSolver) {
     auto &log = Context.TypeCheckerDebug->getStream();
     log << "---Solution---\n";
     solution.dump(log);
@@ -2512,7 +2515,7 @@ TypeChecker::getTypeOfCompletionOperator(DeclContext *DC, Expr *LHS,
 
   // For the infix operator, find the actual LHS from pre-folded LHS.
   if (refKind == DeclRefKind::BinaryOperator)
-    LHS = findLHS(DC, LHS, opName);
+    LHS = TypeChecker::findLHS(DC, LHS, opName);
 
   if (!LHS)
     return nullptr;
@@ -2545,7 +2548,7 @@ TypeChecker::getTypeOfCompletionOperator(DeclContext *DC, Expr *LHS,
     ParenExpr Args(SourceLoc(), LHS, SourceLoc(),
                    /*hasTrailingClosure=*/false);
     PostfixUnaryExpr postfixExpr(opExpr, &Args);
-    return getTypeOfCompletionOperatorImpl(*this, DC, &postfixExpr,
+    return getTypeOfCompletionOperatorImpl(DC, &postfixExpr,
                                            referencedDecl);
   }
 
@@ -2557,11 +2560,11 @@ TypeChecker::getTypeOfCompletionOperator(DeclContext *DC, Expr *LHS,
     //     (code_completion_expr)))
     CodeCompletionExpr dummyRHS(Loc);
     auto Args = TupleExpr::create(
-        Context, SourceLoc(), {LHS, &dummyRHS}, {}, {}, SourceLoc(),
+        DC->getASTContext(), SourceLoc(), {LHS, &dummyRHS}, {}, {}, SourceLoc(),
         /*hasTrailingClosure=*/false, /*isImplicit=*/true);
     BinaryExpr binaryExpr(opExpr, Args, /*isImplicit=*/true);
 
-    return getTypeOfCompletionOperatorImpl(*this, DC, &binaryExpr,
+    return getTypeOfCompletionOperatorImpl(DC, &binaryExpr,
                                            referencedDecl);
   }
 
@@ -2756,6 +2759,7 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
     }
   };
 
+  auto &Context = DC->getASTContext();
   BindingListener listener(Context, pattern, initializer);
   if (!initializer)
     return true;
@@ -2856,7 +2860,7 @@ bool TypeChecker::typeCheckPatternBinding(PatternBindingDecl *PBD,
       DC = initContext;
   }
 
-  bool hadError = typeCheckBinding(pattern, init, DC);
+  bool hadError = TypeChecker::typeCheckBinding(pattern, init, DC);
   if (!init) {
     PBD->setInvalid();
     return true;
@@ -2965,7 +2969,6 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
     Expr *appliedSolution(Solution &solution, Expr *expr) override {
       // Figure out what types the constraints decided on.
       auto &cs = solution.getConstraintSystem();
-      auto &tc = cs.getTypeChecker();
       InitType = solution.simplifyType(InitType);
       SequenceType = solution.simplifyType(SequenceType);
 
@@ -2980,8 +2983,9 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
       Pattern *pattern = Stmt->getPattern();
       TypeResolutionOptions options(TypeResolverContext::ForEachStmt);
       options |= TypeResolutionFlags::OverrideType;
-      if (tc.coercePatternToType(pattern, TypeResolution::forContextual(cs.DC),
-                                 InitType, options)) {
+      if (TypeChecker::coercePatternToType(pattern,
+                                           TypeResolution::forContextual(cs.DC),
+                                           InitType, options)) {
         return nullptr;
       }
 
@@ -2998,7 +3002,7 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
   assert(seq && "type-checking an uninitialized for-each statement?");
 
   // Type-check the for-each loop sequence and element pattern.
-  auto resultTy = typeCheckExpression(seq, dc, &listener);
+  auto resultTy = TypeChecker::typeCheckExpression(seq, dc, &listener);
   return !resultTy;
 }
 
@@ -3006,15 +3010,15 @@ bool TypeChecker::typeCheckCondition(Expr *&expr, DeclContext *dc) {
   // If this expression is already typechecked and has type Bool, then just
   // re-typecheck it.
   if (expr->getType() && expr->getType()->isBool()) {
-    auto resultTy = typeCheckExpression(expr, dc);
+    auto resultTy = TypeChecker::typeCheckExpression(expr, dc);
     return !resultTy;
   }
 
-  auto *boolDecl = Context.getBoolDecl();
+  auto *boolDecl = dc->getASTContext().getBoolDecl();
   if (!boolDecl)
     return true;
 
-  auto resultTy = typeCheckExpression(
+  auto resultTy = TypeChecker::typeCheckExpression(
       expr, dc, TypeLoc::withoutLoc(boolDecl->getDeclaredType()),
       CTP_Condition);
   return !resultTy;
@@ -3022,6 +3026,7 @@ bool TypeChecker::typeCheckCondition(Expr *&expr, DeclContext *dc) {
 
 bool TypeChecker::typeCheckStmtCondition(StmtCondition &cond, DeclContext *dc,
                                          Diag<> diagnosticForAlwaysTrue) {
+  auto &Context = dc->getASTContext();
   bool hadError = false;
   bool hadAnyFalsable = false;
   for (auto &elt : cond) {
@@ -3067,7 +3072,7 @@ bool TypeChecker::typeCheckStmtCondition(StmtCondition &cond, DeclContext *dc,
     TypeResolutionOptions options(TypeResolverContext::InExpression);
     options |= TypeResolutionFlags::AllowUnspecifiedTypes;
     options |= TypeResolutionFlags::AllowUnboundGenerics;
-    if (typeCheckPattern(pattern, dc, options)) {
+    if (TypeChecker::typeCheckPattern(pattern, dc, options)) {
       typeCheckPatternFailed();
       continue;
     }
@@ -3075,7 +3080,7 @@ bool TypeChecker::typeCheckStmtCondition(StmtCondition &cond, DeclContext *dc,
     // If the pattern didn't get a type, it's because we ran into some
     // unknown types along the way. We'll need to check the initializer.
     auto init = elt.getInitializer();
-    hadError |= typeCheckBinding(pattern, init, dc);
+    hadError |= TypeChecker::typeCheckBinding(pattern, init, dc);
     elt.setPattern(pattern);
     elt.setInitializer(init);
     hadAnyFalsable |= pattern->isRefutablePattern();
@@ -3095,6 +3100,7 @@ bool TypeChecker::typeCheckStmtCondition(StmtCondition &cond, DeclContext *dc,
 /// value of a given type.
 bool TypeChecker::typeCheckExprPattern(ExprPattern *EP, DeclContext *DC,
                                        Type rhsType) {
+  auto &Context = DC->getASTContext();
   FrontendStatsTracer StatsTracer(Context.Stats, "typecheck-expr-pattern", EP);
   PrettyStackTracePattern stackTrace(Context, "type-checking", EP);
 
@@ -3238,7 +3244,7 @@ bool TypeChecker::typesSatisfyConstraint(Type type1, Type type2,
   assert(!type1->hasTypeVariable() && !type2->hasTypeVariable() &&
          "Unexpected type variable in constraint satisfaction testing");
 
-  ConstraintSystem cs(*this, dc, ConstraintSystemOptions());
+  ConstraintSystem cs(dc, ConstraintSystemOptions());
   if (openArchetypes) {
     type1 = replaceArchetypesWithTypeVariables(cs, type1);
     type2 = replaceArchetypesWithTypeVariables(cs, type2);
@@ -3293,7 +3299,8 @@ bool TypeChecker::isObjCBridgedTo(Type type1, Type type2, DeclContext *dc,
 }
 
 bool TypeChecker::checkedCastMaySucceed(Type t1, Type t2, DeclContext *dc) {
-  auto kind = typeCheckCheckedCast(t1, t2, CheckedCastContextKind::None, dc,
+  auto kind = TypeChecker::typeCheckCheckedCast(t1, t2,
+                                                CheckedCastContextKind::None, dc,
                                    SourceLoc(), nullptr, SourceRange());
   return (kind != CheckedCastKind::Unresolved);
 }
@@ -3432,7 +3439,7 @@ bool TypeChecker::convertToType(Expr *&expr, Type type, DeclContext *dc,
                                 Optional<Pattern*> typeFromPattern) {
   // TODO: need to add kind arg?
   // Construct a constraint system from this expression.
-  ConstraintSystem cs(*this, dc, ConstraintSystemFlags::AllowFixes);
+  ConstraintSystem cs(dc, ConstraintSystemFlags::AllowFixes);
     
   // Cache the expression type on the system to ensure it is available
   // on diagnostics if the convertion fails.
@@ -3443,7 +3450,8 @@ bool TypeChecker::convertToType(Expr *&expr, Type type, DeclContext *dc,
   cs.addConstraint(ConstraintKind::Conversion, expr->getType(), type,
                    cs.getConstraintLocator(expr));
 
-  if (getLangOpts().DebugConstraintSolver) {
+  auto &Context = dc->getASTContext();
+  if (Context.TypeCheckerOpts.DebugConstraintSolver) {
     auto &log = Context.TypeCheckerDebug->getStream();
     log << "---Initial constraints for the given expression---\n";
     expr->dump(log);
@@ -3453,13 +3461,34 @@ bool TypeChecker::convertToType(Expr *&expr, Type type, DeclContext *dc,
 
   // Attempt to solve the constraint system.
   SmallVector<Solution, 4> viable;
-  if ((cs.solve(viable) || viable.size() != 1) &&
-      cs.salvage(viable, expr)) {
-    return true;
+  if ((cs.solve(viable) || viable.size() != 1)) {
+    // Try to fix the system or provide a decent diagnostic.
+    auto salvagedResult = cs.salvage();
+    switch (salvagedResult.getKind()) {
+    case SolutionResult::Kind::Success:
+      viable.clear();
+      viable.push_back(std::move(salvagedResult).takeSolution());
+      break;
+
+    case SolutionResult::Kind::Error:
+    case SolutionResult::Kind::Ambiguous:
+      return true;
+
+    case SolutionResult::Kind::UndiagnosedError:
+      cs.diagnoseFailureForExpr(expr);
+      salvagedResult.markAsDiagnosed();
+      return true;
+
+    case SolutionResult::Kind::TooComplex:
+      Context.Diags.diagnose(expr->getLoc(), diag::expression_too_complex)
+        .highlight(expr->getSourceRange());
+      salvagedResult.markAsDiagnosed();
+      return true;
+    }
   }
 
   auto &solution = viable[0];
-  if (getLangOpts().DebugConstraintSolver) {
+  if (Context.TypeCheckerOpts.DebugConstraintSolver) {
     auto &log = Context.TypeCheckerDebug->getStream();
     log << "---Solution---\n";
     solution.dump(log);
@@ -3477,7 +3506,7 @@ bool TypeChecker::convertToType(Expr *&expr, Type type, DeclContext *dc,
 
   solution.setExprTypes(expr);
 
-  if (getLangOpts().DebugConstraintSolver) {
+  if (Context.TypeCheckerOpts.DebugConstraintSolver) {
     auto &log = Context.TypeCheckerDebug->getStream();
     log << "---Type-checked expression---\n";
     result->dump(log);
@@ -3498,24 +3527,23 @@ void Solution::dump() const {
 }
 
 void Solution::dump(raw_ostream &out) const {
-  ASTContext &ctx = getConstraintSystem().getASTContext();
-  llvm::SaveAndRestore<bool> debugSolver(ctx.LangOpts.DebugConstraintSolver,
-                                         true);
+  PrintOptions PO;
+  PO.PrintTypesForDebugging = true;
 
-  SourceManager *sm = &ctx.SourceMgr;
+  SourceManager *sm = &getConstraintSystem().getASTContext().SourceMgr;
 
   out << "Fixed score: " << FixedScore << "\n";
 
   out << "Type variables:\n";
   for (auto binding : typeBindings) {
-    auto &typeVar = binding.first->getImpl();
+    auto &typeVar = binding.first;
     out.indent(2);
-    typeVar.print(out);
+    Type(typeVar).print(out, PO);
     out << " as ";
     binding.second.print(out);
-    if (auto *locator = typeVar.getLocator()) {
+    if (auto *locator = typeVar->getImpl().getLocator()) {
       out << " @ ";
-      locator->dump(&ctx.SourceMgr, out);
+      locator->dump(sm, out);
     }
     out << "\n";
   }
@@ -3537,30 +3565,30 @@ void Solution::dump(raw_ostream &out) const {
       choice.getDecl()->dumpRef(out);
       out << " as ";
       if (choice.getBaseType())
-        out << choice.getBaseType()->getString() << ".";
+        out << choice.getBaseType()->getString(PO) << ".";
 
       out << choice.getDecl()->getBaseName() << ": "
-          << ovl.second.openedType->getString() << "\n";
+          << ovl.second.openedType->getString(PO) << "\n";
       break;
 
     case OverloadChoiceKind::BaseType:
-      out << "base type " << choice.getBaseType()->getString() << "\n";
+      out << "base type " << choice.getBaseType()->getString(PO) << "\n";
       break;
 
     case OverloadChoiceKind::KeyPathApplication:
       out << "key path application root "
-          << choice.getBaseType()->getString() << "\n";
+          << choice.getBaseType()->getString(PO) << "\n";
       break;
 
     case OverloadChoiceKind::DynamicMemberLookup:
     case OverloadChoiceKind::KeyPathDynamicMemberLookup:
       out << "dynamic member lookup root "
-          << choice.getBaseType()->getString()
+          << choice.getBaseType()->getString(PO)
           << " name='" << choice.getName() << "'\n";
       break;
   
     case OverloadChoiceKind::TupleIndex:
-      out << "tuple " << choice.getBaseType()->getString() << " index "
+      out << "tuple " << choice.getBaseType()->getString(PO) << " index "
         << choice.getTupleIndex() << "\n";
       break;
     }
@@ -3590,9 +3618,9 @@ void Solution::dump(raw_ostream &out) const {
       out << " opens ";
       interleave(opened.second.begin(), opened.second.end(),
                  [&](OpenedType opened) {
-                   opened.first->print(out);
+                   Type(opened.first).print(out, PO);
                    out << " -> ";
-                   opened.second->print(out);
+                   Type(opened.second).print(out, PO);
                  },
                  [&]() {
                    out << ", ";
@@ -3606,7 +3634,7 @@ void Solution::dump(raw_ostream &out) const {
     for (const auto &openedExistential : OpenedExistentialTypes) {
       out.indent(2);
       openedExistential.first->dump(sm, out);
-      out << " opens to " << openedExistential.second->getString();
+      out << " opens to " << openedExistential.second->getString(PO);
       out << "\n";
     }
   }
@@ -3661,13 +3689,13 @@ void ConstraintSystem::print(raw_ostream &out, Expr *E) const {
 
 void ConstraintSystem::print(raw_ostream &out) const {
   // Print all type variables as $T0 instead of _ here.
-  llvm::SaveAndRestore<bool> X(getASTContext().LangOpts.DebugConstraintSolver,
-                               true);
+  PrintOptions PO;
+  PO.PrintTypesForDebugging = true;
   
   out << "Score: " << CurrentScore << "\n";
 
-  if (contextualType.getType()) {
-    out << "Contextual Type: " << contextualType.getType();
+  if (auto ty = contextualType.getType()) {
+    out << "Contextual Type: " << ty.getString(PO);
     if (TypeRepr *TR = contextualType.getTypeRepr()) {
       out << " at ";
       TR->getSourceRange().print(out, getASTContext().SourceMgr, /*text*/false);
@@ -3678,7 +3706,7 @@ void ConstraintSystem::print(raw_ostream &out) const {
   out << "Type Variables:\n";
   for (auto tv : getTypeVariables()) {
     out.indent(2);
-    tv->getImpl().print(out);
+    Type(tv).print(out, PO);
     if (tv->getImpl().canBindToLValue())
       out << " [lvalue allowed]";
     if (tv->getImpl().canBindToInOut())
@@ -3689,13 +3717,13 @@ void ConstraintSystem::print(raw_ostream &out) const {
     if (rep == tv) {
       if (auto fixed = getFixedType(tv)) {
         out << " as ";
-        fixed->print(out);
+        Type(fixed).print(out, PO);
       } else {
         getPotentialBindings(tv).dump(out, 1);
       }
     } else {
       out << " equivalent to ";
-      rep->print(out);
+      Type(rep).print(out, PO);
     }
 
     if (auto *locator = tv->getImpl().getLocator()) {
@@ -3709,14 +3737,14 @@ void ConstraintSystem::print(raw_ostream &out) const {
   out << "\nActive Constraints:\n";
   for (auto &constraint : ActiveConstraints) {
     out.indent(2);
-    constraint.print(out, &getTypeChecker().Context.SourceMgr);
+    constraint.print(out, &getASTContext().SourceMgr);
     out << "\n";
   }
 
   out << "\nInactive Constraints:\n";
   for (auto &constraint : InactiveConstraints) {
     out.indent(2);
-    constraint.print(out, &getTypeChecker().Context.SourceMgr);
+    constraint.print(out, &getASTContext().SourceMgr);
     out << "\n";
   }
 
@@ -3724,7 +3752,7 @@ void ConstraintSystem::print(raw_ostream &out) const {
     out << "\nRetired Constraints:\n";
     solverState->forEachRetired([&](Constraint &constraint) {
       out.indent(2);
-      constraint.print(out, &getTypeChecker().Context.SourceMgr);
+      constraint.print(out, &getASTContext().SourceMgr);
       out << "\n";
     });
   }
@@ -3743,30 +3771,30 @@ void ConstraintSystem::print(raw_ostream &out) const {
       case OverloadChoiceKind::DeclViaBridge:
       case OverloadChoiceKind::DeclViaUnwrappedOptional:
         if (choice.getBaseType())
-          out << choice.getBaseType()->getString() << ".";
+          out << choice.getBaseType()->getString(PO) << ".";
         out << choice.getDecl()->getBaseName() << ": "
-            << resolved->BoundType->getString() << " == "
-            << resolved->ImpliedType->getString() << "\n";
+            << resolved->BoundType->getString(PO) << " == "
+            << resolved->ImpliedType->getString(PO) << "\n";
         break;
 
       case OverloadChoiceKind::BaseType:
-        out << "base type " << choice.getBaseType()->getString() << "\n";
+        out << "base type " << choice.getBaseType()->getString(PO) << "\n";
         break;
 
       case OverloadChoiceKind::KeyPathApplication:
         out << "key path application root "
-            << choice.getBaseType()->getString() << "\n";
+            << choice.getBaseType()->getString(PO) << "\n";
         break;
 
       case OverloadChoiceKind::DynamicMemberLookup:
       case OverloadChoiceKind::KeyPathDynamicMemberLookup:
         out << "dynamic member lookup:"
-            << choice.getBaseType()->getString() << "  name="
+            << choice.getBaseType()->getString(PO) << "  name="
             << choice.getName() << "\n";
         break;
 
       case OverloadChoiceKind::TupleIndex:
-        out << "tuple " << choice.getBaseType()->getString() << " index "
+        out << "tuple " << choice.getBaseType()->getString(PO) << " index "
             << choice.getTupleIndex() << "\n";
         break;
       }
@@ -3778,7 +3806,7 @@ void ConstraintSystem::print(raw_ostream &out) const {
     out << "\nDisjunction choices:\n";
     for (auto &choice : DisjunctionChoices) {
       out.indent(2);
-      choice.first->dump(&getTypeChecker().Context.SourceMgr, out);
+      choice.first->dump(&getASTContext().SourceMgr, out);
       out << " is #" << choice.second << "\n";
     }
   }
@@ -3787,13 +3815,13 @@ void ConstraintSystem::print(raw_ostream &out) const {
     out << "\nOpened types:\n";
     for (const auto &opened : OpenedTypes) {
       out.indent(2);
-      opened.first->dump(&getTypeChecker().Context.SourceMgr, out);
+      opened.first->dump(&getASTContext().SourceMgr, out);
       out << " opens ";
       interleave(opened.second.begin(), opened.second.end(),
                  [&](OpenedType opened) {
-                   opened.first->print(out);
+                   Type(opened.first).print(out, PO);
                    out << " -> ";
-                   opened.second->print(out);
+                   Type(opened.second).print(out, PO);
                  },
                  [&]() {
                    out << ", ";
@@ -3806,8 +3834,8 @@ void ConstraintSystem::print(raw_ostream &out) const {
     out << "\nOpened existential types:\n";
     for (const auto &openedExistential : OpenedExistentialTypes) {
       out.indent(2);
-      openedExistential.first->dump(&getTypeChecker().Context.SourceMgr, out);
-      out << " opens to " << openedExistential.second->getString();
+      openedExistential.first->dump(&getASTContext().SourceMgr, out);
+      out << " opens to " << openedExistential.second->getString(PO);
       out << "\n";
     }
   }
@@ -3815,7 +3843,7 @@ void ConstraintSystem::print(raw_ostream &out) const {
   if (!DefaultedConstraints.empty()) {
     out << "\nDefaulted constraints: ";
     interleave(DefaultedConstraints, [&](ConstraintLocator *locator) {
-      locator->dump(&getTypeChecker().Context.SourceMgr, out);
+      locator->dump(&getASTContext().SourceMgr, out);
     }, [&] {
       out << ", ";
     });
@@ -3824,7 +3852,7 @@ void ConstraintSystem::print(raw_ostream &out) const {
   if (failedConstraint) {
     out << "\nFailed constraint:\n";
     out.indent(2);
-    failedConstraint->print(out, &getTypeChecker().Context.SourceMgr);
+    failedConstraint->print(out, &getASTContext().SourceMgr);
     out << "\n";
   }
 
@@ -3840,12 +3868,12 @@ void ConstraintSystem::print(raw_ostream &out) const {
 
 /// Determine the semantics of a checked cast operation.
 CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
-                                 Type toType,
-                                 CheckedCastContextKind contextKind,
-                                 DeclContext *dc,
-                                 SourceLoc diagLoc,
-                                 Expr *fromExpr,
-                                 SourceRange diagToRange) {
+                                                  Type toType,
+                                                  CheckedCastContextKind contextKind,
+                                                  DeclContext *dc,
+                                                  SourceLoc diagLoc,
+                                                  Expr *fromExpr,
+                                                  SourceRange diagToRange) {
   SourceRange diagFromRange;
   if (fromExpr)
     diagFromRange = fromExpr->getSourceRange();
@@ -3926,6 +3954,7 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
 
   // If the unwrapped from/to types are equivalent or bridged, this isn't a real
   // downcast. Complain.
+  auto &Context = dc->getASTContext();
   if (extraFromOptionals > 0) {
     switch (typeCheckCheckedCast(fromType, toType,
                                  CheckedCastContextKind::None, dc,

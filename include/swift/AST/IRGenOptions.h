@@ -106,6 +106,9 @@ public:
   /// Which sanitizer is turned on.
   OptionSet<SanitizerKind> Sanitizers;
 
+  /// Which sanitizer(s) have recovery instrumentation enabled.
+  OptionSet<SanitizerKind> SanitizersWithRecoveryInstrumentation;
+
   /// Path prefixes that should be rewritten in debug info.
   PathRemapper DebugPrefixMap;
 
@@ -239,6 +242,7 @@ public:
       : DWARFVersion(2), OutputKind(IRGenOutputKind::LLVMAssembly),
         Verify(true), OptMode(OptimizationMode::NotSet),
         Sanitizers(OptionSet<SanitizerKind>()),
+        SanitizersWithRecoveryInstrumentation(OptionSet<SanitizerKind>()),
         DebugInfoLevel(IRGenDebugInfoLevel::None),
         DebugInfoFormat(IRGenDebugInfoFormat::None),
         DisableClangModuleSkeletonCUs(false), UseJIT(false),

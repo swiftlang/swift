@@ -214,3 +214,14 @@ func erroneousSR11350(x: Int) {
     }).domap(0) // expected-error{{value of type 'Optional<()>' has no member 'domap'}}
   }
 }
+
+func extraArg() {
+  tuplify(true) { _ in
+    1
+    2
+    3
+    4
+    5
+    6 // expected-error {{extra argument in call}}
+  }
+}

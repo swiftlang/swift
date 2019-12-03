@@ -521,11 +521,11 @@ void RequirementFailure::emitRequirementNote(const Decl *anchor, Type lhs,
 
   if (req.getKind() != RequirementKind::SameType) {
     if (auto wrappedType = lhs->getOptionalObjectType()) {
-      auto &tc = getTypeChecker();
       auto kind = (req.getKind() == RequirementKind::Superclass ?
                    ConstraintKind::Subtype : ConstraintKind::ConformsTo);
-      if (tc.typesSatisfyConstraint(wrappedType, rhs, /*openArchetypes=*/false,
-                                    kind, getDC()))
+      if (TypeChecker::typesSatisfyConstraint(wrappedType, rhs,
+                                              /*openArchetypes=*/false,
+                                              kind, getDC()))
         emitDiagnostic(getAnchor()->getLoc(),
                        diag::wrapped_type_satisfies_requirement, wrappedType);
     }
@@ -680,7 +680,7 @@ bool MissingConformanceFailure::diagnoseAsAmbiguousOperatorRef() {
   // about missing conformance just in case.
   auto operatorID = name.getIdentifier();
 
-  auto *applyExpr = cast_or_null<ApplyExpr>(findParentExpr(anchor));
+  auto *applyExpr = cast<ApplyExpr>(findParentExpr(anchor));
   if (auto *binaryOp = dyn_cast<BinaryExpr>(applyExpr)) {
     auto lhsType = getType(binaryOp->getArg()->getElement(0));
     auto rhsType = getType(binaryOp->getArg()->getElement(1));
@@ -1029,8 +1029,6 @@ bool MissingExplicitConversionFailure::diagnoseAsError() {
     return false;
 
   auto *DC = getDC();
-  auto &TC = getTypeChecker();
-
   auto *anchor = getAnchor();
   if (auto *assign = dyn_cast<AssignExpr>(anchor))
     anchor = assign->getSrc();
@@ -1043,9 +1041,8 @@ bool MissingExplicitConversionFailure::diagnoseAsError() {
   if (!toType->hasTypeRepr())
     return false;
 
-  bool useAs = TC.isExplicitlyConvertibleTo(fromType, toType, DC);
-  bool useAsBang = !useAs && TC.checkedCastMaySucceed(fromType, toType, DC);
-  if (!useAs && !useAsBang)
+  bool useAs = TypeChecker::isExplicitlyConvertibleTo(fromType, toType, DC);
+  if (!useAs && !TypeChecker::checkedCastMaySucceed(fromType, toType, DC))
     return false;
 
   auto *expr = findParentExpr(getAnchor());
@@ -1218,6 +1215,11 @@ public:
 bool MissingOptionalUnwrapFailure::diagnoseAsError() {
   if (hasComplexLocator())
     return false;
+
+  if (!getUnwrappedType()->isBool()) {
+    if (diagnoseConversionToBool())
+      return true;
+  }
 
   auto *anchor = getAnchor();
 
@@ -1558,9 +1560,9 @@ bool AssignmentFailure::diagnoseAsError() {
 
   // Walk through the destination expression, resolving what the problem is.  If
   // we find a node in the lvalue path that is problematic, this returns it.
-  auto immInfo = resolveImmutableBase(DestExpr);
-
-  Optional<OverloadChoice> choice = immInfo.second;
+  Expr *immutableExpr;
+  Optional<OverloadChoice> choice;
+  std::tie(immutableExpr, choice) = resolveImmutableBase(DestExpr);
 
   // Attempt diagnostics based on the overload choice.
   if (choice.hasValue()) {
@@ -1574,9 +1576,9 @@ bool AssignmentFailure::diagnoseAsError() {
 
     if (!choice->isDecl()) {
       if (choice->getKind() == OverloadChoiceKind::KeyPathApplication &&
-          !isa<ApplyExpr>(immInfo.first)) {
+          !isa<ApplyExpr>(immutableExpr)) {
         std::string message = "key path is read-only";
-        if (auto *SE = dyn_cast<SubscriptExpr>(immInfo.first)) {
+        if (auto *SE = dyn_cast<SubscriptExpr>(immutableExpr)) {
           if (auto *DRE = dyn_cast<DeclRefExpr>(getKeyPathArgument(SE))) {
             auto identifier = DRE->getDecl()->getBaseName().getIdentifier();
             message =
@@ -1584,7 +1586,7 @@ bool AssignmentFailure::diagnoseAsError() {
           }
         }
         emitDiagnostic(Loc, DeclDiagnostic, message)
-            .highlight(immInfo.first->getSourceRange());
+            .highlight(immutableExpr->getSourceRange());
         return true;
       }
       return false;
@@ -1598,7 +1600,7 @@ bool AssignmentFailure::diagnoseAsError() {
       message += VD->getName().str().str();
       message += "'";
 
-      auto type = getType(immInfo.first);
+      auto type = getType(immutableExpr);
 
       if (isKnownKeyPathType(type))
         message += " is read-only";
@@ -1617,26 +1619,53 @@ bool AssignmentFailure::diagnoseAsError() {
       }
 
       emitDiagnostic(Loc, DeclDiagnostic, message)
-          .highlight(immInfo.first->getSourceRange());
+          .highlight(immutableExpr->getSourceRange());
 
-      // If there is a masked instance variable of the same type, emit a
-      // note to fixit prepend a 'self.'.
+      // If there is a masked property of the same type, emit a
+      // note to fixit prepend a 'self.' or 'Type.'.
       if (auto typeContext = DC->getInnermostTypeContext()) {
-        UnqualifiedLookup lookup(VD->getFullName(), typeContext);
-        for (auto &result : lookup.Results) {
-          const VarDecl *typeVar = dyn_cast<VarDecl>(result.getValueDecl());
-          if (typeVar && typeVar != VD && typeVar->isSettable(DC) &&
-              typeVar->isSetterAccessibleFrom(DC) &&
-              typeVar->getType()->isEqual(VD->getType())) {
-            // But not in its own accessor.
-            auto AD =
-                dyn_cast_or_null<AccessorDecl>(DC->getInnermostMethodContext());
-            if (!AD || AD->getStorage() != typeVar) {
-              emitDiagnostic(Loc, diag::masked_instance_variable,
-                             typeContext->getSelfTypeInContext())
-                  .fixItInsert(Loc, "self.");
-            }
+        SmallVector<ValueDecl *, 2> results;
+        DC->lookupQualified(typeContext->getSelfNominalTypeDecl(),
+                            VD->getFullName(), NL_QualifiedDefault, results);
+
+        auto foundProperty = llvm::find_if(results, [&](ValueDecl *decl) {
+          // We're looking for a settable property that is the same type as the
+          // var we found.
+          auto *var = dyn_cast<VarDecl>(decl);
+          if (!var || var == VD)
+            return false;
+
+          if (!var->isSettable(DC) || !var->isSetterAccessibleFrom(DC))
+            return false;
+
+          if (!var->getType()->isEqual(VD->getType()))
+            return false;
+
+          // Don't suggest a property if we're in one of its accessors.
+          auto *methodDC = DC->getInnermostMethodContext();
+          if (auto *AD = dyn_cast_or_null<AccessorDecl>(methodDC))
+            if (AD->getStorage() == var)
+              return false;
+
+          return true;
+        });
+
+        if (foundProperty != results.end()) {
+          auto startLoc = immutableExpr->getStartLoc();
+          auto *property = *foundProperty;
+          auto selfTy = typeContext->getSelfTypeInContext();
+
+          // If we found an instance property, suggest inserting "self.",
+          // otherwise suggest "Type." for a static property.
+          std::string fixItText;
+          if (property->isInstanceMember()) {
+            fixItText = "self.";
+          } else {
+            fixItText = selfTy->getString() + ".";
           }
+          emitDiagnostic(startLoc, diag::masked_mutable_property,
+                         fixItText, property->getDescriptiveKind(), selfTy)
+              .fixItInsert(startLoc, fixItText);
         }
       }
 
@@ -1657,7 +1686,7 @@ bool AssignmentFailure::diagnoseAsError() {
         message = "subscript is immutable";
 
       emitDiagnostic(Loc, DeclDiagnostic, message)
-          .highlight(immInfo.first->getSourceRange());
+          .highlight(immutableExpr->getSourceRange());
       return true;
     }
 
@@ -1679,7 +1708,7 @@ bool AssignmentFailure::diagnoseAsError() {
         message += " is not settable";
 
       emitDiagnostic(Loc, diagID, message)
-          .highlight(immInfo.first->getSourceRange());
+          .highlight(immutableExpr->getSourceRange());
       return true;
     }
   }
@@ -1689,13 +1718,13 @@ bool AssignmentFailure::diagnoseAsError() {
 
   // If a keypath was the problem but wasn't resolved into a vardecl
   // it is ambiguous or unable to be used for setting.
-  if (auto *KPE = dyn_cast_or_null<KeyPathExpr>(immInfo.first)) {
+  if (auto *KPE = dyn_cast_or_null<KeyPathExpr>(immutableExpr)) {
     emitDiagnostic(Loc, DeclDiagnostic, "immutable key path")
         .highlight(KPE->getSourceRange());
     return true;
   }
 
-  if (auto LE = dyn_cast<LiteralExpr>(immInfo.first)) {
+  if (auto LE = dyn_cast<LiteralExpr>(immutableExpr)) {
     emitDiagnostic(Loc, DeclDiagnostic, "literals are not mutable")
         .highlight(LE->getSourceRange());
     return true;
@@ -1703,7 +1732,7 @@ bool AssignmentFailure::diagnoseAsError() {
 
   // If the expression is the result of a call, it is an rvalue, not a mutable
   // lvalue.
-  if (auto *AE = dyn_cast<ApplyExpr>(immInfo.first)) {
+  if (auto *AE = dyn_cast<ApplyExpr>(immutableExpr)) {
     // Handle literals, which are a call to the conversion function.
     auto argsTuple =
         dyn_cast<TupleExpr>(AE->getArg()->getSemanticsProvidingExpr());
@@ -1736,22 +1765,22 @@ bool AssignmentFailure::diagnoseAsError() {
     return true;
   }
 
-  if (auto contextualType = cs.getContextualType(immInfo.first)) {
+  if (auto contextualType = cs.getContextualType(immutableExpr)) {
     Type neededType = contextualType->getInOutObjectType();
-    Type actualType = getType(immInfo.first)->getInOutObjectType();
+    Type actualType = getType(immutableExpr)->getInOutObjectType();
     if (!neededType->isEqual(actualType)) {
       if (DeclDiagnostic.ID != diag::cannot_pass_rvalue_inout_subelement.ID) {
         emitDiagnostic(Loc, DeclDiagnostic,
                        "implicit conversion from '" + actualType->getString() +
                            "' to '" + neededType->getString() +
                            "' requires a temporary")
-            .highlight(immInfo.first->getSourceRange());
+            .highlight(immutableExpr->getSourceRange());
       }
       return true;
     }
   }
 
-  if (auto IE = dyn_cast<IfExpr>(immInfo.first)) {
+  if (auto IE = dyn_cast<IfExpr>(immutableExpr)) {
     emitDiagnostic(Loc, DeclDiagnostic,
                    "result of conditional operator '? :' is never mutable")
         .highlight(IE->getQuestionLoc())
@@ -1760,7 +1789,7 @@ bool AssignmentFailure::diagnoseAsError() {
   }
 
   emitDiagnostic(Loc, TypeDiagnostic, getType(DestExpr))
-      .highlight(immInfo.first->getSourceRange());
+      .highlight(immutableExpr->getSourceRange());
   return true;
 }
 
@@ -1989,6 +2018,17 @@ bool ContextualFailure::diagnoseAsError() {
   Diag<Type, Type> diagnostic;
   switch (path.back().getKind()) {
   case ConstraintLocator::ClosureResult: {
+    auto *closure = cast<ClosureExpr>(getRawAnchor());
+    if (closure->hasExplicitResultType() &&
+        closure->getExplicitResultTypeLoc().getTypeRepr()) {
+      auto resultRepr = closure->getExplicitResultTypeLoc().getTypeRepr();
+      emitDiagnostic(resultRepr->getStartLoc(),
+                     diag::incorrect_explicit_closure_result, getFromType(),
+                     getToType())
+          .fixItReplace(resultRepr->getSourceRange(), getToType().getString());
+      return true;
+    }
+
     diagnostic = diag::cannot_convert_closure_result;
     break;
   }
@@ -2287,8 +2327,6 @@ void ContextualFailure::tryFixIts(InFlightDiagnostic &diagnostic) const {
 }
 
 bool ContextualFailure::diagnoseMissingFunctionCall() const {
-  auto &TC = getTypeChecker();
-
   if (getLocator()->isLastElement<LocatorPathElt::RValueAdjustment>())
     return false;
 
@@ -2297,7 +2335,7 @@ bool ContextualFailure::diagnoseMissingFunctionCall() const {
     return false;
 
   if (ToType->is<AnyFunctionType>() ||
-      !TC.isConvertibleTo(srcFT->getResult(), ToType, getDC()))
+      !TypeChecker::isConvertibleTo(srcFT->getResult(), ToType, getDC()))
     return false;
 
   auto *anchor = getAnchor();
@@ -2479,8 +2517,6 @@ bool ContextualFailure::tryRawRepresentableFixIts(
     InFlightDiagnostic &diagnostic,
     KnownProtocolKind rawRepresentableProtocol) const {
   auto &CS = getConstraintSystem();
-  auto &TC = getTypeChecker();
-
   auto *expr = getAnchor();
   auto fromType = getFromType();
   auto toType = getToType();
@@ -2549,7 +2585,7 @@ bool ContextualFailure::tryRawRepresentableFixIts(
       convWrapBefore += "(rawValue: ";
       std::string convWrapAfter = ")";
       if (!isa<LiteralExpr>(expr) &&
-          !TC.isConvertibleTo(fromType, rawTy, getDC())) {
+          !TypeChecker::isConvertibleTo(fromType, rawTy, getDC())) {
         // Only try to insert a converting construction if the protocol is a
         // literal protocol and not some other known protocol.
         switch (rawRepresentableProtocol) {
@@ -2574,7 +2610,7 @@ bool ContextualFailure::tryRawRepresentableFixIts(
     if (conformsToKnownProtocol(CS, toType, rawRepresentableProtocol)) {
       std::string convWrapBefore;
       std::string convWrapAfter = ".rawValue";
-      if (!TC.isConvertibleTo(rawTy, toType, getDC())) {
+      if (!TypeChecker::isConvertibleTo(rawTy, toType, getDC())) {
         // Only try to insert a converting construction if the protocol is a
         // literal protocol and not some other known protocol.
         switch (rawRepresentableProtocol) {
@@ -2621,8 +2657,7 @@ bool ContextualFailure::tryIntegerCastFixIts(
   auto *anchor = getAnchor();
   if (Expr *innerE = getInnerCastedExpr(anchor)) {
     Type innerTy = getType(innerE);
-    auto &TC = getTypeChecker();
-    if (TC.isConvertibleTo(innerTy, ToType, getDC())) {
+    if (TypeChecker::isConvertibleTo(innerTy, ToType, getDC())) {
       // Remove the unnecessary cast.
       diagnostic.fixItRemoveChars(anchor->getLoc(), innerE->getStartLoc())
           .fixItRemove(anchor->getEndLoc());
@@ -2682,10 +2717,10 @@ bool ContextualFailure::tryTypeCoercionFixIt(
   if (!toType->hasTypeRepr())
     return false;
 
-  auto &TC = getTypeChecker();
   CheckedCastKind Kind =
-      TC.typeCheckCheckedCast(fromType, toType, CheckedCastContextKind::None,
-                              getDC(), SourceLoc(), nullptr, SourceRange());
+      TypeChecker::typeCheckCheckedCast(fromType, toType,
+                                        CheckedCastContextKind::None, getDC(),
+                                        SourceLoc(), nullptr, SourceRange());
 
   if (Kind != CheckedCastKind::Unresolved) {
     auto *anchor = getAnchor();
@@ -3168,6 +3203,17 @@ bool MissingMemberFailure::diagnoseAsError() {
 
     if (baseType->is<TupleType>())
       diagnostic = diag::could_not_find_tuple_member;
+
+    bool hasUnresolvedPattern = false;
+    anchor->forEachChildExpr([&](Expr *expr) {
+      hasUnresolvedPattern |= isa<UnresolvedPatternExpr>(expr);
+      return hasUnresolvedPattern ? nullptr : expr;
+    });
+    if (hasUnresolvedPattern && !baseType->getAs<EnumType>()) {
+      emitDiagnostic(anchor->getLoc(),
+          diag::cannot_match_unresolved_expr_pattern_with_value, baseType);
+      return;
+    }
 
     emitDiagnostic(anchor->getLoc(), diagnostic, baseType, getName())
         .highlight(baseExpr->getSourceRange())
@@ -4140,8 +4186,7 @@ bool MissingArgumentsFailure::isMisplacedMissingArgument(
   auto argType = cs.simplifyType(cs.getType(argument));
   auto paramType = fnType->getParams()[1].getPlainType();
 
-  auto &TC = cs.getTypeChecker();
-  return TC.isConvertibleTo(argType, paramType, cs.DC);
+  return TypeChecker::isConvertibleTo(argType, paramType, cs.DC);
 }
 
 std::tuple<Expr *, Expr *, unsigned, bool>
@@ -4900,7 +4945,6 @@ bool MissingGenericArgumentsFailure::diagnoseParameter(
 void MissingGenericArgumentsFailure::emitGenericSignatureNote(
     Anchor anchor) const {
   auto &cs = getConstraintSystem();
-  auto &TC = getTypeChecker();
   auto *paramDC = getDeclContext();
 
   if (!paramDC)
@@ -4946,8 +4990,8 @@ void MissingGenericArgumentsFailure::emitGenericSignatureNote(
 
   SmallString<64> paramsAsString;
   auto baseType = anchor.get<TypeRepr *>();
-  if (TC.getDefaultGenericArgumentsString(paramsAsString, GTD,
-                                          getPreferredType)) {
+  if (TypeChecker::getDefaultGenericArgumentsString(paramsAsString, GTD,
+                                                    getPreferredType)) {
     auto diagnostic = emitDiagnostic(
         baseType->getLoc(), diag::unbound_generic_parameter_explicit_fix);
 
@@ -5159,23 +5203,9 @@ bool InvalidTupleSplatWithSingleParameterFailure::diagnoseAsError() {
     }
   }
 
-  // If the parameter is a generic parameter, it's hard to say
-  // whether use of a tuple is really intended here, so let's
-  // attach a fix-it to a note instead of the diagnostic message
-  // to indicate that it's not the only right solution possible.
-  if (auto *typeVar = ParamType->getAs<TypeVariableType>()) {
-    if (typeVar->getImpl().getGenericParameter()) {
-      diagnostic.flush();
-
-      emitDiagnostic(argExpr->getLoc(), diag::note_maybe_forgot_to_form_tuple)
-          .fixItInsertAfter(newLeftParenLoc, "(")
-          .fixItInsert(argExpr->getEndLoc(), ")");
-    }
-  } else {
-    diagnostic.highlight(argExpr->getSourceRange())
-        .fixItInsertAfter(newLeftParenLoc, "(")
-        .fixItInsert(argExpr->getEndLoc(), ")");
-  }
+  diagnostic.highlight(argExpr->getSourceRange())
+      .fixItInsertAfter(newLeftParenLoc, "(")
+      .fixItInsert(argExpr->getEndLoc(), ")");
 
   return true;
 }
@@ -5301,6 +5331,9 @@ bool ArgumentMismatchFailure::diagnoseAsError() {
     return true;
 
   if (diagnoseUseOfReferenceEqualityOperator())
+    return true;
+
+  if (diagnosePropertyWrapperMismatch())
     return true;
 
   auto argType = getFromType();
@@ -5540,6 +5573,32 @@ bool ArgumentMismatchFailure::diagnoseMisplacedMissingArgument() const {
       cs.getConstraintLocator(anchor, ConstraintLocator::ApplyArgument));
 
   return failure.diagnoseSingleMissingArgument();
+}
+
+bool ArgumentMismatchFailure::diagnosePropertyWrapperMismatch() const {
+  auto argType = getFromType();
+  auto paramType = getToType();
+
+  // Verify that this is an implicit call to a property wrapper initializer
+  // in a form of `init(wrappedValue:)` or deprecated `init(initialValue:)`.
+  auto *call = dyn_cast<CallExpr>(getRawAnchor());
+  if (!(call && call->isImplicit() && isa<TypeExpr>(call->getFn()) &&
+        call->getNumArguments() == 1 &&
+        (call->getArgumentLabels().front() == getASTContext().Id_wrappedValue ||
+         call->getArgumentLabels().front() == getASTContext().Id_initialValue)))
+    return false;
+
+  auto argExpr = cast<TupleExpr>(call->getArg())->getElement(0);
+  // If this is an attempt to initialize property wrapper with opaque value
+  // of error type, let's just ignore that problem since original mismatch
+  // has been diagnosed already.
+  if (argExpr->isImplicit() && isa<OpaqueValueExpr>(argExpr) &&
+      argType->is<ErrorType>())
+    return true;
+
+  emitDiagnostic(getLoc(), diag::cannot_convert_initializer_value, argType,
+                 paramType);
+  return true;
 }
 
 void ExpandArrayIntoVarargsFailure::tryDropArrayBracketsFixIt(

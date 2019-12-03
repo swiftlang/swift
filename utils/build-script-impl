@@ -1166,9 +1166,9 @@ function should_build_stdlib_target() {
 #
 NINJA_SOURCE_DIR="${WORKSPACE}/ninja"
 SWIFT_SOURCE_DIR="${WORKSPACE}/swift"
-LLVM_SOURCE_DIR="${WORKSPACE}/llvm"
+LLVM_SOURCE_DIR="${WORKSPACE}/llvm-project/llvm"
 CMARK_SOURCE_DIR="${WORKSPACE}/cmark"
-LLDB_SOURCE_DIR="${WORKSPACE}/lldb"
+LLDB_SOURCE_DIR="${WORKSPACE}/llvm-project/lldb"
 LLBUILD_SOURCE_DIR="${WORKSPACE}/llbuild"
 STRESSTEST_PACKAGE_DIR="${WORKSPACE}/swift-stress-tester"
 XCTEST_SOURCE_DIR="${WORKSPACE}/swift-corelibs-xctest"
@@ -1177,39 +1177,12 @@ FOUNDATION_STATIC_SOURCE_DIR="${WORKSPACE}/swift-corelibs-foundation"
 LIBDISPATCH_SOURCE_DIR="${WORKSPACE}/swift-corelibs-libdispatch"
 LIBDISPATCH_STATIC_SOURCE_DIR="${WORKSPACE}/swift-corelibs-libdispatch"
 LIBICU_SOURCE_DIR="${WORKSPACE}/icu"
-LIBCXX_SOURCE_DIR="${WORKSPACE}/libcxx"
+LIBCXX_SOURCE_DIR="${WORKSPACE}/llvm-project/libcxx"
 PLAYGROUNDSUPPORT_SOURCE_DIR="${WORKSPACE}/swift-xcode-playground-support"
 
 if [[ ! "${SKIP_BUILD_PLAYGROUNDSUPPORT}" && ! -d ${PLAYGROUNDSUPPORT_SOURCE_DIR} ]]; then
     echo "Couldn't find PlaygroundSupport source directory."
     exit 1
-fi
-
-# Symlink clang into the llvm tree.
-CLANG_SOURCE_DIR="${LLVM_SOURCE_DIR}/tools/clang"
-if [ ! -e "${WORKSPACE}/clang" ] ; then
-    # If llvm/tools/clang is already a directory, use that and skip the symlink.
-    if [ ! -d "${CLANG_SOURCE_DIR}" ] ; then
-        echo "Can't find source directory for clang (tried ${WORKSPACE}/clang and ${CLANG_SOURCE_DIR})"
-        exit 1
-    fi
-fi
-if [ ! -d "${CLANG_SOURCE_DIR}" ] ; then
-    make_relative_symlink "${WORKSPACE}/clang" "${CLANG_SOURCE_DIR}"
-fi
-
-# Don't symlink clang-tools-extra into the tree as the 'clang' symlink prevents
-# make_relative_symlink from working correctly.
-if [ -e "${WORKSPACE}/clang-tools-extra" ] ; then
-    CLANG_TOOLS_EXTRA_SOURCE_DIR="${WORKSPACE}/clang-tools-extra"
-fi
-
-# Symlink compiler-rt into the llvm tree, if it exists.
-COMPILER_RT_SOURCE_DIR="${LLVM_SOURCE_DIR}/projects/compiler-rt"
-if [ -e "${WORKSPACE}/compiler-rt" ] ; then
-    if [ ! -d "${COMPILER_RT_SOURCE_DIR}" ] ; then
-        make_relative_symlink "${WORKSPACE}/compiler-rt" "${COMPILER_RT_SOURCE_DIR}"
-    fi
 fi
 
 PRODUCTS=(cmark llvm)
@@ -1273,234 +1246,12 @@ function get_host_specific_variable() {
 }
 
 function calculate_targets_for_host() {
-    local host=$1
-
-    SWIFT_STDLIB_TARGETS=()
-    SWIFT_SDKS=()
-    SWIFT_BENCHMARK_TARGETS=()
-    SWIFT_RUN_BENCHMARK_TARGETS=()
-    SWIFT_TEST_TARGETS=()
-
-    # Get the list of Target platforms for the Host
-    local stdlib_targets=($(get_stdlib_targets_for_host ${host}))
-
-    for stdlib_deployment_target in "${stdlib_targets[@]}"; do
-        local swift_sdk=
-        local is_in_build_list=$(should_build_stdlib_target ${stdlib_deployment_target} ${host})
-        local build_for_this_target=1
-        local test_this_target=1
-        local test_host_only=
-        local build_benchmark_this_target=
-        local build_external_benchmark_this_target=
-        local test_benchmark_this_target=
-
-        case ${stdlib_deployment_target} in
-            linux-*)
-                swift_sdk="LINUX"
-                build_for_this_target=$(not ${SKIP_BUILD_LINUX})
-                test_this_target=$(not ${SKIP_TEST_LINUX})
-                ;;
-            freebsd-*)
-                swift_sdk="FREEBSD"
-                build_for_this_target=$(not ${SKIP_BUILD_FREEBSD})
-                test_this_target=$(not ${SKIP_TEST_FREEBSD})
-                ;;
-            cygwin-*)
-                swift_sdk="CYGWIN"
-                build_for_this_target=$(not ${SKIP_BUILD_CYGWIN})
-                test_this_target=$(not ${SKIP_TEST_CYGWIN})
-                ;;
-            haiku-*)
-                swift_sdk="HAIKU"
-                build_for_this_target=$(not ${SKIP_BUILD_HAIKU})
-                test_this_target=$(not ${SKIP_TEST_HAIKU})
-                ;;
-            macosx-*)
-                swift_sdk="OSX"
-                build_for_this_target=$(not ${SKIP_BUILD_OSX})
-                test_this_target=$(not ${SKIP_TEST_OSX})
-                build_benchmark_this_target=$(not ${SKIP_BUILD_OSX})
-                build_external_benchmark_this_target=$(not ${SKIP_BUILD_OSX})
-                test_benchmark_this_target=$(not ${SKIP_BUILD_OSX})
-                ;;
-            iphoneos-*)
-                swift_sdk="IOS"
-                build_for_this_target=$(not ${SKIP_BUILD_IOS_DEVICE})
-                if [[ ! "${SKIP_TEST_IOS_HOST}" ]] ; then
-                    test_host_only=1
-                else
-                    test_this_target=
-                fi
-                build_benchmark_this_target=$(not ${SKIP_BUILD_IOS_DEVICE})
-                build_external_benchmark_this_target=$(not ${SKIP_BUILD_IOS_DEVICE})
-
-                # Never build iOS armv7s benchmarks.
-                if [[ "${stdlib_deployment_target}" == "iphoneos-armv7s" ]]; then
-                    build_benchmark_this_target=
-                    build_external_benchmark_this_target=
-                fi
-                ;;
-            iphonesimulator-x86_64)
-                swift_sdk="IOS_SIMULATOR"
-                build_for_this_target=$(not ${SKIP_BUILD_IOS_SIMULATOR})
-                test_this_target=$(not ${SKIP_TEST_IOS_SIMULATOR})
-                ;;
-            iphonesimulator-i386)
-                swift_sdk="IOS_SIMULATOR"
-                build_for_this_target=$(not ${SKIP_BUILD_IOS_SIMULATOR})
-                if [[ "${SKIP_TEST_IOS_SIMULATOR}" == "1" ]] ; then
-                    SKIP_TEST_IOS_32BIT_SIMULATOR="${SKIP_TEST_IOS_SIMULATOR}"
-                fi
-                test_this_target=$(not ${SKIP_TEST_IOS_32BIT_SIMULATOR})
-                ;;
-            appletvos-*)
-                swift_sdk="TVOS"
-                build_for_this_target=$(not ${SKIP_BUILD_TVOS_DEVICE})
-                if [[ ! "${SKIP_TEST_TVOS_HOST}" ]] ; then
-                    test_host_only=1
-                else
-                    test_this_target=
-                fi
-                build_benchmark_this_target=$(not ${SKIP_BUILD_TVOS_DEVICE})
-                build_external_benchmark_this_target=$(not ${SKIP_BUILD_TVOS_DEVICE})
-                ;;
-            appletvsimulator-*)
-                swift_sdk="TVOS_SIMULATOR"
-                build_for_this_target=$(not ${SKIP_BUILD_TVOS_SIMULATOR})
-                test_this_target=$(not ${SKIP_TEST_TVOS_SIMULATOR})
-                ;;
-            watchos-*)
-                swift_sdk="WATCHOS"
-                build_for_this_target=$(not ${SKIP_BUILD_WATCHOS_DEVICE})
-                if [[ ! "${SKIP_TEST_WATCHOS_HOST}" ]] ; then
-                    test_host_only=1
-                else
-                    test_this_target=
-                fi
-                build_benchmark_this_target=$(not ${SKIP_BUILD_WATCHOS_DEVICE})
-                build_external_benchmark_this_target=$(not ${SKIP_BUILD_WATCHOS_DEVICE})
-                ;;
-            watchsimulator-*)
-                swift_sdk="WATCHOS_SIMULATOR"
-                build_for_this_target=$(not ${SKIP_BUILD_WATCHOS_SIMULATOR})
-                test_this_target=$(not ${SKIP_TEST_WATCHOS_SIMULATOR})
-                ;;
-            android-*)
-                swift_sdk="ANDROID"
-                build_for_this_target=$(not ${SKIP_BUILD_ANDROID})
-                if [[ ! "${SKIP_TEST_ANDROID_HOST}" ]] ; then
-                    test_host_only=1
-                else
-                    test_this_target=$(not ${SKIP_TEST_ANDROID})
-                fi
-                ;;
-            *)
-                echo "Unknown compiler deployment target: ${stdlib_deployment_target}"
-                exit 1
-                ;;
-        esac
-
-        SWIFT_SDKS+=("${swift_sdk}")
-
-        if [[ "${build_for_this_target}" ]] && [[ "${is_in_build_list}" ]]; then
-
-            if [[ "${BUILD_SWIFT_STDLIB_UNITTEST_EXTRA}" == "1" ]] ; then
-                SWIFT_STDLIB_TARGETS+=("swift-stdlib-${stdlib_deployment_target}")
-            else
-                if [[ "${VALIDATION_TEST}" == "1" || "${LONG_TEST}" == "1" ]] ; then
-                    SWIFT_STDLIB_TARGETS+=("swift-stdlib-${stdlib_deployment_target}")
-                else
-                    SWIFT_STDLIB_TARGETS+=("swift-test-stdlib-${stdlib_deployment_target}")
-                fi
-            fi
-        fi
-        if [[ "${build_benchmark_this_target}" ]] && [[ "${is_in_build_list}" ]]; then
-            SWIFT_BENCHMARK_TARGETS+=("swift-benchmark-${stdlib_deployment_target}")
-            if [[ $(not ${SKIP_TEST_BENCHMARKS}) ]] ; then
-              SWIFT_RUN_BENCHMARK_TARGETS+=("check-swift-benchmark-${stdlib_deployment_target}")
-            fi
-        fi
-
-        if [[ "$(true_false ${SKIP_BUILD_EXTERNAL_BENCHMARKS})" == "FALSE"  ]] &&
-           [[ "${build_external_benchmark_this_target}" ]] &&
-           [[ "${is_in_build_list}" ]] ; then
-            SWIFT_BENCHMARK_TARGETS+=("swift-benchmark-${stdlib_deployment_target}-external")
-            if [[ $(not ${SKIP_TEST_BENCHMARKS}) ]] ; then
-                SWIFT_RUN_BENCHMARK_TARGETS+=("check-swift-benchmark-${stdlib_deployment_target}-external")
-            fi
-        fi
-
-        if [[ "${test_this_target}" ]] && [[ "${is_in_build_list}" ]]; then
-            test_target_suffix=""
-            if [[ -n "${test_host_only}" ]] ; then
-                test_target_suffix="-only_non_executable"
-            elif [[ -n "${ONLY_EXECUTABLE_TEST}" ]] ; then
-                test_target_suffix="-only_executable"
-            fi
-
-            test_subset_target_suffix=""
-            if [[ "${VALIDATION_TEST}" == "1" ]] ; then
-                if [[ "${LONG_TEST}" == "1" ]] ; then
-                    test_subset_target_suffix="-all"
-                else
-                    test_subset_target_suffix="-validation"
-                fi
-            else
-                if [[ "${LONG_TEST}" == "1" ]] ; then
-                    test_subset_target_suffix="-only_long"
-                fi
-            fi
-
-            SWIFT_TEST_TARGETS+=("check-swift${test_subset_target_suffix}${test_target_suffix}-${stdlib_deployment_target}")
-            if [[ $(not ${SKIP_TEST_OPTIMIZED}) && ! -n "${test_host_only}" ]] ; then
-                SWIFT_TEST_TARGETS+=("check-swift${test_subset_target_suffix}-optimize-${stdlib_deployment_target}")
-            fi
-            if [[ $(not ${SKIP_TEST_OPTIMIZE_FOR_SIZE}) && ! -n "${test_host_only}" ]] ; then
-                SWIFT_TEST_TARGETS+=("check-swift${test_subset_target_suffix}-optimize_size-${stdlib_deployment_target}")
-            fi
-            if [[ $(not ${SKIP_TEST_OPTIMIZE_NONE_WITH_IMPLICIT_DYNAMIC}) && ! -n "${test_host_only}" ]] ; then
-                SWIFT_TEST_TARGETS+=("check-swift${test_subset_target_suffix}-optimize_none_with_implicit_dynamic-${stdlib_deployment_target}")
-            fi
-        fi
-    done
-
-    # Filter duplicate SWIFT_SDKs
-    # We will get them if building for multiple architecture variants
-    SWIFT_SDKS=($(echo "${SWIFT_SDKS[@]}" | tr " " "\n" | sort -u | tr "\n" " "))
-
     # Get the values passed by `build-script`.
-    LEGACY_SWIFT_STDLIB_TARGETS=(${SWIFT_STDLIB_TARGETS[@]})
-    LEGACY_SWIFT_SDKS=(${SWIFT_SDKS[@]})
-    LEGACY_SWIFT_BENCHMARK_TARGETS=(${SWIFT_BENCHMARK_TARGETS[@]})
-    LEGACY_SWIFT_RUN_BENCHMARK_TARGETS=(${SWIFT_RUN_BENCHMARK_TARGETS[@]})
-    LEGACY_SWIFT_TEST_TARGETS=(${SWIFT_TEST_TARGETS[@]})
     SWIFT_STDLIB_TARGETS=($(get_host_specific_variable ${host} SWIFT_STDLIB_TARGETS))
     SWIFT_SDKS=($(get_host_specific_variable ${host} SWIFT_SDKS))
     SWIFT_BENCHMARK_TARGETS=($(get_host_specific_variable ${host} SWIFT_BENCHMARK_TARGETS))
     SWIFT_RUN_BENCHMARK_TARGETS=($(get_host_specific_variable ${host} SWIFT_RUN_BENCHMARK_TARGETS))
     SWIFT_TEST_TARGETS=($(get_host_specific_variable ${host} SWIFT_TEST_TARGETS))
-
-    # Validate the parameters match.
-    if [[ "${SWIFT_STDLIB_TARGETS[*]}" != "${LEGACY_SWIFT_STDLIB_TARGETS[*]}" ]]; then
-        printf "error: invalid build-script refactor for 'SWIFT_STDLIB_TARGETS': '%s' vs '%s'\n" "${SWIFT_STDLIB_TARGETS[*]}" "${LEGACY_SWIFT_STDLIB_TARGETS[*]}"
-        exit 1
-    fi
-    if [[ "${SWIFT_SDKS[*]}" != "${LEGACY_SWIFT_SDKS[*]}" ]]; then
-        printf "error: invalid build-script for 'SWIFT_SDKS' refactor: '%s' vs '%s'\n" "${SWIFT_SDKS[*]}" "${LEGACY_SWIFT_SDKS[*]}"
-        exit 1
-    fi
-    if [[ "${SWIFT_BENCHMARK_TARGETS[*]}" != "${LEGACY_SWIFT_BENCHMARK_TARGETS[*]}" ]]; then
-        printf "error: invalid build-script refactor for 'SWIFT_BENCHMARK_TARGETS': '%s' vs '%s'\n" "${SWIFT_BENCHMARK_TARGETS[*]}" "${LEGACY_SWIFT_BENCHMARK_TARGETS[*]}"
-        exit 1
-    fi
-    if [[ "${SWIFT_RUN_BENCHMARK_TARGETS[*]}" != "${LEGACY_SWIFT_RUN_BENCHMARK_TARGETS[*]}" ]]; then
-        printf "error: invalid build-script refactor for 'SWIFT_RUN_BENCHMARK_TARGETS': '%s' vs '%s'\n" "${SWIFT_RUN_BENCHMARK_TARGETS[*]}" "${LEGACY_SWIFT_RUN_BENCHMARK_TARGETS[*]}"
-        exit 1
-    fi
-    if [[ "${SWIFT_TEST_TARGETS[*]}" != "${LEGACY_SWIFT_TEST_TARGETS[*]}" ]]; then
-        printf "error: invalid build-script refactor for 'SWIFT_TEST_TARGETS': '%s' vs '%s'\n" "${SWIFT_TEST_TARGETS[*]}" "${LEGACY_SWIFT_TEST_TARGETS[*]}"
-        exit 1
-    fi
 }
 
 
@@ -1847,6 +1598,9 @@ for host in "${ALL_HOSTS[@]}"; do
             tmp_product=libdispatch
             LIBDISPATCH_STATIC_CMAKE_OPTIONS=${LIBDISPATCH_CMAKE_OPTIONS[@]}
         fi
+        if [[ ${tmp_product} == "foundation_static" ]]; then
+            tmp_product=foundation
+        fi
         if ! [[ $(should_execute_action "${host}-${tmp_product}-build") ]]; then
             continue
         fi
@@ -1923,18 +1677,13 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DLLVM_INCLUDE_DOCS:BOOL=TRUE
                     -DLLVM_ENABLE_LTO:STRING="${LLVM_ENABLE_LTO}"
                     -DCOMPILER_RT_INTERCEPT_LIBDISPATCH=ON
+                    -DLLVM_ENABLE_PROJECTS="clang;clang-tools-extra;compiler-rt;"
                     "${llvm_cmake_options[@]}"
                 )
 
                 cmake_options+=(
                   -DLLVM_TOOL_LLD_BUILD:BOOL=TRUE
                 )
-
-                if [[ ! -z "${CLANG_TOOLS_EXTRA_SOURCE_DIR}" ]] ; then
-                  cmake_options+=(
-                    -DLLVM_EXTERNAL_CLANG_TOOLS_EXTRA_SOURCE_DIR="${CLANG_TOOLS_EXTRA_SOURCE_DIR}"
-                  )
-                fi
 
                 if [[ "${BUILD_TOOLCHAIN_ONLY}" ]]; then
                     cmake_options+=(
@@ -2294,7 +2043,6 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DLLDB_SWIFTC:PATH="$(build_directory ${LOCAL_HOST} swift)/bin/swiftc"
                     -DLLDB_SWIFT_LIBS:PATH="$(build_directory ${LOCAL_HOST} swift)/lib/swift"
                     -DCMAKE_INSTALL_PREFIX:PATH="$(get_host_install_prefix ${host})"
-                    -DLLDB_FRAMEWORK_INSTALL_DIR="$(get_host_install_prefix ${host})../System/Library/PrivateFrameworks"
                     -DLLVM_DIR:PATH=${llvm_build_dir}/lib/cmake/llvm
                     -DClang_DIR:PATH=${llvm_build_dir}/lib/cmake/clang
                     -DSwift_DIR:PATH=${swift_build_dir}/lib/cmake/swift
@@ -2388,15 +2136,18 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DCMAKE_BUILD_TYPE:STRING="${XCTEST_BUILD_TYPE}"
                     -DCMAKE_C_COMPILER:PATH="${LLVM_BIN}/clang"
                     -DCMAKE_CXX_COMPILER:PATH="${LLVM_BIN}/clang++"
-                    -DCMAKE_SWIFT_COMPILER:PATH="$(build_directory_bin ${LOCAL_HOST} swift)/swiftc"
+                    -DCMAKE_Swift_COMPILER:PATH="$(build_directory_bin ${LOCAL_HOST} swift)/swiftc"
                     -DCMAKE_INSTALL_PREFIX:PATH="$(get_host_install_prefix ${host})"
                     -DCMAKE_INSTALL_LIBDIR:PATH="lib"
 
+                    -Ddispatch_DIR=$(build_directory ${host} libdispatch)/cmake/modules
+                    -DFoundation_DIR=$(build_directory ${host} foundation)/cmake/modules
+                    -DLLVM_DIR=$(build_directory ${host} llvm)/lib/cmake/llvm
+
                     -DXCTEST_PATH_TO_LIBDISPATCH_SOURCE:PATH=${LIBDISPATCH_SOURCE_DIR}
                     -DXCTEST_PATH_TO_LIBDISPATCH_BUILD:PATH=$(build_directory ${host} libdispatch)
-
                     -DXCTEST_PATH_TO_FOUNDATION_BUILD:PATH=${FOUNDATION_BUILD_DIR}
-
+                    -DCMAKE_SWIFT_COMPILER:PATH="$(build_directory_bin ${LOCAL_HOST} swift)/swiftc"
                     -DCMAKE_PREFIX_PATH:PATH=$(build_directory ${host} llvm)
 
                     -DENABLE_TESTING=YES
@@ -2913,6 +2664,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     LIBDISPATCH_BUILD_ARGS=(
                       -DFOUNDATION_PATH_TO_LIBDISPATCH_SOURCE=${LIBDISPATCH_SOURCE_DIR}
                       -DFOUNDATION_PATH_TO_LIBDISPATCH_BUILD=${LIBDISPATCH_BUILD_DIR}
+                      -Ddispatch_DIR=${LIBDISPATCH_BUILD_DIR}/cmake/modules
                     )
                 else
                     LIBDISPATCH_BUILD_ARGS=( -DFOUNDATION_ENABLE_LIBDISPATCH=NO )
@@ -2921,20 +2673,22 @@ for host in "${ALL_HOSTS[@]}"; do
                 SWIFTC_BIN="$(build_directory_bin ${LOCAL_HOST} swift)/swiftc"
                 LLVM_BIN="$(build_directory_bin ${LOCAL_HOST} llvm)"
 
+                # NOTE(compnerd) the time has come to enable tests now
                 cmake_options=(
                   ${cmake_options[@]}
                   -DCMAKE_BUILD_TYPE:STRING=${FOUNDATION_BUILD_TYPE}
                   -DCMAKE_C_COMPILER:PATH=${LLVM_BIN}/clang
                   -DCMAKE_CXX_COMPILER:PATH=${LLVM_BIN}/clang++
-                  -DCMAKE_SWIFT_COMPILER:PATH=${SWIFTC_BIN}
                   -DCMAKE_Swift_COMPILER:PATH=${SWIFTC_BIN}
                   -DCMAKE_INSTALL_PREFIX:PATH=$(get_host_install_prefix ${host})
 
                   ${LIBICU_BUILD_ARGS[@]}
                   ${LIBDISPATCH_BUILD_ARGS[@]}
 
-                  # NOTE(compnerd) the time has come to enable tests now
                   -DENABLE_TESTING:BOOL=YES
+                  -DXCTest_DIR=$(build_directory ${host} xctest)/cmake/modules
+
+                  -DCMAKE_SWIFT_COMPILER:PATH=${SWIFTC_BIN}
                   -DFOUNDATION_PATH_TO_XCTEST_BUILD:PATH=$(build_directory ${host} xctest)
                 )
 
@@ -3086,6 +2840,9 @@ for host in "${ALL_HOSTS[@]}"; do
         tmp_product=${product}
         if [[ ${tmp_product} == "libdispatch_static" ]]; then
             tmp_product=libdispatch
+        fi
+        if [[ ${tmp_product} == "foundation_static" ]]; then
+            tmp_product=foundation
         fi
         if ! [[ $(should_execute_action "${host}-${tmp_product}-install") ]]; then
             continue

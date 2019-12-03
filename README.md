@@ -79,8 +79,8 @@ several hours. Naturally, incremental builds are much faster.
 
 ### System Requirements
 
-macOS, Ubuntu Linux LTS, and the latest Ubuntu Linux release are the current
-supported host development operating systems.
+macOS, Ubuntu Linux LTS, and the latest Ubuntu Linux release are currently
+supported as host development operating systems.
 
 Please make sure you use Python 2.x. Python 3.x is not supported currently.
 
@@ -149,28 +149,32 @@ There are two primary build systems to use: Xcode and Ninja. The Xcode build
 system allows you to work in Xcode, but Ninja is a bit faster and supports
 more environments.
 
+First, make sure that you're in the swift directory:
+
+    cd swift
+
 To build using Ninja, run:
 
-    swift/utils/build-script --release-debuginfo
+    utils/build-script --release-debuginfo
 
 When developing Swift, it helps to build what you're working on in a debug
 configuration while building the rest of the project with optimizations. Below
 are some examples of using debug variants:
 
-    swift/utils/build-script --release-debuginfo --debug-swift # Swift frontend built in debug
-    swift/utils/build-script --release-debuginfo --debug-swift-stdlib # Standard library built in debug
-    swift/utils/build-script --release-debuginfo --debug-swift --force-optimized-typechecker # Swift frontend sans type checker built in debug
+    utils/build-script --release-debuginfo --debug-swift # Swift frontend built in debug
+    utils/build-script --release-debuginfo --debug-swift-stdlib # Standard library built in debug
+    utils/build-script --release-debuginfo --debug-swift --force-optimized-typechecker # Swift frontend sans type checker built in debug
 
 Limiting the amount of debug code in the compiler has a very large impact on
 Swift compile times, and in turn the test execution time. If you want to build
 the entire project in debug, you can run:
 
-    swift/utils/build-script --debug
+    utils/build-script --debug
 
 For documentation of all available arguments, as well as additional usage
 information, see the inline help:
 
-    swift/utils/build-script -h
+    utils/build-script -h
 
 #### Xcode
 
@@ -326,8 +330,8 @@ expressed today.
 ## Build Dependencies
 
 ### CMake
-[CMake](https://cmake.org) is the core infrastructure used to configure builds of 
-Swift and its companion projects; at least version 3.4.3 is required. 
+[CMake](https://cmake.org) is the core infrastructure used to configure builds of
+Swift and its companion projects; at least version 3.4.3 is required.
 
 On macOS, you can download the [CMake Binary Distribution](https://cmake.org/download),
 bundled as an application, copy it to `/Applications`, and add the embedded

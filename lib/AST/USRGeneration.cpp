@@ -242,8 +242,6 @@ swift::USRGenerationRequest::evaluate(Evaluator &evaluator,
   }
 
   auto declIFaceTy = D->getInterfaceType();
-  if (!declIFaceTy)
-    return std::string();
 
   // Invalid code.
   if (declIFaceTy.findIf([](Type t) -> bool {

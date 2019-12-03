@@ -504,6 +504,7 @@ void ASTContext::operator delete(void *Data) throw() {
 }
 
 ASTContext *ASTContext::get(LangOptions &langOpts,
+                            TypeCheckerOptions &typeckOpts,
                             SearchPathOptions &SearchPathOpts,
                             SourceManager &SourceMgr,
                             DiagnosticEngine &Diags) {
@@ -516,15 +517,16 @@ ASTContext *ASTContext::get(LangOptions &langOpts,
   auto impl = reinterpret_cast<void*>((char*)mem + sizeof(ASTContext));
   impl = reinterpret_cast<void*>(llvm::alignAddr(impl,alignof(Implementation)));
   new (impl) Implementation();
-  return new (mem) ASTContext(langOpts, SearchPathOpts, SourceMgr, Diags);
+  return new (mem)
+      ASTContext(langOpts, typeckOpts, SearchPathOpts, SourceMgr, Diags);
 }
 
-ASTContext::ASTContext(LangOptions &langOpts, SearchPathOptions &SearchPathOpts,
+ASTContext::ASTContext(LangOptions &langOpts, TypeCheckerOptions &typeckOpts,
+                       SearchPathOptions &SearchPathOpts,
                        SourceManager &SourceMgr, DiagnosticEngine &Diags)
   : LangOpts(langOpts),
-    SearchPathOpts(SearchPathOpts),
-    SourceMgr(SourceMgr),
-    Diags(Diags),
+    TypeCheckerOpts(typeckOpts),
+    SearchPathOpts(SearchPathOpts), SourceMgr(SourceMgr), Diags(Diags),
     evaluator(Diags, langOpts.DebugDumpCycles),
     TheBuiltinModule(createBuiltinModule(*this)),
     StdlibModuleName(getIdentifier(STDLIB_NAME)),
@@ -612,6 +614,10 @@ void ASTContext::setStatsReporter(UnifiedStatsReporter *stats) {
 
 RC<syntax::SyntaxArena> ASTContext::getSyntaxArena() const {
   return getImpl().TheSyntaxArena;
+}
+
+bool ASTContext::areSemanticQueriesEnabled() const {
+  return getLegacyGlobalTypeChecker() != nullptr;
 }
 
 TypeChecker *ASTContext::getLegacyGlobalTypeChecker() const {
@@ -1364,12 +1370,6 @@ bool ASTContext::hasArrayLiteralIntrinsics() const {
   return getArrayDecl()
     && getAllocateUninitializedArray()
     && getDeallocateUninitializedArray();
-}
-
-void ASTContext::addSynthesizedDecl(Decl *decl) {
-  auto *fileUnit = decl->getDeclContext()->getModuleScopeContext();
-  if (auto *sf = dyn_cast<SourceFile>(fileUnit))
-    sf->SynthesizedDecls.push_back(decl);
 }
 
 void ASTContext::addCleanup(std::function<void(void)> cleanup) {
@@ -3693,8 +3693,8 @@ GenericEnvironment *OpenedArchetypeType::getGenericEnvironment() const {
   auto thisType = Type(const_cast<OpenedArchetypeType*>(this));
   auto &ctx = thisType->getASTContext();
   // Create a generic environment to represent the opened type.
-  auto signature = ctx.getExistentialSignature(Opened->getCanonicalType(),
-                                               nullptr);
+  auto signature =
+      ctx.getOpenedArchetypeSignature(Opened->getCanonicalType(), nullptr);
   auto *builder = signature->getGenericSignatureBuilder();
   auto *env = GenericEnvironment::getIncomplete(signature, builder);
   env->addMapping(signature->getGenericParams()[0], thisType);
@@ -4327,8 +4327,15 @@ CanGenericSignature ASTContext::getSingleGenericParameterSignature() const {
   return canonicalSig;
 }
 
-CanGenericSignature ASTContext::getExistentialSignature(CanType existential,
-                                                        ModuleDecl *mod) {
+// Return the signature for an opened existential. The opened archetype may have
+// a different set of conformances from the corresponding existential. The
+// opened archetype conformances are dictated by the ABI for generic arguments,
+// while the existential value conformances are dictated by their layout (see
+// Type::getExistentialLayout()). In particular, the opened archetype signature
+// does not have requirements for conformances inherited from superclass
+// constraints while existential values do.
+CanGenericSignature ASTContext::getOpenedArchetypeSignature(CanType existential,
+                                                            ModuleDecl *mod) {
   auto found = getImpl().ExistentialSignatures.find(existential);
   if (found != getImpl().ExistentialSignatures.end())
     return found->second;
@@ -4360,42 +4367,28 @@ ASTContext::getOverrideGenericSignature(const ValueDecl *base,
   auto derivedGenericCtx = derived->getAsGenericContext();
   auto &ctx = base->getASTContext();
 
-  if (!baseGenericCtx) {
+  if (!baseGenericCtx || !derivedGenericCtx)
     return nullptr;
-  }
 
   auto baseClass = base->getDeclContext()->getSelfClassDecl();
-
-  if (!baseClass) {
+  if (!baseClass)
     return nullptr;
-  }
 
   auto derivedClass = derived->getDeclContext()->getSelfClassDecl();
+  if (!derivedClass)
+    return nullptr;
+
+  if (derivedClass->getSuperclass().isNull())
+    return nullptr;
+
+  if (baseGenericCtx->getGenericSignature().isNull() ||
+      derivedGenericCtx->getGenericSignature().isNull())
+    return nullptr;
+
   auto baseClassSig = baseClass->getGenericSignature();
-
-  if (!derivedClass) {
-    return nullptr;
-  }
-
-  if (derivedClass->getSuperclass().isNull()) {
-    return nullptr;
-  }
-
-  if (!derivedGenericCtx || !derivedGenericCtx->isGeneric()) {
-    return nullptr;
-  }
-
-  if (derivedClass->getGenericSignature().isNull() &&
-      !baseGenericCtx->isGeneric()) {
-    return nullptr;
-  }
-
   auto subMap = derivedClass->getSuperclass()->getContextSubstitutionMap(
       derivedClass->getModuleContext(), baseClass);
 
-  if (baseGenericCtx->getGenericSignature().isNull()) {
-    return nullptr;
-  }
   unsigned derivedDepth = 0;
 
   auto key = OverrideSignatureKey(baseGenericCtx->getGenericSignature(),
@@ -4411,9 +4404,11 @@ ASTContext::getOverrideGenericSignature(const ValueDecl *base,
     derivedDepth = derivedSig->getGenericParams().back()->getDepth() + 1;
 
   SmallVector<GenericTypeParamType *, 2> addedGenericParams;
-  for (auto gp : *derivedGenericCtx->getGenericParams()) {
-    addedGenericParams.push_back(
-        gp->getDeclaredInterfaceType()->castTo<GenericTypeParamType>());
+  if (auto *gpList = derivedGenericCtx->getGenericParams()) {
+    for (auto gp : *gpList) {
+      addedGenericParams.push_back(
+          gp->getDeclaredInterfaceType()->castTo<GenericTypeParamType>());
+    }
   }
 
   unsigned baseDepth = 0;

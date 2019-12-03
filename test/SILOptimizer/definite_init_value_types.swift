@@ -59,9 +59,9 @@ enum ValueEnum {
   // CHECK:      bb6:
   // CHECK-NEXT:   [[NEW_STATE:%.*]] = integer_literal $Builtin.Int1, -1
   // CHECK-NEXT:   store [[NEW_STATE]] to [[STATE]]
+  // CHECK-NEXT:   retain_value [[NEW_SELF]]
   // CHECK-NEXT:   store [[NEW_SELF]] to [[SELF_ACCESS]]
   // CHECK-NEXT:   end_access [[SELF_ACCESS]]
-  // CHECK-NEXT:   retain_value [[NEW_SELF]]
   // CHECK-NEXT:   destroy_addr [[SELF_BOX]]
   // CHECK-NEXT:   dealloc_stack [[SELF_BOX]]
   // CHECK-NEXT:   dealloc_stack [[STATE]]

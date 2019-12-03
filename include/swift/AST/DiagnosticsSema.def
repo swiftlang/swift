@@ -123,8 +123,6 @@ ERROR(expected_result_in_contextual_member,none,
 
 ERROR(unexpected_arguments_in_enum_case,none,
       "enum case %0 has no associated values", (DeclName))
-ERROR(unexpected_arguments_in_contextual_member,none,
-      "%0 %1 is not a function", (DescriptiveDeclKind, DeclName))
 
 ERROR(could_not_use_value_member,none,
       "member %1 cannot be used on value of type %0", (Type, DeclName))
@@ -260,9 +258,6 @@ ERROR(cannot_pass_rvalue_inout,none,
       (Type))
 ERROR(cannot_provide_default_value_inout,none,
       "cannot provide default value to inout parameter %0", (Identifier))
-
-ERROR(cannot_assign_to_literal,none,
-      "cannot assign to a literal value", ())
 
 ERROR(cannot_call_with_no_params,none,
       "cannot invoke %select{|initializer for type }1'%0' with no arguments",
@@ -440,8 +435,6 @@ NOTE(candidate_performs_illegal_ephemeral_conv,none,
 
 ERROR(cannot_convert_argument_value_protocol,none,
       "argument type %0 does not conform to expected type %1", (Type, Type))
-ERROR(cannot_convert_partial_argument_value_protocol,none,
-      "in argument type %0, %1 does not conform to expected type %2", (Type, Type, Type))
 
 ERROR(cannot_convert_argument_value_nil,none,
       "'nil' is not compatible with expected argument type %0", (Type))
@@ -566,9 +559,6 @@ ERROR(cannot_convert_sequence_element_protocol,none,
 ERROR(throws_functiontype_mismatch,none,
       "invalid conversion from throwing function of type %0 to "
       "non-throwing function type %1", (Type, Type))
-ERROR(noescape_functiontype_mismatch,none,
-      "invalid conversion from non-escaping function of type %0 to "
-      "potentially escaping function type %1", (Type, Type))
 
 // Key-path expressions.
 ERROR(expr_keypath_no_objc_runtime,none,
@@ -911,8 +901,12 @@ ERROR(invalid_arg_count_for_operator,none,
       "operators must have one or two arguments", ())
 ERROR(operator_in_local_scope,none,
       "operator functions can only be declared at global or in type scope", ())
-ERROR(nonstatic_operator_in_type,none,
-      "operator %0 declared in type %1 must be 'static'", (Identifier, Type))
+ERROR(nonstatic_operator_in_nominal,none,
+      "operator %0 declared in type %1 must be 'static'",
+      (Identifier, DeclName))
+ERROR(nonstatic_operator_in_extension,none,
+      "operator %0 declared in extension of %1 must be 'static'",
+      (Identifier, TypeRepr*))
 ERROR(nonfinal_operator_in_class,none,
       "operator %0 declared in non-final class %1 must be 'final'",
       (Identifier, Type))
@@ -1158,9 +1152,6 @@ ERROR(instance_member_in_initializer,none,
 ERROR(instance_member_in_default_parameter,none,
       "cannot use instance member %0 as a default parameter", (DeclName))
 
-ERROR(invalid_initialization_parameter_same_type,none,
-      "invalid initializer call with same type %0 as parameter", (Type))
-
 ERROR(missing_argument_named,none,
       "missing argument for parameter %0 in call", (Identifier))
 ERROR(missing_argument_positional,none,
@@ -1393,8 +1384,6 @@ ERROR(access_control_open_bad_decl,none,
       "only classes and overridable class members can be declared 'open';"
       " use 'public'", ())
 
-ERROR(invalid_decl_attribute_simple,none,
-      "attribute cannot be applied to declaration", ())
 ERROR(invalid_decl_attribute,none,
       "'%0' attribute cannot be applied to this declaration", (DeclAttribute))
 ERROR(invalid_decl_modifier,none,
@@ -1472,6 +1461,9 @@ WARNING(option_set_zero_constant,none,
 NOTE(option_set_empty_set_init,none,
      "use [] to silence this warning", ())
 
+ERROR(originally_defined_in_dupe_platform,none,
+      "duplicate version number for platform %0", (StringRef))
+
 // Alignment attribute
 ERROR(alignment_not_power_of_two,none,
       "alignment value must be a power of two", ())
@@ -1481,8 +1473,6 @@ ERROR(indirect_case_without_payload,none,
       "enum case %0 without associated value cannot be 'indirect'", (Identifier))
 ERROR(indirect_case_in_indirect_enum,none,
       "enum case in 'indirect' enum cannot also be 'indirect'", ())
-WARNING(enum_frozen_nonresilient,none,
-        "%0 has no effect without -enable-library-evolution", (DeclAttribute))
 WARNING(enum_frozen_nonpublic,none,
         "%0 has no effect on non-public enums", (DeclAttribute))
 
@@ -2228,9 +2218,6 @@ ERROR(recursive_same_type_constraint,none,
       "same-type constraint %0 == %1 is recursive", (Type, Type))
 ERROR(recursive_superclass_constraint,none,
       "superclass constraint %0 : %1 is recursive", (Type, Type))
-ERROR(requires_same_type_conflict,none,
-      "%select{associated type|generic parameter}0 %1 cannot be equal to "
-      "both %2 and %3", (bool, Type, Type, Type))
 ERROR(requires_generic_param_same_type_does_not_conform,none,
       "same-type constraint type %0 does not conform to required protocol %1",
       (Type, Identifier))
@@ -2905,9 +2892,6 @@ NOTE(found_candidate_type,none,
 
 ERROR(no_MaxBuiltinFloatType_found,none,
    "standard library error: _MaxBuiltinFloatType is not properly defined", ())
-ERROR(integer_literal_overflows_maxwidth, none,
-   "integer literal needs %1 bits, exceeding limit of %0 bits",
-   (unsigned, unsigned))
 
 ERROR(no_member_of_module,none,
       "module %0 has no member named %1", (Identifier, DeclName))
@@ -3078,8 +3062,6 @@ ERROR(missing_protocol,none,
       "missing protocol %0", (Identifier))
 ERROR(nil_literal_broken_proto,none,
       "protocol 'ExpressibleByNilLiteral' is broken", ())
-ERROR(array_protocol_broken,none,
-      "protocol 'ExpressibleByArrayLiteral' is broken", ())
 ERROR(builtin_integer_literal_broken_proto,none,
       "protocol '_ExpressibleByBuiltinIntegerLiteral' is broken", ())
 ERROR(integer_literal_broken_proto,none,
@@ -3120,8 +3102,6 @@ ERROR(should_use_empty_dictionary_literal,none,
       "use [:] to get an empty dictionary literal", ())
 
 // Dictionary literals
-ERROR(dictionary_protocol_broken,none,
-      "ExpressibleByDictionaryLiteral protocol definition is broken", ())
 ERROR(type_is_not_dictionary,none,
       "contextual type %0 cannot be used with dictionary literal", (Type))
 
@@ -3424,19 +3404,13 @@ ERROR(assignment_bang_has_immutable_subcomponent,none,
 NOTE(change_to_mutating,none,
      "mark %select{method|accessor}0 'mutating' to make 'self' mutable",
      (bool))
-NOTE(masked_instance_variable,none,
-     "add explicit 'self.' to refer to mutable property of %0",
-     (Type))
+NOTE(masked_mutable_property,none,
+     "add explicit '%0' to refer to mutable %1 of %2",
+     (StringRef, DescriptiveDeclKind, Type))
 
 ERROR(assignment_let_property_delegating_init,none,
       "'let' property %0 may not be initialized directly; use "
       "\"self.init(...)\" or \"self = ...\" instead", (DeclName))
-
-// ForEach Stmt
-ERROR(sequence_protocol_broken,none,
-      "SequenceType protocol definition is broken", ())
-ERROR(iterator_protocol_broken,none,
-      "IteratorProtocol protocol definition is broken", ())
 
 ERROR(label_shadowed, none,
       "label %0 cannot be reused on an inner statement", (Identifier))
@@ -3502,9 +3476,10 @@ NOTE(add_where_newline, none,
 NOTE(duplicate_where, none,
      "duplicate the 'where' on both patterns to check both patterns",())
 
-ERROR(trailing_closure_requires_parens,none,
-      "trailing closure requires parentheses for disambiguation in this"
-      " context", ())
+WARNING(trailing_closure_requires_parens,none,
+        "trailing closure in this context is confusable with the body of the"
+        " statement; pass as a parenthesized argument to silence this warning",
+        ())
 
 ERROR(opaque_type_var_no_init,none,
       "property declares an opaque return type, but has no initializer "
@@ -3571,17 +3546,12 @@ ERROR(closure_tuple_parameter_destructuring,none,
 ERROR(closure_tuple_parameter_destructuring_implicit,none,
       "closure tuple parameter %0 does not support destructuring "
       "with implicit parameters", (Type))
-ERROR(nested_tuple_parameter_destructuring,none,
-      "nested tuple parameter %0 of function %1 "
-      "does not support destructuring", (Type, Type))
 ERROR(single_tuple_parameter_mismatch_special,none,
       "%0 expects a single parameter of type %1%2",
       (DescriptiveDeclKind, Type, StringRef))
 ERROR(single_tuple_parameter_mismatch_normal,none,
       "%0 %1 expects a single parameter of type %2%3",
       (DescriptiveDeclKind, DeclBaseName, Type, StringRef))
-NOTE(note_maybe_forgot_to_form_tuple,none,
-     "did you mean to pass a tuple?", ())
 ERROR(unknown_single_tuple_parameter_mismatch,none,
       "single parameter of type %0 is expected in call", (Type))
 ERROR(cannot_convert_single_tuple_into_multiple_arguments,none,
@@ -4123,14 +4093,9 @@ ERROR(nonlocal_bridged_to_objc,none,
       "conformance of %0 to %1 can only be written in module %2",
       (Identifier, Identifier, Identifier))
 
-ERROR(broken_bridged_to_objc_protocol,none,
-      "_BridgedToObjectiveC protocol is broken", ())
-
 ERROR(missing_bridging_function,Fatal,
       "missing '%select{_forceBridgeFromObjectiveC|"
       "_conditionallyBridgeFromObjectiveC}0'", (bool))
-ERROR(missing_nserror_bridging_function,none,
-      "missing _bridgeNSError", ())
 
 #define OBJC_DIAG_SELECT "%select{initializer %1|implicit initializer %1|deinitializer|implicit deinitializer|method %1|getter for %1|subscript getter|setter for %1|subscript setter}0"
 
@@ -4489,8 +4454,6 @@ ERROR(specialize_attr_only_generic_param_req,none,
       "Only requirements on generic parameters are supported by '_specialize' attribute", ())
 ERROR(specialize_attr_only_one_concrete_same_type_req,none,
       "Only one concrete type should be used in the same-type requirement in '_specialize' attribute", ())
-ERROR(specialize_attr_non_nominal_type_constraint_req,none,
-      "Only conformances to nominal types are supported by '_specialize' attribute", ())
 ERROR(specialize_attr_non_protocol_type_constraint_req,none,
       "Only conformances to protocol types are supported by '_specialize' attribute", ())
 ERROR(specialize_attr_type_parameter_count_mismatch,none,

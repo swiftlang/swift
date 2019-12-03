@@ -917,6 +917,7 @@ namespace {
   class ConstraintGenerator : public ExprVisitor<ConstraintGenerator, Type> {
     ConstraintSystem &CS;
     DeclContext *CurDC;
+    ConstraintSystemPhase CurrPhase;
     SmallVector<DeclContext*, 4> DCStack;
 
     static const unsigned numEditorPlaceholderVariables = 2;
@@ -1108,9 +1109,16 @@ namespace {
 
   public:
     ConstraintGenerator(ConstraintSystem &CS, DeclContext *DC)
-      : CS(CS), CurDC(DC ? DC : CS.DC) { }
+        : CS(CS), CurDC(DC ? DC : CS.DC), CurrPhase(CS.getPhase()) {
+      // Although constraint system is initialized in `constraint
+      // generation` phase, we have to set it here manually because e.g.
+      // function builders could generate constraints for its body
+      // in the middle of the solving.
+      CS.setPhase(ConstraintSystemPhase::ConstraintGeneration);
+    }
 
     virtual ~ConstraintGenerator() {
+      CS.setPhase(CurrPhase);
       // We really ought to have this assertion:
       //   assert(DCStack.empty() && CurDC == CS.DC);
       // Unfortunately, ASTWalker is really bad at letting us establish
@@ -1147,7 +1155,7 @@ namespace {
       // If this is a standalone `nil` literal expression e.g.
       // `_ = nil`, let's diagnose it here because solver can't
       // attempt any types for it.
-      if (!CS.getTypeChecker().isExprBeingDiagnosed(expr)) {
+      if (!CS.isExprBeingDiagnosed(expr)) {
         auto *parentExpr = CS.getParentExpr(expr);
 
         // `_ = nil`
@@ -2135,7 +2143,7 @@ namespace {
           if (!ty || ty->is<TypeVariableType>())
             ty = CS.createTypeVariable(CS.getConstraintLocator(locator),
                                        TVO_CanBindToNoEscape);
-          return CS.getTypeChecker().getOptionalType(var->getLoc(), ty);
+          return TypeChecker::getOptionalType(var->getLoc(), ty);
         case ReferenceOwnershipOptionality::Allowed:
         case ReferenceOwnershipOptionality::Disallowed:
           break;
@@ -2332,7 +2340,7 @@ namespace {
           Type exnType = CS.getASTContext().getErrorDecl()->getDeclaredType();
           if (!exnType)
             return false;
-          if (CS.TC.coercePatternToType(pattern,
+          if (TypeChecker::coercePatternToType(pattern,
                                         TypeResolution::forContextual(CS.DC),
                                         exnType,
                                         TypeResolverContext::InExpression)) {
@@ -2852,7 +2860,7 @@ namespace {
     /// diagnosing ill-formed standard libraries, so it really isn't
     /// worth QoI efforts.
     Type getOptionalType(SourceLoc optLoc, Type valueTy) {
-      auto optTy = CS.getTypeChecker().getOptionalType(optLoc, valueTy);
+      auto optTy = TypeChecker::getOptionalType(optLoc, valueTy);
       if (!optTy ||
           TypeChecker::requireOptionalIntrinsics(CS.getASTContext(), optLoc))
         return Type();
@@ -3626,7 +3634,7 @@ namespace {
       if (auto keyPath = dyn_cast<KeyPathExpr>(expr)) {
         if (keyPath->isObjC()) {
           auto &cs = CG.getConstraintSystem();
-          (void)cs.getTypeChecker().checkObjCKeyPathExpr(cs.DC, keyPath);
+          (void)TypeChecker::checkObjCKeyPathExpr(cs.DC, keyPath);
         }
       }
 
@@ -3754,6 +3762,8 @@ namespace {
 } // end anonymous namespace
 
 Expr *ConstraintSystem::generateConstraints(Expr *expr, DeclContext *dc) {
+  InputExprs.insert(expr);
+
   // Remove implicit conversions from the expression.
   expr = expr->walk(SanitizeExpr(*this));
 
@@ -3776,7 +3786,7 @@ Type ConstraintSystem::generateConstraints(Pattern *pattern,
 }
 
 void ConstraintSystem::optimizeConstraints(Expr *e) {
-  if (getASTContext().LangOpts.DisableConstraintSolverPerformanceHacks)
+  if (getASTContext().TypeCheckerOpts.DisableConstraintSolverPerformanceHacks)
     return;
   
   SmallVector<Expr *, 16> linkedExprs;
@@ -3799,9 +3809,8 @@ bool swift::areGenericRequirementsSatisfied(
     const DeclContext *DC, GenericSignature sig,
     SubstitutionMap Substitutions, bool isExtension) {
 
-  auto *TC = DC->getASTContext().getLegacyGlobalTypeChecker();
   ConstraintSystemOptions Options;
-  ConstraintSystem CS(*TC, const_cast<DeclContext *>(DC), Options);
+  ConstraintSystem CS(const_cast<DeclContext *>(DC), Options);
   auto Loc = CS.getConstraintLocator(nullptr);
 
   // For every requirement, add a constraint.
@@ -3819,14 +3828,6 @@ bool swift::areGenericRequirementsSatisfied(
 
   // Having a solution implies the requirements have been fulfilled.
   return CS.solveSingle().hasValue();
-}
-
-bool swift::canSatisfy(Type type1, Type type2, bool openArchetypes,
-                       ConstraintKind kind, DeclContext *dc) {
-  auto *TC = dc->getASTContext().getLegacyGlobalTypeChecker();
-  assert(TC && "Must have type checker to make semantic query!");
-  return TC->typesSatisfyConstraint(type1, type2, openArchetypes, kind, dc,
-                                    /*unwrappedIUO=*/nullptr);
 }
 
 void swift::eraseOpenedExistentials(ConstraintSystem &CS, Expr *&expr) {
@@ -3870,10 +3871,8 @@ getMemberDecls(InterestedMemberKind Kind) {
 ResolvedMemberResult
 swift::resolveValueMember(DeclContext &DC, Type BaseTy, DeclName Name) {
   ResolvedMemberResult Result;
-  // If the current ast context has no type checker, create one for it.
-  auto *TC = DC.getASTContext().getLegacyGlobalTypeChecker();
-  assert(TC && "Must have type checker to make global query!");
-  ConstraintSystem CS(*TC, &DC, None);
+  assert(DC.getASTContext().areSemanticQueriesEnabled());
+  ConstraintSystem CS(&DC, None);
 
   // Look up all members of BaseTy with the given Name.
   MemberLookupResult LookupResult = CS.performMemberLookup(

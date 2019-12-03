@@ -911,36 +911,10 @@ void SwiftLangSupport::printMemberDeclDescription(const swift::ValueDecl *VD,
 
 std::string SwiftLangSupport::resolvePathSymlinks(StringRef FilePath) {
   std::string InputPath = FilePath;
-#if !defined(_WIN32)
-  char full_path[MAXPATHLEN];
-  if (const char *path = realpath(InputPath.c_str(), full_path))
-    return path;
-
-  return InputPath;
-#else
-  wchar_t full_path[MAX_PATH] = {0};
-  llvm::SmallVector<llvm::UTF16, 50> utf16Path;
-  llvm::convertUTF8ToUTF16String(InputPath.c_str(), utf16Path);
-
-  HANDLE fileHandle = CreateFileW(
-      (LPCWSTR)utf16Path.data(), 0, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr,
-      OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, nullptr);
-
-  if (fileHandle == INVALID_HANDLE_VALUE)
+  llvm::SmallString<256> output;
+  if (llvm::sys::fs::real_path(InputPath, output))
     return InputPath;
-
-  DWORD numChars = GetFinalPathNameByHandleW(fileHandle, full_path, MAX_PATH,
-                                            FILE_NAME_NORMALIZED);
-  CloseHandle(fileHandle);
-  std::string utf8Path;
-  if (numChars > 0 && numChars <= MAX_PATH) {
-    llvm::ArrayRef<char> pathRef((const char *)full_path,
-                                 (const char *)(full_path + numChars));
-    return llvm::convertUTF16ToUTF8String(pathRef, utf8Path) ? utf8Path
-                                                             : InputPath;
-  }
-  return InputPath;
-#endif
+  return output.str();
 }
 
 void SwiftLangSupport::getStatistics(StatisticsReceiver receiver) {

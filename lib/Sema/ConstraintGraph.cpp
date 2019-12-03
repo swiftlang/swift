@@ -972,7 +972,7 @@ namespace {
         contractedCycle = false;
         for (const auto &edge : cycleEdges) {
           if (unionSets(edge.first, edge.second)) {
-            if (ctx.LangOpts.DebugConstraintSolver) {
+            if (ctx.TypeCheckerOpts.DebugConstraintSolver) {
               auto &log = ctx.TypeCheckerDebug->getStream();
               if (cs.solverState)
                 log.indent(cs.solverState->depth * 2);
@@ -1255,7 +1255,7 @@ bool ConstraintGraph::contractEdges() {
           rep2->getImpl().canBindToLValue()) ||
          // Allow l-value contractions when binding parameter types.
          isParamBindingConstraint)) {
-      if (CS.getASTContext().LangOpts.DebugConstraintSolver) {
+      if (CS.getASTContext().TypeCheckerOpts.DebugConstraintSolver) {
         auto &log = CS.getASTContext().TypeCheckerDebug->getStream();
         if (CS.solverState)
           log.indent(CS.solverState->depth * 2);
@@ -1319,9 +1319,10 @@ void ConstraintGraph::incrementConstraintsPerContractionCounter() {
 
 #pragma mark Debugging output
 
-void ConstraintGraphNode::print(llvm::raw_ostream &out, unsigned indent) const {
+void ConstraintGraphNode::print(llvm::raw_ostream &out, unsigned indent,
+                                PrintOptions PO) const {
   out.indent(indent);
-  TypeVar->print(out);
+  Type(TypeVar).print(out, PO);
   out << ":\n";
 
   // Print constraints.
@@ -1395,15 +1396,18 @@ void ConstraintGraphNode::print(llvm::raw_ostream &out, unsigned indent) const {
 }
 
 void ConstraintGraphNode::dump() const {
-  llvm::SaveAndRestore<bool>
-    debug(TypeVar->getASTContext().LangOpts.DebugConstraintSolver, true);
-  print(llvm::dbgs(), 0);
+  PrintOptions PO;
+  PO.PrintTypesForDebugging = true;
+  print(llvm::dbgs(), 0, PO);
 }
 
 void ConstraintGraph::print(ArrayRef<TypeVariableType *> typeVars,
                             llvm::raw_ostream &out) {
+  PrintOptions PO;
+  PO.PrintTypesForDebugging = true;
+
   for (auto typeVar : typeVars) {
-    (*this)[typeVar].print(out, 2);
+    (*this)[typeVar].print(out, 2, PO);
     out << "\n";
   }
 }
@@ -1413,8 +1417,6 @@ void ConstraintGraph::dump() {
 }
 
 void ConstraintGraph::dump(llvm::raw_ostream &out) {
-  llvm::SaveAndRestore<bool>
-    debug(CS.getASTContext().LangOpts.DebugConstraintSolver, true);
   print(CS.getTypeVariables(), out);
 }
 
@@ -1422,6 +1424,8 @@ void ConstraintGraph::printConnectedComponents(
     ArrayRef<TypeVariableType *> typeVars,
     llvm::raw_ostream &out) {
   auto components = computeConnectedComponents(typeVars);
+  PrintOptions PO;
+  PO.PrintTypesForDebugging = true;
   for (const auto& component : components) {
     out.indent(2);
     out << component.solutionIndex << ": ";
@@ -1432,7 +1436,7 @@ void ConstraintGraph::printConnectedComponents(
     // Print all of the type variables in this connected component.
     interleave(component.typeVars,
                [&](TypeVariableType *typeVar) {
-                 typeVar->print(out);
+                 Type(typeVar).print(out, PO);
                },
                [&] {
                  out << ' ';
@@ -1452,8 +1456,6 @@ void ConstraintGraph::printConnectedComponents(
 }
 
 void ConstraintGraph::dumpConnectedComponents() {
-  llvm::SaveAndRestore<bool>
-    debug(CS.getASTContext().LangOpts.DebugConstraintSolver, true);
   printConnectedComponents(CS.getTypeVariables(), llvm::dbgs());
 }
 
@@ -1559,18 +1561,20 @@ void ConstraintGraphNode::verify(ConstraintGraph &cg) {
   }
 
   // Make sure that the adjacencies we expect are the adjacencies we have.
+  PrintOptions PO;
+  PO.PrintTypesForDebugging = true;
   for (auto adj : expectedAdjacencies) {
     auto knownAdj = AdjacencyInfo.find(adj.first);
     requireWithContext(knownAdj != AdjacencyInfo.end(),
                        "missing adjacency information for type variable",
                        [&] {
-      llvm::dbgs() << "  type variable=" << adj.first->getString() << 'n';
+      llvm::dbgs() << "  type variable=" << adj.first->getString(PO) << 'n';
     });
 
     requireWithContext(adj.second == knownAdj->second.NumConstraints,
                        "wrong number of adjacencies for type variable",
                        [&] {
-       llvm::dbgs() << "  type variable=" << adj.first->getString()
+       llvm::dbgs() << "  type variable=" << adj.first->getString(PO)
                     << " (" << adj.second << " vs. "
                     << knownAdj->second.NumConstraints
                     << ")\n";
@@ -1584,7 +1588,7 @@ void ConstraintGraphNode::verify(ConstraintGraph &cg) {
       requireWithContext(AdjacencyInfo.count(adj.first) > 0,
                          "extraneous adjacency info for type variable",
                          [&] {
-        llvm::dbgs() << "  type variable=" << adj.first->getString() << '\n';
+        llvm::dbgs() << "  type variable=" << adj.first->getString(PO) << '\n';
       });
     }
   }

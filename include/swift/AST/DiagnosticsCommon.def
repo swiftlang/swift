@@ -145,9 +145,6 @@ ERROR(sdk_node_unrecognized_accessor_kind,none,
 ERROR(circular_reference, none,
       "circular reference", ())
 
-ERROR(redundant_type_alias_define, none,
-      "redundant type alias declaration", ())
-
 NOTE(circular_reference_through, none,
      "through reference here", ())
 

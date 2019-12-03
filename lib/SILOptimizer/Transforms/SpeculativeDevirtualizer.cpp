@@ -160,8 +160,7 @@ static FullApplySite speculateMonomorphicTarget(FullApplySite AI,
   CCBI = Builder.createCheckedCastBranch(AI.getLoc(), /*exact*/ true,
                                       CMI->getOperand(),
                                       SILType::getPrimitiveObjectType(SubType),
-                                      Iden,
-                                      Virt);
+                                      SubType, Iden, Virt);
   It = CCBI->getIterator();
 
   SILBuilderWithScope VirtBuilder(Virt, AI.getInstruction());
@@ -563,7 +562,7 @@ static bool tryToSpeculateTarget(FullApplySite AI, ClassHierarchyAnalysis *CHA,
     SILBuilderWithScope B(LastCCBI);
     auto CastedValue = B.createUncheckedBitCast(LastCCBI->getLoc(),
                                                 LastCCBI->getOperand(),
-                                                LastCCBI->getCastType());
+                                                LastCCBI->getTargetLoweredType());
     B.createBranch(LastCCBI->getLoc(), LastCCBI->getSuccessBB(), {CastedValue});
     LastCCBI->eraseFromParent();
     ORE.emit(RB);

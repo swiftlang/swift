@@ -4138,10 +4138,42 @@ public:
 
   void addAccessControl(const ValueDecl *VD,
                         CodeCompletionResultBuilder &Builder) {
-    assert(CurrDeclContext->getSelfNominalTypeDecl());
-    auto AccessOfContext =
-        CurrDeclContext->getSelfNominalTypeDecl()->getFormalAccess();
-    auto Access = std::min(VD->getFormalAccess(), AccessOfContext);
+    auto CurrentNominal = CurrDeclContext->getSelfNominalTypeDecl();
+    assert(CurrentNominal);
+
+    auto AccessOfContext = CurrentNominal->getFormalAccess();
+    if (AccessOfContext < AccessLevel::Public)
+      return;
+
+    auto Access = VD->getFormalAccess();
+    // Use the greater access between the protocol requirement and the witness.
+    // In case of:
+    //
+    //   public protocol P { func foo() }
+    //   public class B { func foo() {} }
+    //   public class C: B, P {
+    //     <complete>
+    //   }
+    //
+    // 'VD' is 'B.foo()' which is implicitly 'internal'. But as the overriding
+    // declaration, the user needs to write both 'public' and 'override':
+    //
+    //   public class C: B {
+    //     public override func foo() {}
+    //   }
+    if (Access < AccessLevel::Public &&
+        !isa<ProtocolDecl>(VD->getDeclContext())) {
+      for (auto Conformance : CurrentNominal->getAllConformances()) {
+        Conformance->getRootConformance()->forEachValueWitness(
+            [&](ValueDecl *req, Witness witness) {
+              if (witness.getDecl() == VD)
+                Access = std::max(
+                    Access, Conformance->getProtocol()->getFormalAccess());
+            });
+      }
+    }
+
+    Access = std::min(Access, AccessOfContext);
     // Only emit 'public', not needed otherwise.
     if (Access >= AccessLevel::Public)
       Builder.addAccessControlKeyword(Access);
@@ -4364,9 +4396,7 @@ public:
     if (D->shouldHideFromEditor())
       return;
 
-    if (D->isFinal() ||
-        // A 'class' member with an initial value cannot be overriden either.
-        (D->isStatic() && D->getAttrs().hasAttribute<HasInitialValueAttr>()))
+    if (D->isFinal())
       return;
 
     bool hasIntroducer = hasFuncIntroducer ||
@@ -4955,13 +4985,16 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink,
   case CompletionKind::TypeIdentifierWithoutDot:
     break;
 
-  case CompletionKind::TypeDeclResultBeginning:
-    if (!isa<ProtocolDecl>(CurDeclContext))
-      if (CurDeclContext->isTypeContext() ||
-          (ParsedDecl && isa<FuncDecl>(ParsedDecl)))
+  case CompletionKind::TypeDeclResultBeginning: {
+    auto DC = CurDeclContext;
+    if (ParsedDecl && ParsedDecl == CurDeclContext->getAsDecl())
+      DC = ParsedDecl->getDeclContext();
+    if (!isa<ProtocolDecl>(DC))
+      if (DC->isTypeContext() || (ParsedDecl && isa<FuncDecl>(ParsedDecl)))
         addOpaqueTypeKeyword(Sink);
 
     LLVM_FALLTHROUGH;
+  }
   case CompletionKind::TypeSimpleBeginning:
     addAnyTypeKeyword(Sink);
     break;
@@ -5130,8 +5163,6 @@ void CodeCompletionCallbacksImpl::doneParsing() {
         CD->getContextKind() == DeclContextKind::TopLevelCodeDecl)
       MaybeFuncBody = false;
   }
-  // Add keywords even if type checking fails completely.
-  addKeywords(CompletionContext.getResultSink(), MaybeFuncBody);
 
   if (auto *DC = dyn_cast_or_null<DeclContext>(ParsedDecl)) {
     if (DC->isChildContextOf(CurDeclContext))
@@ -5141,6 +5172,9 @@ void CodeCompletionCallbacksImpl::doneParsing() {
   typeCheckContextUntil(
       CurDeclContext,
       CurDeclContext->getASTContext().SourceMgr.getCodeCompletionLoc());
+
+  // Add keywords even if type checking fails completely.
+  addKeywords(CompletionContext.getResultSink(), MaybeFuncBody);
 
   Optional<Type> ExprType;
   ConcreteDeclRef ReferencedDecl = nullptr;

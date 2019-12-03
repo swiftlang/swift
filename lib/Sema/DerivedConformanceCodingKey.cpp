@@ -145,9 +145,8 @@ static ValueDecl *deriveInitDecl(DerivedConformance &derived, Type paramType,
 
   initDecl->setAccess(derived.Nominal->getFormalAccess());
 
-  C.addSynthesizedDecl(initDecl);
-
   derived.addMembersToConformanceContext({initDecl});
+
   return initDecl;
 }
 
@@ -176,9 +175,7 @@ static ValueDecl *deriveProperty(DerivedConformance &derived, Type type,
   // Synthesize the body.
   synthesizer(getterDecl);
 
-  auto *dc = cast<IterableDeclContext>(derived.ConformanceDecl);
-  dc->addMember(propDecl);
-  dc->addMember(pbDecl);
+  derived.addMembersToConformanceContext({propDecl, pbDecl});
   return propDecl;
 }
 

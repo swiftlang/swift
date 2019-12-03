@@ -25,6 +25,7 @@
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/Path.h"
 #include "llvm/Support/Regex.h"
 #include "llvm/Support/Signals.h"
 #include "llvm/Support/Threading.h"
@@ -49,35 +50,6 @@ using namespace sourcekitd_test;
 #if defined(_WIN32)
 namespace {
 int STDOUT_FILENO = _fileno(stdout);
-const constexpr size_t MAXPATHLEN = MAX_PATH + 1;
-char *realpath(const char *path, char *resolved_path) {
-  wchar_t full_path[MAXPATHLEN] = {0};
-  llvm::SmallVector<llvm::UTF16, 50> utf16Path;
-  llvm::convertUTF8ToUTF16String(path, utf16Path);
-
-  HANDLE fileHandle = CreateFileW(
-      (LPCWSTR)utf16Path.data(), 0, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr,
-      OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, nullptr);
-
-  if (fileHandle == INVALID_HANDLE_VALUE)
-    return nullptr;
-  DWORD success = GetFinalPathNameByHandleW(fileHandle, full_path, MAX_PATH,
-                                            FILE_NAME_NORMALIZED);
-  CloseHandle(fileHandle);
-  if (!success) return nullptr;
-
-  std::string utf8Path;
-  llvm::ArrayRef<char> pathRef((const char *)full_path,
-                               (const char *)(full_path + MAX_PATH));
-  if (!llvm::convertUTF16ToUTF8String(pathRef, utf8Path))
-    return nullptr;
-
-  if (!resolved_path) {
-    resolved_path = static_cast<char *>(malloc(utf8Path.length() + 1));
-  }
-  std::copy(std::begin(utf8Path), std::end(utf8Path), resolved_path);
-  return resolved_path;
-}
 }
 #endif
 
@@ -312,6 +284,7 @@ static inline std::string getInterfaceGenDocumentName() {
   // "Absolute path" on all platforms since handleTestInvocation will attempt to make this absolute
   llvm::SmallString<64> path = llvm::StringRef("/<interface-gen>");
   llvm::sys::fs::make_absolute(path);
+  llvm::sys::path::native(path);
   return path.str();
 }
 
@@ -475,6 +448,7 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
     llvm::SmallString<64> AbsSourceFile;
     AbsSourceFile += SourceFile;
     llvm::sys::fs::make_absolute(AbsSourceFile);
+    llvm::sys::path::native(AbsSourceFile);
     SourceFile = AbsSourceFile.str();
   }
   std::string SemaName = !Opts.Name.empty() ? Opts.Name : SourceFile;
@@ -1445,9 +1419,9 @@ static void printCursorInfo(sourcekitd_variant_t Info, StringRef FilenameIn,
   }
 
   std::string Filename = FilenameIn;
-  char full_path[MAXPATHLEN];
-  if (const char *path = realpath(Filename.c_str(), full_path))
-    Filename = path;
+  llvm::SmallString<256> output;
+  if (!llvm::sys::fs::real_path(Filename, output))
+    Filename = output.str();
 
   const char *Kind = sourcekitd_uid_get_string_ptr(KindUID);
   const char *USR = sourcekitd_variant_dictionary_get_string(Info, KeyUSR);
@@ -1617,9 +1591,9 @@ static void printRangeInfo(sourcekitd_variant_t Info, StringRef FilenameIn,
   }
 
   std::string Filename = FilenameIn;
-  char full_path[MAXPATHLEN];
-  if (const char *path = realpath(Filename.c_str(), full_path))
-    Filename = path;
+  llvm::SmallString<256> output;
+  if (llvm::sys::fs::real_path(Filename, output))
+    Filename = output.str();
 
   sourcekitd_variant_t OffsetObj =
     sourcekitd_variant_dictionary_get_value(Info, KeyOffset);

@@ -237,7 +237,7 @@ Expr *TypeChecker::findLHS(DeclContext *DC, Expr *E, Identifier name) {
     if (!left)
       // LHS is not binary expression.
       return E;
-    switch (Context.associateInfixOperators(left, right)) {
+    switch (DC->getASTContext().associateInfixOperators(left, right)) {
       case swift::Associativity::None:
         return nullptr;
       case swift::Associativity::Left:
@@ -615,38 +615,6 @@ Expr *TypeChecker::buildRefExpr(ArrayRef<ValueDecl *> Decls,
                                                     functionRefKind,
                                                     Implicit);
   return result;
-}
-
-Expr *TypeChecker::buildAutoClosureExpr(DeclContext *DC, Expr *expr,
-                                        FunctionType *closureType) {
-  bool isInDefaultArgumentContext = false;
-  if (auto *init = dyn_cast<Initializer>(DC))
-    isInDefaultArgumentContext =
-        init->getInitializerKind() == InitializerKind::DefaultArgument;
-
-  auto info = closureType->getExtInfo();
-  auto newClosureType = closureType;
-
-  if (isInDefaultArgumentContext && info.isNoEscape())
-    newClosureType = closureType->withExtInfo(info.withNoEscape(false))
-                         ->castTo<FunctionType>();
-
-  auto *closure = new (Context) AutoClosureExpr(
-      expr, newClosureType, AutoClosureExpr::InvalidDiscriminator, DC);
-
-  closure->setParameterList(ParameterList::createEmpty(Context));
-
-  ClosuresWithUncomputedCaptures.push_back(closure);
-
-  if (!newClosureType->isEqual(closureType)) {
-    assert(isInDefaultArgumentContext);
-    assert(newClosureType
-               ->withExtInfo(newClosureType->getExtInfo().withNoEscape(true))
-               ->isEqual(closureType));
-    return new (Context) FunctionConversionExpr(closure, closureType);
-  }
-
-  return closure;
 }
 
 static Type lookupDefaultLiteralType(const DeclContext *dc,

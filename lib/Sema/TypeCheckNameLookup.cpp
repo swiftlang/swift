@@ -20,52 +20,12 @@
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/Basic/TopCollection.h"
 #include <algorithm>
 
 using namespace swift;
-
-void LookupResult::filter(
-    llvm::function_ref<bool(LookupResultEntry, bool)> pred) {
-  size_t index = 0;
-  size_t originalFirstOuter = IndexOfFirstOuterResult;
-  Results.erase(std::remove_if(Results.begin(), Results.end(),
-                               [&](LookupResultEntry result) -> bool {
-                                 auto isInner = index < originalFirstOuter;
-                                 index++;
-                                 if (pred(result, !isInner))
-                                   return false;
-
-                                 // Need to remove this, which means, if it is
-                                 // an inner result, the outer results need to
-                                 // shift down.
-                                 if (isInner)
-                                   IndexOfFirstOuterResult--;
-                                 return true;
-                               }),
-                Results.end());
-}
-
-void LookupResult::shiftDownResults() {
-  // Remove inner results.
-  Results.erase(Results.begin(), Results.begin() + IndexOfFirstOuterResult);
-  IndexOfFirstOuterResult = 0;
-
-  if (Results.empty())
-    return;
-
-  // Compute IndexOfFirstOuterResult.
-  const DeclContext *dcInner = Results.front().getValueDecl()->getDeclContext();
-  for (auto &&result : Results) {
-    const DeclContext *dc = result.getValueDecl()->getDeclContext();
-    if (dc == dcInner ||
-        (dc->isModuleScopeContext() && dcInner->isModuleScopeContext()))
-      ++IndexOfFirstOuterResult;
-    else
-      break;
-  }
-}
 
 namespace {
   /// Builder that helps construct a lookup result from the raw lookup
@@ -248,17 +208,17 @@ namespace {
   };
 } // end anonymous namespace
 
-static UnqualifiedLookup::Options
+static UnqualifiedLookupOptions
 convertToUnqualifiedLookupOptions(NameLookupOptions options) {
-  UnqualifiedLookup::Options newOptions;
+  UnqualifiedLookupOptions newOptions;
   if (options.contains(NameLookupFlags::KnownPrivate))
-    newOptions |= UnqualifiedLookup::Flags::KnownPrivate;
+    newOptions |= UnqualifiedLookupFlags::KnownPrivate;
   if (options.contains(NameLookupFlags::ProtocolMembers))
-    newOptions |= UnqualifiedLookup::Flags::AllowProtocolMembers;
+    newOptions |= UnqualifiedLookupFlags::AllowProtocolMembers;
   if (options.contains(NameLookupFlags::IgnoreAccessControl))
-    newOptions |= UnqualifiedLookup::Flags::IgnoreAccessControl;
+    newOptions |= UnqualifiedLookupFlags::IgnoreAccessControl;
   if (options.contains(NameLookupFlags::IncludeOuterResults))
-    newOptions |= UnqualifiedLookup::Flags::IncludeOuterResults;
+    newOptions |= UnqualifiedLookupFlags::IncludeOuterResults;
 
   return newOptions;
 }
@@ -266,13 +226,17 @@ convertToUnqualifiedLookupOptions(NameLookupOptions options) {
 LookupResult TypeChecker::lookupUnqualified(DeclContext *dc, DeclName name,
                                             SourceLoc loc,
                                             NameLookupOptions options) {
-  UnqualifiedLookup lookup(name, dc, loc,
-                           convertToUnqualifiedLookupOptions(options));
+  auto ulOptions = convertToUnqualifiedLookupOptions(options);
+
+  auto &ctx = dc->getASTContext();
+  auto descriptor = UnqualifiedLookupDescriptor(name, dc, loc, ulOptions);
+  auto lookup = evaluateOrDefault(ctx.evaluator,
+                                  UnqualifiedLookupRequest{descriptor}, {});
 
   LookupResult result;
   LookupResultBuilder builder(result, dc, options);
-  for (auto idx : indices(lookup.Results)) {
-    const auto &found = lookup.Results[idx];
+  for (auto idx : indices(lookup.allResults())) {
+    const auto &found = lookup[idx];
     // Determine which type we looked through to find this result.
     Type foundInType;
 
@@ -287,7 +251,7 @@ LookupResult TypeChecker::lookupUnqualified(DeclContext *dc, DeclName name,
     }
 
     builder.add(found.getValueDecl(), found.getDeclContext(), foundInType,
-                /*isOuter=*/idx >= lookup.IndexOfFirstOuterResult);
+                /*isOuter=*/idx >= lookup.getIndexOfFirstOuterResult());
   }
   return result;
 }
@@ -296,18 +260,20 @@ LookupResult
 TypeChecker::lookupUnqualifiedType(DeclContext *dc, DeclName name,
                                    SourceLoc loc,
                                    NameLookupOptions options) {
+  auto &ctx = dc->getASTContext();
   auto ulOptions = convertToUnqualifiedLookupOptions(options) |
-                   UnqualifiedLookup::Flags::TypeLookup;
+                   UnqualifiedLookupFlags::TypeLookup;
   {
     // Try lookup without ProtocolMembers first.
-    UnqualifiedLookup lookup(
+    auto desc = UnqualifiedLookupDescriptor(
         name, dc, loc,
-        ulOptions - UnqualifiedLookup::Flags::AllowProtocolMembers);
+        ulOptions - UnqualifiedLookupFlags::AllowProtocolMembers);
 
-    if (!lookup.Results.empty() ||
-        !options.contains(NameLookupFlags::ProtocolMembers)) {
-      return LookupResult(lookup.Results, lookup.IndexOfFirstOuterResult);
-    }
+    auto lookup =
+        evaluateOrDefault(ctx.evaluator, UnqualifiedLookupRequest{desc}, {});
+    if (!lookup.allResults().empty() ||
+        !options.contains(NameLookupFlags::ProtocolMembers))
+      return lookup;
   }
 
   {
@@ -316,11 +282,10 @@ TypeChecker::lookupUnqualifiedType(DeclContext *dc, DeclName name,
     // FIXME: Fix the problem where if NominalTypeDecl::getAllProtocols()
     // is called too early, we start resolving extensions -- even those
     // which do provide not conformances.
-    UnqualifiedLookup lookup(
+    auto desc = UnqualifiedLookupDescriptor(
         name, dc, loc,
-        ulOptions | UnqualifiedLookup::Flags::AllowProtocolMembers);
-
-    return LookupResult(lookup.Results, lookup.IndexOfFirstOuterResult);
+        ulOptions | UnqualifiedLookupFlags::AllowProtocolMembers);
+    return evaluateOrDefault(ctx.evaluator, UnqualifiedLookupRequest{desc}, {});
   }
 }
 

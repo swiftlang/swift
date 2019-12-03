@@ -252,16 +252,18 @@ public:
   /// pointer points to (see NodeType).
   class CGNode {
 
-    /// The associated value in the function. This is always valid for Argument
-    /// and Value nodes, and always nullptr for Return nodes. For Content nodes,
-    /// i is only used for debug printing. A Content's value 'V' is unreliable
-    /// because it can change as a result of the order the the graph is
-    /// constructed and summary graphs are merged. Sometimes it is derived from
-    /// the instructions that access the content, other times, it's simply
-    /// inherited from its parent. There may be multiple nodes associated to the
-    /// same value, e.g. a Content node has the same V as its points-to
-    /// predecessor.
-    ValueBase *V;
+    /// The associated value in the function. This is only valid for nodes that
+    /// are mapped to a value in the graph's Values2Nodes map. Multiple values
+    /// may be mapped to the same node, but only one value is associated with
+    /// the node via 'mappedValue'. Setting 'mappedValue' to a valid SILValue
+    /// for an unmapped node would result in a dangling pointer when the
+    /// SILValue is deleted.
+    ///
+    /// Argument and Value nodes are always initially mapped, but may become
+    /// unmapped when their SILValue is deleted. Content nodes are conditionally
+    /// mapped, only if they are associated with an explicit dereference in the
+    /// code (which has not been deleted). Return nodes are never mapped.
+    ValueBase *mappedValue;
 
     /// The outgoing points-to edge (if any) to a Content node. See also:
     /// pointsToIsEdge.
@@ -305,13 +307,19 @@ public:
     /// True if the merge is finished (see mergeTo). In this state this node
     /// is completely unlinked from the graph,
     bool isMerged = false;
-    
+
+    /// True if this is a content node that owns a reference count. Such a
+    /// content node necessarilly keeps alive all content it points to until it
+    /// is released. This can be conservatively false.
+    bool hasRC = false;
+
     /// The type of the node (mainly distinguishes between content and value
     /// nodes).
     NodeType Type;
     
     /// The constructor.
-    CGNode(ValueBase *V, NodeType Type) : V(V), UsePoints(0), Type(Type) {
+    CGNode(ValueBase *V, NodeType Type, bool hasRC)
+        : mappedValue(V), UsePoints(0), hasRC(hasRC), Type(Type) {
       switch (Type) {
       case NodeType::Argument:
       case NodeType::Value:
@@ -326,6 +334,11 @@ public:
         break;
       }
     }
+
+    /// Get the representative node that maps to a SILValue and depth in the
+    /// pointsTo graph.
+    std::pair<const CGNode *, unsigned>
+    getRepNode(SmallPtrSetImpl<const CGNode *> &visited) const;
 
     /// Merges the use points from another node and returns true if there are
     /// any changes.
@@ -403,17 +416,7 @@ public:
 
     /// Checks an invariant of the connection graph: The points-to nodes of
     /// the defer-successors must match with the points-to of this node.
-    bool matchPointToOfDefers() const {
-      for (CGNode *Def : defersTo) {
-        if (pointsTo != Def->pointsTo)
-          return false;
-      }
-      /// A defer-path in the graph must not end without the specified points-to
-      /// node.
-      if (pointsTo && !pointsToIsEdge && defersTo.empty())
-        return false;
-      return true;
-    }
+    bool matchPointToOfDefers(bool allowMerge = false) const;
 
     friend class CGNodeMap;
     friend class ConnectionGraph;
@@ -421,19 +424,29 @@ public:
     friend struct CGNodeWorklist;
 
   public:
-    SILValue getValue() const {
-      assert(Type == NodeType::Argument || Type == NodeType::Value);
-      return V;
-    }
-    SILValue getValueOrNull() const { return V; }
+    struct RepValue {
+      // May only be an invalid SILValue for Return nodes or deleted values.
+      llvm::PointerIntPair<SILValue, 1, bool> valueAndIsReturn;
+      unsigned depth;
 
-    void updateValue(SILValue newValue) {
-      assert(isContent());
-      V = newValue;
-    }
+      SILValue getValue() const { return valueAndIsReturn.getPointer(); }
+      bool isReturn() const { return valueAndIsReturn.getInt(); }
+      void
+      print(llvm::raw_ostream &stream,
+            const llvm::DenseMap<const SILNode *, unsigned> &instToIDMap) const;
+    };
+    // Get the representative SILValue for this node its depth relative to the
+    // node that is mapped to this value.
+    RepValue getRepValue() const;
 
     /// Return true if this node represents content.
     bool isContent() const { return Type == NodeType::Content; }
+
+    /// Return true if this node represents an entire reference counted object.
+    bool hasRefCount() const { return hasRC; }
+
+    void setRefCount(bool rc) { hasRC = rc; }
+
     /// Returns the escape state.
     EscapeState getEscapeState() const { return State; }
 
@@ -463,9 +476,8 @@ public:
     /// Note that in the false-case the node's value can still escape via
     /// the return instruction.
     ///
-    /// \p nodeValue is often the same as 'this->V', but is sometimes a more
-    /// refined value. For content nodes, 'this->V' is only a placeholder that
-    /// does not necessarilly represent the node's memory.
+    /// \p nodeValue is often the same as 'this->getRepValue().getValue()', but
+    /// is sometimes a more refined value specific to a content nodes.
     bool escapesInsideFunction(SILValue nodeValue) const {
       switch (getEscapeState()) {
         case EscapeState::None:
@@ -476,11 +488,10 @@ public:
         case EscapeState::Global:
           return true;
       }
-
       llvm_unreachable("Unhandled EscapeState in switch.");
     }
 
-    /// Returns the content node if of this node if it exists in the graph.
+    /// Returns the content node of this node if it exists in the graph.
     CGNode *getContentNodeOrNull() const {
       return pointsTo;
     }
@@ -575,10 +586,14 @@ public:
 
     /// Removes all nodes from the graph.
     void clear();
-    
+
     /// Allocates a node of a given type.
-    CGNode *allocNode(ValueBase *V, NodeType Type) {
-      CGNode *Node = new (NodeAllocator.Allocate()) CGNode(V, Type);
+    ///
+    /// hasRC is set for Content nodes based on the type and origin of
+    /// the pointer.
+    CGNode *allocNode(ValueBase *V, NodeType Type, bool hasRC = false) {
+      assert(Type == NodeType::Content || !hasRC);
+      CGNode *Node = new (NodeAllocator.Allocate()) CGNode(V, Type, hasRC);
       Nodes.push_back(Node);
       return Node;
     }
@@ -603,14 +618,25 @@ public:
       }
     }
 
+    /// Initialize the 'pointsTo' fields of all nodes in the defer web of \p
+    /// initialiNode.
+    ///
+    /// If \p createEdge is true, a proper pointsTo edge will be created from \p
+    /// initialNode to \p pointsTo.
+    void initializePointsTo(CGNode *initialNode, CGNode *newPointsTo,
+                            bool createEdge = false);
+
+    void initializePointsToEdge(CGNode *initialNode, CGNode *newPointsTo) {
+      initializePointsTo(initialNode, newPointsTo, true);
+    }
+
     /// Merges all nodes which are added to the ToMerge list.
     void mergeAllScheduledNodes();
 
-    /// Transitively updates pointsTo of all nodes in the defer-edge web,
-    /// starting at \p InitialNode.
-    /// If a node in the web already points to another content node, the other
-    /// content node is scheduled to be merged with \p pointsTo.
-    void updatePointsTo(CGNode *InitialNode, CGNode *pointsTo);
+    /// Transitively update pointsTo of all nodes in the defer-edge web,
+    /// reaching and reachable from \p initialNode. All nodes in this defer web
+    /// must already have an initialized `pointsTo`.
+    void mergePointsTo(CGNode *initialNode, CGNode *pointsTo);
 
     /// Utility function to clear the isInWorkList flags of all nodes in
     /// \p WorkList.
@@ -627,12 +653,19 @@ public:
     /// Returns null, if V is not a "pointer".
     CGNode *getNode(ValueBase *V, bool createIfNeeded = true);
 
-    /// Gets or creates a content node to which \a AddrNode points to during
-    /// initial graph construction. This may not be called after defer edges
-    /// have been created. Doing so would break the invariant that all
-    /// non-content nodes ultimately have a pointsTo edge to a single content
-    /// node.
-    CGNode *getContentNode(CGNode *AddrNode);
+    /// Helper to create and return a content node with the given \p hasRC
+    /// flag. \p addrNode will gain a points-to edge to the new content node.
+    CGNode *createContentNode(CGNode *addrNode, bool hasRC);
+
+    /// Create a new content node based on an existing content node to support
+    /// graph merging.
+    ///
+    /// \p destAddrNode will point to to new content. The content's initial
+    /// state will be initialized based on the \p srcContent node.
+    CGNode *createMergedContent(CGNode *destAddrNode, CGNode *srcContent);
+
+    /// Get a node represnting the field data within the given RC node.
+    CGNode *getFieldContent(CGNode *rcNode);
 
     /// Get or creates a pseudo node for the function return value.
     CGNode *getReturnNode() {
@@ -662,6 +695,8 @@ public:
     void setNode(ValueBase *V, CGNode *Node) {
       assert(Values2Nodes.find(V) == Values2Nodes.end());
       Values2Nodes[V] = Node;
+      if (!Node->mappedValue)
+        Node->mappedValue = V;
     }
 
     /// Adds an argument/instruction in which the node's value is used.
@@ -679,31 +714,21 @@ public:
       return Idx;
     }
 
-    /// Specifies that the node's value escapes to global or unidentified
-    /// memory.
-    void setEscapesGlobal(CGNode *Node) {
-      Node->mergeEscapeState(EscapeState::Global);
-
-      // Make sure to have a content node. Otherwise we may end up not merging
-      // the global-escape state into a caller graph (only content nodes are
-      // merged). Either the node itself is a content node or we let the node
-      // point to one.
-      if (Node->Type != NodeType::Content)
-        getContentNode(Node);
+    void escapeContentsOf(CGNode *Node) {
+      CGNode *escapedContent = Node->getContentNodeOrNull();
+      if (!escapedContent) {
+        escapedContent = createContentNode(Node, /*hasRC=*/false);
+      }
+      escapedContent->markEscaping();
     }
 
     /// Creates a defer-edge between \p From and \p To.
     /// This may trigger node merges to keep the graph invariance 4).
     /// Returns the \p From node or its merge-target in case \p From was merged
     /// during adding the edge.
-    /// The \p EdgeAdded is set to true if there was no defer-edge between
-    /// \p From and \p To, yet.
-    CGNode *defer(CGNode *From, CGNode *To, bool &EdgeAdded) {
-      if (addDeferEdge(From, To))
-        EdgeAdded = true;
-      mergeAllScheduledNodes();
-      return From->getMergeTarget();
-    }
+    /// \p Changed is set to true if a defer edge was added or any nodes were
+    /// merged.
+    CGNode *defer(CGNode *From, CGNode *To, bool &Changed);
 
     /// Creates a defer-edge between \p From and \p To.
     /// This may trigger node merges to keep the graph invariance 4).
@@ -721,10 +746,10 @@ public:
     /// Propagates the escape states through the graph.
     void propagateEscapeStates();
 
-    /// Removes a value from the graph.
-    /// It does not delete its node but makes sure that the value cannot be
-    /// lookup-up with getNode() anymore.
-    void removeFromGraph(ValueBase *V) { Values2Nodes.erase(V); }
+    /// Remove a value from the graph. Do not delete the mapped node, but reset
+    /// mappedValue if it is set to this value, and make sure that the node
+    /// cannot be looked up with getNode().
+    void removeFromGraph(ValueBase *V);
 
     enum class Traversal { Follow, Backtrack, Halt };
 
@@ -802,11 +827,11 @@ public:
     void dumpCG() const;
 
     /// Checks if the graph is OK.
-    void verify() const;
+    void verify(bool allowMerge = false) const;
 
     /// Just verifies the graph structure. This function can also be called
     /// during the graph is modified, e.g. in mergeAllScheduledNodes().
-    void verifyStructure() const;
+    void verifyStructure(bool allowMerge = false) const;
 
     friend struct ::CGForDotView;
     friend class EscapeAnalysis;
@@ -889,9 +914,22 @@ private:
   SILValue getPointerRoot(SILValue value) const;
 
   /// If \p pointer is a pointer, set it to global escaping.
-  void setEscapesGlobal(ConnectionGraph *ConGraph, ValueBase *pointer) {
-    if (CGNode *Node = ConGraph->getNode(pointer))
-      ConGraph->setEscapesGlobal(Node);
+  void setEscapesGlobal(ConnectionGraph *conGraph, ValueBase *pointer) {
+    CGNode *Node = conGraph->getNode(pointer);
+    if (!Node)
+      return;
+
+    if (Node->isContent()) {
+      Node->markEscaping();
+      return;
+    }
+    Node->mergeEscapeState(EscapeState::Global);
+
+    // Make sure to have a content node. Otherwise we may end up not merging
+    // the global-escape state into a caller graph (only content nodes are
+    // merged). Either the node itself is a content node or we let the node
+    // point to one.
+    conGraph->escapeContentsOf(Node);
   }
 
   /// Gets or creates FunctionEffects for \p F.
@@ -901,6 +939,15 @@ private:
       FInfo = new (Allocator.Allocate()) FunctionInfo(F, this);
     return FInfo;
   }
+
+  /// Get or create the node representing the memory pointed to by \p
+  /// addrVal. If \p addrVal is an address, then return the content node for the
+  /// variable's memory. Otherwise, \p addrVal may contain a reference, so
+  /// return the content node for the referenced heap object.
+  ///
+  /// Note that \p addrVal cannot be an address within a heap object, such as
+  /// an address from ref_element_addr or project_box.
+  CGNode *getValueContent(ConnectionGraph *conGraph, SILValue addrVal);
 
   /// Build a connection graph for reach callee from the callee list.
   bool buildConnectionGraphForCallees(SILInstruction *Caller,

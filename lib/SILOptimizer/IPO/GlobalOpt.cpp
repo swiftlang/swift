@@ -298,7 +298,8 @@ static SILFunction *getGlobalGetterFunction(SILOptFunctionBuilder &FunctionBuild
     Serialized = IsSerialized;
   }
 
-  auto refType = M.Types.getLoweredRValueType(varDecl->getInterfaceType());
+  auto refType = M.Types.getLoweredRValueType(TypeExpansionContext::minimal(),
+                                              varDecl->getInterfaceType());
 
   // Function takes no arguments and returns refType
   SILResultInfo Results[] = { SILResultInfo(refType,
@@ -781,7 +782,9 @@ void SILGlobalOpt::optimizeInitializer(SILFunction *AddrF,
   if (hasPublicVisibility(SILG->getLinkage()))
     expansion = ResilienceExpansion::Minimal;
 
-  auto &tl = Module->Types.getTypeLowering(SILG->getLoweredType(), expansion);
+  auto &tl = Module->Types.getTypeLowering(
+      SILG->getLoweredType(),
+      TypeExpansionContext::noOpaqueTypeArchetypesSubstitution(expansion));
   if (!tl.isLoadable())
     return;
 

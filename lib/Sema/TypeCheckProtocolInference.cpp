@@ -208,14 +208,14 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitnesses(
     // because those have to be explicitly declared on the type somewhere
     // so won't be affected by whatever answer inference comes up with.
     auto selfTy = extension->getSelfInterfaceType();
-    auto *tc = getASTContext().getLegacyGlobalTypeChecker();
     for (const Requirement &reqt : extensionSig->getRequirements()) {
       switch (reqt.getKind()) {
       case RequirementKind::Conformance:
       case RequirementKind::Superclass:
         // FIXME: This is the wrong check
         if (selfTy->isEqual(reqt.getFirstType()) &&
-            !tc->isSubtypeOf(conformance->getType(), reqt.getSecondType(), dc))
+            !TypeChecker::isSubtypeOf(conformance->getType(),
+                                      reqt.getSecondType(), dc))
           return false;
         break;
 
