@@ -585,7 +585,10 @@ clang::CanQualType GenClangType::visitSILFunctionType(CanSILFunctionType type) {
   }
   
   SmallVector<clang::QualType, 4> paramTypes;
+  SmallVector<clang::FunctionProtoType::ExtParameterInfo, 4> extParamInfos;
   for (auto paramTy : type->getParameters()) {
+    clang::FunctionProtoType::ExtParameterInfo extParamInfo;
+
     // Blocks should only take direct +0 parameters.
     switch (paramTy.getConvention()) {
     case ParameterConvention::Direct_Guaranteed:
@@ -594,7 +597,9 @@ clang::CanQualType GenClangType::visitSILFunctionType(CanSILFunctionType type) {
       break;
 
     case ParameterConvention::Direct_Owned:
-      llvm_unreachable("block takes owned parameter");
+      extParamInfo = extParamInfo.withIsConsumed(true);
+      break;
+
     case ParameterConvention::Indirect_In:
     case ParameterConvention::Indirect_In_Constant:
     case ParameterConvention::Indirect_Inout:
@@ -606,12 +611,16 @@ clang::CanQualType GenClangType::visitSILFunctionType(CanSILFunctionType type) {
                              paramTy.getArgumentType(IGM.getSILModule(), type));
     if (param.isNull())
       return clang::CanQualType();
+
     paramTypes.push_back(param);
+    extParamInfos.push_back(extParamInfo);
   }
   
   // Build the Clang function type.
-  clang::FunctionProtoType::ExtProtoInfo defaultEPI;
-  auto fnTy = clangCtx.getFunctionType(resultType, paramTypes, defaultEPI);
+  clang::FunctionProtoType::ExtProtoInfo extProtoInfo;
+  extProtoInfo.ExtParameterInfos = extParamInfos.begin();
+
+  auto fnTy = clangCtx.getFunctionType(resultType, paramTypes, extProtoInfo);
   clang::QualType ptrTy;
   
   switch (kind) {
