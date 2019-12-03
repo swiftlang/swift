@@ -92,54 +92,6 @@ void SILFunctionBuilder::addFunctionAttributes(SILFunction *F,
     //   of the `AbstractStorageDecl`.
     for (auto *A : Attrs.getAttributes<DifferentiableAttr>())
       (void)A->getParameterIndices();
-    for (auto *A : Attrs.getAttributes<DifferentiableAttr>()) {
-      auto &ctx = F->getASTContext();
-      // Get lowered argument indices.
-      auto *paramIndices = A->getParameterIndices();
-      assert(paramIndices && "Parameter indices should have been resolved");
-      auto *loweredParamIndices = autodiff::getLoweredParameterIndices(
-          paramIndices, decl->getInterfaceType()->castTo<AnyFunctionType>());
-      // NOTE(TF-893): Extending capacity is necessary when `origSilFnType` has
-      // parameters corresponding to captured variables. These parameters do not
-      // appear in the type of `origFnType`.
-      // TODO: If posssible, change `autodiff::getLoweredParameterIndices` to
-      // take `CaptureInfo` into account.
-      auto origSilFnType = F->getLoweredFunctionType();
-      if (origSilFnType->getNumParameters() >
-          loweredParamIndices->getCapacity())
-        loweredParamIndices = loweredParamIndices->extendingCapacity(
-            ctx, origSilFnType->getNumParameters());
-      SILAutoDiffIndices indices(/*source*/ 0, loweredParamIndices);
-      // Get JVP/VJP names.
-      std::string jvpName, vjpName;
-      if (auto *jvpFn = A->getJVPFunction()) {
-        Mangle::ASTMangler mangler;
-        jvpName = ctx.getIdentifier(
-            mangler.mangleAutoDiffDerivativeFunctionHelper(
-                constant.mangle(), AutoDiffDerivativeFunctionKind::JVP,
-                indices)).str();
-      }
-      if (auto *vjpFn = A->getVJPFunction()) {
-        Mangle::ASTMangler mangler;
-        vjpName = ctx.getIdentifier(
-            mangler.mangleAutoDiffDerivativeFunctionHelper(
-                constant.mangle(), AutoDiffDerivativeFunctionKind::VJP,
-                indices)).str();
-      }
-      auto *silDiffAttr = SILDifferentiableAttr::create(
-          M, indices, M.allocateCopy(jvpName), M.allocateCopy(vjpName),
-          A->getDerivativeGenericSignature());
-#ifndef NDEBUG
-      // Verify that no existing attributes have the same indices.
-      for (auto *existingAttr : F->getDifferentiableAttrs()) {
-        bool sameAttributeConfig =
-            silDiffAttr->getIndices() == existingAttr->getIndices();
-        assert(!sameAttributeConfig &&
-               "Duplicate `[differentiable]` attribute");
-      }
-#endif
-      F->addDifferentiableAttr(silDiffAttr);
-    }
   }
 
   // Only emit replacements for the objc entry point of objc methods.

@@ -2546,11 +2546,6 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
     OS << "[_specialize "; Attr->print(OS); OS << "] ";
   }
 
-  // SWIFT_ENABLE_TENSORFLOW
-  for (auto *Attr : getDifferentiableAttrs()) {
-    OS << "[differentiable "; Attr->print(OS); OS << "] ";
-  }
-
   // TODO: Handle clang node owners which don't have a name.
   if (hasClangNode() && getClangNodeOwner()->hasName()) {
     OS << "[clang ";
@@ -3346,52 +3341,6 @@ void SILSpecializeAttr::print(llvm::raw_ostream &OS) const {
                  }
                },
                [&] { OS << ", "; });
-  }
-}
-
-/// SWIFT_ENABLE_TENSORFLOW
-void SILDifferentiableAttr::print(llvm::raw_ostream &OS) const {
-  auto &indices = getIndices();
-  OS << "source " << indices.source << " wrt ";
-  interleave(indices.parameters->getIndices(),
-             [&](unsigned index) { OS << index; },
-             [&] { OS << ", "; });
-  if (!JVPName.empty()) {
-    OS << " jvp @" << JVPName;
-  }
-  if (!VJPName.empty()) {
-    OS << " vjp @" << VJPName;
-  }
-  if (!getDerivativeGenericSignature())
-    return;
-  auto requirements = getDerivativeGenericSignature()->getRequirements();
-  if (!requirements.empty()) {
-    OS << " where ";
-    SILFunction *original = getOriginal();
-    assert(original);
-    auto genericEnv = original->getGenericEnvironment();
-    PrintOptions SubPrinter = PrintOptions::printSIL();
-    interleave(requirements, [&](Requirement req) {
-      if (!genericEnv) {
-         req.print(OS, SubPrinter);
-         return;
-      }
-      // Use GenericEnvironment to produce user-friendly
-      // names instead of something like 't_0_0'.
-      auto FirstTy = genericEnv->getSugaredType(req.getFirstType());
-      if (req.getKind() != RequirementKind::Layout) {
-        auto SecondTy =
-        genericEnv->getSugaredType(req.getSecondType());
-        Requirement ReqWithDecls(req.getKind(), FirstTy, SecondTy);
-        ReqWithDecls.print(OS, SubPrinter);
-      } else {
-        Requirement ReqWithDecls(req.getKind(), FirstTy,
-                                 req.getLayoutConstraint());
-        ReqWithDecls.print(OS, SubPrinter);
-      }
-    }, [&] {
-      OS << ", ";
-    });
   }
 }
 

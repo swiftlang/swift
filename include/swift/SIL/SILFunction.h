@@ -110,85 +110,6 @@ private:
                     GenericSignature specializedSignature);
 };
 
-/// SWIFT_ENABLE_TENSORFLOW
-/// Differentiable attribute - @differentiable attribute lowered to SIL. This
-/// attribute is used by the automatic differentiation pass to find the autodiff
-/// functions associated with a function: 'jvp' and 'vjp'.
-///
-/// 'jvp' and 'vjp' are optional. We intend for the core AD pass to synthesize
-/// the missing ones.
-///
-/// Note: 'jvp' and 'vjp' are not fully supported yet. In particular, the core
-/// AD pass does not use or synthesize them.
-///
-/// Example:
-///   sil [differentiable jvp @foo_jvp vjp @foo_vjp] @foo
-///     : $(Float) -> Float { ... }
-class SILDifferentiableAttr final {
-  friend SILFunction;
-
-private:
-  /// The AD indices.
-  SILAutoDiffIndices indices;
-  /// The JVP and VJP function names.
-  StringRef JVPName, VJPName;
-  /// The trailing where clause (optional).
-  /// This is defined only for parsed attributes and is resolved to
-  /// `DerivativeGenericSignature` by the SIL parser.
-  TrailingWhereClause *WhereClause = nullptr;
-  /// The derivative generic signature (optional).
-  GenericSignature DerivativeGenericSignature = GenericSignature();
-  /// The original function.
-  SILFunction *Original = nullptr;
-
-  SILDifferentiableAttr(const SILAutoDiffIndices &indices,
-                        StringRef jvpName,
-                        StringRef vjpName,
-                        TrailingWhereClause *whereClause);
-
-  SILDifferentiableAttr(const SILAutoDiffIndices &indices,
-                        StringRef jvpName,
-                        StringRef vjpName,
-                        GenericSignature derivativeGenSig);
-
-public:
-  static SILDifferentiableAttr *create(
-      SILModule &M, const SILAutoDiffIndices &indices,
-      StringRef jvpName = StringRef(), StringRef vjpName = StringRef(),
-      TrailingWhereClause *whereClause = nullptr);
-
-  static SILDifferentiableAttr *create(
-      SILModule &M, const SILAutoDiffIndices &indices,
-      StringRef jvpName = StringRef(), StringRef vjpName = StringRef(),
-      GenericSignature derivativeGenSig = GenericSignature());
-
-  bool hasJVP() const { return !JVPName.empty(); }
-  StringRef getJVPName() const { assert(hasJVP()); return JVPName; }
-  void setJVPName(StringRef name) { JVPName = name; }
-
-  bool hasVJP() const { return !VJPName.empty(); }
-  StringRef getVJPName() const { assert(hasVJP()); return VJPName; }
-  void setVJPName(StringRef name) { VJPName = name; }
-
-  SILFunction *getOriginal() const { return Original; }
-
-  const SILAutoDiffIndices &getIndices() const { return indices; }
-  void setIndices(const SILAutoDiffIndices &indices) {
-    this->indices = indices;
-  }
-
-  TrailingWhereClause *getWhereClause() const { return WhereClause; }
-
-  GenericSignature getDerivativeGenericSignature() const {
-    return DerivativeGenericSignature;
-  }
-  void setDerivativeGenericSignature(GenericSignature derivativeGenSig) {
-    DerivativeGenericSignature = derivativeGenSig;
-  };
-
-  void print(llvm::raw_ostream &OS) const;
-};
-
 /// SILFunction - A function body that has been lowered to SIL. This consists of
 /// zero or more SIL SILBasicBlock objects that contain the SILInstruction
 /// objects making up the function.
@@ -253,11 +174,6 @@ private:
 
   /// The function's remaining set of specialize attributes.
   std::vector<SILSpecializeAttr*> SpecializeAttrSet;
-
-  /// SWIFT_ENABLE_TENSORFLOW
-  /// The function's `[differentiable]` attributes.
-  llvm::SmallVector<SILDifferentiableAttr *, 4>
-    DifferentiableAttrs;
 
   /// Has value if there's a profile for this function
   /// Contains Function Entry Count
@@ -767,18 +683,6 @@ public:
   void clearSpecializeAttrs() { SpecializeAttrSet.clear(); }
 
   void addSpecializeAttr(SILSpecializeAttr *Attr);
-
-  /// SWIFT_ENABLE_TENSORFLOW
-  ArrayRef<SILDifferentiableAttr *> getDifferentiableAttrs() const {
-    return DifferentiableAttrs;
-  }
-
-  void addDifferentiableAttr(SILDifferentiableAttr *attr);
-
-  void removeDifferentiableAttr(SILDifferentiableAttr *attr) {
-    DifferentiableAttrs.erase(std::remove(DifferentiableAttrs.begin(),
-                                          DifferentiableAttrs.end(), attr));
-  }
 
   /// Get this function's optimization mode or OptimizationMode::NotSet if it is
   /// not set for this specific function.

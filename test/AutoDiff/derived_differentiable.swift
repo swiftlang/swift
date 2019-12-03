@@ -16,8 +16,8 @@ public struct Foo : EuclideanDifferentiable {
 // CHECK-AST:     public typealias TangentVector = Foo.TangentVector
 // CHECK-AST:   public var differentiableVectorView: Foo.TangentVector { get }
 
-// CHECK-SILGEN-LABEL: // Foo.a.getter
-// CHECK-SILGEN-NEXT: sil [transparent] [serialized] [differentiable source 0 wrt 0] [ossa] @$s22derived_differentiable3FooV1aSfvg : $@convention(method) (Foo) -> Float
+// CHECK-SILGEN-LABEL: // differentiability witness for Foo.a.getter
+// CHECK-SILGEN-NEXT: sil_differentiability_witness [serialized] [parameters 0] [results 0]
 
 struct AdditiveTangentIsSelf : AdditiveArithmetic, EuclideanDifferentiable {
   var a: Float

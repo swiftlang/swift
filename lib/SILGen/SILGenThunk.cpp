@@ -82,14 +82,12 @@ SILGenModule::getOrCreateAutoDiffDerivativeForwardingThunk(
 
   SILGenFunctionBuilder builder(*this);
   auto originalFn = derivativeFnDeclRef.asAutoDiffOriginalFunction();
-  auto originalLinkage = originalFn.getLinkage(ForDefinition);
-  auto linkage = autodiff::getAutoDiffDerivativeFunctionLinkage(
-      originalLinkage, /*isDerivativeFnExported*/ true);
   auto name = derivativeFnDeclRef.mangle();
   // This thunk is publicly exposed and cannot be transparent.
   // Instead, mark it as "always inline" for optimization.
   auto *thunk = builder.getOrCreateFunction(
-      derivativeFnDecl, name, linkage, derivativeFnTy, IsBare, IsNotTransparent,
+      derivativeFnDecl, name, originalFn.getLinkage(ForDefinition),
+      derivativeFnTy, IsBare, IsNotTransparent,
       derivativeFnDeclRef.isSerialized(), IsNotDynamic, ProfileCounter(),
       IsThunk);
   thunk->setInlineStrategy(AlwaysInline);
@@ -123,16 +121,13 @@ SILFunction *SILGenModule::getOrCreateAutoDiffClassMethodThunk(
 
   SILGenFunctionBuilder builder(*this);
   auto originalFn = derivativeFnDeclRef.asAutoDiffOriginalFunction();
-  auto originalLinkage = originalFn.getLinkage(ForDefinition);
-  auto linkage = autodiff::getAutoDiffDerivativeFunctionLinkage(
-      originalLinkage, /*isDerivativeFnExported*/ true);
   // TODO(TF-685): Use principled thunk mangling.
   // Do not simply reuse reabstraction thunk mangling.
   auto name = derivativeFnDeclRef.mangle() + "_vtable_entry_thunk";
   auto *thunk = builder.getOrCreateFunction(
-      derivativeFnDecl, name, linkage, constantTy, IsBare, IsTransparent,
-      derivativeFnDeclRef.isSerialized(), IsNotDynamic, ProfileCounter(),
-      IsThunk);
+      derivativeFnDecl, name, originalFn.getLinkage(ForDefinition), constantTy,
+      IsBare, IsTransparent, derivativeFnDeclRef.isSerialized(), IsNotDynamic,
+      ProfileCounter(), IsThunk);
   if (!thunk->empty())
     return thunk;
 

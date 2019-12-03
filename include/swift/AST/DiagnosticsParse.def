@@ -1590,14 +1590,6 @@ ERROR(diff_params_clause_expected_parameter,PointsToFirstBadToken,
       "expected a parameter, which can be a function parameter name, "
       "parameter index, or 'self'", ())
 
-// [differentiable ...] (sil-decl attr)
-ERROR(sil_attr_differentiable_expected_keyword,PointsToFirstBadToken,
-      "expected '%0' in 'differentiable' attribute", (StringRef))
-ERROR(sil_attr_differentiable_expected_parameter_list,PointsToFirstBadToken,
-      "expected an comma-separated list of parameter indices, e.g. (0, 1)", ())
-ERROR(sil_attr_differentiable_expected_rsquare,PointsToFirstBadToken,
-      "expected ']' to end 'differentiable' attribute", ())
-
 // SIL autodiff
 ERROR(sil_autodiff_expected_lsquare,PointsToFirstBadToken,
       "expected '[' to start the %0", (StringRef))

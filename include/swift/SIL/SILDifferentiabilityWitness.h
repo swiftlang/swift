@@ -64,32 +64,31 @@ private:
   /// differentiability witness is generated. Used for diagnostics.
   /// Null if the differentiability witness is parsed from SIL or if it is
   /// deserialized.
-  DeclAttribute *Attribute = nullptr;
+  const DeclAttribute *Attribute = nullptr;
 
-  SILDifferentiabilityWitness(SILModule &module, SILLinkage linkage,
-                              SILFunction *originalFunction,
-                              IndexSubset *parameterIndices,
-                              IndexSubset *resultIndices,
-                              GenericSignature derivativeGenSig,
-                              SILFunction *jvp, SILFunction *vjp,
-                              bool isDeclaration, bool isSerialized,
-                              DeclAttribute *attribute)
-    : Module(module), Linkage(linkage), OriginalFunction(originalFunction),
-      Config(parameterIndices, resultIndices, derivativeGenSig.getPointer()),
-      JVP(jvp), VJP(vjp), IsDeclaration(isDeclaration),
-      IsSerialized(isSerialized), Attribute(attribute) {}
-
-public:
-  static SILDifferentiabilityWitness *createDeclaration(
+  SILDifferentiabilityWitness(
       SILModule &module, SILLinkage linkage, SILFunction *originalFunction,
       IndexSubset *parameterIndices, IndexSubset *resultIndices,
-      GenericSignature derivativeGenSig, DeclAttribute *attribute = nullptr);
+      GenericSignature derivativeGenSig, SILFunction *jvp, SILFunction *vjp,
+      bool isDeclaration, bool isSerialized, const DeclAttribute *attribute)
+      : Module(module), Linkage(linkage), OriginalFunction(originalFunction),
+        Config(parameterIndices, resultIndices, derivativeGenSig.getPointer()),
+        JVP(jvp), VJP(vjp), IsDeclaration(isDeclaration),
+        IsSerialized(isSerialized), Attribute(attribute) {}
+
+public:
+  static SILDifferentiabilityWitness *
+  createDeclaration(SILModule &module, SILLinkage linkage,
+                    SILFunction *originalFunction,
+                    IndexSubset *parameterIndices, IndexSubset *resultIndices,
+                    GenericSignature derivativeGenSig,
+                    const DeclAttribute *attribute = nullptr);
 
   static SILDifferentiabilityWitness *createDefinition(
       SILModule &module, SILLinkage linkage, SILFunction *originalFunction,
       IndexSubset *parameterIndices, IndexSubset *resultIndices,
       GenericSignature derivativeGenSig, SILFunction *jvp, SILFunction *vjp,
-      bool isSerialized, DeclAttribute *attribute = nullptr);
+      bool isSerialized, const DeclAttribute *attribute = nullptr);
 
   void convertToDefinition(SILFunction *jvp, SILFunction *vjp,
                            bool isSerialized);
@@ -128,7 +127,12 @@ public:
   bool isDeclaration() const { return IsDeclaration; }
   bool isDefinition() const { return !IsDeclaration; }
   bool isSerialized() const { return IsSerialized; }
-  DeclAttribute *getAttribute() const { return Attribute; }
+  const DeclAttribute *getAttribute() const { return Attribute; }
+
+  /// Returns the `SILAutoDiffIndices` corresponding to this config's indices.
+  // TODO(TF-893): This is a temporary shim for incremental removal of
+  // `SILAutoDiffIndices`. Eventually remove this.
+  SILAutoDiffIndices getSILAutoDiffIndices() const;
 
   /// Verify that the differentiability witness is well-formed.
   void verify(const SILModule &module) const;

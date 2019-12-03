@@ -4756,43 +4756,6 @@ public:
             "have at least one argument for self.");
   }
 
-  /// SWIFT_ENABLE_TENSORFLOW
-  /// Verify the [differentiable] attribute.
-  void verifyDifferentiableAttr(SILFunction *F, SILDifferentiableAttr &Attr) {
-    std::function<unsigned(Type)> countParams;
-    countParams = [&](Type type) -> unsigned {
-      auto *fnTy = type->getAs<SILFunctionType>();
-      if (!fnTy)
-        return 0;
-      if (fnTy->getNumResults() != 1)
-        return fnTy->getNumParameters();
-      return fnTy->getNumParameters() +
-             countParams(fnTy->getResults()[0].getInterfaceType());
-    };
-
-    // Parameter indices must be specified.
-    require(!Attr.getIndices().parameters->isEmpty(),
-            "Parameter indices cannot be empty");
-    // JVP and VJP must be specified in canonical SIL.
-    if (F->getModule().getStage() == SILStage::Canonical)
-      require(!Attr.getJVPName().empty() && !Attr.getVJPName().empty(),
-              "JVP and VJP must be specified in canonical SIL");
-    // Verify if specified parameter indices are valid.
-    auto numParams = countParams(F->getLoweredFunctionType());
-    int lastIndex = -1;
-    for (auto paramIdx : Attr.getIndices().parameters->getIndices()) {
-      require(paramIdx < numParams, "Parameter index out of bounds.");
-      auto currentIdx = (int)paramIdx;
-      require(currentIdx > lastIndex, "Parameter indices not ascending.");
-      lastIndex = currentIdx;
-    }
-    // TODO: Verify if the specified JVP/VJP function has the right signature.
-    // SIL function verification runs right after a function is parsed.
-    // However, the JVP/VJP function may come after the this function. Without
-    // changing the compiler too much, is there a way to verify this at a module
-    // level, after everything is parsed?
-  }
-
   struct VerifyFlowSensitiveRulesDetails {
     enum CFGState {
       /// No special rules are in play.
@@ -5151,10 +5114,6 @@ public:
 
     CanSILFunctionType FTy = F->getLoweredFunctionType();
     verifySILFunctionType(FTy);
-
-    // SWIFT_ENABLE_TENSORFLOW
-    for (auto *DiffAttr : F->getDifferentiableAttrs())
-      verifyDifferentiableAttr(F, *DiffAttr);
 
     if (F->isExternalDeclaration()) {
       if (F->hasForeignBody())
