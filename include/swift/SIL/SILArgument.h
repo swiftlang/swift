@@ -334,50 +334,73 @@ public:
 //===----------------------------------------------------------------------===//
 
 inline bool SILArgument::isPhiArgument() const {
-  if (auto *phiArg = dyn_cast<SILPhiArgument>(this))
-    return phiArg->isPhiArgument();
-
-  return false;
+  switch (getKind()) {
+  case SILArgumentKind::SILPhiArgument:
+    return cast<SILPhiArgument>(this)->isPhiArgument();
+  case SILArgumentKind::SILFunctionArgument:
+    return false;
+  }
+  llvm_unreachable("Covered switch is not covered?!");
 }
 
 inline SILValue
 SILArgument::getIncomingPhiValue(SILBasicBlock *predBlock) const {
-  if (isa<SILFunctionArgument>(this))
+  switch (getKind()) {
+  case SILArgumentKind::SILPhiArgument:
+    return cast<SILPhiArgument>(this)->getIncomingPhiValue(predBlock);
+  case SILArgumentKind::SILFunctionArgument:
     return SILValue();
-  return cast<SILPhiArgument>(this)->getIncomingPhiValue(predBlock);
+  }
+  llvm_unreachable("Covered switch is not covered?!");
 }
 
 inline bool SILArgument::getIncomingPhiValues(
     SmallVectorImpl<SILValue> &returnedPhiValues) const {
-  if (isa<SILFunctionArgument>(this))
+  switch (getKind()) {
+  case SILArgumentKind::SILPhiArgument:
+    return cast<SILPhiArgument>(this)->getIncomingPhiValues(returnedPhiValues);
+  case SILArgumentKind::SILFunctionArgument:
     return false;
-  return cast<SILPhiArgument>(this)->getIncomingPhiValues(returnedPhiValues);
+  }
+  llvm_unreachable("Covered switch is not covered?!");
 }
 
 inline bool SILArgument::getIncomingPhiValues(
     SmallVectorImpl<std::pair<SILBasicBlock *, SILValue>>
         &returnedPredAndPhiValuePairs) const {
-  if (isa<SILFunctionArgument>(this))
+  switch (getKind()) {
+  case SILArgumentKind::SILPhiArgument:
+    return cast<SILPhiArgument>(this)->getIncomingPhiValues(
+        returnedPredAndPhiValuePairs);
+  case SILArgumentKind::SILFunctionArgument:
     return false;
-  return cast<SILPhiArgument>(this)->getIncomingPhiValues(
-      returnedPredAndPhiValuePairs);
+  }
+  llvm_unreachable("Covered switch is not covered?!");
 }
 
 inline bool SILArgument::getSingleTerminatorOperands(
     SmallVectorImpl<SILValue> &returnedSingleTermOperands) const {
-  if (isa<SILFunctionArgument>(this))
+  switch (getKind()) {
+  case SILArgumentKind::SILPhiArgument:
+    return cast<SILPhiArgument>(this)->getSingleTerminatorOperands(
+        returnedSingleTermOperands);
+  case SILArgumentKind::SILFunctionArgument:
     return false;
-  return cast<SILPhiArgument>(this)->getSingleTerminatorOperands(
-      returnedSingleTermOperands);
+  }
+  llvm_unreachable("Covered switch is not covered?!");
 }
 
 inline bool SILArgument::getSingleTerminatorOperands(
     SmallVectorImpl<std::pair<SILBasicBlock *, SILValue>>
         &returnedSingleTermOperands) const {
-  if (isa<SILFunctionArgument>(this))
+  switch (getKind()) {
+  case SILArgumentKind::SILPhiArgument:
+    return cast<SILPhiArgument>(this)->getSingleTerminatorOperands(
+        returnedSingleTermOperands);
+  case SILArgumentKind::SILFunctionArgument:
     return false;
-  return cast<SILPhiArgument>(this)->getSingleTerminatorOperands(
-      returnedSingleTermOperands);
+  }
+  llvm_unreachable("Covered switch is not covered?!");
 }
 
 } // end swift namespace
