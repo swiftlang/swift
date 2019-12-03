@@ -1,3 +1,0 @@
-// swift-interface-format-version: 1.0
-// swift-module-flags: -target wasm32-unknown-unknown-wasm -disable-objc-interop -swift-version 5 -O -module-name Swift -parse-stdlib
-
