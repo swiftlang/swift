@@ -831,7 +831,8 @@ IRGenModule::getAddrOfParentContextDescriptor(DeclContext *from,
 
     // Wrap up private types in an anonymous context for the containing file
     // unit so that the runtime knows they have unstable identity.
-    if (!fromAnonymousContext && Type->isOutermostPrivateOrFilePrivateScope())
+    if (!fromAnonymousContext && Type->isOutermostPrivateOrFilePrivateScope()
+        && !Type->isUsableFromInline())
       return {getAddrOfAnonymousContextDescriptor(Type),
               ConstantReference::Direct};
   }

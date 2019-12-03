@@ -576,7 +576,7 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
     // PublicNonABI function, which has HiddenExternal when
     // referenced as a declaration, and SharedExternal when it has
     // a deserialized body.
-    if (fn->getLinkage() == SILLinkage::HiddenExternal &&
+    if (isAvailableExternally(fn->getLinkage()) &&
         linkage == SILLinkage::PublicNonABI) {
       fn->setLinkage(SILLinkage::SharedExternal);
     }

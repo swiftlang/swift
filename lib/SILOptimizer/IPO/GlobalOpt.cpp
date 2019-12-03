@@ -667,6 +667,10 @@ replaceLoadsByKnownValue(BuiltinInst *CallToOnce, SILFunction *AddrF,
   for (int i = 0, e = Calls.size(); i < e; ++i) {
     auto *Call = Calls[i];
 
+    if (Call->getFunction()->isSerialized() &&
+        !GetterF->hasValidLinkageForFragileRef())
+      continue;
+
     // Make sure that we can go ahead and replace all uses of the
     // address with the value.
     bool isValid = true;
@@ -918,6 +922,10 @@ void SILGlobalOpt::optimizeGlobalAccess(SILGlobalVariable *SILG,
   // invocation should happen at the common dominator of all
   // loads inside this function.
   for (auto *Load : GlobalLoadMap[SILG]) {
+    if (Load->getFunction()->isSerialized() &&
+        !GetterF->hasValidLinkageForFragileRef())
+      continue;
+
     SILBuilderWithScope B(Load);
     auto *GetterRef = B.createFunctionRef(Load->getLoc(), GetterF);
     auto *Value = B.createApply(Load->getLoc(), GetterRef,
