@@ -6060,20 +6060,33 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
 
   auto locator = getConstraintLocator(locatorB);
 
-  // If this is an unresolved member ref e.g. `.foo` and its contextual base
-  // type has been determined to be a "hole", let's mark the resulting member
-  // type as a potential hole and continue solving.
-  if (shouldAttemptFixes() && kind == ConstraintKind::UnresolvedValueMember &&
-      baseObjTy->getMetatypeInstanceType()->isHole()) {
-    auto *fix =
-        SpecifyBaseTypeForContextualMember::create(*this, member, locator);
-    if (recordFix(fix))
-      return SolutionKind::Error;
+  // If the base type of this member lookup is a "hole" there is no
+  // reason to perform a lookup because it wouldn't return any results.
+  if (shouldAttemptFixes()) {
+    auto markMemberTypeAsPotentialHole = [&](Type memberTy) {
+      if (auto *typeVar = memberTy->getAs<TypeVariableType>())
+        recordPotentialHole(typeVar);
+    };
 
-    if (auto *typeVar = memberTy->getAs<TypeVariableType>())
-      recordPotentialHole(typeVar);
+    // If this is an unresolved member ref e.g. `.foo` and its contextual base
+    // type has been determined to be a "hole", let's mark the resulting member
+    // type as a potential hole and continue solving.
+    if (kind == ConstraintKind::UnresolvedValueMember &&
+        baseObjTy->getMetatypeInstanceType()->isHole()) {
+      auto *fix =
+          SpecifyBaseTypeForContextualMember::create(*this, member, locator);
+      if (recordFix(fix))
+        return SolutionKind::Error;
 
-    return SolutionKind::Solved;
+      markMemberTypeAsPotentialHole(memberTy);
+      return SolutionKind::Solved;
+    } else if (kind == ConstraintKind::ValueMember && baseObjTy->isHole()) {
+      // If base type is a "hole" there is no reason to record any
+      // more "member not found" fixes for chained member references.
+      increaseScore(SK_Fix);
+      markMemberTypeAsPotentialHole(memberTy);
+      return SolutionKind::Solved;
+    }
   }
 
   MemberLookupResult result =
@@ -6344,15 +6357,6 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
     // Since member with given base and name doesn't exist, let's try to
     // fake its presence based on use, that makes it possible to diagnose
     // problems related to member lookup more precisely.
-
-    // If base type is a "hole" there is no reason to record any
-    // more "member not found" fixes for chained member references.
-    if (baseTy->isHole()) {
-      increaseScore(SK_Fix);
-      if (auto *memberTypeVar = memberTy->getAs<TypeVariableType>())
-        recordPotentialHole(memberTypeVar);
-      return SolutionKind::Solved;
-    }
 
     return fixMissingMember(origBaseTy, memberTy, locator);
   }
