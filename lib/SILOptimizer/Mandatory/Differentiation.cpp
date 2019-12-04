@@ -883,10 +883,10 @@ public:
     invokers.insert({witness, DifferentiationInvoker(witness)});
   }
 
-  /// Returns the result index for `dfi`, which should be already set.
+  /// Returns the result index for `dfi` if found in this context. Otherwise,
+  /// sets the result index to zero and returns it.
   unsigned getResultIndex(DifferentiableFunctionInst* dfi) {
-    assert(resultIndices.count(dfi) && "No result index set");
-    return resultIndices.lookup(dfi);
+    return resultIndices[dfi];
   }
 
   /// Sets the result index for `dfi`.
