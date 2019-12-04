@@ -5851,7 +5851,7 @@ public:
           << ": To differentiate or not to differentiate?\n";
       for (auto &inst : llvm::reverse(*bb)) {
         s << (getPullbackInfo().shouldDifferentiateInstruction(&inst)
-                  ? "[∂] " : "[ ] ")
+                  ? "[x] " : "[ ] ")
           << inst;
       }
     });
