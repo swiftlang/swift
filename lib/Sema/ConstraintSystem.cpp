@@ -2583,10 +2583,10 @@ static void diagnoseOperatorAmbiguity(ConstraintSystem &cs,
   if (!applyExpr)
     return;
 
-  auto isNameOfStandardComparisonOperator = [](StringRef opName) -> bool {
-    return opName == "==" || opName == "!=" || opName == "===" ||
-           opName == "!==" || opName == "<" || opName == ">" ||
-           opName == "<=" || opName == ">=";
+  auto isNameOfStandardComparisonOperator = [](Identifier opName) -> bool {
+    return opName.is("==") || opName.is("!=") || opName.is("===") ||
+           opName.is("!==") || opName.is("<") || opName.is(">") ||
+           opName.is("<=") || opName.is(">=");
   };
 
   auto isEnumWithAssociatedValues = [](Type type) -> bool {
@@ -2609,7 +2609,7 @@ static void diagnoseOperatorAmbiguity(ConstraintSystem &cs,
           .highlight(lhs->getSourceRange())
           .highlight(rhs->getSourceRange());
 
-      if (isNameOfStandardComparisonOperator(operatorName.str()) &&
+      if (isNameOfStandardComparisonOperator(operatorName) &&
           isEnumWithAssociatedValues(lhsType)) {
         DE.diagnose(applyExpr->getLoc(),
                     diag::no_binary_op_overload_for_enum_with_payload,
