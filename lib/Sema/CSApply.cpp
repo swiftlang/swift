@@ -1524,7 +1524,7 @@ namespace {
       auto &ctx = cs.getASTContext();
       auto *anchor = memberLoc->getAnchor();
 
-      KeyPathExpr::Component component;
+      SmallVector<KeyPathExpr::Component, 2> components;
 
       // Let's create a KeyPath expression and fill in "parsed path"
       // after component is built.
@@ -1546,10 +1546,10 @@ namespace {
       // calls necessary to resolve a member reference.
       if (overload.choice.getKind() ==
           OverloadChoiceKind::KeyPathDynamicMemberLookup) {
-        keyPath->resolveComponents(ctx,
-                                   buildKeyPathSubscriptComponent(
-                                       overload, dotLoc, /*indexExpr=*/nullptr,
-                                       ctx.Id_dynamicMember, componentLoc));
+        buildKeyPathSubscriptComponent(overload, dotLoc, /*indexExpr=*/nullptr,
+                                       ctx.Id_dynamicMember, componentLoc,
+                                       components);
+        keyPath->resolveComponents(ctx, components);
         return keyPath;
       }
 
@@ -1599,8 +1599,8 @@ namespace {
                                               UDE->getNameLoc(),
                                               /*Implicit=*/true);
 
-        component = buildKeyPathPropertyComponent(overload, UDE->getLoc(),
-                                                  componentLoc);
+        buildKeyPathPropertyComponent(overload, UDE->getLoc(), componentLoc,
+                                      components);
       } else if (auto *SE = dyn_cast<SubscriptExpr>(anchor)) {
         componentExpr = SE;
         // If this is not for a keypath component, we have to copy
@@ -1628,9 +1628,9 @@ namespace {
               /*implicit=*/true, SE->getAccessSemantics());
         }
 
-        component = buildKeyPathSubscriptComponent(
-            overload, SE->getLoc(), SE->getIndex(), SE->getArgumentLabels(),
-            componentLoc);
+        buildKeyPathSubscriptComponent(overload, SE->getLoc(), SE->getIndex(),
+                                       SE->getArgumentLabels(), componentLoc,
+                                       components);
       } else {
         return nullptr;
       }
@@ -1643,7 +1643,7 @@ namespace {
       cs.setType(keyPath, 0, ty);
 
       keyPath->setParsedPath(componentExpr);
-      keyPath->resolveComponents(ctx, {component});
+      keyPath->resolveComponents(ctx, components);
       return keyPath;
     }
 
@@ -4190,24 +4190,6 @@ namespace {
           resolvedComponents.push_back(origComponent);
           continue;
         }
-        
-        auto getObjectType = [](Type optionalTy) -> Type {
-          Type objectTy;
-          if (auto lvalue = optionalTy->getAs<LValueType>()) {
-            objectTy = lvalue->getObjectType()->getOptionalObjectType();
-            if (optionalTy->hasUnresolvedType() && !objectTy) {
-              objectTy = optionalTy;
-            }
-            objectTy = LValueType::get(objectTy);
-          } else {
-            objectTy = optionalTy->getOptionalObjectType();
-            if (optionalTy->hasUnresolvedType() && !objectTy) {
-              objectTy = optionalTy;
-            }
-          }
-          assert(objectTy);
-          return objectTy;
-        };
 
         auto kind = origComponent.getKind();
         Optional<SelectedOverload> foundDecl;
@@ -4249,17 +4231,8 @@ namespace {
             break;
           }
 
-          auto component = buildKeyPathPropertyComponent(
-              *foundDecl, origComponent.getLoc(), locator);
-
-          resolvedComponents.push_back(component);
-
-          if (shouldForceUnwrapResult(foundDecl->choice, locator)) {
-            auto objectTy = getObjectType(baseTy);
-            auto loc = origComponent.getLoc();
-            resolvedComponents.push_back(
-                KeyPathExpr::Component::forOptionalForce(objectTy, loc));
-          }
+          buildKeyPathPropertyComponent(*foundDecl, origComponent.getLoc(),
+                                        locator, resolvedComponents);
           break;
         }
         case KeyPathExpr::Component::Kind::UnresolvedSubscript: {
@@ -4273,17 +4246,9 @@ namespace {
           if (!isDynamicMember)
             subscriptLabels = origComponent.getSubscriptLabels();
 
-          auto component = buildKeyPathSubscriptComponent(
+          buildKeyPathSubscriptComponent(
               *foundDecl, origComponent.getLoc(), origComponent.getIndexExpr(),
-              subscriptLabels, locator);
-          resolvedComponents.push_back(component);
-
-          if (shouldForceUnwrapResult(foundDecl->choice, locator)) {
-            auto objectTy = getObjectType(baseTy);
-            auto loc = origComponent.getLoc();
-            resolvedComponents.push_back(
-                KeyPathExpr::Component::forOptionalForce(objectTy, loc));
-          }
+              subscriptLabels, locator, resolvedComponents);
           break;
         }
         case KeyPathExpr::Component::Kind::OptionalChain: {
@@ -4301,13 +4266,9 @@ namespace {
               KeyPathExpr::Component::forOptionalChain(objectTy, loc));
           break;
         }
-        case KeyPathExpr::Component::Kind::OptionalForce: {
-          auto objectTy = getObjectType(baseTy);
-          auto loc = origComponent.getLoc();
-          resolvedComponents.push_back(
-              KeyPathExpr::Component::forOptionalForce(objectTy, loc));
+        case KeyPathExpr::Component::Kind::OptionalForce:
+          buildKeyPathOptionalForceComponent(resolvedComponents);
           break;
-        }
         case KeyPathExpr::Component::Kind::Invalid: {
           auto component = origComponent;
           component.setComponentType(leafTy);
@@ -4466,10 +4427,37 @@ namespace {
       return coerceToType(outerApply, exprType, cs.getConstraintLocator(E));
     }
 
-    KeyPathExpr::Component
-    buildKeyPathPropertyComponent(const SelectedOverload &overload,
-                                  SourceLoc componentLoc,
-                                  ConstraintLocator *locator) {
+    void buildKeyPathOptionalForceComponent(
+        SmallVectorImpl<KeyPathExpr::Component> &components) {
+      assert(!components.empty());
+
+      // Unwrap the last component type, preserving @lvalue-ness.
+      auto optionalTy = components.back().getComponentType();
+      Type objectTy;
+      if (auto lvalue = optionalTy->getAs<LValueType>()) {
+        objectTy = lvalue->getObjectType()->getOptionalObjectType();
+        if (optionalTy->hasUnresolvedType() && !objectTy) {
+          objectTy = optionalTy;
+        }
+        objectTy = LValueType::get(objectTy);
+      } else {
+        objectTy = optionalTy->getOptionalObjectType();
+        if (optionalTy->hasUnresolvedType() && !objectTy) {
+          objectTy = optionalTy;
+        }
+      }
+      assert(objectTy);
+
+      auto loc = components.back().getLoc();
+      components.push_back(
+          KeyPathExpr::Component::forOptionalForce(objectTy, loc));
+    }
+
+    void buildKeyPathPropertyComponent(
+        const SelectedOverload &overload, SourceLoc componentLoc,
+        ConstraintLocator *locator,
+        SmallVectorImpl<KeyPathExpr::Component> &components) {
+      auto resolvedTy = simplifyType(overload.openedType);
       if (auto *property = overload.choice.getDeclOrNull()) {
         // Key paths can only refer to properties currently.
         auto varDecl = cast<VarDecl>(property);
@@ -4479,26 +4467,24 @@ namespace {
         // There is a fix which diagnoses such situation already.
         assert(!varDecl->isStatic());
 
-        auto resolvedTy = overload.openedType;
-        resolvedTy = simplifyType(resolvedTy);
-
         // Compute the concrete reference to the member.
         auto ref = resolveConcreteDeclRef(property, locator);
-        return KeyPathExpr::Component::forProperty(ref, resolvedTy,
-                                                   componentLoc);
+        components.push_back(
+            KeyPathExpr::Component::forProperty(ref, resolvedTy, componentLoc));
+      } else {
+        auto fieldIndex = overload.choice.getTupleIndex();
+        components.push_back(KeyPathExpr::Component::forTupleElement(
+            fieldIndex, resolvedTy, componentLoc));
       }
 
-      auto fieldIndex = overload.choice.getTupleIndex();
-      auto resolvedTy = overload.openedType;
-      resolvedTy = simplifyType(resolvedTy);
-
-      return KeyPathExpr::Component::forTupleElement(fieldIndex, resolvedTy,
-                                                     componentLoc);
+      if (shouldForceUnwrapResult(overload.choice, locator))
+        buildKeyPathOptionalForceComponent(components);
     }
 
-    KeyPathExpr::Component buildKeyPathSubscriptComponent(
+    void buildKeyPathSubscriptComponent(
         SelectedOverload &overload, SourceLoc componentLoc, Expr *indexExpr,
-        ArrayRef<Identifier> labels, ConstraintLocator *locator) {
+        ArrayRef<Identifier> labels, ConstraintLocator *locator,
+        SmallVectorImpl<KeyPathExpr::Component> &components) {
       auto subscript = cast<SubscriptDecl>(overload.choice.getDecl());
       assert(!subscript->isGetterMutating());
 
@@ -4568,10 +4554,14 @@ namespace {
         conformances.push_back(hashableConformance);
       }
 
-      return KeyPathExpr::Component::forSubscriptWithPrebuiltIndexExpr(
+      auto comp = KeyPathExpr::Component::forSubscriptWithPrebuiltIndexExpr(
           ref, newIndexExpr, cs.getASTContext().AllocateCopy(newLabels),
           resolvedTy, componentLoc,
           cs.getASTContext().AllocateCopy(conformances));
+      components.push_back(comp);
+
+      if (shouldForceUnwrapResult(overload.choice, locator))
+        buildKeyPathOptionalForceComponent(components);
     }
 
     Expr *visitKeyPathDotExpr(KeyPathDotExpr *E) {
