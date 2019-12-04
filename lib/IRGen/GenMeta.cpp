@@ -2869,11 +2869,13 @@ namespace {
       llvm_unreachable("Fixed class metadata cannot have missing members");
     }
 
-    void addGenericArgument(ClassDecl *forClass) {
+    void addGenericArgument(GenericRequirement requirement,
+                            ClassDecl *forClass) {
       llvm_unreachable("Fixed class metadata cannot have generic parameters");
     }
 
-    void addGenericWitnessTable(ClassDecl *forClass) {
+    void addGenericWitnessTable(GenericRequirement requirement,
+                                ClassDecl *forClass) {
       llvm_unreachable("Fixed class metadata cannot have generic requirements");
     }
   };
@@ -2908,12 +2910,14 @@ namespace {
       }
     }
 
-    void addGenericArgument(ClassDecl *forClass) {
+    void addGenericArgument(GenericRequirement requirement,
+                            ClassDecl *forClass) {
       // Filled in at runtime.
       B.addNullPointer(IGM.TypeMetadataPtrTy);
     }
 
-    void addGenericWitnessTable(ClassDecl *forClass) {
+    void addGenericWitnessTable(GenericRequirement requirement,
+                                ClassDecl *forClass) {
       // Filled in at runtime.
       B.addNullPointer(IGM.WitnessTablePtrTy);
     }
@@ -3499,11 +3503,11 @@ namespace {
       B.addAlignmentPadding(super::IGM.getPointerAlignment());
     }
 
-    void addGenericArgument() {
+    void addGenericArgument(GenericRequirement requirement) {
       llvm_unreachable("Concrete type metadata cannot have generic parameters");
     }
 
-    void addGenericWitnessTable() {
+    void addGenericWitnessTable(GenericRequirement requirement) {
       llvm_unreachable("Concrete type metadata cannot have generic requirements");
     }
   };
@@ -3733,11 +3737,11 @@ namespace {
       B.add(emitNominalTypeDescriptor());
     }
 
-    void addGenericArgument() {
+    void addGenericArgument(GenericRequirement requirement) {
       llvm_unreachable("Concrete type metadata cannot have generic parameters");
     }
 
-    void addGenericWitnessTable() {
+    void addGenericWitnessTable(GenericRequirement requirement) {
       llvm_unreachable("Concrete type metadata cannot have generic requirements");
     }
   };

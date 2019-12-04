@@ -87,8 +87,8 @@ public:
   void addValueWitnessTable() { addPointer(); }
   void addNominalTypeDescriptor() { addPointer(); }
   void addFieldOffset(VarDecl *) { addInt32(); }
-  void addGenericArgument() { addPointer(); }
-  void addGenericWitnessTable() { addPointer(); }
+  void addGenericArgument(GenericRequirement requirement) { addPointer(); }
+  void addGenericWitnessTable(GenericRequirement requirement) { addPointer(); }
   void noteStartOfTypeSpecificMembers() {}
 
   void noteEndOfFieldOffsets() {
