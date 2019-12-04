@@ -34,11 +34,11 @@
 #include <unordered_set>
 #include <vector>
 
-// Declarations for the portion experimental dependency system used by the
+// Declarations for the portion fine-grained dependency system used by the
 // driver.
 
 namespace swift {
-namespace experimental_dependencies {
+namespace fine_grained_dependencies {
 
 //==============================================================================
 // MARK: ModuleDepGraphNode
@@ -117,7 +117,7 @@ public:
 // MARK: ModuleDepGraph
 //==============================================================================
 
-/// See \ref Node in ExperimentalDependencies.h
+/// See \ref Node in FineGrainedDependencies.h
 class ModuleDepGraph {
 
   /// Find nodes, first by the swiftDeps file, then by key.
@@ -186,8 +186,8 @@ class ModuleDepGraph {
   /// files for the same name distinct, keep a sequence number for each name.
   std::unordered_map<std::string, unsigned> dotFileSequenceNumber;
 
-  const bool verifyExperimentalDependencyGraphAfterEveryImport;
-  const bool emitExperimentalDependencyDotFileAfterEveryImport;
+  const bool verifyFineGrainedDependencyGraphAfterEveryImport;
+  const bool emitFineGrainedDependencyDotFileAfterEveryImport;
 
   /// If tracing dependencies, holds the current node traversal path
   Optional<std::vector<const ModuleDepGraphNode *>> currentPathIfTracing;
@@ -250,14 +250,14 @@ public:
   using NodeType = ModuleDepGraphNode;
 
   /// \p stats may be null
-  ModuleDepGraph(const bool verifyExperimentalDependencyGraphAfterEveryImport,
-                 const bool emitExperimentalDependencyDotFileAfterEveryImport,
+  ModuleDepGraph(const bool verifyFineGrainedDependencyGraphAfterEveryImport,
+                 const bool emitFineGrainedDependencyDotFileAfterEveryImport,
                  const bool shouldTraceDependencies,
                  UnifiedStatsReporter *stats)
-      : verifyExperimentalDependencyGraphAfterEveryImport(
-            verifyExperimentalDependencyGraphAfterEveryImport),
-        emitExperimentalDependencyDotFileAfterEveryImport(
-            emitExperimentalDependencyDotFileAfterEveryImport),
+      : verifyFineGrainedDependencyGraphAfterEveryImport(
+            verifyFineGrainedDependencyGraphAfterEveryImport),
+        emitFineGrainedDependencyDotFileAfterEveryImport(
+            emitFineGrainedDependencyDotFileAfterEveryImport),
         currentPathIfTracing(
             shouldTraceDependencies
                 ? llvm::Optional<std::vector<const ModuleDepGraphNode *>>(
@@ -473,7 +473,7 @@ private:
     return !currentPathIfTracing.hasValue() || currentPathIfTracing->empty();
   }
 };
-} // namespace experimental_dependencies
+} // namespace fine_grained_dependencies
 } // namespace swift
 
 #endif // SWIFT_DRIVER_FINE_GRAINED_DEPENDENCY_DRIVER_GRAPH_H

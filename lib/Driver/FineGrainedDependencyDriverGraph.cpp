@@ -29,23 +29,23 @@
 #include "llvm/Support/YAMLParser.h"
 #include "llvm/Support/raw_ostream.h"
 
-// Definitions for the portion experimental dependency system used by the
+// Definitions for the portion fine-grained dependency system used by the
 // driver.
 
 using namespace swift;
 
-using namespace swift::experimental_dependencies;
+using namespace swift::fine_grained_dependencies;
 using namespace swift::driver;
 
 //==============================================================================
 // MARK: Interfacing to Compilation
 //==============================================================================
 
-using LoadResult = experimental_dependencies::DependencyGraphImpl::LoadResult;
+using LoadResult = fine_grained_dependencies::DependencyGraphImpl::LoadResult;
 
 LoadResult ModuleDepGraph::loadFromPath(const Job *Cmd, StringRef path,
                                         DiagnosticEngine &diags) {
-  FrontendStatsTracer tracer(stats, "experimental-dependencies-loadFromPath");
+  FrontendStatsTracer tracer(stats, "fine-grained-dependencies-loadFromPath");
 
   if (driverDotFileBasePath.empty()) {
     driverDotFileBasePath = path;
@@ -57,9 +57,9 @@ LoadResult ModuleDepGraph::loadFromPath(const Job *Cmd, StringRef path,
   if (!buffer)
     return LoadResult::HadError;
   auto r = loadFromBuffer(Cmd, *buffer.get());
-  if (emitExperimentalDependencyDotFileAfterEveryImport)
+  if (emitFineGrainedDependencyDotFileAfterEveryImport)
     emitDotFileForJob(diags, Cmd);
-  if (verifyExperimentalDependencyGraphAfterEveryImport)
+  if (verifyFineGrainedDependencyGraphAfterEveryImport)
     verify();
   return r;
 }
@@ -82,7 +82,7 @@ bool ModuleDepGraph::isMarked(const Job *cmd) const {
 void ModuleDepGraph::markTransitive(
     SmallVectorImpl<const Job *> &consequentJobsToRecompile,
     const Job *jobToBeRecompiled, const void *ignored) {
-  FrontendStatsTracer tracer(stats, "experimental-dependencies-markTransitive");
+  FrontendStatsTracer tracer(stats, "fine-grained-dependencies-markTransitive");
 
   std::unordered_set<const ModuleDepGraphNode *> dependentNodes;
   const StringRef swiftDepsToBeRecompiled = getSwiftDeps(jobToBeRecompiled);
@@ -129,7 +129,7 @@ std::vector<StringRef> ModuleDepGraph::getExternalDependencies() const {
 // Add every (swiftdeps) use of the external dependency to uses.
 void ModuleDepGraph::markExternal(SmallVectorImpl<const Job *> &uses,
                                   StringRef externalDependency) {
-  FrontendStatsTracer tracer(stats, "experimental-dependencies-markExternal");
+  FrontendStatsTracer tracer(stats, "fine-grained-dependencies-markExternal");
   forEachUnmarkedJobDirectlyDependentOnExternalSwiftdeps(
       externalDependency, [&](const Job *job) {
         uses.push_back(job);
@@ -159,7 +159,7 @@ void ModuleDepGraph::forEachUnmarkedJobDirectlyDependentOnExternalSwiftdeps(
 //==============================================================================
 
 LoadResult ModuleDepGraph::integrate(const SourceFileDepGraph &g) {
-  FrontendStatsTracer tracer(stats, "experimental-dependencies-integrate");
+  FrontendStatsTracer tracer(stats, "fine-grained-dependencies-integrate");
 
   StringRef swiftDeps = g.getSwiftDepsFromSourceFileProvide();
   // When done, disappearedNodes contains the nodes which no longer exist.
@@ -406,7 +406,7 @@ void ModuleDepGraph::emitDotFile(DiagnosticEngine &diags, StringRef baseName) {
 }
 
 void ModuleDepGraph::emitDotFile(llvm::raw_ostream &out) {
-  FrontendStatsTracer tracer(stats, "experimental-dependencies-emitDotFile");
+  FrontendStatsTracer tracer(stats, "fine-grained-dependencies-emitDotFile");
   DotFileEmitter<ModuleDepGraph>(out, *this, true, false).emit();
 }
 
@@ -423,7 +423,7 @@ void ModuleDepGraphNode::dump() const {
 }
 
 bool ModuleDepGraph::verify() const {
-  FrontendStatsTracer tracer(stats, "experimental-dependencies-verify");
+  FrontendStatsTracer tracer(stats, "fine-grained-dependencies-verify");
   verifyNodeMapEntries();
   verifyCanFindEachJob();
   verifyEachJobInGraphIsTracked();
@@ -433,7 +433,7 @@ bool ModuleDepGraph::verify() const {
 
 void ModuleDepGraph::verifyNodeMapEntries() const {
   FrontendStatsTracer tracer(stats,
-                             "experimental-dependencies-verifyNodeMapEntries");
+                             "fine-grained-dependencies-verifyNodeMapEntries");
   // TODO: disable when not debugging
   std::array<
       std::unordered_map<DependencyKey,
@@ -502,7 +502,7 @@ void ModuleDepGraph::verifyExternalDependencyUniqueness(
 
 void ModuleDepGraph::verifyCanFindEachJob() const {
   FrontendStatsTracer tracer(stats,
-                             "experimental-dependencies-verifyCanFindEachJob");
+                             "fine-grained-dependencies-verifyCanFindEachJob");
   for (const auto p : jobsBySwiftDeps) {
     getJob(p.first);
   }
@@ -510,7 +510,7 @@ void ModuleDepGraph::verifyCanFindEachJob() const {
 
 void ModuleDepGraph::verifyEachJobInGraphIsTracked() const {
   FrontendStatsTracer tracer(
-      stats, "experimental-dependencies-verifyEachJobIsTracked");
+      stats, "fine-grained-dependencies-verifyEachJobIsTracked");
   nodeMap.forEachKey1(
       [&](const std::string &swiftDeps, const typename NodeMap::Key2Map &) {
         ensureJobIsTracked(swiftDeps);

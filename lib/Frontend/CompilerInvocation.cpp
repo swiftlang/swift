@@ -357,11 +357,11 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.VerifySyntaxTree = true;
   }
   
-  if (Args.hasArg(OPT_enable_experimental_dependencies))
-    Opts.EnableExperimentalDependencies = true;
+  if (Args.hasArg(OPT_enable_fine_grained_dependencies))
+    Opts.EnableFineGrainedDependencies = true;
 
-  if (Args.hasArg(OPT_experimental_dependency_include_intrafile))
-    Opts.ExperimentalDependenciesIncludeIntrafileOnes = true;
+  if (Args.hasArg(OPT_fine_grained_dependency_include_intrafile))
+    Opts.FineGrainedDependenciesIncludeIntrafileOnes = true;
 
   if (Args.hasArg(OPT_enable_experimental_differentiable_programming))
     Opts.EnableExperimentalDifferentiableProgramming = true;

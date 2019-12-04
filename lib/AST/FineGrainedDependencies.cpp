@@ -26,13 +26,13 @@
 #include "llvm/Support/Path.h"
 #include "llvm/Support/YAMLParser.h"
 
-// This file holds the definitions for the experimental dependency system
+// This file holds the definitions for the fine-grained dependency system
 // that are likely to be stable as it moves away from the status quo.
 // These include the graph structures common to both programs and also
 // the frontend graph, which must be read by the driver.
 
 using namespace swift;
-using namespace experimental_dependencies;
+using namespace fine_grained_dependencies;
 
 //==============================================================================
 // MARK: SourceFileDepGraph access
@@ -181,7 +181,7 @@ std::string DependencyKey::asString() const {
 }
 
 /// Needed for TwoStageMap::verify:
-raw_ostream &experimental_dependencies::operator<<(raw_ostream &out,
+raw_ostream &fine_grained_dependencies::operator<<(raw_ostream &out,
                                                    const DependencyKey &key) {
   out << key.asString();
   return out;
@@ -279,9 +279,9 @@ StringRef ScalarTraits<size_t>::input(StringRef scalar, void *ctxt,
 }
 #endif
 
-void ScalarEnumerationTraits<swift::experimental_dependencies::NodeKind>::
-    enumeration(IO &io, swift::experimental_dependencies::NodeKind &value) {
-  using NodeKind = swift::experimental_dependencies::NodeKind;
+void ScalarEnumerationTraits<swift::fine_grained_dependencies::NodeKind>::
+    enumeration(IO &io, swift::fine_grained_dependencies::NodeKind &value) {
+  using NodeKind = swift::fine_grained_dependencies::NodeKind;
   io.enumCase(value, "topLevel", NodeKind::topLevel);
   io.enumCase(value, "nominal", NodeKind::nominal);
   io.enumCase(value, "potentialMember", NodeKind::potentialMember);
@@ -292,14 +292,14 @@ void ScalarEnumerationTraits<swift::experimental_dependencies::NodeKind>::
 }
 
 void ScalarEnumerationTraits<DeclAspect>::enumeration(
-    IO &io, swift::experimental_dependencies::DeclAspect &value) {
-  using DeclAspect = swift::experimental_dependencies::DeclAspect;
+    IO &io, swift::fine_grained_dependencies::DeclAspect &value) {
+  using DeclAspect = swift::fine_grained_dependencies::DeclAspect;
   io.enumCase(value, "interface", DeclAspect::interface);
   io.enumCase(value, "implementation", DeclAspect::implementation);
 }
 
 void MappingTraits<DependencyKey>::mapping(
-    IO &io, swift::experimental_dependencies::DependencyKey &key) {
+    IO &io, swift::fine_grained_dependencies::DependencyKey &key) {
   io.mapRequired("kind", key.kind);
   io.mapRequired("aspect", key.aspect);
   io.mapRequired("context", key.context);
@@ -307,7 +307,7 @@ void MappingTraits<DependencyKey>::mapping(
 }
 
 void MappingTraits<DepGraphNode>::mapping(
-    IO &io, swift::experimental_dependencies::DepGraphNode &node) {
+    IO &io, swift::fine_grained_dependencies::DepGraphNode &node) {
   io.mapRequired("key", node.key);
   io.mapOptional("fingerprint", node.fingerprint);
 }

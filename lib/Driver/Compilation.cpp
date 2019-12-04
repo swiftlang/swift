@@ -121,10 +121,10 @@ Compilation::Compilation(DiagnosticEngine &Diags,
                          bool SaveTemps,
                          bool ShowDriverTimeCompilation,
                          std::unique_ptr<UnifiedStatsReporter> StatsReporter,
-                         bool EnableExperimentalDependencies,
-                         bool VerifyExperimentalDependencyGraphAfterEveryImport,
-                         bool EmitExperimentalDependencyDotFileAfterEveryImport,
-                         bool ExperimentalDependenciesIncludeIntrafileOnes,
+                         bool EnableFineGrainedDependencies,
+                         bool VerifyFineGrainedDependencyGraphAfterEveryImport,
+                         bool EmitFineGrainedDependencyDotFileAfterEveryImport,
+                         bool FineGrainedDependenciesIncludeIntrafileOnes,
                          bool EnableSourceRangeDependencies,
                          bool CompareIncrementalSchemes,
                          StringRef CompareIncrementalSchemesPath)
@@ -149,13 +149,13 @@ Compilation::Compilation(DiagnosticEngine &Diags,
     ShowDriverTimeCompilation(ShowDriverTimeCompilation),
     Stats(std::move(StatsReporter)),
     FilelistThreshold(FilelistThreshold),
-    EnableExperimentalDependencies(EnableExperimentalDependencies),
-    VerifyExperimentalDependencyGraphAfterEveryImport(
-      VerifyExperimentalDependencyGraphAfterEveryImport),
-    EmitExperimentalDependencyDotFileAfterEveryImport(
-      EmitExperimentalDependencyDotFileAfterEveryImport),
-    ExperimentalDependenciesIncludeIntrafileOnes(
-      ExperimentalDependenciesIncludeIntrafileOnes),
+    EnableFineGrainedDependencies(EnableFineGrainedDependencies),
+    VerifyFineGrainedDependencyGraphAfterEveryImport(
+      VerifyFineGrainedDependencyGraphAfterEveryImport),
+    EmitFineGrainedDependencyDotFileAfterEveryImport(
+      EmitFineGrainedDependencyDotFileAfterEveryImport),
+    FineGrainedDependenciesIncludeIntrafileOnes(
+      FineGrainedDependenciesIncludeIntrafileOnes),
     EnableSourceRangeDependencies(EnableSourceRangeDependencies) {
     if (CompareIncrementalSchemes)
       IncrementalComparator.emplace(
@@ -228,7 +228,7 @@ namespace driver {
     CommandSet DeferredCommands;
   public:
     /// Why are we keeping four dependency graphs?
-    /// One dimension for standard vs experimental (fine-grained) dependencies.
+    /// One dimension for standard vs fine-grained dependencies.
     /// The other dimension because we want to compare what dependency-based
     /// incrementalism would do vs range-based incrementalism. Unfortuneatly,
     /// the dependency graph includes marks that record if a node (Job) has ever
@@ -243,9 +243,8 @@ namespace driver {
     DependencyGraph StandardDepGraph;
     DependencyGraph StandardDepGraphForRanges;
 
-    /// Experimental Dependency graph for finer-grained dependencies
-    experimental_dependencies::ModuleDepGraph ExpDepGraph;
-    experimental_dependencies::ModuleDepGraph ExpDepGraphForRanges;
+    fine_grained_dependencies::ModuleDepGraph ExpDepGraph;
+    fine_grained_dependencies::ModuleDepGraph ExpDepGraphForRanges;
 
   private:
     /// Helper for tracing the propagation of marks in the graph.
@@ -287,7 +286,7 @@ namespace driver {
                                        : "")
                    << reason << ": " << LogJob(cmd) << "\n";
 
-      if (Comp.getEnableExperimentalDependencies())
+      if (Comp.getEnableFineGrainedDependencies())
         getExpDepGraph(forRanges).printPath(llvm::outs(), cmd);
       else
         IncrementalTracer->printPath(
@@ -807,16 +806,16 @@ namespace driver {
     PerformJobsState(Compilation &Comp, std::unique_ptr<TaskQueue> &&TaskQueue)
         : Comp(Comp),
           ExpDepGraph(
-              Comp.getVerifyExperimentalDependencyGraphAfterEveryImport(),
-              Comp.getEmitExperimentalDependencyDotFileAfterEveryImport(),
+              Comp.getVerifyFineGrainedDependencyGraphAfterEveryImport(),
+              Comp.getEmitFineGrainedDependencyDotFileAfterEveryImport(),
               Comp.getTraceDependencies(), Comp.getStatsReporter()),
           ExpDepGraphForRanges(
-              Comp.getVerifyExperimentalDependencyGraphAfterEveryImport(),
-              Comp.getEmitExperimentalDependencyDotFileAfterEveryImport(),
+              Comp.getVerifyFineGrainedDependencyGraphAfterEveryImport(),
+              Comp.getEmitFineGrainedDependencyDotFileAfterEveryImport(),
               Comp.getTraceDependencies(), Comp.getStatsReporter()),
           ActualIncrementalTracer(Comp.getStatsReporter()),
           TQ(std::move(TaskQueue)) {
-      if (!Comp.getEnableExperimentalDependencies() &&
+      if (!Comp.getEnableFineGrainedDependencies() &&
           Comp.getTraceDependencies())
         IncrementalTracer = &ActualIncrementalTracer;
     }
@@ -1007,7 +1006,7 @@ namespace driver {
       const bool isCascading = isCascadingJobAccordingToCondition(
           Cmd, Cond, HasDependenciesFileName);
 
-      if (Comp.getEnableExperimentalDependencies())
+      if (Comp.getEnableFineGrainedDependencies())
         assert(getExpDepGraph(/*forRanges=*/false)
                    .emitDotFileAndVerify(Comp.getDiags()));
       return std::make_pair(shouldSched, isCascading);
@@ -1041,8 +1040,8 @@ namespace driver {
       case DependencyGraphImpl::LoadResult::UpToDate:
         return std::make_pair(Cmd->getCondition(), true);
       case DependencyGraphImpl::LoadResult::AffectsDownstream:
-        if (Comp.getEnableExperimentalDependencies()) {
-          // The experimental graph reports a change, since it lumps new
+        if (Comp.getEnableFineGrainedDependencies()) {
+          // The fine-grained graph reports a change, since it lumps new
           // files together with new "Provides".
           return std::make_pair(Cmd->getCondition(), true);
         }
@@ -1559,13 +1558,13 @@ namespace driver {
     // MARK: dependency graph interface
 
     bool isMarkedInDepGraph(const Job *const Cmd, const bool forRanges) {
-      return Comp.getEnableExperimentalDependencies()
+      return Comp.getEnableFineGrainedDependencies()
                  ? getExpDepGraph(forRanges).isMarked(Cmd)
                  : getDepGraph(forRanges).isMarked(Cmd);
     }
 
     std::vector<StringRef> getExternalDependencies(const bool forRanges) const {
-      if (Comp.getEnableExperimentalDependencies())
+      if (Comp.getEnableFineGrainedDependencies())
         return getExpDepGraph(forRanges).getExternalDependencies();
       const auto deps = getDepGraph(forRanges).getExternalDependencies();
       return std::vector<StringRef>(deps.begin(), deps.end());
@@ -1575,14 +1574,14 @@ namespace driver {
     void markExternalInDepGraph(SmallVector<const driver::Job *, N> &uses,
                                 StringRef externalDependency,
                                 const bool forRanges) {
-      if (Comp.getEnableExperimentalDependencies())
+      if (Comp.getEnableFineGrainedDependencies())
         getExpDepGraph(forRanges).markExternal(uses, externalDependency);
       else
         getDepGraph(forRanges).markExternal(uses, externalDependency);
     }
 
     bool markIntransitiveInDepGraph(const Job *Cmd, const bool forRanges) {
-      return Comp.getEnableExperimentalDependencies()
+      return Comp.getEnableFineGrainedDependencies()
                  ? getExpDepGraph(forRanges).markIntransitive(Cmd)
                  : getDepGraph(forRanges).markIntransitive(Cmd);
     }
@@ -1591,7 +1590,7 @@ namespace driver {
                                                      StringRef path,
                                                      DiagnosticEngine &diags,
                                                      const bool forRanges) {
-      return Comp.getEnableExperimentalDependencies()
+      return Comp.getEnableFineGrainedDependencies()
                  ? getExpDepGraph(forRanges).loadFromPath(Cmd, path, diags)
                  : getDepGraph(forRanges).loadFromPath(Cmd, path, diags);
     }
@@ -1601,27 +1600,27 @@ namespace driver {
     markTransitiveInDepGraph(SmallVector<const Job *, N> &visited,
                              const Job *Cmd, const bool forRanges,
                              DependencyGraph::MarkTracer *tracer = nullptr) {
-      if (Comp.getEnableExperimentalDependencies())
+      if (Comp.getEnableFineGrainedDependencies())
         getExpDepGraph(forRanges).markTransitive(visited, Cmd, tracer);
       else
         getDepGraph(forRanges).markTransitive(visited, Cmd, tracer);
     }
 
     void addIndependentNodeToDepGraph(const Job *Cmd, const bool forRanges) {
-      if (Comp.getEnableExperimentalDependencies())
+      if (Comp.getEnableFineGrainedDependencies())
         getExpDepGraph(forRanges).addIndependentNode(Cmd);
       else
         getDepGraph(forRanges).addIndependentNode(Cmd);
     }
 
-    experimental_dependencies::ModuleDepGraph &
+    fine_grained_dependencies::ModuleDepGraph &
     getExpDepGraph(const bool forRanges) {
       return forRanges ? ExpDepGraphForRanges : ExpDepGraph;
     }
     DependencyGraph &getDepGraph(const bool forRanges) {
       return forRanges ? StandardDepGraphForRanges : StandardDepGraph;
     }
-    const experimental_dependencies::ModuleDepGraph &
+    const fine_grained_dependencies::ModuleDepGraph &
     getExpDepGraph(const bool forRanges) const {
       return forRanges ? ExpDepGraphForRanges : ExpDepGraph;
     }
@@ -1821,7 +1820,7 @@ int Compilation::performJobsImpl(bool &abnormalExit,
                                CompilationRecordPath + "~moduleonly");
     }
   }
-  if (getEnableExperimentalDependencies())
+  if (getEnableFineGrainedDependencies())
     assert(State.ExpDepGraph.emitDotFileAndVerify(getDiags()));
   abnormalExit = State.hadAnyAbnormalExit();
   return State.getResult();

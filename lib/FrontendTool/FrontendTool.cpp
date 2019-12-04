@@ -979,8 +979,8 @@ static void emitReferenceDependenciesForAllPrimaryInputsIfNeeded(
         Invocation.getReferenceDependenciesFilePathForPrimary(
             SF->getFilename());
     if (!referenceDependenciesFilePath.empty()) {
-      if (Invocation.getLangOptions().EnableExperimentalDependencies)
-        (void)experimental_dependencies::emitReferenceDependencies(
+      if (Invocation.getLangOptions().EnableFineGrainedDependencies)
+        (void)fine_grained_dependencies::emitReferenceDependencies(
             Instance.getASTContext().Diags, SF,
             *Instance.getDependencyTracker(), referenceDependenciesFilePath);
       else

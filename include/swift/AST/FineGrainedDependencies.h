@@ -27,7 +27,7 @@
 #include <unordered_set>
 #include <vector>
 
-// Summary: The ExperimentalDependency* files contain infrastructure for a
+// Summary: The FineGrainedDependency* files contain infrastructure for a
 // dependency system that, in the future, will be finer-grained than the current
 // dependency system. At present--12/5/18--they are using the same input
 // information as the current system and expected to produce the same results.
@@ -36,14 +36,14 @@
 //
 // The frontend uses the information from the compiler to built a
 // SourceFileDepGraph consisting of SourceFileDepGraphNodes.
-// ExperimentalDependencies.* define these structures, and
-// ExperimentalDependenciesProducer has the frontend-unique code used to build
+// FineGrainedDependencies.* define these structures, and
+// FineGrainedDependenciesProducer has the frontend-unique code used to build
 // the SourceFileDepGraph.
 //
 // The driver reads the SourceFileDepGraph and integrates it into its dependency
 // graph, a ModuleDepGraph consisting of ModuleDepGraphNodes.
 
-// This file holds the declarations for the experimental dependency system
+// This file holds the declarations for the fine-grained dependency system
 // that are used by both the driver and frontend.
 // These include the graph structures common to both programs and also
 // the frontend graph, which must be read by the driver.
@@ -59,7 +59,7 @@ class FrontendOptions;
 class SourceFile;
 
 /// Use a new namespace to help keep the experimental code from clashing.
-namespace experimental_dependencies {
+namespace fine_grained_dependencies {
 
 using StringVec = std::vector<std::string>;
 
@@ -318,7 +318,7 @@ private:
 // End of general declarations
 
 //==============================================================================
-// MARK: Start of experimental-dependency-specific code
+// MARK: Start of fine-grained-dependency-specific code
 //==============================================================================
 
 /// The entry point into this system from the frontend:
@@ -517,20 +517,20 @@ private:
   // Name conversion helpers
   static std::string demangleTypeAsContext(StringRef);
 };
-} // namespace experimental_dependencies
+} // namespace fine_grained_dependencies
 } // namespace swift
 
 template <>
-struct std::hash<typename swift::experimental_dependencies::DependencyKey> {
+struct std::hash<typename swift::fine_grained_dependencies::DependencyKey> {
   size_t
-  operator()(const swift::experimental_dependencies::DependencyKey &key) const {
+  operator()(const swift::fine_grained_dependencies::DependencyKey &key) const {
     return key.hash();
   }
 };
 template <>
-struct std::hash<typename swift::experimental_dependencies::DeclAspect> {
+struct std::hash<typename swift::fine_grained_dependencies::DeclAspect> {
   size_t
-  operator()(const swift::experimental_dependencies::DeclAspect aspect) const {
+  operator()(const swift::fine_grained_dependencies::DeclAspect aspect) const {
     return size_t(aspect);
   }
 };
@@ -559,7 +559,7 @@ struct std::hash<typename swift::experimental_dependencies::DeclAspect> {
 /// improving it.
 
 namespace swift {
-namespace experimental_dependencies {
+namespace fine_grained_dependencies {
 class DepGraphNode {
   /// Def->use arcs go by DependencyKey. There may be >1 node for a given key.
   DependencyKey key;
@@ -705,7 +705,7 @@ public:
 //==============================================================================
 
 /// The dependency graph produced by the frontend and consumed by the driver.
-/// See \ref Node in ExperimentalDependencies.h
+/// See \ref Node in FineGrainedDependencies.h
 class SourceFileDepGraph {
   /// Every node in the graph. Indices used for serialization.
   /// Use addNode instead of adding directly.
@@ -936,7 +936,7 @@ private:
   }
 };
 
-} // end namespace experimental_dependencies
+} // end namespace fine_grained_dependencies
 } // end namespace swift
 
 //==============================================================================
@@ -948,22 +948,22 @@ private:
 #if !(defined(__linux__) || defined(_WIN64))
 LLVM_YAML_DECLARE_SCALAR_TRAITS(size_t, QuotingType::None)
 #endif
-LLVM_YAML_DECLARE_ENUM_TRAITS(swift::experimental_dependencies::NodeKind)
-LLVM_YAML_DECLARE_ENUM_TRAITS(swift::experimental_dependencies::DeclAspect)
+LLVM_YAML_DECLARE_ENUM_TRAITS(swift::fine_grained_dependencies::NodeKind)
+LLVM_YAML_DECLARE_ENUM_TRAITS(swift::fine_grained_dependencies::DeclAspect)
 LLVM_YAML_DECLARE_MAPPING_TRAITS(
-    swift::experimental_dependencies::DependencyKey)
-LLVM_YAML_DECLARE_MAPPING_TRAITS(swift::experimental_dependencies::DepGraphNode)
+    swift::fine_grained_dependencies::DependencyKey)
+LLVM_YAML_DECLARE_MAPPING_TRAITS(swift::fine_grained_dependencies::DepGraphNode)
 
 namespace llvm {
 namespace yaml {
 template <>
 struct MappingContextTraits<
-    swift::experimental_dependencies::SourceFileDepGraphNode,
-    swift::experimental_dependencies::SourceFileDepGraph> {
+    swift::fine_grained_dependencies::SourceFileDepGraphNode,
+    swift::fine_grained_dependencies::SourceFileDepGraph> {
   using SourceFileDepGraphNode =
-      swift::experimental_dependencies::SourceFileDepGraphNode;
+      swift::fine_grained_dependencies::SourceFileDepGraphNode;
   using SourceFileDepGraph =
-      swift::experimental_dependencies::SourceFileDepGraph;
+      swift::fine_grained_dependencies::SourceFileDepGraph;
 
   static void mapping(IO &io, SourceFileDepGraphNode &node,
                       SourceFileDepGraph &g);
@@ -971,9 +971,9 @@ struct MappingContextTraits<
 
 template <>
 struct SequenceTraits<
-    std::vector<swift::experimental_dependencies::SourceFileDepGraphNode *>> {
+    std::vector<swift::fine_grained_dependencies::SourceFileDepGraphNode *>> {
   using SourceFileDepGraphNode =
-      swift::experimental_dependencies::SourceFileDepGraphNode;
+      swift::fine_grained_dependencies::SourceFileDepGraphNode;
   using NodeVec = std::vector<SourceFileDepGraphNode *>;
   static size_t size(IO &, NodeVec &vec);
   static SourceFileDepGraphNode &element(IO &, NodeVec &vec, size_t index);
@@ -983,6 +983,6 @@ struct SequenceTraits<
 } // namespace llvm
 
 LLVM_YAML_DECLARE_MAPPING_TRAITS(
-    swift::experimental_dependencies::SourceFileDepGraph)
+    swift::fine_grained_dependencies::SourceFileDepGraph)
 
 #endif // SWIFT_AST_FINE_GRAINED_DEPENDENCIES_H
