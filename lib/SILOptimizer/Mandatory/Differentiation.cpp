@@ -885,12 +885,12 @@ public:
 
   /// Returns the result index for `dfi` if found in this context. Otherwise,
   /// sets the result index to zero and returns it.
-  unsigned getResultIndex(DifferentiableFunctionInst* dfi) {
+  unsigned getResultIndex(DifferentiableFunctionInst *dfi) {
     return resultIndices[dfi];
   }
 
   /// Sets the result index for `dfi`.
-  void setResultIndex(DifferentiableFunctionInst* dfi, unsigned index) {
+  void setResultIndex(DifferentiableFunctionInst *dfi, unsigned index) {
     resultIndices[dfi] = index;
   }
 
@@ -898,7 +898,7 @@ public:
     return nestedApplyInfo;
   }
 
-  void recordGeneratedFunction(SILFunction* function) {
+  void recordGeneratedFunction(SILFunction *function) {
     generatedFunctions.push_back(function);
   }
 
