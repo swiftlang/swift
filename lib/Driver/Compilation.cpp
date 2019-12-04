@@ -1568,7 +1568,10 @@ namespace driver {
       if (Comp.getEnableExperimentalDependencies())
         return getExpDepGraph(forRanges).getExternalDependencies();
       const auto deps = getDepGraph(forRanges).getExternalDependencies();
-      return std::vector<StringRef>(deps.begin(), deps.end());
+      std::vector<StringRef> Dependencies;
+      std::copy(std::begin(deps), std::end(deps),
+                std::back_inserter(Dependencies));
+      return Dependencies;
     }
 
     template <unsigned N>
