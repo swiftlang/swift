@@ -1785,8 +1785,7 @@ static void fixItAvailableAttrRename(InFlightDiagnostic &diag,
   auto I = argumentLabelIDs.begin();
 
   auto updateLabelsForArg = [&](Expr *expr) -> bool {
-    if (isa<DefaultArgumentExpr>(expr) ||
-        isa<CallerDefaultArgumentExpr>(expr)) {
+    if (isa<DefaultArgumentExpr>(expr)) {
       // Defaulted: remove param label of it.
       if (I == argumentLabelIDs.end())
         return true;

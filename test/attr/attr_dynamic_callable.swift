@@ -49,6 +49,15 @@ func testCallable(
   d(x1: 1, 2.0, x2: 3)
 }
 
+func testCallableDiagnostics(
+  a: Callable, b: DiscardableResult, c: Throwing, d: KeywordArgumentCallable
+) {
+  a("hello", "world") // expected-error {{cannot invoke 'a' with an argument list of type '(String, String)'}}
+  b("hello", "world") // expected-error {{cannot invoke 'b' with an argument list of type '(String, String)'}}
+  try? c(1, 2, 3, 4) // expected-error {{cannot invoke 'c' with an argument list of type '(Int, Int, Int, Int)'}}
+  d(x1: "hello", x2: "world") // expected-error {{cannot invoke 'd' with an argument list of type '(x1: String, x2: String)'}}
+}
+
 func testIUO(
   a: Callable!, b: DiscardableResult!, c: Throwing!, d: KeywordArgumentCallable!
 ) {

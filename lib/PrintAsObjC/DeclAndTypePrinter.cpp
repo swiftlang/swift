@@ -1934,7 +1934,18 @@ private:
     if (!FT->getParams().empty()) {
       interleave(FT->getParams(),
                  [this](const AnyFunctionType::Param &param) {
-                   print(param.getOldType(), OTK_None, param.getLabel(),
+                   switch (param.getValueOwnership()) {
+                   case ValueOwnership::Default:
+                   case ValueOwnership::Shared:
+                     break;
+                   case ValueOwnership::Owned:
+                     os << "SWIFT_RELEASES_ARGUMENT ";
+                     break;
+                   case ValueOwnership::InOut:
+                     llvm_unreachable("bad specifier");
+                   }
+
+                   print(param.getParameterType(), OTK_None, param.getLabel(),
                          IsFunctionParam);
                  },
                  [this] { os << ", "; });

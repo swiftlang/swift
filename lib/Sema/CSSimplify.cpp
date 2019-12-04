@@ -860,10 +860,9 @@ public:
 
     unsigned newArgIdx = Arguments.size();
     auto *argLoc = CS.getConstraintLocator(
-        Locator
-            .withPathElement(LocatorPathElt::ApplyArgToParam(
-                newArgIdx, paramIdx, param.getParameterFlags()))
-            .withPathElement(LocatorPathElt::SynthesizedArgument(newArgIdx)));
+        Locator, {LocatorPathElt::ApplyArgToParam(newArgIdx, paramIdx,
+                                                  param.getParameterFlags()),
+                  LocatorPathElt::SynthesizedArgument(newArgIdx)});
 
     auto *argType =
         CS.createTypeVariable(argLoc, TVO_CanBindToInOut | TVO_CanBindToLValue |
@@ -4523,12 +4522,10 @@ ConstraintSystem::simplifyConstructionConstraint(
                                                  /*canonicalVararg=*/false);
     Type resultType = fnType->getResult();
 
-    if (matchTypes(resultType, desugarValueType,
-                   ConstraintKind::Bind,
-                   flags,
-                   ConstraintLocatorBuilder(locator)
-                     .withPathElement(ConstraintLocator::ApplyFunction))
-        .isFailure())
+    ConstraintLocatorBuilder builder(locator);
+    if (matchTypes(resultType, desugarValueType, ConstraintKind::Bind, flags,
+                   builder.withPathElement(ConstraintLocator::ApplyFunction))
+            .isFailure())
       return SolutionKind::Error;
 
     return matchTypes(argType, valueType, ConstraintKind::Conversion,
@@ -7337,13 +7334,7 @@ ConstraintSystem::simplifyApplicableFnConstraint(
   // Handle applications of types with `callAsFunction` methods.
   // Do this before stripping optional types below, when `shouldAttemptFixes()`
   // is true.
-  auto hasCallAsFunctionMethods =
-      desugar2->mayHaveMembers() &&
-      llvm::any_of(lookupMember(desugar2, DeclName(ctx.Id_callAsFunction)),
-                   [](LookupResultEntry entry) {
-                     return isa<FuncDecl>(entry.getValueDecl());
-                   });
-  if (hasCallAsFunctionMethods) {
+  if (desugar2->isCallableNominalType(DC)) {
     auto memberLoc = getConstraintLocator(
         outerLocator.withPathElement(ConstraintLocator::Member));
     // Add a `callAsFunction` member constraint, binding the member type to a
@@ -7351,6 +7342,8 @@ ConstraintSystem::simplifyApplicableFnConstraint(
     auto memberTy = createTypeVariable(memberLoc, /*options=*/0);
     // TODO: Revisit this if `static func callAsFunction` is to be supported.
     // Static member constraint requires `FunctionRefKind::DoubleApply`.
+    // TODO: Use a custom locator element to identify this member constraint
+    // instead of just pointing to the function expr.
     addValueMemberConstraint(origLValueType2, DeclName(ctx.Id_callAsFunction),
                              memberTy, DC, FunctionRefKind::SingleApply,
                              /*outerAlternatives*/ {}, locator);

@@ -27,6 +27,8 @@ SWIFT_REQUEST(TypeChecker, AttachedPropertyWrapperTypeRequest,
 SWIFT_REQUEST(TypeChecker, AttachedPropertyWrappersRequest,
               llvm::TinyPtrVector<CustomAttr *>(VarDecl *), Cached,
               NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, CallerSideDefaultArgExprRequest,
+              Expr *(DefaultArgumentExpr *), SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, ClassAncestryFlagsRequest,
               AncestryFlags(ClassDecl *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, CompareDeclSpecializationRequest,
@@ -86,6 +88,8 @@ SWIFT_REQUEST(TypeChecker, InterfaceTypeRequest,
               Type(ValueDecl *), SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, IsAccessorTransparentRequest, bool(AccessorDecl *),
               SeparatelyCached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, IsCallableNominalTypeRequest,
+              bool(CanType, DeclContext *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, IsDynamicRequest, bool(ValueDecl *),
               SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, IsFinalRequest, bool(ValueDecl *), SeparatelyCached,

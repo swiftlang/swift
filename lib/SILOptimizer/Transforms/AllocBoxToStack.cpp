@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "allocbox-to-stack"
+#include "swift/AST/DiagnosticsSIL.h"
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/Dominance.h"
 #include "swift/SIL/SILArgument.h"
@@ -354,6 +355,12 @@ findUnexpectedBoxUse(SILValue Box, bool examinePartialApply,
   return nullptr;
 }
 
+template <typename... T, typename... U>
+static InFlightDiagnostic diagnose(ASTContext &Context, SourceLoc loc,
+                                   Diag<T...> diag, U &&... args) {
+  return Context.Diags.diagnose(loc, diag, std::forward<U>(args)...);
+}
+
 /// canPromoteAllocBox - Can we promote this alloc_box to an alloc_stack?
 static bool canPromoteAllocBox(AllocBoxInst *ABI,
                                SmallVectorImpl<Operand *> &PromotedOperands) {
@@ -368,6 +375,21 @@ static bool canPromoteAllocBox(AllocBoxInst *ABI,
     LLVM_DEBUG(llvm::dbgs() << "*** Failed to promote alloc_box in @"
                << ABI->getFunction()->getName() << ": " << *ABI
                << "    Due to user: " << *User << "\n");
+
+    // Check if the vardecl has a "boxtostack.mustbeonstack" attribute. If so,
+    // emit a diagnostic.
+    if (auto *decl = ABI->getDecl()) {
+      if (decl->hasSemanticsAttr("boxtostack.mustbeonstack")) {
+        auto allocDiag =
+            diag::box_to_stack_cannot_promote_box_to_stack_due_to_escape_alloc;
+        diagnose(ABI->getModule().getASTContext(), ABI->getLoc().getSourceLoc(),
+                 allocDiag);
+        auto escapeNote = diag::
+            box_to_stack_cannot_promote_box_to_stack_due_to_escape_location;
+        diagnose(ABI->getModule().getASTContext(),
+                 User->getLoc().getSourceLoc(), escapeNote);
+      }
+    }
 
     return false;
   }
@@ -584,8 +606,6 @@ SILFunction *PromotedParamCloner::initCloned(SILOptFunctionBuilder &FuncBuilder,
       SILType paramTy;
       {
         auto &TC = Orig->getModule().Types;
-        Lowering::GenericContextScope scope(TC,
-                                      OrigFTI->getSubstGenericSignature());
         paramTy = getSILBoxFieldType(TypeExpansionContext(*Orig), boxTy, TC, 0);
       }
       auto promotedParam = SILParameterInfo(paramTy.getASTType(),

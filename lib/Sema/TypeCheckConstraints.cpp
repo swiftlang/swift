@@ -36,6 +36,7 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/TypeCheckerDebugConsumer.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Parse/Confusables.h"
 #include "swift/Parse/Lexer.h"
@@ -2301,7 +2302,7 @@ Type TypeChecker::typeCheckExpressionImpl(Expr *&expr, DeclContext *dc,
 
 Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
                                             DeclContext *DC, Type paramType,
-                                            bool isAutoClosure, bool canFail) {
+                                            bool isAutoClosure) {
   assert(paramType && !paramType->hasError());
 
   if (isAutoClosure) {
@@ -2323,12 +2324,12 @@ Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
     AutoClosureListener listener(fnType);
     return typeCheckExpression(defaultValue, DC,
                                TypeLoc::withoutLoc(fnType->getResult()),
-                               canFail ? CTP_DefaultParameter : CTP_CannotFail,
-                               TypeCheckExprOptions(), &listener);
+                               CTP_DefaultParameter, TypeCheckExprOptions(),
+                               &listener);
   }
 
   return typeCheckExpression(defaultValue, DC, TypeLoc::withoutLoc(paramType),
-                             canFail ? CTP_DefaultParameter : CTP_CannotFail);
+                             CTP_DefaultParameter);
 }
 
 Type TypeChecker::
@@ -3540,7 +3541,7 @@ void Solution::dump(raw_ostream &out) const {
     out.indent(2);
     Type(typeVar).print(out, PO);
     out << " as ";
-    binding.second.print(out);
+    binding.second.print(out, PO);
     if (auto *locator = typeVar->getImpl().getLocator()) {
       out << " @ ";
       locator->dump(sm, out);
@@ -4568,4 +4569,23 @@ ForcedCheckedCastExpr *swift::findForcedDowncast(ASTContext &ctx, Expr *expr) {
   }
 
   return nullptr;
+}
+
+llvm::Expected<bool>
+IsCallableNominalTypeRequest::evaluate(Evaluator &evaluator, CanType ty,
+                                       DeclContext *dc) const {
+  auto options = defaultMemberLookupOptions;
+  options |= NameLookupFlags::IgnoreAccessControl;
+  if (isa<AbstractFunctionDecl>(dc))
+    options |= NameLookupFlags::KnownPrivate;
+
+  // Look for a callAsFunction method.
+  auto &ctx = ty->getASTContext();
+  auto results =
+      TypeChecker::lookupMember(dc, ty, ctx.Id_callAsFunction, options);
+  return llvm::any_of(results, [](LookupResultEntry entry) -> bool {
+    if (auto *fd = dyn_cast<FuncDecl>(entry.getValueDecl()))
+      return fd->isCallAsFunctionMethod();
+    return false;
+  });
 }

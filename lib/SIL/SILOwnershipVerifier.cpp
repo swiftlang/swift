@@ -349,7 +349,7 @@ bool SILValueOwnershipChecker::gatherUsers(
       //
       // TODO: We could ignore this error and emit a more specific error on the
       // actual terminator.
-      for (auto *succArg : succBlock->getPhiArguments()) {
+      for (auto *succArg : succBlock->getSILPhiArguments()) {
         // *NOTE* We do not emit an error here since we want to allow for more
         // specific errors to be found during use_verification.
         //

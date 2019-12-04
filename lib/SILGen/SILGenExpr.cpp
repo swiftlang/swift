@@ -499,6 +499,8 @@ namespace {
     RValue visitUnevaluatedInstanceExpr(UnevaluatedInstanceExpr *E,
                                         SGFContext C);
     RValue visitTapExpr(TapExpr *E, SGFContext C);
+    RValue visitDefaultArgumentExpr(DefaultArgumentExpr *E, SGFContext C);
+    RValue visitErrorExpr(ErrorExpr *E, SGFContext C);
   };
 } // end anonymous namespace
 
@@ -2659,15 +2661,12 @@ static SILFunction *getOrCreateKeyPathGetter(SILGenModule &SGM,
 
   // Build the signature of the thunk as expected by the keypath runtime.
   CanType loweredBaseTy, loweredPropTy;
-  {
-    GenericContextScope scope(SGM.Types, genericSig);
-    AbstractionPattern opaque = AbstractionPattern::getOpaque();
+  AbstractionPattern opaque = AbstractionPattern::getOpaque();
 
-    loweredBaseTy = SGM.Types.getLoweredRValueType(
-        TypeExpansionContext::minimal(), opaque, baseType);
-    loweredPropTy = SGM.Types.getLoweredRValueType(
-        TypeExpansionContext::minimal(), opaque, propertyType);
-  }
+  loweredBaseTy = SGM.Types.getLoweredRValueType(
+      TypeExpansionContext::minimal(), opaque, baseType);
+  loweredPropTy = SGM.Types.getLoweredRValueType(
+      TypeExpansionContext::minimal(), opaque, propertyType);
   
   auto paramConvention = ParameterConvention::Indirect_In_Guaranteed;
 
@@ -2799,7 +2798,6 @@ static SILFunction *getOrCreateKeyPathSetter(SILGenModule &SGM,
   // Build the signature of the thunk as expected by the keypath runtime.
   CanType loweredBaseTy, loweredPropTy;
   {
-    GenericContextScope scope(SGM.Types, genericSig);
     AbstractionPattern opaque = AbstractionPattern::getOpaque();
 
     loweredBaseTy = SGM.Types.getLoweredRValueType(
@@ -5397,6 +5395,25 @@ RValue RValueEmitter::visitTapExpr(TapExpr *E, SGFContext C) {
                                       VarType, AccessSemantics::Ordinary, C);
   result = std::move(result).ensurePlusOne(SGF, SILLocation(E));
   return outerScope.popPreservingValue(std::move(result));
+}
+
+RValue RValueEmitter::visitDefaultArgumentExpr(DefaultArgumentExpr *E,
+                                               SGFContext C) {
+  // We should only be emitting this as an rvalue for caller-side default
+  // arguments such as magic literals. Other default arguments get handled
+  // specially.
+  return SGF.emitRValue(E->getCallerSideDefaultExpr());
+}
+
+RValue RValueEmitter::visitErrorExpr(ErrorExpr *E, SGFContext C) {
+  // Running into an ErrorExpr here means we've failed to lazily typecheck
+  // something. Just emit an undef of the appropriate type and carry on.
+  if (SGF.getASTContext().Diags.hadAnyError())
+    return SGF.emitUndefRValue(E, E->getType());
+
+  // Use report_fatal_error to ensure we trap in release builds instead of
+  // miscompiling.
+  llvm::report_fatal_error("Found an ErrorExpr but didn't emit an error?");
 }
 
 RValue SILGenFunction::emitRValue(Expr *E, SGFContext C) {

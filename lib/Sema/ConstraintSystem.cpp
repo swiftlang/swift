@@ -413,6 +413,25 @@ ConstraintLocator *ConstraintSystem::getConstraintLocator(
   return getConstraintLocator(anchor, path, builder.getSummaryFlags());
 }
 
+ConstraintLocator *ConstraintSystem::getConstraintLocator(
+    ConstraintLocator *locator,
+    ArrayRef<ConstraintLocator::PathElement> newElts) {
+  auto oldPath = locator->getPath();
+  SmallVector<ConstraintLocator::PathElement, 4> newPath;
+  newPath.append(oldPath.begin(), oldPath.end());
+  newPath.append(newElts.begin(), newElts.end());
+  return getConstraintLocator(locator->getAnchor(), newPath);
+}
+
+ConstraintLocator *ConstraintSystem::getConstraintLocator(
+    const ConstraintLocatorBuilder &builder,
+    ArrayRef<ConstraintLocator::PathElement> newElts) {
+  SmallVector<ConstraintLocator::PathElement, 4> newPath;
+  auto *anchor = builder.getLocatorParts(newPath);
+  newPath.append(newElts.begin(), newElts.end());
+  return getConstraintLocator(anchor, newPath);
+}
+
 ConstraintLocator *
 ConstraintSystem::getCalleeLocator(ConstraintLocator *locator,
                                    bool lookThroughApply) {
@@ -459,16 +478,28 @@ ConstraintSystem::getCalleeLocator(ConstraintLocator *locator,
   if (lookThroughApply) {
     if (auto *applyExpr = dyn_cast<ApplyExpr>(anchor)) {
       auto *fnExpr = applyExpr->getFn();
+
+      // FIXME: We should probably assert that we don't get a type variable
+      // here to make sure we only retrieve callee locators for resolved calls,
+      // ensuring that callee locators don't change after binding a type.
+      // Unfortunately CSDiag currently calls into getCalleeLocator, so all bets
+      // are off. Once we remove that legacy diagnostic logic, we should be able
+      // to assert here.
+      auto fnTy = getFixedTypeRecursive(getType(fnExpr), /*wantRValue*/ true);
+
       // For an apply of a metatype, we have a short-form constructor. Unlike
       // other locators to callees, these are anchored on the apply expression
       // rather than the function expr.
-      auto fnTy = getFixedTypeRecursive(getType(fnExpr), /*wantRValue*/ true);
       if (fnTy->is<AnyMetatypeType>()) {
         auto *fnLocator =
             getConstraintLocator(applyExpr, ConstraintLocator::ApplyFunction);
         return getConstraintLocator(fnLocator,
                                     ConstraintLocator::ConstructorMember);
       }
+
+      // Handle an apply of a nominal type which supports callAsFunction.
+      if (fnTy->isCallableNominalType(DC))
+        return getConstraintLocator(anchor, ConstraintLocator::ApplyFunction);
 
       // Otherwise fall through and look for locators anchored on the function
       // expr. For CallExprs, this can look through things like parens and
@@ -1218,11 +1249,11 @@ void ConstraintSystem::openGenericRequirements(
       break;
     }
 
-    addConstraint(
-        *openedReq,
-        locator.withPathElement(LocatorPathElt::OpenedGeneric(signature))
-            .withPathElement(
-                LocatorPathElt::TypeParameterRequirement(pos, kind)));
+    auto openedGenericLoc =
+        locator.withPathElement(LocatorPathElt::OpenedGeneric(signature));
+    addConstraint(*openedReq,
+                  openedGenericLoc.withPathElement(
+                      LocatorPathElt::TypeParameterRequirement(pos, kind)));
   }
 }
 
@@ -2250,7 +2281,7 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
         // Hashable, because it would be used as a component inside key path.
         for (auto index : indices(subscriptTy->getParams())) {
           const auto &param = subscriptTy->getParams()[index];
-          verifyThatArgumentIsHashable(index, param.getPlainType(), locator);
+          verifyThatArgumentIsHashable(index, param.getParameterType(), locator);
         }
       }
     }

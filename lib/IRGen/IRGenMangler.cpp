@@ -267,7 +267,7 @@ mangleSymbolNameForSymbolicMangling(const SymbolicMangling &mangling,
       = '_';
     Buffer << ' ';
     if (auto ty = referent.dyn_cast<const NominalTypeDecl*>())
-      appendContext(ty);
+      appendContext(ty, ty->getAlternateModuleName());
     else if (auto opaque = referent.dyn_cast<const OpaqueTypeDecl*>())
       appendOpaqueDeclName(opaque);
     else

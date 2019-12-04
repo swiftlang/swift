@@ -2494,12 +2494,6 @@ public:
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
 
-  void visitCallerDefaultArgumentExpr(CallerDefaultArgumentExpr *E) {
-    printCommon(E, "caller_default_argument_expr");
-    printRec(E->getSubExpr());
-    PrintWithColorRAII(OS, ParenthesisColor) << ')';
-  }
-
   void printArgumentLabels(ArrayRef<Identifier> argLabels) {
     PrintWithColorRAII(OS, ArgumentsColor) << " arg_labels=";
     for (auto label : argLabels) {

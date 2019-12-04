@@ -119,9 +119,7 @@ static bool isEffectivelyFinalMethod(FullApplySite applySite, CanType classType,
   if (!cha)
     return false;
 
-  // This is a private or a module internal class.
-  //
-  // We can analyze the class hierarchy rooted at it and
+  // We can analyze the class hierarchy rooted at this class and
   // eventually devirtualize a method call more efficiently.
 
   ClassHierarchyAnalysis::ClassList subs;

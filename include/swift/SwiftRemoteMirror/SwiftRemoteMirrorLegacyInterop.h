@@ -353,7 +353,7 @@ swift_reflection_interop_libraryOwnsAddress(
   // Search the images list to see if the address is in one of them.
   struct SwiftReflectionInteropContextLegacyImageRangeList *Node =
     ContextRef->LegacyImageRangeList;
-  while (Node != NULL) {
+  while (Node != nullptr) {
     if (Node->Start <= Address && Address < Node->End)
       return 1;
     Node = Node->Next;
@@ -380,7 +380,7 @@ swift_reflection_interop_libraryForAddress(
       return Library;
     }
   }
-  return NULL;
+  return nullptr;
 }
 
 static inline uintptr_t
@@ -408,7 +408,7 @@ swift_reflection_interop_libraryForObject(
       if (Library->IsLegacy)
         return Library;
     }
-    return NULL;
+    return nullptr;
   }
   
   return swift_reflection_interop_libraryForAddress(ContextRef, Metadata);
@@ -417,7 +417,7 @@ swift_reflection_interop_libraryForObject(
 static inline int
 swift_reflection_interop_loadFunctions(struct SwiftReflectionInteropContext *Context,
                                        void *Handle) {
-  if (Handle == NULL)
+  if (Handle == nullptr)
     return 0;
 
   struct SwiftReflectionInteropContextLibrary *Library = &Context
@@ -429,7 +429,7 @@ swift_reflection_interop_loadFunctions(struct SwiftReflectionInteropContext *Con
 #endif
 #define LOAD_NAMED(field, symbol, required) do { \
     Functions->field = (decltype(Functions->field))dlsym(Handle, symbol); \
-    if (required && Functions->field == NULL) return 0; \
+    if (required && Functions->field == nullptr) return 0; \
   } while (0)
 #define LOAD(name) LOAD_NAMED(name, "swift_reflection_" #name, 1)
 #define LOAD_OPT(name) LOAD_NAMED(name, "swift_reflection_" #name, 0)
@@ -441,7 +441,7 @@ swift_reflection_interop_loadFunctions(struct SwiftReflectionInteropContext *Con
   if (version < SWIFT_LEGACY_METADATA_MIN_VERSION)
     return 0;
   
-  int IsLegacy = dlsym(Handle, "swift_reflection_addImage") == NULL;
+  int IsLegacy = dlsym(Handle, "swift_reflection_addImage") == nullptr;
   
   if (IsLegacy) {
     LOAD_NAMED(createReflectionContextLegacy, "swift_reflection_createReflectionContext", 1);
@@ -498,11 +498,11 @@ swift_reflection_interop_readBytesAdapter(void *reader_context,
   void *FreeContext;
   const void *ptr = Context->ReadBytes(Context->ReaderContext, address, size,
                                        &FreeContext);
-  if (ptr == NULL)
+  if (ptr == nullptr)
     return 0;
   
   memcpy(dest, ptr, size);
-  if (Context->FreeBytes != NULL)
+  if (Context->FreeBytes != nullptr)
     Context->FreeBytes(Context->ReaderContext, ptr, FreeContext);
   return 1;
 }
@@ -574,7 +574,7 @@ swift_reflection_interop_createReflectionContext(
 
   return swift_reflection_interop_createReflectionContextWithDataLayout(
     ReaderContext,
-    NULL,
+    nullptr,
     FreeBytes,
     ReadBytes,
     GetStringLength,
@@ -600,7 +600,7 @@ swift_reflection_interop_createReflectionContextWithDataLayout(
   ContextRef->GetStringLength = GetStringLength;
   ContextRef->GetSymbolAddress = GetSymbolAddress;
   
-  ContextRef->AddressToLibraryCache = CFDictionaryCreateMutable(NULL, 0, NULL, NULL);
+  ContextRef->AddressToLibraryCache = CFDictionaryCreateMutable(nullptr, 0, nullptr, nullptr);
   
   return ContextRef;
 }
@@ -633,7 +633,7 @@ swift_reflection_interop_addLibrary(
     } else {
       uint8_t PointerSize;
       int result = ContextRef->DataLayout(
-        ContextRef->ReaderContext, DLQ_GetPointerSize, NULL, &PointerSize);
+        ContextRef->ReaderContext, DLQ_GetPointerSize, nullptr, &PointerSize);
       if (!result)
         abort(); // We need the pointer size, can't proceed without it.
 
@@ -658,14 +658,14 @@ swift_reflection_interop_destroyReflectionContext(
   free(ContextRef->Libraries);
   struct SwiftReflectionInteropContextLegacyImageRangeList *LegacyImageRangeList
     = ContextRef->LegacyImageRangeList;
-  while (LegacyImageRangeList != NULL) {
+  while (LegacyImageRangeList != nullptr) {
     struct SwiftReflectionInteropContextLegacyImageRangeList *Next
       = LegacyImageRangeList->Next;
     free(LegacyImageRangeList);
     LegacyImageRangeList = Next;
   }
   struct SwiftReflectionInteropContextFreeList *FreeList = ContextRef->FreeList;
-  while (FreeList != NULL) {
+  while (FreeList != nullptr) {
     ContextRef->FreeBytes(ContextRef->ReaderContext,
                           FreeList->Pointer, FreeList->Context);
     struct SwiftReflectionInteropContextFreeList *Next = FreeList->Next;
@@ -717,37 +717,37 @@ swift_reflection_interop_addImageLegacy(
                               ImageStart,
                               sizeof(MachHeader),
                               &FreeContext);
-  if (Buf == NULL)
+  if (Buf == nullptr)
     return 0;
   
   MachHeader *Header = (MachHeader *)Buf;
   
   if (Header->magic != MH_MAGIC && Header->magic != MH_MAGIC_64) {
-    if (ContextRef->FreeBytes != NULL)
+    if (ContextRef->FreeBytes != nullptr)
       ContextRef->FreeBytes(ContextRef->ReaderContext, Buf, FreeContext);
     return 0;
   }
   
   // Read the commands.
   uint32_t Length = Header->sizeofcmds;
-  if (ContextRef->FreeBytes != NULL)
+  if (ContextRef->FreeBytes != nullptr)
     ContextRef->FreeBytes(ContextRef->ReaderContext, Buf, FreeContext);
   
   Buf = ContextRef->ReadBytes(ContextRef->ReaderContext,
                               ImageStart,
                               Length,
                               &FreeContext);
-  if (Buf == NULL)
+  if (Buf == nullptr)
     return 0;
   Header = (MachHeader *)Buf;
   
   // Find the TEXT segment and figure out where the end is.
   unsigned long TextSize;
   uint8_t *TextSegment = getsegmentdata(Header, "__TEXT", &TextSize);
-  if (ContextRef->FreeBytes != NULL)
+  if (ContextRef->FreeBytes != nullptr)
     ContextRef->FreeBytes(ContextRef->ReaderContext, Buf, FreeContext);
   
-  if (TextSegment == NULL) {
+  if (TextSegment == nullptr) {
     return 0;
   }
   unsigned long TextEnd = TextSegment - (uint8_t *)Buf + TextSize;
@@ -757,7 +757,7 @@ swift_reflection_interop_addImageLegacy(
                               ImageStart,
                               TextEnd,
                               &FreeContext);
-  if (Buf == NULL)
+  if (Buf == nullptr)
     return 0;
   Header = (MachHeader *)Buf;
 
@@ -785,7 +785,7 @@ swift_reflection_interop_addImageLegacy(
                                                  &info.reflstr) || success;
   
   if (!success) {
-    if (ContextRef->FreeBytes != NULL)
+    if (ContextRef->FreeBytes != nullptr)
       ContextRef->FreeBytes(ContextRef->ReaderContext, Buf, FreeContext);
     return 0;
   }
@@ -809,7 +809,7 @@ swift_reflection_interop_addImageLegacy(
   
   // If the buffer needs to be freed, save buffer and free context to free it when the
   //  reflection context is destroyed.
-  if (ContextRef->FreeBytes != NULL) {
+  if (ContextRef->FreeBytes != nullptr) {
     struct SwiftReflectionInteropContextFreeList *FreeListNode =
       (struct SwiftReflectionInteropContextFreeList *)malloc(sizeof(*FreeListNode));
     FreeListNode->Next = ContextRef->FreeList;
@@ -857,7 +857,7 @@ swift_reflection_interop_lookupMetadata(SwiftReflectionInteropContextRef Context
   swift_metadata_interop_t Result = {};
   struct SwiftReflectionInteropContextLibrary *Library =
     swift_reflection_interop_libraryForAddress(ContextRef, Metadata);
-  if (Library != NULL) {
+  if (Library != nullptr) {
     Result.Metadata = Metadata;
     Result.Library = (int)LIBRARY_INDEX;
   }
@@ -881,7 +881,7 @@ swift_reflection_interop_typeRefForInstance(SwiftReflectionInteropContextRef Con
   swift_typeref_interop_t Result = {};
   struct SwiftReflectionInteropContextLibrary *Library
     = swift_reflection_interop_libraryForObject(ContextRef, Object);
-  if (Library != NULL) {
+  if (Library != nullptr) {
     swift_typeref_t Typeref = Library->Functions.typeRefForInstance(Library->Context,
                                                                     Object);
     Result.Typeref = Typeref;
@@ -967,7 +967,7 @@ swift_reflection_interop_infoForInstance(SwiftReflectionInteropContextRef Contex
   struct SwiftReflectionInteropContextLibrary *Library
     = swift_reflection_interop_libraryForObject(ContextRef, Object);
   
-  if (Library != NULL) {
+  if (Library != nullptr) {
     Result = Library->Functions.infoForInstance(Library->Context, Object);
   } else {
     Result.Kind = SWIFT_UNKNOWN;
@@ -983,7 +983,7 @@ swift_reflection_interop_childOfInstance(SwiftReflectionInteropContextRef Contex
   swift_childinfo_interop_t Result = {};
   struct SwiftReflectionInteropContextLibrary *Library
     = swift_reflection_interop_libraryForObject(ContextRef, Object);
-  if (Library != NULL) {
+  if (Library != nullptr) {
     swift_childinfo_t LibResult = Library->Functions.childOfInstance(Library->Context,
                                                                      Object, Index);
     Result.Name = LibResult.Name;
@@ -1061,7 +1061,7 @@ swift_reflection_interop_dumpInfoForInstance(SwiftReflectionInteropContextRef Co
                                              uintptr_t Object) {
   struct SwiftReflectionInteropContextLibrary *Library
     = swift_reflection_interop_libraryForObject(ContextRef, Object);
-  if (Library != NULL) {
+  if (Library != nullptr) {
     Library->Functions.dumpInfoForInstance(Library->Context, Object);
   }
 }

@@ -127,7 +127,7 @@ set(SWIFT_ANALYZE_CODE_COVERAGE FALSE CACHE STRING
 # SWIFT_VERSION is deliberately /not/ cached so that an existing build directory
 # can be reused when a new version of Swift comes out (assuming the user hasn't
 # manually set it as part of their own CMake configuration).
-set(SWIFT_VERSION "5.1.1")
+set(SWIFT_VERSION "5.1.2")
 
 set(SWIFT_VENDOR "" CACHE STRING
     "The vendor name of the Swift compiler")
@@ -926,7 +926,7 @@ find_package(PythonInterp REQUIRED)
 #
 
 if(LLVM_ENABLE_LIBXML2)
-  find_package(Libxml2 REQUIRED)
+  find_package(LibXml2 REQUIRED)
 else()
   find_package(LibXml2)
 endif()

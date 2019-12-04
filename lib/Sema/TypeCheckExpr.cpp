@@ -715,3 +715,83 @@ Expr *TypeChecker::foldSequence(SequenceExpr *expr, DeclContext *dc) {
 
   return Result;
 }
+
+static Expr *synthesizeCallerSideDefault(const ParamDecl *param,
+                                         SourceLoc loc) {
+  auto &ctx = param->getASTContext();
+  switch (param->getDefaultArgumentKind()) {
+  case DefaultArgumentKind::Column:
+    return new (ctx)
+        MagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr::Column, loc,
+                                   /*implicit=*/true);
+
+  case DefaultArgumentKind::File:
+    return new (ctx)
+        MagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr::File, loc,
+                                   /*implicit=*/true);
+
+  case DefaultArgumentKind::Line:
+    return new (ctx)
+        MagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr::Line, loc,
+                                   /*implicit=*/true);
+
+  case DefaultArgumentKind::Function:
+    return new (ctx)
+        MagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr::Function, loc,
+                                   /*implicit=*/true);
+
+  case DefaultArgumentKind::DSOHandle:
+    return new (ctx)
+        MagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr::DSOHandle, loc,
+                                   /*implicit=*/true);
+
+  case DefaultArgumentKind::NilLiteral:
+    return new (ctx) NilLiteralExpr(loc, /*Implicit=*/true);
+    break;
+
+  case DefaultArgumentKind::EmptyArray: {
+    auto *initExpr = ArrayExpr::create(ctx, loc, {}, {}, loc);
+    initExpr->setImplicit();
+    return initExpr;
+  }
+  case DefaultArgumentKind::EmptyDictionary: {
+    auto *initExpr = DictionaryExpr::create(ctx, loc, {}, {}, loc);
+    initExpr->setImplicit();
+    return initExpr;
+  }
+  case DefaultArgumentKind::None:
+  case DefaultArgumentKind::Normal:
+  case DefaultArgumentKind::Inherited:
+  case DefaultArgumentKind::StoredProperty:
+    llvm_unreachable("Not a caller-side default");
+  }
+  llvm_unreachable("Unhandled case in switch");
+}
+
+llvm::Expected<Expr *> CallerSideDefaultArgExprRequest::evaluate(
+    Evaluator &evaluator, DefaultArgumentExpr *defaultExpr) const {
+  auto *param = defaultExpr->getParamDecl();
+  auto paramTy = defaultExpr->getType();
+
+  // Re-create the default argument using the location info of the call site.
+  auto *initExpr = synthesizeCallerSideDefault(param, defaultExpr->getLoc());
+  auto *dc = defaultExpr->ContextOrCallerSideExpr.get<DeclContext *>();
+  assert(dc && "Expected a DeclContext before type-checking caller-side arg");
+
+  auto &ctx = param->getASTContext();
+  DiagnosticTransaction transaction(ctx.Diags);
+  if (!TypeChecker::typeCheckParameterDefault(initExpr, dc, paramTy,
+                                              param->isAutoClosure())) {
+    if (param->hasDefaultExpr()) {
+      // HACK: If we were unable to type-check the default argument in context,
+      // then retry by type-checking it within the parameter decl, which should
+      // also fail. This will present the user with a better error message and
+      // allow us to avoid diagnosing on each call site.
+      transaction.abort();
+      (void)param->getTypeCheckedDefaultExpr();
+      assert(ctx.Diags.hadAnyError());
+    }
+    return new (ctx) ErrorExpr(initExpr->getSourceRange(), paramTy);
+  }
+  return initExpr;
+}

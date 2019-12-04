@@ -400,6 +400,10 @@ ToolChain::constructInvocation(const CompileJobAction &job,
   Arguments.push_back("-module-name");
   Arguments.push_back(context.Args.MakeArgString(context.OI.ModuleName));
 
+  if (context.Args.hasArg(options::OPT_CrossModuleOptimization)) {
+    Arguments.push_back("-cross-module-optimization");
+  }
+                                 
   addOutputsOfType(Arguments, context.Output, context.Args,
                    file_types::TY_OptRecord, "-save-optimization-record-path");
 

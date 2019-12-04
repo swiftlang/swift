@@ -2539,11 +2539,20 @@ ModuleFile::collectLinkLibraries(ModuleDecl::LinkLibraryCallback callback) const
     callback(LinkLibrary(Name, LibraryKind::Framework));
 }
 
-void ModuleFile::getTopLevelDecls(SmallVectorImpl<Decl *> &results) {
+void ModuleFile::getTopLevelDecls(
+       SmallVectorImpl<Decl *> &results,
+       llvm::function_ref<bool(DeclAttributes)> matchAttributes) {
   PrettyStackTraceModuleFile stackEntry(*this);
   for (DeclID entry : OrderedTopLevelDecls) {
-    Expected<Decl *> declOrError = getDeclChecked(entry);
+    Expected<Decl *> declOrError = getDeclChecked(entry, matchAttributes);
     if (!declOrError) {
+      if (declOrError.errorIsA<DeclAttributesDidNotMatch>()) {
+        // Decl rejected by matchAttributes, ignore it.
+        assert(matchAttributes);
+        consumeError(declOrError.takeError());
+        continue;
+      }
+
       if (!getContext().LangOpts.EnableDeserializationRecovery)
         fatal(declOrError.takeError());
       consumeError(declOrError.takeError());

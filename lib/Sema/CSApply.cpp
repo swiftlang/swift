@@ -267,27 +267,6 @@ static bool buildObjCKeyPathString(KeyPathExpr *E,
   return true;
 }
 
-/// Form a type checked expression for the index of a @dynamicMemberLookup
-/// subscript index parameter.
-/// The index expression will have a tuple type of `(dynamicMember: T)`.
-static Expr *buildDynamicMemberLookupIndexExpr(StringRef name, SourceLoc loc,
-                                               DeclContext *dc,
-                                               ConstraintSystem &cs) {
-  auto &ctx = cs.getASTContext();
-
-  auto *stringDecl = ctx.getStringDecl();
-  auto stringType = stringDecl->getDeclaredType();
-
-  // Build and type check the string literal index value to the specific
-  // string type expected by the subscript.
-  auto *nameExpr = new (ctx) StringLiteralExpr(name, loc, /*implicit*/true);
-  nameExpr->setBuiltinInitializer(ctx.getStringBuiltinInitDecl(stringDecl));
-  nameExpr->setType(stringType);
-
-  cs.cacheExprTypes(nameExpr);
-  return nameExpr;
-}
-
 namespace {
 
   /// Rewrites an expression by applying the solution of a constraint
@@ -1235,8 +1214,8 @@ namespace {
       if (selected->choice.getKind() == OverloadChoiceKind::DeclViaDynamic) {
         // Rewrite for implicit unwrapping if the solution requires it.
         auto *dynamicLocator = cs.getConstraintLocator(
-            locator.withPathElement(ConstraintLocator::SubscriptMember)
-                .withPathElement(ConstraintLocator::DynamicLookupResult));
+            locator, {ConstraintLocator::SubscriptMember,
+                      ConstraintLocator::DynamicLookupResult});
 
         if (solution.getDisjunctionChoice(dynamicLocator)) {
           auto *forceValue = new (cs.getASTContext())
@@ -2717,6 +2696,18 @@ namespace {
       llvm_unreachable("Unhandled OverloadChoiceKind in switch.");
     }
 
+    /// Form a type checked expression for the index of a @dynamicMemberLookup
+    /// subscript index parameter.
+    Expr *buildDynamicMemberLookupIndexExpr(StringRef name, SourceLoc loc,
+                                            Type literalTy) {
+      // Build and type check the string literal index value to the specific
+      // string type expected by the subscript.
+      auto &ctx = cs.getASTContext();
+      auto *nameExpr = new (ctx) StringLiteralExpr(name, loc, /*implicit*/true);
+      cs.setType(nameExpr, literalTy);
+      return handleStringLiteralExpr(nameExpr);
+    }
+
     Expr *buildDynamicMemberLookupRef(Expr *expr, Expr *base, SourceLoc dotLoc,
                                       SourceLoc nameLoc,
                                       const SelectedOverload &overload,
@@ -2737,7 +2728,8 @@ namespace {
         // Build and type check the string literal index value to the specific
         // string type expected by the subscript.
         auto fieldName = overload.choice.getName().getBaseIdentifier().str();
-        argExpr = buildDynamicMemberLookupIndexExpr(fieldName, nameLoc, dc, cs);
+        argExpr = buildDynamicMemberLookupIndexExpr(fieldName, nameLoc,
+                                                    paramTy);
       } else {
         argExpr = buildKeyPathDynamicMemberIndexExpr(
             paramTy->castTo<BoundGenericType>(), dotLoc, memberLocator);
@@ -3002,10 +2994,6 @@ namespace {
     }
 
     Expr *visitDefaultArgumentExpr(DefaultArgumentExpr *expr) {
-      llvm_unreachable("Already type-checked");
-    }
-
-    Expr *visitCallerDefaultArgumentExpr(CallerDefaultArgumentExpr *expr) {
       llvm_unreachable("Already type-checked");
     }
 
@@ -4529,16 +4517,8 @@ namespace {
       auto subscript = cast<SubscriptDecl>(overload.choice.getDecl());
       assert(!subscript->isGetterMutating());
 
-      auto dc = subscript->getInnermostDeclContext();
-
-      auto indexType = AnyFunctionType::composeInput(
-          cs.getASTContext(),
-          subscript->getInterfaceType()->castTo<AnyFunctionType>()->getParams(),
-          /*canonicalVararg=*/false);
-
       // Compute substitutions to refer to the member.
       auto ref = resolveConcreteDeclRef(subscript, locator);
-      indexType = indexType.subst(ref.getSubstitutions());
 
       // If this is a @dynamicMemberLookup reference to resolve a property
       // through the subscript(dynamicMember:) member, restore the
@@ -4556,15 +4536,15 @@ namespace {
 
         labels = cs.getASTContext().Id_dynamicMember;
 
+        auto indexType = getTypeOfDynamicMemberIndex(overload);
         if (overload.choice.getKind() ==
             OverloadChoiceKind::KeyPathDynamicMemberLookup) {
-          auto indexType = getTypeOfDynamicMemberIndex(overload);
           indexExpr = buildKeyPathDynamicMemberIndexExpr(
               indexType->castTo<BoundGenericType>(), componentLoc, locator);
         } else {
           auto fieldName = overload.choice.getName().getBaseIdentifier().str();
           indexExpr = buildDynamicMemberLookupIndexExpr(fieldName, componentLoc,
-                                                        dc, cs);
+                                                        indexType);
         }
       }
 
@@ -4591,7 +4571,7 @@ namespace {
       for (auto &param : fnType->getParams()) {
         newLabels.push_back(param.getLabel());
 
-        auto indexType = simplifyType(param.getPlainType());
+        auto indexType = simplifyType(param.getParameterType());
         // Index type conformance to Hashable protocol has been
         // verified by the solver, we just need to get it again
         // with all of the generic parameters resolved.
@@ -4706,87 +4686,15 @@ Solution::resolveLocatorToDecl(ConstraintLocator *locator) const {
   return resolveConcreteDeclRef(overload->choice.getDeclOrNull(), locator);
 }
 
-/// Produce the caller-side default argument for this default argument, or
-/// null if the default argument will be provided by the callee.
-static std::pair<Expr *, DefaultArgumentKind>
-getCallerDefaultArg(ConstraintSystem &cs, DeclContext *dc,
-                    SourceLoc loc, ConcreteDeclRef &owner,
-                    unsigned index) {
-  auto &ctx = cs.getASTContext();
-
-  const auto *param = getParameterAt(cast<ValueDecl>(owner.getDecl()), index);
-  Expr *init = nullptr;
-  switch (param->getDefaultArgumentKind()) {
-  case DefaultArgumentKind::None:
-    llvm_unreachable("No default argument here?");
-
-  case DefaultArgumentKind::StoredProperty:
-  case DefaultArgumentKind::Normal:
-    return {nullptr, param->getDefaultArgumentKind()};
-
-  case DefaultArgumentKind::Inherited:
-    // Update the owner to reflect inheritance here.
-    owner = owner.getOverriddenDecl();
-    return getCallerDefaultArg(cs, dc, loc, owner, index);
-
-  case DefaultArgumentKind::Column:
-    init = new (ctx)
-        MagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr::Column, loc,
-                                   /*implicit=*/true);
-    break;
-
-  case DefaultArgumentKind::File:
-    init = new (ctx)
-        MagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr::File, loc,
-                                   /*implicit=*/true);
-    break;
-    
-  case DefaultArgumentKind::Line:
-    init = new (ctx)
-        MagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr::Line, loc,
-                                   /*implicit=*/true);
-    break;
-      
-  case DefaultArgumentKind::Function:
-    init = new (ctx)
-        MagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr::Function, loc,
-                                   /*implicit=*/true);
-    break;
-
-  case DefaultArgumentKind::DSOHandle:
-    init = new (ctx)
-        MagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr::DSOHandle, loc,
-                                   /*implicit=*/true);
-    break;
-
-  case DefaultArgumentKind::NilLiteral:
-    init = new (ctx) NilLiteralExpr(loc, /*Implicit=*/true);
-    break;
-
-  case DefaultArgumentKind::EmptyArray:
-    init = ArrayExpr::create(ctx, loc, {}, {}, loc);
-    init->setImplicit();
-    break;
-
-  case DefaultArgumentKind::EmptyDictionary:
-    init = DictionaryExpr::create(ctx, loc, {}, {}, loc);
-    init->setImplicit();
-    break;
+/// Returns the concrete callee which 'owns' the default argument at a given
+/// index. This looks through inheritance for inherited default args.
+static ConcreteDeclRef getDefaultArgOwner(ConcreteDeclRef owner,
+                                          unsigned index) {
+  auto *param = getParameterAt(owner.getDecl(), index);
+  if (param->getDefaultArgumentKind() == DefaultArgumentKind::Inherited) {
+    return getDefaultArgOwner(owner.getOverriddenDecl(), index);
   }
-
-  // Convert the literal to the appropriate type.
-  auto defArgType =
-      param->getInterfaceType().subst(owner.getSubstitutions());
-  auto resultTy = TypeChecker::typeCheckParameterDefault(
-      init, dc, defArgType,
-      /*isAutoClosure=*/param->isAutoClosure(),
-      /*canFail=*/false);
-  assert(resultTy && "Conversion cannot fail");
-  (void)resultTy;
-
-  cs.cacheExprTypes(init);
-
-  return {init, param->getDefaultArgumentKind()};
+  return owner;
 }
 
 static bool canPeepholeTupleConversion(Expr *expr,
@@ -5322,22 +5230,10 @@ Expr *ExprRewriter::coerceCallArguments(Expr *arg, AnyFunctionType *funcType,
 
     // Handle default arguments.
     if (parameterBindings[paramIdx].empty()) {
-      Expr *defArg;
-      DefaultArgumentKind defArgKind;
-      std::tie(defArg, defArgKind) = getCallerDefaultArg(cs, dc, arg->getLoc(),
-                                                         callee, paramIdx);
-
-      // If we have a caller-side default argument, just add the magic literal
-      // expression to our argument list.
-      if (defArg) {
-        defArg = new (ctx) CallerDefaultArgumentExpr(defArg, arg->getStartLoc(),
-                                                     param.getParameterType());
-
-        // Otherwise, create a call of the default argument generator.
-      } else {
-        defArg = new (ctx) DefaultArgumentExpr(
-            callee, paramIdx, arg->getStartLoc(), param.getParameterType());
-      }
+      auto owner = getDefaultArgOwner(callee, paramIdx);
+      auto paramTy = param.getParameterType();
+      auto *defArg = new (ctx)
+          DefaultArgumentExpr(owner, paramIdx, arg->getStartLoc(), paramTy, dc);
 
       cs.cacheType(defArg);
       newArgs.push_back(defArg);
@@ -6599,12 +6495,10 @@ static bool isValidDynamicCallableMethod(FuncDecl *method,
   return true;
 }
 
-// Resolve `callAsFunction` method applications.
-static Expr *finishApplyCallAsFunctionMethod(
+// Build a reference to a `callAsFunction` method.
+static Expr *buildCallAsFunctionMethodRef(
     ExprRewriter &rewriter, ApplyExpr *apply, SelectedOverload selected,
-    AnyFunctionType *openedMethodType,
     ConstraintLocatorBuilder applyFunctionLoc) {
-  auto &cs = rewriter.cs;
   auto *fn = apply->getFn();
   auto choice = selected.choice;
   // Create direct reference to `callAsFunction` method.
@@ -6616,21 +6510,7 @@ static Expr *finishApplyCallAsFunctionMethod(
   if (!declRef)
     return nullptr;
   declRef->setImplicit(apply->isImplicit());
-  apply->setFn(declRef);
-  // Coerce argument to input type of the `callAsFunction` method.
-  auto callee = rewriter.resolveConcreteDeclRef(choice.getDecl(),
-                                                applyFunctionLoc);
-  SmallVector<Identifier, 2> argLabelsScratch;
-  auto *arg = rewriter.coerceCallArguments(
-      apply->getArg(), openedMethodType, callee, apply,
-      apply->getArgumentLabels(argLabelsScratch), apply->hasTrailingClosure(),
-      applyFunctionLoc);
-  if (!arg)
-    return nullptr;
-  apply->setArg(arg);
-  cs.setType(apply, openedMethodType->getResult());
-  cs.cacheExprTypes(apply);
-  return apply;
+  return declRef;
 }
 
 // Resolve `@dynamicCallable` applications.
@@ -6872,12 +6752,19 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, ConcreteDeclRef callee,
     auto methodType =
         simplifyType(selected->openedType)->getAs<AnyFunctionType>();
     if (method && methodType) {
-      if (method->isCallAsFunctionMethod())
-        return finishApplyCallAsFunctionMethod(
-            *this, apply, *selected, methodType, applyFunctionLoc);
-      if (methodType && isValidDynamicCallableMethod(method, methodType))
+      // Handle a call to a @dynamicCallable method.
+      if (isValidDynamicCallableMethod(method, methodType))
         return finishApplyDynamicCallable(
             apply, *selected, method, methodType, applyFunctionLoc);
+
+      // If this is an implicit call to a callAsFunction method, build the
+      // appropriate member reference.
+      if (method->isCallAsFunctionMethod()) {
+        fn = buildCallAsFunctionMethodRef(*this, apply, *selected,
+                                          applyFunctionLoc);
+        if (!fn)
+          return nullptr;
+      }
     }
   }
 
@@ -6992,9 +6879,9 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, ConcreteDeclRef callee,
 
   // We're constructing a value of nominal type. Look for the constructor or
   // enum element to use.
-  auto ctorLocator = cs.getConstraintLocator(
-      locator.withPathElement(ConstraintLocator::ApplyFunction)
-             .withPathElement(ConstraintLocator::ConstructorMember));
+  auto *ctorLocator =
+      cs.getConstraintLocator(locator, {ConstraintLocator::ApplyFunction,
+                                        ConstraintLocator::ConstructorMember});
   auto selected = solution.getOverloadChoiceIfAvailable(ctorLocator);
   if (!selected) {
     assert(ty->hasError() || ty->hasUnresolvedType());

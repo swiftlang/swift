@@ -33,6 +33,7 @@ namespace swift {
 class AbstractStorageDecl;
 class AccessorDecl;
 enum class AccessorKind;
+class DefaultArgumentExpr;
 class GenericParamList;
 class PrecedenceGroupDecl;
 struct PropertyWrapperBackingPropertyInfo;
@@ -1884,6 +1885,49 @@ public:
   bool isCached() const { return true; }
   Optional<Expr *> getCachedResult() const;
   void cacheResult(Expr *expr) const;
+};
+
+/// Computes the fully type-checked caller-side default argument within the
+/// context of the call site that it will be inserted into.
+class CallerSideDefaultArgExprRequest
+    : public SimpleRequest<CallerSideDefaultArgExprRequest,
+                           Expr *(DefaultArgumentExpr *),
+                           CacheKind::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<Expr *> evaluate(Evaluator &evaluator,
+                                  DefaultArgumentExpr *defaultExpr) const;
+
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+  Optional<Expr *> getCachedResult() const;
+  void cacheResult(Expr *expr) const;
+};
+
+/// Computes whether this is a type that supports being called through the
+/// implementation of a \c callAsFunction method.
+class IsCallableNominalTypeRequest
+    : public SimpleRequest<IsCallableNominalTypeRequest,
+                           bool(CanType, DeclContext *), CacheKind::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<bool> evaluate(Evaluator &evaluator, CanType ty,
+                                DeclContext *dc) const;
+
+public:
+  // Cached.
+  bool isCached() const { return true; }
 };
 
 // Allow AnyValue to compare two Type values, even though Type doesn't

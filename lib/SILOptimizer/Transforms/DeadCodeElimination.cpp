@@ -400,21 +400,17 @@ void DCE::propagateLiveness(SILInstruction *I) {
   case TermKind::SwitchEnumInst:
   case TermKind::SwitchEnumAddrInst:
   case TermKind::DynamicMethodBranchInst:
-  case TermKind::CheckedCastBranchInst:
-  case TermKind::CheckedCastValueBranchInst:
     markValueLive(I->getOperand(0));
     return;
 
+  case TermKind::CheckedCastBranchInst:
+  case TermKind::CheckedCastValueBranchInst:
+  case TermKind::CheckedCastAddrBranchInst:
   case TermKind::TryApplyInst:
   case TermKind::SwitchValueInst:
   case TermKind::YieldInst:
     for (auto &O : I->getAllOperands())
       markValueLive(O.get());
-    return;
-
-  case TermKind::CheckedCastAddrBranchInst:
-    markValueLive(I->getOperand(0));
-    markValueLive(I->getOperand(1));
     return;
   }
   llvm_unreachable("corrupt instruction!");
