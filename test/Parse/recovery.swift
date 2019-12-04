@@ -695,9 +695,6 @@ struct InitializerWithNameAndParam {
 struct InitializerWithLabels {
   init c d: Int {}
   // expected-error @-1 {{expected '(' for initializer parameters}}
-  // expected-error @-2 {{expected declaration}}
-  // expected-error @-3 {{consecutive declarations on a line must be separated by ';'}}
-  // expected-note @-5 {{in declaration of 'InitializerWithLabels'}}
 }
 
 // rdar://20337695
