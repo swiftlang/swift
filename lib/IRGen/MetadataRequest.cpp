@@ -40,6 +40,7 @@
 #include "swift/SIL/TypeLowering.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/IR/Constant.h"
+#include "llvm/Support/Debug.h"
 #include "llvm/Support/FormatVariadic.h"
 #include <algorithm>
 
@@ -643,6 +644,22 @@ llvm::Value *irgen::emitObjCHeapMetadataRef(IRGenFunction &IGF,
                                 classObject);
 }
 
+static MetadataResponse emitNominalPrespecializedGenericMetadataRef(
+    IRGenFunction &IGF, NominalTypeDecl *theDecl, CanType theType,
+    DynamicMetadataRequest request) {
+  assert(isNominalGenericContextTypeMetadataAccessTrivial(IGF.IGM, *theDecl,
+                                                          theType));
+  // We are applying generic parameters to a generic type.
+  assert(theType->getAnyNominal() == theDecl);
+
+  // Check to see if we've maybe got a local reference already.
+  if (auto cache = IGF.tryGetLocalTypeMetadata(theType, request))
+    return cache;
+
+  auto metadata = IGF.IGM.getAddrOfTypeMetadata(theType);
+  return MetadataResponse::forComplete(metadata);
+}
+
 /// Returns a metadata reference for a nominal type.
 ///
 /// This is only valid in a couple of special cases:
@@ -683,6 +700,12 @@ static MetadataResponse emitNominalMetadataRef(IRGenFunction &IGF,
           theDecl->getGenericSignature()->areAllParamsConcrete()) &&
          "no generic args?!");
 
+  if (isNominalGenericContextTypeMetadataAccessTrivial(IGF.IGM, *theDecl,
+                                                       theType)) {
+    return emitNominalPrespecializedGenericMetadataRef(IGF, theDecl, theType,
+                                                       request);
+  }
+
   // Call the generic metadata accessor function.
   llvm::Function *accessor =
       IGF.IGM.getAddrOfGenericTypeMetadataAccessFunction(theDecl,
@@ -699,10 +722,6 @@ static MetadataResponse emitNominalMetadataRef(IRGenFunction &IGF,
 
 bool irgen::isNominalGenericContextTypeMetadataAccessTrivial(
     IRGenModule &IGM, NominalTypeDecl &nominal, CanType type) {
-  // TODO: Once prespecialized generic metadata can be lazily emitted, eliminate
-  //       this early return.
-  return false;
-
   assert(nominal.isGenericContext());
 
   if (!IGM.shouldPrespecializeGenericMetadata()) {

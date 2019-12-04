@@ -3730,6 +3730,14 @@ ConstantReference IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
     IRGen.noteUseOfTypeMetadata(nominal);
   }
 
+  if (shouldPrespecializeGenericMetadata()) {
+    if (auto nominal = concreteType->getAnyNominal()) {
+      if (nominal->isGenericContext()) {
+        IRGen.noteUseOfSpecializedGenericTypeMetadata(concreteType);
+      }
+    }
+  }
+
   Optional<LinkEntity> entity;
   DebugTypeInfo DbgTy;
 
