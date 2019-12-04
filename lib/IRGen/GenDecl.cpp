@@ -1150,6 +1150,7 @@ void IRGenerator::emitLazyDefinitions() {
       CanType type = LazySpecializedTypeMetadataRecords.pop_back_val();
       auto *nominal = type->getNominalOrBoundGenericNominal();
       CurrentIGMPtr IGM = getGenModule(nominal->getDeclContext());
+      emitLazySpecializedGenericTypeMetadata(*IGM.get(), type);
     }
     while (!LazyTypeContextDescriptors.empty()) {
       NominalTypeDecl *type = LazyTypeContextDescriptors.pop_back_val();

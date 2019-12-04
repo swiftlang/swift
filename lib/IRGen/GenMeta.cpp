@@ -1834,6 +1834,11 @@ void irgen::emitLazyTypeMetadata(IRGenModule &IGM, NominalTypeDecl *type) {
   }
 }
 
+void irgen::emitLazySpecializedGenericTypeMetadata(IRGenModule &IGM,
+                                                   CanType type) {
+  emitSpecializedGenericStructMetadata(IGM, type);
+}
+
 llvm::Constant *
 IRGenModule::getAddrOfSharedContextDescriptor(LinkEntity entity,
                                               ConstantInit definition,
@@ -3677,6 +3682,10 @@ void irgen::emitStructMetadata(IRGenModule &IGM, StructDecl *structDecl) {
   IGM.defineTypeMetadata(declaredType, isPattern, canBeConstant,
                          init.finishAndCreateFuture());
 }
+
+/// Emit the type metadata or metadata template for a struct.
+void irgen::emitSpecializedGenericStructMetadata(IRGenModule &IGM,
+                                                 CanType type) {}
 
 // Enums
 
