@@ -222,9 +222,10 @@ static void printFullContext(const DeclContext *Context, raw_ostream &Buffer) {
 
 static void printValueDecl(ValueDecl *Decl, raw_ostream &OS) {
   printFullContext(Decl->getDeclContext(), OS);
-  assert(Decl->hasName());
 
-  if (Decl->isOperator()) {
+  if (!Decl->hasName()) {
+    OS << "anonname=" << (const void*)Decl;
+  } else if (Decl->isOperator()) {
     OS << '"' << Decl->getBaseName() << '"';
   } else {
     bool shouldEscape = !Decl->getBaseName().isSpecial() &&
