@@ -692,6 +692,76 @@ static MetadataResponse emitNominalMetadataRef(IRGenFunction &IGF,
   return response;
 }
 
+bool irgen::isNominalGenericContextTypeMetadataAccessTrivial(
+    IRGenModule &IGM, NominalTypeDecl &nominal, CanType type) {
+  // TODO: Once prespecialized generic metadata can be lazily emitted, eliminate
+  //       this early return.
+  return false;
+
+  assert(nominal.isGenericContext());
+
+  if (!IGM.shouldPrespecializeGenericMetadata()) {
+    return false;
+  }
+
+  if (type->hasArchetype()) {
+    return false;
+  }
+
+  if (nominal.getModuleContext() != IGM.getSwiftModule() ||
+      nominal.isResilient(IGM.getSwiftModule(), ResilienceExpansion::Minimal)) {
+    return false;
+  }
+
+  if (isa<EnumType>(type) || isa<BoundGenericEnumType>(type)) {
+    // TODO: Support enums.
+    return false;
+  }
+
+  if (isa<ClassType>(type) || isa<BoundGenericClassType>(type)) {
+    // TODO: Support classes.
+    return false;
+  }
+
+  auto *generic = type.getAnyGeneric();
+  assert(generic);
+  auto *environment = generic->getGenericEnvironment();
+  assert(environment);
+  auto substitutions =
+      type->getContextSubstitutionMap(IGM.getSwiftModule(), &nominal);
+
+  return llvm::all_of(environment->getGenericParams(), [&](auto parameter) {
+    auto conformances =
+        environment->getGenericSignature()->getConformsTo(parameter);
+    auto witnessTablesAreReferenceable =
+        llvm::all_of(conformances, [&](ProtocolDecl *conformance) {
+          return conformance->getModuleContext() == IGM.getSwiftModule() &&
+                 !conformance->isResilient(IGM.getSwiftModule(),
+                                           ResilienceExpansion::Minimal);
+        });
+    auto argument = ((Type *)parameter)->subst(substitutions);
+    auto genericArgument = argument->getAnyGeneric();
+    // For now, to avoid statically specializing generic protocol witness
+    // tables, don't statically specialize metadata for types any of whose
+    // arguments are generic.
+    //
+    // TODO: This is more pessimistic than necessary.  Specialize even in
+    //       the face of generic arguments so long as those arguments
+    //       aren't required to conform to any protocols.
+    //
+    // TODO: Once witness tables are statically specialized, check whether the
+    //       ConformanceInfo returns nullptr from tryGetConstantTable.
+    //       early return.
+    auto isGeneric = genericArgument && genericArgument->isGenericContext();
+    auto isNominal = argument->getNominalOrBoundGenericNominal();
+    auto isExistential = argument->isExistentialType();
+    return isNominal && !isGeneric && !isExistential &&
+           witnessTablesAreReferenceable &&
+           irgen::isTypeMetadataAccessTrivial(IGM,
+                                              argument->getCanonicalType());
+  }) && IGM.getTypeInfoForUnlowered(type).isFixedSize(ResilienceExpansion::Maximal);
+}
+
 /// Is it basically trivial to access the given metadata?  If so, we don't
 /// need a cache variable in its accessor.
 bool irgen::isTypeMetadataAccessTrivial(IRGenModule &IGM, CanType type) {
@@ -707,14 +777,14 @@ bool irgen::isTypeMetadataAccessTrivial(IRGenModule &IGM, CanType type) {
     if (isa<ClangModuleUnit>(nominalDecl->getModuleScopeContext()))
       return false;
 
-    // Generic type metadata always requires an accessor.
     if (nominalDecl->isGenericContext())
-      return false;
+      return isNominalGenericContextTypeMetadataAccessTrivial(IGM, *nominalDecl,
+                                                              type);
 
     auto expansion = ResilienceExpansion::Maximal;
 
     // Resiliently-sized metadata access always requires an accessor.
-    return (IGM.getTypeInfoForUnlowered(type).isFixedSize(expansion));
+    return IGM.getTypeInfoForUnlowered(type).isFixedSize(expansion);
   }
 
   // The empty tuple type has a singleton metadata.
@@ -738,6 +808,18 @@ bool irgen::isTypeMetadataAccessTrivial(IRGenModule &IGM, CanType type) {
   // DynamicSelfType is actually local.
   if (type->hasDynamicSelfType())
     return true;
+
+  if (isa<BoundGenericStructType>(type) || isa<BoundGenericEnumType>(type)) {
+    auto nominalType = cast<BoundGenericType>(type);
+    auto *nominalDecl = nominalType->getDecl();
+
+    // Imported type metadata always requires an accessor.
+    if (isa<ClangModuleUnit>(nominalDecl->getModuleScopeContext()))
+      return false;
+
+    return isNominalGenericContextTypeMetadataAccessTrivial(IGM, *nominalDecl,
+                                                            type);
+  }
 
   return false;
 }

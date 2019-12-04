@@ -503,6 +503,10 @@ static inline bool isAccessorLazilyGenerated(MetadataAccessStrategy strategy) {
 /// need a cache variable in its accessor.
 bool isTypeMetadataAccessTrivial(IRGenModule &IGM, CanType type);
 
+bool isNominalGenericContextTypeMetadataAccessTrivial(IRGenModule &IGM,
+                                                      NominalTypeDecl &nominal,
+                                                      CanType type);
+
 /// Determine how the given type metadata should be accessed.
 MetadataAccessStrategy getTypeMetadataAccessStrategy(CanType type);
 
