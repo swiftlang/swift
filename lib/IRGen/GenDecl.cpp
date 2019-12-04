@@ -3682,9 +3682,11 @@ ConstantReference IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
 
   llvm::Type *defaultVarTy;
   unsigned adjustmentIndex;
-  
+
+  bool fullMetadata = (nominal && requiresForeignTypeMetadata(nominal));
+
   // Foreign classes reference the full metadata with a GEP.
-  if (nominal && requiresForeignTypeMetadata(nominal)) {
+  if (fullMetadata) {
     defaultVarTy = FullTypeMetadataStructTy;
     adjustmentIndex = MetadataAdjustmentIndex::ValueType;
   // The symbol for other nominal type metadata is generated at the address
@@ -3712,7 +3714,7 @@ ConstantReference IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
   Optional<LinkEntity> entity;
   DebugTypeInfo DbgTy;
 
-  if (nominal && requiresForeignTypeMetadata(nominal)) {
+  if (fullMetadata) {
     entity = LinkEntity::forTypeMetadata(concreteType,
                                          TypeMetadataAddress::FullMetadata);
     DbgTy = DebugTypeInfo::getMetadata(MetatypeType::get(concreteType),
