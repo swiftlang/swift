@@ -19,24 +19,29 @@
 #include "ConstantBuilder.h"
 #include "Explosion.h"
 #include "FixedTypeInfo.h"
-#include "GenericRequirement.h"
 #include "GenArchetype.h"
 #include "GenClass.h"
 #include "GenMeta.h"
 #include "GenProto.h"
 #include "GenType.h"
+#include "GenericRequirement.h"
 #include "IRGenDebugInfo.h"
 #include "IRGenFunction.h"
 #include "IRGenMangler.h"
 #include "IRGenModule.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ExistentialLayout.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/IRGen/Linking.h"
 #include "swift/SIL/FormalLinkage.h"
 #include "swift/SIL/TypeLowering.h"
+#include "llvm/ADT/STLExtras.h"
+#include "llvm/IR/Constant.h"
+#include "llvm/Support/FormatVariadic.h"
+#include <algorithm>
 
 using namespace swift;
 using namespace irgen;
@@ -1765,6 +1770,74 @@ IRGenFunction::emitGenericTypeMetadataAccessFunctionCall(
   return MetadataResponse::handle(*this, request, call);
 }
 
+static void emitCanonicalSpecializationsForGenericTypeMetadataAccessFunction(
+    IRGenFunction &IGF, Explosion &params, NominalTypeDecl *nominal,
+    GenericArguments &genericArgs,
+    std::function<llvm::Value *(int)> valueAtIndex) {
+  auto &IGM = IGF.IGM;
+  auto specializations = IGF.IGM.IRGen.specializationsForType(nominal);
+  if (specializations.size() > 0) {
+    SmallVector<llvm::BasicBlock *, 4> conditionBlocks;
+    for (size_t index = 0; index < specializations.size(); ++index) {
+      conditionBlocks.push_back(llvm::BasicBlock::Create(IGM.getLLVMContext()));
+    }
+
+    IGF.Builder.CreateBr(conditionBlocks[0]);
+
+    SmallVector<std::pair<llvm::BasicBlock *, llvm::Value *>, 4>
+        specializationBlocks;
+    auto switchDestination = llvm::BasicBlock::Create(IGM.getLLVMContext());
+    unsigned long index = 0;
+    for (auto specialization : specializations) {
+      auto conditionBlock = conditionBlocks[index];
+      IGF.Builder.emitBlock(conditionBlock);
+      auto successorBlock = index < conditionBlocks.size() - 1
+                                ? conditionBlocks[index + 1]
+                                : switchDestination;
+      auto specializationBlock = llvm::BasicBlock::Create(IGM.getLLVMContext());
+      auto substitutions = specialization->getContextSubstitutionMap(
+          IGM.getSwiftModule(), nominal);
+
+      llvm::Value *condition = llvm::ConstantInt::get(IGM.Int1Ty, 1);
+      auto generic = specialization->getAnyGeneric();
+      auto parameters = generic->getGenericEnvironment()->getGenericParams();
+      for (size_t index = 0; index < parameters.size(); ++index) {
+        auto parameter = parameters[index];
+        auto argument = ((Type *)parameter)->subst(substitutions);
+        llvm::Constant *addr =
+            IGM.getAddrOfTypeMetadata(argument->getCanonicalType());
+        auto addrInt = IGF.Builder.CreateBitCast(addr, IGM.Int8PtrTy);
+        condition = IGF.Builder.CreateAnd(
+            condition, IGF.Builder.CreateICmpEQ(addrInt, valueAtIndex(index)));
+      }
+      IGF.Builder.CreateCondBr(condition, specializationBlock, successorBlock);
+
+      auto specializedMetadataAddress =
+          IGM.getAddrOfTypeMetadata(specialization);
+      // Construct a MetadataResponse.  It has three fields in the following
+      // order:
+      //        - const Metadata *Metadata;
+      //        - MetadataState (i32) StaticState;
+      llvm::Value *response = llvm::UndefValue::get(IGM.TypeMetadataResponseTy);
+      response = IGF.Builder.CreateInsertValue(
+          response, specializedMetadataAddress, 0,
+          "insert metadata address into response");
+      auto state =
+          llvm::ConstantInt::get(IGM.SizeTy, (uint32_t)MetadataState::Complete);
+      response = IGF.Builder.CreateInsertValue(
+          response, state, 1, "insert metadata state into response");
+      specializationBlocks.push_back({specializationBlock, response});
+      ++index;
+    }
+
+    for (auto pair : specializationBlocks) {
+      IGF.Builder.emitBlock(pair.first);
+      IGF.Builder.CreateRet(pair.second);
+    }
+    IGF.Builder.emitBlock(switchDestination);
+  }
+}
+
 static MetadataResponse
 emitGenericTypeMetadataAccessFunction(IRGenFunction &IGF,
                                       Explosion &params,
@@ -1787,6 +1860,21 @@ emitGenericTypeMetadataAccessFunction(IRGenFunction &IGF,
     auto argsBuffer = Address(params.claimNext(), IGM.getPointerAlignment());
     llvm::Value *arguments =
       IGF.Builder.CreateBitCast(argsBuffer.getAddress(), IGM.Int8PtrTy);
+
+    llvm::Value *argumentsBuffer =
+        IGF.Builder.CreateBitCast(argsBuffer.getAddress(), IGM.Int8PtrPtrTy);
+
+    emitCanonicalSpecializationsForGenericTypeMetadataAccessFunction(
+        IGF, params, nominal, genericArgs, [&](int index) {
+          llvm::Value *indexValue = llvm::ConstantInt::get(IGM.Int64Ty, index);
+          llvm::SmallVector<llvm::Value *, 1> indices{indexValue};
+          llvm::Value *elementPointer =
+              IGF.Builder.CreateGEP(argumentsBuffer, indexValue);
+          llvm::LoadInst *retval = IGF.Builder.CreateLoad(
+              elementPointer, Alignment(),
+              llvm::formatv("load argument at index {0} from buffer", index));
+          return retval;
+        });
 
     // Make the call.
     auto call = IGF.Builder.CreateCall(IGM.getGetGenericMetadataFn(),
@@ -1873,7 +1961,13 @@ emitGenericTypeMetadataAccessFunction(IRGenFunction &IGF,
     auto arg2 = numArguments >= 3
       ? IGF.Builder.CreateBitCast(params.claimNext(), IGM.Int8PtrTy)
       : llvm::UndefValue::get(IGM.Int8PtrTy);
-    
+
+    std::array<llvm::Value *, 3> argValues{arg0, arg1, arg2};
+
+    emitCanonicalSpecializationsForGenericTypeMetadataAccessFunction(
+        IGF, params, nominal, genericArgs,
+        [&](int index) { return argValues[index]; });
+
     auto call = IGF.Builder.CreateCall(thunkFn,
                                        {request, arg0, arg1, arg2, descriptor});
     call->setDoesNotAccessMemory();
