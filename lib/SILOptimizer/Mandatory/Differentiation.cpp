@@ -838,18 +838,16 @@ public:
   SILPassManager &getPassManager() const { return passManager; }
   Lowering::TypeConverter &getTypeConverter() { return module.Types; }
 
-  /// Returns true if there are `DifferentiableFunctionInst` to process.
-  bool hasDifferentiableFunctionInsts() const {
-    return !differentiableFunctionInsts.empty();
+  /// Returns true if there are no `DifferentiableFunctionInst` to process.
+  bool isDifferentiableFunctionInstsWorklistEmpty() const {
+    return differentiableFunctionInsts.empty();
   }
 
   /// Pick and remove a `DifferentiableFunctionInst` for processing.
   /// Returns nullptr if none are available for processing.
-  DifferentiableFunctionInst* pickAndRemoveDifferentiableFunctionInst() {
+  DifferentiableFunctionInst* popDifferentiableFunctionInstFromWorklist() {
     if (differentiableFunctionInsts.empty()) return nullptr;
-    auto *dfi = differentiableFunctionInsts.back();
-    differentiableFunctionInsts.pop_back();
-    return dfi;
+    return differentiableFunctionInsts.pop_back_val();
   }
 
   void addDifferentiableFunctionInst(DifferentiableFunctionInst* dfi) {
@@ -858,7 +856,7 @@ public:
 
   bool
   isDifferentiableFunctionInstProcessed(DifferentiableFunctionInst *dfi) const {
-    return processedDifferentiableFunctionInsts.count(dfi) > 0;
+    return processedDifferentiableFunctionInsts.count(dfi);
   }
 
   void
@@ -878,26 +876,26 @@ public:
     invokers.insert({witness, DifferentiationInvoker(witness)});
   }
 
-  /// Returns the index for `dfi` if found in this context. Otherwise,
-  /// sets the index to zero and returns it.
+  /// Returns the index for `dfi`, which should be already set.
   unsigned getResultIndex(DifferentiableFunctionInst* dfi) {
-    return resultIndices[dfi];
+    assert(resultIndices.count(dfi) && "No result index set");
+    return resultIndices.lookup(dfi);
   }
 
   /// Updates the index for `dfi` in this context.
-  unsigned updateResultIndex(DifferentiableFunctionInst* dfi, unsigned index) {
-    return resultIndices[dfi] = index;
+  void setResultIndex(DifferentiableFunctionInst* dfi, unsigned index) {
+    resultIndices[dfi] = index;
   }
 
   DenseMap<ApplyInst *, NestedApplyInfo> &getNestedApplyInfo() {
     return nestedApplyInfo;
   }
 
-  void addGeneratedFunction(SILFunction* function) {
+  void recordGeneratedFunction(SILFunction* function) {
     generatedFunctions.push_back(function);
   }
 
-  void addGeneratedFunctionReference(SILValue functionRef) {
+  void recordGeneratedFunctionReference(SILValue functionRef) {
     generatedFunctionReferences.push_back(functionRef);
   }
 
@@ -2630,7 +2628,7 @@ public:
                      witness->getSILAutoDiffIndices(), activityInfo) {
     // Create empty pullback function.
     pullback = createEmptyPullback();
-    context.addGeneratedFunction(pullback);
+    context.recordGeneratedFunction(pullback);
   }
 
   SILFunction *createEmptyPullback() {
@@ -3147,7 +3145,7 @@ public:
       context.addDifferentiableFunctionInst(diffFuncInst);
       // TODO(TF-689): Make `differentiable_function` store result indices and
       // remove `ADContext::resultIndices`.
-      context.updateResultIndex(diffFuncInst, activeResultIndices.front());
+      context.setResultIndex(diffFuncInst, activeResultIndices.front());
 
       auto borrowedADFunc =
           builder.emitBeginBorrowOperation(loc, diffFuncInst);
@@ -4519,7 +4517,7 @@ public:
             context, original, witness, &differentialInfo))),
         diffLocalAllocBuilder(getDifferential()) {
     // Create empty differential function.
-    context.addGeneratedFunction(&getDifferential());
+    context.recordGeneratedFunction(&getDifferential());
   }
 
   static SILFunction *
@@ -4832,7 +4830,7 @@ public:
       context.addDifferentiableFunctionInst(diffFuncInst);
       // TODO(TF-689): Make `differentiable_function` store result indices and
       // remove `ADContext::resultIndices`.
-      context.updateResultIndex(diffFuncInst, activeResultIndices.front());
+      context.setResultIndex(diffFuncInst, activeResultIndices.front());
 
       auto borrowedADFunc =
           builder.emitBeginBorrowOperation(loc, diffFuncInst);
@@ -7299,7 +7297,7 @@ bool DifferentiationTransformer::canonicalizeDifferentiabilityWitness(
 
     witness->setJVP(
         createEmptyJVP(context, original, witness, derivativeFunctionLinkage));
-    context.addGeneratedFunction(witness->getJVP());
+    context.recordGeneratedFunction(witness->getJVP());
 
     // For now, only do JVP generation if the flag is enabled and if custom VJP
     // does not exist. If custom VJP exists but custom JVP does not, skip JVP
@@ -7370,7 +7368,7 @@ bool DifferentiationTransformer::canonicalizeDifferentiabilityWitness(
 
     witness->setVJP(
         createEmptyVJP(context, original, witness, derivativeFunctionLinkage));
-    context.addGeneratedFunction(witness->getVJP());
+    context.recordGeneratedFunction(witness->getVJP());
     VJPEmitter emitter(context, original, witness, witness->getVJP(), invoker);
     return emitter.run();
   }
@@ -7617,7 +7615,7 @@ DifferentiationTransformer::getOrCreateSubsetParametersThunkForLinearMap(
   auto result = joinElements(results, builder, loc);
   builder.createReturn(loc, result);
 
-  context.addGeneratedFunction(thunk);
+  context.recordGeneratedFunction(thunk);
   return {thunk, interfaceSubs};
 }
 
@@ -7783,7 +7781,7 @@ DifferentiationTransformer::getOrCreateSubsetParametersThunkForDerivativeFunctio
     builder.createReturn(loc, thunkedLinearMap);
   }
 
-  context.addGeneratedFunction(thunk);
+  context.recordGeneratedFunction(thunk);
   return {thunk, interfaceSubs};
 }
 
@@ -7844,11 +7842,11 @@ SILValue DifferentiationTransformer::promoteToDifferentiableFunction(
           auto *dfi = context.createDifferentiableFunction(thunkBuilder, loc,
                                                    parameterIndices,
                                                    retInst->getOperand());
-          context.updateResultIndex(dfi, resultIndex);
+          context.setResultIndex(dfi, resultIndex);
           thunkBuilder.createReturn(loc, dfi);
           retInst->eraseFromParent();
 
-          context.addGeneratedFunction(newThunk);
+          context.recordGeneratedFunction(newThunk);
           context.addDifferentiableFunctionInst(dfi);
           if (processDifferentiableFunctionInst(dfi))
             return nullptr;
@@ -7856,7 +7854,7 @@ SILValue DifferentiationTransformer::promoteToDifferentiableFunction(
 
         // Apply the new curry thunk.
         auto *newThunkRef = builder.createFunctionRef(loc, newThunk);
-        context.addGeneratedFunctionReference(newThunkRef);
+        context.recordGeneratedFunctionReference(newThunkRef);
         SmallVector<SILValue, 8> newArgs;
         SmallVector<SILValue, 8> newArgsToDestroy;
         SmallVector<AllocStackInst *, 1> newBuffersToDealloc;
@@ -7892,7 +7890,7 @@ SILValue DifferentiationTransformer::promoteToDifferentiableFunction(
       return nullptr;
 
     auto derivativeFn = derivativeFnAndIndices->first;
-    context.addGeneratedFunctionReference(derivativeFn);
+    context.recordGeneratedFunctionReference(derivativeFn);
 
     // If desired indices are a subset of actual indices, create a "subset
     // indices thunk" and destroy the emitted derivative function reference.
@@ -7972,7 +7970,7 @@ SILValue DifferentiationTransformer::promoteToDifferentiableFunction(
   auto *newDFI = context.createDifferentiableFunction(
       builder, loc, parameterIndices, origFnCopy,
       std::make_pair(derivativeFns[0], derivativeFns[1]));
-  context.updateResultIndex(dfi, resultIndex);
+  context.setResultIndex(dfi, resultIndex);
   context.addDifferentiableFunctionInst(dfi);
 
   return newDFI;
@@ -8108,7 +8106,7 @@ void Differentiation::run() {
 
   // If nothing has triggered differentiation, there's nothing to do.
   if (context.getInvokers().empty() &&
-      !context.hasDifferentiableFunctionInsts())
+      context.isDifferentiableFunctionInstsWorklistEmpty())
     return;
 
   // AD relies on stdlib (the Swift module). If it's not imported, it's an
@@ -8131,7 +8129,7 @@ void Differentiation::run() {
   }
 
   // Iteratively process `differentiable_function` instruction worklist.
-  while (auto *dfi = context.pickAndRemoveDifferentiableFunctionInst()) {
+  while (auto *dfi = context.popDifferentiableFunctionInstFromWorklist()) {
     // Skip instructions that have been already been processed.
     if (context.isDifferentiableFunctionInstProcessed(dfi)) continue;
     errorOccurred |= transformer.processDifferentiableFunctionInst(dfi);
