@@ -4390,7 +4390,7 @@ private:
                   << ": To differentiate or not to differentiate?\n";
         for (auto &inst : origBB) {
           s << (differentialInfo.shouldDifferentiateInstruction(&inst)
-                    ? "[X] " : "[ ] ")
+                    ? "[x] " : "[ ] ")
             << inst;
         }
       });
