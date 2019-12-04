@@ -26,6 +26,21 @@ CHANGELOG
 Swift 5.2
 ---------
 
+* [SR-11841][]:
+
+  When chaining calls to `filter(_:)` on a lazy sequence or collection, the
+  filtering predicates will now be called in the same order as eager filters.
+  
+  ```swift
+  let evens = (1...10).lazy
+      .filter { $0.isMultiple(of: 2) }
+      .filter { print($0); return true }
+  _ = evens.count
+  // Prints 2, 4, 6, 8, and 10 on separate lines
+  ```
+  
+  Previously, the predicates were called in reverse order.
+  
 * [SR-2790][]:
 
   The compiler will now emit a warning when attempting to pass a temporary
@@ -7874,3 +7889,4 @@ Swift 1.0
 [SR-9827]: <https://bugs.swift.org/browse/SR-9827>
 [SR-11298]: <https://bugs.swift.org/browse/SR-11298>
 [SR-11429]: <https://bugs.swift.org/browse/SR-11429>
+[SR-11841]: <https://bugs.swift.org/browse/SR-11841>
