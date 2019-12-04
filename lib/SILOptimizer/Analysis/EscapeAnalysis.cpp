@@ -336,11 +336,11 @@ std::pair<const CGNode *, unsigned> EscapeAnalysis::CGNode::getRepNode(
     return {this, 0};
 
   for (Predecessor pred : Preds) {
-    if (pred.getInt() != EdgeType::PointsTo)
+    if (!pred.is(EdgeType::PointsTo))
       continue;
-    if (!visited.insert(pred.getPointer()).second)
+    if (!visited.insert(pred.getPredNode()).second)
       continue;
-    auto repNodeAndDepth = pred.getPointer()->getRepNode(visited);
+    auto repNodeAndDepth = pred.getPredNode()->getRepNode(visited);
     if (repNodeAndDepth.first)
       return {repNodeAndDepth.first, repNodeAndDepth.second + 1};
     // If a representative node was not found on this pointsTo node, recursion
@@ -390,9 +390,9 @@ bool EscapeAnalysis::CGNode::visitSuccessors(Visitor &&visitor) const {
 template <typename Visitor>
 bool EscapeAnalysis::CGNode::visitDefers(Visitor &&visitor) const {
   for (Predecessor pred : Preds) {
-    if (pred.getInt() != EdgeType::Defer)
+    if (!pred.is(EdgeType::Defer))
       continue;
-    if (!visitor(pred.getPointer(), false))
+    if (!visitor(pred.getPredNode(), false))
       return false;
   }
   for (auto *deferred : defersTo) {
@@ -549,10 +549,10 @@ void EscapeAnalysis::ConnectionGraph::initializePointsTo(CGNode *initialNode,
       // distinguish these cases, always retry backward traversal--it just won't
       // revisit any edges in the later case.
       backwardTraverse(edgeNode, [&](Predecessor pred) {
-        if (pred.getInt() != EdgeType::Defer)
+        if (!pred.is(EdgeType::Defer))
           return Traversal::Backtrack;
 
-        CGNode *predNode = pred.getPointer();
+        CGNode *predNode = pred.getPredNode();
         if (predNode->pointsTo) {
           assert(predNode->pointsTo->getMergeTarget() == newPointsTo);
           return Traversal::Backtrack;
@@ -608,8 +608,8 @@ void EscapeAnalysis::ConnectionGraph::mergeAllScheduledNodes() {
     // initializePointsTo(). By ensuring that 'From' is unreachable first, the
     // graph appears consistent during those operations.
     for (Predecessor Pred : From->Preds) {
-      CGNode *PredNode = Pred.getPointer();
-      if (Pred.getInt() == EdgeType::PointsTo) {
+      CGNode *PredNode = Pred.getPredNode();
+      if (Pred.is(EdgeType::PointsTo)) {
         assert(PredNode->getPointsToEdge() == From
                && "Incoming pointsTo edge not set in predecessor");
         if (PredNode != From)
@@ -715,13 +715,13 @@ void EscapeAnalysis::ConnectionGraph::mergeAllScheduledNodes() {
     // pointsTo predecessors (which are now attached to 'To').
     for (unsigned PredIdx = 0; PredIdx < To->Preds.size(); ++PredIdx) {
       auto predEdge = To->Preds[PredIdx];
-      if (predEdge.getInt() != EdgeType::PointsTo)
+      if (!predEdge.is(EdgeType::PointsTo))
         continue;
-      predEdge.getPointer()->visitDefers(
-        [&](CGNode *deferred, bool /*isSucc*/) {
-          mergePointsTo(deferred, To);
-          return true;
-        });
+      predEdge.getPredNode()->visitDefers(
+          [&](CGNode *deferred, bool /*isSucc*/) {
+            mergePointsTo(deferred, To);
+            return true;
+          });
     }
     To->mergeEscapeState(From->State);
 
@@ -1024,7 +1024,7 @@ bool EscapeAnalysis::ConnectionGraph::backwardTraverse(
     for (Predecessor pred : reachingNode->Preds) {
       switch (visitor(pred)) {
       case Traversal::Follow: {
-        CGNode *predNode = pred.getPointer();
+        CGNode *predNode = pred.getPredNode();
         worklist.tryPush(predNode);
         break;
       }
@@ -1073,7 +1073,7 @@ bool EscapeAnalysis::ConnectionGraph::mayReach(CGNode *pointer,
 
   // This query is successful when the traversal halts and returns false.
   return !backwardTraverse(pointee, [pointer](Predecessor pred) {
-    if (pred.getPointer() == pointer)
+    if (pred.getPredNode() == pointer)
       return Traversal::Halt;
     return Traversal::Follow;
   });
@@ -1177,8 +1177,6 @@ std::string CGForDotView::getNodeLabel(const Node *Node) const {
   std::string Label;
   llvm::raw_string_ostream O(Label);
   Node->OrigNode->getRepValue().print(O, InstToIDMap);
-  if (Node->OrigNode->Type == EscapeAnalysis::NodeType::Return)
-    O << "return";
   O << '\n';
   if (Node->OrigNode->mappedValue) {
     std::string Inst;
@@ -1503,11 +1501,11 @@ void EscapeAnalysis::ConnectionGraph::verifyStructure(bool allowMerge) const {
     }
     // Check if predecessor and successor edges are linked correctly.
     for (Predecessor Pred : Nd->Preds) {
-      CGNode *PredNode = Pred.getPointer();
-      if (Pred.getInt() == EdgeType::Defer) {
+      CGNode *PredNode = Pred.getPredNode();
+      if (Pred.is(EdgeType::Defer)) {
         assert(PredNode->findDeferred(Nd) != PredNode->defersTo.end());
       } else {
-        assert(Pred.getInt() == EdgeType::PointsTo);
+        assert(Pred.is(EdgeType::PointsTo));
         assert(PredNode->getPointsToEdge() == Nd);
       }
     }
@@ -2349,7 +2347,7 @@ bool EscapeAnalysis::canEscapeToUsePoint(SILValue V, SILNode *UsePoint,
 
   // First check if there are escape paths which we don't explicitly see
   // in the graph.
-  if (Node->escapesInsideFunction(V))
+  if (Node->valueEscapesInsideFunction(V))
     return true;
 
   // No hidden escapes: check if the Node is reachable from the UsePoint.
@@ -2369,7 +2367,7 @@ bool EscapeAnalysis::canEscapeToUsePoint(SILValue V, SILNode *UsePoint,
   // As V1's content node is the same as V's content node, we also make the
   // check for the content node.
   CGNode *ContentNode = getValueContent(ConGraph, V);
-  if (ContentNode->escapesInsideFunction(V))
+  if (ContentNode->valueEscapesInsideFunction(V))
     return true;
 
   if (ConGraph->isUsePoint(UsePoint, ContentNode))
@@ -2450,10 +2448,10 @@ bool EscapeAnalysis::canPointToSameMemory(SILValue V1, SILValue V2) {
     return true;
 
   // Finish the check for one value being a non-escaping local object.
-  if (isUniq1 && Node1->escapesInsideFunction(V1))
+  if (isUniq1 && Node1->valueEscapesInsideFunction(V1))
     isUniq1 = false;
 
-  if (isUniq2 && Node2->escapesInsideFunction(V2))
+  if (isUniq2 && Node2->valueEscapesInsideFunction(V2))
     isUniq2 = false;
 
   if (!isUniq1 && !isUniq2)
