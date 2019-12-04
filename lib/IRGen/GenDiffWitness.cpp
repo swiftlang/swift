@@ -34,6 +34,10 @@ void IRGenModule::emitSILDifferentiabilityWitness(
   if (dw->isDeclaration())
     return;
 
+  // Don't emit public_external witnesses.
+  if (hasPublicVisibility(dw->getLinkage()) && isAvailableExternally(dw->getLinkage()))
+    return;
+
   ConstantInitBuilder builder(*this);
   auto diffWitnessContents = builder.beginStruct();
 
