@@ -69,17 +69,26 @@ public func _stdlib_thread_barrier_init(
   InitializeConditionVariable(barrier.pointee.cond!)
 #else
   barrier.pointee.mutex = UnsafeMutablePointer.allocate(capacity: 1)
-  if pthread_mutex_init(barrier.pointee.mutex!, nil) != 0 {
-    // FIXME: leaking memory.
-    return -1
-  }
   barrier.pointee.cond = UnsafeMutablePointer.allocate(capacity: 1)
-  if pthread_cond_init(barrier.pointee.cond!, nil) != 0 {
-    // FIXME: leaking memory, leaking a mutex.
-    return -1
+  guard _stdlib_pthread_barrier_mutex_and_cond_init(barrier) == 0 else {
+    barrier.pointee.mutex!.deinitialize(count: 1)
+    barrier.pointee.mutex!.deallocate()
+    barrier.pointee.cond!.deinitialize(count: 1)
+    barrier.pointee.cond!.deallocate()
   }
 #endif
   barrier.pointee.count = count
+  return 0
+}
+
+private func _stdlib_pthread_barrier_mutex_and_cond_init(_ barrier: UnsafeMutablePointer<_stdlib_pthread_barrier_t>) -> CInt {
+  guard pthread_mutex_init(barrier.pointee.mutex!) == 0 else {
+    return -1
+  }
+  guard pthread_cond_init(barrier.pointee.cond!) == 0 else {
+    pthread_mutex_destroy(barrier.pointee.mutex!)
+    return -1
+  }
   return 0
 }
 
@@ -90,12 +99,8 @@ public func _stdlib_thread_barrier_destroy(
   // Condition Variables do not need to be explicitly destroyed
   // Mutexes do not need to be explicitly destroyed
 #else
-  if pthread_cond_destroy(barrier.pointee.cond!) != 0 {
-    // FIXME: leaking memory, leaking a mutex.
-    return -1
-  }
-  if pthread_mutex_destroy(barrier.pointee.mutex!) != 0 {
-    // FIXME: leaking memory.
+  guard pthread_cond_destroy(barrier.pointee.cond!) == 0 &&
+    pthread_mutex_destroy(barrier.pointee.mutex!) == 0 else {
     return -1
   }
 #endif
