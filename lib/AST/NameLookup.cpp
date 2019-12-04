@@ -2435,6 +2435,27 @@ swift::getDirectlyInheritedNominalTypeDecls(
   // FIXME: Refactor SelfBoundsFromWhereClauseRequest to dig out
   // the source location.
   SourceLoc loc = SourceLoc();
+
+  // For a deserialized protocol, the where clause isn't going to tell us
+  // anything. Ask the requirement signature instead.
+  if (protoDecl->wasDeserialized()) {
+    auto protoSelfTy = protoDecl->getSelfInterfaceType();
+    for (auto &req : protoDecl->getRequirementSignature()) {
+      // Dig out a conformance requirement...
+      if (req.getKind() != RequirementKind::Conformance)
+        continue;
+
+      // constraining Self.
+      if (!req.getFirstType()->isEqual(protoSelfTy))
+        continue;
+
+      result.emplace_back(
+          loc, req.getSecondType()->castTo<ProtocolType>()->getDecl());
+    }
+    return result;
+  }
+
+  // Else we have access to this information on the where clause.
   auto selfBounds = getSelfBoundsFromWhereClause(decl);
   anyObject |= selfBounds.anyObject;
 

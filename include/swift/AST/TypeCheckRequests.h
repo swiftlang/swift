@@ -335,7 +335,8 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<ArrayRef<Requirement>> evaluate(Evaluator &evaluator, ProtocolDecl *proto) const;
+  llvm::Expected<ArrayRef<Requirement>> evaluate(Evaluator &evaluator,
+                                                 ProtocolDecl *proto) const;
 
 public:
   // Separate caching.
