@@ -4181,13 +4181,6 @@ namespace {
         leafTy = keyPathTy->getGenericArgs()[1];
       }
 
-      // Updates the constraint system with the type of the last resolved
-      // component. We do it this way because we sometimes insert new
-      // components.
-      auto updateCSWithResolvedComponent = [&]() {
-        cs.setType(E, resolvedComponents.size() - 1, baseTy);
-      };
-
       for (unsigned i : indices(E->getComponents())) {
         auto &origComponent = E->getMutableComponents()[i];
         
@@ -4248,7 +4241,6 @@ namespace {
           }
         }
 
-        KeyPathExpr::Component component;
         switch (kind) {
         case KeyPathExpr::Component::Kind::UnresolvedProperty: {
           // If we couldn't resolve the component, leave it alone.
@@ -4257,19 +4249,16 @@ namespace {
             break;
           }
 
-          component = buildKeyPathPropertyComponent(
+          auto component = buildKeyPathPropertyComponent(
               *foundDecl, origComponent.getLoc(), locator);
 
-          baseTy = component.getComponentType();
           resolvedComponents.push_back(component);
 
           if (shouldForceUnwrapResult(foundDecl->choice, locator)) {
-            updateCSWithResolvedComponent();
             auto objectTy = getObjectType(baseTy);
             auto loc = origComponent.getLoc();
-            component = KeyPathExpr::Component::forOptionalForce(objectTy, loc);
-            baseTy = component.getComponentType();
-            resolvedComponents.push_back(component);
+            resolvedComponents.push_back(
+                KeyPathExpr::Component::forOptionalForce(objectTy, loc));
           }
           break;
         }
@@ -4284,20 +4273,16 @@ namespace {
           if (!isDynamicMember)
             subscriptLabels = origComponent.getSubscriptLabels();
 
-          component = buildKeyPathSubscriptComponent(
+          auto component = buildKeyPathSubscriptComponent(
               *foundDecl, origComponent.getLoc(), origComponent.getIndexExpr(),
               subscriptLabels, locator);
-
-          baseTy = component.getComponentType();
           resolvedComponents.push_back(component);
 
           if (shouldForceUnwrapResult(foundDecl->choice, locator)) {
-            updateCSWithResolvedComponent();
             auto objectTy = getObjectType(baseTy);
             auto loc = origComponent.getLoc();
-            component = KeyPathExpr::Component::forOptionalForce(objectTy, loc);
-            baseTy = component.getComponentType();
-            resolvedComponents.push_back(component);
+            resolvedComponents.push_back(
+                KeyPathExpr::Component::forOptionalForce(objectTy, loc));
           }
           break;
         }
@@ -4312,32 +4297,29 @@ namespace {
           assert(objectTy);
           
           auto loc = origComponent.getLoc();
-          component = KeyPathExpr::Component::forOptionalChain(objectTy, loc);
-
-          baseTy = component.getComponentType();
-          resolvedComponents.push_back(component);
+          resolvedComponents.push_back(
+              KeyPathExpr::Component::forOptionalChain(objectTy, loc));
           break;
         }
         case KeyPathExpr::Component::Kind::OptionalForce: {
           auto objectTy = getObjectType(baseTy);
           auto loc = origComponent.getLoc();
-          component = KeyPathExpr::Component::forOptionalForce(objectTy, loc);
-          baseTy = component.getComponentType();
+          resolvedComponents.push_back(
+              KeyPathExpr::Component::forOptionalForce(objectTy, loc));
+          break;
+        }
+        case KeyPathExpr::Component::Kind::Invalid: {
+          auto component = origComponent;
+          component.setComponentType(leafTy);
           resolvedComponents.push_back(component);
           break;
         }
-        case KeyPathExpr::Component::Kind::Invalid:
-          component = origComponent;
-          component.setComponentType(leafTy);
-
-          baseTy = component.getComponentType();
-          resolvedComponents.push_back(component);
-          break;
-        case KeyPathExpr::Component::Kind::Identity:
-          component = origComponent;
+        case KeyPathExpr::Component::Kind::Identity: {
+          auto component = origComponent;
           component.setComponentType(baseTy);
           resolvedComponents.push_back(component);
           break;
+        }
         case KeyPathExpr::Component::Kind::Property:
         case KeyPathExpr::Component::Kind::Subscript:
         case KeyPathExpr::Component::Kind::OptionalWrap:
@@ -4345,8 +4327,9 @@ namespace {
           llvm_unreachable("already resolved");
         }
 
-        // By now, "baseTy" is the result type of this component.
-        updateCSWithResolvedComponent();
+        // Update "baseTy" with the result type of the last component.
+        assert(!resolvedComponents.empty());
+        baseTy = resolvedComponents.back().getComponentType();
       }
       
       // Wrap a non-optional result if there was chaining involved.
@@ -4359,10 +4342,12 @@ namespace {
         auto component = KeyPathExpr::Component::forOptionalWrap(leafTy);
         resolvedComponents.push_back(component);
         baseTy = leafTy;
-        updateCSWithResolvedComponent();
       }
+
+      // Set the resolved components, and cache their types.
       E->resolveComponents(cs.getASTContext(), resolvedComponents);
-      
+      cs.cacheExprTypes(E);
+
       // See whether there's an equivalent ObjC key path string we can produce
       // for interop purposes.
       if (cs.getASTContext().LangOpts.EnableObjCInterop) {
