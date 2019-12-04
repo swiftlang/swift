@@ -1550,6 +1550,7 @@ namespace {
                                        ctx.Id_dynamicMember, componentLoc,
                                        components);
         keyPath->resolveComponents(ctx, components);
+        cs.cacheExprTypes(keyPath);
         return keyPath;
       }
 
@@ -1640,10 +1641,9 @@ namespace {
       componentExpr->setType(ty);
       cs.cacheType(componentExpr);
 
-      cs.setType(keyPath, 0, ty);
-
       keyPath->setParsedPath(componentExpr);
       keyPath->resolveComponents(ctx, components);
+      cs.cacheExprTypes(keyPath);
       return keyPath;
     }
 
