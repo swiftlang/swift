@@ -965,10 +965,27 @@ public:
 #endif
 
   enum class ABIDifference : uint8_t {
-    // No ABI differences, function can be trivially bitcast to result type.
-    Trivial,
+    // Types have compatible calling conventions and representations, so can
+    // be trivially bitcast.
+    CompatibleRepresentation,
+    
+    // No convention differences, function can be cast via `convert_function`
+    // without a thunk.
+    //
+    // There may still be a representation difference between values of the
+    // compared function types. This means that, if two function types
+    // have a matching argument or return of function type with
+    // `SameCallingConvention`, then the outer function types may not themselves
+    // have the `SameCallingConvention` because they need a thunk to convert
+    // the inner function value representation.
+    CompatibleCallingConvention,
+    
     // Representation difference requires thin-to-thick conversion.
-    ThinToThick,
+    CompatibleRepresentation_ThinToThick,
+    // Function types have the `SameCallingConvention` but additionally need
+    // a thin-to-thick conversion.
+    CompatibleCallingConvention_ThinToThick,
+    
     // Non-trivial difference requires thunk.
     NeedsThunk
   };

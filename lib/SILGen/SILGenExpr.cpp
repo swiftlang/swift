@@ -1465,7 +1465,8 @@ static ManagedValue convertCFunctionSignature(SILGenFunction &SGF,
   // ABI-compatible, since we can't emit a thunk.
   switch (SGF.SGM.Types.checkForABIDifferences(SGF.SGM.M,
                                                loweredResultTy, loweredDestTy)){
-  case TypeConverter::ABIDifference::Trivial:
+  case TypeConverter::ABIDifference::CompatibleRepresentation:
+  case TypeConverter::ABIDifference::CompatibleCallingConvention:
     result = fnEmitter();
     assert(result.getType() == loweredResultTy);
 
@@ -1484,7 +1485,8 @@ static ManagedValue convertCFunctionSignature(SILGenFunction &SGF,
     result = SGF.emitUndef(loweredDestTy);
     break;
 
-  case TypeConverter::ABIDifference::ThinToThick:
+  case TypeConverter::ABIDifference::CompatibleCallingConvention_ThinToThick:
+  case TypeConverter::ABIDifference::CompatibleRepresentation_ThinToThick:
     llvm_unreachable("Cannot have thin to thick conversion here");
   }
 
