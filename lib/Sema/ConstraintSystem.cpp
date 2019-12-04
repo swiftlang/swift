@@ -109,7 +109,7 @@ bool ConstraintSystem::hasFreeTypeVariables() {
 
 void ConstraintSystem::addTypeVariable(TypeVariableType *typeVar) {
   TypeVariables.insert(typeVar);
-  
+
   // Notify the constraint graph.
   (void)CG[typeVar];
 }
@@ -606,7 +606,7 @@ Type ConstraintSystem::openUnboundGenericType(UnboundGenericType *unbound,
                     locator);
     }
   }
-        
+
   // Map the generic parameters to their corresponding type variables.
   llvm::SmallVector<Type, 2> arguments;
   for (auto gp : unboundDecl->getInnermostGenericParamTypes()) {
@@ -865,7 +865,7 @@ static bool doesStorageProduceLValue(AbstractStorageDecl *storage,
   // Unsettable storage decls always produce rvalues.
   if (!storage->isSettable(useDC, base))
     return false;
-  
+
   if (!storage->isSetterAccessibleFrom(useDC))
     return false;
 
@@ -965,7 +965,7 @@ void ConstraintSystem::recordOpenedTypes(
                       }) == OpenedTypes.end() &&
          "already registered opened types for this locator");
 #endif
-  
+
   OpenedType* openedTypes
     = Allocator.Allocate<OpenedType>(replacements.size());
   std::copy(replacements.begin(), replacements.end(), openedTypes);
@@ -1695,7 +1695,7 @@ static std::pair<Type, Type> getTypeOfReferenceWithSpecialTypeCheckingSemantics(
 
     FunctionType::Param inputArg(input,
                                  CS.getASTContext().getIdentifier("of"));
-    
+
     CS.addConstraint(ConstraintKind::DynamicTypeOf, output, input,
         CS.getConstraintLocator(locator, ConstraintLocator::RValueAdjustment));
     auto refType = FunctionType::get({inputArg}, output);
@@ -1722,18 +1722,19 @@ static std::pair<Type, Type> getTypeOfReferenceWithSpecialTypeCheckingSemantics(
         FunctionType::ExtInfo(FunctionType::Representation::Swift,
                               /*noescape*/ true,
                               /*throws*/ true,
-                              DifferentiabilityKind::NonDifferentiable));
+                              DifferentiabilityKind::NonDifferentiable,
+                              /*clangFunctionType*/ nullptr));
     FunctionType::Param args[] = {
       FunctionType::Param(noescapeClosure),
       FunctionType::Param(bodyClosure, CS.getASTContext().getIdentifier("do")),
     };
 
-    auto refType = FunctionType::get(
-        args, result,
-        FunctionType::ExtInfo(FunctionType::Representation::Swift,
-                              /*noescape*/ false,
-                              /*throws*/ true,
-                              DifferentiabilityKind::NonDifferentiable));
+    auto refType = FunctionType::get(args, result,
+      FunctionType::ExtInfo(FunctionType::Representation::Swift,
+                            /*noescape*/ false,
+                            /*throws*/ true,
+                            DifferentiabilityKind::NonDifferentiable,
+                            /*clangFunctionType*/ nullptr));
     return {refType, refType};
   }
   case DeclTypeCheckingSemantics::OpenExistential: {
@@ -1756,17 +1757,18 @@ static std::pair<Type, Type> getTypeOfReferenceWithSpecialTypeCheckingSemantics(
         FunctionType::ExtInfo(FunctionType::Representation::Swift,
                               /*noescape*/ true,
                               /*throws*/ true,
-                              DifferentiabilityKind::NonDifferentiable));
+                              DifferentiabilityKind::NonDifferentiable,
+                              /*clangFunctionType*/ nullptr));
     FunctionType::Param args[] = {
       FunctionType::Param(existentialTy),
       FunctionType::Param(bodyClosure, CS.getASTContext().getIdentifier("do")),
     };
-    auto refType = FunctionType::get(
-        args, result,
-        FunctionType::ExtInfo(FunctionType::Representation::Swift,
-                              /*noescape*/ false,
-                              /*throws*/ true,
-                              DifferentiabilityKind::NonDifferentiable));
+    auto refType = FunctionType::get(args, result,
+      FunctionType::ExtInfo(FunctionType::Representation::Swift,
+                            /*noescape*/ false,
+                            /*throws*/ true,
+                            DifferentiabilityKind::NonDifferentiable,
+                            /*clangFunctionType*/ nullptr));
     return {refType, refType};
   }
   }
@@ -2468,7 +2470,7 @@ DeclName OverloadChoice::getName() const {
     case OverloadChoiceKind::TupleIndex:
       llvm_unreachable("no name!");
   }
-  
+
   llvm_unreachable("Unhandled OverloadChoiceKind in switch.");
 }
 

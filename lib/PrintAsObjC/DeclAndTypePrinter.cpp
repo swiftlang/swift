@@ -14,6 +14,7 @@
 
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTVisitor.h"
+#include "swift/AST/ClangSwiftTypeCorrespondence.h"
 #include "swift/AST/Comment.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/ExistentialLayout.h"
@@ -1559,8 +1560,7 @@ private:
     ASTContext &ctx = getASTContext();
     auto &clangASTContext = ctx.getClangModuleLoader()->getClangASTContext();
     clang::QualType clangTy = clangASTContext.getTypeDeclType(clangTypeDecl);
-    return clangTy->isPointerType() || clangTy->isBlockPointerType() ||
-      clangTy->isObjCObjectPointerType();
+    return swift::canImportAsOptional(clangTy.getTypePtr());
   }
 
   bool printImportedAlias(const TypeAliasDecl *alias,

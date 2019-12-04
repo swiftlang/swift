@@ -4670,7 +4670,10 @@ public:
     uint8_t rawRepresentation, rawDiffKind;
     bool noescape = false, throws;
     GenericSignature genericSig = GenericSignature();
+    clang::Type *clangFunctionType = nullptr;
 
+    // FIXME: [clang-function-type-serialization] Deserialize a clang::Type out
+    // of the record.
     if (!isGeneric) {
       decls_block::FunctionTypeLayout::readRecord(
           scratch, resultID, rawRepresentation, noescape, throws, rawDiffKind);
@@ -4690,8 +4693,9 @@ public:
     if (!diffKind.hasValue())
       MF.fatal();
 
-    auto info =
-        FunctionType::ExtInfo(*representation, noescape, throws, *diffKind);
+    auto info = FunctionType::ExtInfo(*representation, noescape, throws,
+                                      *diffKind, clangFunctionType);
+
 
     auto resultTy = MF.getTypeChecked(resultID);
     if (!resultTy)
@@ -5025,7 +5029,10 @@ public:
     unsigned numResults;
     GenericSignatureID rawGenericSig;
     ArrayRef<uint64_t> variableData;
+    clang::FunctionType *clangFunctionType = nullptr;
 
+    // FIXME: [clang-function-type-serialization] Deserialize a
+    // clang::FunctionType out of the record.
     decls_block::SILFunctionTypeLayout::readRecord(scratch,
                                              rawCoroutineKind,
                                              rawCalleeConvention,
@@ -5045,11 +5052,13 @@ public:
       = getActualSILFunctionTypeRepresentation(rawRepresentation);
     if (!representation.hasValue())
       MF.fatal();
+
     auto diffKind = getActualDifferentiabilityKind(rawDiffKind);
     if (!diffKind.hasValue())
       MF.fatal();
+
     SILFunctionType::ExtInfo extInfo(*representation, pseudogeneric, noescape,
-                                     *diffKind);
+                                     *diffKind, clangFunctionType);
 
     // Process the coroutine kind.
     auto coroutineKind = getActualSILCoroutineKind(rawCoroutineKind);

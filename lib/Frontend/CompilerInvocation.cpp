@@ -349,6 +349,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.StressASTScopeLookup |= Args.hasArg(OPT_stress_astscope_lookup);
   Opts.WarnIfASTScopeLookup |= Args.hasArg(OPT_warn_if_astscope_lookup);
   Opts.LazyASTScopes |= Args.hasArg(OPT_lazy_astscopes);
+  Opts.UseClangFunctionTypes |= Args.hasArg(OPT_use_clang_function_types);
 
   Opts.NamedLazyMemberLoading &= !Args.hasArg(OPT_disable_named_lazy_member_loading);
 

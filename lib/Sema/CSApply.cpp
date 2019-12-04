@@ -5864,6 +5864,11 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
         }
       }
 
+      auto &err = llvm::errs();
+      err << "fromType->getCanonicalType() = ";
+      fromType->getCanonicalType()->dump(err);
+      err << "toType->getCanonicalType() = ";
+      toType->getCanonicalType()->dump(err);
       llvm_unreachable("Should be handled above");
     }
 
