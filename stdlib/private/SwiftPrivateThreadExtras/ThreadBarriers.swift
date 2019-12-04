@@ -94,14 +94,14 @@ private func _stdlib_pthread_barrier_mutex_and_cond_init(_ barrier: UnsafeMutabl
 
 public func _stdlib_thread_barrier_destroy(
   _ barrier: UnsafeMutablePointer<_stdlib_thread_barrier_t>
-) -> CInt {
+) {
 #if os(Windows)
   // Condition Variables do not need to be explicitly destroyed
   // Mutexes do not need to be explicitly destroyed
 #else
   guard pthread_cond_destroy(barrier.pointee.cond!) == 0 &&
     pthread_mutex_destroy(barrier.pointee.mutex!) == 0 else {
-    return -1
+    fatalError("_stdlib_thread_barrier_destroy() failed")
   }
 #endif
   barrier.pointee.cond!.deinitialize(count: 1)
@@ -110,7 +110,7 @@ public func _stdlib_thread_barrier_destroy(
   barrier.pointee.mutex!.deinitialize(count: 1)
   barrier.pointee.mutex!.deallocate()
 
-  return 0
+  return
 }
 
 public func _stdlib_thread_barrier_wait(

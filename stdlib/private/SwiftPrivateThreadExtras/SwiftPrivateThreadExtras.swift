@@ -162,10 +162,7 @@ public class _stdlib_Barrier {
   }
 
   deinit {
-    let ret = _stdlib_thread_barrier_destroy(_threadBarrierPtr)
-    if ret != 0 {
-      fatalError("_stdlib_thread_barrier_destroy() failed")
-    }
+    _stdlib_thread_barrier_destroy(_threadBarrierPtr)
   }
 
   public func wait() {
