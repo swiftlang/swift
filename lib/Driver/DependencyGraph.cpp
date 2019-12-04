@@ -407,17 +407,6 @@ DependencyGraphImpl::markTransitive(SmallVectorImpl<const void *> &visited,
   }
 }
 
-size_t DependencyGraphImpl::countTopLevelProvides(const void *node) const {
-  const auto iter = Provides.find(node);
-  if (iter == Provides.end())
-    return 0;
-  size_t count = 0;
-  for (const auto &entry : iter->getSecond())
-    if (entry.kindMask & DependencyKind::TopLevelName)
-      ++count;
-  return count;
-}
-
 void DependencyGraphImpl::MarkTracerImpl::countStatsForNodeMarking(
   const OptionSet<DependencyKind> &Kind, bool IsCascading) const {
 

@@ -1238,10 +1238,9 @@ CompilerInstance::getPrimarySpecificPathsForSourceFile(
 bool CompilerInstance::emitSwiftRanges(DiagnosticEngine &diags,
                                        SourceFile *primaryFile,
                                        StringRef outputPath) const {
-  if (const auto *ps = PersistentState.get())
-    return incremental_ranges::SwiftRangesEmitter(outputPath, primaryFile, *ps,
-                                                  SourceMgr, diags)
-        .emit();
+  return incremental_ranges::SwiftRangesEmitter(outputPath, primaryFile,
+                                                SourceMgr, diags)
+      .emit();
   return false;
 }
 

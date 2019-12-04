@@ -267,6 +267,9 @@ public:
     assert(verify() && "ModuleDepGraph should be fine when created");
   }
 
+  /// Unlike the standard \c DependencyGraph, returns \c
+  /// DependencyGraphImpl::LoadResult::AffectsDownstream when loading a new
+  /// file, i.e. when determining the initial set. Caller compensates.
   DependencyGraphImpl::LoadResult loadFromPath(const driver::Job *, StringRef,
                                                DiagnosticEngine &);
 
@@ -285,10 +288,6 @@ public:
   void
   forEachMatchingNode(const DependencyKey &key,
                       function_ref<void(const ModuleDepGraphNode *)>) const;
-
-public:
-  // Interface to source-range incremental system
-  size_t countTopLevelProvides(const driver::Job *);
 
 public:
   // This section contains the interface to the status quo code in the driver.
@@ -313,7 +312,7 @@ public:
   /// Record a new (to this graph) Job.
   void addIndependentNode(const driver::Job *);
 
-  std::vector<std::string> getExternalDependencies() const;
+  std::vector<StringRef> getExternalDependencies() const;
 
   void markExternal(SmallVectorImpl<const driver::Job *> &uses,
                     StringRef externalDependency);

@@ -82,7 +82,6 @@ public:
     const bool EnableIncrementalBuildWhenConstructed;
     const bool &EnableIncrementalBuild;
     const bool EnableSourceRangeDependencies;
-    const bool &UseSourceRangeDependencies;
 
     /// If not empty, the path to use to log the comparision.
     const StringRef CompareIncrementalSchemesPath;
@@ -95,38 +94,28 @@ public:
   private:
     DiagnosticEngine &Diags;
 
-    CommandSet DependencyCompileJobs;
-    CommandSet SourceRangeCompileJobs;
-    CommandSet SourceRangeLackingSuppJobs;
+    CommandSet JobsWithoutRanges;
+    CommandSet JobsWithRanges;
 
-    unsigned DependencyCompileStages = 0;
-    unsigned SourceRangeCompileStages = 0;
+    unsigned CompileStagesWithoutRanges = 0;
+    unsigned CompileStagesWithRanges = 0;
 
   public:
     IncrementalSchemeComparator(const bool &EnableIncrementalBuild,
                                 bool EnableSourceRangeDependencies,
-                                const bool &UseSourceRangeDependencies,
                                 const StringRef CompareIncrementalSchemesPath,
                                 unsigned SwiftInputCount,
                                 DiagnosticEngine &Diags)
         : EnableIncrementalBuildWhenConstructed(EnableIncrementalBuild),
           EnableIncrementalBuild(EnableIncrementalBuild),
           EnableSourceRangeDependencies(EnableSourceRangeDependencies),
-          UseSourceRangeDependencies(UseSourceRangeDependencies),
           CompareIncrementalSchemesPath(CompareIncrementalSchemesPath),
           SwiftInputCount(SwiftInputCount), Diags(Diags) {}
 
     /// Record scheduled jobs in support of the
     /// -compare-incremental-schemes[-path] options
-    ///
-    /// \param depJobs A vector-like collection of jobs that the dependency
-    /// scheme would run \param rangeJobs A vector-like collection of jobs that
-    /// the range scheme would run because of changes \param lackingSuppJobs A
-    /// vector-like collection of jobs that the range scheme would run because
-    /// there are no incremental supplementary outputs such as swiftdeps,
-    /// swiftranges, compiledsource
-    void update(const CommandSet &depJobs, const CommandSet &rangeJobs,
-                const CommandSet &lackingSuppJobs);
+    void update(const CommandSet &withoutRangeJobs,
+                const CommandSet &withRangeJobs);
 
     /// Write the information for the -compare-incremental-schemes[-path]
     /// options
@@ -285,9 +274,6 @@ private:
   /// Experiment with source-range-based dependencies
   const bool EnableSourceRangeDependencies;
 
-  /// May not actually use them if e.g. there is a new input
-  bool UseSourceRangeDependencies = false;
-
 public:
   /// Will contain a comparator if an argument demands it.
   Optional<IncrementalSchemeComparator> IncrementalComparator;
@@ -408,14 +394,6 @@ public:
     return EnableSourceRangeDependencies;
   }
 
-  bool getUseSourceRangeDependencies() const {
-    return UseSourceRangeDependencies;
-  }
-
-  void setUseSourceRangeDependencies(bool use) {
-    UseSourceRangeDependencies = use;
-  }
-
   bool getBatchModeEnabled() const {
     return EnableBatchMode;
   }
@@ -514,14 +492,6 @@ public:
 
   /// How many .swift input files?
   unsigned countSwiftInputs() const;
-
-  void updateIncrementalComparison(const CommandSet &depJobs,
-                                   const CommandSet &rangeJobs,
-                                   const CommandSet &lackingSuppJobs) {
-    if (IncrementalComparator.hasValue())
-      IncrementalComparator.getValue().update(depJobs, rangeJobs,
-                                              lackingSuppJobs);
-  }
 
 private:
   /// Perform all jobs.

@@ -115,27 +115,15 @@ bool ModuleDepGraph::markIntransitive(const Job *node) {
   return rememberThatJobCascades(getSwiftDeps(node));
 }
 
-size_t ModuleDepGraph::countTopLevelProvides(const Job *node) {
-  StringRef swiftDeps = getSwiftDeps(node);
-  size_t count = 0;
-  for (auto &keyAndNode : nodeMap[swiftDeps]) {
-    const DependencyKey &k = keyAndNode.first;
-    if (k.getKind() == NodeKind::topLevel &&
-        k.getAspect() == DeclAspect::interface)
-      ++count;
-  }
-  return count;
-}
-
 void ModuleDepGraph::addIndependentNode(const Job *job) {
   // No need to create any nodes; that will happen when the swiftdeps file is
   // read. Just record the correspondence.
   jobsBySwiftDeps.insert(std::make_pair(getSwiftDeps(job), job));
 }
 
-std::vector<std::string> ModuleDepGraph::getExternalDependencies() const {
-  return std::vector<std::string>(externalDependencies.begin(),
-                                  externalDependencies.end());
+std::vector<StringRef> ModuleDepGraph::getExternalDependencies() const {
+  return std::vector<StringRef>(externalDependencies.begin(),
+                                externalDependencies.end());
 }
 
 // Add every (swiftdeps) use of the external dependency to uses.

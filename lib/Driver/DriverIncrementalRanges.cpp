@@ -23,6 +23,7 @@
 #include "llvm/Support/YAMLTraits.h"
 #include "llvm/Support/raw_ostream.h"
 #include <algorithm>
+#include <string>
 #include <unordered_map>
 
 // These are the definitions for managing serializable source locations so that
@@ -39,64 +40,46 @@ using namespace driver;
 //==============================================================================
 
 SourceRangeBasedInfo::SourceRangeBasedInfo(
+    StringRef primaryInputPath,
     SwiftRangesFileContents &&swiftRangesFileContents,
     SourceComparator::LRRanges &&changedRanges, Ranges &&nonlocalChangedRanges)
-    : swiftRangesFileContents(std::move(swiftRangesFileContents)),
+    : primaryInputPath(primaryInputPath),
+      swiftRangesFileContents(std::move(swiftRangesFileContents)),
       changedRanges(std::move(changedRanges)),
-      nonlocalChangedRanges(std::move(nonlocalChangedRanges)) {}
+      nonlocalChangedRanges(std::move(nonlocalChangedRanges)) {
+  assert(!primaryInputPath.empty() && "Must be a compile job");
+}
 
 SourceRangeBasedInfo::SourceRangeBasedInfo(SourceRangeBasedInfo &&x)
-    : swiftRangesFileContents(std::move(x.swiftRangesFileContents)),
+    : primaryInputPath(x.primaryInputPath),
+      swiftRangesFileContents(std::move(x.swiftRangesFileContents)),
       changedRanges(std::move(x.changedRanges)),
       nonlocalChangedRanges(std::move(x.nonlocalChangedRanges)) {}
-
-/// TODO: optimize by using no entry intead of the wholeFileChanged entry
-Optional<SourceRangeBasedInfo> SourceRangeBasedInfo::wholeFileChanged() {
-  return SourceRangeBasedInfo(SwiftRangesFileContents(),
-                              SourceComparator::LRRanges::wholeFile(),
-                              SerializableSourceRange::RangesForWholeFile());
-}
 
 //==============================================================================
 // MARK: loading
 //==============================================================================
 
-llvm::StringMap<SourceRangeBasedInfo>
-SourceRangeBasedInfo ::loadAllInfo(const Compilation &Comp) {
-  const auto &jobs = Comp.getJobs();
-  auto &diags = Comp.getDiags();
-  const auto showIncrementalBuildDecisions =
-      Comp.getShowIncrementalBuildDecisions();
+Optional<SourceRangeBasedInfo> SourceRangeBasedInfo::loadInfoForOneJob(
+    const Job *cmd, const bool showIncrementalBuildDecisions,
+    DiagnosticEngine &diags) {
+  StringRef primaryInputPath = cmd->getFirstSwiftPrimaryInput();
+  if (primaryInputPath.empty())
+    return None;
 
-  llvm::StringMap<SourceRangeBasedInfo> allInfos;
+  const StringRef compiledSourcePath =
+      cmd->getOutput().getAdditionalOutputForType(
+          file_types::TY_CompiledSource);
+  const StringRef swiftRangesPath =
+      cmd->getOutput().getAdditionalOutputForType(file_types::TY_SwiftRanges);
 
-  for (const auto *Cmd : jobs) {
-    StringRef primaryPath = Cmd->getFirstSwiftPrimaryInput();
-
-    if (primaryPath.empty())
-      continue;
-
-    const StringRef compiledSourcePath =
-        Cmd->getOutput().getAdditionalOutputForType(
-            file_types::TY_CompiledSource);
-    const StringRef swiftRangesPath =
-        Cmd->getOutput().getAdditionalOutputForType(file_types::TY_SwiftRanges);
-
-    auto info =
-        loadInfoForOnePrimary(primaryPath, compiledSourcePath, swiftRangesPath,
-                              showIncrementalBuildDecisions, diags);
-    if (!info)
-      continue;
-    const auto iter =
-        allInfos.insert({primaryPath, std::move(info.getValue())});
-    (void)iter;
-    assert(iter.second && "should not be already there");
-  }
-  return allInfos;
+  return loadInfoForOnePrimary(primaryInputPath, compiledSourcePath,
+                               swiftRangesPath, showIncrementalBuildDecisions,
+                               diags);
 }
 
 Optional<SourceRangeBasedInfo> SourceRangeBasedInfo::loadInfoForOnePrimary(
-    StringRef primaryPath, StringRef compiledSourcePath,
+    StringRef primaryInputPath, StringRef compiledSourcePath,
     StringRef swiftRangesPath, bool showIncrementalBuildDecisions,
     DiagnosticEngine &diags) {
 
@@ -107,22 +90,21 @@ Optional<SourceRangeBasedInfo> SourceRangeBasedInfo::loadInfoForOnePrimary(
       llvm::errs() << "WARNING could not remove: " << swiftRangesPath;
   };
 
-  assert(!primaryPath.empty() && "Must have a primary to load info.");
+  assert(!primaryInputPath.empty() && "Must have a primary to load info.");
 
   // nonexistant primary -> it was removed since invoking swift?!
-  if (!llvm::sys::fs::exists(primaryPath)) {
+  if (!llvm::sys::fs::exists(primaryInputPath)) {
     if (showIncrementalBuildDecisions)
-      llvm::outs() << primaryPath << " was removed.";
+      llvm::outs() << primaryInputPath << " was removed.";
     // so they won't be used if primary gets re-added
     removeSupplementaryPaths();
-    // Force any other file that parsed something in this one to be rebuilt.
-    return wholeFileChanged();
+    return None;
   }
 
   auto swiftRangesFileContents = loadSwiftRangesFileContents(
-      swiftRangesPath, primaryPath, showIncrementalBuildDecisions, diags);
+      swiftRangesPath, primaryInputPath, showIncrementalBuildDecisions, diags);
 
-  auto changedRanges = loadChangedRanges(compiledSourcePath, primaryPath,
+  auto changedRanges = loadChangedRanges(compiledSourcePath, primaryInputPath,
                                          showIncrementalBuildDecisions, diags);
 
   if (!swiftRangesFileContents || !changedRanges) {
@@ -132,14 +114,14 @@ Optional<SourceRangeBasedInfo> SourceRangeBasedInfo::loadInfoForOnePrimary(
 
   Ranges nonlocalChangedRanges = computeNonlocalChangedRanges(
       swiftRangesFileContents.getValue(), changedRanges.getValue());
-  return SourceRangeBasedInfo(std::move(swiftRangesFileContents.getValue()),
-                              std::move(changedRanges.getValue()),
-                              std::move(nonlocalChangedRanges));
+  return SourceRangeBasedInfo(
+      primaryInputPath, std::move(swiftRangesFileContents.getValue()),
+      std::move(changedRanges.getValue()), std::move(nonlocalChangedRanges));
 }
 
 Optional<SwiftRangesFileContents>
 SourceRangeBasedInfo::loadSwiftRangesFileContents(
-    const StringRef swiftRangesPath, const StringRef primaryPath,
+    const StringRef swiftRangesPath, const StringRef primaryInputPath,
     const bool showIncrementalBuildDecisions, DiagnosticEngine &diags) {
   auto bufferOrError = llvm::MemoryBuffer::getFile(swiftRangesPath);
   if (auto ec = bufferOrError.getError()) {
@@ -147,17 +129,17 @@ SourceRangeBasedInfo::loadSwiftRangesFileContents(
                    swiftRangesPath, ec.message());
     return None;
   }
-  return SwiftRangesFileContents::load(primaryPath, *bufferOrError->get(),
+  return SwiftRangesFileContents::load(primaryInputPath, *bufferOrError->get(),
                                        showIncrementalBuildDecisions, diags);
 }
 
 Optional<SourceComparator::LRRanges> SourceRangeBasedInfo::loadChangedRanges(
-    const StringRef compiledSourcePath, const StringRef primaryPath,
+    const StringRef compiledSourcePath, const StringRef primaryInputPath,
     const bool showIncrementalBuildDecisions, DiagnosticEngine &diags) {
 
   // Shortcut the diff if the saved source is newer than the actual source.
-  auto isPreviouslyCompiledNewer = isFileNewerThan(compiledSourcePath,
-                                                   primaryPath, diags);
+  auto isPreviouslyCompiledNewer =
+      isFileNewerThan(compiledSourcePath, primaryInputPath, diags);
   if (!isPreviouslyCompiledNewer)
     return None;
   if (isPreviouslyCompiledNewer.getValue())
@@ -171,10 +153,10 @@ Optional<SourceComparator::LRRanges> SourceRangeBasedInfo::loadChangedRanges(
     return None;
   }
 
-  auto whatIsAboutToBeCompiled = llvm::MemoryBuffer::getFile(primaryPath);
+  auto whatIsAboutToBeCompiled = llvm::MemoryBuffer::getFile(primaryInputPath);
   if (auto ec = whatIsAboutToBeCompiled.getError()) {
-    diags.diagnose(SourceLoc(), diag::warn_unable_to_load_primary, primaryPath,
-                   ec.message());
+    diags.diagnose(SourceLoc(), diag::warn_unable_to_load_primary,
+                   primaryInputPath, ec.message());
     return None;
   }
   // SourceComparator::test();
@@ -183,6 +165,26 @@ Optional<SourceComparator::LRRanges> SourceRangeBasedInfo::loadChangedRanges(
   comp.compare();
   // lhs in terms of old version
   return comp.convertAllMismatches();
+}
+
+/// Return true if lhs is newer than rhs, or None for error.
+Optional<bool> SourceRangeBasedInfo::isFileNewerThan(StringRef lhs,
+                                                     StringRef rhs,
+                                                     DiagnosticEngine &diags) {
+  auto getModTime = [&](StringRef path) -> Optional<llvm::sys::TimePoint<>> {
+    llvm::sys::fs::file_status status;
+    if (auto statError = llvm::sys::fs::status(path, status)) {
+      diags.diagnose(SourceLoc(), diag::warn_cannot_stat_input,
+                     llvm::sys::path::filename(path), statError.message());
+      return None;
+    }
+    return status.getLastModificationTime();
+  };
+  const auto lhsModTime = getModTime(lhs);
+  const auto rhsModTime = getModTime(rhs);
+  return !lhsModTime || !rhsModTime
+             ? None
+             : Optional<bool>(lhsModTime.getValue() > rhsModTime.getValue());
 }
 
 Optional<SwiftRangesFileContents> SwiftRangesFileContents::load(
@@ -219,105 +221,56 @@ Ranges SourceRangeBasedInfo::computeNonlocalChangedRanges(
 // MARK: scheduling
 //==============================================================================
 
-bool SourceRangeBasedInfo::shouldScheduleCompileJob(
-    const llvm::StringMap<SourceRangeBasedInfo> &allInfos, const Job *Cmd,
-    function_ref<void(bool, Twine)> noteBuilding) {
-  const auto primary = Cmd->getFirstSwiftPrimaryInput();
-  if (primary.empty())
-    return false; // not a compile
-
-  auto iter = allInfos.find(primary);
-  if (iter == allInfos.end()) {
-    noteBuilding(true, "(could not obtain range info from frontend)");
-    return true;
-  }
-  if (!iter->second.changedRanges.empty()) {
-    noteBuilding(true, "(this file changed)");
-    return true;
-  }
-  return iter->second.didPrimaryParseAnyNonlocalNonprimaryChanges(
-      llvm::sys::path::filename(primary), allInfos, noteBuilding);
+static std::string rangeStrings(std::string prefix, const Ranges &ranges) {
+  std::string s = prefix;
+  interleave(ranges.begin(), ranges.end(),
+             [&](const SerializableSourceRange &r) { s += r.printString(); },
+             [&] { s += ", "; });
+  return s;
 }
 
-bool SourceRangeBasedInfo::didPrimaryParseAnyNonlocalNonprimaryChanges(
-    StringRef primary, const llvm::StringMap<SourceRangeBasedInfo> &allInfos,
-    function_ref<void(bool, Twine)> noteBuilding) const {
-  return !wasEveryNonprimaryNonlocalChangeUnparsed(primary, allInfos,
-                                                   noteBuilding);
+bool SourceRangeBasedInfo::didInputChangeAtAll(
+    DiagnosticEngine &,
+    function_ref<void(bool, StringRef)> noteBuilding) const {
+  const auto &changesToOldSource = changedRanges.lhs();
+  if (changesToOldSource.empty())
+    noteBuilding(/*willBeBuilding=*/false, "Did not change at all");
+  else
+    noteBuilding(/*willBeBuilding=*/true,
+                 rangeStrings("changed at ", changesToOldSource));
+  return !changesToOldSource.empty();
 }
 
-bool SourceRangeBasedInfo::wasEveryNonprimaryNonlocalChangeUnparsed(
-    StringRef primary, const llvm::StringMap<SourceRangeBasedInfo> &allInfos,
-    function_ref<void(bool, Twine)> noteBuilding) const {
-
-  const auto &myUnparsedRangesByNonPri =
-      swiftRangesFileContents.unparsedRangesByNonPrimary;
-  for (const auto &info : allInfos) {
-    const auto nonPri = info.getKey();
-    const auto &nonPriInfo = info.getValue();
-    if (nonPri == primary || nonPriInfo.nonlocalChangedRanges.empty())
-      continue;
-    auto unparsedRanges = myUnparsedRangesByNonPri.find(nonPri);
-    const auto nonPriFilename = llvm::sys::path::filename(nonPri);
-    if (unparsedRanges == myUnparsedRangesByNonPri.end()) {
-      noteBuilding(
-          true, Twine(nonPriFilename) +
-                    " changed non-locally but I have no unparsed ranges there");
-      return false;
-    }
-    const auto whatChanged = SerializableSourceRange::findOutlierIfAny(
-        nonPriInfo.nonlocalChangedRanges, unparsedRanges->second);
-    if (whatChanged) {
-      noteBuilding(true, Twine("(changed: ") + nonPriFilename + ":" +
-                             whatChanged->printString() + ")");
-      return false;
-    }
-  }
-  noteBuilding(false,
-               "nothing that this file parsed changed in any other file");
-  return true;
+bool SourceRangeBasedInfo::didInputChangeNonlocally(
+    DiagnosticEngine &,
+    function_ref<void(bool, StringRef)> noteInitiallyCascading) const {
+  if (nonlocalChangedRanges.empty())
+    noteInitiallyCascading(false, "did not change outside any function bodies");
+  else
+    noteInitiallyCascading(true,
+                           rangeStrings("changed outside a function body at: ",
+                                        nonlocalChangedRanges));
+  return !nonlocalChangedRanges.empty();
 }
 
-/// Return true if lhs is newer than rhs, or None for error.
-Optional<bool> SourceRangeBasedInfo::isFileNewerThan(StringRef lhs,
-                                                     StringRef rhs,
-                                                     DiagnosticEngine &diags) {
-  auto getModTime = [&](StringRef path) -> Optional<llvm::sys::TimePoint<>> {
-    llvm::sys::fs::file_status status;
-    if (auto statError = llvm::sys::fs::status(path, status)) {
-      diags.diagnose(SourceLoc(), diag::warn_cannot_stat_input,
-                     llvm::sys::path::filename(path), statError.message());
-      return None;
-    }
-    return status.getLastModificationTime();
-  };
-  const auto lhsModTime = getModTime(lhs);
-  const auto rhsModTime = getModTime(rhs);
-  return !lhsModTime || !rhsModTime
-             ? None
-             : Optional<bool>(lhsModTime.getValue() > rhsModTime.getValue());
-}
 
 //==============================================================================
 // MARK: SourceRangeBasedInfo - printing
 //==============================================================================
 
-void SourceRangeBasedInfo ::dumpAllInfo(
-    const llvm::StringMap<SourceRangeBasedInfo> &allInfos,
-    const bool dumpCompiledSourceDiffs, const bool dumpSwiftRanges) {
+void SourceRangeBasedInfo::dump(const bool dumpCompiledSourceDiffs,
+                                const bool dumpSwiftRanges) const {
   if (!dumpSwiftRanges && !dumpCompiledSourceDiffs)
     return;
-  for (const auto &info : allInfos) {
-    const auto filename = llvm::sys::path::filename(info.getKey());
-    if (dumpSwiftRanges)
-      info.getValue().swiftRangesFileContents.dump(filename);
-    if (dumpCompiledSourceDiffs)
-      info.getValue().dumpChangedRanges(filename);
-  }
+  if (dumpSwiftRanges)
+    swiftRangesFileContents.dump(primaryInputPath);
+  if (dumpCompiledSourceDiffs)
+    dumpChangedRanges();
 }
 
-void SourceRangeBasedInfo::dumpChangedRanges(
-    const StringRef primaryFilename) const {
+void SourceRangeBasedInfo::dumpChangedRanges() const {
+  const auto primaryFilename = llvm::sys::path::filename(primaryInputPath);
+
   auto dumpRangeSet = [&](StringRef which, StringRef wrt,
                           const Ranges &ranges) {
     llvm::errs() << "*** " << which << " changed ranges in '" << primaryFilename
