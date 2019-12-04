@@ -4114,9 +4114,6 @@ llvm::Error DeclDeserializer::deserializeDeclAttributes() {
         serialization::decls_block::DynamicReplacementDeclAttrLayout::
             readRecord(scratch, isImplicit, replacedFunID, numArgs, rawPieceIDs);
 
-        auto replacedFunDecl = MF.getDeclChecked(replacedFunID);
-        if (!replacedFunDecl)
-          return replacedFunDecl.takeError();
         auto baseName = MF.getDeclBaseName(rawPieceIDs[0]);
         SmallVector<Identifier, 4> pieces;
         for (auto pieceID : rawPieceIDs.slice(1))
@@ -4125,8 +4122,8 @@ llvm::Error DeclDeserializer::deserializeDeclAttributes() {
         assert(numArgs != 0);
         assert(!isImplicit && "Need to update for implicit");
         Attr = DynamicReplacementAttr::create(
-            ctx, DeclName(ctx, baseName, ArrayRef<Identifier>(pieces)),
-            cast<AbstractFunctionDecl>(*replacedFunDecl));
+            ctx, DeclName(ctx, baseName, ArrayRef<Identifier>(pieces)), &MF,
+            replacedFunID);
         break;
       }
 
@@ -5455,6 +5452,11 @@ Type
 ModuleFile::loadAssociatedTypeDefault(const swift::AssociatedTypeDecl *ATD,
                                       uint64_t contextData) {
   return getType(contextData);
+}
+
+ValueDecl *ModuleFile::loadDynamicallyReplacedFunctionDecl(
+    const DynamicReplacementAttr *DRA, uint64_t contextData) {
+  return cast<ValueDecl>(getDecl(contextData));
 }
 
 void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
