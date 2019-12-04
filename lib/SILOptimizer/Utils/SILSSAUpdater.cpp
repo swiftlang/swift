@@ -221,7 +221,7 @@ SILValue SILSSAUpdater::GetValueInMiddleOfBlock(SILBasicBlock *BB) {
   if (!BB->getArguments().empty()) {
     llvm::SmallDenseMap<SILBasicBlock *, SILValue, 8> ValueMap(PredVals.begin(),
                                                                PredVals.end());
-    for (auto *Arg : BB->getPhiArguments())
+    for (auto *Arg : BB->getSILPhiArguments())
       if (isEquivalentPHI(Arg, ValueMap))
         return Arg;
 
@@ -438,7 +438,7 @@ UseWrapper::UseWrapper(Operand *Use) {
 }
 
 /// Return the operand we wrap. Reconstructing branch operands.
-UseWrapper::operator Operand *() {
+Operand *UseWrapper::getOperand() {
   switch (Type) {
   case kRegularUse:
     return U;

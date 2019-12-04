@@ -234,6 +234,11 @@ static bool areOverrideCompatibleSimple(ValueDecl *decl,
     return false;
   }
 
+  // Ignore declarations that are defined inside constrained extensions.
+  if (auto *ext = dyn_cast<ExtensionDecl>(parentDecl->getDeclContext()))
+    if (ext->isConstrainedExtension())
+      return false;
+
   // The declarations must be of the same kind.
   if (decl->getKind() != parentDecl->getKind())
     return false;
@@ -281,9 +286,6 @@ diagnoseMismatchedOptionals(const ValueDecl *member,
   auto checkParam = [&](const ParamDecl *decl, const ParamDecl *parentDecl) {
     Type paramTy = decl->getType();
     Type parentParamTy = parentDecl->getType();
-
-    if (!paramTy || !parentParamTy)
-      return;
 
     auto *repr = decl->getTypeRepr();
     if (!repr)
@@ -1169,6 +1171,11 @@ bool swift::checkOverrides(ValueDecl *decl) {
     // Otherwise, we have more checking to do.
   }
 
+  // Members of constrained extensions are not considered to be overrides.
+  if (auto *ext = dyn_cast<ExtensionDecl>(decl->getDeclContext()))
+    if (ext->isConstrainedExtension())
+      return false;
+
   // Accessor methods get overrides through their storage declaration, and
   // all checking can be performed via that mechanism.
   if (isa<AccessorDecl>(decl)) {
@@ -1279,12 +1286,14 @@ namespace  {
     UNINTERESTING_ATTR(Exported)
     UNINTERESTING_ATTR(ForbidSerializingReference)
     UNINTERESTING_ATTR(GKInspectable)
+    UNINTERESTING_ATTR(HasMissingDesignatedInitializers)
     UNINTERESTING_ATTR(IBAction)
     UNINTERESTING_ATTR(IBDesignable)
     UNINTERESTING_ATTR(IBInspectable)
     UNINTERESTING_ATTR(IBOutlet)
     UNINTERESTING_ATTR(IBSegueAction)
     UNINTERESTING_ATTR(Indirect)
+    UNINTERESTING_ATTR(InheritsConvenienceInitializers)
     UNINTERESTING_ATTR(Inline)
     UNINTERESTING_ATTR(Optimize)
     UNINTERESTING_ATTR(Inlinable)
@@ -1320,6 +1329,9 @@ namespace  {
     UNINTERESTING_ATTR(DynamicReplacement)
     UNINTERESTING_ATTR(PrivateImport)
 
+    // Differentiation-related attributes.
+    UNINTERESTING_ATTR(Differentiable)
+
     // These can't appear on overridable declarations.
     UNINTERESTING_ATTR(Prefix)
     UNINTERESTING_ATTR(Postfix)
@@ -1349,6 +1361,7 @@ namespace  {
     UNINTERESTING_ATTR(DisfavoredOverload)
     UNINTERESTING_ATTR(FunctionBuilder)
     UNINTERESTING_ATTR(ProjectedValueProperty)
+    UNINTERESTING_ATTR(OriginallyDefinedIn)
 #undef UNINTERESTING_ATTR
 
     void visitAvailableAttr(AvailableAttr *attr) {

@@ -66,12 +66,13 @@ internal func osLog(
   let preamble = message.interpolation.preamble
   let argumentCount = message.interpolation.argumentCount
   let bufferSize = message.bufferSize
+  let uint32bufferSize = UInt32(bufferSize)
+  let argumentClosures = message.interpolation.arguments.argumentClosures
+
   let formatStringPointer = _getGlobalStringTablePointer(formatString)
 
   // Code that will execute at runtime.
   guard logObject.isEnabled(type: logLevel) else { return }
-
-  let arguments = message.interpolation.arguments
 
   // Allocate a byte buffer to store the arguments. The buffer could be stack
   // allocated as it is local to this function and also its size is a
@@ -84,14 +85,14 @@ internal func osLog(
   var currentBufferPosition = bufferMemory
   serialize(preamble, at: &currentBufferPosition)
   serialize(argumentCount, at: &currentBufferPosition)
-  arguments.serializeAt(&currentBufferPosition, using: &stringStorageObjects)
+  argumentClosures.forEach { $0(&currentBufferPosition, &stringStorageObjects) }
 
   ___os_log_impl(UnsafeMutableRawPointer(mutating: #dsohandle),
                  logObject,
                  logLevel,
                  formatStringPointer,
                  bufferMemory,
-                 UInt32(bufferSize))
+                 uint32bufferSize)
 
   // The following operation extends the lifetime of stringStorageObjects
   // and also of the objects stored in it till this point.
@@ -120,6 +121,7 @@ func _checkFormatStringAndBuffer(
   let preamble = message.interpolation.preamble
   let argumentCount = message.interpolation.argumentCount
   let bufferSize = message.bufferSize
+  let argumentClosures = message.interpolation.arguments.argumentClosures
 
   // Code that will execute at runtime.
   let bufferMemory = UnsafeMutablePointer<UInt8>.allocate(capacity: bufferSize)
@@ -128,9 +130,7 @@ func _checkFormatStringAndBuffer(
   var currentBufferPosition = bufferMemory
   serialize(preamble, at: &currentBufferPosition)
   serialize(argumentCount, at: &currentBufferPosition)
-  message.interpolation.arguments.serializeAt(
-    &currentBufferPosition,
-    using: &stringStorageObjects)
+  argumentClosures.forEach { $0(&currentBufferPosition, &stringStorageObjects) }
 
   assertion(
     formatString,

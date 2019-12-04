@@ -83,6 +83,22 @@ struct SupplementaryOutputPaths {
   /// \sa DependencyGraph
   std::string ReferenceDependenciesFilePath;
 
+  /// The path to which we should output a Swift "unparsed ranges" file.
+  /// It is valid whenever there are any inputs.
+  ///
+  /// "Unparsed ranges" track source ranges in non-primary files whose parsing
+  /// was skipped
+  /// (a.k.a. "delayed).\
+  /// These files are consumed by the Swift driver (or will be someday) to
+  /// decide whether a source file needs to be recompiled during a build.
+  ///
+  /// \sa swift::emitSwiftRanges
+  std::string SwiftRangesFilePath;
+
+  /// The path to which we should save the source code of a primary source file
+  /// to be compiled. Used to diff sources of primary inputs.
+  std::string CompiledSourceFilePath;
+
   /// Path to a file which should contain serialized diagnostics for this
   /// frontend invocation.
   ///

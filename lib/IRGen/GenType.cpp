@@ -1262,13 +1262,11 @@ TypeConverter::~TypeConverter() {
   }
 }
 
-void TypeConverter::pushGenericContext(CanGenericSignature signature) {
+void TypeConverter::setGenericContext(CanGenericSignature signature) {
   if (!signature)
     return;
   
-  // Push the generic context down to the SIL TypeConverter, so we can share
-  // archetypes with SIL.
-  IGM.getSILTypes().pushGenericContext(signature);
+  CurGenericSignature = signature;
 
   // Clear the dependent type info cache since we have a new active signature
   // now.
@@ -1277,21 +1275,12 @@ void TypeConverter::pushGenericContext(CanGenericSignature signature) {
   Types.getCacheFor(/*isDependent*/ true, Mode::CompletelyFragile).clear();
 }
 
-void TypeConverter::popGenericContext(CanGenericSignature signature) {
-  if (!signature)
-    return;
-
-  // Pop the SIL TypeConverter's generic context too.
-  IGM.getSILTypes().popGenericContext(signature);
-  
-  Types.getCacheFor(/*isDependent*/ true, Mode::Normal).clear();
-  Types.getCacheFor(/*isDependent*/ true, Mode::Legacy).clear();
-  Types.getCacheFor(/*isDependent*/ true, Mode::CompletelyFragile).clear();
+CanGenericSignature IRGenModule::getCurGenericContext() {
+  return Types.getCurGenericContext();
 }
 
 GenericEnvironment *TypeConverter::getGenericEnvironment() {
-  auto genericSig = IGM.getSILTypes().getCurGenericContext();
-  return genericSig->getCanonicalSignature()->getGenericEnvironment();
+  return CurGenericSignature->getGenericEnvironment();
 }
 
 GenericEnvironment *IRGenModule::getGenericEnvironment() {
@@ -1466,25 +1455,25 @@ const TypeInfo &IRGenFunction::getTypeInfo(SILType T) {
 
 /// Return the SIL-lowering of the given type.
 SILType IRGenModule::getLoweredType(AbstractionPattern orig, Type subst) const {
-  return getSILTypes().getLoweredType(orig, subst,
-                                      ResilienceExpansion::Maximal);
+  return getSILTypes().getLoweredType(
+      orig, subst, TypeExpansionContext::maximalResilienceExpansionOnly());
 }
 
 /// Return the SIL-lowering of the given type.
 SILType IRGenModule::getLoweredType(Type subst) const {
-  return getSILTypes().getLoweredType(subst,
-                                      ResilienceExpansion::Maximal);
+  return getSILTypes().getLoweredType(
+      subst, TypeExpansionContext::maximalResilienceExpansionOnly());
 }
 
 /// Return the SIL-lowering of the given type.
 const Lowering::TypeLowering &IRGenModule::getTypeLowering(SILType type) const {
-  return getSILTypes().getTypeLowering(type,
-                                       ResilienceExpansion::Maximal);
+  return getSILTypes().getTypeLowering(
+      type, TypeExpansionContext::maximalResilienceExpansionOnly());
 }
 
 bool IRGenModule::isTypeABIAccessible(SILType type) const {
-  return getSILModule().isTypeABIAccessible(type,
-                                            ResilienceExpansion::Maximal);
+  return getSILModule().isTypeABIAccessible(
+      type, TypeExpansionContext::maximalResilienceExpansionOnly());
 }
 
 /// Get a pointer to the storage type for the given type.  Note that,
@@ -2307,7 +2296,10 @@ SILType irgen::getSingletonAggregateFieldType(IRGenModule &IGM, SILType t,
     auto allFields = structDecl->getStoredProperties();
     
     if (allFields.size() == 1) {
-      auto fieldTy = t.getFieldType(allFields[0], IGM.getSILModule());
+      auto fieldTy = t.getFieldType(
+          allFields[0], IGM.getSILModule(),
+          TypeExpansionContext(expansion, IGM.getSwiftModule(),
+                               IGM.getSILModule().isWholeModule()));
       if (!IGM.isTypeABIAccessible(fieldTy))
         return SILType();
       return fieldTy;
@@ -2327,7 +2319,10 @@ SILType irgen::getSingletonAggregateFieldType(IRGenModule &IGM, SILType t,
     auto theCase = allCases.begin();
     if (!allCases.empty() && std::next(theCase) == allCases.end()
         && (*theCase)->hasAssociatedValues()) {
-      auto enumEltTy = t.getEnumElementType(*theCase, IGM.getSILModule());
+      auto enumEltTy = t.getEnumElementType(
+          *theCase, IGM.getSILModule(),
+          TypeExpansionContext(expansion, IGM.getSwiftModule(),
+                               IGM.getSILModule().isWholeModule()));
       if (!IGM.isTypeABIAccessible(enumEltTy))
         return SILType();
       return enumEltTy;

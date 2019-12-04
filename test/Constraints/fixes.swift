@@ -167,8 +167,9 @@ struct S1116 {
 }
 
 let a1116: [S1116] = []
-var s1116 = Set(1...10).subtracting(a1116.map({ $0.s })) // expected-error {{cannot convert value of type '[Int?]' to expected argument type 'Set<Int>'}}
-
+var s1116 = Set(1...10).subtracting(a1116.map({ $0.s })) // expected-error {{value of optional type 'Int?' must be unwrapped to a value of type 'Int'}}
+// expected-note@-1{{coalesce using '??' to provide a default when the optional value contains 'nil'}} {{49-49=(}} {{53-53= ?? <#default value#>)}}
+// expected-note@-2{{force-unwrap using '!' to abort execution if the optional value contains 'nil'}} {{53-53=!}}
 
 func moreComplexUnwrapFixes() {
   struct S {
@@ -198,14 +199,14 @@ func moreComplexUnwrapFixes() {
   // expected-note@-2{{force-unwrap using '!'}}{{12-12=!}}
 
   takeOpt(t.optS.value) // expected-error{{value of optional type 'T?' must be unwrapped to refer to member 'optS' of wrapped base type 'T'}}
-  // expected-note@-1{{chain the optional using '?'}}{{17-17=?}}
+  // expected-note@-1{{chain the optional using '?'}}{{12-12=?}}
   // expected-error@-2{{value of optional type 'S?' must be unwrapped to refer to member 'value' of wrapped base type 'S'}}
-  // expected-note@-3{{chain the optional using '?'}}{{12-12=?}}
+  // expected-note@-3{{chain the optional using '?'}}{{17-17=?}}
 
   takeNon(t.optS.value) // expected-error{{value of optional type 'T?' must be unwrapped to refer to member 'optS' of wrapped base type 'T'}}
-  // expected-note@-1{{chain the optional using '?'}}{{17-17=?}}
+  // expected-note@-1{{chain the optional using '?'}}{{12-12=?}}
   // expected-error@-2{{value of optional type 'S?' must be unwrapped to refer to member 'value' of wrapped base type 'S'}}
-  // expected-note@-3{{chain the optional using '?'}}{{12-12=?}}
+  // expected-note@-3{{chain the optional using '?'}}{{17-17=?}}
   // expected-note@-4{{force-unwrap using '!'}}{{17-17=!}}
 
   takeNon(os?.value) // expected-error{{value of optional type 'Int?' must be unwrapped to a value of type 'Int'}}

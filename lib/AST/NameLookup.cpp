@@ -65,6 +65,68 @@ ValueDecl *LookupResultEntry::getBaseDecl() const {
   return nominalDecl;
 }
 
+void LookupResult::filter(
+    llvm::function_ref<bool(LookupResultEntry, bool)> pred) {
+  size_t index = 0;
+  size_t originalFirstOuter = IndexOfFirstOuterResult;
+  Results.erase(std::remove_if(Results.begin(), Results.end(),
+                               [&](LookupResultEntry result) -> bool {
+                                 auto isInner = index < originalFirstOuter;
+                                 index++;
+                                 if (pred(result, !isInner))
+                                   return false;
+
+                                 // Need to remove this, which means, if it is
+                                 // an inner result, the outer results need to
+                                 // shift down.
+                                 if (isInner)
+                                   IndexOfFirstOuterResult--;
+                                 return true;
+                               }),
+                Results.end());
+}
+
+void LookupResult::shiftDownResults() {
+  // Remove inner results.
+  Results.erase(Results.begin(), Results.begin() + IndexOfFirstOuterResult);
+  IndexOfFirstOuterResult = 0;
+
+  if (Results.empty())
+    return;
+
+  // Compute IndexOfFirstOuterResult.
+  const DeclContext *dcInner = Results.front().getValueDecl()->getDeclContext();
+  for (auto &&result : Results) {
+    const DeclContext *dc = result.getValueDecl()->getDeclContext();
+    if (dc == dcInner ||
+        (dc->isModuleScopeContext() && dcInner->isModuleScopeContext()))
+      ++IndexOfFirstOuterResult;
+    else
+      break;
+  }
+}
+
+void swift::simple_display(llvm::raw_ostream &out,
+                           UnqualifiedLookupOptions options) {
+  using Flag = std::pair<UnqualifiedLookupFlags, StringRef>;
+  Flag possibleFlags[] = {
+      {UnqualifiedLookupFlags::AllowProtocolMembers, "AllowProtocolMembers"},
+      {UnqualifiedLookupFlags::IgnoreAccessControl, "IgnoreAccessControl"},
+      {UnqualifiedLookupFlags::IncludeOuterResults, "IncludeOuterResults"},
+      {UnqualifiedLookupFlags::KnownPrivate, "KnownPrivate"},
+      {UnqualifiedLookupFlags::TypeLookup, "TypeLookup"},
+  };
+
+  auto flagsToPrint = llvm::make_filter_range(
+      possibleFlags, [&](Flag flag) { return options.contains(flag.first); });
+
+  out << "{ ";
+  interleave(
+      flagsToPrint, [&](Flag flag) { out << flag.second; },
+      [&] { out << ", "; });
+  out << " }";
+}
+
 void DebuggerClient::anchor() {}
 
 void AccessFilteringDeclConsumer::foundDecl(
@@ -1589,7 +1651,6 @@ bool DeclContext::lookupQualified(ArrayRef<NominalTypeDecl *> typeDecls,
   // Visit all of the nominal types we know about, discovering any others
   // we need along the way.
   auto &ctx = getASTContext();
-  auto typeResolver = ctx.getLazyResolver();
   bool wantProtocolMembers = (options & NL_ProtocolMembers);
   while (!stack.empty()) {
     auto current = stack.back();
@@ -1599,7 +1660,7 @@ bool DeclContext::lookupQualified(ArrayRef<NominalTypeDecl *> typeDecls,
       tracker->addUsedMember({current, member.getBaseName()},isLookupCascading);
 
     // Make sure we've resolved implicit members, if we need them.
-    if (typeResolver) {
+    if (ctx.areSemanticQueriesEnabled()) {
       current->synthesizeSemanticMembersIfNeeded(member);
       installPropertyWrapperMembersIfNeeded(current, member);
     }
@@ -1914,14 +1975,17 @@ directReferencesForUnqualifiedTypeLookup(DeclName name,
                                          SourceLoc loc, DeclContext *dc,
                                          LookupOuterResults lookupOuter) {
   DirectlyReferencedTypeDecls results;
-  UnqualifiedLookup::Options options =
-      UnqualifiedLookup::Flags::TypeLookup |
-      UnqualifiedLookup::Flags::AllowProtocolMembers;
+  UnqualifiedLookupOptions options =
+      UnqualifiedLookupFlags::TypeLookup |
+      UnqualifiedLookupFlags::AllowProtocolMembers;
   if (lookupOuter == LookupOuterResults::Included)
-    options |= UnqualifiedLookup::Flags::IncludeOuterResults;
+    options |= UnqualifiedLookupFlags::IncludeOuterResults;
 
-  UnqualifiedLookup lookup(name, dc, loc, options);
-  for (const auto &result : lookup.Results) {
+  auto &ctx = dc->getASTContext();
+  auto descriptor = UnqualifiedLookupDescriptor(name, dc, loc, options);
+  auto lookup = evaluateOrDefault(ctx.evaluator,
+                                  UnqualifiedLookupRequest{descriptor}, {});
+  for (const auto &result : lookup.allResults()) {
     if (auto typeDecl = dyn_cast<TypeDecl>(result.getValueDecl()))
       results.push_back(typeDecl);
   }
@@ -2371,6 +2435,27 @@ swift::getDirectlyInheritedNominalTypeDecls(
   // FIXME: Refactor SelfBoundsFromWhereClauseRequest to dig out
   // the source location.
   SourceLoc loc = SourceLoc();
+
+  // For a deserialized protocol, the where clause isn't going to tell us
+  // anything. Ask the requirement signature instead.
+  if (protoDecl->wasDeserialized()) {
+    auto protoSelfTy = protoDecl->getSelfInterfaceType();
+    for (auto &req : protoDecl->getRequirementSignature()) {
+      // Dig out a conformance requirement...
+      if (req.getKind() != RequirementKind::Conformance)
+        continue;
+
+      // constraining Self.
+      if (!req.getFirstType()->isEqual(protoSelfTy))
+        continue;
+
+      result.emplace_back(
+          loc, req.getSecondType()->castTo<ProtocolType>()->getDecl());
+    }
+    return result;
+  }
+
+  // Else we have access to this information on the where clause.
   auto selfBounds = getSelfBoundsFromWhereClause(decl);
   anyObject |= selfBounds.anyObject;
 

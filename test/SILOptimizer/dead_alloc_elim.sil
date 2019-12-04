@@ -354,7 +354,7 @@ sil @trivial_destructor_on_stack : $@convention(thin) () -> () {
 // CHECK: alloc_ref
 sil @trivial_destructor_may_trap : $@convention(thin) () -> () {
   %0 = alloc_ref $TrivialDestructor
-  %1 = unconditional_checked_cast %0 : $TrivialDestructor to $AnyObject
+  %1 = unconditional_checked_cast %0 : $TrivialDestructor to AnyObject
   strong_release %0 : $TrivialDestructor
   %4 = tuple()
   return %4 : $()

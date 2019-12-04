@@ -1135,8 +1135,6 @@ extension RangeReplaceableCollection {
   public mutating func removeAll(
     where shouldBeRemoved: (Element) throws -> Bool
   ) rethrows {
-    // FIXME: Switch to using RRC.filter once stdlib is compiled for 4.0
-    // self = try filter { try !predicate($0) }
-    self = try Self(self.lazy.filter { try !shouldBeRemoved($0) })
+    self = try filter { try !shouldBeRemoved($0) }
   }
 }

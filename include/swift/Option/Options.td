@@ -104,6 +104,12 @@ def driver_show_incremental : Flag<["-"], "driver-show-incremental">,
 def driver_show_job_lifecycle : Flag<["-"], "driver-show-job-lifecycle">,
   InternalDebugOpt,
   HelpText<"Show every step in the lifecycle of driver jobs">;
+def driver_dump_swift_ranges : Flag<["-"], "driver-dump-swift-ranges">,
+  InternalDebugOpt,
+  HelpText<"Show the unparsed ranges read upon startup">;
+def driver_dump_compiled_source_diffs : Flag<["-"], "driver-dump-compiled-source-diffs">,
+  InternalDebugOpt,
+  HelpText<"Show the compiled source diffs read upon startup">;
 def driver_use_filelists : Flag<["-"], "driver-use-filelists">,
   InternalDebugOpt, HelpText<"Pass input files as filelists whenever possible">;
 def driver_filelist_threshold : Separate<["-"], "driver-filelist-threshold">,
@@ -129,22 +135,41 @@ def driver_always_rebuild_dependents :
   Flag<["-"], "driver-always-rebuild-dependents">, InternalDebugOpt,
   HelpText<"Always rebuild dependents of files that have been modified">;
 
-def enable_experimental_dependencies :
-Flag<["-"], "enable-experimental-dependencies">, Flags<[FrontendOption, HelpHidden]>,
+def enable_fine_grained_dependencies :
+Flag<["-"], "enable-fine-grained-dependencies">, Flags<[FrontendOption, HelpHidden]>,
 HelpText<"Experimental work-in-progress to be more selective about incremental recompilation">;
 
-def driver_verify_experimental_dependency_graph_after_every_import :
-Flag<["-"], "driver-verify-experimental-dependency-graph-after-every-import">,
+def enable_source_range_dependencies :
+Flag<["-"], "enable-source-range-dependencies">, Flags<[]>,
+HelpText<"Try using source range information">;
+
+
+def driver_compare_incremental_schemes :
+Flag<["-"], "driver-compare-incremental-schemes">, Flags<[DoesNotAffectIncrementalBuild]>,
+HelpText<"Print a simple message comparing dependencies with source ranges (w/ fallback)">;
+
+def driver_compare_incremental_schemes_path :
+Separate<["-"], "driver-compare-incremental-schemes-path">, Flags<[ArgumentIsPath,DoesNotAffectIncrementalBuild]>,
+HelpText<"Path to use for machine-readable comparision">,
+MetaVarName<"<path>">;
+
+def driver_compare_incremental_schemes_path_EQ :
+Joined<["-"], "driver-compare-incremental-schemes-path=">, Flags<[]>,
+Alias<driver_compare_incremental_schemes_path>;
+
+
+def driver_verify_fine_grained_dependency_graph_after_every_import :
+Flag<["-"], "driver-verify-fine-grained-dependency-graph-after-every-import">,
 InternalDebugOpt,
 HelpText<"Debug DriverGraph by verifying it after every import">;
 
-def driver_emit_experimental_dependency_dot_file_after_every_import :
-Flag<["-"], "driver-emit-experimental-dependency-dot-file-after-every-import">,
+def driver_emit_fine_grained_dependency_dot_file_after_every_import :
+Flag<["-"], "driver-emit-fine-grained-dependency-dot-file-after-every-import">,
 InternalDebugOpt,
-HelpText<"Emit dot files every time driver imports an experimental swiftdeps file.">;
+HelpText<"Emit dot files every time driver imports an fine-grained swiftdeps file.">;
 
-def experimental_dependency_include_intrafile :
-Flag<["-"], "experimental-dependency-include-intrafile">,
+def fine_grained_dependency_include_intrafile :
+Flag<["-"], "fine-grained-dependency-include-intrafile">,
 InternalDebugOpt,
 HelpText<"Include within-file dependencies.">;
 
@@ -564,6 +589,10 @@ def Oplayground : Flag<["-"], "Oplayground">, Group<O_Group>,
   Flags<[HelpHidden, FrontendOption, ModuleInterfaceOption]>,
   HelpText<"Compile with optimizations appropriate for a playground">;
 
+def CrossModuleOptimization : Flag<["-"], "cross-module-optimization">,
+  Flags<[HelpHidden, FrontendOption]>,
+  HelpText<"Perform cross-module optimization">;
+
 def RemoveRuntimeAsserts : Flag<["-"], "remove-runtime-asserts">,
   Flags<[FrontendOption]>,
   HelpText<"Remove runtime safety checks.">;
@@ -748,6 +777,9 @@ def emit_sibgen : Flag<["-"], "emit-sibgen">,
 def emit_imported_modules : Flag<["-"], "emit-imported-modules">,
   HelpText<"Emit a list of the imported modules">, ModeOpt,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
+def emit_pcm : Flag<["-"], "emit-pcm">,
+  HelpText<"Emit a precompiled Clang module from a module map">, ModeOpt,
+  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
 
 def c : Flag<["-"], "c">, Alias<emit_object>,
   Flags<[FrontendOption, NoInteractiveOption]>, ModeOpt;
@@ -790,6 +822,10 @@ def dump_type_info : Flag<["-"], "dump-type-info">,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
 def print_ast : Flag<["-"], "print-ast">,
   HelpText<"Parse and type-check input file(s) and pretty print AST(s)">,
+  ModeOpt,
+  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
+def dump_pcm : Flag<["-"], "dump-pcm">,
+  HelpText<"Dump debugging information about a precompiled Clang module">,
   ModeOpt,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
 
@@ -888,6 +924,15 @@ def enable_private_imports : Flag<["-"], "enable-private-imports">,
 def sanitize_EQ : CommaJoined<["-"], "sanitize=">,
   Flags<[FrontendOption, NoInteractiveOption]>, MetaVarName<"<check>">,
   HelpText<"Turn on runtime checks for erroneous behavior.">;
+
+def sanitize_recover_EQ
+    : CommaJoined<["-"], "sanitize-recover=">,
+      Flags<[FrontendOption, NoInteractiveOption]>,
+      MetaVarName<"<check>">,
+      HelpText<"Specify which sanitizer runtime checks (see -sanitize=) will "
+               "generate instrumentation that allows error recovery. Listed "
+               "checks should be comma separated. Default behavior is to not "
+               "allow error recovery.">;
 
 def sanitize_coverage_EQ : CommaJoined<["-"], "sanitize-coverage=">,
   Flags<[FrontendOption, NoInteractiveOption]>,

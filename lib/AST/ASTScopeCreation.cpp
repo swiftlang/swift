@@ -731,6 +731,20 @@ void ASTScope::
   impl->buildEnoughOfTreeForTopLevelExpressionsButDontRequestGenericsOrExtendedNominals();
 }
 
+bool ASTScope::areInactiveIfConfigClausesSupported() {
+  return ScopeCreator::includeInactiveIfConfigClauses;
+}
+
+void ASTScope::expandFunctionBody(AbstractFunctionDecl *AFD) {
+  auto *const SF = AFD->getParentSourceFile();
+  if (SF->isSuitableForASTScopes())
+    SF->getScope().expandFunctionBodyImpl(AFD);
+}
+
+void ASTScope::expandFunctionBodyImpl(AbstractFunctionDecl *AFD) {
+  impl->expandFunctionBody(AFD);
+}
+
 ASTSourceFileScope *ASTScope::createScopeTree(SourceFile *SF) {
   ScopeCreator *scopeCreator = new (SF->getASTContext()) ScopeCreator(SF);
   return scopeCreator->sourceFileScope;
@@ -748,6 +762,15 @@ void ASTSourceFileScope::
       expandAndBeCurrentDetectingRecursion(*scopeCreator);
 }
 
+void ASTSourceFileScope::expandFunctionBody(AbstractFunctionDecl *AFD) {
+  if (!AFD)
+    return;
+  auto sr = AFD->getBodySourceRange();
+  if (sr.isInvalid())
+    return;
+  ASTScopeImpl *bodyScope = findInnermostEnclosingScope(sr.Start, nullptr);
+  bodyScope->expandAndBeCurrentDetectingRecursion(*scopeCreator);
+}
 
 ASTSourceFileScope::ASTSourceFileScope(SourceFile *SF,
                                        ScopeCreator *scopeCreator)
@@ -1055,6 +1078,8 @@ void ASTScopeImpl::disownDescendants(ScopeCreator &scopeCreator) {
 
 ASTScopeImpl *
 ASTScopeImpl::expandAndBeCurrentDetectingRecursion(ScopeCreator &scopeCreator) {
+  assert(scopeCreator.getASTContext().LangOpts.EnableASTScopeLookup &&
+         "Should not be getting here if ASTScopes are disabled");
   return evaluateOrDefault(scopeCreator.getASTContext().evaluator,
                            ExpandASTScopeRequest{this, &scopeCreator}, nullptr);
 }
@@ -1187,7 +1212,7 @@ ParameterListScope::expandAScopeThatCreatesANewInsertionPoint(
   // Unlike generic parameters or pattern initializers, it cannot refer to a
   // previous parameter.
   for (ParamDecl *pd : params->getArray()) {
-    if (pd->getDefaultValue())
+    if (pd->hasDefaultExpr())
       scopeCreator
           .constructExpandAndInsertUncheckable<DefaultArgumentInitializerScope>(
               this, pd);
@@ -1510,7 +1535,7 @@ void ClosureBodyScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
 void DefaultArgumentInitializerScope::
     expandAScopeThatDoesNotCreateANewInsertionPoint(
         ScopeCreator &scopeCreator) {
-  auto *initExpr = decl->getDefaultValue();
+  auto *initExpr = decl->getStructuralDefaultExpr();
   ASTScopeAssert(initExpr,
                  "Default argument initializer must have an initializer.");
   scopeCreator.addToScopeTree(initExpr, this);

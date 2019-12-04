@@ -310,3 +310,14 @@ swift::getVariableOfStaticInitializer(SILFunction *InitFunc,
     return nullptr;
   return GVar;
 }
+
+SILType
+SILGlobalVariable::getLoweredTypeInContext(TypeExpansionContext context) const {
+  auto ty = getLoweredType();
+  if (!ty.getASTType()->hasOpaqueArchetype() ||
+      !context.shouldLookThroughOpaqueTypeArchetypes())
+    return ty;
+  auto resultTy =
+      getModule().Types.getTypeLowering(ty, context).getLoweredType();
+  return resultTy.getCategoryType(ty.getCategory());
+}

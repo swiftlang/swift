@@ -19,6 +19,7 @@
 #include "swift/AST/Availability.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTVisitor.h"
+#include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PropertyWrappers.h"
@@ -225,7 +226,7 @@ void TBDGenVisitor::visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
     addSymbol(
         LinkEntity::forDynamicallyReplaceableFunctionKey(AFD, useAllocator));
   }
-  if (AFD->getAttrs().hasAttribute<DynamicReplacementAttr>()) {
+  if (AFD->getDynamicallyReplacedDecl()) {
     bool useAllocator = shouldUseAllocatorMangling(AFD);
     addSymbol(LinkEntity::forDynamicallyReplaceableFunctionVariable(
         AFD, useAllocator));
@@ -253,7 +254,7 @@ void TBDGenVisitor::visitFuncDecl(FuncDecl *FD) {
       addSymbol(LinkEntity::forOpaqueTypeDescriptorAccessorKey(opaqueResult));
       addSymbol(LinkEntity::forOpaqueTypeDescriptorAccessorVar(opaqueResult));
     }
-    if (FD->getAttrs().hasAttribute<DynamicReplacementAttr>()) {
+    if (FD->getDynamicallyReplacedDecl()) {
       addSymbol(LinkEntity::forOpaqueTypeDescriptorAccessor(opaqueResult));
       addSymbol(LinkEntity::forOpaqueTypeDescriptorAccessorVar(opaqueResult));
     }
@@ -281,7 +282,7 @@ void TBDGenVisitor::visitAbstractStorageDecl(AbstractStorageDecl *ASD) {
       addSymbol(LinkEntity::forOpaqueTypeDescriptorAccessorKey(opaqueResult));
       addSymbol(LinkEntity::forOpaqueTypeDescriptorAccessorVar(opaqueResult));
     }
-    if (ASD->hasAnyDynamicReplacementAccessors()) {
+    if (ASD->getDynamicallyReplacedDecl()) {
       addSymbol(LinkEntity::forOpaqueTypeDescriptorAccessor(opaqueResult));
       addSymbol(LinkEntity::forOpaqueTypeDescriptorAccessorVar(opaqueResult));
     }
@@ -593,16 +594,44 @@ void TBDGenVisitor::addFirstFileSymbols() {
   }
 }
 
-/// Converts a version tuple into a packed version, ignoring components beyond
-/// major, minor, and subminor.
-static llvm::MachO::PackedVersion
-convertToPacked(const version::Version &version) {
-  // FIXME: Warn if version is greater than 3 components?
-  unsigned major = 0, minor = 0, subminor = 0;
-  if (version.size() > 0) major = version[0];
-  if (version.size() > 1) minor = version[1];
-  if (version.size() > 2) subminor = version[2];
-  return llvm::MachO::PackedVersion(major, minor, subminor);
+/// The kind of version being parsed, used for diagnostics.
+/// Note: Must match the order in DiagnosticsFrontend.def
+enum DylibVersionKind_t: unsigned {
+  CurrentVersion,
+  CompatibilityVersion
+};
+
+/// Converts a version string into a packed version, truncating each component
+/// if necessary to fit all 3 into a 32-bit packed structure.
+///
+/// For example, the version '1219.37.11' will be packed as
+///
+///  Major (1,219)       Minor (37) Patch (11)
+/// ┌───────────────────┬──────────┬──────────┐
+/// │ 00001100 11000011 │ 00100101 │ 00001011 │
+/// └───────────────────┴──────────┴──────────┘
+///
+/// If an individual component is greater than the highest number that can be
+/// represented in its alloted space, it will be truncated to the maximum value
+/// that fits in the alloted space, which matches the behavior of the linker.
+static Optional<llvm::MachO::PackedVersion>
+parsePackedVersion(DylibVersionKind_t kind, StringRef versionString,
+                   ASTContext &ctx) {
+  if (versionString.empty())
+    return None;
+
+  llvm::MachO::PackedVersion version;
+  auto result = version.parse64(versionString);
+  if (!result.first) {
+    ctx.Diags.diagnose(SourceLoc(), diag::tbd_err_invalid_version,
+                       (unsigned)kind, versionString);
+    return None;
+  }
+  if (result.second) {
+    ctx.Diags.diagnose(SourceLoc(), diag::tbd_warn_truncating_version,
+                       (unsigned)kind, versionString);
+  }
+  return version;
 }
 
 static bool isApplicationExtensionSafe(const LangOptions &LangOpts) {
@@ -627,15 +656,19 @@ static void enumeratePublicSymbolsAndWrite(ModuleDecl *M, FileUnit *singleFile,
   file.setApplicationExtensionSafe(
     isApplicationExtensionSafe(M->getASTContext().LangOpts));
   file.setInstallName(opts.InstallName);
-  if (auto currentVersion = opts.CurrentVersion) {
-    file.setCurrentVersion(convertToPacked(*currentVersion));
-  }
-  if (auto compatibilityVersion = opts.CompatibilityVersion) {
-    file.setCompatibilityVersion(convertToPacked(*compatibilityVersion));
-  }
   file.setTwoLevelNamespace();
   file.setSwiftABIVersion(irgen::getSwiftABIVersion());
   file.setInstallAPI(opts.IsInstallAPI);
+
+  if (auto packed = parsePackedVersion(CurrentVersion,
+                                       opts.CurrentVersion, ctx)) {
+    file.setCurrentVersion(*packed);
+  }
+
+  if (auto packed = parsePackedVersion(CompatibilityVersion,
+                                       opts.CompatibilityVersion, ctx)) {
+    file.setCompatibilityVersion(*packed);
+  }
 
   llvm::MachO::Target target(triple);
   file.addTarget(target);

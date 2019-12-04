@@ -64,6 +64,12 @@ ERROR(bridging_header_pch_error,Fatal,
    "failed to emit precompiled header '%0' for bridging header '%1'",
    (StringRef, StringRef))
 
+ERROR(emit_pcm_error,Fatal,
+   "failed to emit precompiled module '%0' for module map '%1'",
+   (StringRef, StringRef))
+ERROR(dump_pcm_error,Fatal,
+   "failed to dump precompiled module '%0'", (StringRef))
+
 WARNING(invalid_swift_name_method,none,
   "too %select{few|many}0 parameters in swift_name attribute (expected %1; "
   "got %2)", (bool, unsigned, unsigned))

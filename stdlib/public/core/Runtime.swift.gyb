@@ -156,21 +156,25 @@ internal struct _Buffer72 {
 #if !(os(Windows) || os(Android)) && (arch(i386) || arch(x86_64))
 % end
 
+// Returns a UInt64, but that value is the length of the string, so it's
+// guaranteed to fit into an Int. This is part of the ABI, so we can't
+// trivially change it to Int. Callers can safely convert the result
+// to any integer type without checks, however.
 @_silgen_name("swift_float${bits}ToString")
 internal func _float${bits}ToStringImpl(
   _ buffer: UnsafeMutablePointer<UTF8.CodeUnit>,
   _ bufferLength: UInt, _ value: Float${bits},
   _ debug: Bool
-) -> UInt
+) -> UInt64
 
 internal func _float${bits}ToString(
   _ value: Float${bits}, debug: Bool
 ) -> (buffer: _Buffer32, length: Int) {
   _internalInvariant(MemoryLayout<_Buffer32>.size == 32)
   var buffer = _Buffer32()
-  let length = buffer.withBytes { (bufferPtr) in
-    Int(_float${bits}ToStringImpl(bufferPtr, 32, value, debug))
-  }
+  let length = buffer.withBytes { (bufferPtr) in Int(
+    truncatingIfNeeded: _float${bits}ToStringImpl(bufferPtr, 32, value, debug)
+  )}
   return (buffer, length)
 }
 
@@ -180,12 +184,16 @@ internal func _float${bits}ToString(
 
 % end
 
+// Returns a UInt64, but that value is the length of the string, so it's
+// guaranteed to fit into an Int. This is part of the ABI, so we can't
+// trivially change it to Int. Callers can safely convert the result
+// to any integer type without checks, however.
 @_silgen_name("swift_int64ToString")
 internal func _int64ToStringImpl(
   _ buffer: UnsafeMutablePointer<UTF8.CodeUnit>,
   _ bufferLength: UInt, _ value: Int64,
   _ radix: Int64, _ uppercase: Bool
-) -> UInt
+) -> UInt64
 
 internal func _int64ToString(
   _ value: Int64, radix: Int64 = 10, uppercase: Bool = false
@@ -193,27 +201,31 @@ internal func _int64ToString(
   if radix >= 10 {
     var buffer = _Buffer32()
     return buffer.withBytes { (bufferPtr) in
-      let actualLength
-      = _int64ToStringImpl(bufferPtr, 32, value, radix, uppercase)
-      return String._fromASCII(
-        UnsafeBufferPointer(start: bufferPtr, count: Int(actualLength)))
+      let actualLength = _int64ToStringImpl(bufferPtr, 32, value, radix, uppercase)
+      return String._fromASCII(UnsafeBufferPointer(
+        start: bufferPtr, count: Int(truncatingIfNeeded: actualLength)
+      ))
     }
   } else {
     var buffer = _Buffer72()
     return buffer.withBytes { (bufferPtr) in
-      let actualLength
-      = _int64ToStringImpl(bufferPtr, 72, value, radix, uppercase)
-      return String._fromASCII(
-        UnsafeBufferPointer(start: bufferPtr, count: Int(actualLength)))
+      let actualLength = _int64ToStringImpl(bufferPtr, 72, value, radix, uppercase)
+      return String._fromASCII(UnsafeBufferPointer(
+        start: bufferPtr, count: Int(truncatingIfNeeded: actualLength)
+      ))
     }
   }
 }
 
+// Returns a UInt64, but that value is the length of the string, so it's
+// guaranteed to fit into an Int. This is part of the ABI, so we can't
+// trivially change it to Int. Callers can safely convert the result
+// to any integer type without checks, however.
 @_silgen_name("swift_uint64ToString")
 internal func _uint64ToStringImpl(
   _ buffer: UnsafeMutablePointer<UTF8.CodeUnit>,
   _ bufferLength: UInt, _ value: UInt64, _ radix: Int64, _ uppercase: Bool
-) -> UInt
+) -> UInt64
 
 public // @testable
 func _uint64ToString(
@@ -222,18 +234,18 @@ func _uint64ToString(
   if radix >= 10 {
     var buffer = _Buffer32()
     return buffer.withBytes { (bufferPtr) in
-      let actualLength
-      = _uint64ToStringImpl(bufferPtr, 32, value, radix, uppercase)
-      return String._fromASCII(
-        UnsafeBufferPointer(start: bufferPtr, count: Int(actualLength)))
+      let actualLength = _uint64ToStringImpl(bufferPtr, 32, value, radix, uppercase)
+      return String._fromASCII(UnsafeBufferPointer(
+        start: bufferPtr, count: Int(truncatingIfNeeded: actualLength)
+      ))
     }
   } else {
     var buffer = _Buffer72()
     return buffer.withBytes { (bufferPtr) in
-      let actualLength
-      = _uint64ToStringImpl(bufferPtr, 72, value, radix, uppercase)
-      return String._fromASCII(
-        UnsafeBufferPointer(start: bufferPtr, count: Int(actualLength)))
+      let actualLength = _uint64ToStringImpl(bufferPtr, 72, value, radix, uppercase)
+      return String._fromASCII(UnsafeBufferPointer(
+        start: bufferPtr, count: Int(truncatingIfNeeded: actualLength)
+      ))
     }
   }
 }

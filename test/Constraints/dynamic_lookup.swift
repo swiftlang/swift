@@ -398,3 +398,13 @@ class HasMethodWithDefault {
 func testAnyObjectWithDefault(_ x: AnyObject) {
   x.hasDefaultParam()
 }
+
+// SR-11829: Don't perform dynamic lookup for callAsFunction.
+class ClassWithObjcCallAsFunction {
+  @objc func callAsFunction() {}
+}
+
+func testCallAsFunctionAnyObject(_ x: AnyObject) {
+  x() // expected-error {{cannot call value of non-function type 'AnyObject'}}
+  x.callAsFunction() // Okay.
+}

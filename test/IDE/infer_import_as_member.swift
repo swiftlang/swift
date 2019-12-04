@@ -126,10 +126,10 @@ func testNonEphemeralInitParams(x: Double) {
   var x = x
 
   _ = IAMPointerStruct(ptr1: &x, ptr2: &x)
-  // expected-error@-1 {{cannot use inout expression here; argument #1 must be a pointer that outlives the call to 'init(ptr1:ptr2:)'}}
+  // expected-error@-1 {{cannot use inout expression here; argument 'ptr1' must be a pointer that outlives the call to 'init(ptr1:ptr2:)'}}
   // expected-note@-2 {{implicit argument conversion from 'Double' to 'UnsafeMutablePointer<Double>?' produces a pointer valid only for the duration of the call to 'init(ptr1:ptr2:)'}}
   // expected-note@-3 {{use 'withUnsafeMutablePointer' in order to explicitly convert argument to pointer valid for a defined scope}}
-  // expected-error@-4 {{cannot use inout expression here; argument #2 must be a pointer that outlives the call to 'init(ptr1:ptr2:)'}}
+  // expected-error@-4 {{cannot use inout expression here; argument 'ptr2' must be a pointer that outlives the call to 'init(ptr1:ptr2:)'}}
   // expected-note@-5 {{implicit argument conversion from 'Double' to 'UnsafeMutablePointer<Double>?' produces a pointer valid only for the duration of the call to 'init(ptr1:ptr2:)'}}
   // expected-note@-6 {{use 'withUnsafeMutablePointer' in order to explicitly convert argument to pointer valid for a defined scope}}
 

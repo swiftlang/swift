@@ -275,7 +275,9 @@ struct StaticMembers: Equatable {
   static var optProp: Optional = StaticMembers()
 
   static func method(_: Int) -> StaticMembers { return prop }
+  // expected-note@-1 {{found candidate with type '(Int) -> StaticMembers'}}
   static func method(withLabel: Int) -> StaticMembers { return prop }
+  // expected-note@-1 {{found candidate with type '(Int) -> StaticMembers'}}
   static func optMethod(_: Int) -> StaticMembers? { return optProp }
 
   static func ==(x: StaticMembers, y: StaticMembers) -> Bool { return true }
@@ -285,8 +287,8 @@ let staticMembers = StaticMembers()
 let optStaticMembers: Optional = StaticMembers()
 
 switch staticMembers {
-  case .init: break // expected-error{{cannot match values of type 'StaticMembers'}}
-  case .init(opt:): break // expected-error{{cannot match values of type 'StaticMembers'}}
+  case .init: break // expected-error{{member 'init(opt:)' expects argument of type 'Int'}}
+  case .init(opt:): break // expected-error{{member 'init(opt:)' expects argument of type 'Int'}}
   case .init(): break
 
   case .init(0): break
@@ -300,17 +302,17 @@ switch staticMembers {
   // TODO: repeated error message
   case .optProp: break // expected-error* {{not unwrapped}}
 
-  case .method: break // expected-error{{cannot match}}
+  case .method: break // expected-error{{no exact matches in call to static method 'method'}}
   case .method(0): break
   case .method(_): break // expected-error{{'_' can only appear in a pattern}}
   case .method(let x): break // expected-error{{cannot appear in an expression}}
 
-  case .method(withLabel:): break // expected-error{{cannot match}}
+  case .method(withLabel:): break // expected-error{{member 'method(withLabel:)' expects argument of type 'Int'}}
   case .method(withLabel: 0): break
   case .method(withLabel: _): break // expected-error{{'_' can only appear in a pattern}}
   case .method(withLabel: let x): break // expected-error{{cannot appear in an expression}}
 
-  case .optMethod: break // expected-error{{cannot match}}
+  case .optMethod: break // expected-error{{member 'optMethod' expects argument of type 'Int'}}
   case .optMethod(0): break
   // expected-error@-1 {{value of optional type 'StaticMembers?' must be unwrapped to a value of type 'StaticMembers'}}
   // expected-note@-2 {{coalesce}}
@@ -379,10 +381,10 @@ func test8347() -> String {
       return ""
     }
 
-    func h() -> String { // expected-note {{found this candidate}}
+    func h() -> String {
       return ""
     }
-    func h() -> Double { // expected-note {{found this candidate}}
+    func h() -> Double {
       return 3.0
     }
     func h() -> Int? { //expected-note{{found this candidate}}

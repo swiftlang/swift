@@ -47,11 +47,12 @@ class Outer3 // expected-error {{circular reference}}
 }
 
 // CHECK: ===CYCLE DETECTED===
-// CHECK-NEXT: `--{{.*}}SuperclassDeclRequest({{.*Left}}
-// CHECK:      `--{{.*}}InheritedDeclsReferencedRequest(circular_inheritance.(file).Left@
-// CHECK:          `--{{.*}}SuperclassDeclRequest
-// CHECK:              `--{{.*}}InheritedDeclsReferencedRequest(circular_inheritance.(file).Right@
-// CHECK:                  `--{{.*}}SuperclassDeclRequest{{.*(cyclic dependency)}}
+// CHECK-LABEL: `--{{.*}}HasCircularInheritanceRequest(circular_inheritance.(file).Left@
+// CHECK-NEXT:     `--{{.*}}SuperclassDeclRequest({{.*Left}}
+// CHECK:          `--{{.*}}InheritedDeclsReferencedRequest(circular_inheritance.(file).Left@
+// CHECK:              `--{{.*}}SuperclassDeclRequest
+// CHECK:                  `--{{.*}}InheritedDeclsReferencedRequest(circular_inheritance.(file).Right@
+// CHECK:                      `--{{.*}}SuperclassDeclRequest{{.*(cyclic dependency)}}
 
 // CHECK-DOT: digraph Dependencies
 // CHECK-DOT: label="InheritedTypeRequest

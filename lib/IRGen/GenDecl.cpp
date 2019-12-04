@@ -831,7 +831,8 @@ IRGenModule::getAddrOfParentContextDescriptor(DeclContext *from,
 
     // Wrap up private types in an anonymous context for the containing file
     // unit so that the runtime knows they have unstable identity.
-    if (!fromAnonymousContext && Type->isOutermostPrivateOrFilePrivateScope())
+    if (!fromAnonymousContext && Type->isOutermostPrivateOrFilePrivateScope()
+        && !Type->isUsableFromInline())
       return {getAddrOfAnonymousContextDescriptor(Type),
               ConstantReference::Direct};
   }
@@ -1259,8 +1260,40 @@ void IRGenerator::noteUseOfTypeGlobals(NominalTypeDecl *type,
     }
   }
 
+  // Force emission of ObjC class refs used by type refs.
+  //
+  // Otherwise, autolinking can fail if we try to load the class decl from the
+  // name of the class.
+  if (auto *classDecl = dyn_cast<ClassDecl>(type)) {
+    // The logic behind this predicate is that:
+    //
+    // 1. We need to check if a class decl is foreign to exclude CF classes.
+    //
+    // 2. We want to check that the class decl is objc to exclude c++ classes in
+    //    the future.
+    //
+    // 3. We check that we have a clang node since we want to ensure we have
+    //    something coming from clang, rather than from swift which does not
+    //    have this issue.
+    if (classDecl->hasClangNode() && classDecl->isObjC() && !classDecl->isForeign()) {
+      PrimaryIGM->getAddrOfObjCClassRef(classDecl);
+      return;
+    }
+  }
+
   if (!hasLazyMetadata(type))
     return;
+
+  // If the type can be generated in several TU with weak linkage we don't know
+  // which one will be picked up so we have to require the metadata. Otherwise,
+  // the situation can arise where one TU contains a type descriptor with a null
+  // metadata access function and the other TU which requires metadata has a
+  // type descriptor with a valid metadata access function but the linker picks
+  // the first one.
+  if (isAccessorLazilyGenerated(getTypeMetadataAccessStrategy(
+          type->getDeclaredType()->getCanonicalType()))) {
+    requireMetadata = RequireMetadata;
+  }
 
   // Try to create a new record of the fact that we used this type.
   auto insertResult = LazyTypeGlobals.try_emplace(type);
@@ -2338,13 +2371,12 @@ void IRGenModule::emitOpaqueTypeDescriptorAccessor(OpaqueTypeDecl *opaque) {
   auto *abstractStorage = dyn_cast<AbstractStorageDecl>(namingDecl);
 
   bool isNativeDynamic = false;
-  bool isDynamicReplacement = false;
+  const bool isDynamicReplacement = namingDecl->getDynamicallyReplacedDecl();
 
   // Don't emit accessors for abstract storage that is not dynamic or a dynamic
   // replacement.
   if (abstractStorage) {
     isNativeDynamic = abstractStorage->hasAnyNativeDynamicAccessors();
-    isDynamicReplacement = abstractStorage->hasAnyDynamicReplacementAccessors();
     if (!isNativeDynamic && !isDynamicReplacement)
       return;
   }
@@ -2352,10 +2384,7 @@ void IRGenModule::emitOpaqueTypeDescriptorAccessor(OpaqueTypeDecl *opaque) {
   // Don't emit accessors for functions that are not dynamic or dynamic
   // replacements.
   if (!abstractStorage) {
-    isNativeDynamic = opaque->getNamingDecl()->isNativeDynamic();
-    isDynamicReplacement = opaque->getNamingDecl()
-                               ->getAttrs()
-                               .hasAttribute<DynamicReplacementAttr>();
+    isNativeDynamic = namingDecl->isNativeDynamic();
     if (!isNativeDynamic && !isDynamicReplacement)
       return;
   }

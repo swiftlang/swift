@@ -1,0 +1,121 @@
+// First test: functional correctness
+
+// RUN: %empty-directory(%t) 
+// RUN: %target-build-swift -O -wmo -parse-as-library -cross-module-optimization -emit-module -emit-module-path=%t/Submodule.swiftmodule -module-name=Submodule %S/Inputs/cross-submodule.swift -c -o %t/submodule.o
+// RUN: %target-build-swift -O -wmo -parse-as-library -cross-module-optimization -emit-module -emit-module-path=%t/Test.swiftmodule -module-name=Test -I%t %S/Inputs/cross-module.swift -c -o %t/test.o
+// RUN: %target-build-swift -O -wmo -module-name=Main -I%t %s -c -o %t/main.o
+// RUN: %target-swiftc_driver %t/main.o %t/test.o %t/submodule.o -o %t/a.out
+// RUN: %target-run %t/a.out | %FileCheck %s -check-prefix=CHECK-OUTPUT
+
+// Check if it also works if the main module is compiled with -Onone:
+
+// RUN: %target-build-swift -Onone -wmo -module-name=Main -I%t %s -c -o %t/main-onone.o
+// RUN: %target-swiftc_driver %t/main-onone.o %t/test.o %t/submodule.o -o %t/a.out
+// RUN: %target-run %t/a.out | %FileCheck %s -check-prefix=CHECK-OUTPUT
+
+// REQUIRES: executable_test
+
+// Second test: check if CMO really imports the SIL of functions in other modules.
+
+// RUN: %target-build-swift -O -wmo -module-name=Main -I%t %s -Xllvm -sil-disable-pass=FunctionSignatureOpts -emit-sil | %FileCheck %s -check-prefix=CHECK-SIL
+
+
+import Test
+
+
+func testNestedTypes() {
+  let c = Container()
+
+  // CHECK-OUTPUT: [Test.Container.Base]
+  // CHECK-OUTPUT: 27
+  // CHECK-SIL-DAG: sil shared [noinline] @$s4Test9ContainerV9testclassyxxlFSi_Tg5
+  print(c.testclass(27))
+  // CHECK-OUTPUT: [Test.Container.Base]
+  // CHECK-OUTPUT: 27
+  // CHECK-SIL-DAG: sil shared_external {{.*}} @$s4Test9ContainerV13testclass_genyxxlF
+  print(c.testclass_gen(27))
+  // CHECK-OUTPUT: [Test.PE<Swift.Int>.B(27)]
+  // CHECK-OUTPUT: 27
+  // CHECK-SIL-DAG: sil shared [noinline] @$s4Test9ContainerV8testenumyxxlFSi_Tg5
+  print(c.testenum(27))
+  // CHECK-OUTPUT: [Test.PE<Swift.Int>.B(27)]
+  // CHECK-OUTPUT: 27
+  // CHECK-SIL-DAG: sil shared_external {{.*}} @$s4Test9ContainerV12testenum_genyxxlF
+  print(c.testenum_gen(27))
+}
+
+
+func testClass() {
+  // CHECK-OUTPUT: 28
+  // CHECK-SIL-DAG: sil shared [noinline] @$s4Test11createClassySixlFSi_Tg5
+  // CHECK-SIL-DAG: sil shared [noinline] @${{.*Test.*getClass}}
+  print(createClass(0))
+  // CHECK-OUTPUT: 28
+  // CHECK-SIL-DAG: sil shared_external {{.*}} @$s4Test15createClass_genySixlF
+  print(createClass_gen(0))
+}
+
+func testError() {
+  // CHECK-OUTPUT: PrivateError()
+  // CHECK-SIL-DAG: sil @$s4Test12PrivateError33_{{.*}} : $@convention(method) (@thin PrivateError.Type) -> PrivateError{{$}}
+  print(returnPrivateError(27))
+  // CHECK-OUTPUT: InternalError()
+  // CHECK-SIL-DAG: sil @$s4Test13InternalErrorVACycfC : $@convention(method) (@thin InternalError.Type) -> InternalError{{$}}
+  print(returnInternalError(27))
+}
+
+class DerivedFromOpen<T> : OpenClass<T> { }
+
+func testProtocolsAndClasses() {
+  // CHECK-OUTPUT: false
+  // CHECK-SIL-DAG: sil shared [noinline] @$s4Test20checkIfClassConformsyyxlFSi_Tg5
+  checkIfClassConforms(27)
+  // CHECK-OUTPUT: false
+  // CHECK-SIL-DAG: sil shared_external {{.*}} @$s4Test24checkIfClassConforms_genyyxlF
+  checkIfClassConforms_gen(27)
+  // CHECK-OUTPUT: 123
+  // CHECK-OUTPUT: 1234
+  // CHECK-SIL-DAG: sil shared [noinline] @$s4Test7callFooyyxlFSi_Tg5
+  // CHECK-SIL-DAG: sil [{{.*}}] @$s4Test19printFooExistential33_{{.*}} : $@convention(thin) (@in_guaranteed PrivateProtocol) -> (){{$}}
+  callFoo(27)
+  // CHECK-OUTPUT: 123
+  // CHECK-OUTPUT: 1234
+  // CHECK-SIL-DAG: sil shared_external {{.*}} @$s4Test11callFoo_genyyxlF
+  callFoo_gen(27)
+  // CHECK-OUTPUT: 55
+  callClassMethod(55)
+}
+
+func testSubModule() {
+  // CHECK-OUTPUT: 10
+  // CHECK-SIL-DAG: sil shared [noinline] @$s4Test24callGenericSubmoduleFuncyyxlFSi_Tg5
+  // CHECK-SIL-DAG: sil shared [noinline] @$s9Submodule07genericA4FuncyyxlF
+  callGenericSubmoduleFunc(10)
+  // CHECK-OUTPUT: 101
+  // CHECK-SIL-DAG: sil shared_external {{.*}} @$s4Test28callGenericSubmoduleFunc_genyyxlF
+  callGenericSubmoduleFunc_gen(101)
+}
+
+func testClosures() {
+  // CHECK-OUTPUT: 23
+  // CHECK-SIL-DAG: sil shared [noinline] @$s4Test14genericClosureyxxlFSi_Tg5
+  print(genericClosure(23))
+  // CHECK-OUTPUT: 24
+  // CHECK-SIL-DAG: sil shared_external {{.*}} @$s4Test18genericClosure_genyxxlF
+  print(genericClosure_gen(24))
+}
+
+func testKeypath() {
+  // CHECK-OUTPUT: 27
+  print(useStructKeypath(0))
+  // CHECK-OUTPUT: 29
+  print(useClassKeypath(0))
+}
+
+testNestedTypes()
+testClass()
+testError()
+testProtocolsAndClasses()
+testSubModule()
+testClosures()
+testKeypath()

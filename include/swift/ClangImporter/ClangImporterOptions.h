@@ -60,7 +60,10 @@ public:
     /// Swift code.
     Normal,
     /// Set up Clang for backend compilation only.
-    EmbedBitcode
+    EmbedBitcode,
+    /// Set up Clang to emit a precompiled module from a C/Objective-C module
+    /// map or dump debugging info about a precompiled module.
+    PrecompiledModule
   };
 
   /// Controls how Clang is initially set up.

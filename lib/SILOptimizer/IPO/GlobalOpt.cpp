@@ -264,7 +264,8 @@ static SILFunction *getGlobalGetterFunction(SILOptFunctionBuilder &FunctionBuild
     Serialized = IsSerialized;
   }
 
-  auto refType = M.Types.getLoweredRValueType(varDecl->getInterfaceType());
+  auto refType = M.Types.getLoweredRValueType(TypeExpansionContext::minimal(),
+                                              varDecl->getInterfaceType());
 
   // Function takes no arguments and returns refType
   SILResultInfo Results[] = { SILResultInfo(refType,
@@ -666,6 +667,10 @@ replaceLoadsByKnownValue(BuiltinInst *CallToOnce, SILFunction *AddrF,
   for (int i = 0, e = Calls.size(); i < e; ++i) {
     auto *Call = Calls[i];
 
+    if (Call->getFunction()->isSerialized() &&
+        !GetterF->hasValidLinkageForFragileRef())
+      continue;
+
     // Make sure that we can go ahead and replace all uses of the
     // address with the value.
     bool isValid = true;
@@ -741,6 +746,16 @@ void SILGlobalOpt::optimizeInitializer(SILFunction *AddrF,
   SingleValueInstruction *InitVal;
   SILGlobalVariable *SILG = getVariableOfStaticInitializer(InitF, InitVal);
   if (!SILG)
+    return;
+
+  auto expansion = ResilienceExpansion::Maximal;
+  if (hasPublicVisibility(SILG->getLinkage()))
+    expansion = ResilienceExpansion::Minimal;
+
+  auto &tl = Module->Types.getTypeLowering(
+      SILG->getLoweredType(),
+      TypeExpansionContext::noOpaqueTypeArchetypesSubstitution(expansion));
+  if (!tl.isLoadable())
     return;
 
   LLVM_DEBUG(llvm::dbgs() << "GlobalOpt: use static initializer for "
@@ -907,6 +922,10 @@ void SILGlobalOpt::optimizeGlobalAccess(SILGlobalVariable *SILG,
   // invocation should happen at the common dominator of all
   // loads inside this function.
   for (auto *Load : GlobalLoadMap[SILG]) {
+    if (Load->getFunction()->isSerialized() &&
+        !GetterF->hasValidLinkageForFragileRef())
+      continue;
+
     SILBuilderWithScope B(Load);
     auto *GetterRef = B.createFunctionRef(Load->getLoc(), GetterF);
     auto *Value = B.createApply(Load->getLoc(), GetterRef,

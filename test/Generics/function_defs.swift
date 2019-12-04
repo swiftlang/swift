@@ -78,9 +78,9 @@ protocol Overload {
   func f1(_: B) -> B // expected-note {{candidate expects value of type 'OtherOvl.B' for parameter #1}}
   func f2(_: Int) -> A // expected-note{{found this candidate}}
   func f2(_: Int) -> B // expected-note{{found this candidate}}
-  func f3(_: Int) -> Int // expected-note {{found this candidate}}
-  func f3(_: Float) -> Float // expected-note {{found this candidate}}
-  func f3(_: Self) -> Self // expected-note {{found this candidate}}
+  func f3(_: Int) -> Int // expected-note {{found candidate with type '(Int) -> Int'}}
+  func f3(_: Float) -> Float // expected-note {{found candidate with type '(Float) -> Float'}}
+  func f3(_: Self) -> Self // expected-note {{found candidate with type '(OtherOvl) -> OtherOvl'}}
 
   var prop : Self { get }
 }
@@ -112,7 +112,7 @@ func testOverload<Ovl : Overload, OtherOvl : Overload>(_ ovl: Ovl, ovl2: Ovl,
   var f3f : (Float) -> Float = ovl.f3
   var f3ovl_1 : (Ovl) -> Ovl = ovl.f3
   var f3ovl_2 : (Ovl) -> Ovl = ovl2.f3
-  var f3ovl_3 : (Ovl) -> Ovl = other.f3 // expected-error{{ambiguous reference to member 'f3'}}
+  var f3ovl_3 : (Ovl) -> Ovl = other.f3 // expected-error{{no 'f3' candidates produce the expected contextual result type '(Ovl) -> Ovl'}}
 
   var f3i_unbound : (Ovl) -> (Int) -> Int = Ovl.f3
   var f3f_unbound : (Ovl) -> (Float) -> Float = Ovl.f3
@@ -154,6 +154,7 @@ func subscripting<T : Subscriptable & IntSubscriptable>(_ t: T) {
 
   // Suggests the Int form because we prefer concrete matches to generic matches in diagnosis.
   t[value] = 17 // expected-error{{cannot convert value of type 'T.Value' to expected argument type 'Int'}}
+  // expected-error@-1 {{cannot assign value of type 'Int' to subscript of type 'T.ElementType'}}
 }
 
 //===----------------------------------------------------------------------===//

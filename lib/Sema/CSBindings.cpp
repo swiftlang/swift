@@ -85,7 +85,7 @@ ConstraintSystem::determineBestBindings() {
       }
     }
 
-    if (getASTContext().LangOpts.DebugConstraintSolver) {
+    if (getASTContext().TypeCheckerOpts.DebugConstraintSolver) {
       auto &log = getASTContext().TypeCheckerDebug->getStream();
       bindings.dump(typeVar, log, solverState->depth * 2);
     }
@@ -403,7 +403,6 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) const {
   SmallVector<Constraint *, 2> defaultableConstraints;
   SmallVector<PotentialBinding, 4> literalBindings;
   bool addOptionalSupertypeBindings = false;
-  auto &tc = getTypeChecker();
   bool hasNonDependentMemberRelationalConstraints = false;
   bool hasDependentMemberRelationalConstraints = false;
   for (auto constraint : constraints) {
@@ -523,7 +522,7 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) const {
     case ConstraintKind::SelfObjectOfProtocol:
       // Swift 3 allowed the use of default types for normal conformances
       // to expressible-by-literal protocols.
-      if (tc.Context.LangOpts.EffectiveLanguageVersion[0] >= 4)
+      if (getASTContext().LangOpts.EffectiveLanguageVersion[0] >= 4)
         continue;
 
       if (!constraint->getSecondType()->is<ProtocolType>())
@@ -541,7 +540,7 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) const {
 
       // If there is a default literal type for this protocol, it's a
       // potential binding.
-      auto defaultType = tc.getDefaultType(constraint->getProtocol(), DC);
+      auto defaultType = TypeChecker::getDefaultType(constraint->getProtocol(), DC);
       if (!defaultType)
         continue;
 
@@ -735,11 +734,17 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) const {
                                 constraint->getLocator()});
   }
 
-  // If we don't have any potential bindings, allow generic
-  // parameters and potential holes to default to `Unresolved`.
+  // If there are no bindings, typeVar may be a hole.
   if (shouldAttemptFixes() && result.Bindings.empty() &&
-      (isPotentialHole(typeVar) || result.isGenericParameter())) {
+      typeVar->getImpl().canBindToHole()) {
     result.IsHole = true;
+    // If the base of the unresolved member reference like `.foo`
+    // couldn't be resolved we'd want to bind it to a hole at the
+    // very last moment possible, just like generic parameters.
+    auto *locator = typeVar->getImpl().getLocator();
+    if (locator->isLastElement<LocatorPathElt::MemberRefBase>())
+      result.PotentiallyIncomplete = true;
+
     result.addPotentialBinding({getASTContext().TheUnresolvedType,
         AllowedBindingKind::Exact, ConstraintKind::Defaultable, nullptr,
         typeVar->getImpl().getLocator()});
@@ -992,11 +997,11 @@ bool TypeVariableBinding::attempt(ConstraintSystem &cs) const {
     cs.DefaultedConstraints.push_back(Binding.DefaultableBinding);
 
     if (locator->isForGenericParameter() && type->isHole()) {
-      // Drop `generic parameter '...'` part of the locator to group all of the
-      // missing generic parameters related to the same path together.
+      // Drop `generic parameter` locator element so that all missing
+      // generic parameters related to the same path can be coalesced later.
       auto path = locator->getPath();
       auto genericParam = locator->getGenericParameter();
-      auto *fix = ExplicitlySpecifyGenericArguments::create(cs, {genericParam},
+      auto *fix = DefaultGenericArgument::create(cs, genericParam,
           cs.getConstraintLocator(locator->getAnchor(), path.drop_back()));
       if (cs.recordFix(fix))
         return true;

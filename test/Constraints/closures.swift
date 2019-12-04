@@ -345,7 +345,7 @@ var afterMessageCount : Int?
 func uintFunc() -> UInt {}
 func takeVoidVoidFn(_ a : () -> ()) {}
 takeVoidVoidFn { () -> Void in
-  afterMessageCount = uintFunc()  // expected-error {{cannot assign value of type 'UInt' to type 'Int?'}}
+  afterMessageCount = uintFunc()  // expected-error {{cannot assign value of type 'UInt' to type 'Int'}}
 }
 
 // <rdar://problem/19997471> Swift: Incorrect compile error when calling a function inside a closure
@@ -371,8 +371,7 @@ func someGeneric19997471<T>(_ x: T) {
 func rdar21078316() {
   var foo : [String : String]?
   var bar : [(String, String)]?
-  bar = foo.map { ($0, $1) }  // expected-error {{contextual closure type '([String : String]) throws -> [(String, String)]' expects 1 argument, but 2 were used in closure body}}
-  // expected-error@-1:19 {{cannot convert value of type '(Dictionary<String, String>, _)' to closure result type '[(String, String)]'}}
+  bar = foo.map { ($0, $1) }  // expected-error {{contextual closure type '([String : String]) throws -> U' expects 1 argument, but 2 were used in closure body}}
 }
 
 
@@ -718,7 +717,7 @@ func rdar37790062() {
 }
 
 // <rdar://problem/39489003>
-typealias KeyedItem<K, T> = (key: K, value: T) // expected-note {{'T' declared as parameter to type 'KeyedItem'}}
+typealias KeyedItem<K, T> = (key: K, value: T)
 
 protocol Node {
   associatedtype T
@@ -732,7 +731,7 @@ extension Node {
   func getChild(for key:K)->(key: K, value: T) {
     return children.first(where: { (item:KeyedItem) -> Bool in
         return item.key == key
-        // expected-error@-1 {{generic parameter 'T' could not be inferred}}
+        // expected-error@-1 {{binary operator '==' cannot be applied to two 'Self.K' operands}}
       })!
   }
 }
@@ -766,7 +765,7 @@ overloaded { print("hi"); print("bye") } // multiple expression closure without 
 func not_overloaded(_ handler: () -> Int) {}
 
 not_overloaded { } // empty body
-// expected-error@-1 {{cannot convert value of type '() -> ()' to expected argument type '() -> Int'}}
+// expected-error@-1 {{cannot convert value of type '()' to closure result type 'Int'}}
 
 not_overloaded { print("hi") } // single-expression closure
 // expected-error@-1 {{cannot convert value of type '()' to closure result type 'Int'}}
@@ -787,7 +786,7 @@ func test() -> Int? {
 }
 
 var fn: () -> [Int] = {}
-// expected-error@-1 {{cannot convert value of type '() -> ()' to specified type '() -> [Int]'}}
+// expected-error@-1 {{cannot convert value of type '()' to closure result type '[Int]'}}
 
 fn = {}
 // expected-error@-1 {{cannot assign value of type '() -> ()' to type '() -> [Int]'}}

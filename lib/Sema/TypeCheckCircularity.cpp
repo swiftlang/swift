@@ -98,9 +98,7 @@ private:
 };
 
 /// A helper class for performing a circularity check.
-class CircularityChecker {
-  TypeChecker &TC;
-
+class CircularityChecker final {
   /// The original type declaration we're starting with.
   NominalTypeDecl *OriginalDecl;
 
@@ -111,9 +109,9 @@ class CircularityChecker {
   SmallVector<WorkItem, 8> Workstack;
 
 public:
-  CircularityChecker(TypeChecker &tc, NominalTypeDecl *typeDecl)
-    : TC(tc), OriginalDecl(typeDecl),
-      MaxDepth(tc.Context.LangOpts.MaxCircularityDepth) {}
+  CircularityChecker(NominalTypeDecl *typeDecl)
+      : OriginalDecl(typeDecl),
+        MaxDepth(typeDecl->getASTContext().LangOpts.MaxCircularityDepth) {}
 
   void run();
 
@@ -178,7 +176,7 @@ private:
 } // end anonymous namespace
 
 void TypeChecker::checkDeclCircularity(NominalTypeDecl *decl) {
-  CircularityChecker(*this, decl).run();
+  CircularityChecker(decl).run();
 }
 
 /// The main routine for performing circularity checks.
@@ -523,18 +521,12 @@ bool CircularityChecker::diagnoseCircularity(CanType parentType,
 
   auto baseType = path[0].Ty;
   if (cycleIndex != 0) {
-    TC.diagnose(OriginalDecl->getLoc(),
-                diag::unsupported_infinitely_sized_type,
-                baseType);
+    OriginalDecl->diagnose(diag::unsupported_infinitely_sized_type, baseType);
   } else if (isa<StructDecl>(OriginalDecl)) {
-    TC.diagnose(path[1].Member->getLoc(),
-                diag::unsupported_recursive_struct,
-                baseType);
+    path[1].Member->diagnose(diag::unsupported_recursive_struct, baseType);
   } else if (isa<EnumDecl>(OriginalDecl)) {
-    TC.diagnose(OriginalDecl->getLoc(),
-                diag::recursive_enum_not_indirect,
-                baseType)
-      .fixItInsert(OriginalDecl->getStartLoc(), "indirect ");
+    OriginalDecl->diagnose(diag::recursive_enum_not_indirect, baseType)
+        .fixItInsert(OriginalDecl->getStartLoc(), "indirect ");
   } else {
     llvm_unreachable("what kind of entity was this?");
   }
@@ -545,12 +537,9 @@ bool CircularityChecker::diagnoseCircularity(CanType parentType,
       llvm::raw_svector_ostream out(pathString);
       path.printCycle(out, cycleIndex);
     }
-    TC.diagnose(path[1].Member->getLoc(),
-                diag::note_type_cycle_starts_here,
-                pathString);
+    path[1].Member->diagnose(diag::note_type_cycle_starts_here, pathString);
   } else if (isa<EnumDecl>(OriginalDecl)) {
-    TC.diagnose(path[1].Member->getLoc(),
-                diag::note_recursive_enum_case_here);
+    path[1].Member->diagnose(diag::note_recursive_enum_case_here);
   }
 
   return true;
@@ -573,9 +562,7 @@ bool CircularityChecker::diagnoseInfiniteRecursion(CanType parentType,
   }
 
   auto baseType = path[0].Ty;
-  TC.diagnose(OriginalDecl->getLoc(),
-              diag::unsupported_infinitely_sized_type,
-              baseType);
+  OriginalDecl->diagnose(diag::unsupported_infinitely_sized_type, baseType);
 
   // Add a note about the start of the path.
   llvm::SmallString<128> pathString; {
@@ -583,9 +570,7 @@ bool CircularityChecker::diagnoseInfiniteRecursion(CanType parentType,
     path.printInfinite(out);
   }
 
-  TC.diagnose(path[1].Member->getLoc(),
-              diag::note_type_cycle_starts_here,
-              pathString);
+  path[1].Member->diagnose(diag::note_type_cycle_starts_here, pathString);
 
   return true;
 }
@@ -628,5 +613,5 @@ void CircularityChecker::diagnoseNonWellFoundedEnum(EnumDecl *E) {
   };
 
   if (isNonWellFounded())
-    TC.diagnose(E, diag::enum_non_well_founded);
+    E->getASTContext().Diags.diagnose(E, diag::enum_non_well_founded);
 }

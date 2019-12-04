@@ -245,7 +245,7 @@ struct Initialization {
   var y = true
 
   @WrapperWithInitialValue<Int>
-  var y2 = true // expected-error{{Bool' is not convertible to 'Int}}
+  var y2 = true // expected-error{{cannot convert value of type 'Bool' to specified type 'Int'}}
 
   mutating func checkTypes(s: String) {
     x2 = s // expected-error{{cannot assign value of type 'String' to type 'Double'}}
@@ -964,14 +964,21 @@ struct TestComposition {
   @WrapperD<WrapperC, Int, String> @WrapperC var p4: Int?
   @WrapperD<WrapperC, Int, String> @WrapperE var p5: Int // expected-error{{property type 'Int' does not match that of the 'wrappedValue' property of its wrapper type 'WrapperD<WrapperC, Int, String>'}}
 
-	func triggerErrors(d: Double) {
-		p1 = d // expected-error{{cannot assign value of type 'Double' to type 'Int?'}}
-		p2 = d // expected-error{{cannot assign value of type 'Double' to type 'String?'}}
-    p3 = d // expected-error{{cannot assign value of type 'Double' to type 'Int?'}}
+	func triggerErrors(d: Double) { // expected-note 6 {{mark method 'mutating' to make 'self' mutable}} {{2-2=mutating }}
+		p1 = d // expected-error{{cannot assign value of type 'Double' to type 'Int'}} {{8-8=Int(}} {{9-9=)}}
+    // expected-error@-1 {{cannot assign to property: 'self' is immutable}}
+		p2 = d // expected-error{{cannot assign value of type 'Double' to type 'String'}}
+    // expected-error@-1 {{cannot assign to property: 'self' is immutable}}
+    // TODO(diagnostics): Looks like source range for 'd' here is reported as starting at 10, but it should be 8
+    p3 = d // expected-error{{cannot assign value of type 'Double' to type 'Int'}} {{10-10=Int(}} {{11-11=)}}
+    // expected-error@-1 {{cannot assign to property: 'self' is immutable}}
 
 		_p1 = d // expected-error{{cannot assign value of type 'Double' to type 'WrapperA<WrapperB<WrapperC<Int>>>'}}
+    // expected-error@-1 {{cannot assign to property: 'self' is immutable}}
 		_p2 = d // expected-error{{cannot assign value of type 'Double' to type 'WrapperA<WrapperB<WrapperC<String>>>'}}
+    // expected-error@-1 {{cannot assign to property: 'self' is immutable}}
     _p3 = d // expected-error{{cannot assign value of type 'Double' to type 'WrapperD<WrapperE<Int?>, Int, String>'}}
+    // expected-error@-1 {{cannot assign to property: 'self' is immutable}}
 	}
 }
 
@@ -1577,12 +1584,12 @@ struct SR_11288_S3: SR_11288_P3 {
 // typealias as propertyWrapper in a constrained protocol extension //
 
 protocol SR_11288_P4 {}
-extension SR_11288_P4 where Self: AnyObject { // expected-note 2 {{where 'Self' = 'SR_11288_S4'}}
+extension SR_11288_P4 where Self: AnyObject { // expected-note {{requirement specified as 'Self' : 'AnyObject' [with Self = SR_11288_S4]}}
   typealias SR_11288_Wrapper4 = SR_11288_S0
 }
 
 struct SR_11288_S4: SR_11288_P4 {
-  @SR_11288_Wrapper4 var answer = 42 // expected-error 2 {{referencing type alias 'SR_11288_Wrapper4' on 'SR_11288_P4' requires that 'SR_11288_S4' be a class type}}
+  @SR_11288_Wrapper4 var answer = 42 // expected-error {{'SR_11288_S4.SR_11288_Wrapper4' (aka 'SR_11288_S0') requires that 'SR_11288_S4' be a class type}}
 }
 
 class SR_11288_C0: SR_11288_P4 {
@@ -1801,4 +1808,26 @@ func test_rdar56350060() {
       return self[keyPath: keyPath] // Ok
     }
   }
+}
+
+// rdar://problem/57411331 - crash due to incorrectly synthesized "nil" default
+// argument.
+@propertyWrapper
+struct Blah<Value> {
+  init(blah _: Int) { }
+
+  var wrappedValue: Value {
+    let val: Value? = nil
+    return val!
+  }
+}
+
+struct UseRdar57411331 {
+  let x = Rdar57411331(other: 5)
+}
+
+struct Rdar57411331 {
+  @Blah(blah: 17) var something: Int?
+
+  var other: Int
 }

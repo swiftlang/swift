@@ -695,11 +695,12 @@ emitKeyPathComponent(IRGenModule &IGM,
          && "must be 32-bit-aligned here");
 
   SILType loweredBaseTy;
+  loweredBaseTy = IGM.getLoweredType(AbstractionPattern::getOpaque(),
+                                     baseTy->getWithoutSpecifierType());
+  // TODO: Eliminate GenericContextScope entirely
   GenericContextScope scope(IGM,
          genericEnv ? genericEnv->getGenericSignature()->getCanonicalSignature()
                     : nullptr);
-  loweredBaseTy = IGM.getLoweredType(AbstractionPattern::getOpaque(),
-                                     baseTy->getWithoutSpecifierType());
   switch (auto kind = component.getKind()) {
   case KeyPathPatternComponent::Kind::StoredProperty: {
     auto property = cast<VarDecl>(component.getStoredPropertyDecl());
@@ -790,9 +791,8 @@ emitKeyPathComponent(IRGenModule &IGM,
       switch (getClassFieldAccess(IGM, loweredBaseContextTy, property)) {
       case FieldAccess::ConstantDirect: {
         // Known constant fixed offset.
-        auto offset = tryEmitConstantClassFragilePhysicalMemberOffset(IGM,
-                                                                loweredClassTy,
-                                                                property);
+        auto offset = tryEmitConstantClassFragilePhysicalMemberOffset(
+            IGM, loweredClassTy, property);
         assert(offset && "no constant offset for ConstantDirect field?!");
         addFixedOffset(/*struct*/ false, property->isLet(), offset);
         break;
@@ -1104,7 +1104,8 @@ emitKeyPathComponent(IRGenModule &IGM,
   case KeyPathPatternComponent::Kind::TupleElement:
     assert(baseTy->is<TupleType>() && "not a tuple");
 
-    SILType loweredTy = IGM.getLoweredType(baseTy);
+    SILType loweredTy = IGM.getLoweredType(AbstractionPattern::getOpaque(),
+                                           baseTy);
 
     // Tuple with fixed layout
     //
@@ -1113,7 +1114,8 @@ emitKeyPathComponent(IRGenModule &IGM,
     // the compiler knows that the tuple element is always at offset 0.
     // TODO: If this is behavior is not desired we should find a way to skip to
     // the next section of code e.g. check if baseTy has archetypes?
-    if (auto offset = getFixedTupleElementOffset(IGM, loweredTy, component.getTupleIndex())) {
+    if (auto offset = getFixedTupleElementOffset(IGM, loweredTy,
+                                                 component.getTupleIndex())) {
       auto header = KeyPathComponentHeader
                       ::forStructComponentWithInlineOffset(/*isLet*/ false,
                                                            offset->getValue());

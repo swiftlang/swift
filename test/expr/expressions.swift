@@ -588,12 +588,13 @@ func conversionTest(_ a: inout Double, b: inout Int) {
   var pi_f3 = float.init(getPi()) // expected-error {{ambiguous use of 'init(_:)'}}
   var pi_f4 = float.init(pi_f)
 
-  var e = Empty(f) // expected-warning {{variable 'e' inferred to have type 'Empty', which is an enum with no cases}} expected-note {{add an explicit type annotation to silence this warning}}
+  var e = Empty(f) // expected-warning {{variable 'e' inferred to have type 'Empty', which is an enum with no cases}} expected-note {{add an explicit type annotation to silence this warning}}  {{8-8=: Empty}}
   var e2 = Empty(d) // expected-error{{cannot convert value of type 'Double' to expected argument type 'Float'}}
-  var e3 = Empty(Float(d)) // expected-warning {{variable 'e3' inferred to have type 'Empty', which is an enum with no cases}} expected-note {{add an explicit type annotation to silence this warning}}
+  var e3 = Empty(Float(d)) // expected-warning {{variable 'e3' inferred to have type 'Empty', which is an enum with no cases}} expected-note {{add an explicit type annotation to silence this warning}}  {{9-9=: Empty}}
 }
 
-struct Rule {
+// FIXME(diagnostics): This note is pointing to a synthesized init
+struct Rule { // expected-note {{'init(target:dependencies:)' declared here}}
   var target: String
   var dependencies: String
 }
@@ -602,8 +603,8 @@ var ruleVar: Rule
 // FIXME(diagnostics): To be able to suggest different candidates here we need to teach the solver how to figure out to which parameter
 // does argument belong to in this case. If the `target` was of a different type, we currently suggest to add an argument for `dependencies:`
 // which is incorrect.
-ruleVar = Rule("a") // expected-error {{cannot convert value of type 'String' to expected argument type '(target: String, dependencies: String)'}}
-
+ruleVar = Rule("a") // expected-error {{missing argument label 'target:' in call}}
+// expected-error@-1 {{missing argument for parameter 'dependencies' in call}}
 
 class C {
   var x: C?
@@ -860,7 +861,7 @@ func r20802757(_ z: inout Int = &g20802757) { // expected-error {{cannot provide
   print(z)
 }
 
-_ = _.foo // expected-error {{type of expression is ambiguous without more context}}
+_ = _.foo // expected-error {{'_' can only appear in a pattern or on the left side of an assignment}}
 
 // <rdar://problem/22211854> wrong arg list crashing sourcekit
 func r22211854() {

@@ -28,8 +28,8 @@
 #include "swift/Subsystems.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/DiagnosticsSema.h"
-#include "swift/AST/ExperimentalDependencies.h"
 #include "swift/AST/FileSystem.h"
+#include "swift/AST/FineGrainedDependencies.h"
 #include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/NameLookup.h"
@@ -764,6 +764,29 @@ static bool precompileBridgingHeader(CompilerInvocation &Invocation,
           .InputsAndOutputs.getSingleOutputFilename());
 }
 
+static bool precompileClangModule(CompilerInvocation &Invocation,
+                                  CompilerInstance &Instance) {
+  auto clangImporter = static_cast<ClangImporter *>(
+      Instance.getASTContext().getClangModuleLoader());
+  return clangImporter->emitPrecompiledModule(
+      Invocation.getFrontendOptions()
+          .InputsAndOutputs.getFilenameOfFirstInput(),
+      Invocation.getFrontendOptions().ModuleName,
+      Invocation.getFrontendOptions()
+          .InputsAndOutputs.getSingleOutputFilename());
+}
+
+static bool dumpPrecompiledClangModule(CompilerInvocation &Invocation,
+                                       CompilerInstance &Instance) {
+  auto clangImporter = static_cast<ClangImporter *>(
+      Instance.getASTContext().getClangModuleLoader());
+  return clangImporter->dumpPrecompiledModule(
+      Invocation.getFrontendOptions()
+          .InputsAndOutputs.getFilenameOfFirstInput(),
+      Invocation.getFrontendOptions()
+          .InputsAndOutputs.getSingleOutputFilename());
+}
+
 static bool buildModuleFromInterface(CompilerInvocation &Invocation,
                                      CompilerInstance &Instance) {
   const FrontendOptions &FEOpts = Invocation.getFrontendOptions();
@@ -956,14 +979,51 @@ static void emitReferenceDependenciesForAllPrimaryInputsIfNeeded(
         Invocation.getReferenceDependenciesFilePathForPrimary(
             SF->getFilename());
     if (!referenceDependenciesFilePath.empty()) {
-      if (Invocation.getLangOptions().EnableExperimentalDependencies)
-        (void)experimental_dependencies::emitReferenceDependencies(
+      if (Invocation.getLangOptions().EnableFineGrainedDependencies)
+        (void)fine_grained_dependencies::emitReferenceDependencies(
             Instance.getASTContext().Diags, SF,
             *Instance.getDependencyTracker(), referenceDependenciesFilePath);
       else
         (void)emitReferenceDependencies(Instance.getASTContext().Diags, SF,
                                         *Instance.getDependencyTracker(),
                                         referenceDependenciesFilePath);
+    }
+  }
+}
+static void
+emitSwiftRangesForAllPrimaryInputsIfNeeded(CompilerInvocation &Invocation,
+                                           CompilerInstance &Instance) {
+  if (Invocation.getFrontendOptions().InputsAndOutputs.hasSwiftRangesPath() &&
+      Instance.getPrimarySourceFiles().empty()) {
+    Instance.getASTContext().Diags.diagnose(
+        SourceLoc(), diag::emit_swift_ranges_without_primary_file);
+    return;
+  }
+  for (auto *SF : Instance.getPrimarySourceFiles()) {
+    const std::string &swiftRangesFilePath =
+        Invocation.getSwiftRangesFilePathForPrimary(SF->getFilename());
+    if (!swiftRangesFilePath.empty()) {
+      (void)Instance.emitSwiftRanges(Instance.getASTContext().Diags, SF,
+                                     swiftRangesFilePath);
+    }
+  }
+}
+static void
+emitCompiledSourceForAllPrimaryInputsIfNeeded(CompilerInvocation &Invocation,
+                                              CompilerInstance &Instance) {
+  if (Invocation.getFrontendOptions()
+          .InputsAndOutputs.hasCompiledSourcePath() &&
+      Instance.getPrimarySourceFiles().empty()) {
+    Instance.getASTContext().Diags.diagnose(
+        SourceLoc(), diag::emit_compiled_source_without_primary_file);
+    return;
+  }
+  for (auto *SF : Instance.getPrimarySourceFiles()) {
+    const std::string &compiledSourceFilePath =
+        Invocation.getCompiledSourceFilePathForPrimary(SF->getFilename());
+    if (!compiledSourceFilePath.empty()) {
+      (void)Instance.emitCompiledSource(Instance.getASTContext().Diags, SF,
+                                        compiledSourceFilePath);
     }
   }
 }
@@ -1133,10 +1193,14 @@ static bool performCompile(CompilerInstance &Instance,
     Instance.getASTContext().LangOpts.VerifySyntaxTree = true;
   }
 
-  // We've been asked to precompile a bridging header; we want to
+  // We've been asked to precompile a bridging header or module; we want to
   // avoid touching any other inputs and just parse, emit and exit.
   if (Action == FrontendOptions::ActionType::EmitPCH)
     return precompileBridgingHeader(Invocation, Instance);
+  if (Action == FrontendOptions::ActionType::EmitPCM)
+    return precompileClangModule(Invocation, Instance);
+  if (Action == FrontendOptions::ActionType::DumpPCM)
+    return dumpPrecompiledClangModule(Invocation, Instance);
 
   if (Action == FrontendOptions::ActionType::CompileModuleFromInterface)
     return buildModuleFromInterface(Invocation, Instance);
@@ -1199,6 +1263,8 @@ static bool performCompile(CompilerInstance &Instance,
     Context.getClangModuleLoader()->printStatistics();
 
   emitReferenceDependenciesForAllPrimaryInputsIfNeeded(Invocation, Instance);
+  emitSwiftRangesForAllPrimaryInputsIfNeeded(Invocation, Instance);
+  emitCompiledSourceForAllPrimaryInputsIfNeeded(Invocation, Instance);
 
   if (Context.hadError()) {
     //  Emit the index store data even if there were compiler errors.
@@ -1310,6 +1376,12 @@ static bool processCommandLineAndRunImmediately(CompilerInvocation &Invocation,
       ProcessCmdLine(opts.ImmediateArgv.begin(), opts.ImmediateArgv.end());
   Instance.setSILModule(std::move(SM));
 
+
+  PrettyStackTraceStringAction trace(
+      "running user code",
+      MSF.is<SourceFile *>() ? MSF.get<SourceFile *>()->getFilename()
+                     : MSF.get<ModuleDecl *>()->getModuleFilename());
+
   ReturnValue =
       RunImmediately(Instance, CmdLine, IRGenOpts, Invocation.getSILOptions());
   return Instance.getASTContext().hadError();
@@ -1322,6 +1394,9 @@ static bool validateTBDIfNeeded(CompilerInvocation &Invocation,
   if (!astGuaranteedToCorrespondToSIL ||
       !inputFileKindCanHaveTBDValidated(Invocation.getInputKind()))
     return false;
+    
+  if (Invocation.getSILOptions().CrossModuleOptimization)
+    return false;
 
   const auto &frontendOpts = Invocation.getFrontendOptions();
   auto mode = frontendOpts.ValidateTBDAgainstIR;
@@ -1329,15 +1404,13 @@ static bool validateTBDIfNeeded(CompilerInvocation &Invocation,
   switch (mode) {
   case FrontendOptions::TBDValidationMode::Default:
 #ifndef NDEBUG
-    // When a debug compiler is targeting an apple platform, we do some
-    // validation by default.
-    if (Invocation.getLangOptions().Target.getVendor() == llvm::Triple::Apple) {
-      mode = FrontendOptions::TBDValidationMode::MissingFromTBD;
-      break;
-    }
-#endif
+    // With a debug compiler, we do some validation by default.
+    mode = FrontendOptions::TBDValidationMode::MissingFromTBD;
+    break;
+#else
     // Otherwise, the default is to do nothing.
     LLVM_FALLTHROUGH;
+#endif
   case FrontendOptions::TBDValidationMode::None:
     return false;
   case FrontendOptions::TBDValidationMode::All:

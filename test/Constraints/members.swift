@@ -301,7 +301,7 @@ func test15117741(_ s: r15117741S) {
 // <rdar://problem/22491394> References to unavailable decls sometimes diagnosed as ambiguous
 struct UnavailMember {
   @available(*, unavailable)
-  static var XYZ : X { get {} } // expected-note {{'XYZ' has been explicitly marked unavailable here}}
+  static var XYZ : UnavailMember { get {} } // expected-note {{'XYZ' has been explicitly marked unavailable here}}
 }
 
 let _ : [UnavailMember] = [.XYZ] // expected-error {{'XYZ' is unavailable}}
@@ -325,6 +325,7 @@ enum r23942743 {
   case Tomato(cloud: String)
 }
 let _ = .Tomato(cloud: .none)  // expected-error {{reference to member 'Tomato' cannot be resolved without a contextual type}}
+// expected-error@-1 {{cannot infer contextual base in reference to member 'none'}}
 
 
 

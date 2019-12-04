@@ -165,6 +165,11 @@ protected:
   void markExternal(SmallVectorImpl<const void *> &visited,
                     StringRef externalDependency);
 
+public:
+  void forEachUnmarkedJobDirectlyDependentOnExternalSwiftdeps(
+      StringRef externalDependency, function_ref<void(const void *)> fn);
+
+protected:
   bool isMarked(const void *node) const {
     assert(Provides.count(node) && "node is not in the graph");
     return Marked.count(node);
@@ -233,7 +238,7 @@ public:
   /// If \p node has already been marked, only its outgoing edges are updated.
   /// The third argument is ignored here, but must be present so that the same
   /// call site can polymorphically call \ref
-  /// experimental_dependencies::ModuleDepGraph::loadFromPath
+  /// fine_grained_dependencies::ModuleDepGraph::loadFromPath
   LoadResult loadFromPath(T node, StringRef path, DiagnosticEngine &) {
     return DependencyGraphImpl::loadFromPath(Traits::getAsVoidPointer(node),
                                              path);

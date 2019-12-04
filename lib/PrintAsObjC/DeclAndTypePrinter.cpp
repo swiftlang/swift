@@ -14,6 +14,7 @@
 
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTVisitor.h"
+#include "swift/AST/ClangSwiftTypeCorrespondence.h"
 #include "swift/AST/Comment.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/ExistentialLayout.h"
@@ -1396,8 +1397,8 @@ private:
     // upper-bounded keys.
     else if (swiftNominal == ctx.getDictionaryDecl() &&
              isNSObjectOrAnyHashable(ctx, typeArgs[0])) {
-      if (auto proto = ctx.getNSCopyingDecl()) {
-        rewrittenArgsBuf[0] = proto->getDeclaredInterfaceType();
+      if (auto protoTy = ctx.getNSCopyingType()) {
+        rewrittenArgsBuf[0] = protoTy;
         rewrittenArgsBuf[1] = typeArgs[1];
         typeArgs = rewrittenArgsBuf;
       }
@@ -1559,8 +1560,7 @@ private:
     ASTContext &ctx = getASTContext();
     auto &clangASTContext = ctx.getClangModuleLoader()->getClangASTContext();
     clang::QualType clangTy = clangASTContext.getTypeDeclType(clangTypeDecl);
-    return clangTy->isPointerType() || clangTy->isBlockPointerType() ||
-      clangTy->isObjCObjectPointerType();
+    return swift::canImportAsOptional(clangTy.getTypePtr());
   }
 
   bool printImportedAlias(const TypeAliasDecl *alias,
@@ -1934,7 +1934,18 @@ private:
     if (!FT->getParams().empty()) {
       interleave(FT->getParams(),
                  [this](const AnyFunctionType::Param &param) {
-                   print(param.getOldType(), OTK_None, param.getLabel(),
+                   switch (param.getValueOwnership()) {
+                   case ValueOwnership::Default:
+                   case ValueOwnership::Shared:
+                     break;
+                   case ValueOwnership::Owned:
+                     os << "SWIFT_RELEASES_ARGUMENT ";
+                     break;
+                   case ValueOwnership::InOut:
+                     llvm_unreachable("bad specifier");
+                   }
+
+                   print(param.getParameterType(), OTK_None, param.getLabel(),
                          IsFunctionParam);
                  },
                  [this] { os << ", "; });

@@ -37,6 +37,16 @@ class Product(object):
         It provides a customization point for Product subclasses. It is set to
         the value of product_name() by default for this reason.
         """
+
+        llvm_projects = ['clang',
+                         'clang-tools-extra',
+                         'compiler-rt',
+                         'libcxx',
+                         'lldb',
+                         'llvm']
+
+        if cls.product_name() in llvm_projects:
+            return "llvm-project/{}".format(cls.product_name())
         return cls.product_name()
 
     @classmethod

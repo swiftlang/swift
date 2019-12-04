@@ -619,7 +619,7 @@ class WrongInheritanceClause6(Int {}
 class WrongInheritanceClause7<T>(Int where T:AnyObject {}
 
 // <rdar://problem/18502220> [swift-crashes 078] parser crash on invalid cast in sequence expr
-Base=1 as Base=1  // expected-error {{cannot assign to immutable expression of type 'Base.Type'}}
+Base=1 as Base=1  // expected-error {{cannot convert value of type 'Int' to type 'Base' in coercion}}
 
 
 
@@ -695,9 +695,6 @@ struct InitializerWithNameAndParam {
 struct InitializerWithLabels {
   init c d: Int {}
   // expected-error @-1 {{expected '(' for initializer parameters}}
-  // expected-error @-2 {{expected declaration}}
-  // expected-error @-3 {{consecutive declarations on a line must be separated by ';'}}
-  // expected-note @-5 {{in declaration of 'InitializerWithLabels'}}
 }
 
 // rdar://20337695
@@ -761,7 +758,7 @@ let ￼tryx  = 123        // expected-error 2 {{invalid character in source file
 
 
 // <rdar://problem/21369926> Malformed Swift Enums crash playground service
-enum Rank: Int {  // expected-error {{'Rank' declares raw type 'Int', but does not conform to RawRepresentable and conformance could not be synthesized}} expected-note {{do you want to add protocol stubs?}}
+enum Rank: Int {  // expected-error {{'Rank' declares raw type 'Int', but does not conform to RawRepresentable and conformance could not be synthesized}}
   case Ace = 1
   case Two = 2.1  // expected-error {{cannot convert value of type 'Double' to raw type 'Int'}}
 }

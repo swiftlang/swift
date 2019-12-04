@@ -48,15 +48,14 @@ public:
 /// A collection of typo-correction candidates.
 class TypoCorrectionResults {
 public:
-  TypeChecker &TC;
   DeclName WrittenName;
   DeclNameLoc Loc;
   bool ClaimedCorrection = false;
 
   SmallVector<ValueDecl *, 4> Candidates;
 
-  TypoCorrectionResults(TypeChecker &tc, DeclName writtenName, DeclNameLoc loc)
-    : TC(tc), WrittenName(writtenName), Loc(loc) {}
+  TypoCorrectionResults(DeclName writtenName, DeclNameLoc loc)
+    : WrittenName(writtenName), Loc(loc) {}
 
   /// Try to claim a unique correction from this collection that's simple
   /// enough to include "inline" in the primary diagnostic.  Note that

@@ -428,7 +428,7 @@ class DeclName {
   // it is simple or compound), or a reference to a compound declaration name.
   llvm::PointerUnion<BaseNameAndCompound, CompoundDeclName *> SimpleOrCompound;
 
-  DeclName(void *Opaque)
+  explicit DeclName(void *Opaque)
     : SimpleOrCompound(decltype(SimpleOrCompound)::getFromOpaqueValue(Opaque))
   {}
 
@@ -571,6 +571,11 @@ public:
     return !(lhs == rhs);
   }
 
+  friend llvm::hash_code hash_value(DeclName name) {
+    using llvm::hash_value;
+    return hash_value(name.getOpaqueValue());
+  }
+
   friend bool operator<(DeclName lhs, DeclName rhs) {
     return lhs.compare(rhs) < 0;
   }
@@ -614,6 +619,8 @@ public:
   /// Dump this name to standard error.
   SWIFT_DEBUG_DUMP;
 };
+
+void simple_display(llvm::raw_ostream &out, DeclName name);
 
 enum class ObjCSelectorFamily : unsigned {
   None,

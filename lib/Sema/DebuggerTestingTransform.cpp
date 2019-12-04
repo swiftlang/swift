@@ -218,7 +218,6 @@ private:
     CheckExpectExpr->setThrows(false);
 
     // Create the closure.
-    TypeChecker &TC = TypeChecker::createForContext(Ctx);
     auto *Params = ParameterList::createEmpty(Ctx);
     auto *Closure = new (Ctx)
         ClosureExpr(Params, SourceLoc(), SourceLoc(), SourceLoc(), TypeLoc(),
@@ -238,7 +237,8 @@ private:
     // TODO: typeCheckExpression() seems to assign types to everything here,
     // but may not be sufficient in some cases.
     Expr *FinalExpr = ClosureCall;
-    if (!TC.typeCheckExpression(FinalExpr, getCurrentDeclContext()))
+    (void)swift::createTypeChecker(Ctx);
+    if (!TypeChecker::typeCheckExpression(FinalExpr, getCurrentDeclContext()))
       llvm::report_fatal_error("Could not type-check instrumentation");
 
     // Captures have to be computed after the closure is type-checked. This

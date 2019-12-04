@@ -17,18 +17,17 @@ func unsafePointerInitEphemeralConversions() {
   // expected-note@-1 {{implicit argument conversion from 'Int' to 'UnsafePointer<Int>' produces a pointer valid only for the duration of the call to '+'}}
   // expected-note@-2 {{use 'withUnsafePointer' in order to explicitly convert argument to pointer valid for a defined scope}}
 
-  // FIXME(SR-8411): This is currently ambiguous. The reason why we don't get
-  // the usual "no exact matches in call to initializer" error is we cannot
-  // currently diagnose ambiguities between solutions with multiple fixes, so we
-  // leave it up to CSDiag.
-  _ = UnsafePointer.init(&foo) // expected-error {{ambiguous reference to member 'init(_:)'}}
+  _ = UnsafePointer.init(&foo) // expected-warning {{initialization of 'UnsafePointer<Int>' results in a dangling pointer}}
+  // expected-note@-1 {{implicit argument conversion from 'Int' to 'UnsafePointer<Int>' produces a pointer valid only for the duration of the call to 'init(_:)'}}
+  // expected-note@-2 {{use 'withUnsafePointer' in order to explicitly convert argument to pointer valid for a defined scope}}
 
   _ = UnsafePointer<Int8>("") // expected-warning {{initialization of 'UnsafePointer<Int8>' results in a dangling pointer}}
   // expected-note@-1 {{implicit argument conversion from 'String' to 'UnsafePointer<Int8>' produces a pointer valid only for the duration of the call to 'init(_:)'}}
   // expected-note@-2 {{use the 'withCString' method on String in order to explicitly convert argument to pointer valid for a defined scope}}
 
-  // FIXME(SR-8411): This is currently ambiguous.
-  _ = UnsafePointer<Int8>.init("") // expected-error {{no exact matches in call to initializer}}
+  _ = UnsafePointer<Int8>.init("") // expected-warning {{initialization of 'UnsafePointer<Int8>' results in a dangling pointer}}
+  // expected-note@-1 {{implicit argument conversion from 'String' to 'UnsafePointer<Int8>' produces a pointer valid only for the duration of the call to 'init(_:)'}}
+  // expected-note@-2 {{use the 'withCString' method on String in order to explicitly convert argument to pointer valid for a defined scope}}
 
   _ = UnsafePointer<Int8>(str) // expected-warning {{initialization of 'UnsafePointer<Int8>' results in a dangling pointer}}
   // expected-note@-1 {{implicit argument conversion from 'String' to 'UnsafePointer<Int8>' produces a pointer valid only for the duration of the call to 'init(_:)'}}

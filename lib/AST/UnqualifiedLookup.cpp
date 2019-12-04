@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 ///
-/// This file implements the construction of an UnqualifiedLookup, which entails
-/// performing the lookup.
+/// This file implements unqualified lookup, which searches for an identifier
+/// from a given context.
 ///
 //===----------------------------------------------------------------------===//
 
@@ -81,18 +81,14 @@ namespace {
 } // end anonymous namespace
 
 namespace {
-  /// Because UnqualifiedLookup does all of its work in the constructor,
-  /// a factory class is needed to hold all of the inputs and outputs so
-  /// that the construction code can be decomposed into bite-sized pieces.
-  
   class UnqualifiedLookupFactory {
 
     friend class ASTScopeDeclConsumerForUnqualifiedLookup;
 
   public:
-    using Flags = UnqualifiedLookup::Flags;
-    using Options = UnqualifiedLookup::Options;
-    using ResultsVector = UnqualifiedLookup::ResultsVector;
+    using Flags = UnqualifiedLookupFlags;
+    using Options = UnqualifiedLookupOptions;
+    using ResultsVector = SmallVector<LookupResultEntry, 4>;
     
   private:
     struct ContextAndResolvedIsCascadingUse {
@@ -207,12 +203,6 @@ namespace {
                              DeclContext *const DC,
                              SourceLoc Loc,
                              Options options,
-                             UnqualifiedLookup &lookupToBeCreated);
-    
-    UnqualifiedLookupFactory(DeclName Name,
-                             DeclContext *const DC,
-                             SourceLoc Loc,
-                             Options options,
                              SmallVectorImpl<LookupResultEntry> &Results,
                              size_t &IndexOfFirstOuterResult);
     // clang-format on
@@ -232,7 +222,7 @@ namespace {
     bool useASTScopesForLookup() const;
 
     /// For testing, assume this lookup is enabled:
-    bool useASTScopesForLookupIfEnabled() const;
+    bool wouldUseASTScopesForLookupIfItWereEnabled() const;
 
     void lookUpTopLevelNamesInModuleScopeContext(DeclContext *);
 
@@ -342,7 +332,7 @@ namespace {
     
 #pragma mark common helper declarations
     static NLOptions
-    computeBaseNLOptions(const UnqualifiedLookup::Options options,
+    computeBaseNLOptions(const UnqualifiedLookupOptions options,
                          const bool isOriginallyTypeLookup);
 
     Optional<bool> getInitialIsCascadingUse() const {
@@ -438,18 +428,6 @@ UnqualifiedLookupFactory::UnqualifiedLookupFactory(
                             DeclContext *const DC,
                             SourceLoc Loc,
                             Options options,
-                            UnqualifiedLookup &lookupToBeCreated)
-: UnqualifiedLookupFactory(Name, DC, Loc, options,
-    lookupToBeCreated.Results,
-    lookupToBeCreated.IndexOfFirstOuterResult)
-
-{}
-
-UnqualifiedLookupFactory::UnqualifiedLookupFactory(
-                            DeclName Name,
-                            DeclContext *const DC,
-                            SourceLoc Loc,
-                            Options options,
                             SmallVectorImpl<LookupResultEntry> &Results,
                             size_t &IndexOfFirstOuterResult)
 :
@@ -506,7 +484,8 @@ void UnqualifiedLookupFactory::performUnqualifiedLookup() {
       lookupNamesIntroducedBy(contextAndIsCascadingUse);
   }
 
-  if (crosscheckUnqualifiedLookup && useASTScopesForLookupIfEnabled()) {
+  if (crosscheckUnqualifiedLookup &&
+      wouldUseASTScopesForLookupIfItWereEnabled()) {
     ResultsVector results;
     size_t indexOfFirstOuterResult = 0;
     UnqualifiedLookupFactory altLookup(Name, DC, Loc, options, results,
@@ -550,10 +529,12 @@ void UnqualifiedLookupFactory::lookUpTopLevelNamesInModuleScopeContext(
 }
 
 bool UnqualifiedLookupFactory::useASTScopesForLookup() const {
-  return Ctx.LangOpts.EnableASTScopeLookup && useASTScopesForLookupIfEnabled();
+  return Ctx.LangOpts.EnableASTScopeLookup &&
+         wouldUseASTScopesForLookupIfItWereEnabled();
 }
 
-bool UnqualifiedLookupFactory::useASTScopesForLookupIfEnabled() const {
+bool UnqualifiedLookupFactory::wouldUseASTScopesForLookupIfItWereEnabled()
+    const {
   if (!Loc.isValid())
     return false;
   const auto *const SF = DC->getParentSourceFile();
@@ -1062,7 +1043,7 @@ void UnqualifiedLookupFactory::findResultsAndSaveUnavailables(
 
 
 NLOptions UnqualifiedLookupFactory::computeBaseNLOptions(
-    const UnqualifiedLookup::Options options,
+    const UnqualifiedLookupOptions options,
     const bool isOriginallyTypeLookup) {
   NLOptions baseNLOptions = NL_UnqualifiedDefault;
   if (options.contains(Flags::AllowProtocolMembers))
@@ -1206,29 +1187,15 @@ bool ASTScopeDeclConsumerForUnqualifiedLookup::lookInMembers(
   return factory.isFirstResultEnough();
 }
 
-
-#pragma mark UnqualifiedLookup functions
-
-// clang-format off
-UnqualifiedLookup::UnqualifiedLookup(DeclName Name,
-                                     DeclContext *const DC,
-                                     SourceLoc Loc,
-                                     Options options)
-    // clang-format on
-    : IndexOfFirstOuterResult(0) {
-
-  auto *stats = DC->getASTContext().Stats;
-  if (stats)
-    stats->getFrontendCounters().NumUnqualifiedLookup++;
-
-  UnqualifiedLookupFactory factory(Name, DC, Loc, options, *this);
+llvm::Expected<LookupResult>
+UnqualifiedLookupRequest::evaluate(Evaluator &evaluator,
+                                   UnqualifiedLookupDescriptor desc) const {
+  SmallVector<LookupResultEntry, 4> results;
+  size_t indexOfFirstOuterResult = 0;
+  UnqualifiedLookupFactory factory(desc.Name, desc.DC, desc.Loc, desc.Options,
+                                   results, indexOfFirstOuterResult);
   factory.performUnqualifiedLookup();
-}
-
-TypeDecl *UnqualifiedLookup::getSingleTypeResult() const {
-  if (Results.size() != 1)
-    return nullptr;
-  return dyn_cast<TypeDecl>(Results.back().getValueDecl());
+  return LookupResult(results, indexOfFirstOuterResult);
 }
 
 #pragma mark debugging

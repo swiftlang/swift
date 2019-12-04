@@ -225,12 +225,10 @@ static void diagnoseFunctionParamNotRepresentable(
     AFD->diagnose(diag::objc_invalid_on_func_param_type,
                   ParamIndex + 1, getObjCDiagnosticAttrKind(Reason));
   }
-  if (Type ParamTy = P->getType()) {
-    SourceRange SR;
-    if (auto typeRepr = P->getTypeRepr())
-      SR = typeRepr->getSourceRange();
-    diagnoseTypeNotRepresentableInObjC(AFD, ParamTy, SR);
-  }
+  SourceRange SR;
+  if (auto typeRepr = P->getTypeRepr())
+    SR = typeRepr->getSourceRange();
+  diagnoseTypeNotRepresentableInObjC(AFD, P->getType(), SR);
   describeObjCReason(AFD, Reason);
 }
 
@@ -680,11 +678,10 @@ bool swift::isRepresentableInObjC(
     }
 
     // The error type is always 'AutoreleasingUnsafeMutablePointer<NSError?>?'.
-    auto nsError = ctx.getNSErrorDecl();
+    auto nsErrorTy = ctx.getNSErrorType();
     Type errorParameterType;
-    if (nsError) {
-      errorParameterType = nsError->getDeclaredInterfaceType();
-      errorParameterType = OptionalType::get(errorParameterType);
+    if (nsErrorTy) {
+      errorParameterType = OptionalType::get(nsErrorTy);
       errorParameterType
         = BoundGenericType::get(
             ctx.getAutoreleasingUnsafeMutablePointerDecl(),
@@ -939,48 +936,6 @@ bool swift::canBeRepresentedInObjC(const ValueDecl *decl) {
   return false;
 }
 
-static Type getObjectiveCNominalType(Type &cache,
-                                     Identifier ModuleName,
-                                     Identifier TypeName,
-                                     DeclContext *dc) {
-  if (cache)
-    return cache;
-
-  // FIXME: Does not respect visibility of the module.
-  ASTContext &ctx = dc->getASTContext();
-  ModuleDecl *module = ctx.getLoadedModule(ModuleName);
-  if (!module)
-    return nullptr;
-
-  SmallVector<ValueDecl *, 4> decls;
-  NLOptions options = NL_QualifiedDefault | NL_OnlyTypes;
-  dc->lookupQualified(module, TypeName, options, decls);
-  for (auto decl : decls) {
-    if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
-      cache = nominal->getDeclaredType();
-      return cache;
-    }
-  }
-
-  return nullptr;
-}
-
-#pragma mark Objective-C-specific types
-
-Type TypeChecker::getNSObjectType(DeclContext *dc) {
-  return getObjectiveCNominalType(NSObjectType, Context.Id_ObjectiveC,
-                                Context.getSwiftId(
-                                  KnownFoundationEntity::NSObject),
-                                dc);
-}
-
-Type TypeChecker::getObjCSelectorType(DeclContext *dc) {
-  return getObjectiveCNominalType(ObjCSelectorType,
-                                  Context.Id_ObjectiveC,
-                                  Context.Id_Selector,
-                                  dc);
-}
-
 #pragma mark "@objc declaration handling"
 
 /// Whether this declaration is a member of a class extension marked @objc.
@@ -1090,11 +1045,7 @@ Optional<ObjCReason> shouldMarkAsObjC(const ValueDecl *VD, bool allowImplicit) {
   if (isa<AbstractFunctionDecl>(VD) || isa<AbstractStorageDecl>(VD))
     if (auto *replacementAttr =
             VD->getAttrs().getAttribute<DynamicReplacementAttr>()) {
-      if (auto *replaced = replacementAttr->getReplacedFunction()) {
-        if (replaced->isObjC())
-          return ObjCReason(ObjCReason::ImplicitlyObjC);
-      } else if (auto *replaced =
-                     TypeChecker::findReplacedDynamicFunction(VD)) {
+      if (auto *replaced = VD->getDynamicallyReplacedDecl()) {
         if (replaced->isObjC())
           return ObjCReason(ObjCReason::ImplicitlyObjC);
       }

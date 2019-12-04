@@ -382,6 +382,10 @@ public:
   bool hasResponseFile() const { return ResponseFile.hasValue(); }
 
   bool writeArgsToResponseFile() const;
+
+  /// Assumes that, if a compile job, has one primary swift input
+  /// May return empty if none.
+  StringRef getFirstSwiftPrimaryInput() const;
 };
 
 /// A BatchJob comprises a _set_ of jobs, each of which is sufficiently similar

@@ -40,12 +40,12 @@ struct TBDGenOptions {
   std::string ModuleLinkName;
 
   /// The current project version to use in the generated TBD file. Defaults
-  /// to None.
-  llvm::Optional<version::Version> CurrentVersion = None;
+  /// to empty string if not provided.
+  std::string CurrentVersion;
 
   /// The dylib compatibility-version to use in the generated TBD file. Defaults
-  /// to None.
-  llvm::Optional<version::Version> CompatibilityVersion = None;
+  /// to empty string if not provided.
+  std::string CompatibilityVersion;
 };
 
 void enumeratePublicSymbols(FileUnit *module, llvm::StringSet<> &symbols,

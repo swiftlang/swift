@@ -17,6 +17,7 @@
 #include "swift/AST/TypeMatcher.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsSIL.h"
+#include "swift/AST/SemanticAttrs.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Serialization/SerializedSILLoader.h"
@@ -372,18 +373,18 @@ static bool createsInfiniteSpecializationLoop(ApplySite Apply) {
 
 static bool shouldNotSpecialize(SILFunction *Callee, SILFunction *Caller,
                                 SubstitutionMap Subs = {}) {
-  if (Callee->hasSemanticsAttr("optimize.sil.specialize.generic.never"))
+  if (Callee->hasSemanticsAttr(semantics::OPTIMIZE_SIL_SPECIALIZE_GENERIC_NEVER))
     return true;
 
   if (Caller &&
       Caller->getEffectiveOptimizationMode() == OptimizationMode::ForSize &&
-      Callee->hasSemanticsAttr("optimize.sil.specialize.generic.size.never")) {
+      Callee->hasSemanticsAttr(semantics::OPTIMIZE_SIL_SPECIALIZE_GENERIC_SIZE_NEVER)) {
     return true;
   }
 
 
   if (Subs.hasAnySubstitutableParams() &&
-      Callee->hasSemanticsAttr("optimize.sil.specialize.generic.partial.never"))
+      Callee->hasSemanticsAttr(semantics::OPTIMIZE_SIL_SPECIALIZE_GENERIC_PARTIAL_NEVER))
     return true;
 
   return false;
@@ -537,12 +538,12 @@ bool ReabstractionInfo::canBeSpecialized(ApplySite Apply, SILFunction *Callee,
   return ReInfo.prepareAndCheck(Apply, Callee, ParamSubs);
 }
 
-ReabstractionInfo::ReabstractionInfo(ApplySite Apply, SILFunction *Callee,
-                                     SubstitutionMap ParamSubs,
-                                     IsSerialized_t Serialized,
-                                     bool ConvertIndirectToDirect,
-                                     OptRemark::Emitter *ORE)
+ReabstractionInfo::ReabstractionInfo(
+    ModuleDecl *targetModule, bool isWholeModule, ApplySite Apply,
+    SILFunction *Callee, SubstitutionMap ParamSubs, IsSerialized_t Serialized,
+    bool ConvertIndirectToDirect, OptRemark::Emitter *ORE)
     : ConvertIndirectToDirect(ConvertIndirectToDirect),
+      TargetModule(targetModule), isWholeModule(isWholeModule),
       Serialized(Serialized) {
   if (!prepareAndCheck(Apply, Callee, ParamSubs, ORE))
     return;
@@ -576,14 +577,16 @@ ReabstractionInfo::ReabstractionInfo(ApplySite Apply, SILFunction *Callee,
     auto CalleeFnTy = Callee->getLoweredFunctionType();
     assert(CalleeFnTy->isPolymorphic());
     auto CalleeSubstFnTy = CalleeFnTy->substGenericArgs(
-        Callee->getModule(), getCalleeParamSubstitutionMap());
+        Callee->getModule(), getCalleeParamSubstitutionMap(),
+        getResilienceExpansion());
     assert(!CalleeSubstFnTy->isPolymorphic() &&
            "Substituted callee type should not be polymorphic");
     assert(!CalleeSubstFnTy->hasTypeParameter() &&
            "Substituted callee type should not have type parameters");
 
     SpecializedSubstFnTy = SpecializedFnTy->substGenericArgs(
-        Callee->getModule(), getCallerParamSubstitutionMap());
+        Callee->getModule(), getCallerParamSubstitutionMap(),
+        getResilienceExpansion());
 
     assert(!SpecializedSubstFnTy->isPolymorphic() &&
            "Substituted callee type should not be polymorphic");
@@ -673,7 +676,6 @@ void ReabstractionInfo::createSubstitutedAndSpecializedTypes() {
   CanGenericSignature CanSig;
   if (SpecializedGenericSig)
     CanSig = SpecializedGenericSig->getCanonicalSignature();
-  Lowering::GenericContextScope GenericScope(M.Types, CanSig);
 
   SILFunctionConventions substConv(SubstitutedType, M);
 
@@ -687,6 +689,7 @@ void ReabstractionInfo::createSubstitutedAndSpecializedTypes() {
       assert(RI.isFormalIndirect());
 
       auto ResultTy = substConv.getSILType(RI);
+      ResultTy = Callee->mapTypeIntoContext(ResultTy);
       auto &TL = M.Types.getTypeLowering(ResultTy,
                                          getResilienceExpansion());
 
@@ -706,6 +709,7 @@ void ReabstractionInfo::createSubstitutedAndSpecializedTypes() {
     ++IdxForParam;
 
     auto ParamTy = substConv.getSILType(PI);
+    ParamTy = Callee->mapTypeIntoContext(ParamTy);
     auto &TL = M.Types.getTypeLowering(ParamTy,
                                        getResilienceExpansion());
 
@@ -754,9 +758,8 @@ ReabstractionInfo::createSubstitutedType(SILFunction *OrigF,
   // First substitute concrete types into the existing function type.
   CanSILFunctionType FnTy;
   {
-    Lowering::GenericContextScope GenericScope(M.Types,
-                                               CanSpecializedGenericSig);
-    FnTy = OrigF->getLoweredFunctionType()->substGenericArgs(M, SubstMap);
+    FnTy = OrigF->getLoweredFunctionType()->substGenericArgs(
+        M, SubstMap, getResilienceExpansion());
     // FIXME: Some of the added new requirements may not have been taken into
     // account by the substGenericArgs. So, canonicalize in the context of the
     // specialized signature.
@@ -797,12 +800,10 @@ createSpecializedType(CanSILFunctionType SubstFTy, SILModule &M) const {
         // Convert the indirect result to a direct result.
         SILType SILResTy =
           SILType::getPrimitiveObjectType(RI.getReturnValueType(M, SubstFTy));
-        auto &TL = M.Types.getTypeLowering(SILResTy,
-                                           getResilienceExpansion());
 
         // Indirect results are passed as owned, so we also need to pass the
         // direct result as owned (except it's a trivial type).
-        auto C = (TL.isTrivial()
+        auto C = (SILResTy.isTrivial(*Callee)
                   ? ResultConvention::Unowned
                   : ResultConvention::Owned);
         SpecializedResults.push_back(SILResultInfo(RI.getReturnValueType(M, SubstFTy), C));
@@ -823,14 +824,12 @@ createSpecializedType(CanSILFunctionType SubstFTy, SILModule &M) const {
     // Convert the indirect parameter to a direct parameter.
     SILType SILParamTy =
       SILType::getPrimitiveObjectType(PI.getArgumentType(M, SubstFTy));
-    auto &TL = M.Types.getTypeLowering(SILParamTy,
-                                       getResilienceExpansion());
 
     // Indirect parameters are passed as owned/guaranteed, so we also
     // need to pass the direct/guaranteed parameter as
     // owned/guaranteed (except it's a trivial type).
     auto C = ParameterConvention::Direct_Unowned;
-    if (!TL.isTrivial()) {
+    if (!SILParamTy.isTrivial(*Callee)) {
       if (PI.isGuaranteed()) {
         C = ParameterConvention::Direct_Guaranteed;
       } else {
@@ -886,7 +885,7 @@ void ReabstractionInfo::performFullSpecializationPreparation(
   ClonerParamSubMap = ParamSubs;
 
   SubstitutedType = Callee->getLoweredFunctionType()->substGenericArgs(
-      M, ClonerParamSubMap);
+      M, ClonerParamSubMap, getResilienceExpansion());
   CallerParamSubMap = {};
   createSubstitutedAndSpecializedTypes();
 }
@@ -1755,8 +1754,10 @@ void ReabstractionInfo::finishPartialSpecializationPreparation(
 }
 
 /// This constructor is used when processing @_specialize.
-ReabstractionInfo::ReabstractionInfo(SILFunction *Callee,
-                                     GenericSignature SpecializedSig) {
+ReabstractionInfo::ReabstractionInfo(ModuleDecl *targetModule,
+                                     bool isWholeModule, SILFunction *Callee,
+                                     GenericSignature SpecializedSig)
+    : TargetModule(targetModule), isWholeModule(isWholeModule) {
   Serialized = Callee->isSerialized();
 
   if (shouldNotSpecialize(Callee, nullptr))
@@ -1932,10 +1933,11 @@ static void prepareCallArguments(ApplySite AI, SILBuilder &Builder,
 
 /// Return a substituted callee function type.
 static CanSILFunctionType
-getCalleeSubstFunctionType(SILValue Callee, SubstitutionMap Subs) {
+getCalleeSubstFunctionType(SILValue Callee, SubstitutionMap Subs,
+                           TypeExpansionContext context) {
   // Create a substituted callee type.
   auto CanFnTy = Callee->getType().castTo<SILFunctionType>();
-  return CanFnTy->substGenericArgs(*Callee->getModule(), Subs);
+  return CanFnTy->substGenericArgs(*Callee->getModule(), Subs, context);
 }
 
 /// Create a new apply based on an old one, but with a different
@@ -1956,7 +1958,8 @@ static ApplySite replaceWithSpecializedCallee(ApplySite AI,
     Subs = ReInfo.getCallerParamSubstitutionMap();
   }
 
-  auto CalleeSubstFnTy = getCalleeSubstFunctionType(Callee, Subs);
+  auto CalleeSubstFnTy =
+      getCalleeSubstFunctionType(Callee, Subs, ReInfo.getResilienceExpansion());
   auto CalleeSILSubstFnTy = SILType::getPrimitiveObjectType(CalleeSubstFnTy);
   SILFunctionConventions substConv(CalleeSubstFnTy, Builder.getModule());
 
@@ -2085,11 +2088,6 @@ SILFunction *ReabstractionThunkGenerator::createThunk() {
     return Thunk;
 
   Thunk->setGenericEnvironment(ReInfo.getSpecializedGenericEnvironment());
-
-  // Set proper generic context scope for the type lowering.
-  CanSILFunctionType SpecType = SpecializedFunc->getLoweredFunctionType();
-  Lowering::GenericContextScope GenericScope(M.Types,
-                                     SpecType->getInvocationGenericSignature());
 
   SILBasicBlock *EntryBB = Thunk->createBasicBlock();
   SILBuilder Builder(EntryBB);
@@ -2261,9 +2259,10 @@ static bool createPrespecialized(StringRef UnspecializedName,
   if (!UnspecFunc || !UnspecFunc->isDefinition())
     return false;
 
-  ReabstractionInfo ReInfo(ApplySite(), UnspecFunc, Apply.getSubstitutionMap(),
-                           IsNotSerialized, /*ConvertIndirectToDirect=*/true,
-                           nullptr);
+  ReabstractionInfo ReInfo(M.getSwiftModule(), M.isWholeModule(), ApplySite(),
+                           UnspecFunc, Apply.getSubstitutionMap(),
+                           IsNotSerialized,
+                           /*ConvertIndirectToDirect=*/true, nullptr);
 
   if (!ReInfo.canBeSpecialized())
     return false;
@@ -2362,9 +2361,10 @@ void swift::trySpecializeApplyOfGeneric(
     Serialized = IsNotSerialized;
   }
 
-  ReabstractionInfo ReInfo(Apply, RefF, Apply.getSubstitutionMap(),
-                           Serialized, /*ConvertIndirectToDirect=*/true,
-                           &ORE);
+  ReabstractionInfo ReInfo(FuncBuilder.getModule().getSwiftModule(),
+                           FuncBuilder.getModule().isWholeModule(), Apply, RefF,
+                           Apply.getSubstitutionMap(), Serialized,
+                           /*ConvertIndirectToDirect=*/true, &ORE);
   if (!ReInfo.canBeSpecialized())
     return;
 

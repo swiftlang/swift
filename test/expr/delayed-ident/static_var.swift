@@ -50,4 +50,5 @@ var _: HasClosure = .factoryOpt(3)
 // expected-error@-1 {{value of optional type '((Int) -> HasClosure)?' must be unwrapped to a value of type '(Int) -> HasClosure'}}
 // expected-note@-2 {{coalesce}}
 // expected-note@-3 {{force-unwrap}}
-var _: HasClosure = .factoryOpt!(4) // expected-error {{type '((Int) -> HasClosure)?' has no member 'factoryOpt'}}
+// FIXME: we should accept this
+var _: HasClosure = .factoryOpt!(4) // expected-error {{type 'Optional<_>' has no member 'factoryOpt'}}

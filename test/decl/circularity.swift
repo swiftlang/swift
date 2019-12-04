@@ -60,6 +60,7 @@ extension SIMD3 where SIMD3.Scalar == Float {
 protocol P {
     associatedtype A
     // expected-note@-1 {{protocol requires nested type 'A'; do you want to add it?}}
+    // expected-note@-2 {{through reference here}}
     func run(a: A)
 }
 
