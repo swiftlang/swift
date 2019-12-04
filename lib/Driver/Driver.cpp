@@ -959,8 +959,8 @@ Driver::buildCompilation(const ToolChain &TC,
     const bool EmitFineGrainedDependencyDotFileAfterEveryImport = ArgList->hasArg(
         options::
             OPT_driver_emit_fine_grained_dependency_dot_file_after_every_import);
-    const bool FineGrainedDependenciesIncludeIntrafileOnes = ArgList->hasArg(
-        options::OPT_fine_grained_dependency_include_intrafile);
+    const bool FineGrainedDependenciesIncludeIntrafileOnes =
+        ArgList->hasArg(options::OPT_fine_grained_dependency_include_intrafile);
 
     // clang-format off
     C = llvm::make_unique<Compilation>(
