@@ -4253,7 +4253,7 @@ namespace {
         case KeyPathExpr::Component::Kind::UnresolvedProperty: {
           // If we couldn't resolve the component, leave it alone.
           if (!foundDecl) {
-            component = origComponent;
+            resolvedComponents.push_back(origComponent);
             break;
           }
 
@@ -4276,7 +4276,7 @@ namespace {
         case KeyPathExpr::Component::Kind::UnresolvedSubscript: {
           // Leave the component unresolved if the overload was not resolved.
           if (!foundDecl) {
-            component = origComponent;
+            resolvedComponents.push_back(origComponent);
             break;
           }
 
