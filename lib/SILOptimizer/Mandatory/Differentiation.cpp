@@ -252,97 +252,6 @@ static Inst *peerThroughFunctionConversions(SILValue value) {
 namespace {
 class ADContext;
 
-/// The invoker of a differentiation task. It can be some user syntax, e.g.
-/// an `differentiable_function` instruction lowered from an
-/// `DifferentiableFunctionExpr` expression, the differentiation pass, or
-/// nothing at all. This will be used to emit informative diagnostics.
-struct DifferentiationInvoker {
-public:
-  /// The kind of the invoker of a differentiation task.
-  enum class Kind {
-    // Invoked by an `differentiable_function` instruction, which may or may not
-    // be linked to a Swift AST node (e.g. an `DifferentiableFunctionExpr`
-    // expression).
-    DifferentiableFunctionInst,
-
-    // Invoked by the indirect application of differentiation. This case has an
-    // associated original `apply` instruction and
-    // `SILDifferentiabilityWitness`.
-    IndirectDifferentiation,
-
-    // Invoked by a `SILDifferentiabilityWitness` **without** being linked to a
-    // Swift AST attribute. This case has an associated
-    // `SILDifferentiabilityWitness`.
-    SILDifferentiabilityWitnessInvoker
-  };
-
-private:
-  Kind kind;
-  union Value {
-    /// The instruction associated with the `DifferentiableFunctionInst` case.
-    DifferentiableFunctionInst *diffFuncInst;
-    Value(DifferentiableFunctionInst *inst) : diffFuncInst(inst) {}
-
-    /// The parent `apply` instruction and the witness associated with the
-    /// `IndirectDifferentiation` case.
-    std::pair<ApplyInst *, SILDifferentiabilityWitness *>
-        indirectDifferentiation;
-    Value(ApplyInst *applyInst, SILDifferentiabilityWitness *witness)
-        : indirectDifferentiation({applyInst, witness}) {}
-
-    /// The witness associated with the `SILDifferentiabilityWitnessInvoker`
-    /// case.
-    SILDifferentiabilityWitness *witness;
-    Value(SILDifferentiabilityWitness *witness) : witness(witness) {}
-  } value;
-
-  /*implicit*/
-  DifferentiationInvoker(Kind kind, Value value) : kind(kind), value(value) {}
-
-public:
-  DifferentiationInvoker(DifferentiableFunctionInst *inst)
-      : kind(Kind::DifferentiableFunctionInst), value(inst) {}
-  DifferentiationInvoker(ApplyInst *applyInst,
-                         SILDifferentiabilityWitness *witness)
-      : kind(Kind::IndirectDifferentiation), value({applyInst, witness}) {}
-  DifferentiationInvoker(SILDifferentiabilityWitness *witness)
-      : kind(Kind::SILDifferentiabilityWitnessInvoker), value(witness) {}
-
-  Kind getKind() const { return kind; }
-
-  DifferentiableFunctionInst *getDifferentiableFunctionInst() const {
-    assert(kind == Kind::DifferentiableFunctionInst);
-    return value.diffFuncInst;
-  }
-
-  std::pair<ApplyInst *, SILDifferentiabilityWitness *>
-  getIndirectDifferentiation() const {
-    assert(kind == Kind::IndirectDifferentiation);
-    return value.indirectDifferentiation;
-  }
-
-  SILDifferentiabilityWitness *getSILDifferentiabilityWitnessInvoker() const {
-    assert(kind == Kind::SILDifferentiabilityWitnessInvoker);
-    return value.witness;
-  }
-
-  SourceLoc getLocation() const {
-    switch (kind) {
-    case Kind::DifferentiableFunctionInst:
-      return getDifferentiableFunctionInst()->getLoc().getSourceLoc();
-    case Kind::IndirectDifferentiation:
-      return getIndirectDifferentiation().first->getLoc().getSourceLoc();
-    case Kind::SILDifferentiabilityWitnessInvoker:
-      return getSILDifferentiabilityWitnessInvoker()
-          ->getOriginalFunction()
-          ->getLocation()
-          .getSourceLoc();
-    }
-  }
-
-  void print(llvm::raw_ostream &os) const;
-};
-
 /// Linear map struct and branching trace enum information for an original
 /// function and and derivative function (JVP or VJP).
 ///
@@ -733,39 +642,6 @@ static inline llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
                                             DifferentiationInvoker invoker) {
   invoker.print(os);
   return os;
-}
-
-void DifferentiationInvoker::print(llvm::raw_ostream &os) const {
-  os << "(differentiation_invoker ";
-  switch (kind) {
-  case Kind::DifferentiableFunctionInst:
-    os << "differentiable_function_inst=(" << *getDifferentiableFunctionInst()
-       << ")";
-    break;
-  case Kind::IndirectDifferentiation: {
-    auto indDiff = getIndirectDifferentiation();
-    os << "indirect_differentiation=(" << *std::get<0>(indDiff) << ')';
-    // TODO: Enable printing parent invokers.
-    // May require storing a `DifferentiableInvoker *` in the
-    // `IndirectDifferentiation` case.
-    /*
-    SILInstruction *inst;
-    SILDifferentiableAttr *attr;
-    std::tie(inst, attr) = getIndirectDifferentiation();
-    auto invokerLookup = invokers.find(attr); // No access to ADContext?
-    assert(invokerLookup != invokers.end() && "Expected parent invoker");
-    */
-    break;
-  }
-  case Kind::SILDifferentiabilityWitnessInvoker: {
-    auto witness = getSILDifferentiabilityWitnessInvoker();
-    os << "sil_differentiability_witness_invoker=(witness=(";
-    witness->print(os);
-    os << ") function=" << witness->getOriginalFunction()->getName();
-    break;
-  }
-  }
-  os << ')';
 }
 
 //===----------------------------------------------------------------------===//
