@@ -1129,6 +1129,7 @@ void IRGenerator::emitTypeMetadataRecords() {
 /// else) that we require.
 void IRGenerator::emitLazyDefinitions() {
   while (!LazyTypeMetadata.empty() ||
+         !LazySpecializedTypeMetadataRecords.empty() ||
          !LazyTypeContextDescriptors.empty() ||
          !LazyOpaqueTypeDescriptors.empty() ||
          !LazyFieldDescriptors.empty() ||
@@ -1144,6 +1145,11 @@ void IRGenerator::emitLazyDefinitions() {
       entry.IsMetadataEmitted = true;
       CurrentIGMPtr IGM = getGenModule(type->getDeclContext());
       emitLazyTypeMetadata(*IGM.get(), type);
+    }
+    while (!LazySpecializedTypeMetadataRecords.empty()) {
+      CanType type = LazySpecializedTypeMetadataRecords.pop_back_val();
+      auto *nominal = type->getNominalOrBoundGenericNominal();
+      CurrentIGMPtr IGM = getGenModule(nominal->getDeclContext());
     }
     while (!LazyTypeContextDescriptors.empty()) {
       NominalTypeDecl *type = LazyTypeContextDescriptors.pop_back_val();
@@ -1360,6 +1366,18 @@ void IRGenerator::noteUseOfFieldDescriptor(NominalTypeDecl *type) {
 
   assert(!FinishedEmittingLazyDefinitions);
   LazyFieldDescriptors.push_back(type);
+}
+
+void IRGenerator::noteUseOfSpecializedGenericTypeMetadata(CanType type) {
+  auto key = type->getAnyNominal();
+  assert(key);
+  auto &enqueuedSpecializedTypes = this->SpecializationsForGenericTypes[key];
+  if (llvm::all_of(enqueuedSpecializedTypes,
+                   [&](CanType enqueued) { return enqueued != type; })) {
+    assert(!FinishedEmittingLazyDefinitions);
+    this->LazySpecializedTypeMetadataRecords.push_back(type);
+    enqueuedSpecializedTypes.push_back(type);
+  }
 }
 
 void IRGenerator::noteUseOfOpaqueTypeDescriptor(OpaqueTypeDecl *opaque) {

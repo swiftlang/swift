@@ -244,6 +244,15 @@ private:
   /// queued up.
   llvm::SmallPtrSet<NominalTypeDecl *, 4> LazilyEmittedFieldMetadata;
 
+  /// Maps every generic type that is specialized within the module to its
+  /// specializations.
+  llvm::DenseMap<NominalTypeDecl *, llvm::SmallVector<CanType, 4>>
+      SpecializationsForGenericTypes;
+
+  /// The queue of specialized generic types whose prespecialized metadata to
+  /// emit.
+  llvm::SmallVector<CanType, 4> LazySpecializedTypeMetadataRecords;
+
   struct LazyOpaqueInfo {
     bool IsDescriptorUsed = false;
     bool IsDescriptorEmitted = false;
@@ -375,9 +384,15 @@ public:
 
   void ensureRelativeSymbolCollocation(SILDefaultWitnessTable &wt);
 
+  llvm::SmallVector<CanType, 4> specializationsForType(NominalTypeDecl *type) {
+    return SpecializationsForGenericTypes.lookup(type);
+  }
+
   void noteUseOfTypeMetadata(NominalTypeDecl *type) {
     noteUseOfTypeGlobals(type, true, RequireMetadata);
   }
+
+  void noteUseOfSpecializedGenericTypeMetadata(CanType type);
 
   void noteUseOfTypeMetadata(CanType type) {
     type.visit([&](Type t) {
