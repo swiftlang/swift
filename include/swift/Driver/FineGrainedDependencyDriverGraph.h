@@ -267,7 +267,7 @@ public:
     assert(verify() && "ModuleDepGraph should be fine when created");
   }
 
-  /// Unlike the standard \c DependencyGraph, returns \c
+  /// Unlike the standard \c CoarseGrainedDependencyGraph, returns \c
   /// CoarseGrainedDependencyGraphImpl::LoadResult::AffectsDownstream when loading a new
   /// file, i.e. when determining the initial set. Caller compensates.
   CoarseGrainedDependencyGraphImpl::LoadResult loadFromPath(const driver::Job *, StringRef,

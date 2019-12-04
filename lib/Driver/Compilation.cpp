@@ -239,17 +239,17 @@ namespace driver {
     ///
     /// Dependency graphs for deciding which jobs are dirty (need running)
     /// or clean (can be skipped).
-    using DependencyGraph = DependencyGraph<const Job *>;
-    DependencyGraph StandardDepGraph;
-    DependencyGraph StandardDepGraphForRanges;
+    using CoarseGrainedDependencyGraph = CoarseGrainedDependencyGraph<const Job *>;
+    CoarseGrainedDependencyGraph CoarseGrainedDepGraph;
+    CoarseGrainedDependencyGraph CoarseGrainedDepGraphForRanges;
 
     fine_grained_dependencies::ModuleDepGraph ExpDepGraph;
     fine_grained_dependencies::ModuleDepGraph ExpDepGraphForRanges;
 
   private:
     /// Helper for tracing the propagation of marks in the graph.
-    DependencyGraph::MarkTracer ActualIncrementalTracer;
-    DependencyGraph::MarkTracer *IncrementalTracer = nullptr;
+    CoarseGrainedDependencyGraph::MarkTracer ActualIncrementalTracer;
+    CoarseGrainedDependencyGraph::MarkTracer *IncrementalTracer = nullptr;
     
     /// TaskQueue for execution.
     std::unique_ptr<TaskQueue> TQ;
@@ -1063,7 +1063,7 @@ namespace driver {
           // start nodes in the "Always" condition from the start instead of
           // using markIntransitive and having later functions call
           // markTransitive. That way markIntransitive would be an
-          // implementation detail of DependencyGraph.
+          // implementation detail of CoarseGrainedDependencyGraph.
           markIntransitiveInDepGraph(Cmd, forRanges);
         }
         LLVM_FALLTHROUGH;
@@ -1586,7 +1586,7 @@ namespace driver {
                  : getDepGraph(forRanges).markIntransitive(Cmd);
     }
 
-    DependencyGraph::LoadResult loadDepGraphFromPath(const Job *Cmd,
+    CoarseGrainedDependencyGraph::LoadResult loadDepGraphFromPath(const Job *Cmd,
                                                      StringRef path,
                                                      DiagnosticEngine &diags,
                                                      const bool forRanges) {
@@ -1599,7 +1599,7 @@ namespace driver {
     void
     markTransitiveInDepGraph(SmallVector<const Job *, N> &visited,
                              const Job *Cmd, const bool forRanges,
-                             DependencyGraph::MarkTracer *tracer = nullptr) {
+                             CoarseGrainedDependencyGraph::MarkTracer *tracer = nullptr) {
       if (Comp.getEnableFineGrainedDependencies())
         getExpDepGraph(forRanges).markTransitive(visited, Cmd, tracer);
       else
@@ -1617,15 +1617,15 @@ namespace driver {
     getExpDepGraph(const bool forRanges) {
       return forRanges ? ExpDepGraphForRanges : ExpDepGraph;
     }
-    DependencyGraph &getDepGraph(const bool forRanges) {
-      return forRanges ? StandardDepGraphForRanges : StandardDepGraph;
+    CoarseGrainedDependencyGraph &getDepGraph(const bool forRanges) {
+      return forRanges ? CoarseGrainedDepGraphForRanges : CoarseGrainedDepGraph;
     }
     const fine_grained_dependencies::ModuleDepGraph &
     getExpDepGraph(const bool forRanges) const {
       return forRanges ? ExpDepGraphForRanges : ExpDepGraph;
     }
-    const DependencyGraph &getDepGraph(const bool forRanges) const {
-      return forRanges ? StandardDepGraphForRanges : StandardDepGraph;
+    const CoarseGrainedDependencyGraph &getDepGraph(const bool forRanges) const {
+      return forRanges ? CoarseGrainedDepGraphForRanges : CoarseGrainedDepGraph;
     }
   };
 } // namespace driver

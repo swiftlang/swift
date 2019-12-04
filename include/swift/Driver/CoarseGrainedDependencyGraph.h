@@ -36,14 +36,14 @@ namespace swift {
 
 class UnifiedStatsReporter;
 
-/// The non-templated implementation of DependencyGraph.
+/// The non-templated implementation of CoarseGrainedDependencyGraph.
 ///
-/// \see DependencyGraph
+/// \see CoarseGrainedDependencyGraph
 class CoarseGrainedDependencyGraphImpl {
 public:
   /// Possible dependency kinds.
   ///
-  /// Clients of DependencyGraph should have no reason to use this type.
+  /// Clients of CoarseGrainedDependencyGraph should have no reason to use this type.
   /// It is only used in the implementation.
   enum class DependencyKind : uint8_t;
 
@@ -62,9 +62,9 @@ public:
     AffectsDownstream
   };
 
-  /// The non-templated implementation of DependencyGraph::MarkTracer.
+  /// The non-templated implementation of CoarseGrainedDependencyGraph::MarkTracer.
   ///
-  /// \see DependencyGraph::MarkTracer
+  /// \see CoarseGrainedDependencyGraph::MarkTracer
   class MarkTracerImpl {
     class Entry;
     llvm::DenseMap<const void *, SmallVector<Entry, 4>> Table;
@@ -154,7 +154,7 @@ protected:
     (void)newlyInserted;
   }
 
-  /// See DependencyGraph::markTransitive.
+  /// See CoarseGrainedDependencyGraph::markTransitive.
 
   void markTransitive(SmallVectorImpl<const void *> &visited,
                       const void *node, MarkTracerImpl *tracer = nullptr);
@@ -196,7 +196,7 @@ public:
 /// The graph also supports a "mark" operation, which is intended to track
 /// nodes that have been not just visited but transitively marked through.
 template <typename T>
-class DependencyGraph : public CoarseGrainedDependencyGraphImpl {
+class CoarseGrainedDependencyGraph : public CoarseGrainedDependencyGraphImpl {
   using Traits = llvm::PointerLikeTypeTraits<T>;
   static_assert(Traits::NumLowBitsAvailable >= 0, "not a pointer-like type");
 
@@ -210,7 +210,7 @@ class DependencyGraph : public CoarseGrainedDependencyGraphImpl {
   }
 
 public:
-  /// Traces the graph traversal performed in DependencyGraph::markTransitive.
+  /// Traces the graph traversal performed in CoarseGrainedDependencyGraph::markTransitive.
   ///
   /// This is intended to be a debugging aid.
   class MarkTracer : public MarkTracerImpl {
