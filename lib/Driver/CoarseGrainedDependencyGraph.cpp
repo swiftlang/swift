@@ -1,4 +1,4 @@
-//===--- DependencyGraph.cpp - Track intra-module dependencies ------------===//
+//===- CoarseGrainedDependencyGraph.cpp - Track intra-module dependencies -===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -12,7 +12,7 @@
 
 #include "swift/Basic/ReferenceDependencyKeys.h"
 #include "swift/Basic/Statistic.h"
-#include "swift/Driver/DependencyGraph.h"
+#include "swift/Driver/CoarseGrainedDependencyGraph.h"
 #include "swift/Demangling/Demangle.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/SmallVector.h"

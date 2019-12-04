@@ -23,7 +23,7 @@
 #include "swift/Basic/Version.h"
 #include "swift/Basic/type_traits.h"
 #include "swift/Driver/Action.h"
-#include "swift/Driver/DependencyGraph.h"
+#include "swift/Driver/CoarseGrainedDependencyGraph.h"
 #include "swift/Driver/Driver.h"
 #include "swift/Driver/DriverIncrementalRanges.h"
 #include "swift/Driver/FineGrainedDependencyDriverGraph.h"

@@ -1,4 +1,4 @@
-//===--- DependencyGraph.h - Track intra-module dependencies ----*- C++ -*-===//
+//===- CoarseGrainedDependencyGraph.h - Track intra-module dependencies -*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_DRIVER_DEPENDENCYGRAPH_H
-#define SWIFT_DRIVER_DEPENDENCYGRAPH_H
+#ifndef SWIFT_DRIVER_COARSEGRAINEDDEPENDENCYGRAPH_H
+#define SWIFT_DRIVER_COARSEGRAINEDDEPENDENCYGRAPH_H
 
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/Basic/LLVM.h"
