@@ -69,6 +69,9 @@ ERROR(no_overloads_match_exactly_in_call_no_labels,none,
 ERROR(no_overloads_match_exactly_in_call_special,none,
       "no exact matches in call to %0",
       (DescriptiveDeclKind))
+ERROR(no_overloads_match_exactly_in_assignment,none,
+      "no exact matches in assignment to %0",
+      (DeclBaseName))
 
 ERROR(ambiguous_subscript,none,
       "ambiguous subscript with base type %0 and index type %1",
@@ -3041,6 +3044,8 @@ ERROR(collection_literal_empty,none,
 ERROR(unresolved_member_no_inference,none,
       "reference to member %0 cannot be resolved without a contextual type",
       (DeclName))
+ERROR(cannot_infer_base_of_unresolved_member,none,
+      "cannot infer contextual base in reference to member %0", (DeclName))
 ERROR(unresolved_collection_literal,none,
       "cannot infer type for empty collection literal without a "
       "contextual type", ())
@@ -3400,6 +3405,10 @@ ERROR(assignment_dynamic_property_has_immutable_base,none,
       "cannot assign through dynamic lookup property: %0", (StringRef))
 ERROR(assignment_bang_has_immutable_subcomponent,none,
       "cannot assign through '!': %0", (StringRef))
+
+NOTE(candidate_is_not_assignable,none,
+     "candidate is not assignable: %0 %1",
+     (DescriptiveDeclKind, DeclName))
 
 NOTE(change_to_mutating,none,
      "mark %select{method|accessor}0 'mutating' to make 'self' mutable",

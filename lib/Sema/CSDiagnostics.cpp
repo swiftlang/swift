@@ -1440,6 +1440,17 @@ bool RValueTreatedAsLValueFailure::diagnoseAsError() {
   return failure.diagnose();
 }
 
+bool RValueTreatedAsLValueFailure::diagnoseAsNote() {
+  auto overload = getChoiceFor(getLocator());
+  if (!(overload && overload->choice.isDecl()))
+    return false;
+
+  auto *decl = overload->choice.getDecl();
+  emitDiagnostic(decl, diag::candidate_is_not_assignable,
+                 decl->getDescriptiveKind(), decl->getFullName());
+  return true;
+}
+
 static Decl *findSimpleReferencedDecl(const Expr *E) {
   if (auto *LE = dyn_cast<LoadExpr>(E))
     E = LE->getSubExpr();
@@ -2138,6 +2149,16 @@ bool ContextualFailure::diagnoseAsError() {
   diag.highlight(anchor->getSourceRange());
 
   (void)tryFixIts(diag);
+  return true;
+}
+
+bool ContextualFailure::diagnoseAsNote() {
+  auto overload = getChoiceFor(getLocator());
+  if (!(overload && overload->choice.isDecl()))
+    return false;
+
+  auto *decl = overload->choice.getDecl();
+  emitDiagnostic(decl, diag::found_candidate_type, getFromType());
   return true;
 }
 
@@ -5955,3 +5976,26 @@ bool AssignmentTypeMismatchFailure::diagnoseAsNote() {
   return false;
 }
 
+bool MissingContextualBaseInMemberRefFailure::diagnoseAsError() {
+  auto *anchor = getAnchor();
+  auto &cs = getConstraintSystem();
+
+  // Member reference could be wrapped into a number of parens
+  // e.g. `((.foo))`.
+  auto *parentExpr = findParentExpr(anchor);
+  do {
+    // If we have found something which isn't a paren let's stop,
+    // otherwise let's keep unwrapping until there are either no
+    // more parens or no more parents...
+    if (!parentExpr || !isa<ParenExpr>(parentExpr))
+      break;
+  } while ((parentExpr = findParentExpr(parentExpr)));
+
+  auto diagnostic = parentExpr || cs.getContextualType(anchor)
+                        ? diag::cannot_infer_base_of_unresolved_member
+                        : diag::unresolved_member_no_inference;
+
+  emitDiagnostic(anchor->getLoc(), diagnostic, MemberName)
+      .highlight(anchor->getSourceRange());
+  return true;
+}

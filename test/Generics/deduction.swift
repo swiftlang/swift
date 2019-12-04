@@ -7,7 +7,7 @@
 func identity<T>(_ value: T) -> T { return value }
 
 func identity2<T>(_ value: T) -> T { return value }
-// expected-note@-1 {{candidate expects value of type 'X' for parameter #1}}
+// expected-note@-1 {{'identity2' produces 'Y', not the expected contextual result type 'X'}}
 func identity2<T>(_ value: T) -> Int { return 0 }
 // expected-note@-1 {{'identity2' produces 'Int', not the expected contextual result type 'X'}}
 

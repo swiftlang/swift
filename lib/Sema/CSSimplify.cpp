@@ -1435,7 +1435,7 @@ static bool fixMissingArguments(ConstraintSystem &cs, Expr *anchor,
   // (which might be anonymous), it's most likely used as a
   // tuple e.g. `$0.0`.
   Optional<TypeBase *> argumentTuple;
-  if (isa<ClosureExpr>(anchor) && isSingleTupleParam(ctx, args)) {
+  if (isSingleTupleParam(ctx, args)) {
     auto argType = args.back().getPlainType();
     // Let's unpack argument tuple into N arguments, this corresponds
     // to something like `foo { (bar: (Int, Int)) in }` where `foo`
@@ -1456,24 +1456,26 @@ static bool fixMissingArguments(ConstraintSystem &cs, Expr *anchor,
       };
 
       // Something like `foo { x in }` or `foo { $0 }`
-      anchor->forEachChildExpr([&](Expr *expr) -> Expr * {
-        if (auto *UDE = dyn_cast<UnresolvedDotExpr>(expr)) {
-          if (!isParam(UDE->getBase()))
-            return expr;
+      if (isa<ClosureExpr>(anchor)) {
+        anchor->forEachChildExpr([&](Expr *expr) -> Expr * {
+          if (auto *UDE = dyn_cast<UnresolvedDotExpr>(expr)) {
+            if (!isParam(UDE->getBase()))
+              return expr;
 
-          auto name = UDE->getName().getBaseIdentifier();
-          unsigned index = 0;
-          if (!name.str().getAsInteger(10, index) ||
-              llvm::any_of(params, [&](const AnyFunctionType::Param &param) {
-                return param.getLabel() == name;
-              })) {
-            argumentTuple.emplace(typeVar);
-            args.pop_back();
-            return nullptr;
+            auto name = UDE->getName().getBaseIdentifier();
+            unsigned index = 0;
+            if (!name.str().getAsInteger(10, index) ||
+                llvm::any_of(params, [&](const AnyFunctionType::Param &param) {
+                  return param.getLabel() == name;
+                })) {
+              argumentTuple.emplace(typeVar);
+              args.pop_back();
+              return nullptr;
+            }
           }
-        }
-        return expr;
-      });
+          return expr;
+        });
+      }
     }
   }
 
@@ -1765,8 +1767,31 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
     auto func2Param = func2Params[i];
 
     // Variadic bit must match.
-    if (func1Param.isVariadic() != func2Param.isVariadic())
-      return getTypeMatchFailure(argumentLocator);
+    if (func1Param.isVariadic() != func2Param.isVariadic()) {
+      if (!(shouldAttemptFixes() && func2Param.isVariadic()))
+        return getTypeMatchFailure(argumentLocator);
+
+      auto argType =
+          getFixedTypeRecursive(func1Param.getPlainType(), /*wantRValue=*/true);
+      auto varargsType = func2Param.getPlainType();
+
+      // Delay solving this constriant until argument is resolved.
+      if (argType->is<TypeVariableType>()) {
+        addUnsolvedConstraint(Constraint::create(
+            *this, kind, func1, func2, getConstraintLocator(locator)));
+        return getTypeMatchSuccess();
+      }
+
+      auto *fix = ExpandArrayIntoVarargs::attempt(
+          *this, argType, varargsType,
+          argumentLocator.withPathElement(LocatorPathElt::ApplyArgToParam(
+              i, i, func2Param.getParameterFlags())));
+
+      if (!fix || recordFix(fix))
+        return getTypeMatchFailure(argumentLocator);
+
+      continue;
+    }
 
     // Labels must match.
     //
@@ -2811,6 +2836,30 @@ bool ConstraintSystem::repairFailures(
       conversionsOrFixes.push_back(IgnoreContextualType::create(
           *this, lhs, rhs, getConstraintLocator(locator)));
       return true;
+    }
+
+    if (auto *ODRE = dyn_cast<OverloadedDeclRefExpr>(anchor)) {
+      if (lhs->is<LValueType>()) {
+        conversionsOrFixes.push_back(
+            TreatRValueAsLValue::create(*this, getConstraintLocator(locator)));
+        return true;
+      }
+    }
+
+    if (auto *OEE = dyn_cast<OptionalEvaluationExpr>(anchor)) {
+      // If concrete type of the sub-expression can't be converted to the
+      // type associated with optional evaluation result it could only be
+      // contextual mismatch where type of the top-level expression
+      // comes from contextual type or its parent expression.
+      //
+      // Because result type of the optional evaluation is supposed to
+      // represent the type of its sub-expression with added level of
+      // optionality if needed.
+      if (!lhs->getOptionalObjectType() && !lhs->hasTypeVariable()) {
+        conversionsOrFixes.push_back(IgnoreContextualType::create(
+            *this, lhs, rhs, getConstraintLocator(OEE->getSubExpr())));
+        return true;
+      }
     }
 
     if (auto *AE = dyn_cast<AssignExpr>(anchor)) {
@@ -3942,10 +3991,17 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
 
       auto result = matchFunctionTypes(func1, func2, kind, flags, locator);
 
-      // If this is a type mismatch in assignment, we don't really care
-      // (yet) was it argument or result type mismatch, let's produce a
-      // diagnostic which means both function types.
       if (shouldAttemptFixes() && result.isFailure()) {
+        // If this is a contextual type mismatch failure
+        // let's give the solver a chance to "fix" it.
+        if (auto last = locator.last()) {
+          if (last->is<LocatorPathElt::ContextualType>())
+            break;
+        }
+
+        // If this is a type mismatch in assignment, we don't really care
+        // (yet) was it argument or result type mismatch, let's produce a
+        // diagnostic which mentions both function types.
         auto *anchor = locator.getAnchor();
         if (anchor && isa<AssignExpr>(anchor))
           break;
@@ -6003,6 +6059,23 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
   Type baseObjTy = baseTy->getRValueType();
 
   auto locator = getConstraintLocator(locatorB);
+
+  // If this is an unresolved member ref e.g. `.foo` and its contextual base
+  // type has been determined to be a "hole", let's mark the resulting member
+  // type as a potential hole and continue solving.
+  if (shouldAttemptFixes() && kind == ConstraintKind::UnresolvedValueMember &&
+      baseObjTy->getMetatypeInstanceType()->isHole()) {
+    auto *fix =
+        SpecifyBaseTypeForContextualMember::create(*this, member, locator);
+    if (recordFix(fix))
+      return SolutionKind::Error;
+
+    if (auto *typeVar = memberTy->getAs<TypeVariableType>())
+      recordPotentialHole(typeVar);
+
+    return SolutionKind::Solved;
+  }
+
   MemberLookupResult result =
       performMemberLookup(kind, member, baseTy, functionRefKind, locator,
                           /*includeInaccessibleMembers*/ shouldAttemptFixes());
@@ -8393,6 +8466,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::ExpandArrayIntoVarargs:
   case FixKind::UseValueTypeOfRawRepresentative:
   case FixKind::ExplicitlyConstructRawRepresentable:
+  case FixKind::SpecifyBaseTypeForContextualMember:
   case FixKind::CoerceToCheckedCast: {
     return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
   }
@@ -8431,15 +8505,24 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
     if (recordFix(fix))
       return SolutionKind::Error;
 
-    // If type produced by expression is a function type
-    // with result type matching contextual, it should have
-    // been diagnosed as "missing explicit call", let's
-    // increase the score to make sure that we don't impede that.
-    if (auto *fnType = type1->getAs<FunctionType>()) {
-      auto result = matchTypes(fnType->getResult(), type2, matchKind,
-                               TMF_ApplyingFix, locator);
-      if (result == SolutionKind::Solved)
-        increaseScore(SK_Fix);
+    if (auto *fnType1 = type1->getAs<FunctionType>()) {
+      // If this is a contextual mismatch between two
+      // function types which we couldn't find a more
+      // speficit fix for. Let's assume that such types
+      // are competely disjoint and adjust impact of
+      // the fix accordingly.
+      if (auto *fnType2 = type2->getAs<FunctionType>()) {
+        increaseScore(SK_Fix, 10);
+      } else {
+        // If type produced by expression is a function type
+        // with result type matching contextual, it should have
+        // been diagnosed as "missing explicit call", let's
+        // increase the score to make sure that we don't impede that.
+        auto result = matchTypes(fnType1->getResult(), type2, matchKind,
+                                 TMF_ApplyingFix, locator);
+        if (result == SolutionKind::Solved)
+          increaseScore(SK_Fix);
+      }
     }
 
     return SolutionKind::Solved;

@@ -498,8 +498,8 @@ enum Color {
   static var svar: Color { return .Red }
 }
 
-// FIXME: This used to be better: "'map' produces '[T]', not the expected contextual result type '(Int, Color)'"
-let _: (Int, Color) = [1,2].map({ ($0, .Unknown("")) }) // expected-error {{expression type '((Int) throws -> _) throws -> Array<_>' is ambiguous without more context}}
+let _: (Int, Color) = [1,2].map({ ($0, .Unknown("")) }) // expected-error {{cannot convert value of type 'Array<(Int, _)>' to specified type '(Int, Color)'}}
+// expected-error@-1 {{cannot infer contextual base in reference to member 'Unknown'}}
 
 let _: [(Int, Color)] = [1,2].map({ ($0, .Unknown("")) })// expected-error {{missing argument label 'description:' in call}}
 
@@ -920,13 +920,13 @@ class NSCache<K, V> {
 }
 
 class CacheValue {
-  func value(x: Int) -> Int {} // expected-note {{found this candidate}}
-  func value(y: String) -> String {} // expected-note {{found this candidate}}
+  func value(x: Int) -> Int {} // expected-note {{found candidate with type '(Int) -> Int'}}
+  func value(y: String) -> String {} // expected-note {{found candidate with type '(String) -> String'}}
 }
 
 func valueForKey<K>(_ key: K) -> CacheValue? {
   let cache = NSCache<K, CacheValue>()
-  return cache.object(forKey: key)?.value // expected-error {{ambiguous reference to member 'value(x:)'}}
+  return cache.object(forKey: key)?.value // expected-error {{no exact matches in call to instance method 'value'}}
 }
 
 // SR-2242: poor diagnostic when argument label is omitted
@@ -1288,7 +1288,7 @@ func badTypes() {
 // rdar://34357545
 func unresolvedTypeExistential() -> Bool {
   return (Int.self==_{})
-  // expected-error@-1 {{ambiguous reference to member '=='}}
+  // expected-error@-1 {{expression type 'Bool' is ambiguous without more context}}
 }
 
 func rdar43525641(_ a: Int, _ b: Int = 0, c: Int = 0, _ d: Int) {}

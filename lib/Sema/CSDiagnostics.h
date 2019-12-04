@@ -638,6 +638,7 @@ public:
       : FailureDiagnostic(cs, locator) {}
 
   bool diagnoseAsError() override;
+  bool diagnoseAsNote() override;
 };
 
 class TrailingClosureAmbiguityFailure final : public FailureDiagnostic {
@@ -720,6 +721,8 @@ public:
   Type getToType() const { return ToType; }
 
   bool diagnoseAsError() override;
+
+  bool diagnoseAsNote() override;
 
   /// If we're trying to convert something to `nil`.
   bool diagnoseConversionToNil() const;
@@ -2007,7 +2010,7 @@ private:
   /// valid for the duration of the call, and suggests an alternative to use.
   void emitSuggestionNotes() const;
 };
-	
+
 class AssignmentTypeMismatchFailure final : public ContextualFailure {
 public:
   AssignmentTypeMismatchFailure(ConstraintSystem &cs,
@@ -2020,6 +2023,17 @@ public:
 
 private:
   bool diagnoseMissingConformance() const;
+};
+
+class MissingContextualBaseInMemberRefFailure final : public FailureDiagnostic {
+  DeclName MemberName;
+
+public:
+  MissingContextualBaseInMemberRefFailure(ConstraintSystem &cs, DeclName member,
+                                          ConstraintLocator *locator)
+      : FailureDiagnostic(cs, locator), MemberName(member) {}
+
+  bool diagnoseAsError();
 };
 
 } // end namespace constraints
