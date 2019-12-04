@@ -858,7 +858,7 @@ public:
 
 private:
   TypeConverter &Types;
-  friend class TypeConverter;
+  friend TypeConverter;
 
   const clang::ASTContext *ClangASTContext;
   ClangTypeConverter *ClangTypes;
@@ -1423,6 +1423,10 @@ public:
 
   Address getAddrOfObjCISAMask();
 
+  /// Retrieve the generic signature for the current generic context, or null if no
+  /// generic environment is active.
+  CanGenericSignature getCurGenericContext();
+  
   /// Retrieve the generic environment for the current generic context.
   ///
   /// Fails if there is no generic context.

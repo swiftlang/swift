@@ -576,6 +576,22 @@ Result->X = SM.getLocFromExternalSource(Locs->SourceFilePath, Locs->X.Line,   \
   return Result;
 }
 
+StringRef Decl::getAlternateModuleName() const {
+  if (auto *OD = Attrs.getAttribute(DeclAttrKind::DAK_OriginallyDefinedIn)) {
+    return static_cast<const OriginallyDefinedInAttr*>(OD)->OriginalModuleName;
+  }
+  for (auto *DC = getDeclContext(); DC; DC = DC->getParent()) {
+    if (auto decl = DC->getAsDecl()) {
+      if (decl == this)
+        continue;
+      auto AM = decl->getAlternateModuleName();
+      if (!AM.empty())
+        return AM;
+    }
+  }
+  return StringRef();
+}
+
 SourceLoc Decl::getLoc(bool SerializedOK) const {
 #define DECL(ID, X) \
 static_assert(sizeof(checkSourceLocType(&ID##Decl::getLoc)) == 2, \
@@ -2817,6 +2833,13 @@ void ValueDecl::setIsDynamic(bool value) {
   LazySemanticInfo.isDynamic = value;
 }
 
+ValueDecl *ValueDecl::getDynamicallyReplacedDecl() const {
+  return evaluateOrDefault(getASTContext().evaluator,
+                           DynamicallyReplacedDeclRequest{
+                               const_cast<ValueDecl *>(this)},
+                           nullptr);
+}
+
 bool ValueDecl::canBeAccessedByDynamicLookup() const {
   if (!hasName())
     return false;
@@ -2995,7 +3018,7 @@ SourceLoc ValueDecl::getAttributeInsertionLoc(bool forModifier) const {
 /// Returns true if \p VD needs to be treated as publicly-accessible
 /// at the SIL, LLVM, and machine levels due to being @usableFromInline.
 bool ValueDecl::isUsableFromInline() const {
-  assert(getFormalAccess() == AccessLevel::Internal);
+  assert(getFormalAccess() <= AccessLevel::Internal);
 
   if (getAttrs().hasAttribute<UsableFromInlineAttr>() ||
       getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>() ||
@@ -3092,7 +3115,7 @@ static AccessLevel getAdjustedFormalAccess(const ValueDecl *VD,
     return getMaximallyOpenAccessFor(VD);
 
   if (treatUsableFromInlineAsPublic &&
-      access == AccessLevel::Internal &&
+      (access == AccessLevel::Internal || access == AccessLevel::Private) &&
       VD->isUsableFromInline()) {
     return AccessLevel::Public;
   }
@@ -4942,9 +4965,9 @@ bool AbstractStorageDecl::hasPrivateAccessor() const {
 
 bool AbstractStorageDecl::hasDidSetOrWillSetDynamicReplacement() const {
   if (auto *func = getParsedAccessor(AccessorKind::DidSet))
-    return func->getAttrs().hasAttribute<DynamicReplacementAttr>();
+    return (bool)func->getDynamicallyReplacedDecl();
   if (auto *func = getParsedAccessor(AccessorKind::WillSet))
-    return func->getAttrs().hasAttribute<DynamicReplacementAttr>();
+    return (bool)func->getDynamicallyReplacedDecl();
   return false;
 }
 
@@ -4956,13 +4979,6 @@ bool AbstractStorageDecl::hasAnyNativeDynamicAccessors() const {
   return false;
 }
 
-bool AbstractStorageDecl::hasAnyDynamicReplacementAccessors() const {
-  for (auto accessor : getAllAccessors()) {
-    if (accessor->getAttrs().hasAttribute<DynamicReplacementAttr>())
-      return true;
-  }
-  return false;
-}
 void AbstractStorageDecl::setAccessors(SourceLoc lbraceLoc,
                                        ArrayRef<AccessorDecl *> accessors,
                                        SourceLoc rbraceLoc) {

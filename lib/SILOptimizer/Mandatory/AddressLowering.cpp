@@ -388,15 +388,6 @@ protected:
 
 /// Top-level entry point: allocate storage for all opaque/resilient values.
 void OpaqueStorageAllocation::allocateOpaqueStorage() {
-  // TODO: I think we need a GenericContextScope for mapTypeIntoContext, but all
-  // tests are currently passing without it.
-#if 0
-  auto canFnType = pass.F->getLoweredFunctionType();
-
-  // Setup a generic context for argument and result types.
-  swift::Lowering::GenericContextScope scope(pass.F->getModule().Types,
-                                             canFnType->getGenericSignature());
-#endif
   // Fixup this function's argument types with temporary loads.
   convertIndirectFunctionArgs();
 

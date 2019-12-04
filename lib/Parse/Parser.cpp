@@ -143,24 +143,8 @@ void Parser::performCodeCompletionSecondPassImpl(
   // Disable libSyntax creation in the delayed parsing.
   SyntaxContext->disable();
 
-  auto BeginParserPosition = getParserPosition(info.BodyPos);
-  auto EndLexerState = L->getStateForEndOfTokenLoc(info.BodyEnd);
-
-  // ParserPositionRAII needs a primed parser to restore to.
-  if (Tok.is(tok::NUM_TOKENS))
-    consumeTokenWithoutFeedingReceiver();
-
-  // Ensure that we restore the parser state at exit.
-  ParserPositionRAII PPR(*this);
-
-  // Create a lexer that cannot go past the end state.
-  Lexer LocalLex(*L, BeginParserPosition.LS, EndLexerState);
-
-  // Temporarily swap out the parser's current lexer with our new one.
-  llvm::SaveAndRestore<Lexer *> T(L, &LocalLex);
-
-  // Rewind to the beginning of the top-level code.
-  restoreParserPosition(BeginParserPosition);
+  // Set the parser position to the start of the delayed decl or the body.
+  restoreParserPosition(getParserPosition(info.BodyPos));
 
   // Do not delay parsing in the second pass.
   llvm::SaveAndRestore<bool> DisableDelayedBody(DelayBodyParsing, false);
