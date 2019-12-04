@@ -1949,6 +1949,27 @@ public:
   bool isCached() const { return true; }
 };
 
+class TypeCheckSourceFileRequest :
+    public SimpleRequest<TypeCheckSourceFileRequest,
+                         bool (SourceFile *, unsigned),
+                         CacheKind::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<bool> evaluate(Evaluator &evaluator,
+                                SourceFile *SF, unsigned StartElem) const;
+
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+  Optional<bool> getCachedResult() const;
+  void cacheResult(bool result) const;
+};
+
 // Allow AnyValue to compare two Type values, even though Type doesn't
 // support ==.
 template<>
