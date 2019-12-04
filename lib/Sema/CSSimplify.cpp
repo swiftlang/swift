@@ -6802,22 +6802,6 @@ ConstraintSystem::simplifyKeyPathConstraint(
   // The constraint ought to have been anchored on a KeyPathExpr.
   auto keyPath = cast<KeyPathExpr>(locator.getBaseLocator()->getAnchor());
 
-  // Gather overload choices for any key path components associated with this
-  // key path.
-  SmallVector<OverloadChoice, 4> choices;
-  choices.resize(keyPath->getComponents().size());
-  for (auto resolvedItem = resolvedOverloadSets; resolvedItem;
-       resolvedItem = resolvedItem->Previous) {
-    auto locator = resolvedItem->Locator;
-    auto path = locator->getPath();
-    if (locator->getAnchor() != keyPath || path.size() > 2)
-      continue;
-
-    if (auto kpElt = path[0].getAs<LocatorPathElt::KeyPathComponent>()) {
-      choices[kpElt->getIndex()] = resolvedItem->Choice;
-    }
-  }
-
   keyPathTy = getFixedTypeRecursive(keyPathTy, /*want rvalue*/ true);
   bool definitelyFunctionType = false;
   bool definitelyKeyPathType = false;
@@ -6879,6 +6863,30 @@ ConstraintSystem::simplifyKeyPathConstraint(
       return SolutionKind::Error;
   }
 
+  // First gather the callee locators for the individual components.
+  SmallVector<std::pair<ConstraintLocator *, OverloadChoice>, 4> choices;
+  for (unsigned i : indices(keyPath->getComponents())) {
+    auto *componentLoc = getConstraintLocator(
+        locator.withPathElement(LocatorPathElt::KeyPathComponent(i)));
+    auto *calleeLoc = getCalleeLocator(componentLoc);
+    choices.push_back({calleeLoc, OverloadChoice()});
+  }
+
+  // Then search for the resolved overloads.
+  for (auto resolvedItem = resolvedOverloadSets; resolvedItem;
+       resolvedItem = resolvedItem->Previous) {
+    auto locator = resolvedItem->Locator;
+    auto kpElt = locator->getFirstElementAs<LocatorPathElt::KeyPathComponent>();
+    if (!kpElt || locator->getAnchor() != keyPath)
+      continue;
+
+    auto &choice = choices[kpElt->getIndex()];
+    if (choice.first == locator) {
+      assert(choice.second.isInvalid() && "Resolved same component twice?");
+      choice.second = resolvedItem->Choice;
+    }
+  }
+
   // See if we resolved overloads for all the components involved.
   enum {
     ReadOnly,
@@ -6900,12 +6908,15 @@ ConstraintSystem::simplifyKeyPathConstraint(
     case KeyPathExpr::Component::Kind::Subscript:
     case KeyPathExpr::Component::Kind::UnresolvedProperty:
     case KeyPathExpr::Component::Kind::UnresolvedSubscript: {
+      auto *calleeLoc = choices[i].first;
+      auto choice = choices[i].second;
+
       // If no choice was made, leave the constraint unsolved. But when
       // generating constraints, we may already have enough information
       // to determine whether the result will be a function type vs BGT KeyPath
       // type, so continue through components to create new constraint at the
       // end.
-      if (choices[i].isInvalid() || anyComponentsUnresolved) {
+      if (choice.isInvalid() || anyComponentsUnresolved) {
         if (flags.contains(TMF_GenerateConstraints)) {
           anyComponentsUnresolved = true;
           continue;
@@ -6937,23 +6948,20 @@ ConstraintSystem::simplifyKeyPathConstraint(
       }
 
       // tuple elements do not change the capability of the key path
-      if (choices[i].getKind() == OverloadChoiceKind::TupleIndex) {
+      if (choice.getKind() == OverloadChoiceKind::TupleIndex) {
         continue;
       }
         
       // Discarded unsupported non-decl member lookups.
-      if (!choices[i].isDecl()) {
+      if (!choice.isDecl()) {
         return SolutionKind::Error;
       }
 
-      auto storage = dyn_cast<AbstractStorageDecl>(choices[i].getDecl());
-
-      auto *componentLoc = getConstraintLocator(
-          locator.withPathElement(LocatorPathElt::KeyPathComponent(i)));
+      auto storage = dyn_cast<AbstractStorageDecl>(choice.getDecl());
 
       if (auto *fix = AllowInvalidRefInKeyPath::forRef(
-              *this, choices[i].getDecl(), componentLoc)) {
-        if (!hasFixFor(componentLoc, FixKind::AllowTypeOrInstanceMember))
+              *this, choice.getDecl(), calleeLoc)) {
+        if (!hasFixFor(calleeLoc, FixKind::AllowTypeOrInstanceMember))
           if (!shouldAttemptFixes() || recordFix(fix))
             return SolutionKind::Error;
 
