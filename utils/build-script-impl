@@ -125,6 +125,7 @@ KNOWN_SETTINGS=(
     skip-build-benchmarks       ""               "set to skip building Swift Benchmark Suite"
     skip-build-external-benchmarks "1"            "set to skip building the external Swift Benchmark Suite. (skipped by default)"
     skip-build-playgroundsupport ""              "set to skip building PlaygroundSupport"
+    skip-build-clang-tools-extra ""              "set to skip building clang-tools-extra as part of llvm"
     skip-local-build            ""               "set to skip building for the current host (useful when crosscompiling)"
     skip-test-cmark             ""               "set to skip testing CommonMark"
     skip-test-lldb              ""               "set to skip testing lldb"
@@ -1680,15 +1681,19 @@ for host in "${ALL_HOSTS[@]}"; do
                     "${llvm_cmake_options[@]}"
                 )
 
-                if [[ "${SKIP_BUILD_COMPILER_RT}" ]]; then
-                    cmake_options+=(
-                    -DLLVM_ENABLE_PROJECTS="clang;clang-tools-extra;"
-                    )
-                else
-                    cmake_options+=(
-                    -DLLVM_ENABLE_PROJECTS="clang;clang-tools-extra;compiler-rt;"
-                    )
+                llvm_enable_projects=("clang")
+
+                if [[ ! "${SKIP_BUILD_COMPILER_RT}" ]]; then
+                    llvm_enable_projects+=("compiler-rt")
                 fi
+
+                if [[ ! "${SKIP_BUILD_CLANG_TOOLS_EXTRA}" ]]; then
+                    llvm_enable_projects+=("clang-tools-extra")
+                fi
+
+                cmake_options+=(
+                    -DLLVM_ENABLE_PROJECTS="$(join ";" ${llvm_enable_projects[@]})"
+                )
 
                 cmake_options+=(
                   -DLLVM_TOOL_LLD_BUILD:BOOL=TRUE
