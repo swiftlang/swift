@@ -916,6 +916,8 @@ public:
   /// and arguments. Erase the newly created instruction from the processed set,
   /// if it exists - it may exist in the processed set if it has the same
   /// pointer value as a previously processed and deleted instruction.
+  /// TODO(TF-784): The pointer reuse is a real concern and the use of
+  /// `CanonicalizeInstruction` may get rid of the need for this workaround.
   DifferentiableFunctionInst *createDifferentiableFunction(
       SILBuilder &builder, SILLocation loc,
       IndexSubset *parameterIndices, SILValue original,
@@ -974,13 +976,11 @@ private:
       DifferentiationInvoker invoker);
 
 public:
-  /// Construct an DifferentiationTransformer for the given module.
+  /// Construct an `DifferentiationTransformer` for the given module.
   explicit DifferentiationTransformer(SILModuleTransform &transform)
-    : transform(transform), context(transform) {}
+       : transform(transform), context(transform) {}
 
-  ADContext& getContext() { return context; }
-
-  SILModuleTransform& getTransform() { return transform; }
+  ADContext &getContext() { return context; }
 
   /// Canonicalize the given witness, filling in JVP/VJPs if missing.
   ///
@@ -1783,14 +1783,14 @@ reapplyFunctionConversion(
 /// FIXME: This is too complicated and needs to be rewritten.
 static Optional<std::pair<SILValue, SILAutoDiffIndices>>
 emitDerivativeFunctionReference(
-    DifferentiationTransformer& transformer,
+    DifferentiationTransformer &transformer,
     SILBuilder &builder, SILAutoDiffIndices desiredIndices,
     AutoDiffDerivativeFunctionKind kind, SILValue original,
     DifferentiationInvoker invoker,
     SmallVectorImpl<AllocStackInst *> &newBuffersToDealloc) {
 
   SILValue functionSource = original;
-  ADContext& context = transformer.getContext();
+  ADContext &context = transformer.getContext();
 
   // If `original` is itself an `DifferentiableFunctionExtractInst` whose kind
   // matches the given kind and desired differentiation parameter indices,
@@ -7313,7 +7313,7 @@ bool DifferentiationTransformer::canonicalizeDifferentiabilityWitness(
           SILCoroutineKind::None, ParameterConvention::Direct_Unowned, {},
           /*interfaceYields*/ {}, neverResultInfo,
           /*interfaceErrorResults*/ None, {}, false, context.getASTContext());
-      auto fnBuilder = SILOptFunctionBuilder(getTransform());
+      auto fnBuilder = SILOptFunctionBuilder(context.getTransform());
       auto *fatalErrrorJvpFunc = fnBuilder.getOrCreateFunction(
           loc, "_printJVPErrorAndExit", SILLinkage::PublicExternal,
           fatalErrorJVPType, IsNotBare, IsNotTransparent, IsNotSerialized,
@@ -7397,7 +7397,7 @@ DifferentiationTransformer::getOrCreateSubsetParametersThunkForLinearMap(
   thunkName += "_index_subset_thunk";
 
   auto loc = parentThunk->getLocation();
-  SILOptFunctionBuilder fb(getTransform());
+  SILOptFunctionBuilder fb(context.getTransform());
   auto *thunk = fb.getOrCreateSharedFunction(
       loc, thunkName, thunkType, IsBare, IsTransparent, IsSerialized,
       ProfileCounter(), IsThunk, IsNotDynamic);
@@ -7662,7 +7662,7 @@ DifferentiationTransformer::getOrCreateSubsetParametersThunkForDerivativeFunctio
   thunkName += "_subset_parameters_thunk";
 
   auto loc = origFnOperand.getLoc();
-  SILOptFunctionBuilder fb(getTransform());
+  SILOptFunctionBuilder fb(context.getTransform());
   auto *thunk = fb.getOrCreateSharedFunction(
       loc, thunkName, thunkType, IsBare, IsTransparent, caller->isSerialized(),
       ProfileCounter(), IsThunk, IsNotDynamic);
@@ -8041,7 +8041,7 @@ void Differentiation::run() {
 
   // A transformation helper.
   DifferentiationTransformer transformer(*this);
-  ADContext& context = transformer.getContext();
+  ADContext &context = transformer.getContext();
 
   bool errorOccurred = false;
 
