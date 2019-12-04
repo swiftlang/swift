@@ -1215,8 +1215,6 @@ static bool performCompile(CompilerInstance &Instance,
     Instance.performParseOnly(/*EvaluateConditionals*/
                     Action == FrontendOptions::ActionType::EmitImportedModules,
                               ParseDelayedDeclListsOnEnd);
-  } else if (Action == FrontendOptions::ActionType::ResolveImports) {
-    Instance.performParseAndResolveImportsOnly();
   } else {
     Instance.performSema();
   }
@@ -1227,9 +1225,6 @@ static bool performCompile(CompilerInstance &Instance,
 
   (void)emitMakeDependenciesIfNeeded(Context.Diags,
                                      Instance.getDependencyTracker(), opts);
-
-  if (Action == FrontendOptions::ActionType::ResolveImports)
-    return Context.hadError();
 
   if (observer)
     observer->performedSemanticAnalysis(Instance);

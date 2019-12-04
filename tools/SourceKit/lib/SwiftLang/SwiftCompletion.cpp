@@ -216,7 +216,7 @@ static bool swiftCodeCompleteImpl(
   SwiftConsumer.setContext(&CI.getASTContext(), &Invocation,
                            &CompletionContext);
   registerIDETypeCheckRequestFunctions(CI.getASTContext().evaluator);
-  CI.performParseAndResolveImportsOnly();
+  CI.performParseAndNameBinding();
   SwiftConsumer.clearContext();
 
   return true;

@@ -86,7 +86,7 @@ static bool swiftConformingMethodListImpl(
     return true;
   }
   registerIDERequestFunctions(CI.getASTContext().evaluator);
-  CI.performParseAndResolveImportsOnly();
+  CI.performParseAndNameBinding();
 
   return true;
 }

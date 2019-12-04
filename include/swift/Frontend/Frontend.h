@@ -606,7 +606,7 @@ public:
   ///
   /// Like a parse-only invocation, a single file is required. Unlike a
   /// parse-only invocation, module imports will be processed.
-  void performParseAndResolveImportsOnly();
+  void performParseAndNameBinding();
 
   /// Performs mandatory, diagnostic, and optimization passes over the SIL.
   /// \param silModule The SIL module that was generated during SILGen.

@@ -681,7 +681,7 @@ shouldImplicityImportSwiftOnoneSupportModule(CompilerInvocation &Invocation) {
       || FrontendOptions::doesActionGenerateSIL(options.RequestedAction);
 }
 
-void CompilerInstance::performParseAndResolveImportsOnly() {
+void CompilerInstance::performParseAndNameBinding() {
   performSemaUpTo(SourceFile::NameBound);
 }
 

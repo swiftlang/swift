@@ -14,15 +14,11 @@
 // PARSE_NO_REFERENCE_DEPS: error: this mode does not support emitting reference dependency files{{$}}
 // RUN: not %target-swift-frontend -dump-ast -emit-reference-dependencies %s 2>&1 | %FileCheck -check-prefix=DUMP_NO_REFERENCE_DEPS %s
 // DUMP_NO_REFERENCE_DEPS: error: this mode does not support emitting reference dependency files{{$}}
-// RUN: not %target-swift-frontend -resolve-imports -emit-reference-dependencies %s 2>&1 | %FileCheck -check-prefix=RESOLVE_IMPORTS_NO_REFERENCE_DEPS %s
-// RESOLVE_IMPORTS_NO_REFERENCE_DEPS: error: this mode does not support emitting reference dependency files{{$}}
 
 // RUN: not %target-swift-frontend -parse -emit-objc-header %s 2>&1 | %FileCheck -check-prefix=PARSE_NO_OBJC_HEADER %s
 // PARSE_NO_OBJC_HEADER: error: this mode does not support emitting Objective-C headers{{$}}
 // RUN: not %target-swift-frontend -dump-ast -emit-objc-header %s 2>&1 | %FileCheck -check-prefix=DUMP_NO_OBJC_HEADER %s
 // DUMP_NO_OBJC_HEADER: error: this mode does not support emitting Objective-C headers{{$}}
-// RUN: not %target-swift-frontend -resolve-imports -emit-objc-header %s 2>&1 | %FileCheck -check-prefix=RESOLVE_IMPORTS_NO_OBJC_HEADER %s
-// RESOLVE_IMPORTS_NO_OBJC_HEADER: error: this mode does not support emitting Objective-C headers{{$}}
 
 // RUN: not %target-swift-frontend -parse -emit-module-interface-path %t %s 2>&1 | %FileCheck -check-prefix=PARSE_NO_INTERFACE %s
 // PARSE_NO_INTERFACE: error: this mode does not support emitting module interface files{{$}}
