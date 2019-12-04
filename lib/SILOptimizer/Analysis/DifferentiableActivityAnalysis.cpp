@@ -16,7 +16,7 @@
 #include "swift/SIL/SILArgument.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/PassManager/PassManager.h"
-#include "swift/SILOptimizer/Utils/Differentiation.h"
+#include "swift/SILOptimizer/Utils/Differentiation/Common.h"
 
 using namespace swift;
 using namespace swift::autodiff;

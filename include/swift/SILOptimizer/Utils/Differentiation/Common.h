@@ -1,4 +1,4 @@
-//===--- Differentiation.h - SIL Automatic Differentiation ----*- C++ -*---===//
+//===--- Common.h - Automatic Differentiation Common Utils ----*- C++ -*---===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -12,7 +12,7 @@
 //
 // SWIFT_ENABLE_TENSORFLOW
 //
-// Automatic differentiation utilities.
+// Automatic differentiation common utilities.
 //
 // NOTE: Though automatic differentiation is developed as part of the Swift for
 // TensorFlow project, it is completely independent from TensorFlow.
@@ -23,8 +23,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_SILOPTIMIZER_UTILS_DIFFERENTIATION_H
-#define SWIFT_SILOPTIMIZER_UTILS_DIFFERENTIATION_H
+#ifndef SWIFT_SILOPTIMIZER_UTILS_DIFFERENTIATION_COMMON_H
+#define SWIFT_SILOPTIMIZER_UTILS_DIFFERENTIATION_COMMON_H
 
 #include "swift/SIL/TypeSubstCloner.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
@@ -195,4 +195,4 @@ public:
 
 } // end namespace swift
 
-#endif // SWIFT_SILOPTIMIZER_MANDATORY_DIFFERENTIATION_H
+#endif // SWIFT_SILOPTIMIZER_MANDATORY_DIFFERENTIATION_COMMON_H
