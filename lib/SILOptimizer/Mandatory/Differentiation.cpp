@@ -982,8 +982,6 @@ public:
 
   ADContext &getContext() { return context; }
 
-  SILModuleTransform &getTransform() { return transform; }
-
   /// Canonicalize the given witness, filling in JVP/VJPs if missing.
   ///
   /// \param explicitDifferentiable specifies whether the witness comes from an
@@ -7315,7 +7313,7 @@ bool DifferentiationTransformer::canonicalizeDifferentiabilityWitness(
           SILCoroutineKind::None, ParameterConvention::Direct_Unowned, {},
           /*interfaceYields*/ {}, neverResultInfo,
           /*interfaceErrorResults*/ None, {}, false, context.getASTContext());
-      auto fnBuilder = SILOptFunctionBuilder(getTransform());
+      auto fnBuilder = SILOptFunctionBuilder(context.getTransform());
       auto *fatalErrrorJvpFunc = fnBuilder.getOrCreateFunction(
           loc, "_printJVPErrorAndExit", SILLinkage::PublicExternal,
           fatalErrorJVPType, IsNotBare, IsNotTransparent, IsNotSerialized,
@@ -7399,7 +7397,7 @@ DifferentiationTransformer::getOrCreateSubsetParametersThunkForLinearMap(
   thunkName += "_index_subset_thunk";
 
   auto loc = parentThunk->getLocation();
-  SILOptFunctionBuilder fb(getTransform());
+  SILOptFunctionBuilder fb(context.getTransform());
   auto *thunk = fb.getOrCreateSharedFunction(
       loc, thunkName, thunkType, IsBare, IsTransparent, IsSerialized,
       ProfileCounter(), IsThunk, IsNotDynamic);
@@ -7664,7 +7662,7 @@ DifferentiationTransformer::getOrCreateSubsetParametersThunkForDerivativeFunctio
   thunkName += "_subset_parameters_thunk";
 
   auto loc = origFnOperand.getLoc();
-  SILOptFunctionBuilder fb(getTransform());
+  SILOptFunctionBuilder fb(context.getTransform());
   auto *thunk = fb.getOrCreateSharedFunction(
       loc, thunkName, thunkType, IsBare, IsTransparent, caller->isSerialized(),
       ProfileCounter(), IsThunk, IsNotDynamic);
