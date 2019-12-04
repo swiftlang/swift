@@ -25,30 +25,30 @@
 
 using namespace swift;
 
-enum class DependencyGraphImpl::DependencyKind : uint8_t {
+enum class CoarseGrainedDependencyGraphImpl::DependencyKind : uint8_t {
   TopLevelName = 1 << 0,
   DynamicLookupName = 1 << 1,
   NominalType = 1 << 2,
   NominalTypeMember = 1 << 3,
   ExternalFile = 1 << 4,
 };
-enum class DependencyGraphImpl::DependencyFlags : uint8_t {
+enum class CoarseGrainedDependencyGraphImpl::DependencyFlags : uint8_t {
   IsCascading = 1 << 0
 };
 
-class DependencyGraphImpl::MarkTracerImpl::Entry {
+class CoarseGrainedDependencyGraphImpl::MarkTracerImpl::Entry {
 public:
   const void *Node;
   StringRef Name;
   DependencyMaskTy KindMask;
 };
 
-DependencyGraphImpl::MarkTracerImpl::MarkTracerImpl(UnifiedStatsReporter *Stats)
+CoarseGrainedDependencyGraphImpl::MarkTracerImpl::MarkTracerImpl(UnifiedStatsReporter *Stats)
   : Stats(Stats) {}
-DependencyGraphImpl::MarkTracerImpl::~MarkTracerImpl() = default;
+CoarseGrainedDependencyGraphImpl::MarkTracerImpl::~MarkTracerImpl() = default;
 
-using LoadResult = DependencyGraphImpl::LoadResult;
-using DependencyKind = DependencyGraphImpl::DependencyKind;
+using LoadResult = CoarseGrainedDependencyGraphImpl::LoadResult;
+using DependencyKind = CoarseGrainedDependencyGraphImpl::DependencyKind;
 using DependencyCallbackTy = LoadResult(StringRef, DependencyKind, bool);
 using InterfaceHashCallbackTy = LoadResult(StringRef);
 
@@ -211,7 +211,7 @@ parseDependencyFile(llvm::MemoryBuffer &buffer,
   return result;
 }
 
-LoadResult DependencyGraphImpl::loadFromPath(const void *node, StringRef path) {
+LoadResult CoarseGrainedDependencyGraphImpl::loadFromPath(const void *node, StringRef path) {
   auto buffer = llvm::MemoryBuffer::getFile(path);
   if (!buffer)
     return LoadResult::HadError;
@@ -219,12 +219,12 @@ LoadResult DependencyGraphImpl::loadFromPath(const void *node, StringRef path) {
 }
 
 LoadResult
-DependencyGraphImpl::loadFromString(const void *node, StringRef data) {
+CoarseGrainedDependencyGraphImpl::loadFromString(const void *node, StringRef data) {
   auto buffer = llvm::MemoryBuffer::getMemBuffer(data);
   return loadFromBuffer(node, *buffer);
 }
 
-LoadResult DependencyGraphImpl::loadFromBuffer(const void *node,
+LoadResult CoarseGrainedDependencyGraphImpl::loadFromBuffer(const void *node,
                                                llvm::MemoryBuffer &buffer) {
   auto &provides = Provides[node];
 
@@ -294,7 +294,7 @@ LoadResult DependencyGraphImpl::loadFromBuffer(const void *node,
                              interfaceHashCallback);
 }
 
-void DependencyGraphImpl::markExternal(SmallVectorImpl<const void *> &visited,
+void CoarseGrainedDependencyGraphImpl::markExternal(SmallVectorImpl<const void *> &visited,
                                        StringRef externalDependency) {
   forEachUnmarkedJobDirectlyDependentOnExternalSwiftdeps(
       externalDependency, [&](const void *node) {
@@ -303,7 +303,7 @@ void DependencyGraphImpl::markExternal(SmallVectorImpl<const void *> &visited,
       });
 }
 
-void DependencyGraphImpl::
+void CoarseGrainedDependencyGraphImpl::
     forEachUnmarkedJobDirectlyDependentOnExternalSwiftdeps(
         StringRef externalSwiftDeps, function_ref<void(const void *node)> fn) {
   auto allDependents = Dependencies.find(externalSwiftDeps);
@@ -320,7 +320,7 @@ void DependencyGraphImpl::
 }
 
 void
-DependencyGraphImpl::markTransitive(SmallVectorImpl<const void *> &visited,
+CoarseGrainedDependencyGraphImpl::markTransitive(SmallVectorImpl<const void *> &visited,
                                     const void *node, MarkTracerImpl *tracer) {
   assert(Provides.count(node) && "node is not in the graph");
   llvm::SpecificBumpPtrAllocator<MarkTracerImpl::Entry> scratchAlloc;
@@ -407,7 +407,7 @@ DependencyGraphImpl::markTransitive(SmallVectorImpl<const void *> &visited,
   }
 }
 
-void DependencyGraphImpl::MarkTracerImpl::countStatsForNodeMarking(
+void CoarseGrainedDependencyGraphImpl::MarkTracerImpl::countStatsForNodeMarking(
   const OptionSet<DependencyKind> &Kind, bool IsCascading) const {
 
   if (!Stats)
@@ -439,7 +439,7 @@ void DependencyGraphImpl::MarkTracerImpl::countStatsForNodeMarking(
   }
 }
 
-void DependencyGraphImpl::MarkTracerImpl::printPath(
+void CoarseGrainedDependencyGraphImpl::MarkTracerImpl::printPath(
     raw_ostream &out,
     const void *item,
     llvm::function_ref<void (const void *)> printItem) const {

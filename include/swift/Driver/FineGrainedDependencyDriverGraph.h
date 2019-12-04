@@ -107,10 +107,10 @@ public:
 
 /// A placeholder allowing the experimental system to fit into the driver
 /// without changing as much code.
-class DependencyGraphImpl {
+class CoarseGrainedDependencyGraphImpl {
 public:
   /// Use the status quo LoadResult for now.
-  using LoadResult = typename swift::DependencyGraphImpl::LoadResult;
+  using LoadResult = typename swift::CoarseGrainedDependencyGraphImpl::LoadResult;
 };
 
 //==============================================================================
@@ -268,9 +268,9 @@ public:
   }
 
   /// Unlike the standard \c DependencyGraph, returns \c
-  /// DependencyGraphImpl::LoadResult::AffectsDownstream when loading a new
+  /// CoarseGrainedDependencyGraphImpl::LoadResult::AffectsDownstream when loading a new
   /// file, i.e. when determining the initial set. Caller compensates.
-  DependencyGraphImpl::LoadResult loadFromPath(const driver::Job *, StringRef,
+  CoarseGrainedDependencyGraphImpl::LoadResult loadFromPath(const driver::Job *, StringRef,
                                                DiagnosticEngine &);
 
   /// For the dot file.
@@ -372,12 +372,12 @@ private:
   /// and integrate it into the ModuleDepGraph.
   /// Used both the first time, and to reload the SourceFileDepGraph.
   /// If any changes were observed, indicate same in the return vale.
-  DependencyGraphImpl::LoadResult loadFromBuffer(const driver::Job *,
+  CoarseGrainedDependencyGraphImpl::LoadResult loadFromBuffer(const driver::Job *,
                                                  llvm::MemoryBuffer &);
 
   /// Integrate a SourceFileDepGraph into the receiver.
   /// Integration happens when the driver needs to read SourceFileDepGraph.
-  DependencyGraphImpl::LoadResult integrate(const SourceFileDepGraph &);
+  CoarseGrainedDependencyGraphImpl::LoadResult integrate(const SourceFileDepGraph &);
 
   enum class LocationOfPreexistingNode { nowhere, here, elsewhere };
 

@@ -469,7 +469,7 @@ namespace driver {
 
         switch (loadDepGraphFromPath(FinishedCmd, DependenciesFile,
                                      Comp.getDiags(), forRanges)) {
-        case DependencyGraphImpl::LoadResult::HadError:
+        case CoarseGrainedDependencyGraphImpl::LoadResult::HadError:
           if (ReturnCode == EXIT_SUCCESS) {
             dependencyLoadFailed(DependenciesFile);
             // Better try compiling whatever was waiting on more info.
@@ -479,11 +479,11 @@ namespace driver {
             Dependents.clear();
           } // else, let the next build handle it.
           break;
-        case DependencyGraphImpl::LoadResult::UpToDate:
+        case CoarseGrainedDependencyGraphImpl::LoadResult::UpToDate:
           if (!wasCascading)
             break;
           LLVM_FALLTHROUGH;
-        case DependencyGraphImpl::LoadResult::AffectsDownstream:
+        case CoarseGrainedDependencyGraphImpl::LoadResult::AffectsDownstream:
           markTransitiveInDepGraph(Dependents, FinishedCmd, forRanges,
                                    IncrementalTracer);
           break;
@@ -1034,12 +1034,12 @@ namespace driver {
       const auto loadResult = loadDepGraphFromPath(Cmd, DependenciesFile,
                                                    Comp.getDiags(), forRanges);
       switch (loadResult) {
-      case DependencyGraphImpl::LoadResult::HadError:
+      case CoarseGrainedDependencyGraphImpl::LoadResult::HadError:
         dependencyLoadFailed(DependenciesFile, /*Warn=*/true);
         return None;
-      case DependencyGraphImpl::LoadResult::UpToDate:
+      case CoarseGrainedDependencyGraphImpl::LoadResult::UpToDate:
         return std::make_pair(Cmd->getCondition(), true);
-      case DependencyGraphImpl::LoadResult::AffectsDownstream:
+      case CoarseGrainedDependencyGraphImpl::LoadResult::AffectsDownstream:
         if (Comp.getEnableFineGrainedDependencies()) {
           // The fine-grained graph reports a change, since it lumps new
           // files together with new "Provides".

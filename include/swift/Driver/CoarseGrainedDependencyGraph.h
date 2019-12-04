@@ -39,7 +39,7 @@ class UnifiedStatsReporter;
 /// The non-templated implementation of DependencyGraph.
 ///
 /// \see DependencyGraph
-class DependencyGraphImpl {
+class CoarseGrainedDependencyGraphImpl {
 public:
   /// Possible dependency kinds.
   ///
@@ -70,7 +70,7 @@ public:
     llvm::DenseMap<const void *, SmallVector<Entry, 4>> Table;
     UnifiedStatsReporter *Stats;
 
-    friend class DependencyGraphImpl;
+    friend class CoarseGrainedDependencyGraphImpl;
   protected:
     explicit MarkTracerImpl(UnifiedStatsReporter *Stats);
     ~MarkTracerImpl();
@@ -196,7 +196,7 @@ public:
 /// The graph also supports a "mark" operation, which is intended to track
 /// nodes that have been not just visited but transitively marked through.
 template <typename T>
-class DependencyGraph : public DependencyGraphImpl {
+class DependencyGraph : public CoarseGrainedDependencyGraphImpl {
   using Traits = llvm::PointerLikeTypeTraits<T>;
   static_assert(Traits::NumLowBitsAvailable >= 0, "not a pointer-like type");
 
@@ -240,7 +240,7 @@ public:
   /// call site can polymorphically call \ref
   /// fine_grained_dependencies::ModuleDepGraph::loadFromPath
   LoadResult loadFromPath(T node, StringRef path, DiagnosticEngine &) {
-    return DependencyGraphImpl::loadFromPath(Traits::getAsVoidPointer(node),
+    return CoarseGrainedDependencyGraphImpl::loadFromPath(Traits::getAsVoidPointer(node),
                                              path);
   }
 
@@ -250,7 +250,7 @@ public:
   ///
   /// \sa loadFromPath
   LoadResult loadFromString(T node, StringRef data) {
-    return DependencyGraphImpl::loadFromString(Traits::getAsVoidPointer(node),
+    return CoarseGrainedDependencyGraphImpl::loadFromString(Traits::getAsVoidPointer(node),
                                                data);
   }
 
@@ -259,7 +259,7 @@ public:
   /// This can be used for new nodes that may be updated later.
   void addIndependentNode(T node) {
     return
-        DependencyGraphImpl::addIndependentNode(Traits::getAsVoidPointer(node));
+        CoarseGrainedDependencyGraphImpl::addIndependentNode(Traits::getAsVoidPointer(node));
   }
 
   /// Marks \p node and all nodes that depend on \p node, and places any nodes
@@ -287,7 +287,7 @@ public:
   void markTransitive(SmallVector<T, N> &visited, T node,
                       MarkTracer *tracer = nullptr) {
     SmallVector<const void *, N> rawMarked;
-    DependencyGraphImpl::markTransitive(rawMarked,
+    CoarseGrainedDependencyGraphImpl::markTransitive(rawMarked,
                                         Traits::getAsVoidPointer(node),
                                         tracer);
     // FIXME: How can we avoid this copy?
@@ -297,7 +297,7 @@ public:
   template <unsigned N>
   void markExternal(SmallVector<T, N> &visited, StringRef externalDependency) {
     SmallVector<const void *, N> rawMarked;
-    DependencyGraphImpl::markExternal(rawMarked, externalDependency);
+    CoarseGrainedDependencyGraphImpl::markExternal(rawMarked, externalDependency);
     // FIXME: How can we avoid this copy?
     copyBack(visited, rawMarked);
   }
@@ -309,12 +309,12 @@ public:
   /// \sa #markTransitive
   bool markIntransitive(T node) {
     return
-        DependencyGraphImpl::markIntransitive(Traits::getAsVoidPointer(node));
+        CoarseGrainedDependencyGraphImpl::markIntransitive(Traits::getAsVoidPointer(node));
   }
 
   /// Returns true if \p node has been marked (directly or transitively).
   bool isMarked(T node) const {
-    return DependencyGraphImpl::isMarked(Traits::getAsVoidPointer(node));
+    return CoarseGrainedDependencyGraphImpl::isMarked(Traits::getAsVoidPointer(node));
   }
 };
 

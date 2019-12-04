@@ -41,7 +41,7 @@ using namespace swift::driver;
 // MARK: Interfacing to Compilation
 //==============================================================================
 
-using LoadResult = fine_grained_dependencies::DependencyGraphImpl::LoadResult;
+using LoadResult = fine_grained_dependencies::CoarseGrainedDependencyGraphImpl::LoadResult;
 
 LoadResult ModuleDepGraph::loadFromPath(const Job *Cmd, StringRef path,
                                         DiagnosticEngine &diags) {
@@ -70,7 +70,7 @@ LoadResult ModuleDepGraph::loadFromBuffer(const Job *job,
   Optional<SourceFileDepGraph> sourceFileDepGraph =
       SourceFileDepGraph::loadFromBuffer(buffer);
   if (!sourceFileDepGraph)
-    return DependencyGraphImpl::LoadResult::HadError;
+    return CoarseGrainedDependencyGraphImpl::LoadResult::HadError;
   addIndependentNode(job);
   return integrate(sourceFileDepGraph.getValue());
 }

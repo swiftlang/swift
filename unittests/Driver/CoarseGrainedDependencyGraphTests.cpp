@@ -3,7 +3,7 @@
 #include "gtest/gtest.h"
 
 using namespace swift;
-using LoadResult = DependencyGraphImpl::LoadResult;
+using LoadResult = CoarseGrainedDependencyGraphImpl::LoadResult;
 using namespace reference_dependency_keys;
 
 static LoadResult loadFromString(DependencyGraph<uintptr_t> &dg, uintptr_t node,
