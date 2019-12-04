@@ -792,6 +792,8 @@ private:
 
   /// The set of `differentiable_function` instructions that have been
   /// processed. Used to avoid reprocessing invalidated instructions.
+  /// NOTE(TF-784): if we use `CanonicalizeInstruction` subclass to replace
+  /// `ADContext::processDifferentiableFunctionInst`, this field may be removed.
   SmallPtrSet<DifferentiableFunctionInst *, 32>
       processedDifferentiableFunctionInsts;
 
@@ -838,27 +840,32 @@ public:
   SILPassManager &getPassManager() const { return passManager; }
   Lowering::TypeConverter &getTypeConverter() { return module.Types; }
 
-  /// Returns true if there are no `DifferentiableFunctionInst` to process.
+  /// Returns true if the `differentiable_function` instruction worklist is
+  /// empty.
   bool isDifferentiableFunctionInstsWorklistEmpty() const {
     return differentiableFunctionInsts.empty();
   }
 
-  /// Pick and remove a `DifferentiableFunctionInst` for processing.
-  /// Returns nullptr if none are available for processing.
+  /// Pops and returns a `differentiable_function` instruction from the
+  /// worklist. Returns nullptr if the worklist is empty.
   DifferentiableFunctionInst* popDifferentiableFunctionInstFromWorklist() {
     if (differentiableFunctionInsts.empty()) return nullptr;
     return differentiableFunctionInsts.pop_back_val();
   }
 
+  /// Adds the given `differentiable_function` instruction to the worklist.
   void addDifferentiableFunctionInst(DifferentiableFunctionInst* dfi) {
     differentiableFunctionInsts.push_back(dfi);
   }
 
+  /// Returns true if the given `differentiable_function` instruction has
+  /// already been processed.
   bool
   isDifferentiableFunctionInstProcessed(DifferentiableFunctionInst *dfi) const {
     return processedDifferentiableFunctionInsts.count(dfi);
   }
 
+  /// Adds the given `differentiable_function` instruction to the worklist.
   void
   markDifferentiableFunctionInstAsProcessed(DifferentiableFunctionInst *dfi) {
     processedDifferentiableFunctionInsts.insert(dfi);
@@ -876,13 +883,13 @@ public:
     invokers.insert({witness, DifferentiationInvoker(witness)});
   }
 
-  /// Returns the index for `dfi`, which should be already set.
+  /// Returns the result index for `dfi`, which should be already set.
   unsigned getResultIndex(DifferentiableFunctionInst* dfi) {
     assert(resultIndices.count(dfi) && "No result index set");
     return resultIndices.lookup(dfi);
   }
 
-  /// Updates the index for `dfi` in this context.
+  /// Sets the result index for `dfi`.
   void setResultIndex(DifferentiableFunctionInst* dfi, unsigned index) {
     resultIndices[dfi] = index;
   }
