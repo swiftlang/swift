@@ -1,4 +1,4 @@
-//===-- ExperimentalDependencyGraph.cpp ------------------------------------==//
+//===--- FineGrainedDependencyGraph.cpp ------------------------------------==//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Driver/ExperimentalDependencyDriverGraph.h"
+#include "swift/Driver/FineGrainedDependencyDriverGraph.h"
 // Next two includes needed for reporting errors opening dot file for writing.
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/FileSystem.h"

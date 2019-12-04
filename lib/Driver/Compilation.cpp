@@ -14,7 +14,7 @@
 
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsDriver.h"
-#include "swift/AST/ExperimentalDependencies.h"
+#include "swift/AST/FineGrainedDependencies.h"
 #include "swift/Basic/OutputFileMap.h"
 #include "swift/Basic/Program.h"
 #include "swift/Basic/STLExtras.h"
@@ -26,7 +26,7 @@
 #include "swift/Driver/DependencyGraph.h"
 #include "swift/Driver/Driver.h"
 #include "swift/Driver/DriverIncrementalRanges.h"
-#include "swift/Driver/ExperimentalDependencyDriverGraph.h"
+#include "swift/Driver/FineGrainedDependencyDriverGraph.h"
 #include "swift/Driver/Job.h"
 #include "swift/Driver/ParseableOutput.h"
 #include "swift/Driver/ToolChain.h"

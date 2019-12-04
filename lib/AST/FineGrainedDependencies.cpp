@@ -1,4 +1,4 @@
-//===--- ExperimentalDependencies.cpp - Generates swiftdeps files ---------===//
+//===---- FineGrainedDependencies.cpp - Generates swiftdeps files ---------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -12,7 +12,7 @@
 
 #include <stdio.h>
 
-#include "swift/AST/ExperimentalDependencies.h"
+#include "swift/AST/FineGrainedDependencies.h"
 
 // may not all be needed
 #include "swift/Basic/FileSystem.h"

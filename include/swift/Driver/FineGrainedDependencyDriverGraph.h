@@ -1,4 +1,4 @@
-//===--- ExperimentalDependencyModuleDepGraph.h ------------------*- C++-*-===//
+//===---- FineGrainedDependencyModuleDepGraph.h ------------------*- C++-*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,10 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef ExperimentalDependencyGraph_h
-#define ExperimentalDependencyGraph_h
+#ifndef SWIFT_DRIVER_FINE_GRAINED_DEPENDENCY_DRIVER_GRAPH_H
+#define SWIFT_DRIVER_FINE_GRAINED_DEPENDENCY_DRIVER_GRAPH_H
 
-#include "swift/AST/ExperimentalDependencies.h"
+#include "swift/AST/FineGrainedDependencies.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/OptionSet.h"
@@ -476,4 +476,4 @@ private:
 } // namespace experimental_dependencies
 } // namespace swift
 
-#endif // ExperimentalDependencyGraph_h
+#endif // SWIFT_DRIVER_FINE_GRAINED_DEPENDENCY_DRIVER_GRAPH_H

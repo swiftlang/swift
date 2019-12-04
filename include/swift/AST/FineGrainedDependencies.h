@@ -1,4 +1,4 @@
-//===--- ExperimentalDependencies.h -----------------------------*- C++ -*-===//
+//===----- FineGrainedependencies.h -----------------------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_AST_EXPERIMENTAL_DEPENDENCIES_H
-#define SWIFT_AST_EXPERIMENTAL_DEPENDENCIES_H
+#ifndef SWIFT_AST_FINE_GRAINED_DEPENDENCIES_H
+#define SWIFT_AST_FINE_GRAINED_DEPENDENCIES_H
 
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
@@ -985,4 +985,4 @@ struct SequenceTraits<
 LLVM_YAML_DECLARE_MAPPING_TRAITS(
     swift::experimental_dependencies::SourceFileDepGraph)
 
-#endif // SWIFT_AST_EXPERIMENTAL_DEPENDENCIES_H
+#endif // SWIFT_AST_FINE_GRAINED_DEPENDENCIES_H

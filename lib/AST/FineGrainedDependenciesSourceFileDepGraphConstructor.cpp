@@ -1,4 +1,4 @@
-//===--- ExperimentalDependenciesSourceFileDepGraphConstructor.cpp --------===//
+//===--- FineGrainedDependenciesSourceFileDepGraphConstructor.cpp ---------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -19,7 +19,7 @@
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/ExistentialLayout.h"
-#include "swift/AST/ExperimentalDependencies.h"
+#include "swift/AST/FineGrainedDependencies.h"
 #include "swift/AST/FileSystem.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ModuleLoader.h"

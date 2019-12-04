@@ -28,7 +28,7 @@
 #include "swift/Subsystems.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/DiagnosticsSema.h"
-#include "swift/AST/ExperimentalDependencies.h"
+#include "swift/AST/FineGrainedDependencies.h"
 #include "swift/AST/FileSystem.h"
 #include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/IRGenOptions.h"
