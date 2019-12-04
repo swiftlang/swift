@@ -12,6 +12,7 @@ var closure1 : () -> Int = {4}  // Function producing 4 whenever it is called.
 var closure2 : (Int,Int) -> Int = { 4 } // expected-error{{contextual type for closure argument list expects 2 arguments, which cannot be implicitly ignored}} {{36-36= _,_ in}}
 var closure3a : () -> () -> (Int,Int) = {{ (4, 2) }} // multi-level closing.
 var closure3b : (Int,Int) -> (Int) -> (Int,Int) = {{ (4, 2) }} // expected-error{{contextual type for closure argument list expects 2 arguments, which cannot be implicitly ignored}}  {{52-52=_,_ in }}
+// expected-error@-1 {{contextual type for closure argument list expects 1 argument, which cannot be implicitly ignored}} {{53-53= _ in}}
 var closure4 : (Int,Int) -> Int = { $0 + $1 }
 var closure5 : (Double) -> Int = {
        $0 + 1.0
