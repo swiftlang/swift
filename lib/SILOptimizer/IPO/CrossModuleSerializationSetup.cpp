@@ -137,25 +137,25 @@ public:
 };
 
 /// Make a nominal type, including it's context, usable from inline.
-static void makeNominalUsableFromInline(NominalTypeDecl *NT, SILModule &M) {
-  if (NT->getEffectiveAccess() >= AccessLevel::Public)
+static void makeDeclUsableFromInline(ValueDecl *decl, SILModule &M) {
+  if (decl->getEffectiveAccess() >= AccessLevel::Public)
     return;
 
-  if (!NT->isUsableFromInline()) {
+  if (!decl->isUsableFromInline()) {
     // Mark the nominal type as "usableFromInline".
     // TODO: find a way to do this without modifying the AST. The AST should be
     // immutable at this point.
-    auto &ctx = NT->getASTContext();
+    auto &ctx = decl->getASTContext();
     auto *attr = new (ctx) UsableFromInlineAttr(/*implicit=*/true);
-    NT->getAttrs().add(attr);
+    decl->getAttrs().add(attr);
   }
-  if (auto *enclosingNominal = dyn_cast<NominalTypeDecl>(NT->getDeclContext())) {
-    makeNominalUsableFromInline(enclosingNominal, M);
-  } else if (auto *enclosingExt = dyn_cast<ExtensionDecl>(NT->getDeclContext())) {
-    if (auto *extendedNominal = enclosingExt->getExtendedNominal()) {
-      makeNominalUsableFromInline(extendedNominal, M);
+  if (auto *nominalCtx = dyn_cast<NominalTypeDecl>(decl->getDeclContext())) {
+    makeDeclUsableFromInline(nominalCtx, M);
+  } else if (auto *extCtx = dyn_cast<ExtensionDecl>(decl->getDeclContext())) {
+    if (auto *extendedNominal = extCtx->getExtendedNominal()) {
+      makeDeclUsableFromInline(extendedNominal, M);
     }
-  } else if (NT->getDeclContext()->isLocalContext()) {
+  } else if (decl->getDeclContext()->isLocalContext()) {
     // TODO
   }
 }
@@ -166,7 +166,7 @@ void CrossModuleSerializationSetup::makeTypeUsableFromInline(CanType type) {
     return;
 
   if (NominalTypeDecl *NT = type->getNominalOrBoundGenericNominal()) {
-    makeNominalUsableFromInline(NT, M);
+    makeDeclUsableFromInline(NT, M);
   }
 
   // Also make all sub-types usable from inline.
@@ -174,7 +174,7 @@ void CrossModuleSerializationSetup::makeTypeUsableFromInline(CanType type) {
     CanType subType = rawSubType->getCanonicalType();
     if (typesHandled.insert(subType.getPointer()).second) {
       if (NominalTypeDecl *subNT = subType->getNominalOrBoundGenericNominal()) {
-        makeNominalUsableFromInline(subNT, M);
+        makeDeclUsableFromInline(subNT, M);
       }
     }
   });
@@ -234,6 +234,9 @@ prepareInstructionForSerialization(SILInstruction *inst) {
         [this](SILFunction *func) { handleReferencedFunction(func); },
         [this](SILDeclRef method) { handleReferencedMethod(method); });
     return;
+  }
+  if (auto *REAI = dyn_cast<RefElementAddrInst>(inst)) {
+    makeDeclUsableFromInline(REAI->getField(), M);
   }
 }
 
