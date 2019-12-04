@@ -132,16 +132,17 @@
 /// a flow-insensitive way. Hint: ConGraph->viewCG() displays the Dot-formatted
 /// connection graph.
 ///
-/// In addition to the connection graph, EscapeAnalysis stores information about
-/// "use points". Each release operation is a use points. These instructions are
+/// In addition to the connection graph, EscapeAnalysis caches information about
+/// "use points". Each release operation in which the released reference can be
+/// identified is a considered a use point. The use point instructions are
 /// recorded in a table and given an ID. Each connection graph node stores a
-/// bitset indicating the use points reachable via the CFG by that node. This
-/// provides some flow-sensitive information on top of the otherwise flow
-/// insensitive connection graph.
-///
-/// Note: storing bitsets in each node may be unnecessary overhead since the
-/// same information can be obtained with a graph traversal, typically of only
-/// 1-3 hops.
+/// bitset indicating the use points that may release references represented by
+/// the node. Correctness relies on an invariant: for each reference-type value
+/// in the function, all points in the function which may release the reference
+/// must be identified as use points of the node that the value is mapped to. If
+/// the reference-type value may be released any other way, then its node must
+/// be marked escaping. Corollary: All nodes in the same defer web must have the
+/// same use-point bitset.
 // ===---------------------------------------------------------------------===//
 
 #ifndef SWIFT_SILOPTIMIZER_ANALYSIS_ESCAPEANALYSIS_H_
@@ -537,6 +538,8 @@ public:
     /// true if the visitor returned true for all defers.
     template <typename Visitor> bool visitDefers(Visitor &&visitor) const;
 
+    bool hasDefers() const;
+
     /// For debug dumping.
     void dump() const;
 
@@ -719,19 +722,7 @@ public:
     }
 
     /// Adds an argument/instruction in which the node's value is used.
-    int addUsePoint(CGNode *Node, SILNode *User) {
-      if (Node->getEscapeState() >= EscapeState::Global)
-        return -1;
-
-      User = User->getRepresentativeSILNodeInObject();
-      int Idx = (int)UsePoints.size();
-      assert(UsePoints.count(User) == 0 && "value is already a use-point");
-      UsePoints[User] = Idx;
-      UsePointTable.push_back(User);
-      assert(UsePoints.size() == UsePointTable.size());
-      Node->setUsePointBit(Idx);
-      return Idx;
-    }
+    int addUsePoint(CGNode *Node, SILNode *User);
 
     void escapeContentsOf(CGNode *Node) {
       CGNode *escapedContent = Node->getContentNodeOrNull();
@@ -919,10 +910,6 @@ private:
   /// Callee analysis, used for determining the callees at call sites.
   BasicCalleeAnalysis *BCA;
 
-  /// Returns true if \p V may encapsulate a "pointer" value.
-  /// See EscapeAnalysis::NodeType::Value.
-  bool isPointer(ValueBase *V) const;
-
   /// If EscapeAnalysis should consider the given value to be a derived address
   /// or pointer based on one of its address or pointer operands, then return
   /// that operand value. Otherwise, return an invalid value.
@@ -1022,10 +1009,11 @@ private:
   bool mergeSummaryGraph(ConnectionGraph *SummaryGraph,
                          ConnectionGraph *Graph);
 
-  /// Returns true if the value \p V can escape to the \p UsePoint, where
-  /// \p UsePoint is either a release-instruction or a function call.
-  bool canEscapeToUsePoint(SILValue V, SILNode *UsePoint,
-                           ConnectionGraph *ConGraph);
+  /// Returns true if the value \p value or any address within that value can
+  /// escape to the \p usePoint, where \p usePoint is either a
+  /// release-instruction or a function call.
+  bool canEscapeToUsePoint(SILValue value, SILInstruction *usePoint,
+                           ConnectionGraph *conGraph);
 
   friend struct ::CGForDotView;
 
@@ -1045,6 +1033,10 @@ public:
       recompute(FInfo);
     return &FInfo->Graph;
   }
+
+  /// Returns true if \p V may encapsulate a "pointer" value.
+  /// See EscapeAnalysis::NodeType::Value.
+  bool isPointer(ValueBase *V) const;
 
   /// Returns true if the value \p V can escape to the function call \p FAS.
   /// This means that the called function may access the value \p V.

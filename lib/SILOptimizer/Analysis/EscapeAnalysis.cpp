@@ -402,6 +402,10 @@ bool EscapeAnalysis::CGNode::visitDefers(Visitor &&visitor) const {
   return true;
 }
 
+bool EscapeAnalysis::CGNode::hasDefers() const {
+  return visitDefers([&](CGNode *deferred, bool) { return false; });
+}
+
 void EscapeAnalysis::ConnectionGraph::clear() {
   Values2Nodes.clear();
   Nodes.clear();
@@ -443,6 +447,26 @@ EscapeAnalysis::ConnectionGraph::getNode(ValueBase *V, bool createIfNeeded) {
     }
   }
   return Node->getMergeTarget();
+}
+
+/// Adds an argument/instruction in which the node's value is used.
+int EscapeAnalysis::ConnectionGraph::addUsePoint(CGNode *Node, SILNode *User) {
+  // Use points are never consulted for escaping nodes, but still need to
+  // propagate to other nodes in a defer web. Even if this node is escaping,
+  // some defer predecessors may not be escaping. Only checking if this node has
+  // defer predecessors is insufficient because a defer successor of this node
+  // may have defer predecessors.
+  if (Node->getEscapeState() >= EscapeState::Global && !Node->hasDefers())
+    return -1;
+
+  User = User->getRepresentativeSILNodeInObject();
+  int Idx = (int)UsePoints.size();
+  assert(UsePoints.count(User) == 0 && "value is already a use-point");
+  UsePoints[User] = Idx;
+  UsePointTable.push_back(User);
+  assert(UsePoints.size() == UsePointTable.size());
+  Node->setUsePointBit(Idx);
+  return Idx;
 }
 
 CGNode *EscapeAnalysis::ConnectionGraph::defer(CGNode *From, CGNode *To,
@@ -792,7 +816,9 @@ void EscapeAnalysis::ConnectionGraph::propagateEscapeStates() {
     Changed = false;
 
     for (CGNode *Node : Nodes) {
-      // Propagate the state to all successor nodes.
+      // Propagate the state to all pointsTo nodes. It would be sufficient to
+      // only follow proper pointsTo edges, since this loop also follows defer
+      // edges, but this may converge faster.
       if (Node->pointsTo) {
         Changed |= Node->pointsTo->mergeEscapeState(Node->State);
       }
@@ -855,9 +881,13 @@ void EscapeAnalysis::ConnectionGraph::computeUsePoints() {
   do {
     Changed = false;
     for (CGNode *Node : Nodes) {
-      // Propagate the bits to all successor nodes.
-      Node->visitSuccessors([&Changed, Node](CGNode *succ) {
-        Changed |= succ->mergeUsePoints(Node);
+      // Propagate the bits to pointsTo. A release of a node may also release
+      // any content pointed to be the node.
+      if (Node->pointsTo)
+        Changed |= Node->pointsTo->mergeUsePoints(Node);
+      // All nodes in a defer web must have the same use points.
+      Node->visitDefers([&](CGNode *deferNode, bool /*isSucc*/) {
+        Changed |= deferNode->mergeUsePoints(Node);
         return true;
       });
     }
@@ -2335,44 +2365,50 @@ bool EscapeAnalysis::mergeSummaryGraph(ConnectionGraph *SummaryGraph,
   return SummaryGraph->mergeFrom(Graph, Mapping);
 }
 
-bool EscapeAnalysis::canEscapeToUsePoint(SILValue V, SILNode *UsePoint,
-                                         ConnectionGraph *ConGraph) {
+// Return true if \p value or any address within the object pointed to by \p
+// value escapes. Multiple CG nodes may represent the same object; however, a CG
+// node with hasRefCount is always the head of an object.
+bool EscapeAnalysis::canEscapeToUsePoint(SILValue value,
+                                         SILInstruction *usePoint,
+                                         ConnectionGraph *conGraph) {
 
-  assert((FullApplySite::isa(UsePoint) || isa<RefCountingInst>(UsePoint)) &&
-         "use points are only created for calls and refcount instructions");
+  assert((FullApplySite::isa(usePoint) || isa<RefCountingInst>(usePoint))
+         && "use points are only created for calls and refcount instructions");
 
-  CGNode *Node = ConGraph->getNodeOrNull(V);
-  if (!Node)
+  CGNode *node = conGraph->getNodeOrNull(value);
+  if (!node)
     return true;
 
-  // First check if there are escape paths which we don't explicitly see
-  // in the graph.
-  if (Node->valueEscapesInsideFunction(V))
-    return true;
+  CGNode *content = node->getContentNodeOrNull();
 
-  // No hidden escapes: check if the Node is reachable from the UsePoint.
-  // Check if the object itself can escape to the called function.
-  if (ConGraph->isUsePoint(UsePoint, Node))
-    return true;
+  // Follow points-to edges and return true if the current 'node' may escape at
+  // 'usePoint'.
+  while (true) {
+    // First check if 'node' may escape in a way not represented by the
+    // connection graph, assuming that it may represent part of the object
+    // pointed to by 'value'. If 'node' happens to represent another object
+    // indirectly reachabe from 'value', then it cannot actually escape to this
+    // usePoint, so passing the original value is still conservatively correct.
+    if (node->valueEscapesInsideFunction(value))
+      return true;
 
-  assert(isPointer(V) && "should not have a node for a non-pointer");
+    // No hidden escapes; check if 'usePoint' may access memory at 'node'.
+    if (conGraph->isUsePoint(usePoint, node))
+      return true;
 
-  // Check if the object "content" can escape to the called function.
-  // This will catch cases where V is a reference and a pointer to a stored
-  // property escapes.
-  // It's also important in case of a pointer assignment, e.g.
-  //    V = V1
-  //    apply(V1)
-  // In this case the apply is only a use-point for V1 and V1's content node.
-  // As V1's content node is the same as V's content node, we also make the
-  // check for the content node.
-  CGNode *ContentNode = getValueContent(ConGraph, V);
-  if (ContentNode->valueEscapesInsideFunction(V))
-    return true;
+    // Continue to check for escaping content whenever 'content' may point to
+    // the same object as 'node'.
+    if (!content)
+      break;
 
-  if (ConGraph->isUsePoint(UsePoint, ContentNode))
-    return true;
-
+    node = content;
+    content = node->getContentNodeOrNull();
+    // If the pointed-to node's content is a new object (i.e. node must be a
+    // reference), then ignore it. This applies to all pointed-to nodes, but not
+    // the first node that 'value' directly maps to.
+    if (content && content->hasRefCount())
+      break;
+  }
   return false;
 }
 
