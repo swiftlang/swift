@@ -39,6 +39,9 @@ using llvm::BCVBR;
 /// Magic number for serialized module files.
 const unsigned char SWIFTMODULE_SIGNATURE[] = { 0xE2, 0x9C, 0xA8, 0x0E };
 
+/// Alignment of each serialized modules inside a .swift_ast section.
+const unsigned char SWIFTMODULE_ALIGNMENT = 4;
+
 /// Serialized module format major version number.
 ///
 /// Always 0 for Swift 1.x - 4.x.
