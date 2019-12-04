@@ -110,7 +110,8 @@ public:
 class CoarseGrainedDependencyGraphImpl {
 public:
   /// Use the status quo LoadResult for now.
-  using LoadResult = typename swift::CoarseGrainedDependencyGraphImpl::LoadResult;
+  using LoadResult =
+      typename swift::CoarseGrainedDependencyGraphImpl::LoadResult;
 };
 
 //==============================================================================
@@ -268,10 +269,11 @@ public:
   }
 
   /// Unlike the standard \c CoarseGrainedDependencyGraph, returns \c
-  /// CoarseGrainedDependencyGraphImpl::LoadResult::AffectsDownstream when loading a new
-  /// file, i.e. when determining the initial set. Caller compensates.
-  CoarseGrainedDependencyGraphImpl::LoadResult loadFromPath(const driver::Job *, StringRef,
-                                               DiagnosticEngine &);
+  /// CoarseGrainedDependencyGraphImpl::LoadResult::AffectsDownstream when
+  /// loading a new file, i.e. when determining the initial set. Caller
+  /// compensates.
+  CoarseGrainedDependencyGraphImpl::LoadResult
+  loadFromPath(const driver::Job *, StringRef, DiagnosticEngine &);
 
   /// For the dot file.
   std::string getGraphID() const { return "driver"; }
@@ -372,12 +374,13 @@ private:
   /// and integrate it into the ModuleDepGraph.
   /// Used both the first time, and to reload the SourceFileDepGraph.
   /// If any changes were observed, indicate same in the return vale.
-  CoarseGrainedDependencyGraphImpl::LoadResult loadFromBuffer(const driver::Job *,
-                                                 llvm::MemoryBuffer &);
+  CoarseGrainedDependencyGraphImpl::LoadResult
+  loadFromBuffer(const driver::Job *, llvm::MemoryBuffer &);
 
   /// Integrate a SourceFileDepGraph into the receiver.
   /// Integration happens when the driver needs to read SourceFileDepGraph.
-  CoarseGrainedDependencyGraphImpl::LoadResult integrate(const SourceFileDepGraph &);
+  CoarseGrainedDependencyGraphImpl::LoadResult
+  integrate(const SourceFileDepGraph &);
 
   enum class LocationOfPreexistingNode { nowhere, here, elsewhere };
 

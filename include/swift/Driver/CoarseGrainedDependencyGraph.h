@@ -43,8 +43,8 @@ class CoarseGrainedDependencyGraphImpl {
 public:
   /// Possible dependency kinds.
   ///
-  /// Clients of CoarseGrainedDependencyGraph should have no reason to use this type.
-  /// It is only used in the implementation.
+  /// Clients of CoarseGrainedDependencyGraph should have no reason to use this
+  /// type. It is only used in the implementation.
   enum class DependencyKind : uint8_t;
 
   /// Describes the result of loading a dependency file for a particular node.
@@ -62,7 +62,8 @@ public:
     AffectsDownstream
   };
 
-  /// The non-templated implementation of CoarseGrainedDependencyGraph::MarkTracer.
+  /// The non-templated implementation of
+  /// CoarseGrainedDependencyGraph::MarkTracer.
   ///
   /// \see CoarseGrainedDependencyGraph::MarkTracer
   class MarkTracerImpl {
@@ -71,6 +72,7 @@ public:
     UnifiedStatsReporter *Stats;
 
     friend class CoarseGrainedDependencyGraphImpl;
+
   protected:
     explicit MarkTracerImpl(UnifiedStatsReporter *Stats);
     ~MarkTracerImpl();
@@ -210,7 +212,8 @@ class CoarseGrainedDependencyGraph : public CoarseGrainedDependencyGraphImpl {
   }
 
 public:
-  /// Traces the graph traversal performed in CoarseGrainedDependencyGraph::markTransitive.
+  /// Traces the graph traversal performed in
+  /// CoarseGrainedDependencyGraph::markTransitive.
   ///
   /// This is intended to be a debugging aid.
   class MarkTracer : public MarkTracerImpl {
@@ -240,8 +243,8 @@ public:
   /// call site can polymorphically call \ref
   /// fine_grained_dependencies::ModuleDepGraph::loadFromPath
   LoadResult loadFromPath(T node, StringRef path, DiagnosticEngine &) {
-    return CoarseGrainedDependencyGraphImpl::loadFromPath(Traits::getAsVoidPointer(node),
-                                             path);
+    return CoarseGrainedDependencyGraphImpl::loadFromPath(
+        Traits::getAsVoidPointer(node), path);
   }
 
   /// Load "depends" and "provides" data for \p node from a plain string.
@@ -250,16 +253,16 @@ public:
   ///
   /// \sa loadFromPath
   LoadResult loadFromString(T node, StringRef data) {
-    return CoarseGrainedDependencyGraphImpl::loadFromString(Traits::getAsVoidPointer(node),
-                                               data);
+    return CoarseGrainedDependencyGraphImpl::loadFromString(
+        Traits::getAsVoidPointer(node), data);
   }
 
   /// Adds \p node to the dependency graph without any connections.
   ///
   /// This can be used for new nodes that may be updated later.
   void addIndependentNode(T node) {
-    return
-        CoarseGrainedDependencyGraphImpl::addIndependentNode(Traits::getAsVoidPointer(node));
+    return CoarseGrainedDependencyGraphImpl::addIndependentNode(
+        Traits::getAsVoidPointer(node));
   }
 
   /// Marks \p node and all nodes that depend on \p node, and places any nodes
@@ -287,9 +290,8 @@ public:
   void markTransitive(SmallVector<T, N> &visited, T node,
                       MarkTracer *tracer = nullptr) {
     SmallVector<const void *, N> rawMarked;
-    CoarseGrainedDependencyGraphImpl::markTransitive(rawMarked,
-                                        Traits::getAsVoidPointer(node),
-                                        tracer);
+    CoarseGrainedDependencyGraphImpl::markTransitive(
+        rawMarked, Traits::getAsVoidPointer(node), tracer);
     // FIXME: How can we avoid this copy?
     copyBack(visited, rawMarked);
   }
@@ -297,7 +299,8 @@ public:
   template <unsigned N>
   void markExternal(SmallVector<T, N> &visited, StringRef externalDependency) {
     SmallVector<const void *, N> rawMarked;
-    CoarseGrainedDependencyGraphImpl::markExternal(rawMarked, externalDependency);
+    CoarseGrainedDependencyGraphImpl::markExternal(rawMarked,
+                                                   externalDependency);
     // FIXME: How can we avoid this copy?
     copyBack(visited, rawMarked);
   }
@@ -308,13 +311,14 @@ public:
   ///
   /// \sa #markTransitive
   bool markIntransitive(T node) {
-    return
-        CoarseGrainedDependencyGraphImpl::markIntransitive(Traits::getAsVoidPointer(node));
+    return CoarseGrainedDependencyGraphImpl::markIntransitive(
+        Traits::getAsVoidPointer(node));
   }
 
   /// Returns true if \p node has been marked (directly or transitively).
   bool isMarked(T node) const {
-    return CoarseGrainedDependencyGraphImpl::isMarked(Traits::getAsVoidPointer(node));
+    return CoarseGrainedDependencyGraphImpl::isMarked(
+        Traits::getAsVoidPointer(node));
   }
 };
 

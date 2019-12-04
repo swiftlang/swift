@@ -239,7 +239,8 @@ namespace driver {
     ///
     /// Dependency graphs for deciding which jobs are dirty (need running)
     /// or clean (can be skipped).
-    using CoarseGrainedDependencyGraph = CoarseGrainedDependencyGraph<const Job *>;
+    using CoarseGrainedDependencyGraph =
+        CoarseGrainedDependencyGraph<const Job *>;
     CoarseGrainedDependencyGraph CoarseGrainedDepGraph;
     CoarseGrainedDependencyGraph CoarseGrainedDepGraphForRanges;
 
@@ -1586,20 +1587,19 @@ namespace driver {
                  : getDepGraph(forRanges).markIntransitive(Cmd);
     }
 
-    CoarseGrainedDependencyGraph::LoadResult loadDepGraphFromPath(const Job *Cmd,
-                                                     StringRef path,
-                                                     DiagnosticEngine &diags,
-                                                     const bool forRanges) {
+    CoarseGrainedDependencyGraph::LoadResult
+    loadDepGraphFromPath(const Job *Cmd, StringRef path,
+                         DiagnosticEngine &diags, const bool forRanges) {
       return Comp.getEnableFineGrainedDependencies()
                  ? getExpDepGraph(forRanges).loadFromPath(Cmd, path, diags)
                  : getDepGraph(forRanges).loadFromPath(Cmd, path, diags);
     }
 
     template <unsigned N>
-    void
-    markTransitiveInDepGraph(SmallVector<const Job *, N> &visited,
-                             const Job *Cmd, const bool forRanges,
-                             CoarseGrainedDependencyGraph::MarkTracer *tracer = nullptr) {
+    void markTransitiveInDepGraph(
+        SmallVector<const Job *, N> &visited, const Job *Cmd,
+        const bool forRanges,
+        CoarseGrainedDependencyGraph::MarkTracer *tracer = nullptr) {
       if (Comp.getEnableFineGrainedDependencies())
         getExpDepGraph(forRanges).markTransitive(visited, Cmd, tracer);
       else
@@ -1624,7 +1624,8 @@ namespace driver {
     getExpDepGraph(const bool forRanges) const {
       return forRanges ? ExpDepGraphForRanges : ExpDepGraph;
     }
-    const CoarseGrainedDependencyGraph &getDepGraph(const bool forRanges) const {
+    const CoarseGrainedDependencyGraph &
+    getDepGraph(const bool forRanges) const {
       return forRanges ? CoarseGrainedDepGraphForRanges : CoarseGrainedDepGraph;
     }
   };

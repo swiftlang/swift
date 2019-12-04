@@ -10,9 +10,9 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/Driver/CoarseGrainedDependencyGraph.h"
 #include "swift/Basic/ReferenceDependencyKeys.h"
 #include "swift/Basic/Statistic.h"
-#include "swift/Driver/CoarseGrainedDependencyGraph.h"
 #include "swift/Demangling/Demangle.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/SmallVector.h"
@@ -43,8 +43,9 @@ public:
   DependencyMaskTy KindMask;
 };
 
-CoarseGrainedDependencyGraphImpl::MarkTracerImpl::MarkTracerImpl(UnifiedStatsReporter *Stats)
-  : Stats(Stats) {}
+CoarseGrainedDependencyGraphImpl::MarkTracerImpl::MarkTracerImpl(
+    UnifiedStatsReporter *Stats)
+    : Stats(Stats) {}
 CoarseGrainedDependencyGraphImpl::MarkTracerImpl::~MarkTracerImpl() = default;
 
 using LoadResult = CoarseGrainedDependencyGraphImpl::LoadResult;
@@ -211,21 +212,23 @@ parseDependencyFile(llvm::MemoryBuffer &buffer,
   return result;
 }
 
-LoadResult CoarseGrainedDependencyGraphImpl::loadFromPath(const void *node, StringRef path) {
+LoadResult CoarseGrainedDependencyGraphImpl::loadFromPath(const void *node,
+                                                          StringRef path) {
   auto buffer = llvm::MemoryBuffer::getFile(path);
   if (!buffer)
     return LoadResult::HadError;
   return loadFromBuffer(node, *buffer.get());
 }
 
-LoadResult
-CoarseGrainedDependencyGraphImpl::loadFromString(const void *node, StringRef data) {
+LoadResult CoarseGrainedDependencyGraphImpl::loadFromString(const void *node,
+                                                            StringRef data) {
   auto buffer = llvm::MemoryBuffer::getMemBuffer(data);
   return loadFromBuffer(node, *buffer);
 }
 
-LoadResult CoarseGrainedDependencyGraphImpl::loadFromBuffer(const void *node,
-                                               llvm::MemoryBuffer &buffer) {
+LoadResult
+CoarseGrainedDependencyGraphImpl::loadFromBuffer(const void *node,
+                                                 llvm::MemoryBuffer &buffer) {
   auto &provides = Provides[node];
 
   auto dependsCallback = [this, node](StringRef name, DependencyKind kind,
@@ -294,8 +297,8 @@ LoadResult CoarseGrainedDependencyGraphImpl::loadFromBuffer(const void *node,
                              interfaceHashCallback);
 }
 
-void CoarseGrainedDependencyGraphImpl::markExternal(SmallVectorImpl<const void *> &visited,
-                                       StringRef externalDependency) {
+void CoarseGrainedDependencyGraphImpl::markExternal(
+    SmallVectorImpl<const void *> &visited, StringRef externalDependency) {
   forEachUnmarkedJobDirectlyDependentOnExternalSwiftdeps(
       externalDependency, [&](const void *node) {
         visited.push_back(node);
@@ -319,9 +322,9 @@ void CoarseGrainedDependencyGraphImpl::
   }
 }
 
-void
-CoarseGrainedDependencyGraphImpl::markTransitive(SmallVectorImpl<const void *> &visited,
-                                    const void *node, MarkTracerImpl *tracer) {
+void CoarseGrainedDependencyGraphImpl::markTransitive(
+    SmallVectorImpl<const void *> &visited, const void *node,
+    MarkTracerImpl *tracer) {
   assert(Provides.count(node) && "node is not in the graph");
   llvm::SpecificBumpPtrAllocator<MarkTracerImpl::Entry> scratchAlloc;
 

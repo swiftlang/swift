@@ -6,29 +6,30 @@ using namespace swift;
 using LoadResult = CoarseGrainedDependencyGraphImpl::LoadResult;
 using namespace reference_dependency_keys;
 
-static LoadResult loadFromString(CoarseGrainedDependencyGraph<uintptr_t> &dg, uintptr_t node,
-                                 StringRef key, StringRef data) {
+static LoadResult loadFromString(CoarseGrainedDependencyGraph<uintptr_t> &dg,
+                                 uintptr_t node, StringRef key,
+                                 StringRef data) {
   return dg.loadFromString(node, key.str() + ": [" + data.str() + "]");
 }
 
-static LoadResult loadFromString(CoarseGrainedDependencyGraph<uintptr_t> &dg, uintptr_t node,
-                                 StringRef key1, StringRef data1,
-                                 StringRef key2, StringRef data2) {
-  return dg.loadFromString(node,
-                           key1.str() + ": [" + data1.str() + "]\n" +
-                           key2.str() + ": [" + data2.str() + "]");
+static LoadResult loadFromString(CoarseGrainedDependencyGraph<uintptr_t> &dg,
+                                 uintptr_t node, StringRef key1,
+                                 StringRef data1, StringRef key2,
+                                 StringRef data2) {
+  return dg.loadFromString(node, key1.str() + ": [" + data1.str() + "]\n" +
+                                     key2.str() + ": [" + data2.str() + "]");
 }
 
-static LoadResult loadFromString(CoarseGrainedDependencyGraph<uintptr_t> &dg, uintptr_t node,
-                                 StringRef key1, StringRef data1,
-                                 StringRef key2, StringRef data2,
-                                 StringRef key3, StringRef data3,
-                                 StringRef key4, StringRef data4) {
-  return dg.loadFromString(node,
-                           key1.str() + ": [" + data1.str() + "]\n" +
-                           key2.str() + ": [" + data2.str() + "]\n" +
-                           key3.str() + ": [" + data3.str() + "]\n" +
-                           key4.str() + ": [" + data4.str() + "]\n");
+static LoadResult loadFromString(CoarseGrainedDependencyGraph<uintptr_t> &dg,
+                                 uintptr_t node, StringRef key1,
+                                 StringRef data1, StringRef key2,
+                                 StringRef data2, StringRef key3,
+                                 StringRef data3, StringRef key4,
+                                 StringRef data4) {
+  return dg.loadFromString(node, key1.str() + ": [" + data1.str() + "]\n" +
+                                     key2.str() + ": [" + data2.str() + "]\n" +
+                                     key3.str() + ": [" + data3.str() + "]\n" +
+                                     key4.str() + ": [" + data4.str() + "]\n");
 }
 
 TEST(CoarseGrainedDependencyGraph, BasicLoad) {

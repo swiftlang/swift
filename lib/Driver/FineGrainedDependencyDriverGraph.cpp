@@ -41,7 +41,8 @@ using namespace swift::driver;
 // MARK: Interfacing to Compilation
 //==============================================================================
 
-using LoadResult = fine_grained_dependencies::CoarseGrainedDependencyGraphImpl::LoadResult;
+using LoadResult =
+    fine_grained_dependencies::CoarseGrainedDependencyGraphImpl::LoadResult;
 
 LoadResult ModuleDepGraph::loadFromPath(const Job *Cmd, StringRef path,
                                         DiagnosticEngine &diags) {
