@@ -244,8 +244,8 @@ namespace driver {
     CoarseGrainedDependencyGraph CoarseGrainedDepGraph;
     CoarseGrainedDependencyGraph CoarseGrainedDepGraphForRanges;
 
-    fine_grained_dependencies::ModuleDepGraph ExpDepGraph;
-    fine_grained_dependencies::ModuleDepGraph ExpDepGraphForRanges;
+    fine_grained_dependencies::ModuleDepGraph FineGrainedDepGraph;
+    fine_grained_dependencies::ModuleDepGraph FineGrainedDepGraphForRanges;
 
   private:
     /// Helper for tracing the propagation of marks in the graph.
@@ -288,7 +288,7 @@ namespace driver {
                    << reason << ": " << LogJob(cmd) << "\n";
 
       if (Comp.getEnableFineGrainedDependencies())
-        getExpDepGraph(forRanges).printPath(llvm::outs(), cmd);
+        getFineGrainedDepGraph(forRanges).printPath(llvm::outs(), cmd);
       else
         IncrementalTracer->printPath(
                                      llvm::outs(), cmd, [](raw_ostream &out, const Job *base) {
@@ -806,11 +806,11 @@ namespace driver {
   public:
     PerformJobsState(Compilation &Comp, std::unique_ptr<TaskQueue> &&TaskQueue)
         : Comp(Comp),
-          ExpDepGraph(
+          FineGrainedDepGraph(
               Comp.getVerifyFineGrainedDependencyGraphAfterEveryImport(),
               Comp.getEmitFineGrainedDependencyDotFileAfterEveryImport(),
               Comp.getTraceDependencies(), Comp.getStatsReporter()),
-          ExpDepGraphForRanges(
+          FineGrainedDepGraphForRanges(
               Comp.getVerifyFineGrainedDependencyGraphAfterEveryImport(),
               Comp.getEmitFineGrainedDependencyDotFileAfterEveryImport(),
               Comp.getTraceDependencies(), Comp.getStatsReporter()),
@@ -1008,7 +1008,7 @@ namespace driver {
           Cmd, Cond, HasDependenciesFileName);
 
       if (Comp.getEnableFineGrainedDependencies())
-        assert(getExpDepGraph(/*forRanges=*/false)
+        assert(getFineGrainedDepGraph(/*forRanges=*/false)
                    .emitDotFileAndVerify(Comp.getDiags()));
       return std::make_pair(shouldSched, isCascading);
     }
@@ -1560,13 +1560,13 @@ namespace driver {
 
     bool isMarkedInDepGraph(const Job *const Cmd, const bool forRanges) {
       return Comp.getEnableFineGrainedDependencies()
-                 ? getExpDepGraph(forRanges).isMarked(Cmd)
+                 ? getFineGrainedDepGraph(forRanges).isMarked(Cmd)
                  : getDepGraph(forRanges).isMarked(Cmd);
     }
 
     std::vector<StringRef> getExternalDependencies(const bool forRanges) const {
       if (Comp.getEnableFineGrainedDependencies())
-        return getExpDepGraph(forRanges).getExternalDependencies();
+        return getFineGrainedDepGraph(forRanges).getExternalDependencies();
       const auto deps = getDepGraph(forRanges).getExternalDependencies();
       std::vector<StringRef> Dependencies;
       std::copy(std::begin(deps), std::end(deps),
@@ -1579,14 +1579,14 @@ namespace driver {
                                 StringRef externalDependency,
                                 const bool forRanges) {
       if (Comp.getEnableFineGrainedDependencies())
-        getExpDepGraph(forRanges).markExternal(uses, externalDependency);
+        getFineGrainedDepGraph(forRanges).markExternal(uses, externalDependency);
       else
         getDepGraph(forRanges).markExternal(uses, externalDependency);
     }
 
     bool markIntransitiveInDepGraph(const Job *Cmd, const bool forRanges) {
       return Comp.getEnableFineGrainedDependencies()
-                 ? getExpDepGraph(forRanges).markIntransitive(Cmd)
+                 ? getFineGrainedDepGraph(forRanges).markIntransitive(Cmd)
                  : getDepGraph(forRanges).markIntransitive(Cmd);
     }
 
@@ -1594,7 +1594,7 @@ namespace driver {
     loadDepGraphFromPath(const Job *Cmd, StringRef path,
                          DiagnosticEngine &diags, const bool forRanges) {
       return Comp.getEnableFineGrainedDependencies()
-                 ? getExpDepGraph(forRanges).loadFromPath(Cmd, path, diags)
+                 ? getFineGrainedDepGraph(forRanges).loadFromPath(Cmd, path, diags)
                  : getDepGraph(forRanges).loadFromPath(Cmd, path, diags);
     }
 
@@ -1604,28 +1604,28 @@ namespace driver {
         const bool forRanges,
         CoarseGrainedDependencyGraph::MarkTracer *tracer = nullptr) {
       if (Comp.getEnableFineGrainedDependencies())
-        getExpDepGraph(forRanges).markTransitive(visited, Cmd, tracer);
+        getFineGrainedDepGraph(forRanges).markTransitive(visited, Cmd, tracer);
       else
         getDepGraph(forRanges).markTransitive(visited, Cmd, tracer);
     }
 
     void addIndependentNodeToDepGraph(const Job *Cmd, const bool forRanges) {
       if (Comp.getEnableFineGrainedDependencies())
-        getExpDepGraph(forRanges).addIndependentNode(Cmd);
+        getFineGrainedDepGraph(forRanges).addIndependentNode(Cmd);
       else
         getDepGraph(forRanges).addIndependentNode(Cmd);
     }
 
     fine_grained_dependencies::ModuleDepGraph &
-    getExpDepGraph(const bool forRanges) {
-      return forRanges ? ExpDepGraphForRanges : ExpDepGraph;
+    getFineGrainedDepGraph(const bool forRanges) {
+      return forRanges ? FineGrainedDepGraphForRanges : FineGrainedDepGraph;
     }
     CoarseGrainedDependencyGraph &getDepGraph(const bool forRanges) {
       return forRanges ? CoarseGrainedDepGraphForRanges : CoarseGrainedDepGraph;
     }
     const fine_grained_dependencies::ModuleDepGraph &
-    getExpDepGraph(const bool forRanges) const {
-      return forRanges ? ExpDepGraphForRanges : ExpDepGraph;
+    getFineGrainedDepGraph(const bool forRanges) const {
+      return forRanges ? FineGrainedDepGraphForRanges : FineGrainedDepGraph;
     }
     const CoarseGrainedDependencyGraph &
     getDepGraph(const bool forRanges) const {
@@ -1825,7 +1825,7 @@ int Compilation::performJobsImpl(bool &abnormalExit,
     }
   }
   if (getEnableFineGrainedDependencies())
-    assert(State.ExpDepGraph.emitDotFileAndVerify(getDiags()));
+    assert(State.FineGrainedDepGraph.emitDotFileAndVerify(getDiags()));
   abnormalExit = State.hadAnyAbnormalExit();
   return State.getResult();
 }
