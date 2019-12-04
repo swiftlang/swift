@@ -280,12 +280,12 @@ namespace swift {
 
     /// Scaffolding to permit experimentation with finer-grained dependencies
     /// and faster rebuilds.
-    bool EnableExperimentalDependencies = false;
+    bool EnableFineGrainedDependencies = false;
     
     /// To mimic existing system, set to false.
     /// To experiment with including file-private and private dependency info,
     /// set to true.
-    bool ExperimentalDependenciesIncludeIntrafileOnes = false;
+    bool FineGrainedDependenciesIncludeIntrafileOnes = false;
 
     /// Whether to enable experimental differentiable programming features:
     /// `@differentiable` declaration attribute, etc.

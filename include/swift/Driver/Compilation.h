@@ -259,17 +259,17 @@ private:
 
   /// Scaffolding to permit experimentation with finer-grained dependencies and
   /// faster rebuilds.
-  const bool EnableExperimentalDependencies;
+  const bool EnableFineGrainedDependencies;
 
   /// Helpful for debugging, but slows down the driver. So, only turn on when
   /// needed.
-  const bool VerifyExperimentalDependencyGraphAfterEveryImport;
+  const bool VerifyFineGrainedDependencyGraphAfterEveryImport;
   /// Helpful for debugging, but slows down the driver. So, only turn on when
   /// needed.
-  const bool EmitExperimentalDependencyDotFileAfterEveryImport;
+  const bool EmitFineGrainedDependencyDotFileAfterEveryImport;
 
   /// Experiment with inter-file dependencies
-  const bool ExperimentalDependenciesIncludeIntrafileOnes;
+  const bool FineGrainedDependenciesIncludeIntrafileOnes;
 
   /// Experiment with source-range-based dependencies
   const bool EnableSourceRangeDependencies;
@@ -309,10 +309,10 @@ public:
               bool SaveTemps = false,
               bool ShowDriverTimeCompilation = false,
               std::unique_ptr<UnifiedStatsReporter> Stats = nullptr,
-              bool EnableExperimentalDependencies = false,
-              bool VerifyExperimentalDependencyGraphAfterEveryImport = false,
-              bool EmitExperimentalDependencyDotFileAfterEveryImport = false,
-              bool ExperimentalDependenciesIncludeIntrafileOnes = false,
+              bool EnableFineGrainedDependencies = false,
+              bool VerifyFineGrainedDependencyGraphAfterEveryImport = false,
+              bool EmitFineGrainedDependencyDotFileAfterEveryImport = false,
+              bool FineGrainedDependenciesIncludeIntrafileOnes = false,
               bool EnableSourceRangeDependencies = false,
               bool CompareIncrementalSchemes = false,
               StringRef CompareIncrementalSchemesPath = "");
@@ -374,20 +374,20 @@ public:
   }
   void disableIncrementalBuild(Twine why);
 
-  bool getEnableExperimentalDependencies() const {
-    return EnableExperimentalDependencies;
+  bool getEnableFineGrainedDependencies() const {
+    return EnableFineGrainedDependencies;
   }
 
-  bool getVerifyExperimentalDependencyGraphAfterEveryImport() const {
-    return VerifyExperimentalDependencyGraphAfterEveryImport;
+  bool getVerifyFineGrainedDependencyGraphAfterEveryImport() const {
+    return VerifyFineGrainedDependencyGraphAfterEveryImport;
   }
 
-  bool getEmitExperimentalDependencyDotFileAfterEveryImport() const {
-    return EmitExperimentalDependencyDotFileAfterEveryImport;
+  bool getEmitFineGrainedDependencyDotFileAfterEveryImport() const {
+    return EmitFineGrainedDependencyDotFileAfterEveryImport;
   }
 
-  bool getExperimentalDependenciesIncludeIntrafileOnes() const {
-    return ExperimentalDependenciesIncludeIntrafileOnes;
+  bool getFineGrainedDependenciesIncludeIntrafileOnes() const {
+    return FineGrainedDependenciesIncludeIntrafileOnes;
   }
 
   bool getEnableSourceRangeDependencies() const {

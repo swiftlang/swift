@@ -1,4 +1,4 @@
-//===--- ExperimentalDependenciesSourceFileDepGraphConstructor.cpp --------===//
+//===--- FineGrainedDependenciesSourceFileDepGraphConstructor.cpp ---------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -19,8 +19,8 @@
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/ExistentialLayout.h"
-#include "swift/AST/ExperimentalDependencies.h"
 #include "swift/AST/FileSystem.h"
+#include "swift/AST/FineGrainedDependencies.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/NameLookup.h"
@@ -43,7 +43,7 @@
 // source files require recompilation.
 
 using namespace swift;
-using namespace experimental_dependencies;
+using namespace fine_grained_dependencies;
 
 //==============================================================================
 // MARK: Emitting and reading SourceFileDepGraph
@@ -674,7 +674,7 @@ void SourceFileDepGraphConstructor::recordThatThisWholeFileDependsOn(
 // Entry point from the Frontend to this whole system
 //==============================================================================
 
-bool swift::experimental_dependencies::emitReferenceDependencies(
+bool swift::fine_grained_dependencies::emitReferenceDependencies(
     DiagnosticEngine &diags, SourceFile *const SF,
     const DependencyTracker &depTracker, StringRef outputPath) {
 
@@ -683,7 +683,7 @@ bool swift::experimental_dependencies::emitReferenceDependencies(
   // doesn't matter if it fails.
   llvm::sys::fs::rename(outputPath, outputPath + "~");
   const bool includeIntrafileDeps =
-      SF->getASTContext().LangOpts.ExperimentalDependenciesIncludeIntrafileOnes;
+      SF->getASTContext().LangOpts.FineGrainedDependenciesIncludeIntrafileOnes;
   const bool hadCompilationError = SF->getASTContext().hadError();
   SourceFileDepGraphConstructor gc(SF, depTracker, outputPath,
                                    includeIntrafileDeps, hadCompilationError);

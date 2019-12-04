@@ -950,17 +950,17 @@ Driver::buildCompilation(const ToolChain &TC,
     std::unique_ptr<UnifiedStatsReporter> StatsReporter =
         createStatsReporter(ArgList.get(), Inputs, OI, DefaultTargetTriple);
     // relies on the new dependency graph
-    const bool EnableExperimentalDependencies =
-        ArgList->hasArg(options::OPT_enable_experimental_dependencies);
+    const bool EnableFineGrainedDependencies =
+        ArgList->hasArg(options::OPT_enable_fine_grained_dependencies);
 
-    const bool VerifyExperimentalDependencyGraphAfterEveryImport = ArgList->hasArg(
+    const bool VerifyFineGrainedDependencyGraphAfterEveryImport = ArgList->hasArg(
         options::
-            OPT_driver_verify_experimental_dependency_graph_after_every_import);
-    const bool EmitExperimentalDependencyDotFileAfterEveryImport = ArgList->hasArg(
+            OPT_driver_verify_fine_grained_dependency_graph_after_every_import);
+    const bool EmitFineGrainedDependencyDotFileAfterEveryImport = ArgList->hasArg(
         options::
-            OPT_driver_emit_experimental_dependency_dot_file_after_every_import);
-    const bool ExperimentalDependenciesIncludeIntrafileOnes = ArgList->hasArg(
-        options::OPT_experimental_dependency_include_intrafile);
+            OPT_driver_emit_fine_grained_dependency_dot_file_after_every_import);
+    const bool FineGrainedDependenciesIncludeIntrafileOnes =
+        ArgList->hasArg(options::OPT_fine_grained_dependency_include_intrafile);
 
     // clang-format off
     C = llvm::make_unique<Compilation>(
@@ -982,10 +982,10 @@ Driver::buildCompilation(const ToolChain &TC,
         SaveTemps,
         ShowDriverTimeCompilation,
         std::move(StatsReporter),
-        EnableExperimentalDependencies,
-        VerifyExperimentalDependencyGraphAfterEveryImport,
-        EmitExperimentalDependencyDotFileAfterEveryImport,
-        ExperimentalDependenciesIncludeIntrafileOnes,
+        EnableFineGrainedDependencies,
+        VerifyFineGrainedDependencyGraphAfterEveryImport,
+        EmitFineGrainedDependencyDotFileAfterEveryImport,
+        FineGrainedDependenciesIncludeIntrafileOnes,
         EnableSourceRangeDependencies,
         CompareIncrementalSchemes,
         CompareIncrementalSchemesPath);
