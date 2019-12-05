@@ -109,6 +109,8 @@ class SILGlobalOpt {
   /// A map from a globalinit_func to the number of times "once" has called the
   /// function.
   llvm::DenseMap<SILFunction *, unsigned> InitializerCount;
+  
+  llvm::SmallVector<SILInstruction *, 4> InstToRemove;
 public:
   SILGlobalOpt(SILOptFunctionBuilder &FunctionBuilder, SILModule *M, DominanceAnalysis *DA)
       : FunctionBuilder(FunctionBuilder), Module(M), DA(DA) {}
@@ -121,6 +123,8 @@ protected:
 
   /// Collect all global variables.
   void collect();
+  
+  void collectUsesOfInstructionForDeletion(SILInstruction *inst);
 
   /// If this is a call to a global initializer, map it.
   void collectGlobalInitCall(ApplyInst *AI);
@@ -820,12 +824,10 @@ bool SILGlobalOpt::tryRemoveGlobalAddr(SILGlobalVariable *global) {
     return false;
 
   for (auto *addr : GlobalAddrMap[global]) {
-    eraseUsesOfInstruction(addr);
-    addr->eraseFromParent();
+    collectUsesOfInstructionForDeletion(addr);
+    InstToRemove.push_back(addr);
   }
 
-  reset();
-  collect();
   return true;
 }
 
@@ -834,9 +836,8 @@ bool SILGlobalOpt::tryRemoveGlobalAlloc(SILGlobalVariable *global,
   if (GlobalAddrMap.count(global))
     return false;
 
-  alloc->eraseFromParent();
-  reset();
-  collect();
+  InstToRemove.push_back(alloc);
+
   return true;
 }
 
@@ -846,7 +847,7 @@ bool SILGlobalOpt::tryRemoveUnusedGlobal(SILGlobalVariable *global) {
       GlobalVarStore.count(global))
     return false;
 
-  global->getModule().eraseGlobalVariable(global);
+  Module->eraseGlobalVariable(global);
   return true;
 }
 
@@ -1030,6 +1031,20 @@ void SILGlobalOpt::reset() {
   GlobalInitCallMap.clear();
 }
 
+void SILGlobalOpt::collectUsesOfInstructionForDeletion(SILInstruction *inst) {
+  for (auto result : inst->getResults()) {
+    for (auto *use : result->getUses()) {
+      auto *user = use->getUser();
+      assert(user && "User should never be NULL!");
+
+      // If the instruction itself has any uses, recursively zap them so that
+      // nothing uses this instruction.
+      collectUsesOfInstructionForDeletion(user);
+      InstToRemove.push_back(user);
+    }
+  }
+}
+
 void SILGlobalOpt::collect() {
   for (auto &F : *Module) {
     // TODO: Add support for ownership.
@@ -1129,7 +1144,16 @@ bool SILGlobalOpt::run() {
   for (auto &allocPair : globalAllocPairs) {
     HasChanged |= tryRemoveGlobalAlloc(allocPair.first, allocPair.second);
   }
-
+  
+  // Erase the instructions that we have marked for deletion.
+  for (auto *inst : InstToRemove) {
+    inst->eraseFromParent();
+  }
+  
+  // After we erase some instructions, re-collect.
+  reset();
+  collect();
+  
   // Copy the globals so we don't get issues with modifying while iterating.
   SmallVector<SILGlobalVariable *, 12> globals;
   for (auto &global : Module->getSILGlobals()) {
@@ -1140,6 +1164,8 @@ bool SILGlobalOpt::run() {
     HasChanged |= tryRemoveUnusedGlobal(global);
   }
 
+  // Reset incase we re-run this function (when HasChanged is true).
+  reset();
   return HasChanged;
 }
 
