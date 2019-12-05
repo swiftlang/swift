@@ -14,6 +14,8 @@
 //
 // Automatic differentiation utilities.
 //===----------------------------------------------------------------------===//
+
+#include "swift/SILOptimizer/Analysis/DifferentiableActivityAnalysis.h"
 #include "swift/SILOptimizer/Utils/Differentiation/Common.h"
 
 namespace swift {
@@ -94,6 +96,56 @@ void collectAllFormalResultsInTypeOrder(SILFunction &function,
   for (auto &resInfo : convs.getResults())
     results.push_back(resInfo.isFormalDirect() ? dirResults[dirResIdx++]
                                                : indResults[indResIdx++]);
+}
+
+void collectMinimalIndicesForFunctionCall(
+    ApplyInst *ai, SILAutoDiffIndices parentIndices,
+    const DifferentiableActivityInfo &activityInfo,
+    SmallVectorImpl<SILValue> &results, SmallVectorImpl<unsigned> &paramIndices,
+    SmallVectorImpl<unsigned> &resultIndices) {
+  auto calleeFnTy = ai->getSubstCalleeType();
+  auto calleeConvs = ai->getSubstCalleeConv();
+  // Parameter indices are indices (in the callee type signature) of parameter
+  // arguments that are varied or are arguments.
+  // Record all parameter indices in type order.
+  unsigned currentParamIdx = 0;
+  for (auto applyArg : ai->getArgumentsWithoutIndirectResults()) {
+    if (activityInfo.isActive(applyArg, parentIndices))
+      paramIndices.push_back(currentParamIdx);
+    ++currentParamIdx;
+  }
+  // Result indices are indices (in the callee type signature) of results that
+  // are useful.
+  SmallVector<SILValue, 8> directResults;
+  forEachApplyDirectResult(ai, [&](SILValue directResult) {
+    directResults.push_back(directResult);
+  });
+  auto indirectResults = ai->getIndirectSILResults();
+  // Record all results and result indices in type order.
+  results.reserve(calleeFnTy->getNumResults());
+  unsigned dirResIdx = 0;
+  unsigned indResIdx = calleeConvs.getSILArgIndexOfFirstIndirectResult();
+  for (auto &resAndIdx : enumerate(calleeConvs.getResults())) {
+    auto &res = resAndIdx.value();
+    unsigned idx = resAndIdx.index();
+    if (res.isFormalDirect()) {
+      results.push_back(directResults[dirResIdx]);
+      if (auto dirRes = directResults[dirResIdx])
+        if (dirRes && activityInfo.isActive(dirRes, parentIndices))
+          resultIndices.push_back(idx);
+      ++dirResIdx;
+    } else {
+      results.push_back(indirectResults[indResIdx]);
+      if (activityInfo.isActive(indirectResults[indResIdx], parentIndices))
+        resultIndices.push_back(idx);
+      ++indResIdx;
+    }
+  }
+  // Make sure the function call has active results.
+  assert(results.size() == calleeFnTy->getNumResults());
+  assert(llvm::any_of(results, [&](SILValue result) {
+    return activityInfo.isActive(result, parentIndices);
+  }));
 }
 
 } // end namespace autodiff

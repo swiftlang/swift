@@ -38,6 +38,7 @@ using llvm::SmallMapVector;
 using llvm::SmallSet;
 
 class ApplyInst;
+class DifferentiableActivityInfo;
 
 //===----------------------------------------------------------------------===//
 // Helpers
@@ -86,6 +87,31 @@ void forEachApplyDirectResult(
 /// refer to result values in the body of the function, not at call sites.
 void collectAllFormalResultsInTypeOrder(SILFunction &function,
                                         SmallVectorImpl<SILValue> &results);
+
+/// Returns the underlying instruction for the given SILValue, if it exists,
+/// peering through function conversion instructions.
+template<class Inst>
+Inst *peerThroughFunctionConversions(SILValue value) {
+  if (auto *inst = dyn_cast<Inst>(value))
+    return inst;
+  if (auto *thinToThick = dyn_cast<ThinToThickFunctionInst>(value))
+    return peerThroughFunctionConversions<Inst>(thinToThick->getOperand());
+  if (auto *convertFn = dyn_cast<ConvertFunctionInst>(value))
+    return peerThroughFunctionConversions<Inst>(convertFn->getOperand());
+  if (auto *partialApply = dyn_cast<PartialApplyInst>(value))
+    return peerThroughFunctionConversions<Inst>(partialApply->getCallee());
+  return nullptr;
+}
+
+/// For an `apply` instruction with active results, compute:
+/// - The results of the `apply` instruction, in type order.
+/// - The set of minimal parameter and result indices for differentiating the
+///   `apply` instruction.
+void collectMinimalIndicesForFunctionCall(
+    ApplyInst *ai, SILAutoDiffIndices parentIndices,
+    const DifferentiableActivityInfo &activityInfo,
+    SmallVectorImpl<SILValue> &results, SmallVectorImpl<unsigned> &paramIndices,
+    SmallVectorImpl<unsigned> &resultIndices);
 
 } // end namespace autodiff
 
