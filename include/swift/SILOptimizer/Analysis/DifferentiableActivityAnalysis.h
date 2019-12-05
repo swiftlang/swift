@@ -131,7 +131,7 @@ private:
   SmallVector<SmallDenseSet<SILValue>, 4> usefulValueSets;
 
   /// The original function.
-  SILFunction &getFunction();
+  SILFunction &getFunction() const;
 
   /// Returns true if the given SILValue has a tangent space.
   bool hasTangentSpace(SILValue value) {
@@ -211,8 +211,8 @@ public:
   void dump(SILValue value, const SILAutoDiffIndices &indices,
             llvm::raw_ostream &s = llvm::dbgs()) const;
 
-  /// Prints activity information for the `indices` of the given `fn`.
-  void dump(SILFunction &fn, SILAutoDiffIndices indices,
+  /// Prints activity information for the given `indices`.
+  void dump(SILAutoDiffIndices indices,
             llvm::raw_ostream &s = llvm::dbgs()) const;
 };
 

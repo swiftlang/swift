@@ -59,7 +59,7 @@ DifferentiableActivityInfo::DifferentiableActivityInfo(
   analyze(parent.domInfo, parent.postDomInfo);
 }
 
-SILFunction &DifferentiableActivityInfo::getFunction() {
+SILFunction &DifferentiableActivityInfo::getFunction() const {
   return parent.function;
 }
 
@@ -436,9 +436,9 @@ void DifferentiableActivityInfo::dump(SILValue value,
   s << "] " << value;
 }
 
-void DifferentiableActivityInfo::dump(SILFunction &fn,
-                                      SILAutoDiffIndices indices,
+void DifferentiableActivityInfo::dump(SILAutoDiffIndices indices,
                                       llvm::raw_ostream &s) const {
+  SILFunction &fn = getFunction();
   s << "Activity info for " << fn.getName() << " at " << indices << '\n';
   for (auto &bb : fn) {
     s << "bb" << bb.getDebugID() << ":\n";
