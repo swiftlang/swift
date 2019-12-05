@@ -2758,7 +2758,7 @@ diagnoseMissingWitnesses(MissingWitnessDiagnosisKind Kind) {
     auto FixitBufferId = SM.findBufferContainingLoc(FixitLocation);
     for (auto VD : MissingWitnesses) {
       // Don't ever emit a diagnostic for a requirement in the NSObject
-      // protocol. They'renot implementable.
+      // protocol. They're not implementable.
       if (isNSObjectProtocol(VD->getDeclContext()->getSelfProtocolDecl()))
         continue;
 
