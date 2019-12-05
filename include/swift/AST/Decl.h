@@ -5102,16 +5102,16 @@ public:
   /// Retrieve the backing storage property for a lazy property.
   VarDecl *getLazyStorageProperty() const;
 
-  /// Whether this is a property with a property wrapper that was initialized
-  /// via a value of the original type, e.g.,
+  /// Whether the memberwise initializer parameter for a property with a
+  /// property wrapper type uses the wrapped type. This will occur, for example,
+  /// when there is an explicitly-specified initializer like:
   ///
   /// \code
   /// @Lazy var i = 17
   /// \end
-  bool isPropertyWrapperInitializedWithInitialValue() const;
-
-  /// Whether the memberwise initializer parameter for a property with a property wrapper type
-  /// uses the wrapped type.
+  ///
+  /// Or when there is no initializer but each composed property wrapper has
+  /// a suitable `init(initialValue:)`.
   bool isPropertyMemberwiseInitializedWithWrappedType() const;
 
   /// If this property is the backing storage for a property with an attached
