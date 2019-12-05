@@ -422,9 +422,9 @@ Activity DifferentiableActivityInfo::getActivity(
   return activity;
 }
 
-void DifferentiableActivityInfo::dumpActivityInfo(
-    SILValue value, const SILAutoDiffIndices &indices,
-    llvm::raw_ostream &s) const {
+void DifferentiableActivityInfo::dump(SILValue value,
+                                      const SILAutoDiffIndices &indices,
+                                      llvm::raw_ostream &s) const {
   s << '[';
   auto activity = getActivity(value, indices);
   switch (activity.toRaw()) {
@@ -436,17 +436,17 @@ void DifferentiableActivityInfo::dumpActivityInfo(
   s << "] " << value;
 }
 
-void DifferentiableActivityInfo::dumpActivityInfo(SILFunction &fn,
-                                                  SILAutoDiffIndices indices,
-                                                  llvm::raw_ostream &s) const {
+void DifferentiableActivityInfo::dump(SILFunction &fn,
+                                      SILAutoDiffIndices indices,
+                                      llvm::raw_ostream &s) const {
   s << "Activity info for " << fn.getName() << " at " << indices << '\n';
   for (auto &bb : fn) {
     s << "bb" << bb.getDebugID() << ":\n";
     for (auto *arg : bb.getArguments())
-      dumpActivityInfo(arg, indices, s);
+      dump(arg, indices, s);
     for (auto &inst : bb)
       for (auto res : inst.getResults())
-        dumpActivityInfo(res, indices, s);
+        dump(res, indices, s);
     s << '\n';
   }
 }

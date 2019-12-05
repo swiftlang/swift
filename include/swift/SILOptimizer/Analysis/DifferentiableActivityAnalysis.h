@@ -208,14 +208,12 @@ public:
   Activity getActivity(SILValue value, const SILAutoDiffIndices &indices) const;
 
   /// Prints activity information for the `indices` of the given `value`.
-  void dumpActivityInfo(SILValue value,
-                        const SILAutoDiffIndices &indices,
-                        llvm::raw_ostream &s = llvm::dbgs()) const;
+  void dump(SILValue value, const SILAutoDiffIndices &indices,
+            llvm::raw_ostream &s = llvm::dbgs()) const;
 
   /// Prints activity information for the `indices` of the given `fn`.
-  void dumpActivityInfo(SILFunction &fn, SILAutoDiffIndices indices,
-                             llvm::raw_ostream &s = llvm::dbgs()) const;
-
+  void dump(SILFunction &fn, SILAutoDiffIndices indices,
+            llvm::raw_ostream &s = llvm::dbgs()) const;
 };
 
 class DifferentiableActivityCollection {

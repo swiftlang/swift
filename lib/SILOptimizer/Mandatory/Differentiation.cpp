@@ -1344,7 +1344,7 @@ private:
         vjp->getLoweredFunctionType()->getSubstGenericSignature(),
         AutoDiffDerivativeFunctionKind::VJP);
     LLVM_DEBUG(
-        activityInfo.dumpActivityInfo(*original, indices, getADDebugStream()));
+        activityInfo.dump(*original, indices, getADDebugStream()));
     return activityInfo;
   }
 
@@ -2098,7 +2098,7 @@ private:
         jvp->getLoweredFunctionType()->getSubstGenericSignature(),
         AutoDiffDerivativeFunctionKind::JVP);
     LLVM_DEBUG(
-        activityInfo.dumpActivityInfo(*original, indices, getADDebugStream()));
+        activityInfo.dump(*original, indices, getADDebugStream()));
     return activityInfo;
   }
 
