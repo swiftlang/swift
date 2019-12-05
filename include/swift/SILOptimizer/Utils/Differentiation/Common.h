@@ -87,6 +87,21 @@ void forEachApplyDirectResult(
 void collectAllFormalResultsInTypeOrder(SILFunction &function,
                                         SmallVectorImpl<SILValue> &results);
 
+/// Returns the underlying instruction for the given SILValue, if it exists,
+/// peering through function conversion instructions.
+template<class Inst>
+Inst *peerThroughFunctionConversions(SILValue value) {
+  if (auto *inst = dyn_cast<Inst>(value))
+    return inst;
+  if (auto *thinToThick = dyn_cast<ThinToThickFunctionInst>(value))
+    return peerThroughFunctionConversions<Inst>(thinToThick->getOperand());
+  if (auto *convertFn = dyn_cast<ConvertFunctionInst>(value))
+    return peerThroughFunctionConversions<Inst>(convertFn->getOperand());
+  if (auto *partialApply = dyn_cast<PartialApplyInst>(value))
+    return peerThroughFunctionConversions<Inst>(partialApply->getCallee());
+  return nullptr;
+}
+
 } // end namespace autodiff
 
 /// Helper class for visiting basic blocks in post-order post-dominance order,
