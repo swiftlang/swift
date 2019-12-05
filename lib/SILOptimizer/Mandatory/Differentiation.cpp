@@ -1291,7 +1291,7 @@ static SILValue reapplyFunctionConversion(
              "one argument");
       auto *dfi = context.createDifferentiableFunction(
           builder, loc, reabstractionThunkIndices, newArgs.back());
-      context.addDifferentiableFunctionInst(dfi);
+      context.addDifferentiableFunctionInstToWorklist(dfi);
       newArgs.back() = dfi;
     }
     auto innerNewFunc = reapplyFunctionConversion(
@@ -2654,7 +2654,7 @@ public:
           getBuilder(), loc, indices.parameters, original);
 
       // Record the `differentiable_function` instruction.
-      context.addDifferentiableFunctionInst(diffFuncInst);
+      context.addDifferentiableFunctionInstToWorklist(diffFuncInst);
       // TODO(TF-689): Make `differentiable_function` store result indices and
       // remove `ADContext::resultIndices`.
       context.setResultIndex(diffFuncInst, activeResultIndices.front());
@@ -2753,7 +2753,7 @@ public:
     // instruction to the `differentiable_function` worklist.
     TypeSubstCloner::visitDifferentiableFunctionInst(dfi);
     auto *newDFI = cast<DifferentiableFunctionInst>(getOpValue(dfi));
-    context.addDifferentiableFunctionInst(newDFI);
+    context.addDifferentiableFunctionInstToWorklist(newDFI);
   }
 };
 } // end anonymous namespace
@@ -4339,7 +4339,7 @@ public:
           builder, loc, indices.parameters, original);
 
       // Record the `differentiable_function` instruction.
-      context.addDifferentiableFunctionInst(diffFuncInst);
+      context.addDifferentiableFunctionInstToWorklist(diffFuncInst);
       // TODO(TF-689): Make `differentiable_function` store result indices and
       // remove `ADContext::resultIndices`.
       context.setResultIndex(diffFuncInst, activeResultIndices.front());
@@ -4478,7 +4478,7 @@ public:
     // instruction to the `differentiable_function` worklist.
     TypeSubstCloner::visitDifferentiableFunctionInst(dfi);
     auto *newDFI = cast<DifferentiableFunctionInst>(getOpValue(dfi));
-    context.addDifferentiableFunctionInst(newDFI);
+    context.addDifferentiableFunctionInstToWorklist(newDFI);
   }
 };
 } // end anonymous namespace
@@ -7361,7 +7361,7 @@ SILValue DifferentiationTransformer::promoteToDifferentiableFunction(
           retInst->eraseFromParent();
 
           context.recordGeneratedFunction(newThunk);
-          context.addDifferentiableFunctionInst(dfi);
+          context.addDifferentiableFunctionInstToWorklist(dfi);
           if (processDifferentiableFunctionInst(dfi))
             return nullptr;
         }
@@ -7485,7 +7485,7 @@ SILValue DifferentiationTransformer::promoteToDifferentiableFunction(
       builder, loc, parameterIndices, origFnCopy,
       std::make_pair(derivativeFns[0], derivativeFns[1]));
   context.setResultIndex(dfi, resultIndex);
-  context.addDifferentiableFunctionInst(dfi);
+  context.addDifferentiableFunctionInstToWorklist(dfi);
 
   return newDFI;
 }
@@ -7603,7 +7603,7 @@ void Differentiation::run() {
     for (SILBasicBlock &bb : f) {
       for (SILInstruction &i : bb) {
         if (auto *dfi = dyn_cast<DifferentiableFunctionInst>(&i))
-          context.addDifferentiableFunctionInst(dfi);
+          context.addDifferentiableFunctionInstToWorklist(dfi);
         // Reject uncanonical `linear_function` instructions.
         // FIXME(SR-11850): Add support for linear map transposition.
         else if (auto *lfi = dyn_cast<LinearFunctionInst>(&i)) {
