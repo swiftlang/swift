@@ -1,4 +1,4 @@
-//===--- Differentiation.h - SIL Automatic Differentiation ----*- C++ -*---===//
+//===--- Common.h - Automatic Differentiation Common Utils ----*- C++ -*---===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -12,7 +12,7 @@
 //
 // SWIFT_ENABLE_TENSORFLOW
 //
-// Automatic differentiation utilities.
+// Automatic differentiation common utilities.
 //
 // NOTE: Though automatic differentiation is developed as part of the Swift for
 // TensorFlow project, it is completely independent from TensorFlow.
@@ -23,8 +23,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_SILOPTIMIZER_UTILS_DIFFERENTIATION_H
-#define SWIFT_SILOPTIMIZER_UTILS_DIFFERENTIATION_H
+#ifndef SWIFT_SILOPTIMIZER_UTILS_DIFFERENTIATION_COMMON_H
+#define SWIFT_SILOPTIMIZER_UTILS_DIFFERENTIATION_COMMON_H
 
 #include "swift/SIL/TypeSubstCloner.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
@@ -86,6 +86,25 @@ void forEachApplyDirectResult(
 /// refer to result values in the body of the function, not at call sites.
 void collectAllFormalResultsInTypeOrder(SILFunction &function,
                                         SmallVectorImpl<SILValue> &results);
+
+/// Returns the underlying instruction for the given SILValue, if it exists,
+/// peering through function conversion instructions.
+template<class Inst>
+Inst *peerThroughFunctionConversions(SILValue value) {
+  if (auto *inst = dyn_cast<Inst>(value))
+    return inst;
+  if (auto *cvi = dyn_cast<CopyValueInst>(value))
+    return peerThroughFunctionConversions<Inst>(cvi->getOperand());
+  if (auto *bbi = dyn_cast<BeginBorrowInst>(value))
+    return peerThroughFunctionConversions<Inst>(bbi->getOperand());
+  if (auto *tttfi = dyn_cast<ThinToThickFunctionInst>(value))
+    return peerThroughFunctionConversions<Inst>(tttfi->getOperand());
+  if (auto *cfi = dyn_cast<ConvertFunctionInst>(value))
+    return peerThroughFunctionConversions<Inst>(cfi->getOperand());
+  if (auto *pai = dyn_cast<PartialApplyInst>(value))
+    return peerThroughFunctionConversions<Inst>(pai->getCallee());
+  return nullptr;
+}
 
 } // end namespace autodiff
 
@@ -195,4 +214,4 @@ public:
 
 } // end namespace swift
 
-#endif // SWIFT_SILOPTIMIZER_MANDATORY_DIFFERENTIATION_H
+#endif // SWIFT_SILOPTIMIZER_MANDATORY_DIFFERENTIATION_COMMON_H

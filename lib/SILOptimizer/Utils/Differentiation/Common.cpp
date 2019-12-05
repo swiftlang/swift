@@ -14,7 +14,7 @@
 //
 // Automatic differentiation utilities.
 //===----------------------------------------------------------------------===//
-#include "swift/SILOptimizer/Utils/Differentiation.h"
+#include "swift/SILOptimizer/Utils/Differentiation/Common.h"
 
 namespace swift {
 namespace autodiff {
