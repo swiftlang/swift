@@ -16,8 +16,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_SILOPTIMIZER_UTILS_DERIVATIVELOOKUP_H
-#define SWIFT_SILOPTIMIZER_UTILS_DERIVATIVELOOKUP_H
+#ifndef SWIFT_SILOPTIMIZER_UTILS_DIFFERENTIATION_DERIVATIVELOOKUP_H
+#define SWIFT_SILOPTIMIZER_UTILS_DIFFERENTIATION_DERIVATIVELOOKUP_H
 
 #include "swift/AST/AutoDiff.h"
 #include "swift/SIL/SILDeclRef.h"
@@ -68,4 +68,4 @@ SILDifferentiabilityWitness *getOrCreateMinimalASTDifferentiabilityWitness(
 
 } // end namespace swift
 
-#endif // SWIFT_SILOPTIMIZER_UTILS_DERIVATIVELOOKUP_H
+#endif // SWIFT_SILOPTIMIZER_UTILS_DIFFERENTIATION_DERIVATIVELOOKUP_H
