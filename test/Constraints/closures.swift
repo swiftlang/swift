@@ -763,6 +763,7 @@ overloaded { print("hi"); print("bye") } // multiple expression closure without 
 // expected-error@-1 {{ambiguous use of 'overloaded'}}
 
 func not_overloaded(_ handler: () -> Int) {}
+// expected-note@-1 {{'not_overloaded' declared here}}
 
 not_overloaded { } // empty body
 // expected-error@-1 {{cannot convert value of type '()' to closure result type 'Int'}}

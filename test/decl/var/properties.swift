@@ -489,7 +489,7 @@ extension ProtocolWithExtension2 {
   static let baz: ProtocolWithExtension2 = StructureImplementingProtocolWithExtension2(bar: "baz") // expected-error{{static stored properties not supported in protocol extensions}}
 }
 
-func getS() -> S {
+func getS() -> S { // expected-note 2{{did you mean 'getS'?}}
   let s: S
   return s
 }
@@ -547,7 +547,7 @@ struct Aleph {
   }
 }
 
-struct Beth {
+struct Beth { // expected-note 2{{did you mean 'Beth'?}}
   var c: Int
 }
 
