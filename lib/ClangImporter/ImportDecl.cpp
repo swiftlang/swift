@@ -2174,6 +2174,13 @@ namespace {
       return getVersion() == getActiveSwiftVersion();
     }
 
+    template <typename T>
+    T *recordMemberInContext(DeclContext *dc, T *member) {
+      assert(member && "Attempted to record null member!");
+      Impl.MembersForNominal[dc->getSelfNominalTypeDecl()].push_back(member);
+      return member;
+    }
+
     /// Import the name of the given entity.
     ///
     /// This version of importFullName introduces any context-specific
@@ -3734,7 +3741,7 @@ namespace {
       if (correctSwiftName)
         markAsVariant(result, *correctSwiftName);
 
-      return result;
+      return recordMemberInContext(dc, result);
     }
 
     void finishFuncDecl(const clang::FunctionDecl *decl,
@@ -4344,7 +4351,7 @@ namespace {
         }
       }
 
-      return result;
+      return recordMemberInContext(dc, result);
     }
 
   public:
@@ -5002,43 +5009,56 @@ namespace {
         return nullptr;
 
       VarDecl *overridden = nullptr;
-      if (dc->getSelfClassDecl()) {
-        // Check whether there is a function with the same name as this
-        // property. If so, suppress the property; the user will have to use
-        // the methods directly, to avoid ambiguities.
-        NominalTypeDecl *lookupContext = dc->getSelfNominalTypeDecl();
+      // Check whether there is a function with the same name as this
+      // property. If so, suppress the property; the user will have to use
+      // the methods directly, to avoid ambiguities.
+      if (auto *subject = dc->getSelfClassDecl()) {
+        bool foundMethod = false;
 
         if (auto *classDecl = dyn_cast<ClassDecl>(dc)) {
           // If we're importing into the primary @interface for something, as
           // opposed to an extension, make sure we don't try to load any
           // categories...by just looking into the super type.
-          lookupContext = classDecl->getSuperclassDecl();
+          subject = classDecl->getSuperclassDecl();
         }
+        
+        for (; subject; (subject = subject->getSuperclassDecl())) {
+          llvm::SmallVector<ValueDecl *, 8> lookup;
+          auto found = Impl.MembersForNominal.find(subject);
+          if (found != Impl.MembersForNominal.end()) {
+            lookup.append(found->second.begin(), found->second.end());
+            namelookup::pruneLookupResultSet(dc, NL_QualifiedDefault, lookup);
+          }
 
-        if (lookupContext) {
-          SmallVector<ValueDecl *, 2> lookup;
-          dc->lookupQualified(lookupContext, DeclNameRef(name),
-                              NL_QualifiedDefault | NL_KnownNoDependency,
-                              lookup);
-          bool foundMethod = false;
-          for (auto result : lookup) {
-            if (isa<FuncDecl>(result) &&
-                result->isInstanceMember() == decl->isInstanceProperty() &&
-                result->getFullName().getArgumentNames().empty())
-              foundMethod = true;
+          for (auto &result : lookup) {
+            // Skip declarations that don't match the name we're looking for.
+            if (result->getBaseName() != name)
+              continue;
 
-            if (auto var = dyn_cast<VarDecl>(result)) {
+            if (auto *fd = dyn_cast<FuncDecl>(result)) {
+              if (fd->isInstanceMember() != decl->isInstanceProperty())
+                continue;
+
+              if (fd->getFullName().getArgumentNames().empty()) {
+                foundMethod = true;
+              }
+            } else {
+              auto *var = cast<VarDecl>(result);
+              if (var->isInstanceMember() != decl->isInstanceProperty())
+                continue;
+
               // If the selectors of the getter match in Objective-C, we have an
               // override.
-              if (var->isInstanceMember() == decl->isInstanceProperty() &&
-                  var->getObjCGetterSelector() ==
-                    Impl.importSelector(decl->getGetterName()))
+              if (var->getObjCGetterSelector() ==
+                  Impl.importSelector(decl->getGetterName())) {
                 overridden = var;
+              }
             }
           }
-          if (foundMethod && !overridden)
-            return nullptr;
         }
+
+        if (foundMethod && !overridden)
+          return nullptr;
 
         if (overridden) {
           const DeclContext *overrideContext = overridden->getDeclContext();
@@ -5130,7 +5150,7 @@ namespace {
       if (correctSwiftName)
         markAsVariant(result, *correctSwiftName);
 
-      return result;
+      return recordMemberInContext(dc, result);
     }
 
     Decl *
