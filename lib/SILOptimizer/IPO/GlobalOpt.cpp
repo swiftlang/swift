@@ -59,7 +59,7 @@ class SILGlobalOpt {
 
   typedef SmallVector<ApplyInst *, 4> GlobalInitCalls;
   typedef SmallVector<LoadInst *, 4> GlobalLoads;
-  typedef SmallVector<BeginAccessInst *, 4> GlobalAccess;
+  typedef SmallVector<BeginAccessInst *, 4> GlobalAccesses;
   typedef SmallVector<GlobalAddrInst *, 4> GlobalAddrs;
 
   /// A map from each visited global initializer call to a list of call sites.
@@ -73,7 +73,7 @@ class SILGlobalOpt {
   llvm::MapVector<SILGlobalVariable *, GlobalLoads> GlobalLoadMap;
 
   /// A map from each visited global to its set of begin_access instructions.
-  llvm::MapVector<SILGlobalVariable *, GlobalAccess> GlobalAccessMap;
+  llvm::MapVector<SILGlobalVariable *, GlobalAccesses> GlobalAccessMap;
 
   /// A map from each visited global to all of its global address instructions.
   llvm::MapVector<SILGlobalVariable *, GlobalAddrs> GlobalAddrMap;
