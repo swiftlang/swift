@@ -4662,12 +4662,6 @@ ERROR(inlinable_decl_ref_implementation_only,
       "because %3 was imported implementation-only",
       (DescriptiveDeclKind, DeclName, unsigned, Identifier))
 
-// SWIFT_ENABLE_TENSORFLOW
-ERROR(implicit_derivative_in_fragile_function, none,
-      "the derivative of %1 is implicit and cannot be referenced from "
-      FRAGILE_FUNC_KIND "2",
-      (DeclName, unsigned))
-
 #undef FRAGILE_FUNC_KIND
 
 NOTE(resilience_decl_declared_here_public,

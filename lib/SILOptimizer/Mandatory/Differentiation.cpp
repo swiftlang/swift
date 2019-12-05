@@ -36,7 +36,6 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignatureBuilder.h"
-#include "swift/AST/Initializer.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/SourceFile.h"
@@ -1896,8 +1895,8 @@ emitDerivativeFunctionReference(
     if (original->getFunction()->isSerialized() && !hasPublicVisibility(minimalWitness->getLinkage())) {
       enum { Inlinable = 0, DefaultArgument = 1 };
       unsigned fragileKind = Inlinable;
-      // TODO: This is not a very robust way of determining if the function is a
-      // default argument. Also, we have not exhaustively listed all the kinds
+      // FIXME: This is not a very robust way of determining if the function is
+      // a default argument. Also, we have not exhaustively listed all the kinds
       // of fragility.
       if (original->getFunction()->getLinkage() == SILLinkage::PublicNonABI)
         fragileKind = DefaultArgument;
