@@ -5291,6 +5291,52 @@ allFromConditionalConformances(DeclContext *DC, Type baseTy,
   });
 }
 
+// Check whether given key path dynamic member lookup is self-recursive,
+// which happens when root type of the key path is the same as base type
+// of the member and lookup is attempted on non-existing property e.g.
+//
+// @dynamicMemberLookup
+// struct Recurse<T> {
+//   subscript<U>(dynamicMember member: KeyPath<Recurse<T>, U>) -> Int {
+//     return 1
+//   }
+// }
+//
+// If we going to lookup any no-existent property or member on `Recursive`
+// using key path dynamic member lookup it would attempt to lookup such
+// member on root type which is also `Recursive` which leads to an infinite
+// recursion.
+static bool isSelfRecursiveKeyPathDynamicMemberLookup(
+    ConstraintSystem &cs, Type keyPathRootTy, ConstraintLocator *locator) {
+  // Let's check whether this is a recursive call to keypath
+  // dynamic member lookup on the same type.
+  if (!locator->isLastElement<LocatorPathElt::KeyPathDynamicMember>())
+    return false;
+
+  auto path = locator->getPath();
+  auto *choiceLoc =
+      cs.getConstraintLocator(locator->getAnchor(), path.drop_back());
+
+  if (auto *overload = cs.findSelectedOverloadFor(choiceLoc)) {
+    auto baseTy = overload->Choice.getBaseType();
+
+    // If it's `Foo<Int>` vs. `Foo<String>` it doesn't really matter
+    // for dynamic lookup because it's going to be performed on `Foo`.
+    if (baseTy->is<BoundGenericType>() &&
+        keyPathRootTy->is<BoundGenericType>()) {
+      auto *baseDecl = baseTy->castTo<BoundGenericType>()->getDecl();
+      auto *keyPathRootDecl =
+          keyPathRootTy->castTo<BoundGenericType>()->getDecl();
+      return baseDecl == keyPathRootDecl;
+    }
+
+    if (baseTy->isEqual(keyPathRootTy))
+      return true;
+  }
+
+  return false;
+}
+
 /// Given a ValueMember, UnresolvedValueMember, or TypeMember constraint,
 /// perform a lookup into the specified base type to find a candidate list.
 /// The list returned includes the viable candidates as well as the unviable
@@ -5758,8 +5804,10 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
       ::hasDynamicMemberLookupAttribute(instanceTy, DynamicMemberLookupCache)) {
     const auto &candidates = result.ViableCandidates;
 
-    if (candidates.empty() ||
-        allFromConditionalConformances(DC, instanceTy, candidates)) {
+    if ((candidates.empty() ||
+         allFromConditionalConformances(DC, instanceTy, candidates)) &&
+        !isSelfRecursiveKeyPathDynamicMemberLookup(*this, baseTy,
+                                                   memberLocator)) {
       auto &ctx = getASTContext();
 
       // Recursively look up `subscript(dynamicMember:)` methods in this type.
