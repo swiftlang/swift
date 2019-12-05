@@ -1023,6 +1023,16 @@ getAddrOfKnownValueWitnessTable(IRGenModule &IGM, CanType type,
   return {};
 }
 
+llvm::Constant *
+IRGenModule::getAddrOfEffectiveValueWitnessTable(CanType concreteType,
+                                                 ConstantInit init) {
+  if (auto known =
+          getAddrOfKnownValueWitnessTable(*this, concreteType, false)) {
+    return known.getValue();
+  }
+  return getAddrOfValueWitnessTable(concreteType);
+}
+
 /// Emit a value-witness table for the given type.
 ConstantReference irgen::emitValueWitnessTable(IRGenModule &IGM,
                                              CanType abstractType,
