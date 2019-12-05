@@ -1241,18 +1241,20 @@ static void copyParameterArgumentsForApply(
   }
 }
 
-/// When a function value is used in an instruction (usually `apply`), there's
-/// some conversion instruction in between, e.g. `thin_to_thick_function`. Given
+/// When a function value is used in an instruction (usually `apply`), there may
+/// be conversion instructions in between, e.g. `thin_to_thick_function`. Given
 /// a new function value and an old function value, this helper function
 /// recursively converts the new function just like how the old function is
-/// converted. If the new function's generic signature is specified, it is used
+/// converted.
+///
+/// If the new function's generic signature is specified, it is used
 /// to create substitution maps for reapplied `partial_apply` instructions.
 static SILValue reapplyFunctionConversion(
     ADContext &context, SILValue newFunc, SILValue oldFunc,
     SILValue oldConvertedFunc, SILBuilder &builder, SILLocation loc,
     SmallVectorImpl<AllocStackInst *> &newBuffersToDealloc,
-    GenericSignature newFuncGenSig = GenericSignature(),
-    IndexSubset *reabstractionThunkIndices = nullptr) {
+    IndexSubset *parameterIndices,
+    GenericSignature newFuncGenSig = GenericSignature()) {
   // If the old func is the new func, then there's no conversion.
   if (oldFunc == oldConvertedFunc)
     return newFunc;
@@ -1261,7 +1263,7 @@ static SILValue reapplyFunctionConversion(
   if (auto *cvi = dyn_cast<CopyValueInst>(oldConvertedFunc)) {
     auto innerNewFunc = reapplyFunctionConversion(
         context, newFunc, oldFunc, cvi->getOperand(), builder, loc,
-        newBuffersToDealloc, newFuncGenSig);
+        newBuffersToDealloc, parameterIndices, newFuncGenSig);
     // Note: no `copy_value` is needed for the re-converted function because the
     // caller of `reapplyFunctionConversion` should consume the re-converted
     // function.
@@ -1271,7 +1273,7 @@ static SILValue reapplyFunctionConversion(
   if (auto *tttfi = dyn_cast<ThinToThickFunctionInst>(oldConvertedFunc)) {
     auto innerNewFunc = reapplyFunctionConversion(
         context, newFunc, oldFunc, tttfi->getOperand(), builder, loc,
-        newBuffersToDealloc, newFuncGenSig);
+        newBuffersToDealloc, parameterIndices, newFuncGenSig);
     auto operandFnTy = innerNewFunc->getType().castTo<SILFunctionType>();
     auto thickTy = operandFnTy->getWithRepresentation(
         SILFunctionTypeRepresentation::Thick);
@@ -1285,18 +1287,28 @@ static SILValue reapplyFunctionConversion(
     SmallVector<SILValue, 1> newArgsToDestroy;
     copyParameterArgumentsForApply(pai, newArgs, newArgsToDestroy,
                                    newBuffersToDealloc);
-    if (reabstractionThunkIndices) {
+    auto innerNewFunc = reapplyFunctionConversion(
+        context, newFunc, oldFunc, pai->getCallee(), builder, loc,
+        newBuffersToDealloc, parameterIndices, newFuncGenSig);
+    // Reabstraction thunk `partial_apply` reapplications require special
+    // support. Reabstraction thunk JVP/VJP expects a `@differentiable`
+    // function-typed argument to avoid opaque function non-differentiability
+    // errors. Thus, `partial_apply` reapplications must first form a
+    // `differentiable_function` of the function-typed thunk argument.
+    auto isReabstractionThunkCallee = [&]() -> bool {
+      auto *fri = dyn_cast<FunctionRefInst>(oldFunc);
+      return fri && fri->getReferencedFunctionOrNull()->isThunk() ==
+                        IsReabstractionThunk;
+    };
+    if (isReabstractionThunkCallee()) {
       assert(newArgs.size() == 1 &&
              "Expected reabstraction thunk to be partially applied with only "
              "one argument");
       auto *dfi = context.createDifferentiableFunction(
-          builder, loc, reabstractionThunkIndices, newArgs.back());
+          builder, loc, parameterIndices, newArgs.back());
       context.addDifferentiableFunctionInstToWorklist(dfi);
       newArgs.back() = dfi;
     }
-    auto innerNewFunc = reapplyFunctionConversion(
-        context, newFunc, oldFunc, pai->getCallee(), builder, loc,
-        newBuffersToDealloc, newFuncGenSig);
     // If new function's generic signature is specified, use it to create
     // substitution map for reapplied `partial_apply` instruction.
     auto substMap = !newFuncGenSig
@@ -1482,17 +1494,13 @@ emitDerivativeFunctionReference(
     }
     auto *derivativeFnRef = builder.createDifferentiabilityWitnessFunction(
         loc, witnessKind, minimalWitness);
-    IndexSubset *reabstractionThunkIndices = nullptr;
-    if (originalFn->isThunk() == IsReabstractionThunk)
-      reabstractionThunkIndices = desiredIndices.parameters;
-    auto convertedRef =
-        reapplyFunctionConversion(context, derivativeFnRef, originalFRI,
-                                  original, builder, loc, newBuffersToDealloc,
-                                  derivativeFnRef->getType()
-                                      .getASTType()
-                                      ->castTo<SILFunctionType>()
-                                      ->getSubstGenericSignature(),
-                                  reabstractionThunkIndices);
+    auto convertedRef = reapplyFunctionConversion(
+        context, derivativeFnRef, originalFRI, original, builder, loc,
+        newBuffersToDealloc, desiredIndices.parameters,
+        derivativeFnRef->getType()
+            .getASTType()
+            ->castTo<SILFunctionType>()
+            ->getSubstGenericSignature());
     return std::make_pair(
         convertedRef,
         SILAutoDiffIndices(desiredIndices.source,
@@ -1537,9 +1545,9 @@ emitDerivativeFunctionReference(
         loc, witnessMethod->getLookupType(), witnessMethod->getConformance(),
         requirementDeclRef.asAutoDiffDerivativeFunction(autoDiffFuncId),
         SILType::getPrimitiveObjectType(assocType));
-    auto convertedRef =
-        reapplyFunctionConversion(context, ref, witnessMethod, original,
-                                  builder, loc, newBuffersToDealloc);
+    auto convertedRef = reapplyFunctionConversion(
+        context, ref, witnessMethod, original, builder, loc,
+        newBuffersToDealloc, desiredIndices.parameters);
     return std::make_pair(convertedRef, minimalIndices);
   }
 
@@ -1582,9 +1590,9 @@ emitDerivativeFunctionReference(
         loc, classMethodInst->getOperand(),
         methodDeclRef.asAutoDiffDerivativeFunction(autoDiffFuncId),
         SILType::getPrimitiveObjectType(assocType));
-    auto convertedRef =
-        reapplyFunctionConversion(context, ref, classMethodInst, original,
-                                  builder, loc, newBuffersToDealloc);
+    auto convertedRef = reapplyFunctionConversion(
+        context, ref, classMethodInst, original, builder, loc,
+        newBuffersToDealloc, desiredIndices.parameters);
     return std::make_pair(convertedRef, minimalIndices);
   }
 

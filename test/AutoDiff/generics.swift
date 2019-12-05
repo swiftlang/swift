@@ -16,8 +16,8 @@ _ = gradient(at: Float(1), in: { x in identity(x) })
 // CHECK-SIL-NEXT: [[EMIT_ZERO_INDIRECT:%.*]] = apply [[ZERO_WITNESS]]<τ_0_0.TangentVector>([[ORIG_COTAN]], [[ORIG_COTAN_METATYPE]])
 // CHECK-SIL: }
 
-// Test TF-201: differentiate direct references to generic function:
-// partially-applied reabstraction thunk.
+// Test TF-201: differentiate direct references to generic function.
+// This involves reabstraction thunk differentiation.
 
 _ = gradient(at: Float(1), in: identity)
 
