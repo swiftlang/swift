@@ -466,6 +466,9 @@ ToolChain::constructInvocation(const CompileJobAction &job,
     Arguments.push_back("-runtime-compatibility-version");
     Arguments.push_back(arg->getValue());
   }
+  if (context.Args.hasArg(options::OPT_track_system_dependencies)) {
+    Arguments.push_back("-track-system-dependencies");
+  }
 
   context.Args.AddLastArg(
       Arguments,
