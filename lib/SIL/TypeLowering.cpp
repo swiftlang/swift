@@ -2172,6 +2172,20 @@ CaptureInfo
 TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
   PrettyStackTraceSILLocation stack("getting lowered local captures",
                                     fn.getAsRegularLocation(), Context);
+  // If we're guaranteed to never have local captures, bail out now.
+  switch (fn.kind) {
+  case SILDeclRef::Kind::StoredPropertyInitializer:
+  case SILDeclRef::Kind::PropertyWrapperBackingInitializer:
+    return CaptureInfo::empty();
+
+  default:
+    if (fn.hasDecl()) {
+      if (!fn.getDecl()->isLocalCapture())
+        return CaptureInfo::empty();
+    }
+
+    break;
+  }
 
   fn.isForeign = 0;
   fn.isCurried = 0;
@@ -2199,8 +2213,7 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
   std::function<void (SILDeclRef)> collectConstantCaptures;
 
   collectCaptures = [&](CaptureInfo captureInfo, DeclContext *dc) {
-    assert(captureInfo.hasBeenComputed() ||
-           !TypeConverter::canCaptureFromParent(dc));
+    assert(captureInfo.hasBeenComputed());
 
     if (captureInfo.hasGenericParamCaptures())
       capturesGenericParams = true;
@@ -2325,6 +2338,9 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
   };
 
   collectFunctionCaptures = [&](AnyFunctionRef curFn) {
+    if (!curFn.getBody())
+      return;
+
     if (!visitedFunctions.insert(curFn).second)
       return;
 
@@ -2390,15 +2406,6 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
   } else if (capturesDynamicSelf) {
     selfCapture = CapturedValue::getDynamicSelfMetadata();
     resultingCaptures.push_back(*selfCapture);
-  }
-
-  // It is an error for a member of a nominal type to have any captures
-  // at all. If we just clear them out here, SILGen will diagnose the
-  // problem.
-  if (fn.hasDecl()) {
-    auto *dc = fn.getDecl()->getDeclContext();
-    if (dc->isTypeContext())
-      resultingCaptures.clear();
   }
 
   // Cache the uniqued set of transitive captures.
