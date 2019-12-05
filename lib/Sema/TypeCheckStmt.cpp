@@ -112,6 +112,8 @@ namespace {
         ParentDC = CE;
         CE->getBody()->walk(*this);
         ParentDC = oldParentDC;
+
+        TypeChecker::computeCaptures(CE);
         return { false, E };
       } 
 
@@ -148,9 +150,14 @@ namespace {
         if (CE->hasSingleExpressionBody())
           CE->getBody()->walk(ContextualizeClosures(CE));
 
-        // In neither case do we need to continue the *current* walk.
+        TypeChecker::computeCaptures(CE);
         return { false, E };
       }
+
+      // Caller-side default arguments need their @autoclosures checked.
+      if (auto *DAE = dyn_cast<DefaultArgumentExpr>(E))
+        if (DAE->isCallerSide() && DAE->getParamDecl()->isAutoClosure())
+          DAE->getCallerSideDefaultExpr()->walk(*this);
 
       return { true, E };
     }
@@ -633,7 +640,6 @@ public:
     Type exnType = getASTContext().getErrorDecl()->getDeclaredType();
     if (!exnType) return TS;
 
-    // FIXME: Remove TypeChecker dependency.
     TypeChecker::typeCheckExpression(E, DC, TypeLoc::withoutLoc(exnType),
                                      CTP_ThrowStmt);
     TS->setSubExpr(E);
@@ -863,6 +869,8 @@ public:
 
     auto witness =
         genConformance.getWitnessByName(iteratorTy, getASTContext().Id_next);
+    if (!witness)
+      return nullptr;
     S->setIteratorNext(witness);
 
     auto nextResultType = cast<FuncDecl>(S->getIteratorNext().getDecl())

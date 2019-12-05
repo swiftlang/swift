@@ -649,7 +649,7 @@ void SILCloner<ImplClass>::clonePhiArgs(SILBasicBlock *oldBB) {
   auto *mappedBB = BBMap[oldBB];
 
   // Create new arguments for each of the original block's arguments.
-  for (auto *Arg : oldBB->getPhiArguments()) {
+  for (auto *Arg : oldBB->getSILPhiArguments()) {
     SILValue mappedArg = mappedBB->createPhiArgument(
       getOpType(Arg->getType()), Arg->getOwnershipKind());
 
@@ -1548,8 +1548,8 @@ visitUncheckedRefCastAddrInst(UncheckedRefCastAddrInst *Inst) {
   SILLocation OpLoc = getOpLocation(Inst->getLoc());
   SILValue SrcValue = getOpValue(Inst->getSrc());
   SILValue DestValue = getOpValue(Inst->getDest());
-  CanType SrcType = getOpASTType(Inst->getSourceType());
-  CanType TargetType = getOpASTType(Inst->getTargetType());
+  CanType SrcType = getOpASTType(Inst->getSourceFormalType());
+  CanType TargetType = getOpASTType(Inst->getTargetFormalType());
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   recordClonedInstruction(
       Inst, getBuilder().createUncheckedRefCastAddr(OpLoc, SrcValue, SrcType,
@@ -1690,10 +1690,12 @@ SILCloner<ImplClass>::visitUnconditionalCheckedCastInst(
                                           UnconditionalCheckedCastInst *Inst) {
   SILLocation OpLoc = getOpLocation(Inst->getLoc());
   SILValue OpValue = getOpValue(Inst->getOperand());
-  SILType OpType = getOpType(Inst->getType());
+  SILType OpLoweredType = getOpType(Inst->getTargetLoweredType());
+  CanType OpFormalType = getOpASTType(Inst->getTargetFormalType());
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   recordClonedInstruction(Inst, getBuilder().createUnconditionalCheckedCast(
-                                    OpLoc, OpValue, OpType));
+                                    OpLoc, OpValue,
+                                    OpLoweredType, OpFormalType));
 }
 
 template<typename ImplClass>
@@ -1703,8 +1705,8 @@ SILCloner<ImplClass>::visitUnconditionalCheckedCastAddrInst(
   SILLocation OpLoc = getOpLocation(Inst->getLoc());
   SILValue SrcValue = getOpValue(Inst->getSrc());
   SILValue DestValue = getOpValue(Inst->getDest());
-  CanType SrcType = getOpASTType(Inst->getSourceType());
-  CanType TargetType = getOpASTType(Inst->getTargetType());
+  CanType SrcType = getOpASTType(Inst->getSourceFormalType());
+  CanType TargetType = getOpASTType(Inst->getTargetFormalType());
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   recordClonedInstruction(Inst,
                           getBuilder().createUnconditionalCheckedCastAddr(
@@ -1716,11 +1718,17 @@ void SILCloner<ImplClass>::visitUnconditionalCheckedCastValueInst(
     UnconditionalCheckedCastValueInst *Inst) {
   SILLocation OpLoc = getOpLocation(Inst->getLoc());
   SILValue OpValue = getOpValue(Inst->getOperand());
-  SILType OpType = getOpType(Inst->getType());
+  CanType SrcFormalType = getOpASTType(Inst->getSourceFormalType());
+  SILType OpLoweredType = getOpType(Inst->getTargetLoweredType());
+  CanType OpFormalType = getOpASTType(Inst->getTargetFormalType());
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   recordClonedInstruction(
       Inst,
-      getBuilder().createUnconditionalCheckedCastValue(OpLoc, OpValue, OpType));
+      getBuilder().createUnconditionalCheckedCastValue(OpLoc,
+                                                       OpValue,
+                                                       SrcFormalType,
+                                                       OpLoweredType,
+                                                       OpFormalType));
 }
 
 template <typename ImplClass>
@@ -2651,7 +2659,9 @@ SILCloner<ImplClass>::visitCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
   recordClonedInstruction(
       Inst, getBuilder().createCheckedCastBranch(
                 getOpLocation(Inst->getLoc()), Inst->isExact(),
-                getOpValue(Inst->getOperand()), getOpType(Inst->getCastType()),
+                getOpValue(Inst->getOperand()),
+                getOpType(Inst->getTargetLoweredType()),
+                getOpASTType(Inst->getTargetFormalType()),
                 OpSuccBB, OpFailBB, TrueCount, FalseCount));
 }
 
@@ -2663,8 +2673,12 @@ void SILCloner<ImplClass>::visitCheckedCastValueBranchInst(
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   recordClonedInstruction(
       Inst, getBuilder().createCheckedCastValueBranch(
-                getOpLocation(Inst->getLoc()), getOpValue(Inst->getOperand()),
-                getOpType(Inst->getCastType()), OpSuccBB, OpFailBB));
+                getOpLocation(Inst->getLoc()),
+                getOpValue(Inst->getOperand()),
+                getOpASTType(Inst->getSourceFormalType()),
+                getOpType(Inst->getTargetLoweredType()),
+                getOpASTType(Inst->getTargetFormalType()),
+                OpSuccBB, OpFailBB));
 }
 
 template<typename ImplClass>
@@ -2674,8 +2688,8 @@ void SILCloner<ImplClass>::visitCheckedCastAddrBranchInst(
   SILBasicBlock *OpFailBB = getOpBasicBlock(Inst->getFailureBB());
   SILValue SrcValue = getOpValue(Inst->getSrc());
   SILValue DestValue = getOpValue(Inst->getDest());
-  CanType SrcType = getOpASTType(Inst->getSourceType());
-  CanType TargetType = getOpASTType(Inst->getTargetType());
+  CanType SrcType = getOpASTType(Inst->getSourceFormalType());
+  CanType TargetType = getOpASTType(Inst->getTargetFormalType());
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   auto TrueCount = Inst->getTrueBBCount();
   auto FalseCount = Inst->getFalseBBCount();

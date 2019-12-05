@@ -288,15 +288,16 @@ CanType swift::getNSBridgedClassOfCFClass(ModuleDecl *M, CanType type) {
   return CanType();
 }
 
-static bool isCFBridgingConversion(ModuleDecl *M, SILType sourceType,
-                                   SILType targetType) {
+static bool isCFBridgingConversion(ModuleDecl *M,
+                                   CanType sourceFormalType,
+                                   CanType targetFormalType) {
   if (auto bridgedTarget =
-        getNSBridgedClassOfCFClass(M, targetType.getASTType())) {
-    return bridgedTarget->isExactSuperclassOf(sourceType.getASTType());
+        getNSBridgedClassOfCFClass(M, targetFormalType)) {
+    return bridgedTarget->isExactSuperclassOf(sourceFormalType);
   }
   if (auto bridgedSource =
-        getNSBridgedClassOfCFClass(M, sourceType.getASTType())) {
-    return targetType.getASTType()->isExactSuperclassOf(bridgedSource);
+        getNSBridgedClassOfCFClass(M, sourceFormalType)) {
+    return targetFormalType->isExactSuperclassOf(bridgedSource);
   }
   
   return false;
@@ -871,11 +872,15 @@ namespace {
       } else {
         value = getOwnedScalar(source, srcTL);
       }
-      auto targetTy = target.LoweredType;
-      if (isCFBridgingConversion(SwiftModule, value->getType(), targetTy)) {
-        value = B.createUncheckedRefCast(Loc, value, targetTy.getObjectType());
+      auto targetFormalTy = target.FormalType;
+      auto targetLoweredTy =
+          SILType::getPrimitiveObjectType(targetFormalTy);
+      if (isCFBridgingConversion(SwiftModule,
+                                 source.FormalType,
+                                 targetFormalTy)) {
+        value = B.createUncheckedRefCast(Loc, value, targetLoweredTy);
       } else {
-        value = B.createUpcast(Loc, value, targetTy.getObjectType());
+        value = B.createUpcast(Loc, value, targetLoweredTy);
       }
       return putOwnedScalar(value, target);
     }
@@ -1039,24 +1044,24 @@ swift::emitSuccessfulScalarUnconditionalCast(SILBuilder &B, SILLocation loc,
                                              SILDynamicCastInst dynamicCast) {
   return emitSuccessfulScalarUnconditionalCast(
       B, B.getModule().getSwiftModule(), loc, dynamicCast.getSource(),
-      dynamicCast.getLoweredTargetType(), dynamicCast.getSourceType(),
-      dynamicCast.getTargetType(), dynamicCast.getInstruction());
+      dynamicCast.getTargetLoweredType(), dynamicCast.getSourceFormalType(),
+      dynamicCast.getTargetFormalType(), dynamicCast.getInstruction());
 }
 
 /// Emit an unconditional scalar cast that's known to succeed.
 SILValue
 swift::emitSuccessfulScalarUnconditionalCast(SILBuilder &B, ModuleDecl *M,
                                              SILLocation loc, SILValue value,
-                                             SILType loweredTargetType,
-                                             CanType sourceType,
-                                             CanType targetType,
+                                             SILType targetLoweredType,
+                                             CanType sourceFormalType,
+                                             CanType targetFormalType,
                                              SILInstruction *existingCast) {
-  assert(classifyDynamicCast(M, sourceType, targetType)
+  assert(classifyDynamicCast(M, sourceFormalType, targetFormalType)
            == DynamicCastFeasibility::WillSucceed);
 
   // Casts to/from existential types cannot be further improved.
-  if (sourceType.isAnyExistentialType() ||
-      targetType.isAnyExistentialType()) {
+  if (sourceFormalType.isAnyExistentialType() ||
+      targetFormalType.isAnyExistentialType()) {
     if (existingCast)
       // Indicate that the existing cast cannot be further improved.
       return SILValue();
@@ -1065,14 +1070,14 @@ swift::emitSuccessfulScalarUnconditionalCast(SILBuilder &B, ModuleDecl *M,
   }
 
   // Fast path changes that don't change the type.
-  if (sourceType == targetType)
+  if (sourceFormalType == targetFormalType)
     return value;
 
-  Source source(value, sourceType);
-  Target target(loweredTargetType, targetType);
+  Source source(value, sourceFormalType);
+  Target target(targetLoweredType, targetFormalType);
   Source result = CastEmitter(B, M, loc).emitTopLevel(source, target);
   assert(!result.isAddress());
-  assert(result.Value->getType() == loweredTargetType);
+  assert(result.Value->getType() == targetLoweredType);
   return result.Value;
 }
 
@@ -1080,15 +1085,15 @@ bool swift::emitSuccessfulIndirectUnconditionalCast(
     SILBuilder &B, SILLocation loc, SILDynamicCastInst dynamicCast) {
   return emitSuccessfulIndirectUnconditionalCast(
       B, B.getModule().getSwiftModule(), loc, dynamicCast.getSource(),
-      dynamicCast.getSourceType(), dynamicCast.getDest(),
-      dynamicCast.getTargetType(), dynamicCast.getInstruction());
+      dynamicCast.getSourceFormalType(), dynamicCast.getDest(),
+      dynamicCast.getTargetFormalType(), dynamicCast.getInstruction());
 }
 
 bool swift::emitSuccessfulIndirectUnconditionalCast(
     SILBuilder &B, ModuleDecl *M, SILLocation loc, SILValue src,
-    CanType sourceType, SILValue dest, CanType targetType,
+    CanType sourceFormalType, SILValue dest, CanType targetFormalType,
     SILInstruction *existingCast) {
-  assert(classifyDynamicCast(M, sourceType, targetType)
+  assert(classifyDynamicCast(M, sourceFormalType, targetFormalType)
            == DynamicCastFeasibility::WillSucceed);
 
   assert(src->getType().isAddress());
@@ -1111,20 +1116,21 @@ bool swift::emitSuccessfulIndirectUnconditionalCast(
     if (existingCast) {
       auto *UCCAI = dyn_cast<UnconditionalCheckedCastAddrInst>(existingCast);
       if (UCCAI && UCCAI->getSrc() == src && UCCAI->getDest() == dest
-          && UCCAI->getSourceType() == sourceType
-          && UCCAI->getTargetType() == targetType) {
+          && UCCAI->getSourceFormalType() == sourceFormalType
+          && UCCAI->getTargetFormalType() == targetFormalType) {
         // Indicate that the existing cast cannot be further improved.
         return false;
       }
     }
 
-    B.createUnconditionalCheckedCastAddr(loc, src, sourceType, dest,
-                                         targetType);
+    B.createUnconditionalCheckedCastAddr(loc,
+                                         src, sourceFormalType,
+                                         dest, targetFormalType);
     return true;
   }
 
-  Source source(src, sourceType);
-  Target target(dest, targetType);
+  Source source(src, sourceFormalType);
+  Target target(dest, targetFormalType);
   Source result = CastEmitter(B, M, loc).emitTopLevel(source, target);
   assert(result.isAddress());
   assert(result.Value == dest);
@@ -1135,10 +1141,10 @@ bool swift::emitSuccessfulIndirectUnconditionalCast(
 /// Can the given cast be performed by the scalar checked-cast
 /// instructions?
 bool swift::canUseScalarCheckedCastInstructions(SILModule &M,
-                                                CanType sourceType,
-                                                CanType targetType) {
+                                                CanType sourceFormalType,
+                                                CanType targetFormalType) {
   // Look through one level of optionality on the source.
-  auto objectType = sourceType;
+  auto objectType = sourceFormalType;
   if (auto type = objectType.getOptionalObjectType())
     objectType = type;
 
@@ -1150,7 +1156,7 @@ bool swift::canUseScalarCheckedCastInstructions(SILModule &M,
   // A class-constrained archetype may be bound to NSError, unless it has a
   // non-NSError superclass constraint. Casts to archetypes thus must always be
   // indirect.
-  if (auto archetype = targetType->getAs<ArchetypeType>()) {
+  if (auto archetype = targetFormalType->getAs<ArchetypeType>()) {
     // Only ever permit this if the source type is a reference type.
     if (!objectType.isAnyClassReferenceType())
       return false;
@@ -1171,11 +1177,11 @@ bool swift::canUseScalarCheckedCastInstructions(SILModule &M,
   }
   
   if (M.getASTContext().LangOpts.EnableObjCInterop
-      && targetType == M.Types.getNSErrorType()) {
+      && targetFormalType == M.Types.getNSErrorType()) {
     // If we statically know the source is an NSError subclass, then the cast
     // can go through the scalar path (and it's trivially true so can be
     // killed).
-    return targetType->isExactSuperclassOf(objectType);
+    return targetFormalType->isExactSuperclassOf(objectType);
   }
   
   // Three supported cases:
@@ -1183,10 +1189,10 @@ bool swift::canUseScalarCheckedCastInstructions(SILModule &M,
   // - metatype to object
   // - object to object
   if ((objectType.isAnyClassReferenceType() || isa<AnyMetatypeType>(objectType))
-      && targetType.isAnyClassReferenceType())
+      && targetFormalType.isAnyClassReferenceType())
     return true;
 
-  if (isa<AnyMetatypeType>(objectType) && isa<AnyMetatypeType>(targetType))
+  if (isa<AnyMetatypeType>(objectType) && isa<AnyMetatypeType>(targetFormalType))
     return true;
   
   // Otherwise, we need to use the general indirect-cast functions.
@@ -1197,12 +1203,13 @@ bool swift::canUseScalarCheckedCastInstructions(SILModule &M,
 /// using a scalar cast operation.
 void swift::emitIndirectConditionalCastWithScalar(
     SILBuilder &B, ModuleDecl *M, SILLocation loc,
-    CastConsumptionKind consumption, SILValue srcAddr, CanType sourceType,
-    SILValue destAddr, CanType targetType, SILBasicBlock *indirectSuccBB,
-    SILBasicBlock *indirectFailBB, ProfileCounter TrueCount,
-    ProfileCounter FalseCount) {
+    CastConsumptionKind consumption,
+    SILValue srcAddr, CanType sourceFormalType,
+    SILValue destAddr, CanType targetFormalType,
+    SILBasicBlock *indirectSuccBB, SILBasicBlock *indirectFailBB,
+    ProfileCounter TrueCount, ProfileCounter FalseCount) {
   assert(canUseScalarCheckedCastInstructions(B.getModule(),
-                                             sourceType, targetType));
+                                             sourceFormalType, targetFormalType));
 
   // Create our successor and fail blocks.
   SILBasicBlock *scalarFailBB = B.splitBlockForFallthrough();
@@ -1224,7 +1231,7 @@ void swift::emitIndirectConditionalCastWithScalar(
   // 3. If the original cast was take_on_success, then on success we place the
   // casted value into dest and on failure, store the original value back into
   // src.
-  SILType targetValueType = destAddr->getType().getObjectType();
+  SILType targetLoweredType = destAddr->getType().getObjectType();
   // Inline constructor
   auto srcValue = ([&]() -> SILValue {
     if (consumption == CastConsumptionKind::CopyOnSuccess)
@@ -1232,13 +1239,14 @@ void swift::emitIndirectConditionalCastWithScalar(
     return B.emitLoadValueOperation(loc, srcAddr, LoadOwnershipQualifier::Take);
   })();
 
-  B.createCheckedCastBranch(loc, /*exact*/ false, srcValue, targetValueType,
-                            scalarSuccBB, scalarFailBB, TrueCount, FalseCount);
+  B.createCheckedCastBranch(loc, /*exact*/ false, srcValue, targetLoweredType,
+                            targetFormalType, scalarSuccBB, scalarFailBB,
+                            TrueCount, FalseCount);
 
   // Emit the success block.
   B.setInsertionPoint(scalarSuccBB); {
     SILValue succValue = scalarSuccBB->createPhiArgument(
-        targetValueType, srcValue.getOwnershipKind());
+        targetLoweredType, srcValue.getOwnershipKind());
 
     switch (consumption) {
     // On success, we take with both take_always and take_on_success.

@@ -2634,9 +2634,9 @@ public:
 
   // origParamType is a parameter type.
   void emitSingleArg(ArgumentSource &&arg, AbstractionPattern origParamType) {
-    // If this is default argument, prepare to emit the default argument
+    // If this is delayed default argument, prepare to emit the default argument
     // generator later.
-    if (arg.isDefaultArg()) {
+    if (arg.isDelayedDefaultArg()) {
       auto substParamType = arg.getSubstRValueType();
       auto defArg = std::move(arg).asKnownDefaultArg();
 

@@ -249,6 +249,7 @@ enum class SILFunctionTypeRepresentation : uint8_t {
   Block,
   Thin,
   CFunctionPointer,
+  
   FirstSIL = 8,
   Method = FirstSIL,
   ObjCMethod,
@@ -893,6 +894,7 @@ namespace decls_block {
     BCFixed<1>,  // noescape?
     BCFixed<1>,   // throws?
     DifferentiabilityKindField // differentiability kind
+
     // trailed by parameters
   >;
 
@@ -1738,6 +1740,14 @@ namespace decls_block {
     BCBlob      // platform, followed by message
   >;
 
+  using OriginallyDefinedInDeclAttrLayout = BCRecordLayout<
+    OriginallyDefinedIn_DECL_ATTR,
+    BCFixed<1>,     // implicit flag
+    BC_AVAIL_TUPLE, // moved OS version
+    BCVBR<5>,       // platform
+    BCBlob          // original module name
+  >;
+
   using ObjCDeclAttrLayout = BCRecordLayout<
     ObjC_DECL_ATTR,
     BCFixed<1>, // implicit flag
@@ -1777,7 +1787,7 @@ namespace decls_block {
 
   // TODO(TF-999): Remove deprecated `@differentiating` attribute.
   using DifferentiatingDeclAttrLayout = DerivativeDeclAttrLayout;
-  
+
   // SWIFT_ENABLE_TENSORFLOW
   using TransposeDeclAttrLayout = BCRecordLayout<
     Transpose_DECL_ATTR,

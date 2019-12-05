@@ -208,9 +208,16 @@ void DestroyHoisting::expandStores(MemoryDataflow &dataFlow) {
 // Initialize the dataflow for moving destroys up the control flow.
 void DestroyHoisting::initDataflow(MemoryDataflow &dataFlow) {
   for (BlockState &st : dataFlow) {
-    st.entrySet.set();
     st.genSet.reset();
     st.killSet.reset();
+    if (st.isInInfiniteLoop()) {
+      // Ignore blocks which are in an infinite loop and prevent any destroy
+      // hoisting across such block borders.
+      st.entrySet.reset();
+      st.exitSet.reset();
+      continue;
+    }
+    st.entrySet.set();
     if (isa<UnreachableInst>(st.block->getTerminator())) {
       if (canIgnoreUnreachableBlock(st.block, dataFlow)) {
         st.exitSet.set();
@@ -284,7 +291,7 @@ bool DestroyHoisting::canIgnoreUnreachableBlock(SILBasicBlock *block,
   SILBasicBlock *singlePred = block->getSinglePredecessorBlock();
   if (!singlePred)
     return false;
-  if (!dataFlow.getState(singlePred)->exitReachable)
+  if (!dataFlow.getState(singlePred)->exitReachable())
     return false;
 
   // Check if none of the locations are touched in the unreachable-block.
@@ -372,6 +379,10 @@ void DestroyHoisting::moveDestroys(MemoryDataflow &dataFlow) {
 
     // Is it an unreachable-block we can ignore?
     if (isa<UnreachableInst>(block->getTerminator()) && state.exitSet.any())
+      continue;
+
+    // Ignore blocks which are in an infinite loop.
+    if (state.isInInfiniteLoop())
       continue;
 
     // Do the inner-block processing.

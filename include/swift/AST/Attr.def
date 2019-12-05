@@ -529,10 +529,26 @@ DECL_ATTR(transpose, Transpose,
   NotSerialized, 96)
 // SWIFT_ENABLE_TENSORFLOW END
 
+SIMPLE_DECL_ATTR(_hasMissingDesignatedInitializers,
+  HasMissingDesignatedInitializers, OnClass | UserInaccessible | NotSerialized |
+  APIBreakingToAdd | ABIBreakingToAdd | APIStableToRemove | ABIStableToRemove,
+  92)
+
+SIMPLE_DECL_ATTR(_inheritsConvenienceInitializers,
+  InheritsConvenienceInitializers, OnClass | UserInaccessible | NotSerialized |
+  APIStableToAdd | ABIStableToAdd | APIBreakingToRemove | ABIBreakingToRemove,
+  93)
+
 SIMPLE_DECL_ATTR(IBSegueAction, IBSegueAction,
   OnFunc |
   ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
   95)
+
+DECL_ATTR(_originallyDefinedIn, OriginallyDefinedIn,
+  OnNominalType | OnFunc | OnVar | OnExtension | UserInaccessible |
+  AllowMultipleAttributes |
+  ABIBreakingToAdd | ABIBreakingToRemove | APIStableToAdd | APIStableToRemove,
+  96)
 
 // SWIFT_ENABLE_TENSORFLOW
 DECL_ATTR(quoted, Quoted,

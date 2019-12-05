@@ -432,6 +432,10 @@ private:
 
   void installGlobalTypeChecker(TypeChecker *TC);
 public:
+  /// Returns if semantic AST queries are enabled. This generally means module
+  /// loading and name lookup can take place.
+  bool areSemanticQueriesEnabled() const;
+
   /// Retrieve the global \c TypeChecker instance associated with this context.
   TypeChecker *getLegacyGlobalTypeChecker() const;
 
@@ -618,6 +622,11 @@ public:
   /// Get the runtime availability of features introduced in the Swift 5.1
   /// compiler for the target platform.
   AvailabilityContext getSwift51Availability();
+
+  /// Get the runtime availability of
+  /// swift_getTypeByMangledNameInContextInMetadataState.
+  AvailabilityContext getTypesInAbstractMetadataStateAvailability();
+
 
   //===--------------------------------------------------------------------===//
   // Diagnostics Helper functions
@@ -908,9 +917,9 @@ public:
   CanGenericSignature getSingleGenericParameterSignature() const;
 
   /// Retrieve a generic signature with a single type parameter conforming
-  /// to the given existential type.
-  CanGenericSignature getExistentialSignature(CanType existential,
-                                              ModuleDecl *mod);
+  /// to the given opened archetype.
+  CanGenericSignature getOpenedArchetypeSignature(CanType existential,
+                                                  ModuleDecl *mod);
 
   GenericSignature getOverrideGenericSignature(const ValueDecl *base,
                                                const ValueDecl *derived);

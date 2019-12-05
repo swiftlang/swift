@@ -25,7 +25,7 @@ class D: C {}
 // CHECK:   [[METHOD:%.*]] = class_method [[BORROWED_BAR]] : $Bar, #Bar.bas!getter.1 : (Bar) -> () -> C?, $@convention(method) (@guaranteed Bar) ->
 // CHECK:   apply [[METHOD]]([[BORROWED_BAR]])
 // CHECK:   end_borrow [[BORROWED_BAR]]
-// CHECK:   unconditional_checked_cast {{%.*}} : $C to $D
+// CHECK:   unconditional_checked_cast {{%.*}} : $C to D
 //
 // CHECK: [[NO_BAR]]:
 // CHECK:   unreachable

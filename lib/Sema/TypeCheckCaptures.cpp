@@ -45,13 +45,12 @@ class FindCapturedVars : public ASTWalker {
   bool NoEscape, ObjC, IsGenericFunction;
 
 public:
-  FindCapturedVars(ASTContext &Context,
-                   SourceLoc CaptureLoc,
+  FindCapturedVars(SourceLoc CaptureLoc,
                    DeclContext *CurDC,
                    bool NoEscape,
                    bool ObjC,
                    bool IsGenericFunction)
-      : Context(Context), CaptureLoc(CaptureLoc), CurDC(CurDC),
+      : Context(CurDC->getASTContext()), CaptureLoc(CaptureLoc), CurDC(CurDC),
         NoEscape(NoEscape), ObjC(ObjC), IsGenericFunction(IsGenericFunction) {}
 
   CaptureInfo getCaptureInfo() const {
@@ -595,8 +594,7 @@ void TypeChecker::computeCaptures(AnyFunctionRef AFR) {
     isGeneric = (AFD->getGenericParams() != nullptr);
 
   auto &Context = AFR.getAsDeclContext()->getASTContext();
-  FindCapturedVars finder(Context,
-                          AFR.getLoc(),
+  FindCapturedVars finder(AFR.getLoc(),
                           AFR.getAsDeclContext(),
                           AFR.isKnownNoEscape(),
                           AFR.isObjC(),
@@ -613,8 +611,7 @@ void TypeChecker::computeCaptures(AnyFunctionRef AFR) {
   if (auto *AFD = AFR.getAbstractFunctionDecl()) {
     for (auto *P : *AFD->getParameters()) {
       if (auto E = P->getTypeCheckedDefaultExpr()) {
-        FindCapturedVars finder(Context,
-                                E->getLoc(),
+        FindCapturedVars finder(E->getLoc(),
                                 AFD,
                                 /*isNoEscape=*/false,
                                 /*isObjC=*/false,
@@ -663,10 +660,8 @@ static bool isLazy(PatternBindingDecl *PBD) {
   return false;
 }
 
-void TypeChecker::checkPatternBindingCaptures(NominalTypeDecl *typeDecl) {
-  auto &ctx = typeDecl->getASTContext();
-
-  for (auto member : typeDecl->getMembers()) {
+void TypeChecker::checkPatternBindingCaptures(IterableDeclContext *DC) {
+  for (auto member : DC->getMembers()) {
     // Ignore everything other than PBDs.
     auto *PBD = dyn_cast<PatternBindingDecl>(member);
     if (!PBD) continue;
@@ -680,14 +675,15 @@ void TypeChecker::checkPatternBindingCaptures(NominalTypeDecl *typeDecl) {
       if (init == nullptr)
         continue;
 
-      FindCapturedVars finder(ctx,
-                              init->getLoc(),
-                              PBD->getInitContext(i),
+      auto *DC = PBD->getInitContext(i);
+      FindCapturedVars finder(init->getLoc(),
+                              DC,
                               /*NoEscape=*/false,
                               /*ObjC=*/false,
                               /*IsGenericFunction*/false);
       init->walk(finder);
 
+      auto &ctx = DC->getASTContext();
       if (finder.getDynamicSelfCaptureLoc().isValid() && !isLazy(PBD)) {
         ctx.Diags.diagnose(finder.getDynamicSelfCaptureLoc(),
                            diag::dynamic_self_stored_property_init);

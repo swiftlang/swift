@@ -746,3 +746,10 @@ struct SR_10557_S1 {
     fatalError()
   }
 }
+
+@dynamicMemberLookup
+struct SR11877 {
+  subscript(dynamicMember member: Substring) -> Int { 0 }
+}
+
+_ = \SR11877.okay

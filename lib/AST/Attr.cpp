@@ -360,8 +360,7 @@ static void printShortFormAvailable(ArrayRef<const DeclAttribute *> Attrs,
 }
 
 // Returns the differentiation parameters clause string for the given function,
-// parameter indices, and parsed parameters. Use the parameter indices if
-// specified; otherwise, use the parsed parameters.
+// parameter indices, and parsed parameters.
 static std::string getDifferentiationParametersClauseString(
     const AbstractFunctionDecl *function, IndexSubset *paramIndices,
     ArrayRef<ParsedAutoDiffParameter> parsedParams) {
@@ -428,7 +427,7 @@ static std::string getTransposedParametersClauseString(
     ArrayRef<ParsedAutoDiffParameter> parsedParams) {
   assert(function);
   bool isInstanceMethod = function->isInstanceMember();
-  
+
   std::string result;
   llvm::raw_string_ostream printer(result);
 
@@ -760,6 +759,17 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     Printer.printAttrName("@_silgen_name");
     Printer << "(\"" << cast<SILGenNameAttr>(this)->Name << "\")";
     break;
+
+  case DAK_OriginallyDefinedIn: {
+    Printer.printAttrName("@_originallyDefinedIn");
+    Printer << "(module: ";
+    auto Attr = cast<OriginallyDefinedInAttr>(this);
+    Printer << "\"" << Attr->OriginalModuleName << "\", ";
+    Printer << platformString(Attr->Platform) << " " <<
+      Attr->MovedVersion.getAsString();
+    Printer << ")";
+    break;
+  }
 
   case DAK_Available: {
     Printer.printAttrName("@available");
@@ -1105,6 +1115,8 @@ StringRef DeclAttribute::getAttrName() const {
     return "_projectedValueProperty";
   case DAK_Differentiable:
     return "differentiable";
+  case DAK_OriginallyDefinedIn:
+    return "_originallyDefinedIn";
   // SWIFT_ENABLE_TENSORFLOW
   case DAK_Derivative:
     return "derivative";

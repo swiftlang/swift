@@ -278,28 +278,6 @@ protected:
   ConstraintSystem &getConstraintSystem() const { return CS; }
 };
 
-/// Introduce a '!' to force an optional unwrap.
-class ForceOptional final : public ConstraintFix {
-  Type BaseType;
-  Type UnwrappedType;
-
-  ForceOptional(ConstraintSystem &cs, Type baseType, Type unwrappedType,
-                ConstraintLocator *locator)
-      : ConstraintFix(cs, FixKind::ForceOptional, locator), BaseType(baseType),
-        UnwrappedType(unwrappedType) {
-    assert(baseType && "Base type must not be null");
-    assert(unwrappedType && "Unwrapped type must not be null");
-  }
-
-public:
-  std::string getName() const override { return "force optional"; }
-
-  bool diagnose(bool asNote = false) const override;
-
-  static ForceOptional *create(ConstraintSystem &cs, Type baseType,
-                               Type unwrappedType, ConstraintLocator *locator);
-};
-
 /// Unwrap an optional base when we have a member access.
 class UnwrapOptionalBase final : public ConstraintFix {
   DeclName MemberName;
@@ -512,6 +490,26 @@ public:
 
   static ContextualMismatch *create(ConstraintSystem &cs, Type lhs, Type rhs,
                                     ConstraintLocator *locator);
+};
+
+/// Introduce a '!' to force an optional unwrap.
+class ForceOptional final : public ContextualMismatch {
+  ForceOptional(ConstraintSystem &cs, Type fromType, Type toType,
+                ConstraintLocator *locator)
+      : ContextualMismatch(cs, FixKind::ForceOptional, fromType, toType,
+                           locator) {
+    assert(fromType && "Base type must not be null");
+    assert(fromType->getOptionalObjectType() &&
+           "Unwrapped type must not be null");
+  }
+
+public:
+  std::string getName() const override { return "force optional"; }
+
+  bool diagnose(bool asNote = false) const override;
+
+  static ForceOptional *create(ConstraintSystem &cs, Type fromType, Type toType,
+                               ConstraintLocator *locator);
 };
 
 /// This is a contextual mismatch between throwing and non-throwing

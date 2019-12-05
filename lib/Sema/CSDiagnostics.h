@@ -121,8 +121,6 @@ public:
   InFlightDiagnostic emitDiagnostic(ArgTypes &&... Args) const;
 
 protected:
-  TypeChecker &getTypeChecker() const { return CS.getTypeChecker(); }
-
   DeclContext *getDC() const { return CS.DC; }
 
   ASTContext &getASTContext() const { return CS.getASTContext(); }
@@ -631,35 +629,6 @@ public:
   bool diagnoseAsError() override;
 };
 
-/// Diagnose failures related to use of the unwrapped optional types,
-/// which require some type of force-unwrap e.g. "!" or "try!".
-class MissingOptionalUnwrapFailure final : public FailureDiagnostic {
-  Type BaseType;
-  Type UnwrappedType;
-
-public:
-  MissingOptionalUnwrapFailure(ConstraintSystem &cs, Type baseType,
-                               Type unwrappedType, ConstraintLocator *locator)
-      : FailureDiagnostic(cs, locator), BaseType(baseType),
-        UnwrappedType(unwrappedType) {}
-
-  bool diagnoseAsError() override;
-
-private:
-  Type getBaseType() const {
-    return resolveType(BaseType, /*reconstituteSugar=*/true);
-  }
-
-  Type getUnwrappedType() const {
-    return resolveType(UnwrappedType, /*reconstituteSugar=*/true);
-  }
-
-  /// Suggest a default value via `?? <default value>`
-  void offerDefaultValueUnwrapFixIt(DeclContext *DC, Expr *expr) const;
-  /// Suggest a force optional unwrap via `!`
-  void offerForceUnwrapFixIt(Expr *expr) const;
-};
-
 /// Diagnose errors associated with rvalues in positions
 /// where an lvalue is required, such as inout arguments.
 class RValueTreatedAsLValueFailure final : public FailureDiagnostic {
@@ -850,6 +819,32 @@ protected:
 
   static Optional<Diag<Type, Type>>
   getDiagnosticFor(ContextualTypePurpose context, bool forProtocol);
+};
+
+/// Diagnose failures related to use of the unwrapped optional types,
+/// which require some type of force-unwrap e.g. "!" or "try!".
+class MissingOptionalUnwrapFailure final : public ContextualFailure {
+public:
+  MissingOptionalUnwrapFailure(ConstraintSystem &cs, Type fromType, Type toType,
+                               ConstraintLocator *locator)
+      : ContextualFailure(cs, fromType, toType, locator) {}
+
+  bool diagnoseAsError() override;
+
+private:
+  Type getBaseType() const {
+    return resolveType(getFromType(), /*reconstituteSugar=*/true);
+  }
+
+  Type getUnwrappedType() const {
+    return resolveType(getBaseType()->getOptionalObjectType(),
+                       /*reconstituteSugar=*/true);
+  }
+
+  /// Suggest a default value via `?? <default value>`
+  void offerDefaultValueUnwrapFixIt(DeclContext *DC, Expr *expr) const;
+  /// Suggest a force optional unwrap via `!`
+  void offerForceUnwrapFixIt(Expr *expr) const;
 };
 
 /// Diagnostics for mismatched generic arguments e.g

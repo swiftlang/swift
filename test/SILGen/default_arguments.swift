@@ -84,6 +84,25 @@ func testMagicLiterals(file: String = #file,
 //
 // NEGATIVE-NOT: sil hidden [ossa] @$s17default_arguments17testMagicLiteralsySS4file_SS8functionSi4lineSi6columntFfA2_
 
+// SR-11623
+func genericMagicLiteral<T : ExpressibleByIntegerLiteral>(_ x: T = #column) -> T { x }
+
+// CHECK-LABEL: sil hidden [ossa] @$s17default_arguments23testGenericMagicLiteralyyF
+func testGenericMagicLiteral() {
+  // CHECK:      [[RET:%[0-9]+]] = alloc_stack $Int
+  // CHECK-NEXT: [[RAWLIT:%[0-9]+]] = integer_literal $Builtin.IntLiteral, 35
+  // CHECK-NEXT: [[INTTY:%[0-9]+]] = metatype $@thin Int.Type
+  // CHECK-NEXT: // function_ref Swift.Int.init(_builtinIntegerLiteral: Builtin.IntLiteral) -> Swift.Int
+  // CHECK-NEXT: [[LITFN:%[0-9]+]] = function_ref @$sSi22_builtinIntegerLiteralSiBI_tcfC
+  // CHECK-NEXT: [[LIT:%[0-9]+]] = apply [[LITFN]]([[RAWLIT]], [[INTTY]]) : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int
+  // CHECK-NEXT: [[LITARG:%[0-9]+]] = alloc_stack $Int
+  // CHECK-NEXT: store [[LIT]] to [trivial] [[LITARG]] : $*Int
+  // CHECK-NEXT: // function_ref default_arguments.genericMagicLiteral<A where A: Swift.ExpressibleByIntegerLiteral>(A) -> A
+  // CHECK-NEXT: [[FN:%[0-9]+]] = function_ref @$s17default_arguments19genericMagicLiteralyxxs020ExpressibleByIntegerE0RzlF : $@convention(thin) <τ_0_0 where τ_0_0 : ExpressibleByIntegerLiteral> (@in_guaranteed τ_0_0) -> @out τ_0_0
+  // CHECK-NEXT: apply [[FN]]<Int>([[RET]], [[LITARG]]) : $@convention(thin) <τ_0_0 where τ_0_0 : ExpressibleByIntegerLiteral> (@in_guaranteed τ_0_0) -> @out τ_0_0
+  let _: Int = genericMagicLiteral()
+}
+
 func closure(_: () -> ()) {}
 func autoclosure(_: @autoclosure () -> ()) {}
 

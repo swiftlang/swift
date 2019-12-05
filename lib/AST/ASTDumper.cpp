@@ -2388,6 +2388,7 @@ public:
     printRec(E->getSubExpr());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
+
   // SWIFT_ENABLE_TENSORFLOW
   void visitDifferentiableFunctionExpr(DifferentiableFunctionExpr *E) {
     printCommon(E, "differentiable_function") << '\n';
@@ -2542,12 +2543,6 @@ public:
     OS << " default_args_owner=";
     E->getDefaultArgsOwner().dump(OS);
     OS << " param=" << E->getParamIndex();
-    PrintWithColorRAII(OS, ParenthesisColor) << ')';
-  }
-
-  void visitCallerDefaultArgumentExpr(CallerDefaultArgumentExpr *E) {
-    printCommon(E, "caller_default_argument_expr");
-    printRec(E->getSubExpr());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
 
@@ -3039,11 +3034,39 @@ public:
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
 
+  void visitOptionalTypeRepr(OptionalTypeRepr *T) {
+    printCommon("type_optional") << '\n';
+    printRec(T->getBase());
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
+
+  void visitImplicitlyUnwrappedOptionalTypeRepr(
+      ImplicitlyUnwrappedOptionalTypeRepr *T) {
+    printCommon("type_implicitly_unwrapped_optional") << '\n';
+    printRec(T->getBase());
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
+
+  void visitOpaqueReturnTypeRepr(OpaqueReturnTypeRepr *T) {
+    printCommon("type_opaque_return");
+    printRec(T->getConstraint());
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
+
   void visitFixedTypeRepr(FixedTypeRepr *T) {
-    printCommon("fixed_type");
-    PrintWithColorRAII(OS, TypeColor) << " type='";
-    T->getType().print(PrintWithColorRAII(OS, TypeColor).getOS());
-    PrintWithColorRAII(OS, TypeColor) << "'";
+    printCommon("type_fixed");
+    auto Ty = T->getType();
+    if (Ty) {
+      auto &srcMgr =  Ty->getASTContext().SourceMgr;
+      if (T->getLoc().isValid()) {
+        OS << " location=@";
+        T->getLoc().print(OS, srcMgr);
+      } else {
+        OS << " location=<<invalid>>";
+      }
+    }
+    OS << " type="; Ty.dump(OS);
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
 };
 

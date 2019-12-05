@@ -1,0 +1,84 @@
+// RUN: %target-sil-opt %s -temp-rvalue-opt -enable-sil-verify-all | %FileCheck %s
+//
+// TempRValue iteratively uses EscapeAnalysis and deletes
+// instructions. Make sure that the connection graph remains valid
+// <rdar://57290845>.
+
+import Swift
+
+sil_stage canonical
+
+protocol SomeProtocol {
+  func foo()
+}
+struct SomeInstance : SomeProtocol {
+  func foo()
+}
+class SomeClass {
+  var someProperty: SomeProtocol
+}
+struct SomeStruct {
+  var someRef: SomeClass
+}
+
+// CHECK-LABEL: sil @testTempRvalueEscapeAnalysisUpdate : $@convention(thin) (@in_guaranteed SomeProtocol, @guaranteed SomeClass) -> () {
+// CHECK: bb0(%0 : $*SomeProtocol, %1 : $SomeClass):
+// CHECK: alloc_ref $SomeClass
+// CHECK: alloc_stack $SomeStruct
+// CHECK-NOT: alloc_stack $SomeProtocol
+// CHECK-NOT: copy_addr
+// CHECK: init_existential_addr %{{.*}} : $*SomeProtocol, $SomeInstance
+// CHECK: [[OPEN1:%.*]] = open_existential_addr immutable_access %0 : $*SomeProtocol to $*@opened("6419340C-0B14-11EA-9897-ACDE48001122") SomeProtocol
+// CHECK: apply %{{.*}}<@opened("6419340C-0B14-11EA-9897-ACDE48001122") SomeProtocol>([[OPEN1]]) : $@convention(witness_method: SomeProtocol) <τ_0_0 where τ_0_0 : SomeProtocol> (@in_guaranteed τ_0_0) -> ()
+// CHECK-NOT: destroy_addr
+// CHECK-NOT: alloc_stack $SomeProtocol
+// CHECK-NOT: copy_addr
+// CHECK: [[OPEN2:%.*]] = open_existential_addr immutable_access %{{.*}} : $*SomeProtocol to $*@opened("6419340C-0B14-11EA-9897-ACDE48001123") SomeProtocol
+// CHECK: apply %{{.*}}<@opened("6419340C-0B14-11EA-9897-ACDE48001123") SomeProtocol>([[OPEN2]]) : $@convention(witness_method: SomeProtocol) <τ_0_0 where τ_0_0 : SomeProtocol> (@in_guaranteed τ_0_0) -> ()
+// CHECK-NOT: destroy_addr
+// CHECK-LABEL: } // end sil function 'testTempRvalueEscapeAnalysisUpdate'
+sil @testTempRvalueEscapeAnalysisUpdate : $@convention(thin) (@in_guaranteed SomeProtocol, @guaranteed SomeClass) -> () {
+bb0(%0 : $*SomeProtocol, %1 : $SomeClass):
+  // First create a uniquely identified protocol value. This way
+  // EscapeAnalysis canPointToSameMemory will kick in later. It can't
+  // be an exclusive argument, or AliasAnalysis will filter it before
+  // querying EscapeAnalysis.
+  %localRef = alloc_ref $SomeClass
+  %localPropAdr = ref_element_addr %localRef : $SomeClass, #SomeClass.someProperty
+  copy_addr %0 to [initialization] %localPropAdr : $*SomeProtocol
+  %stk0 = alloc_stack $SomeStruct
+  %stk0Ref = struct_element_addr %stk0 : $*SomeStruct, #SomeStruct.someRef
+  store %localRef to %stk0Ref : $*SomeClass
+  %indirectRef = load %stk0Ref : $*SomeClass
+  %indirectLocalPropAdr = ref_element_addr %indirectRef : $SomeClass, #SomeClass.someProperty
+  
+  %propAdr1 = ref_element_addr %1 : $SomeClass, #SomeClass.someProperty
+  // TempRValue tries to kick in on this copy, but there is an
+  // interfering write that can't be handled by AliasAnlysis without
+  // consulting EscapingAnalysis. MemoryBehavior drops down to
+  // EscapeAnalysis for only a few special instructions, like
+  // init_existential_addr.
+  %stkAdr1 = alloc_stack $SomeProtocol
+  copy_addr %0 to [initialization] %stkAdr1 : $*SomeProtocol
+  %instanceAdr = init_existential_addr %indirectLocalPropAdr : $*SomeProtocol, $SomeInstance
+  %openadr1 = open_existential_addr immutable_access %stkAdr1 : $*SomeProtocol to $*@opened("6419340C-0B14-11EA-9897-ACDE48001122") SomeProtocol
+  %witness1 = witness_method $@opened("6419340C-0B14-11EA-9897-ACDE48001122") SomeProtocol, #SomeProtocol.foo!1 : <Self where Self : SomeProtocol> (Self) -> () -> (), %openadr1 : $*@opened("6419340C-0B14-11EA-9897-ACDE48001122") SomeProtocol : $@convention(witness_method: SomeProtocol) <τ_0_0 where τ_0_0 : SomeProtocol> (@in_guaranteed τ_0_0) -> ()
+  %call1 = apply %witness1<@opened("6419340C-0B14-11EA-9897-ACDE48001122") SomeProtocol>(%openadr1) : $@convention(witness_method: SomeProtocol) <τ_0_0 where τ_0_0 : SomeProtocol> (@in_guaranteed τ_0_0) -> ()
+  destroy_addr %stkAdr1 : $*SomeProtocol
+
+  // TempRValue optimization kicks in here. The open_existential_addr
+  // ceates a content node that refers back to the dead stack
+  // location.
+  %stkAdr2 = alloc_stack $SomeProtocol
+  copy_addr %propAdr1 to [initialization] %stkAdr2 : $*SomeProtocol
+  %openadr2 = open_existential_addr immutable_access %stkAdr2 : $*SomeProtocol to $*@opened("6419340C-0B14-11EA-9897-ACDE48001123") SomeProtocol
+  %witness2 = witness_method $@opened("6419340C-0B14-11EA-9897-ACDE48001123") SomeProtocol, #SomeProtocol.foo!1 : <Self where Self : SomeProtocol> (Self) -> () -> (), %openadr2 : $*@opened("6419340C-0B14-11EA-9897-ACDE48001123") SomeProtocol : $@convention(witness_method: SomeProtocol) <τ_0_0 where τ_0_0 : SomeProtocol> (@in_guaranteed τ_0_0) -> ()
+  %call2 = apply %witness2<@opened("6419340C-0B14-11EA-9897-ACDE48001123") SomeProtocol>(%openadr2) : $@convention(witness_method: SomeProtocol) <τ_0_0 where τ_0_0 : SomeProtocol> (@in_guaranteed τ_0_0) -> ()
+  destroy_addr %stkAdr2 : $*SomeProtocol
+
+  dealloc_stack %stkAdr2 : $*SomeProtocol
+  dealloc_stack %stkAdr1 : $*SomeProtocol
+  dealloc_stack %stk0 : $*SomeStruct
+  %v = tuple ()
+  return %v : $()
+}
