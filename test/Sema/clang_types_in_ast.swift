@@ -4,8 +4,9 @@
 // RUN: %target-swift-frontend %s -typecheck -DNOCRASH2 -sdk %clang-importer-sdk
 // RUN: %target-swift-frontend %s -typecheck -DNOCRASH2 -sdk %clang-importer-sdk -use-clang-function-types
 // RUN: %target-swift-frontend %s -DAUXMODULE -module-name Foo -emit-module -o %t
-// FIXME: rdar://problem/57644243 : We shouldn't crash if -use-clang-function-types is not enabled.
-// RUN: not --crash %target-swift-frontend %s -typecheck -DNOCRASH3 -I %t
+
+// rdar://problem/57644243 : We shouldn't crash if -use-clang-function-types is not enabled.
+// RUN: %target-swift-frontend %s -typecheck -DNOCRASH3 -I %t
 
 // FIXME: [clang-function-type-serialization] This should stop crashing once we
 // start serializing clang function types.
