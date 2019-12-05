@@ -1,4 +1,4 @@
-//===--- AdjointValue.h - Helper class for Differentiation ----*- C++ -*---===//
+//===--- AdjointValue.h - Helper class for differentiation ----*- C++ -*---===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -175,5 +175,3 @@ inline llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
 } // end namespace swift
 
 #endif // SWIFT_SILOPTIMIZER_UTILS_DIFFERENTIATION_ADJOINTVALUE_H
-
-
