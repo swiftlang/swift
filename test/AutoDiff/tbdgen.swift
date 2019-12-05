@@ -121,3 +121,7 @@ func invokeIndirect() {
   print(gradient(of: internalDiffableIndirect)(1, 2))
   print(gradient(of: privateDiffableIndirect)(1, 2))
 }
+
+@inlinable
+@differentiable
+public func inlinableDifferentiable(_ x: Float) -> Float { x }

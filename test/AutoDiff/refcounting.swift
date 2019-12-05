@@ -46,12 +46,12 @@ _ = pullback(at: Vector.zero, in: testOwnedVector)
 // CHECK-DATA-STRUCTURES-LABEL: enum {{.*}}testOwnedVector{{.*}}__Pred__src_0_wrt_0 {
 // CHECK-DATA-STRUCTURES-NEXT: }
 
-// CHECK-LABEL: sil hidden @{{.*}}UsesMethodOfNoDerivativeMember{{.*}}applied2to{{.*}}__pullback_src_0_wrt_0_1
+// CHECK-LABEL: sil private @{{.*}}UsesMethodOfNoDerivativeMember{{.*}}applied2to{{.*}}__pullback_src_0_wrt_0_1
 // CHECK: bb0([[SEED:%.*]] : $Vector, [[PB_STRUCT:%.*]] : ${{.*}}UsesMethodOfNoDerivativeMember{{.*}}applied2to{{.*}}__PB__src_0_wrt_0_1):
 // CHECK:   [[PB:%.*]] = struct_extract [[PB_STRUCT]] : ${{.*}}UsesMethodOfNoDerivativeMember{{.*}}applied2to{{.*}}__PB__src_0_wrt_0_1
 // CHECK:   [[NEEDED_COTAN:%.*]] = apply [[PB]]([[SEED]]) : $@callee_guaranteed (@guaranteed Vector) -> @owned Vector
 
-// CHECK-LABEL: sil hidden @{{.*}}subset_pullback_releases_unused_ones{{.*}}__pullback_src_0_wrt_0
+// CHECK-LABEL: sil private @{{.*}}subset_pullback_releases_unused_ones{{.*}}__pullback_src_0_wrt_0
 // CHECK: bb0([[SEED:%.*]] : $Vector, [[PB_STRUCT:%.*]] : ${{.*}}subset_pullback_releases_unused_ones{{.*}}__PB__src_0_wrt_0):
 // CHECK:   [[PB1:%.*]] = struct_extract [[PB_STRUCT]] : ${{.*}}subset_pullback_releases_unused_ones{{.*}}__PB__src_0_wrt_0, #{{.*}}subset_pullback_releases_unused_ones{{.*}}__PB__src_0_wrt_0.pullback_0
 // CHECK:   [[PB0:%.*]] = struct_extract [[PB_STRUCT]] : ${{.*}}subset_pullback_releases_unused_ones{{.*}}, #{{.*}}subset_pullback_releases_unused_ones{{.*}}__PB__src_0_wrt_0.pullback_1
@@ -65,7 +65,7 @@ _ = pullback(at: Vector.zero, in: testOwnedVector)
 // CHECK:   release_value [[NEEDED_COTAN1]] : $Vector
 // CHECK:   return [[NEEDED_COTAN1]] : $Vector
 
-// CHECK-LABEL: sil hidden @{{.*}}side_effect_release_zero{{.*}}__pullback_src_0_wrt_0
+// CHECK-LABEL: sil private @{{.*}}side_effect_release_zero{{.*}}__pullback_src_0_wrt_0
 // CHECK: bb0([[SEED:%.*]] : $Vector, %1 : ${{.*}}side_effect_release_zero{{.*}}_bb0__PB__src_0_wrt_0):
 // CHECK:   [[BUF:%.*]] = alloc_stack $Vector
 // CHECK:   [[ZERO_GETTER:%.*]] = function_ref @$s11refcounting6VectorV4zeroACvgZ
@@ -83,7 +83,7 @@ _ = pullback(at: Vector.zero, in: testOwnedVector)
 
 // The vjp should not release pullback values.
 //
-// CHECK-LABEL: sil hidden @{{.*}}testOwnedVector{{.*}}__vjp_src_0_wrt_0 : $@convention(thin) (@guaranteed Vector) -> (@owned Vector, @owned @callee_guaranteed (@guaranteed Vector) -> @owned Vector)
+// CHECK-LABEL: sil private @{{.*}}testOwnedVector{{.*}}__vjp_src_0_wrt_0 : $@convention(thin) (@guaranteed Vector) -> (@owned Vector, @owned @callee_guaranteed (@guaranteed Vector) -> @owned Vector)
 // CHECK:   [[ADD:%.*]] = function_ref @Vector_plus
 // CHECK:   [[ADD_JVP:%.*]] = differentiability_witness_function [jvp] [parameters 0 1] [results 0] @Vector_plus
 // CHECK:   [[ADD_VJP:%.*]] = differentiability_witness_function [vjp] [parameters 0 1] [results 0] @Vector_plus
