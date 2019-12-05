@@ -2392,6 +2392,15 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
     resultingCaptures.push_back(*selfCapture);
   }
 
+  // It is an error for a member of a nominal type to have any captures
+  // at all. If we just clear them out here, SILGen will diagnose the
+  // problem.
+  if (fn.hasDecl()) {
+    auto *dc = fn.getDecl()->getDeclContext();
+    if (dc->isTypeContext())
+      resultingCaptures.clear();
+  }
+
   // Cache the uniqued set of transitive captures.
   CaptureInfo info{Context, resultingCaptures, capturesDynamicSelf,
                    capturesOpaqueValue, capturesGenericParams};
