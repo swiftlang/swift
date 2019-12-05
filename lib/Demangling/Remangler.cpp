@@ -1396,30 +1396,61 @@ void Remangler::mangleImplFunctionAttribute(Node *node) {
   unreachable("handled inline");
 }
 
+void Remangler::mangleImplSubstitutions(Node *node) {
+  unreachable("handled inline");
+}
+
+void Remangler::mangleImplImpliedSubstitutions(Node *node) {
+  unreachable("handled inline");
+}
+
 void Remangler::mangleImplFunctionType(Node *node) {
   const char *PseudoGeneric = "";
   Node *GenSig = nullptr;
+  Node *GenSubs = nullptr;
+  bool isImplied;
   for (NodePointer Child : *node) {
-    switch (Child->getKind()) {
-      case Node::Kind::ImplParameter:
-      case Node::Kind::ImplResult:
-      case Node::Kind::ImplErrorResult:
-        mangleChildNode(Child, 1);
-        break;
-      case Node::Kind::DependentPseudogenericSignature:
-        PseudoGeneric = "P";
-        LLVM_FALLTHROUGH;
-      case Node::Kind::DependentGenericSignature:
-        GenSig = Child;
-        break;
-      default:
-        break;
+    switch (auto kind = Child->getKind()) {
+    case Node::Kind::ImplParameter:
+    case Node::Kind::ImplResult:
+    case Node::Kind::ImplErrorResult:
+      mangleChildNode(Child, 1);
+      break;
+    case Node::Kind::DependentPseudogenericSignature:
+      PseudoGeneric = "P";
+      LLVM_FALLTHROUGH;
+    case Node::Kind::DependentGenericSignature:
+      GenSig = Child;
+      break;
+    case Node::Kind::ImplSubstitutions:
+    case Node::Kind::ImplImpliedSubstitutions:
+      GenSubs = Child;
+      isImplied = kind == Node::Kind::ImplImpliedSubstitutions;
+      break;
+    default:
+      break;
     }
   }
   if (GenSig)
     mangle(GenSig);
+  if (GenSubs) {
+    GenSubs->dump();
 
-  Buffer << 'I' << PseudoGeneric;
+    Buffer << 'y';
+    mangleChildNodes(GenSubs->getChild(0));
+    if (GenSubs->getNumChildren() >= 2)
+      mangleRetroactiveConformance(GenSubs->getChild(1));
+  }
+
+  Buffer << 'I';
+
+  if (GenSubs) {
+    Buffer << 's';
+    if (!isImplied)
+      Buffer << 'i';
+  }
+
+  Buffer << PseudoGeneric;
   for (NodePointer Child : *node) {
     switch (Child->getKind()) {
       case Node::Kind::ImplEscaping:
