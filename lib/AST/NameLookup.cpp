@@ -1258,35 +1258,43 @@ maybeFilterOutAttrImplements(TinyPtrVector<ValueDecl *> decls,
   return result;
 }
 
-TinyPtrVector<ValueDecl *> NominalTypeDecl::lookupDirect(
-                                                  DeclName name,
-                                                  OptionSet<LookupDirectFlags> flags) {
-  ASTContext &ctx = getASTContext();
-  if (auto s = ctx.Stats) {
-    ++s->getFrontendCounters().NominalTypeLookupDirectCount;
-  }
+TinyPtrVector<ValueDecl *>
+NominalTypeDecl::lookupDirect(DeclName name,
+                              OptionSet<LookupDirectFlags> flags) {
+  return evaluateOrDefault(getASTContext().evaluator,
+                           DirectLookupRequest({this, name, flags}), {});
+}
+
+llvm::Expected<TinyPtrVector<ValueDecl *>>
+DirectLookupRequest::evaluate(Evaluator &evaluator,
+                              DirectLookupDescriptor desc) const {
+  const auto &name = desc.Name;
+  const auto flags = desc.Options;
+  auto *decl = desc.DC;
 
   // We only use NamedLazyMemberLoading when a user opts-in and we have
   // not yet loaded all the members into the IDC list in the first place.
-  bool useNamedLazyMemberLoading = (ctx.LangOpts.NamedLazyMemberLoading &&
-                                    hasLazyMembers());
+  ASTContext &ctx = decl->getASTContext();
+  bool useNamedLazyMemberLoading =
+      (ctx.LangOpts.NamedLazyMemberLoading && decl->hasLazyMembers());
 
   bool includeAttrImplements =
-      flags.contains(LookupDirectFlags::IncludeAttrImplements);
+      flags.contains(NominalTypeDecl::LookupDirectFlags::IncludeAttrImplements);
 
   // FIXME: At present, lazy member is not able to find inherited constructors
   // in imported classes, because SwiftDeclConverter::importInheritedConstructors()
   // is only called via ClangImporter::Implementation::loadAllMembers().
-  if (hasClangNode() &&
+  if (decl->hasClangNode() &&
       name.getBaseName() == DeclBaseName::createConstructor())
     useNamedLazyMemberLoading = false;
 
-  LLVM_DEBUG(llvm::dbgs() << getNameStr() << ".lookupDirect("
-             << name << ")"
-        << ", isLookupTablePopulated()=" << isLookupTablePopulated()
-        << ", hasLazyMembers()=" << hasLazyMembers()
-        << ", useNamedLazyMemberLoading=" << useNamedLazyMemberLoading
-        << "\n");
+  LLVM_DEBUG(llvm::dbgs() << decl->getNameStr() << ".lookupDirect(" << name
+                          << ")"
+                          << ", isLookupTablePopulated()="
+                          << decl->isLookupTablePopulated()
+                          << ", hasLazyMembers()=" << decl->hasLazyMembers()
+                          << ", useNamedLazyMemberLoading="
+                          << useNamedLazyMemberLoading << "\n");
 
   // We check the LookupTable at most twice, possibly treating a miss in the
   // first try as a cache-miss that we then do a cache-fill on, and retry.
@@ -1308,29 +1316,29 @@ TinyPtrVector<ValueDecl *> NominalTypeDecl::lookupDirect(
       //
       // In either of these cases, we want to reset the table to empty and
       // mark it as needing reconstruction.
-      if (LookupTable.getPointer() &&
-          (hasLazyMembers() || !isLookupTablePopulated())) {
-        LookupTable.getPointer()->clear();
-        setLookupTablePopulated(false);
+      if (decl->LookupTable.getPointer() &&
+          (decl->hasLazyMembers() || !decl->isLookupTablePopulated())) {
+        decl->LookupTable.getPointer()->clear();
+        decl->setLookupTablePopulated(false);
       }
 
-      (void)getMembers();
+      (void)decl->getMembers();
 
       // Make sure we have the complete list of members (in this nominal and in
       // all extensions).
-      for (auto E : getExtensions())
+      for (auto E : decl->getExtensions())
         (void)E->getMembers();
     }
 
     // Next, in all cases, prepare the lookup table for use, possibly
     // repopulating it from the IDC if the IDC member list has just grown.
-    prepareLookupTable();
+    decl->prepareLookupTable();
 
     // Look for a declaration with this name.
-    auto known = LookupTable.getPointer()->find(name);
+    auto known = decl->LookupTable.getPointer()->find(name);
 
     // We found something; return it.
-    if (known != LookupTable.getPointer()->end())
+    if (known != decl->LookupTable.getPointer()->end())
       return maybeFilterOutAttrImplements(known->second, name,
                                           includeAttrImplements);
 
@@ -1343,17 +1351,16 @@ TinyPtrVector<ValueDecl *> NominalTypeDecl::lookupDirect(
     // MemberLookupTable from both this nominal and all of its extensions, and
     // retry. Any failure to load here flips the useNamedLazyMemberLoading to
     // false, and we fall back to loading all members during the retry.
-    auto &Table = *LookupTable.getPointer();
-    if (populateLookupTableEntryFromLazyIDCLoader(ctx, Table,
-                                                  name, this)) {
+    auto &Table = *decl->LookupTable.getPointer();
+    if (populateLookupTableEntryFromLazyIDCLoader(ctx, Table, name, decl)) {
       useNamedLazyMemberLoading = false;
     } else {
-      populateLookupTableEntryFromExtensions(ctx, Table, this, name);
+      populateLookupTableEntryFromExtensions(ctx, Table, decl, name);
     }
   }
 
   // None of our attempts found anything.
-  return { };
+  return TinyPtrVector<ValueDecl *>();
 }
 
 void ClassDecl::createObjCMethodLookup() {

@@ -7764,6 +7764,15 @@ void swift::simple_display(llvm::raw_ostream &out, const Decl *decl) {
   }
 }
 
+void swift::simple_display(llvm::raw_ostream &out,
+                           OptionSet<NominalTypeDecl::LookupDirectFlags> opts) {
+  out << "{ ";
+  using LookupFlags = NominalTypeDecl::LookupDirectFlags;
+  if (opts.contains(LookupFlags::IncludeAttrImplements))
+    out << "IncludeAttrImplements";
+  out << " }";
+}
+
 void swift::simple_display(llvm::raw_ostream &out, const ValueDecl *decl) {
   if (decl) decl->dumpRef(out);
   else out << "(null)";
