@@ -116,31 +116,6 @@ static void collectAllActualResultsInTypeOrder(
   }
 }
 
-/// Given a range of types, joins these into a single type. If there's exactly
-/// one element type, returns that element type. Otherwise, creates a tuple type
-/// of all element types.
-template <typename TypeRange>
-static CanType joinElementTypes(TypeRange &&range, const ASTContext &ctx) {
-  if (range.size() == 1)
-    return range.front();
-  auto typeElts =
-      map<SmallVector<TupleTypeElt, 8>>(range, [&](Type type) { return type; });
-  return TupleType::get(typeElts, ctx);
-}
-
-/// Given a range of SIL values, retrieves the canonical types of these values,
-/// and joins these types into a single type.
-template <typename SILValueRange>
-static CanType joinElementTypesFromValues(SILValueRange &&range,
-                                          const ASTContext &ctx) {
-  if (range.size() == 1)
-    return range.front()->getType().getASTType();
-  SmallVector<TupleTypeElt, 8> elts;
-  transform(range, elts.begin(),
-            [&](SILValue val) { return val->getType().getASTType(); });
-  return TupleType::get(elts, ctx)->getCanonicalType();
-}
-
 /// Returns the "constrained" derivative generic signature given:
 /// - An original SIL function type.
 /// - A wrt parameter index subset.
