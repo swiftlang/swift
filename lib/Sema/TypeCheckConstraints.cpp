@@ -83,14 +83,6 @@ TypeVariableType::Implementation::getGenericParameter() const {
   return locator ? locator->getGenericParameter() : nullptr;
 }
 
-// Only allow allocation of resolved overload set list items using the
-// allocator in ASTContext.
-void *ResolvedOverloadSetListItem::operator new(size_t bytes,
-                                                ConstraintSystem &cs,
-                                                unsigned alignment) {
-  return cs.getAllocator().Allocate(bytes, alignment);
-}
-
 void *operator new(size_t bytes, ConstraintSystem& cs,
                    size_t alignment) {
   return cs.getAllocator().Allocate(bytes, alignment);
@@ -3758,13 +3750,13 @@ void ConstraintSystem::print(raw_ostream &out) const {
     });
   }
 
-  if (resolvedOverloadSets) {
+  if (!ResolvedOverloads.empty()) {
     out << "Resolved overloads:\n";
 
     // Otherwise, report the resolved overloads.
-    for (auto resolved = resolvedOverloadSets;
-         resolved; resolved = resolved->Previous) {
-      auto &choice = resolved->Choice;
+    for (auto elt : ResolvedOverloads) {
+      auto resolved = elt.second;
+      auto &choice = resolved.choice;
       out << "  selected overload set choice ";
       switch (choice.getKind()) {
       case OverloadChoiceKind::Decl:
@@ -3774,8 +3766,8 @@ void ConstraintSystem::print(raw_ostream &out) const {
         if (choice.getBaseType())
           out << choice.getBaseType()->getString(PO) << ".";
         out << choice.getDecl()->getBaseName() << ": "
-            << resolved->BoundType->getString(PO) << " == "
-            << resolved->ImpliedType->getString(PO) << "\n";
+            << resolved.boundType->getString(PO) << " == "
+            << resolved.openedType->getString(PO) << "\n";
         break;
 
       case OverloadChoiceKind::BaseType:

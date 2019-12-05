@@ -803,8 +803,6 @@ getCalleeDeclAndArgs(ConstraintSystem &cs,
   auto calleeLocator = cs.getCalleeLocator(callLocator);
 
   // Find the overload choice corresponding to the callee locator.
-  // FIXME: This linearly walks the list of resolved overloads, which is
-  // potentially very expensive.
   auto selectedOverload = cs.findSelectedOverloadFor(calleeLocator);
 
   // If we didn't find any matching overloads, we're done. Just return the
@@ -815,7 +813,7 @@ getCalleeDeclAndArgs(ConstraintSystem &cs,
                            /*calleeLocator*/ nullptr);
 
   // Return the found declaration, assuming there is one.
-  auto choice = selectedOverload->Choice;
+  auto choice = selectedOverload->choice;
   return std::make_tuple(choice.getDeclOrNull(), hasAppliedSelf(cs, choice),
                          argLabels, hasTrailingClosure, calleeLocator);
 }
@@ -1385,9 +1383,9 @@ assessRequirementFailureImpact(ConstraintSystem &cs, Type requirementType,
       return 1;
 
     unsigned choiceImpact = 0;
-    if (auto *choice = cs.findSelectedOverloadFor(ODRE)) {
+    if (auto choice = cs.findSelectedOverloadFor(ODRE)) {
       auto *typeVar = requirementType->castTo<TypeVariableType>();
-      choice->ImpliedType.visit([&](Type type) {
+      choice->openedType.visit([&](Type type) {
         if (type->isEqual(typeVar))
           ++choiceImpact;
       });
@@ -2450,8 +2448,7 @@ static ConstraintFix *fixRequirementFailure(ConstraintSystem &cs, Type type1,
 
 static ConstraintFix *fixPropertyWrapperFailure(
     ConstraintSystem &cs, Type baseTy, ConstraintLocator *locator,
-    llvm::function_ref<bool(ResolvedOverloadSetListItem *, VarDecl *, Type)>
-        attemptFix,
+    llvm::function_ref<bool(SelectedOverload, VarDecl *, Type)> attemptFix,
     Optional<Type> toType = None) {
 
   Expr *baseExpr = nullptr;
@@ -2486,7 +2483,7 @@ static ConstraintFix *fixPropertyWrapperFailure(
     if (baseTy->isEqual(type))
       return nullptr;
 
-    if (!attemptFix(resolvedOverload, decl, type))
+    if (!attemptFix(*resolvedOverload, decl, type))
       return nullptr;
 
     switch (fix) {
@@ -2503,20 +2500,21 @@ static ConstraintFix *fixPropertyWrapperFailure(
     llvm_unreachable("Unhandled Fix type in switch");
   };
 
-  if (auto storageWrapper = cs.getStorageWrapperInformation(resolvedOverload)) {
+  if (auto storageWrapper =
+          cs.getStorageWrapperInformation(*resolvedOverload)) {
     if (auto *fix = applyFix(Fix::StorageWrapper, storageWrapper->first,
                              storageWrapper->second))
       return fix;
   }
 
-  if (auto wrapper = cs.getPropertyWrapperInformation(resolvedOverload)) {
+  if (auto wrapper = cs.getPropertyWrapperInformation(*resolvedOverload)) {
     if (auto *fix =
             applyFix(Fix::PropertyWrapper, wrapper->first, wrapper->second))
       return fix;
   }
 
   if (auto wrappedProperty =
-          cs.getWrappedPropertyInformation(resolvedOverload)) {
+          cs.getWrappedPropertyInformation(*resolvedOverload)) {
     if (auto *fix = applyFix(Fix::WrappedValue, wrappedProperty->first,
                              wrappedProperty->second))
       return fix;
@@ -2561,8 +2559,8 @@ repairViaBridgingCast(ConstraintSystem &cs, Type fromType, Type toType,
     if (!anchor)
       return false;
 
-    if (auto *overload = cs.findSelectedOverloadFor(anchor)) {
-      auto *decl = overload->Choice.getDeclOrNull();
+    if (auto overload = cs.findSelectedOverloadFor(anchor)) {
+      auto *decl = overload->choice.getDeclOrNull();
       if (decl && decl->isImplicitlyUnwrappedOptional())
         fromType = objectType1;
     }
@@ -2703,11 +2701,11 @@ bool ConstraintSystem::repairFailures(
       if (!anchor)
         return false;
 
-      auto *overload = findSelectedOverloadFor(anchor);
-      if (!(overload && overload->Choice.isDecl()))
+      auto overload = findSelectedOverloadFor(anchor);
+      if (!(overload && overload->choice.isDecl()))
         return false;
 
-      const auto &choice = overload->Choice;
+      const auto &choice = overload->choice;
       ParameterListInfo info(fnType->getParams(), choice.getDecl(),
                              hasAppliedSelf(*this, choice));
 
@@ -3093,8 +3091,7 @@ bool ConstraintSystem::repairFailures(
 
     if (auto *fix = fixPropertyWrapperFailure(
             *this, lhs, loc,
-            [&](ResolvedOverloadSetListItem *overload, VarDecl *decl,
-                Type newBase) {
+            [&](SelectedOverload overload, VarDecl *decl, Type newBase) {
               // FIXME: There is currently no easy way to avoid attempting
               // fixes, matchTypes do not propagate `TMF_ApplyingFix` flag.
               llvm::SaveAndRestore<ConstraintSystemOptions> options(
@@ -5317,8 +5314,8 @@ static bool isSelfRecursiveKeyPathDynamicMemberLookup(
   auto *choiceLoc =
       cs.getConstraintLocator(locator->getAnchor(), path.drop_back());
 
-  if (auto *overload = cs.findSelectedOverloadFor(choiceLoc)) {
-    auto baseTy = overload->Choice.getBaseType();
+  if (auto overload = cs.findSelectedOverloadFor(choiceLoc)) {
+    auto baseTy = overload->choice.getBaseType();
 
     // If it's `Foo<Int>` vs. `Foo<String>` it doesn't really matter
     // for dynamic lookup because it's going to be performed on `Foo`.
@@ -6268,16 +6265,9 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
       if (auto dotExpr =
               dyn_cast_or_null<UnresolvedDotExpr>(locator->getAnchor())) {
         auto baseExpr = dotExpr->getBase();
-        auto resolvedOverload = getResolvedOverloadSets();
-        while (resolvedOverload) {
-          if (resolvedOverload->Locator->getAnchor() == baseExpr) {
-            if (resolvedOverload->Choice
-                    .isImplicitlyUnwrappedValueOrReturnValue())
-              return SolutionKind::Error;
-            break;
-          }
-          resolvedOverload = resolvedOverload->Previous;
-        }
+        if (auto overload = findSelectedOverloadFor(baseExpr))
+          if (overload->choice.isImplicitlyUnwrappedValueOrReturnValue())
+            return SolutionKind::Error;
       }
 
       // Let's check whether the problem is related to optionality of base
@@ -6337,8 +6327,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
     // properties that have matching members.
     if (auto *fix = fixPropertyWrapperFailure(
             *this, baseTy, locator,
-            [&](ResolvedOverloadSetListItem *overload, VarDecl *decl,
-                Type newBase) {
+            [&](SelectedOverload overload, VarDecl *decl, Type newBase) {
               return solveWithNewBaseOrName(newBase, member) ==
                      SolutionKind::Solved;
             })) {
@@ -6915,30 +6904,6 @@ ConstraintSystem::simplifyKeyPathConstraint(
       return SolutionKind::Error;
   }
 
-  // First gather the callee locators for the individual components.
-  SmallVector<std::pair<ConstraintLocator *, OverloadChoice>, 4> choices;
-  for (unsigned i : indices(keyPath->getComponents())) {
-    auto *componentLoc = getConstraintLocator(
-        locator.withPathElement(LocatorPathElt::KeyPathComponent(i)));
-    auto *calleeLoc = getCalleeLocator(componentLoc);
-    choices.push_back({calleeLoc, OverloadChoice()});
-  }
-
-  // Then search for the resolved overloads.
-  for (auto resolvedItem = resolvedOverloadSets; resolvedItem;
-       resolvedItem = resolvedItem->Previous) {
-    auto locator = resolvedItem->Locator;
-    auto kpElt = locator->getFirstElementAs<LocatorPathElt::KeyPathComponent>();
-    if (!kpElt || locator->getAnchor() != keyPath)
-      continue;
-
-    auto &choice = choices[kpElt->getIndex()];
-    if (choice.first == locator) {
-      assert(choice.second.isInvalid() && "Resolved same component twice?");
-      choice.second = resolvedItem->Choice;
-    }
-  }
-
   // See if we resolved overloads for all the components involved.
   enum {
     ReadOnly,
@@ -6960,15 +6925,17 @@ ConstraintSystem::simplifyKeyPathConstraint(
     case KeyPathExpr::Component::Kind::Subscript:
     case KeyPathExpr::Component::Kind::UnresolvedProperty:
     case KeyPathExpr::Component::Kind::UnresolvedSubscript: {
-      auto *calleeLoc = choices[i].first;
-      auto choice = choices[i].second;
+      auto *componentLoc = getConstraintLocator(
+          locator.withPathElement(LocatorPathElt::KeyPathComponent(i)));
+      auto *calleeLoc = getCalleeLocator(componentLoc);
+      auto overload = findSelectedOverloadFor(calleeLoc);
 
       // If no choice was made, leave the constraint unsolved. But when
       // generating constraints, we may already have enough information
       // to determine whether the result will be a function type vs BGT KeyPath
       // type, so continue through components to create new constraint at the
       // end.
-      if (choice.isInvalid() || anyComponentsUnresolved) {
+      if (!overload || anyComponentsUnresolved) {
         if (flags.contains(TMF_GenerateConstraints)) {
           anyComponentsUnresolved = true;
           continue;
@@ -7000,6 +6967,7 @@ ConstraintSystem::simplifyKeyPathConstraint(
       }
 
       // tuple elements do not change the capability of the key path
+      auto choice = overload->choice;
       if (choice.getKind() == OverloadChoiceKind::TupleIndex) {
         continue;
       }

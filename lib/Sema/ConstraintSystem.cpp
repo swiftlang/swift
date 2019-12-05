@@ -2332,13 +2332,9 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
   }
 
   // Note that we have resolved this overload.
-  resolvedOverloadSets
-    = new (*this) ResolvedOverloadSetListItem{resolvedOverloadSets,
-                                              boundType,
-                                              choice,
-                                              locator,
-                                              openedFullType,
-                                              refType};
+  auto overload = SelectedOverload{choice, openedFullType, refType, boundType};
+  auto result = ResolvedOverloads.insert({locator, overload});
+  assert(result.second && "Already resolved this overload?");
 
   // In some cases we already created the appropriate bind constraints.
   if (!bindConstraintCreated) {
@@ -3495,7 +3491,6 @@ ConstraintSystem::isConversionEphemeral(ConversionRestrictionKind conversion,
 
       // Look through a member reference if it's directly accessed.
       if (auto *ude = dyn_cast<UnresolvedDotExpr>(subExpr)) {
-        // FIXME: This is an O(N) search.
         auto overload = findSelectedOverloadFor(ude);
 
         // If we didn't find an overload, it hasn't been resolved yet.
@@ -3504,14 +3499,14 @@ ConstraintSystem::isConversionEphemeral(ConversionRestrictionKind conversion,
 
         // Tuple indices are always non-ephemeral.
         auto *base = ude->getBase();
-        if (overload->Choice.getKind() == OverloadChoiceKind::TupleIndex) {
+        if (overload->choice.getKind() == OverloadChoiceKind::TupleIndex) {
           subExpr = base;
           continue;
         }
 
         // If we don't have a directly accessed declaration associated with the
         // choice, it's ephemeral.
-        auto *member = overload->Choice.getDeclOrNull();
+        auto *member = overload->choice.getDeclOrNull();
         if (!isDirectlyAccessedStoredVar(member))
           return ConversionEphemeralness::Ephemeral;
 
@@ -3554,9 +3549,8 @@ ConstraintSystem::isConversionEphemeral(ConversionRestrictionKind conversion,
       return getBaseEphemeralness(dre->getDecl());
 
     // Otherwise, try to find an overload for the base.
-    // FIXME: This is an O(N) search.
     if (auto baseOverload = findSelectedOverloadFor(subExpr))
-      return getBaseEphemeralness(baseOverload->Choice.getDeclOrNull());
+      return getBaseEphemeralness(baseOverload->choice.getDeclOrNull());
 
     // If we didn't find a base overload for a unresolved member or overloaded
     // decl, it hasn't been resolved yet.
