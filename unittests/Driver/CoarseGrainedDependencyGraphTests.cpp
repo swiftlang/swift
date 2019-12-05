@@ -1,38 +1,39 @@
 #include "swift/Basic/ReferenceDependencyKeys.h"
-#include "swift/Driver/DependencyGraph.h"
+#include "swift/Driver/CoarseGrainedDependencyGraph.h"
 #include "gtest/gtest.h"
 
 using namespace swift;
-using LoadResult = DependencyGraphImpl::LoadResult;
+using LoadResult = CoarseGrainedDependencyGraphImpl::LoadResult;
 using namespace reference_dependency_keys;
 
-static LoadResult loadFromString(DependencyGraph<uintptr_t> &dg, uintptr_t node,
-                                 StringRef key, StringRef data) {
+static LoadResult loadFromString(CoarseGrainedDependencyGraph<uintptr_t> &dg,
+                                 uintptr_t node, StringRef key,
+                                 StringRef data) {
   return dg.loadFromString(node, key.str() + ": [" + data.str() + "]");
 }
 
-static LoadResult loadFromString(DependencyGraph<uintptr_t> &dg, uintptr_t node,
-                                 StringRef key1, StringRef data1,
-                                 StringRef key2, StringRef data2) {
-  return dg.loadFromString(node,
-                           key1.str() + ": [" + data1.str() + "]\n" +
-                           key2.str() + ": [" + data2.str() + "]");
+static LoadResult loadFromString(CoarseGrainedDependencyGraph<uintptr_t> &dg,
+                                 uintptr_t node, StringRef key1,
+                                 StringRef data1, StringRef key2,
+                                 StringRef data2) {
+  return dg.loadFromString(node, key1.str() + ": [" + data1.str() + "]\n" +
+                                     key2.str() + ": [" + data2.str() + "]");
 }
 
-static LoadResult loadFromString(DependencyGraph<uintptr_t> &dg, uintptr_t node,
-                                 StringRef key1, StringRef data1,
-                                 StringRef key2, StringRef data2,
-                                 StringRef key3, StringRef data3,
-                                 StringRef key4, StringRef data4) {
-  return dg.loadFromString(node,
-                           key1.str() + ": [" + data1.str() + "]\n" +
-                           key2.str() + ": [" + data2.str() + "]\n" +
-                           key3.str() + ": [" + data3.str() + "]\n" +
-                           key4.str() + ": [" + data4.str() + "]\n");
+static LoadResult loadFromString(CoarseGrainedDependencyGraph<uintptr_t> &dg,
+                                 uintptr_t node, StringRef key1,
+                                 StringRef data1, StringRef key2,
+                                 StringRef data2, StringRef key3,
+                                 StringRef data3, StringRef key4,
+                                 StringRef data4) {
+  return dg.loadFromString(node, key1.str() + ": [" + data1.str() + "]\n" +
+                                     key2.str() + ": [" + data2.str() + "]\n" +
+                                     key3.str() + ": [" + data3.str() + "]\n" +
+                                     key4.str() + ": [" + data4.str() + "]\n");
 }
 
-TEST(DependencyGraph, BasicLoad) {
-  DependencyGraph<uintptr_t> graph;
+TEST(CoarseGrainedDependencyGraph, BasicLoad) {
+  CoarseGrainedDependencyGraph<uintptr_t> graph;
   uintptr_t i = 0;
 
   EXPECT_EQ(loadFromString(graph, i++, dependsTopLevel, "a, b"),
@@ -62,8 +63,8 @@ TEST(DependencyGraph, BasicLoad) {
             LoadResult::UpToDate);
 }
 
-TEST(DependencyGraph, IndependentNodes) {
-  DependencyGraph<uintptr_t> graph;
+TEST(CoarseGrainedDependencyGraph, IndependentNodes) {
+  CoarseGrainedDependencyGraph<uintptr_t> graph;
 
   EXPECT_EQ(loadFromString(graph, 0,
                            dependsTopLevel, "a",
@@ -106,8 +107,8 @@ TEST(DependencyGraph, IndependentNodes) {
   EXPECT_TRUE(graph.isMarked(2));
 }
 
-TEST(DependencyGraph, IndependentDepKinds) {
-  DependencyGraph<uintptr_t> graph;
+TEST(CoarseGrainedDependencyGraph, IndependentDepKinds) {
+  CoarseGrainedDependencyGraph<uintptr_t> graph;
 
   EXPECT_EQ(loadFromString(graph, 0,
                            dependsNominal, "a",
@@ -126,8 +127,8 @@ TEST(DependencyGraph, IndependentDepKinds) {
   EXPECT_FALSE(graph.isMarked(1));
 }
 
-TEST(DependencyGraph, IndependentDepKinds2) {
-  DependencyGraph<uintptr_t> graph;
+TEST(CoarseGrainedDependencyGraph, IndependentDepKinds2) {
+  CoarseGrainedDependencyGraph<uintptr_t> graph;
 
   EXPECT_EQ(loadFromString(graph, 0,
                            dependsNominal, "a",
@@ -146,8 +147,8 @@ TEST(DependencyGraph, IndependentDepKinds2) {
   EXPECT_TRUE(graph.isMarked(1));
 }
 
-TEST(DependencyGraph, IndependentMembers) {
-  DependencyGraph<uintptr_t> graph;
+TEST(CoarseGrainedDependencyGraph, IndependentMembers) {
+  CoarseGrainedDependencyGraph<uintptr_t> graph;
 
   EXPECT_EQ(loadFromString(graph, 0, providesMember, "[a,aa]"),
             LoadResult::UpToDate);
@@ -171,8 +172,8 @@ TEST(DependencyGraph, IndependentMembers) {
   EXPECT_FALSE(graph.isMarked(4));
 }
 
-TEST(DependencyGraph, SimpleDependent) {
-  DependencyGraph<uintptr_t> graph;
+TEST(CoarseGrainedDependencyGraph, SimpleDependent) {
+  CoarseGrainedDependencyGraph<uintptr_t> graph;
 
   EXPECT_EQ(loadFromString(graph, 0, providesTopLevel, "a, b, c"),
             LoadResult::UpToDate);
@@ -194,8 +195,8 @@ TEST(DependencyGraph, SimpleDependent) {
   EXPECT_TRUE(graph.isMarked(1));
 }
 
-TEST(DependencyGraph, SimpleDependentReverse) {
-  DependencyGraph<uintptr_t> graph;
+TEST(CoarseGrainedDependencyGraph, SimpleDependentReverse) {
+  CoarseGrainedDependencyGraph<uintptr_t> graph;
 
   EXPECT_EQ(loadFromString(graph, 0, dependsTopLevel, "a, b, c"),
             LoadResult::UpToDate);
@@ -217,8 +218,8 @@ TEST(DependencyGraph, SimpleDependentReverse) {
   EXPECT_TRUE(graph.isMarked(1));
 }
 
-TEST(DependencyGraph, SimpleDependent2) {
-  DependencyGraph<uintptr_t> graph;
+TEST(CoarseGrainedDependencyGraph, SimpleDependent2) {
+  CoarseGrainedDependencyGraph<uintptr_t> graph;
 
   EXPECT_EQ(loadFromString(graph, 0, providesNominal, "a, b, c"),
             LoadResult::UpToDate);
@@ -240,8 +241,8 @@ TEST(DependencyGraph, SimpleDependent2) {
   EXPECT_TRUE(graph.isMarked(1));
 }
 
-TEST(DependencyGraph, SimpleDependent3) {
-  DependencyGraph<uintptr_t> graph;
+TEST(CoarseGrainedDependencyGraph, SimpleDependent3) {
+  CoarseGrainedDependencyGraph<uintptr_t> graph;
 
   EXPECT_EQ(loadFromString(graph, 0,
                            providesNominal, "a",
@@ -265,8 +266,8 @@ TEST(DependencyGraph, SimpleDependent3) {
   EXPECT_TRUE(graph.isMarked(1));
 }
 
-TEST(DependencyGraph, SimpleDependent4) {
-  DependencyGraph<uintptr_t> graph;
+TEST(CoarseGrainedDependencyGraph, SimpleDependent4) {
+  CoarseGrainedDependencyGraph<uintptr_t> graph;
 
   EXPECT_EQ(loadFromString(graph, 0, providesNominal, "a"),
             LoadResult::UpToDate);
@@ -290,8 +291,8 @@ TEST(DependencyGraph, SimpleDependent4) {
   EXPECT_TRUE(graph.isMarked(1));
 }
 
-TEST(DependencyGraph, SimpleDependent5) {
-  DependencyGraph<uintptr_t> graph;
+TEST(CoarseGrainedDependencyGraph, SimpleDependent5) {
+  CoarseGrainedDependencyGraph<uintptr_t> graph;
 
   EXPECT_EQ(loadFromString(graph, 0,
                            providesNominal, "a",
@@ -317,8 +318,8 @@ TEST(DependencyGraph, SimpleDependent5) {
   EXPECT_TRUE(graph.isMarked(1));
 }
 
-TEST(DependencyGraph, SimpleDependent6) {
-  DependencyGraph<uintptr_t> graph;
+TEST(CoarseGrainedDependencyGraph, SimpleDependent6) {
+  CoarseGrainedDependencyGraph<uintptr_t> graph;
 
   EXPECT_EQ(loadFromString(graph, 0, providesDynamicLookup, "a, b, c"),
             LoadResult::UpToDate);
@@ -341,8 +342,8 @@ TEST(DependencyGraph, SimpleDependent6) {
 }
 
 
-TEST(DependencyGraph, SimpleDependentMember) {
-  DependencyGraph<uintptr_t> graph;
+TEST(CoarseGrainedDependencyGraph, SimpleDependentMember) {
+  CoarseGrainedDependencyGraph<uintptr_t> graph;
 
   EXPECT_EQ(loadFromString(graph, 0,
                            providesMember, "[a,aa], [b,bb], [c,cc]"),
@@ -372,8 +373,8 @@ static bool contains(const Range &range, const T &value) {
   return std::find(std::begin(range),std::end(range),value) != std::end(range);
 }
 
-TEST(DependencyGraph, MultipleDependentsSame) {
-  DependencyGraph<uintptr_t> graph;
+TEST(CoarseGrainedDependencyGraph, MultipleDependentsSame) {
+  CoarseGrainedDependencyGraph<uintptr_t> graph;
 
   EXPECT_EQ(loadFromString(graph, 0, providesNominal, "a, b, c"),
             LoadResult::UpToDate);
@@ -400,8 +401,8 @@ TEST(DependencyGraph, MultipleDependentsSame) {
   EXPECT_TRUE(graph.isMarked(2));
 }
 
-TEST(DependencyGraph, MultipleDependentsDifferent) {
-  DependencyGraph<uintptr_t> graph;
+TEST(CoarseGrainedDependencyGraph, MultipleDependentsDifferent) {
+  CoarseGrainedDependencyGraph<uintptr_t> graph;
 
   EXPECT_EQ(loadFromString(graph, 0, providesNominal, "a, b, c"),
             LoadResult::UpToDate);
@@ -428,8 +429,8 @@ TEST(DependencyGraph, MultipleDependentsDifferent) {
   EXPECT_TRUE(graph.isMarked(2));
 }
 
-TEST(DependencyGraph, ChainedDependents) {
-  DependencyGraph<uintptr_t> graph;
+TEST(CoarseGrainedDependencyGraph, ChainedDependents) {
+  CoarseGrainedDependencyGraph<uintptr_t> graph;
 
   EXPECT_EQ(loadFromString(graph, 0, providesNominal, "a, b, c"),
             LoadResult::UpToDate);
@@ -458,8 +459,8 @@ TEST(DependencyGraph, ChainedDependents) {
   EXPECT_TRUE(graph.isMarked(2));
 }
 
-TEST(DependencyGraph, MarkTwoNodes) {
-  DependencyGraph<uintptr_t> graph;
+TEST(CoarseGrainedDependencyGraph, MarkTwoNodes) {
+  CoarseGrainedDependencyGraph<uintptr_t> graph;
 
   EXPECT_EQ(loadFromString(graph, 0, providesNominal, "a, b"),
             LoadResult::UpToDate);
@@ -505,8 +506,8 @@ TEST(DependencyGraph, MarkTwoNodes) {
   EXPECT_FALSE(graph.isMarked(12));
 }
 
-TEST(DependencyGraph, MarkOneNodeTwice) {
-  DependencyGraph<uintptr_t> graph;
+TEST(CoarseGrainedDependencyGraph, MarkOneNodeTwice) {
+  CoarseGrainedDependencyGraph<uintptr_t> graph;
 
   EXPECT_EQ(loadFromString(graph, 0, providesNominal, "a"),
             LoadResult::UpToDate);
@@ -537,8 +538,8 @@ TEST(DependencyGraph, MarkOneNodeTwice) {
   EXPECT_TRUE(graph.isMarked(2));
 }
 
-TEST(DependencyGraph, MarkOneNodeTwice2) {
-  DependencyGraph<uintptr_t> graph;
+TEST(CoarseGrainedDependencyGraph, MarkOneNodeTwice2) {
+  CoarseGrainedDependencyGraph<uintptr_t> graph;
 
   EXPECT_EQ(loadFromString(graph, 0, providesNominal, "a"),
             LoadResult::UpToDate);
@@ -569,8 +570,8 @@ TEST(DependencyGraph, MarkOneNodeTwice2) {
   EXPECT_TRUE(graph.isMarked(2));
 }
 
-TEST(DependencyGraph, NotTransitiveOnceMarked) {
-  DependencyGraph<uintptr_t> graph;
+TEST(CoarseGrainedDependencyGraph, NotTransitiveOnceMarked) {
+  CoarseGrainedDependencyGraph<uintptr_t> graph;
 
   EXPECT_EQ(loadFromString(graph, 0, providesNominal, "a"),
             LoadResult::UpToDate);
@@ -609,8 +610,8 @@ TEST(DependencyGraph, NotTransitiveOnceMarked) {
   EXPECT_TRUE(graph.isMarked(2));
 }
 
-TEST(DependencyGraph, DependencyLoops) {
-  DependencyGraph<uintptr_t> graph;
+TEST(CoarseGrainedDependencyGraph, DependencyLoops) {
+  CoarseGrainedDependencyGraph<uintptr_t> graph;
 
   EXPECT_EQ(loadFromString(graph, 0,
                            providesTopLevel, "a, b, c",
@@ -642,8 +643,8 @@ TEST(DependencyGraph, DependencyLoops) {
   EXPECT_TRUE(graph.isMarked(2));
 }
 
-TEST(DependencyGraph, MarkIntransitive) {
-  DependencyGraph<uintptr_t> graph;
+TEST(CoarseGrainedDependencyGraph, MarkIntransitive) {
+  CoarseGrainedDependencyGraph<uintptr_t> graph;
 
   EXPECT_EQ(loadFromString(graph, 0, providesTopLevel, "a, b, c"),
             LoadResult::UpToDate);
@@ -663,8 +664,8 @@ TEST(DependencyGraph, MarkIntransitive) {
   EXPECT_TRUE(graph.isMarked(1));
 }
 
-TEST(DependencyGraph, MarkIntransitiveTwice) {
-  DependencyGraph<uintptr_t> graph;
+TEST(CoarseGrainedDependencyGraph, MarkIntransitiveTwice) {
+  CoarseGrainedDependencyGraph<uintptr_t> graph;
 
   EXPECT_EQ(loadFromString(graph, 0, providesTopLevel, "a, b, c"),
             LoadResult::UpToDate);
@@ -680,8 +681,8 @@ TEST(DependencyGraph, MarkIntransitiveTwice) {
   EXPECT_FALSE(graph.isMarked(1));
 }
 
-TEST(DependencyGraph, MarkIntransitiveThenIndirect) {
-  DependencyGraph<uintptr_t> graph;
+TEST(CoarseGrainedDependencyGraph, MarkIntransitiveThenIndirect) {
+  CoarseGrainedDependencyGraph<uintptr_t> graph;
 
   EXPECT_EQ(loadFromString(graph, 0, providesTopLevel, "a, b, c"),
             LoadResult::UpToDate);
@@ -700,8 +701,8 @@ TEST(DependencyGraph, MarkIntransitiveThenIndirect) {
   EXPECT_TRUE(graph.isMarked(1));
 }
 
-TEST(DependencyGraph, SimpleExternal) {
-  DependencyGraph<uintptr_t> graph;
+TEST(CoarseGrainedDependencyGraph, SimpleExternal) {
+  CoarseGrainedDependencyGraph<uintptr_t> graph;
 
   EXPECT_EQ(loadFromString(graph, 0, dependsExternal, "/foo, /bar"),
             LoadResult::UpToDate);
@@ -720,8 +721,8 @@ TEST(DependencyGraph, SimpleExternal) {
   EXPECT_TRUE(graph.isMarked(0));
 }
 
-TEST(DependencyGraph, SimpleExternal2) {
-  DependencyGraph<uintptr_t> graph;
+TEST(CoarseGrainedDependencyGraph, SimpleExternal2) {
+  CoarseGrainedDependencyGraph<uintptr_t> graph;
 
   EXPECT_EQ(loadFromString(graph, 0, dependsExternal, "/foo, /bar"),
             LoadResult::UpToDate);
@@ -737,8 +738,8 @@ TEST(DependencyGraph, SimpleExternal2) {
   EXPECT_TRUE(graph.isMarked(0));
 }
 
-TEST(DependencyGraph, ChainedExternal) {
-  DependencyGraph<uintptr_t> graph;
+TEST(CoarseGrainedDependencyGraph, ChainedExternal) {
+  CoarseGrainedDependencyGraph<uintptr_t> graph;
 
   EXPECT_EQ(loadFromString(graph, 0,
                            dependsExternal, "/foo",
@@ -765,8 +766,8 @@ TEST(DependencyGraph, ChainedExternal) {
   EXPECT_TRUE(graph.isMarked(1));
 }
 
-TEST(DependencyGraph, ChainedExternalReverse) {
-  DependencyGraph<uintptr_t> graph;
+TEST(CoarseGrainedDependencyGraph, ChainedExternalReverse) {
+  CoarseGrainedDependencyGraph<uintptr_t> graph;
 
   EXPECT_EQ(loadFromString(graph, 0,
                            dependsExternal, "/foo",
@@ -798,8 +799,8 @@ TEST(DependencyGraph, ChainedExternalReverse) {
   EXPECT_TRUE(graph.isMarked(1));
 }
 
-TEST(DependencyGraph, ChainedExternalPreMarked) {
-  DependencyGraph<uintptr_t> graph;
+TEST(CoarseGrainedDependencyGraph, ChainedExternalPreMarked) {
+  CoarseGrainedDependencyGraph<uintptr_t> graph;
 
   EXPECT_EQ(loadFromString(graph, 0,
                            dependsExternal, "/foo",

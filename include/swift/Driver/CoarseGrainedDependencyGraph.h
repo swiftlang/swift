@@ -1,4 +1,4 @@
-//===--- DependencyGraph.h - Track intra-module dependencies ----*- C++ -*-===//
+//===- CoarseGrainedDependencyGraph.h - Track intra-module dependencies -*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_DRIVER_DEPENDENCYGRAPH_H
-#define SWIFT_DRIVER_DEPENDENCYGRAPH_H
+#ifndef SWIFT_DRIVER_COARSEGRAINEDDEPENDENCYGRAPH_H
+#define SWIFT_DRIVER_COARSEGRAINEDDEPENDENCYGRAPH_H
 
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/Basic/LLVM.h"
@@ -36,15 +36,15 @@ namespace swift {
 
 class UnifiedStatsReporter;
 
-/// The non-templated implementation of DependencyGraph.
+/// The non-templated implementation of CoarseGrainedDependencyGraph.
 ///
-/// \see DependencyGraph
-class DependencyGraphImpl {
+/// \see CoarseGrainedDependencyGraph
+class CoarseGrainedDependencyGraphImpl {
 public:
   /// Possible dependency kinds.
   ///
-  /// Clients of DependencyGraph should have no reason to use this type.
-  /// It is only used in the implementation.
+  /// Clients of CoarseGrainedDependencyGraph should have no reason to use this
+  /// type. It is only used in the implementation.
   enum class DependencyKind : uint8_t;
 
   /// Describes the result of loading a dependency file for a particular node.
@@ -62,15 +62,17 @@ public:
     AffectsDownstream
   };
 
-  /// The non-templated implementation of DependencyGraph::MarkTracer.
+  /// The non-templated implementation of
+  /// CoarseGrainedDependencyGraph::MarkTracer.
   ///
-  /// \see DependencyGraph::MarkTracer
+  /// \see CoarseGrainedDependencyGraph::MarkTracer
   class MarkTracerImpl {
     class Entry;
     llvm::DenseMap<const void *, SmallVector<Entry, 4>> Table;
     UnifiedStatsReporter *Stats;
 
-    friend class DependencyGraphImpl;
+    friend class CoarseGrainedDependencyGraphImpl;
+
   protected:
     explicit MarkTracerImpl(UnifiedStatsReporter *Stats);
     ~MarkTracerImpl();
@@ -154,7 +156,7 @@ protected:
     (void)newlyInserted;
   }
 
-  /// See DependencyGraph::markTransitive.
+  /// See CoarseGrainedDependencyGraph::markTransitive.
 
   void markTransitive(SmallVectorImpl<const void *> &visited,
                       const void *node, MarkTracerImpl *tracer = nullptr);
@@ -196,7 +198,7 @@ public:
 /// The graph also supports a "mark" operation, which is intended to track
 /// nodes that have been not just visited but transitively marked through.
 template <typename T>
-class DependencyGraph : public DependencyGraphImpl {
+class CoarseGrainedDependencyGraph : public CoarseGrainedDependencyGraphImpl {
   using Traits = llvm::PointerLikeTypeTraits<T>;
   static_assert(Traits::NumLowBitsAvailable >= 0, "not a pointer-like type");
 
@@ -210,7 +212,8 @@ class DependencyGraph : public DependencyGraphImpl {
   }
 
 public:
-  /// Traces the graph traversal performed in DependencyGraph::markTransitive.
+  /// Traces the graph traversal performed in
+  /// CoarseGrainedDependencyGraph::markTransitive.
   ///
   /// This is intended to be a debugging aid.
   class MarkTracer : public MarkTracerImpl {
@@ -240,8 +243,8 @@ public:
   /// call site can polymorphically call \ref
   /// fine_grained_dependencies::ModuleDepGraph::loadFromPath
   LoadResult loadFromPath(T node, StringRef path, DiagnosticEngine &) {
-    return DependencyGraphImpl::loadFromPath(Traits::getAsVoidPointer(node),
-                                             path);
+    return CoarseGrainedDependencyGraphImpl::loadFromPath(
+        Traits::getAsVoidPointer(node), path);
   }
 
   /// Load "depends" and "provides" data for \p node from a plain string.
@@ -250,16 +253,16 @@ public:
   ///
   /// \sa loadFromPath
   LoadResult loadFromString(T node, StringRef data) {
-    return DependencyGraphImpl::loadFromString(Traits::getAsVoidPointer(node),
-                                               data);
+    return CoarseGrainedDependencyGraphImpl::loadFromString(
+        Traits::getAsVoidPointer(node), data);
   }
 
   /// Adds \p node to the dependency graph without any connections.
   ///
   /// This can be used for new nodes that may be updated later.
   void addIndependentNode(T node) {
-    return
-        DependencyGraphImpl::addIndependentNode(Traits::getAsVoidPointer(node));
+    return CoarseGrainedDependencyGraphImpl::addIndependentNode(
+        Traits::getAsVoidPointer(node));
   }
 
   /// Marks \p node and all nodes that depend on \p node, and places any nodes
@@ -287,9 +290,8 @@ public:
   void markTransitive(SmallVector<T, N> &visited, T node,
                       MarkTracer *tracer = nullptr) {
     SmallVector<const void *, N> rawMarked;
-    DependencyGraphImpl::markTransitive(rawMarked,
-                                        Traits::getAsVoidPointer(node),
-                                        tracer);
+    CoarseGrainedDependencyGraphImpl::markTransitive(
+        rawMarked, Traits::getAsVoidPointer(node), tracer);
     // FIXME: How can we avoid this copy?
     copyBack(visited, rawMarked);
   }
@@ -297,7 +299,8 @@ public:
   template <unsigned N>
   void markExternal(SmallVector<T, N> &visited, StringRef externalDependency) {
     SmallVector<const void *, N> rawMarked;
-    DependencyGraphImpl::markExternal(rawMarked, externalDependency);
+    CoarseGrainedDependencyGraphImpl::markExternal(rawMarked,
+                                                   externalDependency);
     // FIXME: How can we avoid this copy?
     copyBack(visited, rawMarked);
   }
@@ -308,13 +311,14 @@ public:
   ///
   /// \sa #markTransitive
   bool markIntransitive(T node) {
-    return
-        DependencyGraphImpl::markIntransitive(Traits::getAsVoidPointer(node));
+    return CoarseGrainedDependencyGraphImpl::markIntransitive(
+        Traits::getAsVoidPointer(node));
   }
 
   /// Returns true if \p node has been marked (directly or transitively).
   bool isMarked(T node) const {
-    return DependencyGraphImpl::isMarked(Traits::getAsVoidPointer(node));
+    return CoarseGrainedDependencyGraphImpl::isMarked(
+        Traits::getAsVoidPointer(node));
   }
 };
 
