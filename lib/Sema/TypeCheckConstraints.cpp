@@ -2603,26 +2603,25 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
       if (cs) {
         Type valueType = LValueType::get(initType);
         auto dc = wrappedVar->getInnermostDeclContext();
-        auto emptyLocator = cs->getConstraintLocator(nullptr);
+        auto *loc = cs->getConstraintLocator(initializer);
 
         for (unsigned i : indices(wrappedVar->getAttachedPropertyWrappers())) {
           auto wrapperInfo = wrappedVar->getAttachedPropertyWrapperTypeInfo(i);
           if (!wrapperInfo)
             break;
 
-          Type memberType =
-              cs->createTypeVariable(emptyLocator, TVO_CanBindToLValue);
+          loc = cs->getConstraintLocator(loc, ConstraintLocator::Member);
+          Type memberType = cs->createTypeVariable(loc, TVO_CanBindToLValue);
           cs->addValueMemberConstraint(
               valueType, wrapperInfo.valueVar->getFullName(),
-              memberType, dc, FunctionRefKind::Unapplied, { }, emptyLocator);
+              memberType, dc, FunctionRefKind::Unapplied, { }, loc);
           valueType = memberType;
         }
         
         // Set up an equality constraint to drop the lvalue-ness of the value
         // type we produced.
-        Type propertyType = cs->createTypeVariable(emptyLocator, 0);
-        cs->addConstraint(ConstraintKind::Equal, propertyType, valueType,
-                          emptyLocator);
+        Type propertyType = cs->createTypeVariable(loc, 0);
+        cs->addConstraint(ConstraintKind::Equal, propertyType, valueType, loc);
         return propertyType;
       }
 
