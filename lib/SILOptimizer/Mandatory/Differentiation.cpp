@@ -51,6 +51,7 @@
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
+#include "swift/SILOptimizer/Utils/Differentiation/AdjointValue.h"
 #include "swift/SILOptimizer/Utils/Differentiation/ADContext.h"
 #include "swift/SILOptimizer/Utils/Differentiation/Common.h"
 #include "swift/SILOptimizer/Utils/Differentiation/DerivativeLookup.h"
@@ -2006,168 +2007,6 @@ public:
     context.addDifferentiableFunctionInst(newDFI);
   }
 };
-} // end anonymous namespace
-
-//===----------------------------------------------------------------------===//
-// AdjointValue - a symbolic representation for adjoint values that allows
-// for efficient differentiation of aggregates.
-//===----------------------------------------------------------------------===//
-
-namespace {
-class PullbackEmitter;
-class AdjointValue;
-
-enum AdjointValueKind {
-  /// An empty adjoint, i.e. zero. This case exists due to its special
-  /// mathematical properties: `0 + x = x`. This is a guaranteed optimization
-  /// when we combine a zero adjoint with another (e.g. differentiating a
-  /// fanout).
-  Zero,
-
-  /// An aggregate of adjoint values.
-  Aggregate,
-
-  /// A concrete SIL value.
-  Concrete,
-};
-
-class AdjointValueBase {
-  friend class AdjointValue;
-
-  /// The kind of this adjoint value.
-  AdjointValueKind kind;
-
-  /// The type of this value as if it were materialized as a SIL value.
-  SILType type;
-
-  /// The underlying value.
-  union Value {
-    ArrayRef<AdjointValue> aggregate;
-    SILValue concrete;
-    Value(ArrayRef<AdjointValue> v) : aggregate(v) {}
-    Value(SILValue v) : concrete(v) {}
-    Value() {}
-  } value;
-
-  explicit AdjointValueBase(SILType type,
-                            ArrayRef<AdjointValue> aggregate)
-      : kind(AdjointValueKind::Aggregate), type(type), value(aggregate) {}
-
-  explicit AdjointValueBase(SILValue v)
-      : kind(AdjointValueKind::Concrete), type(v->getType()), value(v) {}
-
-  explicit AdjointValueBase(SILType type)
-      : kind(AdjointValueKind::Zero), type(type) {}
-};
-
-/// A symbolic adjoint value that is capable of representing zero value 0 and
-/// 1, in addition to a materialized SILValue. This is expected to be passed
-/// around by value in most cases, as it's two words long.
-class AdjointValue final {
-  friend class PullbackEmitter;
-
-private:
-  /// The kind of this adjoint value.
-  AdjointValueBase *base;
-  /*implicit*/ AdjointValue(AdjointValueBase *base = nullptr) : base(base) {}
-
-public:
-  AdjointValueBase *operator->() const { return base; }
-  AdjointValueBase &operator*() const { return *base; }
-
-  static AdjointValue createConcrete(llvm::BumpPtrAllocator &allocator,
-                                     SILValue value) {
-    return new (allocator.Allocate<AdjointValueBase>()) AdjointValueBase(value);
-  }
-
-  template<typename EltRange>
-  static AdjointValue createAggregate(llvm::BumpPtrAllocator &allocator,
-                                      SILType type, EltRange elements) {
-    AdjointValue *buf = reinterpret_cast<AdjointValue *>(allocator.Allocate(
-        elements.size() * sizeof(AdjointValue), alignof(AdjointValue)));
-    MutableArrayRef<AdjointValue> elementsCopy(buf, elements.size());
-    std::uninitialized_copy(elements.begin(), elements.end(),
-                            elementsCopy.begin());
-    return new (allocator.Allocate<AdjointValueBase>())
-        AdjointValueBase(type, elementsCopy);
-  }
-
-  static AdjointValue createZero(llvm::BumpPtrAllocator &allocator,
-                                 SILType type) {
-    return new (allocator.Allocate<AdjointValueBase>()) AdjointValueBase(type);
-  }
-
-  AdjointValueKind getKind() const { return base->kind; }
-  SILType getType() const { return base->type; }
-  CanType getSwiftType() const { return getType().getASTType(); }
-
-  NominalTypeDecl *getAnyNominal() const {
-    return getSwiftType()->getAnyNominal();
-  }
-
-  bool isZero() const { return getKind() == AdjointValueKind::Zero; }
-  bool isAggregate() const { return getKind() == AdjointValueKind::Aggregate; }
-  bool isConcrete() const { return getKind() == AdjointValueKind::Concrete; }
-
-  unsigned getNumAggregateElements() const {
-    assert(isAggregate());
-    return base->value.aggregate.size();
-  }
-
-  AdjointValue getAggregateElement(unsigned i) const {
-    assert(isAggregate());
-    return base->value.aggregate[i];
-  }
-
-  ArrayRef<AdjointValue> getAggregateElements() const {
-    return base->value.aggregate;
-  }
-
-  SILValue getConcreteValue() const {
-    assert(isConcrete());
-    return base->value.concrete;
-  }
-
-  void print(llvm::raw_ostream &s) const {
-    switch (getKind()) {
-    case AdjointValueKind::Zero:
-      s << "Zero";
-      break;
-    case AdjointValueKind::Aggregate:
-      s << "Aggregate<";
-      if (auto *decl =
-            getType().getASTType()->getStructOrBoundGenericStruct()) {
-        s << "Struct>(";
-        interleave(llvm::zip(decl->getStoredProperties(),
-                             base->value.aggregate),
-                             [&s](std::tuple<VarDecl *,
-                                             const AdjointValue &> elt) {
-                               s << std::get<0>(elt)->getName() << ": ";
-                               std::get<1>(elt).print(s);
-                             }, [&s] { s << ", "; });
-      } else if (auto tupleType = getType().getAs<TupleType>()) {
-        s << "Tuple>(";
-        interleave(base->value.aggregate,
-                   [&s](const AdjointValue &elt) { elt.print(s); },
-                   [&s] { s << ", "; });
-      } else {
-        llvm_unreachable("Invalid aggregate");
-      }
-      s << ')';
-      break;
-    case AdjointValueKind::Concrete:
-      s << "Concrete(" << base->value.concrete << ')';
-      break;
-    }
-  }
-};
-
-inline llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
-                                     const AdjointValue &adjVal) {
-  adjVal.print(os);
-  return os;
-}
-
 } // end anonymous namespace
 
 namespace {
@@ -5512,7 +5351,13 @@ PullbackEmitter::makeConcreteAdjointValue(SILValue value) {
 template<typename EltRange>
 AdjointValue PullbackEmitter::makeAggregateAdjointValue(
     SILType type, EltRange elements) {
-  return AdjointValue::createAggregate(allocator, remapType(type), elements);
+  AdjointValue *buf = reinterpret_cast<AdjointValue *>(allocator.Allocate(
+      elements.size() * sizeof(AdjointValue), alignof(AdjointValue)));
+  MutableArrayRef<AdjointValue> elementsCopy(buf, elements.size());
+  std::uninitialized_copy(elements.begin(), elements.end(),
+                          elementsCopy.begin());
+  return AdjointValue::createAggregate(allocator, remapType(type),
+                                       elementsCopy);
 }
 
 SILValue PullbackEmitter::materializeAdjointDirect(
