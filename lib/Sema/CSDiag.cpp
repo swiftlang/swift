@@ -250,10 +250,6 @@ private:
 
   bool diagnoseTrailingClosureErrors(ApplyExpr *expr);
 
-  bool
-  diagnoseClosureExpr(ClosureExpr *closureExpr, Type contextualType,
-                      llvm::function_ref<bool(Type, Type)> resultTypeProcessor);
-
   bool diagnoseSubscriptErrors(SubscriptExpr *SE, bool performingSet);
 
   bool visitExpr(Expr *E);
@@ -272,8 +268,6 @@ private:
   bool visitCoerceExpr(CoerceExpr *CE);
   bool visitIfExpr(IfExpr *IE);
   bool visitRebindSelfInConstructorExpr(RebindSelfInConstructorExpr *E);
-  bool visitCaptureListExpr(CaptureListExpr *CLE);
-  bool visitClosureExpr(ClosureExpr *CE);
 };
 } // end anonymous namespace
 
@@ -1720,7 +1714,6 @@ bool FailureDiagnosis::diagnoseTrailingClosureErrors(ApplyExpr *callExpr) {
   if (!callExpr->hasTrailingClosure())
     return false;
 
-  auto *DC = CS.DC;
   auto *fnExpr = callExpr->getFn();
   auto *argExpr = callExpr->getArg();
 
@@ -1819,63 +1812,6 @@ bool FailureDiagnosis::diagnoseTrailingClosureErrors(ApplyExpr *callExpr) {
           return true;
       }
     }
-
-    auto processor = [&](Type resultType, Type expectedResultType) -> bool {
-      if (resultType && expectedResultType) {
-        if (!resultType->isEqual(expectedResultType)) {
-          auto &DE = CS.getASTContext().Diags;
-          DE.diagnose(closureExpr->getEndLoc(),
-                      diag::cannot_convert_closure_result, resultType,
-                      expectedResultType);
-          return true;
-        }
-
-        // Looks like both actual and expected result types match,
-        // there is nothing we can diagnose in this case.
-        return false;
-      }
-
-      // If we got a result type, let's re-typecheck the function using it,
-      // maybe we can find a problem where contextually we expect one type
-      // but trailing closure produces completely different one.
-      auto fnType = paramType->getAs<AnyFunctionType>();
-      if (!fnType)
-        return false;
-
-      class ClosureCalleeListener : public ExprTypeCheckListener {
-        FunctionType *InputType;
-        Type ResultType;
-
-      public:
-        explicit ClosureCalleeListener(FunctionType *inputType, Type resultType)
-            : InputType(inputType), ResultType(resultType) {}
-
-        bool builtConstraints(ConstraintSystem &cs, Expr *expr) override {
-          if (!ResultType)
-            return false;
-
-          AnyFunctionType::Param Input(InputType);
-          auto expectedType = FunctionType::get({Input}, ResultType);
-          cs.addConstraint(ConstraintKind::Conversion, cs.getType(expr),
-                           expectedType, cs.getConstraintLocator(expr),
-                           /*isFavored*/ true);
-          return false;
-        }
-      };
-
-      auto expectedArgType = FunctionType::get(fnType->getParams(), resultType,
-                                               fnType->getExtInfo());
-
-      llvm::SaveAndRestore<DeclContext *> SavedDC(CS.DC, DC);
-      ClosureCalleeListener listener(expectedArgType, CS.getContextualType());
-      return !typeCheckChildIndependently(callExpr->getFn(), Type(),
-                                          CTP_CalleeResult, TCC_ForceRecheck,
-                                          &listener);
-    };
-
-    // Let's see if there are any structural problems with closure itself.
-    if (diagnoseClosureExpr(closureExpr, paramType, processor))
-      return true;
   }
 
   return false;
@@ -2513,191 +2449,6 @@ bool FailureDiagnosis::
 visitRebindSelfInConstructorExpr(RebindSelfInConstructorExpr *E) {
   // Don't walk the children for this node, it leads to multiple diagnostics
   // because of how sema injects this node into the type checker.
-  return false;
-}
-
-bool FailureDiagnosis::visitCaptureListExpr(CaptureListExpr *CLE) {
-  // Always walk into the closure of a capture list expression.
-  return visitClosureExpr(CLE->getClosureBody());
-}
-
-static bool isInvalidClosureResultType(Type resultType) {
-  return !resultType || resultType->hasUnresolvedType() ||
-          resultType->hasTypeVariable() || resultType->hasArchetype();
-}
-
-bool FailureDiagnosis::visitClosureExpr(ClosureExpr *CE) {
-  return diagnoseClosureExpr(
-      CE, CS.getContextualType(),
-      [&](Type resultType, Type expectedResultType) -> bool {
-        if (isInvalidClosureResultType(expectedResultType))
-          return false;
-
-        // Following situations are possible:
-        // * No result type - possible structurable problem in the body;
-        // * Function result type - possible use of function without calling it,
-        //   which is properly diagnosed by actual type-check call.
-        if (resultType && !resultType->getRValueType()->is<AnyFunctionType>()) {
-          if (!resultType->isEqual(expectedResultType)) {
-            diagnose(CE->getEndLoc(), diag::cannot_convert_closure_result,
-                     resultType, expectedResultType);
-            return true;
-          }
-        }
-        return false;
-      });
-}
-
-bool FailureDiagnosis::diagnoseClosureExpr(
-    ClosureExpr *CE, Type contextualType,
-    llvm::function_ref<bool(Type, Type)> resultTypeProcessor) {
-  // Look through IUO because it doesn't influence
-  // neither parameter nor return type diagnostics itself,
-  // but if we have function type inside, that might
-  // signficantly improve diagnostic quality.
-  // FIXME: We need to rework this with IUOs out of the type system.
-  // if (contextualType) {
-  //   if (auto IUO =
-  //           CS.lookThroughImplicitlyUnwrappedOptionalType(contextualType))
-  //     contextualType = IUO;
-  // }
-
-  Type expectedResultType;
-
-  // If we have a contextual type available for this closure, apply it to the
-  // ParamDecls in our parameter list.  This ensures that any uses of them get
-  // appropriate types.
-  if (contextualType && contextualType->is<FunctionType>()) {
-    auto fnType = contextualType->getAs<FunctionType>();
-    auto *params = CE->getParameters();
-    auto inferredArgs = fnType->getParams();
-    
-    // It is very common for a contextual type to disagree with the argument
-    // list built into the closure expr.  This can be because the closure expr
-    // had an explicitly specified pattern, a la:
-    //    { a,b in ... }
-    // or could be because the closure has an implicitly generated one:
-    //    { $0 + $1 }
-    // in either case, we want to produce nice and clear diagnostics.
-    unsigned actualArgCount = params->size();
-    unsigned inferredArgCount = inferredArgs.size();
-
-    if (actualArgCount != inferredArgCount) {
-      if (inferredArgCount == 1 && actualArgCount > 1) {
-        auto *argTupleTy = inferredArgs.front().getOldType()->getAs<TupleType>();
-        // Let's see if inferred argument is actually a tuple inside of Paren.
-        if (argTupleTy) {
-          // Looks like the number of closure parameters matches number
-          // of inferred arguments, which means we can we can emit an
-          // error about an attempt to make use of tuple splat or tuple
-          // destructuring and provide a proper fix-it.
-          if (argTupleTy->getNumElements() == actualArgCount) {
-            ClosureParamDestructuringFailure failure(
-                CS, fnType, CS.getConstraintLocator(CE));
-            return failure.diagnoseAsError();
-          }
-        }
-      }
-
-      // Extraneous arguments.
-      if (inferredArgCount < actualArgCount) {
-        auto diag = diagnose(
-            params->getStartLoc(), diag::closure_argument_list_tuple, fnType,
-            inferredArgCount, actualArgCount, (actualArgCount == 1));
-
-        bool onlyAnonymousParams =
-            std::all_of(params->begin(), params->end(),
-                        [](ParamDecl *param) { return !param->hasName(); });
-
-        // If closure expects no parameters but N was given,
-        // and all of them are anonymous let's suggest removing them.
-        if (inferredArgCount == 0 && onlyAnonymousParams) {
-          auto inLoc = CE->getInLoc();
-          auto &sourceMgr = CS.getASTContext().SourceMgr;
-
-          if (inLoc.isValid())
-            diag.fixItRemoveChars(params->getStartLoc(),
-                                  Lexer::getLocForEndOfToken(sourceMgr, inLoc));
-        }
-        return true;
-      }
-
-      // Missing arguments are already diagnosed via new diagnostic framework.
-      return false;
-    }
-
-    // Coerce parameter types here only if there are no unresolved
-    TypeChecker::coerceParameterListToType(params, CE, fnType);
-    expectedResultType = fnType->getResult();
-  }
-
-  // Defend against type variables from our constraint system leaking into
-  // recursive constraints systems formed when checking the body of the
-  // closure.  These typevars come into them when the body does name
-  // lookups against the parameter decls.
-  //
-  // Handle this by rewriting the arguments to UnresolvedType().
-  for (auto VD : *CE->getParameters()) {
-    if (VD->hasInterfaceType() && (VD->getType()->hasTypeVariable() ||
-                                   VD->getType()->hasError())) {
-      VD->setInterfaceType(CS.getASTContext().TheUnresolvedType);
-    }
-  }
-
-  // If this is a complex leaf closure, there is nothing more we can do.
-  if (!CE->hasSingleExpressionBody())
-    return false;
-
-  if (isInvalidClosureResultType(expectedResultType))
-    expectedResultType = Type();
-
-  // When we're type checking a single-expression closure, we need to reset the
-  // DeclContext to this closure for the recursive type checking.  Otherwise,
-  // if there is a closure in the subexpression, we can violate invariants.
-  {
-    llvm::SaveAndRestore<DeclContext *> SavedDC(CS.DC, CE);
-
-    // Explicitly disallow to produce solutions with unresolved type variables,
-    // because there is no auxiliary logic which would handle that and it's
-    // better to allow failure diagnosis to run directly on the closure body.
-    // Note that presence of contextual type implicitly forbids such solutions,
-    // but it's not always reset.
-
-    if (expectedResultType && !CE->hasExplicitResultType()) {
-      auto closure = CE->getSingleExpressionBody();
-      ConcreteDeclRef decl = nullptr;
-      // Let's try to compute result type without mutating AST and
-      // using expected (contextual) result type, that's going to help
-      // diagnose situations where contextual type expected one result
-      // type but actual closure produces a different one without explicitly
-      // declaring it (e.g. by using anonymous parameters).
-      auto type = TypeChecker::getTypeOfExpressionWithoutApplying(
-          closure, CS.DC, decl, FreeTypeVariableBinding::Disallow);
-
-      if (type && resultTypeProcessor(type, expectedResultType))
-        return true;
-    }
-
-    // If the closure had an expected result type, use it.
-    if (CE->hasExplicitResultType())
-      expectedResultType = CE->getExplicitResultTypeLoc().getType();
-
-    // If we couldn't diagnose anything related to the contextual result type
-    // let's run proper type-check with expected type and try to verify it.
-
-    auto CTP = expectedResultType ? CTP_ClosureResult : CTP_Unused;
-    auto *bodyExpr = typeCheckChildIndependently(CE->getSingleExpressionBody(),
-                                                 expectedResultType, CTP,
-                                                 TCCOptions(), nullptr, false);
-
-    if (!bodyExpr)
-      return true;
-
-    if (resultTypeProcessor(CS.getType(bodyExpr), expectedResultType))
-      return true;
-  }
-
-  // Otherwise, we can't produce a specific diagnostic.
   return false;
 }
 

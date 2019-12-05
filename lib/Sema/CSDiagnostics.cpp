@@ -3767,12 +3767,11 @@ bool ImplicitInitOnNonConstMetatypeFailure::diagnoseAsError() {
 bool MissingArgumentsFailure::diagnoseAsError() {
   auto &cs = getConstraintSystem();
   auto *locator = getLocator();
-  auto path = locator->getPath();
 
-  if (path.empty() ||
-      !(path.back().getKind() == ConstraintLocator::ApplyArgToParam ||
-        path.back().getKind() == ConstraintLocator::ContextualType ||
-        path.back().getKind() == ConstraintLocator::ApplyArgument))
+  if (!(locator->isLastElement<LocatorPathElt::ApplyArgToParam>() ||
+        locator->isLastElement<LocatorPathElt::ContextualType>() ||
+        locator->isLastElement<LocatorPathElt::ApplyArgument>() ||
+        locator->isLastElement<LocatorPathElt::ClosureResult>()))
     return false;
 
   // If this is a misplaced `missng argument` situation, it would be
@@ -4015,6 +4014,13 @@ bool MissingArgumentsFailure::diagnoseClosure(ClosureExpr *closure) {
     funcType = cs.getContextualType()->getAs<FunctionType>();
   } else if (auto info = getFunctionArgApplyInfo(locator)) {
     funcType = info->getParamType()->getAs<FunctionType>();
+  } else if (locator->isLastElement<LocatorPathElt::ClosureResult>()) {
+    // Based on the locator we know this this is something like this:
+    // `let _: () -> ((Int) -> Void) = { return {} }`.
+    funcType = getType(getRawAnchor())
+                   ->castTo<FunctionType>()
+                   ->getResult()
+                   ->castTo<FunctionType>();
   }
 
   if (!funcType)

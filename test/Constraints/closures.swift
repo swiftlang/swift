@@ -484,7 +484,7 @@ let _ = { $0 = $0 = 42 } // expected-error {{assigning a variable to itself}}
 let mismatchInClosureResultType : (String) -> ((Int) -> Void) = {
   (String) -> ((Int) -> Void) in
     return { }
-    // expected-error@-1 {{contextual type for closure argument list expects 1 argument, which cannot be implicitly ignored}}
+    // expected-error@-1 {{contextual type for closure argument list expects 1 argument, which cannot be implicitly ignored}} {{13-13= _ in}}
 }
 
 // SR-3520: Generic function taking closure with inout parameter can result in a variety of compiler errors or EXC_BAD_ACCESS

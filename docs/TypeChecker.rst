@@ -988,8 +988,6 @@ The things in the queue yet to be ported are:
   Most of the associated diagnostics have been ported and fixes are
   located in ``ConstraintSystem::simplifyMemberConstraint``.
 
-- Closure expression diagnostics: ``diagnoseClosureExpr``.
-
 - Diagnostics related to ``if`` statement - "conditional" type mismatch
   and, in case of ternary operator, type mismatches between branches.
 
