@@ -1012,6 +1012,12 @@ private:
       DifferentiationInvoker invoker);
 
 public:
+  /// Construct an `DifferentiationTransformer` for the given module.
+  explicit DifferentiationTransformer(SILModuleTransform &transform)
+       : transform(transform), context(transform) {}
+
+  ADContext &getContext() { return context; }
+
   /// Canonicalize the given witness, filling in derivative functions if
   /// missing.
   ///
@@ -7309,7 +7315,7 @@ bool DifferentiationTransformer::canonicalizeDifferentiabilityWitness(
       return true;
 
     witness->setJVP(
-        createEmptyJVP(*this, original, witness, serializeFunctions));
+        createEmptyJVP(context, original, witness, serializeFunctions));
     context.recordGeneratedFunction(witness->getJVP());
 
     // For now, only do JVP generation if the flag is enabled and if custom VJP
@@ -7380,7 +7386,7 @@ bool DifferentiationTransformer::canonicalizeDifferentiabilityWitness(
       return true;
 
     witness->setVJP(
-        createEmptyVJP(*this, original, witness, serializeFunctions));
+        createEmptyVJP(context, original, witness, serializeFunctions));
     context.recordGeneratedFunction(witness->getVJP());
     VJPEmitter emitter(context, original, witness, witness->getVJP(), invoker);
     return emitter.run();
@@ -8136,8 +8142,8 @@ void Differentiation::run() {
     auto *original = witness->getOriginalFunction();
     auto invoker = invokerPair.second;
 
-    if (transformer.canonicalizeDifferentiabilityWitness(original, witness, invoker,
-                                                     original->isSerialized()))
+    if (transformer.canonicalizeDifferentiabilityWitness(
+            original, witness, invoker, original->isSerialized()))
       errorOccurred = true;
   }
 
