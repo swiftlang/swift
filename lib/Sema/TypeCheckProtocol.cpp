@@ -2578,6 +2578,14 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
   }
 }
 
+/// Whether this protocol is the Objective-C "NSObject" protocol.
+static bool isNSObjectProtocol(ProtocolDecl *proto) {
+  if (proto->getNameStr() != "NSObjectProtocol")
+    return false;
+
+  return proto->hasClangNode();
+}
+
 bool swift::
 printRequirementStub(ValueDecl *Requirement, DeclContext *Adopter,
                      Type AdopterTy, SourceLoc TypeLoc, raw_ostream &OS) {
@@ -2707,6 +2715,7 @@ diagnoseMissingWitnesses(MissingWitnessDiagnosisKind Kind) {
   // If this conformance has nothing to complain, return.
   if (LocalMissing.empty())
     return;
+
   SourceLoc ComplainLoc = Loc;
   bool EditorMode = getASTContext().LangOpts.DiagnosticsEditorMode;
   llvm::SetVector<ValueDecl*> MissingWitnesses(GlobalMissingWitnesses.begin(),
@@ -2748,6 +2757,11 @@ diagnoseMissingWitnesses(MissingWitnessDiagnosisKind Kind) {
     auto &SM = DC->getASTContext().SourceMgr;
     auto FixitBufferId = SM.findBufferContainingLoc(FixitLocation);
     for (auto VD : MissingWitnesses) {
+      // Don't ever emit a diagnostic for a requirement in the NSObject
+      // protocol. They'renot implementable.
+      if (isNSObjectProtocol(VD->getDeclContext()->getSelfProtocolDecl()))
+        continue;
+
       // Whether this VD has a stub printed.
       bool AddFixit = !NoStubRequirements.count(VD);
       bool SameFile = VD->getLoc().isValid() ?
@@ -2773,6 +2787,7 @@ diagnoseMissingWitnesses(MissingWitnessDiagnosisKind Kind) {
         }
         continue;
       }
+
       // Issue diagnostics for witness values.
       Type RequirementType =
         getRequirementTypeForDisplay(DC->getParentModule(), Conf, VD);
@@ -4046,6 +4061,45 @@ static void diagnoseConformanceFailure(Type T,
         SourceLoc loc = enumDecl->getInherited()[0].getSourceRange().Start;
         diags.diagnose(loc, diag::enum_raw_type_not_equatable, rawType);
         return;
+      }
+
+      return;
+    }
+  }
+
+  // One cannot meaningfully declare conformance to the NSObject protocol
+  // in Swift. Suggest inheritance from NSObject instead.
+  if (isNSObjectProtocol(Proto)) {
+    if (T->getClassOrBoundGenericClass()) {
+      auto diag =
+          diags.diagnose(ComplainLoc, diag::type_cannot_conform_to_nsobject,
+                         T);
+
+      // Try to suggest inheriting from NSObject instead.
+      auto classDecl = dyn_cast<ClassDecl>(DC);
+      if (!classDecl)
+        return;
+
+      auto inheritedClause = classDecl->getInherited();
+      for (unsigned i : indices(inheritedClause)) {
+        auto &inherited = inheritedClause[i];
+
+        // Find the inherited type.
+        InheritedTypeRequest request{classDecl, i, TypeResolutionStage::Interface};
+        Type inheritedTy = evaluateOrDefault(ctx.evaluator, request, Type());
+
+        // If it's a class, we cannot suggest a different class to inherit
+        // from.
+        if (inheritedTy->getClassOrBoundGenericClass())
+          return;
+
+        // Is it the NSObject protocol?
+        if (auto protoTy = inheritedTy->getAs<ProtocolType>()) {
+          if (isNSObjectProtocol(protoTy->getDecl())) {
+            diag.fixItReplace(inherited.getSourceRange(), "NSObject");
+            return;
+          }
+        }
       }
 
       return;

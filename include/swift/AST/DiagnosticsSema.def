@@ -1734,6 +1734,10 @@ ERROR(type_does_not_conform,none,
 ERROR(cannot_use_nil_with_this_type,none,
       "'nil' cannot be used in context expecting type %0", (Type))
 
+ERROR(type_cannot_conform_to_nsobject,none,
+      "cannot declare conformance to 'NSObjectProtocol' in Swift; %0 should "
+      "inherit 'NSObject' instead", (Type))
+
 ERROR(use_of_equal_instead_of_equality,none,
       "use of '=' in a boolean context, did you mean '=='?", ())
 
