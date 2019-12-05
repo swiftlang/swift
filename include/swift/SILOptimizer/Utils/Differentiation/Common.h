@@ -38,6 +38,7 @@ using llvm::SmallMapVector;
 using llvm::SmallSet;
 
 class ApplyInst;
+class DifferentiableActivityInfo;
 
 //===----------------------------------------------------------------------===//
 // Helpers
@@ -101,6 +102,16 @@ Inst *peerThroughFunctionConversions(SILValue value) {
     return peerThroughFunctionConversions<Inst>(partialApply->getCallee());
   return nullptr;
 }
+
+/// For an `apply` instruction with active results, compute:
+/// - The results of the `apply` instruction, in type order.
+/// - The set of minimal parameter and result indices for differentiating the
+///   `apply` instruction.
+void collectMinimalIndicesForFunctionCall(
+    ApplyInst *ai, SILAutoDiffIndices parentIndices,
+    const DifferentiableActivityInfo &activityInfo,
+    SmallVectorImpl<SILValue> &results, SmallVectorImpl<unsigned> &paramIndices,
+    SmallVectorImpl<unsigned> &resultIndices);
 
 } // end namespace autodiff
 
