@@ -30,7 +30,7 @@ namespace swift {
 namespace autodiff {
 
 //===----------------------------------------------------------------------===//
-// Local Helpers
+// Local helpers
 //===----------------------------------------------------------------------===//
 
 /// Given an operator name, such as '+', and a protocol, returns the '+'
@@ -53,7 +53,7 @@ static FuncDecl *findOperatorDeclInProtocol(DeclName operatorName,
 }
 
 //===----------------------------------------------------------------------===//
-// ADContext methods.
+// ADContext methods
 //===----------------------------------------------------------------------===//
 
 ADContext::ADContext(SILModuleTransform &transform)

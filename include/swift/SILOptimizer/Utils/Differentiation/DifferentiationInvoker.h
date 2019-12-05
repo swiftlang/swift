@@ -15,6 +15,7 @@
 // Class that represents the invoker of a differentiation task.
 //
 //===----------------------------------------------------------------------===//
+
 #ifndef SWIFT_SILOPTIMIZER_UTILS_DIFFERENTIATION_DIFFERENTIATIONINVOKER_H
 #define SWIFT_SILOPTIMIZER_UTILS_DIFFERENTIATION_DIFFERENTIATIONINVOKER_H
 

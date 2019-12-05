@@ -14,6 +14,7 @@
 //
 // Per-module contextual information for the Differentiation pass.
 //===----------------------------------------------------------------------===//
+
 #ifndef SWIFT_SILOPTIMIZER_UTILS_DIFFERENTIATION_ADCONTEXT_H
 #define SWIFT_SILOPTIMIZER_UTILS_DIFFERENTIATION_ADCONTEXT_H
 
