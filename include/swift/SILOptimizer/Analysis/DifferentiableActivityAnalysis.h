@@ -206,6 +206,16 @@ public:
   /// Returns the activity of the given value for the given `SILAutoDiffIndices`
   /// (parameter indices and result index).
   Activity getActivity(SILValue value, const SILAutoDiffIndices &indices) const;
+
+  /// Prints activity information for the `indices` of the given `value`.
+  void dumpActivityInfo(SILValue value,
+                        const SILAutoDiffIndices &indices,
+                        llvm::raw_ostream &s = llvm::dbgs()) const;
+
+  /// Prints activity information for the `indices` of the given `fn`.
+  void dumpActivityInfo(SILFunction &fn, SILAutoDiffIndices indices,
+                             llvm::raw_ostream &s = llvm::dbgs()) const;
+
 };
 
 class DifferentiableActivityCollection {

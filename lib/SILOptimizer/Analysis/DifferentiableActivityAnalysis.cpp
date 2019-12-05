@@ -421,3 +421,32 @@ Activity DifferentiableActivityInfo::getActivity(
     activity |= ActivityFlags::Useful;
   return activity;
 }
+
+void DifferentiableActivityInfo::dumpActivityInfo(
+    SILValue value, const SILAutoDiffIndices &indices,
+    llvm::raw_ostream &s) const {
+  s << '[';
+  auto activity = getActivity(value, indices);
+  switch (activity.toRaw()) {
+  case 0: s << "NONE"; break;
+  case (unsigned)ActivityFlags::Varied: s << "VARIED"; break;
+  case (unsigned)ActivityFlags::Useful: s << "USEFUL"; break;
+  case (unsigned)ActivityFlags::Active: s << "ACTIVE"; break;
+  }
+  s << "] " << value;
+}
+
+void DifferentiableActivityInfo::dumpActivityInfo(SILFunction &fn,
+                                                  SILAutoDiffIndices indices,
+                                                  llvm::raw_ostream &s) const {
+  s << "Activity info for " << fn.getName() << " at " << indices << '\n';
+  for (auto &bb : fn) {
+    s << "bb" << bb.getDebugID() << ":\n";
+    for (auto *arg : bb.getArguments())
+      dumpActivityInfo(arg, indices, s);
+    for (auto &inst : bb)
+      for (auto res : inst.getResults())
+        dumpActivityInfo(res, indices, s);
+    s << '\n';
+  }
+}
