@@ -3008,8 +3008,12 @@ FunctionType *FunctionType::get(ArrayRef<AnyFunctionType::Param> params,
   void *mem = ctx.Allocate(allocSize, alignof(FunctionType), arena);
 
   bool isCanonical = isFunctionTypeCanonical(params, result);
-  if (uncommon.hasValue())
-    isCanonical &= uncommon->ClangFunctionType->isCanonicalUnqualified();
+  if (uncommon.hasValue()) {
+    if (ctx.LangOpts.UseClangFunctionTypes)
+      isCanonical &= uncommon->ClangFunctionType->isCanonicalUnqualified();
+    else
+      isCanonical = false;
+  }
 
   auto funcTy = new (mem) FunctionType(params, result, info,
                                        isCanonical ? &ctx : nullptr,

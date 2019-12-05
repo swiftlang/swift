@@ -5,6 +5,9 @@
 // RUN: %target-swift-frontend %s -typecheck -DNOCRASH2 -sdk %clang-importer-sdk -use-clang-function-types
 // RUN: %target-swift-frontend %s -DAUXMODULE -module-name Foo -emit-module -o %t
 
+// rdar://problem/57644243 : We shouldn't crash if -use-clang-function-types is not enabled.
+// RUN: %target-swift-frontend %s -typecheck -DNOCRASH3 -I %t
+
 // FIXME: [clang-function-type-serialization] This should stop crashing once we
 // start serializing clang function types.
 // RUN: not --crash %target-swift-frontend %s -typecheck -DCRASH -I %t -use-clang-function-types
@@ -25,12 +28,38 @@ func f() {
 #endif
 
 #if AUXMODULE
-public var DUMMY_SIGNAL : Optional<@convention(c) (Int32) -> Void> = .none
+public var DUMMY_SIGNAL1 : Optional<@convention(c) (Int32) -> ()> = .none
+public var DUMMY_SIGNAL2 : Optional<@convention(c) (Int32) -> Void> = .none
+#endif
+
+#if NOCRASH3
+import Foo
+public func my_signal1() -> Optional<@convention(c) (Int32) -> ()> {
+  return Foo.DUMMY_SIGNAL1
+}
+public func my_signal2() -> Optional<@convention(c) (Int32) -> Void> {
+  return Foo.DUMMY_SIGNAL1
+}
+public func my_signal3() -> Optional<@convention(c) (Int32) -> ()> {
+  return Foo.DUMMY_SIGNAL2
+}
+public func my_signal4() -> Optional<@convention(c) (Int32) -> Void> {
+  return Foo.DUMMY_SIGNAL2
+}
 #endif
 
 #if CRASH
 import Foo
-public func my_signal() -> Optional<@convention(c) (Int32) -> Void> {
-  return Foo.DUMMY_SIGNAL
+public func my_signal1() -> Optional<@convention(c) (Int32) -> ()> {
+  return Foo.DUMMY_SIGNAL1
+}
+public func my_signal2() -> Optional<@convention(c) (Int32) -> Void> {
+  return Foo.DUMMY_SIGNAL1
+}
+public func my_signal3() -> Optional<@convention(c) (Int32) -> ()> {
+  return Foo.DUMMY_SIGNAL2
+}
+public func my_signal4() -> Optional<@convention(c) (Int32) -> Void> {
+  return Foo.DUMMY_SIGNAL2
 }
 #endif
