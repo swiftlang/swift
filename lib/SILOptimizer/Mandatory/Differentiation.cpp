@@ -1882,17 +1882,17 @@ emitDerivativeFunctionReference(
               originalFn->getLoweredFunctionType(), desiredParameterIndices,
               contextualDerivativeGenSig);
       minimalWitness = SILDifferentiabilityWitness::createDefinition(
-          context.getModule(), SILLinkage::Private,
-          originalFn, desiredParameterIndices, desiredResultIndices,
+          context.getModule(), SILLinkage::Private, originalFn,
+          desiredParameterIndices, desiredResultIndices,
           derivativeConstrainedGenSig, /*jvp*/ nullptr,
           /*vjp*/ nullptr, /*isSerialized*/ false);
       if (context.canonicalizeDifferentiabilityWitness(
-              originalFn, minimalWitness, invoker,
-              IsNotSerialized))
+              originalFn, minimalWitness, invoker, IsNotSerialized))
         return None;
     }
     assert(minimalWitness);
-    if (original->getFunction()->isSerialized() && !hasPublicVisibility(minimalWitness->getLinkage())) {
+    if (original->getFunction()->isSerialized() &&
+        !hasPublicVisibility(minimalWitness->getLinkage())) {
       enum { Inlinable = 0, DefaultArgument = 1 };
       unsigned fragileKind = Inlinable;
       // FIXME: This is not a very robust way of determining if the function is
@@ -1900,8 +1900,11 @@ emitDerivativeFunctionReference(
       // of fragility.
       if (original->getFunction()->getLinkage() == SILLinkage::PublicNonABI)
         fragileKind = DefaultArgument;
-      context.emitNondifferentiabilityError(original, invoker, diag::autodiff_private_derivative_from_fragile, fragileKind,
-                                            llvm::isa_and_nonnull<AbstractClosureExpr>(originalFRI->getLoc().getAsASTNode<Expr>()));
+      context.emitNondifferentiabilityError(
+          original, invoker, diag::autodiff_private_derivative_from_fragile,
+          fragileKind,
+          llvm::isa_and_nonnull<AbstractClosureExpr>(
+              originalFRI->getLoc().getAsASTNode<Expr>()));
       return None;
     }
     // TODO(TF-482): Move generic requirement checking logic to
@@ -2704,7 +2707,8 @@ public:
         original->getASTContext());
 
     SILOptFunctionBuilder fb(context.getTransform());
-    auto linkage = vjp->isSerialized() ? SILLinkage::Public : SILLinkage::Private;
+    auto linkage =
+        vjp->isSerialized() ? SILLinkage::Public : SILLinkage::Private;
     auto *pullback = fb.createFunction(
         linkage, pbName, pbType, pbGenericEnv, original->getLocation(),
         original->isBare(), IsNotTransparent, vjp->isSerialized(),
@@ -4475,8 +4479,8 @@ public:
                                      witness->getSILAutoDiffIndices(), jvp)),
         differentialInfo(context, AutoDiffLinearMapKind::Differential, original,
                          jvp, witness->getSILAutoDiffIndices(), activityInfo),
-        differentialBuilder(SILBuilder(*createEmptyDifferential(
-            context, witness, &differentialInfo))),
+        differentialBuilder(SILBuilder(
+            *createEmptyDifferential(context, witness, &differentialInfo))),
         diffLocalAllocBuilder(getDifferential()) {
     // Create empty differential function.
     context.getGeneratedFunctions().push_back(&getDifferential());
@@ -4549,7 +4553,8 @@ public:
         original->getASTContext());
 
     SILOptFunctionBuilder fb(context.getTransform());
-    auto linkage = jvp->isSerialized() ? SILLinkage::Public : SILLinkage::Hidden;
+    auto linkage =
+        jvp->isSerialized() ? SILLinkage::Public : SILLinkage::Hidden;
     auto *differential = fb.createFunction(
         linkage, diffName, diffType, diffGenericEnv, original->getLocation(),
         original->isBare(), IsNotTransparent, jvp->isSerialized(),
@@ -7172,10 +7177,10 @@ static SILFunction *createEmptyVJP(ADContext &context, SILFunction *original,
       vjpGenericSig);
 
   SILOptFunctionBuilder fb(context.getTransform());
-  auto *vjp = fb.createFunction(witness->getLinkage(), vjpName, vjpType, vjpGenericEnv,
-                                original->getLocation(), original->isBare(),
-                                IsNotTransparent, isSerialized,
-                                original->isDynamicallyReplaceable());
+  auto *vjp = fb.createFunction(
+      witness->getLinkage(), vjpName, vjpType, vjpGenericEnv,
+      original->getLocation(), original->isBare(), IsNotTransparent,
+      isSerialized, original->isDynamicallyReplaceable());
   vjp->setDebugScope(new (module) SILDebugScope(original->getLocation(), vjp));
 
   LLVM_DEBUG(llvm::dbgs() << "VJP type: " << vjp->getLoweredFunctionType()
@@ -7219,10 +7224,10 @@ static SILFunction *createEmptyJVP(ADContext &context, SILFunction *original,
       LookUpConformanceInModule(module.getSwiftModule()), jvpGenericSig);
 
   SILOptFunctionBuilder fb(context.getTransform());
-  auto *jvp = fb.createFunction(witness->getLinkage(), jvpName, jvpType, jvpGenericEnv,
-                                original->getLocation(), original->isBare(),
-                                IsNotTransparent, isSerialized,
-                                original->isDynamicallyReplaceable());
+  auto *jvp = fb.createFunction(
+      witness->getLinkage(), jvpName, jvpType, jvpGenericEnv,
+      original->getLocation(), original->isBare(), IsNotTransparent,
+      isSerialized, original->isDynamicallyReplaceable());
   jvp->setDebugScope(new (module) SILDebugScope(original->getLocation(), jvp));
 
   LLVM_DEBUG(llvm::dbgs() << "JVP type: " << jvp->getLoweredFunctionType()
@@ -8084,8 +8089,8 @@ void Differentiation::run() {
     auto *original = witness->getOriginalFunction();
     auto invoker = invokerPair.second;
 
-    if (context.canonicalizeDifferentiabilityWitness(
-            original, witness, invoker, original->isSerialized()))
+    if (context.canonicalizeDifferentiabilityWitness(original, witness, invoker,
+                                                     original->isSerialized()))
       errorOccurred = true;
   }
 

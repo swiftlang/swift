@@ -3535,7 +3535,8 @@ SILDeserializer::readDifferentiabilityWitness(DeclID DId) {
   }
 
   auto linkageOpt = fromStableSILLinkage(rawLinkage);
-  assert(linkageOpt && "Expected value linkage for sil_differentiability_witness");
+  assert(linkageOpt &&
+         "Expected value linkage for sil_differentiability_witness");
   auto originalName = MF->getIdentifierText(originalNameId);
   auto jvpName = MF->getIdentifierText(jvpNameId);
   auto vjpName = MF->getIdentifierText(vjpNameId);
