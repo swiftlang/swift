@@ -1257,34 +1257,42 @@ maybeFilterOutAttrImplements(TinyPtrVector<ValueDecl *> decls,
 TinyPtrVector<ValueDecl *>
 NominalTypeDecl::lookupDirect(DeclName name,
                               OptionSet<LookupDirectFlags> flags) {
-  ASTContext &ctx = getASTContext();
-  if (auto s = ctx.Stats) {
-    ++s->getFrontendCounters().NominalTypeLookupDirectCount;
-  }
+  return evaluateOrDefault(getASTContext().evaluator,
+                           DirectLookupRequest({this, name, flags}), {});
+}
+
+llvm::Expected<TinyPtrVector<ValueDecl *>>
+DirectLookupRequest::evaluate(Evaluator &evaluator,
+                              DirectLookupDescriptor desc) const {
+  const auto &name = desc.Name;
+  const auto flags = desc.Options;
+  auto *decl = desc.DC;
 
   // We only use NamedLazyMemberLoading when a user opts-in and we have
   // not yet loaded all the members into the IDC list in the first place.
+  ASTContext &ctx = decl->getASTContext();
   const bool useNamedLazyMemberLoading = (ctx.LangOpts.NamedLazyMemberLoading &&
-                                          hasLazyMembers());
+                                          decl->hasLazyMembers());
 
   const bool includeAttrImplements =
-      flags.contains(LookupDirectFlags::IncludeAttrImplements);
+      flags.contains(NominalTypeDecl::LookupDirectFlags::IncludeAttrImplements);
 
-  LLVM_DEBUG(llvm::dbgs() << getNameStr() << ".lookupDirect("
+  LLVM_DEBUG(llvm::dbgs() << decl->getNameStr() << ".lookupDirect("
                           << name << ")"
-                          << ", hasLazyMembers()=" << hasLazyMembers()
-                          << ", useNamedLazyMemberLoading=" << useNamedLazyMemberLoading
+                          << ", hasLazyMembers()=" << decl->hasLazyMembers()
+                          << ", useNamedLazyMemberLoading="
+                          << useNamedLazyMemberLoading
                           << "\n");
 
 
-  prepareLookupTable();
+  decl->prepareLookupTable();
 
   auto tryCacheLookup =
-      [=](MemberLookupTable *table,
+      [=](MemberLookupTable &table,
           DeclName name) -> Optional<TinyPtrVector<ValueDecl *>> {
     // Look for a declaration with this name.
-    auto known = table->find(name);
-    if (known == table->end()) {
+    auto known = table.find(name);
+    if (known == table.end()) {
       return None;
     }
 
@@ -1293,36 +1301,36 @@ NominalTypeDecl::lookupDirect(DeclName name,
                                         includeAttrImplements);
   };
 
-  auto updateLookupTable = [this](MemberLookupTable *table) {
+  auto updateLookupTable = [&decl](MemberLookupTable &table) {
     // Make sure we have the complete list of members (in this nominal and in
     // all extensions).
-    (void)getMembers();
+    (void)decl->getMembers();
 
-    for (auto E : getExtensions())
+    for (auto E : decl->getExtensions())
       (void)E->getMembers();
 
-    LookupTable->updateLookupTable(this);
+    table.updateLookupTable(decl);
   };
 
+  auto &Table = *decl->LookupTable;
   if (!useNamedLazyMemberLoading) {
-    updateLookupTable(LookupTable);
-  } else if (!LookupTable->isLazilyComplete(name.getBaseName())) {
+    updateLookupTable(Table);
+  } else if (!Table.isLazilyComplete(name.getBaseName())) {
     // The lookup table believes it doesn't have a complete accounting of this
     // name - either because we're never seen it before, or another extension
     // was registered since the last time we searched. Ask the loaders to give
     // us a hand.
-    auto &Table = *LookupTable;
     DeclBaseName baseName(name.getBaseName());
-    if (populateLookupTableEntryFromLazyIDCLoader(ctx, Table, baseName, this)) {
-      updateLookupTable(LookupTable);
+    if (populateLookupTableEntryFromLazyIDCLoader(ctx, Table, baseName, decl)) {
+      updateLookupTable(Table);
     } else {
-      populateLookupTableEntryFromExtensions(ctx, Table, this, baseName);
+      populateLookupTableEntryFromExtensions(ctx, Table, decl, baseName);
     }
     Table.markLazilyComplete(baseName);
   }
 
   // Look for a declaration with this name.
-  return tryCacheLookup(LookupTable, name)
+  return tryCacheLookup(Table, name)
             .getValueOr(TinyPtrVector<ValueDecl *>());
 }
 

@@ -3326,6 +3326,7 @@ class NominalTypeDecl : public GenericTypeDecl, public IterableDeclContext {
   friend class ExtensionDecl;
   friend class DeclContext;
   friend class IterableDeclContext;
+  friend class DirectLookupRequest;
   friend ArrayRef<ValueDecl *>
   ValueDecl::getSatisfiedProtocolRequirements(bool Sorted) const;
 
@@ -7412,6 +7413,9 @@ ParameterList *getParameterList(ValueDecl *source);
 /// Retrieve parameter declaration from the given source at given index, or
 /// nullptr if the source does not have a parameter list.
 const ParamDecl *getParameterAt(const ValueDecl *source, unsigned index);
+
+void simple_display(llvm::raw_ostream &out,
+                    OptionSet<NominalTypeDecl::LookupDirectFlags> options);
 
 /// Display Decl subclasses.
 void simple_display(llvm::raw_ostream &out, const Decl *decl);
