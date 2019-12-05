@@ -267,7 +267,7 @@ func rdar29960565(_ o: AnyObject) {
 
 @objc class DynamicIUO : NSObject, Q {
   @objc var t: String! = ""
-  @objc func bar() -> String! {}
+  @objc func baz() -> String! {}
   @objc subscript(_: DynamicIUO) -> DynamicIUO! {
     get {
       return self
@@ -299,11 +299,11 @@ let _: String = o.t
 let _: String = o.t!
 let _: String = o.t!!
 let _: String? = o.t
-let _: String = o.bar()
-let _: String = o.bar!()
-let _: String = o.bar()!
-let _: String = o.bar!()!
-let _: String? = o.bar()
+let _: String = o.baz()
+let _: String = o.baz!()
+let _: String = o.baz()!
+let _: String = o.baz!()!
+let _: String? = o.baz()
 let _: DynamicIUO = o[dyn_iuo]
 let _: DynamicIUO = o[dyn_iuo]!
 let _: DynamicIUO = o[dyn_iuo]!!

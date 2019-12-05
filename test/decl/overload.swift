@@ -5,8 +5,10 @@ var_redecl1 = 0
 var var_redecl1: UInt // expected-error {{invalid redeclaration of 'var_redecl1'}}
 
 var var_redecl2: Int // expected-note {{previously declared here}}
-var_redecl2 = 0
+// expected-note@-1 {{found this candidate}}
+var_redecl2 = 0 // expected-error {{ambiguous use of 'var_redecl2'}}
 var var_redecl2: Int // expected-error {{invalid redeclaration of 'var_redecl2'}}
+// expected-note@-1 {{found this candidate}}
 
 var var_redecl3: (Int) -> () { get {} } // expected-note {{previously declared here}}
 var var_redecl3: () -> () { get {} } // expected-error {{invalid redeclaration of 'var_redecl3'}}

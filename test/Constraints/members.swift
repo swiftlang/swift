@@ -567,15 +567,15 @@ func rdar_48114578() {
 }
 
 struct S_Min {
-  var min: Int = 42
+  var xmin: Int = 42
 }
 
-func min(_: Int, _: Float) -> Int { return 0 }
-func min(_: Float, _: Int) -> Int { return 0 }
+func xmin(_: Int, _: Float) -> Int { return 0 }
+func xmin(_: Float, _: Int) -> Int { return 0 }
 
 extension S_Min : CustomStringConvertible {
   public var description: String {
-    return "\(min)" // Ok
+    return "\(xmin)" // Ok
   }
 }
 
