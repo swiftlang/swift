@@ -101,6 +101,7 @@ class InstructionVisitor : public SILCloner<InstructionVisitor> {
 
 private:
   CrossModuleSerializationSetup &CMS;
+  SILInstruction *result = nullptr;
 
 public:
   InstructionVisitor(SILFunction *F, CrossModuleSerializationSetup &CMS) :
@@ -122,8 +123,8 @@ public:
   }
 
   void postProcess(SILInstruction *Orig, SILInstruction *Cloned) {
-    SILInstruction::destroy(Cloned);
-    Orig->getFunction()->getModule().deallocateInst(Cloned);
+    result = Cloned;
+    SILCloner<InstructionVisitor>::postProcess(Orig, Cloned);
   }
 
   SILValue getMappedValue(SILValue Value) { return Value; }
@@ -133,6 +134,9 @@ public:
   static void visitInst(SILInstruction *I, CrossModuleSerializationSetup &CMS) {
     InstructionVisitor visitor(I->getFunction(), CMS);
     visitor.visit(I);
+
+    SILInstruction::destroy(visitor.result);
+    CMS.M.deallocateInst(visitor.result);
   }
 };
 
