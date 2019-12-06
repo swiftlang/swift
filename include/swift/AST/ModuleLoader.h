@@ -170,7 +170,7 @@ public:
   /// generations.
   virtual void loadDerivativeFunctionConfigurations(
       AbstractFunctionDecl *originalAFD, unsigned previousGeneration,
-      llvm::SetVector<AutoDiffConfig> &results){};
+      llvm::SetVector<AutoDiffConfig> &results) {};
   // SWIFT_ENABLE_TENSORFLOW END
 
   /// Verify all modules loaded by this loader.

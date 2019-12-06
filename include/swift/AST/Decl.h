@@ -5702,6 +5702,11 @@ private:
   void prepareDerivativeFunctionConfigurations();
 
   /// A uniqued list of derivative function configurations.
+  /// - `@differentiable` and `@derivative` attribute type-checking is
+  ///   responsible for populating derivative function configurations specified
+  ///   in the current module.
+  /// - Module loading is responsible for populating derivative function
+  ///   configurations from imported modules.
   struct DerivativeFunctionConfigurationList;
   DerivativeFunctionConfigurationList *DerivativeFunctionConfigs = nullptr;
 
