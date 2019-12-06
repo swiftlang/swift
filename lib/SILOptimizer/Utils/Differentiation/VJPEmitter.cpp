@@ -1,4 +1,4 @@
-//===--- VJPEmitter.cpp - VJP Generation in Differentiation ---*- C++ -*---===//
+//===--- VJPEmitter.cpp - VJP generation in differentiation ---*- C++ -*---===//
 //
 // This source file is part of the Swift.org open source project
 //
