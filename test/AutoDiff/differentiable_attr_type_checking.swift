@@ -29,7 +29,7 @@ func no_jvp_or_vjp(_ x: Float) -> Float {
   return x * x
 }
 
-// Test duplicated `@differentiable` attributes.
+// Test duplicate `@differentiable` attributes.
 
 @differentiable // expected-error {{duplicate '@differentiable' attribute with same parameters}}
 @differentiable // expected-note {{other attribute declared here}}
@@ -57,6 +57,33 @@ struct ComputedPropertyDupeAttributes<T : Differentiable> : Differentiable {
   var computed2: T {
     get { value }
     set { value = newValue }
+  }
+}
+
+protocol Protocol: Differentiable {}
+extension Protocol {
+  // expected-note @+1 {{other attribute declared here}}
+  @differentiable
+  func method() -> Float { return 1 }
+
+  // expected-note @+1 {{other attribute declared here}}
+  @differentiable
+  func method2() -> Float { return 1 }
+}
+extension Protocol {
+  // Test duplicate `@derivative` with same generic signature.
+  // expected-error @+1 {{a derivative already exists for 'method()'}}
+  @derivative(of: method)
+  internal func vjpMethod() -> (value: Float, pullback: (Float) -> (TangentVector)) {
+    fatalError()
+  }
+}
+extension Protocol where Self: AdditiveArithmetic {
+  // Test duplicate `@derivative` with different generic signature.
+  // expected-error @+1 {{a derivative already exists for 'method2()'}}
+  @derivative(of: method2)
+  internal func vjpMethod2() -> (value: Float, pullback: (Float) -> (TangentVector)) {
+    fatalError()
   }
 }
 

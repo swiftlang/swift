@@ -306,6 +306,7 @@ struct AutoDiffConfig {
 class AutoDiffDerivativeFunctionIdentifier : public llvm::FoldingSetNode {
   const AutoDiffDerivativeFunctionKind kind;
   IndexSubset *const parameterIndices;
+  // TODO(TF-680): Mangle derivative generic signature requirements as well.
 
   AutoDiffDerivativeFunctionIdentifier(
       AutoDiffDerivativeFunctionKind kind, IndexSubset *parameterIndices) :
@@ -505,6 +506,27 @@ template<> struct DenseMapInfo<AutoDiffConfig> {
         LHS.resultIndices == RHS.resultIndices &&
         DenseMapInfo<GenericSignature>::isEqual(LHS.derivativeGenericSignature,
                                                 RHS.derivativeGenericSignature);
+  }
+};
+
+template<> struct DenseMapInfo<AutoDiffDerivativeFunctionKind> {
+  static AutoDiffDerivativeFunctionKind getEmptyKey() {
+    return static_cast<AutoDiffDerivativeFunctionKind::innerty>(
+        DenseMapInfo<unsigned>::getEmptyKey());
+  }
+
+  static AutoDiffDerivativeFunctionKind getTombstoneKey() {
+    return static_cast<AutoDiffDerivativeFunctionKind::innerty>(
+        DenseMapInfo<unsigned>::getTombstoneKey());
+  }
+
+  static unsigned getHashValue(const AutoDiffDerivativeFunctionKind &Val) {
+    return DenseMapInfo<unsigned>::getHashValue(Val);
+  }
+
+  static bool isEqual(const AutoDiffDerivativeFunctionKind &LHS,
+                      const AutoDiffDerivativeFunctionKind &RHS) {
+    return LHS == RHS;
   }
 };
 

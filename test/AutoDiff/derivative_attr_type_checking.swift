@@ -10,6 +10,7 @@ func sin(_ x: Float) -> Float {
 func jvpSin(x: @nondiff Float) -> (value: Float, differential: (Float) -> (Float)) {
   return (x, { $0 })
 }
+// expected-note @+1 {{other attribute declared here}}
 @derivative(of: sin, wrt: x) // ok
 func vjpSinExplicitWrt(x: Float) -> (value: Float, pullback: (Float) -> Float) {
   return (x, { $0 })

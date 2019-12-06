@@ -76,26 +76,32 @@ private:
 
   // SWIFT_ENABLE_TENSORFLOW
   /// Adds the symbol for the linear map function of the given kind associated
-  /// with the given original function and `@differentiable` attr.
+  /// with the given original function and parameter indices.
   void addAutoDiffLinearMapFunction(AbstractFunctionDecl *original,
-                                    const DifferentiableAttr *attr,
+                                    IndexSubset *parameterIndices,
                                     AutoDiffLinearMapKind kind);
 
   /// Adds the symbol for the autodiff function of the given kind associated
-  /// with the given original function and `@differentiable` attr.
+  /// with the given original function and parameter indices.
   void addAutoDiffDerivativeFunction(AbstractFunctionDecl *original,
-                                     const DifferentiableAttr *attr,
+                                     IndexSubset *parameterIndices,
                                      AutoDiffDerivativeFunctionKind kind);
 
   /// Adds the symbol for the differentiability witness associated with the
-  /// given original function and `@differentiable` attr.
+  /// given original function and parameter indices.
   void addDifferentiabilityWitness(AbstractFunctionDecl *original,
-                                   const DifferentiableAttr *attr);
+                                   IndexSubset *parameterIndices,
+                                   GenericSignature derivativeGenericSignature);
 
   /// Adds symbols associated with the given original function and
-  /// `@differentiable` attr.
+  /// `@differentiable` attribute.
   void addDifferentiableAttr(AbstractFunctionDecl *original,
                              const DifferentiableAttr *attr);
+
+  /// Adds symbols associated with the given original function and
+  /// `@derivative` attribute.
+  void addDerivativeAttr(AbstractFunctionDecl *original,
+                         const DerivativeAttr *attr);
 
 public:
   TBDGenVisitor(llvm::MachO::InterfaceFile &symbols,

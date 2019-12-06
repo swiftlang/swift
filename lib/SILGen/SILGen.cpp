@@ -778,6 +778,26 @@ void SILGenModule::postEmitFunction(SILDeclRef constant,
                               diffAttr->getDerivativeGenericSignature());
         emitDifferentiabilityWitness(AFD, F, config, jvp, vjp, diffAttr);
       }
+      for (auto *derivAttr : Attrs.getAttributes<DerivativeAttr>()) {
+        SILFunction *jvp = nullptr;
+        SILFunction *vjp = nullptr;
+        switch (derivAttr->getDerivativeKind()) {
+        case AutoDiffDerivativeFunctionKind::JVP:
+          jvp = F;
+          break;
+        case AutoDiffDerivativeFunctionKind::VJP:
+          vjp = F;
+          break;
+        }
+        auto *origAFD = derivAttr->getOriginalFunction();
+        auto *origFn = getFunction(SILDeclRef(origAFD), NotForDefinition);
+        auto derivativeGenSig = AFD->getGenericSignature();
+        auto *resultIndices = IndexSubset::get(getASTContext(), 1, {0});
+        AutoDiffConfig config(derivAttr->getParameterIndices(), resultIndices,
+                              derivativeGenSig);
+        emitDifferentiabilityWitness(origAFD, origFn, config, jvp, vjp,
+                                     derivAttr);
+      }
     };
     if (auto *accessor = dyn_cast<AccessorDecl>(AFD))
       if (accessor->isGetter())
@@ -790,21 +810,22 @@ void SILGenModule::postEmitFunction(SILDeclRef constant,
 void SILGenModule::emitDifferentiabilityWitness(
     AbstractFunctionDecl *originalAFD, SILFunction *originalFunction,
     const AutoDiffConfig &config, SILFunction *jvp, SILFunction *vjp,
-    const DeclAttribute *diffAttr) {
+    const DeclAttribute *attr) {
+  assert(isa<DifferentiableAttr>(attr) || isa<DerivativeAttr>(attr));
   auto *origFnType = originalAFD->getInterfaceType()->castTo<AnyFunctionType>();
   auto origSilFnType = originalFunction->getLoweredFunctionType();
-  auto *loweredParamIndices = autodiff::getLoweredParameterIndices(
+  auto *silParamIndices = autodiff::getLoweredParameterIndices(
       config.parameterIndices, origFnType);
   // NOTE(TF-893): Extending capacity is necessary when `origSilFnType` has
   // parameters corresponding to captured variables. These parameters do not
   // appear in the type of `origFnType`.
   // TODO: If posssible, change `autodiff::getLoweredParameterIndices` to
   // take `CaptureInfo` into account.
-  if (origSilFnType->getNumParameters() > loweredParamIndices->getCapacity())
-    loweredParamIndices = loweredParamIndices->extendingCapacity(
+  if (origSilFnType->getNumParameters() > silParamIndices->getCapacity())
+    silParamIndices = silParamIndices->extendingCapacity(
         getASTContext(), origSilFnType->getNumParameters());
   // TODO(TF-913): Replace usages of `SILAutoDiffIndices` with `AutoDiffConfig`.
-  SILAutoDiffIndices indices(/*source*/ 0, loweredParamIndices);
+  SILAutoDiffIndices indices(/*source*/ 0, silParamIndices);
 
   // Self reordering thunk is necessary if wrt at least two parameters,
   // including self.
@@ -818,14 +839,21 @@ void SILGenModule::emitDifferentiabilityWitness(
   };
   bool reorderSelf = shouldReorderSelf();
 
-  // Create new SIL differentiability witness.
+  // Get or create new SIL differentiability witness.
   // Witness JVP and VJP are set below.
-  auto *diffWitness = SILDifferentiabilityWitness::createDefinition(
-      M, originalFunction->getLinkage(), originalFunction, loweredParamIndices,
-      config.resultIndices, config.derivativeGenericSignature,
-      /*jvp*/ nullptr, /*vjp*/ nullptr,
-      /*isSerialized*/ hasPublicVisibility(originalFunction->getLinkage()),
-      diffAttr);
+  AutoDiffConfig loweredConfig(silParamIndices, config.resultIndices,
+                               config.derivativeGenericSignature);
+  SILDifferentiabilityWitnessKey key{originalFunction->getName(),
+                                     loweredConfig};
+  auto *diffWitness = M.lookUpDifferentiabilityWitness(key);
+  if (!diffWitness) {
+    diffWitness = SILDifferentiabilityWitness::createDefinition(
+        M, originalFunction->getLinkage(), originalFunction,
+        loweredConfig.parameterIndices, loweredConfig.resultIndices,
+        config.derivativeGenericSignature, /*jvp*/ nullptr, /*vjp*/ nullptr,
+        /*isSerialized*/ hasPublicVisibility(originalFunction->getLinkage()),
+        attr);
+  }
 
   // Set derivative function in differentiability witness.
   auto setDerivativeInDifferentiabilityWitness =

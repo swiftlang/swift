@@ -538,6 +538,67 @@ swift::matchWitness(
     // a requirement, then an '@differentiable' attribute is added
     // automatically.
     ASTContext &ctx = witness->getASTContext();
+    llvm::errs() << "WITNESS: " << cast<ValueDecl>(witness)->getFullName() << "\n";
+    auto *reqAFD = dyn_cast<AbstractFunctionDecl>(req);
+    if (auto *reqASD = dyn_cast<AbstractStorageDecl>(req))
+      reqAFD = reqASD->getAccessor(AccessorKind::Get);
+    auto *witnessAFD = dyn_cast<AbstractFunctionDecl>(witness);
+    if (auto *witnessASD = dyn_cast<AbstractStorageDecl>(witness))
+      witnessAFD = witnessASD->getAccessor(AccessorKind::Get);
+    llvm::errs() << "REQ AFD: " << reqAFD->getEffectiveFullName() << "\n";
+    llvm::errs() << "REQ DERIV CONFIGS: " << reqAFD->getDerivativeFunctionConfigurations().size() << "\n";
+    llvm::errs() << "WITNESS AFD: " << witnessAFD->getEffectiveFullName() << "\n";
+    llvm::errs() << "WITNESS DERIV CONFIGS: " << witnessAFD->getDerivativeFunctionConfigurations().size() << "\n";
+    for (auto config : witnessAFD->getDerivativeFunctionConfigurations()) {
+      config.dump();
+    }
+    for (auto *reqDiffAttr : reqAttrs.getAttributes<DifferentiableAttr>()) {
+      (void)reqDiffAttr->getParameterIndices();
+      bool attrMatch = false;
+      bool attrSupersetMatch = false;
+      for (auto witnessConfig : witnessAFD->getDerivativeFunctionConfigurations()) {
+        if (witnessConfig.parameterIndices == reqDiffAttr->getParameterIndices())
+          attrMatch = true;
+        if (witnessConfig.parameterIndices->isSupersetOf(reqDiffAttr->getParameterIndices()))
+          attrSupersetMatch = true;
+      }
+      if (!attrMatch) {
+        auto implicitDiffAttr = false;
+        if (attrSupersetMatch) {
+          auto *witnessAFD = cast<AbstractFunctionDecl>(witness);
+          auto *newAttr = DifferentiableAttr::create(
+              witnessAFD, /*implicit*/ true, reqDiffAttr->AtLoc,
+              reqDiffAttr->getRange(), reqDiffAttr->isLinear(),
+              reqDiffAttr->getParameterIndices(), /*jvp*/ None,
+              /*vjp*/ None, reqDiffAttr->getDerivativeGenericSignature());
+          auto insertion = ctx.DifferentiableAttrs.try_emplace(
+              {witnessAFD, newAttr->getParameterIndices()}, newAttr);
+          // Register derivative function configuration.
+          auto *resultIndices = IndexSubset::get(ctx, 1, {0});
+          witnessAFD->addDerivativeFunctionConfiguration(
+              {newAttr->getParameterIndices(), resultIndices,
+               newAttr->getDerivativeGenericSignature()});
+          // Valid `@differentiable` attributes are uniqued by original function
+          // and parameter indices. Reject duplicate attributes.
+          if (!insertion.second) {
+            newAttr->setInvalid();
+          } else {
+            witness->getAttrs().add(newAttr);
+            implicitDiffAttr = true;
+          }
+        }
+        if (!implicitDiffAttr) {
+          if (auto *vdWitness = dyn_cast<VarDecl>(witness))
+            return RequirementMatch(
+                getStandinForAccessor(vdWitness, AccessorKind::Get),
+                MatchKind::DifferentiableConflict, reqDiffAttr);
+          else
+            return RequirementMatch(witness, MatchKind::DifferentiableConflict,
+                                    reqDiffAttr);
+        }
+      }
+    }
+#if 0
     auto witnessDiffAttrs = witnessAttrs
         .getAttributes<DifferentiableAttr, /*AllowInvalid*/ true>();
     for (auto *reqDiffAttr : reqAttrs.getAttributes<DifferentiableAttr>()) {
@@ -571,9 +632,8 @@ swift::matchWitness(
           witnessAFD->addDerivativeFunctionConfiguration(
               {newAttr->getParameterIndices(), resultIndices,
                newAttr->getDerivativeGenericSignature()});
-          // Valid `@differentiable` attributes are uniqued by their parameter
-          // indices. Reject duplicate attributes for the same decl and parameter
-          // indices pair.
+          // Valid `@differentiable` attributes are uniqued by original function
+          // and parameter indices. Reject duplicate attributes.
           if (!insertion.second) {
             newAttr->setInvalid();
           } else {
@@ -592,6 +652,7 @@ swift::matchWitness(
         }
       }
     }
+ #endif
   }
   return result;
 }
