@@ -1987,6 +1987,11 @@ int swift::performFrontend(ArrayRef<const char *> Args,
     return finishDiagProcessing(0);
   }
 
+  if (Invocation.getFrontendOptions().PrintTargetTriple) {
+    llvm::outs() << Invocation.getLangOptions().Target.getTriple() << "\n";
+    return finishDiagProcessing(0);
+  }
+
   if (Invocation.getFrontendOptions().RequestedAction ==
       FrontendOptions::ActionType::NoneAction) {
     Instance->getDiags().diagnose(SourceLoc(),
