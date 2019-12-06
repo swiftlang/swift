@@ -64,6 +64,7 @@ enum class SourceKitRequest {
   SyntaxTree,
   EnableCompileNotifications,
   CollectExpresstionType,
+  GlobalConfiguration,
 #define SEMANTIC_REFACTORING(KIND, NAME, ID) KIND,
 #include "swift/IDE/RefactoringKinds.def"
 };
@@ -110,6 +111,8 @@ struct TestOptions {
   bool CollectActionables = false;
   bool isAsyncRequest = false;
   bool timeRequest = false;
+  llvm::Optional<bool> OptimizeForIde;
+  bool SuppressDefaultConfigRequest = false;
   unsigned repeatRequest = 1;
   struct VFSFile {
     std::string path;
