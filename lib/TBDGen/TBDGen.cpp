@@ -252,12 +252,11 @@ void TBDGenVisitor::addDerivativeAttr(AbstractFunctionDecl *derivative,
   // TBDGen already emits symbols for `@differentiable` attributes.
   if (originalFunction->getAttrs().hasAttribute<DifferentiableAttr>())
     return;
-  // Skip if:
-  // - The derivative function is a VJP.
-  // - There exists a registered JVP function for the same original function and
-  //   parameter indices.
-  // This prevents duplicate symbol emission for original functions that have a
-  // `@derivative` JVP and a `@derivative` VJP.
+  // Skip if visiting a `@derivative` VJP function and there exists a
+  // `@derivative` JVP function for the same original function and parameter
+  // indices. This prevents duplicate symbol emission when there exist both a
+  // `@derivative` JVP and a `@derivative` VJP for the same original function
+  // and parameter indices.
   auto &ctx = originalFunction->getASTContext();
   if (attr->getDerivativeKind() == AutoDiffDerivativeFunctionKind::VJP &&
       ctx.DerivativeAttrs.count({originalFunction, attr->getParameterIndices(),
