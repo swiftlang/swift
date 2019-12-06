@@ -136,7 +136,8 @@ public:
   }
 
   /// Adds the given `differentiable_function` instruction to the worklist.
-  void addDifferentiableFunctionInst(DifferentiableFunctionInst* dfi) {
+  void
+  addDifferentiableFunctionInstToWorklist(DifferentiableFunctionInst *dfi) {
     differentiableFunctionInsts.push_back(dfi);
   }
 

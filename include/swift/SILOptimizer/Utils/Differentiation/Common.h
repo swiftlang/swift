@@ -94,12 +94,16 @@ template<class Inst>
 Inst *peerThroughFunctionConversions(SILValue value) {
   if (auto *inst = dyn_cast<Inst>(value))
     return inst;
-  if (auto *thinToThick = dyn_cast<ThinToThickFunctionInst>(value))
-    return peerThroughFunctionConversions<Inst>(thinToThick->getOperand());
-  if (auto *convertFn = dyn_cast<ConvertFunctionInst>(value))
-    return peerThroughFunctionConversions<Inst>(convertFn->getOperand());
-  if (auto *partialApply = dyn_cast<PartialApplyInst>(value))
-    return peerThroughFunctionConversions<Inst>(partialApply->getCallee());
+  if (auto *cvi = dyn_cast<CopyValueInst>(value))
+    return peerThroughFunctionConversions<Inst>(cvi->getOperand());
+  if (auto *bbi = dyn_cast<BeginBorrowInst>(value))
+    return peerThroughFunctionConversions<Inst>(bbi->getOperand());
+  if (auto *tttfi = dyn_cast<ThinToThickFunctionInst>(value))
+    return peerThroughFunctionConversions<Inst>(tttfi->getOperand());
+  if (auto *cfi = dyn_cast<ConvertFunctionInst>(value))
+    return peerThroughFunctionConversions<Inst>(cfi->getOperand());
+  if (auto *pai = dyn_cast<PartialApplyInst>(value))
+    return peerThroughFunctionConversions<Inst>(pai->getCallee());
   return nullptr;
 }
 

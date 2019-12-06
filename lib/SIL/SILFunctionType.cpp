@@ -216,7 +216,7 @@ CanSILFunctionType SILFunctionType::getAutoDiffDerivativeFunctionType(
     IndexSubset *parameterIndices, unsigned resultIndex,
     AutoDiffDerivativeFunctionKind kind, TypeConverter &TC,
     LookupConformanceFn lookupConformance,
-    CanGenericSignature derivativeFnGenSig) {
+    CanGenericSignature derivativeFnGenSig, bool isReabstractionThunk) {
   // JVP: (T...) -> ((R...),
   //                 (T.TangentVector...) -> (R.TangentVector...))
   // VJP: (T...) -> ((R...),
@@ -341,6 +341,22 @@ CanSILFunctionType SILFunctionType::getAutoDiffDerivativeFunctionType(
   }
   }
 
+  SmallVector<SILParameterInfo, 4> newParameters;
+  newParameters.reserve(getNumParameters());
+  newParameters.append(getParameters().begin(), getParameters().end());
+  // Reabstraction thunks have a function-typed parameter (the function to
+  // reabstract) as their last parameter. Reabstraction thunk JVPs/VJPs have a
+  // `@differentiable` function-typed last parameter instead.
+  if (isReabstractionThunk) {
+    assert(!parameterIndices->contains(getNumParameters() - 1) &&
+           "Function-typed parameter should not be wrt");
+    auto fnParam = newParameters.back();
+    auto fnParamType = dyn_cast<SILFunctionType>(fnParam.getInterfaceType());
+    assert(fnParamType);
+    auto diffFnType = fnParamType->getWithDifferentiability(
+        DifferentiabilityKind::Normal, parameterIndices);
+    newParameters.back() = fnParam.getWithInterfaceType(diffFnType);
+  }
   SmallVector<SILResultInfo, 4> newResults;
   newResults.reserve(getNumResults() + 1);
   for (auto &result : getResults()) {
@@ -350,11 +366,11 @@ CanSILFunctionType SILFunctionType::getAutoDiffDerivativeFunctionType(
   }
   newResults.push_back({closureType->getCanonicalType(derivativeFnGenSig),
                         ResultConvention::Owned});
-  return SILFunctionType::get(derivativeFnGenSig, getExtInfo(),
-                              getCoroutineKind(), getCalleeConvention(),
-                              getParameters(), getYields(), newResults,
-                              getOptionalErrorResult(), getSubstitutions(), isGenericSignatureImplied(), ctx,
-                              getWitnessMethodConformanceOrInvalid());
+  return SILFunctionType::get(
+      derivativeFnGenSig, getExtInfo(), getCoroutineKind(),
+      getCalleeConvention(), newParameters, getYields(), newResults,
+      getOptionalErrorResult(), getSubstitutions(), isGenericSignatureImplied(),
+      ctx, getWitnessMethodConformanceOrInvalid());
 }
 
 CanSILFunctionType SILFunctionType::getAutoDiffTransposeFunctionType(

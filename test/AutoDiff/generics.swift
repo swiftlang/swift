@@ -16,31 +16,50 @@ _ = gradient(at: Float(1), in: { x in identity(x) })
 // CHECK-SIL-NEXT: [[EMIT_ZERO_INDIRECT:%.*]] = apply [[ZERO_WITNESS]]<τ_0_0.TangentVector>([[ORIG_COTAN]], [[ORIG_COTAN_METATYPE]])
 // CHECK-SIL: }
 
-struct Tensor<Scalar : FloatingPoint & Differentiable> : Differentiable {
-  // NOTE: `value` must have type with known size (e.g. `Float`, not `Scalar`)
-  // until differentiation has indirect passing support.
-  var value: Float
-  init(_ value: Float) { self.value = value }
-}
+// Test TF-201: differentiate direct references to generic function.
+// This involves reabstraction thunk differentiation.
 
-func generic<T : FloatingPoint & Differentiable>(_ x: Tensor<T>) -> Float {
-  return x.value + x.value
+_ = gradient(at: Float(1), in: identity)
+
+protocol DifferentiableAdditiveArithmetic: Differentiable & AdditiveArithmetic {
+  @differentiable
+  static func + (lhs: Self, rhs: Self) -> Self
 }
-_ = gradient(at: Tensor<Float>(1), in: generic)
+extension Float: DifferentiableAdditiveArithmetic {}
+func generic<T: DifferentiableAdditiveArithmetic>(_ x: T) -> T {
+  x + x + x
+}
+_ = gradient(at: Float(10), in: generic)
+
+struct Wrapper<Scalar : Differentiable> : Differentiable {
+  var value: Scalar
+  init(_ value: Scalar) { self.value = value }
+}
+func generic<T>(_ x: Wrapper<T>) -> T {
+  return x.value
+}
+_ = gradient(at: Wrapper<Float>(1), in: generic)
+
+func generic2<T: Differentiable, U: Differentiable>(_ x: T, _ y: Float, _ z: U) -> T {
+  return x
+}
+func foo<T>(_ x: Wrapper<T>) {
+  _ = gradient(at: Float(1), 2, x, in: generic2)
+}
 
 // Test case where associated derivative function's requirements are met.
-extension Tensor where Scalar : Numeric {
+extension Wrapper where Scalar : Numeric {
   @differentiable(wrt: self where Scalar : Differentiable & FloatingPoint)
-  func mean() -> Tensor {
+  func mean() -> Wrapper {
     return self
   }
 
   @differentiable(wrt: self where Scalar : Differentiable & FloatingPoint)
-  func variance() -> Tensor {
+  func variance() -> Wrapper {
     return mean() // ok
   }
 }
-_ = pullback(at: Tensor<Float>(1), in: { $0.variance() })
+_ = pullback(at: Wrapper<Float>(1), in: { $0.variance() })
 
 // Tests TF-277.
 protocol Layer : Differentiable {
