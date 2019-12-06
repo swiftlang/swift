@@ -1607,7 +1607,7 @@ private:
       ClangDecl = ND->getClangDecl();
     }
     if (ClangDecl) {
-      clang::ASTReader &Reader = *CI.getClangInstance().getModuleManager();
+      clang::ASTReader &Reader = *CI.getClangInstance().getASTReader();
       auto Idx = ClangDecl->getOwningModuleID();
       auto SubModuleDesc = Reader.getSourceDescriptor(Idx);
       auto TopLevelModuleDesc = getClangModule(*TypeDecl->getModuleContext());
