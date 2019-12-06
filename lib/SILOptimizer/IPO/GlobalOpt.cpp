@@ -856,10 +856,17 @@ static bool canBeChangedExternally(SILGlobalVariable *SILG) {
   return true;
 }
 
+static bool canBeUsedOrChangedExternally(SILGlobalVariable *global) {
+  if (global->isLet())
+    return isPossiblyUsedExternally(global->getLinkage(),
+                                    global->getModule().isWholeModule());
+  return canBeChangedExternally(global);
+}
+
 /// If there are no loads or accesses of a given global, then remove its
 /// associated global addr and all asssociated instructions.
 bool SILGlobalOpt::tryRemoveGlobalAddr(SILGlobalVariable *global) {
-  if (canBeChangedExternally(global))
+  if (canBeUsedOrChangedExternally(global))
     return false;
   
   if (GlobalVarSkipProcessing.count(global) ||
@@ -875,7 +882,7 @@ bool SILGlobalOpt::tryRemoveGlobalAddr(SILGlobalVariable *global) {
 }
 
 bool SILGlobalOpt::tryRemoveUnusedGlobal(SILGlobalVariable *global) {
-  if (canBeChangedExternally(global))
+  if (canBeUsedOrChangedExternally(global))
     return false;
   
   if (GlobalVarSkipProcessing.count(global) || GlobalAddrMap.count(global) ||
