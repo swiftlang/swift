@@ -871,8 +871,6 @@ public:
   }
   ParserResult<BraceStmt> parseBraceItemList(Diag<> ID);
 
-  Optional<tok> closestMatchingStmtTokenForIdentifier(StringRef identifier);
-
   //===--------------------------------------------------------------------===//
   // Decl Parsing
 

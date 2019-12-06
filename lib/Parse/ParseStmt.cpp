@@ -194,6 +194,32 @@ static bool isAtStartOfSwitchCase(Parser &parser,
   return parser.Tok.isAny(tok::kw_case, tok::kw_default);
 }
 
+
+static Optional<tok> closestMatchingStmtTokenForIdentifier(StringRef identifier) {
+  SmallVector<std::pair<StringRef, tok>, 19> stmtKeywords;
+  #define STMT_KEYWORD(kw) stmtKeywords.push_back({ #kw, tok::kw_##kw });
+  #include "swift/Syntax/TokenKinds.def"
+  unsigned bestScore = 0;
+  Optional<tok> best = None;
+  for (size_t i = 0; i < stmtKeywords.size(); ++i) {
+    std::pair<StringRef, tok> pair = stmtKeywords[i];
+    StringRef potentialStatement = pair.first;
+
+    unsigned dist = potentialStatement.edit_distance(identifier, /*AllowReplacements=*/true, /*MaxEditDistance=*/bestScore);
+
+    if (dist > (potentialStatement.size() + 1) / 3) {
+      continue;
+    }
+
+    if (dist < bestScore || bestScore == 0) {
+      bestScore = dist;
+      best = pair.second;
+    }
+  }
+
+  return best;
+}
+
 bool Parser::isTerminatorForBraceItemListKind(BraceItemListKind Kind,
                                               ArrayRef<ASTNode> ParsedDecls) {
   switch (Kind) {
@@ -2550,29 +2576,4 @@ ParserResult<Stmt> Parser::parseStmtPoundAssert() {
 
   return makeParserResult<Stmt>(new (Context) PoundAssertStmt(
       SourceRange(startLoc, endLoc), conditionExprResult.get(), message));
-}
-
-Optional<tok> Parser::closestMatchingStmtTokenForIdentifier(StringRef identifier) {
-  SmallVector<std::pair<StringRef, tok>, 19> stmtKeywords;
-  #define STMT_KEYWORD(kw) stmtKeywords.push_back({ #kw, tok::kw_##kw });
-  #include "swift/Syntax/TokenKinds.def"
-  unsigned bestScore = 0;
-  Optional<tok> best = None;
-  for (size_t i = 0; i < stmtKeywords.size(); ++i) {
-    std::pair<StringRef, tok> pair = stmtKeywords[i];
-    StringRef potentialStatement = pair.first;
-
-    unsigned dist = potentialStatement.edit_distance(identifier, /*AllowReplacements=*/true, /*MaxEditDistance=*/bestScore);
-
-    if (dist > (potentialStatement.size() + 1) / 3) {
-      continue;
-    }
-
-    if (dist < bestScore || bestScore == 0) {
-      bestScore = dist;
-      best = pair.second;
-    }
-  }
-
-  return best;
 }
