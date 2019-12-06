@@ -1323,7 +1323,7 @@ void JVPEmitter::visitApplyInst(ApplyInst *ai) {
         builder, loc, indices.parameters, original);
 
     // Record the `differentiable_function` instruction.
-    context.addDifferentiableFunctionInst(diffFuncInst);
+    context.addDifferentiableFunctionInstToWorklist(diffFuncInst);
     // TODO(TF-689): Make `differentiable_function` store result indices and
     // remove `ADContext::resultIndices`.
     context.setResultIndex(diffFuncInst, activeResultIndices.front());
@@ -1458,7 +1458,7 @@ void JVPEmitter::visitDifferentiableFunctionInst(
   // instruction to the `differentiable_function` worklist.
   TypeSubstCloner::visitDifferentiableFunctionInst(dfi);
   auto *newDFI = cast<DifferentiableFunctionInst>(getOpValue(dfi));
-  context.addDifferentiableFunctionInst(newDFI);
+  context.addDifferentiableFunctionInstToWorklist(newDFI);
 }
 
 } // end namespace autodiff
