@@ -3156,6 +3156,12 @@ bool ConstraintSystem::repairFailures(
     // for this call, we can consider overload unrelated.
     if (llvm::any_of(getFixes(), [&](const ConstraintFix *fix) {
           auto *locator = fix->getLocator();
+          // Since arguments to @dynamicCallable form either an array
+          // or a dictionary and all have to match the same element type,
+          // let's allow multiple invalid arguments.
+          if (locator->findFirst<LocatorPathElt::DynamicCallable>())
+            return false;
+
           return locator->findLast<LocatorPathElt::ApplyArgToParam>()
                      ? locator->getAnchor() == anchor
                      : false;
@@ -7841,14 +7847,20 @@ ConstraintSystem::simplifyDynamicCallableApplicableFnConstraint(
   addConstraint(ConstraintKind::Defaultable, argumentType,
                 ctx.TheAnyType, locator);
 
+  auto *baseArgLoc = getConstraintLocator(
+      loc->getAnchor(),
+      {ConstraintLocator::DynamicCallable, ConstraintLocator::ApplyArgument},
+      /*summaryFlags=*/0);
+
   // All dynamic call parameter types must be convertible to the argument type.
   for (auto i : indices(func1->getParams())) {
     auto param = func1->getParams()[i];
     auto paramType = param.getPlainType();
-    auto locatorBuilder =
-        locator.withPathElement(LocatorPathElt::TupleElement(i));
-    addConstraint(ConstraintKind::ArgumentConversion, paramType,
-                  argumentType, locatorBuilder);
+
+    addConstraint(
+        ConstraintKind::ArgumentConversion, paramType, argumentType,
+        getConstraintLocator(baseArgLoc, LocatorPathElt::ApplyArgToParam(
+                                             i, 0, param.getParameterFlags())));
   }
 
   return SolutionKind::Solved;
