@@ -815,22 +815,6 @@ void SILGlobalOpt::optimizeInitializer(SILFunction *AddrF,
   HasChanged = true;
 }
 
-/// If there are no loads or accesses of a given global, then remove its
-/// associated global addr and all asssociated instructions.
-bool SILGlobalOpt::tryRemoveGlobalAddr(SILGlobalVariable *global) {
-  if (isPossiblyUsedExternally(global->getLinkage(), Module->isWholeModule()))
-    return false;
-  if (GlobalLoadMap.count(global) || GlobalAccessMap.count(global))
-    return false;
-
-  for (auto *addr : GlobalAddrMap[global]) {
-    collectUsesOfInstructionForDeletion(addr);
-    InstToRemove.push_back(addr);
-  }
-
-  return true;
-}
-
 bool SILGlobalOpt::tryRemoveGlobalAlloc(SILGlobalVariable *global,
                                         AllocGlobalInst *alloc) {
   if (GlobalAddrMap.count(global))
@@ -838,16 +822,6 @@ bool SILGlobalOpt::tryRemoveGlobalAlloc(SILGlobalVariable *global,
 
   InstToRemove.push_back(alloc);
 
-  return true;
-}
-
-bool SILGlobalOpt::tryRemoveUnusedGlobal(SILGlobalVariable *global) {
-  if (GlobalAddrMap.count(global) || GlobalAccessMap.count(global) ||
-      GlobalLoadMap.count(global) || AllocGlobalStore.count(global) ||
-      GlobalVarStore.count(global))
-    return false;
-
-  Module->eraseGlobalVariable(global);
   return true;
 }
 
@@ -879,6 +853,37 @@ static bool canBeChangedExternally(SILGlobalVariable *SILG) {
     return false;
   }
 
+  return true;
+}
+
+/// If there are no loads or accesses of a given global, then remove its
+/// associated global addr and all asssociated instructions.
+bool SILGlobalOpt::tryRemoveGlobalAddr(SILGlobalVariable *global) {
+  if (canBeChangedExternally(global))
+    return false;
+  
+  if (GlobalVarSkipProcessing.count(global) ||
+      GlobalLoadMap.count(global) || GlobalAccessMap.count(global))
+    return false;
+
+  for (auto *addr : GlobalAddrMap[global]) {
+    collectUsesOfInstructionForDeletion(addr);
+    InstToRemove.push_back(addr);
+  }
+
+  return true;
+}
+
+bool SILGlobalOpt::tryRemoveUnusedGlobal(SILGlobalVariable *global) {
+  if (canBeChangedExternally(global))
+    return false;
+  
+  if (GlobalVarSkipProcessing.count(global) || GlobalAddrMap.count(global) ||
+      GlobalAccessMap.count(global) || GlobalLoadMap.count(global) ||
+      AllocGlobalStore.count(global) || GlobalVarStore.count(global))
+    return false;
+
+  Module->eraseGlobalVariable(global);
   return true;
 }
 
@@ -990,7 +995,7 @@ void SILGlobalOpt::optimizeGlobalAccess(SILGlobalVariable *SILG,
     return;
   }
 
-  if (!GlobalLoadMap.count(SILG)) {
+  if (GlobalLoadMap[SILG].empty()) {
     LLVM_DEBUG(llvm::dbgs() << "GlobalOpt: not in load map: "
                           << SILG->getName() << '\n');
     return;

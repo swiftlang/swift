@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend -primary-file %s -O -module-name=test -emit-sil | %FileCheck %s
 
+import SwiftShims
+
 @_optimize(none) public func make_test(_ x: Int) -> Int {
   return x
 }
@@ -34,8 +36,10 @@ public var unused4 = 0
 
 // These should only be optimized with -wmo.
 // CHECK: sil_global hidden [let] @${{.*}}unused5{{.*}} : $Int
+// CHECK-WMO-NOT: sil_global hidden [let] @${{.*}}unused5{{.*}} : $Int
 let unused5 = 0
 // CHECK: sil_global hidden @${{.*}}unused6{{.*}} : $Int
+// CHECK-WMO-NOT: sil_global hidden @${{.*}}unused6{{.*}} : $Int
 var unused6 = 0
 
 // CHECK-LABEL: sil [Onone] @${{.*}}test{{.*}}
@@ -43,4 +47,19 @@ var unused6 = 0
   // CHECK: %{{[0-9]+}} = global_addr @${{.*}}used2{{.*}}
   // CHECK: %{{[0-9]+}} = global_addr @${{.*}}used1{{.*}}
   return used1 + used2 + x
+}
+
+// CHECK-LABEL: sil @${{.*}}storageVar{{.*}}
+@inlinable
+internal var storageVar: _SwiftEmptyArrayStorage {
+  // CHECK: return %2 : $_SwiftEmptyArrayStorage
+  return _swiftEmptyArrayStorage
+}
+
+public struct Bar {
+  let storage: _SwiftEmptyArrayStorage
+  
+  init () {
+    storage = storageVar
+  }
 }

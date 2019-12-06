@@ -34,7 +34,7 @@ void PrettyStackTraceSILFunctionTransform::print(llvm::raw_ostream &out) const {
   printFunctionInfo(out);
 }
 
-void PrettyStackTraceSILModuleTransform::print(llvm::raw_ostream &out) const {
+void PrettyStackTraceSILModuleTransform::print(llvm::raw_ostream &out) const {  
   out << "While running pass #" << PassNumber
       << " SILModuleTransform \"" << SMT->getID() << "\".\n";
 }
