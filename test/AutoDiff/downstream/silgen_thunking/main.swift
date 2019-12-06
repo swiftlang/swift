@@ -52,7 +52,7 @@ struct SelfReordering : Differentiable & AdditiveArithmetic {
     return (value, { v in (Self(1), Self(2), Self(3)) })
   }
 
-// CHECK-LABEL: sil hidden [always_inline] [ossa] @AD__$s4main14SelfReorderingV20threeParameterMethodyA2C_ACtF__jvp_src_0_wrt_0_1_2 : $@convention(method) (@guaranteed SelfReordering, @guaranteed SelfReordering, @guaranteed SelfReordering) -> (@owned SelfReordering, @owned @callee_guaranteed (@guaranteed SelfReordering, @guaranteed SelfReordering, @guaranteed SelfReordering) -> @owned SelfReordering)
+// CHECK-LABEL: sil hidden [thunk] [always_inline] [ossa] @AD__$s4main14SelfReorderingV20threeParameterMethodyA2C_ACtF__jvp_src_0_wrt_0_1_2 : $@convention(method) (@guaranteed SelfReordering, @guaranteed SelfReordering, @guaranteed SelfReordering) -> (@owned SelfReordering, @owned @callee_guaranteed (@guaranteed SelfReordering, @guaranteed SelfReordering, @guaranteed SelfReordering) -> @owned SelfReordering)
 // CHECK: bb0([[X:%.*]] : @guaranteed $SelfReordering, [[Y:%.*]] : @guaranteed $SelfReordering, [[SELF:%.*]] : @guaranteed $SelfReordering):
 // CHECK: [[JVP:%.*]] = function_ref @$s4main14SelfReorderingV23jvpThreeParameterMethodyAC5value_A2C_A2Ctc12differentialtAC_ACtF
 // CHECK: [[JVP_RESULT:%.*]] = apply [[JVP]]([[X]], [[Y]], [[SELF]])
@@ -67,7 +67,7 @@ struct SelfReordering : Differentiable & AdditiveArithmetic {
 // CHECK: [[DF_RESULT:%.*]] = apply [[DF]]([[DSELF]], [[DX]], [[DY]])
 // CHECK: return [[DF_RESULT]]
 
-// CHECK-LABEL: sil hidden [always_inline] [ossa] @AD__$s4main14SelfReorderingV20threeParameterMethodyA2C_ACtF__vjp_src_0_wrt_0_1_2 : $@convention(method) (@guaranteed SelfReordering, @guaranteed SelfReordering, @guaranteed SelfReordering) -> (@owned SelfReordering, @owned @callee_guaranteed (@guaranteed SelfReordering) -> (@owned SelfReordering, @owned SelfReordering, @owned SelfReordering))
+// CHECK-LABEL: sil hidden [thunk] [always_inline] [ossa] @AD__$s4main14SelfReorderingV20threeParameterMethodyA2C_ACtF__vjp_src_0_wrt_0_1_2 : $@convention(method) (@guaranteed SelfReordering, @guaranteed SelfReordering, @guaranteed SelfReordering) -> (@owned SelfReordering, @owned @callee_guaranteed (@guaranteed SelfReordering) -> (@owned SelfReordering, @owned SelfReordering, @owned SelfReordering))
 // CHECK: bb0([[X:%.*]] : @guaranteed $SelfReordering, [[Y:%.*]] : @guaranteed $SelfReordering, [[SELF:%.*]] : @guaranteed $SelfReordering):
 // CHECK: [[VJP:%.*]] = function_ref @$s4main14SelfReorderingV23vjpThreeParameterMethodyAC5value_AC_A2CtACc8pullbacktAC_ACtF
 // CHECK: [[VJP_RESULT:%.*]] = apply [[VJP]]([[X]], [[Y]], [[SELF]])
@@ -117,7 +117,7 @@ where Dummy: Differentiable & ExpressibleByIntegerLiteral {
     return (value, { v in (v, 2.0, 3.0) })
   }
 
-// CHECK-LABEL: sil hidden [always_inline] [ossa] @AD__$s4main21SelfReorderingGenericV20threeParameterMethodyACyxGqd___qd_0_ts14DifferentiableRd__sAFRd_0_s25ExpressibleByFloatLiteral13TangentVectorRpd__sAgHRpd_0_r0_lF__jvp_src_0_wrt_0_1_2{{.*}} : $@convention(method) <τ_0_0 where τ_0_0 : Differentiable, τ_0_0 : ExpressibleByIntegerLiteral><τ_1_0, τ_1_1 where τ_1_0 : Differentiable, τ_1_1 : Differentiable, τ_1_0.TangentVector : ExpressibleByFloatLiteral, τ_1_1.TangentVector : ExpressibleByFloatLiteral> (@in_guaranteed τ_1_0, @in_guaranteed τ_1_1, @in_guaranteed SelfReorderingGeneric<τ_0_0>) -> (@out SelfReorderingGeneric<τ_0_0>, @owned @callee_guaranteed (@in_guaranteed τ_1_0.TangentVector, @in_guaranteed τ_1_1.TangentVector, @in_guaranteed SelfReorderingGeneric<τ_0_0>.TangentVector) -> @out SelfReorderingGeneric<τ_0_0>.TangentVector) {
+// CHECK-LABEL: sil hidden [thunk] [always_inline] [ossa] @AD__$s4main21SelfReorderingGenericV20threeParameterMethodyACyxGqd___qd_0_ts14DifferentiableRd__sAFRd_0_s25ExpressibleByFloatLiteral13TangentVectorRpd__sAgHRpd_0_r0_lF__jvp_src_0_wrt_0_1_2{{.*}} : $@convention(method) <τ_0_0 where τ_0_0 : Differentiable, τ_0_0 : ExpressibleByIntegerLiteral><τ_1_0, τ_1_1 where τ_1_0 : Differentiable, τ_1_1 : Differentiable, τ_1_0.TangentVector : ExpressibleByFloatLiteral, τ_1_1.TangentVector : ExpressibleByFloatLiteral> (@in_guaranteed τ_1_0, @in_guaranteed τ_1_1, @in_guaranteed SelfReorderingGeneric<τ_0_0>) -> (@out SelfReorderingGeneric<τ_0_0>, @owned @callee_guaranteed (@in_guaranteed τ_1_0.TangentVector, @in_guaranteed τ_1_1.TangentVector, @in_guaranteed SelfReorderingGeneric<τ_0_0>.TangentVector) -> @out SelfReorderingGeneric<τ_0_0>.TangentVector) {
 // CHECK: bb0([[JVP_RESULT:%.*]] : $*SelfReorderingGeneric<τ_0_0>, [[X:%.*]] : $*τ_1_0, [[Y:%.*]] : $*τ_1_1, [[SELF:%.*]] : $*SelfReorderingGeneric<τ_0_0>):
 // CHECK: [[JVP:%.*]] = function_ref @$s4main21SelfReorderingGenericV23jvpThreeParameterMethodyACyxG5value_AC13TangentVectorVyx_GAI_AGQyd__AGQyd_0_tc12differentialtqd___qd_0_ts14DifferentiableRd__sAMRd_0_s25ExpressibleByFloatLiteralAJRQsAnKRQr0_lF
 // CHECK: [[DF:%.*]] = apply [[JVP]]<τ_0_0, τ_1_0, τ_1_1>([[JVP_RESULT]], [[X]], [[Y]], [[SELF]])
@@ -131,7 +131,7 @@ where Dummy: Differentiable & ExpressibleByIntegerLiteral {
 // CHECK: [[VOID:%.*]] = tuple ()
 // CHECK: return [[VOID]]
 
-// CHECK-LABEL: sil hidden [always_inline] [ossa] @AD__$s4main21SelfReorderingGenericV20threeParameterMethodyACyxGqd___qd_0_ts14DifferentiableRd__sAFRd_0_s25ExpressibleByFloatLiteral13TangentVectorRpd__sAgHRpd_0_r0_lF__vjp_src_0_wrt_0_1_2{{.*}} : $@convention(method) <τ_0_0 where τ_0_0 : Differentiable, τ_0_0 : ExpressibleByIntegerLiteral><τ_1_0, τ_1_1 where τ_1_0 : Differentiable, τ_1_1 : Differentiable, τ_1_0.TangentVector : ExpressibleByFloatLiteral, τ_1_1.TangentVector : ExpressibleByFloatLiteral> (@in_guaranteed τ_1_0, @in_guaranteed τ_1_1, @in_guaranteed SelfReorderingGeneric<τ_0_0>) -> (@out SelfReorderingGeneric<τ_0_0>, @owned @callee_guaranteed (@in_guaranteed SelfReorderingGeneric<τ_0_0>.TangentVector) -> (@out τ_1_0.TangentVector, @out τ_1_1.TangentVector, @out SelfReorderingGeneric<τ_0_0>.TangentVector)) {
+// CHECK-LABEL: sil hidden [thunk] [always_inline] [ossa] @AD__$s4main21SelfReorderingGenericV20threeParameterMethodyACyxGqd___qd_0_ts14DifferentiableRd__sAFRd_0_s25ExpressibleByFloatLiteral13TangentVectorRpd__sAgHRpd_0_r0_lF__vjp_src_0_wrt_0_1_2{{.*}} : $@convention(method) <τ_0_0 where τ_0_0 : Differentiable, τ_0_0 : ExpressibleByIntegerLiteral><τ_1_0, τ_1_1 where τ_1_0 : Differentiable, τ_1_1 : Differentiable, τ_1_0.TangentVector : ExpressibleByFloatLiteral, τ_1_1.TangentVector : ExpressibleByFloatLiteral> (@in_guaranteed τ_1_0, @in_guaranteed τ_1_1, @in_guaranteed SelfReorderingGeneric<τ_0_0>) -> (@out SelfReorderingGeneric<τ_0_0>, @owned @callee_guaranteed (@in_guaranteed SelfReorderingGeneric<τ_0_0>.TangentVector) -> (@out τ_1_0.TangentVector, @out τ_1_1.TangentVector, @out SelfReorderingGeneric<τ_0_0>.TangentVector)) {
 // CHECK: bb0([[VJP_RESULT:%.*]] : $*SelfReorderingGeneric<τ_0_0>, [[X:%.*]] : $*τ_1_0, [[Y:%.*]] : $*τ_1_1, [[SELF:%.*]] : $*SelfReorderingGeneric<τ_0_0>):
 // CHECK: [[VJP:%.*]] = function_ref @$s4main21SelfReorderingGenericV23vjpThreeParameterMethodyACyxG5value_AC13TangentVectorVyx_G_AGQyd__AGQyd_0_tAIc8pullbacktqd___qd_0_ts14DifferentiableRd__sAMRd_0_s25ExpressibleByFloatLiteralAJRQsAnKRQr0_lF
 // CHECK: [[PB:%.*]] = apply [[VJP]]<τ_0_0, τ_1_0, τ_1_1>([[VJP_RESULT]], [[X]], [[Y]], [[SELF]])
@@ -145,6 +145,35 @@ where Dummy: Differentiable & ExpressibleByIntegerLiteral {
 // CHECK: [[VOID:%.*]] = tuple ()
 // CHECK: return [[VOID]]
 }
+
+// Test thunk linkage.
+
+public func hasPrivateDerivative(_ x: Float) -> Float { x }
+
+@derivative(of: hasPrivateDerivative)
+fileprivate func privateDerivative(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
+  (x, { $0 })
+}
+
+// CHECK-LABEL: sil private [thunk] [always_inline] [ossa] @AD__$s4main20hasPrivateDerivativeyS2fF__vjp_src_0_wrt_0
+
+public func hasInternalDerivative(_ x: Float) -> Float { x }
+
+@derivative(of: hasInternalDerivative)
+internal func internalDerivative(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
+  (x, { $0 })
+}
+
+// CHECK-LABEL: sil hidden [thunk] [always_inline] [ossa] @AD__$s4main21hasInternalDerivativeyS2fF__vjp_src_0_wrt_0
+
+public func hasPublicDerivative(_ x: Float) -> Float { x }
+
+@derivative(of: hasPublicDerivative)
+public func publicDerivative(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
+  (x, { $0 })
+}
+
+// CHECK-LABEL: sil [thunk] [always_inline] [ossa] @AD__$s4main19hasPublicDerivativeyS2fF__vjp_src_0_wrt_0
 
 extension SelfReorderingGeneric.TangentVector : ExpressibleByFloatLiteral {}
 

@@ -769,9 +769,9 @@ void SILGenModule::postEmitFunction(SILDeclRef constant,
         SILFunction *jvp = nullptr;
         SILFunction *vjp = nullptr;
         if (auto *jvpDecl = diffAttr->getJVPFunction())
-          jvp = getFunction(SILDeclRef(jvpDecl), NotForDefinition);
+          jvp = getFunction(SILDeclRef(jvpDecl), ForDefinition);
         if (auto *vjpDecl = diffAttr->getVJPFunction())
-          vjp = getFunction(SILDeclRef(vjpDecl), NotForDefinition);
+          vjp = getFunction(SILDeclRef(vjpDecl), ForDefinition);
         auto *resultIndices = IndexSubset::get(getASTContext(), 1, {0});
         assert((!F->getLoweredFunctionType()->getSubstGenericSignature() ||
                 diffAttr->getDerivativeGenericSignature()) &&
@@ -829,20 +829,6 @@ void SILGenModule::emitDifferentiabilityWitness(
   if (origSilFnType->getNumParameters() > silParamIndices->getCapacity())
     silParamIndices = silParamIndices->extendingCapacity(
         getASTContext(), origSilFnType->getNumParameters());
-  // TODO(TF-913): Replace usages of `SILAutoDiffIndices` with `AutoDiffConfig`.
-  SILAutoDiffIndices indices(/*source*/ 0, silParamIndices);
-
-  // Self reordering thunk is necessary if wrt at least two parameters,
-  // including self.
-  auto shouldReorderSelf = [&]() {
-    if (!originalFunction->hasSelfParam())
-      return false;
-    auto selfParamIndex = origSilFnType->getNumParameters() - 1;
-    if (!indices.isWrtParameter(selfParamIndex))
-      return false;
-    return indices.parameters->getNumIndices() > 1;
-  };
-  bool reorderSelf = shouldReorderSelf();
 
   // Get or create new SIL differentiability witness.
   // Witness already exists when there are two `@derivative` attributes (JVP and
@@ -867,28 +853,8 @@ void SILGenModule::emitDifferentiabilityWitness(
   // Set derivative function in differentiability witness.
   auto setDerivativeInDifferentiabilityWitness =
       [&](AutoDiffDerivativeFunctionKind kind, SILFunction *derivative) {
-    auto expectedDerivativeType =
-        origSilFnType->getAutoDiffDerivativeFunctionType(
-            indices.parameters, indices.source, kind, Types,
-            LookUpConformanceInModule(M.getSwiftModule()));
-    // Thunk derivative function.
-    SILFunction *derivativeThunk;
-    if (reorderSelf ||
-        derivative->getLoweredFunctionType() != expectedDerivativeType) {
-      derivativeThunk = getOrCreateAutoDiffDerivativeReabstractionThunk(
-          originalFunction, silConfig, derivative, kind, reorderSelf);
-    } else {
-      // Note: `AutoDiffDerivativeFunctionIdentifier` must be constructed with
-      // the AST-level parameter indices, not the SIL-level ones.
-      auto *id = AutoDiffDerivativeFunctionIdentifier::get(
-          kind, config.parameterIndices, config.derivativeGenericSignature,
-          getASTContext());
-      auto origDeclRef = SILDeclRef(originalAFD)
-                             .asForeign(requiresForeignEntryPoint(originalAFD));
-      derivativeThunk = getOrCreateAutoDiffDerivativeForwardingThunk(
-          origDeclRef.asAutoDiffDerivativeFunction(id), derivative,
-          expectedDerivativeType);
-    }
+    auto derivativeThunk = getOrCreateCustomDerivativeThunk(
+        derivative, originalFunction, silConfig, kind);
     // Check for existing same derivative.
     // TODO(TF-835): Remove condition below and simplify assertion to
     // `!diffWitness->getDerivative(kind)` after `@derivative` attribute

@@ -148,15 +148,6 @@ public:
                                CanSILFunctionType constantTy);
 
   // SWIFT_ENABLE_TENSORFLOW
-  /// Get or create an autodiff derivative function forwarding thunk for the
-  /// given derivative SILDeclRef, SILFunction, and function type.
-  /// The thunk simply forwards arguments and returns results: use this when no
-  /// reabstraction or self reordering is necessary.
-  SILFunction *getOrCreateAutoDiffDerivativeForwardingThunk(
-      SILDeclRef derivativeFnRef, SILFunction *derivativeFn,
-      CanSILFunctionType derivativeFnTy);
-
-  // SWIFT_ENABLE_TENSORFLOW
   /// Get or create an autodiff derivative function vtable entry thunk for the
   /// given SILDeclRef and derivative function type.
   SILFunction *
@@ -182,8 +173,15 @@ public:
                                            CanType dynamicSelfType);
 
   // SWIFT_ENABLE_TENSORFLOW
-  /// Get or create an autodiff derivative function thunk performing
-  /// reabstraction and/or self-reordering.
+  /// Given a user-specified custom derivative, get or create a thunk that calls
+  /// the custom derivative, and that haswith the abstraction pattern and
+  /// parameter ordering required for the SIL derivative of the given original
+  /// function.
+  ///
+  /// To achieve the required SIL derivative, the thunk may perform any subset
+  /// of:
+  /// - Self-reordering.
+  /// - Reabstraction.
   ///
   /// Self-reordering is done for canonicalizing the types of derivative
   /// functions for instance methods wrt self. We want users to define
@@ -223,12 +221,14 @@ public:
   /// ordering uniform for "wrt self instance method derivatives" and simplifies
   /// the transform rules.
   ///
-  /// If `reorderSelf` is true, reorder self so that it appears as:
+  /// If self must be reordered, reorder it so that it appears as:
   /// - The last parameter in the returned differential.
   /// - The last result in the returned pullback.
-  SILFunction *getOrCreateAutoDiffDerivativeReabstractionThunk(
-      SILFunction *original, AutoDiffConfig config, SILFunction *derivativeFn,
-      AutoDiffDerivativeFunctionKind derivativeFnKind, bool reorderSelf);
+  SILFunction *
+  getOrCreateCustomDerivativeThunk(
+      SILFunction *customDerivativeFn,
+      SILFunction *originalFn, const AutoDiffConfig &config,
+      AutoDiffDerivativeFunctionKind kind);
 
   /// Determine whether the given class has any instance variables that
   /// need to be destroyed.
