@@ -891,17 +891,17 @@ static bool _dynamicCastToExistential(OpaqueValue *dest,
       }
     }
 
-		if (srcDynamicType) {
-			auto object = *(reinterpret_cast<HeapObject**>(srcDynamicValue));
-			destExistential->Value = object;
-			if (!canConsumeDynamicValue || !(flags & DynamicCastFlags::TakeOnSuccess)) {
-				swift_unknownObjectRetain(object);
-			}
-			maybeDeallocateSource(true);
-			return true;
-		} else {
-			return fallbackForNonClass();
-		}
+    if (srcDynamicType) {
+      auto object = *(reinterpret_cast<HeapObject**>(srcDynamicValue));
+      destExistential->Value = object;
+      if (!canConsumeDynamicValue || !(flags & DynamicCastFlags::TakeOnSuccess)) {
+        swift_unknownObjectRetain(object);
+      }
+      maybeDeallocateSource(true);
+      return true;
+    } else {
+      return fallbackForNonClass();
+    }
   }
   case ExistentialTypeRepresentation::Opaque: {
     auto destExistential =
