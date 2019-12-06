@@ -6455,13 +6455,15 @@ static bool isValidDynamicCallableMethod(FuncDecl *method,
 // Build a reference to a `callAsFunction` method.
 static Expr *buildCallAsFunctionMethodRef(
     ExprRewriter &rewriter, ApplyExpr *apply, SelectedOverload selected,
-    ConstraintLocatorBuilder applyFunctionLoc) {
-  auto *fn = apply->getFn();
+    ConstraintLocator *calleeLoc) {
+  assert(calleeLoc->isLastElement<LocatorPathElt::ImplicitCallAsFunction>());
+  assert(cast<FuncDecl>(selected.choice.getDecl())->isCallAsFunctionMethod());
+
   // Create direct reference to `callAsFunction` method.
+  auto *fn = apply->getFn();
   auto *declRef = rewriter.buildMemberRef(
       fn, /*dotLoc*/ SourceLoc(), selected, DeclNameLoc(fn->getEndLoc()),
-      applyFunctionLoc, applyFunctionLoc, /*implicit*/ true,
-      AccessSemantics::Ordinary);
+      calleeLoc, calleeLoc, /*implicit*/ true, AccessSemantics::Ordinary);
   if (!declRef)
     return nullptr;
   declRef->setImplicit(apply->isImplicit());
@@ -6704,7 +6706,15 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
     callee = resolveConcreteDeclRef(decl, calleeLoc);
   }
 
-  // Resolve `callAsFunction` and `@dynamicCallable` applications.
+  // If this is an implicit call to a `callAsFunction` method, build the
+  // appropriate member reference.
+  if (cs.getType(fn)->getRValueType()->isCallableNominalType(dc)) {
+    fn = buildCallAsFunctionMethodRef(*this, apply, *overload, calleeLoc);
+    if (!fn)
+      return nullptr;
+  }
+
+  // Resolve a `@dynamicCallable` application.
   auto applyFunctionLoc =
       locator.withPathElement(ConstraintLocator::ApplyFunction);
   if (auto selected = solution.getOverloadChoiceIfAvailable(
@@ -6717,15 +6727,6 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
       if (isValidDynamicCallableMethod(method, methodType))
         return finishApplyDynamicCallable(
             apply, *selected, method, methodType, applyFunctionLoc);
-
-      // If this is an implicit call to a callAsFunction method, build the
-      // appropriate member reference.
-      if (method->isCallAsFunctionMethod()) {
-        fn = buildCallAsFunctionMethodRef(*this, apply, *selected,
-                                          applyFunctionLoc);
-        if (!fn)
-          return nullptr;
-      }
     }
   }
 
