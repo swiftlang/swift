@@ -228,3 +228,13 @@ struct PrivateCallable {
 func testAccessControl(_ x: PrivateCallable) {
   x(5) // expected-error {{'callAsFunction' is inaccessible due to 'private' protection level}}
 }
+
+struct SR_11909 {
+  static let s = SR_11909()
+  func callAsFunction(_ x: Int = 0) -> SR_11909 { SR_11909() }
+}
+
+func testDefaultsWithUMEs(_ x: SR_11909) {
+  let _: SR_11909 = .s()
+  let _: SR_11909 = .s(5)
+}
