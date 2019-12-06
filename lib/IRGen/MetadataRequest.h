@@ -34,6 +34,7 @@ enum ForDefinition_t : bool;
 namespace irgen {
 class ConstantReference;
 class Explosion;
+struct GenericArguments;
 class IRGenFunction;
 class IRGenModule;
 class MetadataDependencyCollector;
@@ -587,6 +588,10 @@ void emitCacheAccessFunction(IRGenModule &IGM,
                              CacheStrategy cacheStrategy,
                              CacheEmitter getValue,
                              bool isReadNone = true);
+MetadataResponse
+emitGenericTypeMetadataAccessFunction(IRGenFunction &IGF, Explosion &params,
+                                      NominalTypeDecl *nominal,
+                                      GenericArguments &genericArgs);
 
 /// Emit a declaration reference to a metatype object.
 void emitMetatypeRef(IRGenFunction &IGF, CanMetatypeType type,

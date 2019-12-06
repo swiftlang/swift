@@ -24,6 +24,7 @@
 #include "GenMeta.h"
 #include "GenProto.h"
 #include "GenType.h"
+#include "GenericArguments.h"
 #include "GenericRequirement.h"
 #include "IRGenDebugInfo.h"
 #include "IRGenFunction.h"
@@ -437,60 +438,6 @@ static llvm::Value *emitObjCMetadataRef(IRGenFunction &IGF,
   
   return emitObjCMetadataRefForMetadata(IGF, classPtr);
 }
-
-namespace {
-  /// A structure for collecting generic arguments for emitting a
-  /// nominal metadata reference.  The structure produced here is
-  /// consumed by swift_getGenericMetadata() and must correspond to
-  /// the fill operations that the compiler emits for the bound decl.
-  struct GenericArguments {
-    /// The values to use to initialize the arguments structure.
-    SmallVector<llvm::Value *, 8> Values;
-    SmallVector<llvm::Type *, 8> Types;
-
-    static unsigned getNumGenericArguments(IRGenModule &IGM,
-                                           NominalTypeDecl *nominal) {
-      GenericTypeRequirements requirements(IGM, nominal);
-      return requirements.getNumTypeRequirements();
-    }
-
-    void collectTypes(IRGenModule &IGM, NominalTypeDecl *nominal) {
-      GenericTypeRequirements requirements(IGM, nominal);
-      collectTypes(IGM, requirements);
-    }
-
-    void collectTypes(IRGenModule &IGM,
-                      const GenericTypeRequirements &requirements) {
-      for (auto &requirement : requirements.getRequirements()) {
-        if (requirement.Protocol) {
-          Types.push_back(IGM.WitnessTablePtrTy);
-        } else {
-          Types.push_back(IGM.TypeMetadataPtrTy);
-        }
-      }
-    }
-
-    void collect(IRGenFunction &IGF, CanType type) {
-      auto *decl = type.getNominalOrBoundGenericNominal();
-      GenericTypeRequirements requirements(IGF.IGM, decl);
-
-      auto subs =
-        type->getContextSubstitutionMap(IGF.IGM.getSwiftModule(), decl);
-      requirements.enumerateFulfillments(
-          IGF.IGM, subs,
-          [&](unsigned reqtIndex, CanType type, ProtocolConformanceRef conf) {
-            if (conf) {
-              Values.push_back(emitWitnessTableRef(IGF, type, conf));
-            } else {
-              Values.push_back(IGF.emitAbstractTypeMetadataRef(type));
-            }
-          });
-
-      collectTypes(IGF.IGM, decl);
-      assert(Types.size() == Values.size());
-    }
-  };
-} // end anonymous namespace
 
 static bool isTypeErasedGenericClass(NominalTypeDecl *ntd) {
   // ObjC classes are type erased.
@@ -1857,11 +1804,9 @@ static void emitCanonicalSpecializationsForGenericTypeMetadataAccessFunction(
   }
 }
 
-static MetadataResponse
-emitGenericTypeMetadataAccessFunction(IRGenFunction &IGF,
-                                      Explosion &params,
-                                      NominalTypeDecl *nominal,
-                                      GenericArguments &genericArgs) {
+MetadataResponse irgen::emitGenericTypeMetadataAccessFunction(
+    IRGenFunction &IGF, Explosion &params, NominalTypeDecl *nominal,
+    GenericArguments &genericArgs) {
   auto &IGM = IGF.IGM;
   
   llvm::Constant *descriptor =
@@ -2181,18 +2126,7 @@ irgen::getGenericTypeMetadataAccessFunction(IRGenModule &IGM,
   if (!shouldDefine || !accessor->empty())
     return accessor;
 
-  if (IGM.getOptions().optimizeForSize())
-    accessor->addFnAttr(llvm::Attribute::NoInline);
-
-  bool isReadNone =
-      (genericArgs.Types.size() <= NumDirectGenericTypeMetadataAccessFunctionArgs);
-
-  emitCacheAccessFunction(IGM, accessor, /*cache*/nullptr, CacheStrategy::None,
-                          [&](IRGenFunction &IGF, Explosion &params) {
-                            return emitGenericTypeMetadataAccessFunction(
-                                    IGF, params, nominal, genericArgs);
-                          },
-                          isReadNone);
+  IGM.IRGen.noteUseOfMetadataAccessor(nominal);
 
   return accessor;
 }

@@ -71,6 +71,9 @@ namespace irgen {
   /// generated definitions.
   void emitLazyTypeMetadata(IRGenModule &IGM, NominalTypeDecl *type);
 
+  /// Emit the type metadata accessor for a type for which it might be used.
+  void emitLazyMetadataAccessor(IRGenModule &IGM, NominalTypeDecl *type);
+
   void emitLazySpecializedGenericTypeMetadata(IRGenModule &IGM, CanType type);
 
   /// Emit metadata for a foreign struct, enum or class.

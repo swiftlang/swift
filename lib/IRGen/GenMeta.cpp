@@ -54,6 +54,7 @@
 #include "GenPoly.h"
 #include "GenStruct.h"
 #include "GenValueWitness.h"
+#include "GenericArguments.h"
 #include "HeapTypeInfo.h"
 #include "IRGenDebugInfo.h"
 #include "IRGenMangler.h"
@@ -1833,6 +1834,29 @@ void irgen::emitLazyTypeMetadata(IRGenModule &IGM, NominalTypeDecl *type) {
   } else {
     llvm_unreachable("should not have enqueued a class decl here!");
   }
+}
+
+void irgen::emitLazyMetadataAccessor(IRGenModule &IGM,
+                                     NominalTypeDecl *nominal) {
+  GenericArguments genericArgs;
+  genericArgs.collectTypes(IGM, nominal);
+
+  llvm::Function *accessor = IGM.getAddrOfGenericTypeMetadataAccessFunction(
+      nominal, genericArgs.Types, ForDefinition);
+
+  if (IGM.getOptions().optimizeForSize())
+    accessor->addFnAttr(llvm::Attribute::NoInline);
+
+  bool isReadNone = (genericArgs.Types.size() <=
+                     NumDirectGenericTypeMetadataAccessFunctionArgs);
+
+  emitCacheAccessFunction(
+      IGM, accessor, /*cache*/ nullptr, CacheStrategy::None,
+      [&](IRGenFunction &IGF, Explosion &params) {
+        return emitGenericTypeMetadataAccessFunction(IGF, params, nominal,
+                                                     genericArgs);
+      },
+      isReadNone);
 }
 
 void irgen::emitLazySpecializedGenericTypeMetadata(IRGenModule &IGM,

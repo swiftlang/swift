@@ -253,6 +253,12 @@ private:
   /// emit.
   llvm::SmallVector<CanType, 4> LazySpecializedTypeMetadataRecords;
 
+  /// The queue of metadata accessors to emit.
+  ///
+  /// The accessors must be emitted after everything else which might result in
+  /// a statically-known-canonical prespecialization.
+  llvm::SmallSetVector<NominalTypeDecl *, 4> LazyMetadataAccessors;
+
   struct LazyOpaqueInfo {
     bool IsDescriptorUsed = false;
     bool IsDescriptorEmitted = false;
@@ -386,6 +392,12 @@ public:
 
   llvm::SmallVector<CanType, 4> specializationsForType(NominalTypeDecl *type) {
     return SpecializationsForGenericTypes.lookup(type);
+  }
+
+  void noteUseOfMetadataAccessor(NominalTypeDecl *decl) {
+    if (LazyMetadataAccessors.count(decl) == 0) {
+      LazyMetadataAccessors.insert(decl);
+    }
   }
 
   void noteUseOfTypeMetadata(NominalTypeDecl *type) {

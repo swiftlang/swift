@@ -1192,6 +1192,12 @@ void IRGenerator::emitLazyDefinitions() {
     }
   }
 
+  while (!LazyMetadataAccessors.empty()) {
+    NominalTypeDecl *nominal = LazyMetadataAccessors.pop_back_val();
+    CurrentIGMPtr IGM = getGenModule(nominal->getDeclContext());
+    emitLazyMetadataAccessor(*IGM.get(), nominal);
+  }
+
   FinishedEmittingLazyDefinitions = true;
 }
 
