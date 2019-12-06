@@ -817,7 +817,7 @@ void SILGlobalOpt::optimizeInitializer(SILFunction *AddrF,
 
 bool SILGlobalOpt::tryRemoveGlobalAlloc(SILGlobalVariable *global,
                                         AllocGlobalInst *alloc) {
-  if (GlobalAddrMap.count(global))
+  if (GlobalAddrMap[global].size())
     return false;
 
   InstToRemove.push_back(alloc);
@@ -870,7 +870,7 @@ bool SILGlobalOpt::tryRemoveGlobalAddr(SILGlobalVariable *global) {
     return false;
   
   if (GlobalVarSkipProcessing.count(global) ||
-      GlobalLoadMap.count(global) || GlobalAccessMap.count(global))
+      GlobalLoadMap[global].size() || GlobalAccessMap[global].size())
     return false;
 
   for (auto *addr : GlobalAddrMap[global]) {
@@ -885,8 +885,8 @@ bool SILGlobalOpt::tryRemoveUnusedGlobal(SILGlobalVariable *global) {
   if (canBeUsedOrChangedExternally(global))
     return false;
   
-  if (GlobalVarSkipProcessing.count(global) || GlobalAddrMap.count(global) ||
-      GlobalAccessMap.count(global) || GlobalLoadMap.count(global) ||
+  if (GlobalVarSkipProcessing.count(global) || GlobalAddrMap[global].size() ||
+      GlobalAccessMap[global].size() || GlobalLoadMap[global].size() ||
       AllocGlobalStore.count(global) || GlobalVarStore.count(global))
     return false;
 
