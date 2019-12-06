@@ -19,22 +19,25 @@
 /// * `c.chunks(of: 3)` does not create new storage
 /// * `c.chunks(of: 3).map(f)` maps eagerly and returns a new array
 /// * `c.lazy.chunks(of: 3).map(f)` maps lazily and returns a `LazyMapCollection`
-@_fixed_layout
+@frozen
 public struct ChunkedCollection<Base: Collection> {
-    @usableFromInline
-    internal let _base: Base
-    @usableFromInline
-    internal let _size: Int
-    
-    ///  Creates a view instance that presents the elements of `base`
-    ///  in `SubSequence` chunks of the given size.
-    ///
-    /// - Complexity: O(1)
-    @inlinable
-    internal init(_base: Base, _size: Int) {
-      self._base = _base
-      self._size = _size
-    }
+
+  public typealias Element = Base.SubSequence
+
+  @usableFromInline
+  internal let _base: Base
+  @usableFromInline
+  internal let _size: Int
+  
+  ///  Creates a view instance that presents the elements of `base`
+  ///  in `SubSequence` chunks of the given size.
+  ///
+  /// - Complexity: O(1)
+  @inlinable
+  internal init(_base: Base, _size: Int) {
+    self._base = _base
+    self._size = _size
+  }
 }
 
 extension ChunkedCollection: Collection {
@@ -48,9 +51,8 @@ extension ChunkedCollection: Collection {
     }
   }
     
-  public typealias Element = Base.SubSequence
-  public var startIndex: Index { return Index(_base: _base.startIndex) }
-  public var endIndex: Index { return Index(_base: _base.endIndex) }
+  public var startIndex: Index { Index(_base: _base.startIndex) }
+  public var endIndex: Index { Index(_base: _base.endIndex) }
     
   public subscript(i: Index) -> Element {
     let range = i..<index(after: i)
@@ -64,7 +66,7 @@ extension ChunkedCollection: Collection {
 }
 
 extension ChunkedCollection.Index: Comparable {
-  public static func < (lhs: ChunkedCollection<Base>.Index, rhs: ChunkedCollection<Base>.Index) -> Bool {
+  public static func < (lhs: ChunkedCollection.Index, rhs: ChunkedCollection.Index) -> Bool {
     return lhs._base < rhs._base
   }
 }
@@ -104,7 +106,7 @@ where Base: RandomAccessCollection {
 
 extension Collection {
   /// Returns a `ChunkedCollection<Self>` view presenting the elements
-  ///    in chunks with count of the given size parameter.
+  /// in chunks with count of the given size parameter.
   ///
   /// - Parameter size: The size of the chunks. If the size parameter
   ///   is evenly divided by the count of the base `Collection` all the
