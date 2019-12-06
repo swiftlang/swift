@@ -110,8 +110,11 @@ namespace swift {
   class VarDecl;
   class UnifiedStatsReporter;
   class IndexSubset;
+  // SWIFT_ENABLE_TENSORFLOW
+  struct AutoDiffConfig;
   class VectorSpace;
   class DifferentiableAttr;
+  // SWIFT_ENABLE_TENSORFLOW END
 
   enum class KnownProtocolKind : uint8_t;
 
@@ -701,6 +704,21 @@ public:
                        bool isInstanceMethod,
                        unsigned previousGeneration,
                        llvm::TinyPtrVector<AbstractFunctionDecl *> &methods);
+
+  // SWIFT_ENABLE_TENSORFLOW
+  /// Load derivative function configurations for the given
+  /// AbstractFunctionDecl.
+  ///
+  /// \param originalAFD The declaration whose derivative function
+  /// configurations should be loaded.
+  ///
+  /// \param previousGeneration The previous generation number. The AST already
+  /// contains derivative function configurations loaded from any generation up
+  /// to and including this one.
+  void loadDerivativeFunctionConfigurations(
+      AbstractFunctionDecl *originalAFD, unsigned previousGeneration,
+      llvm::SetVector<AutoDiffConfig> &results);
+  // SWIFT_ENABLE_TENSORFLOW END
 
   /// Retrieve the Clang module loader for this ASTContext.
   ///

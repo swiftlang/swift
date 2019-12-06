@@ -748,19 +748,21 @@ emitDerivativeFunctionReference(
           original, invoker, diag::autodiff_protocol_member_not_differentiable);
       return None;
     }
-    // Get the minimal `@differentiable` attribute and parameter index subset.
-    IndexSubset *minimalParamIndexSet = nullptr;
-    const auto *minimalAttr = getMinimalASTDifferentiableAttr(
-        requirementDecl, desiredIndices.parameters, minimalParamIndexSet);
-    SILAutoDiffIndices minimalIndices(/*source*/ 0, minimalParamIndexSet);
-    // If minimal `@differentiable` attribute does not exist, then no attribute
-    // exists with a superset of the desired indices. Produce an error.
-    if (!minimalAttr) {
+    // Find the minimal derivative configuration: minimal parameter indices and
+    // corresponding derivative generic signature. If it does not exist, produce
+    // an error.
+    IndexSubset *minimalASTParamIndices = nullptr;
+    IndexSubset *minimalSILParamIndices = nullptr;
+    GenericSignature derivativeGenericSignature;
+    if (!findMinimalDerivativeConfiguration(
+            requirementDecl, desiredIndices.parameters, minimalASTParamIndices,
+            minimalSILParamIndices, derivativeGenericSignature)) {
       context.emitNondifferentiabilityError(
           original, invoker,
           diag::autodiff_member_subset_indices_not_differentiable);
       return None;
     }
+    SILAutoDiffIndices minimalIndices(/*source*/ 0, minimalSILParamIndices);
     // Emit a `witness_method` instruction for the derivative function.
     auto originalType = witnessMethod->getType().castTo<SILFunctionType>();
     auto assocType = originalType->getAutoDiffDerivativeFunctionType(
@@ -768,7 +770,7 @@ emitDerivativeFunctionReference(
         kind, context.getTypeConverter(),
         LookUpConformanceInModule(builder.getModule().getSwiftModule()));
     auto *autoDiffFuncId = AutoDiffDerivativeFunctionIdentifier::get(
-        kind, minimalAttr->getParameterIndices(), context.getASTContext());
+        kind, minimalASTParamIndices, context.getASTContext());
     auto *ref = builder.createWitnessMethod(
         loc, witnessMethod->getLookupType(), witnessMethod->getConformance(),
         requirementDeclRef.asAutoDiffDerivativeFunction(autoDiffFuncId),
@@ -792,28 +794,29 @@ emitDerivativeFunctionReference(
           original, invoker, diag::autodiff_class_member_not_differentiable);
       return None;
     }
-    // Get the minimal `@differentiable` attribute and parameter index subset.
-    IndexSubset *minimalParamIndexSet = nullptr;
-    const auto *minimalAttr = getMinimalASTDifferentiableAttr(
-        methodDecl, desiredIndices.parameters, minimalParamIndexSet);
-    SILAutoDiffIndices minimalIndices(/*source*/ 0, minimalParamIndexSet);
-    // If minimal `@differentiable` attribute does not exist, then no attribute
-    // exists with a superset of the desired indices. Produce an error.
-    if (!minimalAttr) {
+    // Find the minimal derivative configuration: minimal parameter indices and
+    // corresponding derivative generic signature. If it does not exist, produce
+    // an error.
+    IndexSubset *minimalASTParamIndices = nullptr;
+    IndexSubset *minimalSILParamIndices = nullptr;
+    GenericSignature derivativeGenericSignature;
+    if (!findMinimalDerivativeConfiguration(
+            methodDecl, desiredIndices.parameters, minimalASTParamIndices,
+            minimalSILParamIndices, derivativeGenericSignature)) {
       context.emitNondifferentiabilityError(
           original, invoker,
           diag::autodiff_member_subset_indices_not_differentiable);
       return None;
     }
+    SILAutoDiffIndices minimalIndices(/*source*/ 0, minimalSILParamIndices);
     // Emit a `class_method` instruction for the derivative function.
     auto originalType = classMethodInst->getType().castTo<SILFunctionType>();
     auto assocType = originalType->getAutoDiffDerivativeFunctionType(
-        minimalIndices.parameters, minimalIndices.source,
-        kind, context.getTypeConverter(),
+        minimalIndices.parameters, minimalIndices.source, kind,
+        context.getTypeConverter(),
         LookUpConformanceInModule(builder.getModule().getSwiftModule()));
     auto *autoDiffFuncId = AutoDiffDerivativeFunctionIdentifier::get(
-        kind, minimalAttr->getParameterIndices(),
-        context.getASTContext());
+        kind, minimalASTParamIndices, context.getASTContext());
     auto *ref = builder.createClassMethod(
         loc, classMethodInst->getOperand(),
         methodDeclRef.asAutoDiffDerivativeFunction(autoDiffFuncId),
