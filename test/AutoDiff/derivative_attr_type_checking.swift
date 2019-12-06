@@ -10,6 +10,7 @@ func sin(_ x: Float) -> Float {
 func jvpSin(x: @nondiff Float) -> (value: Float, differential: (Float) -> (Float)) {
   return (x, { $0 })
 }
+// expected-note @+1 {{other attribute declared here}}
 @derivative(of: sin, wrt: x) // ok
 func vjpSinExplicitWrt(x: Float) -> (value: Float, pullback: (Float) -> Float) {
   return (x, { $0 })
@@ -241,11 +242,13 @@ protocol GenericInstanceMethod : Differentiable where Self == Self.TangentVector
 }
 
 extension GenericInstanceMethod {
-  func jvpInstanceMethod<T : Differentiable>(_ x: T) -> (T, (T.TangentVector) -> (TangentVector, T.TangentVector)) {
-    return (x, { v in (self, v) })
+  @derivative(of: instanceMethod)
+  func jvpInstanceMethod<T : Differentiable>(_ x: T) -> (value: T, differential: (Self, T.TangentVector) -> (T.TangentVector)) {
+    return (x, { (dself, dx) in dx })
   }
 
-  func vjpInstanceMethod<T : Differentiable>(_ x: T) -> (T, (T.TangentVector) -> (TangentVector, T.TangentVector)) {
+  @derivative(of: instanceMethod)
+  func vjpInstanceMethod<T : Differentiable>(_ x: T) -> (value: T, pullback: (T.TangentVector) -> (Self, T.TangentVector)) {
     return (x, { v in (self, v) })
   }
 }
@@ -281,16 +284,108 @@ extension InstanceMethodProto where Self : Differentiable {
   }
 }
 
-// Test consistent usages of `@differentiable` and `@derivative` where
-// derivative functions are specified in both attributes.
+//===----------------------------------------------------------------------===//
+// `@differentiable` and `@derivative` interactions
+//===----------------------------------------------------------------------===//
+
+// Test "overlapping" usages of `@differentiable` and `@derivative`, where both
+// have the same original declaration and parameter indices.
+
+protocol Protocol: Differentiable {
+  func requirementOnlyDerivativeAttr() -> Self
+
+  @differentiable
+  func requirementOverlapping() -> Self
+}
+extension Protocol {
+  func nonRequirementOnlyDerivativeAttr() -> Self { self }
+
+  // expected-note @+1 {{other attribute declared here}}
+  @differentiable
+  func nonRequirementOverlapping() -> Self { self }
+
+  // expected-note @+1 {{other attribute declared here}}
+  @differentiable
+  func nonRequirementOverlappingDerivativeGenSig() -> Self { self }
+}
+extension Protocol {
+  @derivative(of: nonRequirementOnlyDerivativeAttr)
+  func vjpRequirementOnlyDerivativeAttr()
+    -> (value: Self, pullback: (TangentVector) -> (TangentVector)) {
+    return (self, { $0 })
+  }
+}
+
+// Test overlapping attributes for protocol requirement.
+// Valid: `@differentiable` attribute on protocol requirement umambiguously
+// means "require all implementations to have same `@differentiable`
+// attribute".
+extension Protocol {
+  @derivative(of: requirementOverlapping)
+  func vjpRequirementOverlapping()
+    -> (value: Self, pullback: (TangentVector) -> (TangentVector)) {
+    return (self, { $0 })
+  }
+}
+// Test overlapping `@derivative` attribute with same derivative generic
+// signature as the `@differentiable` attribute.
+extension Protocol {
+  // expected-error @+1 {{a derivative already exists for 'nonRequirementOverlapping()'}}
+  @derivative(of: nonRequirementOverlapping)
+  func vjpNonRequirementOverlapping()
+    -> (value: Self, pullback: (TangentVector) -> (TangentVector)) {
+    return (self, { $0 })
+  }
+}
+// Test overlapping `@derivative` attribute with different derivative generic
+// signature from the `@differentiable` attribute.
+extension Protocol where Self: AdditiveArithmetic {
+  // expected-error @+1 {{a derivative already exists for 'nonRequirementOverlappingDerivativeGenSig()'}}
+  @derivative(of: nonRequirementOverlappingDerivativeGenSig)
+  func vjpNonRequirementOverlappingDerivativeGenSig()
+    -> (value: Self, pullback: (TangentVector) -> (TangentVector)) {
+    return (self, { $0 })
+  }
+}
+
+// Test class methods.
+class Class: Differentiable {
+  func classMethodOnlyDerivativeAttr() -> Float { 1 }
+
+  // expected-note @+1 {{other attribute declared here}}
+  @differentiable
+  func classMethodOverlapping() -> Float { 1 }
+}
+extension Class {
+  @derivative(of: classMethodOnlyDerivativeAttr)
+  func vjpClassMethodOnlyDerivativeAttr()
+     -> (value: Float, pullback: (Float) -> (TangentVector)) {
+    return (1, { _ in .init() })
+  }
+
+  // expected-error @+1 {{a derivative already exists for 'classMethodOverlapping()'}}
+  @derivative(of: classMethodOverlapping)
+  func vjpClassMethodOverlapping()
+    -> (value: Float, pullback: (Float) -> (TangentVector)) {
+    return (1, { _ in .init() })
+  }
+}
+
+// Old: test consistent usages of `@differentiable` and `@derivative` where
+// both attributes register the same derivatives. This was previously valid
+// but is now rejected.
+
+// expected-note @+1 2 {{other attribute declared here}}
 @differentiable(jvp: jvpConsistent, vjp: vjpConsistent)
 func consistentSpecifiedDerivatives(_ x: Float) -> Float {
   return x
 }
+// expected-error @+1 {{a derivative already exists for 'consistentSpecifiedDerivatives'}}
 @derivative(of: consistentSpecifiedDerivatives)
 func jvpConsistent(_ x: Float) -> (value: Float, differential: (Float) -> Float) {
   return (x, { $0 })
 }
+// expected-error @+1 {{a derivative already exists for 'consistentSpecifiedDerivatives'}}
 @derivative(of: consistentSpecifiedDerivatives(_:))
 func vjpConsistent(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
   return (x, { $0 })
@@ -331,11 +426,13 @@ func two7(x: Float, y: Float) -> (value: Float, pullback: (Float) -> (Float, Flo
 // Test class methods.
 
 class Super {
+  // expected-note @+1 {{other attribute declared here}}
   @differentiable
   func foo(_ x: Float) -> Float {
     return x
   }
 
+  // expected-error @+1 {{a derivative already exists for 'foo'}}
   @derivative(of: foo)
   func vjpFoo(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
     return (foo(x), { v in v })

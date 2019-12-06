@@ -29,7 +29,7 @@ func no_jvp_or_vjp(_ x: Float) -> Float {
   return x * x
 }
 
-// Test duplicated `@differentiable` attributes.
+// Test duplicate `@differentiable` attributes.
 
 @differentiable // expected-error {{duplicate '@differentiable' attribute with same parameters}}
 @differentiable // expected-note {{other attribute declared here}}
@@ -996,6 +996,21 @@ class Super : Differentiable {
   init(base: Float) {
     self.base = base
   }
+
+  // NOTE(TF-1040): `@differentiable` attribute on class methods currently
+  // does two orthogonal things:
+  // - Requests derivative generation for the class method.
+  // - Adds JVP/VJP vtable entries for the class method.
+  // There's currently no way using `@differentiable` to do only one of the
+  // above.
+  @differentiable
+  func testClassMethod(_ x: Float) -> Float { x }
+
+  @differentiable
+  final func testFinalMethod(_ x: Float) -> Float { x }
+
+  @differentiable
+  static func testStaticMethod(_ x: Float) -> Float { x }
 
   @differentiable(wrt: (self, x))
   @differentiable(wrt: x, vjp: vjp)
