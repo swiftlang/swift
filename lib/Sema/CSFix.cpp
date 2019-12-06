@@ -272,8 +272,7 @@ bool AllowTupleTypeMismatch::coalesceAndDiagnose(
       return false;
     fromType = cs.getType(tupleExpr);
     toType = contextualType;
-  } else if (auto argApplyInfo =
-                 FailureDiagnostic::getFunctionArgApplyInfo(cs, locator)) {
+  } else if (auto argApplyInfo = cs.getFunctionArgApplyInfo(locator)) {
     purpose = CTP_CallArgument;
     fromType = argApplyInfo->getArgType();
     toType = argApplyInfo->getParamType();

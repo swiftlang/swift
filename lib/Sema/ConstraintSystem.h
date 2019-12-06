@@ -486,6 +486,141 @@ struct SelectedOverload {
   Type boundType;
 };
 
+/// Provides information about the application of a function argument to a
+/// parameter.
+class FunctionArgApplyInfo {
+  Expr *ArgListExpr;
+  Expr *ArgExpr;
+  unsigned ArgIdx;
+  Type ArgType;
+
+  unsigned ParamIdx;
+
+  Type FnInterfaceType;
+  FunctionType *FnType;
+  const ValueDecl *Callee;
+
+public:
+  FunctionArgApplyInfo(Expr *argListExpr, Expr *argExpr, unsigned argIdx,
+                       Type argType, unsigned paramIdx, Type fnInterfaceType,
+                       FunctionType *fnType, const ValueDecl *callee)
+      : ArgListExpr(argListExpr), ArgExpr(argExpr), ArgIdx(argIdx),
+        ArgType(argType), ParamIdx(paramIdx), FnInterfaceType(fnInterfaceType),
+        FnType(fnType), Callee(callee) {}
+
+  /// \returns The argument being applied.
+  Expr *getArgExpr() const { return ArgExpr; }
+
+  /// \returns The position of the argument, starting at 1.
+  unsigned getArgPosition() const { return ArgIdx + 1; }
+
+  /// \returns The position of the parameter, starting at 1.
+  unsigned getParamPosition() const { return ParamIdx + 1; }
+
+  /// \returns The type of the argument being applied, including any generic
+  /// substitutions.
+  ///
+  /// \param withSpecifier Whether to keep the inout or @lvalue specifier of
+  /// the argument, if any.
+  Type getArgType(bool withSpecifier = false) const {
+    return withSpecifier ? ArgType : ArgType->getWithoutSpecifierType();
+  }
+
+  /// \returns The label for the argument being applied.
+  Identifier getArgLabel() const {
+    if (auto *te = dyn_cast<TupleExpr>(ArgListExpr))
+      return te->getElementName(ArgIdx);
+
+    assert(isa<ParenExpr>(ArgListExpr));
+    return Identifier();
+  }
+
+  /// \returns A textual description of the argument suitable for diagnostics.
+  /// For an argument with an unambiguous label, this will the label. Otherwise
+  /// it will be its position in the argument list.
+  StringRef getArgDescription(SmallVectorImpl<char> &scratch) const {
+    llvm::raw_svector_ostream stream(scratch);
+
+    // Use the argument label only if it's unique within the argument list.
+    auto argLabel = getArgLabel();
+    auto useArgLabel = [&]() -> bool {
+      if (argLabel.empty())
+        return false;
+
+      if (auto *te = dyn_cast<TupleExpr>(ArgListExpr))
+        return llvm::count(te->getElementNames(), argLabel) == 1;
+
+      return false;
+    };
+
+    if (useArgLabel()) {
+      stream << "'";
+      stream << argLabel;
+      stream << "'";
+    } else {
+      stream << "#";
+      stream << getArgPosition();
+    }
+    return StringRef(scratch.data(), scratch.size());
+  }
+
+  /// \returns The interface type for the function being applied. Note that this
+  /// may not a function type, for example it could be a generic parameter.
+  Type getFnInterfaceType() const { return FnInterfaceType; }
+
+  /// \returns The function type being applied, including any generic
+  /// substitutions.
+  FunctionType *getFnType() const { return FnType; }
+
+  /// \returns The callee for the application.
+  const ValueDecl *getCallee() const { return Callee; }
+
+private:
+  Type getParamTypeImpl(AnyFunctionType *fnTy,
+                        bool lookThroughAutoclosure) const {
+    auto param = fnTy->getParams()[ParamIdx];
+    auto paramTy = param.getPlainType();
+    if (lookThroughAutoclosure && param.isAutoClosure())
+      paramTy = paramTy->castTo<FunctionType>()->getResult();
+    return paramTy;
+  }
+
+public:
+  /// \returns The type of the parameter which the argument is being applied to,
+  /// including any generic substitutions.
+  ///
+  /// \param lookThroughAutoclosure Whether an @autoclosure () -> T parameter
+  /// should be treated as being of type T.
+  Type getParamType(bool lookThroughAutoclosure = true) const {
+    return getParamTypeImpl(FnType, lookThroughAutoclosure);
+  }
+
+  /// \returns The interface type of the parameter which the argument is being
+  /// applied to.
+  ///
+  /// \param lookThroughAutoclosure Whether an @autoclosure () -> T parameter
+  /// should be treated as being of type T.
+  Type getParamInterfaceType(bool lookThroughAutoclosure = true) const {
+    auto interfaceFnTy = FnInterfaceType->getAs<AnyFunctionType>();
+    if (!interfaceFnTy) {
+      // If the interface type isn't a function, then just return the resolved
+      // parameter type.
+      return getParamType(lookThroughAutoclosure)->mapTypeOutOfContext();
+    }
+    return getParamTypeImpl(interfaceFnTy, lookThroughAutoclosure);
+  }
+
+  /// \returns The flags of the parameter which the argument is being applied
+  /// to.
+  ParameterTypeFlags getParameterFlags() const {
+    return FnType->getParams()[ParamIdx].getParameterFlags();
+  }
+
+  ParameterTypeFlags getParameterFlagsAtIndex(unsigned idx) const {
+    return FnType->getParams()[idx].getParameterFlags();
+  }
+};
+
 /// Describes an aspect of a solution that affects its overall score, i.e., a
 /// user-defined conversions.
 enum ScoreKind {
@@ -1596,6 +1731,16 @@ public:
     auto *calleeLoc = getCalleeLocator(loc, /*lookThroughApply*/ false);
     return findSelectedOverloadFor(calleeLoc);
   }
+
+  /// Resolve type variables present in the raw type, using generic parameter
+  /// types where possible.
+  Type resolveInterfaceType(Type type) const;
+
+  /// For a given locator describing a function argument conversion, or a
+  /// constraint within an argument conversion, returns information about the
+  /// application of the argument to its parameter. If the locator is not
+  /// for an argument conversion, returns \c None.
+  Optional<FunctionArgApplyInfo> getFunctionArgApplyInfo(ConstraintLocator *);
 
 private:
   unsigned assignTypeVariableID() {
