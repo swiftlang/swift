@@ -50,8 +50,8 @@ bool findMinimalDerivativeConfiguration(
     IndexSubset *&minimalASTParameterIndices,
     IndexSubset *&minimalSILParameterIndices,
     GenericSignature &derivativeGenericSignature) {
-  auto results = original->getDerivativeFunctionConfigurations();
-  for (auto config : results) {
+  auto configs = original->getDerivativeFunctionConfigurations();
+  for (auto config : configs) {
     auto *paramIndices = config.parameterIndices;
     auto derivativeGenSig = config.derivativeGenericSignature;
     auto *silParameterIndices = autodiff::getLoweredParameterIndices(

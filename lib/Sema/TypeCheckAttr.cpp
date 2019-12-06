@@ -3910,9 +3910,8 @@ void AttributeChecker::visitDerivativeAttr(DerivativeAttr *attr) {
   }
 
   // Reject different-file retroactive derivatives.
-  // TODO(TF-136): Lift this restriction now that SIL diffferentiability witness
-  // infrastructure is in-place. Also requires differentiation transform
-  // changes.
+  // TODO(TF-136): Lift this restriction now that SIL differentiability witness
+  // infrastructure is ready.
   if (originalAFD->getParentSourceFile() != derivative->getParentSourceFile()) {
     diagnoseAndRemoveAttr(attr,
                           diag::derivative_attr_not_in_same_file_as_original);
