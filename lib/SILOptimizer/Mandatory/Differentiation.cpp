@@ -263,36 +263,6 @@ public:
 
 } // end anonymous namespace
 
-static void dumpActivityInfo(SILValue value,
-                             const SILAutoDiffIndices &indices,
-                             const DifferentiableActivityInfo &activityInfo,
-                             llvm::raw_ostream &s = llvm::dbgs()) {
-  s << '[';
-  auto activity = activityInfo.getActivity(value, indices);
-  switch (activity.toRaw()) {
-  case 0: s << "NONE"; break;
-  case (unsigned)ActivityFlags::Varied: s << "VARIED"; break;
-  case (unsigned)ActivityFlags::Useful: s << "USEFUL"; break;
-  case (unsigned)ActivityFlags::Active: s << "ACTIVE"; break;
-  }
-  s << "] " << value;
-}
-
-static void dumpActivityInfo(SILFunction &fn, SILAutoDiffIndices indices,
-                             const DifferentiableActivityInfo &activityInfo,
-                             llvm::raw_ostream &s = llvm::dbgs()) {
-  s << "Activity info for " << fn.getName() << " at " << indices << '\n';
-  for (auto &bb : fn) {
-    s << "bb" << bb.getDebugID() << ":\n";
-    for (auto *arg : bb.getArguments())
-      dumpActivityInfo(arg, indices, activityInfo, s);
-    for (auto &inst : bb)
-      for (auto res : inst.getResults())
-        dumpActivityInfo(res, indices, activityInfo, s);
-    s << '\n';
-  }
-}
-
 /// If the original function doesn't have a return, it cannot be differentiated.
 /// Returns true if error is emitted.
 static bool diagnoseNoReturn(ADContext &context, SILFunction *original,
@@ -1388,8 +1358,7 @@ private:
     auto &activityInfo = activityCollection.getActivityInfo(
         vjp->getLoweredFunctionType()->getSubstGenericSignature(),
         AutoDiffDerivativeFunctionKind::VJP);
-    LLVM_DEBUG(
-        dumpActivityInfo(*original, indices, activityInfo, getADDebugStream()));
+    LLVM_DEBUG(activityInfo.dump(indices, getADDebugStream()));
     return activityInfo;
   }
 
@@ -2141,8 +2110,7 @@ private:
     auto &activityInfo = activityCollection.getActivityInfo(
         jvp->getLoweredFunctionType()->getSubstGenericSignature(),
         AutoDiffDerivativeFunctionKind::JVP);
-    LLVM_DEBUG(
-        dumpActivityInfo(*original, indices, activityInfo, getADDebugStream()));
+    LLVM_DEBUG(activityInfo.dump(indices, getADDebugStream()));
     return activityInfo;
   }
 

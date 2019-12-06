@@ -59,7 +59,7 @@ DifferentiableActivityInfo::DifferentiableActivityInfo(
   analyze(parent.domInfo, parent.postDomInfo);
 }
 
-SILFunction &DifferentiableActivityInfo::getFunction() {
+SILFunction &DifferentiableActivityInfo::getFunction() const {
   return parent.function;
 }
 
@@ -420,4 +420,33 @@ Activity DifferentiableActivityInfo::getActivity(
   if (isUseful(value, indices.source))
     activity |= ActivityFlags::Useful;
   return activity;
+}
+
+void DifferentiableActivityInfo::dump(SILValue value,
+                                      const SILAutoDiffIndices &indices,
+                                      llvm::raw_ostream &s) const {
+  s << '[';
+  auto activity = getActivity(value, indices);
+  switch (activity.toRaw()) {
+  case 0: s << "NONE"; break;
+  case (unsigned)ActivityFlags::Varied: s << "VARIED"; break;
+  case (unsigned)ActivityFlags::Useful: s << "USEFUL"; break;
+  case (unsigned)ActivityFlags::Active: s << "ACTIVE"; break;
+  }
+  s << "] " << value;
+}
+
+void DifferentiableActivityInfo::dump(SILAutoDiffIndices indices,
+                                      llvm::raw_ostream &s) const {
+  SILFunction &fn = getFunction();
+  s << "Activity info for " << fn.getName() << " at " << indices << '\n';
+  for (auto &bb : fn) {
+    s << "bb" << bb.getDebugID() << ":\n";
+    for (auto *arg : bb.getArguments())
+      dump(arg, indices, s);
+    for (auto &inst : bb)
+      for (auto res : inst.getResults())
+        dump(res, indices, s);
+    s << '\n';
+  }
 }
