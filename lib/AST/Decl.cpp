@@ -5830,7 +5830,7 @@ bool VarDecl::isPropertyMemberwiseInitializedWithWrappedType() const {
   if (getAttachedPropertyWrapperTypeInfo(0).defaultInit)
     return false;
 
-  // If all property wrappers have an initialValue initializer, the property
+  // If all property wrappers have a wrappedValue initializer, the property
   // wrapper will be initialized that way.
   return allAttachedPropertyWrappersHaveInitialValueInit();
 }

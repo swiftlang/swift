@@ -2436,8 +2436,7 @@ PropertyWrapperBackingPropertyInfoRequest::evaluate(Evaluator &evaluator,
   }
   
   // Get the property wrapper information.
-  if (!var->allAttachedPropertyWrappersHaveInitialValueInit() &&
-      !originalInitialValue) {
+  if (!var->allAttachedPropertyWrappersHaveInitialValueInit()) {
     return PropertyWrapperBackingPropertyInfo(
         backingVar, storageVar, nullptr, nullptr, nullptr);
   }
