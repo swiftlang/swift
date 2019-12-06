@@ -119,4 +119,36 @@ CastsTests.test("Dynamic casts of CF types to protocol existentials")
 }
 #endif
 
+protocol PP: class {}
+CastsTests.test("Any<Optional<P>> => P (P is class constrained)") {
+  class C : PP {}
+  let a = C()
+  let b: PP = a
+  let c: Optional<PP> = b
+  let d = c as Any
+  let e = d as? PP
+  expectNotNil(e)
+  expectNotNil(d as? C)
+  // FIXME: Compiler rejects these: "Cannot downcast to a more optional type"
+  // But, in this case, the Any holds an Optional<PP>, so the
+  // cast should be accepted.
+  //expectNotNil(d as? Optional<PP>)
+  //expectNotNil(d as? Optional<C>)
+}
+
+protocol PP2 {}
+CastsTests.test("Any<Optional<P>> => P (P not class-constrained)") {
+  class C : PP2 {}
+  let a = C()
+  let b: PP2 = a
+  let c: Optional<PP2> = b
+  let d = c as Any
+  let e = d as? PP2
+  expectNotNil(e)
+  expectNotNil(d as? C)
+  // FIXME: Compiler rejects these
+  //expectNotNil(d as? Optional<PP2>)
+  //expectNotNil(d as? Optional<C>)
+}
+
 runAllTests()
