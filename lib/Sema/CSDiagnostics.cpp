@@ -121,6 +121,12 @@ Expr *FailureDiagnostic::getBaseExprFor(Expr *anchor) const {
     return SE->getBase();
   else if (auto *MRE = dyn_cast<MemberRefExpr>(anchor))
     return MRE->getBase();
+  else if (auto *call = dyn_cast<CallExpr>(anchor)) {
+    auto fnType = getType(call->getFn());
+    if (fnType->isCallableNominalType(getDC())) {
+      return call->getFn();
+    }
+  }
 
   return nullptr;
 }
