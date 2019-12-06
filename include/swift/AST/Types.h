@@ -4361,6 +4361,12 @@ public:
   ///   be differentiated. Instead, the argument is made `@differentiable` and
   ///   reabstraction thunk JVP/VJP callers are reponsible for passing a
   ///   `@differentiable` function.
+  ///   - TODO(TF-1036): Investigate more efficient reabstraction thunk
+  ///     derivative approaches. The last argument can simply be a
+  ///     corresponding derivative function, instead of a `@differentiable`
+  ///     function - this is more direct. It may be possible to implement
+  ///     reabstraction thunk derivatives using "reabstraction thunks for
+  ///     the original function's derivative", avoiding extra code generation.
   ///
   /// Caveats:
   /// - We may support multiple result indices instead of a single result index
