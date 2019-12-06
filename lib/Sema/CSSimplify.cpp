@@ -2662,6 +2662,17 @@ repairViaOptionalUnwrap(ConstraintSystem &cs, Type fromType, Type toType,
   if (fromUnwraps <= toUnwraps && !fromObjectType->is<TypeVariableType>())
     return false;
 
+  // If the result of optional chaining is converted to
+  // an optional contextual type represented by a type
+  // variable e.g. `T?`, there can be no optional mismatch
+  // because `T` could be bound to an optional of any depth.
+  if (isa<OptionalEvaluationExpr>(anchor) && toUnwraps > 0) {
+    auto last = locator.last();
+    if (last && last->is<LocatorPathElt::ContextualType>() &&
+        toObjectType->is<TypeVariableType>())
+      return false;
+  }
+
   auto result =
       cs.matchTypes(fromObjectType, toObjectType, matchKind,
                     ConstraintSystem::TypeMatchFlags::TMF_ApplyingFix, locator);
