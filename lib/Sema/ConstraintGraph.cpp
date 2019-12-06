@@ -1350,7 +1350,7 @@ void ConstraintGraphNode::print(llvm::raw_ostream &out, unsigned indent,
              });
    for (auto adj : sortedAdjacencies) {
      out << ' ';
-     adj->print(out);
+     adj->print(out, PO);
 
      const auto info = AdjacencyInfo.lookup(adj);
      auto degree = info.NumConstraints;
@@ -1389,7 +1389,7 @@ void ConstraintGraphNode::print(llvm::raw_ostream &out, unsigned indent,
     out << "Equivalence class:";
     for (unsigned i = 1, n = EquivalenceClass.size(); i != n; ++i) {
       out << ' ';
-      EquivalenceClass[i]->print(out);
+      EquivalenceClass[i]->print(out, PO);
     }
     out << "\n";
   }
@@ -1403,8 +1403,11 @@ void ConstraintGraphNode::dump() const {
 
 void ConstraintGraph::print(ArrayRef<TypeVariableType *> typeVars,
                             llvm::raw_ostream &out) {
+  PrintOptions PO;
+  PO.PrintTypesForDebugging = true;
+
   for (auto typeVar : typeVars) {
-    (*this)[typeVar].print(out, 2);
+    (*this)[typeVar].print(out, 2, PO);
     out << "\n";
   }
 }

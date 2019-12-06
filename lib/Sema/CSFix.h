@@ -223,6 +223,10 @@ enum class FixKind : uint8_t {
   /// Allow an ephemeral argument conversion for a parameter marked as being
   /// non-ephemeral.
   TreatEphemeralAsNonEphemeral,
+
+  /// Base type in reference to the contextual member e.g. `.foo` couldn't be
+  /// inferred and has to be specified explicitly.
+  SpecifyBaseTypeForContextualMember,
 };
 
 class ConstraintFix {
@@ -276,28 +280,6 @@ public:
 
 protected:
   ConstraintSystem &getConstraintSystem() const { return CS; }
-};
-
-/// Introduce a '!' to force an optional unwrap.
-class ForceOptional final : public ConstraintFix {
-  Type BaseType;
-  Type UnwrappedType;
-
-  ForceOptional(ConstraintSystem &cs, Type baseType, Type unwrappedType,
-                ConstraintLocator *locator)
-      : ConstraintFix(cs, FixKind::ForceOptional, locator), BaseType(baseType),
-        UnwrappedType(unwrappedType) {
-    assert(baseType && "Base type must not be null");
-    assert(unwrappedType && "Unwrapped type must not be null");
-  }
-
-public:
-  std::string getName() const override { return "force optional"; }
-
-  bool diagnose(bool asNote = false) const override;
-
-  static ForceOptional *create(ConstraintSystem &cs, Type baseType,
-                               Type unwrappedType, ConstraintLocator *locator);
 };
 
 /// Unwrap an optional base when we have a member access.
@@ -512,6 +494,26 @@ public:
 
   static ContextualMismatch *create(ConstraintSystem &cs, Type lhs, Type rhs,
                                     ConstraintLocator *locator);
+};
+
+/// Introduce a '!' to force an optional unwrap.
+class ForceOptional final : public ContextualMismatch {
+  ForceOptional(ConstraintSystem &cs, Type fromType, Type toType,
+                ConstraintLocator *locator)
+      : ContextualMismatch(cs, FixKind::ForceOptional, fromType, toType,
+                           locator) {
+    assert(fromType && "Base type must not be null");
+    assert(fromType->getOptionalObjectType() &&
+           "Unwrapped type must not be null");
+  }
+
+public:
+  std::string getName() const override { return "force optional"; }
+
+  bool diagnose(bool asNote = false) const override;
+
+  static ForceOptional *create(ConstraintSystem &cs, Type fromType, Type toType,
+                               ConstraintLocator *locator);
 };
 
 /// This is a contextual mismatch between throwing and non-throwing
@@ -1535,6 +1537,27 @@ public:
   create(ConstraintSystem &cs, ConstraintLocator *locator, Type srcType,
          Type dstType, ConversionRestrictionKind conversionKind,
          bool downgradeToWarning);
+};
+
+class SpecifyBaseTypeForContextualMember final : public ConstraintFix {
+  DeclName MemberName;
+
+  SpecifyBaseTypeForContextualMember(ConstraintSystem &cs, DeclName member,
+                                     ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::SpecifyBaseTypeForContextualMember, locator),
+        MemberName(member) {}
+
+public:
+  std::string getName() const {
+    const auto baseName = MemberName.getBaseName();
+    return "specify base type in reference to member '" +
+           baseName.userFacingName().str() + "'";
+  }
+
+  bool diagnose(bool asNote = false) const;
+
+  static SpecifyBaseTypeForContextualMember *
+  create(ConstraintSystem &cs, DeclName member, ConstraintLocator *locator);
 };
 
 } // end namespace constraints

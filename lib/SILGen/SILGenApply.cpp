@@ -789,8 +789,7 @@ bool isCallToReplacedInDynamicReplacement(SILGenFunction &SGF,
                                           bool &isObjCReplacementSelfCall) {
   if (auto *func =
           dyn_cast_or_null<AbstractFunctionDecl>(SGF.FunctionDC->getAsDecl())) {
-    auto *repl = func->getAttrs().getAttribute<DynamicReplacementAttr>();
-    if (repl && repl->getReplacedFunction() == afd) {
+    if (func->getDynamicallyReplacedDecl() == afd) {
       isObjCReplacementSelfCall = afd->isObjC();
       return true;
     }
@@ -2634,9 +2633,9 @@ public:
 
   // origParamType is a parameter type.
   void emitSingleArg(ArgumentSource &&arg, AbstractionPattern origParamType) {
-    // If this is default argument, prepare to emit the default argument
+    // If this is delayed default argument, prepare to emit the default argument
     // generator later.
-    if (arg.isDefaultArg()) {
+    if (arg.isDelayedDefaultArg()) {
       auto substParamType = arg.getSubstRValueType();
       auto defArg = std::move(arg).asKnownDefaultArg();
 
@@ -4609,9 +4608,6 @@ SILValue SILGenFunction::emitApplyWithRethrow(SILLocation loc, SILValue fn,
     SILValue error = errorBB->createPhiArgument(fnConv.getSILErrorType(),
                                                 ValueOwnershipKind::Owned);
 
-    B.createBuiltin(loc, SGM.getASTContext().getIdentifier("willThrow"),
-                    SGM.Types.getEmptyTupleType(), {}, {error});
-
     Cleanups.emitCleanupsForReturn(CleanupLocation::get(loc), IsForUnwind);
     B.createThrow(loc, error);
   }
@@ -6089,6 +6085,39 @@ RValue SILGenFunction::emitDynamicSubscriptExpr(DynamicSubscriptExpr *e,
   if (optTL.isLoadable())
     optResult = optTL.emitLoad(B, e, optResult, LoadOwnershipQualifier::Take);
   return RValue(*this, e, emitManagedRValueWithCleanup(optResult, optTL));
+}
+
+SmallVector<ManagedValue, 4> SILGenFunction::emitKeyPathSubscriptOperands(
+    SubscriptDecl *subscript, SubstitutionMap subs, Expr *indexExpr) {
+  Type interfaceType = subscript->getInterfaceType();
+  CanFunctionType substFnType =
+      subs ? cast<FunctionType>(interfaceType->castTo<GenericFunctionType>()
+                                    ->substGenericArgs(subs)
+                                    ->getCanonicalType())
+           : cast<FunctionType>(interfaceType->getCanonicalType());
+  AbstractionPattern origFnType(substFnType);
+  auto fnType =
+      getLoweredType(origFnType, substFnType).castTo<SILFunctionType>();
+
+  SmallVector<ManagedValue, 4> argValues;
+  SmallVector<DelayedArgument, 2> delayedArgs;
+  ArgEmitter emitter(*this, fnType->getRepresentation(),
+                     /*yield*/ false,
+                     /*isForCoroutine*/ false,
+                     ClaimedParamsRef(fnType, fnType->getParameters()),
+                     argValues, delayedArgs,
+                     /*foreign error*/ None, ImportAsMemberStatus());
+
+  auto prepared =
+      prepareSubscriptIndices(subscript, subs,
+                              // Strategy doesn't matter
+                              AccessStrategy::getStorage(), indexExpr);
+  emitter.emitPreparedArgs(std::move(prepared), origFnType);
+
+  if (!delayedArgs.empty())
+    emitDelayedArguments(*this, delayedArgs, argValues);
+
+  return argValues;
 }
 
 ManagedValue ArgumentScope::popPreservingValue(ManagedValue mv) {

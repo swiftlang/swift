@@ -508,10 +508,26 @@ DECL_ATTR(differentiable, Differentiable,
   ABIStableToAdd | ABIBreakingToRemove | APIStableToAdd | APIBreakingToRemove,
   91)
 
+SIMPLE_DECL_ATTR(_hasMissingDesignatedInitializers,
+  HasMissingDesignatedInitializers, OnClass | UserInaccessible | NotSerialized |
+  APIBreakingToAdd | ABIBreakingToAdd | APIStableToRemove | ABIStableToRemove,
+  92)
+
+SIMPLE_DECL_ATTR(_inheritsConvenienceInitializers,
+  InheritsConvenienceInitializers, OnClass | UserInaccessible | NotSerialized |
+  APIStableToAdd | ABIStableToAdd | APIBreakingToRemove | ABIBreakingToRemove,
+  93)
+
 SIMPLE_DECL_ATTR(IBSegueAction, IBSegueAction,
   OnFunc |
   ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
   95)
+
+DECL_ATTR(_originallyDefinedIn, OriginallyDefinedIn,
+  OnNominalType | OnFunc | OnVar | OnExtension | UserInaccessible |
+  AllowMultipleAttributes |
+  ABIBreakingToAdd | ABIBreakingToRemove | APIStableToAdd | APIStableToRemove,
+  96)
 
 #undef TYPE_ATTR
 #undef DECL_ATTR_ALIAS

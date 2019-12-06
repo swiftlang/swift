@@ -771,7 +771,6 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(sil_block, SIL_VTABLE);
   BLOCK_RECORD(sil_block, SIL_VTABLE_ENTRY);
   BLOCK_RECORD(sil_block, SIL_GLOBALVAR);
-  BLOCK_RECORD(sil_block, SIL_INST_CAST);
   BLOCK_RECORD(sil_block, SIL_INIT_EXISTENTIAL);
   BLOCK_RECORD(sil_block, SIL_WITNESS_TABLE);
   BLOCK_RECORD(sil_block, SIL_WITNESS_METHOD_ENTRY);
@@ -2070,7 +2069,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
     didVerifyAttrs = true;
   }
 
-  void writeDeclAttribute(const DeclAttribute *DA) {
+  void writeDeclAttribute(const Decl *D, const DeclAttribute *DA) {
     using namespace decls_block;
 
     // Completely ignore attributes that aren't serialized.
@@ -2181,6 +2180,22 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       return;
     }
 
+    case DAK_OriginallyDefinedIn: {
+      auto *theAttr = cast<OriginallyDefinedInAttr>(DA);
+      ENCODE_VER_TUPLE(Moved, llvm::Optional<llvm::VersionTuple>(theAttr->MovedVersion));
+      auto abbrCode = S.DeclTypeAbbrCodes[OriginallyDefinedInDeclAttrLayout::Code];
+      llvm::SmallString<32> blob;
+      blob.append(theAttr->OriginalModuleName.str());
+      blob.push_back('\0');
+      OriginallyDefinedInDeclAttrLayout::emitRecord(
+          S.Out, S.ScratchRecord, abbrCode,
+          theAttr->isImplicit(),
+          LIST_VER_TUPLE_PIECES(Moved),
+          static_cast<unsigned>(theAttr->Platform),
+          blob);
+      return;
+    }
+
     case DAK_Available: {
       auto *theAttr = cast<AvailableAttr>(DA);
       ENCODE_VER_TUPLE(Introduced, theAttr->Introduced)
@@ -2246,10 +2261,11 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       pieces.push_back(S.addDeclBaseNameRef(replacedFun.getBaseName()));
       for (auto argName : replacedFun.getArgumentNames())
         pieces.push_back(S.addDeclBaseNameRef(argName));
-      assert(theAttr->getReplacedFunction());
+      auto *afd = cast<ValueDecl>(D)->getDynamicallyReplacedDecl();
+      assert(afd && "Missing replaced decl!");
       DynamicReplacementDeclAttrLayout::emitRecord(
           S.Out, S.ScratchRecord, abbrCode, false, /*implicit flag*/
-          S.addDeclRef(theAttr->getReplacedFunction()), pieces.size(), pieces);
+          S.addDeclRef(afd), pieces.size(), pieces);
       return;
     }
 
@@ -2658,7 +2674,7 @@ public:
   void visit(const Decl *D) {
     // Emit attributes (if any).
     for (auto Attr : D->getAttrs())
-      writeDeclAttribute(Attr);
+      writeDeclAttribute(D, Attr);
 
     if (auto *value = dyn_cast<ValueDecl>(D))
       writeDiscriminatorsIfNeeded(value);
@@ -3943,6 +3959,8 @@ public:
 
   void visitFunctionType(const FunctionType *fnTy) {
     using namespace decls_block;
+
+    // FIXME: [clang-function-type-serialization] Serialize the clang type here
     unsigned abbrCode = S.DeclTypeAbbrCodes[FunctionTypeLayout::Code];
     FunctionTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
         S.addTypeRef(fnTy->getResult()),

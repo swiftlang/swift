@@ -115,7 +115,6 @@ struct StructWithoutExplicitConformance {
 
 func structWithoutExplicitConformance() {
   if StructWithoutExplicitConformance(a: 1, b: "b") == StructWithoutExplicitConformance(a: 2, b: "a") { } // expected-error{{binary operator '==' cannot be applied to two 'StructWithoutExplicitConformance' operands}}
-  // expected-note @-1 {{overloads for '==' exist with these partially matching parameter lists: }}
 }
 
 // Structs with non-hashable/equatable stored properties don't derive conformance.

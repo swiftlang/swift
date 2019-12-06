@@ -48,6 +48,7 @@ namespace swift {
   class Decl;
   class DeclRefExpr;
   class OpenedArchetypeType;
+  class ParamDecl;
   class Pattern;
   class SubscriptDecl;
   class Stmt;
@@ -3864,6 +3865,8 @@ public:
 /// A DefaultArgumentExpr must only appear as a direct child of a
 /// ParenExpr or a TupleExpr that is itself a call argument.
 class DefaultArgumentExpr final : public Expr {
+  friend class CallerSideDefaultArgExprRequest;
+
   /// The owning declaration.
   ConcreteDeclRef DefaultArgsOwner;
 
@@ -3873,11 +3876,17 @@ class DefaultArgumentExpr final : public Expr {
   /// The source location of the argument list.
   SourceLoc Loc;
 
+  /// Stores either a DeclContext or, upon type-checking, the caller-side
+  /// default expression.
+  PointerUnion<DeclContext *, Expr *> ContextOrCallerSideExpr;
+
 public:
-  explicit DefaultArgumentExpr(ConcreteDeclRef defaultArgsOwner, unsigned paramIndex,
-                               SourceLoc loc, Type Ty)
+  explicit DefaultArgumentExpr(ConcreteDeclRef defaultArgsOwner,
+                               unsigned paramIndex, SourceLoc loc, Type Ty,
+                               DeclContext *dc)
     : Expr(ExprKind::DefaultArgument, /*Implicit=*/true, Ty),
-      DefaultArgsOwner(defaultArgsOwner), ParamIndex(paramIndex), Loc(loc) { }
+      DefaultArgsOwner(defaultArgsOwner), ParamIndex(paramIndex), Loc(loc),
+      ContextOrCallerSideExpr(dc) { }
 
   SourceRange getSourceRange() const {
     return Loc;
@@ -3891,46 +3900,19 @@ public:
     return ParamIndex;
   }
 
+  /// Retrieves the parameter declaration for this default argument.
+  const ParamDecl *getParamDecl() const;
+
+  /// Checks whether this is a caller-side default argument that is emitted
+  /// directly at the call site.
+  bool isCallerSide() const;
+
+  /// For a caller-side default argument, retrieves the fully type-checked
+  /// expression within the context of the call site.
+  Expr *getCallerSideDefaultExpr() const;
+
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::DefaultArgument;
-  }
-};
-
-/// An expression referring to a caller-side default argument left unspecified
-/// at the call site.
-///
-/// A CallerDefaultArgumentExpr must only appear as a direct child of a
-/// ParenExpr or a TupleExpr that is itself a call argument.
-///
-/// FIXME: This only exists to distinguish caller default arguments from arguments
-/// that were specified at the call site. Once we remove SanitizeExpr, we can remove
-/// this hack too.
-class CallerDefaultArgumentExpr final : public Expr {
-  /// The expression that is evaluated to produce the default argument value.
-  Expr *SubExpr;
-
-  /// The source location of the argument list.
-  SourceLoc Loc;
-
-public:
-  explicit CallerDefaultArgumentExpr(Expr *subExpr, SourceLoc loc, Type Ty)
-    : Expr(ExprKind::CallerDefaultArgument, /*Implicit=*/true, Ty),
-      SubExpr(subExpr), Loc(loc) { }
-
-  SourceRange getSourceRange() const {
-    return Loc;
-  }
-
-  Expr *getSubExpr() const {
-    return SubExpr;
-  }
-
-  void setSubExpr(Expr *subExpr) {
-    SubExpr = subExpr;
-  }
-
-  static bool classof(const Expr *E) {
-    return E->getKind() == ExprKind::CallerDefaultArgument;
   }
 };
 
@@ -5398,6 +5380,9 @@ Expr *packSingleArgument(ASTContext &ctx, SourceLoc lParenLoc,
                               });
 
 void simple_display(llvm::raw_ostream &out, const ClosureExpr *CE);
+void simple_display(llvm::raw_ostream &out, const DefaultArgumentExpr *expr);
+
+SourceLoc extractNearestSourceLoc(const DefaultArgumentExpr *expr);
 
 } // end namespace swift
 

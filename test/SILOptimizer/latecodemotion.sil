@@ -722,7 +722,7 @@ bb1:
   strong_retain %17 : $Test
   %19 = class_method %17 : $Test, #Test.testing!1 : (Test) -> () -> UInt64, $@convention(method) (@guaranteed Test) -> UInt64
   %20 = load %7 : $*UInt64
-  checked_cast_br [exact] %17 : $Test to $Test, bb3, bb4
+  checked_cast_br [exact] %17 : $Test to Test, bb3, bb4
 bb2:
 // CHECK: bb2:
 // CHECK-NOT: strong_retain
@@ -1381,7 +1381,7 @@ bb0(%0 : $Builtin.NativeObject, %1: $Builtin.NativeObject):
   strong_retain %0: $Builtin.NativeObject
   %2 = function_ref @blocker : $@convention(thin) () -> ()
   apply %2() : $@convention(thin) () -> ()
-	%3 = unconditional_checked_cast %0 : $Builtin.NativeObject to $B
+	%3 = unconditional_checked_cast %0 : $Builtin.NativeObject to B
   strong_release %0: $Builtin.NativeObject
   %5 = tuple()
   return %5 : $()
@@ -1397,7 +1397,7 @@ bb0(%0 : $Builtin.NativeObject, %1: $Builtin.NativeObject):
   strong_retain %0: $Builtin.NativeObject
   %2 = function_ref @blocker : $@convention(thin) () -> ()
   apply %2() : $@convention(thin) () -> ()
-  %c = unconditional_checked_cast_value %0 : $Builtin.NativeObject to $B
+  %c = unconditional_checked_cast_value Builtin.NativeObject in %0 : $Builtin.NativeObject to B
   strong_release %0: $Builtin.NativeObject
   %5 = tuple()
   return %5 : $()

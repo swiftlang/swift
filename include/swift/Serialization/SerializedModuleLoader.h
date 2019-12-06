@@ -352,6 +352,11 @@ public:
   virtual void getTopLevelDecls(SmallVectorImpl<Decl*> &results) const override;
 
   virtual void
+  getTopLevelDeclsWhereAttributesMatch(
+      SmallVectorImpl<Decl*> &Results,
+      llvm::function_ref<bool(DeclAttributes)> matchAttributes) const override;
+
+  virtual void
   getPrecedenceGroups(SmallVectorImpl<PrecedenceGroupDecl*> &Results) const override;
 
   virtual void

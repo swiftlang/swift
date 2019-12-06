@@ -897,6 +897,10 @@ public:
   /// If this returns true, the decl can be safely casted to ValueDecl.
   bool isPotentiallyOverridable() const;
 
+  /// If an alternative module name is specified for this decl, e.g. using
+  /// @_originalDefinedIn attribute, this function returns this module name.
+  StringRef getAlternateModuleName() const;
+
   /// Emit a diagnostic tied to this declaration.
   template<typename ...ArgTypes>
   InFlightDiagnostic diagnose(
@@ -1889,7 +1893,10 @@ private:
   void setPattern(Pattern *P) { PatternAndFlags.setPointer(P); }
 
   /// Whether the given pattern binding entry is initialized.
-  bool isInitialized() const;
+  ///
+  /// \param onlyExplicit Only consider explicit initializations (rather
+  /// than implicitly-generated ones).
+  bool isInitialized(bool onlyExplicit = false) const;
 
   Expr *getInit() const {
     if (PatternAndFlags.getInt().contains(Flags::Removed) ||
@@ -2382,6 +2389,7 @@ class ValueDecl : public Decl {
     unsigned isIUO : 1;
   } LazySemanticInfo = { };
 
+  friend class DynamicallyReplacedDeclRequest;
   friend class OverriddenDeclsRequest;
   friend class IsObjCRequest;
   friend class IsFinalRequest;
@@ -2742,6 +2750,11 @@ public:
   /// Retrieve the @functionBuilder type attached to this declaration,
   /// if there is one.
   Type getFunctionBuilderType() const;
+
+  /// If this value or its backing storage is annotated
+  /// @_dynamicReplacement(for: ...), compute the original declaration
+  /// that this declaration dynamically replaces.
+  ValueDecl *getDynamicallyReplacedDecl() const;
 };
 
 /// This is a common base class for declarations which declare a type.
@@ -4761,8 +4774,6 @@ public:
 
   bool hasAnyNativeDynamicAccessors() const;
 
-  bool hasAnyDynamicReplacementAccessors() const;
-
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
     return D->getKind() >= DeclKind::First_AbstractStorageDecl &&
@@ -5262,6 +5273,10 @@ public:
   /// Note that this will return false for deserialized declarations, which only
   /// have a textual representation of their default expression.
   bool hasDefaultExpr() const;
+
+  /// Whether this parameter has a caller-side default argument expression
+  /// such as the magic literal \c #function.
+  bool hasCallerSideDefaultExpr() const;
 
   /// Retrieve the fully type-checked default argument expression for this
   /// parameter, or \c nullptr if there is no default expression.

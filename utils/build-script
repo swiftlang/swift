@@ -498,6 +498,8 @@ class BuildScriptInvocation(object):
             impl_args += ["--skip-build-watchos-simulator"]
         if not args.build_android:
             impl_args += ["--skip-build-android"]
+        if not args.build_clang_tools_extra:
+            impl_args += ["--skip-build-clang-tools-extra"]
 
         if not args.test and not args.long_test and not args.stress_test:
             impl_args += ["--skip-test-swift"]

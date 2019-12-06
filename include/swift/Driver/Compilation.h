@@ -19,6 +19,7 @@
 
 #include "swift/Basic/ArrayRefView.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/NullablePtr.h"
 #include "swift/Basic/OutputFileMap.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Driver/Driver.h"
@@ -73,7 +74,57 @@ enum class PreserveOnSignal : bool {
   Yes
 };
 
+using CommandSet = llvm::SmallPtrSet<const Job *, 16>;
+
 class Compilation {
+public:
+  class IncrementalSchemeComparator {
+    const bool EnableIncrementalBuildWhenConstructed;
+    const bool &EnableIncrementalBuild;
+    const bool EnableSourceRangeDependencies;
+
+    /// If not empty, the path to use to log the comparision.
+    const StringRef CompareIncrementalSchemesPath;
+
+    const unsigned SwiftInputCount;
+
+  public:
+    std::string WhyIncrementalWasDisabled = "";
+
+  private:
+    DiagnosticEngine &Diags;
+
+    CommandSet JobsWithoutRanges;
+    CommandSet JobsWithRanges;
+
+    unsigned CompileStagesWithoutRanges = 0;
+    unsigned CompileStagesWithRanges = 0;
+
+  public:
+    IncrementalSchemeComparator(const bool &EnableIncrementalBuild,
+                                bool EnableSourceRangeDependencies,
+                                const StringRef CompareIncrementalSchemesPath,
+                                unsigned SwiftInputCount,
+                                DiagnosticEngine &Diags)
+        : EnableIncrementalBuildWhenConstructed(EnableIncrementalBuild),
+          EnableIncrementalBuild(EnableIncrementalBuild),
+          EnableSourceRangeDependencies(EnableSourceRangeDependencies),
+          CompareIncrementalSchemesPath(CompareIncrementalSchemesPath),
+          SwiftInputCount(SwiftInputCount), Diags(Diags) {}
+
+    /// Record scheduled jobs in support of the
+    /// -compare-incremental-schemes[-path] options
+    void update(const CommandSet &withoutRangeJobs,
+                const CommandSet &withRangeJobs);
+
+    /// Write the information for the -compare-incremental-schemes[-path]
+    /// options
+    void outputComparison() const;
+
+  private:
+    void outputComparison(llvm::raw_ostream &) const;
+  };
+
 public:
   /// The filelist threshold value to pass to ensure file lists are never used
   static const size_t NEVER_USE_FILELIST = SIZE_MAX;
@@ -208,18 +259,26 @@ private:
 
   /// Scaffolding to permit experimentation with finer-grained dependencies and
   /// faster rebuilds.
-  const bool EnableExperimentalDependencies;
+  const bool EnableFineGrainedDependencies;
 
   /// Helpful for debugging, but slows down the driver. So, only turn on when
   /// needed.
-  const bool VerifyExperimentalDependencyGraphAfterEveryImport;
+  const bool VerifyFineGrainedDependencyGraphAfterEveryImport;
   /// Helpful for debugging, but slows down the driver. So, only turn on when
   /// needed.
-  const bool EmitExperimentalDependencyDotFileAfterEveryImport;
+  const bool EmitFineGrainedDependencyDotFileAfterEveryImport;
 
   /// Experiment with inter-file dependencies
-  const bool ExperimentalDependenciesIncludeIntrafileOnes;
+  const bool FineGrainedDependenciesIncludeIntrafileOnes;
 
+  /// Experiment with source-range-based dependencies
+  const bool EnableSourceRangeDependencies;
+
+public:
+  /// Will contain a comparator if an argument demands it.
+  Optional<IncrementalSchemeComparator> IncrementalComparator;
+
+private:
   template <typename T>
   static T *unwrap(const std::unique_ptr<T> &p) {
     return p.get();
@@ -250,10 +309,13 @@ public:
               bool SaveTemps = false,
               bool ShowDriverTimeCompilation = false,
               std::unique_ptr<UnifiedStatsReporter> Stats = nullptr,
-              bool EnableExperimentalDependencies = false,
-              bool VerifyExperimentalDependencyGraphAfterEveryImport = false,
-              bool EmitExperimentalDependencyDotFileAfterEveryImport = false,
-              bool ExperimentalDependenciesIncludeIntrafileOnes = false);
+              bool EnableFineGrainedDependencies = false,
+              bool VerifyFineGrainedDependencyGraphAfterEveryImport = false,
+              bool EmitFineGrainedDependencyDotFileAfterEveryImport = false,
+              bool FineGrainedDependenciesIncludeIntrafileOnes = false,
+              bool EnableSourceRangeDependencies = false,
+              bool CompareIncrementalSchemes = false,
+              StringRef CompareIncrementalSchemesPath = "");
   // clang-format on
   ~Compilation();
 
@@ -285,6 +347,11 @@ public:
   }
   Job *addJob(std::unique_ptr<Job> J);
 
+  /// To send job list to places that don't truck in fancy array views.
+  std::vector<const Job *> getJobsSimply() const {
+    return std::vector<const Job *>(getJobs().begin(), getJobs().end());
+  }
+
   void addTemporaryFile(StringRef file,
                         PreserveOnSignal preserve = PreserveOnSignal::No) {
     TempFilePaths[file] = preserve;
@@ -305,24 +372,26 @@ public:
   bool getIncrementalBuildEnabled() const {
     return EnableIncrementalBuild;
   }
-  void disableIncrementalBuild() {
-    EnableIncrementalBuild = false;
+  void disableIncrementalBuild(Twine why);
+
+  bool getEnableFineGrainedDependencies() const {
+    return EnableFineGrainedDependencies;
   }
 
-  bool getEnableExperimentalDependencies() const {
-    return EnableExperimentalDependencies;
+  bool getVerifyFineGrainedDependencyGraphAfterEveryImport() const {
+    return VerifyFineGrainedDependencyGraphAfterEveryImport;
   }
 
-  bool getVerifyExperimentalDependencyGraphAfterEveryImport() const {
-    return VerifyExperimentalDependencyGraphAfterEveryImport;
+  bool getEmitFineGrainedDependencyDotFileAfterEveryImport() const {
+    return EmitFineGrainedDependencyDotFileAfterEveryImport;
   }
 
-  bool getEmitExperimentalDependencyDotFileAfterEveryImport() const {
-    return EmitExperimentalDependencyDotFileAfterEveryImport;
+  bool getFineGrainedDependenciesIncludeIntrafileOnes() const {
+    return FineGrainedDependenciesIncludeIntrafileOnes;
   }
 
-  bool getExperimentalDependenciesIncludeIntrafileOnes() const {
-    return ExperimentalDependenciesIncludeIntrafileOnes;
+  bool getEnableSourceRangeDependencies() const {
+    return EnableSourceRangeDependencies;
   }
 
   bool getBatchModeEnabled() const {
@@ -420,6 +489,9 @@ public:
       return true;
     }
   }
+
+  /// How many .swift input files?
+  unsigned countSwiftInputs() const;
 
 private:
   /// Perform all jobs.

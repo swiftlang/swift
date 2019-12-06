@@ -1262,13 +1262,11 @@ TypeConverter::~TypeConverter() {
   }
 }
 
-void TypeConverter::pushGenericContext(CanGenericSignature signature) {
+void TypeConverter::setGenericContext(CanGenericSignature signature) {
   if (!signature)
     return;
   
-  // Push the generic context down to the SIL TypeConverter, so we can share
-  // archetypes with SIL.
-  IGM.getSILTypes().pushGenericContext(signature);
+  CurGenericSignature = signature;
 
   // Clear the dependent type info cache since we have a new active signature
   // now.
@@ -1277,21 +1275,12 @@ void TypeConverter::pushGenericContext(CanGenericSignature signature) {
   Types.getCacheFor(/*isDependent*/ true, Mode::CompletelyFragile).clear();
 }
 
-void TypeConverter::popGenericContext(CanGenericSignature signature) {
-  if (!signature)
-    return;
-
-  // Pop the SIL TypeConverter's generic context too.
-  IGM.getSILTypes().popGenericContext(signature);
-  
-  Types.getCacheFor(/*isDependent*/ true, Mode::Normal).clear();
-  Types.getCacheFor(/*isDependent*/ true, Mode::Legacy).clear();
-  Types.getCacheFor(/*isDependent*/ true, Mode::CompletelyFragile).clear();
+CanGenericSignature IRGenModule::getCurGenericContext() {
+  return Types.getCurGenericContext();
 }
 
 GenericEnvironment *TypeConverter::getGenericEnvironment() {
-  auto genericSig = IGM.getSILTypes().getCurGenericContext();
-  return genericSig->getCanonicalSignature()->getGenericEnvironment();
+  return CurGenericSignature->getGenericEnvironment();
 }
 
 GenericEnvironment *IRGenModule::getGenericEnvironment() {

@@ -117,61 +117,124 @@ public:
 
   ValueDecl *getBaseDecl() const;
 
+  friend bool operator ==(const LookupResultEntry &lhs,
+                          const LookupResultEntry &rhs) {
+    return lhs.BaseDC == rhs.BaseDC && lhs.Value == rhs.Value;
+  }
+
   void print(llvm::raw_ostream &) const;
 };
 
-/// This class implements and represents the result of performing
-/// unqualified lookup (i.e. lookup for a plain identifier).
-class UnqualifiedLookup {
+/// The result of name lookup.
+class LookupResult {
+private:
+  /// The set of results found.
+  SmallVector<LookupResultEntry, 4> Results;
+  size_t IndexOfFirstOuterResult = 0;
+
 public:
-  enum class Flags {
-    /// This lookup is known to not affect downstream files.
-    KnownPrivate = 0x01,
-    /// This lookup should only return types.
-    TypeLookup = 0x02,
-    /// This lookup should consider declarations within protocols to which the
-    /// context type conforms.
-    AllowProtocolMembers = 0x04,
-    /// Don't check access when doing lookup into a type.
-    IgnoreAccessControl = 0x08,
-    /// This lookup should include results from outside the innermost scope with
-    /// results.
-    IncludeOuterResults = 0x10,
-  };
-  using Options = OptionSet<Flags>;
+  LookupResult() {}
 
-  /// Lookup an unqualified identifier \p Name in the context.
-  ///
-  /// If the current DeclContext is nested in a function body, the SourceLoc
-  /// is used to determine which declarations in that body are visible.
-  UnqualifiedLookup(DeclName Name, DeclContext *DC,
-                    SourceLoc Loc = SourceLoc(), Options options = Options());
-  
-  using ResultsVector = SmallVector<LookupResultEntry, 4>;
-  ResultsVector Results;
-  
-  /// The index of the first result that isn't from the innermost scope
-  /// with results.
-  ///
-  /// That is, \c makeArrayRef(Results).take_front(IndexOfFirstOuterResults)
-  /// will be \c Results from the innermost scope that had results, and the
-  /// remaining elements of Results will be from parent scopes of this one.
-  ///
-  /// Allows unqualified name lookup to return results from outer scopes.
-  /// This is necessary for disambiguating calls to functions like `min` and
-  /// `max`.
-  size_t IndexOfFirstOuterResult;
+  explicit LookupResult(const SmallVectorImpl<LookupResultEntry> &Results,
+                        size_t indexOfFirstOuterResult)
+      : Results(Results.begin(), Results.end()),
+        IndexOfFirstOuterResult(indexOfFirstOuterResult) {}
 
-  /// Return true if anything was found by the name lookup.
-  bool isSuccess() const { return !Results.empty(); }
+  using iterator = SmallVectorImpl<LookupResultEntry>::iterator;
+  iterator begin() { return Results.begin(); }
+  iterator end() {
+    return Results.begin() + IndexOfFirstOuterResult;
+  }
+  unsigned size() const { return innerResults().size(); }
+  bool empty() const { return innerResults().empty(); }
 
-  /// Get the result as a single type, or a null type if that fails.
-  TypeDecl *getSingleTypeResult() const;
+  ArrayRef<LookupResultEntry> innerResults() const {
+    return llvm::makeArrayRef(Results).take_front(IndexOfFirstOuterResult);
+  }
+
+  ArrayRef<LookupResultEntry> outerResults() const {
+    return llvm::makeArrayRef(Results).drop_front(IndexOfFirstOuterResult);
+  }
+
+  /// \returns An array of both the inner and outer results.
+  ArrayRef<LookupResultEntry> allResults() const {
+    return llvm::makeArrayRef(Results);
+  }
+
+  const LookupResultEntry& operator[](unsigned index) const {
+    return Results[index];
+  }
+
+  LookupResultEntry front() const { return innerResults().front(); }
+  LookupResultEntry back() const { return innerResults().back(); }
+
+  /// \returns The index of the first outer result within \c allResults().
+  size_t getIndexOfFirstOuterResult() const { return IndexOfFirstOuterResult; }
+
+  /// Add a result to the set of results.
+  void add(LookupResultEntry result, bool isOuter) {
+    Results.push_back(result);
+    if (!isOuter) {
+      IndexOfFirstOuterResult++;
+      assert(IndexOfFirstOuterResult == Results.size() &&
+             "found an outer result before an inner one");
+    } else {
+      assert(IndexOfFirstOuterResult > 0 &&
+             "found outer results without an inner one");
+    }
+  }
+
+  void clear() { Results.clear(); }
+
+  /// Determine whether the result set is nonempty.
+  explicit operator bool() const {
+    return !empty();
+  }
+
+  TypeDecl *getSingleTypeResult() const {
+    if (size() != 1)
+      return nullptr;
+
+    return dyn_cast<TypeDecl>(front().getValueDecl());
+  }
+
+  friend bool operator ==(const LookupResult &lhs, const LookupResult &rhs) {
+    return lhs.Results == rhs.Results &&
+           lhs.IndexOfFirstOuterResult == rhs.IndexOfFirstOuterResult;
+  }
+
+  /// Filter out any results that aren't accepted by the given predicate.
+  void
+  filter(llvm::function_ref<bool(LookupResultEntry, /*isOuter*/ bool)> pred);
+
+  /// Shift down results by dropping inner results while keeping outer
+  /// results (if any), the innermost of which are recogized as inner
+  /// results afterwards.
+  void shiftDownResults();
 };
 
-inline UnqualifiedLookup::Options operator|(UnqualifiedLookup::Flags flag1,
-                                            UnqualifiedLookup::Flags flag2) {
-  return UnqualifiedLookup::Options(flag1) | flag2;
+enum class UnqualifiedLookupFlags {
+  /// This lookup is known to not affect downstream files.
+  KnownPrivate = 0x01,
+  /// This lookup should only return types.
+  TypeLookup = 0x02,
+  /// This lookup should consider declarations within protocols to which the
+  /// context type conforms.
+  AllowProtocolMembers = 0x04,
+  /// Don't check access when doing lookup into a type.
+  IgnoreAccessControl = 0x08,
+  /// This lookup should include results from outside the innermost scope with
+  /// results.
+  IncludeOuterResults = 0x10,
+};
+
+using UnqualifiedLookupOptions = OptionSet<UnqualifiedLookupFlags>;
+
+void simple_display(llvm::raw_ostream &out, UnqualifiedLookupOptions options);
+
+inline UnqualifiedLookupOptions operator|(UnqualifiedLookupFlags flag1,
+                                          UnqualifiedLookupFlags flag2) {
+  return UnqualifiedLookupOptions(flag1) | flag2;
 }
 
 /// Describes the reason why a certain declaration is visible.

@@ -97,7 +97,7 @@ class SILPassManager {
 
   /// If true, passes are also run for functions which have
   /// OptimizationMode::NoOptimization.
-  bool isMandatoryPipeline = false;
+  bool isMandatory = false;
 
   /// The IRGen SIL passes. These have to be dynamically added by IRGen.
   llvm::DenseMap<unsigned, SILTransform *> IRGenPasses;
@@ -114,16 +114,15 @@ public:
   /// C'tor. It creates and registers all analysis passes, which are defined
   /// in Analysis.def.
   ///
-  /// If \p isMandatoryPipeline is true, passes are also run for functions
+  /// If \p isMandatory is true, passes are also run for functions
   /// which have OptimizationMode::NoOptimization.
   SILPassManager(SILModule *M, llvm::StringRef Stage = "",
-                 bool isMandatoryPipeline = false);
+                 bool isMandatory = false);
 
   /// C'tor. It creates an IRGen pass manager. Passes can query for the
   /// IRGenModule.
   SILPassManager(SILModule *M, irgen::IRGenModule *IRMod,
-                 llvm::StringRef Stage = "",
-                 bool isMandatoryPipeline = false);
+                 llvm::StringRef Stage = "", bool isMandatory = false);
 
   const SILOptions &getOptions() const;
 

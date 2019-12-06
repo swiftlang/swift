@@ -917,6 +917,7 @@ namespace {
   class ConstraintGenerator : public ExprVisitor<ConstraintGenerator, Type> {
     ConstraintSystem &CS;
     DeclContext *CurDC;
+    ConstraintSystemPhase CurrPhase;
     SmallVector<DeclContext*, 4> DCStack;
 
     static const unsigned numEditorPlaceholderVariables = 2;
@@ -1108,9 +1109,16 @@ namespace {
 
   public:
     ConstraintGenerator(ConstraintSystem &CS, DeclContext *DC)
-      : CS(CS), CurDC(DC ? DC : CS.DC) { }
+        : CS(CS), CurDC(DC ? DC : CS.DC), CurrPhase(CS.getPhase()) {
+      // Although constraint system is initialized in `constraint
+      // generation` phase, we have to set it here manually because e.g.
+      // function builders could generate constraints for its body
+      // in the middle of the solving.
+      CS.setPhase(ConstraintSystemPhase::ConstraintGeneration);
+    }
 
     virtual ~ConstraintGenerator() {
+      CS.setPhase(CurrPhase);
       // We really ought to have this assertion:
       //   assert(DCStack.empty() && CurDC == CS.DC);
       // Unfortunately, ASTWalker is really bad at letting us establish
@@ -1499,10 +1507,13 @@ namespace {
 
       auto memberLocator
         = CS.getConstraintLocator(expr, ConstraintLocator::UnresolvedMember);
-      auto baseTy = CS.createTypeVariable(baseLocator, TVO_CanBindToNoEscape);
-      auto memberTy = CS.createTypeVariable(memberLocator,
-                                            TVO_CanBindToLValue |
-                                            TVO_CanBindToNoEscape);
+
+      // Since base type in this case is completely dependent on context it
+      // should be marked as a potential hole.
+      auto baseTy = CS.createTypeVariable(baseLocator, TVO_CanBindToNoEscape |
+                                                           TVO_CanBindToHole);
+      auto memberTy = CS.createTypeVariable(
+          memberLocator, TVO_CanBindToLValue | TVO_CanBindToNoEscape);
 
       // An unresolved member expression '.member' is modeled as a value member
       // constraint
@@ -1844,7 +1855,6 @@ namespace {
 
       // Introduce conversions from each element to the element type of the
       // array.
-      ConstraintLocatorBuilder builder(locator);
       unsigned index = 0;
       for (auto element : expr->getElements()) {
         CS.addConstraint(ConstraintKind::Conversion,
@@ -2135,7 +2145,7 @@ namespace {
           if (!ty || ty->is<TypeVariableType>())
             ty = CS.createTypeVariable(CS.getConstraintLocator(locator),
                                        TVO_CanBindToNoEscape);
-          return CS.getTypeChecker().getOptionalType(var->getLoc(), ty);
+          return TypeChecker::getOptionalType(var->getLoc(), ty);
         case ReferenceOwnershipOptionality::Allowed:
         case ReferenceOwnershipOptionality::Disallowed:
           break;
@@ -2510,10 +2520,6 @@ namespace {
       return expr->getType();
     }
 
-    Type visitCallerDefaultArgumentExpr(CallerDefaultArgumentExpr *expr) {
-      return expr->getType();
-    }
-
     Type visitApplyExpr(ApplyExpr *expr) {
       auto fnExpr = expr->getFn();
 
@@ -2852,7 +2858,7 @@ namespace {
     /// diagnosing ill-formed standard libraries, so it really isn't
     /// worth QoI efforts.
     Type getOptionalType(SourceLoc optLoc, Type valueTy) {
-      auto optTy = CS.getTypeChecker().getOptionalType(optLoc, valueTy);
+      auto optTy = TypeChecker::getOptionalType(optLoc, valueTy);
       if (!optTy ||
           TypeChecker::requireOptionalIntrinsics(CS.getASTContext(), optLoc))
         return Type();
@@ -3454,8 +3460,7 @@ namespace {
     }
 
     bool isSyntheticArgumentExpr(const Expr *expr) {
-      if (isa<DefaultArgumentExpr>(expr) ||
-          isa<CallerDefaultArgumentExpr>(expr))
+      if (isa<DefaultArgumentExpr>(expr))
         return true;
 
       if (auto *varargExpr = dyn_cast<VarargExpansionExpr>(expr))
@@ -3863,8 +3868,7 @@ getMemberDecls(InterestedMemberKind Kind) {
 ResolvedMemberResult
 swift::resolveValueMember(DeclContext &DC, Type BaseTy, DeclName Name) {
   ResolvedMemberResult Result;
-  assert(DC.getASTContext().getLegacyGlobalTypeChecker() &&
-         "Must have type checker to make global query!");
+  assert(DC.getASTContext().areSemanticQueriesEnabled());
   ConstraintSystem CS(&DC, None);
 
   // Look up all members of BaseTy with the given Name.
@@ -3910,8 +3914,7 @@ swift::getOriginalArgumentList(Expr *expr) {
   OriginalArgumentList result;
 
   auto add = [&](Expr *arg, Identifier label, SourceLoc labelLoc) {
-    if (isa<DefaultArgumentExpr>(arg) ||
-        isa<CallerDefaultArgumentExpr>(arg)) {
+    if (isa<DefaultArgumentExpr>(arg)) {
       return;
     }
 

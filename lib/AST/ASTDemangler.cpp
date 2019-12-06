@@ -348,33 +348,6 @@ Type ASTBuilder::createTupleType(ArrayRef<Type> eltTypes,
 Type ASTBuilder::createFunctionType(
     ArrayRef<Demangle::FunctionParam<Type>> params,
     Type output, FunctionTypeFlags flags) {
-  FunctionTypeRepresentation representation;
-  switch (flags.getConvention()) {
-  case FunctionMetadataConvention::Swift:
-    representation = FunctionTypeRepresentation::Swift;
-    break;
-  case FunctionMetadataConvention::Block:
-    representation = FunctionTypeRepresentation::Block;
-    break;
-  case FunctionMetadataConvention::Thin:
-    representation = FunctionTypeRepresentation::Thin;
-    break;
-  case FunctionMetadataConvention::CFunctionPointer:
-    representation = FunctionTypeRepresentation::CFunctionPointer;
-    break;
-  }
-
-  auto einfo = AnyFunctionType::ExtInfo(representation,
-                                        /*throws*/ flags.throws());
-
-  if (representation == FunctionTypeRepresentation::Swift ||
-      representation == FunctionTypeRepresentation::Block) {
-    if (flags.isEscaping())
-      einfo = einfo.withNoEscape(false);
-    else
-      einfo = einfo.withNoEscape(true);
-  }
-
   // The result type must be materializable.
   if (!output->isMaterializable()) return Type();
 
@@ -396,6 +369,42 @@ Type ASTBuilder::createFunctionType(
 
     funcParams.push_back(AnyFunctionType::Param(type, label, parameterFlags));
   }
+
+  FunctionTypeRepresentation representation;
+  switch (flags.getConvention()) {
+  case FunctionMetadataConvention::Swift:
+    representation = FunctionTypeRepresentation::Swift;
+    break;
+  case FunctionMetadataConvention::Block:
+    representation = FunctionTypeRepresentation::Block;
+    break;
+  case FunctionMetadataConvention::Thin:
+    representation = FunctionTypeRepresentation::Thin;
+    break;
+  case FunctionMetadataConvention::CFunctionPointer:
+    representation = FunctionTypeRepresentation::CFunctionPointer;
+    break;
+  }
+
+  auto noescape =
+    (representation == FunctionTypeRepresentation::Swift
+     || representation == FunctionTypeRepresentation::Block)
+    && !flags.isEscaping();
+
+  FunctionType::ExtInfo incompleteExtInfo(
+    FunctionTypeRepresentation::Swift,
+    noescape, flags.throws(),
+    DifferentiabilityKind::NonDifferentiable,
+    /*clangFunctionType*/nullptr);
+
+  const clang::Type *clangFunctionType = nullptr;
+  if (representation == FunctionTypeRepresentation::CFunctionPointer)
+    clangFunctionType = Ctx.getClangFunctionType(funcParams, output,
+                                                 incompleteExtInfo,
+                                                 representation);
+
+  auto einfo = incompleteExtInfo.withRepresentation(representation)
+                                .withClangFunctionType(clangFunctionType);
 
   return FunctionType::get(funcParams, output, einfo);
 }
@@ -479,9 +488,11 @@ Type ASTBuilder::createImplFunctionType(
     break;
   }
 
+  // TODO: [store-sil-clang-function-type]
   auto einfo = SILFunctionType::ExtInfo(
       representation, flags.isPseudogeneric(), !flags.isEscaping(),
-      DifferentiabilityKind::NonDifferentiable);
+      DifferentiabilityKind::NonDifferentiable,
+      /*clangFunctionType*/ nullptr);
 
   llvm::SmallVector<SILParameterInfo, 8> funcParams;
   llvm::SmallVector<SILYieldInfo, 8> funcYields;

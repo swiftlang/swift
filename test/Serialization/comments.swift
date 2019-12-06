@@ -5,7 +5,7 @@
 // RUN: llvm-bcanalyzer %t/comments.swiftmodule | %FileCheck %s -check-prefix=BCANALYZER
 // RUN: llvm-bcanalyzer %t/comments.swiftdoc | %FileCheck %s -check-prefix=BCANALYZER
 // RUN: llvm-bcanalyzer %t/comments.swiftsourceinfo | %FileCheck %s -check-prefix=BCANALYZER
-// RUN: %target-swift-ide-test -print-module-comments -module-to-print=comments -source-filename %s -I %t | %FileCheck %s -check-prefix=FIRST
+// RUN: %target-swift-ide-test -print-module-comments -module-to-print=comments -enable-swiftsourceinfo -source-filename %s -I %t | %FileCheck %s -check-prefix=FIRST
 
 // Test the case when we have a multiple files in a module.
 //
@@ -16,7 +16,7 @@
 // RUN: llvm-bcanalyzer %t/comments.swiftmodule | %FileCheck %s -check-prefix=BCANALYZER
 // RUN: llvm-bcanalyzer %t/comments.swiftdoc | %FileCheck %s -check-prefix=BCANALYZER
 // RUN: llvm-bcanalyzer %t/comments.swiftsourceinfo | %FileCheck %s -check-prefix=BCANALYZER
-// RUN: %target-swift-ide-test -print-module-comments -module-to-print=comments -source-filename %s -I %t > %t.printed.txt
+// RUN: %target-swift-ide-test -print-module-comments -module-to-print=comments -enable-swiftsourceinfo -source-filename %s -I %t > %t.printed.txt
 // RUN: %FileCheck %s -check-prefix=FIRST < %t.printed.txt
 // RUN: %FileCheck %s -check-prefix=SECOND < %t.printed.txt
 

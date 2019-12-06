@@ -321,12 +321,17 @@ SILFunction *SILModule::lookUpFunction(SILDeclRef fnRef) {
 }
 
 bool SILModule::loadFunction(SILFunction *F) {
-  SILFunction *NewF = getSILLoader()->lookupSILFunction(F);
+  SILFunction *NewF =
+    getSILLoader()->lookupSILFunction(F, /*onlyUpdateLinkage*/ false);
   if (!NewF)
     return false;
 
   assert(F == NewF);
   return true;
+}
+
+void SILModule::updateFunctionLinkage(SILFunction *F) {
+  getSILLoader()->lookupSILFunction(F, /*onlyUpdateLinkage*/ true);
 }
 
 bool SILModule::linkFunction(SILFunction *F, SILModule::LinkingMode Mode) {

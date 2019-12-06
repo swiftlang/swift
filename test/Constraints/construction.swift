@@ -60,6 +60,7 @@ Optional<Int>(1) // expected-warning{{unused}}
 Optional(1) // expected-warning{{unused}}
 _ = .none as Optional<Int>
 Optional(.none) // expected-error{{generic parameter 'T' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}} {{9-9=<Any>}}
+// expected-error@-1 {{cannot infer contextual base in reference to member 'none'}}
 
 // Interpolation
 _ = "\(hello), \(world) #\(i)!"

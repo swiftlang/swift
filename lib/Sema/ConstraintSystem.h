@@ -449,8 +449,6 @@ public:
 
 namespace constraints {
 
-struct ResolvedOverloadSetListItem;
-
 /// The result of comparing two constraint systems that are a solutions
 /// to the given set of constraints.
 enum class SolutionCompareResult {
@@ -481,6 +479,11 @@ struct SelectedOverload {
 
   /// The opened type produced by referring to this overload.
   Type openedType;
+
+  /// The type that this overload binds. Note that this may differ from
+  /// openedType, for example it will include any IUO unwrapping that has taken
+  /// place.
+  Type boundType;
 };
 
 /// Describes an aspect of a solution that affects its overall score, i.e., a
@@ -801,40 +804,6 @@ public:
   explicit SolutionDiff(ArrayRef<Solution> solutions);
 };
 
-/// Describes one resolved overload set within the list of overload sets
-/// resolved by the solver.
-struct ResolvedOverloadSetListItem {
-  /// The previously resolved overload set in the list.
-  ResolvedOverloadSetListItem *Previous;
-
-  /// The type that this overload binds.
-  Type BoundType;
-
-  /// The overload choice.
-  OverloadChoice Choice;
-
-  /// The locator for this choice.
-  ConstraintLocator *Locator;
-
-  /// The type of the fully-opened base, if any.
-  Type OpenedFullType;
-
-  /// The type of the referenced choice.
-  Type ImpliedType;
-
-  // Make vanilla new/delete illegal for overload set items.
-  void *operator new(size_t Bytes) = delete;
-  void operator delete(void *Data) = delete;
-
-  // Only allow allocation of list items using the allocator in the
-  // constraint system.
-  void *operator new(size_t bytes, ConstraintSystem &cs,
-                     unsigned alignment
-                       = alignof(ResolvedOverloadSetListItem));
-};
-  
-
-
 /// Identifies a specific conversion from
 struct SpecificConstraint {
   CanType First;
@@ -995,6 +964,13 @@ struct DynamicCallableMethods {
   }
 };
 
+enum class ConstraintSystemPhase {
+  ConstraintGeneration,
+  Solving,
+  Diagnostics,
+  Finalization
+};
+
 /// Describes a system of constraints on type variables, the
 /// solution of which assigns concrete types to each of the type variables.
 /// Constraint systems are typically generated given an (untyped) expression.
@@ -1038,6 +1014,9 @@ public:
   unsigned CountDisjunctions = 0;
 
 private:
+  /// Current phase of the constraint system lifetime.
+  ConstraintSystemPhase Phase = ConstraintSystemPhase::ConstraintGeneration;
+
   /// The set of expressions for which we have generated constraints.
   llvm::SetVector<Expr *> InputExprs;
 
@@ -1082,7 +1061,7 @@ private:
   llvm::FoldingSetVector<ConstraintLocator> ConstraintLocators;
 
   /// The overload sets that have been resolved along the current path.
-  ResolvedOverloadSetListItem *resolvedOverloadSets = nullptr;
+  llvm::MapVector<ConstraintLocator *, SelectedOverload> ResolvedOverloads;
 
   /// The current fixed score for this constraint system and the (partial)
   /// solution it represents.
@@ -1526,6 +1505,41 @@ private:
   };
 
 public:
+  ConstraintSystemPhase getPhase() const { return Phase; }
+
+  /// Move constraint system to a new phase of its lifetime.
+  void setPhase(ConstraintSystemPhase newPhase) {
+    if (Phase == newPhase)
+      return;
+
+#ifndef NDEBUG
+    switch (Phase) {
+    case ConstraintSystemPhase::ConstraintGeneration:
+      assert(newPhase == ConstraintSystemPhase::Solving);
+      break;
+
+    case ConstraintSystemPhase::Solving:
+      // We can come back to constraint generation phase while
+      // processing function builder body.
+      assert(newPhase == ConstraintSystemPhase::ConstraintGeneration ||
+             newPhase == ConstraintSystemPhase::Diagnostics ||
+             newPhase == ConstraintSystemPhase::Finalization);
+      break;
+
+    case ConstraintSystemPhase::Diagnostics:
+      assert(newPhase == ConstraintSystemPhase::Solving ||
+             newPhase == ConstraintSystemPhase::Finalization);
+      break;
+
+    case ConstraintSystemPhase::Finalization:
+      assert(newPhase == ConstraintSystemPhase::Diagnostics);
+      break;
+    }
+#endif
+
+    Phase = newPhase;
+  }
+
   /// Cache the types of the given expression and all subexpressions.
   void cacheExprTypes(Expr *expr) {
     bool excludeRoot = false;
@@ -1566,29 +1580,21 @@ public:
   /// reference at the given locator.
   Optional<ArgumentInfo> getArgumentInfo(ConstraintLocator *locator);
 
-  ResolvedOverloadSetListItem *getResolvedOverloadSets() const {
-    return resolvedOverloadSets;
-  }
-
-  ResolvedOverloadSetListItem *
+  Optional<SelectedOverload>
   findSelectedOverloadFor(ConstraintLocator *locator) const {
-    auto resolvedOverload = getResolvedOverloadSets();
-    while (resolvedOverload) {
-      if (resolvedOverload->Locator == locator)
-        return resolvedOverload;
-      resolvedOverload = resolvedOverload->Previous;
-    }
-    return nullptr;
+    auto result = ResolvedOverloads.find(locator);
+    if (result == ResolvedOverloads.end())
+      return None;
+    return result->second;
   }
 
-  ResolvedOverloadSetListItem *findSelectedOverloadFor(Expr *expr) const {
-    auto resolvedOverload = getResolvedOverloadSets();
-    while (resolvedOverload) {
-      if (resolvedOverload->Locator->getAnchor() == expr)
-        return resolvedOverload;
-      resolvedOverload = resolvedOverload->Previous;
-    }
-    return nullptr;
+  Optional<SelectedOverload> findSelectedOverloadFor(Expr *expr) {
+    // Retrieve the callee locator for this expression, making sure not to
+    // look through applies in order to ensure we only return the "direct"
+    // callee.
+    auto *loc = getConstraintLocator(expr);
+    auto *calleeLoc = getCalleeLocator(loc, /*lookThroughApply*/ false);
+    return findSelectedOverloadFor(calleeLoc);
   }
 
 private:
@@ -1607,9 +1613,6 @@ public:
   ///
   class SolverScope {
     ConstraintSystem &cs;
-
-    /// The current resolved overload set list.
-    ResolvedOverloadSetListItem *resolvedOverloadSets;
 
     /// The length of \c TypeVariables.
     unsigned numTypeVariables;
@@ -1648,6 +1651,9 @@ public:
 
     unsigned numBuilderTransformedClosures;
 
+    /// The length of \c ResolvedOverloads.
+    unsigned numResolvedOverloads;
+
     /// The previous score.
     Score PreviousScore;
 
@@ -1670,11 +1676,6 @@ public:
   ConstraintSystem(DeclContext *dc,
                    ConstraintSystemOptions options);
   ~ConstraintSystem();
-
-  /// Retrieve the type checker associated with this constraint system.
-  TypeChecker &getTypeChecker() const {
-    return *Context.getLegacyGlobalTypeChecker();
-  }
 
   /// Retrieve the constraint graph associated with this constraint system.
   ConstraintGraph &getConstraintGraph() const { return CG; }
@@ -1706,6 +1707,9 @@ private:
   /// subset of the constraints and then apply it back to the
   /// constraint system for further exploration.
   void applySolution(const Solution &solution);
+
+  // FIXME: Allows the type checker to apply solutions.
+  friend class swift::TypeChecker;
 
   /// Emit the fixes computed as part of the solution, returning true if we were
   /// able to emit an error message, or false if none of the fixits worked out.
@@ -1981,9 +1985,20 @@ public:
   ConstraintLocator *
   getConstraintLocator(ConstraintLocator *locator,
                        ConstraintLocator::PathElement pathElt) {
-    return getConstraintLocator(ConstraintLocatorBuilder(locator)
-                                  .withPathElement(pathElt));
+    ConstraintLocatorBuilder builder(locator);
+    return getConstraintLocator(builder.withPathElement(pathElt));
   }
+
+  /// Extend the given constraint locator with an array of path elements.
+  ConstraintLocator *
+  getConstraintLocator(ConstraintLocator *locator,
+                       ArrayRef<ConstraintLocator::PathElement> newElts);
+
+  /// Retrieve the locator described by a given builder extended by an array of
+  /// path elements.
+  ConstraintLocator *
+  getConstraintLocator(const ConstraintLocatorBuilder &builder,
+                       ArrayRef<ConstraintLocator::PathElement> newElts);
 
   /// Retrieve the constraint locator described by the given
   /// builder.
@@ -2078,17 +2093,8 @@ public:
   ValueDecl *findResolvedMemberRef(ConstraintLocator *locator);
 
   /// Try to salvage the constraint system by applying (speculative)
-  /// fixes to the underlying expression.
-  ///
-  /// \param viable the set of viable solutions produced by the initial
-  /// solution attempt.
-  ///
-  /// \param expr the expression we're trying to salvage.
-  ///
-  /// \returns false if we were able to salvage the system, in which case
-  /// \c viable[0] contains the resulting solution. Otherwise, emits a
-  /// diagnostic and returns true.
-  bool salvage(SmallVectorImpl<Solution> &viable, Expr *expr);
+  /// fixes.
+  SolutionResult salvage();
   
   /// Mine the active and inactive constraints in the constraint
   /// system to generate a plausible diagnosis of why the system could not be
@@ -2101,8 +2107,8 @@ public:
   /// emits an error message.
   void diagnoseFailureForExpr(Expr *expr);
 
-  bool diagnoseAmbiguity(Expr *expr, ArrayRef<Solution> solutions);
-  bool diagnoseAmbiguityWithFixes(ArrayRef<Solution> solutions);
+  bool diagnoseAmbiguity(ArrayRef<Solution> solutions);
+  bool diagnoseAmbiguityWithFixes(SmallVectorImpl<Solution> &solutions);
 
   /// Give the deprecation warning for referring to a global function
   /// when there's a method from a conditional conformance in a smaller/closer
@@ -2341,14 +2347,13 @@ public:
   /// Gets the VarDecl associateed with resolvedOverload, and the type of the
   /// storage wrapper if the decl has an associated storage wrapper.
   Optional<std::pair<VarDecl *, Type>>
-  getStorageWrapperInformation(ResolvedOverloadSetListItem *resolvedOverload) {
-    assert(resolvedOverload);
-    if (resolvedOverload->Choice.isDecl()) {
-      if (auto *decl = dyn_cast<VarDecl>(resolvedOverload->Choice.getDecl())) {
+  getStorageWrapperInformation(SelectedOverload resolvedOverload) {
+    if (resolvedOverload.choice.isDecl()) {
+      if (auto *decl = dyn_cast<VarDecl>(resolvedOverload.choice.getDecl())) {
         if (decl->hasAttachedPropertyWrapper()) {
           if (auto storageWrapper = decl->getPropertyWrapperStorageWrapper()) {
             Type type = storageWrapper->getInterfaceType();
-            if (Type baseType = resolvedOverload->Choice.getBaseType()) {
+            if (Type baseType = resolvedOverload.choice.getBaseType()) {
               type = baseType->getTypeOfMember(DC->getParentModule(),
                                                storageWrapper, type);
             }
@@ -2363,13 +2368,12 @@ public:
   /// Gets the VarDecl associateed with resolvedOverload, and the type of the
   /// backing storage if the decl has an associated property wrapper.
   Optional<std::pair<VarDecl *, Type>>
-  getPropertyWrapperInformation(ResolvedOverloadSetListItem *resolvedOverload) {
-    assert(resolvedOverload);
-    if (resolvedOverload->Choice.isDecl()) {
-      if (auto *decl = dyn_cast<VarDecl>(resolvedOverload->Choice.getDecl())) {
+  getPropertyWrapperInformation(SelectedOverload resolvedOverload) {
+    if (resolvedOverload.choice.isDecl()) {
+      if (auto *decl = dyn_cast<VarDecl>(resolvedOverload.choice.getDecl())) {
         if (decl->hasAttachedPropertyWrapper()) {
           auto wrapperTy = decl->getPropertyWrapperBackingPropertyType();
-          if (Type baseType = resolvedOverload->Choice.getBaseType()) {
+          if (Type baseType = resolvedOverload.choice.getBaseType()) {
             wrapperTy = baseType->getTypeOfMember(DC->getParentModule(),
                                                   decl, wrapperTy);
           }
@@ -2384,13 +2388,12 @@ public:
   /// resolved overload has a decl which is the backing storage for a
   /// property wrapper.
   Optional<std::pair<VarDecl *, Type>>
-  getWrappedPropertyInformation(ResolvedOverloadSetListItem *resolvedOverload) {
-    assert(resolvedOverload);
-    if (resolvedOverload->Choice.isDecl()) {
-      if (auto *decl = dyn_cast<VarDecl>(resolvedOverload->Choice.getDecl())) {
+  getWrappedPropertyInformation(SelectedOverload resolvedOverload) {
+    if (resolvedOverload.choice.isDecl()) {
+      if (auto *decl = dyn_cast<VarDecl>(resolvedOverload.choice.getDecl())) {
         if (auto wrapped = decl->getOriginalWrappedProperty()) {
           Type type = wrapped->getInterfaceType();
-          if (Type baseType = resolvedOverload->Choice.getBaseType()) {
+          if (Type baseType = resolvedOverload.choice.getBaseType()) {
             type = baseType->getTypeOfMember(DC->getParentModule(),
                                              wrapped, type);
           }
@@ -2668,6 +2671,19 @@ public:
                           const DeclRefExpr *base = nullptr,
                           OpenedTypeMap *replacements = nullptr);
 
+private:
+  /// Adjust the constraint system to accomodate the given selected overload, and
+  /// recompute the type of the referenced declaration.
+  ///
+  /// \returns a pair containing the adjusted opened type of a reference to
+  /// this member and a bit indicating whether or not a bind constraint was added.
+  std::pair<Type, bool> adjustTypeOfOverloadReference(
+      const OverloadChoice &choice, ConstraintLocator *locator, Type boundType,
+      Type refType, DeclContext *useDC,
+      llvm::function_ref<void(unsigned int, Type, ConstraintLocator *)>
+          verifyThatArgumentIsHashable);
+
+public:
   /// Attempt to simplify the set of overloads corresponding to a given
   /// function application constraint.
   ///
@@ -3031,6 +3047,10 @@ public:
                                          FunctionRefKind functionRefKind,
                                          ConstraintLocator *memberLocator,
                                          bool includeInaccessibleMembers);
+
+  /// Build implicit autoclosure expression wrapping a given expression.
+  /// Given expression represents computed result of the closure.
+  Expr *buildAutoClosureExpr(Expr *expr, FunctionType *closureType);
 
 private:
   /// Determines whether or not a given conversion at a given locator requires

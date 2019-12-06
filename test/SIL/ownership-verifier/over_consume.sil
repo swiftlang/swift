@@ -276,7 +276,7 @@ bb3:
 // CHECK-LABEL: Function: 'checked_cast_br_mismatching_argument_guaranteed_to_owned_1'
 // CHECK: Have operand with incompatible ownership?!
 // CHECK: Value: %0 = argument of bb0 : $Builtin.NativeObject
-// CHECK: User:   checked_cast_br %0 : $Builtin.NativeObject to $SuperKlass, bb1, bb2
+// CHECK: User:   checked_cast_br %0 : $Builtin.NativeObject to SuperKlass, bb1, bb2
 // CHECK: Conv: guaranteed
 // CHECK: OwnershipMap:
 // CHECK: -- OperandOwnershipKindMap --
@@ -286,7 +286,7 @@ bb3:
 // CHECK: any: Yes. Liveness: MustBeLive
 sil [ossa] @checked_cast_br_mismatching_argument_guaranteed_to_owned_1 : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
 bb0(%0 : @guaranteed $Builtin.NativeObject):
-  checked_cast_br %0 : $Builtin.NativeObject to $SuperKlass, bb1, bb2
+  checked_cast_br %0 : $Builtin.NativeObject to SuperKlass, bb1, bb2
 
 bb1(%1 : @owned $SuperKlass):
   destroy_value %1 : $SuperKlass
@@ -305,11 +305,11 @@ bb3:
 // CHECK: Ill-formed SIL! Unable to compute ownership kind map for user?!
 // CHECK: For terminator users, check that successors have compatible ownership kinds.
 // CHECK: Value: %0 = argument of bb0 : $Builtin.NativeObject
-// CHECK: User:   checked_cast_br %0 : $Builtin.NativeObject to $SuperKlass, bb1, bb2
+// CHECK: User:   checked_cast_br %0 : $Builtin.NativeObject to SuperKlass, bb1, bb2
 // CHECK: Conv: guaranteed
 sil [ossa] @checked_cast_br_mismatching_argument_guaranteed_to_owned_2 : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
 bb0(%0 : @guaranteed $Builtin.NativeObject):
-  checked_cast_br %0 : $Builtin.NativeObject to $SuperKlass, bb1, bb2
+  checked_cast_br %0 : $Builtin.NativeObject to SuperKlass, bb1, bb2
 
 bb1(%1 : @guaranteed $SuperKlass):
   end_borrow %1 : $SuperKlass
@@ -328,11 +328,11 @@ bb3:
 // CHECK: Ill-formed SIL! Unable to compute ownership kind map for user?!
 // CHECK: For terminator users, check that successors have compatible ownership kinds.
 // CHECK: Value: %0 = argument of bb0 : $Builtin.NativeObject
-// CHECK: User:   checked_cast_br %0 : $Builtin.NativeObject to $SuperKlass, bb1, bb2
+// CHECK: User:   checked_cast_br %0 : $Builtin.NativeObject to SuperKlass, bb1, bb2
 // CHECK: Conv: guaranteed
 sil [ossa] @checked_cast_br_mismatching_argument_guaranteed_to_owned_3 : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
 bb0(%0 : @guaranteed $Builtin.NativeObject):
-  checked_cast_br %0 : $Builtin.NativeObject to $SuperKlass, bb1, bb2
+  checked_cast_br %0 : $Builtin.NativeObject to SuperKlass, bb1, bb2
 
 bb1(%1 : @owned $SuperKlass):
   destroy_value %1 : $SuperKlass
@@ -350,7 +350,7 @@ bb3:
 // CHECK-LABEL: Function: 'checked_cast_br_mismatching_argument_owned_to_guaranteed_1'
 // CHECK: Have operand with incompatible ownership?!
 // CHECK: Value: %0 = argument of bb0 : $Builtin.NativeObject
-// CHECK: User:   checked_cast_br %0 : $Builtin.NativeObject to $SuperKlass, bb1, bb2
+// CHECK: User:   checked_cast_br %0 : $Builtin.NativeObject to SuperKlass, bb1, bb2
 // CHECK: Conv: owned
 // CHECK: OwnershipMap:
 // CHECK: -- OperandOwnershipKindMap --
@@ -360,7 +360,7 @@ bb3:
 // CHECK: any: Yes. Liveness: MustBeLive
 sil [ossa] @checked_cast_br_mismatching_argument_owned_to_guaranteed_1 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
 bb0(%0 : @owned $Builtin.NativeObject):
-  checked_cast_br %0 : $Builtin.NativeObject to $SuperKlass, bb1, bb2
+  checked_cast_br %0 : $Builtin.NativeObject to SuperKlass, bb1, bb2
 
 bb1(%1 : @guaranteed $SuperKlass):
   end_borrow %1 : $SuperKlass
@@ -380,11 +380,11 @@ bb3:
 // CHECK: Ill-formed SIL! Unable to compute ownership kind map for user?!
 // CHECK: For terminator users, check that successors have compatible ownership kinds.
 // CHECK: Value: %0 = argument of bb0 : $Builtin.NativeObject
-// CHECK: User:   checked_cast_br %0 : $Builtin.NativeObject to $SuperKlass, bb1, bb2
+// CHECK: User:   checked_cast_br %0 : $Builtin.NativeObject to SuperKlass, bb1, bb2
 // CHECK: Conv: owned
 sil [ossa] @checked_cast_br_mismatching_argument_owned_to_guaranteed_2 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
 bb0(%0 : @owned $Builtin.NativeObject):
-  checked_cast_br %0 : $Builtin.NativeObject to $SuperKlass, bb1, bb2
+  checked_cast_br %0 : $Builtin.NativeObject to SuperKlass, bb1, bb2
 
 bb1(%1 : @guaranteed $SuperKlass):
   end_borrow %1 : $SuperKlass
@@ -403,11 +403,11 @@ bb3:
 // CHECK: Ill-formed SIL! Unable to compute ownership kind map for user?!
 // CHECK: For terminator users, check that successors have compatible ownership kinds.
 // CHECK: Value: %0 = argument of bb0 : $Builtin.NativeObject
-// CHECK: User:   checked_cast_br %0 : $Builtin.NativeObject to $SuperKlass, bb1, bb2
+// CHECK: User:   checked_cast_br %0 : $Builtin.NativeObject to SuperKlass, bb1, bb2
 // CHECK: Conv: owned
 sil [ossa] @checked_cast_br_mismatching_argument_owned_to_guaranteed_3 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
 bb0(%0 : @owned $Builtin.NativeObject):
-  checked_cast_br %0 : $Builtin.NativeObject to $SuperKlass, bb1, bb2
+  checked_cast_br %0 : $Builtin.NativeObject to SuperKlass, bb1, bb2
 
 bb1(%1 : @owned $SuperKlass):
   destroy_value %1 : $SuperKlass
@@ -431,7 +431,7 @@ bb3:
 sil [ossa] @checked_cast_br_guaranteed_arg_outlives_original_value : $@convention(thin) (@owned Builtin.NativeObject) -> () {
 bb0(%0 : @owned $Builtin.NativeObject):
   %1 = begin_borrow %0 : $Builtin.NativeObject
-  checked_cast_br %1 : $Builtin.NativeObject to $SuperKlass, bb1, bb2
+  checked_cast_br %1 : $Builtin.NativeObject to SuperKlass, bb1, bb2
 
 bb1(%2 : @guaranteed $SuperKlass):
   end_borrow %2 : $SuperKlass

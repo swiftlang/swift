@@ -19,6 +19,7 @@
 #include "TypeCheckAvailability.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/Pattern.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/SourceManager.h"
@@ -531,13 +532,15 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
       }
 
       DeclContext *topLevelContext = DC->getModuleScopeContext();
-      UnqualifiedLookup lookup(VD->getBaseName(), topLevelContext,
-                               /*Loc=*/SourceLoc(),
-                               UnqualifiedLookup::Flags::KnownPrivate);
+      auto descriptor = UnqualifiedLookupDescriptor(
+          VD->getBaseName(), topLevelContext, SourceLoc(),
+          UnqualifiedLookupFlags::KnownPrivate);
+      auto lookup = evaluateOrDefault(Ctx.evaluator,
+                                      UnqualifiedLookupRequest{descriptor}, {});
 
       // Group results by module. Pick an arbitrary result from each module.
       llvm::SmallDenseMap<const ModuleDecl*,const ValueDecl*,4> resultsByModule;
-      for (auto &result : lookup.Results) {
+      for (auto &result : lookup) {
         const ValueDecl *value = result.getValueDecl();
         resultsByModule.insert(std::make_pair(value->getModuleContext(),value));
       }
@@ -3027,7 +3030,7 @@ void swift::fixItEncloseTrailingClosure(ASTContext &ctx,
 static void checkStmtConditionTrailingClosure(ASTContext &ctx, const Expr *E) {
   if (E == nullptr || isa<ErrorExpr>(E)) return;
 
-  // Shallow walker. just dig into implicit expression.
+  // Walk into expressions which might have invalid trailing closures
   class DiagnoseWalker : public ASTWalker {
     ASTContext &Ctx;
 
@@ -3062,13 +3065,22 @@ static void checkStmtConditionTrailingClosure(ASTContext &ctx, const Expr *E) {
     bool shouldWalkIntoNonSingleExpressionClosure() override { return false; }
 
     std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
-      // Dig into implicit expression.
-      if (E->isImplicit()) return { true, E };
-      // Diagnose call expression.
-      if (auto CE = dyn_cast<CallExpr>(E))
-        diagnoseIt(CE);
-      // Don't dig any further.
-      return { false, E };
+      switch (E->getKind()) {
+      case ExprKind::Paren:
+      case ExprKind::Tuple:
+      case ExprKind::Array:
+      case ExprKind::Dictionary:
+      case ExprKind::InterpolatedStringLiteral:
+        // If a trailing closure appears as a child of one of these types of
+        // expression, don't diagnose it as there is no ambiguity.
+        return {E->isImplicit(), E};
+      case ExprKind::Call:
+        diagnoseIt(cast<CallExpr>(E));
+        break;
+      default:
+        break;
+      }
+      return {true, E};
     }
   };
 
@@ -3088,9 +3100,13 @@ static void checkStmtConditionTrailingClosure(ASTContext &ctx, const Expr *E) {
 static void checkStmtConditionTrailingClosure(ASTContext &ctx, const Stmt *S) {
   if (auto LCS = dyn_cast<LabeledConditionalStmt>(S)) {
     for (auto elt : LCS->getCond()) {
-      if (elt.getKind() == StmtConditionElement::CK_PatternBinding)
+
+      if (elt.getKind() == StmtConditionElement::CK_PatternBinding) {
         checkStmtConditionTrailingClosure(ctx, elt.getInitializer());
-      else if (elt.getKind() == StmtConditionElement::CK_Boolean)
+        if (auto *exprPattern = dyn_cast<ExprPattern>(elt.getPattern())) {
+          checkStmtConditionTrailingClosure(ctx, exprPattern->getMatchExpr());
+        }
+      } else if (elt.getKind() == StmtConditionElement::CK_Boolean)
         checkStmtConditionTrailingClosure(ctx, elt.getBoolean());
       // No trailing closure for CK_Availability: e.g. `if #available() {}`.
     }

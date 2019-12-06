@@ -1099,8 +1099,8 @@ bool MemberAccessOnOptionalBaseFailure::diagnoseAsError() {
   // type, then the result of the expression is optional (and we want to offer
   // only a '?' fixit) even though the constraint system didn't need to add any
   // additional optionality.
-  auto overload = getResolvedOverload(getLocator());
-  if (overload && overload->ImpliedType->getOptionalObjectType())
+  auto overload = getOverloadChoiceIfAvailable(getLocator());
+  if (overload && overload->openedType->getOptionalObjectType())
     resultIsOptional = true;
 
   auto unwrappedBaseType = baseType->getOptionalObjectType();
@@ -1215,6 +1215,11 @@ public:
 bool MissingOptionalUnwrapFailure::diagnoseAsError() {
   if (hasComplexLocator())
     return false;
+
+  if (!getUnwrappedType()->isBool()) {
+    if (diagnoseConversionToBool())
+      return true;
+  }
 
   auto *anchor = getAnchor();
 
@@ -1412,12 +1417,12 @@ bool RValueTreatedAsLValueFailure::diagnoseAsError() {
       }
     }
 
-    if (auto resolvedOverload = getResolvedOverload(getLocator())) {
-      if (resolvedOverload->Choice.getKind() ==
+    if (auto resolvedOverload = getOverloadChoiceIfAvailable(getLocator())) {
+      if (resolvedOverload->choice.getKind() ==
           OverloadChoiceKind::DynamicMemberLookup)
         subElementDiagID = diag::assignment_dynamic_property_has_immutable_base;
 
-      if (resolvedOverload->Choice.getKind() ==
+      if (resolvedOverload->choice.getKind() ==
           OverloadChoiceKind::KeyPathDynamicMemberLookup) {
         if (!getType(member->getBase(), /*wantRValue=*/false)->hasLValueType())
           subElementDiagID =
@@ -1433,6 +1438,17 @@ bool RValueTreatedAsLValueFailure::diagnoseAsError() {
   AssignmentFailure failure(diagExpr, getConstraintSystem(), loc,
                             subElementDiagID, rvalueDiagID);
   return failure.diagnose();
+}
+
+bool RValueTreatedAsLValueFailure::diagnoseAsNote() {
+  auto overload = getChoiceFor(getLocator());
+  if (!(overload && overload->choice.isDecl()))
+    return false;
+
+  auto *decl = overload->choice.getDecl();
+  emitDiagnostic(decl, diag::candidate_is_not_assignable,
+                 decl->getDescriptiveKind(), decl->getFullName());
+  return true;
 }
 
 static Decl *findSimpleReferencedDecl(const Expr *E) {
@@ -1621,8 +1637,7 @@ bool AssignmentFailure::diagnoseAsError() {
       if (auto typeContext = DC->getInnermostTypeContext()) {
         SmallVector<ValueDecl *, 2> results;
         DC->lookupQualified(typeContext->getSelfNominalTypeDecl(),
-                            VD->getFullName(),
-                            NL_QualifiedDefault | NL_RemoveNonVisible, results);
+                            VD->getFullName(), NL_QualifiedDefault, results);
 
         auto foundProperty = llvm::find_if(results, [&](ValueDecl *decl) {
           // We're looking for a settable property that is the same type as the
@@ -2134,6 +2149,16 @@ bool ContextualFailure::diagnoseAsError() {
   diag.highlight(anchor->getSourceRange());
 
   (void)tryFixIts(diag);
+  return true;
+}
+
+bool ContextualFailure::diagnoseAsNote() {
+  auto overload = getChoiceFor(getLocator());
+  if (!(overload && overload->choice.isDecl()))
+    return false;
+
+  auto *decl = overload->choice.getDecl();
+  emitDiagnostic(decl, diag::found_candidate_type, getFromType());
   return true;
 }
 
@@ -3742,12 +3767,11 @@ bool ImplicitInitOnNonConstMetatypeFailure::diagnoseAsError() {
 bool MissingArgumentsFailure::diagnoseAsError() {
   auto &cs = getConstraintSystem();
   auto *locator = getLocator();
-  auto path = locator->getPath();
 
-  if (path.empty() ||
-      !(path.back().getKind() == ConstraintLocator::ApplyArgToParam ||
-        path.back().getKind() == ConstraintLocator::ContextualType ||
-        path.back().getKind() == ConstraintLocator::ApplyArgument))
+  if (!(locator->isLastElement<LocatorPathElt::ApplyArgToParam>() ||
+        locator->isLastElement<LocatorPathElt::ContextualType>() ||
+        locator->isLastElement<LocatorPathElt::ApplyArgument>() ||
+        locator->isLastElement<LocatorPathElt::ClosureResult>()))
     return false;
 
   // If this is a misplaced `missng argument` situation, it would be
@@ -3990,6 +4014,13 @@ bool MissingArgumentsFailure::diagnoseClosure(ClosureExpr *closure) {
     funcType = cs.getContextualType()->getAs<FunctionType>();
   } else if (auto info = getFunctionArgApplyInfo(locator)) {
     funcType = info->getParamType()->getAs<FunctionType>();
+  } else if (locator->isLastElement<LocatorPathElt::ClosureResult>()) {
+    // Based on the locator we know this this is something like this:
+    // `let _: () -> ((Int) -> Void) = { return {} }`.
+    funcType = getType(getRawAnchor())
+                   ->castTo<FunctionType>()
+                   ->getResult()
+                   ->castTo<FunctionType>();
   }
 
   if (!funcType)
@@ -4132,7 +4163,7 @@ bool MissingArgumentsFailure::isMisplacedMissingArgument(
     return false;
 
   auto *fnType =
-      cs.simplifyType(overloadChoice->ImpliedType)->getAs<FunctionType>();
+      cs.simplifyType(overloadChoice->openedType)->getAs<FunctionType>();
   if (!(fnType && fnType->getNumParams() == 2))
     return false;
 
@@ -5199,23 +5230,9 @@ bool InvalidTupleSplatWithSingleParameterFailure::diagnoseAsError() {
     }
   }
 
-  // If the parameter is a generic parameter, it's hard to say
-  // whether use of a tuple is really intended here, so let's
-  // attach a fix-it to a note instead of the diagnostic message
-  // to indicate that it's not the only right solution possible.
-  if (auto *typeVar = ParamType->getAs<TypeVariableType>()) {
-    if (typeVar->getImpl().getGenericParameter()) {
-      diagnostic.flush();
-
-      emitDiagnostic(argExpr->getLoc(), diag::note_maybe_forgot_to_form_tuple)
-          .fixItInsertAfter(newLeftParenLoc, "(")
-          .fixItInsert(argExpr->getEndLoc(), ")");
-    }
-  } else {
-    diagnostic.highlight(argExpr->getSourceRange())
-        .fixItInsertAfter(newLeftParenLoc, "(")
-        .fixItInsert(argExpr->getEndLoc(), ")");
-  }
+  diagnostic.highlight(argExpr->getSourceRange())
+      .fixItInsertAfter(newLeftParenLoc, "(")
+      .fixItInsert(argExpr->getEndLoc(), ")");
 
   return true;
 }
@@ -5965,3 +5982,26 @@ bool AssignmentTypeMismatchFailure::diagnoseAsNote() {
   return false;
 }
 
+bool MissingContextualBaseInMemberRefFailure::diagnoseAsError() {
+  auto *anchor = getAnchor();
+  auto &cs = getConstraintSystem();
+
+  // Member reference could be wrapped into a number of parens
+  // e.g. `((.foo))`.
+  auto *parentExpr = findParentExpr(anchor);
+  do {
+    // If we have found something which isn't a paren let's stop,
+    // otherwise let's keep unwrapping until there are either no
+    // more parens or no more parents...
+    if (!parentExpr || !isa<ParenExpr>(parentExpr))
+      break;
+  } while ((parentExpr = findParentExpr(parentExpr)));
+
+  auto diagnostic = parentExpr || cs.getContextualType(anchor)
+                        ? diag::cannot_infer_base_of_unresolved_member
+                        : diag::unresolved_member_no_inference;
+
+  emitDiagnostic(anchor->getLoc(), diagnostic, MemberName)
+      .highlight(anchor->getSourceRange());
+  return true;
+}

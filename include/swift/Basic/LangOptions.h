@@ -219,6 +219,13 @@ namespace swift {
     /// Build the ASTScope tree lazily
     bool LazyASTScopes = true;
 
+    /// Use Clang function types for computing canonical types.
+    /// If this option is false, the clang function types will still be computed
+    /// but will not be used for checking type equality.
+    /// FIXME: [clang-function-type-serialization] This option should be turned
+    /// on once we start serializing clang function types.
+    bool UseClangFunctionTypes = false;
+
     /// Whether to use the import as member inference system
     ///
     /// When importing a global, try to infer whether we can import it as a
@@ -273,12 +280,12 @@ namespace swift {
 
     /// Scaffolding to permit experimentation with finer-grained dependencies
     /// and faster rebuilds.
-    bool EnableExperimentalDependencies = false;
+    bool EnableFineGrainedDependencies = false;
     
     /// To mimic existing system, set to false.
     /// To experiment with including file-private and private dependency info,
     /// set to true.
-    bool ExperimentalDependenciesIncludeIntrafileOnes = false;
+    bool FineGrainedDependenciesIncludeIntrafileOnes = false;
 
     /// Whether to enable experimental differentiable programming features:
     /// `@differentiable` declaration attribute, etc.
@@ -296,20 +303,13 @@ namespace swift {
     /// This is only implemented on certain OSs. If no target has been
     /// configured, returns v0.0.0.
     llvm::VersionTuple getMinPlatformVersion() const {
-      unsigned major, minor, revision;
+      unsigned major = 0, minor = 0, revision = 0;
       if (Target.isMacOSX()) {
         Target.getMacOSXVersion(major, minor, revision);
       } else if (Target.isiOS()) {
         Target.getiOSVersion(major, minor, revision);
       } else if (Target.isWatchOS()) {
         Target.getOSVersion(major, minor, revision);
-      } else if (Target.isOSLinux() || Target.isOSFreeBSD() ||
-                 Target.isAndroid() || Target.isOSWindows() ||
-                 Target.isPS4() || Target.isOSHaiku() ||
-                 Target.getTriple().empty()) {
-        major = minor = revision = 0;
-      } else {
-        llvm_unreachable("Unsupported target OS");
       }
       return llvm::VersionTuple(major, minor, revision);
     }

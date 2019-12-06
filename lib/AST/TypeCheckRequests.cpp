@@ -18,10 +18,12 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeLoc.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/AST/Types.h"
+#include "swift/Subsystems.h"
 
 using namespace swift;
 
@@ -1217,4 +1219,69 @@ Optional<Expr *> DefaultArgumentExprRequest::getCachedResult() const {
 void DefaultArgumentExprRequest::cacheResult(Expr *expr) const {
   auto *param = std::get<0>(getStorage());
   param->setDefaultExpr(expr, /*isTypeChecked*/ true);
+}
+
+//----------------------------------------------------------------------------//
+// CallerSideDefaultArgExprRequest computation.
+//----------------------------------------------------------------------------//
+
+Optional<Expr *> CallerSideDefaultArgExprRequest::getCachedResult() const {
+  auto *defaultExpr = std::get<0>(getStorage());
+  auto storage = defaultExpr->ContextOrCallerSideExpr;
+  assert(!storage.isNull());
+
+  if (auto *expr = storage.dyn_cast<Expr *>())
+    return expr;
+
+  return None;
+}
+
+void CallerSideDefaultArgExprRequest::cacheResult(Expr *expr) const {
+  auto *defaultExpr = std::get<0>(getStorage());
+  defaultExpr->ContextOrCallerSideExpr = expr;
+}
+
+//----------------------------------------------------------------------------//
+// TypeCheckSourceFileRequest computation.
+//----------------------------------------------------------------------------//
+
+Optional<bool> TypeCheckSourceFileRequest::getCachedResult() const {
+  auto *SF = std::get<0>(getStorage());
+  if (SF->ASTStage == SourceFile::TypeChecked)
+    return true;
+
+  return None;
+}
+
+void TypeCheckSourceFileRequest::cacheResult(bool result) const {
+  auto *SF = std::get<0>(getStorage());
+
+  // Verify that we've checked types correctly.
+  SF->ASTStage = SourceFile::TypeChecked;
+
+  {
+    auto &Ctx = SF->getASTContext();
+    FrontendStatsTracer tracer(Ctx.Stats, "AST verification");
+    // Verify the SourceFile.
+    swift::verify(*SF);
+
+    // Verify imported modules.
+    //
+    // Skip per-file verification in whole-module mode. Verifying imports
+    // between files could cause the importer to cache declarations without
+    // adding them to the ASTContext. This happens when the importer registers a
+    // declaration without a valid TypeChecker instance, as is the case during
+    // verification. A subsequent file may require that declaration to be fully
+    // imported (e.g. to synthesized a function body), but since it has already
+    // been cached, it will never be added to the ASTContext. The solution is to
+    // skip verification and avoid caching it.
+#ifndef NDEBUG
+    if (!Ctx.TypeCheckerOpts.DelayWholeModuleChecking &&
+        SF->Kind != SourceFileKind::REPL &&
+        SF->Kind != SourceFileKind::SIL &&
+        !Ctx.LangOpts.DebuggerSupport) {
+      Ctx.verifyAllLoadedModules();
+    }
+#endif
+  }
 }

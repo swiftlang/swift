@@ -172,12 +172,6 @@ emitApplyWithRethrow(SILBuilder &Builder,
     SILValue Error = ErrorBB->createPhiArgument(fnConv.getSILErrorType(),
                                                 ValueOwnershipKind::Owned);
 
-    Builder.createBuiltin(Loc,
-                          Builder.getASTContext().getIdentifier("willThrow"),
-                          Builder.getModule().Types.getEmptyTupleType(),
-                          SubstitutionMap(),
-                          {Error});
-
     EmitCleanup(Builder, Loc);
     addThrowValue(ErrorBB, Error);
   }
@@ -619,7 +613,7 @@ SILValue EagerDispatch::emitArgumentCast(CanSILFunctionType CalleeSubstFnTy,
 /// has a direct result.
 SILValue EagerDispatch::
 emitArgumentConversion(SmallVectorImpl<SILValue> &CallArgs) {
-  auto OrigArgs = GenericFunc->begin()->getFunctionArguments();
+  auto OrigArgs = GenericFunc->begin()->getSILFunctionArguments();
   assert(OrigArgs.size() == substConv.getNumSILArguments()
          && "signature mismatch");
   // Create a substituted callee type.

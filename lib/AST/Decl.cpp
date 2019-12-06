@@ -576,6 +576,22 @@ Result->X = SM.getLocFromExternalSource(Locs->SourceFilePath, Locs->X.Line,   \
   return Result;
 }
 
+StringRef Decl::getAlternateModuleName() const {
+  if (auto *OD = Attrs.getAttribute(DeclAttrKind::DAK_OriginallyDefinedIn)) {
+    return static_cast<const OriginallyDefinedInAttr*>(OD)->OriginalModuleName;
+  }
+  for (auto *DC = getDeclContext(); DC; DC = DC->getParent()) {
+    if (auto decl = DC->getAsDecl()) {
+      if (decl == this)
+        continue;
+      auto AM = decl->getAlternateModuleName();
+      if (!AM.empty())
+        return AM;
+    }
+  }
+  return StringRef();
+}
+
 SourceLoc Decl::getLoc(bool SerializedOK) const {
 #define DECL(ID, X) \
 static_assert(sizeof(checkSourceLocType(&ID##Decl::getLoc)) == 2, \
@@ -1539,9 +1555,9 @@ void PatternBindingEntry::setOriginalInit(Expr *E) {
                              PatternFlags::IsText);
 }
 
-bool PatternBindingEntry::isInitialized() const {
+bool PatternBindingEntry::isInitialized(bool onlyExplicit) const {
   // Directly initialized.
-  if (getInit())
+  if (getInit() && (!onlyExplicit || getEqualLoc().isValid()))
     return true;
 
   // Initialized via a property wrapper.
@@ -1833,7 +1849,7 @@ bool PatternBindingDecl::isComputingPatternBindingEntry(
 
 bool PatternBindingDecl::isExplicitlyInitialized(unsigned i) const {
   const auto &entry = getPatternList()[i];
-  return entry.isInitialized() && entry.getEqualLoc().isValid();
+  return entry.isInitialized(/*onlyExplicit=*/true);
 }
 
 SourceLoc PatternBindingDecl::getEqualLoc(unsigned i) const {
@@ -2817,6 +2833,13 @@ void ValueDecl::setIsDynamic(bool value) {
   LazySemanticInfo.isDynamic = value;
 }
 
+ValueDecl *ValueDecl::getDynamicallyReplacedDecl() const {
+  return evaluateOrDefault(getASTContext().evaluator,
+                           DynamicallyReplacedDeclRequest{
+                               const_cast<ValueDecl *>(this)},
+                           nullptr);
+}
+
 bool ValueDecl::canBeAccessedByDynamicLookup() const {
   if (!hasName())
     return false;
@@ -2892,10 +2915,7 @@ bool ValueDecl::isRecursiveValidation() const {
 Type ValueDecl::getInterfaceType() const {
   auto &ctx = getASTContext();
 
-  // N.B. This assertion exists to catch new broken callers. It can be removed
-  // with the LazyResolver when the time comes.
-  assert(ctx.getLegacyGlobalTypeChecker()
-         && "The type checker must be installed to make semantic queries!");
+  assert(ctx.areSemanticQueriesEnabled());
 
   if (auto type =
           evaluateOrDefault(ctx.evaluator,
@@ -2998,7 +3018,7 @@ SourceLoc ValueDecl::getAttributeInsertionLoc(bool forModifier) const {
 /// Returns true if \p VD needs to be treated as publicly-accessible
 /// at the SIL, LLVM, and machine levels due to being @usableFromInline.
 bool ValueDecl::isUsableFromInline() const {
-  assert(getFormalAccess() == AccessLevel::Internal);
+  assert(getFormalAccess() <= AccessLevel::Internal);
 
   if (getAttrs().hasAttribute<UsableFromInlineAttr>() ||
       getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>() ||
@@ -3095,7 +3115,7 @@ static AccessLevel getAdjustedFormalAccess(const ValueDecl *VD,
     return getMaximallyOpenAccessFor(VD);
 
   if (treatUsableFromInlineAsPublic &&
-      access == AccessLevel::Internal &&
+      access <= AccessLevel::Internal &&
       VD->isUsableFromInline()) {
     return AccessLevel::Public;
   }
@@ -4945,9 +4965,9 @@ bool AbstractStorageDecl::hasPrivateAccessor() const {
 
 bool AbstractStorageDecl::hasDidSetOrWillSetDynamicReplacement() const {
   if (auto *func = getParsedAccessor(AccessorKind::DidSet))
-    return func->getAttrs().hasAttribute<DynamicReplacementAttr>();
+    return (bool)func->getDynamicallyReplacedDecl();
   if (auto *func = getParsedAccessor(AccessorKind::WillSet))
-    return func->getAttrs().hasAttribute<DynamicReplacementAttr>();
+    return (bool)func->getDynamicallyReplacedDecl();
   return false;
 }
 
@@ -4959,13 +4979,6 @@ bool AbstractStorageDecl::hasAnyNativeDynamicAccessors() const {
   return false;
 }
 
-bool AbstractStorageDecl::hasAnyDynamicReplacementAccessors() const {
-  for (auto accessor : getAllAccessors()) {
-    if (accessor->getAttrs().hasAttribute<DynamicReplacementAttr>())
-      return true;
-  }
-  return false;
-}
 void AbstractStorageDecl::setAccessors(SourceLoc lbraceLoc,
                                        ArrayRef<AccessorDecl *> accessors,
                                        SourceLoc rbraceLoc) {
@@ -5697,7 +5710,7 @@ StaticSpellingKind AbstractStorageDecl::getCorrectStaticSpelling() const {
 
 llvm::TinyPtrVector<CustomAttr *> VarDecl::getAttachedPropertyWrappers() const {
   auto &ctx = getASTContext();
-  if (!ctx.getLegacyGlobalTypeChecker()) {
+  if (!ctx.areSemanticQueriesEnabled()) {
     return { };
   }
 
@@ -6082,6 +6095,25 @@ bool ParamDecl::hasDefaultExpr() const {
     return getStructuralDefaultExpr();
   }
   llvm_unreachable("Unhandled case in switch");
+}
+
+bool ParamDecl::hasCallerSideDefaultExpr() const {
+  switch (getDefaultArgumentKind()) {
+  case DefaultArgumentKind::None:
+  case DefaultArgumentKind::Inherited:
+  case DefaultArgumentKind::StoredProperty:
+  case DefaultArgumentKind::Normal:
+    return false;
+  case DefaultArgumentKind::File:
+  case DefaultArgumentKind::Line:
+  case DefaultArgumentKind::Column:
+  case DefaultArgumentKind::Function:
+  case DefaultArgumentKind::DSOHandle:
+  case DefaultArgumentKind::NilLiteral:
+  case DefaultArgumentKind::EmptyArray:
+  case DefaultArgumentKind::EmptyDictionary:
+    return true;
+  }
 }
 
 Expr *ParamDecl::getTypeCheckedDefaultExpr() const {
@@ -6642,7 +6674,7 @@ ObjCSelector
 AbstractFunctionDecl::getObjCSelector(DeclName preferredName,
                                       bool skipIsObjCResolution) const {
   // FIXME: Forces computation of the Objective-C selector.
-  if (getASTContext().getLegacyGlobalTypeChecker() && !skipIsObjCResolution)
+  if (getASTContext().areSemanticQueriesEnabled() && !skipIsObjCResolution)
     (void)isObjC();
 
   // If there is an @objc attribute with a name, use that name.

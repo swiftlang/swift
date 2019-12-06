@@ -1760,7 +1760,7 @@ namespace {
 
   public:
     explicit TypeResolver(TypeResolution resolution)
-      : Context(resolution.getDeclContext()->getASTContext()),
+      : Context(resolution.getASTContext()),
         resolution(resolution),
         DC(resolution.getDeclContext())
     {
@@ -1781,8 +1781,11 @@ namespace {
                                TypeResolutionOptions options);
     Type resolveASTFunctionType(FunctionTypeRepr *repr,
                                 TypeResolutionOptions options,
-                                FunctionType::ExtInfo extInfo
-                                  = FunctionType::ExtInfo());
+                                AnyFunctionType::Representation representation
+                                  = AnyFunctionType::Representation::Swift,
+                                bool noescape = false,
+                                DifferentiabilityKind diffKind
+                                  = DifferentiabilityKind::NonDifferentiable);
     bool
     resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
                                  TypeResolutionOptions options,
@@ -1848,11 +1851,11 @@ namespace {
 Type TypeResolution::resolveType(TypeRepr *TyR,
                               TypeResolutionOptions options) {
   auto &ctx = getASTContext();
-
   FrontendStatsTracer StatsTracer(ctx.Stats, "resolve-type", TyR);
   PrettyStackTraceTypeRepr stackTrace(ctx, "resolving", TyR);
 
   TypeResolver typeResolver(*this);
+
   auto result = typeResolver.resolveType(TyR, options);
 
   if (result) {
@@ -2208,8 +2211,10 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
       }
 
       // Resolve the function type directly with these attributes.
+      // TODO: [store-sil-clang-function-type]
       SILFunctionType::ExtInfo extInfo(rep, attrs.has(TAK_pseudogeneric),
-                                       attrs.has(TAK_noescape), diffKind);
+                                       attrs.has(TAK_noescape), diffKind,
+                                       nullptr);
 
       ty = resolveSILFunctionType(fnRepr, options, coroutineKind, extInfo,
                                   calleeConvention, witnessMethodProtocol);
@@ -2271,11 +2276,8 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
                                 : DifferentiabilityKind::Normal;
       }
 
-      // Resolve the function type directly with these attributes.
-      FunctionType::ExtInfo extInfo(rep, /*noescape=*/false, fnRepr->throws(),
-                                    diffKind);
-
-      ty = resolveASTFunctionType(fnRepr, options, extInfo);
+      ty = resolveASTFunctionType(fnRepr, options, rep, /*noescape=*/false,
+                                  diffKind);
       if (!ty || ty->hasError())
         return ty;
     }
@@ -2519,9 +2521,11 @@ Type TypeResolver::resolveOpaqueReturnType(TypeRepr *repr,
   return ty;
 }
 
-Type TypeResolver::resolveASTFunctionType(FunctionTypeRepr *repr,
-                                          TypeResolutionOptions parentOptions,
-                                          FunctionType::ExtInfo extInfo) {
+Type TypeResolver::resolveASTFunctionType(
+    FunctionTypeRepr *repr, TypeResolutionOptions parentOptions,
+    AnyFunctionType::Representation representation, bool noescape,
+    DifferentiabilityKind diffKind) {
+
   TypeResolutionOptions options = None;
   options |= parentOptions.withoutContext().getFlags();
 
@@ -2533,8 +2537,6 @@ Type TypeResolver::resolveASTFunctionType(FunctionTypeRepr *repr,
 
   Type outputTy = resolveType(repr->getResultTypeRepr(), options);
   if (!outputTy || outputTy->hasError()) return outputTy;
-
-  extInfo = extInfo.withThrows(repr->throws());
 
   // If this is a function type without parens around the parameter list,
   // diagnose this and produce a fixit to add them.
@@ -2555,6 +2557,19 @@ Type TypeResolver::resolveASTFunctionType(FunctionTypeRepr *repr,
     }
   }
 
+  FunctionType::ExtInfo incompleteExtInfo(FunctionTypeRepresentation::Swift,
+                                          noescape, repr->throws(), diffKind,
+                                          /*clangFunctionType*/nullptr);
+  
+  const clang::Type *clangFnType = nullptr;
+  if (representation == AnyFunctionType::Representation::CFunctionPointer)
+    clangFnType = Context.getClangFunctionType(
+      params, outputTy, incompleteExtInfo,
+      AnyFunctionType::Representation::CFunctionPointer);
+
+  auto extInfo = incompleteExtInfo.withRepresentation(representation)
+                                  .withClangFunctionType(clangFnType);
+
   // SIL uses polymorphic function types to resolve overloaded member functions.
   if (auto genericEnv = repr->getGenericEnvironment()) {
     outputTy = outputTy->mapTypeOutOfContext();
@@ -2565,12 +2580,14 @@ Type TypeResolver::resolveASTFunctionType(FunctionTypeRepr *repr,
   auto fnTy = FunctionType::get(params, outputTy, extInfo);
   // If the type is a block or C function pointer, it must be representable in
   // ObjC.
-  switch (auto rep = extInfo.getRepresentation()) {
+  switch (representation) {
   case AnyFunctionType::Representation::Block:
   case AnyFunctionType::Representation::CFunctionPointer:
     if (!fnTy->isRepresentableIn(ForeignLanguage::ObjectiveC, DC)) {
       StringRef strName =
-        rep == AnyFunctionType::Representation::Block ? "block" : "c";
+        (representation == AnyFunctionType::Representation::Block)
+        ? "block"
+        : "c";
       auto extInfo2 =
         extInfo.withRepresentation(AnyFunctionType::Representation::Swift);
       auto simpleFnTy = FunctionType::get(params, outputTy, extInfo2);

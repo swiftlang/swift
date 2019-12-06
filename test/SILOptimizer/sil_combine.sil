@@ -564,7 +564,7 @@ bb0(%0 : $C):
 sil @downcast_upcast_roundtrip : $@convention(thin) <T_0_0, T_0_1> (HeapBufferStorage<T_0_0, T_0_1>) -> HeapBufferStorage<T_0_0, T_0_1> {
 bb0(%0 : $HeapBufferStorage<T_0_0, T_0_1>):
   %2 = upcast %0 : $HeapBufferStorage<T_0_0, T_0_1> to $RawBuffer // user: %3
-  %3 = unconditional_checked_cast %2 : $RawBuffer to $HeapBufferStorage<T_0_0, T_0_1>
+  %3 = unconditional_checked_cast %2 : $RawBuffer to HeapBufferStorage<T_0_0, T_0_1>
   return %3 : $HeapBufferStorage<T_0_0, T_0_1>
 }
 
@@ -2526,7 +2526,7 @@ sil @alloc_ref_dynamic_with_upcast_metatype : $() -> () {
 // CHECK: alloc_ref $B
 sil @alloc_ref_dynamic_after_successful_checked_cast_br : $(@thick B.Type) -> Builtin.Int32 {
 bb0(%1 : $@thick B.Type):
-  checked_cast_br [exact] %1 : $@thick B.Type to $@thick B.Type, bb1, bb2
+  checked_cast_br [exact] %1 : $@thick B.Type to B.Type, bb1, bb2
 
 bb1(%2 : $@thick B.Type):
   %3 = alloc_ref_dynamic %2 : $@thick B.Type, $B
@@ -2551,7 +2551,7 @@ bb3 (%10: $Builtin.Int32):
 // CHECK-NEXT: strong_release [[C]]
 sil @alloc_ref_dynamic_upcast_after_successful_checked_cast_br : $(@thick B.Type) -> Builtin.Int32 {
 bb0(%1 : $@thick B.Type):
-  checked_cast_br [exact] %1 : $@thick B.Type to $@thick E.Type, bb1, bb2
+  checked_cast_br [exact] %1 : $@thick B.Type to E.Type, bb1, bb2
 
 bb1(%2 : $@thick E.Type):
   %3 = upcast %2 : $@thick E.Type to $@thick B.Type

@@ -50,6 +50,7 @@ namespace constraints {
   enum class SolutionKind : char;
   class ConstraintSystem;
   class Solution;
+  class SolutionResult;
 }
 
 /// A mapping from substitutable types to the protocol-conformance
@@ -73,81 +74,6 @@ enum class DeclTypeCheckingSemantics {
   /// The _openExistential(_:do:) declaration, which extracts the value inside
   /// an existential and passes it as a value of its own dynamic type.
   OpenExistential,
-};
-
-/// The result of name lookup.
-class LookupResult {
-private:
-  /// The set of results found.
-  SmallVector<LookupResultEntry, 4> Results;
-  size_t IndexOfFirstOuterResult = 0;
-
-public:
-  LookupResult() {}
-
-  explicit LookupResult(const SmallVectorImpl<LookupResultEntry> &Results,
-                        size_t indexOfFirstOuterResult)
-      : Results(Results.begin(), Results.end()),
-        IndexOfFirstOuterResult(indexOfFirstOuterResult) {}
-
-  using iterator = SmallVectorImpl<LookupResultEntry>::iterator;
-  iterator begin() { return Results.begin(); }
-  iterator end() {
-    return Results.begin() + IndexOfFirstOuterResult;
-  }
-  unsigned size() const { return innerResults().size(); }
-  bool empty() const { return innerResults().empty(); }
-
-  ArrayRef<LookupResultEntry> innerResults() const {
-    return llvm::makeArrayRef(Results).take_front(IndexOfFirstOuterResult);
-  }
-
-  ArrayRef<LookupResultEntry> outerResults() const {
-    return llvm::makeArrayRef(Results).drop_front(IndexOfFirstOuterResult);
-  }
-
-  const LookupResultEntry& operator[](unsigned index) const {
-    return Results[index];
-  }
-
-  LookupResultEntry front() const { return innerResults().front(); }
-  LookupResultEntry back() const { return innerResults().back(); }
-
-  /// Add a result to the set of results.
-  void add(LookupResultEntry result, bool isOuter) {
-    Results.push_back(result);
-    if (!isOuter) {
-      IndexOfFirstOuterResult++;
-      assert(IndexOfFirstOuterResult == Results.size() &&
-             "found an outer result before an inner one");
-    } else {
-      assert(IndexOfFirstOuterResult > 0 &&
-             "found outer results without an inner one");
-    }
-  }
-
-  void clear() { Results.clear(); }
-
-  /// Determine whether the result set is nonempty.
-  explicit operator bool() const {
-    return !empty();
-  }
-
-  TypeDecl *getSingleTypeResult() const {
-    if (size() != 1)
-      return nullptr;
-
-    return dyn_cast<TypeDecl>(front().getValueDecl());
-  }
-
-  /// Filter out any results that aren't accepted by the given predicate.
-  void
-  filter(llvm::function_ref<bool(LookupResultEntry, /*isOuter*/ bool)> pred);
-
-  /// Shift down results by dropping inner results while keeping outer
-  /// results (if any), the innermost of which are recogized as inner
-  /// results afterwards.
-  void shiftDownResults();
 };
 
 /// An individual result of a name lookup for a type.
@@ -536,10 +462,6 @@ public:
   /// The list of function definitions we've encountered.
   std::vector<AbstractFunctionDecl *> definedFunctions;
 
-  /// A list of closures for the most recently type-checked function, which we
-  /// will need to compute captures for.
-  std::vector<AbstractClosureExpr *> ClosuresWithUncomputedCaptures;
-
 private:
   TypeChecker() = default;
   ~TypeChecker() = default;
@@ -790,9 +712,7 @@ public:
   static bool typeCheckTapBody(TapExpr *expr, DeclContext *DC);
 
   static Type typeCheckParameterDefault(Expr *&defaultValue, DeclContext *DC,
-                                        Type paramType,
-                                        bool isAutoClosure = false,
-                                        bool canFail = true);
+                                        Type paramType, bool isAutoClosure);
 
   static void typeCheckTopLevelCodeDecl(TopLevelCodeDecl *TLCD);
 
@@ -803,7 +723,6 @@ public:
   static void addImplicitDynamicAttribute(Decl *D);
   static void checkDeclAttributes(Decl *D);
   static void checkParameterAttributes(ParameterList *params);
-  static ValueDecl *findReplacedDynamicFunction(const ValueDecl *d);
 
   static Type checkReferenceOwnershipAttr(VarDecl *D, Type interfaceType,
                                           ReferenceOwnershipAttr *attr);
@@ -889,10 +808,6 @@ public:
       GenericRequirementsCheckListener *listener = nullptr,
       SubstOptions options = None);
 
-  /// Diagnose if the class has no designated initializers.
-  static void maybeDiagnoseClassWithoutInitializers(ClassDecl *classDecl);
-
-  ///
   /// Add any implicitly-defined constructors required for the given
   /// struct or class.
   static void addImplicitConstructors(NominalTypeDecl *typeDecl);
@@ -952,12 +867,12 @@ public:
   }
 
 private:
-  Type typeCheckExpressionImpl(Expr *&expr, DeclContext *dc,
-                               TypeLoc convertType,
-                               ContextualTypePurpose convertTypePurpose,
-                               TypeCheckExprOptions options,
-                               ExprTypeCheckListener &listener,
-                               constraints::ConstraintSystem *baseCS);
+  static Type typeCheckExpressionImpl(Expr *&expr, DeclContext *dc,
+                                      TypeLoc convertType,
+                                      ContextualTypePurpose convertTypePurpose,
+                                      TypeCheckExprOptions options,
+                                      ExprTypeCheckListener &listener,
+                                      constraints::ConstraintSystem *baseCS);
 
 public:
   /// Type check the given expression and return its type without
@@ -1128,7 +1043,7 @@ public:
   static void computeCaptures(AnyFunctionRef AFR);
 
   /// Check for invalid captures from stored property initializers.
-  static void checkPatternBindingCaptures(NominalTypeDecl *typeDecl);
+  static void checkPatternBindingCaptures(IterableDeclContext *DC);
 
   /// Change the context of closures in the given initializer
   /// expression to the given context.
@@ -1407,11 +1322,6 @@ public:
   static Expr *buildRefExpr(ArrayRef<ValueDecl *> Decls, DeclContext *UseDC,
                             DeclNameLoc NameLoc, bool Implicit,
                             FunctionRefKind functionRefKind);
-
-  /// Build implicit autoclosure expression wrapping a given expression.
-  /// Given expression represents computed result of the closure.
-  static Expr *buildAutoClosureExpr(DeclContext *DC, Expr *expr,
-                                    FunctionType *closureType);
   /// @}
 
   /// Retrieve a specific, known protocol.

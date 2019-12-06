@@ -1071,6 +1071,10 @@ ClangImporter::create(ASTContext &ctx, const ClangImporterOptions &importerOpts,
   // read them later.
   instance.getLangOpts().NeededByPCHOrCompilationUsesPCH = true;
 
+  // Make sure to not trigger extra rebuilds on identical files with mismatching
+  // timestamps.
+  instance.getHeaderSearchOpts().ValidateASTInputFilesContent = true;
+
   if (importerOpts.Mode == ClangImporterOptions::Modes::PrecompiledModule)
     return importer;
 
@@ -2902,12 +2906,11 @@ ClangModuleUnit::lookupNestedType(Identifier name,
     // If the entry is not visible, skip it.
     if (!isVisibleClangEntry(clangCtx, entry)) continue;
 
-    auto clangDecl = entry.dyn_cast<clang::NamedDecl *>();
-    auto clangTypeDecl = dyn_cast_or_null<clang::TypeDecl>(clangDecl);
-    if (!clangTypeDecl)
+    auto *clangDecl = entry.dyn_cast<clang::NamedDecl *>();
+    if (!clangDecl)
       continue;
 
-    clangTypeDecl = cast<clang::TypeDecl>(clangTypeDecl->getMostRecentDecl());
+    const auto *clangTypeDecl = clangDecl->getMostRecentDecl();
 
     bool anyMatching = false;
     TypeDecl *originalDecl = nullptr;

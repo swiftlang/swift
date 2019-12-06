@@ -96,15 +96,17 @@ foo(Foo.a, Foo.b) // Ok in Swift 4 because we strip labels from the arguments
 
 // rdar://problem/32551313 - Useless SE-0110 diagnostic
 
-enum E_32551313<L, R> {
+enum E_32551313<L, R> { // expected-note {{'R' declared as parameter to type 'E_32551313'}}
   case Left(L)
   case Right(R)
 }
 
 struct Foo_32551313 {
+  // FIXME(diagnostics): We should be able to figure out L and R from contextual type
   static func bar() -> E_32551313<(String, Foo_32551313?), (String, String)>? {
-    return E_32551313.Left("", Foo_32551313()) // expected-error {{enum case 'Left' expects a single parameter of type 'L' [with L = (String, Foo_32551313?)]}}
-    // expected-note@-1 {{did you mean to pass a tuple?}} {{28-28=(}} {{46-46=)}}
+    return E_32551313.Left("", Foo_32551313()) // expected-error {{extra argument in call}}
+    // expected-error@-1 {{generic parameter 'R' could not be inferred}} expected-note@-1 {{explicitly specify the generic arguments to fix this issue}}
+    // expected-error@-2 {{cannot convert return expression of type 'E_32551313<String, R>' to return type 'E_32551313<(String, Foo_32551313?), (String, String)>?'}}
   }
 }
 

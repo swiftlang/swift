@@ -44,6 +44,7 @@ public struct HasWrappers {
   // CHECK: @TestResilient.Wrapper public var x: {{(Swift.)?}}Int {
   // CHECK-NEXT: get
   // CHECK-NEXT: set
+  // CHECK-NEXT: _modify  
   // CHECK-NEXT: }  
   @Wrapper public var x: Int
 
@@ -59,6 +60,7 @@ public struct HasWrappers {
   // CHECK: @TestResilient.WrapperWithInitialValue @_projectedValueProperty($z) public var z: Swift.Bool {
   // CHECK-NEXT: get
   // CHECK-NEXT: set
+  // CHECK-NEXT: _modify
   // CHECK-NEXT: }  
   @WrapperWithInitialValue(alternate: false) public var z
 }

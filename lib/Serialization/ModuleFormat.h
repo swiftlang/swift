@@ -39,6 +39,9 @@ using llvm::BCVBR;
 /// Magic number for serialized module files.
 const unsigned char SWIFTMODULE_SIGNATURE[] = { 0xE2, 0x9C, 0xA8, 0x0E };
 
+/// Alignment of each serialized modules inside a .swift_ast section.
+const unsigned char SWIFTMODULE_ALIGNMENT = 4;
+
 /// Serialized module format major version number.
 ///
 /// Always 0 for Swift 1.x - 4.x.
@@ -52,7 +55,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 524; // function type differentiability
+const uint16_t SWIFTMODULE_VERSION_MINOR = 526; // @_dynamicReplacement adjustments
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -1728,6 +1731,14 @@ namespace decls_block {
     BCVBR<5>,   // number of bytes in message string
     BCVBR<5>,   // number of bytes in rename string
     BCBlob      // platform, followed by message
+  >;
+
+  using OriginallyDefinedInDeclAttrLayout = BCRecordLayout<
+    OriginallyDefinedIn_DECL_ATTR,
+    BCFixed<1>,     // implicit flag
+    BC_AVAIL_TUPLE, // moved OS version
+    BCVBR<5>,       // platform
+    BCBlob          // original module name
   >;
 
   using ObjCDeclAttrLayout = BCRecordLayout<
