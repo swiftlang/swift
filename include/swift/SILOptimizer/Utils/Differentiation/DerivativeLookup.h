@@ -38,19 +38,17 @@ getExactDifferentiabilityWitness(SILModule &module, SILFunction *original,
 
 /// Finds the derivative configuration (from `@differentiable` and
 /// `@derivative` attributes) for `original` whose parameter indices are a
-/// minimal superset of the specified AST parameter indices. Returns true if
-/// such a configuration is found.
+/// minimal superset of the specified AST parameter indices. Returns `None` if
+/// no such configuration is found.
 ///
 /// \param parameterIndices must be lowered to SIL.
 /// \param minimalASTParameterIndices is an output parameter that is set to the
 /// AST indices of the minimal configuration, or to `nullptr` if no such
 /// configuration exists.
-/// \param minimalConfig is an output parameter that is set to the SIL-lowered
-/// minimal derivative configuration, or to `nullptr` if no such configuration
-/// exists.
-bool findMinimalDerivativeConfiguration(
-    AbstractFunctionDecl *original, IndexSubset *parameterIndices,
-    IndexSubset *&minimalASTParameterIndices, AutoDiffConfig &minimalConfig);
+Optional<AutoDiffConfig>
+findMinimalDerivativeConfiguration(AbstractFunctionDecl *original,
+                                   IndexSubset *parameterIndices,
+                                   IndexSubset *&minimalASTParameterIndices);
 
 /// Returns a differentiability witness for `original` whose parameter indices
 /// are a minimal superset of the specified parameter indices and whose result

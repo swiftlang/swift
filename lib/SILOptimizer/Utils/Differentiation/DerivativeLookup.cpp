@@ -45,9 +45,11 @@ getExactDifferentiabilityWitness(SILModule &module, SILFunction *original,
   return nullptr;
 }
 
-bool findMinimalDerivativeConfiguration(
-    AbstractFunctionDecl *original, IndexSubset *parameterIndices,
-    IndexSubset *&minimalASTParameterIndices, AutoDiffConfig &minimalConfig) {
+Optional<AutoDiffConfig>
+findMinimalDerivativeConfiguration(AbstractFunctionDecl *original,
+                                   IndexSubset *parameterIndices,
+                                   IndexSubset *&minimalASTParameterIndices) {
+  Optional<AutoDiffConfig> minimalConfig = None;
   auto configs = original->getDerivativeFunctionConfigurations();
   for (auto config : configs) {
     auto *silParameterIndices = autodiff::getLoweredParameterIndices(
@@ -63,15 +65,15 @@ bool findMinimalDerivativeConfiguration(
     if (silParameterIndices->isSupersetOf(parameterIndices->extendingCapacity(
             original->getASTContext(), silParameterIndices->getCapacity())) &&
         // fewer parameters than before
-        (!minimalConfig.parameterIndices ||
+        (!minimalConfig ||
          silParameterIndices->getNumIndices() <
-             minimalConfig.parameterIndices->getNumIndices())) {
+             minimalConfig->parameterIndices->getNumIndices())) {
       minimalASTParameterIndices = config.parameterIndices;
-      minimalConfig = config;
-      minimalConfig.parameterIndices = silParameterIndices;
+      minimalConfig = AutoDiffConfig(silParameterIndices, config.resultIndices,
+                                     config.derivativeGenericSignature);
     }
   }
-  return minimalASTParameterIndices;
+  return minimalConfig;
 }
 
 SILDifferentiabilityWitness *getOrCreateMinimalASTDifferentiabilityWitness(
@@ -88,17 +90,13 @@ SILDifferentiabilityWitness *getOrCreateMinimalASTDifferentiabilityWitness(
     return nullptr;
 
   IndexSubset *minimalASTParameterIndices = nullptr;
-  AutoDiffConfig minimalConfig(
-      /*parameterIndices*/ nullptr, /*resultIndices*/ nullptr,
-      /*derivativeGenericSignature*/ GenericSignature());
-  if (!findMinimalDerivativeConfiguration(originalAFD, parameterIndices,
-                                          minimalASTParameterIndices,
-                                          minimalConfig)) {
+  auto minimalConfig = findMinimalDerivativeConfiguration(
+      originalAFD, parameterIndices, minimalASTParameterIndices);
+  if (!minimalConfig)
     return nullptr;
-  }
 
   auto *existingWitness = module.lookUpDifferentiabilityWitness(
-      {original->getName(), minimalConfig});
+      {original->getName(), *minimalConfig});
   if (existingWitness)
     return existingWitness;
 
@@ -108,8 +106,8 @@ SILDifferentiabilityWitness *getOrCreateMinimalASTDifferentiabilityWitness(
 
   return SILDifferentiabilityWitness::createDeclaration(
       module, SILLinkage::PublicExternal, original,
-      minimalConfig.parameterIndices, minimalConfig.resultIndices,
-      minimalConfig.derivativeGenericSignature);
+      minimalConfig->parameterIndices, minimalConfig->resultIndices,
+      minimalConfig->derivativeGenericSignature);
 }
 
 } // end namespace swift

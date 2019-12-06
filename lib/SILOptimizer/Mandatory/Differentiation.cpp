@@ -752,19 +752,15 @@ emitDerivativeFunctionReference(
     // corresponding derivative generic signature. If it does not exist, produce
     // an error.
     IndexSubset *minimalASTParamIndices = nullptr;
-    AutoDiffConfig minimalConfig(
-        /*parameterIndices*/ nullptr, /*resultIndices*/ nullptr,
-        /*derivativeGenericSignature*/ GenericSignature());
-    GenericSignature derivativeGenericSignature;
-    if (!findMinimalDerivativeConfiguration(
-            requirementDecl, desiredIndices.parameters, minimalASTParamIndices,
-            minimalConfig)) {
+    auto minimalConfig = findMinimalDerivativeConfiguration(
+        requirementDecl, desiredIndices.parameters, minimalASTParamIndices);
+    if (!minimalConfig) {
       context.emitNondifferentiabilityError(
           original, invoker,
           diag::autodiff_member_subset_indices_not_differentiable);
       return None;
     }
-    auto minimalIndices = minimalConfig.getSILAutoDiffIndices();
+    auto minimalIndices = minimalConfig->getSILAutoDiffIndices();
     // Emit a `witness_method` instruction for the derivative function.
     auto originalType = witnessMethod->getType().castTo<SILFunctionType>();
     auto assocType = originalType->getAutoDiffDerivativeFunctionType(
@@ -800,18 +796,15 @@ emitDerivativeFunctionReference(
     // corresponding derivative generic signature. If it does not exist, produce
     // an error.
     IndexSubset *minimalASTParamIndices = nullptr;
-    AutoDiffConfig minimalConfig(
-        /*parameterIndices*/ nullptr, /*resultIndices*/ nullptr,
-        /*derivativeGenericSignature*/ GenericSignature());
-    if (!findMinimalDerivativeConfiguration(
-            methodDecl, desiredIndices.parameters, minimalASTParamIndices,
-            minimalConfig)) {
+    auto minimalConfig = findMinimalDerivativeConfiguration(
+        methodDecl, desiredIndices.parameters, minimalASTParamIndices);
+    if (!minimalConfig) {
       context.emitNondifferentiabilityError(
           original, invoker,
           diag::autodiff_member_subset_indices_not_differentiable);
       return None;
     }
-    auto minimalIndices = minimalConfig.getSILAutoDiffIndices();
+    auto minimalIndices = minimalConfig->getSILAutoDiffIndices();
     // Emit a `class_method` instruction for the derivative function.
     auto originalType = classMethodInst->getType().castTo<SILFunctionType>();
     auto assocType = originalType->getAutoDiffDerivativeFunctionType(
