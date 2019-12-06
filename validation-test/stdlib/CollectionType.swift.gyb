@@ -771,15 +771,36 @@ CollectionTypeTests.test("chunks(of:)/Size") {
     var collection = MinimalMutableRandomAccessCollection(elements: test.collection)
     expectEqual(
       test.expected, 
-      collection.chunks(of: test.size).map { [Int]($0) },
-      stackTrace: SourceLocStack().with(test.loc)
-      )
-    expectEqual(
-      test.expected.reversed(), 
-      collection.chunks(of: test.size).reversed().map { [Int]($0) },
+      collection.chunks(of: test.size).map(Array<Int>.init),
       stackTrace: SourceLocStack().with(test.loc)
     )
+    checkCollection(
+      test.expected,
+      collection.chunks(of: test.size),
+      stackTrace: SourceLocStack().with(test.loc))
+      { $0.value == $1.value }
+
+    expectEqual(
+      test.expected.reversed(), 
+      collection.chunks(of: test.size).reversed().map(Array<Int>.init),
+      stackTrace: SourceLocStack().with(test.loc)
+    )
+    checkCollection(
+      test.expected.reversed(),
+      collection.chunks(of: test.size).reversed(),
+      stackTrace: SourceLocStack().with(test.loc))
+      { $0.value == $1.value }
   }
+}
+
+CollectionTypeTests.test("ChunckedCollection/AssociatedTypes") {
+  typealias Collection = ChunckedCollection<Array<Int>>
+  expectCollectionAssociatedTypes(
+    collectionType: Collection.self,
+    iteratorType: IndexingIterator<Collection>.self,
+    subSequenceType: Slice<Collection>.self,
+    indexType: ChunkedCollection.Index.self,
+    indicesType: CountableRange<ChunkedCollection.Index>.self)
 }
 
 runAllTests()
