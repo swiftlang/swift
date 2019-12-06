@@ -163,6 +163,12 @@ public:
         if (isa<IfConfigDecl>(decl))
           continue;
 
+        // Emit #warning/#error but don't build anything for it.
+        if (auto poundDiag = dyn_cast<PoundDiagnosticDecl>(decl)) {
+          TypeChecker::typeCheckDecl(poundDiag);
+          continue;
+        }
+
         if (!unhandledNode)
           unhandledNode = decl;
 
