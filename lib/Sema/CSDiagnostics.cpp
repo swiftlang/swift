@@ -1099,8 +1099,8 @@ bool MemberAccessOnOptionalBaseFailure::diagnoseAsError() {
   // type, then the result of the expression is optional (and we want to offer
   // only a '?' fixit) even though the constraint system didn't need to add any
   // additional optionality.
-  auto overload = getResolvedOverload(getLocator());
-  if (overload && overload->ImpliedType->getOptionalObjectType())
+  auto overload = getOverloadChoiceIfAvailable(getLocator());
+  if (overload && overload->openedType->getOptionalObjectType())
     resultIsOptional = true;
 
   auto unwrappedBaseType = baseType->getOptionalObjectType();
@@ -1417,12 +1417,12 @@ bool RValueTreatedAsLValueFailure::diagnoseAsError() {
       }
     }
 
-    if (auto resolvedOverload = getResolvedOverload(getLocator())) {
-      if (resolvedOverload->Choice.getKind() ==
+    if (auto resolvedOverload = getOverloadChoiceIfAvailable(getLocator())) {
+      if (resolvedOverload->choice.getKind() ==
           OverloadChoiceKind::DynamicMemberLookup)
         subElementDiagID = diag::assignment_dynamic_property_has_immutable_base;
 
-      if (resolvedOverload->Choice.getKind() ==
+      if (resolvedOverload->choice.getKind() ==
           OverloadChoiceKind::KeyPathDynamicMemberLookup) {
         if (!getType(member->getBase(), /*wantRValue=*/false)->hasLValueType())
           subElementDiagID =
@@ -4163,7 +4163,7 @@ bool MissingArgumentsFailure::isMisplacedMissingArgument(
     return false;
 
   auto *fnType =
-      cs.simplifyType(overloadChoice->ImpliedType)->getAs<FunctionType>();
+      cs.simplifyType(overloadChoice->openedType)->getAs<FunctionType>();
   if (!(fnType && fnType->getNumParams() == 2))
     return false;
 

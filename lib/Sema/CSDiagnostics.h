@@ -140,18 +140,10 @@ protected:
     return CS.findResolvedMemberRef(locator);
   }
 
+  /// Retrieve overload choice resolved for a given locator
+  /// by the constraint solver.
   Optional<SelectedOverload>
   getOverloadChoiceIfAvailable(ConstraintLocator *locator) const {
-    if (auto *overload = getResolvedOverload(locator))
-      return Optional<SelectedOverload>(
-           {overload->Choice, overload->OpenedFullType, overload->ImpliedType});
-    return None;
-  }
-
-  /// Retrieve overload choice resolved for given locator
-  /// by the constraint solver.
-  ResolvedOverloadSetListItem *
-  getResolvedOverload(ConstraintLocator *locator) const {
     return CS.findSelectedOverloadFor(locator);
   }
 
