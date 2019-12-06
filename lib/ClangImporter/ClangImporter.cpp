@@ -2962,11 +2962,35 @@ void ClangImporter::loadExtensions(NominalTypeDecl *nominal,
   // For an Objective-C class, import all of the visible categories.
   if (auto objcClass = dyn_cast_or_null<clang::ObjCInterfaceDecl>(
                          effectiveClangContext.getAsDeclContext())) {
+    SmallVector<clang::NamedDecl *, 4> DelayedCategories;
+
     // Simply importing the categories adds them to the list of extensions.
     for (auto I = objcClass->visible_categories_begin(),
            E = objcClass->visible_categories_end();
          I != E; ++I) {
+      // Delay installing categories that don't have an owning module.
+      if (!I->getOwningModule()) {
+        DelayedCategories.push_back(*I);
+        continue;
+      }
+
       Impl.importDeclReal(*I, Impl.CurrentVersion);
+    }
+
+    // Install all the delayed categories.
+    //
+    // The very notion of a delayed category is a result of an emergent behavior
+    // of the visible categories list and the order we import modules. The list
+    // appears in deserialization order rather than some "source order", so it's
+    // possible for, say, a bridging header to import a module that defines an
+    // interface and some categories, but for the categories in the bridging
+    // header to appear *before* the categories in the module - the imported
+    // module will be deserialized on demand. We take it on faith that if there
+    // is no owning module for a given category, that it was created in such a
+    // way, and thus we install it last to try to emulate what we want
+    // "source order" to mean.
+    for (const auto *DelayedCat : DelayedCategories) {
+      Impl.importDeclReal(DelayedCat, Impl.CurrentVersion);
     }
   }
 
