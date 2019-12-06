@@ -109,8 +109,9 @@ class SILGlobalOpt {
   /// A map from a globalinit_func to the number of times "once" has called the
   /// function.
   llvm::DenseMap<SILFunction *, unsigned> InitializerCount;
-  
+
   llvm::SmallVector<SILInstruction *, 4> InstToRemove;
+
 public:
   SILGlobalOpt(SILOptFunctionBuilder &FunctionBuilder, SILModule *M, DominanceAnalysis *DA)
       : FunctionBuilder(FunctionBuilder), Module(M), DA(DA) {}
@@ -123,7 +124,7 @@ protected:
 
   /// Collect all global variables.
   void collect();
-  
+
   void collectUsesOfInstructionForDeletion(SILInstruction *inst);
 
   /// If this is a call to a global initializer, map it.
@@ -868,9 +869,9 @@ static bool canBeUsedOrChangedExternally(SILGlobalVariable *global) {
 bool SILGlobalOpt::tryRemoveGlobalAddr(SILGlobalVariable *global) {
   if (canBeUsedOrChangedExternally(global))
     return false;
-  
-  if (GlobalVarSkipProcessing.count(global) ||
-      GlobalLoadMap[global].size() || GlobalAccessMap[global].size())
+
+  if (GlobalVarSkipProcessing.count(global) || GlobalLoadMap[global].size() ||
+      GlobalAccessMap[global].size())
     return false;
 
   for (auto *addr : GlobalAddrMap[global]) {
@@ -884,7 +885,7 @@ bool SILGlobalOpt::tryRemoveGlobalAddr(SILGlobalVariable *global) {
 bool SILGlobalOpt::tryRemoveUnusedGlobal(SILGlobalVariable *global) {
   if (canBeUsedOrChangedExternally(global))
     return false;
-  
+
   if (GlobalVarSkipProcessing.count(global) || GlobalAddrMap[global].size() ||
       GlobalAccessMap[global].size() || GlobalLoadMap[global].size() ||
       AllocGlobalStore.count(global) || GlobalVarStore.count(global))
@@ -1141,37 +1142,38 @@ bool SILGlobalOpt::run() {
 
     addrGlobals.push_back(addrPair.first);
   }
-  
+
   for (auto *global : addrGlobals) {
     HasChanged |= tryRemoveGlobalAddr(global);
   }
 
-  SmallVector<std::pair<SILGlobalVariable *, AllocGlobalInst *>, 12> globalAllocPairs;
+  SmallVector<std::pair<SILGlobalVariable *, AllocGlobalInst *>, 12>
+      globalAllocPairs;
   for (auto &alloc : AllocGlobalStore) {
     if (!alloc.second->getFunction()->shouldOptimize())
       continue;
     globalAllocPairs.push_back(std::make_pair(alloc.first, alloc.second));
   }
-  
+
   for (auto &allocPair : globalAllocPairs) {
     HasChanged |= tryRemoveGlobalAlloc(allocPair.first, allocPair.second);
   }
-  
+
   // Erase the instructions that we have marked for deletion.
   for (auto *inst : InstToRemove) {
     inst->eraseFromParent();
   }
-  
+
   // After we erase some instructions, re-collect.
   reset();
   collect();
-  
+
   // Copy the globals so we don't get issues with modifying while iterating.
   SmallVector<SILGlobalVariable *, 12> globals;
   for (auto &global : Module->getSILGlobals()) {
     globals.push_back(&global);
   }
-  
+
   for (auto *global : globals) {
     HasChanged |= tryRemoveUnusedGlobal(global);
   }
