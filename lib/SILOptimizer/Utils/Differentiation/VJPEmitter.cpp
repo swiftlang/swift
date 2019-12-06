@@ -1,4 +1,4 @@
-//===--- VJPEmitter.h - VJP Generation in Differentiation -----*- C++ -*---===//
+//===--- VJPEmitter.cpp - VJP Generation in Differentiation ---*- C++ -*---===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -562,7 +562,7 @@ void VJPEmitter::visitApplyInst(ApplyInst *ai) {
         getBuilder(), loc, indices.parameters, original);
 
     // Record the `differentiable_function` instruction.
-    context.addDifferentiableFunctionInst(diffFuncInst);
+    context.addDifferentiableFunctionInstToWorklist(diffFuncInst);
     // TODO(TF-689): Make `differentiable_function` store result indices and
     // remove `ADContext::resultIndices`.
     context.setResultIndex(diffFuncInst, activeResultIndices.front());
@@ -659,7 +659,7 @@ void VJPEmitter::visitDifferentiableFunctionInst(
   // instruction to the `differentiable_function` worklist.
   TypeSubstCloner::visitDifferentiableFunctionInst(dfi);
   auto *newDFI = cast<DifferentiableFunctionInst>(getOpValue(dfi));
-  context.addDifferentiableFunctionInst(newDFI);
+  context.addDifferentiableFunctionInstToWorklist(newDFI);
 }
 
 } // end namespace autodiff

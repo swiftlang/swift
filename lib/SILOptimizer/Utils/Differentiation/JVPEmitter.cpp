@@ -1,4 +1,4 @@
-//===--- JVPEmitter.h - JVP Generation in Differentiation -----*- C++ -*---===//
+//===--- JVPEmitter.cpp - JVP Generation in Differentiation ---*- C++ -*---===//
 //
 // This source file is part of the Swift.org open source project
 //
