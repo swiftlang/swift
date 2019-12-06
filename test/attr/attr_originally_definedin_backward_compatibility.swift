@@ -1,6 +1,5 @@
-// REQUIRES: objc_interop
+// REQUIRES: OS=macosx
 //
-// REQUIRES: rdar57701641
 // RUN: %empty-directory(%t)
 //
 // -----------------------------------------------------------------------------
