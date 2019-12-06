@@ -3970,6 +3970,10 @@ llvm::Expected<IndexSubset *> DifferentiableAttributeTypeCheckRequest::evaluate(
       return nullptr;
     }
     getterDecl->getAttrs().add(newAttr);
+    // Register derivative function configuration.
+    auto *resultIndices = IndexSubset::get(ctx, 1, {0});
+    getterDecl->addDerivativeFunctionConfiguration(
+        {resolvedDiffParamIndices, resultIndices, derivativeGenSig});
     return resolvedDiffParamIndices;
   }
   // Reject duplicate `@differentiable` attributes.
@@ -4340,6 +4344,12 @@ static bool typeCheckDerivativeAttr(ASTContext &Ctx, Decl *D,
     }
     return true;
   }
+
+  // Register derivative function configuration.
+  auto *resultIndices = IndexSubset::get(Ctx, 1, {0});
+  originalAFD->addDerivativeFunctionConfiguration(
+      {resolvedDiffParamIndices, resultIndices,
+       derivative->getGenericSignature()});
 
   return false;
 }
