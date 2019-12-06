@@ -3628,6 +3628,10 @@ DifferentiableAttributeParameterIndicesRequest::evaluate(
       return nullptr;
     }
     getterDecl->getAttrs().add(newAttr);
+    // Register derivative function configuration.
+    auto *resultIndices = IndexSubset::get(ctx, 1, {0});
+    getterDecl->addDerivativeFunctionConfiguration(
+        {checkedWrtParamIndices, resultIndices, whereClauseGenSig});
     return checkedWrtParamIndices;
   }
   auto insertion = ctx.DifferentiableAttrs.try_emplace(
@@ -3640,6 +3644,10 @@ DifferentiableAttributeParameterIndicesRequest::evaluate(
                    diag::differentiable_attr_duplicate_note);
     return nullptr;
   }
+  // Register derivative function configuration.
+  auto *resultIndices = IndexSubset::get(ctx, 1, {0});
+  original->addDerivativeFunctionConfiguration(
+      {checkedWrtParamIndices, resultIndices, whereClauseGenSig});
   return checkedWrtParamIndices;
 }
 
@@ -3902,9 +3910,8 @@ void AttributeChecker::visitDerivativeAttr(DerivativeAttr *attr) {
   }
 
   // Reject different-file retroactive derivatives.
-  // TODO(TF-136): Full support for cross-file/cross-module retroactive
-  // differentiability will require SIL differentiability witnesses and lots of
-  // plumbing.
+  // TODO(TF-136): Lift this restriction now that SIL differentiability witness
+  // infrastructure is ready.
   if (originalAFD->getParentSourceFile() != derivative->getParentSourceFile()) {
     diagnoseAndRemoveAttr(attr,
                           diag::derivative_attr_not_in_same_file_as_original);
@@ -3980,6 +3987,12 @@ void AttributeChecker::visitDerivativeAttr(DerivativeAttr *attr) {
     da->setVJPFunction(derivative);
     break;
   }
+
+  // Register derivative function configuration.
+  auto *resultIndices = IndexSubset::get(Ctx, 1, {0});
+  originalAFD->addDerivativeFunctionConfiguration(
+      {checkedWrtParamIndices, resultIndices,
+       derivative->getGenericSignature()});
 }
 
 void AttributeChecker::visitTransposeAttr(TransposeAttr *attr) {

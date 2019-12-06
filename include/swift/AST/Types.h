@@ -4359,7 +4359,7 @@ public:
   ///   is necessary for the differentiation transform to support reabstraction
   ///   thunk differentiation because the function argument is opaque and cannot
   ///   be differentiated. Instead, the argument is made `@differentiable` and
-  ///   reabstraction thunk JVP/VJP callers are reponsible for passing a
+  ///   reabstraction thunk JVP/VJP callers are responsible for passing a
   ///   `@differentiable` function.
   ///   - TODO(TF-1036): Investigate more efficient reabstraction thunk
   ///     derivative approaches. The last argument can simply be a
