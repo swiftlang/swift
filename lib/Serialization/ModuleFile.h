@@ -411,6 +411,14 @@ private:
       llvm::OnDiskIterableChainedHashTable<DeclUSRTableInfo>;
   std::unique_ptr<SerializedDeclUSRTable> DeclUSRsTable;
 
+  // SWIFT_ENABLE_TENSORFLOW
+  class DerivativeFunctionConfigTableInfo;
+  using SerializedDerivativeFunctionConfigTable =
+      llvm::OnDiskIterableChainedHashTable<DerivativeFunctionConfigTableInfo>;
+  std::unique_ptr<SerializedDerivativeFunctionConfigTable>
+      DerivativeFunctionConfigurations;
+  // SWIFT_ENABLE_TENSORFLOW
+
   /// A blob of 0 terminated string segments referenced in \c SourceLocsTextData
   StringRef SourceLocsTextData;
 
@@ -539,6 +547,14 @@ private:
   /// index_block::DeclMembersLayout format.
   std::unique_ptr<SerializedDeclMembersTable>
   readDeclMembersTable(ArrayRef<uint64_t> fields, StringRef blobData);
+
+  // SWIFT_ENABLE_TENSORFLOW
+  /// Read an on-disk derivative function configuration table stored in
+  /// index_block::DerivativeFunctionConfigTableLayout format.
+  std::unique_ptr<ModuleFile::SerializedDerivativeFunctionConfigTable>
+  readDerivativeFunctionConfigTable(ArrayRef<uint64_t> fields,
+                                    StringRef blobData);
+  // SWIFT_ENABLE_TENSORFLOW END
 
   /// Reads the index block, which contains global tables.
   ///
@@ -763,6 +779,14 @@ public:
                        ObjCSelector selector,
                        bool isInstanceMethod,
                        llvm::TinyPtrVector<AbstractFunctionDecl *> &methods);
+
+  // SWIFT_ENABLE_TENSORFLOW
+  /// Loads all derivative function configurations for the given
+  /// AbstractFunctionDecl.
+  void loadDerivativeFunctionConfigurations(
+      AbstractFunctionDecl *originalAFD,
+      llvm::SetVector<AutoDiffConfig> &results);
+  // SWIFT_ENABLE_TENSORFLOW END
 
   /// Reports all class members in the module to the given consumer.
   ///

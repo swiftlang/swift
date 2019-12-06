@@ -5694,6 +5694,25 @@ public:
 private:
   ParameterList *Params;
 
+// SWIFT_ENABLE_TENSORFLOW
+private:
+  /// The generation at which we last loaded derivative function configurations.
+  unsigned DerivativeFunctionConfigGeneration = 0;
+  /// Prepare to traverse the list of derivative function configurations.
+  void prepareDerivativeFunctionConfigurations();
+
+  /// A uniqued list of derivative function configurations.
+  struct DerivativeFunctionConfigurationList;
+  DerivativeFunctionConfigurationList *DerivativeFunctionConfigs = nullptr;
+
+public:
+  /// Get all derivative function configurations.
+  ArrayRef<AutoDiffConfig> getDerivativeFunctionConfigurations();
+
+  /// Add the given derivative function configuration.
+  void addDerivativeFunctionConfiguration(AutoDiffConfig config);
+  // SWIFT_ENABLE_TENSORFLOW END
+
 protected:
   // If a function has a body at all, we have either a parsed body AST node or
   // we have saved the end location of the unparsed body.

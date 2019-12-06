@@ -45,34 +45,36 @@ getExactDifferentiabilityWitness(SILModule &module, SILFunction *original,
   return nullptr;
 }
 
-const DifferentiableAttr *
-getMinimalASTDifferentiableAttr(AbstractFunctionDecl *original,
-                                IndexSubset *parameterIndices,
-                                IndexSubset *&minimalParameterIndices) {
-  const DifferentiableAttr *minimalAttr = nullptr;
-  minimalParameterIndices = nullptr;
-  for (auto *attr : original->getAttrs().getAttributes<DifferentiableAttr>()) {
-    auto *attrParameterIndices = autodiff::getLoweredParameterIndices(
-        attr->getParameterIndices(),
-        original->getInterfaceType()->castTo<AnyFunctionType>());
-    // If all indices in `parameterIndices` are in `daParameterIndices`, and it
-    // has fewer indices than our current candidate and a primitive VJP, then
-    // `attr` is our new candidate.
+bool findMinimalDerivativeConfiguration(
+    AbstractFunctionDecl *original, IndexSubset *parameterIndices,
+    IndexSubset *&minimalASTParameterIndices,
+    IndexSubset *&minimalSILParameterIndices,
+    GenericSignature &derivativeGenericSignature) {
+  auto results = original->getDerivativeFunctionConfigurations();
+  for (auto config : results) {
+    auto *paramIndices = config.parameterIndices;
+    auto derivativeGenSig = config.derivativeGenericSignature;
+    auto *silParameterIndices = autodiff::getLoweredParameterIndices(
+        paramIndices, original->getInterfaceType()->castTo<AnyFunctionType>());
+    // If all indices in `parameterIndices` are in `daParameterIndices`, and
+    // it has fewer indices than our current candidate and a primitive VJP,
+    // then `attr` is our new candidate.
     //
     // NOTE(TF-642): `attr` may come from a un-partial-applied function and
     // have larger capacity than the desired indices. We expect this logic to
     // go away when `partial_apply` supports `@differentiable` callees.
-    if (attrParameterIndices->isSupersetOf(parameterIndices->extendingCapacity(
-            original->getASTContext(), attrParameterIndices->getCapacity())) &&
+    if (silParameterIndices->isSupersetOf(parameterIndices->extendingCapacity(
+            original->getASTContext(), silParameterIndices->getCapacity())) &&
         // fewer parameters than before
-        (!minimalParameterIndices ||
-         attrParameterIndices->getNumIndices() <
-             minimalParameterIndices->getNumIndices())) {
-      minimalAttr = attr;
-      minimalParameterIndices = attrParameterIndices;
+        (!minimalSILParameterIndices ||
+         silParameterIndices->getNumIndices() <
+             minimalSILParameterIndices->getNumIndices())) {
+      minimalASTParameterIndices = paramIndices;
+      minimalSILParameterIndices = silParameterIndices;
+      derivativeGenericSignature = derivativeGenSig;
     }
   }
-  return minimalAttr;
+  return minimalASTParameterIndices;
 }
 
 SILDifferentiabilityWitness *getOrCreateMinimalASTDifferentiabilityWitness(
@@ -88,19 +90,17 @@ SILDifferentiabilityWitness *getOrCreateMinimalASTDifferentiabilityWitness(
   if (!originalAFD)
     return nullptr;
 
-  IndexSubset *minimalParameterIndices = nullptr;
-  const auto *minimalAttr = getMinimalASTDifferentiableAttr(
-      originalAFD, parameterIndices, minimalParameterIndices);
-
-  // TODO(TF-835): This will also need to search all `@differentiating`
-  // attributes after we stop synthesizing `@differentiable` attributes for
-  // `@differentiating` attributes.
-
-  if (!minimalAttr)
+  IndexSubset *minimalASTParameterIndices = nullptr;
+  IndexSubset *minimalSILParameterIndices = nullptr;
+  GenericSignature derivativeGenericSignature;
+  if (!findMinimalDerivativeConfiguration(
+          originalAFD, parameterIndices, minimalASTParameterIndices,
+          minimalSILParameterIndices, derivativeGenericSignature)) {
     return nullptr;
+  }
 
-  AutoDiffConfig minimalConfig(minimalParameterIndices, resultIndices,
-                               minimalAttr->getDerivativeGenericSignature());
+  AutoDiffConfig minimalConfig(minimalSILParameterIndices, resultIndices,
+                               derivativeGenericSignature);
 
   auto *existingWitness = module.lookUpDifferentiabilityWitness(
       {original->getName(), minimalConfig});

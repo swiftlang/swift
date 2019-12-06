@@ -3617,6 +3617,10 @@ DifferentiableAttributeParameterIndicesRequest::evaluate(
     newAttr->setVJPFunction(attr->getVJPFunction());
     auto insertion = ctx.DifferentiableAttrs.try_emplace(
         {getterDecl, checkedWrtParamIndices}, newAttr);
+    // Register derivative function configuration.
+    auto *resultIndices = IndexSubset::get(ctx, 1, {0});
+    getterDecl->addDerivativeFunctionConfiguration(
+        {checkedWrtParamIndices, resultIndices, whereClauseGenSig});
     // Valid `@differentiable` attributes are uniqued by their parameter
     // indices. Reject duplicate attributes for the same decl and parameter
     // indices pair.
@@ -3632,6 +3636,10 @@ DifferentiableAttributeParameterIndicesRequest::evaluate(
   }
   auto insertion = ctx.DifferentiableAttrs.try_emplace(
       {D, checkedWrtParamIndices}, attr);
+  // Register derivative function configuration.
+  auto *resultIndices = IndexSubset::get(ctx, 1, {0});
+  original->addDerivativeFunctionConfiguration(
+      {checkedWrtParamIndices, resultIndices, whereClauseGenSig});
   // `@differentiable` attributes are uniqued by their parameter indices.
   // Reject duplicate attributes for the same decl and parameter indices pair.
   if (!insertion.second && insertion.first->getSecond() != attr) {
@@ -3902,9 +3910,9 @@ void AttributeChecker::visitDerivativeAttr(DerivativeAttr *attr) {
   }
 
   // Reject different-file retroactive derivatives.
-  // TODO(TF-136): Full support for cross-file/cross-module retroactive
-  // differentiability will require SIL differentiability witnesses and lots of
-  // plumbing.
+  // TODO(TF-136): Lift this restriction now that SIL diffferentiability witness
+  // infrastructure is in-place. Also requires differentiation transform
+  // changes.
   if (originalAFD->getParentSourceFile() != derivative->getParentSourceFile()) {
     diagnoseAndRemoveAttr(attr,
                           diag::derivative_attr_not_in_same_file_as_original);
@@ -3980,6 +3988,12 @@ void AttributeChecker::visitDerivativeAttr(DerivativeAttr *attr) {
     da->setVJPFunction(derivative);
     break;
   }
+
+  // Register derivative function configuration.
+  auto *resultIndices = IndexSubset::get(Ctx, 1, {0});
+  originalAFD->addDerivativeFunctionConfiguration(
+      {checkedWrtParamIndices, resultIndices,
+       derivative->getGenericSignature()});
 }
 
 void AttributeChecker::visitTransposeAttr(TransposeAttr *attr) {

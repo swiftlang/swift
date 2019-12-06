@@ -36,17 +36,26 @@ getExactDifferentiabilityWitness(SILModule &module, SILFunction *original,
                                  IndexSubset *parameterIndices,
                                  IndexSubset *resultIndices);
 
-/// Finds the "@differentiable" attribute on `original` whose parameter indices
-/// are a minimal superset of the specified parameter indices. Returns `nullptr`
-/// if no such attribute exists.
+/// Finds the derivative configuration (from `@differentiable` and
+/// `@derivative` attributes) for `original` whose parameter indices are a
+/// minimal superset of the specified AST parameter indices. Returns true if
+/// such a configuration is found.
 ///
 /// \param parameterIndices must be lowered to SIL.
-/// \param minimalParameterIndices is an output parameter that is set to the SIL
-/// indices of the minimal attribute, or to `nullptr` if no attribute exists.
-const DifferentiableAttr *
-getMinimalASTDifferentiableAttr(AbstractFunctionDecl *original,
-                                IndexSubset *parameterIndices,
-                                IndexSubset *&minimalParameterIndices);
+/// \param minimalASTParameterIndices is an output parameter that is set to the
+/// AST indices of the minimal configuration, or to `nullptr` if no such
+/// configuration exists.
+/// \param minimalSILParameterIndices is an output parameter that is set to the
+/// SIL indices of the minimal configuration, or to `nullptr` if no such
+/// configuration exists.
+/// \param derivativeGenericSignature is an output parameter that is set to the
+/// derivative generic signature of the minimal configuration, or the `nullptr`
+/// if no such configuration exists.
+bool findMinimalDerivativeConfiguration(
+    AbstractFunctionDecl *original, IndexSubset *parameterIndices,
+    IndexSubset *&minimalASTParameterIndices,
+    IndexSubset *&minimalSILParameterIndices,
+    GenericSignature &derivativeGenericSignature);
 
 /// Returns a differentiability witness for `original` whose parameter indices
 /// are a minimal superset of the specified parameter indices and whose result
