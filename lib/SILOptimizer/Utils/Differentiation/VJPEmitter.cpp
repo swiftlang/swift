@@ -18,8 +18,11 @@
 
 #define DEBUG_TYPE "differentiation"
 
+#include "swift/SILOptimizer/PassManager/PrettyStackTrace.h"
+#include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SILOptimizer/Utils/Differentiation/ADContext.h"
+#include "swift/SILOptimizer/Utils/Differentiation/PullbackEmitter.h"
 #include "swift/SILOptimizer/Utils/Differentiation/VJPEmitter.h"
 
 namespace swift {
@@ -658,6 +661,42 @@ void VJPEmitter::visitDifferentiableFunctionInst(
   TypeSubstCloner::visitDifferentiableFunctionInst(dfi);
   auto *newDFI = cast<DifferentiableFunctionInst>(getOpValue(dfi));
   context.addDifferentiableFunctionInstToWorklist(newDFI);
+}
+
+bool VJPEmitter::run() {
+  PrettyStackTraceSILFunction trace("generating VJP for", original);
+  LLVM_DEBUG(getADDebugStream()
+             << "Cloning original @" << original->getName()
+             << " to vjp @" << vjp->getName() << '\n');
+
+  // Create entry BB and arguments.
+  auto *entry = vjp->createBasicBlock();
+  createEntryArguments(vjp);
+
+  // Clone.
+  SmallVector<SILValue, 4> entryArgs(entry->getArguments().begin(),
+                                     entry->getArguments().end());
+  cloneFunctionBody(original, entry, entryArgs);
+  // If errors occurred, back out.
+  if (errorOccurred)
+    return true;
+
+  // Merge VJP basic blocks. This is significant for control flow
+  // differentiation: trampoline destination bbs are merged into trampoline bbs.
+  // NOTE(TF-990): Merging basic blocks ensures that `@guaranteed` trampoline
+  // bb arguments have a lifetime-ending `end_borrow` use, and is robust when
+  // `-enable-strip-ownership-after-serialization` is true.
+  mergeBasicBlocks(vjp);
+
+  // Generate pullback code.
+  PullbackEmitter PullbackEmitter(*this);
+  if (PullbackEmitter.run()) {
+    errorOccurred = true;
+    return true;
+  }
+  LLVM_DEBUG(getADDebugStream() << "Generated VJP for "
+                                << original->getName() << ":\n" << *vjp);
+  return errorOccurred;
 }
 
 } // end namespace autodiff
