@@ -7,7 +7,7 @@
 public func f000_invokedDirectlyByDifferentiableAttrPublic(_ x: Float) -> Float {
   return f001_invokedIndirectlyByDifferentiableAttrPublic(x)
 }
-// CHECK-LABEL: sil_differentiability_witness [parameters 0] [results 0] @f000_invokedDirectlyByDifferentiableAttrPublic
+// CHECK-LABEL: sil_differentiability_witness [serialized] [parameters 0] [results 0] @f000_invokedDirectlyByDifferentiableAttrPublic
 // CHECK-NEXT: jvp
 // CHECK-NEXT: vjp
 
@@ -15,7 +15,7 @@ public func f000_invokedDirectlyByDifferentiableAttrPublic(_ x: Float) -> Float 
 public func f001_invokedIndirectlyByDifferentiableAttrPublic(_ x: Float) -> Float {
   return x
 }
-// CHECK-LABEL: sil_differentiability_witness hidden [parameters 0] [results 0] @f001_invokedIndirectlyByDifferentiableAttrPublic
+// CHECK-LABEL: sil_differentiability_witness private [parameters 0] [results 0] @f001_invokedIndirectlyByDifferentiableAttrPublic
 // CHECK-NEXT: jvp
 // CHECK-NEXT: vjp
 
@@ -23,7 +23,7 @@ public func f001_invokedIndirectlyByDifferentiableAttrPublic(_ x: Float) -> Floa
 public func f002_invokedDirectlyByConversionPublic(_ x: Float) -> Float {
   return f003_invokedIndirectlyByConversionPublic(x)
 }
-// CHECK-LABEL: sil_differentiability_witness hidden [parameters 0] [results 0] @f002_invokedDirectlyByConversionPublic
+// CHECK-LABEL: sil_differentiability_witness private [parameters 0] [results 0] @f002_invokedDirectlyByConversionPublic
 // CHECK-NEXT: jvp
 // CHECK-NEXT: vjp
 
@@ -31,7 +31,7 @@ public func f002_invokedDirectlyByConversionPublic(_ x: Float) -> Float {
 public func f003_invokedIndirectlyByConversionPublic(_ x: Float) -> Float {
   return x
 }
-// CHECK-LABEL: sil_differentiability_witness hidden [parameters 0] [results 0] @f003_invokedIndirectlyByConversionPublic
+// CHECK-LABEL: sil_differentiability_witness private [parameters 0] [results 0] @f003_invokedIndirectlyByConversionPublic
 // CHECK-NEXT: jvp
 // CHECK-NEXT: vjp
 
@@ -50,7 +50,7 @@ internal func f004_invokedDirectlyByDifferentiableAttrInternal(_ x: Float) -> Fl
 internal func f005_invokedIndirectlyByDifferentiableAttrInternal(_ x: Float) -> Float {
   return x
 }
-// CHECK-LABEL: sil_differentiability_witness hidden [parameters 0] [results 0] @f005_invokedIndirectlyByDifferentiableAttrInternal
+// CHECK-LABEL: sil_differentiability_witness private [parameters 0] [results 0] @f005_invokedIndirectlyByDifferentiableAttrInternal
 // CHECK-NEXT: jvp
 // CHECK-NEXT: vjp
 
@@ -58,7 +58,7 @@ internal func f005_invokedIndirectlyByDifferentiableAttrInternal(_ x: Float) -> 
 internal func f006_invokedDirectlyByConversionInternal(_ x: Float) -> Float {
   return f007_invokedIndirectlyByConversionInternal(x)
 }
-// CHECK-LABEL: sil_differentiability_witness hidden [parameters 0] [results 0] @f006_invokedDirectlyByConversionInternal
+// CHECK-LABEL: sil_differentiability_witness private [parameters 0] [results 0] @f006_invokedDirectlyByConversionInternal
 // CHECK-NEXT: jvp
 // CHECK-NEXT: vjp
 
@@ -66,7 +66,7 @@ internal func f006_invokedDirectlyByConversionInternal(_ x: Float) -> Float {
 internal func f007_invokedIndirectlyByConversionInternal(_ x: Float) -> Float {
   return x
 }
-// CHECK-LABEL: sil_differentiability_witness hidden [parameters 0] [results 0] @f007_invokedIndirectlyByConversionInternal
+// CHECK-LABEL: sil_differentiability_witness private [parameters 0] [results 0] @f007_invokedIndirectlyByConversionInternal
 // CHECK-NEXT: jvp
 // CHECK-NEXT: vjp
 

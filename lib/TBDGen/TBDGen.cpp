@@ -178,6 +178,30 @@ void TBDGenVisitor::addConformances(DeclContext *DC) {
 }
 
 // SWIFT_ENABLE_TENSORFLOW
+void TBDGenVisitor::addAutoDiffLinearMapFunction(AbstractFunctionDecl *original,
+                                                 const DifferentiableAttr *attr,
+                                                 AutoDiffLinearMapKind kind) {
+  auto declRef = SILDeclRef(original);
+
+  // Linear maps are only public when the original function is serialized.
+  if (!declRef.isSerialized())
+    return;
+
+  // Differentials are only emitted when forward mode is turned on.
+  if (kind == AutoDiffLinearMapKind::Differential &&
+      !original->getASTContext()
+           .LangOpts.EnableExperimentalForwardModeDifferentiation)
+    return;
+
+  auto *loweredParamIndices = autodiff::getLoweredParameterIndices(
+      attr->getParameterIndices(),
+      original->getInterfaceType()->castTo<AnyFunctionType>());
+  Mangle::ASTMangler mangler;
+  std::string linearMapName = mangler.mangleAutoDiffLinearMapHelper(
+      declRef.mangle(), kind, SILAutoDiffIndices(0, loweredParamIndices));
+  addSymbol(linearMapName);
+}
+
 void TBDGenVisitor::addAutoDiffDerivativeFunction(
     AbstractFunctionDecl *original, const DifferentiableAttr *attr,
     AutoDiffDerivativeFunctionKind kind) {
@@ -208,6 +232,9 @@ void TBDGenVisitor::addDifferentiabilityWitness(
 
 void TBDGenVisitor::addDifferentiableAttr(AbstractFunctionDecl *original,
                                           const DifferentiableAttr *attr) {
+  addAutoDiffLinearMapFunction(original, attr,
+                               AutoDiffLinearMapKind::Differential);
+  addAutoDiffLinearMapFunction(original, attr, AutoDiffLinearMapKind::Pullback);
   addAutoDiffDerivativeFunction(original, attr,
                                 AutoDiffDerivativeFunctionKind::JVP);
   addAutoDiffDerivativeFunction(original, attr,

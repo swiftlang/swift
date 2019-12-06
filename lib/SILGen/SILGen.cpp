@@ -823,7 +823,8 @@ void SILGenModule::emitDifferentiabilityWitness(
   auto *diffWitness = SILDifferentiabilityWitness::createDefinition(
       M, originalFunction->getLinkage(), originalFunction, loweredParamIndices,
       config.resultIndices, config.derivativeGenericSignature,
-      /*jvp*/ nullptr, /*vjp*/ nullptr, originalFunction->isSerialized(),
+      /*jvp*/ nullptr, /*vjp*/ nullptr,
+      /*isSerialized*/ hasPublicVisibility(originalFunction->getLinkage()),
       diffAttr);
 
   // Set derivative function in differentiability witness.
