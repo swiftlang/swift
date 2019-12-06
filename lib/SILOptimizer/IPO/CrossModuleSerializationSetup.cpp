@@ -191,6 +191,12 @@ makeSubstUsableFromInline(const SubstitutionMap &substs) {
   for (Type replType : substs.getReplacementTypes()) {
     makeTypeUsableFromInline(replType->getCanonicalType());
   }
+  for (ProtocolConformanceRef pref : substs.getConformances()) {
+    if (pref.isConcrete()) {
+      ProtocolConformance *concrete = pref.getConcrete();
+      makeDeclUsableFromInline(concrete->getProtocol(), M);
+    }
+  }
 }
 
 /// Decide whether to serialize a function.
