@@ -165,6 +165,11 @@ void diagnoseFailedDerivation(DeclContext *DC, NominalTypeDecl *nominal,
           nominal->getDeclaredInterfaceType());
     }
   }
+
+  if (auto *classDecl = dyn_cast<ClassDecl>(nominal)) {
+    ctx.Diags.diagnose(classDecl->getLoc(),
+                       diag::classes_equatable_hashable_synthesis);
+  }
 }
 
 /// Creates a named variable based on a prefix character and a numeric index.
