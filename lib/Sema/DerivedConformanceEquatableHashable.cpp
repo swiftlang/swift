@@ -168,7 +168,8 @@ void diagnoseFailedDerivation(DeclContext *DC, NominalTypeDecl *nominal,
 
   if (auto *classDecl = dyn_cast<ClassDecl>(nominal)) {
     ctx.Diags.diagnose(classDecl->getLoc(),
-                       diag::classes_equatable_hashable_synthesis);
+                       diag::classes_automatic_protocol_synthesis,
+                       protocol->getName().str());
   }
 }
 
