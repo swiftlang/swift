@@ -993,7 +993,6 @@ The things in the queue yet to be ported are:
 
 - Problems related to calls and operator applications e.g.
 
-  - ``@dynamicCallable`` related diagnostics
   - Missing explicit ``Self.`` and ``self.``
   - Logic related to overload candidate ranking (``CalleeCandidateInfo``)
   - ``diagnoseParameterErrors``
