@@ -32,8 +32,6 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 
-#include <iostream>
-
 using namespace swift;
 
 namespace {
@@ -925,10 +923,6 @@ void SILGlobalOpt::collectGlobalAccess(GlobalAddrInst *GAI) {
   if (!SILG)
     return;
 
-  std::cout << GAI->getFunction()->getName().str() << std::endl;
-  GAI->dump();
-  GlobalAddrMap[SILG].push_back(GAI);
-
   if (!SILG->isLet()) {
     // We cannot determine the value for global variables which could be
     // changed externally at run-time.
@@ -955,6 +949,8 @@ void SILGlobalOpt::collectGlobalAccess(GlobalAddrInst *GAI) {
 
   if (!SILG->getDecl())
     return;
+
+  GlobalAddrMap[SILG].push_back(GAI);
 
   for (auto *Op : getNonDebugUses(GAI)) {
     if (auto *SI = dyn_cast<StoreInst>(Op->getUser())) {

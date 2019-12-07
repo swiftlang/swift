@@ -42,6 +42,10 @@ let unused5 = 0
 // CHECK-WMO-NOT: sil_global hidden @${{.*}}unused6{{.*}} : $Int
 var unused6 = 0
 
+// Edge case: static and static with computed valued
+// See Baz - line 71
+// CHECK: sil_global [let] {{.*}}darwin{{.*}} : $Baz
+
 // CHECK-LABEL: sil [Onone] @${{.*}}test{{.*}}
 @_optimize(none) public func test(x: Int) -> Int {
   // CHECK: %{{[0-9]+}} = global_addr @${{.*}}used2{{.*}}
@@ -62,4 +66,11 @@ public struct Bar {
   init () {
     storage = storageVar
   }
+}
+
+public struct Baz {
+  public init() { }
+
+  public static let darwin = Baz()
+  public static var currentPlatform: Baz { return .darwin }
 }
