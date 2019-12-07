@@ -2122,10 +2122,10 @@ bool Driver::handleImmediateArgs(const ArgList &Args, const ToolChain &TC) {
                                 std::end(commandArgs));
   }
 
-  if (Args.hasArg(options::OPT_print_target_triple)) {
+  if (Args.hasArg(options::OPT_print_target_info)) {
     SmallVector<const char *, 5> commandLine;
     commandLine.push_back("-frontend");
-    commandLine.push_back("-print-target-triple");
+    commandLine.push_back("-print-target-info");
     if (const Arg *TargetArg = Args.getLastArg(options::OPT_target)) {
       commandLine.push_back("-target");
       commandLine.push_back(TargetArg->getValue());

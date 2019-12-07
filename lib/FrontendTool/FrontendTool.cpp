@@ -42,6 +42,7 @@
 #include "swift/Basic/JSONSerialization.h"
 #include "swift/Basic/LLVMContext.h"
 #include "swift/Basic/LLVMInitialize.h"
+#include "swift/Basic/Platform.h"
 #include "swift/Basic/PrettyStackTrace.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
@@ -1863,6 +1864,38 @@ createJSONFixItDiagnosticConsumerIfNeeded(
   });
 }
 
+/// Print information about the selected target in JSON.
+static void printTargetInfo(CompilerInvocation &invocation,
+                            llvm::raw_ostream &out) {
+  out << "{\n";
+
+  // Target information.
+  auto &langOpts = invocation.getLangOptions();
+  out << "  \"target\": {\n";
+
+  out << "    \"triple\": \"";
+  out.write_escaped(langOpts.Target.getTriple());
+  out << "\",\n";
+
+  out << "    \"moduleTriple\": \"";
+  out.write_escaped(getTargetSpecificModuleTriple(langOpts.Target).getTriple());
+  out << "\",\n";
+
+  if (auto runtimeVersion = getSwiftRuntimeCompatibilityVersionForTarget(
+          langOpts.Target)) {
+    out << "    \"swiftRuntimeCompatibilityVersion\": \"";
+    out.write_escaped(runtimeVersion->getAsString());
+    out << "\",\n";
+  }
+
+  out << "    \"librariesRequireRPath\": "
+      << (tripleRequiresRPathForSwiftInOS(langOpts.Target) ? "true" : "false")
+      << "\n";
+
+  out << "  }\n";
+
+  out << "}\n";
+}
 
 int swift::performFrontend(ArrayRef<const char *> Args,
                            const char *Argv0, void *MainAddr,
@@ -1987,8 +2020,8 @@ int swift::performFrontend(ArrayRef<const char *> Args,
     return finishDiagProcessing(0);
   }
 
-  if (Invocation.getFrontendOptions().PrintTargetTriple) {
-    llvm::outs() << Invocation.getLangOptions().Target.getTriple() << "\n";
+  if (Invocation.getFrontendOptions().PrintTargetInfo) {
+    printTargetInfo(Invocation, llvm::outs());
     return finishDiagProcessing(0);
   }
 
