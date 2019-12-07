@@ -2017,49 +2017,6 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
   if (!isUnresolvedOrTypeVarType(fnType) &&
       !fnType->is<AnyFunctionType>() && !fnType->is<MetatypeType>()) {
     auto arg = callExpr->getArg();
-    auto isDynamicCallable =
-        CS.DynamicCallableCache[fnType->getCanonicalType()].isValid();
-
-    auto hasCallAsFunctionMethods = fnType->isCallableNominalType(CS.DC);
-
-    // Diagnose specific @dynamicCallable errors.
-    if (isDynamicCallable) {
-      auto dynamicCallableMethods =
-        CS.DynamicCallableCache[fnType->getCanonicalType()];
-
-      // Diagnose dynamic calls with keywords on @dynamicCallable types that
-      // don't define the `withKeywordArguments` method.
-      if (auto tuple = dyn_cast<TupleExpr>(arg)) {
-        bool hasArgLabel = llvm::any_of(
-          tuple->getElementNames(), [](Identifier i) { return !i.empty(); });
-        if (hasArgLabel &&
-            dynamicCallableMethods.keywordArgumentsMethods.empty()) {
-          diagnose(callExpr->getFn()->getStartLoc(),
-                   diag::missing_dynamic_callable_kwargs_method, fnType);
-          return true;
-        }
-      }
-    }
-
-    auto isExistentialMetatypeType = fnType->is<ExistentialMetatypeType>();
-    if (isExistentialMetatypeType) {
-      auto diag = diagnose(arg->getStartLoc(),
-                           diag::missing_init_on_metatype_initialization);
-      diag.highlight(fnExpr->getSourceRange());
-    } else if (!isDynamicCallable) {
-      auto diag = diagnose(arg->getStartLoc(),
-                           diag::cannot_call_non_function_value, fnType);
-      diag.highlight(fnExpr->getSourceRange());
-
-      // If the argument is an empty tuple, then offer a
-      // fix-it to remove the empty tuple and use the value
-      // directly.
-      if (auto tuple = dyn_cast<TupleExpr>(arg)) {
-        if (tuple->getNumElements() == 0) {
-          diag.fixItRemove(arg->getSourceRange());
-        }
-      }
-    }
 
     // If the argument is a trailing ClosureExpr (i.e. {....}) and it is on
     // the line after the callee, then it's likely the user forgot to
@@ -2072,17 +2029,33 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
         if (closure->hasAnonymousClosureVars() &&
             closure->getParameters()->size() == 0 &&
             1 + SM.getLineNumber(callExpr->getFn()->getEndLoc()) ==
-            SM.getLineNumber(closure->getStartLoc())) {
+                SM.getLineNumber(closure->getStartLoc())) {
           diagnose(closure->getStartLoc(), diag::brace_stmt_suggest_do)
-            .fixItInsert(closure->getStartLoc(), "do ");
+              .fixItInsert(closure->getStartLoc(), "do ");
+          return true;
         }
       }
     }
 
-    // Use the existing machinery to provide more useful diagnostics for
-    // @dynamicCallable calls, rather than cannot_call_non_function_value.
-    if ((isExistentialMetatypeType || !isDynamicCallable) &&
-    	  !hasCallAsFunctionMethods) {
+    auto isExistentialMetatypeType = fnType->is<ExistentialMetatypeType>();
+    if (isExistentialMetatypeType) {
+      auto diag = diagnose(arg->getStartLoc(),
+                           diag::missing_init_on_metatype_initialization);
+      diag.highlight(fnExpr->getSourceRange());
+      return true;
+    } else {
+      auto diag = diagnose(arg->getStartLoc(),
+                           diag::cannot_call_non_function_value, fnType);
+      diag.highlight(fnExpr->getSourceRange());
+
+      // If the argument is an empty tuple, then offer a
+      // fix-it to remove the empty tuple and use the value
+      // directly.
+      if (auto tuple = dyn_cast<TupleExpr>(arg)) {
+        if (tuple->getNumElements() == 0) {
+          diag.fixItRemove(arg->getSourceRange());
+        }
+      }
       return true;
     }
   }
