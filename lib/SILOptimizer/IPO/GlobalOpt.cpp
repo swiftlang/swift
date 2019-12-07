@@ -32,6 +32,8 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 
+#include <iostream>
+
 using namespace swift;
 
 namespace {
@@ -923,6 +925,8 @@ void SILGlobalOpt::collectGlobalAccess(GlobalAddrInst *GAI) {
   if (!SILG)
     return;
 
+  std::cout << GAI->getFunction()->getName().str() << std::endl;
+  GAI->dump();
   GlobalAddrMap[SILG].push_back(GAI);
 
   if (!SILG->isLet()) {
