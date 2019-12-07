@@ -88,20 +88,18 @@ private:
                                      AutoDiffDerivativeFunctionKind kind);
 
   /// Adds the symbol for the differentiability witness associated with the
-  /// given original function and parameter indices.
+  /// given original function, parameter indices, result indices, and derivative
+  /// generic signature.
   void addDifferentiabilityWitness(AbstractFunctionDecl *original,
                                    IndexSubset *parameterIndices,
+                                   IndexSubset *resultIndices,
                                    GenericSignature derivativeGenericSignature);
 
   /// Adds symbols associated with the given original function and
-  /// `@differentiable` attribute.
-  void addDifferentiableAttr(AbstractFunctionDecl *original,
-                             const DifferentiableAttr *attr);
-
-  /// Adds symbols associated with the given original function and
-  /// `@derivative` attribute.
-  void addDerivativeAttr(AbstractFunctionDecl *original,
-                         const DerivativeAttr *attr);
+  /// derivative function configuration.
+  void addDerivativeConfiguration(AbstractFunctionDecl *original,
+                                  AutoDiffConfig config);
+  // SWIFT_ENABLE_TENSORFLOW END
 
 public:
   TBDGenVisitor(llvm::MachO::InterfaceFile &symbols,

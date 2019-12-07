@@ -1841,7 +1841,7 @@ class DifferentiableAttr final
 
   explicit DifferentiableAttr(Decl *original, bool implicit, SourceLoc atLoc,
                               SourceRange baseRange, bool linear,
-                              IndexSubset *indices,
+                              IndexSubset *parameterIndices,
                               Optional<DeclNameWithLoc> jvp,
                               Optional<DeclNameWithLoc> vjp,
                               GenericSignature derivativeGenericSignature);
@@ -1855,9 +1855,10 @@ public:
                                     Optional<DeclNameWithLoc> vjp,
                                     TrailingWhereClause *clause);
 
-  static DifferentiableAttr *create(Decl *original, bool implicit,
-                                    SourceLoc atLoc, SourceRange baseRange,
-                                    bool linear, IndexSubset *indices,
+  static DifferentiableAttr *create(AbstractFunctionDecl *original,
+                                    bool implicit, SourceLoc atLoc,
+                                    SourceRange baseRange, bool linear,
+                                    IndexSubset *parameterIndices,
                                     Optional<DeclNameWithLoc> jvp,
                                     Optional<DeclNameWithLoc> vjp,
                                     GenericSignature derivativeGenSig);

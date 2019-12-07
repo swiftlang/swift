@@ -212,11 +212,10 @@ void TBDGenVisitor::addAutoDiffDerivativeFunction(
 
 void TBDGenVisitor::addDifferentiabilityWitness(
     AbstractFunctionDecl *original, IndexSubset *parameterIndices,
-    GenericSignature derivativeGenericSignature) {
+    IndexSubset *resultIndices, GenericSignature derivativeGenericSignature) {
   if (SILDeclRef(original).getLinkage(ForDefinition) != SILLinkage::Public)
     return;
 
-  auto *resultIndices = IndexSubset::get(original->getASTContext(), 1, {0});
   auto *loweredParamIndices = autodiff::getLoweredParameterIndices(
       parameterIndices,
       original->getInterfaceType()->castTo<AnyFunctionType>());
@@ -231,47 +230,19 @@ void TBDGenVisitor::addDifferentiabilityWitness(
   addSymbol(mangledName);
 }
 
-void TBDGenVisitor::addDifferentiableAttr(AbstractFunctionDecl *original,
-                                          const DifferentiableAttr *attr) {
-  addAutoDiffLinearMapFunction(original, attr->getParameterIndices(),
+void TBDGenVisitor::addDerivativeConfiguration(AbstractFunctionDecl *original,
+                                               AutoDiffConfig config) {
+  addAutoDiffLinearMapFunction(original, config.parameterIndices,
                                AutoDiffLinearMapKind::Differential);
-  addAutoDiffLinearMapFunction(original, attr->getParameterIndices(),
+  addAutoDiffLinearMapFunction(original, config.parameterIndices,
                                AutoDiffLinearMapKind::Pullback);
-  addAutoDiffDerivativeFunction(original, attr->getParameterIndices(),
+  addAutoDiffDerivativeFunction(original, config.parameterIndices,
                                 AutoDiffDerivativeFunctionKind::JVP);
-  addAutoDiffDerivativeFunction(original, attr->getParameterIndices(),
+  addAutoDiffDerivativeFunction(original, config.parameterIndices,
                                 AutoDiffDerivativeFunctionKind::VJP);
-  addDifferentiabilityWitness(original, attr->getParameterIndices(),
-                              attr->getDerivativeGenericSignature());
-}
-
-void TBDGenVisitor::addDerivativeAttr(AbstractFunctionDecl *derivative,
-                                      const DerivativeAttr *attr) {
-  auto *originalFunction = attr->getOriginalFunction();
-  // Skip if original function has a `@differentiable` attribute.
-  // TBDGen already emits symbols for `@differentiable` attributes.
-  if (originalFunction->getAttrs().hasAttribute<DifferentiableAttr>())
-    return;
-  // Skip if visiting a `@derivative` VJP function and there exists a
-  // `@derivative` JVP function for the same original function and parameter
-  // indices. This prevents duplicate symbol emission when there exist both a
-  // `@derivative` JVP and a `@derivative` VJP for the same original function
-  // and parameter indices.
-  auto &ctx = originalFunction->getASTContext();
-  if (attr->getDerivativeKind() == AutoDiffDerivativeFunctionKind::VJP &&
-      ctx.DerivativeAttrs.count({originalFunction, attr->getParameterIndices(),
-                                 AutoDiffDerivativeFunctionKind::JVP}))
-    return;
-  addAutoDiffLinearMapFunction(originalFunction, attr->getParameterIndices(),
-                               AutoDiffLinearMapKind::Differential);
-  addAutoDiffLinearMapFunction(originalFunction, attr->getParameterIndices(),
-                               AutoDiffLinearMapKind::Pullback);
-  addAutoDiffDerivativeFunction(originalFunction, attr->getParameterIndices(),
-                                AutoDiffDerivativeFunctionKind::JVP);
-  addAutoDiffDerivativeFunction(originalFunction, attr->getParameterIndices(),
-                                AutoDiffDerivativeFunctionKind::VJP);
-  addDifferentiabilityWitness(originalFunction, attr->getParameterIndices(),
-                              derivative->getGenericSignature());
+  addDifferentiabilityWitness(original, config.parameterIndices,
+                              config.resultIndices,
+                              config.derivativeGenericSignature);
 }
 
 /// Determine whether dynamic replacement should be emitted for the allocator or
@@ -338,11 +309,8 @@ void TBDGenVisitor::visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
   }
 
   // SWIFT_ENABLE_TENSORFLOW
-  for (auto *DA : AFD->getAttrs().getAttributes<DifferentiableAttr>()) {
-    addDifferentiableAttr(AFD, DA);
-  }
-  for (auto *DA : AFD->getAttrs().getAttributes<DerivativeAttr>()) {
-    addDerivativeAttr(AFD, DA);
+  for (auto derivativeConfig : AFD->getDerivativeFunctionConfigurations()) {
+    addDerivativeConfiguration(AFD, derivativeConfig);
   }
 
   visitDefaultArguments(AFD, AFD->getParameters());
@@ -391,11 +359,6 @@ void TBDGenVisitor::visitAbstractStorageDecl(AbstractStorageDecl *ASD) {
       addSymbol(LinkEntity::forOpaqueTypeDescriptorAccessor(opaqueResult));
       addSymbol(LinkEntity::forOpaqueTypeDescriptorAccessorVar(opaqueResult));
     }
-  }
-
-  // SWIFT_ENABLE_TENSORFLOW
-  for (auto *DA : ASD->getAttrs().getAttributes<DifferentiableAttr>()) {
-    addDifferentiableAttr(ASD->getAccessor(AccessorKind::Get), DA);
   }
 
   // Explicitly look at each accessor here: see visitAccessorDecl.

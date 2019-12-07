@@ -586,7 +586,6 @@ getOrSynthesizeTangentVectorStruct(DerivedConformance &derived, Identifier id) {
     auto memberAssocContextualType =
         parentDC->mapTypeIntoContext(memberAssocInterfaceType);
     newMember->setInterfaceType(memberAssocInterfaceType);
-//    newMember->setType(memberAssocContextualType);
     Pattern *memberPattern =
         new (C) NamedPattern(newMember, /*implicit*/ true);
     memberPattern->setType(memberAssocContextualType);
@@ -623,10 +622,9 @@ getOrSynthesizeTangentVectorStruct(DerivedConformance &derived, Identifier id) {
         derivativeGenSig = extDecl->getGenericSignature();
       auto *diffableAttr = DifferentiableAttr::create(
           getter, /*implicit*/ true, SourceLoc(), SourceLoc(),
-          /*linear*/ false, {}, None, None, derivativeGenSig);
+          /*linear*/ false, /*parameterIndices*/ IndexSubset::get(C, 1, {0}),
+          /*jvp*/ None, /*vjp*/ None, derivativeGenSig);
       member->getAttrs().add(diffableAttr);
-      // Set getter `@differentiable` attribute parameter indices.
-      diffableAttr->setParameterIndices(IndexSubset::get(C, 1, {0}));
     }
   }
 

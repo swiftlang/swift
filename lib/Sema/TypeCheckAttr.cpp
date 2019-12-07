@@ -3628,10 +3628,6 @@ DifferentiableAttributeParameterIndicesRequest::evaluate(
       return nullptr;
     }
     getterDecl->getAttrs().add(newAttr);
-    // Register derivative function configuration.
-    auto *resultIndices = IndexSubset::get(ctx, 1, {0});
-    getterDecl->addDerivativeFunctionConfiguration(
-        {checkedWrtParamIndices, resultIndices, whereClauseGenSig});
     return checkedWrtParamIndices;
   }
   auto insertion = ctx.DifferentiableAttrs.try_emplace(
@@ -3917,24 +3913,6 @@ void AttributeChecker::visitDerivativeAttr(DerivativeAttr *attr) {
     diagnoseAndRemoveAttr(attr,
                           diag::derivative_attr_not_in_same_file_as_original);
     return;
-  }
-
-  // Diagnose if there exists a `@differentiable` attribute with the same
-  // parameter indices as the `@derivative` function.
-  // NOTE(TF-680): relaxing this limitation requires derivative generic
-  // signature mangling to avoid name collisions for SIL derivative functions
-  // with the same parameter indices but different derivative generic
-  // signatures.
-  auto *diffAttr =
-      Ctx.DifferentiableAttrs.lookup({originalAFD, checkedWrtParamIndices});
-  bool isOriginalAFDProtocolRequirement =
-      isa<ProtocolDecl>(originalAFD->getDeclContext()) &&
-      originalAFD->isProtocolRequirement();
-  if (diffAttr && !isOriginalAFDProtocolRequirement) {
-    diagnoseAndRemoveAttr(attr,
-                          diag::derivative_attr_original_already_has_derivative,
-                          originalAFD->getFullName());
-    diagnose(diffAttr->getLocation(), diag::differentiable_attr_duplicate_note);
   }
 
   // Valid `@derivative` attributes are uniqued by original function and

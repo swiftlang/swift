@@ -579,11 +579,6 @@ swift::matchWitness(
             newAttr->setInvalid();
           } else {
             witness->getAttrs().add(newAttr);
-            // Register derivative function configuration.
-            auto *resultIndices = IndexSubset::get(ctx, 1, {0});
-            witnessAFD->addDerivativeFunctionConfiguration(
-                {newAttr->getParameterIndices(), resultIndices,
-                 newAttr->getDerivativeGenericSignature()});
             success = true;
           }
         }
