@@ -6071,6 +6071,7 @@ bool ParamDecl::hasDefaultExpr() const {
     return false;
   case DefaultArgumentKind::Normal:
   case DefaultArgumentKind::File:
+  case DefaultArgumentKind::FilePath:
   case DefaultArgumentKind::Line:
   case DefaultArgumentKind::Column:
   case DefaultArgumentKind::Function:
@@ -6093,6 +6094,7 @@ bool ParamDecl::hasCallerSideDefaultExpr() const {
   case DefaultArgumentKind::Normal:
     return false;
   case DefaultArgumentKind::File:
+  case DefaultArgumentKind::FilePath:
   case DefaultArgumentKind::Line:
   case DefaultArgumentKind::Column:
   case DefaultArgumentKind::Function:
@@ -6402,6 +6404,7 @@ ParamDecl::getDefaultValueStringRepresentation(
   }
   case DefaultArgumentKind::Inherited: return "super";
   case DefaultArgumentKind::File: return "#file";
+  case DefaultArgumentKind::FilePath: return "#filePath";
   case DefaultArgumentKind::Line: return "#line";
   case DefaultArgumentKind::Column: return "#column";
   case DefaultArgumentKind::Function: return "#function";

@@ -730,6 +730,11 @@ static Expr *synthesizeCallerSideDefault(const ParamDecl *param,
         MagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr::File, loc,
                                    /*implicit=*/true);
 
+  case DefaultArgumentKind::FilePath:
+    return new (ctx)
+        MagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr::FilePath, loc,
+                                   /*implicit=*/true);
+
   case DefaultArgumentKind::Line:
     return new (ctx)
         MagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr::Line, loc,

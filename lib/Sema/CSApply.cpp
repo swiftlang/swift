@@ -2157,6 +2157,7 @@ namespace {
     Expr *visitMagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr *expr) {
       switch (expr->getKind()) {
       case MagicIdentifierLiteralExpr::File:
+      case MagicIdentifierLiteralExpr::FilePath:
       case MagicIdentifierLiteralExpr::Function:
         return handleStringLiteralExpr(expr);
 
