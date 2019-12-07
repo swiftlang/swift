@@ -178,12 +178,10 @@ SILFunction *VJPEmitter::createEmptyPullback() {
       original->getASTContext());
 
   SILOptFunctionBuilder fb(context.getTransform());
-  // The generated pullback linkage is set to Hidden because generated
-  // pullbacks are never called cross-module.
-  auto linkage = SILLinkage::Hidden;
+  auto linkage = vjp->isSerialized() ? SILLinkage::Public : SILLinkage::Private;
   auto *pullback = fb.createFunction(
       linkage, pbName, pbType, pbGenericEnv, original->getLocation(),
-      original->isBare(), IsNotTransparent, original->isSerialized(),
+      original->isBare(), IsNotTransparent, vjp->isSerialized(),
       original->isDynamicallyReplaceable());
   pullback->setDebugScope(new (module)
                               SILDebugScope(original->getLocation(), pullback));
