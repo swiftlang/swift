@@ -7814,7 +7814,35 @@ ConstraintSystem::simplifyDynamicCallableApplicableFnConstraint(
     choices.push_back(
       OverloadChoice(type2, candidate, FunctionRefKind::SingleApply));
   }
-  if (choices.empty()) return SolutionKind::Error;
+
+  if (choices.empty()) {
+    if (!shouldAttemptFixes())
+      return SolutionKind::Error;
+
+    // TODO(diagnostics): This is not going to be necessary once
+    // `@dynamicCallable` uses existing `member` machinery.
+
+    auto memberName = DeclName(
+        ctx, ctx.Id_dynamicallyCall,
+        {useKwargsMethod ? ctx.Id_withKeywordArguments : ctx.Id_withArguments});
+
+    auto *fix = DefineMemberBasedOnUse::create(
+        *this, desugar2, memberName,
+        getConstraintLocator(loc, ConstraintLocator::DynamicCallable));
+
+    if (recordFix(fix))
+      return SolutionKind::Error;
+
+    recordPotentialHole(tv);
+
+    Type(func1).visit([&](Type type) {
+      if (auto *typeVar = type->getAs<TypeVariableType>())
+        recordPotentialHole(typeVar);
+    });
+
+    return SolutionKind::Solved;
+  }
+
   addOverloadSet(tv, choices, DC, loc);
 
   // Create a type variable for the argument to the `dynamicallyCall` method.
