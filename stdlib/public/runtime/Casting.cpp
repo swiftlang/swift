@@ -854,10 +854,11 @@ static bool _dynamicCastToExistential(OpaqueValue *dest,
       return fallbackForNonClass();
     }
 
-    // Check for protocol conformances and fill in the witness tables. If
-    // srcDynamicType equals nullptr we have a cast from an existential
-    // container with a class instance to AnyObject. In this case no check is
-    // necessary.
+    // Check for protocol conformances and fill in the witness tables.
+    // Note: `findDynamicValueAndType` sets srcDynamicType == nullptr iff
+    // we have a cast from an existential container with a class instance
+    // to an AnyObject with no protocol constraints.  In that case,
+    // no further protocol conformance checks are needed.
     while (srcDynamicType
            && !_conformsToProtocols(srcDynamicValue, srcDynamicType,
                                     targetType,
@@ -892,17 +893,13 @@ static bool _dynamicCastToExistential(OpaqueValue *dest,
       }
     }
 
-    if (srcDynamicType) {
-      auto object = *(reinterpret_cast<HeapObject**>(srcDynamicValue));
-      destExistential->Value = object;
-      if (!canConsumeDynamicValue || !(flags & DynamicCastFlags::TakeOnSuccess)) {
-        swift_unknownObjectRetain(object);
-      }
-      maybeDeallocateSource(true);
-      return true;
-    } else {
-      return fallbackForNonClass();
+    auto object = *(reinterpret_cast<HeapObject**>(srcDynamicValue));
+    destExistential->Value = object;
+    if (!canConsumeDynamicValue || !(flags & DynamicCastFlags::TakeOnSuccess)) {
+      swift_unknownObjectRetain(object);
     }
+    maybeDeallocateSource(true);
+    return true;
   }
   case ExistentialTypeRepresentation::Opaque: {
     auto destExistential =
