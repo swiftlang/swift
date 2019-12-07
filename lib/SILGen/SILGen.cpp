@@ -419,7 +419,9 @@ SILGenModule::getKeyPathProjectionCoroutine(bool isReadAccess,
   auto extInfo = SILFunctionType::ExtInfo(
       SILFunctionTypeRepresentation::Thin,
       /*pseudogeneric*/ false,
-      /*non-escaping*/ false, DifferentiabilityKind::NonDifferentiable);
+      /*non-escaping*/ false,
+      DifferentiabilityKind::NonDifferentiable,
+      /*clangFunctionType*/ nullptr);
 
   auto functionTy = SILFunctionType::get(sig, extInfo,
                                          SILCoroutineKind::YieldOnce,
@@ -1113,8 +1115,8 @@ emitStoredPropertyInitialization(PatternBindingDecl *pbd, unsigned i) {
             ->isPropertyMemberwiseInitializedWithWrappedType()) {
       auto wrapperInfo =
           originalProperty->getPropertyWrapperBackingPropertyInfo();
-      if (wrapperInfo.originalInitialValue)
-        init = wrapperInfo.originalInitialValue;
+      assert(wrapperInfo.originalInitialValue);
+      init = wrapperInfo.originalInitialValue;
     }
   }
 

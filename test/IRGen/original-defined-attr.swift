@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -swift-version 4 -enforce-exclusivity=checked %s -emit-ir -module-name CurrentModule -D CURRENT_MODULE | %FileCheck %s --check-prefix=CHECK-COMMON --check-prefix=CHECK-CURRENT
-// RUN: %target-swift-frontend -swift-version 4 -enforce-exclusivity=checked %s -emit-ir -module-name OriginalModule | %FileCheck %s --check-prefix=CHECK-COMMON --check-prefix=CHECK-ORIGINAL
+// RUN: %target-swift-frontend -swift-version 4 -enforce-exclusivity=checked %s -emit-ir -module-name CurrentModule -D CURRENT_MODULE | %FileCheck %s --check-prefix=CHECK-COMMON --check-prefix=CHECK-CURRENT --check-prefix=CHECK-CURRENT-%target-ptrsize
+// RUN: %target-swift-frontend -swift-version 4 -enforce-exclusivity=checked %s -emit-ir -module-name OriginalModule | %FileCheck %s --check-prefix=CHECK-COMMON --check-prefix=CHECK-ORIGINAL --check-prefix=CHECK-ORIGINAL-%target-ptrsize
 
 #if CURRENT_MODULE
 
@@ -60,8 +60,10 @@ func entityClient() {
 
 public func unmovableClient() {
 	let unmovable = UnmovableClass()
-	// CHECK-CURRENT: call swiftcc %swift.metadata_response @"$s13CurrentModule14UnmovableClassCMa"(i64 0)
-	// CHECK-ORIGINAL: call swiftcc %swift.metadata_response @"$s14OriginalModule14UnmovableClassCMa"(i64 0)
+	// CHECK-CURRENT-64: call swiftcc %swift.metadata_response @"$s13CurrentModule14UnmovableClassCMa"(i64 0)
+	// CHECK-ORIGINAL-64: call swiftcc %swift.metadata_response @"$s14OriginalModule14UnmovableClassCMa"(i64 0)
+	// CHECK-CURRENT-32: call swiftcc %swift.metadata_response @"$s13CurrentModule14UnmovableClassCMa"(i32 0)
+	// CHECK-ORIGINAL-32: call swiftcc %swift.metadata_response @"$s14OriginalModule14UnmovableClassCMa"(i32 0)
 }
 
 entityClient()

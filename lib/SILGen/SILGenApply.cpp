@@ -789,8 +789,7 @@ bool isCallToReplacedInDynamicReplacement(SILGenFunction &SGF,
                                           bool &isObjCReplacementSelfCall) {
   if (auto *func =
           dyn_cast_or_null<AbstractFunctionDecl>(SGF.FunctionDC->getAsDecl())) {
-    auto *repl = func->getAttrs().getAttribute<DynamicReplacementAttr>();
-    if (repl && repl->getReplacedFunction() == afd) {
+    if (func->getDynamicallyReplacedDecl() == afd) {
       isObjCReplacementSelfCall = afd->isObjC();
       return true;
     }
@@ -4608,9 +4607,6 @@ SILValue SILGenFunction::emitApplyWithRethrow(SILLocation loc, SILValue fn,
     B.emitBlock(errorBB);
     SILValue error = errorBB->createPhiArgument(fnConv.getSILErrorType(),
                                                 ValueOwnershipKind::Owned);
-
-    B.createBuiltin(loc, SGM.getASTContext().getIdentifier("willThrow"),
-                    SGM.Types.getEmptyTupleType(), {}, {error});
 
     Cleanups.emitCleanupsForReturn(CleanupLocation::get(loc), IsForUnwind);
     B.createThrow(loc, error);

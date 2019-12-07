@@ -36,33 +36,33 @@ namespace incremental_ranges {
 /// A per-primary collection of information about its source ranges.
 
 class SourceRangeBasedInfo {
-  SwiftRangesFileContents swiftRangesFileContents;
+  const std::string primaryInputPath;
+  const SwiftRangesFileContents swiftRangesFileContents;
   /// All changed ranges in the primary as computed by the diff in the driver
   /// Both relative to the previously-compiled and the current source.
-  SourceComparator::LRRanges changedRanges;
+  const SourceComparator::LRRanges changedRanges;
   /// All of the non-local changes in the previously-compiled code:  those
   /// residing outside function bodies.
   /// (We only have and only need function-body ranges for the
   /// previously-compiled source.)
-  Ranges nonlocalChangedRanges;
+  const Ranges nonlocalChangedRanges;
 
   //==============================================================================
   // MARK: construction
   //==============================================================================
 
 public:
-  ///  return hadError and info
-  static llvm::StringMap<SourceRangeBasedInfo>
-  loadAllInfo(const driver::Compilation &);
+  static Optional<SourceRangeBasedInfo>
+  loadInfoForOneJob(const driver::Job *cmd,
+                    const bool showIncrementalBuildDecisions,
+                    DiagnosticEngine &diags);
 
   SourceRangeBasedInfo(SourceRangeBasedInfo &&);
 
 private:
-  SourceRangeBasedInfo(SwiftRangesFileContents &&,
+  SourceRangeBasedInfo(StringRef primaryInputPath, SwiftRangesFileContents &&,
                        SourceComparator::LRRanges &&changedRanges,
                        Ranges &&nonlocalChangedRanges);
-
-  static Optional<SourceRangeBasedInfo> wholeFileChanged();
 
   /// Using supplied paths, interrogate the supplementary outputs and update the
   /// two references. Return None if a file was missing or corrupted.
@@ -93,37 +93,29 @@ private:
   //==============================================================================
   // MARK: scheduling jobs
   //==============================================================================
-
 public:
-  static bool shouldScheduleCompileJob(
-      const llvm::StringMap<SourceRangeBasedInfo> &allInfos,
-      const driver::Job *, function_ref<void(bool, Twine)>);
+  bool
+  didInputChangeAtAll(DiagnosticEngine &,
+                      function_ref<void(bool, StringRef)> noteBuilding) const;
+  bool didInputChangeNonlocally(
+      DiagnosticEngine &,
+      function_ref<void(bool, StringRef)> noteInitiallyCascading) const;
 
 private:
   static Optional<bool> isFileNewerThan(StringRef lhs, StringRef rhs,
                                         DiagnosticEngine&);
 
-private:
-  /// Return hadError
-
-  bool didPrimaryParseAnyNonlocalNonprimaryChanges(
-      StringRef primary, const llvm::StringMap<SourceRangeBasedInfo> &,
-      function_ref<void(bool, Twine)>) const;
-
-  bool wasEveryNonprimaryNonlocalChangeUnparsed(
-      StringRef primary, const llvm::StringMap<SourceRangeBasedInfo> &,
-      function_ref<void(bool, Twine)>) const;
 
   //==============================================================================
   // MARK: printing
   //==============================================================================
 
 public:
-  static void dumpAllInfo(const llvm::StringMap<SourceRangeBasedInfo> &,
-                          bool dumpCompiledSourceDiffs, bool dumpSwiftRanges);
+  void dump(bool dumpCompiledSourceDiffs = true,
+            bool dumpSwiftRanges = true) const;
 
 private:
-  void dumpChangedRanges(StringRef primary) const;
+  void dumpChangedRanges() const;
 };
 
 } // namespace incremental_ranges

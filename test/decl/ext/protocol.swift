@@ -1039,9 +1039,9 @@ protocol Empty2 {}
 struct Concrete1 {}
 extension Concrete1 : Empty1 & Empty2 {}
 
-typealias T = Empty1 & Empty2
+typealias TA = Empty1 & Empty2
 struct Concrete2 {}
-extension Concrete2 : T {}
+extension Concrete2 : TA {}
 
 func f<T : Empty1 & Empty2>(_: T) {}
 

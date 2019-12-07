@@ -19,7 +19,6 @@
 
 // RUN: %target-build-swift -O -wmo -module-name=Main -I%t %s -Xllvm -sil-disable-pass=FunctionSignatureOpts -emit-sil | %FileCheck %s -check-prefix=CHECK-SIL
 
-
 import Test
 
 
@@ -64,7 +63,9 @@ func testError() {
   print(returnInternalError(27))
 }
 
-func testProtocol() {
+class DerivedFromOpen<T> : OpenClass<T> { }
+
+func testProtocolsAndClasses() {
   // CHECK-OUTPUT: false
   // CHECK-SIL-DAG: sil shared [noinline] @$s4Test20checkIfClassConformsyyxlFSi_Tg5
   checkIfClassConforms(27)
@@ -80,6 +81,10 @@ func testProtocol() {
   // CHECK-OUTPUT: 1234
   // CHECK-SIL-DAG: sil shared_external {{.*}} @$s4Test11callFoo_genyyxlF
   callFoo_gen(27)
+  // CHECK-OUTPUT: 55
+  callClassMethod(55)
+  // CHECK-OUTPUT: 321
+  callFooViaConformance(0)
 }
 
 func testSubModule() {
@@ -111,7 +116,7 @@ func testKeypath() {
 testNestedTypes()
 testClass()
 testError()
-testProtocol()
+testProtocolsAndClasses()
 testSubModule()
 testClosures()
 testKeypath()

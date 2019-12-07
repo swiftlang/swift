@@ -140,18 +140,10 @@ protected:
     return CS.findResolvedMemberRef(locator);
   }
 
+  /// Retrieve overload choice resolved for a given locator
+  /// by the constraint solver.
   Optional<SelectedOverload>
   getOverloadChoiceIfAvailable(ConstraintLocator *locator) const {
-    if (auto *overload = getResolvedOverload(locator))
-      return Optional<SelectedOverload>(
-           {overload->Choice, overload->OpenedFullType, overload->ImpliedType});
-    return None;
-  }
-
-  /// Retrieve overload choice resolved for given locator
-  /// by the constraint solver.
-  ResolvedOverloadSetListItem *
-  getResolvedOverload(ConstraintLocator *locator) const {
     return CS.findSelectedOverloadFor(locator);
   }
 
@@ -638,6 +630,7 @@ public:
       : FailureDiagnostic(cs, locator) {}
 
   bool diagnoseAsError() override;
+  bool diagnoseAsNote() override;
 };
 
 class TrailingClosureAmbiguityFailure final : public FailureDiagnostic {
@@ -720,6 +713,8 @@ public:
   Type getToType() const { return ToType; }
 
   bool diagnoseAsError() override;
+
+  bool diagnoseAsNote() override;
 
   /// If we're trying to convert something to `nil`.
   bool diagnoseConversionToNil() const;
@@ -2007,7 +2002,7 @@ private:
   /// valid for the duration of the call, and suggests an alternative to use.
   void emitSuggestionNotes() const;
 };
-	
+
 class AssignmentTypeMismatchFailure final : public ContextualFailure {
 public:
   AssignmentTypeMismatchFailure(ConstraintSystem &cs,
@@ -2020,6 +2015,17 @@ public:
 
 private:
   bool diagnoseMissingConformance() const;
+};
+
+class MissingContextualBaseInMemberRefFailure final : public FailureDiagnostic {
+  DeclName MemberName;
+
+public:
+  MissingContextualBaseInMemberRefFailure(ConstraintSystem &cs, DeclName member,
+                                          ConstraintLocator *locator)
+      : FailureDiagnostic(cs, locator), MemberName(member) {}
+
+  bool diagnoseAsError();
 };
 
 } // end namespace constraints

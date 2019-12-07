@@ -1887,7 +1887,7 @@ static CanAnyFunctionType getStoredPropertyInitializerInterfaceType(
   // wrapper that was initialized with '=', the stored property initializer
   // will be in terms of the original property's type.
   if (auto originalProperty = VD->getOriginalWrappedProperty()) {
-    if (originalProperty->isPropertyWrapperInitializedWithInitialValue())
+    if (originalProperty->isPropertyMemberwiseInitializedWithWrappedType())
       resultTy = originalProperty->getValueInterfaceType()->getCanonicalType();
   }
 
@@ -2440,14 +2440,14 @@ TypeConverter::checkForABIDifferences(SILModule &M,
   // If the types are identical and there was no optionality change,
   // we're done.
   if (type1 == type2 && !optionalityChange)
-    return ABIDifference::Trivial;
+    return ABIDifference::CompatibleRepresentation;
   
   // Classes, class-constrained archetypes, and pure-ObjC existential types
   // all have single retainable pointer representation; optionality change
   // is allowed.
   if (type1.getASTType()->satisfiesClassConstraint() &&
       type2.getASTType()->satisfiesClassConstraint())
-    return ABIDifference::Trivial;
+    return ABIDifference::CompatibleRepresentation;
 
   // Function parameters are ABI compatible if their differences are
   // trivial.
@@ -2470,7 +2470,7 @@ TypeConverter::checkForABIDifferences(SILModule &M,
       if (meta1->getRepresentation() == meta2->getRepresentation() &&
           (!optionalityChange ||
            meta1->getRepresentation() == MetatypeRepresentation::Thick))
-        return ABIDifference::Trivial;
+        return ABIDifference::CompatibleRepresentation;
     }
   }
   
@@ -2483,7 +2483,7 @@ TypeConverter::checkForABIDifferences(SILModule &M,
     if (auto meta2 = type2.getAs<ExistentialMetatypeType>()) {
       if (meta1->getRepresentation() == meta2->getRepresentation() &&
           meta1->getRepresentation() == MetatypeRepresentation::ObjC)
-        return ABIDifference::Trivial;
+        return ABIDifference::CompatibleRepresentation;
     }
   }
 
@@ -2498,12 +2498,12 @@ TypeConverter::checkForABIDifferences(SILModule &M,
           if (checkForABIDifferences(M,
                                      type1.getTupleElementType(i),
                                      type2.getTupleElementType(i))
-                != ABIDifference::Trivial)
+                != ABIDifference::CompatibleRepresentation)
             return ABIDifference::NeedsThunk;
         }
 
         // Tuple lengths and elements match
-        return ABIDifference::Trivial;
+        return ABIDifference::CompatibleRepresentation;
       }
     }
   }
@@ -2517,10 +2517,19 @@ TypeConverter::ABIDifference
 TypeConverter::checkFunctionForABIDifferences(SILModule &M,
                                               SILFunctionType *fnTy1,
                                               SILFunctionType *fnTy2) {
+  // For now, only differentiate representation from calling convention when
+  // staging in substituted function types.
+  //
+  // We might still want to conditionalize this behavior even after we commit
+  // substituted function types, to avoid bloating
+  // IR for platforms that don't differentiate function type representations.
+  bool DifferentFunctionTypesHaveDifferentRepresentation
+    = Context.LangOpts.EnableSubstSILFunctionTypesForFunctionValues;
+  
   // Fast path -- if both functions were unwrapped from a CanSILFunctionType,
   // we might have pointer equality here.
   if (fnTy1 == fnTy2)
-    return ABIDifference::Trivial;
+    return ABIDifference::CompatibleRepresentation;
 
   if (fnTy1->getParameters().size() != fnTy2->getParameters().size())
     return ABIDifference::NeedsThunk;
@@ -2548,7 +2557,7 @@ TypeConverter::checkFunctionForABIDifferences(SILModule &M,
                                result1.getSILStorageType(M, fnTy1),
                                result2.getSILStorageType(M, fnTy2),
              /*thunk iuos*/ fnTy1->getLanguage() == SILFunctionLanguage::Swift)
-        != ABIDifference::Trivial)
+        != ABIDifference::CompatibleRepresentation)
       return ABIDifference::NeedsThunk;
   }
 
@@ -2563,7 +2572,7 @@ TypeConverter::checkFunctionForABIDifferences(SILModule &M,
                                yield1.getSILStorageType(M, fnTy1),
                                yield2.getSILStorageType(M, fnTy2),
              /*thunk iuos*/ fnTy1->getLanguage() == SILFunctionLanguage::Swift)
-        != ABIDifference::Trivial)
+        != ABIDifference::CompatibleRepresentation)
       return ABIDifference::NeedsThunk;
   }
 
@@ -2580,7 +2589,7 @@ TypeConverter::checkFunctionForABIDifferences(SILModule &M,
                                error1.getSILStorageType(M, fnTy1),
                                error2.getSILStorageType(M, fnTy2),
               /*thunk iuos*/ fnTy1->getLanguage() == SILFunctionLanguage::Swift)
-        != ABIDifference::Trivial)
+        != ABIDifference::CompatibleRepresentation)
       return ABIDifference::NeedsThunk;
   }
 
@@ -2592,26 +2601,34 @@ TypeConverter::checkFunctionForABIDifferences(SILModule &M,
 
     // Parameters are contravariant and our relation is not symmetric, so
     // make sure to flip the relation around.
-    std::swap(param1, param2);
-
     if (checkForABIDifferences(M,
-                               param1.getSILStorageType(M, fnTy1),
                                param2.getSILStorageType(M, fnTy2),
+                               param1.getSILStorageType(M, fnTy1),
               /*thunk iuos*/ fnTy1->getLanguage() == SILFunctionLanguage::Swift)
-        != ABIDifference::Trivial)
+        != ABIDifference::CompatibleRepresentation)
       return ABIDifference::NeedsThunk;
   }
 
   auto rep1 = fnTy1->getRepresentation(), rep2 = fnTy2->getRepresentation();
   if (rep1 != rep2) {
     if (rep1 == SILFunctionTypeRepresentation::Thin &&
-        rep2 == SILFunctionTypeRepresentation::Thick)
-      return ABIDifference::ThinToThick;
+        rep2 == SILFunctionTypeRepresentation::Thick) {
+      if (DifferentFunctionTypesHaveDifferentRepresentation) {
+        // FIXME: check whether the representations are compatible modulo
+        // context
+        return ABIDifference::CompatibleCallingConvention_ThinToThick;
+      } else {
+        return ABIDifference::CompatibleRepresentation_ThinToThick;
+      }
+    }
 
     return ABIDifference::NeedsThunk;
   }
 
-  return ABIDifference::Trivial;
+  if (DifferentFunctionTypesHaveDifferentRepresentation)
+    return ABIDifference::CompatibleCallingConvention;
+  else
+    return ABIDifference::CompatibleRepresentation;
 }
 
 CanSILBoxType

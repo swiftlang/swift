@@ -219,6 +219,13 @@ namespace swift {
     /// Build the ASTScope tree lazily
     bool LazyASTScopes = true;
 
+    /// Use Clang function types for computing canonical types.
+    /// If this option is false, the clang function types will still be computed
+    /// but will not be used for checking type equality.
+    /// FIXME: [clang-function-type-serialization] This option should be turned
+    /// on once we start serializing clang function types.
+    bool UseClangFunctionTypes = false;
+
     /// Whether to use the import as member inference system
     ///
     /// When importing a global, try to infer whether we can import it as a
@@ -273,12 +280,12 @@ namespace swift {
 
     /// Scaffolding to permit experimentation with finer-grained dependencies
     /// and faster rebuilds.
-    bool EnableExperimentalDependencies = false;
+    bool EnableFineGrainedDependencies = false;
     
     /// To mimic existing system, set to false.
     /// To experiment with including file-private and private dependency info,
     /// set to true.
-    bool ExperimentalDependenciesIncludeIntrafileOnes = false;
+    bool FineGrainedDependenciesIncludeIntrafileOnes = false;
 
     /// Whether to enable experimental differentiable programming features:
     /// `@differentiable` declaration attribute, etc.

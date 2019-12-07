@@ -929,25 +929,29 @@ static bool isValueOfRawRepresentable(ConstraintSystem &cs,
 ExpandArrayIntoVarargs *
 ExpandArrayIntoVarargs::attempt(ConstraintSystem &cs, Type argType,
                                 Type paramType,
-                                ConstraintLocatorBuilder locator) {
-  auto constraintLocator = cs.getConstraintLocator(locator);
-  auto elementType = cs.isArrayType(argType);
-  if (elementType &&
-      constraintLocator->getLastElementAs<LocatorPathElt::ApplyArgToParam>()
-          ->getParameterFlags()
-          .isVariadic()) {
-    auto options = ConstraintSystem::TypeMatchOptions(
-        ConstraintSystem::TypeMatchFlags::TMF_ApplyingFix |
-        ConstraintSystem::TypeMatchFlags::TMF_GenerateConstraints);
-    auto result =
-        cs.matchTypes(*elementType, paramType,
-                      ConstraintKind::ArgumentConversion, options, locator);
-    if (result.isSuccess())
-      return new (cs.getAllocator())
-          ExpandArrayIntoVarargs(cs, argType, paramType, constraintLocator);
-  }
+                                ConstraintLocatorBuilder builder) {
+  auto *locator = cs.getConstraintLocator(builder);
 
-  return nullptr;
+  auto argLoc = locator->getLastElementAs<LocatorPathElt::ApplyArgToParam>();
+  if (!(argLoc && argLoc->getParameterFlags().isVariadic()))
+    return nullptr;
+
+  auto elementType = cs.isArrayType(argType);
+  if (!elementType)
+    return nullptr;
+
+  ConstraintSystem::TypeMatchOptions options;
+  options |= ConstraintSystem::TypeMatchFlags::TMF_ApplyingFix;
+  options |= ConstraintSystem::TypeMatchFlags::TMF_GenerateConstraints;
+
+  auto result = cs.matchTypes(*elementType, paramType, ConstraintKind::Subtype,
+                              options, builder);
+
+  if (result.isFailure())
+    return nullptr;
+
+  return new (cs.getAllocator())
+      ExpandArrayIntoVarargs(cs, argType, paramType, locator);
 }
 
 bool ExpandArrayIntoVarargs::diagnose(bool asNote) const {
@@ -1043,4 +1047,16 @@ std::string TreatEphemeralAsNonEphemeral::getName() const {
   name += "treat ephemeral as non-ephemeral for ";
   name += ::getName(ConversionKind);
   return name;
+}
+
+bool SpecifyBaseTypeForContextualMember::diagnose(bool asNote) const {
+  auto &cs = getConstraintSystem();
+  MissingContextualBaseInMemberRefFailure failure(cs, MemberName, getLocator());
+  return failure.diagnose(asNote);
+}
+
+SpecifyBaseTypeForContextualMember *SpecifyBaseTypeForContextualMember::create(
+    ConstraintSystem &cs, DeclName member, ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      SpecifyBaseTypeForContextualMember(cs, member, locator);
 }

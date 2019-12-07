@@ -42,7 +42,8 @@ std::string
 toolchains::GenericUnix::sanitizerRuntimeLibName(StringRef Sanitizer,
                                                  bool shared) const {
   return (Twine("libclang_rt.") + Sanitizer + "-" +
-          this->getTriple().getArchName() + ".a")
+          this->getTriple().getArchName() +
+          (this->getTriple().isAndroid() ? "-android" : "") + ".a")
       .str();
 }
 

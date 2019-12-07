@@ -8,8 +8,8 @@ struct ContentView : View {
   @State var foo: [String] = Array(repeating: "", count: 5)
 
   var body: some View {
-    VStack {
-      HStack { // expected-error {{ambiguous reference to member 'buildBlock()'}}
+    VStack { // expected-error {{unable to infer complex closure return type; add explicit type to disambiguate}}
+      HStack {
         Text("")
         TextFi // expected-error {{use of unresolved identifier 'TextFi'}}
       }

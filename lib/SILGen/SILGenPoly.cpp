@@ -404,7 +404,7 @@ ManagedValue Transform::transform(ManagedValue v,
     // If the conversion is trivial, just cast.
     if (SGF.SGM.Types.checkForABIDifferences(SGF.SGM.M,
                                              v.getType(), loweredResultTy)
-          == TypeConverter::ABIDifference::Trivial) {
+          == TypeConverter::ABIDifference::CompatibleRepresentation) {
       if (v.getType().isAddress())
         return SGF.B.createUncheckedAddrCast(Loc, v, loweredResultTy);
       return SGF.B.createUncheckedBitCast(Loc, v, loweredResultTy);

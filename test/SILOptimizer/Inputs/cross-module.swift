@@ -92,6 +92,11 @@ private protocol PrivateProtocol {
 
 open class OpenClass<T> {
   public init() { }
+
+  @inline(never)
+  fileprivate func bar(_ t: T) {
+    print(t)
+  }
 }
 
 extension OpenClass {
@@ -112,6 +117,12 @@ public func checkIfClassConforms<T>(_ t: T) {
 public func checkIfClassConforms_gen<T>(_ t: T) {
   let x = OpenClass<T>()
   print(x.testit())
+}
+
+@inline(never)
+public func callClassMethod<T>(_ t: T) {
+  let k = OpenClass<T>()
+  k.bar(t)
 }
 
 extension Int : PrivateProtocol {
@@ -139,6 +150,29 @@ public func callFoo<T>(_ t: T) {
 public func callFoo_gen<T>(_ t: T) {
   printFooExistential(123)
   printFooGeneric(1234)
+}
+
+fileprivate protocol PrivateProto {
+  func foo()
+}
+
+public class FooClass: PrivateProto {
+  func foo() {
+    print(321)
+  }
+}
+
+@inline(never)
+@_semantics("optimize.sil.specialize.generic.never")
+fileprivate func callProtocolFoo<T: PrivateProto>(_ t: T) {
+  t.foo()
+}
+
+@inline(never)
+@_semantics("optimize.sil.specialize.generic.never")
+public func callFooViaConformance<T>(_ t: T) {
+  let c = FooClass()
+  callProtocolFoo(c)
 }
 
 @inline(never)

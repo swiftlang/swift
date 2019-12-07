@@ -1,4 +1,5 @@
 // XFAIL: CPU=powerpc64le
+// XFAIL: CPU=s390x
 // RUN: %target-swift-frontend -enable-large-loadable-types %s -emit-ir | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
 // REQUIRES: optimized_stdlib
 // UNSUPPORTED: CPU=powerpc64le

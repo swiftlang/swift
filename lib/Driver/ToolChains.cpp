@@ -229,9 +229,9 @@ static void addCommonFrontendArgs(const ToolChain &TC, const OutputInfo &OI,
   inputArgs.AddLastArg(arguments, options::OPT_RemoveRuntimeAsserts);
   inputArgs.AddLastArg(arguments, options::OPT_AssumeSingleThreaded);
   inputArgs.AddLastArg(arguments,
-                       options::OPT_enable_experimental_dependencies);
+                       options::OPT_enable_fine_grained_dependencies);
   inputArgs.AddLastArg(arguments,
-                       options::OPT_experimental_dependency_include_intrafile);
+                       options::OPT_fine_grained_dependency_include_intrafile);
   inputArgs.AddLastArg(arguments, options::OPT_package_description_version);
   inputArgs.AddLastArg(arguments, options::OPT_serialize_diagnostics_path);
   inputArgs.AddLastArg(arguments, options::OPT_debug_diagnostic_names);
@@ -465,6 +465,9 @@ ToolChain::constructInvocation(const CompileJobAction &job,
                                   options::OPT_runtime_compatibility_version)) {
     Arguments.push_back("-runtime-compatibility-version");
     Arguments.push_back(arg->getValue());
+  }
+  if (context.Args.hasArg(options::OPT_track_system_dependencies)) {
+    Arguments.push_back("-track-system-dependencies");
   }
 
   context.Args.AddLastArg(

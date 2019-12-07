@@ -482,6 +482,11 @@ inline bool ModuleDecl::EntryPointInfoTy::markDiagnosedMainClassWithScript() {
   return !res;
 }
 
+inline void simple_display(llvm::raw_ostream &out, const SourceFile *SF) {
+  assert(SF && "Cannot display null source file!");
+
+  out << "source_file " << '\"' << SF->getFilename() << '\"';
+}
 } // end namespace swift
 
 #endif

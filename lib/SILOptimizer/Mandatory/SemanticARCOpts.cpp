@@ -15,6 +15,7 @@
 #include "swift/Basic/STLExtras.h"
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/BranchPropagatedUser.h"
+#include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/SILArgument.h"
@@ -148,9 +149,12 @@ struct SemanticARCOptVisitor
   /// Our main worklist. We use this after an initial run through.
   SmallBlotSetVector<SILValue, 32> worklist;
 
-  /// A secondary work list that we use to store dead trivial instructions to
-  /// delete after we are done processing the worklist.
-  SmallBlotSetVector<SILInstruction *, 32> deadTrivialInsts;
+  /// A set of values that we have visited since the last mutation. We use this
+  /// to ensure that we do not visit values twice without mutating.
+  ///
+  /// This is specifically to ensure that we do not go into an infinite loop
+  /// when visiting phi nodes.
+  SmallBlotSetVector<SILValue, 16> visitedSinceLastMutation;
 
   SILFunction &F;
   Optional<DeadEndBlocks> TheDeadEndBlocks;
@@ -167,8 +171,13 @@ struct SemanticARCOptVisitor
   /// the worklist, and then call eraseInstruction on i.
   void eraseAndRAUWSingleValueInstruction(SingleValueInstruction *i, SILValue newValue) {
     worklist.insert(newValue);
+    for (auto *use : i->getUses()) {
+      for (SILValue result : use->getUser()->getResults()) {
+        worklist.insert(result);
+      }
+    }
     i->replaceAllUsesWith(newValue);
-    eraseInstruction(i);
+    eraseInstructionAndAddOperandsToWorklist(i);
   }
 
   /// Add all operands of i to the worklist and then call eraseInstruction on
@@ -189,16 +198,86 @@ struct SemanticARCOptVisitor
     // the instruction.
     for (SILValue result : i->getResults()) {
       worklist.erase(result);
+      visitedSinceLastMutation.erase(result);
     }
-    deadTrivialInsts.erase(i);
     i->eraseFromParent();
+
+    // Add everything else from visitedSinceLastMutation to the worklist.
+    for (auto opt : visitedSinceLastMutation) {
+      if (!opt.hasValue()) {
+        continue;
+      }
+      worklist.insert(*opt);
+    }
+    visitedSinceLastMutation.clear();
   }
 
   /// The default visitor.
-  bool visitSILInstruction(SILInstruction *i) { return false; }
+  bool visitSILInstruction(SILInstruction *i) {
+    assert(!isGuaranteedForwardingInst(i) &&
+           "Should have forwarding visitor for all ownership forwarding "
+           "instructions");
+    return false;
+  }
+
   bool visitCopyValueInst(CopyValueInst *cvi);
   bool visitBeginBorrowInst(BeginBorrowInst *bbi);
   bool visitLoadInst(LoadInst *li);
+  static bool shouldVisitInst(SILInstruction *i) {
+    switch (i->getKind()) {
+    default:
+      return false;
+    case SILInstructionKind::CopyValueInst:
+    case SILInstructionKind::BeginBorrowInst:
+    case SILInstructionKind::LoadInst:
+      return true;
+    }
+  }
+
+#define FORWARDING_INST(NAME)                                                  \
+  bool visit##NAME##Inst(NAME##Inst *cls) {                                    \
+    for (SILValue v : cls->getResults()) {                                     \
+      worklist.insert(v);                                                      \
+    }                                                                          \
+    return false;                                                              \
+  }
+  FORWARDING_INST(Tuple)
+  FORWARDING_INST(Struct)
+  FORWARDING_INST(Enum)
+  FORWARDING_INST(OpenExistentialRef)
+  FORWARDING_INST(Upcast)
+  FORWARDING_INST(UncheckedRefCast)
+  FORWARDING_INST(ConvertFunction)
+  FORWARDING_INST(RefToBridgeObject)
+  FORWARDING_INST(BridgeObjectToRef)
+  FORWARDING_INST(UnconditionalCheckedCast)
+  FORWARDING_INST(UncheckedEnumData)
+  FORWARDING_INST(MarkUninitialized)
+  FORWARDING_INST(SelectEnum)
+  FORWARDING_INST(DestructureStruct)
+  FORWARDING_INST(DestructureTuple)
+  FORWARDING_INST(TupleExtract)
+  FORWARDING_INST(StructExtract)
+  FORWARDING_INST(OpenExistentialValue)
+  FORWARDING_INST(OpenExistentialBoxValue)
+  FORWARDING_INST(MarkDependence)
+#undef FORWARDING_INST
+
+#define FORWARDING_TERM(NAME)                                                  \
+  bool visit##NAME##Inst(NAME##Inst *cls) {                                    \
+    for (auto succValues : cls->getSuccessorBlockArguments()) {                \
+      for (SILValue v : succValues) {                                          \
+        worklist.insert(v);                                                    \
+      }                                                                        \
+    }                                                                          \
+    return false;                                                              \
+  }
+
+  FORWARDING_TERM(SwitchEnum)
+  FORWARDING_TERM(CheckedCastBranch)
+  FORWARDING_TERM(Branch)
+  FORWARDING_TERM(CondBranch)
+#undef FORWARDING_TERM
 
   bool isWrittenTo(LoadInst *li);
 
@@ -225,6 +304,14 @@ bool SemanticARCOptVisitor::processWorklist() {
     if (!next)
       continue;
 
+    // First check if this is a value that we have visited since the last time
+    // we erased an instruction. If we have visited it, skip it. Every time we
+    // modify something, we should be deleting an instruction, so we have not
+    // found any further information.
+    if (!visitedSinceLastMutation.insert(next).second) {
+      continue;
+    }
+
     // First check if this is an instruction that is trivially dead. This can
     // occur if we eliminate rr traffic resulting in dead projections and the
     // like.
@@ -234,7 +321,8 @@ bool SemanticARCOptVisitor::processWorklist() {
     // the instruction).
     if (auto *defInst = next->getDefiningInstruction()) {
       if (isInstructionTriviallyDead(defInst)) {
-        deadTrivialInsts.insert(defInst);
+        deleteAllDebugUses(defInst);
+        eraseInstruction(defInst);
         continue;
       }
     }
@@ -245,23 +333,6 @@ bool SemanticARCOptVisitor::processWorklist() {
       madeChange |= visit(svi);
       continue;
     }
-  }
-
-  // Then eliminate the rest of the dead trivial insts.
-  //
-  // NOTE: We do not need to touch the worklist here since it is guaranteed to
-  // be empty due to the loop above. We enforce this programatically with the
-  // assert.
-  assert(worklist.empty() && "Expected drained worklist so we don't have to "
-                             "remove dead insts form it");
-  while (!deadTrivialInsts.empty()) {
-    auto val = deadTrivialInsts.pop_back_val();
-    if (!val)
-      continue;
-    recursivelyDeleteTriviallyDeadInstructions(
-        *val, true /*force*/,
-        [&](SILInstruction *i) { deadTrivialInsts.erase(i); });
-    madeChange = true;
   }
 
   return madeChange;
@@ -795,59 +866,24 @@ struct SemanticARCOpts : SILFunctionTransform {
            "Can not perform semantic arc optimization unless ownership "
            "verification is enabled");
 
-    // Iterate over all of the arguments, performing small peephole ARC
-    // optimizations. We assume that the visitor will add any instructions we
-    // need to recursively to the visitor's worklist. Also, note that we assume
-    // that we do not look through /any/ sil block arguments here since our
-    // iteration here is only valid up to SSA.
-    bool madeChange = false;
-    
     SemanticARCOptVisitor visitor(f);
-    
-    for (auto &bb : f) {
-      auto ii = bb.rend();
-      auto start = bb.rbegin();
 
-      // If the bb is empty, continue.
-      if (start == ii)
-        continue;
-
-      // Go to the first instruction to process.
-      --ii;
-
-      // Then until we process the first instruction of the block...
-      while (ii != start) {
-        // Move the iterator before ii.
-        auto tmp = std::next(ii);
-
-        // Then try to optimize. If we succeeded, then we deleted
-        // ii. Move ii from the next value back onto the instruction
-        // after ii's old value in the block instruction list and then
-        // process that.
-        if (visitor.visit(&*ii)) {
-          madeChange = true;
-          ii = std::prev(tmp);
-          continue;
+    // Add all the results of all instructions that we want to visit to the
+    // worklist.
+    for (auto &block : f) {
+      for (auto &inst : block) {
+        if (SemanticARCOptVisitor::shouldVisitInst(&inst)) {
+          for (SILValue v : inst.getResults()) {
+            visitor.worklist.insert(v);
+          }
         }
-
-        // Otherwise, we didn't delete ii. Just visit the next instruction.
-        --ii;
       }
-
-      // Finally visit the first instruction of the block.
-      madeChange |= visitor.visit(&*ii);
     }
 
-    // Finally drain the worklist on the visitor and process until we reach the
-    // fixpoint and thus do not have any further work to do.
-    //
-    // NOTE: At this point madeChange has already been set to true if we have
-    // anything in the worklist, so technically we do not need to do this. But I
-    // would rather represent this state to future proof the pass to be
-    // "visually" correct.
-    madeChange |= visitor.processWorklist();
-
-    if (madeChange) {
+    // Then process the worklist. We only destroy instructions, so invalidate
+    // that. Once we modify the ownership of block arguments, we will need to
+    // perhaps invalidate branches as well.
+    if (visitor.processWorklist()) {
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
     }
   }

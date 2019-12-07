@@ -43,22 +43,3 @@ void PersistentParserState::parseAllDelayedDeclLists() {
   for (auto IDC : DelayedDeclLists)
     IDC->loadAllMembers();
 }
-
-void PersistentParserState::forEachDelayedSourceRange(
-    const SourceFile *primaryFile, function_ref<void(SourceRange)> fn) const {
-  // FIXME: separate out unparsed ranges by primary file
-  for (const auto *idc : DelayedDeclLists) {
-    // FIXME: better to check for the exact request (ParseMembersRequest)
-    // in the Evaluator cache
-    if (!idc->hasUnparsedMembers())
-      continue;
-    const auto *d = idc->getDecl();
-    SourceRange sr;
-    if (auto *nt = dyn_cast<NominalTypeDecl>(d))
-      sr = nt->getBraces();
-    else if (auto *e = dyn_cast<ExtensionDecl>(d))
-      sr = e->getBraces();
-    if (sr.isValid())
-      fn(sr);
-  }
-}

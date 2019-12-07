@@ -2833,6 +2833,13 @@ void ValueDecl::setIsDynamic(bool value) {
   LazySemanticInfo.isDynamic = value;
 }
 
+ValueDecl *ValueDecl::getDynamicallyReplacedDecl() const {
+  return evaluateOrDefault(getASTContext().evaluator,
+                           DynamicallyReplacedDeclRequest{
+                               const_cast<ValueDecl *>(this)},
+                           nullptr);
+}
+
 bool ValueDecl::canBeAccessedByDynamicLookup() const {
   if (!hasName())
     return false;
@@ -3108,7 +3115,7 @@ static AccessLevel getAdjustedFormalAccess(const ValueDecl *VD,
     return getMaximallyOpenAccessFor(VD);
 
   if (treatUsableFromInlineAsPublic &&
-      (access == AccessLevel::Internal || access == AccessLevel::Private) &&
+      access <= AccessLevel::Internal &&
       VD->isUsableFromInline()) {
     return AccessLevel::Public;
   }
@@ -4958,9 +4965,9 @@ bool AbstractStorageDecl::hasPrivateAccessor() const {
 
 bool AbstractStorageDecl::hasDidSetOrWillSetDynamicReplacement() const {
   if (auto *func = getParsedAccessor(AccessorKind::DidSet))
-    return func->getAttrs().hasAttribute<DynamicReplacementAttr>();
+    return (bool)func->getDynamicallyReplacedDecl();
   if (auto *func = getParsedAccessor(AccessorKind::WillSet))
-    return func->getAttrs().hasAttribute<DynamicReplacementAttr>();
+    return (bool)func->getDynamicallyReplacedDecl();
   return false;
 }
 
@@ -4972,13 +4979,6 @@ bool AbstractStorageDecl::hasAnyNativeDynamicAccessors() const {
   return false;
 }
 
-bool AbstractStorageDecl::hasAnyDynamicReplacementAccessors() const {
-  for (auto accessor : getAllAccessors()) {
-    if (accessor->getAttrs().hasAttribute<DynamicReplacementAttr>())
-      return true;
-  }
-  return false;
-}
 void AbstractStorageDecl::setAccessors(SourceLoc lbraceLoc,
                                        ArrayRef<AccessorDecl *> accessors,
                                        SourceLoc rbraceLoc) {
@@ -5807,13 +5807,12 @@ VarDecl *VarDecl::getLazyStorageProperty() const {
       {});
 }
 
-static bool propertyWrapperInitializedViaInitialValue(
-   const VarDecl *var, bool checkDefaultInit) {
-  auto customAttrs = var->getAttachedPropertyWrappers();
+bool VarDecl::isPropertyMemberwiseInitializedWithWrappedType() const {
+  auto customAttrs = getAttachedPropertyWrappers();
   if (customAttrs.empty())
     return false;
 
-  auto *PBD = var->getParentPatternBinding();
+  auto *PBD = getParentPatternBinding();
   if (!PBD)
     return false;
 
@@ -5828,23 +5827,12 @@ static bool propertyWrapperInitializedViaInitialValue(
     return false;
 
   // Default initialization does not use a value.
-  if (checkDefaultInit &&
-      var->getAttachedPropertyWrapperTypeInfo(0).defaultInit)
+  if (getAttachedPropertyWrapperTypeInfo(0).defaultInit)
     return false;
 
-  // If all property wrappers have an initialValue initializer, the property
+  // If all property wrappers have a wrappedValue initializer, the property
   // wrapper will be initialized that way.
-  return var->allAttachedPropertyWrappersHaveInitialValueInit();
-}
-
-bool VarDecl::isPropertyWrapperInitializedWithInitialValue() const {
-  return propertyWrapperInitializedViaInitialValue(
-      this, /*checkDefaultInit=*/true);
-}
-
-bool VarDecl::isPropertyMemberwiseInitializedWithWrappedType() const {
-  return propertyWrapperInitializedViaInitialValue(
-      this, /*checkDefaultInit=*/false);
+  return allAttachedPropertyWrappersHaveInitialValueInit();
 }
 
 Identifier VarDecl::getObjCPropertyName() const {

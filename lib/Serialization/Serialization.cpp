@@ -2069,7 +2069,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
     didVerifyAttrs = true;
   }
 
-  void writeDeclAttribute(const DeclAttribute *DA) {
+  void writeDeclAttribute(const Decl *D, const DeclAttribute *DA) {
     using namespace decls_block;
 
     // Completely ignore attributes that aren't serialized.
@@ -2261,10 +2261,11 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       pieces.push_back(S.addDeclBaseNameRef(replacedFun.getBaseName()));
       for (auto argName : replacedFun.getArgumentNames())
         pieces.push_back(S.addDeclBaseNameRef(argName));
-      assert(theAttr->getReplacedFunction());
+      auto *afd = cast<ValueDecl>(D)->getDynamicallyReplacedDecl();
+      assert(afd && "Missing replaced decl!");
       DynamicReplacementDeclAttrLayout::emitRecord(
           S.Out, S.ScratchRecord, abbrCode, false, /*implicit flag*/
-          S.addDeclRef(theAttr->getReplacedFunction()), pieces.size(), pieces);
+          S.addDeclRef(afd), pieces.size(), pieces);
       return;
     }
 
@@ -2673,7 +2674,7 @@ public:
   void visit(const Decl *D) {
     // Emit attributes (if any).
     for (auto Attr : D->getAttrs())
-      writeDeclAttribute(Attr);
+      writeDeclAttribute(D, Attr);
 
     if (auto *value = dyn_cast<ValueDecl>(D))
       writeDiscriminatorsIfNeeded(value);
@@ -3958,6 +3959,8 @@ public:
 
   void visitFunctionType(const FunctionType *fnTy) {
     using namespace decls_block;
+
+    // FIXME: [clang-function-type-serialization] Serialize the clang type here
     unsigned abbrCode = S.DeclTypeAbbrCodes[FunctionTypeLayout::Code];
     FunctionTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
         S.addTypeRef(fnTy->getResult()),

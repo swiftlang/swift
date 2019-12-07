@@ -61,8 +61,6 @@ class CrossModuleSerializationSetup {
 
   void makeSubstUsableFromInline(const SubstitutionMap &substs);
 
-  bool markAsEmitIntoClient(SILFunction *F);
-
 public:
   CrossModuleSerializationSetup(SILModule &M) : M(M) { }
 
@@ -103,6 +101,7 @@ class InstructionVisitor : public SILCloner<InstructionVisitor> {
 
 private:
   CrossModuleSerializationSetup &CMS;
+  SILInstruction *result = nullptr;
 
 public:
   InstructionVisitor(SILFunction *F, CrossModuleSerializationSetup &CMS) :
@@ -124,8 +123,8 @@ public:
   }
 
   void postProcess(SILInstruction *Orig, SILInstruction *Cloned) {
-    SILInstruction::destroy(Cloned);
-    Orig->getFunction()->getModule().deallocateInst(Cloned);
+    result = Cloned;
+    SILCloner<InstructionVisitor>::postProcess(Orig, Cloned);
   }
 
   SILValue getMappedValue(SILValue Value) { return Value; }
@@ -135,29 +134,32 @@ public:
   static void visitInst(SILInstruction *I, CrossModuleSerializationSetup &CMS) {
     InstructionVisitor visitor(I->getFunction(), CMS);
     visitor.visit(I);
+
+    SILInstruction::destroy(visitor.result);
+    CMS.M.deallocateInst(visitor.result);
   }
 };
 
 /// Make a nominal type, including it's context, usable from inline.
-static void makeNominalUsableFromInline(NominalTypeDecl *NT, SILModule &M) {
-  if (NT->getEffectiveAccess() >= AccessLevel::Public)
+static void makeDeclUsableFromInline(ValueDecl *decl, SILModule &M) {
+  if (decl->getEffectiveAccess() >= AccessLevel::Public)
     return;
 
-  if (!NT->isUsableFromInline()) {
+  if (!decl->isUsableFromInline()) {
     // Mark the nominal type as "usableFromInline".
     // TODO: find a way to do this without modifying the AST. The AST should be
     // immutable at this point.
-    auto &ctx = NT->getASTContext();
+    auto &ctx = decl->getASTContext();
     auto *attr = new (ctx) UsableFromInlineAttr(/*implicit=*/true);
-    NT->getAttrs().add(attr);
+    decl->getAttrs().add(attr);
   }
-  if (auto *enclosingNominal = dyn_cast<NominalTypeDecl>(NT->getDeclContext())) {
-    makeNominalUsableFromInline(enclosingNominal, M);
-  } else if (auto *enclosingExt = dyn_cast<ExtensionDecl>(NT->getDeclContext())) {
-    if (auto *extendedNominal = enclosingExt->getExtendedNominal()) {
-      makeNominalUsableFromInline(extendedNominal, M);
+  if (auto *nominalCtx = dyn_cast<NominalTypeDecl>(decl->getDeclContext())) {
+    makeDeclUsableFromInline(nominalCtx, M);
+  } else if (auto *extCtx = dyn_cast<ExtensionDecl>(decl->getDeclContext())) {
+    if (auto *extendedNominal = extCtx->getExtendedNominal()) {
+      makeDeclUsableFromInline(extendedNominal, M);
     }
-  } else if (NT->getDeclContext()->isLocalContext()) {
+  } else if (decl->getDeclContext()->isLocalContext()) {
     // TODO
   }
 }
@@ -168,7 +170,7 @@ void CrossModuleSerializationSetup::makeTypeUsableFromInline(CanType type) {
     return;
 
   if (NominalTypeDecl *NT = type->getNominalOrBoundGenericNominal()) {
-    makeNominalUsableFromInline(NT, M);
+    makeDeclUsableFromInline(NT, M);
   }
 
   // Also make all sub-types usable from inline.
@@ -176,7 +178,7 @@ void CrossModuleSerializationSetup::makeTypeUsableFromInline(CanType type) {
     CanType subType = rawSubType->getCanonicalType();
     if (typesHandled.insert(subType.getPointer()).second) {
       if (NominalTypeDecl *subNT = subType->getNominalOrBoundGenericNominal()) {
-        makeNominalUsableFromInline(subNT, M);
+        makeDeclUsableFromInline(subNT, M);
       }
     }
   });
@@ -188,6 +190,12 @@ void CrossModuleSerializationSetup::
 makeSubstUsableFromInline(const SubstitutionMap &substs) {
   for (Type replType : substs.getReplacementTypes()) {
     makeTypeUsableFromInline(replType->getCanonicalType());
+  }
+  for (ProtocolConformanceRef pref : substs.getConformances()) {
+    if (pref.isConcrete()) {
+      ProtocolConformance *concrete = pref.getConcrete();
+      makeDeclUsableFromInline(concrete->getProtocol(), M);
+    }
   }
 }
 
@@ -236,6 +244,9 @@ prepareInstructionForSerialization(SILInstruction *inst) {
         [this](SILFunction *func) { handleReferencedFunction(func); },
         [this](SILDeclRef method) { handleReferencedMethod(method); });
     return;
+  }
+  if (auto *REAI = dyn_cast<RefElementAddrInst>(inst)) {
+    makeDeclUsableFromInline(REAI->getField(), M);
   }
 }
 
@@ -313,12 +324,7 @@ void CrossModuleSerializationSetup::scanModule() {
 
         // As a code size optimization, make serialized functions
         // @alwaysEmitIntoClient.
-        if (!markAsEmitIntoClient(F)) {
-          // We don't have a declaration to put the attribute on (e.g. in case
-          // the function is a closure). Just make the function public instead
-          // of @alwaysEmitIntoClient.
-          F->setLinkage(SILLinkage::Public);
-        }
+        F->setLinkage(SILLinkage::PublicNonABI);
       } else {
         // If for some reason the function cannot be serialized, we mark it as
         // usable-from-inline.
@@ -326,36 +332,6 @@ void CrossModuleSerializationSetup::scanModule() {
       }
     }
   }
-}
-
-/// Marks a function as @alwaysEmitIntoClient and returns true if this is
-/// successful.
-bool CrossModuleSerializationSetup::markAsEmitIntoClient(SILFunction *F) {
-  auto *DC = F->getDeclContext();
-  if (!DC)
-    return false;
-
-  Decl *decl = DC->getAsDecl();
-  if (!decl)
-    return false;
-
-  if (!isa<AbstractFunctionDecl>(decl))
-    return false;
-
-  F->setLinkage(SILLinkage::PublicNonABI);
-
-  // Adding the attribute is only needed to be able to compile the
-  // client module with -Onone. For optimized builds, setting the
-  // SILLinkage is enough, because with optimization, the client module
-  // eagerly de-serializes all functions and therefore gets the
-  // linkage right. But with -Onone, the linkage is derived purly from
-  // the AST.
-  // TODO: also here, we should find a way to not modify the AST.
-  auto &ctx = M.getASTContext();
-  auto *attr = new (ctx) AlwaysEmitIntoClientAttr(/*implicit=*/true);
-  decl->getAttrs().add(attr);
-
-  return true;
 }
 
 class CrossModuleSerializationSetupPass: public SILModuleTransform {

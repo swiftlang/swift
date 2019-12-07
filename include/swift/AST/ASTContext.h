@@ -22,6 +22,7 @@
 #include "swift/AST/Identifier.h"
 #include "swift/AST/SearchPathOptions.h"
 #include "swift/AST/Type.h"
+#include "swift/AST/Types.h"
 #include "swift/AST/TypeAlignments.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/Malloc.h"
@@ -556,6 +557,19 @@ public:
   /// which will usually by the same as \c type.
   Type getBridgedToObjC(const DeclContext *dc, Type type,
                         Type *bridgedValueType = nullptr) const;
+
+  /// Get the Clang type corresponding to a Swift function type.
+  ///
+  /// \param params The function parameters.
+  /// \param resultTy The Swift result type.
+  /// \param incompleteExtInfo Used to convey escaping and throwing
+  ///                          information, in case it is needed.
+  /// \param trueRep The actual calling convention, which must be C-compatible.
+  ///                The calling convention in \p incompleteExtInfo is ignored.
+  const clang::Type *
+  getClangFunctionType(ArrayRef<AnyFunctionType::Param> params, Type resultTy,
+                       const FunctionType::ExtInfo incompleteExtInfo,
+                       FunctionTypeRepresentation trueRep);
 
   /// Determine whether the given Swift type is representable in a
   /// given foreign language.
