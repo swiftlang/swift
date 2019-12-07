@@ -3671,8 +3671,11 @@ llvm::GlobalValue *IRGenModule::defineTypeMetadata(CanType concreteType,
   if (nominal)
     addRuntimeResolvableType(nominal);
 
-  // Don't define the alias for foreign type metadata, since it's not ABI.
-  if (nominal && requiresForeignTypeMetadata(nominal))
+  // Don't define the alias for foreign type metadata or prespecialized generic
+  // metadata, since neither is ABI.
+  if ((nominal && requiresForeignTypeMetadata(nominal)) ||
+      (concreteType->getAnyGeneric() &&
+       concreteType->getAnyGeneric()->isGenericContext()))
     return var;
 
   // For concrete metadata, declare the alias to its address point.
@@ -3708,7 +3711,9 @@ ConstantReference IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
   llvm::Type *defaultVarTy;
   unsigned adjustmentIndex;
 
-  bool fullMetadata = (nominal && requiresForeignTypeMetadata(nominal));
+  bool fullMetadata = (nominal && requiresForeignTypeMetadata(nominal)) ||
+                      (concreteType->getAnyGeneric() &&
+                       concreteType->getAnyGeneric()->isGenericContext());
 
   // Foreign classes reference the full metadata with a GEP.
   if (fullMetadata) {

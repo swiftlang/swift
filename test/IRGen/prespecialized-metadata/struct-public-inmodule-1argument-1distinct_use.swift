@@ -1,7 +1,8 @@
 // RUN: %swift -target %module-target-future -emit-ir -prespecialize-generic-metadata %s | %FileCheck %s
 
 // CHECK: @"$s4main5ValueVySiGMf" = internal constant <{ i8**, i64, %swift.type_descriptor*, %swift.type*, i32, [4 x i8], i64 }> <{ i8** getelementptr inbounds (%swift.vwtable, %swift.vwtable* @"$s4main5ValueVWV", i32 0, i32 0), i64 512, %swift.type_descriptor* bitcast (<{ i32, i32, i32, i32, i32, i32, i32, i32, i32, i16, i16, i16, i16, i8, i8, i8, i8 }>* @"$s4main5ValueVMn" to %swift.type_descriptor*), %swift.type* @"$sSiN", i32 0, [4 x i8] zeroinitializer, i64 3 }>, align 8
-struct Value<First> {
+@frozen
+public struct Value<First> {
   let first: First
 }
 
@@ -20,7 +21,7 @@ func doit() {
 doit()
 
 // CHECK: ; Function Attrs: noinline nounwind readnone
-// CHECK: define hidden swiftcc %swift.metadata_response @"$s4main5ValueVMa"(i64, %swift.type*) #{{[0-9]+}} {
+// CHECK: define{{[ protected]*}} swiftcc %swift.metadata_response @"$s4main5ValueVMa"(i64, %swift.type*) #{{[0-9]+}} {
 // CHECK: entry:
 // CHECK:   [[ERASED_TYPE:%[0-9]+]] = bitcast %swift.type* %1 to i8*
 // CHECK:   br label %[[TYPE_COMPARISON_LABEL:[0-9]+]]
