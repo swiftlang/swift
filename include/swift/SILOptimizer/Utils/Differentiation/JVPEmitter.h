@@ -371,7 +371,7 @@ public:
                       DifferentiationInvoker invoker);
 
   static SILFunction *
-  createEmptyDifferential(ADContext &context, SILFunction *original,
+  createEmptyDifferential(ADContext &context,
                           SILDifferentiabilityWitness *witness,
                           LinearMapInfo *linearMapInfo);
 
