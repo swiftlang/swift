@@ -905,9 +905,10 @@ static bool _dynamicCastToExistential(OpaqueValue *dest,
     auto destExistential =
       reinterpret_cast<OpaqueExistentialContainer*>(dest);
     // Check for protocol conformances and fill in the witness tables.
-    while (!_conformsToProtocols(srcDynamicValue, srcDynamicType,
-                                 targetType,
-                                 destExistential->getWitnessTables())) {
+    while (srcDynamicType
+           && !_conformsToProtocols(srcDynamicValue, srcDynamicType,
+                                    targetType,
+                                    destExistential->getWitnessTables())) {
       switch (srcDynamicType->getKind()) {
       case MetadataKind::Optional: {
         const Metadata *payloadType =
@@ -919,8 +920,7 @@ static bool _dynamicCastToExistential(OpaqueValue *dest,
         }
         // Unwrap the optional and try again...
         srcDynamicType = payloadType;
-        // srcDynamicValue doesn't change, since Optional layout
-        // is same as the contained type...
+        // Since optional layout == contained layout, srcDynamicValue is unchanged.
         break;
       }
       case MetadataKind::Existential: {
