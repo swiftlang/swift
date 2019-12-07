@@ -2711,7 +2711,7 @@ NOTE(missing_member_type_conformance_prevents_synthesis, none,
      "of %3 to %2",
      (unsigned, Type, Type, Type))
 NOTE(classes_equatable_hashable_synthesis,none,
-    "Currently 'Equatable' and 'Hashable' synthesis is not supported for classes "
+    "currently 'Equatable' and 'Hashable' synthesis is not supported for classes "
     "because of inheritance.", ())
 
 // Dynamic Self
