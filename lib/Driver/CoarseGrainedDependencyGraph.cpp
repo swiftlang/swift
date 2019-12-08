@@ -297,13 +297,16 @@ CoarseGrainedDependencyGraphImpl::loadFromBuffer(const void *node,
                              interfaceHashCallback);
 }
 
-void CoarseGrainedDependencyGraphImpl::markExternal(
-    SmallVectorImpl<const void *> &visited, StringRef externalDependency) {
+std::vector<const void*> CoarseGrainedDependencyGraphImpl::markExternal(
+    StringRef externalDependency) {
+  std::vector<const void*> visited;
   forEachUnmarkedJobDirectlyDependentOnExternalSwiftdeps(
-      externalDependency, [&](const void *node) {
-        visited.push_back(node);
-        markTransitive(visited, node);
-      });
+                                                         externalDependency, [&](const void *node) {
+    visited.push_back(node);
+    for (const void* markedNode: markTransitive(node))
+      visited.push_back(markedNode);
+  });
+  return visited;
 }
 
 void CoarseGrainedDependencyGraphImpl::
@@ -322,9 +325,10 @@ void CoarseGrainedDependencyGraphImpl::
   }
 }
 
-void CoarseGrainedDependencyGraphImpl::markTransitive(
-    SmallVectorImpl<const void *> &visited, const void *node,
+std::vector<const void*> CoarseGrainedDependencyGraphImpl::markTransitive(
+    const void *node,
     MarkTracerImpl *tracer) {
+  std::vector <const void*> visited;
   assert(Provides.count(node) && "node is not in the graph");
   llvm::SpecificBumpPtrAllocator<MarkTracerImpl::Entry> scratchAlloc;
 
@@ -408,6 +412,7 @@ void CoarseGrainedDependencyGraphImpl::markTransitive(
       continue;
     record(next);
   }
+  return visited;
 }
 
 void CoarseGrainedDependencyGraphImpl::MarkTracerImpl::countStatsForNodeMarking(

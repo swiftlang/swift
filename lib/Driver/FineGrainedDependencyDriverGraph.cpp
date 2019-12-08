@@ -28,6 +28,7 @@
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/YAMLParser.h"
 #include "llvm/Support/raw_ostream.h"
+#include <unordered_set>
 
 // Definitions for the portion fine-grained dependency system used by the
 // driver.
@@ -80,8 +81,7 @@ bool ModuleDepGraph::isMarked(const Job *cmd) const {
   return cascadingJobs.count(getSwiftDeps(cmd));
 }
 
-void ModuleDepGraph::markTransitive(
-    SmallVectorImpl<const Job *> &consequentJobsToRecompile,
+std::vector<const Job*> ModuleDepGraph::markTransitive(
     const Job *jobToBeRecompiled, const void *ignored) {
   FrontendStatsTracer tracer(stats, "fine-grained-dependencies-markTransitive");
 
@@ -93,12 +93,14 @@ void ModuleDepGraph::markTransitive(
     findDependentNodesAndRecordCascadingOnes(dependentNodes,
                                              fileAndNode.second);
   }
-  computeUniqueJobsFromNodes(consequentJobsToRecompile, dependentNodes);
+  return computeUniqueJobsFromNodes(dependentNodes);
 }
 
-void ModuleDepGraph::computeUniqueJobsFromNodes(
-    SmallVectorImpl<const Job *> &jobs,
+std::vector<const Job*> ModuleDepGraph::computeUniqueJobsFromNodes(
     const std::unordered_set<const ModuleDepGraphNode *> &nodes) {
+
+  std::vector<const Job*>jobs;
+
   std::unordered_set<std::string> swiftDepsOfNodes;
   for (const ModuleDepGraphNode *n : nodes) {
     if (!n->getSwiftDeps().hasValue())
@@ -110,6 +112,7 @@ void ModuleDepGraph::computeUniqueJobsFromNodes(
       jobs.push_back(getJob(swiftDeps));
     }
   }
+  return jobs;
 }
 
 bool ModuleDepGraph::markIntransitive(const Job *node) {
@@ -128,14 +131,16 @@ std::vector<StringRef> ModuleDepGraph::getExternalDependencies() const {
 }
 
 // Add every (swiftdeps) use of the external dependency to uses.
-void ModuleDepGraph::markExternal(SmallVectorImpl<const Job *> &uses,
-                                  StringRef externalDependency) {
+std::vector<const Job*> ModuleDepGraph::markExternal(StringRef externalDependency) {
   FrontendStatsTracer tracer(stats, "fine-grained-dependencies-markExternal");
+  std::vector<const Job *> uses;
   forEachUnmarkedJobDirectlyDependentOnExternalSwiftdeps(
       externalDependency, [&](const Job *job) {
         uses.push_back(job);
-        markTransitive(uses, job);
+        for (const Job* marked: markTransitive(job))
+          uses.push_back(marked);
       });
+  return uses;
 }
 
 void ModuleDepGraph::forEachUnmarkedJobDirectlyDependentOnExternalSwiftdeps(
