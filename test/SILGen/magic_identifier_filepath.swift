@@ -1,5 +1,5 @@
 // Check that we generate the right code with the flag.
-// RUN: %target-swift-emit-silgen -enable-experimental-concise-pound-file -module-name Foo %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -enable-experimental-concise-pound-file -module-name Foo %/s | %FileCheck %s
 
 // Check that we give errors for use of #filePath if concise #file isn't enabled.
 // FIXME: Drop if we stop rejecting this.
