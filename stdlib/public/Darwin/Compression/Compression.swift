@@ -74,32 +74,6 @@ public enum FilterOperation: RawRepresentable {
     case .decompress: return COMPRESSION_STREAM_DECODE
     }
   }
-
-  /// Returns the result of processing `data` using an `algorithm`.
-  ///
-  ///     let result = try FilterOperation.compress(data, using: .lzfse)
-  ///
-  /// - Parameters:
-  ///   - data:      Either raw data to compress; or a payload to decompress.
-  ///   - algorithm: The scheme/format to use, such as LZFSE or zlib/DEFLATE.
-  ///
-  /// - Throws: `FilterError`
-  ///
-  @available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
-  public func callAsFunction<D: DataProtocol>(
-    _ data: D,
-    using algorithm: Algorithm
-  ) throws -> Data {
-    var result = Data(capacity: data.count)
-
-    let outputFilter = try OutputFilter(self, using: algorithm) {
-      result.append($0 ?? Data())
-    }
-    try outputFilter.write(data)
-    try outputFilter.finalize()
-
-    return result
-  }
 }
 
 /// Compression errors
@@ -417,4 +391,53 @@ public class InputFilter<D: DataProtocol> {
     compression_stream_destroy(&_stream)
   }
 
+}
+
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+extension DataProtocol {
+
+  // <https://github.com/apple/swift-evolution/blob/master/proposals/0253-callable.md>
+  @available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+  private func callAsFunction(
+    _ operation: FilterOperation,
+    using algorithm: Algorithm
+  ) throws -> Data {
+    var result = Data()
+    do {
+      let outputFilter = try OutputFilter(operation, using: algorithm) {
+        result.append($0 ?? Data())
+      }
+      try outputFilter.write(self)
+      try outputFilter.finalize()
+    }
+    return result
+  }
+
+  /// Returns a compressed payload, by processing the raw data of `self`.
+  ///
+  ///     let result = try data.compressed(using: .lzfse)
+  ///
+  /// - Parameters:
+  ///   - algorithm: The scheme/format to use, such as LZFSE or zlib/DEFLATE.
+  ///
+  /// - Throws: `FilterError`
+  ///
+  @available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+  public func compressed(using algorithm: Algorithm) throws -> Data {
+    return try self(.compress, using: algorithm)
+  }
+
+  /// Returns a raw data, by processing the compressed payload of `self`.
+  ///
+  ///     let result = try data.decompressed(using: .lzfse)
+  ///
+  /// - Parameters:
+  ///   - algorithm: The scheme/format to use, such as LZFSE or zlib/DEFLATE.
+  ///
+  /// - Throws: `FilterError`
+  ///
+  @available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+  public func decompressed(using algorithm: Algorithm) throws -> Data {
+    return try self(.decompress, using: algorithm)
+  }
 }

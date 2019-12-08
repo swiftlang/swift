@@ -97,12 +97,12 @@ func ifiltercompress_ofilterdecompress(
 }
 
 @available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
-func filterOperation_callAsFunction(
+func dataProtocolConvenienceAPI(
   _ contents: Data, using algo: Algorithm
 ) throws -> Bool {
 
-  let payload = try FilterOperation.compress(contents, using: algo)
-  let decompressed = try FilterOperation.decompress(payload, using: algo)
+  let payload = try contents.compressed(using: algo)
+  let decompressed = try payload.decompressed(using: algo)
 
   print("\(#function) \(algo): \(contents.count) -> \(payload.count) -> \(decompressed.count)")
 
@@ -153,10 +153,10 @@ if #available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, *) {
         }
 
         if #available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) {
-          tests.test("FilterOperation/callAsFunction/\(algo)/\(blockLength)") {
+          tests.test("dataProtocolConvenienceAPI/\(algo)/\(blockLength)") {
             expectDoesNotThrow({
               expectTrue(
-                try filterOperation_callAsFunction(contents, using: algo),
+                try dataProtocolConvenienceAPI(contents, using: algo),
                 "Failing input: \(testString)"
               )
             })
