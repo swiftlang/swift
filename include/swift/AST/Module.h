@@ -132,14 +132,14 @@ enum class ResilienceStrategy : unsigned {
 /// \sa FileUnit
 class ModuleDecl : public DeclContext, public TypeDecl {
 public:
-  typedef ArrayRef<std::pair<Identifier, SourceLoc>> AccessPathTy;
+  typedef ArrayRef<Located<Identifier>> AccessPathTy;
   typedef std::pair<ModuleDecl::AccessPathTy, ModuleDecl*> ImportedModule;
   
   static bool matchesAccessPath(AccessPathTy AccessPath, DeclName Name) {
     assert(AccessPath.size() <= 1 && "can only refer to top-level decls");
   
     return AccessPath.empty()
-      || DeclName(AccessPath.front().first).matchesRef(Name);
+      || DeclName(AccessPath.front().item).matchesRef(Name);
   }
   
   /// Arbitrarily orders ImportedModule records, for inclusion in sets and such.

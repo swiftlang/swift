@@ -40,6 +40,7 @@
 #include "swift/Basic/NullablePtr.h"
 #include "swift/Basic/OptionalEnum.h"
 #include "swift/Basic/Range.h"
+#include "swift/Basic/Located.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/Support/TrailingObjects.h"
@@ -1503,11 +1504,11 @@ enum class ImportKind : uint8_t {
 ///   import Swift
 ///   import typealias Swift.Int
 class ImportDecl final : public Decl,
-    private llvm::TrailingObjects<ImportDecl, std::pair<Identifier,SourceLoc>> {
+    private llvm::TrailingObjects<ImportDecl, Located<Identifier>> {
   friend TrailingObjects;
   friend class Decl;
 public:
-  typedef std::pair<Identifier, SourceLoc> AccessPathElement;
+  typedef Located<Identifier> AccessPathElement;
 
 private:
   SourceLoc ImportLoc;
@@ -1577,9 +1578,9 @@ public:
   }
 
   SourceLoc getStartLoc() const { return ImportLoc; }
-  SourceLoc getLocFromSource() const { return getFullAccessPath().front().second; }
+  SourceLoc getLocFromSource() const { return getFullAccessPath().front().loc; }
   SourceRange getSourceRange() const {
-    return SourceRange(ImportLoc, getFullAccessPath().back().second);
+    return SourceRange(ImportLoc, getFullAccessPath().back().loc);
   }
   SourceLoc getKindLoc() const { return KindLoc; }
 

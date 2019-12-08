@@ -2097,10 +2097,10 @@ void PrintAST::visitImportDecl(ImportDecl *decl) {
   interleave(decl->getFullAccessPath(),
              [&](const ImportDecl::AccessPathElement &Elem) {
                if (!Mods.empty()) {
-                 Printer.printModuleRef(Mods.front(), Elem.first);
+                 Printer.printModuleRef(Mods.front(), Elem.item);
                  Mods = Mods.slice(1);
                } else {
-                 Printer << Elem.first.str();
+                 Printer << Elem.item.str();
                }
              },
              [&] { Printer << "."; });

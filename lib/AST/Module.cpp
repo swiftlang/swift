@@ -303,7 +303,7 @@ void SourceLookupCache::lookupVisibleDecls(AccessPathTy AccessPath,
   assert(AccessPath.size() <= 1 && "can only refer to top-level decls");
 
   if (!AccessPath.empty()) {
-    auto I = TopLevelValues.find(AccessPath.front().first);
+    auto I = TopLevelValues.find(AccessPath.front().item);
     if (I == TopLevelValues.end()) return;
 
     for (auto vd : I->second)
@@ -335,7 +335,7 @@ void SourceLookupCache::lookupClassMembers(AccessPathTy accessPath,
 
       for (ValueDecl *vd : member.second) {
         auto *nominal = vd->getDeclContext()->getSelfNominalTypeDecl();
-        if (nominal && nominal->getName() == accessPath.front().first)
+        if (nominal && nominal->getName() == accessPath.front().item)
           consumer.foundDecl(vd, DeclVisibilityKind::DynamicLookup,
                              DynamicLookupInfo::AnyObject);
       }
@@ -367,7 +367,7 @@ void SourceLookupCache::lookupClassMember(AccessPathTy accessPath,
   if (!accessPath.empty()) {
     for (ValueDecl *vd : iter->second) {
       auto *nominal = vd->getDeclContext()->getSelfNominalTypeDecl();
-      if (nominal && nominal->getName() == accessPath.front().first)
+      if (nominal && nominal->getName() == accessPath.front().item)
         results.push_back(vd);
     }
     return;
@@ -1181,13 +1181,13 @@ void ModuleDecl::getImportedModulesForLookup(
 }
 
 bool ModuleDecl::isSameAccessPath(AccessPathTy lhs, AccessPathTy rhs) {
-  using AccessPathElem = std::pair<Identifier, SourceLoc>;
+  using AccessPathElem = Located<Identifier>;
   if (lhs.size() != rhs.size())
     return false;
   return std::equal(lhs.begin(), lhs.end(), rhs.begin(),
                     [](const AccessPathElem &lElem,
                        const AccessPathElem &rElem) {
-    return lElem.first == rElem.first;
+    return lElem.item == rElem.item;
   });
 }
 
@@ -1251,12 +1251,12 @@ ModuleDecl::removeDuplicateImports(SmallVectorImpl<ImportedModule> &imports) {
           lhs.second->getReverseFullModuleName(), {},
           rhs.second->getReverseFullModuleName(), {});
     }
-    using AccessPathElem = std::pair<Identifier, SourceLoc>;
+    using AccessPathElem = Located<Identifier>;
     return std::lexicographical_compare(lhs.first.begin(), lhs.first.end(),
                                         rhs.first.begin(), rhs.first.end(),
                                         [](const AccessPathElem &lElem,
                                            const AccessPathElem &rElem) {
-      return lElem.first.str() < rElem.first.str();
+      return lElem.item.str() < rElem.item.str();
     });
   });
   auto last = std::unique(imports.begin(), imports.end(),

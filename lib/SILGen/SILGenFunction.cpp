@@ -538,7 +538,7 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
     // be imported.
     ASTContext &ctx = getASTContext();
     
-    std::pair<Identifier, SourceLoc> UIKitName =
+    Located<Identifier> UIKitName =
       {ctx.getIdentifier("UIKit"), SourceLoc()};
     
     ModuleDecl *UIKit = ctx

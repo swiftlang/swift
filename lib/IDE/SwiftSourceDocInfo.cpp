@@ -246,7 +246,7 @@ bool NameMatcher::walkToDeclPre(Decl *D) {
     }
   } else if (ImportDecl *ID = dyn_cast<ImportDecl>(D)) {
     for(const ImportDecl::AccessPathElement &Element: ID->getFullAccessPath()) {
-      tryResolve(ASTWalker::ParentTy(D), Element.second);
+      tryResolve(ASTWalker::ParentTy(D), Element.loc);
       if (isDone())
         break;
     }

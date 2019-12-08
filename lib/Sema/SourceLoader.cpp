@@ -62,15 +62,15 @@ void SourceLoader::collectVisibleTopLevelModuleNames(
   // TODO: Implement?
 }
 
-bool SourceLoader::canImportModule(std::pair<Identifier, SourceLoc> ID) {
+bool SourceLoader::canImportModule(Located<Identifier> ID) {
   // Search the memory buffers to see if we can find this file on disk.
-  FileOrError inputFileOrError = findModule(Ctx, ID.first.str(),
-                                            ID.second);
+  FileOrError inputFileOrError = findModule(Ctx, ID.item.str(),
+                                            ID.loc);
   if (!inputFileOrError) {
     auto err = inputFileOrError.getError();
     if (err != std::errc::no_such_file_or_directory) {
-      Ctx.Diags.diagnose(ID.second, diag::sema_opening_import,
-                         ID.first, err.message());
+      Ctx.Diags.diagnose(ID.loc, diag::sema_opening_import,
+                         ID.item, err.message());
     }
 
     return false;
@@ -79,21 +79,20 @@ bool SourceLoader::canImportModule(std::pair<Identifier, SourceLoc> ID) {
 }
 
 ModuleDecl *SourceLoader::loadModule(SourceLoc importLoc,
-                                     ArrayRef<std::pair<Identifier,
-                                     SourceLoc>> path) {
+                                     ArrayRef<Located<Identifier>> path) {
   // FIXME: Swift submodules?
   if (path.size() > 1)
     return nullptr;
 
   auto moduleID = path[0];
 
-  FileOrError inputFileOrError = findModule(Ctx, moduleID.first.str(),
-                                            moduleID.second);
+  FileOrError inputFileOrError = findModule(Ctx, moduleID.item.str(),
+                                            moduleID.loc);
   if (!inputFileOrError) {
     auto err = inputFileOrError.getError();
     if (err != std::errc::no_such_file_or_directory) {
-      Ctx.Diags.diagnose(moduleID.second, diag::sema_opening_import,
-                         moduleID.first, err.message());
+      Ctx.Diags.diagnose(moduleID.loc, diag::sema_opening_import,
+                         moduleID.item, err.message());
     }
 
     return nullptr;
@@ -116,10 +115,10 @@ ModuleDecl *SourceLoader::loadModule(SourceLoc importLoc,
   else
     bufferID = Ctx.SourceMgr.addNewSourceBuffer(std::move(inputFile));
 
-  auto *importMod = ModuleDecl::create(moduleID.first, Ctx);
+  auto *importMod = ModuleDecl::create(moduleID.item, Ctx);
   if (EnableLibraryEvolution)
     importMod->setResilienceStrategy(ResilienceStrategy::Resilient);
-  Ctx.LoadedModules[moduleID.first] = importMod;
+  Ctx.LoadedModules[moduleID.item] = importMod;
 
   auto implicitImportKind = SourceFile::ImplicitModuleImportKind::Stdlib;
   if (!Ctx.getStdlibModule())

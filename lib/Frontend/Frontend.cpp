@@ -778,7 +778,7 @@ ModuleDecl *CompilerInstance::importUnderlyingModule() {
   ModuleDecl *objCModuleUnderlyingMixedFramework =
       static_cast<ClangImporter *>(Context->getClangModuleLoader())
           ->loadModule(SourceLoc(),
-                       std::make_pair(MainModule->getName(), SourceLoc()));
+                       {{MainModule->getName(), SourceLoc()}});
   if (objCModuleUnderlyingMixedFramework)
     return objCModuleUnderlyingMixedFramework;
   Diagnostics.diagnose(SourceLoc(), diag::error_underlying_module_not_found,
@@ -808,7 +808,7 @@ void CompilerInstance::getImplicitlyImportedModules(
     if (Lexer::isIdentifier(ImplicitImportModuleName)) {
       auto moduleID = Context->getIdentifier(ImplicitImportModuleName);
       ModuleDecl *importModule =
-          Context->getModule(std::make_pair(moduleID, SourceLoc()));
+        Context->getModule({{moduleID, SourceLoc()}});
       if (importModule) {
         importModules.push_back(importModule);
       } else {

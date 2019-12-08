@@ -1377,7 +1377,7 @@ public:
   void completeAccessorBeginning(CodeCompletionExpr *E) override;
 
   void completePoundAvailablePlatform() override;
-  void completeImportDecl(std::vector<std::pair<Identifier, SourceLoc>> &Path) override;
+  void completeImportDecl(std::vector<Located<Identifier>> &Path) override;
   void completeUnresolvedMember(CodeCompletionExpr *E,
                                 SourceLoc DotLoc) override;
   void completeCallArg(CodeCompletionExpr *E, bool isFirst) override;
@@ -4080,10 +4080,9 @@ public:
     Kind = LookupKind::ImportFromModule;
     NeedLeadingDot = ResultsHaveLeadingDot;
 
-    llvm::SmallVector<std::pair<Identifier, SourceLoc>, 1> LookupAccessPath;
+    llvm::SmallVector<Located<Identifier>, 1> LookupAccessPath;
     for (auto Piece : AccessPath) {
-      LookupAccessPath.push_back(
-          std::make_pair(Ctx.getIdentifier(Piece), SourceLoc()));
+      LookupAccessPath.push_back({Ctx.getIdentifier(Piece), SourceLoc()});
     }
     AccessFilteringDeclConsumer FilteringConsumer(CurrDeclContext, *this);
     TheModule->lookupVisibleDecls(LookupAccessPath, FilteringConsumer,
@@ -4725,10 +4724,10 @@ void CodeCompletionCallbacksImpl::completeCaseStmtBeginning(CodeCompletionExpr *
 }
 
 void CodeCompletionCallbacksImpl::completeImportDecl(
-    std::vector<std::pair<Identifier, SourceLoc>> &Path) {
+    std::vector<Located<Identifier>> &Path) {
   Kind = CompletionKind::Import;
   CurDeclContext = P.CurDeclContext;
-  DotLoc = Path.empty() ? SourceLoc() : Path.back().second;
+  DotLoc = Path.empty() ? SourceLoc() : Path.back().loc;
   if (DotLoc.isInvalid())
     return;
   auto Importer = static_cast<ClangImporter *>(CurDeclContext->getASTContext().
@@ -4737,7 +4736,7 @@ void CodeCompletionCallbacksImpl::completeImportDecl(
   Importer->collectSubModuleNames(Path, SubNames);
   ASTContext &Ctx = CurDeclContext->getASTContext();
   for (StringRef Sub : SubNames) {
-    Path.push_back(std::make_pair(Ctx.getIdentifier(Sub), SourceLoc()));
+    Path.push_back({ Ctx.getIdentifier(Sub), SourceLoc() });
     SubModuleNameVisibilityPairs.push_back(
       std::make_pair(Sub.str(), Ctx.getLoadedModule(Path)));
     Path.pop_back();
@@ -5574,7 +5573,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
 
       std::vector<std::string> AccessPath;
       for (auto Piece : Path) {
-        AccessPath.push_back(Piece.first.str());
+        AccessPath.push_back(Piece.item.str());
       }
 
       StringRef ModuleFilename = TheModule->getModuleFilename();

@@ -60,7 +60,7 @@ public:
   /// This is all of the forward referenced functions with
   /// the location for where the reference is.
   llvm::DenseMap<Identifier,
-                 std::pair<SILFunction*, SourceLoc>> ForwardRefFns;
+                 Located<SILFunction*>> ForwardRefFns;
   /// A list of all functions forward-declared by a sil_scope.
   llvm::DenseSet<SILFunction *> PotentialZombieFns;
 
@@ -85,8 +85,8 @@ public:
 SILParserTUState::~SILParserTUState() {
   if (!ForwardRefFns.empty()) {
     for (auto Entry : ForwardRefFns) {
-      if (Entry.second.second.isValid()) {
-        M.getASTContext().Diags.diagnose(Entry.second.second,
+      if (Entry.second.loc.isValid()) {
+        M.getASTContext().Diags.diagnose(Entry.second.loc,
                                          diag::sil_use_of_undefined_value,
                                          Entry.first.str());
       }
@@ -613,13 +613,13 @@ SILFunction *SILParser::getGlobalNameForDefinition(Identifier name,
   // complete the forward reference.
   auto iter = TUState.ForwardRefFns.find(name);
   if (iter != TUState.ForwardRefFns.end()) {
-    SILFunction *fn = iter->second.first;
+    SILFunction *fn = iter->second.item;
 
     // Verify that the types match up.
     if (fn->getLoweredFunctionType() != ty) {
       P.diagnose(sourceLoc, diag::sil_value_use_type_mismatch, name.str(),
                  fn->getLoweredFunctionType(), ty);
-      P.diagnose(iter->second.second, diag::sil_prior_reference);
+      P.diagnose(iter->second.loc, diag::sil_prior_reference);
       fn = builder.createFunctionForForwardReference("" /*name*/, ty, silLoc);
     }
 
@@ -2375,13 +2375,13 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     return true;
   }
 
-  SmallVector<std::pair<StringRef, SourceLoc>, 4> resultNames;
+  SmallVector<Located<StringRef>, 4> resultNames;
   SourceLoc resultClauseBegin;
 
   // If the instruction has a name '%foo =', parse it.
   if (P.Tok.is(tok::sil_local_name)) {
     resultClauseBegin = P.Tok.getLoc();
-    resultNames.push_back(std::make_pair(P.Tok.getText(), P.Tok.getLoc()));
+    resultNames.push_back({P.Tok.getText(), P.Tok.getLoc()});
     P.consumeToken(tok::sil_local_name);
 
   // If the instruction has a '(%foo, %bar) = ', parse it.
@@ -2395,7 +2395,7 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
           return true;
         }
 
-        resultNames.push_back(std::make_pair(P.Tok.getText(), P.Tok.getLoc()));
+        resultNames.push_back({P.Tok.getText(), P.Tok.getLoc()});
         P.consumeToken(tok::sil_local_name);
 
         if (P.consumeIf(tok::comma))
@@ -5084,7 +5084,7 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
                  results.size());
     } else {
       for (size_t i : indices(results)) {
-        setLocalValue(results[i], resultNames[i].first, resultNames[i].second);
+        setLocalValue(results[i], resultNames[i].item, resultNames[i].loc);
       }
     }
   }
