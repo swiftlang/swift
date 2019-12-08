@@ -96,6 +96,19 @@ func ifiltercompress_ofilterdecompress(
   return contents == decompressed
 }
 
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+func filterOperation_callAsFunction(
+  _ contents: Data, using algo: Algorithm
+) throws -> Bool {
+
+  let payload = try FilterOperation.compress(contents, using: algo)
+  let decompressed = try FilterOperation.decompress(payload, using: algo)
+
+  print("\(#function) \(algo): \(contents.count) -> \(payload.count) -> \(decompressed.count)")
+
+  return contents == decompressed
+}
+
 func randomString(withBlockLength n: Int) -> String {
   var strings = [String]()
   for _ in 0 ..< n {
@@ -137,6 +150,17 @@ if #available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, *) {
               "Failing input: \(testString)"
             )
           })
+        }
+
+        if #available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) {
+          tests.test("FilterOperation/callAsFunction/\(algo)/\(blockLength)") {
+            expectDoesNotThrow({
+              expectTrue(
+                try filterOperation_callAsFunction(contents, using: algo),
+                "Failing input: \(testString)"
+              )
+            })
+          }
         }
       }
 
