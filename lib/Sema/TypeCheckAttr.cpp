@@ -115,10 +115,6 @@ class AttributeChecker : public AttributeVisitor<AttributeChecker> {
   IGNORED_ATTR(ReferenceOwnership)
   IGNORED_ATTR(OriginallyDefinedIn)
 
-  // TODO(TF-828): Upstream `@differentiable` attribute type-checking from
-  // tensorflow branch.
-  IGNORED_ATTR(Differentiable)
-
   // TODO(TF-715): Allow @quoted on more decls.
   IGNORED_ATTR(Quoted)
 #undef IGNORED_ATTR

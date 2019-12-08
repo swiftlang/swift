@@ -885,7 +885,7 @@ public:
   /// \returns If successful, a typechecked expression that at runtime will
   /// approximate the given expression. If not successful, nullptr (appropriate
   /// error messages will also be emitted as a side effect).
-  Expr *quoteExpr(Expr *expr, DeclContext *dc);
+  static Expr *quoteExpr(Expr *expr, DeclContext *dc);
 
   /// Compute the type of quoteExpr given the type of expression.
   ///
@@ -898,7 +898,7 @@ public:
   ///
   /// TODO(TF-735): In the future, we may implement more complicated rules
   /// based on something like ExpressibleByQuoteLiteral.
-  Type getTypeOfQuoteExpr(Type exprType, SourceLoc loc);
+  static Type getTypeOfQuoteExpr(Type exprType, SourceLoc loc);
 
   /// Compute the type of #unquote given the type of expression.
   ///
@@ -911,7 +911,7 @@ public:
   ///
   /// TODO(TF-735): In the future, we may implement more complicated rules
   /// based on something like ExpressibleByQuoteLiteral.
-  Type getTypeOfUnquoteExpr(Type exprType, SourceLoc loc);
+  static Type getTypeOfUnquoteExpr(Type exprType, SourceLoc loc);
 
   /// Quote the given typed declaration by creating a snippet of code that at
   /// runtime will approximate the given declaration using the data structures
@@ -927,7 +927,7 @@ public:
   /// \returns If successful, a typechecked expression that at runtime will
   /// approximate the given declaration. If not successful, nullptr (appropriate
   /// error messages will also be emitted as a side effect).
-  Expr *quoteDecl(Decl *decl, DeclContext *dc);
+  static Expr *quoteDecl(Decl *decl, DeclContext *dc);
 
   /// Compute the type of quoteDecl.
   ///
@@ -935,7 +935,7 @@ public:
   ///
   /// TODO(TF-736): In the future, we may want to infer more precise type
   /// based on the shape of the quoted declaration.
-  Type getTypeOfQuoteDecl(ASTContext &ctx, SourceLoc loc);
+  static Type getTypeOfQuoteDecl(ASTContext &ctx, SourceLoc loc);
 
 private:
   static Type typeCheckExpressionImpl(Expr *&expr, DeclContext *dc,

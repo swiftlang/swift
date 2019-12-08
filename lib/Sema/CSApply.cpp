@@ -2211,16 +2211,14 @@ namespace {
     }
 
     Expr *visitQuoteLiteralExpr(QuoteLiteralExpr *expr) {
-      auto &tc = cs.getTypeChecker();
       auto subExprType = cs.getType(expr->getSubExpr());
-      cs.setType(expr, tc.getTypeOfQuoteExpr(subExprType, expr->getLoc()));
+      cs.setType(expr, TypeChecker::getTypeOfQuoteExpr(subExprType, expr->getLoc()));
       return expr;
     }
 
     Expr *visitUnquoteExpr(UnquoteExpr *expr) {
-      auto &tc = cs.getTypeChecker();
       auto subExprType = cs.getType(expr->getSubExpr());
-      cs.setType(expr, tc.getTypeOfUnquoteExpr(subExprType, expr->getLoc()));
+      cs.setType(expr, TypeChecker::getTypeOfUnquoteExpr(subExprType, expr->getLoc()));
       return expr;
     }
 
@@ -2228,9 +2226,8 @@ namespace {
       // NOTE: Unlike QuoteLiteralExprs which cannot be expanded in CSApply
       // because their nested closures / funcs aren't yet typechecked by now,
       // DeclQuoteExprs can be expanded right away.
-      auto &tc = cs.getTypeChecker();
       auto &ctx = cs.getASTContext();
-      Expr *quotedExpr = tc.quoteDecl(expr->getQuotedDecl(), cs.DC);
+      Expr *quotedExpr = TypeChecker::quoteDecl(expr->getQuotedDecl(), cs.DC);
       if (quotedExpr) {
         cs.cacheExprTypes(quotedExpr);
         auto treeProto = ctx.getTreeDecl();
@@ -7500,8 +7497,7 @@ Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr,
       // will obviate the necessity of this workaround.
       quote->getSubExpr()->setType(getType(quote->getSubExpr()));
 
-      Expr *quotedExpr =
-          getTypeChecker().quoteExpr(quote->getSubExpr(), quoteDC);
+      Expr *quotedExpr = TypeChecker::quoteExpr(quote->getSubExpr(), quoteDC);
       if (quotedExpr) {
         cacheExprTypes(quotedExpr);
         quote->setSemanticExpr(quotedExpr);

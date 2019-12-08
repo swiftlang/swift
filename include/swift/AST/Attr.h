@@ -1923,7 +1923,7 @@ public:
     return NumParsedParameters;
   }
 
-  bool isLinear() const { return linear; }
+  bool isLinear() const { return Linear; }
 
   TrailingWhereClause *getWhereClause() const { return WhereClause; }
 

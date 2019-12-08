@@ -2388,7 +2388,6 @@ public:
     printRec(E->getSubExpr());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
-
   // SWIFT_ENABLE_TENSORFLOW
   void visitDifferentiableFunctionExpr(DifferentiableFunctionExpr *E) {
     printCommon(E, "differentiable_function") << '\n';

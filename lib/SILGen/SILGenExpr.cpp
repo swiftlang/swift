@@ -2697,6 +2697,7 @@ static SILFunction *getOrCreateKeyPathGetter(SILGenModule &SGM,
     loweredPropTy = SGM.Types.getLoweredRValueType(
         TypeExpansionContext::minimal(), opaque, propertyType);
   }
+
   auto paramConvention = ParameterConvention::Indirect_In_Guaranteed;
 
   SmallVector<SILParameterInfo, 2> params;

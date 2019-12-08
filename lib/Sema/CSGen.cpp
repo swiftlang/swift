@@ -1326,20 +1326,17 @@ namespace {
     }
 
     Type visitQuoteLiteralExpr(QuoteLiteralExpr *expr) {
-      auto &tc = CS.getTypeChecker();
       auto subExprType = CS.getType(expr->getSubExpr());
-      return tc.getTypeOfQuoteExpr(subExprType, expr->getLoc());
+      return TypeChecker::getTypeOfQuoteExpr(subExprType, expr->getLoc());
     }
 
     Type visitUnquoteExpr(UnquoteExpr *expr) {
-      auto &tc = CS.getTypeChecker();
       auto subExprType = CS.getType(expr->getSubExpr());
-      return tc.getTypeOfUnquoteExpr(subExprType, expr->getLoc());
+      return TypeChecker::getTypeOfUnquoteExpr(subExprType, expr->getLoc());
     }
 
     Type visitDeclQuoteExpr(DeclQuoteExpr *expr) {
-      auto &tc = CS.getTypeChecker();
-      return tc.getTypeOfQuoteDecl(CS.getASTContext(), expr->getLoc());
+      return TypeChecker::getTypeOfQuoteDecl(CS.getASTContext(), expr->getLoc());
     }
 
     Type visitDeclRefExpr(DeclRefExpr *E) {
