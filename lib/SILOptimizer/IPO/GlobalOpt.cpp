@@ -878,6 +878,11 @@ bool SILGlobalOpt::tryRemoveGlobalAddr(SILGlobalVariable *global) {
     return false;
 
   for (auto *addr : GlobalAddrMap[global]) {
+    for (auto *use : addr->getUses()) {
+      use->getUser()->dump();
+      if (!isa<StoreInst>(use->getUser()))
+        return false;
+    }
     collectUsesOfInstructionForDeletion(addr);
     InstToRemove.push_back(addr);
   }
