@@ -1579,7 +1579,8 @@ namespace driver {
                                 StringRef externalDependency,
                                 const bool forRanges) {
       if (Comp.getEnableFineGrainedDependencies())
-        getFineGrainedDepGraph(forRanges).markExternal(uses, externalDependency);
+        getFineGrainedDepGraph(forRanges).markExternal(uses,
+                                                       externalDependency);
       else
         getDepGraph(forRanges).markExternal(uses, externalDependency);
     }
@@ -1594,7 +1595,8 @@ namespace driver {
     loadDepGraphFromPath(const Job *Cmd, StringRef path,
                          DiagnosticEngine &diags, const bool forRanges) {
       return Comp.getEnableFineGrainedDependencies()
-                 ? getFineGrainedDepGraph(forRanges).loadFromPath(Cmd, path, diags)
+                 ? getFineGrainedDepGraph(forRanges).loadFromPath(Cmd, path,
+                                                                  diags)
                  : getDepGraph(forRanges).loadFromPath(Cmd, path, diags);
     }
 
