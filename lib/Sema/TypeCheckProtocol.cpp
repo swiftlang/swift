@@ -544,6 +544,17 @@ swift::matchWitness(
     auto *witnessAFD = dyn_cast<AbstractFunctionDecl>(witness);
     if (auto *witnessASD = dyn_cast<AbstractStorageDecl>(witness))
       witnessAFD = witnessASD->getAccessor(AccessorKind::Get);
+    // NOTE: Validate `@differentiable` attributes by calling
+    // `getParameterIndices`. This is important for type-checking
+    // `@differentiable` attributes in non-primary files to skip invalid
+    // attributes and to resolve derivative configurations, used below.
+    for (auto *witnessDiffAttr :
+         witnessAttrs.getAttributes<DifferentiableAttr>()) {
+      (void)witnessDiffAttr->getParameterIndices();
+    }
+    for (auto *reqDiffAttr : reqAttrs.getAttributes<DifferentiableAttr>()) {
+      (void)reqDiffAttr->getParameterIndices();
+    }
     for (auto *reqDiffAttr : reqAttrs.getAttributes<DifferentiableAttr>()) {
       bool foundExactAttr = false;
       bool foundSupersetAttr = false;
@@ -583,6 +594,14 @@ swift::matchWitness(
           }
         }
         if (!success) {
+          LLVM_DEBUG({
+            llvm::dbgs() << "Protocol requirement match failure: missing "
+                            "`@differentiable` attribute for witness ";
+            witnessAFD->dumpRef(llvm::dbgs());
+            llvm::dbgs() << " from requirement ";
+            req->dumpRef(llvm::dbgs());
+            llvm::dbgs() << '\n';
+          });
           if (auto *vdWitness = dyn_cast<VarDecl>(witness))
             return RequirementMatch(
                 getStandinForAccessor(vdWitness, AccessorKind::Get),
