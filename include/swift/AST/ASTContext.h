@@ -22,6 +22,7 @@
 #include "swift/AST/Identifier.h"
 #include "swift/AST/SearchPathOptions.h"
 #include "swift/AST/Type.h"
+#include "swift/AST/Types.h"
 #include "swift/AST/TypeAlignments.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/Malloc.h"
@@ -201,8 +202,9 @@ class ASTContext final {
   ASTContext(const ASTContext&) = delete;
   void operator=(const ASTContext&) = delete;
 
-  ASTContext(LangOptions &langOpts, SearchPathOptions &SearchPathOpts,
-             SourceManager &SourceMgr, DiagnosticEngine &Diags);
+  ASTContext(LangOptions &langOpts, TypeCheckerOptions &typeckOpts,
+             SearchPathOptions &SearchPathOpts, SourceManager &SourceMgr,
+             DiagnosticEngine &Diags);
 
 public:
   // Members that should only be used by ASTContext.cpp.
@@ -213,10 +215,9 @@ public:
 
   void operator delete(void *Data) throw();
 
-  static ASTContext *get(LangOptions &langOpts,
+  static ASTContext *get(LangOptions &langOpts, TypeCheckerOptions &typeckOpts,
                          SearchPathOptions &SearchPathOpts,
-                         SourceManager &SourceMgr,
-                         DiagnosticEngine &Diags);
+                         SourceManager &SourceMgr, DiagnosticEngine &Diags);
   ~ASTContext();
 
   /// Optional table of counters to report, nullptr when not collecting.
@@ -227,6 +228,9 @@ public:
 
   /// The language options used for translation.
   LangOptions &LangOpts;
+
+  /// The type checker options.
+  TypeCheckerOptions &TypeCheckerOpts;
 
   /// The search path options used by this AST context.
   SearchPathOptions &SearchPathOpts;
@@ -273,6 +277,10 @@ public:
 
   /// The # of times we have performed typo correction.
   unsigned NumTypoCorrections = 0;
+
+  /// The next auto-closure discriminator.  This needs to be preserved
+  /// across invocations of both the parser and the type-checker.
+  unsigned NextAutoClosureDiscriminator = 0;
 
 private:
   /// The current generation number, which reflects the number of
@@ -412,6 +420,10 @@ private:
 
   void installGlobalTypeChecker(TypeChecker *TC);
 public:
+  /// Returns if semantic AST queries are enabled. This generally means module
+  /// loading and name lookup can take place.
+  bool areSemanticQueriesEnabled() const;
+
   /// Retrieve the global \c TypeChecker instance associated with this context.
   TypeChecker *getLegacyGlobalTypeChecker() const;
 
@@ -546,16 +558,25 @@ public:
   Type getBridgedToObjC(const DeclContext *dc, Type type,
                         Type *bridgedValueType = nullptr) const;
 
+  /// Get the Clang type corresponding to a Swift function type.
+  ///
+  /// \param params The function parameters.
+  /// \param resultTy The Swift result type.
+  /// \param incompleteExtInfo Used to convey escaping and throwing
+  ///                          information, in case it is needed.
+  /// \param trueRep The actual calling convention, which must be C-compatible.
+  ///                The calling convention in \p incompleteExtInfo is ignored.
+  const clang::Type *
+  getClangFunctionType(ArrayRef<AnyFunctionType::Param> params, Type resultTy,
+                       const FunctionType::ExtInfo incompleteExtInfo,
+                       FunctionTypeRepresentation trueRep);
+
   /// Determine whether the given Swift type is representable in a
   /// given foreign language.
   ForeignRepresentationInfo
   getForeignRepresentationInfo(NominalTypeDecl *nominal,
                                ForeignLanguage language,
                                const DeclContext *dc);
-
-  /// Add a declaration that was synthesized to a per-source file list if
-  /// if is part of a source file.
-  void addSynthesizedDecl(Decl *decl);
 
   /// Add a cleanup function to be called when the ASTContext is deallocated.
   void addCleanup(std::function<void(void)> cleanup);
@@ -573,6 +594,11 @@ public:
   /// Get the runtime availability of features introduced in the Swift 5.1
   /// compiler for the target platform.
   AvailabilityContext getSwift51Availability();
+
+  /// Get the runtime availability of
+  /// swift_getTypeByMangledNameInContextInMetadataState.
+  AvailabilityContext getTypesInAbstractMetadataStateAvailability();
+
 
   //===--------------------------------------------------------------------===//
   // Diagnostics Helper functions
@@ -863,9 +889,9 @@ public:
   CanGenericSignature getSingleGenericParameterSignature() const;
 
   /// Retrieve a generic signature with a single type parameter conforming
-  /// to the given existential type.
-  CanGenericSignature getExistentialSignature(CanType existential,
-                                              ModuleDecl *mod);
+  /// to the given opened archetype.
+  CanGenericSignature getOpenedArchetypeSignature(CanType existential,
+                                                  ModuleDecl *mod);
 
   GenericSignature getOverrideGenericSignature(const ValueDecl *base,
                                                const ValueDecl *derived);

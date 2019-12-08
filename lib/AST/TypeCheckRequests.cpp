@@ -13,14 +13,17 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsCommon.h"
 #include "swift/AST/DiagnosticsSema.h"
+#include "swift/AST/Initializer.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeLoc.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/AST/Types.h"
+#include "swift/Subsystems.h"
 
 using namespace swift;
 
@@ -1112,4 +1115,173 @@ Optional<Witness> ValueWitnessRequest::getCachedResult() const {
 
 void ValueWitnessRequest::cacheResult(Witness type) const {
   // FIXME: Refactor this to be the thing that warms the cache.
+}
+
+//----------------------------------------------------------------------------//
+// PreCheckFunctionBuilderRequest computation.
+//----------------------------------------------------------------------------//
+
+void swift::simple_display(llvm::raw_ostream &out,
+                           FunctionBuilderClosurePreCheck value) {
+  switch (value) {
+  case FunctionBuilderClosurePreCheck::Okay:
+    out << "okay";
+    break;
+  case FunctionBuilderClosurePreCheck::HasReturnStmt:
+    out << "has return statement";
+    break;
+  case FunctionBuilderClosurePreCheck::Error:
+    out << "error";
+    break;
+  }
+}
+
+//----------------------------------------------------------------------------//
+// HasCircularInheritanceRequest computation.
+//----------------------------------------------------------------------------//
+
+void HasCircularInheritanceRequest::diagnoseCycle(
+    DiagnosticEngine &diags) const {
+  auto *decl = std::get<0>(getStorage());
+  diags.diagnose(decl, diag::circular_class_inheritance, decl->getName());
+}
+
+void HasCircularInheritanceRequest::noteCycleStep(
+    DiagnosticEngine &diags) const {
+  auto *decl = std::get<0>(getStorage());
+  diags.diagnose(decl, diag::kind_declname_declared_here,
+                 decl->getDescriptiveKind(), decl->getName());
+}
+
+//----------------------------------------------------------------------------//
+// HasCircularInheritedProtocolsRequest computation.
+//----------------------------------------------------------------------------//
+
+void HasCircularInheritedProtocolsRequest::diagnoseCycle(
+    DiagnosticEngine &diags) const {
+  auto *decl = std::get<0>(getStorage());
+  diags.diagnose(decl, diag::circular_protocol_def, decl->getName());
+}
+
+void HasCircularInheritedProtocolsRequest::noteCycleStep(
+    DiagnosticEngine &diags) const {
+  auto *decl = std::get<0>(getStorage());
+  diags.diagnose(decl, diag::kind_declname_declared_here,
+                 decl->getDescriptiveKind(), decl->getName());
+}
+
+//----------------------------------------------------------------------------//
+// HasCircularRawValueRequest computation.
+//----------------------------------------------------------------------------//
+
+void HasCircularRawValueRequest::diagnoseCycle(DiagnosticEngine &diags) const {
+  auto *decl = std::get<0>(getStorage());
+  diags.diagnose(decl, diag::circular_enum_inheritance, decl->getName());
+}
+
+void HasCircularRawValueRequest::noteCycleStep(DiagnosticEngine &diags) const {
+  auto *decl = std::get<0>(getStorage());
+  diags.diagnose(decl, diag::kind_declname_declared_here,
+                 decl->getDescriptiveKind(), decl->getName());
+}
+
+//----------------------------------------------------------------------------//
+// DefaultArgumentInitContextRequest computation.
+//----------------------------------------------------------------------------//
+
+Optional<Initializer *>
+DefaultArgumentInitContextRequest::getCachedResult() const {
+  auto *param = std::get<0>(getStorage());
+  return param->getCachedDefaultArgumentInitContext();
+}
+
+void DefaultArgumentInitContextRequest::cacheResult(Initializer *init) const {
+  auto *param = std::get<0>(getStorage());
+  param->setDefaultArgumentInitContext(init);
+}
+
+//----------------------------------------------------------------------------//
+// DefaultArgumentExprRequest computation.
+//----------------------------------------------------------------------------//
+
+Optional<Expr *> DefaultArgumentExprRequest::getCachedResult() const {
+  auto *param = std::get<0>(getStorage());
+  auto *defaultInfo = param->DefaultValueAndFlags.getPointer();
+  if (!defaultInfo)
+    return None;
+
+  if (!defaultInfo->InitContextAndIsTypeChecked.getInt())
+    return None;
+
+  return defaultInfo->DefaultArg.get<Expr *>();
+}
+
+void DefaultArgumentExprRequest::cacheResult(Expr *expr) const {
+  auto *param = std::get<0>(getStorage());
+  param->setDefaultExpr(expr, /*isTypeChecked*/ true);
+}
+
+//----------------------------------------------------------------------------//
+// CallerSideDefaultArgExprRequest computation.
+//----------------------------------------------------------------------------//
+
+Optional<Expr *> CallerSideDefaultArgExprRequest::getCachedResult() const {
+  auto *defaultExpr = std::get<0>(getStorage());
+  auto storage = defaultExpr->ContextOrCallerSideExpr;
+  assert(!storage.isNull());
+
+  if (auto *expr = storage.dyn_cast<Expr *>())
+    return expr;
+
+  return None;
+}
+
+void CallerSideDefaultArgExprRequest::cacheResult(Expr *expr) const {
+  auto *defaultExpr = std::get<0>(getStorage());
+  defaultExpr->ContextOrCallerSideExpr = expr;
+}
+
+//----------------------------------------------------------------------------//
+// TypeCheckSourceFileRequest computation.
+//----------------------------------------------------------------------------//
+
+Optional<bool> TypeCheckSourceFileRequest::getCachedResult() const {
+  auto *SF = std::get<0>(getStorage());
+  if (SF->ASTStage == SourceFile::TypeChecked)
+    return true;
+
+  return None;
+}
+
+void TypeCheckSourceFileRequest::cacheResult(bool result) const {
+  auto *SF = std::get<0>(getStorage());
+
+  // Verify that we've checked types correctly.
+  SF->ASTStage = SourceFile::TypeChecked;
+
+  {
+    auto &Ctx = SF->getASTContext();
+    FrontendStatsTracer tracer(Ctx.Stats, "AST verification");
+    // Verify the SourceFile.
+    swift::verify(*SF);
+
+    // Verify imported modules.
+    //
+    // Skip per-file verification in whole-module mode. Verifying imports
+    // between files could cause the importer to cache declarations without
+    // adding them to the ASTContext. This happens when the importer registers a
+    // declaration without a valid TypeChecker instance, as is the case during
+    // verification. A subsequent file may require that declaration to be fully
+    // imported (e.g. to synthesized a function body), but since it has already
+    // been cached, it will never be added to the ASTContext. The solution is to
+    // skip verification and avoid caching it.
+#ifndef NDEBUG
+    if (!Ctx.TypeCheckerOpts.DelayWholeModuleChecking &&
+        SF->Kind != SourceFileKind::REPL &&
+        SF->Kind != SourceFileKind::SIL &&
+        !Ctx.LangOpts.DebuggerSupport) {
+      Ctx.verifyAllLoadedModules();
+    }
+#endif
+  }
 }

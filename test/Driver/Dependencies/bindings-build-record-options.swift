@@ -2,12 +2,14 @@
 // RUN: cp -r %S/Inputs/bindings-build-record/* %t
 // RUN: touch -t 201401240005 %t/*
 
-// RUN: cd %t && %swiftc_driver -c -module-name main -driver-print-bindings ./main.swift ./other.swift ./yet-another.swift -incremental -output-file-map %t/output.json 2>&1 | %FileCheck %s -check-prefix=MUST-EXEC-INITIAL
+// RUN: cd %t && %swiftc_driver -c -module-name main -driver-print-bindings -driver-show-incremental ./main.swift ./other.swift ./yet-another.swift -incremental -output-file-map %t/output.json 2>&1 |  %FileCheck %s -check-prefix=MUST-EXEC-INITIAL
 
 // MUST-EXEC-INITIAL-NOT: warning
-// MUST-EXEC-INITIAL: inputs: ["./main.swift"], output: {{[{].*[}]}}, condition: run-without-cascading
-// MUST-EXEC-INITIAL: inputs: ["./other.swift"], output: {{[{].*[}]}}, condition: run-without-cascading
-// MUST-EXEC-INITIAL: inputs: ["./yet-another.swift"], output: {{[{].*[}]}}, condition: run-without-cascading
+// MUST-EXEC-INITIAL: inputs: ["./main.swift"], output: {object: "./main.o", swift-dependencies: "./main.swiftdeps"}
+// MUST-EXEC-INITIAL: inputs: ["./other.swift"], output: {object: "./other.o", swift-dependencies: "./other.swiftdeps"}
+// MUST-EXEC-INITIAL: inputs: ["./yet-another.swift"], output: {object: "./yet-another.o", swift-dependencies: "./yet-another.swiftdeps"}
+
+
 
 // MUST-EXEC-ALL-NOT: warning
 // MUST-EXEC-ALL: inputs: ["./main.swift"], output: {{[{].*[}]$}}

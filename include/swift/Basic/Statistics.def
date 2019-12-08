@@ -153,9 +153,6 @@ FRONTEND_STATISTIC(AST, NumLookupInModule)
 /// Number of local lookups into a module.
 FRONTEND_STATISTIC(AST, NumModuleLookupValue)
 
-/// Number of unqualified lookups.
-FRONTEND_STATISTIC(AST, NumUnqualifiedLookup)
-
 /// Number of local lookups into a module's class members, for
 /// AnyObject lookup.
 FRONTEND_STATISTIC(AST, NumModuleLookupClassMember)

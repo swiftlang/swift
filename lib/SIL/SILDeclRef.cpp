@@ -1065,7 +1065,8 @@ bool SILDeclRef::canBeDynamicReplacement() const {
 bool SILDeclRef::isDynamicallyReplaceable() const {
   if (kind == SILDeclRef::Kind::DefaultArgGenerator)
     return false;
-  if (isStoredPropertyInitializer())
+  if (isStoredPropertyInitializer() ||
+      kind == SILDeclRef::Kind::PropertyWrapperBackingInitializer)
     return false;
 
   // Class allocators are not dynamic replaceable.

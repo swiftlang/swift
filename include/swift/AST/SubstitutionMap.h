@@ -20,6 +20,7 @@
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/ProtocolConformanceRef.h"
 #include "swift/AST/Type.h"
+#include "swift/AST/TypeExpansionContext.h"
 #include "swift/Basic/Debug.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMapInfo.h"
@@ -176,7 +177,13 @@ public:
   SubstitutionMap subst(TypeSubstitutionFn subs,
                         LookupConformanceFn conformances,
                         SubstOptions options=None) const;
-  
+
+  /// Apply type expansion lowering to all types in the substitution map. Opaque
+  /// archetypes will be lowered to their underlying types if the type expansion
+  /// context allows.
+  SubstitutionMap mapIntoTypeExpansionContext(
+      TypeExpansionContext context) const;
+
   /// Create a substitution map for a protocol conformance.
   static SubstitutionMap
   getProtocolSubstitutions(ProtocolDecl *protocol,

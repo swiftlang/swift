@@ -17,6 +17,7 @@
 #include "TypeChecker.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTVisitor.h"
+#include "swift/AST/ASTWalker.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/NameLookup.h"
@@ -30,24 +31,52 @@
 using namespace swift;
 
 namespace {
+
+/// Find available closure discriminators.
+///
+/// The parser typically takes care of assigning unique discriminators to
+/// closures, but the parser is unavailable to this transform.
+class DiscriminatorFinder : public ASTWalker {
+  unsigned NextDiscriminator = 0;
+
+public:
+  Expr *walkToExprPost(Expr *E) override {
+    auto *ACE = dyn_cast<AbstractClosureExpr>(E);
+    if (!ACE)
+      return E;
+
+    unsigned Discriminator = ACE->getDiscriminator();
+    assert(Discriminator != AbstractClosureExpr::InvalidDiscriminator &&
+           "Existing closures should have valid discriminators");
+    if (Discriminator >= NextDiscriminator)
+      NextDiscriminator = Discriminator + 1;
+    return E;
+  }
+
+  // Get the next available closure discriminator.
+  unsigned getNextDiscriminator() {
+    if (NextDiscriminator == AbstractClosureExpr::InvalidDiscriminator)
+      llvm::report_fatal_error("Out of valid closure discriminators");
+    return NextDiscriminator++;
+  }
+};
+
 struct REPLContext {
-  TypeChecker &TC;
   ASTContext &Context;
   SourceFile &SF;
   SmallVector<ValueDecl *, 4> PrintDecls;
   SmallVector<ValueDecl *, 4> DebugPrintlnDecls;
 
-  REPLContext(TypeChecker &TC, SourceFile &SF)
-      : TC(TC), Context(TC.Context), SF(SF) {}
+  REPLContext(SourceFile &SF) : Context(SF.getASTContext()), SF(SF) {}
 
   bool requirePrintDecls() {
     if (!PrintDecls.empty() && !DebugPrintlnDecls.empty())
       return false;
 
+    auto *stdlib = TypeChecker::getStdlibModule(&SF);
     {
       Identifier Id(Context.getIdentifier("_replPrintLiteralString"));
-      auto lookup = TypeChecker::lookupUnqualified(TC.getStdlibModule(&SF), Id,
-                                                   SourceLoc());
+      auto lookup = TypeChecker::lookupUnqualified(stdlib, Id, SourceLoc());
       if (!lookup)
         return true;
       for (auto result : lookup)
@@ -55,8 +84,7 @@ struct REPLContext {
     }
     {
       Identifier Id(Context.getIdentifier("_replDebugPrintln"));
-      auto lookup = TypeChecker::lookupUnqualified(TC.getStdlibModule(&SF), Id,
-                                                   SourceLoc());
+      auto lookup = TypeChecker::lookupUnqualified(stdlib, Id, SourceLoc());
       if (!lookup)
         return true;
       for (auto result : lookup)
@@ -185,14 +213,14 @@ struct PatternBindingPrintLHS : public ASTVisitor<PatternBindingPrintLHS> {
 
 namespace {
   class REPLChecker : public REPLContext {
-    TopLevelContext &TLC;
+    DiscriminatorFinder &DF;
 
     /// The index of the next response metavariable to bind to a REPL result.
     unsigned NextResponseVariableIndex = 0;
 
   public:
-    REPLChecker(TypeChecker &TC, SourceFile &SF, TopLevelContext &TLC)
-      : REPLContext(TC, SF), TLC(TLC) {}
+    REPLChecker(SourceFile &SF, DiscriminatorFinder &DF)
+        : REPLContext(SF), DF(DF) {}
 
     void processREPLTopLevelExpr(Expr *E);
     void processREPLTopLevelPatternBinding(PatternBindingDecl *PBD);
@@ -225,7 +253,7 @@ void REPLChecker::generatePrintOfExpression(StringRef NameStr, Expr *E) {
   Arg->setSpecifier(ParamSpecifier::Default);
   auto params = ParameterList::createWithoutLoc(Arg);
 
-  unsigned discriminator = TLC.claimNextClosureDiscriminator();
+  unsigned discriminator = DF.getNextDiscriminator();
 
   ClosureExpr *CE =
       new (Context) ClosureExpr(params, SourceLoc(), SourceLoc(), SourceLoc(),
@@ -257,8 +285,9 @@ void REPLChecker::generatePrintOfExpression(StringRef NameStr, Expr *E) {
   // Typecheck the function.
   BraceStmt *Body = builder.createBodyStmt(Loc, EndLoc);
   CE->setBody(Body, false);
-  TC.typeCheckClosureBody(CE);
-  TC.ClosuresWithUncomputedCaptures.push_back(CE);
+
+  TypeChecker::typeCheckClosureBody(CE);
+  TypeChecker::computeCaptures(CE);
 
   auto *TheCall = CallExpr::createImplicit(Context, CE, { E }, { });
   TheCall->getArg()->setType(AnyFunctionType::composeInput(Context, args, false));
@@ -431,13 +460,18 @@ Identifier REPLChecker::getNextResponseVariableName(DeclContext *DC) {
 /// processREPLTopLevel - This is called after we've parsed and typechecked some
 /// new decls at the top level.  We inject code to print out expressions and
 /// pattern bindings the are evaluated.
-void TypeChecker::processREPLTopLevel(SourceFile &SF, TopLevelContext &TLC,
-                                      unsigned FirstDecl) {
+void TypeChecker::processREPLTopLevel(SourceFile &SF, unsigned FirstDecl) {
+  // Walk over all decls in the file to find the next available closure
+  // discriminator.
+  DiscriminatorFinder DF;
+  for (Decl *D : SF.Decls)
+    D->walk(DF);
+
   // Move new declarations out.
   std::vector<Decl *> NewDecls(SF.Decls.begin()+FirstDecl, SF.Decls.end());
   SF.Decls.resize(FirstDecl);
 
-  REPLChecker RC(*this, SF, TLC);
+  REPLChecker RC(SF, DF);
 
   // Loop over each of the new decls, processing them, adding them back to
   // the Decls list.
@@ -457,7 +491,7 @@ void TypeChecker::processREPLTopLevel(SourceFile &SF, TopLevelContext &TLC,
       if (auto *PBD = dyn_cast<PatternBindingDecl>(D))
         RC.processREPLTopLevelPatternBinding(PBD);
 
-    contextualizeTopLevelCode(TLC, TLCD);
+    TypeChecker::contextualizeTopLevelCode(TLCD);
   }
 
   SF.clearLookupCache();

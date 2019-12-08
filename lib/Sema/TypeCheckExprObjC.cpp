@@ -30,7 +30,8 @@ Optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
   if (expr->getObjCStringLiteralExpr() && !requireResultType) return None;
 
   // ObjC #keyPath only makes sense when we have the Objective-C runtime.
-  auto &diags = dc->getASTContext().Diags;
+  auto &Context = dc->getASTContext();
+  auto &diags = Context.Diags;
   if (!Context.LangOpts.EnableObjCInterop) {
     diags.diagnose(expr->getLoc(), diag::expr_keypath_no_objc_runtime);
 

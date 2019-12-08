@@ -174,3 +174,19 @@ let fooThing5 = Foo(a: 0, d: 1, h: nil) // expected-error {{missing arguments fo
 // Here b = false and g = nil, but we're checking that f doesn't get a default value
 let fooThing6 = Foo(a: 0, d: 1, e: 2, h: nil) // expected-error {{missing argument for parameter 'f' in call}}
                                               // expected-note@-29 {{'init(a:b:d:e:f:g:h:)' declared here}}
+
+// SR-11085
+func sr_11085(x: Int) {}
+func sr_11085(line: String = #line) {} // expected-error {{default argument value of type 'Int' cannot be converted to type 'String'}}
+sr_11085()
+
+class SR_11085_C { init(line: String = #line) {} } // expected-error {{default argument value of type 'Int' cannot be converted to type 'String'}}
+let _ = SR_11085_C()
+
+// SR-11623
+func badGenericMagicLiteral<T : ExpressibleByIntegerLiteral>(_ x: T = #function) -> T { x } // expected-error {{default argument value of type 'String' cannot be converted to type 'T'}}
+let _: Int = badGenericMagicLiteral()
+
+func genericMagicLiteral<T : ExpressibleByIntegerLiteral>(_ x: T = #line) -> T { x } // expected-note {{where 'T' = 'String'}}
+let _: Int = genericMagicLiteral()
+let _: String = genericMagicLiteral() // expected-error {{global function 'genericMagicLiteral' requires that 'String' conform to 'ExpressibleByIntegerLiteral'}}

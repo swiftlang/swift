@@ -85,7 +85,7 @@ ninja -C S:\b\toolchain check-swift
 ## Build swift-corelibs-libdispatch
 
 ```cmd
-cmake -B S:\b\libdispatch -G Ninja -S S:\toolchain\swift-corelibs-libdispatch -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_C_COMPILER=clang-cl -DCMAKE_CXX_COMPILER=clang-cl -DCMAKE_Swift_COMPILER=S:/b/toolchain/bin/swiftc.exe -DENABLE_SWIFT=YES
+cmake -B S:\b\libdispatch -G Ninja -S S:\toolchain\swift-corelibs-libdispatch -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_C_COMPILER=S:/b/toolchain/bin/clang-cl.exe -DCMAKE_CXX_COMPILER=S:/b/toolchain/bin/clang-cl.exe -DCMAKE_Swift_COMPILER=S:/b/toolchain/bin/swiftc.exe -DENABLE_SWIFT=YES
 ninja -C S:\b\libdispatch
 ```
 
@@ -98,45 +98,20 @@ ninja -C S:\b\libdispatch check
 ## Build swift-corelibs-foundation
 
 ```cmd
-md "S:\b\foundation"
-cd "S:\b\foundation
-cmake -G Ninja^
-  -DCMAKE_BUILD_TYPE=RelWithDebInfo^
-  -DCMAKE_C_COMPILER=clang-cl^
-  -DCMAKE_SWIFT_COMPILER=S:\b\toolchain\bin\swiftc.exe^
-  -DCURL_LIBRARY="S:/Library/libcurl-development/usr/lib/libcurl.lib"^
-  -DCURL_INCLUDE_DIR="S:/Library/libcurl-development/usr/include"^
-  -DENABLE_TESTING=NO^
-  -DICU_ROOT="S:/Library/icu-64"^
-  -DLIBXML2_LIBRARY="S:/Library/libxml2-development/usr/lib/libxml2.lib"^
-  -DLIBXML2_INCLUDE_DIR="S:/Library/libxml2-development/usr/include"^
-  -DFOUNDATION_PATH_TO_LIBDISPATCH_SOURCE=S:\swift-corelibs-libdispatch^
-  -DFOUNDATION_PATH_TO_LIBDISPATCH_BUILD=S:\b\libdispatch^
-   S:\swift-corelibs-foundation
-ninja
+cmake -B S:\b\foundation -G Ninja -S S:\toolchain\swift-corelibs-foundation -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_C_COMPILER=S:/b/toolchain/clang-cl.exe -DCMAKE_Swift_COMPILER=S:/b/toolchain/bin/swiftc.exe -DCURL_LIBRARY="S:/Library/libcurl-development/usr/lib/libcurl.lib" -DCURL_INCLUDE_DIR="S:/Library/libcurl-development/usr/include" -DICU_ROOT="S:/Library/icu-64" -DICU_INCLUDE_DIR=S:/Library/icu-64/usr/include -DLIBXML2_LIBRARY="S:/Library/libxml2-development/usr/lib/libxml2s.lib" -DLIBXML2_INCLUDE_DIR="S:/Library/libxml2-development/usr/include/libxml2" -DENABLE_TESTING=NO -Ddispatch_DIR=S:/b/libdispatch/cmake/modules
+ninja -C S:\b\foundation
 ```
 
 - Add Foundation to your path:
 ```cmd
-path S:\b\foundation;%PATH%
+path S:\b\foundation\Foundation;%PATH%
 ```
 
 ## Build swift-corelibs-xctest
 
 ```cmd
-md "S:\b\xctest"
-cd "S:\b\xctest"
-cmake -G Ninja^
-  -DBUILD_SHARED_LIBS=YES^
-  -DCMAKE_BUILD_TYPE=RelWithDebInfo^
-  -DCMAKE_SWIFT_COMPILER=S:\b\toolchain\bin\swiftc.exe^
-  -DXCTEST_PATH_TO_FOUNDATION_BUILD=S:\b\foundation^
-  -DXCTEST_PATH_TO_LIBDISPATCH_SOURCE=S:\swift-corelibs-libdispatch^
-  -DXCTEST_PATH_TO_LIBDISPATCH_BUILD=S:\b\libdispatch^
-  -DLIT_COMMAND=S:\llvm\utils\lit\lit.py^
-  -DPYTHON_EXECUTABLE=C:\Python27\python.exe^
-  S:\swift-corelibs-xctest
-ninja
+cmake -B S:\b\xctest -G Ninja -S S:\toolchain\swift-corelibs-xctest -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_Swift_COMPILER=S:/b/toolchain/bin/swiftc.exe -Ddispatch_DIR=S:\b\dispatch\cmake\modules -DFoundation_DIR=S:\b\foundation\cmake\modules -DLIT_COMMAND=S:\toolchain\llvm\utils\lit\lit.py -DPYTHON_EXECUTABLE=C:\Python27\python.exe
+ninja -C S:\b\xctest
 ```
 
 - Add XCTest to your path:
@@ -153,22 +128,8 @@ ninja -C S:\b\xctest check-xctest
 ## Rebuild Foundation
 
 ```cmd
-cd "S:\b\foundation
-cmake -G Ninja^
-  -DCMAKE_BUILD_TYPE=RelWithDebInfo^
-  -DCMAKE_C_COMPILER=clang-cl^
-  -DCMAKE_SWIFT_COMPILER=S:\b\toolchain\bin\swiftc.exe^
-  -DCURL_LIBRARY="S:/Library/libcurl-development/usr/lib/libcurl.lib"^
-  -DCURL_INCLUDE_DIR="S:/Library/libcurl-development/usr/include"^
-  -DENABLE_TESTING=YES^
-  -DICU_ROOT="S:/Library/icu-64"^
-  -DLIBXML2_LIBRARY="S:/Library/libxml2-development/usr/lib/libxml2.lib"^
-  -DLIBXML2_INCLUDE_DIR="S:/Library/libxml2-development/usr/include"^
-  -DFOUNDATION_PATH_TO_LIBDISPATCH_SOURCE=S:\swift-corelibs-libdispatch^
-  -DFOUNDATION_PATH_TO_LIBDISPATCH_BUILD=S:\b\libdispatch^
-  -DFOUNDATION_PATH_TO_XCTEST_BUILD=S:\b\xctest^
-   S:\swift-corelibs-foundation
-ninja
+cmake -B S:\b\foundation -G Ninja -S S:\toolchain\swift-corelibs-foundation -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_C_COMPILER=S:/b/toolchain/bin/clang-cl.exe -DCMAKE_Swift_COMPILER=S:/b/toolchain/bin/swiftc.exe -DCURL_LIBRARY="S:/Library/libcurl-development/usr/lib/libcurl.lib" -DCURL_INCLUDE_DIR="S:/Library/libcurl-development/usr/include" -DICU_ROOT="S:/Library/icu-64" -DLIBXML2_LIBRARY="S:/Library/libxml2-development/usr/lib/libxml2.lib" -DLIBXML2_INCLUDE_DIR="S:/Library/libxml2-development/usr/include" -DENABLE_TESTING=YES -Ddisptch_DIR=S:/b/libdispatch/cmake/modules -DXCTest_DIR=S:/b/xctest/cmake/modules
+ninja -C S:\b\foundation
 ```
 
 ## Test Foundation
@@ -181,26 +142,22 @@ ninja -C S:\b\foundation test
 ## Build llbuild
 
 ```cmd
-md S:\b\llbuild
-cd S:\b\llbuild
 set AR=llvm-ar
-cmake -G Ninja^
-  -DCMAKE_BUILD_TYPE=RelWithDebInfo^
-  -DCMAKE_C_COMPILER=cl^
-  -DCMAKE_CXX_COMPILER=cl^
-  -DFOUNDATION_BUILD_DIR=S:\b\foundation^
-  -DLIBDISPATCH_BUILD_DIR=S:\b\libdispatch^
-  -DLIBDISPATCH_SOURCE_DIR=S:\swift-corelibs-libdispatch^
-  -DSQLite3_INCLUDE_DIR=S:\Library\sqlite-3.28.0\usr\include^
-  -DSQLite3_LIBRARY=S:\Library\sqlite-3.28.0\usr\lib\sqlite3.lib^
-  -DLLBUILD_SUPPORT_BINDINGS=Swift^
-  S:\llbuild
-ninja
+cmake -B S:\b\llbuild -G Ninja -S S:\toolchain\llbuild -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_CXX_COMPILER=cl -DCMAKE_Swift_COMPILER=S:/b/toolchain/bin/swiftc.exe -DFoundation_DIR=S:/b/foundation/cmake/modules -Ddispatch_DIR=S:/b/libdispatch/cmake/modules -DSQLite3_INCLUDE_DIR=S:\Library\sqlite-3.28.0\usr\include -DSQLite3_LIBRARY=S:\Library\sqlite-3.28.0\usr\lib\sqlite3.lib -DLLBUILD_SUPPORT_BINDINGS=Swift
+ninja -C S:\b\llbuild
 ```
 
  - Add llbuild to your path:
 ```cmd
 path S:\b\llbuild\bin;%PATH%
+```
+
+## Build swift-tools-core-support
+
+```cmd
+md S:\b\tsc
+cmake -B S:\b\tsc -G Ninja -S S:\toolchain\swift-tools-support-core -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_C_COMPILER=cl -DCMAKE_Swift_COMPILER=S:/b/toolchain/bin/swiftc.exe -DFoundation_DIR=S:/b/foundation/cmake/modules -Ddispatch_DIR=S:/b/libdispatch/cmake/modules
+ninja -C S:\b\tsc
 ```
 
 ## Build swift-package-manager
@@ -220,11 +177,3 @@ ninja -C S:\b\toolchain install
 ```
 
 - Add the Swift on Windows binaries path (`C:\Library\Developer\Toolchains\unknown-Asserts-development.xctoolchain\usr\bin`)  to the `PATH` environment variable.
-
-## Resuming Builds
-
-If you resume development from a new shell, the path will need to be readjusted.  The following will add the correct search order to the path:
-
-```cmd
-path S:\Library\icu-64\bin;S:\b\llvm\bin;S:\b\swift\bin;S:\b\libdispatch;S:\b\libdispatch\src;S:\b\foundation;S:\b\xctest;S:\b\llbuild\bin;S:\b\sqlite;%PATH%;%ProgramFiles%\Git\usr\bin
-```

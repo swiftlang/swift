@@ -56,6 +56,7 @@ EXPECTED_DEFAULTS = {
     'build_android': False,
     'build_args': [],
     'build_benchmarks': True,
+    'build_clang_tools_extra': True,
     'build_cygwin': True,
     'build_external_benchmarks': False,
     'build_foundation': False,
@@ -553,6 +554,8 @@ EXPECTED_OPTIONS = [
     DisableOption('--skip-test-swiftevolve', dest='test_swiftevolve'),
     DisableOption('--skip-test-toolchain-benchmarks',
                   dest='test_toolchainbenchmarks'),
+    DisableOption('--skip-build-clang-tools-extra',
+                  dest='build_clang_tools_extra'),
 
     ChoicesOption('--android-ndk-gcc-version',
                   choices=['4.8', '4.9']),

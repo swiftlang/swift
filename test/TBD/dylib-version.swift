@@ -14,4 +14,4 @@
 // CURRENT: current-version: 2
 // COMPAT: compatibility-version: 2
 
-// BOGUS: version component contains non-numeric characters
+// BOGUS: invalid dynamic library compatibility version 'not_a_version_string'

@@ -153,10 +153,12 @@ SILGenFunction::emitSiblingMethodRef(SILLocation loc,
   // dispatch (viz. objc_msgSend for now).
   if (methodConstant.hasDecl()
       && methodConstant.getDecl()->isObjCDynamic()) {
-    methodValue = emitDynamicMethodRef(
-                      loc, methodConstant,
-                      SGM.Types.getConstantInfo(methodConstant).SILFnType)
-                      .getValue();
+    methodValue =
+        emitDynamicMethodRef(
+            loc, methodConstant,
+            SGM.Types.getConstantInfo(getTypeExpansionContext(), methodConstant)
+                .SILFnType)
+            .getValue();
   } else {
     methodValue = emitGlobalFunctionRef(loc, methodConstant);
   }
@@ -164,7 +166,8 @@ SILGenFunction::emitSiblingMethodRef(SILLocation loc,
   SILType methodTy = methodValue->getType();
 
   // Specialize the generic method.
-  methodTy = methodTy.substGenericArgs(SGM.M, subMap);
+  methodTy =
+      methodTy.substGenericArgs(SGM.M, subMap, getTypeExpansionContext());
 
   return std::make_tuple(ManagedValue::forUnmanaged(methodValue),
                          methodTy);
@@ -190,8 +193,8 @@ void SILGenFunction::emitCaptures(SILLocation loc,
     canGuarantee = true;
     break;
   }
-  
-  auto expansion = F.getResilienceExpansion();
+
+  auto expansion = getTypeExpansionContext();
 
   for (auto capture : captureInfo.getCaptures()) {
     if (capture.isDynamicSelfMetadata()) {
@@ -262,10 +265,12 @@ void SILGenFunction::emitCaptures(SILLocation loc,
         capturedArgs.push_back(emitUndef(getLoweredType(type).getAddressType()));
         break;
       case CaptureKind::Box: {
-        auto boxTy = SGM.Types.getContextBoxTypeForCapture(vd,
-                                  getLoweredType(type).getASTType(),
-                                  FunctionDC->getGenericEnvironmentOfContext(),
-                                  /*mutable*/ true);
+        auto boxTy = SGM.Types.getContextBoxTypeForCapture(
+            vd,
+            SGM.Types.getLoweredRValueType(TypeExpansionContext::minimal(),
+                                           type),
+            FunctionDC->getGenericEnvironmentOfContext(),
+            /*mutable*/ true);
         capturedArgs.push_back(emitUndef(boxTy));
         break;
       }
@@ -273,8 +278,28 @@ void SILGenFunction::emitCaptures(SILLocation loc,
       continue;
     }
 
-    auto Entry = found->second;
+    // Get an address value for a SILValue if it is address only in an type
+    // expansion context without opaque archetype substitution.
+    auto getAddressValue = [&](SILValue entryValue) -> SILValue {
+      if (SGM.Types
+              .getTypeLowering(
+                  valueType,
+                  TypeExpansionContext::noOpaqueTypeArchetypesSubstitution(
+                      expansion.getResilienceExpansion()))
+              .isAddressOnly() &&
+          !entryValue->getType().isAddress()) {
 
+        auto addr = emitTemporaryAllocation(vd, entryValue->getType());
+        auto val = B.emitCopyValueOperation(vd, entryValue);
+        auto &lowering = getTypeLowering(entryValue->getType());
+        lowering.emitStore(B, vd, val, addr, StoreOwnershipQualifier::Init);
+        entryValue = addr;
+        enterDestroyCleanup(addr);
+      }
+      return entryValue;
+    };
+
+    auto Entry = found->second;
     switch (SGM.Types.getDeclCaptureKind(capture, expansion)) {
     case CaptureKind::Constant: {
       // let declarations.
@@ -309,20 +334,25 @@ void SILGenFunction::emitCaptures(SILLocation loc,
     }
 
     case CaptureKind::StorageAddress: {
+      auto entryValue = getAddressValue(Entry.value);
       // No-escaping stored declarations are captured as the
       // address of the value.
-      assert(Entry.value->getType().isAddress() && "no address for captured var!");
-      capturedArgs.push_back(ManagedValue::forLValue(Entry.value));
+      assert(entryValue->getType().isAddress() && "no address for captured var!");
+      capturedArgs.push_back(ManagedValue::forLValue(entryValue));
       break;
     }
 
     case CaptureKind::Box: {
+      auto entryValue = getAddressValue(Entry.value);
       // LValues are captured as both the box owning the value and the
       // address of the value.
-      assert(Entry.value->getType().isAddress() && "no address for captured var!");
-
+      assert(entryValue->getType().isAddress() && "no address for captured var!");
+      // Boxes of opaque return values stay opaque.
+      auto minimalLoweredType = SGM.Types.getLoweredRValueType(
+          TypeExpansionContext::minimal(), type->getCanonicalType());
       // If this is a boxed variable, we can use it directly.
-      if (Entry.box) {
+      if (Entry.box &&
+          entryValue->getType().getASTType() == minimalLoweredType) {
         // We can guarantee our own box to the callee.
         if (canGuarantee) {
           capturedArgs.push_back(
@@ -330,7 +360,7 @@ void SILGenFunction::emitCaptures(SILLocation loc,
         } else {
           capturedArgs.push_back(emitManagedRetain(loc, Entry.box));
         }
-        escapesToMark.push_back(Entry.value);
+        escapesToMark.push_back(entryValue);
       } else {
         // Address only 'let' values are passed by box.  This isn't great, in
         // that a variable captured by multiple closures will be boxed for each
@@ -343,14 +373,13 @@ void SILGenFunction::emitCaptures(SILLocation loc,
         // closure context and pass it down to the partially applied function
         // in-place.
         // TODO: Use immutable box for immutable captures.
-        auto boxTy = SGM.Types.getContextBoxTypeForCapture(vd,
-                                  Entry.value->getType().getASTType(),
-                                  FunctionDC->getGenericEnvironmentOfContext(),
-                                  /*mutable*/ true);
-        
+        auto boxTy = SGM.Types.getContextBoxTypeForCapture(
+            vd, minimalLoweredType, FunctionDC->getGenericEnvironmentOfContext(),
+            /*mutable*/ true);
+
         AllocBoxInst *allocBox = B.createAllocBox(loc, boxTy);
         ProjectBoxInst *boxAddress = B.createProjectBox(loc, allocBox, 0);
-        B.createCopyAddr(loc, Entry.value, boxAddress, IsNotTake,
+        B.createCopyAddr(loc, entryValue, boxAddress, IsNotTake,
                          IsInitialization);
         if (canGuarantee)
           capturedArgs.push_back(
@@ -377,7 +406,7 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
                                  SubstitutionMap subs) {
   auto loweredCaptureInfo = SGM.Types.getLoweredLocalCaptures(constant);
 
-  auto constantInfo = getConstantInfo(constant);
+  auto constantInfo = getConstantInfo(getTypeExpansionContext(), constant);
   SILValue functionRef = emitGlobalFunctionRef(loc, constant, constantInfo);
   SILType functionTy = functionRef->getType();
 
@@ -400,7 +429,8 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
 
   bool wasSpecialized = false;
   if (!subs.empty()) {
-    auto specialized = pft->substGenericArgs(F.getModule(), subs);
+    auto specialized =
+        pft->substGenericArgs(F.getModule(), subs, getTypeExpansionContext());
     functionTy = SILType::getPrimitiveObjectType(specialized);
     wasSpecialized = true;
   }
@@ -782,7 +812,7 @@ void SILGenFunction::emitGeneratorFunction(SILDeclRef function, VarDecl *var) {
   // wrapper that was initialized with '=', the stored property initializer
   // will be in terms of the original property's type.
   if (auto originalProperty = var->getOriginalWrappedProperty()) {
-    if (originalProperty->isPropertyWrapperInitializedWithInitialValue()) {
+    if (originalProperty->isPropertyMemberwiseInitializedWithWrappedType()) {
       interfaceType = originalProperty->getValueInterfaceType();
       varType = originalProperty->getType();
     }

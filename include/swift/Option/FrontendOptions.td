@@ -58,6 +58,19 @@ def emit_reference_dependencies_path
   : Separate<["-"], "emit-reference-dependencies-path">, MetaVarName<"<path>">,
     HelpText<"Output Swift-style dependencies file to <path>">;
 
+
+def emit_swift_ranges : Flag<["-"], "emit-swift-ranges">,
+  HelpText<"Emit unparsed source ranges">;
+def emit_swift_ranges_path
+  : Separate<["-"], "emit-swift-ranges-path">, MetaVarName<"<path>">,
+    HelpText<"Output unparsed ranges to <path>">;
+
+def emit_compiled_source : Flag<["-"], "emit-compiled-source">,
+  HelpText<"Emit compiled source">;
+def emit_compiled_source_path
+  : Separate<["-"], "emit-compiled-source-path">, MetaVarName<"<path>">,
+    HelpText<"Output compiled source to <path>">;
+
 def emit_fixits_path
   : Separate<["-"], "emit-fixits-path">, MetaVarName<"<path>">,
     HelpText<"Output compiler fixits as source edits to <path>">;
@@ -150,6 +163,9 @@ def warn_if_astscope_lookup : Flag<["-"], "warn-if-astscope-lookup">,
   
 def lazy_astscopes : Flag<["-"], "lazy-astscopes">,
   HelpText<"Build ASTScopes lazily">;
+
+def use_clang_function_types : Flag<["-"], "use-clang-function-types">,
+  HelpText<"Use stored Clang function types for computing canonical types.">;
 
 def print_clang_stats : Flag<["-"], "print-clang-stats">,
   HelpText<"Print Clang importer statistics">;
@@ -254,6 +270,8 @@ def debugger_support : Flag<["-"], "debugger-support">,
 
 def disable_arc_opts : Flag<["-"], "disable-arc-opts">,
   HelpText<"Don't run SIL ARC optimization passes.">;
+def disable_ossa_opts : Flag<["-"], "disable-ossa-opts">,
+  HelpText<"Don't run SIL OSSA optimization passes.">;
 
 def disable_sil_partial_apply : Flag<["-"], "disable-sil-partial-apply">,
   HelpText<"Disable use of partial_apply in SIL generation">;

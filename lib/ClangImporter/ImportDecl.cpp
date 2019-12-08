@@ -4563,17 +4563,25 @@ namespace {
 
       if (!found) {
         // Try harder to find a match looking at just custom Objective-C names.
-        SmallVector<Decl *, 64> allTopLevelDecls;
-        overlay->getTopLevelDecls(allTopLevelDecls);
-        for (auto result : allTopLevelDecls) {
+        // Limit what we deserialize to decls with an @objc attribute.
+        SmallVector<Decl *, 4> matchingTopLevelDecls;
+
+        // Get decls with a matching @objc attribute
+        overlay->getTopLevelDeclsWhereAttributesMatch(
+          matchingTopLevelDecls,
+          [&name](const DeclAttributes attrs) -> bool {
+            if (auto objcAttr = attrs.getAttribute<ObjCAttr>())
+              if (auto objcName = objcAttr->getName())
+                return objcName->getSimpleName() == name;
+            return false;
+          });
+
+        // Filter by decl kind
+        for (auto result : matchingTopLevelDecls) {
           if (auto singleResult = dyn_cast<T>(result)) {
-            // The base name _could_ match but it's irrelevant here.
-            if (isMatch(singleResult, /*baseNameMatches=*/false,
-                        /*allowObjCMismatch=*/false)) {
-              if (found)
-                return nullptr;
-              found = singleResult;
-            }
+            if (found)
+              return nullptr;
+            found = singleResult;
           }
         }
       }
@@ -4699,8 +4707,6 @@ namespace {
 
       Impl.ImportedDecls[{decl->getCanonicalDecl(), getVersion()}] = result;
 
-      result->setCircularityCheck(CircularityCheck::Checked);
-
       // Import protocols this protocol conforms to.
       SmallVector<TypeLoc, 4> inheritedTypes;
       importObjCProtocols(result, decl->getReferencedProtocols(),
@@ -4736,7 +4742,6 @@ namespace {
                                                         SourceLoc(), None,
                                                         nullptr, dc);
         Impl.ImportedDecls[{decl->getCanonicalDecl(), getVersion()}] = result;
-        result->setCircularityCheck(CircularityCheck::Checked);
         result->setSuperclass(Type());
         result->setAddedImplicitInitializers(); // suppress all initializers
         result->setHasMissingVTableEntries(false);
@@ -4842,7 +4847,6 @@ namespace {
       }
 
       Impl.ImportedDecls[{decl->getCanonicalDecl(), getVersion()}] = result;
-      result->setCircularityCheck(CircularityCheck::Checked);
       addObjCAttribute(result, Impl.importIdentifier(decl->getIdentifier()));
 
       if (declaredNative)
@@ -5319,7 +5323,6 @@ SwiftDeclConverter::importCFClassType(const clang::TypedefNameDecl *decl,
   auto theClass = Impl.createDeclWithClangNode<ClassDecl>(
       decl, AccessLevel::Public, SourceLoc(), className, SourceLoc(), None,
       nullptr, dc);
-  theClass->setCircularityCheck(CircularityCheck::Checked);
   theClass->setSuperclass(superclass);
   theClass->setAddedImplicitInitializers(); // suppress all initializers
   theClass->setHasMissingVTableEntries(false);

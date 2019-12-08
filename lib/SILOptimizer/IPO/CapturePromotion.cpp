@@ -337,10 +337,7 @@ computeNewArgInterfaceTypes(SILFunction *F, IndicesSet &PromotableIndices,
 
   LLVM_DEBUG(llvm::dbgs() << "Preparing New Args!\n");
 
-  auto fnTy = F->getLoweredFunctionType();
-
   auto &Types = F->getModule().Types;
-  Lowering::GenericContextScope scope(Types, fnTy->getInvocationGenericSignature());
 
   // For each parameter in the old function...
   for (unsigned Index : indices(Parameters)) {
@@ -368,8 +365,10 @@ computeNewArgInterfaceTypes(SILFunction *F, IndicesSet &PromotableIndices,
     auto paramBoxTy = paramTy.castTo<SILBoxType>();
     assert(paramBoxTy->getLayout()->getFields().size() == 1
            && "promoting compound box not implemented yet");
-    auto paramBoxedTy = getSILBoxFieldType(paramBoxTy, Types, 0);
-    auto &paramTL = Types.getTypeLowering(paramBoxedTy, expansion);
+    auto paramBoxedTy =
+        getSILBoxFieldType(TypeExpansionContext(*F), paramBoxTy, Types, 0);
+    assert(expansion == F->getResilienceExpansion());
+    auto &paramTL = Types.getTypeLowering(paramBoxedTy, *F);
     ParameterConvention convention;
     if (paramTL.isAddressOnly()) {
       convention = ParameterConvention::Indirect_In;
@@ -480,8 +479,9 @@ ClosureCloner::populateCloned() {
     auto BoxTy = (*I)->getType().castTo<SILBoxType>();
     assert(BoxTy->getLayout()->getFields().size() == 1 &&
            "promoting compound box not implemented");
-    auto BoxedTy = getSILBoxFieldType(BoxTy, Cloned->getModule().Types, 0)
-      .getObjectType();
+    auto BoxedTy = getSILBoxFieldType(TypeExpansionContext(*Cloned), BoxTy,
+                                      Cloned->getModule().Types, 0)
+                       .getObjectType();
     SILValue MappedValue =
         ClonedEntryBB->createFunctionArgument(BoxedTy, (*I)->getDecl());
 
@@ -999,7 +999,8 @@ bool isPartialApplyNonEscapingUser(Operand *CurrentOp, PartialApplyInst *PAI,
   auto BoxTy = BoxArg->getType().castTo<SILBoxType>();
   assert(BoxTy->getLayout()->getFields().size() == 1 &&
          "promoting compound box not implemented yet");
-  if (getSILBoxFieldType(BoxTy, M.Types, 0).isAddressOnly(*F)) {
+  if (getSILBoxFieldType(TypeExpansionContext(*Fn), BoxTy, M.Types, 0)
+          .isAddressOnly(*F)) {
     LLVM_DEBUG(llvm::dbgs() << "        FAIL! Box is an address only "
                                "argument!\n");
     return false;
@@ -1273,8 +1274,8 @@ processPartialApplyInst(SILOptFunctionBuilder &FuncBuilder,
   auto CalleeFunctionTy = PAI->getCallee()->getType().castTo<SILFunctionType>();
   auto SubstCalleeFunctionTy = CalleeFunctionTy;
   if (PAI->hasSubstitutions())
-    SubstCalleeFunctionTy =
-        CalleeFunctionTy->substGenericArgs(M, PAI->getSubstitutionMap());
+    SubstCalleeFunctionTy = CalleeFunctionTy->substGenericArgs(
+        M, PAI->getSubstitutionMap(), TypeExpansionContext(*F));
   SILFunctionConventions calleeConv(SubstCalleeFunctionTy, M);
   auto CalleePInfo = SubstCalleeFunctionTy->getParameters();
   SILFunctionConventions paConv(PAI->getType().castTo<SILFunctionType>(), M);

@@ -52,24 +52,6 @@ void ConstraintLocator::Profile(llvm::FoldingSetNodeID &id, Expr *anchor,
       id.AddPointer(kpElt.getKeyPathDecl());
       break;
     }
-    case ApplyArgument:
-    case ApplyFunction:
-    case FunctionArgument:
-    case FunctionResult:
-    case OptionalPayload:
-    case Member:
-    case MemberRefBase:
-    case UnresolvedMember:
-    case SubscriptMember:
-    case ConstructorMember:
-    case LValueConversion:
-    case RValueAdjustment:
-    case ClosureResult:
-    case ParentType:
-    case ExistentialSuperclassType:
-    case InstanceType:
-    case SequenceElementType:
-    case AutoclosureResult:
     case GenericArgument:
     case NamedTupleElement:
     case TupleElement:
@@ -78,18 +60,16 @@ void ConstraintLocator::Profile(llvm::FoldingSetNodeID &id, Expr *anchor,
     case KeyPathComponent:
     case ConditionalRequirement:
     case TypeParameterRequirement:
-    case ImplicitlyUnwrappedDisjunctionChoice:
-    case DynamicLookupResult:
     case ContextualType:
-    case SynthesizedArgument:
-    case KeyPathType:
-    case KeyPathRoot:
-    case KeyPathValue:
-    case KeyPathComponentResult:
-    case Condition:
+    case SynthesizedArgument: {
       auto numValues = numNumericValuesInPathElement(elt.getKind());
       for (unsigned i = 0; i < numValues; ++i)
         id.AddInteger(elt.getValue(i));
+      break;
+    }
+#define SIMPLE_LOCATOR_PATH_ELT(Name) case Name :
+#include "ConstraintLocatorPathElts.def"
+      // Nothing to do for simple locator elements.
       break;
     }
   }
@@ -261,6 +241,9 @@ void ConstraintLocator::dump(ConstraintSystem *CS) const {
 
 
 void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) const {
+  PrintOptions PO;
+  PO.PrintTypesForDebugging = true;
+  
   out << "locator@" << (void*) this << " [";
 
   if (anchor) {
@@ -295,7 +278,7 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) const {
     switch (elt.getKind()) {
     case GenericParameter: {
       auto gpElt = elt.castTo<LocatorPathElt::GenericParameter>();
-      out << "generic parameter '" << gpElt.getType()->getString() << "'";
+      out << "generic parameter '" << gpElt.getType()->getString(PO) << "'";
       break;
     }
     case ApplyArgument:

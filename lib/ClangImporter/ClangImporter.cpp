@@ -902,6 +902,7 @@ ClangImporter::create(ASTContext &ctx, const ClangImporterOptions &importerOpts,
   invocationArgStrs.push_back("clang");
   switch (importerOpts.Mode) {
   case ClangImporterOptions::Modes::Normal:
+  case ClangImporterOptions::Modes::PrecompiledModule:
     getNormalInvocationArguments(invocationArgStrs, ctx, importerOpts);
     break;
   case ClangImporterOptions::Modes::EmbedBitcode:
@@ -1062,7 +1063,21 @@ ClangImporter::create(ASTContext &ctx, const ClangImporterOptions &importerOpts,
   if (importerOpts.Mode == ClangImporterOptions::Modes::EmbedBitcode)
     return importer;
 
+  // ClangImporter always sets this in Normal mode, so we need to make sure to
+  // set it before bailing out early when configuring ClangImporter for
+  // precompiled modules. This is not a benign langopt, so forgetting this (for
+  // example, if we combined the early exit below with the one above) would make
+  // the compiler instance used to emit PCMs incompatible with the one used to
+  // read them later.
   instance.getLangOpts().NeededByPCHOrCompilationUsesPCH = true;
+
+  // Make sure to not trigger extra rebuilds on identical files with mismatching
+  // timestamps.
+  instance.getHeaderSearchOpts().ValidateASTInputFilesContent = true;
+
+  if (importerOpts.Mode == ClangImporterOptions::Modes::PrecompiledModule)
+    return importer;
+
   bool canBegin = action->BeginSourceFile(instance,
                                           instance.getFrontendOpts().Inputs[0]);
   if (!canBegin)
@@ -1446,46 +1461,144 @@ std::string ClangImporter::getBridgingHeaderContents(StringRef headerPath,
   return result;
 }
 
+/// Returns the appropriate source input language based on language options.
+static clang::Language getLanguageFromOptions(
+    const clang::LangOptions *LangOpts) {
+  if (LangOpts->OpenCL)
+    return clang::Language::OpenCL;
+  if (LangOpts->CUDA)
+    return clang::Language::CUDA;
+  if (LangOpts->ObjC)
+    return LangOpts->CPlusPlus ?
+        clang::Language::ObjCXX : clang::Language::ObjC;
+  return LangOpts->CPlusPlus ? clang::Language::CXX : clang::Language::C;
+}
+
+/// Wraps the given frontend action in an index data recording action if the
+/// frontend options have an index store path specified.
+static
+std::unique_ptr<clang::FrontendAction> wrapActionForIndexingIfEnabled(
+    const clang::FrontendOptions &FrontendOpts,
+    std::unique_ptr<clang::FrontendAction> action) {
+  if (!FrontendOpts.IndexStorePath.empty()) {
+    return clang::index::createIndexDataRecordingAction(
+        FrontendOpts, std::move(action));
+  }
+  return action;
+}
+
+std::unique_ptr<clang::CompilerInstance>
+ClangImporter::cloneCompilerInstanceForPrecompiling() {
+  auto invocation =
+      std::make_shared<clang::CompilerInvocation>(*Impl.Invocation);
+
+  auto &PPOpts = invocation->getPreprocessorOpts();
+  PPOpts.resetNonModularOptions();
+
+  auto &FrontendOpts = invocation->getFrontendOpts();
+  FrontendOpts.DisableFree = false;
+  FrontendOpts.Inputs.clear();
+
+  auto clonedInstance = llvm::make_unique<clang::CompilerInstance>(
+    Impl.Instance->getPCHContainerOperations(),
+    &Impl.Instance->getModuleCache());
+  clonedInstance->setInvocation(std::move(invocation));
+  clonedInstance->createDiagnostics(&Impl.Instance->getDiagnosticClient(),
+                                    /*ShouldOwnClient=*/false);
+
+  clang::FileManager &fileManager = Impl.Instance->getFileManager();
+  clonedInstance->setFileManager(&fileManager);
+  clonedInstance->createSourceManager(fileManager);
+  clonedInstance->setTarget(&Impl.Instance->getTarget());
+
+  return clonedInstance;
+}
+
 bool
 ClangImporter::emitBridgingPCH(StringRef headerPath,
                                StringRef outputPCHPath) {
-  auto invocation =
-      std::make_shared<clang::CompilerInvocation>(*Impl.Invocation);
-  invocation->getFrontendOpts().DisableFree = false;
-  invocation->getFrontendOpts().Inputs.clear();
-  invocation->getFrontendOpts().Inputs.push_back(
-      clang::FrontendInputFile(headerPath, clang::Language::ObjC));
-  invocation->getFrontendOpts().OutputFile = outputPCHPath;
-  invocation->getFrontendOpts().ProgramAction = clang::frontend::GeneratePCH;
-  invocation->getPreprocessorOpts().resetNonModularOptions();
-  invocation->getLangOpts()->NeededByPCHOrCompilationUsesPCH = true;
-  invocation->getLangOpts()->CacheGeneratedPCH = true;
+  auto emitInstance = cloneCompilerInstanceForPrecompiling();
+  auto &invocation = emitInstance->getInvocation();
 
-  clang::CompilerInstance emitInstance(
-    Impl.Instance->getPCHContainerOperations(),
-    &Impl.Instance->getModuleCache());
-  emitInstance.setInvocation(std::move(invocation));
-  emitInstance.createDiagnostics(&Impl.Instance->getDiagnosticClient(),
-                                 /*ShouldOwnClient=*/false);
+  auto LangOpts = invocation.getLangOpts();
+  LangOpts->NeededByPCHOrCompilationUsesPCH = true;
+  LangOpts->CacheGeneratedPCH = true;
 
-  clang::FileManager &fileManager = Impl.Instance->getFileManager();
-  emitInstance.setFileManager(&fileManager);
-  emitInstance.createSourceManager(fileManager);
-  emitInstance.setTarget(&Impl.Instance->getTarget());
+  auto language = getLanguageFromOptions(LangOpts);
+  auto inputFile = clang::FrontendInputFile(headerPath, language);
 
-  std::unique_ptr<clang::FrontendAction> action;
-  action.reset(new clang::GeneratePCHAction());
-  if (!emitInstance.getFrontendOpts().IndexStorePath.empty()) {
-    action = clang::index::
-      createIndexDataRecordingAction(emitInstance.getFrontendOpts(),
-                                     std::move(action));
-  }
-  emitInstance.ExecuteAction(*action);
+  auto &FrontendOpts = invocation.getFrontendOpts();
+  FrontendOpts.Inputs = {inputFile};
+  FrontendOpts.OutputFile = outputPCHPath;
+  FrontendOpts.ProgramAction = clang::frontend::GeneratePCH;
 
-  if (emitInstance.getDiagnostics().hasErrorOccurred()) {
+  auto action = wrapActionForIndexingIfEnabled(
+      FrontendOpts, llvm::make_unique<clang::GeneratePCHAction>());
+  emitInstance->ExecuteAction(*action);
+
+  if (emitInstance->getDiagnostics().hasErrorOccurred()) {
     Impl.SwiftContext.Diags.diagnose({},
                                      diag::bridging_header_pch_error,
                                      outputPCHPath, headerPath);
+    return true;
+  }
+  return false;
+}
+
+bool ClangImporter::emitPrecompiledModule(StringRef moduleMapPath,
+                                          StringRef moduleName,
+                                          StringRef outputPath) {
+  auto emitInstance = cloneCompilerInstanceForPrecompiling();
+  auto &invocation = emitInstance->getInvocation();
+
+  auto LangOpts = invocation.getLangOpts();
+  LangOpts->setCompilingModule(clang::LangOptions::CMK_ModuleMap);
+  LangOpts->ModuleName = moduleName;
+  LangOpts->CurrentModule = LangOpts->ModuleName;
+
+  auto language = getLanguageFromOptions(LangOpts);
+  auto inputFile = clang::FrontendInputFile(
+      moduleMapPath, clang::InputKind(
+          language, clang::InputKind::ModuleMap, false));
+
+  auto &FrontendOpts = invocation.getFrontendOpts();
+  FrontendOpts.Inputs = {inputFile};
+  FrontendOpts.OriginalModuleMap = moduleMapPath;
+  FrontendOpts.OutputFile = outputPath;
+  FrontendOpts.ProgramAction = clang::frontend::GenerateModule;
+
+  auto action = wrapActionForIndexingIfEnabled(
+      FrontendOpts,
+      llvm::make_unique<clang::GenerateModuleFromModuleMapAction>());
+  emitInstance->ExecuteAction(*action);
+
+  if (emitInstance->getDiagnostics().hasErrorOccurred()) {
+    Impl.SwiftContext.Diags.diagnose({},
+                                     diag::emit_pcm_error,
+                                     outputPath, moduleMapPath);
+    return true;
+  }
+  return false;
+}
+
+bool ClangImporter::dumpPrecompiledModule(StringRef modulePath,
+                                          StringRef outputPath) {
+  auto dumpInstance = cloneCompilerInstanceForPrecompiling();
+  auto &invocation = dumpInstance->getInvocation();
+
+  auto inputFile = clang::FrontendInputFile(
+      modulePath, clang::InputKind(
+          clang::Language::Unknown, clang::InputKind::Precompiled, false));
+
+  auto &FrontendOpts = invocation.getFrontendOpts();
+  FrontendOpts.Inputs = {inputFile};
+  FrontendOpts.OutputFile = outputPath;
+
+  auto action = llvm::make_unique<clang::DumpModuleInfoAction>();
+  dumpInstance->ExecuteAction(*action);
+
+  if (dumpInstance->getDiagnostics().hasErrorOccurred()) {
+    Impl.SwiftContext.Diags.diagnose({}, diag::dump_pcm_error, modulePath);
     return true;
   }
   return false;
@@ -2793,12 +2906,11 @@ ClangModuleUnit::lookupNestedType(Identifier name,
     // If the entry is not visible, skip it.
     if (!isVisibleClangEntry(clangCtx, entry)) continue;
 
-    auto clangDecl = entry.dyn_cast<clang::NamedDecl *>();
-    auto clangTypeDecl = dyn_cast_or_null<clang::TypeDecl>(clangDecl);
-    if (!clangTypeDecl)
+    auto *clangDecl = entry.dyn_cast<clang::NamedDecl *>();
+    if (!clangDecl)
       continue;
 
-    clangTypeDecl = cast<clang::TypeDecl>(clangTypeDecl->getMostRecentDecl());
+    const auto *clangTypeDecl = clangDecl->getMostRecentDecl();
 
     bool anyMatching = false;
     TypeDecl *originalDecl = nullptr;

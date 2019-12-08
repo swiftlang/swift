@@ -644,6 +644,12 @@ void ModuleDecl::getTopLevelDecls(SmallVectorImpl<Decl*> &Results) const {
   FORWARD(getTopLevelDecls, (Results));
 }
 
+void ModuleDecl::getTopLevelDeclsWhereAttributesMatch(
+              SmallVectorImpl<Decl*> &Results,
+              llvm::function_ref<bool(DeclAttributes)> matchAttributes) const {
+  FORWARD(getTopLevelDeclsWhereAttributesMatch, (Results, matchAttributes));
+}
+
 void SourceFile::getTopLevelDecls(SmallVectorImpl<Decl*> &Results) const {
   Results.append(Decls.begin(), Decls.end());
 }
@@ -1871,6 +1877,22 @@ SourceFile::lookupOpaqueResultType(StringRef MangledName) {
 void FileUnit::anchor() {}
 void *FileUnit::operator new(size_t Bytes, ASTContext &C, unsigned Alignment) {
   return C.Allocate(Bytes, Alignment);
+}
+
+void FileUnit::getTopLevelDeclsWhereAttributesMatch(
+            SmallVectorImpl<Decl*> &Results,
+            llvm::function_ref<bool(DeclAttributes)> matchAttributes) const {
+  auto prevSize = Results.size();
+  getTopLevelDecls(Results);
+
+  // Filter out unwanted decls that were just added to Results.
+  // Note: We could apply this check in all implementations of
+  // getTopLevelDecls instead or in everything that creates a Decl.
+  auto newEnd = std::remove_if(Results.begin() + prevSize, Results.end(),
+                               [&matchAttributes](const Decl *D) -> bool {
+      return !matchAttributes(D->getAttrs());
+    });
+  Results.erase(newEnd, Results.end());
 }
 
 StringRef LoadedFile::getFilename() const {

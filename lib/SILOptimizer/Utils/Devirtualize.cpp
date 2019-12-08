@@ -119,9 +119,7 @@ static bool isEffectivelyFinalMethod(FullApplySite applySite, CanType classType,
   if (!cha)
     return false;
 
-  // This is a private or a module internal class.
-  //
-  // We can analyze the class hierarchy rooted at it and
+  // We can analyze the class hierarchy rooted at this class and
   // eventually devirtualize a method call more efficiently.
 
   ClassHierarchyAnalysis::ClassList subs;
@@ -743,14 +741,16 @@ FullApplySite swift::devirtualizeClassMethod(FullApplySite applySite,
 
   auto *f = getTargetClassMethod(module, cd, mi);
 
-  CanSILFunctionType genCalleeType = f->getLoweredFunctionType();
+  CanSILFunctionType genCalleeType = f->getLoweredFunctionTypeInContext(
+      TypeExpansionContext(*applySite.getFunction()));
 
   SubstitutionMap subs = getSubstitutionsForCallee(
       module, genCalleeType, classOrMetatype->getType().getASTType(),
       applySite);
   CanSILFunctionType substCalleeType = genCalleeType;
   if (genCalleeType->isPolymorphic())
-    substCalleeType = genCalleeType->substGenericArgs(module, subs);
+    substCalleeType = genCalleeType->substGenericArgs(
+        module, subs, TypeExpansionContext(*applySite.getFunction()));
   SILFunctionConventions substConv(substCalleeType, module);
 
   SILBuilderWithScope builder(applySite.getInstruction());
@@ -937,7 +937,8 @@ SubstitutionMap
 swift::getWitnessMethodSubstitutions(SILModule &module, ApplySite applySite,
                                      SILFunction *f,
                                      ProtocolConformanceRef cRef) {
-  auto witnessFnTy = f->getLoweredFunctionType();
+  auto witnessFnTy = f->getLoweredFunctionTypeInContext(
+      TypeExpansionContext(*applySite.getFunction()));
   assert(witnessFnTy->getRepresentation() ==
          SILFunctionTypeRepresentation::WitnessMethod);
 
@@ -975,8 +976,10 @@ static ApplySite devirtualizeWitnessMethod(ApplySite applySite, SILFunction *f,
 
   // Figure out the exact bound type of the function to be called by
   // applying all substitutions.
-  auto calleeCanType = f->getLoweredFunctionType();
-  auto substCalleeCanType = calleeCanType->substGenericArgs(module, subMap);
+  auto calleeCanType = f->getLoweredFunctionTypeInContext(
+      TypeExpansionContext(*applySite.getFunction()));
+  auto substCalleeCanType = calleeCanType->substGenericArgs(
+      module, subMap, TypeExpansionContext(*applySite.getFunction()));
 
   // Collect arguments from the apply instruction.
   SmallVector<SILValue, 4> arguments;

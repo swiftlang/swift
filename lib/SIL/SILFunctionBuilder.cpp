@@ -76,12 +76,12 @@ void SILFunctionBuilder::addFunctionAttributes(SILFunction *F,
           SILFunctionTypeRepresentation::ObjCMethod)
     return;
 
-  auto *replacedFuncAttr = Attrs.getAttribute<DynamicReplacementAttr>();
-  if (!replacedFuncAttr)
+  // Only assign replacements when the thing being replaced is function-like and
+  // explicitly declared.  
+  auto *origDecl = decl->getDynamicallyReplacedDecl();
+  auto *replacedDecl = dyn_cast_or_null<AbstractFunctionDecl>(origDecl);
+  if (!replacedDecl)
     return;
-
-  auto *replacedDecl = replacedFuncAttr->getReplacedFunction();
-  assert(replacedDecl);
 
   if (decl->isObjC()) {
     F->setObjCReplacement(replacedDecl);
@@ -107,7 +107,8 @@ SILFunctionBuilder::getOrCreateFunction(SILLocation loc, SILDeclRef constant,
                                         ForDefinition_t forDefinition,
                                         ProfileCounter entryCount) {
   auto nameTmp = constant.mangle();
-  auto constantType = mod.Types.getConstantFunctionType(constant);
+  auto constantType = mod.Types.getConstantFunctionType(
+      TypeExpansionContext::minimal(), constant);
   SILLinkage linkage = constant.getLinkage(forDefinition);
 
   if (auto fn = mod.lookUpFunction(nameTmp)) {

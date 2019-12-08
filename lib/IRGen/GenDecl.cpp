@@ -148,20 +148,19 @@ public:
     if (method->getAttrs().hasAttribute<NSManagedAttr>())
       return;
 
-    llvm::Constant *name, *imp, *types;
-    emitObjCMethodDescriptorParts(IGM, method, /*concrete*/true,
-                                  name, types, imp);
+    auto descriptor = emitObjCMethodDescriptorParts(IGM, method,
+                                                    /*concrete*/true);
     
     // When generating JIT'd code, we need to call sel_registerName() to force
     // the runtime to unique the selector.
     llvm::Value *sel = Builder.CreateCall(IGM.getObjCSelRegisterNameFn(),
-                                          name);
+                                          descriptor.selectorRef);
     
     llvm::Value *args[] = {
       method->isStatic() ? metaclassMetadata : classMetadata,
       sel,
-      imp,
-      types
+      descriptor.impl,
+      descriptor.typeEncoding
     };
     
     Builder.CreateCall(class_replaceMethod, args);
@@ -172,20 +171,19 @@ public:
 
   void visitConstructorDecl(ConstructorDecl *constructor) {
     if (!requiresObjCMethodDescriptor(constructor)) return;
-    llvm::Constant *name, *imp, *types;
-    emitObjCMethodDescriptorParts(IGM, constructor, /*concrete*/true,
-                                  name, types, imp);
+    auto descriptor = emitObjCMethodDescriptorParts(IGM, constructor,
+                                                    /*concrete*/true);
 
     // When generating JIT'd code, we need to call sel_registerName() to force
     // the runtime to unique the selector.
     llvm::Value *sel = Builder.CreateCall(IGM.getObjCSelRegisterNameFn(),
-                                          name);
+                                          descriptor.selectorRef);
 
     llvm::Value *args[] = {
       classMetadata,
       sel,
-      imp,
-      types
+      descriptor.impl,
+      descriptor.typeEncoding
     };
 
     Builder.CreateCall(class_replaceMethod, args);
@@ -206,23 +204,22 @@ public:
     if (prop->getAttrs().hasAttribute<NSManagedAttr>())
       return;
 
-    llvm::Constant *name, *imp, *types;
-    emitObjCGetterDescriptorParts(IGM, prop,
-                                  name, types, imp);
+    auto descriptor = emitObjCGetterDescriptorParts(IGM, prop);
     // When generating JIT'd code, we need to call sel_registerName() to force
     // the runtime to unique the selector.
     llvm::Value *sel = Builder.CreateCall(IGM.getObjCSelRegisterNameFn(),
-                                          name);
+                                          descriptor.selectorRef);
     auto theClass = prop->isStatic() ? metaclassMetadata : classMetadata;
-    llvm::Value *getterArgs[] = {theClass, sel, imp, types};
+    llvm::Value *getterArgs[] =
+      {theClass, sel, descriptor.impl, descriptor.typeEncoding};
     Builder.CreateCall(class_replaceMethod, getterArgs);
 
     if (prop->isSettable(prop->getDeclContext())) {
-      emitObjCSetterDescriptorParts(IGM, prop,
-                                    name, types, imp);
+      auto descriptor = emitObjCSetterDescriptorParts(IGM, prop);
       sel = Builder.CreateCall(IGM.getObjCSelRegisterNameFn(),
-                               name);
-      llvm::Value *setterArgs[] = {theClass, sel, imp, types};
+                               descriptor.selectorRef);
+      llvm::Value *setterArgs[] =
+        {theClass, sel, descriptor.impl, descriptor.typeEncoding};
       
       Builder.CreateCall(class_replaceMethod, setterArgs);
     }
@@ -232,22 +229,21 @@ public:
     assert(!subscript->isStatic() && "objc doesn't support class subscripts");
     if (!requiresObjCSubscriptDescriptor(IGM, subscript)) return;
     
-    llvm::Constant *name, *imp, *types;
-    emitObjCGetterDescriptorParts(IGM, subscript,
-                                  name, types, imp);
+    auto descriptor = emitObjCGetterDescriptorParts(IGM, subscript);
     // When generating JIT'd code, we need to call sel_registerName() to force
     // the runtime to unique the selector.
     llvm::Value *sel = Builder.CreateCall(IGM.getObjCSelRegisterNameFn(),
-                                          name);
-    llvm::Value *getterArgs[] = {classMetadata, sel, imp, types};
+                                          descriptor.selectorRef);
+    llvm::Value *getterArgs[] =
+      {classMetadata, sel, descriptor.impl, descriptor.typeEncoding};
     Builder.CreateCall(class_replaceMethod, getterArgs);
 
     if (subscript->supportsMutation()) {
-      emitObjCSetterDescriptorParts(IGM, subscript,
-                                    name, types, imp);
+      auto descriptor = emitObjCSetterDescriptorParts(IGM, subscript);
       sel = Builder.CreateCall(IGM.getObjCSelRegisterNameFn(),
-                               name);
-      llvm::Value *setterArgs[] = {classMetadata, sel, imp, types};
+                               descriptor.selectorRef);
+      llvm::Value *setterArgs[] =
+        {classMetadata, sel, descriptor.impl, descriptor.typeEncoding};
       
       Builder.CreateCall(class_replaceMethod, setterArgs);
     }
@@ -353,16 +349,16 @@ public:
       return;
     }
 
-    llvm::Constant *name, *imp, *types;
-    emitObjCMethodDescriptorParts(IGM, method, /*concrete*/false,
-                                  name, types, imp);
+    auto descriptor = emitObjCMethodDescriptorParts(IGM, method,
+                                                    /*concrete*/false);
     
     // When generating JIT'd code, we need to call sel_registerName() to force
     // the runtime to unique the selector.
-    llvm::Value *sel = Builder.CreateCall(IGM.getObjCSelRegisterNameFn(), name);
+    llvm::Value *sel = Builder.CreateCall(IGM.getObjCSelRegisterNameFn(),
+                                          descriptor.selectorRef);
 
     llvm::Value *args[] = {
-      NewProto, sel, types,
+      NewProto, sel, descriptor.typeEncoding,
       // required?
       llvm::ConstantInt::get(IGM.ObjCBoolTy,
                              !method->getAttrs().hasAttribute<OptionalAttr>()),
@@ -381,14 +377,13 @@ public:
   void visitAbstractStorageDecl(AbstractStorageDecl *prop) {
     // TODO: Add properties to protocol.
     
-    llvm::Constant *name, *imp, *types;
-    emitObjCGetterDescriptorParts(IGM, prop,
-                                  name, types, imp);
+    auto descriptor = emitObjCGetterDescriptorParts(IGM, prop);
     // When generating JIT'd code, we need to call sel_registerName() to force
     // the runtime to unique the selector.
-    llvm::Value *sel = Builder.CreateCall(IGM.getObjCSelRegisterNameFn(), name);
+    llvm::Value *sel = Builder.CreateCall(IGM.getObjCSelRegisterNameFn(),
+                                          descriptor.selectorRef);
     llvm::Value *getterArgs[] = {
-      NewProto, sel, types,
+      NewProto, sel, descriptor.typeEncoding,
       // required?
       llvm::ConstantInt::get(IGM.ObjCBoolTy,
                              !prop->getAttrs().hasAttribute<OptionalAttr>()),
@@ -399,11 +394,11 @@ public:
     Builder.CreateCall(protocol_addMethodDescription, getterArgs);
     
     if (prop->isSettable(nullptr)) {
-      emitObjCSetterDescriptorParts(IGM, prop,
-                                    name, types, imp);
-      sel = Builder.CreateCall(IGM.getObjCSelRegisterNameFn(), name);
+      auto descriptor = emitObjCSetterDescriptorParts(IGM, prop);
+      sel = Builder.CreateCall(IGM.getObjCSelRegisterNameFn(),
+                               descriptor.selectorRef);
       llvm::Value *setterArgs[] = {
-        NewProto, sel, types,
+        NewProto, sel, descriptor.typeEncoding,
         // required?
         llvm::ConstantInt::get(IGM.ObjCBoolTy,
                                !prop->getAttrs().hasAttribute<OptionalAttr>()),
@@ -831,7 +826,8 @@ IRGenModule::getAddrOfParentContextDescriptor(DeclContext *from,
 
     // Wrap up private types in an anonymous context for the containing file
     // unit so that the runtime knows they have unstable identity.
-    if (!fromAnonymousContext && Type->isOutermostPrivateOrFilePrivateScope())
+    if (!fromAnonymousContext && Type->isOutermostPrivateOrFilePrivateScope()
+        && !Type->isUsableFromInline())
       return {getAddrOfAnonymousContextDescriptor(Type),
               ConstantReference::Direct};
   }
@@ -1259,8 +1255,40 @@ void IRGenerator::noteUseOfTypeGlobals(NominalTypeDecl *type,
     }
   }
 
+  // Force emission of ObjC class refs used by type refs.
+  //
+  // Otherwise, autolinking can fail if we try to load the class decl from the
+  // name of the class.
+  if (auto *classDecl = dyn_cast<ClassDecl>(type)) {
+    // The logic behind this predicate is that:
+    //
+    // 1. We need to check if a class decl is foreign to exclude CF classes.
+    //
+    // 2. We want to check that the class decl is objc to exclude c++ classes in
+    //    the future.
+    //
+    // 3. We check that we have a clang node since we want to ensure we have
+    //    something coming from clang, rather than from swift which does not
+    //    have this issue.
+    if (classDecl->hasClangNode() && classDecl->isObjC() && !classDecl->isForeign()) {
+      PrimaryIGM->getAddrOfObjCClassRef(classDecl);
+      return;
+    }
+  }
+
   if (!hasLazyMetadata(type))
     return;
+
+  // If the type can be generated in several TU with weak linkage we don't know
+  // which one will be picked up so we have to require the metadata. Otherwise,
+  // the situation can arise where one TU contains a type descriptor with a null
+  // metadata access function and the other TU which requires metadata has a
+  // type descriptor with a valid metadata access function but the linker picks
+  // the first one.
+  if (isAccessorLazilyGenerated(getTypeMetadataAccessStrategy(
+          type->getDeclaredType()->getCanonicalType()))) {
+    requireMetadata = RequireMetadata;
+  }
 
   // Try to create a new record of the fact that we used this type.
   auto insertResult = LazyTypeGlobals.try_emplace(type);
@@ -2338,13 +2366,12 @@ void IRGenModule::emitOpaqueTypeDescriptorAccessor(OpaqueTypeDecl *opaque) {
   auto *abstractStorage = dyn_cast<AbstractStorageDecl>(namingDecl);
 
   bool isNativeDynamic = false;
-  bool isDynamicReplacement = false;
+  const bool isDynamicReplacement = namingDecl->getDynamicallyReplacedDecl();
 
   // Don't emit accessors for abstract storage that is not dynamic or a dynamic
   // replacement.
   if (abstractStorage) {
     isNativeDynamic = abstractStorage->hasAnyNativeDynamicAccessors();
-    isDynamicReplacement = abstractStorage->hasAnyDynamicReplacementAccessors();
     if (!isNativeDynamic && !isDynamicReplacement)
       return;
   }
@@ -2352,10 +2379,7 @@ void IRGenModule::emitOpaqueTypeDescriptorAccessor(OpaqueTypeDecl *opaque) {
   // Don't emit accessors for functions that are not dynamic or dynamic
   // replacements.
   if (!abstractStorage) {
-    isNativeDynamic = opaque->getNamingDecl()->isNativeDynamic();
-    isDynamicReplacement = opaque->getNamingDecl()
-                               ->getAttrs()
-                               .hasAttribute<DynamicReplacementAttr>();
+    isNativeDynamic = namingDecl->isNativeDynamic();
     if (!isNativeDynamic && !isDynamicReplacement)
       return;
   }

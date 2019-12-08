@@ -487,6 +487,12 @@ void Remangler::mangleAnyNominalType(Node *node) {
 void Remangler::mangleGenericArgs(Node *node, char &Separator,
                                   bool fullSubstitutionMap) {
   switch (node->getKind()) {
+    case Node::Kind::Protocol:
+      // A protocol cannot be the parent of a nominal type, so this case should
+      // never be hit by valid swift code. But the indexer might generate a URL
+      // from invalid swift code, which has a bound generic inside a protocol.
+      // The ASTMangler treats a protocol like any other nominal type in this
+      // case, so we also support it in the remangler.
     case Node::Kind::Structure:
     case Node::Kind::Enum:
     case Node::Kind::Class:

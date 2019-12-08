@@ -242,8 +242,6 @@ swift::USRGenerationRequest::evaluate(Evaluator &evaluator,
   }
 
   auto declIFaceTy = D->getInterfaceType();
-  if (!declIFaceTy)
-    return std::string();
 
   // Invalid code.
   if (declIFaceTy.findIf([](Type t) -> bool {
@@ -307,7 +305,7 @@ bool ide::printAccessorUSR(const AbstractStorageDecl *D, AccessorKind AccKind,
 
   Mangle::ASTMangler NewMangler;
   std::string Mangled = NewMangler.mangleAccessorEntityAsUSR(AccKind,
-                          SD, getUSRSpacePrefix());
+                          SD, getUSRSpacePrefix(), SD->isStatic());
 
   OS << Mangled;
 

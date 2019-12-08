@@ -250,7 +250,7 @@ bb0(%0 : $Foo, %1 : $Builtin.Int1):
 // CHECK: bb0([[P:%.*]] : $Foo):
 // CHECK-NOT: retain
 // CHECK-NOT: unsafeGuaranteed
-// CHECK:   checked_cast_br [exact] [[P]] : $Foo to $Foo, bb1, bb3
+// CHECK:   checked_cast_br [exact] [[P]] : $Foo to Foo, bb1, bb3
 // CHECK: bb1([[P2:%.*]] : $Foo):
 // CHECK:   function_ref @beep : $@convention(thin) () -> ()
 // CHECK:   %4 = apply %3() : $@convention(thin) () -> ()
@@ -271,7 +271,7 @@ bb0(%0 : $Foo):
   %4 = builtin "unsafeGuaranteed"<Foo>(%0 : $Foo) : $(Foo, Builtin.Int8)
   %5 = tuple_extract %4 : $(Foo, Builtin.Int8), 0
   %6 = tuple_extract %4 : $(Foo, Builtin.Int8), 1
-  checked_cast_br [exact] %5 : $Foo to $Foo, bb1, bb3
+  checked_cast_br [exact] %5 : $Foo to Foo, bb1, bb3
 
 bb1(%11 : $Foo):
   %12 = function_ref @beep : $@convention(thin) () -> ()
@@ -300,7 +300,7 @@ bb0(%0 : $Foo):
   %4 = builtin "unsafeGuaranteed"<Foo>(%0 : $Foo) : $(Foo, Builtin.Int8)
   %5 = tuple_extract %4 : $(Foo, Builtin.Int8), 0
   %6 = tuple_extract %4 : $(Foo, Builtin.Int8), 1
-  checked_cast_br [exact] %5 : $Foo to $Foo, bb1, bb3
+  checked_cast_br [exact] %5 : $Foo to Foo, bb1, bb3
 
 bb1(%11 : $Foo):
   %12 = function_ref @beep : $@convention(thin) () -> ()

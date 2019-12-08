@@ -17,6 +17,7 @@
 #include "swift/AST/Pattern.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/Types.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "DerivedConformances.h"
@@ -38,8 +39,11 @@ DeclContext *DerivedConformance::getConformanceContext() const {
 void DerivedConformance::addMembersToConformanceContext(
     ArrayRef<Decl *> children) {
   auto IDC = cast<IterableDeclContext>(ConformanceDecl);
+  auto *SF = ConformanceDecl->getDeclContext()->getParentSourceFile();
   for (auto child : children) {
     IDC->addMember(child);
+    if (SF)
+      SF->SynthesizedDecls.push_back(child);
   }
 }
 
@@ -100,7 +104,7 @@ bool DerivedConformance::derivesProtocolConformance(DeclContext *DC,
         }
 
         // hasOnlyCasesWithoutAssociatedValues will return true for empty enums;
-        // empty enumas are allowed to conform as well.
+        // empty enums are allowed to conform as well.
         return enumDecl->hasOnlyCasesWithoutAssociatedValues();
       }
 
@@ -311,7 +315,6 @@ DerivedConformance::declareDerivedPropertyGetter(VarDecl *property,
 
   getterDecl->copyFormalAccessFrom(property);
 
-  C.addSynthesizedDecl(getterDecl);
 
   return getterDecl;
 }

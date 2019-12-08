@@ -121,8 +121,6 @@ public:
   InFlightDiagnostic emitDiagnostic(ArgTypes &&... Args) const;
 
 protected:
-  TypeChecker &getTypeChecker() const { return CS.TC; }
-
   DeclContext *getDC() const { return CS.DC; }
 
   ASTContext &getASTContext() const { return CS.getASTContext(); }
@@ -142,18 +140,10 @@ protected:
     return CS.findResolvedMemberRef(locator);
   }
 
+  /// Retrieve overload choice resolved for a given locator
+  /// by the constraint solver.
   Optional<SelectedOverload>
   getOverloadChoiceIfAvailable(ConstraintLocator *locator) const {
-    if (auto *overload = getResolvedOverload(locator))
-      return Optional<SelectedOverload>(
-           {overload->Choice, overload->OpenedFullType, overload->ImpliedType});
-    return None;
-  }
-
-  /// Retrieve overload choice resolved for given locator
-  /// by the constraint solver.
-  ResolvedOverloadSetListItem *
-  getResolvedOverload(ConstraintLocator *locator) const {
     return CS.findSelectedOverloadFor(locator);
   }
 
@@ -631,35 +621,6 @@ public:
   bool diagnoseAsError() override;
 };
 
-/// Diagnose failures related to use of the unwrapped optional types,
-/// which require some type of force-unwrap e.g. "!" or "try!".
-class MissingOptionalUnwrapFailure final : public FailureDiagnostic {
-  Type BaseType;
-  Type UnwrappedType;
-
-public:
-  MissingOptionalUnwrapFailure(ConstraintSystem &cs, Type baseType,
-                               Type unwrappedType, ConstraintLocator *locator)
-      : FailureDiagnostic(cs, locator), BaseType(baseType),
-        UnwrappedType(unwrappedType) {}
-
-  bool diagnoseAsError() override;
-
-private:
-  Type getBaseType() const {
-    return resolveType(BaseType, /*reconstituteSugar=*/true);
-  }
-
-  Type getUnwrappedType() const {
-    return resolveType(UnwrappedType, /*reconstituteSugar=*/true);
-  }
-
-  /// Suggest a default value via `?? <default value>`
-  void offerDefaultValueUnwrapFixIt(DeclContext *DC, Expr *expr) const;
-  /// Suggest a force optional unwrap via `!`
-  void offerForceUnwrapFixIt(Expr *expr) const;
-};
-
 /// Diagnose errors associated with rvalues in positions
 /// where an lvalue is required, such as inout arguments.
 class RValueTreatedAsLValueFailure final : public FailureDiagnostic {
@@ -669,6 +630,7 @@ public:
       : FailureDiagnostic(cs, locator) {}
 
   bool diagnoseAsError() override;
+  bool diagnoseAsNote() override;
 };
 
 class TrailingClosureAmbiguityFailure final : public FailureDiagnostic {
@@ -751,6 +713,8 @@ public:
   Type getToType() const { return ToType; }
 
   bool diagnoseAsError() override;
+
+  bool diagnoseAsNote() override;
 
   /// If we're trying to convert something to `nil`.
   bool diagnoseConversionToNil() const;
@@ -850,6 +814,32 @@ protected:
 
   static Optional<Diag<Type, Type>>
   getDiagnosticFor(ContextualTypePurpose context, bool forProtocol);
+};
+
+/// Diagnose failures related to use of the unwrapped optional types,
+/// which require some type of force-unwrap e.g. "!" or "try!".
+class MissingOptionalUnwrapFailure final : public ContextualFailure {
+public:
+  MissingOptionalUnwrapFailure(ConstraintSystem &cs, Type fromType, Type toType,
+                               ConstraintLocator *locator)
+      : ContextualFailure(cs, fromType, toType, locator) {}
+
+  bool diagnoseAsError() override;
+
+private:
+  Type getBaseType() const {
+    return resolveType(getFromType(), /*reconstituteSugar=*/true);
+  }
+
+  Type getUnwrappedType() const {
+    return resolveType(getBaseType()->getOptionalObjectType(),
+                       /*reconstituteSugar=*/true);
+  }
+
+  /// Suggest a default value via `?? <default value>`
+  void offerDefaultValueUnwrapFixIt(DeclContext *DC, Expr *expr) const;
+  /// Suggest a force optional unwrap via `!`
+  void offerForceUnwrapFixIt(Expr *expr) const;
 };
 
 /// Diagnostics for mismatched generic arguments e.g
@@ -1845,6 +1835,11 @@ public:
   /// reference equality operators `===` and `!==`.
   bool diagnoseUseOfReferenceEqualityOperator() const;
 
+  /// Tailored diagnostics for type mismatches associated with
+  /// property wrapper initialization via implicit `init(wrappedValue:)`
+  /// or now deprecated `init(initialValue:)`.
+  bool diagnosePropertyWrapperMismatch() const;
+
 protected:
   /// \returns The position of the argument being diagnosed, starting at 1.
   unsigned getArgPosition() const { return Info->getArgPosition(); }
@@ -2007,7 +2002,7 @@ private:
   /// valid for the duration of the call, and suggests an alternative to use.
   void emitSuggestionNotes() const;
 };
-	
+
 class AssignmentTypeMismatchFailure final : public ContextualFailure {
 public:
   AssignmentTypeMismatchFailure(ConstraintSystem &cs,
@@ -2020,6 +2015,17 @@ public:
 
 private:
   bool diagnoseMissingConformance() const;
+};
+
+class MissingContextualBaseInMemberRefFailure final : public FailureDiagnostic {
+  DeclName MemberName;
+
+public:
+  MissingContextualBaseInMemberRefFailure(ConstraintSystem &cs, DeclName member,
+                                          ConstraintLocator *locator)
+      : FailureDiagnostic(cs, locator), MemberName(member) {}
+
+  bool diagnoseAsError();
 };
 
 } // end namespace constraints

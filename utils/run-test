@@ -58,9 +58,14 @@ def error_exit(msg):
 
 
 # Return true if the path looks like swift build directory.
-def is_swift_build_dir(path):
+def is_swift_build_dir(path, unified_build_dir):
+    if not unified_build_dir:
+        tests_path = [path, "test-%s" % host_target]
+    else:
+        tests_path = [path, "tools", "swift", "test-%s" % host_target]
+
     return (os.path.exists(os.path.join(path, "CMakeCache.txt")) and
-            os.path.isdir(os.path.join(path, "test-%s" % host_target)))
+            os.path.isdir(os.path.join(*tests_path)))
 
 
 # Return true if the swift build directory is configured with `Xcode`
@@ -81,14 +86,19 @@ def is_subpath(path, d):
 # Convert test path in source directory to corresponding path in build
 # directory. If the path is not sub path of test directories in source,
 # return the path as is.
-def normalize_test_path(path, build_dir, variant):
+def normalize_test_path(path, build_dir, variant, unified_build_dir):
+    if not unified_build_dir:
+        tests_path = [build_dir]
+    else:
+        tests_path = [build_dir, "tools", "swift"]
+
     for d, prefix in [(TEST_SOURCE_DIR, 'test-%s'),
                       (VALIDATION_TEST_SOURCE_DIR, 'validation-test-%s')]:
         if is_subpath(path, d):
-            return os.path.normpath(os.path.join(
-                build_dir,
-                prefix % variant,
-                os.path.relpath(path, d)))
+            return os.path.normpath(os.path.join(*(
+                tests_path +
+                [prefix % variant,
+                 os.path.relpath(path, d)])))
     return path
 
 
@@ -133,6 +143,9 @@ def main():
     parser.add_argument("--lit", default=LIT_BIN_DEFAULT, metavar="PATH",
                         help="lit.py executable path "
                              "(default: ${LLVM_SOURCE_DIR}/utils/lit/lit.py)")
+    parser.add_argument("--unified", action="store_true",
+                        help="The build directory is an unified LLVM build, "
+                             "not a standalone Swift build")
 
     args = parser.parse_args()
 
@@ -151,7 +164,7 @@ def main():
         for d in [
                 build_dir,
                 os.path.join(build_dir, 'swift-%s' % host_target)]:
-            if is_swift_build_dir(d):
+            if is_swift_build_dir(d, args.unified):
                 build_dir = d
                 break
         else:
@@ -164,9 +177,8 @@ def main():
         # $ run-test --build-dir=<swift-build-dir> <test-dir-in-source> ... \
         #       --target macosx-x86_64 --target iphonesimulator-i386
         for target in targets:
-            paths += map(
-                lambda p: normalize_test_path(p, build_dir, target),
-                args.paths)
+            paths += [normalize_test_path(p, build_dir, target, args.unified)
+                      for p in args.paths]
 
     else:
         # Otherwise, we assume all given paths are valid test paths in the
@@ -181,7 +193,7 @@ def main():
             # Traverse the first test path to find the `build_dir`
             d = os.path.dirname(paths[0])
             while d not in ['', os.sep]:
-                if is_swift_build_dir(d):
+                if is_swift_build_dir(d, args.unified):
                     build_dir = d
                     break
                 d = os.path.dirname(d)

@@ -225,12 +225,10 @@ static void diagnoseFunctionParamNotRepresentable(
     AFD->diagnose(diag::objc_invalid_on_func_param_type,
                   ParamIndex + 1, getObjCDiagnosticAttrKind(Reason));
   }
-  if (Type ParamTy = P->getType()) {
-    SourceRange SR;
-    if (auto typeRepr = P->getTypeRepr())
-      SR = typeRepr->getSourceRange();
-    diagnoseTypeNotRepresentableInObjC(AFD, ParamTy, SR);
-  }
+  SourceRange SR;
+  if (auto typeRepr = P->getTypeRepr())
+    SR = typeRepr->getSourceRange();
+  diagnoseTypeNotRepresentableInObjC(AFD, P->getType(), SR);
   describeObjCReason(AFD, Reason);
 }
 
@@ -1047,11 +1045,7 @@ Optional<ObjCReason> shouldMarkAsObjC(const ValueDecl *VD, bool allowImplicit) {
   if (isa<AbstractFunctionDecl>(VD) || isa<AbstractStorageDecl>(VD))
     if (auto *replacementAttr =
             VD->getAttrs().getAttribute<DynamicReplacementAttr>()) {
-      if (auto *replaced = replacementAttr->getReplacedFunction()) {
-        if (replaced->isObjC())
-          return ObjCReason(ObjCReason::ImplicitlyObjC);
-      } else if (auto *replaced =
-                     TypeChecker::findReplacedDynamicFunction(VD)) {
+      if (auto *replaced = VD->getDynamicallyReplacedDecl()) {
         if (replaced->isObjC())
           return ObjCReason(ObjCReason::ImplicitlyObjC);
       }

@@ -10,31 +10,6 @@ add_sourcekit_library(SourceKitSwiftLang
   SwiftLangSupport.cpp
   SwiftSourceDocInfo.cpp
   SwiftTypeContextInfo.cpp
-  LINK_LIBS
-    SourceKitCore swiftDriver swiftFrontend
-    swiftClangImporter swiftIDE
-    swiftAST swiftMarkup swiftParse swiftParseSIL swiftSIL swiftSILGen
-    swiftSILOptimizer swiftIRGen swiftSema swiftBasic swiftSerialization
-    swiftSyntax swiftOption libcmark_static
-    # Clang dependencies.
-      clangIndex
-      clangFormat
-      clangToolingCore
-      clangFrontendTool
-      clangFrontend
-      clangDriver
-      clangCodeGen
-      clangSerialization
-      clangParse
-      clangSema
-      clangAnalysis
-      clangEdit
-      clangRewriteFrontend
-      clangRewrite
-      clangLex
-      clangAST
-      clangAPINotes
-      clangBasic
     LLVM_LINK_COMPONENTS ${LLVM_TARGETS_TO_BUILD}
       bitreader
       bitwriter
@@ -49,5 +24,43 @@ add_sourcekit_library(SourceKitSwiftLang
       objcarcopts
       profiledata
 )
-
+target_link_libraries(SourceKitSwiftLang PRIVATE
+  SourceKitCore
+  swiftDriver
+  swiftFrontend
+  swiftClangImporter
+  swiftIDE
+  swiftAST
+  swiftMarkup
+  swiftParse
+  swiftParseSIL
+  swiftSIL
+  swiftSILGen
+  swiftSILOptimizer
+  swiftIRGen
+  swiftSema
+  swiftBasic
+  swiftSerialization
+  swiftSyntax
+  swiftOption
+  libcmark_static
+  # Clang dependencies.
+  clangIndex
+  clangFormat
+  clangToolingCore
+  clangFrontendTool
+  clangFrontend
+  clangDriver
+  clangCodeGen
+  clangSerialization
+  clangParse
+  clangSema
+  clangAnalysis
+  clangEdit
+  clangRewriteFrontend
+  clangRewrite
+  clangLex
+  clangAST
+  clangAPINotes
+  clangBasic)
 add_dependencies(SourceKitSwiftLang clang-tablegen-targets)

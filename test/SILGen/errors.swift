@@ -269,7 +269,6 @@ class HasThrowingInit {
 // CHECK:    bb1([[SELF:%.*]] : @owned $HasThrowingInit):
 // CHECK-NEXT: return [[SELF]]
 // CHECK:    bb2([[ERROR:%.*]] : @owned $Error):
-// CHECK-NEXT: builtin "willThrow"
 // CHECK-NEXT: throw [[ERROR]]
 
 // CHECK-LABEL: sil hidden [ossa] @$s6errors15HasThrowingInit{{.*}} : $@convention(method) (Int, @owned HasThrowingInit) -> (@owned HasThrowingInit, @error Error) {
@@ -320,7 +319,6 @@ protocol Doomed {
 // CHECK:      [[T0:%.*]] = tuple ()
 // CHECK:      return [[T0]] : $()
 // CHECK:    bb2([[T0:%.*]] : @owned $Error):
-// CHECK:      builtin "willThrow"([[T0]] : $Error)
 // CHECK:      throw [[T0]] : $Error
 struct DoomedStruct : Doomed {
   func check() throws {}
@@ -335,7 +333,6 @@ struct DoomedStruct : Doomed {
 // CHECK:      end_borrow [[BORROWED_SELF]]
 // CHECK:      return [[T0]] : $()
 // CHECK:    bb2([[T0:%.*]] : @owned $Error):
-// CHECK:      builtin "willThrow"([[T0]] : $Error)
 // CHECK:      end_borrow [[BORROWED_SELF]]
 // CHECK:      throw [[T0]] : $Error
 class DoomedClass : Doomed {
@@ -376,7 +373,6 @@ func testThunk(_ fn: () throws -> Int) throws -> Int {
 // CHECK:   [[T0:%.*]] = tuple ()
 // CHECK:   return [[T0]]
 // CHECK: bb2([[T0:%.*]] : @owned $Error):
-// CHECK:   builtin "willThrow"([[T0]] : $Error)
 // CHECK:   throw [[T0]] : $Error
 
 func createInt(_ fn: () -> Int) throws {}

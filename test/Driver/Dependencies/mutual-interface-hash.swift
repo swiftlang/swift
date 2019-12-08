@@ -34,15 +34,17 @@
 // RUN: cp -r %S/Inputs/mutual-interface-hash/*.swiftdeps %t
 
 // Make sure the files really were dependent on one another.
+
 // RUN: touch -t 201401240007 %t/does-not-change.swift
 // RUN: cd %t && %swiftc_driver -c -driver-use-frontend-path "%{python};%S/Inputs/update-dependencies.py" -output-file-map %t/output.json -incremental -driver-always-rebuild-dependents ./does-change.swift ./does-not-change.swift -module-name main -j1 -v 2>&1 | %FileCheck -check-prefix=CHECK-REBUILD-DEPENDENTS %s
 
-// CHECK-REBUILD-DEPENDENTS: Handled does-not-change.swift
-// CHECK-REBUILD-DEPENDENTS: Handled does-change.swift
+// CHECK-REBUILD-DEPENDENTS-DAG: Handled does-not-change.swift
+// CHECK-REBUILD-DEPENDENTS-DAG: Handled does-change.swift
 
 
 // Check that cascading builds triggered by the build record are still
 // considered cascading.
+
 // RUN: cp -r %S/Inputs/mutual-interface-hash/*.swiftdeps %t
 // RUN: sed -E -e 's/"[^"]*does-not-change.swift":/& !dirty/' -i.prev %t/main~buildrecord.swiftdeps
 // RUN: cd %t && %swiftc_driver -c -driver-use-frontend-path "%{python};%S/Inputs/update-dependencies.py" -output-file-map %t/output.json -incremental ./does-change.swift ./does-not-change.swift -module-name main -j1 -v 2>&1 | %FileCheck -check-prefix=CHECK-REBUILD-DEPENDENTS %s

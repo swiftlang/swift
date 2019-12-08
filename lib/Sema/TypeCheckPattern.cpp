@@ -711,7 +711,7 @@ static bool validateTypedPattern(TypeResolution resolution,
 
 bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
                                    TypeResolutionOptions options) {
-  auto &diags = dc->getASTContext().Diags;
+  auto &Context = dc->getASTContext();
   switch (P->getKind()) {
   // Type-check paren patterns by checking the sub-pattern and
   // propagating that type out.
@@ -722,7 +722,7 @@ bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
       SP = PP->getSubPattern();
     else
       SP = cast<VarPattern>(P)->getSubPattern();
-    if (typeCheckPattern(SP, dc, options)) {
+    if (TypeChecker::typeCheckPattern(SP, dc, options)) {
       P->setType(ErrorType::get(Context));
       return true;
     }
@@ -748,9 +748,9 @@ bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
       return hadError;
 
     Pattern *subPattern = TP->getSubPattern();
-    if (coercePatternToType(subPattern, resolution, P->getType(),
-                            options|TypeResolutionFlags::FromNonInferredPattern,
-                            TP->getTypeLoc()))
+    if (TypeChecker::coercePatternToType(subPattern, resolution, P->getType(),
+                                         options|TypeResolutionFlags::FromNonInferredPattern,
+                                         TP->getTypeLoc()))
       hadError = true;
     else {
       TP->setSubPattern(subPattern);
@@ -768,7 +768,7 @@ bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
     if (options & TypeResolutionFlags::AllowUnspecifiedTypes)
       return false;
 
-    diags.diagnose(P->getLoc(), diag::cannot_infer_type_for_pattern);
+    Context.Diags.diagnose(P->getLoc(), diag::cannot_infer_type_for_pattern);
     P->setType(ErrorType::get(Context));
     if (auto named = dyn_cast<NamedPattern>(P)) {
       if (auto var = named->getDecl()) {
@@ -788,7 +788,7 @@ bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
     for (unsigned i = 0, e = tuplePat->getNumElements(); i != e; ++i) {
       TuplePatternElt &elt = tuplePat->getElement(i);
       Pattern *pattern = elt.getPattern();
-      if (typeCheckPattern(pattern, dc, elementOptions)) {
+      if (TypeChecker::typeCheckPattern(pattern, dc, elementOptions)) {
         hadError = true;
         continue;
       }
@@ -822,7 +822,8 @@ bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
   case PatternKind::Expr:
     // In a let/else, these always require an initial value to match against.
     if (!(options & TypeResolutionFlags::AllowUnspecifiedTypes)) {
-      diags.diagnose(P->getLoc(), diag::refutable_pattern_requires_initializer);
+      Context.Diags.diagnose(P->getLoc(),
+                             diag::refutable_pattern_requires_initializer);
       P->setType(ErrorType::get(Context));
       return true;
     }
@@ -883,7 +884,8 @@ recur:
   }
 
   auto dc = resolution.getDeclContext();
-  auto &diags = dc->getASTContext().Diags;
+  auto &Context = dc->getASTContext();
+  auto &diags = Context.Diags;
   auto subOptions = options;
   subOptions.setContext(None);
   switch (P->getKind()) {
@@ -978,12 +980,10 @@ recur:
     TypeChecker::checkForForbiddenPrefix(Context, var->getBaseName());
 
     // If we are inferring a variable to have type AnyObject.Type,
-    // "()", an uninhabited type, or optional thereof, emit a diagnostic.
-    // In the first 2 cases, the coder probably forgot a cast and expected a
-    // concrete type.  In the later case, they probably didn't mean to bind to
-    // a variable, or there is some other bug.  We always tell them that they
-    // can silence the warning with an explicit type annotation
-    // (and provide a fixit) as a note.
+    // "()", "[()]", an uninhabited type, or optional thereof, emit a diagnostic.
+    // They are probably missing a cast or didn't mean to bind to a variable.
+    // We always tell them that they can silence the warning with an
+    // explicit type annotation (and provide a fixit) as a note.
     Type diagTy = type->lookThroughAllOptionalTypes();
     bool isOptional = !type->getOptionalObjectType().isNull();
     if (!diagTy) diagTy = type;
@@ -1010,6 +1010,9 @@ recur:
         assert((diagTy->is<EnumType>() || diagTy->is<BoundGenericEnumType>()) &&
           "unknown structurally uninhabited type");
       }
+    } else if (auto *BST = diagTy->getAs<BoundGenericStructType>()) {
+      if (BST->getDecl() == Context.getArrayDecl())
+          shouldRequireType = BST->getGenericArgs()[0]->isEqual(Context.TheEmptyTupleType);
     }
     
     if (shouldRequireType &&
@@ -1018,8 +1021,8 @@ recur:
         !(options & TypeResolutionFlags::FromNonInferredPattern)) {
       diags.diagnose(NP->getLoc(), diag, NP->getDecl()->getName(), type,
                      NP->getDecl()->isLet());
-      diags.diagnose(NP->getLoc(),
-                     diag::add_explicit_type_annotation_to_silence);
+      diags.diagnose(NP->getLoc(), diag::add_explicit_type_annotation_to_silence)
+          .fixItInsertAfter(var->getNameLoc(), ": " + type->getWithoutParens()->getString());
     }
 
     return false;
@@ -1040,7 +1043,7 @@ recur:
     auto decayToParen = [&]() -> bool {
       assert(canDecayToParen);
       Pattern *sub = TP->getElement(0).getPattern();
-      if (this->coercePatternToType(sub, resolution, type, subOptions))
+      if (TypeChecker::coercePatternToType(sub, resolution, type, subOptions))
         return true;
       
       if (TP->getLParenLoc().isValid()) {
@@ -1131,10 +1134,10 @@ recur:
                                              NLE->getLoc(), NLE->getLoc(),
                                              NoneEnumElement->getName(),
                                              NoneEnumElement, nullptr, false);
-        return coercePatternToType(P, resolution, type, options);
+        return TypeChecker::coercePatternToType(P, resolution, type, options);
       }
     }
-    return typeCheckExprPattern(cast<ExprPattern>(P), dc, type);
+    return TypeChecker::typeCheckExprPattern(cast<ExprPattern>(P), dc, type);
   }
       
   // Coerce an 'is' pattern by determining the cast kind.
@@ -1175,14 +1178,14 @@ recur:
 
 
     CheckedCastKind castKind
-      = typeCheckCheckedCast(type, IP->getCastTypeLoc().getType(),
-                             type->hasError()
-                               ? CheckedCastContextKind::None
-                               : CheckedCastContextKind::IsPattern,
-                             dc,
-                             IP->getLoc(),
-                             nullptr,
-                             IP->getCastTypeLoc().getSourceRange());
+      = TypeChecker::typeCheckCheckedCast(type, IP->getCastTypeLoc().getType(),
+                                          type->hasError()
+                                            ? CheckedCastContextKind::None
+                                            : CheckedCastContextKind::IsPattern,
+                                          dc,
+                                          IP->getLoc(),
+                                          nullptr,
+                                          IP->getCastTypeLoc().getSourceRange());
     switch (castKind) {
     case CheckedCastKind::Unresolved:
       return true;
@@ -1485,10 +1488,7 @@ void TypeChecker::coerceParameterListToType(ParameterList *P, ClosureExpr *CE,
     if (param->isInvalid())
       return true;
 
-    if (auto type = param->getType())
-      return !isValidType(type);
-
-    return true;
+    return !isValidType(param->getType());
   };
 
   auto handleParameter = [&](ParamDecl *param, Type ty, bool forceMutable) {

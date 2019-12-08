@@ -1,5 +1,5 @@
 add_swift_unittest(SwiftDriverTests
-  DependencyGraphTests.cpp
+  CoarseGrainedDependencyGraphTests.cpp
 )
 
 target_link_libraries(SwiftDriverTests

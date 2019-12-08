@@ -77,7 +77,7 @@ extension NSCoder {
     var error: NSError?
     let result = __NSCoderDecodeObjectForKey(self, key, &error)
     try resolveError(error)
-    return result
+    return result as AnyObject?
   }
 
   @nonobjc
