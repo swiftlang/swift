@@ -864,11 +864,14 @@ static bool canBeUsedOrChangedExternally(SILGlobalVariable *global) {
   return canBeChangedExternally(global);
 }
 
+static bool isSafeToRemove(SILGlobalVariable *global) {
+  return global->getDecl() && !canBeUsedOrChangedExternally(global);
+}
+
 /// If there are no loads or accesses of a given global, then remove its
 /// associated global addr and all asssociated instructions.
 bool SILGlobalOpt::tryRemoveGlobalAddr(SILGlobalVariable *global) {
-  if (canBeUsedOrChangedExternally(global))
-    return false;
+  if (!isSafeToRemove(global)) return false;
 
   if (GlobalVarSkipProcessing.count(global) || GlobalLoadMap[global].size() ||
       GlobalAccessMap[global].size())
@@ -883,8 +886,7 @@ bool SILGlobalOpt::tryRemoveGlobalAddr(SILGlobalVariable *global) {
 }
 
 bool SILGlobalOpt::tryRemoveUnusedGlobal(SILGlobalVariable *global) {
-  if (canBeUsedOrChangedExternally(global))
-    return false;
+  if (!isSafeToRemove(global)) return false;
 
   if (GlobalVarSkipProcessing.count(global) || GlobalAddrMap[global].size() ||
       GlobalAccessMap[global].size() || GlobalLoadMap[global].size() ||
@@ -942,15 +944,17 @@ void SILGlobalOpt::collectGlobalAccess(GlobalAddrInst *GAI) {
     return;
   }
 
+  if (!SILG->getDecl())
+    return;
+
+  // We want to make sure that we still collect global addr instructions
+  // that are inside the addressors.
+  GlobalAddrMap[SILG].push_back(GAI);
+  
   // Ignore any accesses inside addressors for SILG
   auto GlobalVar = getVariableOfGlobalInit(F);
   if (GlobalVar == SILG)
     return;
-
-  if (!SILG->getDecl())
-    return;
-
-  GlobalAddrMap[SILG].push_back(GAI);
 
   for (auto *Op : getNonDebugUses(GAI)) {
     if (auto *SI = dyn_cast<StoreInst>(Op->getUser())) {
