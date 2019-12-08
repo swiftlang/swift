@@ -306,6 +306,10 @@ public:
     return getTerminator()->succblock_end();
   }
 
+  bool hasSingleSuccessorBlock() const {
+    return bool(getSingleSuccessorBlock());
+  }
+
   SILBasicBlock *getSingleSuccessorBlock() {
     return getTerminator()->getSingleSuccessorBlock();
   }
@@ -350,6 +354,10 @@ public:
     return any_of(
         getPredecessorBlocks(),
         [&BB](const SILBasicBlock *PredBB) -> bool { return BB == PredBB; });
+  }
+
+  bool hasSinglePredecessorBlock() const {
+    return bool(getSinglePredecessorBlock);
   }
 
   SILBasicBlock *getSinglePredecessorBlock() {
