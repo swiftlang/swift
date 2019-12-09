@@ -3617,9 +3617,7 @@ DifferentiableAttributeParameterIndicesRequest::evaluate(
     newAttr->setVJPFunction(attr->getVJPFunction());
     auto insertion = ctx.DifferentiableAttrs.try_emplace(
         {getterDecl, checkedWrtParamIndices}, newAttr);
-    // Valid `@differentiable` attributes are uniqued by their parameter
-    // indices. Reject duplicate attributes for the same decl and parameter
-    // indices pair.
+    // Reject duplicate `@differentiable` attributes.
     if (!insertion.second) {
       diagnoseAndRemoveAttr(diags, D, attr,
                             diag::differentiable_attr_duplicate);
@@ -3632,8 +3630,7 @@ DifferentiableAttributeParameterIndicesRequest::evaluate(
   }
   auto insertion = ctx.DifferentiableAttrs.try_emplace(
       {D, checkedWrtParamIndices}, attr);
-  // `@differentiable` attributes are uniqued by their parameter indices.
-  // Reject duplicate attributes for the same decl and parameter indices pair.
+  // Reject duplicate `@differentiable` attributes.
   if (!insertion.second && insertion.first->getSecond() != attr) {
     diagnoseAndRemoveAttr(diags, D, attr, diag::differentiable_attr_duplicate);
     diags.diagnose(insertion.first->getSecond()->getLocation(),
@@ -3915,8 +3912,7 @@ void AttributeChecker::visitDerivativeAttr(DerivativeAttr *attr) {
     return;
   }
 
-  // Valid `@derivative` attributes are uniqued by original function and
-  // parameter indices. Reject duplicate attributes.
+  // Reject duplicate `@derivative` attributes.
   auto insertion = Ctx.DerivativeAttrs.try_emplace(
       {originalAFD, checkedWrtParamIndices, kind}, attr);
   if (!insertion.second) {
