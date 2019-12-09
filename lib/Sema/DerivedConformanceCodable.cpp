@@ -1139,3 +1139,21 @@ ValueDecl *DerivedConformance::deriveDecodable(ValueDecl *requirement) {
 
   return nullptr;
 }
+
+TypeDecl *DerivedConformance::derivePhantomCodingKeysRequirement() {
+  // We can only synthesize CodingKeys for structs and classes.
+  if (!isa<StructDecl>(Nominal) && !isa<ClassDecl>(Nominal))
+    return nullptr;
+
+  // Pull out a user-defined CodingKeys declaration.
+  auto result = Nominal->lookupDirect(DeclName(Context.Id_CodingKeys));
+  TypeDecl *keysDecl = nullptr;
+  if (!result.empty()) {
+    return dyn_cast<TypeDecl>(result.front());
+  } else {
+    // That failed, try to synthesize one.
+    keysDecl = synthesizeCodingKeysEnum(*this);
+  }
+
+  return keysDecl;
+}

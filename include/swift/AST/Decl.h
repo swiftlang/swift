@@ -467,10 +467,14 @@ protected:
     IsDebuggerAlias : 1
   );
 
-  SWIFT_INLINE_BITFIELD(NominalTypeDecl, GenericTypeDecl, 1+1+1,
+  SWIFT_INLINE_BITFIELD(NominalTypeDecl, GenericTypeDecl, 1+1+1+1,
     /// Whether we have already added implicitly-defined initializers
     /// to this declaration.
     AddedImplicitInitializers : 1,
+
+    /// Whether we have already added the phantom CodingKeys
+    /// nested requirement to this declaration.
+    AddedPhantomCodingKeys : 1,
 
     /// Whether there is are lazily-loaded conformances for this nominal type.
     HasLazyConformances : 1,
@@ -3323,6 +3327,7 @@ protected:
     IterableDeclContext(IterableDeclContextKind::NominalTypeDecl)
   {
     Bits.NominalTypeDecl.AddedImplicitInitializers = false;
+    Bits.NominalTypeDecl.AddedPhantomCodingKeys = false;
     ExtensionGeneration = 0;
     Bits.NominalTypeDecl.HasLazyConformances = false;
     Bits.NominalTypeDecl.IsComputingSemanticMembers = false;
@@ -3361,6 +3366,18 @@ public:
   /// Note that we have attempted to add implicit initializers.
   void setAddedImplicitInitializers() {
     Bits.NominalTypeDecl.AddedImplicitInitializers = true;
+  }
+
+  /// Determine whether we have already attempted to add the
+  /// phantom CodingKeys type to this declaration.
+  bool addedPhantomCodingKeys() const {
+    return Bits.NominalTypeDecl.AddedPhantomCodingKeys;
+  }
+
+  /// Note that we have attempted to add the phantom CodingKeys type
+  /// to this declaration.
+  void setAddedPhantomCodingKeys() {
+    Bits.NominalTypeDecl.AddedPhantomCodingKeys = true;
   }
 
   /// getDeclaredType - Retrieve the type declared by this entity, without

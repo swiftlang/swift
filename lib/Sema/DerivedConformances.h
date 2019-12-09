@@ -189,6 +189,9 @@ public:
   /// \returns the derived member, which will also be added to the type.
   ValueDecl *deriveDecodable(ValueDecl *requirement);
 
+  /// Derive the CodingKeys requirement for a value type.
+  TypeDecl *derivePhantomCodingKeysRequirement();
+
   /// Declare a read-only property.
   std::pair<VarDecl *, PatternBindingDecl *>
   declareDerivedProperty(Identifier name, Type propertyInterfaceType,

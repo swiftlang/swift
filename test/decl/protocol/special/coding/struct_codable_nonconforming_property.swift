@@ -162,7 +162,6 @@ struct NonConformingStruct : Codable { // expected-error {{type 'NonConformingSt
   // These lines have to be within the NonConformingStruct type because
   // CodingKeys should be private.
   func foo() {
-    // They should not get a CodingKeys type.
     let _ = NonConformingStruct.CodingKeys.self
     let _ = NonConformingStruct.CodingKeys.x
     let _ = NonConformingStruct.CodingKeys.y
