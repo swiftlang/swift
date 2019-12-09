@@ -1269,6 +1269,7 @@ bool IRGenModule::finalize() {
       ModuleHash->setSection("__LLVM,__swift_modhash");
       break;
     case llvm::Triple::ELF:
+    case llvm::Triple::Wasm:
       ModuleHash->setSection(".swift_modhash");
       break;
     case llvm::Triple::COFF:

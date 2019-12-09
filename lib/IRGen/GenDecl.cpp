@@ -905,12 +905,11 @@ std::string IRGenModule::GetObjCSectionName(StringRef Section,
                ? ("__DATA," + Section).str()
                : ("__DATA," + Section + "," + MachOAttributes).str();
   case llvm::Triple::ELF:
+  case llvm::Triple::Wasm:
     return Section.substr(2).str();
   case llvm::Triple::XCOFF:
   case llvm::Triple::COFF:
     return ("." + Section.substr(2) + "$B").str();
-  case llvm::Triple::Wasm:
-    return Section.substr(2).str();
   }
 
   llvm_unreachable("unexpected object file format");
@@ -937,11 +936,10 @@ void IRGenModule::SetCStringLiteralSection(llvm::GlobalVariable *GV,
       return;
     }
   case llvm::Triple::ELF:
+  case llvm::Triple::Wasm:
     return;
   case llvm::Triple::XCOFF:
   case llvm::Triple::COFF:
-    return;
-  case llvm::Triple::Wasm:
     return;
   }
 
