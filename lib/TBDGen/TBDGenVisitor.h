@@ -75,6 +75,12 @@ private:
   void addBaseConformanceDescriptor(BaseConformance conformance);
 
   // SWIFT_ENABLE_TENSORFLOW
+  /// Adds the symbol for the linear map function of the given kind associated
+  /// with the given original function and `@differentiable` attr.
+  void addAutoDiffLinearMapFunction(AbstractFunctionDecl *original,
+                                    const DifferentiableAttr *attr,
+                                    AutoDiffLinearMapKind kind);
+
   /// Adds the symbol for the autodiff function of the given kind associated
   /// with the given original function and `@differentiable` attr.
   void addAutoDiffDerivativeFunction(AbstractFunctionDecl *original,

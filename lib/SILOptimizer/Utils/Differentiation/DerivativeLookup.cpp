@@ -45,34 +45,35 @@ getExactDifferentiabilityWitness(SILModule &module, SILFunction *original,
   return nullptr;
 }
 
-const DifferentiableAttr *
-getMinimalASTDifferentiableAttr(AbstractFunctionDecl *original,
-                                IndexSubset *parameterIndices,
-                                IndexSubset *&minimalParameterIndices) {
-  const DifferentiableAttr *minimalAttr = nullptr;
-  minimalParameterIndices = nullptr;
-  for (auto *attr : original->getAttrs().getAttributes<DifferentiableAttr>()) {
-    auto *attrParameterIndices = autodiff::getLoweredParameterIndices(
-        attr->getParameterIndices(),
+Optional<AutoDiffConfig>
+findMinimalDerivativeConfiguration(AbstractFunctionDecl *original,
+                                   IndexSubset *parameterIndices,
+                                   IndexSubset *&minimalASTParameterIndices) {
+  Optional<AutoDiffConfig> minimalConfig = None;
+  auto configs = original->getDerivativeFunctionConfigurations();
+  for (auto config : configs) {
+    auto *silParameterIndices = autodiff::getLoweredParameterIndices(
+        config.parameterIndices,
         original->getInterfaceType()->castTo<AnyFunctionType>());
-    // If all indices in `parameterIndices` are in `daParameterIndices`, and it
-    // has fewer indices than our current candidate and a primitive VJP, then
-    // `attr` is our new candidate.
+    // If all indices in `parameterIndices` are in `daParameterIndices`, and
+    // it has fewer indices than our current candidate and a primitive VJP,
+    // then `attr` is our new candidate.
     //
     // NOTE(TF-642): `attr` may come from a un-partial-applied function and
     // have larger capacity than the desired indices. We expect this logic to
     // go away when `partial_apply` supports `@differentiable` callees.
-    if (attrParameterIndices->isSupersetOf(parameterIndices->extendingCapacity(
-            original->getASTContext(), attrParameterIndices->getCapacity())) &&
+    if (silParameterIndices->isSupersetOf(parameterIndices->extendingCapacity(
+            original->getASTContext(), silParameterIndices->getCapacity())) &&
         // fewer parameters than before
-        (!minimalParameterIndices ||
-         attrParameterIndices->getNumIndices() <
-             minimalParameterIndices->getNumIndices())) {
-      minimalAttr = attr;
-      minimalParameterIndices = attrParameterIndices;
+        (!minimalConfig ||
+         silParameterIndices->getNumIndices() <
+             minimalConfig->parameterIndices->getNumIndices())) {
+      minimalASTParameterIndices = config.parameterIndices;
+      minimalConfig = AutoDiffConfig(silParameterIndices, config.resultIndices,
+                                     config.derivativeGenericSignature);
     }
   }
-  return minimalAttr;
+  return minimalConfig;
 }
 
 SILDifferentiabilityWitness *getOrCreateMinimalASTDifferentiabilityWitness(
@@ -88,22 +89,14 @@ SILDifferentiabilityWitness *getOrCreateMinimalASTDifferentiabilityWitness(
   if (!originalAFD)
     return nullptr;
 
-  IndexSubset *minimalParameterIndices = nullptr;
-  const auto *minimalAttr = getMinimalASTDifferentiableAttr(
-      originalAFD, parameterIndices, minimalParameterIndices);
-
-  // TODO(TF-835): This will also need to search all `@differentiating`
-  // attributes after we stop synthesizing `@differentiable` attributes for
-  // `@differentiating` attributes.
-
-  if (!minimalAttr)
+  IndexSubset *minimalASTParameterIndices = nullptr;
+  auto minimalConfig = findMinimalDerivativeConfiguration(
+      originalAFD, parameterIndices, minimalASTParameterIndices);
+  if (!minimalConfig)
     return nullptr;
 
-  AutoDiffConfig minimalConfig(minimalParameterIndices, resultIndices,
-                               minimalAttr->getDerivativeGenericSignature());
-
   auto *existingWitness = module.lookUpDifferentiabilityWitness(
-      {original->getName(), minimalConfig});
+      {original->getName(), *minimalConfig});
   if (existingWitness)
     return existingWitness;
 
@@ -113,8 +106,8 @@ SILDifferentiabilityWitness *getOrCreateMinimalASTDifferentiabilityWitness(
 
   return SILDifferentiabilityWitness::createDeclaration(
       module, SILLinkage::PublicExternal, original,
-      minimalConfig.parameterIndices, minimalConfig.resultIndices,
-      minimalConfig.derivativeGenericSignature);
+      minimalConfig->parameterIndices, minimalConfig->resultIndices,
+      minimalConfig->derivativeGenericSignature);
 }
 
 } // end namespace swift

@@ -318,15 +318,24 @@ ForwardModeTests.test("TupleMutation") {
   }
   expectEqual(405, derivative(at: 3, in: nested))
 
-  // FIXME(TF-201): Update after reabstraction thunks can be directly differentiated.
-  /*
-  func generic<T : Differentiable & AdditiveArithmetic>(_ x: T) -> T {
+  func generic<T: Differentiable & AdditiveArithmetic>(_ x: T) -> T {
     var tuple = (x, x)
-    tuple.0 += x
-    tuple.1 += x
-    return tuple.0 + tuple.0
+    return tuple.0
   }
   expectEqual(1, derivative(at: 3.0, in: generic))
+
+  // FIXME(TF-1033): Fix forward-mode ownership error for tuple with non-active
+  // initial values.
+  /*
+  func genericInitialNonactive<T: Differentiable & AdditiveArithmetic>(
+    _ x: T
+  ) -> T {
+    var tuple = (T.zero, T.zero)
+    tuple.0 = x
+    tuple.1 = x
+    return tuple.0
+  }
+  expectEqual(1, derivative(at: 3.0, in: genericInitialNonactive))
   */
 }
 

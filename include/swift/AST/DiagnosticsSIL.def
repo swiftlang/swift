@@ -467,6 +467,12 @@ NOTE(autodiff_expression_not_differentiable_note,none,
 NOTE(autodiff_external_nondifferentiable_function,none,
      "cannot differentiate functions that have not been marked "
      "'@differentiable' and that are defined in other files", ())
+NOTE(autodiff_private_derivative_from_fragile,none,
+     "differentiated functions in "
+     "%select{'@inlinable' functions|default arguments}0 must be marked "
+     "'@differentiable' or have a public '@derivative'"
+     "%select{|; this is not possible with a closure, make a top-level "
+     "function instead}1", (unsigned, bool))
 NOTE(autodiff_nondifferentiable_argument,none,
      "cannot differentiate through a non-differentiable argument; do you want "
      "to use 'withoutDerivative(at:)'?", ())

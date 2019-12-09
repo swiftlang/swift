@@ -166,6 +166,12 @@ public:
                  unsigned previousGeneration,
                  llvm::TinyPtrVector<AbstractFunctionDecl *> &methods) override;
 
+  // SWIFT_ENABLE_TENSORFLOW
+  virtual void loadDerivativeFunctionConfigurations(
+      AbstractFunctionDecl *originalAFD, unsigned previousGeneration,
+      llvm::SetVector<AutoDiffConfig> &results) override;
+  // SWIFT_ENABLE_TENSORFLOW END
+
   virtual void verifyAllModules() override;
 };
 

@@ -466,3 +466,35 @@ _ = gradient(at: Float(1), Float(2), in: (+) as @differentiable (Float, @nondiff
 
 // expected-error @+1 {{conversion to '@differentiable(linear)' function type is not yet supported}}
 let _: @differentiable(linear) (Float) -> Float = { x in x }
+
+//===----------------------------------------------------------------------===//
+// Differentiating from fragile functions
+//===----------------------------------------------------------------------===//
+
+public func implicitlyDifferentiableFromFragile(_ x: Float) -> Float { x }
+
+public func hasImplicitlyDifferentiatedTopLevelDefaultArgument(
+// expected-error @+2 {{function is not differentiable}}
+// expected-note @+1 {{differentiated functions in default arguments must be marked '@differentiable' or have a public '@derivative'}}
+  _ f: @differentiable (Float) -> Float = implicitlyDifferentiableFromFragile
+) {}
+
+// TODO(TF-1030): This will eventually not be an error.
+// expected-error @+2 {{function is not differentiable}}
+// expected-note @+1 {{differentiated functions in default arguments must be marked '@differentiable' or have a public '@derivative'; this is not possible with a closure, make a top-level function instead}}
+public func hasImplicitlyDifferentiatedClosureDefaultArgument(_ f: @differentiable (Float) -> Float = { $0 }) {}
+
+@inlinable
+public func fragileFuncWithGradient() {
+  // expected-error @+2 {{function is not differentiable}}
+  // expected-note @+1 {{differentiated functions in '@inlinable' functions must be marked '@differentiable' or have a public '@derivative'}}
+  let _ = gradient(at: 0, in: implicitlyDifferentiableFromFragile)
+}
+
+@inlinable
+@differentiable
+public func fragileDifferentiable(_ x: Float) -> Float {
+  // expected-error @+2 {{expression is not differentiable}}
+  // expected-note @+1 {{differentiated functions in '@inlinable' functions must be marked '@differentiable' or have a public '@derivative'}}
+  implicitlyDifferentiableFromFragile(x)
+}

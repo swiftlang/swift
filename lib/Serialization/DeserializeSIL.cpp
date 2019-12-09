@@ -3540,8 +3540,9 @@ SILDeserializer::readDifferentiabilityWitness(DeclID DId) {
     assert(!isSerialized && "declaration must not be serialized");
   }
 
-  auto linkage = fromStableSILLinkage(rawLinkage);
-  assert(linkage && "Expected value linkage for sil_differentiability_witness");
+  auto linkageOpt = fromStableSILLinkage(rawLinkage);
+  assert(linkageOpt &&
+         "Expected value linkage for sil_differentiability_witness");
   auto originalName = MF->getIdentifierText(originalNameId);
   auto jvpName = MF->getIdentifierText(jvpNameId);
   auto vjpName = MF->getIdentifierText(vjpNameId);
@@ -3578,10 +3579,14 @@ SILDeserializer::readDifferentiabilityWitness(DeclID DId) {
   auto *diffWitness =
       SILMod.lookUpDifferentiabilityWitness({originalName, config});
 
+  // Witnesses that we deserialize are always available externally; we never
+  // want to emit them ourselves.
+  auto linkage = swift::addExternalToLinkage(*linkageOpt);
+
   // If there is no existing differentiability witness, create one.
   if (!diffWitness)
     diffWitness = SILDifferentiabilityWitness::createDeclaration(
-        SILMod, *linkage, original, parameterIndices, resultIndices,
+        SILMod, linkage, original, parameterIndices, resultIndices,
         derivativeGenSig);
 
   // If the current differentiability witness is merely a declaration, and the
