@@ -2804,14 +2804,19 @@ ContextualFailure::getDiagnosticFor(ContextualTypePurpose context,
 }
 
 bool TupleContextualFailure::diagnoseAsError() {
-  auto diagnostic = isNumElementsMismatch()
-                        ? diag::tuple_types_not_convertible_nelts
-                        : getDiagnosticFor(getContextualTypePurpose(),
-                                           /*forProtocol=*/false);
-  if (!diagnostic)
+  Diag<Type, Type> diagnostic;
+  auto purpose = getContextualTypePurpose();
+  auto &cs = getConstraintSystem();
+  if (isNumElementsMismatch())
+    diagnostic = diag::tuple_types_not_convertible_nelts;
+  else if ((purpose == CTP_Initialization) && !cs.getContextualType())
+    diagnostic = diag::tuple_types_not_convertible;
+  else if (auto diag = getDiagnosticFor(purpose, /*forProtocol=*/false))
+    diagnostic = *diag;
+  else
     return false;
 
-  emitDiagnostic(getAnchor()->getLoc(), *diagnostic, getFromType(), getToType());
+  emitDiagnostic(getAnchor()->getLoc(), diagnostic, getFromType(), getToType());
   return true;
 }
 
