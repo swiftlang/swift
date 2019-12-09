@@ -34,6 +34,7 @@ typedef NS_ENUM(NSUInteger, MyEventType) {
 
 @interface MyView : NSObject
 @property (nonatomic, nullable, readonly, strong) MyWindow *window;
+@property (nonatomic, nullable, strong) MyWindow *window2;
 @end
 
 typedef struct MyPoint {
