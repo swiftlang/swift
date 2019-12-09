@@ -13,7 +13,10 @@
 
 // CHECK-IOS:   "paths": {
 // CHECK-IOS:     "runtimeLibraryPaths": [
-// CHECK-IOS:     "runtimeResourcePath":{{.*}}lib{{(/|\\)}}swift"
+// CHECK-IOS:     ],
+// CHECK-IOS:     "runtimeLibraryImportPaths": [
+// CHECK-IOS:     ],
+// CHECK-IOS:     "runtimeResourcePath": "{{.*}}lib{{(/|\\\\)}}swift"
 // CHECK-IOS:   }
 
 
