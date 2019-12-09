@@ -51,7 +51,6 @@
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SILOptimizer/Utils/Differentiation/ADContext.h"
 #include "swift/SILOptimizer/Utils/Differentiation/Common.h"
-#include "swift/SILOptimizer/Utils/Differentiation/DerivativeLookup.h"
 #include "swift/SILOptimizer/Utils/Differentiation/JVPEmitter.h"
 #include "swift/SILOptimizer/Utils/Differentiation/LinearMapInfo.h"
 #include "swift/SILOptimizer/Utils/Differentiation/VJPEmitter.h"
