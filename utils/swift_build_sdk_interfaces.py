@@ -402,9 +402,18 @@ def main():
             xfails = json.load(xfails_file)
 
     make_dirs_if_needed(args.output_dir, args.dry_run)
-    shared_output_lock = multiprocessing.Lock()
-    pool = multiprocessing.Pool(args.jobs, set_up_child,
-                                (args, shared_output_lock))
+    if 'ANDROID_DATA' not in os.environ:
+        shared_output_lock = multiprocessing.Lock()
+        pool = multiprocessing.Pool(args.jobs, set_up_child,
+                                    (args, shared_output_lock))
+    else:
+        # Android doesn't support Python's multiprocessing as it doesn't have
+        # sem_open, so switch to a ThreadPool instead.
+        import threading
+        shared_output_lock = threading.Lock()
+        from multiprocessing.pool import ThreadPool
+        pool = ThreadPool(args.jobs, set_up_child,
+                          (args, shared_output_lock))
 
     interface_framework_dirs = (args.interface_framework_dirs or
                                 DEFAULT_FRAMEWORK_INTERFACE_SEARCH_PATHS)

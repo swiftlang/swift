@@ -168,6 +168,13 @@ macro(add_sourcekit_library name)
     endif()
   endif()
 
+  if("${CMAKE_SYSTEM_NAME}" STREQUAL "Android")
+    if(SOURCEKITLIB_SHARED)
+      set_target_properties(${name} PROPERTIES BUILD_WITH_INSTALL_RPATH TRUE)
+      set_target_properties(${name} PROPERTIES INSTALL_RPATH "$ORIGIN/../lib/swift/android")
+    endif()
+  endif()
+
   if("${SOURCEKITLIB_INSTALL_IN_COMPONENT}" STREQUAL "")
     if(SOURCEKITLIB_SHARED)
       set(SOURCEKITLIB_INSTALL_IN_COMPONENT tools)

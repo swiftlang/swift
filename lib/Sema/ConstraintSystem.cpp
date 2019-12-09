@@ -475,31 +475,38 @@ ConstraintSystem::getCalleeLocator(ConstraintLocator *locator,
   if (isa<SubscriptExpr>(anchor))
     return getConstraintLocator(anchor, ConstraintLocator::SubscriptMember);
 
+  auto getSpecialFnCalleeLoc = [&](Type fnTy) -> ConstraintLocator * {
+    // FIXME: We should probably assert that we don't get a type variable
+    // here to make sure we only retrieve callee locators for resolved calls,
+    // ensuring that callee locators don't change after binding a type.
+    // Unfortunately CSDiag currently calls into getCalleeLocator, so all bets
+    // are off. Once we remove that legacy diagnostic logic, we should be able
+    // to assert here.
+    fnTy = getFixedTypeRecursive(fnTy, /*wantRValue*/ true);
+
+    // For an apply of a metatype, we have a short-form constructor. Unlike
+    // other locators to callees, these are anchored on the apply expression
+    // rather than the function expr.
+    if (fnTy->is<AnyMetatypeType>()) {
+      return getConstraintLocator(anchor,
+                                  {LocatorPathElt::ApplyFunction(),
+                                   LocatorPathElt::ConstructorMember()});
+    }
+
+    // Handle an apply of a nominal type which supports callAsFunction.
+    if (fnTy->isCallableNominalType(DC))
+      return getConstraintLocator(anchor, ConstraintLocator::ApplyFunction);
+
+    return nullptr;
+  };
+
   if (lookThroughApply) {
     if (auto *applyExpr = dyn_cast<ApplyExpr>(anchor)) {
       auto *fnExpr = applyExpr->getFn();
 
-      // FIXME: We should probably assert that we don't get a type variable
-      // here to make sure we only retrieve callee locators for resolved calls,
-      // ensuring that callee locators don't change after binding a type.
-      // Unfortunately CSDiag currently calls into getCalleeLocator, so all bets
-      // are off. Once we remove that legacy diagnostic logic, we should be able
-      // to assert here.
-      auto fnTy = getFixedTypeRecursive(getType(fnExpr), /*wantRValue*/ true);
-
-      // For an apply of a metatype, we have a short-form constructor. Unlike
-      // other locators to callees, these are anchored on the apply expression
-      // rather than the function expr.
-      if (fnTy->is<AnyMetatypeType>()) {
-        auto *fnLocator =
-            getConstraintLocator(applyExpr, ConstraintLocator::ApplyFunction);
-        return getConstraintLocator(fnLocator,
-                                    ConstraintLocator::ConstructorMember);
-      }
-
-      // Handle an apply of a nominal type which supports callAsFunction.
-      if (fnTy->isCallableNominalType(DC))
-        return getConstraintLocator(anchor, ConstraintLocator::ApplyFunction);
+      // Handle special cases for applies of non-function types.
+      if (auto *loc = getSpecialFnCalleeLoc(getType(fnExpr)))
+        return loc;
 
       // Otherwise fall through and look for locators anchored on the function
       // expr. For CallExprs, this can look through things like parens and
@@ -519,8 +526,23 @@ ConstraintSystem::getCalleeLocator(ConstraintLocator *locator,
                     : ConstraintLocator::Member);
   }
 
-  if (isa<UnresolvedMemberExpr>(anchor))
-    return getConstraintLocator(anchor, ConstraintLocator::UnresolvedMember);
+  if (auto *UME = dyn_cast<UnresolvedMemberExpr>(anchor)) {
+    auto *calleeLoc =
+        getConstraintLocator(UME, ConstraintLocator::UnresolvedMember);
+
+    // Handle special cases for applies of non-function types.
+    // FIXME: Consider re-designing the AST such that an unresolved member expr
+    // with arguments uses a CallExpr, which would make this logic unnecessary
+    // and clean up a bunch of other special cases. Doing so may require a bit
+    // of hacking in CSGen though.
+    if (UME->hasArguments()) {
+      if (auto overload = findSelectedOverloadFor(calleeLoc)) {
+        if (auto *loc = getSpecialFnCalleeLoc(overload->boundType))
+          return loc;
+      }
+    }
+    return calleeLoc;
+  }
 
   if (isa<MemberRefExpr>(anchor))
     return getConstraintLocator(anchor, ConstraintLocator::Member);
@@ -3044,6 +3066,11 @@ void constraints::simplifyLocator(Expr *&anchor,
       break;
     }
 
+    case ConstraintLocator::DynamicCallable: {
+      path = path.slice(1);
+      continue;
+    }
+
     case ConstraintLocator::ApplyFunction:
       // Extract application function.
       if (auto applyExpr = dyn_cast<ApplyExpr>(anchor)) {
@@ -3356,10 +3383,16 @@ ConstraintSystem::getArgumentInfoLocator(ConstraintLocator *locator) {
   if (!anchor)
     return nullptr;
 
+  // Applies and unresolved member exprs can have callee locators that are
+  // dependent on the type of their function, which may not have been resolved
+  // yet. Therefore we need to handle them specially.
   if (auto *apply = dyn_cast<ApplyExpr>(anchor)) {
     auto *fnExpr = getArgumentLabelTargetExpr(apply->getFn());
     return getConstraintLocator(fnExpr);
   }
+
+  if (auto *UME = dyn_cast<UnresolvedMemberExpr>(anchor))
+    return getConstraintLocator(UME);
 
   return getCalleeLocator(locator);
 }

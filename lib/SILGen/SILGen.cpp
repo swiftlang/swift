@@ -1090,6 +1090,7 @@ void SILGenModule::emitDefaultArgGenerator(SILDeclRef constant,
   case DefaultArgumentKind::Inherited:
   case DefaultArgumentKind::Column:
   case DefaultArgumentKind::File:
+  case DefaultArgumentKind::FilePath:
   case DefaultArgumentKind::Line:
   case DefaultArgumentKind::Function:
   case DefaultArgumentKind::DSOHandle:
@@ -1115,8 +1116,8 @@ emitStoredPropertyInitialization(PatternBindingDecl *pbd, unsigned i) {
             ->isPropertyMemberwiseInitializedWithWrappedType()) {
       auto wrapperInfo =
           originalProperty->getPropertyWrapperBackingPropertyInfo();
-      if (wrapperInfo.originalInitialValue)
-        init = wrapperInfo.originalInitialValue;
+      assert(wrapperInfo.originalInitialValue);
+      init = wrapperInfo.originalInitialValue;
     }
   }
 

@@ -874,7 +874,7 @@ namespace {
       }
       auto targetFormalTy = target.FormalType;
       auto targetLoweredTy =
-          SILType::getPrimitiveObjectType(targetFormalTy);
+          SILType::getPrimitiveObjectType(target.LoweredType.getASTType());
       if (isCFBridgingConversion(SwiftModule,
                                  source.FormalType,
                                  targetFormalTy)) {

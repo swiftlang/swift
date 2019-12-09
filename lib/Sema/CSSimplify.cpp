@@ -2660,6 +2660,17 @@ repairViaOptionalUnwrap(ConstraintSystem &cs, Type fromType, Type toType,
   if (fromUnwraps <= toUnwraps && !fromObjectType->is<TypeVariableType>())
     return false;
 
+  // If the result of optional chaining is converted to
+  // an optional contextual type represented by a type
+  // variable e.g. `T?`, there can be no optional mismatch
+  // because `T` could be bound to an optional of any depth.
+  if (isa<OptionalEvaluationExpr>(anchor) && toUnwraps > 0) {
+    auto last = locator.last();
+    if (last && last->is<LocatorPathElt::ContextualType>() &&
+        toObjectType->is<TypeVariableType>())
+      return false;
+  }
+
   auto result =
       cs.matchTypes(fromObjectType, toObjectType, matchKind,
                     ConstraintSystem::TypeMatchFlags::TMF_ApplyingFix, locator);
@@ -3156,6 +3167,12 @@ bool ConstraintSystem::repairFailures(
     // for this call, we can consider overload unrelated.
     if (llvm::any_of(getFixes(), [&](const ConstraintFix *fix) {
           auto *locator = fix->getLocator();
+          // Since arguments to @dynamicCallable form either an array
+          // or a dictionary and all have to match the same element type,
+          // let's allow multiple invalid arguments.
+          if (locator->findFirst<LocatorPathElt::DynamicCallable>())
+            return false;
+
           return locator->findLast<LocatorPathElt::ApplyArgToParam>()
                      ? locator->getAnchor() == anchor
                      : false;
@@ -7808,7 +7825,35 @@ ConstraintSystem::simplifyDynamicCallableApplicableFnConstraint(
     choices.push_back(
       OverloadChoice(type2, candidate, FunctionRefKind::SingleApply));
   }
-  if (choices.empty()) return SolutionKind::Error;
+
+  if (choices.empty()) {
+    if (!shouldAttemptFixes())
+      return SolutionKind::Error;
+
+    // TODO(diagnostics): This is not going to be necessary once
+    // `@dynamicCallable` uses existing `member` machinery.
+
+    auto memberName = DeclName(
+        ctx, ctx.Id_dynamicallyCall,
+        {useKwargsMethod ? ctx.Id_withKeywordArguments : ctx.Id_withArguments});
+
+    auto *fix = DefineMemberBasedOnUse::create(
+        *this, desugar2, memberName,
+        getConstraintLocator(loc, ConstraintLocator::DynamicCallable));
+
+    if (recordFix(fix))
+      return SolutionKind::Error;
+
+    recordPotentialHole(tv);
+
+    Type(func1).visit([&](Type type) {
+      if (auto *typeVar = type->getAs<TypeVariableType>())
+        recordPotentialHole(typeVar);
+    });
+
+    return SolutionKind::Solved;
+  }
+
   addOverloadSet(tv, choices, DC, loc);
 
   // Create a type variable for the argument to the `dynamicallyCall` method.
@@ -7841,14 +7886,20 @@ ConstraintSystem::simplifyDynamicCallableApplicableFnConstraint(
   addConstraint(ConstraintKind::Defaultable, argumentType,
                 ctx.TheAnyType, locator);
 
+  auto *baseArgLoc = getConstraintLocator(
+      loc->getAnchor(),
+      {ConstraintLocator::DynamicCallable, ConstraintLocator::ApplyArgument},
+      /*summaryFlags=*/0);
+
   // All dynamic call parameter types must be convertible to the argument type.
   for (auto i : indices(func1->getParams())) {
     auto param = func1->getParams()[i];
     auto paramType = param.getPlainType();
-    auto locatorBuilder =
-        locator.withPathElement(LocatorPathElt::TupleElement(i));
-    addConstraint(ConstraintKind::ArgumentConversion, paramType,
-                  argumentType, locatorBuilder);
+
+    addConstraint(
+        ConstraintKind::ArgumentConversion, paramType, argumentType,
+        getConstraintLocator(baseArgLoc, LocatorPathElt::ApplyArgToParam(
+                                             i, 0, param.getParameterFlags())));
   }
 
   return SolutionKind::Solved;

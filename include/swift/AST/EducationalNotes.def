@@ -26,4 +26,7 @@ EDUCATIONAL_NOTES(non_nominal_extension, "nominal-types.md")
 EDUCATIONAL_NOTES(associated_type_witness_conform_impossible,
                   "nominal-types.md")
 
+EDUCATIONAL_NOTES(cannot_infer_closure_result_type,
+                  "complex-closure-inference.md")
+
 #undef EDUCATIONAL_NOTES

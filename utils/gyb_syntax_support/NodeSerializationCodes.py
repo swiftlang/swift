@@ -241,6 +241,7 @@ SYNTAX_NODE_SERIALIZATION_CODES = {
     'DifferentiationParam': 237,
     'DifferentiableAttributeFuncSpecifier': 238,
     'FunctionDeclName': 239,
+    'PoundFilePathExpr': 240,
 }
 
 

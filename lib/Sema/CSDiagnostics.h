@@ -1148,6 +1148,12 @@ public:
   bool diagnoseAsError() override;
 
 private:
+  /// Tailored diagnostics for missing special `@dynamicCallable` methods
+  /// e.g. if caller expects `dynamicallyCall(withKeywordArguments:)`
+  /// overload to be present, but a class marked as `@dynamicCallable`
+  /// defines only `dynamicallyCall(withArguments:)` variant.
+  bool diagnoseForDynamicCallable() const;
+
   static DeclName findCorrectEnumCaseName(Type Ty,
                                           TypoCorrectionResults &corrections,
                                           DeclName memberName);

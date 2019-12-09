@@ -3681,6 +3681,7 @@ RValue RValueEmitter::
 visitMagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr *E, SGFContext C) {
   switch (E->getKind()) {
   case MagicIdentifierLiteralExpr::File:
+  case MagicIdentifierLiteralExpr::FilePath:
   case MagicIdentifierLiteralExpr::Function:
   case MagicIdentifierLiteralExpr::Line:
   case MagicIdentifierLiteralExpr::Column:
