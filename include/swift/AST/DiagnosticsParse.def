@@ -803,6 +803,12 @@ ERROR(sil_box_expected_r_brace,none,
 ERROR(sil_box_expected_r_angle,none,
       "expected '>' to complete SIL box generic argument list", ())
 
+// SIL function types
+ERROR(sil_function_subst_expected_l_angle,none,
+      "expected '<' to begin SIL function type substitution list after 'for'", ())
+ERROR(sil_function_subst_expected_r_angle,none,
+      "expected '>' to begin SIL function type substitution list after 'for'", ())
+
 // Opaque types
 ERROR(opaque_mid_composition,none,
       "'some' should appear at the beginning of a composition", ())

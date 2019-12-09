@@ -2731,6 +2731,21 @@ Type TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
       }
     }
   } // restore generic type resolution
+  
+  // Resolve substitutions if we have them.
+  SubstitutionMap subs;
+  if (!repr->getSubstitutions().empty()) {
+    auto sig = repr->getGenericEnvironment()->getGenericSignature()
+                   ->getCanonicalSignature();
+    TypeSubstitutionMap subsMap;
+    auto params = sig->getGenericParams();
+    for (unsigned i : indices(repr->getSubstitutions())) {
+      auto resolved = resolveType(repr->getSubstitutions()[i], options);
+      subsMap.insert({params[i], resolved->getCanonicalType()});
+    }
+    subs = SubstitutionMap::get(sig, QueryTypeSubstitutionMap{subsMap},
+                                TypeChecker::LookUpConformance(DC));
+  }
 
   if (hasError) {
     return ErrorType::get(Context);
@@ -2803,7 +2818,8 @@ Type TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
                               callee,
                               interfaceParams, interfaceYields,
                               interfaceResults, interfaceErrorResult,
-                              SubstitutionMap(), false,
+                              subs,
+                              repr->areGenericParamsImplied(),
                               Context, witnessMethodConformance);
 }
 
