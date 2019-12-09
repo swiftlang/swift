@@ -183,6 +183,21 @@ public:
                        nullptr /*leakingBlocks*/)
                 .getFoundError();
   }
+
+  bool validateLifetime(SILValue value,
+                        ArrayRef<SILInstruction *> consumingUses,
+                        ArrayRef<SILInstruction *> nonConsumingUses) {
+    auto *consumingUsesCast =
+        reinterpret_cast<const BranchPropagatedUser *>(consumingUses.data());
+    auto *nonConsumingUsesCast =
+        reinterpret_cast<const BranchPropagatedUser *>(nonConsumingUses.data());
+    ArrayRef<BranchPropagatedUser> consumingUsesCastArray(consumingUsesCast,
+                                                          consumingUses.size());
+    ArrayRef<BranchPropagatedUser> nonConsumingUsesCastArray(
+        nonConsumingUsesCast, nonConsumingUses.size());
+    return validateLifetime(value, consumingUsesCastArray,
+                            nonConsumingUsesCastArray);
+  }
 };
 
 /// Returns true if v is an address or trivial.
