@@ -1693,7 +1693,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     "${llvm_cmake_options[@]}"
                 )
 
-                llvm_enable_projects=("clang")
+                llvm_enable_projects=("clang" "lld")
 
                 if [[ ! "${SKIP_BUILD_COMPILER_RT}" ]]; then
                     llvm_enable_projects+=("compiler-rt")
