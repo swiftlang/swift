@@ -948,8 +948,8 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     Printer.printAttrName("@derivative");
     Printer << "(of: ";
     auto *attr = cast<DerivativeAttr>(this);
-    auto *derivative = cast<AbstractFunctionDecl>(D);
     Printer << attr->getOriginalFunctionName().Name;
+    auto *derivative = cast<AbstractFunctionDecl>(D);
     auto diffParamsString = getDifferentiationParametersClauseString(
         derivative, attr->getParameterIndices(), attr->getParsedParameters());
     if (!diffParamsString.empty())
@@ -963,8 +963,8 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     Printer.printAttrName("@transpose");
     Printer << '(';
     auto *attr = cast<TransposeAttr>(this);
-    auto *transpose = cast<AbstractFunctionDecl>(D);
     Printer << attr->getOriginalFunctionName().Name;
+    auto *transpose = cast<AbstractFunctionDecl>(D);
     auto transParamsString = getTransposedParametersClauseString(
         transpose, attr->getParameterIndices(), attr->getParsedParameters());
     if (!transParamsString.empty())
