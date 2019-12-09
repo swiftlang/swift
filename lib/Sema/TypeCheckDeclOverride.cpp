@@ -1298,6 +1298,7 @@ namespace  {
     UNINTERESTING_ATTR(IBInspectable)
     UNINTERESTING_ATTR(IBOutlet)
     UNINTERESTING_ATTR(IBSegueAction)
+    UNINTERESTING_ATTR(ImplicitlySynthesizesNestedRequirement)
     UNINTERESTING_ATTR(Indirect)
     UNINTERESTING_ATTR(InheritsConvenienceInitializers)
     UNINTERESTING_ATTR(Inline)
