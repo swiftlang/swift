@@ -217,3 +217,8 @@ public class Foo : NSObject {
     return true
   }
 }
+
+public func testCalendar() {
+   let formatter = DateFormatter()
+   formatter.calendar = Calendar(identifier: .gregorian)
+}
