@@ -70,7 +70,7 @@ public func _stdlib_thread_barrier_init(
 #else
   barrier.pointee.mutex = UnsafeMutablePointer.allocate(capacity: 1)
   barrier.pointee.cond = UnsafeMutablePointer.allocate(capacity: 1)
-  guard _stdlib_pthread_barrier_mutex_and_cond_init(barrier) == 0 else {
+  guard _stdlib_thread_barrier_mutex_and_cond_init(barrier) == 0 else {
     barrier.pointee.mutex!.deinitialize(count: 1)
     barrier.pointee.mutex!.deallocate()
     barrier.pointee.cond!.deinitialize(count: 1)
@@ -81,7 +81,7 @@ public func _stdlib_thread_barrier_init(
   return 0
 }
 
-private func _stdlib_pthread_barrier_mutex_and_cond_init(_ barrier: UnsafeMutablePointer<_stdlib_pthread_barrier_t>) -> CInt {
+private func _stdlib_thread_barrier_mutex_and_cond_init(_ barrier: UnsafeMutablePointer<_stdlib_thread_barrier_t>) -> CInt {
   guard pthread_mutex_init(barrier.pointee.mutex!) == 0 else {
     return -1
   }
