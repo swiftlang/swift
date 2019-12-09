@@ -2717,6 +2717,9 @@ NOTE(missing_member_type_conformance_prevents_synthesis, none,
      "protocol %2, preventing synthesized conformance "
      "of %3 to %2",
      (unsigned, Type, Type, Type))
+NOTE(classes_automatic_protocol_synthesis,none,
+    "automatic synthesis of '%0' is not supported for classes",
+    (StringRef))
 
 // Dynamic Self
 ERROR(dynamic_self_non_method,none,
