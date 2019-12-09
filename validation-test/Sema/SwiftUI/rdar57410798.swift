@@ -1,6 +1,7 @@
 // RUN: %target-typecheck-verify-swift -target x86_64-apple-macosx10.15 -swift-version 5
 // REQUIRES: objc_interop
 // REQUIRES: OS=macosx
+// REQUIRES: rdar_57756956
 
 import SwiftUI
 
