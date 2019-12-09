@@ -63,7 +63,7 @@ bool swift::parseASTSection(MemoryBufferSerializedModuleLoader &Loader,
       return false;
     }
 
-    buf = buf.substr(info.bytes);
+    buf = buf.substr(llvm::alignTo(info.bytes, 4));
   }
 
   return true;
