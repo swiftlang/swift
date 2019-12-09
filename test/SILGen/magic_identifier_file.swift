@@ -1,5 +1,5 @@
-// RUN: %target-swift-emit-silgen -module-name Foo %s | %FileCheck --check-prefixes=BOTH,ABSOLUTE %s
-// RUN: %target-swift-emit-silgen -enable-experimental-concise-pound-file -DNEEDS_CONCISE -module-name Foo %s | %FileCheck --check-prefixes=BOTH,CONCISE %s
+// RUN: %target-swift-emit-silgen -module-name Foo %/s | %FileCheck --check-prefixes=BOTH,ABSOLUTE %s
+// RUN: %target-swift-emit-silgen -enable-experimental-concise-pound-file -DNEEDS_CONCISE -module-name Foo %/s | %FileCheck --check-prefixes=BOTH,CONCISE %s
 
 // FIXME: Once this feature becomes non-experimental, we should update existing
 // tests and delete this file.
