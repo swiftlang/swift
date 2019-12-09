@@ -137,7 +137,11 @@ def driver_always_rebuild_dependents :
 
 def enable_fine_grained_dependencies :
 Flag<["-"], "enable-fine-grained-dependencies">, Flags<[FrontendOption, HelpHidden]>,
-HelpText<"Experimental work-in-progress to be more selective about incremental recompilation">;
+HelpText<"Be more selective about incremental recompilation">;
+
+def disable_fine_grained_dependencies :
+Flag<["-"], "disable-fine-grained-dependencies">, Flags<[FrontendOption, HelpHidden]>,
+HelpText<"Don't be more selective about incremental recompilation">;
 
 
 def enable_only_one_dependency_file :

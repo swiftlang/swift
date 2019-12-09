@@ -57,11 +57,11 @@ SourceFileDepGraph::getSourceFileNodePair() const {
                                                                 getNode(1));
 }
 
-StringRef SourceFileDepGraph::getSwiftDepsFromSourceFileProvide() const {
+StringRef SourceFileDepGraph::getSwiftDepsOfJobThatProducedThisGraph() const {
   return getSourceFileNodePair()
       .getInterface()
       ->getKey()
-      .getSwiftDepsFromSourceFileProvide();
+      .getSwiftDepsFromASourceFileProvideNodeKey();
 }
 
 void SourceFileDepGraph::forEachArc(

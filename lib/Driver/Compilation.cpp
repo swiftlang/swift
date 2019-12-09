@@ -468,7 +468,7 @@ namespace driver {
         // other recompilations. It is possible that the current code marks
         // things that do not need to be marked. Unecessary compilation would
         // result if that were the case.
-        bool wasCascading = isMarkedInDepGraph(FinishedCmd, forRanges);
+        bool wasKnownToNeedRunning = isMarkedInDepGraph(FinishedCmd, forRanges);
 
         switch (loadDepGraphFromPath(FinishedCmd, DependenciesFile,
                                      Comp.getDiags(), forRanges)) {
@@ -484,7 +484,7 @@ namespace driver {
           break;
 
         case CoarseGrainedDependencyGraph::LoadResult::UpToDate:
-          if (!wasCascading)
+          if (!wasKnownToNeedRunning)
             break;
           LLVM_FALLTHROUGH;
         case CoarseGrainedDependencyGraph::LoadResult::AffectsDownstream:
@@ -1493,11 +1493,11 @@ namespace driver {
             continue;
 
           // Be conservative, in case we use ranges this time but not next.
-          bool isCascading = true;
+          bool mightBeCascading = true;
           if (Comp.getIncrementalBuildEnabled())
-            isCascading = isMarkedInDepGraph(
+            mightBeCascading = isMarkedInDepGraph(
                 Cmd, /*forRanges=*/Comp.getEnableSourceRangeDependencies());
-          UnfinishedCommands.insert({Cmd, isCascading});
+          UnfinishedCommands.insert({Cmd, mightBeCascading});
         }
       }
     }

@@ -66,6 +66,11 @@ LoadResult ModuleDepGraph::loadFromPath(const Job *Cmd, StringRef path,
   return r;
 }
 
+LoadResult ModuleDepGraph::loadFromString(const Job *cmd, StringRef data) {
+  auto buffer = llvm::MemoryBuffer::getMemBuffer(data);
+  return loadFromBuffer(cmd, *buffer.get());
+}
+
 LoadResult ModuleDepGraph::loadFromBuffer(const Job *job,
                                           llvm::MemoryBuffer &buffer) {
 
@@ -73,50 +78,68 @@ LoadResult ModuleDepGraph::loadFromBuffer(const Job *job,
       SourceFileDepGraph::loadFromBuffer(buffer);
   if (!sourceFileDepGraph)
     return CoarseGrainedDependencyGraphImpl::LoadResult::HadError;
+  return loadFromSourceFileDepGraph(job, sourceFileDepGraph.getValue());
+}
+
+LoadResult ModuleDepGraph::loadFromSourceFileDepGraph(
+    const Job *job, const SourceFileDepGraph &sourceFileDepGraph) {
   addIndependentNode(job);
-  return integrate(sourceFileDepGraph.getValue());
+  return integrate(sourceFileDepGraph);
 }
 
 bool ModuleDepGraph::isMarked(const Job *cmd) const {
-  return cascadingJobs.count(getSwiftDeps(cmd));
+  return swiftDepsOfJobsThatNeedRunning.count(getSwiftDeps(cmd));
 }
 
 std::vector<const Job*> ModuleDepGraph::markTransitive(
     const Job *jobToBeRecompiled, const void *ignored) {
   FrontendStatsTracer tracer(stats, "fine-grained-dependencies-markTransitive");
+  assert(jobToBeRecompiled && "Ensure there is really a job");
 
   std::unordered_set<const ModuleDepGraphNode *> dependentNodes;
   const StringRef swiftDepsToBeRecompiled = getSwiftDeps(jobToBeRecompiled);
-  // Do the traversal.
+  assert(!swiftDepsToBeRecompiled.empty() && "Must have a swift deps");
+  // Caller already knows to run this job, no need to return it.
+  recordJobNeedsRunning(swiftDepsToBeRecompiled);
+
+  // Do the traversal for every node in the job to be recompiled.
   for (auto &fileAndNode : nodeMap[swiftDepsToBeRecompiled]) {
     assert(isCurrentPathForTracingEmpty());
-    findDependentNodesAndRecordCascadingOnes(dependentNodes,
-                                             fileAndNode.second);
+    findDependentNodes(dependentNodes, fileAndNode.second);
   }
-  return computeUniqueJobsFromNodes(dependentNodes);
-}
-
-std::vector<const Job*> ModuleDepGraph::computeUniqueJobsFromNodes(
-    const std::unordered_set<const ModuleDepGraphNode *> &nodes) {
-
-  std::vector<const Job*>jobs;
-
-  std::unordered_set<std::string> swiftDepsOfNodes;
-  for (const ModuleDepGraphNode *n : nodes) {
-    if (!n->getSwiftDeps().hasValue())
-      continue;
-    const std::string &swiftDeps = n->getSwiftDeps().getValue();
-    if (swiftDepsOfNodes.insert(swiftDeps).second) {
-      assert(n->assertImplementationMustBeInAFile());
-      ensureJobIsTracked(swiftDeps);
-      jobs.push_back(getJob(swiftDeps));
+  std::vector<const Job *> newJobsToCompile;
+  // The job containing the interface "cascades", in other words
+  // whenever that job gets recompiled, anything depending on it
+  // (since we don't have interface-specific dependency info as of Dec.
+  // 2018) must be recompiled.
+  for (const auto &entry : computeSwiftDepsFromInterfaceNodes(dependentNodes)) {
+    const StringRef swiftDeps = entry.getKey();
+    if (recordJobNeedsRunning(swiftDeps)) {
+      const Job *j = getJob(swiftDeps.str());
+      newJobsToCompile.push_back(j);
     }
   }
-  return jobs;
+  return newJobsToCompile;
 }
 
-bool ModuleDepGraph::markIntransitive(const Job *node) {
-  return rememberThatJobCascades(getSwiftDeps(node));
+llvm::StringSet<> ModuleDepGraph::computeSwiftDepsFromInterfaceNodes(
+    const std::unordered_set<const ModuleDepGraphNode *> &nodes) {
+
+  llvm::StringSet<> swiftDepsOfNodes;
+  for (const ModuleDepGraphNode *n : nodes) {
+    if (!n->doesNodeProvideAnInterface())
+      continue;
+    const std::string &swiftDeps = n->getSwiftDepsOfProvides();
+    if (swiftDepsOfNodes.insert(swiftDeps).second) {
+      assert(n->assertImplementationMustBeInAFile());
+      assert(ensureJobIsTracked(swiftDeps));
+    }
+  }
+  return swiftDepsOfNodes;
+}
+
+bool ModuleDepGraph::markIntransitive(const Job *job) {
+  return recordJobNeedsRunning(getSwiftDeps(job));
 }
 
 void ModuleDepGraph::addIndependentNode(const Job *job) {
@@ -153,8 +176,9 @@ void ModuleDepGraph::forEachUnmarkedJobDirectlyDependentOnExternalSwiftdeps(
   // collect answers into useSet
   std::unordered_set<std::string> visitedSet;
   for (const ModuleDepGraphNode *useNode : usesByDef[key]) {
-    const Job *job = getJob(useNode->getSwiftDeps());
-    if (!isMarked(job))
+    const auto swiftDepsOfUse = useNode->getSwiftDepsOfProvides();
+    const Job *job = getJob(swiftDepsOfUse);
+    if (isMarked(job))
       continue;
     fn(job);
   }
@@ -167,7 +191,7 @@ void ModuleDepGraph::forEachUnmarkedJobDirectlyDependentOnExternalSwiftdeps(
 LoadResult ModuleDepGraph::integrate(const SourceFileDepGraph &g) {
   FrontendStatsTracer tracer(stats, "fine-grained-dependencies-integrate");
 
-  StringRef swiftDeps = g.getSwiftDepsFromSourceFileProvide();
+  StringRef swiftDeps = g.getSwiftDepsOfJobThatProducedThisGraph();
   // When done, disappearedNodes contains the nodes which no longer exist.
   auto disappearedNodes = nodeMap[swiftDeps];
   // When done, changeDependencyKeys contains a list of keys that changed
@@ -229,10 +253,14 @@ bool ModuleDepGraph::integrateSourceFileDepGraphNode(
   if (integrand->getKey().getKind() == NodeKind::externalDepend)
     return externalDependencies.insert(integrand->getKey().getName()).second;
 
+  // Since dependencies are modeled as arcs in both SourceFile and Module
+  // dependency graphs, no more integration need be done for a depends node. The
+  // information will be obtained front the using node's arcs.
   if (integrand->isDepends())
-    return false; // dependency will be handled by the use node
+    return false;
 
-  StringRef swiftDepsOfSourceFileGraph = g.getSwiftDepsFromSourceFileProvide();
+  StringRef swiftDepsOfSourceFileGraph =
+      g.getSwiftDepsOfJobThatProducedThisGraph();
   auto changedAndUseNode = integrateSourceFileDeclNode(
       integrand, swiftDepsOfSourceFileGraph, preexistingMatch);
   recordWhatUseDependsUpon(g, integrand, changedAndUseNode.second);
@@ -340,31 +368,24 @@ void ModuleDepGraph::forEachArc(
 // Could be faster by passing in a file, not a node, but we are trying for
 // generality.
 
-void ModuleDepGraph::findDependentNodesAndRecordCascadingOnes(
+void ModuleDepGraph::findDependentNodes(
     std::unordered_set<const ModuleDepGraphNode *> &foundDependents,
     const ModuleDepGraphNode *definition) {
 
-    size_t pathLengthAfterArrival = traceArrival(definition);
+  size_t pathLengthAfterArrival = traceArrival(definition);
 
   // Moved this out of the following loop for effieciency.
-  assert(definition->getSwiftDeps().hasValue() &&
-         "Should only call me for Decl nodes.");
+  assert(definition->getIsProvides() && "Should only call me for Decl nodes.");
 
   forEachUseOf(definition, [&](const ModuleDepGraphNode *u) {
     // Cycle recording and check.
     if (!foundDependents.insert(u).second)
       return;
-    if (u->getKey().isInterface() && u->getSwiftDeps().hasValue()) {
-      // An interface depends on something. Thus, if that something changes
-      // the interface must be recompiled. But if an interface changes, then
-      // anything using that interface must also be recompiled.
-      // So, the job containing the interface "cascades", in other words
-      // whenever that job gets recompiled, anything depending on it
-      // (since we don't have interface-specific dependency info as of Dec.
-      // 2018) must be recompiled.
-      rememberThatJobCascades(u->getSwiftDeps().getValue());
-      findDependentNodesAndRecordCascadingOnes(foundDependents, u);
-    }
+    // An interface depends on something. Thus, if that something changes
+    // the interface must be recompiled. But if an interface changes, then
+    // anything using that interface must also be recompiled.
+    if (u->doesNodeProvideAnInterface())
+      findDependentNodes(foundDependents, u);
   });
   traceDeparture(pathLengthAfterArrival);
 }
@@ -373,7 +394,8 @@ size_t ModuleDepGraph::traceArrival(const ModuleDepGraphNode *visitedNode) {
   if (!currentPathIfTracing.hasValue())
     return 0;
   auto &currentPath = currentPathIfTracing.getValue();
-  recordDependencyPathToJob(currentPath, getJob(visitedNode->getSwiftDeps()));
+  const auto visitedSwiftDepsIfAny = visitedNode->getSwiftDeps();
+  recordDependencyPathToJob(currentPath, getJob(visitedSwiftDepsIfAny));
 
   currentPath.push_back(visitedNode);
   return currentPath.size();
@@ -422,8 +444,8 @@ void ModuleDepGraph::emitDotFile(llvm::raw_ostream &out) {
 
 void ModuleDepGraphNode::dump() const {
   DepGraphNode::dump();
-  if (getSwiftDeps().hasValue())
-    llvm::errs() << " swiftDeps: <" << getSwiftDeps().getValue() << ">\n";
+  if (getIsProvides())
+    llvm::errs() << " swiftDeps: <" << getSwiftDepsOfProvides() << ">\n";
   else
     llvm::errs() << " no swiftDeps\n";
 }
@@ -478,9 +500,7 @@ void ModuleDepGraph::verifyNodeIsUniqueWithinSubgraph(
   assert(submapIndex < nodesSeenInNodeMap.size() &&
          "submapIndex is out of bounds.");
   auto iterInserted = nodesSeenInNodeMap[submapIndex][n->getKey()].insert(
-      std::make_pair(n->getSwiftDeps().hasValue() ? n->getSwiftDeps().getValue()
-                                                  : std::string(),
-                     n));
+      std::make_pair(n->getSwiftDepsForMapKey(), n));
   if (!iterInserted.second) {
     llvm_unreachable("duplicate driver keys");
   }
