@@ -3066,6 +3066,11 @@ void constraints::simplifyLocator(Expr *&anchor,
       break;
     }
 
+    case ConstraintLocator::DynamicCallable: {
+      path = path.slice(1);
+      continue;
+    }
+
     case ConstraintLocator::ApplyFunction:
       // Extract application function.
       if (auto applyExpr = dyn_cast<ApplyExpr>(anchor)) {

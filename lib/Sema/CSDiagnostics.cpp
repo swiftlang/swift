@@ -121,6 +121,12 @@ Expr *FailureDiagnostic::getBaseExprFor(Expr *anchor) const {
     return SE->getBase();
   else if (auto *MRE = dyn_cast<MemberRefExpr>(anchor))
     return MRE->getBase();
+  else if (auto *call = dyn_cast<CallExpr>(anchor)) {
+    auto fnType = getType(call->getFn());
+    if (fnType->isCallableNominalType(getDC())) {
+      return call->getFn();
+    }
+  }
 
   return nullptr;
 }
@@ -3205,6 +3211,9 @@ bool MissingMemberFailure::diagnoseAsError() {
   if (!anchor || !baseExpr)
     return false;
 
+  if (diagnoseForDynamicCallable())
+    return true;
+
   auto baseType = resolveType(getBaseType())->getWithoutSpecifierType();
 
   DeclNameLoc nameLoc(anchor->getStartLoc());
@@ -3374,6 +3383,26 @@ bool MissingMemberFailure::diagnoseAsError() {
   // Note all the correction candidates.
   corrections.noteAllCandidates();
   return true;
+}
+
+bool MissingMemberFailure::diagnoseForDynamicCallable() const {
+  auto *locator = getLocator();
+  if (!locator->isLastElement<LocatorPathElt::DynamicCallable>())
+    return false;
+
+  auto memberName = getName();
+  auto arguments = memberName.getArgumentNames();
+  assert(arguments.size() == 1);
+
+  auto &ctx = getASTContext();
+  if (arguments.front() == ctx.Id_withKeywordArguments) {
+    auto anchor = getAnchor();
+    emitDiagnostic(anchor->getLoc(),
+                   diag::missing_dynamic_callable_kwargs_method, getBaseType());
+    return true;
+  }
+
+  return false;
 }
 
 bool InvalidMemberRefOnExistential::diagnoseAsError() {
