@@ -955,9 +955,8 @@ ERROR(types_not_convertible_use_bool_value,none,
 ERROR(tuple_types_not_convertible_nelts,none,
       "%0 is not convertible to %1, "
       "tuples have a different number of elements", (Type, Type))
-
 ERROR(tuple_types_not_convertible,none,
-      "tuple type %0 is not convertible to tuple %1", (Type, Type))
+       "tuple type %0 is not convertible to tuple type %1", (Type, Type))
 
 ERROR(invalid_force_unwrap,none,
       "cannot force unwrap value of non-optional type %0", (Type))

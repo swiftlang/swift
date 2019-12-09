@@ -19,5 +19,5 @@ struct S: P {
   typealias R = T3
 
   static let foo: (T1, (R) -> T2) = bind()
-  // expected-error@-1 {{tuple type '(T1, (S.R) -> T3)' (aka '(Int, (Bool) -> Bool)') is not convertible to tuple '(T1, (S.R) -> T2)' (aka '(Int, (Bool) -> Float)')}}
+  // expected-error@-1 {{cannot convert value of type '(T1, (S.R) -> T3)' (aka '(Int, (Bool) -> Bool)') to specified type '(T1, (S.R) -> T2)' (aka '(Int, (Bool) -> Float)')}}
 }

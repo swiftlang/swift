@@ -3540,11 +3540,23 @@ bool ConstraintSystem::repairFailures(
       conversionsOrFixes.push_back(CollectionElementContextualMismatch::create(
           *this, lhs, rhs, getConstraintLocator(locator)));
     }
-    if (lhs->is<TupleType>() && rhs->is<TupleType>()) {
-      auto *fix = AllowTupleTypeMismatch::create(*this, lhs, rhs,
-                                                 getConstraintLocator(locator));
-      conversionsOrFixes.push_back(fix);
-    }
+
+    // Drop the `tuple element` locator element so that all tuple element
+    // mismatches within the same tuple type can be coalesced later.
+    path.pop_back();
+    auto *tupleLocator = getConstraintLocator(locator.getAnchor(), path);
+
+    // TODO: Add a tailored fix for function parameter type mismatches.
+    // Let this fail if it's a contextual mismatch with sequence element types,
+    // as there's a special fix for that.
+    if (tupleLocator->isLastElement<LocatorPathElt::FunctionArgument>() ||
+        tupleLocator->isLastElement<LocatorPathElt::SequenceElementType>())
+      break;
+
+    auto index = elt.getAs<LocatorPathElt::TupleElement>()->getIndex();
+    auto *fix =
+        AllowTupleTypeMismatch::create(*this, lhs, rhs, tupleLocator, index);
+    conversionsOrFixes.push_back(fix);
     break;
   }
 
@@ -8476,6 +8488,12 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   }
 
   case FixKind::AllowTupleTypeMismatch: {
+    if (fix->getAs<AllowTupleTypeMismatch>()->isElementMismatch()) {
+      auto *locator = fix->getLocator();
+      if (recordFix(fix, /*impact*/locator->isForContextualType() ? 5 : 1))
+        return SolutionKind::Error;
+      return SolutionKind::Solved;
+    }
     auto lhs = type1->castTo<TupleType>();
     auto rhs = type2->castTo<TupleType>();
     // Create a new tuple type the size of the smaller tuple with elements
@@ -8487,6 +8505,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
     // when the tuples (X, Y, $1) and (X, $0, B) get matched, $0 is equated
     // to Y, $1 is equated to B, and $2 is defaulted to Any.
     auto lhsLarger = lhs->getNumElements() >= rhs->getNumElements();
+    auto isLabelingFailure = lhs->getNumElements() == rhs->getNumElements();
     auto larger = lhsLarger ? lhs : rhs;
     auto smaller = lhsLarger ? rhs : lhs;
     llvm::SmallVector<TupleTypeElt, 4> newTupleTypes;
@@ -8495,7 +8514,9 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
       auto largerElt = larger->getElement(i);
       if (i < smaller->getNumElements()) {
         auto smallerElt = smaller->getElement(i);
-        if (largerElt.getType()->isTypeVariableOrMember() ||
+        if (isLabelingFailure)
+          newTupleTypes.push_back(TupleTypeElt(largerElt.getType()));
+        else if (largerElt.getType()->isTypeVariableOrMember() ||
             smallerElt.getType()->isTypeVariableOrMember())
           newTupleTypes.push_back(largerElt);
         else
