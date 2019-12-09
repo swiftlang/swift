@@ -244,6 +244,30 @@
                 "sourcekit-lsp": "swift-5.1-branch",
                 "swift-format": "master"
             }
+        },
+       "swift-5.2-branch": {
+            "aliases": ["swift-5.2-branch", "swift/swift-5.2-branch"],
+            "repos": {
+                "llvm-project": "swift/swift-5.2-branch",
+                "swift": "swift-5.2-branch",
+                "cmark": "swift-5.2-branch",
+                "llbuild": "swift-5.2-branch",
+                "swift-tools-support-core": "swift-5.2-branch",
+                "swiftpm": "swift-5.2-branch",
+                "swift-syntax": "swift-5.2-branch",
+                "swift-stress-tester": "swift-5.2-branch",
+                "swift-corelibs-xctest": "swift-5.2-branch",
+                "swift-corelibs-foundation": "swift-5.2-branch",
+                "swift-corelibs-libdispatch": "swift-5.2-branch",
+                "swift-integration-tests": "swift-5.2-branch",
+                "swift-xcode-playground-support": "swift-5.2-branch",
+                "ninja": "release",
+                "icu": "release-65-1",
+                "cmake": "v3.15.1",
+                "indexstore-db": "swift-5.2-branch",
+                "sourcekit-lsp": "swift-5.2-branch",
+                "swift-format": "master"
+            }
         }
     }
 }
