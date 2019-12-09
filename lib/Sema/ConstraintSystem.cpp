@@ -2357,6 +2357,7 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
   auto overload = SelectedOverload{choice, openedFullType, refType, boundType};
   auto result = ResolvedOverloads.insert({locator, overload});
   assert(result.second && "Already resolved this overload?");
+  (void)result;
 
   // In some cases we already created the appropriate bind constraints.
   if (!bindConstraintCreated) {
