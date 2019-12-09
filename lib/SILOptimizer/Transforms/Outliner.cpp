@@ -764,6 +764,13 @@ BridgedArgument BridgedArgument::match(unsigned ArgIdx, SILValue Arg,
       Enum->getOperand() != BridgeCall || !BridgeCall->hasOneUse())
     return BridgedArgument();
 
+  auto &selfArg = FullApplySite(BridgeCall).getSelfArgumentOperand();
+  auto selfConvention =
+      FullApplySite(BridgeCall).getArgumentConvention(selfArg);
+  if (selfConvention != SILArgumentConvention::Direct_Guaranteed &&
+      selfConvention != SILArgumentConvention::Direct_Owned)
+    return BridgedArgument();
+
   auto BridgedValue = BridgeCall->getArgument(0);
   auto Next = std::next(SILBasicBlock::iterator(Enum));
   if (Next == Enum->getParent()->end())
