@@ -1895,38 +1895,6 @@ static void printTargetInfo(CompilerInvocation &invocation,
       << (tripleRequiresRPathForSwiftInOS(langOpts.Target) ? "true" : "false")
       << "\n";
 
-  out << "  },\n";
-
-  // Various paths.
-  auto &searchOpts = invocation.getSearchPathOptions();
-  out << "  \"paths\": {\n";
-
-  if (!searchOpts.SDKPath.empty()) {
-    out << "    \"sdkPath\": \"";
-    out.write_escaped(searchOpts.SDKPath);
-    out << "\",\n";
-  }
-
-  auto outputPaths = [&](StringRef name, const std::vector<std::string> &paths){
-    out << "    \"" << name << "\": [\n";
-    interleave(paths, [&out](const std::string &path) {
-      out << "      \"";
-      out.write_escaped(path);
-      out << "\"";
-    }, [&out] {
-      out << ",\n";
-    });
-    out << "\n    ],\n";
-  };
-
-  outputPaths("runtimeLibraryPaths", searchOpts.RuntimeLibraryPaths);
-  outputPaths("runtimeLibraryImportPaths",
-              searchOpts.RuntimeLibraryImportPaths);
-
-  out << "    \"runtimeResourcePath\": \"";
-  out.write_escaped(searchOpts.RuntimeResourcePath);
-  out << "\"\n";
-
   out << "  }\n";
 
   out << "}\n";

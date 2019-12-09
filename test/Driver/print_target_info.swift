@@ -11,12 +11,6 @@
 // CHECK-IOS:     "librariesRequireRPath": true
 // CHECK-IOS:   }
 
-// CHECK-IOS:   "paths": {
-// CHECK-IOS:     "runtimeLibraryPaths": [
-// CHECK-IOS:     "runtimeResourcePath":{{.*}}lib{{(/|\\)}}swift"
-// CHECK-IOS:   }
-
-
 // CHECK-LINUX:   "target": {
 // CHECK-LINUX:     "triple": "x86_64-unknown-linux",
 // CHECK-LINUX:     "moduleTriple": "x86_64-unknown-linux",
