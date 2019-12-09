@@ -492,7 +492,8 @@ static bool matchSwitch(SwitchInfo &SI, SILInstruction *Inst,
   auto *BridgeFun = FunRef->getInitiallyReferencedFunction();
   auto *SwiftModule = BridgeFun->getModule().getSwiftModule();
   auto bridgeWitness = getBridgeFromObjectiveC(NativeType, SwiftModule);
-  if (BridgeFun->getName() != bridgeWitness.mangle())
+  if (bridgeWitness == SILDeclRef() ||
+      BridgeFun->getName() != bridgeWitness.mangle())
     return false;
 
   // %41 = enum $Optional<String>, #Optional.some!enumelt.1, %40 : $String
@@ -809,7 +810,8 @@ BridgedArgument BridgedArgument::match(unsigned ArgIdx, SILValue Arg,
   auto *BridgeFun = FunRef->getInitiallyReferencedFunction();
   auto *SwiftModule = BridgeFun->getModule().getSwiftModule();
   auto bridgeWitness = getBridgeToObjectiveC(NativeType, SwiftModule);
-  if (BridgeFun->getName() != bridgeWitness.mangle())
+  if (bridgeWitness == SILDeclRef() ||
+      BridgeFun->getName() != bridgeWitness.mangle())
     return BridgedArgument();
 
   return BridgedArgument(ArgIdx, FunRef, BridgeCall, Enum, BridgedValueRelease,
