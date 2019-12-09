@@ -3536,7 +3536,9 @@ bool ConstraintSystem::repairFailures(
         tupleLocator->isLastElement<LocatorPathElt::SequenceElementType>())
       break;
 
-    auto *fix = AllowTupleTypeMismatch::create(*this, lhs, rhs, tupleLocator);
+    auto index = elt.getAs<LocatorPathElt::TupleElement>()->getIndex();
+    auto *fix =
+        AllowTupleTypeMismatch::create(*this, lhs, rhs, tupleLocator, index);
     conversionsOrFixes.push_back(fix);
     break;
   }
@@ -8435,7 +8437,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   }
 
   case FixKind::AllowTupleTypeMismatch: {
-    if (!(type1->is<TupleType>() && type2->is<TupleType>())) {
+    if (fix->getAs<AllowTupleTypeMismatch>()->isElementMismatch()) {
       auto *locator = fix->getLocator();
       if (recordFix(fix, /*impact*/locator->isForContextualType() ? 5 : 1))
         return SolutionKind::Error;

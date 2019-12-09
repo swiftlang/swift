@@ -257,6 +257,17 @@ ContextualMismatch *ContextualMismatch::create(ConstraintSystem &cs, Type lhs,
 
 bool AllowTupleTypeMismatch::coalesceAndDiagnose(
     ArrayRef<ConstraintFix *> fixes, bool asNote) const {
+  llvm::SmallVector<unsigned, 4> indices;
+  if (isElementMismatch())
+    indices.push_back(*Index);
+
+  for (auto fix : fixes) {
+    auto *tupleFix = fix->getAs<AllowTupleTypeMismatch>();
+    if (!tupleFix || !tupleFix->isElementMismatch())
+      continue;
+    indices.push_back(*tupleFix->Index);
+  }
+
   auto &cs = getConstraintSystem();
   auto *locator = getLocator();
   auto purpose = cs.getContextualTypePurpose();
@@ -288,7 +299,7 @@ bool AllowTupleTypeMismatch::coalesceAndDiagnose(
     return false;
   }
 
-  TupleContextualFailure failure(cs, purpose, fromType, toType, locator);
+  TupleContextualFailure failure(cs, purpose, fromType, toType, indices, locator);
   return failure.diagnose(asNote);
 }
 
@@ -298,8 +309,10 @@ bool AllowTupleTypeMismatch::diagnose(bool asNote) const {
 
 AllowTupleTypeMismatch *
 AllowTupleTypeMismatch::create(ConstraintSystem &cs, Type lhs, Type rhs,
-                               ConstraintLocator *locator) {
-  return new (cs.getAllocator()) AllowTupleTypeMismatch(cs, lhs, rhs, locator);
+                               ConstraintLocator *locator,
+                               Optional<unsigned> index) {
+  return new (cs.getAllocator())
+      AllowTupleTypeMismatch(cs, lhs, rhs, locator, index);
 }
 
 bool GenericArgumentsMismatch::diagnose(bool asNote) const {

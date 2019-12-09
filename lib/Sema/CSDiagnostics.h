@@ -830,10 +830,16 @@ protected:
 
 /// Diagnose mismatches relating to tuple destructuring.
 class TupleContextualFailure final : public ContextualFailure {
+  /// Indices of the tuple elements whose types do not match.
+  llvm::SmallVector<unsigned, 4> Indices;
+
 public:
   TupleContextualFailure(ConstraintSystem &cs, ContextualTypePurpose purpose,
-                         Type lhs, Type rhs, ConstraintLocator *locator)
-      : ContextualFailure(cs, purpose, lhs, rhs, locator) {
+                         Type lhs, Type rhs, llvm::ArrayRef<unsigned> indices,
+                         ConstraintLocator *locator)
+      : ContextualFailure(cs, purpose, lhs, rhs, locator),
+        Indices(indices.begin(), indices.end()) {
+    std::sort(Indices.begin(), Indices.end());
     assert(getFromType()->is<TupleType>() && getToType()->is<TupleType>());
   }
 

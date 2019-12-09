@@ -954,14 +954,20 @@ private:
 };
 
 class AllowTupleTypeMismatch final : public ContextualMismatch {
+  /// If this is an element mismatch, \c Index is the element index where the
+  /// type mismatch occurred. If this is an arity or label mismatch, \c Index
+  /// will be \c None.
+  Optional<unsigned> Index;
+
   AllowTupleTypeMismatch(ConstraintSystem &cs, Type lhs, Type rhs,
-                         ConstraintLocator *locator)
+                         ConstraintLocator *locator, Optional<unsigned> index)
       : ContextualMismatch(cs, FixKind::AllowTupleTypeMismatch, lhs, rhs,
-                           locator) {}
+                           locator), Index(index) {}
 
 public:
   static AllowTupleTypeMismatch *create(ConstraintSystem &cs, Type lhs,
-                                        Type rhs, ConstraintLocator *locator);
+                                        Type rhs, ConstraintLocator *locator,
+                                        Optional<unsigned> index = None);
 
   static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::AllowTupleTypeMismatch;
@@ -969,6 +975,10 @@ public:
 
   std::string getName() const override {
     return "fix tuple mismatches in type and arity";
+  }
+
+  bool isElementMismatch() const {
+    return Index.hasValue();
   }
 
   bool coalesceAndDiagnose(ArrayRef<ConstraintFix *> secondaryFixes,
