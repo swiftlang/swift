@@ -242,6 +242,7 @@ SYNTAX_NODE_SERIALIZATION_CODES = {
     'DifferentiableAttributeFuncSpecifier': 238,
     'FunctionDeclName': 239,
     'PoundFilePathExpr': 240,
+    'DerivativeRegistrationAttributeArguments': 241,
 }
 
 

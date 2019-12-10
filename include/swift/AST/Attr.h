@@ -1747,6 +1747,84 @@ public:
   }
 };
 
+/// Attribute that registers a function as a derivative of another function.
+///
+/// Examples:
+///   @derivative(of: sin(_:))
+///   @derivative(of: +, wrt: (lhs, rhs))
+class DerivativeAttr final
+    : public DeclAttribute,
+      private llvm::TrailingObjects<DerivativeAttr, ParsedAutoDiffParameter> {
+  friend TrailingObjects;
+
+  /// The original function name.
+  DeclNameWithLoc OriginalFunctionName;
+  /// The original function declaration, resolved by the type checker.
+  AbstractFunctionDecl *OriginalFunction = nullptr;
+  /// The number of parsed parameters specified in 'wrt:'.
+  unsigned NumParsedParameters = 0;
+  /// The differentiation parameters' indices, resolved by the type checker.
+  IndexSubset *ParameterIndices = nullptr;
+  /// The derivative function kind (JVP or VJP), resolved by the type checker.
+  Optional<AutoDiffDerivativeFunctionKind> Kind = None;
+
+  explicit DerivativeAttr(bool implicit, SourceLoc atLoc, SourceRange baseRange,
+                          DeclNameWithLoc original,
+                          ArrayRef<ParsedAutoDiffParameter> params);
+
+  explicit DerivativeAttr(bool implicit, SourceLoc atLoc, SourceRange baseRange,
+                          DeclNameWithLoc original, IndexSubset *indices);
+
+public:
+  static DerivativeAttr *create(ASTContext &context, bool implicit,
+                                SourceLoc atLoc, SourceRange baseRange,
+                                DeclNameWithLoc original,
+                                ArrayRef<ParsedAutoDiffParameter> params);
+
+  static DerivativeAttr *create(ASTContext &context, bool implicit,
+                                SourceLoc atLoc, SourceRange baseRange,
+                                DeclNameWithLoc original, IndexSubset *indices);
+
+  DeclNameWithLoc getOriginalFunctionName() const {
+    return OriginalFunctionName;
+  }
+  AbstractFunctionDecl *getOriginalFunction() const {
+    return OriginalFunction;
+  }
+  void setOriginalFunction(AbstractFunctionDecl *decl) {
+    OriginalFunction = decl;
+  }
+
+  AutoDiffDerivativeFunctionKind getDerivativeKind() const {
+    assert(Kind && "Derivative function kind has not yet been resolved");
+    return *Kind;
+  }
+  void setDerivativeKind(AutoDiffDerivativeFunctionKind kind) { Kind = kind; }
+
+  /// The parsed differentiation parameters, i.e. the list of parameters
+  /// specified in 'wrt:'.
+  ArrayRef<ParsedAutoDiffParameter> getParsedParameters() const {
+    return {getTrailingObjects<ParsedAutoDiffParameter>(), NumParsedParameters};
+  }
+  MutableArrayRef<ParsedAutoDiffParameter> getParsedParameters() {
+    return {getTrailingObjects<ParsedAutoDiffParameter>(), NumParsedParameters};
+  }
+  size_t numTrailingObjects(OverloadToken<ParsedAutoDiffParameter>) const {
+    return NumParsedParameters;
+  }
+
+  IndexSubset *getParameterIndices() const {
+    return ParameterIndices;
+  }
+  void setParameterIndices(IndexSubset *parameterIndices) {
+    ParameterIndices = parameterIndices;
+  }
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DAK_Derivative;
+  }
+};
+
 /// Attributes that may be applied to declarations.
 class DeclAttributes {
   /// Linked list of declaration attributes.
