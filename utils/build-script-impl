@@ -397,6 +397,40 @@ function should_execute_host_actions_for_phase() {
     fi
 }
 
+function verify_host_is_supported() {
+    local host="$1"
+    case ${host} in
+      freebsd-x86_64            \
+      | cygwin-x86_64           \
+      | haiku-x86_64            \
+      | linux-x86_64            \
+      | linux-i686              \
+      | linux-armv6             \
+      | linux-armv7             \
+      | linux-aarch64           \
+      | linux-powerpc64         \
+      | linux-powerpc64le       \
+      | linux-s390x             \
+      | macosx-x86_64           \
+      | iphonesimulator-i386    \
+      | iphonesimulator-x86_64  \
+      | iphoneos-armv7          \
+      | iphoneos-armv7s         \
+      | iphoneos-arm64          \
+      | appletvsimulator-x86_64 \
+      | appletvos-arm64         \
+      | watchsimulator-i386     \
+      | watchos-armv7k          \
+      | android-armv7           \
+      | android-aarch64)
+        ;;
+      *)
+        echo "Unknown host tools target: ${host}"
+        exit 1
+        ;;
+    esac
+}
+
 function set_build_options_for_host() {
     llvm_cmake_options=()
     swift_cmake_options=()
@@ -410,6 +444,8 @@ function set_build_options_for_host() {
 
     # Hosts which can be cross-compiled must specify:
     # SWIFT_HOST_TRIPLE and llvm_target_arch (as well as usual HOST_VARIANT flags)
+
+    verify_host_is_supported $host
 
     case ${host} in
         freebsd-x86_64)
@@ -555,10 +591,6 @@ function set_build_options_for_host() {
                     SWIFT_HOST_VARIANT_ARCH="armv7k"
                     cmake_osx_deployment_target=""
                     ;;
-                *)
-                    echo "Unknown host for swift tools: ${host}"
-                    exit 1
-                    ;;
             esac
 
             if [[ "${DARWIN_SDK_DEPLOYMENT_TARGETS}" != "" ]]; then
@@ -638,10 +670,6 @@ function set_build_options_for_host() {
                     ;;
                 esac
         ;;
-        *)
-            echo "Unknown host tools target: ${host}"
-            exit 1
-            ;;
     esac
 
 
