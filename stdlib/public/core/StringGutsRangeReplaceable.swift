@@ -52,6 +52,11 @@ extension _StringGuts {
   }
 }
 
+@inline(__always)
+internal func _growStringCapacity(_ capacity: Int) -> Int {
+  return ((capacity * 3) + 1) / 2
+}
+
 // Range-replaceable operation support
 extension _StringGuts {
   @inlinable
@@ -79,7 +84,7 @@ extension _StringGuts {
     _internalInvariant(
       self.uniqueNativeCapacity == nil || self.uniqueNativeCapacity! < n)
 
-    let growthTarget = Swift.max(n, (self.uniqueNativeCapacity ?? 0) * 2)
+    let growthTarget = Swift.max(n, _growStringCapacity(self.uniqueNativeCapacity ?? 0))
 
     if _fastPath(isFastUTF8) {
       let isASCII = self.isASCII
@@ -140,7 +145,7 @@ extension _StringGuts {
       growthTarget = totalCount
     } else {
       growthTarget = Swift.max(
-        totalCount, _growArrayCapacity(nativeCapacity ?? 0))
+        totalCount, _growStringCapacity(nativeCapacity ?? 0))
     }
     self.grow(growthTarget)
   }
