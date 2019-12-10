@@ -2086,18 +2086,11 @@ void ConstraintSystem::bindOverloadType(
     DeclName memberName =
         isSubscriptRef ? DeclBaseName::createSubscript() : choice.getName();
 
-    auto *memberRef = Constraint::createMember(
-        *this, ConstraintKind::ValueMember, LValueType::get(rootTy), memberTy,
-        memberName, useDC,
-        isSubscriptRef ? FunctionRefKind::DoubleApply
-                       : FunctionRefKind::Unapplied,
-        keyPathLoc);
-
-    // Delay simplication of this constraint until after the overload choice
-    // has been bound for this key path dynamic member. This helps to identify
-    // recursive calls with the same base.
-    addUnsolvedConstraint(memberRef);
-    activateConstraint(memberRef);
+    addValueMemberConstraint(LValueType::get(rootTy), memberName, memberTy,
+                             useDC,
+                             isSubscriptRef ? FunctionRefKind::DoubleApply
+                                            : FunctionRefKind::Unapplied,
+                             /*outerAlternatives=*/{}, keyPathLoc);
 
     // In case of subscript things are more compicated comparing to "dot"
     // syntax, because we have to get "applicable function" constraint
