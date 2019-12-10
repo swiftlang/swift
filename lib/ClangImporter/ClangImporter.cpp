@@ -2908,12 +2908,11 @@ ClangModuleUnit::lookupNestedType(Identifier name,
     // If the entry is not visible, skip it.
     if (!isVisibleClangEntry(clangCtx, entry)) continue;
 
-    auto clangDecl = entry.dyn_cast<clang::NamedDecl *>();
-    auto clangTypeDecl = dyn_cast_or_null<clang::TypeDecl>(clangDecl);
-    if (!clangTypeDecl)
+    auto *clangDecl = entry.dyn_cast<clang::NamedDecl *>();
+    if (!clangDecl)
       continue;
 
-    clangTypeDecl = cast<clang::TypeDecl>(clangTypeDecl->getMostRecentDecl());
+    const auto *clangTypeDecl = clangDecl->getMostRecentDecl();
 
     bool anyMatching = false;
     TypeDecl *originalDecl = nullptr;

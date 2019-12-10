@@ -203,7 +203,7 @@ Protocols in Objective-C are normally in a separate namespace from the "ordinary
 
 ## CF Types
 
-"Core Foundation" is a C-based object-oriented system with strong conventions built around pointers to opaque structs. Creating new Core Foundation types is not generally supported, but Swift will recognize those in Apple's SDKs. If a struct has the `objc_bridge`, `objc_mutable_bridge`, or `objc_bridge_related` Clang attributes, it will be treated as a CF type and a typedef of a pointer to that struct will be imported as a class in Swift. The suffix "Ref" will be dropped from the class's name if present unless doing so would conflict with another declaration in the same module as the typedef.
+"Core Foundation" is a C-based object-oriented system with strong conventions built around pointers to opaque structs. Creating new Core Foundation types is not generally supported, but Swift will recognize those in Apple's SDKs. If a struct has the `objc_bridge`, `objc_bridge_mutable`, or `objc_bridge_related` Clang attributes, it will be treated as a CF type and a typedef of a pointer to that struct will be imported as a class in Swift. The suffix "Ref" will be dropped from the class's name if present unless doing so would conflict with another declaration in the same module as the typedef.
 
 If the class name contains the word "Mutable" exactly once per the usual word-boundary rules, a corresponding class name without the word "Mutable" will be used as the superclass if present. Otherwise, the CF type is taken to be a root object.
 

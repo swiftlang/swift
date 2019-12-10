@@ -170,7 +170,7 @@ public:
 
   ArrayRef<CapturedValue> getCaptures() const {
     // FIXME: Ideally, everywhere that synthesizes a function should include
-    // its capture info.
+    // its capture info.
     if (!hasBeenComputed())
       return None;
     return StorageAndFlags.getPointer()->getCaptures();
@@ -188,7 +188,7 @@ public:
   /// \returns true if the function captures any generic type parameters.
   bool hasGenericParamCaptures() const {
     // FIXME: Ideally, everywhere that synthesizes a function should include
-    // its capture info.
+    // its capture info.
     if (!hasBeenComputed())
       return false;
     return StorageAndFlags.getInt().contains(Flags::HasGenericParamCaptures);
@@ -202,7 +202,7 @@ public:
   /// \returns the captured dynamic Self type, if any.
   DynamicSelfType *getDynamicSelfType() const {
     // FIXME: Ideally, everywhere that synthesizes a function should include
-    // its capture info.
+    // its capture info.
     if (!hasBeenComputed())
       return nullptr;
     return StorageAndFlags.getPointer()->getDynamicSelfType();
@@ -214,7 +214,7 @@ public:
 
   OpaqueValueExpr *getOpaqueValue() const {
     // FIXME: Ideally, everywhere that synthesizes a function should include
-    // its capture info.
+    // its capture info.
     if (!hasBeenComputed())
       return nullptr;
     return StorageAndFlags.getPointer()->getOpaqueValue();

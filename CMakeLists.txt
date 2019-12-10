@@ -132,7 +132,7 @@ set(SWIFT_ANALYZE_CODE_COVERAGE FALSE CACHE STRING
 # SWIFT_VERSION is deliberately /not/ cached so that an existing build directory
 # can be reused when a new version of Swift comes out (assuming the user hasn't
 # manually set it as part of their own CMake configuration).
-set(SWIFT_VERSION "5.1.1")
+set(SWIFT_VERSION "5.2")
 
 set(SWIFT_VENDOR "" CACHE STRING
     "The vendor name of the Swift compiler")
@@ -606,13 +606,7 @@ if(SWIFT_HOST_VARIANT_SDK)
   set(SWIFT_HOST_VARIANT_SDK_default "${SWIFT_HOST_VARIANT_SDK}")
 else()
   if("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
-    # CMake on an Android host sets this to Linux, so check for the ANDROID_DATA
-    # environment variable to see if we're building on Android.
-    if(NOT "$ENV{ANDROID_DATA}" STREQUAL "")
-      set(SWIFT_HOST_VARIANT_SDK_default "ANDROID")
-    else()
-      set(SWIFT_HOST_VARIANT_SDK_default "LINUX")
-    endif()
+    set(SWIFT_HOST_VARIANT_SDK_default "LINUX")
   elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "FreeBSD")
     set(SWIFT_HOST_VARIANT_SDK_default "FREEBSD")
   elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "CYGWIN")
@@ -622,7 +616,6 @@ else()
   elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Haiku")
     set(SWIFT_HOST_VARIANT_SDK_default "HAIKU")
   elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Android")
-    # CMAKE_SYSTEM_NAME might be set this way when cross-compiling to Android.
     set(SWIFT_HOST_VARIANT_SDK_default "ANDROID")
   elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
     set(SWIFT_HOST_VARIANT_SDK_default "OSX")
@@ -931,7 +924,7 @@ find_package(PythonInterp REQUIRED)
 #
 
 if(LLVM_ENABLE_LIBXML2)
-  find_package(Libxml2 REQUIRED)
+  find_package(LibXml2 REQUIRED)
 else()
   find_package(LibXml2)
 endif()

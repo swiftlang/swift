@@ -965,23 +965,40 @@ static bool isValidTrailingClosure(bool isExprBasic, Parser &P){
   // the token after the { is on the same line as the {.
   if (P.peekToken().isAtStartOfLine())
     return false;
-  
-  
+
   // Determine if the {} goes with the expression by eating it, and looking
-  // to see if it is immediately followed by '{', 'where', or comma.  If so,
-  // we consider it to be part of the proceeding expression.
+  // to see if it is immediately followed by a token which indicates we should
+  // consider it part of the preceding expression
   Parser::BacktrackingScope backtrack(P);
   P.consumeToken(tok::l_brace);
   P.skipUntil(tok::r_brace);
   SourceLoc endLoc;
-  if (!P.consumeIf(tok::r_brace, endLoc) ||
-      P.Tok.isNot(tok::l_brace, tok::kw_where, tok::comma)) {
+  if (!P.consumeIf(tok::r_brace, endLoc))
+    return false;
+
+  switch (P.Tok.getKind()) {
+  case tok::l_brace:
+  case tok::kw_where:
+  case tok::comma:
+    return true;
+  case tok::l_square:
+  case tok::l_paren:
+  case tok::period:
+  case tok::period_prefix:
+  case tok::kw_is:
+  case tok::kw_as:
+  case tok::question_postfix:
+  case tok::question_infix:
+  case tok::exclaim_postfix:
+  case tok::colon:
+  case tok::equal:
+  case tok::oper_postfix:
+  case tok::oper_binary_spaced:
+  case tok::oper_binary_unspaced:
+    return !P.Tok.isAtStartOfLine();
+  default:
     return false;
   }
-
-  // Recoverable case. Just return true here and Sema will emit a diagnostic
-  // later. see: Sema/MiscDiagnostics.cpp#checkStmtConditionTrailingClosure
-  return true;
 }
 
 
@@ -997,6 +1014,8 @@ getMagicIdentifierLiteralKind(tok Kind) {
   case tok::kw___FILE__:
   case tok::pound_file:
     return MagicIdentifierLiteralExpr::Kind::File;
+  case tok::pound_filePath:
+    return MagicIdentifierLiteralExpr::Kind::FilePath;
   case tok::kw___FUNCTION__:
   case tok::pound_function:
     return MagicIdentifierLiteralExpr::Kind::Function;
@@ -1429,6 +1448,15 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
       .fixItReplace(Tok.getLoc(), replacement);
     LLVM_FALLTHROUGH;
   }
+
+  case tok::pound_filePath:
+    // Check twice because of fallthrough--this is ugly but temporary.
+    if (Tok.is(tok::pound_filePath) && !Context.LangOpts.EnableConcisePoundFile)
+      diagnose(Tok.getLoc(), diag::unknown_pound_expr, "filePath");
+    // Continue since we actually do know how to handle it. This avoids extra
+    // diagnostics.
+    LLVM_FALLTHROUGH;
+
   case tok::pound_column:
   case tok::pound_file:
   case tok::pound_function:
@@ -1438,6 +1466,7 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
     switch (Tok.getKind()) {
     case tok::pound_column: SKind = SyntaxKind::PoundColumnExpr; break;
     case tok::pound_file: SKind = SyntaxKind::PoundFileExpr; break;
+    case tok::pound_filePath: SKind = SyntaxKind::PoundFilePathExpr; break;
     case tok::pound_function: SKind = SyntaxKind::PoundFunctionExpr; break;
     // FIXME: #line was renamed to #sourceLocation
     case tok::pound_line: SKind = SyntaxKind::PoundLineExpr; break;

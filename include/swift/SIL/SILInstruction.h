@@ -1397,6 +1397,11 @@ protected:
 
 public:
   DEFINE_ABSTRACT_SINGLE_VALUE_INST_BOILERPLATE(AllocationInst)
+
+  /// Return the underlying variable declaration associated with this
+  /// allocation, or null if this allocation inst is associated with a temporary
+  /// allocation.
+  VarDecl *getDecl() const;
 };
 
 class DeallocStackInst;
@@ -1438,10 +1443,6 @@ public:
 
   void setDynamicLifetime() { dynamicLifetime = true; }
   bool hasDynamicLifetime() const { return dynamicLifetime; }
-
-  /// Return the underlying variable declaration associated with this
-  /// allocation, or null if this is a temporary allocation.
-  VarDecl *getDecl() const;
 
   /// Return the debug variable information attached to this instruction.
   Optional<SILDebugVariable> getVarInfo() const {
@@ -1684,10 +1685,6 @@ public:
 
   // Return the type of the memory stored in the alloc_box.
   SILType getAddressType() const;
-
-  /// Return the underlying variable declaration associated with this
-  /// allocation, or null if this is a temporary allocation.
-  VarDecl *getDecl() const;
 
   /// Return the debug variable information attached to this instruction.
   Optional<SILDebugVariable> getVarInfo() const {
@@ -2895,6 +2892,10 @@ public:
     return KeyPathPatternComponent(tupleIndex, ty);
   }
   
+  void visitReferencedFunctionsAndMethods(
+      std::function<void (SILFunction *)> functionCallBack,
+      std::function<void (SILDeclRef)> methodCallBack) const;
+    
   void incrementRefCounts() const;
   void decrementRefCounts() const;
   
@@ -2951,6 +2952,15 @@ public:
   
   ArrayRef<KeyPathPatternComponent> getComponents() const;
   
+  void visitReferencedFunctionsAndMethods(
+      std::function<void (SILFunction *)> functionCallBack,
+      std::function<void (SILDeclRef)> methodCallBack) {
+    for (auto &component : getComponents()) {
+      component.visitReferencedFunctionsAndMethods(functionCallBack,
+                                                   methodCallBack);
+    }
+  }
+
   static KeyPathPattern *get(SILModule &M,
                              CanGenericSignature signature,
                              CanType rootType,
@@ -6989,8 +6999,8 @@ public:
   }
 
   using SuccessorBlockArgumentsListTy =
-      TransformRange<ConstSuccessorListTy,
-                     function_ref<PhiArgumentArrayRef(const SILSuccessor &)>>;
+      TransformRange<ConstSuccessorListTy, function_ref<SILPhiArgumentArrayRef(
+                                               const SILSuccessor &)>>;
 
   /// Return the range of Argument arrays for each successor of this
   /// block.

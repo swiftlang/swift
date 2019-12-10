@@ -223,6 +223,10 @@ enum class FixKind : uint8_t {
   /// Allow an ephemeral argument conversion for a parameter marked as being
   /// non-ephemeral.
   TreatEphemeralAsNonEphemeral,
+
+  /// Base type in reference to the contextual member e.g. `.foo` couldn't be
+  /// inferred and has to be specified explicitly.
+  SpecifyBaseTypeForContextualMember,
 };
 
 class ConstraintFix {
@@ -950,18 +954,35 @@ private:
 };
 
 class AllowTupleTypeMismatch final : public ContextualMismatch {
+  /// If this is an element mismatch, \c Index is the element index where the
+  /// type mismatch occurred. If this is an arity or label mismatch, \c Index
+  /// will be \c None.
+  Optional<unsigned> Index;
+
   AllowTupleTypeMismatch(ConstraintSystem &cs, Type lhs, Type rhs,
-                         ConstraintLocator *locator)
+                         ConstraintLocator *locator, Optional<unsigned> index)
       : ContextualMismatch(cs, FixKind::AllowTupleTypeMismatch, lhs, rhs,
-                           locator) {}
+                           locator), Index(index) {}
 
 public:
   static AllowTupleTypeMismatch *create(ConstraintSystem &cs, Type lhs,
-                                        Type rhs, ConstraintLocator *locator);
+                                        Type rhs, ConstraintLocator *locator,
+                                        Optional<unsigned> index = None);
+
+  static bool classof(const ConstraintFix *fix) {
+    return fix->getKind() == FixKind::AllowTupleTypeMismatch;
+  }
 
   std::string getName() const override {
     return "fix tuple mismatches in type and arity";
   }
+
+  bool isElementMismatch() const {
+    return Index.hasValue();
+  }
+
+  bool coalesceAndDiagnose(ArrayRef<ConstraintFix *> secondaryFixes,
+                           bool asNote = false) const override;
 
   bool diagnose(bool asNote = false) const override;
 };
@@ -1533,6 +1554,27 @@ public:
   create(ConstraintSystem &cs, ConstraintLocator *locator, Type srcType,
          Type dstType, ConversionRestrictionKind conversionKind,
          bool downgradeToWarning);
+};
+
+class SpecifyBaseTypeForContextualMember final : public ConstraintFix {
+  DeclName MemberName;
+
+  SpecifyBaseTypeForContextualMember(ConstraintSystem &cs, DeclName member,
+                                     ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::SpecifyBaseTypeForContextualMember, locator),
+        MemberName(member) {}
+
+public:
+  std::string getName() const {
+    const auto baseName = MemberName.getBaseName();
+    return "specify base type in reference to member '" +
+           baseName.userFacingName().str() + "'";
+  }
+
+  bool diagnose(bool asNote = false) const;
+
+  static SpecifyBaseTypeForContextualMember *
+  create(ConstraintSystem &cs, DeclName member, ConstraintLocator *locator);
 };
 
 } // end namespace constraints

@@ -158,7 +158,7 @@ func errorRecovery() {
   // <rdar://problem/22426860> CrashTracer: [USER] swift at …mous_namespace::ConstraintGenerator::getTypeForPattern + 698
   var (g1, g2, g3) = (1, 2) // expected-error {{'(Int, Int)' is not convertible to '(Int, Int, _)', tuples have a different number of elements}}
   var (h1, h2) = (1, 2, 3) // expected-error {{'(Int, Int, Int)' is not convertible to '(Int, Int)', tuples have a different number of elements}}
-  var i: (Bool, Bool) = makeTuple() // expected-error {{tuple type '(String, Int)' is not convertible to tuple '(Bool, Bool)'}}
+  var i: (Bool, Bool) = makeTuple() // expected-error {{cannot convert value of type '(String, Int)' to specified type '(Bool, Bool)'}}
 }
 
 func acceptsInt(_ x: Int) {}
@@ -189,7 +189,7 @@ func test4() -> ((_ arg1: Int, _ arg2: Int) -> Int) {
 func test5() {
   let a: (Int, Int) = (1,2)
   var
-     _: ((Int) -> Int, Int) = a  // expected-error {{tuple type '(Int, Int)' is not convertible to tuple '((Int) -> Int, Int)'}}
+     _: ((Int) -> Int, Int) = a  // expected-error {{cannot convert value of type '(Int, Int)' to specified type '((Int) -> Int, Int)'}}
 
 
   let c: (a: Int, b: Int) = (1,2)
@@ -525,7 +525,7 @@ func testSingleQuoteStringLiterals() {
 }
 
 // <rdar://problem/17128913>
-var s = ""
+var s = "" // expected-note {{did you mean 's'?}}
 s.append(contentsOf: ["x"])
 
 //===----------------------------------------------------------------------===//
@@ -606,7 +606,7 @@ var ruleVar: Rule
 ruleVar = Rule("a") // expected-error {{missing argument label 'target:' in call}}
 // expected-error@-1 {{missing argument for parameter 'dependencies' in call}}
 
-class C {
+class C { // expected-note {{did you mean 'C'?}}
   var x: C?
   init(other: C?) { x = other }
 
@@ -882,8 +882,8 @@ func r22348394() {
 }
 
 // <rdar://problem/23185177> Compiler crashes in Assertion failed: ((AllowOverwrite || !E->hasLValueAccessKind()) && "l-value access kind has already been set"), function visit
-protocol P { var y: String? { get } }
-func r23185177(_ x: P?) -> [String] {
+protocol Proto { var y: String? { get } }
+func r23185177(_ x: Proto?) -> [String] {
   return x?.y // expected-error{{cannot convert return expression of type 'String?' to return type '[String]'}}
 }
 
@@ -893,17 +893,17 @@ func r22913570() {
   f(1 + 1) // expected-error{{missing argument for parameter 'to' in call}}
 }
 
-
 // SR-628 mixing lvalues and rvalues in tuple expression
-var x = 0
-var y = 1
-let _ = (x, x + 1).0
-let _ = (x, 3).1
-(x,y) = (2,3)
-(x,4) = (1,2) // expected-error {{cannot assign to value: literals are not mutable}}
-(x,y).1 = 7 // expected-error {{cannot assign to immutable expression of type 'Int'}}
-x = (x,(3,y)).1.1
-
+do {
+  var x = 0
+  var y = 1
+  let _ = (x, x + 1).0
+  let _ = (x, 3).1
+  (x,y) = (2,3)
+  (x,4) = (1,2) // expected-error {{cannot assign to value: literals are not mutable}}
+  (x,y).1 = 7 // expected-error {{cannot assign to immutable expression of type 'Int'}}
+  x = (x,(3,y)).1.1
+}
 
 // SR-3439 subscript with pound exprssions.
 Sr3439: do {

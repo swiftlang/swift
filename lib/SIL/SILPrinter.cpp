@@ -222,9 +222,10 @@ static void printFullContext(const DeclContext *Context, raw_ostream &Buffer) {
 
 static void printValueDecl(ValueDecl *Decl, raw_ostream &OS) {
   printFullContext(Decl->getDeclContext(), OS);
-  assert(Decl->hasName());
 
-  if (Decl->isOperator()) {
+  if (!Decl->hasName()) {
+    OS << "anonname=" << (const void*)Decl;
+  } else if (Decl->isOperator()) {
     OS << '"' << Decl->getBaseName() << '"';
   } else {
     bool shouldEscape = !Decl->getBaseName().isSpecial() &&
@@ -2695,6 +2696,18 @@ static void printSILProperties(SILPrintContext &Ctx,
   }
 }
 
+static void printExternallyVisibleDecls(SILPrintContext &Ctx,
+                                        ArrayRef<ValueDecl *> decls) {
+  if (decls.empty())
+    return;
+  Ctx.OS() << "/* externally visible decls: \n";
+  for (ValueDecl *decl : decls) {
+    printValueDecl(decl, Ctx.OS());
+    Ctx.OS() << '\n';
+  }
+  Ctx.OS() << "*/\n";
+}
+
 /// Pretty-print the SILModule to the designated stream.
 void SILModule::print(SILPrintContext &PrintCtx, ModuleDecl *M,
                       bool PrintASTDecls) const {
@@ -2761,7 +2774,8 @@ void SILModule::print(SILPrintContext &PrintCtx, ModuleDecl *M,
   printSILDefaultWitnessTables(PrintCtx, getDefaultWitnessTableList());
   printSILCoverageMaps(PrintCtx, getCoverageMaps());
   printSILProperties(PrintCtx, getPropertyList());
-  
+  printExternallyVisibleDecls(PrintCtx, externallyVisible.getArrayRef());
+
   OS << "\n\n";
 }
 

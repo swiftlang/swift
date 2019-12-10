@@ -538,7 +538,7 @@ void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
   ArgumentExplosionFinalizeOptimizedFunction();
 
   // Update the ownership kinds of function entry BB arguments.
-  for (auto Arg : NewF->begin()->getFunctionArguments()) {
+  for (auto Arg : NewF->begin()->getSILFunctionArguments()) {
     SILType MappedTy = Arg->getType();
     auto Ownershipkind =
         ValueOwnershipKind(*NewF, MappedTy, Arg->getArgumentConvention());
@@ -826,7 +826,7 @@ public:
     llvm::SpecificBumpPtrAllocator<ProjectionTreeNode> Allocator;
     llvm::SmallVector<ArgumentDescriptor, 4> ArgumentDescList;
     llvm::SmallVector<ResultDescriptor, 4> ResultDescList;
-    auto Args = F->begin()->getFunctionArguments();
+    auto Args = F->begin()->getSILFunctionArguments();
     for (unsigned i : indices(Args)) {
       ArgumentDescList.emplace_back(Args[i], Allocator);
     }

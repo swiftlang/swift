@@ -1,4 +1,5 @@
 // XFAIL: CPU=powerpc64le
+// XFAIL: CPU=s390x
 // RUN: %target-swift-frontend -primary-file %s -emit-ir | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-runtime --check-prefix=CHECK-%target-cpu
 
 sil_stage canonical
@@ -64,6 +65,7 @@ entry(%0 : $AnyObject):
   // CHECK-armv7k:      [[ERRORSLOT:%.*]] = alloca [[SWIFTERROR:.*]] %swift.error*, align
   // CHECK-arm64:       [[ERRORSLOT:%.*]] = alloca [[SWIFTERROR:.*]] %swift.error*, align
   // CHECK-aarch64:       [[ERRORSLOT:%.*]] = alloca [[SWIFTERROR:.*]] %swift.error*, align
+  // CHECK-powerpc64le: [[ERRORSLOT:%.*]] = alloca [[SWIFTERROR:.*]] %swift.error*, align
   // CHECK-NEXT: store %swift.error* null, %swift.error** [[ERRORSLOT]], align
 
   // CHECK-objc-NEXT: [[RESULT:%.*]] = call swiftcc %objc_object* @try_apply_helper(%objc_object* %0, %swift.refcounted* swiftself undef, %swift.error** noalias nocapture [[SWIFTERROR]]{{( )?}}dereferenceable({{.}}) [[ERRORSLOT]])

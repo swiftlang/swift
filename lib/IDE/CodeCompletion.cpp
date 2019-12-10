@@ -2168,6 +2168,14 @@ public:
     addValueBaseName(Builder, Name);
     setClangDeclKeywords(VD, Pairs, Builder);
 
+    // "not recommended" in its own getter.
+    if (Kind == LookupKind::ValueInDeclContext) {
+      if (auto accessor = dyn_cast<AccessorDecl>(CurrDeclContext)) {
+        if (accessor->getStorage() == VD && accessor->isGetter())
+          Builder.setNotRecommended(CodeCompletionResult::NoReason);
+      }
+    }
+
     if (!VD->hasInterfaceType())
       return;
 
@@ -2236,6 +2244,7 @@ public:
         return !includeDefaultArgs;
 
       case DefaultArgumentKind::File:
+      case DefaultArgumentKind::FilePath:
       case DefaultArgumentKind::Line:
       case DefaultArgumentKind::Column:
       case DefaultArgumentKind::Function:
@@ -2730,22 +2739,21 @@ public:
       return;
 
     assert(CurrDeclContext);
-    SmallVector<ValueDecl *, 16> initializers;
-    if (CurrDeclContext->lookupQualified(type, DeclBaseName::createConstructor(),
-                                         NL_QualifiedDefault,
-                                         initializers)) {
-      for (auto *init : initializers) {
-        if (init->shouldHideFromEditor())
-          continue;
-        if (IsUnresolvedMember &&
-            cast<ConstructorDecl>(init)->isFailable() &&
-            !cast<ConstructorDecl>(init)->isImplicitlyUnwrappedOptional()) {
-          continue;
-        }
-        addConstructorCall(cast<ConstructorDecl>(init), Reason,
-                           dynamicLookupInfo, type, None,
-                           /*IsOnType=*/true, name);
+
+    auto results =
+        swift::lookupSemanticMember(const_cast<DeclContext *>(CurrDeclContext),
+                                    type, DeclBaseName::createConstructor());
+    for (const auto &entry : results.allResults()) {
+      auto *init = cast<ConstructorDecl>(entry.getValueDecl());
+      if (init->shouldHideFromEditor())
+        continue;
+      if (IsUnresolvedMember && init->isFailable() &&
+          !init->isImplicitlyUnwrappedOptional()) {
+        continue;
       }
+      addConstructorCall(cast<ConstructorDecl>(init), Reason,
+                         dynamicLookupInfo, type, None,
+                         /*IsOnType=*/true, name);
     }
   }
 
@@ -3645,6 +3653,10 @@ public:
                  CodeCompletionLiteralKind::StringLiteral, "String");
     addFromProto("#file", CodeCompletionKeywordKind::pound_file,
                  CodeCompletionLiteralKind::StringLiteral, "String");
+    if (Ctx.LangOpts.EnableConcisePoundFile) {
+      addFromProto("#filePath", CodeCompletionKeywordKind::pound_file,
+                   CodeCompletionLiteralKind::StringLiteral, "String");
+    }
     addFromProto("#line", CodeCompletionKeywordKind::pound_line,
                  CodeCompletionLiteralKind::IntegerLiteral, "Int");
     addFromProto("#column", CodeCompletionKeywordKind::pound_column,

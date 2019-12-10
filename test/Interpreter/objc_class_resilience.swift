@@ -1,10 +1,10 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-clang -fobjc-arc %S/Inputs/ObjCClasses/ObjCClasses.m -c -o %t/ObjCClasses.o
+// RUN: %target-clang -fobjc-arc %S/../Inputs/ObjCClasses/ObjCClasses.m -c -o %t/ObjCClasses.o
 // RUN: %target-build-swift-dylib(%t/%target-library-name(resilient_struct)) -enable-library-evolution %S/../Inputs/resilient_struct.swift -emit-module -emit-module-path %t/resilient_struct.swiftmodule -module-name resilient_struct
 // RUN: %target-codesign %t/%target-library-name(resilient_struct)
 
-// RUN: %target-build-swift %s -L %t -I %t -lresilient_struct -I %S/Inputs/ObjCClasses/ -Xlinker %t/ObjCClasses.o -o %t/main %target-rpath(%t)
+// RUN: %target-build-swift %s -L %t -I %t -lresilient_struct -I %S/../Inputs/ObjCClasses/ -Xlinker %t/ObjCClasses.o -o %t/main %target-rpath(%t)
 // RUN: %target-codesign %t/main
 
 // RUN: %target-run %t/main %t/%target-library-name(resilient_struct)

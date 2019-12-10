@@ -43,11 +43,14 @@ public enum Privacy {
 /// Maximum number of arguments i.e., interpolated expressions that can
 /// be used in the string interpolations passed to the log APIs.
 /// This limit is imposed by the ABI of os_log.
-@_transparent
+@_semantics("constant_evaluable")
+@inlinable
+@_optimize(none)
 public var maxOSLogArgumentCount: UInt8 { return 48 }
 
-@usableFromInline
-@_transparent
+@_semantics("constant_evaluable")
+@inlinable
+@_optimize(none)
 internal var logBitsPerByte: Int { return 3 }
 
 /// Represents a string interpolation passed to the log APIs.
@@ -303,7 +306,8 @@ public struct OSLogMessage :
   /// The byte size of the buffer that will be passed to the C os_log ABI.
   /// It will contain the elements of `interpolation.arguments` and the two
   /// summary bytes: preamble and argument count.
-  @_transparent
+  @_semantics("constant_evaluable")
+  @inlinable
   @_optimize(none)
   public var bufferSize: Int {
     return interpolation.totalBytesForSerializingArguments + 2
@@ -353,8 +357,9 @@ internal struct OSLogArguments {
 
 /// Serialize a UInt8 value at the buffer location pointed to by `bufferPosition`,
 /// and increment the `bufferPosition` with the byte size of the serialized value.
-@usableFromInline
+@inlinable
 @_alwaysEmitIntoClient
+@inline(__always)
 internal func serialize(
   _ value: UInt8,
   at bufferPosition: inout ByteBufferPointer)

@@ -2157,16 +2157,29 @@ static bool shouldAccessByMangledName(IRGenModule &IGM, CanType type) {
   
 }
 
+static bool canIssueIncompleteMetadataRequests(IRGenModule &IGM) {
+  // We can only answer blocking complete metadata requests with the <=5.1
+  // runtime ABI entry points.
+  auto &context = IGM.getSwiftModule()->getASTContext();
+  auto deploymentAvailability =
+      AvailabilityContext::forDeploymentTarget(context);
+  return deploymentAvailability.isContainedIn(
+      context.getTypesInAbstractMetadataStateAvailability());
+}
+
 /// Emit a call to a type metadata accessor using a mangled name.
 static MetadataResponse
 emitMetadataAccessByMangledName(IRGenFunction &IGF, CanType type,
                                 DynamicMetadataRequest request) {
-  // TODO: We can only answer blocking complete metadata requests with the
-  // <=5.1 runtime ABI entry points.
-  assert(request.isStaticallyBlockingComplete()
-         && "can only form complete metadata by mangled name");
-  
   auto &IGM = IGF.IGM;
+
+  // We can only answer blocking complete metadata requests with the <=5.1
+  // runtime ABI entry points.
+  assert((request.isStaticallyBlockingComplete() ||
+          (request.isStaticallyAbstract() &&
+           canIssueIncompleteMetadataRequests(IGM))) &&
+         "can only form complete metadata by mangled name");
+
   llvm::Constant *mangledString;
   unsigned mangledStringSize;
   std::tie(mangledString, mangledStringSize) =
@@ -2199,11 +2212,14 @@ emitMetadataAccessByMangledName(IRGenFunction &IGF, CanType type,
   }
 
   // Get or create a shared helper function to do the instantiation.
+  auto instantiationFnName =
+      request.isStaticallyAbstract()
+          ? "__swift_instantiateConcreteTypeFromMangledNameAbstract"
+          : "__swift_instantiateConcreteTypeFromMangledName";
   auto instantiationFn = cast<llvm::Function>(
       IGM.getModule()
-          ->getOrInsertFunction(
-              "__swift_instantiateConcreteTypeFromMangledName",
-              IGF.IGM.TypeMetadataPtrTy, cache->getType())
+          ->getOrInsertFunction(instantiationFnName, IGF.IGM.TypeMetadataPtrTy,
+                                cache->getType())
           .getCallee()
           ->stripPointerCasts());
   if (instantiationFn->empty()) {
@@ -2215,7 +2231,7 @@ emitMetadataAccessByMangledName(IRGenFunction &IGF, CanType type,
                                   llvm::Attribute::NoInline);
     IGM.setHasFramePointer(instantiationFn, false);
 
-    [&IGM, instantiationFn]{
+    [&IGM, instantiationFn, request]{
       IRGenFunction subIGF(IGM, instantiationFn);
       
       auto params = subIGF.collectParameters();
@@ -2282,15 +2298,26 @@ emitMetadataAccessByMangledName(IRGenFunction &IGF, CanType type,
       auto stringAddr = subIGF.Builder.CreateAdd(stringAddrBase,
                                                  stringAddrOffset);
       stringAddr = subIGF.Builder.CreateIntToPtr(stringAddr, IGM.Int8PtrTy);
-      
-      auto call =
-        subIGF.Builder.CreateCall(IGM.getGetTypeByMangledNameInContextFn(),
-               {stringAddr,
-                size,
-                // TODO: Use mangled name lookup in generic
-                // contexts?
-                llvm::ConstantPointerNull::get(IGM.TypeContextDescriptorPtrTy),
-                llvm::ConstantPointerNull::get(IGM.Int8PtrPtrTy)});
+
+      llvm::CallInst *call;
+      if (request.isStaticallyAbstract()) {
+        call = subIGF.Builder.CreateCall(
+            IGM.getGetTypeByMangledNameInContextInMetadataStateFn(),
+            {llvm::ConstantInt::get(IGM.SizeTy, (size_t)MetadataState::Abstract),
+             stringAddr, size,
+             // TODO: Use mangled name lookup in generic
+             // contexts?
+             llvm::ConstantPointerNull::get(IGM.TypeContextDescriptorPtrTy),
+             llvm::ConstantPointerNull::get(IGM.Int8PtrPtrTy)});
+      } else {
+        call = subIGF.Builder.CreateCall(
+            IGM.getGetTypeByMangledNameInContextFn(),
+            {stringAddr, size,
+             // TODO: Use mangled name lookup in generic
+             // contexts?
+             llvm::ConstantPointerNull::get(IGM.TypeContextDescriptorPtrTy),
+             llvm::ConstantPointerNull::get(IGM.Int8PtrPtrTy)});
+      }
       call->setDoesNotThrow();
       call->setDoesNotAccessMemory();
       call->setCallingConv(IGM.SwiftCC);
@@ -2342,14 +2369,13 @@ emitCallToTypeMetadataAccessFunction(IRGenFunction &IGF, CanType type,
   // single access by mangled name instead, if we're asking for complete
   // metadata.
   //
-  // TODO: The getTypeByMangledNameInContext entry point in Swift <=5.1 can
-  // only answer requests for complete metadata. We could introduce new
-  // entry points that could answer all metadata requests.
-  if (request.isStaticallyBlockingComplete()
-      && shouldAccessByMangledName(IGF.IGM, type)) {
+  if ((request.isStaticallyBlockingComplete() ||
+       (request.isStaticallyAbstract() &&
+        canIssueIncompleteMetadataRequests(IGF.IGM))) &&
+      shouldAccessByMangledName(IGF.IGM, type)) {
     return emitMetadataAccessByMangledName(IGF, type, request);
   }
-    
+
   llvm::Constant *accessor =
     getOrCreateTypeMetadataAccessFunction(IGF.IGM, type);
   llvm::CallInst *call = IGF.Builder.CreateCall(accessor, { request.get(IGF) });

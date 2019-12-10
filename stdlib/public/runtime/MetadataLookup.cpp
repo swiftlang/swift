@@ -1691,6 +1691,26 @@ swift_getTypeByMangledNameInEnvironment(
 
 SWIFT_CC(swift) SWIFT_RUNTIME_EXPORT
 const Metadata * _Nullable
+swift_getTypeByMangledNameInEnvironmentInMetadataState(
+                        size_t metadataState,
+                        const char *typeNameStart,
+                        size_t typeNameLength,
+                        const TargetGenericEnvironment<InProcess> *environment,
+                        const void * const *genericArgs) {
+  llvm::StringRef typeName(typeNameStart, typeNameLength);
+  SubstGenericParametersFromMetadata substitutions(environment, genericArgs);
+  return swift_getTypeByMangledName((MetadataState)metadataState, typeName,
+    genericArgs,
+    [&substitutions](unsigned depth, unsigned index) {
+      return substitutions.getMetadata(depth, index);
+    },
+    [&substitutions](const Metadata *type, unsigned index) {
+      return substitutions.getWitnessTable(type, index);
+    }).getMetadata();
+}
+
+SWIFT_CC(swift) SWIFT_RUNTIME_EXPORT
+const Metadata * _Nullable
 swift_getTypeByMangledNameInContext(
                         const char *typeNameStart,
                         size_t typeNameLength,
@@ -1699,6 +1719,26 @@ swift_getTypeByMangledNameInContext(
   llvm::StringRef typeName(typeNameStart, typeNameLength);
   SubstGenericParametersFromMetadata substitutions(context, genericArgs);
   return swift_getTypeByMangledName(MetadataState::Complete, typeName,
+    genericArgs,
+    [&substitutions](unsigned depth, unsigned index) {
+      return substitutions.getMetadata(depth, index);
+    },
+    [&substitutions](const Metadata *type, unsigned index) {
+      return substitutions.getWitnessTable(type, index);
+    }).getMetadata();
+}
+
+SWIFT_CC(swift) SWIFT_RUNTIME_EXPORT
+const Metadata * _Nullable
+swift_getTypeByMangledNameInContextInMetadataState(
+                        size_t metadataState,
+                        const char *typeNameStart,
+                        size_t typeNameLength,
+                        const TargetContextDescriptor<InProcess> *context,
+                        const void * const *genericArgs) {
+  llvm::StringRef typeName(typeNameStart, typeNameLength);
+  SubstGenericParametersFromMetadata substitutions(context, genericArgs);
+  return swift_getTypeByMangledName((MetadataState)metadataState, typeName,
     genericArgs,
     [&substitutions](unsigned depth, unsigned index) {
       return substitutions.getMetadata(depth, index);

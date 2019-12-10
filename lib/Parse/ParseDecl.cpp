@@ -799,6 +799,18 @@ Parser::parseImplementsAttribute(SourceLoc AtLoc, SourceLoc Loc) {
                            ProtocolType.get(), MemberName, MemberNameLoc));
 }
 
+/// Parse a `@differentiable` attribute, returning true on error.
+///
+/// \verbatim
+///   differentiable-attribute-arguments:
+///     '(' (differentiation-params-clause ',')?
+///         (differentiable-attr-func-specifier ',')?
+///         differentiable-attr-func-specifier?
+///         where-clause?
+///     ')'
+///   differentiable-attr-func-specifier:
+///     ('jvp' | 'vjp') ':' decl-name
+/// \endverbatim
 ParserResult<DifferentiableAttr>
 Parser::parseDifferentiableAttribute(SourceLoc atLoc, SourceLoc loc) {
   StringRef AttrName = "differentiable";
@@ -829,25 +841,41 @@ Parser::parseDifferentiableAttribute(SourceLoc atLoc, SourceLoc loc) {
                                  params, jvpSpec, vjpSpec, whereClause));
 }
 
+// Attribute parsing error helper.
+// For the given parentheses depth, skip until ')' and consume it if possible.
+// If no ')' is found, produce error.
+// Always returns true to indicate a parsing error has occurred.
+static bool errorAndSkipUntilConsumeRightParen(Parser &P, StringRef attrName,
+                                               int parenDepth = 1) {
+  for (int i = 0; i < parenDepth; ++i) {
+    P.skipUntil(tok::r_paren);
+    if (!P.consumeIf(tok::r_paren)) {
+      P.diagnose(P.Tok, diag::attr_expected_rparen, attrName,
+                 /*DeclModifier=*/false);
+      return true;
+    }
+  }
+  return true;
+};
+
+/// Parse a differentiation parameters 'wrt:' clause, returning true on error.
+///
+/// \verbatim
+///   differentiation-params-clause:
+///     'wrt' ':' (differentiation-param | differentiation-params)
+///   differentiation-params:
+///     '(' differentiation-param (',' differentiation-param)* ')'
+///   differentiation-param:
+///     'self' | identifier
+/// \endverbatim
 bool Parser::parseDifferentiationParametersClause(
     SmallVectorImpl<ParsedAutoDiffParameter> &params, StringRef attrName) {
-  // Set parse error, skip until ')' and parse it.
-  auto errorAndSkipToEnd = [&](int parenDepth = 1) -> bool {
-    for (int i = 0; i < parenDepth; i++) {
-      skipUntil(tok::r_paren);
-      if (!consumeIf(tok::r_paren))
-        diagnose(Tok, diag::attr_expected_rparen, attrName,
-                 /*DeclModifier=*/false);
-    }
-    return true;
-  };
-
   SyntaxParsingContext DiffParamsClauseContext(
        SyntaxContext, SyntaxKind::DifferentiationParamsClause);
   consumeToken(tok::identifier);
   if (!consumeIf(tok::colon)) {
     diagnose(Tok, diag::expected_colon_after_label, "wrt");
-    return errorAndSkipToEnd();
+    return errorAndSkipUntilConsumeRightParen(*this, attrName);
   }
 
   // Function that parses a parameter into `params`. Returns true if error
@@ -899,11 +927,11 @@ bool Parser::parseDifferentiationParametersClause(
     consumeToken(tok::l_paren);
     // Parse first parameter. At least one is required.
     if (parseParam())
-      return errorAndSkipToEnd(2);
+      return errorAndSkipUntilConsumeRightParen(*this, attrName, 2);
     // Parse remaining parameters until ')'.
     while (Tok.isNot(tok::r_paren))
       if (parseParam())
-        return errorAndSkipToEnd(2);
+        return errorAndSkipUntilConsumeRightParen(*this, attrName, 2);
     SyntaxContext->collectNodesInPlace(SyntaxKind::DifferentiationParamList);
     // Parse closing ')' of the parameter list.
     consumeToken(tok::r_paren);
@@ -911,7 +939,7 @@ bool Parser::parseDifferentiationParametersClause(
   // If no opening '(' for parameter list, parse a single parameter.
   else {
     if (parseParam(/*parseTrailingComma*/ false))
-      return errorAndSkipToEnd();
+      return errorAndSkipUntilConsumeRightParen(*this, attrName);
   }
   return false;
 }
@@ -921,17 +949,6 @@ bool Parser::parseDifferentiableAttributeArguments(
     Optional<DeclNameWithLoc> &jvpSpec, Optional<DeclNameWithLoc> &vjpSpec,
     TrailingWhereClause *&whereClause) {
   StringRef AttrName = "differentiable";
-
-  // Set parse error, skip until ')' and parse it.
-  auto errorAndSkipToEnd = [&](int parenDepth = 1) -> bool {
-    for (int i = 0; i < parenDepth; i++) {
-      skipUntil(tok::r_paren);
-      if (!consumeIf(tok::r_paren))
-        diagnose(Tok, diag::attr_expected_rparen, AttrName,
-                 /*DeclModifier=*/false);
-    }
-    return true;
-  };
 
   // Parse trailing comma, if it exists, and check for errors.
   auto consumeIfTrailingComma = [&]() -> bool {
@@ -965,7 +982,7 @@ bool Parser::parseDifferentiableAttributeArguments(
     if (Tok.isNot(tok::comma, tok::kw_where))
       return false;
     if (consumeIfTrailingComma())
-      return errorAndSkipToEnd();
+      return errorAndSkipUntilConsumeRightParen(*this, AttrName);
   }
 
   // If 'withRespectTo' is used, make the user change it to 'wrt'.
@@ -974,7 +991,7 @@ bool Parser::parseDifferentiableAttributeArguments(
     diagnose(Tok, diag::attr_differentiable_use_wrt_not_withrespectto)
         .highlight(withRespectToRange)
         .fixItReplace(withRespectToRange, "wrt:");
-    return errorAndSkipToEnd();
+    return errorAndSkipUntilConsumeRightParen(*this, AttrName);
   }
   // Parse differentiation parameters' clause.
   if (isIdentifier(Tok, "wrt")) {
@@ -984,7 +1001,7 @@ bool Parser::parseDifferentiableAttributeArguments(
     if (Tok.isNot(tok::comma, tok::kw_where))
       return false;
     if (consumeIfTrailingComma())
-      return errorAndSkipToEnd();
+      return errorAndSkipUntilConsumeRightParen(*this, AttrName);
   }
 
   // Function that parses a label and a function specifier, e.g. 'vjp: foo(_:)'.
@@ -1020,11 +1037,11 @@ bool Parser::parseDifferentiableAttributeArguments(
         SyntaxContext, SyntaxKind::DifferentiableAttributeFuncSpecifier);
     jvpSpec = DeclNameWithLoc();
     if (parseFuncSpec("jvp", *jvpSpec, terminateParsingArgs))
-      return errorAndSkipToEnd();
+      return errorAndSkipUntilConsumeRightParen(*this, AttrName);
     if (terminateParsingArgs)
       return false;
     if (consumeIfTrailingComma())
-      return errorAndSkipToEnd();
+      return errorAndSkipUntilConsumeRightParen(*this, AttrName);
   }
 
   // Parse 'vjp: <func_name>' (optional).
@@ -1033,19 +1050,19 @@ bool Parser::parseDifferentiableAttributeArguments(
         SyntaxContext, SyntaxKind::DifferentiableAttributeFuncSpecifier);
     vjpSpec = DeclNameWithLoc();
     if (parseFuncSpec("vjp", *vjpSpec, terminateParsingArgs))
-      return errorAndSkipToEnd();
+      return errorAndSkipUntilConsumeRightParen(*this, AttrName);
     if (terminateParsingArgs)
       return false;
     // Note: intentionally parse trailing comma here, even though it's the last
     // function specifier. `consumeIfTrailingComma` will emit an error.
     if (consumeIfTrailingComma())
-      return errorAndSkipToEnd();
+      return errorAndSkipUntilConsumeRightParen(*this, AttrName);
   }
 
   // If parser has not advanced and token is not 'where' or ')', emit error.
   if (Tok.getLoc() == startingLoc && Tok.isNot(tok::kw_where, tok::r_paren)) {
     diagnose(Tok, diag::attr_differentiable_expected_label);
-    return errorAndSkipToEnd();
+    return errorAndSkipUntilConsumeRightParen(*this, AttrName);
   }
 
   // Parse a trailing 'where' clause if any.
@@ -1060,6 +1077,76 @@ bool Parser::parseDifferentiableAttributeArguments(
   return false;
 }
 
+/// Parse a `@derivative(of:)` attribute, returning true on error.
+///
+/// \verbatim
+///   derivative-attribute-arguments:
+///     '(' 'of' ':' decl-name (',' differentiation-params-clause)? ')'
+/// \endverbatim
+ParserResult<DerivativeAttr> Parser::parseDerivativeAttribute(SourceLoc atLoc,
+                                                              SourceLoc loc) {
+  StringRef AttrName = "derivative";
+  SourceLoc lParenLoc = loc, rParenLoc = loc;
+  DeclNameWithLoc original;
+  SmallVector<ParsedAutoDiffParameter, 8> params;
+
+  // Parse trailing comma, if it exists, and check for errors.
+  auto consumeIfTrailingComma = [&]() -> bool {
+    if (!consumeIf(tok::comma)) return false;
+    // Diagnose trailing comma before ')'.
+    if (Tok.is(tok::r_paren)) {
+      diagnose(Tok, diag::unexpected_separator, ",");
+      return errorAndSkipUntilConsumeRightParen(*this, AttrName);
+    }
+    // Check that token after comma is 'wrt:'.
+    if (isIdentifier(Tok, "wrt"))
+      return false;
+    diagnose(Tok, diag::attr_expected_label, "wrt", AttrName);
+    return errorAndSkipUntilConsumeRightParen(*this, AttrName);
+  };
+  // Parse '('.
+  if (!consumeIf(tok::l_paren, lParenLoc)) {
+    diagnose(getEndOfPreviousLoc(), diag::attr_expected_lparen, AttrName,
+             /*DeclModifier*/ false);
+    return makeParserError();
+  }
+  {
+    SyntaxParsingContext ContentContext(
+        SyntaxContext, SyntaxKind::DerivativeRegistrationAttributeArguments);
+    // Parse the 'of:' label and colon.
+    if (parseSpecificIdentifier("of", diag::attr_missing_label, "of",
+                                AttrName) ||
+        parseToken(tok::colon, diag::expected_colon_after_label, "of")) {
+      return makeParserError();
+    }
+    {
+      // Parse the name of the function.
+      SyntaxParsingContext FuncDeclNameContext(SyntaxContext,
+                                               SyntaxKind::FunctionDeclName);
+      // NOTE: Use `afterDot = true` and `allowDeinitAndSubscript = true` to
+      // enable, e.g. `@derivative(of: init)` and `@derivative(of: subscript)`.
+      original.Name = parseUnqualifiedDeclName(
+          /*afterDot*/ true, original.Loc,
+          diag::attr_derivative_expected_original_name, /*allowOperators*/ true,
+          /*allowZeroArgCompoundNames*/ true, /*allowDeinitAndSubscript*/ true);
+    }
+    if (consumeIfTrailingComma())
+      return makeParserError();
+    // Parse the optional 'wrt' differentiation parameters clause.
+    if (isIdentifier(Tok, "wrt") &&
+        parseDifferentiationParametersClause(params, AttrName))
+      return makeParserError();
+  }
+  // Parse ')'.
+  if (!consumeIf(tok::r_paren, rParenLoc)) {
+    diagnose(getEndOfPreviousLoc(), diag::attr_expected_rparen, AttrName,
+             /*DeclModifier*/ false);
+    return makeParserError();
+  }
+  return ParserResult<DerivativeAttr>(
+      DerivativeAttr::create(Context, /*implicit*/ false, atLoc,
+                             SourceRange(loc, rParenLoc), original, params));
+}
 
 void Parser::parseObjCSelector(SmallVector<Identifier, 4> &Names,
                                SmallVector<SourceLoc, 4> &NameLocs,
@@ -1531,7 +1618,124 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
                                                  /*Implicit=*/false));
     break;
   }
+  case DAK_OriginallyDefinedIn: {
+    auto LeftLoc = Tok.getLoc();
+    if (!consumeIf(tok::l_paren)) {
+      diagnose(Loc, diag::attr_expected_lparen, AttrName,
+               DeclAttribute::isDeclModifier(DK));
+      return false;
+    }
+    SourceLoc RightLoc;
+    enum class NextSegmentKind: uint8_t {
+      ModuleName = 0,
+      PlatformVersion,
+    };
+    NextSegmentKind NK = NextSegmentKind::ModuleName;
+    StringRef OriginalModuleName;
+    llvm::SmallVector<std::pair<PlatformKind, llvm::VersionTuple>, 4>
+      PlatformAndVersions;
 
+    StringRef AttrName = "@_originalDefinedIn";
+    if (parseList(tok::r_paren, LeftLoc, RightLoc, false,
+                  diag::originally_defined_in_missing_rparen,
+                  SyntaxKind::Unknown, [&]() -> ParserStatus {
+      SWIFT_DEFER {
+        if (NK != NextSegmentKind::PlatformVersion) {
+          NK = (NextSegmentKind)((uint8_t)NK + (uint8_t)1);
+        }
+      };
+      switch (NK) {
+      // Parse 'module: "original_module_name"'.
+      case NextSegmentKind::ModuleName: {
+        // Parse 'module' ':'.
+        if (!Tok.is(tok::identifier) || Tok.getText() != "module" ||
+            !peekToken().is(tok::colon)) {
+          diagnose(Tok, diag::originally_defined_in_need_original_module_name);
+          return makeParserError();
+        }
+        consumeToken(tok::identifier);
+        consumeToken(tok::colon);
+        // Parse the next string literal as the original module name.
+        auto ModuleNameLoc = Tok.getLoc();
+        if (Tok.is(tok::string_literal)) {
+          auto NameOp = getStringLiteralIfNotInterpolated(Tok.getLoc(),
+                                                          "original module name");
+          if (NameOp.hasValue())
+            OriginalModuleName = *NameOp;
+          consumeToken();
+        }
+        if (OriginalModuleName.empty()) {
+          diagnose(ModuleNameLoc,
+                   diag::originally_defined_in_need_nonempty_module_name);
+          return makeParserError();
+        }
+        return makeParserSuccess();
+      }
+      // Parse 'OSX 13.13'.
+      case NextSegmentKind::PlatformVersion: {
+        if ((Tok.is(tok::identifier) || Tok.is(tok::oper_binary_spaced)) &&
+            (peekToken().is(tok::floating_literal) ||
+             peekToken().is(tok::integer_literal))) {
+          PlatformKind Platform;
+          // Parse platform name.
+          auto Plat = platformFromString(Tok.getText());
+          if (!Plat.hasValue()) {
+            diagnose(Tok.getLoc(),
+                     diag::originally_defined_in_unrecognized_platform);
+            return makeParserError();
+          } else {
+            consumeToken();
+            Platform = *Plat;
+          }
+          // Parse version number
+          llvm::VersionTuple VerTuple;
+          SourceRange VersionRange;
+          if (parseVersionTuple(VerTuple, VersionRange,
+              Diagnostic(diag::attr_availability_expected_version, AttrName))) {
+            return makeParserError();
+          } else {
+            if (VerTuple.getSubminor().hasValue() ||
+                VerTuple.getBuild().hasValue()) {
+              diagnose(Tok.getLoc(), diag::originally_defined_in_major_minor_only);
+            }
+            // * as platform name isn't supported.
+            if (Platform == PlatformKind::none) {
+              diagnose(AtLoc, diag::originally_defined_in_missing_platform_name);
+            } else {
+              PlatformAndVersions.emplace_back(Platform, VerTuple);
+            }
+            return makeParserSuccess();
+          }
+        }
+        diagnose(AtLoc, diag::originally_defined_in_need_platform_version);
+        return makeParserError();
+      }
+      }
+    }).isError()) {
+      return false;
+    }
+    if (OriginalModuleName.empty()) {
+      diagnose(AtLoc, diag::originally_defined_in_need_nonempty_module_name);
+      return false;
+    }
+    if (PlatformAndVersions.empty()) {
+      diagnose(AtLoc, diag::originally_defined_in_need_platform_version);
+      return false;
+    }
+
+    assert(!OriginalModuleName.empty());
+    assert(!PlatformAndVersions.empty());
+    assert(NK == NextSegmentKind::PlatformVersion);
+    AttrRange = SourceRange(Loc, Tok.getLoc());
+    for (auto &Item: PlatformAndVersions) {
+      Attributes.add(new (Context) OriginallyDefinedInAttr(AtLoc, AttrRange,
+                                                           OriginalModuleName,
+                                                           Item.first,
+                                                           Item.second,
+                                                           /*IsImplicit*/false));
+    }
+    break;
+  }
   case DAK_Available: {
     if (!consumeIf(tok::l_paren)) {
       diagnose(Loc, diag::attr_expected_lparen, AttrName,
@@ -1862,6 +2066,17 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
 
   case DAK_Differentiable: {
     auto Attr = parseDifferentiableAttribute(AtLoc, Loc);
+    if (Attr.isNonNull())
+      Attributes.add(Attr.get());
+    break;
+  }
+
+  case DAK_Derivative: {
+    // `@derivative` in a local scope is not allowed.
+    if (CurDeclContext->isLocalContext())
+      diagnose(Loc, diag::attr_only_at_non_local_scope, '@' + AttrName.str());
+
+    auto Attr = parseDerivativeAttribute(AtLoc, Loc);
     if (Attr.isNonNull())
       Attributes.add(Attr.get());
     break;
@@ -2234,9 +2449,10 @@ static bool parseDifferentiableAttributeArgument(Parser &P,
     return false;
   }
 
-  // If the next token is an arrow, then the matched '( <identifier> )' is
-  // actually the parameter type list, not an argument to '@differentiable'.
-  if (P.Tok.is(tok::arrow))
+  // If the next token is not a `(`, `@`, or an identifier, then the
+  // matched '( <identifier> )' is actually the parameter type list,
+  // not an argument to '@differentiable'.
+  if (P.Tok.isNot(tok::l_paren, tok::at_sign, tok::identifier))
     return false;
 
   backtrack.cancelBacktrack();
@@ -2249,6 +2465,91 @@ static bool parseDifferentiableAttributeArgument(Parser &P,
   }
 
   Attributes.linear = true;
+  return false;
+}
+
+/// Parse the inside of a convention attribute '(...)'.
+///
+/// The '@convention' prefix should've been parsed by the caller.
+/// See `Parser::parseTypeAttribute` for the justChecking argument.
+///
+/// Returns true if there was an error.
+bool Parser::parseConventionAttributeInternal(
+    bool justChecking, TypeAttributes::Convention &convention) {
+  SourceLoc LPLoc;
+  if (!consumeIfNotAtStartOfLine(tok::l_paren)) {
+    if (!justChecking)
+      diagnose(Tok, diag::convention_attribute_expected_lparen);
+    return true;
+  }
+
+  if (Tok.isNot(tok::identifier)) {
+    if (!justChecking)
+      diagnose(Tok, diag::convention_attribute_expected_name);
+    return true;
+  }
+
+  convention.Name = Tok.getText();
+  consumeToken(tok::identifier);
+
+  // Consume extra (optional) ', cType: " blah blah "'
+  if (consumeIf(tok::comma)) {
+    if (Tok.isNot(tok::identifier)) {
+      if (!justChecking)
+        diagnose(Tok, diag::convention_attribute_ctype_expected_label);
+      return true;
+    }
+    auto cTypeLabel = Tok.getText();
+    consumeToken(tok::identifier);
+    if (cTypeLabel != "cType") {
+      if (!justChecking)
+        diagnose(Tok, diag::convention_attribute_ctype_expected_label);
+      return true;
+    }
+    if (!consumeIf(tok::colon)) {
+      if (!justChecking)
+        diagnose(Tok, diag::convention_attribute_ctype_expected_colon);
+      return true;
+    }
+    if (Tok.isNot(tok::string_literal)) {
+      if (!justChecking)
+        diagnose(Tok, diag::convention_attribute_ctype_expected_string);
+      return true;
+    }
+    if (auto ty = getStringLiteralIfNotInterpolated(Tok.getLoc(), "(C type)")) {
+      convention.ClangType = ty.getValue();
+      convention.ClangTypeLoc = Tok.getLoc();
+    }
+    consumeToken(tok::string_literal);
+  }
+
+  if (convention.Name == "witness_method") {
+    if (!consumeIf(tok::colon)) {
+      if (!justChecking)
+        diagnose(Tok,
+                 diag::convention_attribute_witness_method_expected_colon);
+      return true;
+    }
+    if (Tok.isNot(tok::identifier)) {
+      if (!justChecking)
+        diagnose(Tok,
+                 diag::convention_attribute_witness_method_expected_protocol);
+      return true;
+    }
+
+    convention.WitnessMethodProtocol = Tok.getText();
+    consumeToken(tok::identifier);
+  }
+  
+  // Parse the ')'.  We can't use parseMatchingToken if we're in
+  // just-checking mode.
+  if (justChecking && Tok.isNot(tok::r_paren))
+    return true;
+
+  SourceLoc RPLoc;
+  parseMatchingToken(tok::r_paren, RPLoc,
+                     diag::convention_attribute_expected_rparen,
+                     LPLoc);
   return false;
 }
 
@@ -2325,56 +2626,16 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, SourceLoc AtLoc,
   StringRef Text = Tok.getText();
   consumeToken();
   
-  StringRef conventionName;
-  StringRef witnessMethodProtocol;
-
+  TypeAttributes::Convention convention;
   if (attr == TAK_convention) {
-    SourceLoc LPLoc;
-    if (!consumeIfNotAtStartOfLine(tok::l_paren)) {
-      if (!justChecking)
-        diagnose(Tok, diag::convention_attribute_expected_lparen);
+    bool failedToParse =
+      parseConventionAttributeInternal(justChecking, convention);
+    if (failedToParse) {
+      if (Tok.is(tok::r_paren))
+        consumeToken();
       return true;
     }
-
-    if (Tok.isNot(tok::identifier)) {
-      if (!justChecking)
-        diagnose(Tok, diag::convention_attribute_expected_name);
-      return true;
-    }
-
-    conventionName = Tok.getText();
-    consumeToken(tok::identifier);
-
-    if (conventionName == "witness_method") {
-      if (Tok.isNot(tok::colon)) {
-        if (!justChecking)
-          diagnose(Tok,
-                   diag::convention_attribute_witness_method_expected_colon);
-        return true;
-      }
-      consumeToken(tok::colon);
-      if (Tok.isNot(tok::identifier)) {
-        if (!justChecking)
-          diagnose(Tok,
-                   diag::convention_attribute_witness_method_expected_protocol);
-        return true;
-      }
-
-      witnessMethodProtocol = Tok.getText();
-      consumeToken(tok::identifier);
-    }
-
-    // Parse the ')'.  We can't use parseMatchingToken if we're in
-    // just-checking mode.
-    if (justChecking && Tok.isNot(tok::r_paren))
-      return true;
-
-    SourceLoc RPLoc;
-    parseMatchingToken(tok::r_paren, RPLoc,
-                       diag::convention_attribute_expected_rparen,
-                       LPLoc);
   }
-
 
   // In just-checking mode, we only need to consume the tokens, and we don't
   // want to do any other analysis.
@@ -2474,8 +2735,7 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, SourceLoc AtLoc,
 
   // Convention attribute.
   case TAK_convention:
-    Attributes.convention = conventionName;
-    Attributes.conventionWitnessMethodProtocol = witnessMethodProtocol;
+    Attributes.ConventionArguments = convention;
     break;
       
   case TAK__opaqueReturnTypeOf: {
@@ -2801,21 +3061,11 @@ static void diagnoseOperatorFixityAttributes(Parser &P,
 static unsigned skipUntilMatchingRBrace(Parser &P,
                                         bool &HasPoundDirective,
                                         bool &HasOperatorDeclarations,
-                                        bool &HasNestedClassDeclarations,
-                                        SyntaxParsingContext *&SyntaxContext) {
+                                        bool &HasNestedClassDeclarations) {
   HasPoundDirective = false;
   HasOperatorDeclarations = false;
   HasNestedClassDeclarations = false;
 
-  bool isRootCtx = SyntaxContext->isRoot();
-  SyntaxParsingContext BlockItemListContext(SyntaxContext,
-                                            SyntaxKind::CodeBlockItemList);
-  if (isRootCtx) {
-    BlockItemListContext.setTransparent();
-  }
-  SyntaxParsingContext BlockItemContext(SyntaxContext,
-                                        SyntaxKind::CodeBlockItem);
-  SyntaxParsingContext BodyContext(SyntaxContext, SyntaxKind::TokenList);
   unsigned OpenBraces = 1;
 
   bool LastTokenWasFunc = false;
@@ -3999,8 +4249,7 @@ bool Parser::canDelayMemberDeclParsing(bool &HasOperatorDeclarations,
   skipUntilMatchingRBrace(*this,
                           HasPoundDirective,
                           HasOperatorDeclarations,
-                          HasNestedClassDeclarations,
-                          SyntaxContext);
+                          HasNestedClassDeclarations);
   if (!HasPoundDirective)
     BackTrack.cancelBacktrack();
   return !BackTrack.willBacktrack();
@@ -4691,10 +4940,10 @@ static ParameterList *parseOptionalAccessorArgument(SourceLoc SpecifierLoc,
   return ParameterList::create(P.Context, StartLoc, param, EndLoc);
 }
 
-static unsigned skipBracedBlock(Parser &P,
-                                SyntaxParsingContext *&SyntaxContext) {
-  SyntaxParsingContext CodeBlockContext(SyntaxContext, SyntaxKind::CodeBlock);
-  P.consumeToken(tok::l_brace);
+bool Parser::skipBracedBlock() {
+  SyntaxParsingContext disabled(SyntaxContext);
+  SyntaxContext->disable();
+  consumeToken(tok::l_brace);
 
   // We don't care if a skipped function body contained any of these, so
   // just ignore them.
@@ -4702,14 +4951,13 @@ static unsigned skipBracedBlock(Parser &P,
   bool HasOperatorDeclarations;
   bool HasNestedClassDeclarations;
 
-  unsigned OpenBraces = skipUntilMatchingRBrace(P,
+  unsigned OpenBraces = skipUntilMatchingRBrace(*this,
                                                 HasPoundDirectives,
                                                 HasOperatorDeclarations,
-                                                HasNestedClassDeclarations,
-                                                SyntaxContext);
-  if (P.consumeIf(tok::r_brace))
+                                                HasNestedClassDeclarations);
+  if (consumeIf(tok::r_brace))
     OpenBraces--;
-  return OpenBraces;
+  return OpenBraces != 0;
 }
 
 /// Returns a descriptive name for the given accessor/addressor kind.
@@ -5579,20 +5827,8 @@ void Parser::consumeAbstractFunctionBody(AbstractFunctionDecl *AFD,
   SourceRange BodyRange;
   BodyRange.Start = Tok.getLoc();
 
-  // Consume the '{', and find the matching '}'.
-  unsigned OpenBraces = skipBracedBlock(*this, SyntaxContext);
-  if (OpenBraces != 0 && Tok.isNot(tok::code_complete)) {
-    assert(Tok.is(tok::eof));
-    // We hit EOF, and not every brace has a pair.  Recover by searching
-    // for the next decl except variable decls and cutting off before
-    // that point.
-    backtrackToPosition(BeginParserPosition);
-    consumeToken(tok::l_brace);
-    while (Tok.is(tok::kw_var) || Tok.is(tok::kw_let) ||
-           (Tok.isNot(tok::eof) && !isStartOfDecl())) {
-      consumeToken();
-    }
-  }
+  // Advance the parser to the end of the block; '{' ... '}'.
+  skipBracedBlock();
 
   BodyRange.End = PreviousLoc;
 
@@ -5646,6 +5882,7 @@ ParserResult<FuncDecl> Parser::parseDeclFunc(SourceLoc StaticLoc,
     }
   }
 
+  ParserStatus Status;
   SourceLoc FuncLoc =
       HasFuncKeyword ? consumeToken(tok::kw_func) : Tok.getLoc();
 
@@ -5702,12 +5939,13 @@ ParserResult<FuncDecl> Parser::parseDeclFunc(SourceLoc StaticLoc,
   Optional<Scope> GenericsScope;
   GenericsScope.emplace(this, ScopeKind::Generics);
   GenericParamList *GenericParams;
-  bool SignatureHasCodeCompletion = false;
   auto GenericParamResult = maybeParseGenericParams();
   GenericParams = GenericParamResult.getPtrOrNull();
-  SignatureHasCodeCompletion |= GenericParamResult.hasCodeCompletion();
-  if (SignatureHasCodeCompletion && !CodeCompletion)
-    return makeParserCodeCompletionStatus();
+  if (GenericParamResult.hasCodeCompletion()) {
+    Status.setHasCodeCompletion();
+    if (!CodeCompletion)
+      return Status;
+  }
 
   DefaultArgumentInfo DefaultArgs;
   TypeRepr *FuncRetTy = nullptr;
@@ -5715,14 +5953,11 @@ ParserResult<FuncDecl> Parser::parseDeclFunc(SourceLoc StaticLoc,
   ParameterList *BodyParams;
   SourceLoc throwsLoc;
   bool rethrows;
-  ParserStatus SignatureStatus =
-      parseFunctionSignature(SimpleName, FullName, BodyParams, DefaultArgs,
-                             throwsLoc, rethrows, FuncRetTy);
-
-  SignatureHasCodeCompletion |= SignatureStatus.hasCodeCompletion();
-  if (SignatureStatus.hasCodeCompletion() && !CodeCompletion) {
+  Status |= parseFunctionSignature(SimpleName, FullName, BodyParams,
+                                   DefaultArgs, throwsLoc, rethrows, FuncRetTy);
+  if (Status.hasCodeCompletion() && !CodeCompletion) {
     // Trigger delayed parsing, no need to continue.
-    return SignatureStatus;
+    return Status;
   }
 
   diagnoseWhereClauseInGenericParamList(GenericParams);
@@ -5747,11 +5982,10 @@ ParserResult<FuncDecl> Parser::parseDeclFunc(SourceLoc StaticLoc,
   if (Tok.is(tok::kw_where)) {
     ContextChange CC(*this, FD);
 
-    auto whereStatus = parseFreestandingGenericWhereClause(GenericParams);
-    SignatureHasCodeCompletion |= whereStatus.hasCodeCompletion();
-    if (whereStatus.hasCodeCompletion() && !CodeCompletion) {
+    Status |= parseFreestandingGenericWhereClause(GenericParams);
+    if (Status.hasCodeCompletion() && !CodeCompletion) {
       // Trigger delayed parsing, no need to continue.
-      return whereStatus;
+      return Status;
     }
   }
   
@@ -5772,8 +6006,10 @@ ParserResult<FuncDecl> Parser::parseDeclFunc(SourceLoc StaticLoc,
   FD->getAttrs() = Attributes;
 
   // Pass the function signature to code completion.
-  if (SignatureHasCodeCompletion)
+  if (Status.hasCodeCompletion()) {
+    assert(CodeCompletion && "must be code completion second pass");
     CodeCompletion->setParsedDecl(FD);
+  }
 
   DefaultArgs.setFunctionContext(FD, FD->getParameters());
   setLocalDiscriminator(FD);
@@ -5783,7 +6019,7 @@ ParserResult<FuncDecl> Parser::parseDeclFunc(SourceLoc StaticLoc,
       diagnose(Tok, diag::protocol_method_with_body);
       skipSingle();
     }
-  } else {
+  } else if (!Status.hasCodeCompletion()) {
     parseAbstractFunctionBody(FD);
   }
 
@@ -6545,14 +6781,14 @@ Parser::parseDeclSubscript(SourceLoc StaticLoc,
   Optional<Scope> GenericsScope;
   GenericsScope.emplace(this, ScopeKind::Generics);
   GenericParamList *GenericParams;
-  bool SignatureHasCodeCompletion = false;
 
   auto Result = maybeParseGenericParams();
   GenericParams = Result.getPtrOrNull();
-  SignatureHasCodeCompletion |= Result.hasCodeCompletion();
-
-  if (SignatureHasCodeCompletion && !CodeCompletion)
-    return makeParserCodeCompletionStatus();
+  if (Result.hasCodeCompletion()) {
+    Status.setHasCodeCompletion();
+    if (!CodeCompletion)
+      return Status;
+  }
 
   // Parse the parameter list.
   DefaultArgumentInfo DefaultArgs;
@@ -6561,10 +6797,8 @@ Parser::parseDeclSubscript(SourceLoc StaticLoc,
     = parseSingleParameterClause(ParameterContextKind::Subscript,
                                  &argumentNames, &DefaultArgs);
   Status |= Indices;
-
-  SignatureHasCodeCompletion |= Indices.hasCodeCompletion();
-  if (SignatureHasCodeCompletion && !CodeCompletion)
-    return makeParserCodeCompletionStatus();
+  if (Status.hasCodeCompletion() && !CodeCompletion)
+    return Status;
   
   SourceLoc ArrowLoc;
   ParserResult<TypeRepr> ElementTy;
@@ -6588,10 +6822,9 @@ Parser::parseDeclSubscript(SourceLoc StaticLoc,
     // type
     ElementTy = parseDeclResultType(diag::expected_type_subscript);
     Status |= ElementTy;
-    SignatureHasCodeCompletion |= ElementTy.hasCodeCompletion();
-    if (SignatureHasCodeCompletion && !CodeCompletion) {
-      return makeParserCodeCompletionStatus();
-    }
+    if (Status.hasCodeCompletion() && !CodeCompletion)
+      return Status;
+
     if (ElementTy.isNull()) {
       // Always set an element type.
       ElementTy = makeParserResult(ElementTy, new (Context) ErrorTypeRepr());
@@ -6625,16 +6858,16 @@ Parser::parseDeclSubscript(SourceLoc StaticLoc,
   if (Tok.is(tok::kw_where)) {
     ContextChange CC(*this, Subscript);
 
-    auto whereStatus = parseFreestandingGenericWhereClause(GenericParams);
-    SignatureHasCodeCompletion |= whereStatus.hasCodeCompletion();
-    if (whereStatus.hasCodeCompletion() && !CodeCompletion) {
+    Status |= parseFreestandingGenericWhereClause(GenericParams);
+    if (Status.hasCodeCompletion() && !CodeCompletion) {
       // Trigger delayed parsing, no need to continue.
-      return whereStatus;
+      return Status;
     }
   }
 
   // Pass the function signature to code completion.
-  if (SignatureHasCodeCompletion && CodeCompletion) {
+  if (Status.hasCodeCompletion()) {
+    assert(CodeCompletion && "must be code completion second pass");
     CodeCompletion->setParsedDecl(Subscript);
   }
 
@@ -6655,7 +6888,7 @@ Parser::parseDeclSubscript(SourceLoc StaticLoc,
       }
       Status.setIsParseError();
     }
-  } else {
+  } else if (!Status.hasCodeCompletion()) {
     Status |= parseGetSet(Flags, GenericParams, Indices.get(),
                           accessors, Subscript, StaticLoc);
   }
@@ -6680,6 +6913,7 @@ Parser::parseDeclSubscript(SourceLoc StaticLoc,
 ParserResult<ConstructorDecl>
 Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   assert(Tok.is(tok::kw_init));
+  ParserStatus Status;
   SourceLoc ConstructorLoc = consumeToken();
   bool Failable = false, IUO = false;
   SourceLoc FailabilityLoc;
@@ -6714,21 +6948,22 @@ Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   Scope S(this, ScopeKind::Generics);
   auto GPResult = maybeParseGenericParams();
   GenericParamList *GenericParams = GPResult.getPtrOrNull();
-  if (GPResult.hasCodeCompletion())
-    return makeParserCodeCompletionStatus();
+  if (GPResult.hasCodeCompletion()) {
+    Status.setHasCodeCompletion();
+    if (!CodeCompletion)
+      return Status;
+  }
 
   // Parse the parameters.
   DefaultArgumentInfo DefaultArgs;
   llvm::SmallVector<Identifier, 4> namePieces;
-  bool SignatureHasCodeCompletion = false;
   ParserResult<ParameterList> Params
     = parseSingleParameterClause(ParameterContextKind::Initializer,
                                  &namePieces, &DefaultArgs);
-
-  SignatureHasCodeCompletion |= Params.hasCodeCompletion();
-  if (Params.hasCodeCompletion() && !CodeCompletion) {
+  Status |= Params;
+  if (Status.hasCodeCompletion() && !CodeCompletion) {
     // Trigger delayed parsing, no need to continue.
-    return makeParserCodeCompletionStatus();
+    return Status;
   }
 
   // Protocol initializer arguments may not have default values.
@@ -6760,11 +6995,10 @@ Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   if (Tok.is(tok::kw_where)) {
     ContextChange(*this, CD);
 
-    auto whereStatus = parseFreestandingGenericWhereClause(GenericParams);
-    SignatureHasCodeCompletion |= whereStatus.hasCodeCompletion();
-    if (whereStatus.hasCodeCompletion() && !CodeCompletion) {
+    Status |= parseFreestandingGenericWhereClause(GenericParams);
+    if (Status.hasCodeCompletion() && !CodeCompletion) {
       // Trigger delayed parsing, no need to continue.
-      return whereStatus;
+      return Status;
     }
   }
 
@@ -6773,8 +7007,10 @@ Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   DefaultArgs.setFunctionContext(CD, CD->getParameters());
 
   // Pass the function signature to code completion.
-  if (SignatureHasCodeCompletion)
+  if (Status.hasCodeCompletion()) {
+    assert(CodeCompletion && "must be code completion second pass");
     CodeCompletion->setParsedDecl(CD);
+  }
 
   if (ConstructorsNotAllowed || Params.isParseError()) {
     // Tell the type checker not to touch this constructor.
@@ -6786,11 +7022,11 @@ Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
       diagnose(Tok, diag::protocol_init_with_body);
       skipSingle();
     }
-  } else {
+  } else if(!Status.hasCodeCompletion()) {
     parseAbstractFunctionBody(CD);
   }
 
-  return makeParserResult(CD);
+  return makeParserResult(Status, CD);
 }
 
 ParserResult<DestructorDecl> Parser::
@@ -7034,12 +7270,13 @@ Parser::parseDeclPrecedenceGroup(ParseDeclOptions flags,
   if (parseIdentifier(name, nameLoc, diag::expected_precedencegroup_name)) {
     // If the identifier is missing or a keyword or something, try to
     // skip the entire body.
-    if (consumeIf(tok::l_brace)) {
+    if (!Tok.isAtStartOfLine() && Tok.isNot(tok::eof) &&
+         peekToken().is(tok::l_brace))
+      consumeToken();
+    if (Tok.is(tok::l_brace)) {
+      consumeToken(tok::l_brace);
       skipUntilDeclRBrace();
       (void) consumeIf(tok::r_brace);
-    } else if (Tok.isNot(tok::eof) && peekToken().is(tok::l_brace)) {
-      consumeToken();
-      skipBracedBlock(*this, SyntaxContext);
     }
     return nullptr;
   }

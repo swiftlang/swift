@@ -46,10 +46,7 @@ public:
   DeclContext *getConformanceContext() const;
 
   /// Add \c children as members of the context that declares the conformance.
-  ///
-  /// \returns True if any of the added members were found to be invalid after type
-  /// checking.
-  bool addMembersToConformanceContext(ArrayRef<Decl *> children);
+  void addMembersToConformanceContext(ArrayRef<Decl *> children);
 
   /// Get the declared type of the protocol that this is conformance is for.
   Type getProtocolType() const;
@@ -200,7 +197,12 @@ public:
   /// Add a getter to a derived property.  The property becomes read-only.
   static AccessorDecl *
   addGetterToReadOnlyDerivedProperty(VarDecl *property,
-                                            Type propertyContextType);
+                                     Type propertyContextType);
+
+  /// Declare a getter for a derived property.
+  /// The getter will not be added to the property yet.
+  static AccessorDecl *declareDerivedPropertyGetter(VarDecl *property,
+                                                    Type propertyContextType);
 
   /// Build a reference to the 'self' decl of a derived function.
   static DeclRefExpr *createSelfDeclRef(AbstractFunctionDecl *fn);

@@ -104,6 +104,10 @@ bool ArgsToFrontendOptionsConverter::convert(
   Opts.IgnoreSwiftSourceInfo |= Args.hasArg(OPT_ignore_module_source_info);
   computeHelpOptions();
 
+  if (Args.hasArg(OPT_print_target_info)) {
+    Opts.PrintTargetInfo = true;
+  }
+
   if (const Arg *A = Args.getLastArg(OPT_verify_generic_signatures)) {
     Opts.VerifyGenericSignaturesInModule = A->getValue();
   }
@@ -499,6 +503,16 @@ bool ArgsToFrontendOptionsConverter::checkUnusedSupplementaryOutputPaths()
       && Opts.InputsAndOutputs.hasReferenceDependenciesPath()) {
     Diags.diagnose(SourceLoc(),
                    diag::error_mode_cannot_emit_reference_dependencies);
+    return true;
+  }
+  if (!FrontendOptions::canActionEmitSwiftRanges(Opts.RequestedAction) &&
+      Opts.InputsAndOutputs.hasSwiftRangesPath()) {
+    Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_swift_ranges);
+    return true;
+  }
+  if (!FrontendOptions::canActionEmitCompiledSource(Opts.RequestedAction) &&
+      Opts.InputsAndOutputs.hasCompiledSourcePath()) {
+    Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_compiled_source);
     return true;
   }
   if (!FrontendOptions::canActionEmitObjCHeader(Opts.RequestedAction) &&

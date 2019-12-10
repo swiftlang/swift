@@ -258,7 +258,7 @@ void addHighLevelLoopOptPasses(SILPassPipelinePlan &P) {
   P.addCOWArrayOpts();
   // Cleanup.
   P.addDCE();
-  P.addSwiftArrayOpts();
+  P.addSwiftArrayPropertyOpt();
 }
 
 // Perform classic SSA optimizations.
@@ -397,6 +397,8 @@ static void addPerfEarlyModulePassPipeline(SILPassPipelinePlan &P) {
   // we do not spend time optimizing them.
   P.addDeadFunctionElimination();
 
+  P.addSemanticARCOpts();
+
   // Strip ownership from non-transparent functions.
   if (P.getOptions().StripOwnershipAfterSerialization)
     P.addNonTransparentFunctionOwnershipModelEliminator();
@@ -409,6 +411,8 @@ static void addPerfEarlyModulePassPipeline(SILPassPipelinePlan &P) {
 
   // Add the outliner pass (Osize).
   P.addOutliner();
+
+  P.addCrossModuleSerializationSetup();
 }
 
 static void addHighLevelEarlyLoopOptPipeline(SILPassPipelinePlan &P) {

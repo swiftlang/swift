@@ -87,8 +87,8 @@ Double(1) as Double as String // expected-error{{cannot convert value of type 'D
 // expected-error@-1 2 {{cannot convert value of type 'Int' to expected element type 'String'}}
 // expected-error@-2   {{cannot convert value of type 'Double' to expected element type 'String'}}
 [[1]] as [[String]] // expected-error{{cannot convert value of type 'Int' to expected element type 'String'}}
-(1, 1.0) as (Int, Int) // expected-error{{cannot convert value of type 'Double' to type 'Int' in coercion}}
-(1.0, 1, "asd") as (String, Int, Float) // expected-error{{cannot convert value of type 'Double' to type 'String' in coercion}}
+(1, 1.0) as (Int, Int) // expected-error{{cannot convert value of type '(Int, Double)' to type '(Int, Int)' in coercion}}
+(1.0, 1, "asd") as (String, Int, Float) // expected-error{{cannot convert value of type '(Double, Int, String)' to type '(String, Int, Float)' in coercion}}
 (1, 1.0, "a", [1, 23]) as (Int, Double, String, [String])
 // expected-error@-1 2 {{cannot convert value of type 'Int' to expected element type 'String'}}
 

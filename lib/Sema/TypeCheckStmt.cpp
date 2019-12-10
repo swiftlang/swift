@@ -154,6 +154,11 @@ namespace {
         return { false, E };
       }
 
+      // Caller-side default arguments need their @autoclosures checked.
+      if (auto *DAE = dyn_cast<DefaultArgumentExpr>(E))
+        if (DAE->isCallerSide() && DAE->getParamDecl()->isAutoClosure())
+          DAE->getCallerSideDefaultExpr()->walk(*this);
+
       return { true, E };
     }
 
@@ -635,7 +640,6 @@ public:
     Type exnType = getASTContext().getErrorDecl()->getDeclaredType();
     if (!exnType) return TS;
 
-    // FIXME: Remove TypeChecker dependency.
     TypeChecker::typeCheckExpression(E, DC, TypeLoc::withoutLoc(exnType),
                                      CTP_ThrowStmt);
     TS->setSubExpr(E);
@@ -1527,6 +1531,7 @@ static void diagnoseIgnoredLiteral(ASTContext &Ctx, LiteralExpr *LE) {
     case ExprKind::MagicIdentifierLiteral:
       switch (cast<MagicIdentifierLiteralExpr>(LE)->getKind()) {
       case MagicIdentifierLiteralExpr::Kind::File: return "#file";
+      case MagicIdentifierLiteralExpr::Kind::FilePath: return "#filePath";
       case MagicIdentifierLiteralExpr::Kind::Line: return "#line";
       case MagicIdentifierLiteralExpr::Kind::Column: return "#column";
       case MagicIdentifierLiteralExpr::Kind::Function: return "#function";
@@ -2122,15 +2127,11 @@ TypeCheckFunctionBodyUntilRequest::evaluate(Evaluator &evaluator,
                                                             builderType);
       if (!body)
         return true;
-    } else if (func->hasSingleExpressionBody()) {
-      auto resultTypeLoc = func->getBodyResultTypeLoc();
-      auto expr = func->getSingleExpressionBody();
-
-      if (resultTypeLoc.isNull() || resultTypeLoc.getType()->isVoid()) {
-        // The function returns void.  We don't need an explicit return, no matter
-        // what the type of the expression is.  Take the inserted return back out.
-        body->setFirstElement(expr);
-      }
+    } else if (func->hasSingleExpressionBody() &&
+               func->getResultInterfaceType()->isVoid()) {
+      // The function returns void.  We don't need an explicit return, no matter
+      // what the type of the expression is.  Take the inserted return back out.
+      body->setFirstElement(func->getSingleExpressionBody());
     }
   } else if (isa<ConstructorDecl>(AFD) &&
              (body->empty() ||

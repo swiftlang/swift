@@ -739,6 +739,12 @@ SmallVector<OverrideMatch, 2> OverrideMatcher::match(
   if (members.empty() || name != membersName) {
     membersName = name;
     members.clear();
+    // FIXME: This suggests we need to use TypeChecker's high-level lookup
+    // entrypoints.  But first we need one that supports additive qualified
+    // lookup.
+    for (auto *ctx : superContexts) {
+      ctx->synthesizeSemanticMembersIfNeeded(membersName);
+    }
     dc->lookupQualified(superContexts, membersName,
                         NL_QualifiedDefault, members);
   }
@@ -1286,12 +1292,14 @@ namespace  {
     UNINTERESTING_ATTR(Exported)
     UNINTERESTING_ATTR(ForbidSerializingReference)
     UNINTERESTING_ATTR(GKInspectable)
+    UNINTERESTING_ATTR(HasMissingDesignatedInitializers)
     UNINTERESTING_ATTR(IBAction)
     UNINTERESTING_ATTR(IBDesignable)
     UNINTERESTING_ATTR(IBInspectable)
     UNINTERESTING_ATTR(IBOutlet)
     UNINTERESTING_ATTR(IBSegueAction)
     UNINTERESTING_ATTR(Indirect)
+    UNINTERESTING_ATTR(InheritsConvenienceInitializers)
     UNINTERESTING_ATTR(Inline)
     UNINTERESTING_ATTR(Optimize)
     UNINTERESTING_ATTR(Inlinable)
@@ -1329,6 +1337,7 @@ namespace  {
 
     // Differentiation-related attributes.
     UNINTERESTING_ATTR(Differentiable)
+    UNINTERESTING_ATTR(Derivative)
 
     // These can't appear on overridable declarations.
     UNINTERESTING_ATTR(Prefix)
@@ -1359,6 +1368,7 @@ namespace  {
     UNINTERESTING_ATTR(DisfavoredOverload)
     UNINTERESTING_ATTR(FunctionBuilder)
     UNINTERESTING_ATTR(ProjectedValueProperty)
+    UNINTERESTING_ATTR(OriginallyDefinedIn)
 #undef UNINTERESTING_ATTR
 
     void visitAvailableAttr(AvailableAttr *attr) {

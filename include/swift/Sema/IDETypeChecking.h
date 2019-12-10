@@ -35,6 +35,7 @@ namespace swift {
   class Expr;
   class ExtensionDecl;
   class FunctionType;
+  class LookupResult;
   class NominalTypeDecl;
   class PatternBindingDecl;
   class ProtocolDecl;
@@ -136,6 +137,9 @@ namespace swift {
   ///
   /// \returns true on success, false on error.
   bool typeCheckTopLevelCodeDecl(TopLevelCodeDecl *TLCD);
+
+  LookupResult
+  lookupSemanticMember(DeclContext *DC, Type ty, DeclName name);
 
   struct ExtensionInfo {
     // The extension with the declarations to apply.

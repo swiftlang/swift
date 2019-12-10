@@ -1105,9 +1105,13 @@ function(_add_swift_library_single target name)
       PROPERTIES
       INSTALL_RPATH "$ORIGIN:/usr/lib/swift/cygwin")
   elseif("${SWIFTLIB_SINGLE_SDK}" STREQUAL "ANDROID")
-    # CMake generates incorrect rule `$SONAME_FLAG $INSTALLNAME_DIR$SONAME` for Android build on macOS cross-compile host.
-    # Proper linker flags constructed manually. See below variable `swiftlib_link_flags_all`.
-    set_target_properties("${target}" PROPERTIES NO_SONAME TRUE)
+    # CMake generates an incorrect rule `$SONAME_FLAG $INSTALLNAME_DIR$SONAME`
+    # for an Android cross-build from a macOS host. Construct the proper linker
+    # flags manually in add_swift_target_library instead, see there with
+    # variable `swiftlib_link_flags_all`.
+    if(SWIFTLIB_SINGLE_TARGET_LIBRARY)
+      set_target_properties("${target}" PROPERTIES NO_SONAME TRUE)
+    endif()
     # Only set the install RPATH if cross-compiling the host tools, in which
     # case both the NDK and Sysroot paths must be set.
     if(NOT "${SWIFT_ANDROID_NDK_PATH}" STREQUAL "" AND
@@ -1260,6 +1264,14 @@ function(_add_swift_library_single target name)
       "${SWIFTLIB_DIR}/${SWIFTLIB_SINGLE_SUBDIR}"
       "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/../lib/swift/${SWIFTLIB_SINGLE_SUBDIR}"
       "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/../lib/swift/${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_LIB_SUBDIR}")
+
+  # In certain cases when building, the environment variable SDKROOT is set to override
+  # where the sdk root is located in the system. If that environment variable has been
+  # set by the user, respect it and add the specified SDKROOT directory to the
+  # library_search_directories so we are able to link against those libraries
+  if(DEFINED ENV{SDKROOT} AND EXISTS "$ENV{SDKROOT}/usr/lib/swift")
+      list(APPEND library_search_directories "$ENV{SDKROOT}/usr/lib/swift")
+  endif()
 
   # Add variant-specific flags.
   if(SWIFTLIB_SINGLE_TARGET_LIBRARY)

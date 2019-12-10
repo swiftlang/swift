@@ -651,6 +651,10 @@ public:
   /// plain Tok.is(T1) check).
   bool skipUntilTokenOrEndOfLine(tok T1);
 
+  /// Skip a braced block (e.g. function body). The current token must be '{'.
+  /// Returns \c true if the parser hit the eof before finding matched '}'.
+  bool skipBracedBlock();
+
   /// If the parser is generating only a syntax tree, try loading the current
   /// node from a previously generated syntax tree.
   /// Returns \c true if the node has been loaded and inserted into the current
@@ -993,6 +997,10 @@ public:
   bool parseDifferentiationParametersClause(
       SmallVectorImpl<ParsedAutoDiffParameter> &params, StringRef attrName);
 
+  /// Parse the @derivative attribute.
+  ParserResult<DerivativeAttr> parseDerivativeAttribute(SourceLoc AtLoc,
+                                                        SourceLoc Loc);
+
   /// Parse a specific attribute.
   ParserStatus parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc);
 
@@ -1017,6 +1025,10 @@ public:
   bool parseTypeAttributeListPresent(ParamDecl::Specifier &Specifier,
                                      SourceLoc &SpecifierLoc,
                                      TypeAttributes &Attributes);
+
+  bool parseConventionAttributeInternal(bool justChecking,
+                                        TypeAttributes::Convention &convention);
+
   bool parseTypeAttribute(TypeAttributes &Attributes, SourceLoc AtLoc,
                           bool justChecking = false);
   

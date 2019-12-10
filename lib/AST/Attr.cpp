@@ -22,14 +22,15 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/IndexSubset.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/ParameterList.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/AST/Types.h"
-#include "swift/AST/ParameterList.h"
 #include "swift/Basic/Defer.h"
+#include "swift/Basic/QuotedString.h"
 #include "llvm/ADT/SmallString.h"
-#include "llvm/Support/raw_ostream.h"
-#include "llvm/Support/ErrorHandling.h"
 #include "llvm/ADT/StringSwitch.h"
+#include "llvm/Support/ErrorHandling.h"
+#include "llvm/Support/raw_ostream.h"
 using namespace swift;
 
 #define DECL_ATTR(_, Id, ...) \
@@ -81,6 +82,18 @@ StringRef swift::getAccessLevelSpelling(AccessLevel value) {
   }
 
   llvm_unreachable("Unhandled AccessLevel in switch.");
+}
+
+void TypeAttributes::getConventionArguments(SmallVectorImpl<char> &buf) const {
+  llvm::raw_svector_ostream stream(buf);
+  auto &convention = ConventionArguments.getValue();
+  stream << convention.Name;
+  if (!convention.WitnessMethodProtocol.empty()) {
+    stream << ": " << convention.WitnessMethodProtocol;
+    return;
+  }
+  if (!convention.ClangType.empty())
+    stream << ", cType: " << QuotedString(convention.ClangType);
 }
 
 /// Given a name like "autoclosure", return the type attribute ID that
@@ -691,6 +704,17 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     Printer << "(\"" << cast<SILGenNameAttr>(this)->Name << "\")";
     break;
 
+  case DAK_OriginallyDefinedIn: {
+    Printer.printAttrName("@_originallyDefinedIn");
+    Printer << "(module: ";
+    auto Attr = cast<OriginallyDefinedInAttr>(this);
+    Printer << "\"" << Attr->OriginalModuleName << "\", ";
+    Printer << platformString(Attr->Platform) << " " <<
+      Attr->MovedVersion.getAsString();
+    Printer << ")";
+    break;
+  }
+
   case DAK_Available: {
     Printer.printAttrName("@available");
     Printer << "(";
@@ -1003,8 +1027,12 @@ StringRef DeclAttribute::getAttrName() const {
     return "<<custom>>";
   case DAK_ProjectedValueProperty:
     return "_projectedValueProperty";
+  case DAK_OriginallyDefinedIn:
+    return "_originallyDefinedIn";
   case DAK_Differentiable:
     return "differentiable";
+  case DAK_Derivative:
+    return "derivative";
   }
   llvm_unreachable("bad DeclAttrKind");
 }
@@ -1135,7 +1163,7 @@ DynamicReplacementAttr::DynamicReplacementAttr(SourceLoc atLoc,
                                                SourceRange parenRange)
     : DeclAttribute(DAK_DynamicReplacement, atLoc, baseRange,
                     /*Implicit=*/false),
-      ReplacedFunctionName(name), ReplacedFunction(nullptr) {
+      ReplacedFunctionName(name) {
   Bits.DynamicReplacementAttr.HasTrailingLocationInfo = true;
   getTrailingLocations()[0] = parenRange.Start;
   getTrailingLocations()[1] = parenRange.End;
@@ -1152,17 +1180,16 @@ DynamicReplacementAttr::create(ASTContext &Ctx, SourceLoc AtLoc,
       SourceRange(LParenLoc, RParenLoc));
 }
 
-DynamicReplacementAttr *DynamicReplacementAttr::create(ASTContext &Ctx,
-                                                       DeclName name) {
-  return new (Ctx) DynamicReplacementAttr(name);
+DynamicReplacementAttr *
+DynamicReplacementAttr::create(ASTContext &Ctx, DeclName name,
+                               AbstractFunctionDecl *f) {
+  return new (Ctx) DynamicReplacementAttr(name, f);
 }
 
 DynamicReplacementAttr *
 DynamicReplacementAttr::create(ASTContext &Ctx, DeclName name,
-                               AbstractFunctionDecl *f) {
-  auto res = new (Ctx) DynamicReplacementAttr(name);
-  res->setReplacedFunction(f);
-  return res;
+                               LazyMemberLoader *Resolver, uint64_t Data) {
+  return new (Ctx) DynamicReplacementAttr(name, Resolver, Data);
 }
 
 SourceLoc DynamicReplacementAttr::getLParenLoc() const {
@@ -1340,31 +1367,30 @@ SpecializeAttr *SpecializeAttr::create(ASTContext &Ctx, SourceLoc atLoc,
                                   specializedSignature);
 }
 
-DifferentiableAttr::DifferentiableAttr(ASTContext &context, bool implicit,
-                                       SourceLoc atLoc, SourceRange baseRange,
-                                       bool linear,
+DifferentiableAttr::DifferentiableAttr(bool implicit, SourceLoc atLoc,
+                                       SourceRange baseRange, bool linear,
                                        ArrayRef<ParsedAutoDiffParameter> params,
                                        Optional<DeclNameWithLoc> jvp,
                                        Optional<DeclNameWithLoc> vjp,
                                        TrailingWhereClause *clause)
   : DeclAttribute(DAK_Differentiable, atLoc, baseRange, implicit),
-    linear(linear), NumParsedParameters(params.size()), JVP(std::move(jvp)),
+    Linear(linear), NumParsedParameters(params.size()), JVP(std::move(jvp)),
     VJP(std::move(vjp)), WhereClause(clause) {
   std::copy(params.begin(), params.end(),
             getTrailingObjects<ParsedAutoDiffParameter>());
 }
 
-DifferentiableAttr::DifferentiableAttr(ASTContext &context, bool implicit,
+DifferentiableAttr::DifferentiableAttr(Decl *original, bool implicit,
                                        SourceLoc atLoc, SourceRange baseRange,
                                        bool linear,
-                                       IndexSubset *indices,
+                                       IndexSubset *parameterIndices,
                                        Optional<DeclNameWithLoc> jvp,
                                        Optional<DeclNameWithLoc> vjp,
                                        GenericSignature derivativeGenSig)
     : DeclAttribute(DAK_Differentiable, atLoc, baseRange, implicit),
-      linear(linear), JVP(std::move(jvp)), VJP(std::move(vjp)),
-      ParameterIndices(indices) {
-  setDerivativeGenericSignature(context, derivativeGenSig);
+      Linear(linear), JVP(std::move(jvp)), VJP(std::move(vjp)) {
+  setParameterIndices(parameterIndices);
+  setDerivativeGenericSignature(derivativeGenSig);
 }
 
 DifferentiableAttr *
@@ -1377,22 +1403,23 @@ DifferentiableAttr::create(ASTContext &context, bool implicit,
                            TrailingWhereClause *clause) {
   unsigned size = totalSizeToAlloc<ParsedAutoDiffParameter>(parameters.size());
   void *mem = context.Allocate(size, alignof(DifferentiableAttr));
-  return new (mem) DifferentiableAttr(context, implicit, atLoc, baseRange,
-                                      linear, parameters, std::move(jvp),
+  return new (mem) DifferentiableAttr(implicit, atLoc, baseRange, linear,
+                                      parameters, std::move(jvp),
                                       std::move(vjp), clause);
 }
 
 DifferentiableAttr *
-DifferentiableAttr::create(ASTContext &context, bool implicit,
-                           SourceLoc atLoc, SourceRange baseRange,
-                           bool linear, IndexSubset *indices,
+DifferentiableAttr::create(AbstractFunctionDecl *original, bool implicit,
+                           SourceLoc atLoc, SourceRange baseRange, bool linear,
+                           IndexSubset *parameterIndices,
                            Optional<DeclNameWithLoc> jvp,
                            Optional<DeclNameWithLoc> vjp,
                            GenericSignature derivativeGenSig) {
-  void *mem = context.Allocate(sizeof(DifferentiableAttr),
-                               alignof(DifferentiableAttr));
-  return new (mem) DifferentiableAttr(context, implicit, atLoc, baseRange,
-                                      linear, indices, std::move(jvp),
+  auto &ctx = original->getASTContext();
+  void *mem = ctx.Allocate(sizeof(DifferentiableAttr),
+                           alignof(DifferentiableAttr));
+  return new (mem) DifferentiableAttr(original, implicit, atLoc, baseRange,
+                                      linear, parameterIndices, std::move(jvp),
                                       std::move(vjp), derivativeGenSig);
 }
 
@@ -1423,6 +1450,44 @@ void DifferentiableAttr::print(llvm::raw_ostream &OS, const Decl *D,
   P << "@" << getAttrName();
   printDifferentiableAttrArguments(this, P, PrintOptions(), D, omitWrtClause,
                                    omitAssociatedFunctions);
+}
+
+DerivativeAttr::DerivativeAttr(bool implicit, SourceLoc atLoc,
+                               SourceRange baseRange,
+                               DeclNameWithLoc originalName,
+                               ArrayRef<ParsedAutoDiffParameter> params)
+    : DeclAttribute(DAK_Derivative, atLoc, baseRange, implicit),
+      OriginalFunctionName(std::move(originalName)),
+      NumParsedParameters(params.size()) {
+  std::copy(params.begin(), params.end(),
+            getTrailingObjects<ParsedAutoDiffParameter>());
+}
+
+DerivativeAttr::DerivativeAttr(bool implicit, SourceLoc atLoc,
+                               SourceRange baseRange,
+                               DeclNameWithLoc originalName,
+                               IndexSubset *indices)
+    : DeclAttribute(DAK_Derivative, atLoc, baseRange, implicit),
+      OriginalFunctionName(std::move(originalName)), ParameterIndices(indices) {
+}
+
+DerivativeAttr *
+DerivativeAttr::create(ASTContext &context, bool implicit, SourceLoc atLoc,
+                       SourceRange baseRange, DeclNameWithLoc originalName,
+                       ArrayRef<ParsedAutoDiffParameter> params) {
+  unsigned size = totalSizeToAlloc<ParsedAutoDiffParameter>(params.size());
+  void *mem = context.Allocate(size, alignof(DerivativeAttr));
+  return new (mem) DerivativeAttr(implicit, atLoc, baseRange,
+                                  std::move(originalName), params);
+}
+
+DerivativeAttr *DerivativeAttr::create(ASTContext &context, bool implicit,
+                                       SourceLoc atLoc, SourceRange baseRange,
+                                       DeclNameWithLoc originalName,
+                                       IndexSubset *indices) {
+  void *mem = context.Allocate(sizeof(DerivativeAttr), alignof(DerivativeAttr));
+  return new (mem) DerivativeAttr(implicit, atLoc, baseRange,
+                                  std::move(originalName), indices);
 }
 
 ImplementsAttr::ImplementsAttr(SourceLoc atLoc, SourceRange range,

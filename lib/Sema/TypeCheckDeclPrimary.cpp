@@ -333,6 +333,12 @@ static void checkInheritanceClause(
   }
 }
 
+static void installCodingKeysIfNecessary(NominalTypeDecl *NTD) {
+  auto req =
+    ResolveImplicitMemberRequest{NTD, ImplicitMemberAction::ResolveCodingKeys};
+  (void)evaluateOrDefault(NTD->getASTContext().evaluator, req, false);
+}
+
 // Check for static properties that produce empty option sets
 // using a rawValue initializer with a value of '0'
 static void checkForEmptyOptionSet(const VarDecl *VD) {
@@ -777,10 +783,12 @@ DefaultArgumentInitContextRequest::evaluate(Evaluator &eval,
     // kicked off the request, make a note of it for when we return. Otherwise
     // cache the result ourselves.
     auto *initDC = new (ctx) DefaultArgumentInitializer(parentDC, idx);
-    if (param == otherParam)
+    if (param == otherParam) {
       result = initDC;
-    else
-      eval.cacheOutput(DefaultArgumentInitContextRequest{otherParam}, std::move(initDC));
+    } else {
+      eval.cacheOutput(DefaultArgumentInitContextRequest{otherParam},
+                       std::move(initDC));
+    }
   }
   assert(result && "Didn't create init context?");
   return result;
@@ -1664,6 +1672,8 @@ public:
 
     TypeChecker::addImplicitConstructors(SD);
 
+    installCodingKeysIfNecessary(SD);
+
     for (Decl *Member : SD->getMembers())
       visit(Member);
 
@@ -2054,7 +2064,8 @@ public:
     // Force these requests in case they emit diagnostics.
     (void) FD->getInterfaceType();
     (void) FD->getOperatorDecl();
-
+    (void) FD->getDynamicallyReplacedDecl();
+    
     if (!FD->isInvalid()) {
       checkGenericParams(FD);
       TypeChecker::checkReferencedGenericParams(FD);

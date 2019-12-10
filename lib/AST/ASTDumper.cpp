@@ -27,6 +27,7 @@
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/QuotedString.h"
 #include "swift/Basic/STLExtras.h"
+#include "clang/AST/Type.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SmallString.h"
@@ -299,6 +300,7 @@ static StringRef getDefaultArgumentKindString(DefaultArgumentKind value) {
     case DefaultArgumentKind::Column: return "#column";
     case DefaultArgumentKind::DSOHandle: return "#dsohandle";
     case DefaultArgumentKind::File: return "#file";
+    case DefaultArgumentKind::FilePath: return "#filePath";
     case DefaultArgumentKind::Function: return "#function";
     case DefaultArgumentKind::Inherited: return "inherited";
     case DefaultArgumentKind::Line: return "#line";
@@ -315,6 +317,7 @@ static StringRef
 getMagicIdentifierLiteralExprKindString(MagicIdentifierLiteralExpr::Kind value) {
   switch (value) {
     case MagicIdentifierLiteralExpr::File: return "#file";
+    case MagicIdentifierLiteralExpr::FilePath: return "#filePath";
     case MagicIdentifierLiteralExpr::Function: return "#function";
     case MagicIdentifierLiteralExpr::Line: return "#line";
     case MagicIdentifierLiteralExpr::Column: return "#column";
@@ -2494,12 +2497,6 @@ public:
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
 
-  void visitCallerDefaultArgumentExpr(CallerDefaultArgumentExpr *E) {
-    printCommon(E, "caller_default_argument_expr");
-    printRec(E->getSubExpr());
-    PrintWithColorRAII(OS, ParenthesisColor) << ')';
-  }
-
   void printArgumentLabels(ArrayRef<Identifier> argLabels) {
     PrintWithColorRAII(OS, ArgumentsColor) << " arg_labels=";
     for (auto label : argLabels) {
@@ -2985,6 +2982,41 @@ public:
   void visitOwnedTypeRepr(OwnedTypeRepr *T) {
     printCommon("type_owned") << '\n';
     printRec(T->getBase());
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
+
+  void visitOptionalTypeRepr(OptionalTypeRepr *T) {
+    printCommon("type_optional") << '\n';
+    printRec(T->getBase());
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
+
+  void visitImplicitlyUnwrappedOptionalTypeRepr(
+      ImplicitlyUnwrappedOptionalTypeRepr *T) {
+    printCommon("type_implicitly_unwrapped_optional") << '\n';
+    printRec(T->getBase());
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
+
+  void visitOpaqueReturnTypeRepr(OpaqueReturnTypeRepr *T) {
+    printCommon("type_opaque_return");
+    printRec(T->getConstraint());
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
+
+  void visitFixedTypeRepr(FixedTypeRepr *T) {
+    printCommon("type_fixed");
+    auto Ty = T->getType();
+    if (Ty) {
+      auto &srcMgr =  Ty->getASTContext().SourceMgr;
+      if (T->getLoc().isValid()) {
+        OS << " location=@";
+        T->getLoc().print(OS, srcMgr);
+      } else {
+        OS << " location=<<invalid>>";
+      }
+    }
+    OS << " type="; Ty.dump(OS);
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
 };
@@ -3607,6 +3639,12 @@ namespace {
 
       OS << "\n";
       Indent += 2;
+      if (auto *cty = T->getClangFunctionType()) {
+        std::string s;
+        llvm::raw_string_ostream os(s);
+        cty->dump(os);
+        printField("clang_type", os.str());
+      }
       printAnyFunctionParams(T->getParams(), "input");
       Indent -=2;
       printRec("output", T->getResult());
