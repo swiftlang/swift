@@ -398,4 +398,10 @@ ArrayAutoDiffTests.test("Array.DifferentiableView : KeyPathIterable") {
     })
 }
 
+ArrayAutoDiffTests.test("Array.zeroTangentVectorInitializer") {
+  let count = 10
+  let array: [Float] = Array((0..<count).map(Float.init))
+  expectEqual(array.zeroTangentVector.base, Array(repeating: 0, count: count))
+}
+
 runAllTests()
