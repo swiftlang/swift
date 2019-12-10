@@ -1364,6 +1364,11 @@ ERROR(attr_expected_comma,none,
 ERROR(attr_expected_string_literal,none,
 "expected string literal in '%0' attribute", (StringRef))
 
+ERROR(attr_missing_label,PointsToFirstBadToken,
+      "missing label '%0:' in '@%1' attribute", (StringRef, StringRef))
+ERROR(attr_expected_label,none,
+      "expected label '%0:' in '@%1' attribute", (StringRef, StringRef))
+
 ERROR(alignment_must_be_positive_integer,none,
       "alignment value must be a positive integer literal", ())
 
@@ -1579,10 +1584,6 @@ ERROR(diff_params_clause_expected_parameter,PointsToFirstBadToken,
 // derivative
 ERROR(attr_derivative_expected_original_name,PointsToFirstBadToken,
       "expected an original function name", ())
-ERROR(attr_missing_label,PointsToFirstBadToken,
-      "missing label '%0:' in '@%1' attribute", (StringRef, StringRef))
-ERROR(attr_expected_label,none,
-      "expected label '%0:' in '@%1' attribute", (StringRef, StringRef))
 WARNING(attr_differentiating_deprecated,PointsToFirstBadToken,
         "'@differentiating' attribute is deprecated; use '@derivative(of:)' "
         "instead", ())

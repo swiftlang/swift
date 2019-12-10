@@ -237,7 +237,7 @@ using DifferentiabilityKindField = BCFixed<2>;
 // module version.
 enum class AutoDiffDerivativeFunctionKind : uint8_t {
   JVP = 0,
-  VJP = 1
+  VJP
 };
 using AutoDiffDerivativeFunctionKindField = BCFixed<1>;
 // SWIFT_ENABLE_TENSORFLOW END
