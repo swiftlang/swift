@@ -800,18 +800,15 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
 
     // Key path referring to the property being accessed.
     Expr *propertyKeyPath = new (ctx) KeyPathDotExpr(SourceLoc());
-    propertyKeyPath = new (ctx) UnresolvedDotExpr(
-        propertyKeyPath, SourceLoc(),
-        enclosingSelfAccess->accessedProperty->getFullName(), DeclNameLoc(),
-        /*Implicit=*/true);
+    propertyKeyPath = UnresolvedDotExpr::createImplicit(ctx, propertyKeyPath,
+        enclosingSelfAccess->accessedProperty->getFullName());
     propertyKeyPath = new (ctx) KeyPathExpr(
         SourceLoc(), nullptr, propertyKeyPath);
 
     // Key path referring to the backing storage property.
     Expr *storageKeyPath = new (ctx) KeyPathDotExpr(SourceLoc());
-    storageKeyPath = new (ctx) UnresolvedDotExpr(
-        storageKeyPath, SourceLoc(), storage->getFullName(), DeclNameLoc(),
-        /*Implicit=*/true);
+    storageKeyPath = UnresolvedDotExpr::createImplicit(ctx, storageKeyPath,
+                                                       storage->getFullName());
     storageKeyPath = new (ctx) KeyPathExpr(
         SourceLoc(), nullptr, storageKeyPath);
     Expr *args[3] = {

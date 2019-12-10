@@ -833,11 +833,9 @@ static CallExpr *createHasherCombineCall(ASTContext &C,
                                          Expr *hashable) {
   Expr *hasherExpr = new (C) DeclRefExpr(ConcreteDeclRef(hasher),
                                          DeclNameLoc(), /*implicit*/ true);
-  DeclName name(C, C.Id_combine, {Identifier()});
   // hasher.combine(_:)
-  auto *combineCall = new (C) UnresolvedDotExpr(hasherExpr, SourceLoc(),
-                                                name, DeclNameLoc(),
-                                                /*implicit*/ true);
+  auto *combineCall = UnresolvedDotExpr::createImplicit(
+      C, hasherExpr, C.Id_combine, {Identifier()});
   
   // hasher.combine(hashable)
   return CallExpr::createImplicit(C, combineCall, {hashable}, {Identifier()});
@@ -912,9 +910,8 @@ deriveBodyHashable_compat_hashInto(AbstractFunctionDecl *hashIntoDecl, void *) {
   auto selfDecl = hashIntoDecl->getImplicitSelfDecl();
   auto selfRef = new (C) DeclRefExpr(selfDecl, DeclNameLoc(),
                                      /*implicit*/ true);
-  auto hashValueExpr = new (C) UnresolvedDotExpr(selfRef, SourceLoc(),
-                                                 C.Id_hashValue, DeclNameLoc(),
-                                                 /*implicit*/ true);
+  auto hashValueExpr = UnresolvedDotExpr::createImplicit(C, selfRef,
+                                                         C.Id_hashValue);
   auto hasherParam = hashIntoDecl->getParameters()->get(0);
   auto hasherExpr = createHasherCombineCall(C, hasherParam, hashValueExpr);
 
@@ -938,9 +935,8 @@ deriveBodyHashable_enum_rawValue_hashInto(
 
   // generate: self.rawValue
   auto *selfRef = DerivedConformance::createSelfDeclRef(hashIntoDecl);
-  auto *rawValueRef = new (C) UnresolvedDotExpr(selfRef, SourceLoc(),
-                                                C.Id_rawValue, DeclNameLoc(),
-                                                /*Implicit=*/true);
+  auto *rawValueRef = UnresolvedDotExpr::createImplicit(C, selfRef,
+                                                        C.Id_rawValue);
 
   // generate: hasher.combine(discriminator)
   auto hasherParam = hashIntoDecl->getParameters()->get(0);
