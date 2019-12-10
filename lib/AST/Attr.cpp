@@ -958,8 +958,8 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     Printer.printAttrName("@derivative");
     Printer << "(of: ";
     auto *attr = cast<DerivativeAttr>(this);
-    auto *derivative = cast<AbstractFunctionDecl>(D);
     Printer << attr->getOriginalFunctionName().Name;
+    auto *derivative = cast<AbstractFunctionDecl>(D);
     auto diffParamsString = getDifferentiationParametersClauseString(
         derivative, attr->getParameterIndices(), attr->getParsedParameters());
     if (!diffParamsString.empty())
@@ -973,8 +973,8 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     Printer.printAttrName("@transpose");
     Printer << '(';
     auto *attr = cast<TransposeAttr>(this);
-    auto *transpose = cast<AbstractFunctionDecl>(D);
     Printer << attr->getOriginalFunctionName().Name;
+    auto *transpose = cast<AbstractFunctionDecl>(D);
     auto transParamsString = getTransposedParametersClauseString(
         transpose, attr->getParameterIndices(), attr->getParsedParameters());
     if (!transParamsString.empty())
@@ -1504,16 +1504,24 @@ DifferentiableAttr::create(ASTContext &context, bool implicit,
 }
 
 DifferentiableAttr *
-DifferentiableAttr::create(Decl *original, bool implicit, SourceLoc atLoc,
-                           SourceRange baseRange, bool linear,
-                           IndexSubset *indices, Optional<DeclNameWithLoc> jvp,
+DifferentiableAttr::create(AbstractFunctionDecl *original, bool implicit,
+                           SourceLoc atLoc, SourceRange baseRange, bool linear,
+                           IndexSubset *parameterIndices,
+                           Optional<DeclNameWithLoc> jvp,
                            Optional<DeclNameWithLoc> vjp,
                            GenericSignature derivativeGenSig) {
   auto &ctx = original->getASTContext();
   void *mem = ctx.Allocate(sizeof(DifferentiableAttr),
                            alignof(DifferentiableAttr));
+  // Register derivative function configuration for the given original
+  // declaration.
+  // NOTE(TF-1038): `@differentiable` attributes currently always have
+  // effective result indices `{0}` (the first and only result index).
+  auto *resultIndices = IndexSubset::get(ctx, 1, {0});
+  original->addDerivativeFunctionConfiguration(
+      {parameterIndices, resultIndices, derivativeGenSig});
   return new (mem) DifferentiableAttr(original, implicit, atLoc, baseRange,
-                                      linear, indices, std::move(jvp),
+                                      linear, parameterIndices, std::move(jvp),
                                       std::move(vjp), derivativeGenSig);
 }
 

@@ -48,7 +48,6 @@ public func bar_jvp<T>(_ x: Float, _ y: T) -> (value: Float, differential: (Floa
 // - Has hidden linkage.
 // - Has `where` clause.
 
-@differentiable(where T: Differentiable)
 func generic<T>(_ x: T, _ y: Float) -> T { x }
 
 @derivative(of: generic)
@@ -122,7 +121,6 @@ public struct Foo: Differentiable {
 // Has a tuple argument to verify that indices are correctly lowered to SIL.
 
 @differentiable(wrt: x)
-@differentiable(wrt: y)
 public func wrt_subset(_ tup: (Int, Int), _ x: Float, _ y: Float) -> Float {
   return 0
 }
@@ -148,9 +146,7 @@ public func wrt_subset_vjp_wrt_x_y(_ tup: (Int, Int), _ x: Float, _ y: Float) ->
 }
 
 // CHECK-LABEL: // differentiability witness for wrt_subset(_:_:_:)
-// CHECK-NEXT: sil_differentiability_witness [serialized] [parameters 2 3] [results 0] @$s36sil_differentiability_witness_silgen10wrt_subsetySfSi_Sit_S2ftF : $@convention(thin) (Int, Int, Float, Float) -> Float {
-// CHECK-NEXT:   jvp:
-// CHECK-NEXT:   vjp:
+// CHECK-NEXT: sil_differentiability_witness [serialized] [parameters 2] [results 0] @$s36sil_differentiability_witness_silgen10wrt_subsetySfSi_Sit_S2ftF : $@convention(thin) (Int, Int, Float, Float) -> Float {
 // CHECK-NEXT: }
 
 // CHECK-LABEL: // differentiability witness for wrt_subset(_:_:_:)
@@ -160,5 +156,7 @@ public func wrt_subset_vjp_wrt_x_y(_ tup: (Int, Int), _ x: Float, _ y: Float) ->
 // CHECK-NEXT: }
 
 // CHECK-LABEL: // differentiability witness for wrt_subset(_:_:_:)
-// CHECK-NEXT: sil_differentiability_witness [serialized] [parameters 2] [results 0] @$s36sil_differentiability_witness_silgen10wrt_subsetySfSi_Sit_S2ftF : $@convention(thin) (Int, Int, Float, Float) -> Float {
+// CHECK-NEXT: sil_differentiability_witness [serialized] [parameters 2 3] [results 0] @$s36sil_differentiability_witness_silgen10wrt_subsetySfSi_Sit_S2ftF : $@convention(thin) (Int, Int, Float, Float) -> Float {
+// CHECK-NEXT:   jvp:
+// CHECK-NEXT:   vjp:
 // CHECK-NEXT: }

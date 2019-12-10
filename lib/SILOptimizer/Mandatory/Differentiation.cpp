@@ -1392,12 +1392,14 @@ SILValue DifferentiationTransformer::promoteToDifferentiableFunction(
 
       auto thunkTy = thunk->getLoweredFunctionType();
       auto thunkResult = thunkTy->getSingleResult();
-      if (auto resultFnTy = thunkResult.getInterfaceType()->getAs<SILFunctionType>()) {
-        // Construct new curry thunk type with `@differentiable` result.
-        auto diffableResultFnTy = resultFnTy->getWithExtInfo(
-            resultFnTy->getExtInfo()
-                .withDifferentiabilityKind(DifferentiabilityKind::Normal));
-        auto newThunkResult = thunkResult.getWithInterfaceType(diffableResultFnTy);
+      if (auto resultFnTy =
+              thunkResult.getInterfaceType()->getAs<SILFunctionType>()) {
+        // Construct new curry thunk type with `@differentiable` function
+        // result.
+        auto diffResultFnTy = resultFnTy->getWithExtInfo(
+            resultFnTy->getExtInfo().withDifferentiabilityKind(
+                DifferentiabilityKind::Normal));
+        auto newThunkResult = thunkResult.getWithInterfaceType(diffResultFnTy);
         auto thunkType = SILFunctionType::get(
             thunkTy->getSubstGenericSignature(), thunkTy->getExtInfo(),
             thunkTy->getCoroutineKind(), thunkTy->getCalleeConvention(),
@@ -1425,12 +1427,18 @@ SILValue DifferentiationTransformer::promoteToDifferentiableFunction(
           cloner.run();
           auto *retInst =
               cast<ReturnInst>(newThunk->findReturnBB()->getTerminator());
-          SILBuilder thunkBuilder(retInst);
-          auto *dfi = context.createDifferentiableFunction(thunkBuilder, loc,
-                                                   parameterIndices,
-                                                   retInst->getOperand());
+          auto returnValue = retInst->getOperand();
+          // Create `differentiable_function` instruction directly after the
+          // defining instruction (e.g. `partial_apply`) of the returned value.
+          // Note: `differentiable_function` is not created at the end of the
+          // new thunk to avoid `alloc_stack`/`dealloc_stack` ordering issues.
+          SILBuilder dfiBuilder(
+              std::next(returnValue->getDefiningInstruction()->getIterator()));
+          auto *dfi = context.createDifferentiableFunction(
+              dfiBuilder, loc, parameterIndices, returnValue);
           context.setResultIndex(dfi, resultIndex);
-          thunkBuilder.createReturn(loc, dfi);
+          dfiBuilder.setInsertionPoint(newThunk->findReturnBB());
+          dfiBuilder.createReturn(loc, dfi);
           retInst->eraseFromParent();
 
           context.recordGeneratedFunction(newThunk);
@@ -1450,12 +1458,8 @@ SILValue DifferentiationTransformer::promoteToDifferentiableFunction(
         auto *newApply = builder.createApply(
             ai->getLoc(), newThunkRef, ai->getSubstitutionMap(), newArgs,
             ai->isNonThrowing());
-        for (auto arg : newArgsToDestroy) {
-          if (arg->getType().isObject())
-            builder.emitDestroyValueOperation(loc, arg);
-          else
-            builder.emitDestroyAddr(loc, arg);
-        }
+        for (auto arg : newArgsToDestroy)
+          builder.emitDestroyOperation(loc, arg);
         for (auto *alloc : newBuffersToDealloc)
           builder.createDeallocStack(loc, alloc);
         return newApply;

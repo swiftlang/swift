@@ -52,7 +52,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 528; // derivative function config table
+const uint16_t SWIFTMODULE_VERSION_MINOR = 529; // `@derivative` serialization
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -231,6 +231,16 @@ enum class DifferentiabilityKind : uint8_t {
   Linear,
 };
 using DifferentiabilityKindField = BCFixed<2>;
+
+// SWIFT_ENABLE_TENSORFLOW
+// These IDs must \em not be renumbered or reordered without incrementing the
+// module version.
+enum class AutoDiffDerivativeFunctionKind : uint8_t {
+  JVP = 0,
+  VJP = 1
+};
+using AutoDiffDerivativeFunctionKindField = BCFixed<1>;
+// SWIFT_ENABLE_TENSORFLOW END
 
 enum class ForeignErrorConventionKind : uint8_t {
   ZeroResult,
@@ -1780,6 +1790,7 @@ namespace decls_block {
     BCFixed<1>, // Implicit flag.
     IdentifierIDField, // Original name.
     DeclIDField, // Original function declaration.
+    AutoDiffDerivativeFunctionKindField, // Derivative function kind.
     BCArray<BCFixed<1>> // Differentiation parameter indices' bitvector.
   >;
 
@@ -1792,7 +1803,7 @@ namespace decls_block {
     BCFixed<1>, // Implicit flag.
     IdentifierIDField, // Original name.
     DeclIDField, // Original function declaration.
-    BCArray<BCFixed<1>> // Differentiation parameter indices' bitvector.
+    BCArray<BCFixed<1>> // Transposed parameter indices' bitvector.
   >;
 
 #define SIMPLE_DECL_ATTR(X, CLASS, ...)         \
