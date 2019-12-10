@@ -237,10 +237,20 @@ static bool diagnoseUnsupportedControlFlow(ADContext &context,
 /// derivative generic signature (containing requirements), and substitution
 /// map. Returns true if error is emitted.
 static bool diagnoseUnsatisfiedRequirements(ADContext &context,
+                                            CanSILFunctionType origFnTy,
                                             GenericSignature derivativeGenSig,
                                             SubstitutionMap substMap,
                                             DifferentiationInvoker invoker,
                                             SourceLoc loc) {
+  // If the original function is polymorphic and its generic signature is the
+  // same as the derivative generic signature, then the requirements are
+  // satisfied. This check is necessary because the subsequent logic does not
+  // correctly handle polymorphic original functions.
+  // TODO(TF-1055): Can be removed after we have a robust solution for TF-1055.
+  if (origFnTy->getInvocationGenericSignature() && derivativeGenSig &&
+      origFnTy->getInvocationGenericSignature()->isEqual(derivativeGenSig))
+    return false;
+
   // If there are no derivative requirements, return false.
   if (!derivativeGenSig)
     return false;
@@ -528,6 +538,7 @@ emitDerivativeFunctionReference(
           peerThroughFunctionConversions<FunctionRefInst>(original)) {
     auto loc = originalFRI->getLoc();
     auto *originalFn = originalFRI->getReferencedFunctionOrNull();
+    assert(originalFn);
     auto originalFnTy = originalFn->getLoweredFunctionType();
     auto *desiredResultIndices =
         IndexSubset::get(context.getASTContext(), originalFnTy->getNumResults(),
@@ -636,8 +647,9 @@ emitDerivativeFunctionReference(
       substMap = ai->getSubstitutionMap();
     }
     if (diagnoseUnsatisfiedRequirements(
-            context, minimalWitness->getDerivativeGenericSignature(), substMap,
-            invoker, original.getLoc().getSourceLoc()))
+            context, original->getType().castTo<SILFunctionType>(),
+            minimalWitness->getDerivativeGenericSignature(), substMap, invoker,
+            original.getLoc().getSourceLoc()))
       return None;
     DifferentiabilityWitnessFunctionKind witnessKind;
     switch (kind) {
