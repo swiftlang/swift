@@ -179,66 +179,72 @@ void TBDGenVisitor::addConformances(DeclContext *DC) {
 
 // SWIFT_ENABLE_TENSORFLOW
 void TBDGenVisitor::addAutoDiffLinearMapFunction(AbstractFunctionDecl *original,
-                                                 IndexSubset *parameterIndices,
+                                                 AutoDiffConfig config,
                                                  AutoDiffLinearMapKind kind) {
+  auto &ctx = original->getASTContext();
   auto declRef = SILDeclRef(original);
 
+  if (!declRef.isSerialized())
+    return;
   // Linear maps are public only when the original function is serialized.
   if (!declRef.isSerialized())
     return;
-
   // Linear maps are emitted only when forward mode is enabled.
   if (kind == AutoDiffLinearMapKind::Differential &&
-      !original->getASTContext()
-           .LangOpts.EnableExperimentalForwardModeDifferentiation)
+      !ctx.LangOpts.EnableExperimentalForwardModeDifferentiation)
     return;
-
   auto *loweredParamIndices = autodiff::getLoweredParameterIndices(
-      parameterIndices,
+      config.parameterIndices,
       original->getInterfaceType()->castTo<AnyFunctionType>());
   Mangle::ASTMangler mangler;
-  std::string linearMapName = mangler.mangleAutoDiffLinearMapHelper(
-      declRef.mangle(), kind, SILAutoDiffIndices(0, loweredParamIndices));
+  AutoDiffConfig silConfig{loweredParamIndices, config.resultIndices,
+                           config.derivativeGenericSignature};
+  std::string linearMapName =
+      mangler.mangleAutoDiffLinearMapHelper(declRef.mangle(), kind, silConfig);
   addSymbol(linearMapName);
 }
 
 void TBDGenVisitor::addAutoDiffDerivativeFunction(
     AbstractFunctionDecl *original, IndexSubset *parameterIndices,
+    GenericSignature derivativeGenericSignature,
     AutoDiffDerivativeFunctionKind kind) {
   auto *assocFnId = AutoDiffDerivativeFunctionIdentifier::get(
-      kind, parameterIndices, original->getASTContext());
+      kind, parameterIndices, derivativeGenericSignature,
+      original->getASTContext());
   addSymbol(SILDeclRef(original).asAutoDiffDerivativeFunction(assocFnId));
 }
 
 void TBDGenVisitor::addDifferentiabilityWitness(
-    AbstractFunctionDecl *original, IndexSubset *parameterIndices,
+    AbstractFunctionDecl *original, IndexSubset *astParameterIndices,
     IndexSubset *resultIndices, GenericSignature derivativeGenericSignature) {
   if (SILDeclRef(original).getLinkage(ForDefinition) != SILLinkage::Public)
     return;
 
-  auto *loweredParamIndices = autodiff::getLoweredParameterIndices(
-      parameterIndices,
+  auto *silParamIndices = autodiff::getLoweredParameterIndices(
+      astParameterIndices,
       original->getInterfaceType()->castTo<AnyFunctionType>());
 
   std::string originalMangledName = SILDeclRef(original).mangle();
-  AutoDiffConfig config{loweredParamIndices, resultIndices,
+  AutoDiffConfig config{silParamIndices, resultIndices,
                         derivativeGenericSignature};
   SILDifferentiabilityWitnessKey key(originalMangledName, config);
 
-  Mangle::ASTMangler mangle;
-  std::string mangledName = mangle.mangleSILDifferentiabilityWitnessKey(key);
+  Mangle::ASTMangler mangler;
+  std::string mangledName = mangler.mangleSILDifferentiabilityWitnessKey(key);
   addSymbol(mangledName);
 }
 
 void TBDGenVisitor::addDerivativeConfiguration(AbstractFunctionDecl *original,
                                                AutoDiffConfig config) {
-  addAutoDiffLinearMapFunction(original, config.parameterIndices,
+  addAutoDiffLinearMapFunction(original, config,
                                AutoDiffLinearMapKind::Differential);
-  addAutoDiffLinearMapFunction(original, config.parameterIndices,
+  addAutoDiffLinearMapFunction(original, config,
                                AutoDiffLinearMapKind::Pullback);
   addAutoDiffDerivativeFunction(original, config.parameterIndices,
+                                config.derivativeGenericSignature,
                                 AutoDiffDerivativeFunctionKind::JVP);
   addAutoDiffDerivativeFunction(original, config.parameterIndices,
+                                config.derivativeGenericSignature,
                                 AutoDiffDerivativeFunctionKind::VJP);
   addDifferentiabilityWitness(original, config.parameterIndices,
                               config.resultIndices,

@@ -166,11 +166,11 @@ SILFunction *VJPEmitter::createEmptyPullback() {
   }
 
   Mangle::ASTMangler mangler;
-  auto pbName =
-      original->getASTContext()
-          .getIdentifier(mangler.mangleAutoDiffLinearMapHelper(
-              original->getName(), AutoDiffLinearMapKind::Pullback, indices))
-          .str();
+  auto pbName = original->getASTContext()
+                    .getIdentifier(mangler.mangleAutoDiffLinearMapHelper(
+                        original->getName(), AutoDiffLinearMapKind::Pullback,
+                        witness->getConfig()))
+                    .str();
   auto pbGenericSig = getDerivativeGenericSignature(witness, original);
   auto *pbGenericEnv =
       pbGenericSig ? pbGenericSig->getGenericEnvironment() : nullptr;

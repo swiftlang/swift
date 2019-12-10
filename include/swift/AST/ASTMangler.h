@@ -158,18 +158,21 @@ public:
   /// Mangle the derivative function (JVP/VJP) with the given:
   /// - Mangled original function name.
   /// - Derivative function kind.
-  /// - Parameter/result indices.
-  std::string mangleAutoDiffDerivativeFunctionHelper(
-      StringRef name, AutoDiffDerivativeFunctionKind kind,
-      const SILAutoDiffIndices &indices);
+  /// - Derivative function configuration: parameter/result indices and
+  ///   derivative generic signature.
+  std::string
+  mangleAutoDiffDerivativeFunctionHelper(StringRef name,
+                                         AutoDiffDerivativeFunctionKind kind,
+                                         AutoDiffConfig config);
 
   /// Mangle the autodiff linear map (differential/pullback) with the given:
   /// - Mangled original function name.
   /// - Linear map kind.
-  /// - Parameter/result indices.
-  std::string mangleAutoDiffLinearMapHelper(
-      StringRef name, AutoDiffLinearMapKind kind,
-      const SILAutoDiffIndices &indices);
+  /// - Derivative function configuration: parameter/result indices and
+  ///   derivative generic signature.
+  std::string mangleAutoDiffLinearMapHelper(StringRef name,
+                                            AutoDiffLinearMapKind kind,
+                                            AutoDiffConfig config);
 
   /// Mangle a SIL differentiability witness key.
   /// - Mangled original function name.

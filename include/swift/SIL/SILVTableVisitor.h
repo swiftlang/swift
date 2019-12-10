@@ -93,14 +93,14 @@ template <class T> class SILVTableVisitor {
       auto constant = SILDeclRef(fd, SILDeclRef::Kind::Func);
       auto jvpConstant = constant.asAutoDiffDerivativeFunction(
           AutoDiffDerivativeFunctionIdentifier::get(
-              AutoDiffDerivativeFunctionKind::JVP,
-              DA->getParameterIndices(), fd->getASTContext()));
+              AutoDiffDerivativeFunctionKind::JVP, DA->getParameterIndices(),
+              DA->getDerivativeGenericSignature(), fd->getASTContext()));
       maybeAddEntry(jvpConstant);
 
       auto vjpConstant = constant.asAutoDiffDerivativeFunction(
           AutoDiffDerivativeFunctionIdentifier::get(
-              AutoDiffDerivativeFunctionKind::VJP,
-              DA->getParameterIndices(), fd->getASTContext()));
+              AutoDiffDerivativeFunctionKind::VJP, DA->getParameterIndices(),
+              DA->getDerivativeGenericSignature(), fd->getASTContext()));
       maybeAddEntry(vjpConstant);
     }
     // SWIFT_ENABLE_TENSORFLOW END
@@ -120,14 +120,14 @@ template <class T> class SILVTableVisitor {
       auto constant = SILDeclRef(cd, SILDeclRef::Kind::Allocator);
       auto jvpConstant = constant.asAutoDiffDerivativeFunction(
           AutoDiffDerivativeFunctionIdentifier::get(
-              AutoDiffDerivativeFunctionKind::JVP,
-              DA->getParameterIndices(), cd->getASTContext()));
+              AutoDiffDerivativeFunctionKind::JVP, DA->getParameterIndices(),
+              DA->getDerivativeGenericSignature(), cd->getASTContext()));
       maybeAddEntry(jvpConstant);
 
       auto vjpConstant = constant.asAutoDiffDerivativeFunction(
           AutoDiffDerivativeFunctionIdentifier::get(
-              AutoDiffDerivativeFunctionKind::VJP,
-              DA->getParameterIndices(), cd->getASTContext()));
+              AutoDiffDerivativeFunctionKind::VJP, DA->getParameterIndices(),
+              DA->getDerivativeGenericSignature(), cd->getASTContext()));
       maybeAddEntry(vjpConstant);
     }
     // SWIFT_ENABLE_TENSORFLOW END

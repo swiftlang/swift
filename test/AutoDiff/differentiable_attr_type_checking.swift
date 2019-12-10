@@ -1024,6 +1024,13 @@ class Super : Differentiable {
     fatalError()
   }
 
+  // Test duplicate attributes with different derivative generic signatures.
+  // expected-error @+1 {{duplicate '@differentiable' attribute with same parameters}}
+  @differentiable(wrt: x where T: Differentiable)
+  // expected-note @+1 {{other attribute declared here}}
+  @differentiable(wrt: x)
+  func instanceMethod<T>(_ x: Float, y: T) -> Float { x }
+
   // expected-error @+1 {{'@differentiable' attribute cannot be declared on class methods returning 'Self'}}
   @differentiable(vjp: vjpDynamicSelfResult)
   func dynamicSelfResult() -> Self { self }
