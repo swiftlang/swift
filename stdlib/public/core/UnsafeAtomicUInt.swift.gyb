@@ -31,24 +31,18 @@
 /// memory location.
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @frozen
-public struct AtomicUInt: Anchored {
-  @usableFromInline
-  internal let _anchor: AnyObject
-
+public struct UnsafeAtomicUInt {
   @usableFromInline
   internal let _ptr: UnsafeMutableRawPointer
 
   @_transparent // Debug performance
-  public init(at address: UnsafeMutablePointer<UInt>, in anchor: AnyObject) {
-    self._anchor = anchor
+  public init(_ address: UnsafeMutablePointer<UInt>) {
     self._ptr = UnsafeMutableRawPointer(address)
   }
-
-  public static var defaultInitialValue: UInt { 0 }
 }
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-extension AtomicUInt {
+extension UnsafeAtomicUInt {
   /// Atomically loads and returns the current value,
   /// with the specified memory ordering.
   @_transparent @_alwaysEmitIntoClient
@@ -59,7 +53,7 @@ extension AtomicUInt {
 
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-extension AtomicUInt {
+extension UnsafeAtomicUInt {
   /// Atomically sets the current value to `desired`,
   /// with the specified memory ordering.
   @_transparent @_alwaysEmitIntoClient
@@ -72,7 +66,7 @@ extension AtomicUInt {
 }
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-extension AtomicUInt {
+extension UnsafeAtomicUInt {
   /// Atomically sets the current value to `desired` and returns the previous
   /// value, with the specified memory ordering.
   ///
@@ -87,7 +81,7 @@ extension AtomicUInt {
 }
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-extension AtomicUInt {
+extension UnsafeAtomicUInt {
   /// Perform an atomic compare and exchange operation with
   /// the specified memory ordering.
   ///
@@ -124,7 +118,7 @@ extension AtomicUInt {
 
 % for (name, op, label, doc) in integerOperations:
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-extension AtomicUInt {
+extension UnsafeAtomicUInt {
   /// Perform an atomic ${doc} operation and return the original value, with
   /// the specified memory ordering.
   ///
@@ -166,7 +160,7 @@ extension AtomicUInt {
 % end
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-extension AtomicUInt {
+extension UnsafeAtomicUInt {
   @_transparent @_alwaysEmitIntoClient
   public func wrappingIncrement(
     by delta: UInt = 1,

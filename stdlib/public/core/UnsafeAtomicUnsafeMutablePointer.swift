@@ -14,26 +14,20 @@
 /// at a stable memory location.
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @frozen
-public struct AtomicUnsafeMutablePointer<Pointee>: Anchored {
+public struct UnsafeAtomicUnsafeMutablePointer<Pointee> {
   public typealias Value = UnsafeMutablePointer<Pointee>?
-
-  @usableFromInline
-  internal let _anchor: AnyObject
 
   @usableFromInline
   internal let _ptr: UnsafeMutableRawPointer
 
   @_transparent // Debug performance
-  public init(at address: UnsafeMutablePointer<Value>, in anchor: AnyObject) {
-    self._anchor = anchor
+  public init(_ address: UnsafeMutablePointer<Value>) {
     self._ptr = UnsafeMutableRawPointer(address)
   }
-
-  public static var defaultInitialValue: Value { nil }
 }
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-extension AtomicUnsafeMutablePointer {
+extension UnsafeAtomicUnsafeMutablePointer {
   /// Atomically loads and returns the current value,
   /// with the specified memory ordering.
   @_transparent @_alwaysEmitIntoClient
@@ -45,7 +39,7 @@ extension AtomicUnsafeMutablePointer {
 
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-extension AtomicUnsafeMutablePointer {
+extension UnsafeAtomicUnsafeMutablePointer {
   /// Atomically sets the current value to `desired`,
   /// with the specified memory ordering.
   @_transparent @_alwaysEmitIntoClient
@@ -59,7 +53,7 @@ extension AtomicUnsafeMutablePointer {
 }
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-extension AtomicUnsafeMutablePointer {
+extension UnsafeAtomicUnsafeMutablePointer {
   /// Atomically sets the current value to `desired` and returns the previous
   /// value, with the specified memory ordering.
   ///
@@ -76,7 +70,7 @@ extension AtomicUnsafeMutablePointer {
 }
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-extension AtomicUnsafeMutablePointer {
+extension UnsafeAtomicUnsafeMutablePointer {
   /// Perform an atomic compare and exchange operation with
   /// the specified ordering constraints.
   ///

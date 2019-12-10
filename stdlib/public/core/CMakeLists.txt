@@ -204,10 +204,7 @@ set(SWIFTLIB_SOURCES
   ${SWIFTLIB_ESSENTIAL}
   ### PLEASE KEEP THIS LIST IN ALPHABETICAL ORDER ###
   Anchored.swift
-  AtomicInitializableReference.swift
   AtomicMemoryOrderings.swift
-  AtomicUnmanaged.swift
-  AtomicUnsafeMutablePointer.swift
   Availability.swift
   CollectionDifference.swift
   CollectionOfOne.swift
@@ -218,6 +215,9 @@ set(SWIFTLIB_SOURCES
   SliceBuffer.swift
   SIMDVector.swift
   UnfoldSequence.swift
+  UnsafeAtomicInitializableReference.swift
+  UnsafeAtomicUnmanaged.swift
+  UnsafeAtomicUnsafeMutablePointer.swift
   VarArgs.swift
   Zip.swift
   "${SWIFT_SOURCE_DIR}/stdlib/linker-support/magic-symbols-for-install-name.c"
@@ -225,12 +225,12 @@ set(SWIFTLIB_SOURCES
 
 set(SWIFTLIB_GYB_SOURCES
   ${SWIFTLIB_ESSENTIAL_GYB_SOURCES}
-  AtomicInt.swift.gyb
-  AtomicUInt.swift.gyb
   ExistentialCollection.swift.gyb
   RawAtomics.swift.gyb
   SIMDVectorTypes.swift.gyb
   Tuple.swift.gyb
+  UnsafeAtomicInt.swift.gyb
+  UnsafeAtomicUInt.swift.gyb
   )
 set(GROUP_INFO_JSON_FILE ${CMAKE_CURRENT_SOURCE_DIR}/GroupInfo.json)
 set(swift_core_link_flags "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}")

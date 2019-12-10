@@ -199,11 +199,11 @@
   "Atomics": [
     "AtomicMemoryOrderings.swift",
     "RawAtomics.swift",
-    "AtomicInitializableReference.swift",
-    "AtomicInt.swift",
-    "AtomicUInt.swift",
-    "AtomicUnmanaged.swift",
-    "AtomicUnsafeMutablePointer.swift",
+    "UnsafeAtomicInitializableReference.swift",
+    "UnsafeAtomicInt.swift",
+    "UnsafeAtomicUInt.swift",
+    "UnsafeAtomicUnmanaged.swift",
+    "UnsafeAtomicUnsafeMutablePointer.swift",
     "LegacyAtomicInt.swift"
   ],
   "Misc": [

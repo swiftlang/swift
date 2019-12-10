@@ -14,26 +14,20 @@
 /// at a stable memory location.
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @frozen
-public struct AtomicUnmanaged<Instance: AnyObject>: Anchored {
+public struct UnsafeAtomicUnmanaged<Instance: AnyObject> {
   public typealias Value = Unmanaged<Instance>?
-
-  @usableFromInline
-  internal let _anchor: AnyObject
 
   @usableFromInline
   internal let _ptr: UnsafeMutableRawPointer
 
   @_transparent // Debug performance
-  public init(at address: UnsafeMutablePointer<Value>, in anchor: AnyObject) {
-    self._anchor = anchor
+  public init(_ address: UnsafeMutablePointer<Value>) {
     self._ptr = UnsafeMutableRawPointer(address)
   }
-
-  public static var defaultInitialValue: Value { nil }
 }
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-extension AtomicUnmanaged {
+extension UnsafeAtomicUnmanaged {
   /// Atomically loads and returns the current value,
   /// with the specified memory ordering.
   @_transparent @_alwaysEmitIntoClient
@@ -46,7 +40,7 @@ extension AtomicUnmanaged {
 
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-extension AtomicUnmanaged {
+extension UnsafeAtomicUnmanaged {
   /// Atomically sets the current value to `desired`,
   /// with the specified memory ordering.
   @_transparent @_alwaysEmitIntoClient
@@ -60,7 +54,7 @@ extension AtomicUnmanaged {
 }
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-extension AtomicUnmanaged {
+extension UnsafeAtomicUnmanaged {
   /// Atomically sets the current value to `desired` and returns the previous
   /// value, with the specified memory ordering.
   ///
@@ -78,7 +72,7 @@ extension AtomicUnmanaged {
 }
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-extension AtomicUnmanaged {
+extension UnsafeAtomicUnmanaged {
   /// Perform an atomic compare and exchange operation with
   /// with the specified memory ordering.
   ///

@@ -32,26 +32,18 @@
 /// stable memory location.
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 @frozen
-public struct AtomicInt: Anchored {
-  public typealias Value = Int
-
-  @usableFromInline
-  internal let _anchor: AnyObject
-
+public struct UnsafeAtomicInt {
   @usableFromInline
   internal let _ptr: UnsafeMutableRawPointer
 
   @_transparent // Debug performance
-  public init(at address: UnsafeMutablePointer<Int>, in anchor: AnyObject) {
-    self._anchor = anchor
+  public init(_ address: UnsafeMutablePointer<Int>) {
     self._ptr = UnsafeMutableRawPointer(address)
   }
-
-  public static var defaultInitialValue: Int { 0 }
 }
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-extension AtomicInt {
+extension UnsafeAtomicInt {
   /// Atomically loads and returns the current value,
   /// with the specified memory ordering.
   @_transparent @_alwaysEmitIntoClient
@@ -62,7 +54,7 @@ extension AtomicInt {
 
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-extension AtomicInt {
+extension UnsafeAtomicInt {
   /// Atomically sets the current value to `desired`,
   /// with the specified memory ordering.
   @_transparent @_alwaysEmitIntoClient
@@ -75,7 +67,7 @@ extension AtomicInt {
 }
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-extension AtomicInt {
+extension UnsafeAtomicInt {
   /// Atomically sets the current value to `desired` and returns the previous
   /// value, with the specified memory ordering.
   ///
@@ -93,7 +85,7 @@ extension AtomicInt {
 }
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-extension AtomicInt {
+extension UnsafeAtomicInt {
   /// Perform an atomic compare and exchange operation with
   /// the specified memory ordering.
   ///
@@ -132,7 +124,7 @@ extension AtomicInt {
 
 % for (name, op, label, doc) in integerOperations:
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-extension AtomicInt {
+extension UnsafeAtomicInt {
   /// Perform an atomic ${doc} operation and return the original value, with
   /// the specified memory ordering.
   ///
@@ -174,7 +166,7 @@ extension AtomicInt {
 % end
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-extension AtomicInt {
+extension UnsafeAtomicInt {
   /// Atomically increments the current value by the specified integer, with the
   /// specified memory ordering.
   ///
