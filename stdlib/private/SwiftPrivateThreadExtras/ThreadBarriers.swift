@@ -82,10 +82,10 @@ public func _stdlib_thread_barrier_init(
 }
 
 private func _stdlib_thread_barrier_mutex_and_cond_init(_ barrier: UnsafeMutablePointer<_stdlib_thread_barrier_t>) -> CInt {
-  guard pthread_mutex_init(barrier.pointee.mutex!) == 0 else {
+  guard pthread_mutex_init(barrier.pointee.mutex!, nil) == 0 else {
     return -1
   }
-  guard pthread_cond_init(barrier.pointee.cond!) == 0 else {
+  guard pthread_cond_init(barrier.pointee.cond!, nil) == 0 else {
     pthread_mutex_destroy(barrier.pointee.mutex!)
     return -1
   }
