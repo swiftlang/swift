@@ -1027,10 +1027,12 @@ StringRef DeclAttribute::getAttrName() const {
     return "<<custom>>";
   case DAK_ProjectedValueProperty:
     return "_projectedValueProperty";
-  case DAK_Differentiable:
-    return "differentiable";
   case DAK_OriginallyDefinedIn:
     return "_originallyDefinedIn";
+  case DAK_Differentiable:
+    return "differentiable";
+  case DAK_Derivative:
+    return "derivative";
   }
   llvm_unreachable("bad DeclAttrKind");
 }
@@ -1448,6 +1450,44 @@ void DifferentiableAttr::print(llvm::raw_ostream &OS, const Decl *D,
   P << "@" << getAttrName();
   printDifferentiableAttrArguments(this, P, PrintOptions(), D, omitWrtClause,
                                    omitAssociatedFunctions);
+}
+
+DerivativeAttr::DerivativeAttr(bool implicit, SourceLoc atLoc,
+                               SourceRange baseRange,
+                               DeclNameWithLoc originalName,
+                               ArrayRef<ParsedAutoDiffParameter> params)
+    : DeclAttribute(DAK_Derivative, atLoc, baseRange, implicit),
+      OriginalFunctionName(std::move(originalName)),
+      NumParsedParameters(params.size()) {
+  std::copy(params.begin(), params.end(),
+            getTrailingObjects<ParsedAutoDiffParameter>());
+}
+
+DerivativeAttr::DerivativeAttr(bool implicit, SourceLoc atLoc,
+                               SourceRange baseRange,
+                               DeclNameWithLoc originalName,
+                               IndexSubset *indices)
+    : DeclAttribute(DAK_Derivative, atLoc, baseRange, implicit),
+      OriginalFunctionName(std::move(originalName)), ParameterIndices(indices) {
+}
+
+DerivativeAttr *
+DerivativeAttr::create(ASTContext &context, bool implicit, SourceLoc atLoc,
+                       SourceRange baseRange, DeclNameWithLoc originalName,
+                       ArrayRef<ParsedAutoDiffParameter> params) {
+  unsigned size = totalSizeToAlloc<ParsedAutoDiffParameter>(params.size());
+  void *mem = context.Allocate(size, alignof(DerivativeAttr));
+  return new (mem) DerivativeAttr(implicit, atLoc, baseRange,
+                                  std::move(originalName), params);
+}
+
+DerivativeAttr *DerivativeAttr::create(ASTContext &context, bool implicit,
+                                       SourceLoc atLoc, SourceRange baseRange,
+                                       DeclNameWithLoc originalName,
+                                       IndexSubset *indices) {
+  void *mem = context.Allocate(sizeof(DerivativeAttr), alignof(DerivativeAttr));
+  return new (mem) DerivativeAttr(implicit, atLoc, baseRange,
+                                  std::move(originalName), indices);
 }
 
 ImplementsAttr::ImplementsAttr(SourceLoc atLoc, SourceRange range,

@@ -529,6 +529,11 @@ DECL_ATTR(_originallyDefinedIn, OriginallyDefinedIn,
   ABIBreakingToAdd | ABIBreakingToRemove | APIStableToAdd | APIStableToRemove,
   96)
 
+DECL_ATTR(derivative, Derivative,
+  OnFunc | LongAttribute | AllowMultipleAttributes |
+  ABIStableToAdd | ABIBreakingToRemove | APIStableToAdd | APIBreakingToRemove,
+  97)
+
 #undef TYPE_ATTR
 #undef DECL_ATTR_ALIAS
 #undef CONTEXTUAL_DECL_ATTR_ALIAS
