@@ -280,7 +280,7 @@ struct SemanticARCOptVisitor
   FORWARDING_TERM(CondBranch)
 #undef FORWARDING_TERM
 
-  bool isWrittenTo(LoadInst *li);
+  bool isWrittenTo(LoadInst *li, ArrayRef<SILInstruction *> destroys);
 
   bool processWorklist();
 
@@ -664,6 +664,7 @@ bool mayFunctionMutateArgument(const AccessedStorage &storage, SILFunction &f) {
 // Then find our accessed storage to determine whether it provides a guarantee
 // for the loaded value.
 namespace {
+
 class StorageGuaranteesLoadVisitor
   : public AccessUseDefChainVisitor<StorageGuaranteesLoadVisitor>
 {
@@ -677,12 +678,15 @@ class StorageGuaranteesLoadVisitor
   SILValue currentAddress;
   
   Optional<bool> isWritten;
-  
+
+  ArrayRef<SILInstruction *> destroyValues;
+
 public:
-  StorageGuaranteesLoadVisitor(SemanticARCOptVisitor &arcOpt, LoadInst *load)
-    : ARCOpt(arcOpt), Load(load), currentAddress(load->getOperand())
-  {}
-  
+  StorageGuaranteesLoadVisitor(SemanticARCOptVisitor &arcOpt, LoadInst *load,
+                               ArrayRef<SILInstruction *> destroyValues)
+      : ARCOpt(arcOpt), Load(load), currentAddress(load->getOperand()),
+        destroyValues(destroyValues) {}
+
   void answer(bool written) {
     currentAddress = nullptr;
     isWritten = written;
@@ -790,6 +794,25 @@ public:
     return answer(true);
   }
 
+  /// See if we have an alloc_stack that is only written to once by an
+  /// initializing instruction.
+  void visitStackAccess(AllocStackInst *stack) {
+    SmallVector<SILInstruction *, 8> destroyAddrs;
+    bool initialAnswer = isSingleInitAllocStack(stack, destroyAddrs);
+    if (!initialAnswer)
+      return answer(true);
+
+    // Then make sure that all of our load [copy] uses are within the
+    // destroy_addr.
+    SmallPtrSet<SILBasicBlock *, 4> visitedBlocks;
+    LinearLifetimeChecker checker(visitedBlocks, ARCOpt.getDeadEndBlocks());
+    // Returns true on success. So we invert.
+    bool foundError =
+        !checker.validateLifetime(stack, destroyAddrs /*consuming users*/,
+                                  destroyValues /*non consuming users*/);
+    return answer(foundError);
+  }
+
   bool doIt() {
     while (currentAddress) {
       visit(currentAddress);
@@ -797,10 +820,12 @@ public:
     return *isWritten;
   }
 };
+
 } // namespace
 
-bool SemanticARCOptVisitor::isWrittenTo(LoadInst *load) {
-  StorageGuaranteesLoadVisitor visitor(*this, load);
+bool SemanticARCOptVisitor::isWrittenTo(LoadInst *load,
+                                        ArrayRef<SILInstruction *> destroys) {
+  StorageGuaranteesLoadVisitor visitor(*this, load, destroys);
   return visitor.doIt();
 }
 
@@ -825,7 +850,7 @@ bool SemanticARCOptVisitor::visitLoadInst(LoadInst *li) {
   // Then check if our address is ever written to. If it is, then we cannot use
   // the load_borrow because the stored value may be released during the loaded
   // value's live range.
-  if (isWrittenTo(li))
+  if (isWrittenTo(li, destroyValues))
     return false;
 
   // Ok, we can perform our optimization. Convert the load [copy] into a
