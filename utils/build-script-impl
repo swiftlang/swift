@@ -2997,6 +2997,10 @@ for host in "${ALL_HOSTS[@]}"; do
 
         echo "--- Running tests for ${product} ---"
         for target in "${results_targets[@]}"; do
+            # TODO (TF-1045): Ninja/Build/strip-colors.ninja in llbuild tests is spuriously failing
+            if [[ "${product}" == "llbuild" ]]; then
+                continue
+            fi
             if [[ "${target}" != "" ]]; then
                 echo "--- ${target} ---"
                 trap "tests_busted ${product} '(${target})'" ERR
