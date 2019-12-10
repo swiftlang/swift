@@ -4843,3 +4843,14 @@ CanType swift::substOpaqueTypesWithUnderlyingTypes(CanType ty,
         SubstFlags::SubstituteOpaqueArchetypes | SubstFlags::AllowLoweredTypes;
   return ty.subst(replacer, replacer, flags)->getCanonicalType();
 }
+
+CanSILFunctionType
+SILFunctionType::withSubstitutions(SubstitutionMap subs) const {
+  return SILFunctionType::get(getSubstGenericSignature(),
+                          getExtInfo(), getCoroutineKind(),
+                          getCalleeConvention(),
+                          getParameters(), getYields(), getResults(),
+                          getOptionalErrorResult(),
+                          subs, isGenericSignatureImplied(),
+                          const_cast<SILFunctionType*>(this)->getASTContext());
+}

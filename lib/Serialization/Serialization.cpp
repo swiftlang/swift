@@ -4091,7 +4091,10 @@ public:
         stableRepresentation, fnTy->isPseudogeneric(), fnTy->isNoEscape(),
         stableDiffKind, fnTy->hasErrorResult(), fnTy->getParameters().size(),
         fnTy->getNumYields(), fnTy->getNumResults(),
-        S.addGenericSignatureRef(sig), variableData);
+        fnTy->isGenericSignatureImplied(),
+        S.addGenericSignatureRef(sig),
+        S.addSubstitutionMapRef(fnTy->getSubstitutions()),
+        variableData);
 
     if (auto conformance = fnTy->getWitnessMethodConformanceOrInvalid())
       S.writeConformance(conformance, S.DeclTypeAbbrCodes);

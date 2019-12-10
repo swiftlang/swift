@@ -2744,7 +2744,8 @@ Type TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
       subsMap.insert({params[i], resolved->getCanonicalType()});
     }
     subs = SubstitutionMap::get(sig, QueryTypeSubstitutionMap{subsMap},
-                                TypeChecker::LookUpConformance(DC));
+                                TypeChecker::LookUpConformance(DC))
+      .getCanonical();
   }
 
   if (hasError) {

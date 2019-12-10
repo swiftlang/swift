@@ -55,7 +55,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 528; // @derivative attribute
+const uint16_t SWIFTMODULE_VERSION_MINOR = 529; // SILFunctionType substitutions
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -990,11 +990,14 @@ namespace decls_block {
     BCVBR<6>,              // number of parameters
     BCVBR<5>,              // number of yields
     BCVBR<5>,              // number of results
+    BCFixed<1>,            // generic signature implied
     GenericSignatureIDField, // generic signature
+    SubstitutionMapIDField, // substitutions
     BCArray<TypeIDField>   // parameter types/conventions, alternating
                            // followed by result types/conventions, alternating
                            // followed by error result type/convention
     // Optionally a protocol conformance (for witness_methods)
+    // Optionally a substitution map (for substituted function types)
   >;
   
   using SILBlockStorageTypeLayout = BCRecordLayout<

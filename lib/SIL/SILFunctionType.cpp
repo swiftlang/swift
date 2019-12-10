@@ -3334,17 +3334,6 @@ StringRef SILFunctionType::ABICompatibilityCheckResult::getMessage() const {
   llvm_unreachable("Covered switch isn't completely covered?!");
 }
 
-CanSILFunctionType
-SILFunctionType::withSubstitutions(SubstitutionMap subs) const {
-  return SILFunctionType::get(getSubstGenericSignature(),
-                          getExtInfo(), getCoroutineKind(),
-                          getCalleeConvention(),
-                          getParameters(), getYields(), getResults(),
-                          getOptionalErrorResult(),
-                          subs, isGenericSignatureImplied(),
-                          const_cast<SILFunctionType*>(this)->getASTContext());
-}
-
 static DeclContext *getDeclContextForExpansion(const SILFunction &f) {
   auto *dc = f.getDeclContext();
   if (!dc)
