@@ -2168,7 +2168,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
       if (!attrs.hasConvention()) {
         rep = SILFunctionType::Representation::Thick;
       } else {
-        auto convention = attrs.getConvention();
+        auto convention = attrs.getConventionName();
         // SIL exposes a greater number of conventions than Swift source.
         auto parsedRep =
             llvm::StringSwitch<Optional<SILFunctionType::Representation>>(
@@ -2185,14 +2185,15 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
                 .Default(None);
         if (!parsedRep) {
           diagnose(attrs.getLoc(TAK_convention),
-                   diag::unsupported_sil_convention, attrs.getConvention());
+                   diag::unsupported_sil_convention, attrs.getConventionName());
           rep = SILFunctionType::Representation::Thin;
         } else {
           rep = *parsedRep;
         }
 
         if (rep == SILFunctionType::Representation::WitnessMethod) {
-          auto protocolName = *attrs.conventionWitnessMethodProtocol;
+          auto protocolName =
+            attrs.ConventionArguments.getValue().WitnessMethodProtocol;
           witnessMethodProtocol = new (Context) SimpleIdentTypeRepr(
               SourceLoc(), Context.getIdentifier(protocolName));
         }
@@ -2225,7 +2226,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
       if (attrs.hasConvention()) {
         auto parsedRep =
             llvm::StringSwitch<Optional<FunctionType::Representation>>(
-                attrs.getConvention())
+                attrs.getConventionName())
                 .Case("swift", FunctionType::Representation::Swift)
                 .Case("block", FunctionType::Representation::Block)
                 .Case("thin", FunctionType::Representation::Thin)
@@ -2233,7 +2234,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
                 .Default(None);
         if (!parsedRep) {
           diagnose(attrs.getLoc(TAK_convention), diag::unsupported_convention,
-                   attrs.getConvention());
+                   attrs.getConventionName());
           rep = FunctionType::Representation::Swift;
         } else {
           rep = *parsedRep;
@@ -2244,7 +2245,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
                 rep == FunctionType::Representation::Block) {
               diagnose(attrs.getLoc(TAK_convention),
                        diag::invalid_autoclosure_and_convention_attributes,
-                       attrs.getConvention());
+                       attrs.getConventionName());
               attrs.clearAttribute(TAK_convention);
             }
           }
@@ -2357,7 +2358,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
     // Remove the function attributes from the set so that we don't diagnose.
     for (auto i : FunctionAttrs)
       attrs.clearAttribute(i);
-    attrs.convention = None;
+    attrs.ConventionArguments = None;
   }
 
   // In SIL, handle @opened (n), which creates an existential archetype.

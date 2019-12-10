@@ -312,10 +312,12 @@ void AttributedTypeRepr::printAttrs(ASTPrinter &Printer,
   if (hasAttr(TAK_thick))
     Printer.printSimpleAttr("@thick") << " ";
 
-  if (hasAttr(TAK_convention) && Attrs.convention.hasValue()) {
+  if (hasAttr(TAK_convention) && Attrs.hasConvention()) {
     Printer.callPrintStructurePre(PrintStructureKind::BuiltinAttribute);
     Printer.printAttrName("@convention");
-    Printer << "(" << Attrs.convention.getValue() << ")";
+    SmallString<32> convention;
+    Attrs.getConventionArguments(convention);
+    Printer << "(" << convention << ")";
     Printer.printStructurePost(PrintStructureKind::BuiltinAttribute);
     Printer << " ";
   }
