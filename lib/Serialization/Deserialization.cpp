@@ -2120,6 +2120,22 @@ getActualReadWriteImplKind(unsigned rawKind) {
   return None;
 }
 
+// SWIFT_ENABLE_TENSORFLOW
+/// Translate from the serialization DifferentiabilityKind enumerators, which
+/// are guaranteed to be stable, to the AST ones.
+static Optional<swift::AutoDiffDerivativeFunctionKind>
+getActualAutoDiffDerivativeFunctionKind(uint8_t raw) {
+  switch (serialization::AutoDiffDerivativeFunctionKind(raw)) {
+#define CASE(ID)                                                               \
+  case serialization::AutoDiffDerivativeFunctionKind::ID:                      \
+    return {swift::AutoDiffDerivativeFunctionKind::ID};
+  CASE(JVP)
+  CASE(VJP)
+#undef CASE
+  }
+  return None;
+}
+
 void ModuleFile::configureStorage(AbstractStorageDecl *decl,
                                   uint8_t rawOpaqueReadOwnership,
                                   uint8_t rawReadImplKind,
@@ -4150,6 +4166,38 @@ llvm::Error DeclDeserializer::deserializeDeclAttributes() {
         Attr = diffAttr;
         break;
       }
+
+      // SWIFT_ENABLE_TENSORFLOW
+      case decls_block::Derivative_DECL_ATTR: {
+        bool isImplicit;
+        uint64_t origNameId;
+        DeclID origDeclId;
+        uint64_t rawDerivativeKind;
+        ArrayRef<uint64_t> parameters;
+
+        serialization::decls_block::DerivativeDeclAttrLayout::readRecord(
+            scratch, isImplicit, origNameId, origDeclId, rawDerivativeKind,
+            parameters);
+
+        DeclNameWithLoc origName{MF.getIdentifier(origNameId), DeclNameLoc()};
+        auto *origDecl = cast<AbstractFunctionDecl>(MF.getDecl(origDeclId));
+        auto derivativeKind =
+            getActualAutoDiffDerivativeFunctionKind(rawDerivativeKind);
+        if (!derivativeKind)
+          MF.fatal();
+        llvm::SmallBitVector parametersBitVector(parameters.size());
+        for (unsigned i : indices(parameters))
+          parametersBitVector[i] = parameters[i];
+        auto *indices = IndexSubset::get(ctx, parametersBitVector);
+
+        auto *derivAttr = DerivativeAttr::create(
+            ctx, isImplicit, SourceLoc(), SourceRange(), origName, indices);
+        derivAttr->setOriginalFunction(origDecl);
+        derivAttr->setDerivativeKind(*derivativeKind);
+        Attr = derivAttr;
+        break;
+      }
+      // SWIFT_ENABLE_TENSORFLOW END
 
       case decls_block::DynamicReplacement_DECL_ATTR: {
         bool isImplicit;

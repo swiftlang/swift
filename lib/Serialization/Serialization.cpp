@@ -2029,6 +2029,21 @@ static uint8_t getRawStableVarDeclIntroducer(swift::VarDecl::Introducer intr) {
   llvm_unreachable("bad variable decl introducer kind");
 }
 
+// SWIFT_ENABLE_TENSORFLOW
+/// Translate from the AST differentiability kind enum to the Serialization enum
+/// values, which are guaranteed to be stable.
+static uint8_t getRawStableAutoDiffDerivativeFunctionKind(
+    swift::AutoDiffDerivativeFunctionKind kind) {
+  switch (kind) {
+  case swift::AutoDiffDerivativeFunctionKind::JVP:
+    return uint8_t(serialization::AutoDiffDerivativeFunctionKind::JVP);
+  case swift::AutoDiffDerivativeFunctionKind::VJP:
+    return uint8_t(serialization::AutoDiffDerivativeFunctionKind::VJP);
+  }
+  llvm_unreachable("bad derivative function kind");
+}
+// SWIFT_ENABLE_TENSORFLOW END
+
 /// Returns true if the declaration of \p decl depends on \p problemContext
 /// based on lexical nesting.
 ///
@@ -2129,9 +2144,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
     case DAK_PrivateImport:
       llvm_unreachable("cannot serialize attribute");
     // SWIFT_ENABLE_TENSORFLOW
-    case DAK_Derivative:
     case DAK_Transpose:
-    case DAK_Differentiating:
       llvm_unreachable("cannot serialize attribute");
     // SWIFT_ENABLE_TENSORFLOW END
 
@@ -2345,6 +2358,30 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       return;
     }
 
+    // SWIFT_ENABLE_TENSORFLOW
+    case DAK_Derivative:
+    case DAK_Differentiating: {
+      auto abbrCode = S.DeclTypeAbbrCodes[DerivativeDeclAttrLayout::Code];
+      auto *attr = cast<DerivativeAttr>(DA);
+      assert(attr->getOriginalFunction() &&
+             "`@derivative` attribute should have original declaration set "
+             "during construction or parsing");
+      auto origName = attr->getOriginalFunctionName().Name.getBaseName();
+      IdentifierID origNameId = S.addDeclBaseNameRef(origName);
+      DeclID origDeclID = S.addDeclRef(attr->getOriginalFunction());
+      auto derivativeKind =
+          getRawStableAutoDiffDerivativeFunctionKind(attr->getDerivativeKind());
+      auto paramIndices = attr->getParameterIndices();
+      assert(paramIndices && "Parameter indices must be resolved");
+      SmallVector<bool, 4> indices;
+      for (unsigned i : range(paramIndices->getCapacity()))
+        indices.push_back(paramIndices->contains(i));
+      DerivativeDeclAttrLayout::emitRecord(
+          S.Out, S.ScratchRecord, abbrCode, attr->isImplicit(), origNameId,
+          origDeclID, derivativeKind, indices);
+      return;
+    }
+
     case DAK_Quoted: {
       auto abbrCode = S.DeclTypeAbbrCodes[QuotedDeclAttrLayout::Code];
       auto attr = cast<QuotedAttr>(DA);
@@ -2354,6 +2391,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
                                        S.addDeclRef(attr->getQuoteDecl()));
       return;
     }
+    // SWIFT_ENABLE_TENSORFLOW END
     }
   }
 
