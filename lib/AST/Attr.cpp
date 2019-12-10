@@ -1365,31 +1365,30 @@ SpecializeAttr *SpecializeAttr::create(ASTContext &Ctx, SourceLoc atLoc,
                                   specializedSignature);
 }
 
-DifferentiableAttr::DifferentiableAttr(ASTContext &context, bool implicit,
-                                       SourceLoc atLoc, SourceRange baseRange,
-                                       bool linear,
+DifferentiableAttr::DifferentiableAttr(bool implicit, SourceLoc atLoc,
+                                       SourceRange baseRange, bool linear,
                                        ArrayRef<ParsedAutoDiffParameter> params,
                                        Optional<DeclNameWithLoc> jvp,
                                        Optional<DeclNameWithLoc> vjp,
                                        TrailingWhereClause *clause)
   : DeclAttribute(DAK_Differentiable, atLoc, baseRange, implicit),
-    linear(linear), NumParsedParameters(params.size()), JVP(std::move(jvp)),
+    Linear(linear), NumParsedParameters(params.size()), JVP(std::move(jvp)),
     VJP(std::move(vjp)), WhereClause(clause) {
   std::copy(params.begin(), params.end(),
             getTrailingObjects<ParsedAutoDiffParameter>());
 }
 
-DifferentiableAttr::DifferentiableAttr(ASTContext &context, bool implicit,
+DifferentiableAttr::DifferentiableAttr(Decl *original, bool implicit,
                                        SourceLoc atLoc, SourceRange baseRange,
                                        bool linear,
-                                       IndexSubset *indices,
+                                       IndexSubset *parameterIndices,
                                        Optional<DeclNameWithLoc> jvp,
                                        Optional<DeclNameWithLoc> vjp,
                                        GenericSignature derivativeGenSig)
     : DeclAttribute(DAK_Differentiable, atLoc, baseRange, implicit),
-      linear(linear), JVP(std::move(jvp)), VJP(std::move(vjp)),
-      ParameterIndices(indices) {
-  setDerivativeGenericSignature(context, derivativeGenSig);
+      Linear(linear), JVP(std::move(jvp)), VJP(std::move(vjp)) {
+  setParameterIndices(parameterIndices);
+  setDerivativeGenericSignature(derivativeGenSig);
 }
 
 DifferentiableAttr *
@@ -1402,22 +1401,23 @@ DifferentiableAttr::create(ASTContext &context, bool implicit,
                            TrailingWhereClause *clause) {
   unsigned size = totalSizeToAlloc<ParsedAutoDiffParameter>(parameters.size());
   void *mem = context.Allocate(size, alignof(DifferentiableAttr));
-  return new (mem) DifferentiableAttr(context, implicit, atLoc, baseRange,
-                                      linear, parameters, std::move(jvp),
+  return new (mem) DifferentiableAttr(implicit, atLoc, baseRange, linear,
+                                      parameters, std::move(jvp),
                                       std::move(vjp), clause);
 }
 
 DifferentiableAttr *
-DifferentiableAttr::create(ASTContext &context, bool implicit,
-                           SourceLoc atLoc, SourceRange baseRange,
-                           bool linear, IndexSubset *indices,
+DifferentiableAttr::create(AbstractFunctionDecl *original, bool implicit,
+                           SourceLoc atLoc, SourceRange baseRange, bool linear,
+                           IndexSubset *parameterIndices,
                            Optional<DeclNameWithLoc> jvp,
                            Optional<DeclNameWithLoc> vjp,
                            GenericSignature derivativeGenSig) {
-  void *mem = context.Allocate(sizeof(DifferentiableAttr),
-                               alignof(DifferentiableAttr));
-  return new (mem) DifferentiableAttr(context, implicit, atLoc, baseRange,
-                                      linear, indices, std::move(jvp),
+  auto &ctx = original->getASTContext();
+  void *mem = ctx.Allocate(sizeof(DifferentiableAttr),
+                           alignof(DifferentiableAttr));
+  return new (mem) DifferentiableAttr(original, implicit, atLoc, baseRange,
+                                      linear, parameterIndices, std::move(jvp),
                                       std::move(vjp), derivativeGenSig);
 }
 
