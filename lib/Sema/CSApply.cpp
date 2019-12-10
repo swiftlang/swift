@@ -384,12 +384,13 @@ namespace {
 
   public:
     /// Build a reference to the given declaration.
-    Expr *buildDeclRef(OverloadChoice choice, DeclNameLoc loc, Type openedType,
+    Expr *buildDeclRef(SelectedOverload overload, DeclNameLoc loc,
                        ConstraintLocatorBuilder locator, bool implicit,
-                       FunctionRefKind functionRefKind,
                        AccessSemantics semantics) {
+      auto choice = overload.choice;
       assert(choice.getKind() != OverloadChoiceKind::DeclViaDynamic);
       auto *decl = choice.getDecl();
+      auto fullType = simplifyType(overload.openedFullType);
 
       // Determine the declaration selected for this overloaded reference.
       auto &ctx = cs.getASTContext();
@@ -399,10 +400,7 @@ namespace {
       if (decl->getDeclContext()->isTypeContext() && isa<FuncDecl>(decl)) {
         assert(cast<FuncDecl>(decl)->isOperator() && "Must be an operator");
 
-        auto openedFnType = openedType->castTo<FunctionType>();
-        auto simplifiedFnType
-          = simplifyType(openedFnType)->castTo<FunctionType>();
-        auto baseTy = getBaseType(simplifiedFnType);
+        auto baseTy = getBaseType(fullType->castTo<FunctionType>());
 
         // Handle operator requirements found in protocols.
         if (auto proto = dyn_cast<ProtocolDecl>(decl->getDeclContext())) {
@@ -424,7 +422,10 @@ namespace {
                 // FIXME: the hop through 'getDecl()' is because
                 // SpecializedProtocolConformance doesn't substitute into
                 // witnesses' ConcreteDeclRefs.
-                Type expectedFnType = simplifiedFnType->getResult();
+                Type expectedFnType = simplifyType(overload.openedType);
+                assert(expectedFnType->isEqual(
+                           fullType->castTo<AnyFunctionType>()->getResult()) &&
+                       "Cannot handle adjustments made to the opened type");
                 Expr *refExpr;
                 if (witness->getDeclContext()->isTypeContext()) {
                   Expr *base =
@@ -435,7 +436,7 @@ namespace {
                 } else {
                   auto declRefExpr =  new (ctx) DeclRefExpr(witness, loc,
                                                             /*Implicit=*/false);
-                  declRefExpr->setFunctionRefKind(functionRefKind);
+                  declRefExpr->setFunctionRefKind(choice.getFunctionRefKind());
                   refExpr = declRefExpr;
                 }
 
@@ -464,26 +465,22 @@ namespace {
           TypeExpr::createImplicitHack(loc.getBaseNameLoc(), baseTy, ctx);
         cs.cacheExprTypes(base);
 
-        return buildMemberRef(base, openedType, SourceLoc(), choice, loc,
-                              openedFnType->getResult(), locator, locator,
-                              implicit, functionRefKind, semantics);
+        return buildMemberRef(base, SourceLoc(), overload, loc, locator,
+                              locator, implicit, semantics);
       }
-
-      auto type = solution.simplifyType(openedType);
 
       if (isa<TypeDecl>(decl) && !isa<ModuleDecl>(decl)) {
         auto typeExpr = TypeExpr::createImplicitHack(
-          loc.getBaseNameLoc(), type->getMetatypeInstanceType(),
-          ctx);
+            loc.getBaseNameLoc(), fullType->getMetatypeInstanceType(), ctx);
         cs.cacheType(typeExpr);
         return typeExpr;
       }
 
       auto ref = resolveConcreteDeclRef(decl, locator);
       auto declRefExpr =
-          new (ctx) DeclRefExpr(ref, loc, implicit, semantics, type);
+          new (ctx) DeclRefExpr(ref, loc, implicit, semantics, fullType);
       cs.cacheType(declRefExpr);
-      declRefExpr->setFunctionRefKind(functionRefKind);
+      declRefExpr->setFunctionRefKind(choice.getFunctionRefKind());
       return forceUnwrapIfExpected(declRefExpr, choice, locator);
     }
 
@@ -734,12 +731,15 @@ namespace {
     }
 
     /// Build a new member reference with the given base and member.
-    Expr *buildMemberRef(Expr *base, Type openedFullType, SourceLoc dotLoc,
-                         OverloadChoice choice, DeclNameLoc memberLoc,
-                         Type openedType, ConstraintLocatorBuilder locator,
+    Expr *buildMemberRef(Expr *base, SourceLoc dotLoc,
+                         SelectedOverload overload, DeclNameLoc memberLoc,
+                         ConstraintLocatorBuilder locator,
                          ConstraintLocatorBuilder memberLocator, bool Implicit,
-                         FunctionRefKind functionRefKind,
                          AccessSemantics semantics) {
+      auto choice = overload.choice;
+      auto openedType = overload.openedType;
+      auto openedFullType = overload.openedFullType;
+
       ValueDecl *member = choice.getDecl();
 
       auto &context = cs.getASTContext();
@@ -770,7 +770,7 @@ namespace {
                "Direct property access doesn't make sense for this");
         auto ref = new (context) DeclRefExpr(memberRef, memberLoc, Implicit);
         cs.setType(ref, refTy);
-        ref->setFunctionRefKind(functionRefKind);
+        ref->setFunctionRefKind(choice.getFunctionRefKind());
         auto *DSBI = cs.cacheType(new (context) DotSyntaxBaseIgnoredExpr(
             base, dotLoc, ref, cs.getType(ref)));
         return forceUnwrapIfExpected(DSBI, choice, memberLocator);
@@ -969,7 +969,7 @@ namespace {
       // Handle all other references.
       auto declRefExpr = new (context) DeclRefExpr(memberRef, memberLoc,
                                                    Implicit, semantics);
-      declRefExpr->setFunctionRefKind(functionRefKind);
+      declRefExpr->setFunctionRefKind(choice.getFunctionRefKind());
       cs.setType(declRefExpr, refTy);
       Expr *ref = declRefExpr;
 
@@ -1005,9 +1005,6 @@ namespace {
 
       return finishApply(apply, memberRef, openedType, locator);
     }
-    
-    /// Describes either a type or the name of a type to be resolved.
-    using TypeOrName = llvm::PointerUnion<Identifier, Type>;
 
     /// Convert the given literal expression via a protocol pair.
     ///
@@ -2273,10 +2270,8 @@ namespace {
         return expr;
       }
 
-      return buildDeclRef(selected->choice, expr->getNameLoc(),
-                          selected->openedFullType, locator, expr->isImplicit(),
-                          expr->getFunctionRefKind(),
-                          expr->getAccessSemantics());
+      return buildDeclRef(*selected, expr->getNameLoc(), locator,
+                          expr->isImplicit(), expr->getAccessSemantics());
     }
 
     Expr *visitSuperRefExpr(SuperRefExpr *expr) {
@@ -2304,12 +2299,9 @@ namespace {
       // Determine the declaration selected for this overloaded reference.
       auto locator = cs.getConstraintLocator(expr);
       auto selected = solution.getOverloadChoice(locator);
-      auto choice = selected.choice;
 
-      return buildDeclRef(choice, expr->getNameLoc(), selected.openedFullType,
-                          locator, expr->isImplicit(),
-                          choice.getFunctionRefKind(),
-                          AccessSemantics::Ordinary);
+      return buildDeclRef(selected, expr->getNameLoc(), locator,
+                          expr->isImplicit(), AccessSemantics::Ordinary);
     }
 
     Expr *visitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *expr) {
@@ -2328,10 +2320,9 @@ namespace {
                                                    ConstraintLocator::Member);
       auto selected = solution.getOverloadChoice(memberLocator);
       return buildMemberRef(
-          expr->getBase(), selected.openedFullType, expr->getDotLoc(),
-          selected.choice, expr->getNameLoc(), selected.openedType,
+          expr->getBase(), expr->getDotLoc(), selected, expr->getNameLoc(),
           cs.getConstraintLocator(expr), memberLocator, expr->isImplicit(),
-          selected.choice.getFunctionRefKind(), expr->getAccessSemantics());
+          expr->getAccessSemantics());
     }
 
     Expr *visitDynamicMemberRefExpr(DynamicMemberRefExpr *expr) {
@@ -2373,10 +2364,8 @@ namespace {
       // Build the member reference.
       auto *exprLoc = cs.getConstraintLocator(expr);
       auto result = buildMemberRef(
-          base, selected.openedFullType, expr->getDotLoc(), selected.choice,
-          expr->getNameLoc(), selected.openedType,
-          exprLoc, memberLocator, expr->isImplicit(),
-          selected.choice.getFunctionRefKind(), AccessSemantics::Ordinary);
+          base, expr->getDotLoc(), selected, expr->getNameLoc(), exprLoc,
+          memberLocator, expr->isImplicit(), AccessSemantics::Ordinary);
       if (!result)
         return nullptr;
 
@@ -2515,8 +2504,8 @@ namespace {
     Expr *applyCtorRefExpr(Expr *expr, Expr *base, SourceLoc dotLoc,
                            DeclNameLoc nameLoc, bool implicit,
                            ConstraintLocator *ctorLocator,
-                           OverloadChoice choice,
-                           FunctionRefKind functionRefKind, Type openedType) {
+                           SelectedOverload overload) {
+      auto choice = overload.choice;
       assert(choice.getKind() != OverloadChoiceKind::DeclViaDynamic);
       auto *ctor = cast<ConstructorDecl>(choice.getDecl());
 
@@ -2524,9 +2513,8 @@ namespace {
       // constructor.
       if (cs.getType(base)->is<AnyMetatypeType>()) {
         return buildMemberRef(
-            base, openedType, dotLoc, choice, nameLoc, cs.getType(expr),
-            ConstraintLocatorBuilder(cs.getConstraintLocator(expr)),
-            ctorLocator, implicit, functionRefKind, AccessSemantics::Ordinary);
+            base, dotLoc, overload, nameLoc, cs.getConstraintLocator(expr),
+            ctorLocator, implicit, AccessSemantics::Ordinary);
       }
 
       // The subexpression must be either 'self' or 'super'.
@@ -2570,8 +2558,9 @@ namespace {
 
       // Build a partial application of the delegated initializer.
       auto callee = resolveConcreteDeclRef(ctor, ctorLocator);
-      Expr *ctorRef = buildOtherConstructorRef(openedType, callee, base,
-                                               nameLoc, ctorLocator, implicit);
+      Expr *ctorRef = buildOtherConstructorRef(overload.openedFullType, callee,
+                                               base, nameLoc, ctorLocator,
+                                               implicit);
       auto *call = new (cs.getASTContext()) DotSyntaxCallExpr(ctorRef, dotLoc,
                                                               base);
 
@@ -2587,10 +2576,8 @@ namespace {
                            expr,
                            ConstraintLocator::ConstructorMember);
       if (auto selected = solution.getOverloadChoiceIfAvailable(ctorLocator)) {
-        auto choice = selected->choice;
         return applyCtorRefExpr(
-            expr, base, dotLoc, nameLoc, implicit, ctorLocator, choice,
-            choice.getFunctionRefKind(), selected->openedFullType);
+            expr, base, dotLoc, nameLoc, implicit, ctorLocator, *selected);
       }
 
       // Determine the declaration selected for this overloaded reference.
@@ -2618,9 +2605,7 @@ namespace {
         cs.diagnoseDeprecatedConditionalConformanceOuterAccess(
             UDE, selected.choice.getDecl());
 
-        return buildDeclRef(selected.choice, nameLoc, selected.openedFullType,
-                            memberLocator, implicit,
-                            selected.choice.getFunctionRefKind(),
+        return buildDeclRef(selected, nameLoc, memberLocator, implicit,
                             AccessSemantics::Ordinary);
       }
 
@@ -2651,11 +2636,9 @@ namespace {
       case OverloadChoiceKind::Decl:
       case OverloadChoiceKind::DeclViaUnwrappedOptional:
       case OverloadChoiceKind::DeclViaDynamic:
-        return buildMemberRef(base, selected.openedFullType, dotLoc,
-                              selected.choice, nameLoc, selected.openedType,
+        return buildMemberRef(base, dotLoc, selected, nameLoc,
                               cs.getConstraintLocator(expr), memberLocator,
-                              implicit, selected.choice.getFunctionRefKind(),
-                              AccessSemantics::Ordinary);
+                              implicit, AccessSemantics::Ordinary);
 
       case OverloadChoiceKind::TupleIndex: {
         Type toType = simplifyType(cs.getType(expr));
@@ -6485,12 +6468,10 @@ static Expr *buildCallAsFunctionMethodRef(
     ExprRewriter &rewriter, ApplyExpr *apply, SelectedOverload selected,
     ConstraintLocatorBuilder applyFunctionLoc) {
   auto *fn = apply->getFn();
-  auto choice = selected.choice;
   // Create direct reference to `callAsFunction` method.
   auto *declRef = rewriter.buildMemberRef(
-      fn, selected.openedFullType, /*dotLoc*/ SourceLoc(), choice,
-      DeclNameLoc(fn->getEndLoc()), selected.openedType, applyFunctionLoc,
-      applyFunctionLoc, /*implicit*/ true, choice.getFunctionRefKind(),
+      fn, /*dotLoc*/ SourceLoc(), selected, DeclNameLoc(fn->getEndLoc()),
+      applyFunctionLoc, applyFunctionLoc, /*implicit*/ true,
       AccessSemantics::Ordinary);
   if (!declRef)
     return nullptr;
@@ -6523,12 +6504,9 @@ ExprRewriter::finishApplyDynamicCallable(ApplyExpr *apply,
   bool useKwargsMethod = argumentLabel == ctx.Id_withKeywordArguments;
 
   // Construct expression referencing the `dynamicallyCall` method.
-  auto member = buildMemberRef(fn, selected.openedFullType,
-                               SourceLoc(), selected.choice,
-                               DeclNameLoc(method->getNameLoc()),
-                               selected.openedType, loc, loc, /*implicit*/ true,
-                               selected.choice.getFunctionRefKind(),
-                               AccessSemantics::Ordinary);
+  auto member = buildMemberRef(fn, SourceLoc(), selected,
+                               DeclNameLoc(method->getNameLoc()), loc, loc,
+                               /*implicit*/ true, AccessSemantics::Ordinary);
 
   // Construct argument to the method (either an array or dictionary
   // expression).
@@ -6883,12 +6861,9 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, ConcreteDeclRef callee,
   // Consider the constructor decl reference expr 'implicit', but the
   // constructor call expr itself has the apply's 'implicitness'.
   auto ctorRef = resolveConcreteDeclRef(choice.getDecl(), ctorLocator);
-  Expr *declRef = buildMemberRef(fn, selected->openedFullType,
-                                 /*dotLoc=*/SourceLoc(), choice,
-                                 DeclNameLoc(fn->getEndLoc()),
-                                 selected->openedType, locator, ctorLocator,
-                                 /*Implicit=*/true,
-                                 choice.getFunctionRefKind(),
+  Expr *declRef = buildMemberRef(fn, /*dotLoc=*/SourceLoc(), *selected,
+                                 DeclNameLoc(fn->getEndLoc()), locator,
+                                 ctorLocator, /*Implicit=*/true,
                                  AccessSemantics::Ordinary);
   if (!declRef)
     return nullptr;

@@ -939,13 +939,6 @@ public:
   explicit SolutionDiff(ArrayRef<Solution> solutions);
 };
 
-/// Identifies a specific conversion from
-struct SpecificConstraint {
-  CanType First;
-  CanType Second;
-  ConstraintKind Kind;
-};
-
 /// An intrusive, doubly-linked list of constraints.
 using ConstraintList = llvm::ilist<Constraint>;
 
