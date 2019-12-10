@@ -1088,12 +1088,6 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
                                          ConcreteTyID,
                                          NumConformances);
     break;
-  case SIL_INST_CAST:
-    SILInstCastLayout::readRecord(scratch, RawOpCode, Attr,
-                                  TyID, TyCategory,
-                                  TyID2, TyCategory2,
-                                  ValID);
-    break;
   case SIL_ONE_TYPE_VALUES:
     SILOneTypeValuesLayout::readRecord(scratch, RawOpCode, TyID, TyCategory,
                                        ListOfValues);
@@ -1849,12 +1843,16 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   }
   // Checked Conversion instructions.
   case SILInstructionKind::UnconditionalCheckedCastInst: {
-    SILValue Val =
-        getLocalValue(ValID, getSILType(MF->getType(TyID2),
-                                        (SILValueCategory)TyCategory2, Fn));
-    SILType Ty =
+    SILType srcLoweredType = getSILType(MF->getType(ListOfValues[1]),
+                                        (SILValueCategory)ListOfValues[2], Fn);
+    SILValue src = getLocalValue(ListOfValues[0], srcLoweredType);
+
+    SILType targetLoweredType =
         getSILType(MF->getType(TyID), (SILValueCategory)TyCategory, Fn);
-    ResultVal = Builder.createUnconditionalCheckedCast(Loc, Val, Ty);
+    CanType targetFormalType =
+        MF->getType(ListOfValues[3])->getCanonicalType();
+    ResultVal = Builder.createUnconditionalCheckedCast(
+        Loc, src, targetLoweredType, targetFormalType);
     break;
   }
 
@@ -2488,80 +2486,88 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   case SILInstructionKind::CheckedCastBranchInst: {
     // Format: the cast kind, a typed value, a BasicBlock ID for success,
     // a BasicBlock ID for failure. Uses SILOneTypeValuesLayout.
-    assert(ListOfValues.size() == 6 &&
-           "expect 7 numbers for CheckedCastBranchInst");
     bool isExact = ListOfValues[0] != 0;
     SILType opTy = getSILType(MF->getType(ListOfValues[2]),
                               (SILValueCategory)ListOfValues[3], Fn);
     SILValue op = getLocalValue(ListOfValues[1], opTy);
-    SILType castTy =
+    SILType targetLoweredType =
         getSILType(MF->getType(TyID), (SILValueCategory)TyCategory, Fn);
-    auto *successBB = getBBForReference(Fn, ListOfValues[4]);
-    auto *failureBB = getBBForReference(Fn, ListOfValues[5]);
+    CanType targetFormalType =
+        MF->getType(ListOfValues[4])->getCanonicalType();
+    auto *successBB = getBBForReference(Fn, ListOfValues[5]);
+    auto *failureBB = getBBForReference(Fn, ListOfValues[6]);
 
-    ResultVal = Builder.createCheckedCastBranch(Loc, isExact, op, castTy,
-                                                successBB, failureBB);
+    ResultVal = Builder.createCheckedCastBranch(
+        Loc, isExact, op, targetLoweredType, targetFormalType,
+        successBB, failureBB);
     break;
   }
   case SILInstructionKind::CheckedCastValueBranchInst: {
-    // Format: the cast kind, a typed value, a BasicBlock ID for success,
-    // a BasicBlock ID for failure. Uses SILOneTypeValuesLayout.
-    assert(ListOfValues.size() == 5 &&
-           "expect 6 numbers for CheckedCastValueBranchInst");
-    SILType opTy = getSILType(MF->getType(ListOfValues[1]),
-                              (SILValueCategory)ListOfValues[2], Fn);
-    SILValue op = getLocalValue(ListOfValues[0], opTy);
-    SILType castTy =
+    CanType srcFormalType = MF->getType(ListOfValues[0])->getCanonicalType();
+    SILType srcLoweredType = getSILType(MF->getType(ListOfValues[2]),
+                                        (SILValueCategory)ListOfValues[3], Fn);
+    SILValue op = getLocalValue(ListOfValues[1], srcLoweredType);
+    SILType targetLoweredType =
         getSILType(MF->getType(TyID), (SILValueCategory)TyCategory, Fn);
-    auto *successBB = getBBForReference(Fn, ListOfValues[3]);
-    auto *failureBB = getBBForReference(Fn, ListOfValues[4]);
+    CanType targetFormalType =
+        MF->getType(ListOfValues[4])->getCanonicalType();
+    auto *successBB = getBBForReference(Fn, ListOfValues[5]);
+    auto *failureBB = getBBForReference(Fn, ListOfValues[6]);
 
-    ResultVal = Builder.createCheckedCastValueBranch(Loc, op, castTy, successBB,
-                                                     failureBB);
+    ResultVal = Builder.createCheckedCastValueBranch(
+        Loc, op, srcFormalType, targetLoweredType, targetFormalType,
+        successBB, failureBB);
     break;
   }
   case SILInstructionKind::UnconditionalCheckedCastValueInst: {
-    SILValue Val = getLocalValue(
-        ValID, getSILType(MF->getType(TyID2), (SILValueCategory)TyCategory2, Fn));
-    SILType Ty =
+    CanType srcFormalType = MF->getType(ListOfValues[0])->getCanonicalType();
+    SILType srcLoweredType = getSILType(MF->getType(ListOfValues[2]),
+                                      (SILValueCategory)ListOfValues[3], Fn);
+    SILValue src = getLocalValue(ListOfValues[1], srcLoweredType);
+
+    SILType targetLoweredType =
         getSILType(MF->getType(TyID), (SILValueCategory)TyCategory, Fn);
-    ResultVal = Builder.createUnconditionalCheckedCastValue(Loc, Val, Ty);
+    CanType targetFormalType = MF->getType(ListOfValues[4])->getCanonicalType();
+    ResultVal = Builder.createUnconditionalCheckedCastValue(Loc, src, srcFormalType,
+                                                            targetLoweredType,
+                                                            targetFormalType);
     break;
   }
   case SILInstructionKind::UnconditionalCheckedCastAddrInst: {
     // ignore attr.
-    CanType sourceType = MF->getType(ListOfValues[0])->getCanonicalType();
-    SILType srcAddrTy = getSILType(MF->getType(ListOfValues[2]),
-                                   (SILValueCategory)ListOfValues[3], Fn);
-    SILValue src = getLocalValue(ListOfValues[1], srcAddrTy);
+    CanType srcFormalType = MF->getType(ListOfValues[0])->getCanonicalType();
+    SILType srcLoweredType = getSILType(MF->getType(ListOfValues[2]),
+                                       (SILValueCategory)ListOfValues[3], Fn);
+    SILValue src = getLocalValue(ListOfValues[1], srcLoweredType);
 
-    CanType targetType = MF->getType(ListOfValues[4])->getCanonicalType();
-    SILType destAddrTy =
+    CanType targetFormalType = MF->getType(ListOfValues[4])->getCanonicalType();
+    SILType targetLoweredType =
         getSILType(MF->getType(TyID), (SILValueCategory)TyCategory, Fn);
-    SILValue dest = getLocalValue(ListOfValues[5], destAddrTy);
+    SILValue dest = getLocalValue(ListOfValues[5], targetLoweredType);
 
-    ResultVal = Builder.createUnconditionalCheckedCastAddr(Loc, src, sourceType,
-                                                           dest, targetType);
+    ResultVal = Builder.createUnconditionalCheckedCastAddr(Loc, src, srcFormalType,
+                                                           dest, targetFormalType);
     break;
   }
   case SILInstructionKind::CheckedCastAddrBranchInst: {
     CastConsumptionKind consumption = getCastConsumptionKind(ListOfValues[0]);
 
-    CanType sourceType = MF->getType(ListOfValues[1])->getCanonicalType();
-    SILType srcAddrTy = getSILType(MF->getType(ListOfValues[3]),
-                                   (SILValueCategory)ListOfValues[4], Fn);
-    SILValue src = getLocalValue(ListOfValues[2], srcAddrTy);
+    CanType srcFormalType = MF->getType(ListOfValues[1])->getCanonicalType();
+    SILType srcLoweredType = getSILType(MF->getType(ListOfValues[3]),
+                                        (SILValueCategory)ListOfValues[4], Fn);
+    SILValue src = getLocalValue(ListOfValues[2], srcLoweredType);
 
-    CanType targetType = MF->getType(ListOfValues[5])->getCanonicalType();
-    SILType destAddrTy =
+    CanType targetFormalType =
+        MF->getType(ListOfValues[5])->getCanonicalType();
+    SILType targetLoweredType =
         getSILType(MF->getType(TyID), (SILValueCategory)TyCategory, Fn);
-    SILValue dest = getLocalValue(ListOfValues[6], destAddrTy);
+    SILValue dest = getLocalValue(ListOfValues[6], targetLoweredType);
 
     auto *successBB = getBBForReference(Fn, ListOfValues[7]);
     auto *failureBB = getBBForReference(Fn, ListOfValues[8]);
     ResultVal = Builder.createCheckedCastAddrBranch(Loc, consumption,
-                                                    src, sourceType,
-                                                    dest, targetType,
+                                                    src, srcFormalType,
+                                                    dest, targetFormalType,
                                                     successBB, failureBB);
     break;
   }

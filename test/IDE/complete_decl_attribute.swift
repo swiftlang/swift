@@ -64,12 +64,12 @@ struct MyStruct {}
 // KEYWORD2-NEXT:             Keyword/None:                       discardableResult[#Func Attribute#]; name=discardableResult
 // KEYWORD2-NEXT:             Keyword/None:                       differentiable[#Func Attribute#]; name=differentiable
 // SWIFT_ENABLE_TENSORFLOW
-// KEYWORD2-NEXT:             Keyword/None:                       derivative[#Func Attribute#]; name=derivative
-// KEYWORD2-NEXT:             Keyword/None:                       compilerEvaluable[#Func Attribute#]; name=compilerEvaluable
-// KEYWORD2-NEXT:             Keyword/None:                       transpose[#Func Attribute#]; name=transpose
 // KEYWORD2-NEXT:             Keyword/None:                       IBSegueAction[#Func Attribute#]; name=IBSegueAction{{$}}
 // KEYWORD2-NEXT:             Keyword/None:                       quoted[#Func Attribute#]; name=quoted
 // KEYWORD2-NEXT:             Keyword/None:                       differentiating[#Func Attribute#]; name=differentiating
+// KEYWORD2-NEXT:             Keyword/None:                       derivative[#Func Attribute#]; name=derivative
+// KEYWORD2-NEXT:             Keyword/None:                       compilerEvaluable[#Func Attribute#]; name=compilerEvaluable
+// KEYWORD2-NEXT:             Keyword/None:                       transpose[#Func Attribute#]; name=transpose
 // SWIFT_ENABLE_TENSORFLOW END
 // KEYWORD2-NOT:              Keyword
 // KEYWORD2:                  Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct
@@ -185,13 +185,14 @@ struct _S {
 // ON_METHOD-DAG: Keyword/None:                       warn_unqualified_access[#Func Attribute#]; name=warn_unqualified_access
 // ON_METHOD-DAG: Keyword/None:                       usableFromInline[#Func Attribute#]; name=usableFromInline
 // ON_METHOD-DAG: Keyword/None:                       discardableResult[#Func Attribute#]; name=discardableResult
-// ON_METHOD-DAG: Keyword/None:                       IBSegueAction[#Func Attribute#]; name=IBSegueAction
 // ON_METHOD-DAG: Keyword/None:                       differentiable[#Func Attribute#]; name=differentiable
+// ON_METHOD-DAG: Keyword/None:                       IBSegueAction[#Func Attribute#]; name=IBSegueAction
 // SWIFT_ENABLE_TENSORFLOW
-// ON_METHOD-DAG: Keyword/None:                       derivative[#Func Attribute#]; name=derivative
-// ON_METHOD-DAG: Keyword/None:                       compilerEvaluable[#Func Attribute#]; name=compilerEvaluable
 // ON_METHOD-DAG: Keyword/None:                       quoted[#Func Attribute#]; name=quoted
 // ON_METHOD-DAG: Keyword/None:                       differentiating[#Func Attribute#]; name=differentiating
+// ON_METHOD-DAG: Keyword/None:                       derivative[#Func Attribute#]; name=derivative
+// ON_METHOD-DAG: Keyword/None:                       compilerEvaluable[#Func Attribute#]; name=compilerEvaluable
+// ON_METHOD-DAG: Keyword/None:                       transpose[#Func Attribute#]; name=transpose
 // SWIFT_ENABLE_TENSORFLOW END
 // ON_METHOD-NOT: Keyword
 // ON_METHOD: Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct
@@ -249,11 +250,12 @@ struct _S {
 // ON_MEMBER_LAST-DAG: Keyword/None:                       _functionBuilder[#Declaration Attribute#]; name=_functionBuilder
 // ON_MEMBER_LAST-DAG: Keyword/None:                       differentiable[#Declaration Attribute#]; name=differentiable
 // SWIFT_ENABLE_TENSORFLOW
-// ON_MEMBER_LAST-DAG: Keyword/None:                       derivative[#Declaration Attribute#]; name=derivative
+// ON_MEMBER_LAST-DAG: Keyword/None:                       quoted[#Declaration Attribute#]; name=quoted
 // ON_MEMBER_LAST-DAG: Keyword/None:                       differentiating[#Declaration Attribute#]; name=differentiating
+// ON_MEMBER_LAST-DAG: Keyword/None:                       derivative[#Declaration Attribute#]; name=derivative
 // ON_MEMBER_LAST-DAG: Keyword/None:                       compilerEvaluable[#Declaration Attribute#]; name=compilerEvaluable
 // ON_MEMBER_LAST-DAG: Keyword/None:                       noDerivative[#Declaration Attribute#]; name=noDerivative
-// ON_MEMBER_LAST-DAG: Keyword/None:                       quoted[#Declaration Attribute#]; name=quoted
+// ON_MEMBER_LAST-DAG: Keyword/None:                       transpose[#Declaration Attribute#]; name=transpose
 // SWIFT_ENABLE_TENSORFLOW END
 // ON_MEMBER_LAST-NOT: Keyword
 // ON_MEMBER_LAST: Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct
@@ -298,14 +300,14 @@ func dummy2() {}
 // KEYWORD_LAST-NEXT:             Keyword/None:                       propertyWrapper[#Declaration Attribute#]; name=propertyWrapper
 // KEYWORD_LAST-NEXT:             Keyword/None:                       _functionBuilder[#Declaration Attribute#]; name=_functionBuilder{{$}}
 // KEYWORD_LAST-NEXT:             Keyword/None:                       differentiable[#Declaration Attribute#]; name=differentiable
+// KEYWORD_LAST-NEXT:             Keyword/None:                       IBSegueAction[#Declaration Attribute#]; name=IBSegueAction{{$}}
 // SWIFT_ENABLE_TENSORFLOW
+// KEYWORD_LAST-NEXT:             Keyword/None:                       quoted[#Declaration Attribute#]; name=quoted
+// KEYWORD_LAST-NEXT:             Keyword/None:                       differentiating[#Declaration Attribute#]; name=differentiating
 // KEYWORD_LAST-NEXT:             Keyword/None:                       derivative[#Declaration Attribute#]; name=derivative
 // KEYWORD_LAST-NEXT:             Keyword/None:                       compilerEvaluable[#Declaration Attribute#]; name=compilerEvaluable
 // KEYWORD_LAST-NEXT:             Keyword/None:                       noDerivative[#Declaration Attribute#]; name=noDerivative
 // KEYWORD_LAST-NEXT:             Keyword/None:                       transpose[#Declaration Attribute#]; name=transpose
-// KEYWORD_LAST-NEXT:             Keyword/None:                       IBSegueAction[#Declaration Attribute#]; name=IBSegueAction{{$}}
-// KEYWORD_LAST-NEXT:             Keyword/None:                       quoted[#Declaration Attribute#]; name=quoted
-// KEYWORD_LAST-NEXT:             Keyword/None:                       differentiating[#Declaration Attribute#]; name=differentiating
 // SWIFT_ENABLE_TENSORFLOW END
 // KEYWORD_LAST-NOT:              Keyword
 // KEYWORD_LAST: Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct

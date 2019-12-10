@@ -400,6 +400,8 @@ static void addPerfEarlyModulePassPipeline(SILPassPipelinePlan &P) {
   // we do not spend time optimizing them.
   P.addDeadFunctionElimination();
 
+  P.addSemanticARCOpts();
+
   // SWIFT_ENABLE_TENSORFLOW
   // This unblocks many other passes' optimizations (e.g. inlining) and this is
   // not blocked by any other passes' optimizations, so do it early.

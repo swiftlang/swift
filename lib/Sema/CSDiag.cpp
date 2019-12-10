@@ -2615,7 +2615,6 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
   // non-function/non-metatype type, then we cannot call it!
   if (!isUnresolvedOrTypeVarType(fnType) &&
       !fnType->is<AnyFunctionType>() && !fnType->is<MetatypeType>()) {
-
     auto arg = callExpr->getArg();
     auto isDynamicCallable =
         CS.DynamicCallableCache[fnType->getCanonicalType()].isValid();
@@ -2628,7 +2627,7 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
           return funcDecl && funcDecl->isCallAsFunctionMethod();
         });
 
-    // Diagnose @dynamicCallable errors.
+    // Diagnose specific @dynamicCallable errors.
     if (isDynamicCallable) {
       auto dynamicCallableMethods =
         CS.DynamicCallableCache[fnType->getCanonicalType()];
@@ -2647,13 +2646,12 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
       }
     }
 
-    if (fnType->is<ExistentialMetatypeType>()) {
+    auto isExistentialMetatypeType = fnType->is<ExistentialMetatypeType>();
+    if (isExistentialMetatypeType) {
       auto diag = diagnose(arg->getStartLoc(),
                            diag::missing_init_on_metatype_initialization);
       diag.highlight(fnExpr->getSourceRange());
-    }
-
-    if (!fnType->is<ExistentialMetatypeType>()) {
+    } else if (!isDynamicCallable) {
       auto diag = diagnose(arg->getStartLoc(),
                            diag::cannot_call_non_function_value, fnType);
       diag.highlight(fnExpr->getSourceRange());
@@ -2672,7 +2670,7 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
     // the line after the callee, then it's likely the user forgot to
     // write "do" before their brace stmt.
     // Note that line differences of more than 1 are diagnosed during parsing.
-    if (auto *PE = dyn_cast<ParenExpr>(arg))
+    if (auto *PE = dyn_cast<ParenExpr>(arg)) {
       if (PE->hasTrailingClosure() && isa<ClosureExpr>(PE->getSubExpr())) {
         auto *closure = cast<ClosureExpr>(PE->getSubExpr());
         auto &SM = CS.getASTContext().SourceMgr;
@@ -2684,9 +2682,14 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
             .fixItInsert(closure->getStartLoc(), "do ");
         }
       }
+    }
 
-    if (!isDynamicCallable && !hasCallAsFunctionMethods)
+    // Use the existing machinery to provide more useful diagnostics for
+    // @dynamicCallable calls, rather than cannot_call_non_function_value.
+    if ((isExistentialMetatypeType || !isDynamicCallable) &&
+    	  !hasCallAsFunctionMethods) {
       return true;
+    }
   }
   
   bool hasTrailingClosure = callArgHasTrailingClosure(callExpr->getArg());
@@ -3865,6 +3868,10 @@ bool FailureDiagnosis::diagnoseExprFailure() {
 /// This is guaranteed to always emit an error message.
 ///
 void ConstraintSystem::diagnoseFailureForExpr(Expr *expr) {
+  setPhase(ConstraintSystemPhase::Diagnostics);
+
+  SWIFT_DEFER { setPhase(ConstraintSystemPhase::Finalization); };
+
   // Continue simplifying any active constraints left in the system.  We can end
   // up with them because the solver bails out as soon as it sees a Failure.  We
   // don't want to leave them around in the system because later diagnostics

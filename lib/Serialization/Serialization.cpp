@@ -774,7 +774,6 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(sil_block, SIL_VTABLE);
   BLOCK_RECORD(sil_block, SIL_VTABLE_ENTRY);
   BLOCK_RECORD(sil_block, SIL_GLOBALVAR);
-  BLOCK_RECORD(sil_block, SIL_INST_CAST);
   BLOCK_RECORD(sil_block, SIL_INIT_EXISTENTIAL);
   BLOCK_RECORD(sil_block, SIL_WITNESS_TABLE);
   BLOCK_RECORD(sil_block, SIL_WITNESS_METHOD_ENTRY);
@@ -2229,6 +2228,22 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       auto abbrCode = S.DeclTypeAbbrCodes[EffectsDeclAttrLayout::Code];
       EffectsDeclAttrLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
                                        (unsigned)theAttr->getKind());
+      return;
+    }
+
+    case DAK_OriginallyDefinedIn: {
+      auto *theAttr = cast<OriginallyDefinedInAttr>(DA);
+      ENCODE_VER_TUPLE(Moved, llvm::Optional<llvm::VersionTuple>(theAttr->MovedVersion));
+      auto abbrCode = S.DeclTypeAbbrCodes[OriginallyDefinedInDeclAttrLayout::Code];
+      llvm::SmallString<32> blob;
+      blob.append(theAttr->OriginalModuleName.str());
+      blob.push_back('\0');
+      OriginallyDefinedInDeclAttrLayout::emitRecord(
+          S.Out, S.ScratchRecord, abbrCode,
+          theAttr->isImplicit(),
+          LIST_VER_TUPLE_PIECES(Moved),
+          static_cast<unsigned>(theAttr->Platform),
+          blob);
       return;
     }
 

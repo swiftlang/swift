@@ -483,15 +483,6 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
 
   Expr *visitDefaultArgumentExpr(DefaultArgumentExpr *E) { return E; }
 
-  Expr *visitCallerDefaultArgumentExpr(CallerDefaultArgumentExpr *E) {
-    if (auto subExpr = doIt(E->getSubExpr())) {
-      E->setSubExpr(subExpr);
-      return E;
-    }
-
-    return nullptr;
-  }
-
   Expr *visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *E) {
     if (auto oldAppendingExpr = E->getAppendingExpr()) {
       if (auto appendingExpr = doIt(oldAppendingExpr))

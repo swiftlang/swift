@@ -1242,19 +1242,19 @@ class diff_match_patch {
     int count_insert = 0;
     string_t text_delete;
     string_t text_insert;
-    Diff *prevEqual = NULL;
+    Diff *prevEqual = nullptr;
     int commonlength;
     for (cur_diff = diffs.begin(); cur_diff != diffs.end(); ++cur_diff) {
       switch ((*cur_diff).operation) {
         case INSERT:
           count_insert++;
           text_insert += (*cur_diff).text;
-          prevEqual = NULL;
+          prevEqual = nullptr;
           break;
         case DELETE:
           count_delete++;
           text_delete += (*cur_diff).text;
-          prevEqual = NULL;
+          prevEqual = nullptr;
           break;
         case EQUAL:
           if (count_delete + count_insert > 1) {
@@ -1296,7 +1296,7 @@ class diff_match_patch {
             if (!text_insert.empty()) {
               diffs.insert(cur_diff, Diff(INSERT, text_insert));
             }
-          } else if (prevEqual != NULL) {
+          } else if (prevEqual != nullptr) {
             // Merge this equality with the previous one.
             prevEqual->text += (*cur_diff).text;
             diffs.erase(cur_diff--);
@@ -1672,7 +1672,7 @@ class diff_match_patch {
     int bin_min, bin_mid;
     int bin_max = pattern.length() + text.length();
     int *rd;
-    int *last_rd = NULL;
+    int *last_rd = nullptr;
     for (int d = 0; d < (int)pattern.length(); d++) {
       // Scan for the best match; each iteration allows for one more error.
       // Run a binary search to determine how far from 'loc' we can stray at
@@ -2571,7 +2571,7 @@ template <> struct diff_match_patch_traits<wchar_t> : diff_match_patch_utf32_fro
   static bool is_alnum(wchar_t c) { return std::iswalnum(c)? true : false; }
   static bool is_digit(wchar_t c) { return std::iswdigit(c)? true : false; }
   static bool is_space(wchar_t c) { return std::iswspace(c)? true : false; }
-  static int to_int(const wchar_t* s) { return static_cast<int>(std::wcstol(s, NULL, 10)); }
+  static int to_int(const wchar_t* s) { return static_cast<int>(std::wcstol(s, nullptr, 10)); }
   static wchar_t from_wchar(wchar_t c) { return c; }
   static wchar_t to_wchar(wchar_t c) { return c; }
   static const wchar_t* cs(const wchar_t* s) { return s; }

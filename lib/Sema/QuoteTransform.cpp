@@ -63,12 +63,11 @@ public:
 
 class AbstractQuoter {
 protected:
-  TypeChecker &tc;
   ASTContext &ctx;
   Breadcrumbs &bcs;
 
-  AbstractQuoter(TypeChecker &tc, ASTContext& ctx, Breadcrumbs &bcs)
-      : tc(tc), ctx(ctx), bcs(bcs) {}
+  AbstractQuoter(ASTContext& ctx, Breadcrumbs &bcs)
+      : ctx(ctx), bcs(bcs) {}
 
   Expr *quoteArray(ArrayRef<Expr *> quotedTrees) {
     auto arrayExpr =
@@ -159,8 +158,8 @@ private:
 class TypeQuoter : public TypeVisitor<TypeQuoter, Expr *>,
                    private AbstractQuoter {
 public:
-  TypeQuoter(TypeChecker &tc, ASTContext &ctx, Breadcrumbs &bcs)
-    : AbstractQuoter(tc, ctx, bcs) {}
+  TypeQuoter(ASTContext &ctx, Breadcrumbs &bcs)
+    : AbstractQuoter(ctx, bcs) {}
 
 #define UNSUPPORTED_TYPE(TYPE)                                                 \
   Expr *visit##TYPE(TYPE *type) { return unknownTree(type); }
@@ -298,8 +297,8 @@ class ASTQuoter
   TypeQuoter typeQuoter;
 
 public:
-  ASTQuoter(TypeChecker &tc, ASTContext& ctx, Breadcrumbs &bcs)
-    : AbstractQuoter(tc, ctx, bcs), typeQuoter(TypeQuoter(tc, ctx, bcs)) {}
+  ASTQuoter(ASTContext& ctx, Breadcrumbs &bcs)
+    : AbstractQuoter(ctx, bcs), typeQuoter(TypeQuoter(ctx, bcs)) {}
 
 #define UNSUPPORTED_EXPR(EXPR)                                                 \
   Expr *visit##EXPR(EXPR *expr) {                                              \
@@ -349,11 +348,6 @@ public:
     auto type = ctx.getBoolDecl()->getDeclaredType();
     return makeQuote("BooleanLiteral",
                      {quoteBool(expr->getValue()), quoteType(type)});
-  }
-
-  Expr *visitCallerDefaultArgumentExpr(CallerDefaultArgumentExpr *expr) {
-    Breadcrumb bc(bcs, expr);
-    return quoteExpr(expr->getSubExpr());
   }
 
   Expr *visitCallExpr(CallExpr *expr) {
@@ -418,8 +412,8 @@ public:
           DeclRefExpr(ConcreteDeclRef(attr->getQuoteDecl()), DeclNameLoc(),
                       /*Implicit=*/true);
       auto quoteCall = CallExpr::createImplicit(ctx, quoteRef, {}, {});
-      auto &tc = createTypeChecker(ctx);
-      auto type = tc.getTypeOfQuoteExpr(expr->getType(), expr->getLoc());
+      auto type =
+          TypeChecker::getTypeOfQuoteExpr(expr->getType(), expr->getLoc());
       return makeQuote("Unquote", {quotedExpr, quoteCall, quoteType(type)});
     } else {
       return quotedExpr;
@@ -499,8 +493,7 @@ public:
         auto quoteDot =
             new (ctx) DotSyntaxCallExpr(quoteRef, SourceLoc(), quoteBase);
         auto quoteCall = CallExpr::createImplicit(ctx, quoteDot, {}, {});
-        auto &tc = createTypeChecker(ctx);
-        auto type = tc.getTypeOfQuoteExpr(refType, ref->getLoc());
+        auto type = TypeChecker::getTypeOfQuoteExpr(refType, ref->getLoc());
         return makeQuote("Unquote", {quotedExpr, quoteCall, quoteType(type)});
       } else {
         return quotedExpr;
@@ -532,8 +525,8 @@ public:
           auto quoteDot =
               new (ctx) DotSyntaxCallExpr(quoteRef, SourceLoc(), quoteBase);
           auto quoteCall = CallExpr::createImplicit(ctx, quoteDot, {}, {});
-          auto &tc = createTypeChecker(ctx);
-          auto type = tc.getTypeOfQuoteExpr(expr->getType(), expr->getLoc());
+          auto type =
+              TypeChecker::getTypeOfQuoteExpr(expr->getType(), expr->getLoc());
           return makeQuote("Unquote", {quotedExpr, quoteCall, quoteType(type)});
         } else {
           return quotedExpr;
@@ -1225,7 +1218,7 @@ Expr *TypeChecker::quoteExpr(Expr *expr, DeclContext *dc) {
 
   Breadcrumbs bcs;
   auto &ctx = dc->getASTContext();
-  ASTQuoter astQuoter(*this, ctx, bcs);
+  ASTQuoter astQuoter(ctx, bcs);
   Expr *quotedExpr = astQuoter.visit(expr);
   if (!quotedExpr) {
     return nullptr;
@@ -1341,7 +1334,7 @@ Type TypeChecker::getTypeOfUnquoteExpr(Type exprType, SourceLoc loc) {
 
 Expr *TypeChecker::quoteDecl(Decl *decl, DeclContext *dc) {
   Breadcrumbs bcs;
-  ASTQuoter astQuoter(*this, dc->getASTContext(), bcs);
+  ASTQuoter astQuoter(dc->getASTContext(), bcs);
   Expr *quotedDecl = astQuoter.visit(decl);
   if (!quotedDecl) {
     return nullptr;

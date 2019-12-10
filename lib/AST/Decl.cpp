@@ -2903,10 +2903,7 @@ bool ValueDecl::isRecursiveValidation() const {
 Type ValueDecl::getInterfaceType() const {
   auto &ctx = getASTContext();
 
-  // N.B. This assertion exists to catch new broken callers. It can be removed
-  // with the LazyResolver when the time comes.
-  assert(ctx.getLegacyGlobalTypeChecker()
-         && "The type checker must be installed to make semantic queries!");
+  assert(ctx.areSemanticQueriesEnabled());
 
   if (auto type =
           evaluateOrDefault(ctx.evaluator,
@@ -5783,7 +5780,7 @@ StaticSpellingKind AbstractStorageDecl::getCorrectStaticSpelling() const {
 
 llvm::TinyPtrVector<CustomAttr *> VarDecl::getAttachedPropertyWrappers() const {
   auto &ctx = getASTContext();
-  if (!ctx.getLegacyGlobalTypeChecker()) {
+  if (!ctx.areSemanticQueriesEnabled()) {
     return { };
   }
 
@@ -6170,6 +6167,25 @@ bool ParamDecl::hasDefaultExpr() const {
     return getStructuralDefaultExpr();
   }
   llvm_unreachable("Unhandled case in switch");
+}
+
+bool ParamDecl::hasCallerSideDefaultExpr() const {
+  switch (getDefaultArgumentKind()) {
+  case DefaultArgumentKind::None:
+  case DefaultArgumentKind::Inherited:
+  case DefaultArgumentKind::StoredProperty:
+  case DefaultArgumentKind::Normal:
+    return false;
+  case DefaultArgumentKind::File:
+  case DefaultArgumentKind::Line:
+  case DefaultArgumentKind::Column:
+  case DefaultArgumentKind::Function:
+  case DefaultArgumentKind::DSOHandle:
+  case DefaultArgumentKind::NilLiteral:
+  case DefaultArgumentKind::EmptyArray:
+  case DefaultArgumentKind::EmptyDictionary:
+    return true;
+  }
 }
 
 Expr *ParamDecl::getTypeCheckedDefaultExpr() const {
@@ -6730,7 +6746,7 @@ ObjCSelector
 AbstractFunctionDecl::getObjCSelector(DeclName preferredName,
                                       bool skipIsObjCResolution) const {
   // FIXME: Forces computation of the Objective-C selector.
-  if (getASTContext().getLegacyGlobalTypeChecker() && !skipIsObjCResolution)
+  if (getASTContext().areSemanticQueriesEnabled() && !skipIsObjCResolution)
     (void)isObjC();
 
   // If there is an @objc attribute with a name, use that name.

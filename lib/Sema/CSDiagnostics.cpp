@@ -1218,6 +1218,11 @@ bool MissingOptionalUnwrapFailure::diagnoseAsError() {
   if (hasComplexLocator())
     return false;
 
+  if (!getUnwrappedType()->isBool()) {
+    if (diagnoseConversionToBool())
+      return true;
+  }
+
   auto *anchor = getAnchor();
 
   // If this is an unresolved member expr e.g. `.foo` its
@@ -1623,8 +1628,7 @@ bool AssignmentFailure::diagnoseAsError() {
       if (auto typeContext = DC->getInnermostTypeContext()) {
         SmallVector<ValueDecl *, 2> results;
         DC->lookupQualified(typeContext->getSelfNominalTypeDecl(),
-                            VD->getFullName(),
-                            NL_QualifiedDefault | NL_RemoveNonVisible, results);
+                            VD->getFullName(), NL_QualifiedDefault, results);
 
         auto foundProperty = llvm::find_if(results, [&](ValueDecl *decl) {
           // We're looking for a settable property that is the same type as the

@@ -252,16 +252,18 @@ public:
   /// pointer points to (see NodeType).
   class CGNode {
 
-    /// The associated value in the function. This is always valid for Argument
-    /// and Value nodes, and always nullptr for Return nodes. For Content nodes,
-    /// i is only used for debug printing. A Content's value 'V' is unreliable
-    /// because it can change as a result of the order the the graph is
-    /// constructed and summary graphs are merged. Sometimes it is derived from
-    /// the instructions that access the content, other times, it's simply
-    /// inherited from its parent. There may be multiple nodes associated to the
-    /// same value, e.g. a Content node has the same V as its points-to
-    /// predecessor.
-    ValueBase *V;
+    /// The associated value in the function. This is only valid for nodes that
+    /// are mapped to a value in the graph's Values2Nodes map. Multiple values
+    /// may be mapped to the same node, but only one value is associated with
+    /// the node via 'mappedValue'. Setting 'mappedValue' to a valid SILValue
+    /// for an unmapped node would result in a dangling pointer when the
+    /// SILValue is deleted.
+    ///
+    /// Argument and Value nodes are always initially mapped, but may become
+    /// unmapped when their SILValue is deleted. Content nodes are conditionally
+    /// mapped, only if they are associated with an explicit dereference in the
+    /// code (which has not been deleted). Return nodes are never mapped.
+    ValueBase *mappedValue;
 
     /// The outgoing points-to edge (if any) to a Content node. See also:
     /// pointsToIsEdge.
@@ -317,7 +319,7 @@ public:
     
     /// The constructor.
     CGNode(ValueBase *V, NodeType Type, bool hasRC)
-        : V(V), UsePoints(0), hasRC(hasRC), Type(Type) {
+        : mappedValue(V), UsePoints(0), hasRC(hasRC), Type(Type) {
       switch (Type) {
       case NodeType::Argument:
       case NodeType::Value:
@@ -332,6 +334,11 @@ public:
         break;
       }
     }
+
+    /// Get the representative node that maps to a SILValue and depth in the
+    /// pointsTo graph.
+    std::pair<const CGNode *, unsigned>
+    getRepNode(SmallPtrSetImpl<const CGNode *> &visited) const;
 
     /// Merges the use points from another node and returns true if there are
     /// any changes.
@@ -417,16 +424,20 @@ public:
     friend struct CGNodeWorklist;
 
   public:
-    SILValue getValue() const {
-      assert(Type == NodeType::Argument || Type == NodeType::Value);
-      return V;
-    }
-    SILValue getValueOrNull() const { return V; }
+    struct RepValue {
+      // May only be an invalid SILValue for Return nodes or deleted values.
+      llvm::PointerIntPair<SILValue, 1, bool> valueAndIsReturn;
+      unsigned depth;
 
-    void updateValue(SILValue newValue) {
-      assert(isContent());
-      V = newValue;
-    }
+      SILValue getValue() const { return valueAndIsReturn.getPointer(); }
+      bool isReturn() const { return valueAndIsReturn.getInt(); }
+      void
+      print(llvm::raw_ostream &stream,
+            const llvm::DenseMap<const SILNode *, unsigned> &instToIDMap) const;
+    };
+    // Get the representative SILValue for this node its depth relative to the
+    // node that is mapped to this value.
+    RepValue getRepValue() const;
 
     /// Return true if this node represents content.
     bool isContent() const { return Type == NodeType::Content; }
@@ -434,7 +445,7 @@ public:
     /// Return true if this node represents an entire reference counted object.
     bool hasRefCount() const { return hasRC; }
 
-    void setRefCount() { hasRC = true; }
+    void setRefCount(bool rc) { hasRC = rc; }
 
     /// Returns the escape state.
     EscapeState getEscapeState() const { return State; }
@@ -465,9 +476,8 @@ public:
     /// Note that in the false-case the node's value can still escape via
     /// the return instruction.
     ///
-    /// \p nodeValue is often the same as 'this->V', but is sometimes a more
-    /// refined value. For content nodes, 'this->V' is only a placeholder that
-    /// does not necessarilly represent the node's memory.
+    /// \p nodeValue is often the same as 'this->getRepValue().getValue()', but
+    /// is sometimes a more refined value specific to a content nodes.
     bool escapesInsideFunction(SILValue nodeValue) const {
       switch (getEscapeState()) {
         case EscapeState::None:
@@ -478,7 +488,6 @@ public:
         case EscapeState::Global:
           return true;
       }
-
       llvm_unreachable("Unhandled EscapeState in switch.");
     }
 
@@ -644,10 +653,9 @@ public:
     /// Returns null, if V is not a "pointer".
     CGNode *getNode(ValueBase *V, bool createIfNeeded = true);
 
-    /// Helper to create a content node and update the pointsTo graph. \p
-    /// addrNode will point to the new content node. The new content node is
-    /// directly initialized with the remaining function arguments.
-    CGNode *createContentNode(CGNode *addrNode, SILValue addrVal, bool hasRC);
+    /// Helper to create and return a content node with the given \p hasRC
+    /// flag. \p addrNode will gain a points-to edge to the new content node.
+    CGNode *createContentNode(CGNode *addrNode, bool hasRC);
 
     /// Create a new content node based on an existing content node to support
     /// graph merging.
@@ -687,6 +695,8 @@ public:
     void setNode(ValueBase *V, CGNode *Node) {
       assert(Values2Nodes.find(V) == Values2Nodes.end());
       Values2Nodes[V] = Node;
+      if (!Node->mappedValue)
+        Node->mappedValue = V;
     }
 
     /// Adds an argument/instruction in which the node's value is used.
@@ -707,7 +717,7 @@ public:
     void escapeContentsOf(CGNode *Node) {
       CGNode *escapedContent = Node->getContentNodeOrNull();
       if (!escapedContent) {
-        escapedContent = createContentNode(Node, Node->V, /*hasRC=*/false);
+        escapedContent = createContentNode(Node, /*hasRC=*/false);
       }
       escapedContent->markEscaping();
     }
@@ -736,10 +746,10 @@ public:
     /// Propagates the escape states through the graph.
     void propagateEscapeStates();
 
-    /// Removes a value from the graph.
-    /// It does not delete its node but makes sure that the value cannot be
-    /// lookup-up with getNode() anymore.
-    void removeFromGraph(ValueBase *V) { Values2Nodes.erase(V); }
+    /// Remove a value from the graph. Do not delete the mapped node, but reset
+    /// mappedValue if it is set to this value, and make sure that the node
+    /// cannot be looked up with getNode().
+    void removeFromGraph(ValueBase *V);
 
     enum class Traversal { Follow, Backtrack, Halt };
 
@@ -821,7 +831,7 @@ public:
 
     /// Just verifies the graph structure. This function can also be called
     /// during the graph is modified, e.g. in mergeAllScheduledNodes().
-    void verifyStructure() const;
+    void verifyStructure(bool allowMerge = false) const;
 
     friend struct ::CGForDotView;
     friend class EscapeAnalysis;

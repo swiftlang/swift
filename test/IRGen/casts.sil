@@ -66,7 +66,7 @@ entry(%n : $Builtin.NativeObject):
 // CHECK:         call void @llvm.trap()
 sil @u_cast_to_class_existential : $@convention(thin) (@owned AnyObject) -> @owned CP {
 entry(%a : $AnyObject):
-  %p = unconditional_checked_cast %a : $AnyObject to $CP
+  %p = unconditional_checked_cast %a : $AnyObject to CP
   return %p : $CP
 }
 
@@ -74,7 +74,7 @@ entry(%a : $AnyObject):
 // CHECK:         call { i8*, i8** } @dynamic_cast_existential_1_unconditional(i8* %1, %swift.type* %0, {{.*}} @"$s5casts2CPMp"
 sil @u_cast_to_existential_metatype : $@convention(thin) (@owned @thick Any.Type) -> @owned @thick CP.Type {
 entry(%a : $@thick Any.Type):
-  %p = unconditional_checked_cast %a : $@thick Any.Type to $@thick CP.Type
+  %p = unconditional_checked_cast %a : $@thick Any.Type to @thick CP.Type
   return %p : $@thick CP.Type
 }
 
@@ -94,7 +94,7 @@ entry(%a : $@thick Any.Type):
 // CHECK:         call void @llvm.trap()
 sil @u_cast_to_class_existential_2 : $@convention(thin) (@owned AnyObject) -> @owned CP & CP2 {
 entry(%a : $AnyObject):
-  %p = unconditional_checked_cast %a : $AnyObject to $CP & CP2
+  %p = unconditional_checked_cast %a : $AnyObject to CP & CP2
   return %p : $CP & CP2
 }
 
@@ -103,7 +103,7 @@ entry(%a : $AnyObject):
 // CHECK:         call { i8*, i8**, i8** } @dynamic_cast_existential_2_unconditional(i8* {{%.*}}, %swift.type* {{%.*}}, {{.*}} @"$s5casts2CPMp" {{[^,]*}}, {{.*}} @"$s5casts3CP2Mp"
 sil @u_cast_to_class_existential_mixed : $@convention(thin) (@owned AnyObject) -> @owned CP & OP & CP2 {
 entry(%a : $AnyObject):
-  %p = unconditional_checked_cast %a : $AnyObject to $CP & OP & CP2
+  %p = unconditional_checked_cast %a : $AnyObject to CP & OP & CP2
   return %p : $CP & OP & CP2
 }
 
@@ -115,7 +115,7 @@ entry(%a : $AnyObject):
 // CHECK:         insertvalue {{.*}} [[OBJ]]
 sil @u_cast_to_existential_metatype_mixed : $@convention(thin) (@owned @thick Any.Type) -> @owned @thick (CP & OP & CP2).Type {
 entry(%a : $@thick Any.Type):
-  %p = unconditional_checked_cast %a : $@thick Any.Type to $@thick (CP & OP & CP2).Type
+  %p = unconditional_checked_cast %a : $@thick Any.Type to @thick (CP & OP & CP2).Type
   return %p : $@thick (CP & OP & CP2).Type
 }
 
@@ -132,7 +132,7 @@ entry(%a : $@thick Any.Type):
 // CHECK:         ret { i8*, i8** } zeroinitializer
 sil @c_cast_to_class_existential : $@convention(thin) (@owned AnyObject) -> @owned CP {
 entry(%a : $AnyObject):
-  checked_cast_br %a : $AnyObject to $CP, yea, nay
+  checked_cast_br %a : $AnyObject to CP, yea, nay
 yea(%p : $CP):
   return %p : $CP
 nay:
@@ -143,7 +143,7 @@ nay:
 // CHECK:         call { i8*, i8** } @dynamic_cast_existential_1_conditional(i8* %1, %swift.type* %0, {{.*}} @"$s5casts2CPMp"
 sil @c_cast_to_existential_metatype : $@convention(thin) (@owned @thick Any.Type) -> @owned @thick CP.Type {
 entry(%a : $@thick Any.Type):
-  checked_cast_br %a : $@thick Any.Type to $@thick CP.Type, yea, nay
+  checked_cast_br %a : $@thick Any.Type to @thick CP.Type, yea, nay
 yea(%p : $@thick CP.Type):
   return %p : $@thick CP.Type
 nay:
@@ -166,7 +166,7 @@ nay:
 // CHECK:         ret { i8*, i8**, i8** } zeroinitializer
 sil @c_cast_to_class_existential_2 : $@convention(thin) (@owned AnyObject) -> @owned CP & CP2 {
 entry(%a : $AnyObject):
-  checked_cast_br %a : $AnyObject to $CP & CP2, yea, nay
+  checked_cast_br %a : $AnyObject to CP & CP2, yea, nay
 yea(%p : $CP & CP2):
   return %p : $CP & CP2
 nay:
@@ -184,7 +184,7 @@ nay:
 // CHECK:         phi %objc_object* [ [[CAST:%.*]], %success ], [ null, %entry ]
 sil @c_cast_to_class_existential_mixed : $@convention(thin) (@owned AnyObject) -> @owned CP & OP & CP2 {
 entry(%a : $AnyObject):
-  checked_cast_br %a : $AnyObject to $CP & OP & CP2, yea, nay
+  checked_cast_br %a : $AnyObject to CP & OP & CP2, yea, nay
 yea(%p : $CP & OP & CP2):
   return %p : $CP & OP & CP2
 nay:
@@ -199,7 +199,7 @@ nay:
 // CHECK:         call { i8*, i8**, i8** } @dynamic_cast_existential_2_conditional(i8* {{.*}}, %swift.type* %0, {{.*}} @"$s5casts2CPMp" {{[^,]*}}, {{.*}} @"$s5casts3CP2Mp"
 sil @c_cast_to_existential_metatype_mixed : $@convention(thin) (@owned @thick Any.Type) -> @owned @thick (CP & OP & CP2).Type {
 entry(%a : $@thick Any.Type):
-  checked_cast_br %a : $@thick Any.Type to $@thick (CP & OP & CP2).Type, yea, nay
+  checked_cast_br %a : $@thick Any.Type to @thick (CP & OP & CP2).Type, yea, nay
 yea(%p : $@thick (CP & OP & CP2).Type):
   return %p : $@thick (CP & OP & CP2).Type
 nay:
@@ -212,7 +212,7 @@ nay:
 // CHECK:         phi %objc_object*
 sil @checked_upcast : $@convention(thin) (@owned A) -> @owned AnyObject {
 entry(%a : $A):
-  checked_cast_br %a : $A to $AnyObject, yea, nay
+  checked_cast_br %a : $A to AnyObject, yea, nay
 yea(%o : $AnyObject):
   return %o : $AnyObject
 nay:
@@ -231,7 +231,7 @@ nay:
 // CHECK:         br i1 [[COND]]
 sil @checked_downcast_optional : $@convention(thin) (Optional<A>) -> @owned A {
 entry(%a : $Optional<A>):
-  checked_cast_br %a : $Optional<A> to $A, yea, nay
+  checked_cast_br %a : $Optional<A> to A, yea, nay
 yea(%aa : $A):
   return %aa : $A
 nay:
@@ -247,7 +247,7 @@ nay:
 // CHECK:         br i1 [[COND]]
 sil @checked_downcast_optional_metatype : $@convention(thin) (Optional<@thick A.Type>) -> @thick B.Type {
 entry(%a : $Optional<@thick A.Type>):
-  checked_cast_br %a : $Optional<@thick A.Type> to $@thick B.Type, yea, nay
+  checked_cast_br %a : $Optional<@thick A.Type> to @thick B.Type, yea, nay
 yea(%b : $@thick B.Type):
   return %b : $@thick B.Type
 nay:
@@ -263,7 +263,7 @@ nay:
 // CHECK:         br i1 [[COND]]
 sil @checked_downcast_optional_exmetatype : $@convention(thin) (Optional<@thick CP.Type>) -> @thick B.Type {
 entry(%a : $Optional<@thick CP.Type>):
-  checked_cast_br %a : $Optional<@thick CP.Type> to $@thick B.Type, yea, nay
+  checked_cast_br %a : $Optional<@thick CP.Type> to @thick B.Type, yea, nay
 yea(%b : $@thick B.Type):
   return %b : $@thick B.Type
 nay:
@@ -280,7 +280,7 @@ nay:
 // CHECK:    load %swift.type*, %swift.type** [[V4]]
 sil @checked_downcast_optional_class_to_ex : $@convention(thin) (@guaranteed Optional<A>) -> @owned Optional<CP> {
 bb0(%0 : $Optional<A>):
-  checked_cast_br %0 : $Optional<A> to $CP, bb1, bb2
+  checked_cast_br %0 : $Optional<A> to CP, bb1, bb2
 
 bb1(%3 : $CP):
   %4 = enum $Optional<CP>, #Optional.some!enumelt.1, %3 : $CP
@@ -300,22 +300,22 @@ sil @checked_metatype_to_object_casts : $@convention(thin) <T> (@thick Any.Type)
 entry(%e : $@thick Any.Type):
   %a = metatype $@thin NotClass.Type
   // CHECK: br i1 false
-  checked_cast_br %a : $@thin NotClass.Type to $AnyObject, a_yea, a_nay
+  checked_cast_br %a : $@thin NotClass.Type to AnyObject, a_yea, a_nay
 a_yea(%1 : $AnyObject):
   %b = metatype $@thick A.Type
   // CHECK: bitcast %swift.type* {{%.*}} to %objc_object*
-  checked_cast_br %b : $@thick A.Type to $AnyObject, b_yea, b_nay
+  checked_cast_br %b : $@thick A.Type to AnyObject, b_yea, b_nay
 b_yea(%2 : $AnyObject):
   %c = metatype $@objc_metatype A.Type
   // CHECK: bitcast %objc_class* {{%.*}} to %objc_object*
-  checked_cast_br %c : $@objc_metatype A.Type to $AnyObject, c_yea, c_nay
+  checked_cast_br %c : $@objc_metatype A.Type to AnyObject, c_yea, c_nay
 c_yea(%3 : $AnyObject):
   %d = metatype $@thick T.Type
   // CHECK: call %objc_object* @swift_dynamicCastMetatypeToObjectConditional(%swift.type* %T)
-  checked_cast_br %d : $@thick T.Type to $AnyObject, d_yea, d_nay
+  checked_cast_br %d : $@thick T.Type to AnyObject, d_yea, d_nay
 d_yea(%4 : $AnyObject):
   // CHECK: call %objc_object* @swift_dynamicCastMetatypeToObjectConditional(%swift.type* %0)
-  checked_cast_br %e : $@thick Any.Type to $AnyObject, e_yea, e_nay
+  checked_cast_br %e : $@thick Any.Type to AnyObject, e_yea, e_nay
 e_yea(%5 : $AnyObject):
   return undef : $()
 a_nay:
@@ -348,7 +348,7 @@ entry(%x : $OB):
 // CHECK:         @swift_dynamicCastClassUnconditional
 sil @checked_object_to_object_casts : $@convention(thin) (A) -> B {
 entry(%a : $A):
-  %b = unconditional_checked_cast %a : $A to $B
+  %b = unconditional_checked_cast %a : $A to B
   return %b : $B
 }
 
@@ -356,7 +356,7 @@ entry(%a : $A):
 // CHECK:         @swift_dynamicCastClassUnconditional
 sil @checked_objc_object_to_object_casts : $@convention(thin) (OA) -> OB {
 entry(%a : $OA):
-  %b = unconditional_checked_cast %a : $OA to $OB
+  %b = unconditional_checked_cast %a : $OA to OB
   return %b : $OB
 }
 
@@ -372,7 +372,7 @@ sil_vtable C {}
 
 sil @cast_protocol_composition_with_anyobject : $@convention(thin) (@owned P & AnyObject ) -> @owned Optional<C & P> {
 bb0(%0: $P & AnyObject):
-  checked_cast_br %0 : $P & AnyObject to $C & P, bb1, bb2
+  checked_cast_br %0 : $P & AnyObject to C & P, bb1, bb2
 
 bb1(%2 : $C & P):
   %3 = enum $Optional<C & P>, #Optional.some!enumelt.1, %2 : $C & P
@@ -393,7 +393,7 @@ bb3(%11 : $Optional<C & P>):
 // CHECK: call { i8*, i8** } @dynamic_cast_existential_1_superclass_conditional({{.*}}, %swift.type* [[C_META]], %swift.protocol* {{.*}}@"$s5casts10PAnyObjectMp"
 sil @cast_protocol_with_anyobject : $@convention(thin) (@owned PAnyObject ) -> @owned Optional<C & PAnyObject> {
 bb0(%0: $PAnyObject):
-  checked_cast_br %0 : $PAnyObject to $C & PAnyObject, bb1, bb2
+  checked_cast_br %0 : $PAnyObject to C & PAnyObject, bb1, bb2
 
 bb1(%2 : $C & PAnyObject):
   %3 = enum $Optional<C & PAnyObject>, #Optional.some!enumelt.1, %2 : $C & PAnyObject

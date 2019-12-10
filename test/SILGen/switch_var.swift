@@ -704,7 +704,7 @@ func f(_: D) -> Bool { return true }
 // CHECK-LABEL: sil hidden [ossa] @{{.*}}test_multiple_patterns_value_semantics
 func test_multiple_patterns_value_semantics(_ y: C) {
   switch y {
-    // CHECK:   checked_cast_br {{%.*}} : $C to $D, [[AS_D:bb[0-9]+]], [[NOT_AS_D:bb[0-9]+]]
+    // CHECK:   checked_cast_br {{%.*}} : $C to D, [[AS_D:bb[0-9]+]], [[NOT_AS_D:bb[0-9]+]]
     // CHECK: [[AS_D]]({{.*}}):
     // CHECK:   cond_br {{%.*}}, [[F_TRUE:bb[0-9]+]], [[F_FALSE:bb[0-9]+]]
     // CHECK: [[F_TRUE]]:

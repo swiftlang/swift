@@ -1224,22 +1224,6 @@ if [[ "${ENABLE_TENSORFLOW}" ]]; then
     fi
 fi
 
-# Symlink clang into the llvm tree.
-CLANG_SOURCE_DIR="${LLVM_SOURCE_DIR}/tools/clang"
-if [ ! -d "${CLANG_SOURCE_DIR}" ] ; then
-    make_relative_symlink "${WORKSPACE}/llvm-project/clang" "${CLANG_SOURCE_DIR}"
-fi
-
-# Don't symlink clang-tools-extra into the tree as the 'clang' symlink prevents
-# make_relative_symlink from working correctly.
-CLANG_TOOLS_EXTRA_SOURCE_DIR="${WORKSPACE}/llvm-project/clang-tools-extra"
-
-# Symlink compiler-rt into the llvm tree, if it exists.
-COMPILER_RT_SOURCE_DIR="${LLVM_SOURCE_DIR}/projects/compiler-rt"
-if [ ! -d "${COMPILER_RT_SOURCE_DIR}" ] ; then
-    make_relative_symlink "${WORKSPACE}/llvm-project/compiler-rt" "${COMPILER_RT_SOURCE_DIR}"
-fi
-
 PRODUCTS=(cmark llvm)
 if [[ ! "${SKIP_BUILD_LIBCXX}" ]] ; then
      PRODUCTS=("${PRODUCTS[@]}" libcxx)
@@ -1790,12 +1774,18 @@ for host in "${ALL_HOSTS[@]}"; do
                     "${llvm_cmake_options[@]}"
                 )
 
-                cmake_options+=(
-                  -DLLVM_TOOL_LLD_BUILD:BOOL=TRUE
-                )
+                if [[ "${SKIP_BUILD_COMPILER_RT}" ]]; then
+                    cmake_options+=(
+                    -DLLVM_ENABLE_PROJECTS="clang;clang-tools-extra;"
+                    )
+                else
+                    cmake_options+=(
+                    -DLLVM_ENABLE_PROJECTS="clang;clang-tools-extra;compiler-rt;"
+                    )
+                fi
 
                 cmake_options+=(
-                  -DLLVM_EXTERNAL_CLANG_TOOLS_EXTRA_SOURCE_DIR="${CLANG_TOOLS_EXTRA_SOURCE_DIR}"
+                  -DLLVM_TOOL_LLD_BUILD:BOOL=TRUE
                 )
 
                 if [[ "${BUILD_TOOLCHAIN_ONLY}" ]]; then

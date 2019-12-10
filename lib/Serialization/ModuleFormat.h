@@ -1748,6 +1748,14 @@ namespace decls_block {
     BCBlob      // platform, followed by message
   >;
 
+  using OriginallyDefinedInDeclAttrLayout = BCRecordLayout<
+    OriginallyDefinedIn_DECL_ATTR,
+    BCFixed<1>,     // implicit flag
+    BC_AVAIL_TUPLE, // moved OS version
+    BCVBR<5>,       // platform
+    BCBlob          // original module name
+  >;
+
   using ObjCDeclAttrLayout = BCRecordLayout<
     ObjC_DECL_ATTR,
     BCFixed<1>, // implicit flag

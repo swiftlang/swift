@@ -8,6 +8,14 @@ let b: @differentiable(linear) (Float) -> Float // okay
 // CHECK: (pattern_named 'b'
 // CHECK-NEXT: (type_attributed attrs=@differentiable(linear)
 
+let c: @differentiable (Float) throws -> Float // okay
+// CHECK: (pattern_named 'c'
+// CHECK-NEXT: (type_attributed attrs=@differentiable{{[^(]}}
+
+let d: @differentiable(linear) (Float) throws -> Float // okay
+// CHECK: (pattern_named 'd'
+// CHECK-NEXT: (type_attributed attrs=@differentiable(linear)
+
 // Generic type test.
 struct A<T> {
   func foo() {

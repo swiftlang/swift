@@ -619,7 +619,7 @@ SILValue EagerDispatch::emitArgumentCast(CanSILFunctionType CalleeSubstFnTy,
 /// has a direct result.
 SILValue EagerDispatch::
 emitArgumentConversion(SmallVectorImpl<SILValue> &CallArgs) {
-  auto OrigArgs = GenericFunc->begin()->getFunctionArguments();
+  auto OrigArgs = GenericFunc->begin()->getSILFunctionArguments();
   assert(OrigArgs.size() == substConv.getNumSILArguments()
          && "signature mismatch");
   // Create a substituted callee type.
