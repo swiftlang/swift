@@ -17,7 +17,7 @@
 using namespace swift;
 
 namespace {
-  using ExpectedDiagnostic = std::pair<SourceLoc, StringRef>;
+  using ExpectedDiagnostic = Located<StringRef>;
 
   class ExpectationDiagnosticConsumer: public DiagnosticConsumer {
     ExpectationDiagnosticConsumer *previous;

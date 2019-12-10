@@ -228,7 +228,7 @@ namespace {
     /// Data structures used to perform name lookup of basic blocks.
     llvm::DenseMap<Identifier, SILBasicBlock*> BlocksByName;
     llvm::DenseMap<SILBasicBlock*,
-                   std::pair<SourceLoc, Identifier>> UndefinedBlocks;
+                   Located<Identifier>> UndefinedBlocks;
 
     /// Data structures used to perform name lookup for local values.
     llvm::StringMap<ValueBase*> LocalValues;
@@ -584,8 +584,8 @@ bool SILParser::diagnoseProblems() {
   if (!UndefinedBlocks.empty()) {
     // FIXME: These are going to come out in nondeterministic order.
     for (auto Entry : UndefinedBlocks)
-      P.diagnose(Entry.second.first, diag::sil_undefined_basicblock_use,
-                 Entry.second.second);
+      P.diagnose(Entry.second.loc, diag::sil_undefined_basicblock_use,
+                 Entry.second.item);
 
     HadError = true;
   }
@@ -717,7 +717,7 @@ SILBasicBlock *SILParser::getBBForReference(Identifier Name, SourceLoc Loc) {
   // Otherwise, create it and remember that this is a forward reference so
   // that we can diagnose use without definition problems.
   BB = F->createBasicBlock();
-  UndefinedBlocks[BB] = {Loc, Name};
+  UndefinedBlocks[BB] = {Name, Loc};
   return BB;
 }
 

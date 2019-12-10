@@ -258,7 +258,7 @@ HasCircularInheritedProtocolsRequest::evaluate(Evaluator &evaluator,
   bool anyObject = false;
   auto inherited = getDirectlyInheritedNominalTypeDecls(decl, anyObject);
   for (auto &found : inherited) {
-    auto *protoDecl = dyn_cast<ProtocolDecl>(found.second);
+    auto *protoDecl = dyn_cast<ProtocolDecl>(found.item);
     if (!protoDecl)
       continue;
 
@@ -490,11 +490,11 @@ ProtocolRequiresClassRequest::evaluate(Evaluator &evaluator,
   // class-bound protocol.
   for (const auto found : allInheritedNominals) {
     // Superclass bound.
-    if (isa<ClassDecl>(found.second))
+    if (isa<ClassDecl>(found.item))
       return true;
 
     // A protocol that might be class-constrained.
-    if (auto proto = dyn_cast<ProtocolDecl>(found.second)) {
+    if (auto proto = dyn_cast<ProtocolDecl>(found.item)) {
       if (proto->requiresClass())
         return true;
     }
