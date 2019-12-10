@@ -286,7 +286,7 @@ extension MemoryLayout where T: AnyObject {
   ///
   @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
   @_transparent
-  public static func unsafeAddress<Value>(
+  public static func _unsafeAddress<Value>(
     of key: ReferenceWritableKeyPath<T, Value>,
     in root: T
   ) -> UnsafeMutablePointer<Value>? {
