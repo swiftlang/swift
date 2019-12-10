@@ -180,7 +180,7 @@ AllocStackInst::create(SILDebugLocation Loc,
                      hasDynamicLifetime);
 }
 
-VarDecl *AllocStackInst::getDecl() const {
+VarDecl *AllocationInst::getDecl() const {
   return getLoc().getAsASTNode<VarDecl>();
 }
 
@@ -288,10 +288,6 @@ SILType AllocBoxInst::getAddressType() const {
   return getSILBoxFieldType(TypeExpansionContext(*this->getFunction()),
                             getBoxType(), getModule().Types, 0)
       .getAddressType();
-}
-
-VarDecl *AllocBoxInst::getDecl() const {
-  return getLoc().getAsASTNode<VarDecl>();
 }
 
 DebugValueInst::DebugValueInst(SILDebugLocation DebugLoc, SILValue Operand,
@@ -2617,6 +2613,46 @@ void KeyPathInst::dropReferencedPattern() {
   }
   Pattern = nullptr;
 }
+
+void KeyPathPatternComponent::
+visitReferencedFunctionsAndMethods(
+      std::function<void (SILFunction *)> functionCallBack,
+      std::function<void (SILDeclRef)> methodCallBack) const {
+  switch (getKind()) {
+  case KeyPathPatternComponent::Kind::SettableProperty:
+    functionCallBack(getComputedPropertySetter());
+    LLVM_FALLTHROUGH;
+  case KeyPathPatternComponent::Kind::GettableProperty: {
+    functionCallBack(getComputedPropertyGetter());
+    auto id = getComputedPropertyId();
+    switch (id.getKind()) {
+    case KeyPathPatternComponent::ComputedPropertyId::DeclRef: {
+      methodCallBack(id.getDeclRef());
+      break;
+    }
+    case KeyPathPatternComponent::ComputedPropertyId::Function:
+      functionCallBack(id.getFunction());
+      break;
+    case KeyPathPatternComponent::ComputedPropertyId::Property:
+      break;
+    }
+
+    if (auto equals = getSubscriptIndexEquals())
+      functionCallBack(equals);
+    if (auto hash = getSubscriptIndexHash())
+      functionCallBack(hash);
+
+    break;
+  }
+  case KeyPathPatternComponent::Kind::StoredProperty:
+  case KeyPathPatternComponent::Kind::OptionalChain:
+  case KeyPathPatternComponent::Kind::OptionalForce:
+  case KeyPathPatternComponent::Kind::OptionalWrap:
+  case KeyPathPatternComponent::Kind::TupleElement:
+    break;
+  }
+}
+
 
 GenericSpecializationInformation::GenericSpecializationInformation(
     SILFunction *Caller, SILFunction *Parent, SubstitutionMap Subs)

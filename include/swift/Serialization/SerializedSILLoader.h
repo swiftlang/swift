@@ -62,7 +62,7 @@ public:
   }
   ~SerializedSILLoader();
 
-  SILFunction *lookupSILFunction(SILFunction *Callee);
+  SILFunction *lookupSILFunction(SILFunction *Callee, bool onlyUpdateLinkage);
   SILFunction *
   lookupSILFunction(StringRef Name, bool declarationOnly = false,
                     Optional<SILLinkage> linkage = None);

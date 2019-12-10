@@ -1243,6 +1243,7 @@ namespace {
       switch (expr->getKind()) {
       case MagicIdentifierLiteralExpr::Column:
       case MagicIdentifierLiteralExpr::File:
+      case MagicIdentifierLiteralExpr::FilePath:
       case MagicIdentifierLiteralExpr::Function:
       case MagicIdentifierLiteralExpr::Line:
         return visitLiteralExpr(expr);
@@ -1521,10 +1522,13 @@ namespace {
 
       auto memberLocator
         = CS.getConstraintLocator(expr, ConstraintLocator::UnresolvedMember);
-      auto baseTy = CS.createTypeVariable(baseLocator, TVO_CanBindToNoEscape);
-      auto memberTy = CS.createTypeVariable(memberLocator,
-                                            TVO_CanBindToLValue |
-                                            TVO_CanBindToNoEscape);
+
+      // Since base type in this case is completely dependent on context it
+      // should be marked as a potential hole.
+      auto baseTy = CS.createTypeVariable(baseLocator, TVO_CanBindToNoEscape |
+                                                           TVO_CanBindToHole);
+      auto memberTy = CS.createTypeVariable(
+          memberLocator, TVO_CanBindToLValue | TVO_CanBindToNoEscape);
 
       // An unresolved member expression '.member' is modeled as a value member
       // constraint

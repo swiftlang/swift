@@ -26,10 +26,10 @@ struct S {
     f({x in x}, 2) // expected-error {{generic parameter 'T' could not be inferred}}
   }
   
-  func g<T>(_ a: T, _ b: Int) -> Void {} // expected-note {{in call to function 'g'}}
+  func g<T>(_ a: T, _ b: Int) -> Void {}
   func g(_ a: String) -> Void {}
   func test2() -> Void {
-    g(.notAThing, 7) // expected-error {{generic parameter 'T' could not be inferred}}
+    g(.notAThing, 7) // expected-error {{cannot infer contextual base in reference to member 'notAThing'}}
   }
   
   func h(_ a: Int, _ b: Int) -> Void {}

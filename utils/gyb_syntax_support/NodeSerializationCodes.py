@@ -241,11 +241,12 @@ SYNTAX_NODE_SERIALIZATION_CODES = {
     'DifferentiationParam': 237,
     'DifferentiableAttributeFuncSpecifier': 238,
     'FunctionDeclName': 239,
+    'PoundFilePathExpr': 240,
     # SWIFT_ENABLE_TENSORFLOW
-    'DerivativeRegistrationAttributeArguments': 240,
-    'QuoteLiteralExpr': 241,
-    'UnquoteExpr': 242,
-    'DeprecatedDerivativeRegistrationAttributeArguments': 243,
+    'DerivativeRegistrationAttributeArguments': 241,
+    'QuoteLiteralExpr': 242,
+    'UnquoteExpr': 243,
+    'DeprecatedDerivativeRegistrationAttributeArguments': 244,
     # SWIFT_ENABLE_TENSORFLOW END
 }
 

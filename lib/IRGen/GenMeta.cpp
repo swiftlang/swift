@@ -113,14 +113,12 @@ void IRGenModule::setTrueConstGlobal(llvm::GlobalVariable *var) {
     var->setSection("__TEXT,__const");
     break;
   case llvm::Triple::ELF:
+  case llvm::Triple::Wasm:
     var->setSection(".rodata");
     break;
   case llvm::Triple::XCOFF:
   case llvm::Triple::COFF:
     var->setSection(".rdata");
-    break;
-  case llvm::Triple::Wasm:
-    var->setSection(".rodata");
     break;
   }
 }
@@ -2225,6 +2223,7 @@ namespace {
     void layout() {
       asImpl().layoutHeader();
 
+      // See also: [pre-5.2-extra-data-zeroing]
       if (asImpl().hasExtraDataPattern()) {
         asImpl().addExtraDataPattern();
       }

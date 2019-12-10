@@ -294,7 +294,7 @@ void TBDGenVisitor::visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
     addSymbol(
         LinkEntity::forDynamicallyReplaceableFunctionKey(AFD, useAllocator));
   }
-  if (AFD->getAttrs().hasAttribute<DynamicReplacementAttr>()) {
+  if (AFD->getDynamicallyReplacedDecl()) {
     bool useAllocator = shouldUseAllocatorMangling(AFD);
     addSymbol(LinkEntity::forDynamicallyReplaceableFunctionVariable(
         AFD, useAllocator));
@@ -327,7 +327,7 @@ void TBDGenVisitor::visitFuncDecl(FuncDecl *FD) {
       addSymbol(LinkEntity::forOpaqueTypeDescriptorAccessorKey(opaqueResult));
       addSymbol(LinkEntity::forOpaqueTypeDescriptorAccessorVar(opaqueResult));
     }
-    if (FD->getAttrs().hasAttribute<DynamicReplacementAttr>()) {
+    if (FD->getDynamicallyReplacedDecl()) {
       addSymbol(LinkEntity::forOpaqueTypeDescriptorAccessor(opaqueResult));
       addSymbol(LinkEntity::forOpaqueTypeDescriptorAccessorVar(opaqueResult));
     }
@@ -355,7 +355,7 @@ void TBDGenVisitor::visitAbstractStorageDecl(AbstractStorageDecl *ASD) {
       addSymbol(LinkEntity::forOpaqueTypeDescriptorAccessorKey(opaqueResult));
       addSymbol(LinkEntity::forOpaqueTypeDescriptorAccessorVar(opaqueResult));
     }
-    if (ASD->hasAnyDynamicReplacementAccessors()) {
+    if (ASD->getDynamicallyReplacedDecl()) {
       addSymbol(LinkEntity::forOpaqueTypeDescriptorAccessor(opaqueResult));
       addSymbol(LinkEntity::forOpaqueTypeDescriptorAccessorVar(opaqueResult));
     }

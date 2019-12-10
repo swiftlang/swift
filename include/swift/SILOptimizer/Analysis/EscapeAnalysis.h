@@ -243,7 +243,19 @@ private:
   struct CGNodeWorklist;
 
   /// The int-part is an EdgeType and specifies which kind of predecessor it is.
-  typedef llvm::PointerIntPair<CGNode *, 1> Predecessor;
+  struct Predecessor {
+    llvm::PointerIntPair<CGNode *, 1> predAndEdgeType;
+
+    Predecessor(CGNode *predNode, EdgeType ty)
+        : predAndEdgeType(predNode, ty) {}
+    bool operator==(const Predecessor &pred) {
+      return predAndEdgeType == pred.predAndEdgeType;
+    }
+
+    bool is(EdgeType ty) const { return predAndEdgeType.getInt() == ty; }
+
+    CGNode *getPredNode() const { return predAndEdgeType.getPointer(); }
+  };
 
 public:
 
@@ -473,22 +485,35 @@ public:
     /// Returns true if the node's value escapes within the function. This
     /// means that any unidentified pointer in the function may alias to
     /// the node's value.
+    ///
     /// Note that in the false-case the node's value can still escape via
     /// the return instruction.
     ///
     /// \p nodeValue is often the same as 'this->getRepValue().getValue()', but
     /// is sometimes a more refined value specific to a content nodes.
-    bool escapesInsideFunction(SILValue nodeValue) const {
+    bool valueEscapesInsideFunction(SILValue nodeValue) const {
       switch (getEscapeState()) {
         case EscapeState::None:
         case EscapeState::Return:
           return false;
         case EscapeState::Arguments:
-          return !isExclusiveArgument(nodeValue);
+          return !nodeValue || !isExclusiveArgument(nodeValue);
         case EscapeState::Global:
           return true;
       }
       llvm_unreachable("Unhandled EscapeState in switch.");
+    }
+    /// Returns true if the node's value escapes within the function.
+    ///
+    /// This is a more conservative variant of valueEscapesInsideFunction, for
+    /// when the value being accessed is unknown. For content nodes, the node's
+    /// value cannot be used because it arbitrarily takes on one of the values
+    /// associated with the content. e.g. if that value is an exclusive
+    /// argument, it would be incorrect to assume all values for that content
+    /// are exclusive.
+    bool escapesInsideFunction() const {
+      SILValue nodeValue = isContent() ? SILValue() : SILValue(mappedValue);
+      return valueEscapesInsideFunction(nodeValue);
     }
 
     /// Returns the content node of this node if it exists in the graph.
@@ -597,12 +622,6 @@ public:
       Nodes.push_back(Node);
       return Node;
     }
-
-    /// Adds a defer-edge and updates pointsTo of all defer-reachable nodes.
-    /// The addition of a defer-edge may invalidate the graph invariance 4).
-    /// If this is the case, all "mismatching" Content nodes are merged until
-    /// invariance 4) is reached again.
-    bool addDeferEdge(CGNode *From, CGNode *To);
 
     /// Adds the node \p From (to be merged with \p To) to the ToMerge list.
     /// The actual merging is done in mergeAllScheduledNodes().
@@ -837,6 +856,7 @@ public:
     friend class EscapeAnalysis;
     friend struct CGNodeWorklist;
   };
+  using Traversal = ConnectionGraph::Traversal;
 
 private:
 
@@ -1053,9 +1073,9 @@ public:
 
   /// Returns true if the pointers \p V1 and \p V2 can possibly point to the
   /// same memory.
+  ///
   /// If at least one of the pointers refers to a local object and the
   /// connection-graph-nodes of both pointers do not point to the same content
-  /// node, the pointers do not alias.
   bool canPointToSameMemory(SILValue V1, SILValue V2);
 
   /// Invalidate all information in this analysis.

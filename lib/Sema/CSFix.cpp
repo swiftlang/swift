@@ -255,18 +255,64 @@ ContextualMismatch *ContextualMismatch::create(ConstraintSystem &cs, Type lhs,
   return new (cs.getAllocator()) ContextualMismatch(cs, lhs, rhs, locator);
 }
 
-bool AllowTupleTypeMismatch::diagnose(bool asNote) const {
-  auto failure = TupleContextualFailure(
-      getConstraintSystem(), getFromType(), getToType(), getLocator());
+bool AllowTupleTypeMismatch::coalesceAndDiagnose(
+    ArrayRef<ConstraintFix *> fixes, bool asNote) const {
+  llvm::SmallVector<unsigned, 4> indices;
+  if (isElementMismatch())
+    indices.push_back(*Index);
+
+  for (auto fix : fixes) {
+    auto *tupleFix = fix->getAs<AllowTupleTypeMismatch>();
+    if (!tupleFix || !tupleFix->isElementMismatch())
+      continue;
+    indices.push_back(*tupleFix->Index);
+  }
+
+  auto &cs = getConstraintSystem();
+  auto *locator = getLocator();
+  auto purpose = cs.getContextualTypePurpose();
+  Type fromType;
+  Type toType;
+
+  if (getFromType()->is<TupleType>() && getToType()->is<TupleType>()) {
+    fromType = getFromType();
+    toType = getToType();
+  } else if (auto contextualType = cs.getContextualType()) {
+    auto *tupleExpr = simplifyLocatorToAnchor(locator);
+    if (!tupleExpr)
+      return false;
+    fromType = cs.getType(tupleExpr);
+    toType = contextualType;
+  } else if (auto argApplyInfo = cs.getFunctionArgApplyInfo(locator)) {
+    purpose = CTP_CallArgument;
+    fromType = argApplyInfo->getArgType();
+    toType = argApplyInfo->getParamType();
+  } else if (auto *coerceExpr = dyn_cast<CoerceExpr>(locator->getAnchor())) {
+    purpose = CTP_CoerceOperand;
+    fromType = cs.getType(coerceExpr->getSubExpr());
+    toType = cs.getType(coerceExpr);
+  } else if (auto *assignExpr = dyn_cast<AssignExpr>(locator->getAnchor())) {
+    purpose = CTP_AssignSource;
+    fromType = cs.getType(assignExpr->getSrc());
+    toType = cs.getType(assignExpr->getDest());
+  } else {
+    return false;
+  }
+
+  TupleContextualFailure failure(cs, purpose, fromType, toType, indices, locator);
   return failure.diagnose(asNote);
+}
+
+bool AllowTupleTypeMismatch::diagnose(bool asNote) const {
+  return coalesceAndDiagnose({}, asNote);
 }
 
 AllowTupleTypeMismatch *
 AllowTupleTypeMismatch::create(ConstraintSystem &cs, Type lhs, Type rhs,
-                               ConstraintLocator *locator) {
-  assert(lhs->is<TupleType>() && rhs->is<TupleType>() &&
-         "lhs and rhs must be tuple types");
-  return new (cs.getAllocator()) AllowTupleTypeMismatch(cs, lhs, rhs, locator);
+                               ConstraintLocator *locator,
+                               Optional<unsigned> index) {
+  return new (cs.getAllocator())
+      AllowTupleTypeMismatch(cs, lhs, rhs, locator, index);
 }
 
 bool GenericArgumentsMismatch::diagnose(bool asNote) const {
@@ -929,25 +975,29 @@ static bool isValueOfRawRepresentable(ConstraintSystem &cs,
 ExpandArrayIntoVarargs *
 ExpandArrayIntoVarargs::attempt(ConstraintSystem &cs, Type argType,
                                 Type paramType,
-                                ConstraintLocatorBuilder locator) {
-  auto constraintLocator = cs.getConstraintLocator(locator);
-  auto elementType = cs.isArrayType(argType);
-  if (elementType &&
-      constraintLocator->getLastElementAs<LocatorPathElt::ApplyArgToParam>()
-          ->getParameterFlags()
-          .isVariadic()) {
-    auto options = ConstraintSystem::TypeMatchOptions(
-        ConstraintSystem::TypeMatchFlags::TMF_ApplyingFix |
-        ConstraintSystem::TypeMatchFlags::TMF_GenerateConstraints);
-    auto result =
-        cs.matchTypes(*elementType, paramType,
-                      ConstraintKind::ArgumentConversion, options, locator);
-    if (result.isSuccess())
-      return new (cs.getAllocator())
-          ExpandArrayIntoVarargs(cs, argType, paramType, constraintLocator);
-  }
+                                ConstraintLocatorBuilder builder) {
+  auto *locator = cs.getConstraintLocator(builder);
 
-  return nullptr;
+  auto argLoc = locator->getLastElementAs<LocatorPathElt::ApplyArgToParam>();
+  if (!(argLoc && argLoc->getParameterFlags().isVariadic()))
+    return nullptr;
+
+  auto elementType = cs.isArrayType(argType);
+  if (!elementType)
+    return nullptr;
+
+  ConstraintSystem::TypeMatchOptions options;
+  options |= ConstraintSystem::TypeMatchFlags::TMF_ApplyingFix;
+  options |= ConstraintSystem::TypeMatchFlags::TMF_GenerateConstraints;
+
+  auto result = cs.matchTypes(*elementType, paramType, ConstraintKind::Subtype,
+                              options, builder);
+
+  if (result.isFailure())
+    return nullptr;
+
+  return new (cs.getAllocator())
+      ExpandArrayIntoVarargs(cs, argType, paramType, locator);
 }
 
 bool ExpandArrayIntoVarargs::diagnose(bool asNote) const {
@@ -1043,4 +1093,16 @@ std::string TreatEphemeralAsNonEphemeral::getName() const {
   name += "treat ephemeral as non-ephemeral for ";
   name += ::getName(ConversionKind);
   return name;
+}
+
+bool SpecifyBaseTypeForContextualMember::diagnose(bool asNote) const {
+  auto &cs = getConstraintSystem();
+  MissingContextualBaseInMemberRefFailure failure(cs, MemberName, getLocator());
+  return failure.diagnose(asNote);
+}
+
+SpecifyBaseTypeForContextualMember *SpecifyBaseTypeForContextualMember::create(
+    ConstraintSystem &cs, DeclName member, ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      SpecifyBaseTypeForContextualMember(cs, member, locator);
 }

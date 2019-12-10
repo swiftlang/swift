@@ -21,7 +21,12 @@
 // REQUIRES: executable_test
 
 // REQUIRES: objc_interop
-// REQUIRES: rdar55727144
+
+// The oldest ABI-stable stdlibs don't have a __SwiftNativeNSMutableArrayBase
+// class, so they can't run the UnwantedCdtors test.
+// FIXME: This should be based on a runtime library version check.
+// UNSUPPORTED: use_os_stdlib
+
 import Foundation
 import StdlibUnittest
 

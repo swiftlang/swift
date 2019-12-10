@@ -69,6 +69,9 @@ ERROR(no_overloads_match_exactly_in_call_no_labels,none,
 ERROR(no_overloads_match_exactly_in_call_special,none,
       "no exact matches in call to %0",
       (DescriptiveDeclKind))
+ERROR(no_overloads_match_exactly_in_assignment,none,
+      "no exact matches in assignment to %0",
+      (DeclBaseName))
 
 ERROR(ambiguous_subscript,none,
       "ambiguous subscript with base type %0 and index type %1",
@@ -952,9 +955,8 @@ ERROR(types_not_convertible_use_bool_value,none,
 ERROR(tuple_types_not_convertible_nelts,none,
       "%0 is not convertible to %1, "
       "tuples have a different number of elements", (Type, Type))
-
 ERROR(tuple_types_not_convertible,none,
-      "tuple type %0 is not convertible to tuple %1", (Type, Type))
+       "tuple type %0 is not convertible to tuple type %1", (Type, Type))
 
 ERROR(invalid_force_unwrap,none,
       "cannot force unwrap value of non-optional type %0", (Type))
@@ -1745,6 +1747,10 @@ ERROR(type_does_not_conform,none,
       "type %0 does not conform to protocol %1", (Type, Type))
 ERROR(cannot_use_nil_with_this_type,none,
       "'nil' cannot be used in context expecting type %0", (Type))
+
+ERROR(type_cannot_conform_to_nsobject,none,
+      "cannot declare conformance to 'NSObjectProtocol' in Swift; %0 should "
+      "inherit 'NSObject' instead", (Type))
 
 ERROR(use_of_equal_instead_of_equality,none,
       "use of '=' in a boolean context, did you mean '=='?", ())
@@ -2752,6 +2758,9 @@ NOTE(missing_member_type_conformance_prevents_synthesis, none,
      "protocol %2, preventing synthesized conformance "
      "of %3 to %2",
      (unsigned, Type, Type, Type))
+NOTE(classes_automatic_protocol_synthesis,none,
+    "automatic synthesis of '%0' is not supported for classes",
+    (StringRef))
 
 // Dynamic Self
 ERROR(dynamic_self_non_method,none,
@@ -3246,6 +3255,8 @@ ERROR(collection_literal_empty,none,
 ERROR(unresolved_member_no_inference,none,
       "reference to member %0 cannot be resolved without a contextual type",
       (DeclName))
+ERROR(cannot_infer_base_of_unresolved_member,none,
+      "cannot infer contextual base in reference to member %0", (DeclName))
 ERROR(unresolved_collection_literal,none,
       "cannot infer type for empty collection literal without a "
       "contextual type", ())
@@ -3605,6 +3616,10 @@ ERROR(assignment_dynamic_property_has_immutable_base,none,
       "cannot assign through dynamic lookup property: %0", (StringRef))
 ERROR(assignment_bang_has_immutable_subcomponent,none,
       "cannot assign through '!': %0", (StringRef))
+
+NOTE(candidate_is_not_assignable,none,
+     "candidate is not assignable: %0 %1",
+     (DescriptiveDeclKind, DeclName))
 
 NOTE(change_to_mutating,none,
      "mark %select{method|accessor}0 'mutating' to make 'self' mutable",

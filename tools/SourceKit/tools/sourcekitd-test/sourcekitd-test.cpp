@@ -57,7 +57,9 @@ int STDOUT_FILENO = _fileno(stdout);
 }
 #endif
 
-static int handleTestInvocation(ArrayRef<const char *> Args, TestOptions &InitOpts);
+static bool sendGlobalConfigRequest();
+static int handleTestInvocation(ArrayRef<const char *> Args, TestOptions &InitOpts,
+                                bool IsFirstInvocation);
 static bool handleResponse(sourcekitd_response_t Resp, const TestOptions &Opts,
                            const std::string &SourceFile,
                            std::unique_ptr<llvm::MemoryBuffer> SourceBuf,
@@ -242,6 +244,7 @@ static void skt_main(skt_args *args) {
   // invocations.
   TestOptions InitOpts;
   auto Args = llvm::makeArrayRef(argv+1, argc-1);
+  bool firstInvocation = true;
   while (1) {
     unsigned i = 0;
     for (auto Arg: Args) {
@@ -251,15 +254,17 @@ static void skt_main(skt_args *args) {
     }
     if (i == Args.size())
       break;
-    if (int ret = handleTestInvocation(Args.slice(0, i), InitOpts)) {
+    if (int ret = handleTestInvocation(Args.slice(0, i), InitOpts,
+                                       firstInvocation)) {
       sourcekitd_shutdown();
       args->ret = ret;
       return;
     }
     Args = Args.slice(i + 1);
+    firstInvocation = false;
   }
 
-  if (int ret = handleTestInvocation(Args, InitOpts)) {
+  if (int ret = handleTestInvocation(Args, InitOpts, firstInvocation)) {
     sourcekitd_shutdown();
     args->ret = ret;
     return;
@@ -389,7 +394,7 @@ static int handleJsonRequestPath(StringRef QueryPath, const TestOptions &Opts) {
 static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts);
 
 static int handleTestInvocation(ArrayRef<const char *> Args,
-                                TestOptions &InitOpts) {
+                                TestOptions &InitOpts, bool firstInvocation) {
 
   unsigned Optargc = 0;
   for (auto Arg: Args) {
@@ -404,6 +409,16 @@ static int handleTestInvocation(ArrayRef<const char *> Args,
 
   if (Optargc < Args.size())
     Opts.CompilerArgs = Args.slice(Optargc+1);
+
+  if (firstInvocation && Opts.Request != SourceKitRequest::GlobalConfiguration &&
+      !Opts.SuppressDefaultConfigRequest) {
+    // We don't fail if this request fails for now so that sourcekitd-test is
+    // still usable with older versions of sourcekitd that don't have the
+    // global-configuration request.
+    if (sendGlobalConfigRequest()) {
+      llvm::outs() << "warning: global configuration request failed\n";
+    }
+  }
 
   assert(Opts.repeatRequest >= 1);
   for (unsigned i = 0; i < Opts.repeatRequest; ++i) {
@@ -437,6 +452,28 @@ static int setExpectedTypes(const sourcekitd_test::TestOptions &Opts,
     }
   }
   return 0;
+}
+
+static bool sendGlobalConfigRequest() {
+  TestOptions Opts;
+  sourcekitd_object_t Req = sourcekitd_request_dictionary_create(nullptr,
+                                                                 nullptr, 0);
+  sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestGlobalConfiguration);
+
+  // For test invocations we default to setting OptimizeForIDE to true. This
+  // matches the use case of the most popular clients of sourcekitd (editors)
+  // and also disables loading locations from .swiftsourceinfo files. This is
+  // desirable for testing because the .swiftsourceinfo for the stdlib is
+  // available when sourcekitd is tested, and can make some stdlib-dependent
+  // sourcekitd tests unstable due to changing source locations from the stdlib
+  // module.
+  sourcekitd_request_dictionary_set_int64(Req, KeyOptimizeForIDE, static_cast<int64_t>(true));
+  sourcekitd_response_t Resp = sendRequestSync(Req, Opts);
+  bool IsError = sourcekitd_response_is_error(Resp);
+  if (IsError)
+    sourcekitd_response_description_dump(Resp);
+  sourcekitd_request_release(Req);
+  return IsError;
 }
 
 static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
@@ -495,7 +532,6 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
   sourcekitd_object_t Req = sourcekitd_request_dictionary_create(nullptr,
                                                                  nullptr, 0);
   ActiveRequest = Opts.Request;
-  bool ShouldIgnoreSourceInfo = true;
   switch (Opts.Request) {
   case SourceKitRequest::None:
     llvm::errs() << "request is not set\n";
@@ -503,6 +539,12 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
     //        In other words, despite returning 1 here, the program still exits
     //        with a zero (successful) exit code.
     return 1;
+
+  case SourceKitRequest::GlobalConfiguration:
+    sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestGlobalConfiguration);
+    if (Opts.OptimizeForIde.hasValue())
+      sourcekitd_request_dictionary_set_int64(Req, KeyOptimizeForIDE, static_cast<int64_t>(Opts.OptimizeForIde.getValue()));
+    break;
 
   case SourceKitRequest::ProtocolVersion:
     sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestProtocolVersion);
@@ -855,7 +897,6 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
           sourcekitd_request_dictionary_set_int64(Req, KeyUsingSwiftArgs, true);
       sourcekitd_request_dictionary_set_uid(Req, KeyRequest,
                                             RequestEditorOpenHeaderInterface);
-      ShouldIgnoreSourceInfo = false;
     }
 
     sourcekitd_request_dictionary_set_string(Req, KeyName, getInterfaceGenDocumentName().c_str());
@@ -949,17 +990,6 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
     sourcekitd_object_t Args = sourcekitd_request_array_create(nullptr, 0);
     for (auto Arg : Opts.CompilerArgs)
       sourcekitd_request_array_set_string(Args, SOURCEKITD_ARRAY_APPEND, Arg);
-    if (ShouldIgnoreSourceInfo) {
-      // Ignore .swiftsourceinfo file when testing sourcekitd.
-      // .swiftsourceinfo for stdlib will be available when sourcekitd is tested,
-      // which may make some stdlib-depending sourcekitd tests volatile.
-      // We cannot append the flags when the compiler arguments are for clang
-      // invocation.
-      sourcekitd_request_array_set_string(Args, SOURCEKITD_ARRAY_APPEND,
-                                          "-Xfrontend");
-      sourcekitd_request_array_set_string(Args, SOURCEKITD_ARRAY_APPEND,
-                                          "-ignore-module-source-info");
-    }
     sourcekitd_request_dictionary_set_value(Req, KeyCompilerArgs, Args);
     sourcekitd_request_release(Args);
   }
@@ -1106,6 +1136,7 @@ static bool handleResponse(sourcekitd_response_t Resp, const TestOptions &Opts,
       printMangleResults(sourcekitd_response_get_value(Resp), outs());
       break;
 
+    case SourceKitRequest::GlobalConfiguration:
     case SourceKitRequest::ProtocolVersion:
     case SourceKitRequest::CompilerVersion:
     case SourceKitRequest::Close:

@@ -25,7 +25,7 @@ struct Lens<T> {
   }
 }
 
-enum MyEnum: String {
+enum MyEnum: String, CaseIterable {
   case foo = "foo"
   case bar = "bar"
 }
@@ -72,13 +72,15 @@ func testDynamicMemberLookup(lens: Lens<Point>) {
 }
 func testRawRepresentable() {
   MyEnum.#^MYENUM_DOT^#
-// MYENUM_DOT: Begin completions, 7 items
+// MYENUM_DOT: Begin completions, 9 items
 // MYENUM_DOT-DAG: Keyword[self]/CurrNominal:          self[#MyEnum.Type#];
 // MYENUM_DOT-DAG: Keyword/CurrNominal:                Type[#MyEnum.Type#];
 // MYENUM_DOT-DAG: Decl[EnumElement]/CurrNominal:      foo[#MyEnum#];
 // MYENUM_DOT-DAG: Decl[EnumElement]/CurrNominal:      bar[#MyEnum#];
 // MYENUM_DOT-DAG: Decl[TypeAlias]/CurrNominal:        RawValue[#String#];
 // MYENUM_DOT-DAG: Decl[Constructor]/CurrNominal:      init({#rawValue: String#})[#MyEnum?#];
+// MYENUM_DOT-DAG: Decl[TypeAlias]/CurrNominal:        AllCases[#[MyEnum]#];
+// MYENUM_DOT-DAG: Decl[StaticVar]/CurrNominal:        allCases[#[MyEnum]#];
 // MYENUM_DOT-DAG: Decl[InstanceMethod]/Super:         hash({#(self): MyEnum#})[#(into: inout Hasher) -> Void#];
 // MYENUM_DOT: End completions
 }

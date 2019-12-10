@@ -53,6 +53,7 @@ class ClassDecl;
 class FuncDecl;
 class GenericFunctionType;
 class LazyConformanceLoader;
+class LazyMemberLoader;
 class PatternBindingInitializer;
 class TrailingWhereClause;
 
@@ -65,8 +66,24 @@ public:
   /// AtLoc - This is the location of the first '@' in the attribute specifier.
   /// If this is an empty attribute specifier, then this will be an invalid loc.
   SourceLoc AtLoc;
-  Optional<StringRef> convention = None;
-  Optional<StringRef> conventionWitnessMethodProtocol = None;
+
+  struct Convention {
+    StringRef Name = {};
+    StringRef WitnessMethodProtocol = {};
+    StringRef ClangType = {};
+    // Carry the source location for diagnostics.
+    SourceLoc ClangTypeLoc = {};
+
+    /// Convenience factory function to create a Swift convention.
+    ///
+    /// Don't use this function if you are creating a C convention as you
+    /// probably need a ClangType field as well.
+    static Convention makeSwiftConvention(StringRef name) {
+      return {name, "", "", {}};
+    }
+  };
+
+  Optional<Convention> ConventionArguments;
 
   // Indicates whether the type's '@differentiable' attribute has a 'linear'
   // argument.
@@ -135,8 +152,19 @@ public:
     return true;
   }
   
-  bool hasConvention() const { return convention.hasValue(); }
-  StringRef getConvention() const { return *convention; }
+  bool hasConvention() const { return ConventionArguments.hasValue(); }
+
+  /// Returns the primary calling convention string.
+  ///
+  /// Note: For C conventions, this may not represent the full convention.
+  StringRef getConventionName() const {
+    return ConventionArguments.getValue().Name;
+  }
+
+  /// Show the string enclosed between @convention(..)'s parentheses.
+  ///
+  /// For example, @convention(foo, bar) will give the string "foo, bar".
+  void getConventionArguments(SmallVectorImpl<char> &buffer) const;
 
   bool hasOwnership() const {
     return getOwnership() != ReferenceOwnership::Strong;
@@ -1011,18 +1039,31 @@ class DynamicReplacementAttr final
     : public DeclAttribute,
       private llvm::TrailingObjects<DynamicReplacementAttr, SourceLoc> {
   friend TrailingObjects;
+  friend class DynamicallyReplacedDeclRequest;
 
   DeclName ReplacedFunctionName;
-  AbstractFunctionDecl *ReplacedFunction;
+  LazyMemberLoader *Resolver = nullptr;
+  uint64_t ResolverContextData;
 
   /// Create an @_dynamicReplacement(for:) attribute written in the source.
   DynamicReplacementAttr(SourceLoc atLoc, SourceRange baseRange,
                          DeclName replacedFunctionName, SourceRange parenRange);
 
-  explicit DynamicReplacementAttr(DeclName name)
+  DynamicReplacementAttr(DeclName name, AbstractFunctionDecl *f)
       : DeclAttribute(DAK_DynamicReplacement, SourceLoc(), SourceRange(),
                       /*Implicit=*/false),
-        ReplacedFunctionName(name), ReplacedFunction(nullptr) {
+        ReplacedFunctionName(name),
+        Resolver(nullptr), ResolverContextData(0) {
+    Bits.DynamicReplacementAttr.HasTrailingLocationInfo = false;
+  }
+
+  DynamicReplacementAttr(DeclName name,
+                         LazyMemberLoader *Resolver = nullptr,
+                         uint64_t Data = 0)
+      : DeclAttribute(DAK_DynamicReplacement, SourceLoc(), SourceRange(),
+                      /*Implicit=*/false),
+        ReplacedFunctionName(name),
+        Resolver(Resolver), ResolverContextData(Data) {
     Bits.DynamicReplacementAttr.HasTrailingLocationInfo = false;
   }
 
@@ -1046,23 +1087,16 @@ public:
          SourceLoc LParenLoc, DeclName replacedFunction, SourceLoc RParenLoc);
 
   static DynamicReplacementAttr *create(ASTContext &ctx,
-                                        DeclName replacedFunction);
-
-  static DynamicReplacementAttr *create(ASTContext &ctx,
                                         DeclName replacedFunction,
                                         AbstractFunctionDecl *replacedFuncDecl);
 
+  static DynamicReplacementAttr *create(ASTContext &ctx,
+                                        DeclName replacedFunction,
+                                        LazyMemberLoader *Resolver,
+                                        uint64_t Data);
+
   DeclName getReplacedFunctionName() const {
     return ReplacedFunctionName;
-  }
-
-  AbstractFunctionDecl *getReplacedFunction() const {
-    return ReplacedFunction;
-  }
-
-  void setReplacedFunction(AbstractFunctionDecl *f) {
-    assert(ReplacedFunction == nullptr);
-    ReplacedFunction = f;
   }
 
   /// Retrieve the location of the opening parentheses, if there is one.

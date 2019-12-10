@@ -23,6 +23,7 @@ struct NativeObjectPair {
 sil @get_nativeobject_pair : $@convention(thin) () -> @owned NativeObjectPair
 
 class Klass {}
+sil @guaranteed_klass_user : $@convention(thin) (@guaranteed Klass) -> ()
 
 struct MyInt {
   var value: Builtin.Int32
@@ -434,6 +435,28 @@ bb0(%x : @guaranteed $ClassLet):
   end_borrow %b : $Klass
   destroy_value %v : $Klass
 
+  return undef : $()
+}
+
+// CHECK-LABEL: sil [ossa] @dont_copy_let_properties_with_guaranteed_base_and_forwarding_uses :
+// CHECK:         ref_element_addr
+// CHECK-NEXT:    load_borrow
+// CHECK-NEXT:    unchecked_ref_cast
+// CHECK-NEXT:    apply
+// CHECK-NEXT:    end_borrow
+// CHECK-NEXT:    return
+// CHECK: } // end sil function 'dont_copy_let_properties_with_guaranteed_base_and_forwarding_uses'
+sil [ossa] @dont_copy_let_properties_with_guaranteed_base_and_forwarding_uses : $@convention(thin) (@guaranteed ClassLet) -> () {
+bb0(%x : @guaranteed $ClassLet):
+  %f = function_ref @black_hole : $@convention(thin) (@guaranteed Klass) -> ()
+
+  %p = ref_element_addr %x : $ClassLet, #ClassLet.aLet
+  %v = load [copy] %p : $*Klass
+  %c = unchecked_ref_cast %v : $Klass to $Klass
+  %b = begin_borrow %c : $Klass
+  apply %f(%b) : $@convention(thin) (@guaranteed Klass) -> ()
+  end_borrow %b : $Klass
+  destroy_value %c : $Klass
   return undef : $()
 }
 
@@ -899,4 +922,124 @@ bb2:
 
 bb3:
   unreachable
+}
+
+// Make sure that we put the end_borrow on the load_borrow, not LHS or RHS.
+//
+// CHECK-LABEL: sil [ossa] @destructure_load_copy_to_load_borrow : $@convention(thin) (@guaranteed ClassLet) -> () {
+// CHECK: bb0([[ARG:%.*]] :
+// CHECK:   [[INTERIOR_POINTER:%.*]] = ref_element_addr [[ARG]]
+// CHECK:   [[BORROWED_VAL:%.*]] = load_borrow [[INTERIOR_POINTER]]
+// CHECK:   ([[LHS:%.*]], [[RHS:%.*]]) = destructure_tuple [[BORROWED_VAL]]
+// CHECK:   apply {{%.*}}([[LHS]])
+// CHECK:   apply {{%.*}}([[RHS]])
+// CHECK:   end_borrow [[BORROWED_VAL]]
+// CHECK: } // end sil function 'destructure_load_copy_to_load_borrow'
+sil [ossa] @destructure_load_copy_to_load_borrow : $@convention(thin) (@guaranteed ClassLet) -> () {
+bb0(%0 : @guaranteed $ClassLet):
+  %1 = ref_element_addr %0 : $ClassLet, #ClassLet.aLetTuple
+  %2 = load [copy] %1 : $*(Klass, Klass)
+  (%3, %4) = destructure_tuple %2 : $(Klass, Klass)
+  %5 = function_ref @guaranteed_klass_user : $@convention(thin) (@guaranteed Klass) -> ()
+  %6 = apply %5(%3) : $@convention(thin) (@guaranteed Klass) -> ()
+  %7 = apply %5(%4) : $@convention(thin) (@guaranteed Klass) -> ()
+  destroy_value %3 : $Klass
+  destroy_value %4 : $Klass
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @single_init_allocstack : $@convention(thin) (@owned Klass) -> () {
+// CHECK-NOT: load [copy]
+// CHECK: } // end sil function 'single_init_allocstack'
+sil [ossa] @single_init_allocstack : $@convention(thin) (@owned Klass) -> () {
+bb0(%0 : @owned $Klass):
+  %1 = alloc_stack $Klass
+  store %0 to [init] %1 : $*Klass
+  %2 = load [copy] %1 : $*Klass
+
+  %3 = function_ref @guaranteed_klass_user : $@convention(thin) (@guaranteed Klass) -> ()
+  apply %3(%2) : $@convention(thin) (@guaranteed Klass) -> ()
+
+  destroy_value %2 : $Klass
+  destroy_addr %1 : $*Klass
+  dealloc_stack %1 : $*Klass
+
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @multiple_init_allocstack : $@convention(thin) (@owned Klass) -> () {
+// CHECK: load [copy]
+// CHECK: } // end sil function 'multiple_init_allocstack'
+sil [ossa] @multiple_init_allocstack : $@convention(thin) (@owned Klass) -> () {
+bb0(%0 : @owned $Klass):
+  %0a = copy_value %0 : $Klass
+  %1 = alloc_stack $Klass
+  store %0 to [init] %1 : $*Klass
+  %2 = load [copy] %1 : $*Klass
+
+  %3 = function_ref @guaranteed_klass_user : $@convention(thin) (@guaranteed Klass) -> ()
+  apply %3(%2) : $@convention(thin) (@guaranteed Klass) -> ()
+
+  destroy_value %2 : $Klass
+  destroy_addr %1 : $*Klass
+
+  store %0a to [init] %1 : $*Klass
+  destroy_addr %1 : $*Klass
+  dealloc_stack %1 : $*Klass
+
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// We could support this, but for now we are keeping things simple. If we do add
+// support, this test will need to be updated.
+//
+// CHECK-LABEL: sil [ossa] @single_init_wrongblock : $@convention(thin) (@owned Klass) -> () {
+// CHECK: load [copy]
+// CHECK: } // end sil function 'single_init_wrongblock'
+sil [ossa] @single_init_wrongblock : $@convention(thin) (@owned Klass) -> () {
+bb0(%0 : @owned $Klass):
+  %1 = alloc_stack $Klass
+  br bb1
+
+bb1:
+  store %0 to [init] %1 : $*Klass
+  %2 = load [copy] %1 : $*Klass
+
+  %3 = function_ref @guaranteed_klass_user : $@convention(thin) (@guaranteed Klass) -> ()
+  apply %3(%2) : $@convention(thin) (@guaranteed Klass) -> ()
+
+  destroy_value %2 : $Klass
+  destroy_addr %1 : $*Klass
+  dealloc_stack %1 : $*Klass
+
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// We could support this, but for now we are keeping things simple. If we do add
+// support, this test will need to be updated.
+//
+// CHECK-LABEL: sil [ossa] @single_init_loadtake : $@convention(thin) (@owned Klass) -> () {
+// CHECK: load [copy]
+// CHECK: } // end sil function 'single_init_loadtake'
+sil [ossa] @single_init_loadtake : $@convention(thin) (@owned Klass) -> () {
+bb0(%0 : @owned $Klass):
+  %1 = alloc_stack $Klass
+  store %0 to [init] %1 : $*Klass
+  %2 = load [copy] %1 : $*Klass
+
+  %3 = function_ref @guaranteed_klass_user : $@convention(thin) (@guaranteed Klass) -> ()
+  apply %3(%2) : $@convention(thin) (@guaranteed Klass) -> ()
+
+  destroy_value %2 : $Klass
+
+  %4 = load [take] %1 : $*Klass
+  destroy_value %4 : $Klass
+  dealloc_stack %1 : $*Klass
+
+  %9999 = tuple()
+  return %9999 : $()
 }

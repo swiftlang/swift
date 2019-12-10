@@ -66,6 +66,7 @@ internal func osLog(
   let preamble = message.interpolation.preamble
   let argumentCount = message.interpolation.argumentCount
   let bufferSize = message.bufferSize
+  let uint32bufferSize = UInt32(bufferSize)
   let argumentClosures = message.interpolation.arguments.argumentClosures
 
   let formatStringPointer = _getGlobalStringTablePointer(formatString)
@@ -91,7 +92,7 @@ internal func osLog(
                  logLevel,
                  formatStringPointer,
                  bufferMemory,
-                 UInt32(bufferSize))
+                 uint32bufferSize)
 
   // The following operation extends the lifetime of stringStorageObjects
   // and also of the objects stored in it till this point.

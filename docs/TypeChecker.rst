@@ -981,21 +981,15 @@ to the new diagnostic framework, which is described in detail in this
 
 The things in the queue yet to be ported are:
 
-- ``visitTupleExpr``: Diagnostics related to label/type mismatches
-  associated with tuple conversions.
-
 - Diagnostics related to member references: ``diagnoseMemberFailures``.
   Most of the associated diagnostics have been ported and fixes are
   located in ``ConstraintSystem::simplifyMemberConstraint``.
-
-- Closure expression diagnostics: ``diagnoseClosureExpr``.
 
 - Diagnostics related to ``if`` statement - "conditional" type mismatch
   and, in case of ternary operator, type mismatches between branches.
 
 - Problems related to calls and operator applications e.g.
 
-  - ``@dynamicCallable`` related diagnostics
   - Missing explicit ``Self.`` and ``self.``
   - Logic related to overload candidate ranking (``CalleeCandidateInfo``)
   - ``diagnoseParameterErrors``

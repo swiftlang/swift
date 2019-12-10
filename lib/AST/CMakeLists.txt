@@ -36,6 +36,8 @@ add_swift_host_library(swiftAST STATIC
   AvailabilitySpec.cpp
   Builtins.cpp
   CaptureInfo.cpp
+  ClangSwiftTypeCorrespondence.cpp
+  ClangTypeConverter.cpp
   ConcreteDeclRef.cpp
   ConformanceLookupTable.cpp
   Decl.cpp
@@ -46,9 +48,9 @@ add_swift_host_library(swiftAST STATIC
   DiagnosticList.cpp
   DocComment.cpp
   Evaluator.cpp
-  ExperimentalDependencies.cpp
-  ExperimentalDependenciesSourceFileDepGraphConstructor.cpp
   Expr.cpp
+  FineGrainedDependencies.cpp
+  FineGrainedDependenciesSourceFileDepGraphConstructor.cpp
   GenericEnvironment.cpp
   GenericSignature.cpp
   GenericSignatureBuilder.cpp

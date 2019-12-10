@@ -2168,6 +2168,14 @@ public:
     addValueBaseName(Builder, Name);
     setClangDeclKeywords(VD, Pairs, Builder);
 
+    // "not recommended" in its own getter.
+    if (Kind == LookupKind::ValueInDeclContext) {
+      if (auto accessor = dyn_cast<AccessorDecl>(CurrDeclContext)) {
+        if (accessor->getStorage() == VD && accessor->isGetter())
+          Builder.setNotRecommended(CodeCompletionResult::NoReason);
+      }
+    }
+
     if (!VD->hasInterfaceType())
       return;
 
@@ -2236,6 +2244,7 @@ public:
         return !includeDefaultArgs;
 
       case DefaultArgumentKind::File:
+      case DefaultArgumentKind::FilePath:
       case DefaultArgumentKind::Line:
       case DefaultArgumentKind::Column:
       case DefaultArgumentKind::Function:
@@ -3651,6 +3660,10 @@ public:
                  CodeCompletionLiteralKind::StringLiteral, "String");
     addFromProto("#file", CodeCompletionKeywordKind::pound_file,
                  CodeCompletionLiteralKind::StringLiteral, "String");
+    if (Ctx.LangOpts.EnableConcisePoundFile) {
+      addFromProto("#filePath", CodeCompletionKeywordKind::pound_file,
+                   CodeCompletionLiteralKind::StringLiteral, "String");
+    }
     addFromProto("#line", CodeCompletionKeywordKind::pound_line,
                  CodeCompletionLiteralKind::IntegerLiteral, "Int");
     addFromProto("#column", CodeCompletionKeywordKind::pound_column,

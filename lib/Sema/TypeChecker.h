@@ -723,7 +723,6 @@ public:
   static void addImplicitDynamicAttribute(Decl *D);
   static void checkDeclAttributes(Decl *D);
   static void checkParameterAttributes(ParameterList *params);
-  static ValueDecl *findReplacedDynamicFunction(const ValueDecl *d);
 
   static Type checkReferenceOwnershipAttr(VarDecl *D, Type interfaceType,
                                           ReferenceOwnershipAttr *attr);

@@ -62,9 +62,9 @@ func test_varname_binding() {
 // ForwardIndex referencing of types.
 //===----------------------------------------------------------------------===//
 
-// We don't allow namebinding to look forward past a var declaration in the
+// We allow namebinding to look forward past a var declaration in the
 // main module
-var x : x_ty  // expected-error {{use of undeclared type 'x_ty'}}
+var x : x_ty
 typealias x_ty = Int
 
 // We allow namebinding to look forward past a function declaration (and other

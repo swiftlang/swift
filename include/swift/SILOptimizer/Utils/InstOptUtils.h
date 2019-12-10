@@ -388,6 +388,9 @@ struct LLVM_LIBRARY_VISIBILITY FindLocalApplySitesResult {
 Optional<FindLocalApplySitesResult>
 findLocalApplySites(FunctionRefBaseInst *fri);
 
+/// Gets the base implementation of a method.
+AbstractFunctionDecl *getBaseMethod(AbstractFunctionDecl *FD);
+
 } // end namespace swift
 
 #endif

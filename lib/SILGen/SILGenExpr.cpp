@@ -1480,7 +1480,8 @@ static ManagedValue convertCFunctionSignature(SILGenFunction &SGF,
   // ABI-compatible, since we can't emit a thunk.
   switch (SGF.SGM.Types.checkForABIDifferences(SGF.SGM.M,
                                                loweredResultTy, loweredDestTy)){
-  case TypeConverter::ABIDifference::Trivial:
+  case TypeConverter::ABIDifference::CompatibleRepresentation:
+  case TypeConverter::ABIDifference::CompatibleCallingConvention:
     result = fnEmitter();
     assert(result.getType() == loweredResultTy);
 
@@ -1499,7 +1500,8 @@ static ManagedValue convertCFunctionSignature(SILGenFunction &SGF,
     result = SGF.emitUndef(loweredDestTy);
     break;
 
-  case TypeConverter::ABIDifference::ThinToThick:
+  case TypeConverter::ABIDifference::CompatibleCallingConvention_ThinToThick:
+  case TypeConverter::ABIDifference::CompatibleRepresentation_ThinToThick:
     llvm_unreachable("Cannot have thin to thick conversion here");
   }
 
@@ -1565,25 +1567,22 @@ ManagedValue emitCFunctionPointer(SILGenFunction &SGF,
   // C function pointers cannot capture anything from their context.
   auto captures = SGF.SGM.Types.getLoweredLocalCaptures(constant);
 
-  if (captures.hasGenericParamCaptures() ||
+  if (!captures.getCaptures().empty() ||
+      captures.hasGenericParamCaptures() ||
       captures.hasDynamicSelfCapture() ||
-      captures.hasLocalCaptures() ||
       captures.hasOpaqueValueCapture()) {
-    unsigned kind;
-    if (captures.hasLocalCaptures())
-      kind = 0;
-    else if (captures.hasGenericParamCaptures())
+    unsigned kind = 0;
+    if (captures.hasGenericParamCaptures())
       kind = 1;
-    else if (captures.hasLocalCaptures())
+    else if (captures.hasDynamicSelfCapture())
       kind = 2;
-    else
-      kind = 3;
     SGF.SGM.diagnose(expr->getLoc(),
                      diag::c_function_pointer_from_function_with_context,
                      /*closure*/ constant.hasClosureExpr(),
                      kind);
 
-    return SGF.emitUndef(constantInfo.getSILType());
+    auto loweredTy = SGF.getLoweredType(conversionExpr->getType());
+    return SGF.emitUndef(loweredTy);
   }
 
   return convertCFunctionSignature(
@@ -2688,16 +2687,13 @@ static SILFunction *getOrCreateKeyPathGetter(SILGenModule &SGM,
 
   // Build the signature of the thunk as expected by the keypath runtime.
   CanType loweredBaseTy, loweredPropTy;
-  {
-    GenericContextScope scope(SGM.Types, genericSig);
-    AbstractionPattern opaque = AbstractionPattern::getOpaque();
+  AbstractionPattern opaque = AbstractionPattern::getOpaque();
 
-    loweredBaseTy = SGM.Types.getLoweredRValueType(
-        TypeExpansionContext::minimal(), opaque, baseType);
-    loweredPropTy = SGM.Types.getLoweredRValueType(
-        TypeExpansionContext::minimal(), opaque, propertyType);
-  }
-
+  loweredBaseTy = SGM.Types.getLoweredRValueType(
+      TypeExpansionContext::minimal(), opaque, baseType);
+  loweredPropTy = SGM.Types.getLoweredRValueType(
+      TypeExpansionContext::minimal(), opaque, propertyType);
+  
   auto paramConvention = ParameterConvention::Indirect_In_Guaranteed;
 
   SmallVector<SILParameterInfo, 2> params;
@@ -2711,10 +2707,7 @@ static SILFunction *getOrCreateKeyPathGetter(SILGenModule &SGM,
   SILResultInfo result(loweredPropTy, ResultConvention::Indirect);
   
   auto signature = SILFunctionType::get(genericSig,
-    SILFunctionType::ExtInfo(SILFunctionType::Representation::Thin,
-                             /*pseudogeneric*/ false,
-                             /*noescape*/ false,
-                             DifferentiabilityKind::NonDifferentiable),
+    SILFunctionType::ExtInfo::getThin(),
     SILCoroutineKind::None,
     ParameterConvention::Direct_Unowned,
     params, {}, result, None,
@@ -2828,7 +2821,6 @@ static SILFunction *getOrCreateKeyPathSetter(SILGenModule &SGM,
   // Build the signature of the thunk as expected by the keypath runtime.
   CanType loweredBaseTy, loweredPropTy;
   {
-    GenericContextScope scope(SGM.Types, genericSig);
     AbstractionPattern opaque = AbstractionPattern::getOpaque();
 
     loweredBaseTy = SGM.Types.getLoweredRValueType(
@@ -2856,10 +2848,7 @@ static SILFunction *getOrCreateKeyPathSetter(SILGenModule &SGM,
                       ParameterConvention::Direct_Unowned});
   
   auto signature = SILFunctionType::get(genericSig,
-    SILFunctionType::ExtInfo(SILFunctionType::Representation::Thin,
-                             /*pseudogeneric*/ false,
-                             /*noescape*/ false,
-                             DifferentiabilityKind::NonDifferentiable),
+    SILFunctionType::ExtInfo::getThin(),
     SILCoroutineKind::None,
     ParameterConvention::Direct_Unowned,
     params, {}, {}, None,
@@ -3033,10 +3022,7 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
     results.push_back({boolTy, ResultConvention::Unowned});
     
     auto signature = SILFunctionType::get(genericSig,
-      SILFunctionType::ExtInfo(SILFunctionType::Representation::Thin,
-                               /*pseudogeneric*/ false,
-                               /*noescape*/ false,
-                               DifferentiabilityKind::NonDifferentiable),
+      SILFunctionType::ExtInfo::getThin(),
       SILCoroutineKind::None,
       ParameterConvention::Direct_Unowned,
       params, /*yields*/ {}, results, None,
@@ -3210,10 +3196,7 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
     results.push_back({intTy, ResultConvention::Unowned});
     
     auto signature = SILFunctionType::get(genericSig,
-      SILFunctionType::ExtInfo(SILFunctionType::Representation::Thin,
-                               /*pseudogeneric*/ false,
-                               /*noescape*/ false,
-                               DifferentiabilityKind::NonDifferentiable),
+      SILFunctionType::ExtInfo::getThin(),
       SILCoroutineKind::None,
       ParameterConvention::Direct_Unowned,
       params, /*yields*/ {}, results, None,
@@ -3725,6 +3708,7 @@ RValue RValueEmitter::
 visitMagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr *E, SGFContext C) {
   switch (E->getKind()) {
   case MagicIdentifierLiteralExpr::File:
+  case MagicIdentifierLiteralExpr::FilePath:
   case MagicIdentifierLiteralExpr::Function:
   case MagicIdentifierLiteralExpr::Line:
   case MagicIdentifierLiteralExpr::Column:

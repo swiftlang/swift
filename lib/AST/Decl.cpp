@@ -586,6 +586,22 @@ Result->X = SM.getLocFromExternalSource(Locs->SourceFilePath, Locs->X.Line,   \
   return Result;
 }
 
+StringRef Decl::getAlternateModuleName() const {
+  if (auto *OD = Attrs.getAttribute(DeclAttrKind::DAK_OriginallyDefinedIn)) {
+    return static_cast<const OriginallyDefinedInAttr*>(OD)->OriginalModuleName;
+  }
+  for (auto *DC = getDeclContext(); DC; DC = DC->getParent()) {
+    if (auto decl = DC->getAsDecl()) {
+      if (decl == this)
+        continue;
+      auto AM = decl->getAlternateModuleName();
+      if (!AM.empty())
+        return AM;
+    }
+  }
+  return StringRef();
+}
+
 SourceLoc Decl::getLoc(bool SerializedOK) const {
 #define DECL(ID, X) \
 static_assert(sizeof(checkSourceLocType(&ID##Decl::getLoc)) == 2, \
@@ -1550,9 +1566,9 @@ void PatternBindingEntry::setOriginalInit(Expr *E) {
                              PatternFlags::IsText);
 }
 
-bool PatternBindingEntry::isInitialized() const {
+bool PatternBindingEntry::isInitialized(bool onlyExplicit) const {
   // Directly initialized.
-  if (getInit())
+  if (getInit() && (!onlyExplicit || getEqualLoc().isValid()))
     return true;
 
   // Initialized via a property wrapper.
@@ -1844,7 +1860,7 @@ bool PatternBindingDecl::isComputingPatternBindingEntry(
 
 bool PatternBindingDecl::isExplicitlyInitialized(unsigned i) const {
   const auto &entry = getPatternList()[i];
-  return entry.isInitialized() && entry.getEqualLoc().isValid();
+  return entry.isInitialized(/*onlyExplicit=*/true);
 }
 
 SourceLoc PatternBindingDecl::getEqualLoc(unsigned i) const {
@@ -2828,6 +2844,13 @@ void ValueDecl::setIsDynamic(bool value) {
   LazySemanticInfo.isDynamic = value;
 }
 
+ValueDecl *ValueDecl::getDynamicallyReplacedDecl() const {
+  return evaluateOrDefault(getASTContext().evaluator,
+                           DynamicallyReplacedDeclRequest{
+                               const_cast<ValueDecl *>(this)},
+                           nullptr);
+}
+
 bool ValueDecl::canBeAccessedByDynamicLookup() const {
   if (!hasName())
     return false;
@@ -3006,7 +3029,7 @@ SourceLoc ValueDecl::getAttributeInsertionLoc(bool forModifier) const {
 /// Returns true if \p VD needs to be treated as publicly-accessible
 /// at the SIL, LLVM, and machine levels due to being @usableFromInline.
 bool ValueDecl::isUsableFromInline() const {
-  assert(getFormalAccess() == AccessLevel::Internal);
+  assert(getFormalAccess() <= AccessLevel::Internal);
 
   if (getAttrs().hasAttribute<UsableFromInlineAttr>() ||
       getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>() ||
@@ -3103,7 +3126,7 @@ static AccessLevel getAdjustedFormalAccess(const ValueDecl *VD,
     return getMaximallyOpenAccessFor(VD);
 
   if (treatUsableFromInlineAsPublic &&
-      access == AccessLevel::Internal &&
+      access <= AccessLevel::Internal &&
       VD->isUsableFromInline()) {
     return AccessLevel::Public;
   }
@@ -5028,9 +5051,9 @@ bool AbstractStorageDecl::hasPrivateAccessor() const {
 
 bool AbstractStorageDecl::hasDidSetOrWillSetDynamicReplacement() const {
   if (auto *func = getParsedAccessor(AccessorKind::DidSet))
-    return func->getAttrs().hasAttribute<DynamicReplacementAttr>();
+    return (bool)func->getDynamicallyReplacedDecl();
   if (auto *func = getParsedAccessor(AccessorKind::WillSet))
-    return func->getAttrs().hasAttribute<DynamicReplacementAttr>();
+    return (bool)func->getDynamicallyReplacedDecl();
   return false;
 }
 
@@ -5042,13 +5065,6 @@ bool AbstractStorageDecl::hasAnyNativeDynamicAccessors() const {
   return false;
 }
 
-bool AbstractStorageDecl::hasAnyDynamicReplacementAccessors() const {
-  for (auto accessor : getAllAccessors()) {
-    if (accessor->getAttrs().hasAttribute<DynamicReplacementAttr>())
-      return true;
-  }
-  return false;
-}
 void AbstractStorageDecl::setAccessors(SourceLoc lbraceLoc,
                                        ArrayRef<AccessorDecl *> accessors,
                                        SourceLoc rbraceLoc) {
@@ -5877,13 +5893,12 @@ VarDecl *VarDecl::getLazyStorageProperty() const {
       {});
 }
 
-static bool propertyWrapperInitializedViaInitialValue(
-   const VarDecl *var, bool checkDefaultInit) {
-  auto customAttrs = var->getAttachedPropertyWrappers();
+bool VarDecl::isPropertyMemberwiseInitializedWithWrappedType() const {
+  auto customAttrs = getAttachedPropertyWrappers();
   if (customAttrs.empty())
     return false;
 
-  auto *PBD = var->getParentPatternBinding();
+  auto *PBD = getParentPatternBinding();
   if (!PBD)
     return false;
 
@@ -5898,23 +5913,12 @@ static bool propertyWrapperInitializedViaInitialValue(
     return false;
 
   // Default initialization does not use a value.
-  if (checkDefaultInit &&
-      var->getAttachedPropertyWrapperTypeInfo(0).defaultInit)
+  if (getAttachedPropertyWrapperTypeInfo(0).defaultInit)
     return false;
 
-  // If all property wrappers have an initialValue initializer, the property
+  // If all property wrappers have a wrappedValue initializer, the property
   // wrapper will be initialized that way.
-  return var->allAttachedPropertyWrappersHaveInitialValueInit();
-}
-
-bool VarDecl::isPropertyWrapperInitializedWithInitialValue() const {
-  return propertyWrapperInitializedViaInitialValue(
-      this, /*checkDefaultInit=*/true);
-}
-
-bool VarDecl::isPropertyMemberwiseInitializedWithWrappedType() const {
-  return propertyWrapperInitializedViaInitialValue(
-      this, /*checkDefaultInit=*/false);
+  return allAttachedPropertyWrappersHaveInitialValueInit();
 }
 
 Identifier VarDecl::getObjCPropertyName() const {
@@ -6155,6 +6159,7 @@ bool ParamDecl::hasDefaultExpr() const {
     return false;
   case DefaultArgumentKind::Normal:
   case DefaultArgumentKind::File:
+  case DefaultArgumentKind::FilePath:
   case DefaultArgumentKind::Line:
   case DefaultArgumentKind::Column:
   case DefaultArgumentKind::Function:
@@ -6177,6 +6182,7 @@ bool ParamDecl::hasCallerSideDefaultExpr() const {
   case DefaultArgumentKind::Normal:
     return false;
   case DefaultArgumentKind::File:
+  case DefaultArgumentKind::FilePath:
   case DefaultArgumentKind::Line:
   case DefaultArgumentKind::Column:
   case DefaultArgumentKind::Function:
@@ -6486,6 +6492,7 @@ ParamDecl::getDefaultValueStringRepresentation(
   }
   case DefaultArgumentKind::Inherited: return "super";
   case DefaultArgumentKind::File: return "#file";
+  case DefaultArgumentKind::FilePath: return "#filePath";
   case DefaultArgumentKind::Line: return "#line";
   case DefaultArgumentKind::Column: return "#column";
   case DefaultArgumentKind::Function: return "#function";
