@@ -684,9 +684,9 @@ ErrorBridgingTests.test("Wrapped NSError identity") {
 }
 
 extension Error {
-	func asNSError() -> NSError {
-		return self as NSError
-	}
+  func asNSError() -> NSError {
+    return self as NSError
+  }
 }
 
 func unconditionalCast<T>(_ x: Any, to: T.Type) -> T {
@@ -800,11 +800,11 @@ ErrorBridgingTests.test("CFError-to-Error casts") {
     } else {
       expectUnreachable()
     }
-	}
+  }
 
-	// TODO: Wrap some leak checking around this
-	// Until then, this is a helpful debug tool
-	should_not_leak()
+  // TODO: Wrap some leak checking around this
+  // Until then, this is a helpful debug tool
+  should_not_leak()
 }
 
 runAllTests()
