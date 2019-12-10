@@ -16,13 +16,17 @@
 typedef SWIFT_ENUM_NAMED(NSInteger, ObjCEnum, "SwiftEnum") {
     ObjCEnumOne = 1,
     ObjCEnumTwo,
-    ObjCEnumThree
+    ObjCEnumThree,
+
+    ObjCEnumUnavailable __attribute__((availability(swift,unavailable))) = 999 
 };
 
 typedef SWIFT_EXHAUSTIVE_ENUM(NSInteger, ExhaustiveEnum) {
     ExhaustiveEnumOne = 1,
     ExhaustiveEnumTwo,
-    ExhaustiveEnumThree
+    ExhaustiveEnumThree,
+
+    ExhaustiveEnumUnavailable __attribute__((availability(swift,unavailable))) = 999
 };
 
 enum BareForwardEnum;

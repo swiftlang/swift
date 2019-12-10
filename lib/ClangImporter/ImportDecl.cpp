@@ -2852,35 +2852,41 @@ namespace {
                                       {KnownProtocolKind::RawRepresentable});
         }
 
-        // Provide custom implementations of the init(rawValue:) and rawValue
-        // conversions that just do a bitcast. We can't reliably filter a
-        // C enum without additional knowledge that the type has no
-        // undeclared values, and won't ever add cases.
-        auto rawValueConstructor = makeEnumRawValueConstructor(Impl, enumDecl);
+        if (enumKind == EnumKind::NonFrozenEnum) {
+          // Provide custom implementations of the init(rawValue:) and rawValue
+          // conversions that just do a bitcast. We can't reliably filter a
+          // non-frozen C enum without additional knowledge that the type has no
+          // undeclared values, and won't ever add cases.
+          //
+          // Otherwise, fall back and use the standard 
+          // RawRepresentable conformance generator.
+          auto rawValueConstructor = makeEnumRawValueConstructor(Impl, enumDecl);
 
-        auto varName = C.Id_rawValue;
-        auto rawValue = new (C) VarDecl(/*IsStatic*/false,
-                                        VarDecl::Introducer::Var,
-                                        /*IsCaptureList*/false,
-                                        SourceLoc(), varName,
-                                        enumDecl);
-        rawValue->setImplicit();
-        rawValue->setAccess(AccessLevel::Public);
-        rawValue->setSetterAccess(AccessLevel::Private);
-        rawValue->setInterfaceType(underlyingType);
+          auto varName = C.Id_rawValue;
+          auto rawValue = new (C) VarDecl(/*IsStatic*/false,
+                                          VarDecl::Introducer::Var,
+                                          /*IsCaptureList*/false,
+                                          SourceLoc(), varName,
+                                          enumDecl);
+          rawValue->setImplicit();
+          rawValue->setAccess(AccessLevel::Public);
+          rawValue->setSetterAccess(AccessLevel::Private);
+          rawValue->setInterfaceType(underlyingType);
 
-        // Create a pattern binding to describe the variable.
-        Pattern *varPattern = createTypedNamedPattern(rawValue);
+          // Create a pattern binding to describe the variable.
+          Pattern *varPattern = createTypedNamedPattern(rawValue);
 
-        auto *rawValueBinding = PatternBindingDecl::createImplicit(
-            C, StaticSpellingKind::None, varPattern, /*InitExpr*/ nullptr,
-            enumDecl);
+          auto *rawValueBinding = PatternBindingDecl::createImplicit(
+              C, StaticSpellingKind::None, varPattern, /*InitExpr*/ nullptr,
+              enumDecl);
 
-        makeEnumRawValueGetter(Impl, enumDecl, rawValue);
+          makeEnumRawValueGetter(Impl, enumDecl, rawValue);
 
-        enumDecl->addMember(rawValueConstructor);
-        enumDecl->addMember(rawValue);
-        enumDecl->addMember(rawValueBinding);
+          enumDecl->addMember(rawValueConstructor);
+          enumDecl->addMember(rawValue);
+          enumDecl->addMember(rawValueBinding);
+        }
+ 
 
         addSynthesizedTypealias(enumDecl, C.Id_RawValue, underlyingType);
         Impl.RawTypes[enumDecl] = underlyingType;
