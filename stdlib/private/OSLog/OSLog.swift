@@ -41,7 +41,7 @@ public struct Logger {
   @_transparent
   @_optimize(none)
   public func log(level: OSLogType = .default, _ message: OSLogMessage) {
-    osLog(logObject, level, message)
+    osLog(log: logObject, level: level, message)
   }
 
   // TODO: define overloads for logging at specific levels: debug, info, notice,
@@ -52,12 +52,11 @@ public struct Logger {
 /// extract the format string, serialize the arguments to a byte buffer,
 /// and pass them to the OS logging system.
 @available(macOS 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
-@usableFromInline
 @_transparent
 @_optimize(none)
-internal func osLog(
-  _ logObject: OSLog,
-  _ logLevel: OSLogType,
+public func osLog(
+  log logObject: OSLog,
+  level logLevel: OSLogType,
   _ message: OSLogMessage
 ) {
   // Compute static constants first so that they can be folded by
@@ -94,9 +93,12 @@ internal func osLog(
                  bufferMemory,
                  uint32bufferSize)
 
-  // The following operation extends the lifetime of stringStorageObjects
-  // and also of the objects stored in it till this point.
-  stringStorageObjects.removeAll()
+  // The following operation extends the lifetime of argumentClosures,
+  // stringStorageObjects, and also of the objects stored in them till this
+  // point. This is necessary because __os_log_impl is passed internal pointers
+  // to the objects/strings stored in these arrays.
+  _fixLifetime(argumentClosures)
+  _fixLifetime(stringStorageObjects)
   bufferMemory.deallocate()
 }
 
@@ -136,6 +138,7 @@ func _checkFormatStringAndBuffer(
     formatString,
     UnsafeBufferPointer(start: UnsafePointer(bufferMemory), count: bufferSize))
 
-  stringStorageObjects.removeAll()
+  _fixLifetime(argumentClosures)
+  _fixLifetime(stringStorageObjects)
   bufferMemory.deallocate()
 }
