@@ -28,7 +28,6 @@ namespace swift {
 /// the ClangImporter needs to keep track of where imports were originally written.
 /// Located makes it easy to do so while making the code more readable, compared to
 /// using `std::pair`.
-
 template<typename T>
 struct Located {
 
