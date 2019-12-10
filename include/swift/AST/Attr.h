@@ -1908,10 +1908,6 @@ public:
   FuncDecl *getVJPFunction() const { return VJPFunction; }
   void setVJPFunction(FuncDecl *decl);
 
-  bool parametersMatch(const DifferentiableAttr &other) const {
-    return getParameterIndices() == other.getParameterIndices();
-  }
-
   /// Get the derivative generic environment for the given `@differentiable`
   /// attribute and original function.
   GenericEnvironment *
@@ -1999,8 +1995,8 @@ public:
   IndexSubset *getParameterIndices() const {
     return ParameterIndices;
   }
-  void setParameterIndices(IndexSubset *pi) {
-    ParameterIndices = pi;
+  void setParameterIndices(IndexSubset *parameterIndices) {
+    ParameterIndices = parameterIndices;
   }
 
   static bool classof(const DeclAttribute *DA) {
@@ -2079,8 +2075,8 @@ public:
   IndexSubset *getParameterIndices() const {
     return ParameterIndices;
   }
-  void setParameterIndices(IndexSubset *pi) {
-    ParameterIndices = pi;
+  void setParameterIndices(IndexSubset *parameterIndices) {
+    ParameterIndices = parameterIndices;
   }
 
   static bool classof(const DeclAttribute *DA) {

@@ -183,11 +183,11 @@ void TBDGenVisitor::addAutoDiffLinearMapFunction(AbstractFunctionDecl *original,
                                                  AutoDiffLinearMapKind kind) {
   auto declRef = SILDeclRef(original);
 
-  // Linear maps are only public when the original function is serialized.
+  // Linear maps are public only when the original function is serialized.
   if (!declRef.isSerialized())
     return;
 
-  // Differentials are only emitted when forward mode is turned on.
+  // Linear maps are emitted only when forward mode is enabled.
   if (kind == AutoDiffLinearMapKind::Differential &&
       !original->getASTContext()
            .LangOpts.EnableExperimentalForwardModeDifferentiation)

@@ -804,6 +804,18 @@ Parser::parseImplementsAttribute(SourceLoc AtLoc, SourceLoc Loc) {
                            ProtocolType.get(), MemberName, MemberNameLoc));
 }
 
+/// Parse a `@differentiable` attribute, returning true on error.
+///
+/// \verbatim
+///   differentiable-attribute-arguments:
+///     '(' (differentiation-params-clause ',')?
+///         (differentiable-attr-func-specifier ',')?
+///         differentiable-attr-func-specifier?
+///         where-clause?
+///     ')'
+///   differentiable-attr-func-specifier:
+///     ('jvp' | 'vjp') ':' decl-name
+/// \endverbatim
 ParserResult<DifferentiableAttr>
 Parser::parseDifferentiableAttribute(SourceLoc atLoc, SourceLoc loc) {
   StringRef AttrName = "differentiable";
@@ -852,6 +864,16 @@ static bool errorAndSkipUntilConsumeRightParen(Parser &P, StringRef attrName,
   return true;
 };
 
+/// Parse a differentiation parameters 'wrt:' clause, returning true on error.
+///
+/// \verbatim
+///   differentiation-params-clause:
+///     'wrt' ':' (differentiation-param | differentiation-params)
+///   differentiation-params:
+///     '(' differentiation-param (',' differentiation-param)* ')'
+///   differentiation-param:
+///     'self' | identifier
+/// \endverbatim
 bool Parser::parseDifferentiationParametersClause(
     SmallVectorImpl<ParsedAutoDiffParameter> &params, StringRef attrName) {
   SyntaxParsingContext DiffParamsClauseContext(
@@ -929,6 +951,16 @@ bool Parser::parseDifferentiationParametersClause(
 }
 
 // SWIFT_ENABLE_TENSORFLOW
+/// Parse a transposed parameters 'wrt:' clause, returning true on error.
+///
+/// \verbatim
+///   transposed-params-clause:
+///     'wrt' ':' (transposed-param | transposed-params)
+///   transposed-params:
+///     '(' transposed-param (',' transposed-param)* ')'
+///   transposed-param:
+///     'self' | [0-9]+
+/// \endverbatim
 bool Parser::parseTransposedParametersClause(
     SmallVectorImpl<ParsedAutoDiffParameter> &params, StringRef attrName) {
   SyntaxParsingContext TransposeParamsClauseContext(
@@ -1130,7 +1162,13 @@ bool Parser::parseDifferentiableAttributeArguments(
   return false;
 }
 
-/// SWIFT_ENABLE_TENSORFLOW
+// SWIFT_ENABLE_TENSORFLOW
+/// Parse a `@derivative(of:)` attribute, returning true on error.
+///
+/// \verbatim
+///   derivative-attribute-arguments:
+///     '(' 'of' ':' decl-name (',' differentiation-params-clause)? ')'
+/// \endverbatim
 ParserResult<DerivativeAttr> Parser::parseDerivativeAttribute(SourceLoc atLoc,
                                                               SourceLoc loc) {
   StringRef AttrName = "derivative";
@@ -1196,7 +1234,7 @@ ParserResult<DerivativeAttr> Parser::parseDerivativeAttribute(SourceLoc atLoc,
                              SourceRange(loc, rParenLoc), original, params));
 }
 
-/// SWIFT_ENABLE_TENSORFLOW
+// SWIFT_ENABLE_TENSORFLOW
 ParserResult<DerivativeAttr>
 Parser::parseDifferentiatingAttribute(SourceLoc atLoc, SourceLoc loc) {
   StringRef AttrName = "differentiating";
@@ -1315,6 +1353,12 @@ bool parseQualifiedDeclName(Parser &P, Diag<> nameParseError,
 // SWIFT_ENABLE_TENSORFLOW END
 
 // SWIFT_ENABLE_TENSORFLOW
+/// Parse a `@transpose(of:)` attribute, returning true on error.
+///
+/// \verbatim
+///   transpose-attribute-arguments:
+///     '(' 'of' ':' decl-name (',' transposed-params-clause)? ')'
+/// \endverbatim
 ParserResult<TransposeAttr> Parser::parseTransposeAttribute(SourceLoc atLoc,
                                                             SourceLoc loc) {
   StringRef AttrName = "transpose";

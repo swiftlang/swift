@@ -2030,8 +2030,8 @@ static uint8_t getRawStableVarDeclIntroducer(swift::VarDecl::Introducer intr) {
 }
 
 // SWIFT_ENABLE_TENSORFLOW
-/// Translate from the AST differentiability kind enum to the Serialization enum
-/// values, which are guaranteed to be stable.
+/// Translate from the AST derivative function kind enum to the Serialization
+/// enum values, which are guaranteed to be stable.
 static uint8_t getRawStableAutoDiffDerivativeFunctionKind(
     swift::AutoDiffDerivativeFunctionKind kind) {
   switch (kind) {
