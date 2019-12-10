@@ -2826,6 +2826,16 @@ bool TupleContextualFailure::diagnoseAsError() {
   return true;
 }
 
+bool FunctionTypeMismatch::diagnoseAsError() {
+  auto purpose = getContextualTypePurpose();
+  auto diagnostic = getDiagnosticFor(purpose, /*forProtocol=*/false);
+  if (!diagnostic)
+    return false;
+
+  emitDiagnostic(getAnchor()->getLoc(), *diagnostic, getFromType(), getToType());
+  return true;
+}
+
 bool AutoClosureForwardingFailure::diagnoseAsError() {
   auto *loc = getLocator();
   auto last = loc->castLastElementTo<LocatorPathElt::ApplyArgToParam>();

@@ -3543,19 +3543,21 @@ bool ConstraintSystem::repairFailures(
 
     // Drop the `tuple element` locator element so that all tuple element
     // mismatches within the same tuple type can be coalesced later.
+    auto index = elt.getAs<LocatorPathElt::TupleElement>()->getIndex();
     path.pop_back();
     auto *tupleLocator = getConstraintLocator(locator.getAnchor(), path);
 
-    // TODO: Add a tailored fix for function parameter type mismatches.
     // Let this fail if it's a contextual mismatch with sequence element types,
     // as there's a special fix for that.
-    if (tupleLocator->isLastElement<LocatorPathElt::FunctionArgument>() ||
-        tupleLocator->isLastElement<LocatorPathElt::SequenceElementType>())
+    if (tupleLocator->isLastElement<LocatorPathElt::SequenceElementType>())
       break;
 
-    auto index = elt.getAs<LocatorPathElt::TupleElement>()->getIndex();
-    auto *fix =
-        AllowTupleTypeMismatch::create(*this, lhs, rhs, tupleLocator, index);
+    ConstraintFix *fix;
+    if (tupleLocator->isLastElement<LocatorPathElt::FunctionArgument>()) {
+      fix = AllowFunctionTypeMismatch::create(*this, lhs, rhs, tupleLocator, index);
+    } else {
+      fix = AllowTupleTypeMismatch::create(*this, lhs, rhs, tupleLocator, index);
+    }
     conversionsOrFixes.push_back(fix);
     break;
   }
@@ -8531,6 +8533,12 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
     if (recordFix(fix))
       return SolutionKind::Error;
     return matchTupleTypes(matchingType, smaller, matchKind, subflags, locator);
+  }
+
+  case FixKind::AllowFunctionTypeMismatch: {
+    if (recordFix(fix, /*impact=*/5))
+      return SolutionKind::Error;
+    return SolutionKind::Solved;
   }
 
   case FixKind::TreatEphemeralAsNonEphemeral: {
