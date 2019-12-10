@@ -1778,7 +1778,7 @@ ModuleDecl *ASTContext::getStdlibModule(bool loadIfAbsent) {
   if (loadIfAbsent) {
     auto mutableThis = const_cast<ASTContext*>(this);
     TheStdlibModule =
-      mutableThis->getModule({{ StdlibModuleName, SourceLoc() }});
+      mutableThis->getModule({ Located<Identifier>(StdlibModuleName, SourceLoc()) });
   } else {
     TheStdlibModule = getLoadedModule(StdlibModuleName);
   }

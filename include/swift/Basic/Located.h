@@ -10,7 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// Provides a currency data type Located<T> that should be used instead of std::pair<T, SourceLoc>.
+// Provides a currency data type Located<T> that should be used instead
+// of std::pair<T, SourceLoc>.
 //
 //===----------------------------------------------------------------------===//
 
@@ -22,11 +23,12 @@
 namespace swift {
 
 /// A currency type for keeping track of items which were found in the source code.
-///
-/// Several parts of the compiler need to keep track of a `SourceLoc` corresponding to an item, in case
-/// they need to report some diagnostics later. For example, the ClangImporter needs to keep track
-/// of where imports were originally written. Located makes it easy to do so while making the code
-/// more readable, compared to using `std::pair`.
+/// Several parts of the compiler need to keep track of a `SourceLoc` corresponding
+/// to an item, in case they need to report some diagnostics later. For example,
+/// the ClangImporter needs to keep track of where imports were originally written.
+/// Located makes it easy to do so while making the code more readable, compared to
+/// using `std::pair`.
+
 template<typename T>
 struct Located {
 

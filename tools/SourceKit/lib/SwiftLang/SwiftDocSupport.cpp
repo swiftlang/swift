@@ -52,7 +52,7 @@ static ModuleDecl *getModuleByFullName(ASTContext &Ctx, StringRef ModuleName) {
 }
 
 static ModuleDecl *getModuleByFullName(ASTContext &Ctx, Identifier ModuleName) {
-  return Ctx.getModule({{ModuleName, SourceLoc()}});
+  return Ctx.getModule({ Located<Identifier>(ModuleName, SourceLoc()) });
 }
 
 namespace {

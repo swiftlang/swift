@@ -98,7 +98,7 @@ bool swift::emitImportedModules(ASTContext &Context, ModuleDecl *mainModule,
   }
 
   if (opts.ImportUnderlyingModule) {
-    auto underlyingModule = clangImporter->loadModule(SourceLoc(), {{ mainModule->getName(), SourceLoc() }});
+    auto underlyingModule = clangImporter->loadModule(SourceLoc(), { Located<Identifier>(mainModule->getName(), SourceLoc()) });
     if (!underlyingModule) {
       Context.Diags.diagnose(SourceLoc(),
                              diag::error_underlying_module_not_found,

@@ -1600,7 +1600,7 @@ static ModuleDecl *getModuleByFullName(ASTContext &Context, StringRef ModuleName
 }
 
 static ModuleDecl *getModuleByFullName(ASTContext &Context, Identifier ModuleName) {
-  ModuleDecl *Result = Context.getModule({{ModuleName,SourceLoc()}});
+  ModuleDecl *Result = Context.getModule({ Located<Identifier>(ModuleName,SourceLoc()) });
   if (!Result || Result->failedToLoad())
     return nullptr;
   return Result;
