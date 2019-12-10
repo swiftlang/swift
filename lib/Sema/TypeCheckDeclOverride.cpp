@@ -739,6 +739,12 @@ SmallVector<OverrideMatch, 2> OverrideMatcher::match(
   if (members.empty() || name != membersName) {
     membersName = name;
     members.clear();
+    // FIXME: This suggests we need to use TypeChecker's high-level lookup
+    // entrypoints.  But first we need one that supports additive qualified
+    // lookup.
+    for (auto *ctx : superContexts) {
+      ctx->synthesizeSemanticMembersIfNeeded(membersName);
+    }
     dc->lookupQualified(superContexts, membersName,
                         NL_QualifiedDefault, members);
   }
