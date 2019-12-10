@@ -2973,6 +2973,11 @@ public:
     return allocateCopy(vec.begin(), vec.end());
   }
 
+  /// Generate constraints for the body of the given single-statement closure.
+  ///
+  /// \returns a possibly-sanitized expression, or null if an error occurred.
+  Expr *generateConstraints(ClosureExpr *closure);
+
   /// Generate constraints for the given (unchecked) expression.
   ///
   /// \returns a possibly-sanitized expression, or null if an error occurred.

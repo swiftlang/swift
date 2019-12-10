@@ -3781,22 +3781,32 @@ namespace {
   };
 } // end anonymous namespace
 
-Expr *ConstraintSystem::generateConstraints(Expr *expr, DeclContext *dc) {
-  InputExprs.insert(expr);
-
+static Expr *generateConstraintsFor(ConstraintSystem &cs, Expr *expr,
+                                    DeclContext *DC) {
   // Remove implicit conversions from the expression.
-  expr = expr->walk(SanitizeExpr(*this));
+  expr = expr->walk(SanitizeExpr(cs));
 
   // Walk the expression, generating constraints.
-  ConstraintGenerator cg(*this, dc);
+  ConstraintGenerator cg(cs, DC);
   ConstraintWalker cw(cg);
-  
-  Expr* result = expr->walk(cw);
-  
+
+  Expr *result = expr->walk(cw);
+
   if (result)
-    this->optimizeConstraints(result);
+    cs.optimizeConstraints(result);
 
   return result;
+}
+
+Expr *ConstraintSystem::generateConstraints(ClosureExpr *closure) {
+  assert(closure->hasSingleExpressionBody());
+  return generateConstraintsFor(*this, closure->getSingleExpressionBody(),
+                                closure);
+}
+
+Expr *ConstraintSystem::generateConstraints(Expr *expr, DeclContext *dc) {
+  InputExprs.insert(expr);
+  return generateConstraintsFor(*this, expr, dc);
 }
 
 Type ConstraintSystem::generateConstraints(Pattern *pattern,
