@@ -33,6 +33,7 @@ namespace swift {
 class AbstractStorageDecl;
 class AccessorDecl;
 enum class AccessorKind;
+class DefaultArgumentExpr;
 class GenericParamList;
 class PrecedenceGroupDecl;
 struct PropertyWrapperBackingPropertyInfo;
@@ -1910,6 +1911,29 @@ private:
 
   // Evaluation.
   llvm::Expected<Expr *> evaluate(Evaluator &evaluator, ParamDecl *param) const;
+
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+  Optional<Expr *> getCachedResult() const;
+  void cacheResult(Expr *expr) const;
+};
+
+/// Computes the fully type-checked caller-side default argument within the
+/// context of the call site that it will be inserted into.
+class CallerSideDefaultArgExprRequest
+    : public SimpleRequest<CallerSideDefaultArgExprRequest,
+                           Expr *(DefaultArgumentExpr *),
+                           CacheKind::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<Expr *> evaluate(Evaluator &evaluator,
+                                  DefaultArgumentExpr *defaultExpr) const;
 
 public:
   // Separate caching.

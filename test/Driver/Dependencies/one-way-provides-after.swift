@@ -19,8 +19,8 @@
 // RUN: touch -t 201401240006 %t/other.swift
 // RUN: cd %t && %swiftc_driver -c -driver-use-frontend-path "%{python};%S/Inputs/update-dependencies.py" -output-file-map %t/output.json -incremental -driver-always-rebuild-dependents ./main.swift ./other.swift -module-name main -j1 -v 2>&1 | %FileCheck -check-prefix=CHECK-SECOND %s
 
-// CHECK-SECOND: Handled other.swift
-// CHECK-SECOND: Handled main.swift
+// CHECK-SECOND-DAG: Handled other.swift
+// CHECK-SECOND-DAG: Handled main.swift
 
 // RUN: touch -t 201401240007 %t/other.swift
 // RUN: cd %t && %swiftc_driver -c -driver-use-frontend-path "%{python};%S/Inputs/update-dependencies.py" -output-file-map %t/output.json -incremental -driver-always-rebuild-dependents ./main.swift ./other.swift -module-name main -j1 -v 2>&1 | %FileCheck -check-prefix=CHECK-SECOND %s

@@ -533,32 +533,50 @@ swift::matchWitness(
   // SWIFT_ENABLE_TENSORFLOW
   auto result = finalize(anyRenaming, optionalAdjustments);
   if (result.isViable()) {
-    // '@differentiable' attributes must match completely. If there exists a
-    // '@differentiable' attribute with a superset of the "wrt" parameters of
-    // a requirement, then an '@differentiable' attribute is added
-    // automatically.
+    // For all `@differentiable` attributes of the protocol requirement, check
+    // that the witness has a derivative configuration with exactly the same
+    // parameter indices, or one with "superset" parameter indices. If there
+    // exists a witness derivative configuration with "superset" parameter
+    // indices, create an implicit `@differentiable` attribute for the witness
+    // with the exact parameter indices from the requirement `@differentiable`
+    // attribute.
     ASTContext &ctx = witness->getASTContext();
-    auto witnessDiffAttrs = witnessAttrs
-        .getAttributes<DifferentiableAttr, /*AllowInvalid*/ true>();
+    auto *witnessAFD = dyn_cast<AbstractFunctionDecl>(witness);
+    if (auto *witnessASD = dyn_cast<AbstractStorageDecl>(witness))
+      witnessAFD = witnessASD->getAccessor(AccessorKind::Get);
+    // NOTE: Validate `@differentiable` attributes by calling
+    // `getParameterIndices`. This is important for type-checking
+    // `@differentiable` attributes in non-primary files to skip invalid
+    // attributes and to resolve derivative configurations, used below.
+    for (auto *witnessDiffAttr :
+         witnessAttrs.getAttributes<DifferentiableAttr>()) {
+      (void)witnessDiffAttr->getParameterIndices();
+    }
     for (auto *reqDiffAttr : reqAttrs.getAttributes<DifferentiableAttr>()) {
-      // TODO(TF-482): Also check whether generic requirements are the same.
-      bool reqDiffAttrMatch = llvm::any_of(
-          witnessDiffAttrs, [&](const DifferentiableAttr *witnessDiffAttr) {
-            return witnessDiffAttr->getParameterIndices() &&
-                   reqDiffAttr->getParameterIndices() &&
-                   witnessDiffAttr->parametersMatch(*reqDiffAttr);
-          });
-      bool reqDiffAttrSupersetMatch = llvm::any_of(
-          witnessDiffAttrs, [&](const DifferentiableAttr *witnessDiffAttr) {
-            return witnessDiffAttr->getParameterIndices() &&
-                   reqDiffAttr->getParameterIndices() &&
-                   witnessDiffAttr->getParameterIndices()
-                     ->isSupersetOf(reqDiffAttr->getParameterIndices());
-          });
-      if (!reqDiffAttrMatch) {
-        auto implicitDiffAttr = false;
-        if (reqDiffAttrSupersetMatch) {
-          auto *witnessAFD = cast<AbstractFunctionDecl>(witness);
+      (void)reqDiffAttr->getParameterIndices();
+    }
+    for (auto *reqDiffAttr : reqAttrs.getAttributes<DifferentiableAttr>()) {
+      bool foundExactAttr = false;
+      bool foundSupersetAttr = false;
+      for (auto witnessConfig :
+           witnessAFD->getDerivativeFunctionConfigurations()) {
+        if (witnessConfig.parameterIndices ==
+            reqDiffAttr->getParameterIndices())
+          foundExactAttr = true;
+        if (witnessConfig.parameterIndices->isSupersetOf(
+                reqDiffAttr->getParameterIndices()))
+          foundSupersetAttr = true;
+      }
+      if (!foundExactAttr) {
+        bool success = false;
+        if (foundSupersetAttr) {
+          // If the witness has a "superset" derivative configuration, create an
+          // implicit `@differentiable` attribute with the exact requirement
+          // `@differentiable` attribute parameter indices.
+          // TODO(TF-1041): Investigate why this logic is necessary. When
+          // "implicit `@differentiable` attribute" logic is removed, core
+          // stdlib compilation succeeds and AutoDiff tests pass, but TensorFlow
+          // compilation crashes. An AutoDiff reproducer test should be added.
           auto *newAttr = DifferentiableAttr::create(
               witnessAFD, /*implicit*/ true, reqDiffAttr->AtLoc,
               reqDiffAttr->getRange(), reqDiffAttr->isLinear(),
@@ -566,22 +584,24 @@ swift::matchWitness(
               /*vjp*/ None, reqDiffAttr->getDerivativeGenericSignature());
           auto insertion = ctx.DifferentiableAttrs.try_emplace(
               {witnessAFD, newAttr->getParameterIndices()}, newAttr);
-          // Register derivative function configuration.
-          auto *resultIndices = IndexSubset::get(ctx, 1, {0});
-          witnessAFD->addDerivativeFunctionConfiguration(
-              {newAttr->getParameterIndices(), resultIndices,
-               newAttr->getDerivativeGenericSignature()});
-          // Valid `@differentiable` attributes are uniqued by their parameter
-          // indices. Reject duplicate attributes for the same decl and parameter
-          // indices pair.
+          // Valid `@differentiable` attributes are uniqued by original function
+          // and parameter indices. Reject duplicate attributes.
           if (!insertion.second) {
             newAttr->setInvalid();
           } else {
             witness->getAttrs().add(newAttr);
-            implicitDiffAttr = true;
+            success = true;
           }
         }
-        if (!implicitDiffAttr) {
+        if (!success) {
+          LLVM_DEBUG({
+            llvm::dbgs() << "Protocol requirement match failure: missing "
+                            "`@differentiable` attribute for witness ";
+            witnessAFD->dumpRef(llvm::dbgs());
+            llvm::dbgs() << " from requirement ";
+            req->dumpRef(llvm::dbgs());
+            llvm::dbgs() << '\n';
+          });
           if (auto *vdWitness = dyn_cast<VarDecl>(witness))
             return RequirementMatch(
                 getStandinForAccessor(vdWitness, AccessorKind::Get),

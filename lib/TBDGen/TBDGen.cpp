@@ -179,22 +179,22 @@ void TBDGenVisitor::addConformances(DeclContext *DC) {
 
 // SWIFT_ENABLE_TENSORFLOW
 void TBDGenVisitor::addAutoDiffLinearMapFunction(AbstractFunctionDecl *original,
-                                                 const DifferentiableAttr *attr,
+                                                 IndexSubset *parameterIndices,
                                                  AutoDiffLinearMapKind kind) {
   auto declRef = SILDeclRef(original);
 
-  // Linear maps are only public when the original function is serialized.
+  // Linear maps are public only when the original function is serialized.
   if (!declRef.isSerialized())
     return;
 
-  // Differentials are only emitted when forward mode is turned on.
+  // Linear maps are emitted only when forward mode is enabled.
   if (kind == AutoDiffLinearMapKind::Differential &&
       !original->getASTContext()
            .LangOpts.EnableExperimentalForwardModeDifferentiation)
     return;
 
   auto *loweredParamIndices = autodiff::getLoweredParameterIndices(
-      attr->getParameterIndices(),
+      parameterIndices,
       original->getInterfaceType()->castTo<AnyFunctionType>());
   Mangle::ASTMangler mangler;
   std::string linearMapName = mangler.mangleAutoDiffLinearMapHelper(
@@ -203,26 +203,26 @@ void TBDGenVisitor::addAutoDiffLinearMapFunction(AbstractFunctionDecl *original,
 }
 
 void TBDGenVisitor::addAutoDiffDerivativeFunction(
-    AbstractFunctionDecl *original, const DifferentiableAttr *attr,
+    AbstractFunctionDecl *original, IndexSubset *parameterIndices,
     AutoDiffDerivativeFunctionKind kind) {
   auto *assocFnId = AutoDiffDerivativeFunctionIdentifier::get(
-      kind, attr->getParameterIndices(), original->getASTContext());
+      kind, parameterIndices, original->getASTContext());
   addSymbol(SILDeclRef(original).asAutoDiffDerivativeFunction(assocFnId));
 }
 
 void TBDGenVisitor::addDifferentiabilityWitness(
-    AbstractFunctionDecl *original, const DifferentiableAttr *attr) {
+    AbstractFunctionDecl *original, IndexSubset *parameterIndices,
+    IndexSubset *resultIndices, GenericSignature derivativeGenericSignature) {
   if (SILDeclRef(original).getLinkage(ForDefinition) != SILLinkage::Public)
     return;
 
-  auto *resultIndices = IndexSubset::get(original->getASTContext(), 1, {0});
   auto *loweredParamIndices = autodiff::getLoweredParameterIndices(
-      attr->getParameterIndices(),
+      parameterIndices,
       original->getInterfaceType()->castTo<AnyFunctionType>());
 
   std::string originalMangledName = SILDeclRef(original).mangle();
   AutoDiffConfig config{loweredParamIndices, resultIndices,
-                        attr->getDerivativeGenericSignature()};
+                        derivativeGenericSignature};
   SILDifferentiabilityWitnessKey key(originalMangledName, config);
 
   Mangle::ASTMangler mangle;
@@ -230,16 +230,19 @@ void TBDGenVisitor::addDifferentiabilityWitness(
   addSymbol(mangledName);
 }
 
-void TBDGenVisitor::addDifferentiableAttr(AbstractFunctionDecl *original,
-                                          const DifferentiableAttr *attr) {
-  addAutoDiffLinearMapFunction(original, attr,
+void TBDGenVisitor::addDerivativeConfiguration(AbstractFunctionDecl *original,
+                                               AutoDiffConfig config) {
+  addAutoDiffLinearMapFunction(original, config.parameterIndices,
                                AutoDiffLinearMapKind::Differential);
-  addAutoDiffLinearMapFunction(original, attr, AutoDiffLinearMapKind::Pullback);
-  addAutoDiffDerivativeFunction(original, attr,
+  addAutoDiffLinearMapFunction(original, config.parameterIndices,
+                               AutoDiffLinearMapKind::Pullback);
+  addAutoDiffDerivativeFunction(original, config.parameterIndices,
                                 AutoDiffDerivativeFunctionKind::JVP);
-  addAutoDiffDerivativeFunction(original, attr,
+  addAutoDiffDerivativeFunction(original, config.parameterIndices,
                                 AutoDiffDerivativeFunctionKind::VJP);
-  addDifferentiabilityWitness(original, attr);
+  addDifferentiabilityWitness(original, config.parameterIndices,
+                              config.resultIndices,
+                              config.derivativeGenericSignature);
 }
 
 /// Determine whether dynamic replacement should be emitted for the allocator or
@@ -306,9 +309,8 @@ void TBDGenVisitor::visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
   }
 
   // SWIFT_ENABLE_TENSORFLOW
-  auto diffAttrs = AFD->getAttrs().getAttributes<DifferentiableAttr>();
-  for (auto *DA : diffAttrs) {
-    addDifferentiableAttr(AFD, DA);
+  for (auto derivativeConfig : AFD->getDerivativeFunctionConfigurations()) {
+    addDerivativeConfiguration(AFD, derivativeConfig);
   }
 
   visitDefaultArguments(AFD, AFD->getParameters());
@@ -357,12 +359,6 @@ void TBDGenVisitor::visitAbstractStorageDecl(AbstractStorageDecl *ASD) {
       addSymbol(LinkEntity::forOpaqueTypeDescriptorAccessor(opaqueResult));
       addSymbol(LinkEntity::forOpaqueTypeDescriptorAccessorVar(opaqueResult));
     }
-  }
-
-  // SWIFT_ENABLE_TENSORFLOW
-  auto diffAttrs = ASD->getAttrs().getAttributes<DifferentiableAttr>();
-  for (auto *DA : diffAttrs) {
-    addDifferentiableAttr(ASD->getAccessor(AccessorKind::Get), DA);
   }
 
   // Explicitly look at each accessor here: see visitAccessorDecl.

@@ -42,7 +42,7 @@ Backticks were added manually.
     *   [The `Differentiable` protocol](#the-differentiable-protocol)
     *   [The `@differentiable` declaration attribute](#the-differentiable-declaration-attribute)
     *   [`@differentiable` function types](#differentiable-function-types)
-    *   [`@differentiating` and `@transposing` attributes](#differentiating-and-transposing-attributes)
+    *   [`@derivative` and `@transpose` attributes](#derivative-and-transpose-attributes)
     *   [Differential operators](#differential-operators)
 *   [Detailed design](#detailed-design)
     *   [Differentiable data structures](#differentiable-data-structures)
@@ -57,8 +57,8 @@ Backticks were added manually.
         *   [Conformance and subclassing](#conformance-and-subclassing)
             *   [Protocol dispatch](#protocol-dispatch)
             *   [Class dispatch](#class-dispatch)
-    *   [Make a function differentiable using `@differentiating` or
-        `@transposing`](#make-a-function-differentiable-using-differentiating-or-transposing)
+    *   [Make a function differentiable using `@derivative` or
+        `@transpose`](#make-a-function-differentiable-using-derivative-or-transpose)
         *   [Linear maps](#linear-maps)
             *   [Examples](#examples)
         *   [Derivative functions](#derivative-functions)
@@ -72,7 +72,7 @@ Backticks were added manually.
             *   [Upcasting to non-`@differentiable` functions](#upcasting-to-non-differentiable-functions)
         *   [Implied generic constraints](#implied-generic-constraints)
         *   [Non-differentiable parameters](#non-differentiable-parameters)
-    *   [Differentiable operators](#differentiable-operators)
+    *   [Differential operators](#differential-operators)
         *   [Differential-producing differential operators](#differential-producing-differential-operators)
         *   [Pullback-producing differential operators](#pullback-producing-differential-operators)
         *   [Example usage](#example-usage)
@@ -109,7 +109,7 @@ First-class differentiable programming includes five core additions:
 -   `@differentiable` function types.
 -   The `@differentiable` declaration attribute for defining differentiable
     functions.
--   The `@differentiating` and `@transposing` attributes for defining custom
+-   The `@derivative` and `@transpose` attributes for defining custom
     derivatives.
 -   Differential operators (e.g. `derivative(of:)`) in the standard library.
 
@@ -174,9 +174,9 @@ third-party libraries like [TensorFlow](https://github.com/tensorflow/swift).
 import TensorFlow
 
 let model = Sequential {
-    var layer1 = Dense<Float>(inputSize: 784, outputSize: 100, activation: relu)
-    var layer2 = Dense<Float>(inputSize: 100, outputSize: 30, activation: relu)
-    var layer3 = Dense<Float>(inputSize: 30, outputSize: 3, activation: identity)
+    Dense<Float>(inputSize: 784, outputSize: 100, activation: relu)
+    Dense<Float>(inputSize: 100, outputSize: 30, activation: relu)
+    Dense<Float>(inputSize: 30, outputSize: 3, activation: identity)
 }
 
 var classifier = Model()
@@ -238,12 +238,13 @@ Differentiation is the process of computing derivatives. See the
 ["Math Introduction"](#math-introduction) section below for more details.
 
 Derivatives are a fundamental tool in calculus and have applications in many
-domains, notably deep learning. Numerical computing in Swift is an expressive,
-high-performance language that is a great fit for numerical applications. Recent
-proposals have paved the way for low-level numerical computing in Swift:
-[AdditiveArithmetic][SE-0233], SIMD [[1][SE-0229]] [[2][SE-0251]], [generic math
-functions][SE-0246]. However, high-level numerical computing applications,
-including machine learning and artificial intelligence, require more work.
+domains, notably deep learning. As an expressive, high-performance language,
+Swift is a great fit for numerical applications. The [Swift Numerics
+library][swift-numerics] and recent Swift Evolution proposals have paved the way
+for low-level numerical computing in Swift: [AdditiveArithmetic][SE-0233], SIMD
+[[1][SE-0229]] [[2][SE-0251]], [generic math functions][SE-0246]. However,
+high-level numerical computing applications, including machine learning and
+artificial intelligence, require more work.
 
 We believe that first-class differentiable programming is a big step towards
 high-level numerical computing support and will make Swift a real contender in
@@ -362,7 +363,7 @@ like Python: these languages are concise and easy to use. However, some people
 prefer safer programming: features like type checking and static diagnostics
 help catch errors early and improve productivity.
 
-Differentiable programming in Swift enables safe, powerful machine learning.
+Differentiable programming in Swift enables safe, expressive machine learning.
 Custom differentiable data structures can be declared and checked at
 compile-time. Thanks to protocol-oriented programming, differentiable types are
 generalized by a protocol, enabling differential operators to be defined as
@@ -893,15 +894,15 @@ let _: @differentiable (Float) -> Float = addOne
 let _: @differentiable(linear) (Float) -> Float = addOne
 ```
 
-### `@differentiating` and `@transposing` attributes
+### `@derivative` and `@transpose` attributes
 
-`@differentiating` and `@transposing` attributes are used for declaring custom
+`@derivative` and `@transpose` attributes are used for declaring custom
 derivative functions for some other function declaration.
 
 ```swift
 import Glibc
 
-@differentiating(expf)
+@derivative(of: expf)
 func _(_ x: Float) -> (value: Float,
                        differential: @differentiable(linear) (Float) -> Float) {
     let y = expf(x)
@@ -1439,13 +1440,13 @@ class Subclass: Superclass {
 }
 ```
 
-### Make a function differentiable using `@differentiating` or `@transposing`
+### Make a function differentiable using `@derivative` or `@transpose`
 
 Any function that has `Differentiable`-conforming parameters and result can be
 made differentiable by extending the function to have either an associated
-derivative function or a linear transpose. The `@differentiating` attribute is
+derivative function or a linear transpose. The `@derivative` attribute is
 used for marking a function as producing a custom derivative for another
-function, hence making the other function differentiable. The `@transposing`
+function, hence making the other function differentiable. The `@transpose`
 attribute is used for marking a function as transposing another function, hence
 making the other function linear.
 
@@ -1473,9 +1474,9 @@ provided with a transpose (e.g. scalar multiplication, matrix transposition, and
 matrix multiplication), because gradients can only be computed when the
 differential can be transposed.
 
-To make a function a linear map, use a `@transposing` attribute on the transpose
+To make a function a linear map, use a `@transpose` attribute on the transpose
 function. If the function is only linear with respect to certain parameters, use
-a wrt: clause to indicate parameter positions, e.g. `@transposing(..., wrt:
+a wrt: clause to indicate parameter positions, e.g. `@transpose(of: ..., wrt:
 (self, 0))`.
 
 The numeric addition operator
@@ -1494,11 +1495,11 @@ prototype and pitch this change through Swift Evolution._
 
 ```swift
 extension FloatingPoint where Self: Differentiable & AdditiveArithmetic {
-    @transposing(+)
+    @transpose(of: +)
     static func _(_ v: Self) -> (Self, Self) { (v, v) }
 
-    @transposing(*, wrt: 0)
-    @transposing(*, wrt: 1)
+    @transpose(of: *, wrt: 0)
+    @transpose(of: *, wrt: 1)
     static func _(lhs: Self, rhs: Self) -> Self { lhs * rhs }
 }
 ```
@@ -1518,18 +1519,18 @@ matrix multiplication function.
 
 ```swift
 extension Tensor where Scalar: FloatingPoint & Differentiable {
-    @transposing(transposed, wrt: self)
+    @transpose(of: transposed, wrt: self)
     func _() -> Tensor {
         self.transposed()
     }
 }
 
-@transposing(matmul(_:_:), wrt: 0)
+@transpose(of: matmul(_:_:), wrt: 0)
 func _<T: FloatingPoint & Differentiable>(y: Tensor<T>, v: Tensor<T>) -> Tensor<T> {
     matmul(v, y.transposed())
 }
 
-@transposing(matmul(_:_:), wrt: 1)
+@transpose(of: matmul(_:_:), wrt: 1)
 func _<T: FloatingPoint & Differentiable>(x: Tensor<T>, v: Tensor<T>) -> Tensor<T> {
     matmul(x.transposed(), v)
 }
@@ -1543,20 +1544,20 @@ Multiplication is bilinear (linear with respect to each argument).
 ```swift
 extension FloatingPoint {
     @inlinable
-    @transposing(+)
+    @transpose(of: +)
     func _(_ v: Self) -> (Self, Self) {
         (v, v)
     }
 
     @inlinable
-    @transposing(-)
+    @transpose(of: -)
     func _(_ v: Self) -> (Self, Self) {
         (v, -v)
     }
 
     @inlinable
-    @transposing(*, wrt: 0)
-    @transposing(*, wrt: 1)
+    @transpose(of: *, wrt: 0)
+    @transpose(of: *, wrt: 1)
     func _(_ x: Self, _ v: Self) -> Self {
         return x * v
     }
@@ -1610,8 +1611,8 @@ on `SIMD`.
 
 ```swift
 extension SIMD where Self: Differentiable, TangentVector: SIMD, Scalar: BinaryFloatingPoint, Self == Self.TangentVector {
-    @transposing(*, wrt: 0)
-    @transposing(*, wrt: 1)
+    @transpose(of: *, wrt: 0)
+    @transpose(of: *, wrt: 1)
     static func _(v: Self, x: Self) -> Self {
         v * x
     }
@@ -1633,7 +1634,7 @@ where Scalar: Differentiable & BinaryFloatingPoint,
 
 // `subscript` is defined on `SIMD`-conforming types, so the transpose is as well.
 extension SIMDScalar where Self: Differentiable & BinaryFloatingPoint {
-    @transposing(subscript)
+    @transpose(of: subscript)
     func _(index: Int) -> SIMD${n}<Self> {
         var result = SIMD${n}<Self>.zero
         result[index] = self
@@ -1652,13 +1653,13 @@ on the `tensorflow` branch.
 
 In the following example, the 32-bit floating point exponential function
 [`expf(_:)`](https://en.cppreference.com/w/c/numeric/math/exp) is imported from
-the C standard library. The derivative function marked with `@differentiating`
+the C standard library. The derivative function marked with `@derivative`
 makes `expf(_:)` a differentiable function.
 
 ```swift
 import Glibc
 
-@differentiating(expf)
+@derivative(of: expf)
 func _(_ x: Float) -> (value: Float,
                        differential: @differentiable(linear) (Float) -> Float) {
     let y = expf(x)
@@ -1679,7 +1680,7 @@ flexibility and performance.
 The `ElementaryFunctions` protocol introduced in
 [SE-0246](https://github.com/apple/swift-evolution/blob/master/proposals/0246-mathable.md)
 defines generic elementary functions, which are non-linear. By defining
-derivatives using the `@differentiating` attribute for these protocol
+derivatives using the `@derivative` attribute for these protocol
 requirements in an extension, all conforming types now have differentiable
 elementary functions.
 
@@ -1697,45 +1698,45 @@ public protocol ElementaryFunctions {
 
 public extension ElementaryFunctions where Self: Differentiable, Self == Self.TangentVector {
     @inlinable
-    @differentiating(sqrt)
+    @derivative(of: sqrt)
     func _(_ x: Self) -> (value: Self, differential: @differential(linear) (Self) -> Self) {
         (sqrt(x), { dx in (1 / 2) * (1 / sqrt(x)) * dx })
     }
 
     @inlinable
-    @differentiating(cos)
+    @derivative(of: cos)
     func _(_ x: Self) -> (value: Self, differential: @differential(linear) (Self) -> Self) {
         (cos(x), { dx in -sin(x) * dx })
     }
 
     @inlinable
-    @differentiating(asinh)
+    @derivative(of: asinh)
     func _(_ x: Self) -> (value: Self, differential: @differential(linear) (Self) -> Self) {
         (asinh(x), { dx in 1 / (1 + x * x) * dx })
     }
 
     @inlinable
-    @differentiating(exp)
+    @derivative(of: exp)
     func _(_ x: Self) -> (value: Self, differential: @differential(linear) (Self) -> Self) {
         let ret = exp(x)
         return (ret, { dx in ret * dx })
     }
 
     @inlinable
-    @differentiating(exp10)
+    @derivative(of: exp10)
     func _(_ x: Self) -> (value: Self, differential: @differential(linear) (Self) -> Self) {
         let ret = exp10(x)
         return (ret, { dx in exp(10) * ret * dx })
     }
 
     @inlinable
-    @differentiating(log)
+    @derivative(of: log)
     func _(_ x: Self) -> (value: Self, differential: @differential(linear) (Self) -> Self) { dx in
         (log(x), { 1 / x * dx })
     }
 
     @inlinable
-    @differentiating(pow)
+    @derivative(of: pow)
     func _(_ x: Self, _ y: Self) -> (value: Self, differential: @differential(linear) (Self, Self) -> Self) {
         (pow(x, y), { (dx, dy) in
             let l = y * pow(x, y-1) * dx
@@ -2001,7 +2002,7 @@ _ = f0 as @differentiable (@noDerivative Float, Float) -> Float
 _ = f0 as @differentiable (@noDerivative Float, @noDerivative Float) -> Float
 ```
 
-### Differentiable operators
+### Differential operators
 
 The core differentiation APIs are the differential operators. Differential
 operators are higher-order functions that take `@differentiable` functions as
@@ -2085,7 +2086,7 @@ func valueWithGradient<T, R: FloatingPoint>(
 
 func gradient<T, R: FloatingPoint>(
     at x: T, in body: @differentiable (T) -> R
-) -> (value: R, gradient: T.TangentVector) where R.TangentVector: FloatingPoint {
+) -> T.TangentVector where R.TangentVector: FloatingPoint {
     return valueWithGradient(at: x, in: body).gradient
 }
 
@@ -2640,6 +2641,8 @@ Parker Schuh, and Dimitrios Vytiniotis.
 [Dan Zheng]: https://github.com/dan-zheng
 [Marc Rasi]: https://github.com/marcrasi
 [Bart Chrzaszcz]: https://github.com/bartchr808
+
+[swift-numerics]: https://github.com/apple/swift-numerics
 [SE-0229]: https://github.com/apple/swift-evolution/blob/master/proposals/0229-simd.md
 [SE-0233]: https://github.com/apple/swift-evolution/blob/master/proposals/0233-additive-arithmetic-protocol.md
 [SE-0246]: https://github.com/apple/swift-evolution/blob/master/proposals/0246-mathable.md

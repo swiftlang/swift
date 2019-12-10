@@ -167,13 +167,13 @@ findSuitableWrapperInit(ASTContext &ctx, NominalTypeDecl *nominal,
       if (!argumentParam)
         continue;
 
-      if (!argumentParam->hasInterfaceType())
-        continue;
-
       if (argumentParam->isInOut() || argumentParam->isVariadic())
         continue;
 
       auto paramType = argumentParam->getInterfaceType();
+      if (paramType->is<ErrorType>())
+        continue;
+
       if (argumentParam->isAutoClosure()) {
         if (auto *fnType = paramType->getAs<FunctionType>())
           paramType = fnType->getResult();
@@ -491,7 +491,7 @@ AttachedPropertyWrapperTypeRequest::evaluate(Evaluator &evaluator,
     return Type();
 
   ASTContext &ctx = var->getASTContext();
-  if (!ctx.getLegacyGlobalTypeChecker())
+  if (!ctx.areSemanticQueriesEnabled())
     return nullptr;
 
   auto resolution =
@@ -527,7 +527,7 @@ PropertyWrapperBackingPropertyTypeRequest::evaluate(
     return Type();
 
   ASTContext &ctx = var->getASTContext();
-  if (!ctx.getLegacyGlobalTypeChecker())
+  if (!ctx.areSemanticQueriesEnabled())
     return Type();
 
   // If there's an initializer of some sort, checking it will determine the

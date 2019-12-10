@@ -1,8 +1,9 @@
 silopt_register_sources(
   ADContext.cpp
   Common.cpp
-  DerivativeLookup.cpp
   DifferentiationInvoker.cpp
   JVPEmitter.cpp
   LinearMapInfo.cpp
+  PullbackEmitter.cpp
+  VJPEmitter.cpp
 )

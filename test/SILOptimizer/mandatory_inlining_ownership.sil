@@ -280,7 +280,7 @@ bb3:
 // CHECK-NEXT:   [[DEST_ADDR:%.*]] = alloc_stack $Klass
 // CHECK-NEXT:   store [[ARG_COPY]] to [init] [[SRC_ADDR]]
 // CHECK-NEXT:   [[RELOADED_ARG:%.*]] = load [take] [[SRC_ADDR]]
-// CHECK-NEXT:   checked_cast_br [[RELOADED_ARG]] : $Builtin.NativeObject to $Klass, [[SUCCESS_BB:bb[0-9]+]], [[FAILURE_BB:bb[0-9]+]]
+// CHECK-NEXT:   checked_cast_br [[RELOADED_ARG]] : $Builtin.NativeObject to Klass, [[SUCCESS_BB:bb[0-9]+]], [[FAILURE_BB:bb[0-9]+]]
 //
 // ==> On success, we store the value into dest. The destroy is not from the
 // ==> optimizer, but from the code.
@@ -336,7 +336,7 @@ bb3:
 // CHECK-NEXT:   [[DEST_ADDR:%.*]] = alloc_stack $Klass
 // CHECK-NEXT:   store [[ARG_COPY]] to [init] [[SRC_ADDR]]
 // CHECK-NEXT:   [[RELOADED_ARG:%.*]] = load [take] [[SRC_ADDR]]
-// CHECK-NEXT:   checked_cast_br [[RELOADED_ARG]] : $Builtin.NativeObject to $Klass, [[SUCCESS_BB:bb[0-9]+]], [[FAILURE_BB:bb[0-9]+]]
+// CHECK-NEXT:   checked_cast_br [[RELOADED_ARG]] : $Builtin.NativeObject to Klass, [[SUCCESS_BB:bb[0-9]+]], [[FAILURE_BB:bb[0-9]+]]
 //
 // CHECK: [[SUCCESS_BB]]([[CAST_VALUE:%.*]] :
 // ==> On success, we store into dest and destroy dest.
@@ -392,7 +392,7 @@ bb3:
 // CHECK-NEXT:   [[DEST_ADDR:%.*]] = alloc_stack $Klass
 // CHECK-NEXT:   store [[ARG_COPY]] to [init] [[SRC_ADDR]]
 // CHECK-NEXT:   [[RELOADED_ARG:%.*]] = load_borrow [[SRC_ADDR]]
-// CHECK-NEXT:   checked_cast_br [[RELOADED_ARG]] : $Builtin.NativeObject to $Klass, [[SUCCESS_BB:bb[0-9]+]], [[FAILURE_BB:bb[0-9]+]]
+// CHECK-NEXT:   checked_cast_br [[RELOADED_ARG]] : $Builtin.NativeObject to Klass, [[SUCCESS_BB:bb[0-9]+]], [[FAILURE_BB:bb[0-9]+]]
 //
 // CHECK: [[SUCCESS_BB]]([[CAST_VALUE:%.*]] : @guaranteed
 // CHECK-NEXT:   [[CAST_VALUE_COPY:%.*]] = copy_value [[CAST_VALUE]]

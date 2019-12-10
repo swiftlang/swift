@@ -302,12 +302,6 @@ static void typeCheckFunctionsAndExternalDecls(SourceFile &SF, TypeChecker &TC) 
     }
   } while (currentFunctionIdx < TC.definedFunctions.size());
 
-  // Compute captures for functions and closures we visited.
-  for (auto *closure : TC.ClosuresWithUncomputedCaptures) {
-    TypeChecker::computeCaptures(closure);
-  }
-  TC.ClosuresWithUncomputedCaptures.clear();
-
   for (AbstractFunctionDecl *FD : llvm::reverse(TC.definedFunctions)) {
     TypeChecker::computeCaptures(FD);
   }
@@ -554,8 +548,7 @@ bool swift::performTypeLocChecking(ASTContext &Ctx, TypeLoc &T,
   Optional<DiagnosticSuppression> suppression;
   if (!ProduceDiagnostics)
     suppression.emplace(Ctx.Diags);
-  assert(Ctx.getLegacyGlobalTypeChecker() &&
-         "Should have a TypeChecker registered");
+  assert(Ctx.areSemanticQueriesEnabled());
   return TypeChecker::validateType(Ctx, T, resolution, options);
 }
 

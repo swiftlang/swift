@@ -70,9 +70,14 @@
 // RUN: %FileCheck -check-prefix SIMPLE %s < %t.simple-macosx10.10.txt
 
 // RUN: %empty-directory(%t)
-// RUN: touch %t/a.o
+// RUN: echo "int dummy;" >%t/a.cpp
+// RUN: cc -c %t/a.cpp -o %t/a.o
 // RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-macosx10.9 %s %t/a.o -o linker 2>&1 | %FileCheck -check-prefix COMPILE_AND_LINK %s
-// RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-macosx10.9 %s %t/a.o -driver-filelist-threshold=0 -o linker 2>&1 | %FileCheck -check-prefix FILELIST %s
+// RUN: %swiftc_driver -save-temps -driver-print-jobs  -target x86_64-apple-macosx10.9 %s %t/a.o -driver-filelist-threshold=0 -o linker  2>&1 | tee %t/forFilelistCapture | %FileCheck -check-prefix FILELIST %s
+
+// Extract filelist name and check it out
+// RUN: tail -1 %t/forFilelistCapture | sed 's/.*-filelist //' | sed 's/ .*//' >%t/filelistName
+// RUN: %FileCheck -check-prefix FILELIST-CONTENTS %s < `cat %t/filelistName`
 
 // RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-macosx10.9 -emit-library %s -module-name LINKER | %FileCheck -check-prefix INFERRED_NAME_DARWIN %s
 // RUN: %swiftc_driver -driver-print-jobs -target x86_64-unknown-linux-gnu -emit-library %s -module-name LINKER | %FileCheck -check-prefix INFERRED_NAME_LINUX %s
@@ -346,10 +351,10 @@
 // FILELIST-NOT: .o{{"? }}
 // FILELIST: -filelist {{"?[^-]}}
 // FILELIST-NOT: .o{{"? }}
-// FILELIST: /a.o{{"? }}
-// FILELIST-NOT: .o{{"? }}
 // FILELIST: -o linker
 
+// FILELIST-CONTENTS: /linker-{{.*}}.o
+// FILELIST-CONTENTS: /a.o
 
 // INFERRED_NAME_DARWIN: bin{{/|\\\\}}swift{{c?(\.EXE)?}}
 // INFERRED_NAME_DARWIN: -module-name LINKER

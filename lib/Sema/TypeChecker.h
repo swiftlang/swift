@@ -462,10 +462,6 @@ public:
   /// The list of function definitions we've encountered.
   std::vector<AbstractFunctionDecl *> definedFunctions;
 
-  /// A list of closures for the most recently type-checked function, which we
-  /// will need to compute captures for.
-  std::vector<AbstractClosureExpr *> ClosuresWithUncomputedCaptures;
-
 private:
   TypeChecker() = default;
   ~TypeChecker() = default;
@@ -716,9 +712,7 @@ public:
   static bool typeCheckTapBody(TapExpr *expr, DeclContext *DC);
 
   static Type typeCheckParameterDefault(Expr *&defaultValue, DeclContext *DC,
-                                        Type paramType,
-                                        bool isAutoClosure = false,
-                                        bool canFail = true);
+                                        Type paramType, bool isAutoClosure);
 
   static void typeCheckTopLevelCodeDecl(TopLevelCodeDecl *TLCD);
 
@@ -815,10 +809,6 @@ public:
       GenericRequirementsCheckListener *listener = nullptr,
       SubstOptions options = None);
 
-  /// Diagnose if the class has no designated initializers.
-  static void maybeDiagnoseClassWithoutInitializers(ClassDecl *classDecl);
-
-  ///
   /// Add any implicitly-defined constructors required for the given
   /// struct or class.
   static void addImplicitConstructors(NominalTypeDecl *typeDecl);
@@ -895,7 +885,7 @@ public:
   /// \returns If successful, a typechecked expression that at runtime will
   /// approximate the given expression. If not successful, nullptr (appropriate
   /// error messages will also be emitted as a side effect).
-  Expr *quoteExpr(Expr *expr, DeclContext *dc);
+  static Expr *quoteExpr(Expr *expr, DeclContext *dc);
 
   /// Compute the type of quoteExpr given the type of expression.
   ///
@@ -908,7 +898,7 @@ public:
   ///
   /// TODO(TF-735): In the future, we may implement more complicated rules
   /// based on something like ExpressibleByQuoteLiteral.
-  Type getTypeOfQuoteExpr(Type exprType, SourceLoc loc);
+  static Type getTypeOfQuoteExpr(Type exprType, SourceLoc loc);
 
   /// Compute the type of #unquote given the type of expression.
   ///
@@ -921,7 +911,7 @@ public:
   ///
   /// TODO(TF-735): In the future, we may implement more complicated rules
   /// based on something like ExpressibleByQuoteLiteral.
-  Type getTypeOfUnquoteExpr(Type exprType, SourceLoc loc);
+  static Type getTypeOfUnquoteExpr(Type exprType, SourceLoc loc);
 
   /// Quote the given typed declaration by creating a snippet of code that at
   /// runtime will approximate the given declaration using the data structures
@@ -937,7 +927,7 @@ public:
   /// \returns If successful, a typechecked expression that at runtime will
   /// approximate the given declaration. If not successful, nullptr (appropriate
   /// error messages will also be emitted as a side effect).
-  Expr *quoteDecl(Decl *decl, DeclContext *dc);
+  static Expr *quoteDecl(Decl *decl, DeclContext *dc);
 
   /// Compute the type of quoteDecl.
   ///
@@ -945,15 +935,15 @@ public:
   ///
   /// TODO(TF-736): In the future, we may want to infer more precise type
   /// based on the shape of the quoted declaration.
-  Type getTypeOfQuoteDecl(ASTContext &ctx, SourceLoc loc);
+  static Type getTypeOfQuoteDecl(ASTContext &ctx, SourceLoc loc);
 
 private:
-  Type typeCheckExpressionImpl(Expr *&expr, DeclContext *dc,
-                               TypeLoc convertType,
-                               ContextualTypePurpose convertTypePurpose,
-                               TypeCheckExprOptions options,
-                               ExprTypeCheckListener &listener,
-                               constraints::ConstraintSystem *baseCS);
+  static Type typeCheckExpressionImpl(Expr *&expr, DeclContext *dc,
+                                      TypeLoc convertType,
+                                      ContextualTypePurpose convertTypePurpose,
+                                      TypeCheckExprOptions options,
+                                      ExprTypeCheckListener &listener,
+                                      constraints::ConstraintSystem *baseCS);
 
 public:
   /// Type check the given expression and return its type without
@@ -1124,7 +1114,7 @@ public:
   static void computeCaptures(AnyFunctionRef AFR);
 
   /// Check for invalid captures from stored property initializers.
-  static void checkPatternBindingCaptures(NominalTypeDecl *typeDecl);
+  static void checkPatternBindingCaptures(IterableDeclContext *DC);
 
   /// Change the context of closures in the given initializer
   /// expression to the given context.
@@ -1403,11 +1393,6 @@ public:
   static Expr *buildRefExpr(ArrayRef<ValueDecl *> Decls, DeclContext *UseDC,
                             DeclNameLoc NameLoc, bool Implicit,
                             FunctionRefKind functionRefKind);
-
-  /// Build implicit autoclosure expression wrapping a given expression.
-  /// Given expression represents computed result of the closure.
-  static Expr *buildAutoClosureExpr(DeclContext *DC, Expr *expr,
-                                    FunctionType *closureType);
   /// @}
 
   /// Retrieve a specific, known protocol.

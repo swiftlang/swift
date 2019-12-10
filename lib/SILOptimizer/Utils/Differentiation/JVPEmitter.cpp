@@ -1,4 +1,4 @@
-//===--- JVPEmitter.h - JVP Generation in Differentiation -----*- C++ -*---===//
+//===--- JVPEmitter.cpp - JVP generation in differentiation ---*- C++ -*---===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -69,8 +69,8 @@ JVPEmitter::JVPEmitter(ADContext &context, SILFunction *original,
                                    witness->getSILAutoDiffIndices(), jvp)),
       differentialInfo(context, AutoDiffLinearMapKind::Differential, original,
                        jvp, witness->getSILAutoDiffIndices(), activityInfo),
-      differentialBuilder(SILBuilder(*createEmptyDifferential(
-          context, original, witness, &differentialInfo))),
+      differentialBuilder(SILBuilder(
+          *createEmptyDifferential(context, witness, &differentialInfo))),
       diffLocalAllocBuilder(getDifferential()) {
   // Create empty differential function.
   context.recordGeneratedFunction(&getDifferential());
@@ -1016,10 +1016,12 @@ void JVPEmitter::prepareForDifferentialGeneration() {
 }
 
 /*static*/ SILFunction *
-JVPEmitter::createEmptyDifferential(ADContext &context, SILFunction *original,
+JVPEmitter::createEmptyDifferential(ADContext &context,
                                     SILDifferentiabilityWitness *witness,
                                     LinearMapInfo *linearMapInfo) {
   auto &module = context.getModule();
+  auto *original = witness->getOriginalFunction();
+  auto *jvp = witness->getJVP();
   auto origTy = original->getLoweredFunctionType();
   auto lookupConformance = LookUpConformanceInModule(module.getSwiftModule());
 
@@ -1080,12 +1082,10 @@ JVPEmitter::createEmptyDifferential(ADContext &context, SILFunction *original,
       original->getASTContext());
 
   SILOptFunctionBuilder fb(context.getTransform());
-  // The generated tangent linkage is set to Hidden because generated tangent
-  // are never called cross-module.
-  auto linkage = SILLinkage::Hidden;
+  auto linkage = jvp->isSerialized() ? SILLinkage::Public : SILLinkage::Hidden;
   auto *differential = fb.createFunction(
       linkage, diffName, diffType, diffGenericEnv, original->getLocation(),
-      original->isBare(), IsNotTransparent, original->isSerialized(),
+      original->isBare(), IsNotTransparent, jvp->isSerialized(),
       original->isDynamicallyReplaceable());
   differential->setDebugScope(
       new (module) SILDebugScope(original->getLocation(), differential));

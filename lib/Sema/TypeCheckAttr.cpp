@@ -93,6 +93,8 @@ class AttributeChecker : public AttributeVisitor<AttributeChecker> {
   IGNORED_ATTR(Exported)
   IGNORED_ATTR(ForbidSerializingReference)
   IGNORED_ATTR(HasStorage)
+  IGNORED_ATTR(HasMissingDesignatedInitializers)
+  IGNORED_ATTR(InheritsConvenienceInitializers)
   IGNORED_ATTR(Inline)
   IGNORED_ATTR(ObjCBridged)
   IGNORED_ATTR(ObjCNonLazyRealization)
@@ -111,7 +113,8 @@ class AttributeChecker : public AttributeVisitor<AttributeChecker> {
   IGNORED_ATTR(DisfavoredOverload)
   IGNORED_ATTR(ProjectedValueProperty)
   IGNORED_ATTR(ReferenceOwnership)
-  // SWIFT_ENABLE_TENSORFLOW
+  IGNORED_ATTR(OriginallyDefinedIn)
+
   // TODO(TF-715): Allow @quoted on more decls.
   IGNORED_ATTR(Quoted)
 #undef IGNORED_ATTR
@@ -245,6 +248,7 @@ class AttributeChecker : public AttributeVisitor<AttributeChecker> {
 
   void visitImplementationOnlyAttr(ImplementationOnlyAttr *attr);
   void visitNonEphemeralAttr(NonEphemeralAttr *attr);
+  void checkOriginalDefinedInAttrs(ArrayRef<OriginallyDefinedInAttr*> Attrs);
 
   // SWIFT_ENABLE_TENSORFLOW
   void visitDifferentiableAttr(DifferentiableAttr *attr);
@@ -1021,14 +1025,21 @@ void AttributeChecker::visitOptionalAttr(OptionalAttr *attr) {
 
 void TypeChecker::checkDeclAttributes(Decl *D) {
   AttributeChecker Checker(D);
+  // We need to check all OriginallyDefinedInAttr relative to each other, so
+  // collect them and check in batch later.
+  llvm::SmallVector<OriginallyDefinedInAttr*, 4> ODIAttrs;
   for (auto attr : D->getAttrs()) {
     if (!attr->isValid()) continue;
 
     // If Attr.def says that the attribute cannot appear on this kind of
     // declaration, diagnose it and disable it.
     if (attr->canAppearOnDecl(D)) {
-      // Otherwise, check it.
-      Checker.visit(attr);
+      if (auto *ODI = dyn_cast<OriginallyDefinedInAttr>(attr)) {
+        ODIAttrs.push_back(ODI);
+      } else {
+        // Otherwise, check it.
+        Checker.visit(attr);
+      }
       continue;
     }
 
@@ -1065,6 +1076,7 @@ void TypeChecker::checkDeclAttributes(Decl *D) {
     else
       Checker.diagnoseAndRemoveAttr(attr, diag::invalid_decl_attribute, attr);
   }
+  Checker.checkOriginalDefinedInAttrs(ODIAttrs);
 }
 
 /// Returns true if the given method is an valid implementation of a
@@ -1216,7 +1228,7 @@ bool swift::isValidKeyPathDynamicMemberLookup(SubscriptDecl *decl,
     return false;
 
   const auto *param = decl->getIndices()->get(0);
-  if (auto NTD = param->getType()->getAnyNominal()) {
+  if (auto NTD = param->getInterfaceType()->getAnyNominal()) {
     return NTD == ctx.getKeyPathDecl() ||
            NTD == ctx.getWritableKeyPathDecl() ||
            NTD == ctx.getReferenceWritableKeyPathDecl();
@@ -1404,7 +1416,7 @@ void AttributeChecker::visitUnsafeNoObjCTaggedPointerAttr(
              diag::no_objc_tagged_pointer_not_class_protocol);
     attr->setInvalid();
   }
-
+  
   if (!proto->requiresClass()
       && !proto->getAttrs().hasAttribute<ObjCAttr>()) {
     diagnose(attr->getLocation(),
@@ -3106,7 +3118,7 @@ static IndexSubset *computeTransposedParameters(
   // Get function type and parameters.
   auto *transposeFunctionType =
       transposeFunction->getInterfaceType()->castTo<AnyFunctionType>();
-  
+
   ArrayRef<TupleTypeElt> transposeResultTypes;
   // Return type of '@transpose' function can be a singular type or a tuple
   // type.
@@ -3617,9 +3629,7 @@ DifferentiableAttributeParameterIndicesRequest::evaluate(
     newAttr->setVJPFunction(attr->getVJPFunction());
     auto insertion = ctx.DifferentiableAttrs.try_emplace(
         {getterDecl, checkedWrtParamIndices}, newAttr);
-    // Valid `@differentiable` attributes are uniqued by their parameter
-    // indices. Reject duplicate attributes for the same decl and parameter
-    // indices pair.
+    // Reject duplicate `@differentiable` attributes.
     if (!insertion.second) {
       diagnoseAndRemoveAttr(diags, D, attr,
                             diag::differentiable_attr_duplicate);
@@ -3628,16 +3638,11 @@ DifferentiableAttributeParameterIndicesRequest::evaluate(
       return nullptr;
     }
     getterDecl->getAttrs().add(newAttr);
-    // Register derivative function configuration.
-    auto *resultIndices = IndexSubset::get(ctx, 1, {0});
-    getterDecl->addDerivativeFunctionConfiguration(
-        {checkedWrtParamIndices, resultIndices, whereClauseGenSig});
     return checkedWrtParamIndices;
   }
   auto insertion = ctx.DifferentiableAttrs.try_emplace(
       {D, checkedWrtParamIndices}, attr);
-  // `@differentiable` attributes are uniqued by their parameter indices.
-  // Reject duplicate attributes for the same decl and parameter indices pair.
+  // Reject duplicate `@differentiable` attributes.
   if (!insertion.second && insertion.first->getSecond() != attr) {
     diagnoseAndRemoveAttr(diags, D, attr, diag::differentiable_attr_duplicate);
     diags.diagnose(insertion.first->getSecond()->getLocation(),
@@ -3696,6 +3701,7 @@ void AttributeChecker::visitDerivativeAttr(DerivativeAttr *attr) {
     attr->setInvalid();
     return;
   }
+  attr->setDerivativeKind(kind);
   // `value: R` result tuple element must conform to `Differentiable`.
   auto diffableProto = Ctx.getProtocol(KnownProtocolKind::Differentiable);
   auto valueResultType = valueResultElt.getType();
@@ -3918,74 +3924,16 @@ void AttributeChecker::visitDerivativeAttr(DerivativeAttr *attr) {
     return;
   }
 
-  // Try to find a `@differentiable` attribute on the original function with the
-  // same differentiation parameters.
-  DifferentiableAttr *da = nullptr;
-  for (auto *cda : originalAFD->getAttrs().getAttributes<DifferentiableAttr>())
-    if (checkedWrtParamIndices == cda->getParameterIndices())
-      da = const_cast<DifferentiableAttr *>(cda);
-  // If the original function does not have a `@differentiable` attribute with
-  // the same differentiation parameters, create one.
-  // TODO(TF-835): Lower `@derivative` attributes directly to SIL
-  // differentiability witnesses during SILGen instead of generating implicit
-  // `@differentiable` attributes.
-  if (!da) {
-    da = DifferentiableAttr::create(
-        originalAFD, /*implicit*/ true, attr->AtLoc, attr->getRange(),
-        /*linear*/ false, checkedWrtParamIndices, /*jvp*/ None,
-        /*vjp*/ None, derivative->getGenericSignature());
-    switch (kind) {
-    case AutoDiffDerivativeFunctionKind::JVP:
-      da->setJVPFunction(derivative);
-      break;
-    case AutoDiffDerivativeFunctionKind::VJP:
-      da->setVJPFunction(derivative);
-      break;
-    }
-    auto insertion = Ctx.DifferentiableAttrs.try_emplace(
-        {originalAFD, checkedWrtParamIndices}, da);
-    // Valid `@differentiable` attributes are uniqued by their parameter
-    // indices. Reject duplicate attributes for the same decl and parameter
-    // indices pair.
-    if (!insertion.second && insertion.first->getSecond() != da) {
-      diagnoseAndRemoveAttr(da, diag::differentiable_attr_duplicate);
-      diagnose(insertion.first->getSecond()->getLocation(),
-               diag::differentiable_attr_duplicate_note);
-      return;
-    }
-    originalAFD->getAttrs().add(da);
+  // Reject duplicate `@derivative` attributes.
+  auto insertion = Ctx.DerivativeAttrs.try_emplace(
+      {originalAFD, checkedWrtParamIndices, kind}, attr);
+  if (!insertion.second) {
+    diagnoseAndRemoveAttr(attr,
+                          diag::derivative_attr_original_already_has_derivative,
+                          originalAFD->getFullName());
+    diagnose(insertion.first->getSecond()->getLocation(),
+             diag::differentiable_attr_duplicate_note);
     return;
-  }
-  // If the original function has a `@differentiable` attribute with the same
-  // differentiation parameters, check if the `@differentiable` attribute
-  // already has a different registered derivative. If so, emit an error on the
-  // `@derivative` attribute. Otherwise, register the derivative in the
-  // `@differentiable` attribute.
-  switch (kind) {
-  case AutoDiffDerivativeFunctionKind::JVP:
-    // If there's a different registered derivative, emit an error.
-    if ((da->getJVP() &&
-         da->getJVP()->Name.getBaseName() != derivative->getBaseName()) ||
-        (da->getJVPFunction() && da->getJVPFunction() != derivative)) {
-      diagnoseAndRemoveAttr(
-          attr, diag::derivative_attr_original_already_has_derivative,
-          originalAFD->getFullName());
-      return;
-    }
-    da->setJVPFunction(derivative);
-    break;
-  case AutoDiffDerivativeFunctionKind::VJP:
-    // If there's a different registered derivative, emit an error.
-    if ((da->getVJP() &&
-         da->getVJP()->Name.getBaseName() != derivative->getBaseName()) ||
-        (da->getVJPFunction() && da->getVJPFunction() != derivative)) {
-      diagnoseAndRemoveAttr(
-          attr, diag::derivative_attr_original_already_has_derivative,
-          originalAFD->getFullName());
-      return;
-    }
-    da->setVJPFunction(derivative);
-    break;
   }
 
   // Register derivative function configuration.
@@ -4002,14 +3950,14 @@ void AttributeChecker::visitTransposeAttr(TransposeAttr *attr) {
   auto originalName = attr->getOriginalFunctionName();
   auto *transposeInterfaceType =
       transpose->getInterfaceType()->castTo<AnyFunctionType>();
-  
+
   // Get checked wrt param indices.
   auto *wrtParamIndices = attr->getParameterIndices();
 
   // Get the parsed wrt param indices, which have not yet been checked.
   // This is defined for parsed attributes.
   auto parsedWrtParams = attr->getParsedParameters();
-  
+
   // If checked wrt param indices are not specified, compute them.
   bool isCurried = transposeInterfaceType->getResult()->is<AnyFunctionType>();
   if (!wrtParamIndices)
@@ -4353,6 +4301,23 @@ void AttributeChecker::visitNonEphemeralAttr(NonEphemeralAttr *attr) {
 void TypeChecker::checkParameterAttributes(ParameterList *params) {
   for (auto param: *params) {
     checkDeclAttributes(param);
+  }
+}
+
+void
+AttributeChecker::checkOriginalDefinedInAttrs(
+    ArrayRef<OriginallyDefinedInAttr*> Attrs) {
+  llvm::SmallSet<PlatformKind, 4> AllPlatforms;
+  // Attrs are in the reverse order of the source order. We need to visit them
+  // in source order to diagnose the later attribute.
+  for (auto It = Attrs.rbegin(), End = Attrs.rend(); It != End; ++ It) {
+    auto *Attr = *It;
+    auto CurPlat = Attr->Platform;
+    if (!AllPlatforms.insert(CurPlat).second) {
+      // Only one version number is allowed for one platform name.
+      diagnose(Attr->AtLoc, diag::originally_defined_in_dupe_platform,
+               platformString(Attr->Platform));
+    }
   }
 }
 

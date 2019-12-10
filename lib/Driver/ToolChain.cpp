@@ -238,6 +238,9 @@ bool ToolChain::jobIsBatchable(const Compilation &C, const Job *A) const {
   auto const *CJActA = dyn_cast<const CompileJobAction>(&A->getSource());
   if (!CJActA)
     return false;
+  // At present the Frontend cannot provide unparsedRanges in batch mode:
+  if (!A->getOutput().getAnyOutputForType(file_types::TY_SwiftRanges).empty())
+    return false;
   return findSingleSwiftInput(CJActA) != nullptr;
 }
 

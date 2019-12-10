@@ -360,8 +360,7 @@ static void printShortFormAvailable(ArrayRef<const DeclAttribute *> Attrs,
 }
 
 // Returns the differentiation parameters clause string for the given function,
-// parameter indices, and parsed parameters. Use the parameter indices if
-// specified; otherwise, use the parsed parameters.
+// parameter indices, and parsed parameters.
 static std::string getDifferentiationParametersClauseString(
     const AbstractFunctionDecl *function, IndexSubset *paramIndices,
     ArrayRef<ParsedAutoDiffParameter> parsedParams) {
@@ -428,7 +427,7 @@ static std::string getTransposedParametersClauseString(
     ArrayRef<ParsedAutoDiffParameter> parsedParams) {
   assert(function);
   bool isInstanceMethod = function->isInstanceMember();
-  
+
   std::string result;
   llvm::raw_string_ostream printer(result);
 
@@ -761,6 +760,17 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     Printer << "(\"" << cast<SILGenNameAttr>(this)->Name << "\")";
     break;
 
+  case DAK_OriginallyDefinedIn: {
+    Printer.printAttrName("@_originallyDefinedIn");
+    Printer << "(module: ";
+    auto Attr = cast<OriginallyDefinedInAttr>(this);
+    Printer << "\"" << Attr->OriginalModuleName << "\", ";
+    Printer << platformString(Attr->Platform) << " " <<
+      Attr->MovedVersion.getAsString();
+    Printer << ")";
+    break;
+  }
+
   case DAK_Available: {
     Printer.printAttrName("@available");
     Printer << "(";
@@ -948,8 +958,8 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     Printer.printAttrName("@derivative");
     Printer << "(of: ";
     auto *attr = cast<DerivativeAttr>(this);
-    auto *derivative = cast<AbstractFunctionDecl>(D);
     Printer << attr->getOriginalFunctionName().Name;
+    auto *derivative = cast<AbstractFunctionDecl>(D);
     auto diffParamsString = getDifferentiationParametersClauseString(
         derivative, attr->getParameterIndices(), attr->getParsedParameters());
     if (!diffParamsString.empty())
@@ -963,8 +973,8 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     Printer.printAttrName("@transpose");
     Printer << '(';
     auto *attr = cast<TransposeAttr>(this);
-    auto *transpose = cast<AbstractFunctionDecl>(D);
     Printer << attr->getOriginalFunctionName().Name;
+    auto *transpose = cast<AbstractFunctionDecl>(D);
     auto transParamsString = getTransposedParametersClauseString(
         transpose, attr->getParameterIndices(), attr->getParsedParameters());
     if (!transParamsString.empty())
@@ -1105,6 +1115,8 @@ StringRef DeclAttribute::getAttrName() const {
     return "_projectedValueProperty";
   case DAK_Differentiable:
     return "differentiable";
+  case DAK_OriginallyDefinedIn:
+    return "_originallyDefinedIn";
   // SWIFT_ENABLE_TENSORFLOW
   case DAK_Derivative:
     return "derivative";
@@ -1492,16 +1504,24 @@ DifferentiableAttr::create(ASTContext &context, bool implicit,
 }
 
 DifferentiableAttr *
-DifferentiableAttr::create(Decl *original, bool implicit, SourceLoc atLoc,
-                           SourceRange baseRange, bool linear,
-                           IndexSubset *indices, Optional<DeclNameWithLoc> jvp,
+DifferentiableAttr::create(AbstractFunctionDecl *original, bool implicit,
+                           SourceLoc atLoc, SourceRange baseRange, bool linear,
+                           IndexSubset *parameterIndices,
+                           Optional<DeclNameWithLoc> jvp,
                            Optional<DeclNameWithLoc> vjp,
                            GenericSignature derivativeGenSig) {
   auto &ctx = original->getASTContext();
   void *mem = ctx.Allocate(sizeof(DifferentiableAttr),
                            alignof(DifferentiableAttr));
+  // Register derivative function configuration for the given original
+  // declaration.
+  // NOTE(TF-1038): `@differentiable` attributes currently always have
+  // effective result indices `{0}` (the first and only result index).
+  auto *resultIndices = IndexSubset::get(ctx, 1, {0});
+  original->addDerivativeFunctionConfiguration(
+      {parameterIndices, resultIndices, derivativeGenSig});
   return new (mem) DifferentiableAttr(original, implicit, atLoc, baseRange,
-                                      linear, indices, std::move(jvp),
+                                      linear, parameterIndices, std::move(jvp),
                                       std::move(vjp), derivativeGenSig);
 }
 

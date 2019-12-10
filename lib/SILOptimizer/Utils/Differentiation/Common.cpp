@@ -650,5 +650,100 @@ void extractAllElements(SILValue value, SILBuilder &builder,
     results.push_back(builder.createTupleExtract(value.getLoc(), value, i));
 }
 
+//===----------------------------------------------------------------------===//
+// Utilities for looking up derivatives of functions
+//===----------------------------------------------------------------------===//
+
+/// Returns the AbstractFunctionDecl corresponding to `F`. If there isn't one,
+/// returns `nullptr`.
+static AbstractFunctionDecl *findAbstractFunctionDecl(SILFunction *F) {
+  auto *DC = F->getDeclContext();
+  if (!DC)
+    return nullptr;
+  auto *D = DC->getAsDecl();
+  if (!D)
+    return nullptr;
+  return dyn_cast<AbstractFunctionDecl>(D);
+}
+
+SILDifferentiabilityWitness *
+getExactDifferentiabilityWitness(SILModule &module, SILFunction *original,
+                                 IndexSubset *parameterIndices,
+                                 IndexSubset *resultIndices) {
+  for (auto *w : module.lookUpDifferentiabilityWitnessesForFunction(
+           original->getName())) {
+    if (w->getParameterIndices() == parameterIndices &&
+        w->getResultIndices() == resultIndices)
+      return w;
+  }
+  return nullptr;
+}
+
+Optional<AutoDiffConfig>
+findMinimalDerivativeConfiguration(AbstractFunctionDecl *original,
+                                   IndexSubset *parameterIndices,
+                                   IndexSubset *&minimalASTParameterIndices) {
+  Optional<AutoDiffConfig> minimalConfig = None;
+  auto configs = original->getDerivativeFunctionConfigurations();
+  for (auto config : configs) {
+    auto *silParameterIndices = autodiff::getLoweredParameterIndices(
+        config.parameterIndices,
+        original->getInterfaceType()->castTo<AnyFunctionType>());
+    // If all indices in `parameterIndices` are in `daParameterIndices`, and
+    // it has fewer indices than our current candidate and a primitive VJP,
+    // then `attr` is our new candidate.
+    //
+    // NOTE(TF-642): `attr` may come from a un-partial-applied function and
+    // have larger capacity than the desired indices. We expect this logic to
+    // go away when `partial_apply` supports `@differentiable` callees.
+    if (silParameterIndices->isSupersetOf(parameterIndices->extendingCapacity(
+            original->getASTContext(), silParameterIndices->getCapacity())) &&
+        // fewer parameters than before
+        (!minimalConfig ||
+         silParameterIndices->getNumIndices() <
+             minimalConfig->parameterIndices->getNumIndices())) {
+      minimalASTParameterIndices = config.parameterIndices;
+      minimalConfig = AutoDiffConfig(silParameterIndices, config.resultIndices,
+                                     config.derivativeGenericSignature);
+    }
+  }
+  return minimalConfig;
+}
+
+SILDifferentiabilityWitness *getOrCreateMinimalASTDifferentiabilityWitness(
+    SILModule &module, SILFunction *original, IndexSubset *parameterIndices,
+    IndexSubset *resultIndices) {
+  // AST differentiability witnesses always have a single result.
+  if (resultIndices->getCapacity() != 1 || !resultIndices->contains(0))
+    return nullptr;
+
+  // Explicit differentiability witnesses only exist on SILFunctions that come
+  // from AST functions.
+  auto *originalAFD = findAbstractFunctionDecl(original);
+  if (!originalAFD)
+    return nullptr;
+
+  IndexSubset *minimalASTParameterIndices = nullptr;
+  auto minimalConfig = findMinimalDerivativeConfiguration(
+      originalAFD, parameterIndices, minimalASTParameterIndices);
+  if (!minimalConfig)
+    return nullptr;
+
+  auto *existingWitness = module.lookUpDifferentiabilityWitness(
+      {original->getName(), *minimalConfig});
+  if (existingWitness)
+    return existingWitness;
+
+  assert(original->isExternalDeclaration() &&
+         "SILGen should create differentiability witnesses for all function "
+         "definitions with explicit differentiable attributes");
+
+  return SILDifferentiabilityWitness::createDeclaration(
+      module, SILLinkage::PublicExternal, original,
+      minimalConfig->parameterIndices, minimalConfig->resultIndices,
+      minimalConfig->derivativeGenericSignature);
+}
+
+
 } // end namespace autodiff
 } // end namespace swift

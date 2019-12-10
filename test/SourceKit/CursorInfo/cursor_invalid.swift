@@ -24,6 +24,10 @@ func resyncParser2() {}
 
 Swift(label: 3)
 
+enum Outer {
+  case Inner(IDontExist)
+}
+
 // RUN: %sourcekitd-test -req=cursor -pos=4:13 %s -- %s | %FileCheck -check-prefix=CHECK1 %s
 // CHECK1: source.lang.swift.decl.var.local (4:13-4:14)
 // CHECK1: c
@@ -63,3 +67,7 @@ Swift(label: 3)
 // EQEQ3: <decl.function.operator.infix><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>== </decl.name>(<decl.var.parameter><decl.var.parameter.name>x</decl.var.parameter.name>: <decl.var.parameter.type><ref.class usr="s:14cursor_invalid1CC">C</ref.class></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.name>y</decl.var.parameter.name>: <decl.var.parameter.type><ref.class usr="s:14cursor_invalid1CC">C</ref.class></decl.var.parameter.type></decl.var.parameter>)</decl.function.operator.infix>
 
 // RUN: %sourcekitd-test -req=cursor -pos=25:7 %s -- %s | %FileCheck -check-prefix=DIAG %s
+
+// RUN: %sourcekitd-test -req=cursor -pos=28:8 %s -- %s | %FileCheck -check-prefix=INVALID_ENUM %s
+// INVALID_ENUM: source.lang.swift.decl.enumelement (28:8-28:13)
+// INVALID_ENUM: Inner(_:)

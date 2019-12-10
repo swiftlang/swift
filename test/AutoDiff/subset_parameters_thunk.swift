@@ -1,6 +1,5 @@
 // RUN: %target-swift-frontend -emit-sil %s | %FileCheck %s
 
-@differentiable(where T: Differentiable)
 func foo<T: Numeric>(_ x: T, _ y: T) -> T { x * y }
 
 @derivative(of: foo)

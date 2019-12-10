@@ -237,3 +237,17 @@ AvailabilityContext ASTContext::getSwift51Availability() {
     return AvailabilityContext::alwaysAvailable();
   }
 }
+
+AvailabilityContext ASTContext::getTypesInAbstractMetadataStateAvailability() {
+  auto target = LangOpts.Target;
+
+  if (target.isMacOSX() ) {
+    return AvailabilityContext(
+        VersionRange::allGTE(llvm::VersionTuple(10, 99, 0)));
+  } else if (target.isiOS() || target.isWatchOS()) {
+    return AvailabilityContext(
+        VersionRange::allGTE(llvm::VersionTuple(9999, 0, 0)));
+  } else {
+    return AvailabilityContext::alwaysAvailable();
+  }
+}

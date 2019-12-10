@@ -112,8 +112,10 @@ namespace swift {
   class IndexSubset;
   // SWIFT_ENABLE_TENSORFLOW
   struct AutoDiffConfig;
-  class VectorSpace;
+  struct AutoDiffDerivativeFunctionKind;
+  class DerivativeAttr;
   class DifferentiableAttr;
+  class VectorSpace;
   // SWIFT_ENABLE_TENSORFLOW END
 
   enum class KnownProtocolKind : uint8_t;
@@ -290,11 +292,26 @@ public:
   /// Cache of autodiff-associated vector spaces.
   llvm::DenseMap<Type, Optional<VectorSpace>> AutoDiffVectorSpaces;
 
-  /// Cache of `@differentiable` attributes keyed by parameter indices. This
-  /// helps us diagnose multiple `@differentiable`s that are with respect to the
-  /// same set of parameters.
+  /// Cache of `@differentiable` attributes keyed by parameter indices. Used to
+  /// diagnose duplicate `@differentiable` attributes for the same key.
+  // NOTE(TF-680): relaxing the uniqueness condition to use derivative generic
+  // signature as a key is possible. It requires derivative generic signature
+  // mangling to avoid name collisions for SIL derivative functions with the
+  // same parameter indices but different derivative generic signatures.
   llvm::DenseMap<std::pair<Decl *, IndexSubset *>, DifferentiableAttr *>
       DifferentiableAttrs;
+
+  /// Cache of `@derivative` attributes keyed by parameter indices and
+  /// derivative function kind. Used to diagnose duplicate `@derivative`
+  /// attributes for the same key.
+  // NOTE(TF-680): relaxing the uniqueness condition to use derivative generic
+  // signature as a key is possible. It requires derivative generic signature
+  // mangling to avoid name collisions for SIL derivative functions with the
+  // same parameter indices but different derivative generic signatures.
+  llvm::DenseMap<
+      std::tuple<Decl *, IndexSubset *, AutoDiffDerivativeFunctionKind>,
+      DerivativeAttr *>
+      DerivativeAttrs;
   // SWIFT_ENABLE_TENSORFLOW END
 
 private:
@@ -435,6 +452,10 @@ private:
 
   void installGlobalTypeChecker(TypeChecker *TC);
 public:
+  /// Returns if semantic AST queries are enabled. This generally means module
+  /// loading and name lookup can take place.
+  bool areSemanticQueriesEnabled() const;
+
   /// Retrieve the global \c TypeChecker instance associated with this context.
   TypeChecker *getLegacyGlobalTypeChecker() const;
 
@@ -621,6 +642,11 @@ public:
   /// Get the runtime availability of features introduced in the Swift 5.1
   /// compiler for the target platform.
   AvailabilityContext getSwift51Availability();
+
+  /// Get the runtime availability of
+  /// swift_getTypeByMangledNameInContextInMetadataState.
+  AvailabilityContext getTypesInAbstractMetadataStateAvailability();
+
 
   //===--------------------------------------------------------------------===//
   // Diagnostics Helper functions
@@ -926,9 +952,9 @@ public:
   CanGenericSignature getSingleGenericParameterSignature() const;
 
   /// Retrieve a generic signature with a single type parameter conforming
-  /// to the given existential type.
-  CanGenericSignature getExistentialSignature(CanType existential,
-                                              ModuleDecl *mod);
+  /// to the given opened archetype.
+  CanGenericSignature getOpenedArchetypeSignature(CanType existential,
+                                                  ModuleDecl *mod);
 
   GenericSignature getOverrideGenericSignature(const ValueDecl *base,
                                                const ValueDecl *derived);

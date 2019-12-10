@@ -530,7 +530,7 @@ bool CheckedCastBrJumpThreading::trySimplify(CheckedCastBranchInst *CCBI) {
     // fact that the source operand is the same for
     // both instructions.
     if (!CCBI->isExact() && !DomCCBI->isExact()) {
-      if (DomCCBI->getCastType() != CCBI->getCastType())
+      if (DomCCBI->getTargetFormalType() != CCBI->getTargetFormalType())
         continue;
     }
 
@@ -602,7 +602,7 @@ bool CheckedCastBrJumpThreading::trySimplify(CheckedCastBranchInst *CCBI) {
 
     bool InvertSuccess = false;
     if (DomCCBI->isExact() && CCBI->isExact() &&
-        DomCCBI->getCastType() != CCBI->getCastType()) {
+        DomCCBI->getTargetFormalType() != CCBI->getTargetFormalType()) {
       if (TotalPreds == SuccessPreds.size()) {
         // The dominating exact cast was successful, but it casted to a
         // different type. Therefore, the current cast fails for sure.

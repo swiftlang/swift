@@ -16,6 +16,7 @@
 
 #define DEBUG_TYPE "sil-existential-transform"
 #include "ExistentialTransform.h"
+#include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/SIL/OptimizationRemark.h"
@@ -114,11 +115,29 @@ void ExistentialSpecializerCloner::cloneAndPopulateFunction() {
   }
 }
 
+// Gather the conformances needed for an existential value based on an opened
+// archetype. This adds any conformances inherited from superclass constraints.
+static ArrayRef<ProtocolConformanceRef>
+collectExistentialConformances(ModuleDecl *M, CanType openedType,
+                               CanType existentialType) {
+  assert(!openedType.isAnyExistentialType());
+
+  auto layout = existentialType.getExistentialLayout();
+  auto protocols = layout.getProtocols();
+
+  SmallVector<ProtocolConformanceRef, 4> conformances;
+  for (auto proto : protocols) {
+    auto conformance = M->lookupConformance(openedType, proto->getDecl());
+    assert(conformance);
+    conformances.push_back(conformance);
+  }
+  return M->getASTContext().AllocateCopy(conformances);
+}
+
 // Create the entry basic block with the function arguments.
 void ExistentialSpecializerCloner::cloneArguments(
     SmallVectorImpl<SILValue> &entryArgs) {
   auto &M = OrigF->getModule();
-  auto &Ctx = M.getASTContext();
 
   // Create the new entry block.
   SILFunction &NewF = getBuilder().getFunction();
@@ -164,14 +183,10 @@ void ExistentialSpecializerCloner::cloneArguments(
     NewArg->setOwnershipKind(ValueOwnershipKind(
         NewF, GenericSILType, ArgDesc.Arg->getArgumentConvention()));
     // Determine the Conformances.
-    SmallVector<ProtocolConformanceRef, 1> NewConformances;
-    auto ContextTy = NewF.mapTypeIntoContext(GenericParam);
-    auto OpenedArchetype = ContextTy->castTo<ArchetypeType>();
-    for (auto proto : OpenedArchetype->getConformsTo()) {
-      NewConformances.push_back(ProtocolConformanceRef(proto));
-    }
-    ArrayRef<ProtocolConformanceRef> Conformances =
-        Ctx.AllocateCopy(NewConformances);
+    SILType ExistentialType = ArgDesc.Arg->getType().getObjectType();
+    CanType OpenedType = NewArg->getType().getASTType();
+    auto Conformances = collectExistentialConformances(
+        M.getSwiftModule(), OpenedType, ExistentialType.getASTType());
     auto ExistentialRepr =
         ArgDesc.Arg->getType().getPreferredExistentialRepresentation();
     auto &EAD = ExistentialArgDescriptor[ArgDesc.Index];

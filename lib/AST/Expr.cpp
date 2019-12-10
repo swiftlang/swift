@@ -25,6 +25,7 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/AvailabilitySpec.h"
 #include "swift/AST/PrettyStackTrace.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeLoc.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/PointerUnion.h"
@@ -312,7 +313,6 @@ ConcreteDeclRef Expr::getReferencedDecl() const {
 
   NO_REFERENCE(OpaqueValue);
   NO_REFERENCE(DefaultArgument);
-  NO_REFERENCE(CallerDefaultArgument);
 
   PASS_THROUGH_REFERENCE(BindOptional, getSubExpr);
   PASS_THROUGH_REFERENCE(OptionalEvaluation, getSubExpr);
@@ -631,7 +631,6 @@ bool Expr::canAppendPostfixExpression(bool appendingPostfixOperator) const {
   case ExprKind::RebindSelfInConstructor:
   case ExprKind::OpaqueValue:
   case ExprKind::DefaultArgument:
-  case ExprKind::CallerDefaultArgument:
   case ExprKind::BindOptional:
   case ExprKind::OptionalEvaluation:
     return false;
@@ -1432,6 +1431,23 @@ static ValueDecl *getCalledValue(Expr *E) {
     return getCalledValue(E2);
 
   return nullptr;
+}
+
+const ParamDecl *DefaultArgumentExpr::getParamDecl() const {
+  return getParameterAt(DefaultArgsOwner.getDecl(), ParamIndex);
+}
+
+bool DefaultArgumentExpr::isCallerSide() const {
+  return getParamDecl()->hasCallerSideDefaultExpr();
+}
+
+Expr *DefaultArgumentExpr::getCallerSideDefaultExpr() const {
+  assert(isCallerSide());
+  auto &ctx = DefaultArgsOwner.getDecl()->getASTContext();
+  auto *mutableThis = const_cast<DefaultArgumentExpr *>(this);
+  return evaluateOrDefault(ctx.evaluator,
+                           CallerSideDefaultArgExprRequest{mutableThis},
+                           new (ctx) ErrorExpr(getSourceRange(), getType()));
 }
 
 ValueDecl *ApplyExpr::getCalledValue() const {
@@ -2259,6 +2275,23 @@ void swift::simple_display(llvm::raw_ostream &out, const ClosureExpr *CE) {
   } else {
     out << "closure";
   }
+}
+
+void swift::simple_display(llvm::raw_ostream &out,
+                           const DefaultArgumentExpr *expr) {
+  if (!expr) {
+    out << "(null)";
+    return;
+  }
+
+  out << "default arg for param ";
+  out << "#" << expr->getParamIndex() + 1 << " ";
+  out << "of ";
+  simple_display(out, expr->getDefaultArgsOwner().getDecl());
+}
+
+SourceLoc swift::extractNearestSourceLoc(const DefaultArgumentExpr *expr) {
+  return expr->getLoc();
 }
 
 // See swift/Basic/Statistic.h for declaration: this enables tracing Exprs, is

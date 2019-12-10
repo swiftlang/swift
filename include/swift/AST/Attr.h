@@ -67,7 +67,7 @@ public:
   SourceLoc AtLoc;
   Optional<StringRef> convention = None;
   Optional<StringRef> conventionWitnessMethodProtocol = None;
-  
+
   // Indicates whether the type's '@differentiable' attribute has a 'linear'
   // argument.
   bool linear = false;
@@ -1547,6 +1547,38 @@ public:
   }
 };
 
+/// Describe a symbol was originally defined in another module. For example, given
+/// \code
+/// @_originallyDefinedIn(module: "Original", OSX 10.15) var foo: Int
+/// \endcode
+///
+/// Where variable Foo has originally defined in another module called Original prior to OSX 10.15
+class OriginallyDefinedInAttr: public DeclAttribute {
+public:
+  OriginallyDefinedInAttr(SourceLoc AtLoc, SourceRange Range,
+                          StringRef OriginalModuleName,
+                          PlatformKind Platform,
+                          const llvm::VersionTuple MovedVersion,
+                          bool Implicit)
+    : DeclAttribute(DAK_OriginallyDefinedIn, AtLoc, Range, Implicit),
+      OriginalModuleName(OriginalModuleName),
+      Platform(Platform),
+      MovedVersion(MovedVersion) {}
+
+  // The original module name.
+  const StringRef OriginalModuleName;
+
+  /// The platform of the symbol.
+  const PlatformKind Platform;
+
+  /// Indicates when the symbol was moved here.
+  const llvm::VersionTuple MovedVersion;
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DAK_OriginallyDefinedIn;
+  }
+};
+
 /// Attribute that asks the compiler to generate a function that returns a
 /// quoted representation of the attributed declaration.
 ///
@@ -1841,7 +1873,7 @@ class DifferentiableAttr final
 
   explicit DifferentiableAttr(Decl *original, bool implicit, SourceLoc atLoc,
                               SourceRange baseRange, bool linear,
-                              IndexSubset *indices,
+                              IndexSubset *parameterIndices,
                               Optional<DeclNameWithLoc> jvp,
                               Optional<DeclNameWithLoc> vjp,
                               GenericSignature derivativeGenericSignature);
@@ -1855,9 +1887,10 @@ public:
                                     Optional<DeclNameWithLoc> vjp,
                                     TrailingWhereClause *clause);
 
-  static DifferentiableAttr *create(Decl *original, bool implicit,
-                                    SourceLoc atLoc, SourceRange baseRange,
-                                    bool linear, IndexSubset *indices,
+  static DifferentiableAttr *create(AbstractFunctionDecl *original,
+                                    bool implicit, SourceLoc atLoc,
+                                    SourceRange baseRange, bool linear,
+                                    IndexSubset *parameterIndices,
                                     Optional<DeclNameWithLoc> jvp,
                                     Optional<DeclNameWithLoc> vjp,
                                     GenericSignature derivativeGenSig);
@@ -1890,7 +1923,7 @@ public:
   size_t numTrailingObjects(OverloadToken<ParsedAutoDiffParameter>) const {
     return NumParsedParameters;
   }
-                                      
+
   bool isLinear() const { return Linear; }
 
   TrailingWhereClause *getWhereClause() const { return WhereClause; }
@@ -1906,10 +1939,6 @@ public:
   void setJVPFunction(FuncDecl *decl);
   FuncDecl *getVJPFunction() const { return VJPFunction; }
   void setVJPFunction(FuncDecl *decl);
-
-  bool parametersMatch(const DifferentiableAttr &other) const {
-    return getParameterIndices() == other.getParameterIndices();
-  }
 
   /// Get the derivative generic environment for the given `@differentiable`
   /// attribute and original function.
@@ -1947,6 +1976,8 @@ class DerivativeAttr final
   unsigned NumParsedParameters = 0;
   /// The differentiation parameters' indices, resolved by the type checker.
   IndexSubset *ParameterIndices = nullptr;
+  /// The derivative function kind (JVP or VJP), resolved by the type checker.
+  Optional<AutoDiffDerivativeFunctionKind> Kind = None;
 
   explicit DerivativeAttr(bool implicit, SourceLoc atLoc, SourceRange baseRange,
                           DeclNameWithLoc original,
@@ -1975,6 +2006,12 @@ public:
     OriginalFunction = decl;
   }
 
+  AutoDiffDerivativeFunctionKind getDerivativeKind() const {
+    assert(Kind && "Derivative function kind has not yet been resolved");
+    return *Kind;
+  }
+  void setDerivativeKind(AutoDiffDerivativeFunctionKind kind) { Kind = kind; }
+
   /// The parsed differentiation parameters, i.e. the list of parameters
   /// specified in 'wrt:'.
   ArrayRef<ParsedAutoDiffParameter> getParsedParameters() const {
@@ -1990,8 +2027,8 @@ public:
   IndexSubset *getParameterIndices() const {
     return ParameterIndices;
   }
-  void setParameterIndices(IndexSubset *pi) {
-    ParameterIndices = pi;
+  void setParameterIndices(IndexSubset *parameterIndices) {
+    ParameterIndices = parameterIndices;
   }
 
   static bool classof(const DeclAttribute *DA) {
@@ -2070,8 +2107,8 @@ public:
   IndexSubset *getParameterIndices() const {
     return ParameterIndices;
   }
-  void setParameterIndices(IndexSubset *pi) {
-    ParameterIndices = pi;
+  void setParameterIndices(IndexSubset *parameterIndices) {
+    ParameterIndices = parameterIndices;
   }
 
   static bool classof(const DeclAttribute *DA) {

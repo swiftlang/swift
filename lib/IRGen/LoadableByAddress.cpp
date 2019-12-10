@@ -2746,6 +2746,22 @@ bool LoadableByAddress::recreateConvInstr(SILInstruction &I,
   auto currSILFunctionType = currSILType.castTo<SILFunctionType>();
   GenericEnvironment *genEnv =
       convInstr->getFunction()->getGenericEnvironment();
+  // SWIFT_ENABLE_TENSORFLOW
+  // Differentiable function conversion instructions can happen while the
+  // function is still generic. In that case, we must calculate the new type
+  // using the converted function's generic environment rather than the
+  // converting function's generic environment.
+  //
+  // This happens in witness thunks for default implementations of derivative
+  // requirements, e.g. `requirement00024` in
+  // "test/AutoDiff/compiler_crashers_fixed/tf961".
+  if (convInstr->getKind() == SILInstructionKind::DifferentiableFunctionInst ||
+      convInstr->getKind() == SILInstructionKind::DifferentiableFunctionExtractInst ||
+      convInstr->getKind() == SILInstructionKind::LinearFunctionInst ||
+      convInstr->getKind() == SILInstructionKind::LinearFunctionExtractInst)
+    if (auto genSig = currSILFunctionType->getSubstGenericSignature())
+      genEnv = genSig->getGenericEnvironment();
+  // SWIFT_ENABLE_TENSORFLOW_END
   CanSILFunctionType newFnType = MapperCache.getNewSILFunctionType(
       genEnv, currSILFunctionType, *currIRMod);
   SILType newType = SILType::getPrimitiveObjectType(newFnType);

@@ -3952,6 +3952,18 @@ void Metadata::dump() const {
   if (auto *contextDescriptor = getTypeContextDescriptor()) {
     printf("Name: %s.\n", contextDescriptor->Name.get());
     printf("Type Context Description: %p.\n", contextDescriptor);
+
+    if (contextDescriptor->isGeneric()) {
+      auto genericCount = contextDescriptor->getFullGenericContextHeader().Base.getNumArguments();
+      auto *args = getGenericArgs();
+      printf("Generic Args: %u: [", genericCount);
+      for (uint32_t i = 0; i < genericCount; i++) {
+        if (i > 0)
+          printf(", ");
+        printf("%p", args[i]);
+      }
+      printf("]\n");
+    }
   }
 
   if (auto *tuple = dyn_cast<TupleTypeMetadata>(this)) {
@@ -3975,8 +3987,6 @@ void Metadata::dump() const {
         printf("Superclass constraint: %s.\n", contextDescriptor->Name.get());
     printf("\n");
   }
-
-  printf("Generic Args: %p.\n", getGenericArgs());
 
 #if SWIFT_OBJC_INTEROP
   if (auto *classObject = getClassObject()) {

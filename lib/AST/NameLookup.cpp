@@ -1660,7 +1660,7 @@ bool DeclContext::lookupQualified(ArrayRef<NominalTypeDecl *> typeDecls,
       tracker->addUsedMember({current, member.getBaseName()},isLookupCascading);
 
     // Make sure we've resolved implicit members, if we need them.
-    if (ctx.getLegacyGlobalTypeChecker()) {
+    if (ctx.areSemanticQueriesEnabled()) {
       current->synthesizeSemanticMembersIfNeeded(member);
       installPropertyWrapperMembersIfNeeded(current, member);
     }
