@@ -788,4 +788,23 @@ ErrorBridgingTests.test("error-to-NSObject casts") {
   }
 }
 
+// SR-7732: Casting CFError to Error results in a memory leak
+ErrorBridgingTests.test("CFError-to-Error casts") {
+  func should_not_leak() {
+    let something: Any? = NSError(domain: "Foo", code: 1)
+
+    if let error = something as? Error {
+      expectEqual(
+        "The operation couldn’t be completed. (Foo error 1.)",
+        error.localizedDescription)
+    } else {
+      expectUnreachable()
+    }
+	}
+
+	// TODO: Wrap some leak checking around this
+	// Until then, this is a helpful debug tool
+	should_not_leak()
+}
+
 runAllTests()
