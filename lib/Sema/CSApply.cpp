@@ -152,6 +152,14 @@ static bool shouldAccessStorageDirectly(Expr *base, VarDecl *member,
   return true;
 }
 
+ConstraintLocator *Solution::getCalleeLocator(ConstraintLocator *locator,
+                                              bool lookThroughApply) const {
+  auto &cs = getConstraintSystem();
+  return cs.getCalleeLocator(
+      locator, lookThroughApply,
+      [&](const Expr *expr) -> Type { return getType(expr); });
+}
+
 /// Return the implicit access kind for a MemberRefExpr with the
 /// specified base and member in the specified DeclContext.
 static AccessSemantics
@@ -7410,6 +7418,21 @@ ProtocolConformanceRef Solution::resolveConformance(
   }
 
   return ProtocolConformanceRef::forInvalid();
+}
+
+Type Solution::getType(const Expr *expr) const {
+  auto result = llvm::find_if(
+      addedNodeTypes, [&](const std::pair<TypedNode, Type> &node) -> bool {
+        if (auto *e = node.first.dyn_cast<const Expr *>())
+          return expr == e;
+        return false;
+      });
+
+  if (result != addedNodeTypes.end())
+    return result->second;
+
+  auto &cs = getConstraintSystem();
+  return cs.getType(expr);
 }
 
 void Solution::setExprTypes(Expr *expr) const {

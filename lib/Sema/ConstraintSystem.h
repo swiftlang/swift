@@ -907,6 +907,11 @@ public:
   ProtocolConformanceRef resolveConformance(ConstraintLocator *locator,
                                             ProtocolDecl *proto);
 
+  ConstraintLocator *getCalleeLocator(ConstraintLocator *locator,
+                                      bool lookThroughApply = true) const;
+
+  Type getType(const Expr *E) const;
+
   void setExprTypes(Expr *expr) const;
 
   SWIFT_DEBUG_DUMP;
@@ -2241,8 +2246,17 @@ public:
   /// \param lookThroughApply Whether to look through applies. If false, a
   /// callee locator will only be returned for a direct reference such as
   /// \c x.foo rather than \c x.foo().
+  /// \param getType The callback to fetch a type for given expression.
+  ConstraintLocator *
+  getCalleeLocator(ConstraintLocator *locator, bool lookThroughApply,
+                   llvm::function_ref<Type(const Expr *)> getType);
+
   ConstraintLocator *getCalleeLocator(ConstraintLocator *locator,
-                                      bool lookThroughApply = true);
+                                      bool lookThroughApply = true) {
+    return getCalleeLocator(
+        locator, lookThroughApply,
+        [&](const Expr *expr) -> Type { return getType(expr); });
+  }
 
 public:
 
@@ -2699,7 +2713,7 @@ public:
   /// a complete solution from partial solutions.
   void assignFixedType(TypeVariableType *typeVar, Type type,
                        bool updateState = true);
-  
+
   /// Determine if the type in question is an Array<T> and, if so, provide the
   /// element type of the array.
   static Optional<Type> isArrayType(Type type);
