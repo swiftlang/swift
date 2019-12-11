@@ -59,8 +59,8 @@
 // EXEC: {{ld|clang}}
 // EXEC:  {{.*te?mp.*[/\\]}}main{{[^ ]*}}.o{{"?}} {{.*te?mp.*[/\\]}}multi-threaded{{[^ ]*}}.o
 
-// DEPENDENCIES-DAG: {{.*}}multi-threaded.o : {{.*[/\\]}}multi-threaded.swift {{.*[/\\]}}Inputs{{[/\\]}}main.swift
-// DEPENDENCIES-DAG: {{.*}}main.o : {{.*[/\\]}}multi-threaded.swift {{.*[/\\]}}Inputs{{[/\\]}}main.swift
+// DEPENDENCIES: {{.*}}main.o : {{.*[/\\]}}multi-threaded.swift {{.*[/\\]}}Inputs{{[/\\]}}main.swift
+// DEPENDENCIES-NEXT: {{.*}}multi-threaded.o :{{.*}}main.o
 
 // PARSEABLE2: "name": "compile"
 // PARSEABLE2: "outputs": [
