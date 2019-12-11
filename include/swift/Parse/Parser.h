@@ -1661,6 +1661,9 @@ struct ParsedDeclName {
 
   /// Form a declaration name from this parsed declaration name.
   DeclName formDeclName(ASTContext &ctx) const;
+
+  /// Form a declaration name from this parsed declaration name.
+  DeclNameRef formDeclNameRef(ASTContext &ctx) const;
 };
 
 /// Parse a stringified Swift declaration name,
@@ -1673,6 +1676,13 @@ DeclName formDeclName(ASTContext &ctx,
                       ArrayRef<StringRef> argumentLabels,
                       bool isFunctionName,
                       bool isInitializer);
+
+/// Form a Swift declaration name referemce from its constituent parts.
+DeclNameRef formDeclNameRef(ASTContext &ctx,
+                            StringRef baseName,
+                            ArrayRef<StringRef> argumentLabels,
+                            bool isFunctionName,
+                            bool isInitializer);
 
 /// Parse a stringified Swift declaration name, e.g. "init(frame:)".
 DeclName parseDeclName(ASTContext &ctx, StringRef name);

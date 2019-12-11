@@ -1352,8 +1352,12 @@ ParsedDeclName swift::parseDeclName(StringRef name) {
 }
 
 DeclName ParsedDeclName::formDeclName(ASTContext &ctx) const {
-  return swift::formDeclName(ctx, BaseName, ArgumentLabels, IsFunctionName,
-                             /*IsInitializer=*/true);
+  return formDeclNameRef(ctx).getFullName();
+}
+
+DeclNameRef ParsedDeclName::formDeclNameRef(ASTContext &ctx) const {
+  return swift::formDeclNameRef(ctx, BaseName, ArgumentLabels, IsFunctionName,
+                                /*IsInitializer=*/true);
 }
 
 DeclName swift::formDeclName(ASTContext &ctx,
@@ -1361,11 +1365,21 @@ DeclName swift::formDeclName(ASTContext &ctx,
                              ArrayRef<StringRef> argumentLabels,
                              bool isFunctionName,
                              bool isInitializer) {
+  return formDeclNameRef(ctx, baseName, argumentLabels, isFunctionName,
+                         isInitializer).getFullName();
+}
+
+DeclNameRef swift::formDeclNameRef(ASTContext &ctx,
+                                   StringRef baseName,
+
+                                   ArrayRef<StringRef> argumentLabels,
+                                   bool isFunctionName,
+                                   bool isInitializer) {
   // We cannot import when the base name is not an identifier.
   if (baseName.empty())
-    return DeclName();
+    return DeclNameRef();
   if (!Lexer::isIdentifier(baseName) && !Lexer::isOperator(baseName))
-    return DeclName();
+    return DeclNameRef();
 
   // Get the identifier for the base name. Special-case `init`.
   DeclBaseName baseNameId = ((isInitializer && baseName == "init")
@@ -1373,7 +1387,7 @@ DeclName swift::formDeclName(ASTContext &ctx,
                              : ctx.getIdentifier(baseName));
 
   // For non-functions, just use the base name.
-  if (!isFunctionName) return baseNameId;
+  if (!isFunctionName) return DeclNameRef_(baseNameId);
 
   // For functions, we need to form a complete name.
 
@@ -1389,7 +1403,7 @@ DeclName swift::formDeclName(ASTContext &ctx,
   }
 
   // Build the result.
-  return DeclName(ctx, baseNameId, argumentLabelIds);
+  return DeclNameRef_(DeclName(ctx, baseNameId, argumentLabelIds));
 }
 
 DeclName swift::parseDeclName(ASTContext &ctx, StringRef name) {

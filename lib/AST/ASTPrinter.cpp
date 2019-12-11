@@ -334,10 +334,26 @@ ASTPrinter &ASTPrinter::operator<<(UUID UU) {
   return *this;
 }
 
+ASTPrinter &ASTPrinter::operator<<(Identifier name) {
+  return *this << DeclName(name);
+}
+
+ASTPrinter &ASTPrinter::operator<<(DeclBaseName name) {
+  return *this << DeclName(name);
+}
+
 ASTPrinter &ASTPrinter::operator<<(DeclName name) {
   llvm::SmallString<32> str;
   llvm::raw_svector_ostream os(str);
   name.print(os);
+  printTextImpl(os.str());
+  return *this;
+}
+
+ASTPrinter &ASTPrinter::operator<<(DeclNameRef ref) {
+  llvm::SmallString<32> str;
+  llvm::raw_svector_ostream os(str);
+  ref.print(os);
   printTextImpl(os.str());
   return *this;
 }

@@ -188,6 +188,7 @@ private:
 };
   
 class DeclName;
+class DeclNameRef;
 class ObjCSelector;
 
 } // end namespace swift
@@ -195,6 +196,7 @@ class ObjCSelector;
 namespace llvm {
   raw_ostream &operator<<(raw_ostream &OS, swift::Identifier I);
   raw_ostream &operator<<(raw_ostream &OS, swift::DeclName I);
+  raw_ostream &operator<<(raw_ostream &OS, swift::DeclNameRef I);
   raw_ostream &operator<<(raw_ostream &OS, swift::ObjCSelector S);
 
   // Identifiers hash just like pointers.
@@ -546,7 +548,7 @@ public:
     // The names don't match.
     return false;
   }
-  
+
   /// Add a DeclName to a lookup table so that it can be found by its simple
   /// name or its compound name.
   template<typename LookupTable, typename Element>
@@ -621,6 +623,193 @@ public:
 };
 
 void simple_display(llvm::raw_ostream &out, DeclName name);
+
+/// An in-source reference to another declaration, including qualification
+/// information.
+class DeclNameRef {
+  DeclName FullName;
+
+public:
+  static DeclNameRef createSubscript();
+  static DeclNameRef createConstructor();
+
+  DeclNameRef() : FullName() { }
+
+  void *getOpaqueValue() const { return FullName.getOpaqueValue(); }
+  static DeclNameRef getFromOpaqueValue(void *p);
+
+  // *** TRANSITIONAL CODE STARTS HERE ***
+
+  // We want all DeclNameRef constructions to be explicit, but they need to be
+  // threaded through large portions of the compiler, so that would be
+  // difficult. Instead, we will make uses of DeclNameRef(...) implicit but
+  // deprecated, and use DeclNameRef_(...) as a stand-in for intentional calls
+  // to the constructors. The deprecations and DeclNameRef_ function will go
+  // away before we merge any of this into master.
+
+  [[deprecated]] DeclNameRef(DeclName FullName)
+    : FullName(FullName) { }
+
+  [[deprecated]] DeclNameRef(DeclBaseName BaseName)
+    : FullName(BaseName) { }
+
+  [[deprecated]] DeclNameRef(Identifier BaseName)
+    : FullName(BaseName) { }
+
+  // *** TRANSITIONAL CODE ENDS HERE ***
+
+  /// The name of the declaration being referenced.
+  DeclName getFullName() const {
+    return FullName;
+  }
+
+  DeclName &getFullName() {
+    return FullName;
+  }
+
+  /// The base name of the declaration being referenced.
+  DeclBaseName getBaseName() const {
+    return FullName.getBaseName();
+  }
+
+  Identifier getBaseIdentifier() const {
+    return FullName.getBaseIdentifier();
+  }
+
+  ArrayRef<Identifier> getArgumentNames() const {
+    return FullName.getArgumentNames();
+  }
+
+  bool isSimpleName() const {
+    return FullName.isSimpleName();
+  }
+
+  bool isSimpleName(DeclBaseName name) const {
+    return FullName.isSimpleName(name);
+  }
+
+  bool isSimpleName(StringRef name) const {
+    return FullName.isSimpleName(name);
+  }
+
+  bool isSpecial() const {
+    return FullName.isSpecial();
+  }
+
+  bool isOperator() const {
+    return FullName.isOperator();
+  }
+
+  bool isCompoundName() const {
+    return FullName.isCompoundName();
+  }
+
+  explicit operator bool() const {
+    return (bool)FullName;
+  }
+
+  /// Compare two declaration names, producing -1 if \c *this comes before
+  /// \c other,  1 if \c *this comes after \c other, and 0 if they are equal.
+  ///
+  /// Null declaration names come after all other declaration names.
+  int compare(DeclNameRef other) const {
+    return getFullName().compare(other.getFullName());
+  }
+
+  friend bool operator==(DeclNameRef lhs, DeclNameRef rhs) {
+    return lhs.getOpaqueValue() == rhs.getOpaqueValue();
+  }
+
+  friend bool operator!=(DeclNameRef lhs, DeclNameRef rhs) {
+    return !(lhs == rhs);
+  }
+
+  friend llvm::hash_code hash_value(DeclNameRef name) {
+    using llvm::hash_value;
+    return hash_value(name.getFullName().getOpaqueValue());
+  }
+
+  friend bool operator<(DeclNameRef lhs, DeclNameRef rhs) {
+    return lhs.compare(rhs) < 0;
+  }
+
+  friend bool operator<=(DeclNameRef lhs, DeclNameRef rhs) {
+    return lhs.compare(rhs) <= 0;
+  }
+
+  friend bool operator>(DeclNameRef lhs, DeclNameRef rhs) {
+    return lhs.compare(rhs) > 0;
+  }
+
+  friend bool operator>=(DeclNameRef lhs, DeclNameRef rhs) {
+    return lhs.compare(rhs) >= 0;
+  }
+
+  DeclNameRef withoutArgumentLabels() const;
+  DeclNameRef withArgumentLabels(ASTContext &C,
+                                 ArrayRef<Identifier> argumentNames) const;
+
+  /// Get a string representation of the name,
+  ///
+  /// \param scratch Scratch space to use.
+  StringRef getString(llvm::SmallVectorImpl<char> &scratch,
+                      bool skipEmptyArgumentNames = false) const;
+
+  /// Print the representation of this declaration name to the given
+  /// stream.
+  ///
+  /// \param skipEmptyArgumentNames When true, don't print the argument labels
+  /// if they are all empty.
+  llvm::raw_ostream &print(llvm::raw_ostream &os,
+                           bool skipEmptyArgumentNames = false) const;
+
+  /// Print a "pretty" representation of this declaration name to the given
+  /// stream.
+  ///
+  /// This is the name used for diagnostics; it is not necessarily the
+  /// fully-specified name that would be written in the source.
+  llvm::raw_ostream &printPretty(llvm::raw_ostream &os) const;
+
+  /// Dump this name to standard error.
+  LLVM_ATTRIBUTE_DEPRECATED(void dump() const LLVM_ATTRIBUTE_USED,
+                            "only for use within the debugger");
+};
+
+// *** TRANSITIONAL CODE STARTS HERE ***
+
+template<typename T>
+static DeclNameRef DeclNameRef_(T name) {
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+  return DeclNameRef(name);
+#pragma clang diagnostic pop
+}
+
+// *** TRANSITIONAL CODE ENDS HERE ***
+
+inline DeclNameRef DeclNameRef::getFromOpaqueValue(void *p) {
+  return DeclNameRef_(DeclName::getFromOpaqueValue(p));
+}
+
+inline DeclNameRef DeclNameRef::withoutArgumentLabels() const {
+  return DeclNameRef_(getBaseName());
+}
+
+inline DeclNameRef DeclNameRef::withArgumentLabels(
+    ASTContext &C, ArrayRef<Identifier> argumentNames) const {
+  return DeclNameRef_(DeclName(C, getBaseName(), argumentNames));
+}
+
+
+inline DeclNameRef DeclNameRef::createSubscript() {
+  return DeclNameRef_(DeclBaseName::createSubscript());
+}
+
+inline DeclNameRef DeclNameRef::createConstructor() {
+  return DeclNameRef_(DeclBaseName::createConstructor());
+}
+
+void simple_display(llvm::raw_ostream &out, DeclNameRef name);
 
 enum class ObjCSelectorFamily : unsigned {
   None,
@@ -763,6 +952,37 @@ namespace llvm {
     }
     static bool isEqual(swift::DeclName LHS, swift::DeclName RHS) {
       return LHS.getOpaqueValue() == RHS.getOpaqueValue();
+    }
+  };
+
+  // A DeclNameRef is "pointer like" just like DeclNames.
+  template<typename T> struct PointerLikeTypeTraits;
+  template<>
+  struct PointerLikeTypeTraits<swift::DeclNameRef> {
+  public:
+    static inline void *getAsVoidPointer(swift::DeclNameRef name) {
+      return name.getOpaqueValue();
+    }
+    static inline swift::DeclNameRef getFromVoidPointer(void *ptr) {
+      return swift::DeclNameRef::getFromOpaqueValue(ptr);
+    }
+    enum { NumLowBitsAvailable = PointerLikeTypeTraits<swift::DeclName>::NumLowBitsAvailable };
+  };
+
+  // DeclNameRefs hash just like DeclNames.
+  template<> struct DenseMapInfo<swift::DeclNameRef> {
+    static swift::DeclNameRef getEmptyKey() {
+      return DeclNameRef_(DenseMapInfo<swift::DeclName>::getEmptyKey());
+    }
+    static swift::DeclNameRef getTombstoneKey() {
+      return DeclNameRef_(DenseMapInfo<swift::DeclName>::getTombstoneKey());
+    }
+    static unsigned getHashValue(swift::DeclNameRef Val) {
+      return DenseMapInfo<swift::DeclName>::getHashValue(Val.getFullName());
+    }
+    static bool isEqual(swift::DeclNameRef LHS, swift::DeclNameRef RHS) {
+      return DenseMapInfo<swift::DeclName>::isEqual(LHS.getFullName(),
+                                                    RHS.getFullName());
     }
   };
 

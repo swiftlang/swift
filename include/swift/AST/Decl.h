@@ -2459,6 +2459,12 @@ public:
   /// names.
   DeclBaseName getBaseName() const { return Name.getBaseName(); }
 
+  /// Generates a DeclNameRef referring to this declaration with as much
+  /// specificity as possible.
+  DeclNameRef createNameRef() const {
+    return DeclNameRef_(getFullName());
+  }
+
   /// Retrieve the name to use for this declaration when interoperating
   /// with the Objective-C runtime.
   ///
