@@ -2077,12 +2077,12 @@ void Parser::parseOptionalArgumentLabel(Identifier &name, SourceLoc &loc) {
   }
 }
 
-DeclName Parser::parseUnqualifiedDeclName(bool afterDot,
-                                          DeclNameLoc &loc,
-                                          const Diagnostic &diag,
-                                          bool allowOperators,
-                                          bool allowZeroArgCompoundNames,
-                                          bool allowDeinitAndSubscript) {
+DeclBaseName Parser::parseUnqualifiedDeclBaseName(
+                                                 bool afterDot,
+                                                 DeclNameLoc &loc,
+                                                 const Diagnostic &diag,
+                                                 bool allowOperators,
+                                                 bool allowDeinitAndSubscript) {
   // Consume the base name.
   DeclBaseName baseName;
   SourceLoc baseNameLoc;
@@ -2114,12 +2114,25 @@ DeclName Parser::parseUnqualifiedDeclName(bool afterDot,
     return DeclName();
   }
 
-  // If the next token isn't a following '(', we don't have a compound name.
-  if (!Tok.isFollowingLParen()) {
-    loc = DeclNameLoc(baseNameLoc);
-    return baseName;
-  }
+  loc = DeclNameLoc(baseNameLoc);
+  return baseName;
+}
 
+
+DeclName Parser::parseUnqualifiedDeclName(bool afterDot,
+                                             DeclNameLoc &loc,
+                                             const Diagnostic &diag,
+                                             bool allowOperators,
+                                             bool allowZeroArgCompoundNames,
+                                             bool allowDeinitAndSubscript) {
+  // Consume the base name.
+  auto baseName = parseUnqualifiedDeclBaseName(afterDot, loc, diag,
+                                               allowOperators,
+                                               allowDeinitAndSubscript);
+
+  // If the next token isn't a following '(', we don't have a compound name.
+  if (!baseName || !Tok.isFollowingLParen())
+    return baseName;
 
   // If the next token is a ')' then we have a 0-arg compound name. This is
   // explicitly differentiated from "simple" (non-compound) name in DeclName.
@@ -2133,7 +2146,6 @@ DeclName Parser::parseUnqualifiedDeclName(bool afterDot,
           ParsedSyntaxRecorder::makeBlankDeclNameArgumentList(
               leadingTriviaLoc(), *SyntaxContext));
     consumeToken(tok::r_paren);
-    loc = DeclNameLoc(baseNameLoc);
     SmallVector<Identifier, 2> argumentLabels;
     return DeclName(Context, baseName, argumentLabels);
   }
@@ -2142,7 +2154,6 @@ DeclName Parser::parseUnqualifiedDeclName(bool afterDot,
   // compound name.
   if ((!peekToken().canBeArgumentLabel() && !peekToken().is(tok::colon)) ||
       Identifier::isEditorPlaceholder(peekToken().getText())) {
-    loc = DeclNameLoc(baseNameLoc);
     return baseName;
   }
 
@@ -2176,7 +2187,6 @@ DeclName Parser::parseUnqualifiedDeclName(bool afterDot,
 
     // This is not a compound name.
     // FIXME: Could recover better if we "know" it's a compound name.
-    loc = DeclNameLoc(baseNameLoc);
     ArgCtxt.setBackTracking();
     ArgsCtxt.setBackTracking();
     return baseName;
@@ -2190,7 +2200,7 @@ DeclName Parser::parseUnqualifiedDeclName(bool afterDot,
   assert(!argumentLabels.empty() && "Logic above should prevent this");
   assert(argumentLabels.size() == argumentLabelLocs.size());
 
-  loc = DeclNameLoc(Context, baseNameLoc, lparenLoc, argumentLabelLocs,
+  loc = DeclNameLoc(Context, loc.getBaseNameLoc(), lparenLoc, argumentLabelLocs,
                     rparenLoc);
   return DeclName(Context, baseName, argumentLabels);
 }
@@ -3020,17 +3030,18 @@ ParserStatus Parser::parseExprList(tok leftTok, tok rightTok,
     if (Tok.isBinaryOperator() && peekToken().isAny(rightTok, tok::comma)) {
       SyntaxParsingContext operatorContext(SyntaxContext,
                                            SyntaxKind::IdentifierExpr);
-      SourceLoc Loc;
-      Identifier OperName;
-      if (parseAnyIdentifier(OperName, Loc, diag::expected_operator_ref)) {
+      DeclNameLoc Loc;
+      auto OperName = parseUnqualifiedDeclBaseName(/*afterDot=*/false, Loc,
+                                                   diag::expected_operator_ref,
+                                                   /*allowOperators=*/true);
+      if (!OperName) {
         return makeParserError();
       }
       // Bypass local lookup. Use an 'Ordinary' reference kind so that the
       // reference may resolve to any unary or binary operator based on
       // context.
       SubExpr = new(Context) UnresolvedDeclRefExpr(OperName,
-                                                   DeclRefKind::Ordinary,
-                                                   DeclNameLoc(Loc));
+                                                   DeclRefKind::Ordinary, Loc);
     } else if (isPostfix && Tok.is(tok::code_complete)) {
       // Handle call arguments specially because it may need argument labels.
       auto CCExpr = new (Context) CodeCompletionExpr(Tok.getLoc());

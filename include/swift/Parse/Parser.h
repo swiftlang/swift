@@ -1411,11 +1411,26 @@ public:
   /// \param loc The location of the label (empty if it doesn't exist)
   void parseOptionalArgumentLabel(Identifier &name, SourceLoc &loc);
 
-  /// Parse an unqualified-decl-name.
+  /// Parse an unqualified-decl-base-name.
   ///
   ///   unqualified-decl-name:
   ///     identifier
-  ///     identifier '(' ((identifier | '_') ':') + ')'
+  ///
+  /// \param afterDot Whether this identifier is coming after a period, which
+  /// enables '.init' and '.default' like expressions.
+  /// \param loc Will be populated with the location of the name.
+  /// \param diag The diagnostic to emit if this is not a name.
+  /// \param allowOperators Whether to allow operator basenames too.
+  DeclBaseName parseUnqualifiedDeclBaseName(bool afterDot, DeclNameLoc &loc,
+                                            const Diagnostic &diag,
+                                            bool allowOperators=false,
+                                            bool allowDeinitAndSubscript=false);
+
+  /// Parse an unqualified-decl-name.
+  ///
+  ///   unqualified-decl-name:
+  ///     unqualified-decl-base-name
+  ///     unqualified-decl-base-name '(' ((identifier | '_') ':') + ')'
   ///
   /// \param afterDot Whether this identifier is coming after a period, which
   /// enables '.init' and '.default' like expressions.
