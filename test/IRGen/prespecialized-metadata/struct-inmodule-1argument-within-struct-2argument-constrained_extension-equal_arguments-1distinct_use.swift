@@ -11,7 +11,7 @@
 // CHECK-SAME:   %swift.type*, 
 // CHECK-SAME:   %swift.type*, 
 // CHECK-SAME:   i32, 
-// CHECK-SAME:   {{(\[4 x i8\])?}}, 
+// CHECK-SAME:   {{(\[4 x i8\],)?}}
 // CHECK-SAME:   i64 
 // CHECK-SAME: }> <{ 
 //               i8** getelementptr inbounds (
@@ -29,7 +29,7 @@
 // CHECK-SAME:   %swift.type* @"$sSiN", 
 // CHECK-SAME:   %swift.type* @"$sSSN", 
 // CHECK-SAME:   i32 0, 
-// CHECK-SAME:   {{(\[4 x i8\] zeroinitializer)?}}, 
+// CHECK-SAME:   {{(\[4 x i8\] zeroinitializer,)?}}
 // CHECK-SAME:   i64 3 
 // CHECK-SAME: }>, 
 // CHECK-SAME: align [[ALIGNMENT]]
@@ -60,7 +60,7 @@ func consume<T>(_ t: T) {
 // CHECK-SAME:           %swift.type_descriptor*, 
 // CHECK-SAME:           %swift.type*, 
 // CHECK-SAME:           i32,
-// CHECK-SAME:           {{(\[4 x i8\])?}}, 
+// CHECK-SAME:           {{(\[4 x i8\],)?}} 
 // CHECK-SAME:           i64 
 // CHECK-SAME:         }>* @"$s4main9NamespaceVAAq_RszrlE5ValueVyS2i_SSGMf" 
 // CHECK-SAME:         to %swift.full_type*
@@ -99,7 +99,7 @@ doit()
 // CHECK-SAME:           %swift.type*, 
 // CHECK-SAME:           %swift.type*, 
 // CHECK-SAME:           i32, 
-// CHECK-SAME:           {{(\[4 x i8\])?}}, 
+// CHECK-SAME:           {{(\[4 x i8\],)?}}
 // CHECK-SAME:           i64 
 // CHECK-SAME:         }>* @"$s4main9NamespaceVAAq_RszrlE5ValueVyS2i_SSGMf" 
 // CHECK-SAME:         to %swift.full_type*
