@@ -1,0 +1,140 @@
+// RUN: %empty-directory(%t)
+// RUN: %gyb -DCMAKE_SIZEOF_VOID_P=%target-ptrsize %s -o %t/RawAtomics.swift
+// RUN: %line-directive %t/RawAtomics.swift -- %target-build-swift %t/RawAtomics.swift -o %t/a.out
+// RUN: %target-codesign %t/a.out
+// RUN: %line-directive %t/RawAtomics.swift -- %target-run %t/a.out
+// REQUIRES: executable_test
+
+%{
+  def rmwOrderings():
+    return [
+      # Swift enum case,         API name,     documentation name,        llvm name,   failure name
+      ('relaxed',                'Relaxed',    'relaxed',                 'monotonic', 'monotonic'),
+      ('acquiring',              'Acquiring',  'acquiring',               'acquire',   'acquire'),
+      ('releasing',              'Releasing',  'releasing',               'release',   'monotonic'),
+      ('acquiringAndReleasing',  'Barrier',    'acquiring-and-releasing', 'acqrel',    'acquire'),
+    ]
+
+  def loadOrderings():
+    return [
+      # Swift enum case,         API name,    doc name,     llvm name
+      ('relaxed',                'Relaxed',   'relaxed',    'monotonic'),
+      ('acquiring',              'Acquiring', 'acquiring',  'acquire'),
+    ]
+
+  def storeOrderings():
+    return [
+      # Swift enum case,         API name,    doc name,     llvm name
+      ('relaxed',                'Relaxed',   'relaxed',    'monotonic'),
+      ('releasing',              'Releasing', 'releasing',  'release'),
+    ]
+
+  integerOperations = [
+    # Swift name,         llvm name,  operator, label, doc
+    ('WrappingIncrement', 'add',      '&+',     "by",  "wrapping add"),
+    ('WrappingDecrement', 'sub',      '&-',     "by",  "wrapping subtract"),
+    ('BitwiseAnd',        'and',      '&',      "_",   "bitwise and"),
+    ('BitwiseOr',         'or',       '|',      "_",   "bitwise or"),
+    ('BitwiseXor',        'xor',      '^',      "_",   "bitwise xor")
+  ]
+
+  def argLabel(label):
+    return label + ": " if label <> "_" else ""
+}%
+
+import StdlibUnittest
+
+let suite = TestSuite("RawAtomics")
+defer { runAllTests() }
+
+func withWordPtr(
+  initialValue: UInt = 0,
+  expectedResult: UInt? = nil,
+  file: String = #file,
+  line: UInt = #line,
+  body: (UnsafeMutableRawPointer) -> Void
+) {
+  let ptr = UnsafeMutablePointer<UInt>.allocate(capacity: 1)
+  ptr.initialize(to: initialValue)
+  defer { ptr.deallocate() }
+  body(UnsafeMutableRawPointer(ptr))
+  if let expectedResult = expectedResult {
+    expectEqual(expectedResult, ptr.pointee, file: file, line: line)
+  }
+}
+
+% for _, apiOrder, _, _ in loadOrderings():
+suite.test("simple_atomic${apiOrder}LoadWord") {
+  withWordPtr(initialValue: 0, expectedResult: 0) { ptr in
+    expectEqual(0, ptr._atomic${apiOrder}LoadWord())
+  }
+  withWordPtr(initialValue: 42, expectedResult: 42) { ptr in
+    expectEqual(42, ptr._atomic${apiOrder}LoadWord())
+  }
+}
+% end
+
+% for _, apiOrder, _, _ in storeOrderings():
+suite.test("simple_atomic${apiOrder}StoreWord") {
+  withWordPtr(initialValue: 0, expectedResult: 23) { ptr in
+    ptr._atomic${apiOrder}StoreWord(42)
+    expectEqual(42, ptr._atomicRelaxedLoadWord())
+
+    ptr._atomic${apiOrder}StoreWord(23)
+    expectEqual(23, ptr._atomicRelaxedLoadWord())
+  }
+}
+% end
+
+% for _, apiOrder, _, _, _ in rmwOrderings():
+suite.test("simple_atomic${apiOrder}ExchangeWord") {
+  withWordPtr(initialValue: 0, expectedResult: 23) { ptr in
+    var r = ptr._atomic${apiOrder}ExchangeWord(42)
+    expectEqual(0, r)
+
+    r = ptr._atomic${apiOrder}ExchangeWord(23)
+    expectEqual(42, r)
+  }
+}
+% end
+
+% for _, apiOrder, _, _, _ in rmwOrderings():
+suite.test("simple_atomic${apiOrder}CompareExchangeWord") {
+  withWordPtr(initialValue: 0, expectedResult: 2) { ptr in
+    var expected: UInt = 0
+    expectTrue(ptr._atomic${apiOrder}CompareExchangeWord(
+        expected: &expected,
+        desired: 1))
+    expectEqual(0, expected)
+    expectEqual(1, ptr._atomicRelaxedLoadWord())
+
+    expected = 0
+    expectFalse(ptr._atomic${apiOrder}CompareExchangeWord(
+        expected: &expected,
+        desired: 2))
+    expectEqual(1, expected)
+    expectEqual(1, ptr._atomicRelaxedLoadWord())
+
+    expectTrue(ptr._atomic${apiOrder}CompareExchangeWord(
+        expected: &expected,
+        desired: 2))
+    expectEqual(1, expected)
+    expectEqual(2, ptr._atomicRelaxedLoadWord())
+  }
+}
+% end
+
+% for (swiftName, _, operator, label, _) in integerOperations:
+%   for _, apiOrder, _, _, _ in rmwOrderings():
+suite.test("simple_atomic${apiOrder}FetchThen${swiftName}Word") {
+  let a: UInt = 3
+  let b: UInt = 8
+  let result: UInt = a ${operator} b
+  withWordPtr(initialValue: a, expectedResult: result) { ptr in
+    let old = ptr._atomic${apiOrder}FetchThen${swiftName}Word(${argLabel(label)}b)
+    expectEqual(a, old)
+    expectEqual(result, ptr._atomicRelaxedLoadWord())
+  }
+}
+%   end
+% end
