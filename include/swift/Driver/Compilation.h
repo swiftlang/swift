@@ -257,6 +257,16 @@ private:
   /// limit filelists will be used.
   size_t FilelistThreshold;
 
+  /// Because each frontend job outputs the same info in its .d file, only do it
+  /// on the first job that actually runs. Write out dummies for the rest of the
+  /// jobs. This hack saves a lot of time in the build system when incrementally
+  /// building a project with many files. Record if a scheduled job has already
+  /// added -emit-dependency-path.
+  bool HaveAlreadyAddedDependencyPath = false;
+
+  /// Set if the -only-one-dependency-file flag is set
+  const bool OnlyOneDependencyFile;
+
   /// Scaffolding to permit experimentation with finer-grained dependencies and
   /// faster rebuilds.
   const bool EnableFineGrainedDependencies;
@@ -309,6 +319,7 @@ public:
               bool SaveTemps = false,
               bool ShowDriverTimeCompilation = false,
               std::unique_ptr<UnifiedStatsReporter> Stats = nullptr,
+              bool OnlyOneDependencyFile = false,
               bool EnableFineGrainedDependencies = false,
               bool VerifyFineGrainedDependencyGraphAfterEveryImport = false,
               bool EmitFineGrainedDependencyDotFileAfterEveryImport = false,
@@ -426,6 +437,14 @@ public:
   size_t getFilelistThreshold() const {
     return FilelistThreshold;
   }
+
+  /// Called to decide whether to add a dependency path argument, or whether to
+  /// create a dummy file. Responds by invoking one of the two passed-in
+  /// functions.
+  void addDependencyPathOrCreateDummy(
+      const CommandOutput &Output,
+      function_ref<void(StringRef)> addDependencyPath,
+      function_ref<void(StringRef)> createDummy);
 
   UnifiedStatsReporter *getStatsReporter() const {
     return Stats.get();

@@ -671,8 +671,20 @@ void ToolChain::JobContext::addFrontendSupplementaryOutputArguments(
            "mode!");
   }
 
-  addOutputsOfType(arguments, Output, Args, file_types::TY_Dependencies,
-                   "-emit-dependencies-path");
+  C.addDependencyPathOrCreateDummy(
+      Output,
+      [&](StringRef) {
+        addOutputsOfType(arguments, Output, Args, file_types::TY_Dependencies,
+                         "-emit-dependencies-path");
+      },
+      [&](StringRef dependencyFile) {
+        // Create an empty file
+        using namespace llvm::sys::fs;
+        if (auto file = openNativeFileForWrite(dependencyFile, CD_CreateAlways,
+                                               OF_Text))
+          closeFile(file.get());
+      });
+
   addOutputsOfType(arguments, Output, Args, file_types::TY_SwiftDeps,
                    "-emit-reference-dependencies-path");
   addOutputsOfType(arguments, Output, Args, file_types::TY_SwiftRanges,
