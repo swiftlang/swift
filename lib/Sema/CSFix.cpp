@@ -255,6 +255,35 @@ ContextualMismatch *ContextualMismatch::create(ConstraintSystem &cs, Type lhs,
   return new (cs.getAllocator()) ContextualMismatch(cs, lhs, rhs, locator);
 }
 
+/// Computes the contextual type information for a type mismatch of a
+/// component in a structural type (tuple or function type).
+///
+/// \returns A tuple containing the contextual type purpose, the source type,
+/// and the contextual type.
+static Optional<std::tuple<ContextualTypePurpose, Type, Type>>
+getStructuralTypeContext(ConstraintSystem &cs, ConstraintLocator *locator) {
+  if (auto contextualType = cs.getContextualType()) {
+    if (auto *anchor = simplifyLocatorToAnchor(locator))
+      return std::make_tuple(cs.getContextualTypePurpose(),
+                             cs.getType(anchor),
+                             contextualType);
+  } else if (auto argApplyInfo = cs.getFunctionArgApplyInfo(locator)) {
+    return std::make_tuple(CTP_CallArgument,
+                           argApplyInfo->getArgType(),
+                           argApplyInfo->getParamType());
+  } else if (auto *coerceExpr = dyn_cast<CoerceExpr>(locator->getAnchor())) {
+    return std::make_tuple(CTP_CoerceOperand,
+                           cs.getType(coerceExpr->getSubExpr()),
+                           cs.getType(coerceExpr));
+  } else if (auto *assignExpr = dyn_cast<AssignExpr>(locator->getAnchor())) {
+    return std::make_tuple(CTP_AssignSource,
+                           cs.getType(assignExpr->getSrc()),
+                           cs.getType(assignExpr->getDest()));
+  }
+
+  return None;
+}
+
 bool AllowTupleTypeMismatch::coalesceAndDiagnose(
     ArrayRef<ConstraintFix *> fixes, bool asNote) const {
   llvm::SmallVector<unsigned, 4> indices;
@@ -270,31 +299,16 @@ bool AllowTupleTypeMismatch::coalesceAndDiagnose(
 
   auto &cs = getConstraintSystem();
   auto *locator = getLocator();
-  auto purpose = cs.getContextualTypePurpose();
+  ContextualTypePurpose purpose;
   Type fromType;
   Type toType;
 
   if (getFromType()->is<TupleType>() && getToType()->is<TupleType>()) {
+    purpose = cs.getContextualTypePurpose();
     fromType = getFromType();
     toType = getToType();
-  } else if (auto contextualType = cs.getContextualType()) {
-    auto *tupleExpr = simplifyLocatorToAnchor(locator);
-    if (!tupleExpr)
-      return false;
-    fromType = cs.getType(tupleExpr);
-    toType = contextualType;
-  } else if (auto argApplyInfo = cs.getFunctionArgApplyInfo(locator)) {
-    purpose = CTP_CallArgument;
-    fromType = argApplyInfo->getArgType();
-    toType = argApplyInfo->getParamType();
-  } else if (auto *coerceExpr = dyn_cast<CoerceExpr>(locator->getAnchor())) {
-    purpose = CTP_CoerceOperand;
-    fromType = cs.getType(coerceExpr->getSubExpr());
-    toType = cs.getType(coerceExpr);
-  } else if (auto *assignExpr = dyn_cast<AssignExpr>(locator->getAnchor())) {
-    purpose = CTP_AssignSource;
-    fromType = cs.getType(assignExpr->getSrc());
-    toType = cs.getType(assignExpr->getDest());
+  } else if (auto contextualTypeInfo = getStructuralTypeContext(cs, locator)) {
+    std::tie(purpose, fromType, toType) = *contextualTypeInfo;
   } else {
     return false;
   }
@@ -313,6 +327,41 @@ AllowTupleTypeMismatch::create(ConstraintSystem &cs, Type lhs, Type rhs,
                                Optional<unsigned> index) {
   return new (cs.getAllocator())
       AllowTupleTypeMismatch(cs, lhs, rhs, locator, index);
+}
+
+bool AllowFunctionTypeMismatch::coalesceAndDiagnose(
+    ArrayRef<ConstraintFix *> fixes, bool asNote) const {
+  llvm::SmallVector<unsigned, 4> indices{ParamIndex};
+
+  for (auto fix : fixes) {
+    if (auto *fnFix = fix->getAs<AllowFunctionTypeMismatch>())
+      indices.push_back(fnFix->ParamIndex);
+  }
+
+  auto &cs = getConstraintSystem();
+  auto *locator = getLocator();
+  ContextualTypePurpose purpose;
+  Type fromType;
+  Type toType;
+
+  auto contextualTypeInfo = getStructuralTypeContext(cs, locator);
+  if (!contextualTypeInfo)
+    return false;
+
+  std::tie(purpose, fromType, toType) = *contextualTypeInfo;
+  FunctionTypeMismatch failure(cs, purpose, fromType, toType, indices, locator);
+  return failure.diagnose(asNote);
+}
+
+bool AllowFunctionTypeMismatch::diagnose(bool asNote) const {
+  return coalesceAndDiagnose({}, asNote);
+}
+
+AllowFunctionTypeMismatch *
+AllowFunctionTypeMismatch::create(ConstraintSystem &cs, Type lhs, Type rhs,
+                                  ConstraintLocator *locator, unsigned index) {
+  return new (cs.getAllocator())
+      AllowFunctionTypeMismatch(cs, lhs, rhs, locator, index);
 }
 
 bool GenericArgumentsMismatch::diagnose(bool asNote) const {
