@@ -374,12 +374,15 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
 
   // Parse generic parameters in SIL mode.
   GenericParamList *generics = nullptr;
+  bool isImplied = false;
   if (isInSILMode()) {
     // If this is part of a sil function decl, generic parameters are visible in
     // the function body; otherwise, they are visible when parsing the type.
     if (!IsSILFuncDecl)
       GenericsScope.emplace(this, ScopeKind::Generics);
     generics = maybeParseGenericParams().getPtrOrNull();
+    
+    isImplied = consumeIf(tok::kw_in);
   }
   
   // In SIL mode, parse box types { ... }.
@@ -477,9 +480,42 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
                                         tyR->getSourceRange());
       }
     }
+    
+    // Parse substitutions for substituted SIL types.
+    SourceLoc SubsLAngleLoc, SubsRAngleLoc;
+    MutableArrayRef<TypeRepr *> SubsTypes;
+    if (isInSILMode() && consumeIf(tok::kw_for)) {
+      if (!Tok.isContextualPunctuator("<")) {
+        diagnose(Tok, diag::sil_function_subst_expected_l_angle);
+        return makeParserError();
+      }
+      
+      SubsLAngleLoc = consumeToken();
+
+      SmallVector<TypeRepr*, 4> SubsTypesVec;
+      for (;;) {
+        auto argTy = parseType();
+        if (!argTy.getPtrOrNull())
+          return makeParserError();
+        SubsTypesVec.push_back(argTy.get());
+        if (consumeIf(tok::comma))
+          continue;
+        break;
+      }
+      if (!Tok.isContextualPunctuator(">")) {
+        diagnose(Tok, diag::sil_function_subst_expected_r_angle);
+        return makeParserError();
+      }
+      
+      SubsRAngleLoc = consumeToken();
+
+      SubsTypes = Context.AllocateCopy(SubsTypesVec);
+    }
 
     tyR = new (Context) FunctionTypeRepr(generics, argsTyR, throwsLoc, arrowLoc,
-                                         SecondHalf.get());
+                                         SecondHalf.get(),
+                                         isImplied,
+                                         SubsTypes);
   } else if (generics) {
     // Only function types may be generic.
     auto brackets = generics->getSourceRange();

@@ -245,6 +245,9 @@ protected:
   unsigned appendBoundGenericArgs(DeclContext *dc,
                                   SubstitutionMap subs,
                                   bool &isFirstArgList);
+  
+  /// Append the bound generic arguments as a flat list, disregarding depth.
+  void appendFlatGenericArgs(SubstitutionMap subs);
 
   /// Append any retroactive conformances.
   void appendRetroactiveConformances(Type type);
