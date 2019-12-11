@@ -785,6 +785,11 @@ ErrorBridgingTests.test("error-to-NSObject casts") {
 
     // "is" check
     expectTrue(error is NSObject)
+
+    // Unconditional cast to a dictionary.
+    let dict = ["key" : NoisyError()]
+    let anyOfDict = dict as AnyObject
+    let dict2 = anyOfDict as! [String: NSObject]
   }
 }
 
