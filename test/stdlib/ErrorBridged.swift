@@ -795,9 +795,11 @@ ErrorBridgingTests.test("CFError-to-Error casts") {
     expectTrue(something is Error)
   }
 
-  // TODO: Wrap some leak checking around this
-  // Until then, this is a helpful debug tool
-  should_not_leak()
+  if #available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) {
+    // TODO: Wrap some leak checking around this
+    // Until then, this is a helpful debug tool
+    should_not_leak()
+  }
 }
 
 runAllTests()
