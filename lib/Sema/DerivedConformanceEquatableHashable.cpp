@@ -308,8 +308,8 @@ static DeclRefExpr *convertEnumToIndex(SmallVectorImpl<ASTNode> &stmts,
   for (auto elt : enumDecl->getAllElements()) {
     // generate: case .<Case>:
     auto pat = new (C) EnumElementPattern(TypeLoc::withoutLoc(enumType),
-                                          SourceLoc(), SourceLoc(),
-                                          Identifier(), elt, nullptr);
+                                          SourceLoc(), DeclNameLoc(),
+                                          DeclName(), elt, nullptr);
     pat->setImplicit();
     pat->setType(enumType);
 
@@ -511,8 +511,8 @@ deriveBodyEquatable_enum_hasAssociatedValues_eq(AbstractFunctionDecl *eqDecl,
     auto lhsSubpattern = enumElementPayloadSubpattern(elt, 'l', eqDecl,
                                                       lhsPayloadVars);
     auto lhsElemPat = new (C) EnumElementPattern(TypeLoc::withoutLoc(enumType),
-                                                 SourceLoc(), SourceLoc(),
-                                                 Identifier(), elt,
+                                                 SourceLoc(), DeclNameLoc(),
+                                                 DeclName(), elt,
                                                  lhsSubpattern);
     lhsElemPat->setImplicit();
 
@@ -521,8 +521,8 @@ deriveBodyEquatable_enum_hasAssociatedValues_eq(AbstractFunctionDecl *eqDecl,
     auto rhsSubpattern = enumElementPayloadSubpattern(elt, 'r', eqDecl,
                                                       rhsPayloadVars);
     auto rhsElemPat = new (C) EnumElementPattern(TypeLoc::withoutLoc(enumType),
-                                                 SourceLoc(), SourceLoc(),
-                                                 Identifier(), elt,
+                                                 SourceLoc(), DeclNameLoc(),
+                                                 DeclName(), elt,
                                                  rhsSubpattern);
     rhsElemPat->setImplicit();
 
@@ -1033,8 +1033,9 @@ deriveBodyHashable_enum_hasAssociatedValues_hashInto(
     auto payloadPattern = enumElementPayloadSubpattern(elt, 'a', hashIntoDecl,
                                                        payloadVars);
     auto pat = new (C) EnumElementPattern(TypeLoc::withoutLoc(enumType),
-                                          SourceLoc(), SourceLoc(),
-                                          elt->getName(), elt, payloadPattern);
+                                          SourceLoc(), DeclNameLoc(),
+                                          elt->getName(), elt,
+                                          payloadPattern);
     pat->setImplicit();
 
     auto labelItem = CaseLabelItem(pat);

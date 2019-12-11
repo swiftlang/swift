@@ -3576,7 +3576,7 @@ ERROR(cannot_convert_single_tuple_into_multiple_arguments,none,
 
 ERROR(enum_element_pattern_assoc_values_mismatch,none,
       "pattern with associated values does not match enum case %0",
-      (Identifier))
+      (DeclName))
 NOTE(enum_element_pattern_assoc_values_remove,none,
      "remove associated values to make the pattern match", ())
 ERROR(tuple_pattern_length_mismatch,none,
@@ -3584,14 +3584,14 @@ ERROR(tuple_pattern_length_mismatch,none,
 ERROR(tuple_pattern_label_mismatch,none,
       "tuple pattern element label %0 must be %1", (Identifier, Identifier))
 ERROR(enum_element_pattern_member_not_found,none,
-      "enum case '%0' not found in type %1", (StringRef, Type))
+      "enum case %0 not found in type %1", (DeclName, Type))
 ERROR(optional_element_pattern_not_valid_type,none,
       "'?' pattern cannot match values of type %0", (Type))
 ERROR(condition_optional_element_pattern_not_valid_type,none,
       "initializer for conditional binding must have Optional type, not %0",
       (Type))
 ERROR(enum_element_pattern_not_member_of_enum,none,
-      "enum case '%0' is not a member of type %1", (StringRef, Type))
+      "enum case %0 is not a member of type %1", (DeclName, Type))
 ERROR(ambiguous_enum_pattern_type,none,
       "generic enum type %0 is ambiguous without explicit generic parameters "
       "when matching value of type %1", (Type, Type))
