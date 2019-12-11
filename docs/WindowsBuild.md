@@ -32,7 +32,8 @@ git clone https://github.com/apple/swift-corelibs-libdispatch toolchain/swift-co
 git clone https://github.com/apple/swift-corelibs-foundation toolchain/swift-corelibs-foundation
 git clone https://github.com/apple/swift-corelibs-xctest toolchain/swift-corelibs-xctest
 git clone https://github.com/apple/swift-llbuild toolchain/llbuild
-git clone -c core.autocrlf=input https://github.com/apple/swift-package-manager toolchain/swift-package-manager
+git clone https://github.com/apple/swift-tools-support-core toolchain/swift-tools-support-core
+git clone -c core.autocrlf=input https://github.com/apple/swift-package-manager toolchain/swiftpm
 git clone https://github.com/compnerd/windows-swift windows-swift
 ```
 
@@ -155,7 +156,6 @@ path S:\b\llbuild\bin;%PATH%
 ## Build swift-tools-core-support
 
 ```cmd
-md S:\b\tsc
 cmake -B S:\b\tsc -G Ninja -S S:\toolchain\swift-tools-support-core -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_C_COMPILER=cl -DCMAKE_Swift_COMPILER=S:/b/toolchain/bin/swiftc.exe -DFoundation_DIR=S:/b/foundation/cmake/modules -Ddispatch_DIR=S:/b/libdispatch/cmake/modules
 ninja -C S:\b\tsc
 ```
@@ -163,9 +163,8 @@ ninja -C S:\b\tsc
 ## Build swift-package-manager
 
 ```cmd
-md S:\b\spm
-cd S:\b\spm
-C:\Python27\python.exe S:\swift-package-manager\Utilities\bootstrap --foundation S:\b\foundation --libdispatch-build-dir S:\b\libdispatch --libdispatch-source-dir S:\swift-corelibs-libdispatch --llbuild-build-dir S:\b\llbuild --llbuild-source-dir S:\llbuild --sqlite-build-dir S:\b\sqlite --sqlite-source-dir S:\sqlite-amalgamation-3270200
+cmake -B S:\b\spm -G Ninja -S S:\toolchain\swiftpm -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_C_COMPILER=S:/b/toolchain/bin/clang-cl.exe -DCMAKE_CXX_COMPILER=S:/b/toolchain/bin/clang-cl.exe -DCMAKE_Swift_COMPILER=S:/b/toolchain/bin/swiftc.exe -DUSE_VENDORED_TSC=YES -DFoundation_DIR=S:/b/foundation/cmake/modules -Ddispatch_DIR=S:/b/libdispatch/cmake/modules -DLLBuild_DIR=S:/b/llbuild/cmake/modules
+ninja -C S:\b\spm
 ```
 
 ## Install the Swift toolchain on Windows
