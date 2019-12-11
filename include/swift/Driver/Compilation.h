@@ -264,7 +264,12 @@ private:
   /// added -emit-dependency-path.
   bool HaveAlreadyAddedDependencyPath = false;
 
-  /// Set if the -only-one-dependency-file flag is set
+  /// When set, only the first scheduled frontend job gets the argument needed
+  /// to produce a make-style dependency file. The other jobs create dummy files
+  /// in the driver. This hack speeds up incremental compilation by reducing the
+  /// time for the build system to read each dependency file, which are all
+  /// identical. This optimization can be disabled by passing
+  /// -disable-only-one-dependency-file on the command line.
   const bool OnlyOneDependencyFile;
 
   /// Scaffolding to permit experimentation with finer-grained dependencies and
