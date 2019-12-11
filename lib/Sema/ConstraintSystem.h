@@ -1266,6 +1266,10 @@ private:
   /// type in a disjunction constraint.
   llvm::DenseMap<Expr *, TypeBase *> FavoredTypes;
 
+  /// Maps discovered closures to their types inferred
+  /// from declared parameters/result and body.
+  llvm::MapVector<const ClosureExpr *, FunctionType *> ClosureTypes;
+
   /// Maps expression types used within all portions of the constraint
   /// system, instead of directly using the types on the expression
   /// nodes themselves. This allows us to typecheck an expression and
@@ -1854,6 +1858,9 @@ public:
     /// The length of \c ResolvedOverloads.
     unsigned numResolvedOverloads;
 
+    /// The length of \c ClosureTypes.
+    unsigned numInferredClosureTypes;
+
     /// The previous score.
     Score PreviousScore;
 
@@ -1988,6 +1995,19 @@ public:
   /// the moment.
   bool isActiveTypeVariable(TypeVariableType *typeVar) const {
     return TypeVariables.count(typeVar) > 0;
+  }
+
+  void setClosureType(const ClosureExpr *closure, FunctionType *type) {
+    assert(closure);
+    assert(type && "Expected non-null type");
+    assert(ClosureTypes.count(closure) == 0 && "Cannot reset closure type");
+    ClosureTypes.insert({closure, type});
+  }
+
+  FunctionType *getClosureType(const ClosureExpr *closure) const {
+    auto result = ClosureTypes.find(closure);
+    assert(result != ClosureTypes.end());
+    return result->second;
   }
 
   TypeBase* getFavoredType(Expr *E) {
