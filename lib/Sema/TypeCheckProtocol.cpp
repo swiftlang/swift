@@ -562,7 +562,8 @@ swift::matchWitness(
            witnessAFD->getDerivativeFunctionConfigurations()) {
         // We can't use witnesses that have generic signatures not satisfied by
         // the requirement's generic signature.
-        if (!witnessConfig.derivativeGenericSignature
+        if (witnessConfig.derivativeGenericSignature &&
+            !witnessConfig.derivativeGenericSignature
                  ->requirementsNotSatisfiedBy(
                      reqDiffAttr->getDerivativeGenericSignature())
                  .empty())
