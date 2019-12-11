@@ -140,9 +140,13 @@ Type TypeResolution::resolveDependentMemberType(
                                           Type baseTy, DeclContext *DC,
                                           SourceRange baseRange,
                                           ComponentIdentTypeRepr *ref) const {
+  // FIXME(ModQual): Reject qualified names immediately; they cannot be
+  // dependent member types.
+  Identifier refIdentifier = ref->getNameRef().getBaseIdentifier();
+
   switch (stage) {
   case TypeResolutionStage::Structural:
-    return DependentMemberType::get(baseTy, ref->getIdentifier());
+    return DependentMemberType::get(baseTy, refIdentifier);
 
   case TypeResolutionStage::Contextual:
     llvm_unreachable("Dependent type after archetype substitution");
@@ -168,14 +172,13 @@ Type TypeResolution::resolveDependentMemberType(
 
   // Look for a nested type with the given name.
   if (auto nestedType =
-          baseEquivClass->lookupNestedType(*builder, ref->getIdentifier())) {
+          baseEquivClass->lookupNestedType(*builder, refIdentifier)) {
     // Record the type we found.
     ref->setValue(nestedType, nullptr);
   } else {
     // Resolve the base to a potential archetype.
     // Perform typo correction.
-    TypoCorrectionResults corrections(ref->getIdentifier(),
-                                      DeclNameLoc(ref->getIdLoc()));
+    TypoCorrectionResults corrections(ref->getNameRef(), ref->getNameLoc());
     TypeChecker::performTypoCorrection(DC, DeclRefKind::Ordinary,
                                        MetatypeType::get(baseTy),
                                        NameLookupFlags::ProtocolMembers,
@@ -189,8 +192,8 @@ Type TypeResolution::resolveDependentMemberType(
 
     // If we don't have a single result, complain and fail.
     if (!singleType) {
-      Identifier name = ref->getIdentifier();
-      SourceLoc nameLoc = ref->getIdLoc();
+      auto name = ref->getNameRef();
+      auto nameLoc = ref->getNameLoc();
       ctx.Diags.diagnose(nameLoc, diag::invalid_member_type, name, baseTy)
         .highlight(baseRange);
       corrections.noteAllCandidates();
@@ -199,14 +202,14 @@ Type TypeResolution::resolveDependentMemberType(
     }
 
     // We have a single type result. Suggest it.
-    ctx.Diags.diagnose(ref->getIdLoc(), diag::invalid_member_type_suggest,
-                       baseTy, ref->getIdentifier(),
-                       singleType->getBaseName().getIdentifier())
-      .fixItReplace(ref->getIdLoc(),
+    ctx.Diags.diagnose(ref->getNameLoc(), diag::invalid_member_type_suggest,
+                       baseTy, ref->getNameRef(),
+                       singleType->getBaseName())
+      .fixItReplace(ref->getNameLoc().getSourceRange(),
                     singleType->getBaseName().userFacingName());
 
     // Correct to the single type result.
-    ref->overwriteIdentifier(singleType->getBaseName().getIdentifier());
+    ref->overwriteNameRef(singleType->getFullName());
     ref->setValue(singleType, nullptr);
   }
 
@@ -705,7 +708,7 @@ static Type applyGenericArguments(Type type,
                                   ComponentIdentTypeRepr *comp,
                                   TypeResolutionOptions options) {
   auto dc = resolution.getDeclContext();
-  auto loc = comp->getIdLoc();
+  auto loc = comp->getNameLoc().getBaseNameLoc();
 
   auto *generic = dyn_cast<GenericIdentTypeRepr>(comp);
   if (!generic) {
@@ -1012,7 +1015,8 @@ static Type resolveTypeDecl(TypeDecl *typeDecl,
     auto fromDC = resolution.getDeclContext();
     assert(fromDC && "No declaration context for type resolution?");
     maybeDiagnoseBadConformanceRef(fromDC, foundDC->getDeclaredInterfaceType(),
-                                   comp->getIdLoc(), typeDecl);
+                                   comp->getNameLoc().getBaseNameLoc(),
+                                   typeDecl);
   }
 
   return applyGenericArguments(type, resolution, comp, options);
@@ -1067,7 +1071,7 @@ static Type diagnoseUnknownType(TypeResolution resolution,
 
   // Unqualified lookup case.
   if (parentType.isNull()) {
-    if (comp->getIdentifier() == ctx.Id_Self &&
+    if (comp->getNameRef().isSimpleName(ctx.Id_Self) &&
         !isa<GenericIdentTypeRepr>(comp)) {
       DeclContext *nominalDC = nullptr;
       NominalTypeDecl *nominal = nullptr;
@@ -1079,18 +1083,18 @@ static Type diagnoseUnknownType(TypeResolution resolution,
 
         // Produce a Fix-It replacing 'Self' with the nominal type name.
         auto name = getDeclNameFromContext(dc, nominal);
-        diags.diagnose(comp->getIdLoc(), diag::dynamic_self_invalid, name)
-          .fixItReplace(comp->getIdLoc(), name);
+        diags.diagnose(comp->getNameLoc(), diag::dynamic_self_invalid, name)
+          .fixItReplace(comp->getNameLoc().getSourceRange(), name);
 
         auto type = resolution.mapTypeIntoContext(
           dc->getInnermostTypeContext()->getSelfInterfaceType());
 
-        comp->overwriteIdentifier(nominal->getName());
+        comp->overwriteNameRef(nominal->getName());
         comp->setValue(nominal, nominalDC->getParent());
         return type;
       }
       // Attempt to refer to 'Self' from a free function.
-      diags.diagnose(comp->getIdLoc(), diag::dynamic_self_non_method,
+      diags.diagnose(comp->getNameLoc(), diag::dynamic_self_non_method,
                      dc->getParent()->isLocalContext());
 
       return ErrorType::get(ctx);
@@ -1101,13 +1105,13 @@ static Type diagnoseUnknownType(TypeResolution resolution,
     relookupOptions |= NameLookupFlags::KnownPrivate;
     relookupOptions |= NameLookupFlags::IgnoreAccessControl;
     auto inaccessibleResults =
-    TypeChecker::lookupUnqualifiedType(dc, comp->getIdentifier(),
-                                       comp->getIdLoc(), relookupOptions);
+    TypeChecker::lookupUnqualifiedType(dc, comp->getNameRef(),
+                                       comp->getLoc(), relookupOptions);
     if (!inaccessibleResults.empty()) {
       // FIXME: What if the unviable candidates have different levels of access?
       auto first = cast<TypeDecl>(inaccessibleResults.front().getValueDecl());
-      diags.diagnose(comp->getIdLoc(), diag::candidate_inaccessible,
-                     comp->getIdentifier(), first->getFormalAccess());
+      diags.diagnose(comp->getNameLoc(), diag::candidate_inaccessible,
+                     first->getBaseName(), first->getFormalAccess());
 
       // FIXME: If any of the candidates (usually just one) are in the same
       // module we could offer a fix-it.
@@ -1121,22 +1125,22 @@ static Type diagnoseUnknownType(TypeResolution resolution,
     }
 
     // Fallback.
-    SourceLoc L = comp->getIdLoc();
-    SourceRange R = SourceRange(comp->getIdLoc());
+    auto L = comp->getNameLoc();
+    SourceRange R = comp->getNameLoc().getSourceRange();
 
     // Check if the unknown type is in the type remappings.
     auto &Remapped = ctx.RemappedTypes;
-    auto TypeName = comp->getIdentifier().str();
+    auto TypeName = comp->getNameRef().getBaseIdentifier().str();
     auto I = Remapped.find(TypeName);
     if (I != Remapped.end()) {
       auto RemappedTy = I->second->getString();
       diags.diagnose(L, diag::use_undeclared_type_did_you_mean,
-                     comp->getIdentifier(), RemappedTy)
+                     comp->getNameRef(), RemappedTy)
         .highlight(R)
         .fixItReplace(R, RemappedTy);
 
       // Replace the computed type with the suggested type.
-      comp->overwriteIdentifier(ctx.getIdentifier(RemappedTy));
+      comp->overwriteNameRef(ctx.getIdentifier(RemappedTy));
 
       // HACK: 'NSUInteger' suggests both 'UInt' and 'Int'.
       if (TypeName == ctx.getSwiftName(KnownFoundationEntity::NSUInteger)) {
@@ -1148,7 +1152,7 @@ static Type diagnoseUnknownType(TypeResolution resolution,
     }
 
     diags.diagnose(L, diag::use_undeclared_type,
-                comp->getIdentifier())
+                comp->getNameRef())
       .highlight(R);
 
     return ErrorType::get(ctx);
@@ -1156,8 +1160,8 @@ static Type diagnoseUnknownType(TypeResolution resolution,
 
   // Qualified lookup case.
   if (!parentType->mayHaveMembers()) {
-    diags.diagnose(comp->getIdLoc(), diag::invalid_member_type,
-                   comp->getIdentifier(), parentType)
+    diags.diagnose(comp->getNameLoc(), diag::invalid_member_type,
+                   comp->getNameRef(), parentType)
         .highlight(parentRange);
     return ErrorType::get(ctx);
   }
@@ -1167,13 +1171,13 @@ static Type diagnoseUnknownType(TypeResolution resolution,
   relookupOptions |= NameLookupFlags::KnownPrivate;
   relookupOptions |= NameLookupFlags::IgnoreAccessControl;
   auto inaccessibleMembers =
-    TypeChecker::lookupMemberType(dc, parentType, comp->getIdentifier(),
+    TypeChecker::lookupMemberType(dc, parentType, comp->getNameRef(),
                                   relookupOptions);
   if (inaccessibleMembers) {
     // FIXME: What if the unviable candidates have different levels of access?
     const TypeDecl *first = inaccessibleMembers.front().Member;
-    diags.diagnose(comp->getIdLoc(), diag::candidate_inaccessible,
-                   comp->getIdentifier(), first->getFormalAccess());
+    diags.diagnose(comp->getNameLoc(), diag::candidate_inaccessible,
+                   first->getBaseName(), first->getFormalAccess());
 
     // FIXME: If any of the candidates (usually just one) are in the same module
     // we could offer a fix-it.
@@ -1190,8 +1194,8 @@ static Type diagnoseUnknownType(TypeResolution resolution,
 
   // Lookup into a type.
   if (auto moduleType = parentType->getAs<ModuleType>()) {
-    diags.diagnose(comp->getIdLoc(), diag::no_module_type,
-                   comp->getIdentifier(), moduleType->getModule()->getName());
+    diags.diagnose(comp->getNameLoc(), diag::no_module_type,
+                   comp->getNameRef(), moduleType->getModule()->getName());
   } else {
     LookupResult memberLookup;
     // Let's try to lookup given identifier as a member of the parent type,
@@ -1202,19 +1206,19 @@ static Type diagnoseUnknownType(TypeResolution resolution,
     memberLookupOptions |= NameLookupFlags::KnownPrivate;
 
     memberLookup = TypeChecker::lookupMember(dc, parentType,
-                                             comp->getIdentifier(),
+                                             comp->getNameRef(),
                                              memberLookupOptions);
 
     // Looks like this is not a member type, but simply a member of parent type.
     if (!memberLookup.empty()) {
       auto member = memberLookup[0].getValueDecl();
-      diags.diagnose(comp->getIdLoc(), diag::invalid_member_reference,
-                     member->getDescriptiveKind(), comp->getIdentifier(),
+      diags.diagnose(comp->getNameLoc(), diag::invalid_member_reference,
+                     member->getDescriptiveKind(), member->getFullName(),
                      parentType)
           .highlight(parentRange);
     } else {
-      diags.diagnose(comp->getIdLoc(), diag::invalid_member_type,
-                     comp->getIdentifier(), parentType)
+      diags.diagnose(comp->getNameLoc(), diag::invalid_member_type,
+                     comp->getNameRef(), parentType)
         .highlight(parentRange);
       // Note where the type was defined, this can help diagnose if the user
       // expected name lookup to find a module when there's a conflicting type.
@@ -1297,10 +1301,10 @@ resolveTopLevelIdentTypeComponent(TypeResolution resolution,
   // Resolve the first component, which is the only one that requires
   // unqualified name lookup.
   auto DC = resolution.getDeclContext();
-  auto id = comp->getIdentifier();
+  auto id = comp->getNameRef();
 
   // Dynamic 'Self' in the result type of a function body.
-  if (id == ctx.Id_Self) {
+  if (id.isSimpleName(ctx.Id_Self)) {
     if (auto *typeDC = DC->getInnermostTypeContext()) {
       // FIXME: The passed-in TypeRepr should get 'typechecked' as well.
       // The issue is though that ComponentIdentTypeRepr only accepts a ValueDecl
@@ -1323,9 +1327,7 @@ resolveTopLevelIdentTypeComponent(TypeResolution resolution,
   NameLookupOptions lookupOptions = defaultUnqualifiedLookupOptions;
   if (options.contains(TypeResolutionFlags::KnownNonCascadingDependency))
     lookupOptions |= NameLookupFlags::KnownPrivate;
-  auto globals = TypeChecker::lookupUnqualifiedType(DC,
-                                                    id,
-                                                    comp->getIdLoc(),
+  auto globals = TypeChecker::lookupUnqualifiedType(DC, id, comp->getLoc(),
                                                     lookupOptions);
 
   // Process the names we found.
@@ -1364,9 +1366,9 @@ resolveTopLevelIdentTypeComponent(TypeResolution resolution,
   // FIXME: We could recover by looking at later components.
   if (isAmbiguous) {
     if (!options.contains(TypeResolutionFlags::SilenceErrors)) {
-      diags.diagnose(comp->getIdLoc(), diag::ambiguous_type_base,
-                     comp->getIdentifier())
-        .highlight(comp->getIdLoc());
+      diags.diagnose(comp->getNameLoc(), diag::ambiguous_type_base,
+                     comp->getNameRef())
+        .highlight(comp->getNameLoc().getSourceRange());
       for (auto entry : globals) {
         entry.getValueDecl()->diagnose(diag::found_candidate);
       }
@@ -1392,7 +1394,7 @@ resolveTopLevelIdentTypeComponent(TypeResolution resolution,
 }
 
 static void diagnoseAmbiguousMemberType(Type baseTy, SourceRange baseRange,
-                                        Identifier name, SourceLoc nameLoc,
+                                        DeclName name, DeclNameLoc nameLoc,
                                         LookupTypeResult &lookup) {
   ASTContext &ctx = baseTy->getASTContext();
   auto &diags = ctx.Diags;
@@ -1431,12 +1433,12 @@ static Type resolveNestedIdentTypeComponent(
           diagnoseUnboundGenericType(parentTy, parentRange.End);
         else if (parentTy->isExistentialType() &&
                  isa<AssociatedTypeDecl>(member)) {
-          diags.diagnose(comp->getIdLoc(), diag::assoc_type_outside_of_protocol,
-                         comp->getIdentifier());
+          diags.diagnose(comp->getNameLoc(), diag::assoc_type_outside_of_protocol,
+                         comp->getNameRef());
         } else if (parentTy->isExistentialType() &&
                    isa<TypeAliasDecl>(member)) {
-          diags.diagnose(comp->getIdLoc(), diag::typealias_outside_of_protocol,
-                         comp->getIdentifier());
+          diags.diagnose(comp->getNameLoc(), diag::typealias_outside_of_protocol,
+                         comp->getNameRef());
         }
       }
 
@@ -1515,7 +1517,7 @@ static Type resolveNestedIdentTypeComponent(
   LookupTypeResult memberTypes;
   if (parentTy->mayHaveMembers())
     memberTypes = TypeChecker::lookupMemberType(DC, parentTy,
-                                                comp->getIdentifier(),
+                                                comp->getNameRef(),
                                                 lookupOptions);
 
   // Name lookup was ambiguous. Complain.
@@ -1523,8 +1525,8 @@ static Type resolveNestedIdentTypeComponent(
   // that resolves things. But do we really want that to succeed?
   if (memberTypes.size() > 1) {
     if (!options.contains(TypeResolutionFlags::SilenceErrors))
-      diagnoseAmbiguousMemberType(parentTy, parentRange, comp->getIdentifier(),
-                                  comp->getIdLoc(), memberTypes);
+      diagnoseAmbiguousMemberType(parentTy, parentRange, comp->getNameRef(),
+                                  comp->getNameLoc(), memberTypes);
     return ErrorType::get(ctx);
   }
 
@@ -1571,8 +1573,8 @@ static Type resolveIdentTypeComponent(
   Type parentTy = resolveIdentTypeComponent(resolution, parentComps, options);
   if (!parentTy || parentTy->hasError()) return parentTy;
   
-  SourceRange parentRange(parentComps.front()->getIdLoc(),
-                          parentComps.back()->getSourceRange().End);
+  SourceRange parentRange(parentComps.front()->getStartLoc(),
+                          parentComps.back()->getEndLoc());
 
   // Resolve the nested type.
   return resolveNestedIdentTypeComponent(resolution, parentTy,
@@ -1590,7 +1592,8 @@ static bool diagnoseAvailability(IdentTypeRepr *IdType,
   auto componentRange = IdType->getComponentRange();
   for (auto comp : componentRange) {
     if (auto *typeDecl = comp->getBoundDecl()) {
-      if (diagnoseDeclAvailability(typeDecl, DC, comp->getIdLoc(), flags)) {
+      if (diagnoseDeclAvailability(typeDecl, DC,
+                                   comp->getNameLoc().getSourceRange(), flags)) {
         return true;
       }
     }
@@ -1643,9 +1646,9 @@ Type TypeChecker::resolveIdentifierType(
   if (auto moduleTy = result->getAs<ModuleType>()) {
     if (!options.contains(TypeResolutionFlags::SilenceErrors)) {
       auto moduleName = moduleTy->getModule()->getName();
-      diags.diagnose(Components.back()->getIdLoc(),
+      diags.diagnose(Components.back()->getNameLoc(),
                      diag::use_undeclared_type, moduleName);
-      diags.diagnose(Components.back()->getIdLoc(),
+      diags.diagnose(Components.back()->getNameLoc(),
                      diag::note_module_as_type, moduleName);
     }
     Components.back()->setInvalid();
@@ -2195,7 +2198,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
           auto protocolName =
             attrs.ConventionArguments.getValue().WitnessMethodProtocol;
           witnessMethodProtocol = new (Context) SimpleIdentTypeRepr(
-              SourceLoc(), Context.getIdentifier(protocolName));
+              DeclNameLoc(), protocolName);
         }
       }
 
@@ -2549,7 +2552,7 @@ Type TypeResolver::resolveASTFunctionType(
     if (args->getNumElements() == 1) {
       if (const auto Void =
           dyn_cast<SimpleIdentTypeRepr>(args->getElementType(0))) {
-        if (Void->getIdentifier().str() == "Void") {
+        if (Void->getNameRef().isSimpleName(Context.Id_Void)) {
           diagnose(args->getStartLoc(), diag::paren_void_probably_void)
             .fixItReplace(args->getSourceRange(), "()");
           repr->setWarned();
@@ -3509,7 +3512,8 @@ public:
     auto comp = T->getComponentRange().back();
     if (auto *proto = dyn_cast_or_null<ProtocolDecl>(comp->getBoundDecl())) {
       if (!proto->existentialTypeSupported()) {
-        Ctx.Diags.diagnose(comp->getIdLoc(), diag::unsupported_existential_type,
+        Ctx.Diags.diagnose(comp->getNameLoc(),
+                           diag::unsupported_existential_type,
                            proto->getName());
         T->setInvalid();
       }
@@ -3526,7 +3530,7 @@ public:
             if (protoDecl->existentialTypeSupported())
               continue;
             
-            Ctx.Diags.diagnose(comp->getIdLoc(),
+            Ctx.Diags.diagnose(comp->getNameLoc(),
                                diag::unsupported_existential_type,
                                protoDecl->getName());
             T->setInvalid();

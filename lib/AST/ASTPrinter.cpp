@@ -2834,7 +2834,7 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
       // TypeRepr is not getting 'typechecked'. See
       // \c resolveTopLevelIdentTypeComponent function in TypeCheckType.cpp.
       if (auto *simId = dyn_cast_or_null<SimpleIdentTypeRepr>(ResultTyLoc.getTypeRepr())) {
-        if (simId->getIdentifier() == Ctx.Id_Self)
+        if (simId->getNameRef().isSimpleName(Ctx.Id_Self))
           ResultTyLoc = TypeLoc::withoutLoc(ResultTy);
       }
       Printer << " -> ";

@@ -902,7 +902,7 @@ namespace {
     bool walkToTypeReprPre(TypeRepr *Ty) override {
       auto *T = dyn_cast_or_null<IdentTypeRepr>(Ty);
       auto Comp = T->getComponentRange().front();
-      if (auto Entry = P.lookupInScope(Comp->getIdentifier()))
+      if (auto Entry = P.lookupInScope(Comp->getNameRef()))
         if (auto *TD = dyn_cast<TypeDecl>(Entry)) {
           Comp->setValue(TD, nullptr);
           return false;
@@ -1703,7 +1703,7 @@ static void bindProtocolSelfInTypeRepr(TypeLoc &TL, ProtocolDecl *proto) {
       virtual bool walkToTypeReprPre(TypeRepr *T) override {
         if (auto ident = dyn_cast<IdentTypeRepr>(T)) {
           auto firstComponent = ident->getComponentRange().front();
-          if (firstComponent->getIdentifier() == selfId)
+          if (firstComponent->getNameRef().isSimpleName(selfId))
             firstComponent->setValue(selfParam, proto);
         }
 

@@ -68,7 +68,7 @@ public:
 
   struct Convention {
     StringRef Name = {};
-    StringRef WitnessMethodProtocol = {};
+    DeclName WitnessMethodProtocol = {};
     StringRef ClangType = {};
     // Carry the source location for diagnostics.
     SourceLoc ClangTypeLoc = {};
@@ -78,7 +78,7 @@ public:
     /// Don't use this function if you are creating a C convention as you
     /// probably need a ClangType field as well.
     static Convention makeSwiftConvention(StringRef name) {
-      return {name, "", "", {}};
+      return {name, DeclName(), "", {}};
     }
   };
 

@@ -88,7 +88,7 @@ void TypeAttributes::getConventionArguments(SmallVectorImpl<char> &buf) const {
   llvm::raw_svector_ostream stream(buf);
   auto &convention = ConventionArguments.getValue();
   stream << convention.Name;
-  if (!convention.WitnessMethodProtocol.empty()) {
+  if (convention.WitnessMethodProtocol) {
     stream << ": " << convention.WitnessMethodProtocol;
     return;
   }

@@ -775,7 +775,8 @@ SelfBoundsFromWhereClauseRequest::evaluate(
     bool isSelfLHS = false;
     if (auto typeRepr = req.getSubjectRepr()) {
       if (auto identTypeRepr = dyn_cast<SimpleIdentTypeRepr>(typeRepr))
-        isSelfLHS = (identTypeRepr->getIdentifier() == ctx.Id_Self);
+        isSelfLHS = (identTypeRepr->getNameRef().getBaseIdentifier() ==
+                     ctx.Id_Self);
     } else if (Type type = req.getSubject()) {
       isSelfLHS = type->isEqual(dc->getSelfInterfaceType());
     }
@@ -1889,8 +1890,8 @@ resolveTypeDeclsToNominal(Evaluator &evaluator,
           if (auto compound = dyn_cast<CompoundIdentTypeRepr>(typeRepr)) {
             auto components = compound->getComponents();
             if (components.size() == 2 &&
-                components[0]->getIdentifier().is("Builtin") &&
-                components[1]->getIdentifier().is("AnyObject")) {
+                components[0]->getNameRef().isSimpleName("Builtin") &&
+                components[1]->getNameRef().isSimpleName("AnyObject")) {
               anyObject = true;
             }
           }
@@ -2018,8 +2019,8 @@ directReferencesForIdentTypeRepr(Evaluator &evaluator,
     // For the first component, perform unqualified name lookup.
     if (current.empty()) {
       current =
-        directReferencesForUnqualifiedTypeLookup(component->getIdentifier(),
-                                                 component->getIdLoc(),
+        directReferencesForUnqualifiedTypeLookup(component->getNameRef(),
+                                                 component->getLoc(),
                                                  dc,
                                                  LookupOuterResults::Excluded);
 
@@ -2034,7 +2035,7 @@ directReferencesForIdentTypeRepr(Evaluator &evaluator,
     // For subsequent components, perform qualified name lookup.
     current =
         directReferencesForQualifiedTypeLookup(evaluator, ctx, current,
-                                               component->getIdentifier(), dc);
+                                               component->getNameRef(), dc);
     if (current.empty())
       return current;
   }
@@ -2304,7 +2305,7 @@ CustomAttrNominalRequest::evaluate(Evaluator &evaluator,
         modulesFound.clear();
         anyObject = false;
         decls = directReferencesForUnqualifiedTypeLookup(
-            identTypeRepr->getIdentifier(), identTypeRepr->getIdLoc(), dc,
+            identTypeRepr->getNameRef(), identTypeRepr->getLoc(), dc,
             LookupOuterResults::Included);
         nominals = resolveTypeDeclsToNominal(evaluator, ctx, decls,
                                              modulesFound, anyObject);
@@ -2315,7 +2316,7 @@ CustomAttrNominalRequest::evaluate(Evaluator &evaluator,
             auto moduleName = nominal->getParentModule()->getName();
             ctx.Diags.diagnose(typeRepr->getLoc(),
                                diag::warn_property_wrapper_module_scope,
-                               identTypeRepr->getIdentifier(),
+                               identTypeRepr->getNameRef(),
                                moduleName)
               .fixItInsert(typeRepr->getLoc(),
                            moduleName.str().str() + ".");
@@ -2324,7 +2325,8 @@ CustomAttrNominalRequest::evaluate(Evaluator &evaluator,
                                assocType->getFullName());
 
             ComponentIdentTypeRepr *components[2] = {
-              new (ctx) SimpleIdentTypeRepr(typeRepr->getLoc(), moduleName),
+              new (ctx) SimpleIdentTypeRepr(identTypeRepr->getNameLoc(),
+                                            moduleName),
               identTypeRepr
             };
 

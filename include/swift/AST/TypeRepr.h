@@ -256,30 +256,30 @@ public:
 };
 
 class ComponentIdentTypeRepr : public IdentTypeRepr {
-  SourceLoc Loc;
+  DeclNameLoc Loc;
 
   /// Either the identifier or declaration that describes this
   /// component.
   ///
   /// The initial parsed representation is always an identifier, and
   /// name binding will resolve this to a specific declaration.
-  llvm::PointerUnion<Identifier, TypeDecl *> IdOrDecl;
+  llvm::PointerUnion<DeclName, TypeDecl *> IdOrDecl;
 
   /// The declaration context from which the bound declaration was
   /// found. only valid if IdOrDecl is a TypeDecl.
   DeclContext *DC;
 
 protected:
-  ComponentIdentTypeRepr(TypeReprKind K, SourceLoc Loc, Identifier Id)
+  ComponentIdentTypeRepr(TypeReprKind K, DeclNameLoc Loc, DeclName Id)
     : IdentTypeRepr(K), Loc(Loc), IdOrDecl(Id), DC(nullptr) {}
 
 public:
-  SourceLoc getIdLoc() const { return Loc; }
-  Identifier getIdentifier() const;
+  DeclNameLoc getNameLoc() const { return Loc; }
+  DeclName getNameRef() const;
 
   /// Replace the identifier with a new identifier, e.g., due to typo
   /// correction.
-  void overwriteIdentifier(Identifier newId) { IdOrDecl = newId; }
+  void overwriteNameRef(DeclName newId) { IdOrDecl = newId; }
 
   /// Return true if this has been name-bound already.
   bool isBound() const { return IdOrDecl.is<TypeDecl *>(); }
@@ -305,20 +305,20 @@ public:
 protected:
   void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
 
-  SourceLoc getLocImpl() const { return Loc; }
+  SourceLoc getLocImpl() const { return Loc.getBaseNameLoc(); }
   friend class TypeRepr;
 };
 
 /// A simple identifier type like "Int".
 class SimpleIdentTypeRepr : public ComponentIdentTypeRepr {
 public:
-  SimpleIdentTypeRepr(SourceLoc Loc, Identifier Id)
+  SimpleIdentTypeRepr(DeclNameLoc Loc, DeclName Id)
     : ComponentIdentTypeRepr(TypeReprKind::SimpleIdent, Loc, Id) {}
 
   // SmallVector::emplace_back will never need to call this because
   // we reserve the right size, but it does try statically.
   SimpleIdentTypeRepr(const SimpleIdentTypeRepr &repr)
-      : SimpleIdentTypeRepr(repr.getLoc(), repr.getIdentifier()) {
+      : SimpleIdentTypeRepr(repr.getNameLoc(), repr.getNameRef()) {
     llvm_unreachable("should not be called dynamically");
   }
 
@@ -328,8 +328,8 @@ public:
   static bool classof(const SimpleIdentTypeRepr *T) { return true; }
 
 private:
-  SourceLoc getStartLocImpl() const { return getIdLoc(); }
-  SourceLoc getEndLocImpl() const { return getIdLoc(); }
+  SourceLoc getStartLocImpl() const { return getNameLoc().getStartLoc(); }
+  SourceLoc getEndLocImpl() const { return getNameLoc().getEndLoc(); }
   friend class TypeRepr;
 };
 
@@ -342,7 +342,7 @@ class GenericIdentTypeRepr final : public ComponentIdentTypeRepr,
   friend TrailingObjects;
   SourceRange AngleBrackets;
 
-  GenericIdentTypeRepr(SourceLoc Loc, Identifier Id,
+  GenericIdentTypeRepr(DeclNameLoc Loc, DeclName Id,
                        ArrayRef<TypeRepr*> GenericArgs,
                        SourceRange AngleBrackets)
     : ComponentIdentTypeRepr(TypeReprKind::GenericIdent, Loc, Id),
@@ -359,8 +359,8 @@ class GenericIdentTypeRepr final : public ComponentIdentTypeRepr,
 
 public:
   static GenericIdentTypeRepr *create(const ASTContext &C,
-                                      SourceLoc Loc,
-                                      Identifier Id,
+                                      DeclNameLoc Loc,
+                                      DeclName Id,
                                       ArrayRef<TypeRepr*> GenericArgs,
                                       SourceRange AngleBrackets);
 
@@ -380,7 +380,7 @@ public:
   static bool classof(const GenericIdentTypeRepr *T) { return true; }
 
 private:
-  SourceLoc getStartLocImpl() const { return getIdLoc(); }
+  SourceLoc getStartLocImpl() const { return getNameLoc().getStartLoc(); }
   SourceLoc getEndLocImpl() const { return AngleBrackets.End; }
   friend class TypeRepr;
 };

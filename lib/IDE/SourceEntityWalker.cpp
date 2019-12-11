@@ -74,7 +74,7 @@ private:
   bool passReference(ValueDecl *D, Type Ty, SourceLoc Loc, SourceRange Range,
                      ReferenceMetaData Data);
   bool passReference(ValueDecl *D, Type Ty, DeclNameLoc Loc, ReferenceMetaData Data);
-  bool passReference(ModuleEntity Mod, std::pair<Identifier, SourceLoc> IdLoc);
+  bool passReference(ModuleEntity Mod, std::pair<DeclName, SourceLoc> IdLoc);
 
   bool passSubscriptReference(ValueDecl *D, SourceLoc Loc,
                               ReferenceMetaData Data, bool IsOpenBracket);
@@ -490,10 +490,10 @@ bool SemaAnnotator::walkToTypeReprPre(TypeRepr *T) {
   if (auto IdT = dyn_cast<ComponentIdentTypeRepr>(T)) {
     if (ValueDecl *VD = IdT->getBoundDecl()) {
       if (auto *ModD = dyn_cast<ModuleDecl>(VD))
-        return passReference(ModD, std::make_pair(IdT->getIdentifier(),
-                                                  IdT->getIdLoc()));
+        return passReference(ModD, std::make_pair(IdT->getNameRef(),
+                                                  IdT->getLoc()));
 
-      return passReference(VD, Type(), DeclNameLoc(IdT->getIdLoc()),
+      return passReference(VD, Type(), IdT->getNameLoc(),
                            ReferenceMetaData(SemaReferenceKind::TypeRef, None));
     }
   }
@@ -668,10 +668,10 @@ passReference(ValueDecl *D, Type Ty, SourceLoc BaseNameLoc, SourceRange Range,
 }
 
 bool SemaAnnotator::passReference(ModuleEntity Mod,
-                                  std::pair<Identifier, SourceLoc> IdLoc) {
+                                  std::pair<DeclName, SourceLoc> IdLoc) {
   if (IdLoc.second.isInvalid())
     return true;
-  unsigned NameLen = IdLoc.first.getLength();
+  unsigned NameLen = IdLoc.first.getBaseIdentifier().getLength();
   CharSourceRange Range{ IdLoc.second, NameLen };
   bool Continue = SEWalker.visitModuleReference(Mod, Range);
   if (!Continue)

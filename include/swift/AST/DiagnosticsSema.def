@@ -781,21 +781,21 @@ NOTE(invalid_redecl_prev,none,
      "%0 previously declared here", (DeclName))
 
 ERROR(ambiguous_type_base,none,
-      "%0 is ambiguous for type lookup in this context", (Identifier))
+      "%0 is ambiguous for type lookup in this context", (DeclName))
 ERROR(invalid_member_type,none,
-      "%0 is not a member type of %1", (Identifier, Type))
+      "%0 is not a member type of %1", (DeclName, Type))
 ERROR(invalid_member_type_suggest,none,
       "%0 does not have a member type named %1; did you mean %2?",
-      (Type, Identifier, Identifier))
+      (Type, DeclName, DeclName))
 ERROR(invalid_member_reference,none,
       "%0 %1 is not a member type of %2",
-      (DescriptiveDeclKind, Identifier, Type))
+      (DescriptiveDeclKind, DeclName, Type))
 ERROR(ambiguous_member_type,none,
-      "ambiguous type name %0 in %1", (Identifier, Type))
+      "ambiguous type name %0 in %1", (DeclName, Type))
 ERROR(no_module_type,none,
-      "no type named %0 in module %1", (Identifier, Identifier))
+      "no type named %0 in module %1", (DeclName, Identifier))
 ERROR(ambiguous_module_type,none,
-      "ambiguous type name %0 in module %1", (Identifier, Identifier))
+      "ambiguous type name %0 in module %1", (DeclName, Identifier))
 ERROR(use_nonmatching_operator,none,
       "%0 is not a %select{binary|prefix unary|postfix unary}1 operator",
       (DeclName, unsigned))
@@ -828,9 +828,9 @@ NOTE(confusable_character,none,
       "did you mean to use '%2'?",
       (bool, StringRef, StringRef))
 ERROR(use_undeclared_type,none,
-      "use of undeclared type %0", (Identifier))
+      "use of undeclared type %0", (DeclName))
 ERROR(use_undeclared_type_did_you_mean,none,
-      "use of undeclared type %0; did you mean to use '%1'?", (Identifier, StringRef))
+      "use of undeclared type %0; did you mean to use '%1'?", (DeclName, StringRef))
 NOTE(note_typo_candidate_implicit_member,none,
      "did you mean the implicitly-synthesized %1 '%0'?", (StringRef, StringRef))
 NOTE(note_remapped_type,none,
@@ -2178,10 +2178,10 @@ WARNING(append_interpolation_access_control,none,
 // Protocols and existentials
 ERROR(assoc_type_outside_of_protocol,none,
       "associated type %0 can only be used with a concrete type or "
-      "generic parameter base", (Identifier))
+      "generic parameter base", (DeclName))
 ERROR(typealias_outside_of_protocol,none,
       "type alias %0 can only be used with a concrete type or "
-      "generic parameter base", (Identifier))
+      "generic parameter base", (DeclName))
 
 ERROR(objc_protocol_inherits_non_objc_protocol,none,
       "@objc protocol %0 cannot refine non-@objc protocol %1", (Type, Type))

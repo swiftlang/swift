@@ -1882,7 +1882,7 @@ Type TypeExpr::getInstanceType(
 }
 
 
-TypeExpr *TypeExpr::createForDecl(SourceLoc Loc, TypeDecl *Decl,
+TypeExpr *TypeExpr::createForDecl(DeclNameLoc Loc, TypeDecl *Decl,
                                   DeclContext *DC,
                                   bool isImplicit) {
   ASTContext &C = Decl->getASTContext();
@@ -1895,9 +1895,9 @@ TypeExpr *TypeExpr::createForDecl(SourceLoc Loc, TypeDecl *Decl,
   return result;
 }
 
-TypeExpr *TypeExpr::createForMemberDecl(SourceLoc ParentNameLoc,
+TypeExpr *TypeExpr::createForMemberDecl(DeclNameLoc ParentNameLoc,
                                         TypeDecl *Parent,
-                                        SourceLoc NameLoc,
+                                        DeclNameLoc NameLoc,
                                         TypeDecl *Decl) {
   ASTContext &C = Decl->getASTContext();
   assert(ParentNameLoc.isValid());
@@ -1923,7 +1923,7 @@ TypeExpr *TypeExpr::createForMemberDecl(SourceLoc ParentNameLoc,
 }
 
 TypeExpr *TypeExpr::createForMemberDecl(IdentTypeRepr *ParentTR,
-                                        SourceLoc NameLoc,
+                                        DeclNameLoc NameLoc,
                                         TypeDecl *Decl) {
   ASTContext &C = Decl->getASTContext();
 
@@ -1983,7 +1983,7 @@ TypeExpr *TypeExpr::createForSpecializedDecl(IdentTypeRepr *ParentTR,
     }
 
     auto *genericComp = GenericIdentTypeRepr::create(C,
-      last->getIdLoc(), last->getIdentifier(),
+      last->getNameLoc(), last->getNameRef(),
       Args, AngleLocs);
     genericComp->setValue(last->getBoundDecl(), last->getDeclContext());
     components.push_back(genericComp);

@@ -458,7 +458,7 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
                                       DeclContext *DC) {
   // Process UnresolvedDeclRefExpr by doing an unqualified lookup.
   DeclName Name = UDRE->getName();
-  SourceLoc Loc = UDRE->getLoc();
+  DeclNameLoc Loc = UDRE->getNameLoc();
 
   // Perform standard value name lookup.
   NameLookupOptions lookupOptions = defaultUnqualifiedLookupOptions;
@@ -467,7 +467,8 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
   if (shouldConsiderOuterResultsFor(Name))
     lookupOptions |= NameLookupFlags::IncludeOuterResults;
 
-  auto Lookup = TypeChecker::lookupUnqualified(DC, Name, Loc, lookupOptions);
+  auto Lookup = TypeChecker::lookupUnqualified(DC, Name, Loc.getBaseNameLoc(),
+                                               lookupOptions);
 
   auto &Context = DC->getASTContext();
   if (!Lookup) {
@@ -485,7 +486,8 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
     relookupOptions |= NameLookupFlags::KnownPrivate;
     relookupOptions |= NameLookupFlags::IgnoreAccessControl;
     auto inaccessibleResults =
-        TypeChecker::lookupUnqualified(DC, Name, Loc, relookupOptions);
+        TypeChecker::lookupUnqualified(DC, Name, Loc.getBaseNameLoc(),
+                                       relookupOptions);
     if (inaccessibleResults) {
       // FIXME: What if the unviable candidates have different levels of access?
       const ValueDecl *first = inaccessibleResults.front().getValueDecl();
@@ -546,8 +548,9 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
           if (typeContext->getSelfClassDecl())
             SelfType = DynamicSelfType::get(SelfType, Context);
           SelfType = DC->mapTypeIntoContext(SelfType);
-          return new (Context) TypeExpr(TypeLoc(new (Context)
-                                                FixedTypeRepr(SelfType, Loc)));
+          return new (Context) TypeExpr(
+              TypeLoc(new (Context) FixedTypeRepr(SelfType,
+                                                  Loc.getBaseNameLoc())));
         }
       }
 
@@ -573,7 +576,7 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
           .diagnose(Loc, diag::confusable_character,
                     UDRE->getName().isOperator(), simpleName.str(),
                     expectedIdentifier)
-          .fixItReplace(Loc, expectedIdentifier);
+          .fixItReplace(Loc.getBaseNameLoc(), expectedIdentifier);
     }
 
     // TODO: consider recovering from here.  We may want some way to suppress
@@ -595,7 +598,7 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
     if (Loc.isValid() && D->getLoc().isValid() &&
         D->getDeclContext()->isLocalContext() &&
         D->getDeclContext() == DC &&
-        Context.SourceMgr.isBeforeInBuffer(Loc, D->getLoc()) &&
+        Context.SourceMgr.isBeforeInBuffer(Loc.getBaseNameLoc(), D->getLoc()) &&
         !isa<TypeDecl>(D)) {
       localDeclAfterUse = D;
       return false;
@@ -615,7 +618,7 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
     if (!lookupOptions.contains(NameLookupFlags::IncludeOuterResults)) {
       auto option = lookupOptions;
       option |= NameLookupFlags::IncludeOuterResults;
-      Lookup = lookupUnqualified(DC, Name, Loc, option);
+      Lookup = lookupUnqualified(DC, Name, Loc.getBaseNameLoc(), option);
     }
 
     while (localDeclAfterUse) {
@@ -1397,7 +1400,7 @@ TypeExpr *PreCheckExpression::simplifyNestedTypeExpr(UnresolvedDotExpr *UDE) {
     return nullptr;
 
   auto Name = UDE->getName().getBaseIdentifier();
-  auto NameLoc = UDE->getNameLoc().getBaseNameLoc();
+  auto NameLoc = UDE->getNameLoc();
 
   // Qualified type lookup with a module base is represented as a DeclRefExpr
   // and not a TypeExpr.
@@ -1415,8 +1418,7 @@ TypeExpr *PreCheckExpression::simplifyNestedTypeExpr(UnresolvedDotExpr *UDE) {
       // If there is no nested type with this name, we have a lookup of
       // a non-type member, so leave the expression as-is.
       if (Result.size() == 1) {
-        return TypeExpr::createForMemberDecl(DRE->getNameLoc().getBaseNameLoc(),
-                                             TD, NameLoc,
+        return TypeExpr::createForMemberDecl(DRE->getNameLoc(), TD, NameLoc,
                                              Result.front().Member);
       }
     }
@@ -1435,7 +1437,8 @@ TypeExpr *PreCheckExpression::simplifyNestedTypeExpr(UnresolvedDotExpr *UDE) {
   // Fold 'T.Protocol' into a protocol metatype.
   if (Name == getASTContext().Id_Protocol) {
     auto *NewTypeRepr =
-        new (getASTContext()) ProtocolTypeRepr(InnerTypeRepr, NameLoc);
+        new (getASTContext()) ProtocolTypeRepr(InnerTypeRepr,
+                                               NameLoc.getBaseNameLoc());
     return new (getASTContext()) TypeExpr(TypeLoc(NewTypeRepr, Type()));
   }
 
@@ -1443,7 +1446,8 @@ TypeExpr *PreCheckExpression::simplifyNestedTypeExpr(UnresolvedDotExpr *UDE) {
   // or an ordinary metatype otherwise.
   if (Name == getASTContext().Id_Type) {
     auto *NewTypeRepr =
-        new (getASTContext()) MetatypeTypeRepr(InnerTypeRepr, NameLoc);
+        new (getASTContext()) MetatypeTypeRepr(InnerTypeRepr,
+                                               NameLoc.getBaseNameLoc());
     return new (getASTContext()) TypeExpr(TypeLoc(NewTypeRepr, Type()));
   }
 
@@ -1671,7 +1675,7 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
     auto diagnoseMissingParens = [](ASTContext &ctx, TypeRepr *tyR) {
       bool isVoid = false;
       if (const auto Void = dyn_cast<SimpleIdentTypeRepr>(tyR)) {
-        if (Void->getIdentifier() == ctx.Id_Void) {
+        if (Void->getNameRef().isSimpleName(ctx.Id_Void)) {
           isVoid = true;
         }
       }

@@ -174,7 +174,7 @@ struct ExprToIdentTypeRepr : public ASTVisitor<ExprToIdentTypeRepr, bool>
     // Get the declared type.
     if (auto *td = dyn_cast<TypeDecl>(dre->getDecl())) {
       components.push_back(
-        new (C) SimpleIdentTypeRepr(dre->getLoc(), td->getName()));
+        new (C) SimpleIdentTypeRepr(dre->getNameLoc(), td->getName()));
       components.back()->setValue(td, nullptr);
       return true;
     }
@@ -185,8 +185,8 @@ struct ExprToIdentTypeRepr : public ASTVisitor<ExprToIdentTypeRepr, bool>
     assert(components.empty() && "decl ref should be root element of expr");
     // Track the AST location of the component.
     components.push_back(
-      new (C) SimpleIdentTypeRepr(udre->getLoc(),
-                                  udre->getName().getBaseIdentifier()));
+      new (C) SimpleIdentTypeRepr(udre->getNameLoc(),
+                                  udre->getName()));
     return true;
   }
   
@@ -198,8 +198,8 @@ struct ExprToIdentTypeRepr : public ASTVisitor<ExprToIdentTypeRepr, bool>
 
     // Track the AST location of the new component.
     components.push_back(
-      new (C) SimpleIdentTypeRepr(ude->getLoc(),
-                                  ude->getName().getBaseIdentifier()));
+      new (C) SimpleIdentTypeRepr(ude->getNameLoc(),
+                                  ude->getName()));
     return true;
   }
   
@@ -215,8 +215,8 @@ struct ExprToIdentTypeRepr : public ASTVisitor<ExprToIdentTypeRepr, bool>
       argTypeReprs.push_back(arg.getTypeRepr());
     auto origComponent = components.back();
     components.back() =
-      GenericIdentTypeRepr::create(C, origComponent->getIdLoc(),
-                                   origComponent->getIdentifier(), argTypeReprs,
+      GenericIdentTypeRepr::create(C, origComponent->getNameLoc(),
+                                   origComponent->getNameRef(), argTypeReprs,
                                    SourceRange(use->getLAngleLoc(),
                                                use->getRAngleLoc()));
 
@@ -547,8 +547,7 @@ public:
     if (components.empty()) {
       // Only one component. Try looking up an enum element in context.
       referencedElement
-        = lookupUnqualifiedEnumMemberElement(DC,
-                                             tailComponent->getIdentifier(),
+        = lookupUnqualifiedEnumMemberElement(DC, tailComponent->getNameRef(),
                                              tailComponent->getLoc());
       if (!referencedElement)
         return nullptr;
@@ -572,7 +571,7 @@ public:
 
       referencedElement
         = lookupEnumMemberElement(DC, enumTy,
-                                  tailComponent->getIdentifier(),
+                                  tailComponent->getNameRef(),
                                   tailComponent->getLoc());
       if (!referencedElement)
         return nullptr;
@@ -586,8 +585,8 @@ public:
 
     auto *subPattern = getSubExprPattern(ce->getArg());
     return new (Context) EnumElementPattern(
-        loc, SourceLoc(), DeclNameLoc(tailComponent->getIdLoc()),
-        tailComponent->getIdentifier(), referencedElement,
+        loc, SourceLoc(), tailComponent->getNameLoc(),
+        tailComponent->getNameRef(), referencedElement,
         subPattern);
   }
 };

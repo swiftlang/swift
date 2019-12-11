@@ -2567,15 +2567,12 @@ bool Parser::parseConventionAttributeInternal(
                  diag::convention_attribute_witness_method_expected_colon);
       return true;
     }
-    if (Tok.isNot(tok::identifier)) {
-      if (!justChecking)
-        diagnose(Tok,
-                 diag::convention_attribute_witness_method_expected_protocol);
-      return true;
-    }
 
-    convention.WitnessMethodProtocol = Tok.getText();
-    consumeToken(tok::identifier);
+    DeclNameLoc unusedWitnessMethodProtocolLoc;
+    convention.WitnessMethodProtocol = parseUnqualifiedDeclBaseName(
+        /*afterDot=*/false, unusedWitnessMethodProtocolLoc,
+       diag::convention_attribute_witness_method_expected_protocol
+    );
   }
   
   // Parse the ')'.  We can't use parseMatchingToken if we're in
@@ -3660,7 +3657,7 @@ Parser::parseDecl(ParseDeclOptions Flags,
         if (auto repr = extension->getExtendedTypeRepr()) {
           if (auto idRepr = dyn_cast<IdentTypeRepr>(repr)) {
             diagnose(extension->getLoc(), diag::note_in_decl_extension, true,
-                     idRepr->getComponentRange().front()->getIdentifier());
+                     idRepr->getComponentRange().front()->getNameRef());
           }
         }
       }
@@ -4044,7 +4041,7 @@ ParserStatus Parser::parseInheritance(SmallVectorImpl<TypeLoc> &Inherited,
 
       // Add 'AnyObject' to the inherited list.
       Inherited.push_back(
-        new (Context) SimpleIdentTypeRepr(classLoc,
+        new (Context) SimpleIdentTypeRepr(DeclNameLoc(classLoc),
                                           Context.getIdentifier("AnyObject")));
       continue;
     }
