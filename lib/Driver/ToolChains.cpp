@@ -34,6 +34,8 @@
 #include "llvm/Support/Process.h"
 #include "llvm/Support/Program.h"
 
+#include <fstream>
+
 using namespace swift;
 using namespace swift::driver;
 using namespace llvm::opt;
@@ -679,10 +681,7 @@ void ToolChain::JobContext::addFrontendSupplementaryOutputArguments(
       },
       [&](StringRef dependencyFile) {
         // Create an empty file
-        using namespace llvm::sys::fs;
-        if (auto file = openNativeFileForWrite(dependencyFile, CD_CreateAlways,
-                                               OF_Text))
-          closeFile(file.get());
+        std::ofstream(dependencyFile.str().c_str());
       });
 
   addOutputsOfType(arguments, Output, Args, file_types::TY_SwiftDeps,
