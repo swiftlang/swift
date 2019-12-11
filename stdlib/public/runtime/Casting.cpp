@@ -1301,7 +1301,8 @@ static bool _dynamicCastToUnknownClassFromExistential(OpaqueValue *dest,
 #if SWIFT_OBJC_INTEROP
     // If we're casting to NSError, we may need a representation change,
     // so fall into the general swift_dynamicCast path.
-    if (targetType == getNSErrorMetadata()) {
+    if (targetType == getNSErrorMetadata() ||
+        targetType == getNSObjectMetadata()) {
       return swift_dynamicCast(dest, src, swift_getObjectType((HeapObject*)obj),
                                targetType, flags);
     }
