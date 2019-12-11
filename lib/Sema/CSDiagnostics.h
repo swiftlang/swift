@@ -852,6 +852,23 @@ public:
   }
 };
 
+class FunctionTypeMismatch final : public ContextualFailure {
+  /// Indices of the parameters whose types do not match.
+  llvm::SmallVector<unsigned, 4> Indices;
+
+public:
+  FunctionTypeMismatch(ConstraintSystem &cs, ContextualTypePurpose purpose,
+                         Type lhs, Type rhs, llvm::ArrayRef<unsigned> indices,
+                         ConstraintLocator *locator)
+      : ContextualFailure(cs, purpose, lhs, rhs, locator),
+        Indices(indices.begin(), indices.end()) {
+    std::sort(Indices.begin(), Indices.end());
+    assert(getFromType()->is<AnyFunctionType>() && getToType()->is<AnyFunctionType>());
+  }
+
+  bool diagnoseAsError() override;
+};
+
 /// Diagnose situations when @autoclosure argument is passed to @autoclosure
 /// parameter directly without calling it first.
 class AutoClosureForwardingFailure final : public FailureDiagnostic {

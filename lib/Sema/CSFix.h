@@ -145,6 +145,10 @@ enum class FixKind : uint8_t {
   /// types.
   AllowTupleTypeMismatch,
 
+  /// Allow a function type to be destructured with mismatched parameter types
+  /// or return type.
+  AllowFunctionTypeMismatch,
+
   /// Allow an invalid member access on a value of protocol type as if
   /// that protocol type were a generic constraint requiring conformance
   /// to that protocol.
@@ -986,6 +990,35 @@ public:
 
   bool diagnose(bool asNote = false) const override;
 };
+
+class AllowFunctionTypeMismatch final : public ContextualMismatch {
+  /// The index of the parameter where the type mismatch occurred.
+  unsigned ParamIndex;
+
+  AllowFunctionTypeMismatch(ConstraintSystem &cs, Type lhs, Type rhs,
+                            ConstraintLocator *locator, unsigned index)
+      : ContextualMismatch(cs, FixKind::AllowFunctionTypeMismatch, lhs, rhs,
+                           locator), ParamIndex(index) {}
+
+public:
+  static AllowFunctionTypeMismatch *create(ConstraintSystem &cs, Type lhs,
+                                           Type rhs, ConstraintLocator *locator,
+                                           unsigned index);
+
+  static bool classof(const ConstraintFix *fix) {
+    return fix->getKind() == FixKind::AllowFunctionTypeMismatch;
+  }
+
+  std::string getName() const override {
+    return "allow function type mismatch";
+  }
+
+  bool coalesceAndDiagnose(ArrayRef<ConstraintFix *> secondaryFixes,
+                           bool asNote = false) const override;
+
+  bool diagnose(bool asNote = false) const override;
+};
+
 
 class AllowMutatingMemberOnRValueBase final : public AllowInvalidMemberRef {
   AllowMutatingMemberOnRValueBase(ConstraintSystem &cs, Type baseType,
