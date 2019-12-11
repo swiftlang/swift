@@ -120,6 +120,7 @@ Compilation::Compilation(DiagnosticEngine &Diags,
                          bool SaveTemps,
                          bool ShowDriverTimeCompilation,
                          std::unique_ptr<UnifiedStatsReporter> StatsReporter,
+                         bool OnlyOneDependencyFile,
                          bool EnableExperimentalDependencies,
                          bool VerifyExperimentalDependencyGraphAfterEveryImport,
                          bool EmitExperimentalDependencyDotFileAfterEveryImport,
@@ -145,6 +146,7 @@ Compilation::Compilation(DiagnosticEngine &Diags,
     ShowDriverTimeCompilation(ShowDriverTimeCompilation),
     Stats(std::move(StatsReporter)),
     FilelistThreshold(FilelistThreshold),
+    OnlyOneDependencyFile(OnlyOneDependencyFile),
     EnableExperimentalDependencies(EnableExperimentalDependencies),
     VerifyExperimentalDependencyGraphAfterEveryImport(
       VerifyExperimentalDependencyGraphAfterEveryImport),
@@ -1560,4 +1562,20 @@ const char *Compilation::getAllSourcesPath() const {
     mutableThis->AllSourceFilesPath = getArgs().MakeArgString(Buffer);
   }
   return AllSourceFilesPath;
+}
+
+void Compilation::addDependencyPathOrCreateDummy(
+    const CommandOutput &Output,
+    function_ref<void(StringRef)> addDependencyPath,
+    function_ref<void(StringRef)> createDummy) {
+  StringRef path =
+      Output.getAdditionalOutputForType(file_types::TY_Dependencies);
+  if (path.empty())
+    return;
+  if (HaveAlreadyAddedDependencyPath && OnlyOneDependencyFile)
+    createDummy(path);
+  else {
+    addDependencyPath(path);
+    HaveAlreadyAddedDependencyPath = true;
+  }
 }
