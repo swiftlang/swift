@@ -42,6 +42,14 @@ private:
   unsigned &TmpNameIndex;
   bool HighPerformance;
 
+  DeclName DebugPrintName;
+  DeclName PrintName;
+  DeclName PostPrintName;
+  DeclName LogWithIDName;
+  DeclName LogScopeExitName;
+  DeclName LogScopeEntryName;
+  DeclName SendDataName;
+
   struct BracePair {
   public:
     SourceRange BraceRange;
@@ -117,7 +125,14 @@ public:
   Instrumenter(ASTContext &C, DeclContext *DC, std::mt19937_64 &RNG, bool HP,
                unsigned &TmpNameIndex)
       : InstrumenterBase(C, DC), RNG(RNG), TmpNameIndex(TmpNameIndex),
-        HighPerformance(HP) {}
+        HighPerformance(HP),
+        DebugPrintName((C.getIdentifier("__builtin_debugPrint"))),
+        PrintName((C.getIdentifier("__builtin_print"))),
+        PostPrintName((C.getIdentifier("__builtin_postPrint"))),
+        LogWithIDName((C.getIdentifier("__builtin_log_with_id"))),
+        LogScopeExitName((C.getIdentifier("__builtin_log_scope_exit"))),
+        LogScopeEntryName((C.getIdentifier("__builtin_log_scope_entry"))),
+        SendDataName((C.getIdentifier("__builtin_send_data"))) { }
 
   Stmt *transformStmt(Stmt *S) {
     switch (S->getKind()) {
@@ -699,11 +714,10 @@ public:
   Added<Stmt *> logPrint(bool isDebugPrint, ApplyExpr *AE,
                          PatternBindingDecl *&ArgPattern,
                          VarDecl *&ArgVariable) {
-    const char *LoggerName =
-        isDebugPrint ? "__builtin_debugPrint" : "__builtin_print";
+    DeclName LoggerName = isDebugPrint ? DebugPrintName : PrintName;
 
     UnresolvedDeclRefExpr *LoggerRef = new (Context) UnresolvedDeclRefExpr(
-        Context.getIdentifier(LoggerName), DeclRefKind::Ordinary,
+        LoggerName, DeclRefKind::Ordinary,
         DeclNameLoc(AE->getSourceRange().End));
 
     std::tie(ArgPattern, ArgVariable) = maybeFixupPrintArgument(AE);
@@ -719,8 +733,7 @@ public:
   }
 
   Added<Stmt *> logPostPrint(SourceRange SR) {
-    return buildLoggerCallWithArgs("__builtin_postPrint",
-                                   MutableArrayRef<Expr *>(), SR);
+    return buildLoggerCallWithArgs(PostPrintName, {}, SR);
   }
 
   std::pair<PatternBindingDecl *, VarDecl *>
@@ -770,7 +783,7 @@ public:
 
     Expr *LoggerArgExprs[] = {*E, NameExpr, IDExpr};
 
-    return buildLoggerCallWithArgs("__builtin_log_with_id",
+    return buildLoggerCallWithArgs(LogWithIDName,
                                    MutableArrayRef<Expr *>(LoggerArgExprs), SR);
   }
 
@@ -783,13 +796,12 @@ public:
   }
 
   Added<Stmt *> buildScopeCall(SourceRange SR, bool IsExit) {
-    const char *LoggerName =
-        IsExit ? "__builtin_log_scope_exit" : "__builtin_log_scope_entry";
+    auto LoggerName = IsExit ? LogScopeExitName : LogScopeEntryName;
 
     return buildLoggerCallWithArgs(LoggerName, MutableArrayRef<Expr *>(), SR);
   }
 
-  Added<Stmt *> buildLoggerCallWithArgs(const char *LoggerName,
+  Added<Stmt *> buildLoggerCallWithArgs(DeclName LoggerName,
                                         MutableArrayRef<Expr *> Args,
                                         SourceRange SR) {
     // If something doesn't have a valid source range it can not be playground
@@ -809,17 +821,8 @@ public:
     Expr *StartColumn = IntegerLiteralExpr::createFromUnsigned(Context, StartLC.second);
     Expr *EndColumn = IntegerLiteralExpr::createFromUnsigned(Context, EndLC.second);
 
-    Expr *ModuleExpr =
-        !ModuleIdentifier.empty()
-            ? (Expr *)new (Context) UnresolvedDeclRefExpr(
-                  ModuleIdentifier, DeclRefKind::Ordinary, DeclNameLoc(SR.End))
-            : (Expr *)IntegerLiteralExpr::createFromUnsigned(Context, 0);
-
-    Expr *FileExpr =
-        !FileIdentifier.empty()
-            ? (Expr *)new (Context) UnresolvedDeclRefExpr(
-                  FileIdentifier, DeclRefKind::Ordinary, DeclNameLoc(SR.End))
-            : (Expr *)IntegerLiteralExpr::createFromUnsigned(Context, 0);
+    Expr *ModuleExpr = buildIDArgumentExpr(ModuleIdentifier, SR);
+    Expr *FileExpr = buildIDArgumentExpr(FileIdentifier, SR);
 
     llvm::SmallVector<Expr *, 6> ArgsWithSourceRange(Args.begin(), Args.end());
 
@@ -827,8 +830,8 @@ public:
         {StartLine, EndLine, StartColumn, EndColumn, ModuleExpr, FileExpr});
 
     UnresolvedDeclRefExpr *LoggerRef = new (Context)
-        UnresolvedDeclRefExpr(Context.getIdentifier(LoggerName),
-                              DeclRefKind::Ordinary, DeclNameLoc(SR.End));
+        UnresolvedDeclRefExpr(LoggerName, DeclRefKind::Ordinary,
+                              DeclNameLoc(SR.End));
 
     LoggerRef->setImplicit(true);
 
@@ -857,8 +860,8 @@ public:
                                   AccessSemantics::Ordinary, Apply->getType());
 
     UnresolvedDeclRefExpr *SendDataRef = new (Context)
-        UnresolvedDeclRefExpr(Context.getIdentifier("__builtin_send_data"),
-                              DeclRefKind::Ordinary, DeclNameLoc());
+        UnresolvedDeclRefExpr(SendDataName, DeclRefKind::Ordinary,
+                              DeclNameLoc());
 
     SendDataRef->setImplicit(true);
 

@@ -40,10 +40,14 @@ namespace {
 class Instrumenter : InstrumenterBase {
 private:
   unsigned &TmpNameIndex;
+  DeclName LogBeforeName;
+  DeclName LogAfterName;
 
 public:
   Instrumenter(ASTContext &C, DeclContext *DC, unsigned &TmpNameIndex)
-      : InstrumenterBase(C, DC), TmpNameIndex(TmpNameIndex) {}
+      : InstrumenterBase(C, DC), TmpNameIndex(TmpNameIndex),
+        LogBeforeName((C.getIdentifier("__builtin_pc_before"))),
+        LogAfterName((C.getIdentifier("__builtin_pc_after"))) {}
 
   Stmt *transformStmt(Stmt *S) {
     switch (S->getKind()) {
@@ -494,9 +498,9 @@ public:
 
   Added<Stmt *> buildLoggerCall(SourceRange SR, bool isBefore) {
     if (isBefore) {
-      return buildLoggerCallWithArgs("__builtin_pc_before", SR);
+      return buildLoggerCallWithArgs(LogBeforeName, SR);
     } else {
-      return buildLoggerCallWithArgs("__builtin_pc_after", SR);
+      return buildLoggerCallWithArgs(LogAfterName, SR);
     }
   }
 
@@ -534,17 +538,8 @@ public:
     Expr *StartColumn = IntegerLiteralExpr::createFromUnsigned(Context, StartLC.second);
     Expr *EndColumn = IntegerLiteralExpr::createFromUnsigned(Context, EndLC.second);
 
-    Expr *ModuleExpr =
-        !ModuleIdentifier.empty()
-            ? (Expr *)new (Context) UnresolvedDeclRefExpr(
-                  ModuleIdentifier, DeclRefKind::Ordinary, DeclNameLoc(SR.End))
-            : (Expr *)IntegerLiteralExpr::createFromUnsigned(Context, 0);
-
-    Expr *FileExpr =
-        !FileIdentifier.empty()
-            ? (Expr *)new (Context) UnresolvedDeclRefExpr(
-                  FileIdentifier, DeclRefKind::Ordinary, DeclNameLoc(SR.End))
-            : (Expr *)IntegerLiteralExpr::createFromUnsigned(Context, 0);
+    Expr *ModuleExpr = buildIDArgumentExpr(ModuleIdentifier, SR);
+    Expr *FileExpr = buildIDArgumentExpr(FileIdentifier, SR);
 
     llvm::SmallVector<Expr *, 6> ArgsWithSourceRange{};
 
@@ -552,7 +547,7 @@ public:
         {StartLine, EndLine, StartColumn, EndColumn, ModuleExpr, FileExpr});
 
     UnresolvedDeclRefExpr *BeforeLoggerRef = new (Context)
-        UnresolvedDeclRefExpr(Context.getIdentifier("__builtin_pc_before"),
+        UnresolvedDeclRefExpr(LogBeforeName,
                               DeclRefKind::Ordinary, DeclNameLoc(SR.End));
     BeforeLoggerRef->setImplicit(true);
     SmallVector<Identifier, 6> ArgLabels(ArgsWithSourceRange.size(),
@@ -566,7 +561,7 @@ public:
     }
 
     UnresolvedDeclRefExpr *AfterLoggerRef = new (Context)
-        UnresolvedDeclRefExpr(Context.getIdentifier("__builtin_pc_after"),
+        UnresolvedDeclRefExpr(LogAfterName,
                               DeclRefKind::Ordinary, DeclNameLoc(SR.End));
     AfterLoggerRef->setImplicit(true);
     ApplyExpr *AfterLoggerCall = CallExpr::createImplicit(
@@ -597,7 +592,7 @@ public:
     return *AddedGet;
   }
 
-  Added<Stmt *> buildLoggerCallWithArgs(const char *LoggerName,
+  Added<Stmt *> buildLoggerCallWithArgs(DeclName LoggerName,
                                         SourceRange SR) {
     if (!SR.isValid()) {
       return nullptr;
@@ -614,17 +609,8 @@ public:
     Expr *StartColumn = IntegerLiteralExpr::createFromUnsigned(Context, StartLC.second);
     Expr *EndColumn = IntegerLiteralExpr::createFromUnsigned(Context, EndLC.second);
 
-    Expr *ModuleExpr =
-        !ModuleIdentifier.empty()
-            ? (Expr *)new (Context) UnresolvedDeclRefExpr(
-                  ModuleIdentifier, DeclRefKind::Ordinary, DeclNameLoc(SR.End))
-            : (Expr *)IntegerLiteralExpr::createFromUnsigned(Context, 0);
-
-    Expr *FileExpr =
-        !FileIdentifier.empty()
-            ? (Expr *)new (Context) UnresolvedDeclRefExpr(
-                  FileIdentifier, DeclRefKind::Ordinary, DeclNameLoc(SR.End))
-            : (Expr *)IntegerLiteralExpr::createFromUnsigned(Context, 0);
+    Expr *ModuleExpr = buildIDArgumentExpr(ModuleIdentifier, SR);
+    Expr *FileExpr = buildIDArgumentExpr(FileIdentifier, SR);
 
     llvm::SmallVector<Expr *, 6> ArgsWithSourceRange{};
 
@@ -632,7 +618,7 @@ public:
         {StartLine, EndLine, StartColumn, EndColumn, ModuleExpr, FileExpr});
 
     UnresolvedDeclRefExpr *LoggerRef = new (Context)
-        UnresolvedDeclRefExpr(Context.getIdentifier(LoggerName),
+        UnresolvedDeclRefExpr(LoggerName,
                               DeclRefKind::Ordinary, DeclNameLoc(SR.End));
 
     LoggerRef->setImplicit(true);
