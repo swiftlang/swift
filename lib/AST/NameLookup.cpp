@@ -1559,7 +1559,7 @@ static void extractDirectlyReferencedNominalTypes(
 }
 
 bool DeclContext::lookupQualified(Type type,
-                                  DeclName member,
+                                  DeclNameRef member,
                                   NLOptions options,
                                   SmallVectorImpl<ValueDecl *> &decls) const {
   using namespace namelookup;
@@ -1584,7 +1584,7 @@ bool DeclContext::lookupQualified(Type type,
 }
 
 bool DeclContext::lookupQualified(ArrayRef<NominalTypeDecl *> typeDecls,
-                                  DeclName member,
+                                  DeclNameRef member,
                                   NLOptions options,
                                   SmallVectorImpl<ValueDecl *> &decls) const {
   using namespace namelookup;
@@ -1639,7 +1639,7 @@ bool DeclContext::lookupQualified(ArrayRef<NominalTypeDecl *> typeDecls,
     auto flags = OptionSet<NominalTypeDecl::LookupDirectFlags>();
     if (options & NL_IncludeAttributeImplements)
       flags |= NominalTypeDecl::LookupDirectFlags::IncludeAttrImplements;
-    for (auto decl : current->lookupDirect(member, flags)) {
+    for (auto decl : current->lookupDirect(member.getFullName(), flags)) {
       // If we're performing a type lookup, don't even attempt to validate
       // the decl if its not a type.
       if ((options & NL_OnlyTypes) && !isa<TypeDecl>(decl))
@@ -1708,14 +1708,14 @@ bool DeclContext::lookupQualified(ArrayRef<NominalTypeDecl *> typeDecls,
 
   pruneLookupResultSet(this, options, decls);
   if (auto *debugClient = this->getParentModule()->getDebugClient()) {
-    debugClient->finishLookupInNominals(this, typeDecls, member, options,
-                                        decls);
+    debugClient->finishLookupInNominals(this, typeDecls, member.getFullName(),
+                                        options, decls);
   }
   // We're done. Report success/failure.
   return !decls.empty();
 }
 
-bool DeclContext::lookupQualified(ModuleDecl *module, DeclName member,
+bool DeclContext::lookupQualified(ModuleDecl *module, DeclNameRef member,
                                   NLOptions options,
                                   SmallVectorImpl<ValueDecl *> &decls) const {
   using namespace namelookup;
@@ -1736,9 +1736,10 @@ bool DeclContext::lookupQualified(ModuleDecl *module, DeclName member,
   auto topLevelScope = getModuleScopeContext();
   if (module == topLevelScope->getParentModule()) {
     if (tracker) {
-      recordLookupOfTopLevelName(topLevelScope, member, isLookupCascading);
+      recordLookupOfTopLevelName(topLevelScope, member.getFullName(),
+                                 isLookupCascading);
     }
-    lookupInModule(module, member, decls,
+    lookupInModule(module, member.getFullName(), decls,
                    NLKind::QualifiedLookup, kind, topLevelScope);
   } else {
     // Note: This is a lookup into another module. Unless we're compiling
@@ -1751,9 +1752,10 @@ bool DeclContext::lookupQualified(ModuleDecl *module, DeclName member,
         module, topLevelScope);
     if (llvm::any_of(accessPaths,
                      [&](ModuleDecl::AccessPathTy accessPath) {
-                       return ModuleDecl::matchesAccessPath(accessPath, member);
+                       return ModuleDecl::matchesAccessPath(accessPath,
+                                                            member.getFullName());
                      })) {
-      lookupInModule(module, member, decls,
+      lookupInModule(module, member.getFullName(), decls,
                      NLKind::QualifiedLookup, kind, topLevelScope);
     }
   }
@@ -1761,7 +1763,8 @@ bool DeclContext::lookupQualified(ModuleDecl *module, DeclName member,
   pruneLookupResultSet(this, options, decls);
 
   if (auto *debugClient = this->getParentModule()->getDebugClient()) {
-    debugClient->finishLookupInModule(this, module, member, options, decls);
+    debugClient->finishLookupInModule(this, module, member.getFullName(),
+                                      options, decls);
   }
   // We're done. Report success/failure.
   return !decls.empty();
@@ -1769,7 +1772,7 @@ bool DeclContext::lookupQualified(ModuleDecl *module, DeclName member,
 
 llvm::Expected<QualifiedLookupResult>
 AnyObjectLookupRequest::evaluate(Evaluator &evaluator, const DeclContext *dc,
-                                 DeclName member, NLOptions options) const {
+                                 DeclNameRef member, NLOptions options) const {
   using namespace namelookup;
   QualifiedLookupResult decls;
 
@@ -1789,7 +1792,8 @@ AnyObjectLookupRequest::evaluate(Evaluator &evaluator, const DeclContext *dc,
   // Collect all of the visible declarations.
   SmallVector<ValueDecl *, 4> allDecls;
   for (auto import : namelookup::getAllImports(dc)) {
-    import.second->lookupClassMember(import.first, member, allDecls);
+    import.second->lookupClassMember(import.first, member.getFullName(),
+                                     allDecls);
   }
 
   // For each declaration whose context is not something we've
@@ -1820,7 +1824,8 @@ AnyObjectLookupRequest::evaluate(Evaluator &evaluator, const DeclContext *dc,
 
   pruneLookupResultSet(dc, options, decls);
   if (auto *debugClient = dc->getParentModule()->getDebugClient()) {
-    debugClient->finishLookupInAnyObject(dc, member, options, decls);
+    debugClient->finishLookupInAnyObject(dc, member.getFullName(), options,
+                                         decls);
   }
   return decls;
 }
@@ -1934,7 +1939,7 @@ resolveTypeDeclsToNominal(Evaluator &evaluator,
 
 /// Perform unqualified name lookup for types at the given location.
 static DirectlyReferencedTypeDecls
-directReferencesForUnqualifiedTypeLookup(DeclName name,
+directReferencesForUnqualifiedTypeLookup(DeclNameRef name,
                                          SourceLoc loc, DeclContext *dc,
                                          LookupOuterResults lookupOuter) {
   DirectlyReferencedTypeDecls results;
@@ -1961,7 +1966,7 @@ static DirectlyReferencedTypeDecls
 directReferencesForQualifiedTypeLookup(Evaluator &evaluator,
                                        ASTContext &ctx,
                                        ArrayRef<TypeDecl *> baseTypes,
-                                       DeclName name,
+                                       DeclNameRef name,
                                        DeclContext *dc) {
   DirectlyReferencedTypeDecls result;
   auto addResults = [&result](ArrayRef<ValueDecl *> found){

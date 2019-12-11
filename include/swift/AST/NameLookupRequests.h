@@ -321,10 +321,19 @@ public:
   SourceLoc Loc;
   LookupOptions Options;
 
-  UnqualifiedLookupDescriptor(DeclName name, DeclContext *dc,
+  /// Transitional entry point.
+  [[deprecated]] UnqualifiedLookupDescriptor(DeclName name, DeclContext *dc,
                               SourceLoc loc = SourceLoc(),
                               LookupOptions options = {})
       : Name(name), DC(dc), Loc(loc), Options(options) {}
+
+  #pragma clang diagnostic push
+  #pragma clang diagnostic ignored "-Wdeprecated-declarations"
+  UnqualifiedLookupDescriptor(DeclNameRef name, DeclContext *dc,
+                              SourceLoc loc = SourceLoc(),
+                              LookupOptions options = {})
+      : UnqualifiedLookupDescriptor(name.getFullName(), dc, loc, options) { }
+  #pragma clang diagnostic pop
 
   friend llvm::hash_code hash_value(const UnqualifiedLookupDescriptor &desc) {
     return llvm::hash_combine(desc.Name, desc.DC, desc.Loc,
@@ -389,8 +398,8 @@ private:
 /// Perform \c AnyObject lookup for a given member.
 class AnyObjectLookupRequest
     : public SimpleRequest<AnyObjectLookupRequest,
-                           QualifiedLookupResult(const DeclContext *, DeclName,
-                                                 NLOptions),
+                           QualifiedLookupResult(const DeclContext *,
+                                                 DeclNameRef, NLOptions),
                            CacheKind::Uncached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -400,7 +409,7 @@ private:
 
   llvm::Expected<QualifiedLookupResult> evaluate(Evaluator &evaluator,
                                                  const DeclContext *dc,
-                                                 DeclName name,
+                                                 DeclNameRef name,
                                                  NLOptions options) const;
 };
 

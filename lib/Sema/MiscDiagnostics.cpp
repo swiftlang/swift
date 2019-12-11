@@ -533,7 +533,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
 
       DeclContext *topLevelContext = DC->getModuleScopeContext();
       auto descriptor = UnqualifiedLookupDescriptor(
-          VD->getBaseName(), topLevelContext, SourceLoc(),
+          DeclName(VD->getBaseName()), topLevelContext, SourceLoc(),
           UnqualifiedLookupFlags::KnownPrivate);
       auto lookup = evaluateOrDefault(Ctx.evaluator,
                                       UnqualifiedLookupRequest{descriptor}, {});
