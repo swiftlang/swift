@@ -342,14 +342,14 @@ public:
     }
   }
 
-  std::string digForName(Expr *E) {
+  DeclBaseName digForName(Expr *E) {
     Added<Expr *> RE = nullptr;
     ValueDecl *VD = nullptr;
     std::tie(RE, VD) = digForVariable(E);
     if (VD) {
-      return VD->getBaseName().getIdentifier().str();
+      return VD->getBaseName();
     } else {
-      return std::string("");
+      return DeclBaseName();
     }
   }
 
@@ -417,14 +417,14 @@ public:
                                          true); // implicit
             NAE->setType(Context.TheEmptyTupleType);
             AE->setImplicit(true);
-            std::string Name = digForName(AE->getDest());
 
-            Added<Stmt *> Log(buildLoggerCall(
-                new (Context) DeclRefExpr(
-                    ConcreteDeclRef(PV.second), DeclNameLoc(),
-                    true, // implicit
-                    AccessSemantics::Ordinary, AE->getSrc()->getType()),
-                AE->getSrc()->getSourceRange(), Name.c_str()));
+            DeclBaseName Name = digForName(AE->getDest());
+            Expr * PVVarRef = new (Context) DeclRefExpr(
+                ConcreteDeclRef(PV.second), DeclNameLoc(), /*implicit=*/ true,
+                AccessSemantics::Ordinary, AE->getSrc()->getType());
+            Added<Stmt *> Log(
+                buildLoggerCall(PVVarRef, AE->getSrc()->getSourceRange(),
+                                Name.getIdentifier().str()));
 
             if (*Log) {
               Elements[EI] = PV.first;
@@ -439,11 +439,11 @@ public:
           if (auto *DRE = dyn_cast<DeclRefExpr>(AE->getFn())) {
             auto *FnD = dyn_cast<AbstractFunctionDecl>(DRE->getDecl());
             if (FnD && FnD->getModuleContext() == Context.TheStdlibModule) {
-              StringRef FnName = FnD->getNameStr();
-              if (FnName.equals("print") || FnName.equals("debugPrint")) {
+              DeclBaseName FnName = FnD->getBaseName();
+              if (FnName == "print" || FnName == "debugPrint") {
                 const bool isOldStyle = false;
                 if (isOldStyle) {
-                  const bool isDebugPrint = FnName.equals("debugPrint");
+                  const bool isDebugPrint = (FnName == "debugPrint");
                   PatternBindingDecl *ArgPattern = nullptr;
                   VarDecl *ArgVariable = nullptr;
                   Added<Stmt *> Log =
@@ -620,39 +620,36 @@ public:
         new (Context) DeclRefExpr(ConcreteDeclRef(VD), DeclNameLoc(),
                                   true, // implicit
                                   AccessSemantics::Ordinary, Type()),
-        VD->getSourceRange(), VD->getName().str().str().c_str());
+        VD->getSourceRange(), VD->getName().str());
   }
 
   Added<Stmt *> logDeclOrMemberRef(Added<Expr *> RE) {
     if (auto *DRE = dyn_cast<DeclRefExpr>(*RE)) {
       VarDecl *VD = cast<VarDecl>(DRE->getDecl());
 
-      if (isa<ConstructorDecl>(TypeCheckDC) &&
-          VD->getNameStr().equals("self")) {
+      if (isa<ConstructorDecl>(TypeCheckDC) && VD->getBaseName() == "self") {
         // Don't log "self" in a constructor
         return nullptr;
       }
 
       return buildLoggerCall(
           new (Context) DeclRefExpr(ConcreteDeclRef(VD), DeclNameLoc(),
-                                    true, // implicit
-                                    AccessSemantics::Ordinary, Type()),
-          DRE->getSourceRange(), VD->getName().str().str().c_str());
+                                    /*implicit=*/true),
+          DRE->getSourceRange(), VD->getName().str());
     } else if (auto *MRE = dyn_cast<MemberRefExpr>(*RE)) {
       Expr *B = MRE->getBase();
       ConcreteDeclRef M = MRE->getMember();
 
-      if (isa<ConstructorDecl>(TypeCheckDC) && !digForName(B).compare("self")) {
+      if (isa<ConstructorDecl>(TypeCheckDC) && digForName(B) == "self") {
         // Don't log attributes of "self" in a constructor
         return nullptr;
       }
 
       return buildLoggerCall(
           new (Context) MemberRefExpr(B, SourceLoc(), M, DeclNameLoc(),
-                                      true, // implicit
-                                      AccessSemantics::Ordinary),
+                                      /*implicit=*/true),
           MRE->getSourceRange(),
-          M.getDecl()->getBaseName().getIdentifier().str().str().c_str());
+          M.getDecl()->getBaseName().userFacingName());
     } else {
       return nullptr;
     }
@@ -738,11 +735,8 @@ public:
 
   std::pair<PatternBindingDecl *, VarDecl *>
   buildPatternAndVariable(Expr *InitExpr) {
-    // This is 14 because "tmp" is 3 chars, %u is at most 10 digits long plus a
-    // null terminator.
-    char NameBuf[14] = {0};
-    snprintf(NameBuf, sizeof(NameBuf), "tmp%u", TmpNameIndex);
-    TmpNameIndex++;
+    SmallString<16> NameBuf;
+    (Twine("tmp") + Twine(TmpNameIndex)).toVector(NameBuf);
 
     Expr *MaybeLoadInitExpr = nullptr;
 
@@ -769,40 +763,27 @@ public:
   }
 
   Added<Stmt *> buildLoggerCall(Added<Expr *> E, SourceRange SR,
-                                const char *Name) {
-    assert(Name);
-    std::string *NameInContext = Context.AllocateObjectCopy(std::string(Name));
-
-    Expr *NameExpr =
-        new (Context) StringLiteralExpr(NameInContext->c_str(), SourceRange());
-    NameExpr->setImplicit(true);
+                                StringRef Name) {
+    Expr *NameExpr = new (Context) StringLiteralExpr(
+        Context.AllocateCopy(Name), SourceRange(), /*implicit=*/true);
 
     std::uniform_int_distribution<unsigned> Distribution(0, 0x7fffffffu);
     const unsigned id_num = Distribution(RNG);
     Expr *IDExpr = IntegerLiteralExpr::createFromUnsigned(Context, id_num);
 
-    Expr *LoggerArgExprs[] = {*E, NameExpr, IDExpr};
-
-    return buildLoggerCallWithArgs(LogWithIDName,
-                                   MutableArrayRef<Expr *>(LoggerArgExprs), SR);
+    return buildLoggerCallWithArgs(LogWithIDName, { *E, NameExpr, IDExpr }, SR);
   }
 
   Added<Stmt *> buildScopeEntry(SourceRange SR) {
-    return buildScopeCall(SR, false);
+    return buildLoggerCallWithArgs(LogScopeEntryName, {}, SR);
   }
 
   Added<Stmt *> buildScopeExit(SourceRange SR) {
-    return buildScopeCall(SR, true);
-  }
-
-  Added<Stmt *> buildScopeCall(SourceRange SR, bool IsExit) {
-    auto LoggerName = IsExit ? LogScopeExitName : LogScopeEntryName;
-
-    return buildLoggerCallWithArgs(LoggerName, MutableArrayRef<Expr *>(), SR);
+    return buildLoggerCallWithArgs(LogScopeExitName, {}, SR);
   }
 
   Added<Stmt *> buildLoggerCallWithArgs(DeclNameRef LoggerName,
-                                        MutableArrayRef<Expr *> Args,
+                                        ArrayRef<Expr *> Args,
                                         SourceRange SR) {
     // If something doesn't have a valid source range it can not be playground
     // logged. For example, a PC Macro event.
@@ -832,13 +813,10 @@ public:
     UnresolvedDeclRefExpr *LoggerRef = new (Context)
         UnresolvedDeclRefExpr(LoggerName, DeclRefKind::Ordinary,
                               DeclNameLoc(SR.End));
-
     LoggerRef->setImplicit(true);
 
-    SmallVector<Identifier, 6> ArgLabels(ArgsWithSourceRange.size(),
-                                         Identifier());
-    ApplyExpr *LoggerCall = CallExpr::createImplicit(
-        Context, LoggerRef, ArgsWithSourceRange, ArgLabels);
+    ApplyExpr *LoggerCall = CallExpr::createImplicit(Context, LoggerRef,
+                                                     ArgsWithSourceRange, {});
     Added<ApplyExpr *> AddedLogger(LoggerCall);
 
     if (!doTypeCheck(Context, TypeCheckDC, AddedLogger)) {

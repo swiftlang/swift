@@ -13,6 +13,35 @@
 //  This file implements the 'program counter simulation' for Swift.
 //  Based off the PlaygroundTransform, PCMacro instruments code to call
 //  functions at times that a debugger would show the program counter move.
+//  It can be used to collect and display information about the flow of control
+//  through Swift code in "live coding" environments like Playgrounds without
+//  resorting to more heavyweight mechanisms like profiling.
+//
+//  More specifically, this transformation inserts calls to visible functions
+//  with these names and signatures (other integer types should work too):
+//
+//      func __builtin_pc_before(
+//          _ startLine: Int, _ endLine: Int,
+//          _ startColumn: Int, _ endColumn: Int,
+//          _ moduleID: Int, _ fileID: Int
+//      ) -> Void
+//      func __builtin_pc_after(
+//          _ startLine: Int, _ endLine: Int,
+//          _ startColumn: Int, _ endColumn: Int,
+//          _ moduleID: Int, _ fileID: Int
+//      ) -> Void
+//
+//  The `startLine`, `endLine`, `startColumn`, and `endColumn` parameters are
+//  passed 1-based integer literals; 0 is used for invalid (i.e.
+//  compiler-generated) code. The `moduleID` and `fileID` parameters are passed
+//  the values of visible variables or constants named
+//  `__builtin_pg_module_<module name>` and
+//  `__builtin_pg_file_<file base name>`, or an integer literal 0 if suitable
+//  variables are not found.
+//
+//  The transform inserts these calls before and after each statement, as well
+//  as before and after expressions nested inside statements, such as `if` and
+//  `while` conditions and `var` and `let` initial values.
 //
 //===----------------------------------------------------------------------===//
 
@@ -347,8 +376,8 @@ public:
       if (auto *E = Element.dyn_cast<Expr *>()) {
         E->walk(CF);
 
-        Added<Stmt *> LogBefore = buildLoggerCall(E->getSourceRange(), true);
-        Added<Stmt *> LogAfter = buildLoggerCall(E->getSourceRange(), false);
+        Added<Stmt *> LogBefore = buildLoggerCall(LogBeforeName, E->getSourceRange());
+        Added<Stmt *> LogAfter = buildLoggerCall(LogAfterName, E->getSourceRange());
 
         if (*LogBefore && *LogAfter) {
           Elements[EI] = *LogBefore;
@@ -372,9 +401,9 @@ public:
             ReturnStmt *NRS = new (Context) ReturnStmt(SourceLoc(), DRE,
                                                        true); // implicit
             Added<Stmt *> LogBefore =
-                buildLoggerCall(RS->getSourceRange(), true);
+                buildLoggerCall(LogBeforeName, RS->getSourceRange());
             Added<Stmt *> LogAfter =
-                buildLoggerCall(RS->getSourceRange(), false);
+                buildLoggerCall(LogAfterName, RS->getSourceRange());
             if (*LogBefore && *LogAfter) {
               Elements[EI] = *LogBefore;
               Elements.insert(Elements.begin() + (EI + 1), PV.first);
@@ -385,9 +414,9 @@ public:
             }
           } else {
             Added<Stmt *> LogBefore =
-                buildLoggerCall(RS->getSourceRange(), true);
+                buildLoggerCall(LogBeforeName, RS->getSourceRange());
             Added<Stmt *> LogAfter =
-                buildLoggerCall(RS->getSourceRange(), false);
+                buildLoggerCall(LogAfterName, RS->getSourceRange());
             if (*LogBefore && *LogAfter) {
               Elements[EI] = *LogBefore;
               Elements.insert(Elements.begin() + (EI + 1), *LogAfter);
@@ -396,8 +425,8 @@ public:
             }
           }
         } else if (auto *CS = dyn_cast<ContinueStmt>(S)) {
-          Added<Stmt *> LogBefore = buildLoggerCall(CS->getSourceRange(), true);
-          Added<Stmt *> LogAfter = buildLoggerCall(CS->getSourceRange(), false);
+          Added<Stmt *> LogBefore = buildLoggerCall(LogBeforeName, CS->getSourceRange());
+          Added<Stmt *> LogAfter = buildLoggerCall(LogAfterName, CS->getSourceRange());
           if (*LogBefore && *LogAfter) {
             Elements[EI] = *LogBefore;
             Elements.insert(Elements.begin() + (EI + 1), *LogAfter);
@@ -406,8 +435,8 @@ public:
           }
 
         } else if (auto *BS = dyn_cast<BreakStmt>(S)) {
-          Added<Stmt *> LogBefore = buildLoggerCall(BS->getSourceRange(), true);
-          Added<Stmt *> LogAfter = buildLoggerCall(BS->getSourceRange(), false);
+          Added<Stmt *> LogBefore = buildLoggerCall(LogBeforeName, BS->getSourceRange());
+          Added<Stmt *> LogAfter = buildLoggerCall(LogAfterName, BS->getSourceRange());
           if (*LogBefore && *LogAfter) {
             Elements[EI] = *LogBefore;
             Elements.insert(Elements.begin() + (EI + 1), *LogAfter);
@@ -416,8 +445,8 @@ public:
           }
 
         } else if (auto *FS = dyn_cast<FallthroughStmt>(S)) {
-          Added<Stmt *> LogBefore = buildLoggerCall(FS->getSourceRange(), true);
-          Added<Stmt *> LogAfter = buildLoggerCall(FS->getSourceRange(), false);
+          Added<Stmt *> LogBefore = buildLoggerCall(LogBeforeName, FS->getSourceRange());
+          Added<Stmt *> LogAfter = buildLoggerCall(LogAfterName, FS->getSourceRange());
           if (*LogBefore && *LogAfter) {
             Elements[EI] = *LogBefore;
             Elements.insert(Elements.begin() + (EI + 1), *LogAfter);
@@ -443,8 +472,8 @@ public:
                 SR = PBD->getOriginalInitRange(0);
               }
 
-              Added<Stmt *> LogBefore = buildLoggerCall(SR, true);
-              Added<Stmt *> LogAfter = buildLoggerCall(SR, false);
+              Added<Stmt *> LogBefore = buildLoggerCall(LogBeforeName, SR);
+              Added<Stmt *> LogAfter = buildLoggerCall(LogAfterName, SR);
 
               if (*LogBefore && *LogAfter) {
                 Elements[EI] = *LogBefore;
@@ -466,10 +495,8 @@ public:
 
   std::pair<PatternBindingDecl *, VarDecl *>
   buildPatternAndVariable(Expr *InitExpr) {
-    // This is 16 because "pctmp" is 5 chars, %u is at most 10 digits long plus
-    // a null terminator.
-    char NameBuf[16] = {0};
-    snprintf(NameBuf, sizeof(NameBuf), "pctmp%u", TmpNameIndex);
+    SmallString<16> NameBuf;
+    (Twine("pctmp") + Twine(TmpNameIndex)).toVector(NameBuf);
     TmpNameIndex++;
 
     Expr *MaybeLoadInitExpr = nullptr;
@@ -496,19 +523,11 @@ public:
     return std::make_pair(PBD, VD);
   }
 
-  Added<Stmt *> buildLoggerCall(SourceRange SR, bool isBefore) {
-    if (isBefore) {
-      return buildLoggerCallWithArgs(LogBeforeName, SR);
-    } else {
-      return buildLoggerCallWithArgs(LogAfterName, SR);
-    }
-  }
-
   // Puts a pair of before/after calls at the start of the body, pointing at
   // that range.
   BraceStmt *prependLoggerCall(BraceStmt *BS, SourceRange SR) {
-    Added<Stmt *> Before = buildLoggerCall(SR, true);
-    Added<Stmt *> After = buildLoggerCall(SR, false);
+    Added<Stmt *> Before = buildLoggerCall(LogBeforeName, SR);
+    Added<Stmt *> After = buildLoggerCall(LogAfterName, SR);
 
     ArrayRef<ASTNode> OriginalElements = BS->getElements();
     SmallVector<swift::ASTNode, 3> Elements(OriginalElements.begin(),
@@ -592,8 +611,7 @@ public:
     return *AddedGet;
   }
 
-  Added<Stmt *> buildLoggerCallWithArgs(DeclNameRef LoggerName,
-                                        SourceRange SR) {
+  Added<Stmt *> buildLoggerCall(DeclNameRef LoggerName, SourceRange SR) {
     if (!SR.isValid()) {
       return nullptr;
     }
@@ -612,10 +630,9 @@ public:
     Expr *ModuleExpr = buildIDArgumentExpr(ModuleIdentifier, SR);
     Expr *FileExpr = buildIDArgumentExpr(FileIdentifier, SR);
 
-    llvm::SmallVector<Expr *, 6> ArgsWithSourceRange{};
-
-    ArgsWithSourceRange.append(
-        {StartLine, EndLine, StartColumn, EndColumn, ModuleExpr, FileExpr});
+    llvm::SmallVector<Expr *, 6> ArgsWithSourceRange{
+      StartLine, EndLine, StartColumn, EndColumn, ModuleExpr, FileExpr
+    };
 
     UnresolvedDeclRefExpr *LoggerRef = new (Context)
         UnresolvedDeclRefExpr(LoggerName,
