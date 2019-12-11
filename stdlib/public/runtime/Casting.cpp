@@ -846,52 +846,21 @@ static bool _dynamicCastToExistential(OpaqueValue *dest,
                          dynamicFlags);
         maybeDeallocateSource(success);
         return success;
-      } else {
-        break;
       }
+      LLVM_FALLTHROUGH;
 
     default:
       return fallbackForNonClass();
     }
 
-    // Check for protocol conformances and fill in the witness tables.
-    // Note: `findDynamicValueAndType` sets srcDynamicType == nullptr iff
-    // we have a cast from an existential container with a class instance
-    // to an AnyObject with no protocol constraints.  In that case,
-    // no further protocol conformance checks are needed.
-    while (srcDynamicType
-           && !_conformsToProtocols(srcDynamicValue, srcDynamicType,
-                                    targetType,
-                                    destExistential->getWitnessTables())) {
-      switch (srcDynamicType->getKind()) {
-      case MetadataKind::Optional: {
-        const Metadata *payloadType =
-          cast<EnumMetadata>(srcDynamicType)->getGenericArgs()[0];
-        unsigned enumCase =
-          payloadType->vw_getEnumTagSinglePayload(srcDynamicValue, /*emptyCases=*/1);
-        if (enumCase != 0) { // found nil
-          return fallbackForNonDirectConformance();
-        }
-        // Unwrap the optional and try again
-        srcDynamicType = payloadType;
-        // Since optional layout == contained layout, srcDynamicValue is unchanged.
-        break;
-      }
-      case MetadataKind::Existential: {
-        OpaqueValue *innerValue;
-        const Metadata *innerType;
-        findDynamicValueAndType(srcDynamicValue, srcDynamicType,
-                                innerValue, innerType,
-                                canConsumeDynamicValue, isTargetTypeAnyObject,
-                                /*isExistentialMetatype*/ true);
-        srcDynamicType = innerType;
-        srcDynamicValue = innerValue;
-        break;
-      }
-      default:
-        return fallbackForNonDirectConformance();
-      }
-    }
+    // Check for protocol conformances and fill in the witness tables. If
+    // srcDynamicType equals nullptr we have a cast from an existential
+    // container with a class instance to AnyObject. In this case no check is
+    // necessary.
+    if (srcDynamicType && !_conformsToProtocols(srcDynamicValue, srcDynamicType,
+                              targetType,
+                              destExistential->getWitnessTables()))
+      return fallbackForNonDirectConformance();
 
     auto object = *(reinterpret_cast<HeapObject**>(srcDynamicValue));
     destExistential->Value = object;
@@ -904,40 +873,12 @@ static bool _dynamicCastToExistential(OpaqueValue *dest,
   case ExistentialTypeRepresentation::Opaque: {
     auto destExistential =
       reinterpret_cast<OpaqueExistentialContainer*>(dest);
+
     // Check for protocol conformances and fill in the witness tables.
-    while (srcDynamicType
-           && !_conformsToProtocols(srcDynamicValue, srcDynamicType,
-                                    targetType,
-                                    destExistential->getWitnessTables())) {
-      switch (srcDynamicType->getKind()) {
-      case MetadataKind::Optional: {
-        const Metadata *payloadType =
-          cast<EnumMetadata>(srcDynamicType)->getGenericArgs()[0];
-        unsigned enumCase =
-          payloadType->vw_getEnumTagSinglePayload(srcDynamicValue, /*emptyCases=*/1);
-        if (enumCase != 0) { // Found nil
-          return fallbackForNonDirectConformance();
-        }
-        // Unwrap the optional and try again...
-        srcDynamicType = payloadType;
-        // Since optional layout == contained layout, srcDynamicValue is unchanged.
-        break;
-      }
-      case MetadataKind::Existential: {
-        OpaqueValue *innerValue;
-        const Metadata *innerType;
-        findDynamicValueAndType(srcDynamicValue, srcDynamicType,
-                                innerValue, innerType,
-                                canConsumeDynamicValue, isTargetTypeAnyObject,
-                                /*isExistentialMetatype*/ true);
-        srcDynamicType = innerType;
-        srcDynamicValue = innerValue;
-        break;
-      }
-      default:
-        return fallbackForNonDirectConformance();
-      }
-    }
+    if (!_conformsToProtocols(srcDynamicValue, srcDynamicType,
+                              targetType,
+                              destExistential->getWitnessTables()))
+      return fallbackForNonDirectConformance();
 
     // Fill in the type and value.
     destExistential->Type = srcDynamicType;
