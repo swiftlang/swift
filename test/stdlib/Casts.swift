@@ -91,25 +91,22 @@ CastsTests.test("SR-3871: ObjC wrapper") {
   }
   let a = ObjCWrapper().any
   let b = a as AnyObject
-  expectNotNil(b as? P2) // SR-3871: This succeeds
   expectNotNil(a as? P2) // SR-3871: This fails
+  expectNotNil(b as? P2) // SR-3871: This succeeds
 }
 
 CastsTests.test("SR-3871: Swift wrapper") {
   struct S: P2 {}
-
-  do {
-    class SwiftWrapper {
-      let any: Any = S()
-      init() {}
-    }
-    let a = SwiftWrapper().any
-    expectTrue(a is P2)
-    expectNotNil(a as? P2)
-    let b = a as AnyObject
-    expectTrue(b is P2)
-    expectNotNil(b as? P2)
+  class SwiftWrapper {
+    let any: Any = S()
+    init() {}
   }
+  let a = SwiftWrapper().any
+  expectTrue(a is P2)
+  expectNotNil(a as? P2)
+  let b = a as AnyObject
+  expectTrue(b is P2)
+  expectNotNil(b as? P2)
 }
 
 
