@@ -72,6 +72,7 @@ Backticks were added manually.
             *   [Upcasting to non-`@differentiable` functions](#upcasting-to-non-differentiable-functions)
         *   [Implied generic constraints](#implied-generic-constraints)
         *   [Non-differentiable parameters](#non-differentiable-parameters)
+        *   [Higher-order functions and currying](#higher-order-functions-and-currying)
     *   [Differential operators](#differential-operators)
         *   [Differential-producing differential operators](#differential-producing-differential-operators)
         *   [Pullback-producing differential operators](#pullback-producing-differential-operators)
@@ -88,7 +89,6 @@ Backticks were added manually.
         *   [Convolutional neural networks (CNN)](#convolutional-neural-networks-cnn)
         *   [Recurrent neural networks (RNN)](#recurrent-neural-networks-rnn)
 *   [Future directions](#future-directions)
-    *   [Differentiation of higher-order functions](#differentiation-of-higher-order-functions)
     *   [Higher-order differentiation](#higher-order-differentiation)
     *   [Naming conventions for numerical computing](#naming-conventions-for-numerical-computing)
 *   [Source compatibility](#source-compatibility)
@@ -2002,6 +2002,42 @@ _ = f0 as @differentiable (@noDerivative Float, Float) -> Float
 _ = f0 as @differentiable (@noDerivative Float, @noDerivative Float) -> Float
 ```
 
+#### Higher-order functions and currying
+
+As defined above, the `@differentiable` function type attributes requires all
+non-`@noDerivative` arguments and results to conform to the `@differentiable`
+attribute. However, there is one exception: when the type of an argument or
+result is a function type, e.g. `@differentiable (T) -> @differentiable (U) ->
+V`. This is because we need to differentiate higher-order funtions.
+
+Mathematically, the differentiability of `@differentiable (T, U) -> V` is
+similar to that of `@differentiable (T) -> @differentiable (U) -> V` in that
+differentiating either one will provide derivatives with respect to parameters
+`T` and `U`. Here are some examples of first-order function types and their
+corresponding curried function types:
+
+| First-order function type                 | Curried function type                           |
+| @differentiable (T, U) -> V               | @differentiable (T) -> @differentiable (U) -> V |
+| @differentiable (T, @noDerivative U) -> V | @differentiable (T) -> (U) -> V                 |
+| @differentiable (@noDerivative T, U) -> V | (T) -> @differentiable (U) -> V                 |
+
+A curried differentiable function can be formed like any curried
+non-differentiable function in Swift.
+
+```swift
+func curry<T, U, V>(
+    _ f: @differentiable (T, U) -> V
+) -> @differentiable (T) -> @differentiable (U) -> V {
+    { x in { y in f(x, y) } }
+}
+```
+
+The way this works is that the compiler internally assigns a tangent bundle to a
+closure that captures variables. This tangent bundle is existentially typed,
+because closure contexts are type-erased in Swift. The theory behind the typing
+rules has been published as [The Differentiable
+Curry](https://www.semanticscholar.org/paper/The-Differentiable-Curry-Plotkin-Brain/187078bfb159c78cc8c78c3bbe81a9176b3a6e02).
+
 ### Differential operators
 
 The core differentiation APIs are the differential operators. Differential
@@ -2455,30 +2491,6 @@ typealias LSTM<Scalar: TensorFlowFloatingPoint> = RNN<LSTMCell<Scalar>>
 ```
 
 ## Future directions
-
-### Differentiation of higher-order functions
-
-Mathematically, the differentiability of `@differentiable (T, U) -> V` is
-similar to that of `@differentiable (T) -> @differentiable (U) -> V` in that
-differentiating either one will provide derivatives with respect to parameters
-`T` and `U`.
-
-To form a `@differentiable (T) -> @differentiable (U) -> V`, the most natural
-thing to do is currying, which one might implement as:
-
-```swift
-func curry<T, U, V>(
-    _ f: @differentiable (T, U) -> V
-) -> @differentiable (T) -> @differentiable (U) -> V {
-    { x in { y in f(x, y) } }
-}
-```
-
-However, the compiler does not support currying today due to known
-type-theoretical constraints and implementation complexity regarding
-differentiating a closure with respect to the values it captures. Fortunately,
-we have a formally proven solution in the works, but we would like to defer this
-to a future proposal since it is purely additive to the existing semantics.
 
 ### Higher-order differentiation
 
