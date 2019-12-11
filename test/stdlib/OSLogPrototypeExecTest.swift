@@ -26,23 +26,18 @@ if #available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *) {
     h.log("A message with no data")
 
     // Test logging at specific levels.
-    h.log(level: .debug, "Minimum integer value: \(Int.min, format: .hex)")
-    h.log(level: .info, "Maximum integer value: \(Int.max, format: .hex)")
+    h.debug("Minimum integer value: \(Int.min, format: .hex)")
+    h.info("Maximum integer value: \(Int.max, format: .hex)")
 
     let privateID = 0x79abcdef
-    h.log(
-      level: .error,
-      "Private Identifier: \(privateID, format: .hex, privacy: .private)")
+    h.error("Private Identifier: \(privateID, format: .hex, privacy: .private)")
     let addr = 0x7afebabe
-    h.log(
-      level: .fault,
-      "Invalid address: 0x\(addr, format: .hex, privacy: .public)")
+    h.fault("Invalid address: 0x\(addr, format: .hex, privacy: .public)")
 
     // Test logging with multiple arguments.
     let filePermissions = 0o777
     let pid = 122225
-    h.log(
-      level: .error,
+    h.error(
       """
       Access prevented: process \(pid) initiated by \
       user: \(privateID, privacy: .private) attempted resetting \
