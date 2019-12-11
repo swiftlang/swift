@@ -363,7 +363,7 @@ clang::QualType ClangTypeConverter::visitTupleType(TupleType *type) {
     return clang::QualType();
 
   APInt size(32, tupleNumElements);
-  return ClangASTContext.getConstantArrayType(clangEltTy, size,
+  return ClangASTContext.getConstantArrayType(clangEltTy, size, nullptr,
            clang::ArrayType::Normal, 0);
 }
 

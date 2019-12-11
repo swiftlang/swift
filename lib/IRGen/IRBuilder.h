@@ -216,12 +216,12 @@ public:
   using IRBuilderBase::CreateMemSet;
   llvm::CallInst *CreateMemSet(Address dest, llvm::Value *value, Size size) {
     return CreateMemSet(dest.getAddress(), value, size.getValue(),
-                        dest.getAlignment().getValue());
+                        llvm::MaybeAlign(dest.getAlignment().getValue()));
   }
   llvm::CallInst *CreateMemSet(Address dest, llvm::Value *value,
                                llvm::Value *size) {
     return CreateMemSet(dest.getAddress(), value, size,
-                        dest.getAlignment().getValue());
+                        llvm::MaybeAlign(dest.getAlignment().getValue()));
   }
   
   using IRBuilderBase::CreateLifetimeStart;
