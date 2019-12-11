@@ -560,6 +560,14 @@ swift::matchWitness(
       bool foundSupersetAttr = false;
       for (auto witnessConfig :
            witnessAFD->getDerivativeFunctionConfigurations()) {
+        // We can't use witnesses that have generic signatures not satisfied by
+        // the requirement's generic signature.
+        if (!witnessConfig.derivativeGenericSignature
+                 ->requirementsNotSatisfiedBy(
+                     reqDiffAttr->getDerivativeGenericSignature())
+                 .empty())
+          continue;
+
         if (witnessConfig.parameterIndices ==
             reqDiffAttr->getParameterIndices())
           foundExactAttr = true;
