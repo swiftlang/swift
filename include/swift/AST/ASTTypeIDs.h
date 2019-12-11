@@ -61,6 +61,7 @@ struct TypePair;
 struct TypeWitnessAndDecl;
 enum class AncestryFlags : uint8_t;
 enum class ImplicitMemberAction : uint8_t;
+enum class AutoclosureStructureResult : uint8_t;
 
 // Define the AST type zone (zone 1)
 #define SWIFT_TYPEID_ZONE AST

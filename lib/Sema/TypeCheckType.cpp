@@ -21,7 +21,6 @@
 #include "TypeCheckType.h"
 #include "TypoCorrection.h"
 
-#include "swift/Strings.h"
 #include "swift/AST/ASTDemangler.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
@@ -35,12 +34,14 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeLoc.h"
 #include "swift/AST/TypeResolutionStage.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/ClangImporter/ClangImporter.h"
+#include "swift/Strings.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallString.h"
@@ -1780,7 +1781,8 @@ namespace {
 
     Type resolveAttributedType(AttributedTypeRepr *repr,
                                TypeResolutionOptions options);
-    Type resolveAttributedType(TypeAttributes &attrs, TypeRepr *repr,
+    Type resolveAttributedType(TypeAttributes &attrs,
+                               AttributedTypeRepr *attrRepr,
                                TypeResolutionOptions options);
     Type resolveASTFunctionType(FunctionTypeRepr *repr,
                                 TypeResolutionOptions options,
@@ -2007,21 +2009,24 @@ static Type rebuildWithDynamicSelf(ASTContext &Context, Type ty) {
 
 Type TypeResolver::resolveAttributedType(AttributedTypeRepr *repr,
                                          TypeResolutionOptions options) {
+
   // Copy the attributes, since we're about to start hacking on them.
   TypeAttributes attrs = repr->getAttrs();
   assert(!attrs.empty());
 
-  return resolveAttributedType(attrs, repr->getTypeRepr(), options);
+  return resolveAttributedType(attrs, repr, options);
 }
 
 Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
-                                         TypeRepr *repr,
+                                         AttributedTypeRepr *attrRepr,
                                          TypeResolutionOptions options) {
   // Convenience to grab the source range of a type attribute.
   auto getTypeAttrRangeWithAt = [](ASTContext &ctx, SourceLoc attrLoc) {
     return SourceRange(attrLoc, attrLoc.getAdvancedLoc(1));
 
   };
+
+  auto repr = attrRepr->getTypeRepr();
 
   // Remember whether this is a function parameter.
   bool isParam = options.is(TypeResolverContext::FunctionInput);
@@ -2241,31 +2246,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
           rep = FunctionType::Representation::Swift;
         } else {
           rep = *parsedRep;
-          
-          if (attrs.has(TAK_autoclosure)) {
-            // @convention(c) and @convention(block) are not allowed with an @autoclosure type.
-            if (rep == FunctionType::Representation::CFunctionPointer ||
-                rep == FunctionType::Representation::Block) {
-              diagnose(attrs.getLoc(TAK_convention),
-                       diag::invalid_autoclosure_and_convention_attributes,
-                       attrs.getConventionName());
-              attrs.clearAttribute(TAK_convention);
-            }
-          }
         }
-      }
-
-      // @autoclosure is only valid on parameters.
-      if (!isParam && attrs.has(TAK_autoclosure)) {
-        bool isVariadicFunctionParam =
-            options.is(TypeResolverContext::VariadicFunctionInput) &&
-            !options.hasBase(TypeResolverContext::EnumElementDecl);
-
-        diagnose(attrs.getLoc(TAK_autoclosure),
-                 isVariadicFunctionParam ? diag::attr_not_on_variadic_parameters
-                                         : diag::attr_only_on_parameters,
-                 "@autoclosure");
-        attrs.clearAttribute(TAK_autoclosure);
       }
 
       if (attrs.has(TAK_differentiable) &&
@@ -2284,6 +2265,35 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
                                   diffKind);
       if (!ty || ty->hasError())
         return ty;
+    }
+  }
+
+  // If we have an @autoclosure, check its structure
+  if (attrs.has(TAK_autoclosure)) {
+    auto result = evaluateOrDefault(
+        Context.evaluator,
+        AutoclosureStructureRequest{attrRepr, options.getBaseContext(),
+                                    options.getContext()},
+        AutoclosureStructureResult::Valid);
+    switch (result) {
+    case AutoclosureStructureResult::Valid:
+      break;
+    case AutoclosureStructureResult::NotOnParameter:
+      diagnose(attrs.getLoc(TAK_autoclosure), diag::attr_only_on_parameters,
+               "@autoclosure");
+      attrs.clearAttribute(TAK_autoclosure);
+      break;
+    case AutoclosureStructureResult::OnVariadicParameter:
+      diagnose(attrs.getLoc(TAK_autoclosure),
+               diag::attr_not_on_variadic_parameters, "@autoclosure");
+      attrs.clearAttribute(TAK_autoclosure);
+      break;
+    case AutoclosureStructureResult::CombinedWithConventionC:
+    case AutoclosureStructureResult::CombinedWithConventionBlock:
+      diagnose(attrs.getLoc(TAK_convention),
+               diag::invalid_autoclosure_and_convention_attributes,
+               attrs.getConventionName());
+      attrs.clearAttribute(TAK_convention);
     }
   }
 
@@ -2870,7 +2880,7 @@ SILParameterInfo TypeResolver::resolveSILParameter(
     checkFor(TypeAttrKind::TAK_guaranteed,
              ParameterConvention::Direct_Guaranteed);
 
-    type = resolveAttributedType(attrs, attrRepr->getTypeRepr(), options);
+    type = resolveAttributedType(attrs, attrRepr, options);
   } else {
     type = resolveType(repr, options);
   }
@@ -2942,7 +2952,7 @@ bool TypeResolver::resolveSingleSILResult(TypeRepr *repr,
     checkFor(TypeAttrKind::TAK_autoreleased, ResultConvention::Autoreleased);
     if (hadError) return true;
 
-    type = resolveAttributedType(attrs, attrRepr->getTypeRepr(), options);
+    type = resolveAttributedType(attrs, attrRepr, options);
   } else {
     type = resolveType(repr, options);
   }

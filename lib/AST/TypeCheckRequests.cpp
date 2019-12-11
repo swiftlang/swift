@@ -1279,3 +1279,33 @@ void TypeCheckSourceFileRequest::cacheResult(bool result) const {
 #endif
   }
 }
+
+//----------------------------------------------------------------------------//
+// AutoclosureStructureRequest computation.
+//----------------------------------------------------------------------------//
+
+void swift::simple_display(llvm::raw_ostream &out,
+                           AutoclosureStructureResult result) {
+  switch (result) {
+  case AutoclosureStructureResult::Valid:
+    out << "valid @autoclosure structure";
+    break;
+  case AutoclosureStructureResult::NotOnParameter:
+    out << "@autoclosure not in parameter position";
+    break;
+  case AutoclosureStructureResult::OnVariadicParameter:
+    out << "@autoclosure with variadic parameter";
+    break;
+  case AutoclosureStructureResult::CombinedWithConventionC:
+    out << "@autoclosure with @convention(c)";
+    break;
+  case AutoclosureStructureResult::CombinedWithConventionBlock:
+    out << "@autoclosure with @convention(block)";
+    break;
+  }
+}
+
+void swift::simple_display(llvm::raw_ostream &out,
+                           TypeResolverContext context) {
+  // TODO: Implement this
+}
