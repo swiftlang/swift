@@ -461,13 +461,13 @@ private:
 /// Diagnose failures related to attempting member access on optional base
 /// type without optional chaining or force-unwrapping it first.
 class MemberAccessOnOptionalBaseFailure final : public FailureDiagnostic {
-  DeclName Member;
+  DeclNameRef Member;
   bool ResultTypeIsOptional;
 
 public:
   MemberAccessOnOptionalBaseFailure(ConstraintSystem &cs,
                                     ConstraintLocator *locator,
-                                    DeclName memberName, bool resultOptional)
+                                    DeclNameRef memberName, bool resultOptional)
       : FailureDiagnostic(cs, locator), Member(memberName),
         ResultTypeIsOptional(resultOptional) {}
 
@@ -977,17 +977,17 @@ public:
 
 class InvalidMemberRefFailure : public FailureDiagnostic {
   Type BaseType;
-  DeclName Name;
+  DeclNameRef Name;
 
 public:
   InvalidMemberRefFailure(ConstraintSystem &cs, Type baseType,
-                          DeclName memberName, ConstraintLocator *locator)
+                          DeclNameRef memberName, ConstraintLocator *locator)
       : FailureDiagnostic(cs, locator), BaseType(baseType->getRValueType()),
         Name(memberName) {}
 
 protected:
   Type getBaseType() const { return BaseType; }
-  DeclName getName() const { return Name; }
+  DeclNameRef getName() const { return Name; }
 };
 
 /// Diagnose situations when member referenced by name is missing
@@ -1002,7 +1002,7 @@ protected:
 class MissingMemberFailure final : public InvalidMemberRefFailure {
 public:
   MissingMemberFailure(ConstraintSystem &cs, Type baseType,
-                       DeclName memberName, ConstraintLocator *locator)
+                       DeclNameRef memberName, ConstraintLocator *locator)
       : InvalidMemberRefFailure(cs, baseType, memberName, locator) {}
 
   bool diagnoseAsError() override;
@@ -1016,7 +1016,7 @@ private:
 
   static DeclName findCorrectEnumCaseName(Type Ty,
                                           TypoCorrectionResults &corrections,
-                                          DeclName memberName);
+                                          DeclNameRef memberName);
 };
 
 /// Diagnose cases where a member only accessible on generic constraints
@@ -1035,7 +1035,7 @@ private:
 class InvalidMemberRefOnExistential final : public InvalidMemberRefFailure {
 public:
   InvalidMemberRefOnExistential(ConstraintSystem &cs, Type baseType,
-                                DeclName memberName, ConstraintLocator *locator)
+                                DeclNameRef memberName, ConstraintLocator *locator)
       : InvalidMemberRefFailure(cs, baseType, memberName, locator) {}
 
   bool diagnoseAsError() override;
@@ -1060,12 +1060,12 @@ public:
 class AllowTypeOrInstanceMemberFailure final : public FailureDiagnostic {
   Type BaseType;
   ValueDecl *Member;
-  DeclName Name;
+  DeclNameRef Name;
 
 public:
   AllowTypeOrInstanceMemberFailure(ConstraintSystem &cs,
                                    Type baseType, ValueDecl *member,
-                                   DeclName name, ConstraintLocator *locator)
+                                   DeclNameRef name, ConstraintLocator *locator)
       : FailureDiagnostic(cs, locator),
         BaseType(baseType->getRValueType()), Member(member), Name(name) {
     assert(member);
@@ -1884,10 +1884,11 @@ private:
 };
 
 class MissingContextualBaseInMemberRefFailure final : public FailureDiagnostic {
-  DeclName MemberName;
+  DeclNameRef MemberName;
 
 public:
-  MissingContextualBaseInMemberRefFailure(ConstraintSystem &cs, DeclName member,
+  MissingContextualBaseInMemberRefFailure(ConstraintSystem &cs,
+                                          DeclNameRef member,
                                           ConstraintLocator *locator)
       : FailureDiagnostic(cs, locator), MemberName(member) {}
 

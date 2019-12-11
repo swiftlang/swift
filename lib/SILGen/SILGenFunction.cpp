@@ -550,7 +550,7 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
     assert(UIKit && "couldn't find UIKit objc module?!");
     SmallVector<ValueDecl *, 1> results;
     UIKit->lookupQualified(UIKit,
-                           ctx.getIdentifier("UIApplicationMain"),
+                           DeclNameRef(ctx.getIdentifier("UIApplicationMain")),
                            NL_QualifiedDefault,
                            results);
     assert(results.size() == 1

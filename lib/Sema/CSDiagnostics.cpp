@@ -1259,7 +1259,7 @@ bool RValueTreatedAsLValueFailure::diagnoseAsError() {
           emitDiagnostic(loc, diag::assignment_let_property_delegating_init,
                       member->getName());
           if (auto *ref = getResolvedMemberRef(member)) {
-            emitDiagnostic(ref, diag::decl_declared_here, member->getName());
+            emitDiagnostic(ref, diag::decl_declared_here, ref->getFullName());
           }
           return true;
         }
@@ -1486,7 +1486,7 @@ bool AssignmentFailure::diagnoseAsError() {
       if (auto typeContext = DC->getInnermostTypeContext()) {
         SmallVector<ValueDecl *, 2> results;
         DC->lookupQualified(typeContext->getSelfNominalTypeDecl(),
-                            VD->getFullName(), NL_QualifiedDefault, results);
+                            VD->createNameRef(), NL_QualifiedDefault, results);
 
         auto foundProperty = llvm::find_if(results, [&](ValueDecl *decl) {
           // We're looking for a settable property that is the same type as the
@@ -3042,7 +3042,7 @@ bool SubscriptMisuseFailure::diagnoseAsNote() {
 /// meaning their lower case counterparts are identical.
 ///   - DeclName is valid when such a correct case is found; invalid otherwise.
 DeclName MissingMemberFailure::findCorrectEnumCaseName(
-    Type Ty, TypoCorrectionResults &corrections, DeclName memberName) {
+    Type Ty, TypoCorrectionResults &corrections, DeclNameRef memberName) {
   if (memberName.isSpecial() || !memberName.isSimpleName())
     return DeclName();
   if (!Ty->getEnumOrBoundGenericEnum())
@@ -3146,10 +3146,9 @@ bool MissingMemberFailure::diagnoseAsError() {
                getName().getBaseName() == DeclBaseName::createConstructor()) {
       auto &cs = getConstraintSystem();
 
-      auto memberName = getName().getBaseName();
       auto result = cs.performMemberLookup(
-          ConstraintKind::ValueMember, memberName, metatypeTy,
-          FunctionRefKind::DoubleApply, getLocator(),
+          ConstraintKind::ValueMember, getName().withoutArgumentLabels(),
+          metatypeTy, FunctionRefKind::DoubleApply, getLocator(),
           /*includeInaccessibleMembers=*/true);
 
       // If there are no `init` members at all produce a tailored
@@ -3470,10 +3469,10 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
         // static members doesn't make a whole lot of sense
         if (auto TAD = dyn_cast<TypeAliasDecl>(Member)) {
           Diag.emplace(emitDiagnostic(loc, diag::typealias_outside_of_protocol,
-                                      TAD->getName()));
+                                      Name));
         } else if (auto ATD = dyn_cast<AssociatedTypeDecl>(Member)) {
           Diag.emplace(emitDiagnostic(loc, diag::assoc_type_outside_of_protocol,
-                                      ATD->getName()));
+                                      Name));
         } else if (isa<ConstructorDecl>(Member)) {
           Diag.emplace(emitDiagnostic(loc, diag::construct_protocol_by_name,
                                       instanceTy));

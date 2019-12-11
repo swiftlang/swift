@@ -4660,7 +4660,7 @@ ConstraintSystem::simplifyConstructionConstraint(
   // variable T. T2 is the result type provided via the construction
   // constraint itself.
   addValueMemberConstraint(MetatypeType::get(valueType, getASTContext()),
-                           DeclBaseName::createConstructor(),
+                           DeclNameRef::createConstructor(),
                            memberType,
                            useDC, functionRefKind,
                            /*outerAlternatives=*/{},
@@ -5372,7 +5372,7 @@ static bool isSelfRecursiveKeyPathDynamicMemberLookup(
 /// try to identify and classify inaccessible members that may be being
 /// referenced.
 MemberLookupResult ConstraintSystem::
-performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
+performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
                     Type baseTy, FunctionRefKind functionRefKind,
                     ConstraintLocator *memberLocator,
                     bool includeInaccessibleMembers) {
@@ -5446,8 +5446,8 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
     // anything else, because the cost of the general search is so
     // high.
     if (auto info = getArgumentInfo(memberLocator)) {
-      memberName = DeclName(ctx, memberName.getBaseName(),
-                            info->Labels);
+      memberName.getFullName() = DeclName(ctx, memberName.getBaseName(),
+                                          info->Labels);
     }
   }
 
@@ -5767,7 +5767,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
       memberName.getBaseName() == DeclBaseName::createConstructor() &&
       !isImplicitInit) {
     auto &compatLookup = lookupMember(instanceTy,
-                                      ctx.getIdentifier("init"));
+                                      DeclNameRef(ctx.getIdentifier("init")));
     for (auto result : compatLookup)
       addChoice(getOverloadChoice(result.getValueDecl(),
                                   /*isBridged=*/false,
@@ -5837,8 +5837,8 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
       auto &ctx = getASTContext();
 
       // Recursively look up `subscript(dynamicMember:)` methods in this type.
-      auto subscriptName =
-          DeclName(ctx, DeclBaseName::createSubscript(), ctx.Id_dynamicMember);
+      DeclNameRef subscriptName(
+          { ctx, DeclBaseName::createSubscript(), { ctx.Id_dynamicMember } });
       auto subscripts = performMemberLookup(
           constraintKind, subscriptName, baseTy, functionRefKind, memberLocator,
           includeInaccessibleMembers);
@@ -6052,7 +6052,7 @@ static ConstraintFix *validateInitializerRef(ConstraintSystem &cs,
 
 static ConstraintFix *
 fixMemberRef(ConstraintSystem &cs, Type baseTy,
-             DeclName memberName, const OverloadChoice &choice,
+             DeclNameRef memberName, const OverloadChoice &choice,
              ConstraintLocator *locator,
              Optional<MemberLookupResult::UnviableReason> reason = None) {
   // Not all of the choices handled here are going
@@ -6120,7 +6120,7 @@ fixMemberRef(ConstraintSystem &cs, Type baseTy,
 }
 
 ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
-    ConstraintKind kind, Type baseTy, DeclName member, Type memberTy,
+    ConstraintKind kind, Type baseTy, DeclNameRef member, Type memberTy,
     DeclContext *useDC, FunctionRefKind functionRefKind,
     ArrayRef<OverloadChoice> outerAlternatives, TypeMatchOptions flags,
     ConstraintLocatorBuilder locatorB) {
@@ -6339,7 +6339,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
     }
 
     auto solveWithNewBaseOrName = [&](Type baseType,
-                                      DeclName memberName) -> SolutionKind {
+                                      DeclNameRef memberName) -> SolutionKind {
       return simplifyMemberConstraint(kind, baseType, memberName, memberTy,
                                       useDC, functionRefKind, outerAlternatives,
                                       flags | TMF_ApplyingFix, locatorB);
@@ -6382,7 +6382,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
     // Instead of using subscript operator spelled out `subscript` directly.
     if (member.getBaseName() == getTokenText(tok::kw_subscript)) {
       auto result =
-          solveWithNewBaseOrName(baseTy, DeclBaseName::createSubscript());
+          solveWithNewBaseOrName(baseTy, DeclNameRef::createSubscript());
       // Looks like it was indeed meant to be a subscript operator.
       if (result == SolutionKind::Solved)
         return recordFix(UseSubscriptOperator::create(*this, locator))
@@ -7474,7 +7474,8 @@ ConstraintSystem::simplifyApplicableFnConstraint(
     // Static member constraint requires `FunctionRefKind::DoubleApply`.
     // TODO: Use a custom locator element to identify this member constraint
     // instead of just pointing to the function expr.
-    addValueMemberConstraint(origLValueType2, DeclName(ctx.Id_callAsFunction),
+    addValueMemberConstraint(origLValueType2,
+                             DeclNameRef(ctx.Id_callAsFunction),
                              memberTy, DC, FunctionRefKind::SingleApply,
                              /*outerAlternatives*/ {}, locator);
     // Add new applicable function constraint based on the member type
@@ -7606,12 +7607,11 @@ lookupDynamicCallableMethods(Type type, ConstraintSystem &CS,
                              Identifier argumentName, bool hasKeywordArgs) {
   auto &ctx = CS.getASTContext();
   auto decl = type->getAnyNominal();
-  auto methodName = DeclName(ctx, ctx.Id_dynamicallyCall, { argumentName });
-  auto matches = CS.performMemberLookup(ConstraintKind::ValueMember,
-                                        methodName, type,
-                                        FunctionRefKind::SingleApply,
-                                        CS.getConstraintLocator(locator),
-                                        /*includeInaccessibleMembers*/ false);
+  DeclNameRef methodName({ ctx, ctx.Id_dynamicallyCall, { argumentName } });
+  auto matches = CS.performMemberLookup(
+      ConstraintKind::ValueMember, methodName, type,
+      FunctionRefKind::SingleApply, CS.getConstraintLocator(locator),
+      /*includeInaccessibleMembers*/ false);
   // Filter valid candidates.
   auto candidates = matches.ViableCandidates;
   auto filter = [&](OverloadChoice choice) {
@@ -7845,9 +7845,9 @@ ConstraintSystem::simplifyDynamicCallableApplicableFnConstraint(
     // TODO(diagnostics): This is not going to be necessary once
     // `@dynamicCallable` uses existing `member` machinery.
 
-    auto memberName = DeclName(
-        ctx, ctx.Id_dynamicallyCall,
-        {useKwargsMethod ? ctx.Id_withKeywordArguments : ctx.Id_withArguments});
+    auto argLabel = useKwargsMethod ? ctx.Id_withKeywordArguments
+                                    : ctx.Id_withArguments;
+    DeclNameRef memberName({ ctx, ctx.Id_dynamicallyCall, {argLabel} });
 
     auto *fix = DefineMemberBasedOnUse::create(
         *this, desugar2, memberName,

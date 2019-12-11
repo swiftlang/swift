@@ -895,7 +895,7 @@ private:
                                  const ParsedDeclName renamedParsedDeclName) {
     auto declContext = D->getDeclContext();
     ASTContext &astContext = D->getASTContext();
-    auto renamedDeclName = renamedParsedDeclName.formDeclName(astContext);
+    auto renamedDeclName = renamedParsedDeclName.formDeclNameRef(astContext);
 
     if (isa<ClassDecl>(D) || isa<ProtocolDecl>(D)) {
       if (!renamedParsedDeclName.ContextName.empty()) {
@@ -903,7 +903,7 @@ private:
       }
       SmallVector<ValueDecl *, 1> decls;
       declContext->lookupQualified(declContext->getParentModule(),
-                                   renamedDeclName.getBaseIdentifier(),
+                                   renamedDeclName.withoutArgumentLabels(),
                                    NL_OnlyTypes,
                                    decls);
       if (decls.size() == 1)

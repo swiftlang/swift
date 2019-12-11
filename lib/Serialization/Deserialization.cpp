@@ -1273,7 +1273,7 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
       baseModule->lookupMember(values, baseModule, name,
                                getIdentifier(privateDiscriminator));
     } else {
-      baseModule->lookupQualified(baseModule, name,
+      baseModule->lookupQualified(baseModule, DeclNameRef(name),
                                   NL_QualifiedDefault | NL_KnownNoDependency,
                                   values);
     }
@@ -4124,8 +4124,7 @@ llvm::Error DeclDeserializer::deserializeDeclAttributes() {
         assert(numArgs != 0);
         assert(!isImplicit && "Need to update for implicit");
         Attr = DynamicReplacementAttr::create(
-            ctx, DeclName(ctx, baseName, ArrayRef<Identifier>(pieces)), &MF,
-            replacedFunID);
+            ctx, DeclNameRef({ ctx, baseName, pieces }), &MF, replacedFunID);
         break;
       }
 

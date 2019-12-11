@@ -278,12 +278,13 @@ public:
 
 /// Collect function (or subscript) members with the given \p name on \p baseTy.
 static void collectPossibleCalleesByQualifiedLookup(
-    DeclContext &DC, Type baseTy, DeclBaseName name,
+    DeclContext &DC, Type baseTy, DeclNameRef name,
     SmallVectorImpl<FunctionTypeAndDecl> &candidates) {
   bool isOnMetaType = baseTy->is<AnyMetatypeType>();
 
   SmallVector<ValueDecl *, 2> decls;
-  if (!DC.lookupQualified(baseTy->getMetatypeInstanceType(), name,
+  if (!DC.lookupQualified(baseTy->getMetatypeInstanceType(),
+                          name.withoutArgumentLabels(),
                           NL_QualifiedDefault | NL_ProtocolMembers,
                           decls))
     return;
@@ -341,7 +342,7 @@ static void collectPossibleCalleesByQualifiedLookup(
 /// Collect function (or subscript) members with the given \p name on
 /// \p baseExpr expression.
 static void collectPossibleCalleesByQualifiedLookup(
-    DeclContext &DC, Expr *baseExpr, DeclBaseName name,
+    DeclContext &DC, Expr *baseExpr, DeclNameRef name,
     SmallVectorImpl<FunctionTypeAndDecl> &candidates) {
   ConcreteDeclRef ref = nullptr;
   auto baseTyOpt = getTypeOfCompletionContextExpr(
@@ -388,11 +389,12 @@ static bool collectPossibleCalleesForApply(
     }
   } else if (auto *UDE = dyn_cast<UnresolvedDotExpr>(fnExpr)) {
     collectPossibleCalleesByQualifiedLookup(
-        DC, UDE->getBase(), UDE->getName().getBaseName(), candidates);
+        DC, UDE->getBase(), UDE->getName(), candidates);
   } else if (auto *DSCE = dyn_cast<DotSyntaxCallExpr>(fnExpr)) {
     if (auto *DRE = dyn_cast<DeclRefExpr>(DSCE->getFn())) {
     collectPossibleCalleesByQualifiedLookup(
-        DC, DSCE->getArg(), DRE->getDecl()->getBaseName(), candidates);
+        DC, DSCE->getArg(), DeclNameRef(DRE->getDecl()->getFullName()),
+                                            candidates);
     }
   }
 
@@ -409,7 +411,7 @@ static bool collectPossibleCalleesForApply(
       auto baseTy = AMT->getInstanceType();
       if (baseTy->mayHaveMembers())
         collectPossibleCalleesByQualifiedLookup(
-            DC, AMT, DeclBaseName::createConstructor(), candidates);
+            DC, AMT, DeclNameRef::createConstructor(), candidates);
     }
   }
 
@@ -430,7 +432,7 @@ static bool collectPossibleCalleesForSubscript(
     }
   } else {
     collectPossibleCalleesByQualifiedLookup(DC, subscriptExpr->getBase(),
-                                            DeclBaseName::createSubscript(),
+                                            DeclNameRef::createSubscript(),
                                             candidates);
   }
   return !candidates.empty();
@@ -442,7 +444,6 @@ static bool collectPossibleCalleesForUnresolvedMember(
     DeclContext &DC, UnresolvedMemberExpr *unresolvedMemberExpr,
     SmallVectorImpl<FunctionTypeAndDecl> &candidates) {
   auto currModule = DC.getParentModule();
-  auto baseName = unresolvedMemberExpr->getName().getBaseName();
 
   // Get the context of the expression itself.
   ExprContextInfo contextInfo(&DC, unresolvedMemberExpr);
@@ -451,7 +452,8 @@ static bool collectPossibleCalleesForUnresolvedMember(
       continue;
     SmallVector<FunctionTypeAndDecl, 2> members;
     collectPossibleCalleesByQualifiedLookup(DC, MetatypeType::get(expectedTy),
-                                            baseName, members);
+                                            unresolvedMemberExpr->getName(),
+                                            members);
     for (auto member : members) {
       if (isReferenceableByImplicitMemberExpr(currModule, &DC, expectedTy,
                                               member.second))

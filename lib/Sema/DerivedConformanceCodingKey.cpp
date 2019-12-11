@@ -50,9 +50,8 @@ deriveRawValueReturn(AbstractFunctionDecl *funcDecl, void *) {
   auto &C = parentDC->getASTContext();
 
   auto *selfRef = DerivedConformance::createSelfDeclRef(funcDecl);
-  auto *memberRef = new (C) UnresolvedDotExpr(selfRef, SourceLoc(),
-                                              C.Id_rawValue, DeclNameLoc(),
-                                              /*Implicit=*/true);
+  auto *memberRef =
+      UnresolvedDotExpr::createImplicit(C, selfRef, C.Id_rawValue);
 
   auto *returnStmt = new (C) ReturnStmt(SourceLoc(), memberRef);
   auto *body = BraceStmt::create(C, SourceLoc(), ASTNode(returnStmt),
@@ -84,13 +83,10 @@ deriveRawValueInit(AbstractFunctionDecl *initDecl, void *) {
   rawValueDecl->setImplicit();
   auto *paramList = ParameterList::createWithoutLoc(rawValueDecl);
 
-  // init(rawValue:) constructor name
-  DeclName ctorName(C, DeclBaseName::createConstructor(), paramList);
-
   // self.init(rawValue:) expr
   auto *selfRef = DerivedConformance::createSelfDeclRef(initDecl);
-  auto *initExpr = new (C) UnresolvedDotExpr(selfRef, SourceLoc(), ctorName,
-                                             DeclNameLoc(), /*Implicit=*/true);
+  auto *initExpr = UnresolvedDotExpr::createImplicit(
+      C, selfRef, DeclBaseName::createConstructor(), paramList);
 
   // Bind the value param in self.init(rawValue: {string,int}Value).
   Expr *args[1] = {valueParamExpr};
@@ -217,8 +213,8 @@ deriveBodyCodingKey_enum_stringValue(AbstractFunctionDecl *strValDecl, void *) {
     SmallVector<ASTNode, 4> cases;
     for (auto *elt : elements) {
       auto *pat = new (C) EnumElementPattern(TypeLoc::withoutLoc(enumType),
-                                             SourceLoc(), SourceLoc(),
-                                             Identifier(), elt, nullptr);
+                                             SourceLoc(), DeclNameLoc(),
+                                             DeclNameRef(), elt, nullptr);
       pat->setImplicit();
 
       auto labelItem = CaseLabelItem(pat);

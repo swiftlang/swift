@@ -239,12 +239,13 @@ private:
   /// unviable ones.
   void diagnoseUnviableLookupResults(MemberLookupResult &lookupResults,
                                      Expr *expr, Type baseObjTy, Expr *baseExpr,
-                                     DeclName memberName, DeclNameLoc nameLoc,
-                                     SourceLoc loc);
+                                     DeclNameRef memberName,
+                                     DeclNameLoc nameLoc, SourceLoc loc);
 
   bool diagnoseMemberFailures(
-      Expr *E, Expr *baseEpxr, ConstraintKind lookupKind, DeclName memberName,
-      FunctionRefKind funcRefKind, ConstraintLocator *locator,
+      Expr *E, Expr *baseEpxr, ConstraintKind lookupKind,
+      DeclNameRef memberName, FunctionRefKind funcRefKind,
+      ConstraintLocator *locator,
       Optional<std::function<bool(ArrayRef<OverloadChoice>)>> callback = None,
       bool includeInaccessibleMembers = true);
 
@@ -274,7 +275,7 @@ private:
 /// unviable ones.
 void FailureDiagnosis::diagnoseUnviableLookupResults(
     MemberLookupResult &result, Expr *E, Type baseObjTy, Expr *baseExpr,
-    DeclName memberName, DeclNameLoc nameLoc, SourceLoc loc) {
+    DeclNameRef memberName, DeclNameLoc nameLoc, SourceLoc loc) {
   SourceRange baseRange = baseExpr ? baseExpr->getSourceRange() : SourceRange();
 
   // If we found no results at all, mention that fact.
@@ -1626,7 +1627,7 @@ bool FailureDiagnosis::diagnoseSubscriptErrors(SubscriptExpr *SE,
       CS.getConstraintLocator(SE, ConstraintLocator::SubscriptMember);
 
   return diagnoseMemberFailures(SE, baseExpr, ConstraintKind::ValueMember,
-                                DeclBaseName::createSubscript(),
+                                DeclNameRef::createSubscript(),
                                 FunctionRefKind::DoubleApply, locator,
                                 callback);
 }
@@ -2671,7 +2672,7 @@ bool FailureDiagnosis::visitUnresolvedMemberExpr(UnresolvedMemberExpr *E) {
 }
 
 bool FailureDiagnosis::diagnoseMemberFailures(
-    Expr *E, Expr *baseExpr, ConstraintKind lookupKind, DeclName memberName,
+    Expr *E, Expr *baseExpr, ConstraintKind lookupKind, DeclNameRef memberName,
     FunctionRefKind funcRefKind, ConstraintLocator *locator,
     Optional<std::function<bool(ArrayRef<OverloadChoice>)>> callback,
     bool includeInaccessibleMembers) {

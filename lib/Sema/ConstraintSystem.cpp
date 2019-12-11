@@ -232,7 +232,7 @@ getDynamicResultSignature(ValueDecl *decl) {
   llvm_unreachable("Not a valid @objc member");
 }
 
-LookupResult &ConstraintSystem::lookupMember(Type base, DeclName name) {
+LookupResult &ConstraintSystem::lookupMember(Type base, DeclNameRef name) {
   // Check whether we've already performed this lookup.
   auto &result = MemberLookups[{base, name}];
   if (result) return *result;
@@ -2083,8 +2083,10 @@ void ConstraintSystem::bindOverloadType(
     // Attempt to lookup a member with a give name in the root type and
     // assign result to the leaf type of the keypath.
     bool isSubscriptRef = locator->isSubscriptMemberRef();
-    DeclName memberName =
-        isSubscriptRef ? DeclBaseName::createSubscript() : choice.getName();
+    DeclNameRef memberName = isSubscriptRef
+                           ? DeclNameRef::createSubscript()
+                           // FIXME: Should propagate name-as-written through.
+                           : DeclNameRef(choice.getName());
 
     addValueMemberConstraint(LValueType::get(rootTy), memberName, memberTy,
                              useDC,
@@ -2983,7 +2985,9 @@ bool ConstraintSystem::diagnoseAmbiguity(ArrayRef<Solution> solutions) {
   // depth-first numbering of expressions.
   if (bestOverload) {
     auto &overload = diff.overloads[*bestOverload];
-    auto name = getOverloadChoiceName(overload.choices);
+    // FIXME: We would prefer to emit the name as written, but that information
+    // is not sufficiently centralized in the AST.
+    DeclNameRef name(getOverloadChoiceName(overload.choices));
     auto anchor = simplifyLocatorToAnchor(overload.locator);
 
     // Emit the ambiguity diagnostic.

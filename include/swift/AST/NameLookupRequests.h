@@ -27,6 +27,7 @@ namespace swift {
 class ClassDecl;
 class DeclContext;
 class DeclName;
+class DeclNameRef;
 class DestructorDecl;
 class GenericContext;
 class GenericParamList;
@@ -316,15 +317,15 @@ class UnqualifiedLookupDescriptor {
   using LookupOptions = OptionSet<UnqualifiedLookupFlags>;
 
 public:
-  DeclName Name;
+  DeclNameRef Name;
   DeclContext *DC;
   SourceLoc Loc;
   LookupOptions Options;
 
-  UnqualifiedLookupDescriptor(DeclName name, DeclContext *dc,
+  UnqualifiedLookupDescriptor(DeclNameRef name, DeclContext *dc,
                               SourceLoc loc = SourceLoc(),
                               LookupOptions options = {})
-      : Name(name), DC(dc), Loc(loc), Options(options) {}
+      : Name(name), DC(dc), Loc(loc), Options(options) { }
 
   friend llvm::hash_code hash_value(const UnqualifiedLookupDescriptor &desc) {
     return llvm::hash_combine(desc.Name, desc.DC, desc.Loc,
@@ -389,8 +390,8 @@ private:
 /// Perform \c AnyObject lookup for a given member.
 class AnyObjectLookupRequest
     : public SimpleRequest<AnyObjectLookupRequest,
-                           QualifiedLookupResult(const DeclContext *, DeclName,
-                                                 NLOptions),
+                           QualifiedLookupResult(const DeclContext *,
+                                                 DeclNameRef, NLOptions),
                            CacheKind::Uncached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -400,7 +401,7 @@ private:
 
   llvm::Expected<QualifiedLookupResult> evaluate(Evaluator &evaluator,
                                                  const DeclContext *dc,
-                                                 DeclName name,
+                                                 DeclNameRef name,
                                                  NLOptions options) const;
 };
 

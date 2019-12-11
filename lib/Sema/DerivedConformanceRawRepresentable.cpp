@@ -91,10 +91,8 @@ deriveBodyRawRepresentable_raw(AbstractFunctionDecl *toRawDecl, void *) {
     // a bitcast.
 
     // return unsafeBitCast(self, to: RawType.self)
-    DeclName name(C, C.getIdentifier("unsafeBitCast"), {Identifier(), C.Id_to});
-    auto functionRef = new (C) UnresolvedDeclRefExpr(name,
-                                                     DeclRefKind::Ordinary,
-                                                     DeclNameLoc());
+    auto functionRef = UnresolvedDeclRefExpr::createImplicit(
+        C, C.getIdentifier("unsafeBitCast"), {Identifier(), C.Id_to});
     auto selfRef = DerivedConformance::createSelfDeclRef(toRawDecl);
     auto bareTypeExpr = TypeExpr::createImplicit(rawTy, C);
     auto typeExpr = new (C) DotSelfExpr(bareTypeExpr, SourceLoc(), SourceLoc());
@@ -111,8 +109,8 @@ deriveBodyRawRepresentable_raw(AbstractFunctionDecl *toRawDecl, void *) {
   SmallVector<ASTNode, 4> cases;
   for (auto elt : enumDecl->getAllElements()) {
     auto pat = new (C) EnumElementPattern(TypeLoc::withoutLoc(enumType),
-                                          SourceLoc(), SourceLoc(),
-                                          Identifier(), elt, nullptr);
+                                          SourceLoc(), DeclNameLoc(),
+                                          DeclNameRef(), elt, nullptr);
     pat->setImplicit();
 
     auto labelItem = CaseLabelItem(pat);
@@ -374,9 +372,8 @@ deriveBodyRawRepresentable_init(AbstractFunctionDecl *initDecl, void *) {
   Expr *switchArg = rawRef;
   if (isStringEnum) {
     // Call _findStringSwitchCase with an array of strings as argument.
-    auto *Fun = new (C) UnresolvedDeclRefExpr(
-                  C.getIdentifier("_findStringSwitchCase"),
-                  DeclRefKind::Ordinary, DeclNameLoc());
+    auto *Fun = UnresolvedDeclRefExpr::createImplicit(
+        C, C.getIdentifier("_findStringSwitchCase"));
     auto *strArray = ArrayExpr::create(C, SourceLoc(), stringExprs, {},
                                        SourceLoc());;
     Identifier tableId = C.getIdentifier("cases");
