@@ -5767,7 +5767,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
       memberName.getBaseName() == DeclBaseName::createConstructor() &&
       !isImplicitInit) {
     auto &compatLookup = lookupMember(instanceTy,
-                                      DeclNameRef_(ctx.getIdentifier("init")));
+                                      DeclNameRef(ctx.getIdentifier("init")));
     for (auto result : compatLookup)
       addChoice(getOverloadChoice(result.getValueDecl(),
                                   /*isBridged=*/false,
@@ -5837,11 +5837,11 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
       auto &ctx = getASTContext();
 
       // Recursively look up `subscript(dynamicMember:)` methods in this type.
-      auto subscriptName =
-          DeclName(ctx, DeclBaseName::createSubscript(), ctx.Id_dynamicMember);
+      DeclNameRef subscriptName(
+          { ctx, DeclBaseName::createSubscript(), { ctx.Id_dynamicMember } });
       auto subscripts = performMemberLookup(
-          constraintKind, DeclNameRef_(subscriptName), baseTy, functionRefKind,
-          memberLocator, includeInaccessibleMembers);
+          constraintKind, subscriptName, baseTy, functionRefKind, memberLocator,
+          includeInaccessibleMembers);
 
       // Reflect the candidates found as `DynamicMemberLookup` results.
       auto name = memberName.getBaseIdentifier();
@@ -7475,7 +7475,7 @@ ConstraintSystem::simplifyApplicableFnConstraint(
     // TODO: Use a custom locator element to identify this member constraint
     // instead of just pointing to the function expr.
     addValueMemberConstraint(origLValueType2,
-                             DeclNameRef_(ctx.Id_callAsFunction),
+                             DeclNameRef(ctx.Id_callAsFunction),
                              memberTy, DC, FunctionRefKind::SingleApply,
                              /*outerAlternatives*/ {}, locator);
     // Add new applicable function constraint based on the member type
@@ -7607,12 +7607,11 @@ lookupDynamicCallableMethods(Type type, ConstraintSystem &CS,
                              Identifier argumentName, bool hasKeywordArgs) {
   auto &ctx = CS.getASTContext();
   auto decl = type->getAnyNominal();
-  auto methodName = DeclName(ctx, ctx.Id_dynamicallyCall, { argumentName });
-  auto matches = CS.performMemberLookup(ConstraintKind::ValueMember,
-                                        DeclNameRef_(methodName), type,
-                                        FunctionRefKind::SingleApply,
-                                        CS.getConstraintLocator(locator),
-                                        /*includeInaccessibleMembers*/ false);
+  DeclNameRef methodName({ ctx, ctx.Id_dynamicallyCall, { argumentName } });
+  auto matches = CS.performMemberLookup(
+      ConstraintKind::ValueMember, methodName, type,
+      FunctionRefKind::SingleApply, CS.getConstraintLocator(locator),
+      /*includeInaccessibleMembers*/ false);
   // Filter valid candidates.
   auto candidates = matches.ViableCandidates;
   auto filter = [&](OverloadChoice choice) {

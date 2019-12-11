@@ -1503,7 +1503,7 @@ public:
   static UnresolvedDeclRefExpr *createImplicit(
       ASTContext &C, DeclName name,
       DeclRefKind refKind = DeclRefKind::Ordinary) {
-    return new (C) UnresolvedDeclRefExpr(DeclNameRef_(name), refKind,
+    return new (C) UnresolvedDeclRefExpr(DeclNameRef(name), refKind,
                                          DeclNameLoc());
   }
 
@@ -2430,7 +2430,7 @@ public:
   static UnresolvedDotExpr *createImplicit(
       ASTContext &C, Expr *base, DeclName name) {
     return new (C) UnresolvedDotExpr(base, SourceLoc(),
-                                     DeclNameRef_(name), DeclNameLoc(),
+                                     DeclNameRef(name), DeclNameLoc(),
                                      /*implicit=*/true);
   }
 

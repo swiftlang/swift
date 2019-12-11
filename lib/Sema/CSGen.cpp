@@ -2043,7 +2043,7 @@ namespace {
 
     Type visitTupleElementExpr(TupleElementExpr *expr) {
       ASTContext &context = CS.getASTContext();
-      auto name = DeclNameRef_(
+      DeclNameRef name(
           context.getIdentifier(llvm::utostr(expr->getFieldNumber())));
       return addMemberRefConstraints(expr, expr->getBase(), name,
                                      FunctionRefKind::Unapplied,
@@ -3874,7 +3874,7 @@ swift::resolveValueMember(DeclContext &DC, Type BaseTy, DeclName Name) {
 
   // Look up all members of BaseTy with the given Name.
   MemberLookupResult LookupResult = CS.performMemberLookup(
-    ConstraintKind::ValueMember, DeclNameRef_(Name), BaseTy,
+    ConstraintKind::ValueMember, DeclNameRef(Name), BaseTy,
     FunctionRefKind::SingleApply, nullptr, false);
 
   // Keep track of all the unviable members.

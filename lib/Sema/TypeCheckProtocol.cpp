@@ -4800,8 +4800,7 @@ diagnoseMissingAppendInterpolationMethod(NominalTypeDecl *typeDecl) {
     static bool hasValidMethod(NominalTypeDecl *typeDecl,
                                SmallVectorImpl<InvalidMethod> &invalid) {
       auto type = typeDecl->getDeclaredType();
-      auto baseName =
-          DeclNameRef_(typeDecl->getASTContext().Id_appendInterpolation);
+      DeclNameRef baseName(typeDecl->getASTContext().Id_appendInterpolation);
       auto lookupOptions = defaultMemberTypeLookupOptions;
       lookupOptions -= NameLookupFlags::PerformConformanceCheck;
 
@@ -5569,7 +5568,7 @@ void TypeChecker::inferDefaultWitnesses(ProtocolDecl *proto) {
     if (assocType->getProtocol() != proto) {
       SmallVector<ValueDecl *, 2> found;
       proto->getModuleContext()->lookupQualified(
-                           proto, DeclNameRef_(assocType->getFullName()),
+                           proto, DeclNameRef(assocType->getFullName()),
                            NL_QualifiedDefault|NL_ProtocolMembers|NL_OnlyTypes,
                            found);
       if (found.size() == 1 && isa<AssociatedTypeDecl>(found[0]))

@@ -46,8 +46,8 @@ private:
 public:
   Instrumenter(ASTContext &C, DeclContext *DC, unsigned &TmpNameIndex)
       : InstrumenterBase(C, DC), TmpNameIndex(TmpNameIndex),
-        LogBeforeName(DeclNameRef_(C.getIdentifier("__builtin_pc_before"))),
-        LogAfterName(DeclNameRef_(C.getIdentifier("__builtin_pc_after"))) {}
+        LogBeforeName(C.getIdentifier("__builtin_pc_before")),
+        LogAfterName(C.getIdentifier("__builtin_pc_after")) {}
 
   Stmt *transformStmt(Stmt *S) {
     switch (S->getKind()) {

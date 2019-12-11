@@ -414,7 +414,7 @@ const ValueDecl *findDefaultProvidedDeclWithDocComment(const ValueDecl *VD) {
 
   SmallVector<ValueDecl *, 2> members;
   protocol->lookupQualified(const_cast<ProtocolDecl *>(protocol),
-                            DeclNameRef_(VD->getFullName()),
+                            DeclNameRef(VD->getFullName()),
                             NLOptions::NL_ProtocolMembers,
                             members);
 

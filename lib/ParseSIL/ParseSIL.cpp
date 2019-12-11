@@ -1187,7 +1187,7 @@ lookupTopDecl(Parser &P, DeclBaseName Name, bool typeLookup) {
     options |= UnqualifiedLookupFlags::TypeLookup;
 
   auto &ctx = P.SF.getASTContext();
-  auto descriptor = UnqualifiedLookupDescriptor(DeclNameRef_(Name), &P.SF);
+  auto descriptor = UnqualifiedLookupDescriptor(DeclNameRef(Name), &P.SF);
   auto lookup = evaluateOrDefault(ctx.evaluator,
                                   UnqualifiedLookupRequest{descriptor}, {});
   assert(lookup.size() == 1);

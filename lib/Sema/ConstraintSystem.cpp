@@ -2051,7 +2051,7 @@ std::pair<Type, bool> ConstraintSystem::adjustTypeOfOverloadReference(
     DeclNameRef memberName = isSubscriptRef
                            ? DeclNameRef::createSubscript()
                            // FIXME: Should propagate name-as-written through.
-                           : DeclNameRef_(choice.getName());
+                           : DeclNameRef(choice.getName());
 
     auto *memberRef = Constraint::createMember(
         *this, ConstraintKind::ValueMember, LValueType::get(rootTy), memberTy,
@@ -2962,7 +2962,7 @@ bool ConstraintSystem::diagnoseAmbiguity(ArrayRef<Solution> solutions) {
     auto &overload = diff.overloads[*bestOverload];
     // FIXME: We would prefer to emit the name as written, but that information
     // is not sufficiently centralized in the AST.
-    auto name = DeclNameRef_(getOverloadChoiceName(overload.choices));
+    DeclNameRef name(getOverloadChoiceName(overload.choices));
     auto anchor = simplifyLocatorToAnchor(overload.locator);
 
     // Emit the ambiguity diagnostic.

@@ -83,7 +83,7 @@ DeclNameRef ComponentIdentTypeRepr::getNameRef() const {
   if (IdOrDecl.is<DeclNameRef>())
     return IdOrDecl.get<DeclNameRef>();
 
-  return DeclNameRef_(IdOrDecl.get<TypeDecl *>()->getFullName());
+  return IdOrDecl.get<TypeDecl *>()->createNameRef();
 }
 
 static void printTypeRepr(const TypeRepr *TyR, ASTPrinter &Printer,

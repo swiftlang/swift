@@ -369,7 +369,7 @@ static GuardStmt *returnIfNotEqualGuard(ASTContext &C,
   // Next, generate the condition being checked.
   // lhs == rhs
   auto cmpFuncExpr = new (C) UnresolvedDeclRefExpr(
-    DeclNameRef_(C.Id_EqualsOperator), DeclRefKind::BinaryOperator,
+    DeclNameRef(C.Id_EqualsOperator), DeclRefKind::BinaryOperator,
     DeclNameLoc());
   auto cmpArgsTuple = TupleExpr::create(C, SourceLoc(),
                                         { lhsExpr, rhsExpr },
@@ -1034,7 +1034,7 @@ deriveBodyHashable_enum_hasAssociatedValues_hashInto(
                                                        payloadVars);
     auto pat = new (C) EnumElementPattern(TypeLoc::withoutLoc(enumType),
                                           SourceLoc(), DeclNameLoc(),
-                                          DeclNameRef_(elt->getName()), elt,
+                                          DeclNameRef(elt->getName()), elt,
                                           payloadPattern);
     pat->setImplicit();
 

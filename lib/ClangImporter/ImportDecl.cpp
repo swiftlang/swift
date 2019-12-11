@@ -5017,7 +5017,7 @@ namespace {
 
         if (lookupContext) {
           SmallVector<ValueDecl *, 2> lookup;
-          dc->lookupQualified(lookupContext, DeclNameRef_(name),
+          dc->lookupQualified(lookupContext, DeclNameRef(name),
                               NL_QualifiedDefault | NL_KnownNoDependency,
                               lookup);
           bool foundMethod = false;
@@ -6396,7 +6396,7 @@ void SwiftDeclConverter::recordObjCOverride(AbstractFunctionDecl *decl) {
     return;
   // Dig out the Objective-C superclass.
   SmallVector<ValueDecl *, 4> results;
-  superDecl->lookupQualified(superDecl, DeclNameRef_(decl->getFullName()),
+  superDecl->lookupQualified(superDecl, DeclNameRef(decl->getFullName()),
                              NL_QualifiedDefault | NL_KnownNoDependency,
                              results);
   for (auto member : results) {
@@ -6469,7 +6469,7 @@ void SwiftDeclConverter::recordObjCOverride(SubscriptDecl *subscript) {
   // operation.
   SmallVector<ValueDecl *, 2> lookup;
   subscript->getModuleContext()->lookupQualified(
-      superDecl, DeclNameRef_(subscript->getFullName()),
+      superDecl, DeclNameRef(subscript->getFullName()),
       NL_QualifiedDefault | NL_KnownNoDependency, lookup);
 
   for (auto result : lookup) {
@@ -7752,7 +7752,7 @@ static void finishTypeWitnesses(
                           NL_OnlyTypes |
                           NL_ProtocolMembers);
 
-    dc->lookupQualified(nominal, DeclNameRef_(assocType->getFullName()), options,
+    dc->lookupQualified(nominal, DeclNameRef(assocType->getFullName()), options,
                         lookupResults);
     for (auto member : lookupResults) {
       auto typeDecl = cast<TypeDecl>(member);

@@ -2260,7 +2260,7 @@ static int doPrintDecls(const CompilerInvocation &InitInvok,
   for (const auto &name : DeclsToPrint) {
     ASTContext &ctx = CI.getASTContext();
     auto descriptor =
-        UnqualifiedLookupDescriptor(DeclNameRef_(ctx.getIdentifier(name)),
+        UnqualifiedLookupDescriptor(DeclNameRef(ctx.getIdentifier(name)),
                                     CI.getPrimarySourceFile());
     auto lookup = evaluateOrDefault(ctx.evaluator,
                                     UnqualifiedLookupRequest{descriptor}, {});

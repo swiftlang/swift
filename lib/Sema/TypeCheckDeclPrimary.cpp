@@ -964,8 +964,8 @@ static void diagnoseClassWithoutInitializers(ClassDecl *classDecl) {
       // We're going to diagnose on the concrete init(from:) decl if it exists
       // and isn't implicit; otherwise, on the subclass itself.
       ValueDecl *diagDest = classDecl;
-      auto initFrom = DeclNameRef_(
-          DeclName(C, DeclBaseName::createConstructor(), C.Id_from));
+      DeclNameRef initFrom(
+          { C, DeclBaseName::createConstructor(), { C.Id_from } });
       auto result =
           TypeChecker::lookupMember(superclassDecl, superclassType, initFrom,
                                     NameLookupFlags::ProtocolMembers |

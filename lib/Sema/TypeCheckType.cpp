@@ -1089,7 +1089,7 @@ static Type diagnoseUnknownType(TypeResolution resolution,
         auto type = resolution.mapTypeIntoContext(
           dc->getInnermostTypeContext()->getSelfInterfaceType());
 
-        comp->overwriteNameRef(DeclNameRef_(nominal->getName()));
+        comp->overwriteNameRef(DeclNameRef(nominal->getName()));
         comp->setValue(nominal, nominalDC->getParent());
         return type;
       }
@@ -1140,7 +1140,7 @@ static Type diagnoseUnknownType(TypeResolution resolution,
         .fixItReplace(R, RemappedTy);
 
       // Replace the computed type with the suggested type.
-      comp->overwriteNameRef(DeclNameRef_(ctx.getIdentifier(RemappedTy)));
+      comp->overwriteNameRef(DeclNameRef(ctx.getIdentifier(RemappedTy)));
 
       // HACK: 'NSUInteger' suggests both 'UInt' and 'Int'.
       if (TypeName == ctx.getSwiftName(KnownFoundationEntity::NSUInteger)) {
@@ -1647,7 +1647,7 @@ Type TypeChecker::resolveIdentifierType(
     if (!options.contains(TypeResolutionFlags::SilenceErrors)) {
       auto moduleName = moduleTy->getModule()->getName();
       diags.diagnose(Components.back()->getNameLoc(),
-                     diag::use_undeclared_type, DeclNameRef_(moduleName));
+                     diag::use_undeclared_type, DeclNameRef(moduleName));
       diags.diagnose(Components.back()->getNameLoc(),
                      diag::note_module_as_type, moduleName);
     }

@@ -2462,7 +2462,7 @@ public:
   /// Generates a DeclNameRef referring to this declaration with as much
   /// specificity as possible.
   DeclNameRef createNameRef() const {
-    return DeclNameRef_(getFullName());
+    return DeclNameRef(getFullName());
   }
 
   /// Retrieve the name to use for this declaration when interoperating

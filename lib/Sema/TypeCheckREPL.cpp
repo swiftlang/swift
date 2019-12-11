@@ -75,7 +75,7 @@ struct REPLContext {
 
     auto *stdlib = TypeChecker::getStdlibModule(&SF);
     {
-      auto Id = DeclNameRef_(Context.getIdentifier("_replPrintLiteralString"));
+      DeclNameRef Id(Context.getIdentifier("_replPrintLiteralString"));
       auto lookup = TypeChecker::lookupUnqualified(stdlib, Id, SourceLoc());
       if (!lookup)
         return true;
@@ -83,7 +83,7 @@ struct REPLContext {
         PrintDecls.push_back(result.getValueDecl());
     }
     {
-      auto Id = DeclNameRef_(Context.getIdentifier("_replDebugPrintln"));
+      DeclNameRef Id(Context.getIdentifier("_replDebugPrintln"));
       auto lookup = TypeChecker::lookupUnqualified(stdlib, Id, SourceLoc());
       if (!lookup)
         return true;
@@ -451,7 +451,7 @@ Identifier REPLChecker::getNextResponseVariableName(DeclContext *DC) {
     names << "r" << NextResponseVariableIndex++;
 
     ident = Context.getIdentifier(names.str());
-    nameUsed = (bool)TypeChecker::lookupUnqualified(DC, DeclNameRef_(ident),
+    nameUsed = (bool)TypeChecker::lookupUnqualified(DC, DeclNameRef(ident),
                                                     SourceLoc());
   } while (nameUsed);
 

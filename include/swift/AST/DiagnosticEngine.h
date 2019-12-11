@@ -138,15 +138,15 @@ namespace swift {
 
     DiagnosticArgument(DeclName D)
         : Kind(DiagnosticArgumentKind::Identifier),
-          IdentifierVal(DeclNameRef_(D)) {}
+          IdentifierVal(DeclNameRef(D)) {}
 
     DiagnosticArgument(DeclBaseName D)
         : Kind(DiagnosticArgumentKind::Identifier),
-          IdentifierVal(DeclNameRef_(D)) {}
+          IdentifierVal(DeclNameRef(D)) {}
 
     DiagnosticArgument(Identifier I)
       : Kind(DiagnosticArgumentKind::Identifier),
-        IdentifierVal(DeclNameRef_(I)) {
+        IdentifierVal(DeclNameRef(I)) {
     }
 
     DiagnosticArgument(ObjCSelector S)

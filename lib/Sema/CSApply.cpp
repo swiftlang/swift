@@ -2440,7 +2440,7 @@ namespace {
                                    ->getNominalOrBoundGenericNominal();
           auto results = TypeChecker::lookupMember(
               baseTyNominalDecl->getModuleContext(), baseTyUnwrapped,
-              DeclNameRef_(memberName), defaultMemberLookupOptions);
+              DeclNameRef(memberName), defaultMemberLookupOptions);
 
           // Filter out any functions, instance members, enum cases with
           // associated values or variables whose type does not match the

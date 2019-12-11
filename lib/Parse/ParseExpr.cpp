@@ -806,11 +806,10 @@ UnresolvedDeclRefExpr *Parser::parseExprOperator() {
   assert(Tok.isAnyOperator());
   DeclRefKind refKind = getDeclRefKindForOperator(Tok.getKind());
   SourceLoc loc = Tok.getLoc();
-  Identifier name = Context.getIdentifier(Tok.getText());
+  DeclNameRef name(Context.getIdentifier(Tok.getText()));
   consumeToken();
   // Bypass local lookup.
-  return new (Context) UnresolvedDeclRefExpr(DeclNameRef_(name), refKind,
-                                             DeclNameLoc(loc));
+  return new (Context) UnresolvedDeclRefExpr(name, refKind, DeclNameLoc(loc));
 }
 
 static VarDecl *getImplicitSelfDeclForSuperContext(Parser &P,
@@ -824,7 +823,7 @@ static VarDecl *getImplicitSelfDeclForSuperContext(Parser &P,
 
   // Do an actual lookup for 'self' in case it shows up in a capture list.
   auto *methodSelf = methodContext->getImplicitSelfDecl();
-  auto *lookupSelf = P.lookupInScope(DeclNameRef_(P.Context.Id_self));
+  auto *lookupSelf = P.lookupInScope(DeclNameRef(P.Context.Id_self));
   if (lookupSelf && lookupSelf != methodSelf) {
     // FIXME: This is the wrong diagnostic for if someone manually declares a
     // variable named 'self' using backticks.
@@ -1074,7 +1073,7 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
 
       // Handle "x.42" - a tuple index.
       if (Tok.is(tok::integer_literal)) {
-        auto name = DeclNameRef_(Context.getIdentifier(Tok.getText()));
+        DeclNameRef name(Context.getIdentifier(Tok.getText()));
         SourceLoc nameLoc = consumeToken(tok::integer_literal);
         SyntaxContext->createNodeInPlace(SyntaxKind::MemberAccessExpr);
 
@@ -1753,9 +1752,9 @@ parseStringSegments(SmallVectorImpl<Lexer::StringSegment> &Segments,
   ParsedTrivia EmptyTrivia;
   bool First = true;
 
-  auto appendLiteral = DeclNameRef_(DeclName(Context, Context.Id_appendLiteral,
-                                             { Identifier() }));
-  auto appendInterpolation = DeclNameRef_(Context.Id_appendInterpolation);
+  DeclNameRef appendLiteral(
+      { Context, Context.Id_appendLiteral, { Identifier() } });
+  DeclNameRef appendInterpolation(Context.Id_appendInterpolation);
 
   for (auto Segment : Segments) {
     auto InterpolationVarRef =
@@ -2117,7 +2116,7 @@ DeclNameRef Parser::parseUnqualifiedDeclBaseName(
   }
 
   loc = DeclNameLoc(baseNameLoc);
-  return DeclNameRef_(baseName);
+  return DeclNameRef(baseName);
 }
 
 
@@ -2897,7 +2896,7 @@ Expr *Parser::parseExprAnonClosureArg() {
     if (Context.LangOpts.DebuggerSupport) {
       auto refKind = DeclRefKind::Ordinary;
       auto identifier = Context.getIdentifier(Name);
-      return new (Context) UnresolvedDeclRefExpr(DeclNameRef_(identifier),
+      return new (Context) UnresolvedDeclRefExpr(DeclNameRef(identifier),
                                                  refKind, DeclNameLoc(Loc));
     }
     diagnose(Loc, diag::anon_closure_arg_not_in_closure);

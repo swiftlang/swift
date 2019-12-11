@@ -533,7 +533,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
 
       DeclContext *topLevelContext = DC->getModuleScopeContext();
       auto descriptor = UnqualifiedLookupDescriptor(
-          DeclNameRef_(VD->getBaseName()), topLevelContext, SourceLoc(),
+          DeclNameRef(VD->getBaseName()), topLevelContext, SourceLoc(),
           UnqualifiedLookupFlags::KnownPrivate);
       auto lookup = evaluateOrDefault(Ctx.evaluator,
                                       UnqualifiedLookupRequest{descriptor}, {});
@@ -3177,7 +3177,7 @@ class ObjCSelectorWalker : public ASTWalker {
     auto nominal = method->getDeclContext()->getSelfNominalTypeDecl();
     auto result = TypeChecker::lookupMember(
         const_cast<DeclContext *>(DC), nominal->getDeclaredInterfaceType(),
-        DeclNameRef_(lookupName),
+        DeclNameRef(lookupName),
         (defaultMemberLookupOptions | NameLookupFlags::KnownPrivate));
 
     // If we didn't find multiple methods, there is no ambiguity.

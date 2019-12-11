@@ -1371,7 +1371,6 @@ DeclName swift::formDeclName(ASTContext &ctx,
 
 DeclNameRef swift::formDeclNameRef(ASTContext &ctx,
                                    StringRef baseName,
-
                                    ArrayRef<StringRef> argumentLabels,
                                    bool isFunctionName,
                                    bool isInitializer) {
@@ -1387,7 +1386,7 @@ DeclNameRef swift::formDeclNameRef(ASTContext &ctx,
                              : ctx.getIdentifier(baseName));
 
   // For non-functions, just use the base name.
-  if (!isFunctionName) return DeclNameRef_(baseNameId);
+  if (!isFunctionName) return DeclNameRef(baseNameId);
 
   // For functions, we need to form a complete name.
 
@@ -1403,7 +1402,7 @@ DeclNameRef swift::formDeclNameRef(ASTContext &ctx,
   }
 
   // Build the result.
-  return DeclNameRef_(DeclName(ctx, baseNameId, argumentLabelIds));
+  return DeclNameRef({ ctx, baseNameId, argumentLabelIds });
 }
 
 DeclName swift::parseDeclName(ASTContext &ctx, StringRef name) {

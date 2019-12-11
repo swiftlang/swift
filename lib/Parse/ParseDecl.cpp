@@ -4045,7 +4045,7 @@ ParserStatus Parser::parseInheritance(SmallVectorImpl<TypeLoc> &Inherited,
 
       // Add 'AnyObject' to the inherited list.
       Inherited.push_back(
-        new (Context) SimpleIdentTypeRepr(DeclNameLoc(classLoc), DeclNameRef_(
+        new (Context) SimpleIdentTypeRepr(DeclNameLoc(classLoc), DeclNameRef(
                                           Context.getIdentifier("AnyObject"))));
       continue;
     }

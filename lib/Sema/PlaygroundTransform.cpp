@@ -126,13 +126,13 @@ public:
                unsigned &TmpNameIndex)
       : InstrumenterBase(C, DC), RNG(RNG), TmpNameIndex(TmpNameIndex),
         HighPerformance(HP),
-        DebugPrintName(DeclNameRef_(C.getIdentifier("__builtin_debugPrint"))),
-        PrintName(DeclNameRef_(C.getIdentifier("__builtin_print"))),
-        PostPrintName(DeclNameRef_(C.getIdentifier("__builtin_postPrint"))),
-        LogWithIDName(DeclNameRef_(C.getIdentifier("__builtin_log_with_id"))),
-        LogScopeExitName(DeclNameRef_(C.getIdentifier("__builtin_log_scope_exit"))),
-        LogScopeEntryName(DeclNameRef_(C.getIdentifier("__builtin_log_scope_entry"))),
-        SendDataName(DeclNameRef_(C.getIdentifier("__builtin_send_data"))) { }
+        DebugPrintName(C.getIdentifier("__builtin_debugPrint")),
+        PrintName(C.getIdentifier("__builtin_print")),
+        PostPrintName(C.getIdentifier("__builtin_postPrint")),
+        LogWithIDName(C.getIdentifier("__builtin_log_with_id")),
+        LogScopeExitName(C.getIdentifier("__builtin_log_scope_exit")),
+        LogScopeEntryName(C.getIdentifier("__builtin_log_scope_entry")),
+        SendDataName(C.getIdentifier("__builtin_send_data")) { }
 
   Stmt *transformStmt(Stmt *S) {
     switch (S->getKind()) {

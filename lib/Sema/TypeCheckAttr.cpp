@@ -1127,8 +1127,7 @@ static bool hasValidDynamicCallableMethod(NominalTypeDecl *decl,
                                           bool hasKeywordArgs) {
   auto &ctx = decl->getASTContext();
   auto declType = decl->getDeclaredType();
-  auto methodName = DeclNameRef_(DeclName(ctx, ctx.Id_dynamicallyCall,
-                                          { argumentName }));
+  DeclNameRef methodName({ ctx, ctx.Id_dynamicallyCall, { argumentName } });
   auto candidates = TypeChecker::lookupMember(decl, declType, methodName);
   if (candidates.empty()) return false;
 
@@ -1252,8 +1251,8 @@ visitDynamicMemberLookupAttr(DynamicMemberLookupAttr *attr) {
   };
 
   // Look up `subscript(dynamicMember:)` candidates.
-  auto subscriptName = DeclNameRef_(
-      DeclName(ctx, DeclBaseName::createSubscript(), ctx.Id_dynamicMember));
+  DeclNameRef subscriptName(
+      { ctx, DeclBaseName::createSubscript(), { ctx.Id_dynamicMember } });
   auto candidates = TypeChecker::lookupMember(decl, type, subscriptName);
 
   if (!candidates.empty()) {
@@ -2387,7 +2386,7 @@ void AttributeChecker::visitImplementsAttr(ImplementsAttr *attr) {
     // Check that the ProtocolType has the specified member.
     LookupResult R =
         TypeChecker::lookupMember(PD->getDeclContext(), PT,
-                                  DeclNameRef_(attr->getMemberName()));
+                                  DeclNameRef(attr->getMemberName()));
     if (!R) {
       diagnose(attr->getLocation(),
                diag::implements_attr_protocol_lacks_member,

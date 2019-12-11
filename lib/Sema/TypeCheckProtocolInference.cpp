@@ -572,7 +572,7 @@ AssociatedTypeInference::inferTypeWitnessesViaAssociatedType(
       out << assocType->getName().str();
     }
 
-    defaultName = DeclNameRef_(getASTContext().getIdentifier(defaultNameStr));
+    defaultName = DeclNameRef(getASTContext().getIdentifier(defaultNameStr));
   }
 
   // Look for types with the given default name that have appropriate

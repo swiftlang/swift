@@ -623,7 +623,7 @@ static Type lookupDefaultLiteralType(const DeclContext *dc,
   auto lookupOptions = defaultUnqualifiedLookupOptions;
   if (isa<AbstractFunctionDecl>(dc))
     lookupOptions |= NameLookupFlags::KnownPrivate;
-  auto nameRef = DeclNameRef_(ctx.getIdentifier(name));
+  DeclNameRef nameRef(ctx.getIdentifier(name));
   auto lookup = TypeChecker::lookupUnqualified(dc->getModuleScopeContext(),
                                                nameRef, SourceLoc(),
                                                lookupOptions);

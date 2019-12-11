@@ -73,8 +73,9 @@ class DebuggerTestingTransform : public ASTWalker {
 public:
   DebuggerTestingTransform(ASTContext &Ctx, DiscriminatorFinder &DF)
       : Ctx(Ctx), DF(DF),
-        StringForPrintObjectName(DeclNameRef_(Ctx.getIdentifier("_stringForPrintObject"))),
-        DebuggerTestingCheckExpectName(DeclNameRef_(Ctx.getIdentifier("_debuggerTestingCheckExpect"))) {}
+        StringForPrintObjectName(Ctx.getIdentifier("_stringForPrintObject")),
+        DebuggerTestingCheckExpectName(
+            Ctx.getIdentifier("_debuggerTestingCheckExpect")) {}
 
   bool walkToDeclPre(Decl *D) override {
     pushLocalDeclContext(D);

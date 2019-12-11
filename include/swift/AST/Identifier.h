@@ -638,25 +638,14 @@ public:
   void *getOpaqueValue() const { return FullName.getOpaqueValue(); }
   static DeclNameRef getFromOpaqueValue(void *p);
 
-  // *** TRANSITIONAL CODE STARTS HERE ***
-
-  // We want all DeclNameRef constructions to be explicit, but they need to be
-  // threaded through large portions of the compiler, so that would be
-  // difficult. Instead, we will make uses of DeclNameRef(...) implicit but
-  // deprecated, and use DeclNameRef_(...) as a stand-in for intentional calls
-  // to the constructors. The deprecations and DeclNameRef_ function will go
-  // away before we merge any of this into master.
-
-  [[deprecated]] DeclNameRef(DeclName FullName)
+  explicit DeclNameRef(DeclName FullName)
     : FullName(FullName) { }
 
-  [[deprecated]] DeclNameRef(DeclBaseName BaseName)
+  explicit DeclNameRef(DeclBaseName BaseName)
     : FullName(BaseName) { }
 
-  [[deprecated]] DeclNameRef(Identifier BaseName)
+  explicit DeclNameRef(Identifier BaseName)
     : FullName(BaseName) { }
-
-  // *** TRANSITIONAL CODE ENDS HERE ***
 
   /// The name of the declaration being referenced.
   DeclName getFullName() const {
@@ -775,38 +764,26 @@ public:
                             "only for use within the debugger");
 };
 
-// *** TRANSITIONAL CODE STARTS HERE ***
-
-template<typename T>
-static DeclNameRef DeclNameRef_(T name) {
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdeprecated-declarations"
-  return DeclNameRef(name);
-#pragma clang diagnostic pop
-}
-
-// *** TRANSITIONAL CODE ENDS HERE ***
-
 inline DeclNameRef DeclNameRef::getFromOpaqueValue(void *p) {
-  return DeclNameRef_(DeclName::getFromOpaqueValue(p));
+  return DeclNameRef(DeclName::getFromOpaqueValue(p));
 }
 
 inline DeclNameRef DeclNameRef::withoutArgumentLabels() const {
-  return DeclNameRef_(getBaseName());
+  return DeclNameRef(getBaseName());
 }
 
 inline DeclNameRef DeclNameRef::withArgumentLabels(
     ASTContext &C, ArrayRef<Identifier> argumentNames) const {
-  return DeclNameRef_(DeclName(C, getBaseName(), argumentNames));
+  return DeclNameRef(DeclName(C, getBaseName(), argumentNames));
 }
 
 
 inline DeclNameRef DeclNameRef::createSubscript() {
-  return DeclNameRef_(DeclBaseName::createSubscript());
+  return DeclNameRef(DeclBaseName::createSubscript());
 }
 
 inline DeclNameRef DeclNameRef::createConstructor() {
-  return DeclNameRef_(DeclBaseName::createConstructor());
+  return DeclNameRef(DeclBaseName::createConstructor());
 }
 
 void simple_display(llvm::raw_ostream &out, DeclNameRef name);
@@ -972,10 +949,10 @@ namespace llvm {
   // DeclNameRefs hash just like DeclNames.
   template<> struct DenseMapInfo<swift::DeclNameRef> {
     static swift::DeclNameRef getEmptyKey() {
-      return DeclNameRef_(DenseMapInfo<swift::DeclName>::getEmptyKey());
+      return swift::DeclNameRef(DenseMapInfo<swift::DeclName>::getEmptyKey());
     }
     static swift::DeclNameRef getTombstoneKey() {
-      return DeclNameRef_(DenseMapInfo<swift::DeclName>::getTombstoneKey());
+      return swift::DeclNameRef(DenseMapInfo<swift::DeclName>::getTombstoneKey());
     }
     static unsigned getHashValue(swift::DeclNameRef Val) {
       return DenseMapInfo<swift::DeclName>::getHashValue(Val.getFullName());

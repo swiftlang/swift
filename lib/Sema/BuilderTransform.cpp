@@ -80,7 +80,7 @@ private:
 
     typeExpr->setImplicit();
     auto memberRef = new (ctx) UnresolvedDotExpr(
-        typeExpr, loc, DeclNameRef_(fnName), DeclNameLoc(loc),
+        typeExpr, loc, DeclNameRef(fnName), DeclNameLoc(loc),
         /*implicit=*/true);
     SourceLoc openLoc = args.empty() ? loc : args.front()->getStartLoc();
     SourceLoc closeLoc = args.empty() ? loc : args.back()->getEndLoc();
@@ -451,7 +451,7 @@ public:
     auto optionalTypeExpr =
       TypeExpr::createImplicitHack(loc, optionalType, ctx);
     auto someRef = new (ctx) UnresolvedDotExpr(
-        optionalTypeExpr, loc, DeclNameRef_(ctx.getIdentifier("some")),
+        optionalTypeExpr, loc, DeclNameRef(ctx.getIdentifier("some")),
         DeclNameLoc(loc), /*implicit=*/true);
     return CallExpr::createImplicit(ctx, someRef, arg, { });
   }
@@ -463,7 +463,7 @@ public:
     auto optionalTypeExpr =
       TypeExpr::createImplicitHack(endLoc, optionalType, ctx);
     return new (ctx) UnresolvedDotExpr(
-        optionalTypeExpr, endLoc, DeclNameRef_(ctx.getIdentifier("none")),
+        optionalTypeExpr, endLoc, DeclNameRef(ctx.getIdentifier("none")),
         DeclNameLoc(endLoc), /*implicit=*/true);
   }
 
