@@ -38,10 +38,7 @@ public:
 
   /// The kind of input on which the frontend should operate.
   InputFileKind InputKind = InputFileKind::Swift;
-
-  void forAllOutputPaths(const InputFile &input,
-                         llvm::function_ref<void(StringRef)> fn) const;
-
+  
   bool isOutputFileDirectory() const;
 
   /// A list of arbitrary modules to import and make implicitly visible.

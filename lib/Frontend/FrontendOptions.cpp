@@ -113,27 +113,6 @@ bool FrontendOptions::shouldActionOnlyParse(ActionType action) {
   }
 }
 
-void FrontendOptions::forAllOutputPaths(
-    const InputFile &input, llvm::function_ref<void(StringRef)> fn) const {
-  if (RequestedAction != FrontendOptions::ActionType::EmitModuleOnly &&
-      RequestedAction != FrontendOptions::ActionType::MergeModules) {
-    if (InputsAndOutputs.isWholeModule())
-      InputsAndOutputs.forEachOutputFilename(fn);
-    else
-      fn(input.outputFilename());
-  }
-  const SupplementaryOutputPaths &outs =
-      input.getPrimarySpecificPaths().SupplementaryOutputs;
-  const std::string *outputs[] = {&outs.ModuleOutputPath,
-                                  &outs.ModuleDocOutputPath,
-                                  &outs.ParseableInterfaceOutputPath,
-                                  &outs.ObjCHeaderOutputPath};
-  for (const std::string *next : outputs) {
-    if (!next->empty())
-      fn(*next);
-  }
-}
-
 file_types::ID
 FrontendOptions::formatForPrincipalOutputFileForAction(ActionType action) {
   using namespace file_types;
