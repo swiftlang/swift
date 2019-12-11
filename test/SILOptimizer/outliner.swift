@@ -222,3 +222,20 @@ public func testCalendar() {
    let formatter = DateFormatter()
    formatter.calendar = Calendar(identifier: .gregorian)
 }
+
+open class Test
+{
+   @inline(never)
+   public func getWindow() -> MyWindow
+   {
+       return MyWindow()
+   }
+
+   public func testDontCrash() -> MyView
+   {
+
+     let view = MyView()
+     view.window2 = getWindow()
+     return view
+   }
+}

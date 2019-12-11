@@ -83,7 +83,40 @@ tests.test("basics") {
   expectEqual([.Satchel, .Box], p)
 }
 
-// FIXME: add tests for all of SetAlgebra, in particular
-// insert/remove/replace.
+tests.test("set algebra") {
+  typealias P = PackagingOptions
+  
+  // remove
+  var p = P.BoxOrBag
+  expectNil(p.remove(P.Carton))
+  
+  p = P.BoxOrBag
+  p.remove(P.BoxOrCartonOrBag)
+  expectEqual(P(), p)
+  
+  p = P.BoxOrBag
+  expectEqual(P.Bag, p.remove(P.SatchelOrBag))
+  expectEqual(P.Box, p)
+  
+  // insert
+  p = P.Box
+  var insertionResult = p.insert(.Bag)
+  expectTrue(insertionResult.inserted)
+  expectEqual(P.Bag, insertionResult.memberAfterInsert)
+  expectEqual(P.BoxOrBag, p)
+  
+  insertionResult = p.insert(.Bag)
+  expectFalse(insertionResult.inserted)
+  expectEqual(P.Bag, insertionResult.memberAfterInsert)
+  
+  // update
+  p = P.Box
+  expectNil(p.update(with: .Bag))
+  expectEqual(P.BoxOrBag, p)
+  
+  p = P.Box
+  expectEqual(P.Box, p.update(with: .BoxOrBag))
+  expectEqual(P.BoxOrBag, p)
+}
 
 runAllTests()
