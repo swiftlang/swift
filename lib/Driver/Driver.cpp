@@ -953,7 +953,7 @@ Driver::buildCompilation(const ToolChain &TC,
         createStatsReporter(ArgList.get(), Inputs, OI, DefaultTargetTriple);
 
     const bool OnlyOneDependencyFile =
-        ArgList->hasArg(options::OPT_only_one_dependency_file);
+        !ArgList->hasArg(options::OPT_disable_only_one_dependency_file);
     // relies on the new dependency graph
 
     const bool EnableFineGrainedDependencies =
