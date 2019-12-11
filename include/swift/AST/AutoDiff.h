@@ -21,10 +21,13 @@
 
 #include "swift/AST/Identifier.h"
 #include "swift/AST/IndexSubset.h"
-#include "swift/Basic/SourceLoc.h"
+#include "swift/AST/Type.h"
 #include "swift/Basic/Range.h"
+#include "swift/Basic/SourceLoc.h"
 
 namespace swift {
+
+class AnyFunctionType;
 
 /// A function type differentiability kind.
 enum class DifferentiabilityKind : uint8_t {
@@ -130,6 +133,46 @@ public:
   }
 };
 
+/// Automatic differentiation utility namespace.
+namespace autodiff {
+
+/// Appends the subset's parameter's types to `results`, in the order in
+/// which they appear in the function type.
+void getSubsetParameterTypes(IndexSubset *indices, AnyFunctionType *type,
+                             SmallVectorImpl<Type> &results,
+                             bool reverseCurryLevels = false);
+
+} // end namespace autodiff
+
 } // end namespace swift
+
+namespace llvm {
+
+using swift::AutoDiffDerivativeFunctionKind;
+
+template <typename T> struct DenseMapInfo;
+
+template <> struct DenseMapInfo<AutoDiffDerivativeFunctionKind> {
+  static AutoDiffDerivativeFunctionKind getEmptyKey() {
+    return static_cast<AutoDiffDerivativeFunctionKind::innerty>(
+        DenseMapInfo<unsigned>::getEmptyKey());
+  }
+
+  static AutoDiffDerivativeFunctionKind getTombstoneKey() {
+    return static_cast<AutoDiffDerivativeFunctionKind::innerty>(
+        DenseMapInfo<unsigned>::getTombstoneKey());
+  }
+
+  static unsigned getHashValue(const AutoDiffDerivativeFunctionKind &Val) {
+    return DenseMapInfo<unsigned>::getHashValue(Val);
+  }
+
+  static bool isEqual(const AutoDiffDerivativeFunctionKind &LHS,
+                      const AutoDiffDerivativeFunctionKind &RHS) {
+    return LHS == RHS;
+  }
+};
+
+} // end namespace llvm
 
 #endif // SWIFT_AST_AUTODIFF_H
