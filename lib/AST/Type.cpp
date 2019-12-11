@@ -4644,7 +4644,7 @@ Type TypeBase::openAnyExistentialType(OpenedArchetypeType *&opened) {
 }
 
 // SWIFT_ENABLE_TENSORFLOW
-// Makes a function with the same generic signature and extinfo as `copy`, but
+// Makes a function with the same generic signature and ExtInfo as `copy`, but
 // with `params` parameters and `retTy` return type.
 static AnyFunctionType *
 makeFunctionType(AnyFunctionType *copy, ArrayRef<AnyFunctionType::Param> params,

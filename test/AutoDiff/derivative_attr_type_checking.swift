@@ -64,7 +64,33 @@ func vjpGenericExtraGenericRequirements<T : Differentiable & FloatingPoint>(x: T
   return (x, { ($0, $0) })
 }
 
-func foo<T : FloatingPoint & Differentiable>(_ x: T) -> T { return x }
+// Test ambiguous original declaration.
+
+protocol P1 {}
+protocol P2 {}
+func ambiguous<T: P1>(_ x: T) -> T { x }
+func ambiguous<T: P2>(_ x: T) -> T { x }
+
+// expected-error @+1 {{ambiguous reference to 'ambiguous' in '@derivative' attribute}}
+@derivative(of: ambiguous)
+func jvpAmbiguous<T: P1 & P2 & Differentiable>(x: T)
+  -> (value: T, differential: (T.TangentVector) -> (T.TangentVector)) {
+  return (x, { $0 })
+}
+
+// Test no valid original declaration.
+// Original declarations are invalid because they have extra generic
+// requirements unsatisfied by the `@derivative` function.
+
+func invalid<T: BinaryFloatingPoint>(x: T) -> T { x }
+func invalid<T: CustomStringConvertible>(x: T) -> T { x }
+func invalid<T: FloatingPoint>(x: T) -> T { x }
+
+// expected-error @+1 {{could not find function 'invalid' with expected type '<T where T : Differentiable> (x: T) -> T'}}
+@derivative(of: invalid)
+func jvpInvalid<T: Differentiable>(x: T) -> (value: T, differential: (T.TangentVector) -> T.TangentVector) {
+  return (x, { $0 })
+}
 
 // Test `wrt` clauses.
 
@@ -113,13 +139,7 @@ func vjpNoDiffParams(x: Int) -> (value: Float, pullback: (Float) -> Int) {
   return (1, { _ in 0 })
 }
 
-// expected-error @+1 {{functions ('@differentiable (Float) -> Float') cannot be differentiated with respect to}}
-@differentiable(wrt: fn)
-func invalidDiffWrtFunction(_ fn: @differentiable(Float) -> Float) -> Float {
-  return fn(.pi)
-}
-
-// expected-error @+2 {{type 'T' does not conform to protocol 'FloatingPoint'}}
+func foo<T : FloatingPoint & Differentiable>(_ x: T) -> T { return x }
 // expected-error @+1 {{could not find function 'foo' with expected type '<T where T : AdditiveArithmetic, T : Differentiable> (T) -> T'}}
 @derivative(of: foo)
 func vjpFoo<T : AdditiveArithmetic & Differentiable>(_ x: T) -> (value: T, pullback: (T.TangentVector) -> (T.TangentVector)) {

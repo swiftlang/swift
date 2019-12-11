@@ -2707,7 +2707,7 @@ static AbstractFunctionDecl *findAbstractFunctionDecl(
     DeclName funcName, SourceLoc funcNameLoc, Type baseType,
     DeclContext *lookupContext,
     const std::function<bool(AbstractFunctionDecl *)> &isValidCandidate,
-    const std::function<void()> &overloadDiagnostic,
+    const std::function<void()> &noneValidDiagnostic,
     const std::function<void()> &ambiguousDiagnostic,
     const std::function<void()> &notFunctionDiagnostic,
     NameLookupOptions lookupOptions,
@@ -2739,7 +2739,7 @@ static AbstractFunctionDecl *findAbstractFunctionDecl(
   bool notFunction = false;
   bool wrongTypeContext = false;
   bool ambiguousFuncDecl = false;
-  bool overloadNotFound = false;
+  bool foundInvalid = false;
 
   // Filter lookup results.
   for (auto choice : results) {
@@ -2761,7 +2761,7 @@ static AbstractFunctionDecl *findAbstractFunctionDecl(
       continue;
     }
     if (!isValidCandidate(candidate)) {
-      overloadNotFound = true;
+      foundInvalid = true;
       continue;
     }
     if (resolvedCandidate) {
@@ -2791,8 +2791,8 @@ static AbstractFunctionDecl *findAbstractFunctionDecl(
     (*invalidTypeCtxDiagnostic)();
     return nullptr;
   }
-  if (overloadNotFound) {
-    overloadDiagnostic();
+  if (foundInvalid) {
+    noneValidDiagnostic();
     return nullptr;
   }
   assert(notFunction && "Expected 'not a function' error");
@@ -2810,7 +2810,7 @@ static FuncDecl *findAutoDiffDerivativeFunction(
   auto &ctx = original->getASTContext();
   auto &diags = ctx.Diags;
   auto nameLoc = specifier.Loc.getBaseNameLoc();
-  auto overloadDiagnostic = [&]() {
+  auto noneValidDiagnostic = [&]() {
     diags.diagnose(nameLoc, diag::differentiable_attr_overload_not_found,
                    specifier.Name, expectedTy);
   };
@@ -2877,7 +2877,7 @@ static FuncDecl *findAutoDiffDerivativeFunction(
 
   auto *candidate = findAbstractFunctionDecl(
       specifier.Name, nameLoc, /*baseType*/ Type(), originalTypeCtx, isValid,
-      overloadDiagnostic, ambiguousDiagnostic, notFunctionDiagnostic,
+      noneValidDiagnostic, ambiguousDiagnostic, notFunctionDiagnostic,
       lookupOptions, hasValidTypeContext, invalidTypeContextDiagnostic);
   if (!candidate)
     return nullptr;
@@ -3715,6 +3715,8 @@ void AttributeChecker::visitDerivativeAttr(DerivativeAttr *attr) {
   auto *originalFnType =
       derivativeInterfaceType->getAutoDiffOriginalFunctionType();
 
+  // Returns true if the generic parameters in `source` satisfy the generic
+  // requirements in `target`.
   std::function<bool(GenericSignature, GenericSignature)>
       checkGenericSignatureSatisfied = [&](GenericSignature source,
                                            GenericSignature target) {
@@ -3726,6 +3728,12 @@ void AttributeChecker::visitDerivativeAttr(DerivativeAttr *attr) {
         if (!source)
           return false;
         // Check if target's requirements are satisfied by source.
+        // Cancel diagnostics using `DiagnosticTransaction`.
+        // Diagnostics should not be emitted because this function is used to
+        // check candidates; if no candidates match, a separate diagnostic will
+        // be produced.
+        DiagnosticTransaction transaction(Ctx.Diags);
+        SWIFT_DEFER { transaction.abort(); };
         return TypeChecker::checkGenericArguments(
             derivative, originalName.Loc.getBaseNameLoc(),
             originalName.Loc.getBaseNameLoc(), Type(),
@@ -3743,26 +3751,23 @@ void AttributeChecker::visitDerivativeAttr(DerivativeAttr *attr) {
         checkGenericSignatureSatisfied);
   };
 
-  // TODO(TF-998): Do not reuse incompatible `@differentiable` attribute
-  // diagnostics. Rename compatible diagnostics so that they're not
-  // attribute-specific.
-  auto overloadDiagnostic = [&]() {
-    diagnose(originalName.Loc, diag::derivative_attr_overload_not_found,
+  auto noneValidDiagnostic = [&]() {
+    diagnose(originalName.Loc,
+             diag::autodiff_attr_original_decl_none_valid_found,
              originalName.Name, originalFnType);
   };
   auto ambiguousDiagnostic = [&]() {
-    diagnose(originalName.Loc,
-             diag::differentiable_attr_ambiguous_function_identifier,
-             originalName.Name);
+    diagnose(originalName.Loc, diag::attr_ambiguous_reference_to_decl,
+             originalName.Name, attr->getAttrName());
   };
   auto notFunctionDiagnostic = [&]() {
     diagnose(originalName.Loc,
-             diag::differentiable_attr_derivative_not_function,
+             diag::autodiff_attr_original_decl_invalid_kind,
              originalName.Name);
   };
   std::function<void()> invalidTypeContextDiagnostic = [&]() {
     diagnose(originalName.Loc,
-             diag::differentiable_attr_function_not_same_type_context,
+             diag::autodiff_attr_original_decl_not_same_type_context,
              originalName.Name);
   };
 
@@ -3793,7 +3798,7 @@ void AttributeChecker::visitDerivativeAttr(DerivativeAttr *attr) {
   // Look up original function.
   auto *originalAFD = findAbstractFunctionDecl(
       originalName.Name, originalName.Loc.getBaseNameLoc(), /*baseType*/ Type(),
-      derivativeTypeCtx, isValidOriginal, overloadDiagnostic,
+      derivativeTypeCtx, isValidOriginal, noneValidDiagnostic,
       ambiguousDiagnostic, notFunctionDiagnostic, lookupOptions,
       hasValidTypeContext, invalidTypeContextDiagnostic);
   if (!originalAFD) {
@@ -4064,7 +4069,8 @@ void AttributeChecker::visitTransposeAttr(TransposeAttr *attr) {
     return;
   }
 
-  // Compute expected original function type.
+  // Returns true if the generic parameters in `source` satisfy the generic
+  // requirements in `target`.
   std::function<bool(GenericSignature, GenericSignature)>
       checkGenericSignatureSatisfied = [&](GenericSignature source,
                                            GenericSignature target) {
@@ -4076,6 +4082,12 @@ void AttributeChecker::visitTransposeAttr(TransposeAttr *attr) {
         if (!source)
           return false;
         // Check if target's requirements are satisfied by source.
+        // Cancel diagnostics using `DiagnosticTransaction`.
+        // Diagnostics should not be emitted because this function is used to
+        // check candidates; if no candidates match, a separate diagnostic will
+        // be produced.
+        DiagnosticTransaction transaction(Ctx.Diags);
+        SWIFT_DEFER { transaction.abort(); };
         return TypeChecker::checkGenericArguments(
             transpose, originalName.Loc.getBaseNameLoc(),
             originalName.Loc.getBaseNameLoc(), Type(),
@@ -4093,26 +4105,23 @@ void AttributeChecker::visitTransposeAttr(TransposeAttr *attr) {
         checkGenericSignatureSatisfied);
   };
 
-  // TODO(TF-998): Do not reuse incompatible `@differentiable` attribute
-  // diagnostics. Rename compatible diagnostics so that they're not
-  // attribute-specific.
-  auto overloadDiagnostic = [&]() {
-    diagnose(originalName.Loc, diag::derivative_attr_overload_not_found,
+  auto noneValidDiagnostic = [&]() {
+    diagnose(originalName.Loc,
+             diag::autodiff_attr_original_decl_none_valid_found,
              originalName.Name, expectedOriginalFnType);
   };
   auto ambiguousDiagnostic = [&]() {
-    diagnose(originalName.Loc,
-             diag::differentiable_attr_ambiguous_function_identifier,
-             originalName.Name);
+    diagnose(originalName.Loc, diag::attr_ambiguous_reference_to_decl,
+             originalName.Name, attr->getAttrName());
   };
   auto notFunctionDiagnostic = [&]() {
     diagnose(originalName.Loc,
-             diag::differentiable_attr_derivative_not_function,
+             diag::autodiff_attr_original_decl_invalid_kind,
              originalName.Name);
   };
   std::function<void()> invalidTypeContextDiagnostic = [&]() {
     diagnose(originalName.Loc,
-             diag::differentiable_attr_function_not_same_type_context,
+             diag::autodiff_attr_original_decl_not_same_type_context,
              originalName.Name);
   };
 
@@ -4139,7 +4148,7 @@ void AttributeChecker::visitTransposeAttr(TransposeAttr *attr) {
     funcLoc = attr->getBaseType()->getLoc();
   auto *originalAFD = findAbstractFunctionDecl(
       originalName.Name, funcLoc, baseType, transposeTypeCtx, isValidOriginal,
-      overloadDiagnostic, ambiguousDiagnostic, notFunctionDiagnostic,
+      noneValidDiagnostic, ambiguousDiagnostic, notFunctionDiagnostic,
       lookupOptions, hasValidTypeContext, invalidTypeContextDiagnostic);
 
   if (!originalAFD) {
