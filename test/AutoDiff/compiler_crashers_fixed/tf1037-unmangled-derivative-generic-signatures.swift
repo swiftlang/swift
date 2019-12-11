@@ -1,4 +1,4 @@
-// RUN: not --crash %target-swift-emit-sil %s -verify
+// RUN: %target-swift-emit-sil %s -verify
 // REQUIRES: asserts
 
 // TF-1037: Differentiation transform crashes due to multiple SIL

@@ -1067,11 +1067,12 @@ JVPEmitter::createEmptyDifferential(ADContext &context,
   dfParams.push_back({dfStructType, ParameterConvention::Direct_Owned});
 
   Mangle::ASTMangler mangler;
-  auto diffName = original->getASTContext()
-                      .getIdentifier(mangler.mangleAutoDiffLinearMapHelper(
-                          original->getName(),
-                          AutoDiffLinearMapKind::Differential, indices))
-                      .str();
+  auto diffName =
+      original->getASTContext()
+          .getIdentifier(mangler.mangleAutoDiffLinearMapHelper(
+              original->getName(), AutoDiffLinearMapKind::Differential,
+              witness->getConfig()))
+          .str();
   auto diffGenericSig = getDerivativeGenericSignature(witness, original);
   auto *diffGenericEnv =
       diffGenericSig ? diffGenericSig->getGenericEnvironment() : nullptr;
