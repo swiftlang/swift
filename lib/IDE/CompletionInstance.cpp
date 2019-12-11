@@ -130,6 +130,9 @@ CompilerInstance *CompletionInstance::getReusingCompilerInstance(
     const swift::CompilerInvocation &Invocation,
     llvm::MemoryBuffer *completionBuffer, unsigned int Offset,
     DiagnosticConsumer *DiagC) {
+  if (!EnableASTCaching)
+    return nullptr;
+
   if (!CachedCI)
     return nullptr;
 
