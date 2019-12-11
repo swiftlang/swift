@@ -6997,6 +6997,13 @@ public:
   SourceLoc getNameLoc() const { return NameLoc; }
   Identifier getName() const { return name; }
 
+  /// Get the list of identifiers after the colon in the operator declaration.
+  ///
+  /// This list includes the names of designated types. For infix operators, the
+  /// first item in the list is a precedence group instead.
+  ///
+  /// \todo These two purposes really ought to be in separate properties and the
+  /// designated type list should be of TypeReprs instead of Identifiers.
   ArrayRef<Identifier> getIdentifiers() const {
     return Identifiers;
   }
