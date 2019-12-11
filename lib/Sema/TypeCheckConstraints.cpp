@@ -655,7 +655,7 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
                                        D->getInterfaceType());
     }
 
-    return TypeExpr::createForDecl(Loc, D,
+    return TypeExpr::createForDecl(UDRE->getNameLoc(), D,
                                    Lookup[0].getDeclContext(),
                                    UDRE->isImplicit());
   }
@@ -747,12 +747,13 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
   if (AllMemberRefs) {
     Expr *BaseExpr;
     if (auto PD = dyn_cast<ProtocolDecl>(Base)) {
-      BaseExpr = TypeExpr::createForDecl(Loc,
+      BaseExpr = TypeExpr::createForDecl(UDRE->getNameLoc(),
                                          PD->getGenericParams()->getParams().front(),
                                          /*DC*/nullptr,
                                          /*isImplicit=*/true);
     } else if (auto NTD = dyn_cast<NominalTypeDecl>(Base)) {
-      BaseExpr = TypeExpr::createForDecl(Loc, NTD, BaseDC, /*isImplicit=*/true);
+      BaseExpr = TypeExpr::createForDecl(UDRE->getNameLoc(), NTD, BaseDC,
+                                         /*isImplicit=*/true);
     } else {
       BaseExpr = new (Context) DeclRefExpr(Base, UDRE->getNameLoc(),
                                            /*Implicit=*/true);
@@ -1416,9 +1417,8 @@ TypeExpr *PreCheckExpression::simplifyNestedTypeExpr(UnresolvedDotExpr *UDE) {
       // If there is no nested type with this name, we have a lookup of
       // a non-type member, so leave the expression as-is.
       if (Result.size() == 1) {
-        return TypeExpr::createForMemberDecl(DRE->getNameLoc().getBaseNameLoc(),
-                                             TD, NameLoc,
-                                             Result.front().Member);
+        return TypeExpr::createForMemberDecl(
+            DRE->getNameLoc(), TD, UDE->getNameLoc(), Result.front().Member);
       }
     }
 
@@ -1472,7 +1472,7 @@ TypeExpr *PreCheckExpression::simplifyNestedTypeExpr(UnresolvedDotExpr *UDE) {
       // If there is no nested type with this name, we have a lookup of
       // a non-type member, so leave the expression as-is.
       if (Result.size() == 1) {
-        return TypeExpr::createForMemberDecl(ITR, NameLoc,
+        return TypeExpr::createForMemberDecl(ITR, UDE->getNameLoc(),
                                              Result.front().Member);
       }
     }
