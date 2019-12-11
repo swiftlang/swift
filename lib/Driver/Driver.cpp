@@ -951,6 +951,11 @@ Driver::buildCompilation(const ToolChain &TC,
         ArgList->hasArg(options::OPT_driver_time_compilation);
     std::unique_ptr<UnifiedStatsReporter> StatsReporter =
         createStatsReporter(ArgList.get(), Inputs, OI, DefaultTargetTriple);
+
+    const bool OnlyOneDependencyFile =
+        ArgList->hasFlag(options::OPT_enable_only_one_dependency_file,
+                     options::OPT_disable_only_one_dependency_file, true);
+
     // relies on the new dependency graph
     const bool EnableFineGrainedDependencies =
         ArgList->hasArg(options::OPT_enable_fine_grained_dependencies);
@@ -984,6 +989,7 @@ Driver::buildCompilation(const ToolChain &TC,
         SaveTemps,
         ShowDriverTimeCompilation,
         std::move(StatsReporter),
+        OnlyOneDependencyFile,
         EnableFineGrainedDependencies,
         VerifyFineGrainedDependencyGraphAfterEveryImport,
         EmitFineGrainedDependencyDotFileAfterEveryImport,
