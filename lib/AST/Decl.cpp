@@ -1741,12 +1741,12 @@ static bool isDefaultInitializable(const TypeRepr *typeRepr, ASTContext &ctx) {
   // Also support the desugared 'Optional<T>' spelling.
   if (!ctx.isSwiftVersionAtLeast(5)) {
     if (auto *identRepr = dyn_cast<SimpleIdentTypeRepr>(typeRepr)) {
-      if (identRepr->getIdentifier() == ctx.Id_Void)
+      if (identRepr->getNameRef().getBaseIdentifier() == ctx.Id_Void)
         return true;
     }
 
     if (auto *identRepr = dyn_cast<GenericIdentTypeRepr>(typeRepr)) {
-      if (identRepr->getIdentifier() == ctx.Id_Optional &&
+      if (identRepr->getNameRef().getBaseIdentifier() == ctx.Id_Optional &&
           identRepr->getNumGenericArgs() == 1)
         return true;
     }

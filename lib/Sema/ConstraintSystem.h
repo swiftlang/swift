@@ -1177,7 +1177,7 @@ private:
   size_t MaxMemory = 0;
 
   /// Cached member lookups.
-  llvm::DenseMap<std::pair<Type, DeclName>, Optional<LookupResult>>
+  llvm::DenseMap<std::pair<Type, DeclNameRef>, Optional<LookupResult>>
     MemberLookups;
 
   /// Cached sets of "alternative" literal types.
@@ -1907,7 +1907,7 @@ public:
   /// and no new names are introduced after name binding.
   ///
   /// \returns A reference to the member-lookup result.
-  LookupResult &lookupMember(Type base, DeclName name);
+  LookupResult &lookupMember(Type base, DeclNameRef name);
 
   /// Retrieve the set of "alternative" literal types that we'll explore
   /// for a given literal protocol kind.
@@ -2306,7 +2306,7 @@ public:
   }
 
   /// Add a value member constraint to the constraint system.
-  void addValueMemberConstraint(Type baseTy, DeclName name, Type memberTy,
+  void addValueMemberConstraint(Type baseTy, DeclNameRef name, Type memberTy,
                                 DeclContext *useDC,
                                 FunctionRefKind functionRefKind,
                                 ArrayRef<OverloadChoice> outerAlternatives,
@@ -2336,7 +2336,7 @@ public:
 
   /// Add a value member constraint for an UnresolvedMemberRef
   /// to the constraint system.
-  void addUnresolvedValueMemberConstraint(Type baseTy, DeclName name,
+  void addUnresolvedValueMemberConstraint(Type baseTy, DeclNameRef name,
                                           Type memberTy, DeclContext *useDC,
                                           FunctionRefKind functionRefKind,
                                           ConstraintLocatorBuilder locator) {
@@ -3186,7 +3186,7 @@ public:
   /// try to identify and classify inaccessible members that may be being
   /// referenced.
   MemberLookupResult performMemberLookup(ConstraintKind constraintKind,
-                                         DeclName memberName, Type baseTy,
+                                         DeclNameRef memberName, Type baseTy,
                                          FunctionRefKind functionRefKind,
                                          ConstraintLocator *memberLocator,
                                          bool includeInaccessibleMembers);
@@ -3263,7 +3263,7 @@ private:
 
   /// Attempt to simplify the given member constraint.
   SolutionKind simplifyMemberConstraint(
-      ConstraintKind kind, Type baseType, DeclName member, Type memberType,
+      ConstraintKind kind, Type baseType, DeclNameRef member, Type memberType,
       DeclContext *useDC, FunctionRefKind functionRefKind,
       ArrayRef<OverloadChoice> outerAlternatives, TypeMatchOptions flags,
       ConstraintLocatorBuilder locator);

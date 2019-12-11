@@ -308,8 +308,8 @@ static DeclRefExpr *convertEnumToIndex(SmallVectorImpl<ASTNode> &stmts,
   for (auto elt : enumDecl->getAllElements()) {
     // generate: case .<Case>:
     auto pat = new (C) EnumElementPattern(TypeLoc::withoutLoc(enumType),
-                                          SourceLoc(), SourceLoc(),
-                                          Identifier(), elt, nullptr);
+                                          SourceLoc(), DeclNameLoc(),
+                                          DeclNameRef(), elt, nullptr);
     pat->setImplicit();
     pat->setType(enumType);
 
@@ -369,7 +369,7 @@ static GuardStmt *returnIfNotEqualGuard(ASTContext &C,
   // Next, generate the condition being checked.
   // lhs == rhs
   auto cmpFuncExpr = new (C) UnresolvedDeclRefExpr(
-    DeclName(C.getIdentifier("==")), DeclRefKind::BinaryOperator,
+    DeclNameRef(C.Id_EqualsOperator), DeclRefKind::BinaryOperator,
     DeclNameLoc());
   auto cmpArgsTuple = TupleExpr::create(C, SourceLoc(),
                                         { lhsExpr, rhsExpr },
@@ -511,8 +511,8 @@ deriveBodyEquatable_enum_hasAssociatedValues_eq(AbstractFunctionDecl *eqDecl,
     auto lhsSubpattern = enumElementPayloadSubpattern(elt, 'l', eqDecl,
                                                       lhsPayloadVars);
     auto lhsElemPat = new (C) EnumElementPattern(TypeLoc::withoutLoc(enumType),
-                                                 SourceLoc(), SourceLoc(),
-                                                 Identifier(), elt,
+                                                 SourceLoc(), DeclNameLoc(),
+                                                 DeclNameRef(), elt,
                                                  lhsSubpattern);
     lhsElemPat->setImplicit();
 
@@ -521,8 +521,8 @@ deriveBodyEquatable_enum_hasAssociatedValues_eq(AbstractFunctionDecl *eqDecl,
     auto rhsSubpattern = enumElementPayloadSubpattern(elt, 'r', eqDecl,
                                                       rhsPayloadVars);
     auto rhsElemPat = new (C) EnumElementPattern(TypeLoc::withoutLoc(enumType),
-                                                 SourceLoc(), SourceLoc(),
-                                                 Identifier(), elt,
+                                                 SourceLoc(), DeclNameLoc(),
+                                                 DeclNameRef(), elt,
                                                  rhsSubpattern);
     rhsElemPat->setImplicit();
 
@@ -833,11 +833,9 @@ static CallExpr *createHasherCombineCall(ASTContext &C,
                                          Expr *hashable) {
   Expr *hasherExpr = new (C) DeclRefExpr(ConcreteDeclRef(hasher),
                                          DeclNameLoc(), /*implicit*/ true);
-  DeclName name(C, C.Id_combine, {Identifier()});
   // hasher.combine(_:)
-  auto *combineCall = new (C) UnresolvedDotExpr(hasherExpr, SourceLoc(),
-                                                name, DeclNameLoc(),
-                                                /*implicit*/ true);
+  auto *combineCall = UnresolvedDotExpr::createImplicit(
+      C, hasherExpr, C.Id_combine, {Identifier()});
   
   // hasher.combine(hashable)
   return CallExpr::createImplicit(C, combineCall, {hashable}, {Identifier()});
@@ -912,9 +910,8 @@ deriveBodyHashable_compat_hashInto(AbstractFunctionDecl *hashIntoDecl, void *) {
   auto selfDecl = hashIntoDecl->getImplicitSelfDecl();
   auto selfRef = new (C) DeclRefExpr(selfDecl, DeclNameLoc(),
                                      /*implicit*/ true);
-  auto hashValueExpr = new (C) UnresolvedDotExpr(selfRef, SourceLoc(),
-                                                 C.Id_hashValue, DeclNameLoc(),
-                                                 /*implicit*/ true);
+  auto hashValueExpr = UnresolvedDotExpr::createImplicit(C, selfRef,
+                                                         C.Id_hashValue);
   auto hasherParam = hashIntoDecl->getParameters()->get(0);
   auto hasherExpr = createHasherCombineCall(C, hasherParam, hashValueExpr);
 
@@ -938,9 +935,8 @@ deriveBodyHashable_enum_rawValue_hashInto(
 
   // generate: self.rawValue
   auto *selfRef = DerivedConformance::createSelfDeclRef(hashIntoDecl);
-  auto *rawValueRef = new (C) UnresolvedDotExpr(selfRef, SourceLoc(),
-                                                C.Id_rawValue, DeclNameLoc(),
-                                                /*Implicit=*/true);
+  auto *rawValueRef = UnresolvedDotExpr::createImplicit(C, selfRef,
+                                                        C.Id_rawValue);
 
   // generate: hasher.combine(discriminator)
   auto hasherParam = hashIntoDecl->getParameters()->get(0);
@@ -1037,8 +1033,9 @@ deriveBodyHashable_enum_hasAssociatedValues_hashInto(
     auto payloadPattern = enumElementPayloadSubpattern(elt, 'a', hashIntoDecl,
                                                        payloadVars);
     auto pat = new (C) EnumElementPattern(TypeLoc::withoutLoc(enumType),
-                                          SourceLoc(), SourceLoc(),
-                                          elt->getName(), elt, payloadPattern);
+                                          SourceLoc(), DeclNameLoc(),
+                                          DeclNameRef(elt->getName()), elt,
+                                          payloadPattern);
     pat->setImplicit();
 
     auto labelItem = CaseLabelItem(pat);

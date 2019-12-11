@@ -898,8 +898,8 @@ WitnessChecker::lookupValueWitnessesViaImplementsAttr(
   auto lookupOptions = defaultMemberTypeLookupOptions;
   lookupOptions -= NameLookupFlags::PerformConformanceCheck;
   lookupOptions |= NameLookupFlags::IncludeAttributeImplements;
-  auto candidates =
-      TypeChecker::lookupMember(DC, Adoptee, req->getFullName(), lookupOptions);
+  auto candidates = TypeChecker::lookupMember(DC, Adoptee, req->createNameRef(),
+                                              lookupOptions);
   for (auto candidate : candidates) {
     if (witnessHasImplementsAttrForExactRequirement(candidate.getValueDecl(), req)) {
       witnesses.push_back(candidate.getValueDecl());
@@ -918,14 +918,17 @@ WitnessChecker::lookupValueWitnesses(ValueDecl *req, bool *ignoringNames) {
   // for this requirement.
   lookupValueWitnessesViaImplementsAttr(req, witnesses);
 
+  auto reqName = req->createNameRef();
+  auto reqBaseName = reqName.withoutArgumentLabels();
+
   if (req->isOperator()) {
     // Operator lookup is always global.
     auto lookupOptions = defaultUnqualifiedLookupOptions;
     if (!DC->isCascadingContextForLookup(false))
       lookupOptions |= NameLookupFlags::KnownPrivate;
     auto lookup = TypeChecker::lookupUnqualified(DC->getModuleScopeContext(),
-                                                 req->getBaseName(),
-                                                 SourceLoc(), lookupOptions);
+                                                 reqBaseName, SourceLoc(),
+                                                 lookupOptions);
     for (auto candidate : lookup) {
       auto decl = candidate.getValueDecl();
       if (swift::isMemberOperator(cast<FuncDecl>(decl), Adoptee)) {
@@ -937,13 +940,13 @@ WitnessChecker::lookupValueWitnesses(ValueDecl *req, bool *ignoringNames) {
     auto lookupOptions = defaultMemberTypeLookupOptions;
     lookupOptions -= NameLookupFlags::PerformConformanceCheck;
 
-    auto candidates = TypeChecker::lookupMember(DC, Adoptee, req->getFullName(),
+    auto candidates = TypeChecker::lookupMember(DC, Adoptee, reqName,
                                                 lookupOptions);
 
     // If we didn't find anything with the appropriate name, look
     // again using only the base name.
     if (candidates.empty() && ignoringNames) {
-      candidates = TypeChecker::lookupMember(DC, Adoptee, req->getBaseName(),
+      candidates = TypeChecker::lookupMember(DC, Adoptee, reqBaseName,
                                              lookupOptions);
       *ignoringNames = true;
     }
@@ -997,7 +1000,7 @@ bool WitnessChecker::findBestWitness(
       auto lookupOptions = defaultUnqualifiedLookupOptions;
       lookupOptions |= NameLookupFlags::KnownPrivate;
       auto lookup = TypeChecker::lookupUnqualified(
-          overlay, requirement->getBaseName(), SourceLoc(), lookupOptions);
+          overlay, requirement->createNameRef(), SourceLoc(), lookupOptions);
       for (auto candidate : lookup)
         witnesses.push_back(candidate.getValueDecl());
       break;
@@ -3534,7 +3537,8 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaLookup(
 
   // Look for a member type with the same name as the associated type.
   auto candidates = TypeChecker::lookupMemberType(
-      DC, Adoptee, assocType->getName(), NameLookupFlags::ProtocolMembers);
+      DC, Adoptee, assocType->createNameRef(),
+      NameLookupFlags::ProtocolMembers);
 
   // If there aren't any candidates, we're done.
   if (!candidates) {
@@ -4796,8 +4800,7 @@ diagnoseMissingAppendInterpolationMethod(NominalTypeDecl *typeDecl) {
     static bool hasValidMethod(NominalTypeDecl *typeDecl,
                                SmallVectorImpl<InvalidMethod> &invalid) {
       auto type = typeDecl->getDeclaredType();
-      auto baseName =
-          DeclName(typeDecl->getASTContext().Id_appendInterpolation);
+      DeclNameRef baseName(typeDecl->getASTContext().Id_appendInterpolation);
       auto lookupOptions = defaultMemberTypeLookupOptions;
       lookupOptions -= NameLookupFlags::PerformConformanceCheck;
 
@@ -5565,7 +5568,7 @@ void TypeChecker::inferDefaultWitnesses(ProtocolDecl *proto) {
     if (assocType->getProtocol() != proto) {
       SmallVector<ValueDecl *, 2> found;
       proto->getModuleContext()->lookupQualified(
-                           proto, assocType->getFullName(),
+                           proto, DeclNameRef(assocType->getFullName()),
                            NL_QualifiedDefault|NL_ProtocolMembers|NL_OnlyTypes,
                            found);
       if (found.size() == 1 && isa<AssociatedTypeDecl>(found[0]))

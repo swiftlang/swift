@@ -563,7 +563,7 @@ AssociatedTypeInference::inferTypeWitnessesViaAssociatedType(
                    const llvm::SetVector<AssociatedTypeDecl *> &allUnresolved,
                    AssociatedTypeDecl *assocType) {
   // Form the default name _Default_Foo.
-  Identifier defaultName;
+  DeclNameRef defaultName;
   {
     SmallString<32> defaultNameStr;
     {
@@ -572,7 +572,7 @@ AssociatedTypeInference::inferTypeWitnessesViaAssociatedType(
       out << assocType->getName().str();
     }
 
-    defaultName = getASTContext().getIdentifier(defaultNameStr);
+    defaultName = DeclNameRef(getASTContext().getIdentifier(defaultNameStr));
   }
 
   // Look for types with the given default name that have appropriate

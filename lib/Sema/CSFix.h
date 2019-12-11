@@ -284,9 +284,9 @@ protected:
 
 /// Unwrap an optional base when we have a member access.
 class UnwrapOptionalBase final : public ConstraintFix {
-  DeclName MemberName;
+  DeclNameRef MemberName;
 
-  UnwrapOptionalBase(ConstraintSystem &cs, FixKind kind, DeclName member,
+  UnwrapOptionalBase(ConstraintSystem &cs, FixKind kind, DeclNameRef member,
                      ConstraintLocator *locator)
       : ConstraintFix(cs, kind, locator), MemberName(member) {
     assert(kind == FixKind::UnwrapOptionalBase ||
@@ -300,11 +300,11 @@ public:
 
   bool diagnose(bool asNote = false) const override;
 
-  static UnwrapOptionalBase *create(ConstraintSystem &cs, DeclName member,
+  static UnwrapOptionalBase *create(ConstraintSystem &cs, DeclNameRef member,
                                     ConstraintLocator *locator);
 
   static UnwrapOptionalBase *
-  createWithOptionalResult(ConstraintSystem &cs, DeclName member,
+  createWithOptionalResult(ConstraintSystem &cs, DeclNameRef member,
                            ConstraintLocator *locator);
 };
 
@@ -801,9 +801,9 @@ public:
 
 class DefineMemberBasedOnUse final : public ConstraintFix {
   Type BaseType;
-  DeclName Name;
+  DeclNameRef Name;
 
-  DefineMemberBasedOnUse(ConstraintSystem &cs, Type baseType, DeclName member,
+  DefineMemberBasedOnUse(ConstraintSystem &cs, Type baseType, DeclNameRef member,
                          ConstraintLocator *locator)
       : ConstraintFix(cs, FixKind::DefineMemberBasedOnUse, locator),
         BaseType(baseType), Name(member) {}
@@ -819,18 +819,18 @@ public:
   bool diagnose(bool asNote = false) const override;
 
   static DefineMemberBasedOnUse *create(ConstraintSystem &cs, Type baseType,
-                                        DeclName member,
+                                        DeclNameRef member,
                                         ConstraintLocator *locator);
 };
 
 class AllowInvalidMemberRef : public ConstraintFix {
   Type BaseType;
   ValueDecl *Member;
-  DeclName Name;
+  DeclNameRef Name;
 
 protected:
   AllowInvalidMemberRef(ConstraintSystem &cs, FixKind kind, Type baseType,
-                        ValueDecl *member, DeclName name,
+                        ValueDecl *member, DeclNameRef name,
                         ConstraintLocator *locator)
       : ConstraintFix(cs, kind, locator), BaseType(baseType), Member(member),
         Name(name) {}
@@ -840,12 +840,12 @@ public:
 
   ValueDecl *getMember() const { return Member; }
 
-  DeclName getMemberName() const { return Name; }
+  DeclNameRef getMemberName() const { return Name; }
 };
 
 class AllowMemberRefOnExistential final : public AllowInvalidMemberRef {
   AllowMemberRefOnExistential(ConstraintSystem &cs, Type baseType,
-                              DeclName memberName, ValueDecl *member,
+                              DeclNameRef memberName, ValueDecl *member,
                               ConstraintLocator *locator)
       : AllowInvalidMemberRef(cs, FixKind::AllowMemberRefOnExistential,
                               baseType, member, memberName, locator) {}
@@ -862,13 +862,13 @@ public:
 
   static AllowMemberRefOnExistential *create(ConstraintSystem &cs,
                                              Type baseType, ValueDecl *member,
-                                             DeclName memberName,
+                                             DeclNameRef memberName,
                                              ConstraintLocator *locator);
 };
 
 class AllowTypeOrInstanceMember final : public AllowInvalidMemberRef {
   AllowTypeOrInstanceMember(ConstraintSystem &cs, Type baseType,
-                            ValueDecl *member, DeclName name,
+                            ValueDecl *member, DeclNameRef name,
                             ConstraintLocator *locator)
       : AllowInvalidMemberRef(cs, FixKind::AllowTypeOrInstanceMember, baseType,
                               member, name, locator) {
@@ -883,7 +883,7 @@ public:
   bool diagnose(bool asNote = false) const override;
 
   static AllowTypeOrInstanceMember *create(ConstraintSystem &cs, Type baseType,
-                                           ValueDecl *member, DeclName usedName,
+                                           ValueDecl *member, DeclNameRef usedName,
                                            ConstraintLocator *locator);
 };
 
@@ -989,7 +989,7 @@ public:
 
 class AllowMutatingMemberOnRValueBase final : public AllowInvalidMemberRef {
   AllowMutatingMemberOnRValueBase(ConstraintSystem &cs, Type baseType,
-                                  ValueDecl *member, DeclName name,
+                                  ValueDecl *member, DeclNameRef name,
                                   ConstraintLocator *locator)
       : AllowInvalidMemberRef(cs, FixKind::AllowMutatingMemberOnRValueBase,
                               baseType, member, name, locator) {}
@@ -1002,8 +1002,8 @@ public:
   bool diagnose(bool asNote = false) const override;
 
   static AllowMutatingMemberOnRValueBase *
-  create(ConstraintSystem &cs, Type baseType, ValueDecl *member, DeclName name,
-         ConstraintLocator *locator);
+  create(ConstraintSystem &cs, Type baseType, ValueDecl *member,
+         DeclNameRef name, ConstraintLocator *locator);
 };
 
 class AllowClosureParamDestructuring final : public ConstraintFix {
@@ -1145,7 +1145,7 @@ public:
 
 class AllowInaccessibleMember final : public AllowInvalidMemberRef {
   AllowInaccessibleMember(ConstraintSystem &cs, Type baseType,
-                          ValueDecl *member, DeclName name,
+                          ValueDecl *member, DeclNameRef name,
                           ConstraintLocator *locator)
       : AllowInvalidMemberRef(cs, FixKind::AllowInaccessibleMember, baseType,
                               member, name, locator) {}
@@ -1158,7 +1158,7 @@ public:
   bool diagnose(bool asNote = false) const override;
 
   static AllowInaccessibleMember *create(ConstraintSystem &cs, Type baseType,
-                                         ValueDecl *member, DeclName name,
+                                         ValueDecl *member, DeclNameRef name,
                                          ConstraintLocator *locator);
 };
 
@@ -1557,9 +1557,9 @@ public:
 };
 
 class SpecifyBaseTypeForContextualMember final : public ConstraintFix {
-  DeclName MemberName;
+  DeclNameRef MemberName;
 
-  SpecifyBaseTypeForContextualMember(ConstraintSystem &cs, DeclName member,
+  SpecifyBaseTypeForContextualMember(ConstraintSystem &cs, DeclNameRef member,
                                      ConstraintLocator *locator)
       : ConstraintFix(cs, FixKind::SpecifyBaseTypeForContextualMember, locator),
         MemberName(member) {}
@@ -1574,7 +1574,7 @@ public:
   bool diagnose(bool asNote = false) const;
 
   static SpecifyBaseTypeForContextualMember *
-  create(ConstraintSystem &cs, DeclName member, ConstraintLocator *locator);
+  create(ConstraintSystem &cs, DeclNameRef member, ConstraintLocator *locator);
 };
 
 } // end namespace constraints

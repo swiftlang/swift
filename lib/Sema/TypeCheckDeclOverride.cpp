@@ -745,7 +745,7 @@ SmallVector<OverrideMatch, 2> OverrideMatcher::match(
     for (auto *ctx : superContexts) {
       ctx->synthesizeSemanticMembersIfNeeded(membersName);
     }
-    dc->lookupQualified(superContexts, membersName,
+    dc->lookupQualified(superContexts, DeclNameRef(membersName),
                         NL_QualifiedDefault, members);
   }
 

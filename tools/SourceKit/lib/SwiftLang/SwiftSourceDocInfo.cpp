@@ -499,7 +499,7 @@ void walkRelatedDecls(const ValueDecl *VD, const FnTy &Fn) {
   // For now we use unqualified lookup to fetch other declarations with the same
   // base name.
   auto &ctx = VD->getASTContext();
-  auto descriptor = UnqualifiedLookupDescriptor(VD->getBaseName(),
+  auto descriptor = UnqualifiedLookupDescriptor(DeclNameRef(VD->getBaseName()),
                                                 VD->getDeclContext());
   auto lookup = evaluateOrDefault(ctx.evaluator,
                                   UnqualifiedLookupRequest{descriptor}, {});
