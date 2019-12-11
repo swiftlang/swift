@@ -75,6 +75,7 @@ public func _stdlib_thread_barrier_init(
     barrier.pointee.mutex!.deallocate()
     barrier.pointee.cond!.deinitialize(count: 1)
     barrier.pointee.cond!.deallocate()
+    return -1
   }
 #endif
   barrier.pointee.count = count
