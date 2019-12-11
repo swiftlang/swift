@@ -647,3 +647,23 @@ InterpolationTestSuite.test("NSObject") {
       })
   }
 }
+
+// A generic function.
+func toString<T>(_ subject: T?) -> String {
+  return ""
+}
+
+protocol TestProto {
+}
+
+InterpolationTestSuite.test("Interpolation of complex expressions") {
+  class TestClass<T: TestProto>: NSObject {
+    func testFunction() {
+      // The following call should no crash.
+      _checkFormatStringAndBuffer("A complex expression \(toString(self))") {
+        (formatString, _) in
+        expectEqual("A complex expression %s", formatString)
+      }
+    }
+  }
+}
