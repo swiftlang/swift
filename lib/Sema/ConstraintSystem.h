@@ -2817,7 +2817,12 @@ private:
   /// this member and a bit indicating whether or not a bind constraint was added.
   std::pair<Type, bool> adjustTypeOfOverloadReference(
       const OverloadChoice &choice, ConstraintLocator *locator, Type boundType,
-      Type refType, DeclContext *useDC,
+      Type refType);
+
+  /// Add the constraints needed to bind an overload's type variable.
+  void bindOverloadType(
+      const SelectedOverload &overload, Type boundType,
+      ConstraintLocator *locator, DeclContext *useDC,
       llvm::function_ref<void(unsigned int, Type, ConstraintLocator *)>
           verifyThatArgumentIsHashable);
 
