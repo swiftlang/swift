@@ -5029,7 +5029,9 @@ public:
     unsigned numParams;
     unsigned numYields;
     unsigned numResults;
+    bool isGenericSignatureImplied;
     GenericSignatureID rawGenericSig;
+    SubstitutionMapID rawSubs;
     ArrayRef<uint64_t> variableData;
     clang::FunctionType *clangFunctionType = nullptr;
 
@@ -5046,7 +5048,9 @@ public:
                                              numParams,
                                              numYields,
                                              numResults,
+                                             isGenericSignatureImplied,
                                              rawGenericSig,
+                                             rawSubs,
                                              variableData);
 
     // Process the ExtInfo.
@@ -5166,11 +5170,13 @@ public:
     }
 
     GenericSignature genericSig = MF.getGenericSignature(rawGenericSig);
+    SubstitutionMap subs = MF.getSubstitutionMap(rawSubs).getCanonical();
+    
     return SILFunctionType::get(genericSig, extInfo, coroutineKind.getValue(),
                                 calleeConvention.getValue(),
                                 allParams, allYields, allResults,
                                 errorResult,
-                                SubstitutionMap(), false,
+                                subs, isGenericSignatureImplied,
                                 ctx, witnessMethodConformance);
   }
 

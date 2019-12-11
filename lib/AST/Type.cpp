@@ -3559,8 +3559,8 @@ static Type substType(Type derivedType,
            "should not be doing AST type-substitution on a lowered SIL type;"
            "use SILType::subst");
 
-    // Special-case handle SILBoxTypes; we want to structurally substitute the
-    // substitutions.
+    // Special-case handle SILBoxTypes and substituted SILFunctionTypes;
+    // we want to structurally substitute the substitutions.
     if (auto boxTy = dyn_cast<SILBoxType>(type)) {
       auto subMap = boxTy->getSubstitutions();
       auto newSubMap = subMap.subst(substitutions, lookupConformances);
@@ -3569,6 +3569,14 @@ static Type substType(Type derivedType,
                              boxTy->getLayout(),
                              newSubMap);
     }
+    
+    if (auto silFnTy = dyn_cast<SILFunctionType>(type)) {
+      if (auto subs = silFnTy->getSubstitutions()) {
+        auto newSubs = subs.subst(substitutions, lookupConformances);
+        return silFnTy->withSubstitutions(newSubs);
+      }
+    }
+    
 
     // Special-case TypeAliasType; we need to substitute conformances.
     if (auto aliasTy = dyn_cast<TypeAliasType>(type)) {
@@ -4834,4 +4842,15 @@ CanType swift::substOpaqueTypesWithUnderlyingTypes(CanType ty,
     flags =
         SubstFlags::SubstituteOpaqueArchetypes | SubstFlags::AllowLoweredTypes;
   return ty.subst(replacer, replacer, flags)->getCanonicalType();
+}
+
+CanSILFunctionType
+SILFunctionType::withSubstitutions(SubstitutionMap subs) const {
+  return SILFunctionType::get(getSubstGenericSignature(),
+                          getExtInfo(), getCoroutineKind(),
+                          getCalleeConvention(),
+                          getParameters(), getYields(), getResults(),
+                          getOptionalErrorResult(),
+                          subs, isGenericSignatureImplied(),
+                          const_cast<SILFunctionType*>(this)->getASTContext());
 }

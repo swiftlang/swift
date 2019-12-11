@@ -471,10 +471,12 @@ inline IdentTypeRepr::ComponentRange IdentTypeRepr::getComponentRange() {
 ///   (x: Foo, y: Bar) -> Baz
 /// \endcode
 class FunctionTypeRepr : public TypeRepr {
-  // These three are only used in SIL mode, which is the only time
-  // we can have polymorphic function values.
+  // These fields are only used in SIL mode, which is the only time
+  // we can have polymorphic and substituted function values.
   GenericParamList *GenericParams;
   GenericEnvironment *GenericEnv;
+  bool GenericParamsAreImplied;
+  ArrayRef<TypeRepr *> GenericSubs;
 
   TupleTypeRepr *ArgsTy;
   TypeRepr *RetTy;
@@ -483,16 +485,22 @@ class FunctionTypeRepr : public TypeRepr {
 
 public:
   FunctionTypeRepr(GenericParamList *genericParams, TupleTypeRepr *argsTy,
-                   SourceLoc throwsLoc, SourceLoc arrowLoc, TypeRepr *retTy)
+                   SourceLoc throwsLoc, SourceLoc arrowLoc, TypeRepr *retTy,
+                   bool GenericParamsAreImplied = false,
+                   ArrayRef<TypeRepr *> GenericSubs = {})
     : TypeRepr(TypeReprKind::Function),
       GenericParams(genericParams),
       GenericEnv(nullptr),
+      GenericParamsAreImplied(GenericParamsAreImplied),
+      GenericSubs(GenericSubs),
       ArgsTy(argsTy), RetTy(retTy),
       ArrowLoc(arrowLoc), ThrowsLoc(throwsLoc) {
   }
 
   GenericParamList *getGenericParams() const { return GenericParams; }
   GenericEnvironment *getGenericEnvironment() const { return GenericEnv; }
+  bool areGenericParamsImplied() const { return GenericParamsAreImplied; }
+  ArrayRef<TypeRepr*> getSubstitutions() const { return GenericSubs; }
 
   void setGenericEnvironment(GenericEnvironment *genericEnv) {
     assert(GenericEnv == nullptr);
