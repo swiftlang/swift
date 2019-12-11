@@ -1434,8 +1434,6 @@ void Remangler::mangleImplFunctionType(Node *node) {
   if (GenSig)
     mangle(GenSig);
   if (GenSubs) {
-    GenSubs->dump();
-
     Buffer << 'y';
     mangleChildNodes(GenSubs->getChild(0));
     if (GenSubs->getNumChildren() >= 2)
