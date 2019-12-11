@@ -1,4 +1,4 @@
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2019 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -67,6 +67,15 @@ class TestUUID : TestUUIDSuper {
     func test_description() {
         let uuid = UUID()
         expectEqual(uuid.description, uuid.uuidString, "The description must be the same as the uuidString.")
+    }
+
+    func test_LosslessStringConvertible() {
+        let uuidA = UUID()
+        let uuidB = UUID(uuidA.description)
+        expectEqual(uuidA.uuidString, uuidA.description)
+        expectEqual(uuidA.uuidString, String(uuidA))
+        expectEqual(uuidA.uuidString, "\(uuidA)")
+        expectEqual(uuidA, uuidB)
     }
 
     func test_roundTrips() {
@@ -148,6 +157,7 @@ UUIDTests.test("test_InvalidUUID") { TestUUID().test_InvalidUUID() }
 UUIDTests.test("test_NS_uuidString") { TestUUID().test_NS_uuidString() }
 UUIDTests.test("test_uuidString") { TestUUID().test_uuidString() }
 UUIDTests.test("test_description") { TestUUID().test_description() }
+UUIDTests.test("test_LosslessStringConvertible") { TestUUID().test_LosslessStringConvertible() }
 UUIDTests.test("test_roundTrips") { TestUUID().test_roundTrips() }
 UUIDTests.test("test_hash") { TestUUID().test_hash() }
 UUIDTests.test("test_AnyHashableContainingUUID") { TestUUID().test_AnyHashableContainingUUID() }

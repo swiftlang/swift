@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2019 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -16,7 +16,7 @@ import _SwiftCoreFoundationOverlayShims
 
 /// Represents UUID strings, which can be used to uniquely identify types, interfaces, and other items.
 @available(macOS 10.8, iOS 6.0, *)
-public struct UUID : ReferenceConvertible, Hashable, Equatable, CustomStringConvertible {
+public struct UUID : ReferenceConvertible, Hashable, Equatable, LosslessStringConvertible {
     public typealias ReferenceType = NSUUID
 
     public private(set) var uuid: uuid_t = (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
@@ -53,6 +53,11 @@ public struct UUID : ReferenceConvertible, Hashable, Equatable, CustomStringConv
             return nil
         }
     }
+
+    /// Create a UUID from a string such as "E621E1F8-C36C-495A-93FC-0C247A3E6E5F".
+    public init?(_ description: __shared String) {
+        self.init(uuidString: description)
+    }
     
     /// Create a UUID from a `uuid_t`.
     public init(uuid: uuid_t) {
@@ -80,6 +85,7 @@ public struct UUID : ReferenceConvertible, Hashable, Equatable, CustomStringConv
         }
     }
 
+    /// Returns a string created from the UUID, such as "E621E1F8-C36C-495A-93FC-0C247A3E6E5F"
     public var description: String {
         return uuidString
     }
