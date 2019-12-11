@@ -1668,26 +1668,26 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
   if (auto *AE = dyn_cast<ArrowExpr>(E)) {
     if (!AE->isFolded()) return nullptr;
 
-    auto diagnoseMissingParens = [](DiagnosticEngine &DE, TypeRepr *tyR) {
+    auto diagnoseMissingParens = [](ASTContext &ctx, TypeRepr *tyR) {
       bool isVoid = false;
       if (const auto Void = dyn_cast<SimpleIdentTypeRepr>(tyR)) {
-        if (Void->getIdentifier().str() == "Void") {
+        if (Void->getIdentifier() == ctx.Id_Void) {
           isVoid = true;
         }
       }
 
       if (isVoid) {
-        DE.diagnose(tyR->getStartLoc(), diag::function_type_no_parens)
+        ctx.Diags.diagnose(tyR->getStartLoc(), diag::function_type_no_parens)
             .fixItReplace(tyR->getStartLoc(), "()");
       } else {
-        DE.diagnose(tyR->getStartLoc(), diag::function_type_no_parens)
+        ctx.Diags.diagnose(tyR->getStartLoc(), diag::function_type_no_parens)
             .highlight(tyR->getSourceRange())
             .fixItInsert(tyR->getStartLoc(), "(")
             .fixItInsertAfter(tyR->getEndLoc(), ")");
       }
     };
 
-    auto &DE = getASTContext().Diags;
+    auto &ctx = getASTContext();
     auto extractInputTypeRepr = [&](Expr *E) -> TupleTypeRepr * {
       if (!E)
         return nullptr;
@@ -1695,9 +1695,8 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
         auto ArgRepr = TyE->getTypeRepr();
         if (auto *TTyRepr = dyn_cast<TupleTypeRepr>(ArgRepr))
           return TTyRepr;
-        diagnoseMissingParens(DE, ArgRepr);
-        return TupleTypeRepr::create(getASTContext(), {ArgRepr},
-                                     ArgRepr->getSourceRange());
+        diagnoseMissingParens(ctx, ArgRepr);
+        return TupleTypeRepr::create(ctx, {ArgRepr}, ArgRepr->getSourceRange());
       }
       if (auto *TE = dyn_cast<TupleExpr>(E))
         if (TE->getNumElements() == 0)
@@ -1710,9 +1709,8 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
         auto ArgRepr = ArgsTypeExpr->getTypeRepr();
         if (auto *TTyRepr = dyn_cast<TupleTypeRepr>(ArgRepr))
           return TTyRepr;
-        diagnoseMissingParens(DE, ArgRepr);
-        return TupleTypeRepr::create(getASTContext(), {ArgRepr},
-                                     ArgRepr->getSourceRange());
+        diagnoseMissingParens(ctx, ArgRepr);
+        return TupleTypeRepr::create(ctx, {ArgRepr}, ArgRepr->getSourceRange());
       }
       return nullptr;
     };
@@ -1724,8 +1722,7 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
         return TyE->getTypeRepr();
       if (auto *TE = dyn_cast<TupleExpr>(E))
         if (TE->getNumElements() == 0)
-          return TupleTypeRepr::createEmpty(getASTContext(),
-                                            TE->getSourceRange());
+          return TupleTypeRepr::createEmpty(ctx, TE->getSourceRange());
 
       // When simplifying a type expr like "P1 & P2 -> P3 & P4 -> Int",
       // it may have been folded at the same time; recursively simplify it.
@@ -1736,26 +1733,26 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
 
     TupleTypeRepr *ArgsTypeRepr = extractInputTypeRepr(AE->getArgsExpr());
     if (!ArgsTypeRepr) {
-      DE.diagnose(AE->getArgsExpr()->getLoc(),
-                  diag::expected_type_before_arrow);
+      ctx.Diags.diagnose(AE->getArgsExpr()->getLoc(),
+                         diag::expected_type_before_arrow);
       auto ArgRange = AE->getArgsExpr()->getSourceRange();
-      auto ErrRepr = new (getASTContext()) ErrorTypeRepr(ArgRange);
+      auto ErrRepr = new (ctx) ErrorTypeRepr(ArgRange);
       ArgsTypeRepr =
-          TupleTypeRepr::create(getASTContext(), {ErrRepr}, ArgRange);
+          TupleTypeRepr::create(ctx, {ErrRepr}, ArgRange);
     }
 
     TypeRepr *ResultTypeRepr = extractTypeRepr(AE->getResultExpr());
     if (!ResultTypeRepr) {
-      DE.diagnose(AE->getResultExpr()->getLoc(),
-                  diag::expected_type_after_arrow);
-      ResultTypeRepr = new (getASTContext())
+      ctx.Diags.diagnose(AE->getResultExpr()->getLoc(),
+                         diag::expected_type_after_arrow);
+      ResultTypeRepr = new (ctx)
           ErrorTypeRepr(AE->getResultExpr()->getSourceRange());
     }
 
-    auto NewTypeRepr = new (getASTContext())
+    auto NewTypeRepr = new (ctx)
         FunctionTypeRepr(nullptr, ArgsTypeRepr, AE->getThrowsLoc(),
                          AE->getArrowLoc(), ResultTypeRepr);
-    return new (getASTContext()) TypeExpr(TypeLoc(NewTypeRepr, Type()));
+    return new (ctx) TypeExpr(TypeLoc(NewTypeRepr, Type()));
   }
   
   // Fold 'P & Q' into a composition type
