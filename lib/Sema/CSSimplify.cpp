@@ -6515,6 +6515,56 @@ ConstraintSystem::simplifyOneWayConstraint(
                     locator);
 }
 
+bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
+                                      Type contextualType) {
+  auto *locator = typeVar->getImpl().getLocator();
+  auto *closure = cast<ClosureExpr>(simplifyLocatorToAnchor(locator));
+
+  auto *closureType = getClosureType(closure);
+
+  auto *paramList = closure->getParameters();
+  for (unsigned i = 0, n = paramList->size(); i != n; ++i) {
+    const auto *param = paramList->get(i);
+
+    Type externalType = closureType->getParams()[i].getOldType();
+    Type internalType;
+
+    if (param->getTypeRepr()) {
+      internalType = externalType;
+    } else {
+      auto *paramLoc =
+          getConstraintLocator(closure, LocatorPathElt::TupleElement(i));
+
+      internalType = createTypeVariable(paramLoc, TVO_CanBindToLValue |
+                                                      TVO_CanBindToNoEscape);
+
+      addConstraint(ConstraintKind::BindParam, externalType, internalType,
+                    paramLoc);
+    }
+
+    setType(param, internalType);
+  }
+
+  assignFixedType(typeVar, closureType, locator);
+
+  // If this is a multi-statement closure its body doesn't participate
+  // in type-checking.
+  if (closure->hasSingleExpressionBody()) {
+    auto *closureBody = generateConstraints(closure);
+    if (!closureBody)
+      return false;
+
+    // Since result of the closure type has to be r-value type, we have
+    // to use equality here.
+    addConstraint(
+        ConstraintKind::Conversion, getType(closureBody),
+        closureType->getResult(),
+        getConstraintLocator(locator, ConstraintLocator::ClosureResult));
+  }
+
+  return true;
+}
+
 ConstraintSystem::SolutionKind
 ConstraintSystem::simplifyDynamicTypeOfConstraint(
                                         Type type1, Type type2,
