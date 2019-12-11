@@ -1376,28 +1376,17 @@ namespace {
       auto subscriptRef = resolveConcreteDeclRef(subscript, memberLoc);
 
       // Figure out the index and result types.
-      Type resultTy;
-      if (choice.getKind() != OverloadChoiceKind::DynamicMemberLookup &&
-          choice.getKind() != OverloadChoiceKind::KeyPathDynamicMemberLookup) {
-        auto subscriptTy = simplifyType(selected.openedType);
-        auto *subscriptFnTy = subscriptTy->castTo<FunctionType>();
-        resultTy = subscriptFnTy->getResult();
+      auto subscriptTy = simplifyType(selected.openedType);
+      auto *subscriptFnTy = subscriptTy->castTo<FunctionType>();
+      auto resultTy = subscriptFnTy->getResult();
 
-        // Coerce the index argument.
-        index = coerceCallArguments(index, subscriptFnTy, subscriptRef, nullptr,
-                                    argLabels, hasTrailingClosure,
-                                    locator.withPathElement(
-                                      ConstraintLocator::ApplyArgument));
-        if (!index)
-          return nullptr;
-
-      } else {
-        // If this is a @dynamicMemberLookup, then the type of the selection is
-        // actually the property/result type.  That's fine though, and we
-        // already have the index type adjusted to the correct type expected by
-        // the subscript.
-        resultTy = simplifyType(selected.openedType);
-      }
+      // Coerce the index argument.
+      index = coerceCallArguments(index, subscriptFnTy, subscriptRef, nullptr,
+                                  argLabels, hasTrailingClosure,
+                                  locator.withPathElement(
+                                    ConstraintLocator::ApplyArgument));
+      if (!index)
+        return nullptr;
 
       auto getType = [&](const Expr *E) -> Type {
         return cs.getType(E);
@@ -4490,9 +4479,6 @@ namespace {
               OverloadChoiceKind::KeyPathDynamicMemberLookup;
 
       if (forDynamicLookup) {
-        overload.openedType =
-            overload.openedFullType->castTo<AnyFunctionType>()->getResult();
-
         labels = cs.getASTContext().Id_dynamicMember;
 
         auto indexType = getTypeOfDynamicMemberIndex(overload);
