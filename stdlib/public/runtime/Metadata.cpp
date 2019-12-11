@@ -2197,7 +2197,7 @@ static inline ClassROData *getROData(ClassMetadata *theClass) {
   return (ClassROData*)(theClass->Data & ~uintptr_t(SWIFT_CLASS_IS_SWIFT_MASK));
 }
 
-static void initGenericClassObjCName(ClassMetadata *theClass) {
+static char *copyGenericClassObjCName(ClassMetadata *theClass) {
   // Use the remangler to generate a mangled name from the type metadata.
   Demangle::StackAllocatedDemangler<4096> Dem;
 
@@ -2230,11 +2230,46 @@ static void initGenericClassObjCName(ClassMetadata *theClass) {
   } else {
     fullNameBuf[string.size()] = '\0';
   }
+  return fullNameBuf;
+}
 
+static void initGenericClassObjCName(ClassMetadata *theClass) {
   auto theMetaclass = (ClassMetadata *)object_getClass((id)theClass);
 
-  getROData(theClass)->Name = fullNameBuf;
-  getROData(theMetaclass)->Name = fullNameBuf;
+  char *name = copyGenericClassObjCName(theClass);
+  getROData(theClass)->Name = name;
+  getROData(theMetaclass)->Name = name;
+}
+
+static bool installLazyClassNameHandler() {
+  auto _objc_setLazyClassNamer =
+    (void (*)(char * (*)(Class)))
+    dlsym(RTLD_NEXT, "_objc_setLazyClassNamer");  
+  if (_objc_setLazyClassNamer == nullptr)
+    return false;
+
+  _objc_setLazyClassNamer([](Class theClass) {
+    ClassMetadata *metadata;
+    if (class_isMetaClass(theClass)) {
+      metadata = (ClassMetadata *)class_getIvarLayout(theClass);
+    } else {
+      metadata = (ClassMetadata *)theClass;
+    }
+    return copyGenericClassObjCName(metadata);
+  });
+  return true;
+}
+
+static void setUpGenericClassObjCName(ClassMetadata *theClass) {
+  bool supportsLazyNames = SWIFT_LAZY_CONSTANT(installLazyClassNameHandler());
+  if (supportsLazyNames) {
+    getROData(theClass)->Name = nullptr;
+    auto theMetaclass = (ClassMetadata *)object_getClass((id)theClass);
+    getROData(theMetaclass)->Name = nullptr;
+    getROData(theMetaclass)->IvarLayout = (const uint8_t *)theClass;
+  } else {
+    initGenericClassObjCName(theClass);
+  }
 }
 #endif
 
@@ -2488,7 +2523,7 @@ initGenericObjCClass(ClassMetadata *self, size_t numFields,
                      const TypeLayout * const *fieldTypes,
                      size_t *fieldOffsets) {
   // If the class is generic, we need to give it a name for Objective-C.
-  initGenericClassObjCName(self);
+  setUpGenericClassObjCName(self);
 
   ClassROData *rodata = getROData(self);
 
