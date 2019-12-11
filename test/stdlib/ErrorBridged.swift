@@ -792,14 +792,7 @@ ErrorBridgingTests.test("error-to-NSObject casts") {
 ErrorBridgingTests.test("CFError-to-Error casts") {
   func should_not_leak() {
     let something: Any? = NSError(domain: "Foo", code: 1)
-
-    if let error = something as? Error {
-      expectEqual(
-        "The operation couldn’t be completed. (Foo error 1.)",
-        error.localizedDescription)
-    } else {
-      expectUnreachable()
-    }
+    expectTrue(something is Error)
   }
 
   // TODO: Wrap some leak checking around this
