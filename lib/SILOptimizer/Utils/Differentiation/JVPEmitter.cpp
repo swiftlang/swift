@@ -421,13 +421,6 @@ CLONE_AND_EMIT_TANGENT(StoreBorrow, sbi) {
 ///   Original: copy_addr x to y
 ///    Tangent: copy_addr tan[x] to tan[y]
 CLONE_AND_EMIT_TANGENT(CopyAddr, cai) {
-  auto *diffGenEnv = getDifferential().getGenericEnvironment();
-  auto diffGenSig =
-      diffGenEnv ? diffGenEnv->getGenericSignature()->getCanonicalSignature()
-                 : nullptr;
-  Lowering::GenericContextScope genericContextScope(context.getTypeConverter(),
-                                                    diffGenSig);
-
   auto diffBuilder = getDifferentialBuilder();
   auto loc = cai->getLoc();
   auto *bb = cai->getParent();
@@ -919,18 +912,12 @@ void JVPEmitter::emitReturnInstForDifferential() {
 
 void JVPEmitter::prepareForDifferentialGeneration() {
   // Create differential blocks and arguments.
-  auto *diffGenEnv = getDifferential().getGenericEnvironment();
-  auto diffGenSig =
-      diffGenEnv ? diffGenEnv->getGenericSignature()->getCanonicalSignature()
-                 : nullptr;
   auto &differential = getDifferential();
   auto *origEntry = original->getEntryBlock();
   for (auto &origBB : *original) {
     auto *diffBB = differential.createBasicBlock();
     diffBBMap.insert({&origBB, diffBB});
     {
-      Lowering::GenericContextScope genericContextScope(
-          context.getTypeConverter(), diffGenSig);
       auto diffStructLoweredType = remapSILTypeInDifferential(
           differentialInfo.getLinearMapStructLoweredType(&origBB));
 
@@ -1024,12 +1011,6 @@ JVPEmitter::createEmptyDifferential(ADContext &context,
   auto *jvp = witness->getJVP();
   auto origTy = original->getLoweredFunctionType();
   auto lookupConformance = LookUpConformanceInModule(module.getSwiftModule());
-
-  // RAII that pushes the original function's generic signature to
-  // `module.Types` so that calls to `module.Types.getTypeLowering()` below
-  // will know the original function's generic parameter types.
-  Lowering::GenericContextScope genericContextScope(
-      module.Types, origTy->getSubstGenericSignature());
 
   // Parameters of the differential are:
   // - the tangent values of the wrt parameters.
@@ -1382,11 +1363,6 @@ void JVPEmitter::visitApplyInst(ApplyInst *ai) {
       getOpType(differential->getType()).getAs<SILFunctionType>();
   auto differentialType =
       remapType(differential->getType()).castTo<SILFunctionType>();
-  auto jvpGenSig = SubsMap.getGenericSignature()
-                       ? SubsMap.getGenericSignature()->getCanonicalSignature()
-                       : nullptr;
-  Lowering::GenericContextScope genericContextScope(context.getTypeConverter(),
-                                                    jvpGenSig);
   auto loweredDifferentialType =
       getOpType(context.getTypeConverter().getLoweredType(
                     differentialDecl->getInterfaceType()->getCanonicalType(),

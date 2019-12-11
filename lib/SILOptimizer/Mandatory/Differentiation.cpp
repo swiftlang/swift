@@ -781,13 +781,6 @@ static SILFunction *createEmptyVJP(ADContext &context, SILFunction *original,
           original->getName(), AutoDiffDerivativeFunctionKind::VJP, indices))
               .str();
   auto vjpGenericSig = getDerivativeGenericSignature(witness, original);
-
-  // RAII that pushes the original function's generic signature to
-  // `module.Types` so that calls to `module.Types.getTypeLowering()` below
-  // will know the VJP's generic parameter types.
-  Lowering::GenericContextScope genericContextScope(
-      module.Types, vjpGenericSig);
-
   auto *vjpGenericEnv = vjpGenericSig
       ? vjpGenericSig->getGenericEnvironment()
       : nullptr;
@@ -829,13 +822,6 @@ static SILFunction *createEmptyJVP(ADContext &context, SILFunction *original,
           original->getName(), AutoDiffDerivativeFunctionKind::JVP, indices))
               .str();
   auto jvpGenericSig = getDerivativeGenericSignature(witness, original);
-
-  // RAII that pushes the original function's generic signature to
-  // `module.Types` so that calls to `module.Types.getTypeLowering()` below
-  // will know the VJP's generic parameter types.
-  Lowering::GenericContextScope genericContextScope(
-      module.Types, jvpGenericSig);
-
   auto *jvpGenericEnv = jvpGenericSig
       ? jvpGenericSig->getGenericEnvironment()
       : nullptr;

@@ -644,6 +644,9 @@ public:
     case MagicIdentifierLiteralExpr::File:
       kind = "file";
       break;
+    case MagicIdentifierLiteralExpr::FilePath:
+      kind = "filePath";
+      break;
     case MagicIdentifierLiteralExpr::Line:
       kind = "line";
       break;

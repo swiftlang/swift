@@ -231,14 +231,6 @@ static void addCommonFrontendArgs(const ToolChain &TC, const OutputInfo &OI,
   inputArgs.AddLastArg(arguments,
                        options::OPT_enable_fine_grained_dependencies);
   inputArgs.AddLastArg(arguments,
-                       options::OPT_experimental_dependency_include_intrafile);
-  // SWIFT_ENABLE_TENSORFLOW
-  inputArgs.AddLastArg(
-      arguments, options::OPT_enable_experimental_forward_mode_differentiation);
-  // SWIFT_ENABLE_TENSORFLOW END
-  inputArgs.AddLastArg(arguments,
-                       options::OPT_enable_experimental_quasiquotes);
-  inputArgs.AddLastArg(arguments,
                        options::OPT_fine_grained_dependency_include_intrafile);
   inputArgs.AddLastArg(arguments, options::OPT_package_description_version);
   inputArgs.AddLastArg(arguments, options::OPT_serialize_diagnostics_path);
@@ -248,6 +240,12 @@ static void addCommonFrontendArgs(const ToolChain &TC, const OutputInfo &OI,
   inputArgs.AddLastArg(arguments, options::OPT_disable_parser_lookup);
   inputArgs.AddLastArg(arguments,
                        options::OPT_enable_experimental_concise_pound_file);
+  // SWIFT_ENABLE_TENSORFLOW
+  inputArgs.AddLastArg(
+      arguments, options::OPT_enable_experimental_forward_mode_differentiation);
+  inputArgs.AddLastArg(arguments,
+                       options::OPT_enable_experimental_quasiquotes);
+  // SWIFT_ENABLE_TENSORFLOW END
 
   // Pass on any build config options
   inputArgs.AddAllArgs(arguments, options::OPT_D);

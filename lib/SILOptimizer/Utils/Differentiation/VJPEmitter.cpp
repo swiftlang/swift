@@ -77,12 +77,6 @@ SILFunction *VJPEmitter::createEmptyPullback() {
   auto origTy = original->getLoweredFunctionType();
   auto lookupConformance = LookUpConformanceInModule(module.getSwiftModule());
 
-  // RAII that pushes the original function's generic signature to
-  // `module.Types` so that the calls to `module.Types.getTypeLowering()`
-  // below will know the original function's generic parameter types.
-  Lowering::GenericContextScope genericContextScope(
-      module.Types, origTy->getSubstGenericSignature());
-
   // Given a type, returns its formal SIL parameter info.
   auto getTangentParameterInfoForOriginalResult =
       [&](CanType tanType, ResultConvention origResConv) -> SILParameterInfo {
@@ -619,11 +613,6 @@ void VJPEmitter::visitApplyInst(ApplyInst *ai) {
   // the pullback using a thunk.
   auto actualPullbackType =
       getOpType(pullback->getType()).getAs<SILFunctionType>();
-  auto vjpGenSig = SubsMap.getGenericSignature()
-                       ? SubsMap.getGenericSignature()->getCanonicalSignature()
-                       : nullptr;
-  Lowering::GenericContextScope genericContextScope(context.getTypeConverter(),
-                                                    vjpGenSig);
   auto loweredPullbackType =
       getOpType(context.getTypeConverter().getLoweredType(
                     pullbackDecl->getInterfaceType()->getCanonicalType(),

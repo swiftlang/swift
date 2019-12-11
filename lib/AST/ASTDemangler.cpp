@@ -348,50 +348,6 @@ Type ASTBuilder::createTupleType(ArrayRef<Type> eltTypes,
 Type ASTBuilder::createFunctionType(
     ArrayRef<Demangle::FunctionParam<Type>> params,
     Type output, FunctionTypeFlags flags) {
-<<<<<<< HEAD
-  FunctionTypeRepresentation representation;
-  switch (flags.getConvention()) {
-  case FunctionMetadataConvention::Swift:
-    representation = FunctionTypeRepresentation::Swift;
-    break;
-  case FunctionMetadataConvention::Block:
-    representation = FunctionTypeRepresentation::Block;
-    break;
-  case FunctionMetadataConvention::Thin:
-    representation = FunctionTypeRepresentation::Thin;
-    break;
-  case FunctionMetadataConvention::CFunctionPointer:
-    representation = FunctionTypeRepresentation::CFunctionPointer;
-    break;
-  }
-
-  auto einfo = AnyFunctionType::ExtInfo(representation,
-                                        /*throws*/ flags.throws());
-
-  if (representation == FunctionTypeRepresentation::Swift ||
-      representation == FunctionTypeRepresentation::Block) {
-    if (flags.isEscaping())
-      einfo = einfo.withNoEscape(false);
-    else
-      einfo = einfo.withNoEscape(true);
-  }
-
-  // SWIFT_ENABLE_TENSORFLOW
-  switch (flags.getDifferentiabilityKind()) {
-  case FunctionMetadataDifferentiabilityKind::NonDifferentiable:
-    einfo =
-        einfo.withDifferentiabilityKind(DifferentiabilityKind::NonDifferentiable);
-    break;
-  case FunctionMetadataDifferentiabilityKind::Normal:
-    einfo = einfo.withDifferentiabilityKind(DifferentiabilityKind::Normal);
-    break;
-  case FunctionMetadataDifferentiabilityKind::Linear:
-    einfo = einfo.withDifferentiabilityKind(DifferentiabilityKind::Linear);
-    break;
-  }
-
-=======
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-12-09-a
   // The result type must be materializable.
   if (!output->isMaterializable()) return Type();
 
@@ -432,6 +388,19 @@ Type ASTBuilder::createFunctionType(
     break;
   }
 
+  DifferentiabilityKind diffKind;
+  switch (flags.getDifferentiabilityKind()) {
+  case FunctionMetadataDifferentiabilityKind::NonDifferentiable:
+    diffKind = DifferentiabilityKind::NonDifferentiable;
+    break;
+  case FunctionMetadataDifferentiabilityKind::Normal:
+    diffKind = DifferentiabilityKind::Normal;
+    break;
+  case FunctionMetadataDifferentiabilityKind::Linear:
+    diffKind = DifferentiabilityKind::Linear;
+    break;
+  }
+
   auto noescape =
     (representation == FunctionTypeRepresentation::Swift
      || representation == FunctionTypeRepresentation::Block)
@@ -440,7 +409,7 @@ Type ASTBuilder::createFunctionType(
   FunctionType::ExtInfo incompleteExtInfo(
     FunctionTypeRepresentation::Swift,
     noescape, flags.throws(),
-    DifferentiabilityKind::NonDifferentiable,
+    diffKind,
     /*clangFunctionType*/nullptr);
 
   const clang::Type *clangFunctionType = nullptr;

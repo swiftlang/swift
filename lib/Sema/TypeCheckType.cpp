@@ -2572,10 +2572,11 @@ Type TypeResolver::resolveASTFunctionType(
   options |= parentOptions.withoutContext().getFlags();
 
   SmallVector<AnyFunctionType::Param, 8> params;
+  bool isDifferentiable = diffKind != DifferentiabilityKind::NonDifferentiable;
   if (resolveASTFunctionTypeParams(repr->getArgsTypeRepr(), options,
                                    // SWIFT_ENABLE_TENSORFLOW
                                    repr->getGenericEnvironment() != nullptr,
-                                   extInfo.isDifferentiable(), params)) {
+                                   isDifferentiable, params)) {
     return Type();
   }
 

@@ -3023,7 +3023,6 @@ public:
     bool isNoEscape() const { return Bits & NoEscapeMask; }
     bool throws() const { return Bits & ThrowsMask; }
     bool isDifferentiable() const {
-      // return getDifferentiabilityKind() >= DifferentiabilityKind::Normal;
       return getDifferentiabilityKind() >
              DifferentiabilityKind::NonDifferentiable;
     }
@@ -3106,7 +3105,7 @@ public:
     const {
       return ExtInfo((Bits & ~DifferentiabilityMask) |
                      ((unsigned)differentiability <<
-                      DifferentiabilityMaskOffset));
+                      DifferentiabilityMaskOffset), Other);
     }
 
     std::pair<unsigned, const void *> getFuncAttrKey() const {
@@ -4110,7 +4109,7 @@ public:
         DifferentiabilityKind differentiability) const {
       return ExtInfo((Bits & ~DifferentiabilityMask) |
                      ((unsigned)differentiability <<
-                      DifferentiabilityMaskOffset));
+                      DifferentiabilityMaskOffset), Other);
     }
 
     std::pair<unsigned, const void *> getFuncAttrKey() const {

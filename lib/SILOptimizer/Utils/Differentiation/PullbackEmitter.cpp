@@ -375,12 +375,6 @@ bool PullbackEmitter::run() {
   auto pbLoc = getPullback().getLocation();
   LLVM_DEBUG(getADDebugStream() << "Running PullbackEmitter on\n" << original);
 
-  auto *pbGenEnv = getPullback().getGenericEnvironment();
-  auto pbGenSig = pbGenEnv
-                      ? pbGenEnv->getGenericSignature()->getCanonicalSignature()
-                      : nullptr;
-  Lowering::GenericContextScope genericContextScope(
-      getContext().getTypeConverter(), pbGenSig);
   auto origExitIt = original.findReturnBB();
   assert(origExitIt != original.end() &&
          "Functions without returns must have been diagnosed");

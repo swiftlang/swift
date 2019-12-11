@@ -282,7 +282,6 @@ CanSILFunctionType SILFunctionType::getAutoDiffDerivativeFunctionType(
     derivativeFnGenSig = getSubstGenericSignature();
   derivativeFnGenSig = getAutoDiffDerivativeFunctionGenericSignature(
       derivativeFnGenSig, getParameters(), parameterIndices, &TC.M);
-  Lowering::GenericContextScope genericContextScope(TC, derivativeFnGenSig);
 
   // Given a type, returns its formal SIL parameter info.
   auto getTangentParameterInfoForOriginalResult = [&](
@@ -422,7 +421,6 @@ CanSILFunctionType SILFunctionType::getAutoDiffTransposeFunctionType(
     genSig = getSubstGenericSignature();
   genSig = getAutoDiffDerivativeFunctionGenericSignature(
       genSig, getParameters(), parameterIndices, &TC.M);
-  Lowering::GenericContextScope genericContextScope(TC, genSig);
 
   // Given a type, returns its formal SIL parameter info.
   auto getParameterInfoForOriginalResult = [&](
