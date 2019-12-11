@@ -925,7 +925,7 @@ public:
         } else {
           unsigned distance =
             TypeChecker::getCallEditDistance(
-                S->getTargetName(), (*I)->getLabelInfo().Name,
+                DeclNameRef_(S->getTargetName()), (*I)->getLabelInfo().Name,
                 TypeChecker::UnreasonableCallEditDistance);
           if (distance < TypeChecker::UnreasonableCallEditDistance)
             labelCorrections.insert(distance, std::move(*I));
@@ -990,7 +990,7 @@ public:
         } else {
           unsigned distance =
             TypeChecker::getCallEditDistance(
-                S->getTargetName(), (*I)->getLabelInfo().Name,
+                DeclNameRef_(S->getTargetName()), (*I)->getLabelInfo().Name,
                 TypeChecker::UnreasonableCallEditDistance);
           if (distance < TypeChecker::UnreasonableCallEditDistance)
             labelCorrections.insert(distance, std::move(*I));

@@ -113,10 +113,10 @@ filterForEnumElement(DeclContext *DC, SourceLoc UseLoc,
 
 /// Find an unqualified enum element.
 static EnumElementDecl *
-lookupUnqualifiedEnumMemberElement(DeclContext *DC, DeclName name,
+lookupUnqualifiedEnumMemberElement(DeclContext *DC, DeclNameRef name,
                                    SourceLoc UseLoc) {
   // FIXME: We should probably pay attention to argument labels someday.
-  name = name.getBaseName();
+  name = name.withoutArgumentLabels();
 
   auto lookupOptions = defaultUnqualifiedLookupOptions;
   lookupOptions |= NameLookupFlags::KnownPrivate;
@@ -129,12 +129,12 @@ lookupUnqualifiedEnumMemberElement(DeclContext *DC, DeclName name,
 /// Find an enum element in an enum type.
 static EnumElementDecl *
 lookupEnumMemberElement(DeclContext *DC, Type ty,
-                        DeclName name, SourceLoc UseLoc) {
+                        DeclNameRef name, SourceLoc UseLoc) {
   if (!ty->mayHaveMembers())
     return nullptr;
 
   // FIXME: We should probably pay attention to argument labels someday.
-  name = name.getBaseName();
+  name = name.withoutArgumentLabels();
 
   // Look up the case inside the enum.
   // FIXME: We should be able to tell if this is a private lookup.
@@ -174,7 +174,7 @@ struct ExprToIdentTypeRepr : public ASTVisitor<ExprToIdentTypeRepr, bool>
     // Get the declared type.
     if (auto *td = dyn_cast<TypeDecl>(dre->getDecl())) {
       components.push_back(
-        new (C) SimpleIdentTypeRepr(dre->getNameLoc(), td->getName()));
+        new (C) SimpleIdentTypeRepr(dre->getNameLoc(), td->createNameRef()));
       components.back()->setValue(td, nullptr);
       return true;
     }
@@ -1134,7 +1134,7 @@ recur:
         P = new (Context) EnumElementPattern(TypeLoc::withoutLoc(type),
                                              NLE->getLoc(),
                                              DeclNameLoc(NLE->getLoc()),
-                                             NoneEnumElement->getFullName(),
+                                             NoneEnumElement->createNameRef(),
                                              NoneEnumElement, nullptr, false);
         return TypeChecker::coercePatternToType(P, resolution, type, options);
       }
@@ -1169,7 +1169,7 @@ recur:
         sub = new (Context) EnumElementPattern(TypeLoc(),
                                                IP->getStartLoc(),
                                                DeclNameLoc(IP->getEndLoc()),
-                                               some->getFullName(),
+                                               some->createNameRef(),
                                                nullptr, sub,
                                                /*Implicit=*/true);
       }

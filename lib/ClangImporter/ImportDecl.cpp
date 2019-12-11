@@ -7752,7 +7752,7 @@ static void finishTypeWitnesses(
                           NL_OnlyTypes |
                           NL_ProtocolMembers);
 
-    dc->lookupQualified(nominal, assocType->getFullName(), options,
+    dc->lookupQualified(nominal, DeclNameRef_(assocType->getFullName()), options,
                         lookupResults);
     for (auto member : lookupResults) {
       auto typeDecl = cast<TypeDecl>(member);

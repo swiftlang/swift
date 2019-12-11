@@ -263,23 +263,23 @@ class ComponentIdentTypeRepr : public IdentTypeRepr {
   ///
   /// The initial parsed representation is always an identifier, and
   /// name binding will resolve this to a specific declaration.
-  llvm::PointerUnion<DeclName, TypeDecl *> IdOrDecl;
+  llvm::PointerUnion<DeclNameRef, TypeDecl *> IdOrDecl;
 
   /// The declaration context from which the bound declaration was
   /// found. only valid if IdOrDecl is a TypeDecl.
   DeclContext *DC;
 
 protected:
-  ComponentIdentTypeRepr(TypeReprKind K, DeclNameLoc Loc, DeclName Id)
+  ComponentIdentTypeRepr(TypeReprKind K, DeclNameLoc Loc, DeclNameRef Id)
     : IdentTypeRepr(K), Loc(Loc), IdOrDecl(Id), DC(nullptr) {}
 
 public:
   DeclNameLoc getNameLoc() const { return Loc; }
-  DeclName getNameRef() const;
+  DeclNameRef getNameRef() const;
 
   /// Replace the identifier with a new identifier, e.g., due to typo
   /// correction.
-  void overwriteNameRef(DeclName newId) { IdOrDecl = newId; }
+  void overwriteNameRef(DeclNameRef newId) { IdOrDecl = newId; }
 
   /// Return true if this has been name-bound already.
   bool isBound() const { return IdOrDecl.is<TypeDecl *>(); }
@@ -312,7 +312,7 @@ protected:
 /// A simple identifier type like "Int".
 class SimpleIdentTypeRepr : public ComponentIdentTypeRepr {
 public:
-  SimpleIdentTypeRepr(DeclNameLoc Loc, DeclName Id)
+  SimpleIdentTypeRepr(DeclNameLoc Loc, DeclNameRef Id)
     : ComponentIdentTypeRepr(TypeReprKind::SimpleIdent, Loc, Id) {}
 
   // SmallVector::emplace_back will never need to call this because
@@ -342,7 +342,7 @@ class GenericIdentTypeRepr final : public ComponentIdentTypeRepr,
   friend TrailingObjects;
   SourceRange AngleBrackets;
 
-  GenericIdentTypeRepr(DeclNameLoc Loc, DeclName Id,
+  GenericIdentTypeRepr(DeclNameLoc Loc, DeclNameRef Id,
                        ArrayRef<TypeRepr*> GenericArgs,
                        SourceRange AngleBrackets)
     : ComponentIdentTypeRepr(TypeReprKind::GenericIdent, Loc, Id),
@@ -360,7 +360,7 @@ class GenericIdentTypeRepr final : public ComponentIdentTypeRepr,
 public:
   static GenericIdentTypeRepr *create(const ASTContext &C,
                                       DeclNameLoc Loc,
-                                      DeclName Id,
+                                      DeclNameRef Id,
                                       ArrayRef<TypeRepr*> GenericArgs,
                                       SourceRange AngleBrackets);
 

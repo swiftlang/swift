@@ -809,7 +809,8 @@ UnresolvedDeclRefExpr *Parser::parseExprOperator() {
   Identifier name = Context.getIdentifier(Tok.getText());
   consumeToken();
   // Bypass local lookup.
-  return new (Context) UnresolvedDeclRefExpr(name, refKind, DeclNameLoc(loc));
+  return new (Context) UnresolvedDeclRefExpr(DeclNameRef_(name), refKind,
+                                             DeclNameLoc(loc));
 }
 
 static VarDecl *getImplicitSelfDeclForSuperContext(Parser &P,
@@ -823,7 +824,7 @@ static VarDecl *getImplicitSelfDeclForSuperContext(Parser &P,
 
   // Do an actual lookup for 'self' in case it shows up in a capture list.
   auto *methodSelf = methodContext->getImplicitSelfDecl();
-  auto *lookupSelf = P.lookupInScope(P.Context.Id_self);
+  auto *lookupSelf = P.lookupInScope(DeclNameRef_(P.Context.Id_self));
   if (lookupSelf && lookupSelf != methodSelf) {
     // FIXME: This is the wrong diagnostic for if someone manually declares a
     // variable named 'self' using backticks.
@@ -1073,7 +1074,7 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
 
       // Handle "x.42" - a tuple index.
       if (Tok.is(tok::integer_literal)) {
-        DeclName name = Context.getIdentifier(Tok.getText());
+        auto name = DeclNameRef_(Context.getIdentifier(Tok.getText()));
         SourceLoc nameLoc = consumeToken(tok::integer_literal);
         SyntaxContext->createNodeInPlace(SyntaxKind::MemberAccessExpr);
 
@@ -1130,7 +1131,7 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
       Diag<> D = isa<SuperRefExpr>(Result.get())
                      ? diag::expected_identifier_after_super_dot_expr
                      : diag::expected_member_name;
-      DeclName Name = parseUnqualifiedDeclName(/*afterDot=*/true, NameLoc, D);
+      DeclNameRef Name = parseUnqualifiedDeclName(/*afterDot=*/true, NameLoc, D);
       if (!Name)
         return nullptr;
       SyntaxContext->createNodeInPlace(SyntaxKind::MemberAccessExpr);
@@ -1566,7 +1567,7 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
                                                    /*Implicit=*/false));
     }
     
-    DeclName Name;
+    DeclNameRef Name;
     DeclNameLoc NameLoc;
 
     if (Tok.is(tok::code_complete)) {
@@ -1752,8 +1753,9 @@ parseStringSegments(SmallVectorImpl<Lexer::StringSegment> &Segments,
   ParsedTrivia EmptyTrivia;
   bool First = true;
 
-  DeclName appendLiteral(Context, Context.Id_appendLiteral, { Identifier() });
-  DeclName appendInterpolation(Context.Id_appendInterpolation);
+  auto appendLiteral = DeclNameRef_(DeclName(Context, Context.Id_appendLiteral,
+                                             { Identifier() }));
+  auto appendInterpolation = DeclNameRef_(Context.Id_appendInterpolation);
 
   for (auto Segment : Segments) {
     auto InterpolationVarRef =
@@ -2077,7 +2079,7 @@ void Parser::parseOptionalArgumentLabel(Identifier &name, SourceLoc &loc) {
   }
 }
 
-DeclBaseName Parser::parseUnqualifiedDeclBaseName(
+DeclNameRef Parser::parseUnqualifiedDeclBaseName(
                                                  bool afterDot,
                                                  DeclNameLoc &loc,
                                                  const Diagnostic &diag,
@@ -2111,15 +2113,15 @@ DeclBaseName Parser::parseUnqualifiedDeclBaseName(
     baseName = Context.getIdentifier(Tok.getText());
     checkForInputIncomplete();
     diagnose(Tok, diag);
-    return DeclName();
+    return DeclNameRef();
   }
 
   loc = DeclNameLoc(baseNameLoc);
-  return baseName;
+  return DeclNameRef_(baseName);
 }
 
 
-DeclName Parser::parseUnqualifiedDeclName(bool afterDot,
+DeclNameRef Parser::parseUnqualifiedDeclName(bool afterDot,
                                              DeclNameLoc &loc,
                                              const Diagnostic &diag,
                                              bool allowOperators,
@@ -2147,7 +2149,7 @@ DeclName Parser::parseUnqualifiedDeclName(bool afterDot,
               leadingTriviaLoc(), *SyntaxContext));
     consumeToken(tok::r_paren);
     SmallVector<Identifier, 2> argumentLabels;
-    return DeclName(Context, baseName, argumentLabels);
+    return baseName.withArgumentLabels(Context, argumentLabels);
   }
 
   // If the token after that isn't an argument label or ':', we don't have a
@@ -2202,7 +2204,7 @@ DeclName Parser::parseUnqualifiedDeclName(bool afterDot,
 
   loc = DeclNameLoc(Context, loc.getBaseNameLoc(), lparenLoc, argumentLabelLocs,
                     rparenLoc);
-  return DeclName(Context, baseName, argumentLabels);
+  return baseName.withArgumentLabels(Context, argumentLabels);
 }
 
 ///   expr-identifier:
@@ -2215,8 +2217,8 @@ Expr *Parser::parseExprIdentifier() {
 
   // Parse the unqualified-decl-name.
   DeclNameLoc loc;
-  DeclName name = parseUnqualifiedDeclName(/*afterDot=*/false, loc,
-                                           diag::expected_expr);
+  DeclNameRef name = parseUnqualifiedDeclName(/*afterDot=*/false, loc,
+                                              diag::expected_expr);
 
   SmallVector<TypeRepr*, 8> args;
   SourceLoc LAngleLoc, RAngleLoc;
@@ -2254,7 +2256,7 @@ Expr *Parser::parseExprIdentifier() {
       }
     } else {
       for (auto activeVar : DisabledVars) {
-        if (activeVar->getFullName() == name) {
+        if (activeVar->getFullName() == name.getFullName()) {
           diagnose(loc.getBaseNameLoc(), DisabledVarReason);
           return new (Context) ErrorExpr(loc.getSourceRange());
         }
@@ -2895,8 +2897,8 @@ Expr *Parser::parseExprAnonClosureArg() {
     if (Context.LangOpts.DebuggerSupport) {
       auto refKind = DeclRefKind::Ordinary;
       auto identifier = Context.getIdentifier(Name);
-      return new (Context) UnresolvedDeclRefExpr(DeclName(identifier), refKind,
-                                                 DeclNameLoc(Loc));
+      return new (Context) UnresolvedDeclRefExpr(DeclNameRef_(identifier),
+                                                 refKind, DeclNameLoc(Loc));
     }
     diagnose(Loc, diag::anon_closure_arg_not_in_closure);
     return new (Context) ErrorExpr(Loc);

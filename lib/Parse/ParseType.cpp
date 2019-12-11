@@ -529,7 +529,7 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
         if (auto ident = dyn_cast<ComponentIdentTypeRepr>(T)) {
           if (auto decl = ident->getBoundDecl()) {
             if (auto genericParam = dyn_cast<GenericTypeParamDecl>(decl))
-              ident->overwriteNameRef(genericParam->getName());
+              ident->overwriteNameRef(genericParam->createNameRef());
           }
         }
         return true;
@@ -667,7 +667,7 @@ ParserResult<TypeRepr> Parser::parseTypeIdentifier() {
   SourceLoc EndLoc;
   while (true) {
     DeclNameLoc Loc;
-    DeclName Name = parseUnqualifiedDeclBaseName(
+    DeclNameRef Name = parseUnqualifiedDeclBaseName(
         /*afterDot=*/false, Loc,
         diag::expected_identifier_in_dotted_type);
     if (!Name)

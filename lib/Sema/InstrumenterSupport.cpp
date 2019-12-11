@@ -91,7 +91,7 @@ InstrumenterBase::InstrumenterBase(ASTContext &C, DeclContext *DC)
       moduleIdentifier, NLKind::UnqualifiedLookup, results);
 
   if (results.size() == 1)
-    ModuleIdentifier = results.front()->getFullName();
+    ModuleIdentifier = results.front()->createNameRef();
 
   // Setup File identifier
   StringRef filePath = TypeCheckDC->getParentSourceFile()->getFilename();
@@ -108,7 +108,7 @@ InstrumenterBase::InstrumenterBase(ASTContext &C, DeclContext *DC)
       fileIdentifier, NLKind::UnqualifiedLookup, results);
 
   if (results.size() == 1)
-    FileIdentifier = results.front()->getFullName();
+    FileIdentifier = results.front()->createNameRef();
 }
 
 void InstrumenterBase::anchor() {}
@@ -131,7 +131,7 @@ bool InstrumenterBase::doTypeCheckImpl(ASTContext &Ctx, DeclContext *DC,
   return false;
 }
 
-Expr *InstrumenterBase::buildIDArgumentExpr(Optional<DeclName> name,
+Expr *InstrumenterBase::buildIDArgumentExpr(Optional<DeclNameRef> name,
                                             SourceRange SR) {
   if (!name)
     return IntegerLiteralExpr::createFromUnsigned(Context, 0);

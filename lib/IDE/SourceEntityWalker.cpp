@@ -74,7 +74,7 @@ private:
   bool passReference(ValueDecl *D, Type Ty, SourceLoc Loc, SourceRange Range,
                      ReferenceMetaData Data);
   bool passReference(ValueDecl *D, Type Ty, DeclNameLoc Loc, ReferenceMetaData Data);
-  bool passReference(ModuleEntity Mod, std::pair<DeclName, SourceLoc> IdLoc);
+  bool passReference(ModuleEntity Mod, std::pair<DeclNameRef, SourceLoc> IdLoc);
 
   bool passSubscriptReference(ValueDecl *D, SourceLoc Loc,
                               ReferenceMetaData Data, bool IsOpenBracket);
@@ -668,7 +668,7 @@ passReference(ValueDecl *D, Type Ty, SourceLoc BaseNameLoc, SourceRange Range,
 }
 
 bool SemaAnnotator::passReference(ModuleEntity Mod,
-                                  std::pair<DeclName, SourceLoc> IdLoc) {
+                                  std::pair<DeclNameRef, SourceLoc> IdLoc) {
   if (IdLoc.second.isInvalid())
     return true;
   unsigned NameLen = IdLoc.first.getBaseIdentifier().getLength();

@@ -254,7 +254,7 @@ static void installPropertyWrapperMembersIfNeeded(NominalTypeDecl *target,
   }
 }
 
-LookupResult TypeChecker::lookupUnqualified(DeclContext *dc, DeclName name,
+LookupResult TypeChecker::lookupUnqualified(DeclContext *dc, DeclNameRef name,
                                             SourceLoc loc,
                                             NameLookupOptions options) {
   auto ulOptions = convertToUnqualifiedLookupOptions(options);
@@ -262,7 +262,7 @@ LookupResult TypeChecker::lookupUnqualified(DeclContext *dc, DeclName name,
   // Make sure we've resolved implicit members, if we need them.
   if (auto *current = dc->getInnermostTypeContext()) {
     installPropertyWrapperMembersIfNeeded(current->getSelfNominalTypeDecl(),
-                                          name);
+                                          name.getFullName());
   }
 
   auto &ctx = dc->getASTContext();
@@ -294,7 +294,7 @@ LookupResult TypeChecker::lookupUnqualified(DeclContext *dc, DeclName name,
 }
 
 LookupResult
-TypeChecker::lookupUnqualifiedType(DeclContext *dc, DeclName name,
+TypeChecker::lookupUnqualifiedType(DeclContext *dc, DeclNameRef name,
                                    SourceLoc loc,
                                    NameLookupOptions options) {
   auto &ctx = dc->getASTContext();
@@ -327,7 +327,7 @@ TypeChecker::lookupUnqualifiedType(DeclContext *dc, DeclName name,
 }
 
 LookupResult TypeChecker::lookupMember(DeclContext *dc,
-                                       Type type, DeclName name,
+                                       Type type, DeclNameRef name,
                                        NameLookupOptions options) {
   assert(type->mayHaveMembers());
 
@@ -350,8 +350,8 @@ LookupResult TypeChecker::lookupMember(DeclContext *dc,
 
   // Make sure we've resolved implicit members, if we need them.
   if (auto *current = type->getAnyNominal()) {
-    current->synthesizeSemanticMembersIfNeeded(name);
-    installPropertyWrapperMembersIfNeeded(current, name);
+    current->synthesizeSemanticMembersIfNeeded(name.getFullName());
+    installPropertyWrapperMembersIfNeeded(current, name.getFullName());
   }
 
   LookupResultBuilder builder(result, dc, options);
@@ -413,7 +413,7 @@ bool TypeChecker::isUnsupportedMemberTypeAccess(Type type, TypeDecl *typeDecl) {
 }
 
 LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
-                                               Type type, Identifier name,
+                                               Type type, DeclNameRef name,
                                                NameLookupOptions options) {
   LookupTypeResult result;
 
@@ -430,8 +430,8 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
 
   // Make sure we've resolved implicit members, if we need them.
   if (auto *current = type->getAnyNominal()) {
-    current->synthesizeSemanticMembersIfNeeded(name);
-    installPropertyWrapperMembersIfNeeded(current, name);
+    current->synthesizeSemanticMembersIfNeeded(name.getFullName());
+    installPropertyWrapperMembersIfNeeded(current, name.getFullName());
   }
 
   if (!dc->lookupQualified(type, name, subOptions, decls))
@@ -555,7 +555,7 @@ LookupResult TypeChecker::lookupConstructors(DeclContext *dc, Type type,
   return lookupMember(dc, type, DeclNameRef::createConstructor(), options);
 }
 
-unsigned TypeChecker::getCallEditDistance(DeclName writtenName,
+unsigned TypeChecker::getCallEditDistance(DeclNameRef writtenName,
                                           DeclName correctedName,
                                           unsigned maxEditDistance) {
   // TODO: consider arguments.
@@ -591,7 +591,7 @@ unsigned TypeChecker::getCallEditDistance(DeclName writtenName,
   return distance;
 }
 
-static bool isPlausibleTypo(DeclRefKind refKind, DeclName typedName,
+static bool isPlausibleTypo(DeclRefKind refKind, DeclNameRef typedName,
                             ValueDecl *candidate) {
   // Ignore anonymous declarations.
   if (!candidate->hasName())

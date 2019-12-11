@@ -309,7 +309,7 @@ static DeclRefExpr *convertEnumToIndex(SmallVectorImpl<ASTNode> &stmts,
     // generate: case .<Case>:
     auto pat = new (C) EnumElementPattern(TypeLoc::withoutLoc(enumType),
                                           SourceLoc(), DeclNameLoc(),
-                                          DeclName(), elt, nullptr);
+                                          DeclNameRef(), elt, nullptr);
     pat->setImplicit();
     pat->setType(enumType);
 
@@ -369,7 +369,7 @@ static GuardStmt *returnIfNotEqualGuard(ASTContext &C,
   // Next, generate the condition being checked.
   // lhs == rhs
   auto cmpFuncExpr = new (C) UnresolvedDeclRefExpr(
-    DeclName(C.getIdentifier("==")), DeclRefKind::BinaryOperator,
+    DeclNameRef_(C.Id_EqualsOperator), DeclRefKind::BinaryOperator,
     DeclNameLoc());
   auto cmpArgsTuple = TupleExpr::create(C, SourceLoc(),
                                         { lhsExpr, rhsExpr },
@@ -512,7 +512,7 @@ deriveBodyEquatable_enum_hasAssociatedValues_eq(AbstractFunctionDecl *eqDecl,
                                                       lhsPayloadVars);
     auto lhsElemPat = new (C) EnumElementPattern(TypeLoc::withoutLoc(enumType),
                                                  SourceLoc(), DeclNameLoc(),
-                                                 DeclName(), elt,
+                                                 DeclNameRef(), elt,
                                                  lhsSubpattern);
     lhsElemPat->setImplicit();
 
@@ -522,7 +522,7 @@ deriveBodyEquatable_enum_hasAssociatedValues_eq(AbstractFunctionDecl *eqDecl,
                                                       rhsPayloadVars);
     auto rhsElemPat = new (C) EnumElementPattern(TypeLoc::withoutLoc(enumType),
                                                  SourceLoc(), DeclNameLoc(),
-                                                 DeclName(), elt,
+                                                 DeclNameRef(), elt,
                                                  rhsSubpattern);
     rhsElemPat->setImplicit();
 
@@ -1034,7 +1034,7 @@ deriveBodyHashable_enum_hasAssociatedValues_hashInto(
                                                        payloadVars);
     auto pat = new (C) EnumElementPattern(TypeLoc::withoutLoc(enumType),
                                           SourceLoc(), DeclNameLoc(),
-                                          elt->getName(), elt,
+                                          DeclNameRef_(elt->getName()), elt,
                                           payloadPattern);
     pat->setImplicit();
 

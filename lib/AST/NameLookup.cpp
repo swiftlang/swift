@@ -2331,7 +2331,7 @@ CustomAttrNominalRequest::evaluate(Evaluator &evaluator,
 
             ComponentIdentTypeRepr *components[2] = {
               new (ctx) SimpleIdentTypeRepr(identTypeRepr->getNameLoc(),
-                                            moduleName),
+                                            DeclNameRef_(moduleName)),
               identTypeRepr
             };
 

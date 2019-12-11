@@ -999,7 +999,8 @@ static bool canSynthesize(DerivedConformance &derived, ValueDecl *requirement) {
       }
 
       auto result =
-          TypeChecker::lookupMember(superclassDecl, superType, memberName);
+          TypeChecker::lookupMember(superclassDecl, superType,
+                                    DeclNameRef_(memberName));
 
       if (result.empty()) {
         // No super initializer for us to call.

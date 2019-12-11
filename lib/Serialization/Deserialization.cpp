@@ -4124,8 +4124,9 @@ llvm::Error DeclDeserializer::deserializeDeclAttributes() {
         assert(numArgs != 0);
         assert(!isImplicit && "Need to update for implicit");
         Attr = DynamicReplacementAttr::create(
-            ctx, DeclName(ctx, baseName, ArrayRef<Identifier>(pieces)), &MF,
-            replacedFunID);
+            ctx,
+            DeclNameRef_(DeclName(ctx, baseName, ArrayRef<Identifier>(pieces))),
+            &MF, replacedFunID);
         break;
       }
 

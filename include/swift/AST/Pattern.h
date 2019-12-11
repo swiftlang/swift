@@ -505,13 +505,13 @@ class EnumElementPattern : public Pattern {
   TypeLoc ParentType;
   SourceLoc DotLoc;
   DeclNameLoc NameLoc;
-  DeclName Name;
+  DeclNameRef Name;
   PointerUnion<EnumElementDecl *, Expr*> ElementDeclOrUnresolvedOriginalExpr;
   Pattern /*nullable*/ *SubPattern;
   
 public:
   EnumElementPattern(TypeLoc ParentType, SourceLoc DotLoc, DeclNameLoc NameLoc,
-                     DeclName Name, EnumElementDecl *Element,
+                     DeclNameRef Name, EnumElementDecl *Element,
                      Pattern *SubPattern, Optional<bool> Implicit = None)
     : Pattern(PatternKind::EnumElement),
       ParentType(ParentType), DotLoc(DotLoc), NameLoc(NameLoc), Name(Name),
@@ -525,7 +525,7 @@ public:
   /// contextual type.
   EnumElementPattern(SourceLoc DotLoc,
                      DeclNameLoc NameLoc,
-                     DeclName Name,
+                     DeclNameRef Name,
                      Pattern *SubPattern,
                      Expr *UnresolvedOriginalExpr)
     : Pattern(PatternKind::EnumElement),
@@ -551,7 +551,7 @@ public:
   
   void setSubPattern(Pattern *p) { SubPattern = p; }
   
-  DeclName getName() const { return Name; }
+  DeclNameRef getName() const { return Name; }
   
   EnumElementDecl *getElementDecl() const {
     return ElementDeclOrUnresolvedOriginalExpr.dyn_cast<EnumElementDecl*>();

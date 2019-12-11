@@ -67,14 +67,14 @@ class DebuggerTestingTransform : public ASTWalker {
   ASTContext &Ctx;
   DiscriminatorFinder &DF;
   std::vector<DeclContext *> LocalDeclContextStack;
-  const DeclName StringForPrintObjectName;
-  const DeclName DebuggerTestingCheckExpectName;
+  const DeclNameRef StringForPrintObjectName;
+  const DeclNameRef DebuggerTestingCheckExpectName;
 
 public:
   DebuggerTestingTransform(ASTContext &Ctx, DiscriminatorFinder &DF)
       : Ctx(Ctx), DF(DF),
-        StringForPrintObjectName((Ctx.getIdentifier("_stringForPrintObject"))),
-        DebuggerTestingCheckExpectName((Ctx.getIdentifier("_debuggerTestingCheckExpect"))) {}
+        StringForPrintObjectName(DeclNameRef_(Ctx.getIdentifier("_stringForPrintObject"))),
+        DebuggerTestingCheckExpectName(DeclNameRef_(Ctx.getIdentifier("_debuggerTestingCheckExpect"))) {}
 
   bool walkToDeclPre(Decl *D) override {
     pushLocalDeclContext(D);

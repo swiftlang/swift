@@ -2127,7 +2127,7 @@ static VarDecl *synthesizePropertyWrapperStorageWrapperProperty(
   // that to find the storage wrapper property.
   if (auto attr = var->getAttrs().getAttribute<ProjectedValuePropertyAttr>()){
     SmallVector<ValueDecl *, 2> declsFound;
-    auto projectionName = attr->ProjectionPropertyName;
+    auto projectionName = DeclNameRef_(attr->ProjectionPropertyName);
     auto dc = var->getDeclContext();
     if (dc->isTypeContext()) {
       dc->lookupQualified(dc->getSelfNominalTypeDecl(), projectionName,

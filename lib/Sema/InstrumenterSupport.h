@@ -42,8 +42,8 @@ class InstrumenterBase {
 protected:
   ASTContext &Context;
   DeclContext *TypeCheckDC;
-  Optional<DeclName> ModuleIdentifier;
-  Optional<DeclName> FileIdentifier;
+  Optional<DeclNameRef> ModuleIdentifier;
+  Optional<DeclNameRef> FileIdentifier;
 
   InstrumenterBase(ASTContext &C, DeclContext *DC);
   virtual ~InstrumenterBase() = default;
@@ -53,7 +53,7 @@ protected:
 
   /// Create an expression which retrieves a valid ModuleIdentifier or
   /// FileIdentifier, if available.
-  Expr *buildIDArgumentExpr(Optional<DeclName> name, SourceRange SR);
+  Expr *buildIDArgumentExpr(Optional<DeclNameRef> name, SourceRange SR);
 
   class ClosureFinder : public ASTWalker {
   private:

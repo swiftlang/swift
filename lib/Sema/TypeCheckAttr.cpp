@@ -1127,8 +1127,8 @@ static bool hasValidDynamicCallableMethod(NominalTypeDecl *decl,
                                           bool hasKeywordArgs) {
   auto &ctx = decl->getASTContext();
   auto declType = decl->getDeclaredType();
-  auto methodName = DeclName(ctx, DeclBaseName(ctx.Id_dynamicallyCall),
-                             { argumentName });
+  auto methodName = DeclNameRef_(DeclName(ctx, ctx.Id_dynamicallyCall,
+                                          { argumentName }));
   auto candidates = TypeChecker::lookupMember(decl, declType, methodName);
   if (candidates.empty()) return false;
 
@@ -1252,8 +1252,8 @@ visitDynamicMemberLookupAttr(DynamicMemberLookupAttr *attr) {
   };
 
   // Look up `subscript(dynamicMember:)` candidates.
-  auto subscriptName =
-      DeclName(ctx, DeclBaseName::createSubscript(), ctx.Id_dynamicMember);
+  auto subscriptName = DeclNameRef_(
+      DeclName(ctx, DeclBaseName::createSubscript(), ctx.Id_dynamicMember));
   auto candidates = TypeChecker::lookupMember(decl, type, subscriptName);
 
   if (!candidates.empty()) {
@@ -1278,7 +1278,7 @@ visitDynamicMemberLookupAttr(DynamicMemberLookupAttr *attr) {
   //
   // Let's do another lookup using just the base name.
   auto newCandidates =
-      TypeChecker::lookupMember(decl, type, DeclBaseName::createSubscript());
+      TypeChecker::lookupMember(decl, type, DeclNameRef::createSubscript());
 
   // Validate the candidates while ignoring the label.
   newCandidates.filter([&](const LookupResultEntry entry, bool isOuter) {
@@ -2194,7 +2194,7 @@ static FuncDecl *findReplacedAccessor(DeclNameRef replacedVarName,
   if (!origStorage->isDynamic()) {
     Diags.diagnose(attr->getLocation(),
                    diag::dynamic_replacement_accessor_not_dynamic,
-                   replacedVarName);
+                   origStorage->getFullName());
     attr->setInvalid();
     return nullptr;
   }
@@ -2210,7 +2210,8 @@ static FuncDecl *findReplacedAccessor(DeclNameRef replacedVarName,
         origStorage->getWriteImpl() == WriteImplKind::Stored)) {
     Diags.diagnose(attr->getLocation(),
                    diag::dynamic_replacement_accessor_not_explicit,
-                   (unsigned)origAccessor->getAccessorKind(), replacedVarName);
+                   (unsigned)origAccessor->getAccessorKind(),
+                   origStorage->getFullName());
     attr->setInvalid();
     return nullptr;
   }
@@ -2333,13 +2334,13 @@ void AttributeChecker::visitDynamicReplacementAttr(DynamicReplacementAttr *attr)
   if (original->isObjC() && !replacement->isObjC()) {
     diagnose(attr->getLocation(),
              diag::dynamic_replacement_replacement_not_objc_dynamic,
-             attr->getReplacedFunctionName());
+             replacement->getFullName());
     attr->setInvalid();
   }
   if (!original->isObjC() && replacement->isObjC()) {
     diagnose(attr->getLocation(),
              diag::dynamic_replacement_replaced_not_objc_dynamic,
-             attr->getReplacedFunctionName());
+             original->getFullName());
     attr->setInvalid();
   }
 
@@ -2384,8 +2385,9 @@ void AttributeChecker::visitImplementsAttr(ImplementsAttr *attr) {
     ProtocolDecl *PD = PT->getDecl();
 
     // Check that the ProtocolType has the specified member.
-    LookupResult R = TypeChecker::lookupMember(PD->getDeclContext(),
-                                               PT, attr->getMemberName());
+    LookupResult R =
+        TypeChecker::lookupMember(PD->getDeclContext(), PT,
+                                  DeclNameRef_(attr->getMemberName()));
     if (!R) {
       diagnose(attr->getLocation(),
                diag::implements_attr_protocol_lacks_member,

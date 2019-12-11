@@ -79,11 +79,11 @@ void *TypeRepr::operator new(size_t Bytes, const ASTContext &C,
   return C.Allocate(Bytes, Alignment);
 }
 
-DeclName ComponentIdentTypeRepr::getNameRef() const {
-  if (IdOrDecl.is<DeclName>())
-    return IdOrDecl.get<DeclName>();
+DeclNameRef ComponentIdentTypeRepr::getNameRef() const {
+  if (IdOrDecl.is<DeclNameRef>())
+    return IdOrDecl.get<DeclNameRef>();
 
-  return IdOrDecl.get<TypeDecl *>()->getFullName();
+  return DeclNameRef_(IdOrDecl.get<TypeDecl *>()->getFullName());
 }
 
 static void printTypeRepr(const TypeRepr *TyR, ASTPrinter &Printer,
@@ -450,7 +450,7 @@ TupleTypeRepr *TupleTypeRepr::createEmpty(const ASTContext &C,
 
 GenericIdentTypeRepr *GenericIdentTypeRepr::create(const ASTContext &C,
                                                    DeclNameLoc Loc,
-                                                   DeclName Id,
+                                                   DeclNameRef Id,
                                                 ArrayRef<TypeRepr*> GenericArgs,
                                                    SourceRange AngleBrackets) {
   auto size = totalSizeToAlloc<TypeRepr*>(GenericArgs.size());

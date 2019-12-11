@@ -747,7 +747,7 @@ public:
     getScopeInfo().addToScope(D, *this, diagnoseRedefinitions);
   }
 
-  ValueDecl *lookupInScope(DeclName Name) {
+  ValueDecl *lookupInScope(DeclNameRef Name) {
     if (Context.LangOpts.DisableParserLookup)
           return nullptr;
 
@@ -990,7 +990,8 @@ public:
   /// Parse the arguments inside the @differentiable attribute.
   bool parseDifferentiableAttributeArguments(
       bool &linear, SmallVectorImpl<ParsedAutoDiffParameter> &params,
-      Optional<DeclNameWithLoc> &jvpSpec, Optional<DeclNameWithLoc> &vjpSpec,
+      Optional<DeclNameRefWithLoc> &jvpSpec,
+      Optional<DeclNameRefWithLoc> &vjpSpec,
       TrailingWhereClause *&whereClause);
 
   /// Parse a differentiation parameters clause.
@@ -1421,10 +1422,10 @@ public:
   /// \param loc Will be populated with the location of the name.
   /// \param diag The diagnostic to emit if this is not a name.
   /// \param allowOperators Whether to allow operator basenames too.
-  DeclBaseName parseUnqualifiedDeclBaseName(bool afterDot, DeclNameLoc &loc,
-                                            const Diagnostic &diag,
-                                            bool allowOperators=false,
-                                            bool allowDeinitAndSubscript=false);
+  DeclNameRef parseUnqualifiedDeclBaseName(bool afterDot, DeclNameLoc &loc,
+                                           const Diagnostic &diag,
+                                           bool allowOperators=false,
+                                           bool allowDeinitAndSubscript=false);
 
   /// Parse an unqualified-decl-name.
   ///
@@ -1438,11 +1439,11 @@ public:
   /// \param diag The diagnostic to emit if this is not a name.
   /// \param allowOperators Whether to allow operator basenames too.
   /// \param allowZeroArgCompoundNames Whether to allow empty argument lists.
-  DeclName parseUnqualifiedDeclName(bool afterDot, DeclNameLoc &loc,
-                                    const Diagnostic &diag,
-                                    bool allowOperators=false,
-                                    bool allowZeroArgCompoundNames=false,
-                                    bool allowDeinitAndSubscript=false);
+  DeclNameRef parseUnqualifiedDeclName(bool afterDot, DeclNameLoc &loc,
+                                       const Diagnostic &diag,
+                                       bool allowOperators=false,
+                                       bool allowZeroArgCompoundNames=false,
+                                       bool allowDeinitAndSubscript=false);
 
   Expr *parseExprIdentifier();
   Expr *parseExprEditorPlaceholder(Token PlaceholderTok,

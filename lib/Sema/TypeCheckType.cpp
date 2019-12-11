@@ -209,7 +209,7 @@ Type TypeResolution::resolveDependentMemberType(
                     singleType->getBaseName().userFacingName());
 
     // Correct to the single type result.
-    ref->overwriteNameRef(singleType->getFullName());
+    ref->overwriteNameRef(singleType->createNameRef());
     ref->setValue(singleType, nullptr);
   }
 
@@ -1089,7 +1089,7 @@ static Type diagnoseUnknownType(TypeResolution resolution,
         auto type = resolution.mapTypeIntoContext(
           dc->getInnermostTypeContext()->getSelfInterfaceType());
 
-        comp->overwriteNameRef(nominal->getName());
+        comp->overwriteNameRef(DeclNameRef_(nominal->getName()));
         comp->setValue(nominal, nominalDC->getParent());
         return type;
       }
@@ -1140,7 +1140,7 @@ static Type diagnoseUnknownType(TypeResolution resolution,
         .fixItReplace(R, RemappedTy);
 
       // Replace the computed type with the suggested type.
-      comp->overwriteNameRef(ctx.getIdentifier(RemappedTy));
+      comp->overwriteNameRef(DeclNameRef_(ctx.getIdentifier(RemappedTy)));
 
       // HACK: 'NSUInteger' suggests both 'UInt' and 'Int'.
       if (TypeName == ctx.getSwiftName(KnownFoundationEntity::NSUInteger)) {
@@ -1394,7 +1394,7 @@ resolveTopLevelIdentTypeComponent(TypeResolution resolution,
 }
 
 static void diagnoseAmbiguousMemberType(Type baseTy, SourceRange baseRange,
-                                        DeclName name, DeclNameLoc nameLoc,
+                                        DeclNameRef name, DeclNameLoc nameLoc,
                                         LookupTypeResult &lookup) {
   ASTContext &ctx = baseTy->getASTContext();
   auto &diags = ctx.Diags;
@@ -1647,7 +1647,7 @@ Type TypeChecker::resolveIdentifierType(
     if (!options.contains(TypeResolutionFlags::SilenceErrors)) {
       auto moduleName = moduleTy->getModule()->getName();
       diags.diagnose(Components.back()->getNameLoc(),
-                     diag::use_undeclared_type, moduleName);
+                     diag::use_undeclared_type, DeclNameRef_(moduleName));
       diags.diagnose(Components.back()->getNameLoc(),
                      diag::note_module_as_type, moduleName);
     }

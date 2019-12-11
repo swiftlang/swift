@@ -82,6 +82,11 @@ namespace swift {
     ArrayRef<ValueDecl*> getMemberDecls(InterestedMemberKind Kind);
   };
 
+  /// Look up a member with the given name in the given type.
+  ///
+  /// Unlike other member lookup functions, \c swift::resolveValueMember()
+  /// should be used when you want to look up declarations with the same name as
+  /// one you already have.
   ResolvedMemberResult resolveValueMember(DeclContext &DC, Type BaseTy,
                                          DeclName Name);
 

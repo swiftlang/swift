@@ -3177,7 +3177,7 @@ class ObjCSelectorWalker : public ASTWalker {
     auto nominal = method->getDeclContext()->getSelfNominalTypeDecl();
     auto result = TypeChecker::lookupMember(
         const_cast<DeclContext *>(DC), nominal->getDeclaredInterfaceType(),
-        lookupName,
+        DeclNameRef_(lookupName),
         (defaultMemberLookupOptions | NameLookupFlags::KnownPrivate));
 
     // If we didn't find multiple methods, there is no ambiguity.

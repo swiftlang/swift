@@ -40,14 +40,14 @@ namespace {
 class Instrumenter : InstrumenterBase {
 private:
   unsigned &TmpNameIndex;
-  DeclName LogBeforeName;
-  DeclName LogAfterName;
+  DeclNameRef LogBeforeName;
+  DeclNameRef LogAfterName;
 
 public:
   Instrumenter(ASTContext &C, DeclContext *DC, unsigned &TmpNameIndex)
       : InstrumenterBase(C, DC), TmpNameIndex(TmpNameIndex),
-        LogBeforeName((C.getIdentifier("__builtin_pc_before"))),
-        LogAfterName((C.getIdentifier("__builtin_pc_after"))) {}
+        LogBeforeName(DeclNameRef_(C.getIdentifier("__builtin_pc_before"))),
+        LogAfterName(DeclNameRef_(C.getIdentifier("__builtin_pc_after"))) {}
 
   Stmt *transformStmt(Stmt *S) {
     switch (S->getKind()) {
@@ -592,7 +592,7 @@ public:
     return *AddedGet;
   }
 
-  Added<Stmt *> buildLoggerCallWithArgs(DeclName LoggerName,
+  Added<Stmt *> buildLoggerCallWithArgs(DeclNameRef LoggerName,
                                         SourceRange SR) {
     if (!SR.isValid()) {
       return nullptr;

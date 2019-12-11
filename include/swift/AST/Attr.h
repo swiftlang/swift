@@ -68,7 +68,7 @@ public:
 
   struct Convention {
     StringRef Name = {};
-    DeclName WitnessMethodProtocol = {};
+    DeclNameRef WitnessMethodProtocol = {};
     StringRef ClangType = {};
     // Carry the source location for diagnostics.
     SourceLoc ClangTypeLoc = {};
@@ -78,7 +78,7 @@ public:
     /// Don't use this function if you are creating a C convention as you
     /// probably need a ClangType field as well.
     static Convention makeSwiftConvention(StringRef name) {
-      return {name, DeclName(), "", {}};
+      return {name, DeclNameRef(), "", {}};
     }
   };
 
@@ -1057,15 +1057,16 @@ class DynamicReplacementAttr final
   friend TrailingObjects;
   friend class DynamicallyReplacedDeclRequest;
 
-  DeclName ReplacedFunctionName;
+  DeclNameRef ReplacedFunctionName;
   LazyMemberLoader *Resolver = nullptr;
   uint64_t ResolverContextData;
 
   /// Create an @_dynamicReplacement(for:) attribute written in the source.
   DynamicReplacementAttr(SourceLoc atLoc, SourceRange baseRange,
-                         DeclName replacedFunctionName, SourceRange parenRange);
+                         DeclNameRef replacedFunctionName,
+                         SourceRange parenRange);
 
-  DynamicReplacementAttr(DeclName name, AbstractFunctionDecl *f)
+  DynamicReplacementAttr(DeclNameRef name, AbstractFunctionDecl *f)
       : DeclAttribute(DAK_DynamicReplacement, SourceLoc(), SourceRange(),
                       /*Implicit=*/false),
         ReplacedFunctionName(name),
@@ -1073,7 +1074,7 @@ class DynamicReplacementAttr final
     Bits.DynamicReplacementAttr.HasTrailingLocationInfo = false;
   }
 
-  DynamicReplacementAttr(DeclName name,
+  DynamicReplacementAttr(DeclNameRef name,
                          LazyMemberLoader *Resolver = nullptr,
                          uint64_t Data = 0)
       : DeclAttribute(DAK_DynamicReplacement, SourceLoc(), SourceRange(),
@@ -1100,18 +1101,18 @@ class DynamicReplacementAttr final
 public:
   static DynamicReplacementAttr *
   create(ASTContext &Context, SourceLoc AtLoc, SourceLoc DynReplLoc,
-         SourceLoc LParenLoc, DeclName replacedFunction, SourceLoc RParenLoc);
+         SourceLoc LParenLoc, DeclNameRef replacedFunction, SourceLoc RParenLoc);
 
   static DynamicReplacementAttr *create(ASTContext &ctx,
-                                        DeclName replacedFunction,
+                                        DeclNameRef replacedFunction,
                                         AbstractFunctionDecl *replacedFuncDecl);
 
   static DynamicReplacementAttr *create(ASTContext &ctx,
-                                        DeclName replacedFunction,
+                                        DeclNameRef replacedFunction,
                                         LazyMemberLoader *Resolver,
                                         uint64_t Data);
 
-  DeclName getReplacedFunctionName() const {
+  DeclNameRef getReplacedFunctionName() const {
     return ReplacedFunctionName;
   }
 
@@ -1630,8 +1631,8 @@ public:
 };
 
 /// A declaration name with location.
-struct DeclNameWithLoc {
-  DeclName Name;
+struct DeclNameRefWithLoc {
+  DeclNameRef Name;
   DeclNameLoc Loc;
 };
 
@@ -1652,9 +1653,9 @@ class DifferentiableAttr final
   /// The number of parsed parameters specified in 'wrt:'.
   unsigned NumParsedParameters = 0;
   /// The JVP function.
-  Optional<DeclNameWithLoc> JVP;
+  Optional<DeclNameRefWithLoc> JVP;
   /// The VJP function.
-  Optional<DeclNameWithLoc> VJP;
+  Optional<DeclNameRefWithLoc> VJP;
   /// The JVP function (optional), resolved by the type checker if JVP name is
   /// specified.
   FuncDecl *JVPFunction = nullptr;
@@ -1674,15 +1675,15 @@ class DifferentiableAttr final
   explicit DifferentiableAttr(bool implicit, SourceLoc atLoc,
                               SourceRange baseRange, bool linear,
                               ArrayRef<ParsedAutoDiffParameter> parameters,
-                              Optional<DeclNameWithLoc> jvp,
-                              Optional<DeclNameWithLoc> vjp,
+                              Optional<DeclNameRefWithLoc> jvp,
+                              Optional<DeclNameRefWithLoc> vjp,
                               TrailingWhereClause *clause);
 
   explicit DifferentiableAttr(Decl *original, bool implicit, SourceLoc atLoc,
                               SourceRange baseRange, bool linear,
                               IndexSubset *parameterIndices,
-                              Optional<DeclNameWithLoc> jvp,
-                              Optional<DeclNameWithLoc> vjp,
+                              Optional<DeclNameRefWithLoc> jvp,
+                              Optional<DeclNameRefWithLoc> vjp,
                               GenericSignature derivativeGenericSignature);
 
 public:
@@ -1690,27 +1691,27 @@ public:
                                     SourceLoc atLoc, SourceRange baseRange,
                                     bool linear,
                                     ArrayRef<ParsedAutoDiffParameter> params,
-                                    Optional<DeclNameWithLoc> jvp,
-                                    Optional<DeclNameWithLoc> vjp,
+                                    Optional<DeclNameRefWithLoc> jvp,
+                                    Optional<DeclNameRefWithLoc> vjp,
                                     TrailingWhereClause *clause);
 
   static DifferentiableAttr *create(AbstractFunctionDecl *original,
                                     bool implicit, SourceLoc atLoc,
                                     SourceRange baseRange, bool linear,
                                     IndexSubset *parameterIndices,
-                                    Optional<DeclNameWithLoc> jvp,
-                                    Optional<DeclNameWithLoc> vjp,
+                                    Optional<DeclNameRefWithLoc> jvp,
+                                    Optional<DeclNameRefWithLoc> vjp,
                                     GenericSignature derivativeGenSig);
 
   /// Get the optional 'jvp:' function name and location.
   /// Use this instead of `getJVPFunction` to check whether the attribute has a
   /// registered JVP.
-  Optional<DeclNameWithLoc> getJVP() const { return JVP; }
+  Optional<DeclNameRefWithLoc> getJVP() const { return JVP; }
 
   /// Get the optional 'vjp:' function name and location.
   /// Use this instead of `getVJPFunction` to check whether the attribute has a
   /// registered VJP.
-  Optional<DeclNameWithLoc> getVJP() const { return VJP; }
+  Optional<DeclNameRefWithLoc> getVJP() const { return VJP; }
 
   IndexSubset *getParameterIndices() const {
     return ParameterIndices;
@@ -1775,7 +1776,7 @@ class DerivativeAttr final
   friend TrailingObjects;
 
   /// The original function name.
-  DeclNameWithLoc OriginalFunctionName;
+  DeclNameRefWithLoc OriginalFunctionName;
   /// The original function declaration, resolved by the type checker.
   AbstractFunctionDecl *OriginalFunction = nullptr;
   /// The number of parsed parameters specified in 'wrt:'.
@@ -1786,23 +1787,24 @@ class DerivativeAttr final
   Optional<AutoDiffDerivativeFunctionKind> Kind = None;
 
   explicit DerivativeAttr(bool implicit, SourceLoc atLoc, SourceRange baseRange,
-                          DeclNameWithLoc original,
+                          DeclNameRefWithLoc original,
                           ArrayRef<ParsedAutoDiffParameter> params);
 
   explicit DerivativeAttr(bool implicit, SourceLoc atLoc, SourceRange baseRange,
-                          DeclNameWithLoc original, IndexSubset *indices);
+                          DeclNameRefWithLoc original, IndexSubset *indices);
 
 public:
   static DerivativeAttr *create(ASTContext &context, bool implicit,
                                 SourceLoc atLoc, SourceRange baseRange,
-                                DeclNameWithLoc original,
+                                DeclNameRefWithLoc original,
                                 ArrayRef<ParsedAutoDiffParameter> params);
 
   static DerivativeAttr *create(ASTContext &context, bool implicit,
                                 SourceLoc atLoc, SourceRange baseRange,
-                                DeclNameWithLoc original, IndexSubset *indices);
+                                DeclNameRefWithLoc original,
+                                IndexSubset *indices);
 
-  DeclNameWithLoc getOriginalFunctionName() const {
+  DeclNameRefWithLoc getOriginalFunctionName() const {
     return OriginalFunctionName;
   }
   AbstractFunctionDecl *getOriginalFunction() const {

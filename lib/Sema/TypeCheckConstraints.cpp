@@ -295,8 +295,8 @@ static bool diagnoseOperatorJuxtaposition(UnresolvedDeclRefExpr *UDRE,
     if (!Lexer::isOperator(startStr) || !Lexer::isOperator(endStr))
       continue;
 
-    auto startName = Context.getIdentifier(startStr);
-    auto endName = Context.getIdentifier(endStr);
+    auto startName = DeclNameRef_(Context.getIdentifier(startStr));
+    auto endName = DeclNameRef_(Context.getIdentifier(endStr));
 
     // Perform name lookup for the first and second pieces.  If either fail to
     // be found, then it isn't a valid split.
@@ -378,7 +378,7 @@ static bool diagnoseRangeOperatorMisspell(DiagnosticEngine &Diags,
   if (!corrected.empty()) {
     Diags
         .diagnose(UDRE->getLoc(), diag::use_unresolved_identifier_corrected,
-                  name, true, corrected)
+                  UDRE->getName(), true, corrected)
         .highlight(UDRE->getSourceRange())
         .fixItReplace(UDRE->getSourceRange(), corrected);
 
@@ -402,7 +402,7 @@ static bool diagnoseIncDecOperator(DiagnosticEngine &Diags,
   if (!corrected.empty()) {
     Diags
         .diagnose(UDRE->getLoc(), diag::use_unresolved_identifier_corrected,
-                  name, true, corrected)
+                  UDRE->getName(), true, corrected)
         .highlight(UDRE->getSourceRange());
 
     return true;
@@ -442,7 +442,7 @@ static bool findNonMembers(ArrayRef<LookupResultEntry> lookupResults,
 ///
 /// This is very restrictive because it's a source compatibility issue (see the
 /// if (AllConditionalConformances) { (void)findNonMembers(...); } below).
-static bool shouldConsiderOuterResultsFor(DeclName name) {
+static bool shouldConsiderOuterResultsFor(DeclNameRef name) {
   const StringRef specialNames[] = {"min", "max"};
   for (auto specialName : specialNames)
     if (name.isSimpleName(specialName))
@@ -457,7 +457,7 @@ static bool shouldConsiderOuterResultsFor(DeclName name) {
 Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
                                       DeclContext *DC) {
   // Process UnresolvedDeclRefExpr by doing an unqualified lookup.
-  DeclName Name = UDRE->getName();
+  DeclNameRef Name = UDRE->getName();
   DeclNameLoc Loc = UDRE->getNameLoc();
 
   // Perform standard value name lookup.
@@ -492,7 +492,7 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
       // FIXME: What if the unviable candidates have different levels of access?
       const ValueDecl *first = inaccessibleResults.front().getValueDecl();
       Context.Diags.diagnose(
-          Loc, diag::candidate_inaccessible, Name,
+          Loc, diag::candidate_inaccessible, first->getBaseName(),
           first->getFormalAccessScope().accessLevelForDiagnostics());
 
       // FIXME: If any of the candidates (usually just one) are in the same
@@ -541,7 +541,7 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
     };
 
     if (!isConfused) {
-      if (Name == Context.Id_Self) {
+      if (Name.isSimpleName(Context.Id_Self)) {
         if (DeclContext *typeContext = DC->getInnermostTypeContext()){
           Type SelfType = typeContext->getSelfInterfaceType();
 
@@ -624,7 +624,8 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
     while (localDeclAfterUse) {
       if (Lookup.outerResults().empty()) {
         Context.Diags.diagnose(Loc, diag::use_local_before_declaration, Name);
-        Context.Diags.diagnose(innerDecl, diag::decl_declared_here, Name);
+        Context.Diags.diagnose(innerDecl, diag::decl_declared_here,
+                               localDeclAfterUse->getFullName());
         Expr *error = new (Context) ErrorExpr(UDRE->getSourceRange());
         return error;
       }
@@ -1027,7 +1028,7 @@ namespace {
               if (newArg) {
                 auto newCallee = new (Context) UnresolvedDotExpr(
                     callee->getBase(), /*dotloc=*/SourceLoc(),
-                    DeclName(Context.Id_appendInterpolation),
+                    DeclNameRef_(Context.Id_appendInterpolation),
                     /*nameloc=*/DeclNameLoc(), /*Implicit=*/true);
 
                 E = CallExpr::create(Context, newCallee, lParen, {newArg},
@@ -1399,7 +1400,7 @@ TypeExpr *PreCheckExpression::simplifyNestedTypeExpr(UnresolvedDotExpr *UDE) {
       UDE->getName().isSpecial())
     return nullptr;
 
-  auto Name = UDE->getName().getBaseIdentifier();
+  auto Name = UDE->getName();
   auto NameLoc = UDE->getNameLoc();
 
   // Qualified type lookup with a module base is represented as a DeclRefExpr
@@ -1435,7 +1436,7 @@ TypeExpr *PreCheckExpression::simplifyNestedTypeExpr(UnresolvedDotExpr *UDE) {
     return nullptr;
 
   // Fold 'T.Protocol' into a protocol metatype.
-  if (Name == getASTContext().Id_Protocol) {
+  if (Name.isSimpleName(getASTContext().Id_Protocol)) {
     auto *NewTypeRepr =
         new (getASTContext()) ProtocolTypeRepr(InnerTypeRepr,
                                                NameLoc.getBaseNameLoc());
@@ -1444,7 +1445,7 @@ TypeExpr *PreCheckExpression::simplifyNestedTypeExpr(UnresolvedDotExpr *UDE) {
 
   // Fold 'T.Type' into an existential metatype if 'T' is a protocol,
   // or an ordinary metatype otherwise.
-  if (Name == getASTContext().Id_Type) {
+  if (Name.isSimpleName(getASTContext().Id_Type)) {
     auto *NewTypeRepr =
         new (getASTContext()) MetatypeTypeRepr(InnerTypeRepr,
                                                NameLoc.getBaseNameLoc());
@@ -2529,7 +2530,7 @@ TypeChecker::getTypeOfCompletionOperator(DeclContext *DC, Expr *LHS,
   // Build temporary expression to typecheck.
   // We allocate these expressions on the stack because we know they can't
   // escape and there isn't a better way to allocate scratch Expr nodes.
-  UnresolvedDeclRefExpr UDRE(opName, refKind, DeclNameLoc(Loc));
+  UnresolvedDeclRefExpr UDRE(DeclNameRef_(opName), refKind, DeclNameLoc(Loc));
   auto *opExpr = TypeChecker::resolveDeclRefExpr(&UDRE, DC);
 
   switch (refKind) {
@@ -2614,7 +2615,7 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
           loc = cs->getConstraintLocator(loc, ConstraintLocator::Member);
           Type memberType = cs->createTypeVariable(loc, TVO_CanBindToLValue);
           cs->addValueMemberConstraint(
-              valueType, wrapperInfo.valueVar->getFullName(),
+              valueType, wrapperInfo.valueVar->createNameRef(),
               memberType, dc, FunctionRefKind::Unapplied, { }, loc);
           valueType = memberType;
         }
@@ -3113,8 +3114,9 @@ bool TypeChecker::typeCheckExprPattern(ExprPattern *EP, DeclContext *DC,
   // Find '~=' operators for the match.
   auto lookupOptions = defaultUnqualifiedLookupOptions;
   lookupOptions |= NameLookupFlags::KnownPrivate;
-  auto matchLookup = lookupUnqualified(DC, Context.Id_MatchOperator,
-                                       SourceLoc(), lookupOptions);
+  auto matchLookup =
+      lookupUnqualified(DC, DeclNameRef_(Context.Id_MatchOperator), SourceLoc(),
+                        lookupOptions);
   auto &diags = DC->getASTContext().Diags;
   if (!matchLookup) {
     diags.diagnose(EP->getLoc(), diag::no_match_operator);
@@ -4574,7 +4576,8 @@ IsCallableNominalTypeRequest::evaluate(Evaluator &evaluator, CanType ty,
   // Look for a callAsFunction method.
   auto &ctx = ty->getASTContext();
   auto results =
-      TypeChecker::lookupMember(dc, ty, ctx.Id_callAsFunction, options);
+      TypeChecker::lookupMember(dc, ty, DeclNameRef_(ctx.Id_callAsFunction),
+                                options);
   return llvm::any_of(results, [](LookupResultEntry entry) -> bool {
     if (auto *fd = dyn_cast<FuncDecl>(entry.getValueDecl()))
       return fd->isCallAsFunctionMethod();

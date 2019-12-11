@@ -42,13 +42,13 @@ private:
   unsigned &TmpNameIndex;
   bool HighPerformance;
 
-  DeclName DebugPrintName;
-  DeclName PrintName;
-  DeclName PostPrintName;
-  DeclName LogWithIDName;
-  DeclName LogScopeExitName;
-  DeclName LogScopeEntryName;
-  DeclName SendDataName;
+  DeclNameRef DebugPrintName;
+  DeclNameRef PrintName;
+  DeclNameRef PostPrintName;
+  DeclNameRef LogWithIDName;
+  DeclNameRef LogScopeExitName;
+  DeclNameRef LogScopeEntryName;
+  DeclNameRef SendDataName;
 
   struct BracePair {
   public:
@@ -126,13 +126,13 @@ public:
                unsigned &TmpNameIndex)
       : InstrumenterBase(C, DC), RNG(RNG), TmpNameIndex(TmpNameIndex),
         HighPerformance(HP),
-        DebugPrintName((C.getIdentifier("__builtin_debugPrint"))),
-        PrintName((C.getIdentifier("__builtin_print"))),
-        PostPrintName((C.getIdentifier("__builtin_postPrint"))),
-        LogWithIDName((C.getIdentifier("__builtin_log_with_id"))),
-        LogScopeExitName((C.getIdentifier("__builtin_log_scope_exit"))),
-        LogScopeEntryName((C.getIdentifier("__builtin_log_scope_entry"))),
-        SendDataName((C.getIdentifier("__builtin_send_data"))) { }
+        DebugPrintName(DeclNameRef_(C.getIdentifier("__builtin_debugPrint"))),
+        PrintName(DeclNameRef_(C.getIdentifier("__builtin_print"))),
+        PostPrintName(DeclNameRef_(C.getIdentifier("__builtin_postPrint"))),
+        LogWithIDName(DeclNameRef_(C.getIdentifier("__builtin_log_with_id"))),
+        LogScopeExitName(DeclNameRef_(C.getIdentifier("__builtin_log_scope_exit"))),
+        LogScopeEntryName(DeclNameRef_(C.getIdentifier("__builtin_log_scope_entry"))),
+        SendDataName(DeclNameRef_(C.getIdentifier("__builtin_send_data"))) { }
 
   Stmt *transformStmt(Stmt *S) {
     switch (S->getKind()) {
@@ -714,7 +714,7 @@ public:
   Added<Stmt *> logPrint(bool isDebugPrint, ApplyExpr *AE,
                          PatternBindingDecl *&ArgPattern,
                          VarDecl *&ArgVariable) {
-    DeclName LoggerName = isDebugPrint ? DebugPrintName : PrintName;
+    DeclNameRef LoggerName = isDebugPrint ? DebugPrintName : PrintName;
 
     UnresolvedDeclRefExpr *LoggerRef = new (Context) UnresolvedDeclRefExpr(
         LoggerName, DeclRefKind::Ordinary,
@@ -801,7 +801,7 @@ public:
     return buildLoggerCallWithArgs(LoggerName, MutableArrayRef<Expr *>(), SR);
   }
 
-  Added<Stmt *> buildLoggerCallWithArgs(DeclName LoggerName,
+  Added<Stmt *> buildLoggerCallWithArgs(DeclNameRef LoggerName,
                                         MutableArrayRef<Expr *> Args,
                                         SourceRange SR) {
     // If something doesn't have a valid source range it can not be playground
