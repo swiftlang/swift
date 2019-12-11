@@ -59,7 +59,7 @@ class Identifier {
   
 public:
   enum : size_t {
-    NumLowBitsAvailable = 2,
+    NumLowBitsAvailable = 3,
     RequiredAlignment = 1 << NumLowBitsAvailable,
     SpareBitMask = ((intptr_t)1 << NumLowBitsAvailable) - 1
   };
@@ -72,7 +72,7 @@ private:
   }
 
   /// A type with the alignment expected of a valid \c Identifier::Pointer .
-  struct alignas(uint32_t) Aligner {};
+  struct alignas(uint64_t) Aligner {};
 
   static_assert(alignof(Aligner) >= RequiredAlignment,
                 "Identifier table will provide enough spare bits");
