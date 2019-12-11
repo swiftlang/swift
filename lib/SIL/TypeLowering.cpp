@@ -239,12 +239,12 @@ namespace {
       switch (type->getDifferentiabilityKind()) {
       case DifferentiabilityKind::Normal:
         return asImpl().visitNormalDifferentiableSILFunctionType(
-            type,
-            getNormalDifferentiableSILFunctionTypeRecursiveProperties(type));
+            type, getNormalDifferentiableSILFunctionTypeRecursiveProperties(
+                      type, origType));
       case DifferentiabilityKind::Linear:
         return asImpl().visitLinearDifferentiableSILFunctionType(
-            type,
-            getLinearDifferentiableSILFunctionTypeRecursiveProperties(type));
+            type, getLinearDifferentiableSILFunctionTypeRecursiveProperties(
+                      type, origType));
       case DifferentiabilityKind::NonDifferentiable:
         break;
       }
@@ -262,7 +262,7 @@ namespace {
     // SWIFT_ENABLE_TENSORFLOW
     RecursiveProperties
     getNormalDifferentiableSILFunctionTypeRecursiveProperties(
-        CanSILFunctionType type) {
+        CanSILFunctionType type, AbstractionPattern origType) {
       auto &M = TC.M;
       auto origTy = type->getWithoutDifferentiability();
       auto jvpTy = origTy->getAutoDiffDerivativeFunctionType(
@@ -274,23 +274,27 @@ namespace {
           AutoDiffDerivativeFunctionKind::VJP, TC,
           LookUpConformanceInModule(&M));
       RecursiveProperties props;
-      props.addSubobject(classifyType(origTy, TC, Sig, Expansion));
-      props.addSubobject(classifyType(jvpTy, TC, Sig, Expansion));
-      props.addSubobject(classifyType(vjpTy, TC, Sig, Expansion));
+      // TODO(TF-1050): Fix `AbstractionPattern` argument to `classifyType`
+      // calls.
+      props.addSubobject(classifyType(origType, origTy, TC, Expansion));
+      props.addSubobject(classifyType(origType, jvpTy, TC, Expansion));
+      props.addSubobject(classifyType(origType, vjpTy, TC, Expansion));
       return props;
     }
 
     RecursiveProperties
     getLinearDifferentiableSILFunctionTypeRecursiveProperties(
-        CanSILFunctionType type) {
+        CanSILFunctionType type, AbstractionPattern origType) {
       auto &M = TC.M;
       auto origTy = type->getWithoutDifferentiability();
       auto transTy = origTy->getAutoDiffTransposeFunctionType(
           type->getDifferentiationParameterIndices(), TC,
           LookUpConformanceInModule(&M));
       RecursiveProperties props;
-      props.addSubobject(classifyType(origTy, TC, Sig, Expansion));
-      props.addSubobject(classifyType(transTy, TC, Sig, Expansion));
+      // TODO(TF-1050): Fix `AbstractionPattern` argument to `classifyType`
+      // calls.
+      props.addSubobject(classifyType(origType, origTy, TC, Expansion));
+      props.addSubobject(classifyType(origType, transTy, TC, Expansion));
       return props;
     }
 

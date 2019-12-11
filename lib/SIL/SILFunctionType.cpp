@@ -1146,17 +1146,13 @@ private:
       assert(!isIndirectFormalParameter(convention));
     }
 
-    auto loweredType = substTL.getLoweredType().getASTType();
-
     // SWIFT_ENABLE_TENSORFLOW
-    SILParameterInfo param(loweredType, convention);
+    SILParameterInfo param(substTL.getLoweredType().getASTType(), convention);
     if (isNonDifferentiable)
       param = param.getWithDifferentiability(
           SILParameterDifferentiability::NotDifferentiable);
     Inputs.push_back(param);
-    
-    Inputs.push_back(SILParameterInfo(
-                            substTL.getLoweredType().getASTType(), convention));
+    // SWIFT_ENABLE_TENSORFLOW END
 
     maybeAddForeignParameters();
   }

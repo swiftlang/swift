@@ -3727,9 +3727,6 @@ SILGenModule::getOrCreateAutoDiffDerivativeReabstractionThunk(
   auto name = getASTContext().getIdentifier(
       mangler.mangleAutoDiffDerivativeFunctionHelper(
           original->getName(), derivativeFnKind, indices)).str();
-
-  Lowering::GenericContextScope genericContextScope(
-      Types, derivativeFnType->getSubstGenericSignature());
   auto *thunkGenericEnv = derivativeFnType->getSubstGenericSignature()
       ? derivativeFnType->getSubstGenericSignature()->getGenericEnvironment()
       : nullptr;
