@@ -23,6 +23,7 @@
 #include "swift/Parse/PersistentParserState.h"
 #include "swift/Subsystems.h"
 #include "llvm/Support/MemoryBuffer.h"
+#include "llvm/ADT/Hashing.h"
 
 using namespace swift;
 using namespace ide;
@@ -124,6 +125,73 @@ static DeclContext *getEquivalentDeclContextFromSourceFile(DeclContext *DC,
 
   return newDC;
 }
+
+/// Calculate the hash value of the \c CompilerInvocation.
+/// This should take all options affecting completion results into account.
+/// If the hashes between multiple completion invocation are different, we
+/// cannot reuse the CompilerInstance.
+static llvm::hash_code calculateInvocationHash(const CompilerInvocation &Inv) {
+  llvm::hash_code hash(0);
+
+  auto &frontendOpts = Inv.getFrontendOptions();
+  for (const InputFile &Input : frontendOpts.InputsAndOutputs.getAllInputs())
+    hash = llvm::hash_combine(hash, Input.file());
+  hash = llvm::hash_combine(
+      hash,
+      frontendOpts.InputKind,
+      llvm::makeArrayRef(frontendOpts.ImplicitImportModuleNames),
+      frontendOpts.ImplicitObjCHeaderPath,
+      frontendOpts.ModuleName,
+      frontendOpts.PrebuiltModuleCachePath,
+      llvm::makeArrayRef(frontendOpts.PreferInterfaceForModules),
+      frontendOpts.ParseStdlib,
+      frontendOpts.EnableSourceImport,
+      frontendOpts.ImportUnderlyingModule);
+
+  auto &langOpts = Inv.getLangOptions();
+  hash = llvm::hash_combine(
+      hash,
+      langOpts.Target.str(),
+      llvm::VersionTuple(langOpts.EffectiveLanguageVersion).getAsString(),
+      llvm::VersionTuple(langOpts.PackageDescriptionVersion).getAsString(),
+      langOpts.DisableAvailabilityChecking,
+      langOpts.EnableAccessControl,
+      langOpts.EnableAppExtensionRestrictions,
+      langOpts.RequireExplicitAvailability,
+      langOpts.RequireExplicitAvailabilityTarget,
+      langOpts.EnableObjCInterop,
+      langOpts.EnableCXXInterop,
+      langOpts.InferImportAsMember,
+      langOpts.EnableSwift3ObjCInference);
+
+  auto &searchPathOpts = Inv.getSearchPathOptions();
+  hash = llvm::hash_combine(
+      hash,
+      searchPathOpts.SDKPath,
+      llvm::makeArrayRef(searchPathOpts.ImportSearchPaths),
+      llvm::makeArrayRef(searchPathOpts.VFSOverlayFiles),
+      searchPathOpts.RuntimeResourcePath,
+      llvm::makeArrayRef(searchPathOpts.RuntimeLibraryImportPaths),
+      llvm::makeArrayRef(searchPathOpts.SkipRuntimeLibraryImportPaths));
+  for (auto &P : searchPathOpts.FrameworkSearchPaths)
+    hash = llvm::hash_combine(hash, P.IsSystem, P.Path);
+
+  auto &clangOpts = Inv.getClangImporterOptions();
+  hash = llvm::hash_combine(
+      hash,
+      clangOpts.ModuleCachePath,
+      llvm::makeArrayRef(clangOpts.ExtraArgs),
+      clangOpts.OverrideResourceDir,
+      clangOpts.TargetCPU,
+      static_cast<uint8_t>(clangOpts.Mode),
+      clangOpts.ImportForwardDeclarations,
+      clangOpts.InferImportAsMember,
+      clangOpts.DisableSwiftBridgeAttr,
+      clangOpts.DisableOverlayModules);
+
+  return hash;
+}
+
 } // namespace
 
 CompilerInstance *CompletionInstance::getReusingCompilerInstance(
@@ -136,7 +204,8 @@ CompilerInstance *CompletionInstance::getReusingCompilerInstance(
   if (!CachedCI)
     return nullptr;
 
-  if (Invocation.getPCHHash() != CachedCI->getInvocation().getPCHHash())
+  if (calculateInvocationHash(Invocation) !=
+      calculateInvocationHash(CachedCI->getInvocation()))
     return nullptr;
 
   auto &oldState = CachedCI->getPersistentParserState();
