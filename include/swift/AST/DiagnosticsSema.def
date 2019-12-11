@@ -4210,24 +4210,24 @@ ERROR(dynamic_and_library_evolution_not_supported,none,
 //------------------------------------------------------------------------------
 
 ERROR(dynamic_replacement_accessor_type_mismatch, none,
-      "replaced accessor %0's type does not match", (DeclName))
+      "replaced accessor %0's type does not match", (DeclNameRef))
 ERROR(dynamic_replacement_accessor_not_dynamic, none,
-      "replaced accessor for %0 is not marked dynamic", (DeclName))
+      "replaced accessor for %0 is not marked dynamic", (DeclNameRef))
 ERROR(dynamic_replacement_accessor_not_explicit, none,
       "replaced accessor %select{get|set|_read|_modify|willSet|didSet|unsafeAddress|addressWithOwner|addressWithNativeOwner|unsafeMutableAddress|mutableAddressWithOwner|}0 for %1 is not explicitly defined",
-      (unsigned, DeclName))
+      (unsigned, DeclNameRef))
 ERROR(dynamic_replacement_function_not_dynamic, none,
       "replaced function %0 is not marked dynamic", (DeclName))
 ERROR(dynamic_replacement_function_not_found, none,
-     "replaced function %0 could not be found", (DeclName))
+     "replaced function %0 could not be found", (DeclNameRef))
 ERROR(dynamic_replacement_accessor_not_found, none,
-      "replaced accessor for %0 could not be found", (DeclName))
+      "replaced accessor for %0 could not be found", (DeclNameRef))
 ERROR(dynamic_replacement_accessor_ambiguous, none,
-      "replaced accessor for %0 occurs in multiple places", (DeclName))
+      "replaced accessor for %0 occurs in multiple places", (DeclNameRef))
 NOTE(dynamic_replacement_accessor_ambiguous_candidate, none,
       "candidate accessor found in module %0", (DeclName))
 ERROR(dynamic_replacement_function_of_type_not_found, none,
-      "replaced function %0 of type %1 could not be found", (DeclName, Type))
+      "replaced function %0 of type %1 could not be found", (DeclNameRef, Type))
 NOTE(dynamic_replacement_found_function_of_type, none,
       "found function %0 of type %1", (DeclName, Type))
 ERROR(dynamic_replacement_not_in_extension, none,

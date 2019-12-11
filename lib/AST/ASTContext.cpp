@@ -833,7 +833,8 @@ DECLTYPE *ASTContext::get##NAME##Decl() const { \
       /* Note: lookupQualified() will search both the Swift overlay \
        * and the Clang module it imports. */ \
       SmallVector<ValueDecl *, 1> decls; \
-      M->lookupQualified(M, getIdentifier(#NAME), NL_OnlyTypes, decls); \
+      M->lookupQualified(M, DeclNameRef_(getIdentifier(#NAME)), NL_OnlyTypes, \
+                         decls); \
       if (decls.size() == 1 && isa<DECLTYPE>(decls[0])) { \
         auto decl = cast<DECLTYPE>(decls[0]); \
         if (isa<ProtocolDecl>(decl) || decl->getGenericParams() == nullptr) { \

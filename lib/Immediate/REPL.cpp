@@ -1092,7 +1092,7 @@ public:
           ASTContext &ctx = CI.getASTContext();
           SourceFile &SF =
               MostRecentModule->getMainSourceFile(SourceFileKind::REPL);
-          DeclName name = ctx.getIdentifier(Tok.getText());
+          auto name = DeclNameRef_(ctx.getIdentifier(Tok.getText()));
           auto descriptor = UnqualifiedLookupDescriptor(name, &SF);
           auto lookup = evaluateOrDefault(
               ctx.evaluator, UnqualifiedLookupRequest{descriptor}, {});

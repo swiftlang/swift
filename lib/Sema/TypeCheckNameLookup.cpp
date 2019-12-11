@@ -552,7 +552,7 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
 
 LookupResult TypeChecker::lookupConstructors(DeclContext *dc, Type type,
                                              NameLookupOptions options) {
-  return lookupMember(dc, type, DeclBaseName::createConstructor(), options);
+  return lookupMember(dc, type, DeclNameRef::createConstructor(), options);
 }
 
 unsigned TypeChecker::getCallEditDistance(DeclName writtenName,

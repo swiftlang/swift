@@ -5017,7 +5017,7 @@ namespace {
 
         if (lookupContext) {
           SmallVector<ValueDecl *, 2> lookup;
-          dc->lookupQualified(lookupContext, name,
+          dc->lookupQualified(lookupContext, DeclNameRef_(name),
                               NL_QualifiedDefault | NL_KnownNoDependency,
                               lookup);
           bool foundMethod = false;
@@ -6396,7 +6396,7 @@ void SwiftDeclConverter::recordObjCOverride(AbstractFunctionDecl *decl) {
     return;
   // Dig out the Objective-C superclass.
   SmallVector<ValueDecl *, 4> results;
-  superDecl->lookupQualified(superDecl, decl->getFullName(),
+  superDecl->lookupQualified(superDecl, DeclNameRef_(decl->getFullName()),
                              NL_QualifiedDefault | NL_KnownNoDependency,
                              results);
   for (auto member : results) {
@@ -6469,7 +6469,7 @@ void SwiftDeclConverter::recordObjCOverride(SubscriptDecl *subscript) {
   // operation.
   SmallVector<ValueDecl *, 2> lookup;
   subscript->getModuleContext()->lookupQualified(
-      superDecl, subscript->getFullName(),
+      superDecl, DeclNameRef_(subscript->getFullName()),
       NL_QualifiedDefault | NL_KnownNoDependency, lookup);
 
   for (auto result : lookup) {

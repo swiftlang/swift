@@ -2076,7 +2076,7 @@ void AttributeChecker::visitDiscardableResultAttr(DiscardableResultAttr *attr) {
 }
 
 /// Lookup the replaced decl in the replacments scope.
-static void lookupReplacedDecl(DeclName replacedDeclName,
+static void lookupReplacedDecl(DeclNameRef replacedDeclName,
                                const DynamicReplacementAttr *attr,
                                const ValueDecl *replacement,
                                SmallVectorImpl<ValueDecl *> &results) {
@@ -2130,7 +2130,7 @@ static Type getDynamicComparisonType(ValueDecl *value) {
   return interfaceType->removeArgumentLabels(numArgumentLabels);
 }
 
-static FuncDecl *findReplacedAccessor(DeclName replacedVarName,
+static FuncDecl *findReplacedAccessor(DeclNameRef replacedVarName,
                                       AccessorDecl *replacement,
                                       DynamicReplacementAttr *attr,
                                       ASTContext &ctx) {
@@ -2219,7 +2219,7 @@ static FuncDecl *findReplacedAccessor(DeclName replacedVarName,
 }
 
 static AbstractFunctionDecl *
-findReplacedFunction(DeclName replacedFunctionName,
+findReplacedFunction(DeclNameRef replacedFunctionName,
                      const AbstractFunctionDecl *replacement,
                      DynamicReplacementAttr *attr, DiagnosticEngine *Diags) {
 
@@ -2246,7 +2246,7 @@ findReplacedFunction(DeclName replacedFunctionName,
         if (Diags) {
           Diags->diagnose(attr->getLocation(),
                           diag::dynamic_replacement_function_not_dynamic,
-                          replacedFunctionName);
+                          result->getFullName());
           attr->setInvalid();
         }
         return nullptr;
@@ -2261,17 +2261,17 @@ findReplacedFunction(DeclName replacedFunctionName,
   if (results.empty()) {
     Diags->diagnose(attr->getLocation(),
                     diag::dynamic_replacement_function_not_found,
-                    attr->getReplacedFunctionName());
+                    replacedFunctionName);
   } else {
     Diags->diagnose(attr->getLocation(),
                     diag::dynamic_replacement_function_of_type_not_found,
-                    attr->getReplacedFunctionName(),
+                    replacedFunctionName,
                     replacement->getInterfaceType()->getCanonicalType());
 
     for (auto *result : results) {
       Diags->diagnose(SourceLoc(),
                       diag::dynamic_replacement_found_function_of_type,
-                      attr->getReplacedFunctionName(),
+                      result->getFullName(),
                       result->getInterfaceType()->getCanonicalType());
     }
   }
@@ -2280,7 +2280,7 @@ findReplacedFunction(DeclName replacedFunctionName,
 }
 
 static AbstractStorageDecl *
-findReplacedStorageDecl(DeclName replacedFunctionName,
+findReplacedStorageDecl(DeclNameRef replacedFunctionName,
                         const AbstractStorageDecl *replacement,
                         const DynamicReplacementAttr *attr) {
 

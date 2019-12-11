@@ -27,6 +27,7 @@ namespace swift {
 class ClassDecl;
 class DeclContext;
 class DeclName;
+class DeclNameRef;
 class DestructorDecl;
 class GenericContext;
 class GenericParamList;
@@ -316,24 +317,15 @@ class UnqualifiedLookupDescriptor {
   using LookupOptions = OptionSet<UnqualifiedLookupFlags>;
 
 public:
-  DeclName Name;
+  DeclNameRef Name;
   DeclContext *DC;
   SourceLoc Loc;
   LookupOptions Options;
 
-  /// Transitional entry point.
-  [[deprecated]] UnqualifiedLookupDescriptor(DeclName name, DeclContext *dc,
-                              SourceLoc loc = SourceLoc(),
-                              LookupOptions options = {})
-      : Name(name), DC(dc), Loc(loc), Options(options) {}
-
-  #pragma clang diagnostic push
-  #pragma clang diagnostic ignored "-Wdeprecated-declarations"
   UnqualifiedLookupDescriptor(DeclNameRef name, DeclContext *dc,
                               SourceLoc loc = SourceLoc(),
                               LookupOptions options = {})
-      : UnqualifiedLookupDescriptor(name.getFullName(), dc, loc, options) { }
-  #pragma clang diagnostic pop
+      : Name(name), DC(dc), Loc(loc), Options(options) { }
 
   friend llvm::hash_code hash_value(const UnqualifiedLookupDescriptor &desc) {
     return llvm::hash_combine(desc.Name, desc.DC, desc.Loc,
