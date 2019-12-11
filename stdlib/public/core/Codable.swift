@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 /// A type that can encode itself to an external representation.
+@_implicitly_synthesizes_nested_requirement("CodingKeys")
 public protocol Encodable {
   /// Encodes this value into the given encoder.
   ///
@@ -29,6 +30,7 @@ public protocol Encodable {
 }
 
 /// A type that can decode itself from an external representation.
+@_implicitly_synthesizes_nested_requirement("CodingKeys")
 public protocol Decodable {
   /// Creates a new instance by decoding from the given decoder.
   ///
