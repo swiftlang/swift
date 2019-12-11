@@ -161,6 +161,9 @@ enum class ConstraintKind : char {
   /// type). At that point, this constraint will be treated like an `Equal`
   /// constraint.
   OneWayEqual,
+  /// If there are no contextual types e.g. `_ = { 42 }` default first type
+  /// to a second type (inferred closure type).
+  DefaultClosureType,
 };
 
 /// Classification of the different kinds of constraints.
@@ -540,6 +543,7 @@ public:
     case ConstraintKind::OptionalObject:
     case ConstraintKind::OpaqueUnderlyingType:
     case ConstraintKind::OneWayEqual:
+    case ConstraintKind::DefaultClosureType:
       return ConstraintClassification::Relational;
 
     case ConstraintKind::ValueMember:

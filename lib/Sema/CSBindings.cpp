@@ -503,6 +503,7 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) const {
     }
 
     case ConstraintKind::Defaultable:
+    case ConstraintKind::DefaultClosureType:
       // Do these in a separate pass.
       if (getFixedTypeRecursive(constraint->getFirstType(), true)
               ->getAs<TypeVariableType>() == typeVar) {
@@ -726,6 +727,15 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) const {
     Type type = constraint->getSecondType();
     if (!exactTypes.insert(type->getCanonicalType()).second)
       continue;
+
+    if (constraint->getKind() == ConstraintKind::DefaultClosureType) {
+      // If there are no other possible bindings for this closure
+      // let's default it to the type inferred from its parameters/body,
+      // otherwise we should only attempt contextual types as a
+      // top-level closure type.
+      if (!result.Bindings.empty())
+        continue;
+    }
 
     result.addPotentialBinding({type, AllowedBindingKind::Exact, constraint});
   }

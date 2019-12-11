@@ -1214,6 +1214,7 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
   case ConstraintKind::FunctionInput:
   case ConstraintKind::FunctionResult:
   case ConstraintKind::OneWayEqual:
+  case ConstraintKind::DefaultClosureType:
     llvm_unreachable("Not a conversion");
   }
 
@@ -1278,6 +1279,7 @@ static bool matchFunctionRepresentations(FunctionTypeRepresentation rep1,
   case ConstraintKind::FunctionInput:
   case ConstraintKind::FunctionResult:
   case ConstraintKind::OneWayEqual:
+  case ConstraintKind::DefaultClosureType:
     return false;
   }
 
@@ -1558,6 +1560,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   case ConstraintKind::FunctionInput:
   case ConstraintKind::FunctionResult:
   case ConstraintKind::OneWayEqual:
+  case ConstraintKind::DefaultClosureType:
     llvm_unreachable("Not a relational constraint");
   }
 
@@ -3893,6 +3896,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     case ConstraintKind::FunctionInput:
     case ConstraintKind::FunctionResult:
     case ConstraintKind::OneWayEqual:
+    case ConstraintKind::DefaultClosureType:
       llvm_unreachable("Not a relational constraint");
     }
   }
@@ -6459,18 +6463,15 @@ ConstraintSystem::simplifyValueWitnessConstraint(
   return SolutionKind::Solved;
 }
 
-ConstraintSystem::SolutionKind
-ConstraintSystem::simplifyDefaultableConstraint(
-                                            Type first, Type second,
-                                            TypeMatchOptions flags,
-                                            ConstraintLocatorBuilder locator) {
+ConstraintSystem::SolutionKind ConstraintSystem::simplifyDefaultableConstraint(
+    ConstraintKind kind, Type first, Type second, TypeMatchOptions flags,
+    ConstraintLocatorBuilder locator) {
   first = getFixedTypeRecursive(first, flags, true);
 
   if (first->isTypeVariableOrMember()) {
     if (flags.contains(TMF_GenerateConstraints)) {
-      addUnsolvedConstraint(
-        Constraint::create(*this, ConstraintKind::Defaultable, first, second,
-                           getConstraintLocator(locator)));
+      addUnsolvedConstraint(Constraint::create(*this, kind, first, second,
+                                               getConstraintLocator(locator)));
       return SolutionKind::Solved;
     }
 
@@ -8842,7 +8843,9 @@ ConstraintSystem::addConstraintImpl(ConstraintKind kind, Type first,
     return simplifyOptionalObjectConstraint(first, second, subflags, locator);
 
   case ConstraintKind::Defaultable:
-    return simplifyDefaultableConstraint(first, second, subflags, locator);
+  case ConstraintKind::DefaultClosureType:
+    return simplifyDefaultableConstraint(kind, first, second, subflags,
+                                         locator);
 
   case ConstraintKind::FunctionInput:
   case ConstraintKind::FunctionResult:
@@ -9253,7 +9256,9 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
                                           constraint.getLocator());
 
   case ConstraintKind::Defaultable:
-    return simplifyDefaultableConstraint(constraint.getFirstType(),
+  case ConstraintKind::DefaultClosureType:
+    return simplifyDefaultableConstraint(constraint.getKind(),
+                                         constraint.getFirstType(),
                                          constraint.getSecondType(),
                                          TMF_GenerateConstraints,
                                          constraint.getLocator());

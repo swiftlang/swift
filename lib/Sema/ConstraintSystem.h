@@ -3479,7 +3479,8 @@ private:
       ConstraintLocatorBuilder locator);
 
   /// Attempt to simplify the given defaultable constraint.
-  SolutionKind simplifyDefaultableConstraint(Type first, Type second,
+  SolutionKind simplifyDefaultableConstraint(ConstraintKind kind,
+                                             Type first, Type second,
                                              TypeMatchOptions flags,
                                              ConstraintLocatorBuilder locator);
 
