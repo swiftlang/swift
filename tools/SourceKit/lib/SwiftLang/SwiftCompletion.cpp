@@ -199,10 +199,28 @@ static bool swiftCodeCompleteImpl(
   return true;
 }
 
+static void translateCodeCompletionOptions(OptionsDictionary &from,
+                                           CodeCompletion::Options &to,
+                                           StringRef &filterText,
+                                           unsigned &resultOffset,
+                                           unsigned &maxResults);
+
 void SwiftLangSupport::codeComplete(
     llvm::MemoryBuffer *UnresolvedInputFile, unsigned Offset,
+    OptionsDictionary *options,
     SourceKit::CodeCompletionConsumer &SKConsumer, ArrayRef<const char *> Args,
     Optional<VFSOptions> vfsOptions) {
+
+
+  CodeCompletion::Options CCOpts;
+  if (options) {
+    StringRef filterText;
+    unsigned resultOffset = 0;
+    unsigned maxResults = 0;
+    translateCodeCompletionOptions(*options, CCOpts, filterText, resultOffset,
+                                   maxResults);
+  }
+  CompletionInst->setEnableASTCaching(CCOpts.reuseASTContextIfPossible);
 
   std::string error;
   // FIXME: the use of None as primary file is to match the fact we do not read
@@ -823,6 +841,7 @@ static void translateCodeCompletionOptions(OptionsDictionary &from,
   static UIdent KeyContextWeight("key.codecomplete.sort.contextweight");
   static UIdent KeyFuzzyWeight("key.codecomplete.sort.fuzzyweight");
   static UIdent KeyPopularityBonus("key.codecomplete.sort.popularitybonus");
+  static UIdent KeyReuseASTContext("key.codecomplete.reuseastcontext");
   from.valueForOption(KeySortByName, to.sortByName);
   from.valueForOption(KeyUseImportDepth, to.useImportDepth);
   from.valueForOption(KeyGroupOverloads, to.groupOverloads);
@@ -846,6 +865,7 @@ static void translateCodeCompletionOptions(OptionsDictionary &from,
   from.valueForOption(KeyPopularityBonus, to.popularityBonus);
   from.valueForOption(KeyHideByName, to.hideByNameStyle);
   from.valueForOption(KeyTopNonLiteral, to.showTopNonLiteralResults);
+  from.valueForOption(KeyReuseASTContext, to.reuseASTContextIfPossible);
 }
 
 /// Canonicalize a name that is in the format of a reference to a function into
@@ -1164,6 +1184,7 @@ void SwiftLangSupport::codeCompleteOpen(
   if (options)
     translateCodeCompletionOptions(*options, CCOpts, filterText, resultOffset,
                                    maxResults);
+  CompletionInst->setEnableASTCaching(CCOpts.reuseASTContextIfPossible);
 
   std::string error;
   // FIXME: the use of None as primary file is to match the fact we do not read
@@ -1284,6 +1305,7 @@ void SwiftLangSupport::codeCompleteUpdate(
   if (options)
     translateCodeCompletionOptions(*options, CCOpts, filterText, resultOffset,
                                    maxResults);
+  CompletionInst->setEnableASTCaching(CCOpts.reuseASTContextIfPossible);
 
   NameToPopularityMap *nameToPopularity = nullptr;
   // This reference must outlive the uses of nameToPopularity.

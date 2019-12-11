@@ -36,6 +36,7 @@ makeCodeCompletionMemoryBuffer(const llvm::MemoryBuffer *origBuf,
 
 class CompletionInstance {
   std::unique_ptr<CompilerInstance> CachedCI = nullptr;
+  bool EnableASTCaching = false;
 
   swift::CompilerInstance *
   getReusingCompilerInstance(const swift::CompilerInvocation &Invocation,
@@ -49,6 +50,10 @@ class CompletionInstance {
       std::string &Error, DiagnosticConsumer *DiagC);
 
 public:
+  void setEnableASTCaching(bool Flag) {
+    EnableASTCaching = Flag;
+  }
+
   swift::CompilerInstance *getCompilerInstance(
       swift::CompilerInvocation &Invocation,
       llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,

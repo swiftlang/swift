@@ -445,6 +445,7 @@ public:
 
   void codeComplete(
       llvm::MemoryBuffer *InputBuf, unsigned Offset,
+      OptionsDictionary *options,
       SourceKit::CodeCompletionConsumer &Consumer, ArrayRef<const char *> Args,
       Optional<VFSOptions> vfsOptions) override;
 

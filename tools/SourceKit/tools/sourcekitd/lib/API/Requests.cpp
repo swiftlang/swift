@@ -158,6 +158,7 @@ static void findRelatedIdents(StringRef Filename,
 
 static sourcekitd_response_t
 codeComplete(llvm::MemoryBuffer *InputBuf, int64_t Offset,
+             Optional<RequestDict> optionsDict,
              ArrayRef<const char *> Args, Optional<VFSOptions> vfsOptions);
 
 static sourcekitd_response_t codeCompleteOpen(StringRef name,
@@ -940,7 +941,9 @@ static void handleSemanticRequest(
     int64_t Offset;
     if (Req.getInt64(KeyOffset, Offset, /*isOptional=*/false))
       return Rec(createErrorRequestInvalid("missing 'key.offset'"));
-    return Rec(codeComplete(InputBuf.get(), Offset, Args, std::move(vfsOptions)));
+    Optional<RequestDict> options = Req.getDictionary(KeyCodeCompleteOptions);
+    return Rec(codeComplete(InputBuf.get(), Offset, options, Args,
+                            std::move(vfsOptions)));
   }
 
   if (ReqUID == RequestCodeCompleteOpen) {
@@ -1932,12 +1935,19 @@ public:
 
 static sourcekitd_response_t
 codeComplete(llvm::MemoryBuffer *InputBuf, int64_t Offset,
+             Optional<RequestDict> optionsDict,
              ArrayRef<const char *> Args,
              Optional<VFSOptions> vfsOptions) {
   ResponseBuilder RespBuilder;
   SKCodeCompletionConsumer CCC(RespBuilder);
+
+  std::unique_ptr<SKOptionsDictionary> options;
+  if (optionsDict)
+    options = std::make_unique<SKOptionsDictionary>(*optionsDict);
+
   LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
-  Lang.codeComplete(InputBuf, Offset, CCC, Args, std::move(vfsOptions));
+  Lang.codeComplete(InputBuf, Offset, options.get(), CCC, Args,
+                    std::move(vfsOptions));
   return CCC.createResponse();
 }
 

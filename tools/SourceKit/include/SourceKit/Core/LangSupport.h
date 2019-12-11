@@ -653,6 +653,7 @@ public:
 
   virtual void
   codeComplete(llvm::MemoryBuffer *InputBuf, unsigned Offset,
+               OptionsDictionary *options,
                CodeCompletionConsumer &Consumer, ArrayRef<const char *> Args,
                Optional<VFSOptions> vfsOptions) = 0;
 
