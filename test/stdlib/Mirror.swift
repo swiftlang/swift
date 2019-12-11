@@ -517,7 +517,8 @@ mirrors.test("struct/WrapNSArray") {
 protocol WeakUnownedTestsP1: class {
   func f1() -> Int
 }
-protocol WeakUnownedTestsP2 {
+// FIXME: Remove the `: class` constraint here.
+protocol WeakUnownedTestsP2: class {
   func f2() -> String
 }
 
