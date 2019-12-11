@@ -31,6 +31,7 @@ class DestructorDecl;
 class GenericContext;
 class GenericParamList;
 class LookupResult;
+enum class NLKind;
 class SourceLoc;
 class TypeAliasDecl;
 class TypeDecl;
@@ -39,6 +40,9 @@ namespace ast_scope {
 class ASTScopeImpl;
 class ScopeCreator;
 } // namespace ast_scope
+namespace namelookup {
+enum class ResolutionKind;
+} // namespace namelookup
 
 /// Display a nominal type or extension thereof.
 void simple_display(
@@ -358,6 +362,46 @@ private:
   // Evaluation.
   llvm::Expected<LookupResult> evaluate(Evaluator &evaluator,
                                         UnqualifiedLookupDescriptor desc) const;
+};
+
+using QualifiedLookupResult = SmallVector<ValueDecl *, 4>;
+
+/// Performs a lookup into a given module and its imports.
+class LookupInModuleRequest
+    : public SimpleRequest<LookupInModuleRequest,
+                           QualifiedLookupResult(
+                               const DeclContext *, DeclName, NLKind,
+                               namelookup::ResolutionKind, const DeclContext *),
+                           CacheKind::Uncached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<QualifiedLookupResult>
+  evaluate(Evaluator &evaluator, const DeclContext *moduleOrFile, DeclName name,
+           NLKind lookupKind, namelookup::ResolutionKind resolutionKind,
+           const DeclContext *moduleScopeContext) const;
+};
+
+/// Perform \c AnyObject lookup for a given member.
+class AnyObjectLookupRequest
+    : public SimpleRequest<AnyObjectLookupRequest,
+                           QualifiedLookupResult(const DeclContext *, DeclName,
+                                                 NLOptions),
+                           CacheKind::Uncached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  llvm::Expected<QualifiedLookupResult> evaluate(Evaluator &evaluator,
+                                                 const DeclContext *dc,
+                                                 DeclName name,
+                                                 NLOptions options) const;
 };
 
 #define SWIFT_TYPEID_ZONE NameLookup
