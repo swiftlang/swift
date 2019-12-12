@@ -982,9 +982,7 @@ bool TypeVariableBinding::attempt(ConstraintSystem &cs) const {
     type = type->reconstituteSugar(/*recursive=*/false);
   }
 
-  // FIXME: We want the locator that indicates where the binding came
-  // from.
-  cs.addConstraint(ConstraintKind::Bind, TypeVar, type, locator);
+  cs.addConstraint(ConstraintKind::Bind, TypeVar, type, Binding.getLocator());
 
   // If this was from a defaultable binding note that.
   if (Binding.isDefaultableBinding()) {
