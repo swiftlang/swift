@@ -1761,7 +1761,7 @@ considered as providing a default derivative for that member. Types that conform
 to the protocol or inherit from the class can inherit the default derivative.
 
 If the original member does not have a `@differentiable` attribute, a default
-derivative is implicitly add to all conforming/overriding implementations.
+derivative is implicitly added to all conforming/overriding implementations.
 
 ```swift
 protocol P {
