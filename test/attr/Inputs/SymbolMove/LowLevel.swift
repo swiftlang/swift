@@ -1,8 +1,10 @@
+@available(OSX 10.8, *)
 @_originallyDefinedIn(module: "HighLevel", OSX 10.10)
 public func printMessageMoved() {
   print("Hello from LowLevel")
 }
 
+@available(OSX 10.8, *)
 @_originallyDefinedIn(module: "HighLevel", OSX 10.10)
 public struct Entity {
     public let value = "LowLevel"
@@ -11,6 +13,7 @@ public struct Entity {
 }
 
 // =================== Move protocol =================================//
+@available(OSX 10.8, *)
 @_originallyDefinedIn(module: "HighLevel", OSX 10.10)
 public protocol Box {
   associatedtype Item
@@ -19,11 +22,13 @@ public protocol Box {
   func shape() -> String
 }
 
+@available(OSX 10.8, *)
 @_originallyDefinedIn(module: "HighLevel", OSX 10.10)
 extension Box {
   public func shape() -> String { return "round"}
 }
 
+@available(OSX 10.8, *)
 @_originallyDefinedIn(module: "HighLevel", OSX 10.10)
 public struct Candy {
   public var kind = "candy"
@@ -31,6 +36,7 @@ public struct Candy {
 }
 
 // =================== Move enum ============================ //
+@available(OSX 10.8, *)
 @_originallyDefinedIn(module: "HighLevel", OSX 10.10)
 public enum LanguageKind: Int {
   case Cpp = 1
@@ -39,6 +45,7 @@ public enum LanguageKind: Int {
 }
 
 // =================== Move class ============================ //
+@available(OSX 10.8, *)
 @_originallyDefinedIn(module: "HighLevel", OSX 10.10)
 open class Vehicle {
     public init() {}
