@@ -289,7 +289,7 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
     // TensorArrayProtocol._tensorHandleCount
     if (name.isSimpleName(ctx.Id_tensorHandleCount))
       return getRequirement(KnownProtocolKind::TensorArrayProtocol);
-    
+
     // SWIFT_ENABLE_TENSORFLOW
     // TensorArrayProtocol._typeList
     if (name.isSimpleName(ctx.Id_typeList) && !requirement->isStatic())
@@ -390,7 +390,7 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
 
     // SWIFT_ENABLE_TENSORFLOW
     // TensorArrayProtocol._unpackTensorHandles(into:)
-    if (name.isCompoundName() && 
+    if (name.isCompoundName() &&
         name.getBaseName() == ctx.Id_unpackTensorHandles) {
       auto argumentNames = name.getArgumentNames();
       if (argumentNames.size() == 1 &&
@@ -439,7 +439,7 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
     } else if (argumentNames.size() == 2) {
       // SWIFT_ENABLE_TENSORFLOW
       // TensorArrayProtocol.init(_owning:count)
-      if (argumentNames[0] == ctx.getIdentifier("_owning") && 
+      if (argumentNames[0] == ctx.getIdentifier("_owning") &&
           argumentNames[1] == ctx.getIdentifier("count")) {
         return getRequirement(KnownProtocolKind::TensorArrayProtocol);
       }
@@ -528,7 +528,7 @@ DerivedConformance::declareDerivedPropertyGetter(VarDecl *property,
 std::pair<AccessorDecl *, AccessorDecl *>
 DerivedConformance::addGetterAndSetterToMutableDerivedProperty(
     VarDecl *property, Type propertyContextType) {
-  auto *getter = addGetterToReadOnlyDerivedProperty(property, propertyContextType);
+  auto *getter = declareDerivedPropertyGetter(property, propertyContextType);
   auto *setter = declareDerivedPropertySetter(property, propertyContextType);
   property->setImplInfo(StorageImplInfo::getMutableComputed());
   property->setAccessors(SourceLoc(), {getter, setter}, SourceLoc());

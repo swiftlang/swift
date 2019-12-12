@@ -209,7 +209,7 @@ public:
   /// Determine if a TensorArrayProtocol requirement can be derived for a type.
   ///
   /// \returns True if the requirement can be derived.
-  static bool canDeriveTensorArrayProtocol(NominalTypeDecl *type, 
+  static bool canDeriveTensorArrayProtocol(NominalTypeDecl *type,
                                            DeclContext *DC);
 
   /// Derive a TensorArrayProtocol requirement for a nominal type.

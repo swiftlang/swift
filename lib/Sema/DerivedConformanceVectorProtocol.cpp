@@ -137,11 +137,7 @@ deriveBodyVectorProtocol_method(AbstractFunctionDecl *funcDecl,
 
   // Get references to `self` and parameter declarations.
   auto *selfDecl = funcDecl->getImplicitSelfDecl();
-  auto *selfDRE =
-      new (C) DeclRefExpr(selfDecl, DeclNameLoc(), /*Implicit*/ true);
   auto *paramDecl = funcDecl->getParameters()->get(0);
-  auto *paramDRE =
-      new (C) DeclRefExpr(paramDecl, DeclNameLoc(), /*Implicit*/ true);
 
   // Create call expression applying a member method to the parameter.
   // Format: `<member>.method(<parameter>)`.
@@ -171,6 +167,10 @@ deriveBodyVectorProtocol_method(AbstractFunctionDecl *funcDecl,
     memberMethodDRE->setFunctionRefKind(FunctionRefKind::SingleApply);
 
     // Create reference to member method: `x.scaled(by:)`.
+    auto *selfDRE =
+        new (C) DeclRefExpr(selfDecl, DeclNameLoc(), /*Implicit*/ true);
+    auto *paramDRE =
+        new (C) DeclRefExpr(paramDecl, DeclNameLoc(), /*Implicit*/ true);
     auto memberExpr =
         new (C) MemberRefExpr(selfDRE, SourceLoc(), member, DeclNameLoc(),
                               /*Implicit*/ true);

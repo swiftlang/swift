@@ -2292,7 +2292,7 @@ public:
 };
   
 /// An AST walker that determines the underlying type of an opaque return decl
-/// from its derivative function body.
+/// from its associated function body.
 class OpaqueUnderlyingTypeChecker : public ASTWalker {
   ASTContext &Ctx;
   AbstractFunctionDecl *Implementation;
