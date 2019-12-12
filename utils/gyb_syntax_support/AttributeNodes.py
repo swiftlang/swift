@@ -267,11 +267,11 @@ ATTRIBUTE_NODES = [
     Node('DifferentiationParamList', kind='SyntaxCollection',
          element='DifferentiationParam'),
 
-    # differentiation-param -> ('self' | identifer) ','?
+    # differentiation-param -> ('self' | identifer | integer-literal) ','?
     Node('DifferentiationParam', kind='Syntax',
          description='''
-         A differentiation parameter: either the "self" identifier or a
-         function parameter name.
+         A differentiation parameter: either the "self" identifier, a
+         function parameter name, or a function parameter index.
          ''',
          traits=['WithTrailingComma'],
          children=[
@@ -279,6 +279,7 @@ ATTRIBUTE_NODES = [
                    node_choices=[
                        Child('Self', kind='SelfToken'),
                        Child('Name', kind='IdentifierToken'),
+                       Child('Index', kind='IntegerLiteralToken'),
                    ]),
              Child('TrailingComma', kind='CommaToken', is_optional=True),
          ]),
@@ -298,6 +299,45 @@ ATTRIBUTE_NODES = [
              Child('FunctionDeclName', kind='FunctionDeclName',
                    description='The referenced function name.'),
              Child('TrailingComma', kind='CommaToken', is_optional=True),
+         ]),
+
+    # An optionally qualified declaration name.
+    # qualified-decl-name ->
+    #     base-type? '.'? (identifier | operator) decl-name-arguments?
+    # base-type ->
+    #     member-type-identifier | base-type-identifier
+    Node('QualifiedDeclName', kind='Syntax',
+         description='''
+         An optionally qualified function declaration name (e.g. `foo(_:_:)`,
+         `Swift.Float.+(_:_:)`).
+         ''',
+         children=[
+             Child('BaseType', kind='Type', description='''
+                   The base type of the qualified name, optionally specified.
+                   ''',
+                   node_choices=[
+                       Child('MemberType', kind='MemberTypeIdentifier'),
+                       Child('SimpleType', kind='SimpleTypeIdentifier'),
+                   ], is_optional=True),
+             Child('Dot', kind='Token',
+                   token_choices=[
+                       'PeriodToken', 'PrefixPeriodToken'
+                   ], is_optional=True),
+             Child('Name', kind='Syntax', description='''
+                   The base name of the referenced function.
+                   ''',
+                   node_choices=[
+                       Child('Identifier', kind='IdentifierToken'),
+                       Child('PrefixOperator', kind='PrefixOperatorToken'),
+                       Child('PostfixOperator', kind='PostfixOperatorToken'),
+                       Child('SpacedBinaryOperator',
+                             kind='SpacedBinaryOperatorToken'),
+                   ]),
+             Child('Arguments', kind='DeclNameArguments',
+                   is_optional=True, description='''
+                   The argument labels of the referenced function, optionally
+                   specified.
+                   '''),
          ]),
 
     # func-decl-name -> (identifier | operator) decl-name-arguments?
@@ -343,29 +383,27 @@ ATTRIBUTE_NODES = [
                    The colon separating the "of" label and the original
                    declaration name.
                    '''),
-             Child('Original', kind='FunctionDeclName',
-                   description='The referenced original declaration.'),
+             Child('OriginalDeclName', kind='QualifiedDeclName',
+                   description='The referenced original declaration name.'),
              Child('Comma', kind='CommaToken', is_optional=True),
              Child('DiffParams', kind='DifferentiationParamsClause',
                    is_optional=True),
          ]),
 
     # SWIFT_ENABLE_TENSORFLOW
-    # The argument of the deprecated derivative registration attributes
-    # '@differentiating' and '@transposing'.
+    # The argument of the deprecated derivative registration attribute
+    # '@differentiating'.
     # deprecated-derivative-registration-attr-arguments ->
     #     func-decl-name ','? differentiation-params-clause?
-    # TODO(TF-999): Remove deprecated `@differentiating` and `@transposing`
-    # attributes.
+    # TODO(TF-999): Remove deprecated `@differentiating` attribute.
     Node('DeprecatedDerivativeRegistrationAttributeArguments', kind='Syntax',
          description='''
-         The arguments for the '@differentiating' and '@transposing' attributes:
-         the original declaration name and an optional differentiation parameter
-         list.
+         The arguments for the '@differentiating' attribute: the original
+         declaration name and an optional differentiation parameter list.
          ''',
          children=[
-             Child('Original', kind='FunctionDeclName',
-                   description='The referenced original declaration.'),
+             Child('OriginalDeclName', kind='QualifiedDeclName',
+                   description='The referenced original declaration name.'),
              Child('Comma', kind='CommaToken', is_optional=True),
              Child('DiffParams', kind='DifferentiationParamsClause',
                    is_optional=True),
