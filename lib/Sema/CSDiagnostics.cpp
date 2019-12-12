@@ -897,27 +897,23 @@ bool NoEscapeFuncToTypeConversionFailure::diagnoseAsError() {
   if (diagnoseParameterUse())
     return true;
 
-  if (ConvertTo) {
-    emitDiagnostic(anchor->getLoc(), diag::converting_noescape_to_type,
-                   ConvertTo);
-    return true;
+  if (auto *typeVar = getRawFromType()->getAs<TypeVariableType>()) {
+    if (auto *GP = typeVar->getImpl().getGenericParameter()) {
+      emitDiagnostic(anchor->getLoc(), diag::converting_noescape_to_type, GP);
+      return true;
+    }
   }
 
-  auto *loc = getLocator();
-  if (auto gpElt = loc->getLastElementAs<LocatorPathElt::GenericParameter>()) {
-    auto *paramTy = gpElt->getType();
-    emitDiagnostic(anchor->getLoc(), diag::converting_noescape_to_type,
-                  paramTy);
-  } else {
-    emitDiagnostic(anchor->getLoc(), diag::unknown_escaping_use_of_noescape);
-  }
+  emitDiagnostic(anchor->getLoc(), diag::converting_noescape_to_type,
+                 getToType());
   return true;
 }
 
 bool NoEscapeFuncToTypeConversionFailure::diagnoseParameterUse() const {
+  auto convertTo = getToType();
   // If the other side is not a function, we have common case diagnostics
   // which handle function-to-type conversion diagnostics.
-  if (!ConvertTo || !ConvertTo->is<FunctionType>())
+  if (!convertTo->is<FunctionType>())
     return false;
 
   auto *anchor = getAnchor();
@@ -943,7 +939,9 @@ bool NoEscapeFuncToTypeConversionFailure::diagnoseParameterUse() const {
                          diag::converting_noespace_param_to_generic_type,
                          PD->getName(), paramInterfaceTy);
 
-          emitDiagnostic(decl, diag::generic_parameters_always_escaping);
+          auto declLoc = decl->getLoc();
+          if (declLoc.isValid())
+            emitDiagnostic(decl, diag::generic_parameters_always_escaping);
         };
 
         // If this is a situation when non-escaping parameter is passed

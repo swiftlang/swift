@@ -585,26 +585,6 @@ public:
   bool diagnoseAsNote() override;
 };
 
-/// Diagnose errors related to converting function type which
-/// isn't explicitly '@escaping' to some other type.
-class NoEscapeFuncToTypeConversionFailure final : public FailureDiagnostic {
-  Type ConvertTo;
-
-public:
-  NoEscapeFuncToTypeConversionFailure(ConstraintSystem &cs,
-                                      ConstraintLocator *locator,
-                                      Type toType = Type())
-      : FailureDiagnostic(cs, locator), ConvertTo(toType) {}
-
-  bool diagnoseAsError() override;
-
-private:
-  /// Emit tailored diagnostics for no-escape parameter conversions e.g.
-  /// passing such parameter as an @escaping argument, or trying to
-  /// assign it to a variable which expects @escaping function.
-  bool diagnoseParameterUse() const;
-};
-
 /// Diagnose failures related to attempting member access on optional base
 /// type without optional chaining or force-unwrapping it first.
 class MemberAccessOnOptionalBaseFailure final : public FailureDiagnostic {
@@ -817,6 +797,23 @@ protected:
 
   static Optional<Diag<Type, Type>>
   getDiagnosticFor(ContextualTypePurpose context, bool forProtocol);
+};
+
+/// Diagnose errors related to converting function type which
+/// isn't explicitly '@escaping' to some other type.
+class NoEscapeFuncToTypeConversionFailure final : public ContextualFailure {
+public:
+  NoEscapeFuncToTypeConversionFailure(ConstraintSystem &cs, Type fromType,
+                                      Type toType, ConstraintLocator *locator)
+      : ContextualFailure(cs, fromType, toType, locator) {}
+
+  bool diagnoseAsError() override;
+
+private:
+  /// Emit tailored diagnostics for no-escape parameter conversions e.g.
+  /// passing such parameter as an @escaping argument, or trying to
+  /// assign it to a variable which expects @escaping function.
+  bool diagnoseParameterUse() const;
 };
 
 /// Diagnose failures related to use of the unwrapped optional types,
