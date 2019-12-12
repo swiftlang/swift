@@ -899,7 +899,7 @@ static Type getInitializationTypeInContext(
   // initialization type is the original property type.
   if (auto singleVar = pattern->getSingleVar()) {
     if (auto originalProperty = singleVar->getOriginalWrappedProperty()) {
-      if (originalProperty->isPropertyWrapperInitializedWithInitialValue())
+      if (originalProperty->isPropertyMemberwiseInitializedWithWrappedType())
         interfaceType = originalProperty->getValueInterfaceType();
     }
   }
@@ -968,7 +968,7 @@ void SILGenFunction::emitMemberInitializers(DeclContext *dc,
         if (auto singleVar = pbd->getSingleVar()) {
           auto originalVar = singleVar->getOriginalWrappedProperty();
           if (originalVar &&
-              originalVar->isPropertyWrapperInitializedWithInitialValue()) {
+              originalVar->isPropertyMemberwiseInitializedWithWrappedType()) {
             result = maybeEmitPropertyWrapperInitFromValue(
                 *this, init, singleVar, std::move(result));
           }

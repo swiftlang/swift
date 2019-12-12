@@ -1741,12 +1741,12 @@ static bool isDefaultInitializable(const TypeRepr *typeRepr, ASTContext &ctx) {
   // Also support the desugared 'Optional<T>' spelling.
   if (!ctx.isSwiftVersionAtLeast(5)) {
     if (auto *identRepr = dyn_cast<SimpleIdentTypeRepr>(typeRepr)) {
-      if (identRepr->getIdentifier() == ctx.Id_Void)
+      if (identRepr->getNameRef().getBaseIdentifier() == ctx.Id_Void)
         return true;
     }
 
     if (auto *identRepr = dyn_cast<GenericIdentTypeRepr>(typeRepr)) {
-      if (identRepr->getIdentifier() == ctx.Id_Optional &&
+      if (identRepr->getNameRef().getBaseIdentifier() == ctx.Id_Optional &&
           identRepr->getNumGenericArgs() == 1)
         return true;
     }
@@ -3995,19 +3995,6 @@ void NominalTypeDecl::synthesizeSemanticMembersIfNeeded(DeclName member) {
     if (baseName.getIdentifier() == getASTContext().Id_CodingKeys) {
       action.emplace(ImplicitMemberAction::ResolveCodingKeys);
     }
-  } else {
-    auto argumentNames = member.getArgumentNames();
-    if (!member.isCompoundName() || argumentNames.size() == 1) {
-      if (baseName == DeclBaseName::createConstructor() &&
-          (member.isSimpleName() || argumentNames.front() == Context.Id_from)) {
-        action.emplace(ImplicitMemberAction::ResolveDecodable);
-      } else if (!baseName.isSpecial() &&
-                 baseName.getIdentifier() == Context.Id_encode &&
-                 (member.isSimpleName() ||
-                  argumentNames.front() == Context.Id_to)) {
-        action.emplace(ImplicitMemberAction::ResolveEncodable);
-      }
-    }
   }
 
   if (auto actionToTake = action) {
@@ -5807,13 +5794,12 @@ VarDecl *VarDecl::getLazyStorageProperty() const {
       {});
 }
 
-static bool propertyWrapperInitializedViaInitialValue(
-   const VarDecl *var, bool checkDefaultInit) {
-  auto customAttrs = var->getAttachedPropertyWrappers();
+bool VarDecl::isPropertyMemberwiseInitializedWithWrappedType() const {
+  auto customAttrs = getAttachedPropertyWrappers();
   if (customAttrs.empty())
     return false;
 
-  auto *PBD = var->getParentPatternBinding();
+  auto *PBD = getParentPatternBinding();
   if (!PBD)
     return false;
 
@@ -5828,23 +5814,12 @@ static bool propertyWrapperInitializedViaInitialValue(
     return false;
 
   // Default initialization does not use a value.
-  if (checkDefaultInit &&
-      var->getAttachedPropertyWrapperTypeInfo(0).defaultInit)
+  if (getAttachedPropertyWrapperTypeInfo(0).defaultInit)
     return false;
 
-  // If all property wrappers have an initialValue initializer, the property
+  // If all property wrappers have a wrappedValue initializer, the property
   // wrapper will be initialized that way.
-  return var->allAttachedPropertyWrappersHaveInitialValueInit();
-}
-
-bool VarDecl::isPropertyWrapperInitializedWithInitialValue() const {
-  return propertyWrapperInitializedViaInitialValue(
-      this, /*checkDefaultInit=*/true);
-}
-
-bool VarDecl::isPropertyMemberwiseInitializedWithWrappedType() const {
-  return propertyWrapperInitializedViaInitialValue(
-      this, /*checkDefaultInit=*/false);
+  return allAttachedPropertyWrappersHaveInitialValueInit();
 }
 
 Identifier VarDecl::getObjCPropertyName() const {
@@ -6083,6 +6058,7 @@ bool ParamDecl::hasDefaultExpr() const {
     return false;
   case DefaultArgumentKind::Normal:
   case DefaultArgumentKind::File:
+  case DefaultArgumentKind::FilePath:
   case DefaultArgumentKind::Line:
   case DefaultArgumentKind::Column:
   case DefaultArgumentKind::Function:
@@ -6105,6 +6081,7 @@ bool ParamDecl::hasCallerSideDefaultExpr() const {
   case DefaultArgumentKind::Normal:
     return false;
   case DefaultArgumentKind::File:
+  case DefaultArgumentKind::FilePath:
   case DefaultArgumentKind::Line:
   case DefaultArgumentKind::Column:
   case DefaultArgumentKind::Function:
@@ -6414,6 +6391,7 @@ ParamDecl::getDefaultValueStringRepresentation(
   }
   case DefaultArgumentKind::Inherited: return "super";
   case DefaultArgumentKind::File: return "#file";
+  case DefaultArgumentKind::FilePath: return "#filePath";
   case DefaultArgumentKind::Line: return "#line";
   case DefaultArgumentKind::Column: return "#column";
   case DefaultArgumentKind::Function: return "#function";

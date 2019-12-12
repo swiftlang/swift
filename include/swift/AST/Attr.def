@@ -529,6 +529,17 @@ DECL_ATTR(_originallyDefinedIn, OriginallyDefinedIn,
   ABIBreakingToAdd | ABIBreakingToRemove | APIStableToAdd | APIStableToRemove,
   96)
 
+DECL_ATTR(derivative, Derivative,
+  OnFunc | LongAttribute | AllowMultipleAttributes |
+  ABIStableToAdd | ABIBreakingToRemove | APIStableToAdd | APIBreakingToRemove,
+  97)
+
+DECL_ATTR(_implicitly_synthesizes_nested_requirement, ImplicitlySynthesizesNestedRequirement,
+  OnProtocol |
+  UserInaccessible |
+  ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
+  98)
+
 #undef TYPE_ATTR
 #undef DECL_ATTR_ALIAS
 #undef CONTEXTUAL_DECL_ATTR_ALIAS

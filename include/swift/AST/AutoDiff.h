@@ -26,6 +26,47 @@
 
 namespace swift {
 
+/// A function type differentiability kind.
+enum class DifferentiabilityKind : uint8_t {
+  NonDifferentiable = 0,
+  Normal = 1,
+  Linear = 2
+};
+
+/// The kind of an linear map.
+struct AutoDiffLinearMapKind {
+  enum innerty : uint8_t {
+    // The differential function.
+    Differential = 0,
+    // The pullback function.
+    Pullback = 1
+  } rawValue;
+
+  AutoDiffLinearMapKind() = default;
+  AutoDiffLinearMapKind(innerty rawValue) : rawValue(rawValue) {}
+  operator innerty() const { return rawValue; }
+};
+
+/// The kind of a derivative function.
+struct AutoDiffDerivativeFunctionKind {
+  enum innerty : uint8_t {
+    // The Jacobian-vector products function.
+    JVP = 0,
+    // The vector-Jacobian products function.
+    VJP = 1
+  } rawValue;
+
+  AutoDiffDerivativeFunctionKind() = default;
+  AutoDiffDerivativeFunctionKind(innerty rawValue) : rawValue(rawValue) {}
+  AutoDiffDerivativeFunctionKind(AutoDiffLinearMapKind linMapKind)
+      : rawValue(static_cast<innerty>(linMapKind.rawValue)) {}
+  explicit AutoDiffDerivativeFunctionKind(StringRef string);
+  operator innerty() const { return rawValue; }
+  AutoDiffLinearMapKind getLinearMapKind() {
+    return (AutoDiffLinearMapKind::innerty)rawValue;
+  }
+};
+
 class ParsedAutoDiffParameter {
 public:
   enum class Kind { Named, Ordered, Self };
@@ -87,12 +128,6 @@ public:
       return getName() == other.getName();
     return getKind() == Kind::Self;
   }
-};
-
-enum class DifferentiabilityKind : uint8_t {
-  NonDifferentiable = 0,
-  Normal = 1,
-  Linear = 2
 };
 
 } // end namespace swift

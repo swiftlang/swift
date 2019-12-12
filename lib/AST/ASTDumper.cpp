@@ -300,6 +300,7 @@ static StringRef getDefaultArgumentKindString(DefaultArgumentKind value) {
     case DefaultArgumentKind::Column: return "#column";
     case DefaultArgumentKind::DSOHandle: return "#dsohandle";
     case DefaultArgumentKind::File: return "#file";
+    case DefaultArgumentKind::FilePath: return "#filePath";
     case DefaultArgumentKind::Function: return "#function";
     case DefaultArgumentKind::Inherited: return "inherited";
     case DefaultArgumentKind::Line: return "#line";
@@ -316,6 +317,7 @@ static StringRef
 getMagicIdentifierLiteralExprKindString(MagicIdentifierLiteralExpr::Kind value) {
   switch (value) {
     case MagicIdentifierLiteralExpr::File: return "#file";
+    case MagicIdentifierLiteralExpr::FilePath: return "#filePath";
     case MagicIdentifierLiteralExpr::Function: return "#function";
     case MagicIdentifierLiteralExpr::Line: return "#line";
     case MagicIdentifierLiteralExpr::Column: return "#column";
@@ -2882,7 +2884,7 @@ public:
       OS << '\n';
       printCommon("component");
       PrintWithColorRAII(OS, IdentifierColor)
-        << " id='" << comp->getIdentifier() << '\'';
+        << " id='" << comp->getNameRef() << '\'';
       OS << " bind=";
       if (comp->isBound())
         comp->getBoundDecl()->dumpRef(OS);
@@ -3597,7 +3599,7 @@ namespace {
       if (auto assocType = T->getAssocType()) {
         printField("assoc_type", assocType->printRef());
       } else {
-        printField("name", T->getName().str());
+        printField("name", T->getName());
       }
       printRec("base", T->getBase());
       PrintWithColorRAII(OS, ParenthesisColor) << ')';

@@ -472,14 +472,7 @@ function set_build_options_for_host() {
                     SWIFT_HOST_VARIANT="macosx"
                     SWIFT_HOST_VARIANT_SDK="OSX"
                     SWIFT_HOST_VARIANT_ARCH="x86_64"
-
                     cmake_osx_deployment_target="${DARWIN_DEPLOYMENT_VERSION_OSX}"
-                    cmark_cmake_options=(
-                        -DCMAKE_C_FLAGS="$(cmark_c_flags ${host})"
-                        -DCMAKE_CXX_FLAGS="$(cmark_c_flags ${host})"
-                        -DCMAKE_OSX_SYSROOT:PATH="$(xcrun --sdk ${xcrun_sdk_name} --show-sdk-path)"
-                        -DCMAKE_OSX_DEPLOYMENT_TARGET="${cmake_osx_deployment_target}"
-                    )
                     ;;
                 iphonesimulator-i386)
                     xcrun_sdk_name="iphonesimulator"
@@ -488,13 +481,7 @@ function set_build_options_for_host() {
                     SWIFT_HOST_VARIANT="iphonesimulator"
                     SWIFT_HOST_VARIANT_SDK="IOS_SIMULATOR"
                     SWIFT_HOST_VARIANT_ARCH="i386"
-
                     cmake_osx_deployment_target=""
-                    cmark_cmake_options=(
-                        -DCMAKE_C_FLAGS="$(cmark_c_flags ${host})"
-                        -DCMAKE_CXX_FLAGS="$(cmark_c_flags ${host})"
-                        -DCMAKE_OSX_SYSROOT:PATH="$(xcrun --sdk ${xcrun_sdk_name} --show-sdk-path)"
-                    )
                     ;;
                 iphonesimulator-x86_64)
                     xcrun_sdk_name="iphonesimulator"
@@ -503,13 +490,7 @@ function set_build_options_for_host() {
                     SWIFT_HOST_VARIANT="iphonesimulator"
                     SWIFT_HOST_VARIANT_SDK="IOS_SIMULATOR"
                     SWIFT_HOST_VARIANT_ARCH="x86_64"
-
                     cmake_osx_deployment_target=""
-                    cmark_cmake_options=(
-                        -DCMAKE_C_FLAGS="$(cmark_c_flags ${host})"
-                        -DCMAKE_CXX_FLAGS="$(cmark_c_flags ${host})"
-                        -DCMAKE_OSX_SYSROOT:PATH="$(xcrun --sdk ${xcrun_sdk_name} --show-sdk-path)"
-                    )
                     ;;
                 iphoneos-armv7)
                     xcrun_sdk_name="iphoneos"
@@ -518,13 +499,7 @@ function set_build_options_for_host() {
                     SWIFT_HOST_VARIANT="iphoneos"
                     SWIFT_HOST_VARIANT_SDK="IOS"
                     SWIFT_HOST_VARIANT_ARCH="armv7"
-
                     cmake_osx_deployment_target=""
-                    cmark_cmake_options=(
-                        -DCMAKE_C_FLAGS="$(cmark_c_flags ${host})"
-                        -DCMAKE_CXX_FLAGS="$(cmark_c_flags ${host})"
-                        -DCMAKE_OSX_SYSROOT:PATH="$(xcrun --sdk ${xcrun_sdk_name} --show-sdk-path)"
-                    )
                     ;;
                 iphoneos-armv7s)
                     xcrun_sdk_name="iphoneos"
@@ -533,13 +508,7 @@ function set_build_options_for_host() {
                     SWIFT_HOST_VARIANT="iphoneos"
                     SWIFT_HOST_VARIANT_SDK="IOS"
                     SWIFT_HOST_VARIANT_ARCH="armv7s"
-
                     cmake_osx_deployment_target=""
-                    cmark_cmake_options=(
-                        -DCMAKE_C_FLAGS="$(cmark_c_flags ${host})"
-                        -DCMAKE_CXX_FLAGS="$(cmark_c_flags ${host})"
-                        -DCMAKE_OSX_SYSROOT:PATH="$(xcrun --sdk ${xcrun_sdk_name} --show-sdk-path)"
-                    )
                     ;;
                 iphoneos-arm64)
                     xcrun_sdk_name="iphoneos"
@@ -548,13 +517,7 @@ function set_build_options_for_host() {
                     SWIFT_HOST_VARIANT="iphoneos"
                     SWIFT_HOST_VARIANT_SDK="IOS"
                     SWIFT_HOST_VARIANT_ARCH="arm64"
-
                     cmake_osx_deployment_target=""
-                    cmark_cmake_options=(
-                        -DCMAKE_C_FLAGS="$(cmark_c_flags ${host})"
-                        -DCMAKE_CXX_FLAGS="$(cmark_c_flags ${host})"
-                        -DCMAKE_OSX_SYSROOT:PATH="$(xcrun --sdk ${xcrun_sdk_name} --show-sdk-path)"
-                    )
                     ;;
                 appletvsimulator-x86_64)
                     xcrun_sdk_name="appletvsimulator"
@@ -563,13 +526,7 @@ function set_build_options_for_host() {
                     SWIFT_HOST_VARIANT="appletvsimulator"
                     SWIFT_HOST_VARIANT_SDK="TVOS_SIMULATOR"
                     SWIFT_HOST_VARIANT_ARCH="x86_64"
-
                     cmake_osx_deployment_target=""
-                    cmark_cmake_options=(
-                        -DCMAKE_C_FLAGS="$(cmark_c_flags ${host})"
-                        -DCMAKE_CXX_FLAGS="$(cmark_c_flags ${host})"
-                        -DCMAKE_OSX_SYSROOT:PATH="$(xcrun --sdk ${xcrun_sdk_name} --show-sdk-path)"
-                    )
                     ;;
                 appletvos-arm64)
                     xcrun_sdk_name="appletvos"
@@ -578,13 +535,7 @@ function set_build_options_for_host() {
                     SWIFT_HOST_VARIANT="appletvos"
                     SWIFT_HOST_VARIANT_SDK="TVOS"
                     SWIFT_HOST_VARIANT_ARCH="arm64"
-
                     cmake_osx_deployment_target=""
-                    cmark_cmake_options=(
-                        -DCMAKE_C_FLAGS="$(cmark_c_flags ${host})"
-                        -DCMAKE_CXX_FLAGS="$(cmark_c_flags ${host})"
-                        -DCMAKE_OSX_SYSROOT:PATH="$(xcrun --sdk ${xcrun_sdk_name} --show-sdk-path)"
-                    )
                     ;;
                 watchsimulator-i386)
                     xcrun_sdk_name="watchsimulator"
@@ -593,13 +544,7 @@ function set_build_options_for_host() {
                     SWIFT_HOST_VARIANT="watchsimulator"
                     SWIFT_HOST_VARIANT_SDK="WATCHOS_SIMULATOR"
                     SWIFT_HOST_VARIANT_ARCH="i386"
-
                     cmake_osx_deployment_target=""
-                    cmark_cmake_options=(
-                        -DCMAKE_C_FLAGS="$(cmark_c_flags ${host})"
-                        -DCMAKE_CXX_FLAGS="$(cmark_c_flags ${host})"
-                        -DCMAKE_OSX_SYSROOT:PATH="$(xcrun --sdk ${xcrun_sdk_name} --show-sdk-path)"
-                    )
                     ;;
                 watchos-armv7k)
                     xcrun_sdk_name="watchos"
@@ -608,13 +553,7 @@ function set_build_options_for_host() {
                     SWIFT_HOST_VARIANT="watchos"
                     SWIFT_HOST_VARIANT_SDK="WATCHOS"
                     SWIFT_HOST_VARIANT_ARCH="armv7k"
-
                     cmake_osx_deployment_target=""
-                    cmark_cmake_options=(
-                        -DCMAKE_C_FLAGS="$(cmark_c_flags ${host})"
-                        -DCMAKE_CXX_FLAGS="$(cmark_c_flags ${host})"
-                        -DCMAKE_OSX_SYSROOT:PATH="$(xcrun --sdk ${xcrun_sdk_name} --show-sdk-path)"
-                    )
                     ;;
                 *)
                     echo "Unknown host for swift tools: ${host}"
@@ -634,6 +573,12 @@ function set_build_options_for_host() {
                 done
             fi
 
+            cmark_cmake_options=(
+                -DCMAKE_C_FLAGS="$(cmark_c_flags ${host})"
+                -DCMAKE_CXX_FLAGS="$(cmark_c_flags ${host})"
+                -DCMAKE_OSX_SYSROOT:PATH="$(xcrun --sdk ${xcrun_sdk_name} --show-sdk-path)"
+                -DCMAKE_OSX_DEPLOYMENT_TARGET="${cmake_osx_deployment_target}"
+            )
             llvm_cmake_options=(
                 -DCMAKE_OSX_DEPLOYMENT_TARGET:STRING="${cmake_osx_deployment_target}"
                 -DCMAKE_OSX_SYSROOT:PATH="$(xcrun --sdk ${xcrun_sdk_name} --show-sdk-path)"
@@ -681,6 +626,18 @@ function set_build_options_for_host() {
                 -DSWIFT_DARWIN_DEPLOYMENT_VERSION_WATCHOS="${DARWIN_DEPLOYMENT_VERSION_WATCHOS}"
             )
             ;;
+        android-*)
+            SWIFT_HOST_VARIANT="android"
+            SWIFT_HOST_VARIANT_SDK="ANDROID"
+            case ${host} in
+                android-armv7)
+                    SWIFT_HOST_VARIANT_ARCH="armv7"
+                    ;;
+                android-aarch64)
+                    SWIFT_HOST_VARIANT_ARCH="aarch64"
+                    ;;
+                esac
+        ;;
         *)
             echo "Unknown host tools target: ${host}"
             exit 1
@@ -2057,6 +2014,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DLLDB_SWIFTC:PATH="$(build_directory ${LOCAL_HOST} swift)/bin/swiftc"
                     -DLLDB_SWIFT_LIBS:PATH="$(build_directory ${LOCAL_HOST} swift)/lib/swift"
                     -DCMAKE_INSTALL_PREFIX:PATH="$(get_host_install_prefix ${host})"
+                    -DLLDB_FRAMEWORK_INSTALL_DIR="$(get_host_install_prefix ${host})../System/Library/PrivateFrameworks"
                     -DLLVM_DIR:PATH=${llvm_build_dir}/lib/cmake/llvm
                     -DClang_DIR:PATH=${llvm_build_dir}/lib/cmake/clang
                     -DSwift_DIR:PATH=${swift_build_dir}/lib/cmake/swift
@@ -2933,7 +2891,7 @@ for host in "${ALL_HOSTS[@]}"; do
                 fi
 
                 case ${host} in
-                  linux-*|freebsd-*|cygwin-*|haiku-*) ;;
+                  linux-*|freebsd-*|cygwin-*|haiku-*|android-*) ;;
                   *)
                     echo "error: --install-xctest is not supported on this platform"
                     exit 1

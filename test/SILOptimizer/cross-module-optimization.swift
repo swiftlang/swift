@@ -19,7 +19,6 @@
 
 // RUN: %target-build-swift -O -wmo -module-name=Main -I%t %s -Xllvm -sil-disable-pass=FunctionSignatureOpts -emit-sil | %FileCheck %s -check-prefix=CHECK-SIL
 
-
 import Test
 
 
@@ -84,6 +83,8 @@ func testProtocolsAndClasses() {
   callFoo_gen(27)
   // CHECK-OUTPUT: 55
   callClassMethod(55)
+  // CHECK-OUTPUT: 321
+  callFooViaConformance(0)
 }
 
 func testSubModule() {

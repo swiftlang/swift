@@ -905,12 +905,11 @@ std::string IRGenModule::GetObjCSectionName(StringRef Section,
                ? ("__DATA," + Section).str()
                : ("__DATA," + Section + "," + MachOAttributes).str();
   case llvm::Triple::ELF:
+  case llvm::Triple::Wasm:
     return Section.substr(2).str();
   case llvm::Triple::XCOFF:
   case llvm::Triple::COFF:
     return ("." + Section.substr(2) + "$B").str();
-  case llvm::Triple::Wasm:
-    return Section.substr(2).str();
   }
 
   llvm_unreachable("unexpected object file format");
@@ -937,11 +936,10 @@ void IRGenModule::SetCStringLiteralSection(llvm::GlobalVariable *GV,
       return;
     }
   case llvm::Triple::ELF:
+  case llvm::Triple::Wasm:
     return;
   case llvm::Triple::XCOFF:
   case llvm::Triple::COFF:
-    return;
-  case llvm::Triple::Wasm:
     return;
   }
 
@@ -2592,20 +2590,15 @@ static llvm::GlobalVariable *createGOTEquivalent(IRGenModule &IGM,
                                       global,
                                       llvm::Twine("got.") + globalName);
   
-  // rdar://problem/50968433: Unnamed_addr constants appear to get emitted
-  // with incorrect alignment by the LLVM JIT in some cases. Don't use
-  // unnamed_addr as a workaround.
   // rdar://problem/53836960: i386 ld64 also mis-links relative references
   // to GOT entries.
-  if (!IGM.getOptions().UseJIT
-      && (!IGM.Triple.isOSDarwin()
-          || IGM.Triple.getArch() != llvm::Triple::x86)) {
+  if (!IGM.Triple.isOSDarwin() || IGM.Triple.getArch() != llvm::Triple::x86) {
     gotEquivalent->setUnnamedAddr(llvm::GlobalValue::UnnamedAddr::Global);
   } else {
     ApplyIRLinkage(IRLinkage::InternalLinkOnceODR)
       .to(gotEquivalent);
   }
-  
+
   return gotEquivalent;
 }
 

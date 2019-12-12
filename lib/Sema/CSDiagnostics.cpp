@@ -121,6 +121,12 @@ Expr *FailureDiagnostic::getBaseExprFor(Expr *anchor) const {
     return SE->getBase();
   else if (auto *MRE = dyn_cast<MemberRefExpr>(anchor))
     return MRE->getBase();
+  else if (auto *call = dyn_cast<CallExpr>(anchor)) {
+    auto fnType = getType(call->getFn());
+    if (fnType->isCallableNominalType(getDC())) {
+      return call->getFn();
+    }
+  }
 
   return nullptr;
 }
@@ -129,165 +135,6 @@ Optional<SelectedOverload>
 FailureDiagnostic::getChoiceFor(ConstraintLocator *locator) const {
   auto &cs = getConstraintSystem();
   return getOverloadChoiceIfAvailable(cs.getCalleeLocator(locator));
-}
-
-Type FailureDiagnostic::resolveInterfaceType(Type type,
-                                             bool reconstituteSugar) const {
-  auto &cs = getConstraintSystem();
-  auto resolvedType = type.transform([&](Type type) -> Type {
-    if (auto *tvt = type->getAs<TypeVariableType>()) {
-      // If this type variable is for a generic parameter, return that.
-      if (auto *gp = tvt->getImpl().getGenericParameter())
-        return gp;
-
-      // Otherwise resolve its fixed type, mapped out of context.
-      if (auto fixed = cs.getFixedType(tvt))
-        return resolveInterfaceType(fixed->mapTypeOutOfContext());
-
-      return cs.getRepresentative(tvt);
-    }
-    if (auto *dmt = type->getAs<DependentMemberType>()) {
-      // For a dependent member, first resolve the base.
-      auto newBase = resolveInterfaceType(dmt->getBase());
-
-      // Then reconstruct using its associated type.
-      assert(dmt->getAssocType());
-      return DependentMemberType::get(newBase, dmt->getAssocType());
-    }
-    return type;
-  });
-
-  assert(!resolvedType->hasArchetype());
-  return reconstituteSugar ? resolvedType->reconstituteSugar(/*recursive*/ true)
-                           : resolvedType;
-}
-
-/// Given an apply expr, returns true if it is expected to have a direct callee
-/// overload, resolvable using `getChoiceFor`. Otherwise, returns false.
-static bool shouldHaveDirectCalleeOverload(const CallExpr *callExpr) {
-  auto *fnExpr = callExpr->getDirectCallee();
-
-  // An apply of an apply/subscript doesn't have a direct callee.
-  if (isa<ApplyExpr>(fnExpr) || isa<SubscriptExpr>(fnExpr))
-    return false;
-
-  // Applies of closures don't have callee overloads.
-  if (isa<ClosureExpr>(fnExpr))
-    return false;
-
-  // No direct callee for a try!/try?.
-  if (isa<ForceTryExpr>(fnExpr) || isa<OptionalTryExpr>(fnExpr))
-    return false;
-
-  // If we have an intermediate cast, there's no direct callee.
-  if (isa<ExplicitCastExpr>(fnExpr))
-    return false;
-
-  // No direct callee for an if expr.
-  if (isa<IfExpr>(fnExpr))
-    return false;
-
-  // Assume that anything else would have a direct callee.
-  return true;
-}
-
-Optional<FunctionArgApplyInfo>
-FailureDiagnostic::getFunctionArgApplyInfo(ConstraintLocator *locator) const {
-  auto &cs = getConstraintSystem();
-  auto *anchor = locator->getAnchor();
-  auto path = locator->getPath();
-
-  // Look for the apply-arg-to-param element in the locator's path. We may
-  // have to look through other elements that are generated from an argument
-  // conversion such as GenericArgument for an optional-to-optional conversion,
-  // and OptionalPayload for a value-to-optional conversion.
-  auto iter = path.rbegin();
-  auto applyArgElt = locator->findLast<LocatorPathElt::ApplyArgToParam>(iter);
-  if (!applyArgElt)
-    return None;
-
-  auto nextIter = iter + 1;
-  assert(!locator->findLast<LocatorPathElt::ApplyArgToParam>(nextIter) &&
-         "Multiple ApplyArgToParam components?");
-
-  // Form a new locator that ends at the apply-arg-to-param element, and
-  // simplify it to get the full argument expression.
-  auto argPath = path.drop_back(iter - path.rbegin());
-  auto *argLocator = cs.getConstraintLocator(
-      anchor, argPath, ConstraintLocator::getSummaryFlagsForPath(argPath));
-
-  auto *argExpr = simplifyLocatorToAnchor(argLocator);
-
-  // If we were unable to simplify down to the argument expression, we don't
-  // know what this is.
-  if (!argExpr)
-    return None;
-
-  Optional<OverloadChoice> choice;
-  Type rawFnType;
-  if (auto overload = getChoiceFor(argLocator)) {
-    // If we have resolved an overload for the callee, then use that to get the
-    // function type and callee.
-    choice = overload->choice;
-    rawFnType = overload->openedType;
-  } else {
-    // If we didn't resolve an overload for the callee, we should be dealing
-    // with a call of an arbitrary function expr.
-    if (auto *call = dyn_cast<CallExpr>(anchor)) {
-      assert(!shouldHaveDirectCalleeOverload(call) &&
-             "Should we have resolved a callee for this?");
-      rawFnType = cs.getType(call->getFn());
-    } else {
-      // FIXME: ArgumentMismatchFailure is currently used from CSDiag, meaning
-      // we can end up a BinaryExpr here with an unresolved callee. It should be
-      // possible to remove this once we've gotten rid of the old CSDiag logic
-      // and just assert that we have a CallExpr.
-      auto *apply = cast<ApplyExpr>(anchor);
-      rawFnType = cs.getType(apply->getFn());
-    }
-  }
-
-  // Try to resolve the function type by loading lvalues and looking through
-  // optional types, which can occur for expressions like `fn?(5)`.
-  auto *fnType = resolveType(rawFnType)
-                     ->lookThroughAllOptionalTypes()
-                     ->getAs<FunctionType>();
-  if (!fnType)
-    return None;
-
-  // Resolve the interface type for the function. Note that this may not be a
-  // function type, for example it could be a generic parameter.
-  Type fnInterfaceType;
-  auto *callee = choice ? choice->getDeclOrNull() : nullptr;
-  if (callee && callee->hasInterfaceType()) {
-    // If we have a callee with an interface type, we can use it. This is
-    // preferable to resolveInterfaceType, as this will allow us to get a
-    // GenericFunctionType for generic decls.
-    //
-    // Note that it's possible to find a callee without an interface type. This
-    // can happen for example with closure parameters, where the interface type
-    // isn't set until the solution is applied. In that case, use
-    // resolveInterfaceType.
-    fnInterfaceType = callee->getInterfaceType();
-
-    // Strip off the curried self parameter if necessary.
-    if (hasAppliedSelf(cs, *choice))
-      fnInterfaceType = fnInterfaceType->castTo<AnyFunctionType>()->getResult();
-
-    if (auto *fn = fnInterfaceType->getAs<AnyFunctionType>()) {
-      assert(fn->getNumParams() == fnType->getNumParams() &&
-             "Parameter mismatch?");
-      (void)fn;
-    }
-  } else {
-    fnInterfaceType = resolveInterfaceType(rawFnType);
-  }
-
-  auto argIdx = applyArgElt->getArgIdx();
-  auto paramIdx = applyArgElt->getParamIdx();
-
-  return FunctionArgApplyInfo(cs, argExpr, argIdx, getType(argExpr),
-                              paramIdx, fnInterfaceType, fnType, callee);
 }
 
 Type FailureDiagnostic::restoreGenericParameters(
@@ -929,7 +776,8 @@ bool NoEscapeFuncToTypeConversionFailure::diagnoseParameterUse() const {
     // Let's check whether this is a function parameter passed
     // as an argument to another function which accepts @escaping
     // function at that position.
-    if (auto argApplyInfo = getFunctionArgApplyInfo(getLocator())) {
+    auto &cs = getConstraintSystem();
+    if (auto argApplyInfo = cs.getFunctionArgApplyInfo(getLocator())) {
       auto paramInterfaceTy = argApplyInfo->getParamInterfaceType();
       if (paramInterfaceTy->isTypeParameter()) {
         auto diagnoseGenericParamFailure = [&](GenericTypeParamDecl *decl) {
@@ -1099,8 +947,8 @@ bool MemberAccessOnOptionalBaseFailure::diagnoseAsError() {
   // type, then the result of the expression is optional (and we want to offer
   // only a '?' fixit) even though the constraint system didn't need to add any
   // additional optionality.
-  auto overload = getResolvedOverload(getLocator());
-  if (overload && overload->ImpliedType->getOptionalObjectType())
+  auto overload = getOverloadChoiceIfAvailable(getLocator());
+  if (overload && overload->openedType->getOptionalObjectType())
     resultIsOptional = true;
 
   auto unwrappedBaseType = baseType->getOptionalObjectType();
@@ -1137,7 +985,8 @@ void MissingOptionalUnwrapFailure::offerDefaultValueUnwrapFixIt(
   if (isa<InOutExpr>(anchor))
     return;
 
-  if (auto argApplyInfo = getFunctionArgApplyInfo(getLocator()))
+  auto &cs = getConstraintSystem();
+  if (auto argApplyInfo = cs.getFunctionArgApplyInfo(getLocator()))
     if (argApplyInfo->getParameterFlags().isInOut())
       return;
 
@@ -1410,19 +1259,19 @@ bool RValueTreatedAsLValueFailure::diagnoseAsError() {
           emitDiagnostic(loc, diag::assignment_let_property_delegating_init,
                       member->getName());
           if (auto *ref = getResolvedMemberRef(member)) {
-            emitDiagnostic(ref, diag::decl_declared_here, member->getName());
+            emitDiagnostic(ref, diag::decl_declared_here, ref->getFullName());
           }
           return true;
         }
       }
     }
 
-    if (auto resolvedOverload = getResolvedOverload(getLocator())) {
-      if (resolvedOverload->Choice.getKind() ==
+    if (auto resolvedOverload = getOverloadChoiceIfAvailable(getLocator())) {
+      if (resolvedOverload->choice.getKind() ==
           OverloadChoiceKind::DynamicMemberLookup)
         subElementDiagID = diag::assignment_dynamic_property_has_immutable_base;
 
-      if (resolvedOverload->Choice.getKind() ==
+      if (resolvedOverload->choice.getKind() ==
           OverloadChoiceKind::KeyPathDynamicMemberLookup) {
         if (!getType(member->getBase(), /*wantRValue=*/false)->hasLValueType())
           subElementDiagID =
@@ -1637,7 +1486,7 @@ bool AssignmentFailure::diagnoseAsError() {
       if (auto typeContext = DC->getInnermostTypeContext()) {
         SmallVector<ValueDecl *, 2> results;
         DC->lookupQualified(typeContext->getSelfNominalTypeDecl(),
-                            VD->getFullName(), NL_QualifiedDefault, results);
+                            VD->createNameRef(), NL_QualifiedDefault, results);
 
         auto foundProperty = llvm::find_if(results, [&](ValueDecl *decl) {
           // We're looking for a settable property that is the same type as the
@@ -2961,10 +2810,29 @@ ContextualFailure::getDiagnosticFor(ContextualTypePurpose context,
 }
 
 bool TupleContextualFailure::diagnoseAsError() {
-  auto diagnostic = isNumElementsMismatch()
-                        ? diag::tuple_types_not_convertible_nelts
-                        : diag::tuple_types_not_convertible;
+  Diag<Type, Type> diagnostic;
+  auto purpose = getContextualTypePurpose();
+  auto &cs = getConstraintSystem();
+  if (isNumElementsMismatch())
+    diagnostic = diag::tuple_types_not_convertible_nelts;
+  else if ((purpose == CTP_Initialization) && !cs.getContextualType())
+    diagnostic = diag::tuple_types_not_convertible;
+  else if (auto diag = getDiagnosticFor(purpose, /*forProtocol=*/false))
+    diagnostic = *diag;
+  else
+    return false;
+
   emitDiagnostic(getAnchor()->getLoc(), diagnostic, getFromType(), getToType());
+  return true;
+}
+
+bool FunctionTypeMismatch::diagnoseAsError() {
+  auto purpose = getContextualTypePurpose();
+  auto diagnostic = getDiagnosticFor(purpose, /*forProtocol=*/false);
+  if (!diagnostic)
+    return false;
+
+  emitDiagnostic(getAnchor()->getLoc(), *diagnostic, getFromType(), getToType());
   return true;
 }
 
@@ -3184,7 +3052,7 @@ bool SubscriptMisuseFailure::diagnoseAsNote() {
 /// meaning their lower case counterparts are identical.
 ///   - DeclName is valid when such a correct case is found; invalid otherwise.
 DeclName MissingMemberFailure::findCorrectEnumCaseName(
-    Type Ty, TypoCorrectionResults &corrections, DeclName memberName) {
+    Type Ty, TypoCorrectionResults &corrections, DeclNameRef memberName) {
   if (memberName.isSpecial() || !memberName.isSimpleName())
     return DeclName();
   if (!Ty->getEnumOrBoundGenericEnum())
@@ -3204,6 +3072,9 @@ bool MissingMemberFailure::diagnoseAsError() {
 
   if (!anchor || !baseExpr)
     return false;
+
+  if (diagnoseForDynamicCallable())
+    return true;
 
   auto baseType = resolveType(getBaseType())->getWithoutSpecifierType();
 
@@ -3285,10 +3156,9 @@ bool MissingMemberFailure::diagnoseAsError() {
                getName().getBaseName() == DeclBaseName::createConstructor()) {
       auto &cs = getConstraintSystem();
 
-      auto memberName = getName().getBaseName();
       auto result = cs.performMemberLookup(
-          ConstraintKind::ValueMember, memberName, metatypeTy,
-          FunctionRefKind::DoubleApply, getLocator(),
+          ConstraintKind::ValueMember, getName().withoutArgumentLabels(),
+          metatypeTy, FunctionRefKind::DoubleApply, getLocator(),
           /*includeInaccessibleMembers=*/true);
 
       // If there are no `init` members at all produce a tailored
@@ -3374,6 +3244,26 @@ bool MissingMemberFailure::diagnoseAsError() {
   // Note all the correction candidates.
   corrections.noteAllCandidates();
   return true;
+}
+
+bool MissingMemberFailure::diagnoseForDynamicCallable() const {
+  auto *locator = getLocator();
+  if (!locator->isLastElement<LocatorPathElt::DynamicCallable>())
+    return false;
+
+  auto memberName = getName();
+  auto arguments = memberName.getArgumentNames();
+  assert(arguments.size() == 1);
+
+  auto &ctx = getASTContext();
+  if (arguments.front() == ctx.Id_withKeywordArguments) {
+    auto anchor = getAnchor();
+    emitDiagnostic(anchor->getLoc(),
+                   diag::missing_dynamic_callable_kwargs_method, getBaseType());
+    return true;
+  }
+
+  return false;
 }
 
 bool InvalidMemberRefOnExistential::diagnoseAsError() {
@@ -3589,10 +3479,10 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
         // static members doesn't make a whole lot of sense
         if (auto TAD = dyn_cast<TypeAliasDecl>(Member)) {
           Diag.emplace(emitDiagnostic(loc, diag::typealias_outside_of_protocol,
-                                      TAD->getName()));
+                                      Name));
         } else if (auto ATD = dyn_cast<AssociatedTypeDecl>(Member)) {
           Diag.emplace(emitDiagnostic(loc, diag::assoc_type_outside_of_protocol,
-                                      ATD->getName()));
+                                      Name));
         } else if (isa<ConstructorDecl>(Member)) {
           Diag.emplace(emitDiagnostic(loc, diag::construct_protocol_by_name,
                                       instanceTy));
@@ -3796,7 +3686,7 @@ bool MissingArgumentsFailure::diagnoseAsError() {
   // foo(bar) // `() -> Void` vs. `(Int) -> Void`
   // ```
   if (locator->isLastElement<LocatorPathElt::ApplyArgToParam>()) {
-    auto info = *getFunctionArgApplyInfo(locator);
+    auto info = *(cs.getFunctionArgApplyInfo(locator));
 
     auto *argExpr = info.getArgExpr();
     emitDiagnostic(argExpr->getLoc(), diag::cannot_convert_argument_value,
@@ -4012,7 +3902,7 @@ bool MissingArgumentsFailure::diagnoseClosure(ClosureExpr *closure) {
   auto *locator = getLocator();
   if (locator->isForContextualType()) {
     funcType = cs.getContextualType()->getAs<FunctionType>();
-  } else if (auto info = getFunctionArgApplyInfo(locator)) {
+  } else if (auto info = cs.getFunctionArgApplyInfo(locator)) {
     funcType = info->getParamType()->getAs<FunctionType>();
   } else if (locator->isLastElement<LocatorPathElt::ClosureResult>()) {
     // Based on the locator we know this this is something like this:
@@ -4163,7 +4053,7 @@ bool MissingArgumentsFailure::isMisplacedMissingArgument(
     return false;
 
   auto *fnType =
-      cs.simplifyType(overloadChoice->ImpliedType)->getAs<FunctionType>();
+      cs.simplifyType(overloadChoice->openedType)->getAs<FunctionType>();
   if (!(fnType && fnType->getNumParams() == 2))
     return false;
 
@@ -4725,7 +4615,8 @@ SourceLoc InvalidUseOfAddressOf::getLoc() const {
 }
 
 bool InvalidUseOfAddressOf::diagnoseAsError() {
-  if (auto argApplyInfo = getFunctionArgApplyInfo(getLocator())) {
+  auto &cs = getConstraintSystem();
+  if (auto argApplyInfo = cs.getFunctionArgApplyInfo(getLocator())) {
     if (!argApplyInfo->getParameterFlags().isInOut()) {
       auto anchor = getAnchor();
       emitDiagnostic(anchor->getLoc(), diag::extra_address_of, getToType())
@@ -5245,18 +5136,19 @@ bool ThrowingFunctionConversionFailure::diagnoseAsError() {
 }
 
 bool InOutConversionFailure::diagnoseAsError() {
+  auto &cs = getConstraintSystem();
   auto *anchor = getAnchor();
   auto *locator = getLocator();
   auto path = locator->getPath();
 
   if (!path.empty() &&
       path.back().getKind() == ConstraintLocator::FunctionArgument) {
-    if (auto argApplyInfo = getFunctionArgApplyInfo(locator)) {
+    if (auto argApplyInfo = cs.getFunctionArgApplyInfo(locator)) {
       emitDiagnostic(anchor->getLoc(), diag::cannot_convert_argument_value,
           argApplyInfo->getArgType(), argApplyInfo->getParamType());
     } else {
       assert(locator->findLast<LocatorPathElt::ContextualType>());
-      auto contextualType = getConstraintSystem().getContextualType();
+      auto contextualType = cs.getContextualType();
       auto purpose = getContextualTypePurpose();
       auto diagnostic = getDiagnosticFor(purpose, /*forProtocol=*/false);
 
