@@ -556,6 +556,7 @@ func verifyWeakUnownedReflection
   func verifyExistentialField(child: (label: String?, value: Any), name: String) {
     expectEqual(child.label, name)
     let vp1 = child.value as? WeakUnownedTestsP1
+    print("child.value = ", type(of: child.value), "vp1.value = ", type(of: vp1))
     expectNotNil(vp1)
     expectEqual(vp1!.f1(), 2)
     let vp2 = child.value as? WeakUnownedTestsP2

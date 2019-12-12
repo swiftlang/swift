@@ -83,6 +83,8 @@ func testProtocolsAndClasses() {
   callFoo_gen(27)
   // CHECK-OUTPUT: 55
   callClassMethod(55)
+  // CHECK-OUTPUT: 321
+  callFooViaConformance(0)
 }
 
 func testSubModule() {

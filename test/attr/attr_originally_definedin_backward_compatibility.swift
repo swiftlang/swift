@@ -1,4 +1,4 @@
-// REQUIRES: objc_interop
+// REQUIRES: OS=macosx
 //
 // RUN: %empty-directory(%t)
 //

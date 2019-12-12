@@ -5807,13 +5807,12 @@ VarDecl *VarDecl::getLazyStorageProperty() const {
       {});
 }
 
-static bool propertyWrapperInitializedViaInitialValue(
-   const VarDecl *var, bool checkDefaultInit) {
-  auto customAttrs = var->getAttachedPropertyWrappers();
+bool VarDecl::isPropertyMemberwiseInitializedWithWrappedType() const {
+  auto customAttrs = getAttachedPropertyWrappers();
   if (customAttrs.empty())
     return false;
 
-  auto *PBD = var->getParentPatternBinding();
+  auto *PBD = getParentPatternBinding();
   if (!PBD)
     return false;
 
@@ -5828,23 +5827,12 @@ static bool propertyWrapperInitializedViaInitialValue(
     return false;
 
   // Default initialization does not use a value.
-  if (checkDefaultInit &&
-      var->getAttachedPropertyWrapperTypeInfo(0).defaultInit)
+  if (getAttachedPropertyWrapperTypeInfo(0).defaultInit)
     return false;
 
-  // If all property wrappers have an initialValue initializer, the property
+  // If all property wrappers have a wrappedValue initializer, the property
   // wrapper will be initialized that way.
-  return var->allAttachedPropertyWrappersHaveInitialValueInit();
-}
-
-bool VarDecl::isPropertyWrapperInitializedWithInitialValue() const {
-  return propertyWrapperInitializedViaInitialValue(
-      this, /*checkDefaultInit=*/true);
-}
-
-bool VarDecl::isPropertyMemberwiseInitializedWithWrappedType() const {
-  return propertyWrapperInitializedViaInitialValue(
-      this, /*checkDefaultInit=*/false);
+  return allAttachedPropertyWrappersHaveInitialValueInit();
 }
 
 Identifier VarDecl::getObjCPropertyName() const {
@@ -6083,6 +6071,7 @@ bool ParamDecl::hasDefaultExpr() const {
     return false;
   case DefaultArgumentKind::Normal:
   case DefaultArgumentKind::File:
+  case DefaultArgumentKind::FilePath:
   case DefaultArgumentKind::Line:
   case DefaultArgumentKind::Column:
   case DefaultArgumentKind::Function:
@@ -6105,6 +6094,7 @@ bool ParamDecl::hasCallerSideDefaultExpr() const {
   case DefaultArgumentKind::Normal:
     return false;
   case DefaultArgumentKind::File:
+  case DefaultArgumentKind::FilePath:
   case DefaultArgumentKind::Line:
   case DefaultArgumentKind::Column:
   case DefaultArgumentKind::Function:
@@ -6414,6 +6404,7 @@ ParamDecl::getDefaultValueStringRepresentation(
   }
   case DefaultArgumentKind::Inherited: return "super";
   case DefaultArgumentKind::File: return "#file";
+  case DefaultArgumentKind::FilePath: return "#filePath";
   case DefaultArgumentKind::Line: return "#line";
   case DefaultArgumentKind::Column: return "#column";
   case DefaultArgumentKind::Function: return "#function";

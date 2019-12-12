@@ -48,6 +48,8 @@ static DefaultArgumentKind getDefaultArgKind(Expr *init) {
     return DefaultArgumentKind::Column;
   case MagicIdentifierLiteralExpr::File:
     return DefaultArgumentKind::File;
+  case MagicIdentifierLiteralExpr::FilePath:
+    return DefaultArgumentKind::FilePath;
   case MagicIdentifierLiteralExpr::Line:
     return DefaultArgumentKind::Line;
   case MagicIdentifierLiteralExpr::Function:

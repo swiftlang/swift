@@ -454,6 +454,11 @@ def enable_experimental_differentiable_programming : Flag<["-"], "enable-experim
   Flags<[FrontendOption]>,
   HelpText<"Enable experimental differentiable programming features">;
 
+def enable_experimental_concise_pound_file : Flag<["-"],
+    "enable-experimental-concise-pound-file">,
+  Flags<[FrontendOption]>,
+  HelpText<"Enable experimental concise '#file' identifier and '#filePath' alternative">;
+
 // Diagnostic control options
 def suppress_warnings : Flag<["-"], "suppress-warnings">,
   Flags<[FrontendOption]>,
@@ -888,6 +893,9 @@ def target : Separate<["-"], "target">,
   HelpText<"Generate code for the given target <triple>, such as x86_64-apple-macos10.9">, MetaVarName<"<triple>">;
 def target_legacy_spelling : Joined<["--"], "target=">,
   Flags<[FrontendOption]>, Alias<target>;
+def print_target_info : Flag<["-"], "print-target-info">,
+    Flags<[FrontendOption]>,
+    HelpText<"Print target information for the given target <triple>, such as x86_64-apple-macos10.9">, MetaVarName<"<triple>">;
 
 def target_cpu : Separate<["-"], "target-cpu">, Flags<[FrontendOption, ModuleInterfaceOption]>,
   HelpText<"Generate code for a particular CPU variant">;

@@ -1014,6 +1014,8 @@ getMagicIdentifierLiteralKind(tok Kind) {
   case tok::kw___FILE__:
   case tok::pound_file:
     return MagicIdentifierLiteralExpr::Kind::File;
+  case tok::pound_filePath:
+    return MagicIdentifierLiteralExpr::Kind::FilePath;
   case tok::kw___FUNCTION__:
   case tok::pound_function:
     return MagicIdentifierLiteralExpr::Kind::Function;
@@ -1446,6 +1448,15 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
       .fixItReplace(Tok.getLoc(), replacement);
     LLVM_FALLTHROUGH;
   }
+
+  case tok::pound_filePath:
+    // Check twice because of fallthrough--this is ugly but temporary.
+    if (Tok.is(tok::pound_filePath) && !Context.LangOpts.EnableConcisePoundFile)
+      diagnose(Tok.getLoc(), diag::unknown_pound_expr, "filePath");
+    // Continue since we actually do know how to handle it. This avoids extra
+    // diagnostics.
+    LLVM_FALLTHROUGH;
+
   case tok::pound_column:
   case tok::pound_file:
   case tok::pound_function:
@@ -1455,6 +1466,7 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
     switch (Tok.getKind()) {
     case tok::pound_column: SKind = SyntaxKind::PoundColumnExpr; break;
     case tok::pound_file: SKind = SyntaxKind::PoundFileExpr; break;
+    case tok::pound_filePath: SKind = SyntaxKind::PoundFilePathExpr; break;
     case tok::pound_function: SKind = SyntaxKind::PoundFunctionExpr; break;
     // FIXME: #line was renamed to #sourceLocation
     case tok::pound_line: SKind = SyntaxKind::PoundLineExpr; break;

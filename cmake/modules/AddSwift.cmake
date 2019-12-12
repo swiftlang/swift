@@ -1105,9 +1105,13 @@ function(_add_swift_library_single target name)
       PROPERTIES
       INSTALL_RPATH "$ORIGIN:/usr/lib/swift/cygwin")
   elseif("${SWIFTLIB_SINGLE_SDK}" STREQUAL "ANDROID")
-    # CMake generates incorrect rule `$SONAME_FLAG $INSTALLNAME_DIR$SONAME` for Android build on macOS cross-compile host.
-    # Proper linker flags constructed manually. See below variable `swiftlib_link_flags_all`.
-    set_target_properties("${target}" PROPERTIES NO_SONAME TRUE)
+    # CMake generates an incorrect rule `$SONAME_FLAG $INSTALLNAME_DIR$SONAME`
+    # for an Android cross-build from a macOS host. Construct the proper linker
+    # flags manually in add_swift_target_library instead, see there with
+    # variable `swiftlib_link_flags_all`.
+    if(SWIFTLIB_SINGLE_TARGET_LIBRARY)
+      set_target_properties("${target}" PROPERTIES NO_SONAME TRUE)
+    endif()
     # Only set the install RPATH if cross-compiling the host tools, in which
     # case both the NDK and Sysroot paths must be set.
     if(NOT "${SWIFT_ANDROID_NDK_PATH}" STREQUAL "" AND

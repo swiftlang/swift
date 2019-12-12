@@ -489,7 +489,17 @@ class C3 : P1 {} // expected-error{{type 'C3' does not conform to protocol 'P1'}
 func h<T : C3>(_ x : T) {
   _ = x as P1 // expected-error{{protocol 'P1' can only be used as a generic constraint because it has Self or associated type requirements}}
 }
-
+func i<T : C3>(_ x : T?) -> Bool {
+  return x is P1 // expected-error{{protocol 'P1' can only be used as a generic constraint because it has Self or associated type requirements}}
+  // FIXME: Bogus diagnostic.  See SR-11920.
+  // expected-warning@-2 {{checking a value with optional type 'T?' against dynamic type 'P1' succeeds whenever the value is non-nil; did you mean to use '!= nil'?}}
+}
+func j(_ x : C1) -> Bool {
+  return x is P1 // expected-error{{protocol 'P1' can only be used as a generic constraint because it has Self or associated type requirements}}
+}
+func k(_ x : C1?) -> Bool {
+  return x is P1 // expected-error{{protocol 'P1' can only be used as a generic constraint because it has Self or associated type requirements}}
+}
 
 
 protocol P4 {

@@ -1531,6 +1531,7 @@ static void diagnoseIgnoredLiteral(ASTContext &Ctx, LiteralExpr *LE) {
     case ExprKind::MagicIdentifierLiteral:
       switch (cast<MagicIdentifierLiteralExpr>(LE)->getKind()) {
       case MagicIdentifierLiteralExpr::Kind::File: return "#file";
+      case MagicIdentifierLiteralExpr::Kind::FilePath: return "#filePath";
       case MagicIdentifierLiteralExpr::Kind::Line: return "#line";
       case MagicIdentifierLiteralExpr::Kind::Column: return "#column";
       case MagicIdentifierLiteralExpr::Kind::Function: return "#function";

@@ -2124,6 +2124,40 @@ bool Driver::handleImmediateArgs(const ArgList &Args, const ToolChain &TC) {
                                 std::end(commandArgs));
   }
 
+  if (Args.hasArg(options::OPT_print_target_info)) {
+    SmallVector<const char *, 5> commandLine;
+    commandLine.push_back("-frontend");
+    commandLine.push_back("-print-target-info");
+    if (const Arg *targetArg = Args.getLastArg(options::OPT_target)) {
+      commandLine.push_back("-target");
+      commandLine.push_back(targetArg->getValue());
+    }
+    if (const Arg *sdkArg = Args.getLastArg(options::OPT_sdk)) {
+      commandLine.push_back("-sdk");
+      commandLine.push_back(sdkArg->getValue());
+    }
+
+    if (const Arg *resourceDirArg = Args.getLastArg(options::OPT_resource_dir)) {
+      commandLine.push_back("-resource-dir");
+      commandLine.push_back(resourceDirArg->getValue());
+    }
+
+    std::string executable = getSwiftProgramPath();
+
+    sys::TaskQueue queue;
+    queue.addTask(executable.c_str(), commandLine);
+    queue.execute(nullptr,
+                  [](sys::ProcessId PID, int returnCode,
+                      StringRef output, StringRef errors,
+                      sys::TaskProcessInformation ProcInfo,
+                      void *unused) -> sys::TaskFinishedResponse {
+      llvm::outs() << output;
+      llvm::errs() << errors;
+      return sys::TaskFinishedResponse::ContinueExecution;
+    });
+    return false;
+  }
+
   return true;
 }
 

@@ -2157,6 +2157,7 @@ namespace {
     Expr *visitMagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr *expr) {
       switch (expr->getKind()) {
       case MagicIdentifierLiteralExpr::File:
+      case MagicIdentifierLiteralExpr::FilePath:
       case MagicIdentifierLiteralExpr::Function:
         return handleStringLiteralExpr(expr);
 
@@ -2385,8 +2386,12 @@ namespace {
 
       // If there was an argument, apply it.
       if (auto arg = expr->getArgument()) {
-        auto callee = resolveConcreteDeclRef(selected.choice.getDecl(),
-                                             memberLocator);
+        // Find the callee. Note this may be different to the member being
+        // referenced for things like callAsFunction.
+        auto *calleeLoc = cs.getCalleeLocator(exprLoc);
+        auto calleeOverload = solution.getOverloadChoice(calleeLoc);
+        auto callee = resolveConcreteDeclRef(calleeOverload.choice.getDecl(),
+                                             calleeLoc);
         ApplyExpr *apply = CallExpr::create(
             ctx, result, arg, expr->getArgumentLabels(),
             expr->getArgumentLabelLocs(), expr->hasTrailingClosure(),

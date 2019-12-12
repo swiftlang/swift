@@ -52,10 +52,21 @@ func testCallable(
 func testCallableDiagnostics(
   a: Callable, b: DiscardableResult, c: Throwing, d: KeywordArgumentCallable
 ) {
-  a("hello", "world") // expected-error {{cannot invoke 'a' with an argument list of type '(String, String)'}}
-  b("hello", "world") // expected-error {{cannot invoke 'b' with an argument list of type '(String, String)'}}
-  try? c(1, 2, 3, 4) // expected-error {{cannot invoke 'c' with an argument list of type '(Int, Int, Int, Int)'}}
-  d(x1: "hello", x2: "world") // expected-error {{cannot invoke 'd' with an argument list of type '(x1: String, x2: String)'}}
+  a("hello", "world")
+  // expected-error@-1:5  {{cannot convert value of type 'String' to expected argument type 'Int'}}
+  // expected-error@-2:14 {{cannot convert value of type 'String' to expected argument type 'Int'}}
+  b("hello", "world")
+  // expected-error@-1:5  {{cannot convert value of type 'String' to expected argument type 'Double'}}
+  // expected-error@-2:14 {{cannot convert value of type 'String' to expected argument type 'Double'}}
+  try? c(1, 2, 3, 4)
+  // expected-error@-1:10 {{cannot convert value of type 'Int' to expected argument type 'String'}}
+  // expected-error@-2:13 {{cannot convert value of type 'Int' to expected argument type 'String'}}
+  // expected-error@-3:16 {{cannot convert value of type 'Int' to expected argument type 'String'}}
+  // expected-error@-4:19 {{cannot convert value of type 'Int' to expected argument type 'String'}}
+
+  d(x1: "hello", x2: "world")
+  // expected-error@-1:9  {{cannot convert value of type 'String' to expected argument type 'Float'}}
+  // expected-error@-2:22 {{cannot convert value of type 'String' to expected argument type 'Float'}}
 }
 
 func testIUO(

@@ -238,6 +238,8 @@ static void addCommonFrontendArgs(const ToolChain &TC, const OutputInfo &OI,
   inputArgs.AddLastArg(arguments, options::OPT_enable_astscope_lookup);
   inputArgs.AddLastArg(arguments, options::OPT_disable_astscope_lookup);
   inputArgs.AddLastArg(arguments, options::OPT_disable_parser_lookup);
+  inputArgs.AddLastArg(arguments,
+                       options::OPT_enable_experimental_concise_pound_file);
 
   // Pass on any build config options
   inputArgs.AddAllArgs(arguments, options::OPT_D);
