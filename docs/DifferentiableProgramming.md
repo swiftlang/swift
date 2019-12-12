@@ -1790,7 +1790,7 @@ let d = derivative(at: 0) { x in
 When a protocol requirement or class member is marked with `@differentiable`, it
 is considered as a _differentiability customization point_. This means that all
 conforming/overriding implementation must provide a corresponding
-`@differentiable` attribute, which causes the implementation to be will be
+`@differentiable` attribute, which causes the implementation to be
 differentiated. To inherit the default derivative without differentiating the
 implementation, add `default` to the `@differentiable` attribute.
 
