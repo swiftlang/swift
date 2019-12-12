@@ -3953,6 +3953,11 @@ public:
       return getSILFunctionLanguage(getRepresentation());
     }
 
+    /// Return the underlying Uncommon value if it is not the default value.
+    Optional<Uncommon> getUncommonInfo() const {
+      return Other.empty() ? Optional<Uncommon>() : Other;
+    }
+
     bool hasSelfParam() const {
       switch (getRepresentation()) {
       case Representation::Thick:
