@@ -1098,6 +1098,10 @@ namespace driver {
       BatchPartition Partition(NumPartitions);
       partitionIntoBatches(Batchable.takeVector(), Partition);
 
+      // Ensure that at least one batch job gets a -emit-dependency-path
+      // argument when constructInvocation isCalled.
+      Comp.resetHaveAlreadyAddedDependencyPath();
+
       // Construct a BatchJob from each batch in the partition.
       for (auto const &Batch : Partition) {
         formBatchJobFromPartitionBatch(Batches, Batch);
@@ -1405,6 +1409,7 @@ static bool writeFilelistIfNecessary(const Job *job, const ArgList &args,
       break;
     }
     case FilelistInfo::WhichFiles::SupplementaryOutput:
+    #error fix writeOutputFileMap???
       job->getOutput().writeOutputFileMap(out);
       break;
     }
@@ -1563,6 +1568,11 @@ const char *Compilation::getAllSourcesPath() const {
   }
   return AllSourceFilesPath;
 }
+
+void Compilation::resetHaveAlreadyAddedDependencyPath() {
+   HaveAlreadyAddedDependencyPath = false;
+ }
+
 
 void Compilation::addDependencyPathOrCreateDummy(
     const CommandOutput &Output,

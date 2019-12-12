@@ -374,6 +374,8 @@ public:
     return FilelistThreshold;
   }
 
+  void resetHaveAlreadyAddedDependencyPath();
+
   /// Called to decide whether to add a dependency path argument, or whether to
   /// create a dummy file. Responds by invoking one of the two passed-in
   /// functions.
