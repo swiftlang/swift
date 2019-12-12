@@ -263,6 +263,8 @@ struct SemanticARCOptVisitor
   FORWARDING_INST(OpenExistentialBoxValue)
   FORWARDING_INST(MarkDependence)
   // SWIFT_ENABLE_TENSORFLOW
+  FORWARDING_INST(DifferentiableFunction)
+  FORWARDING_INST(LinearFunction)
   FORWARDING_INST(DifferentiableFunctionExtract)
   FORWARDING_INST(LinearFunctionExtract)
   // SWIFT_ENABLE_TENSORFLOW END
