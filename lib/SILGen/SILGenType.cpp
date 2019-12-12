@@ -103,7 +103,6 @@ SILGenModule::emitVTableMethod(ClassDecl *theClass,
     implFn = getFunction(derived, NotForDefinition);
   }
 
-
   // As a fast path, if there is no override, definitely no thunk is necessary.
   if (derived == base)
     return SILVTable::Entry(base, implFn, implKind);

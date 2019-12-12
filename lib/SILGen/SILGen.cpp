@@ -543,7 +543,7 @@ static SILFunction *getFunctionToInsertAfter(SILGenModule &SGM,
   return nullptr;
 }
 
-static bool haveProfiledDerivativeFunction(SILDeclRef constant) {
+static bool haveProfiledAssociatedFunction(SILDeclRef constant) {
   return constant.isDefaultArgGenerator() || constant.isForeign ||
          constant.isCurried;
 }
@@ -555,7 +555,7 @@ static void setUpForProfiling(SILDeclRef constant, SILFunction *F,
     return;
 
   ASTNode profiledNode;
-  if (!haveProfiledDerivativeFunction(constant)) {
+  if (!haveProfiledAssociatedFunction(constant)) {
     if (constant.hasDecl()) {
       if (auto *fd = constant.getFuncDecl()) {
         if (fd->hasBody()) {
