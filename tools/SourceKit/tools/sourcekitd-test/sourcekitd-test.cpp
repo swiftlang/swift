@@ -573,6 +573,7 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
   case SourceKitRequest::CodeComplete:
     sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestCodeComplete);
     sourcekitd_request_dictionary_set_int64(Req, KeyOffset, ByteOffset);
+    addCodeCompleteOptions(Req, Opts);
     break;
 
   case SourceKitRequest::CodeCompleteOpen:
