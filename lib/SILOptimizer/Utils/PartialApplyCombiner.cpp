@@ -322,7 +322,7 @@ SILInstruction *PartialApplyCombiner::combine() {
       assert(use->get()->getType().castTo<SILFunctionType>() ==
              escapingCalleeTy);
       (void)escapingCalleeTy;
-      uses.append(cfi->getUses().begin(), cfi->getUses().end());
+      llvm::copy(cfi->getUses(), std::back_inserter(uses));
       continue;
     }
 
