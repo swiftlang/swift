@@ -271,11 +271,11 @@ namespace {
       auto jvpTy = origTy->getAutoDiffDerivativeFunctionType(
           type->getDifferentiationParameterIndices(), /*resultIndex*/ 0,
           AutoDiffDerivativeFunctionKind::JVP, TC,
-          LookUpConformanceInModule(&M), origType.getGenericSignature());
+          LookUpConformanceInModule(&M), origType.getGenericSignatureOrNull());
       auto vjpTy = origTy->getAutoDiffDerivativeFunctionType(
           type->getDifferentiationParameterIndices(), /*resultIndex*/ 0,
           AutoDiffDerivativeFunctionKind::VJP, TC,
-          LookUpConformanceInModule(&M), origType.getGenericSignature());
+          LookUpConformanceInModule(&M), origType.getGenericSignatureOrNull());
       RecursiveProperties props;
       props.addSubobject(classifyType(origType, origTy, TC, Expansion));
       props.addSubobject(classifyType(origType, jvpTy, TC, Expansion));
@@ -290,7 +290,7 @@ namespace {
       auto origTy = type->getWithoutDifferentiability();
       auto transTy = origTy->getAutoDiffTransposeFunctionType(
           type->getDifferentiationParameterIndices(), TC,
-          LookUpConformanceInModule(&M), origType.getGenericSignature());
+          LookUpConformanceInModule(&M), origType.getGenericSignatureOrNull());
       RecursiveProperties props;
       props.addSubobject(classifyType(origType, origTy, TC, Expansion));
       props.addSubobject(classifyType(origType, transTy, TC, Expansion));
