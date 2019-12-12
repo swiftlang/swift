@@ -911,7 +911,9 @@ static bool _dynamicCastToExistential(OpaqueValue *dest,
                                                         srcDynamicType,
                                                         errorWitness)) {
       *destBoxAddr = reinterpret_cast<SwiftError*>(embedded);
-      maybeDeallocateSource(true);
+      if (shouldDeallocateSource(true, flags)) {
+        srcType->vw_destroy(src);
+      }
       return true;
     }
 #endif
