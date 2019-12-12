@@ -3625,7 +3625,7 @@ void AttributeChecker::visitDerivativeAttr(DerivativeAttr *attr) {
 
   // Reject duplicate `@derivative` attributes.
   auto insertion = Ctx.DerivativeAttrs.try_emplace(
-      {originalAFD, resolvedWrtParamIndices, kind}, attr);
+      std::make_tuple(originalAFD, resolvedWrtParamIndices, kind), attr);
   if (!insertion.second) {
     diagnoseAndRemoveAttr(attr,
                           diag::derivative_attr_original_already_has_derivative,
