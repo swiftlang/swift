@@ -232,9 +232,9 @@ SILType VJPEmitter::getLoweredType(Type type) {
 }
 
 SILType VJPEmitter::getNominalDeclLoweredType(NominalTypeDecl *nominal) {
-  auto nomType =
+  auto nominalType =
       getOpASTType(nominal->getDeclaredInterfaceType()->getCanonicalType());
-  return getLoweredType(nomType);
+  return getLoweredType(nominalType);
 }
 
 StructInst *VJPEmitter::buildPullbackValueStructValue(TermInst *termInst) {

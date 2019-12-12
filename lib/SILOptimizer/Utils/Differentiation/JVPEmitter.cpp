@@ -125,12 +125,17 @@ JVPEmitter::getNextDifferentialLocalAllocationInsertionPoint() {
   return it;
 }
 
+SILType JVPEmitter::getLoweredType(Type type) {
+  Lowering::AbstractionPattern pattern(
+      jvp->getLoweredFunctionType()->getSubstGenericSignature(),
+      type->getCanonicalType());
+  return jvp->getLoweredType(pattern, type);
+}
+
 SILType JVPEmitter::getNominalDeclLoweredType(NominalTypeDecl *nominal) {
-  auto nomType =
+  auto nominalType =
       getOpASTType(nominal->getDeclaredInterfaceType()->getCanonicalType());
-  auto nomSILType = context.getTypeConverter().getLoweredType(
-      nomType, TypeExpansionContext::minimal());
-  return nomSILType;
+  return getLoweredType(nominalType);
 }
 
 StructInst *JVPEmitter::buildDifferentialValueStructValue(TermInst *termInst) {
@@ -1364,9 +1369,7 @@ void JVPEmitter::visitApplyInst(ApplyInst *ai) {
   auto differentialType =
       remapType(differential->getType()).castTo<SILFunctionType>();
   auto loweredDifferentialType =
-      getOpType(context.getTypeConverter().getLoweredType(
-                    differentialDecl->getInterfaceType()->getCanonicalType(),
-                    TypeExpansionContext::minimal()))
+      getOpType(getLoweredType(differentialDecl->getInterfaceType()))
           .castTo<SILFunctionType>();
   // If actual differential type does not match lowered differential type,
   // reabstract the differential using a thunk.

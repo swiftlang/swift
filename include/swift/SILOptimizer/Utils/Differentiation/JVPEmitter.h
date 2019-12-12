@@ -155,6 +155,9 @@ private:
 
   SILBasicBlock::iterator getNextDifferentialLocalAllocationInsertionPoint();
 
+  /// Get the lowered SIL type of the given AST type.
+  SILType getLoweredType(Type type);
+
   /// Get the lowered SIL type of the given nominal type declaration.
   SILType getNominalDeclLoweredType(NominalTypeDecl *nominal);
 
