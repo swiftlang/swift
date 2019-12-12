@@ -163,6 +163,8 @@ func blah2<T: DoubleDifferentiableDistribution>(_ x: T, _ value: T.Value) -> Tra
   x.logProbability(of: value)
 }
 
+// Satisfying the requirement with more wrt indices than are necessary.
+
 protocol DifferentiableFoo {
   associatedtype T: Differentiable
   @differentiable(wrt: x)
@@ -179,6 +181,20 @@ struct MoreDifferentiableFooStruct: MoreDifferentiableFoo {
   func foo(_ x: Tracked<Float>) -> Tracked<Float> {
     x
   }
+}
+
+// Satisfiying the requirement with a less-constrained derivative than is necessary.
+
+protocol ExtraDerivativeConstraint {}
+
+protocol HasExtraConstrainedDerivative {
+  @differentiable
+  func requirement<T: Differentiable & ExtraDerivativeConstraint>(_ x: T) -> T
+}
+
+struct SatisfiesDerivativeWithLessConstraint: HasExtraConstrainedDerivative {
+  @differentiable
+  func requirement<T: Differentiable>(_ x: T) -> T { x }
 }
 
 runAllTests()
