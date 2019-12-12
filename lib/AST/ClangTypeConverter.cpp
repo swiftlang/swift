@@ -137,9 +137,9 @@ const clang::Type *ClangTypeConverter::getFunctionType(
 
   switch (repr) {
   case AnyFunctionType::Representation::CFunctionPointer:
-    return fn.getTypePtr();
+    return ClangASTContext.getPointerType(fn).getTypePtr();
   case AnyFunctionType::Representation::Block:
-    return ClangASTContext.getBlockPointerType(fn).getTypePtrOrNull();
+    return ClangASTContext.getBlockPointerType(fn).getTypePtr();
   case AnyFunctionType::Representation::Swift:
   case AnyFunctionType::Representation::Thin:
     llvm_unreachable("Expected a C-compatible representation.");

@@ -3235,10 +3235,13 @@ Type ProtocolCompositionType::get(const ASTContext &C,
 void
 AnyFunctionType::ExtInfo::assertIsFunctionType(const clang::Type *type) {
 #ifndef NDEBUG
-  if (!type->isFunctionType()) {
-    llvm::errs() << "Expected a Clang function type but found\n";
-    type->dump(llvm::errs());
-    llvm_unreachable("");
+  if (!(type->isFunctionPointerType() || type->isBlockPointerType())) {
+    SmallString<256> buf;
+    llvm::raw_svector_ostream os(buf);
+    os << "Expected a Clang function type wrapped in a pointer type or "
+       << "a block pointer type but found:\n";
+    type->dump(os);
+    llvm_unreachable(os.str().data());
   }
 #endif
   return;
@@ -3250,7 +3253,7 @@ const clang::Type *AnyFunctionType::getClangFunctionType() const {
     return cast<FunctionType>(this)->getClangFunctionType();
   case TypeKind::GenericFunction:
     // Generic functions do not have C types.
-  return nullptr;
+    return nullptr;
   default:
     llvm_unreachable("Illegal type kind for AnyFunctionType.");
   }

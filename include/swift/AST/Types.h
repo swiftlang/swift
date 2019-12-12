@@ -2925,8 +2925,11 @@ public:
       friend ExtInfo;
       friend class AnyFunctionType;
       friend class FunctionType;
-      // We preserve a full clang::Type *, not a clang::FunctionType *, so
-      // we can keep sugar in case we need to present an error to the user.
+      // We preserve a full clang::Type *, not a clang::FunctionType * as:
+      // 1. We need to keep sugar in case we need to present an error to the user.
+      // 2. The actual type being stored is [ignoring sugar] either a
+      //    clang::PointerType or a clang::BlockPointerType which points to a
+      //    clang::FunctionType.
       const clang::Type *ClangFunctionType;
 
       bool empty() const { return !ClangFunctionType; }
