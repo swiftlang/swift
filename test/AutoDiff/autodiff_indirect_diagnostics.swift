@@ -4,6 +4,10 @@
 // due to direct differentiation of reabstraction thunks, which emits errors
 // with unknown location.
 
+//===----------------------------------------------------------------------===//
+// Non-differentiable arguments and results
+//===----------------------------------------------------------------------===//
+
 @differentiable
 func generic<T: Differentiable & FloatingPoint>(_ x: T) -> T {
   // expected-error @+2 {{expression is not differentiable}}
@@ -67,6 +71,31 @@ struct TF8Struct<Scalar> : TF8Proto where Scalar : FloatingPoint & Differentiabl
 }
 
 _ = gradient(at: 1.0, in: { x in x.squareRoot() })
+
+// Test same-type requirements.
+// FIXME(TF-1059): Requirements are actually met; no diagnostic should be
+// produced. This is a deficiency in `diagnoseUnmetRequirements` in
+// lib/SILOptimizer/Differentiation.cpp.
+
+struct TF_1059<Scalar> {}
+extension TF_1059: Differentiable where Scalar == Float {}
+extension TF_1059 where Scalar == Float {
+  @differentiable(vjp: _vjpAdd)
+  static func + (_ lhs: TF_1059, _ rhs: TF_1059) -> TF_1059 {
+    return lhs
+  }
+  static func _vjpAdd(lhs: TF_1059, rhs: TF_1059)
+    -> (TF_1059, (TangentVector) -> (TangentVector, TangentVector)) {
+    return (lhs + rhs, { v in (v, v) })
+  }
+}
+@differentiable
+func TF_1059_func(input: TF_1059<Float>) -> TF_1059<Float> {
+  let other = TF_1059<Float>()
+  // expected-error @+2 {{expression is not differentiable}}
+  // expected-note @+1 {{function call is not differentiable because generic requirements are not met: 'Scalar == Float'}}
+  return other + input
+}
 
 //===----------------------------------------------------------------------===//
 // Non-differentiable arguments and results
