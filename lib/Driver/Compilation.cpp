@@ -121,13 +121,15 @@ Compilation::Compilation(DiagnosticEngine &Diags,
                          bool SaveTemps,
                          bool ShowDriverTimeCompilation,
                          std::unique_ptr<UnifiedStatsReporter> StatsReporter,
+                         bool OnlyOneDependencyFile,
                          bool EnableFineGrainedDependencies,
                          bool VerifyFineGrainedDependencyGraphAfterEveryImport,
                          bool EmitFineGrainedDependencyDotFileAfterEveryImport,
                          bool FineGrainedDependenciesIncludeIntrafileOnes,
                          bool EnableSourceRangeDependencies,
                          bool CompareIncrementalSchemes,
-                         StringRef CompareIncrementalSchemesPath)
+                         StringRef CompareIncrementalSchemesPath
+                         )
   : Diags(Diags), TheToolChain(TC),
     TheOutputInfo(OI),
     Level(Level),
@@ -149,6 +151,7 @@ Compilation::Compilation(DiagnosticEngine &Diags,
     ShowDriverTimeCompilation(ShowDriverTimeCompilation),
     Stats(std::move(StatsReporter)),
     FilelistThreshold(FilelistThreshold),
+    OnlyOneDependencyFile(OnlyOneDependencyFile),
     EnableFineGrainedDependencies(EnableFineGrainedDependencies),
     VerifyFineGrainedDependencyGraphAfterEveryImport(
       VerifyFineGrainedDependencyGraphAfterEveryImport),
@@ -156,7 +159,8 @@ Compilation::Compilation(DiagnosticEngine &Diags,
       EmitFineGrainedDependencyDotFileAfterEveryImport),
     FineGrainedDependenciesIncludeIntrafileOnes(
       FineGrainedDependenciesIncludeIntrafileOnes),
-    EnableSourceRangeDependencies(EnableSourceRangeDependencies) {
+    EnableSourceRangeDependencies(EnableSourceRangeDependencies)
+    {
     if (CompareIncrementalSchemes)
       IncrementalComparator.emplace(
       // Ensure the references are to inst vars, NOT arguments
@@ -2031,4 +2035,20 @@ unsigned Compilation::countSwiftInputs() const {
     if (p.first == file_types::TY_Swift)
       ++inputCount;
   return inputCount;
+}
+
+void Compilation::addDependencyPathOrCreateDummy(
+    const CommandOutput &Output,
+    function_ref<void(StringRef)> addDependencyPath,
+    function_ref<void(StringRef)> createDummy) {
+  StringRef path =
+      Output.getAdditionalOutputForType(file_types::TY_Dependencies);
+  if (path.empty())
+    return;
+  if (HaveAlreadyAddedDependencyPath && OnlyOneDependencyFile)
+    createDummy(path);
+  else {
+    addDependencyPath(path);
+    HaveAlreadyAddedDependencyPath = true;
+  }
 }

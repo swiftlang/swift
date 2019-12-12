@@ -447,6 +447,10 @@ public:
   // Mapping from imported types to their raw value types.
   llvm::DenseMap<const NominalTypeDecl *, Type> RawTypes;
 
+  /// Keep track of all member declarations that have been imported into a nominal type.
+  llvm::DenseMap<const NominalTypeDecl *, std::vector<ValueDecl *>>
+      MembersForNominal;
+
   clang::CompilerInstance *getClangInstance() {
     return Instance.get();
   }
