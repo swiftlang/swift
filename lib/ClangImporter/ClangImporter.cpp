@@ -3718,18 +3718,18 @@ void ClangImporter::Implementation::lookupAllObjCMembers(
 // deserialized before loading the named member of this class. This allows the
 // decl members table to be warmed up and enables the correct identification of
 // overrides.
-static void loadNamedMemberOfSuperclassesIfNeeded(const ClassDecl *CD,
+static void loadNamedMemberOfSuperclassIfNeeded(const ClassDecl *CD,
                                                   DeclBaseName name) {
   if (!CD)
     return;
 
-  while ((CD = CD->getSuperclassDecl())) {
-    if (CD->hasClangNode()) {
-      auto ci = CD->getASTContext().getOrCreateLazyIterableContextData(
-          CD, /*lazyLoader=*/nullptr);
-      ci->loader->loadNamedMembers(CD, name, ci->memberData);
-    }
-  }
+  CD = CD->getSuperclassDecl();
+  if (!CD || !CD->hasClangNode())
+    return;
+  
+  auto ci = CD->getASTContext().getOrCreateLazyIterableContextData(
+      CD, /*lazyLoader=*/nullptr);
+  ci->loader->loadNamedMembers(CD, name, ci->memberData);
 }
 
 Optional<TinyPtrVector<ValueDecl *>>
@@ -3793,7 +3793,7 @@ ClangImporter::Implementation::loadNamedMembers(
 
   assert(isa<clang::ObjCContainerDecl>(CD) || isa<clang::NamespaceDecl>(CD));
 
-  loadNamedMemberOfSuperclassesIfNeeded(dyn_cast<ClassDecl>(D), N);
+  loadNamedMemberOfSuperclassIfNeeded(dyn_cast<ClassDecl>(D), N);
 
   TinyPtrVector<ValueDecl *> Members;
   for (auto entry : table->lookup(SerializedSwiftName(N),
