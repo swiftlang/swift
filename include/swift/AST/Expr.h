@@ -3748,7 +3748,8 @@ public:
                   DeclContext *Parent)
       : AbstractClosureExpr(ExprKind::AutoClosure, ResultTy, /*Implicit=*/true,
                             Discriminator, Parent) {
-    setBody(Body);
+    if (Body != nullptr)
+      setBody(Body);
   }
 
   SourceRange getSourceRange() const;
