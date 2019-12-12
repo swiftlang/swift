@@ -1,4 +1,4 @@
-//===--- AutoDiff.h - Swift Automatic Differentiation ---------------------===//
+//===--- AutoDiff.h - Swift automatic differentiation utilities -----------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-//  This file defines AST support for automatic differentiation.
+//  This file defines utilities for automatic differentiation.
 //
 //===----------------------------------------------------------------------===//
 
