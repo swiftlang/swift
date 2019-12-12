@@ -1696,48 +1696,49 @@ public protocol ElementaryFunctions {
     ...
 }
 
-public extension ElementaryFunctions where Self: Differentiable, Self == Self.TangentVector {
+public extension ElementaryFunctions
+where Self: Differentiable & FloatingPoint, Self == Self.TangentVector {
     @inlinable
     @derivative(of: sqrt)
-    func _(_ x: Self) -> (value: Self, differential: @differential(linear) (Self) -> Self) {
+    static func _(_ x: Self) -> (value: Self, differential: @differentiable(linear) (Self) -> Self) {
         (sqrt(x), { dx in (1 / 2) * (1 / sqrt(x)) * dx })
     }
 
     @inlinable
     @derivative(of: cos)
-    func _(_ x: Self) -> (value: Self, differential: @differential(linear) (Self) -> Self) {
+    static func _(_ x: Self) -> (value: Self, differential: @differentiable(linear) (Self) -> Self) {
         (cos(x), { dx in -sin(x) * dx })
     }
 
     @inlinable
     @derivative(of: asinh)
-    func _(_ x: Self) -> (value: Self, differential: @differential(linear) (Self) -> Self) {
+    static func _(_ x: Self) -> (value: Self, differential: @differentiable(linear) (Self) -> Self) {
         (asinh(x), { dx in 1 / (1 + x * x) * dx })
     }
 
     @inlinable
     @derivative(of: exp)
-    func _(_ x: Self) -> (value: Self, differential: @differential(linear) (Self) -> Self) {
+    static func _(_ x: Self) -> (value: Self, differential: @differentiable(linear) (Self) -> Self) {
         let ret = exp(x)
         return (ret, { dx in ret * dx })
     }
 
     @inlinable
     @derivative(of: exp10)
-    func _(_ x: Self) -> (value: Self, differential: @differential(linear) (Self) -> Self) {
+    static func _(_ x: Self) -> (value: Self, differential: @differentiable(linear) (Self) -> Self) {
         let ret = exp10(x)
         return (ret, { dx in exp(10) * ret * dx })
     }
 
     @inlinable
     @derivative(of: log)
-    func _(_ x: Self) -> (value: Self, differential: @differential(linear) (Self) -> Self) { dx in
+    static func _(_ x: Self) -> (value: Self, differential: @differentiable(linear) (Self) -> Self) { dx in
         (log(x), { 1 / x * dx })
     }
 
     @inlinable
     @derivative(of: pow)
-    func _(_ x: Self, _ y: Self) -> (value: Self, differential: @differential(linear) (Self, Self) -> Self) {
+    static func _(_ x: Self, _ y: Self) -> (value: Self, differential: @differentiable(linear) (Self, Self) -> Self) {
         (pow(x, y), { (dx, dy) in
             let l = y * pow(x, y-1) * dx
             let r = pow(x, y) * log(x) * dy
