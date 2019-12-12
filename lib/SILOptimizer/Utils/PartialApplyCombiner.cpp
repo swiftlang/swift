@@ -48,7 +48,7 @@ class PartialApplyCombiner {
   bool processSingleApply(FullApplySite ai);
   bool allocateTemporaries();
   void deallocateTemporaries();
-  void releaseTemporaries();
+  void destroyTemporaries();
 
 public:
   PartialApplyCombiner(PartialApplyInst *pai, SILBuilder &builder,
@@ -77,7 +77,7 @@ bool PartialApplyCombiner::allocateTemporaries() {
   //
   // TODO: Copy arguments of the partial_apply into new temporaries only if the
   // lifetime of arguments ends before their uses by apply instructions.
-  bool needsReleases = false;
+  bool needsDestroys = false;
   CanSILFunctionType paiTy =
       pai->getCallee()->getType().getAs<SILFunctionType>();
 
@@ -108,15 +108,15 @@ bool PartialApplyCombiner::allocateTemporaries() {
       if (arg->getType().hasOpenedExistential())
         return false;
 
-      // If the temporary is non-trivial, we need to release it later.
+      // If the temporary is non-trivial, we need to destroy it later.
       if (!arg->getType().isTrivial(*pai->getFunction()))
-        needsReleases = true;
+        needsDestroys = true;
       argsToHandle.push_back(std::make_pair(arg, i));
     }
   }
 
-  if (needsReleases) {
-    // Compute the set of endpoints, which will be used to insert releases of
+  if (needsDestroys) {
+    // Compute the set of endpoints, which will be used to insert destroys of
     // temporaries. This may fail if the frontier is located on a critical edge
     // which we may not split (no CFG changes in SILCombine).
     ValueLifetimeAnalysis vla(pai);
@@ -158,7 +158,7 @@ void PartialApplyCombiner::deallocateTemporaries() {
 }
 
 /// Emit code to release/destroy temporaries.
-void PartialApplyCombiner::releaseTemporaries() {
+void PartialApplyCombiner::destroyTemporaries() {
   // Insert releases and destroy_addrs as early as possible,
   // because we don't want to keep objects alive longer than
   // its really needed.
@@ -169,10 +169,9 @@ void PartialApplyCombiner::releaseTemporaries() {
     for (auto *endPoint : partialApplyFrontier) {
       builder.setInsertionPoint(endPoint);
       if (!tmpType.isAddressOnly(*pai->getFunction())) {
-        auto *load = builder.createLoad(pai->getLoc(), op,
-                                        LoadOwnershipQualifier::Unqualified);
-        builder.createReleaseValue(pai->getLoc(), load,
-                                   builder.getDefaultAtomicity());
+        SILValue load = builder.emitLoadValueOperation(
+            pai->getLoc(), op, LoadOwnershipQualifier::Take);
+        builder.emitDestroyValueOperation(pai->getLoc(), load);
       } else {
         builder.createDestroyAddr(pai->getLoc(), op);
       }
@@ -223,19 +222,19 @@ bool PartialApplyCombiner::processSingleApply(FullApplySite paiAI) {
   // arguments.
   auto paramInfo = pai->getSubstCalleeType()->getParameters();
   auto partialApplyArgs = pai->getArguments();
-  // Set of arguments that need to be released after each invocation.
-  SmallVector<SILValue, 8> toBeReleasedArgs;
+  // Set of arguments that need to be destroyed after each invocation.
+  SmallVector<SILValue, 8> toBeDestroyedArgs;
   for (unsigned i : indices(partialApplyArgs)) {
     auto arg = partialApplyArgs[i];
 
     if (!arg->getType().isAddress()) {
-      // Retain the argument as the callee may consume it.
+      // Copy the argument as the callee may consume it.
       arg = builder.emitCopyValueOperation(pai->getLoc(), arg);
       // For non consumed parameters (e.g. guaranteed), we also need to
-      // insert releases after each apply instruction that we create.
+      // insert destroys after each apply instruction that we create.
       if (!paramInfo[paramInfo.size() - partialApplyArgs.size() + i]
                .isConsumed())
-        toBeReleasedArgs.push_back(arg);
+        toBeDestroyedArgs.push_back(arg);
     }
   }
 
@@ -253,27 +252,26 @@ bool PartialApplyCombiner::processSingleApply(FullApplySite paiAI) {
     nai = builder.createApply(paiAI.getLoc(), callee, subs, argList,
                               cast<ApplyInst>(paiAI)->isNonThrowing());
 
-  // We also need to release the partial_apply instruction itself because it
-  // is consumed by the apply_instruction.
+  // We also need to destroy the partial_apply instruction itself because it is
+  // consumed by the apply_instruction.
   if (auto *tai = dyn_cast<TryApplyInst>(paiAI)) {
     builder.setInsertionPoint(tai->getNormalBB()->begin());
-    for (auto arg : toBeReleasedArgs) {
+    for (auto arg : toBeDestroyedArgs) {
       builder.emitDestroyValueOperation(pai->getLoc(), arg);
     }
     if (!pai->hasCalleeGuaranteedContext())
-      builder.createStrongRelease(paiAI.getLoc(), pai,
-                                  builder.getDefaultAtomicity());
+      builder.emitDestroyValueOperation(paiAI.getLoc(), pai);
     builder.setInsertionPoint(tai->getErrorBB()->begin());
-    // Release the non-consumed parameters.
-    for (auto arg : toBeReleasedArgs) {
+    // Destroy the non-consumed parameters.
+    for (auto arg : toBeDestroyedArgs) {
       builder.emitDestroyValueOperation(pai->getLoc(), arg);
     }
     if (!pai->hasCalleeGuaranteedContext())
       builder.emitDestroyValueOperation(pai->getLoc(), pai);
     builder.setInsertionPoint(paiAI.getInstruction());
   } else {
-    // Release the non-consumed parameters.
-    for (auto arg : toBeReleasedArgs) {
+    // Destroy the non-consumed parameters.
+    for (auto arg : toBeDestroyedArgs) {
       builder.emitDestroyValueOperation(pai->getLoc(), arg);
     }
     if (!pai->hasCalleeGuaranteedContext())
@@ -324,7 +322,7 @@ SILInstruction *PartialApplyCombiner::combine() {
       assert(use->get()->getType().castTo<SILFunctionType>() ==
              escapingCalleeTy);
       (void)escapingCalleeTy;
-      uses.append(cfi->getUses().begin(), cfi->getUses().end());
+      llvm::copy(cfi->getUses(), std::back_inserter(uses));
       continue;
     }
 
@@ -356,7 +354,7 @@ SILInstruction *PartialApplyCombiner::combine() {
 
   // release/destroy and deallocate introduced temporaries.
   if (!tmpCopies.empty()) {
-    releaseTemporaries();
+    destroyTemporaries();
     deallocateTemporaries();
   }
 
