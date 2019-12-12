@@ -208,9 +208,8 @@ static void propagateBasicBlockArgs(SILBasicBlock &BB) {
 static bool constantFoldEnumTerminator(SILBasicBlock &BB,
                                        UnreachableUserCodeReportingState *State,
                                        SwitchEnumInstBase *SUI,
-                                       const EnumElementDecl *TheEnumElem,
-                                       SILValue value = SILValue(),
-                                       SILValue defaultValue = SILValue()) {
+                                       EnumElementDecl *TheEnumElem,
+                                       EnumInst *EnumInst) {
   SILBasicBlock *TheSuccessorBlock = nullptr;
   int ReachableBlockIdx = -1;
   for (unsigned Idx = 0; Idx < SUI->getNumCases(); ++Idx) {
@@ -251,15 +250,88 @@ static bool constantFoldEnumTerminator(SILBasicBlock &BB,
     // value.
     SILValue branchOperand;
     if (TheSuccessorBlock != DB) {
-      assert(value);
-      branchOperand = value;
+      branchOperand = B.createUncheckedEnumData(Loc, EnumInst, TheEnumElem);
     } else {
-      assert(defaultValue);
-      branchOperand = defaultValue;
+      branchOperand = EnumInst;
     }
     B.createBranch(Loc, TheSuccessorBlock, branchOperand);
   } else
     B.createBranch(Loc, TheSuccessorBlock);
+
+  // Produce diagnostic info if we are not within an inlined function or
+  // template instantiation.
+  // FIXME: Do not report if we are within a template instantiation.
+  assert(ReachableBlockIdx >= 0);
+  if (Loc.is<RegularLocation>() && State) {
+    // Find the first unreachable block in the switch so that we could use
+    // it for better diagnostics.
+    SILBasicBlock *UnreachableBlock = nullptr;
+    if (SUI->getNumCases() > 1) {
+      // More than one case.
+      UnreachableBlock = (ReachableBlockIdx == 0) ? SUI->getCase(1).second
+                                                  : SUI->getCase(0).second;
+    } else {
+      if (SUI->getNumCases() == 1 && SUI->hasDefault()) {
+        // One case and a default.
+        UnreachableBlock = (ReachableBlockIdx == 0) ? SUI->getDefaultBB()
+                                                    : SUI->getCase(0).second;
+      }
+    }
+
+    // Generate diagnostic info.
+    if (UnreachableBlock &&
+        !State->PossiblyUnreachableBlocks.count(UnreachableBlock)) {
+      State->PossiblyUnreachableBlocks.insert(UnreachableBlock);
+      State->MetaMap.insert(std::pair<const SILBasicBlock *, UnreachableInfo>(
+          UnreachableBlock,
+          UnreachableInfo{UnreachableKind::FoldedSwitchEnum, Loc, true}));
+    }
+  }
+
+  LLVM_DEBUG(llvm::dbgs() << "Folding terminator: " << *SUI);
+  recursivelyDeleteTriviallyDeadInstructions(SUI, true);
+  NumTerminatorsFolded++;
+  return true;
+}
+
+static bool constantFoldEnumAddrTerminator(
+    SILBasicBlock &BB, UnreachableUserCodeReportingState *State,
+    SwitchEnumInstBase *SUI, const EnumElementDecl *TheEnumElem) {
+  SILBasicBlock *TheSuccessorBlock = nullptr;
+  int ReachableBlockIdx = -1;
+  for (unsigned Idx = 0; Idx < SUI->getNumCases(); ++Idx) {
+    const EnumElementDecl *EI;
+    SILBasicBlock *BI;
+    std::tie(EI, BI) = SUI->getCase(Idx);
+    if (EI == TheEnumElem) {
+      TheSuccessorBlock = BI;
+      ReachableBlockIdx = Idx;
+      break;
+    }
+  }
+
+  SILBasicBlock *DB = nullptr;
+  if (!TheSuccessorBlock) {
+    if (SUI->hasDefault()) {
+      DB = SUI->getDefaultBB();
+      if (!isa<UnreachableInst>(DB->getTerminator())) {
+        TheSuccessorBlock = DB;
+        ReachableBlockIdx = SUI->getNumCases();
+      }
+    }
+  }
+
+  // Not fully covered switches will be diagnosed later. SILGen represents
+  // them with a Default basic block with an unreachable instruction.
+  // We are going to produce an error on all unreachable instructions not
+  // eliminated by DCE.
+  if (!TheSuccessorBlock)
+    return false;
+
+  // Replace the switch with a branch to the TheSuccessorBlock.
+  SILBuilderWithScope B(&BB, SUI);
+  SILLocation Loc = SUI->getLoc();
+  B.createBranch(Loc, TheSuccessorBlock);
 
   // Produce diagnostic info if we are not within an inlined function or
   // template instantiation.
@@ -506,10 +578,8 @@ static bool constantFoldTerminator(SILBasicBlock &BB,
   //   br bb2
   if (auto *SEI = dyn_cast<SwitchEnumInst>(TI)) {
     if (auto *TheEnum = dyn_cast<EnumInst>(SEI->getOperand())) {
-      SILValue operand =
-          TheEnum->hasOperand() ? TheEnum->getOperand() : SILValue();
       return constantFoldEnumTerminator(BB, State, SEI, TheEnum->getElement(),
-                                        operand /*case*/, TheEnum /*default*/);
+                                        TheEnum);
     }
   }
   if (auto *SEAI = dyn_cast<SwitchEnumAddrInst>(TI)) {
@@ -520,7 +590,8 @@ static bool constantFoldTerminator(SILBasicBlock &BB,
     //
     // TODO: This needs a better name.
     if (auto *IEAI = getAllocStackSingleInitializingInjectEnumAddr(SEAI)) {
-      return constantFoldEnumTerminator(BB, State, SEAI, IEAI->getElement());
+      return constantFoldEnumAddrTerminator(BB, State, SEAI,
+                                            IEAI->getElement());
     }
   }
 
