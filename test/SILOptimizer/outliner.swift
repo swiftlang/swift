@@ -239,3 +239,20 @@ open class Test
      return view
    }
 }
+
+internal extension NSError {
+   convenience init(myError code: Int) {
+     self.init(domain: "error", code: code, userInfo: [:])
+   }
+}
+
+public class AnotherTest {
+  public let obj: MyObject
+  public init(obj: MyObject) {
+    self.obj = obj
+  }
+
+  public func dontCrash() {
+      self.obj.error = NSError(myError: 10)
+  }
+}
