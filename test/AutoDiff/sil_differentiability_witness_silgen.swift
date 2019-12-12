@@ -40,7 +40,7 @@ public func bar_jvp<T>(_ x: Float, _ y: T) -> (value: Float, differential: (Floa
 
 // CHECK-LABEL: // differentiability witness for bar<A>(_:_:)
 // CHECK-NEXT: sil_differentiability_witness hidden [parameters 0] [results 0] <τ_0_0> @$s36sil_differentiability_witness_silgen3baryS2f_xtlF : $@convention(thin) <T> (Float, @in_guaranteed T) -> Float {
-// CHECK-NEXT:   jvp: @AD__$s36sil_differentiability_witness_silgen3baryS2f_xtlF__jvp_src_0_wrt_0 : $@convention(thin) <τ_0_0> (Float, @in_guaranteed τ_0_0) -> (Float, @owned @callee_guaranteed (Float) -> Float)
+// CHECK-NEXT:   jvp: @AD__$s36sil_differentiability_witness_silgen3baryS2f_xtlF__jvp_src_0_wrt_0_l : $@convention(thin) <τ_0_0> (Float, @in_guaranteed τ_0_0) -> (Float, @owned @callee_guaranteed (Float) -> Float)
 // CHECK-NEXT: }
 
 // Test internal generic function.
@@ -66,8 +66,8 @@ func generic_vjp<T: Differentiable>(_ x: T, _ y: Float) -> (
 
 // CHECK-LABEL: // differentiability witness for generic<A>(_:_:)
 // CHECK-NEXT: sil_differentiability_witness hidden [parameters 0 1] [results 0] <τ_0_0 where τ_0_0 : Differentiable> @$s36sil_differentiability_witness_silgen7genericyxx_SftlF : $@convention(thin) <T> (@in_guaranteed T, Float) -> @out T {
-// CHECK-NEXT:   jvp: @AD__$s36sil_differentiability_witness_silgen7genericyxx_SftlF__jvp_src_0_wrt_0_1 : $@convention(thin) <τ_0_0 where τ_0_0 : Differentiable> (@in_guaranteed τ_0_0, Float) -> (@out τ_0_0, @owned @callee_guaranteed (@in_guaranteed τ_0_0.TangentVector, Float) -> @out τ_0_0.TangentVector)
-// CHECK-NEXT:   vjp: @AD__$s36sil_differentiability_witness_silgen7genericyxx_SftlF__vjp_src_0_wrt_0_1 : $@convention(thin) <τ_0_0 where τ_0_0 : Differentiable> (@in_guaranteed τ_0_0, Float) -> (@out τ_0_0, @owned @callee_guaranteed (@in_guaranteed τ_0_0.TangentVector) -> (@out τ_0_0.TangentVector, Float))
+// CHECK-NEXT:   jvp: @AD__$s36sil_differentiability_witness_silgen7genericyxx_SftlF__jvp_src_0_wrt_0_1_s14DifferentiableRzl : $@convention(thin) <τ_0_0 where τ_0_0 : Differentiable> (@in_guaranteed τ_0_0, Float) -> (@out τ_0_0, @owned @callee_guaranteed (@in_guaranteed τ_0_0.TangentVector, Float) -> @out τ_0_0.TangentVector)
+// CHECK-NEXT:   vjp: @AD__$s36sil_differentiability_witness_silgen7genericyxx_SftlF__vjp_src_0_wrt_0_1_s14DifferentiableRzl : $@convention(thin) <τ_0_0 where τ_0_0 : Differentiable> (@in_guaranteed τ_0_0, Float) -> (@out τ_0_0, @owned @callee_guaranteed (@in_guaranteed τ_0_0.TangentVector) -> (@out τ_0_0.TangentVector, Float))
 // CHECK-NEXT: }
 
 public struct Foo: Differentiable {
@@ -159,4 +159,32 @@ public func wrt_subset_vjp_wrt_x_y(_ tup: (Int, Int), _ x: Float, _ y: Float) ->
 // CHECK-NEXT: sil_differentiability_witness [serialized] [parameters 2 3] [results 0] @$s36sil_differentiability_witness_silgen10wrt_subsetySfSi_Sit_S2ftF : $@convention(thin) (Int, Int, Float, Float) -> Float {
 // CHECK-NEXT:   jvp:
 // CHECK-NEXT:   vjp:
+// CHECK-NEXT: }
+
+// Test original function with `@differentiable` and `@derivative` attributes.
+// NOTE(TF-1046): The `@differentiable` and `@derivative` attribute currently
+// have different derivative generic signatures, causing two differentiability
+// witnesses to be created. This behavior is unexpected for users; TF-1046 will
+// resolve this issue so that only one differentiability witness will be
+// created.
+
+protocol P1: Differentiable {}
+extension P1 {
+  @differentiable // derivative generic signature: none
+  func foo() -> Float { 1 }
+}
+extension P1 {
+  @derivative(of: foo) // derivative generic signature: `<P1 where Self: P1>`
+  func vjpFoo() -> (value: Float, pullback: (Float) -> (TangentVector)) {
+    fatalError()
+  }
+}
+
+// CHECK-LABEL: // differentiability witness for P1.foo()
+// CHECK-NEXT: sil_differentiability_witness hidden [parameters 0] [results 0] @$s36sil_differentiability_witness_silgen2P1PAAE3fooSfyF : $@convention(method) <Self where Self : P1> (@in_guaranteed Self) -> Float {
+// CHECK-NEXT: }
+
+// CHECK-LABEL: // differentiability witness for P1.foo()
+// CHECK-NEXT: sil_differentiability_witness hidden [parameters 0] [results 0] <τ_0_0 where τ_0_0 : P1> @$s36sil_differentiability_witness_silgen2P1PAAE3fooSfyF : $@convention(method) <Self where Self : P1> (@in_guaranteed Self) -> Float {
+// CHECK-NEXT:   vjp: @AD__$s36sil_differentiability_witness_silgen2P1PAAE3fooSfyF__vjp_src_0_wrt_0_36sil_differentiability_witness_silgen2P1Rzl : $@convention(method) <τ_0_0 where τ_0_0 : P1> (@in_guaranteed τ_0_0) -> (Float, @owned @callee_guaranteed (Float) -> @out τ_0_0.TangentVector)
 // CHECK-NEXT: }

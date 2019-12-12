@@ -1547,19 +1547,19 @@ bool SILParser::parseSILDeclRef(SILDeclRef &Result,
       } else if (Id.str() == "jvp" || Id.str() == "vjp") {
         AutoDiffDerivativeFunctionKind kind;
         IndexSubset *parameterIndices = nullptr;
-
+        GenericSignature derivativeGenSig;
+        // Parse derivative function kind.
         if (Id.str() == "jvp")
           kind = AutoDiffDerivativeFunctionKind::JVP;
         else if (Id.str() == "vjp")
           kind = AutoDiffDerivativeFunctionKind::VJP;
         else
           llvm_unreachable("Should only have JVP and VJP here");
-
         if (!P.consumeIf(tok::period)) {
           P.diagnose(P.Tok, diag::expected_tok_in_sil_instr, ".");
           return true;
         }
-
+        // Parse parameter indices.
         parameterIndices = IndexSubset::getFromString(
             SILMod.getASTContext(), P.Tok.getText());
         if (!parameterIndices) {
@@ -1567,10 +1567,19 @@ bool SILParser::parseSILDeclRef(SILDeclRef &Result,
           return true;
         }
         P.consumeToken();
-
+        // Parse derivative generic signature (optional).
+        if (P.Tok.is(tok::oper_binary_unspaced) && P.Tok.getText() == ".<") {
+          P.consumeStartingCharacterOfCurrentToken(tok::period);
+          // Create a new scope to avoid type redefinition errors.
+          Scope genericsScope(&P, ScopeKind::Generics);
+          auto *genericParams = P.maybeParseGenericParams().getPtrOrNull();
+          assert(genericParams);
+          auto *derivativeGenEnv = handleSILGenericParams(genericParams, &P.SF);
+          derivativeGenSig = derivativeGenEnv->getGenericSignature();
+        }
         autoDiffFuncId = AutoDiffDerivativeFunctionIdentifier::get(
-            kind, parameterIndices, SILMod.getASTContext());
-
+            kind, parameterIndices, derivativeGenSig,
+            SILMod.getASTContext());
         break;
       } else
         break;

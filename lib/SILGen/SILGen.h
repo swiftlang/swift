@@ -227,8 +227,7 @@ public:
   /// - The last parameter in the returned differential.
   /// - The last result in the returned pullback.
   SILFunction *getOrCreateAutoDiffDerivativeReabstractionThunk(
-      SILFunction *original, SILAutoDiffIndices &indices,
-      SILFunction *derivativeFn,
+      SILFunction *original, AutoDiffConfig config, SILFunction *derivativeFn,
       AutoDiffDerivativeFunctionKind derivativeFnKind, bool reorderSelf);
 
   /// Determine whether the given class has any instance variables that

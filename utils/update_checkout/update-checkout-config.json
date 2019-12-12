@@ -295,7 +295,7 @@
                 "indexstore-db": "swift-DEVELOPMENT-SNAPSHOT-2019-12-09-a",
                 "sourcekit-lsp": "swift-DEVELOPMENT-SNAPSHOT-2019-12-09-a",
                 "tensorflow": "7c7d924821a8b1b20433c2f3f484bbd409873a84",
-                "tensorflow-swift-apis": "c2736d482731d8d68e54c352866e74726ea432b4",
+                "tensorflow-swift-apis": "47de23315b574f936daefe1e781bbfd5dfe1a247",
                 "tensorflow-swift-quote": "4faabf7b04827b9c522eef15387eea3895eaf001"
             }
         }

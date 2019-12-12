@@ -870,12 +870,13 @@ void SILGenModule::emitDifferentiabilityWitness(
     if (reorderSelf ||
         derivative->getLoweredFunctionType() != expectedDerivativeType) {
       derivativeThunk = getOrCreateAutoDiffDerivativeReabstractionThunk(
-          originalFunction, indices, derivative, kind, reorderSelf);
+          originalFunction, silConfig, derivative, kind, reorderSelf);
     } else {
       // Note: `AutoDiffDerivativeFunctionIdentifier` must be constructed with
       // the AST-level parameter indices, not the SIL-level ones.
       auto *id = AutoDiffDerivativeFunctionIdentifier::get(
-          kind, config.parameterIndices, getASTContext());
+          kind, config.parameterIndices, config.derivativeGenericSignature,
+          getASTContext());
       derivativeThunk = getOrCreateAutoDiffDerivativeForwardingThunk(
           SILDeclRef(originalAFD).asAutoDiffDerivativeFunction(id), derivative,
           expectedDerivativeType);

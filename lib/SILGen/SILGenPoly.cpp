@@ -3715,26 +3715,27 @@ SILGenFunction::getThunkedAutoDiffLinearMap(
 }
 
 // SWIFT_ENABLE_TENSORFLOW
-SILFunction *
-SILGenModule::getOrCreateAutoDiffDerivativeReabstractionThunk(
-    SILFunction *original, SILAutoDiffIndices &indices,
-    SILFunction *derivativeFn, AutoDiffDerivativeFunctionKind derivativeFnKind,
-    bool reorderSelf) {
+SILFunction *SILGenModule::getOrCreateAutoDiffDerivativeReabstractionThunk(
+    SILFunction *original, AutoDiffConfig config, SILFunction *derivativeFn,
+    AutoDiffDerivativeFunctionKind derivativeFnKind, bool reorderSelf) {
   auto derivativeFnType = derivativeFn->getLoweredFunctionType();
 
   // TODO(TF-685): Use principled thunk mangling.
   // Do not simply reuse reabstraction thunk mangling.
   Mangle::ASTMangler mangler;
-  auto name = getASTContext().getIdentifier(
-      mangler.mangleAutoDiffDerivativeFunctionHelper(
-          original->getName(), derivativeFnKind, indices)).str();
+  auto name = getASTContext()
+                  .getIdentifier(mangler.mangleAutoDiffDerivativeFunctionHelper(
+                      original->getName(), derivativeFnKind, config))
+                  .str();
   auto *thunkGenericEnv = derivativeFnType->getSubstGenericSignature()
       ? derivativeFnType->getSubstGenericSignature()->getGenericEnvironment()
       : nullptr;
 
   auto origFnType = original->getLoweredFunctionType();
+  assert(config.resultIndices->getNumIndices() == 1 &&
+         "Only single result index is currently supported");
   auto origDerivativeFnType = origFnType->getAutoDiffDerivativeFunctionType(
-      indices.parameters, indices.source,
+      config.parameterIndices, *config.resultIndices->getIndices().begin(),
       derivativeFnKind, Types, LookUpConformanceInModule(M.getSwiftModule()),
       derivativeFnType->getSubstGenericSignature());
   assert(!origDerivativeFnType->getExtInfo().hasContext());

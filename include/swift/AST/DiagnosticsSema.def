@@ -2797,6 +2797,11 @@ ERROR(attr_not_on_variadic_parameters,none,
 ERROR(attr_not_on_subscript_parameters,none,
       "'%0' must not be used on subscript parameters", (StringRef))
 
+// SWIFT_ENABLE_TENSORFLOW
+ERROR(attr_ambiguous_reference_to_decl,none,
+      "ambiguous reference to %0 in '@%1' attribute", (DeclName, StringRef))
+// SWIFT_ENABLE_TENSORFLOW END
+
 ERROR(override_final,none,
       "%0 overrides a 'final' %1", (DescriptiveDeclKind, DescriptiveDeclKind))
 
@@ -3011,8 +3016,6 @@ NOTE(derivative_attr_result_func_type_mismatch_note,none,
      "%0 does not have expected type %1", (Identifier, Type))
 NOTE(derivative_attr_result_func_original_note,none,
      "%0 defined here", (DeclName))
-ERROR(derivative_attr_overload_not_found,none,
-      "could not find function %0 with expected type %1", (DeclName, Type))
 ERROR(derivative_attr_not_in_same_file_as_original,none,
       "derivative not in the same file as the original function", ())
 ERROR(derivative_attr_original_stored_property_unsupported,none,
@@ -3032,6 +3035,15 @@ ERROR(transpose_attr_cannot_use_named_wrt_params,none,
 ERROR(transpose_attr_result_value_not_differentiable,none,
       "'@transpose(of:)' attribute requires original function result %0 to "
       "conform to 'Differentiable'", (Type))
+
+// Automatic differentiation attributes
+ERROR(autodiff_attr_original_decl_invalid_kind,none,
+      "%0 is not a 'func', 'init', 'subscript', or 'var' computed property "
+      "declaration", (DeclName))
+ERROR(autodiff_attr_original_decl_none_valid_found,none,
+      "could not find function %0 with expected type %1", (DeclName, Type))
+ERROR(autodiff_attr_original_decl_not_same_type_context,none,
+      "%0 is not defined in the current type context", (DeclName))
 
 // differentiation `wrt` parameters clause
 ERROR(diff_function_no_parameters,none,

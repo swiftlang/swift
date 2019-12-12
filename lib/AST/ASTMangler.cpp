@@ -383,9 +383,8 @@ std::string ASTMangler::mangleReabstractionThunkHelper(
 // SWIFT_ENABLE_TENSORFLOW
 std::string ASTMangler::mangleAutoDiffDerivativeFunctionHelper(
     StringRef name, AutoDiffDerivativeFunctionKind kind,
-    const SILAutoDiffIndices &indices) {
-  // TODO(TF-20): Make the mangling scheme robust.
-  // TODO(TF-680): Mangle derivative generic signature as well.
+    AutoDiffConfig config) {
+  // TODO(TF-20): Make the mangling scheme robust. Support demangling.
   beginManglingWithoutPrefix();
 
   Buffer << "AD__" << name << '_';
@@ -397,7 +396,11 @@ std::string ASTMangler::mangleAutoDiffDerivativeFunctionHelper(
     Buffer << "_vjp_";
     break;
   }
-  Buffer << indices.mangle();
+  Buffer << config.getSILAutoDiffIndices().mangle();
+  if (config.derivativeGenericSignature) {
+    Buffer << '_';
+    appendGenericSignature(config.derivativeGenericSignature);
+  }
 
   auto result = Storage.str().str();
   Storage.clear();
@@ -405,10 +408,8 @@ std::string ASTMangler::mangleAutoDiffDerivativeFunctionHelper(
 }
 
 std::string ASTMangler::mangleAutoDiffLinearMapHelper(
-    StringRef name, AutoDiffLinearMapKind kind,
-    const SILAutoDiffIndices &indices) {
-  // TODO(TF-20): Make the mangling scheme robust.
-  // TODO(TF-680): Mangle derivative generic signature as well.
+    StringRef name, AutoDiffLinearMapKind kind, AutoDiffConfig config) {
+  // TODO(TF-20): Make the mangling scheme robust. Support demangling.
   beginManglingWithoutPrefix();
 
   Buffer << "AD__" << name << '_';
@@ -420,7 +421,11 @@ std::string ASTMangler::mangleAutoDiffLinearMapHelper(
     Buffer << "_pullback_";
     break;
   }
-  Buffer << indices.mangle();
+  Buffer << config.getSILAutoDiffIndices().mangle();
+  if (config.derivativeGenericSignature) {
+    Buffer << '_';
+    appendGenericSignature(config.derivativeGenericSignature);
+  }
 
   auto result = Storage.str().str();
   Storage.clear();
@@ -429,7 +434,7 @@ std::string ASTMangler::mangleAutoDiffLinearMapHelper(
 
 std::string ASTMangler::mangleSILDifferentiabilityWitnessKey(
     SILDifferentiabilityWitnessKey key) {
-  // TODO(TF-20): Make the mangling scheme robust.
+  // TODO(TF-20): Make the mangling scheme robust. Support demangling.
   beginManglingWithoutPrefix();
 
   auto originalName = key.first;

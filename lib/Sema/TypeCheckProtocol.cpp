@@ -560,6 +560,15 @@ swift::matchWitness(
       bool foundSupersetAttr = false;
       for (auto witnessConfig :
            witnessAFD->getDerivativeFunctionConfigurations()) {
+        // We can't use witnesses that have generic signatures not satisfied by
+        // the requirement's generic signature.
+        if (witnessConfig.derivativeGenericSignature &&
+            !witnessConfig.derivativeGenericSignature
+                 ->requirementsNotSatisfiedBy(
+                     reqDiffAttr->getDerivativeGenericSignature())
+                 .empty())
+          continue;
+
         if (witnessConfig.parameterIndices ==
             reqDiffAttr->getParameterIndices())
           foundExactAttr = true;
@@ -573,10 +582,6 @@ swift::matchWitness(
           // If the witness has a "superset" derivative configuration, create an
           // implicit `@differentiable` attribute with the exact requirement
           // `@differentiable` attribute parameter indices.
-          // TODO(TF-1041): Investigate why this logic is necessary. When
-          // "implicit `@differentiable` attribute" logic is removed, core
-          // stdlib compilation succeeds and AutoDiff tests pass, but TensorFlow
-          // compilation crashes. An AutoDiff reproducer test should be added.
           auto *newAttr = DifferentiableAttr::create(
               witnessAFD, /*implicit*/ true, reqDiffAttr->AtLoc,
               reqDiffAttr->getRange(), reqDiffAttr->isLinear(),

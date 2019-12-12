@@ -136,4 +136,27 @@ DerivativeRegistrationTests.testWithLeakChecking("ComputedProperty") {
   expectEqual(Wrapper.TangentVector(float: 6), 𝛁wrapper)
 }
 
+struct Generic<T> {
+  @differentiable // derivative generic signature: none
+  func instanceMethod(_ x: Tracked<Float>) -> Tracked<Float> {
+    x
+  }
+}
+extension Generic {
+  @derivative(of: instanceMethod) // derivative generic signature: <T>
+  func vjpInstanceMethod(_ x: Tracked<Float>)
+    -> (value: Tracked<Float>, pullback: (Tracked<Float>) -> Tracked<Float>) {
+    (x, { v in 1000 })
+  }
+}
+DerivativeRegistrationTests.testWithLeakChecking("DerivativeGenericSignature") {
+  let generic = Generic<Float>()
+  let x: Tracked<Float> = 3
+  let dx = gradient(at: x) { x in generic.instanceMethod(x) }
+  // NOTE(TF-1046): `gradient(at:in:)` calls the generated derivative for
+  // `Generic.instanceMethod` is used, not the registered derivative. This
+  // behavior is likely not expected by users; TF-1046 will fix this.
+  expectEqual(1, dx)
+}
+
 runAllTests()
