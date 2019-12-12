@@ -3911,7 +3911,8 @@ public:
     }
   }
 
-  void printFunctionExtInfo(SILFunctionType::ExtInfo info,
+  void printFunctionExtInfo(ASTContext &Ctx,
+                            SILFunctionType::ExtInfo info,
                             ProtocolConformanceRef witnessMethodConformance) {
     if (Options.SkipAttributes)
       return;
@@ -3925,10 +3926,19 @@ public:
       }
     }
 
-    if ((Options.PrintFunctionRepresentationAttrs !=
-         PrintOptions::FunctionRepresentationMode::None) &&
-        !Options.excludeAttrKind(TAK_convention) &&
-        info.getRepresentation() != SILFunctionType::Representation::Thick) {
+
+    SmallString<64> buf;
+    switch (Options.PrintFunctionRepresentationAttrs) {
+    case PrintOptions::FunctionRepresentationMode::None:
+      break;
+    case PrintOptions::FunctionRepresentationMode::NameOnly:
+    case PrintOptions::FunctionRepresentationMode::Full:
+      if (Options.excludeAttrKind(TAK_convention) ||
+          info.getRepresentation() == SILFunctionType::Representation::Thick)
+        break;
+
+      bool printNameOnly = Options.PrintFunctionRepresentationAttrs ==
+                           PrintOptions::FunctionRepresentationMode::NameOnly;
       Printer.callPrintStructurePre(PrintStructureKind::BuiltinAttribute);
       Printer.printAttrName("@convention");
       Printer << "(";
@@ -3943,6 +3953,11 @@ public:
         break;
       case SILFunctionType::Representation::CFunctionPointer:
         Printer << "c";
+        // FIXME: [clang-function-type-serialization] Once we start serializing
+        // Clang function types, we should be able to remove the second check.
+        if (printNameOnly || !info.getUncommonInfo().hasValue())
+          break;
+        printCType(Ctx, Printer, info);
         break;
       case SILFunctionType::Representation::Method:
         Printer << "method";
@@ -4102,7 +4117,7 @@ public:
 
   void visitSILFunctionType(SILFunctionType *T) {
     printSILCoroutineKind(T->getCoroutineKind());
-    printFunctionExtInfo(T->getExtInfo(),
+    printFunctionExtInfo(T->getASTContext(), T->getExtInfo(),
                          T->getWitnessMethodConformanceOrInvalid());
     printCalleeConvention(T->getCalleeConvention());
   

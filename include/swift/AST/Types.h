@@ -3900,6 +3900,11 @@ public:
 
       bool empty() const { return !ClangFunctionType; }
       Uncommon(const clang::FunctionType *type) : ClangFunctionType(type) {}
+
+    public:
+      /// Analog of AnyFunctionType::ExtInfo::Uncommon::printClangFunctionType.
+      void printClangFunctionType(ClangModuleLoader *cml,
+                                  llvm::raw_ostream &os) const;
     };
 
     Uncommon Other;
