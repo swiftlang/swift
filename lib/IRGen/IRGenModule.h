@@ -331,7 +331,7 @@ public:
   
   /// Emit functions, variables and tables which are needed anyway, e.g. because
   /// they are externally visible.
-  void emitGlobalTopLevel();
+  void emitGlobalTopLevel(llvm::StringSet<> *LinkerDirectives);
 
   /// Emit references to each of the protocol descriptors defined in this
   /// IR module.

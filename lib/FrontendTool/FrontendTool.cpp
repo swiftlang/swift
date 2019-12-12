@@ -1347,18 +1347,20 @@ static void generateIR(IRGenOptions &IRGenOpts, std::unique_ptr<SILModule> SM,
                        StringRef OutputFilename, ModuleOrSourceFile MSF,
                        std::unique_ptr<llvm::Module> &IRModule,
                        llvm::GlobalVariable *&HashGlobal,
-                       ArrayRef<std::string> parallelOutputFilenames) {
+                       ArrayRef<std::string> parallelOutputFilenames,
+                       llvm::StringSet<> &LinkerDirectives) {
   // FIXME: We shouldn't need to use the global context here, but
   // something is persisting across calls to performIRGeneration.
   auto &LLVMContext = getGlobalLLVMContext();
   IRModule = MSF.is<SourceFile *>()
                  ? performIRGeneration(IRGenOpts, *MSF.get<SourceFile *>(),
                                        std::move(SM), OutputFilename, PSPs,
-                                       LLVMContext, &HashGlobal)
+                                       LLVMContext, &HashGlobal,
+                                       &LinkerDirectives)
                  : performIRGeneration(IRGenOpts, MSF.get<ModuleDecl *>(),
                                        std::move(SM), OutputFilename, PSPs,
                                        LLVMContext, parallelOutputFilenames,
-                                       &HashGlobal);
+                                       &HashGlobal, &LinkerDirectives);
 }
 
 static bool processCommandLineAndRunImmediately(CompilerInvocation &Invocation,
@@ -1455,6 +1457,17 @@ static bool generateCode(CompilerInvocation &Invocation,
   return performLLVM(Invocation.getIRGenOptions(), &Instance.getDiags(),
                      nullptr, HashGlobal, IRModule, TargetMachine.get(),
                      EffectiveLanguageVersion, OutputFilename, Stats);
+}
+
+static void collectLinkerDirectives(CompilerInvocation &Invocation,
+                                    ModuleOrSourceFile MSF,
+                                    llvm::StringSet<> &Symbols) {
+  auto tbdOpts = Invocation.getTBDGenOptions();
+  tbdOpts.LinkerDirectivesOnly = true;
+  if (MSF.is<SourceFile*>())
+    enumeratePublicSymbols(MSF.get<SourceFile*>(), Symbols, tbdOpts);
+  else
+    enumeratePublicSymbols(MSF.get<ModuleDecl*>(), Symbols, tbdOpts);
 }
 
 static bool performCompileStepsPostSILGen(
@@ -1585,6 +1598,8 @@ static bool performCompileStepsPostSILGen(
     return processCommandLineAndRunImmediately(
         Invocation, Instance, std::move(SM), MSF, observer, ReturnValue);
 
+  llvm::StringSet<> LinkerDirectives;
+  collectLinkerDirectives(Invocation, MSF, LinkerDirectives);
   StringRef OutputFilename = PSPs.OutputFilename;
   std::vector<std::string> ParallelOutputFilenames =
     Invocation.getFrontendOptions().InputsAndOutputs.copyOutputFilenames();
@@ -1592,7 +1607,7 @@ static bool performCompileStepsPostSILGen(
   llvm::GlobalVariable *HashGlobal;
   generateIR(
       IRGenOpts, std::move(SM), PSPs, OutputFilename, MSF, IRModule, HashGlobal,
-      ParallelOutputFilenames);
+      ParallelOutputFilenames, LinkerDirectives);
 
   // Walk the AST for indexing after IR generation. Walking it before seems
   // to cause miscompilation issues.

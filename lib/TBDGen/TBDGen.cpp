@@ -57,7 +57,10 @@ static bool isGlobalOrStaticVar(VarDecl *VD) {
 }
 
 void TBDGenVisitor::addSymbolInternal(StringRef name,
-                                      llvm::MachO::SymbolKind kind) {
+                                      llvm::MachO::SymbolKind kind,
+                                      bool isLinkerDirective) {
+  if (!isLinkerDirective && Opts.LinkerDirectivesOnly)
+    return;
   Symbols.addSymbol(kind, name, Targets);
   if (StringSymbols && kind == SymbolKind::GlobalSymbol) {
     auto isNewValue = StringSymbols->insert(name).second;
@@ -102,7 +105,8 @@ void TBDGenVisitor::addLinkerDirectiveSymbols(StringRef name,
       llvm::SmallString<64> Buffer;
       llvm::raw_svector_ostream OS(Buffer);
       OS << "$ld$hide$os" << CurMaj << "." << CurMin << "$" << name;
-      addSymbolInternal(OS.str(), llvm::MachO::SymbolKind::GlobalSymbol);
+      addSymbolInternal(OS.str(), llvm::MachO::SymbolKind::GlobalSymbol,
+                        /*LinkerDirective*/true);
     }
   }
 }
@@ -686,6 +690,12 @@ static bool isApplicationExtensionSafe(const LangOptions &LangOpts) {
          llvm::sys::Process::GetEnv("LD_APPLICATION_EXTENSION_SAFE");
 }
 
+static bool hasLinkerDirective(Decl *D) {
+  if (D->getAttrs().hasAttribute<OriginallyDefinedInAttr>())
+    return true;
+  return false;
+}
+
 static void enumeratePublicSymbolsAndWrite(ModuleDecl *M, FileUnit *singleFile,
                                            StringSet *symbols,
                                            llvm::raw_ostream *os,
@@ -734,6 +744,8 @@ static void enumeratePublicSymbolsAndWrite(ModuleDecl *M, FileUnit *singleFile,
     visitor.addMainIfNecessary(file);
 
     for (auto d : decls) {
+      if (opts.LinkerDirectivesOnly && !hasLinkerDirective(d))
+        continue;
       visitor.TopLevelDecl = d;
       SWIFT_DEFER { visitor.TopLevelDecl = nullptr; };
       visitor.visit(d);
