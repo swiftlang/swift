@@ -14,6 +14,7 @@
 
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticEngine.h"
+#include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/Basic/LangOptions.h"
@@ -290,6 +291,11 @@ CompilerInstance *CompletionInstance::getReusingCompilerInstance(
     AFD->setBodyDelayed(AFD->getBodySourceRange());
   if (DiagC)
     CachedCI->addDiagnosticConsumer(DiagC);
+
+  CachedCI->getDiags().diagnose(
+      SM.getLocForOffset(BufferID, newInfo.StartOffset),
+      diag::completion_reusing_astcontext);
+
   return CachedCI.get();
 }
 
