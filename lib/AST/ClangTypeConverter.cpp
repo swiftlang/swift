@@ -118,17 +118,13 @@ const clang::Type *ClangTypeConverter::getFunctionType(
     ArrayRef<AnyFunctionType::Param> params, Type resultTy,
     AnyFunctionType::Representation repr) {
 
-  SmallVector<Type, 4> paramsTy;
-  for (auto p : params)
-    paramsTy.push_back(p.getPlainType());
-
   auto resultClangTy = convert(resultTy);
   if (resultClangTy.isNull())
     return nullptr;
 
   SmallVector<clang::QualType, 8> paramsClangTy;
-  for (auto p : paramsTy) {
-    auto pc = convert(p);
+  for (auto p : params) {
+    auto pc = convert(p.getPlainType());
     if (pc.isNull())
       return nullptr;
     paramsClangTy.push_back(pc);
