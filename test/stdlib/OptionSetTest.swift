@@ -93,9 +93,10 @@ tests.test("set algebra") {
   expectEqual(P(), p)
 
   p = P.boxOrBag
+  let removed = p.remove(P.satchelOrBag)
   if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
     // https://github.com/apple/swift/pull/28378
-    expectEqual(P.bag, p.remove(P.satchelOrBag))
+    expectEqual(P.bag, removed)
   }
   expectEqual(P.box, p)
 
