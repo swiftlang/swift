@@ -3354,7 +3354,15 @@ getAutoDiffOriginalFunctionType(AnyFunctionType *derivativeFnTy) {
 }
 
 void AttributeChecker::visitDerivativeAttr(DerivativeAttr *attr) {
-  FuncDecl *derivative = cast<FuncDecl>(D);
+  // `@derivative` attribute requires experimental differentiable programming
+  // to be enabled.
+  auto &ctx = D->getASTContext();
+  if (!ctx.LangOpts.EnableExperimentalDifferentiableProgramming) {
+    diagnoseAndRemoveAttr(
+        attr, diag::experimental_differentiable_programming_disabled);
+    return;
+  }
+  auto *derivative = cast<FuncDecl>(D);
   auto lookupConformance =
       LookUpConformanceInModule(D->getDeclContext()->getParentModule());
   auto originalName = attr->getOriginalFunctionName();
