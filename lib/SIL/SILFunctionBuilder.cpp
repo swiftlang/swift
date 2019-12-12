@@ -13,8 +13,6 @@
 #include "swift/SIL/SILFunctionBuilder.h"
 #include "swift/AST/Availability.h"
 #include "swift/AST/Decl.h"
-// SWIFT_ENABLE_TENSORFLOW
-#include "swift/AST/ASTMangler.h"
 using namespace swift;
 
 SILFunction *SILFunctionBuilder::getOrCreateFunction(
@@ -67,32 +65,24 @@ void SILFunctionBuilder::addFunctionAttributes(SILFunction *F,
   if (Attrs.hasAttribute<SILGenNameAttr>() || Attrs.hasAttribute<CDeclAttr>())
     F->setHasCReferences(true);
 
+  // NOTE: Validate `@differentiable` attributes by calling
+  // `getParameterIndices`. This is important for:
+  // - Skipping invalid `@differentiable` attributes in non-primary files.
+  // - Preventing duplicate SIL differentiability witness creation for
+  //   `@differentiable` attributes on `AbstractStorageDecl` declarations.
+  //   Such `@differentiable` attributes are deleted and recreated on the getter
+  //   `AccessorDecl` of the `AbstractStorageDecl`.
+  // NOTE(TF-988): Consider creating SIL differentiability witnesses from
+  // `@differentiable` and `@derivative` attributes here instead of in
+  // `SILGenModule::postEmitFunction`. This supports differentiating external
+  // functions in roundtrip SIL tests.
+  for (auto *A : Attrs.getAttributes<DifferentiableAttr>())
+    (void)A->getParameterIndices();
+
   // Propagate @_dynamicReplacement(for:).
   if (constant.isNull())
     return;
   auto *decl = constant.getDecl();
-
-  // SWIFT_ENABLE_TENSORFLOW
-  // Propagate @differentiable attributes.
-  // Don't propagate @differentiable to:
-  // - Non-getter accessors (setters, modifiers, etc).
-  // - Default argument generator functions.
-  // - Thunks. Those are currently handled in SILGenThunk.cpp.
-  if ((!isa<AccessorDecl>(decl) || cast<AccessorDecl>(decl)->isGetter()) &&
-      constant.kind != SILDeclRef::Kind::DefaultArgGenerator &&
-      !constant.autoDiffDerivativeFunctionIdentifier &&
-      !constant.isStoredPropertyInitializer() &&
-      !constant.isThunk()) {
-    // NOTE: Validate `@differentiable` attributes by calling
-    // `getParameterIndices`. This is important for:
-    // - Skiping invalid `@differentiable` attributes in non-primary files.
-    // - Preventing duplicate SIL `[differentiable]` attribute generation for
-    //   `@differentiable` attributes on `AbstractStorageDecl` declarations.
-    //   Such attributes are deleted and recreated on the getter `AccessorDecl`
-    //   of the `AbstractStorageDecl`.
-    for (auto *A : Attrs.getAttributes<DifferentiableAttr>())
-      (void)A->getParameterIndices();
-  }
 
   // Only emit replacements for the objc entry point of objc methods.
   if (decl->isObjC() &&
@@ -124,7 +114,6 @@ void SILFunctionBuilder::addFunctionAttributes(SILFunction *F,
          replacedFunc->getLoweredFunctionType()->hasOpaqueArchetype());
 
   F->setDynamicallyReplacedFunction(replacedFunc);
-
 }
 
 SILFunction *
@@ -193,8 +182,8 @@ SILFunctionBuilder::getOrCreateFunction(SILLocation loc, SILDeclRef constant,
 
     if (auto *accessor = dyn_cast<AccessorDecl>(decl)) {
       auto *storage = accessor->getStorage();
-      // SWIFT_ENABLE_TENSORFLOW
-      addFunctionAttributes(F, storage->getAttrs(), mod, constant);
+      // Add attributes for e.g. computed properties.
+      addFunctionAttributes(F, storage->getAttrs(), mod);
     }
     addFunctionAttributes(F, decl->getAttrs(), mod, constant);
   }

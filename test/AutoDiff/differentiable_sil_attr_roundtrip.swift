@@ -19,6 +19,8 @@
 
 @differentiable(wrt: x)
 func TF_656(_ x: Float, _ y: Float) -> Float {
+  // FIXME(TF-988): Cannot differentiate external functions.
+  // return x + y
   return 0
 }
 _ = gradient(at: 1, in: { x in TF_656(x, 2) })
