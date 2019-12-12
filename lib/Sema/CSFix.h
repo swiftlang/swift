@@ -322,27 +322,6 @@ public:
                                      ConstraintLocator *locator);
 };
 
-/// Mark function type as explicitly '@escaping'.
-class MarkExplicitlyEscaping final : public ConstraintFix {
-  /// Sometimes function type has to be marked as '@escaping'
-  /// to be converted to some other generic type.
-  Type ConvertTo;
-
-  MarkExplicitlyEscaping(ConstraintSystem &cs, ConstraintLocator *locator,
-                         Type convertingTo = Type())
-      : ConstraintFix(cs, FixKind::ExplicitlyEscaping, locator),
-        ConvertTo(convertingTo) {}
-
-public:
-  std::string getName() const override { return "add @escaping"; }
-
-  bool diagnose(bool asNote = false) const override;
-
-  static MarkExplicitlyEscaping *create(ConstraintSystem &cs,
-                                        ConstraintLocator *locator,
-                                        Type convertingTo = Type());
-};
-
 /// Arguments have labeling failures - missing/extraneous or incorrect
 /// labels attached to the, fix it by suggesting proper labels.
 class RelabelArguments final
@@ -494,6 +473,22 @@ public:
 
   static ContextualMismatch *create(ConstraintSystem &cs, Type lhs, Type rhs,
                                     ConstraintLocator *locator);
+};
+
+/// Mark function type as explicitly '@escaping'.
+class MarkExplicitlyEscaping final : public ContextualMismatch {
+  MarkExplicitlyEscaping(ConstraintSystem &cs, Type lhs, Type rhs,
+                         ConstraintLocator *locator)
+      : ContextualMismatch(cs, FixKind::ExplicitlyEscaping, lhs, rhs, locator) {
+  }
+
+public:
+  std::string getName() const override { return "add @escaping"; }
+
+  bool diagnose(bool asNote = false) const override;
+
+  static MarkExplicitlyEscaping *create(ConstraintSystem &cs, Type lhs,
+                                        Type rhs, ConstraintLocator *locator);
 };
 
 /// Introduce a '!' to force an optional unwrap.

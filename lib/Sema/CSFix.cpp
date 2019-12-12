@@ -159,16 +159,16 @@ CoerceToCheckedCast *CoerceToCheckedCast::attempt(ConstraintSystem &cs,
 }
 
 bool MarkExplicitlyEscaping::diagnose(bool asNote) const {
-  NoEscapeFuncToTypeConversionFailure failure(getConstraintSystem(),
-                                              getLocator(), ConvertTo);
+  auto &cs = getConstraintSystem();
+  NoEscapeFuncToTypeConversionFailure failure(cs, getFromType(), getToType(),
+                                              getLocator());
   return failure.diagnose(asNote);
 }
 
 MarkExplicitlyEscaping *
-MarkExplicitlyEscaping::create(ConstraintSystem &cs, ConstraintLocator *locator,
-                               Type convertingTo) {
-  return new (cs.getAllocator())
-      MarkExplicitlyEscaping(cs, locator, convertingTo);
+MarkExplicitlyEscaping::create(ConstraintSystem &cs, Type lhs, Type rhs,
+                               ConstraintLocator *locator) {
+  return new (cs.getAllocator()) MarkExplicitlyEscaping(cs, lhs, rhs, locator);
 }
 
 bool RelabelArguments::diagnose(bool asNote) const {
