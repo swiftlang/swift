@@ -3535,7 +3535,11 @@ bool NominalTypeDecl::isResilient(ModuleDecl *M,
   case ResilienceExpansion::Minimal:
     return isResilient();
   case ResilienceExpansion::Maximal:
-    return M != getModuleContext() && isResilient();
+    // We consider this decl belongs to the module either it's currently
+    // defined in this module or it's originally defined in this module, which
+    // is specified by @_originallyDefinedIn
+    return M != getModuleContext() &&
+      M->getName().str() != getAlternateModuleName() && isResilient();
   }
   llvm_unreachable("bad resilience expansion");
 }

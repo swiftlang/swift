@@ -828,6 +828,15 @@ bool IRGenModule::isResilientConformance(
       conformanceModule == conformance->getProtocol()->getParentModule())
     return false;
 
+  // If the protocol WAS from the current module (@_originallyDefinedIn), we
+  // consider the conformance non-resilient, because we used to consider it
+  // non-resilient before the symbol moved. This is to ensure ABI stability
+  // across module boundaries.
+  if (conformanceModule == getSwiftModule() &&
+      conformanceModule->getName().str() ==
+        conformance->getProtocol()->getAlternateModuleName())
+    return false;
+
   // If the protocol and the conformance are in the same module and the
   // conforming type is not generic, they're not resilient.
   //
