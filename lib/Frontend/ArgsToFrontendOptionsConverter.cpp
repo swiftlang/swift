@@ -86,6 +86,9 @@ bool ArgsToFrontendOptionsConverter::convert(
   Opts.RemarkOnRebuildFromModuleInterface |=
     Args.hasArg(OPT_Rmodule_interface_rebuild);
 
+  Opts.ExperimentalCompressedDependencies |=
+    Args.hasArg(OPT_compress_make_style_dependencies);
+
   computePrintStatsOptions();
   computeDebugTimeOptions();
   computeTBDOptions();

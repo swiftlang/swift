@@ -38,7 +38,10 @@ public:
 
   /// The kind of input on which the frontend should operate.
   InputFileKind InputKind = InputFileKind::Swift;
-  
+
+  void forAllOutputPaths(const InputFile &input,
+                         llvm::function_ref<void(StringRef)> fn) const;
+
   bool isOutputFileDirectory() const;
 
   /// A list of arbitrary modules to import and make implicitly visible.
@@ -275,6 +278,9 @@ public:
   /// Should we warn if an imported module needed to be rebuilt from a
   /// module interface file?
   bool RemarkOnRebuildFromModuleInterface = false;
+
+  /// Should we emit make-style dependencies with a single target?
+  bool ExperimentalCompressedDependencies = false;
 
   /// The different modes for validating TBD against the LLVM IR.
   enum class TBDValidationMode {

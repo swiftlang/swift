@@ -134,93 +134,6 @@ swift::frontend::utils::escapeForMake(StringRef raw,
   return buffer.data();
 }
 
-// From the given set of frontend options and the primary input file, apply a
-// set of callbacks that enable the construction of make-style dependencies with
-// minimal duplication.
-//
-// The idea is to collate the set of known outputs in a preferred order. Each of
-// these outputs will become a target listed in the .d file, but only the first,
-// most-preferred target needs the full list of files as its dependencies.  The
-// remaining targets need only depend on that target being rebuilt to be
-// re-emitted.
-//
-// Thus, the first callback is invoked for the most preferred target - often an
-// object file or a .swiftmodule file.  The remaining callback is provided with
-// an auxiliary target as its first argument, and the main target on which
-// it should depend as its second argument.
-//
-// The final structure of the dependency file is therefore:
-//
-// /Path/To/Most/Preferred/Output/File.o:
-//   <Big Ol' List Of Files...>
-// /Path/To/Supplementary/Output/File.swiftdoc:
-//   /Path/To/Most/Preferred/Output/File.o
-// /Path/To/Supplementary/Output/File.swiftsourceinfo:
-//   /Path/To/Most/Preferred/Output/File.o
-// ...
-static void forEachMinimalMakeStyleTarget(
-    const FrontendOptions &opts, const InputFile &input,
-    llvm::function_ref<void(StringRef)> mainTarget,
-    llvm::function_ref<void(StringRef, StringRef)> remainingTarget) {
-  llvm::SmallVector<const std::string *, 8> preferredOutputs;
-
-  // Try to compute the main file from the action we're given.  If we're just
-  // emitting a module interface or running merge-modules, we'll pick up the
-  // module output path first from the list below.
-  if (opts.RequestedAction != FrontendOptions::ActionType::EmitModuleOnly &&
-      opts.RequestedAction != FrontendOptions::ActionType::MergeModules) {
-    if (!opts.InputsAndOutputs.isWholeModule()) {
-      preferredOutputs.push_back(&input.outputFilenameRef());
-    } else {
-      llvm::StringSet<> seenTargets;
-      opts.InputsAndOutputs.forEachInputProducingAMainOutputFile(
-          [&](const InputFile &input) {
-            // Unique the file names we're pushing as targets. Because multiple
-            // source files are going to map to the same main output file.
-            if (seenTargets.insert(input.outputFilenameRef()).second) {
-              preferredOutputs.push_back(&input.outputFilenameRef());
-            }
-            // Don't early-exit.
-            return false;
-          });
-    }
-  }
-
-  // Now append the remaining output paths in order of preference for their
-  // being the main target given no other choice.
-  const SupplementaryOutputPaths &outs =
-      input.getPrimarySpecificPaths().SupplementaryOutputs;
-  preferredOutputs.append({
-    &outs.ModuleOutputPath,
-    &outs.ModuleDocOutputPath,
-    &outs.ModuleInterfaceOutputPath,
-    &outs.ObjCHeaderOutputPath,
-    &outs.ModuleSourceInfoOutputPath,
-  });
-
-  // Slice the collection at the first non-empty candidate target. This will
-  // be the target all the others depend on.
-  auto it = llvm::find_if(preferredOutputs, [](const std::string *str) {
-    return !str->empty();
-  });
-
-  // No targets? There's nothing to do here.
-  if (it == std::end(preferredOutputs))
-    return;
-
-  // Apply the function to the most preferred target.
-  const std::string *const firstNonEmptyTarget(*it);
-  mainTarget(*firstNonEmptyTarget);
-
-  // Now scan forward to apply the supplementary function
-  // to the remaining targets.
-  for (++it; it != std::end(preferredOutputs); ++it) {
-    if (!(*it)->empty()) {
-      remainingTarget(**it, *firstNonEmptyTarget);
-    }
-  }
-}
-
 /// Emits a Make-style dependencies file.
 static bool emitMakeDependenciesIfNeeded(DiagnosticEngine &diags,
                                          DependencyTracker *depTracker,
@@ -242,30 +155,37 @@ static bool emitMakeDependenciesIfNeeded(DiagnosticEngine &diags,
 
   llvm::SmallString<256> buffer;
 
-  // FIXME: Xcode can't currently handle multiple targets in a single
-  // dependency line.
-  forEachMinimalMakeStyleTarget(
-      opts, input,
-      [&](const StringRef mainTarget) {
-        out << swift::frontend::utils::escapeForMake(mainTarget, buffer)
-            << " :";
-        // First include all other files in the module. Make-style dependencies
-        // need to be conservative!
-        for (auto const &path : reversePathSortedFilenames(
-                 opts.InputsAndOutputs.getInputFilenames()))
-          out << ' ' << swift::frontend::utils::escapeForMake(path, buffer);
-        // Then print dependencies we've picked up during compilation.
-        for (auto const &path :
+  if (opts.ExperimentalCompressedDependencies) {
+    // N.B. The target name doesn't matter. LLBuild is just looking
+    // for file paths.
+    out << "swiftc :";
+    // First include all other files in the module. Make-style dependencies
+    // need to be conservative!
+    for (auto const &path : reversePathSortedFilenames(
+             opts.InputsAndOutputs.getInputFilenames()))
+      out << ' ' << swift::frontend::utils::escapeForMake(path, buffer);
+    // Then print dependencies we've picked up during compilation.
+    for (auto const &path :
+         reversePathSortedFilenames(depTracker->getDependencies()))
+      out << ' ' << swift::frontend::utils::escapeForMake(path, buffer);
+    out << '\n';
+  } else {
+    // FIXME: Xcode can't currently handle multiple targets in a single
+    // dependency line.
+    opts.forAllOutputPaths(input, [&](const StringRef targetName) {
+      out << swift::frontend::utils::escapeForMake(targetName, buffer) << " :";
+      // First include all other files in the module. Make-style dependencies
+      // need to be conservative!
+      for (auto const &path :
+           reversePathSortedFilenames(opts.InputsAndOutputs.getInputFilenames()))
+        out << ' ' << swift::frontend::utils::escapeForMake(path, buffer);
+      // Then print dependencies we've picked up during compilation.
+      for (auto const &path :
              reversePathSortedFilenames(depTracker->getDependencies()))
-          out << ' ' << swift::frontend::utils::escapeForMake(path, buffer);
-        out << '\n';
-      },
-      [&](const StringRef otherTarget, const StringRef mainTarget) {
-        out << swift::frontend::utils::escapeForMake(otherTarget, buffer)
-            << " :";
-        out << ' ' << swift::frontend::utils::escapeForMake(mainTarget, buffer);
-        out << '\n';
-      });
+        out << ' ' << swift::frontend::utils::escapeForMake(path, buffer);
+      out << '\n';
+    });
+  }
 
   return false;
 }
