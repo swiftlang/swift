@@ -80,8 +80,10 @@ SILFunction *VJPEmitter::createEmptyPullback() {
   // Given a type, returns its formal SIL parameter info.
   auto getTangentParameterInfoForOriginalResult =
       [&](CanType tanType, ResultConvention origResConv) -> SILParameterInfo {
+    Lowering::AbstractionPattern pattern(
+        vjp->getLoweredFunctionType()->getSubstGenericSignature(), tanType);
     auto &tl = context.getTypeConverter().getTypeLowering(
-        tanType, TypeExpansionContext::minimal());
+        pattern, tanType, TypeExpansionContext::minimal());
     ParameterConvention conv;
     switch (origResConv) {
     case ResultConvention::Owned:
@@ -103,8 +105,10 @@ SILFunction *VJPEmitter::createEmptyPullback() {
   // Given a type, returns its formal SIL result info.
   auto getTangentResultInfoForOriginalParameter =
       [&](CanType tanType, ParameterConvention origParamConv) -> SILResultInfo {
+    Lowering::AbstractionPattern pattern(
+        vjp->getLoweredFunctionType()->getSubstGenericSignature(), tanType);
     auto &tl = context.getTypeConverter().getTypeLowering(
-        tanType, TypeExpansionContext::minimal());
+        pattern, tanType, TypeExpansionContext::minimal());
     ResultConvention conv;
     switch (origParamConv) {
     case ParameterConvention::Direct_Owned:
@@ -220,12 +224,17 @@ void VJPEmitter::visitSILInstruction(SILInstruction *inst) {
   errorOccurred = true;
 }
 
+SILType VJPEmitter::getLoweredType(Type type) {
+  Lowering::AbstractionPattern pattern(
+      vjp->getLoweredFunctionType()->getSubstGenericSignature(),
+      type->getCanonicalType());
+  return vjp->getLoweredType(pattern, type);
+}
+
 SILType VJPEmitter::getNominalDeclLoweredType(NominalTypeDecl *nominal) {
   auto nomType =
       getOpASTType(nominal->getDeclaredInterfaceType()->getCanonicalType());
-  auto nomSILType = context.getTypeConverter().getLoweredType(
-      nomType, TypeExpansionContext::minimal());
-  return nomSILType;
+  return getLoweredType(nomType);
 }
 
 StructInst *VJPEmitter::buildPullbackValueStructValue(TermInst *termInst) {
@@ -614,9 +623,7 @@ void VJPEmitter::visitApplyInst(ApplyInst *ai) {
   auto actualPullbackType =
       getOpType(pullback->getType()).getAs<SILFunctionType>();
   auto loweredPullbackType =
-      getOpType(context.getTypeConverter().getLoweredType(
-                    pullbackDecl->getInterfaceType()->getCanonicalType(),
-                    TypeExpansionContext::minimal()))
+      getOpType(getLoweredType(pullbackDecl->getInterfaceType()))
           .castTo<SILFunctionType>();
   if (!loweredPullbackType->isEqual(actualPullbackType)) {
     // Set non-reabstracted original pullback type in nested apply info.

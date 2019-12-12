@@ -3364,9 +3364,10 @@ static ManagedValue createAutoDiffThunk(SILGenFunction &SGF,
       [&](AutoDiffDerivativeFunctionKind kind) -> ManagedValue {
     auto derivativeFnInputOrigType =
         getDerivativeFnPattern(inputOrigTypeNotDiff, kind);
-    auto derivativeFnInputSubstType = getDerivativeFnTy(inputSubstTypeNotDiff, kind);
-    auto derivativeFnOutputOrigType = getDerivativeFnPattern(outputOrigTypeNotDiff,
-                                                   kind);
+    auto derivativeFnInputSubstType =
+        getDerivativeFnTy(inputSubstTypeNotDiff, kind);
+    auto derivativeFnOutputOrigType =
+        getDerivativeFnPattern(outputOrigTypeNotDiff, kind);
     auto derivativeFnOutputSubstType =
         getDerivativeFnTy(outputSubstTypeNotDiff, kind);
     auto &derivativeFnExpectedTL = SGF.getTypeLowering(

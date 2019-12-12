@@ -147,6 +147,13 @@ void PullbackEmitter::cleanUpTemporariesForBlock(SILBasicBlock *bb,
 // Type transformer
 //--------------------------------------------------------------------------//
 
+const Lowering::TypeLowering &PullbackEmitter::getTypeLowering(Type type) {
+  Lowering::AbstractionPattern pattern(
+      getPullback().getLoweredFunctionType()->getSubstGenericSignature(),
+      type->getCanonicalType());
+  return getPullback().getTypeLowering(pattern, type);
+}
+
 /// Remap any archetypes into the current function's context.
 SILType PullbackEmitter::remapType(SILType ty) {
   if (ty.hasArchetype())
@@ -1180,11 +1187,7 @@ void PullbackEmitter::visitStructInst(StructInst *si) {
     auto structTy = remapType(si->getType()).getASTType();
     auto tangentVectorTy =
         getTangentSpace(structTy)->getType()->getCanonicalType();
-    assert(
-        !getModule()
-             .Types
-             .getTypeLowering(tangentVectorTy, TypeExpansionContext::minimal())
-             .isAddressOnly());
+    assert(!getTypeLowering(tangentVectorTy).isAddressOnly());
     auto *tangentVectorDecl = tangentVectorTy->getStructOrBoundGenericStruct();
     assert(tangentVectorDecl);
 
@@ -1238,10 +1241,7 @@ void PullbackEmitter::visitStructExtractInst(StructExtractInst *sei) {
   auto structTy = remapType(sei->getOperand()->getType()).getASTType();
   auto tangentVectorTy =
       getTangentSpace(structTy)->getType()->getCanonicalType();
-  assert(!getModule()
-              .Types
-              .getTypeLowering(tangentVectorTy, TypeExpansionContext::minimal())
-              .isAddressOnly());
+  assert(!getTypeLowering(tangentVectorTy).isAddressOnly());
   auto tangentVectorSILTy = SILType::getPrimitiveObjectType(tangentVectorTy);
   auto *tangentVectorDecl = tangentVectorTy->getStructOrBoundGenericStruct();
   assert(tangentVectorDecl);

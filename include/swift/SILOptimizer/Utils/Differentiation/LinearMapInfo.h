@@ -163,7 +163,10 @@ public:
     auto *linMapStruct = getLinearMapStruct(origBB);
     auto linMapStructType =
         linMapStruct->getDeclaredInterfaceType()->getCanonicalType();
-    return typeConverter.getLoweredType(linMapStructType,
+    Lowering::AbstractionPattern pattern(
+        derivative->getLoweredFunctionType()->getSubstGenericSignature(),
+        linMapStructType);
+    return typeConverter.getLoweredType(pattern, linMapStructType,
                                         TypeExpansionContext::minimal());
   }
 
@@ -178,7 +181,10 @@ public:
     auto *traceDecl = getBranchingTraceDecl(origBB);
     auto traceDeclType =
         traceDecl->getDeclaredInterfaceType()->getCanonicalType();
-    return typeConverter.getLoweredType(traceDeclType,
+    Lowering::AbstractionPattern pattern(
+        derivative->getLoweredFunctionType()->getSubstGenericSignature(),
+        traceDeclType);
+    return typeConverter.getLoweredType(pattern, traceDeclType,
                                         TypeExpansionContext::minimal());
   }
 

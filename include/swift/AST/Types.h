@@ -4457,11 +4457,16 @@ public:
   ///                    ^~~~~~~         ^~~~~~            ^~~~~~~~~~~~~~~~~~~
   ///          original results | derivative wrt result | derivatives wrt params
   ///
-  /// The JVP/VJP generic signature is a "constrained" version of the given
-  /// `derivativeFunctionGenericSignature` if specified. Otherwise, it is a
-  /// "constrained" version of the original generic signature. A "constrained"
-  /// generic signature requires all "wrt" parameters to conform to
+  /// A "constrained derivative generic signature" is computed from
+  /// `derivativeFunctionGenericSignature`, if specified. Otherwise, it is
+  /// computed from the original generic signature. A "constrained derivative
+  /// generic signature" requires all "wrt" parameters to conform to
   /// `Differentiable`; this is important for correctness.
+  ///
+  /// This "constrained derivative generic signature" is used for
+  /// parameter/result type lowering. It is used as the actual generic signature
+  /// of the derivative function type iff the original function type has a
+  /// generic signature; otherwise, no derivative generic signature is used.
   ///
   /// Other properties of the original function type are copied exactly:
   /// `ExtInfo`, coroutine kind, callee convention, yields, optional error
