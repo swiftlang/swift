@@ -167,6 +167,8 @@ deriveBodyVectorProtocol_method(AbstractFunctionDecl *funcDecl,
     memberMethodDRE->setFunctionRefKind(FunctionRefKind::SingleApply);
 
     // Create reference to member method: `x.scaled(by:)`.
+    // NOTE(TF-1054): create new `DeclRefExpr`s per loop iteration to avoid
+    // `ConstraintSystem::resolveOverload` error.
     auto *selfDRE =
         new (C) DeclRefExpr(selfDecl, DeclNameLoc(), /*Implicit*/ true);
     auto *paramDRE =

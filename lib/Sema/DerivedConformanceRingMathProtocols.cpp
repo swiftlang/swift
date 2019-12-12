@@ -181,6 +181,8 @@ deriveBodyMathOperator(AbstractFunctionDecl *funcDecl, MathOperator op) {
         new (C) DotSyntaxCallExpr(memberOpDRE, SourceLoc(), memberTypeExpr);
 
     // Create expression `lhs.member <op> rhs.member`.
+    // NOTE(TF-1054): create new `DeclRefExpr`s per loop iteration to avoid
+    // `ConstraintSystem::resolveOverload` error.
     auto *lhsDRE =
         new (C) DeclRefExpr(params->get(0), DeclNameLoc(), /*Implicit*/ true);
     auto *rhsDRE =

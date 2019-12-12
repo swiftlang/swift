@@ -190,6 +190,8 @@ deriveBodyElementaryFunction(AbstractFunctionDecl *funcDecl,
     //   `<op>(x.member, y.member)`.
     // - For `pow(_ x: Self, _ n: Int)` and `root(_ x: Self, n: Int)`, create:
     //   `<op>(x.member, n)`.
+    // NOTE(TF-1054): create new `DeclRefExpr`s per loop iteration to avoid
+    // `ConstraintSystem::resolveOverload` error.
     auto *firstParamDRE =
         new (C) DeclRefExpr(params->get(0), DeclNameLoc(), /*Implicit*/ true);
     Expr *secondParamDRE = nullptr;

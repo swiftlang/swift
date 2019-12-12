@@ -162,7 +162,7 @@ deriveBodyTensorArrayProtocol_unpackTensorHandles(
 
     // Obtain the method call argument.
     auto *addressDRE = new (C) DeclRefExpr(
-      currAddressDecl, DeclNameLoc(), /*implicit*/ true);
+        currAddressDecl, DeclNameLoc(), /*implicit*/ true);
     auto *loadExpr = new (C) LoadExpr(addressDRE, baseAddressType);
     auto *injectExpr = new (C) InjectIntoOptionalExpr(loadExpr, addressType);
 
@@ -172,6 +172,10 @@ deriveBodyTensorArrayProtocol_unpackTensorHandles(
     // Advance the current address.
     DeclName advancedName(C, C.getIdentifier("advanced"),
                           {C.getIdentifier("by")});
+    // NOTE(TF-1054): create new `DeclRefExpr` to avoid
+    // `ConstraintSystem::resolveOverload` error.
+    addressDRE = new (C) DeclRefExpr(
+        currAddressDecl, DeclNameLoc(), /*implicit*/ true);
     auto *advancedMethodExpr =
         new (C) UnresolvedDotExpr(addressDRE, SourceLoc(),
                                   advancedName, DeclNameLoc(),
@@ -188,12 +192,16 @@ deriveBodyTensorArrayProtocol_unpackTensorHandles(
     auto *intInitExpr =
         new (C) UnresolvedDotExpr(intTE, SourceLoc(), intInitName,
                                   DeclNameLoc(), /*Implicit*/ true);
-auto *intInitCallExpr = CallExpr::createImplicit(
+    auto *intInitCallExpr = CallExpr::createImplicit(
         C, intInitExpr, {memberCountMRE}, {Identifier()});
 
     // Assign the new address.
     auto *assignCallExpr = CallExpr::createImplicit(
         C, advancedMethodExpr, {intInitCallExpr}, {C.getIdentifier("by")});
+    // NOTE(TF-1054): create new `DeclRefExpr` to avoid
+    // `ConstraintSystem::resolveOverload` error.
+    addressDRE = new (C) DeclRefExpr(
+        currAddressDecl, DeclNameLoc(), /*implicit*/ true);
     auto *assignExpr = new (C) AssignExpr(addressDRE, SourceLoc(),
                                           assignCallExpr, /*Implicit*/ true);
 
@@ -552,6 +560,10 @@ deriveBodyTensorArrayProtocol_init(AbstractFunctionDecl *funcDecl, void *) {
     elseMemberExprs.push_back(elseAssignMemberExpr);
 
     // Advance the current address.
+    // NOTE(TF-1054): create new `DeclRefExpr` to avoid
+    // `ConstraintSystem::resolveOverload` error.
+    addressDRE = new (C) DeclRefExpr(
+        currAddressDecl, DeclNameLoc(), /*implicit*/ true);
     DeclName advancedName(C, C.getIdentifier("advanced"),
                           {C.getIdentifier("by")});
     auto *advancedMethodExpr =
@@ -576,6 +588,10 @@ deriveBodyTensorArrayProtocol_init(AbstractFunctionDecl *funcDecl, void *) {
     // Assign the new address.
     auto *assignAddrCallExpr = CallExpr::createImplicit(
         C, advancedMethodExpr, {intInitCallExpr}, {C.getIdentifier("by")});
+    // NOTE(TF-1054): create new `DeclRefExpr` to avoid
+    // `ConstraintSystem::resolveOverload` error.
+    addressDRE = new (C) DeclRefExpr(
+        currAddressDecl, DeclNameLoc(), /*implicit*/ true);
     auto *assignAddrExpr = new (C) AssignExpr(addressDRE, SourceLoc(),
                                               assignAddrCallExpr,
                                               /*Implicit*/ true);
