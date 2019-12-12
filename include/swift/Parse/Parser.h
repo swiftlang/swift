@@ -994,13 +994,21 @@ public:
       Optional<DeclNameRefWithLoc> &vjpSpec,
       TrailingWhereClause *&whereClause);
 
-  /// Parse a differentiation parameters clause.
+  /// Parse a differentiation parameters clause, i.e. the 'wrt:' clause in
+  /// `@differentiable` and `@derivative` attributes.
+  /// If `allowNamedParameters` is false, allow only index parameters and
+  /// 'self'.
   bool parseDifferentiationParametersClause(
-      SmallVectorImpl<ParsedAutoDiffParameter> &params, StringRef attrName);
+      SmallVectorImpl<ParsedAutoDiffParameter> &params, StringRef attrName,
+      bool allowNamedParameters = true);
 
   /// Parse the @derivative attribute.
   ParserResult<DerivativeAttr> parseDerivativeAttribute(SourceLoc AtLoc,
                                                         SourceLoc Loc);
+
+  /// Parse the @transpose attribute.
+  ParserResult<TransposeAttr> parseTransposeAttribute(SourceLoc AtLoc,
+                                                      SourceLoc Loc);
 
   /// Parse a specific attribute.
   ParserStatus parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc);
@@ -1143,7 +1151,19 @@ public:
                                      SourceLoc &LAngleLoc,
                                      SourceLoc &RAngleLoc);
 
-  ParserResult<TypeRepr> parseTypeIdentifier();
+  /// Parses a type identifier (e.g. 'Foo' or 'Foo.Bar.Baz').
+  ///
+  /// When `isParsingQualifiedDeclBaseType` is true:
+  /// - Parses and returns the base type for a qualified declaration name,
+  ///   positioning the parser at the '.' before the final declaration name.
+  //    This position is important for parsing final declaration names like
+  //    '.init' via `parseUnqualifiedDeclName`.
+  /// - For example, 'Foo.Bar.f' parses as 'Foo.Bar' and the parser is
+  ///   positioned at '.f'.
+  /// - If there is no base type qualifier (e.g. when parsing just 'f'), returns
+  ///   an empty parser error.
+  ParserResult<TypeRepr> parseTypeIdentifier(
+      bool isParsingQualifiedDeclBaseType = false);
   ParserResult<TypeRepr> parseOldStyleProtocolComposition();
   ParserResult<TypeRepr> parseAnyType();
   ParserResult<TypeRepr> parseSILBoxType(GenericParamList *generics,
@@ -1365,6 +1385,14 @@ public:
   bool canParseGenericArguments();
 
   bool canParseTypedPattern();
+
+  /// Returns true if a base type for a qualified declaration name can be
+  /// parsed.
+  /// Examples:
+  ///   'Foo.f' -> true
+  ///   'Foo.Bar.f' -> true
+  ///   'f' -> false
+  bool canParseBaseTypeForQualifiedDeclName();
 
   //===--------------------------------------------------------------------===//
   // Expression Parsing

@@ -862,6 +862,7 @@ static bool errorAndSkipUntilConsumeRightParen(Parser &P, StringRef attrName,
 };
 
 /// Parse a differentiation parameters 'wrt:' clause, returning true on error.
+/// If `allowNamedParameters` is false, allow only index parameters and 'self'.
 ///
 /// \verbatim
 ///   differentiation-params-clause:
@@ -869,10 +870,11 @@ static bool errorAndSkipUntilConsumeRightParen(Parser &P, StringRef attrName,
 ///   differentiation-params:
 ///     '(' differentiation-param (',' differentiation-param)* ')'
 ///   differentiation-param:
-///     'self' | identifier
+///     'self' | identifier | [0-9]+
 /// \endverbatim
 bool Parser::parseDifferentiationParametersClause(
-    SmallVectorImpl<ParsedAutoDiffParameter> &params, StringRef attrName) {
+    SmallVectorImpl<ParsedAutoDiffParameter> &params, StringRef attrName,
+    bool allowNamedParameters) {
   SyntaxParsingContext DiffParamsClauseContext(
        SyntaxContext, SyntaxKind::DifferentiationParamsClause);
   consumeToken(tok::identifier);
@@ -888,34 +890,38 @@ bool Parser::parseDifferentiationParametersClause(
         SyntaxContext, SyntaxKind::DifferentiationParam);
     SourceLoc paramLoc;
     switch (Tok.getKind()) {
-      case tok::identifier: {
-        Identifier paramName;
-        if (parseIdentifier(paramName, paramLoc,
-                            diag::diff_params_clause_expected_parameter))
-          return true;
-        params.push_back(ParsedAutoDiffParameter::getNamedParameter(
-            paramLoc, paramName));
-        break;
-      }
-      case tok::integer_literal: {
-        unsigned paramNum;
-        if (parseUnsignedInteger(
-                paramNum, paramLoc,
-                diag::diff_params_clause_expected_parameter))
-          return true;
-
-        params.push_back(ParsedAutoDiffParameter::getOrderedParameter(
-            paramLoc, paramNum));
-        break;
-      }
-      case tok::kw_self: {
-        paramLoc = consumeToken(tok::kw_self);
-        params.push_back(ParsedAutoDiffParameter::getSelfParameter(paramLoc));
-        break;
-      }
-      default:
-        diagnose(Tok, diag::diff_params_clause_expected_parameter);
+    case tok::identifier: {
+      // If named parameters are not allowed, diagnose.
+      if (!allowNamedParameters) {
+        diagnose(Tok, diag::diff_params_clause_expected_parameter_unnamed);
         return true;
+      }
+      Identifier paramName;
+      if (parseIdentifier(paramName, paramLoc,
+                          diag::diff_params_clause_expected_parameter))
+        return true;
+      params.push_back(ParsedAutoDiffParameter::getNamedParameter(
+          paramLoc, paramName));
+      break;
+    }
+    case tok::integer_literal: {
+      unsigned paramNum;
+      if (parseUnsignedInteger(
+              paramNum, paramLoc,
+              diag::diff_params_clause_expected_parameter))
+        return true;
+      params.push_back(ParsedAutoDiffParameter::getOrderedParameter(
+          paramLoc, paramNum));
+      break;
+    }
+    case tok::kw_self: {
+      paramLoc = consumeToken(tok::kw_self);
+      params.push_back(ParsedAutoDiffParameter::getSelfParameter(paramLoc));
+      break;
+    }
+    default:
+      diagnose(Tok, diag::diff_params_clause_expected_parameter);
+      return true;
     }
     if (parseTrailingComma && Tok.isNot(tok::r_paren))
       return parseToken(tok::comma, diag::attr_expected_comma, attrName,
@@ -1081,6 +1087,66 @@ bool Parser::parseDifferentiableAttributeArguments(
   return false;
 }
 
+/// Helper function that parses 'type-identifier' for `parseQualifiedDeclName`.
+/// Returns true on error. Sets `baseType` to the parsed base type if present,
+/// or to `nullptr` if not. A missing base type is not considered an error.
+static bool parseBaseTypeForQualifiedDeclName(Parser &P, TypeRepr *&baseType) {
+  baseType = nullptr;
+
+  if (!P.canParseBaseTypeForQualifiedDeclName())
+    return false;
+
+  auto result = P.parseTypeIdentifier(/*isParsingQualifiedDeclName*/ true);
+  if (result.isNull())
+    return true;
+
+  // Consume a leading period. This is relevant only for qualified operators.
+  // TODO(TF-1065): Consider disallowing qualified operator names. There is no
+  // precedent for qualified operator syntax elsewhere in Swift.
+  if (P.startsWithSymbol(P.Tok, '.')) {
+    assert(P.Tok.isAnyOperator() &&
+           "Only operators should have leading period here");
+    P.consumeStartingCharacterOfCurrentToken(tok::period);
+  }
+
+  baseType = result.getPtrOrNull();
+  return false;
+}
+
+/// parseQualifiedDeclName
+///
+/// \verbatim
+///   qualified-decl-name:
+///     type-identifier? unqualified-decl-name
+///   type-identifier:
+///     identifier generic-args? ('.' identifier generic-args?)*
+/// \endverbatim
+///
+/// Parses an optional base type, followed by a declaration name.
+/// Returns true on error (if declaration name could not be parsed).
+// TODO(TF-1066): Use module qualified name syntax/parsing instead of custom
+// qualified name syntax/parsing.
+static bool parseQualifiedDeclName(Parser &P, Diag<> nameParseError,
+                                   TypeRepr *&baseType,
+                                   DeclNameRefWithLoc &original) {
+  SyntaxParsingContext DeclNameContext(P.SyntaxContext,
+                                       SyntaxKind::QualifiedDeclName);
+  // Parse base type.
+  if (parseBaseTypeForQualifiedDeclName(P, baseType))
+    return true;
+  // Parse final declaration name.
+  // Note: Use `afterDot = true` and `allowDeinitAndSubscript = true` to enable
+  // initializer and subscript lookup.
+  original.Name =
+      P.parseUnqualifiedDeclName(/*afterDot*/ true, original.Loc,
+                                 nameParseError, /*allowOperators*/ true,
+                                 /*allowZeroArgCompoundNames*/ true,
+                                 /*allowDeinitAndSubscript*/ true);
+  // The base type is optional, but the final unqualified declaration name is
+  // not. If name could not be parsed, return true for error.
+  return !original.Name;
+}
+
 /// Parse a `@derivative(of:)` attribute, returning true on error.
 ///
 /// \verbatim
@@ -1091,6 +1157,7 @@ ParserResult<DerivativeAttr> Parser::parseDerivativeAttribute(SourceLoc atLoc,
                                                               SourceLoc loc) {
   StringRef AttrName = "derivative";
   SourceLoc lParenLoc = loc, rParenLoc = loc;
+  TypeRepr *baseType = nullptr;
   DeclNameRefWithLoc original;
   SmallVector<ParsedAutoDiffParameter, 8> params;
 
@@ -1124,15 +1191,11 @@ ParserResult<DerivativeAttr> Parser::parseDerivativeAttribute(SourceLoc atLoc,
       return makeParserError();
     }
     {
-      // Parse the name of the function.
-      SyntaxParsingContext FuncDeclNameContext(SyntaxContext,
-                                               SyntaxKind::FunctionDeclName);
-      // NOTE: Use `afterDot = true` and `allowDeinitAndSubscript = true` to
-      // enable, e.g. `@derivative(of: init)` and `@derivative(of: subscript)`.
-      original.Name = parseUnqualifiedDeclName(
-          /*afterDot*/ true, original.Loc,
-          diag::attr_derivative_expected_original_name, /*allowOperators*/ true,
-          /*allowZeroArgCompoundNames*/ true, /*allowDeinitAndSubscript*/ true);
+      // Parse the optionally qualified function name.
+      if (parseQualifiedDeclName(
+              *this, diag::autodiff_attr_expected_original_decl_name,
+              baseType, original))
+        return makeParserError();
     }
     if (consumeIfTrailingComma())
       return makeParserError();
@@ -1150,6 +1213,76 @@ ParserResult<DerivativeAttr> Parser::parseDerivativeAttribute(SourceLoc atLoc,
   return ParserResult<DerivativeAttr>(
       DerivativeAttr::create(Context, /*implicit*/ false, atLoc,
                              SourceRange(loc, rParenLoc), original, params));
+}
+
+/// Parse a `@transpose(of:)` attribute, returning true on error.
+///
+/// \verbatim
+///   transpose-attribute-arguments:
+///     '(' 'of' ':' decl-name (',' transposed-params-clause)? ')'
+/// \endverbatim
+ParserResult<TransposeAttr> Parser::parseTransposeAttribute(SourceLoc atLoc,
+                                                            SourceLoc loc) {
+  StringRef AttrName = "transpose";
+  SourceLoc lParenLoc = loc, rParenLoc = loc;
+  TypeRepr *baseType = nullptr;
+  DeclNameRefWithLoc original;
+  SmallVector<ParsedAutoDiffParameter, 8> params;
+
+  // Parse trailing comma, if it exists, and check for errors.
+  auto consumeIfTrailingComma = [&]() -> bool {
+    if (!consumeIf(tok::comma)) return false;
+    // Diagnose trailing comma before ')'.
+    if (Tok.is(tok::r_paren)) {
+      diagnose(Tok, diag::unexpected_separator, ",");
+      return errorAndSkipUntilConsumeRightParen(*this, AttrName);
+    }
+    // Check that token after comma is 'wrt:'.
+    if (isIdentifier(Tok, "wrt"))
+      return false;
+    diagnose(Tok, diag::attr_expected_label, "wrt", AttrName);
+    return errorAndSkipUntilConsumeRightParen(*this, AttrName);
+  };
+
+  // Parse '('.
+  if (!consumeIf(tok::l_paren, lParenLoc)) {
+    diagnose(getEndOfPreviousLoc(), diag::attr_expected_lparen, AttrName,
+             /*DeclModifier*/ false);
+    return makeParserError();
+  }
+  {
+    SyntaxParsingContext ContentContext(
+        SyntaxContext, SyntaxKind::DerivativeRegistrationAttributeArguments);
+    // Parse the 'of:' label and colon.
+    if (parseSpecificIdentifier("of", diag::attr_missing_label, "of",
+                                AttrName) ||
+        parseToken(tok::colon, diag::expected_colon_after_label, "of")) {
+      return makeParserError();
+    }
+    {
+      // Parse the optionally qualified function name.
+      if (parseQualifiedDeclName(
+              *this, diag::autodiff_attr_expected_original_decl_name,
+              baseType, original))
+        return makeParserError();
+    }
+    if (consumeIfTrailingComma())
+      return makeParserError();
+    // Parse the optional 'wrt' transposed parameters clause.
+    if (Tok.is(tok::identifier) && Tok.getText() == "wrt" &&
+        parseDifferentiationParametersClause(params, AttrName,
+                                             /*allowNamedParameters*/ false))
+      return makeParserError();
+  }
+  // Parse ')'.
+  if (!consumeIf(tok::r_paren, rParenLoc)) {
+    diagnose(getEndOfPreviousLoc(), diag::attr_expected_rparen, AttrName,
+             /*DeclModifier*/ false);
+    return makeParserError();
+  }
+  return ParserResult<TransposeAttr>(TransposeAttr::create(
+      Context, /*implicit*/ false, atLoc, SourceRange(loc, rParenLoc), baseType,
+      original, params));
 }
 
 void Parser::parseObjCSelector(SmallVector<Identifier, 4> &Names,
@@ -2118,6 +2251,17 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
       diagnose(Loc, diag::attr_only_at_non_local_scope, '@' + AttrName.str());
 
     auto Attr = parseDerivativeAttribute(AtLoc, Loc);
+    if (Attr.isNonNull())
+      Attributes.add(Attr.get());
+    break;
+  }
+
+  case DAK_Transpose: {
+    // `@transpose` in a local scope is not allowed.
+    if (CurDeclContext->isLocalContext())
+      diagnose(Loc, diag::attr_only_at_non_local_scope, '@' + AttrName.str());
+
+    auto Attr = parseTransposeAttribute(AtLoc, Loc);
     if (Attr.isNonNull())
       Attributes.add(Attr.get());
     break;

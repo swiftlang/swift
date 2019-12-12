@@ -37,3 +37,25 @@ func bazDerivative(_ x: Float, y: Float)
     -> (value: Float, pullback: (Float) -> Float) {
   return (x, { v in v })
 }
+
+@transpose(of: -)
+func negateDerivative(_ x: Float)
+    -> (value: Float, pullback: (Float) -> Float) {
+  return (-x, { v in -v })
+}
+
+@derivative(of: baz(label:_:), wrt: (x))
+func bazDerivative(_ x: Float, y: Float)
+    -> (value: Float, pullback: (Float) -> Float) {
+  return (x, { v in v })
+}
+
+@transpose(of: +)
+func addTranspose(_ v: Float) -> (Float, Float) {
+  return (v, v)
+}
+
+@transpose(of: -, wrt: (0, 1))
+func subtractTranspose(_ v: Float) -> (Float, Float) {
+  return (v, -v)
+}

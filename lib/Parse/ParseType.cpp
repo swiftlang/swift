@@ -633,12 +633,42 @@ ParserStatus Parser::parseGenericArguments(SmallVectorImpl<TypeRepr *> &Args,
   return makeParserSuccess();
 }
 
+/// Returns true if a base type for a qualified declaration name can be
+/// parsed.
+///
+/// Examples:
+///   'Foo.f' -> true
+///   'Foo.Bar.f' -> true
+///   'f' -> false, no base type
+bool Parser::canParseBaseTypeForQualifiedDeclName() {
+  BacktrackingScope backtrack(*this);
+
+  // First, parse a single type identifier component.
+  if (!Tok.isAny(tok::identifier, tok::kw_Self, tok::kw_Any))
+    return false;
+  consumeToken();
+  if (startsWithLess(Tok)) {
+    if (!canParseGenericArguments())
+      return false;
+  }
+
+  // If the next token is a period or starts with a period, then this can be
+  // parsed as a type qualifier.
+  return startsWithSymbol(Tok, '.');
+}
+
 /// parseTypeIdentifier
 ///   
 ///   type-identifier:
 ///     identifier generic-args? ('.' identifier generic-args?)*
 ///
-ParserResult<TypeRepr> Parser::parseTypeIdentifier() {
+ParserResult<TypeRepr>
+Parser::parseTypeIdentifier(bool isParsingQualifiedDeclBaseType) {
+  // If parsing a qualified declaration name, return error if base type cannot
+  // be parsed.
+  if (isParsingQualifiedDeclBaseType && !canParseBaseTypeForQualifiedDeclName())
+    return makeParserError();
+
   if (Tok.isNot(tok::identifier) && Tok.isNot(tok::kw_Self)) {
     // is this the 'Any' type
     if (Tok.is(tok::kw_Any)) {
@@ -704,7 +734,18 @@ ParserResult<TypeRepr> Parser::parseTypeIdentifier() {
       }
       if (!peekToken().isContextualKeyword("Type")
           && !peekToken().isContextualKeyword("Protocol")) {
+        // Consume the period.
         consumeToken();
+        // If parsing a qualified declaration name, break before parsing the
+        // final declaration name component.
+        if (isParsingQualifiedDeclBaseType) {
+          BacktrackingScope backtrack(*this);
+          // If qualified name base type cannot be parsed from the current
+          // point (i.e. the next type identifier is not followed by a '.'),
+          // then the next identifier is the final declaration name component.
+          if (!canParseBaseTypeForQualifiedDeclName())
+            break;
+        }
         continue;
       }
     } else if (Tok.is(tok::code_complete)) {
