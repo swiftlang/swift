@@ -22,5 +22,5 @@ bb0(%0 : $Rect):
 // CHECK_LABEL: sil_vtable Rect
 sil_vtable Rect {
   // CHECK: #Rect.orgx!getter
-  #Rect.orgx!getter.1: @_TFC4rect4Rectg4orgxSd
+  #Rect.orgx!getter: @_TFC4rect4Rectg4orgxSd
 }

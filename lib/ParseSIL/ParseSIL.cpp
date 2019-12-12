@@ -1340,9 +1340,7 @@ static Optional<AccessorKind> getAccessorKind(StringRef ident) {
 }
 
 ///  sil-decl-ref ::= '#' sil-identifier ('.' sil-identifier)* sil-decl-subref?
-///  sil-decl-subref ::= '!' sil-decl-subref-part ('.' sil-decl-uncurry-level)?
-///                      ('.' sil-decl-lang)?
-///  sil-decl-subref ::= '!' sil-decl-uncurry-level ('.' sil-decl-lang)?
+///  sil-decl-subref ::= '!' sil-decl-subref-part ('.' sil-decl-lang)?
 ///  sil-decl-subref ::= '!' sil-decl-lang
 ///  sil-decl-subref-part ::= 'getter'
 ///  sil-decl-subref-part ::= 'setter'
@@ -1351,7 +1349,6 @@ static Optional<AccessorKind> getAccessorKind(StringRef ident) {
 ///  sil-decl-subref-part ::= 'enumelt'
 ///  sil-decl-subref-part ::= 'destroyer'
 ///  sil-decl-subref-part ::= 'globalaccessor'
-///  sil-decl-uncurry-level ::= [0-9]+
 ///  sil-decl-lang ::= 'foreign'
 bool SILParser::parseSILDeclRef(SILDeclRef &Result,
                                 SmallVectorImpl<ValueDecl *> &values) {
@@ -1359,25 +1356,21 @@ bool SILParser::parseSILDeclRef(SILDeclRef &Result,
   if (parseSILDottedPath(VD, values))
     return true;
 
-  // Initialize Kind, uncurryLevel and IsObjC.
+  // Initialize Kind and IsObjC.
   SILDeclRef::Kind Kind = SILDeclRef::Kind::Func;
-  unsigned uncurryLevel = 0;
   bool IsObjC = false;
 
   if (!P.consumeIf(tok::sil_exclamation)) {
     // Construct SILDeclRef.
-    Result = SILDeclRef(VD, Kind, /*isCurried=*/false, IsObjC);
-    if (uncurryLevel < Result.getParameterListCount() - 1)
-      Result = Result.asCurried();
+    Result = SILDeclRef(VD, Kind, IsObjC);
     return false;
   }
 
   // Handle sil-constant-kind-and-uncurry-level.
   // ParseState indicates the value we just handled.
-  // 1 means we just handled Kind, 2 means we just handled uncurryLevel.
-  // We accept func|getter|setter|...|foreign or an integer when ParseState is
-  // 0; accept foreign or an integer when ParseState is 1; accept foreign when
-  // ParseState is 2.
+  // 1 means we just handled Kind.
+  // We accept func|getter|setter|...|foreign when ParseState is 0;
+  // accept foreign when ParseState is 1.
   unsigned ParseState = 0;
   Identifier Id;
   do {
@@ -1448,19 +1441,13 @@ bool SILParser::parseSILDeclRef(SILDeclRef &Result,
         break;
       } else
         break;
-    } else if (ParseState < 2 && P.Tok.is(tok::integer_literal)) {
-      parseIntegerLiteral(P.Tok.getText(), 0, uncurryLevel);
-      P.consumeToken(tok::integer_literal);
-      ParseState = 2;
     } else
       break;
 
   } while (P.consumeIf(tok::period));
 
   // Construct SILDeclRef.
-  Result = SILDeclRef(VD, Kind, /*isCurried=*/false, IsObjC);
-  if (uncurryLevel < Result.getParameterListCount() - 1)
-    Result = Result.asCurried();
+  Result = SILDeclRef(VD, Kind, IsObjC);
   return false;
 }
 

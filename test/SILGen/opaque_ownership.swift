@@ -23,13 +23,13 @@ public protocol Decoder {
 // CHECK-LABEL: sil [ossa] @$ss11takeDecoder4fromBi1_s0B0_p_tKF : $@convention(thin) (@in_guaranteed Decoder) -> (Builtin.Int1, @error Error) {
 // CHECK: bb0(%0 : @guaranteed $Decoder):
 // CHECK:  [[OPENED:%.*]] = open_existential_value %0 : $Decoder to $@opened("{{.*}}") Decoder
-// CHECK:  [[WT:%.*]] = witness_method $@opened("{{.*}}") Decoder, #Decoder.unkeyedContainer!1 : <Self where Self : Decoder> (Self) -> () throws -> UnkeyedDecodingContainer, %3 : $@opened("{{.*}}") Decoder : $@convention(witness_method: Decoder) <τ_0_0 where τ_0_0 : Decoder> (@in_guaranteed τ_0_0) -> (@out UnkeyedDecodingContainer, @error Error)
+// CHECK:  [[WT:%.*]] = witness_method $@opened("{{.*}}") Decoder, #Decoder.unkeyedContainer : <Self where Self : Decoder> (Self) -> () throws -> UnkeyedDecodingContainer, %3 : $@opened("{{.*}}") Decoder : $@convention(witness_method: Decoder) <τ_0_0 where τ_0_0 : Decoder> (@in_guaranteed τ_0_0) -> (@out UnkeyedDecodingContainer, @error Error)
 // CHECK:  try_apply [[WT]]<@opened("{{.*}}") Decoder>([[OPENED]]) : $@convention(witness_method: Decoder) <τ_0_0 where τ_0_0 : Decoder> (@in_guaranteed τ_0_0) -> (@out UnkeyedDecodingContainer, @error Error), normal bb2, error bb1
 //
 // CHECK:bb{{.*}}([[RET1:%.*]] : @owned $UnkeyedDecodingContainer):
 // CHECK:  [[BORROW2:%.*]] = begin_borrow [[RET1]] : $UnkeyedDecodingContainer
 // CHECK:  [[OPENED2:%.*]] = open_existential_value [[BORROW2]] : $UnkeyedDecodingContainer to $@opened("{{.*}}") UnkeyedDecodingContainer
-// CHECK:  [[WT2:%.*]] = witness_method $@opened("{{.*}}") UnkeyedDecodingContainer, #UnkeyedDecodingContainer.isAtEnd!getter.1 : <Self where Self : UnkeyedDecodingContainer> (Self) -> () -> Builtin.Int1, [[OPENED2]] : $@opened("{{.*}}") UnkeyedDecodingContainer : $@convention(witness_method: UnkeyedDecodingContainer) <τ_0_0 where τ_0_0 : UnkeyedDecodingContainer> (@in_guaranteed τ_0_0) -> Builtin.Int1
+// CHECK:  [[WT2:%.*]] = witness_method $@opened("{{.*}}") UnkeyedDecodingContainer, #UnkeyedDecodingContainer.isAtEnd!getter : <Self where Self : UnkeyedDecodingContainer> (Self) -> () -> Builtin.Int1, [[OPENED2]] : $@opened("{{.*}}") UnkeyedDecodingContainer : $@convention(witness_method: UnkeyedDecodingContainer) <τ_0_0 where τ_0_0 : UnkeyedDecodingContainer> (@in_guaranteed τ_0_0) -> Builtin.Int1
 // CHECK:  [[RET2:%.*]] = apply [[WT2]]<@opened("{{.*}}") UnkeyedDecodingContainer>([[OPENED2]]) : $@convention(witness_method: UnkeyedDecodingContainer) <τ_0_0 where τ_0_0 : UnkeyedDecodingContainer> (@in_guaranteed τ_0_0) -> Builtin.Int1
 // CHECK:  end_borrow [[BORROW2]] : $UnkeyedDecodingContainer
 // CHECK:  destroy_value [[RET1]] : $UnkeyedDecodingContainer
@@ -239,7 +239,7 @@ public struct EnumIter<Base : IP> : IP, Seq {
 // CHECK:  [[MT:%.*]] = metatype $@thin EnumIter<Base.Iterator>.Type
 // CHECK:  [[FIELD:%.*]] = struct_extract %0 : $EnumSeq<Base>, #EnumSeq._base
 // CHECK:  [[COPY:%.*]] = copy_value [[FIELD]] : $Base
-// CHECK:  [[WT:%.*]] = witness_method $Base, #Seq.makeIterator!1 : <Self where Self : Seq> (Self) -> () -> Self.Iterator : $@convention(witness_method: Seq) <τ_0_0 where τ_0_0 : Seq> (@in_guaranteed τ_0_0) -> @out τ_0_0.Iterator
+// CHECK:  [[WT:%.*]] = witness_method $Base, #Seq.makeIterator : <Self where Self : Seq> (Self) -> () -> Self.Iterator : $@convention(witness_method: Seq) <τ_0_0 where τ_0_0 : Seq> (@in_guaranteed τ_0_0) -> @out τ_0_0.Iterator
 // CHECK:  [[ITER:%.*]] = apply [[WT]]<Base>([[COPY]]) : $@convention(witness_method: Seq) <τ_0_0 where τ_0_0 : Seq> (@in_guaranteed τ_0_0) -> @out τ_0_0.Iterator
 // CHECK:  destroy_value [[COPY]] : $Base
 // CHECK: [[FN:%.*]] = function_ref @$ss8EnumIterV5_baseAByxGx_tcfC : $@convention(method) <τ_0_0 where τ_0_0 : IP> (@in τ_0_0, @thin EnumIter<τ_0_0>.Type) -> @out EnumIter<τ_0_0>

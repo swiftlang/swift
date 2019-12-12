@@ -103,7 +103,7 @@ bb0(%0 : $*T, %1 : $*P):
   checked_cast_addr_br take_always P in %4 : $*P to C in %6 : $*C, bb1, bb2
 bb1:
   %8 = load %6 : $*C
-  %9 = enum $Optional<C>, #Optional.some!enumelt.1, %8 : $C
+  %9 = enum $Optional<C>, #Optional.some!enumelt, %8 : $C
   dealloc_stack %6 : $*C
   br bb3(%9 : $Optional<C>)
 bb2:

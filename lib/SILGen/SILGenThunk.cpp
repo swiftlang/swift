@@ -134,9 +134,7 @@ SILGenFunction::emitGlobalFunctionRef(SILLocation loc, SILDeclRef constant,
   
   // If the constant is a thunk we haven't emitted yet, emit it.
   if (!SGM.hasFunction(constant)) {
-    if (constant.isCurried) {
-      llvm_unreachable("Curry thunks should have been built in CSApply");
-    } else if (constant.isForeignToNativeThunk()) {
+    if (constant.isForeignToNativeThunk()) {
       SGM.emitForeignToNativeThunk(constant);
     } else if (constant.isNativeToForeignThunk()) {
       SGM.emitNativeToForeignThunk(constant);

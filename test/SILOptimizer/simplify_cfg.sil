@@ -659,7 +659,7 @@ class C {
 // CHECK-LABEL: @redundant_switchenum
 sil @redundant_switchenum : $@convention(thin) (@owned Optional<C>) -> Int32 {
 bb0(%0 : $Optional<C>):
-  switch_enum %0 : $Optional<C>, case #Optional.some!enumelt.1: bb1, case #Optional.none!enumelt: bb2
+  switch_enum %0 : $Optional<C>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
 
 // CHECK: bb1:
 bb1:
@@ -687,10 +687,10 @@ bb4:
   %21 = alloc_stack $Optional<C>
   store %0 to %21 : $*Optional<C>
 // CHECK-NOT: switch_enum
-  switch_enum %0 : $Optional<C>, case #Optional.some!enumelt.1: bb5, case #Optional.none!enumelt: bb6
+  switch_enum %0 : $Optional<C>, case #Optional.some!enumelt: bb5, case #Optional.none!enumelt: bb6
 
 bb5:
-  %25 = unchecked_take_enum_data_addr %21 : $*Optional<C>, #Optional.some!enumelt.1
+  %25 = unchecked_take_enum_data_addr %21 : $*Optional<C>, #Optional.some!enumelt
   %26 = load %25 : $*C
   dealloc_stack %21 : $*Optional<C>
   %29 = ref_element_addr %26 : $C, #C.value
@@ -760,17 +760,17 @@ bb0:
   cond_br undef, bb1, bb2
 
 bb1:
-  %12 = enum $Optional<Int32>, #Optional.some!enumelt.1, %11 : $Int32
+  %12 = enum $Optional<Int32>, #Optional.some!enumelt, %11 : $Int32
   br bb3(%12 : $Optional<Int32>)
 
 bb2:
-  %22 = enum $Optional<Int32>, #Optional.some!enumelt.1, %21 : $Int32
+  %22 = enum $Optional<Int32>, #Optional.some!enumelt, %21 : $Int32
   br bb3(%22 : $Optional<Int32>)
 
 bb3(%30 : $Optional<Int32>):
   %u = function_ref @unknown : $@convention(thin) () -> ()
   apply %u() : $@convention(thin) () -> ()
-  switch_enum %30 : $Optional<Int32>, case #Optional.none!enumelt: bb4, case #Optional.some!enumelt.1: bb5
+  switch_enum %30 : $Optional<Int32>, case #Optional.none!enumelt: bb4, case #Optional.some!enumelt: bb5
 
 bb4:
   br bb6(%11 : $Int32)
@@ -785,7 +785,7 @@ bb6(%r : $Int32):
 // CHECK-LABEL: sil @simplify_switch_enum2
 // CHECK: bb3([[A:%[0-9]+]] : $Optional<Int32>):
 // CHECK: apply
-// CHECK: [[R:%[0-9]+]] = unchecked_enum_data [[A]] : $Optional<Int32>, #Optional.some!enumelt.1
+// CHECK: [[R:%[0-9]+]] = unchecked_enum_data [[A]] : $Optional<Int32>, #Optional.some!enumelt
 // CHECK: return [[R]]
 sil @simplify_switch_enum2 : $@convention(thin) (Optional<Int32>) -> Int32 {
 bb0(%0 : $Optional<Int32>):
@@ -793,10 +793,10 @@ bb0(%0 : $Optional<Int32>):
   %11 = struct $Int32 (%10 : $Builtin.Int32)
   %20 = integer_literal $Builtin.Int32, 3
   %21 = struct $Int32 (%20 : $Builtin.Int32)
-  switch_enum %0 : $Optional<Int32>, case #Optional.none!enumelt: bb1, case #Optional.some!enumelt.1: bb2
+  switch_enum %0 : $Optional<Int32>, case #Optional.none!enumelt: bb1, case #Optional.some!enumelt: bb2
 
 bb1:
-  %12 = enum $Optional<Int32>, #Optional.some!enumelt.1, %11 : $Int32
+  %12 = enum $Optional<Int32>, #Optional.some!enumelt, %11 : $Int32
   br bb3(%12 : $Optional<Int32>)
 
 bb2:
@@ -805,7 +805,7 @@ bb2:
 bb3(%30 : $Optional<Int32>):
   %u = function_ref @unknown : $@convention(thin) () -> ()
   apply %u() : $@convention(thin) () -> ()
-  switch_enum %30 : $Optional<Int32>, case #Optional.none!enumelt: bb4, case #Optional.some!enumelt.1: bb5
+  switch_enum %30 : $Optional<Int32>, case #Optional.none!enumelt: bb4, case #Optional.some!enumelt: bb5
 
 bb4:
   br bb6(%21 : $Int32)
@@ -823,7 +823,7 @@ bb6(%r : $Int32):
 // CHECK-NEXT: return
 sil @identical_switch_enum_dests : $@convention(thin) (Optional<Int32>) -> () {
 bb0(%0 : $Optional<Int32>):
-  switch_enum %0 : $Optional<Int32>, case #Optional.none!enumelt: bb1, case #Optional.some!enumelt.1: bb2
+  switch_enum %0 : $Optional<Int32>, case #Optional.none!enumelt: bb1, case #Optional.some!enumelt: bb2
 
 bb1:
   br bb3
@@ -842,7 +842,7 @@ bb3:
 // CHECK-NEXT: return
 sil @identical_switch_enum_addr_dests : $@convention(thin) (@in Optional<Int32>) -> () {
 bb0(%0 : $*Optional<Int32>):
-  switch_enum_addr %0 : $*Optional<Int32>, case #Optional.none!enumelt: bb1, case #Optional.some!enumelt.1: bb2
+  switch_enum_addr %0 : $*Optional<Int32>, case #Optional.none!enumelt: bb1, case #Optional.some!enumelt: bb2
 
 bb1:
   br bb3
@@ -990,7 +990,7 @@ bb7(%6 : $Builtin.Int64):
 
 // CHECK-LABEL: @switch_enum_dominates_switch_enum_arg
 // CHECK:      bb0(%0 : $Optional<Builtin.Int32>):
-// CHECK-NEXT:   switch_enum %0 {{.*}} case #Optional.some!enumelt.1: bb2
+// CHECK-NEXT:   switch_enum %0 {{.*}} case #Optional.some!enumelt: bb2
 // CHECK:      bb2:
 // CHECK-NEXT:   [[D:%[0-9]+]] = unchecked_enum_data %0
 // CHECK-NEXT:   br bb3([[D]] : $Builtin.Int32)
@@ -998,14 +998,14 @@ bb7(%6 : $Builtin.Int64):
 // CHECK-NEXT:   return [[R]]
 sil @switch_enum_dominates_switch_enum_arg : $@convention(thin) (Optional<Builtin.Int32>) -> Builtin.Int32 {
 bb0(%0 : $Optional<Builtin.Int32>):
-  switch_enum %0 : $Optional<Builtin.Int32>, case #Optional.none!enumelt: bb1, case #Optional.some!enumelt.1: bb2
+  switch_enum %0 : $Optional<Builtin.Int32>, case #Optional.none!enumelt: bb1, case #Optional.some!enumelt: bb2
 
 bb1:
   %i1 = integer_literal $Builtin.Int32, 1
   br bb5(%i1 : $Builtin.Int32)
 
 bb2:
-  switch_enum %0 : $Optional<Builtin.Int32>, case #Optional.none!enumelt: bb3, case #Optional.some!enumelt.1: bb4
+  switch_enum %0 : $Optional<Builtin.Int32>, case #Optional.none!enumelt: bb3, case #Optional.some!enumelt: bb4
 
 bb3:
   %i2 = integer_literal $Builtin.Int32, 2
@@ -1020,7 +1020,7 @@ bb5(%r : $Builtin.Int32):
 
 // CHECK-LABEL: @switch_enum_dominates_switch_enum_arg_reuse
 // CHECK:      bb0(%0 : $Optional<Builtin.Int32>):
-// CHECK-NEXT:   switch_enum %0 {{.*}} case #Optional.some!enumelt.1: bb2
+// CHECK-NEXT:   switch_enum %0 {{.*}} case #Optional.some!enumelt: bb2
 // CHECK:      bb2({{.*}} : $Builtin.Int32):
 // CHECK-NEXT:   [[A:%[0-9]+]] = unchecked_enum_data %0
 // CHECK-NEXT:   br bb3([[A]] : $Builtin.Int32)
@@ -1028,14 +1028,14 @@ bb5(%r : $Builtin.Int32):
 // CHECK-NEXT:   return [[R]]
 sil @switch_enum_dominates_switch_enum_arg_reuse : $@convention(thin) (Optional<Builtin.Int32>) -> Builtin.Int32 {
 bb0(%0 : $Optional<Builtin.Int32>):
-  switch_enum %0 : $Optional<Builtin.Int32>, case #Optional.none!enumelt: bb1, case #Optional.some!enumelt.1: bb2
+  switch_enum %0 : $Optional<Builtin.Int32>, case #Optional.none!enumelt: bb1, case #Optional.some!enumelt: bb2
 
 bb1:
   %i1 = integer_literal $Builtin.Int32, 1
   br bb5(%i1 : $Builtin.Int32)
 
 bb2(%d : $Builtin.Int32):
-  switch_enum %0 : $Optional<Builtin.Int32>, case #Optional.none!enumelt: bb3, case #Optional.some!enumelt.1: bb4
+  switch_enum %0 : $Optional<Builtin.Int32>, case #Optional.none!enumelt: bb3, case #Optional.some!enumelt: bb4
 
 bb3:
   %i2 = integer_literal $Builtin.Int32, 2
@@ -1079,17 +1079,17 @@ bb3:
   %14 = tuple_extract %13 : $(Builtin.Int32, Builtin.Int1), 0
   %15 = tuple_extract %13 : $(Builtin.Int32, Builtin.Int1), 1
   cond_fail %15 : $Builtin.Int1
-  %17 = enum $Optional<Int32>, #Optional.some!enumelt.1, %4 : $Int32
+  %17 = enum $Optional<Int32>, #Optional.some!enumelt, %4 : $Int32
   br bb4(%14 : $Builtin.Int32, %17 : $Optional<Int32>)
 
 bb4(%19 : $Builtin.Int32, %20 : $Optional<Int32>):
-  switch_enum %20 : $Optional<Int32>, case #Optional.some!enumelt.1: bb5, case #Optional.none!enumelt: bb6
+  switch_enum %20 : $Optional<Int32>, case #Optional.some!enumelt: bb5, case #Optional.none!enumelt: bb6
 
 bb5:
   // This could be a use like we generate for a loop with an induction
   // variable use like in:
   //  for i in 1..10 { a[i] = i }
-  %9 = unchecked_enum_data %20 : $Optional<Int32>, #Optional.some!enumelt.1
+  %9 = unchecked_enum_data %20 : $Optional<Int32>, #Optional.some!enumelt
   br bb1(%19 : $Builtin.Int32)
 
 bb6:
@@ -1117,8 +1117,8 @@ sil @_TFC3ccb4Base6middlefS0_FT_T_ : $@convention(method) (@guaranteed Base) -> 
 // CHECK-LABEL: sil @redundant_checked_cast_br
 sil @redundant_checked_cast_br : $@convention(method) (@guaranteed Base) -> () {
 bb0(%0 : $Base):
-// CHECK: [[METHOD:%.*]] = class_method %0 : $Base, #Base.middle!1 : (Base) -> () -> (), $@convention(method) (@guaranteed Base) -> ()
-  %1 = class_method %0 : $Base, #Base.middle!1 : (Base) -> () -> (), $@convention(method) (@guaranteed Base) -> ()
+// CHECK: [[METHOD:%.*]] = class_method %0 : $Base, #Base.middle : (Base) -> () -> (), $@convention(method) (@guaranteed Base) -> ()
+  %1 = class_method %0 : $Base, #Base.middle : (Base) -> () -> (), $@convention(method) (@guaranteed Base) -> ()
 // CHECK: checked_cast_br [exact] %0 : $Base to Base, [[SUCCESS:bb[0-9]+]], [[FAIL:bb[0-9]+]]
   checked_cast_br [exact] %0 : $Base to Base, bb2, bb7
 
@@ -1129,7 +1129,7 @@ bb1:
 
 bb2(%5 : $Base):
 // CHECK: [[SUCCESS]]
-  %7 = class_method %0 : $Base, #Base.inner!1 : (Base) -> () -> (), $@convention(method) (@guaranteed Base) -> ()
+  %7 = class_method %0 : $Base, #Base.inner : (Base) -> () -> (), $@convention(method) (@guaranteed Base) -> ()
 // CHECK-NOT: checked_cast_br
   checked_cast_br [exact] %0 : $Base to Base, bb3, bb5
 // CHECK: [[INNER:%.*]] = function_ref @_TFC3ccb4Base5innerfS0_FT_T_ : $@convention(method) (@guaranteed Base) -> ()
@@ -1165,8 +1165,8 @@ bb7:
 // CHECK-LABEL: sil @not_redundant_checked_cast_br : $@convention(method) (@guaranteed Base) -> () {
 sil @not_redundant_checked_cast_br : $@convention(method) (@guaranteed Base) -> () {
 bb0(%0 : $Base):
-// CHECK: [[METHOD:%.*]] = class_method %0 : $Base, #Base.middle!1 : (Base) -> () -> (), $@convention(method) (@guaranteed Base) -> ()
-  %1 = class_method %0 : $Base, #Base.middle!1 : (Base) -> () -> (), $@convention(method) (@guaranteed Base) -> ()
+// CHECK: [[METHOD:%.*]] = class_method %0 : $Base, #Base.middle : (Base) -> () -> (), $@convention(method) (@guaranteed Base) -> ()
+  %1 = class_method %0 : $Base, #Base.middle : (Base) -> () -> (), $@convention(method) (@guaranteed Base) -> ()
 // CHECK: checked_cast_br [exact] %0 : $Base to Base, [[SUCCESS:bb[0-9]+]], [[FAIL:bb[0-9]+]]
   checked_cast_br [exact] %0 : $Base to Base, bb2, bb7
 
@@ -1176,8 +1176,8 @@ bb1:
 
 bb2(%5 : $Base):
 // CHECK: [[SUCCESS]]
-// CHECK: [[METHOD2:%.*]] = class_method %0 : $Base, #Base.inner!1 : (Base) -> () -> (), $@convention(method) (@guaranteed Base) -> ()
-  %7 = class_method %0 : $Base, #Base.inner!1 : (Base) -> () -> (), $@convention(method) (@guaranteed Base) -> ()
+// CHECK: [[METHOD2:%.*]] = class_method %0 : $Base, #Base.inner : (Base) -> () -> (), $@convention(method) (@guaranteed Base) -> ()
+  %7 = class_method %0 : $Base, #Base.inner : (Base) -> () -> (), $@convention(method) (@guaranteed Base) -> ()
   %8 = apply %7(%0) : $@convention(method) (@guaranteed Base) -> ()
   br bb4
 
@@ -1191,7 +1191,7 @@ bb4:
   br bb6(%13 : $())
 
 bb5:
-  %14 = class_method %0 : $Base, #Base.inner!1 : (Base) -> () -> (), $@convention(method) (@guaranteed Base) -> ()
+  %14 = class_method %0 : $Base, #Base.inner : (Base) -> () -> (), $@convention(method) (@guaranteed Base) -> ()
   %15 = apply %14(%0) : $@convention(method) (@guaranteed Base) -> ()
   br bb4
 
@@ -1210,8 +1210,8 @@ bb7:
 // CHECK-LABEL: sil @failing_checked_cast_br
 sil @failing_checked_cast_br : $@convention(method) (@guaranteed Base) -> () {
 bb0(%0 : $Base):
-// CHECK: [[METHOD:%.*]] = class_method %0 : $Base, #Base.middle!1 : (Base) -> () -> (), $@convention(method) (@guaranteed Base) -> ()
-  %1 = class_method %0 : $Base, #Base.middle!1 : (Base) -> () -> (), $@convention(method) (@guaranteed Base) -> ()
+// CHECK: [[METHOD:%.*]] = class_method %0 : $Base, #Base.middle : (Base) -> () -> (), $@convention(method) (@guaranteed Base) -> ()
+  %1 = class_method %0 : $Base, #Base.middle : (Base) -> () -> (), $@convention(method) (@guaranteed Base) -> ()
 // CHECK: checked_cast_br [exact] %0 : $Base to Base, [[SUCCESS:bb[0-9]+]], [[FAIL:bb[0-9]+]]
   checked_cast_br [exact] %0 : $Base to Base, bb2, bb7
 
@@ -1222,8 +1222,8 @@ bb1:
 
 bb2(%5 : $Base):
 // CHECK: [[SUCCESS]]
-// CHECK: [[METHOD2:%.*]] = class_method %0 : $Base, #Base.inner!1 : (Base) -> () -> (), $@convention(method) (@guaranteed Base) -> ()
-  %7 = class_method %0 : $Base, #Base.inner!1 : (Base) -> () -> (), $@convention(method) (@guaranteed Base) -> ()
+// CHECK: [[METHOD2:%.*]] = class_method %0 : $Base, #Base.inner : (Base) -> () -> (), $@convention(method) (@guaranteed Base) -> ()
+  %7 = class_method %0 : $Base, #Base.inner : (Base) -> () -> (), $@convention(method) (@guaranteed Base) -> ()
 // CHECK-NOT: checked_cast_br [exact] %0 : $Base to Derived
 // CHECK: apply [[METHOD2]]
 // Check that checked_cast_br [exact] was replaced by a branch to the failure BB of the checked_cast_br.
@@ -1316,14 +1316,14 @@ bb0(%0 : $Int32):
 bb2:
   %14 = integer_literal $Builtin.Int32, 2
   %15 = struct $Int32 (%2 : $Builtin.Int32)
-  %16 = enum $Optional<Int32>, #Optional.some!enumelt.1, %15 : $Int32
+  %16 = enum $Optional<Int32>, #Optional.some!enumelt, %15 : $Int32
   br bb3(%1 : $Builtin.Int32, %14 : $Builtin.Int32, %16 : $Optional<Int32>)
 
 bb3(%18 : $Builtin.Int32, %19 : $Builtin.Int32, %20 : $Optional<Int32>):
-  switch_enum %20 : $Optional<Int32>, case #Optional.some!enumelt.1: bb4, case #Optional.none!enumelt: bb5
+  switch_enum %20 : $Optional<Int32>, case #Optional.some!enumelt: bb4, case #Optional.none!enumelt: bb5
 
 bb4:
-  %22 = unchecked_enum_data %20 : $Optional<Int32>, #Optional.some!enumelt.1
+  %22 = unchecked_enum_data %20 : $Optional<Int32>, #Optional.some!enumelt
   %23 = struct_extract %22 : $Int32, #Int32._value
   %24 = builtin "sadd_with_overflow_Int32"(%18 : $Builtin.Int32, %23 : $Builtin.Int32, %5 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
   %25 = tuple_extract %24 : $(Builtin.Int32, Builtin.Int1), 0
@@ -1345,7 +1345,7 @@ bb7:
   %35 = tuple_extract %34 : $(Builtin.Int32, Builtin.Int1), 0
   %36 = tuple_extract %34 : $(Builtin.Int32, Builtin.Int1), 1
   cond_fail %36 : $Builtin.Int1
-  %38 = enum $Optional<Int32>, #Optional.some!enumelt.1, %28 : $Int32
+  %38 = enum $Optional<Int32>, #Optional.some!enumelt, %28 : $Int32
   br bb3(%25 : $Builtin.Int32, %35 : $Builtin.Int32, %38 : $Optional<Int32>)
 
 bb8(%40 : $Builtin.Int32):
@@ -1360,15 +1360,15 @@ bb8(%40 : $Builtin.Int32):
 sil @jumpthread_switch_enum2 : $@convention(thin) (Int32) -> Int32 {
 bb0(%0 : $Int32):
   %1 = integer_literal $Builtin.Int32, 0
-  %3 = enum $Optional<Int32>, #Optional.some!enumelt.1, %0 : $Int32
+  %3 = enum $Optional<Int32>, #Optional.some!enumelt, %0 : $Int32
   %4 = enum $Optional<Int32>, #Optional.none!enumelt
   br bb1(%1 : $Builtin.Int32, %3 : $Optional<Int32>)
 
 bb1(%6 : $Builtin.Int32, %7 : $Optional<Int32>):
-  switch_enum %7 : $Optional<Int32>, case #Optional.some!enumelt.1: bb2, case #Optional.none!enumelt: bb3
+  switch_enum %7 : $Optional<Int32>, case #Optional.some!enumelt: bb2, case #Optional.none!enumelt: bb3
 
 bb2:
-  %9 = unchecked_enum_data %7 : $Optional<Int32>, #Optional.some!enumelt.1
+  %9 = unchecked_enum_data %7 : $Optional<Int32>, #Optional.some!enumelt
   %10 = struct_extract %9 : $Int32, #Int32._value
   %11 = integer_literal $Builtin.Int1, 0
   %12 = builtin "sadd_with_overflow_Int32"(%6 : $Builtin.Int32, %10 : $Builtin.Int32, %11 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
@@ -1381,7 +1381,7 @@ bb3:
 }
 
 // CHECK-LABEL: sil @jumpthread_switch_enum3
-// CHECK: switch_enum %0 : $Optional<Int32>, case #Optional.none!enumelt: bb1, case #Optional.some!enumelt.1: bb2
+// CHECK: switch_enum %0 : $Optional<Int32>, case #Optional.none!enumelt: bb1, case #Optional.some!enumelt: bb2
 // CHECK: bb1:
 // CHECK-NEXT: switch_enum
 // CHECK: bb2:
@@ -1400,7 +1400,7 @@ bb0(%0 : $Optional<Int32>):
   %11 = struct $Int32 (%10 : $Builtin.Int32)
   %20 = integer_literal $Builtin.Int32, 3
   %21 = struct $Int32 (%20 : $Builtin.Int32)
-  switch_enum %0 : $Optional<Int32>, case #Optional.none!enumelt: bb1, case #Optional.some!enumelt.1: bb2
+  switch_enum %0 : $Optional<Int32>, case #Optional.none!enumelt: bb1, case #Optional.some!enumelt: bb2
 
 bb1:
   br bb3(undef : $Optional<Int32>)
@@ -1409,7 +1409,7 @@ bb2:
   br bb3(%0 : $Optional<Int32>)
 
 bb3(%30 : $Optional<Int32>):
-  switch_enum %30 : $Optional<Int32>, case #Optional.none!enumelt: bb4, case #Optional.some!enumelt.1: bb5
+  switch_enum %30 : $Optional<Int32>, case #Optional.none!enumelt: bb4, case #Optional.some!enumelt: bb5
 
 bb4:
   br bb6(%21 : $Int32)
@@ -1429,7 +1429,7 @@ bb6(%r : $Int32):
 // CHECK:        br bb3
 // CHECK:      bb2:
 // CHECK:        integer_literal $Builtin.Int32, 0
-// CHECK:        enum $Optional<Int32>, #Optional.some!enumelt.1
+// CHECK:        enum $Optional<Int32>, #Optional.some!enumelt
 // CHECK:        br bb3
 // CHECK:      bb3
 // CHECK:        integer_literal {{.*}}, 27
@@ -1447,7 +1447,7 @@ bb1:
 bb2:
   %6 = integer_literal $Builtin.Int32, 0
   %7 = struct $Int32 (%6 : $Builtin.Int32)
-  %8 = enum $Optional<Int32>, #Optional.some!enumelt.1, %7 : $Int32
+  %8 = enum $Optional<Int32>, #Optional.some!enumelt, %7 : $Int32
   br bb3(%8 : $Optional<Int32>)
 
 
@@ -1457,7 +1457,7 @@ bb3(%10 : $Optional<Int32>):
   br bb4(%10 : $Optional<Int32>, %c1 : $Builtin.Int32)
 
 bb4(%13 : $Optional<Int32>, %carg1 : $Builtin.Int32):
-  switch_enum %13 : $Optional<Int32>, case #Optional.some!enumelt.1: bb5, case #Optional.none!enumelt: bb6
+  switch_enum %13 : $Optional<Int32>, case #Optional.some!enumelt: bb5, case #Optional.none!enumelt: bb6
 
 bb5:
   %r1 = integer_literal $Builtin.Int32, 27
@@ -1487,11 +1487,11 @@ sil @jumpthread_switch_enum5 : $@convention(thin) () -> () {
 bb0:
   %6 = integer_literal $Builtin.Int32, 0
   %7 = struct $Int32 (%6 : $Builtin.Int32)
-  %8 = enum $Optional<Int32>, #Optional.some!enumelt.1, %7 : $Int32
+  %8 = enum $Optional<Int32>, #Optional.some!enumelt, %7 : $Int32
   br bb1(%8 : $Optional<Int32>)
 
 bb1(%13 : $Optional<Int32>):
-  switch_enum %13 : $Optional<Int32>, case #Optional.some!enumelt.1: bb2, case #Optional.none!enumelt: bb3
+  switch_enum %13 : $Optional<Int32>, case #Optional.some!enumelt: bb2, case #Optional.none!enumelt: bb3
 
 bb2:
   br bb4
@@ -1540,16 +1540,16 @@ bb0(%0 : $Int32):
 bb2:
   %14 = integer_literal $Builtin.Int32, 2
   %15 = struct $Int32 (%2 : $Builtin.Int32)
-  %16 = enum $Optional<Int32>, #Optional.some!enumelt.1, %15 : $Int32
+  %16 = enum $Optional<Int32>, #Optional.some!enumelt, %15 : $Int32
   br bb3(%1 : $Builtin.Int32, %14 : $Builtin.Int32, %16 : $Optional<Int32>)
 
 bb3(%18 : $Builtin.Int32, %19 : $Builtin.Int32, %20 : $Optional<Int32>):
-  %101 = objc_method %100 : $Bar, #Bar.foo!1.foreign : (Bar) -> () -> (), $@convention(objc_method) (Bar) -> ()
-  switch_enum %20 : $Optional<Int32>, case #Optional.some!enumelt.1: bb4, case #Optional.none!enumelt: bb5
+  %101 = objc_method %100 : $Bar, #Bar.foo!foreign : (Bar) -> () -> (), $@convention(objc_method) (Bar) -> ()
+  switch_enum %20 : $Optional<Int32>, case #Optional.some!enumelt: bb4, case #Optional.none!enumelt: bb5
 
 bb4:
   %102 = apply %101(%100) : $@convention(objc_method) (Bar) -> ()
-  %22 = unchecked_enum_data %20 : $Optional<Int32>, #Optional.some!enumelt.1
+  %22 = unchecked_enum_data %20 : $Optional<Int32>, #Optional.some!enumelt
   %23 = struct_extract %22 : $Int32, #Int32._value
   %24 = builtin "sadd_with_overflow_Int32"(%18 : $Builtin.Int32, %23 : $Builtin.Int32, %5 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
   %25 = tuple_extract %24 : $(Builtin.Int32, Builtin.Int1), 0
@@ -1691,13 +1691,13 @@ bb0:
   br bb1(undef : $OneCase)
 
 bb1(%19 : $OneCase):
-  switch_enum %19 : $OneCase, case #OneCase.First!enumelt.1: bb2
+  switch_enum %19 : $OneCase, case #OneCase.First!enumelt: bb2
 
 bb2:
-  switch_enum %19 : $OneCase, case #OneCase.First!enumelt.1: bb3
+  switch_enum %19 : $OneCase, case #OneCase.First!enumelt: bb3
 
 bb3:
-  %48 = enum $OneCase, #OneCase.First!enumelt.1
+  %48 = enum $OneCase, #OneCase.First!enumelt
   cond_br undef, bb6, bb7
 
 bb6:
@@ -1720,12 +1720,12 @@ enum IntEnum : Int32 {
 // CHECK-DAG: [[X5:%[0-9]+]] = enum $Optional<IntEnum>, #Optional.none!enumelt
 // CHECK-DAG: [[X6:%[0-9]+]] = integer_literal $Builtin.Int32, 2
 // CHECK-DAG: [[X7:%[0-9]+]] = enum $IntEnum, #IntEnum.E2!enumelt
-// CHECK-DAG: [[X8:%[0-9]+]] = enum $Optional<IntEnum>, #Optional.some!enumelt.1, [[X7]] : $IntEnum
+// CHECK-DAG: [[X8:%[0-9]+]] = enum $Optional<IntEnum>, #Optional.some!enumelt, [[X7]] : $IntEnum
 // CHECK-DAG: [[X9:%[0-9]+]] = integer_literal $Builtin.Int32, 1
 // CHECK-DAG: [[X10:%[0-9]+]] = enum $IntEnum, #IntEnum.E1!enumelt
-// CHECK-DAG: [[X11:%[0-9]+]] = enum $Optional<IntEnum>, #Optional.some!enumelt.1, [[X10]] : $IntEnum
+// CHECK-DAG: [[X11:%[0-9]+]] = enum $Optional<IntEnum>, #Optional.some!enumelt, [[X10]] : $IntEnum
 // CHECK-DAG: [[X12:%[0-9]+]] = enum $IntEnum, #IntEnum.E0!enumelt
-// CHECK-DAG: [[X13:%[0-9]+]] = enum $Optional<IntEnum>, #Optional.some!enumelt.1, [[X12]] : $IntEnum
+// CHECK-DAG: [[X13:%[0-9]+]] = enum $Optional<IntEnum>, #Optional.some!enumelt, [[X12]] : $IntEnum
 // CHECK-DAG: [[X14:%[0-9]+]] = select_value %0 : $Builtin.Int32, case [[X6]]: [[X8]], case [[X9]]: [[X11]], case [[X2]]: [[X13]], default [[X5]] : $Optional<IntEnum>
 // CHECK-DAG: return [[X14]] : $Optional<IntEnum>
 sil @create_select_value : $@convention(thin) (Builtin.Int32) -> Optional<IntEnum> {
@@ -1736,7 +1736,7 @@ bb0(%0 : $Builtin.Int32):
 
 bb1:
   %6 = enum $IntEnum, #IntEnum.E0!enumelt
-  %7 = enum $Optional<IntEnum>, #Optional.some!enumelt.1, %6 : $IntEnum
+  %7 = enum $Optional<IntEnum>, #Optional.some!enumelt, %6 : $IntEnum
   br bb7(%7 : $Optional<IntEnum>)
 
 bb2:
@@ -1746,7 +1746,7 @@ bb2:
 
 bb3:
   %12 = enum $IntEnum, #IntEnum.E1!enumelt
-  %13 = enum $Optional<IntEnum>, #Optional.some!enumelt.1, %12 : $IntEnum
+  %13 = enum $Optional<IntEnum>, #Optional.some!enumelt, %12 : $IntEnum
   br bb7(%13 : $Optional<IntEnum>)
 
 bb4:
@@ -1756,7 +1756,7 @@ bb4:
 
 bb5:
   %18 = enum $IntEnum, #IntEnum.E2!enumelt
-  %19 = enum $Optional<IntEnum>, #Optional.some!enumelt.1, %18 : $IntEnum
+  %19 = enum $Optional<IntEnum>, #Optional.some!enumelt, %18 : $IntEnum
   br bb7(%19 : $Optional<IntEnum>)
 
 bb6:
@@ -2224,7 +2224,7 @@ bb0(%0: $Builtin.Int1, %1 : $T, %2 : $Builtin.Int1):
   cond_br %0, bb1 , bb2
 
 bb1:
-  %3 = objc_method %1 : $T, #ObjcProto.foo!1.foreign, $@convention(objc_method) <τ_0_0 where τ_0_0 : ObjcProto> (τ_0_0) -> ()
+  %3 = objc_method %1 : $T, #ObjcProto.foo!foreign, $@convention(objc_method) <τ_0_0 where τ_0_0 : ObjcProto> (τ_0_0) -> ()
   %4 = apply %3<T>(%1) : $@convention(objc_method) <τ_0_0 where τ_0_0 : ObjcProto> (τ_0_0) -> ()
   br bb2
 
@@ -2248,7 +2248,7 @@ sil @f_use : $@convention(thin) (Builtin.Int32) -> ()
 // CHECK: bb1:
 // CHECK:  [[INVADD:%.*]] = builtin "sadd
 // CHECK:  [[EXT:%.*]] = tuple_extract [[INVADD]]
-// CHECK:  switch_enum {{.*}} case #Optional.some!enumelt.1: bb3
+// CHECK:  switch_enum {{.*}} case #Optional.some!enumelt: bb3
 
 // CHECK: bb3{{.*}}
 // CHECK:  br bb4({{.*}} : $Builtin.Int32, %2 : $Builtin.Int32, [[EXT]]
@@ -2276,7 +2276,7 @@ bb3(%10 : $Builtin.Int32, %7 : $Optional<Builtin.Int32>):
   %5 = integer_literal $Builtin.Int1, -1
   %6 = builtin "sadd_with_overflow_Int32"(%10 : $Builtin.Int32, %4 : $Builtin.Int32,  %5 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
   %16 = tuple_extract %6 : $(Builtin.Int32, Builtin.Int1), 0
-  switch_enum %7 : $Optional<Builtin.Int32>, case #Optional.some!enumelt.1: bb5, case #Optional.none!enumelt: bb4
+  switch_enum %7 : $Optional<Builtin.Int32>, case #Optional.some!enumelt: bb5, case #Optional.none!enumelt: bb4
 
 bb4:
  cond_fail %5 : $Builtin.Int1
@@ -2288,7 +2288,7 @@ bb5(%9 : $Builtin.Int32):
   cond_br %3, bb6, bb10
 
 bb6:
-  %8 = enum $Optional<Builtin.Int32>, #Optional.some!enumelt.1, %9 : $Builtin.Int32
+  %8 = enum $Optional<Builtin.Int32>, #Optional.some!enumelt, %9 : $Builtin.Int32
   br bb3(%16 : $Builtin.Int32, %8 : $Optional<Builtin.Int32>)
 
 bb10:
@@ -2368,17 +2368,17 @@ sil @f2 : $@convention(thin) (Builtin.Int16) -> ()
 // CHECK: bb0([[ARG:%.*]] : $AnEnum):
 // CHECK:  [[F:%.*]] = function_ref @f : $@convention(thin) (Builtin.Int32) -> ()
 // CHECK:  [[F2:%.*]] = function_ref @f2 : $@convention(thin) (Builtin.Int16) -> ()
-// CHECK:  switch_enum [[ARG]] : $AnEnum, case #AnEnum.B!enumelt.1: bb1, case #AnEnum.C!enumelt.1: bb2
+// CHECK:  switch_enum [[ARG]] : $AnEnum, case #AnEnum.B!enumelt: bb1, case #AnEnum.C!enumelt: bb2
 
 // CHECK: bb1([[ARG2:%.*]] : $Builtin.Int32):
 // CHECK:  apply [[F]]([[ARG2]])
-// CHECK:  [[UED:%.*]] = unchecked_enum_data [[ARG]] : $AnEnum, #AnEnum.B!enumelt.1
+// CHECK:  [[UED:%.*]] = unchecked_enum_data [[ARG]] : $AnEnum, #AnEnum.B!enumelt
 // CHECK:  apply [[F]]([[UED]])
 // CHECK:  br bb3
 
 // CHECK: bb2([[ARG3:%.*]] : $Builtin.Int16):
 // CHECK:  apply [[F2]]([[ARG3]])
-// CHECK:  [[UED2:%.*]] = unchecked_enum_data [[ARG]] : $AnEnum, #AnEnum.C!enumelt.1
+// CHECK:  [[UED2:%.*]] = unchecked_enum_data [[ARG]] : $AnEnum, #AnEnum.C!enumelt
 // CHECK:  apply [[F2]]([[UED2]])
 // CHECK:  br bb3
 
@@ -2388,7 +2388,7 @@ bb0(%0 : $AnEnum):
   %1 = function_ref @f : $@convention(thin) (Builtin.Int32) -> ()
 
   %2 = function_ref @f2 : $@convention(thin) (Builtin.Int16) -> ()
-  switch_enum %0 : $AnEnum, case #AnEnum.B!enumelt.1: bb1, case #AnEnum.C!enumelt.1: bb3
+  switch_enum %0 : $AnEnum, case #AnEnum.B!enumelt: bb1, case #AnEnum.C!enumelt: bb3
 
 bb1(%4 : $Builtin.Int32):
   br bb2
@@ -2405,7 +2405,7 @@ bb4:
   br bb5
 
 bb5:
-  switch_enum %0 : $AnEnum, case #AnEnum.C!enumelt.1: bb6, case #AnEnum.B!enumelt.1: bb8
+  switch_enum %0 : $AnEnum, case #AnEnum.C!enumelt: bb6, case #AnEnum.B!enumelt: bb8
 
 bb6(%13 : $Builtin.Int16):
   br bb7
@@ -2436,9 +2436,9 @@ sil @fC : $@convention(thin) () -> ()
 // CHECK-LABEL: sil @dont_jump_thread_switch_enum_to_cond_br
 // CHECK:    [[BFUN:%.*]] = function_ref @fB : $@convention(thin) () -> ()
 // CHECK:    [[FALSE:%.*]] = integer_literal $Builtin.Int1, 0
-// CHECK:    switch_enum [[ENUM:%.*]] : $AnEnum, case #AnEnum.B!enumelt.1: bb1
+// CHECK:    switch_enum [[ENUM:%.*]] : $AnEnum, case #AnEnum.B!enumelt: bb1
 // CHECK:  bb1:
-// CHECK:    [[F:%.*]] = select_enum [[ENUM]] : $AnEnum, case #AnEnum.B!enumelt.1: [[FALSE]]
+// CHECK:    [[F:%.*]] = select_enum [[ENUM]] : $AnEnum, case #AnEnum.B!enumelt: [[FALSE]]
 // CHECK:    cond_br [[F]], bb3, bb4
 // CHECK:  bb4:
 // CHECK-NOT: br
@@ -2451,17 +2451,17 @@ bb0(%0 : $AnEnum):
   %2 = function_ref @fC : $@convention(thin) () -> ()
   %t = integer_literal $Builtin.Int1, 1
   %f = integer_literal $Builtin.Int1, 0
-  switch_enum %0 : $AnEnum, case #AnEnum.B!enumelt.1: bb4, case #AnEnum.C!enumelt.1: bb5
+  switch_enum %0 : $AnEnum, case #AnEnum.B!enumelt: bb4, case #AnEnum.C!enumelt: bb5
 
 bb4:
   br bb1
 
 bb5:
-  %8 = select_enum %0 : $AnEnum, case #AnEnum.B!enumelt.1: %f, case #AnEnum.C!enumelt.1: %t : $Builtin.Int1
+  %8 = select_enum %0 : $AnEnum, case #AnEnum.B!enumelt: %f, case #AnEnum.C!enumelt: %t : $Builtin.Int1
   cond_br %8, bb10, bb1
 
 bb1:
-  %3 = select_enum %0 : $AnEnum, case #AnEnum.B!enumelt.1: %f, case #AnEnum.C!enumelt.1: %t : $Builtin.Int1
+  %3 = select_enum %0 : $AnEnum, case #AnEnum.B!enumelt: %f, case #AnEnum.C!enumelt: %t : $Builtin.Int1
   cond_br %3, bb2, bb3
 
 bb2:
@@ -2533,7 +2533,7 @@ public class DD : PP {
 // CHECK-NOT: try_apply
 // CHECK: apply
 // Check that return value is properly casted
-// CHECK-NEXT: enum $Optional<CC>, #Optional.some!enumelt.1, %{{.*}} : $CC
+// CHECK-NEXT: enum $Optional<CC>, #Optional.some!enumelt, %{{.*}} : $CC
 // CHECK-NEXT: upcast %{{.*}} : $Optional<CC> to $Optional<BB>
 // CHECK-NEXT: return
 sil @replace_try_apply_with_apply_cast_return_type: $@convention(method) (@guaranteed DD) -> @owned Optional<BB> {
@@ -2783,15 +2783,15 @@ bb0(%0 : $Int, %1 : $Int):
   cond_br undef, bb1, bb2
 
 bb1:
-  %2 = enum $Optional<Int>, #Optional.some!enumelt.1, %0 : $Int
+  %2 = enum $Optional<Int>, #Optional.some!enumelt, %0 : $Int
   br bb3(%2 : $Optional<Int>)
 
 bb2:
-  %3 = enum $Optional<Int>, #Optional.some!enumelt.1, %1 : $Int
+  %3 = enum $Optional<Int>, #Optional.some!enumelt, %1 : $Int
   br bb3(%3 : $Optional<Int>)
 
 bb3(%4 : $Optional<Int>):
-  %5 = unchecked_enum_data %4 : $Optional<Int>, #Optional.some!enumelt.1
+  %5 = unchecked_enum_data %4 : $Optional<Int>, #Optional.some!enumelt
   return %5 : $Int
 }
 
@@ -2803,11 +2803,11 @@ bb3(%4 : $Optional<Int>):
 // CHECK:   return
 sil @dont_crash_on_enum_payload_is_enum : $@convention(thin) (TwoCase) -> () {
 bb0(%0 : $TwoCase):
-  %x = enum $Optional<TwoCase>, #Optional.some!enumelt.1, %0 : $TwoCase
+  %x = enum $Optional<TwoCase>, #Optional.some!enumelt, %0 : $TwoCase
   br bb1(%x : $Optional<TwoCase>)
 
 bb1(%10 : $Optional<TwoCase>):
-  switch_enum %10 : $Optional<TwoCase>, case #Optional.some!enumelt.1: bb2, case #Optional.none!enumelt: bb5
+  switch_enum %10 : $Optional<TwoCase>, case #Optional.some!enumelt: bb2, case #Optional.none!enumelt: bb5
 
 bb2(%1 : $TwoCase):
   // Simplification of that switch_enum crashed the compiler because
@@ -2853,7 +2853,7 @@ sil @foo2 : $@convention(thin) (Builtin.Int32) -> Builtin.Int8
 
 sil @dont_thread_throw_block : $@convention(thin) (@guaranteed TestEnum) -> (Builtin.Int8, @error Error) {
 bb0(%0 : $TestEnum):
-  switch_enum %0 : $TestEnum, case #TestEnum.int64!enumelt.1: bb1,  default bb4
+  switch_enum %0 : $TestEnum, case #TestEnum.int64!enumelt: bb1,  default bb4
 
 bb1(%5 : $Builtin.Int64):
   %7 = function_ref @foo : $@convention(thin) (Builtin.Int64) -> Builtin.Int8
@@ -2869,26 +2869,26 @@ bb4:
   debug_value %0 : $TestEnum
   %22 = alloc_existential_box $Error, $MyError2
   %23 = project_existential_box $MyError2 in %22 : $Error
-  switch_enum %0 : $TestEnum, case #TestEnum.none!enumelt: bbnone, case #TestEnum.int64!enumelt.1: bb7, case #TestEnum.string!enumelt.1: bb10
+  switch_enum %0 : $TestEnum, case #TestEnum.none!enumelt: bbnone, case #TestEnum.int64!enumelt: bb7, case #TestEnum.string!enumelt: bb10
 
 bbnone:
   %tn = enum $TestEnum, #TestEnum.none!enumelt
-  %en = enum $MyError, #MyError.c!enumelt.1, %tn : $TestEnum
+  %en = enum $MyError, #MyError.c!enumelt, %tn : $TestEnum
 br bb5(%en : $MyError)
 
 bb7(%50 : $Builtin.Int64):
-  %t = enum $TestEnum, #TestEnum.int64!enumelt.1, %50 : $Builtin.Int64
-  %e1 = enum $MyError, #MyError.c!enumelt.1, %t : $TestEnum
+  %t = enum $TestEnum, #TestEnum.int64!enumelt, %50 : $Builtin.Int64
+  %e1 = enum $MyError, #MyError.c!enumelt, %t : $TestEnum
   br bb5(%e1 : $MyError)
 
 bb10(%53 : $Base):
-  %t4 = enum $TestEnum, #TestEnum.string!enumelt.1, %53 : $Base
-  %e4 = enum $MyError, #MyError.c!enumelt.1, %t4 : $TestEnum
+  %t4 = enum $TestEnum, #TestEnum.string!enumelt, %53 : $Base
+  %e4 = enum $MyError, #MyError.c!enumelt, %t4 : $TestEnum
   br bb5(%e4 : $MyError)
 
 bb5(%e : $MyError):
-  %89 = enum $Optional<MyError>, #Optional.some!enumelt.1, %e : $MyError
-  %e5 = enum $MyError2, #MyError2.o!enumelt.1, %89 : $Optional<MyError>
+  %89 = enum $Optional<MyError>, #Optional.some!enumelt, %e : $MyError
+  %e5 = enum $MyError2, #MyError2.o!enumelt, %89 : $Optional<MyError>
   store %e5 to %23 : $*MyError2
   throw %22 : $Error
 
@@ -3104,7 +3104,7 @@ bb3:
   br bb8(%2 : $TestEnm)
 
 bb8(%47 : $TestEnm):
-  %49 = unchecked_enum_data %47 : $TestEnm, #TestEnm.Y!enumelt.1
+  %49 = unchecked_enum_data %47 : $TestEnm, #TestEnm.Y!enumelt
   %57 = struct_extract %49 : $TestStr, #TestStr.c
   cond_br undef, bb9, bb11
 
@@ -3113,7 +3113,7 @@ bb9:
 
 bb10:
   %64 = struct $TestStr (%3 : $Int32, %57 : $Int32)
-  %65 = enum $TestEnm, #TestEnm.Y!enumelt.1, %64 : $TestStr
+  %65 = enum $TestEnm, #TestEnm.Y!enumelt, %64 : $TestStr
   cond_br undef, bb2, bb16
 
 bb11:
@@ -3181,7 +3181,7 @@ bb2:
 
 bb3(%y: $Builtin.AnyObject):
   strong_release %y : $Builtin.AnyObject
-  dynamic_method_br %x : $Builtin.AnyObject, #X.f!1.foreign, bb4, bb5
+  dynamic_method_br %x : $Builtin.AnyObject, #X.f!foreign, bb4, bb5
 
 bb4(%m : $@convention(objc_method) (Builtin.AnyObject) -> ()):
   br bb6

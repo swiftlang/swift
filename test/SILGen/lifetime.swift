@@ -359,7 +359,7 @@ func logical_lvalue_lifetime(_ r: RefWithProp, _ i: Int, _ v: Val) {
   r.int_prop = i
   // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[PR]]
   // CHECK: [[R1:%[0-9]+]] = load [copy] [[READ]]
-  // CHECK: [[SETTER_METHOD:%[0-9]+]] = class_method {{.*}} : $RefWithProp, #RefWithProp.int_prop!setter.1 : (RefWithProp) -> (Int) -> (), $@convention(method) (Int, @guaranteed RefWithProp) -> ()
+  // CHECK: [[SETTER_METHOD:%[0-9]+]] = class_method {{.*}} : $RefWithProp, #RefWithProp.int_prop!setter : (RefWithProp) -> (Int) -> (), $@convention(method) (Int, @guaranteed RefWithProp) -> ()
   // CHECK: apply [[SETTER_METHOD]]({{.*}}, [[R1]])
   // CHECK: destroy_value [[R1]]
 
@@ -367,7 +367,7 @@ func logical_lvalue_lifetime(_ r: RefWithProp, _ i: Int, _ v: Val) {
   // CHECK: [[READ:%.*]] = begin_access [read] [unknown] [[PR]]
   // CHECK: [[R2:%[0-9]+]] = load [copy] [[READ]]
   // CHECK: [[R2BORROW:%[0-9]+]] = begin_borrow [[R2]]
-  // CHECK: [[MODIFY:%[0-9]+]] = class_method [[R2BORROW]] : $RefWithProp, #RefWithProp.aleph_prop!modify.1 :
+  // CHECK: [[MODIFY:%[0-9]+]] = class_method [[R2BORROW]] : $RefWithProp, #RefWithProp.aleph_prop!modify :
   // CHECK: ([[ADDR:%.*]], [[TOKEN:%.*]]) = begin_apply [[MODIFY]]([[R2BORROW]])
   // CHECK: end_apply [[TOKEN]]
 }
@@ -431,7 +431,7 @@ class Foo<T> {
 
     z = Foo<T>.makeT()
     // CHECK: [[FOOMETA:%[0-9]+]] = metatype $@thick Foo<T>.Type
-    // CHECK: [[MAKET:%[0-9]+]] = class_method [[FOOMETA]] : {{.*}}, #Foo.makeT!1
+    // CHECK: [[MAKET:%[0-9]+]] = class_method [[FOOMETA]] : {{.*}}, #Foo.makeT :
     // CHECK: ref_element_addr
 
     // -- cleanup this lvalue and return this

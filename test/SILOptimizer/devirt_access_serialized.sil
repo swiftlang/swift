@@ -40,18 +40,18 @@ bb0(%0 : $Y):
   debug_value %0 : $Y, let, name "a" // id: %1
   strong_retain %0 : $Y                           // id: %2
   %3 = upcast %0 : $Y to $X                       // users: %4, %5
-  %4 = class_method %3 : $X, #X.ping!1 : (X) -> () -> Int, $@convention(method) (@guaranteed X) -> Int // user: %5
+  %4 = class_method %3 : $X, #X.ping : (X) -> () -> Int, $@convention(method) (@guaranteed X) -> Int // user: %5
   %5 = apply %4(%3) : $@convention(method) (@guaranteed X) -> Int // user: %7
   strong_release %0 : $Y                          // id: %6
   return %5 : $Int                                // id: %7
 }
 
 sil_vtable X {
-  #X.ping!1: @_TFC14devirt_access21X4pingfS0_FT_Si	// devirt_access2.X.ping (devirt_access2.X)() -> Swift.Int
-  #X.init!initializer.1: @_TFC14devirt_access21XcfMS0_FT_S0_	// devirt_access2.X.init (devirt_access2.X.Type)() -> devirt_access2.X
+  #X.ping: @_TFC14devirt_access21X4pingfS0_FT_Si	// devirt_access2.X.ping (devirt_access2.X)() -> Swift.Int
+  #X.init!initializer: @_TFC14devirt_access21XcfMS0_FT_S0_	// devirt_access2.X.init (devirt_access2.X.Type)() -> devirt_access2.X
 }
 
 sil_vtable Y {
-  #X.ping!1: @_TFC14devirt_access21X4pingfS0_FT_Si	// devirt_access2.X.ping (devirt_access2.X)() -> Swift.Int
-  #X.init!initializer.1: @_TFC14devirt_access21YcfMS0_FT_S0_	// devirt_access2.Y.init (devirt_access2.Y.Type)() -> devirt_access2.Y
+  #X.ping: @_TFC14devirt_access21X4pingfS0_FT_Si	// devirt_access2.X.ping (devirt_access2.X)() -> Swift.Int
+  #X.init!initializer: @_TFC14devirt_access21YcfMS0_FT_S0_	// devirt_access2.Y.init (devirt_access2.Y.Type)() -> devirt_access2.Y
 }

@@ -38,7 +38,7 @@ sil shared [transparent] [serialized] [thunk] @Pfoo : $@convention(witness_metho
 // %0                                             // user: %1
 bb0(%0 : $*B):
   %1 = load %0 : $*B                              // users: %2, %3
-  %2 = class_method %1 : $B, #B.foo!1 : (B) -> () -> Int64, $@convention(method) (@guaranteed B) -> Int64 // user: %3
+  %2 = class_method %1 : $B, #B.foo : (B) -> () -> Int64, $@convention(method) (@guaranteed B) -> Int64 // user: %3
   %3 = apply %2(%1) : $@convention(method) (@guaranteed B) -> Int64 // user: %4
   return %3 : $Int64                                // id: %4
 } // end sil function 'Pfoo'
@@ -97,7 +97,7 @@ bb0(%0 : $A & P, %1 : $A & P):
   // class C's foo method is named "bar" whereas class B's foo method is named "foo".
   // We want to make sure that we call a function named "foo" not "bar".
   // CHECK: [[FN:%[0-9]+]] = function_ref @${{.*}}foo{{.*}} : $@convention(thin) () -> Int64
-  %7 = witness_method $@opened("A1F1B526-1463-11EA-932F-ACBC329C418B") A & P, #P.foo!1 : <Self where Self : P> (Self) -> () -> Int64, %2 : $@opened("A1F1B526-1463-11EA-932F-ACBC329C418B") A & P : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int64
+  %7 = witness_method $@opened("A1F1B526-1463-11EA-932F-ACBC329C418B") A & P, #P.foo : <Self where Self : P> (Self) -> () -> Int64, %2 : $@opened("A1F1B526-1463-11EA-932F-ACBC329C418B") A & P : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int64
   // CHECK: apply [[FN]]
   %8 = apply %7<@opened("A1F1B526-1463-11EA-932F-ACBC329C418B") A & P>(%5) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int64
   
@@ -111,13 +111,13 @@ bb0(%0 : $A & P, %1 : $A & P):
 sil @bar : $@convention(method) (@guaranteed C) -> Int64
 
 sil_vtable [serialized] B {
-  #B.foo!1: (B) -> () -> Int64 : @foo  // B.foo()
+  #B.foo: (B) -> () -> Int64 : @foo  // B.foo()
 }
 
 sil_vtable [serialized] C {
-  #C.foo!1: (C) -> () -> Int64 : @bar
+  #C.foo: (C) -> () -> Int64 : @bar
 }
 
 sil_witness_table [serialized] B: P module run {
-  method #P.foo!1: <Self where Self : P> (Self) -> () -> Int64 : @Pfoo  // protocol witness for P.foo() in conformance B
+  method #P.foo: <Self where Self : P> (Self) -> () -> Int64 : @Pfoo  // protocol witness for P.foo() in conformance B
 }

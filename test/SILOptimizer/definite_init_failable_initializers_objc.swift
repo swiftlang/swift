@@ -65,13 +65,13 @@ class Cat : FakeNSObject {
     // CHECK-NEXT: [[RELOAD_ARG2:%.*]] = load [[SELF_BOX]]
     // CHECK-NEXT: [[SUPER:%.*]] = upcast [[RELOAD_ARG2]] : $Cat to $FakeNSObject
     // CHECK-NEXT: [[SUB:%.*]] = unchecked_ref_cast [[SUPER]] : $FakeNSObject to $Cat
-    // CHECK-NEXT: [[SUPER_FN:%.*]] = objc_super_method [[SUB]] : $Cat, #FakeNSObject.init!initializer.1.foreign : (FakeNSObject.Type) -> () -> FakeNSObject, $@convention(objc_method) (@owned FakeNSObject) -> @owned FakeNSObject
+    // CHECK-NEXT: [[SUPER_FN:%.*]] = objc_super_method [[SUB]] : $Cat, #FakeNSObject.init!initializer.foreign : (FakeNSObject.Type) -> () -> FakeNSObject, $@convention(objc_method) (@owned FakeNSObject) -> @owned FakeNSObject
     // CHECK-NEXT: [[NEW_SUPER_SELF:%.*]] = apply [[SUPER_FN]]([[SUPER]]) : $@convention(objc_method) (@owned FakeNSObject) -> @owned FakeNSObject
     // CHECK-NEXT: [[NEW_SELF:%.*]] = unchecked_ref_cast [[NEW_SUPER_SELF]] : $FakeNSObject to $Cat
     // TODO: Once we re-enable arbitrary take promotion, this retain and the associated destroy_addr will go away.
     // CHECK-NEXT: strong_retain [[NEW_SELF]]
     // CHECK-NEXT: store [[NEW_SELF]] to [[SELF_BOX]] : $*Cat
-    // CHECK-NEXT: [[RESULT:%.*]] = enum $Optional<Cat>, #Optional.some!enumelt.1, [[NEW_SELF]] : $Cat
+    // CHECK-NEXT: [[RESULT:%.*]] = enum $Optional<Cat>, #Optional.some!enumelt, [[NEW_SELF]] : $Cat
     // CHECK-NEXT: destroy_addr [[SELF_BOX]]
     // CHECK-NEXT: dealloc_stack [[SELF_BOX]] : $*Cat
     // CHECK-NEXT: br bb3([[RESULT]] : $Optional<Cat>)
@@ -108,7 +108,7 @@ class Cat : FakeNSObject {
       
   // CHECK: bb{{[0-9]+}}:
     // CHECK: [[RELOAD_SELF:%.*]] = load [[SELF_BOX]]
-    // CHECK: [[SELF_INIT:%.+]] = objc_method [[RELOAD_SELF]] : $Cat, #Cat.init!initializer.1.foreign : (Cat.Type) -> (Int, Bool) -> Cat?
+    // CHECK: [[SELF_INIT:%.+]] = objc_method [[RELOAD_SELF]] : $Cat, #Cat.init!initializer.foreign : (Cat.Type) -> (Int, Bool) -> Cat?
     // CHECK: [[NEW_OPT_SELF:%.+]] = apply [[SELF_INIT]]({{%.+}}, {{%.+}}, {{%.+}}) : $@convention(objc_method) (Int, ObjCBool, @owned Cat) -> @owned Optional<Cat>
     // CHECK: [[COND:%.+]] = select_enum [[NEW_OPT_SELF]] : $Optional<Cat>
     // CHECK-NEXT: cond_br [[COND]], [[SUCCESS_BRANCH:bb[0-9]+]], [[RELEASE_THEN_ERROR_BRANCH:bb[0-9]+]]
@@ -118,11 +118,11 @@ class Cat : FakeNSObject {
     // CHECK-NEXT: br [[ERROR_BRANCH]]
 
   // CHECK: [[SUCCESS_BRANCH]]:
-    // CHECK-NEXT: [[NEW_SELF:%.+]] = unchecked_enum_data [[NEW_OPT_SELF]] : $Optional<Cat>, #Optional.some!enumelt.1
+    // CHECK-NEXT: [[NEW_SELF:%.+]] = unchecked_enum_data [[NEW_OPT_SELF]] : $Optional<Cat>, #Optional.some!enumelt
     // TODO: Once we re-enable arbitrary take promotion, this retain and the associated destroy_addr will go away.
     // CHECK-NEXT: strong_retain [[NEW_SELF]]
     // CHECK-NEXT: store [[NEW_SELF]] to [[SELF_BOX]] : $*Cat
-    // CHECK-NEXT: [[RESULT:%.+]] = enum $Optional<Cat>, #Optional.some!enumelt.1, [[NEW_SELF]] : $Cat
+    // CHECK-NEXT: [[RESULT:%.+]] = enum $Optional<Cat>, #Optional.some!enumelt, [[NEW_SELF]] : $Cat
     // CHECK-NEXT: destroy_addr [[SELF_BOX]]
     // CHECK-NEXT: dealloc_stack [[SELF_BOX]] : $*Cat
     // CHECK-NEXT: br [[RESULT_BRANCH:bb[0-9]+]]([[RESULT]] : $Optional<Cat>)

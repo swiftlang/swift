@@ -282,7 +282,7 @@ class C {
 // CHECK-SIMPLIFY-CFG: end sil function 'test_infinite_loop_in_unreachable_block'
 sil @test_infinite_loop_in_unreachable_block : $@convention(method) (@guaranteed C) -> () {
 bb0(%0 : $C):
-  %1 = enum $MyOptional<C>, #MyOptional.some!enumelt.1, %0 : $C
+  %1 = enum $MyOptional<C>, #MyOptional.some!enumelt, %0 : $C
   %2 = integer_literal $Builtin.Int64, 0 
   strong_retain %0 : $C
   release_value %1 : $MyOptional<C>
@@ -290,15 +290,15 @@ bb0(%0 : $C):
   cond_br %6, bb5, bb1
 
 bb1:
-  %8 = enum $MyOptional<C>, #MyOptional.some!enumelt.1, %0 : $C
+  %8 = enum $MyOptional<C>, #MyOptional.some!enumelt, %0 : $C
   strong_retain %0 : $C
   br bb2(%8 : $MyOptional<C>)
 
 bb2(%11 : $MyOptional<C>):
-  %12 = unchecked_enum_data %11 : $MyOptional<C>, #MyOptional.some!enumelt.1
+  %12 = unchecked_enum_data %11 : $MyOptional<C>, #MyOptional.some!enumelt
   %13 = ref_element_addr %12 : $C, #C.this
   %14 = load %13 : $*MyOptional<C>
-  switch_enum %14 : $MyOptional<C>, case #MyOptional.some!enumelt.1: bb3, case #MyOptional.none!enumelt: bb4
+  switch_enum %14 : $MyOptional<C>, case #MyOptional.some!enumelt: bb3, case #MyOptional.none!enumelt: bb4
 
 bb3(%16 : $C):
   retain_value %14 : $MyOptional<C>

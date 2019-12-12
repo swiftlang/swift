@@ -104,12 +104,12 @@ bb0:
 
   // Dynamic dispatch
 
-  // CHECK: class_method undef : $C, #C.fn!1 : (C) -> () -> (), $@convention(method) (@guaranteed C) -> ()
-  class_method undef : $C, #C.fn!1 : (C) -> () -> (), $@convention(method) (@guaranteed C) -> ()
-  // CHECK: super_method undef : $D, #C.fn!1 : (C) -> () -> (), $@convention(method) (@guaranteed C) -> ()
-  super_method undef : $D, #C.fn!1 : (C) -> () -> (), $@convention(method) (@guaranteed C) -> ()
-  // CHECK: objc_method undef : $C, #C.fn!1.foreign : (C) -> () -> (), $@convention(objc_method) (C) -> ()
-  objc_method undef : $C, #C.fn!1.foreign : (C) -> () -> (), $@convention(objc_method) (C) -> ()
+  // CHECK: class_method undef : $C, #C.fn : (C) -> () -> (), $@convention(method) (@guaranteed C) -> ()
+  class_method undef : $C, #C.fn : (C) -> () -> (), $@convention(method) (@guaranteed C) -> ()
+  // CHECK: super_method undef : $D, #C.fn : (C) -> () -> (), $@convention(method) (@guaranteed C) -> ()
+  super_method undef : $D, #C.fn : (C) -> () -> (), $@convention(method) (@guaranteed C) -> ()
+  // CHECK: objc_method undef : $C, #C.fn!foreign : (C) -> () -> (), $@convention(objc_method) (C) -> ()
+  objc_method undef : $C, #C.fn!foreign : (C) -> () -> (), $@convention(objc_method) (C) -> ()
 
   // Function Application
 
@@ -158,8 +158,8 @@ bb0:
 
   // Enums
 
-  // CHECK: enum $E, #E.DataCase!enumelt.1, undef : $()
-  enum $E, #E.DataCase!enumelt.1, undef : $()
+  // CHECK: enum $E, #E.DataCase!enumelt, undef : $()
+  enum $E, #E.DataCase!enumelt, undef : $()
   // CHECK: unchecked_enum_data undef : $E, #E.DataCase!enumelt
   unchecked_enum_data undef : $E, #E.DataCase!enumelt
   // CHECK: init_enum_data_addr undef : $*E, #E.DataCase!enumelt
@@ -339,8 +339,8 @@ bb3:
 
 sil @dynamic_method_br_test : $() -> () {
 bb0:
-  // CHECK: dynamic_method_br undef : $P, #C.fn!1.foreign, bb1, bb2
-  dynamic_method_br undef : $P, #C.fn!1.foreign, bb1, bb2
+  // CHECK: dynamic_method_br undef : $P, #C.fn!foreign, bb1, bb2
+  dynamic_method_br undef : $P, #C.fn!foreign, bb1, bb2
 bb1(%x : $@convention(objc_method) (P) -> ()):
   br bb3
 bb2:

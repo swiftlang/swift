@@ -27,7 +27,7 @@
 // IR-OPT-LABEL: define swiftcc i32 @$s9pgo_foreach10guessWhiles5Int32VAD1x_tF
 
 public func guessForEach1(x: Int32) -> Int32 {
-  // SIL: switch_enum {{.*}} : $Optional<Int32>, case #Optional.some!enumelt.1: {{.*}} !case_count(798), case #Optional.none!enumelt: {{.*}} !case_count(42)
+  // SIL: switch_enum {{.*}} : $Optional<Int32>, case #Optional.some!enumelt: {{.*}} !case_count(798), case #Optional.none!enumelt: {{.*}} !case_count(42)
 
   var ret : Int32 = 0
   for currVal in stride(from: 5, to: x, by: 5) {
@@ -42,7 +42,7 @@ public func guessForEach1(x: Int32) -> Int32 {
 // IR-OPT-LABEL: define swiftcc i32 @$s9pgo_foreach10guessWhiles5Int32VAD1x_tF
 
 public func guessForEach2(x: Int32) -> Int32 {
-  // SIL: switch_enum {{.*}} : $Optional<(String, Int32)>, case #Optional.some!enumelt.1: {{.*}} !case_count(168), case #Optional.none!enumelt: {{.*}} !case_count(42)
+  // SIL: switch_enum {{.*}} : $Optional<(String, Int32)>, case #Optional.some!enumelt: {{.*}} !case_count(168), case #Optional.none!enumelt: {{.*}} !case_count(42)
 
   var ret : Int32 = 0
   let names = ["John" : Int32(1), "Paul" : Int32(2), "George" : Int32(3), "Ringo" : Int32(x)]
@@ -58,7 +58,7 @@ public func guessForEach2(x: Int32) -> Int32 {
 // IR-OPT-LABEL: define swiftcc i32 @$s9pgo_foreach10guessWhiles5Int32VAD1x_tF
 
 func main() {
-  // SIL: switch_enum {{.*}} : $Optional<Int>, case #Optional.some!enumelt.1: {{.*}} !case_count(42), case #Optional.none!enumelt: {{.*}} !case_count(1)
+  // SIL: switch_enum {{.*}} : $Optional<Int>, case #Optional.some!enumelt: {{.*}} !case_count(42), case #Optional.none!enumelt: {{.*}} !case_count(1)
   var guesses : Int32 = 0;
 
   for _ in 1...42 {

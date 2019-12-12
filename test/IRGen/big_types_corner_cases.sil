@@ -308,15 +308,15 @@ bb0(%0 : $AnyObject):
   %2 = open_existential_ref %0 : $AnyObject to $@opened("E5D03528-36AD-11E8-A0AB-D0817AD47398") AnyObject
   strong_retain %2 : $@opened("E5D03528-36AD-11E8-A0AB-D0817AD47398") AnyObject
   %4 = alloc_stack $Optional<BitfieldOne>
-  dynamic_method_br %2 : $@opened("E5D03528-36AD-11E8-A0AB-D0817AD47398") AnyObject, #X.foo!1.foreign, bb1, bb2
+  dynamic_method_br %2 : $@opened("E5D03528-36AD-11E8-A0AB-D0817AD47398") AnyObject, #X.foo!foreign, bb1, bb2
 
 bb1(%6 : $@convention(objc_method) (@opened("E5D03528-36AD-11E8-A0AB-D0817AD47398") AnyObject) -> BitfieldOne): // Preds: bb0
   strong_retain %2 : $@opened("E5D03528-36AD-11E8-A0AB-D0817AD47398") AnyObject
   %8 = partial_apply [callee_guaranteed] %6(%2) : $@convention(objc_method) (@opened("E5D03528-36AD-11E8-A0AB-D0817AD47398") AnyObject) -> BitfieldOne
   %9 = apply %8() : $@callee_guaranteed () -> BitfieldOne
-  %10 = init_enum_data_addr %4 : $*Optional<BitfieldOne>, #Optional.some!enumelt.1
+  %10 = init_enum_data_addr %4 : $*Optional<BitfieldOne>, #Optional.some!enumelt
   store %9 to %10 : $*BitfieldOne
-  inject_enum_addr %4 : $*Optional<BitfieldOne>, #Optional.some!enumelt.1
+  inject_enum_addr %4 : $*Optional<BitfieldOne>, #Optional.some!enumelt
   strong_release %8 : $@callee_guaranteed () -> BitfieldOne
   br bb3
 

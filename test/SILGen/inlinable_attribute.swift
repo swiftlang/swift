@@ -71,7 +71,7 @@ public class Horse {
 // CHECK: }
 
 // CHECK-LABEL: sil shared [serialized] [ossa] @$s19inlinable_attribute15talkAboutAHorse1hyAA5HorseC_tFyycAEcfu_yycfu0_ : $@convention(thin) (@guaranteed Horse) -> () {
-// CHECK: class_method %0 : $Horse, #Horse.gallop!1 : (Horse) -> () -> (), $@convention(method) (@guaranteed Horse) -> ()
+// CHECK: class_method %0 : $Horse, #Horse.gallop : (Horse) -> () -> (), $@convention(method) (@guaranteed Horse) -> ()
 // CHECK: return
 // CHECK: }
 

@@ -124,7 +124,7 @@ class ChildToFixedOutsideParent : OutsideParent {
   }
 
   // CHECK-LABEL: sil private [ossa] @$s19partial_apply_super25ChildToFixedOutsideParentC6methodyyFyycfu_ : $@convention(thin) (@guaranteed ChildToFixedOutsideParent) -> ()
-  // CHECK: super_method {{%.*}} : $ChildToFixedOutsideParent, #OutsideParent.method!1 : (OutsideParent) -> () -> (), $@convention(method) (@guaranteed OutsideParent) -> ()
+  // CHECK: super_method {{%.*}} : $ChildToFixedOutsideParent, #OutsideParent.method : (OutsideParent) -> () -> (), $@convention(method) (@guaranteed OutsideParent) -> ()
   // CHECK: } // end sil function '$s19partial_apply_super25ChildToFixedOutsideParentC6methodyyFyycfu_'
 
 
@@ -136,7 +136,7 @@ class ChildToFixedOutsideParent : OutsideParent {
   }
 
   // CHECK-LABEL: sil private [ossa] @$s19partial_apply_super25ChildToFixedOutsideParentC11classMethodyyFZyycfu_ : $@convention(thin) (@thick ChildToFixedOutsideParent.Type) -> ()
-  // CHECK: super_method %0 : $@thick ChildToFixedOutsideParent.Type, #OutsideParent.classMethod!1 : (OutsideParent.Type) -> () -> (), $@convention(method) (@thick OutsideParent.Type) -> ()
+  // CHECK: super_method %0 : $@thick ChildToFixedOutsideParent.Type, #OutsideParent.classMethod : (OutsideParent.Type) -> () -> (), $@convention(method) (@thick OutsideParent.Type) -> ()
   // CHECK: } // end sil function '$s19partial_apply_super25ChildToFixedOutsideParentC11classMethodyyFZyycfu_'
 }
 
@@ -149,7 +149,7 @@ class ChildToResilientOutsideParent : ResilientOutsideParent {
   }
 
   // CHECK-LABEL: sil private [ossa] @$s19partial_apply_super29ChildToResilientOutsideParentC6methodyyFyycfu_ : $@convention(thin) (@guaranteed ChildToResilientOutsideParent) -> ()
-  // CHECK: super_method {{%.*}} : $ChildToResilientOutsideParent, #ResilientOutsideParent.method!1 : (ResilientOutsideParent) -> () -> (), $@convention(method) (@guaranteed ResilientOutsideParent) -> ()
+  // CHECK: super_method {{%.*}} : $ChildToResilientOutsideParent, #ResilientOutsideParent.method : (ResilientOutsideParent) -> () -> (), $@convention(method) (@guaranteed ResilientOutsideParent) -> ()
   // CHECK: } // end sil function '$s19partial_apply_super29ChildToResilientOutsideParentC6methodyyFyycfu_'
 
 
@@ -161,7 +161,7 @@ class ChildToResilientOutsideParent : ResilientOutsideParent {
   }
 
   // CHECK-LABEL: sil private [ossa] @$s19partial_apply_super29ChildToResilientOutsideParentC11classMethodyyFZyycfu_ : $@convention(thin) (@thick ChildToResilientOutsideParent.Type) -> ()
-  // CHECK: super_method %0 : $@thick ChildToResilientOutsideParent.Type, #ResilientOutsideParent.classMethod!1 : (ResilientOutsideParent.Type) -> () -> (), $@convention(method) (@thick ResilientOutsideParent.Type) -> ()
+  // CHECK: super_method %0 : $@thick ChildToResilientOutsideParent.Type, #ResilientOutsideParent.classMethod : (ResilientOutsideParent.Type) -> () -> (), $@convention(method) (@thick ResilientOutsideParent.Type) -> ()
   // CHECK: } // end sil function '$s19partial_apply_super29ChildToResilientOutsideParentC11classMethodyyFZyycfu_'
 }
 
@@ -174,7 +174,7 @@ class GrandchildToFixedOutsideChild : OutsideChild {
   }
 
   // CHECK-LABEL: sil private [ossa] @$s19partial_apply_super29GrandchildToFixedOutsideChildC6methodyyFyycfu_ : $@convention(thin) (@guaranteed GrandchildToFixedOutsideChild) -> ()
-  // CHECK: super_method {{%.*}} : $GrandchildToFixedOutsideChild, #OutsideChild.method!1 : (OutsideChild) -> () -> (), $@convention(method) (@guaranteed OutsideChild) -> ()
+  // CHECK: super_method {{%.*}} : $GrandchildToFixedOutsideChild, #OutsideChild.method : (OutsideChild) -> () -> (), $@convention(method) (@guaranteed OutsideChild) -> ()
   // CHECK: } // end sil function '$s19partial_apply_super29GrandchildToFixedOutsideChildC6methodyyFyycfu_'
 
 
@@ -186,7 +186,7 @@ class GrandchildToFixedOutsideChild : OutsideChild {
   }
 
   // CHECK-LABEL: sil private [ossa] @$s19partial_apply_super29GrandchildToFixedOutsideChildC11classMethodyyFZyycfu_ : $@convention(thin) (@thick GrandchildToFixedOutsideChild.Type) -> ()
-  // CHECK: super_method %0 : $@thick GrandchildToFixedOutsideChild.Type, #OutsideChild.classMethod!1 : (OutsideChild.Type) -> () -> (), $@convention(method) (@thick OutsideChild.Type) -> ()
+  // CHECK: super_method %0 : $@thick GrandchildToFixedOutsideChild.Type, #OutsideChild.classMethod : (OutsideChild.Type) -> () -> (), $@convention(method) (@thick OutsideChild.Type) -> ()
   // CHECK: } // end sil function '$s19partial_apply_super29GrandchildToFixedOutsideChildC11classMethodyyFZyycfu_
 }
 
@@ -199,7 +199,7 @@ class GrandchildToResilientOutsideChild : ResilientOutsideChild {
   }
 
   // CHECK-LABEL: sil private [ossa] @$s19partial_apply_super33GrandchildToResilientOutsideChildC6methodyyFyycfu_ : $@convention(thin) (@guaranteed GrandchildToResilientOutsideChild) -> ()
-  // CHECK: super_method {{%.*}} : $GrandchildToResilientOutsideChild, #ResilientOutsideChild.method!1 : (ResilientOutsideChild) -> () -> (), $@convention(method) (@guaranteed ResilientOutsideChild) -> ()
+  // CHECK: super_method {{%.*}} : $GrandchildToResilientOutsideChild, #ResilientOutsideChild.method : (ResilientOutsideChild) -> () -> (), $@convention(method) (@guaranteed ResilientOutsideChild) -> ()
   // CHECK: } // end sil function '$s19partial_apply_super33GrandchildToResilientOutsideChildC6methodyyFyycfu_'
 
   // CHECK-LABEL: sil hidden [ossa] @$s19partial_apply_super33GrandchildToResilientOutsideChildC11classMethodyyFZ
@@ -210,7 +210,7 @@ class GrandchildToResilientOutsideChild : ResilientOutsideChild {
   }
 
   // CHECK-LABEL: sil private [ossa] @$s19partial_apply_super33GrandchildToResilientOutsideChildC11classMethodyyFZyycfu_ : $@convention(thin) (@thick GrandchildToResilientOutsideChild.Type) -> ()
-  // CHECK: super_method %0 : $@thick GrandchildToResilientOutsideChild.Type, #ResilientOutsideChild.classMethod!1 : (ResilientOutsideChild.Type) -> () -> (), $@convention(method) (@thick ResilientOutsideChild.Type) -> ()
+  // CHECK: super_method %0 : $@thick GrandchildToResilientOutsideChild.Type, #ResilientOutsideChild.classMethod : (ResilientOutsideChild.Type) -> () -> (), $@convention(method) (@thick ResilientOutsideChild.Type) -> ()
   // CHECK: } // end sil function '$s19partial_apply_super33GrandchildToResilientOutsideChildC11classMethodyyFZyycfu_'
 }
 
@@ -223,7 +223,7 @@ class GenericChildToFixedGenericOutsideParent<A> : GenericOutsideParent<A> {
   }
 
   // CHECK-LABEL: sil private [ossa] @$s19partial_apply_super019GenericChildToFixedD13OutsideParentC6methodyyFyycfu_ : $@convention(thin) <A> (@guaranteed GenericChildToFixedGenericOutsideParent<A>) -> ()
-  // CHECK: super_method {{%.*}} : $GenericChildToFixedGenericOutsideParent<A>, #GenericOutsideParent.method!1 : <A> (GenericOutsideParent<A>) -> () -> (), $@convention(method) <τ_0_0> (@guaranteed GenericOutsideParent<τ_0_0>) -> ()
+  // CHECK: super_method {{%.*}} : $GenericChildToFixedGenericOutsideParent<A>, #GenericOutsideParent.method : <A> (GenericOutsideParent<A>) -> () -> (), $@convention(method) <τ_0_0> (@guaranteed GenericOutsideParent<τ_0_0>) -> ()
   // CHECK: } // end sil function '$s19partial_apply_super019GenericChildToFixedD13OutsideParentC6methodyyFyycfu_'
 
 
@@ -235,7 +235,7 @@ class GenericChildToFixedGenericOutsideParent<A> : GenericOutsideParent<A> {
   }
 
   // CHECK-LABEL: sil private [ossa] @$s19partial_apply_super019GenericChildToFixedD13OutsideParentC11classMethodyyFZyycfu_ : $@convention(thin) <A> (@thick GenericChildToFixedGenericOutsideParent<A>.Type) -> ()
-  // CHECK: super_method %0 : $@thick GenericChildToFixedGenericOutsideParent<A>.Type, #GenericOutsideParent.classMethod!1 : <A> (GenericOutsideParent<A>.Type) -> () -> (), $@convention(method) <τ_0_0> (@thick GenericOutsideParent<τ_0_0>.Type) -> ()
+  // CHECK: super_method %0 : $@thick GenericChildToFixedGenericOutsideParent<A>.Type, #GenericOutsideParent.classMethod : <A> (GenericOutsideParent<A>.Type) -> () -> (), $@convention(method) <τ_0_0> (@thick GenericOutsideParent<τ_0_0>.Type) -> ()
   // CHECK: } // end sil function '$s19partial_apply_super019GenericChildToFixedD13OutsideParentC11classMethodyyFZyycfu_'
 }
 
@@ -248,7 +248,7 @@ class GenericChildToResilientGenericOutsideParent<A> : ResilientGenericOutsidePa
   }
 
   // CHECK-LABEL: sil private [ossa] @$s19partial_apply_super023GenericChildToResilientD13OutsideParentC6methodyyFyycfu_ : $@convention(thin) <A> (@guaranteed GenericChildToResilientGenericOutsideParent<A>) -> ()
-  // CHECK: super_method %5 : $GenericChildToResilientGenericOutsideParent<A>, #ResilientGenericOutsideParent.method!1 : <A> (ResilientGenericOutsideParent<A>) -> () -> (), $@convention(method) <τ_0_0> (@guaranteed ResilientGenericOutsideParent<τ_0_0>) -> ()
+  // CHECK: super_method %5 : $GenericChildToResilientGenericOutsideParent<A>, #ResilientGenericOutsideParent.method : <A> (ResilientGenericOutsideParent<A>) -> () -> (), $@convention(method) <τ_0_0> (@guaranteed ResilientGenericOutsideParent<τ_0_0>) -> ()
   // CHECK: } // end sil function '$s19partial_apply_super023GenericChildToResilientD13OutsideParentC6methodyyFyycfu_'
 
 
@@ -260,6 +260,6 @@ class GenericChildToResilientGenericOutsideParent<A> : ResilientGenericOutsidePa
   }
 
   // CHECK-LABEL: sil private [ossa] @$s19partial_apply_super023GenericChildToResilientD13OutsideParentC11classMethodyyFZyycfu_ : $@convention(thin) <A> (@thick GenericChildToResilientGenericOutsideParent<A>.Type) -> ()
-  // CHECK: super_method %0 : $@thick GenericChildToResilientGenericOutsideParent<A>.Type, #ResilientGenericOutsideParent.classMethod!1 : <A> (ResilientGenericOutsideParent<A>.Type) -> () -> (), $@convention(method) <τ_0_0> (@thick ResilientGenericOutsideParent<τ_0_0>.Type) -> (
+  // CHECK: super_method %0 : $@thick GenericChildToResilientGenericOutsideParent<A>.Type, #ResilientGenericOutsideParent.classMethod : <A> (ResilientGenericOutsideParent<A>.Type) -> () -> (), $@convention(method) <τ_0_0> (@thick ResilientGenericOutsideParent<τ_0_0>.Type) -> (
   // CHECK: } // end sil function '$s19partial_apply_super023GenericChildToResilientD13OutsideParentC11classMethodyyFZyycfu_'
 }

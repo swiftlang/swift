@@ -1381,7 +1381,6 @@ void irgen::emitObjCIVarInitDestroyDescriptor(
   SILDeclRef declRef = SILDeclRef(cd, 
                                   isDestroyer? SILDeclRef::Kind::IVarDestroyer
                                              : SILDeclRef::Kind::IVarInitializer,
-                                  1, 
                                   /*foreign*/ true);
   Selector selector(declRef);
 

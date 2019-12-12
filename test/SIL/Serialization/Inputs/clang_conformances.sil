@@ -24,7 +24,7 @@ bb0:
 sil @compare_eq : $@convention(witness_method: Equatable) (@in_guaranteed ComparisonResult, @in_guaranteed ComparisonResult, @thick ComparisonResult.Type) -> Bool
 
 sil_witness_table shared [serialized] ComparisonResult: Equatable module __ObjC {
-  method #Equatable."=="!1: @compare_eq
+  method #Equatable."==": @compare_eq
 }
 
 

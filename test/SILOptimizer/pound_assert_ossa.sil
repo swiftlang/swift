@@ -545,8 +545,8 @@ case right(Builtin.Int64)
 sil [ossa] @switch_enum_test_callee_1 : $@convention(thin) () -> Builtin.Int64 {
 bb0:
   %0 = integer_literal $Builtin.Int64, 0
-  %1 = enum $Either, #Either.left!enumelt.1, %0 : $Builtin.Int64
-  switch_enum %1 : $Either, case #Either.left!enumelt.1: bb1, default bb2
+  %1 = enum $Either, #Either.left!enumelt, %0 : $Builtin.Int64
+  switch_enum %1 : $Either, case #Either.left!enumelt: bb1, default bb2
 
 bb1(%2 : $Builtin.Int64):
   br bb3(%2 : $Builtin.Int64)
@@ -562,15 +562,15 @@ bb3(%5 : $Builtin.Int64):
 sil [ossa] @switch_enum_test_callee_2 : $@convention(thin) () -> Builtin.Int64 {
 bb0:
   %0 = integer_literal $Builtin.Int64, 0
-  %1 = enum $Either, #Either.left!enumelt.1, %0 : $Builtin.Int64
+  %1 = enum $Either, #Either.left!enumelt, %0 : $Builtin.Int64
   // Make sure we go down the bad path.
-  switch_enum %1 : $Either, case #Either.right!enumelt.1: bb4, default bb5
+  switch_enum %1 : $Either, case #Either.right!enumelt: bb4, default bb5
 
 bb4(%7 : $Builtin.Int64):
   br bb6(%7 : $Builtin.Int64)
 
 bb5(%8 : $Either):
-  %9 = unchecked_enum_data %8 : $Either, #Either.right!enumelt.1
+  %9 = unchecked_enum_data %8 : $Either, #Either.right!enumelt
   br bb6(%9 : $Builtin.Int64)
 
 bb6(%10 : $Builtin.Int64):

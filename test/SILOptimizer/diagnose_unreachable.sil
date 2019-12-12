@@ -302,8 +302,8 @@ sil @singleton_inout_user : $@convention(thin) (@inout (Int, Unicode.Scalar)) ->
 sil @constant_fold_switch_enum_with_payload : $@convention(thin) (Int, Unicode.Scalar) -> (Int, Unicode.Scalar) {
 bb0(%6 : $Int, %10 : $Unicode.Scalar):
   %11 = tuple (%6 : $Int, %10 : $Unicode.Scalar)
-  %12 = enum $Singleton, #Singleton.x!enumelt.1, %11 : $(Int, Unicode.Scalar)
-  switch_enum %12 : $Singleton, case #Singleton.x!enumelt.1: bb1
+  %12 = enum $Singleton, #Singleton.x!enumelt, %11 : $(Int, Unicode.Scalar)
+  switch_enum %12 : $Singleton, case #Singleton.x!enumelt: bb1
 
 bb1(%15 : $(Int, Unicode.Scalar)):
   br bb2(%15 : $(Int, Unicode.Scalar))
@@ -471,14 +471,14 @@ class Klass2 {}
 
 // CHECK-LABEL: sil [ossa] @constant_fold_diagnose_unreachable_succ_match : $@convention(thin) (@owned Klass1) -> () {
 // CHECK: bb0([[ARG:%.*]] :
-// CHECK:   [[ENUM_VAL:%.*]] = enum $Either<Klass1, Klass2>, #Either.left!enumelt.1, [[ARG]]
+// CHECK:   [[ENUM_VAL:%.*]] = enum $Either<Klass1, Klass2>, #Either.left!enumelt, [[ARG]]
 // CHECK:   [[RESULT:%.*]] = unchecked_enum_data [[ENUM_VAL]]
 // CHECK:   destroy_value [[RESULT]]
 // CHECK: } // end sil function 'constant_fold_diagnose_unreachable_succ_match'
 sil [ossa] @constant_fold_diagnose_unreachable_succ_match : $@convention(thin) (@owned Klass1) -> () {
 bb0(%0 : @owned $Klass1):
-  %1 = enum $Either<Klass1, Klass2>, #Either.left!enumelt.1, %0 : $Klass1
-  switch_enum %1 : $Either<Klass1, Klass2>, case #Either.left!enumelt.1: bb1, default bb2
+  %1 = enum $Either<Klass1, Klass2>, #Either.left!enumelt, %0 : $Klass1
+  switch_enum %1 : $Either<Klass1, Klass2>, case #Either.left!enumelt: bb1, default bb2
 
 bb1(%2 : @owned $Klass1):
   destroy_value %2 : $Klass1
@@ -495,13 +495,13 @@ bb3:
 
 // CHECK-LABEL: sil [ossa] @constant_fold_diagnose_unreachable_default : $@convention(thin) (@owned Klass2) -> () {
 // CHECK: bb0([[ARG:%.*]] :
-// CHECK:   [[ENUM:%.*]] = enum $Either<Klass1, Klass2>, #Either.right!enumelt.1, [[ARG]]
+// CHECK:   [[ENUM:%.*]] = enum $Either<Klass1, Klass2>, #Either.right!enumelt, [[ARG]]
 // CHECK:   destroy_value [[ENUM]]
 // CHECK: } // end sil function 'constant_fold_diagnose_unreachable_default'
 sil [ossa] @constant_fold_diagnose_unreachable_default : $@convention(thin) (@owned Klass2) -> () {
 bb0(%0 : @owned $Klass2):
-  %1 = enum $Either<Klass1, Klass2>, #Either.right!enumelt.1, %0 : $Klass2
-  switch_enum %1 : $Either<Klass1, Klass2>, case #Either.left!enumelt.1: bb1, default bb2
+  %1 = enum $Either<Klass1, Klass2>, #Either.right!enumelt, %0 : $Klass2
+  switch_enum %1 : $Either<Klass1, Klass2>, case #Either.left!enumelt: bb1, default bb2
 
 bb1(%2 : @owned $Klass1):
   destroy_value %2 : $Klass1
@@ -576,10 +576,10 @@ sil @constant_fold_switch_enum_addr_with_payload : $@convention(thin) (Int, Unic
 bb0(%6 : $Int, %10 : $Unicode.Scalar):
   %1 = alloc_stack $Singleton
   %11 = tuple (%6 : $Int, %10 : $Unicode.Scalar)
-  %2 = init_enum_data_addr %1 : $*Singleton, #Singleton.x!enumelt.1
+  %2 = init_enum_data_addr %1 : $*Singleton, #Singleton.x!enumelt
   store %11 to %2 : $*(Int, Unicode.Scalar)
-  inject_enum_addr %1 : $*Singleton, #Singleton.x!enumelt.1
-  switch_enum_addr %1 : $*Singleton, case #Singleton.x!enumelt.1: bb1
+  inject_enum_addr %1 : $*Singleton, #Singleton.x!enumelt
+  switch_enum_addr %1 : $*Singleton, case #Singleton.x!enumelt: bb1
 
 bb1:
   br bb2
@@ -603,10 +603,10 @@ bb2:
 sil @constant_fold_switch_enum_addr_with_nontrivial_payload : $@convention(thin) (@owned Builtin.NativeObject) -> () {
 bb0(%0 : $Builtin.NativeObject):
   %1 = alloc_stack $FakeOptional<Builtin.NativeObject>
-  %2 = init_enum_data_addr %1 : $*FakeOptional<Builtin.NativeObject>, #FakeOptional.some!enumelt.1
+  %2 = init_enum_data_addr %1 : $*FakeOptional<Builtin.NativeObject>, #FakeOptional.some!enumelt
   store %0 to %2 : $*Builtin.NativeObject
-  inject_enum_addr %1 : $*FakeOptional<Builtin.NativeObject>, #FakeOptional.some!enumelt.1
-  switch_enum_addr %1 : $*FakeOptional<Builtin.NativeObject>, case #FakeOptional.some!enumelt.1: bb1, case #FakeOptional.none!enumelt: bb2
+  inject_enum_addr %1 : $*FakeOptional<Builtin.NativeObject>, #FakeOptional.some!enumelt
+  switch_enum_addr %1 : $*FakeOptional<Builtin.NativeObject>, case #FakeOptional.some!enumelt: bb1, case #FakeOptional.none!enumelt: bb2
 
 bb1:
   br bb3
@@ -634,10 +634,10 @@ bb3:
 sil @constant_fold_switch_enum_addr_with_nontrivial_payload_2 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
 bb0(%0 : $Builtin.NativeObject):
   %1 = alloc_stack $FakeOptional<Builtin.NativeObject>
-  %2 = init_enum_data_addr %1 : $*FakeOptional<Builtin.NativeObject>, #FakeOptional.some!enumelt.1
+  %2 = init_enum_data_addr %1 : $*FakeOptional<Builtin.NativeObject>, #FakeOptional.some!enumelt
   store %0 to %2 : $*Builtin.NativeObject
-  inject_enum_addr %1 : $*FakeOptional<Builtin.NativeObject>, #FakeOptional.some!enumelt.1
-  switch_enum_addr %1 : $*FakeOptional<Builtin.NativeObject>, case #FakeOptional.some!enumelt.1: bb1, case #FakeOptional.none!enumelt: bb2
+  inject_enum_addr %1 : $*FakeOptional<Builtin.NativeObject>, #FakeOptional.some!enumelt
+  switch_enum_addr %1 : $*FakeOptional<Builtin.NativeObject>, case #FakeOptional.some!enumelt: bb1, case #FakeOptional.none!enumelt: bb2
 
 bb1:
   br bb3
@@ -722,18 +722,18 @@ bb0(%6 : $Int, %10 : $Unicode.Scalar):
   cond_br undef, bb0a, bb0b
 
 bb0a:
-  %2a = init_enum_data_addr %1 : $*Singleton, #Singleton.x!enumelt.1
+  %2a = init_enum_data_addr %1 : $*Singleton, #Singleton.x!enumelt
   store %11 to %2a : $*(Int, Unicode.Scalar)
   br bb0c
 
 bb0b:
-  %2b = init_enum_data_addr %1 : $*Singleton, #Singleton.x!enumelt.1
+  %2b = init_enum_data_addr %1 : $*Singleton, #Singleton.x!enumelt
   store undef to %2b : $*(Int, Unicode.Scalar)
   br bb0c
 
 bb0c:
-  inject_enum_addr %1 : $*Singleton, #Singleton.x!enumelt.1
-  switch_enum_addr %1 : $*Singleton, case #Singleton.x!enumelt.1: bb1
+  inject_enum_addr %1 : $*Singleton, #Singleton.x!enumelt
+  switch_enum_addr %1 : $*Singleton, case #Singleton.x!enumelt: bb1
 
 bb1:
   br bb2
@@ -752,12 +752,12 @@ sil @constant_fold_switch_enum_addr_with_payload_escaping_init_enum_data_addr : 
 bb0(%6 : $Int, %10 : $Unicode.Scalar):
   %1 = alloc_stack $Singleton
   %11 = tuple (%6 : $Int, %10 : $Unicode.Scalar)
-  %2a = init_enum_data_addr %1 : $*Singleton, #Singleton.x!enumelt.1
+  %2a = init_enum_data_addr %1 : $*Singleton, #Singleton.x!enumelt
   store %11 to %2a : $*(Int, Unicode.Scalar)
   %func = function_ref @singleton_inout_user : $@convention(thin) (@inout (Int, Unicode.Scalar)) -> ()
   apply %func(%2a) : $@convention(thin) (@inout (Int, Unicode.Scalar)) -> ()
-  inject_enum_addr %1 : $*Singleton, #Singleton.x!enumelt.1
-  switch_enum_addr %1 : $*Singleton, case #Singleton.x!enumelt.1: bb1
+  inject_enum_addr %1 : $*Singleton, #Singleton.x!enumelt
+  switch_enum_addr %1 : $*Singleton, case #Singleton.x!enumelt: bb1
 
 bb1:
   br bb2
@@ -778,8 +778,8 @@ bb2:
 // CHECK: } // end sil function 'constant_fold_switch_enum_with_owned_payload'
 sil [ossa] @constant_fold_switch_enum_with_owned_payload : $@convention(thin) (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject {
 bb0(%0 : @owned $Builtin.NativeObject):
-  %1 = enum $FakeOptional<Builtin.NativeObject>, #FakeOptional.some!enumelt.1, %0 : $Builtin.NativeObject
-  switch_enum %1 : $FakeOptional<Builtin.NativeObject>, case #FakeOptional.some!enumelt.1: bb1, case #FakeOptional.none!enumelt: bb2
+  %1 = enum $FakeOptional<Builtin.NativeObject>, #FakeOptional.some!enumelt, %0 : $Builtin.NativeObject
+  switch_enum %1 : $FakeOptional<Builtin.NativeObject>, case #FakeOptional.some!enumelt: bb1, case #FakeOptional.none!enumelt: bb2
 
 bb1(%2 : @owned $Builtin.NativeObject):
   return %2 : $Builtin.NativeObject
@@ -802,7 +802,7 @@ enum EnumWithB {
 // CHECK-LABEL: } // end sil function 'testEliminatePropagateGuaranteedPhiAfterSwitch'
 sil hidden [ossa] @testEliminatePropagateGuaranteedPhiAfterSwitch : $@convention(method) (@guaranteed EnumWithB) -> () {
 bb0(%0 : @guaranteed $EnumWithB):
-  switch_enum %0 : $EnumWithB, case #EnumWithB.A!enumelt.1: bb1
+  switch_enum %0 : $EnumWithB, case #EnumWithB.A!enumelt: bb1
 
 bb1(%2 : @guaranteed $B):
   %2a = begin_borrow %2 : $B
@@ -843,11 +843,11 @@ bb3(%3 : @guaranteed $B):
 // CHECK-LABEL: } // end sil function 'testPropagateGuaranteedPhiSwitchEnum'
 sil hidden [ossa] @testPropagateGuaranteedPhiSwitchEnum : $@convention(method) (@guaranteed EnumWithB) -> () {
 bb0(%0 : @guaranteed $EnumWithB):
-  switch_enum %0 : $EnumWithB, case #EnumWithB.A!enumelt.1: bb1
+  switch_enum %0 : $EnumWithB, case #EnumWithB.A!enumelt: bb1
 
 bb1(%2 : @guaranteed $B):
-  %3 = enum $EnumWithB, #EnumWithB.A!enumelt.1, %2 : $B
-  switch_enum %3 : $EnumWithB, case #EnumWithB.A!enumelt.1: bb3
+  %3 = enum $EnumWithB, #EnumWithB.A!enumelt, %2 : $B
+  switch_enum %3 : $EnumWithB, case #EnumWithB.A!enumelt: bb3
 
 bb3(%4 : @guaranteed $B):
   %99 = tuple ()

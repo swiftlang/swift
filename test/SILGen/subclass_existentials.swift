@@ -119,7 +119,7 @@ func methodCalls(
   // CHECK: [[PAYLOAD:%.*]] = open_existential_ref [[ARG0]] : $Base<Int> & P to $@opened("{{.*}}") Base<Int> & P
   // CHECK: [[REF:%.*]] = copy_value [[PAYLOAD]] : $@opened("{{.*}}") Base<Int> & P
   // CHECK: [[CLASS_REF:%.*]] = upcast [[REF]] : $@opened("{{.*}}") Base<Int> & P to $Base<Int>
-  // CHECK: [[METHOD:%.*]] = class_method [[CLASS_REF]] : $Base<Int>, #Base.classSelfReturn!1 : <T> (Base<T>) -> () -> @dynamic_self Base<T>, $@convention(method) <τ_0_0> (@guaranteed Base<τ_0_0>) -> @owned Base<τ_0_0>
+  // CHECK: [[METHOD:%.*]] = class_method [[CLASS_REF]] : $Base<Int>, #Base.classSelfReturn : <T> (Base<T>) -> () -> @dynamic_self Base<T>, $@convention(method) <τ_0_0> (@guaranteed Base<τ_0_0>) -> @owned Base<τ_0_0>
   // CHECK: [[RESULT_CLASS_REF:%.*]] = apply [[METHOD]]<Int>([[CLASS_REF]]) : $@convention(method) <τ_0_0> (@guaranteed Base<τ_0_0>) -> @owned Base<τ_0_0>
   // CHECK: destroy_value [[CLASS_REF]] : $Base<Int>
   // CHECK: [[RESULT_REF:%.*]] = unchecked_ref_cast [[RESULT_CLASS_REF]] : $Base<Int> to $@opened("{{.*}}") Base<Int> & P
@@ -130,7 +130,7 @@ func methodCalls(
   // CHECK: [[PAYLOAD:%.*]] = open_existential_ref [[ARG0]] : $Base<Int> & P to $@opened("{{.*}}") Base<Int> & P
   // CHECK: [[SELF_BOX:%.*]] = alloc_stack $@opened("{{.*}}") Base<Int> & P
   // CHECK: store_borrow [[PAYLOAD]] to [[SELF_BOX]] : $*@opened("{{.*}}") Base<Int> & P
-  // CHECK: [[METHOD:%.*]] = witness_method $@opened("{{.*}}") Base<Int> & P, #P.protocolSelfReturn!1 : <Self where Self : P> (Self) -> () -> Self, [[PAYLOAD]] : $@opened("{{.*}}") Base<Int> & P : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @out τ_0_0
+  // CHECK: [[METHOD:%.*]] = witness_method $@opened("{{.*}}") Base<Int> & P, #P.protocolSelfReturn : <Self where Self : P> (Self) -> () -> Self, [[PAYLOAD]] : $@opened("{{.*}}") Base<Int> & P : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @out τ_0_0
   // CHECK: [[RESULT_BOX:%.*]] = alloc_box
   // CHECK: [[RESULT_BUF:%.*]] = project_box [[RESULT_BOX]]
   // CHECK: apply [[METHOD]]<@opened("{{.*}}") Base<Int> & P>([[RESULT_BUF]], [[SELF_BOX]]) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @out τ_0_0
@@ -151,7 +151,7 @@ func methodCalls(
   let _: Base<Int> & P = baseAndPType.classSelfReturn()
 
   // CHECK: [[METATYPE:%.*]] = open_existential_metatype %1 : $@thick (Base<Int> & P).Type to $@thick (@opened("{{.*}}") (Base<Int> & P)).Type
-  // CHECK: [[METHOD:%.*]] = witness_method $@opened("{{.*}}") (Base<Int> & P), #P.protocolSelfReturn!1 : <Self where Self : P> (Self.Type) -> () -> Self, [[METATYPE]] : $@thick (@opened("{{.*}}") (Base<Int> & P)).Type : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@thick τ_0_0.Type) -> @out τ_0_0
+  // CHECK: [[METHOD:%.*]] = witness_method $@opened("{{.*}}") (Base<Int> & P), #P.protocolSelfReturn : <Self where Self : P> (Self.Type) -> () -> Self, [[METATYPE]] : $@thick (@opened("{{.*}}") (Base<Int> & P)).Type : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@thick τ_0_0.Type) -> @out τ_0_0
   // CHECK: [[RESULT_BOX:%.*]] = alloc_box
   // CHECK: [[RESULT_BUF:%.*]] = project_box
   // CHECK: apply [[METHOD]]<@opened("{{.*}}") (Base<Int> & P)>([[RESULT_BUF]], [[METATYPE]]) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@thick τ_0_0.Type) -> @out τ_0_0

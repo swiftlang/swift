@@ -116,11 +116,11 @@ sil @$s28witness_return_optional_self2CCCACycfC : $@convention(method) (@thick C
 // CHECK-LABEL: sil @$s28witness_return_optional_self29testWitnessReturnOptionalSelfAA2PP_pSgyF : $@convention(thin) () -> @owned Optional<PP> {
 // CHECK: [[E1:%.*]] = init_existential_ref %{{.*}} : $CC : $CC, $PP
 // CHECK: [[O1:%.*]] = open_existential_ref [[E1]] : $PP to $@opened("{{.*}}") PP
-// CHECK: [[W1:%.*]] = witness_method $CC, #PP.returnOptionalSelf!1 : <Self where Self : PP> (Self) -> () -> Self? : $@convention(witness_method: PP) <τ_0_0 where τ_0_0 : PP> (@guaranteed τ_0_0) -> @owned Optional<τ_0_0>
+// CHECK: [[W1:%.*]] = witness_method $CC, #PP.returnOptionalSelf : <Self where Self : PP> (Self) -> () -> Self? : $@convention(witness_method: PP) <τ_0_0 where τ_0_0 : PP> (@guaranteed τ_0_0) -> @owned Optional<τ_0_0>
 // CHECK: apply [[W1]]<@opened("{{.*}}") PP>([[O1]]) : $@convention(witness_method: PP) <τ_0_0 where τ_0_0 : PP> (@guaranteed τ_0_0) -> @owned Optional<τ_0_0>
 // CHECK: [[E2:%.*]] = init_existential_ref %{{.*}} : $@opened("{{.*}}") PP : $@opened("{{.*}}") PP, $PP
 // CHECK: [[O2:%.*]] = open_existential_ref [[E2]] : $PP to $@opened("{{.*}}") PP
-// CHECK: [[W2:%.*]] = witness_method $@opened("{{.*}}") PP, #PP.returnOptionalSelf!1 : <Self where Self : PP> (Self) -> () -> Self?, [[O1]] : $@opened("{{.*}}") PP : $@convention(witness_method: PP) <τ_0_0 where τ_0_0 : PP> (@guaranteed τ_0_0) -> @owned Optional<τ_0_0>
+// CHECK: [[W2:%.*]] = witness_method $@opened("{{.*}}") PP, #PP.returnOptionalSelf : <Self where Self : PP> (Self) -> () -> Self?, [[O1]] : $@opened("{{.*}}") PP : $@convention(witness_method: PP) <τ_0_0 where τ_0_0 : PP> (@guaranteed τ_0_0) -> @owned Optional<τ_0_0>
 // CHECK: apply [[W2]]<@opened("{{.*}}") PP>([[O2]]) : $@convention(witness_method: PP) <τ_0_0 where τ_0_0 : PP> (@guaranteed τ_0_0) -> @owned Optional<τ_0_0>
 // CHECK-LABEL: } // end sil function '$s28witness_return_optional_self29testWitnessReturnOptionalSelfAA2PP_pSgyF'
 sil @$s28witness_return_optional_self29testWitnessReturnOptionalSelfAA2PP_pSgyF : $@convention(thin) () -> @owned Optional<PP> {
@@ -131,18 +131,18 @@ bb0:
   %2 = apply %1(%0) : $@convention(method) (@thick CC.Type) -> @owned CC
   %3 = init_existential_ref %2 : $CC : $CC, $PP
   %5 = open_existential_ref %3 : $PP to $@opened("00000000-72AD-11E8-88DF-ACDE48001122") PP
-  %6 = witness_method $@opened("00000000-72AD-11E8-88DF-ACDE48001122") PP, #PP.returnOptionalSelf!1 : <Self where Self : PP> (Self) -> () -> Self?, %5 : $@opened("00000000-72AD-11E8-88DF-ACDE48001122") PP : $@convention(witness_method: PP) <τ_0_0 where τ_0_0 : PP> (@guaranteed τ_0_0) -> @owned Optional<τ_0_0>
+  %6 = witness_method $@opened("00000000-72AD-11E8-88DF-ACDE48001122") PP, #PP.returnOptionalSelf : <Self where Self : PP> (Self) -> () -> Self?, %5 : $@opened("00000000-72AD-11E8-88DF-ACDE48001122") PP : $@convention(witness_method: PP) <τ_0_0 where τ_0_0 : PP> (@guaranteed τ_0_0) -> @owned Optional<τ_0_0>
   %7 = apply %6<@opened("00000000-72AD-11E8-88DF-ACDE48001122") PP>(%5) : $@convention(witness_method: PP) <τ_0_0 where τ_0_0 : PP> (@guaranteed τ_0_0) -> @owned Optional<τ_0_0>
-  %8 = unchecked_enum_data %7 : $Optional<@opened("00000000-72AD-11E8-88DF-ACDE48001122") PP>, #Optional.some!enumelt.1
+  %8 = unchecked_enum_data %7 : $Optional<@opened("00000000-72AD-11E8-88DF-ACDE48001122") PP>, #Optional.some!enumelt
   %11 = init_existential_ref %8 : $@opened("00000000-72AD-11E8-88DF-ACDE48001122") PP : $@opened("00000000-72AD-11E8-88DF-ACDE48001122") PP, $PP
-  %12 = enum $Optional<PP>, #Optional.some!enumelt.1, %11 : $PP
-  %13 = unchecked_enum_data %12 : $Optional<PP>, #Optional.some!enumelt.1
+  %12 = enum $Optional<PP>, #Optional.some!enumelt, %11 : $PP
+  %13 = unchecked_enum_data %12 : $Optional<PP>, #Optional.some!enumelt
   %18 = open_existential_ref %13 : $PP to $@opened("FFFFFFFF-72AD-11E8-88DF-ACDE48001122") PP
-  %19 = witness_method $@opened("FFFFFFFF-72AD-11E8-88DF-ACDE48001122") PP, #PP.returnOptionalSelf!1 : <Self where Self : PP> (Self) -> () -> Self?, %18 : $@opened("FFFFFFFF-72AD-11E8-88DF-ACDE48001122") PP : $@convention(witness_method: PP) <τ_0_0 where τ_0_0 : PP> (@guaranteed τ_0_0) -> @owned Optional<τ_0_0>
+  %19 = witness_method $@opened("FFFFFFFF-72AD-11E8-88DF-ACDE48001122") PP, #PP.returnOptionalSelf : <Self where Self : PP> (Self) -> () -> Self?, %18 : $@opened("FFFFFFFF-72AD-11E8-88DF-ACDE48001122") PP : $@convention(witness_method: PP) <τ_0_0 where τ_0_0 : PP> (@guaranteed τ_0_0) -> @owned Optional<τ_0_0>
   %20 = apply %19<@opened("FFFFFFFF-72AD-11E8-88DF-ACDE48001122") PP>(%18) : $@convention(witness_method: PP) <τ_0_0 where τ_0_0 : PP> (@guaranteed τ_0_0) -> @owned Optional<τ_0_0>
-  %21 = unchecked_enum_data %20 : $Optional<@opened("FFFFFFFF-72AD-11E8-88DF-ACDE48001122") PP>, #Optional.some!enumelt.1
+  %21 = unchecked_enum_data %20 : $Optional<@opened("FFFFFFFF-72AD-11E8-88DF-ACDE48001122") PP>, #Optional.some!enumelt
   %22 = init_existential_ref %21 : $@opened("FFFFFFFF-72AD-11E8-88DF-ACDE48001122") PP : $@opened("FFFFFFFF-72AD-11E8-88DF-ACDE48001122") PP, $PP
-  %23 = enum $Optional<PP>, #Optional.some!enumelt.1, %22 : $PP
+  %23 = enum $Optional<PP>, #Optional.some!enumelt, %22 : $PP
   strong_release %18 : $@opened("FFFFFFFF-72AD-11E8-88DF-ACDE48001122") PP
   strong_release %3 : $PP
   return %23 : $Optional<PP>
@@ -180,13 +180,13 @@ sil @$s37witness_return_optional_indirect_self1SVACycfC : $@convention(method) (
 // CHECK-LABEL: sil @$s37witness_return_optional_indirect_self37testWitnessReturnOptionalIndirectSelfyyF : $@convention(thin) () -> () {
 // CHECK: [[O1:%.*]] = open_existential_addr immutable_access %0 : $*PPP to $*@opened("83DE9694-7315-11E8-955C-ACDE48001122") PPP
 // CHECK: [[R1:%.*]] = alloc_stack $Optional<@opened("83DE9694-7315-11E8-955C-ACDE48001122") PPP>
-// CHECK: [[W1:%.*]] = witness_method $S, #PPP.returnsOptionalIndirect!1 : <Self where Self : PPP> (Self) -> () -> Self? : $@convention(witness_method: PPP) <τ_0_0 where τ_0_0 : PPP> (@in_guaranteed τ_0_0) -> @out Optional<τ_0_0>
+// CHECK: [[W1:%.*]] = witness_method $S, #PPP.returnsOptionalIndirect : <Self where Self : PPP> (Self) -> () -> Self? : $@convention(witness_method: PPP) <τ_0_0 where τ_0_0 : PPP> (@in_guaranteed τ_0_0) -> @out Optional<τ_0_0>
 // CHECK: apply [[W1]]<@opened("83DE9694-7315-11E8-955C-ACDE48001122") PPP>([[R1]], [[O1]]) : $@convention(witness_method: PPP) <τ_0_0 where τ_0_0 : PPP> (@in_guaranteed τ_0_0) -> @out Optional<τ_0_0>
-// CHECK: inject_enum_addr [[OE1:%.*]] : $*Optional<PPP>, #Optional.some!enumelt.1
-// CHECK: [[E1:%.*]] = unchecked_take_enum_data_addr [[OE1]] : $*Optional<PPP>, #Optional.some!enumelt.1
+// CHECK: inject_enum_addr [[OE1:%.*]] : $*Optional<PPP>, #Optional.some!enumelt
+// CHECK: [[E1:%.*]] = unchecked_take_enum_data_addr [[OE1]] : $*Optional<PPP>, #Optional.some!enumelt
 // CHECK: [[O2:%.*]] = open_existential_addr immutable_access [[E1]] : $*PPP to $*@opened("83DE97CA-7315-11E8-955C-ACDE48001122") PPP
 // CHECK: [[R2:%.*]] = alloc_stack $Optional<@opened("83DE97CA-7315-11E8-955C-ACDE48001122") PPP>
-// CHECK: [[W2:%.*]] = witness_method $@opened("83DE97CA-7315-11E8-955C-ACDE48001122") PPP, #PPP.returnsOptionalIndirect!1 : <Self where Self : PPP> (Self) -> () -> Self?, %19 : $*@opened("83DE97CA-7315-11E8-955C-ACDE48001122") PPP : $@convention(witness_method: PPP) <τ_0_0 where τ_0_0 : PPP> (@in_guaranteed τ_0_0) -> @out Optional<τ_0_0>
+// CHECK: [[W2:%.*]] = witness_method $@opened("83DE97CA-7315-11E8-955C-ACDE48001122") PPP, #PPP.returnsOptionalIndirect : <Self where Self : PPP> (Self) -> () -> Self?, %19 : $*@opened("83DE97CA-7315-11E8-955C-ACDE48001122") PPP : $@convention(witness_method: PPP) <τ_0_0 where τ_0_0 : PPP> (@in_guaranteed τ_0_0) -> @out Optional<τ_0_0>
 // CHECK: apply [[W2]]<@opened("83DE97CA-7315-11E8-955C-ACDE48001122") PPP>([[R2]], [[O2]]) : $@convention(witness_method: PPP) <τ_0_0 where τ_0_0 : PPP> (@in_guaranteed τ_0_0) -> @out Optional<τ_0_0>
 // CHECK-LABEL: } // end sil function '$s37witness_return_optional_indirect_self37testWitnessReturnOptionalIndirectSelfyyF'
 sil @$s37witness_return_optional_indirect_self37testWitnessReturnOptionalIndirectSelfyyF : $@convention(thin) () -> () {
@@ -201,25 +201,25 @@ bb0:
   %6 = alloc_stack $Optional<PPP>
   %7 = alloc_stack $Optional<PPP>
   %8 = open_existential_addr immutable_access %0 : $*PPP to $*@opened("83DE9694-7315-11E8-955C-ACDE48001122") PPP
-  %9 = init_enum_data_addr %7 : $*Optional<PPP>, #Optional.some!enumelt.1
+  %9 = init_enum_data_addr %7 : $*Optional<PPP>, #Optional.some!enumelt
   %10 = init_existential_addr %9 : $*PPP, $@opened("83DE9694-7315-11E8-955C-ACDE48001122") PPP
   %11 = alloc_stack $Optional<@opened("83DE9694-7315-11E8-955C-ACDE48001122") PPP>
-  %12 = witness_method $@opened("83DE9694-7315-11E8-955C-ACDE48001122") PPP, #PPP.returnsOptionalIndirect!1 : <Self where Self : PPP> (Self) -> () -> Self?, %8 : $*@opened("83DE9694-7315-11E8-955C-ACDE48001122") PPP : $@convention(witness_method: PPP) <τ_0_0 where τ_0_0 : PPP> (@in_guaranteed τ_0_0) -> @out Optional<τ_0_0>
+  %12 = witness_method $@opened("83DE9694-7315-11E8-955C-ACDE48001122") PPP, #PPP.returnsOptionalIndirect : <Self where Self : PPP> (Self) -> () -> Self?, %8 : $*@opened("83DE9694-7315-11E8-955C-ACDE48001122") PPP : $@convention(witness_method: PPP) <τ_0_0 where τ_0_0 : PPP> (@in_guaranteed τ_0_0) -> @out Optional<τ_0_0>
   %13 = apply %12<@opened("83DE9694-7315-11E8-955C-ACDE48001122") PPP>(%11, %8) : $@convention(witness_method: PPP) <τ_0_0 where τ_0_0 : PPP> (@in_guaranteed τ_0_0) -> @out Optional<τ_0_0>
-  %14 = unchecked_take_enum_data_addr %11 : $*Optional<@opened("83DE9694-7315-11E8-955C-ACDE48001122") PPP>, #Optional.some!enumelt.1
+  %14 = unchecked_take_enum_data_addr %11 : $*Optional<@opened("83DE9694-7315-11E8-955C-ACDE48001122") PPP>, #Optional.some!enumelt
   copy_addr [take] %14 to [initialization] %10 : $*@opened("83DE9694-7315-11E8-955C-ACDE48001122") PPP
-  inject_enum_addr %7 : $*Optional<PPP>, #Optional.some!enumelt.1
+  inject_enum_addr %7 : $*Optional<PPP>, #Optional.some!enumelt
   dealloc_stack %11 : $*Optional<@opened("83DE9694-7315-11E8-955C-ACDE48001122") PPP>
-  %28 = unchecked_take_enum_data_addr %7 : $*Optional<PPP>, #Optional.some!enumelt.1
+  %28 = unchecked_take_enum_data_addr %7 : $*Optional<PPP>, #Optional.some!enumelt
   %29 = open_existential_addr immutable_access %28 : $*PPP to $*@opened("83DE97CA-7315-11E8-955C-ACDE48001122") PPP
-  %30 = init_enum_data_addr %6 : $*Optional<PPP>, #Optional.some!enumelt.1
+  %30 = init_enum_data_addr %6 : $*Optional<PPP>, #Optional.some!enumelt
   %31 = init_existential_addr %30 : $*PPP, $@opened("83DE97CA-7315-11E8-955C-ACDE48001122") PPP
   %32 = alloc_stack $Optional<@opened("83DE97CA-7315-11E8-955C-ACDE48001122") PPP>
-  %33 = witness_method $@opened("83DE97CA-7315-11E8-955C-ACDE48001122") PPP, #PPP.returnsOptionalIndirect!1 : <Self where Self : PPP> (Self) -> () -> Self?, %29 : $*@opened("83DE97CA-7315-11E8-955C-ACDE48001122") PPP : $@convention(witness_method: PPP) <τ_0_0 where τ_0_0 : PPP> (@in_guaranteed τ_0_0) -> @out Optional<τ_0_0>
+  %33 = witness_method $@opened("83DE97CA-7315-11E8-955C-ACDE48001122") PPP, #PPP.returnsOptionalIndirect : <Self where Self : PPP> (Self) -> () -> Self?, %29 : $*@opened("83DE97CA-7315-11E8-955C-ACDE48001122") PPP : $@convention(witness_method: PPP) <τ_0_0 where τ_0_0 : PPP> (@in_guaranteed τ_0_0) -> @out Optional<τ_0_0>
   %34 = apply %33<@opened("83DE97CA-7315-11E8-955C-ACDE48001122") PPP>(%32, %29) : $@convention(witness_method: PPP) <τ_0_0 where τ_0_0 : PPP> (@in_guaranteed τ_0_0) -> @out Optional<τ_0_0>
-  %41 = unchecked_take_enum_data_addr %32 : $*Optional<@opened("83DE97CA-7315-11E8-955C-ACDE48001122") PPP>, #Optional.some!enumelt.1
+  %41 = unchecked_take_enum_data_addr %32 : $*Optional<@opened("83DE97CA-7315-11E8-955C-ACDE48001122") PPP>, #Optional.some!enumelt
   copy_addr [take] %41 to [initialization] %31 : $*@opened("83DE97CA-7315-11E8-955C-ACDE48001122") PPP
-  inject_enum_addr %6 : $*Optional<PPP>, #Optional.some!enumelt.1
+  inject_enum_addr %6 : $*Optional<PPP>, #Optional.some!enumelt
   dealloc_stack %32 : $*Optional<@opened("83DE97CA-7315-11E8-955C-ACDE48001122") PPP>
   destroy_addr %28 : $*PPP
   dealloc_stack %7 : $*Optional<PPP>
@@ -269,9 +269,9 @@ bb0(%0 : $CCCC):
   %oe = open_existential_addr immutable_access %pa : $*PPPP to $*@opened("A6DDDAF6-70BD-11E8-ADF1-ACDE48001122") PPPP
 
   %optional = alloc_stack $Optional<@opened("A6DDDAF6-70BD-11E8-ADF1-ACDE48001122") PPPP>
-  %someadr = init_enum_data_addr %optional : $*Optional<@opened("A6DDDAF6-70BD-11E8-ADF1-ACDE48001122") PPPP>, #Optional.some!enumelt.1
+  %someadr = init_enum_data_addr %optional : $*Optional<@opened("A6DDDAF6-70BD-11E8-ADF1-ACDE48001122") PPPP>, #Optional.some!enumelt
   copy_addr %oe to [initialization] %someadr : $*@opened("A6DDDAF6-70BD-11E8-ADF1-ACDE48001122") PPPP
-  inject_enum_addr %optional : $*Optional<@opened("A6DDDAF6-70BD-11E8-ADF1-ACDE48001122") PPPP>, #Optional.some!enumelt.1
+  inject_enum_addr %optional : $*Optional<@opened("A6DDDAF6-70BD-11E8-ADF1-ACDE48001122") PPPP>, #Optional.some!enumelt
 
   %f = function_ref @takeOptionalSelf : $@convention(method) <τ_0_0 where τ_0_0 : PPPP> (@in_guaranteed Optional<τ_0_0>, @in_guaranteed τ_0_0) -> ()
   %call = apply %f<@opened("A6DDDAF6-70BD-11E8-ADF1-ACDE48001122") PPPP>(%optional, %oe) : $@convention(method) <τ_0_0 where τ_0_0 : PPPP> (@in_guaranteed Optional<τ_0_0>, @in_guaranteed τ_0_0) -> ()
@@ -390,7 +390,7 @@ struct StructOfAnyP : AnyP {
 // CHECK-LABEL: sil @testWitnessCopiedSelfWithIndirectResult : $@convention(thin) () -> () {
 // CHECK: [[IN:%[0-9]+]] = alloc_stack $StructOfAnyP
 // CHECK: [[OUT:%[0-9]+]] = alloc_stack $StructOfAnyP
-// CHECK: witness_method $StructOfAnyP, #AnyP.returnsSelf!1 : <Self where Self : AnyP> (Self) -> () -> Self : $@convention(witness_method: AnyP) <τ_0_0 where τ_0_0 : AnyP> (@in_guaranteed τ_0_0) -> @out StructOfAnyP
+// CHECK: witness_method $StructOfAnyP, #AnyP.returnsSelf : <Self where Self : AnyP> (Self) -> () -> Self : $@convention(witness_method: AnyP) <τ_0_0 where τ_0_0 : AnyP> (@in_guaranteed τ_0_0) -> @out StructOfAnyP
 // CHECK: apply %{{.*}}<StructOfAnyP>([[OUT]], [[IN]]) : $@convention(witness_method: AnyP) <τ_0_0 where τ_0_0 : AnyP> (@in_guaranteed τ_0_0) -> @out StructOfAnyP
 // CHECK-LABEL: } // end sil function 'testWitnessCopiedSelfWithIndirectResult'
 sil @testWitnessCopiedSelfWithIndirectResult : $() -> () {
@@ -401,7 +401,7 @@ bb0:
   copy_addr %a0 to [initialization] %a1 : $*AnyP
   %o0 = open_existential_addr immutable_access %a1 : $*AnyP to $*@opened("7C4DAF8E-D722-11E8-920A-D0817AD9F6DD") AnyP
   %a2 = alloc_stack $StructOfAnyP
-  %w0 = witness_method $@opened("7C4DAF8E-D722-11E8-920A-D0817AD9F6DD") AnyP, #AnyP.returnsSelf!1 : <Self where Self : AnyP> (Self) -> () -> Self, %o0 : $*@opened("7C4DAF8E-D722-11E8-920A-D0817AD9F6DD") AnyP : $@convention(witness_method: AnyP) <τ_0_0 where τ_0_0 : AnyP> (@in_guaranteed τ_0_0) -> @out StructOfAnyP
+  %w0 = witness_method $@opened("7C4DAF8E-D722-11E8-920A-D0817AD9F6DD") AnyP, #AnyP.returnsSelf : <Self where Self : AnyP> (Self) -> () -> Self, %o0 : $*@opened("7C4DAF8E-D722-11E8-920A-D0817AD9F6DD") AnyP : $@convention(witness_method: AnyP) <τ_0_0 where τ_0_0 : AnyP> (@in_guaranteed τ_0_0) -> @out StructOfAnyP
   %c0 = apply %w0<@opened("7C4DAF8E-D722-11E8-920A-D0817AD9F6DD") AnyP>(%a2, %o0) : $@convention(witness_method: AnyP) <τ_0_0 where τ_0_0 : AnyP> (@in_guaranteed τ_0_0) -> @out StructOfAnyP
   dealloc_stack %a2 : $*StructOfAnyP
   dealloc_stack %a1 : $*AnyP
@@ -416,7 +416,7 @@ sil @takeany :  $@convention(thin) (@in_guaranteed AnyP) -> ()
 // CHECK: [[IN:%[0-9]+]] = alloc_stack $AnyP
 // CHECK: [[EA:%[0-9]+]] = init_existential_addr [[IN]]
 // CHECK: [[OUT:%[0-9]+]] = alloc_stack $StructOfAnyP
-// CHECK: witness_method $StructOfAnyP, #AnyP.returnsSelf!1 : <Self where Self : AnyP> (Self) -> () -> Self : $@convention(witness_method: AnyP) <τ_0_0 where τ_0_0 : AnyP> (@in_guaranteed τ_0_0) -> @out StructOfAnyP
+// CHECK: witness_method $StructOfAnyP, #AnyP.returnsSelf : <Self where Self : AnyP> (Self) -> () -> Self : $@convention(witness_method: AnyP) <τ_0_0 where τ_0_0 : AnyP> (@in_guaranteed τ_0_0) -> @out StructOfAnyP
 // CHECK: apply %{{.*}}<StructOfAnyP>([[OUT]], [[EA]]) : $@convention(witness_method: AnyP) <τ_0_0 where τ_0_0 : AnyP> (@in_guaranteed τ_0_0) -> @out StructOfAnyP
 // CHECK-LABEL: } // end sil function 'testWitnessCopiedSelfWithIndirectResult2'
 sil @testWitnessCopiedSelfWithIndirectResult2 : $() -> () {
@@ -429,7 +429,7 @@ bb0:
   copy_addr %a0 to [initialization] %a1 : $*AnyP
   %o0 = open_existential_addr immutable_access %a1 : $*AnyP to $*@opened("7C4DAF8E-D722-11E8-920A-D0817AD9F6DD") AnyP
   %a2 = alloc_stack $StructOfAnyP
-  %w0 = witness_method $@opened("7C4DAF8E-D722-11E8-920A-D0817AD9F6DD") AnyP, #AnyP.returnsSelf!1 : <Self where Self : AnyP> (Self) -> () -> Self, %o0 : $*@opened("7C4DAF8E-D722-11E8-920A-D0817AD9F6DD") AnyP : $@convention(witness_method: AnyP) <τ_0_0 where τ_0_0 : AnyP> (@in_guaranteed τ_0_0) -> @out StructOfAnyP
+  %w0 = witness_method $@opened("7C4DAF8E-D722-11E8-920A-D0817AD9F6DD") AnyP, #AnyP.returnsSelf : <Self where Self : AnyP> (Self) -> () -> Self, %o0 : $*@opened("7C4DAF8E-D722-11E8-920A-D0817AD9F6DD") AnyP : $@convention(witness_method: AnyP) <τ_0_0 where τ_0_0 : AnyP> (@in_guaranteed τ_0_0) -> @out StructOfAnyP
   %c0 = apply %w0<@opened("7C4DAF8E-D722-11E8-920A-D0817AD9F6DD") AnyP>(%a2, %o0) : $@convention(witness_method: AnyP) <τ_0_0 where τ_0_0 : AnyP> (@in_guaranteed τ_0_0) -> @out StructOfAnyP
   dealloc_stack %a2 : $*StructOfAnyP
   dealloc_stack %a1 : $*AnyP
@@ -463,16 +463,16 @@ sil [transparent] [reabstraction_thunk] @testDevirtExistentialEnumThunk : $@conv
 // CHECK-LABEL: sil shared [noinline] @testDevirtExistentialEnum : $@convention(thin) (@guaranteed Array<Int>) -> () {
 // CHECK: [[ALLOC_EXISTENTIAL:%.*]] = alloc_stack $ContiguousBytes
 // CHECK: [[ALLOC_ENUM:%.*]] = alloc_stack $Optional<ContiguousBytes>
-// CHECK: [[ENUM:%.*]] = init_enum_data_addr [[ALLOC_ENUM]] : $*Optional<ContiguousBytes>, #Optional.some!enumelt.1
+// CHECK: [[ENUM:%.*]] = init_enum_data_addr [[ALLOC_ENUM]] : $*Optional<ContiguousBytes>, #Optional.some!enumelt
 // CHECK: [[INIT_DATA:%.*]] = init_existential_addr [[ENUM]] : $*ContiguousBytes, $Array<Int>
 // CHECK: store %0 to [[INIT_DATA]] : $*Array<Int>
-// CHECK: inject_enum_addr [[ALLOC_ENUM]] : $*Optional<ContiguousBytes>, #Optional.some!enumelt.1
-// CHECK: [[TAKE_DATA:%.*]] = unchecked_take_enum_data_addr [[ALLOC_ENUM]] : $*Optional<ContiguousBytes>, #Optional.some!enumelt.1
+// CHECK: inject_enum_addr [[ALLOC_ENUM]] : $*Optional<ContiguousBytes>, #Optional.some!enumelt
+// CHECK: [[TAKE_DATA:%.*]] = unchecked_take_enum_data_addr [[ALLOC_ENUM]] : $*Optional<ContiguousBytes>, #Optional.some!enumelt
 // CHECK: copy_addr [take] [[TAKE_DATA]] to [initialization] [[ALLOC_EXISTENTIAL]] : $*ContiguousBytes
 // CHECK: [[OPENED:%.*]] = open_existential_addr immutable_access [[ALLOC_EXISTENTIAL]] : $*ContiguousBytes to $*@opened("8402EC1A-F35D-11E8-950A-D0817AD9F6DD") ContiguousBytes
 // CHECK: [[THUNK:%.*]] = function_ref @testDevirtExistentialEnumThunk : $@convention(thin) (UnsafeRawBufferPointer) -> (@out (), @error Error)
 // CHECK: [[TTF:%.*]] = thin_to_thick_function [[THUNK:%.*]] : $@convention(thin) (UnsafeRawBufferPointer) -> (@out (), @error Error) to $@noescape @callee_guaranteed (UnsafeRawBufferPointer) -> (@out (), @error Error)
-// CHECK: [[WM:%.*]] = witness_method $Array<Int>, #ContiguousBytes.withUnsafeBytes!1 : <Self where Self : ContiguousBytes><R> (Self) -> ((UnsafeRawBufferPointer) throws -> R) throws -> R : $@convention(witness_method: ContiguousBytes) <τ_0_0 where τ_0_0 : ContiguousBytes><τ_1_0> (@noescape @callee_guaranteed (UnsafeRawBufferPointer) -> (@out τ_1_0, @error Error), @in_guaranteed τ_0_0) -> (@out τ_1_0, @error Error)
+// CHECK: [[WM:%.*]] = witness_method $Array<Int>, #ContiguousBytes.withUnsafeBytes : <Self where Self : ContiguousBytes><R> (Self) -> ((UnsafeRawBufferPointer) throws -> R) throws -> R : $@convention(witness_method: ContiguousBytes) <τ_0_0 where τ_0_0 : ContiguousBytes><τ_1_0> (@noescape @callee_guaranteed (UnsafeRawBufferPointer) -> (@out τ_1_0, @error Error), @in_guaranteed τ_0_0) -> (@out τ_1_0, @error Error)
 // CHECK: apply [nothrow] [[WM]]<@opened("8402EC1A-F35D-11E8-950A-D0817AD9F6DD") ContiguousBytes, ()>(%{{.*}}, [[TTF]], [[OPENED]]) : $@convention(witness_method: ContiguousBytes) <τ_0_0 where τ_0_0 : ContiguousBytes><τ_1_0> (@noescape @callee_guaranteed (UnsafeRawBufferPointer) -> (@out τ_1_0, @error Error), @in_guaranteed τ_0_0) -> (@out τ_1_0, @error Error)
 // CHECK: destroy_addr [[ALLOC_EXISTENTIAL]] : $*ContiguousBytes
 // CHECK-LABEL: } // end sil function 'testDevirtExistentialEnum'
@@ -480,18 +480,18 @@ sil shared [noinline] @testDevirtExistentialEnum : $@convention(thin) (@guarante
 bb0(%0 : $Array<Int>):
   %3 = alloc_stack $ContiguousBytes
   %4 = alloc_stack $Optional<ContiguousBytes>
-  %5 = init_enum_data_addr %4 : $*Optional<ContiguousBytes>, #Optional.some!enumelt.1
+  %5 = init_enum_data_addr %4 : $*Optional<ContiguousBytes>, #Optional.some!enumelt
   %6 = init_existential_addr %5 : $*ContiguousBytes, $Array<Int>
   store %0 to %6 : $*Array<Int>
-  inject_enum_addr %4 : $*Optional<ContiguousBytes>, #Optional.some!enumelt.1
-  %9 = unchecked_take_enum_data_addr %4 : $*Optional<ContiguousBytes>, #Optional.some!enumelt.1
+  inject_enum_addr %4 : $*Optional<ContiguousBytes>, #Optional.some!enumelt
+  %9 = unchecked_take_enum_data_addr %4 : $*Optional<ContiguousBytes>, #Optional.some!enumelt
   copy_addr [take] %9 to [initialization] %3 : $*ContiguousBytes
   dealloc_stack %4 : $*Optional<ContiguousBytes>
   %12 = open_existential_addr immutable_access %3 : $*ContiguousBytes to $*@opened("8402EC1A-F35D-11E8-950A-D0817AD9F6DD") ContiguousBytes
   %13 = alloc_stack $()
   %14 = function_ref @testDevirtExistentialEnumThunk : $@convention(thin) (UnsafeRawBufferPointer) -> (@out (), @error Error)
   %15 = thin_to_thick_function %14 : $@convention(thin) (UnsafeRawBufferPointer) -> (@out (), @error Error) to $@noescape @callee_guaranteed (UnsafeRawBufferPointer) -> (@out (), @error Error)
-  %16 = witness_method $@opened("8402EC1A-F35D-11E8-950A-D0817AD9F6DD") ContiguousBytes, #ContiguousBytes.withUnsafeBytes!1 : <Self where Self : ContiguousBytes><R> (Self) -> ((UnsafeRawBufferPointer) throws -> R) throws -> R, %12 : $*@opened("8402EC1A-F35D-11E8-950A-D0817AD9F6DD") ContiguousBytes : $@convention(witness_method: ContiguousBytes) <τ_0_0 where τ_0_0 : ContiguousBytes><τ_1_0> (@noescape @callee_guaranteed (UnsafeRawBufferPointer) -> (@out τ_1_0, @error Error), @in_guaranteed τ_0_0) -> (@out τ_1_0, @error Error)
+  %16 = witness_method $@opened("8402EC1A-F35D-11E8-950A-D0817AD9F6DD") ContiguousBytes, #ContiguousBytes.withUnsafeBytes : <Self where Self : ContiguousBytes><R> (Self) -> ((UnsafeRawBufferPointer) throws -> R) throws -> R, %12 : $*@opened("8402EC1A-F35D-11E8-950A-D0817AD9F6DD") ContiguousBytes : $@convention(witness_method: ContiguousBytes) <τ_0_0 where τ_0_0 : ContiguousBytes><τ_1_0> (@noescape @callee_guaranteed (UnsafeRawBufferPointer) -> (@out τ_1_0, @error Error), @in_guaranteed τ_0_0) -> (@out τ_1_0, @error Error)
   %21 = apply [nothrow] %16<@opened("8402EC1A-F35D-11E8-950A-D0817AD9F6DD") ContiguousBytes, ()>(%13, %15, %12) : $@convention(witness_method: ContiguousBytes) <τ_0_0 where τ_0_0 : ContiguousBytes><τ_1_0> (@noescape @callee_guaranteed (UnsafeRawBufferPointer) -> (@out τ_1_0, @error Error), @in_guaranteed τ_0_0) -> (@out τ_1_0, @error Error)
   dealloc_stack %13 : $*()
   destroy_addr %3 : $*ContiguousBytes
