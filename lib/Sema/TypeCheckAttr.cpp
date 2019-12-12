@@ -3371,7 +3371,6 @@ void AttributeChecker::visitDerivativeAttr(DerivativeAttr *attr) {
       derivative->getInterfaceType()->castTo<AnyFunctionType>();
 
   // Perform preliminary `@derivative` declaration checks.
-
   // The result type should be a two-element tuple.
   // Either a value and pullback:
   //     (value: R, pullback: (R.TangentVector) -> (T.TangentVector...)
@@ -3381,8 +3380,7 @@ void AttributeChecker::visitDerivativeAttr(DerivativeAttr *attr) {
   auto derivativeResultTupleType = derivativeResultType->getAs<TupleType>();
   if (!derivativeResultTupleType ||
       derivativeResultTupleType->getNumElements() != 2) {
-    diagnose(attr->getLocation(), diag::derivative_attr_expected_result_tuple);
-    attr->setInvalid();
+    diagnoseAndRemoveAttr(attr, diag::derivative_attr_expected_result_tuple);
     return;
   }
   auto valueResultElt = derivativeResultTupleType->getElement(0);
@@ -3390,9 +3388,8 @@ void AttributeChecker::visitDerivativeAttr(DerivativeAttr *attr) {
   // Get derivative kind and derivative function identifier.
   AutoDiffDerivativeFunctionKind kind;
   if (valueResultElt.getName().str() != "value") {
-    diagnose(attr->getLocation(),
-             diag::derivative_attr_invalid_result_tuple_value_label);
-    attr->setInvalid();
+    diagnoseAndRemoveAttr(
+        attr, diag::derivative_attr_invalid_result_tuple_value_label);
     return;
   }
   if (funcResultElt.getName().str() == "differential") {
@@ -3400,9 +3397,8 @@ void AttributeChecker::visitDerivativeAttr(DerivativeAttr *attr) {
   } else if (funcResultElt.getName().str() == "pullback") {
     kind = AutoDiffDerivativeFunctionKind::VJP;
   } else {
-    diagnose(attr->getLocation(),
-             diag::derivative_attr_invalid_result_tuple_func_label);
-    attr->setInvalid();
+    diagnoseAndRemoveAttr(
+        attr, diag::derivative_attr_invalid_result_tuple_func_label);
     return;
   }
   attr->setDerivativeKind(kind);
@@ -3414,10 +3410,9 @@ void AttributeChecker::visitDerivativeAttr(DerivativeAttr *attr) {
   auto valueResultConf = TypeChecker::conformsToProtocol(
       valueResultType, diffableProto, derivative->getDeclContext(), None);
   if (!valueResultConf) {
-    diagnose(attr->getLocation(),
-             diag::derivative_attr_result_value_not_differentiable,
-             valueResultElt.getType());
-    attr->setInvalid();
+    diagnoseAndRemoveAttr(attr,
+                          diag::derivative_attr_result_value_not_differentiable,
+                          valueResultElt.getType());
     return;
   }
 
@@ -3602,9 +3597,8 @@ void AttributeChecker::visitDerivativeAttr(DerivativeAttr *attr) {
   // Check if differential/pullback type matches expected type.
   if (!funcEltType->isEqual(expectedFuncEltType)) {
     // Emit differential/pullback type mismatch error on attribute.
-    diagnose(attr->getLocation(),
-             diag::derivative_attr_result_func_type_mismatch,
-             funcResultElt.getName(), originalAFD->getFullName());
+    diagnoseAndRemoveAttr(attr, diag::derivative_attr_result_func_type_mismatch,
+                          funcResultElt.getName(), originalAFD->getFullName());
     // Emit note with expected differential/pullback type on actual type
     // location.
     auto *tupleReturnTypeRepr =
@@ -3619,7 +3613,6 @@ void AttributeChecker::visitDerivativeAttr(DerivativeAttr *attr) {
       diagnose(originalAFD->getLoc(),
                diag::derivative_attr_result_func_original_note,
                originalAFD->getFullName());
-    attr->setInvalid();
     return;
   }
 
