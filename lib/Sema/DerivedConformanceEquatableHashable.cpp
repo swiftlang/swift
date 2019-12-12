@@ -165,6 +165,12 @@ void diagnoseFailedDerivation(DeclContext *DC, NominalTypeDecl *nominal,
           nominal->getDeclaredInterfaceType());
     }
   }
+
+  if (auto *classDecl = dyn_cast<ClassDecl>(nominal)) {
+    ctx.Diags.diagnose(classDecl->getLoc(),
+                       diag::classes_automatic_protocol_synthesis,
+                       protocol->getName().str());
+  }
 }
 
 /// Creates a named variable based on a prefix character and a numeric index.
@@ -1251,10 +1257,7 @@ static ValueDecl *deriveHashable_hashValue(DerivedConformance &derived) {
       C, StaticSpellingKind::None, hashValuePat, /*InitExpr*/ nullptr,
       parentDC);
 
-  // If any of the members we synthesized didn't typecheck, bail out.
-  if (derived.addMembersToConformanceContext({hashValueDecl, patDecl})) {
-    return nullptr;
-  }
+  derived.addMembersToConformanceContext({hashValueDecl, patDecl});
 
   return hashValueDecl;
 }

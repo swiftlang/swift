@@ -25,17 +25,18 @@
 // SWIFT_ENABLE_TENSORFLOW END
 #include "swift/AST/IndexSubset.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/ParameterList.h"
 #include "swift/AST/TypeRepr.h"
 // SWIFT_ENABLE_TENSORFLOW
 #include "swift/AST/TypeCheckRequests.h"
 // SWIFT_ENABLE_TENSORFLOW END
 #include "swift/AST/Types.h"
-#include "swift/AST/ParameterList.h"
 #include "swift/Basic/Defer.h"
+#include "swift/Basic/QuotedString.h"
 #include "llvm/ADT/SmallString.h"
-#include "llvm/Support/raw_ostream.h"
-#include "llvm/Support/ErrorHandling.h"
 #include "llvm/ADT/StringSwitch.h"
+#include "llvm/Support/ErrorHandling.h"
+#include "llvm/Support/raw_ostream.h"
 using namespace swift;
 
 #define DECL_ATTR(_, Id, ...) \
@@ -87,6 +88,18 @@ StringRef swift::getAccessLevelSpelling(AccessLevel value) {
   }
 
   llvm_unreachable("Unhandled AccessLevel in switch.");
+}
+
+void TypeAttributes::getConventionArguments(SmallVectorImpl<char> &buf) const {
+  llvm::raw_svector_ostream stream(buf);
+  auto &convention = ConventionArguments.getValue();
+  stream << convention.Name;
+  if (!convention.WitnessMethodProtocol.empty()) {
+    stream << ": " << convention.WitnessMethodProtocol;
+    return;
+  }
+  if (!convention.ClangType.empty())
+    stream << ", cType: " << QuotedString(convention.ClangType);
 }
 
 /// Given a name like "autoclosure", return the type attribute ID that
@@ -1257,7 +1270,7 @@ DynamicReplacementAttr::DynamicReplacementAttr(SourceLoc atLoc,
                                                SourceRange parenRange)
     : DeclAttribute(DAK_DynamicReplacement, atLoc, baseRange,
                     /*Implicit=*/false),
-      ReplacedFunctionName(name), ReplacedFunction(nullptr) {
+      ReplacedFunctionName(name) {
   Bits.DynamicReplacementAttr.HasTrailingLocationInfo = true;
   getTrailingLocations()[0] = parenRange.Start;
   getTrailingLocations()[1] = parenRange.End;
@@ -1274,17 +1287,16 @@ DynamicReplacementAttr::create(ASTContext &Ctx, SourceLoc AtLoc,
       SourceRange(LParenLoc, RParenLoc));
 }
 
-DynamicReplacementAttr *DynamicReplacementAttr::create(ASTContext &Ctx,
-                                                       DeclName name) {
-  return new (Ctx) DynamicReplacementAttr(name);
+DynamicReplacementAttr *
+DynamicReplacementAttr::create(ASTContext &Ctx, DeclName name,
+                               AbstractFunctionDecl *f) {
+  return new (Ctx) DynamicReplacementAttr(name, f);
 }
 
 DynamicReplacementAttr *
 DynamicReplacementAttr::create(ASTContext &Ctx, DeclName name,
-                               AbstractFunctionDecl *f) {
-  auto res = new (Ctx) DynamicReplacementAttr(name);
-  res->setReplacedFunction(f);
-  return res;
+                               LazyMemberLoader *Resolver, uint64_t Data) {
+  return new (Ctx) DynamicReplacementAttr(name, Resolver, Data);
 }
 
 SourceLoc DynamicReplacementAttr::getLParenLoc() const {

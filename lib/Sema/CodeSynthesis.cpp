@@ -145,7 +145,8 @@ static void maybeAddMemberwiseDefaultArg(ParamDecl *arg, VarDecl *var,
     var->getAttrs().hasAttribute<LazyAttr>() ||
     (!isExplicitlyInitialized && isDefaultInitializable &&
      var->getValueInterfaceType()->getAnyNominal() == ctx.getOptionalDecl() &&
-     !var->getAttachedPropertyWrapperTypeInfo(0).defaultInit);
+     (var->getAttachedPropertyWrappers().empty() ||
+      var->isPropertyMemberwiseInitializedWithWrappedType()));
   if (isNilInitialized) {
     arg->setDefaultArgumentKind(DefaultArgumentKind::NilLiteral);
     return;

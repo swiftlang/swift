@@ -191,21 +191,21 @@ public:
   
   std::string mangleModuleDescriptor(const ModuleDecl *Decl) {
     beginMangling();
-    appendContext(Decl);
+    appendContext(Decl, Decl->getAlternateModuleName());
     appendOperator("MXM");
     return finalize();
   }
   
   std::string mangleExtensionDescriptor(const ExtensionDecl *Decl) {
     beginMangling();
-    appendContext(Decl);
+    appendContext(Decl, Decl->getAlternateModuleName());
     appendOperator("MXE");
     return finalize();
   }
   
   void appendAnonymousDescriptorName(PointerUnion<DeclContext*, VarDecl*> Name){
     if (auto DC = Name.dyn_cast<DeclContext *>()) {
-      return appendContext(DC);
+      return appendContext(DC, StringRef());
     }
     if (auto VD = Name.dyn_cast<VarDecl *>()) {
       return appendEntity(VD);
@@ -225,12 +225,6 @@ public:
     beginMangling();
     appendAnonymousDescriptorName(Name);
     appendOperator("MXX");
-    return finalize();
-  }
-
-  std::string mangleContext(const DeclContext *DC) {
-    beginMangling();
-    appendContext(DC);
     return finalize();
   }
 

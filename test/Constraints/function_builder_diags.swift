@@ -225,3 +225,12 @@ func extraArg() {
     6 // expected-error {{extra argument in call}}
   }
 }
+
+// rdar://problem/53209000 - use of #warning and #error
+tuplify(true) { x in
+  1
+  #error("boom")    // expected-error{{boom}}
+  "hello"
+  #warning("oops")  // expected-warning{{oops}}
+  3.14159
+}

@@ -221,7 +221,8 @@ then run the build product in Terminal.
 Swift toolchains are created using the script
 [build-toolchain-tensorflow](https://github.com/apple/swift/blob/tensorflow/utils/build-toolchain-tensorflow).
 This script is used by swift.org's CI to produce snapshots and can allow for one to
-locally reproduce such builds for development or distribution purposes. E.x.:
+locally reproduce such builds for development or distribution purposes. A typical 
+invocation looks like the following:
 
 ```
   $ ./swift/utils/build-toolchain-tensorflow $BUNDLE_PREFIX

@@ -81,7 +81,9 @@ SILType SILType::getSILTokenType(const ASTContext &C) {
 }
 
 bool SILType::isTrivial(const SILFunction &F) const {
-  return F.getTypeLowering(*this).isTrivial();
+  auto contextType = hasTypeParameter() ? F.mapTypeIntoContext(*this) : *this;
+  
+  return F.getTypeLowering(contextType).isTrivial();
 }
 
 bool SILType::isReferenceCounted(SILModule &M) const {
@@ -195,7 +197,9 @@ bool SILType::isLoadableOrOpaque(const SILFunction &F) const {
 }
 
 bool SILType::isAddressOnly(const SILFunction &F) const {
-  return F.getTypeLowering(*this).isAddressOnly();
+  auto contextType = hasTypeParameter() ? F.mapTypeIntoContext(*this) : *this;
+    
+  return F.getTypeLowering(contextType).isAddressOnly();
 }
 
 SILType SILType::substGenericArgs(SILModule &M, SubstitutionMap SubMap,
@@ -393,20 +397,24 @@ SILType SILType::mapTypeOutOfContext() const {
 CanType swift::getSILBoxFieldLoweredType(TypeExpansionContext context,
                                          SILBoxType *type, TypeConverter &TC,
                                          unsigned index) {
-  auto fieldTy = type->getLayout()->getFields()[index].getLoweredType();
+  auto fieldTy = SILType::getPrimitiveObjectType(
+    type->getLayout()->getFields()[index].getLoweredType());
+  
+  // Map the type into the new expansion context, which might substitute opaque
+  // types.
+  auto sig = type->getLayout()->getGenericSignature();
+  fieldTy = TC.getTypeLowering(fieldTy, context, sig)
+              .getLoweredType();
   
   // Apply generic arguments if the layout is generic.
   if (auto subMap = type->getSubstitutions()) {
-    auto sig = type->getLayout()->getGenericSignature();
-    fieldTy = SILType::getPrimitiveObjectType(fieldTy)
-      .subst(TC,
-             QuerySubstitutionMap{subMap},
-             LookUpConformanceInSubstitutionMap(subMap),
-             sig)
-      .getASTType();
+    fieldTy = fieldTy.subst(TC,
+                            QuerySubstitutionMap{subMap},
+                            LookUpConformanceInSubstitutionMap(subMap),
+                            sig);
   }
-  fieldTy = TC.getLoweredType(fieldTy, context).getASTType();
-  return fieldTy;
+  
+  return fieldTy.getASTType();
 }
 
 ValueOwnershipKind
@@ -414,7 +422,6 @@ SILResultInfo::getOwnershipKind(SILFunction &F) const {
   auto &M = F.getModule();
   auto FTy = F.getLoweredFunctionType();
   auto sig = FTy->getInvocationGenericSignature();
-  GenericContextScope GCS(M.Types, sig);
 
   bool IsTrivial = getSILStorageType(M, FTy).isTrivial(F);
   switch (getConvention()) {

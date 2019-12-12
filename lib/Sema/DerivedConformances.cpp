@@ -17,6 +17,7 @@
 #include "swift/AST/Pattern.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/Types.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "DerivedConformances.h"
@@ -35,16 +36,15 @@ DeclContext *DerivedConformance::getConformanceContext() const {
   return cast<DeclContext>(ConformanceDecl);
 }
 
-bool DerivedConformance::addMembersToConformanceContext(
+void DerivedConformance::addMembersToConformanceContext(
     ArrayRef<Decl *> children) {
   auto IDC = cast<IterableDeclContext>(ConformanceDecl);
-  bool anyInvalid = false;
+  auto *SF = ConformanceDecl->getDeclContext()->getParentSourceFile();
   for (auto child : children) {
     IDC->addMember(child);
-    TypeChecker::typeCheckDecl(child);
-    anyInvalid |= child->isInvalid();
+    if (SF)
+      SF->SynthesizedDecls.push_back(child);
   }
-  return anyInvalid;
 }
 
 Type DerivedConformance::getProtocolType() const {
@@ -289,7 +289,7 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
     // TensorArrayProtocol._tensorHandleCount
     if (name.isSimpleName(ctx.Id_tensorHandleCount))
       return getRequirement(KnownProtocolKind::TensorArrayProtocol);
-    
+
     // SWIFT_ENABLE_TENSORFLOW
     // TensorArrayProtocol._typeList
     if (name.isSimpleName(ctx.Id_typeList) && !requirement->isStatic())
@@ -390,7 +390,7 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
 
     // SWIFT_ENABLE_TENSORFLOW
     // TensorArrayProtocol._unpackTensorHandles(into:)
-    if (name.isCompoundName() && 
+    if (name.isCompoundName() &&
         name.getBaseName() == ctx.Id_unpackTensorHandles) {
       auto argumentNames = name.getArgumentNames();
       if (argumentNames.size() == 1 &&
@@ -439,7 +439,7 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
     } else if (argumentNames.size() == 2) {
       // SWIFT_ENABLE_TENSORFLOW
       // TensorArrayProtocol.init(_owning:count)
-      if (argumentNames[0] == ctx.getIdentifier("_owning") && 
+      if (argumentNames[0] == ctx.getIdentifier("_owning") &&
           argumentNames[1] == ctx.getIdentifier("count")) {
         return getRequirement(KnownProtocolKind::TensorArrayProtocol);
       }
@@ -490,23 +490,8 @@ DerivedConformance::createSelfDeclRef(AbstractFunctionDecl *fn) {
 AccessorDecl *DerivedConformance::
 addGetterToReadOnlyDerivedProperty(VarDecl *property,
                                    Type propertyContextType) {
-  auto &C = property->getASTContext();
-  auto parentDC = property->getDeclContext();
-  ParameterList *params = ParameterList::createEmpty(C);
-
-  Type propertyInterfaceType = property->getInterfaceType();
-
-  auto getter = AccessorDecl::create(C,
-    /*FuncLoc=*/SourceLoc(), /*AccessorKeywordLoc=*/SourceLoc(),
-    AccessorKind::Get, property,
-    /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
-    /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
-    /*GenericParams=*/nullptr, params,
-    TypeLoc::withoutLoc(propertyInterfaceType), parentDC);
-  getter->setImplicit();
-  getter->setIsTransparent(false);
-
-  getter->copyFormalAccessFrom(property);
+  auto getter =
+    declareDerivedPropertyGetter(property, propertyContextType);
 
   property->setImplInfo(StorageImplInfo::getImmutableComputed());
   property->setAccessors(SourceLoc(), {getter}, SourceLoc());
@@ -514,11 +499,36 @@ addGetterToReadOnlyDerivedProperty(VarDecl *property,
   return getter;
 }
 
+AccessorDecl *
+DerivedConformance::declareDerivedPropertyGetter(VarDecl *property,
+                                                 Type propertyContextType) {
+  auto &C = property->getASTContext();
+  auto parentDC = property->getDeclContext();
+  ParameterList *params = ParameterList::createEmpty(C);
+
+  Type propertyInterfaceType = property->getInterfaceType();
+  
+  auto getterDecl = AccessorDecl::create(C,
+    /*FuncLoc=*/SourceLoc(), /*AccessorKeywordLoc=*/SourceLoc(),
+    AccessorKind::Get, property,
+    /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
+    /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
+    /*GenericParams=*/nullptr, params,
+    TypeLoc::withoutLoc(propertyInterfaceType), parentDC);
+  getterDecl->setImplicit();
+  getterDecl->setIsTransparent(false);
+
+  getterDecl->copyFormalAccessFrom(property);
+
+
+  return getterDecl;
+}
+
 // SWIFT_ENABLE_TENSORFLOW
 std::pair<AccessorDecl *, AccessorDecl *>
 DerivedConformance::addGetterAndSetterToMutableDerivedProperty(
     VarDecl *property, Type propertyContextType) {
-  auto *getter = addGetterToReadOnlyDerivedProperty(property, propertyContextType);
+  auto *getter = declareDerivedPropertyGetter(property, propertyContextType);
   auto *setter = declareDerivedPropertySetter(property, propertyContextType);
   property->setImplInfo(StorageImplInfo::getMutableComputed());
   property->setAccessors(SourceLoc(), {getter, setter}, SourceLoc());

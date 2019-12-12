@@ -27,6 +27,7 @@
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/QuotedString.h"
 #include "swift/Basic/STLExtras.h"
+#include "clang/AST/Type.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SmallString.h"
@@ -299,6 +300,7 @@ static StringRef getDefaultArgumentKindString(DefaultArgumentKind value) {
     case DefaultArgumentKind::Column: return "#column";
     case DefaultArgumentKind::DSOHandle: return "#dsohandle";
     case DefaultArgumentKind::File: return "#file";
+    case DefaultArgumentKind::FilePath: return "#filePath";
     case DefaultArgumentKind::Function: return "#function";
     case DefaultArgumentKind::Inherited: return "inherited";
     case DefaultArgumentKind::Line: return "#line";
@@ -315,6 +317,7 @@ static StringRef
 getMagicIdentifierLiteralExprKindString(MagicIdentifierLiteralExpr::Kind value) {
   switch (value) {
     case MagicIdentifierLiteralExpr::File: return "#file";
+    case MagicIdentifierLiteralExpr::FilePath: return "#filePath";
     case MagicIdentifierLiteralExpr::Function: return "#function";
     case MagicIdentifierLiteralExpr::Line: return "#line";
     case MagicIdentifierLiteralExpr::Column: return "#column";
@@ -3687,6 +3690,12 @@ namespace {
 
       OS << "\n";
       Indent += 2;
+      if (auto *cty = T->getClangFunctionType()) {
+        std::string s;
+        llvm::raw_string_ostream os(s);
+        cty->dump(os);
+        printField("clang_type", os.str());
+      }
       printAnyFunctionParams(T->getParams(), "input");
       Indent -=2;
       printRec("output", T->getResult());

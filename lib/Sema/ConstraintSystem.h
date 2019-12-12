@@ -449,8 +449,6 @@ public:
 
 namespace constraints {
 
-struct ResolvedOverloadSetListItem;
-
 /// The result of comparing two constraint systems that are a solutions
 /// to the given set of constraints.
 enum class SolutionCompareResult {
@@ -481,6 +479,146 @@ struct SelectedOverload {
 
   /// The opened type produced by referring to this overload.
   Type openedType;
+
+  /// The type that this overload binds. Note that this may differ from
+  /// openedType, for example it will include any IUO unwrapping that has taken
+  /// place.
+  Type boundType;
+};
+
+/// Provides information about the application of a function argument to a
+/// parameter.
+class FunctionArgApplyInfo {
+  Expr *ArgListExpr;
+  Expr *ArgExpr;
+  unsigned ArgIdx;
+  Type ArgType;
+
+  unsigned ParamIdx;
+
+  Type FnInterfaceType;
+  FunctionType *FnType;
+  const ValueDecl *Callee;
+
+public:
+  FunctionArgApplyInfo(Expr *argListExpr, Expr *argExpr, unsigned argIdx,
+                       Type argType, unsigned paramIdx, Type fnInterfaceType,
+                       FunctionType *fnType, const ValueDecl *callee)
+      : ArgListExpr(argListExpr), ArgExpr(argExpr), ArgIdx(argIdx),
+        ArgType(argType), ParamIdx(paramIdx), FnInterfaceType(fnInterfaceType),
+        FnType(fnType), Callee(callee) {}
+
+  /// \returns The argument being applied.
+  Expr *getArgExpr() const { return ArgExpr; }
+
+  /// \returns The position of the argument, starting at 1.
+  unsigned getArgPosition() const { return ArgIdx + 1; }
+
+  /// \returns The position of the parameter, starting at 1.
+  unsigned getParamPosition() const { return ParamIdx + 1; }
+
+  /// \returns The type of the argument being applied, including any generic
+  /// substitutions.
+  ///
+  /// \param withSpecifier Whether to keep the inout or @lvalue specifier of
+  /// the argument, if any.
+  Type getArgType(bool withSpecifier = false) const {
+    return withSpecifier ? ArgType : ArgType->getWithoutSpecifierType();
+  }
+
+  /// \returns The label for the argument being applied.
+  Identifier getArgLabel() const {
+    if (auto *te = dyn_cast<TupleExpr>(ArgListExpr))
+      return te->getElementName(ArgIdx);
+
+    assert(isa<ParenExpr>(ArgListExpr));
+    return Identifier();
+  }
+
+  /// \returns A textual description of the argument suitable for diagnostics.
+  /// For an argument with an unambiguous label, this will the label. Otherwise
+  /// it will be its position in the argument list.
+  StringRef getArgDescription(SmallVectorImpl<char> &scratch) const {
+    llvm::raw_svector_ostream stream(scratch);
+
+    // Use the argument label only if it's unique within the argument list.
+    auto argLabel = getArgLabel();
+    auto useArgLabel = [&]() -> bool {
+      if (argLabel.empty())
+        return false;
+
+      if (auto *te = dyn_cast<TupleExpr>(ArgListExpr))
+        return llvm::count(te->getElementNames(), argLabel) == 1;
+
+      return false;
+    };
+
+    if (useArgLabel()) {
+      stream << "'";
+      stream << argLabel;
+      stream << "'";
+    } else {
+      stream << "#";
+      stream << getArgPosition();
+    }
+    return StringRef(scratch.data(), scratch.size());
+  }
+
+  /// \returns The interface type for the function being applied. Note that this
+  /// may not a function type, for example it could be a generic parameter.
+  Type getFnInterfaceType() const { return FnInterfaceType; }
+
+  /// \returns The function type being applied, including any generic
+  /// substitutions.
+  FunctionType *getFnType() const { return FnType; }
+
+  /// \returns The callee for the application.
+  const ValueDecl *getCallee() const { return Callee; }
+
+private:
+  Type getParamTypeImpl(AnyFunctionType *fnTy,
+                        bool lookThroughAutoclosure) const {
+    auto param = fnTy->getParams()[ParamIdx];
+    auto paramTy = param.getPlainType();
+    if (lookThroughAutoclosure && param.isAutoClosure())
+      paramTy = paramTy->castTo<FunctionType>()->getResult();
+    return paramTy;
+  }
+
+public:
+  /// \returns The type of the parameter which the argument is being applied to,
+  /// including any generic substitutions.
+  ///
+  /// \param lookThroughAutoclosure Whether an @autoclosure () -> T parameter
+  /// should be treated as being of type T.
+  Type getParamType(bool lookThroughAutoclosure = true) const {
+    return getParamTypeImpl(FnType, lookThroughAutoclosure);
+  }
+
+  /// \returns The interface type of the parameter which the argument is being
+  /// applied to.
+  ///
+  /// \param lookThroughAutoclosure Whether an @autoclosure () -> T parameter
+  /// should be treated as being of type T.
+  Type getParamInterfaceType(bool lookThroughAutoclosure = true) const {
+    auto interfaceFnTy = FnInterfaceType->getAs<AnyFunctionType>();
+    if (!interfaceFnTy) {
+      // If the interface type isn't a function, then just return the resolved
+      // parameter type.
+      return getParamType(lookThroughAutoclosure)->mapTypeOutOfContext();
+    }
+    return getParamTypeImpl(interfaceFnTy, lookThroughAutoclosure);
+  }
+
+  /// \returns The flags of the parameter which the argument is being applied
+  /// to.
+  ParameterTypeFlags getParameterFlags() const {
+    return FnType->getParams()[ParamIdx].getParameterFlags();
+  }
+
+  ParameterTypeFlags getParameterFlagsAtIndex(unsigned idx) const {
+    return FnType->getParams()[idx].getParameterFlags();
+  }
 };
 
 /// Describes an aspect of a solution that affects its overall score, i.e., a
@@ -801,40 +939,6 @@ public:
   explicit SolutionDiff(ArrayRef<Solution> solutions);
 };
 
-/// Describes one resolved overload set within the list of overload sets
-/// resolved by the solver.
-struct ResolvedOverloadSetListItem {
-  /// The previously resolved overload set in the list.
-  ResolvedOverloadSetListItem *Previous;
-
-  /// The type that this overload binds.
-  Type BoundType;
-
-  /// The overload choice.
-  OverloadChoice Choice;
-
-  /// The locator for this choice.
-  ConstraintLocator *Locator;
-
-  /// The type of the fully-opened base, if any.
-  Type OpenedFullType;
-
-  /// The type of the referenced choice.
-  Type ImpliedType;
-
-  // Make vanilla new/delete illegal for overload set items.
-  void *operator new(size_t Bytes) = delete;
-  void operator delete(void *Data) = delete;
-
-  // Only allow allocation of list items using the allocator in the
-  // constraint system.
-  void *operator new(size_t bytes, ConstraintSystem &cs,
-                     unsigned alignment
-                       = alignof(ResolvedOverloadSetListItem));
-};
-  
-
-
 /// Identifies a specific conversion from
 struct SpecificConstraint {
   CanType First;
@@ -1092,7 +1196,7 @@ private:
   llvm::FoldingSetVector<ConstraintLocator> ConstraintLocators;
 
   /// The overload sets that have been resolved along the current path.
-  ResolvedOverloadSetListItem *resolvedOverloadSets = nullptr;
+  llvm::MapVector<ConstraintLocator *, SelectedOverload> ResolvedOverloads;
 
   /// The current fixed score for this constraint system and the (partial)
   /// solution it represents.
@@ -1611,30 +1715,32 @@ public:
   /// reference at the given locator.
   Optional<ArgumentInfo> getArgumentInfo(ConstraintLocator *locator);
 
-  ResolvedOverloadSetListItem *getResolvedOverloadSets() const {
-    return resolvedOverloadSets;
-  }
-
-  ResolvedOverloadSetListItem *
+  Optional<SelectedOverload>
   findSelectedOverloadFor(ConstraintLocator *locator) const {
-    auto resolvedOverload = getResolvedOverloadSets();
-    while (resolvedOverload) {
-      if (resolvedOverload->Locator == locator)
-        return resolvedOverload;
-      resolvedOverload = resolvedOverload->Previous;
-    }
-    return nullptr;
+    auto result = ResolvedOverloads.find(locator);
+    if (result == ResolvedOverloads.end())
+      return None;
+    return result->second;
   }
 
-  ResolvedOverloadSetListItem *findSelectedOverloadFor(Expr *expr) const {
-    auto resolvedOverload = getResolvedOverloadSets();
-    while (resolvedOverload) {
-      if (resolvedOverload->Locator->getAnchor() == expr)
-        return resolvedOverload;
-      resolvedOverload = resolvedOverload->Previous;
-    }
-    return nullptr;
+  Optional<SelectedOverload> findSelectedOverloadFor(Expr *expr) {
+    // Retrieve the callee locator for this expression, making sure not to
+    // look through applies in order to ensure we only return the "direct"
+    // callee.
+    auto *loc = getConstraintLocator(expr);
+    auto *calleeLoc = getCalleeLocator(loc, /*lookThroughApply*/ false);
+    return findSelectedOverloadFor(calleeLoc);
   }
+
+  /// Resolve type variables present in the raw type, using generic parameter
+  /// types where possible.
+  Type resolveInterfaceType(Type type) const;
+
+  /// For a given locator describing a function argument conversion, or a
+  /// constraint within an argument conversion, returns information about the
+  /// application of the argument to its parameter. If the locator is not
+  /// for an argument conversion, returns \c None.
+  Optional<FunctionArgApplyInfo> getFunctionArgApplyInfo(ConstraintLocator *);
 
 private:
   unsigned assignTypeVariableID() {
@@ -1652,9 +1758,6 @@ public:
   ///
   class SolverScope {
     ConstraintSystem &cs;
-
-    /// The current resolved overload set list.
-    ResolvedOverloadSetListItem *resolvedOverloadSets;
 
     /// The length of \c TypeVariables.
     unsigned numTypeVariables;
@@ -1692,6 +1795,9 @@ public:
     unsigned numFavoredConstraints;
 
     unsigned numBuilderTransformedClosures;
+
+    /// The length of \c ResolvedOverloads.
+    unsigned numResolvedOverloads;
 
     /// The previous score.
     Score PreviousScore;
@@ -2147,7 +2253,7 @@ public:
   void diagnoseFailureForExpr(Expr *expr);
 
   bool diagnoseAmbiguity(ArrayRef<Solution> solutions);
-  bool diagnoseAmbiguityWithFixes(ArrayRef<Solution> solutions);
+  bool diagnoseAmbiguityWithFixes(SmallVectorImpl<Solution> &solutions);
 
   /// Give the deprecation warning for referring to a global function
   /// when there's a method from a conditional conformance in a smaller/closer
@@ -2386,14 +2492,13 @@ public:
   /// Gets the VarDecl associateed with resolvedOverload, and the type of the
   /// storage wrapper if the decl has an associated storage wrapper.
   Optional<std::pair<VarDecl *, Type>>
-  getStorageWrapperInformation(ResolvedOverloadSetListItem *resolvedOverload) {
-    assert(resolvedOverload);
-    if (resolvedOverload->Choice.isDecl()) {
-      if (auto *decl = dyn_cast<VarDecl>(resolvedOverload->Choice.getDecl())) {
+  getStorageWrapperInformation(SelectedOverload resolvedOverload) {
+    if (resolvedOverload.choice.isDecl()) {
+      if (auto *decl = dyn_cast<VarDecl>(resolvedOverload.choice.getDecl())) {
         if (decl->hasAttachedPropertyWrapper()) {
           if (auto storageWrapper = decl->getPropertyWrapperStorageWrapper()) {
             Type type = storageWrapper->getInterfaceType();
-            if (Type baseType = resolvedOverload->Choice.getBaseType()) {
+            if (Type baseType = resolvedOverload.choice.getBaseType()) {
               type = baseType->getTypeOfMember(DC->getParentModule(),
                                                storageWrapper, type);
             }
@@ -2408,13 +2513,12 @@ public:
   /// Gets the VarDecl associateed with resolvedOverload, and the type of the
   /// backing storage if the decl has an associated property wrapper.
   Optional<std::pair<VarDecl *, Type>>
-  getPropertyWrapperInformation(ResolvedOverloadSetListItem *resolvedOverload) {
-    assert(resolvedOverload);
-    if (resolvedOverload->Choice.isDecl()) {
-      if (auto *decl = dyn_cast<VarDecl>(resolvedOverload->Choice.getDecl())) {
+  getPropertyWrapperInformation(SelectedOverload resolvedOverload) {
+    if (resolvedOverload.choice.isDecl()) {
+      if (auto *decl = dyn_cast<VarDecl>(resolvedOverload.choice.getDecl())) {
         if (decl->hasAttachedPropertyWrapper()) {
           auto wrapperTy = decl->getPropertyWrapperBackingPropertyType();
-          if (Type baseType = resolvedOverload->Choice.getBaseType()) {
+          if (Type baseType = resolvedOverload.choice.getBaseType()) {
             wrapperTy = baseType->getTypeOfMember(DC->getParentModule(),
                                                   decl, wrapperTy);
           }
@@ -2429,13 +2533,12 @@ public:
   /// resolved overload has a decl which is the backing storage for a
   /// property wrapper.
   Optional<std::pair<VarDecl *, Type>>
-  getWrappedPropertyInformation(ResolvedOverloadSetListItem *resolvedOverload) {
-    assert(resolvedOverload);
-    if (resolvedOverload->Choice.isDecl()) {
-      if (auto *decl = dyn_cast<VarDecl>(resolvedOverload->Choice.getDecl())) {
+  getWrappedPropertyInformation(SelectedOverload resolvedOverload) {
+    if (resolvedOverload.choice.isDecl()) {
+      if (auto *decl = dyn_cast<VarDecl>(resolvedOverload.choice.getDecl())) {
         if (auto wrapped = decl->getOriginalWrappedProperty()) {
           Type type = wrapped->getInterfaceType();
-          if (Type baseType = resolvedOverload->Choice.getBaseType()) {
+          if (Type baseType = resolvedOverload.choice.getBaseType()) {
             type = baseType->getTypeOfMember(DC->getParentModule(),
                                              wrapped, type);
           }

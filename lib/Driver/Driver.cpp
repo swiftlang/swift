@@ -265,6 +265,8 @@ Driver::buildToolChain(const llvm::opt::InputArgList &ArgList) {
     return llvm::make_unique<toolchains::Windows>(*this, target);
   case llvm::Triple::Haiku:
     return llvm::make_unique<toolchains::GenericUnix>(*this, target);
+  case llvm::Triple::WASI:
+    return llvm::make_unique<toolchains::GenericUnix>(*this, target);
   default:
     Diags.diagnose(SourceLoc(), diag::error_unknown_target,
                    ArgList.getLastArg(options::OPT_target)->getValue());
@@ -950,17 +952,17 @@ Driver::buildCompilation(const ToolChain &TC,
     std::unique_ptr<UnifiedStatsReporter> StatsReporter =
         createStatsReporter(ArgList.get(), Inputs, OI, DefaultTargetTriple);
     // relies on the new dependency graph
-    const bool EnableExperimentalDependencies =
-        ArgList->hasArg(options::OPT_enable_experimental_dependencies);
+    const bool EnableFineGrainedDependencies =
+        ArgList->hasArg(options::OPT_enable_fine_grained_dependencies);
 
-    const bool VerifyExperimentalDependencyGraphAfterEveryImport = ArgList->hasArg(
+    const bool VerifyFineGrainedDependencyGraphAfterEveryImport = ArgList->hasArg(
         options::
-            OPT_driver_verify_experimental_dependency_graph_after_every_import);
-    const bool EmitExperimentalDependencyDotFileAfterEveryImport = ArgList->hasArg(
+            OPT_driver_verify_fine_grained_dependency_graph_after_every_import);
+    const bool EmitFineGrainedDependencyDotFileAfterEveryImport = ArgList->hasArg(
         options::
-            OPT_driver_emit_experimental_dependency_dot_file_after_every_import);
-    const bool ExperimentalDependenciesIncludeIntrafileOnes = ArgList->hasArg(
-        options::OPT_experimental_dependency_include_intrafile);
+            OPT_driver_emit_fine_grained_dependency_dot_file_after_every_import);
+    const bool FineGrainedDependenciesIncludeIntrafileOnes =
+        ArgList->hasArg(options::OPT_fine_grained_dependency_include_intrafile);
 
     // clang-format off
     C = llvm::make_unique<Compilation>(
@@ -982,10 +984,10 @@ Driver::buildCompilation(const ToolChain &TC,
         SaveTemps,
         ShowDriverTimeCompilation,
         std::move(StatsReporter),
-        EnableExperimentalDependencies,
-        VerifyExperimentalDependencyGraphAfterEveryImport,
-        EmitExperimentalDependencyDotFileAfterEveryImport,
-        ExperimentalDependenciesIncludeIntrafileOnes,
+        EnableFineGrainedDependencies,
+        VerifyFineGrainedDependencyGraphAfterEveryImport,
+        EmitFineGrainedDependencyDotFileAfterEveryImport,
+        FineGrainedDependenciesIncludeIntrafileOnes,
         EnableSourceRangeDependencies,
         CompareIncrementalSchemes,
         CompareIncrementalSchemesPath);
@@ -2120,6 +2122,40 @@ bool Driver::handleImmediateArgs(const ArgList &Args, const ToolChain &TC) {
     DriverExecutable = commandArgs[0];
     DriverExecutableArgs.assign(std::begin(commandArgs) + 1,
                                 std::end(commandArgs));
+  }
+
+  if (Args.hasArg(options::OPT_print_target_info)) {
+    SmallVector<const char *, 5> commandLine;
+    commandLine.push_back("-frontend");
+    commandLine.push_back("-print-target-info");
+    if (const Arg *targetArg = Args.getLastArg(options::OPT_target)) {
+      commandLine.push_back("-target");
+      commandLine.push_back(targetArg->getValue());
+    }
+    if (const Arg *sdkArg = Args.getLastArg(options::OPT_sdk)) {
+      commandLine.push_back("-sdk");
+      commandLine.push_back(sdkArg->getValue());
+    }
+
+    if (const Arg *resourceDirArg = Args.getLastArg(options::OPT_resource_dir)) {
+      commandLine.push_back("-resource-dir");
+      commandLine.push_back(resourceDirArg->getValue());
+    }
+
+    std::string executable = getSwiftProgramPath();
+
+    sys::TaskQueue queue;
+    queue.addTask(executable.c_str(), commandLine);
+    queue.execute(nullptr,
+                  [](sys::ProcessId PID, int returnCode,
+                      StringRef output, StringRef errors,
+                      sys::TaskProcessInformation ProcInfo,
+                      void *unused) -> sys::TaskFinishedResponse {
+      llvm::outs() << output;
+      llvm::errs() << errors;
+      return sys::TaskFinishedResponse::ContinueExecution;
+    });
+    return false;
   }
 
   return true;

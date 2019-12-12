@@ -242,7 +242,8 @@ public:
   ///
   /// This is equivalent to, but possibly faster than, calling
   /// tc.getTypeLowering(type).isAddressOnly().
-  static bool isAddressOnly(CanType type, Lowering::TypeConverter &tc,
+  static bool isAddressOnly(CanType type,
+                            Lowering::TypeConverter &tc,
                             CanGenericSignature sig,
                             TypeExpansionContext expansion);
 

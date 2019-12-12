@@ -154,10 +154,6 @@ deriveBodyMathOperator(AbstractFunctionDecl *funcDecl, MathOperator op) {
 
   // Create reference to operator parameters: lhs and rhs.
   auto params = funcDecl->getParameters();
-  auto *lhsDRE =
-      new (C) DeclRefExpr(params->get(0), DeclNameLoc(), /*Implicit*/ true);
-  auto *rhsDRE =
-      new (C) DeclRefExpr(params->get(1), DeclNameLoc(), /*Implicit*/ true);
 
   // Create expression combining lhs and rhs members using member operator.
   auto createMemberOpExpr = [&](VarDecl *member) -> Expr * {
@@ -185,6 +181,12 @@ deriveBodyMathOperator(AbstractFunctionDecl *funcDecl, MathOperator op) {
         new (C) DotSyntaxCallExpr(memberOpDRE, SourceLoc(), memberTypeExpr);
 
     // Create expression `lhs.member <op> rhs.member`.
+    // NOTE(TF-1054): create new `DeclRefExpr`s per loop iteration to avoid
+    // `ConstraintSystem::resolveOverload` error.
+    auto *lhsDRE =
+        new (C) DeclRefExpr(params->get(0), DeclNameLoc(), /*Implicit*/ true);
+    auto *rhsDRE =
+        new (C) DeclRefExpr(params->get(1), DeclNameLoc(), /*Implicit*/ true);
     Expr *lhsArg = new (C) MemberRefExpr(lhsDRE, SourceLoc(), member,
                                          DeclNameLoc(), /*Implicit*/ true);
     auto *rhsArg = new (C) MemberRefExpr(rhsDRE, SourceLoc(), member,

@@ -15,6 +15,7 @@
 #include "swift/Basic/STLExtras.h"
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/BranchPropagatedUser.h"
+#include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/SILArgument.h"
@@ -25,6 +26,7 @@
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
+#include "swift/SILOptimizer/Utils/ValueLifetime.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Statistic.h"
@@ -44,9 +46,9 @@ STATISTIC(NumLoadCopyConvertedToLoadBorrow,
 ///
 /// Semantically this implies that a value is never passed off as +1 to memory
 /// or another function implying it can be used everywhere at +0.
-static bool isDeadLiveRange(
-    SILValue v, SmallVectorImpl<DestroyValueInst *> &destroys,
-    NullablePtr<SmallVectorImpl<SILInstruction *>> forwardingInsts = nullptr) {
+static bool
+isDeadLiveRange(SILValue v, SmallVectorImpl<SILInstruction *> &destroys,
+                SmallVectorImpl<SILInstruction *> &forwardingInsts) {
   assert(v.getOwnershipKind() == ValueOwnershipKind::Owned);
   SmallVector<Operand *, 32> worklist(v->use_begin(), v->use_end());
   while (!worklist.empty()) {
@@ -84,8 +86,7 @@ static bool isDeadLiveRange(
       //
       // NOTE: Today we do not support TermInsts for simplicity... we /could/
       // support it though if we need to.
-      if (forwardingInsts.isNull() || isa<TermInst>(user) ||
-          !isGuaranteedForwardingInst(user) ||
+      if (isa<TermInst>(user) || !isGuaranteedForwardingInst(user) ||
           1 != count_if(user->getOperandValues(
                             true /*ignore type dependent operands*/),
                         [&](SILValue v) {
@@ -98,7 +99,7 @@ static bool isDeadLiveRange(
       // Ok, this is a forwarding instruction whose ownership we can flip from
       // owned -> guaranteed. Visit its users recursively to see if the the
       // users force the live range to be alive.
-      forwardingInsts.get()->push_back(user);
+      forwardingInsts.push_back(user);
       for (SILValue v : user->getResults()) {
         if (v.getOwnershipKind() != ValueOwnershipKind::Owned)
           continue;
@@ -148,12 +149,16 @@ struct SemanticARCOptVisitor
   /// Our main worklist. We use this after an initial run through.
   SmallBlotSetVector<SILValue, 32> worklist;
 
-  /// A secondary work list that we use to store dead trivial instructions to
-  /// delete after we are done processing the worklist.
-  SmallBlotSetVector<SILInstruction *, 32> deadTrivialInsts;
+  /// A set of values that we have visited since the last mutation. We use this
+  /// to ensure that we do not visit values twice without mutating.
+  ///
+  /// This is specifically to ensure that we do not go into an infinite loop
+  /// when visiting phi nodes.
+  SmallBlotSetVector<SILValue, 16> visitedSinceLastMutation;
 
   SILFunction &F;
   Optional<DeadEndBlocks> TheDeadEndBlocks;
+  ValueLifetimeAnalysis::Frontier lifetimeFrontier;
 
   explicit SemanticARCOptVisitor(SILFunction &F) : F(F) {}
 
@@ -167,8 +172,13 @@ struct SemanticARCOptVisitor
   /// the worklist, and then call eraseInstruction on i.
   void eraseAndRAUWSingleValueInstruction(SingleValueInstruction *i, SILValue newValue) {
     worklist.insert(newValue);
+    for (auto *use : i->getUses()) {
+      for (SILValue result : use->getUser()->getResults()) {
+        worklist.insert(result);
+      }
+    }
     i->replaceAllUsesWith(newValue);
-    eraseInstruction(i);
+    eraseInstructionAndAddOperandsToWorklist(i);
   }
 
   /// Add all operands of i to the worklist and then call eraseInstruction on
@@ -189,18 +199,94 @@ struct SemanticARCOptVisitor
     // the instruction.
     for (SILValue result : i->getResults()) {
       worklist.erase(result);
+      visitedSinceLastMutation.erase(result);
     }
-    deadTrivialInsts.erase(i);
     i->eraseFromParent();
+
+    // Add everything else from visitedSinceLastMutation to the worklist.
+    for (auto opt : visitedSinceLastMutation) {
+      if (!opt.hasValue()) {
+        continue;
+      }
+      worklist.insert(*opt);
+    }
+    visitedSinceLastMutation.clear();
   }
 
   /// The default visitor.
-  bool visitSILInstruction(SILInstruction *i) { return false; }
+  bool visitSILInstruction(SILInstruction *i) {
+    assert(!isGuaranteedForwardingInst(i) &&
+           "Should have forwarding visitor for all ownership forwarding "
+           "instructions");
+    return false;
+  }
+
   bool visitCopyValueInst(CopyValueInst *cvi);
   bool visitBeginBorrowInst(BeginBorrowInst *bbi);
   bool visitLoadInst(LoadInst *li);
+  static bool shouldVisitInst(SILInstruction *i) {
+    switch (i->getKind()) {
+    default:
+      return false;
+    case SILInstructionKind::CopyValueInst:
+    case SILInstructionKind::BeginBorrowInst:
+    case SILInstructionKind::LoadInst:
+      return true;
+    }
+  }
 
-  bool isWrittenTo(LoadInst *li);
+#define FORWARDING_INST(NAME)                                                  \
+  bool visit##NAME##Inst(NAME##Inst *cls) {                                    \
+    for (SILValue v : cls->getResults()) {                                     \
+      worklist.insert(v);                                                      \
+    }                                                                          \
+    return false;                                                              \
+  }
+  FORWARDING_INST(Tuple)
+  FORWARDING_INST(Struct)
+  FORWARDING_INST(Enum)
+  FORWARDING_INST(OpenExistentialRef)
+  FORWARDING_INST(Upcast)
+  FORWARDING_INST(UncheckedRefCast)
+  FORWARDING_INST(ConvertFunction)
+  FORWARDING_INST(RefToBridgeObject)
+  FORWARDING_INST(BridgeObjectToRef)
+  FORWARDING_INST(UnconditionalCheckedCast)
+  FORWARDING_INST(UncheckedEnumData)
+  FORWARDING_INST(MarkUninitialized)
+  FORWARDING_INST(SelectEnum)
+  FORWARDING_INST(DestructureStruct)
+  FORWARDING_INST(DestructureTuple)
+  FORWARDING_INST(TupleExtract)
+  FORWARDING_INST(StructExtract)
+  FORWARDING_INST(OpenExistentialValue)
+  FORWARDING_INST(OpenExistentialBoxValue)
+  FORWARDING_INST(MarkDependence)
+  // SWIFT_ENABLE_TENSORFLOW
+  FORWARDING_INST(DifferentiableFunction)
+  FORWARDING_INST(LinearFunction)
+  FORWARDING_INST(DifferentiableFunctionExtract)
+  FORWARDING_INST(LinearFunctionExtract)
+  // SWIFT_ENABLE_TENSORFLOW END
+#undef FORWARDING_INST
+
+#define FORWARDING_TERM(NAME)                                                  \
+  bool visit##NAME##Inst(NAME##Inst *cls) {                                    \
+    for (auto succValues : cls->getSuccessorBlockArguments()) {                \
+      for (SILValue v : succValues) {                                          \
+        worklist.insert(v);                                                    \
+      }                                                                        \
+    }                                                                          \
+    return false;                                                              \
+  }
+
+  FORWARDING_TERM(SwitchEnum)
+  FORWARDING_TERM(CheckedCastBranch)
+  FORWARDING_TERM(Branch)
+  FORWARDING_TERM(CondBranch)
+#undef FORWARDING_TERM
+
+  bool isWrittenTo(LoadInst *li, ArrayRef<SILInstruction *> destroys);
 
   bool processWorklist();
 
@@ -225,6 +311,14 @@ bool SemanticARCOptVisitor::processWorklist() {
     if (!next)
       continue;
 
+    // First check if this is a value that we have visited since the last time
+    // we erased an instruction. If we have visited it, skip it. Every time we
+    // modify something, we should be deleting an instruction, so we have not
+    // found any further information.
+    if (!visitedSinceLastMutation.insert(next).second) {
+      continue;
+    }
+
     // First check if this is an instruction that is trivially dead. This can
     // occur if we eliminate rr traffic resulting in dead projections and the
     // like.
@@ -234,7 +328,8 @@ bool SemanticARCOptVisitor::processWorklist() {
     // the instruction).
     if (auto *defInst = next->getDefiningInstruction()) {
       if (isInstructionTriviallyDead(defInst)) {
-        deadTrivialInsts.insert(defInst);
+        deleteAllDebugUses(defInst);
+        eraseInstruction(defInst);
         continue;
       }
     }
@@ -245,23 +340,6 @@ bool SemanticARCOptVisitor::processWorklist() {
       madeChange |= visit(svi);
       continue;
     }
-  }
-
-  // Then eliminate the rest of the dead trivial insts.
-  //
-  // NOTE: We do not need to touch the worklist here since it is guaranteed to
-  // be empty due to the loop above. We enforce this programatically with the
-  // assert.
-  assert(worklist.empty() && "Expected drained worklist so we don't have to "
-                             "remove dead insts form it");
-  while (!deadTrivialInsts.empty()) {
-    auto val = deadTrivialInsts.pop_back_val();
-    if (!val)
-      continue;
-    recursivelyDeleteTriviallyDeadInstructions(
-        *val, true /*force*/,
-        [&](SILInstruction *i) { deadTrivialInsts.erase(i); });
-    madeChange = true;
   }
 
   return madeChange;
@@ -297,6 +375,49 @@ bool SemanticARCOptVisitor::visitBeginBorrowInst(BeginBorrowInst *bbi) {
   eraseAndRAUWSingleValueInstruction(bbi, bbi->getOperand());
   ++NumEliminatedInsts;
   return true;
+}
+
+static void convertForwardingInstsFromOwnedToGuaranteed(
+    SmallVectorImpl<SILInstruction *> &guaranteedForwardingInsts) {
+  // Then change all of our guaranteed forwarding insts to have guaranteed
+  // ownership kind instead of what ever they previously had (ignoring trivial
+  // results);
+  while (!guaranteedForwardingInsts.empty()) {
+    auto *i = guaranteedForwardingInsts.pop_back_val();
+    assert(i->hasResults());
+
+    for (SILValue result : i->getResults()) {
+      if (auto *svi = dyn_cast<OwnershipForwardingSingleValueInst>(result)) {
+        if (svi->getOwnershipKind() == ValueOwnershipKind::Owned) {
+          svi->setOwnershipKind(ValueOwnershipKind::Guaranteed);
+        }
+        continue;
+      }
+
+      if (auto *ofci = dyn_cast<OwnershipForwardingConversionInst>(result)) {
+        if (ofci->getOwnershipKind() == ValueOwnershipKind::Owned) {
+          ofci->setOwnershipKind(ValueOwnershipKind::Guaranteed);
+        }
+        continue;
+      }
+
+      if (auto *sei = dyn_cast<OwnershipForwardingSelectEnumInstBase>(result)) {
+        if (sei->getOwnershipKind() == ValueOwnershipKind::Owned) {
+          sei->setOwnershipKind(ValueOwnershipKind::Guaranteed);
+        }
+        continue;
+      }
+
+      if (auto *mvir = dyn_cast<MultipleValueInstructionResult>(result)) {
+        if (mvir->getOwnershipKind() == ValueOwnershipKind::Owned) {
+          mvir->setOwnershipKind(ValueOwnershipKind::Guaranteed);
+        }
+        continue;
+      }
+
+      llvm_unreachable("unhandled forwarding instruction?!");
+    }
+  }
 }
 
 // Eliminate a copy of a borrowed value, if:
@@ -346,9 +467,9 @@ bool SemanticARCOptVisitor::performGuaranteedCopyValueOptimization(CopyValueInst
   // must be some consuming use that we either do not understand is /actually/
   // forwarding or a user that truly represents a necessary consume of the
   // value (e.x. storing into memory).
-  SmallVector<DestroyValueInst *, 16> destroys;
+  SmallVector<SILInstruction *, 16> destroys;
   SmallVector<SILInstruction *, 16> guaranteedForwardingInsts;
-  if (!isDeadLiveRange(cvi, destroys, &guaranteedForwardingInsts))
+  if (!isDeadLiveRange(cvi, destroys, guaranteedForwardingInsts))
     return false;
 
   // Next check if we do not have any destroys of our copy_value and are
@@ -459,47 +580,8 @@ bool SemanticARCOptVisitor::performGuaranteedCopyValueOptimization(CopyValueInst
   }
 
   eraseAndRAUWSingleValueInstruction(cvi, cvi->getOperand());
+  convertForwardingInstsFromOwnedToGuaranteed(guaranteedForwardingInsts);
 
-  // Then change all of our guaranteed forwarding insts to have guaranteed
-  // ownership kind instead of what ever they previously had (ignoring trivial
-  // results);
-  while (!guaranteedForwardingInsts.empty()) {
-    auto *i = guaranteedForwardingInsts.pop_back_val();
-
-    assert(i->hasResults());
-
-    for (SILValue result : i->getResults()) {
-      if (auto *svi = dyn_cast<OwnershipForwardingSingleValueInst>(result)) {
-        if (svi->getOwnershipKind() == ValueOwnershipKind::Owned) {
-          svi->setOwnershipKind(ValueOwnershipKind::Guaranteed);
-        }
-        continue;
-      }
-
-      if (auto *ofci = dyn_cast<OwnershipForwardingConversionInst>(result)) {
-        if (ofci->getOwnershipKind() == ValueOwnershipKind::Owned) {
-          ofci->setOwnershipKind(ValueOwnershipKind::Guaranteed);
-        }
-        continue;
-      }
-
-      if (auto *sei = dyn_cast<OwnershipForwardingSelectEnumInstBase>(result)) {
-        if (sei->getOwnershipKind() == ValueOwnershipKind::Owned) {
-          sei->setOwnershipKind(ValueOwnershipKind::Guaranteed);
-        }
-        continue;
-      }
-
-      if (auto *mvir = dyn_cast<MultipleValueInstructionResult>(result)) {
-        if (mvir->getOwnershipKind() == ValueOwnershipKind::Owned) {
-          mvir->setOwnershipKind(ValueOwnershipKind::Guaranteed);
-        }
-        continue;
-      }
-
-      llvm_unreachable("unhandled forwarding instruction?!");
-    }
-  }
   ++NumEliminatedInsts;
   return true;
 }
@@ -588,6 +670,7 @@ bool mayFunctionMutateArgument(const AccessedStorage &storage, SILFunction &f) {
 // Then find our accessed storage to determine whether it provides a guarantee
 // for the loaded value.
 namespace {
+
 class StorageGuaranteesLoadVisitor
   : public AccessUseDefChainVisitor<StorageGuaranteesLoadVisitor>
 {
@@ -601,12 +684,15 @@ class StorageGuaranteesLoadVisitor
   SILValue currentAddress;
   
   Optional<bool> isWritten;
-  
+
+  ArrayRef<SILInstruction *> destroyValues;
+
 public:
-  StorageGuaranteesLoadVisitor(SemanticARCOptVisitor &arcOpt, LoadInst *load)
-    : ARCOpt(arcOpt), Load(load), currentAddress(load->getOperand())
-  {}
-  
+  StorageGuaranteesLoadVisitor(SemanticARCOptVisitor &arcOpt, LoadInst *load,
+                               ArrayRef<SILInstruction *> destroyValues)
+      : ARCOpt(arcOpt), Load(load), currentAddress(load->getOperand()),
+        destroyValues(destroyValues) {}
+
   void answer(bool written) {
     currentAddress = nullptr;
     isWritten = written;
@@ -714,6 +800,25 @@ public:
     return answer(true);
   }
 
+  /// See if we have an alloc_stack that is only written to once by an
+  /// initializing instruction.
+  void visitStackAccess(AllocStackInst *stack) {
+    SmallVector<SILInstruction *, 8> destroyAddrs;
+    bool initialAnswer = isSingleInitAllocStack(stack, destroyAddrs);
+    if (!initialAnswer)
+      return answer(true);
+
+    // Then make sure that all of our load [copy] uses are within the
+    // destroy_addr.
+    SmallPtrSet<SILBasicBlock *, 4> visitedBlocks;
+    LinearLifetimeChecker checker(visitedBlocks, ARCOpt.getDeadEndBlocks());
+    // Returns true on success. So we invert.
+    bool foundError =
+        !checker.validateLifetime(stack, destroyAddrs /*consuming users*/,
+                                  destroyValues /*non consuming users*/);
+    return answer(foundError);
+  }
+
   bool doIt() {
     while (currentAddress) {
       visit(currentAddress);
@@ -721,10 +826,12 @@ public:
     return *isWritten;
   }
 };
+
 } // namespace
 
-bool SemanticARCOptVisitor::isWrittenTo(LoadInst *load) {
-  StorageGuaranteesLoadVisitor visitor(*this, load);
+bool SemanticARCOptVisitor::isWrittenTo(LoadInst *load,
+                                        ArrayRef<SILInstruction *> destroys) {
+  StorageGuaranteesLoadVisitor visitor(*this, load, destroys);
   return visitor.doIt();
 }
 
@@ -741,14 +848,15 @@ bool SemanticARCOptVisitor::visitLoadInst(LoadInst *li) {
   // FIXME: We should consider if it is worth promoting a load [copy]
   // -> load_borrow if we can put a copy_value on a cold path and thus
   // eliminate RR traffic on a hot path.
-  SmallVector<DestroyValueInst *, 32> destroyValues;
-  if (!isDeadLiveRange(li, destroyValues))
+  SmallVector<SILInstruction *, 32> destroyValues;
+  SmallVector<SILInstruction *, 16> guaranteedForwardingInsts;
+  if (!isDeadLiveRange(li, destroyValues, guaranteedForwardingInsts))
     return false;
 
   // Then check if our address is ever written to. If it is, then we cannot use
   // the load_borrow because the stored value may be released during the loaded
   // value's live range.
-  if (isWrittenTo(li))
+  if (isWrittenTo(li, destroyValues))
     return false;
 
   // Ok, we can perform our optimization. Convert the load [copy] into a
@@ -760,14 +868,34 @@ bool SemanticARCOptVisitor::visitLoadInst(LoadInst *li) {
   // parameters, we can have multiple destroy_value along the same path. We need
   // to find the post-dominating block set of these destroy value to ensure that
   // we do not insert multiple end_borrow.
+  assert(lifetimeFrontier.empty());
+  ValueLifetimeAnalysis analysis(li, destroyValues);
+  bool foundCriticalEdges = !analysis.computeFrontier(
+      lifetimeFrontier, ValueLifetimeAnalysis::DontModifyCFG,
+      &getDeadEndBlocks());
+  (void)foundCriticalEdges;
+  assert(!foundCriticalEdges);
+  auto loc = RegularLocation::getAutoGeneratedLocation();
+  while (!lifetimeFrontier.empty()) {
+    auto *insertPoint = lifetimeFrontier.pop_back_val();
+    SILBuilderWithScope builder(insertPoint);
+    builder.createEndBorrow(loc, lbi);
+  }
+
+  // Then delete all of our destroy_value.
   while (!destroyValues.empty()) {
     auto *dvi = destroyValues.pop_back_val();
-    SILBuilderWithScope(dvi).createEndBorrow(dvi->getLoc(), lbi);
     eraseInstruction(dvi);
     ++NumEliminatedInsts;
   }
 
+  // RAUW our other uses from the load to the load_borrow.
   eraseAndRAUWSingleValueInstruction(li, lbi);
+
+  // And then change the ownership all of our owned forwarding users to be
+  // guaranteed.
+  convertForwardingInstsFromOwnedToGuaranteed(guaranteedForwardingInsts);
+
   ++NumEliminatedInsts;
   ++NumLoadCopyConvertedToLoadBorrow;
   return true;
@@ -795,59 +923,24 @@ struct SemanticARCOpts : SILFunctionTransform {
            "Can not perform semantic arc optimization unless ownership "
            "verification is enabled");
 
-    // Iterate over all of the arguments, performing small peephole ARC
-    // optimizations. We assume that the visitor will add any instructions we
-    // need to recursively to the visitor's worklist. Also, note that we assume
-    // that we do not look through /any/ sil block arguments here since our
-    // iteration here is only valid up to SSA.
-    bool madeChange = false;
-    
     SemanticARCOptVisitor visitor(f);
-    
-    for (auto &bb : f) {
-      auto ii = bb.rend();
-      auto start = bb.rbegin();
 
-      // If the bb is empty, continue.
-      if (start == ii)
-        continue;
-
-      // Go to the first instruction to process.
-      --ii;
-
-      // Then until we process the first instruction of the block...
-      while (ii != start) {
-        // Move the iterator before ii.
-        auto tmp = std::next(ii);
-
-        // Then try to optimize. If we succeeded, then we deleted
-        // ii. Move ii from the next value back onto the instruction
-        // after ii's old value in the block instruction list and then
-        // process that.
-        if (visitor.visit(&*ii)) {
-          madeChange = true;
-          ii = std::prev(tmp);
-          continue;
+    // Add all the results of all instructions that we want to visit to the
+    // worklist.
+    for (auto &block : f) {
+      for (auto &inst : block) {
+        if (SemanticARCOptVisitor::shouldVisitInst(&inst)) {
+          for (SILValue v : inst.getResults()) {
+            visitor.worklist.insert(v);
+          }
         }
-
-        // Otherwise, we didn't delete ii. Just visit the next instruction.
-        --ii;
       }
-
-      // Finally visit the first instruction of the block.
-      madeChange |= visitor.visit(&*ii);
     }
 
-    // Finally drain the worklist on the visitor and process until we reach the
-    // fixpoint and thus do not have any further work to do.
-    //
-    // NOTE: At this point madeChange has already been set to true if we have
-    // anything in the worklist, so technically we do not need to do this. But I
-    // would rather represent this state to future proof the pass to be
-    // "visually" correct.
-    madeChange |= visitor.processWorklist();
-
-    if (madeChange) {
+    // Then process the worklist. We only destroy instructions, so invalidate
+    // that. Once we modify the ownership of block arguments, we will need to
+    // perhaps invalidate branches as well.
+    if (visitor.processWorklist()) {
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
     }
   }

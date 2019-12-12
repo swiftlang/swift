@@ -101,12 +101,9 @@ Solution ConstraintSystem::finalize() {
     solution.typeBindings[tv] = simplifyType(tv)->reconstituteSugar(false);
   }
 
-  // For each of the overload sets, get its overload choice.
-  for (auto resolved = resolvedOverloadSets;
-       resolved; resolved = resolved->Previous) {
-    solution.overloadChoices[resolved->Locator]
-      = { resolved->Choice, resolved->OpenedFullType, resolved->ImpliedType };
-  }
+  // Copy over the resolved overloads.
+  solution.overloadChoices.insert(ResolvedOverloads.begin(),
+                                  ResolvedOverloads.end());
 
   // For each of the constraint restrictions, record it with simplified,
   // canonical types.
@@ -203,15 +200,8 @@ void ConstraintSystem::applySolution(const Solution &solution) {
 
   // Register overload choices.
   // FIXME: Copy these directly into some kind of partial solution?
-  for (auto overload : solution.overloadChoices) {
-    resolvedOverloadSets
-      = new (*this) ResolvedOverloadSetListItem{resolvedOverloadSets,
-                                                Type(),
-                                                overload.second.choice,
-                                                overload.first,
-                                                overload.second.openedFullType,
-                                                overload.second.openedType};    
-  }
+  for (auto overload : solution.overloadChoices)
+    ResolvedOverloads.insert(overload);
 
   // Register constraint restrictions.
   // FIXME: Copy these directly into some kind of partial solution?
@@ -433,7 +423,6 @@ ConstraintSystem::SolverState::~SolverState() {
 ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
   : cs(cs), CGScope(cs.CG)
 {
-  resolvedOverloadSets = cs.resolvedOverloadSets;
   numTypeVariables = cs.TypeVariables.size();
   numSavedBindings = cs.solverState->savedBindings.size();
   numConstraintRestrictions = cs.ConstraintRestrictions.size();
@@ -448,6 +437,7 @@ ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
   numDisabledConstraints = cs.solverState->getNumDisabledConstraints();
   numFavoredConstraints = cs.solverState->getNumFavoredConstraints();
   numBuilderTransformedClosures = cs.builderTransformedClosures.size();
+  numResolvedOverloads = cs.ResolvedOverloads.size();
 
   PreviousScore = cs.CurrentScore;
 
@@ -457,9 +447,11 @@ ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
 
 ConstraintSystem::SolverScope::~SolverScope() {
   // Erase the end of various lists.
-  cs.resolvedOverloadSets = resolvedOverloadSets;
   while (cs.TypeVariables.size() > numTypeVariables)
     cs.TypeVariables.pop_back();
+
+  while (cs.ResolvedOverloads.size() > numResolvedOverloads)
+    cs.ResolvedOverloads.pop_back();
 
   // Restore bindings.
   cs.restoreTypeVariableBindings(cs.solverState->savedBindings.size() -

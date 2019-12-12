@@ -618,6 +618,8 @@ namespace {
         Changed |= tryToSpeculateTarget(AI, CHA, ORE);
 
       if (Changed) {
+        CurFn.getModule().linkFunction(&CurFn, SILModule::LinkingMode::LinkAll);
+
         invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
       }
     }

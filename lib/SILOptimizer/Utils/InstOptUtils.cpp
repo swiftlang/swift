@@ -1582,3 +1582,10 @@ void swift::insertDestroyOfCapturedArguments(
     releasePartialApplyCapturedArg(builder, loc, arg.get(), paramInfo);
   }
 }
+
+AbstractFunctionDecl *swift::getBaseMethod(AbstractFunctionDecl *FD) {
+  while (FD->getOverriddenDecl()) {
+    FD = FD->getOverriddenDecl();
+  }
+  return FD;
+}

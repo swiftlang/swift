@@ -159,12 +159,6 @@ deriveBodyElementaryFunction(AbstractFunctionDecl *funcDecl,
   // Create reference(s) to operator parameters: one for unary functions and two
   // for binary functions.
   auto params = funcDecl->getParameters();
-  auto *firstParamDRE =
-      new (C) DeclRefExpr(params->get(0), DeclNameLoc(), /*Implicit*/ true);
-  Expr *secondParamDRE = nullptr;
-  if (params->size() == 2)
-    secondParamDRE =
-        new (C) DeclRefExpr(params->get(1), DeclNameLoc(), /*Implicit*/ true);
 
   // Create call expression combining lhs and rhs members using member operator.
   auto createMemberOpCallExpr = [&](VarDecl *member) -> Expr * {
@@ -196,6 +190,14 @@ deriveBodyElementaryFunction(AbstractFunctionDecl *funcDecl,
     //   `<op>(x.member, y.member)`.
     // - For `pow(_ x: Self, _ n: Int)` and `root(_ x: Self, n: Int)`, create:
     //   `<op>(x.member, n)`.
+    // NOTE(TF-1054): create new `DeclRefExpr`s per loop iteration to avoid
+    // `ConstraintSystem::resolveOverload` error.
+    auto *firstParamDRE =
+        new (C) DeclRefExpr(params->get(0), DeclNameLoc(), /*Implicit*/ true);
+    Expr *secondParamDRE = nullptr;
+    if (params->size() == 2)
+      secondParamDRE =
+          new (C) DeclRefExpr(params->get(1), DeclNameLoc(), /*Implicit*/ true);
     Expr *firstArg = new (C) MemberRefExpr(firstParamDRE, SourceLoc(), member,
                                          DeclNameLoc(), /*Implicit*/ true);
     Expr *secondArg = nullptr;

@@ -163,7 +163,6 @@ StringRef swift::getPlatformNameForTriple(const llvm::Triple &triple) {
   case llvm::Triple::AMDPAL:
   case llvm::Triple::HermitCore:
   case llvm::Triple::Hurd:
-  case llvm::Triple::WASI:
     return "";
   case llvm::Triple::Darwin:
   case llvm::Triple::MacOSX:
@@ -191,6 +190,8 @@ StringRef swift::getPlatformNameForTriple(const llvm::Triple &triple) {
     return "ps4";
   case llvm::Triple::Haiku:
     return "haiku";
+  case llvm::Triple::WASI:
+    return "wasi";
   }
   llvm_unreachable("unsupported OS");
 }
