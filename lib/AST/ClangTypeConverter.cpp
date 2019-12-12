@@ -122,15 +122,25 @@ const clang::Type *ClangTypeConverter::getFunctionType(
   if (resultClangTy.isNull())
     return nullptr;
 
-  SmallVector<clang::QualType, 8> paramsClangTy;
+  SmallVector<clang::FunctionProtoType::ExtParameterInfo, 4> extParamInfos;
+  SmallVector<clang::QualType, 4> paramsClangTy;
+  bool someParamIsConsumed = false;
   for (auto p : params) {
     auto pc = convert(p.getPlainType());
     if (pc.isNull())
       return nullptr;
+    clang::FunctionProtoType::ExtParameterInfo extParamInfo;
+    if (p.getParameterFlags().isOwned()) {
+      someParamIsConsumed = true;
+      extParamInfo = extParamInfo.withIsConsumed(true);
+    }
+    extParamInfos.push_back(extParamInfo);
     paramsClangTy.push_back(pc);
   }
 
   clang::FunctionProtoType::ExtProtoInfo info(clang::CallingConv::CC_C);
+  if (someParamIsConsumed)
+    info.ExtParameterInfos = extParamInfos.begin();
   auto fn = ClangASTContext.getFunctionType(resultClangTy, paramsClangTy, info);
   if (fn.isNull())
     return nullptr;
