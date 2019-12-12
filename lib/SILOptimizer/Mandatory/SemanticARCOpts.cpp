@@ -262,6 +262,10 @@ struct SemanticARCOptVisitor
   FORWARDING_INST(OpenExistentialValue)
   FORWARDING_INST(OpenExistentialBoxValue)
   FORWARDING_INST(MarkDependence)
+  // SWIFT_ENABLE_TENSORFLOW
+  FORWARDING_INST(DifferentiableFunctionExtract)
+  FORWARDING_INST(LinearFunctionExtract)
+  // SWIFT_ENABLE_TENSORFLOW END
 #undef FORWARDING_INST
 
 #define FORWARDING_TERM(NAME)                                                  \
