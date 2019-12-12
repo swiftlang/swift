@@ -3,12 +3,14 @@
 
 #if CURRENT_MODULE
 
+@available(OSX 10.8, *)
 @_originallyDefinedIn(module: "OriginalModule", macOS 10.15)
 public struct Entity {
 	public func addEntity(_ e: Entity) {}
 	public func removeEntity(_ e: Entity) {}
 }
 
+@available(OSX 10.8, *)
 @_originallyDefinedIn(module: "OriginalModule", macOS 10.15)
 public protocol Movable {
 	func MovableFuncFoo()
@@ -16,6 +18,7 @@ public protocol Movable {
 
 public protocol Unmoveable {}
 
+@available(OSX 10.8, *)
 @_originallyDefinedIn(module: "OriginalModule", macOS 10.15)
 public class MovedClass: Movable, Unmoveable {
 	public func MovableFuncFoo() {}
