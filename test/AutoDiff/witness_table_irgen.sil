@@ -65,8 +65,8 @@ bb0(%0 : $Float, %1 : $AD__$s23witness_tables_autodiff25DifferentiableConformanc
 
 sil_witness_table hidden DifferentiableConformance: DifferentiableRequirement module witness_tables_autodiff {
   method #DifferentiableRequirement.f!1: <Self where Self : DifferentiableRequirement> (Self) -> (Float) -> Float : @$s23witness_tables_autodiff25DifferentiableConformanceVAA0D11RequirementA2aDP1fyS2fFTW	// protocol witness for DifferentiableRequirement.f(_:) in conformance DifferentiableConformance
-  method #DifferentiableRequirement.f!1.jvp.SU: <Self where Self : DifferentiableRequirement> (Self) -> (Float) -> Float : @AD__$s23witness_tables_autodiff25DifferentiableConformanceVAA0D11RequirementA2aDP1fyS2fFTW_jvp_SU	// AD__$s23witness_tables_autodiff25DifferentiableConformanceVAA0D11RequirementA2aDP1fyS2fFTW_jvp_SU
-  method #DifferentiableRequirement.f!1.vjp.SU: <Self where Self : DifferentiableRequirement> (Self) -> (Float) -> Float : @AD__$s23witness_tables_autodiff25DifferentiableConformanceVAA0D11RequirementA2aDP1fyS2fFTW_vjp_SU	// AD__$s23witness_tables_autodiff25DifferentiableConformanceVAA0D11RequirementA2aDP1fyS2fFTW_vjp_SU
+  method #DifferentiableRequirement.f!1.jvp.SU.<Self where Self : DifferentiableRequirement>: <Self where Self : DifferentiableRequirement> (Self) -> (Float) -> Float : @AD__$s23witness_tables_autodiff25DifferentiableConformanceVAA0D11RequirementA2aDP1fyS2fFTW_jvp_SU	// AD__$s23witness_tables_autodiff25DifferentiableConformanceVAA0D11RequirementA2aDP1fyS2fFTW_jvp_SU
+  method #DifferentiableRequirement.f!1.vjp.SU.<Self where Self : DifferentiableRequirement>: <Self where Self : DifferentiableRequirement> (Self) -> (Float) -> Float : @AD__$s23witness_tables_autodiff25DifferentiableConformanceVAA0D11RequirementA2aDP1fyS2fFTW_vjp_SU	// AD__$s23witness_tables_autodiff25DifferentiableConformanceVAA0D11RequirementA2aDP1fyS2fFTW_vjp_SU
 }
 
 // CHECK: @"$s19witness_table_irgen25DifferentiableConformanceVAA0D11RequirementAAWP" = hidden constant [4 x i8*] [

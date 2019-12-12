@@ -3360,13 +3360,16 @@ DifferentiableAttributeParameterIndicesRequest::evaluate(
   // Start type-checking the arguments of the @differentiable attribute. This
   // covers 'wrt:', 'jvp:', 'vjp:', and 'where', all of which are optional.
 
+  // Note: If there is a 'where' clause, then the generic signature from that
+  // overwrites this.
+  GenericSignature derivativeGenSig = original->getGenericSignature();
+
   // Handle 'where' clause, if it exists.
   // - Resolve attribute where clause requirements and store in the attribute
   //   for serialization.
   // - Compute generic signature for autodiff derivative functions based on
   //   the original function's generate signature and the attribute's where
   //   clause requirements.
-  GenericSignature whereClauseGenSig = GenericSignature();
   GenericEnvironment *whereClauseGenEnv = nullptr;
   if (auto *whereClause = attr->getWhereClause()) {
     // `@differentiable` attributes on protocol requirements do not support
@@ -3438,12 +3441,13 @@ DifferentiableAttributeParameterIndicesRequest::evaluate(
 
     // Compute generic signature and environment for autodiff associated
     // functions.
-    whereClauseGenSig = std::move(builder).computeGenericSignature(
+    derivativeGenSig = std::move(builder).computeGenericSignature(
         attr->getLocation(), /*allowConcreteGenericParams=*/true);
-    whereClauseGenEnv = whereClauseGenSig->getGenericEnvironment();
-    // Store the resolved derivative generic signature in the attribute.
-    attr->setDerivativeGenericSignature(whereClauseGenSig);
+    whereClauseGenEnv = derivativeGenSig->getGenericEnvironment();
   }
+
+  // Store the resolved derivative generic signature in the attribute.
+  attr->setDerivativeGenericSignature(derivativeGenSig);
 
   // Validate the 'wrt:' parameters.
 
@@ -3503,7 +3507,7 @@ DifferentiableAttributeParameterIndicesRequest::evaluate(
         originalFnTy->getAutoDiffDerivativeFunctionType(
             checkedWrtParamIndices, /*resultIndex*/ 0,
             AutoDiffDerivativeFunctionKind::JVP, lookupConformance,
-            whereClauseGenSig, /*makeSelfParamFirst*/ true);
+            derivativeGenSig, /*makeSelfParamFirst*/ true);
 
     auto isValidJVP = [&](AbstractFunctionDecl *jvpCandidate) -> bool {
       return checkFunctionSignature(
@@ -3527,7 +3531,7 @@ DifferentiableAttributeParameterIndicesRequest::evaluate(
         originalFnTy->getAutoDiffDerivativeFunctionType(
             checkedWrtParamIndices, /*resultIndex*/ 0,
             AutoDiffDerivativeFunctionKind::VJP, lookupConformance,
-            whereClauseGenSig, /*makeSelfParamFirst*/ true);
+            derivativeGenSig, /*makeSelfParamFirst*/ true);
 
     auto isValidVJP = [&](AbstractFunctionDecl *vjpCandidate) -> bool {
       return checkFunctionSignature(
@@ -3583,7 +3587,7 @@ DifferentiableAttributeParameterIndicesRequest::evaluate(
   // Register derivative function configuration.
   auto *resultIndices = IndexSubset::get(ctx, 1, {0});
   original->addDerivativeFunctionConfiguration(
-      {checkedWrtParamIndices, resultIndices, whereClauseGenSig});
+      {checkedWrtParamIndices, resultIndices, derivativeGenSig});
   return checkedWrtParamIndices;
 }
 

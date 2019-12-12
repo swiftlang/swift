@@ -556,29 +556,47 @@ swift::matchWitness(
       (void)reqDiffAttr->getParameterIndices();
     }
     for (auto *reqDiffAttr : reqAttrs.getAttributes<DifferentiableAttr>()) {
-      bool foundExactAttr = false;
-      bool foundSupersetAttr = false;
+      bool foundExactConfig = false;
+      Optional<AutoDiffConfig> supersetConfig = None;
       for (auto witnessConfig :
            witnessAFD->getDerivativeFunctionConfigurations()) {
-        // We can't use witnesses that have generic signatures not satisfied by
-        // the requirement's generic signature.
-        if (witnessConfig.derivativeGenericSignature &&
-            !witnessConfig.derivativeGenericSignature
-                 ->requirementsNotSatisfiedBy(
-                     reqDiffAttr->getDerivativeGenericSignature())
-                 .empty())
-          continue;
+        // All the witness's derivative generic requirements must be satisfied
+        // by the requirement's derivative generic requirements OR by the
+        // conditional conformance requirements.
+        if (witnessConfig.derivativeGenericSignature) {
+          bool genericRequirementsSatisfied = true;
+          auto reqDiffGenSig = reqDiffAttr->getDerivativeGenericSignature();
+          auto conformanceGenSig = dc->getGenericSignatureOfContext();
+          for (const auto &req :
+               witnessConfig.derivativeGenericSignature->getRequirements()) {
+            auto substReq = req.subst(result.WitnessSubstitutions);
+            bool reqDiffGenSigSatisfies =
+                reqDiffGenSig && substReq &&
+                reqDiffGenSig->isRequirementSatisfied(*substReq);
+            bool conformanceGenSigSatisfies =
+                conformanceGenSig &&
+                conformanceGenSig->isRequirementSatisfied(req);
+            if (!reqDiffGenSigSatisfies && !conformanceGenSigSatisfies) {
+              genericRequirementsSatisfied = false;
+              break;
+            }
+          }
+          if (!genericRequirementsSatisfied)
+            continue;
+        }
 
         if (witnessConfig.parameterIndices ==
-            reqDiffAttr->getParameterIndices())
-          foundExactAttr = true;
+            reqDiffAttr->getParameterIndices()) {
+          foundExactConfig = true;
+          break;
+        }
         if (witnessConfig.parameterIndices->isSupersetOf(
                 reqDiffAttr->getParameterIndices()))
-          foundSupersetAttr = true;
+          supersetConfig = witnessConfig;
       }
-      if (!foundExactAttr) {
+      if (!foundExactConfig) {
         bool success = false;
-        if (foundSupersetAttr) {
+        if (supersetConfig) {
           // If the witness has a "superset" derivative configuration, create an
           // implicit `@differentiable` attribute with the exact requirement
           // `@differentiable` attribute parameter indices.
@@ -586,7 +604,7 @@ swift::matchWitness(
               witnessAFD, /*implicit*/ true, reqDiffAttr->AtLoc,
               reqDiffAttr->getRange(), reqDiffAttr->isLinear(),
               reqDiffAttr->getParameterIndices(), /*jvp*/ None,
-              /*vjp*/ None, reqDiffAttr->getDerivativeGenericSignature());
+              /*vjp*/ None, supersetConfig->derivativeGenericSignature);
           auto insertion = ctx.DifferentiableAttrs.try_emplace(
               {witnessAFD, newAttr->getParameterIndices()}, newAttr);
           // Valid `@differentiable` attributes are uniqued by original function

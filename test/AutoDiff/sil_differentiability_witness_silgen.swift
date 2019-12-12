@@ -162,11 +162,6 @@ public func wrt_subset_vjp_wrt_x_y(_ tup: (Int, Int), _ x: Float, _ y: Float) ->
 // CHECK-NEXT: }
 
 // Test original function with `@differentiable` and `@derivative` attributes.
-// NOTE(TF-1046): The `@differentiable` and `@derivative` attribute currently
-// have different derivative generic signatures, causing two differentiability
-// witnesses to be created. This behavior is unexpected for users; TF-1046 will
-// resolve this issue so that only one differentiability witness will be
-// created.
 
 protocol P1: Differentiable {}
 extension P1 {
@@ -181,10 +176,62 @@ extension P1 {
 }
 
 // CHECK-LABEL: // differentiability witness for P1.foo()
-// CHECK-NEXT: sil_differentiability_witness hidden [parameters 0] [results 0] @$s36sil_differentiability_witness_silgen2P1PAAE3fooSfyF : $@convention(method) <Self where Self : P1> (@in_guaranteed Self) -> Float {
-// CHECK-NEXT: }
-
-// CHECK-LABEL: // differentiability witness for P1.foo()
 // CHECK-NEXT: sil_differentiability_witness hidden [parameters 0] [results 0] <τ_0_0 where τ_0_0 : P1> @$s36sil_differentiability_witness_silgen2P1PAAE3fooSfyF : $@convention(method) <Self where Self : P1> (@in_guaranteed Self) -> Float {
 // CHECK-NEXT:   vjp: @AD__$s36sil_differentiability_witness_silgen2P1PAAE3fooSfyF__vjp_src_0_wrt_0_36sil_differentiability_witness_silgen2P1Rzl : $@convention(method) <τ_0_0 where τ_0_0 : P1> (@in_guaranteed τ_0_0) -> (Float, @owned @callee_guaranteed (Float) -> @out τ_0_0.TangentVector)
 // CHECK-NEXT: }
+
+// Test custom derivatives of functions with generic signatures and `@differentiable` attributes.
+
+@differentiable
+@_silgen_name("genericWithDiffAttr")
+public func genericWithDiffAttr<T: Differentiable>(_ x: T) -> T { fatalError() }
+
+@derivative(of: genericWithDiffAttr)
+public func vjpGenericWithDiffAttr<T: Differentiable>(_ x: T)
+  -> (value: T, pullback: (T.TangentVector) -> T.TangentVector)
+{
+  fatalError()
+}
+
+// CHECK-LABEL: // differentiability witness for genericWithDiffAttr
+// CHECK-NEXT: sil_differentiability_witness [serialized] [parameters 0] [results 0] <τ_0_0 where τ_0_0 : Differentiable> @genericWithDiffAttr : $@convention(thin) <T where T : Differentiable> (@in_guaranteed T) -> @out T {
+// CHECK-NEXT:   vjp
+// CHECK-NEXT: }
+
+// CHECK-NOT: // differentiability witness for genericWithDiffAttr
+
+@differentiable(where T: Differentiable)
+@_silgen_name("genericWithConstrainedDifferentiable")
+public func genericWithConstrainedDifferentiable<T>(_ x: T) -> T { fatalError() }
+
+@derivative(of: genericWithConstrainedDifferentiable)
+public func vjpGenericWithConstrainedDifferentiable<T: Differentiable>(_ x: T)
+  -> (value: T, pullback: (T.TangentVector) -> T.TangentVector)
+{
+  fatalError()
+}
+
+// CHECK-LABEL: // differentiability witness for genericWithConstrainedDifferentiable
+// CHECK-NEXT: sil_differentiability_witness [serialized] [parameters 0] [results 0] <τ_0_0 where τ_0_0 : Differentiable> @genericWithConstrainedDifferentiable : $@convention(thin) <T> (@in_guaranteed T) -> @out T {
+// CHECK-NEXT:   vjp
+// CHECK-NEXT: }
+
+// CHECK-NOT: // differentiability witness for genericWithConstrainedDifferentiable
+
+public extension Differentiable {
+  @differentiable
+  @_silgen_name("protocolExtensionWithDiffAttr")
+  func protocolExtensionWithDiffAttr() -> Self { self }
+
+  @derivative(of: protocolExtensionWithDiffAttr)
+  func protocolExtensionWithDiffAttr() -> (value: Self, pullback: (TangentVector) -> TangentVector) {
+    fatalError("unimplemented")
+  }
+}
+
+// CHECK-LABEL: // differentiability witness for protocolExtensionWithDiffAttr
+// CHECK-NEXT: sil_differentiability_witness [serialized] [parameters 0] [results 0] <τ_0_0 where τ_0_0 : Differentiable> @protocolExtensionWithDiffAttr : $@convention(method) <Self where Self : Differentiable> (@in_guaranteed Self) -> @out Self {
+// CHECK-NEXT:   vjp
+// CHECK-NEXT: }
+
+// CHECK-NOT: // differentiability witness for protocolExtensionWithDiffAttr

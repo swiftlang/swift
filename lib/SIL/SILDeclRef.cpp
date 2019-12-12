@@ -949,13 +949,22 @@ SILDeclRef SILDeclRef::getNextOverriddenVTableEntry() const {
     if (autoDiffDerivativeFunctionIdentifier) {
       auto overriddenAttrs =
           overridden.getDecl()->getAttrs().getAttributes<DifferentiableAttr>();
-      if (llvm::none_of(overriddenAttrs, [&](const DifferentiableAttr *attr) {
-        return attr->getParameterIndices() ==
-               autoDiffDerivativeFunctionIdentifier->getParameterIndices();
-      })) {
-        return SILDeclRef();
+      for (const auto *attr : overriddenAttrs) {
+        if (attr->getParameterIndices() !=
+            autoDiffDerivativeFunctionIdentifier->getParameterIndices())
+          continue;
+
+        // TODO(TF-1056): Do we need to check generic signature requirements?
+
+        auto dfi = overridden.autoDiffDerivativeFunctionIdentifier;
+        overridden.autoDiffDerivativeFunctionIdentifier =
+            AutoDiffDerivativeFunctionIdentifier::get(
+                dfi->getKind(), dfi->getParameterIndices(),
+                attr->getDerivativeGenericSignature(),
+                getDecl()->getASTContext());
+        return overridden;
       }
-      return overridden;
+      return SILDeclRef();
     }
     // SWIFT_ENABLE_TENSORFLOW END
     return overridden;
