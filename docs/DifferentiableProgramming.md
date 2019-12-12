@@ -1735,7 +1735,7 @@ where Self: Differentiable & FloatingPoint, Self == Self.TangentVector {
 
     @inlinable
     @derivative(of: log)
-    static func _(_ x: Self) -> (value: Self, differential: @differential(linear) (Self) -> Self) {
+    static func _(_ x: Self) -> (value: Self, differential: @differentiable(linear) (Self) -> Self) {
         (log(x), { dx in 1 / x * dx })
     }
 
