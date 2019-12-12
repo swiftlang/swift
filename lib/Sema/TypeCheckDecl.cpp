@@ -1349,7 +1349,8 @@ PrecedenceGroupDecl *TypeChecker::lookupPrecedenceGroup(DeclContext *dc,
 static NominalTypeDecl *resolveSingleNominalTypeDecl(
     DeclContext *DC, SourceLoc loc, Identifier ident, ASTContext &Ctx,
     TypeResolutionFlags flags = TypeResolutionFlags(0)) {
-  auto *TyR = new (Ctx) SimpleIdentTypeRepr(loc, ident);
+  auto *TyR = new (Ctx) SimpleIdentTypeRepr(DeclNameLoc(loc),
+                                            DeclNameRef(ident));
   TypeLoc typeLoc = TypeLoc(TyR);
 
   TypeResolutionOptions options = TypeResolverContext::TypeAliasDecl;

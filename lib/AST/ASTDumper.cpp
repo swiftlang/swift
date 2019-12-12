@@ -2884,7 +2884,7 @@ public:
       OS << '\n';
       printCommon("component");
       PrintWithColorRAII(OS, IdentifierColor)
-        << " id='" << comp->getIdentifier() << '\'';
+        << " id='" << comp->getNameRef() << '\'';
       OS << " bind=";
       if (comp->isBound())
         comp->getBoundDecl()->dumpRef(OS);
@@ -3599,7 +3599,7 @@ namespace {
       if (auto assocType = T->getAssocType()) {
         printField("assoc_type", assocType->printRef());
       } else {
-        printField("name", T->getName().str());
+        printField("name", T->getName());
       }
       printRec("base", T->getBase());
       PrintWithColorRAII(OS, ParenthesisColor) << ')';

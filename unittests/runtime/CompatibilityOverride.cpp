@@ -60,7 +60,7 @@ struct OverrideSection {
 #include "../../stdlib/public/runtime/CompatibilityOverride.def"
 };
 
-OverrideSection Overrides __attribute__((section("__DATA,__swift51_hooks"))) = {
+OverrideSection Overrides __attribute__((section("__DATA,__swift52_hooks"))) = {
   0,
 #define OVERRIDE(name, ret, attrs, ccAttrs, namespace, typedArgs, namedArgs) \
   name ## Override,

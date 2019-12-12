@@ -2043,9 +2043,12 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
     for (const Action *A : AllLinkerInputs)
       if (A->getType() == file_types::TY_Object)
         AutolinkExtractInputs.push_back(A);
-    if (!AutolinkExtractInputs.empty() &&
-        (TC.getTriple().getObjectFormat() == llvm::Triple::ELF ||
-         TC.getTriple().isOSCygMing())) {
+    const auto &Triple = TC.getTriple();
+    const bool AutolinkExtractRequired =
+        (Triple.getObjectFormat() == llvm::Triple::ELF && !Triple.isPS4()) ||
+        Triple.getObjectFormat() == llvm::Triple::Wasm ||
+        Triple.isOSCygMing();
+    if (!AutolinkExtractInputs.empty() && AutolinkExtractRequired) {
       auto *AutolinkExtractAction =
           C.createAction<AutolinkExtractJobAction>(AutolinkExtractInputs);
       // Takes the same inputs as the linker...
@@ -2055,8 +2058,9 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
 
     if (MergeModuleAction) {
       if (OI.DebugInfoLevel == IRGenDebugInfoLevel::Normal) {
-        if (TC.getTriple().getObjectFormat() == llvm::Triple::ELF ||
-            TC.getTriple().getObjectFormat() == llvm::Triple::COFF) {
+        const bool ModuleWrapRequired =
+            Triple.getObjectFormat() != llvm::Triple::MachO;
+        if (ModuleWrapRequired) {
           auto *ModuleWrapAction =
               C.createAction<ModuleWrapJobAction>(MergeModuleAction);
           LinkAction->addInput(ModuleWrapAction);

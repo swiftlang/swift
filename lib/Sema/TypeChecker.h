@@ -1214,6 +1214,17 @@ public:
   static Type deriveTypeWitness(DeclContext *DC, NominalTypeDecl *nominal,
                                 AssociatedTypeDecl *assocType);
 
+  /// Derive an implicit type witness for a given "phantom" nested type
+  /// requirement that is known to the compiler but unstated as a
+  /// formal type requirement.
+  ///
+  /// This exists to support Codable and only Codable. Do not expand its
+  /// usage outside of that domain.
+  static TypeDecl *derivePhantomWitness(DeclContext *DC,
+                                        NominalTypeDecl *nominal,
+                                        ProtocolDecl *proto,
+                                        const StringRef Name);
+
   /// \name Name lookup
   ///
   /// Routines that perform name lookup.
@@ -1227,7 +1238,7 @@ public:
   /// \param name The name of the entity to look for.
   /// \param loc The source location at which name lookup occurs.
   /// \param options Options that control name lookup.
-  static LookupResult lookupUnqualified(DeclContext *dc, DeclName name,
+  static LookupResult lookupUnqualified(DeclContext *dc, DeclNameRef name,
                                         SourceLoc loc,
                                         NameLookupOptions options
                                           = defaultUnqualifiedLookupOptions);
@@ -1240,7 +1251,7 @@ public:
   /// \param loc The source location at which name lookup occurs.
   /// \param options Options that control name lookup.
   LookupResult
-  static lookupUnqualifiedType(DeclContext *dc, DeclName name, SourceLoc loc,
+  static lookupUnqualifiedType(DeclContext *dc, DeclNameRef name, SourceLoc loc,
                                NameLookupOptions options
                                  = defaultUnqualifiedLookupOptions);
 
@@ -1252,7 +1263,7 @@ public:
   /// \param options Options that control name lookup.
   ///
   /// \returns The result of name lookup.
-  static LookupResult lookupMember(DeclContext *dc, Type type, DeclName name,
+  static LookupResult lookupMember(DeclContext *dc, Type type, DeclNameRef name,
                                    NameLookupOptions options
                                      = defaultMemberLookupOptions);
 
@@ -1268,7 +1279,7 @@ public:
   ///
   /// \returns The result of name lookup.
   static LookupTypeResult lookupMemberType(DeclContext *dc, Type type,
-                                           Identifier name,
+                                           DeclNameRef name,
                                            NameLookupOptions options
                                              = defaultMemberTypeLookupOptions);
 
@@ -1555,7 +1566,7 @@ public:
   static Optional<Identifier> omitNeedlessWords(VarDecl *var);
 
   /// Calculate edit distance between declaration names.
-  static unsigned getCallEditDistance(DeclName writtenName,
+  static unsigned getCallEditDistance(DeclNameRef writtenName,
                                       DeclName correctedName,
                                       unsigned maxEditDistance);
 

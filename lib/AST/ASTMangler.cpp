@@ -1201,6 +1201,16 @@ void ASTMangler::bindGenericParameters(const DeclContext *DC) {
     bindGenericParameters(sig->getCanonicalSignature());
 }
 
+void ASTMangler::appendFlatGenericArgs(SubstitutionMap subs) {
+  appendOperator("y");
+
+  for (auto replacement : subs.getReplacementTypes()) {
+    if (replacement->hasArchetype())
+      replacement = replacement->mapTypeOutOfContext();
+    appendType(replacement);
+  }
+}
+
 unsigned ASTMangler::appendBoundGenericArgs(DeclContext *dc,
                                             SubstitutionMap subs,
                                             bool &isFirstArgList) {
@@ -1429,6 +1439,13 @@ void ASTMangler::appendImplFunctionType(SILFunctionType *fn) {
 
   llvm::SmallVector<char, 32> OpArgs;
 
+  if (fn->getSubstitutions()) {
+    OpArgs.push_back('s');
+    if (!fn->isGenericSignatureImplied()) {
+      OpArgs.push_back('i');
+    }
+  }
+  
   if (fn->isPolymorphic() && fn->isPseudogeneric())
     OpArgs.push_back('P');
 
@@ -1465,7 +1482,7 @@ void ASTMangler::appendImplFunctionType(SILFunctionType *fn) {
       OpArgs.push_back('W');
       break;
   }
-
+  
   // Mangle the parameters.
   for (auto param : fn->getParameters()) {
     OpArgs.push_back(getParamConvention(param.getConvention()));
@@ -1485,8 +1502,13 @@ void ASTMangler::appendImplFunctionType(SILFunctionType *fn) {
     OpArgs.push_back(getResultConvention(error.getConvention()));
     appendType(error.getInterfaceType());
   }
-  if (fn->isPolymorphic())
-    appendGenericSignature(fn->getSubstGenericSignature());
+  if (auto sig = fn->getSubstGenericSignature()) {
+    appendGenericSignature(sig);
+  }
+  if (auto subs = fn->getSubstitutions()) {
+    appendFlatGenericArgs(subs);
+    appendRetroactiveConformances(subs, Mod);
+  }
 
   OpArgs.push_back('_');
 

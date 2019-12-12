@@ -486,6 +486,141 @@ struct SelectedOverload {
   Type boundType;
 };
 
+/// Provides information about the application of a function argument to a
+/// parameter.
+class FunctionArgApplyInfo {
+  Expr *ArgListExpr;
+  Expr *ArgExpr;
+  unsigned ArgIdx;
+  Type ArgType;
+
+  unsigned ParamIdx;
+
+  Type FnInterfaceType;
+  FunctionType *FnType;
+  const ValueDecl *Callee;
+
+public:
+  FunctionArgApplyInfo(Expr *argListExpr, Expr *argExpr, unsigned argIdx,
+                       Type argType, unsigned paramIdx, Type fnInterfaceType,
+                       FunctionType *fnType, const ValueDecl *callee)
+      : ArgListExpr(argListExpr), ArgExpr(argExpr), ArgIdx(argIdx),
+        ArgType(argType), ParamIdx(paramIdx), FnInterfaceType(fnInterfaceType),
+        FnType(fnType), Callee(callee) {}
+
+  /// \returns The argument being applied.
+  Expr *getArgExpr() const { return ArgExpr; }
+
+  /// \returns The position of the argument, starting at 1.
+  unsigned getArgPosition() const { return ArgIdx + 1; }
+
+  /// \returns The position of the parameter, starting at 1.
+  unsigned getParamPosition() const { return ParamIdx + 1; }
+
+  /// \returns The type of the argument being applied, including any generic
+  /// substitutions.
+  ///
+  /// \param withSpecifier Whether to keep the inout or @lvalue specifier of
+  /// the argument, if any.
+  Type getArgType(bool withSpecifier = false) const {
+    return withSpecifier ? ArgType : ArgType->getWithoutSpecifierType();
+  }
+
+  /// \returns The label for the argument being applied.
+  Identifier getArgLabel() const {
+    if (auto *te = dyn_cast<TupleExpr>(ArgListExpr))
+      return te->getElementName(ArgIdx);
+
+    assert(isa<ParenExpr>(ArgListExpr));
+    return Identifier();
+  }
+
+  /// \returns A textual description of the argument suitable for diagnostics.
+  /// For an argument with an unambiguous label, this will the label. Otherwise
+  /// it will be its position in the argument list.
+  StringRef getArgDescription(SmallVectorImpl<char> &scratch) const {
+    llvm::raw_svector_ostream stream(scratch);
+
+    // Use the argument label only if it's unique within the argument list.
+    auto argLabel = getArgLabel();
+    auto useArgLabel = [&]() -> bool {
+      if (argLabel.empty())
+        return false;
+
+      if (auto *te = dyn_cast<TupleExpr>(ArgListExpr))
+        return llvm::count(te->getElementNames(), argLabel) == 1;
+
+      return false;
+    };
+
+    if (useArgLabel()) {
+      stream << "'";
+      stream << argLabel;
+      stream << "'";
+    } else {
+      stream << "#";
+      stream << getArgPosition();
+    }
+    return StringRef(scratch.data(), scratch.size());
+  }
+
+  /// \returns The interface type for the function being applied. Note that this
+  /// may not a function type, for example it could be a generic parameter.
+  Type getFnInterfaceType() const { return FnInterfaceType; }
+
+  /// \returns The function type being applied, including any generic
+  /// substitutions.
+  FunctionType *getFnType() const { return FnType; }
+
+  /// \returns The callee for the application.
+  const ValueDecl *getCallee() const { return Callee; }
+
+private:
+  Type getParamTypeImpl(AnyFunctionType *fnTy,
+                        bool lookThroughAutoclosure) const {
+    auto param = fnTy->getParams()[ParamIdx];
+    auto paramTy = param.getPlainType();
+    if (lookThroughAutoclosure && param.isAutoClosure())
+      paramTy = paramTy->castTo<FunctionType>()->getResult();
+    return paramTy;
+  }
+
+public:
+  /// \returns The type of the parameter which the argument is being applied to,
+  /// including any generic substitutions.
+  ///
+  /// \param lookThroughAutoclosure Whether an @autoclosure () -> T parameter
+  /// should be treated as being of type T.
+  Type getParamType(bool lookThroughAutoclosure = true) const {
+    return getParamTypeImpl(FnType, lookThroughAutoclosure);
+  }
+
+  /// \returns The interface type of the parameter which the argument is being
+  /// applied to.
+  ///
+  /// \param lookThroughAutoclosure Whether an @autoclosure () -> T parameter
+  /// should be treated as being of type T.
+  Type getParamInterfaceType(bool lookThroughAutoclosure = true) const {
+    auto interfaceFnTy = FnInterfaceType->getAs<AnyFunctionType>();
+    if (!interfaceFnTy) {
+      // If the interface type isn't a function, then just return the resolved
+      // parameter type.
+      return getParamType(lookThroughAutoclosure)->mapTypeOutOfContext();
+    }
+    return getParamTypeImpl(interfaceFnTy, lookThroughAutoclosure);
+  }
+
+  /// \returns The flags of the parameter which the argument is being applied
+  /// to.
+  ParameterTypeFlags getParameterFlags() const {
+    return FnType->getParams()[ParamIdx].getParameterFlags();
+  }
+
+  ParameterTypeFlags getParameterFlagsAtIndex(unsigned idx) const {
+    return FnType->getParams()[idx].getParameterFlags();
+  }
+};
+
 /// Describes an aspect of a solution that affects its overall score, i.e., a
 /// user-defined conversions.
 enum ScoreKind {
@@ -804,13 +939,6 @@ public:
   explicit SolutionDiff(ArrayRef<Solution> solutions);
 };
 
-/// Identifies a specific conversion from
-struct SpecificConstraint {
-  CanType First;
-  CanType Second;
-  ConstraintKind Kind;
-};
-
 /// An intrusive, doubly-linked list of constraints.
 using ConstraintList = llvm::ilist<Constraint>;
 
@@ -1049,7 +1177,7 @@ private:
   size_t MaxMemory = 0;
 
   /// Cached member lookups.
-  llvm::DenseMap<std::pair<Type, DeclName>, Optional<LookupResult>>
+  llvm::DenseMap<std::pair<Type, DeclNameRef>, Optional<LookupResult>>
     MemberLookups;
 
   /// Cached sets of "alternative" literal types.
@@ -1597,6 +1725,16 @@ public:
     return findSelectedOverloadFor(calleeLoc);
   }
 
+  /// Resolve type variables present in the raw type, using generic parameter
+  /// types where possible.
+  Type resolveInterfaceType(Type type) const;
+
+  /// For a given locator describing a function argument conversion, or a
+  /// constraint within an argument conversion, returns information about the
+  /// application of the argument to its parameter. If the locator is not
+  /// for an argument conversion, returns \c None.
+  Optional<FunctionArgApplyInfo> getFunctionArgApplyInfo(ConstraintLocator *);
+
 private:
   unsigned assignTypeVariableID() {
     return TypeCounter++;
@@ -1769,7 +1907,7 @@ public:
   /// and no new names are introduced after name binding.
   ///
   /// \returns A reference to the member-lookup result.
-  LookupResult &lookupMember(Type base, DeclName name);
+  LookupResult &lookupMember(Type base, DeclNameRef name);
 
   /// Retrieve the set of "alternative" literal types that we'll explore
   /// for a given literal protocol kind.
@@ -2168,7 +2306,7 @@ public:
   }
 
   /// Add a value member constraint to the constraint system.
-  void addValueMemberConstraint(Type baseTy, DeclName name, Type memberTy,
+  void addValueMemberConstraint(Type baseTy, DeclNameRef name, Type memberTy,
                                 DeclContext *useDC,
                                 FunctionRefKind functionRefKind,
                                 ArrayRef<OverloadChoice> outerAlternatives,
@@ -2198,7 +2336,7 @@ public:
 
   /// Add a value member constraint for an UnresolvedMemberRef
   /// to the constraint system.
-  void addUnresolvedValueMemberConstraint(Type baseTy, DeclName name,
+  void addUnresolvedValueMemberConstraint(Type baseTy, DeclNameRef name,
                                           Type memberTy, DeclContext *useDC,
                                           FunctionRefKind functionRefKind,
                                           ConstraintLocatorBuilder locator) {
@@ -2679,7 +2817,12 @@ private:
   /// this member and a bit indicating whether or not a bind constraint was added.
   std::pair<Type, bool> adjustTypeOfOverloadReference(
       const OverloadChoice &choice, ConstraintLocator *locator, Type boundType,
-      Type refType, DeclContext *useDC,
+      Type refType);
+
+  /// Add the constraints needed to bind an overload's type variable.
+  void bindOverloadType(
+      const SelectedOverload &overload, Type boundType,
+      ConstraintLocator *locator, DeclContext *useDC,
       llvm::function_ref<void(unsigned int, Type, ConstraintLocator *)>
           verifyThatArgumentIsHashable);
 
@@ -3043,7 +3186,7 @@ public:
   /// try to identify and classify inaccessible members that may be being
   /// referenced.
   MemberLookupResult performMemberLookup(ConstraintKind constraintKind,
-                                         DeclName memberName, Type baseTy,
+                                         DeclNameRef memberName, Type baseTy,
                                          FunctionRefKind functionRefKind,
                                          ConstraintLocator *memberLocator,
                                          bool includeInaccessibleMembers);
@@ -3120,7 +3263,7 @@ private:
 
   /// Attempt to simplify the given member constraint.
   SolutionKind simplifyMemberConstraint(
-      ConstraintKind kind, Type baseType, DeclName member, Type memberType,
+      ConstraintKind kind, Type baseType, DeclNameRef member, Type memberType,
       DeclContext *useDC, FunctionRefKind functionRefKind,
       ArrayRef<OverloadChoice> outerAlternatives, TypeMatchOptions flags,
       ConstraintLocatorBuilder locator);

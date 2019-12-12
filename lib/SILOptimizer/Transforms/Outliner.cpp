@@ -492,7 +492,8 @@ static bool matchSwitch(SwitchInfo &SI, SILInstruction *Inst,
   auto *BridgeFun = FunRef->getInitiallyReferencedFunction();
   auto *SwiftModule = BridgeFun->getModule().getSwiftModule();
   auto bridgeWitness = getBridgeFromObjectiveC(NativeType, SwiftModule);
-  if (BridgeFun->getName() != bridgeWitness.mangle())
+  if (bridgeWitness == SILDeclRef() ||
+      BridgeFun->getName() != bridgeWitness.mangle())
     return false;
 
   // %41 = enum $Optional<String>, #Optional.some!enumelt.1, %40 : $String
@@ -764,6 +765,13 @@ BridgedArgument BridgedArgument::match(unsigned ArgIdx, SILValue Arg,
       Enum->getOperand() != BridgeCall || !BridgeCall->hasOneUse())
     return BridgedArgument();
 
+  auto &selfArg = FullApplySite(BridgeCall).getSelfArgumentOperand();
+  auto selfConvention =
+      FullApplySite(BridgeCall).getArgumentConvention(selfArg);
+  if (selfConvention != SILArgumentConvention::Direct_Guaranteed &&
+      selfConvention != SILArgumentConvention::Direct_Owned)
+    return BridgedArgument();
+
   auto BridgedValue = BridgeCall->getArgument(0);
   auto Next = std::next(SILBasicBlock::iterator(Enum));
   if (Next == Enum->getParent()->end())
@@ -802,7 +810,8 @@ BridgedArgument BridgedArgument::match(unsigned ArgIdx, SILValue Arg,
   auto *BridgeFun = FunRef->getInitiallyReferencedFunction();
   auto *SwiftModule = BridgeFun->getModule().getSwiftModule();
   auto bridgeWitness = getBridgeToObjectiveC(NativeType, SwiftModule);
-  if (BridgeFun->getName() != bridgeWitness.mangle())
+  if (bridgeWitness == SILDeclRef() ||
+      BridgeFun->getName() != bridgeWitness.mangle())
     return BridgedArgument();
 
   return BridgedArgument(ArgIdx, FunRef, BridgeCall, Enum, BridgedValueRelease,
