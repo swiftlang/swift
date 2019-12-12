@@ -806,10 +806,19 @@ class DefineMemberBasedOnUse final : public ConstraintFix {
   Type BaseType;
   DeclNameRef Name;
 
+  /// Whether or not the member error is already diagnosed. This can happen
+  /// when referencing an erroneous member, and the error is diagnosed at the
+  /// member declaration.
+  ///
+  /// We still want to define erroneous members based on use in order to find
+  /// a solution through the new diagnostic infrastructure, but we don't
+  /// want to report a second error message.
+  bool AlreadyDiagnosed;
+
   DefineMemberBasedOnUse(ConstraintSystem &cs, Type baseType, DeclNameRef member,
-                         ConstraintLocator *locator)
+                         bool alreadyDiagnosed, ConstraintLocator *locator)
       : ConstraintFix(cs, FixKind::DefineMemberBasedOnUse, locator),
-        BaseType(baseType), Name(member) {}
+        BaseType(baseType), Name(member), AlreadyDiagnosed(alreadyDiagnosed) {}
 
 public:
   std::string getName() const override {
@@ -822,7 +831,7 @@ public:
   bool diagnose(bool asNote = false) const override;
 
   static DefineMemberBasedOnUse *create(ConstraintSystem &cs, Type baseType,
-                                        DeclNameRef member,
+                                        DeclNameRef member, bool alreadyDiagnosed,
                                         ConstraintLocator *locator);
 };
 
