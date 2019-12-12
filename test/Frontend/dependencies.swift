@@ -29,11 +29,14 @@
 // CHECK-MULTIPLE-OUTPUTS: Inputs/empty\ file.swift
 // CHECK-MULTIPLE-OUTPUTS: Swift.swiftmodule
 // CHECK-MULTIPLE-OUTPUTS-LABEL: empty\ file.swiftdoc :
-// CHECK-MULTIPLE-OUTPUTS: empty\ file.swiftmodule
+// CHECK-MULTIPLE-OUTPUTS: Inputs/empty\ file.swift
+// CHECK-MULTIPLE-OUTPUTS: Swift.swiftmodule
 // CHECK-MULTIPLE-OUTPUTS-LABEL: empty\ file.swiftinterface :
-// CHECK-MULTIPLE-OUTPUTS: empty\ file.swiftmodule
+// CHECK-MULTIPLE-OUTPUTS: Inputs/empty\ file.swift
+// CHECK-MULTIPLE-OUTPUTS: Swift.swiftmodule
 // CHECK-MULTIPLE-OUTPUTS-LABEL: empty\ file.h :
-// CHECK-MULTIPLE-OUTPUTS: empty\ file.swiftmodule
+// CHECK-MULTIPLE-OUTPUTS: Inputs/empty\ file.swift
+// CHECK-MULTIPLE-OUTPUTS: Swift.swiftmodule
 // CHECK-MULTIPLE-OUTPUTS-NOT: {{ }}:{{ }}
 
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-objc-interop -disable-objc-attr-requires-foundation-module -import-objc-header %S/Inputs/dependencies/extra-header.h -emit-dependencies-path - -resolve-imports %s | %FileCheck -check-prefix=CHECK-IMPORT %s

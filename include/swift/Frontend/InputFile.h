@@ -74,7 +74,6 @@ public:
   }
 
   std::string outputFilename() const { return PSPs.OutputFilename; }
-  const std::string &outputFilenameRef() const { return PSPs.OutputFilename; }
 
   const PrimarySpecificPaths &getPrimarySpecificPaths() const { return PSPs; }
 
