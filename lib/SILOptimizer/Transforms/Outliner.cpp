@@ -764,7 +764,8 @@ BridgedArgument BridgedArgument::match(unsigned ArgIdx, SILValue Arg,
   auto *BridgeCall =
       dyn_cast<ApplyInst>(std::prev(SILBasicBlock::iterator(Enum)));
   if (!BridgeCall || BridgeCall->getNumArguments() != 1 ||
-      Enum->getOperand() != BridgeCall || !BridgeCall->hasOneUse())
+      Enum->getOperand() != BridgeCall || !BridgeCall->hasOneUse() ||
+      !FullApplySite(BridgeCall).hasSelfArgument())
     return BridgedArgument();
 
   auto &selfArg = FullApplySite(BridgeCall).getSelfArgumentOperand();
