@@ -2207,7 +2207,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
               SourceLoc(), Context.getIdentifier(protocolName));
         }
       }
-      
+
       if (attrs.has(TAK_differentiable) &&
           !Context.LangOpts.EnableExperimentalDifferentiableProgramming) {
         diagnose(attrs.getLoc(TAK_differentiable),
@@ -2269,7 +2269,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
                  "@autoclosure");
         attrs.clearAttribute(TAK_autoclosure);
       }
-      
+
       if (attrs.has(TAK_differentiable) &&
           !Context.LangOpts.EnableExperimentalDifferentiableProgramming) {
         diagnose(attrs.getLoc(TAK_differentiable),
@@ -2365,7 +2365,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
       attrs.clearAttribute(i);
     attrs.ConventionArguments = None;
   }
-  
+
   // SWIFT_ENABLE_TENSORFLOW
   // @nondiff is only valid on parameters.
   if (attrs.has(TAK_nondiff)) {
@@ -2376,7 +2376,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
                      : diag::attr_not_on_variadic_parameters, "@nondiff");
     attrs.clearAttribute(TAK_nondiff);
   }
-  
+
   // In SIL, handle @opened (n), which creates an existential archetype.
   if (attrs.has(TAK_opened)) {
     if (!ty->isExistentialType()) {
