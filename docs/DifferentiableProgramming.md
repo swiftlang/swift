@@ -1755,7 +1755,7 @@ where Self: Differentiable & FloatingPoint, Self == Self.TangentVector {
 
 #### Default derivatives
 
-In a protocol extension, class definition, or class definition, providing a
+In a protocol extension, class definition, or class extension, providing a
 derivative or transpose for a protocol extension or a non-final class member is
 considered as providing a default derivative for that member. Types that conform
 to the protocol or inherit from the class can inherit the default derivative.
