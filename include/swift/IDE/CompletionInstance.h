@@ -37,6 +37,8 @@ makeCodeCompletionMemoryBuffer(const llvm::MemoryBuffer *origBuf,
 class CompletionInstance {
   std::unique_ptr<CompilerInstance> CachedCI = nullptr;
   bool EnableASTCaching = false;
+  unsigned MaxASTReuseCount = 100;
+  unsigned CurrentASTReuseCount = 0;
 
   swift::CompilerInstance *
   getReusingCompilerInstance(const swift::CompilerInvocation &Invocation,
