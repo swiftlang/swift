@@ -210,6 +210,9 @@ private:
   // Type transformer
   //--------------------------------------------------------------------------//
 
+  /// Get the type lowering for the given AST type.
+  const Lowering::TypeLowering &getTypeLowering(Type type);
+
   /// Remap any archetypes into the current function's context.
   SILType remapType(SILType ty);
 
