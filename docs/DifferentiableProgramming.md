@@ -1808,7 +1808,7 @@ extension P {
 }
 
 struct S: P {
-    @differentiable(default) // Inherits from `P.foo(_:)`.
+    @differentiable(default) // Inherits default derivative for `P.foo(_:)`.
     func foo(_ x: Float) -> Float {
         33
     }
