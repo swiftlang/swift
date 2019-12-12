@@ -5016,12 +5016,10 @@ namespace {
         bool foundMethod = false;
 
         if (auto *classDecl = dyn_cast<ClassDecl>(dc)) {
-          // If we're importing into the primary @interface for something, as
-          // opposed to an extension, make sure we don't try to load any
-          // categories...by just looking into the super type.
+          // Start looking into the superclass.
           subject = classDecl->getSuperclassDecl();
         }
-        
+
         for (; subject; (subject = subject->getSuperclassDecl())) {
           llvm::SmallVector<ValueDecl *, 8> lookup;
           auto found = Impl.MembersForNominal.find(subject);
@@ -5030,7 +5028,7 @@ namespace {
             namelookup::pruneLookupResultSet(dc, NL_QualifiedDefault, lookup);
           }
 
-          for (auto &result : lookup) {
+          for (auto *&result : lookup) {
             // Skip declarations that don't match the name we're looking for.
             if (result->getBaseName() != name)
               continue;
@@ -8425,6 +8423,19 @@ createUnavailableDecl(Identifier name, DeclContext *dc, Type type,
   return var;
 }
 
+// Force the members of the entire inheritance hierarchy to be loaded and
+// deserialized before loading the members of this class. This allows the
+// decl members table to be warmed up and enables the correct identification of
+// overrides.
+static void loadAllMembersOfSuperclassesIfNeeded(const ClassDecl *CD) {
+  if (!CD)
+    return;
+
+  while ((CD = CD->getSuperclassDecl())) {
+    if (CD->hasClangNode())
+      CD->loadAllMembers();
+  }
+}
 
 void
 ClangImporter::Implementation::loadAllMembers(Decl *D, uint64_t extra) {
@@ -8438,6 +8449,7 @@ ClangImporter::Implementation::loadAllMembers(Decl *D, uint64_t extra) {
 
   // If not, we're importing globals-as-members into an extension.
   if (objcContainer) {
+    loadAllMembersOfSuperclassesIfNeeded(dyn_cast<ClassDecl>(D));
     loadAllMembersOfObjcContainer(D, objcContainer);
     return;
   }
