@@ -614,16 +614,18 @@ getOrSynthesizeTangentVectorStruct(DerivedConformance &derived, Identifier id) {
       if (member->getAttrs().hasAttribute<DifferentiableAttr>() ||
           getter->getAttrs().hasAttribute<DifferentiableAttr>())
         continue;
-      GenericSignature derivativeGenSig = GenericSignature();
+      GenericSignature derivativeGenericSignature =
+          getter->getGenericSignature();
       // If the parent declaration context is an extension, the nominal type may
       // conditionally conform to `Differentiable`. Use the extension generic
       // requirements in getter `@differentiable` attributes.
       if (auto *extDecl = dyn_cast<ExtensionDecl>(parentDC->getAsDecl()))
-        derivativeGenSig = extDecl->getGenericSignature();
+        if (auto extGenSig = extDecl->getGenericSignature())
+          derivativeGenericSignature = extGenSig;
       auto *diffableAttr = DifferentiableAttr::create(
           getter, /*implicit*/ true, SourceLoc(), SourceLoc(),
           /*linear*/ false, /*parameterIndices*/ IndexSubset::get(C, 1, {0}),
-          /*jvp*/ None, /*vjp*/ None, derivativeGenSig);
+          /*jvp*/ None, /*vjp*/ None, derivativeGenericSignature);
       member->getAttrs().add(diffableAttr);
     }
   }
