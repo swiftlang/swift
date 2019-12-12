@@ -202,6 +202,11 @@ CompilerInstance *CompletionInstance::getReusingCompilerInstance(
   if (!EnableASTCaching)
     return nullptr;
 
+  if (CurrentASTReuseCount >= MaxASTReuseCount) {
+    CurrentASTReuseCount = 0;
+    return nullptr;
+  }
+
   if (!CachedCI)
     return nullptr;
 
@@ -295,6 +300,8 @@ CompilerInstance *CompletionInstance::getReusingCompilerInstance(
   CachedCI->getDiags().diagnose(
       SM.getLocForOffset(BufferID, newInfo.StartOffset),
       diag::completion_reusing_astcontext);
+
+  CurrentASTReuseCount += 1;
 
   return CachedCI.get();
 }
