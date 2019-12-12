@@ -694,7 +694,7 @@ private:
 /// e.g. argument/parameter, closure result, conversions etc.
 class ContextualFailure : public FailureDiagnostic {
   ContextualTypePurpose CTP;
-  Type FromType, ToType;
+  Type RawFromType, RawToType;
 
 public:
   ContextualFailure(ConstraintSystem &cs, Type lhs, Type rhs,
@@ -702,15 +702,18 @@ public:
       : ContextualFailure(cs, cs.getContextualTypePurpose(), lhs, rhs,
                           locator) {}
 
-  ContextualFailure(ConstraintSystem &cs,
-                    ContextualTypePurpose purpose, Type lhs, Type rhs,
-                    ConstraintLocator *locator)
-      : FailureDiagnostic(cs, locator), CTP(purpose),
-        FromType(resolve(lhs)), ToType(resolve(rhs)) {}
+  ContextualFailure(ConstraintSystem &cs, ContextualTypePurpose purpose,
+                    Type lhs, Type rhs, ConstraintLocator *locator)
+      : FailureDiagnostic(cs, locator), CTP(purpose), RawFromType(lhs),
+        RawToType(rhs) {}
 
-  Type getFromType() const { return FromType; }
+  Type getFromType() const { return resolve(RawFromType); }
 
-  Type getToType() const { return ToType; }
+  Type getToType() const { return resolve(RawToType); }
+
+  Type getRawFromType() const { return RawFromType; }
+
+  Type getRawToType() const { return RawToType; }
 
   bool diagnoseAsError() override;
 
@@ -791,7 +794,7 @@ protected:
                                             Type contextualType);
 
 private:
-  Type resolve(Type rawType) {
+  Type resolve(Type rawType) const {
     return resolveType(rawType)->getWithoutSpecifierType();
   }
 
