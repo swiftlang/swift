@@ -1,4 +1,5 @@
 // RUN: %target-run-simple-swift
+// REQUIRES: executable_test
 // REQUIRES: differentiable_programming
 
 import _Differentiation
