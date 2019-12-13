@@ -34,8 +34,6 @@
 #include "llvm/Support/Process.h"
 #include "llvm/Support/Program.h"
 
-#include <fstream>
-
 using namespace swift;
 using namespace swift::driver;
 using namespace llvm::opt;
@@ -673,17 +671,8 @@ void ToolChain::JobContext::addFrontendSupplementaryOutputArguments(
            "mode!");
   }
 
-  C.addDependencyPathOrCreateDummy(
-      Output,
-      [&](StringRef) {
-        addOutputsOfType(arguments, Output, Args, file_types::TY_Dependencies,
-                         "-emit-dependencies-path");
-      },
-      [&](StringRef dependencyFile) {
-        // Create an empty file
-        std::ofstream(dependencyFile.str().c_str());
-      });
-
+  addOutputsOfType(arguments, Output, Args, file_types::TY_Dependencies,
+                   "-emit-dependencies-path");
   addOutputsOfType(arguments, Output, Args, file_types::TY_SwiftDeps,
                    "-emit-reference-dependencies-path");
   addOutputsOfType(arguments, Output, Args, file_types::TY_SwiftRanges,
