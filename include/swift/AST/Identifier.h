@@ -388,7 +388,15 @@ public:
 
 namespace swift {
 
-/// A declaration name, which may comprise one or more identifier pieces.
+/// A canonical declaration name, which may comprise one or more identifier
+/// pieces.
+///
+/// Use this type when you are representing the exact name a particular
+/// declaration was declared to have. For example, \c ValueDecl::getFullName()
+/// uses \c DeclName because it returns the exact name given to the declaration,
+/// but \c UnresolvedDeclRefExpr::getName() does not use \c DeclName because it
+/// returns a name that was written elsewhere in the source code and needs to
+/// be matched to a particular declaration.
 class DeclName {
   friend class ASTContext;
 
@@ -624,8 +632,16 @@ public:
 
 void simple_display(llvm::raw_ostream &out, DeclName name);
 
-/// An in-source reference to another declaration, including qualification
-/// information.
+/// A name referring to a declaration created elsewhere, which may comprise one
+/// or more identifier pieces.
+///
+/// Use this type when you are representing a name written in one place that
+/// should be bound to a declaration from elsewhere. For example,
+/// \c ValueDecl::getFullName() does not use \c DeclNameRef because it returns
+/// the exact name given to the declaration, but
+/// \c UnresolvedDeclRefExpr::getName() uses \c DeclNameRef because it
+/// returns a name that was written elsewhere in the source code and needs to
+/// be matched to a particular declaration.
 class DeclNameRef {
   DeclName FullName;
 
