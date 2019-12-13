@@ -1675,39 +1675,6 @@ namespace {
   };
 } // end anonymous namespace
 
-static bool diagnoseClosureExplicitParameterMismatch(
-    ConstraintSystem &CS, SourceLoc loc,
-    ArrayRef<AnyFunctionType::Param> params,
-    ArrayRef<AnyFunctionType::Param> args) {
-  // We are not trying to diagnose structural problems with top-level
-  // arguments here.
-  if (params.size() != args.size())
-    return false;
-
-  for (unsigned i = 0, n = params.size(); i != n; ++i) {
-    auto paramType = params[i].getOldType();
-    auto argType = args[i].getOldType();
-
-    if (auto paramFnType = paramType->getAs<AnyFunctionType>()) {
-      if (auto argFnType = argType->getAs<AnyFunctionType>())
-        return diagnoseClosureExplicitParameterMismatch(
-            CS, loc, paramFnType->getParams(), argFnType->getParams());
-    }
-
-    if (!paramType || !argType || isUnresolvedOrTypeVarType(paramType) ||
-        isUnresolvedOrTypeVarType(argType))
-      continue;
-
-    if (!TypeChecker::isConvertibleTo(argType, paramType, CS.DC)) {
-      CS.getASTContext().Diags.diagnose(loc, diag::types_not_convertible,
-                                        false, paramType, argType);
-      return true;
-    }
-  }
-
-  return false;
-}
-
 /// Check if there failure associated with expression is related
 /// to given contextual type.
 bool FailureDiagnosis::diagnoseCallContextualConversionErrors(
