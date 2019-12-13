@@ -21,6 +21,7 @@
 #include "swift/SILOptimizer/PassManager/PrettyStackTrace.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SILOptimizer/Utils/Differentiation/ADContext.h"
+#include "swift/SILOptimizer/Utils/Differentiation/Thunk.h"
 #include "swift/SILOptimizer/Utils/Differentiation/JVPEmitter.h"
 
 namespace swift {
