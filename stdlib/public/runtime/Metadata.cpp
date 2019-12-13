@@ -5223,6 +5223,8 @@ template <>
 bool Metadata::isCanonicalStaticallySpecializedGenericMetadata() const {
   if (auto *metadata = dyn_cast<StructMetadata>(this))
     return metadata->isCanonicalStaticallySpecializedGenericMetadata();
+  if (auto *metadata = dyn_cast<EnumMetadata>(this))
+    return metadata->isCanonicalStaticallySpecializedGenericMetadata();
 
   return false;
 }
