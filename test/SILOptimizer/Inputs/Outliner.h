@@ -60,3 +60,9 @@ NS_ASSUME_NONNULL_BEGIN
 - (nullable NSArray *) treeishChildren;
 @end
 NS_ASSUME_NONNULL_END
+
+NS_ASSUME_NONNULL_BEGIN
+@interface MyObject : NSObject
+@property (nullable) NSError *error;
+@end
+NS_ASSUME_NONNULL_END
