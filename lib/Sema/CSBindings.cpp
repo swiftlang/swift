@@ -962,12 +962,13 @@ bool TypeVarBindingProducer::computeNext() {
 
 bool TypeVariableBinding::attempt(ConstraintSystem &cs) const {
   auto type = Binding.BindingType;
-  auto *locator = TypeVar->getImpl().getLocator();
+  auto *srcLocator = Binding.getLocator();
+  auto *dstLocator = TypeVar->getImpl().getLocator();
 
   if (Binding.hasDefaultedLiteralProtocol()) {
-    type = cs.openUnboundGenericType(type, locator);
+    type = cs.openUnboundGenericType(type, dstLocator);
     type = type->reconstituteSugar(/*recursive=*/false);
-  } else if (Binding.getSourceKind() == ConstraintKind::ArgumentConversion &&
+  } else if (srcLocator->isLastElement<LocatorPathElt::ApplyArgToParam>() &&
              !type->hasTypeVariable() && cs.isCollectionType(type)) {
     // If the type binding comes from the argument conversion, let's
     // instead of binding collection types directly, try to bind
@@ -978,25 +979,27 @@ bool TypeVariableBinding::attempt(ConstraintSystem &cs) const {
     auto UGT = UnboundGenericType::get(BGT->getDecl(), BGT->getParent(),
                                        BGT->getASTContext());
 
-    type = cs.openUnboundGenericType(UGT, locator);
+    type = cs.openUnboundGenericType(UGT, dstLocator);
     type = type->reconstituteSugar(/*recursive=*/false);
   }
 
-  cs.addConstraint(ConstraintKind::Bind, TypeVar, type, Binding.getLocator());
+  cs.addConstraint(ConstraintKind::Bind, TypeVar, type, srcLocator);
 
   // If this was from a defaultable binding note that.
   if (Binding.isDefaultableBinding()) {
-    cs.DefaultedConstraints.push_back(Binding.getLocator());
+    cs.DefaultedConstraints.push_back(srcLocator);
 
-    if (locator->isForGenericParameter() && type->isHole()) {
-      // Drop `generic parameter` locator element so that all missing
-      // generic parameters related to the same path can be coalesced later.
-      auto path = locator->getPath();
-      auto genericParam = locator->getGenericParameter();
-      auto *fix = DefaultGenericArgument::create(cs, genericParam,
-          cs.getConstraintLocator(locator->getAnchor(), path.drop_back()));
-      if (cs.recordFix(fix))
-        return true;
+    if (type->isHole()) {
+      if (auto *GP = TypeVar->getImpl().getGenericParameter()) {
+        auto path = dstLocator->getPath();
+        // Drop `generic parameter` locator element so that all missing
+        // generic parameters related to the same path can be coalesced later.
+        auto *fix = DefaultGenericArgument::create(
+            cs, GP,
+            cs.getConstraintLocator(dstLocator->getAnchor(), path.drop_back()));
+        if (cs.recordFix(fix))
+          return true;
+      }
     }
   }
 

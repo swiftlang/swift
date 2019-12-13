@@ -3328,14 +3328,6 @@ private:
                  : nullptr;
     }
 
-    ConstraintKind getSourceKind() const {
-      if (auto *constraint = BindingSource.dyn_cast<Constraint *>())
-        return constraint->getKind();
-      // If binding source is not constraint - it's a hole which is
-      // always a `Bind` constraint.
-      return ConstraintKind::Bind;
-    }
-
     ConstraintLocator *getLocator() const {
       if (auto *constraint = BindingSource.dyn_cast<Constraint *>())
         return constraint->getLocator();
@@ -3346,8 +3338,8 @@ private:
       return {type, Kind, BindingSource};
     }
 
-    PotentialBinding withSameSource(Type type, AllowedBindingKind kind) {
-      return {type, Kind, BindingSource};
+    PotentialBinding withSameSource(Type type, AllowedBindingKind kind) const {
+      return {type, kind, BindingSource};
     }
 
     static PotentialBinding forHole(ASTContext &ctx,
