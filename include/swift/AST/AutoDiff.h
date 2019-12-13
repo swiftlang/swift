@@ -169,7 +169,8 @@ template <> struct DenseMapInfo<AutoDiffDerivativeFunctionKind> {
 
   static bool isEqual(const AutoDiffDerivativeFunctionKind &LHS,
                       const AutoDiffDerivativeFunctionKind &RHS) {
-    return LHS == RHS;
+    return static_cast<AutoDiffDerivativeFunctionKind::innerty>(LHS) ==
+        static_cast<AutoDiffDerivativeFunctionKind::innerty>(RHS);
   }
 };
 
