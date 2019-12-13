@@ -156,4 +156,24 @@ DerivativeRegistrationTests.testWithLeakChecking("DerivativeGenericSignature") {
   expectEqual(1000, dx)
 }
 
+// When non-canonicalized generic signatures are used to compare derivative configurations, the
+// `@differentiable` and `@derivative` attributes create separate derivatives, and we get a
+// duplicate symbol error in TBDGen.
+public protocol RefinesDifferentiable: Differentiable {}
+extension Float: RefinesDifferentiable {}
+@differentiable(where T: Differentiable, T: RefinesDifferentiable)
+public func nonCanonicalizedGenSigComparison<T>(_ t: T) -> T { t }
+@derivative(of: nonCanonicalizedGenSigComparison)
+public func dNonCanonicalizedGenSigComparison<T: RefinesDifferentiable>(_ t: T)
+  -> (value: T, pullback: (T.TangentVector) -> T.TangentVector)
+{
+  (t, { _ in T.TangentVector.zero })
+}
+DerivativeRegistrationTests.testWithLeakChecking("NonCanonicalizedGenericSignatureComparison") {
+  let dx = gradient(at: Float(0), in: nonCanonicalizedGenSigComparison)
+  // Expect that we use the custom registered derivative, not a generated derivative (which would
+  // give a gradient of 1).
+  expectEqual(0, dx)
+}
+
 runAllTests()

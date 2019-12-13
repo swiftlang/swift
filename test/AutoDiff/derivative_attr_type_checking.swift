@@ -532,3 +532,33 @@ struct StoredProperty: Differentiable {
     (stored, { _ in .zero })
   }
 }
+
+// When the generic signature is not considered while calculating the actual pullback type, the
+// typechecker does not realize that `T.TangentVector == Float`, and therefore it complains that
+// "'pullback' does not have expected type '(Float) -> (Float)'".
+// The user can work around this by setting the pullback type to `(Float) -> Float`.
+func genericSignatureConsidered<T>(_ x: T) -> T { fatalError() }
+@derivative(of: genericSignatureConsidered)
+func dGenericSignatureConsidered<T>(_ x: T)
+  -> (value: T, pullback: (T.TangentVector) -> T.TangentVector)
+  where T: Differentiable, T.TangentVector == Float
+{
+  fatalError()
+}
+
+// When the generic signature is not considered while calculating the actual pullback type,
+// the typechecker complains that the pullback type is not correct, and there is no pullback type
+// that the user can specify that satisfies the typechecker.
+struct Wrapper<T: AdditiveArithmetic & Equatable>: AdditiveArithmetic, Equatable {
+  var t: T
+  init(_ t: T) { self.t = t }
+}
+extension Wrapper: Differentiable where T: Differentiable, T == T.TangentVector {
+  typealias TangentVector = Wrapper<T.TangentVector>
+}
+extension Wrapper where T: Differentiable, T == T.TangentVector {
+  @derivative(of: init(_:))
+  static func dInit(_ t: T) -> (value: Self, pullback: (Wrapper<T>.TangentVector) -> (T)) {
+    fatalError()
+  }
+}
