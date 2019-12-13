@@ -4211,7 +4211,7 @@ llvm::Error DeclDeserializer::deserializeDeclAttributes() {
             scratch, isImplicit, origNameId, origDeclId, rawDerivativeKind,
             parameters);
 
-        DeclNameWithLoc origName{MF.getIdentifier(origNameId), DeclNameLoc()};
+        DeclNameWithLoc origName{MF.getDeclBaseName(origNameId), DeclNameLoc()};
         auto *origDecl = cast<AbstractFunctionDecl>(MF.getDecl(origDeclId));
         auto derivativeKind =
             getActualAutoDiffDerivativeFunctionKind(rawDerivativeKind);

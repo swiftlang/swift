@@ -245,15 +245,16 @@ public func differentiableFunction<T, U, R>(
 }
 
 public extension Differentiable {
-  @differentiable(wrt: self, vjp: _vjpWithDerivative)
+  @differentiable(wrt: self)
   func withDerivative(_ body: @escaping (inout TangentVector) -> Void) -> Self {
     return self
   }
 
   @inlinable
+  @derivative(of: withDerivative)
   internal func _vjpWithDerivative(
     _ body: @escaping (inout TangentVector) -> Void
-  ) -> (Self, (TangentVector) -> TangentVector) {
+  ) -> (value: Self, pullback: (TangentVector) -> TangentVector) {
     return (self, { grad in
       var grad = grad
       body(&grad)
@@ -275,7 +276,7 @@ public func withRecomputationInPullbacks<T, U>(
 
 public extension Differentiable {
   @inlinable
-  @differentiable(wrt: self, vjp: _vjp_withRecomputationInPullbacks)
+  @differentiable(wrt: self)
   func withRecomputationInPullbacks<Result : Differentiable>(
     _ body: @escaping @differentiable (Self) -> Result
   ) -> Result {
@@ -283,9 +284,10 @@ public extension Differentiable {
   }
 
   @inlinable
+  @derivative(of: withRecomputationInPullbacks)
   internal func _vjp_withRecomputationInPullbacks<Result : Differentiable>(
     _ body: @escaping @differentiable (Self) -> Result
-  ) -> (Result, (Result.TangentVector) -> TangentVector) {
+  ) -> (value: Result, pullback: (Result.TangentVector) -> TangentVector) {
     return Swift.valueWithPullback(
       at: self, in: Swift.withRecomputationInPullbacks(body)
     )
@@ -908,24 +910,26 @@ public struct AnyDerivative: EuclideanDifferentiable & AdditiveArithmetic {
 
   /// Creates a type-erased derivative from the given derivative.
   @inlinable
-  @differentiable(jvp: _jvpInit(_:), vjp: _vjpInit(_:))
+  @differentiable
   public init<T>(_ base: T) where T: Differentiable, T.TangentVector == T {
     self._box = _ConcreteDerivativeBox<T>(base)
   }
 
   @inlinable
+  @derivative(of: init)
   internal static func _vjpInit<T>(
     _ base: T
-  ) -> (AnyDerivative, (AnyDerivative) -> T.TangentVector)
+  ) -> (value: AnyDerivative, pullback: (AnyDerivative) -> T.TangentVector)
     where T: Differentiable, T.TangentVector == T
   {
     return (AnyDerivative(base), { v in v.base as! T.TangentVector })
   }
 
   @inlinable
+  @derivative(of: init)
   internal static func _jvpInit<T>(
     _ base: T
-  ) -> (AnyDerivative, (T.TangentVector) -> AnyDerivative)
+  ) -> (value: AnyDerivative, differential: (T.TangentVector) -> AnyDerivative)
     where T: Differentiable, T.TangentVector == T
   {
     return (AnyDerivative(base), { dbase in AnyDerivative(dbase) })
@@ -1028,7 +1032,7 @@ public struct AnyDerivative: EuclideanDifferentiable & AdditiveArithmetic {
 //===----------------------------------------------------------------------===//
 
 public extension Array where Element: Differentiable {
-  @differentiable(wrt: (self, initialResult), vjp: _vjpDifferentiableReduce)
+  @differentiable(wrt: (self, initialResult))
   func differentiableReduce<Result: Differentiable>(
     _ initialResult: Result,
     _ nextPartialResult: @differentiable (Result, Element) -> Result
@@ -1037,6 +1041,7 @@ public extension Array where Element: Differentiable {
   }
 
   @usableFromInline
+  @derivative(of: differentiableReduce)
   internal func _vjpDifferentiableReduce<Result: Differentiable>(
     _ initialResult: Result,
     _ nextPartialResult: @differentiable (Result, Element) -> Result
@@ -1070,7 +1075,7 @@ public extension Array where Element: Differentiable {
 }
 
 public extension Array where Element: Differentiable {
-  @differentiable(wrt: self, vjp: _vjpDifferentiableMap)
+  @differentiable(wrt: self)
   func differentiableMap<Result: Differentiable>(
     _ body: @differentiable (Element) -> Result
   ) -> [Result] {
@@ -1078,6 +1083,7 @@ public extension Array where Element: Differentiable {
   }
 
   @usableFromInline
+  @derivative(of: differentiableMap)
   internal func _vjpDifferentiableMap<Result: Differentiable>(
     _ body: @differentiable (Element) -> Result
   ) -> (value: [Result],

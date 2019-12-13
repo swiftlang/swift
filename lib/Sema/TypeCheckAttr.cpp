@@ -3885,8 +3885,20 @@ void AttributeChecker::visitDerivativeAttr(DerivativeAttr *attr) {
   auto vectorTy = valueResultConf.getTypeWitnessByName(
       valueResultType, Ctx.Id_TangentVector);
 
+  // Compute the actual differential/pullback type that we use for comparison
+  // with the expected type. We must canonicalize the derivative interface type
+  // before extracting the differential/pullback type from it, so that the
+  // derivative interface type generic signature is available for simplifying
+  // types.
+  CanType canActualResultType = derivativeInterfaceType->getCanonicalType();
+  while (isa<AnyFunctionType>(canActualResultType)) {
+    canActualResultType =
+        cast<AnyFunctionType>(canActualResultType).getResult();
+  }
+  CanType actualFuncEltType =
+      cast<TupleType>(canActualResultType).getElementType(1);
+
   // Compute expected differential/pullback type.
-  auto funcEltType = funcResultElt.getType();
   Type expectedFuncEltType;
   if (kind == AutoDiffDerivativeFunctionKind::JVP) {
     auto diffParams = map<SmallVector<AnyFunctionType::Param, 4>>(
@@ -3901,7 +3913,7 @@ void AttributeChecker::visitDerivativeAttr(DerivativeAttr *attr) {
   expectedFuncEltType = expectedFuncEltType->mapTypeOutOfContext();
 
   // Check if differential/pullback type matches expected type.
-  if (!funcEltType->isEqual(expectedFuncEltType)) {
+  if (!actualFuncEltType->isEqual(expectedFuncEltType)) {
     // Emit differential/pullback type mismatch error on attribute.
     diagnose(attr->getLocation(),
              diag::derivative_attr_result_func_type_mismatch,
