@@ -20,6 +20,7 @@
 #include "swift/SIL/SILCloner.h"
 #include "swift/SIL/SILGlobalVariable.h"
 #include "swift/SIL/SILInstruction.h"
+#include "swift/SIL/SILInstructionWorklist.h"
 #include "swift/SILOptimizer/Analysis/ColdBlockInfo.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
@@ -110,7 +111,8 @@ class SILGlobalOpt {
   /// function.
   llvm::DenseMap<SILFunction *, unsigned> InitializerCount;
 
-  llvm::SmallVector<SILInstruction *, 4> InstToRemove;
+  SmallSILInstructionWorklist<4> InstToRemove;
+  llvm::SmallVector<SILGlobalVariable *, 4> GlobalsToRemove;
 
 public:
   SILGlobalOpt(SILOptFunctionBuilder &FunctionBuilder, SILModule *M, DominanceAnalysis *DA)
@@ -860,20 +862,21 @@ static bool isSafeToRemove(SILGlobalVariable *global) {
 
 bool SILGlobalOpt::tryRemoveGlobalAlloc(SILGlobalVariable *global,
                                         AllocGlobalInst *alloc) {
-  if (!isSafeToRemove(global)) return false;
-  
+  if (!isSafeToRemove(global))
+    return false;
+
   if (GlobalAddrMap[global].size())
     return false;
 
-  InstToRemove.push_back(alloc);
-
+  InstToRemove.add(alloc);
   return true;
 }
 
 /// If there are no loads or accesses of a given global, then remove its
 /// associated global addr and all asssociated instructions.
 bool SILGlobalOpt::tryRemoveGlobalAddr(SILGlobalVariable *global) {
-  if (!isSafeToRemove(global)) return false;
+  if (!isSafeToRemove(global))
+    return false;
 
   if (GlobalVarSkipProcessing.count(global) || GlobalLoadMap[global].size() ||
       GlobalAccessMap[global].size())
@@ -884,22 +887,23 @@ bool SILGlobalOpt::tryRemoveGlobalAddr(SILGlobalVariable *global) {
       if (!isa<StoreInst>(use->getUser()))
         return false;
     }
-    collectUsesOfInstructionForDeletion(addr);
-    InstToRemove.push_back(addr);
+    InstToRemove.addUsersOfAllResultsToWorklist(addr);
+    InstToRemove.add(addr);
   }
 
   return true;
 }
 
 bool SILGlobalOpt::tryRemoveUnusedGlobal(SILGlobalVariable *global) {
-  if (!isSafeToRemove(global)) return false;
+  if (!isSafeToRemove(global))
+    return false;
 
   if (GlobalVarSkipProcessing.count(global) || GlobalAddrMap[global].size() ||
       GlobalAccessMap[global].size() || GlobalLoadMap[global].size() ||
       AllocGlobalStore.count(global) || GlobalVarStore.count(global))
     return false;
 
-  Module->eraseGlobalVariable(global);
+  GlobalsToRemove.push_back(global);
   return true;
 }
 
@@ -927,7 +931,6 @@ static LoadInst *getValidLoad(SILInstruction *I, SILValue V) {
 
 /// If this is a read from a global let variable, map it.
 void SILGlobalOpt::collectGlobalAccess(GlobalAddrInst *GAI) {
-  GAI->dump();
   auto *SILG = GAI->getReferencedGlobal();
   if (!SILG)
     return;
@@ -957,7 +960,7 @@ void SILGlobalOpt::collectGlobalAccess(GlobalAddrInst *GAI) {
   // We want to make sure that we still collect global addr instructions
   // that are inside the addressors.
   GlobalAddrMap[SILG].push_back(GAI);
-  
+
   // Ignore any accesses inside addressors for SILG
   auto GlobalVar = getVariableOfGlobalInit(F);
   if (GlobalVar == SILG)
@@ -1053,22 +1056,6 @@ void SILGlobalOpt::reset() {
   GlobalAccessMap.clear();
   GlobalLoadMap.clear();
   GlobalInitCallMap.clear();
-}
-
-void SILGlobalOpt::collectUsesOfInstructionForDeletion(SILInstruction *inst) {
-  for (auto result : inst->getResults()) {
-    for (auto *use : result->getUses()) {
-      auto *user = use->getUser();
-      assert(user && "User should never be NULL!");
-      assert(use->get()->use_begin() == use->get()->use_end()
-             && "All collected uses must not be used themselves.");
-
-      // If the instruction itself has any uses, recursively zap them so that
-      // nothing uses this instruction.
-      collectUsesOfInstructionForDeletion(user);
-      InstToRemove.push_back(user);
-    }
-  }
 }
 
 void SILGlobalOpt::collect() {
@@ -1173,7 +1160,7 @@ bool SILGlobalOpt::run() {
   }
 
   // Erase the instructions that we have marked for deletion.
-  for (auto *inst : InstToRemove) {
+  while (auto *inst = InstToRemove.pop_back_val()) {
     inst->eraseFromParent();
   }
 
@@ -1181,14 +1168,12 @@ bool SILGlobalOpt::run() {
   reset();
   collect();
 
-  // Copy the globals so we don't get issues with modifying while iterating.
-  SmallVector<SILGlobalVariable *, 12> globals;
   for (auto &global : Module->getSILGlobals()) {
-    globals.push_back(&global);
+    HasChanged |= tryRemoveUnusedGlobal(&global);
   }
 
-  for (auto *global : globals) {
-    HasChanged |= tryRemoveUnusedGlobal(global);
+  for (auto *global : GlobalsToRemove) {
+    Module->eraseGlobalVariable(global);
   }
 
   // Reset incase we re-run this function (when HasChanged is true).
