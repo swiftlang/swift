@@ -291,11 +291,10 @@ SILInstruction *PartialApplyCombiner::combine() {
   // and look for applies that use it as a callee.
 
   // Worklist of operands.
-  SmallVector<Operand *, 8> uses(pai->getUses());
+  SmallVector<Operand *, 8> worklist(pai->getUses());
 
-  // Uses may grow in this loop.
-  for (size_t useIndex = 0; useIndex < uses.size(); ++useIndex) {
-    auto *use = uses[useIndex];
+  while (!worklist.empty()) {
+    auto *use = worklist.pop_back_val();
     auto *user = use->getUser();
 
     // Recurse through conversions.
@@ -313,7 +312,7 @@ SILInstruction *PartialApplyCombiner::combine() {
       assert(use->get()->getType().castTo<SILFunctionType>() ==
              escapingCalleeTy);
       (void)escapingCalleeTy;
-      llvm::copy(cfi->getUses(), std::back_inserter(uses));
+      llvm::copy(cfi->getUses(), std::back_inserter(worklist));
       continue;
     }
 
@@ -322,7 +321,7 @@ SILInstruction *PartialApplyCombiner::combine() {
       if (mdi->getValue() == use->get() &&
           mdi->getValue()->getType().is<SILFunctionType>() &&
           mdi->getValue()->getType().castTo<SILFunctionType>()->isNoEscape()) {
-        llvm::copy(mdi->getUses(), std::back_inserter(uses));
+        llvm::copy(mdi->getUses(), std::back_inserter(worklist));
       }
       continue;
     }
