@@ -4058,21 +4058,22 @@ void AttributeChecker::visitTransposeAttr(TransposeAttr *attr) {
   std::function<bool(AbstractFunctionDecl *)> hasValidTypeContext =
       [&](AbstractFunctionDecl *decl) { return true; };
 
-  auto typeRes = TypeResolution::forContextual(transpose->getDeclContext());
-  auto baseType = Type();
-  if (attr->getBaseType())
-    baseType = typeRes.resolveType(attr->getBaseType(), None);
-  auto lookupOptions = (attr->getBaseType() ? defaultMemberLookupOptions
-                                            : defaultUnqualifiedLookupOptions) |
-                        NameLookupFlags::IgnoreAccessControl;
+  auto resolution = TypeResolution::forContextual(transpose->getDeclContext());
+  Type baseType;
+  if (attr->getBaseTypeRepr())
+    baseType = resolution.resolveType(attr->getBaseTypeRepr(), None);
+  auto lookupOptions =
+      (attr->getBaseTypeRepr() ? defaultMemberLookupOptions
+                               : defaultUnqualifiedLookupOptions) |
+      NameLookupFlags::IgnoreAccessControl;
   auto transposeTypeCtx = transpose->getInnermostTypeContext();
   if (!transposeTypeCtx) transposeTypeCtx = transpose->getParent();
   assert(transposeTypeCtx);
 
   // Look up original function.
   auto funcLoc = originalName.Loc.getBaseNameLoc();
-  if (attr->getBaseType())
-    funcLoc = attr->getBaseType()->getLoc();
+  if (attr->getBaseTypeRepr())
+    funcLoc = attr->getBaseTypeRepr()->getLoc();
   auto *originalAFD = findAbstractFunctionDecl(
       originalName.Name, funcLoc, baseType, transposeTypeCtx, isValidOriginal,
       noneValidDiagnostic, ambiguousDiagnostic, notFunctionDiagnostic,

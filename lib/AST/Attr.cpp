@@ -372,11 +372,24 @@ static void printShortFormAvailable(ArrayRef<const DeclAttribute *> Attrs,
   Printer.printNewline();
 }
 
+/// Printing style for a differentiation parameter in a differentiation
+/// parameters clause.
+enum class DifferentiationParameterPrintingStyle {
+  /// Print parameter by name.
+  /// Used for `@differentiable` and `@derivative` attribute.
+  Name,
+  /// Print parameter by index.
+  /// Used for `@transpose` attribute.
+  Index
+};
+
 // Returns the differentiation parameters clause string for the given function,
-// parameter indices, and parsed parameters.
+// parameter indices, parsed parameters, and parameter printing style. Use the
+// parameter indices if specified; otherwise, use the parsed parameters.
 static std::string getDifferentiationParametersClauseString(
     const AbstractFunctionDecl *function, IndexSubset *paramIndices,
-    ArrayRef<ParsedAutoDiffParameter> parsedParams) {
+    ArrayRef<ParsedAutoDiffParameter> parsedParams,
+    DifferentiationParameterPrintingStyle style) {
   assert(function);
   bool isInstanceMethod = function->isInstanceMember();
   std::string result;
@@ -398,7 +411,14 @@ static std::string getDifferentiationParametersClauseString(
     }
     // Print remaining differentiation parameters.
     interleave(parameters.set_bits(), [&](unsigned index) {
-      printer << function->getParameters()->get(index)->getName().str();
+      switch (style) {
+      case DifferentiationParameterPrintingStyle::Name:
+        printer << function->getParameters()->get(index)->getName().str();
+        break;
+      case DifferentiationParameterPrintingStyle::Index:
+        printer << index;
+        break;
+      }
     }, [&] { printer << ", "; });
     if (parameterCount > 1)
       printer << ')';
@@ -430,69 +450,6 @@ static std::string getDifferentiationParametersClauseString(
   }
   return printer.str();
 }
-
-// SWIFT_ENABLE_TENSORFLOW
-// Returns the transposed parameters clause string for the given function,
-// parameter indices, and parsed parameters. Use the parameter indices if
-// specified; otherwise, use the parsed parameters.
-static std::string getTransposedParametersClauseString(
-    const AbstractFunctionDecl *function, IndexSubset *paramIndices,
-    ArrayRef<ParsedAutoDiffParameter> parsedParams) {
-  assert(function);
-  bool isInstanceMethod = function->isInstanceMember();
-
-  std::string result;
-  llvm::raw_string_ostream printer(result);
-
-  // Use the parameter indices, if specified.
-  if (paramIndices) {
-    SmallBitVector parameters(paramIndices->getBitVector());
-    auto parameterCount = parameters.count();
-    printer << "wrt: ";
-    if (parameterCount > 1)
-      printer << '(';
-    // Check if transposing wrt `self`. If so, manually print it first.
-    if (isInstanceMethod && parameters.test(parameters.size() - 1)) {
-      parameters.reset(parameters.size() - 1);
-      printer << "self";
-      if (parameters.any())
-        printer << ", ";
-    }
-    // Print remaining transposed parameters.
-    interleave(parameters.set_bits(), [&](unsigned index) { printer << index; },
-               [&] { printer << ", "; });
-    if (parameterCount > 1)
-      printer << ')';
-  }
-  // Otherwise, use the parsed parameters.
-  else if (!parsedParams.empty()) {
-    printer << "wrt: ";
-    if (parsedParams.size() > 1)
-      printer << '(';
-    interleave(parsedParams, [&](const ParsedAutoDiffParameter &param) {
-      switch (param.getKind()) {
-      case ParsedAutoDiffParameter::Kind::Named:
-        printer << param.getName();
-        break;
-      case ParsedAutoDiffParameter::Kind::Self:
-        printer << "self";
-        break;
-      case ParsedAutoDiffParameter::Kind::Ordered:
-        auto *paramList = function->getParameters();
-        assert((param.getIndex() < paramList->size()) &&
-                "'wrt:' parameter index should be less than the number "
-                "of parameters");
-        auto *funcParam = paramList->get(param.getIndex());
-        printer << funcParam->getNameStr();
-        break;
-      }
-    }, [&] { printer << ", "; });
-    if (parsedParams.size() > 1)
-      printer << ')';
-  }
-  return printer.str();
-}
-// SWIFT_ENABLE_TENSORFLOW END
 
 // Print the arguments of the given `@differentiable` attribute.
 // - If `omitWrtClause` is true, omit printing the `wrt:` differentiation
@@ -534,7 +491,8 @@ static void printDifferentiableAttrArguments(
   // Print differentiation parameters clause, unless it is to be omitted.
   if (!omitWrtClause) {
     auto diffParamsString = getDifferentiationParametersClauseString(
-        original, attr->getParameterIndices(), attr->getParsedParameters());
+        original, attr->getParameterIndices(), attr->getParsedParameters(),
+        DifferentiationParameterPrintingStyle::Name);
     // Check whether differentiation parameter clause is empty.
     // Handles edge case where resolved parameter indices are unset and
     // parsed parameters are empty. This case should never trigger for
@@ -974,7 +932,8 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     Printer << attr->getOriginalFunctionName().Name;
     auto *derivative = cast<AbstractFunctionDecl>(D);
     auto diffParamsString = getDifferentiationParametersClauseString(
-        derivative, attr->getParameterIndices(), attr->getParsedParameters());
+        derivative, attr->getParameterIndices(), attr->getParsedParameters(),
+        DifferentiationParameterPrintingStyle::Name);
     if (!diffParamsString.empty())
       Printer << ", " << diffParamsString;
     Printer << ')';
@@ -988,8 +947,9 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     auto *attr = cast<TransposeAttr>(this);
     Printer << attr->getOriginalFunctionName().Name;
     auto *transpose = cast<AbstractFunctionDecl>(D);
-    auto transParamsString = getTransposedParametersClauseString(
-        transpose, attr->getParameterIndices(), attr->getParsedParameters());
+    auto transParamsString = getDifferentiationParametersClauseString(
+        transpose, attr->getParameterIndices(), attr->getParsedParameters(),
+        DifferentiationParameterPrintingStyle::Index);
     if (!transParamsString.empty())
       Printer << ", " << transParamsString;
     Printer << ')';
@@ -1640,21 +1600,21 @@ DerivativeAttr *DerivativeAttr::create(ASTContext &context, bool implicit,
 }
 
 TransposeAttr::TransposeAttr(bool implicit, SourceLoc atLoc,
-                             SourceRange baseRange, TypeRepr *baseType,
+                             SourceRange baseRange, TypeRepr *baseTypeRepr,
                              DeclNameWithLoc originalName,
                              ArrayRef<ParsedAutoDiffParameter> params)
     : DeclAttribute(DAK_Transpose, atLoc, baseRange, implicit),
-      BaseType(baseType), OriginalFunctionName(std::move(originalName)),
+      BaseTypeRepr(baseTypeRepr), OriginalFunctionName(std::move(originalName)),
       NumParsedParameters(params.size()) {
   std::uninitialized_copy(params.begin(), params.end(),
                           getTrailingObjects<ParsedAutoDiffParameter>());
 }
 
 TransposeAttr::TransposeAttr(bool implicit, SourceLoc atLoc,
-                             SourceRange baseRange, TypeRepr *baseType,
+                             SourceRange baseRange, TypeRepr *baseTypeRepr,
                              DeclNameWithLoc originalName, IndexSubset *indices)
     : DeclAttribute(DAK_Transpose, atLoc, baseRange, implicit),
-      BaseType(baseType), OriginalFunctionName(std::move(originalName)),
+      BaseTypeRepr(baseTypeRepr), OriginalFunctionName(std::move(originalName)),
       ParameterIndices(indices) {}
 
 TransposeAttr *TransposeAttr::create(ASTContext &context, bool implicit,

@@ -4150,7 +4150,6 @@ llvm::Error DeclDeserializer::deserializeDeclAttributes() {
         break;
       }
 
-      // SWIFT_ENABLE_TENSORFLOW
       case decls_block::Differentiable_DECL_ATTR: {
         bool isImplicit;
         bool linear;
