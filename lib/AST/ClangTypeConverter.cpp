@@ -118,32 +118,38 @@ const clang::Type *ClangTypeConverter::getFunctionType(
     ArrayRef<AnyFunctionType::Param> params, Type resultTy,
     AnyFunctionType::Representation repr) {
 
-  SmallVector<Type, 4> paramsTy;
-  for (auto p : params)
-    paramsTy.push_back(p.getPlainType());
-
   auto resultClangTy = convert(resultTy);
   if (resultClangTy.isNull())
     return nullptr;
 
-  SmallVector<clang::QualType, 8> paramsClangTy;
-  for (auto p : paramsTy) {
-    auto pc = convert(p);
+  SmallVector<clang::FunctionProtoType::ExtParameterInfo, 4> extParamInfos;
+  SmallVector<clang::QualType, 4> paramsClangTy;
+  bool someParamIsConsumed = false;
+  for (auto p : params) {
+    auto pc = convert(p.getPlainType());
     if (pc.isNull())
       return nullptr;
+    clang::FunctionProtoType::ExtParameterInfo extParamInfo;
+    if (p.getParameterFlags().isOwned()) {
+      someParamIsConsumed = true;
+      extParamInfo = extParamInfo.withIsConsumed(true);
+    }
+    extParamInfos.push_back(extParamInfo);
     paramsClangTy.push_back(pc);
   }
 
   clang::FunctionProtoType::ExtProtoInfo info(clang::CallingConv::CC_C);
+  if (someParamIsConsumed)
+    info.ExtParameterInfos = extParamInfos.begin();
   auto fn = ClangASTContext.getFunctionType(resultClangTy, paramsClangTy, info);
   if (fn.isNull())
     return nullptr;
 
   switch (repr) {
   case AnyFunctionType::Representation::CFunctionPointer:
-    return fn.getTypePtr();
+    return ClangASTContext.getPointerType(fn).getTypePtr();
   case AnyFunctionType::Representation::Block:
-    return ClangASTContext.getBlockPointerType(fn).getTypePtrOrNull();
+    return ClangASTContext.getBlockPointerType(fn).getTypePtr();
   case AnyFunctionType::Representation::Swift:
   case AnyFunctionType::Representation::Thin:
     llvm_unreachable("Expected a C-compatible representation.");
