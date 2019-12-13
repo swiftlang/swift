@@ -1740,9 +1740,6 @@ bool areGenericRequirementsSatisfied(const DeclContext *DC,
                                      GenericSignature sig,
                                      SubstitutionMap Substitutions,
                                      bool isExtension);
-
-bool hasDynamicMemberLookupAttribute(Type type,
-  llvm::DenseMap<CanType, bool> &DynamicMemberLookupCache);
 } // end namespace swift
 
 #endif
