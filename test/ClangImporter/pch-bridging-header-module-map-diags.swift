@@ -1,4 +1,5 @@
 // RUN: rm -f %t.*
+// REQUIRES: objc_interop
 
 // Build a bridging PCH for involving a module map that contains a warning
 // RUN: %target-swift-frontend -F %S/Inputs/ModuleMapWarning -emit-pch %S/Inputs/ModuleMapWarning/bridging-pch.h -pch-output-dir %t/pch 2> %t.stderr
