@@ -4466,7 +4466,8 @@ public:
   /// This "constrained derivative generic signature" is used for
   /// parameter/result type lowering. It is used as the actual generic signature
   /// of the derivative function type iff the original function type has a
-  /// generic signature; otherwise, no derivative generic signature is used.
+  /// generic signature and not all generic parameters are bound to concrete
+  /// types. Otherwise, no derivative generic signature is used.
   ///
   /// Other properties of the original function type are copied exactly:
   /// `ExtInfo`, coroutine kind, callee convention, yields, optional error

@@ -133,14 +133,6 @@ DestructureTupleInst *getSingleDestructureTupleUser(SILValue value);
 void forEachApplyDirectResult(
     ApplyInst *ai, llvm::function_ref<void(SILValue)> resultCallback);
 
-/// Returns the canonical derivative generic signature for the given witness
-/// and original function.
-/// - Return the witness derivative generic signature if it exists.
-/// - Otherwise, return the original function's generic signature.
-CanGenericSignature
-getDerivativeGenericSignature(SILDifferentiabilityWitness *witness,
-                              SILFunction *original);
-
 /// Given a function, gathers all of its formal results (both direct and
 /// indirect) in an order defined by its result type. Note that "formal results"
 /// refer to result values in the body of the function, not at call sites.

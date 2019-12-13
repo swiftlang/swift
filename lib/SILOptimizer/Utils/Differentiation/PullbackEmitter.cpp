@@ -162,6 +162,9 @@ SILType PullbackEmitter::remapType(SILType ty) {
 }
 
 Optional<VectorSpace> PullbackEmitter::getTangentSpace(CanType type) {
+  // Use witness generic signature to remap types.
+  if (auto witnessGenSig = getWitness()->getDerivativeGenericSignature())
+    type = witnessGenSig->getCanonicalTypeInContext(type);
   return type->getAutoDiffAssociatedTangentSpace(
       LookUpConformanceInModule(getModule().getSwiftModule()));
 }

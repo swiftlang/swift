@@ -461,13 +461,29 @@ static SILValue reapplyFunctionConversion(
       context.addDifferentiableFunctionInstToWorklist(dfi);
       newArgs.back() = dfi;
     }
-    // If new function's generic signature is specified, use it to create
-    // substitution map for reapplied `partial_apply` instruction.
-    auto substMap = !newFuncGenSig
-        ? pai->getSubstitutionMap()
-        : SubstitutionMap::get(
-              newFuncGenSig, QuerySubstitutionMap{pai->getSubstitutionMap()},
-              LookUpConformanceInModule(builder.getModule().getSwiftModule()));
+    // Compute substitution map for reapplying `partial_apply`.
+    // - If reapplied functoin is not polymorphic, use empty substitution map
+    //   regardless of the original `partial_apply`'s substitution map.
+    //   - This case is triggered for reapplying `partial_apply` where `newFunc`
+    //     is a `differentiability_witness_function` where the witness generic
+    //     signature has all concrete parameters while the original function's
+    //     generic signature does not. In this case, the original function type
+    //     is polymorphic while derivative function types are not (specialized
+    //     with concrete types from same-type requirements).
+    // - Otherwise, if `newFuncGenSig` is not specified, use the original
+    //   `partial_apply`'s substitution map.
+    // - Otherwise, if `newFuncGenSig` is specified, combine it with the
+    //   original `partial_apply`'s substitution map.
+    SubstitutionMap substMap;
+    if (innerNewFunc->getType().castTo<SILFunctionType>()->isPolymorphic()) {
+      if (!newFuncGenSig) {
+        substMap = pai->getSubstitutionMap();
+      } else {
+        substMap = SubstitutionMap::get(
+            newFuncGenSig, QuerySubstitutionMap{pai->getSubstitutionMap()},
+            LookUpConformanceInModule(builder.getModule().getSwiftModule()));
+      }
+    }
     return builder.createPartialApply(loc, innerNewFunc, substMap, newArgs,
                                       ParameterConvention::Direct_Guaranteed);
   }
@@ -796,14 +812,16 @@ static SILFunction *createEmptyVJP(ADContext &context, SILFunction *original,
               original->getName(), AutoDiffDerivativeFunctionKind::VJP,
               witness->getConfig()))
           .str();
-  auto vjpGenericSig = getDerivativeGenericSignature(witness, original);
-  auto *vjpGenericEnv = vjpGenericSig
-      ? vjpGenericSig->getGenericEnvironment()
-      : nullptr;
+  CanGenericSignature vjpCanGenSig;
+  if (auto jvpGenSig = witness->getDerivativeGenericSignature())
+    vjpCanGenSig = jvpGenSig->getCanonicalSignature();
+  GenericEnvironment *vjpGenericEnv = nullptr;
+  if (vjpCanGenSig && !vjpCanGenSig->areAllParamsConcrete())
+    vjpGenericEnv = vjpCanGenSig->getGenericEnvironment();
   auto vjpType = originalTy->getAutoDiffDerivativeFunctionType(
       indices.parameters, indices.source, AutoDiffDerivativeFunctionKind::VJP,
       module.Types, LookUpConformanceInModule(module.getSwiftModule()),
-      vjpGenericSig,
+      vjpCanGenSig,
       /*isReabstractionThunk*/ original->isThunk() == IsReabstractionThunk);
 
   SILOptFunctionBuilder fb(context.getTransform());
@@ -839,14 +857,16 @@ static SILFunction *createEmptyJVP(ADContext &context, SILFunction *original,
               original->getName(), AutoDiffDerivativeFunctionKind::JVP,
               witness->getConfig()))
           .str();
-  auto jvpGenericSig = getDerivativeGenericSignature(witness, original);
-  auto *jvpGenericEnv = jvpGenericSig
-      ? jvpGenericSig->getGenericEnvironment()
-      : nullptr;
+  CanGenericSignature jvpCanGenSig;
+  if (auto jvpGenSig = witness->getDerivativeGenericSignature())
+    jvpCanGenSig = jvpGenSig->getCanonicalSignature();
+  GenericEnvironment *jvpGenericEnv = nullptr;
+  if (jvpCanGenSig && !jvpCanGenSig->areAllParamsConcrete())
+    jvpGenericEnv = jvpCanGenSig->getGenericEnvironment();
   auto jvpType = originalTy->getAutoDiffDerivativeFunctionType(
       indices.parameters, indices.source, AutoDiffDerivativeFunctionKind::JVP,
       module.Types, LookUpConformanceInModule(module.getSwiftModule()),
-      jvpGenericSig,
+      jvpCanGenSig,
       /*isReabstractionThunk*/ original->isThunk() == IsReabstractionThunk);
 
   SILOptFunctionBuilder fb(context.getTransform());

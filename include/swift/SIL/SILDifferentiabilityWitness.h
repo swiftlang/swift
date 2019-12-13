@@ -49,7 +49,9 @@ private:
   /// The original function.
   SILFunction *OriginalFunction;
   /// The autodiff configuration: parameter indices, result indices, derivative
-  /// generic signature (optional).
+  /// generic signature (optional). The derivative generic signature may contain
+  /// same-type requirements such that all generic parameters are bound to
+  /// concrete types.
   AutoDiffConfig Config;
   /// The JVP (Jacobian-vector products) derivative function.
   SILFunction *JVP;

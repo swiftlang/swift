@@ -75,13 +75,20 @@ VJPEmitter::VJPEmitter(ADContext &context, SILFunction *original,
 SILFunction *VJPEmitter::createEmptyPullback() {
   auto &module = context.getModule();
   auto origTy = original->getLoweredFunctionType();
+  // Get witness generic signature for remapping types.
+  // Witness generic signature may have more requirements than VJP generic
+  // signature: when witness generic signature has same-type requirements
+  // binding all generic parameters to concrete types, VJP function type uses
+  // all the concrete types and VJP generic signature is null.
+  CanGenericSignature witnessCanGenSig;
+  if (auto witnessGenSig = witness->getDerivativeGenericSignature())
+    witnessCanGenSig = witnessGenSig->getCanonicalSignature();
   auto lookupConformance = LookUpConformanceInModule(module.getSwiftModule());
 
   // Given a type, returns its formal SIL parameter info.
   auto getTangentParameterInfoForOriginalResult =
       [&](CanType tanType, ResultConvention origResConv) -> SILParameterInfo {
-    Lowering::AbstractionPattern pattern(
-        vjp->getLoweredFunctionType()->getSubstGenericSignature(), tanType);
+    Lowering::AbstractionPattern pattern(witnessCanGenSig, tanType);
     auto &tl = context.getTypeConverter().getTypeLowering(
         pattern, tanType, TypeExpansionContext::minimal());
     ParameterConvention conv;
@@ -105,8 +112,7 @@ SILFunction *VJPEmitter::createEmptyPullback() {
   // Given a type, returns its formal SIL result info.
   auto getTangentResultInfoForOriginalParameter =
       [&](CanType tanType, ParameterConvention origParamConv) -> SILResultInfo {
-    Lowering::AbstractionPattern pattern(
-        vjp->getLoweredFunctionType()->getSubstGenericSignature(), tanType);
+    Lowering::AbstractionPattern pattern(witnessCanGenSig, tanType);
     auto &tl = context.getTypeConverter().getTypeLowering(
         pattern, tanType, TypeExpansionContext::minimal());
     ResultConvention conv;
@@ -139,12 +145,14 @@ SILFunction *VJPEmitter::createEmptyPullback() {
   auto indices = witness->getSILAutoDiffIndices();
 
   // Add pullback parameter for the seed.
-  auto origResInfo = origTy->getResults()[indices.source];
+  auto origResult = origTy->getResults()[indices.source];
+  origResult = origResult.getWithInterfaceType(
+      origResult.getInterfaceType()->getCanonicalType(witnessCanGenSig));
   pbParams.push_back(getTangentParameterInfoForOriginalResult(
-      origResInfo.getInterfaceType()
+      origResult.getInterfaceType()
           ->getAutoDiffAssociatedTangentSpace(lookupConformance)
           ->getCanonicalType(),
-      origResInfo.getConvention()));
+      origResult.getConvention()));
 
   // Accept a pullback struct in the pullback parameter list. This is the
   // returned pullback's closure context.
@@ -156,6 +164,8 @@ SILFunction *VJPEmitter::createEmptyPullback() {
   // Add pullback results for the requested wrt parameters.
   for (auto i : indices.parameters->getIndices()) {
     auto origParam = origParams[i];
+    origParam = origParam.getWithInterfaceType(
+        origParam.getInterfaceType()->getCanonicalType(witnessCanGenSig));
     adjResults.push_back(getTangentResultInfoForOriginalParameter(
         origParam.getInterfaceType()
             ->getAutoDiffAssociatedTangentSpace(lookupConformance)
@@ -169,7 +179,10 @@ SILFunction *VJPEmitter::createEmptyPullback() {
                         original->getName(), AutoDiffLinearMapKind::Pullback,
                         witness->getConfig()))
                     .str();
-  auto pbGenericSig = getDerivativeGenericSignature(witness, original);
+  // Set pullback generic signature equal to VJP generic signature.
+  // Do not use witness generic signature, which may have same-type requirements
+  // binding all generic parameters to concrete types.
+  auto pbGenericSig = vjp->getLoweredFunctionType()->getSubstGenericSignature();
   auto *pbGenericEnv =
       pbGenericSig ? pbGenericSig->getGenericEnvironment() : nullptr;
   auto pbType = SILFunctionType::get(

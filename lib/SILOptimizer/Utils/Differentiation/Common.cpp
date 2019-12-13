@@ -81,18 +81,6 @@ void forEachApplyDirectResult(
       resultCallback(result);
 }
 
-/// Returns the canonical derivative generic signature for the given witness
-/// and original function.
-/// - Return the witness derivative generic signature if it exists.
-/// - Otherwise, return the original function's generic signature.
-CanGenericSignature
-getDerivativeGenericSignature(SILDifferentiabilityWitness *witness,
-                              SILFunction *original) {
-  if (auto sig = witness->getDerivativeGenericSignature())
-    return sig->getCanonicalSignature();
-  return original->getLoweredFunctionType()->getSubstGenericSignature();
-}
-
 void collectAllFormalResultsInTypeOrder(SILFunction &function,
                                         SmallVectorImpl<SILValue> &results) {
   SILFunctionConventions convs(function.getLoweredFunctionType(),
