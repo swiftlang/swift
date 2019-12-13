@@ -201,10 +201,6 @@ public:
                                          ContextualTypePurpose CTP,
                                          Type suggestedType = Type());
 
-  /// For an expression being type checked with a CTP_CalleeResult contextual
-  /// type, try to diagnose a problem.
-  bool diagnoseCalleeResultContextualConversionError();
-
   /// Attempt to produce a diagnostic for a mismatch between a call's
   /// type and its assumed contextual type.
   bool diagnoseCallContextualConversionErrors(ApplyExpr *callEpxr,
