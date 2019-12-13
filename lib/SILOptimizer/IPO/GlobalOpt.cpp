@@ -1060,6 +1060,8 @@ void SILGlobalOpt::collectUsesOfInstructionForDeletion(SILInstruction *inst) {
     for (auto *use : result->getUses()) {
       auto *user = use->getUser();
       assert(user && "User should never be NULL!");
+      assert(use->get()->use_begin() == use->get()->use_end()
+             && "All collected uses must not be used themselves.");
 
       // If the instruction itself has any uses, recursively zap them so that
       // nothing uses this instruction.
