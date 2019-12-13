@@ -2083,9 +2083,10 @@ class TransposeAttr final
       private llvm::TrailingObjects<TransposeAttr, ParsedAutoDiffParameter> {
   friend TrailingObjects;
 
-  /// The base type of the original function.
-  /// This is non-null only when the original function is not top-level (i.e. it
-  /// is an instance/static method).
+  /// The base type for the referenced original declaration. This field is
+  /// non-null only for parsed attributes that reference a qualified original
+  /// declaration. This field is not serialized; type-checking uses it to
+  /// resolve the original declaration, which is serialized.
   TypeRepr *BaseType;
   /// The original function name.
   DeclNameWithLoc OriginalFunctionName;

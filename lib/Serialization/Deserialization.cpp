@@ -4201,7 +4201,6 @@ llvm::Error DeclDeserializer::deserializeDeclAttributes() {
         break;
       }
 
-      // SWIFT_ENABLE_TENSORFLOW
       case decls_block::Derivative_DECL_ATTR: {
         bool isImplicit;
         uint64_t origNameId;
@@ -4229,6 +4228,29 @@ llvm::Error DeclDeserializer::deserializeDeclAttributes() {
         derivAttr->setOriginalFunction(origDecl);
         derivAttr->setDerivativeKind(*derivativeKind);
         Attr = derivAttr;
+        break;
+      }
+
+      case decls_block::Transpose_DECL_ATTR: {
+        bool isImplicit;
+        uint64_t origNameId;
+        DeclID origDeclId;
+        ArrayRef<uint64_t> parameters;
+
+        serialization::decls_block::TransposeDeclAttrLayout::readRecord(
+            scratch, isImplicit, origNameId, origDeclId, parameters);
+
+        DeclNameWithLoc origName{MF.getDeclBaseName(origNameId), DeclNameLoc()};
+        auto *origDecl = cast<AbstractFunctionDecl>(MF.getDecl(origDeclId));
+        llvm::SmallBitVector parametersBitVector(parameters.size());
+        for (unsigned i : indices(parameters))
+          parametersBitVector[i] = parameters[i];
+        auto *indices = IndexSubset::get(ctx, parametersBitVector);
+        auto *transposeAttr =
+            TransposeAttr::create(ctx, isImplicit, SourceLoc(), SourceRange(),
+                                  /*baseTypeRepr*/ nullptr, origName, indices);
+        transposeAttr->setOriginalFunction(origDecl);
+        Attr = transposeAttr;
         break;
       }
       // SWIFT_ENABLE_TENSORFLOW END
