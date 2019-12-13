@@ -303,12 +303,10 @@ namespace {
     ///
     /// \param expr The expression to be coerced.
     /// \param toType The type to which the expression will be coerced.
-    /// \param locator Locator describing where this conversion occurs.
     ///
     /// \return The coerced expression, whose type will be equivalent to
     /// \c toType.
-    Expr *coerceSuperclass(Expr *expr, Type toType,
-                           ConstraintLocatorBuilder locator);
+    Expr *coerceSuperclass(Expr *expr, Type toType);
 
     /// Coerce the given value to existential type.
     ///
@@ -320,12 +318,10 @@ namespace {
     ///
     /// \param expr The expression to be coerced.
     /// \param toType The type to which the expression will be coerced.
-    /// \param locator Locator describing where this conversion occurs.
     ///
     /// \return The coerced expression, whose type will be equivalent to
     /// \c toType.
-    Expr *coerceExistential(Expr *expr, Type toType,
-                            ConstraintLocatorBuilder locator);
+    Expr *coerceExistential(Expr *expr, Type toType);
 
     /// Coerce an expression of (possibly unchecked) optional
     /// type to have a different (possibly unchecked) optional type.
@@ -4342,7 +4338,8 @@ namespace {
       auto closureTy =
           FunctionType::get({ FunctionType::Param(baseTy) }, leafTy);
       auto closure = new (ctx)
-          AutoClosureExpr(E, leafTy, discriminator, cs.DC);
+          AutoClosureExpr(/*set body later*/nullptr, leafTy,
+                          discriminator, cs.DC);
       auto param = new (ctx) ParamDecl(
           SourceLoc(),
           /*argument label*/ SourceLoc(), Identifier(),
@@ -4356,7 +4353,8 @@ namespace {
       auto outerClosureTy =
           FunctionType::get({ FunctionType::Param(keyPathTy) }, closureTy);
       auto outerClosure = new (ctx)
-          AutoClosureExpr(closure, closureTy, discriminator, cs.DC);
+          AutoClosureExpr(/*set body later*/nullptr, closureTy,
+                          discriminator, cs.DC);
       auto outerParam =
           new (ctx) ParamDecl(SourceLoc(),
                               /*argument label*/ SourceLoc(), Identifier(),
@@ -4754,8 +4752,7 @@ static Type getMetatypeSuperclass(Type t) {
   return t->getSuperclass();
 }
 
-Expr *ExprRewriter::coerceSuperclass(Expr *expr, Type toType,
-                                     ConstraintLocatorBuilder locator) {
+Expr *ExprRewriter::coerceSuperclass(Expr *expr, Type toType) {
   auto &ctx = cs.getASTContext();
 
   auto fromType = cs.getType(expr);
@@ -4780,7 +4777,7 @@ Expr *ExprRewriter::coerceSuperclass(Expr *expr, Type toType,
         new (ctx) ArchetypeToSuperExpr(expr, superclass));
 
     if (!superclass->isEqual(toType))
-      return coerceSuperclass(expr, toType, locator);
+      return coerceSuperclass(expr, toType);
 
     return expr;
 
@@ -4794,7 +4791,7 @@ Expr *ExprRewriter::coerceSuperclass(Expr *expr, Type toType,
     auto *archetypeVal = cs.cacheType(new (ctx) OpaqueValueExpr(
         expr->getSourceRange(), fromArchetype));
 
-    auto *result = coerceSuperclass(archetypeVal, toType, locator);
+    auto *result = coerceSuperclass(archetypeVal, toType);
 
     return cs.cacheType(
       new (ctx) OpenExistentialExpr(expr, archetypeVal, result,
@@ -4830,8 +4827,7 @@ collectExistentialConformances(Type fromType, Type toType,
   return toType->getASTContext().AllocateCopy(conformances);
 }
 
-Expr *ExprRewriter::coerceExistential(Expr *expr, Type toType,
-                                      ConstraintLocatorBuilder locator) {
+Expr *ExprRewriter::coerceExistential(Expr *expr, Type toType) {
   Type fromType = cs.getType(expr);
   Type fromInstanceType = fromType;
   Type toInstanceType = toType;
@@ -5823,11 +5819,11 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
 
     case ConversionRestrictionKind::Superclass:
     case ConversionRestrictionKind::ExistentialMetatypeToMetatype:
-      return coerceSuperclass(expr, toType, locator);
+      return coerceSuperclass(expr, toType);
 
     case ConversionRestrictionKind::Existential:
     case ConversionRestrictionKind::MetatypeToExistentialMetatype:
-      return coerceExistential(expr, toType, locator);
+      return coerceExistential(expr, toType);
 
     case ConversionRestrictionKind::ClassMetatypeToAnyObject: {
       assert(ctx.LangOpts.EnableObjCInterop &&
@@ -6060,7 +6056,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
          fromSuperClass;
          fromSuperClass = fromSuperClass->getSuperclass()) {
       if (fromSuperClass->isEqual(toType)) {
-        return coerceSuperclass(expr, toType, locator);
+        return coerceSuperclass(expr, toType);
       }
     }
     break;
@@ -6193,7 +6189,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
   case TypeKind::ExistentialMetatype:
   case TypeKind::ProtocolComposition:
   case TypeKind::Protocol:
-    return coerceExistential(expr, toType, locator);
+    return coerceExistential(expr, toType);
 
   // Coercion to Optional<T>.
   case TypeKind::BoundGenericEnum: {
