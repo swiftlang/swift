@@ -877,7 +877,7 @@ static bool errorAndSkipUntilConsumeRightParen(Parser &P, StringRef attrName,
 bool Parser::parseDifferentiationParametersClause(
     SmallVectorImpl<ParsedAutoDiffParameter> &params, StringRef attrName) {
   SyntaxParsingContext DiffParamsClauseContext(
-       SyntaxContext, SyntaxKind::DifferentiationParamsClause);
+      SyntaxContext, SyntaxKind::DifferentiationParamsClause);
   consumeToken(tok::identifier);
   if (!consumeIf(tok::colon)) {
     diagnose(Tok, diag::expected_colon_after_label, "wrt");
@@ -1207,17 +1207,19 @@ ParserResult<DerivativeAttr> Parser::parseDerivativeAttribute(SourceLoc atLoc,
     }
     {
       // Parse the name of the function.
-      SyntaxParsingContext FuncDeclNameContext(SyntaxContext,
-                                               SyntaxKind::FunctionDeclName);
+      // TODO(TF-1058): Make `@derivative` attribute support qualified
+      // original declarations.
+      SyntaxParsingContext DeclNameContext(SyntaxContext,
+                                           SyntaxKind::QualifiedDeclName);
       // NOTE: Use `afterDot = true` and `allowDeinitAndSubscript = true` to
       // enable, e.g. `@derivative(of: init)` and `@derivative(of: subscript)`.
       original.Name = parseUnqualifiedDeclName(
           /*afterDot*/ true, original.Loc,
           diag::attr_derivative_expected_original_name, /*allowOperators*/ true,
           /*allowZeroArgCompoundNames*/ true, /*allowDeinitAndSubscript*/ true);
-      if (consumeIfTrailingComma())
-        return makeParserError();
     }
+    if (consumeIfTrailingComma())
+      return makeParserError();
     // Parse the optional 'wrt' differentiation parameters clause.
     if (isIdentifier(Tok, "wrt") &&
         parseDifferentiationParametersClause(params, AttrName))
@@ -1269,8 +1271,10 @@ Parser::parseDifferentiatingAttribute(SourceLoc atLoc, SourceLoc loc) {
         SyntaxKind::DeprecatedDerivativeRegistrationAttributeArguments);
     {
       // Parse the name of the function.
-      SyntaxParsingContext FuncDeclNameContext(
-          SyntaxContext, SyntaxKind::FunctionDeclName);
+      // TODO(TF-1058): Make `@differentiating` attribute support qualified
+      // original declarations.
+      SyntaxParsingContext DeclNameContext(SyntaxContext,
+                                           SyntaxKind::QualifiedDeclName);
       // NOTE: Use `afterDot = true` and `allowDeinitAndSubscript = true` to
       // enable, e.g. `@differentiating(init)` and
       // `@differentiating(subscript)`.
@@ -1278,9 +1282,9 @@ Parser::parseDifferentiatingAttribute(SourceLoc atLoc, SourceLoc loc) {
           /*afterDot*/ true, original.Loc,
           diag::attr_derivative_expected_original_name, /*allowOperators*/ true,
           /*allowZeroArgCompoundNames*/ true, /*allowDeinitAndSubscript*/ true);
-      if (consumeIfTrailingComma())
-        return makeParserError();
     }
+    if (consumeIfTrailingComma())
+      return makeParserError();
     // Parse the optional 'wrt' differentiation parameters clause.
     if (isIdentifier(Tok, "wrt") &&
         parseDifferentiationParametersClause(params, AttrName))
@@ -1335,6 +1339,8 @@ static bool parseBaseTypeForQualifiedDeclName(Parser &P, TypeRepr *&baseType) {
 /// Returns true on error (if function decl name could not be parsed).
 bool parseQualifiedDeclName(Parser &P, Diag<> nameParseError,
                             TypeRepr *&baseType, DeclNameWithLoc &original) {
+  SyntaxParsingContext DeclNameContext(P.SyntaxContext,
+                                       SyntaxKind::QualifiedDeclName);
   if (parseBaseTypeForQualifiedDeclName(P, baseType))
     return true;
 
@@ -1399,18 +1405,13 @@ ParserResult<TransposeAttr> Parser::parseTransposeAttribute(SourceLoc atLoc,
     }
     {
       // Parse the optionally qualified function name.
-      // TODO(TF-1009): Fix syntax support for dot-separated qualified names.
-      // Currently, `SyntaxKind::FunctionDeclName` only supports unqualified
-      // names.
-      SyntaxParsingContext FuncDeclNameContext(SyntaxContext,
-                                               SyntaxKind::FunctionDeclName);
       if (parseQualifiedDeclName(*this,
                                  diag::attr_transpose_expected_original_name,
                                  baseType, original))
         return makeParserError();
-      if (consumeIfTrailingComma())
-        return makeParserError();
     }
+    if (consumeIfTrailingComma())
+      return makeParserError();
     // Parse the optional 'wrt' transposed parameters clause.
     if (Tok.is(tok::identifier) && Tok.getText() == "wrt" &&
         parseTransposedParametersClause(params, AttrName))
