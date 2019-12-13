@@ -1160,8 +1160,8 @@ bool SILGlobalOpt::run() {
   }
 
   // Erase the instructions that we have marked for deletion.
-  while (auto *inst = InstToRemove.pop_back_val()) {
-    inst->eraseFromParent();
+  while (!InstToRemove.isEmpty()) {
+    InstToRemove.pop_back_val()->eraseFromParent();
   }
 
   // After we erase some instructions, re-collect.
