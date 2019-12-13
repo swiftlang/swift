@@ -1452,8 +1452,11 @@ making the other function linear.
 
 A protocol requirement or class method/property/subscript can be made
 differentiable via a derivative function or transpose function defined in an
-extension. A dispatched call to such a member can be differentiated even if the
-concrete implementation is not differentiable.
+extension. When a protocol requirement is not marked with `@differentiable` but
+has been made differentiable by a `@derivative` or `@transpose` declaration in a
+protocol extension, a dispatched call to such a member can be differentiated,
+and the derivative or transpose is always the one provided in the protocol
+extension.
 
 #### Linear maps
 
@@ -1732,8 +1735,8 @@ where Self: Differentiable & FloatingPoint, Self == Self.TangentVector {
 
     @inlinable
     @derivative(of: log)
-    static func _(_ x: Self) -> (value: Self, differential: @differentiable(linear) (Self) -> Self) { dx in
-        (log(x), { 1 / x * dx })
+    static func _(_ x: Self) -> (value: Self, differential: @differentiable(linear) (Self) -> Self) {
+        (log(x), { dx in 1 / x * dx })
     }
 
     @inlinable
@@ -1748,6 +1751,73 @@ where Self: Differentiable & FloatingPoint, Self == Self.TangentVector {
 
     ...
 }
+```
+
+#### Default derivatives
+
+In a protocol extension, class definition, or class extension, providing a
+derivative or transpose for a protocol extension or a non-final class member is
+considered as providing a default derivative for that member. Types that conform
+to the protocol or inherit from the class can inherit the default derivative.
+
+If the original member does not have a `@differentiable` attribute, a default
+derivative is implicitly added to all conforming/overriding implementations.
+
+```swift
+protocol P {
+    func foo(_ x: Float) -> Float
+}
+
+extension P {
+    @derivative(of: foo(x:))
+    func _(_ x: Float) -> (value: Float, differential: (Float) -> Float) {
+        (value: foo(x), differential: { _ in 42 })
+    }
+}
+
+struct S: P {
+    func foo(_ x: Float) -> Float {
+        33
+    }
+}
+
+let s = S()
+let d = derivative(at: 0) { x in
+   s.foo(x)
+} // ==> 42
+```
+
+When a protocol requirement or class member is marked with `@differentiable`, it
+is considered as a _differentiability customization point_. This means that all
+conforming/overriding implementation must provide a corresponding
+`@differentiable` attribute, which causes the implementation to be
+differentiated. To inherit the default derivative without differentiating the
+implementation, add `default` to the `@differentiable` attribute.
+
+```swift
+protocol P {
+    @differentiable
+    func foo(_ x: Float) -> Float
+}
+
+extension P {
+    @derivative(of: foo(x:))
+    func _(_ x: Float) -> (value: Float, differential: (Float) -> Float) {
+        (value: foo(x), differential: { _ in 42 })
+    }
+}
+
+struct S: P {
+    @differentiable(default) // Inherits default derivative for `P.foo(_:)`.
+    func foo(_ x: Float) -> Float {
+        33
+    }
+}
+
+let s = S()
+let d = derivative(at: 0) { x in
+   s.foo(x)
+} // ==> 42
 ```
 
 ### Differentiable function types
@@ -2241,13 +2311,13 @@ whether the derivative is always zero and warns the user.
 
 ```swift
 let grad = gradient(at: 1.0) { x in
-    3.squareRoot()
+    Double(3).squareRoot()
 }
 ```
 
 ```console
-test.swift:4:18: warning: result does not depend on differentiation arguments and will always have a zero derivative; do you want to add '.withoutDerivative()' to make it explicit?
-    3.squareRoot()
+test.swift:4:18: warning: result does not depend on differentiation arguments and will always have a zero derivative; do you want to use 'withoutDerivative(at:)' to make it explicit?
+    Double(3).squareRoot()
     ^
     withoutDerivative(at:)
 ```
