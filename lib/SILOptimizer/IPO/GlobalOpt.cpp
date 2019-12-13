@@ -816,16 +816,6 @@ void SILGlobalOpt::optimizeInitializer(SILFunction *AddrF,
   HasChanged = true;
 }
 
-bool SILGlobalOpt::tryRemoveGlobalAlloc(SILGlobalVariable *global,
-                                        AllocGlobalInst *alloc) {
-  if (GlobalAddrMap[global].size())
-    return false;
-
-  InstToRemove.push_back(alloc);
-
-  return true;
-}
-
 static bool canBeChangedExternally(SILGlobalVariable *SILG) {
   // Don't assume anything about globals which are imported from other modules.
   if (isAvailableExternally(SILG->getLinkage()))
@@ -866,6 +856,18 @@ static bool canBeUsedOrChangedExternally(SILGlobalVariable *global) {
 
 static bool isSafeToRemove(SILGlobalVariable *global) {
   return global->getDecl() && !canBeUsedOrChangedExternally(global);
+}
+
+bool SILGlobalOpt::tryRemoveGlobalAlloc(SILGlobalVariable *global,
+                                        AllocGlobalInst *alloc) {
+  if (!isSafeToRemove(global)) return false;
+  
+  if (GlobalAddrMap[global].size())
+    return false;
+
+  InstToRemove.push_back(alloc);
+
+  return true;
 }
 
 /// If there are no loads or accesses of a given global, then remove its
@@ -925,6 +927,7 @@ static LoadInst *getValidLoad(SILInstruction *I, SILValue V) {
 
 /// If this is a read from a global let variable, map it.
 void SILGlobalOpt::collectGlobalAccess(GlobalAddrInst *GAI) {
+  GAI->dump();
   auto *SILG = GAI->getReferencedGlobal();
   if (!SILG)
     return;
