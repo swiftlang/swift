@@ -904,10 +904,6 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
     pushStructureNode(SN, NTD);
 
   } else if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
-    // Normally bindExtension() would take care of computing the extended
-    // nominal. It must be done before asking for generic parameters.
-    if (!inInactiveClause || ASTScope::areInactiveIfConfigClausesSupported())
-      ED->computeExtendedNominal();
     SyntaxStructureNode SN;
     setDecl(SN, D);
     SN.Kind = SyntaxStructureKind::Extension;
@@ -1112,11 +1108,11 @@ bool ModelASTWalker::walkToTypeReprPre(TypeRepr *T) {
       return false;
 
   } else if (auto IdT = dyn_cast<ComponentIdentTypeRepr>(T)) {
-    if (!passTokenNodesUntil(IdT->getIdLoc(),
+    if (!passTokenNodesUntil(IdT->getStartLoc(),
                              ExcludeNodeAtLocation).shouldContinue)
       return false;
     if (TokenNodes.empty() ||
-        TokenNodes.front().Range.getStart() != IdT->getIdLoc())
+        TokenNodes.front().Range.getStart() != IdT->getStartLoc())
       return false;
     if (!passNode({SyntaxNodeKind::TypeId, TokenNodes.front().Range}))
       return false;

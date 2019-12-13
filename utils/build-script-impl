@@ -125,6 +125,7 @@ KNOWN_SETTINGS=(
     skip-build-benchmarks       ""               "set to skip building Swift Benchmark Suite"
     skip-build-external-benchmarks "1"            "set to skip building the external Swift Benchmark Suite. (skipped by default)"
     skip-build-playgroundsupport ""              "set to skip building PlaygroundSupport"
+    skip-build-clang-tools-extra ""              "set to skip building clang-tools-extra as part of llvm"
     skip-local-build            ""               "set to skip building for the current host (useful when crosscompiling)"
     skip-test-cmark             ""               "set to skip testing CommonMark"
     skip-test-lldb              ""               "set to skip testing lldb"
@@ -396,6 +397,40 @@ function should_execute_host_actions_for_phase() {
     fi
 }
 
+function verify_host_is_supported() {
+    local host="$1"
+    case ${host} in
+      freebsd-x86_64            \
+      | cygwin-x86_64           \
+      | haiku-x86_64            \
+      | linux-x86_64            \
+      | linux-i686              \
+      | linux-armv6             \
+      | linux-armv7             \
+      | linux-aarch64           \
+      | linux-powerpc64         \
+      | linux-powerpc64le       \
+      | linux-s390x             \
+      | macosx-x86_64           \
+      | iphonesimulator-i386    \
+      | iphonesimulator-x86_64  \
+      | iphoneos-armv7          \
+      | iphoneos-armv7s         \
+      | iphoneos-arm64          \
+      | appletvsimulator-x86_64 \
+      | appletvos-arm64         \
+      | watchsimulator-i386     \
+      | watchos-armv7k          \
+      | android-armv7           \
+      | android-aarch64)
+        ;;
+      *)
+        echo "Unknown host tools target: ${host}"
+        exit 1
+        ;;
+    esac
+}
+
 function set_build_options_for_host() {
     llvm_cmake_options=()
     swift_cmake_options=()
@@ -408,58 +443,28 @@ function set_build_options_for_host() {
     local host="$1"
 
     # Hosts which can be cross-compiled must specify:
-    # SWIFT_HOST_TRIPLE and llvm_target_arch (as well as usual HOST_VARIANT flags)
+    # SWIFT_HOST_TRIPLE and llvm_target_arch.
+    # Hosts which have differing platforn names from their
+    # SWIFT_HOST_VARIANT_* values should change them here as well.
+
+    verify_host_is_supported $host
+
+    local platform=${host%%-*}
+    local architecture=${host##*-}
+
+    SWIFT_HOST_VARIANT=$platform
+    SWIFT_HOST_VARIANT_SDK=$(toupper $platform)
+    SWIFT_HOST_VARIANT_ARCH=$architecture
 
     case ${host} in
-        freebsd-x86_64)
-            SWIFT_HOST_VARIANT="freebsd"
-            SWIFT_HOST_VARIANT_SDK="FREEBSD"
-            SWIFT_HOST_VARIANT_ARCH="x86_64"
+        linux-armv6)
+            SWIFT_HOST_TRIPLE="armv6-unknown-linux-gnueabihf"
+            llvm_target_arch="ARM"
             ;;
-        cygwin-x86_64)
-            SWIFT_HOST_VARIANT="cygwin"
-            SWIFT_HOST_VARIANT_SDK="CYGWIN"
-            SWIFT_HOST_VARIANT_ARCH="x86_64"
+        linux-armv7)
+            SWIFT_HOST_TRIPLE="armv7-unknown-linux-gnueabihf"
+            llvm_target_arch="ARM"
             ;;
-        haiku-x86_64)
-            SWIFT_HOST_VARIANT="haiku"
-            SWIFT_HOST_VARIANT_SDK="HAIKU"
-            SWIFT_HOST_VARIANT_ARCH="x86_64"
-            ;;
-        linux-*)
-            SWIFT_HOST_VARIANT="linux"
-            SWIFT_HOST_VARIANT_SDK="LINUX"
-            case ${host} in
-                linux-x86_64)
-                    SWIFT_HOST_VARIANT_ARCH="x86_64"
-                    ;;
-                linux-i686)
-                    SWIFT_HOST_VARIANT_ARCH="i686"
-                    ;;
-                linux-armv6)
-                    SWIFT_HOST_VARIANT_ARCH="armv6"
-                    SWIFT_HOST_TRIPLE="armv6-unknown-linux-gnueabihf"
-                    llvm_target_arch="ARM"
-                    ;;
-                linux-armv7)
-                    SWIFT_HOST_VARIANT_ARCH="armv7"
-                    SWIFT_HOST_TRIPLE="armv7-unknown-linux-gnueabihf"
-                    llvm_target_arch="ARM"
-                    ;;
-                linux-aarch64)
-                    SWIFT_HOST_VARIANT_ARCH="aarch64"
-                    ;;
-                linux-powerpc64)
-                    SWIFT_HOST_VARIANT_ARCH="powerpc64"
-                    ;;
-                linux-powerpc64le)
-                    SWIFT_HOST_VARIANT_ARCH="powerpc64le"
-                    ;;
-                linux-s390x)
-                    SWIFT_HOST_VARIANT_ARCH="s390x"
-                    ;;
-                esac
-        ;;
         macosx-* | iphoneos-* | iphonesimulator-* | \
           appletvos-* | appletvsimulator-* | \
             watchos-* | watchsimulator-*)
@@ -468,156 +473,71 @@ function set_build_options_for_host() {
                     xcrun_sdk_name="macosx"
                     llvm_target_arch=""
                     SWIFT_HOST_TRIPLE="x86_64-apple-macosx${DARWIN_DEPLOYMENT_VERSION_OSX}"
-                    SWIFT_HOST_VARIANT="macosx"
                     SWIFT_HOST_VARIANT_SDK="OSX"
-                    SWIFT_HOST_VARIANT_ARCH="x86_64"
-
                     cmake_osx_deployment_target="${DARWIN_DEPLOYMENT_VERSION_OSX}"
-                    cmark_cmake_options=(
-                        -DCMAKE_C_FLAGS="$(cmark_c_flags ${host})"
-                        -DCMAKE_CXX_FLAGS="$(cmark_c_flags ${host})"
-                        -DCMAKE_OSX_SYSROOT:PATH="$(xcrun --sdk ${xcrun_sdk_name} --show-sdk-path)"
-                        -DCMAKE_OSX_DEPLOYMENT_TARGET="${cmake_osx_deployment_target}"
-                    )
                     ;;
                 iphonesimulator-i386)
                     xcrun_sdk_name="iphonesimulator"
                     llvm_target_arch="X86"
                     SWIFT_HOST_TRIPLE="i386-apple-ios${DARWIN_DEPLOYMENT_VERSION_IOS}"
-                    SWIFT_HOST_VARIANT="iphonesimulator"
                     SWIFT_HOST_VARIANT_SDK="IOS_SIMULATOR"
-                    SWIFT_HOST_VARIANT_ARCH="i386"
-
                     cmake_osx_deployment_target=""
-                    cmark_cmake_options=(
-                        -DCMAKE_C_FLAGS="$(cmark_c_flags ${host})"
-                        -DCMAKE_CXX_FLAGS="$(cmark_c_flags ${host})"
-                        -DCMAKE_OSX_SYSROOT:PATH="$(xcrun --sdk ${xcrun_sdk_name} --show-sdk-path)"
-                    )
                     ;;
                 iphonesimulator-x86_64)
                     xcrun_sdk_name="iphonesimulator"
                     llvm_target_arch="X86"
                     SWIFT_HOST_TRIPLE="x86_64-apple-ios${DARWIN_DEPLOYMENT_VERSION_IOS}"
-                    SWIFT_HOST_VARIANT="iphonesimulator"
                     SWIFT_HOST_VARIANT_SDK="IOS_SIMULATOR"
-                    SWIFT_HOST_VARIANT_ARCH="x86_64"
-
                     cmake_osx_deployment_target=""
-                    cmark_cmake_options=(
-                        -DCMAKE_C_FLAGS="$(cmark_c_flags ${host})"
-                        -DCMAKE_CXX_FLAGS="$(cmark_c_flags ${host})"
-                        -DCMAKE_OSX_SYSROOT:PATH="$(xcrun --sdk ${xcrun_sdk_name} --show-sdk-path)"
-                    )
                     ;;
                 iphoneos-armv7)
                     xcrun_sdk_name="iphoneos"
                     llvm_target_arch="ARM"
                     SWIFT_HOST_TRIPLE="armv7-apple-ios${DARWIN_DEPLOYMENT_VERSION_IOS}"
-                    SWIFT_HOST_VARIANT="iphoneos"
                     SWIFT_HOST_VARIANT_SDK="IOS"
-                    SWIFT_HOST_VARIANT_ARCH="armv7"
-
                     cmake_osx_deployment_target=""
-                    cmark_cmake_options=(
-                        -DCMAKE_C_FLAGS="$(cmark_c_flags ${host})"
-                        -DCMAKE_CXX_FLAGS="$(cmark_c_flags ${host})"
-                        -DCMAKE_OSX_SYSROOT:PATH="$(xcrun --sdk ${xcrun_sdk_name} --show-sdk-path)"
-                    )
                     ;;
                 iphoneos-armv7s)
                     xcrun_sdk_name="iphoneos"
                     llvm_target_arch="ARM"
                     SWIFT_HOST_TRIPLE="armv7s-apple-ios${DARWIN_DEPLOYMENT_VERSION_IOS}"
-                    SWIFT_HOST_VARIANT="iphoneos"
                     SWIFT_HOST_VARIANT_SDK="IOS"
-                    SWIFT_HOST_VARIANT_ARCH="armv7s"
-
                     cmake_osx_deployment_target=""
-                    cmark_cmake_options=(
-                        -DCMAKE_C_FLAGS="$(cmark_c_flags ${host})"
-                        -DCMAKE_CXX_FLAGS="$(cmark_c_flags ${host})"
-                        -DCMAKE_OSX_SYSROOT:PATH="$(xcrun --sdk ${xcrun_sdk_name} --show-sdk-path)"
-                    )
                     ;;
                 iphoneos-arm64)
                     xcrun_sdk_name="iphoneos"
                     llvm_target_arch="AArch64"
                     SWIFT_HOST_TRIPLE="arm64-apple-ios${DARWIN_DEPLOYMENT_VERSION_IOS}"
-                    SWIFT_HOST_VARIANT="iphoneos"
                     SWIFT_HOST_VARIANT_SDK="IOS"
-                    SWIFT_HOST_VARIANT_ARCH="arm64"
-
                     cmake_osx_deployment_target=""
-                    cmark_cmake_options=(
-                        -DCMAKE_C_FLAGS="$(cmark_c_flags ${host})"
-                        -DCMAKE_CXX_FLAGS="$(cmark_c_flags ${host})"
-                        -DCMAKE_OSX_SYSROOT:PATH="$(xcrun --sdk ${xcrun_sdk_name} --show-sdk-path)"
-                    )
                     ;;
                 appletvsimulator-x86_64)
                     xcrun_sdk_name="appletvsimulator"
                     llvm_target_arch="X86"
                     SWIFT_HOST_TRIPLE="x86_64-apple-tvos${DARWIN_DEPLOYMENT_VERSION_TVOS}"
-                    SWIFT_HOST_VARIANT="appletvsimulator"
                     SWIFT_HOST_VARIANT_SDK="TVOS_SIMULATOR"
-                    SWIFT_HOST_VARIANT_ARCH="x86_64"
-
                     cmake_osx_deployment_target=""
-                    cmark_cmake_options=(
-                        -DCMAKE_C_FLAGS="$(cmark_c_flags ${host})"
-                        -DCMAKE_CXX_FLAGS="$(cmark_c_flags ${host})"
-                        -DCMAKE_OSX_SYSROOT:PATH="$(xcrun --sdk ${xcrun_sdk_name} --show-sdk-path)"
-                    )
                     ;;
                 appletvos-arm64)
                     xcrun_sdk_name="appletvos"
                     llvm_target_arch="AArch64"
                     SWIFT_HOST_TRIPLE="arm64-apple-tvos${DARWIN_DEPLOYMENT_VERSION_TVOS}"
-                    SWIFT_HOST_VARIANT="appletvos"
                     SWIFT_HOST_VARIANT_SDK="TVOS"
-                    SWIFT_HOST_VARIANT_ARCH="arm64"
-
                     cmake_osx_deployment_target=""
-                    cmark_cmake_options=(
-                        -DCMAKE_C_FLAGS="$(cmark_c_flags ${host})"
-                        -DCMAKE_CXX_FLAGS="$(cmark_c_flags ${host})"
-                        -DCMAKE_OSX_SYSROOT:PATH="$(xcrun --sdk ${xcrun_sdk_name} --show-sdk-path)"
-                    )
                     ;;
                 watchsimulator-i386)
                     xcrun_sdk_name="watchsimulator"
                     llvm_target_arch="X86"
                     SWIFT_HOST_TRIPLE="i386-apple-watchos${DARWIN_DEPLOYMENT_VERSION_WATCHOS}"
-                    SWIFT_HOST_VARIANT="watchsimulator"
                     SWIFT_HOST_VARIANT_SDK="WATCHOS_SIMULATOR"
-                    SWIFT_HOST_VARIANT_ARCH="i386"
-
                     cmake_osx_deployment_target=""
-                    cmark_cmake_options=(
-                        -DCMAKE_C_FLAGS="$(cmark_c_flags ${host})"
-                        -DCMAKE_CXX_FLAGS="$(cmark_c_flags ${host})"
-                        -DCMAKE_OSX_SYSROOT:PATH="$(xcrun --sdk ${xcrun_sdk_name} --show-sdk-path)"
-                    )
                     ;;
                 watchos-armv7k)
                     xcrun_sdk_name="watchos"
                     llvm_target_arch="ARM"
                     SWIFT_HOST_TRIPLE="armv7k-apple-watchos${DARWIN_DEPLOYMENT_VERSION_WATCHOS}"
-                    SWIFT_HOST_VARIANT="watchos"
                     SWIFT_HOST_VARIANT_SDK="WATCHOS"
-                    SWIFT_HOST_VARIANT_ARCH="armv7k"
-
                     cmake_osx_deployment_target=""
-                    cmark_cmake_options=(
-                        -DCMAKE_C_FLAGS="$(cmark_c_flags ${host})"
-                        -DCMAKE_CXX_FLAGS="$(cmark_c_flags ${host})"
-                        -DCMAKE_OSX_SYSROOT:PATH="$(xcrun --sdk ${xcrun_sdk_name} --show-sdk-path)"
-                    )
-                    ;;
-                *)
-                    echo "Unknown host for swift tools: ${host}"
-                    exit 1
                     ;;
             esac
 
@@ -633,6 +553,12 @@ function set_build_options_for_host() {
                 done
             fi
 
+            cmark_cmake_options=(
+                -DCMAKE_C_FLAGS="$(cmark_c_flags ${host})"
+                -DCMAKE_CXX_FLAGS="$(cmark_c_flags ${host})"
+                -DCMAKE_OSX_SYSROOT:PATH="$(xcrun --sdk ${xcrun_sdk_name} --show-sdk-path)"
+                -DCMAKE_OSX_DEPLOYMENT_TARGET="${cmake_osx_deployment_target}"
+            )
             llvm_cmake_options=(
                 -DCMAKE_OSX_DEPLOYMENT_TARGET:STRING="${cmake_osx_deployment_target}"
                 -DCMAKE_OSX_SYSROOT:PATH="$(xcrun --sdk ${xcrun_sdk_name} --show-sdk-path)"
@@ -679,10 +605,6 @@ function set_build_options_for_host() {
                 -DSWIFT_DARWIN_DEPLOYMENT_VERSION_TVOS="${DARWIN_DEPLOYMENT_VERSION_TVOS}"
                 -DSWIFT_DARWIN_DEPLOYMENT_VERSION_WATCHOS="${DARWIN_DEPLOYMENT_VERSION_WATCHOS}"
             )
-            ;;
-        *)
-            echo "Unknown host tools target: ${host}"
-            exit 1
             ;;
     esac
 
@@ -1166,9 +1088,9 @@ function should_build_stdlib_target() {
 #
 NINJA_SOURCE_DIR="${WORKSPACE}/ninja"
 SWIFT_SOURCE_DIR="${WORKSPACE}/swift"
-LLVM_SOURCE_DIR="${WORKSPACE}/llvm"
+LLVM_SOURCE_DIR="${WORKSPACE}/llvm-project/llvm"
 CMARK_SOURCE_DIR="${WORKSPACE}/cmark"
-LLDB_SOURCE_DIR="${WORKSPACE}/lldb"
+LLDB_SOURCE_DIR="${WORKSPACE}/llvm-project/lldb"
 LLBUILD_SOURCE_DIR="${WORKSPACE}/llbuild"
 STRESSTEST_PACKAGE_DIR="${WORKSPACE}/swift-stress-tester"
 XCTEST_SOURCE_DIR="${WORKSPACE}/swift-corelibs-xctest"
@@ -1177,39 +1099,12 @@ FOUNDATION_STATIC_SOURCE_DIR="${WORKSPACE}/swift-corelibs-foundation"
 LIBDISPATCH_SOURCE_DIR="${WORKSPACE}/swift-corelibs-libdispatch"
 LIBDISPATCH_STATIC_SOURCE_DIR="${WORKSPACE}/swift-corelibs-libdispatch"
 LIBICU_SOURCE_DIR="${WORKSPACE}/icu"
-LIBCXX_SOURCE_DIR="${WORKSPACE}/libcxx"
+LIBCXX_SOURCE_DIR="${WORKSPACE}/llvm-project/libcxx"
 PLAYGROUNDSUPPORT_SOURCE_DIR="${WORKSPACE}/swift-xcode-playground-support"
 
 if [[ ! "${SKIP_BUILD_PLAYGROUNDSUPPORT}" && ! -d ${PLAYGROUNDSUPPORT_SOURCE_DIR} ]]; then
     echo "Couldn't find PlaygroundSupport source directory."
     exit 1
-fi
-
-# Symlink clang into the llvm tree.
-CLANG_SOURCE_DIR="${LLVM_SOURCE_DIR}/tools/clang"
-if [ ! -e "${WORKSPACE}/clang" ] ; then
-    # If llvm/tools/clang is already a directory, use that and skip the symlink.
-    if [ ! -d "${CLANG_SOURCE_DIR}" ] ; then
-        echo "Can't find source directory for clang (tried ${WORKSPACE}/clang and ${CLANG_SOURCE_DIR})"
-        exit 1
-    fi
-fi
-if [ ! -d "${CLANG_SOURCE_DIR}" ] ; then
-    make_relative_symlink "${WORKSPACE}/clang" "${CLANG_SOURCE_DIR}"
-fi
-
-# Don't symlink clang-tools-extra into the tree as the 'clang' symlink prevents
-# make_relative_symlink from working correctly.
-if [ -e "${WORKSPACE}/clang-tools-extra" ] ; then
-    CLANG_TOOLS_EXTRA_SOURCE_DIR="${WORKSPACE}/clang-tools-extra"
-fi
-
-# Symlink compiler-rt into the llvm tree, if it exists.
-COMPILER_RT_SOURCE_DIR="${LLVM_SOURCE_DIR}/projects/compiler-rt"
-if [ -e "${WORKSPACE}/compiler-rt" ] ; then
-    if [ ! -d "${COMPILER_RT_SOURCE_DIR}" ] ; then
-        make_relative_symlink "${WORKSPACE}/compiler-rt" "${COMPILER_RT_SOURCE_DIR}"
-    fi
 fi
 
 PRODUCTS=(cmark llvm)
@@ -1273,234 +1168,12 @@ function get_host_specific_variable() {
 }
 
 function calculate_targets_for_host() {
-    local host=$1
-
-    SWIFT_STDLIB_TARGETS=()
-    SWIFT_SDKS=()
-    SWIFT_BENCHMARK_TARGETS=()
-    SWIFT_RUN_BENCHMARK_TARGETS=()
-    SWIFT_TEST_TARGETS=()
-
-    # Get the list of Target platforms for the Host
-    local stdlib_targets=($(get_stdlib_targets_for_host ${host}))
-
-    for stdlib_deployment_target in "${stdlib_targets[@]}"; do
-        local swift_sdk=
-        local is_in_build_list=$(should_build_stdlib_target ${stdlib_deployment_target} ${host})
-        local build_for_this_target=1
-        local test_this_target=1
-        local test_host_only=
-        local build_benchmark_this_target=
-        local build_external_benchmark_this_target=
-        local test_benchmark_this_target=
-
-        case ${stdlib_deployment_target} in
-            linux-*)
-                swift_sdk="LINUX"
-                build_for_this_target=$(not ${SKIP_BUILD_LINUX})
-                test_this_target=$(not ${SKIP_TEST_LINUX})
-                ;;
-            freebsd-*)
-                swift_sdk="FREEBSD"
-                build_for_this_target=$(not ${SKIP_BUILD_FREEBSD})
-                test_this_target=$(not ${SKIP_TEST_FREEBSD})
-                ;;
-            cygwin-*)
-                swift_sdk="CYGWIN"
-                build_for_this_target=$(not ${SKIP_BUILD_CYGWIN})
-                test_this_target=$(not ${SKIP_TEST_CYGWIN})
-                ;;
-            haiku-*)
-                swift_sdk="HAIKU"
-                build_for_this_target=$(not ${SKIP_BUILD_HAIKU})
-                test_this_target=$(not ${SKIP_TEST_HAIKU})
-                ;;
-            macosx-*)
-                swift_sdk="OSX"
-                build_for_this_target=$(not ${SKIP_BUILD_OSX})
-                test_this_target=$(not ${SKIP_TEST_OSX})
-                build_benchmark_this_target=$(not ${SKIP_BUILD_OSX})
-                build_external_benchmark_this_target=$(not ${SKIP_BUILD_OSX})
-                test_benchmark_this_target=$(not ${SKIP_BUILD_OSX})
-                ;;
-            iphoneos-*)
-                swift_sdk="IOS"
-                build_for_this_target=$(not ${SKIP_BUILD_IOS_DEVICE})
-                if [[ ! "${SKIP_TEST_IOS_HOST}" ]] ; then
-                    test_host_only=1
-                else
-                    test_this_target=
-                fi
-                build_benchmark_this_target=$(not ${SKIP_BUILD_IOS_DEVICE})
-                build_external_benchmark_this_target=$(not ${SKIP_BUILD_IOS_DEVICE})
-
-                # Never build iOS armv7s benchmarks.
-                if [[ "${stdlib_deployment_target}" == "iphoneos-armv7s" ]]; then
-                    build_benchmark_this_target=
-                    build_external_benchmark_this_target=
-                fi
-                ;;
-            iphonesimulator-x86_64)
-                swift_sdk="IOS_SIMULATOR"
-                build_for_this_target=$(not ${SKIP_BUILD_IOS_SIMULATOR})
-                test_this_target=$(not ${SKIP_TEST_IOS_SIMULATOR})
-                ;;
-            iphonesimulator-i386)
-                swift_sdk="IOS_SIMULATOR"
-                build_for_this_target=$(not ${SKIP_BUILD_IOS_SIMULATOR})
-                if [[ "${SKIP_TEST_IOS_SIMULATOR}" == "1" ]] ; then
-                    SKIP_TEST_IOS_32BIT_SIMULATOR="${SKIP_TEST_IOS_SIMULATOR}"
-                fi
-                test_this_target=$(not ${SKIP_TEST_IOS_32BIT_SIMULATOR})
-                ;;
-            appletvos-*)
-                swift_sdk="TVOS"
-                build_for_this_target=$(not ${SKIP_BUILD_TVOS_DEVICE})
-                if [[ ! "${SKIP_TEST_TVOS_HOST}" ]] ; then
-                    test_host_only=1
-                else
-                    test_this_target=
-                fi
-                build_benchmark_this_target=$(not ${SKIP_BUILD_TVOS_DEVICE})
-                build_external_benchmark_this_target=$(not ${SKIP_BUILD_TVOS_DEVICE})
-                ;;
-            appletvsimulator-*)
-                swift_sdk="TVOS_SIMULATOR"
-                build_for_this_target=$(not ${SKIP_BUILD_TVOS_SIMULATOR})
-                test_this_target=$(not ${SKIP_TEST_TVOS_SIMULATOR})
-                ;;
-            watchos-*)
-                swift_sdk="WATCHOS"
-                build_for_this_target=$(not ${SKIP_BUILD_WATCHOS_DEVICE})
-                if [[ ! "${SKIP_TEST_WATCHOS_HOST}" ]] ; then
-                    test_host_only=1
-                else
-                    test_this_target=
-                fi
-                build_benchmark_this_target=$(not ${SKIP_BUILD_WATCHOS_DEVICE})
-                build_external_benchmark_this_target=$(not ${SKIP_BUILD_WATCHOS_DEVICE})
-                ;;
-            watchsimulator-*)
-                swift_sdk="WATCHOS_SIMULATOR"
-                build_for_this_target=$(not ${SKIP_BUILD_WATCHOS_SIMULATOR})
-                test_this_target=$(not ${SKIP_TEST_WATCHOS_SIMULATOR})
-                ;;
-            android-*)
-                swift_sdk="ANDROID"
-                build_for_this_target=$(not ${SKIP_BUILD_ANDROID})
-                if [[ ! "${SKIP_TEST_ANDROID_HOST}" ]] ; then
-                    test_host_only=1
-                else
-                    test_this_target=$(not ${SKIP_TEST_ANDROID})
-                fi
-                ;;
-            *)
-                echo "Unknown compiler deployment target: ${stdlib_deployment_target}"
-                exit 1
-                ;;
-        esac
-
-        SWIFT_SDKS+=("${swift_sdk}")
-
-        if [[ "${build_for_this_target}" ]] && [[ "${is_in_build_list}" ]]; then
-
-            if [[ "${BUILD_SWIFT_STDLIB_UNITTEST_EXTRA}" == "1" ]] ; then
-                SWIFT_STDLIB_TARGETS+=("swift-stdlib-${stdlib_deployment_target}")
-            else
-                if [[ "${VALIDATION_TEST}" == "1" || "${LONG_TEST}" == "1" ]] ; then
-                    SWIFT_STDLIB_TARGETS+=("swift-stdlib-${stdlib_deployment_target}")
-                else
-                    SWIFT_STDLIB_TARGETS+=("swift-test-stdlib-${stdlib_deployment_target}")
-                fi
-            fi
-        fi
-        if [[ "${build_benchmark_this_target}" ]] && [[ "${is_in_build_list}" ]]; then
-            SWIFT_BENCHMARK_TARGETS+=("swift-benchmark-${stdlib_deployment_target}")
-            if [[ $(not ${SKIP_TEST_BENCHMARKS}) ]] ; then
-              SWIFT_RUN_BENCHMARK_TARGETS+=("check-swift-benchmark-${stdlib_deployment_target}")
-            fi
-        fi
-
-        if [[ "$(true_false ${SKIP_BUILD_EXTERNAL_BENCHMARKS})" == "FALSE"  ]] &&
-           [[ "${build_external_benchmark_this_target}" ]] &&
-           [[ "${is_in_build_list}" ]] ; then
-            SWIFT_BENCHMARK_TARGETS+=("swift-benchmark-${stdlib_deployment_target}-external")
-            if [[ $(not ${SKIP_TEST_BENCHMARKS}) ]] ; then
-                SWIFT_RUN_BENCHMARK_TARGETS+=("check-swift-benchmark-${stdlib_deployment_target}-external")
-            fi
-        fi
-
-        if [[ "${test_this_target}" ]] && [[ "${is_in_build_list}" ]]; then
-            test_target_suffix=""
-            if [[ -n "${test_host_only}" ]] ; then
-                test_target_suffix="-only_non_executable"
-            elif [[ -n "${ONLY_EXECUTABLE_TEST}" ]] ; then
-                test_target_suffix="-only_executable"
-            fi
-
-            test_subset_target_suffix=""
-            if [[ "${VALIDATION_TEST}" == "1" ]] ; then
-                if [[ "${LONG_TEST}" == "1" ]] ; then
-                    test_subset_target_suffix="-all"
-                else
-                    test_subset_target_suffix="-validation"
-                fi
-            else
-                if [[ "${LONG_TEST}" == "1" ]] ; then
-                    test_subset_target_suffix="-only_long"
-                fi
-            fi
-
-            SWIFT_TEST_TARGETS+=("check-swift${test_subset_target_suffix}${test_target_suffix}-${stdlib_deployment_target}")
-            if [[ $(not ${SKIP_TEST_OPTIMIZED}) && ! -n "${test_host_only}" ]] ; then
-                SWIFT_TEST_TARGETS+=("check-swift${test_subset_target_suffix}-optimize-${stdlib_deployment_target}")
-            fi
-            if [[ $(not ${SKIP_TEST_OPTIMIZE_FOR_SIZE}) && ! -n "${test_host_only}" ]] ; then
-                SWIFT_TEST_TARGETS+=("check-swift${test_subset_target_suffix}-optimize_size-${stdlib_deployment_target}")
-            fi
-            if [[ $(not ${SKIP_TEST_OPTIMIZE_NONE_WITH_IMPLICIT_DYNAMIC}) && ! -n "${test_host_only}" ]] ; then
-                SWIFT_TEST_TARGETS+=("check-swift${test_subset_target_suffix}-optimize_none_with_implicit_dynamic-${stdlib_deployment_target}")
-            fi
-        fi
-    done
-
-    # Filter duplicate SWIFT_SDKs
-    # We will get them if building for multiple architecture variants
-    SWIFT_SDKS=($(echo "${SWIFT_SDKS[@]}" | tr " " "\n" | sort -u | tr "\n" " "))
-
     # Get the values passed by `build-script`.
-    LEGACY_SWIFT_STDLIB_TARGETS=(${SWIFT_STDLIB_TARGETS[@]})
-    LEGACY_SWIFT_SDKS=(${SWIFT_SDKS[@]})
-    LEGACY_SWIFT_BENCHMARK_TARGETS=(${SWIFT_BENCHMARK_TARGETS[@]})
-    LEGACY_SWIFT_RUN_BENCHMARK_TARGETS=(${SWIFT_RUN_BENCHMARK_TARGETS[@]})
-    LEGACY_SWIFT_TEST_TARGETS=(${SWIFT_TEST_TARGETS[@]})
     SWIFT_STDLIB_TARGETS=($(get_host_specific_variable ${host} SWIFT_STDLIB_TARGETS))
     SWIFT_SDKS=($(get_host_specific_variable ${host} SWIFT_SDKS))
     SWIFT_BENCHMARK_TARGETS=($(get_host_specific_variable ${host} SWIFT_BENCHMARK_TARGETS))
     SWIFT_RUN_BENCHMARK_TARGETS=($(get_host_specific_variable ${host} SWIFT_RUN_BENCHMARK_TARGETS))
     SWIFT_TEST_TARGETS=($(get_host_specific_variable ${host} SWIFT_TEST_TARGETS))
-
-    # Validate the parameters match.
-    if [[ "${SWIFT_STDLIB_TARGETS[*]}" != "${LEGACY_SWIFT_STDLIB_TARGETS[*]}" ]]; then
-        printf "error: invalid build-script refactor for 'SWIFT_STDLIB_TARGETS': '%s' vs '%s'\n" "${SWIFT_STDLIB_TARGETS[*]}" "${LEGACY_SWIFT_STDLIB_TARGETS[*]}"
-        exit 1
-    fi
-    if [[ "${SWIFT_SDKS[*]}" != "${LEGACY_SWIFT_SDKS[*]}" ]]; then
-        printf "error: invalid build-script for 'SWIFT_SDKS' refactor: '%s' vs '%s'\n" "${SWIFT_SDKS[*]}" "${LEGACY_SWIFT_SDKS[*]}"
-        exit 1
-    fi
-    if [[ "${SWIFT_BENCHMARK_TARGETS[*]}" != "${LEGACY_SWIFT_BENCHMARK_TARGETS[*]}" ]]; then
-        printf "error: invalid build-script refactor for 'SWIFT_BENCHMARK_TARGETS': '%s' vs '%s'\n" "${SWIFT_BENCHMARK_TARGETS[*]}" "${LEGACY_SWIFT_BENCHMARK_TARGETS[*]}"
-        exit 1
-    fi
-    if [[ "${SWIFT_RUN_BENCHMARK_TARGETS[*]}" != "${LEGACY_SWIFT_RUN_BENCHMARK_TARGETS[*]}" ]]; then
-        printf "error: invalid build-script refactor for 'SWIFT_RUN_BENCHMARK_TARGETS': '%s' vs '%s'\n" "${SWIFT_RUN_BENCHMARK_TARGETS[*]}" "${LEGACY_SWIFT_RUN_BENCHMARK_TARGETS[*]}"
-        exit 1
-    fi
-    if [[ "${SWIFT_TEST_TARGETS[*]}" != "${LEGACY_SWIFT_TEST_TARGETS[*]}" ]]; then
-        printf "error: invalid build-script refactor for 'SWIFT_TEST_TARGETS': '%s' vs '%s'\n" "${SWIFT_TEST_TARGETS[*]}" "${LEGACY_SWIFT_TEST_TARGETS[*]}"
-        exit 1
-    fi
 }
 
 
@@ -1847,6 +1520,9 @@ for host in "${ALL_HOSTS[@]}"; do
             tmp_product=libdispatch
             LIBDISPATCH_STATIC_CMAKE_OPTIONS=${LIBDISPATCH_CMAKE_OPTIONS[@]}
         fi
+        if [[ ${tmp_product} == "foundation_static" ]]; then
+            tmp_product=foundation
+        fi
         if ! [[ $(should_execute_action "${host}-${tmp_product}-build") ]]; then
             continue
         fi
@@ -1926,15 +1602,23 @@ for host in "${ALL_HOSTS[@]}"; do
                     "${llvm_cmake_options[@]}"
                 )
 
+                llvm_enable_projects=("clang")
+
+                if [[ ! "${SKIP_BUILD_COMPILER_RT}" ]]; then
+                    llvm_enable_projects+=("compiler-rt")
+                fi
+
+                if [[ ! "${SKIP_BUILD_CLANG_TOOLS_EXTRA}" ]]; then
+                    llvm_enable_projects+=("clang-tools-extra")
+                fi
+
+                cmake_options+=(
+                    -DLLVM_ENABLE_PROJECTS="$(join ";" ${llvm_enable_projects[@]})"
+                )
+
                 cmake_options+=(
                   -DLLVM_TOOL_LLD_BUILD:BOOL=TRUE
                 )
-
-                if [[ ! -z "${CLANG_TOOLS_EXTRA_SOURCE_DIR}" ]] ; then
-                  cmake_options+=(
-                    -DLLVM_EXTERNAL_CLANG_TOOLS_EXTRA_SOURCE_DIR="${CLANG_TOOLS_EXTRA_SOURCE_DIR}"
-                  )
-                fi
 
                 if [[ "${BUILD_TOOLCHAIN_ONLY}" ]]; then
                     cmake_options+=(
@@ -2341,6 +2025,20 @@ for host in "${ALL_HOSTS[@]}"; do
                     -Ddispatch_DIR:PATH=$(build_directory ${host} libdispatch)/cmake/modules
                     -DFoundation_DIR:PATH=$(build_directory ${host} foundation)/cmake/modules
                 )
+
+                # Ensure on Darwin platforms that we consider only the SQLite headers
+                # from the SDK instead of picking ones found elsewhere
+                # (e.g. in /usr/include )
+                # Also consider only the SQLite dylib shipped with the OS
+                # to avoid mismatch with the headers
+                if [[ "$(uname -s)" = "Darwin" ]]; then
+                    cmake_options=(
+                        "${cmake_options[@]}"
+
+                        -DSQLite3_INCLUDE_DIR:PATH="$(xcrun -sdk macosx -show-sdk-path)/usr/include"
+                        -DSQLite3_LIBRARY:PATH="/usr/lib/libsqlite3.dylib"
+                    )
+                fi
                 ;;
             xctest)
                 SWIFTC_BIN="$(build_directory_bin ${LOCAL_HOST} swift)/swiftc"
@@ -3093,6 +2791,9 @@ for host in "${ALL_HOSTS[@]}"; do
         if [[ ${tmp_product} == "libdispatch_static" ]]; then
             tmp_product=libdispatch
         fi
+        if [[ ${tmp_product} == "foundation_static" ]]; then
+            tmp_product=foundation
+        fi
         if ! [[ $(should_execute_action "${host}-${tmp_product}-install") ]]; then
             continue
         fi
@@ -3154,7 +2855,7 @@ for host in "${ALL_HOSTS[@]}"; do
                 fi
 
                 case ${host} in
-                  linux-*|freebsd-*|cygwin-*|haiku-*) ;;
+                  linux-*|freebsd-*|cygwin-*|haiku-*|android-*) ;;
                   *)
                     echo "error: --install-xctest is not supported on this platform"
                     exit 1

@@ -1,4 +1,4 @@
-//===--- AutoDiff.h - Swift Automatic Differentiation ---------------------===//
+//===--- AutoDiff.h - Swift automatic differentiation utilities -----------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-//  This file defines AST support for automatic differentiation.
+//  This file defines utilities for automatic differentiation.
 //
 //===----------------------------------------------------------------------===//
 
@@ -21,10 +21,54 @@
 
 #include "swift/AST/Identifier.h"
 #include "swift/AST/IndexSubset.h"
-#include "swift/Basic/SourceLoc.h"
+#include "swift/AST/Type.h"
 #include "swift/Basic/Range.h"
+#include "swift/Basic/SourceLoc.h"
 
 namespace swift {
+
+class AnyFunctionType;
+
+/// A function type differentiability kind.
+enum class DifferentiabilityKind : uint8_t {
+  NonDifferentiable = 0,
+  Normal = 1,
+  Linear = 2
+};
+
+/// The kind of an linear map.
+struct AutoDiffLinearMapKind {
+  enum innerty : uint8_t {
+    // The differential function.
+    Differential = 0,
+    // The pullback function.
+    Pullback = 1
+  } rawValue;
+
+  AutoDiffLinearMapKind() = default;
+  AutoDiffLinearMapKind(innerty rawValue) : rawValue(rawValue) {}
+  operator innerty() const { return rawValue; }
+};
+
+/// The kind of a derivative function.
+struct AutoDiffDerivativeFunctionKind {
+  enum innerty : uint8_t {
+    // The Jacobian-vector products function.
+    JVP = 0,
+    // The vector-Jacobian products function.
+    VJP = 1
+  } rawValue;
+
+  AutoDiffDerivativeFunctionKind() = default;
+  AutoDiffDerivativeFunctionKind(innerty rawValue) : rawValue(rawValue) {}
+  AutoDiffDerivativeFunctionKind(AutoDiffLinearMapKind linMapKind)
+      : rawValue(static_cast<innerty>(linMapKind.rawValue)) {}
+  explicit AutoDiffDerivativeFunctionKind(StringRef string);
+  operator innerty() const { return rawValue; }
+  AutoDiffLinearMapKind getLinearMapKind() {
+    return (AutoDiffLinearMapKind::innerty)rawValue;
+  }
+};
 
 class ParsedAutoDiffParameter {
 public:
@@ -89,12 +133,47 @@ public:
   }
 };
 
-enum class DifferentiabilityKind : uint8_t {
-  NonDifferentiable = 0,
-  Normal = 1,
-  Linear = 2
-};
+/// Automatic differentiation utility namespace.
+namespace autodiff {
+
+/// Appends the subset's parameter's types to `results`, in the order in
+/// which they appear in the function type.
+void getSubsetParameterTypes(IndexSubset *indices, AnyFunctionType *type,
+                             SmallVectorImpl<Type> &results,
+                             bool reverseCurryLevels = false);
+
+} // end namespace autodiff
 
 } // end namespace swift
+
+namespace llvm {
+
+using swift::AutoDiffDerivativeFunctionKind;
+
+template <typename T> struct DenseMapInfo;
+
+template <> struct DenseMapInfo<AutoDiffDerivativeFunctionKind> {
+  static AutoDiffDerivativeFunctionKind getEmptyKey() {
+    return static_cast<AutoDiffDerivativeFunctionKind::innerty>(
+        DenseMapInfo<unsigned>::getEmptyKey());
+  }
+
+  static AutoDiffDerivativeFunctionKind getTombstoneKey() {
+    return static_cast<AutoDiffDerivativeFunctionKind::innerty>(
+        DenseMapInfo<unsigned>::getTombstoneKey());
+  }
+
+  static unsigned getHashValue(const AutoDiffDerivativeFunctionKind &Val) {
+    return DenseMapInfo<unsigned>::getHashValue(Val);
+  }
+
+  static bool isEqual(const AutoDiffDerivativeFunctionKind &LHS,
+                      const AutoDiffDerivativeFunctionKind &RHS) {
+    return static_cast<AutoDiffDerivativeFunctionKind::innerty>(LHS) ==
+        static_cast<AutoDiffDerivativeFunctionKind::innerty>(RHS);
+  }
+};
+
+} // end namespace llvm
 
 #endif // SWIFT_AST_AUTODIFF_H

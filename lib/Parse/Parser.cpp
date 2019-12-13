@@ -119,15 +119,16 @@ void swift::performCodeCompletionSecondPass(
 void Parser::performCodeCompletionSecondPass(
     PersistentParserState &ParserState,
     CodeCompletionCallbacksFactory &Factory) {
-  SharedTimer timer("CodeCompletionSecondPass");
   if (!ParserState.hasCodeCompletionDelayedDeclState())
     return;
 
   auto state = ParserState.takeCodeCompletionDelayedDeclState();
-
   auto &SF = *state->ParentContext->getParentSourceFile();
-  auto &SM = SF.getASTContext().SourceMgr;
-  auto BufferID = SM.findBufferContainingLoc(state->BodyPos.Loc);
+  auto &Ctx = SF.getASTContext();
+
+  FrontendStatsTracer tracer(Ctx.Stats, "CodeCompletionSecondPass");
+
+  auto BufferID = Ctx.SourceMgr.findBufferContainingLoc(state->BodyPos.Loc);
   Parser TheParser(BufferID, SF, nullptr, &ParserState, nullptr);
 
   std::unique_ptr<CodeCompletionCallbacks> CodeCompletion(
@@ -142,24 +143,8 @@ void Parser::performCodeCompletionSecondPassImpl(
   // Disable libSyntax creation in the delayed parsing.
   SyntaxContext->disable();
 
-  auto BeginParserPosition = getParserPosition(info.BodyPos);
-  auto EndLexerState = L->getStateForEndOfTokenLoc(info.BodyEnd);
-
-  // ParserPositionRAII needs a primed parser to restore to.
-  if (Tok.is(tok::NUM_TOKENS))
-    consumeTokenWithoutFeedingReceiver();
-
-  // Ensure that we restore the parser state at exit.
-  ParserPositionRAII PPR(*this);
-
-  // Create a lexer that cannot go past the end state.
-  Lexer LocalLex(*L, BeginParserPosition.LS, EndLexerState);
-
-  // Temporarily swap out the parser's current lexer with our new one.
-  llvm::SaveAndRestore<Lexer *> T(L, &LocalLex);
-
-  // Rewind to the beginning of the top-level code.
-  restoreParserPosition(BeginParserPosition);
+  // Set the parser position to the start of the delayed decl or the body.
+  restoreParserPosition(getParserPosition(info.BodyPos));
 
   // Do not delay parsing in the second pass.
   llvm::SaveAndRestore<bool> DisableDelayedBody(DelayBodyParsing, false);
@@ -1367,8 +1352,12 @@ ParsedDeclName swift::parseDeclName(StringRef name) {
 }
 
 DeclName ParsedDeclName::formDeclName(ASTContext &ctx) const {
-  return swift::formDeclName(ctx, BaseName, ArgumentLabels, IsFunctionName,
-                             /*IsInitializer=*/true);
+  return formDeclNameRef(ctx).getFullName();
+}
+
+DeclNameRef ParsedDeclName::formDeclNameRef(ASTContext &ctx) const {
+  return swift::formDeclNameRef(ctx, BaseName, ArgumentLabels, IsFunctionName,
+                                /*IsInitializer=*/true);
 }
 
 DeclName swift::formDeclName(ASTContext &ctx,
@@ -1376,11 +1365,20 @@ DeclName swift::formDeclName(ASTContext &ctx,
                              ArrayRef<StringRef> argumentLabels,
                              bool isFunctionName,
                              bool isInitializer) {
+  return formDeclNameRef(ctx, baseName, argumentLabels, isFunctionName,
+                         isInitializer).getFullName();
+}
+
+DeclNameRef swift::formDeclNameRef(ASTContext &ctx,
+                                   StringRef baseName,
+                                   ArrayRef<StringRef> argumentLabels,
+                                   bool isFunctionName,
+                                   bool isInitializer) {
   // We cannot import when the base name is not an identifier.
   if (baseName.empty())
-    return DeclName();
+    return DeclNameRef();
   if (!Lexer::isIdentifier(baseName) && !Lexer::isOperator(baseName))
-    return DeclName();
+    return DeclNameRef();
 
   // Get the identifier for the base name. Special-case `init`.
   DeclBaseName baseNameId = ((isInitializer && baseName == "init")
@@ -1388,7 +1386,7 @@ DeclName swift::formDeclName(ASTContext &ctx,
                              : ctx.getIdentifier(baseName));
 
   // For non-functions, just use the base name.
-  if (!isFunctionName) return baseNameId;
+  if (!isFunctionName) return DeclNameRef(baseNameId);
 
   // For functions, we need to form a complete name.
 
@@ -1404,7 +1402,7 @@ DeclName swift::formDeclName(ASTContext &ctx,
   }
 
   // Build the result.
-  return DeclName(ctx, baseNameId, argumentLabelIds);
+  return DeclNameRef({ ctx, baseNameId, argumentLabelIds });
 }
 
 DeclName swift::parseDeclName(ASTContext &ctx, StringRef name) {

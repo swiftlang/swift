@@ -265,6 +265,8 @@ Driver::buildToolChain(const llvm::opt::InputArgList &ArgList) {
     return llvm::make_unique<toolchains::Windows>(*this, target);
   case llvm::Triple::Haiku:
     return llvm::make_unique<toolchains::GenericUnix>(*this, target);
+  case llvm::Triple::WASI:
+    return llvm::make_unique<toolchains::GenericUnix>(*this, target);
   default:
     Diags.diagnose(SourceLoc(), diag::error_unknown_target,
                    ArgList.getLastArg(options::OPT_target)->getValue());
@@ -375,33 +377,41 @@ static bool getCompilationRecordPath(std::string &buildRecordPath,
   return false;
 }
 
-static bool failedToReadOutOfDateMap(bool ShowIncrementalBuildDecisions,
-                                     StringRef buildRecordPath,
-                                     StringRef reason = "") {
-  if (ShowIncrementalBuildDecisions) {
-    llvm::outs() << "Incremental compilation has been disabled due to "
-                 << "malformed build record file '" << buildRecordPath << "'.";
-    if (!reason.empty()) {
-      llvm::outs() << " " << reason;
-    }
-    llvm::outs() << "\n";
+static std::string failedToReadOutOfDateMap(bool ShowIncrementalBuildDecisions,
+                                          StringRef buildRecordPath,
+                                          StringRef reason = "") {
+  std::string why = "malformed build record file";
+  if (!reason.empty()) {
+    why += " ";
+    why += reason;
   }
-  return true;
+  if (ShowIncrementalBuildDecisions) {
+    llvm::outs() << "Incremental compilation has been disabled due to " << why
+                 << " '" << buildRecordPath << "'.\n";
+  }
+  return why;
 }
 
-/// Returns true on error.
-static bool populateOutOfDateMap(InputInfoMap &map,
-                                 llvm::sys::TimePoint<> &LastBuildTime,
-                                 StringRef argsHashStr,
-                                 const InputFileList &inputs,
-                                 StringRef buildRecordPath,
-                                 bool ShowIncrementalBuildDecisions) {
+static SmallVector<StringRef, 8> findRemovedInputs(
+    const InputFileList &inputs,
+    const llvm::StringMap<CompileJobAction::InputInfo> &previousInputs);
+
+static void dealWithRemovedInputs(ArrayRef<StringRef> removedInputs,
+                                  bool ShowIncrementalBuildDecisions);
+
+/// Returns why ignore incrementality
+static std::string
+populateOutOfDateMap(InputInfoMap &map, llvm::sys::TimePoint<> &LastBuildTime,
+                     StringRef argsHashStr, const InputFileList &inputs,
+                     StringRef buildRecordPath,
+                     const bool EnableSourceRangeDependencies,
+                     const bool ShowIncrementalBuildDecisions) {
   // Treat a missing file as "no previous build".
   auto buffer = llvm::MemoryBuffer::getFile(buildRecordPath);
   if (!buffer) {
     if (ShowIncrementalBuildDecisions)
       llvm::outs() << "Incremental compilation could not read build record.\n";
-    return false;
+    return "could not read build record";
   }
 
   namespace yaml = llvm::yaml;
@@ -491,7 +501,7 @@ static bool populateOutOfDateMap(InputInfoMap &map,
     } else if (keyStr == compilation_record::getName(TopLevelKey::Options)) {
       auto *value = dyn_cast<yaml::ScalarNode>(i->getValue());
       if (!value)
-        return true;
+        return "no name node in build record";
       optionsMatch = (argsHashStr == value->getValue(scratch));
 
     } else if (keyStr == compilation_record::getName(TopLevelKey::BuildTime)) {
@@ -504,7 +514,7 @@ static bool populateOutOfDateMap(InputInfoMap &map,
       }
       llvm::sys::TimePoint<> timeVal;
       if (readTimeValue(i->getValue(), timeVal))
-        return true;
+        return "could not read time value in build record";
       LastBuildTime = timeVal;
 
     } else if (keyStr == compilation_record::getName(TopLevelKey::Inputs)) {
@@ -521,21 +531,21 @@ static bool populateOutOfDateMap(InputInfoMap &map,
       for (auto i = inputMap->begin(), e = inputMap->end(); i != e; ++i) {
         auto *key = dyn_cast<yaml::ScalarNode>(i->getKey());
         if (!key)
-          return true;
+          return "no input entry in build record";
 
         auto *value = dyn_cast<yaml::SequenceNode>(i->getValue());
         if (!value)
-          return true;
+          return "no sequence node for input entry in build record";
 
         using compilation_record::getInfoStatusForIdentifier;
         auto previousBuildState =
           getInfoStatusForIdentifier(value->getRawTag());
         if (!previousBuildState)
-          return true;
+          return "no previous build state in build record";
 
         llvm::sys::TimePoint<> timeValue;
         if (readTimeValue(value, timeValue))
-          return true;
+          return "could not read time value in build record";
 
         auto inputName = key->getValue(scratch);
         previousInputs[inputName] = { *previousBuildState, timeValue };
@@ -553,7 +563,7 @@ static bool populateOutOfDateMap(InputInfoMap &map,
                    << "\tPreviously compiled with: "
                    << CompilationRecordSwiftVersion << "\n";
     }
-    return true;
+    return "compiler version mismatch";
   }
 
   if (!optionsMatch) {
@@ -561,48 +571,70 @@ static bool populateOutOfDateMap(InputInfoMap &map,
       llvm::outs() << "Incremental compilation has been disabled, because "
                    << "different arguments were passed to the compiler.\n";
     }
-    return true;
+    return "different arguments passed to compiler";
   }
 
-  size_t numInputsFromPrevious = 0;
+  unsigned numMatchingPreviouslyCompiledInputs = 0;
   for (auto &inputPair : inputs) {
     auto iter = previousInputs.find(inputPair.second->getValue());
-    if (iter == previousInputs.end()) {
-      map[inputPair.second] = InputInfo::makeNewlyAdded();
-      continue;
+    if (iter == previousInputs.end())
+      map[inputPair.second] = CompileJobAction::InputInfo::makeNewlyAdded();
+    else {
+      map[inputPair.second] = iter->getValue();
+      ++numMatchingPreviouslyCompiledInputs;
     }
-    ++numInputsFromPrevious;
-    map[inputPair.second] = iter->getValue();
   }
+  assert(numMatchingPreviouslyCompiledInputs <= previousInputs.size());
+  auto const wereAnyInputsRemoved =
+      numMatchingPreviouslyCompiledInputs < previousInputs.size();
+  if (!wereAnyInputsRemoved)
+    return "";
 
-  if (numInputsFromPrevious == previousInputs.size()) {
-    return false;
-  } else {
-    // If a file was removed, we've lost its dependency info. Rebuild everything.
-    // FIXME: Can we do better?
-    if (ShowIncrementalBuildDecisions) {
-      llvm::DenseSet<StringRef> inputArgs;
-      for (auto &inputPair : inputs) {
-        inputArgs.insert(inputPair.second->getValue());
-      }
+  const auto removedInputs = findRemovedInputs(inputs, previousInputs);
+  assert(!removedInputs.empty());
 
-      SmallVector<StringRef, 8> missingInputs;
-      for (auto &previousInput : previousInputs) {
-        auto previousInputArg = previousInput.getKey();
-        if (inputArgs.find(previousInputArg) == inputArgs.end()) {
-          missingInputs.push_back(previousInputArg);
-        }
-      }
+  dealWithRemovedInputs(removedInputs, ShowIncrementalBuildDecisions);
+  return "an input was removed"; // recompile everything; could do better
+                                 // someday
+}
 
-      llvm::outs() << "Incremental compilation has been disabled, because "
-                   << "the following inputs were used in the previous "
-                   << "compilation, but not in the current compilation:\n";
-      for (auto &missing : missingInputs) {
-        llvm::outs() << "\t" << missing << "\n";
-      }
+static SmallVector<StringRef, 8> findRemovedInputs(
+    const InputFileList &inputs,
+    const llvm::StringMap<CompileJobAction::InputInfo> &previousInputs) {
+  llvm::DenseSet<StringRef> inputArgs;
+  for (auto &inputPair : inputs) {
+    inputArgs.insert(inputPair.second->getValue());
+  }
+  SmallVector<StringRef, 8> missingInputs;
+  for (auto &previousInput : previousInputs) {
+    auto previousInputArg = previousInput.getKey();
+    if (inputArgs.find(previousInputArg) == inputArgs.end()) {
+      missingInputs.push_back(previousInputArg);
     }
-    return true;
   }
+  return missingInputs;
+}
+
+static void showRemovedInputs(ArrayRef<StringRef> removedInputs);
+
+/// Return true if hadError
+static void dealWithRemovedInputs(ArrayRef<StringRef> removedInputs,
+                                  const bool ShowIncrementalBuildDecisions) {
+  // If a file was removed, we've lost its dependency info. Rebuild everything.
+  // FIXME: Can we do better?
+  // Yes, for range-based recompilation.
+  if (ShowIncrementalBuildDecisions)
+    showRemovedInputs(removedInputs);
+}
+
+static void showRemovedInputs(ArrayRef<StringRef> removedInputs) {
+
+  llvm::outs() << "Incremental compilation has been disabled, because "
+               << "the following inputs were used in the previous "
+               << "compilation, but not in the current compilation:\n";
+
+  for (auto &missing : removedInputs)
+    llvm::outs() << "\t" << missing << "\n";
 }
 
 // warn if -embed-bitcode is set and the output type is not an object
@@ -825,8 +857,18 @@ Driver::buildCompilation(const ToolChain &TC,
     // REPL mode expects no input files, so suppress the error.
     SuppressNoInputFilesError = true;
 
-  Optional<OutputFileMap> OFM =
-      buildOutputFileMap(*TranslatedArgList, workingDirectory);
+  const bool EnableSourceRangeDependencies =
+      ArgList->hasArg(options::OPT_enable_source_range_dependencies);
+  const bool CompareIncrementalSchemes =
+      ArgList->hasArg(options::OPT_driver_compare_incremental_schemes) ||
+      ArgList->hasArg(options::OPT_driver_compare_incremental_schemes_path);
+  const StringRef CompareIncrementalSchemesPath = ArgList->getLastArgValue(
+      options::OPT_driver_compare_incremental_schemes_path);
+
+  Optional<OutputFileMap> OFM = buildOutputFileMap(
+      *TranslatedArgList, workingDirectory,
+      /*addEntriesForSourceFileDependencies=*/EnableSourceRangeDependencies ||
+          CompareIncrementalSchemes);
 
   if (Diags.hadAnyError())
     return nullptr;
@@ -853,15 +895,16 @@ Driver::buildCompilation(const ToolChain &TC,
   computeArgsHash(ArgsHash, *TranslatedArgList);
   llvm::sys::TimePoint<> LastBuildTime = llvm::sys::TimePoint<>::min();
   InputInfoMap outOfDateMap;
-  bool rebuildEverything = true;
-  if (Incremental && !buildRecordPath.empty()) {
-    if (populateOutOfDateMap(outOfDateMap, LastBuildTime, ArgsHash, Inputs,
-                             buildRecordPath, ShowIncrementalBuildDecisions)) {
-      // FIXME: Distinguish errors from "file removed", which is benign.
-    } else {
-      rebuildEverything = false;
-    }
-  }
+  std::string whyIgnoreIncrementallity =
+      !Incremental
+          ? ""
+          : buildRecordPath.empty()
+                ? "no build record path"
+                : populateOutOfDateMap(outOfDateMap, LastBuildTime, ArgsHash,
+                                       Inputs, buildRecordPath,
+                                       EnableSourceRangeDependencies,
+                                       ShowIncrementalBuildDecisions);
+  // FIXME: Distinguish errors from "file removed", which is benign.
 
   size_t DriverFilelistThreshold;
   if (getFilelistThreshold(*TranslatedArgList, DriverFilelistThreshold, Diags))
@@ -908,16 +951,18 @@ Driver::buildCompilation(const ToolChain &TC,
         ArgList->hasArg(options::OPT_driver_time_compilation);
     std::unique_ptr<UnifiedStatsReporter> StatsReporter =
         createStatsReporter(ArgList.get(), Inputs, OI, DefaultTargetTriple);
-    const bool EnableExperimentalDependencies =
-        ArgList->hasArg(options::OPT_enable_experimental_dependencies);
-    const bool VerifyExperimentalDependencyGraphAfterEveryImport = ArgList->hasArg(
+    // relies on the new dependency graph
+    const bool EnableFineGrainedDependencies =
+        ArgList->hasArg(options::OPT_enable_fine_grained_dependencies);
+
+    const bool VerifyFineGrainedDependencyGraphAfterEveryImport = ArgList->hasArg(
         options::
-            OPT_driver_verify_experimental_dependency_graph_after_every_import);
-    const bool EmitExperimentalDependencyDotFileAfterEveryImport = ArgList->hasArg(
+            OPT_driver_verify_fine_grained_dependency_graph_after_every_import);
+    const bool EmitFineGrainedDependencyDotFileAfterEveryImport = ArgList->hasArg(
         options::
-            OPT_driver_emit_experimental_dependency_dot_file_after_every_import);
-    const bool ExperimentalDependenciesIncludeIntrafileOnes = ArgList->hasArg(
-        options::OPT_experimental_dependency_include_intrafile);
+            OPT_driver_emit_fine_grained_dependency_dot_file_after_every_import);
+    const bool FineGrainedDependenciesIncludeIntrafileOnes =
+        ArgList->hasArg(options::OPT_fine_grained_dependency_include_intrafile);
 
     // clang-format off
     C = llvm::make_unique<Compilation>(
@@ -939,17 +984,20 @@ Driver::buildCompilation(const ToolChain &TC,
         SaveTemps,
         ShowDriverTimeCompilation,
         std::move(StatsReporter),
-        EnableExperimentalDependencies,
-        VerifyExperimentalDependencyGraphAfterEveryImport,
-        EmitExperimentalDependencyDotFileAfterEveryImport,
-        ExperimentalDependenciesIncludeIntrafileOnes);
+        EnableFineGrainedDependencies,
+        VerifyFineGrainedDependencyGraphAfterEveryImport,
+        EmitFineGrainedDependencyDotFileAfterEveryImport,
+        FineGrainedDependenciesIncludeIntrafileOnes,
+        EnableSourceRangeDependencies,
+        CompareIncrementalSchemes,
+        CompareIncrementalSchemesPath);
     // clang-format on
   }
 
   // Construct the graph of Actions.
   SmallVector<const Action *, 8> TopLevelActions;
   buildActions(TopLevelActions, TC, OI,
-               rebuildEverything ? nullptr : &outOfDateMap, *C);
+               whyIgnoreIncrementallity.empty() ? &outOfDateMap : nullptr, *C);
 
   if (Diags.hadAnyError())
     return nullptr;
@@ -980,8 +1028,8 @@ Driver::buildCompilation(const ToolChain &TC,
 
   // This has to happen after building jobs, because otherwise we won't even
   // emit .swiftdeps files for the next build.
-  if (rebuildEverything)
-    C->disableIncrementalBuild();
+  if (!whyIgnoreIncrementallity.empty())
+    C->disableIncrementalBuild(whyIgnoreIncrementallity);
 
   if (Diags.hadAnyError())
     return nullptr;
@@ -1706,18 +1754,26 @@ Driver::computeCompilerMode(const DerivedArgList &Args,
                               options::OPT_disable_batch_mode,
                               false);
 
-  if (!ArgRequiringSingleCompile)
-    return OutputInfo::Mode::StandardCompile;
+  // For best unparsed ranges, want non-batch mode, standard compile
+  const Arg *ArgRequiringSinglePrimaryCompile =
+      Args.getLastArg(options::OPT_enable_source_range_dependencies);
 
   // Override batch mode if given -wmo or -index-file.
-  if (BatchModeOut) {
-    BatchModeOut = false;
-    // Emit a warning about such overriding (FIXME: we might conditionalize
-    // this based on the user or xcode passing -disable-batch-mode).
-    Diags.diagnose(SourceLoc(), diag::warn_ignoring_batch_mode,
-                   ArgRequiringSingleCompile->getOption().getPrefixedName());
+  if (ArgRequiringSingleCompile) {
+    if (BatchModeOut) {
+      BatchModeOut = false;
+      // Emit a warning about such overriding (FIXME: we might conditionalize
+      // this based on the user or xcode passing -disable-batch-mode).
+      Diags.diagnose(SourceLoc(), diag::warn_ignoring_batch_mode,
+                     ArgRequiringSingleCompile->getOption().getPrefixedName());
+    }
+    if (ArgRequiringSinglePrimaryCompile)
+      Diags.diagnose(SourceLoc(), diag::warn_ignoring_source_range_dependencies,
+                     ArgRequiringSingleCompile->getOption().getPrefixedName());
+    return OutputInfo::Mode::SingleCompile;
   }
-  return OutputInfo::Mode::SingleCompile;
+
+  return OutputInfo::Mode::StandardCompile;
 }
 
 void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
@@ -1836,6 +1892,8 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
       case file_types::TY_ObjCHeader:
       case file_types::TY_ClangModuleFile:
       case file_types::TY_SwiftDeps:
+      case file_types::TY_SwiftRanges:
+      case file_types::TY_CompiledSource:
       case file_types::TY_Remapping:
       case file_types::TY_IndexData:
       case file_types::TY_PCH:
@@ -1985,9 +2043,12 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
     for (const Action *A : AllLinkerInputs)
       if (A->getType() == file_types::TY_Object)
         AutolinkExtractInputs.push_back(A);
-    if (!AutolinkExtractInputs.empty() &&
-        (TC.getTriple().getObjectFormat() == llvm::Triple::ELF ||
-         TC.getTriple().isOSCygMing())) {
+    const auto &Triple = TC.getTriple();
+    const bool AutolinkExtractRequired =
+        (Triple.getObjectFormat() == llvm::Triple::ELF && !Triple.isPS4()) ||
+        Triple.getObjectFormat() == llvm::Triple::Wasm ||
+        Triple.isOSCygMing();
+    if (!AutolinkExtractInputs.empty() && AutolinkExtractRequired) {
       auto *AutolinkExtractAction =
           C.createAction<AutolinkExtractJobAction>(AutolinkExtractInputs);
       // Takes the same inputs as the linker...
@@ -1997,8 +2058,9 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
 
     if (MergeModuleAction) {
       if (OI.DebugInfoLevel == IRGenDebugInfoLevel::Normal) {
-        if (TC.getTriple().getObjectFormat() == llvm::Triple::ELF ||
-            TC.getTriple().getObjectFormat() == llvm::Triple::COFF) {
+        const bool ModuleWrapRequired =
+            Triple.getObjectFormat() != llvm::Triple::MachO;
+        if (ModuleWrapRequired) {
           auto *ModuleWrapAction =
               C.createAction<ModuleWrapJobAction>(MergeModuleAction);
           LinkAction->addInput(ModuleWrapAction);
@@ -2066,19 +2128,54 @@ bool Driver::handleImmediateArgs(const ArgList &Args, const ToolChain &TC) {
                                 std::end(commandArgs));
   }
 
+  if (Args.hasArg(options::OPT_print_target_info)) {
+    SmallVector<const char *, 5> commandLine;
+    commandLine.push_back("-frontend");
+    commandLine.push_back("-print-target-info");
+    if (const Arg *targetArg = Args.getLastArg(options::OPT_target)) {
+      commandLine.push_back("-target");
+      commandLine.push_back(targetArg->getValue());
+    }
+    if (const Arg *sdkArg = Args.getLastArg(options::OPT_sdk)) {
+      commandLine.push_back("-sdk");
+      commandLine.push_back(sdkArg->getValue());
+    }
+
+    if (const Arg *resourceDirArg = Args.getLastArg(options::OPT_resource_dir)) {
+      commandLine.push_back("-resource-dir");
+      commandLine.push_back(resourceDirArg->getValue());
+    }
+
+    std::string executable = getSwiftProgramPath();
+
+    sys::TaskQueue queue;
+    queue.addTask(executable.c_str(), commandLine);
+    queue.execute(nullptr,
+                  [](sys::ProcessId PID, int returnCode,
+                      StringRef output, StringRef errors,
+                      sys::TaskProcessInformation ProcInfo,
+                      void *unused) -> sys::TaskFinishedResponse {
+      llvm::outs() << output;
+      llvm::errs() << errors;
+      return sys::TaskFinishedResponse::ContinueExecution;
+    });
+    return false;
+  }
+
   return true;
 }
 
 Optional<OutputFileMap>
 Driver::buildOutputFileMap(const llvm::opt::DerivedArgList &Args,
-                           StringRef workingDirectory) const {
+                           StringRef workingDirectory,
+                           bool addEntriesForSourceFileDependencies) const {
   const Arg *A = Args.getLastArg(options::OPT_output_file_map);
   if (!A)
     return None;
 
   // TODO: perform some preflight checks to ensure the file exists.
-  llvm::Expected<OutputFileMap> OFM =
-      OutputFileMap::loadFromPath(A->getValue(), workingDirectory);
+  llvm::Expected<OutputFileMap> OFM = OutputFileMap::loadFromPath(
+      A->getValue(), workingDirectory, addEntriesForSourceFileDependencies);
   if (auto Err = OFM.takeError()) {
     Diags.diagnose(SourceLoc(), diag::error_unable_to_load_output_file_map,
                    llvm::toString(std::move(Err)), A->getValue());
@@ -2964,8 +3061,11 @@ void Driver::chooseDependenciesOutputPaths(Compilation &C,
                        workingDirectory);
   }
   if (C.getIncrementalBuildEnabled()) {
-    addAuxiliaryOutput(C, *Output, file_types::TY_SwiftDeps, OutputMap,
-                       workingDirectory);
+    file_types::forEachIncrementalOutputType([&](file_types::ID type) {
+      if (C.getEnableSourceRangeDependencies() || C.IncrementalComparator ||
+          type == file_types::TY_SwiftDeps)
+        addAuxiliaryOutput(C, *Output, type, OutputMap, workingDirectory);
+    });
   }
   chooseLoadedModuleTracePath(C, workingDirectory, Buf, Output);
 }

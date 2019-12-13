@@ -1519,7 +1519,7 @@ visitAllocRefDynamicInst(AllocRefDynamicInst *ARDI) {
       return nullptr;
     auto *CCBI = dyn_cast<CheckedCastBranchInst>(PredBB->getTerminator());
     if (CCBI && CCBI->isExact() && ARDI->getParent() == CCBI->getSuccessBB()) {
-      auto MetaTy = CCBI->getCastType().castTo<MetatypeType>();
+      auto MetaTy = cast<MetatypeType>(CCBI->getTargetFormalType());
       auto InstanceTy = MetaTy.getInstanceType();
       if (auto SelfTy = dyn_cast<DynamicSelfType>(InstanceTy))
         InstanceTy = SelfTy.getSelfType();

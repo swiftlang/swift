@@ -49,6 +49,26 @@ func testCallable(
   d(x1: 1, 2.0, x2: 3)
 }
 
+func testCallableDiagnostics(
+  a: Callable, b: DiscardableResult, c: Throwing, d: KeywordArgumentCallable
+) {
+  a("hello", "world")
+  // expected-error@-1:5  {{cannot convert value of type 'String' to expected argument type 'Int'}}
+  // expected-error@-2:14 {{cannot convert value of type 'String' to expected argument type 'Int'}}
+  b("hello", "world")
+  // expected-error@-1:5  {{cannot convert value of type 'String' to expected argument type 'Double'}}
+  // expected-error@-2:14 {{cannot convert value of type 'String' to expected argument type 'Double'}}
+  try? c(1, 2, 3, 4)
+  // expected-error@-1:10 {{cannot convert value of type 'Int' to expected argument type 'String'}}
+  // expected-error@-2:13 {{cannot convert value of type 'Int' to expected argument type 'String'}}
+  // expected-error@-3:16 {{cannot convert value of type 'Int' to expected argument type 'String'}}
+  // expected-error@-4:19 {{cannot convert value of type 'Int' to expected argument type 'String'}}
+
+  d(x1: "hello", x2: "world")
+  // expected-error@-1:9  {{cannot convert value of type 'String' to expected argument type 'Float'}}
+  // expected-error@-2:22 {{cannot convert value of type 'String' to expected argument type 'Float'}}
+}
+
 func testIUO(
   a: Callable!, b: DiscardableResult!, c: Throwing!, d: KeywordArgumentCallable!
 ) {

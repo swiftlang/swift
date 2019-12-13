@@ -36,7 +36,7 @@ bb0:
   %1 = alloc_ref $Foo                             // users: %5, %3, %2
   %2 = copy_value %1 : $Foo                         // id: %2
   %3 = upcast %2 : $Foo to $Bar                   // user: %4
-  %4 = unconditional_checked_cast %3 : $Bar to $Foo // user: %6
+  %4 = unconditional_checked_cast %3 : $Bar to Foo // user: %6
   destroy_value %1 : $Foo                        // id: %5
   %6 = upcast %4 : $Foo to $Bar                   // user: %7
   %10 = class_method %6 : $Bar, #Bar.ping!1 : (Bar) -> () -> (), $@convention(method) (@guaranteed Bar) -> () // user: %11
@@ -55,7 +55,7 @@ bb0:
 // CHECK: } // end sil function 'function_with_cm_with_dynamic_type_known_from_checked_cast_br'
 sil [ossa] @function_with_cm_with_dynamic_type_known_from_checked_cast_br : $@convention(thin) (@owned Bar) -> () {
 bb0(%0 : @owned $Bar):
-  checked_cast_br [exact] %0 : $Bar to $Bar, bb1, bb5
+  checked_cast_br [exact] %0 : $Bar to Bar, bb1, bb5
 
 bb1(%1 : @owned $Bar):
   br bb2(%1 : $Bar)

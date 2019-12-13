@@ -214,3 +214,23 @@ func erroneousSR11350(x: Int) {
     }).domap(0) // expected-error{{value of type 'Optional<()>' has no member 'domap'}}
   }
 }
+
+func extraArg() {
+  tuplify(true) { _ in
+    1
+    2
+    3
+    4
+    5
+    6 // expected-error {{extra argument in call}}
+  }
+}
+
+// rdar://problem/53209000 - use of #warning and #error
+tuplify(true) { x in
+  1
+  #error("boom")    // expected-error{{boom}}
+  "hello"
+  #warning("oops")  // expected-warning{{oops}}
+  3.14159
+}

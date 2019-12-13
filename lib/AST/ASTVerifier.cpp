@@ -2866,15 +2866,6 @@ public:
 
     void verifyParsed(ConstructorDecl *CD) {
       PrettyStackTraceDecl debugStack("verifying ConstructorDecl", CD);
-
-      auto *DC = CD->getDeclContext();
-      if (!isa<NominalTypeDecl>(DC) && !isa<ExtensionDecl>(DC) &&
-          !CD->isInvalid()) {
-        Out << "ConstructorDecls outside nominal types and extensions "
-               "should be marked invalid";
-        abort();
-      }
-
       verifyParsedBase(CD);
     }
 
@@ -2955,15 +2946,6 @@ public:
         Out << "DestructorDecl cannot be generic";
         abort();
       }
-
-      auto *DC = DD->getDeclContext();
-      if (!isa<NominalTypeDecl>(DC) && !isa<ExtensionDecl>(DC) &&
-          !DD->isInvalid()) {
-        Out << "DestructorDecls outside nominal types and extensions "
-               "should be marked invalid";
-        abort();
-      }
-
       verifyParsedBase(DD);
     }
 

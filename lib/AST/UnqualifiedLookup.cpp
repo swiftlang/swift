@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 ///
-/// This file implements the construction of an UnqualifiedLookup, which entails
-/// performing the lookup.
+/// This file implements unqualified lookup, which searches for an identifier
+/// from a given context.
 ///
 //===----------------------------------------------------------------------===//
 
@@ -81,18 +81,14 @@ namespace {
 } // end anonymous namespace
 
 namespace {
-  /// Because UnqualifiedLookup does all of its work in the constructor,
-  /// a factory class is needed to hold all of the inputs and outputs so
-  /// that the construction code can be decomposed into bite-sized pieces.
-  
   class UnqualifiedLookupFactory {
 
     friend class ASTScopeDeclConsumerForUnqualifiedLookup;
 
   public:
-    using Flags = UnqualifiedLookup::Flags;
-    using Options = UnqualifiedLookup::Options;
-    using ResultsVector = UnqualifiedLookup::ResultsVector;
+    using Flags = UnqualifiedLookupFlags;
+    using Options = UnqualifiedLookupOptions;
+    using ResultsVector = SmallVector<LookupResultEntry, 4>;
     
   private:
     struct ContextAndResolvedIsCascadingUse {
@@ -135,7 +131,7 @@ namespace {
       
     public:
       /// Do the lookups and add matches to results.
-      void findResults(const DeclName &Name, bool isCascadingUse,
+      void findResults(const DeclNameRef &Name, bool isCascadingUse,
                        NLOptions baseNLOptions, DeclContext *contextForLookup,
                        SmallVectorImpl<LookupResultEntry> &results) const;
     };
@@ -151,7 +147,7 @@ namespace {
       
     public:
       InstrumentedNamedDeclConsumer(UnqualifiedLookupFactory *factory,
-                                    DeclName name,
+                                    DeclNameRef name,
                                     SmallVectorImpl<LookupResultEntry> &results,
                                     bool isTypeLookup)
       : NamedDeclConsumer(name, results, isTypeLookup), factory(factory) {}
@@ -167,7 +163,7 @@ namespace {
     };
 #endif
     // Inputs
-    const DeclName Name;
+    const DeclNameRef Name;
     DeclContext *const DC;
     ModuleDecl &M;
     const ASTContext &Ctx;
@@ -203,13 +199,7 @@ namespace {
     
   public:
     // clang-format off
-    UnqualifiedLookupFactory(DeclName Name,
-                             DeclContext *const DC,
-                             SourceLoc Loc,
-                             Options options,
-                             UnqualifiedLookup &lookupToBeCreated);
-    
-    UnqualifiedLookupFactory(DeclName Name,
+    UnqualifiedLookupFactory(DeclNameRef Name,
                              DeclContext *const DC,
                              SourceLoc Loc,
                              Options options,
@@ -330,7 +320,7 @@ namespace {
     void setAsideUnavailableResults(size_t firstPossiblyUnavailableResult);
     
     void recordDependencyOnTopLevelName(DeclContext *topLevelContext,
-                                        DeclName name, bool isCascadingUse);
+                                        DeclNameRef name, bool isCascadingUse);
     
     void addImportedResults(DeclContext *const dc);
     
@@ -342,7 +332,7 @@ namespace {
     
 #pragma mark common helper declarations
     static NLOptions
-    computeBaseNLOptions(const UnqualifiedLookup::Options options,
+    computeBaseNLOptions(const UnqualifiedLookupOptions options,
                          const bool isOriginallyTypeLookup);
 
     Optional<bool> getInitialIsCascadingUse() const {
@@ -434,19 +424,7 @@ public:
 
 // clang-format off
 UnqualifiedLookupFactory::UnqualifiedLookupFactory(
-                            DeclName Name,
-                            DeclContext *const DC,
-                            SourceLoc Loc,
-                            Options options,
-                            UnqualifiedLookup &lookupToBeCreated)
-: UnqualifiedLookupFactory(Name, DC, Loc, options,
-    lookupToBeCreated.Results,
-    lookupToBeCreated.IndexOfFirstOuterResult)
-
-{}
-
-UnqualifiedLookupFactory::UnqualifiedLookupFactory(
-                            DeclName Name,
+                            DeclNameRef Name,
                             DeclContext *const DC,
                             SourceLoc Loc,
                             Options options,
@@ -928,7 +906,7 @@ void UnqualifiedLookupFactory::addGenericParametersForFunction(
 }
 
 void UnqualifiedLookupFactory::ResultFinderForTypeContext::findResults(
-    const DeclName &Name, bool isCascadingUse, NLOptions baseNLOptions,
+    const DeclNameRef &Name, bool isCascadingUse, NLOptions baseNLOptions,
     DeclContext *contextForLookup,
     SmallVectorImpl<LookupResultEntry> &results) const {
   // An optimization:
@@ -982,8 +960,8 @@ void UnqualifiedLookupFactory::setAsideUnavailableResults(
 
 
 void UnqualifiedLookupFactory::recordDependencyOnTopLevelName(
-    DeclContext *topLevelContext, DeclName name, bool isCascadingUse) {
-  recordLookupOfTopLevelName(topLevelContext, Name, isCascadingUse);
+    DeclContext *topLevelContext, DeclNameRef name, bool isCascadingUse) {
+  recordLookupOfTopLevelName(topLevelContext, Name.getFullName(), isCascadingUse);
   recordedSF = dyn_cast<SourceFile>(topLevelContext);
   recordedIsCascadingUse = isCascadingUse;
 }
@@ -993,7 +971,7 @@ void UnqualifiedLookupFactory::addImportedResults(DeclContext *const dc) {
   SmallVector<ValueDecl *, 8> CurModuleResults;
   auto resolutionKind = isOriginallyTypeLookup ? ResolutionKind::TypesOnly
                                                : ResolutionKind::Overloadable;
-  lookupInModule(dc, Name, CurModuleResults, NLKind::UnqualifiedLookup,
+  lookupInModule(dc, Name.getFullName(), CurModuleResults, NLKind::UnqualifiedLookup,
                  resolutionKind, dc);
 
   // Always perform name shadowing for type lookup.
@@ -1036,7 +1014,7 @@ void UnqualifiedLookupFactory::lookForAModuleWithTheGivenName(
     return;
   }
   ModuleDecl *desiredModule = Ctx.getLoadedModule(Name.getBaseIdentifier());
-  if (!desiredModule && Name == Ctx.TheBuiltinModule->getName())
+  if (!desiredModule && Name.getFullName() == Ctx.TheBuiltinModule->getName())
     desiredModule = Ctx.TheBuiltinModule;
   if (desiredModule) {
     // Make sure the desired module is actually visible from the current
@@ -1065,7 +1043,7 @@ void UnqualifiedLookupFactory::findResultsAndSaveUnavailables(
 
 
 NLOptions UnqualifiedLookupFactory::computeBaseNLOptions(
-    const UnqualifiedLookup::Options options,
+    const UnqualifiedLookupOptions options,
     const bool isOriginallyTypeLookup) {
   NLOptions baseNLOptions = NL_UnqualifiedDefault;
   if (options.contains(Flags::AllowProtocolMembers))
@@ -1157,7 +1135,7 @@ bool ASTScopeDeclConsumerForUnqualifiedLookup::consume(
   for (auto *value: values) {
     if (factory.isOriginallyTypeLookup && !isa<TypeDecl>(value))
       continue;
-    if (!value->getFullName().matchesRef(factory.Name))
+    if (!value->getFullName().matchesRef(factory.Name.getFullName()))
       continue;
 
     // In order to preserve the behavior of the existing context-based lookup,
@@ -1209,29 +1187,15 @@ bool ASTScopeDeclConsumerForUnqualifiedLookup::lookInMembers(
   return factory.isFirstResultEnough();
 }
 
-
-#pragma mark UnqualifiedLookup functions
-
-// clang-format off
-UnqualifiedLookup::UnqualifiedLookup(DeclName Name,
-                                     DeclContext *const DC,
-                                     SourceLoc Loc,
-                                     Options options)
-    // clang-format on
-    : IndexOfFirstOuterResult(0) {
-
-  auto *stats = DC->getASTContext().Stats;
-  if (stats)
-    stats->getFrontendCounters().NumUnqualifiedLookup++;
-
-  UnqualifiedLookupFactory factory(Name, DC, Loc, options, *this);
+llvm::Expected<LookupResult>
+UnqualifiedLookupRequest::evaluate(Evaluator &evaluator,
+                                   UnqualifiedLookupDescriptor desc) const {
+  SmallVector<LookupResultEntry, 4> results;
+  size_t indexOfFirstOuterResult = 0;
+  UnqualifiedLookupFactory factory(desc.Name, desc.DC, desc.Loc, desc.Options,
+                                   results, indexOfFirstOuterResult);
   factory.performUnqualifiedLookup();
-}
-
-TypeDecl *UnqualifiedLookup::getSingleTypeResult() const {
-  if (Results.size() != 1)
-    return nullptr;
-  return dyn_cast<TypeDecl>(Results.back().getValueDecl());
+  return LookupResult(results, indexOfFirstOuterResult);
 }
 
 #pragma mark debugging

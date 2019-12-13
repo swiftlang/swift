@@ -248,3 +248,33 @@ bb1:
   %r = tuple ()
   return %r : $()
 }
+
+// CHECK-LABEL: sil [ossa] @test_simple_infinite_loop
+// CHECK-NOT:     destroy_addr
+// CHECK:       } // end sil function 'test_simple_infinite_loop'
+sil [ossa] @test_simple_infinite_loop : $@convention(thin) (@in_guaranteed S) -> () {
+bb0(%0 : $*S):
+  br bb1
+bb1:
+  br bb1
+}
+
+// CHECK-LABEL: sil [ossa] @test_infinite_loop
+// CHECK-NOT:     destroy_addr
+// CHECK:       bb3:
+// CHECK-NEXT:    destroy_addr %1
+// CHECK-NOT:     destroy_addr
+// CHECK:       } // end sil function 'test_infinite_loop'
+sil [ossa] @test_infinite_loop : $@convention(thin) (@in_guaranteed S, @in S) -> () {
+bb0(%0 : $*S, %1 : $*S):
+  cond_br undef, bb1, bb2
+bb1:
+  br bb1
+bb2:
+  br bb3
+bb3:
+  destroy_addr %1 : $*S
+  %r = tuple ()
+  return %r : $()
+}
+

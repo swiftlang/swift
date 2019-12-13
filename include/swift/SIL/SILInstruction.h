@@ -1397,6 +1397,11 @@ protected:
 
 public:
   DEFINE_ABSTRACT_SINGLE_VALUE_INST_BOILERPLATE(AllocationInst)
+
+  /// Return the underlying variable declaration associated with this
+  /// allocation, or null if this allocation inst is associated with a temporary
+  /// allocation.
+  VarDecl *getDecl() const;
 };
 
 class DeallocStackInst;
@@ -1438,10 +1443,6 @@ public:
 
   void setDynamicLifetime() { dynamicLifetime = true; }
   bool hasDynamicLifetime() const { return dynamicLifetime; }
-
-  /// Return the underlying variable declaration associated with this
-  /// allocation, or null if this is a temporary allocation.
-  VarDecl *getDecl() const;
 
   /// Return the debug variable information attached to this instruction.
   Optional<SILDebugVariable> getVarInfo() const {
@@ -1684,10 +1685,6 @@ public:
 
   // Return the type of the memory stored in the alloc_box.
   SILType getAddressType() const;
-
-  /// Return the underlying variable declaration associated with this
-  /// allocation, or null if this is a temporary allocation.
-  VarDecl *getDecl() const;
 
   /// Return the debug variable information attached to this instruction.
   Optional<SILDebugVariable> getVarInfo() const {
@@ -2895,6 +2892,10 @@ public:
     return KeyPathPatternComponent(tupleIndex, ty);
   }
   
+  void visitReferencedFunctionsAndMethods(
+      std::function<void (SILFunction *)> functionCallBack,
+      std::function<void (SILDeclRef)> methodCallBack) const;
+    
   void incrementRefCounts() const;
   void decrementRefCounts() const;
   
@@ -2951,6 +2952,15 @@ public:
   
   ArrayRef<KeyPathPatternComponent> getComponents() const;
   
+  void visitReferencedFunctionsAndMethods(
+      std::function<void (SILFunction *)> functionCallBack,
+      std::function<void (SILDeclRef)> methodCallBack) {
+    for (auto &component : getComponents()) {
+      component.visitReferencedFunctionsAndMethods(functionCallBack,
+                                                   methodCallBack);
+    }
+  }
+
   static KeyPathPattern *get(SILModule &M,
                              CanGenericSignature signature,
                              CanType rootType,
@@ -4476,11 +4486,11 @@ public:
   SILValue getSrc() const { return Operands[Src].get(); }
   SILValue getDest() const { return Operands[Dest].get(); }
 
-  /// Returns the formal type of the source value.
-  CanType getSourceType() const { return SourceType; }
+  SILType getSourceLoweredType() const { return getSrc()->getType(); }
+  CanType getSourceFormalType() const { return SourceType; }
 
-  /// Returns the formal target type.
-  CanType getTargetType() const { return TargetType; }
+  SILType getTargetLoweredType() const { return getDest()->getType(); }
+  CanType getTargetFormalType() const { return TargetType; }
 
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
   MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
@@ -4752,31 +4762,28 @@ class UnconditionalCheckedCastInst final
     : public UnaryInstructionWithTypeDependentOperandsBase<
           SILInstructionKind::UnconditionalCheckedCastInst,
           UnconditionalCheckedCastInst, OwnershipForwardingConversionInst> {
+  CanType DestFormalTy;
   friend SILBuilder;
 
   UnconditionalCheckedCastInst(SILDebugLocation DebugLoc, SILValue Operand,
                                ArrayRef<SILValue> TypeDependentOperands,
-                               SILType DestTy)
+                               SILType DestLoweredTy, CanType DestFormalTy)
       : UnaryInstructionWithTypeDependentOperandsBase(
-            DebugLoc, Operand, TypeDependentOperands, DestTy,
-            Operand.getOwnershipKind()) {}
+            DebugLoc, Operand, TypeDependentOperands, DestLoweredTy,
+          Operand.getOwnershipKind()),
+        DestFormalTy(DestFormalTy) {}
 
   static UnconditionalCheckedCastInst *
-  create(SILDebugLocation DebugLoc, SILValue Operand, SILType DestTy,
+  create(SILDebugLocation DebugLoc, SILValue Operand,
+         SILType DestLoweredTy, CanType DestFormalTy,
          SILFunction &F, SILOpenedArchetypesState &OpenedArchetypes);
 
 public:
-  /// Returns the formal type of the source value.
-  CanType getSourceType() const {
-    // This instruction is only used with types that allow this.
-    return getOperand()->getType().getASTType();
-  }
+  SILType getSourceLoweredType() const { return getOperand()->getType(); }
+  CanType getSourceFormalType() const { return getSourceLoweredType().getASTType(); }
 
-  /// Returns the formal target type.
-  CanType getTargetType() const {
-    // This instruction is only used with types that allow this.
-    return getType().getASTType();
-  }
+  CanType getTargetFormalType() const { return DestFormalTy; }
+  SILType getTargetLoweredType() const { return getType(); }
 };
 
 /// Perform an unconditional checked cast that aborts if the cast fails.
@@ -4804,11 +4811,11 @@ public:
   SILValue getSrc() const { return Operands[Src].get(); }
   SILValue getDest() const { return Operands[Dest].get(); }
 
-  /// Returns the formal type of the source value.
-  CanType getSourceType() const { return SourceType; }
+  SILType getSourceLoweredType() const { return getSrc()->getType(); }
+  CanType getSourceFormalType() const { return SourceType; }
 
-  /// Returns the formal target type.
-  CanType getTargetType() const { return TargetType; }
+  SILType getTargetLoweredType() const { return getDest()->getType(); }
+  CanType getTargetFormalType() const { return TargetType; }
 
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
   MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
@@ -4820,17 +4827,32 @@ class UnconditionalCheckedCastValueInst final
     : public UnaryInstructionWithTypeDependentOperandsBase<
           SILInstructionKind::UnconditionalCheckedCastValueInst,
           UnconditionalCheckedCastValueInst, ConversionInst> {
+  CanType SourceFormalTy;
+  CanType DestFormalTy;
   friend SILBuilder;
 
-  UnconditionalCheckedCastValueInst(SILDebugLocation DebugLoc, SILValue Operand,
+  UnconditionalCheckedCastValueInst(SILDebugLocation DebugLoc,
+                                    SILValue Operand, CanType SourceFormalTy,
                                     ArrayRef<SILValue> TypeDependentOperands,
-                                    SILType DestTy)
+                                    SILType DestLoweredTy, CanType DestFormalTy)
       : UnaryInstructionWithTypeDependentOperandsBase(
-            DebugLoc, Operand, TypeDependentOperands, DestTy) {}
+            DebugLoc, Operand, TypeDependentOperands,
+            DestLoweredTy),
+        SourceFormalTy(SourceFormalTy),
+        DestFormalTy(DestFormalTy) {}
 
   static UnconditionalCheckedCastValueInst *
-  create(SILDebugLocation DebugLoc, SILValue Operand, SILType DestTy,
+  create(SILDebugLocation DebugLoc,
+         SILValue Operand, CanType SourceFormalTy,
+         SILType DestLoweredTy, CanType DestFormalTy,
          SILFunction &F, SILOpenedArchetypesState &OpenedArchetypes);
+
+public:
+  SILType getSourceLoweredType() const { return getOperand()->getType(); }
+  CanType getSourceFormalType() const { return SourceFormalTy; }
+
+  SILType getTargetLoweredType() const { return getType(); }
+  CanType getTargetFormalType() const { return DestFormalTy; }
 };
 
 /// StructInst - Represents a constructed loadable struct.
@@ -6977,8 +6999,8 @@ public:
   }
 
   using SuccessorBlockArgumentsListTy =
-      TransformRange<ConstSuccessorListTy,
-                     function_ref<PhiArgumentArrayRef(const SILSuccessor &)>>;
+      TransformRange<ConstSuccessorListTy, function_ref<SILPhiArgumentArrayRef(
+                                               const SILSuccessor &)>>;
 
   /// Return the range of Argument arrays for each successor of this
   /// block.
@@ -7660,7 +7682,8 @@ class CheckedCastBranchInst final:
                               TermInst> {
   friend SILBuilder;
 
-  SILType DestTy;
+  SILType DestLoweredTy;
+  CanType DestFormalTy;
   bool IsExact;
 
   SILSuccessor DestBBs[2];
@@ -7668,18 +7691,20 @@ class CheckedCastBranchInst final:
   CheckedCastBranchInst(SILDebugLocation DebugLoc, bool IsExact,
                         SILValue Operand,
                         ArrayRef<SILValue> TypeDependentOperands,
-                        SILType DestTy, SILBasicBlock *SuccessBB,
-                        SILBasicBlock *FailureBB, ProfileCounter Target1Count,
-                        ProfileCounter Target2Count)
+                        SILType DestLoweredTy, CanType DestFormalTy,
+                        SILBasicBlock *SuccessBB, SILBasicBlock *FailureBB,
+                        ProfileCounter Target1Count, ProfileCounter Target2Count)
       : UnaryInstructionWithTypeDependentOperandsBase(DebugLoc, Operand,
                                                       TypeDependentOperands),
-        DestTy(DestTy),
+        DestLoweredTy(DestLoweredTy),
+        DestFormalTy(DestFormalTy),
         IsExact(IsExact), DestBBs{{this, SuccessBB, Target1Count},
                                   {this, FailureBB, Target2Count}} {}
 
   static CheckedCastBranchInst *
   create(SILDebugLocation DebugLoc, bool IsExact, SILValue Operand,
-         SILType DestTy, SILBasicBlock *SuccessBB, SILBasicBlock *FailureBB,
+         SILType DestLoweredTy, CanType DestFormalTy,
+         SILBasicBlock *SuccessBB, SILBasicBlock *FailureBB,
          SILFunction &F, SILOpenedArchetypesState &OpenedArchetypes,
          ProfileCounter Target1Count, ProfileCounter Target2Count);
 
@@ -7690,19 +7715,11 @@ public:
     return DestBBs;
   }
 
-  /// Returns the formal type of the source value.
-  CanType getSourceType() const {
-    // This instruction is only used with types that allow this.
-    return getOperand()->getType().getASTType();
-  }
+  SILType getSourceLoweredType() const { return getOperand()->getType(); }
+  CanType getSourceFormalType() const { return getSourceLoweredType().getASTType(); }
 
-  /// Returns the formal target type.
-  CanType getTargetType() const {
-    // This instruction is only used with types that allow this.
-    return getCastType().getASTType();
-  }
-
-  SILType getCastType() const { return DestTy; }
+  SILType getTargetLoweredType() const { return DestLoweredTy; }
+  CanType getTargetFormalType() const { return DestFormalTy; }
 
   SILBasicBlock *getSuccessBB() { return DestBBs[0]; }
   const SILBasicBlock *getSuccessBB() const { return DestBBs[0]; }
@@ -7725,39 +7742,38 @@ class CheckedCastValueBranchInst final
           TermInst> {
   friend SILBuilder;
 
-  SILType DestTy;
+  CanType SourceFormalTy;
+  SILType DestLoweredTy;
+  CanType DestFormalTy;
 
   SILSuccessor DestBBs[2];
 
-  CheckedCastValueBranchInst(SILDebugLocation DebugLoc, SILValue Operand,
+  CheckedCastValueBranchInst(SILDebugLocation DebugLoc,
+                             SILValue Operand, CanType SourceFormalTy,
                              ArrayRef<SILValue> TypeDependentOperands,
-                             SILType DestTy, SILBasicBlock *SuccessBB,
-                             SILBasicBlock *FailureBB)
+                             SILType DestLoweredTy, CanType DestFormalTy,
+                             SILBasicBlock *SuccessBB, SILBasicBlock *FailureBB)
       : UnaryInstructionWithTypeDependentOperandsBase(DebugLoc, Operand,
                                                       TypeDependentOperands),
-        DestTy(DestTy), DestBBs{{this, SuccessBB}, {this, FailureBB}} {}
+        SourceFormalTy(SourceFormalTy),
+        DestLoweredTy(DestLoweredTy), DestFormalTy(DestFormalTy),
+        DestBBs{{this, SuccessBB}, {this, FailureBB}} {}
 
   static CheckedCastValueBranchInst *
-  create(SILDebugLocation DebugLoc, SILValue Operand, SILType DestTy,
-         SILBasicBlock *SuccessBB, SILBasicBlock *FailureBB, SILFunction &F,
-         SILOpenedArchetypesState &OpenedArchetypes);
+  create(SILDebugLocation DebugLoc,
+         SILValue Operand, CanType SourceFormalTy,
+         SILType DestLoweredTy, CanType DestFormalTy,
+         SILBasicBlock *SuccessBB, SILBasicBlock *FailureBB,
+         SILFunction &F, SILOpenedArchetypesState &OpenedArchetypes);
 
 public:
   SuccessorListTy getSuccessors() { return DestBBs; }
 
-  /// Returns the formal type of the source value.
-  CanType getSourceType() const {
-    // This instruction is only used with types that allow this.
-    return getOperand()->getType().getASTType();
-  }
+  SILType getSourceLoweredType() const { return getOperand()->getType(); }
+  CanType getSourceFormalType() const { return SourceFormalTy; }
 
-  /// Returns the formal target type.
-  CanType getTargetType() const {
-    // This instruction is only used with types that allow this.
-    return getCastType().getASTType();
-  }
-
-  SILType getCastType() const { return DestTy; }
+  SILType getTargetLoweredType() const { return DestLoweredTy; }
+  CanType getTargetFormalType() const { return DestFormalTy; }
 
   SILBasicBlock *getSuccessBB() { return DestBBs[0]; }
   const SILBasicBlock *getSuccessBB() const { return DestBBs[0]; }
@@ -7807,11 +7823,11 @@ public:
   SILValue getSrc() const { return Operands[Src].get(); }
   SILValue getDest() const { return Operands[Dest].get(); }
 
-  /// Returns the formal type of the source value.
-  CanType getSourceType() const { return SourceType; }
+  SILType getSourceLoweredType() const { return getSrc()->getType(); }
+  CanType getSourceFormalType() const { return SourceType; }
 
-  /// Returns the formal target type.
-  CanType getTargetType() const { return TargetType; }
+  SILType getTargetLoweredType() const { return getDest()->getType(); }
+  CanType getTargetFormalType() const { return TargetType; }
 
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
   MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }

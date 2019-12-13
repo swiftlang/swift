@@ -207,7 +207,7 @@ ERROR(lex_conflict_marker_in_file,none,
 //------------------------------------------------------------------------------
 
 NOTE(note_in_decl_extension,none,
-     "in %select{declaration|extension}0 of %1", (bool, Identifier))
+     "in %select{declaration|extension}0 of %1", (bool, DeclNameRef))
 ERROR(line_directive_style_deprecated,none,
         "#line directive was renamed to #sourceLocation",
         ())
@@ -591,8 +591,6 @@ ERROR(sil_dbg_unknown_key,none,
       "unknown key '%0' in debug variable declaration", (StringRef))
 ERROR(sil_objc_with_tail_elements,none,
       "alloc_ref [objc] cannot have tail allocated elements", ())
-ERROR(found_unqualified_instruction_in_qualified_function,none,
-      "found unqualified instruction in qualified function '%0'", (StringRef))
 ERROR(sil_expected_access_kind,none,
       "%0 instruction must have explicit access kind", (StringRef))
 ERROR(sil_expected_access_enforcement,none,
@@ -605,9 +603,6 @@ ERROR(sil_keypath_unknown_component_kind,none,
 ERROR(sil_keypath_computed_property_missing_part,none,
       "keypath %select{gettable|settable}0_property component needs an "
       "%select{id and getter|id, getter, and setter}0", (bool))
-ERROR(sil_keypath_external_missing_part,none,
-      "keypath external component with indices needs an indices_equals and "
-      "indices_hash function", ())
 ERROR(sil_keypath_no_root,none,
       "keypath must have a root component declared",())
 ERROR(sil_keypath_index_not_hashable,none,
@@ -684,8 +679,6 @@ ERROR(sil_witness_protocol_conformance_not_found,none,
       "sil protocol conformance not found", ())
 
 // SIL Coverage Map
-ERROR(sil_coverage_func_not_found, none,
-      "sil function not found %0", (Identifier))
 ERROR(sil_coverage_invalid_hash, none,
       "expected coverage hash", ())
 ERROR(sil_coverage_expected_lbrace, none,
@@ -809,6 +802,12 @@ ERROR(sil_box_expected_r_brace,none,
       "expected '}' to complete SIL box field type list", ())
 ERROR(sil_box_expected_r_angle,none,
       "expected '>' to complete SIL box generic argument list", ())
+
+// SIL function types
+ERROR(sil_function_subst_expected_l_angle,none,
+      "expected '<' to begin SIL function type substitution list after 'for'", ())
+ERROR(sil_function_subst_expected_r_angle,none,
+      "expected '>' to begin SIL function type substitution list after 'for'", ())
 
 // Opaque types
 ERROR(opaque_mid_composition,none,
@@ -1280,12 +1279,6 @@ ERROR(expr_selector_expected_rparen,PointsToFirstBadToken,
       "expected ')' to complete '#selector' expression", ())
 
 // Type-of expressions.
-ERROR(expr_typeof_expected_label_of,PointsToFirstBadToken,
-      "expected argument label 'of:' within 'type(...)'", ())
-ERROR(expr_typeof_expected_expr,PointsToFirstBadToken,
-      "expected an expression within 'type(of: ...)'", ())
-ERROR(expr_typeof_expected_rparen,PointsToFirstBadToken,
-      "expected ')' to complete 'type(of: ...)' expression", ())
 ERROR(expr_dynamictype_deprecated,PointsToFirstBadToken,
       "'.dynamicType' is deprecated. Use 'type(of: ...)' instead", ())
 
@@ -1341,6 +1334,11 @@ ERROR(attr_expected_comma,none,
 
 ERROR(attr_expected_string_literal,none,
 "expected string literal in '%0' attribute", (StringRef))
+
+ERROR(attr_missing_label,PointsToFirstBadToken,
+      "missing label '%0:' in '@%1' attribute", (StringRef, StringRef))
+ERROR(attr_expected_label,none,
+      "expected label '%0:' in '@%1' attribute", (StringRef, StringRef))
 
 ERROR(alignment_must_be_positive_integer,none,
       "alignment value must be a positive integer literal", ())
@@ -1410,6 +1408,32 @@ WARNING(attr_availability_nonspecific_platform_unexpected_version,none,
       "unexpected version number in '%0' attribute for non-specific platform "
       "'*'", (StringRef))
 
+// originallyDefinedIn
+ERROR(originally_defined_in_missing_rparen,none,
+      "expected ')' in @_originallyDefinedIn argument list", ())
+
+ERROR(originally_defined_in_unrecognized_platform,none,
+      "unrecognized platform name in @_originallyDefinedIn argument list", ())
+
+ERROR(originally_defined_in_unrecognized_property,none,
+      "unrecognized property in @_originallyDefinedIn argument list", ())
+
+ERROR(originally_defined_in_need_original_module_name,none,
+      "expected 'module: \"original\"' in the first argument to "
+      "@_originallyDefinedIn", ())
+
+ERROR(originally_defined_in_need_nonempty_module_name,none,
+      "original module name cannot be empty in @_originallyDefinedIn", ())
+
+ERROR(originally_defined_in_need_platform_version,none,
+     "expected at least one platform version in @_originallyDefinedIn", ())
+
+WARNING(originally_defined_in_major_minor_only,none,
+        "@_originallyDefinedIn only uses major and minor version number", ())
+
+WARNING(originally_defined_in_missing_platform_name,none,
+        "* as platform name has no effect", ())
+
 // convention
 ERROR(convention_attribute_expected_lparen,none,
       "expected '(' after 'convention' attribute", ())
@@ -1417,6 +1441,13 @@ ERROR(convention_attribute_expected_name,none,
       "expected convention name identifier in 'convention' attribute", ())
 ERROR(convention_attribute_expected_rparen,none,
       "expected ')' after convention name for 'convention' attribute", ())
+ERROR(convention_attribute_ctype_expected_label,none,
+      "expected 'cType' label in 'convention' attribute", ())
+ERROR(convention_attribute_ctype_expected_colon,none,
+      "expected ':' after 'cType' for 'convention' attribute", ())
+ERROR(convention_attribute_ctype_expected_string,none,
+      "expected string literal containing clang type for 'cType' in "
+      "'convention' attribute", ())
 ERROR(convention_attribute_witness_method_expected_colon,none,
       "expected ':' after 'witness_method' for 'convention' attribute", ())
 ERROR(convention_attribute_witness_method_expected_protocol,none,
@@ -1480,10 +1511,6 @@ WARNING(attr_warn_unused_result_removed,none,
 ERROR(attr_warn_unused_result_expected_rparen,none,
       "expected ')' after 'warn_unused_result' attribute", ())
 
-// escaping
-ERROR(attr_escaping_conflicts_noescape,none,
-      "@escaping conflicts with @noescape", ())
-
 // _specialize
 ERROR(attr_specialize_missing_colon,none,
       "missing ':' after %0 in '_specialize' attribute", (StringRef))
@@ -1533,6 +1560,10 @@ ERROR(expected_colon_after_label,PointsToFirstBadToken,
 ERROR(diff_params_clause_expected_parameter,PointsToFirstBadToken,
       "expected a parameter, which can be a function parameter name, "
       "parameter index, or 'self'", ())
+
+// derivative
+ERROR(attr_derivative_expected_original_name,PointsToFirstBadToken,
+      "expected an original function name", ())
 
 //------------------------------------------------------------------------------
 // MARK: Generics parsing diagnostics

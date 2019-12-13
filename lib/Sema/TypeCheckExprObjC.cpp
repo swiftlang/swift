@@ -162,7 +162,7 @@ Optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
   };
   
   // Local function to perform name lookup for the current index.
-  auto performLookup = [&](DeclBaseName componentName,
+  auto performLookup = [&](DeclNameRef componentName,
                            SourceLoc componentNameLoc,
                            Type &lookupType) -> LookupResult {
     if (state == Beginning)
@@ -186,7 +186,7 @@ Optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
 
   // Local function to print a component to the string.
   bool needDot = false;
-  auto printComponent = [&](DeclBaseName component) {
+  auto printComponent = [&](DeclName component) {
     if (needDot)
       keyPathOS << ".";
     else
@@ -224,20 +224,19 @@ Optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
       llvm_unreachable("already resolved!");
     }
     
-    auto componentFullName = component.getUnresolvedDeclName();
-    if (!componentFullName.isSimpleName()) {
+    auto componentName = component.getUnresolvedDeclName();
+    if (!componentName.isSimpleName()) {
       diags.diagnose(componentNameLoc,
                      diag::expr_unsupported_objc_key_path_compound_name);
       continue;
     }
-    auto componentName = componentFullName.getBaseName();
 
     // If we are resolving into a dictionary, any component is
     // well-formed because the keys are unknown dynamically.
     if (state == ResolvingDictionary) {
       // Just print the component unchanged; there's no checking we
       // can do here.
-      printComponent(componentName);
+      printComponent(componentName.getBaseName());
 
       // From here, we're resolving a property. Use the current type.
       updateState(/*isProperty=*/true, currentType);
@@ -330,7 +329,7 @@ Optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
       // Check that the property is @objc.
       if (!var->isObjC()) {
         diags.diagnose(componentNameLoc, diag::expr_keypath_non_objc_property,
-                       componentName);
+                       var->getFullName());
         if (var->getLoc().isValid() && var->getDeclContext()->isTypeContext()) {
           diags.diagnose(var, diag::make_decl_objc,
                          var->getDescriptiveKind())
@@ -374,7 +373,7 @@ Optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
       // We cannot refer to a generic type.
       if (type->getDeclaredInterfaceType()->hasTypeParameter()) {
         diags.diagnose(componentNameLoc, diag::expr_keypath_generic_type,
-                       componentName);
+                       type->getFullName());
         isInvalid = true;
         break;
       }

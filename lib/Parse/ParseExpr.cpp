@@ -806,7 +806,7 @@ UnresolvedDeclRefExpr *Parser::parseExprOperator() {
   assert(Tok.isAnyOperator());
   DeclRefKind refKind = getDeclRefKindForOperator(Tok.getKind());
   SourceLoc loc = Tok.getLoc();
-  Identifier name = Context.getIdentifier(Tok.getText());
+  DeclNameRef name(Context.getIdentifier(Tok.getText()));
   consumeToken();
   // Bypass local lookup.
   return new (Context) UnresolvedDeclRefExpr(name, refKind, DeclNameLoc(loc));
@@ -823,7 +823,7 @@ static VarDecl *getImplicitSelfDeclForSuperContext(Parser &P,
 
   // Do an actual lookup for 'self' in case it shows up in a capture list.
   auto *methodSelf = methodContext->getImplicitSelfDecl();
-  auto *lookupSelf = P.lookupInScope(P.Context.Id_self);
+  auto *lookupSelf = P.lookupInScope(DeclNameRef(P.Context.Id_self));
   if (lookupSelf && lookupSelf != methodSelf) {
     // FIXME: This is the wrong diagnostic for if someone manually declares a
     // variable named 'self' using backticks.
@@ -965,23 +965,40 @@ static bool isValidTrailingClosure(bool isExprBasic, Parser &P){
   // the token after the { is on the same line as the {.
   if (P.peekToken().isAtStartOfLine())
     return false;
-  
-  
+
   // Determine if the {} goes with the expression by eating it, and looking
-  // to see if it is immediately followed by '{', 'where', or comma.  If so,
-  // we consider it to be part of the proceeding expression.
+  // to see if it is immediately followed by a token which indicates we should
+  // consider it part of the preceding expression
   Parser::BacktrackingScope backtrack(P);
   P.consumeToken(tok::l_brace);
   P.skipUntil(tok::r_brace);
   SourceLoc endLoc;
-  if (!P.consumeIf(tok::r_brace, endLoc) ||
-      P.Tok.isNot(tok::l_brace, tok::kw_where, tok::comma)) {
+  if (!P.consumeIf(tok::r_brace, endLoc))
+    return false;
+
+  switch (P.Tok.getKind()) {
+  case tok::l_brace:
+  case tok::kw_where:
+  case tok::comma:
+    return true;
+  case tok::l_square:
+  case tok::l_paren:
+  case tok::period:
+  case tok::period_prefix:
+  case tok::kw_is:
+  case tok::kw_as:
+  case tok::question_postfix:
+  case tok::question_infix:
+  case tok::exclaim_postfix:
+  case tok::colon:
+  case tok::equal:
+  case tok::oper_postfix:
+  case tok::oper_binary_spaced:
+  case tok::oper_binary_unspaced:
+    return !P.Tok.isAtStartOfLine();
+  default:
     return false;
   }
-
-  // Recoverable case. Just return true here and Sema will emit a diagnostic
-  // later. see: Sema/MiscDiagnostics.cpp#checkStmtConditionTrailingClosure
-  return true;
 }
 
 
@@ -997,6 +1014,8 @@ getMagicIdentifierLiteralKind(tok Kind) {
   case tok::kw___FILE__:
   case tok::pound_file:
     return MagicIdentifierLiteralExpr::Kind::File;
+  case tok::pound_filePath:
+    return MagicIdentifierLiteralExpr::Kind::FilePath;
   case tok::kw___FUNCTION__:
   case tok::pound_function:
     return MagicIdentifierLiteralExpr::Kind::Function;
@@ -1054,7 +1073,7 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
 
       // Handle "x.42" - a tuple index.
       if (Tok.is(tok::integer_literal)) {
-        DeclName name = Context.getIdentifier(Tok.getText());
+        DeclNameRef name(Context.getIdentifier(Tok.getText()));
         SourceLoc nameLoc = consumeToken(tok::integer_literal);
         SyntaxContext->createNodeInPlace(SyntaxKind::MemberAccessExpr);
 
@@ -1111,7 +1130,7 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
       Diag<> D = isa<SuperRefExpr>(Result.get())
                      ? diag::expected_identifier_after_super_dot_expr
                      : diag::expected_member_name;
-      DeclName Name = parseUnqualifiedDeclName(/*afterDot=*/true, NameLoc, D);
+      DeclNameRef Name = parseUnqualifiedDeclName(/*afterDot=*/true, NameLoc, D);
       if (!Name)
         return nullptr;
       SyntaxContext->createNodeInPlace(SyntaxKind::MemberAccessExpr);
@@ -1429,6 +1448,15 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
       .fixItReplace(Tok.getLoc(), replacement);
     LLVM_FALLTHROUGH;
   }
+
+  case tok::pound_filePath:
+    // Check twice because of fallthrough--this is ugly but temporary.
+    if (Tok.is(tok::pound_filePath) && !Context.LangOpts.EnableConcisePoundFile)
+      diagnose(Tok.getLoc(), diag::unknown_pound_expr, "filePath");
+    // Continue since we actually do know how to handle it. This avoids extra
+    // diagnostics.
+    LLVM_FALLTHROUGH;
+
   case tok::pound_column:
   case tok::pound_file:
   case tok::pound_function:
@@ -1438,6 +1466,7 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
     switch (Tok.getKind()) {
     case tok::pound_column: SKind = SyntaxKind::PoundColumnExpr; break;
     case tok::pound_file: SKind = SyntaxKind::PoundFileExpr; break;
+    case tok::pound_filePath: SKind = SyntaxKind::PoundFilePathExpr; break;
     case tok::pound_function: SKind = SyntaxKind::PoundFunctionExpr; break;
     // FIXME: #line was renamed to #sourceLocation
     case tok::pound_line: SKind = SyntaxKind::PoundLineExpr; break;
@@ -1537,7 +1566,7 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
                                                    /*Implicit=*/false));
     }
     
-    DeclName Name;
+    DeclNameRef Name;
     DeclNameLoc NameLoc;
 
     if (Tok.is(tok::code_complete)) {
@@ -1723,8 +1752,9 @@ parseStringSegments(SmallVectorImpl<Lexer::StringSegment> &Segments,
   ParsedTrivia EmptyTrivia;
   bool First = true;
 
-  DeclName appendLiteral(Context, Context.Id_appendLiteral, { Identifier() });
-  DeclName appendInterpolation(Context.Id_appendInterpolation);
+  DeclNameRef appendLiteral(
+      { Context, Context.Id_appendLiteral, { Identifier() } });
+  DeclNameRef appendInterpolation(Context.Id_appendInterpolation);
 
   for (auto Segment : Segments) {
     auto InterpolationVarRef =
@@ -2048,12 +2078,12 @@ void Parser::parseOptionalArgumentLabel(Identifier &name, SourceLoc &loc) {
   }
 }
 
-DeclName Parser::parseUnqualifiedDeclName(bool afterDot,
-                                          DeclNameLoc &loc,
-                                          const Diagnostic &diag,
-                                          bool allowOperators,
-                                          bool allowZeroArgCompoundNames,
-                                          bool allowDeinitAndSubscript) {
+DeclNameRef Parser::parseUnqualifiedDeclBaseName(
+                                                 bool afterDot,
+                                                 DeclNameLoc &loc,
+                                                 const Diagnostic &diag,
+                                                 bool allowOperators,
+                                                 bool allowDeinitAndSubscript) {
   // Consume the base name.
   DeclBaseName baseName;
   SourceLoc baseNameLoc;
@@ -2082,15 +2112,28 @@ DeclName Parser::parseUnqualifiedDeclName(bool afterDot,
     baseName = Context.getIdentifier(Tok.getText());
     checkForInputIncomplete();
     diagnose(Tok, diag);
-    return DeclName();
+    return DeclNameRef();
   }
+
+  loc = DeclNameLoc(baseNameLoc);
+  return DeclNameRef(baseName);
+}
+
+
+DeclNameRef Parser::parseUnqualifiedDeclName(bool afterDot,
+                                             DeclNameLoc &loc,
+                                             const Diagnostic &diag,
+                                             bool allowOperators,
+                                             bool allowZeroArgCompoundNames,
+                                             bool allowDeinitAndSubscript) {
+  // Consume the base name.
+  auto baseName = parseUnqualifiedDeclBaseName(afterDot, loc, diag,
+                                               allowOperators,
+                                               allowDeinitAndSubscript);
 
   // If the next token isn't a following '(', we don't have a compound name.
-  if (!Tok.isFollowingLParen()) {
-    loc = DeclNameLoc(baseNameLoc);
+  if (!baseName || !Tok.isFollowingLParen())
     return baseName;
-  }
-
 
   // If the next token is a ')' then we have a 0-arg compound name. This is
   // explicitly differentiated from "simple" (non-compound) name in DeclName.
@@ -2104,16 +2147,14 @@ DeclName Parser::parseUnqualifiedDeclName(bool afterDot,
           ParsedSyntaxRecorder::makeBlankDeclNameArgumentList(
               leadingTriviaLoc(), *SyntaxContext));
     consumeToken(tok::r_paren);
-    loc = DeclNameLoc(baseNameLoc);
     SmallVector<Identifier, 2> argumentLabels;
-    return DeclName(Context, baseName, argumentLabels);
+    return baseName.withArgumentLabels(Context, argumentLabels);
   }
 
   // If the token after that isn't an argument label or ':', we don't have a
   // compound name.
   if ((!peekToken().canBeArgumentLabel() && !peekToken().is(tok::colon)) ||
       Identifier::isEditorPlaceholder(peekToken().getText())) {
-    loc = DeclNameLoc(baseNameLoc);
     return baseName;
   }
 
@@ -2147,7 +2188,6 @@ DeclName Parser::parseUnqualifiedDeclName(bool afterDot,
 
     // This is not a compound name.
     // FIXME: Could recover better if we "know" it's a compound name.
-    loc = DeclNameLoc(baseNameLoc);
     ArgCtxt.setBackTracking();
     ArgsCtxt.setBackTracking();
     return baseName;
@@ -2161,9 +2201,9 @@ DeclName Parser::parseUnqualifiedDeclName(bool afterDot,
   assert(!argumentLabels.empty() && "Logic above should prevent this");
   assert(argumentLabels.size() == argumentLabelLocs.size());
 
-  loc = DeclNameLoc(Context, baseNameLoc, lparenLoc, argumentLabelLocs,
+  loc = DeclNameLoc(Context, loc.getBaseNameLoc(), lparenLoc, argumentLabelLocs,
                     rparenLoc);
-  return DeclName(Context, baseName, argumentLabels);
+  return baseName.withArgumentLabels(Context, argumentLabels);
 }
 
 ///   expr-identifier:
@@ -2176,8 +2216,8 @@ Expr *Parser::parseExprIdentifier() {
 
   // Parse the unqualified-decl-name.
   DeclNameLoc loc;
-  DeclName name = parseUnqualifiedDeclName(/*afterDot=*/false, loc,
-                                           diag::expected_expr);
+  DeclNameRef name = parseUnqualifiedDeclName(/*afterDot=*/false, loc,
+                                              diag::expected_expr);
 
   SmallVector<TypeRepr*, 8> args;
   SourceLoc LAngleLoc, RAngleLoc;
@@ -2215,7 +2255,7 @@ Expr *Parser::parseExprIdentifier() {
       }
     } else {
       for (auto activeVar : DisabledVars) {
-        if (activeVar->getFullName() == name) {
+        if (activeVar->getFullName() == name.getFullName()) {
           diagnose(loc.getBaseNameLoc(), DisabledVarReason);
           return new (Context) ErrorExpr(loc.getSourceRange());
         }
@@ -2239,8 +2279,7 @@ Expr *Parser::parseExprIdentifier() {
     // global or local declarations here.
     assert(!TD->getDeclContext()->isTypeContext() ||
            isa<GenericTypeParamDecl>(TD));
-    E = TypeExpr::createForDecl(loc.getBaseNameLoc(), TD, /*DC*/nullptr,
-                                /*implicit*/false);
+    E = TypeExpr::createForDecl(loc, TD, /*DC*/nullptr, /*implicit*/false);
   } else {
     E = new (Context) DeclRefExpr(D, loc, /*Implicit=*/false);
   }
@@ -2857,8 +2896,8 @@ Expr *Parser::parseExprAnonClosureArg() {
     if (Context.LangOpts.DebuggerSupport) {
       auto refKind = DeclRefKind::Ordinary;
       auto identifier = Context.getIdentifier(Name);
-      return new (Context) UnresolvedDeclRefExpr(DeclName(identifier), refKind,
-                                                 DeclNameLoc(Loc));
+      return new (Context) UnresolvedDeclRefExpr(DeclNameRef(identifier),
+                                                 refKind, DeclNameLoc(Loc));
     }
     diagnose(Loc, diag::anon_closure_arg_not_in_closure);
     return new (Context) ErrorExpr(Loc);
@@ -2991,17 +3030,18 @@ ParserStatus Parser::parseExprList(tok leftTok, tok rightTok,
     if (Tok.isBinaryOperator() && peekToken().isAny(rightTok, tok::comma)) {
       SyntaxParsingContext operatorContext(SyntaxContext,
                                            SyntaxKind::IdentifierExpr);
-      SourceLoc Loc;
-      Identifier OperName;
-      if (parseAnyIdentifier(OperName, Loc, diag::expected_operator_ref)) {
+      DeclNameLoc Loc;
+      auto OperName = parseUnqualifiedDeclBaseName(/*afterDot=*/false, Loc,
+                                                   diag::expected_operator_ref,
+                                                   /*allowOperators=*/true);
+      if (!OperName) {
         return makeParserError();
       }
       // Bypass local lookup. Use an 'Ordinary' reference kind so that the
       // reference may resolve to any unary or binary operator based on
       // context.
       SubExpr = new(Context) UnresolvedDeclRefExpr(OperName,
-                                                   DeclRefKind::Ordinary,
-                                                   DeclNameLoc(Loc));
+                                                   DeclRefKind::Ordinary, Loc);
     } else if (isPostfix && Tok.is(tok::code_complete)) {
       // Handle call arguments specially because it may need argument labels.
       auto CCExpr = new (Context) CodeCompletionExpr(Tok.getLoc());

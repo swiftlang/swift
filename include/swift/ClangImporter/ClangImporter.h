@@ -362,7 +362,7 @@ public:
 
   void verifyAllModules() override;
 
-  clang::TargetInfo &getTargetInfo() const;
+  clang::TargetInfo &getTargetInfo() const override;
   clang::ASTContext &getClangASTContext() const override;
   clang::Preprocessor &getClangPreprocessor() const override;
   clang::Sema &getClangSema() const override;

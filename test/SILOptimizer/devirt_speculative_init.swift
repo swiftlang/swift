@@ -23,7 +23,7 @@ public func make(type: Cat.Type, cats: Int) {
 }
 
 // CHECK-LABEL: sil @$s23devirt_speculative_init4make4type4catsyAA3CatCm_SitF : $@convention(thin) (@thick Cat.Type, Int) -> ()
-// CHECK:   checked_cast_br [exact] %0 : $@thick Cat.Type to $@thick Cat.Type, bb2, bb3
+// CHECK:   checked_cast_br [exact] %0 : $@thick Cat.Type to @thick Cat.Type, bb2, bb3
 // CHECK: bb1:
 // CHECK:   return
 // CHECK: bb2({{%.*}} : $@thick Cat.Type):

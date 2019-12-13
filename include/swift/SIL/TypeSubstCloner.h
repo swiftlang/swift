@@ -257,8 +257,8 @@ protected:
     SILLocation loc = getOpLocation(inst->getLoc());
     SILValue src = getOpValue(inst->getSrc());
     SILValue dest = getOpValue(inst->getDest());
-    CanType sourceType = getOpASTType(inst->getSourceType());
-    CanType targetType = getOpASTType(inst->getTargetType());
+    CanType sourceType = getOpASTType(inst->getSourceFormalType());
+    CanType targetType = getOpASTType(inst->getTargetFormalType());
     SILBasicBlock *succBB = getOpBasicBlock(inst->getSuccessBB());
     SILBasicBlock *failBB = getOpBasicBlock(inst->getFailureBB());
 

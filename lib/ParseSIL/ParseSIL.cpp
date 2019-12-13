@@ -15,6 +15,7 @@
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckRequests.h"
@@ -140,7 +141,7 @@ static bool parseIntoSourceFileImpl(SourceFile &SF,
   if (SIL)
     DelayBodyParsing = false;
 
-  SharedTimer timer("Parsing");
+  FrontendStatsTracer tracer(SF.getASTContext().Stats, "Parsing");
   Parser P(BufferID, SF, SIL ? SIL->Impl.get() : nullptr,
            PersistentState, STreeCreator, DelayBodyParsing);
   PrettyStackTraceParser StackTrace(P);
@@ -901,7 +902,7 @@ namespace {
     bool walkToTypeReprPre(TypeRepr *Ty) override {
       auto *T = dyn_cast_or_null<IdentTypeRepr>(Ty);
       auto Comp = T->getComponentRange().front();
-      if (auto Entry = P.lookupInScope(Comp->getIdentifier()))
+      if (auto Entry = P.lookupInScope(Comp->getNameRef()))
         if (auto *TD = dyn_cast<TypeDecl>(Entry)) {
           Comp->setValue(TD, nullptr);
           return false;
@@ -1181,14 +1182,16 @@ lookupTopDecl(Parser &P, DeclBaseName Name, bool typeLookup) {
   llvm::SaveAndRestore<SourceFile::ASTStage_t> ASTStage(P.SF.ASTStage,
                                                         SourceFile::Parsed);
 
-  UnqualifiedLookup::Options options;
+  UnqualifiedLookupOptions options;
   if (typeLookup)
-    options |= UnqualifiedLookup::Flags::TypeLookup;
+    options |= UnqualifiedLookupFlags::TypeLookup;
 
-  UnqualifiedLookup DeclLookup(Name, &P.SF, SourceLoc(), options);
-  assert(DeclLookup.isSuccess() && DeclLookup.Results.size() == 1);
-  ValueDecl *VD = DeclLookup.Results.back().getValueDecl();
-  return VD;
+  auto &ctx = P.SF.getASTContext();
+  auto descriptor = UnqualifiedLookupDescriptor(DeclNameRef(Name), &P.SF);
+  auto lookup = evaluateOrDefault(ctx.evaluator,
+                                  UnqualifiedLookupRequest{descriptor}, {});
+  assert(lookup.size() == 1);
+  return lookup.back().getValueDecl();
 }
 
 /// Find the ValueDecl given an interface type and a member name.
@@ -1269,7 +1272,8 @@ bool SILParser::parseSILType(SILType &Result,
   if (IsFuncDecl && !attrs.has(TAK_convention)) {
     // Use a random location.
     attrs.setAttr(TAK_convention, P.PreviousLoc);
-    attrs.convention = "thin";
+    attrs.ConventionArguments =
+      TypeAttributes::Convention::makeSwiftConvention("thin");
   }
 
   ParserResult<TypeRepr> TyR = P.parseType(diag::expected_sil_type,
@@ -1699,7 +1703,7 @@ static void bindProtocolSelfInTypeRepr(TypeLoc &TL, ProtocolDecl *proto) {
       virtual bool walkToTypeReprPre(TypeRepr *T) override {
         if (auto ident = dyn_cast<IdentTypeRepr>(T)) {
           auto firstComponent = ident->getComponentRange().front();
-          if (firstComponent->getIdentifier() == selfId)
+          if (firstComponent->getNameRef().isSimpleName(selfId))
             firstComponent->setValue(selfParam, proto);
         }
 
@@ -3172,9 +3176,6 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     SmallVector<SILValue, 4> operands;
     
     if (P.consumeIf(tok::l_paren)) {
-      Lowering::GenericContextScope scope(SILMod.Types,
-        patternEnv ? patternEnv->getGenericSignature()->getCanonicalSignature()
-                   : nullptr);
       while (true) {
         SILValue v;
         
@@ -3438,23 +3439,39 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
         InstLoc, SourceAddr, SourceType, DestAddr, TargetType);
     break;
 
-  case SILInstructionKind::UnconditionalCheckedCastValueInst:
-    if (parseTypedValueRef(Val, B) || parseVerbatim("to") || parseSILType(Ty)
+  case SILInstructionKind::UnconditionalCheckedCastValueInst: {
+    if (parseASTType(SourceType)
+        || parseVerbatim("in")
+        || parseTypedValueRef(Val, B)
+        || parseVerbatim("to")
+        || parseASTType(TargetType)
         || parseSILDebugLocation(InstLoc, B))
       return true;
 
-    ResultVal = B.createUnconditionalCheckedCastValue(InstLoc, Val, Ty);
+    auto opaque = Lowering::AbstractionPattern::getOpaque();
+    ResultVal =
+      B.createUnconditionalCheckedCastValue(InstLoc,
+                                            Val, SourceType,
+                                            F->getLoweredType(opaque, TargetType),
+                                            TargetType);
     break;
+  }
 
-  case SILInstructionKind::UnconditionalCheckedCastInst:
-    if (parseTypedValueRef(Val, B) || parseVerbatim("to") || parseSILType(Ty))
+  case SILInstructionKind::UnconditionalCheckedCastInst: {
+    if (parseTypedValueRef(Val, B) || parseVerbatim("to")
+        || parseASTType(TargetType))
       return true;
 
     if (parseSILDebugLocation(InstLoc, B))
       return true;
 
-    ResultVal = B.createUnconditionalCheckedCast(InstLoc, Val, Ty);
+    auto opaque = Lowering::AbstractionPattern::getOpaque();
+    ResultVal =
+      B.createUnconditionalCheckedCast(InstLoc, Val,
+                                       F->getLoweredType(opaque, TargetType),
+                                       TargetType);
     break;
+  }
 
   case SILInstructionKind::CheckedCastBranchInst: {
     bool isExact = false;
@@ -3462,25 +3479,36 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
         parseSILOptional(isExact, *this, "exact"))
       return true;
 
-    if (parseTypedValueRef(Val, B) || parseVerbatim("to") || parseSILType(Ty)
+    if (parseTypedValueRef(Val, B) || parseVerbatim("to")
+        || parseASTType(TargetType)
         || parseConditionalBranchDestinations())
       return true;
 
+    auto opaque = Lowering::AbstractionPattern::getOpaque();
     ResultVal = B.createCheckedCastBranch(
-        InstLoc, isExact, Val, Ty,
+        InstLoc, isExact, Val,
+        F->getLoweredType(opaque, TargetType), TargetType,
         getBBForReference(SuccessBBName, SuccessBBLoc),
         getBBForReference(FailureBBName, FailureBBLoc));
     break;
   }
-  case SILInstructionKind::CheckedCastValueBranchInst:
-    if (parseTypedValueRef(Val, B) || parseVerbatim("to") || parseSILType(Ty)
+  case SILInstructionKind::CheckedCastValueBranchInst: {
+    if (parseASTType(SourceType)
+        || parseVerbatim("in")
+        || parseTypedValueRef(Val, B)
+        || parseVerbatim("to")
+        || parseASTType(TargetType)
         || parseConditionalBranchDestinations())
       return true;
 
+    auto opaque = Lowering::AbstractionPattern::getOpaque();
     ResultVal = B.createCheckedCastValueBranch(
-        InstLoc, Val, Ty, getBBForReference(SuccessBBName, SuccessBBLoc),
+        InstLoc, Val, SourceType,
+        F->getLoweredType(opaque, TargetType), TargetType,
+        getBBForReference(SuccessBBName, SuccessBBLoc),
         getBBForReference(FailureBBName, FailureBBLoc));
     break;
+  }
 
   case SILInstructionKind::MarkUninitializedInst: {
     if (P.parseToken(tok::l_square, diag::expected_tok_in_sil_instr, "["))

@@ -541,6 +541,35 @@ struct SR_11603 {
   }
 }
 
+// rdar://problem/57545381 - crash due to inconsistent decision about whether
+// to initialize a wrapper property with an instance of the wrapper type vs.
+// the wrapped type.
+@propertyWrapper
+class WrappedInt {
+  var intValue: Int?
+
+  var wrappedValue: Int? {
+    get {
+      return intValue
+    }
+    set {
+      intValue = newValue
+    }
+  }
+
+  init() { }
+
+  init(wrappedValue: Int?) {
+    self.wrappedValue = wrappedValue
+  }
+}
+
+struct WrappedIntContainer {
+  // CHECK: sil hidden [ossa] @$s17property_wrappers19WrappedIntContainerV3intAcA0cD0C_tcfcfA_ : $@convention(thin) () -> @owned WrappedInt
+  @WrappedInt var int: Int?
+}
+
+
 // CHECK-LABEL: sil_vtable ClassUsingWrapper {
 // CHECK-NEXT:  #ClassUsingWrapper.x!getter.1: (ClassUsingWrapper) -> () -> Int : @$s17property_wrappers17ClassUsingWrapperC1xSivg   // ClassUsingWrapper.x.getter
 // CHECK-NEXT:  #ClassUsingWrapper.x!setter.1: (ClassUsingWrapper) -> (Int) -> () : @$s17property_wrappers17ClassUsingWrapperC1xSivs // ClassUsingWrapper.x.setter

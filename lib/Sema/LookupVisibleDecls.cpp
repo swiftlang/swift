@@ -993,8 +993,8 @@ static void lookupVisibleDynamicMemberLookupDecls(
   auto &ctx = dc->getASTContext();
 
   // Lookup the `subscript(dynamicMember:)` methods in this type.
-  auto subscriptName =
-      DeclName(ctx, DeclBaseName::createSubscript(), ctx.Id_dynamicMember);
+  DeclNameRef subscriptName(
+      { ctx, DeclBaseName::createSubscript(), { ctx.Id_dynamicMember} });
 
   SmallVector<ValueDecl *, 2> subscripts;
   dc->lookupQualified(baseType, subscriptName, NL_QualifiedDefault,
@@ -1208,11 +1208,11 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
     bool isUsableValue(ValueDecl *VD, DeclVisibilityKind Reason) {
 
       // Check "use within its own initial value" case.
-      if (auto *varD = dyn_cast<VarDecl>(VD))
-        if (auto *PBD = varD->getParentPatternBinding())
-          if (!PBD->isImplicit() &&
-              SM.rangeContainsTokenLoc(PBD->getSourceRange(), Loc))
+      if (auto *varD = dyn_cast<VarDecl>(VD)) {
+        if (auto *initExpr = varD->getParentInitializer())
+          if (SM.rangeContainsTokenLoc(initExpr->getSourceRange(), Loc))
             return false;
+      }
 
       switch (Reason) {
       case DeclVisibilityKind::LocalVariable:

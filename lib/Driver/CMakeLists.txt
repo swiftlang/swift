@@ -1,10 +1,12 @@
 set(swiftDriver_sources
   Action.cpp
+  CoarseGrainedDependencyGraph.cpp
   Compilation.cpp
   DarwinToolChains.cpp
-  DependencyGraph.cpp
+  SourceComparator.cpp
   Driver.cpp
-  ExperimentalDependencyDriverGraph.cpp
+  DriverIncrementalRanges.cpp
+  FineGrainedDependencyDriverGraph.cpp
   FrontendUtil.cpp
   Job.cpp
   ParseableOutput.cpp

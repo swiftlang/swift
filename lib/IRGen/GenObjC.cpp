@@ -1111,52 +1111,53 @@ static llvm::Constant *getObjCEncodingForMethodType(IRGenModule &IGM,
 
 /// Emit the components of an Objective-C method descriptor: its selector,
 /// type encoding, and IMP pointer.
-SILFunction *irgen::emitObjCMethodDescriptorParts(IRGenModule &IGM,
-                                                  AbstractFunctionDecl *method,
-                                                  bool concrete,
-                                                  llvm::Constant *&selectorRef,
-                                                  llvm::Constant *&atEncoding,
-                                                  llvm::Constant *&impl) {
+ObjCMethodDescriptor
+irgen::emitObjCMethodDescriptorParts(IRGenModule &IGM,
+                                     AbstractFunctionDecl *method,
+                                     bool concrete) {
+  ObjCMethodDescriptor descriptor{};
   Selector selector(method);
   
   /// The first element is the selector.
-  selectorRef = IGM.getAddrOfObjCMethodName(selector.str());
+  descriptor.selectorRef = IGM.getAddrOfObjCMethodName(selector.str());
   
   /// The second element is the method signature. A method signature is made of
   /// the return type @encoding and every parameter type @encoding, glued with
   /// numbers that used to represent stack offsets for each of these elements.
   CanSILFunctionType methodType = getObjCMethodType(IGM, method);
-  atEncoding = getObjCEncodingForMethodType(IGM, methodType, /*extended*/false);
+  descriptor.typeEncoding = getObjCEncodingForMethodType(IGM, methodType, /*extended*/false);
   
   /// The third element is the method implementation pointer.
   if (!concrete) {
-    impl = nullptr;
-    return nullptr;
+    descriptor.impl = nullptr;
+    descriptor.silFunction = nullptr;
+    return descriptor;
   }
-  SILFunction *silFn = nullptr;
+  descriptor.silFunction = nullptr;
+
   if (auto func = dyn_cast<FuncDecl>(method))
-    impl = getObjCMethodPointer(IGM, func, silFn);
+    descriptor.impl = getObjCMethodPointer(IGM, func, descriptor.silFunction);
   else if (auto ctor = dyn_cast<ConstructorDecl>(method))
-    impl = getObjCMethodPointer(IGM, ctor, silFn);
+    descriptor.impl = getObjCMethodPointer(IGM, ctor, descriptor.silFunction);
   else
-    impl = getObjCMethodPointer(IGM, cast<DestructorDecl>(method), silFn);
-  return silFn;
+    descriptor.impl = getObjCMethodPointer(IGM, cast<DestructorDecl>(method),
+                                           descriptor.silFunction);
+  return descriptor;
 }
 
 /// Emit the components of an Objective-C method descriptor for a
 /// property getter method.
-SILFunction *irgen::emitObjCGetterDescriptorParts(IRGenModule &IGM,
-                                                  VarDecl *property,
-                                                  llvm::Constant *&selectorRef,
-                                                  llvm::Constant *&atEncoding,
-                                                  llvm::Constant *&impl) {
+ObjCMethodDescriptor
+irgen::emitObjCGetterDescriptorParts(IRGenModule &IGM, VarDecl *property) {
   Selector getterSel(property, Selector::ForGetter);
-  selectorRef = IGM.getAddrOfObjCMethodName(getterSel.str());
+  ObjCMethodDescriptor descriptor{};
+  descriptor.selectorRef = IGM.getAddrOfObjCMethodName(getterSel.str());
   
   auto clangType = getObjCPropertyType(IGM, property);
   if (clangType.isNull()) {
-    atEncoding = llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
-    return nullptr;
+    descriptor.typeEncoding = llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
+    descriptor.silFunction = nullptr;
+    return descriptor;
   }
 
   auto &clangASTContext = IGM.getClangASTContext();
@@ -1169,58 +1170,53 @@ SILFunction *irgen::emitObjCGetterDescriptorParts(IRGenModule &IGM,
   TypeStr += llvm::itostr(ParmOffset);
   TypeStr += "@0:";
   TypeStr += llvm::itostr(PtrSize.getValue());
-  atEncoding = IGM.getAddrOfGlobalString(TypeStr.c_str());
-  SILFunction *silFn = nullptr;
-  impl = getObjCGetterPointer(IGM, property, silFn);
-  return silFn;
+  descriptor.typeEncoding = IGM.getAddrOfGlobalString(TypeStr.c_str());
+  descriptor.silFunction = nullptr;
+  descriptor.impl = getObjCGetterPointer(IGM, property, descriptor.silFunction);
+  return descriptor;
 }
 
 /// Emit the components of an Objective-C method descriptor for a
 /// subscript getter method.
-SILFunction *irgen::emitObjCGetterDescriptorParts(IRGenModule &IGM,
-                                                  SubscriptDecl *subscript,
-                                                  llvm::Constant *&selectorRef,
-                                                  llvm::Constant *&atEncoding,
-                                                  llvm::Constant *&impl) {
+ObjCMethodDescriptor
+irgen::emitObjCGetterDescriptorParts(IRGenModule &IGM,
+                                     SubscriptDecl *subscript) {
   Selector getterSel(subscript, Selector::ForGetter);
-  selectorRef = IGM.getAddrOfObjCMethodName(getterSel.str());
+  ObjCMethodDescriptor descriptor{};
+  descriptor.selectorRef = IGM.getAddrOfObjCMethodName(getterSel.str());
   auto methodTy = getObjCMethodType(IGM,
                               subscript->getOpaqueAccessor(AccessorKind::Get));
-  atEncoding = getObjCEncodingForMethodType(IGM, methodTy, /*extended*/false);
-  SILFunction *silFn = nullptr;
-  impl = getObjCGetterPointer(IGM, subscript, silFn);
-  return silFn;
+  descriptor.typeEncoding = getObjCEncodingForMethodType(IGM, methodTy,
+                                                         /*extended*/false);
+  descriptor.silFunction = nullptr;
+  descriptor.impl = getObjCGetterPointer(IGM, subscript,
+                                         descriptor.silFunction);
+  return descriptor;
 }
 
-SILFunction *irgen::emitObjCGetterDescriptorParts(IRGenModule &IGM,
-                                                  AbstractStorageDecl *decl,
-                                                  llvm::Constant *&selectorRef,
-                                                  llvm::Constant *&atEncoding,
-                                                  llvm::Constant *&impl) {
+ObjCMethodDescriptor
+irgen::emitObjCGetterDescriptorParts(IRGenModule &IGM,
+                                     AbstractStorageDecl *decl) {
   if (auto sub = dyn_cast<SubscriptDecl>(decl)) {
-    return emitObjCGetterDescriptorParts(IGM, sub,
-                                         selectorRef, atEncoding, impl);
+    return emitObjCGetterDescriptorParts(IGM, sub);
   }
   if (auto var = dyn_cast<VarDecl>(decl)) {
-    return emitObjCGetterDescriptorParts(IGM, var,
-                                         selectorRef, atEncoding, impl);
+    return emitObjCGetterDescriptorParts(IGM, var);
   }
   llvm_unreachable("unknown storage!");
-  return nullptr;
 }
 
 /// Emit the components of an Objective-C method descriptor for a
 /// property getter method.
-SILFunction *irgen::emitObjCSetterDescriptorParts(IRGenModule &IGM,
-                                                  VarDecl *property,
-                                                  llvm::Constant *&selectorRef,
-                                                  llvm::Constant *&atEncoding,
-                                                  llvm::Constant *&impl) {
+ObjCMethodDescriptor
+irgen::emitObjCSetterDescriptorParts(IRGenModule &IGM,
+                                     VarDecl *property) {
   assert(property->isSettable(property->getDeclContext()) &&
          "not a settable property?!");
 
   Selector setterSel(property, Selector::ForSetter);
-  selectorRef = IGM.getAddrOfObjCMethodName(setterSel.str());
+  ObjCMethodDescriptor descriptor{};
+  descriptor.selectorRef = IGM.getAddrOfObjCMethodName(setterSel.str());
   
   auto &clangASTContext = IGM.getClangASTContext();
   std::string TypeStr;
@@ -1232,8 +1228,9 @@ SILFunction *irgen::emitObjCSetterDescriptorParts(IRGenModule &IGM,
 
   clangType = getObjCPropertyType(IGM, property);
   if (clangType.isNull()) {
-    atEncoding = llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
-    return nullptr;
+    descriptor.typeEncoding = llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
+    descriptor.silFunction = nullptr;
+    return descriptor;
   }
   clang::CharUnits sz = clangASTContext.getObjCEncodingTypeSize(clangType);
   if (!sz.isZero())
@@ -1244,57 +1241,64 @@ SILFunction *irgen::emitObjCSetterDescriptorParts(IRGenModule &IGM,
   ParmOffset = 2 * PtrSize.getValue();
   clangASTContext.getObjCEncodingForType(clangType, TypeStr);
   TypeStr += llvm::itostr(ParmOffset);
-  atEncoding = IGM.getAddrOfGlobalString(TypeStr.c_str());
-  SILFunction *silFn = nullptr;
-  impl = getObjCSetterPointer(IGM, property, silFn);
-  return silFn;
+  descriptor.typeEncoding = IGM.getAddrOfGlobalString(TypeStr.c_str());
+  descriptor.silFunction = nullptr;
+  descriptor.impl = getObjCSetterPointer(IGM, property, descriptor.silFunction);
+  return descriptor;
 }
 
 /// Emit the components of an Objective-C method descriptor for a
 /// subscript getter method.
-SILFunction *irgen::emitObjCSetterDescriptorParts(IRGenModule &IGM,
-                                                  SubscriptDecl *subscript,
-                                                  llvm::Constant *&selectorRef,
-                                                  llvm::Constant *&atEncoding,
-                                                  llvm::Constant *&impl) {
+ObjCMethodDescriptor
+irgen::emitObjCSetterDescriptorParts(IRGenModule &IGM,
+                                     SubscriptDecl *subscript) {
   assert(subscript->supportsMutation() && "not a settable subscript?!");
 
   Selector setterSel(subscript, Selector::ForSetter);
-  selectorRef = IGM.getAddrOfObjCMethodName(setterSel.str());
+  ObjCMethodDescriptor descriptor{};
+  descriptor.selectorRef = IGM.getAddrOfObjCMethodName(setterSel.str());
   auto methodTy = getObjCMethodType(IGM,
                               subscript->getOpaqueAccessor(AccessorKind::Set));
-  atEncoding = getObjCEncodingForMethodType(IGM, methodTy, /*extended*/false);
-  SILFunction *silFn = nullptr;
-  impl = getObjCSetterPointer(IGM, subscript, silFn);
-  return silFn;
+  descriptor.typeEncoding = getObjCEncodingForMethodType(IGM, methodTy,
+                                                         /*extended*/false);
+  descriptor.silFunction = nullptr;
+  descriptor.impl = getObjCSetterPointer(IGM, subscript,
+                                         descriptor.silFunction);
+  return descriptor;
 }
 
-SILFunction *irgen::emitObjCSetterDescriptorParts(IRGenModule &IGM,
-                                                  AbstractStorageDecl *decl,
-                                                  llvm::Constant *&selectorRef,
-                                                  llvm::Constant *&atEncoding,
-                                                  llvm::Constant *&impl) {
+ObjCMethodDescriptor
+irgen::emitObjCSetterDescriptorParts(IRGenModule &IGM,
+                                     AbstractStorageDecl *decl) {
   if (auto sub = dyn_cast<SubscriptDecl>(decl)) {
-    return emitObjCSetterDescriptorParts(IGM, sub,
-                                         selectorRef, atEncoding, impl);
+    return emitObjCSetterDescriptorParts(IGM, sub);
   }
   if (auto var = dyn_cast<VarDecl>(decl)) {
-    return emitObjCSetterDescriptorParts(IGM, var,
-                                         selectorRef, atEncoding, impl);
+    return emitObjCSetterDescriptorParts(IGM, var);
   }
   llvm_unreachable("unknown storage!");
-  return nullptr;
 }
 
 static void buildMethodDescriptor(ConstantArrayBuilder &descriptors,
-                                  llvm::Constant *selectorRef,
-                                  llvm::Constant *atEncoding,
-                                  llvm::Constant *impl) {
+                                  ObjCMethodDescriptor &parts) {
   auto descriptor = descriptors.beginStruct();
-  descriptor.add(selectorRef);
-  descriptor.add(atEncoding);
-  descriptor.add(impl);
+  descriptor.add(parts.selectorRef);
+  descriptor.add(parts.typeEncoding);
+  descriptor.add(parts.impl);
   descriptor.finishAndAddTo(descriptors);
+}
+
+static void emitObjCDescriptor(IRGenModule &IGM,
+                               ConstantArrayBuilder &descriptors,
+                               ObjCMethodDescriptor &descriptor) {
+  buildMethodDescriptor(descriptors, descriptor);
+  auto *silFn = descriptor.silFunction;
+  if (silFn && silFn->hasObjCReplacement()) {
+    auto replacedSelector =
+      IGM.getAddrOfObjCMethodName(silFn->getObjCReplacement().str());
+    descriptor.selectorRef = replacedSelector;
+    buildMethodDescriptor(descriptors, descriptor);
+  }
 }
 
 /// Emit an Objective-C method descriptor for the given method.
@@ -1306,16 +1310,9 @@ static void buildMethodDescriptor(ConstantArrayBuilder &descriptors,
 void irgen::emitObjCMethodDescriptor(IRGenModule &IGM,
                                      ConstantArrayBuilder &descriptors,
                                      AbstractFunctionDecl *method) {
-  llvm::Constant *selectorRef, *atEncoding, *impl;
-  auto silFn = emitObjCMethodDescriptorParts(IGM, method, /*concrete*/ true,
-                                             selectorRef, atEncoding, impl);
-  buildMethodDescriptor(descriptors, selectorRef, atEncoding, impl);
-
-  if (silFn && silFn->hasObjCReplacement()) {
-    auto replacedSelector =
-        IGM.getAddrOfObjCMethodName(silFn->getObjCReplacement().str());
-    buildMethodDescriptor(descriptors, replacedSelector, atEncoding, impl);
-  }
+  ObjCMethodDescriptor descriptor(
+    emitObjCMethodDescriptorParts(IGM, method, /*concrete*/ true));
+  emitObjCDescriptor(IGM, descriptors, descriptor);
 }
 
 void irgen::emitObjCIVarInitDestroyDescriptor(IRGenModule &IGM,
@@ -1330,7 +1327,8 @@ void irgen::emitObjCIVarInitDestroyDescriptor(IRGenModule &IGM,
                                   1, 
                                   /*foreign*/ true);
   Selector selector(declRef);
-  auto selectorRef = IGM.getAddrOfObjCMethodName(selector.str());
+  ObjCMethodDescriptor descriptor{};
+  descriptor.selectorRef = IGM.getAddrOfObjCMethodName(selector.str());
   
   /// The second element is the method signature. A method signature is made of
   /// the return type @encoding and every parameter type @encoding, glued with
@@ -1338,13 +1336,13 @@ void irgen::emitObjCIVarInitDestroyDescriptor(IRGenModule &IGM,
   auto ptrSize = IGM.getPointerSize().getValue();
   llvm::SmallString<8> signature;
   signature = "v" + llvm::itostr(ptrSize * 2) + "@0:" + llvm::itostr(ptrSize);
-  auto atEncoding = IGM.getAddrOfGlobalString(signature);
+  descriptor.typeEncoding = IGM.getAddrOfGlobalString(signature);
 
   /// The third element is the method implementation pointer.
-  auto impl = llvm::ConstantExpr::getBitCast(objcImpl, IGM.Int8PtrTy);
+  descriptor.impl = llvm::ConstantExpr::getBitCast(objcImpl, IGM.Int8PtrTy);
 
   // Form the method_t instance.
-  buildMethodDescriptor(descriptors, selectorRef, atEncoding, impl);
+  buildMethodDescriptor(descriptors, descriptor);
 }
 
 llvm::Constant *
@@ -1369,29 +1367,15 @@ irgen::getBlockTypeExtendedEncoding(IRGenModule &IGM,
 void irgen::emitObjCGetterDescriptor(IRGenModule &IGM,
                                      ConstantArrayBuilder &descriptors,
                                      AbstractStorageDecl *storage) {
-  llvm::Constant *selectorRef, *atEncoding, *impl;
-  auto *silFn = emitObjCGetterDescriptorParts(IGM, storage,
-                                              selectorRef, atEncoding, impl);
-  buildMethodDescriptor(descriptors, selectorRef, atEncoding, impl);
-  if (silFn && silFn->hasObjCReplacement()) {
-    auto replacedSelector =
-        IGM.getAddrOfObjCMethodName(silFn->getObjCReplacement().str());
-    buildMethodDescriptor(descriptors, replacedSelector, atEncoding, impl);
-  }
+  ObjCMethodDescriptor descriptor(emitObjCGetterDescriptorParts(IGM, storage));
+  emitObjCDescriptor(IGM, descriptors, descriptor);
 }
 
 void irgen::emitObjCSetterDescriptor(IRGenModule &IGM,
                                      ConstantArrayBuilder &descriptors,
                                      AbstractStorageDecl *storage) {
-  llvm::Constant *selectorRef, *atEncoding, *impl;
-  auto *silFn = emitObjCSetterDescriptorParts(IGM, storage,
-                                              selectorRef, atEncoding, impl);
-  buildMethodDescriptor(descriptors, selectorRef, atEncoding, impl);
-  if (silFn && silFn->hasObjCReplacement()) {
-    auto replacedSelector =
-        IGM.getAddrOfObjCMethodName(silFn->getObjCReplacement().str());
-    buildMethodDescriptor(descriptors, replacedSelector, atEncoding, impl);
-  }
+  ObjCMethodDescriptor descriptor(emitObjCSetterDescriptorParts(IGM, storage));
+  emitObjCDescriptor(IGM, descriptors, descriptor);
 }
 
 bool irgen::requiresObjCMethodDescriptor(FuncDecl *method) {

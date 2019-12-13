@@ -306,7 +306,7 @@ func downcast(_ obj: AnyObject) -> X {
   // CHECK:   store [[OBJ_COPY]] to [init] [[PBOBJ]] : $*AnyObject
   // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[PBOBJ]]
   // CHECK:   [[OBJ:%[0-9]+]] = load [copy] [[READ]] : $*AnyObject
-  // CHECK:   [[X:%[0-9]+]] = unconditional_checked_cast [[OBJ]] : $AnyObject to $X
+  // CHECK:   [[X:%[0-9]+]] = unconditional_checked_cast [[OBJ]] : $AnyObject to X
   // CHECK:   destroy_value [[OBJ_BOX]] : ${ var AnyObject }
   // CHECK:   return [[X]] : $X
   return obj as! X

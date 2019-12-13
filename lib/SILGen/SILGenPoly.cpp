@@ -404,7 +404,7 @@ ManagedValue Transform::transform(ManagedValue v,
     // If the conversion is trivial, just cast.
     if (SGF.SGM.Types.checkForABIDifferences(SGF.SGM.M,
                                              v.getType(), loweredResultTy)
-          == TypeConverter::ABIDifference::Trivial) {
+          == TypeConverter::ABIDifference::CompatibleRepresentation) {
       if (v.getType().isAddress())
         return SGF.B.createUncheckedAddrCast(Loc, v, loweredResultTy);
       return SGF.B.createUncheckedBitCast(Loc, v, loweredResultTy);
@@ -2992,8 +2992,10 @@ CanSILFunctionType SILGenFunction::buildThunkType(
     SubstitutionMap &interfaceSubs,
     CanType &dynamicSelfType,
     bool withoutActuallyEscaping) {
-  assert(!expectedType->isPolymorphic());
-  assert(!sourceType->isPolymorphic());
+  // We shouldn't be thunking generic types here, and substituted function types
+  // ought to have their substitutions applied before we get here.
+  assert(!expectedType->isPolymorphic() && !expectedType->getSubstitutions());
+  assert(!sourceType->isPolymorphic() && !sourceType->getSubstitutions());
 
   // Can't build a thunk without context, so we require ownership semantics
   // on the result type.
@@ -3187,8 +3189,22 @@ static ManagedValue createThunk(SILGenFunction &SGF,
                                 AbstractionPattern outputOrigType,
                                 CanAnyFunctionType outputSubstType,
                                 const TypeLowering &expectedTL) {
-  auto sourceType = fn.getType().castTo<SILFunctionType>();
-  auto expectedType = expectedTL.getLoweredType().castTo<SILFunctionType>();
+  auto substSourceType = fn.getType().castTo<SILFunctionType>();
+  auto substExpectedType = expectedTL.getLoweredType().castTo<SILFunctionType>();
+  
+  // Apply substitutions in the source and destination types, since the thunk
+  // doesn't change because of different function representations.
+  CanSILFunctionType sourceType;
+  if (substSourceType->getSubstitutions()) {
+    sourceType = substSourceType->getUnsubstitutedType(SGF.SGM.M);
+    fn = SGF.B.createConvertFunction(loc, fn,
+                                   SILType::getPrimitiveObjectType(sourceType));
+  } else {
+    sourceType = substSourceType;
+  }
+  
+  auto expectedType = substExpectedType
+    ->getUnsubstitutedType(SGF.SGM.M);
 
   // We can't do bridging here.
   assert(expectedType->getLanguage() ==
@@ -3231,14 +3247,22 @@ static ManagedValue createThunk(SILGenFunction &SGF,
     createPartialApplyOfThunk(SGF, loc, thunk, interfaceSubs, dynamicSelfType,
                               toType, fn.ensurePlusOne(SGF, loc));
 
-  if (!expectedType->isNoEscape()) {
+  // Convert to the substituted result type.
+  if (expectedType != substExpectedType) {
+    auto substEscapingExpectedType = substExpectedType
+      ->getWithExtInfo(substExpectedType->getExtInfo().withNoEscape(false));
+    thunkedFn = SGF.B.createConvertFunction(loc, thunkedFn,
+                    SILType::getPrimitiveObjectType(substEscapingExpectedType));
+  }
+  
+  if (!substExpectedType->isNoEscape()) {
     return thunkedFn;
   }
 
   // Handle the escaping to noescape conversion.
-  assert(expectedType->isNoEscape());
+  assert(substExpectedType->isNoEscape());
   return SGF.B.createConvertEscapeToNoEscape(
-      loc, thunkedFn, SILType::getPrimitiveObjectType(expectedType));
+      loc, thunkedFn, SILType::getPrimitiveObjectType(substExpectedType));
 }
 
 static CanSILFunctionType buildWithoutActuallyEscapingThunkType(

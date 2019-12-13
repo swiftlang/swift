@@ -83,7 +83,7 @@ func testArray(f1: Float) {
   _ = [1, 2, f1] #^LITERAL8^#
 }
 // LITERAL8-DAG: Decl[InstanceVar]/CurrNominal:      .count[#Int#]; name=count
-// LITERAL8-DAG: Decl[InstanceVar]/Super:            .first[#Float?#]; name=first
+// LITERAL8-DAG: Decl[InstanceVar]/CurrNominal:      .first[#Float?#]; name=first
 
 func testDict(f1: Float) {
   _ = ["foo": f1, "bar": "baz"] #^LITERAL9^#

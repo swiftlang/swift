@@ -409,7 +409,13 @@ public:
     assert(hasGenericSignature());
     return CanGenericSignature(GenericSig);
   }
-  
+
+  CanGenericSignature getGenericSignatureOrNull() const {
+    if (!hasGenericSignature())
+      return CanGenericSignature();
+    return CanGenericSignature(GenericSig);
+  }
+
   /// Return an open-coded abstraction pattern for a tuple.  The
   /// caller is responsible for ensuring that the storage for the
   /// tuple elements is valid for as long as the abstraction pattern is.
@@ -512,6 +518,15 @@ public:
     pattern.initSwiftType(signature, origType, Kind::Discard);
     return pattern;
   }
+  
+  /// Return an abstraction pattern for the type of the given struct field or enum case
+  /// substituted in `this` type.
+  ///
+  /// Note that, for most purposes, you should lower a field's type against its
+  /// *unsubstituted* interface type.
+  AbstractionPattern
+  unsafeGetSubstFieldType(ValueDecl *member,
+                          CanType origMemberType = CanType()) const;
   
 private:
   /// Return an abstraction pattern for the curried type of an
@@ -648,11 +663,34 @@ public:
     return getKind() != Kind::Invalid;
   }
 
+  bool isTypeParameterOrOpaqueArchetype() const {
+    switch (getKind()) {
+    case Kind::Opaque:
+      return true;
+    case Kind::Type:
+    case Kind::ClangType:
+    case Kind::Discard: {
+      auto type = getType();
+      if (isa<DependentMemberType>(type) ||
+          isa<GenericTypeParamType>(type)) {
+        return true;
+      }
+      if (auto archetype = dyn_cast<ArchetypeType>(type)) {
+        return true;
+      }
+      return false;
+    }
+    default:
+      return false;
+    }
+  }
+
   bool isTypeParameter() const {
     switch (getKind()) {
     case Kind::Opaque:
       return true;
     case Kind::Type:
+    case Kind::ClangType:
     case Kind::Discard: {
       auto type = getType();
       if (isa<DependentMemberType>(type) ||
@@ -668,12 +706,13 @@ public:
       return false;
     }
   }
-
+  
   /// Is this an interface type that is subject to a concrete
   /// same-type constraint?
   bool isConcreteType() const;
 
-  bool requiresClass();
+  bool requiresClass() const;
+  LayoutConstraint getLayoutConstraint() const;
 
   /// Return the Swift type which provides structure for this
   /// abstraction pattern.

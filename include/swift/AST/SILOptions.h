@@ -62,6 +62,9 @@ public:
   /// Useful when you want to enable -O LLVM opts but not -O SIL opts.
   bool DisableSILPerfOptimizations = false;
 
+  /// Controls whether cross module optimization is enabled.
+  bool CrossModuleOptimization = false;
+  
   /// Controls whether or not paranoid verification checks are run.
   bool VerifyAll = false;
 
@@ -148,7 +151,7 @@ public:
 
   /// Should the default pass pipelines strip ownership during the diagnostic
   /// pipeline or after serialization.
-  bool StripOwnershipAfterSerialization = false;
+  bool StripOwnershipAfterSerialization = true;
 
   /// The name of the file to which the backend should save YAML optimization
   /// records.

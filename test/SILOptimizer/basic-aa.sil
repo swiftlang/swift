@@ -110,12 +110,12 @@ bb1(%1 : $*Builtin.NativeObject, %2 : $*Builtin.NativeObject):
 
 // Assume that inout arguments alias to preserve memory safety.
 //
-// CHECK-LABEL: @inout_args_may_alias
+// CHECK-LABEL: @inout_args_may_not_alias
 // CHECK: PAIR #1.
 // CHECK-NEXT: %0 = argument of bb0
 // CHECK-NEXT: %1 = argument of bb0
 // CHECK-NEXT: NoAlias
-sil @inout_args_may_alias: $@convention(thin) (@inout Builtin.NativeObject, @inout Builtin.NativeObject) -> () {
+sil @inout_args_may_not_alias: $@convention(thin) (@inout Builtin.NativeObject, @inout Builtin.NativeObject) -> () {
 bb0(%0 : $*Builtin.NativeObject, %1 : $*Builtin.NativeObject):
   %2 = tuple()
   return %2 : $()

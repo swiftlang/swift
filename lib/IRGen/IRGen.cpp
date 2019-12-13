@@ -37,6 +37,7 @@
 #include "swift/SILOptimizer/PassManager/PassPipeline.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/Subsystems.h"
+#include "../Serialization/ModuleFormat.h"
 #include "clang/Basic/TargetInfo.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Analysis/AliasAnalysis.h"
@@ -877,7 +878,7 @@ performIRGeneration(IRGenOptions &Opts, ModuleDecl *M,
   runIRGenPreparePasses(*SILMod, IGM);
   
   {
-    SharedTimer timer("IRGen");
+    FrontendStatsTracer tracer(Ctx.Stats, "IRGen");
     // Emit the module contents.
     irgen.emitGlobalTopLevel();
 
@@ -948,7 +949,7 @@ performIRGeneration(IRGenOptions &Opts, ModuleDecl *M,
   if (outModuleHash) {
     *outModuleHash = IGM.ModuleHash;
   } else {
-    SharedTimer timer("LLVM pipeline");
+    FrontendStatsTracer tracer(Ctx.Stats, "LLVM pipeline");
 
     // Since no out module hash was set, we need to performLLVM.
     if (performLLVM(Opts, &IGM.Context.Diags, nullptr, IGM.ModuleHash,
@@ -1236,7 +1237,7 @@ static void performParallelIRGeneration(
   // Bail out if there are any errors.
   if (Ctx.hadError()) return;
 
-  SharedTimer timer("LLVM pipeline");
+  FrontendStatsTracer tracer(Ctx.Stats, "LLVM pipeline");
 
   llvm::sys::Mutex DiagMutex;
 
@@ -1330,7 +1331,7 @@ swift::createSwiftModuleObjectFile(SILModule &SILMod, StringRef Buffer,
     break;
   }
   ASTSym->setSection(Section);
-  ASTSym->setAlignment(8);
+  ASTSym->setAlignment(serialization::SWIFTMODULE_ALIGNMENT);
   ::performLLVM(Opts, &Ctx.Diags, nullptr, nullptr, IGM.getModule(),
                 IGM.TargetMachine.get(),
                 Ctx.LangOpts.EffectiveLanguageVersion,
