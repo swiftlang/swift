@@ -232,10 +232,6 @@ namespace swift {
   /// written by the user; this performs the reverse transformation.
   OriginalArgumentList getOriginalArgumentList(Expr *expr);
 
-  /// Return true if the specified type or a super-class/super-protocol has the
-  /// @dynamicMemberLookup attribute on it.
-  bool hasDynamicMemberLookupAttribute(Type type);
-
   /// Returns the root type and result type of the keypath type in a keypath
   /// dynamic member lookup subscript, or \c None if it cannot be determined.
   ///

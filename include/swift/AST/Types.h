@@ -829,6 +829,10 @@ public:
   /// check access control.
   bool isCallableNominalType(DeclContext *dc);
 
+  /// Return true if the specified type or a super-class/super-protocol has the
+  /// @dynamicMemberLookup attribute on it.
+  bool hasDynamicMemberLookupAttribute();
+
   /// Retrieve the superclass of this type.
   ///
   /// \param useArchetypes Whether to use context archetypes for outer generic

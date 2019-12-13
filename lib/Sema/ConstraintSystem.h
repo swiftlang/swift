@@ -1297,9 +1297,6 @@ public:
   /// types.
   llvm::DenseMap<CanType, DynamicCallableMethods> DynamicCallableCache;
 
-  /// A cache that stores whether types are valid @dynamicMemberLookup types.
-  llvm::DenseMap<CanType, bool> DynamicMemberLookupCache;
-
 private:
   /// Describe the candidate expression for partial solving.
   /// This class used by shrink & solve methods which apply
