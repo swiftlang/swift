@@ -1273,7 +1273,7 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
       baseModule->lookupMember(values, baseModule, name,
                                getIdentifier(privateDiscriminator));
     } else {
-      baseModule->lookupQualified(baseModule, name,
+      baseModule->lookupQualified(baseModule, DeclNameRef(name),
                                   NL_QualifiedDefault | NL_KnownNoDependency,
                                   values);
     }
@@ -4124,8 +4124,7 @@ llvm::Error DeclDeserializer::deserializeDeclAttributes() {
         assert(numArgs != 0);
         assert(!isImplicit && "Need to update for implicit");
         Attr = DynamicReplacementAttr::create(
-            ctx, DeclName(ctx, baseName, ArrayRef<Identifier>(pieces)), &MF,
-            replacedFunID);
+            ctx, DeclNameRef({ ctx, baseName, pieces }), &MF, replacedFunID);
         break;
       }
 
@@ -4162,6 +4161,13 @@ llvm::Error DeclDeserializer::deserializeDeclAttributes() {
         auto name = MF.getIdentifier(nameID);
         Attr = new (ctx) ProjectedValuePropertyAttr(
             name, SourceLoc(), SourceRange(), isImplicit);
+        break;
+      }
+
+      case decls_block::ImplicitlySynthesizesNestedRequirement_DECL_ATTR: {
+        serialization::decls_block::ImplicitlySynthesizesNestedRequirementDeclAttrLayout
+            ::readRecord(scratch);
+        Attr = new (ctx) ImplicitlySynthesizesNestedRequirementAttr(blobData, {}, {});
         break;
       }
 
@@ -5029,7 +5035,9 @@ public:
     unsigned numParams;
     unsigned numYields;
     unsigned numResults;
+    bool isGenericSignatureImplied;
     GenericSignatureID rawGenericSig;
+    SubstitutionMapID rawSubs;
     ArrayRef<uint64_t> variableData;
     clang::FunctionType *clangFunctionType = nullptr;
 
@@ -5046,7 +5054,9 @@ public:
                                              numParams,
                                              numYields,
                                              numResults,
+                                             isGenericSignatureImplied,
                                              rawGenericSig,
+                                             rawSubs,
                                              variableData);
 
     // Process the ExtInfo.
@@ -5166,11 +5176,13 @@ public:
     }
 
     GenericSignature genericSig = MF.getGenericSignature(rawGenericSig);
+    SubstitutionMap subs = MF.getSubstitutionMap(rawSubs).getCanonical();
+    
     return SILFunctionType::get(genericSig, extInfo, coroutineKind.getValue(),
                                 calleeConvention.getValue(),
                                 allParams, allYields, allResults,
                                 errorResult,
-                                SubstitutionMap(), false,
+                                subs, isGenericSignatureImplied,
                                 ctx, witnessMethodConformance);
   }
 

@@ -3540,11 +3540,25 @@ bool ConstraintSystem::repairFailures(
       conversionsOrFixes.push_back(CollectionElementContextualMismatch::create(
           *this, lhs, rhs, getConstraintLocator(locator)));
     }
-    if (lhs->is<TupleType>() && rhs->is<TupleType>()) {
-      auto *fix = AllowTupleTypeMismatch::create(*this, lhs, rhs,
-                                                 getConstraintLocator(locator));
-      conversionsOrFixes.push_back(fix);
+
+    // Drop the `tuple element` locator element so that all tuple element
+    // mismatches within the same tuple type can be coalesced later.
+    auto index = elt.getAs<LocatorPathElt::TupleElement>()->getIndex();
+    path.pop_back();
+    auto *tupleLocator = getConstraintLocator(locator.getAnchor(), path);
+
+    // Let this fail if it's a contextual mismatch with sequence element types,
+    // as there's a special fix for that.
+    if (tupleLocator->isLastElement<LocatorPathElt::SequenceElementType>())
+      break;
+
+    ConstraintFix *fix;
+    if (tupleLocator->isLastElement<LocatorPathElt::FunctionArgument>()) {
+      fix = AllowFunctionTypeMismatch::create(*this, lhs, rhs, tupleLocator, index);
+    } else {
+      fix = AllowTupleTypeMismatch::create(*this, lhs, rhs, tupleLocator, index);
     }
+    conversionsOrFixes.push_back(fix);
     break;
   }
 
@@ -4648,7 +4662,7 @@ ConstraintSystem::simplifyConstructionConstraint(
   // variable T. T2 is the result type provided via the construction
   // constraint itself.
   addValueMemberConstraint(MetatypeType::get(valueType, getASTContext()),
-                           DeclBaseName::createConstructor(),
+                           DeclNameRef::createConstructor(),
                            memberType,
                            useDC, functionRefKind,
                            /*outerAlternatives=*/{},
@@ -5360,7 +5374,7 @@ static bool isSelfRecursiveKeyPathDynamicMemberLookup(
 /// try to identify and classify inaccessible members that may be being
 /// referenced.
 MemberLookupResult ConstraintSystem::
-performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
+performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
                     Type baseTy, FunctionRefKind functionRefKind,
                     ConstraintLocator *memberLocator,
                     bool includeInaccessibleMembers) {
@@ -5434,8 +5448,8 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
     // anything else, because the cost of the general search is so
     // high.
     if (auto info = getArgumentInfo(memberLocator)) {
-      memberName = DeclName(ctx, memberName.getBaseName(),
-                            info->Labels);
+      memberName.getFullName() = DeclName(ctx, memberName.getBaseName(),
+                                          info->Labels);
     }
   }
 
@@ -5755,7 +5769,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
       memberName.getBaseName() == DeclBaseName::createConstructor() &&
       !isImplicitInit) {
     auto &compatLookup = lookupMember(instanceTy,
-                                      ctx.getIdentifier("init"));
+                                      DeclNameRef(ctx.getIdentifier("init")));
     for (auto result : compatLookup)
       addChoice(getOverloadChoice(result.getValueDecl(),
                                   /*isBridged=*/false,
@@ -5825,8 +5839,8 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
       auto &ctx = getASTContext();
 
       // Recursively look up `subscript(dynamicMember:)` methods in this type.
-      auto subscriptName =
-          DeclName(ctx, DeclBaseName::createSubscript(), ctx.Id_dynamicMember);
+      DeclNameRef subscriptName(
+          { ctx, DeclBaseName::createSubscript(), { ctx.Id_dynamicMember } });
       auto subscripts = performMemberLookup(
           constraintKind, subscriptName, baseTy, functionRefKind, memberLocator,
           includeInaccessibleMembers);
@@ -6040,7 +6054,7 @@ static ConstraintFix *validateInitializerRef(ConstraintSystem &cs,
 
 static ConstraintFix *
 fixMemberRef(ConstraintSystem &cs, Type baseTy,
-             DeclName memberName, const OverloadChoice &choice,
+             DeclNameRef memberName, const OverloadChoice &choice,
              ConstraintLocator *locator,
              Optional<MemberLookupResult::UnviableReason> reason = None) {
   // Not all of the choices handled here are going
@@ -6108,7 +6122,7 @@ fixMemberRef(ConstraintSystem &cs, Type baseTy,
 }
 
 ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
-    ConstraintKind kind, Type baseTy, DeclName member, Type memberTy,
+    ConstraintKind kind, Type baseTy, DeclNameRef member, Type memberTy,
     DeclContext *useDC, FunctionRefKind functionRefKind,
     ArrayRef<OverloadChoice> outerAlternatives, TypeMatchOptions flags,
     ConstraintLocatorBuilder locatorB) {
@@ -6327,7 +6341,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
     }
 
     auto solveWithNewBaseOrName = [&](Type baseType,
-                                      DeclName memberName) -> SolutionKind {
+                                      DeclNameRef memberName) -> SolutionKind {
       return simplifyMemberConstraint(kind, baseType, memberName, memberTy,
                                       useDC, functionRefKind, outerAlternatives,
                                       flags | TMF_ApplyingFix, locatorB);
@@ -6370,7 +6384,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
     // Instead of using subscript operator spelled out `subscript` directly.
     if (member.getBaseName() == getTokenText(tok::kw_subscript)) {
       auto result =
-          solveWithNewBaseOrName(baseTy, DeclBaseName::createSubscript());
+          solveWithNewBaseOrName(baseTy, DeclNameRef::createSubscript());
       // Looks like it was indeed meant to be a subscript operator.
       if (result == SolutionKind::Solved)
         return recordFix(UseSubscriptOperator::create(*this, locator))
@@ -7462,7 +7476,8 @@ ConstraintSystem::simplifyApplicableFnConstraint(
     // Static member constraint requires `FunctionRefKind::DoubleApply`.
     // TODO: Use a custom locator element to identify this member constraint
     // instead of just pointing to the function expr.
-    addValueMemberConstraint(origLValueType2, DeclName(ctx.Id_callAsFunction),
+    addValueMemberConstraint(origLValueType2,
+                             DeclNameRef(ctx.Id_callAsFunction),
                              memberTy, DC, FunctionRefKind::SingleApply,
                              /*outerAlternatives*/ {}, locator);
     // Add new applicable function constraint based on the member type
@@ -7594,12 +7609,11 @@ lookupDynamicCallableMethods(Type type, ConstraintSystem &CS,
                              Identifier argumentName, bool hasKeywordArgs) {
   auto &ctx = CS.getASTContext();
   auto decl = type->getAnyNominal();
-  auto methodName = DeclName(ctx, ctx.Id_dynamicallyCall, { argumentName });
-  auto matches = CS.performMemberLookup(ConstraintKind::ValueMember,
-                                        methodName, type,
-                                        FunctionRefKind::SingleApply,
-                                        CS.getConstraintLocator(locator),
-                                        /*includeInaccessibleMembers*/ false);
+  DeclNameRef methodName({ ctx, ctx.Id_dynamicallyCall, { argumentName } });
+  auto matches = CS.performMemberLookup(
+      ConstraintKind::ValueMember, methodName, type,
+      FunctionRefKind::SingleApply, CS.getConstraintLocator(locator),
+      /*includeInaccessibleMembers*/ false);
   // Filter valid candidates.
   auto candidates = matches.ViableCandidates;
   auto filter = [&](OverloadChoice choice) {
@@ -7833,9 +7847,9 @@ ConstraintSystem::simplifyDynamicCallableApplicableFnConstraint(
     // TODO(diagnostics): This is not going to be necessary once
     // `@dynamicCallable` uses existing `member` machinery.
 
-    auto memberName = DeclName(
-        ctx, ctx.Id_dynamicallyCall,
-        {useKwargsMethod ? ctx.Id_withKeywordArguments : ctx.Id_withArguments});
+    auto argLabel = useKwargsMethod ? ctx.Id_withKeywordArguments
+                                    : ctx.Id_withArguments;
+    DeclNameRef memberName({ ctx, ctx.Id_dynamicallyCall, {argLabel} });
 
     auto *fix = DefineMemberBasedOnUse::create(
         *this, desugar2, memberName,
@@ -8476,6 +8490,12 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   }
 
   case FixKind::AllowTupleTypeMismatch: {
+    if (fix->getAs<AllowTupleTypeMismatch>()->isElementMismatch()) {
+      auto *locator = fix->getLocator();
+      if (recordFix(fix, /*impact*/locator->isForContextualType() ? 5 : 1))
+        return SolutionKind::Error;
+      return SolutionKind::Solved;
+    }
     auto lhs = type1->castTo<TupleType>();
     auto rhs = type2->castTo<TupleType>();
     // Create a new tuple type the size of the smaller tuple with elements
@@ -8487,6 +8507,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
     // when the tuples (X, Y, $1) and (X, $0, B) get matched, $0 is equated
     // to Y, $1 is equated to B, and $2 is defaulted to Any.
     auto lhsLarger = lhs->getNumElements() >= rhs->getNumElements();
+    auto isLabelingFailure = lhs->getNumElements() == rhs->getNumElements();
     auto larger = lhsLarger ? lhs : rhs;
     auto smaller = lhsLarger ? rhs : lhs;
     llvm::SmallVector<TupleTypeElt, 4> newTupleTypes;
@@ -8495,7 +8516,9 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
       auto largerElt = larger->getElement(i);
       if (i < smaller->getNumElements()) {
         auto smallerElt = smaller->getElement(i);
-        if (largerElt.getType()->isTypeVariableOrMember() ||
+        if (isLabelingFailure)
+          newTupleTypes.push_back(TupleTypeElt(largerElt.getType()));
+        else if (largerElt.getType()->isTypeVariableOrMember() ||
             smallerElt.getType()->isTypeVariableOrMember())
           newTupleTypes.push_back(largerElt);
         else
@@ -8510,6 +8533,12 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
     if (recordFix(fix))
       return SolutionKind::Error;
     return matchTupleTypes(matchingType, smaller, matchKind, subflags, locator);
+  }
+
+  case FixKind::AllowFunctionTypeMismatch: {
+    if (recordFix(fix, /*impact=*/5))
+      return SolutionKind::Error;
+    return SolutionKind::Solved;
   }
 
   case FixKind::TreatEphemeralAsNonEphemeral: {

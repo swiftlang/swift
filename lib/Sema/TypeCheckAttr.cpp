@@ -96,6 +96,7 @@ public:
   IGNORED_ATTR(HasMissingDesignatedInitializers)
   IGNORED_ATTR(InheritsConvenienceInitializers)
   IGNORED_ATTR(Inline)
+  IGNORED_ATTR(ImplicitlySynthesizesNestedRequirement)
   IGNORED_ATTR(ObjCBridged)
   IGNORED_ATTR(ObjCNonLazyRealization)
   IGNORED_ATTR(ObjCRuntimeName)
@@ -118,6 +119,9 @@ public:
   // TODO(TF-828): Upstream `@differentiable` attribute type-checking from
   // tensorflow branch.
   IGNORED_ATTR(Differentiable)
+  // TODO(TF-829): Upstream `@derivative` attribute type-checking from
+  // tensorflow branch.
+  IGNORED_ATTR(Derivative)
 #undef IGNORED_ATTR
 
   void visitAlignmentAttr(AlignmentAttr *attr) {
@@ -1123,8 +1127,7 @@ static bool hasValidDynamicCallableMethod(NominalTypeDecl *decl,
                                           bool hasKeywordArgs) {
   auto &ctx = decl->getASTContext();
   auto declType = decl->getDeclaredType();
-  auto methodName = DeclName(ctx, DeclBaseName(ctx.Id_dynamicallyCall),
-                             { argumentName });
+  DeclNameRef methodName({ ctx, ctx.Id_dynamicallyCall, { argumentName } });
   auto candidates = TypeChecker::lookupMember(decl, declType, methodName);
   if (candidates.empty()) return false;
 
@@ -1248,8 +1251,8 @@ visitDynamicMemberLookupAttr(DynamicMemberLookupAttr *attr) {
   };
 
   // Look up `subscript(dynamicMember:)` candidates.
-  auto subscriptName =
-      DeclName(ctx, DeclBaseName::createSubscript(), ctx.Id_dynamicMember);
+  DeclNameRef subscriptName(
+      { ctx, DeclBaseName::createSubscript(), { ctx.Id_dynamicMember } });
   auto candidates = TypeChecker::lookupMember(decl, type, subscriptName);
 
   if (!candidates.empty()) {
@@ -1274,7 +1277,7 @@ visitDynamicMemberLookupAttr(DynamicMemberLookupAttr *attr) {
   //
   // Let's do another lookup using just the base name.
   auto newCandidates =
-      TypeChecker::lookupMember(decl, type, DeclBaseName::createSubscript());
+      TypeChecker::lookupMember(decl, type, DeclNameRef::createSubscript());
 
   // Validate the candidates while ignoring the label.
   newCandidates.filter([&](const LookupResultEntry entry, bool isOuter) {
@@ -2072,7 +2075,7 @@ void AttributeChecker::visitDiscardableResultAttr(DiscardableResultAttr *attr) {
 }
 
 /// Lookup the replaced decl in the replacments scope.
-static void lookupReplacedDecl(DeclName replacedDeclName,
+static void lookupReplacedDecl(DeclNameRef replacedDeclName,
                                const DynamicReplacementAttr *attr,
                                const ValueDecl *replacement,
                                SmallVectorImpl<ValueDecl *> &results) {
@@ -2126,7 +2129,7 @@ static Type getDynamicComparisonType(ValueDecl *value) {
   return interfaceType->removeArgumentLabels(numArgumentLabels);
 }
 
-static FuncDecl *findReplacedAccessor(DeclName replacedVarName,
+static FuncDecl *findReplacedAccessor(DeclNameRef replacedVarName,
                                       AccessorDecl *replacement,
                                       DynamicReplacementAttr *attr,
                                       ASTContext &ctx) {
@@ -2190,7 +2193,7 @@ static FuncDecl *findReplacedAccessor(DeclName replacedVarName,
   if (!origStorage->isDynamic()) {
     Diags.diagnose(attr->getLocation(),
                    diag::dynamic_replacement_accessor_not_dynamic,
-                   replacedVarName);
+                   origStorage->getFullName());
     attr->setInvalid();
     return nullptr;
   }
@@ -2206,7 +2209,8 @@ static FuncDecl *findReplacedAccessor(DeclName replacedVarName,
         origStorage->getWriteImpl() == WriteImplKind::Stored)) {
     Diags.diagnose(attr->getLocation(),
                    diag::dynamic_replacement_accessor_not_explicit,
-                   (unsigned)origAccessor->getAccessorKind(), replacedVarName);
+                   (unsigned)origAccessor->getAccessorKind(),
+                   origStorage->getFullName());
     attr->setInvalid();
     return nullptr;
   }
@@ -2215,7 +2219,7 @@ static FuncDecl *findReplacedAccessor(DeclName replacedVarName,
 }
 
 static AbstractFunctionDecl *
-findReplacedFunction(DeclName replacedFunctionName,
+findReplacedFunction(DeclNameRef replacedFunctionName,
                      const AbstractFunctionDecl *replacement,
                      DynamicReplacementAttr *attr, DiagnosticEngine *Diags) {
 
@@ -2242,7 +2246,7 @@ findReplacedFunction(DeclName replacedFunctionName,
         if (Diags) {
           Diags->diagnose(attr->getLocation(),
                           diag::dynamic_replacement_function_not_dynamic,
-                          replacedFunctionName);
+                          result->getFullName());
           attr->setInvalid();
         }
         return nullptr;
@@ -2257,17 +2261,17 @@ findReplacedFunction(DeclName replacedFunctionName,
   if (results.empty()) {
     Diags->diagnose(attr->getLocation(),
                     diag::dynamic_replacement_function_not_found,
-                    attr->getReplacedFunctionName());
+                    replacedFunctionName);
   } else {
     Diags->diagnose(attr->getLocation(),
                     diag::dynamic_replacement_function_of_type_not_found,
-                    attr->getReplacedFunctionName(),
+                    replacedFunctionName,
                     replacement->getInterfaceType()->getCanonicalType());
 
     for (auto *result : results) {
       Diags->diagnose(SourceLoc(),
                       diag::dynamic_replacement_found_function_of_type,
-                      attr->getReplacedFunctionName(),
+                      result->getFullName(),
                       result->getInterfaceType()->getCanonicalType());
     }
   }
@@ -2276,7 +2280,7 @@ findReplacedFunction(DeclName replacedFunctionName,
 }
 
 static AbstractStorageDecl *
-findReplacedStorageDecl(DeclName replacedFunctionName,
+findReplacedStorageDecl(DeclNameRef replacedFunctionName,
                         const AbstractStorageDecl *replacement,
                         const DynamicReplacementAttr *attr) {
 
@@ -2329,13 +2333,13 @@ void AttributeChecker::visitDynamicReplacementAttr(DynamicReplacementAttr *attr)
   if (original->isObjC() && !replacement->isObjC()) {
     diagnose(attr->getLocation(),
              diag::dynamic_replacement_replacement_not_objc_dynamic,
-             attr->getReplacedFunctionName());
+             replacement->getFullName());
     attr->setInvalid();
   }
   if (!original->isObjC() && replacement->isObjC()) {
     diagnose(attr->getLocation(),
              diag::dynamic_replacement_replaced_not_objc_dynamic,
-             attr->getReplacedFunctionName());
+             original->getFullName());
     attr->setInvalid();
   }
 
@@ -2380,8 +2384,9 @@ void AttributeChecker::visitImplementsAttr(ImplementsAttr *attr) {
     ProtocolDecl *PD = PT->getDecl();
 
     // Check that the ProtocolType has the specified member.
-    LookupResult R = TypeChecker::lookupMember(PD->getDeclContext(),
-                                               PT, attr->getMemberName());
+    LookupResult R =
+        TypeChecker::lookupMember(PD->getDeclContext(), PT,
+                                  DeclNameRef(attr->getMemberName()));
     if (!R) {
       diagnose(attr->getLocation(),
                diag::implements_attr_protocol_lacks_member,

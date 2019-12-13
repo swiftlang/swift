@@ -202,6 +202,7 @@ func convention1(_: @convention(thick) ()->()) {}
 func convention2(_: @convention(thin) ()->()) {}
 func convention3(_: @convention(block) ()->()) {}
 func convention4(_: @convention(c) ()->()) {}
+func convention4a(_: @convention(c, cType: "void *(void *, int[])") () -> () {}
 func convention5(_: @convention(method) ()->()) {}
 func convention6(_: @convention(objc_method) ()->()) {}
 func convention7(_: @convention(witness_method: P1) ()->()) {}
@@ -717,46 +718,47 @@ enum E7: String {
 // RUN: %sourcekitd-test -req=cursor -pos=205:6 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK86 %s
 // RUN: %sourcekitd-test -req=cursor -pos=206:6 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK86 %s
 // RUN: %sourcekitd-test -req=cursor -pos=207:6 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK86 %s
-// CHECK86: <syntaxtype.attribute.builtin><syntaxtype.attribute.name>@convention</syntaxtype.attribute.name>({{[a-z_]*}})</syntaxtype.attribute.builtin>
+// RUN: %sourcekitd-test -req=cursor -pos=208:6 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK86 %s
+// CHECK86: <syntaxtype.attribute.builtin><syntaxtype.attribute.name>@convention</syntaxtype.attribute.name>({{[a-z_]*((, [a-zA-Z_]*: &quot;[^&]*&quot;)|(: [a-zA-Z0-9_]*))?}})</syntaxtype.attribute.builtin>
 
-// RUN: %sourcekitd-test -req=cursor -pos=212:8 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK87 %s
-// CHECK87:      source.lang.swift.decl.struct (212:8-212:26)
+// RUN: %sourcekitd-test -req=cursor -pos=213:8 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK87 %s
+// CHECK87:      source.lang.swift.decl.struct (213:8-213:26)
 // CHECK87-NEXT: HasLocalizationKey
 // CHECK87-NEXT: s:11cursor_info18HasLocalizationKeyV
 // CHECK87-NEXT: HasLocalizationKey.Type
 // CHECK87-NEXT: $s
 // CHECK87-NEXT: <Declaration>struct HasLocalizationKey</Declaration>
 // CHECK87-NEXT: <decl.struct><syntaxtype.keyword>struct</syntaxtype.keyword> <decl.name>HasLocalizationKey</decl.name></decl.struct>
-// CHECK87-NEXT: <Class file="{{[^"]+}}cursor_info.swift" line="212" column="8"><Name>HasLocalizationKey</Name><USR>s:11cursor_info18HasLocalizationKeyV</USR><Declaration>struct HasLocalizationKey</Declaration><CommentParts><Abstract><Para>Brief.</Para></Abstract></CommentParts></Class>
+// CHECK87-NEXT: <Class file="{{[^"]+}}cursor_info.swift" line="213" column="8"><Name>HasLocalizationKey</Name><USR>s:11cursor_info18HasLocalizationKeyV</USR><Declaration>struct HasLocalizationKey</Declaration><CommentParts><Abstract><Para>Brief.</Para></Abstract></CommentParts></Class>
 // CHECK87-NEXT: <LocalizationKey>ABC</LocalizationKey>
 
-// RUN: %sourcekitd-test -req=cursor -pos=215:6 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK88 %s
-// CHECK88:      source.lang.swift.decl.function.free (215:6-215:27)
+// RUN: %sourcekitd-test -req=cursor -pos=216:6 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK88 %s
+// CHECK88:      source.lang.swift.decl.function.free (216:6-216:27)
 // CHECK88-NEXT: hasLocalizationKey2
 // CHECK88-NEXT: s:11cursor_info19hasLocalizationKey2yyF
 // CHECK88-NEXT: () -> ()
 // CHECK88-NEXT: $s
 // CHECK88-NEXT: <Declaration>func hasLocalizationKey2()</Declaration>
 // CHECK88-NEXT: <decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>hasLocalizationKey2</decl.name>()</decl.function.free>
-// CHECK88-NEXT: <Function file="{{[^"]+}}cursor_info.swift" line="215" column="6"><Name>hasLocalizationKey2()</Name><USR>s:11cursor_info19hasLocalizationKey2yyF</USR><Declaration>func hasLocalizationKey2()</Declaration><CommentParts></CommentParts></Function
+// CHECK88-NEXT: <Function file="{{[^"]+}}cursor_info.swift" line="216" column="6"><Name>hasLocalizationKey2()</Name><USR>s:11cursor_info19hasLocalizationKey2yyF</USR><Declaration>func hasLocalizationKey2()</Declaration><CommentParts></CommentParts></Function
 // CHECK88-NEXT: <LocalizationKey>ABC</LocalizationKey>
 
-// RUN: %sourcekitd-test -req=cursor -pos=218:6 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK89 %s
+// RUN: %sourcekitd-test -req=cursor -pos=219:6 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK89 %s
 // CHECK89: <Declaration>func funcWithNestedEscaping(a: (@escaping () -&gt; ()) -&gt; ())</Declaration>
 // CHECK89-NEXT: <decl.var.parameter.type>(<decl.var.parameter><decl.var.parameter.type><syntaxtype.attribute.builtin><syntaxtype.attribute.name>@escaping</syntaxtype.attribute.name></syntaxtype.attribute.builtin> () -&gt; <decl.function.returntype><tuple>()</tuple></decl.function.returntype></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><tuple>()</tuple></decl.function.returntype></decl.var.parameter.type>
 
-// RUN: %sourcekitd-test -req=cursor -pos=221:11 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK90 %s
+// RUN: %sourcekitd-test -req=cursor -pos=222:11 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK90 %s
 // CHECK90: <Declaration>typealias typeWithNestedAutoclosure = (@autoclosure () -&gt; ()) -&gt; ()</Declaration>
 // CHECK90-NEXT: <decl.var.parameter.type><syntaxtype.attribute.builtin><syntaxtype.attribute.name>@autoclosure</syntaxtype.attribute.name></syntaxtype.attribute.builtin> () -&gt; <decl.function.returntype><tuple>()</tuple></decl.function.returntype></decl.var.parameter.type>
 
-// RUN: %sourcekitd-test -req=cursor -pos=223:11 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK91 %s
+// RUN: %sourcekitd-test -req=cursor -pos=224:11 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK91 %s
 // CHECK91: <Declaration>typealias GenericAlias&lt;T, U&gt; = <Type usr="s:11cursor_info7MyAliasa">MyAlias</Type>&lt;<Type usr="s:11cursor_info12GenericAliasa1Txmfp">T</Type>, <Type usr="s:11cursor_info12GenericAliasa1Uq_mfp">U</Type>&gt; where T : <Type usr="s:11cursor_info2P1P">P1</Type></Declaration>
 // CHECK91-NEXT: <decl.typealias><syntaxtype.keyword>typealias</syntaxtype.keyword> <decl.name>GenericAlias</decl.name>&lt;<decl.generic_type_param usr="s:11cursor_info12GenericAliasa1Txmfp"><decl.generic_type_param.name>T</decl.generic_type_param.name></decl.generic_type_param>, <decl.generic_type_param usr="s:11cursor_info12GenericAliasa1Uq_mfp"><decl.generic_type_param.name>U</decl.generic_type_param.name></decl.generic_type_param>&gt; = <ref.typealias usr="s:11cursor_info7MyAliasa">MyAlias</ref.typealias>&lt;<ref.generic_type_param usr="s:11cursor_info12GenericAliasa1Txmfp">T</ref.generic_type_param>, <ref.generic_type_param usr="s:11cursor_info12GenericAliasa1Uq_mfp">U</ref.generic_type_param>&gt; <syntaxtype.keyword>where</syntaxtype.keyword> <decl.generic_type_requirement>T : <ref.protocol usr="s:11cursor_info2P1P">P1</ref.protocol></decl.generic_type_requirement></decl.typealias>
 
-// RUN: %sourcekitd-test -req=cursor -pos=226:10 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK92 %s
+// RUN: %sourcekitd-test -req=cursor -pos=227:10 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK92 %s
 // CHECK92: <Declaration>case a = &quot;\u{1B}&quot;</Declaration>
 // CHECK92-NEXT: <decl.enumelement><syntaxtype.keyword>case</syntaxtype.keyword> <decl.name>a</decl.name> = <syntaxtype.string>&quot;\u{1B}&quot;</syntaxtype.string></decl.enumelement>
 
-// RUN: %sourcekitd-test -req=cursor -pos=227:10 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK93 %s
+// RUN: %sourcekitd-test -req=cursor -pos=228:10 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK93 %s
 // CHECK93: <Declaration>case b = &quot;f&quot;</Declaration>
 // CHECK93-NEXT: <decl.enumelement><syntaxtype.keyword>case</syntaxtype.keyword> <decl.name>b</decl.name> = <syntaxtype.string>&quot;f&quot;</syntaxtype.string></decl.enumelement>

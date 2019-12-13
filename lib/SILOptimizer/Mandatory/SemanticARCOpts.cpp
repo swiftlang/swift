@@ -41,16 +41,50 @@ STATISTIC(NumLoadCopyConvertedToLoadBorrow,
 //                                  Utility
 //===----------------------------------------------------------------------===//
 
-/// Return true if v only has invalidating uses that are destroy_value. Such an
-/// owned value is said to represent a dead "live range".
-///
-/// Semantically this implies that a value is never passed off as +1 to memory
-/// or another function implying it can be used everywhere at +0.
-static bool
-isDeadLiveRange(SILValue v, SmallVectorImpl<SILInstruction *> &destroys,
-                SmallVectorImpl<SILInstruction *> &forwardingInsts) {
-  assert(v.getOwnershipKind() == ValueOwnershipKind::Owned);
-  SmallVector<Operand *, 32> worklist(v->use_begin(), v->use_end());
+//===----------------------------------------------------------------------===//
+//                            Live Range Modeling
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+class LiveRange {
+  /// A list of destroy_values of the live range.
+  SmallVector<SILInstruction *, 16> destroys;
+
+  /// A list of forwarding instructions that forward our destroys ownership, but
+  /// that are also able to forward guaranteed ownership.
+  SmallVector<SILInstruction *, 16> generalForwardingInsts;
+
+  /// Consuming users that we were not able to understand as a forwarding
+  /// instruction or a destroy_value. These must be passed a strongly control
+  /// equivalent +1 value.
+  SmallVector<SILInstruction *, 16> unknownConsumingUsers;
+
+public:
+  LiveRange(SILValue value);
+
+  LiveRange(const LiveRange &) = delete;
+  LiveRange &operator=(const LiveRange &) = delete;
+
+  /// Return true if v only has invalidating uses that are destroy_value. Such
+  /// an owned value is said to represent a dead "live range".
+  ///
+  /// Semantically this implies that a value is never passed off as +1 to memory
+  /// or another function implying it can be used everywhere at +0.
+  bool hasConsumingUse() const { return unknownConsumingUsers.size(); }
+
+  ArrayRef<SILInstruction *> getDestroys() const { return destroys; }
+  ArrayRef<SILInstruction *> getNonConsumingForwardingInsts() const {
+    return generalForwardingInsts;
+  }
+};
+
+} // end anonymous namespace
+
+LiveRange::LiveRange(SILValue value)
+    : destroys(), generalForwardingInsts(), unknownConsumingUsers() {
+  SmallVector<Operand *, 32> worklist(value->getUses());
+
   while (!worklist.empty()) {
     auto *op = worklist.pop_back_val();
 
@@ -93,13 +127,14 @@ isDeadLiveRange(SILValue v, SmallVectorImpl<SILInstruction *> &destroys,
                           return v.getOwnershipKind() ==
                                  ValueOwnershipKind::Owned;
                         })) {
-        return false;
+        unknownConsumingUsers.push_back(user);
+        continue;
       }
 
       // Ok, this is a forwarding instruction whose ownership we can flip from
       // owned -> guaranteed. Visit its users recursively to see if the the
       // users force the live range to be alive.
-      forwardingInsts.push_back(user);
+      generalForwardingInsts.push_back(user);
       for (SILValue v : user->getResults()) {
         if (v.getOwnershipKind() != ValueOwnershipKind::Owned)
           continue;
@@ -118,10 +153,6 @@ isDeadLiveRange(SILValue v, SmallVectorImpl<SILInstruction *> &destroys,
       continue;
     }
   }
-
-  // We visited all of our users and were able to prove that all of them were
-  // benign. Return true.
-  return true;
 }
 
 //===----------------------------------------------------------------------===//
@@ -280,7 +311,7 @@ struct SemanticARCOptVisitor
   FORWARDING_TERM(CondBranch)
 #undef FORWARDING_TERM
 
-  bool isWrittenTo(LoadInst *li);
+  bool isWrittenTo(LoadInst *li, ArrayRef<SILInstruction *> destroys);
 
   bool processWorklist();
 
@@ -372,12 +403,13 @@ bool SemanticARCOptVisitor::visitBeginBorrowInst(BeginBorrowInst *bbi) {
 }
 
 static void convertForwardingInstsFromOwnedToGuaranteed(
-    SmallVectorImpl<SILInstruction *> &guaranteedForwardingInsts) {
+    ArrayRef<SILInstruction *> guaranteedForwardingInsts) {
   // Then change all of our guaranteed forwarding insts to have guaranteed
   // ownership kind instead of what ever they previously had (ignoring trivial
   // results);
   while (!guaranteedForwardingInsts.empty()) {
-    auto *i = guaranteedForwardingInsts.pop_back_val();
+    auto *i = guaranteedForwardingInsts.back();
+    guaranteedForwardingInsts = guaranteedForwardingInsts.drop_back();
     assert(i->hasResults());
 
     for (SILValue result : i->getResults()) {
@@ -461,9 +493,8 @@ bool SemanticARCOptVisitor::performGuaranteedCopyValueOptimization(CopyValueInst
   // must be some consuming use that we either do not understand is /actually/
   // forwarding or a user that truly represents a necessary consume of the
   // value (e.x. storing into memory).
-  SmallVector<SILInstruction *, 16> destroys;
-  SmallVector<SILInstruction *, 16> guaranteedForwardingInsts;
-  if (!isDeadLiveRange(cvi, destroys, guaranteedForwardingInsts))
+  LiveRange lr(cvi);
+  if (lr.hasConsumingUse())
     return false;
 
   // Next check if we do not have any destroys of our copy_value and are
@@ -526,6 +557,7 @@ bool SemanticARCOptVisitor::performGuaranteedCopyValueOptimization(CopyValueInst
         return borrowScope.isLocalScope();
       });
 
+  auto destroys = lr.getDestroys();
   if (destroys.empty() && haveAnyLocalScopes) {
     return false;
   }
@@ -568,13 +600,15 @@ bool SemanticARCOptVisitor::performGuaranteedCopyValueOptimization(CopyValueInst
   // Otherwise, we know that our copy_value/destroy_values are all completely
   // within the guaranteed value scope. First delete the destroys/copies.
   while (!destroys.empty()) {
-    auto *dvi = destroys.pop_back_val();
+    auto *dvi = destroys.back();
+    destroys = destroys.drop_back();
     eraseInstruction(dvi);
     ++NumEliminatedInsts;
   }
 
   eraseAndRAUWSingleValueInstruction(cvi, cvi->getOperand());
-  convertForwardingInstsFromOwnedToGuaranteed(guaranteedForwardingInsts);
+  convertForwardingInstsFromOwnedToGuaranteed(
+      lr.getNonConsumingForwardingInsts());
 
   ++NumEliminatedInsts;
   return true;
@@ -664,6 +698,7 @@ bool mayFunctionMutateArgument(const AccessedStorage &storage, SILFunction &f) {
 // Then find our accessed storage to determine whether it provides a guarantee
 // for the loaded value.
 namespace {
+
 class StorageGuaranteesLoadVisitor
   : public AccessUseDefChainVisitor<StorageGuaranteesLoadVisitor>
 {
@@ -677,12 +712,15 @@ class StorageGuaranteesLoadVisitor
   SILValue currentAddress;
   
   Optional<bool> isWritten;
-  
+
+  ArrayRef<SILInstruction *> destroyValues;
+
 public:
-  StorageGuaranteesLoadVisitor(SemanticARCOptVisitor &arcOpt, LoadInst *load)
-    : ARCOpt(arcOpt), Load(load), currentAddress(load->getOperand())
-  {}
-  
+  StorageGuaranteesLoadVisitor(SemanticARCOptVisitor &arcOpt, LoadInst *load,
+                               ArrayRef<SILInstruction *> destroyValues)
+      : ARCOpt(arcOpt), Load(load), currentAddress(load->getOperand()),
+        destroyValues(destroyValues) {}
+
   void answer(bool written) {
     currentAddress = nullptr;
     isWritten = written;
@@ -790,6 +828,25 @@ public:
     return answer(true);
   }
 
+  /// See if we have an alloc_stack that is only written to once by an
+  /// initializing instruction.
+  void visitStackAccess(AllocStackInst *stack) {
+    SmallVector<SILInstruction *, 8> destroyAddrs;
+    bool initialAnswer = isSingleInitAllocStack(stack, destroyAddrs);
+    if (!initialAnswer)
+      return answer(true);
+
+    // Then make sure that all of our load [copy] uses are within the
+    // destroy_addr.
+    SmallPtrSet<SILBasicBlock *, 4> visitedBlocks;
+    LinearLifetimeChecker checker(visitedBlocks, ARCOpt.getDeadEndBlocks());
+    // Returns true on success. So we invert.
+    bool foundError =
+        !checker.validateLifetime(stack, destroyAddrs /*consuming users*/,
+                                  destroyValues /*non consuming users*/);
+    return answer(foundError);
+  }
+
   bool doIt() {
     while (currentAddress) {
       visit(currentAddress);
@@ -797,10 +854,12 @@ public:
     return *isWritten;
   }
 };
+
 } // namespace
 
-bool SemanticARCOptVisitor::isWrittenTo(LoadInst *load) {
-  StorageGuaranteesLoadVisitor visitor(*this, load);
+bool SemanticARCOptVisitor::isWrittenTo(LoadInst *load,
+                                        ArrayRef<SILInstruction *> destroys) {
+  StorageGuaranteesLoadVisitor visitor(*this, load, destroys);
   return visitor.doIt();
 }
 
@@ -817,15 +876,15 @@ bool SemanticARCOptVisitor::visitLoadInst(LoadInst *li) {
   // FIXME: We should consider if it is worth promoting a load [copy]
   // -> load_borrow if we can put a copy_value on a cold path and thus
   // eliminate RR traffic on a hot path.
-  SmallVector<SILInstruction *, 32> destroyValues;
-  SmallVector<SILInstruction *, 16> guaranteedForwardingInsts;
-  if (!isDeadLiveRange(li, destroyValues, guaranteedForwardingInsts))
+  LiveRange lr(li);
+  if (lr.hasConsumingUse())
     return false;
 
   // Then check if our address is ever written to. If it is, then we cannot use
   // the load_borrow because the stored value may be released during the loaded
   // value's live range.
-  if (isWrittenTo(li))
+  auto destroyValues = lr.getDestroys();
+  if (isWrittenTo(li, destroyValues))
     return false;
 
   // Ok, we can perform our optimization. Convert the load [copy] into a
@@ -853,7 +912,8 @@ bool SemanticARCOptVisitor::visitLoadInst(LoadInst *li) {
 
   // Then delete all of our destroy_value.
   while (!destroyValues.empty()) {
-    auto *dvi = destroyValues.pop_back_val();
+    auto *dvi = destroyValues.back();
+    destroyValues = destroyValues.drop_back();
     eraseInstruction(dvi);
     ++NumEliminatedInsts;
   }
@@ -863,7 +923,8 @@ bool SemanticARCOptVisitor::visitLoadInst(LoadInst *li) {
 
   // And then change the ownership all of our owned forwarding users to be
   // guaranteed.
-  convertForwardingInstsFromOwnedToGuaranteed(guaranteedForwardingInsts);
+  convertForwardingInstsFromOwnedToGuaranteed(
+      lr.getNonConsumingForwardingInsts());
 
   ++NumEliminatedInsts;
   ++NumLoadCopyConvertedToLoadBorrow;

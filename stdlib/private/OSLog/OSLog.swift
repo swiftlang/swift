@@ -21,14 +21,19 @@ public struct Logger {
   @usableFromInline
   internal let logObject: OSLog
 
-  /// Create a custom OS log object.
+  /// Create a custom OSLog object for logging.
   public init(subsystem: String, category: String) {
     logObject = OSLog(subsystem: subsystem, category: category)
   }
 
-  /// Return the default OS log object.
+  /// Use the default OSLog object for logging.
   public init() {
     logObject = OSLog.default
+  }
+
+  /// Create a Logger instance from an existing OSLog Object.
+  public init(_ logObj: OSLog) {
+    logObject = logObj
   }
 
   // Functions defined below are marked @_optimize(none) to prevent inlining
@@ -41,23 +46,71 @@ public struct Logger {
   @_transparent
   @_optimize(none)
   public func log(level: OSLogType = .default, _ message: OSLogMessage) {
-    osLog(logObject, level, message)
+    osLog(log: logObject, level: level, message)
   }
 
-  // TODO: define overloads for logging at specific levels: debug, info, notice,
-  // error, fault based on the Swift forum "logging-levels" discussion.
+  // The following overloads are for logging at specific levels. The levels that
+  // are supported are debug (also called trace), info, notice (also called
+  // default), error (also called warning), fault (also called critical).
+
+  @_transparent
+  @_optimize(none)
+  public func trace(_ message: OSLogMessage) {
+    osLog(log: logObject, level: .debug, message)
+  }
+
+  @_transparent
+  @_optimize(none)
+  public func debug(_ message: OSLogMessage) {
+    osLog(log: logObject, level: .debug, message)
+  }
+
+  @_transparent
+  @_optimize(none)
+  public func info(_ message: OSLogMessage) {
+    osLog(log: logObject, level: .info, message)
+  }
+
+  @_transparent
+  @_optimize(none)
+  public func notice(_ message: OSLogMessage) {
+    osLog(log: logObject, level: .default, message)
+  }
+
+  @_transparent
+  @_optimize(none)
+  public func warning(_ message: OSLogMessage) {
+    osLog(log: logObject, level: .error, message)
+  }
+
+  @_transparent
+  @_optimize(none)
+  public func error(_ message: OSLogMessage) {
+    osLog(log: logObject, level: .error, message)
+  }
+
+  @_transparent
+  @_optimize(none)
+  public func critical(_ message: OSLogMessage) {
+    osLog(log: logObject, level: .fault, message)
+  }
+
+  @_transparent
+  @_optimize(none)
+  public func fault(_ message: OSLogMessage) {
+    osLog(log: logObject, level: .fault, message)
+  }
 }
 
 /// Given an instance of the custom string interpolation type: `OSLogMessage`,
 /// extract the format string, serialize the arguments to a byte buffer,
 /// and pass them to the OS logging system.
 @available(macOS 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
-@usableFromInline
 @_transparent
 @_optimize(none)
-internal func osLog(
-  _ logObject: OSLog,
-  _ logLevel: OSLogType,
+public func osLog(
+  log logObject: OSLog,
+  level logLevel: OSLogType,
   _ message: OSLogMessage
 ) {
   // Compute static constants first so that they can be folded by
@@ -94,9 +147,12 @@ internal func osLog(
                  bufferMemory,
                  uint32bufferSize)
 
-  // The following operation extends the lifetime of stringStorageObjects
-  // and also of the objects stored in it till this point.
-  stringStorageObjects.removeAll()
+  // The following operation extends the lifetime of argumentClosures,
+  // stringStorageObjects, and also of the objects stored in them till this
+  // point. This is necessary because __os_log_impl is passed internal pointers
+  // to the objects/strings stored in these arrays.
+  _fixLifetime(argumentClosures)
+  _fixLifetime(stringStorageObjects)
   bufferMemory.deallocate()
 }
 
@@ -136,6 +192,7 @@ func _checkFormatStringAndBuffer(
     formatString,
     UnsafeBufferPointer(start: UnsafePointer(bufferMemory), count: bufferSize))
 
-  stringStorageObjects.removeAll()
+  _fixLifetime(argumentClosures)
+  _fixLifetime(stringStorageObjects)
   bufferMemory.deallocate()
 }

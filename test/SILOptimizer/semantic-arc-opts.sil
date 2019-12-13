@@ -948,3 +948,98 @@ bb0(%0 : @guaranteed $ClassLet):
   %9999 = tuple()
   return %9999 : $()
 }
+
+// CHECK-LABEL: sil [ossa] @single_init_allocstack : $@convention(thin) (@owned Klass) -> () {
+// CHECK-NOT: load [copy]
+// CHECK: } // end sil function 'single_init_allocstack'
+sil [ossa] @single_init_allocstack : $@convention(thin) (@owned Klass) -> () {
+bb0(%0 : @owned $Klass):
+  %1 = alloc_stack $Klass
+  store %0 to [init] %1 : $*Klass
+  %2 = load [copy] %1 : $*Klass
+
+  %3 = function_ref @guaranteed_klass_user : $@convention(thin) (@guaranteed Klass) -> ()
+  apply %3(%2) : $@convention(thin) (@guaranteed Klass) -> ()
+
+  destroy_value %2 : $Klass
+  destroy_addr %1 : $*Klass
+  dealloc_stack %1 : $*Klass
+
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @multiple_init_allocstack : $@convention(thin) (@owned Klass) -> () {
+// CHECK: load [copy]
+// CHECK: } // end sil function 'multiple_init_allocstack'
+sil [ossa] @multiple_init_allocstack : $@convention(thin) (@owned Klass) -> () {
+bb0(%0 : @owned $Klass):
+  %0a = copy_value %0 : $Klass
+  %1 = alloc_stack $Klass
+  store %0 to [init] %1 : $*Klass
+  %2 = load [copy] %1 : $*Klass
+
+  %3 = function_ref @guaranteed_klass_user : $@convention(thin) (@guaranteed Klass) -> ()
+  apply %3(%2) : $@convention(thin) (@guaranteed Klass) -> ()
+
+  destroy_value %2 : $Klass
+  destroy_addr %1 : $*Klass
+
+  store %0a to [init] %1 : $*Klass
+  destroy_addr %1 : $*Klass
+  dealloc_stack %1 : $*Klass
+
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// We could support this, but for now we are keeping things simple. If we do add
+// support, this test will need to be updated.
+//
+// CHECK-LABEL: sil [ossa] @single_init_wrongblock : $@convention(thin) (@owned Klass) -> () {
+// CHECK: load [copy]
+// CHECK: } // end sil function 'single_init_wrongblock'
+sil [ossa] @single_init_wrongblock : $@convention(thin) (@owned Klass) -> () {
+bb0(%0 : @owned $Klass):
+  %1 = alloc_stack $Klass
+  br bb1
+
+bb1:
+  store %0 to [init] %1 : $*Klass
+  %2 = load [copy] %1 : $*Klass
+
+  %3 = function_ref @guaranteed_klass_user : $@convention(thin) (@guaranteed Klass) -> ()
+  apply %3(%2) : $@convention(thin) (@guaranteed Klass) -> ()
+
+  destroy_value %2 : $Klass
+  destroy_addr %1 : $*Klass
+  dealloc_stack %1 : $*Klass
+
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// We could support this, but for now we are keeping things simple. If we do add
+// support, this test will need to be updated.
+//
+// CHECK-LABEL: sil [ossa] @single_init_loadtake : $@convention(thin) (@owned Klass) -> () {
+// CHECK: load [copy]
+// CHECK: } // end sil function 'single_init_loadtake'
+sil [ossa] @single_init_loadtake : $@convention(thin) (@owned Klass) -> () {
+bb0(%0 : @owned $Klass):
+  %1 = alloc_stack $Klass
+  store %0 to [init] %1 : $*Klass
+  %2 = load [copy] %1 : $*Klass
+
+  %3 = function_ref @guaranteed_klass_user : $@convention(thin) (@guaranteed Klass) -> ()
+  apply %3(%2) : $@convention(thin) (@guaranteed Klass) -> ()
+
+  destroy_value %2 : $Klass
+
+  %4 = load [take] %1 : $*Klass
+  destroy_value %4 : $Klass
+  dealloc_stack %1 : $*Klass
+
+  %9999 = tuple()
+  return %9999 : $()
+}
