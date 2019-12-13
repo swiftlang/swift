@@ -31,10 +31,8 @@ bb0(%0 : $Builtin.Int64):
 // CHECK: bb0(%0 : $T):
 // CHECK:   %1 = copy_value %0 : $T
 // CHECK:   %2 = copy_value %0 : $T
-// CHECK:   %3 = copy_value %0 : $T
-// CHECK:   destroy_value %0 : $T
-// CHECK:   %5 = tuple (%1 : $T, %2 : $T, %3 : $T)
-// CHECK:   return %5 : $(T, T, T)
+// CHECK:   %3 = tuple (%1 : $T, %2 : $T, %0 : $T)
+// CHECK:   return %3 : $(T, T, T)
 // CHECK-LABEL: } // end sil function 'f020_multiResult'
 sil hidden [noinline] @f020_multiResult : $@convention(thin) <T> (@in T) -> (@out T, @out T, @out T) {
 bb0(%0 : $T):

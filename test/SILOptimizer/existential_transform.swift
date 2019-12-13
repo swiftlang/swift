@@ -299,10 +299,8 @@ func wrap_gcp<T:GP>(_ a:T,_ b:GP) -> Int {
 // CHECK: store
 // CHECK: function_ref @$s21existential_transform8wrap_gcpySix_AA2GP_ptAaCRzlFTf4ne_n : $@convention(thin) <τ_0_0 where τ_0_0 : GP><τ_1_0 where τ_1_0 : GP> (@in_guaranteed τ_0_0, @in_guaranteed τ_1_0) -> Int 
 // CHECK: open_existential_addr 
-// CHECK: strong_retain 
 // CHECK: apply
 // CHECK: destroy_addr 
-// CHECK: strong_release 
 // CHECK: dealloc_stack
 // CHECK: return 
 // CHECK: } // end sil function '$s21existential_transform3gcpySixAA2GPRzlF'
@@ -326,10 +324,8 @@ func wrap_gcp_arch<T:GP>(_ a:T,_ b:GP, _ c:inout Array<T>) -> Int {
 // CHECK: store
 // CHECK: function_ref @$s21existential_transform13wrap_gcp_archySix_AA2GP_pSayxGztAaCRzlFTf4nen_n : $@convention(thin) <τ_0_0 where τ_0_0 : GP><τ_1_0 where τ_1_0 : GP> (@in_guaranteed τ_0_0, @in_guaranteed τ_1_0, @inout Array<τ_0_0>) -> Int
 // CHECK: open_existential_addr
-// CHECK: strong_retain
 // CHECK: apply
 // CHECK: destroy_addr
-// CHECK: strong_release
 // CHECK: dealloc_stack
 // CHECK: return
 // CHECK-LABEL: } // end sil function '$s21existential_transform8gcp_archySix_SayxGztAA2GPRzlF'

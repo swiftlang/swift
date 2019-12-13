@@ -48,12 +48,15 @@ class LiveRange {
 
   /// A list of forwarding instructions that forward our destroys ownership, but
   /// that are also able to forward guaranteed ownership.
-  SmallVector<SILInstruction *, 16> generalForwardingInsts;
+  SmallVector<SILInstruction *, 16> consumingForwardingInsts;
 
   /// Consuming users that we were not able to understand as a forwarding
   /// instruction or a destroy_value. These must be passed a strongly control
   /// equivalent +1 value.
-  SmallVector<SILInstruction *, 16> unknownConsumingUsers;
+  SmallSetVector<SILInstruction *, 16> unknownConsumingUsers;
+
+  /// The list of non consuming users that we found.
+  SmallSetVector<SILInstruction *, 16> nonConsumingUsers;
 
 public:
   LiveRange(SILValue value);
@@ -68,16 +71,43 @@ public:
   /// or another function implying it can be used everywhere at +0.
   bool hasConsumingUse() const { return unknownConsumingUsers.size(); }
 
+  /// Returns true if this LiveRange has any consuming forwarding uses.
+  ///
+  /// These uses are not technically ending the lifetime of the underlying value
+  /// that is being propagated around and can be converted to guaranteed
+  /// arguments.
+  bool hasConsumingForwardingUse() const {
+    return consumingForwardingInsts.size();
+  }
+
+  /// Return true if this live range has any non consuming uses.
+  bool hasNonConsumingUse() const { return nonConsumingUsers.size(); }
+
   ArrayRef<SILInstruction *> getDestroys() const { return destroys; }
-  ArrayRef<SILInstruction *> getNonConsumingForwardingInsts() const {
-    return generalForwardingInsts;
+
+  ArrayRef<SILInstruction *> getConsumingForwardingInsts() const {
+    return consumingForwardingInsts;
+  }
+
+  /// If this live range has only one single destroy user, return that
+  /// destroy. Otherwise, return nullptr.
+  SILInstruction *getSingleDestroyUser() const {
+    if (destroys.size() != 1)
+      return nullptr;
+    return destroys[0];
+  }
+
+  /// Returns true if maybeUser is an actual non consuming user of this live
+  /// range. False otherwise.
+  bool isNonConsumingUser(SILInstruction *maybeUser) const {
+    return nonConsumingUsers.count(maybeUser);
   }
 };
 
 } // end anonymous namespace
 
 LiveRange::LiveRange(SILValue value)
-    : destroys(), generalForwardingInsts(), unknownConsumingUsers() {
+    : destroys(), consumingForwardingInsts(), unknownConsumingUsers() {
   SmallVector<Operand *, 32> worklist(value->getUses());
 
   while (!worklist.empty()) {
@@ -122,14 +152,14 @@ LiveRange::LiveRange(SILValue value)
                           return v.getOwnershipKind() ==
                                  ValueOwnershipKind::Owned;
                         })) {
-        unknownConsumingUsers.push_back(user);
+        unknownConsumingUsers.insert(user);
         continue;
       }
 
       // Ok, this is a forwarding instruction whose ownership we can flip from
       // owned -> guaranteed. Visit its users recursively to see if the the
       // users force the live range to be alive.
-      generalForwardingInsts.push_back(user);
+      consumingForwardingInsts.push_back(user);
       for (SILValue v : user->getResults()) {
         if (v.getOwnershipKind() != ValueOwnershipKind::Owned)
           continue;
@@ -145,6 +175,16 @@ LiveRange::LiveRange(SILValue value)
       assert(map.canAcceptKind(ValueOwnershipKind::Guaranteed) &&
              "Any non-consuming use of an owned value should be able to take a "
              "guaranteed value");
+      nonConsumingUsers.insert(user);
+
+      // See if this is a borrow introducer. If it is a borrow, we need to add
+      // its end_borrows to the non consuming users.
+      if (auto scopeOperand = BorrowScopeOperand::get(op)) {
+        scopeOperand->visitEndScopeInstructions([&](Operand *endScopeOp) {
+          nonConsumingUsers.insert(endScopeOp->getUser());
+        });
+      }
+
       continue;
     }
   }
@@ -228,6 +268,7 @@ struct SemanticARCOptVisitor
       visitedSinceLastMutation.erase(result);
     }
     i->eraseFromParent();
+    ++NumEliminatedInsts;
 
     // Add everything else from visitedSinceLastMutation to the worklist.
     for (auto opt : visitedSinceLastMutation) {
@@ -312,6 +353,7 @@ struct SemanticARCOptVisitor
 
   bool performGuaranteedCopyValueOptimization(CopyValueInst *cvi);
   bool eliminateDeadLiveRangeCopyValue(CopyValueInst *cvi);
+  bool eliminateConsumedLiveRangeCopyValue(CopyValueInst *cvi);
 };
 
 } // end anonymous namespace
@@ -389,11 +431,9 @@ bool SemanticARCOptVisitor::visitBeginBorrowInst(BeginBorrowInst *bbi) {
   while (!endBorrows.empty()) {
     auto *ebi = endBorrows.pop_back_val();
     eraseInstruction(ebi);
-    ++NumEliminatedInsts;
   }
 
   eraseAndRAUWSingleValueInstruction(bbi, bbi->getOperand());
-  ++NumEliminatedInsts;
   return true;
 }
 
@@ -596,26 +636,108 @@ bool SemanticARCOptVisitor::performGuaranteedCopyValueOptimization(CopyValueInst
     auto *dvi = destroys.back();
     destroys = destroys.drop_back();
     eraseInstruction(dvi);
-    ++NumEliminatedInsts;
   }
 
   eraseAndRAUWSingleValueInstruction(cvi, cvi->getOperand());
-  convertForwardingInstsFromOwnedToGuaranteed(
-      lr.getNonConsumingForwardingInsts());
-
-  ++NumEliminatedInsts;
+  convertForwardingInstsFromOwnedToGuaranteed(lr.getConsumingForwardingInsts());
   return true;
+}
+
+// This tries to handle simple cases where:
+//
+// 1. Our operand only has one destroy and that destroy is in the same block
+//    as our copy_value.
+//
+// 2. All other uses of the operand are either not in the copy_value/destroy
+//    block or are strictly before the copy_value.
+//
+// If we succeed in identifying such a situation, we return the destroy_addr of
+// the operand that must be deleted. If we can not optimize, we return nullptr.
+static SILInstruction *
+isSimpleConsumedLiveRangeCopyValue(const LiveRange &operandLiveRange,
+                                   CopyValueInst *cvi) {
+  // For now to make our optimization simple, we do not allow for our live range
+  // to have consuming uses that we could turn into guaranteed arguments.
+  if (operandLiveRange.hasConsumingForwardingUse()) {
+    return nullptr;
+  }
+
+  // Now grab the single destroy if we have one and make sure that single
+  // destroy is in the same block as the copy value. Otherwise, return nullptr
+  // to signal failure.
+  auto *singleDestroy = operandLiveRange.getSingleDestroyUser();
+  if (!singleDestroy || singleDestroy->getParent() != cvi->getParent()) {
+    return nullptr;
+  }
+
+  // Now we must validate that all operand uses that are not consuming are
+  // either not in the same block as our copy or are ordered strictly earlier
+  // than our copy in the block. Otherwise, we can not optimize. First we
+  // quickly return success if we do not have any consuming users.
+  if (!operandLiveRange.hasNonConsumingUse()) {
+    return singleDestroy;
+  }
+
+  // Then walk the block from the copy to the single destroy,
+  // validated that none of the instructions in that region are non
+  // consuming users of the live range. If we hit the end of the block
+  // and haven't seen the destroy, then we know that the destroy was
+  // before us in the block and we can not optimize.
+  auto iterRange =
+      llvm::make_range(std::next(cvi->getIterator()), cvi->getParent()->end());
+  bool foundSingleDestroy = false;
+  for (auto &inst : iterRange) {
+    if (&inst == singleDestroy) {
+      foundSingleDestroy = true;
+      break;
+    }
+
+    if (operandLiveRange.isNonConsumingUser(&inst)) {
+      return nullptr;
+    }
+  }
+
+  if (!foundSingleDestroy)
+    return nullptr;
+
+  // Alright! We can optimize away the copy/destroy! Return the destroy_addr to
+  // our caller so that they can clean up as appropriate.
+  return singleDestroy;
+}
+
+bool SemanticARCOptVisitor::eliminateConsumedLiveRangeCopyValue(
+    CopyValueInst *cvi) {
+  SILValue operand = cvi->getOperand();
+  if (operand.getOwnershipKind() != ValueOwnershipKind::Owned) {
+    return false;
+  }
+
+  LiveRange operandLiveRange(operand);
+
+  // If our live range is not truly dead, bail.
+  if (operandLiveRange.hasConsumingUse())
+    return false;
+
+  // First try to handle some simple cases before we deal with the full
+  // optimization.
+  if (auto *dvi = isSimpleConsumedLiveRangeCopyValue(operandLiveRange, cvi)) {
+    eraseInstruction(dvi);
+    eraseAndRAUWSingleValueInstruction(cvi, operand);
+    return true;
+  }
+
+  // We failed to optimize. Signal failure by returning false.
+  return false;
 }
 
 /// If cvi only has destroy value users, then cvi is a dead live range. Lets
 /// eliminate all such dead live ranges.
 bool SemanticARCOptVisitor::eliminateDeadLiveRangeCopyValue(CopyValueInst *cvi) {
   // See if we are lucky and have a simple case.
-  if (auto *op = cvi->getSingleUse()) {
-    if (auto *dvi = dyn_cast<DestroyValueInst>(op->getUser())) {
+  if (auto *copyValueUse = cvi->getSingleUse()) {
+    if (auto *dvi = dyn_cast<DestroyValueInst>(copyValueUse->getUser())) {
       eraseInstruction(dvi);
       eraseInstructionAndAddOperandsToWorklist(cvi);
-      NumEliminatedInsts += 2;
       return true;
     }
   }
@@ -639,10 +761,8 @@ bool SemanticARCOptVisitor::eliminateDeadLiveRangeCopyValue(CopyValueInst *cvi) 
   // Now that we have a truly dead live range copy value, eliminate it!
   while (!destroys.empty()) {
     eraseInstruction(destroys.pop_back_val());
-    ++NumEliminatedInsts;
   }
   eraseInstructionAndAddOperandsToWorklist(cvi);
-  ++NumEliminatedInsts;
   return true;
 }
 
@@ -650,6 +770,18 @@ bool SemanticARCOptVisitor::visitCopyValueInst(CopyValueInst *cvi) {
   // If our copy value inst has only destroy_value users, it is a dead live
   // range. Try to eliminate them.
   if (eliminateDeadLiveRangeCopyValue(cvi)) {
+    return true;
+  }
+
+  // See if:
+  //
+  // 1. Our copy_value is a copy of an owned value that is a "dead live range".
+  // 2. Our copy_value is consumed by all of its users.
+  //
+  // In such a case, assuming that our copy_value is strongly control
+  // equivalent, we can eliminate the inner copy and feed the dead live range
+  // into the forwarding operation.
+  if (eliminateConsumedLiveRangeCopyValue(cvi)) {
     return true;
   }
 
@@ -892,7 +1024,6 @@ bool SemanticARCOptVisitor::visitLoadInst(LoadInst *li) {
     auto *dvi = destroyValues.back();
     destroyValues = destroyValues.drop_back();
     eraseInstruction(dvi);
-    ++NumEliminatedInsts;
   }
 
   // RAUW our other uses from the load to the load_borrow.
@@ -900,10 +1031,8 @@ bool SemanticARCOptVisitor::visitLoadInst(LoadInst *li) {
 
   // And then change the ownership all of our owned forwarding users to be
   // guaranteed.
-  convertForwardingInstsFromOwnedToGuaranteed(
-      lr.getNonConsumingForwardingInsts());
+  convertForwardingInstsFromOwnedToGuaranteed(lr.getConsumingForwardingInsts());
 
-  ++NumEliminatedInsts;
   ++NumLoadCopyConvertedToLoadBorrow;
   return true;
 }
