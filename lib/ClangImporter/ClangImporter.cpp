@@ -802,6 +802,11 @@ bool ClangImporter::canReadPCH(StringRef PCHFilename) {
   auto FID = clangSrcMgr.createFileID(
                         std::make_unique<ZeroFilledMemoryBuffer>(1, "<main>"));
   clangSrcMgr.setMainFileID(FID);
+  auto &diagConsumer = CI.getDiagnosticClient();
+  diagConsumer.BeginSourceFile(CI.getLangOpts());
+  SWIFT_DEFER {
+    diagConsumer.EndSourceFile();
+  };
 
   // Pass in TU_Complete, which is the default mode for the Preprocessor
   // constructor and the right one for reading a PCH.
