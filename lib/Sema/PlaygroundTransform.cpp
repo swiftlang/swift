@@ -320,8 +320,16 @@ public:
     }
     case ExprKind::Load:
       return digForVariable(cast<LoadExpr>(E)->getSubExpr());
-    case ExprKind::ForceValue:
-      return digForVariable(cast<ForceValueExpr>(E)->getSubExpr());
+    case ExprKind::ForceValue: {
+      std::pair<Added<Expr *>, ValueDecl *> BaseVariable =
+          digForVariable(cast<ForceValueExpr>(E)->getSubExpr());
+      if (!*BaseVariable.first || !BaseVariable.second)
+        return std::make_pair(nullptr, nullptr);
+
+      Added<Expr *> Forced(
+          new (Context) ForceValueExpr(*BaseVariable.first, SourceLoc()));
+      return std::make_pair(Forced, BaseVariable.second);
+    }
     case ExprKind::InOut:
       return digForVariable(cast<InOutExpr>(E)->getSubExpr());
     }
