@@ -1765,7 +1765,21 @@ public:
   }
 };
 
-/// Attribute that registers a function as a derivative of another function.
+/// The `@derivative` attribute registers a function as a derivative of another
+/// function-like declaration: a 'func', 'init', 'subscript', or 'var' computed
+/// property declaration.
+///
+/// The `@derivative` attribute also has an optional `wrt:` clause specifying
+/// the parameters that are differentiated "with respect to", i.e. the
+/// differentiation parameters. The differentiation parameters must conform to
+/// the `Differentiable` protocol.
+///
+/// If the `wrt:` clause is unspecified, the differentiation parameters are
+/// inferred to be all parameters that conform to `Differentiable`.
+///
+/// `@derivative` attribute type-checking verifies that the type of the
+/// derivative function declaration is consistent with the type of the
+/// referenced original declaration and the differentiation parameters.
 ///
 /// Examples:
 ///   @derivative(of: sin(_:))
