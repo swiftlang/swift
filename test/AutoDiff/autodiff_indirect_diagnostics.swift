@@ -1,8 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil -verify -verify-ignore-unknown %s
-
-// FIXME(TF-201): Remove `-verify-ignore-unknown`. This is currently necessary
-// due to direct differentiation of reabstraction thunks, which emits errors
-// with unknown location.
+// RUN: %target-swift-frontend -emit-sil -verify %s
 
 //===----------------------------------------------------------------------===//
 // Non-differentiable arguments and results
