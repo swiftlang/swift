@@ -69,28 +69,38 @@ void TBDGenVisitor::addSymbolInternal(StringRef name,
   }
 }
 
+static Optional<llvm::VersionTuple> getDeclMoveOSVersion(Decl *D) {
+  for (auto *attr: D->getAttrs()) {
+    if (auto *ODA = dyn_cast<OriginallyDefinedInAttr>(attr)) {
+      if (ODA->isActivePlatform(D->getASTContext()))
+        return ODA->MovedVersion;
+    }
+  }
+  return None;
+}
+
 void TBDGenVisitor::addLinkerDirectiveSymbols(StringRef name,
                                               llvm::MachO::SymbolKind kind) {
   if (kind != llvm::MachO::SymbolKind::GlobalSymbol)
     return;
   if (!TopLevelDecl)
     return;
-  auto ODA = TopLevelDecl->getAttrs().getAttribute<OriginallyDefinedInAttr>();
-  if (!ODA)
+  auto MovedVer = getDeclMoveOSVersion(TopLevelDecl);
+  if (!MovedVer.hasValue())
     return;
+  assert(MovedVer.hasValue());
   unsigned Major[2];
   unsigned Minor[2];
-  Major[1] = ODA->MovedVersion.getMajor();
-  Minor[1] = ODA->MovedVersion.getMinor().hasValue() ?
-    *ODA->MovedVersion.getMinor(): 0;
+  Major[1] = MovedVer->getMajor();
+  Minor[1] = MovedVer->getMinor().hasValue() ? *MovedVer->getMinor(): 0;
   auto AvailRange = AvailabilityInference::availableRange(TopLevelDecl,
                                 TopLevelDecl->getASTContext()).getOSVersion();
   assert(AvailRange.hasLowerEndpoint() &&
          "cannot find the start point of availability");
   if (!AvailRange.hasLowerEndpoint())
     return;
-  assert(AvailRange.getLowerEndpoint() < ODA->MovedVersion);
-  if (AvailRange.getLowerEndpoint() >= ODA->MovedVersion)
+  assert(AvailRange.getLowerEndpoint() < *MovedVer);
+  if (AvailRange.getLowerEndpoint() >= *MovedVer)
     return;
   Major[0] = AvailRange.getLowerEndpoint().getMajor();
   Minor[0] = AvailRange.getLowerEndpoint().getMinor().hasValue() ?
@@ -691,9 +701,7 @@ static bool isApplicationExtensionSafe(const LangOptions &LangOpts) {
 }
 
 static bool hasLinkerDirective(Decl *D) {
-  if (D->getAttrs().hasAttribute<OriginallyDefinedInAttr>())
-    return true;
-  return false;
+  return getDeclMoveOSVersion(D).hasValue();
 }
 
 static void enumeratePublicSymbolsAndWrite(ModuleDecl *M, FileUnit *singleFile,
