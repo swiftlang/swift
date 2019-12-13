@@ -2756,6 +2756,9 @@ ERROR(attr_not_on_variadic_parameters,none,
 ERROR(attr_not_on_subscript_parameters,none,
       "'%0' must not be used on subscript parameters", (StringRef))
 
+ERROR(attr_ambiguous_reference_to_decl,none,
+      "ambiguous reference to %0 in '@%1' attribute", (DeclNameRef, StringRef))
+
 ERROR(override_final,none,
       "%0 overrides a 'final' %1", (DescriptiveDeclKind, DescriptiveDeclKind))
 
@@ -2890,6 +2893,68 @@ ERROR(implements_attr_non_protocol_type,none,
 ERROR(implements_attr_protocol_not_conformed_to,none,
       "containing type %0 does not conform to protocol %1",
       (DeclName, DeclName))
+
+// @derivative
+ERROR(derivative_attr_expected_result_tuple,none,
+      "'@derivative(of:)' attribute requires function to return a two-element "
+      "tuple of type '(value: T..., pullback: (U.TangentVector) -> T.TangentVector...)' "
+      "or '(value: T..., differential: (T.TangentVector...) -> U.TangentVector)'", ())
+ERROR(derivative_attr_invalid_result_tuple_value_label,none,
+      "'@derivative(of:)' attribute requires function to return a two-element "
+      "tuple (first element must have label 'value:')", ())
+ERROR(derivative_attr_invalid_result_tuple_func_label,none,
+      "'@derivative(of:)' attribute requires function to return a two-element "
+      "tuple (second element must have label 'pullback:' or 'differential:')",
+      ())
+ERROR(derivative_attr_result_value_not_differentiable,none,
+      "'@derivative(of:)' attribute requires function to return a two-element "
+      "tuple (first element type %0 must conform to 'Differentiable')", (Type))
+ERROR(derivative_attr_result_func_type_mismatch,none,
+      "function result's %0 type does not match %1", (Identifier, DeclName))
+NOTE(derivative_attr_result_func_type_mismatch_note,none,
+     "%0 does not have expected type %1", (Identifier, Type))
+NOTE(derivative_attr_result_func_original_note,none,
+     "%0 defined here", (DeclName))
+ERROR(derivative_attr_not_in_same_file_as_original,none,
+      "derivative not in the same file as the original function", ())
+ERROR(derivative_attr_original_stored_property_unsupported,none,
+      "cannot register derivative for stored property %0", (DeclNameRef))
+ERROR(derivative_attr_original_already_has_derivative,none,
+      "a derivative already exists for %0", (DeclName))
+NOTE(derivative_attr_duplicate_note,none,
+     "other attribute declared here", ())
+
+// Automatic differentiation attributes
+ERROR(autodiff_attr_original_decl_invalid_kind,none,
+      "%0 is not a 'func', 'init', 'subscript', or 'var' computed property "
+      "declaration", (DeclNameRef))
+ERROR(autodiff_attr_original_decl_none_valid_found,none,
+      "could not find function %0 with expected type %1", (DeclNameRef, Type))
+ERROR(autodiff_attr_original_decl_not_same_type_context,none,
+      "%0 is not defined in the current type context", (DeclNameRef))
+
+// differentiation `wrt` parameters clause
+ERROR(diff_function_no_parameters,none,
+      "%0 has no parameters to differentiate with respect to", (DeclName))
+ERROR(diff_params_clause_param_name_unknown,none,
+      "unknown parameter name %0", (Identifier))
+ERROR(diff_params_clause_self_instance_method_only,none,
+      "'self' parameter is only applicable to instance methods", ())
+ERROR(diff_params_clause_self_must_be_first,none,
+      "'self' parameter must come first in the parameter list", ())
+ERROR(diff_params_clause_params_not_original_order,none,
+      "parameters must be specified in original order", ())
+ERROR(diff_params_clause_param_index_out_of_range,none,
+      "parameter index is larger than total number of parameters", ())
+ERROR(diff_params_clause_no_inferred_parameters,PointsToFirstBadToken,
+      "no differentiation parameters could be inferred; must differentiate "
+      "with respect to at least one parameter conforming to 'Differentiable'",
+      ())
+ERROR(diff_params_clause_cannot_diff_wrt_inout_parameter,none,
+      "cannot differentiate with respect to 'inout' parameter (%0)", (Type))
+ERROR(diff_params_clause_param_not_differentiable,none,
+      "can only differentiate with respect to parameters that conform to "
+      "'Differentiable', but %0 does not conform to 'Differentiable'", (Type))
 
 //------------------------------------------------------------------------------
 // MARK: Type Check Expressions
