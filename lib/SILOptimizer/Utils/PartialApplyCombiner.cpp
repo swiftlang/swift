@@ -279,9 +279,13 @@ bool PartialApplyCombiner::processSingleApply(FullApplySite paiAI) {
 SILInstruction *PartialApplyCombiner::combine() {
   // We need to model @unowned_inner_pointer better before we can do the
   // peephole here.
-  for (auto resultInfo : pai->getSubstCalleeType()->getResults())
-    if (resultInfo.getConvention() == ResultConvention::UnownedInnerPointer)
-      return nullptr;
+  if (llvm::any_of(pai->getSubstCalleeType()->getResults(),
+                   [](SILResultInfo resultInfo) {
+                     return resultInfo.getConvention() ==
+                            ResultConvention::UnownedInnerPointer;
+                   })) {
+    return nullptr;
+  }
 
   // Iterate over all uses of the partial_apply
   // and look for applies that use it as a callee.
