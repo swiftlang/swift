@@ -2059,7 +2059,7 @@ func valueWithDifferential<T, R>(
 ) -> (value: R,
       differential: @differentiable(linear) (T.TangentVector) -> R.TangentVector) {
     // Compiler built-in.
-    Builtin.autodiffApply_jvp_arity1(body, x)
+    Builtin.applyDerivative_arity1(body, x)
 }
 
 
@@ -2068,7 +2068,7 @@ func transpose<T, R>(
     of body: @escaping @differentiable(linear) (T) -> R
 ) -> @differentiable(linear) (R) -> T {
     // Compiler built-in.
-    { x in Builtin.autodiffApply_transpose(body, x) }
+    { x in Builtin.applyTranspose_arity1(body, x) }
 }
 ```
 
