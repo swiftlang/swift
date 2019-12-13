@@ -8427,14 +8427,15 @@ createUnavailableDecl(Identifier name, DeclContext *dc, Type type,
 // deserialized before loading the members of this class. This allows the
 // decl members table to be warmed up and enables the correct identification of
 // overrides.
-static void loadAllMembersOfSuperclassesIfNeeded(const ClassDecl *CD) {
+static void loadAllMembersOfSuperclassIfNeeded(const ClassDecl *CD) {
   if (!CD)
     return;
 
-  while ((CD = CD->getSuperclassDecl())) {
-    if (CD->hasClangNode())
-      CD->loadAllMembers();
-  }
+  CD = CD->getSuperclassDecl();
+  if (!CD || !CD->hasClangNode())
+    return;
+
+  CD->loadAllMembers();
 }
 
 void
@@ -8449,7 +8450,7 @@ ClangImporter::Implementation::loadAllMembers(Decl *D, uint64_t extra) {
 
   // If not, we're importing globals-as-members into an extension.
   if (objcContainer) {
-    loadAllMembersOfSuperclassesIfNeeded(dyn_cast<ClassDecl>(D));
+    loadAllMembersOfSuperclassIfNeeded(dyn_cast<ClassDecl>(D));
     loadAllMembersOfObjcContainer(D, objcContainer);
     return;
   }
