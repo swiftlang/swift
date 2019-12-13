@@ -7520,11 +7520,6 @@ ConstraintSystem::simplifyApplicableFnConstraint(
         desugar2->is<AnyMetatypeType>())
       return SolutionKind::Error;
 
-    if (auto objectTy = desugar2->lookThroughAllOptionalTypes()) {
-      if (objectTy->isAny() || objectTy->isAnyObject())
-        return SolutionKind::Error;
-    }
-
     // If there are any type variables associated with arguments/result
     // they have to be marked as "holes".
     type1.visit([&](Type subType) {
