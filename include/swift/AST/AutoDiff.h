@@ -492,29 +492,39 @@ template<> struct DenseMapInfo<AutoDiffConfig> {
   static AutoDiffConfig getEmptyKey() {
     auto *ptr = llvm::DenseMapInfo<void *>::getEmptyKey();
     return {static_cast<IndexSubset *>(ptr), static_cast<IndexSubset *>(ptr),
-            DenseMapInfo<GenericSignature>::getEmptyKey()};
+            nullptr};
   }
 
   static AutoDiffConfig getTombstoneKey() {
     auto *ptr = llvm::DenseMapInfo<void *>::getTombstoneKey();
     return {static_cast<IndexSubset *>(ptr), static_cast<IndexSubset *>(ptr),
-            DenseMapInfo<GenericSignature>::getTombstoneKey()};
+            nullptr};
   }
 
   static unsigned getHashValue(const AutoDiffConfig &Val) {
+    auto canGenSig =
+        Val.derivativeGenericSignature
+            ? Val.derivativeGenericSignature->getCanonicalSignature()
+            : nullptr;
     unsigned combinedHash = hash_combine(
         ~1U, DenseMapInfo<void *>::getHashValue(Val.parameterIndices),
         DenseMapInfo<void *>::getHashValue(Val.resultIndices),
-        DenseMapInfo<GenericSignature>::getHashValue(
-            Val.derivativeGenericSignature));
+        DenseMapInfo<GenericSignature>::getHashValue(canGenSig));
     return combinedHash;
   }
 
   static bool isEqual(const AutoDiffConfig &LHS, const AutoDiffConfig &RHS) {
+    auto lhsCanGenSig =
+        LHS.derivativeGenericSignature
+            ? LHS.derivativeGenericSignature->getCanonicalSignature()
+            : nullptr;
+    auto rhsCanGenSig =
+        RHS.derivativeGenericSignature
+            ? RHS.derivativeGenericSignature->getCanonicalSignature()
+            : nullptr;
     return LHS.parameterIndices == RHS.parameterIndices &&
-        LHS.resultIndices == RHS.resultIndices &&
-        DenseMapInfo<GenericSignature>::isEqual(LHS.derivativeGenericSignature,
-                                                RHS.derivativeGenericSignature);
+           LHS.resultIndices == RHS.resultIndices &&
+           DenseMapInfo<GenericSignature>::isEqual(lhsCanGenSig, rhsCanGenSig);
   }
 };
 

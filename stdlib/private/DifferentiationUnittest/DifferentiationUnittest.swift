@@ -65,12 +65,12 @@ public struct Tracked<T> {
   }
   private var handle: Box
 
-  @differentiable(jvp: _jvpInit, vjp: _vjpInit where T : Differentiable, T == T.TangentVector)
+  @differentiable(where T : Differentiable, T == T.TangentVector)
   public init(_ value: T) {
     self.handle = Box(value)
   }
 
-  @differentiable(jvp: _jvpValue, vjp: _vjpValue where T : Differentiable, T == T.TangentVector)
+  @differentiable(where T : Differentiable, T == T.TangentVector)
   public var value: T {
     get { handle.value }
     set { handle.value = newValue }
@@ -172,24 +172,28 @@ extension Tracked : Differentiable where T : Differentiable, T == T.TangentVecto
 
 extension Tracked where T : Differentiable, T == T.TangentVector {
   @usableFromInline
+  @derivative(of: init)
   internal static func _vjpInit(_ value: T)
       -> (value: Self, pullback: (Self.TangentVector) -> (T.TangentVector)) {
     return (Tracked(value), { v in v.value })
   }
 
   @usableFromInline
+  @derivative(of: init)
   internal static func _jvpInit(_ value: T)
       -> (value: Self, differential: (T.TangentVector) -> (Self.TangentVector)) {
     return (Tracked(value), { v in Tracked(v) })
   }
 
   @usableFromInline
-  internal func _vjpValue() -> (T, (T.TangentVector) -> Self.TangentVector) {
+  @derivative(of: value)
+  internal func _vjpValue() -> (value: T, pullback: (T.TangentVector) -> Self.TangentVector) {
     return (value, { v in Tracked(v) })
   }
 
   @usableFromInline
-  internal func _jvpValue() -> (T, (Self.TangentVector) -> T.TangentVector) {
+  @derivative(of: value)
+  internal func _jvpValue() -> (value: T, differential: (Self.TangentVector) -> T.TangentVector) {
     return (value, { v in v.value })
   }
 }
