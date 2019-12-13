@@ -1548,8 +1548,8 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
     if (!shouldAttemptFixes())
       return getTypeMatchFailure(locator);
 
-    auto *fix = MarkExplicitlyEscaping::create(
-        *this, getConstraintLocator(locator), func2);
+    auto *fix = MarkExplicitlyEscaping::create(*this, func1, func2,
+                                               getConstraintLocator(locator));
 
     if (recordFix(fix))
       return getTypeMatchFailure(locator);
@@ -2084,9 +2084,8 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
       return getTypeMatchSuccess();
 
     if (shouldAttemptFixes()) {
-      auto &ctx = getASTContext();
-      auto *fix = MarkExplicitlyEscaping::create(
-          *this, getConstraintLocator(locator), ctx.TheAnyType);
+      auto *fix = MarkExplicitlyEscaping::create(*this, type1, type2,
+                                                 getConstraintLocator(locator));
       if (!recordFix(fix))
         return getTypeMatchSuccess();
     }
@@ -2348,8 +2347,8 @@ ConstraintSystem::matchTypesBindTypeVar(
   // but we still have a non-escaping type, fail.
   if (!typeVar->getImpl().canBindToNoEscape() && type->isNoEscape()) {
     if (shouldAttemptFixes()) {
-      auto *fix = MarkExplicitlyEscaping::create(
-          *this, getConstraintLocator(locator));
+      auto *fix = MarkExplicitlyEscaping::create(*this, typeVar, type,
+                                                 getConstraintLocator(locator));
       if (recordFix(fix))
         return getTypeMatchFailure(locator);
 
