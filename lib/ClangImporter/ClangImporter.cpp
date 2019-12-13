@@ -3292,6 +3292,12 @@ ClangImporter::parseClangFunctionType(StringRef typeStr,
   return nullptr;
 }
 
+void ClangImporter::printClangType(const clang::Type *type,
+                                   llvm::raw_ostream &os) const {
+  auto policy = clang::PrintingPolicy(getClangASTContext().getLangOpts());
+  clang::QualType(type, 0).print(os, policy);
+}
+
 //===----------------------------------------------------------------------===//
 // ClangModule Implementation
 //===----------------------------------------------------------------------===//

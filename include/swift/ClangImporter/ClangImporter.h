@@ -420,6 +420,8 @@ public:
 
   const clang::Type *parseClangFunctionType(StringRef type,
                                             SourceLoc loc) const override;
+  void printClangType(const clang::Type *type,
+                      llvm::raw_ostream &os) const override;
 };
 
 ImportDecl *createImportDecl(ASTContext &Ctx, DeclContext *DC, ClangNode ClangN,

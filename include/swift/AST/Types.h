@@ -59,6 +59,7 @@ class AssociatedTypeDecl;
 class ASTContext;
 enum BufferPointerTypeKind : unsigned;
 class ClassDecl;
+class ClangModuleLoader;
 class DependentMemberType;
 class GenericTypeParamDecl;
 class GenericTypeParamType;
@@ -2950,6 +2951,11 @@ public:
 
       bool empty() const { return !ClangFunctionType; }
       Uncommon(const clang::Type *type) : ClangFunctionType(type) {}
+
+    public:
+      /// Use the ClangModuleLoader to print the Clang type as a string.
+      void printClangFunctionType(ClangModuleLoader *cml,
+                                  llvm::raw_ostream &os);
     };
 
   private:

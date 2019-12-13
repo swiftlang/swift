@@ -107,6 +107,10 @@ public:
   /// Returns null if there was a parsing failure.
   virtual const clang::Type *parseClangFunctionType(StringRef type,
                                                     SourceLoc loc) const = 0;
+
+  /// Print the Clang type.
+  virtual void printClangType(const clang::Type *type,
+                              llvm::raw_ostream &os) const = 0;
 };
 
 } // namespace swift
