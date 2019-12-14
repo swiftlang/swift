@@ -2875,25 +2875,34 @@ static bool checkFunctionSignature(
     return false;
   }
 
+  // Map type into the required function type's generic signature, if it exists.
+  // This is significant when the required generic signature has same-type
+  // requirements while the candidate generic signature does not.
+  auto mapType = [&](Type type) {
+    if (!requiredGenSig)
+      return type->getCanonicalType();
+    return requiredGenSig->getCanonicalTypeInContext(type);
+  };
+
   // Check that parameter types match, disregarding labels.
   if (required->getNumParams() != candidateFnTy->getNumParams())
     return false;
   if (!std::equal(required->getParams().begin(), required->getParams().end(),
                   candidateFnTy->getParams().begin(),
-                  [](AnyFunctionType::Param x, AnyFunctionType::Param y) {
-                    return x.getPlainType()->isEqual(y.getPlainType());
+                  [&](AnyFunctionType::Param x, AnyFunctionType::Param y) {
+                    return x.getPlainType()->isEqual(mapType(y.getPlainType()));
                   }))
     return false;
 
   // If required result type is not a function type, check that result types
   // match exactly.
   auto requiredResultFnTy = dyn_cast<AnyFunctionType>(required.getResult());
+  auto candidateResultTy = mapType(candidateFnTy.getResult());
   if (!requiredResultFnTy) {
     auto requiredResultTupleTy = dyn_cast<TupleType>(required.getResult());
-    auto candidateResultTupleTy =
-        dyn_cast<TupleType>(candidateFnTy.getResult());
+    auto candidateResultTupleTy = dyn_cast<TupleType>(candidateResultTy);
     if (!requiredResultTupleTy || !candidateResultTupleTy)
-      return required.getResult()->isEqual(candidateFnTy.getResult());
+      return required.getResult()->isEqual(candidateResultTy);
     // If result types are tuple types, check that element types match,
     // ignoring labels.
     if (requiredResultTupleTy->getNumElements() !=
@@ -2906,7 +2915,7 @@ static bool checkFunctionSignature(
   }
 
   // Required result type is a function. Recurse.
-  return checkFunctionSignature(requiredResultFnTy, candidateFnTy.getResult());
+  return checkFunctionSignature(requiredResultFnTy, candidateResultTy);
 };
 
 // SWIFT_ENABLE_TENSORFLOW
@@ -3357,12 +3366,15 @@ DifferentiableAttributeParameterIndicesRequest::evaluate(
     }
   }
 
-  // Start type-checking the arguments of the @differentiable attribute. This
+  // Start type-checking the arguments of the `@differentiable` attribute. This
   // covers 'wrt:', 'jvp:', 'vjp:', and 'where', all of which are optional.
 
-  // Note: If there is a 'where' clause, then the generic signature from that
-  // overwrites this.
-  GenericSignature derivativeGenSig = original->getGenericSignature();
+  // Compute the derivative generic signature for the `@differentiable`
+  // attribute:
+  // - If the `@differentiable` attribute has a `where` clause, use it to
+  //   compute the derivative generic signature.
+  // - Otherwise, use the original declaration's generic signature by default.
+  auto derivativeGenSig = original->getGenericSignature();
 
   // Handle 'where' clause, if it exists.
   // - Resolve attribute where clause requirements and store in the attribute
@@ -3446,7 +3458,27 @@ DifferentiableAttributeParameterIndicesRequest::evaluate(
     whereClauseGenEnv = derivativeGenSig->getGenericEnvironment();
   }
 
-  // Store the resolved derivative generic signature in the attribute.
+  // Set the resolved derivative generic signature in the attribute.
+  // Do not set the derivative generic signature if the original declaration's
+  // generic signature is equal to `derivativeGenSig` and all generic parameters
+  // are concrete. In that case, the original declaration and derivative
+  // functions are all lowered as SIL functions with no generic signature
+  // (specialized with concrete types from same-type requirements), so the
+  // derivative generic signature should not be set.
+  auto skipDerivativeGenericSignature = [&] {
+    CanGenericSignature origCanGenSig;
+    if (auto origGenSig = original->getGenericSignature())
+      origCanGenSig = origGenSig->getCanonicalSignature();
+    CanGenericSignature derivativeCanGenSig;
+    if (derivativeGenSig)
+      derivativeCanGenSig = derivativeGenSig->getCanonicalSignature();
+    if (!derivativeGenSig)
+      return false;
+    return origCanGenSig == derivativeCanGenSig &&
+           derivativeCanGenSig->areAllParamsConcrete();
+  };
+  if (skipDerivativeGenericSignature())
+    derivativeGenSig = GenericSignature();
   attr->setDerivativeGenericSignature(derivativeGenSig);
 
   // Validate the 'wrt:' parameters.

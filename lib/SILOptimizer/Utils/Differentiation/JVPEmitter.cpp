@@ -285,6 +285,9 @@ SILType JVPEmitter::remapSILTypeInDifferential(SILType ty) {
 }
 
 Optional<VectorSpace> JVPEmitter::getTangentSpace(CanType type) {
+  // Use witness generic signature to remap types.
+  if (auto witnessGenSig = witness->getDerivativeGenericSignature())
+    type = witnessGenSig->getCanonicalTypeInContext(type);
   return type->getAutoDiffAssociatedTangentSpace(
       LookUpConformanceInModule(getModule().getSwiftModule()));
 }
@@ -1015,6 +1018,14 @@ JVPEmitter::createEmptyDifferential(ADContext &context,
   auto *original = witness->getOriginalFunction();
   auto *jvp = witness->getJVP();
   auto origTy = original->getLoweredFunctionType();
+  // Get witness generic signature for remapping types.
+  // Witness generic signature may have more requirements than JVP generic
+  // signature: when witness generic signature has same-type requirements
+  // binding all generic parameters to concrete types, JVP function type uses
+  // all the concrete types and JVP generic signature is null.
+  CanGenericSignature witnessCanGenSig;
+  if (auto witnessGenSig = witness->getDerivativeGenericSignature())
+    witnessCanGenSig = witnessGenSig->getCanonicalSignature();
   auto lookupConformance = LookUpConformanceInModule(module.getSwiftModule());
 
   // Parameters of the differential are:
@@ -1028,16 +1039,20 @@ JVPEmitter::createEmptyDifferential(ADContext &context,
   auto indices = witness->getSILAutoDiffIndices();
 
   // Add differential results.
-  auto origResInfo = origTy->getResults()[indices.source];
+  auto origResult = origTy->getResults()[indices.source];
+  origResult = origResult.getWithInterfaceType(
+      origResult.getInterfaceType()->getCanonicalType(witnessCanGenSig));
   dfResults.push_back(
-      SILResultInfo(origResInfo.getInterfaceType()
+      SILResultInfo(origResult.getInterfaceType()
                         ->getAutoDiffAssociatedTangentSpace(lookupConformance)
                         ->getCanonicalType(),
-                    origResInfo.getConvention()));
+                    origResult.getConvention()));
 
   // Add differential parameters for the requested wrt parameters.
   for (auto i : indices.parameters->getIndices()) {
     auto origParam = origParams[i];
+    origParam = origParam.getWithInterfaceType(
+        origParam.getInterfaceType()->getCanonicalType(witnessCanGenSig));
     dfParams.push_back(SILParameterInfo(
         origParam.getInterfaceType()
             ->getAutoDiffAssociatedTangentSpace(lookupConformance)
@@ -1059,7 +1074,11 @@ JVPEmitter::createEmptyDifferential(ADContext &context,
               original->getName(), AutoDiffLinearMapKind::Differential,
               witness->getConfig()))
           .str();
-  auto diffGenericSig = getDerivativeGenericSignature(witness, original);
+  // Set differential generic signature equal to JVP generic signature.
+  // Do not use witness generic signature, which may have same-type requirements
+  // binding all generic parameters to concrete types.
+  auto diffGenericSig =
+      jvp->getLoweredFunctionType()->getSubstGenericSignature();
   auto *diffGenericEnv =
       diffGenericSig ? diffGenericSig->getGenericEnvironment() : nullptr;
   auto diffType = SILFunctionType::get(
