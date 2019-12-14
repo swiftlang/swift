@@ -326,7 +326,7 @@ internal enum _KnownCocoaString {
                                               to: __SharedStringStorage.self))
     case ObjectIdentifier(_SwiftNSMutableString.self):
       let mutStr = _unsafeUncheckedDowncast(str, to: _SwiftNSMutableString.self)
-      if mutStr.isStringBacked {
+      if mutStr.brokenStorage == nil {
         self = .mutable(mutStr)
       } else {
         self = .cocoa(str) // treat as opaque

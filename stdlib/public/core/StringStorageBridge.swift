@@ -202,14 +202,12 @@ extension _AbstractStringStorage {
     case .shared(let storage):
       return _nativeIsEqual(storage)
     case .mutable(let storage):
-      if storage.isStringBacked {
-        return _nativeIsEqual(storage)
-      }
-      return _fallbackIsEqual(other, true)
-      #if !(arch(i386) || arch(arm))
+      return _nativeIsEqual(storage)
+#if !(arch(i386) || arch(arm))
     case .tagged(let otherStr):
-      return _fallbackIsEqual(otherStr, true)
-      #endif
+      //should pass true here but need to exclude non-string tagged pointers
+      return _fallbackIsEqual(otherStr, false)
+#endif
     case .cocoa(let otherStr):
       return _fallbackIsEqual(otherStr, false)
     }
@@ -429,235 +427,110 @@ extension __SharedStringStorage {
   
 }
 
+// Swift String always wants to have valid contents, so for cases where
+// mutation of the contents makes them invalid (e.g. deleting half of a
+// surrogate pair) we have an alternate backing store that's just an
+// Array of UTF16, which we largely leave up to NSString to interpret
+// We smuggle this into _SwiftNSMutableString by storing it as a foreign String
+@objc internal final class _InvalidUTF16StringStorage : __SwiftNativeNSString {
+  var contents: ContiguousArray<UTF16.CodeUnit>
+  
+  init(brokenContents arr: ContiguousArray<UTF16.CodeUnit>) {
+    contents = arr
+    super.init()
+  }
+  
+  @objc(characterAtIndex:)
+  @_effects(readonly)
+  final internal func character(at offset: Int) -> UInt16 {
+    return contents[offset]
+  }
+  
+  @objc(length)
+  internal var UTF16Length : Int {
+    @_effects(readonly) get {
+      return contents.count
+    }
+  }
+  
+  @objc(isEqualToString:)
+  @_effects(readonly)
+  final internal func isEqual(toString other:AnyObject?) -> Int8 {
+    guard let other = other else {
+      return 0
+    }
+    
+    guard self !== other else {
+      return 1
+    }
+    
+    guard _isNSString(other) == 1 else {
+      return 0
+    }
+    
+    if UTF16Length != _stdlib_binary_CFStringGetLength(other) {
+      return 0
+    }
+    
+    /*
+     The abstract implementation of -isEqualToString: falls back to compare:
+     immediately, so when we run out of fast options to try, do the same.
+     We can likely be more clever here if need be
+     */
+    return _cocoaStringCompare(self, other) == 0 ? 1 : 0
+  }
+  
+  @objc(isEqual:)
+  @_effects(readonly)
+  final internal func isEqual(to other:AnyObject?) -> Int8 {
+    return isEqual(toString: other)
+  }
+
+  @objc(getCharacters:range:)
+  @_effects(releasenone)
+  final internal func getCharacters(
+    _ buffer: UnsafeMutablePointer<UInt16>, range aRange: _SwiftNSRange
+  ) {
+    let range = aRange.location ..< aRange.location+aRange.length
+
+    let bufPtr = UnsafeMutableBufferPointer(
+      start: buffer,
+      count: range.count
+    )
+    contents[range]._copyContents(initializing: bufPtr)
+  }
+}
+
 @usableFromInline
 @objc internal final class _SwiftNSMutableString :
   _SwiftNativeNSMutableString, _AbstractStringStorage {
   
-  // Swift String always wants to have valid contents, so for cases where
-  // mutation of the contents makes them invalid (e.g. deleting half of a
-  // surrogate pair) we have an alternate backing store that's just an
-  // Array of UTF16, which we largely leave up to NSString to interpret
-  private enum Contents {
-    case native(String)
-    case utf16(ContiguousArray<UTF16.CodeUnit>)
+  private var contents: String
     
-    var asString: String {
-      @_effects(readonly) @inline(__always) get {
-        switch self {
-        case .native(let str):
-          return str
-        case .utf16(let arr):
-          return String(decoding: arr, as: UTF16.self)
-        }
-      }
-    }
-    
-    var start: UnsafePointer<UInt8>? {
-      @_effects(readonly) @inline(__always) get {
-        switch self {
-        case .native(let str):
-          let guts = str._guts
-          guard !guts.isSmall else { return nil }
-          return guts._object.fastUTF8.baseAddress
-        default:
-          return nil
-        }
-      }
-    }
-    
-    var isASCII: Bool {
-      @_effects(readonly) @inline(__always) get {
-        switch self {
-        case .native(let str):
-          return str._guts.isASCII
-        default:
-          return false
-        }
-      }
-    }
-    
-    var UTF16Length: Int {
-      @_effects(readonly) @inline(__always) get {
-        switch self {
-        case .native(let str):
-          return str.utf16.count // UTF16View special-cases ASCII for us.
-        case .utf16(let arr):
-          return arr.count
-        }
-      }
-    }
-    
-    @_effects(readonly)
-    func character(at offset: Int) -> UInt16 {
-      switch self {
-      case .native(let str):
-        return str.utf16[str._toUTF16Index(offset)]
-      case .utf16(let arr):
-        return arr[offset]
-      }
-    }
-    
-    func _validUTF16(_ data: UnsafeBufferPointer<UTF16.CodeUnit>) -> Bool {
-      var lookingForTrailingSurrogate = false
-      for scalar in data {
-        if UTF16.isTrailSurrogate(scalar) {
-          if _fastPath(lookingForTrailingSurrogate) {
-            lookingForTrailingSurrogate = false
-          } else {
-            return false
-          }
-        }
-        if UTF16.isLeadSurrogate(scalar) {
-          if _fastPath(!lookingForTrailingSurrogate) {
-            lookingForTrailingSurrogate = true
-          } else {
-            return false
-          }
-        }
-      }
-      return true
-    }
-    
-    mutating func _switchRepresentationsIfInvalidUTF16(
-      _ replacementBytes: UnsafeBufferPointer<UTF16.CodeUnit>
-    ) {
-      if case .native(let str) = self, !_validUTF16(replacementBytes) {
-        self = .utf16(ContiguousArray(str.utf16))
-      }
-    }
-    
-    mutating func _convertIncomingNSRangeSwitchingRepresentationIfUnaligned(
-      _ range: _SwiftNSRange
-    ) -> Range<String.Index>? {
-      switch self {
-      case .native(let str):
-        let range = str._toUTF16Indices(
-          range.location ..< range.location + range.length
-        )
-        let rs = range.lowerBound
-        let re = range.upperBound
-        let scalarAligned =
-          (rs._isScalarAligned || rs.transcodedOffset == 0) &&
-            (re._isScalarAligned || re.transcodedOffset == 0)
-        
-        if _slowPath(!scalarAligned) {
-          self = .utf16(ContiguousArray(str.utf16))
-          return nil
-        }
-        return range
-      case .utf16(_):
-        return nil
-      }
-    }
-    
-    // Fast mutation path: replacement is known valid, we are known String-backed
-    mutating func _replace(
-      in range: Range<String.Index>,
-      with replacement: String
-    ) {
-      switch self {
-      case .native(var str):
-        // The next two lines should optimize to an in-place mutation
-        str.replaceSubrange(range, with: replacement)
-        self = .native(str)
-      case .utf16(_):
-        _internalInvariantFailure(
-          "Fast path can't be used on UTF16-backed NSMutableString"
-        )
-      }
-    }
-    
-    // Slow mutation path: replacement may be invalid, we are known Array-backed
-    mutating func _replace_slow(
-      in nsRange: _SwiftNSRange,
-      with utf16Bytes: UnsafeBufferPointer<UTF16.CodeUnit>
-    ) {
-      switch self {
-      case .native(_):
-        _internalInvariantFailure(
-          "Slow path can't be used on String-backed NSMutableString"
-        )
-      case .utf16(var arr):
-        let cocoaRange = nsRange.location ..< nsRange.location + nsRange.length
-        arr.replaceSubrange(cocoaRange, with: utf16Bytes)
-        self = .utf16(arr)
-      }
-    }
-    
-    // Fast path for append
-    mutating func _append(string: String) {
-      switch self {
-      case .native(var str):
-        str.append(string)
-        self = .native(str)
-      case .utf16(var arr):
-        arr.append(contentsOf: string.utf16)
-        self = .utf16(arr)
-      }
-    }
-    
-    // Slow path: bytes may be invalid UTF-16, either representation allowed
-    mutating func _append(utf16Bytes: UnsafeBufferPointer<UTF16.CodeUnit>) {
-      self._switchRepresentationsIfInvalidUTF16(utf16Bytes)
-      
-      switch self {
-      case .native(var str):
-        str.append(String(decoding: utf16Bytes, as: UTF16.self))
-        self = .native(str)
-      case .utf16(var arr):
-        arr.append(contentsOf: utf16Bytes)
-        self = .utf16(arr)
-      }
-    }
-    
-    func mutableCopy() -> AnyObject {
-      switch self {
-      case .native(let str):
-        return _SwiftNSMutableString(str)
-      case .utf16(let arr):
-        return _SwiftNSMutableString(brokenContents: arr)
-      }
-    }
-    
-    func copy() -> AnyObject {
-      // While __StringStorage instances aren't immutable in general,
-      // mutations may only occur when instances are uniquely referenced.
-      // Therefore, it is safe to return self here; any outstanding Objective-C
-      // reference will make the instance non-unique.
-      switch self {
-      case .native(let str):
-        return str._bridgeToObjectiveCImpl()
-      case .utf16(let arr):
-        return _SwiftNSMutableString(brokenContents: arr)
-      }
-    }
-  }
-  
-  private var _contents: Contents
-  
   internal init(_ str: String) {
-    _contents = .native(str)
+    contents = str
     super.init()
     _internalInvariant(asString._guts.isFastUTF8)
   }
   
   internal init(brokenContents arr: ContiguousArray<UTF16.CodeUnit>) {
-    _contents = .utf16(arr)
+    contents = ""
     super.init()
+    _switchToUTF16Backing(arr)
   }
   
-  final internal var isStringBacked: Bool {
+  final internal var brokenStorage: _InvalidUTF16StringStorage? {
     @_effects(readonly) @inline(__always) get {
-      if case .native(_) = _contents {
-        return true
+      if _slowPath(contents._guts.isForeign) {
+        return contents._guts._object.cocoaObject as? _InvalidUTF16StringStorage
       }
-      return false
+      return nil
     }
   }
   
   final internal var asString: String {
     @_effects(readonly) @inline(__always) get {
-      return _contents.asString
+      return contents
     }
   }
   
@@ -670,21 +543,31 @@ extension __SharedStringStorage {
   
   @inline(__always)
   internal var start: UnsafePointer<UInt8>? {
-    return _contents.start
+    @_effects(readonly) get {
+      let guts = contents._guts
+      guard !guts.isSmall else { return nil }
+      return guts._object.fastUTF8.baseAddress
+    }
   }
   
   @inline(__always)
-  internal var count: Int { return asString.utf8.count }
+  internal var count: Int {
+    @_effects(readonly) get {
+      return asString.utf8.count
+    }
+  }
   
   @inline(__always)
   final internal var isASCII: Bool {
-    return _contents.isASCII
+    @_effects(readonly) get {
+      return contents._guts.isASCII
+    }
   }
   
   @objc(length)
   final internal var UTF16Length: Int {
     @_effects(readonly) get {
-      return _contents.UTF16Length
+      return brokenStorage?.UTF16Length ?? contents.utf16.count
     }
   }
 
@@ -698,7 +581,8 @@ extension __SharedStringStorage {
   @objc(characterAtIndex:)
   @_effects(readonly)
   final internal func character(at offset: Int) -> UInt16 {
-    return _contents.character(at: offset)
+    return brokenStorage?.character(at: offset) ??
+      contents.utf16[contents._toUTF16Index(offset)]
   }
 
   @objc(getCharacters:range:)
@@ -706,21 +590,10 @@ extension __SharedStringStorage {
   final internal func getCharacters(
     _ buffer: UnsafeMutablePointer<UInt16>, range aRange: _SwiftNSRange
   ) {
-    switch _contents {
-    case .native(_):
-      _getCharacters(buffer, aRange)
-    case .utf16(let arr):
-      _precondition(aRange.location >= 0 && aRange.length >= 0,
-                       "Range out of bounds")
-      _precondition(aRange.location + aRange.length <= Int(count),
-                       "Range out of bounds")
-      let range = Range(
-        uncheckedBounds: (aRange.location, aRange.location+aRange.length))
-      let bufPtr = UnsafeMutableBufferPointer(
-        start: buffer,
-        count: range.count
-      )
-      arr[range]._copyContents(initializing: bufPtr)
+    if let storage = brokenStorage {
+      storage.getCharacters(buffer, range: aRange)
+    } else {
+      return _getCharacters(buffer, aRange)
     }
   }
 
@@ -752,29 +625,41 @@ extension __SharedStringStorage {
 
   @objc(isEqualToString:)
   @_effects(readonly)
+  final internal func isEqual(toString other:AnyObject?) -> Int8 {
+    return brokenStorage?.isEqual(to: other) ?? _isEqual(other)
+  }
+  
+  @objc(isEqual:)
+  @_effects(readonly)
   final internal func isEqual(to other:AnyObject?) -> Int8 {
-    return _isEqual(other)
+    return brokenStorage?.isEqual(to: other) ?? _isEqual(other)
   }
 
   @objc(copyWithZone:)
   final internal func copy(with zone: _SwiftNSZone?) -> AnyObject {
-    return _contents.copy()
+    return brokenStorage ?? contents._bridgeToObjectiveCImpl()
   }
   
   @objc(copy)
   final internal func copy() -> AnyObject {
-    return _contents.copy()
+    return brokenStorage ?? contents._bridgeToObjectiveCImpl()
   }
   
   @objc(mutableCopyWithZone:)
   final internal func mutableCopy(with zone: _SwiftNSZone?) -> AnyObject {
-    return _contents.mutableCopy()
+    if let broken = brokenStorage {
+      return _SwiftNSMutableString(brokenContents: broken.contents)
+    }
+    return _SwiftNSMutableString(contents)
   }
   
   @objc(mutableCopy)
   final internal func mutableCopy() -> AnyObject {
-    return _contents.mutableCopy()
-  }
+    if let broken = brokenStorage {
+      return _SwiftNSMutableString(brokenContents: broken.contents)
+    }
+    return _SwiftNSMutableString(contents)
+}
   
   /*
    NSString, unlike Swift String, does not require its contents to be valid
@@ -792,8 +677,132 @@ extension __SharedStringStorage {
    either of the following situations:
     • The range of a mutation splits a unicode scalar
     • The replacement bytes of a mutation are not themselves valid UTF-16
-   */
+ */
+  func _switchToUTF16Backing<T>(_ data: T)
+    where T:Sequence, T.Element == UTF16.CodeUnit {
+    let arr = ContiguousArray(data)
+    let broken = _InvalidUTF16StringStorage(brokenContents: arr) as AnyObject
+    let length = _stdlib_binary_CFStringGetLength(broken)
+    contents = String(
+      _StringGuts(
+        cocoa: broken,
+        providesFastUTF8: false,
+        isASCII: false,
+        length: length
+      )
+    )
+  }
+
+  func _convertIncomingNSRangeSwitchingRepresentationIfUnaligned(
+    _ range: _SwiftNSRange
+  ) -> Range<String.Index>? {
+    guard brokenStorage == nil else { return nil }
+    
+    let range = contents._toUTF16Indices(
+      range.location ..< range.location + range.length
+    )
+    let rs = range.lowerBound
+    let re = range.upperBound
+    let scalarAligned =
+      (rs._isScalarAligned || rs.transcodedOffset == 0) &&
+        (re._isScalarAligned || re.transcodedOffset == 0)
+    
+    if _slowPath(!scalarAligned) {
+      _switchToUTF16Backing(contents.utf16)
+      return nil
+    }
+    return range
+  }
+
+  static func _validUTF16(_ data: UnsafeBufferPointer<UTF16.CodeUnit>) -> Bool {
+    var lookingForTrailingSurrogate = false
+    for scalar in data {
+      if UTF16.isTrailSurrogate(scalar) {
+        if _fastPath(lookingForTrailingSurrogate) {
+          lookingForTrailingSurrogate = false
+        } else {
+          return false
+        }
+      }
+      if UTF16.isLeadSurrogate(scalar) {
+        if _fastPath(!lookingForTrailingSurrogate) {
+          lookingForTrailingSurrogate = true
+        } else {
+          return false
+        }
+      }
+    }
+    return true
+  }
+
+  func _switchRepresentationsIfInvalidUTF16(
+    _ replacementBytes: UnsafeBufferPointer<UTF16.CodeUnit>
+  ) {
+    guard brokenStorage == nil else { return }
+    if !_SwiftNSMutableString._validUTF16(replacementBytes) {
+      _switchToUTF16Backing(contents.utf16)
+    }
+  }
   
+  // Fast mutation path: replacement is known valid, we are known String-backed
+  func _replace(
+    in range: Range<String.Index>,
+    with replacement: String
+  ) {
+    guard brokenStorage == nil else {
+      _internalInvariantFailure(
+         "Fast path can't be used on UTF16-backed NSMutableString"
+       )
+    }
+    
+    contents.replaceSubrange(range, with: replacement)
+    //make sure we're in a native representation
+    contents.reserveCapacity(contents.utf8.count)
+  }
+  
+  // Slow mutation path: replacement may be invalid, we are known Array-backed
+  func _replace_slow(
+    in nsRange: _SwiftNSRange,
+    with utf16Bytes: UnsafeBufferPointer<UTF16.CodeUnit>
+  ) {
+    guard let storage = brokenStorage else {
+      _internalInvariantFailure(
+            "Slow path can't be used on String-backed NSMutableString"
+      )
+    }
+    let cocoaRange = nsRange.location ..< nsRange.location + nsRange.length
+    var backing = storage.contents
+    backing.replaceSubrange(cocoaRange, with: utf16Bytes)
+    _switchToUTF16Backing(backing)
+  }
+  
+  // Fast path for append
+  func _append(string: String) {
+    if let storage = brokenStorage {
+      var backing = storage.contents
+      backing.append(contentsOf: string.utf16)
+      _switchToUTF16Backing(backing)
+    } else {
+      contents.append(string)
+      //make sure we're in a native representation
+      contents.reserveCapacity(contents.utf8.count)
+    }
+  }
+  
+  // Slow path: bytes may be invalid UTF-16, either representation allowed
+  func _append(utf16Bytes: UnsafeBufferPointer<UTF16.CodeUnit>) {
+    _switchRepresentationsIfInvalidUTF16(utf16Bytes)
+    if let storage = brokenStorage {
+      var backing = storage.contents
+      backing.append(contentsOf: utf16Bytes)
+      _switchToUTF16Backing(backing)
+    } else {
+      contents.append(String(decoding: utf16Bytes, as: UTF16.self))
+      //make sure we're in a native representation
+      contents.reserveCapacity(contents.utf8.count)
+    }
+  }
+
   @objc(replaceCharactersInRange:withString:)
   final func replaceCharacters(
     in nsRange: _SwiftNSRange,
@@ -801,11 +810,11 @@ extension __SharedStringStorage {
   ) {
     let cocoaString = aString ?? ""._bridgeToObjectiveCImpl()
     
-    guard let range = _contents._convertIncomingNSRangeSwitchingRepresentationIfUnaligned(
+    guard let range = _convertIncomingNSRangeSwitchingRepresentationIfUnaligned(
       nsRange
     ) else {
       _withCocoaStringUTF16Contents(cocoaString) {
-        _contents._replace_slow(in: nsRange, with: $0)
+        _replace_slow(in: nsRange, with: $0)
       }
       return
     }
@@ -818,20 +827,20 @@ extension __SharedStringStorage {
     // If `aString` is actually a bridged Swift String or something else
     // we can be sure is valid and bridge quickly, get a String to work with
     let didFastPath = _withTemporaryBridgedCocoaString(cocoaString) {
-      _contents._replace(in: range, with: $0)
+      _replace(in: range, with: $0)
     }
     
     if _slowPath(!didFastPath) {
       _withCocoaStringUTF16Contents(cocoaString) {
-        _contents._switchRepresentationsIfInvalidUTF16($0)
-        if case .native(_) = _contents {
-          _contents._replace(
+        _switchRepresentationsIfInvalidUTF16($0)
+        if brokenStorage == nil {
+          _replace(
             in: range,
             with: String(decoding: $0, as: UTF16.self)
           )
         } else {
           // Fall back to the slow path because we found invalid UTF-16
-          _contents._replace_slow(in: nsRange, with: $0)
+          _replace_slow(in: nsRange, with: $0)
         }
       }
     }
@@ -847,12 +856,12 @@ extension __SharedStringStorage {
     }
 
     let didFastPath = _withTemporaryBridgedCocoaString(aString) {
-      _contents._append(string: $0)
+      _append(string: $0)
     }
     
     if _slowPath(!didFastPath) {
       _withCocoaStringUTF16Contents(aString) {
-        _contents._append(utf16Bytes: $0)
+        _append(utf16Bytes: $0)
        }
     }
   }
