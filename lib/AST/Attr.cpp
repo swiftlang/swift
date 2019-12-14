@@ -984,7 +984,7 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
   // SWIFT_ENABLE_TENSORFLOW
   case DAK_Transpose: {
     Printer.printAttrName("@transpose");
-    Printer << '(';
+    Printer << "(of: ";
     auto *attr = cast<TransposeAttr>(this);
     Printer << attr->getOriginalFunctionName().Name;
     auto *transpose = cast<AbstractFunctionDecl>(D);

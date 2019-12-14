@@ -557,8 +557,8 @@ SIMPLE_DECL_ATTR(noDerivative, NoDerivative,
   101)
 DECL_ATTR(transpose, Transpose,
   OnFunc | LongAttribute | AllowMultipleAttributes |
-  ABIStableToAdd | ABIBreakingToRemove | APIStableToAdd | APIBreakingToRemove |
-  NotSerialized, 102)
+  ABIStableToAdd | ABIBreakingToRemove | APIStableToAdd | APIBreakingToRemove,
+  102)
 // SWIFT_ENABLE_TENSORFLOW END
 
 #undef TYPE_ATTR

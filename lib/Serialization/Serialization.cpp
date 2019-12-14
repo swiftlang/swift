@@ -2143,10 +2143,6 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
     case DAK_ClangImporterSynthesizedType:
     case DAK_PrivateImport:
       llvm_unreachable("cannot serialize attribute");
-    // SWIFT_ENABLE_TENSORFLOW
-    case DAK_Transpose:
-      llvm_unreachable("cannot serialize attribute");
-    // SWIFT_ENABLE_TENSORFLOW END
 
     case DAK_Count:
       llvm_unreachable("not a real attribute");
@@ -2396,6 +2392,26 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       DerivativeDeclAttrLayout::emitRecord(
           S.Out, S.ScratchRecord, abbrCode, attr->isImplicit(), origNameId,
           origDeclID, derivativeKind, indices);
+      return;
+    }
+
+    case DAK_Transpose: {
+      auto abbrCode = S.DeclTypeAbbrCodes[TransposeDeclAttrLayout::Code];
+      auto *attr = cast<TransposeAttr>(DA);
+      assert(attr->getOriginalFunction() &&
+             "`@transpose` attribute should have original declaration set "
+             "during construction or parsing");
+      auto origName = attr->getOriginalFunctionName().Name.getBaseName();
+      IdentifierID origNameId = S.addDeclBaseNameRef(origName);
+      DeclID origDeclID = S.addDeclRef(attr->getOriginalFunction());
+      auto paramIndices = attr->getParameterIndices();
+      assert(paramIndices && "Parameter indices must be resolved");
+      SmallVector<bool, 4> indices;
+      for (unsigned i : range(paramIndices->getCapacity()))
+        indices.push_back(paramIndices->contains(i));
+      TransposeDeclAttrLayout::emitRecord(
+          S.Out, S.ScratchRecord, abbrCode, attr->isImplicit(), origNameId,
+          origDeclID, indices);
       return;
     }
 
