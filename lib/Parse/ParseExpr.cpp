@@ -2219,47 +2219,6 @@ DeclNameRef Parser::parseDeclNameRef(DeclNameLoc &loc,
   return DeclNameRef({ Context, baseName, argumentLabels });
 }
 
-DeclNameRef Parser::parseUnqualifiedDeclBaseName(
-                                                 bool afterDot,
-                                                 DeclNameLoc &loc,
-                                                 const Diagnostic &diag,
-                                                 bool allowOperators,
-                                                 bool allowDeinitAndSubscript) {
-  DeclNameOptions flags = {};
-  if (afterDot)
-    flags |= DeclNameFlag::AllowKeywords;
-  if (allowOperators)
-    flags |= DeclNameFlag::AllowOperators;
-  if (allowDeinitAndSubscript) {
-    assert(afterDot);
-    flags |= DeclNameFlag::UseSpecialNamesForDeinitAndSubscript;
-  }
-
-  return parseDeclNameRef(loc, diag, flags);
-}
-
-
-DeclNameRef Parser::parseUnqualifiedDeclName(bool afterDot,
-                                             DeclNameLoc &loc,
-                                             const Diagnostic &diag,
-                                             bool allowOperators,
-                                             bool allowZeroArgCompoundNames,
-                                             bool allowDeinitAndSubscript) {
-  DeclNameOptions flags = DeclNameFlag::AllowCompoundNames;
-  if (afterDot)
-    flags |= DeclNameFlag::AllowKeywords;
-  if (allowOperators)
-    flags |= DeclNameFlag::AllowOperators;
-  if (allowDeinitAndSubscript) {
-    assert(afterDot);
-    flags |= DeclNameFlag::UseSpecialNamesForDeinitAndSubscript;
-  }
-  if (allowZeroArgCompoundNames)
-    flags |= DeclNameFlag::AllowZeroArgCompoundNames;
-
-  return parseDeclNameRef(loc, diag, flags);
-}
-
 ///   expr-identifier:
 ///     unqualified-decl-name generic-args?
 Expr *Parser::parseExprIdentifier() {
