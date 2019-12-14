@@ -201,7 +201,7 @@ testCases = [
 
 /// Whether this can be safely casted to NSObject
 func isNSObject<T>(_ value: T) -> Bool {
-  return (value as? NSObject) != nil
+  return (value is NSObject) && !(value is LifetimeTracked)
 }
 
 % for testName, type, valueExpr, testFunc, conformsToError, conformsToHashable in testCases:
