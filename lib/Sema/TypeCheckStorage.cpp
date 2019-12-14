@@ -341,8 +341,13 @@ IsSetterMutatingRequest::evaluate(Evaluator &evaluator,
   // or not based on the composition of the wrappers.
   if (auto var = dyn_cast<VarDecl>(storage)) {
     if (auto mut = var->getPropertyWrapperMutability()) {
-      return mut->Setter == PropertyWrapperMutability::Mutating
-        && result;
+      bool isMutating = mut->Setter == PropertyWrapperMutability::Mutating;
+      if (var->getParsedAccessor(AccessorKind::DidSet)) {
+        // If there's a didSet, we call the getter for the 'oldValue', and so
+        // should consider the getter's mutatingness as well
+        isMutating |= (mut->Getter == PropertyWrapperMutability::Mutating);
+      }
+      return isMutating && result;
     }
   }
 
@@ -587,14 +592,17 @@ getEnclosingSelfPropertyWrapperAccess(VarDecl *property, bool forProjected) {
   return result;
 }
 
-/// Build an l-value for the storage of a declaration. Returns nullptr if there
+/// Build a reference to the storage of a declaration. Returns nullptr if there
 /// was an error. This should only occur if an invalid declaration was type
 /// checked; another diagnostic should have been emitted already.
 static Expr *buildStorageReference(AccessorDecl *accessor,
                                    AbstractStorageDecl *storage,
                                    TargetImpl target,
-                                   bool isLValue,
+                                   bool isUsedForGetAccess,
+                                   bool isUsedForSetAccess,
                                    ASTContext &ctx) {
+  // Whether the last component of the expression should be an l-value
+  bool isLValue = isUsedForSetAccess;
   // Local function to "finish" the expression, creating a member reference
   // to the given sequence of underlying variables.
   Optional<EnclosingSelfPropertyWrapperAccess> enclosingSelfAccess;
@@ -758,46 +766,61 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
     return finish(storageDRE);
   }
 
-  bool isMemberLValue = isLValue;
-  auto propertyWrapperMutability =
-      [&](Decl *decl) -> Optional<std::pair<bool, bool>> {
-    // If we're not accessing via a property wrapper, we don't need to adjust
-    // the mutability.
-    if (target != TargetImpl::Wrapper && target != TargetImpl::WrapperStorage)
-      return None;
+  // Build self
 
-    auto var = dyn_cast<VarDecl>(decl);
-    if (!var)
-      return None;
-    auto mut = var->getPropertyWrapperMutability();
-    if (!mut)
-      return None;
-    return std::make_pair(mut->Getter == PropertyWrapperMutability::Mutating,
-                          mut->Setter == PropertyWrapperMutability::Mutating);
-  };
-
-  // If we're accessing a property wrapper, determine if the
-  // intermediate access requires an lvalue.
-  if (auto mut = propertyWrapperMutability(accessor->getStorage())) {
-    isMemberLValue = mut->first;
-    if (isLValue)
-      isMemberLValue |= mut->second;
+  bool isGetterMutating = storage->isGetterMutating();
+  bool isSetterMutating = storage->isSetterMutating();
+  // If we're not accessing via a property wrapper, we don't need to adjust
+  // the mutability.
+  if (target == TargetImpl::Wrapper || target == TargetImpl::WrapperStorage) {
+    auto var = cast<VarDecl>(accessor->getStorage());
+    if (auto mutability = var->getPropertyWrapperMutability()) {
+      // We consider the storage's mutability too because the wrapped property
+      // might be part of a class, in case of which nothing is mutating.
+      isGetterMutating = (mutability->Getter == PropertyWrapperMutability::Mutating)
+        ? (storage->isGetterMutating() || storage->isSetterMutating())
+        : storage->isGetterMutating();
+      isSetterMutating = (mutability->Setter == PropertyWrapperMutability::Mutating)
+        ? (storage->isGetterMutating() || storage->isSetterMutating())
+        : storage->isGetterMutating();
+    }
   }
 
-  bool isSelfLValue = storage->isGetterMutating();
-  if (isMemberLValue)
-    isSelfLValue |= storage->isSetterMutating();
-
-  // If we're accessing a property wrapper, determine if
-  // the self requires an lvalue.
-  if (auto mut = propertyWrapperMutability(storage)) {
-    isSelfLValue = mut->first;
-    if (isMemberLValue)
-      isSelfLValue |= mut->second;
-  }
+  // If the accessor is mutating, then self should be referred as an l-value
+  bool isSelfLValue = (isGetterMutating && isUsedForGetAccess) ||
+                      (isSetterMutating && isUsedForSetAccess);
 
   Expr *selfDRE = buildSelfReference(selfDecl, selfAccessKind, isSelfLValue,
                                      /*convertTy*/ selfTypeForAccess);
+  if (isSelfLValue)
+    selfTypeForAccess = LValueType::get(selfTypeForAccess);
+
+  if (!selfDRE->getType()->isEqual(selfTypeForAccess)) {
+    assert(selfAccessKind == SelfAccessorKind::Super);
+    selfDRE = new (ctx) DerivedToBaseExpr(selfDRE, selfTypeForAccess);
+  }
+
+  // Build self.member or equivalent
+
+  bool isMemberLValue = isLValue;
+  if (target == TargetImpl::Wrapper || target == TargetImpl::WrapperStorage) {
+    // If the outermost property wrapper's getter / setter is mutating,
+    // then the reference to the backing storage should be an l-value.
+    auto var = cast<VarDecl>(accessor->getStorage());
+    auto varMember = (target == TargetImpl::WrapperStorage)
+      ? &PropertyWrapperTypeInfo::projectedValueVar
+      : &PropertyWrapperTypeInfo::valueVar;
+    auto wrapper = (target == TargetImpl::WrapperStorage)
+      ? var->getOriginalWrappedProperty(
+          PropertyWrapperSynthesizedPropertyKind::StorageWrapper)
+          ->getAttachedPropertyWrapperTypeInfo(0)
+      : var->getAttachedPropertyWrapperTypeInfo(0);
+    bool isWrapperGetterMutating = (wrapper.*varMember)->isGetterMutating();
+    bool isWrapperSetterMutating = (wrapper.*varMember)->isSetterMutating();
+    isMemberLValue = (isWrapperGetterMutating && isUsedForGetAccess) ||
+                     (isWrapperSetterMutating && isUsedForSetAccess);
+  }
+
   Expr *lookupExpr;
   ConcreteDeclRef memberRef(storage, subs);
   auto type = storage->getValueInterfaceType().subst(subs);
@@ -871,6 +894,8 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
     lookupExpr->setType(type);
   }
 
+  // Build self.member.wrappedValue if applicable
+
   return finish(lookupExpr);
 }
 
@@ -881,7 +906,9 @@ createPropertyLoadOrCallSuperclassGetter(AccessorDecl *accessor,
                                          AbstractStorageDecl *storage,
                                          TargetImpl target,
                                          ASTContext &ctx) {
-  return buildStorageReference(accessor, storage, target, /*isLValue=*/false,
+  return buildStorageReference(accessor, storage, target,
+                               /*isUsedForGetAccess=*/true,
+                               /*isUsedForSetAccess=*/false,
                                ctx);
 }
 
@@ -1033,7 +1060,9 @@ void createPropertyStoreOrCallSuperclassSetter(AccessorDecl *accessor,
     return;
 
   Expr *dest = buildStorageReference(accessor, storage, target,
-                                     /*isLValue=*/true, ctx);
+                                     /*isUsedForGetAccess=*/false,
+                                     /*isUsedForSetAccess=*/true,
+                                     ctx);
 
   // Error recovery.
   if (dest == nullptr)
@@ -1493,7 +1522,10 @@ synthesizeObservedSetterBody(AccessorDecl *Set, TargetImpl target,
     // parameter or it's provided explicitly in the parameter list.
     if (!didSet->isSimpleDidSet()) {
       Expr *OldValueExpr =
-          buildStorageReference(Set, VD, target, /*isLValue=*/true, Ctx);
+          buildStorageReference(Set, VD, target,
+                                /*isUsedForGetAccess=*/true,
+                                /*isUsedForSetAccess=*/true,
+                                Ctx);
 
       // Error recovery.
       if (OldValueExpr == nullptr) {
@@ -1609,7 +1641,10 @@ synthesizeModifyCoroutineBodyWithSimpleDidSet(AccessorDecl *accessor,
 
   SmallVector<ASTNode, 1> body;
 
-  Expr *ref = buildStorageReference(accessor, storage, target, true, ctx);
+  Expr *ref = buildStorageReference(accessor, storage, target,
+                                    /*isUsedForGetAccess=*/true,
+                                    /*isUsedForSetAccess=*/true,
+                                    ctx);
   ref = maybeWrapInOutExpr(ref, ctx);
 
   YieldStmt *yield = YieldStmt::create(ctx, loc, loc, ref, loc, true);
@@ -1686,16 +1721,19 @@ synthesizeCoroutineAccessorBody(AccessorDecl *accessor, ASTContext &ctx) {
   SourceLoc loc = storage->getLoc();
   SmallVector<ASTNode, 1> body;
 
-  bool isLValue = accessor->getAccessorKind() == AccessorKind::Modify;
+  bool isModify = accessor->getAccessorKind() == AccessorKind::Modify;
 
-  if (isLValue &&
+  if (isModify &&
       (storageReadWriteImpl == ReadWriteImplKind::StoredWithSimpleDidSet ||
        storageReadWriteImpl == ReadWriteImplKind::InheritedWithSimpleDidSet)) {
     return synthesizeModifyCoroutineBodyWithSimpleDidSet(accessor, ctx);
   }
 
   // Build a reference to the storage.
-  Expr *ref = buildStorageReference(accessor, storage, target, isLValue, ctx);
+  Expr *ref = buildStorageReference(accessor, storage, target,
+                /*isUsedForGetAccess=*/true,
+                /*isUsedForSetAccess=*/isModify,
+                ctx);
   if (ref != nullptr) {
     // Wrap it with an `&` marker if this is a modify.
     ref = maybeWrapInOutExpr(ref, ctx);
