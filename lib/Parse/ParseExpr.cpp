@@ -2078,12 +2078,87 @@ void Parser::parseOptionalArgumentLabel(Identifier &name, SourceLoc &loc) {
   }
 }
 
-DeclNameRef Parser::parseUnqualifiedDeclBaseName(
-                                                 bool afterDot,
-                                                 DeclNameLoc &loc,
-                                                 const Diagnostic &diag,
-                                                 bool allowOperators,
-                                                 bool allowDeinitAndSubscript) {
+static bool tryParseArgLabelList(Parser &P, Parser::DeclNameOptions flags,
+                                 SourceLoc &lparenLoc,
+                                 SmallVectorImpl<Identifier> &argumentLabels,
+                                 SmallVectorImpl<SourceLoc> &argumentLabelLocs,
+                                 SourceLoc &rparenLoc) {
+  if (!flags.contains(Parser::DeclNameFlag::AllowCompoundNames))
+    return false;
+
+  // Is the current token a left paren?
+  if (!P.Tok.isFollowingLParen())
+    return false;
+
+  // Okay, let's look ahead and see if the next token is something that could
+  // be in an arg label list...
+  const Token &next = P.peekToken();
+
+  // A close parenthesis, if empty lists are allowed.
+  bool nextIsRParen =
+      flags.contains(Parser::DeclNameFlag::AllowZeroArgCompoundNames) &&
+      next.is(tok::r_paren);
+  // An argument label.
+  bool nextIsArgLabel = next.canBeArgumentLabel() || next.is(tok::colon);
+  // An editor placeholder.
+  bool nextIsPlaceholder = Identifier::isEditorPlaceholder(next.getText());
+
+  if (!(nextIsRParen || nextIsArgLabel || nextIsPlaceholder))
+    return false;
+
+  // Try to parse a compound name.
+  SyntaxParsingContext ArgsCtxt(P.SyntaxContext, SyntaxKind::DeclNameArguments);
+  Parser::BacktrackingScope backtrack(P);
+
+  lparenLoc = P.consumeToken(tok::l_paren);
+  while (P.Tok.isNot(tok::r_paren)) {
+    SyntaxParsingContext ArgCtxt(P.SyntaxContext, SyntaxKind::DeclNameArgument);
+
+    // If we see a ':', the user forgot the '_';
+    if (P.Tok.is(tok::colon)) {
+      P.diagnose(P.Tok, diag::empty_arg_label_underscore)
+          .fixItInsert(P.Tok.getLoc(), "_");
+      argumentLabels.push_back(Identifier());
+      argumentLabelLocs.push_back(P.consumeToken(tok::colon));
+    }
+
+    Identifier argName;
+    SourceLoc argLoc;
+    P.parseOptionalArgumentLabel(argName, argLoc);
+    if (argLoc.isValid()) {
+      argumentLabels.push_back(argName);
+      argumentLabelLocs.push_back(argLoc);
+      continue;
+    }
+
+    // This is not a compound name.
+    // FIXME: Could recover better if we "know" it's a compound name.
+    ArgCtxt.setBackTracking();
+    ArgsCtxt.setBackTracking();
+
+    return false;
+  }
+
+  // We have a compound name. Cancel backtracking and build that name.
+  backtrack.cancelBacktrack();
+
+  if (argumentLabels.empty() && P.SyntaxContext->isEnabled())
+    P.SyntaxContext->addSyntax(
+        ParsedSyntaxRecorder::makeBlankDeclNameArgumentList(
+            P.leadingTriviaLoc(), *P.SyntaxContext));
+  else
+    ArgsCtxt.collectNodesInPlace(SyntaxKind::DeclNameArgumentList);
+
+  rparenLoc = P.consumeToken(tok::r_paren);
+
+  assert(argumentLabels.size() == argumentLabelLocs.size());
+
+  return true;
+}
+
+DeclNameRef Parser::parseDeclNameRef(DeclNameLoc &loc,
+                                     const Diagnostic &diag,
+                                     DeclNameOptions flags) {
   // Consume the base name.
   DeclBaseName baseName;
   SourceLoc baseNameLoc;
@@ -2092,17 +2167,21 @@ DeclNameRef Parser::parseUnqualifiedDeclBaseName(
     baseNameLoc = consumeIdentifier(
         &baseNameId, /*allowDollarIdentifier=*/true);
     baseName = baseNameId;
-  } else if (allowOperators && Tok.isAnyOperator()) {
+  } else if (flags.contains(DeclNameFlag::AllowOperators) &&
+             Tok.isAnyOperator()) {
     baseName = Context.getIdentifier(Tok.getText());
     baseNameLoc = consumeToken();
-  } else if (afterDot && Tok.isKeyword()) {
+  } else if (flags.contains(DeclNameFlag::AllowKeywords) && Tok.isKeyword()) {
+    bool specialDeinitAndSubscript =
+        flags.contains(DeclNameFlag::UseSpecialNamesForDeinitAndSubscript);
+
     // Syntax highlighting should treat this token as an identifier and
     // not as a keyword.
     if (Tok.is(tok::kw_init))
       baseName = DeclBaseName::createConstructor();
-    else if (allowDeinitAndSubscript &&Tok.is(tok::kw_deinit))
+    else if (specialDeinitAndSubscript && Tok.is(tok::kw_deinit))
       baseName = DeclBaseName::createDestructor();
-    else if (allowDeinitAndSubscript &&Tok.is(tok::kw_subscript))
+    else if (specialDeinitAndSubscript && Tok.is(tok::kw_subscript))
       baseName = DeclBaseName::createSubscript();
     else
       baseName = Context.getIdentifier(Tok.getText());
@@ -2115,8 +2194,45 @@ DeclNameRef Parser::parseUnqualifiedDeclBaseName(
     return DeclNameRef();
   }
 
-  loc = DeclNameLoc(baseNameLoc);
-  return DeclNameRef(baseName);
+  // Parse an argument list, if the flags allow it and it's present.
+  SmallVector<Identifier, 2> argumentLabels;
+  SmallVector<SourceLoc, 2> argumentLabelLocs;
+  SourceLoc lparenLoc;
+  SourceLoc rparenLoc;
+
+  bool hadArgList = tryParseArgLabelList(*this, flags, lparenLoc,
+                                         argumentLabels, argumentLabelLocs,
+                                         rparenLoc);
+
+  if (argumentLabelLocs.empty() || !hadArgList)
+    loc = DeclNameLoc(baseNameLoc);
+  else
+    loc = DeclNameLoc(Context, baseNameLoc, lparenLoc, argumentLabelLocs,
+                      rparenLoc);
+
+  if (!hadArgList)
+    return DeclNameRef(baseName);
+
+  return DeclNameRef({ Context, baseName, argumentLabels });
+}
+
+DeclNameRef Parser::parseUnqualifiedDeclBaseName(
+                                                 bool afterDot,
+                                                 DeclNameLoc &loc,
+                                                 const Diagnostic &diag,
+                                                 bool allowOperators,
+                                                 bool allowDeinitAndSubscript) {
+  DeclNameOptions flags = {};
+  if (afterDot)
+    flags |= DeclNameFlag::AllowKeywords;
+  if (allowOperators)
+    flags |= DeclNameFlag::AllowOperators;
+  if (allowDeinitAndSubscript) {
+    assert(afterDot);
+    flags |= DeclNameFlag::UseSpecialNamesForDeinitAndSubscript;
+  }
+
+  return parseDeclNameRef(loc, diag, flags);
 }
 
 
@@ -2126,84 +2242,19 @@ DeclNameRef Parser::parseUnqualifiedDeclName(bool afterDot,
                                              bool allowOperators,
                                              bool allowZeroArgCompoundNames,
                                              bool allowDeinitAndSubscript) {
-  // Consume the base name.
-  auto baseName = parseUnqualifiedDeclBaseName(afterDot, loc, diag,
-                                               allowOperators,
-                                               allowDeinitAndSubscript);
-
-  // If the next token isn't a following '(', we don't have a compound name.
-  if (!baseName || !Tok.isFollowingLParen())
-    return baseName;
-
-  // If the next token is a ')' then we have a 0-arg compound name. This is
-  // explicitly differentiated from "simple" (non-compound) name in DeclName.
-  // Unfortunately only some places in the grammar are ok with accepting this
-  // kind of name; in other places it's ambiguous with trailing calls.
-  if (allowZeroArgCompoundNames && peekToken().is(tok::r_paren)) {
-    SyntaxParsingContext ArgsCtxt(SyntaxContext, SyntaxKind::DeclNameArguments);
-    consumeToken(tok::l_paren);
-    if (SyntaxContext->isEnabled())
-      SyntaxContext->addSyntax(
-          ParsedSyntaxRecorder::makeBlankDeclNameArgumentList(
-              leadingTriviaLoc(), *SyntaxContext));
-    consumeToken(tok::r_paren);
-    SmallVector<Identifier, 2> argumentLabels;
-    return baseName.withArgumentLabels(Context, argumentLabels);
+  DeclNameOptions flags = DeclNameFlag::AllowCompoundNames;
+  if (afterDot)
+    flags |= DeclNameFlag::AllowKeywords;
+  if (allowOperators)
+    flags |= DeclNameFlag::AllowOperators;
+  if (allowDeinitAndSubscript) {
+    assert(afterDot);
+    flags |= DeclNameFlag::UseSpecialNamesForDeinitAndSubscript;
   }
+  if (allowZeroArgCompoundNames)
+    flags |= DeclNameFlag::AllowZeroArgCompoundNames;
 
-  // If the token after that isn't an argument label or ':', we don't have a
-  // compound name.
-  if ((!peekToken().canBeArgumentLabel() && !peekToken().is(tok::colon)) ||
-      Identifier::isEditorPlaceholder(peekToken().getText())) {
-    return baseName;
-  }
-
-  // Try to parse a compound name.
-  SyntaxParsingContext ArgsCtxt(SyntaxContext, SyntaxKind::DeclNameArguments);
-  BacktrackingScope backtrack(*this);
-
-  SmallVector<Identifier, 2> argumentLabels;
-  SmallVector<SourceLoc, 2> argumentLabelLocs;
-  SourceLoc lparenLoc = consumeToken(tok::l_paren);
-  SourceLoc rparenLoc;
-  while (Tok.isNot(tok::r_paren)) {
-    SyntaxParsingContext ArgCtxt(SyntaxContext, SyntaxKind::DeclNameArgument);
-
-    // If we see a ':', the user forgot the '_';
-    if (Tok.is(tok::colon)) {
-      diagnose(Tok, diag::empty_arg_label_underscore)
-          .fixItInsert(Tok.getLoc(), "_");
-      argumentLabels.push_back(Identifier());
-      argumentLabelLocs.push_back(consumeToken(tok::colon));
-    }
-
-    Identifier argName;
-    SourceLoc argLoc;
-    parseOptionalArgumentLabel(argName, argLoc);
-    if (argLoc.isValid()) {
-      argumentLabels.push_back(argName);
-      argumentLabelLocs.push_back(argLoc);
-      continue;
-    }
-
-    // This is not a compound name.
-    // FIXME: Could recover better if we "know" it's a compound name.
-    ArgCtxt.setBackTracking();
-    ArgsCtxt.setBackTracking();
-    return baseName;
-  }
-  // We have a compound name. Cancel backtracking and build that name.
-  backtrack.cancelBacktrack();
-
-  ArgsCtxt.collectNodesInPlace(SyntaxKind::DeclNameArgumentList);
-  rparenLoc = consumeToken(tok::r_paren);
-
-  assert(!argumentLabels.empty() && "Logic above should prevent this");
-  assert(argumentLabels.size() == argumentLabelLocs.size());
-
-  loc = DeclNameLoc(Context, loc.getBaseNameLoc(), lparenLoc, argumentLabelLocs,
-                    rparenLoc);
-  return baseName.withArgumentLabels(Context, argumentLabels);
+  return parseDeclNameRef(loc, diag, flags);
 }
 
 ///   expr-identifier:
