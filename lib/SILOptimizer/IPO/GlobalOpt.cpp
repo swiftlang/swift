@@ -887,7 +887,7 @@ bool SILGlobalOpt::tryRemoveGlobalAddr(SILGlobalVariable *global) {
       if (!isa<StoreInst>(use->getUser()))
         return false;
     }
-    InstToRemove.addUsersOfAllResultsToWorklist(addr);
+
     InstToRemove.add(addr);
   }
 
@@ -898,10 +898,43 @@ bool SILGlobalOpt::tryRemoveUnusedGlobal(SILGlobalVariable *global) {
   if (!isSafeToRemove(global))
     return false;
 
+  if (GlobalVarSkipProcessing.count(global))
+    return false;
+
   if (GlobalVarSkipProcessing.count(global) || GlobalAddrMap[global].size() ||
       GlobalAccessMap[global].size() || GlobalLoadMap[global].size() ||
-      AllocGlobalStore.count(global) || GlobalVarStore.count(global))
-    return false;
+      AllocGlobalStore.count(global) || GlobalVarStore.count(global)) {
+    SmallVector<SILInstruction *, 4> deadInsts;
+    while (!InstToRemove.isEmpty()) {
+      auto *inst = InstToRemove.pop_back_val();
+      deadInsts.push_back(inst);
+    }
+    InstToRemove.addInitialGroup(deadInsts);
+
+    for (auto *inst : deadInsts) {
+      if (GlobalAddrMap[global].size() &&
+          !std::any_of(GlobalAddrMap[global].begin(),
+                       GlobalAddrMap[global].end(),
+                       [&inst](SILInstruction *addr) { return inst == addr; }))
+        return false;
+      if (GlobalAccessMap[global].size() &&
+          !std::any_of(
+              GlobalAccessMap[global].begin(), GlobalAccessMap[global].end(),
+              [&inst](SILInstruction *access) { return inst == access; }))
+        return false;
+      if (GlobalLoadMap[global].size() &&
+          !std::any_of(GlobalLoadMap[global].begin(),
+                       GlobalLoadMap[global].end(),
+                       [&inst](SILInstruction *load) { return inst == load; }))
+        return false;
+
+      if (AllocGlobalStore.count(global) && AllocGlobalStore[global] != inst)
+        return false;
+
+      if (GlobalVarStore.count(global) && GlobalVarStore[global] != inst)
+        return false;
+    }
+  }
 
   GlobalsToRemove.push_back(global);
   return true;
@@ -1161,12 +1194,8 @@ bool SILGlobalOpt::run() {
 
   // Erase the instructions that we have marked for deletion.
   while (!InstToRemove.isEmpty()) {
-    InstToRemove.pop_back_val()->eraseFromParent();
+    eraseUsesOfInstruction(InstToRemove.pop_back_val());
   }
-
-  // After we erase some instructions, re-collect.
-  reset();
-  collect();
 
   for (auto &global : Module->getSILGlobals()) {
     HasChanged |= tryRemoveUnusedGlobal(&global);
