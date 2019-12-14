@@ -872,7 +872,7 @@ bool SILGlobalOpt::tryRemoveGlobalAlloc(SILGlobalVariable *global,
        std::any_of(GlobalAddrMap[global].begin(), GlobalAddrMap[global].end(),
                    [=](GlobalAddrInst *addr) {
                      return std::find(InstToRemove.begin(), InstToRemove.end(),
-                                      addr) != InstToRemove.end();
+                                      addr) == InstToRemove.end();
                    })))
     return false;
 
@@ -890,12 +890,18 @@ bool SILGlobalOpt::tryRemoveGlobalAddr(SILGlobalVariable *global) {
       GlobalAccessMap[global].size())
     return false;
 
+  // Check if the address is used in anything but a store. If any global_addr
+  // instruction associated with a global is used in anything but a store, we
+  // can't remove ANY global_addr instruction associated with that global.
   for (auto *addr : GlobalAddrMap[global]) {
     for (auto *use : addr->getUses()) {
       if (!isa<StoreInst>(use->getUser()))
         return false;
     }
-
+  }
+  
+  // Now that it's safe, remove all global addresses associated with this global
+  for (auto *addr : GlobalAddrMap[global]) {
     InstToRemove.push_back(addr);
   }
 
@@ -931,7 +937,7 @@ bool SILGlobalOpt::tryRemoveUnusedGlobal(SILGlobalVariable *global) {
       std::any_of(GlobalAddrMap[global].begin(), GlobalAddrMap[global].end(),
                   [=](GlobalAddrInst *addr) {
                     return std::find(InstToRemove.begin(), InstToRemove.end(),
-                                     addr) != InstToRemove.end();
+                                     addr) == InstToRemove.end();
                   }))
     return false;
 
@@ -939,7 +945,7 @@ bool SILGlobalOpt::tryRemoveUnusedGlobal(SILGlobalVariable *global) {
       std::any_of(GlobalAccessMap[global].begin(),
                   GlobalAccessMap[global].end(), [=](BeginAccessInst *access) {
                     return std::find(InstToRemove.begin(), InstToRemove.end(),
-                                     access) != InstToRemove.end();
+                                     access) == InstToRemove.end();
                   }))
     return false;
 
