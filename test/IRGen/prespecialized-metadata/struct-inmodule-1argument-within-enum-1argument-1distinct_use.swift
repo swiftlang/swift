@@ -16,7 +16,11 @@
 //                i8** @"$sB[[INT]]_WV",
 //                i8** getelementptr inbounds (%swift.vwtable, %swift.vwtable* @"$s4main9NamespaceO5ValueVySS_SiGWV", i32 0, i32 0)
 // CHECK-SAME:    [[INT]] 512,
-// CHECK-SAME:    %swift.type_descriptor* bitcast (<{ i32, i32, i32, i32, i32, i32, i32, i32, i32, i16, i16, i16, i16, i8, i8, i8, i8 }>* @"$s4main9NamespaceO5ValueVMn" to %swift.type_descriptor*),
+// CHECK-SAME:    %swift.type_descriptor* bitcast (
+// CHECK-SAME:      <{ i32, i32, i32, i32, i32, i32, i32, i32, i32, i16, i16, i16, i16, i8, i8, i8, i8 }>* 
+// CHECK-SAME:      @"$s4main9NamespaceO5ValueVMn" 
+// CHECK-SAME:      to %swift.type_descriptor*
+// CHECK-SAME:    ),
 // CHECK-SAME:    %swift.type* @"$sSSN",
 // CHECK-SAME:    %swift.type* @"$sSiN",
 // CHECK-SAME:    i32 0{{(, \[4 x i8\] zeroinitializer)?}},
@@ -36,7 +40,26 @@ func consume<T>(_ t: T) {
 }
 
 // CHECK: define hidden swiftcc void @"$s4main4doityyF"() #{{[0-9]+}} {
-// CHECK:   call swiftcc void @"$s4main7consumeyyxlF"(%swift.opaque* noalias nocapture %{{[0-9]+}}, %swift.type* getelementptr inbounds (%swift.full_type, %swift.full_type* bitcast (<{ i8**, [[INT]], %swift.type_descriptor*, %swift.type*, %swift.type*, i32{{(, \[4 x i8\])?}}, i64 }>* @"$s4main9NamespaceO5ValueVySS_SiGMf" to %swift.full_type*), i32 0, i32 1))
+// CHECK:   call swiftcc void @"$s4main7consumeyyxlF"(
+// CHECK-SAME:     %swift.opaque* noalias nocapture %{{[0-9]+}}, 
+// CHECK-SAME:     %swift.type* getelementptr inbounds (
+// CHECK-SAME:       %swift.full_type, 
+// CHECK-SAME:       %swift.full_type* bitcast (
+// CHECK-SAME:         <{ 
+// CHECK-SAME:           i8**, 
+// CHECK-SAME:           [[INT]], 
+// CHECK-SAME:           %swift.type_descriptor*, 
+// CHECK-SAME:           %swift.type*, 
+// CHECK-SAME:           %swift.type*, 
+// CHECK-SAME:           i32{{(, \[4 x i8\])?}}, 
+// CHECK-SAME:           i64 
+// CHECK-SAME:         }>* @"$s4main9NamespaceO5ValueVySS_SiGMf" 
+// CHECK-SAME:         to %swift.full_type*
+// CHECK-SAME:       ), 
+// CHECK-SAME:       i32 0, 
+// CHECK-SAME:       i32 1
+// CHECK-SAME:     )
+// CHECK-SAME:   )
 // CHECK: }
 func doit() {
   consume( Namespace<String>.Value(first: 13) )
@@ -56,8 +79,37 @@ doit()
 // CHECK:   [[EQUAL_TYPES_1_2:%[0-9]+]] = and i1 [[EQUAL_TYPES_1_1]], [[EQUAL_TYPE_1_2]]
 // CHECK:   br i1 [[EQUAL_TYPES_1_2]], label %[[EXIT_PRESPECIALIZED_1:[0-9]+]], label %[[EXIT_NORMAL:[0-9]+]]
 // CHECK: [[EXIT_PRESPECIALIZED_1]]:
-// CHECK:   ret %swift.metadata_response { %swift.type* getelementptr inbounds (%swift.full_type, %swift.full_type* bitcast (<{ i8**, [[INT]], %swift.type_descriptor*, %swift.type*, %swift.type*, i32{{(, \[4 x i8\])?}}, i64 }>* @"$s4main9NamespaceO5ValueVySS_SiGMf" to %swift.full_type*), i32 0, i32 1), [[INT]] 0 }
+// CHECK:   ret %swift.metadata_response { 
+// CHECK-SAME:     %swift.type* getelementptr inbounds (
+// CHECK-SAME:       %swift.full_type, 
+// CHECK-SAME:       %swift.full_type* bitcast (
+// CHECK-SAME:         <{ 
+// CHECK-SAME:           i8**, 
+// CHECK-SAME:           [[INT]], 
+// CHECK-SAME:           %swift.type_descriptor*, 
+// CHECK-SAME:           %swift.type*, 
+// CHECK-SAME:           %swift.type*, 
+// CHECK-SAME:           i32{{(, \[4 x i8\])?}}, 
+// CHECK-SAME:           i64 
+// CHECK-SAME:         }>* @"$s4main9NamespaceO5ValueVySS_SiGMf" 
+// CHECK-SAME:         to %swift.full_type*
+// CHECK-SAME:       ), 
+// CHECK-SAME:       i32 0, 
+// CHECK-SAME:       i32 1
+// CHECK-SAME:     ), 
+// CHECK-SAME:     [[INT]] 0 
+// CHECK-SAME:   }
 // CHECK: [[EXIT_NORMAL]]:
-// CHECK:   {{%[0-9]+}} = call swiftcc %swift.metadata_response @__swift_instantiateGenericMetadata([[INT]] %0, i8* [[ERASED_TYPE_1]], i8* [[ERASED_TYPE_2]], i8* undef, %swift.type_descriptor* bitcast (<{ i32, i32, i32, i32, i32, i32, i32, i32, i32, i16, i16, i16, i16, i8, i8, i8, i8 }>* @"$s4main9NamespaceO5ValueVMn" to %swift.type_descriptor*)) #{{[0-9]+}}
+// CHECK:   {{%[0-9]+}} = call swiftcc %swift.metadata_response @__swift_instantiateGenericMetadata(
+// CHECK-SAME:     [[INT]] %0, 
+// CHECK-SAME:     i8* [[ERASED_TYPE_1]], 
+// CHECK-SAME:     i8* [[ERASED_TYPE_2]], 
+// CHECK-SAME:     i8* undef, 
+// CHECK-SAME:     %swift.type_descriptor* bitcast (
+// CHECK-SAME:       <{ i32, i32, i32, i32, i32, i32, i32, i32, i32, i16, i16, i16, i16, i8, i8, i8, i8 }>* 
+// CHECK-SAME:       @"$s4main9NamespaceO5ValueVMn" 
+// CHECK-SAME:       to %swift.type_descriptor*
+// CHECK-SAME:     )
+// CHECK-SAME:   ) #{{[0-9]+}}
 // CHECK:   ret %swift.metadata_response {{%[0-9]+}}
 // CHECK: }

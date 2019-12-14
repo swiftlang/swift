@@ -4,32 +4,29 @@
 // UNSUPPORTED: CPU=armv7 && OS=ios
 // UNSUPPORTED: CPU=armv7s && OS=ios
 
-// CHECK: @"$s4main9NamespaceV5ValueVySS_SiGMf" = internal constant <{
+// CHECK: @"$s4main9NamespaceO5ValueOySS_SiGMf" = internal constant <{
 // CHECK-SAME:    i8**,
 // CHECK-SAME:    [[INT]],
 // CHECK-SAME:    %swift.type_descriptor*,
 // CHECK-SAME:    %swift.type*,
 // CHECK-SAME:    %swift.type*,
-// CHECK-SAME:    i32{{(, \[4 x i8\])?}},
 // CHECK-SAME:    i64
 // CHECK-SAME: }> <{
-//                i8** @"$sB[[INT]]_WV",
-//                i8** getelementptr inbounds (%swift.vwtable, %swift.vwtable* @"$s4main9NamespaceV5ValueVySS_SiGWV", i32 0, i32 0),
-// CHECK-SAME:    [[INT]] 512,
+//                i8** getelementptr inbounds (%swift.enum_vwtable, %swift.enum_vwtable* @"$s4main9NamespaceO5ValueOySS_SiGWV", i32 0, i32 0)
+// CHECK-SAME:    [[INT]] 513,
 // CHECK-SAME:    %swift.type_descriptor* bitcast (
 // CHECK-SAME:      <{ i32, i32, i32, i32, i32, i32, i32, i32, i32, i16, i16, i16, i16, i8, i8, i8, i8 }>* 
-// CHECK-SAME:      @"$s4main9NamespaceV5ValueVMn" 
+// CHECK-SAME:      @"$s4main9NamespaceO5ValueOMn" 
 // CHECK-SAME:      to %swift.type_descriptor*
 // CHECK-SAME:    ),
 // CHECK-SAME:    %swift.type* @"$sSSN",
 // CHECK-SAME:    %swift.type* @"$sSiN",
-// CHECK-SAME:    i32 0{{(, \[4 x i8\] zeroinitializer)?}},
 // CHECK-SAME:    i64 3
 // CHECK-SAME: }>, align [[ALIGNMENT]]
 
-struct Namespace<Arg> {
-  struct Value<First> {
-    let first: First
+enum Namespace<Arg> {
+  enum Value<First> {
+    case first(First)
   }
 }
 
@@ -51,9 +48,8 @@ func consume<T>(_ t: T) {
 // CHECK-SAME:           %swift.type_descriptor*, 
 // CHECK-SAME:           %swift.type*, 
 // CHECK-SAME:           %swift.type*, 
-// CHECK-SAME:           i32{{(, \[4 x i8\])?}}, 
 // CHECK-SAME:           i64 
-// CHECK-SAME:         }>* @"$s4main9NamespaceV5ValueVySS_SiGMf" 
+// CHECK-SAME:         }>* @"$s4main9NamespaceO5ValueOySS_SiGMf" 
 // CHECK-SAME:         to %swift.full_type*
 // CHECK-SAME:       ), 
 // CHECK-SAME:       i32 0, 
@@ -62,12 +58,12 @@ func consume<T>(_ t: T) {
 // CHECK-SAME:   )
 // CHECK: }
 func doit() {
-  consume( Namespace<String>.Value(first: 13) )
+  consume( Namespace<String>.Value.first(13) )
 }
 doit()
 
 // CHECK: ; Function Attrs: noinline nounwind readnone
-// CHECK: define hidden swiftcc %swift.metadata_response @"$s4main9NamespaceV5ValueVMa"([[INT]], %swift.type*, %swift.type*) #{{[0-9]+}} {
+// CHECK: define hidden swiftcc %swift.metadata_response @"$s4main9NamespaceO5ValueOMa"([[INT]], %swift.type*, %swift.type*) #{{[0-9]+}} {
 // CHECK: entry:
 // CHECK:   [[ERASED_TYPE_1:%[0-9]+]] = bitcast %swift.type* %1 to i8*
 // CHECK:   [[ERASED_TYPE_2:%[0-9]+]] = bitcast %swift.type* %2 to i8*
@@ -87,10 +83,10 @@ doit()
 // CHECK-SAME:           i8**, 
 // CHECK-SAME:           [[INT]], 
 // CHECK-SAME:           %swift.type_descriptor*, 
-// CHECK-SAME:           %swift.type*, %swift.type*, 
-// CHECK-SAME:           i32{{(, \[4 x i8\])?}}, 
+// CHECK-SAME:           %swift.type*, 
+// CHECK-SAME:           %swift.type*, 
 // CHECK-SAME:           i64 
-// CHECK-SAME:         }>* @"$s4main9NamespaceV5ValueVySS_SiGMf" 
+// CHECK-SAME:         }>* @"$s4main9NamespaceO5ValueOySS_SiGMf" 
 // CHECK-SAME:         to %swift.full_type*
 // CHECK-SAME:       ), 
 // CHECK-SAME:       i32 0, 
@@ -106,7 +102,7 @@ doit()
 // CHECK-SAME:     i8* undef, 
 // CHECK-SAME:     %swift.type_descriptor* bitcast (
 // CHECK-SAME:       <{ i32, i32, i32, i32, i32, i32, i32, i32, i32, i16, i16, i16, i16, i8, i8, i8, i8 }>* 
-// CHECK-SAME:       @"$s4main9NamespaceV5ValueVMn" 
+// CHECK-SAME:       @"$s4main9NamespaceO5ValueOMn" 
 // CHECK-SAME:       to %swift.type_descriptor*
 // CHECK-SAME:     )
 // CHECK-SAME:   ) #{{[0-9]+}}
