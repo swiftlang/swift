@@ -34,7 +34,7 @@ public func foo_vjp(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
 func bar<T>(_ x: Float, _ y: T) -> Float { x }
 
 @derivative(of: bar)
-public func bar_jvp<T>(_ x: Float, _ y: T) -> (value: Float, differential: (Float) -> Float) {
+func bar_jvp<T>(_ x: Float, _ y: T) -> (value: Float, differential: (Float) -> Float) {
   (x, { $0 })
 }
 

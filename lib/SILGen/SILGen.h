@@ -366,7 +366,8 @@ public:
                                     SILFunction *originalFunction,
                                     const AutoDiffConfig &config,
                                     SILFunction *jvp, SILFunction *vjp,
-                                    const DeclAttribute *diffAttr);
+                                    const DeclAttribute *diffAttr,
+                                    SILLinkage witnessLinkage);
   // SWIFT_ENABLE_TENSORFLOW END
 
   /// Emit the lazy initializer function for a global pattern binding

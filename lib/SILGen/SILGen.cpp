@@ -781,7 +781,8 @@ void SILGenModule::postEmitFunction(SILDeclRef constant,
                "all functions with generic signatures");
         AutoDiffConfig config(diffAttr->getParameterIndices(), resultIndices,
                               diffAttr->getDerivativeGenericSignature());
-        emitDifferentiabilityWitness(AFD, F, config, jvp, vjp, diffAttr);
+        emitDifferentiabilityWitness(AFD, F, config, jvp, vjp, diffAttr,
+                                     F->getLinkage());
       }
       for (auto *derivAttr : Attrs.getAttributes<DerivativeAttr>()) {
         SILFunction *jvp = nullptr;
@@ -801,7 +802,7 @@ void SILGenModule::postEmitFunction(SILDeclRef constant,
         AutoDiffConfig config(derivAttr->getParameterIndices(), resultIndices,
                               derivativeGenSig);
         emitDifferentiabilityWitness(origAFD, origFn, config, jvp, vjp,
-                                     derivAttr);
+                                     derivAttr, F->getLinkage());
       }
     };
     if (auto *accessor = dyn_cast<AccessorDecl>(AFD))
@@ -815,7 +816,7 @@ void SILGenModule::postEmitFunction(SILDeclRef constant,
 void SILGenModule::emitDifferentiabilityWitness(
     AbstractFunctionDecl *originalAFD, SILFunction *originalFunction,
     const AutoDiffConfig &config, SILFunction *jvp, SILFunction *vjp,
-    const DeclAttribute *attr) {
+    const DeclAttribute *attr, SILLinkage witnessLinkage) {
   assert(isa<DifferentiableAttr>(attr) || isa<DerivativeAttr>(attr));
   auto *origFnType = originalAFD->getInterfaceType()->castTo<AnyFunctionType>();
   auto origSilFnType = originalFunction->getLoweredFunctionType();
@@ -854,11 +855,19 @@ void SILGenModule::emitDifferentiabilityWitness(
   auto *diffWitness = M.lookUpDifferentiabilityWitness(key);
   if (!diffWitness) {
     diffWitness = SILDifferentiabilityWitness::createDefinition(
-        M, originalFunction->getLinkage(), originalFunction,
-        silConfig.parameterIndices, silConfig.resultIndices,
-        config.derivativeGenericSignature, /*jvp*/ nullptr, /*vjp*/ nullptr,
-        /*isSerialized*/ hasPublicVisibility(originalFunction->getLinkage()),
-        attr);
+        M, witnessLinkage, originalFunction, silConfig.parameterIndices,
+        silConfig.resultIndices, config.derivativeGenericSignature,
+        /*jvp*/ nullptr, /*vjp*/ nullptr,
+        /*isSerialized*/ hasPublicVisibility(witnessLinkage), attr);
+  }
+
+  // Use the least restrictive declared linkage, so that e.g. a
+  // `@differentiable` on `public` function with `@derivative`s on `internal`
+  // functions results in a public witness. (Sema is responsible for diagnosing
+  // forbidden combinations).
+  if (witnessLinkage < diffWitness->getLinkage()) {
+    diffWitness->setLinkage(witnessLinkage);
+    diffWitness->setSerialized(hasPublicVisibility(witnessLinkage));
   }
 
   // Set derivative function in differentiability witness.

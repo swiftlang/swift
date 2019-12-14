@@ -55,6 +55,15 @@ public:
   ModuleDecl *SwiftModule;
   const TBDGenOptions &Opts;
 
+  // SWIFT_ENABLE_TENSORFLOW
+  /// Tracks derivatives that have been added to the TBD.
+  ///
+  /// Different attributes trigger emission of the same derivatives (e.g.
+  /// `@differentiable` and `@derivative(of:)`), so we use this to deduplicate
+  /// the symbols associated with the derivatives in the TBD.
+  llvm::DenseSet<std::pair<AbstractFunctionDecl *, AutoDiffConfig>>
+      AddedDerivatives;
+
 private:
   void addSymbol(StringRef name, llvm::MachO::SymbolKind kind =
                                      llvm::MachO::SymbolKind::GlobalSymbol);

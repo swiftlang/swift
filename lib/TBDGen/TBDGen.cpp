@@ -67,6 +67,8 @@ void TBDGenVisitor::addSymbol(StringRef name, SymbolKind kind) {
   if (StringSymbols && kind == SymbolKind::GlobalSymbol) {
     auto isNewValue = StringSymbols->insert(mangled).second;
     (void)isNewValue;
+    if (!isNewValue)
+      llvm::dbgs() << mangled << "\n";
     assert(isNewValue && "symbol appears twice");
   }
 }
@@ -236,6 +238,10 @@ void TBDGenVisitor::addDifferentiabilityWitness(
 
 void TBDGenVisitor::addDerivativeConfiguration(AbstractFunctionDecl *original,
                                                AutoDiffConfig config) {
+  auto inserted = AddedDerivatives.insert({original, config});
+  if (!inserted.second)
+    return;
+
   addAutoDiffLinearMapFunction(original, config,
                                AutoDiffLinearMapKind::Differential);
   addAutoDiffLinearMapFunction(original, config,
@@ -315,9 +321,20 @@ void TBDGenVisitor::visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
   }
 
   // SWIFT_ENABLE_TENSORFLOW
-  for (auto derivativeConfig : AFD->getDerivativeFunctionConfigurations()) {
-    addDerivativeConfiguration(AFD, derivativeConfig);
-  }
+  for (const auto *differentiableAttr :
+       AFD->getAttrs().getAttributes<DifferentiableAttr>())
+    addDerivativeConfiguration(
+        AFD,
+        AutoDiffConfig(differentiableAttr->getParameterIndices(),
+                       IndexSubset::get(AFD->getASTContext(), 1, {0}),
+                       differentiableAttr->getDerivativeGenericSignature()));
+  for (const auto *derivativeAttr :
+       AFD->getAttrs().getAttributes<DerivativeAttr>())
+    addDerivativeConfiguration(
+        derivativeAttr->getOriginalFunction(),
+        AutoDiffConfig(derivativeAttr->getParameterIndices(),
+                       IndexSubset::get(AFD->getASTContext(), 1, {0}),
+                       AFD->getGenericSignature()));
 
   visitDefaultArguments(AFD, AFD->getParameters());
 }
@@ -371,6 +388,15 @@ void TBDGenVisitor::visitAbstractStorageDecl(AbstractStorageDecl *ASD) {
   ASD->visitEmittedAccessors([&](AccessorDecl *accessor) {
     visitFuncDecl(accessor);
   });
+
+  // SWIFT_ENABLE_TENSORFLOW
+  for (const auto *differentiableAttr :
+       ASD->getAttrs().getAttributes<DifferentiableAttr>())
+    addDerivativeConfiguration(
+        ASD->getAccessor(AccessorKind::Get),
+        AutoDiffConfig(differentiableAttr->getParameterIndices(),
+                       IndexSubset::get(ASD->getASTContext(), 1, {0}),
+                       differentiableAttr->getDerivativeGenericSignature()));
 }
 
 void TBDGenVisitor::visitVarDecl(VarDecl *VD) {

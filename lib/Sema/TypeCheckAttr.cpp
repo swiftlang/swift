@@ -3867,12 +3867,15 @@ void AttributeChecker::visitDerivativeAttr(DerivativeAttr *attr) {
     return;
   }
 
-  // Reject different-file retroactive derivatives.
-  // TODO(TF-136): Lift this restriction now that SIL differentiability witness
-  // infrastructure is ready.
-  if (originalAFD->getParentSourceFile() != derivative->getParentSourceFile()) {
-    diagnoseAndRemoveAttr(attr,
-                          diag::derivative_attr_not_in_same_file_as_original);
+  // Check that derivative visibility is at least as restricted as original
+  // function visibility.
+  if (derivative->getFormalAccessScope() !=
+          originalAFD->getFormalAccessScope() &&
+      !derivative->getFormalAccessScope().isChildOf(
+          originalAFD->getFormalAccessScope())) {
+    diagnoseAndRemoveAttr(attr, diag::derivative_attr_visibility_too_broad);
+    diagnose(originalAFD->getLoc(),
+             diag::derivative_attr_visibility_too_broad_note);
     return;
   }
 

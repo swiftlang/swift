@@ -96,6 +96,7 @@ public:
   SILDifferentiabilityWitnessKey getKey() const;
   SILModule &getModule() const { return Module; }
   SILLinkage getLinkage() const { return Linkage; }
+  void setLinkage(SILLinkage linkage) { Linkage = linkage; }
   SILFunction *getOriginalFunction() const { return OriginalFunction; }
   const AutoDiffConfig &getConfig() const { return Config; }
   IndexSubset *getParameterIndices() const {
@@ -127,6 +128,7 @@ public:
   bool isDeclaration() const { return IsDeclaration; }
   bool isDefinition() const { return !IsDeclaration; }
   bool isSerialized() const { return IsSerialized; }
+  void setSerialized(bool isSerialized) { IsSerialized = isSerialized; }
   const DeclAttribute *getAttribute() const { return Attribute; }
 
   /// Returns the `SILAutoDiffIndices` corresponding to this config's indices.
