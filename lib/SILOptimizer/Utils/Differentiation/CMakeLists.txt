@@ -5,5 +5,6 @@ silopt_register_sources(
   JVPEmitter.cpp
   LinearMapInfo.cpp
   PullbackEmitter.cpp
+  Thunk.cpp
   VJPEmitter.cpp
 )
