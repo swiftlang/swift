@@ -1206,7 +1206,7 @@ bool SILGlobalOpt::run() {
     Module->eraseGlobalVariable(global);
   }
 
-  // Reset incase we re-run this function (when HasChanged is true).
+  // Reset in case we re-run this function (when HasChanged is true).
   reset();
   return HasChanged;
 }
