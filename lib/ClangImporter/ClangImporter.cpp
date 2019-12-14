@@ -1625,13 +1625,13 @@ void ClangImporter::collectSubModuleNames(
 
   // Look up the top-level module first.
   clang::Module *clangModule = clangHeaderSearch.lookupModule(
-      path.front().item.str(), /*AllowSearch=*/true,
+      path.front().Item.str(), /*AllowSearch=*/true,
       /*AllowExtraModuleMapSearch=*/true);
   if (!clangModule)
     return;
   clang::Module *submodule = clangModule;
   for (auto component : path.slice(1)) {
-    submodule = submodule->findSubmodule(component.item.str());
+    submodule = submodule->findSubmodule(component.Item.str());
     if (!submodule)
       return;
   }
@@ -1648,7 +1648,7 @@ bool ClangImporter::canImportModule(Located<Identifier> moduleID) {
   // FIXME: This only works with top-level modules.
   auto &clangHeaderSearch = Impl.getClangPreprocessor().getHeaderSearchInfo();
   clang::Module *clangModule =
-      clangHeaderSearch.lookupModule(moduleID.item.str(), /*AllowSearch=*/true,
+      clangHeaderSearch.lookupModule(moduleID.Item.str(), /*AllowSearch=*/true,
                                      /*AllowExtraModuleMapSearch=*/true);
   if (!clangModule) {
     return false;
@@ -1668,7 +1668,7 @@ ModuleDecl *ClangImporter::Implementation::loadModuleClang(
 
   // Look up the top-level module first, to see if it exists at all.
   clang::Module *clangModule = clangHeaderSearch.lookupModule(
-      path.front().item.str(), /*AllowSearch=*/true,
+      path.front().Item.str(), /*AllowSearch=*/true,
       /*AllowExtraModuleMapSearch=*/true);
   if (!clangModule)
     return nullptr;
@@ -1677,8 +1677,8 @@ ModuleDecl *ClangImporter::Implementation::loadModuleClang(
   SmallVector<std::pair<clang::IdentifierInfo *, clang::SourceLocation>, 4>
       clangPath;
   for (auto component : path) {
-    clangPath.push_back({&clangContext.Idents.get(component.item.str()),
-                         exportSourceLoc(component.loc)});
+    clangPath.push_back({&clangContext.Idents.get(component.Item.str()),
+                         exportSourceLoc(component.Loc)});
   }
 
   auto &rawDiagClient = Instance->getDiagnosticClient();
@@ -1728,13 +1728,13 @@ ModuleDecl *ClangImporter::Implementation::loadModuleClang(
   // Verify that the submodule exists.
   clang::Module *submodule = clangModule;
   for (auto &component : path.slice(1)) {
-    submodule = submodule->findSubmodule(component.item.str());
+    submodule = submodule->findSubmodule(component.Item.str());
 
     // Special case: a submodule named "Foo.Private" can be moved to a top-level
     // module named "Foo_Private". Clang has special support for this.
     // We're limiting this to just submodules named "Private" because this will
     // put the Clang AST in a fatal error state if it /doesn't/ exist.
-    if (!submodule && component.item.str() == "Private" &&
+    if (!submodule && component.Item.str() == "Private" &&
         (&component) == (&path[1])) {
       submodule = loadModule(llvm::makeArrayRef(clangPath).slice(0, 2), false);
     }

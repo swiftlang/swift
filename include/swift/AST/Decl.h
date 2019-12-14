@@ -1578,9 +1578,9 @@ public:
   }
 
   SourceLoc getStartLoc() const { return ImportLoc; }
-  SourceLoc getLocFromSource() const { return getFullAccessPath().front().loc; }
+  SourceLoc getLocFromSource() const { return getFullAccessPath().front().Loc; }
   SourceRange getSourceRange() const {
-    return SourceRange(ImportLoc, getFullAccessPath().back().loc);
+    return SourceRange(ImportLoc, getFullAccessPath().back().Loc);
   }
   SourceLoc getKindLoc() const { return KindLoc; }
 

@@ -303,7 +303,7 @@ void SourceLookupCache::lookupVisibleDecls(AccessPathTy AccessPath,
   assert(AccessPath.size() <= 1 && "can only refer to top-level decls");
 
   if (!AccessPath.empty()) {
-    auto I = TopLevelValues.find(AccessPath.front().item);
+    auto I = TopLevelValues.find(AccessPath.front().Item);
     if (I == TopLevelValues.end()) return;
 
     for (auto vd : I->second)
@@ -335,7 +335,7 @@ void SourceLookupCache::lookupClassMembers(AccessPathTy accessPath,
 
       for (ValueDecl *vd : member.second) {
         auto *nominal = vd->getDeclContext()->getSelfNominalTypeDecl();
-        if (nominal && nominal->getName() == accessPath.front().item)
+        if (nominal && nominal->getName() == accessPath.front().Item)
           consumer.foundDecl(vd, DeclVisibilityKind::DynamicLookup,
                              DynamicLookupInfo::AnyObject);
       }
@@ -367,7 +367,7 @@ void SourceLookupCache::lookupClassMember(AccessPathTy accessPath,
   if (!accessPath.empty()) {
     for (ValueDecl *vd : iter->second) {
       auto *nominal = vd->getDeclContext()->getSelfNominalTypeDecl();
-      if (nominal && nominal->getName() == accessPath.front().item)
+      if (nominal && nominal->getName() == accessPath.front().Item)
         results.push_back(vd);
     }
     return;
@@ -1187,7 +1187,7 @@ bool ModuleDecl::isSameAccessPath(AccessPathTy lhs, AccessPathTy rhs) {
   return std::equal(lhs.begin(), lhs.end(), rhs.begin(),
                     [](const AccessPathElem &lElem,
                        const AccessPathElem &rElem) {
-    return lElem.item == rElem.item;
+    return lElem.Item == rElem.Item;
   });
 }
 
@@ -1256,7 +1256,7 @@ ModuleDecl::removeDuplicateImports(SmallVectorImpl<ImportedModule> &imports) {
                                         rhs.first.begin(), rhs.first.end(),
                                         [](const AccessPathElem &lElem,
                                            const AccessPathElem &rElem) {
-      return lElem.item.str() < rElem.item.str();
+      return lElem.Item.str() < rElem.Item.str();
     });
   });
   auto last = std::unique(imports.begin(), imports.end(),

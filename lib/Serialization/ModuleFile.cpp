@@ -2209,7 +2209,7 @@ void ModuleFile::getImportDecls(SmallVectorImpl<Decl *> &Results) {
         AccessPath.push_back({Ctx.getIdentifier(NextComponent), SourceLoc()});
       }
 
-      if (AccessPath.size() == 1 && AccessPath[0].item == Ctx.StdlibModuleName)
+      if (AccessPath.size() == 1 && AccessPath[0].Item == Ctx.StdlibModuleName)
         continue;
 
       ModuleDecl *M = Ctx.getLoadedModule(AccessPath);
@@ -2228,7 +2228,7 @@ void ModuleFile::getImportDecls(SmallVectorImpl<Decl *> &Results) {
           // Lookup the decl in the top-level module.
           ModuleDecl *TopLevelModule = M;
           if (AccessPath.size() > 1)
-            TopLevelModule = Ctx.getLoadedModule(AccessPath.front().item);
+            TopLevelModule = Ctx.getLoadedModule(AccessPath.front().Item);
 
           SmallVector<ValueDecl *, 8> Decls;
           TopLevelModule->lookupQualified(
@@ -2278,7 +2278,7 @@ void ModuleFile::lookupVisibleDecls(ModuleDecl::AccessPathTy accessPath,
   };
 
   if (!accessPath.empty()) {
-    auto iter = TopLevelDecls->find(accessPath.front().item);
+    auto iter = TopLevelDecls->find(accessPath.front().Item);
     if (iter == TopLevelDecls->end())
       return;
 
@@ -2454,7 +2454,7 @@ void ModuleFile::lookupClassMember(ModuleDecl::AccessPathTy accessPath,
         while (!dc->getParent()->isModuleScopeContext())
           dc = dc->getParent();
         if (auto nominal = dc->getSelfNominalTypeDecl())
-          if (nominal->getName() == accessPath.front().item)
+          if (nominal->getName() == accessPath.front().Item)
             results.push_back(vd);
       }
     } else {
@@ -2467,7 +2467,7 @@ void ModuleFile::lookupClassMember(ModuleDecl::AccessPathTy accessPath,
         while (!dc->getParent()->isModuleScopeContext())
           dc = dc->getParent();
         if (auto nominal = dc->getSelfNominalTypeDecl())
-          if (nominal->getName() == accessPath.front().item)
+          if (nominal->getName() == accessPath.front().Item)
             results.push_back(vd);
       }
     }
@@ -2496,7 +2496,7 @@ void ModuleFile::lookupClassMembers(ModuleDecl::AccessPathTy accessPath,
         while (!dc->getParent()->isModuleScopeContext())
           dc = dc->getParent();
         if (auto nominal = dc->getSelfNominalTypeDecl())
-          if (nominal->getName() == accessPath.front().item)
+          if (nominal->getName() == accessPath.front().Item)
             consumer.foundDecl(vd, DeclVisibilityKind::DynamicLookup,
                                DynamicLookupInfo::AnyObject);
       }

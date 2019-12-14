@@ -2623,7 +2623,7 @@ static int doPrintModuleImports(const CompilerInvocation &InitInvok,
       for (auto &import : scratch) {
         llvm::outs() << "\t" << import.second->getName();
         for (auto accessPathPiece : import.first) {
-          llvm::outs() << "." << accessPathPiece.item;
+          llvm::outs() << "." << accessPathPiece.Item;
         }
 
         if (import.second->isClangModule())

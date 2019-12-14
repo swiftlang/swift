@@ -170,9 +170,9 @@ SyntaxModelContext::SyntaxModelContext(SourceFile &SrcFile)
       case tok::pound_imageLiteral:
         if (auto Match = matchImageOrFileLiteralArg(Tokens.slice(I+1))) {
           Kind = SyntaxNodeKind::ObjectLiteral;
-          Length = SM.getByteDistance(Loc, Match->loc);
+          Length = SM.getByteDistance(Loc, Match->Loc);
           // skip over the extra matched tokens
-          I += Match->item - 1;
+          I += Match->Item - 1;
         } else {
           Kind = SyntaxNodeKind::Keyword;
         }
@@ -180,9 +180,9 @@ SyntaxModelContext::SyntaxModelContext(SourceFile &SrcFile)
       case tok::pound_colorLiteral:
         if (auto Match = matchColorLiteralArg(Tokens.slice(I+1))) {
           Kind = SyntaxNodeKind::ObjectLiteral;
-          Length = SM.getByteDistance(Loc, Match->loc);
+          Length = SM.getByteDistance(Loc, Match->Loc);
           // skip over the matches tokens
-          I += Match->item - 1;
+          I += Match->Item - 1;
         } else {
           Kind = SyntaxNodeKind::Keyword;
         }

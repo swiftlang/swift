@@ -139,7 +139,7 @@ public:
     assert(AccessPath.size() <= 1 && "can only refer to top-level decls");
   
     return AccessPath.empty()
-      || DeclName(AccessPath.front().item).matchesRef(Name);
+      || DeclName(AccessPath.front().Item).matchesRef(Name);
   }
   
   /// Arbitrarily orders ImportedModule records, for inclusion in sets and such.

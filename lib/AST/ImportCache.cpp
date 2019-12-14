@@ -57,7 +57,7 @@ void ImportSet::Profile(
   for (auto import : topLevelImports) {
     ID.AddInteger(import.first.size());
     for (auto accessPathElt : import.first) {
-      ID.AddPointer(accessPathElt.item.getAsOpaquePointer());
+      ID.AddPointer(accessPathElt.Item.getAsOpaquePointer());
     }
     ID.AddPointer(import.second);
   }

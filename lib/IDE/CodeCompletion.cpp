@@ -4727,7 +4727,7 @@ void CodeCompletionCallbacksImpl::completeImportDecl(
     std::vector<Located<Identifier>> &Path) {
   Kind = CompletionKind::Import;
   CurDeclContext = P.CurDeclContext;
-  DotLoc = Path.empty() ? SourceLoc() : Path.back().loc;
+  DotLoc = Path.empty() ? SourceLoc() : Path.back().Loc;
   if (DotLoc.isInvalid())
     return;
   auto Importer = static_cast<ClangImporter *>(CurDeclContext->getASTContext().
@@ -5573,7 +5573,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
 
       std::vector<std::string> AccessPath;
       for (auto Piece : Path) {
-        AccessPath.push_back(Piece.item.str());
+        AccessPath.push_back(Piece.Item.str());
       }
 
       StringRef ModuleFilename = TheModule->getModuleFilename();

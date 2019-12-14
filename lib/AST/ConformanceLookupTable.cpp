@@ -200,8 +200,8 @@ void ConformanceLookupTable::forEachInStage(ConformanceStage stage,
       bool anyObject = false;
       for (const auto &found :
                getDirectlyInheritedNominalTypeDecls(next, anyObject)) {
-        if (auto proto = dyn_cast<ProtocolDecl>(found.item))
-          protocols.push_back({proto, found.loc});
+        if (auto proto = dyn_cast<ProtocolDecl>(found.Item))
+          protocols.push_back({proto, found.Loc});
       }
     }
 
@@ -281,7 +281,7 @@ void ConformanceLookupTable::updateLookupTable(NominalTypeDecl *nominal,
           // its inherited protocols directly.
           auto source = ConformanceSource::forExplicit(ext);
           for (auto locAndProto : protos)
-            addProtocol(locAndProto.item, locAndProto.loc, source);
+            addProtocol(locAndProto.Item, locAndProto.Loc, source);
         });
     break;
 
@@ -470,8 +470,8 @@ void ConformanceLookupTable::addInheritedProtocols(
   bool anyObject = false;
   for (const auto &found :
           getDirectlyInheritedNominalTypeDecls(decl, anyObject)) {
-    if (auto proto = dyn_cast<ProtocolDecl>(found.item))
-      addProtocol(proto, found.loc, source);
+    if (auto proto = dyn_cast<ProtocolDecl>(found.Item))
+      addProtocol(proto, found.Loc, source);
   }
 }
 

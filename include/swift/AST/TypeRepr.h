@@ -746,12 +746,12 @@ public:
 
   SourceLoc getEllipsisLoc() const {
     return hasEllipsis() ?
-      getTrailingObjects<SourceLocAndIdx>()[0].loc : SourceLoc();
+      getTrailingObjects<SourceLocAndIdx>()[0].Loc : SourceLoc();
   }
 
   unsigned getEllipsisIndex() const {
     return hasEllipsis() ?
-      getTrailingObjects<SourceLocAndIdx>()[0].item :
+      getTrailingObjects<SourceLocAndIdx>()[0].Item :
         Bits.TupleTypeRepr.NumElements;
   }
 

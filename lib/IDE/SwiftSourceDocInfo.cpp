@@ -246,7 +246,7 @@ bool NameMatcher::walkToDeclPre(Decl *D) {
     }
   } else if (ImportDecl *ID = dyn_cast<ImportDecl>(D)) {
     for(const ImportDecl::AccessPathElement &Element: ID->getFullAccessPath()) {
-      tryResolve(ASTWalker::ParentTy(D), Element.loc);
+      tryResolve(ASTWalker::ParentTy(D), Element.Loc);
       if (isDone())
         break;
     }
@@ -416,9 +416,9 @@ bool NameMatcher::walkToTypeReprPre(TypeRepr *T) {
   if (isa<ComponentIdentTypeRepr>(T)) {
     // If we're walking a CustomAttr's type we may have an associated call
     // argument to resolve with from its semantic initializer.
-    if (CustomAttrArg.hasValue() && CustomAttrArg->loc == T->getLoc()) {
+    if (CustomAttrArg.hasValue() && CustomAttrArg->Loc == T->getLoc()) {
       tryResolve(ASTWalker::ParentTy(T), T->getLoc(), LabelRangeType::CallArg,
-                 getCallArgLabelRanges(getSourceMgr(), CustomAttrArg->item, LabelRangeEndAt::BeforeElemStart));
+                 getCallArgLabelRanges(getSourceMgr(), CustomAttrArg->Item, LabelRangeEndAt::BeforeElemStart));
     } else {
       tryResolve(ASTWalker::ParentTy(T), T->getLoc());
     }

@@ -670,10 +670,10 @@ passReference(ValueDecl *D, Type Ty, SourceLoc BaseNameLoc, SourceRange Range,
 
 bool SemaAnnotator::passReference(ModuleEntity Mod,
                                   Located<Identifier> IdLoc) {
-  if (IdLoc.loc.isInvalid())
+  if (IdLoc.Loc.isInvalid())
     return true;
-  unsigned NameLen = IdLoc.item.getLength();
-  CharSourceRange Range{ IdLoc.loc, NameLen };
+  unsigned NameLen = IdLoc.Item.getLength();
+  CharSourceRange Range{ IdLoc.Loc, NameLen };
   bool Continue = SEWalker.visitModuleReference(Mod, Range);
   if (!Continue)
     Cancelled = true;

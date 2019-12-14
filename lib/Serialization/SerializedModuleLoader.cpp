@@ -428,7 +428,7 @@ SerializedModuleLoaderBase::findModule(AccessPathElem moduleID,
            std::unique_ptr<llvm::MemoryBuffer> *moduleDocBuffer,
            std::unique_ptr<llvm::MemoryBuffer> *moduleSourceInfoBuffer,
            bool &isFramework, bool &isSystemModule) {
-  llvm::SmallString<64> moduleName(moduleID.item.str());
+  llvm::SmallString<64> moduleName(moduleID.Item.str());
   ModuleFilenamePair fileNames(moduleName);
 
   SmallVector<ModuleFilenamePair, 4> targetFileNamePairs;
@@ -465,7 +465,7 @@ SerializedModuleLoaderBase::findModule(AccessPathElem moduleID,
 
     // We can only get here if all targetFileNamePairs failed with
     // 'std::errc::no_such_file_or_directory'.
-    if (maybeDiagnoseTargetMismatch(moduleID.loc, moduleName,
+    if (maybeDiagnoseTargetMismatch(moduleID.Loc, moduleName,
                                     primaryTargetSpecificName, currPath)) {
       return false;
     } else {
@@ -517,7 +517,7 @@ SerializedModuleLoaderBase::findModule(AccessPathElem moduleID,
         case SearchPathKind::Framework: {
           isFramework = true;
           llvm::sys::path::append(currPath,
-                                  moduleID.item.str() + ".framework");
+                                  moduleID.Item.str() + ".framework");
 
           // Check if the framework directory exists.
           if (!fs.exists(currPath))
@@ -841,7 +841,7 @@ bool SerializedModuleLoaderBase::canImportModule(
 bool MemoryBufferSerializedModuleLoader::canImportModule(
     Located<Identifier> mID) {
   // See if we find it in the registered memory buffers.
-  return MemoryBuffers.count(mID.item.str());
+  return MemoryBuffers.count(mID.Item.str());
 }
 
 ModuleDecl *
@@ -876,15 +876,15 @@ SerializedModuleLoaderBase::loadModule(SourceLoc importLoc,
 
   assert(moduleInputBuffer);
 
-  auto M = ModuleDecl::create(moduleID.item, Ctx);
+  auto M = ModuleDecl::create(moduleID.Item, Ctx);
   M->setIsSystemModule(isSystemModule);
-  Ctx.LoadedModules[moduleID.item] = M;
+  Ctx.LoadedModules[moduleID.Item] = M;
   SWIFT_DEFER { M->setHasResolvedImports(); };
 
   StringRef moduleInterfacePathStr =
     Ctx.AllocateCopy(moduleInterfacePath.str());
 
-  if (!loadAST(*M, moduleID.loc, moduleInterfacePathStr,
+  if (!loadAST(*M, moduleID.Loc, moduleInterfacePathStr,
                std::move(moduleInputBuffer), std::move(moduleDocInputBuffer),
                std::move(moduleSourceInfoInputBuffer),
                isFramework, /*treatAsPartialModule*/false)) {
@@ -908,7 +908,7 @@ MemoryBufferSerializedModuleLoader::loadModule(SourceLoc importLoc,
   // FIXME: Right now this works only with access paths of length 1.
   // Once submodules are designed, this needs to support suffix
   // matching and a search path.
-  auto bufIter = MemoryBuffers.find(moduleID.item.str());
+  auto bufIter = MemoryBuffers.find(moduleID.Item.str());
   if (bufIter == MemoryBuffers.end())
     return nullptr;
 
@@ -919,16 +919,16 @@ MemoryBufferSerializedModuleLoader::loadModule(SourceLoc importLoc,
   MemoryBuffers.erase(bufIter);
   assert(moduleInputBuffer);
 
-  auto *M = ModuleDecl::create(moduleID.item, Ctx);
+  auto *M = ModuleDecl::create(moduleID.Item, Ctx);
   SWIFT_DEFER { M->setHasResolvedImports(); };
 
-  if (!loadAST(*M, moduleID.loc, /*moduleInterfacePath*/ "",
+  if (!loadAST(*M, moduleID.Loc, /*moduleInterfacePath*/ "",
                std::move(moduleInputBuffer), {}, {},
                isFramework, treatAsPartialModule)) {
     return nullptr;
   }
 
-  Ctx.LoadedModules[moduleID.item] = M;
+  Ctx.LoadedModules[moduleID.Item] = M;
   return M;
 }
 

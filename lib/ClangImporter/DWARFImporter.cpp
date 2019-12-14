@@ -105,7 +105,7 @@ ModuleDecl *ClangImporter::Implementation::loadModuleDWARF(
     return nullptr;
 
   // FIXME: Implement submodule support!
-  Identifier name = path[0].item;
+  Identifier name = path[0].Item;
   auto it = DWARFModuleUnits.find(name);
   if (it != DWARFModuleUnits.end())
     return it->second->getParentModule();

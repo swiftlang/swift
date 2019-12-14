@@ -49,7 +49,7 @@ static void diagnoseScopedImports(DiagnosticEngine &diags,
   for (const ModuleDecl::ImportedModule &importPair : imports) {
     if (importPair.first.empty())
       continue;
-    diags.diagnose(importPair.first.front().loc,
+    diags.diagnose(importPair.first.front().Loc,
                    diag::module_interface_scoped_import_unsupported);
   }
 }
@@ -119,7 +119,7 @@ static void printImports(raw_ostream &out, ModuleDecl *M) {
     if (!import.first.empty()) {
       out << "/*";
       for (const auto &accessPathElem : import.first)
-        out << "." << accessPathElem.item;
+        out << "." << accessPathElem.Item;
       out << "*/";
     }
 

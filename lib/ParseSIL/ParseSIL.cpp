@@ -85,8 +85,8 @@ public:
 SILParserTUState::~SILParserTUState() {
   if (!ForwardRefFns.empty()) {
     for (auto Entry : ForwardRefFns) {
-      if (Entry.second.loc.isValid()) {
-        M.getASTContext().Diags.diagnose(Entry.second.loc,
+      if (Entry.second.Loc.isValid()) {
+        M.getASTContext().Diags.diagnose(Entry.second.Loc,
                                          diag::sil_use_of_undefined_value,
                                          Entry.first.str());
       }
@@ -584,8 +584,8 @@ bool SILParser::diagnoseProblems() {
   if (!UndefinedBlocks.empty()) {
     // FIXME: These are going to come out in nondeterministic order.
     for (auto Entry : UndefinedBlocks)
-      P.diagnose(Entry.second.loc, diag::sil_undefined_basicblock_use,
-                 Entry.second.item);
+      P.diagnose(Entry.second.Loc, diag::sil_undefined_basicblock_use,
+                 Entry.second.Item);
 
     HadError = true;
   }
@@ -613,13 +613,13 @@ SILFunction *SILParser::getGlobalNameForDefinition(Identifier name,
   // complete the forward reference.
   auto iter = TUState.ForwardRefFns.find(name);
   if (iter != TUState.ForwardRefFns.end()) {
-    SILFunction *fn = iter->second.item;
+    SILFunction *fn = iter->second.Item;
 
     // Verify that the types match up.
     if (fn->getLoweredFunctionType() != ty) {
       P.diagnose(sourceLoc, diag::sil_value_use_type_mismatch, name.str(),
                  fn->getLoweredFunctionType(), ty);
-      P.diagnose(iter->second.loc, diag::sil_prior_reference);
+      P.diagnose(iter->second.Loc, diag::sil_prior_reference);
       fn = builder.createFunctionForForwardReference("" /*name*/, ty, silLoc);
     }
 
@@ -5084,7 +5084,7 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
                  results.size());
     } else {
       for (size_t i : indices(results)) {
-        setLocalValue(results[i], resultNames[i].item, resultNames[i].loc);
+        setLocalValue(results[i], resultNames[i].Item, resultNames[i].Loc);
       }
     }
   }

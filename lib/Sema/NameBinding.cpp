@@ -73,7 +73,7 @@ NameBinder::getModule(ArrayRef<Located<Identifier>> modulePath) {
   // The Builtin module cannot be explicitly imported unless we're a .sil file
   // or in the REPL.
   if ((SF.Kind == SourceFileKind::SIL || SF.Kind == SourceFileKind::REPL) &&
-      moduleID.item == Context.TheBuiltinModule->getName())
+      moduleID.Item == Context.TheBuiltinModule->getName())
     return Context.TheBuiltinModule;
 
   // If the imported module name is the same as the current module,
@@ -82,10 +82,10 @@ NameBinder::getModule(ArrayRef<Located<Identifier>> modulePath) {
   //
   // FIXME: We'd like to only use this in SIL mode, but unfortunately we use it
   // for our fake overlays as well.
-  if (moduleID.item == SF.getParentModule()->getName() &&
+  if (moduleID.Item == SF.getParentModule()->getName() &&
       modulePath.size() == 1) {
     if (auto importer = Context.getClangModuleLoader())
-      return importer->loadModule(moduleID.loc, modulePath);
+      return importer->loadModule(moduleID.Loc, modulePath);
     return nullptr;
   }
   
@@ -170,17 +170,17 @@ static bool shouldImportSelfImportClang(const ImportDecl *ID,
 
 void NameBinder::addImport(
     SmallVectorImpl<SourceFile::ImportedModuleDesc> &imports, ImportDecl *ID) {
-  if (ID->getModulePath().front().item == SF.getParentModule()->getName() &&
+  if (ID->getModulePath().front().Item == SF.getParentModule()->getName() &&
       ID->getModulePath().size() == 1 && !shouldImportSelfImportClang(ID, SF)) {
     // If the imported module name is the same as the current module,
     // produce a diagnostic.
     StringRef filename = llvm::sys::path::filename(SF.getFilename());
     if (filename.empty())
       Context.Diags.diagnose(ID, diag::sema_import_current_module,
-                             ID->getModulePath().front().item);
+                             ID->getModulePath().front().Item);
     else
       Context.Diags.diagnose(ID, diag::sema_import_current_module_with_file,
-                             filename, ID->getModulePath().front().item);
+                             filename, ID->getModulePath().front().Item);
     ID->setModule(SF.getParentModule());
     return;
   }
@@ -190,7 +190,7 @@ void NameBinder::addImport(
     SmallString<64> modulePathStr;
     interleave(ID->getModulePath(),
                [&](ImportDecl::AccessPathElement elem) {
-                 modulePathStr += elem.item.str();
+                 modulePathStr += elem.Item.str();
                },
                [&] { modulePathStr += "."; });
 
@@ -214,7 +214,7 @@ void NameBinder::addImport(
     topLevelModule = M;
   } else {
     // If we imported a submodule, import the top-level module as well.
-    Identifier topLevelName = ID->getModulePath().front().item;
+    Identifier topLevelName = ID->getModulePath().front().Item;
     topLevelModule = Context.getLoadedModule(topLevelName);
     if (!topLevelModule) {
       // Clang can sometimes import top-level modules as if they were
@@ -234,8 +234,8 @@ void NameBinder::addImport(
       !topLevelModule->isTestingEnabled() &&
       !topLevelModule->isNonSwiftModule() &&
       Context.LangOpts.EnableTestableAttrRequiresTestableModule) {
-    diagnose(ID->getModulePath().front().loc, diag::module_not_testable,
-             ID->getModulePath().front().item);
+    diagnose(ID->getModulePath().front().Loc, diag::module_not_testable,
+             ID->getModulePath().front().Item);
     testableAttr->setInvalid();
   }
 
@@ -243,9 +243,9 @@ void NameBinder::addImport(
   StringRef privateImportFileName;
   if (privateImportAttr) {
     if (!topLevelModule || !topLevelModule->arePrivateImportsEnabled()) {
-      diagnose(ID->getModulePath().front().loc,
+      diagnose(ID->getModulePath().front().Loc,
                diag::module_not_compiled_for_private_import,
-               ID->getModulePath().front().item);
+               ID->getModulePath().front().Item);
       privateImportAttr->setInvalid();
     } else {
       privateImportFileName = privateImportAttr->getSourceFile();
@@ -256,7 +256,7 @@ void NameBinder::addImport(
       !topLevelModule->isResilient() &&
       !topLevelModule->isNonSwiftModule() &&
       !ID->getAttrs().hasAttribute<ImplementationOnlyAttr>()) {
-    diagnose(ID->getModulePath().front().loc,
+    diagnose(ID->getModulePath().front().Loc,
              diag::module_not_compiled_with_library_evolution,
              topLevelModule->getName(), SF.getParentModule()->getName());
   }
@@ -296,17 +296,17 @@ void NameBinder::addImport(
     // FIXME: Doesn't handle scoped testable imports correctly.
     assert(declPath.size() == 1 && "can't handle sub-decl imports");
     SmallVector<ValueDecl *, 8> decls;
-    lookupInModule(topLevelModule, declPath.front().item, decls,
+    lookupInModule(topLevelModule, declPath.front().Item, decls,
                    NLKind::QualifiedLookup, ResolutionKind::Overloadable,
                    &SF);
 
     if (decls.empty()) {
       diagnose(ID, diag::decl_does_not_exist_in_module,
                static_cast<unsigned>(ID->getImportKind()),
-               declPath.front().item,
-               ID->getModulePath().front().item)
-        .highlight(SourceRange(declPath.front().loc,
-                               declPath.back().loc));
+               declPath.front().Item,
+               ID->getModulePath().front().Item)
+        .highlight(SourceRange(declPath.front().Loc,
+                               declPath.back().Loc));
       return;
     }
 
@@ -316,7 +316,7 @@ void NameBinder::addImport(
     if (!actualKind.hasValue()) {
       // FIXME: print entire module name?
       diagnose(ID, diag::ambiguous_decl_in_module,
-               declPath.front().item, M->getName());
+               declPath.front().Item, M->getName());
       for (auto next : decls)
         diagnose(next, diag::found_candidate);
 
@@ -338,7 +338,7 @@ void NameBinder::addImport(
             getImportKindString(ID->getImportKind())));
       } else {
         emittedDiag.emplace(diagnose(ID, diag::imported_decl_is_wrong_kind,
-            declPath.front().item,
+            declPath.front().Item,
             getImportKindString(ID->getImportKind()),
             static_cast<unsigned>(*actualKind)));
       }

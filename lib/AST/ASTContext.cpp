@@ -1473,7 +1473,7 @@ ModuleDecl *ASTContext::getLoadedModule(
 
   // TODO: Swift submodules.
   if (ModulePath.size() == 1) {
-    return getLoadedModule(ModulePath[0].item);
+    return getLoadedModule(ModulePath[0].Item);
   }
   return nullptr;
 }
@@ -1729,7 +1729,7 @@ bool ASTContext::canImportModule(Located<Identifier> ModulePath) {
     return true;
 
   // If we've failed loading this module before, don't look for it again.
-  if (FailedModuleImportNames.count(ModulePath.item))
+  if (FailedModuleImportNames.count(ModulePath.Item))
     return false;
 
   // Otherwise, ask the module loaders.
@@ -1739,7 +1739,7 @@ bool ASTContext::canImportModule(Located<Identifier> ModulePath) {
     }
   }
 
-  FailedModuleImportNames.insert(ModulePath.item);
+  FailedModuleImportNames.insert(ModulePath.Item);
   return false;
 }
 
@@ -1752,7 +1752,7 @@ ASTContext::getModule(ArrayRef<Located<Identifier>> ModulePath) {
 
   auto moduleID = ModulePath[0];
   for (auto &importer : getImpl().ModuleLoaders) {
-    if (ModuleDecl *M = importer->loadModule(moduleID.loc, ModulePath)) {
+    if (ModuleDecl *M = importer->loadModule(moduleID.Loc, ModulePath)) {
       return M;
     }
   }

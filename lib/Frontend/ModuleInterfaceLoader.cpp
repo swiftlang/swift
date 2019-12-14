@@ -1020,10 +1020,10 @@ std::error_code ModuleInterfaceLoader::findModuleFilesInDirectory(
   }
 
   // Create an instance of the Impl to do the heavy lifting.
-  auto ModuleName = ModuleID.item.str();
+  auto ModuleName = ModuleID.Item.str();
   ModuleInterfaceLoaderImpl Impl(
                 Ctx, ModPath, InPath, ModuleName,
-                CacheDir, PrebuiltCacheDir, ModuleID.loc,
+                CacheDir, PrebuiltCacheDir, ModuleID.Loc,
                 RemarkOnRebuildFromInterface, dependencyTracker,
                 llvm::is_contained(PreferInterfaceForModules,
                                    ModuleName) ?

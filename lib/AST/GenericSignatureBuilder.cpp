@@ -4060,8 +4060,8 @@ ConstraintResult GenericSignatureBuilder::expandConformanceRequirement(
                          assocTypeDecl->getFullName(),
                          inheritedFromProto->getDeclaredInterfaceType())
             .fixItInsertAfter(
-                      fixItWhere.loc,
-                      getAssociatedTypeReqs(assocTypeDecl, fixItWhere.item))
+                      fixItWhere.Loc,
+                      getAssociatedTypeReqs(assocTypeDecl, fixItWhere.Item))
             .fixItRemove(assocTypeDecl->getSourceRange());
 
           Diags.diagnose(inheritedAssocTypeDecl, diag::decl_declared_here,
@@ -4136,8 +4136,8 @@ ConstraintResult GenericSignatureBuilder::expandConformanceRequirement(
                              diag::typealias_override_associated_type,
                              name,
                              inheritedFromProto->getDeclaredInterfaceType())
-                .fixItInsertAfter(fixItWhere.loc,
-                                  getConcreteTypeReq(type, fixItWhere.item))
+                .fixItInsertAfter(fixItWhere.Loc,
+                                  getConcreteTypeReq(type, fixItWhere.Item))
                 .fixItRemove(type->getSourceRange());
               Diags.diagnose(inheritedAssocTypeDecl, diag::decl_declared_here,
                              inheritedAssocTypeDecl->getFullName());

@@ -32,18 +32,18 @@ template<typename T>
 struct Located {
 
   /// The main item whose source location is being tracked.
-  T item;
+  T Item;
 
   /// The original source location from which the item was parsed.
-  SourceLoc loc;
+  SourceLoc Loc;
 
-  Located() {}
+  Located(): Item(), Loc() {}
 
-  Located(T item, SourceLoc loc): item(item), loc(loc) {}
+  Located(T Item, SourceLoc loc): Item(Item), Loc(loc) {}
 
   template<typename U>
   friend bool operator ==(const Located<U>& lhs, const Located<U>& rhs) {
-    return lhs.item == rhs.item && lhs.loc == rhs.loc;
+    return lhs.Item == rhs.Item && lhs.Loc == rhs.Loc;
   }
 };
 }
