@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -swift-version 4 -enforce-exclusivity=checked %s -emit-ir -module-name CurrentModule -D CURRENT_MODULE | %FileCheck %s --check-prefix=CHECK-SAMEMAJOR --check-prefix=CHECK-DIFFMAJOR
+// REQUIRES: OS=macosx
 
 @available(OSX 10.8, *)
 @_originallyDefinedIn(module: "OriginalModule", macOS 10.10)

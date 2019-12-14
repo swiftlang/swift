@@ -1,4 +1,6 @@
 // REQUIRES: VENDOR=apple 
+// REQUIRES: OS=macosx
+
 // RUN: %empty-directory(%t)
 
 // RUN: %target-swift-frontend -typecheck %s -tbd-is-installapi -emit-tbd -emit-tbd-path %t/linker_directives.tbd
