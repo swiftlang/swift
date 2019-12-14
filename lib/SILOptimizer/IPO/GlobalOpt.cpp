@@ -865,7 +865,15 @@ bool SILGlobalOpt::tryRemoveGlobalAlloc(SILGlobalVariable *global,
   if (!isSafeToRemove(global))
     return false;
 
-  if (GlobalAddrMap[global].size())
+  // Make sure the global's address is never taken and we shouldn't skip this
+  // global.
+  if (GlobalVarSkipProcessing.count(global) ||
+      (GlobalAddrMap[global].size() &&
+       std::any_of(GlobalAddrMap[global].begin(), GlobalAddrMap[global].end(),
+                   [=](GlobalAddrInst *addr) {
+                     return std::find(InstToRemove.begin(), InstToRemove.end(),
+                                      addr) != InstToRemove.end();
+                   })))
     return false;
 
   InstToRemove.push_back(alloc);
@@ -901,6 +909,9 @@ bool SILGlobalOpt::tryRemoveUnusedGlobal(SILGlobalVariable *global) {
   if (GlobalVarSkipProcessing.count(global))
     return false;
 
+  // If this global is used, check if the user is going to be removed.
+  // Make sure none of the removed instructions are the same as this global's
+  // alloc instruction
   if (AllocGlobalStore.count(global) &&
       std::none_of(InstToRemove.begin(), InstToRemove.end(),
                    [=](SILInstruction *inst) {
@@ -914,27 +925,23 @@ bool SILGlobalOpt::tryRemoveUnusedGlobal(SILGlobalVariable *global) {
           [=](SILInstruction *inst) { return GlobalVarStore[global] == inst; }))
     return false;
 
-  // If this global is used, check if the user is going to be removed.
-  if (GlobalVarSkipProcessing.count(global) || GlobalAddrMap[global].size() ||
-      GlobalAccessMap[global].size() || GlobalLoadMap[global].size()) {
-    for (auto *inst : InstToRemove) {
-      if (GlobalAddrMap[global].size() &&
-          std::none_of(GlobalAddrMap[global].begin(),
-                       GlobalAddrMap[global].end(),
-                       [&inst](SILInstruction *addr) { return inst == addr; }))
-        return false;
-      if (GlobalAccessMap[global].size() &&
-          std::none_of(
-              GlobalAccessMap[global].begin(), GlobalAccessMap[global].end(),
-              [&inst](SILInstruction *access) { return inst == access; }))
-        return false;
-      if (GlobalLoadMap[global].size() &&
-          std::none_of(GlobalLoadMap[global].begin(),
-                       GlobalLoadMap[global].end(),
-                       [&inst](SILInstruction *load) { return inst == load; }))
-        return false;
-    }
-  }
+  // Check if any of the global_addr instructions associated with this global
+  // aren't going to be removed. In that case, we need to keep the global.
+  if (GlobalAddrMap[global].size() &&
+      std::any_of(GlobalAddrMap[global].begin(), GlobalAddrMap[global].end(),
+                  [=](GlobalAddrInst *addr) {
+                    return std::find(InstToRemove.begin(), InstToRemove.end(),
+                                     addr) != InstToRemove.end();
+                  }))
+    return false;
+
+  if (GlobalAccessMap[global].size() &&
+      std::any_of(GlobalAccessMap[global].begin(),
+                  GlobalAccessMap[global].end(), [=](BeginAccessInst *access) {
+                    return std::find(InstToRemove.begin(), InstToRemove.end(),
+                                     access) != InstToRemove.end();
+                  }))
+    return false;
 
   GlobalsToRemove.push_back(global);
   return true;
@@ -968,6 +975,11 @@ void SILGlobalOpt::collectGlobalAccess(GlobalAddrInst *GAI) {
   if (!SILG)
     return;
 
+  if (!SILG->getDecl())
+    return;
+
+  GlobalAddrMap[SILG].push_back(GAI);
+
   if (!SILG->isLet()) {
     // We cannot determine the value for global variables which could be
     // changed externally at run-time.
@@ -986,13 +998,6 @@ void SILGlobalOpt::collectGlobalAccess(GlobalAddrInst *GAI) {
     GlobalVarSkipProcessing.insert(SILG);
     return;
   }
-
-  if (!SILG->getDecl())
-    return;
-
-  // We want to make sure that we still collect global addr instructions
-  // that are inside the addressors.
-  GlobalAddrMap[SILG].push_back(GAI);
 
   // Ignore any accesses inside addressors for SILG
   auto GlobalVar = getVariableOfGlobalInit(F);
