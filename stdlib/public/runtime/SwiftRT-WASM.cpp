@@ -14,14 +14,10 @@
 
 #include <cstddef>
 
-// Create empty sections to ensure that the start/stop symbols are synthesized
-// by the linker.  Otherwise, we may end up with undefined symbol references as
-// the linker table section was never constructed.
-
+// Link start/stop symbols weakly to link them if they aren't synthesized by the linker. 
 #define DECLARE_SWIFT_SECTION(name)                                                             \
-  __attribute__((__used__,__section__(#name),__aligned__(1))) const char __dummy_##name = 0x00; \
-  __attribute__((__visibility__("hidden"),__aligned__(1))) extern const char __start_##name;    \
-  __attribute__((__visibility__("hidden"),__aligned__(1))) extern const char __stop_##name;
+  __attribute__((__visibility__("hidden"),__aligned__(1),weak)) extern const char __start_##name;    \
+  __attribute__((__visibility__("hidden"),__aligned__(1),weak)) extern const char __stop_##name;
 
 extern "C" {
 DECLARE_SWIFT_SECTION(swift5_protocols)
