@@ -644,6 +644,7 @@ ParserResult<Expr> Parser::parseExprKeyPathObjC() {
   // Parse the sequence of unqualified-names.
   ParserStatus status;
   SourceLoc LastDotLoc;
+  DeclNameOptions flags = DeclNameFlag::AllowCompoundNames;
   while (true) {
     SyntaxParsingContext NamePieceCtx(SyntaxContext, SyntaxKind::ObjcNamePiece);
     // Handle code completion.
@@ -652,10 +653,8 @@ ParserResult<Expr> Parser::parseExprKeyPathObjC() {
 
     // Parse the next name.
     DeclNameLoc nameLoc;
-    bool afterDot = !components.empty();
-    auto name = parseUnqualifiedDeclName(
-                  afterDot, nameLoc, 
-                  diag::expr_keypath_expected_property_or_type);
+    DeclNameRef name = parseDeclNameRef(nameLoc,
+        diag::expr_keypath_expected_property_or_type, flags);
     if (!name) {
       status.setIsParseError();
       break;
@@ -665,6 +664,9 @@ ParserResult<Expr> Parser::parseExprKeyPathObjC() {
     auto component = KeyPathExpr::Component::forUnresolvedProperty(name,
                                                       nameLoc.getBaseNameLoc());
     components.push_back(component);
+
+    // After the first component, we can start parsing keywords.
+    flags |= DeclNameFlag::AllowKeywords;
 
     // Handle code completion.
     if (Tok.is(tok::code_complete))
@@ -1130,7 +1132,8 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
       Diag<> D = isa<SuperRefExpr>(Result.get())
                      ? diag::expected_identifier_after_super_dot_expr
                      : diag::expected_member_name;
-      DeclNameRef Name = parseUnqualifiedDeclName(/*afterDot=*/true, NameLoc, D);
+      auto Name = parseDeclNameRef(NameLoc, D,
+          DeclNameFlag::AllowKeywords | DeclNameFlag::AllowCompoundNames);
       if (!Name)
         return nullptr;
       SyntaxContext->createNodeInPlace(SyntaxKind::MemberAccessExpr);
@@ -1580,8 +1583,8 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
       return Result;
     }
 
-    Name = parseUnqualifiedDeclName(/*afterDot=*/true, NameLoc,
-                                    diag::expected_identifier_after_dot_expr);
+    Name = parseDeclNameRef(NameLoc, diag::expected_identifier_after_dot_expr,
+        DeclNameFlag::AllowKeywords | DeclNameFlag::AllowCompoundNames);
     if (!Name) return nullptr;
     SyntaxContext->createNodeInPlace(SyntaxKind::MemberAccessExpr);
 
@@ -2267,8 +2270,8 @@ Expr *Parser::parseExprIdentifier() {
 
   // Parse the unqualified-decl-name.
   DeclNameLoc loc;
-  DeclNameRef name = parseUnqualifiedDeclName(/*afterDot=*/false, loc,
-                                              diag::expected_expr);
+  DeclNameRef name = parseDeclNameRef(loc, diag::expected_expr,
+                                      DeclNameFlag::AllowCompoundNames);
 
   SmallVector<TypeRepr*, 8> args;
   SourceLoc LAngleLoc, RAngleLoc;
@@ -3082,9 +3085,8 @@ ParserStatus Parser::parseExprList(tok leftTok, tok rightTok,
       SyntaxParsingContext operatorContext(SyntaxContext,
                                            SyntaxKind::IdentifierExpr);
       DeclNameLoc Loc;
-      auto OperName = parseUnqualifiedDeclBaseName(/*afterDot=*/false, Loc,
-                                                   diag::expected_operator_ref,
-                                                   /*allowOperators=*/true);
+      auto OperName = parseDeclNameRef(Loc, diag::expected_operator_ref,
+                                       DeclNameFlag::AllowOperators);
       if (!OperName) {
         return makeParserError();
       }
