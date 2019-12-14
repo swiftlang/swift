@@ -363,6 +363,20 @@ struct MutatingGet<T> {
   }
 }
 
+@propertyWrapper
+struct MutatingGetNonMutatingSet<T> {
+  private var fixed: T
+
+  var wrappedValue: T {
+    mutating get { fixed }
+    nonmutating set { }
+  }
+
+  init(wrappedValue initialValue: T) {
+    fixed = initialValue
+  }
+}
+
 struct ObservingTest {
 	// ObservingTest.text.setter
 	// CHECK-LABEL: sil hidden [ossa] @$s17property_wrappers13ObservingTestV4textSSvs : $@convention(method) (@owned String, @guaranteed ObservingTest) -> ()
@@ -382,6 +396,26 @@ struct ObservingTest {
   @MutatingGet var integer2: Int = 17 {
     willSet { }
   }
+
+  @MutatingGetNonMutatingSet var text3: String = "" {
+    didSet { }
+  }
+
+  @MutatingGetNonMutatingSet var integer3: Int = 17 {
+    willSet { }
+  }
+}
+
+struct NonObservingTest {
+  @NonMutatingSet var text: String = ""
+  @MutatingGet var text2: String = ""
+  @MutatingGetNonMutatingSet var text3: String = ""
+}
+
+class NonObservingClassTest {
+  @NonMutatingSet var text: String = ""
+  @MutatingGet var text2: String = ""
+  @MutatingGetNonMutatingSet var text3: String = ""
 }
 
 // Tuple initial values.
