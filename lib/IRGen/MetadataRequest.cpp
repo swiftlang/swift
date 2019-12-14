@@ -684,11 +684,6 @@ bool irgen::isNominalGenericContextTypeMetadataAccessTrivial(
     return false;
   }
 
-  if (isa<EnumType>(type) || isa<BoundGenericEnumType>(type)) {
-    // TODO: Support enums.
-    return false;
-  }
-
   if (isa<ClassType>(type) || isa<BoundGenericClassType>(type)) {
     // TODO: Support classes.
     return false;
