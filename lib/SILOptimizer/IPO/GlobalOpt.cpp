@@ -111,7 +111,7 @@ class SILGlobalOpt {
   /// function.
   llvm::DenseMap<SILFunction *, unsigned> InitializerCount;
 
-  SmallSILInstructionWorklist<4> InstToRemove;
+  llvm::SmallVector<SILInstruction *, 4> InstToRemove;
   llvm::SmallVector<SILGlobalVariable *, 4> GlobalsToRemove;
 
 public:
@@ -868,7 +868,7 @@ bool SILGlobalOpt::tryRemoveGlobalAlloc(SILGlobalVariable *global,
   if (GlobalAddrMap[global].size())
     return false;
 
-  InstToRemove.add(alloc);
+  InstToRemove.push_back(alloc);
   return true;
 }
 
@@ -888,7 +888,7 @@ bool SILGlobalOpt::tryRemoveGlobalAddr(SILGlobalVariable *global) {
         return false;
     }
 
-    InstToRemove.add(addr);
+    InstToRemove.push_back(addr);
   }
 
   return true;
@@ -901,37 +901,37 @@ bool SILGlobalOpt::tryRemoveUnusedGlobal(SILGlobalVariable *global) {
   if (GlobalVarSkipProcessing.count(global))
     return false;
 
-  if (GlobalVarSkipProcessing.count(global) || GlobalAddrMap[global].size() ||
-      GlobalAccessMap[global].size() || GlobalLoadMap[global].size() ||
-      AllocGlobalStore.count(global) || GlobalVarStore.count(global)) {
-    SmallVector<SILInstruction *, 4> deadInsts;
-    while (!InstToRemove.isEmpty()) {
-      auto *inst = InstToRemove.pop_back_val();
-      deadInsts.push_back(inst);
-    }
-    InstToRemove.addInitialGroup(deadInsts);
+  if (AllocGlobalStore.count(global) &&
+      std::none_of(InstToRemove.begin(), InstToRemove.end(),
+                   [=](SILInstruction *inst) {
+                     return AllocGlobalStore[global] == inst;
+                   }))
+    return false;
 
-    for (auto *inst : deadInsts) {
+  if (GlobalVarStore.count(global) &&
+      std::none_of(
+          InstToRemove.begin(), InstToRemove.end(),
+          [=](SILInstruction *inst) { return GlobalVarStore[global] == inst; }))
+    return false;
+
+  // If this global is used, check if the user is going to be removed.
+  if (GlobalVarSkipProcessing.count(global) || GlobalAddrMap[global].size() ||
+      GlobalAccessMap[global].size() || GlobalLoadMap[global].size()) {
+    for (auto *inst : InstToRemove) {
       if (GlobalAddrMap[global].size() &&
-          !std::any_of(GlobalAddrMap[global].begin(),
+          std::none_of(GlobalAddrMap[global].begin(),
                        GlobalAddrMap[global].end(),
                        [&inst](SILInstruction *addr) { return inst == addr; }))
         return false;
       if (GlobalAccessMap[global].size() &&
-          !std::any_of(
+          std::none_of(
               GlobalAccessMap[global].begin(), GlobalAccessMap[global].end(),
               [&inst](SILInstruction *access) { return inst == access; }))
         return false;
       if (GlobalLoadMap[global].size() &&
-          !std::any_of(GlobalLoadMap[global].begin(),
+          std::none_of(GlobalLoadMap[global].begin(),
                        GlobalLoadMap[global].end(),
                        [&inst](SILInstruction *load) { return inst == load; }))
-        return false;
-
-      if (AllocGlobalStore.count(global) && AllocGlobalStore[global] != inst)
-        return false;
-
-      if (GlobalVarStore.count(global) && GlobalVarStore[global] != inst)
         return false;
     }
   }
@@ -1193,8 +1193,9 @@ bool SILGlobalOpt::run() {
   }
 
   // Erase the instructions that we have marked for deletion.
-  while (!InstToRemove.isEmpty()) {
-    eraseUsesOfInstruction(InstToRemove.pop_back_val());
+  for (auto *inst : InstToRemove) {
+    eraseUsesOfInstruction(inst);
+    inst->eraseFromParent();
   }
 
   for (auto &global : Module->getSILGlobals()) {
