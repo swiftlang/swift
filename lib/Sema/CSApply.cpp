@@ -470,7 +470,7 @@ namespace {
             TypeChecker::conformsToProtocol(
                       baseTy, proto, cs.DC,
                       ConformanceCheckFlags::InExpression);
-          if (conformance.isConcrete()) {
+          if (false && conformance.isConcrete()) {
             if (auto witness = conformance.getConcrete()->getWitnessDecl(decl)) {
               // The fullType was computed by substituting the protocol
               // requirement so it always has a (Self) -> ... curried
