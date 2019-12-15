@@ -10,10 +10,16 @@
 
 protocol P {
   func modifyIt()
+  var computed: Int { get set }
+  
+  subscript(a: Int, b: Bool, c: Int?) -> Int { get set }
 }
 
 struct GenStruct<T : P> : P {
   var st: T
+  var computed: Int { get { st.computed } set { st.computed = newValue } }
+  
+  subscript(a: Int, b: Bool, c: Int?) -> Int { get { st[a, b, c] } set { st[a, b, c] = newValue } }
   
   init(_ st: T) { self.st = st }
 
@@ -26,6 +32,9 @@ var numGenClassObjs = 0
 
 final class GenClass<T : P> : P {
   var ct: T
+  var computed: Int { get { ct.computed } set { ct.computed = newValue } }
+  
+  subscript(a: Int, b: Bool, c: Int?) -> Int { get { ct[a, b, c] } set { ct[a, b, c] = newValue } }
 
   init(_ ct: T) {
     self.ct = ct
@@ -53,6 +62,7 @@ final class DerivedClass2 : DerivedClass<Int> {
 
 final class SimpleClass : P {
   var i: Int
+  var array = [1, 2, 3, 4, 5]
   static var numObjs = 0
 
   init(_ i: Int) {
@@ -67,6 +77,26 @@ final class SimpleClass : P {
   func modifyIt() {
     i += 10
   }
+  
+  var computed: Int { get { i + 1 } set { i = newValue - 1} }
+  
+  subscript(a: Int, b: Bool, c: Int?) -> Int {
+    get { precondition(!b && c == nil, "arguments are corrupt"); return array[a] }
+    set { precondition(b && c == 42, "arguments are corrupt"); array[a] = newValue }
+  }
+}
+
+struct SimpleStruct {
+  var tuple = (0, 1)
+  
+  struct Nested {
+    var i: Int
+  }
+  var opt: Nested?
+  
+  var i = 0
+  
+  var computed: Int { get { i + 1 } set { i = newValue - 1} }
 }
 
 // Check if all keypath instructions have been optimized away
@@ -252,6 +282,139 @@ func testNestedModify<T : P>(_ s: inout GenStruct<GenClass<GenClass<T>>>) {
   modifyGeneric(&s[keyPath: kp])
 }
 
+// CHECK-LABEL: sil {{.*}}testTuple
+// CHECK: [[E:%[0-9]+]] = struct_element_addr
+// CHECK: [[T1:%[0-9]+]] = tuple_element_addr [[E]]
+// CHECK: [[I:%[0-9]+]] = load [[T1]]
+// CHECK: [[T2:%[0-9]+]] = tuple_element_addr [[E]]
+// CHECK: store [[I]] to [[T2]]
+// CHECK: return
+@inline(never)
+@_semantics("optimize.sil.specialize.generic.never")
+func testTuple(_ s: inout SimpleStruct) {
+  let first = \SimpleStruct.tuple.0
+  let second = \SimpleStruct.tuple.1
+  s[keyPath: first] = s[keyPath: second]
+}
+
+// CHECK-LABEL: sil {{.*}} [noinline] {{.*}}testGetter
+// CHECK: [[A:%[0-9]+]] = alloc_stack $Int
+// CHECK: [[F:%[0-9]+]] = function_ref {{.*}}computed
+// CHECK: apply [[F]]<T>([[A]], %0)
+// destroy_addr gets optimized out
+// CHECK: dealloc_stack [[A]]
+// CHECK: return
+@inline(never)
+@_semantics("optimize.sil.specialize.generic.never")
+func testGetter<T : P>(_ s: GenStruct<T>) -> Int {
+  let kp = \GenStruct<T>.computed
+  return s[keyPath: kp]
+}
+
+// CHECK-LABEL: sil {{.*}}testComputedModify
+// CHECK: [[A:%[0-9]+]] = alloc_stack $Int
+// CHECK: [[G:%[0-9]+]] = function_ref {{.*}}computed
+// CHECK: apply [[G]]<T>([[A]], %0)
+// CHECK: store {{%[0-9]+}} to [[A]]
+// CHECK: [[S:%[0-9]+]] = function_ref {{.*}}computed
+// CHECK: apply [[S]]<T>([[A]], %0)
+// destroy_addr gets optimized out
+// CHECK: dealloc_stack [[A]]
+// CHECK: return
+@inline(never)
+@_semantics("optimize.sil.specialize.generic.never")
+func testComputedModify<T : P>(_ s: inout GenStruct<T>) {
+  let kp = \GenStruct<T>.computed
+  s[keyPath: kp] += 10
+}
+
+// CHECK-LABEL: sil {{.*}}testSubscript
+// CHECK: [[I1:%[0-9]+]] = alloc_stack $Int
+// CHECK: [[C1:%[0-9]+]] = alloc_stack $(Int, Bool, Optional<Int>)
+// CHECK: [[A1:%[0-9]+]] = address_to_pointer [[C1]]
+// CHECK: [[R1:%[0-9]+]] = struct $UnsafeRawPointer ([[A1]]
+// CHECK: [[G:%[0-9]+]] = function_ref
+// CHECK: apply [[G]]<T>([[I1]], {{%[0-9]+}}, [[R1]])
+// CHECK: dealloc_stack [[C1]]
+//
+// CHECK: [[I2:%[0-9]+]] = alloc_stack $Int
+// CHECK: [[C2:%[0-9]+]] = alloc_stack $(Int, Bool, Optional<Int>)
+// CHECK: [[A2:%[0-9]+]] = address_to_pointer [[C2]]
+// CHECK: [[R2:%[0-9]+]] = struct $UnsafeRawPointer ([[A2]]
+// CHECK: [[S:%[0-9]+]] = function_ref
+// CHECK: apply [[S]]<T>([[I2]], {{%[0-9]+}}, [[R2]])
+// CHECK: dealloc_stack [[C2]]
+@inline(never)
+@_semantics("optimize.sil.specialize.generic.never")
+func testSubscript<T : P>(_ s: inout GenStruct<T>) {
+  let kp1 = \GenStruct<T>[1, true, 42]
+  let kp2 = \GenStruct<T>[2, false, nil]
+  s[keyPath: kp1] = s[keyPath: kp2]
+}
+
+// CHECK-LABEL: sil {{.*}}testModifyOptionalForce
+// CHECK: [[F:%[0-9]+]] = select_enum [[O:%[0-9]+]]
+// CHECK: cond_fail [[F]]
+// CHECK: unchecked_enum_data [[O]]
+// CHECK: [[E2:%[0-9]+]] = init_enum_data_addr [[E1:%[0-9]+]]
+// CHECK: store {{%[0-9]+}} to [[E2]]
+// CHECK: inject_enum_addr [[E1]]
+// CHECK: return
+@inline(never)
+@_semantics("optimize.sil.specialize.generic.never")
+func testModifyOptionalForce(_ s: inout SimpleStruct) {
+  let kp = \SimpleStruct.opt!.i
+  s[keyPath: kp] += 10
+}
+
+
+
+// CHECK-LABEL: sil {{.*}}testOptionalChain
+// By the time the test gets run, lots of stack
+// allocations have been promoted to registers.
+//
+//     Check if value is null
+// CHECK: switch_enum [[O:%[0-9]+]]
+// CHECK: {{bb.}}:
+//         Unwrap value
+//     CHECK: [[A1:%[0-9]+]] = alloc_stack
+//     CHECK: store [[O]] to [[A1]]
+//     CHECK: [[U:%[0-9]+]] = unchecked_take_enum_data_addr [[A1]]
+//         Access stored property & re-wrap result
+//     CHECK: [[I:%[0-9]+]] = struct_element_addr [[U]]
+//     CHECK: [[R1:%[0-9]+]] = enum
+//     CHECK: dealloc_stack [[A1]]
+//     CHECK: br [[CONTINUATION:bb.]]([[R1]] : $Optional<Int>)
+// CHECK: {{bb.}}:
+//         Store nil in result
+//     CHECK: [[R2:%[0-9]+]] = enum
+//     CHECK: br [[CONTINUATION]]([[R2]] : $Optional<Int>)
+// CHECK: [[CONTINUATION]]([[R:%[0-9]+]] : $Optional<Int>):
+// CHECK: return [[R]]
+@inline(never)
+@_semantics("optimize.sil.specialize.generic.never")
+func testOptionalChain(_ s: SimpleStruct) -> Int? {
+  let kp = \SimpleStruct.opt?.i
+  return s[keyPath: kp]
+}
+
+
+// CHECK-LABEL: sil {{.*}}testGetOptionalForce
+// CHECK: [[F:%[0-9]+]] = select_enum [[O:%[0-9]+]]
+// CHECK: cond_fail [[F]]
+// CHECK: [[A:%[0-9]+]] = alloc_stack
+// CHECK: store [[O]] to [[A]]
+// CHECK: [[E2:%[0-9]+]] = unchecked_take_enum_data_addr [[A]]
+// CHECK: [[E3:%[0-9]+]] = struct_element_addr [[E2]]
+// CHECK: [[I:%[0-9]+]] = load [[E3]]
+// CHECK: dealloc_stack [[A]]
+// CHECK: return [[I]]
+@inline(never)
+@_semantics("optimize.sil.specialize.generic.never")
+func testGetOptionalForce(_ s: SimpleStruct) -> Int {
+  let kp = \SimpleStruct.opt!.i
+  return s[keyPath: kp]
+}
 
 // CHECK-LABEL: sil {{.*}}testit
 func testit() {
@@ -300,6 +463,34 @@ func testit() {
   var s2 = GenStruct(GenClass(GenClass(SimpleClass(34))))
   testNestedModify(&s2)
   print("NestedModify: \(s2.st.ct.ct.i)")
+  
+  // CHECK-OUTPUT: Getter: 51
+  var s3 = GenStruct(SimpleClass(50))
+  print("Getter: \(testGetter(s3))")
+  
+  // CHECK-OUTPUT: ComputedModify: 61
+  testComputedModify(&s3)
+  print("ComputedModify: \(s3.computed)")
+  
+  // CHECK-OUTPUT: Subscript: [1, 3, 3, 4, 5]
+  testSubscript(&s3)
+  print("Subscript: \(s3.st.array)")
+  
+  var s4 = SimpleStruct()
+  // CHECK-OUTPUT: Tuple: 1
+  testTuple(&s4)
+  print("Tuple: \(s4.tuple.0)")
+  
+  // CHECK-OUTPUT: OptionalChain1: nil
+  print("OptionalChain1: \(String(describing: testOptionalChain(s4)))")
+  
+  // CHECK-OUTPUT: OptionalChain2: Optional(70)
+  s4.opt = .init(i: 70)
+  print("OptionalChain2: \(String(describing: testOptionalChain(s4)))")
+  
+  // CHECK-OUTPUT: OptionalForce: 80
+  testModifyOptionalForce(&s4)
+  print("OptionalForce: \(testGetOptionalForce(s4))")
 }
 
 testit()
