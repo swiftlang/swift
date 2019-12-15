@@ -92,8 +92,8 @@ void TypeAttributes::getConventionArguments(SmallVectorImpl<char> &buf) const {
     stream << ": " << convention.WitnessMethodProtocol;
     return;
   }
-  if (!convention.ClangType.empty())
-    stream << ", cType: " << QuotedString(convention.ClangType);
+  if (!convention.ClangType.Item.empty())
+    stream << ", cType: " << QuotedString(convention.ClangType.Item);
 }
 
 /// Given a name like "autoclosure", return the type attribute ID that

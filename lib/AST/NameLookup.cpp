@@ -2402,8 +2402,8 @@ swift::getDirectlyInheritedNominalTypeDecls(
       if (!req.getFirstType()->isEqual(protoSelfTy))
         continue;
 
-      result.emplace_back(
-          loc, req.getSecondType()->castTo<ProtocolType>()->getDecl());
+      result.emplace_back(req.getSecondType()->castTo<ProtocolType>()->getDecl(),
+                          loc);
     }
     return result;
   }

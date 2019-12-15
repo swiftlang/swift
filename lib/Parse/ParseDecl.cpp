@@ -2699,8 +2699,7 @@ bool Parser::parseConventionAttributeInternal(
       return true;
     }
     if (auto ty = getStringLiteralIfNotInterpolated(Tok.getLoc(), "(C type)")) {
-      convention.ClangType = ty.getValue();
-      convention.ClangTypeLoc = Tok.getLoc();
+      convention.ClangType = { ty.getValue(), Tok.getLoc() };
     }
     consumeToken(tok::string_literal);
   }
