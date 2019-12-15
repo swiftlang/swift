@@ -333,8 +333,6 @@ std::pair<bool, bool> LangOptions::setTarget(llvm::Triple triple) {
   case llvm::Triple::ArchType::systemz:
     addPlatformConditionValue(PlatformConditionKind::Endianness, "big");
     break;
-  default:
-    llvm_unreachable("undefined architecture endianness");
   }
 
   // Set the "runtime" platform condition.
