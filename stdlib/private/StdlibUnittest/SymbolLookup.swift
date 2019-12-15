@@ -12,7 +12,7 @@
 
 #if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
   import Darwin
-#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Haiku) || os(Wasm)
+#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Haiku) || os(WASI)
   import Glibc
 #elseif os(Windows)
   import MSVCRT
@@ -23,7 +23,7 @@
 
 #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
   let RTLD_DEFAULT = UnsafeMutableRawPointer(bitPattern: -2)
-#elseif os(Linux) || os(Wasm)
+#elseif os(Linux) || os(WASI)
   let RTLD_DEFAULT = UnsafeMutableRawPointer(bitPattern: 0)
 #elseif os(Android)
   #if arch(arm) || arch(i386)
@@ -43,7 +43,7 @@ public func pointerToSwiftCoreSymbol(name: String) -> UnsafeMutableRawPointer? {
 #if os(Windows)
   return unsafeBitCast(GetProcAddress(hStdlibCore, name),
                        to: UnsafeMutableRawPointer?.self)
-#elseif os(Wasm)
+#elseif os(WASI)
   fatalError("\(#function) is not supported on WebAssembly")
 #else
   return dlsym(RTLD_DEFAULT, name)

@@ -551,7 +551,7 @@ function(_add_variant_link_flags)
     foreach(path IN LISTS ${LFLAGS_ARCH}_LIB)
       list(APPEND library_search_directories ${path})
     endforeach()
-  elseif("${LFLAGS_SDK}" STREQUAL "WASM")
+  elseif("${LFLAGS_SDK}" STREQUAL "WASI")
     # No extra libraries needed.
   else()
     # If lto is enabled, we need to add the object path flag so that the LTO code
@@ -582,7 +582,7 @@ function(_add_variant_link_flags)
   if(NOT SWIFT_COMPILER_IS_MSVC_LIKE)
     # FIXME: On Apple platforms, find_program needs to look for "ld64.lld"
     find_program(LDLLD_PATH "ld.lld")
-    if("${LFLAGS_SDK}" STREQUAL "WASM")
+    if("${SWIFT_SDK_${LFLAGS_SDK}_OBJECT_FORMAT}" STREQUAL "WASM")
       list(APPEND result "-fuse-ld=${CMAKE_SOURCE_DIR}/fakeld")
     elseif((SWIFT_ENABLE_LLD_LINKER AND LDLLD_PATH AND NOT APPLE) OR
        ("${LFLAGS_SDK}" STREQUAL "WINDOWS" AND
@@ -1715,8 +1715,8 @@ endfunction()
 # SWIFT_MODULE_DEPENDS_HAIKU
 #   Swift modules this library depends on when built for Haiku.
 #
-# SWIFT_MODULE_DEPENDS_WASM
-#   Swift modules this library depends on when built for WebAssembly.
+# SWIFT_MODULE_DEPENDS_WASI
+#   Swift modules this library depends on when built for WASI.
 #
 # FRAMEWORK_DEPENDS
 #   System frameworks this library depends on.
@@ -1834,7 +1834,7 @@ function(add_swift_target_library name)
         SWIFT_MODULE_DEPENDS_OSX
         SWIFT_MODULE_DEPENDS_TVOS
         SWIFT_MODULE_DEPENDS_WATCHOS
-	SWIFT_MODULE_DEPENDS_WASM
+	SWIFT_MODULE_DEPENDS_WASI
         SWIFT_MODULE_DEPENDS_WINDOWS
         SWIFT_MODULE_DEPENDS_FROM_SDK
         TARGET_SDKS
@@ -1996,9 +1996,9 @@ function(add_swift_target_library name)
     elseif(${sdk} STREQUAL HAIKU)
       list(APPEND swiftlib_module_depends_flattened
            ${SWIFTLIB_SWIFT_MODULE_DEPENDS_HAIKU})
-    elseif(${sdk} STREQUAL WASM)
+    elseif(${sdk} STREQUAL WASI)
       list(APPEND swiftlib_module_depends_flattened
-           ${SWIFTLIB_SWIFT_MODULE_DEPENDS_WASM})
+           ${SWIFTLIB_SWIFT_MODULE_DEPENDS_WASI})
     elseif(${sdk} STREQUAL WINDOWS)
       list(APPEND swiftlib_module_depends_flattened
            ${SWIFTLIB_SWIFT_MODULE_DEPENDS_WINDOWS})

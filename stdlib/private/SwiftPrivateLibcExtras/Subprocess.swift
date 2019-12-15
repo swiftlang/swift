@@ -13,7 +13,7 @@
 import SwiftPrivate
 #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
 import Darwin
-#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Haiku) || os(Wasm)
+#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Haiku) || os(WASI)
 import Glibc
 #elseif os(Windows)
 import MSVCRT
@@ -21,7 +21,7 @@ import WinSDK
 #endif
 
 internal func _signalToString(_ signal: Int) -> String {
-#if os(Wasm)
+#if os(WASI)
   return "unsupported"
 #else
   switch CInt(signal) {
@@ -36,7 +36,7 @@ internal func _signalToString(_ signal: Int) -> String {
 #endif
   default:      return "SIG???? (\(signal))"
   }
-#endif // os(Wasm)
+#endif // os(WASI)
 }
 
 public enum ProcessTerminationStatus : CustomStringConvertible {
@@ -145,7 +145,7 @@ public func waitProcess(_ process: HANDLE) -> ProcessTerminationStatus {
   }
   return .exit(Int(status))
 }
-#elseif os(Wasm)
+#elseif os(WASI)
 // Oops, we can't launch tests in subprocesses yet!
 public func spawnChild(_ args: [String])
   -> (pid: pid_t, stdinFD: CInt, stdoutFD: CInt, stderrFD: CInt) {

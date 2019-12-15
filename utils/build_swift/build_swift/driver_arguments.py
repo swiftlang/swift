@@ -1086,19 +1086,19 @@ def create_argument_parser():
 
     in_group('Build settings for Android')
 
-    option('--wasm-wasi-sdk', store_path,
+    option('--wasi-sdk', store_path,
            help='An absolute path to WASI SDK that will be used as a libc '
                 'implementation for Wasm builds')
 
-    option('--wasm-icu-uc', store_path,
+    option('--wasi-icu-uc', store_path,
            help='Path to libicuuc.so')
-    option('--wasm-icu-uc-include', store_path,
+    option('--wasi-icu-uc-include', store_path,
            help='Path to a directory containing headers for libicuuc')
-    option('--wasm-icu-i18n', store_path,
+    option('--wasi-icu-i18n', store_path,
            help='Path to libicui18n.so')
-    option('--wasm-icu-i18n-include', store_path,
+    option('--wasi-icu-i18n-include', store_path,
            help='Path to a directory containing headers libicui18n')
-    option('--wasm-icu-data', store_path,
+    option('--wasi-icu-data', store_path,
            help='Path to libicudata.so')
 
     # -------------------------------------------------------------------------

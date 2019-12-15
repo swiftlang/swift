@@ -366,7 +366,7 @@ public var SIG_IGN: _crt_signal_t {
 public var SIG_ERR: _crt_signal_t {
   return unsafeBitCast(-1, to: _crt_signal_t.self)
 }
-#elseif os(Wasm)
+#elseif os(WASI)
 // WebAssembly/WASI doesn't have signals.
 #else
 internal var _ignore = _UnsupportedPlatformError()
@@ -382,7 +382,7 @@ public var SEM_FAILED: UnsafeMutablePointer<sem_t>? {
 #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
   // The value is ABI.  Value verified to be correct for OS X, iOS, watchOS, tvOS.
   return UnsafeMutablePointer<sem_t>(bitPattern: -1)
-#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Haiku) || os(Wasm)
+#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Haiku) || os(WASI)
   // The value is ABI.  Value verified to be correct on Glibc.
   return UnsafeMutablePointer<sem_t>(bitPattern: 0)
 #else

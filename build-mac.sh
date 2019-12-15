@@ -13,12 +13,12 @@ export sourcedir=$PWD/..
     -DCMAKE_AR='/usr/local/opt/llvm/bin/llvm-ar' \
     -DCMAKE_RANLIB='/usr/local/opt/llvm/bin/llvm-ranlib' \
   " \
-  --build-stdlib-deployment-targets "wasm-wasm32" \
+  --build-stdlib-deployment-targets "wasi-wasm32" \
   --build-swift-dynamic-sdk-overlay false \
   --build-swift-static-sdk-overlay false \
   --build-swift-static-stdlib \
   --llvm-targets-to-build "X86;WebAssembly" \
-  --stdlib-deployment-targets "wasm-wasm32" \
+  --stdlib-deployment-targets "wasi-wasm32" \
   --wasm-icu-data "todo-icu-data" \
   --wasm-icu-i18n "$sourcedir/icu_out/lib" \
   --wasm-icu-i18n-include "$sourcedir/icu_out/include" \

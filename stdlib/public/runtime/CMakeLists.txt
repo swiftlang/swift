@@ -92,7 +92,7 @@ list(APPEND swift_runtime_library_compile_flags -I${SWIFT_SOURCE_DIR}/include)
 set(image_inspection_shared_sdk)
 if(SWIFT_BUILD_STATIC_STDLIB AND "${SWIFT_HOST_VARIANT_SDK}" STREQUAL "LINUX")
   set(image_inspection_shared_sdk "${SWIFT_HOST_VARIANT_SDK}")
-elseif("${SWIFT_PRIMARY_VARIANT_SDK}" STREQUAL "WASM")
+elseif("${SWIFT_PRIMARY_VARIANT_SDK}" STREQUAL "WASI")
   set(image_inspection_shared_sdk "${SWIFT_PRIMARY_VARIANT_SDK}")
 endif()
 

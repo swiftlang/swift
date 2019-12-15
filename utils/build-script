@@ -123,17 +123,17 @@ class BuildScriptInvocation(object):
                     "must be specified")
 
         if args.wasm:
-            if args.wasm_wasi_sdk is None or \
-                    args.wasm_icu_uc is None or \
-                    args.wasm_icu_uc_include is None or \
-                    args.wasm_icu_i18n is None or \
-                    args.wasm_icu_i18n_include is None or \
-                    args.wasm_icu_data is None:
+            if args.wasi_sdk is None or \
+                    args.wasi_icu_uc is None or \
+                    args.wasi_icu_uc_include is None or \
+                    args.wasi_icu_i18n is None or \
+                    args.wasi_icu_i18n_include is None or \
+                    args.wasi_icu_data is None:
                 diagnostics.fatal(
-                    "when building for WebAssembly, --wasm-wasi-sdk, "
-                    "--wasm-icu-uc, "
-                    "--wasm-icu-uc-include, --wasm-icu-i18n, "
-                    "--wasm-icu-i18n-include, and --wasm-icu-data "
+                    "when building for WebAssembly, --wasi-sdk, "
+                    "--wasi-icu-uc, "
+                    "--wasi-icu-uc-include, --wasi-icu-i18n, "
+                    "--wasi-icu-i18n-include, and --wasi-icu-data "
                     "must be specified")
 
         targets_needing_toolchain = [
@@ -232,7 +232,7 @@ class BuildScriptInvocation(object):
                     StdlibDeploymentTarget.Android.aarch64.name)
         if args.wasm:
             args.stdlib_deployment_targets.append(
-                StdlibDeploymentTarget.Wasm.wasm32.name)
+                StdlibDeploymentTarget.WASI.wasm32.name)
 
         # Infer platform flags from manually-specified configure targets.
         # This doesn't apply to Darwin platforms, as they are
@@ -606,12 +606,12 @@ class BuildScriptInvocation(object):
 
         if args.wasm:
             impl_args += [
-                "--wasm-wasi-sdk", args.wasm_wasi_sdk,
-                "--wasm-icu-uc", args.wasm_icu_uc,
-                "--wasm-icu-uc-include", args.wasm_icu_uc_include,
-                "--wasm-icu-i18n", args.wasm_icu_i18n,
-                "--wasm-icu-i18n-include", args.wasm_icu_i18n_include,
-                "--wasm-icu-data", args.wasm_icu_data,
+                "--wasi-sdk", args.wasi_sdk,
+                "--wasi-icu-uc", args.wasi_icu_uc,
+                "--wasi-icu-uc-include", args.wasi_icu_uc_include,
+                "--wasi-icu-i18n", args.wasi_icu_i18n,
+                "--wasi-icu-i18n-include", args.wasi_icu_i18n_include,
+                "--wasi-icu-data", args.wasi_icu_data,
             ]
 
         if platform.system() == 'Darwin':

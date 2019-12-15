@@ -263,7 +263,7 @@ set(SWIFT_ANDROID_DEPLOY_DEVICE_PATH "" CACHE STRING
 # User-configurable ICU specific options for Android, FreeBSD, Linux, Haiku, and WebAssembly.
 #
 
-foreach(sdk ANDROID;FREEBSD;LINUX;WINDOWS;HAIKU;WASM)
+foreach(sdk ANDROID;FREEBSD;LINUX;WINDOWS;HAIKU;WASI)
   foreach(arch aarch64;armv6;armv7;i686;powerpc64;powerpc64le;s390x;wasm32;x86_64)
     set(SWIFT_${sdk}_${arch}_ICU_UC "" CACHE STRING
         "Path to a directory containing the icuuc library for ${sdk}")
@@ -782,8 +782,8 @@ if(swift_build_windows AND NOT "${CMAKE_SYSTEM_NAME}" STREQUAL "Windows")
 endif()
 
 # Should we cross-compile the standard library for WebAssembly (WASI)?
-is_sdk_requested(WASM swift_build_wasm)
-if(swift_build_wasm AND NOT "${SWIFT_HOST_VARIANT_SDK}" STREQUAL "WASM")
+is_sdk_requested(WASI swift_build_wasm)
+if(swift_build_wasm AND NOT "${SWIFT_HOST_VARIANT_SDK}" STREQUAL "WASI")
   #if ("${SWIFT_ANDROID_NDK_PATH}" STREQUAL "")
   #  message(FATAL_ERROR "You must set SWIFT_ANDROID_NDK_PATH to cross-compile the Swift runtime for Android")
   #endif()
@@ -791,10 +791,10 @@ if(swift_build_wasm AND NOT "${SWIFT_HOST_VARIANT_SDK}" STREQUAL "WASM")
   #  message(FATAL_ERROR "A Darwin or Linux host is required to build the Swift runtime for Android")
   #endif()
 
-  if("${SWIFT_SDK_WASM_ARCHITECTURES}" STREQUAL "")
-    set(SWIFT_SDK_WASM_ARCHITECTURES wasm32)
+  if("${SWIFT_SDK_WASI_ARCHITECTURES}" STREQUAL "")
+    set(SWIFT_SDK_WASI_ARCHITECTURES wasm32)
   endif()
-  configure_sdk_unix("Wasm" "${SWIFT_SDK_WASM_ARCHITECTURES}")
+  configure_sdk_unix("WASI" "${SWIFT_SDK_WASI_ARCHITECTURES}")
 endif()
 
 if("${SWIFT_SDKS}" STREQUAL "")

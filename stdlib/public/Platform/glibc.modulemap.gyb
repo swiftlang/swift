@@ -126,7 +126,7 @@ module SwiftGlibc [system] {
       header "${GLIBC_INCLUDE_PATH}/math.h"
       export *
     }
-% if CMAKE_SDK != "WASM":
+% if CMAKE_SDK != "WASI":
     module setjmp {
       header "${GLIBC_INCLUDE_PATH}/setjmp.h"
       export *
@@ -321,7 +321,7 @@ module SwiftGlibc [system] {
       header "${GLIBC_INCLUDE_PATH}/dirent.h"
       export *
     }
-% if CMAKE_SDK != "WASM":
+% if CMAKE_SDK != "WASI":
     module dl {
       header "${GLIBC_INCLUDE_PATH}/link.h"
       export *
@@ -339,7 +339,7 @@ module SwiftGlibc [system] {
       header "${GLIBC_INCLUDE_PATH}/fnmatch.h"
       export *
     }
-% if CMAKE_SDK != "WASM":
+% if CMAKE_SDK != "WASI":
     module grp {
       header "${GLIBC_INCLUDE_PATH}/grp.h"
       export *
@@ -353,7 +353,7 @@ module SwiftGlibc [system] {
       header "${GLIBC_INCLUDE_PATH}/libgen.h"
       export *
     }
-% if CMAKE_SDK != "WASM":
+% if CMAKE_SDK != "WASI":
     module net {
       module if {
         header "${GLIBC_INCLUDE_PATH}/net/if.h"
@@ -381,7 +381,7 @@ module SwiftGlibc [system] {
       header "${GLIBC_INCLUDE_PATH}/pthread.h"
       export *
     }
-% if CMAKE_SDK != "WASM":
+% if CMAKE_SDK != "WASI":
     module pwd {
       header "${GLIBC_INCLUDE_PATH}/pwd.h"
       export *
@@ -432,7 +432,7 @@ module SwiftGlibc [system] {
       }
 % end
 
-% if CMAKE_SDK != "WASM":
+% if CMAKE_SDK != "WASI":
       module ipc {
         header "${GLIBC_ARCH_INCLUDE_PATH}/sys/ipc.h"
         export *
@@ -442,7 +442,7 @@ module SwiftGlibc [system] {
         header "${GLIBC_ARCH_INCLUDE_PATH}/sys/mman.h"
         export *
       }
-% if CMAKE_SDK != "WASM":
+% if CMAKE_SDK != "WASI":
       module msg {
         header "${GLIBC_ARCH_INCLUDE_PATH}/sys/msg.h"
         export *
@@ -456,7 +456,7 @@ module SwiftGlibc [system] {
         header "${GLIBC_ARCH_INCLUDE_PATH}/sys/select.h"
         export *
       }
-% if CMAKE_SDK != "FREEBSD" and CMAKE_SDK != "HAIKU" and CMAKE_SDK != "WASM":
+% if CMAKE_SDK != "FREEBSD" and CMAKE_SDK != "HAIKU" and CMAKE_SDK != "WASI":
       module sendfile {
         header "${GLIBC_ARCH_INCLUDE_PATH}/sys/sendfile.h"
         export *
@@ -506,7 +506,7 @@ module SwiftGlibc [system] {
         header "${GLIBC_ARCH_INCLUDE_PATH}/sys/utsname.h"
         export *
       }
-% if CMAKE_SDK != "WASM":
+% if CMAKE_SDK != "WASI":
       module wait {
         header "${GLIBC_ARCH_INCLUDE_PATH}/sys/wait.h"
         export *
@@ -519,7 +519,7 @@ module SwiftGlibc [system] {
       export *
     }
 % end
-% if CMAKE_SDK != "WASM":
+% if CMAKE_SDK != "WASI":
     module termios {
       header "${GLIBC_INCLUDE_PATH}/termios.h"
       export *
@@ -536,7 +536,7 @@ module SwiftGlibc [system] {
   }
 }
 
-% if CMAKE_SDK != "WASM":
+% if CMAKE_SDK != "WASI":
 module CUUID [system] {
   header "${GLIBC_INCLUDE_PATH}/uuid/uuid.h"
   link "uuid"
