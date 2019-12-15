@@ -2259,7 +2259,7 @@ Type TypeChecker::typeCheckExpressionImpl(Expr *&expr, DeclContext *dc,
   result = cs.applySolution(
       solution, result, convertType.getType(),
       options.contains(TypeCheckExprFlags::IsDiscarded),
-      options.contains(TypeCheckExprFlags::SkipMultiStmtClosures));
+      options.contains(TypeCheckExprFlags::SubExpressionDiagnostics));
 
   if (!result) {
     listener.applySolutionFailed(solution, expr);
