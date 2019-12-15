@@ -18,6 +18,8 @@
 
 #ifndef SWIFT_BASIC_LOCATED_H
 #define SWIFT_BASIC_LOCATED_H
+#include "swift/Basic/Debug.h"
+#include "swift/Basic/LLVM.h"
 #include "swift/Basic/SourceLoc.h"
 
 namespace swift {
@@ -41,11 +43,15 @@ struct Located {
 
   Located(T Item, SourceLoc loc): Item(Item), Loc(loc) {}
 
+  SWIFT_DEBUG_DUMP;
+  void dump(raw_ostream &os) const;
+
   template<typename U>
   friend bool operator ==(const Located<U>& lhs, const Located<U>& rhs) {
     return lhs.Item == rhs.Item && lhs.Loc == rhs.Loc;
   }
 };
-}
+
+} // end namespace swift
 
 #endif // SWIFT_BASIC_LOCATED_H
