@@ -595,10 +595,6 @@ Expr *FailureDiagnosis::typeCheckChildIndependently(
   // to diagnose a problem.
   TCEOptions |= TypeCheckExprFlags::SubExpressionDiagnostics;
 
-  // Don't walk into non-single expression closure bodies, because
-  // ExprTypeSaver and TypeNullifier skip them too.
-  TCEOptions |= TypeCheckExprFlags::SkipMultiStmtClosures;
-
   // Claim that the result is discarded to preserve the lvalue type of
   // the expression.
   if (options.contains(TCC_AllowLValue))
