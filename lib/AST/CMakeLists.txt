@@ -29,7 +29,7 @@ add_swift_host_library(swiftAST STATIC
   ASTVerifier.cpp
   ASTWalker.cpp
   Attr.cpp
-  IndexSubset.cpp
+  AutoDiff.cpp
   Availability.cpp
   AvailabilitySpec.cpp
   Builtins.cpp
@@ -55,6 +55,7 @@ add_swift_host_library(swiftAST STATIC
   Identifier.cpp
   ImportCache.cpp
   IncrementalRanges.cpp
+  IndexSubset.cpp
   InlinableText.cpp
   LayoutConstraint.cpp
   Module.cpp

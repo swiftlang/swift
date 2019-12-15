@@ -715,5 +715,5 @@ void swift::bindExtensions(SourceFile &SF) {
 
 LookupResult
 swift::lookupSemanticMember(DeclContext *DC, Type ty, DeclName name) {
-  return TypeChecker::lookupMember(DC, ty, name, None);
+  return TypeChecker::lookupMember(DC, ty, DeclNameRef(name), None);
 }

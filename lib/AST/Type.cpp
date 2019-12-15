@@ -1498,6 +1498,13 @@ bool TypeBase::isCallableNominalType(DeclContext *dc) {
                            IsCallableNominalTypeRequest{canTy, dc}, false);
 }
 
+bool TypeBase::hasDynamicMemberLookupAttribute() {
+  auto canTy = getCanonicalType();
+  auto &ctx = canTy->getASTContext();
+  return evaluateOrDefault(
+      ctx.evaluator, HasDynamicMemberLookupAttributeRequest{canTy}, false);
+}
+
 Type TypeBase::getSuperclass(bool useArchetypes) {
   auto *nominalDecl = getAnyNominal();
   auto *classDecl = dyn_cast_or_null<ClassDecl>(nominalDecl);
@@ -3235,10 +3242,13 @@ Type ProtocolCompositionType::get(const ASTContext &C,
 void
 AnyFunctionType::ExtInfo::assertIsFunctionType(const clang::Type *type) {
 #ifndef NDEBUG
-  if (!type->isFunctionType()) {
-    llvm::errs() << "Expected a Clang function type but found\n";
-    type->dump(llvm::errs());
-    llvm_unreachable("");
+  if (!(type->isFunctionPointerType() || type->isBlockPointerType())) {
+    SmallString<256> buf;
+    llvm::raw_svector_ostream os(buf);
+    os << "Expected a Clang function type wrapped in a pointer type or "
+       << "a block pointer type but found:\n";
+    type->dump(os);
+    llvm_unreachable(os.str().data());
   }
 #endif
   return;
@@ -3250,7 +3260,7 @@ const clang::Type *AnyFunctionType::getClangFunctionType() const {
     return cast<FunctionType>(this)->getClangFunctionType();
   case TypeKind::GenericFunction:
     // Generic functions do not have C types.
-  return nullptr;
+    return nullptr;
   default:
     llvm_unreachable("Illegal type kind for AnyFunctionType.");
   }
@@ -4853,4 +4863,11 @@ SILFunctionType::withSubstitutions(SubstitutionMap subs) const {
                           getOptionalErrorResult(),
                           subs, isGenericSignatureImplied(),
                           const_cast<SILFunctionType*>(this)->getASTContext());
+}
+
+SourceLoc swift::extractNearestSourceLoc(Type ty) {
+  if (auto nominal = ty->getAnyNominal())
+    return extractNearestSourceLoc(nominal);
+
+  return SourceLoc();
 }

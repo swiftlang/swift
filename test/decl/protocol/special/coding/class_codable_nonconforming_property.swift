@@ -162,17 +162,13 @@ class NonConformingClass : Codable { // expected-error {{type 'NonConformingClas
   // These lines have to be within the NonConformingClass type because
   // CodingKeys should be private.
   func foo() {
-    // They should not get a CodingKeys type.
-    let _ = NonConformingClass.CodingKeys.self // expected-error {{type 'NonConformingClass' has no member 'CodingKeys'}}
-    let _ = NonConformingClass.CodingKeys.x // expected-error {{type 'NonConformingClass' has no member 'CodingKeys'}}
-    let _ = NonConformingClass.CodingKeys.y // expected-error {{type 'NonConformingClass' has no member 'CodingKeys'}}
-    let _ = NonConformingClass.CodingKeys.z // expected-error {{type 'NonConformingClass' has no member 'CodingKeys'}}
+    let _ = NonConformingClass.CodingKeys.self
+    let _ = NonConformingClass.CodingKeys.x
+    let _ = NonConformingClass.CodingKeys.y
+    let _ = NonConformingClass.CodingKeys.z // expected-error {{type 'NonConformingClass.CodingKeys' has no member 'z'}}
   }
 }
 
 // They should not receive Codable methods.
 let _ = NonConformingClass.init(from:) // expected-error {{type 'NonConformingClass' has no member 'init(from:)'}}
 let _ = NonConformingClass.encode(to:) // expected-error {{type 'NonConformingClass' has no member 'encode(to:)'}}
-
-// They should not get a CodingKeys type.
-let _ = NonConformingClass.CodingKeys.self // expected-error {{type 'NonConformingClass' has no member 'CodingKeys'}}

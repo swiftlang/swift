@@ -21,14 +21,19 @@ public struct Logger {
   @usableFromInline
   internal let logObject: OSLog
 
-  /// Create a custom OS log object.
+  /// Create a custom OSLog object for logging.
   public init(subsystem: String, category: String) {
     logObject = OSLog(subsystem: subsystem, category: category)
   }
 
-  /// Return the default OS log object.
+  /// Use the default OSLog object for logging.
   public init() {
     logObject = OSLog.default
+  }
+
+  /// Create a Logger instance from an existing OSLog Object.
+  public init(_ logObj: OSLog) {
+    logObject = logObj
   }
 
   // Functions defined below are marked @_optimize(none) to prevent inlining
@@ -44,8 +49,57 @@ public struct Logger {
     osLog(log: logObject, level: level, message)
   }
 
-  // TODO: define overloads for logging at specific levels: debug, info, notice,
-  // error, fault based on the Swift forum "logging-levels" discussion.
+  // The following overloads are for logging at specific levels. The levels that
+  // are supported are debug (also called trace), info, notice (also called
+  // default), error (also called warning), fault (also called critical).
+
+  @_transparent
+  @_optimize(none)
+  public func trace(_ message: OSLogMessage) {
+    osLog(log: logObject, level: .debug, message)
+  }
+
+  @_transparent
+  @_optimize(none)
+  public func debug(_ message: OSLogMessage) {
+    osLog(log: logObject, level: .debug, message)
+  }
+
+  @_transparent
+  @_optimize(none)
+  public func info(_ message: OSLogMessage) {
+    osLog(log: logObject, level: .info, message)
+  }
+
+  @_transparent
+  @_optimize(none)
+  public func notice(_ message: OSLogMessage) {
+    osLog(log: logObject, level: .default, message)
+  }
+
+  @_transparent
+  @_optimize(none)
+  public func warning(_ message: OSLogMessage) {
+    osLog(log: logObject, level: .error, message)
+  }
+
+  @_transparent
+  @_optimize(none)
+  public func error(_ message: OSLogMessage) {
+    osLog(log: logObject, level: .error, message)
+  }
+
+  @_transparent
+  @_optimize(none)
+  public func critical(_ message: OSLogMessage) {
+    osLog(log: logObject, level: .fault, message)
+  }
+
+  @_transparent
+  @_optimize(none)
+  public func fault(_ message: OSLogMessage) {
+    osLog(log: logObject, level: .fault, message)
+  }
 }
 
 /// Given an instance of the custom string interpolation type: `OSLogMessage`,

@@ -232,7 +232,7 @@ getDynamicResultSignature(ValueDecl *decl) {
   llvm_unreachable("Not a valid @objc member");
 }
 
-LookupResult &ConstraintSystem::lookupMember(Type base, DeclName name) {
+LookupResult &ConstraintSystem::lookupMember(Type base, DeclNameRef name) {
   // Check whether we've already performed this lookup.
   auto &result = MemberLookups[{base, name}];
   if (result) return *result;
@@ -1875,9 +1875,7 @@ isInvalidPartialApplication(ConstraintSystem &cs, const ValueDecl *member,
 
 std::pair<Type, bool> ConstraintSystem::adjustTypeOfOverloadReference(
     const OverloadChoice &choice, ConstraintLocator *locator,
-    Type boundType, Type refType, DeclContext *useDC,
-    llvm::function_ref<void(unsigned int, Type, ConstraintLocator *)>
-        verifyThatArgumentIsHashable) {
+    Type boundType, Type refType) {
   // If the declaration is unavailable, note that in the score.
   if (choice.getDecl()->getAttrs().isUnavailable(getASTContext())) {
     increaseScore(SK_Unavailable);
@@ -1899,6 +1897,7 @@ std::pair<Type, bool> ConstraintSystem::adjustTypeOfOverloadReference(
 
     // Deal with values declared as implicitly unwrapped, or
     // functions with return types that are implicitly unwrapped.
+    // TODO: Move this logic to bindOverloadType.
     if (choice.isImplicitlyUnwrappedValueOrReturnValue()) {
       // Build the disjunction to attempt binding both T? and T (or
       // function returning T? and function returning T).
@@ -1910,6 +1909,7 @@ std::pair<Type, bool> ConstraintSystem::adjustTypeOfOverloadReference(
       bindConstraintCreated = true;
     }
 
+    // TODO: Move this to getTypeOfMemberReference.
     refType = OptionalType::get(refType->getRValueType());
   }
 
@@ -1922,6 +1922,7 @@ std::pair<Type, bool> ConstraintSystem::adjustTypeOfOverloadReference(
   case OverloadChoiceKind::KeyPathApplication:
     return {refType, bindConstraintCreated};
   case OverloadChoiceKind::DeclViaDynamic: {
+    // TODO: Move the IUO handling logic here to bindOverloadType.
     if (isa<SubscriptDecl>(choice.getDecl())) {
       // We always expect function type for subscripts.
       auto fnTy = refType->castTo<AnyFunctionType>();
@@ -1982,20 +1983,52 @@ std::pair<Type, bool> ConstraintSystem::adjustTypeOfOverloadReference(
 
       // We store an Optional of the originally resolved type in the
       // overload set.
+      // TODO: Move this to getTypeOfMemberReference.
       refType = OptionalType::get(refType->getRValueType());
     }
 
     return {refType, /*bindConstraintCreated*/ true};
   }
+  case OverloadChoiceKind::DynamicMemberLookup:
+  case OverloadChoiceKind::KeyPathDynamicMemberLookup:
+    return {refType, bindConstraintCreated};
+  }
+
+  llvm_unreachable("Unhandled OverloadChoiceKind in switch.");
+}
+
+void ConstraintSystem::bindOverloadType(
+    const SelectedOverload &overload, Type boundType,
+    ConstraintLocator *locator, DeclContext *useDC,
+    llvm::function_ref<void(unsigned int, Type, ConstraintLocator *)>
+        verifyThatArgumentIsHashable) {
+  auto choice = overload.choice;
+  auto openedType = overload.openedType;
+
+  auto bindTypeOrIUO = [&](Type ty) {
+    if (choice.isImplicitlyUnwrappedValueOrReturnValue()) {
+      // Build the disjunction to attempt binding both T? and T (or
+      // function returning T? and function returning T).
+      buildDisjunctionForImplicitlyUnwrappedOptional(boundType, ty, locator);
+    } else {
+      // Add the type binding constraint.
+      addConstraint(ConstraintKind::Bind, boundType, ty, locator);
+    }
+  };
+  switch (choice.getKind()) {
+  case OverloadChoiceKind::Decl:
+  case OverloadChoiceKind::DeclViaBridge:
+  case OverloadChoiceKind::DeclViaUnwrappedOptional:
+  case OverloadChoiceKind::TupleIndex:
+  case OverloadChoiceKind::BaseType:
+  case OverloadChoiceKind::KeyPathApplication:
+  case OverloadChoiceKind::DeclViaDynamic:
+    bindTypeOrIUO(openedType);
+    return;
   case OverloadChoiceKind::DynamicMemberLookup: {
     // DynamicMemberLookup results are always a (dynamicMember:T1)->T2
     // subscript.
-    auto refFnType = refType->castTo<FunctionType>();
-
-    // If this is a dynamic member lookup, then the decl we have is for the
-    // subscript(dynamicMember:) member, but the type we need to return is the
-    // result of the subscript.  Dig through it.
-    refType = refFnType->getResult();
+    auto refFnType = openedType->castTo<FunctionType>();
 
     // Before we drop the argument type on the floor, we need to constrain it
     // to having a literal conformance to ExpressibleByStringLiteral.  This
@@ -2008,7 +2041,7 @@ std::pair<Type, bool> ConstraintSystem::adjustTypeOfOverloadReference(
         TypeChecker::getProtocol(getASTContext(), choice.getDecl()->getLoc(),
                                  KnownProtocolKind::ExpressibleByStringLiteral);
     if (!stringLiteral)
-      return {refType, bindConstraintCreated};
+      return;
 
     addConstraint(ConstraintKind::LiteralConformsTo, argType,
                   stringLiteral->getDeclaredType(), locator);
@@ -2018,18 +2051,20 @@ std::pair<Type, bool> ConstraintSystem::adjustTypeOfOverloadReference(
     if (isa<KeyPathExpr>(locator->getAnchor()))
       verifyThatArgumentIsHashable(0, argType, locator);
 
-    return {refType, bindConstraintCreated};
+    // The resolved decl is for subscript(dynamicMember:), however the original
+    // member constraint was for a property. Therefore we need to bind to the
+    // result type.
+    bindTypeOrIUO(refFnType->getResult());
+    return;
   }
   case OverloadChoiceKind::KeyPathDynamicMemberLookup: {
-    auto *fnType = refType->castTo<FunctionType>();
+    auto *fnType = openedType->castTo<FunctionType>();
     assert(fnType->getParams().size() == 1 &&
            "subscript always has one argument");
     // Parameter type is KeyPath<T, U> where `T` is a root type
     // and U is a leaf type (aka member type).
     auto keyPathTy =
         fnType->getParams()[0].getPlainType()->castTo<BoundGenericType>();
-
-    refType = fnType->getResult();
 
     auto *keyPathDecl = keyPathTy->getAnyNominal();
     assert(isKnownKeyPathDecl(getASTContext(), keyPathDecl) &&
@@ -2048,21 +2083,16 @@ std::pair<Type, bool> ConstraintSystem::adjustTypeOfOverloadReference(
     // Attempt to lookup a member with a give name in the root type and
     // assign result to the leaf type of the keypath.
     bool isSubscriptRef = locator->isSubscriptMemberRef();
-    DeclName memberName =
-        isSubscriptRef ? DeclBaseName::createSubscript() : choice.getName();
+    DeclNameRef memberName = isSubscriptRef
+                           ? DeclNameRef::createSubscript()
+                           // FIXME: Should propagate name-as-written through.
+                           : DeclNameRef(choice.getName());
 
-    auto *memberRef = Constraint::createMember(
-        *this, ConstraintKind::ValueMember, LValueType::get(rootTy), memberTy,
-        memberName, useDC,
-        isSubscriptRef ? FunctionRefKind::DoubleApply
-                       : FunctionRefKind::Unapplied,
-        keyPathLoc);
-
-    // Delay simplication of this constraint until after the overload choice
-    // has been bound for this key path dynamic member. This helps to identify
-    // recursive calls with the same base.
-    addUnsolvedConstraint(memberRef);
-    activateConstraint(memberRef);
+    addValueMemberConstraint(LValueType::get(rootTy), memberName, memberTy,
+                             useDC,
+                             isSubscriptRef ? FunctionRefKind::DoubleApply
+                                            : FunctionRefKind::Unapplied,
+                             /*outerAlternatives=*/{}, keyPathLoc);
 
     // In case of subscript things are more compicated comparing to "dot"
     // syntax, because we have to get "applicable function" constraint
@@ -2140,10 +2170,15 @@ std::pair<Type, bool> ConstraintSystem::adjustTypeOfOverloadReference(
 
     if (isa<KeyPathExpr>(locator->getAnchor()))
       verifyThatArgumentIsHashable(0, keyPathTy, locator);
-  }
-    return {refType, bindConstraintCreated};
-  }
 
+    // The resolved decl is for subscript(dynamicMember:), however the
+    // original member constraint was either for a property, or we've
+    // re-purposed the overload type variable to represent the result type of
+    // the subscript. In both cases, we need to bind to the result type.
+    bindTypeOrIUO(fnType->getResult());
+    return;
+  }
+  }
   llvm_unreachable("Unhandled OverloadChoiceKind in switch.");
 }
 
@@ -2231,8 +2266,7 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
     // getTypeOfMemberReference(); their result types are unchecked
     // optional.
     std::tie(refType, bindConstraintCreated) =
-        adjustTypeOfOverloadReference(choice, locator, boundType, refType,
-                                      useDC, verifyThatArgumentIsHashable);
+        adjustTypeOfOverloadReference(choice, locator, boundType, refType);
     break;
   }
 
@@ -2361,15 +2395,8 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
 
   // In some cases we already created the appropriate bind constraints.
   if (!bindConstraintCreated) {
-    if (choice.isImplicitlyUnwrappedValueOrReturnValue()) {
-      // Build the disjunction to attempt binding both T? and T (or
-      // function returning T? and function returning T).
-      buildDisjunctionForImplicitlyUnwrappedOptional(boundType, refType,
-                                                     locator);
-    } else {
-      // Add the type binding constraint.
-      addConstraint(ConstraintKind::Bind, boundType, refType, locator);
-    }
+    bindOverloadType(overload, boundType, locator, useDC,
+                     verifyThatArgumentIsHashable);
   }
 
   if (getASTContext().TypeCheckerOpts.DebugConstraintSolver) {
@@ -2958,7 +2985,9 @@ bool ConstraintSystem::diagnoseAmbiguity(ArrayRef<Solution> solutions) {
   // depth-first numbering of expressions.
   if (bestOverload) {
     auto &overload = diff.overloads[*bestOverload];
-    auto name = getOverloadChoiceName(overload.choices);
+    // FIXME: We would prefer to emit the name as written, but that information
+    // is not sufficiently centralized in the AST.
+    DeclNameRef name(getOverloadChoiceName(overload.choices));
     auto anchor = simplifyLocatorToAnchor(overload.locator);
 
     // Emit the ambiguity diagnostic.

@@ -236,8 +236,6 @@ public:
   // the result bit.
   SILInstruction *optimizeBuiltinCompareEq(BuiltinInst *AI, bool NegateResult);
 
-  SILInstruction *tryOptimizeApplyOfPartialApply(PartialApplyInst *PAI);
-
   SILInstruction *optimizeApplyOfConvertFunctionInst(FullApplySite AI,
                                                      ConvertFunctionInst *CFI);
 
@@ -253,6 +251,15 @@ public:
                                        StringRef FInverseName, StringRef FName);
 
 private:
+  InstModCallbacks getInstModCallbacks() {
+    return InstModCallbacks(
+        [this](SILInstruction *DeadInst) { eraseInstFromFunction(*DeadInst); },
+        [this](SILInstruction *NewInst) { Worklist.add(NewInst); },
+        [this](SILValue oldValue, SILValue newValue) {
+          replaceValueUsesWith(oldValue, newValue);
+        });
+  }
+
   FullApplySite rewriteApplyCallee(FullApplySite apply, SILValue callee);
 
   // Build concrete existential information using findInitExistential.

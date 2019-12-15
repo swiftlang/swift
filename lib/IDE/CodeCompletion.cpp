@@ -1325,8 +1325,8 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
     if (auto *ITR = dyn_cast<IdentTypeRepr>(ParsedTypeLoc.getTypeRepr())) {
       SmallVector<ImportDecl::AccessPathElement, 4> AccessPath;
       for (auto Component : ITR->getComponentRange())
-        AccessPath.push_back({ Component->getIdentifier(),
-                               Component->getIdLoc() });
+        AccessPath.push_back({ Component->getNameRef().getBaseIdentifier(),
+                               Component->getLoc() });
       if (auto Module = Context.getLoadedModule(AccessPath))
         ParsedTypeLoc.setType(ModuleType::get(Module));
         return true;

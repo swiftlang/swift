@@ -462,7 +462,7 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
     } else {
       bool isVoid = false;
       if (const auto Void = dyn_cast<SimpleIdentTypeRepr>(tyR)) {
-        if (Void->getIdentifier().str() == "Void") {
+        if (Void->getNameRef().isSimpleName(Context.Id_Void)) {
           isVoid = true;
         }
       }
@@ -529,7 +529,7 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
         if (auto ident = dyn_cast<ComponentIdentTypeRepr>(T)) {
           if (auto decl = ident->getBoundDecl()) {
             if (auto genericParam = dyn_cast<GenericTypeParamDecl>(decl))
-              ident->overwriteIdentifier(genericParam->getName());
+              ident->overwriteNameRef(genericParam->createNameRef());
           }
         }
         return true;
@@ -666,17 +666,12 @@ ParserResult<TypeRepr> Parser::parseTypeIdentifier() {
   SmallVector<ComponentIdentTypeRepr *, 4> ComponentsR;
   SourceLoc EndLoc;
   while (true) {
-    SourceLoc Loc;
-    Identifier Name;
-    if (Tok.is(tok::kw_Self)) {
-      Loc = consumeIdentifier(&Name);
-    } else {
-      // FIXME: specialize diagnostic for 'Type': type cannot start with
-      // 'metatype'
-      // FIXME: offer a fixit: 'self' -> 'Self'
-      if (parseIdentifier(Name, Loc, diag::expected_identifier_in_dotted_type))
-        Status.setIsParseError();
-    }
+    DeclNameLoc Loc;
+    DeclNameRef Name = parseUnqualifiedDeclBaseName(
+        /*afterDot=*/false, Loc,
+        diag::expected_identifier_in_dotted_type);
+    if (!Name)
+      Status.setIsParseError();
 
     if (Loc.isValid()) {
       SourceLoc LAngle, RAngle;
@@ -686,7 +681,7 @@ ParserResult<TypeRepr> Parser::parseTypeIdentifier() {
         if (genericArgsStatus.isError())
           return genericArgsStatus;
       }
-      EndLoc = Loc;
+      EndLoc = Loc.getEndLoc();
 
       ComponentIdentTypeRepr *CompT;
       if (!GenericArgs.empty())
@@ -724,7 +719,7 @@ ParserResult<TypeRepr> Parser::parseTypeIdentifier() {
   if (!ComponentsR.empty()) {
     // Lookup element #0 through our current scope chains in case it is some
     // thing local (this returns null if nothing is found).
-    if (auto Entry = lookupInScope(ComponentsR[0]->getIdentifier()))
+    if (auto Entry = lookupInScope(ComponentsR[0]->getNameRef()))
       if (auto *TD = dyn_cast<TypeDecl>(Entry))
         ComponentsR[0]->setValue(TD, nullptr);
 
