@@ -171,8 +171,6 @@ static StringRef getPlatformNameForDarwin(const DarwinPlatformKind platform) {
 StringRef swift::getPlatformNameForTriple(const llvm::Triple &triple) {
   switch (triple.getOS()) {
   case llvm::Triple::UnknownOS:
-    if (triple.isOSBinFormatWasm())
-      return "wasm";
     llvm_unreachable("unknown OS");
   case llvm::Triple::Ananas:
   case llvm::Triple::CloudABI:

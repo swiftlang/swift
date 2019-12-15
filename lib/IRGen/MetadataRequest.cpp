@@ -2427,9 +2427,6 @@ emitMetadataAccessByMangledName(IRGenFunction &IGF, CanType type,
                                                    stringAddrOffset);
         stringAddr = subIGF.Builder.CreateIntToPtr(stringAddr, IGM.Int8PtrTy);
       }
-      auto stringAddr = subIGF.Builder.CreateAdd(stringAddrBase,
-                                                 stringAddrOffset);
-      stringAddr = subIGF.Builder.CreateIntToPtr(stringAddr, IGM.Int8PtrTy);
 
       llvm::CallInst *call;
       if (request.isStaticallyAbstract()) {
