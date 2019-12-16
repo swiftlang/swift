@@ -24,7 +24,7 @@ var ta = [t]
 
 va = ta
 
-var va2: ([V])? = va as [V]
+var va2: ([V])? = va as [V] // expected-warning {{redundant cast to '[V]' has no effect}} {{22-29=}}
 var v2: V = va2![0]
 
 var ua2: ([U])? = va as? [U]

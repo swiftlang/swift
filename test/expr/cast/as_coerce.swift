@@ -81,7 +81,7 @@ c3 as C4 // expected-error {{'C3' is not convertible to 'C4'; did you mean to us
 // <rdar://problem/19495142> Various incorrect diagnostics for explicit type conversions
 1 as Double as Float // expected-error{{cannot convert value of type 'Double' to type 'Float' in coercion}}
 1 as Int as String // expected-error{{cannot convert value of type 'Int' to type 'String' in coercion}}
-Double(1) as Double as String // expected-error{{cannot convert value of type 'Double' to type 'String' in coercion}}
+Double(1) as Double as String // expected-error{{cannot convert value of type 'Double' to type 'String' in coercion}} expected-warning {{redundant cast to 'Double' has no effect}} {{11-21=}}
 ["awd"] as [Int] // expected-error{{cannot convert value of type 'String' to expected element type 'Int'}}
 ([1, 2, 1.0], 1) as ([String], Int)
 // expected-error@-1 2 {{cannot convert value of type 'Int' to expected element type 'String'}}
@@ -135,3 +135,182 @@ _ = sr6022 as! AnyObject // expected-warning {{forced cast from '() -> Any' to '
 _ = sr6022 as? AnyObject // expected-warning {{conditional cast from '() -> Any' to 'AnyObject' always succeeds}}
 _ = sr6022_1 as! Any // expected-warning {{forced cast from '() -> ()' to 'Any' always succeeds; did you mean to use 'as'?}}
 _ = sr6022_1 as? Any // expected-warning {{conditional cast from '() -> ()' to 'Any' always succeeds}}
+
+// SR-11295
+let sr11295a = "Hello"
+_ = sr11295a as String // expected-warning {{redundant cast to 'String' has no effect}} {{14-24=}}
+
+let sr11295b = 1
+_ = sr11295b as Int // expected-warning {{redundant cast to 'Int' has no effect}} {{14-21=}}
+
+typealias Type = String
+
+let sr11295c: Type = "Hello Typealias"
+_ = sr11295c as String // expected-warning {{redundant cast to 'String' has no effect}} {{14-24=}}
+
+let sr11295d = "Hello Typealias"
+_ = sr11295d as Type // expected-warning {{redundant cast to 'Type' (aka 'String') has no effect}} {{14-22=}}
+
+_ = "Hello" as String // Ok
+_ = 1 as Int64 // Ok
+_ = [] as Set<Int> // Ok
+
+class SR11295A {}
+class SR11295B: SR11295A {}
+
+var sr11295ap = SR11295A()
+var sr11295bc = SR11295B()
+
+_ = sr11295bc as SR11295A // Ok 
+
+_ = 1 as Double as Double // expected-warning {{redundant cast to 'Double' has no effect}} {{17-27=}}
+_ = Double(1) as Double // expected-warning {{redundant cast to 'Double' has no effect}} {{15-25=}}
+_ = Int(1) as Int  // expected-warning {{redundant cast to 'Int' has no effect}} {{12-19=}}
+
+typealias Double1 = Double
+typealias Double2 = Double
+
+let sr11295ta1: Double1 = 1.0
+_ = sr11295ta1 as Double2 // expected-warning {{redundant cast from 'Double1' (aka 'Double') to 'Double2' (aka 'Double') has no effect}} {{16-27=}}
+_ = sr11295ta1 as Double1 // expected-warning {{redundant cast to 'Double1' (aka 'Double') has no effect}} {{16-27=}}
+
+func ff11295_0<T>(_ t: T) -> T { return t }
+func ff11295_1(_ i: Int) -> Int { return i }
+
+// Function call expressions
+_ = ff11295_0(1 as Int) as Int // expected-warning {{redundant cast to 'Int' has no effect}} {{25-32=}}
+_ = ff11295_1(1) as Int // expected-warning {{redundant cast to 'Int' has no effect}} {{18-25=}}
+
+func ff11295_3(i: Int) {
+  let a: [Int] = []
+  _ = a.count - ((i + 1) as Int) // Ok
+}
+
+struct SR11295C {
+  var i: Int 
+}
+struct SR11295D<T> {
+  var t: T 
+
+  func f() -> T { return t }
+}
+enum SR11295_E: Int {
+  case a
+}
+
+// Coerce members
+_ = SR11295C(i: 1).i as Int // expected-warning {{redundant cast to 'Int' has no effect}} {{22-29=}}
+_ = SR11295D<Int>(t: 1).t as Int // expected-warning {{redundant cast to 'Int' has no effect}} {{27-34=}}
+_ = SR11295D(t: 1 as Int).t as Int // expected-warning {{redundant cast to 'Int' has no effect}} {{29-36=}}
+_ = SR11295D(t: 1).t as Int // Ok
+_ = SR11295D(t: 1).t as UInt // Ok
+_ = SR11295_E.a.rawValue as Int // expected-warning {{redundant cast to 'Int' has no effect}} {{26-33=}}
+_ = SR11295D(t: 1 as Int).f() as Int // expected-warning {{redundant cast to 'Int' has no effect}} {{31-38=}}
+_ = SR11295D(t: 1).f() as Int // Ok
+
+// Overload decl expr
+func f11295_Overload(a: Int, b: Int) -> Int { }
+func f11295_Overload(c: Double, d: Double) -> Double { }
+
+_ = (f11295_Overload as (Int, Int) -> Int)(0, 0)
+_ = (f11295_Overload as (Double, Double) -> Double)(0, 0)
+
+_ = (1 - 2 / 3 * 6) as UInt
+_ = 1/4 as Float > 3/2 as Float // Ok
+_ = 1/4 as Int > 3/2 as Int // Ok
+
+// Special cases where the coerced expression type is inferred by context.
+
+var f11295: (Float) -> Float = { $0 as Float } // expected-warning {{redundant cast to 'Float' has no effect}} {{37-46=}}
+var f11295_1 = { $0 as Float } // Ok
+
+func ff11295() -> (Int) -> Int {
+  return { $0 as Int } // expected-warning {{redundant cast to 'Int' has no effect}} {{15-22=}}
+}
+
+func f11295t_2<A: Hashable, R>(f: @escaping ((A) -> R, A) -> R) {}
+
+f11295t_2 { (f, n) in
+  n < 2 ? n : 0 // Ok
+}
+
+f11295t_2 { (f, n) in
+  n < 2 ? n as Int: 0 // Ok
+}
+
+f11295t_2 { (_, n) in
+  _ = n as Int // Ok
+}
+
+f11295t_2 { (f, n: Int) in
+  n < 2 ? n as Int : 0 // expected-warning {{redundant cast to 'Int' has no effect}} {{13-20=}}
+}
+
+f11295t_2 { (_, n) in
+  _ = SR11295D(t: n as Int).t as Int // expected-warning {{redundant cast to 'Int' has no effect}} {{31-38=}}
+}
+
+f11295t_2 { (_, n) in
+  _ = SR11295D(t: n).t as Int // Ok
+}
+
+func ff11295_g<T>(_ v: T) {
+  let _ = { v as T } // expected-warning {{redundant cast to 'T' has no effect}} {{15-20=}}
+} 
+
+func ff11295_g1(_ v: Int) { 
+  let _ = { v as Int } // expected-warning {{redundant cast to 'Int' has no effect}} {{15-22=}}
+}
+
+func ff11295_g2<T>(_ v: T) {
+  let _ = { $0 as T } // Ok
+} 
+
+func ff11295_g2<T>(_ v: T) -> (T) -> T {
+  let _ : (T) -> T = { $0 as T } // expected-warning {{redundant cast to 'T' has no effect}} {{27-32=}}
+  return { $0 as T } // expected-warning {{redundant cast to 'T' has no effect}} {{15-20=}}
+} 
+
+func ff11295_g3(_ v: Int) { 
+  let _ = { $0 as Int } // Ok
+}
+
+func ff11295_g4<T>(_ v: T) {
+  let c = v as T // expected-warning {{redundant cast to 'T' has no effect}} {{13-18=}}
+  let _ = { c as T } // expected-warning {{redundant cast to 'T' has no effect}} {{15-20=}}
+}
+
+func ff11295_g5<T>(_ v: T) {
+  // Nested closures
+  let _ = { { { $0 as T } } } // Ok
+  let _ = { { { v as T } } } // expected-warning {{redundant cast to 'T' has no effect}} {{19-24=}}
+}
+
+func ff11295_6(_ i: Int) -> Int { i }
+func ff11295_g6<T>(_ i: T) -> T { i }
+
+let _ = { ff11295_g6($0 as Int) } // Ok
+
+let _ = { ff11295_6($0) } // Ok
+
+let _ = { ff11295_6($0 as Int) } // Ok
+
+// A similar test case comming from validation-test/Sema/type_checker_perf/fast/rdar17077404.swift
+func f11295_3<A: Hashable, R>(
+  f: @escaping ((A) -> R, A) -> R
+) -> ((A) -> R) {
+  return { (a: A) -> R in
+    let r: R! 
+    return r
+  }
+}
+
+_ = f11295_3 { 
+  (f, n) in
+  f(n as Int) as Int // OK
+}
+
+_ = f11295_3 {
+  (f, n) in
+  n < 2 ? n as Int : f(n - 1) + f(n - 2) // OK 
+}

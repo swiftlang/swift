@@ -4,24 +4,24 @@
 // RUN: %empty-directory(%t.overlays)
 
 // FIXME: BEGIN -enable-source-import hackaround
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-module -o %t.overlays %clang-importer-sdk-path/swift-modules/ObjectiveC.swift -disable-objc-attr-requires-foundation-module
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-module -o %t.overlays %clang-importer-sdk-path/swift-modules/CoreGraphics.swift
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-module -o %t.overlays %clang-importer-sdk-path/swift-modules/Foundation.swift
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-module -o %t.overlays %clang-importer-sdk-path/swift-modules/ObjectiveC.swift -disable-objc-attr-requires-foundation-module -disable-redundant-coercion-warning
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-module -o %t.overlays %clang-importer-sdk-path/swift-modules/CoreGraphics.swift -disable-redundant-coercion-warning
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-module -o %t.overlays %clang-importer-sdk-path/swift-modules/Foundation.swift -disable-redundant-coercion-warning
 // FIXME: END -enable-source-import hackaround
 
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-module -o %t.overlays %S/Inputs/fixits_helper.swift -module-name Helper
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-module -o %t.overlays %S/Inputs/fixits_helper.swift -module-name Helper -disable-redundant-coercion-warning
 
 // Make sure we get the right diagnostics.
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t.overlays) -typecheck %s -verify
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t.overlays) -disable-redundant-coercion-warning -typecheck %s -verify 
 
 // Copy the source, apply the Fix-Its, and compile it again, making
 // sure that we've cleaned up all of the deprecation warnings.
 // RUN: %empty-directory(%t.sources)
 // RUN: %empty-directory(%t.remapping)
 // RUN: cp %s %t.sources/fixits.swift
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t.overlays) -typecheck %t.sources/fixits.swift -fixit-all -emit-fixits-path %t.remapping/fixits.remap
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t.overlays) -disable-redundant-coercion-warning -typecheck %t.sources/fixits.swift -fixit-all -emit-fixits-path %t.remapping/fixits.remap
 // RUN: %{python} %utils/apply-fixit-edits.py %t.remapping
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t.overlays) -typecheck %t.sources/fixits.swift 2> %t.result
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t.overlays) -disable-redundant-coercion-warning -typecheck %t.sources/fixits.swift 2> %t.result
 
 // RUN: %FileCheck %s < %t.result
 // RUN: grep -c "warning:" %t.result | grep 3
@@ -55,7 +55,6 @@ func testDeprecatedStringLiteralSelector() {
   // We don't need coercion here because we get the right selector
   // from the static method.
   _ = "staticOrNonStatic:" as Selector // expected-warning{{use of string literal for Objective-C selectors is deprecated; use '#selector' instead}}{{7-39=#selector(Bar.staticOrNonStatic(_:))}}
-
   // We need coercion here because we asked for a selector from an
   // instance method with the same name as (but a different selector
   // from) a static method.

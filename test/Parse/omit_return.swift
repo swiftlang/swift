@@ -510,7 +510,7 @@ func ff_implicitIsExpr<T>(t: T) -> Bool {
 }
 
 func ff_implicitCoerceExpr<T>() -> T.Type {
-    T.self as T.Type
+    T.self as T.Type // expected-warning {{redundant cast to 'T.Type' has no effect}} {{12-22=}}
 }
 
 func ff_implicitConditionalCheckedCastExprAs<T>(t: T) -> Int? {

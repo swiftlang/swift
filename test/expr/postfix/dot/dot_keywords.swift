@@ -68,7 +68,7 @@ class ClassWithDeinitFunc {
 let instanceWithDeinitFunc = ClassWithDeinitFunc()
 instanceWithDeinitFunc.deinit()
 _ = instanceWithDeinitFunc.deinit(a:)
-_ = instanceWithDeinitFunc.deinit as () -> Void
+_ = instanceWithDeinitFunc.deinit as () -> Void // expected-warning {{redundant cast to '() -> Void' has no effect}} {{35-49=}}
 SR3043Derived.deinit() // expected-error {{deinitializers cannot be accessed}}
 
 class ClassWithDeinitMember {

@@ -30,6 +30,6 @@ func infer_generic_args() {
 
   // Function types
   let f : (Dictionary) -> Array = dict_to_array
-  _ = f(d) as [(String, Int)]
+  _ = f(d) as [(String, Int)] // expected-warning {{redundant cast to '[(String, Int)]' has no effect}} {{12-31=}}
 }
 
