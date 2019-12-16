@@ -513,7 +513,12 @@ void SILGenFunction::emitClosure(AbstractClosureExpr *ace) {
     emitStmt(ce->getBody());
   } else {
     auto *autoclosure = cast<AutoClosureExpr>(ace);
-    emitStmt(autoclosure->getBody());
+    // Closure expressions implicitly return the result of their body
+    // expression.
+    if (B.hasValidInsertionPoint()) {
+      emitReturnExpr(ImplicitReturnLocation(ace),
+                     autoclosure->getSingleExpressionBody());
+    }
   }
   emitEpilog(ace);
 }
