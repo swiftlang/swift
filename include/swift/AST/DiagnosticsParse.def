@@ -1581,30 +1581,24 @@ ERROR(differentiable_attribute_expected_rparen,none,
 ERROR(unexpected_argument_differentiable,none,
       "unexpected argument '%0' in '@differentiable' attribute", (StringRef))
 
+// derivative
+WARNING(attr_differentiating_deprecated,PointsToFirstBadToken,
+        "'@differentiating' attribute is deprecated; use '@derivative(of:)' "
+        "instead", ())
+
 // differentiation `wrt` parameters clause
 ERROR(expected_colon_after_label,PointsToFirstBadToken,
       "expected a colon ':' after '%0'", (StringRef))
 ERROR(diff_params_clause_expected_parameter,PointsToFirstBadToken,
       "expected a parameter, which can be a function parameter name, "
       "parameter index, or 'self'", ())
+ERROR(diff_params_clause_expected_parameter_unnamed,PointsToFirstBadToken,
+      "expected a parameter, which can be a function parameter index or 'self'",
+      ())
 
-// derivative
-ERROR(attr_derivative_expected_original_name,PointsToFirstBadToken,
+// Automatic differentiation attributes
+ERROR(autodiff_attr_expected_original_decl_name,PointsToFirstBadToken,
       "expected an original function name", ())
-WARNING(attr_differentiating_deprecated,PointsToFirstBadToken,
-        "'@differentiating' attribute is deprecated; use '@derivative(of:)' "
-        "instead", ())
-
-// transpose
-ERROR(attr_transpose_expected_original_name,PointsToFirstBadToken,
-      "expected an original function name", ())
-ERROR(attr_transpose_expected_label_linear_or_wrt,none,
-      "expected 'wrt:'", ())
-
-// transpose `wrt` parameters clause
-ERROR(transpose_params_clause_expected_parameter,PointsToFirstBadToken,
-      "expected a parameter, which can be a 'unsigned int' parameter number "
-      "or 'self'", ())
 
 // SIL autodiff
 ERROR(sil_autodiff_expected_lsquare,PointsToFirstBadToken,

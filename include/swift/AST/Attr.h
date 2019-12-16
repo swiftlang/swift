@@ -2087,7 +2087,7 @@ class TransposeAttr final
   /// non-null only for parsed attributes that reference a qualified original
   /// declaration. This field is not serialized; type-checking uses it to
   /// resolve the original declaration, which is serialized.
-  TypeRepr *BaseType;
+  TypeRepr *BaseTypeRepr;
   /// The original function name.
   DeclNameWithLoc OriginalFunctionName;
   /// The original function declaration, resolved by the type checker.
@@ -2098,25 +2098,25 @@ class TransposeAttr final
   IndexSubset *ParameterIndices = nullptr;
 
   explicit TransposeAttr(bool implicit, SourceLoc atLoc, SourceRange baseRange,
-                         TypeRepr *baseType, DeclNameWithLoc original,
+                         TypeRepr *baseTypeRepr, DeclNameWithLoc original,
                          ArrayRef<ParsedAutoDiffParameter> params);
 
   explicit TransposeAttr(bool implicit, SourceLoc atLoc, SourceRange baseRange,
-                         TypeRepr *baseType, DeclNameWithLoc original,
+                         TypeRepr *baseTypeRepr, DeclNameWithLoc original,
                          IndexSubset *indices);
 
 public:
   static TransposeAttr *create(ASTContext &context, bool implicit,
                                SourceLoc atLoc, SourceRange baseRange,
-                               TypeRepr *baseType, DeclNameWithLoc original,
+                               TypeRepr *baseTypeRepr, DeclNameWithLoc original,
                                ArrayRef<ParsedAutoDiffParameter> params);
 
   static TransposeAttr *create(ASTContext &context, bool implicit,
                                SourceLoc atLoc, SourceRange baseRange,
-                               TypeRepr *baseType, DeclNameWithLoc original,
+                               TypeRepr *baseTypeRepr, DeclNameWithLoc original,
                                IndexSubset *indices);
 
-  TypeRepr *getBaseType() const { return BaseType; }
+  TypeRepr *getBaseTypeRepr() const { return BaseTypeRepr; }
   DeclNameWithLoc getOriginalFunctionName() const {
     return OriginalFunctionName;
   }

@@ -993,10 +993,13 @@ public:
       Optional<DeclNameWithLoc> &jvpSpec, Optional<DeclNameWithLoc> &vjpSpec,
       TrailingWhereClause *&whereClause);
 
-  /// Parse a differentiation parameters clause, i.e. the "wrt:" clause in
-  /// @differentiable and @derivative attributes.
+  /// Parse a differentiation parameters clause, i.e. the 'wrt:' clause in
+  /// `@differentiable` and `@derivative` attributes.
+  /// If `allowNamedParameters` is false, allow only index parameters and
+  /// 'self'.
   bool parseDifferentiationParametersClause(
-      SmallVectorImpl<ParsedAutoDiffParameter> &params, StringRef attrName);
+      SmallVectorImpl<ParsedAutoDiffParameter> &params, StringRef attrName,
+      bool allowNamedParameters = true);
 
   /// Parse the @derivative attribute.
   ParserResult<DerivativeAttr> parseDerivativeAttribute(SourceLoc AtLoc,
@@ -1006,11 +1009,6 @@ public:
   // TODO(TF-999): Remove the deprecated `@differentiating` attribute.
   ParserResult<DerivativeAttr> parseDifferentiatingAttribute(SourceLoc AtLoc,
                                                              SourceLoc Loc);
-
-  /// Parse a transposed parameters clause, i.e. the "wrt:" clause in @transpose
-  /// attributes.
-  bool parseTransposedParametersClause(
-      SmallVectorImpl<ParsedAutoDiffParameter> &params, StringRef attrName);
 
   /// Parse the @transpose attribute.
   ParserResult<TransposeAttr> parseTransposeAttribute(SourceLoc AtLoc,
@@ -1395,11 +1393,9 @@ public:
   bool canParseTypedPattern();
 
   // SWIFT_ENABLE_TENSORFLOW
-  /// Determines whether a type qualifier for a decl name can be parsed. e.g.:
-  ///   'Foo.f' -> true
-  ///   'Foo.Bar.f' -> true
-  ///   'f' -> false
-  bool canParseTypeQualifierForDeclName();
+  /// Returns true if a base type for a qualified declaration name can be
+  /// parsed.
+  bool canParseBaseTypeForQualifiedDeclName();
 
   //===--------------------------------------------------------------------===//
   // Expression Parsing
