@@ -1129,8 +1129,8 @@ ParserResult<DerivativeAttr> Parser::parseDerivativeAttribute(SourceLoc atLoc,
       original.Name = parseDeclNameRef(original.Loc,
           diag::attr_derivative_expected_original_name,
           DeclNameFlag::AllowZeroArgCompoundNames |
-          DeclNameFlag::AllowKeywords | DeclNameFlag::AllowOperators |
-          DeclNameFlag::UseSpecialNamesForDeinitAndSubscript);
+          DeclNameFlag::AllowKeywordsUsingSpecialNames |
+          DeclNameFlag::AllowOperators);
     }
     if (consumeIfTrailingComma())
       return makeParserError();
@@ -2061,8 +2061,8 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
         replacedFunction = parseDeclNameRef(loc,
             diag::attr_dynamic_replacement_expected_function,
             DeclNameFlag::AllowZeroArgCompoundNames |
-            DeclNameFlag::AllowKeywords | DeclNameFlag::AllowOperators |
-            DeclNameFlag::UseSpecialNamesForDeinitAndSubscript);
+            DeclNameFlag::AllowKeywordsUsingSpecialNames |
+            DeclNameFlag::AllowOperators);
       }
     }
 

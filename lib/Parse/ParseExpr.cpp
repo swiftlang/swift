@@ -2176,7 +2176,7 @@ DeclNameRef Parser::parseDeclNameRef(DeclNameLoc &loc,
     baseNameLoc = consumeToken();
   } else if (flags.contains(DeclNameFlag::AllowKeywords) && Tok.isKeyword()) {
     bool specialDeinitAndSubscript =
-        flags.contains(DeclNameFlag::UseSpecialNamesForDeinitAndSubscript);
+        flags.contains(DeclNameFlag::AllowKeywordsUsingSpecialNames);
 
     // Syntax highlighting should treat this token as an identifier and
     // not as a keyword.

@@ -1422,7 +1422,7 @@ public:
 
     /// If passed, 'deinit' and 'subscript' should be parsed as special names,
     /// not ordinary identifiers.
-    UseSpecialNamesForDeinitAndSubscript = AllowKeywords | 1 << 2,
+    AllowKeywordsUsingSpecialNames = AllowKeywords | 1 << 2,
 
     /// If passed, compound names with argument lists are allowed, unless they
     /// have empty argument lists.
