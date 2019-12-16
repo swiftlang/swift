@@ -608,13 +608,16 @@ bool Constraint::isExplicitConversion() const {
 
 Constraint *Constraint::create(ConstraintSystem &cs, ConstraintKind kind, 
                                Type first, Type second,
-                               ConstraintLocator *locator) {
+                               ConstraintLocator *locator,
+                               ArrayRef<TypeVariableType *> extraTypeVars) {
   // Collect type variables.
   SmallVector<TypeVariableType *, 4> typeVars;
   if (first->hasTypeVariable())
     first->getTypeVariables(typeVars);
   if (second && second->hasTypeVariable())
     second->getTypeVariables(typeVars);
+
+  typeVars.append(extraTypeVars.begin(), extraTypeVars.end());
   uniqueTypeVariables(typeVars);
 
   // Conformance constraints expect an existential on the right-hand side.

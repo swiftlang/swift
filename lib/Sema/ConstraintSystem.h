@@ -3481,10 +3481,15 @@ private:
       ConstraintLocatorBuilder locator);
 
   /// Attempt to simplify the given defaultable constraint.
-  SolutionKind simplifyDefaultableConstraint(ConstraintKind kind,
-                                             Type first, Type second,
+  SolutionKind simplifyDefaultableConstraint(Type first, Type second,
                                              TypeMatchOptions flags,
                                              ConstraintLocatorBuilder locator);
+
+  /// Attempt to simplify the given defaultable closure type constraint.
+  SolutionKind simplifyDefaultClosureTypeConstraint(
+      Type closureType, Type inferredType,
+      ArrayRef<TypeVariableType *> referencedOuterParameters,
+      TypeMatchOptions flags, ConstraintLocatorBuilder locator);
 
   /// Attempt to simplify a one-way constraint.
   SolutionKind simplifyOneWayConstraint(ConstraintKind kind,

@@ -6448,14 +6448,37 @@ ConstraintSystem::simplifyValueWitnessConstraint(
 }
 
 ConstraintSystem::SolutionKind ConstraintSystem::simplifyDefaultableConstraint(
-    ConstraintKind kind, Type first, Type second, TypeMatchOptions flags,
+    Type first, Type second, TypeMatchOptions flags,
     ConstraintLocatorBuilder locator) {
   first = getFixedTypeRecursive(first, flags, true);
 
   if (first->isTypeVariableOrMember()) {
     if (flags.contains(TMF_GenerateConstraints)) {
-      addUnsolvedConstraint(Constraint::create(*this, kind, first, second,
-                                               getConstraintLocator(locator)));
+      addUnsolvedConstraint(
+          Constraint::create(*this, ConstraintKind::Defaultable, first, second,
+                             getConstraintLocator(locator)));
+      return SolutionKind::Solved;
+    }
+
+    return SolutionKind::Unsolved;
+  }
+
+  // Otherwise, any type is fine.
+  return SolutionKind::Solved;
+}
+
+ConstraintSystem::SolutionKind
+ConstraintSystem::simplifyDefaultClosureTypeConstraint(
+    Type closureType, Type inferredType,
+    ArrayRef<TypeVariableType *> referencedOuterParameters,
+    TypeMatchOptions flags, ConstraintLocatorBuilder locator) {
+  closureType = getFixedTypeRecursive(closureType, flags, /*wantRValue=*/true);
+
+  if (closureType->isTypeVariableOrMember()) {
+    if (flags.contains(TMF_GenerateConstraints)) {
+      addUnsolvedConstraint(Constraint::create(
+          *this, ConstraintKind::DefaultClosureType, closureType, inferredType,
+          getConstraintLocator(locator), referencedOuterParameters));
       return SolutionKind::Solved;
     }
 
@@ -8857,9 +8880,7 @@ ConstraintSystem::addConstraintImpl(ConstraintKind kind, Type first,
     return simplifyOptionalObjectConstraint(first, second, subflags, locator);
 
   case ConstraintKind::Defaultable:
-  case ConstraintKind::DefaultClosureType:
-    return simplifyDefaultableConstraint(kind, first, second, subflags,
-                                         locator);
+    return simplifyDefaultableConstraint(first, second, subflags, locator);
 
   case ConstraintKind::FunctionInput:
   case ConstraintKind::FunctionResult:
@@ -8876,6 +8897,7 @@ ConstraintSystem::addConstraintImpl(ConstraintKind kind, Type first,
   case ConstraintKind::Disjunction:
   case ConstraintKind::KeyPath:
   case ConstraintKind::KeyPathApplication:
+  case ConstraintKind::DefaultClosureType:
     llvm_unreachable("Use the correct addConstraint()");
   }
 
@@ -9270,12 +9292,17 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
                                           constraint.getLocator());
 
   case ConstraintKind::Defaultable:
-  case ConstraintKind::DefaultClosureType:
-    return simplifyDefaultableConstraint(constraint.getKind(),
-                                         constraint.getFirstType(),
+    return simplifyDefaultableConstraint(constraint.getFirstType(),
                                          constraint.getSecondType(),
                                          TMF_GenerateConstraints,
                                          constraint.getLocator());
+
+  case ConstraintKind::DefaultClosureType:
+    return simplifyDefaultClosureTypeConstraint(constraint.getFirstType(),
+                                                constraint.getSecondType(),
+                                                constraint.getTypeVariables(),
+                                                TMF_GenerateConstraints,
+                                                constraint.getLocator());
 
   case ConstraintKind::FunctionInput:
   case ConstraintKind::FunctionResult:
