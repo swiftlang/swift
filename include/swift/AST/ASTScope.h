@@ -479,6 +479,10 @@ public:
   /// asked.
   virtual Optional<NullablePtr<DeclContext>> computeSelfDCForParent() const;
 
+  /// Returns the context that should be used when a nested scope (e.g. a
+  /// closure) captures self explicitly.
+  virtual NullablePtr<DeclContext> capturedSelfDC() const;
+
 protected:
   /// Find either locals or members (no scope has both)
   /// \param history The scopes visited since the start of lookup (including
@@ -1462,9 +1466,9 @@ public:
   /// Since explicit captures of \c self by closures enable the use of implicit
   /// \c self, we need to make sure that the appropriate \c self is used as the
   /// base decl for these uses (otherwise, the capture would be marked as
-  /// unused. \c ClosureParametersScope::computeSelfDCForParent() checks if we
-  /// have such a capture of self.
-  Optional<NullablePtr<DeclContext>> computeSelfDCForParent() const override;
+  /// unused. \c ClosureParametersScope::capturedSelfDC() checks if we have such
+  ///  a capture of self.
+  NullablePtr<DeclContext> capturedSelfDC() const override;
 
 protected:
   ASTScopeImpl *expandSpecifically(ScopeCreator &) override;
