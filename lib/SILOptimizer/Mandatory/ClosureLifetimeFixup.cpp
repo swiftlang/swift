@@ -458,6 +458,9 @@ static bool tryRewriteToPartialApplyStack(
     saveDeleteInst(convertOrPartialApply);
   saveDeleteInst(origPA);
 
+  // Only insert destroys for defined partial_apply arguments.
+  auto isDefined = [](SILValue arg) -> bool { return !isa<SILUndef>(arg); };
+
   // Insert destroys of arguments after the apply and the dealloc_stack.
   if (auto *apply = dyn_cast<ApplyInst>(singleApplyUser)) {
     auto insertPt = std::next(SILBasicBlock::iterator(apply));
@@ -466,12 +469,12 @@ static bool tryRewriteToPartialApplyStack(
       return true;
     SILBuilderWithScope b3(insertPt);
     b3.createDeallocStack(loc, newPA);
-    insertDestroyOfCapturedArguments(newPA, b3);
+    insertDestroyOfCapturedArguments(newPA, b3, isDefined);
   } else if (auto *tai = dyn_cast<TryApplyInst>(singleApplyUser)) {
     for (auto *succBB : tai->getSuccessorBlocks()) {
       SILBuilderWithScope b3(succBB->begin());
       b3.createDeallocStack(loc, newPA);
-      insertDestroyOfCapturedArguments(newPA, b3);
+      insertDestroyOfCapturedArguments(newPA, b3, isDefined);
     }
   } else {
     llvm_unreachable("Unknown FullApplySite instruction kind");
