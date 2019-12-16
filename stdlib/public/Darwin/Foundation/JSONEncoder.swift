@@ -270,7 +270,7 @@ open class JSONEncoder {
 
         let writingOptions = JSONSerialization.WritingOptions(rawValue: self.outputFormatting.rawValue)
         do {
-           return try JSONSerialization.data(withJSONObject: topLevel, options: writingOptions)
+           return try JSONSerialization.data(withJSONObject: topLevel, options: [writingOptions, .fragmentsAllowed])
         } catch {
             throw EncodingError.invalidValue(value, 
                                              EncodingError.Context(codingPath: [], debugDescription: "Unable to encode the given top-level value to JSON.", underlyingError: error))
@@ -1205,7 +1205,7 @@ open class JSONDecoder {
     open func decode<T : Decodable>(_ type: T.Type, from data: Data) throws -> T {
         let topLevel: Any
         do {
-           topLevel = try JSONSerialization.jsonObject(with: data)
+           topLevel = try JSONSerialization.jsonObject(with: data, options: [.fragmentsAllowed])
         } catch {
             throw DecodingError.dataCorrupted(DecodingError.Context(codingPath: [], debugDescription: "The given data was not valid JSON.", underlyingError: error))
         }
