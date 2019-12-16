@@ -820,4 +820,20 @@ ErrorBridgingTests.test("CFError-to-Error casts") {
   }
 }
 
+enum MyError: Error {
+  case someThing
+}
+
+ErrorBridgingTests.test("SR-9207 crash in failed cast to NSError") {
+
+  if #available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) {
+    let error = MyError.someThing
+    let foundationError = error as NSError
+
+    if let urlError = foundationError as? URLError {
+      expectUnreachable()
+    }
+  }
+}
+
 runAllTests()
