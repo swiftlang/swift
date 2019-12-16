@@ -158,13 +158,13 @@ extension P {
 }
 
 func cast<T : P>(_ t: T) {
-  let _: (T) -> (Bool) -> T? = id(T.iuoResult as (T) -> (Bool) -> T?)
-  let _: (Bool) -> T? = id(T.iuoResult(t) as (Bool) -> T?)
+  let _: (T) -> (Bool) -> T? = id(T.iuoResult as (T) -> (Bool) -> T?) // expected-warning {{redundant cast to '(T) -> (Bool) -> T?' has no effect}} {{47-69=}}
+  let _: (Bool) -> T? = id(T.iuoResult(t) as (Bool) -> T?) // expected-warning {{redundant cast to '(Bool) -> T?' has no effect}} {{43-58=}}
   let _: T! = id(T.iuoResult(t)(true))
-  let _: (Bool) -> T? = id(t.iuoResult as (Bool) -> T?)
+  let _: (Bool) -> T? = id(t.iuoResult as (Bool) -> T?) // expected-warning {{redundant cast to '(Bool) -> T?' has no effect}} {{40-55=}}
   let _: T! = id(t.iuoResult(true))
   let _: T = id(t.iuoResult(true))
-  let _: (Bool) -> T? = id(T.iuoResultStatic as (Bool) -> T?)
+  let _: (Bool) -> T? = id(T.iuoResultStatic as (Bool) -> T?) // expected-warning {{redundant cast to '(Bool) -> T?' has no effect}} {{46-61=}}
   let _: T! = id(T.iuoResultStatic(true))
 }
 

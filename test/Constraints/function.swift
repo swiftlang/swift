@@ -174,7 +174,7 @@ func testWeirdFnExprs<T>(_ fn: () -> Int, _ cond: Bool, _ any: Any, genericArg: 
   // expected-error@-1 {{passing non-escaping parameter 'fn' to function expecting an @escaping closure}}
 
   let wrapped = Wrapper<(@escaping () -> Int) -> Void>({ x in })
-  (wrapped[keyPath: \.value] as (@escaping () -> Int) -> Void)(fn)
+  (wrapped[keyPath: \.value] as (@escaping () -> Int) -> Void)(fn) // expected-warning {{redundant cast to '(@escaping () -> Int) -> Void' has no effect}} {{30-62=}}
   // expected-error@-1 {{passing non-escaping parameter 'fn' to function expecting an @escaping closure}}
 
   (cond ? returnsTakesEscapingFn() : returnsTakesEscapingFn())(fn)
