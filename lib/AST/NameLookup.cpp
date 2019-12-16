@@ -2010,7 +2010,9 @@ directReferencesForQualifiedTypeLookup(Evaluator &evaluator,
       auto innerOptions = options;
       innerOptions &= ~NL_RemoveOverridden;
       innerOptions &= ~NL_RemoveNonVisible;
-      dc->lookupQualified(module, name, innerOptions, members);
+      SmallVector<ValueDecl *, 4> moduleMembers;
+      dc->lookupQualified(module, name, innerOptions, moduleMembers);
+      members.append(moduleMembers.begin(), moduleMembers.end());
     }
 
     addResults(members);
