@@ -1949,7 +1949,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
     auto *typeVar = createTypeVariable(getConstraintLocator(argLoc),
                                        TVO_CanBindToNoEscape);
     params.emplace_back(typeVar);
-    assignFixedType(typeVar, input);
+    assignFixedType(typeVar, input, getConstraintLocator(argLoc));
   };
 
   {
@@ -2825,7 +2825,7 @@ ConstraintSystem::matchTypesBindTypeVar(
                : getTypeMatchFailure(locator);
   }
 
-  assignFixedType(typeVar, type);
+  assignFixedType(typeVar, type, getConstraintLocator(locator));
 
   return getTypeMatchSuccess();
 }
@@ -3424,7 +3424,8 @@ bool ConstraintSystem::repairFailures(
     });
   };
 
-  if (path.empty()) {
+  if (path.empty() ||
+      path.back().is<LocatorPathElt::ExplicitTypeCoercion>()) {
     if (!anchor)
       return false;
 
@@ -4465,9 +4466,16 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
   // let's defer it until later proper check.
   if (!(desugar1->is<DependentMemberType>() &&
         desugar2->is<DependentMemberType>())) {
-    // If the types are obviously equivalent, we're done.
-    if (desugar1->isEqual(desugar2) && !isa<InOutType>(desugar2)) {
-      return getTypeMatchSuccess();
+    if (desugar1->isEqual(desugar2)) {
+      if (kind == ConstraintKind::Conversion &&
+          !flags.contains(TMF_ApplyingFix)) {
+        if (RemoveUnnecessaryCoercion::attempt(*this, type1, type2,
+                                               getConstraintLocator(locator))) {
+          return getTypeMatchFailure(locator);
+        }
+      }
+      if (!isa<InOutType>(desugar2))
+        return getTypeMatchSuccess();
     }
   }
 
@@ -4554,9 +4562,10 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
         if (auto *iot = type1->getAs<InOutType>()) {
           if (!rep2->getImpl().canBindToLValue())
             return getTypeMatchFailure(locator);
-          assignFixedType(rep2, LValueType::get(iot->getObjectType()));
+          assignFixedType(rep2, LValueType::get(iot->getObjectType()),
+                          getConstraintLocator(locator));
         } else {
-          assignFixedType(rep2, type1);
+          assignFixedType(rep2, type1, getConstraintLocator(locator));
         }
         return getTypeMatchSuccess();
       } else if (typeVar1 && !typeVar2) {
@@ -4569,9 +4578,10 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
         if (auto *lvt = type2->getAs<LValueType>()) {
           if (!rep1->getImpl().canBindToInOut())
             return getTypeMatchFailure(locator);
-          assignFixedType(rep1, InOutType::get(lvt->getObjectType()));
+          assignFixedType(rep1, InOutType::get(lvt->getObjectType()),
+                          getConstraintLocator(locator));
         } else {
-          assignFixedType(rep1, type2);
+          assignFixedType(rep1, type2, getConstraintLocator(locator));
         }
         return getTypeMatchSuccess();
       } if (typeVar1 && typeVar2) {
@@ -4602,6 +4612,12 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
               type2->is<AnyFunctionType>())
             return matchTypesBindTypeVar(typeVar1, type2, kind, flags, locator,
                                          formUnsolvedResult);
+        }
+        if (!typeVar2) {
+          // If type1 is a type varaible and type2 type is a fixed type, 
+          // record this as the potential fixed type locator source.
+          recordTypeVariableBindingLocator(typeVar1,
+                                           getConstraintLocator(locator));
         }
       }
 
@@ -10112,6 +10128,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::SpecifyClosureParameterType:
   case FixKind::SpecifyClosureReturnType:
   case FixKind::AddQualifierToAccessTopLevelName:
+  case FixKind::RemoveUnnecessaryCoercion:
     llvm_unreachable("handled elsewhere");
   }
 
@@ -10497,11 +10514,20 @@ void ConstraintSystem::addExplicitConversionConstraint(
   SmallVector<Constraint *, 3> constraints;
 
   auto locatorPtr = getConstraintLocator(locator);
+  ConstraintLocator *coerceLocator = locatorPtr;
+
+  if (allowFixes && shouldAttemptFixes()) {
+    auto *anchor = locator.getAnchor();
+    if (isa<CoerceExpr>(anchor) && !anchor->isImplicit()) {
+      coerceLocator =
+          getConstraintLocator(anchor, LocatorPathElt::ExplicitTypeCoercion());
+    }
+  }
 
   // Coercion (the common case).
   Constraint *coerceConstraint =
     Constraint::create(*this, ConstraintKind::Conversion,
-                       fromType, toType, locatorPtr);
+                       fromType, toType, coerceLocator);
   coerceConstraint->setFavored();
   constraints.push_back(coerceConstraint);
 
