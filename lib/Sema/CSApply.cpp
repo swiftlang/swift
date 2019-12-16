@@ -4485,7 +4485,8 @@ namespace {
     }
 
     void buildKeyPathSubscriptComponent(
-        SelectedOverload &overload, SourceLoc componentLoc, Expr *indexExpr,
+        const SelectedOverload &overload,
+        SourceLoc componentLoc, Expr *indexExpr,
         ArrayRef<Identifier> labels, ConstraintLocator *locator,
         SmallVectorImpl<KeyPathExpr::Component> &components) {
       auto subscript = cast<SubscriptDecl>(overload.choice.getDecl());
