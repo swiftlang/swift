@@ -51,7 +51,7 @@ class Y<T> : X<[T]> {
 
 func testGenericInherit() {
   let yi : Y<Int>
-  _ = yi.f() as [Int] 
+  _ = yi.f() as [Int] // expected-warning {{redundant cast to '[Int]' has no effect}} {{14-23=}}
 }
 
 

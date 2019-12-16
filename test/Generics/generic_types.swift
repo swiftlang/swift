@@ -73,7 +73,7 @@ func getFirst<R : IteratorProtocol>(_ r: R) -> R.Element {
 }
 
 func testGetFirst(ir: Range<Int>) {
-  _ = getFirst(ir.makeIterator()) as Int
+  _ = getFirst(ir.makeIterator()) as Int // expected-warning {{redundant cast to 'Int' has no effect}} {{35-42=}}
 }
 
 struct XT<T> {
@@ -191,11 +191,11 @@ var xarray : XArray = [1, 2, 3]
 // Type parameters can be referenced only via unqualified name lookup
 struct XParam<T> { // expected-note{{'XParam' declared here}}
   func foo(_ x: T) {
-    _ = x as T
+    _ = x as T // expected-warning {{redundant cast to 'T' has no effect}} {{11-16=}}
   }
 
   static func bar(_ x: T) {
-    _ = x as T
+    _ = x as T // expected-warning {{redundant cast to 'T' has no effect}} {{11-16=}}
   }
 }
 

@@ -6,7 +6,8 @@ import CoreServices
 
 func testFSEventStreamRef(stream: FSEventStreamRef) {
   // FIXME: These should be distinct types, constructible from one another.
-  _ = stream as ConstFSEventStreamRef // works by coincidence because both are currently OpaquePointer
+  // works by coincidence because both are currently OpaquePointer 
+  _ = stream as ConstFSEventStreamRef // expected-warning {{redundant cast from 'FSEventStreamRef' (aka 'OpaquePointer') to 'ConstFSEventStreamRef' (aka 'OpaquePointer') has no effect}} {{14-39=}}
   _ = ConstFSEventStreamRef(stream) // expected-error {{no exact matches in call to initializer}}
 
   // This is not a CF object.

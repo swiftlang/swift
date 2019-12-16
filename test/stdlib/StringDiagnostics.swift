@@ -27,7 +27,7 @@ func testNonAmbiguousStringComparisons() {
   let s2 = "b"
   var x = false // expected-warning {{variable 'x' was written to, but never read}}
   x = s1 > s2
-  x = s1 as String > s2
+  x = s1 as String > s2 // expected-warning {{redundant cast to 'String' has no effect}} {{10-20=}}
 }
 
 func testAmbiguousStringComparisons(s: String) {
