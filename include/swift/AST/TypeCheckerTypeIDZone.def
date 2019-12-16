@@ -216,6 +216,3 @@ SWIFT_REQUEST(TypeChecker, TypeWitnessRequest,
 SWIFT_REQUEST(TypeChecker, ValueWitnessRequest,
               Witness(NormalProtocolConformance *, ValueDecl *),
               SeparatelyCached, NoLocationInfo)
-SWIFT_REQUEST(TypeChecker, AutoclosureStructureRequest,
-              AutoclosureStructureRequest(AttributedTypeRepr *,
-              TypeResolverContext, TypeResolverContext), Cached, NoLocationInfo)

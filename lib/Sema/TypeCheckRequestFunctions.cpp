@@ -232,35 +232,6 @@ FunctionBuilderTypeRequest::evaluate(Evaluator &evaluator,
   return type->mapTypeOutOfContext();
 }
 
-llvm::Expected<AutoclosureStructureResult>
-AutoclosureStructureRequest::evaluate(Evaluator &evaluator,
-                                      AttributedTypeRepr *repr,
-                                      TypeResolverContext base,
-                                      TypeResolverContext current) const {
-  auto attrs = repr->getAttrs();
-  assert(attrs.has(TAK_autoclosure));
-
-  if (attrs.hasConvention()) {
-    if (attrs.getConventionName() == "c") {
-      return AutoclosureStructureResult::CombinedWithConventionC;
-    }
-    if (attrs.getConventionName() == "block") {
-      return AutoclosureStructureResult::CombinedWithConventionBlock;
-    }
-  }
-
-  if (current == TypeResolverContext::VariadicFunctionInput &&
-      base != TypeResolverContext::EnumElementDecl) {
-    return AutoclosureStructureResult::OnVariadicParameter;
-  }
-
-  if (current != TypeResolverContext::FunctionInput) {
-    return AutoclosureStructureResult::NotOnParameter;
-  }
-
-  return AutoclosureStructureResult::Valid;
-}
-
 // Define request evaluation functions for each of the type checker requests.
 static AbstractRequestFunction *typeCheckerRequestFunctions[] = {
 #define SWIFT_REQUEST(Zone, Name, Sig, Caching, LocOptions)                    \

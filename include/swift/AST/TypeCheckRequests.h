@@ -48,8 +48,6 @@ struct TypeWitnessAndDecl;
 class ValueDecl;
 enum class OpaqueReadOwnership: uint8_t;
 class StorageImplInfo;
-class AttributedTypeRepr;
-enum class TypeResolverContext : uint8_t;
 
 /// Display a nominal type or extension thereof.
 void simple_display(
@@ -2016,8 +2014,6 @@ void simple_display(llvm::raw_ostream &out, Type value);
 void simple_display(llvm::raw_ostream &out, const TypeRepr *TyR);
 void simple_display(llvm::raw_ostream &out, ImplicitMemberAction action);
 void simple_display(llvm::raw_ostream &out, FunctionBuilderClosurePreCheck pck);
-void simple_display(llvm::raw_ostream &out, TypeResolverContext context);
-void simple_display(llvm::raw_ostream &out, AutoclosureStructureResult result);
 
 #define SWIFT_TYPEID_ZONE TypeChecker
 #define SWIFT_TYPEID_HEADER "swift/AST/TypeCheckerTypeIDZone.def"
