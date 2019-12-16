@@ -3318,7 +3318,6 @@ END_CAN_TYPE_WRAPPER(FunctionType, AnyFunctionType)
 /// has a default argument.
 struct ParameterListInfo {
   SmallBitVector defaultArguments;
-  std::vector<Type> functionBuilderTypes;
 
 public:
   ParameterListInfo() { }
@@ -3336,9 +3335,6 @@ public:
 
   /// Retrieve the number of parameters for which we have information.
   unsigned size() const { return defaultArguments.size(); }
-
-  /// Retrieve the function builder type for the given parameter.
-  Type getFunctionBuilderType(unsigned paramIdx) const;
 };
 
 /// Turn a param list into a symbolic and printable representation that does not
