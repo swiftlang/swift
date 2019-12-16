@@ -5598,6 +5598,19 @@ bool ExtraneousCallFailure::diagnoseAsError() {
     }
   }
 
+  if (auto *UDE = dyn_cast<UnresolvedDotExpr>(anchor)) {
+    auto *baseExpr = UDE->getBase();
+    auto *call = cast<CallExpr>(getRawAnchor());
+
+    if (getType(baseExpr)->isAnyObject()) {
+      emitDiagnostic(anchor->getLoc(), diag::cannot_call_with_params,
+                     UDE->getName().getBaseName().userFacingName(),
+                     getType(call->getArg())->getString(),
+                     isa<TypeExpr>(baseExpr));
+      return true;
+    }
+  }
+
   auto diagnostic = emitDiagnostic(
       anchor->getLoc(), diag::cannot_call_non_function_value, getType(anchor));
   removeParensFixIt(diagnostic);

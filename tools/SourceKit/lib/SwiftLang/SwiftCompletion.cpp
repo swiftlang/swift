@@ -100,7 +100,6 @@ struct SwiftCodeCompletionConsumer
 
   void handleResults(MutableArrayRef<CodeCompletionResult *> Results) override {
     assert(swiftContext.swiftASTContext);
-    CodeCompletionContext::sortCompletionResults(Results);
     handleResultsImpl(Results, swiftContext);
   }
 };

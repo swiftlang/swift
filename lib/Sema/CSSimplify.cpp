@@ -7427,6 +7427,26 @@ ConstraintSystem::simplifyApplicableFnConstraint(
       // Track how many times we do this so that we can record a fix for each.
       ++unwrapCount;
     }
+
+    // Let's account for optional members concept from Objective-C
+    // which forms a disjunction for member type to check whether
+    // it would be possible to use optional type directly or it has
+    // to be force unwrapped (because such types are imported as IUO).
+    if (unwrapCount > 0 && desugar2->is<TypeVariableType>()) {
+      auto *typeVar = desugar2->castTo<TypeVariableType>();
+      auto *locator = typeVar->getImpl().getLocator();
+      if (locator->isLastElement<LocatorPathElt::Member>()) {
+        auto *fix = ForceOptional::create(*this, origType2, desugar2,
+                                          getConstraintLocator(locator));
+        if (recordFix(fix, /*impact=*/unwrapCount))
+          return SolutionKind::Error;
+
+        // Since the right-hand side of the constraint has been changed
+        // we have to re-generate this constraint to use new type.
+        flags |= TMF_GenerateConstraints;
+        return formUnsolved();
+      }
+    }
   }
 
   // For a function, bind the output and convert the argument to the input.
@@ -7499,11 +7519,6 @@ ConstraintSystem::simplifyApplicableFnConstraint(
     if (desugar2->is<TypeVariableType>() || desugar2->is<FunctionType>() ||
         desugar2->is<AnyMetatypeType>())
       return SolutionKind::Error;
-
-    if (auto objectTy = desugar2->lookThroughAllOptionalTypes()) {
-      if (objectTy->isAny() || objectTy->isAnyObject())
-        return SolutionKind::Error;
-    }
 
     // If there are any type variables associated with arguments/result
     // they have to be marked as "holes".
