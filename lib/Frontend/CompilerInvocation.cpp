@@ -381,6 +381,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   Opts.DiagnosticsEditorMode |= Args.hasArg(OPT_diagnostics_editor_mode,
                                             OPT_serialize_diagnostics_path);
+  
+  Opts.DisableRedundantCoercionWarning |=
+    Args.hasArg(OPT_disable_redundant_coercion_warning);
 
   Opts.EnableExperimentalStaticAssert |=
     Args.hasArg(OPT_enable_experimental_static_assert);

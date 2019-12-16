@@ -667,7 +667,7 @@ def prebuilt_module_cache_path_EQ :
   Alias<prebuilt_module_cache_path>;
 
 def force_public_linkage : Flag<["-"], "force-public-linkage">,
-   HelpText<"Force public linkage for private symbols. Used by LLDB.">;
+  HelpText<"Force public linkage for private symbols. Used by LLDB.">;
 
 def dump_api_path : Separate<["-"], "dump-api-path">,
   HelpText<"The path to output swift interface files for the compiled source files">;
@@ -676,14 +676,17 @@ def group_info_path : Separate<["-"], "group-info-path">,
   HelpText<"The path to collect the group information of the compiled module">;
 
 def diagnostics_editor_mode : Flag<["-"], "diagnostics-editor-mode">,
-HelpText<"Diagnostics will be used in editor">;
+  HelpText<"Diagnostics will be used in editor">;
+
+def disable_redundant_coercion_warning : Flag<["-"], "disable-redundant-coercion-warning">,
+  HelpText<"Disable redundant coercion warning diagnostic">;
 
 def validate_tbd_against_ir_EQ: Joined<["-"], "validate-tbd-against-ir=">,
-    HelpText<"Compare the symbols in the IR against the TBD file that would be generated.">,
-    MetaVarName<"<level>">;
+  HelpText<"Compare the symbols in the IR against the TBD file that would be generated.">,
+  MetaVarName<"<level>">;
 
 def bypass_batch_mode_checks: Flag<["-"], "bypass-batch-mode-checks">,
-    HelpText<"Bypass checks for batch-mode errors.">;
+  HelpText<"Bypass checks for batch-mode errors.">;
 
 def enable_verify_exclusivity : Flag<["-"], "enable-verify-exclusivity">,
   HelpText<"Enable verification of access markers used to enforce exclusivity.">;

@@ -303,6 +303,10 @@ namespace swift {
     /// If set to true, the diagnosis engine can assume the emitted diagnostics
     /// will be used in editor. This usually leads to more aggressive fixit.
     bool DiagnosticsEditorMode = false;
+    
+    /// If set to true, disable redundant coercions e.g. Double(1) as Double
+    /// warning diagnostics.
+    bool DisableRedundantCoercionWarning = false;
 
     /// Whether to enable Swift 3 @objc inference, e.g., for members of
     /// Objective-C-derived classes and 'dynamic' members.
