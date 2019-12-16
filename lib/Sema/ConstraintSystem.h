@@ -2731,10 +2731,12 @@ public:
   /// closure expression.
   /// \param contextualType The contextual type this closure would be
   /// converted to.
+  /// \param locator The locator associated with contextual type.
   ///
   /// \returns `true` if it was possible to generate constraints for
   /// the body and assign fixed type to the closure, `false` otherwise.
-  bool resolveClosure(TypeVariableType *typeVar, Type contextualType);
+  bool resolveClosure(TypeVariableType *typeVar, Type contextualType,
+                      ConstraintLocatorBuilder locator);
 
   /// Assign a fixed type to the given type variable.
   ///

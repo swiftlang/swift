@@ -1094,22 +1094,6 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
         }
       }
 
-      // If the parameter has a function builder type and the argument is a
-      // closure, apply the function builder transformation.
-      if (Type functionBuilderType
-              = paramInfo.getFunctionBuilderType(paramIdx)) {
-        Expr *arg = getArgumentExpr(locator.getAnchor(), argIdx);
-        if (auto closure = dyn_cast_or_null<ClosureExpr>(arg)) {
-          auto closureType = cs.getType(closure);
-          auto result = cs.matchFunctionBuilder(
-              closure, functionBuilderType,
-              closureType->castTo<FunctionType>()->getResult(),
-              ConstraintKind::Conversion, calleeLocator, loc);
-          if (result.isFailure())
-            return result;
-        }
-      }
-
       // If argument comes for declaration it should loose
       // `@autoclosure` flag, because in context it's used
       // as a function type represented by autoclosure.
@@ -6516,10 +6500,27 @@ ConstraintSystem::simplifyOneWayConstraint(
                     locator);
 }
 
+static Type getFunctionBuilderTypeFor(ConstraintSystem &cs, unsigned paramIdx,
+                                      ConstraintLocator *calleeLocator) {
+  auto selectedOverload = cs.findSelectedOverloadFor(calleeLocator);
+  if (!(selectedOverload &&
+        selectedOverload->choice.getKind() == OverloadChoiceKind::Decl))
+    return Type();
+
+  auto *choice = selectedOverload->choice.getDecl();
+
+  if (!choice->hasParameterList())
+    return Type();
+
+  auto *PD = getParameterAt(choice, paramIdx);
+  return PD->getFunctionBuilderType();
+}
+
 bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
-                                      Type contextualType) {
-  auto *locator = typeVar->getImpl().getLocator();
-  auto *closure = cast<ClosureExpr>(simplifyLocatorToAnchor(locator));
+                                      Type contextualType,
+                                      ConstraintLocatorBuilder locator) {
+  auto *closureLocator = typeVar->getImpl().getLocator();
+  auto *closure = cast<ClosureExpr>(closureLocator->getAnchor());
 
   auto *closureType = getClosureType(closure);
 
@@ -6546,7 +6547,20 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
     setType(param, internalType);
   }
 
-  assignFixedType(typeVar, closureType, locator);
+  assignFixedType(typeVar, closureType, closureLocator);
+
+  if (auto last = locator.last()) {
+    if (auto argToParam = last->getAs<LocatorPathElt::ApplyArgToParam>()) {
+      auto *calleeLocator = getCalleeLocator(getConstraintLocator(locator));
+      if (auto functionBuilderType = getFunctionBuilderTypeFor(
+              *this, argToParam->getParamIdx(), calleeLocator)) {
+        auto result = matchFunctionBuilder(
+            closure, functionBuilderType, closureType->getResult(),
+            ConstraintKind::Conversion, calleeLocator, locator);
+        return result.isSuccess();
+      }
+    }
+  }
 
   // If this is a multi-statement closure its body doesn't participate
   // in type-checking.
@@ -6560,7 +6574,7 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
     addConstraint(
         ConstraintKind::Conversion, getType(closureBody),
         closureType->getResult(),
-        getConstraintLocator(locator, ConstraintLocator::ClosureResult));
+        getConstraintLocator(closure, ConstraintLocator::ClosureResult));
   }
 
   return true;

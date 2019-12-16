@@ -615,13 +615,6 @@ ConstraintSystem::TypeMatchResult ConstraintSystem::matchFunctionBuilder(
   assert(builder && "Bad function builder type");
   assert(builder->getAttrs().hasAttribute<FunctionBuilderAttr>());
 
-  // FIXME: Right now, single-expression closures suppress the function
-  // builder translation.
-  if (auto closure = fn.getAbstractClosureExpr()) {
-    if (closure->hasSingleExpressionBody())
-      return getTypeMatchSuccess();
-  }
-
   // Pre-check the body: pre-check any expressions in it and look
   // for return statements.
   auto request = PreCheckFunctionBuilderRequest{fn};
