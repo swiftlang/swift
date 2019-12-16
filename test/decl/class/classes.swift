@@ -43,8 +43,8 @@ extension A {
 }
 func f() {
   let x = B()
-  _ = x.f() as ()
-  _ = x[10] as Int
+  _ = x.f() as () // expected-warning {{redundant cast to '()' has no effect}} {{13-19=}}
+  _ = x[10] as Int // expected-warning {{redundant cast to 'Int' has no effect}} {{13-20=}}
 }
 
 class C<T> {

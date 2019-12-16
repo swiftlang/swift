@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -module-name ModuleName
+// RUN: %target-typecheck-verify-swift -module-name ModuleName -disable-redundant-coercion-warning
 
 protocol ClassProtocol : class {
   init()
