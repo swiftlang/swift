@@ -3862,6 +3862,13 @@ template <> OpaqueValue *Metadata::allocateBoxForExistentialIn(ValueBuffer *buff
   return refAndValueAddr.buffer;
 }
 
+template <> void Metadata::deallocateBoxForExistentialIn(ValueBuffer *buffer) const {
+  auto *vwt = getValueWitnesses();
+  if (vwt->isValueInline())
+    return;
+  swift_deallocBox(reinterpret_cast<HeapObject *>(buffer->PrivateData[0]));
+}
+
 template <> OpaqueValue *Metadata::allocateBufferIn(ValueBuffer *buffer) const {
   auto *vwt = getValueWitnesses();
   if (vwt->isValueInline())
