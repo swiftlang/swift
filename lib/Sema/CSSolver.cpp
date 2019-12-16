@@ -90,7 +90,8 @@ Solution ConstraintSystem::finalize() {
       break;
         
     case FreeTypeVariableBinding::UnresolvedType:
-      assignFixedType(tv, ctx.TheUnresolvedType);
+      assignFixedType(tv, ctx.TheUnresolvedType,
+                      tv->getImpl().getLocator());
       break;
     }
   }
@@ -204,8 +205,11 @@ void ConstraintSystem::applySolution(const Solution &solution) {
 
     // If we don't already have a fixed type for this type variable,
     // assign the fixed type from the solution.
-    if (!getFixedType(binding.first) && !binding.second->hasTypeVariable())
-      assignFixedType(binding.first, binding.second, /*updateState=*/false);
+    if (!getFixedType(binding.first) && !binding.second->hasTypeVariable()) {
+      auto typeVar = binding.first;
+      assignFixedType(typeVar, binding.second, typeVar->getImpl().getLocator(),
+                      /*updateState=*/false);
+    }
   }
 
   // Register overload choices.
@@ -493,8 +497,11 @@ ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
 
 ConstraintSystem::SolverScope::~SolverScope() {
   // Erase the end of various lists.
-  while (cs.TypeVariables.size() > numTypeVariables)
-    cs.TypeVariables.pop_back();
+  while (cs.TypeVariables.size() > numTypeVariables) {
+    auto typeVariable = cs.TypeVariables.pop_back_val();
+    // Clear type variable source binding recorded in the current scope.
+    cs.TypeVariableBindings.erase(typeVariable);
+  }
 
   truncate(cs.ResolvedOverloads, numResolvedOverloads);
 
