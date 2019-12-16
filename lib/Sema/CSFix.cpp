@@ -1136,6 +1136,83 @@ IgnoreContextualType *IgnoreContextualType::create(ConstraintSystem &cs,
       IgnoreContextualType(cs, resultTy, specifiedTy, locator);
 }
 
+bool RemoveUnnecessaryCoercion::diagnose(bool asNote) const {
+  auto &cs = getConstraintSystem();
+  UnnecessaryCoercionFailure failure(cs, getFromType(), getToType(),
+                                     getLocator());
+  return failure.diagnose(asNote);
+}
+
+bool RemoveUnnecessaryCoercion::attempt(ConstraintSystem &cs, Type fromType,
+                                        Type toType,
+                                        ConstraintLocatorBuilder locator) {
+  auto &ctx = cs.getASTContext();
+  if (ctx.LangOpts.DisableRedundantCoercionWarning)
+    return false;
+  
+  auto last = locator.last();
+  bool isExplicitCoercion =
+      last && last->is<LocatorPathElt::ExplicitTypeCoercion>();
+  if (!isExplicitCoercion)
+    return false;
+
+  auto expr = cast<CoerceExpr>(locator.getAnchor());
+  
+  // Check to ensure the from and to types are equal the cast type.
+  // This is required to handle cases where the conversion is done
+  // using compiler intrinsics e.g. _HasCustomAnyHashableRepresentation
+  // to AnyHashable where if we coerce a generic type that conforms to
+  // this protocol to AnyHashable we match equal types here, but the
+  // explicit coercion is still required.
+  auto castType = cs.getType(expr->getCastTypeLoc());
+  if (!fromType->isEqual(castType) && !castType->hasTypeVariable())
+    return false;
+
+  // Fixed type was already applied to the subEpxr.
+  if (expr->getSubExpr()->getType())
+    return false;
+  
+  auto toTypeRepr = expr->getCastTypeLoc().getTypeRepr();
+  
+  // Don't emit this diagnostic for Implicitly unwrapped optional types
+  // e.g. i as Int!
+  if (isa<ImplicitlyUnwrappedOptionalTypeRepr>(toTypeRepr))
+    return false;
+  
+  // If we are dealing with an OverloadedDeclRefExpr the coercion
+  // is probably being used to match a specific overload function type.
+  bool hasOverloadedDeclRefSubExpr = false;
+  expr->forEachChildExpr([&](Expr *childExpr) -> Expr *{
+    if (isa<OverloadedDeclRefExpr>(childExpr)) {
+      hasOverloadedDeclRefSubExpr = true;
+      return nullptr;
+    }
+    return childExpr;
+  });
+  
+  if (hasOverloadedDeclRefSubExpr)
+    return false;
+  
+  auto coercedType = cs.getType(expr->getSubExpr());
+  if (auto *typeVariable = coercedType->getAs<TypeVariableType>()) {
+    // Only diagnose if we have all type variables resolved in the system.
+    if (cs.hasFreeTypeVariables())
+      return false;
+    
+    if (auto *typeSourceLocator = cs.getTypeVariableBindingLocator(typeVariable)) {
+      // If the type variable binding source locator is the same the
+      // contextual type equality is coming from this coercion.
+      if (typeSourceLocator == cs.getConstraintLocator(locator))
+        return false;
+    }
+  }
+
+  auto *fix = new (cs.getAllocator()) RemoveUnnecessaryCoercion(
+      cs, fromType, toType, cs.getConstraintLocator(locator));
+
+  return cs.recordFix(fix);
+}
+
 bool IgnoreAssignmentDestinationType::diagnose(const Solution &solution,
                                                bool asNote) const {
   auto &cs = getConstraintSystem();

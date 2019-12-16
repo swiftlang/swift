@@ -1791,6 +1791,27 @@ public:
   void tryDropArrayBracketsFixIt(const Expr *anchor) const;
 };
 
+/// Diagnose a situation where there is an explicit type coercion
+/// to the same type e.g.:
+///
+/// ```swift
+/// Double(1) as Double // redundant cast to 'Double' has no effect
+/// 1 as Double as Double // redundant cast to 'Double' has no effect
+/// let string = "String"
+/// let s = string as String // redundant cast to 'String' has no effect
+/// ```
+class UnnecessaryCoercionFailure final
+    : public ContextualFailure {
+      
+public:
+  UnnecessaryCoercionFailure(ConstraintSystem &cs,
+                             Type fromType, Type toType,
+                             ConstraintLocator *locator)
+      : ContextualFailure(cs, fromType, toType, locator) {}
+  
+  bool diagnoseAsError() override;
+};
+
 /// Diagnose a situation there is a mismatch between argument and parameter
 /// types e.g.:
 ///

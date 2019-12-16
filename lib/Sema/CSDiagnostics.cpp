@@ -5540,6 +5540,35 @@ bool ThrowingFunctionConversionFailure::diagnoseAsError() {
   return true;
 }
 
+bool UnnecessaryCoercionFailure::diagnoseAsError() {
+  auto expr = cast<CoerceExpr>(getAnchor());
+  auto sourceRange =
+      SourceRange(expr->getLoc(), expr->getCastTypeLoc().getSourceRange().End);
+  auto castType = expr->getCastTypeLoc().getType();
+  
+  if (isa<TypeAliasType>(getFromType().getPointer()) &&
+      isa<TypeAliasType>(getToType().getPointer())) {
+    auto fromTypeAlias = cast<TypeAliasType>(getFromType().getPointer());
+    auto toTypeAlias = cast<TypeAliasType>(getToType().getPointer());
+    // If the typealias are different, we need a warning mentioning both types.
+    if (fromTypeAlias->getDecl() != toTypeAlias->getDecl()) {
+      emitDiagnostic(expr->getLoc(),
+                     diag::unnecessary_same_typealias_type_coercion,
+                     getFromType(), castType)
+          .fixItRemove(sourceRange);
+    } else {
+      emitDiagnostic(expr->getLoc(), diag::unnecessary_same_type_coercion,
+                     castType)
+          .fixItRemove(sourceRange);
+    }
+  } else {
+    emitDiagnostic(expr->getLoc(), diag::unnecessary_same_type_coercion,
+                   castType)
+        .fixItRemove(sourceRange);
+  }
+  return true;
+}
+
 bool InOutConversionFailure::diagnoseAsError() {
   auto *locator = getLocator();
   auto path = locator->getPath();
