@@ -344,7 +344,7 @@ extension Collection {
   }
   @available(swift, deprecated: 4.0, obsoleted: 5.0, message: "all index distances are now of type Int")
   public func distance<T: BinaryInteger>(from start: Index, to end: Index) -> T {
-    return numericCast(distance(from: start, to: end) as Int)
+    return numericCast(distance(from: start, to: end))
   }
 }
 
