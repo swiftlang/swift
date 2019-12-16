@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-silgen -parse-as-library -verify %s
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-sil -O -parse-as-library -DEMIT_SIL %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-silgen -parse-as-library -disable-redundant-coercion-warning -verify %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-sil -O -parse-as-library -disable-redundant-coercion-warning -DEMIT_SIL %s
 
 // REQUIRES: objc_interop
 

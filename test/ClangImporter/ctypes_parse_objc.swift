@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift %clang-importer-sdk -enable-objc-interop
+// RUN: %target-typecheck-verify-swift %clang-importer-sdk -enable-objc-interop -disable-redundant-coercion-warning
 
 import ctypes
 import CoreGraphics

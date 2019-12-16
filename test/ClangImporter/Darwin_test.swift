@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift %clang-importer-sdk
+// RUN: %target-typecheck-verify-swift %clang-importer-sdk -disable-redundant-coercion-warning
 
 // REQUIRES: objc_interop
 

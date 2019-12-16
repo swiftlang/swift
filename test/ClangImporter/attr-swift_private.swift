@@ -1,8 +1,8 @@
 // RUN: %empty-directory(%t)
 // RUN: %build-clang-importer-objc-overlays
 
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -I %S/Inputs/custom-modules -typecheck %s -verify
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -I %S/Inputs/custom-modules -emit-ir %s -D IRGEN | %FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -I %S/Inputs/custom-modules -typecheck %s -verify -disable-redundant-coercion-warning
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -I %S/Inputs/custom-modules -emit-ir -disable-redundant-coercion-warning %s -D IRGEN | %FileCheck %s
 
 // RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk-nosource -I %t) -I %S/Inputs/custom-modules -print-module -source-filename="%s" -module-to-print SwiftPrivateAttr > %t.txt
 // RUN: %FileCheck -check-prefix=GENERATED-NEGATIVE %s < %t.txt

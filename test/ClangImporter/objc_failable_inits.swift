@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck %s -verify
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -disable-redundant-coercion-warning -typecheck %s -verify
 
 // REQUIRES: objc_interop
 
