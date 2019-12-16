@@ -391,10 +391,10 @@ bb0(%0 : $Int):
   return %10 : $()                                // id: %11
 }
 
-// CHECK-LABEL: sil shared [ossa] @$s6struct8useStack1tySi_tFSiycfU_Tf0s_n
-// CHECK-LABEL: sil private [ossa] @$s6struct8useStack1tySi_tFSiycfU_
+// CHECK-LABEL: sil shared [transparent] [ossa] @$s6struct8useStack1tySi_tFSiycfU_Tf0s_n
+// CHECK-LABEL: sil private [transparent] [ossa] @$s6struct8useStack1tySi_tFSiycfU_
 // struct.(useStack (t : Swift.Int) -> ()).(closure #1)
-sil private [ossa] @$s6struct8useStack1tySi_tFSiycfU_ : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Int>) -> Int {
+sil private [transparent] [ossa] @$s6struct8useStack1tySi_tFSiycfU_ : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Int>) -> Int {
 bb0(%0 : @owned $<τ_0_0> { var τ_0_0 } <Int>):
   %1 = project_box %0 : $<τ_0_0> { var τ_0_0 } <Int>, 0
   // function_ref Swift.++ @postfix <A : Swift._Incrementable>(x : @inout A) -> A
