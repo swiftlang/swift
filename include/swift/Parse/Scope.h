@@ -47,7 +47,7 @@ private:
   unsigned ResolvableDepth = 0;
 
 public:
-  ValueDecl *lookupValueName(DeclName Name);
+  ValueDecl *lookupValueName(DeclNameRef Name);
 
   Scope *getCurrentScope() const { return CurScope; }
 
@@ -159,7 +159,7 @@ public:
   }
 };
 
-inline ValueDecl *ScopeInfo::lookupValueName(DeclName Name) {
+inline ValueDecl *ScopeInfo::lookupValueName(DeclNameRef Name) {
   // FIXME: this check can go away when SIL parser parses everything in
   // a toplevel scope.
   if (!CurScope)
@@ -169,7 +169,8 @@ inline ValueDecl *ScopeInfo::lookupValueName(DeclName Name) {
   // If we found nothing, or we found a decl at the top-level, return nothing.
   // We ignore results at the top-level because we may have overloading that
   // will be resolved properly by name binding.
-  std::pair<unsigned, ValueDecl *> Res = HT.lookup(CurScope->HTScope, Name);
+  std::pair<unsigned, ValueDecl *> Res = HT.lookup(CurScope->HTScope,
+                                                   Name.getFullName());
   if (Res.first < ResolvableDepth)
     return 0;
   return Res.second;

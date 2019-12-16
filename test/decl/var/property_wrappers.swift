@@ -216,7 +216,11 @@ struct BadCombinations {
 }
 
 struct MultipleWrappers {
-  @Wrapper(stored: 17)
+  // FIXME: The diagnostics here aren't great. The problem is that we're
+  // attempting to splice a 'wrappedValue:' argument into the call to Wrapper's
+  // init, but it doesn't have a matching init. We're then attempting to access
+  // the nested 'wrappedValue', but Wrapper's 'wrappedValue' is Int.
+  @Wrapper(stored: 17) // expected-error{{value of type 'Int' has no member 'wrappedValue'}}
   @WrapperWithInitialValue // expected-error{{extra argument 'wrappedValue' in call}}
   var x: Int = 17
 

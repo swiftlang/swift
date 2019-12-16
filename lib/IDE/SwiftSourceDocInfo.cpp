@@ -764,18 +764,21 @@ void swift::ide::getLocationInfo(const ValueDecl *VD,
   auto ClangNode = VD->getClangNode();
 
   if (VD->getLoc().isValid()) {
-    unsigned NameLen;
-    if (auto FD = dyn_cast<AbstractFunctionDecl>(VD)) {
-      SourceRange R = FD->getSignatureSourceRange();
-      if (R.isInvalid())
-        return;
-      NameLen = getCharLength(SM, R);
-    } else {
-      if (VD->hasName()) {
-        NameLen = VD->getBaseName().userFacingName().size();
-      } else {
-        NameLen = getCharLength(SM, VD->getLoc());
+    auto getSignatureRange = [&](const ValueDecl *VD) -> Optional<unsigned> {
+      if (auto FD = dyn_cast<AbstractFunctionDecl>(VD)) {
+        SourceRange R = FD->getSignatureSourceRange();
+        if (R.isValid())
+          return getCharLength(SM, R);
       }
+      return None;
+    };
+    unsigned NameLen;
+    if (auto SigLen = getSignatureRange(VD)) {
+      NameLen = SigLen.getValue();
+    } else if (VD->hasName()) {
+      NameLen = VD->getBaseName().userFacingName().size();
+    } else {
+      NameLen = getCharLength(SM, VD->getLoc());
     }
 
     unsigned DeclBufID = SM.findBufferContainingLoc(VD->getLoc());

@@ -1065,6 +1065,7 @@ static uint8_t getRawStableDefaultArgumentKind(swift::DefaultArgumentKind kind) 
   CASE(Inherited)
   CASE(Column)
   CASE(File)
+  CASE(FilePath)
   CASE(Line)
   CASE(Function)
   CASE(DSOHandle)
@@ -1996,6 +1997,18 @@ static uint8_t getRawStableVarDeclIntroducer(swift::VarDecl::Introducer intr) {
   llvm_unreachable("bad variable decl introducer kind");
 }
 
+/// Translate from the AST derivative function kind enum to the Serialization
+/// enum values, which are guaranteed to be stable.
+static uint8_t getRawStableAutoDiffDerivativeFunctionKind(
+    swift::AutoDiffDerivativeFunctionKind kind) {
+  switch (kind) {
+  case swift::AutoDiffDerivativeFunctionKind::JVP:
+    return uint8_t(serialization::AutoDiffDerivativeFunctionKind::JVP);  case swift::AutoDiffDerivativeFunctionKind::VJP:
+    return uint8_t(serialization::AutoDiffDerivativeFunctionKind::VJP);
+  }
+  llvm_unreachable("bad derivative function kind");
+}
+
 /// Returns true if the declaration of \p decl depends on \p problemContext
 /// based on lexical nesting.
 ///
@@ -2307,12 +2320,12 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
         vjpRef = S.addDeclRef(vjpFunction);
 
       auto paramIndices = attr->getParameterIndices();
-      // TODO(TF-837): Implement `@differentiable` attribute serialization.
-      // Blocked by TF-828: `@differentiable` attribute type-checking, which
-      // resolves parameter indices (`IndexSubset *`).
+      // NOTE(TF-836): `@differentiable` attribute serialization is blocked by
+      // `@differentiable` attribute type-checking (TF-828), which resolves
+      // parameter indices (`IndexSubset *`).
       if (!paramIndices)
         return;
-      assert(paramIndices && "Checked parameter indices must be resolved");
+      assert(paramIndices && "Parameter indices must be resolved");
       SmallVector<bool, 4> indices;
       for (unsigned i : range(paramIndices->getCapacity()))
         indices.push_back(paramIndices->contains(i));
@@ -2322,6 +2335,36 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
           attr->isLinear(), jvpName, jvpRef, vjpName, vjpRef,
           S.addGenericSignatureRef(attr->getDerivativeGenericSignature()),
           indices);
+      return;
+    }
+
+    case DAK_Derivative: {
+      auto abbrCode = S.DeclTypeAbbrCodes[DerivativeDeclAttrLayout::Code];
+      auto *attr = cast<DerivativeAttr>(DA);
+      assert(attr->getOriginalFunction() &&
+             "`@derivative` attribute should have original declaration set "
+             "during construction or parsing");
+      auto origName = attr->getOriginalFunctionName().Name.getBaseName();
+      IdentifierID origNameId = S.addDeclBaseNameRef(origName);
+      DeclID origDeclID = S.addDeclRef(attr->getOriginalFunction());
+      auto derivativeKind =
+          getRawStableAutoDiffDerivativeFunctionKind(attr->getDerivativeKind());
+      auto *parameterIndices = attr->getParameterIndices();
+      assert(parameterIndices && "Parameter indices must be resolved");
+      SmallVector<bool, 4> indices;
+      for (unsigned i : range(parameterIndices->getCapacity()))
+        indices.push_back(parameterIndices->contains(i));
+      DerivativeDeclAttrLayout::emitRecord(
+          S.Out, S.ScratchRecord, abbrCode, attr->isImplicit(), origNameId,
+          origDeclID, derivativeKind, indices);
+      return;
+    }
+
+    case DAK_ImplicitlySynthesizesNestedRequirement: {
+      auto *theAttr = cast<ImplicitlySynthesizesNestedRequirementAttr>(DA);
+      auto abbrCode = S.DeclTypeAbbrCodes[ImplicitlySynthesizesNestedRequirementDeclAttrLayout::Code];
+      ImplicitlySynthesizesNestedRequirementDeclAttrLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+                                                          theAttr->Value);
       return;
     }
     }
@@ -4051,7 +4094,10 @@ public:
         stableRepresentation, fnTy->isPseudogeneric(), fnTy->isNoEscape(),
         stableDiffKind, fnTy->hasErrorResult(), fnTy->getParameters().size(),
         fnTy->getNumYields(), fnTy->getNumResults(),
-        S.addGenericSignatureRef(sig), variableData);
+        fnTy->isGenericSignatureImplied(),
+        S.addGenericSignatureRef(sig),
+        S.addSubstitutionMapRef(fnTy->getSubstitutions()),
+        variableData);
 
     if (auto conformance = fnTy->getWitnessMethodConformanceOrInvalid())
       S.writeConformance(conformance, S.DeclTypeAbbrCodes);

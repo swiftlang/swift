@@ -66,7 +66,7 @@ import TestsUtils
 let ascii =
   "siebenhundertsiebenundsiebzigtausendsiebenhundertsiebenundsiebzig"
 let emoji = "👍👩‍👩‍👧‍👧👨‍👨‍👦‍👦🇺🇸🇨🇦🇲🇽👍🏻👍🏼👍🏽👍🏾👍🏿"
-let utf16 = emoji + "the quick brown fox" + String(emoji.reversed() as Array<Character>)
+let utf16 = emoji + "the quick brown fox" + String(emoji.reversed())
 
 let japanese = "今回のアップデートでSwiftに大幅な改良が施され、安定していてしかも直感的に使うことができるAppleプラットフォーム向けプログラミング言語になりました。"
 let chinese = "Swift 是面向 Apple 平台的编程语言，功能强大且直观易用，而本次更新对其进行了全面优化。"

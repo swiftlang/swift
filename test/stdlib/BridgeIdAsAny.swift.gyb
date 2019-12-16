@@ -175,10 +175,7 @@ protocol P {}
 %{
 testCases = [
   # testName                     type                               valueExpr                      testFunc                                     conformsToError  conformsToHashable
-
-  # disabled to unblock CI: rdar://problem/57393991
-  #  ("classes",                    "LifetimeTracked",                 "LifetimeTracked(0)",          "bridgedObjectPreservesIdentity",            True,            True),
-
+  ("classes",                    "LifetimeTracked",                 "LifetimeTracked(0)",          "bridgedObjectPreservesIdentity",            True,            True),
   ("strings",                    "String",                          '"vitameatavegamin"',          "stringBridgesToEqualNSString",              True,            True),
   ("unbridged type",             "KnownUnbridged",                  "KnownUnbridged()",            "boxedTypeRoundTripsThroughDynamicCasting",  False,           True),
   ("tuple",                      "(Int, String)",                   '(1, "2")',                    "tupleCanBeDynamicallyCast",                 False,           False),
@@ -199,6 +196,11 @@ testCases = [
 ]
 }%
 
+/// Whether this can be safely casted to NSObject
+func isNSObject<T>(_ value: T) -> Bool {
+  return (value is NSObject) && !(value is LifetimeTracked)
+}
+
 % for testName, type, valueExpr, testFunc, conformsToError, conformsToHashable in testCases:
 BridgeAnything.test("${testName}") {
   autoreleasepool {
@@ -210,7 +212,7 @@ BridgeAnything.test("${testName}") {
     let xInArray = [x]
     ${testFunc}(original: x, bridged: (_bridgeAnythingToObjectiveC(xInArray) as! [AnyObject])[0])
     ${testFunc}(original: x, bridged: (_bridgeAnythingToObjectiveC(xInArray) as? [AnyObject])![0])
-    if (x as? NSObject) != nil {
+    if isNSObject(x) {
       ${testFunc}(original: x, bridged: (_bridgeAnythingToObjectiveC(xInArray) as! [AnyObject])[0])
       ${testFunc}(original: x, bridged: (_bridgeAnythingToObjectiveC(xInArray) as? [AnyObject])![0])
     }
@@ -219,7 +221,7 @@ BridgeAnything.test("${testName}") {
     let xInDictValue = ["key" : x]
     ${testFunc}(original: x, bridged: (_bridgeAnythingToObjectiveC(xInDictValue) as! [String: AnyObject])["key"]!)
     ${testFunc}(original: x, bridged: (_bridgeAnythingToObjectiveC(xInDictValue) as? [String: AnyObject])!["key"]!)
-    if (x as? NSObject) != nil {
+    if isNSObject(x) {
       ${testFunc}(original: x, bridged: (_bridgeAnythingToObjectiveC(xInDictValue) as! [String: NSObject])["key"]!)
       ${testFunc}(original: x, bridged: (_bridgeAnythingToObjectiveC(xInDictValue) as? [String: NSObject])!["key"]!)
     }
@@ -231,7 +233,7 @@ BridgeAnything.test("${testName}") {
     // The NSObject version below can't test class LifetimeTracked.
     // ${testFunc}(original: x, bridged: (_bridgeAnythingToObjectiveC(xInDictKey) as! [(AnyObject & Hashable): String]).keys.first!)
     // ${testFunc}(original: x, bridged: (_bridgeAnythingToObjectiveC(xInDictKey) as? [(AnyObject & Hashable): String])!.keys.first!)
-    if (x as? NSObject) != nil {
+    if isNSObject(x) {
       ${testFunc}(original: x, bridged: (_bridgeAnythingToObjectiveC(xInDictKey) as! [NSObject: String]).keys.first!)
       ${testFunc}(original: x, bridged: (_bridgeAnythingToObjectiveC(xInDictKey) as? [NSObject: String])!.keys.first!)
     }

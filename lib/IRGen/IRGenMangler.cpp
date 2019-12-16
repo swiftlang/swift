@@ -119,19 +119,6 @@ IRGenMangler::withSymbolicReferences(IRGenModule &IGM,
         }
       }
 
-      // TODO: ObjectMemoryReader for PE platforms still does not
-      // implement symbol relocations. For now, on non-Mach-O platforms,
-      // only symbolic reference things in the same module.
-      if (IGM.TargetInfo.OutputObjectFormat != llvm::Triple::MachO
-          && IGM.TargetInfo.OutputObjectFormat != llvm::Triple::ELF) {
-        auto formalAccessScope = type->getFormalAccessScope(nullptr, true);
-        if ((formalAccessScope.isPublic() || formalAccessScope.isInternal()) &&
-            (!IGM.CurSourceFile ||
-             IGM.CurSourceFile != type->getParentSourceFile())) {
-          return false;
-        }
-      }
-      
       return true;
     } else if (auto opaque = s.dyn_cast<const OpaqueTypeDecl *>()) {
       // Always symbolically reference opaque types.

@@ -152,6 +152,29 @@ public func callFoo_gen<T>(_ t: T) {
   printFooGeneric(1234)
 }
 
+fileprivate protocol PrivateProto {
+  func foo()
+}
+
+public class FooClass: PrivateProto {
+  func foo() {
+    print(321)
+  }
+}
+
+@inline(never)
+@_semantics("optimize.sil.specialize.generic.never")
+fileprivate func callProtocolFoo<T: PrivateProto>(_ t: T) {
+  t.foo()
+}
+
+@inline(never)
+@_semantics("optimize.sil.specialize.generic.never")
+public func callFooViaConformance<T>(_ t: T) {
+  let c = FooClass()
+  callProtocolFoo(c)
+}
+
 @inline(never)
 public func callGenericSubmoduleFunc<T>(_ t: T) {
   genericSubmoduleFunc(t)
@@ -211,5 +234,16 @@ func getClassKeypath<T>(_ t: T) -> KeyPath<Myclass, Int> {
 public func useClassKeypath<T>(_ t: T) -> Int {
   let c = Derived()
   return c[keyPath: getClassKeypath(t)]
+}
+
+@inline(never)
+func unrelated<U>(_ u: U) {
+  print(u)
+}
+
+@inline(never)
+public func callUnrelated<T>(_ t: T) -> T {
+  unrelated(43)
+  return t
 }
 

@@ -1252,6 +1252,14 @@ void Remangler::mangleImplEscaping(Node *node) {
   // The old mangler does not encode escaping.
 }
 
+void Remangler::mangleImplSubstitutions(Node *node) {
+  // The old mangler does not encode substituted function types.
+}
+
+void Remangler::mangleImplImpliedSubstitutions(Node *node) {
+  // The old mangler does not encode substituted function types.
+}
+
 void Remangler::mangleImplConvention(Node *node) {
   assert(node->getKind() == Node::Kind::ImplConvention);
   StringRef text = node->getText();

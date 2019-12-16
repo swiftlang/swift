@@ -49,7 +49,11 @@ class CrossModuleSerializationSetup {
     }
   }
 
-  bool setUpForSerialization(SILFunction *F);
+  bool canUseFromInline(SILFunction *F, bool lookIntoThunks);
+
+  bool canSerialize(SILFunction *F, bool lookIntoThunks);
+
+  void setUpForSerialization(SILFunction *F);
 
   void prepareInstructionForSerialization(SILInstruction *inst);
 
@@ -66,27 +70,6 @@ public:
 
   void scanModule();
 };
-
-static bool canUseFromInline(SILFunction *F) {
-  if (!F)
-    return false;
-
-  switch (F->getLinkage()) {
-  case SILLinkage::PublicNonABI:
-  case SILLinkage::Shared:
-    return F->isSerialized() != IsNotSerialized;
-  case SILLinkage::Public:
-  case SILLinkage::Hidden:
-  case SILLinkage::Private:
-  case SILLinkage::PublicExternal:
-  case SILLinkage::SharedExternal:
-  case SILLinkage::PrivateExternal:
-  case SILLinkage::HiddenExternal:
-    break;
-  }
-
-  return true;
-}
 
 /// Visitor for making used types of an intruction inlinable.
 ///
@@ -191,6 +174,12 @@ makeSubstUsableFromInline(const SubstitutionMap &substs) {
   for (Type replType : substs.getReplacementTypes()) {
     makeTypeUsableFromInline(replType->getCanonicalType());
   }
+  for (ProtocolConformanceRef pref : substs.getConformances()) {
+    if (pref.isConcrete()) {
+      ProtocolConformance *concrete = pref.getConcrete();
+      makeDeclUsableFromInline(concrete->getProtocol(), M);
+    }
+  }
 }
 
 /// Decide whether to serialize a function.
@@ -247,11 +236,27 @@ prepareInstructionForSerialization(SILInstruction *inst) {
 void CrossModuleSerializationSetup::handleReferencedFunction(SILFunction *func) {
   if (!func->isDefinition() || func->isAvailableExternally())
     return;
+  if (func->getLinkage() == SILLinkage::Shared) {
+    assert(func->isThunk() != IsNotThunk &&
+      "only thunks are accepted to have shared linkage");
+    assert(canSerialize(func, /*lookIntoThunks*/ false) &&
+      "we should already have checked that the thunk is serializable");
+    
+    if (func->isSerialized() == IsSerialized)
+      return;
+
+    // We cannot make shared functions "usableFromInline", i.e. make them Public
+    // because this could result in duplicate-symbol errors. Instead we make
+    // them "@alwaysEmitIntoClient"
+    setUpForSerialization(func);
+    return;
+  }
   if (shouldSerialize(func)) {
     addToWorklistIfNotHandled(func);
-  } else {
-    makeFunctionUsableFromInline(func);
+    return;
   }
+  makeFunctionUsableFromInline(func);
+  return;
 }
 
 void CrossModuleSerializationSetup::handleReferencedMethod(SILDeclRef method) {
@@ -262,23 +267,24 @@ void CrossModuleSerializationSetup::handleReferencedMethod(SILDeclRef method) {
   M.addExternallyVisibleDecl(getBaseMethod(methodDecl));
 }
 
-/// Setup the function \p param F for serialization and put callees onto the
-/// worklist for further processing.
+/// Check if the function \p F can be serialized.
 ///
-/// Returns false in case this is not possible for some reason.
-bool CrossModuleSerializationSetup::setUpForSerialization(SILFunction *F) {
+/// If \p lookIntoThunks is true, function_ref instructions of shared
+/// thunks are also accepted.
+bool CrossModuleSerializationSetup::canSerialize(SILFunction *F,
+                                                 bool lookIntoThunks) {
   // First step: check if serializing F is even possible.
   for (SILBasicBlock &block : *F) {
     for (SILInstruction &inst : block) {
       if (auto *FRI = dyn_cast<FunctionRefBaseInst>(&inst)) {
         SILFunction *callee = FRI->getReferencedFunctionOrNull();
-        if (!canUseFromInline(callee))
+        if (!canUseFromInline(callee, lookIntoThunks))
           return false;
       } else if (auto *KPI = dyn_cast<KeyPathInst>(&inst)) {
         bool canUse = true;
         KPI->getPattern()->visitReferencedFunctionsAndMethods(
             [&](SILFunction *func) {
-              if (!canUseFromInline(func))
+              if (!canUseFromInline(func, lookIntoThunks))
                 canUse = false;
             },
             [](SILDeclRef method) { });
@@ -287,6 +293,45 @@ bool CrossModuleSerializationSetup::setUpForSerialization(SILFunction *F) {
       }
     }
   }
+  return true;
+}
+
+/// Returns true if the function \p func can be used from a serialized function.
+///
+/// If \p lookIntoThunks is true, serializable shared thunks are also accepted.
+bool CrossModuleSerializationSetup::canUseFromInline(SILFunction *func,
+                                                     bool lookIntoThunks) {
+  if (!func)
+    return false;
+
+  switch (func->getLinkage()) {
+  case SILLinkage::PublicNonABI:
+    return func->isSerialized() != IsNotSerialized;
+  case SILLinkage::Shared:
+    if (func->isThunk() != IsNotThunk && lookIntoThunks &&
+        // Don't recursively lookIntoThunks to avoid infinite loops.
+        canSerialize(func, /*lookIntoThunks*/ false)) {
+      return true;
+    }
+    return false;
+  case SILLinkage::Public:
+  case SILLinkage::Hidden:
+  case SILLinkage::Private:
+  case SILLinkage::PublicExternal:
+  case SILLinkage::SharedExternal:
+  case SILLinkage::PrivateExternal:
+  case SILLinkage::HiddenExternal:
+    break;
+  }
+  return true;
+}
+
+/// Setup the function \p param F for serialization and put callees onto the
+/// worklist for further processing.
+///
+/// Returns false in case this is not possible for some reason.
+void CrossModuleSerializationSetup::setUpForSerialization(SILFunction *F) {
+  assert(F->isSerialized() != IsSerialized);
 
   // Second step: go through all instructions and prepare them for
   // for serialization.
@@ -295,7 +340,14 @@ bool CrossModuleSerializationSetup::setUpForSerialization(SILFunction *F) {
       prepareInstructionForSerialization(&inst);
     }
   }
-  return true;
+  F->setSerialized(IsSerialized);
+
+  // As a code size optimization, make serialized functions
+  // @alwaysEmitIntoClient.
+  // Also, for shared thunks it's required to make them @alwaysEmitIntoClient.
+  // SILLinkage::Public would not work for shared functions, because it could
+  // result in duplicate-symbol linker errors.
+  F->setLinkage(SILLinkage::PublicNonABI);
 }
 
 /// Select functions in the module which should be serialized.
@@ -313,12 +365,8 @@ void CrossModuleSerializationSetup::scanModule() {
     // Decide whether we want to serialize the function.
     if (shouldSerialize(F)) {
       // Try to serialize.
-      if (setUpForSerialization(F)) {
-        F->setSerialized(IsSerialized);
-
-        // As a code size optimization, make serialized functions
-        // @alwaysEmitIntoClient.
-        F->setLinkage(SILLinkage::PublicNonABI);
+      if (canSerialize(F, /*lookIntoThunks*/ true)) {
+        setUpForSerialization(F);
       } else {
         // If for some reason the function cannot be serialized, we mark it as
         // usable-from-inline.

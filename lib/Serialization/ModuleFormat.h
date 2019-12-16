@@ -55,7 +55,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 526; // @_dynamicReplacement adjustments
+const uint16_t SWIFTMODULE_VERSION_MINOR = 530; // @_implicitly_synthesizes_nested_requirement
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -234,6 +234,14 @@ enum class DifferentiabilityKind : uint8_t {
   Linear,
 };
 using DifferentiabilityKindField = BCFixed<2>;
+
+// These IDs must \em not be renumbered or reordered without incrementing the
+// module version.
+enum class AutoDiffDerivativeFunctionKind : uint8_t {
+  JVP = 0,
+  VJP
+};
+using AutoDiffDerivativeFunctionKindField = BCFixed<1>;
 
 enum class ForeignErrorConventionKind : uint8_t {
   ZeroResult,
@@ -440,6 +448,7 @@ enum class DefaultArgumentKind : uint8_t {
   None = 0,
   Normal,
   File,
+  FilePath,
   Line,
   Column,
   Function,
@@ -981,11 +990,14 @@ namespace decls_block {
     BCVBR<6>,              // number of parameters
     BCVBR<5>,              // number of yields
     BCVBR<5>,              // number of results
+    BCFixed<1>,            // generic signature implied
     GenericSignatureIDField, // generic signature
+    SubstitutionMapIDField, // substitutions
     BCArray<TypeIDField>   // parameter types/conventions, alternating
                            // followed by result types/conventions, alternating
                            // followed by error result type/convention
     // Optionally a protocol conformance (for witness_methods)
+    // Optionally a substitution map (for substituted function types)
   >;
   
   using SILBlockStorageTypeLayout = BCRecordLayout<
@@ -1769,6 +1781,15 @@ namespace decls_block {
     BCArray<BCFixed<1>> // Differentiation parameter indices' bitvector.
   >;
 
+  using DerivativeDeclAttrLayout = BCRecordLayout<
+    Derivative_DECL_ATTR,
+    BCFixed<1>, // Implicit flag.
+    IdentifierIDField, // Original name.
+    DeclIDField, // Original function declaration.
+    AutoDiffDerivativeFunctionKindField, // Derivative function kind.
+    BCArray<BCFixed<1>> // Differentiation parameter indices' bitvector.
+  >;
+
 #define SIMPLE_DECL_ATTR(X, CLASS, ...)         \
   using CLASS##DeclAttrLayout = BCRecordLayout< \
     CLASS##_DECL_ATTR, \
@@ -1790,6 +1811,10 @@ namespace decls_block {
     TypeIDField // type referenced by this custom attribute
   >;
 
+  using ImplicitlySynthesizesNestedRequirementDeclAttrLayout = BCRecordLayout<
+    ImplicitlySynthesizesNestedRequirement_DECL_ATTR,
+    BCBlob      // member name
+  >;
 }
 
 /// Returns the encoding kind for the given decl.

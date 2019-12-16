@@ -739,7 +739,13 @@ SmallVector<OverrideMatch, 2> OverrideMatcher::match(
   if (members.empty() || name != membersName) {
     membersName = name;
     members.clear();
-    dc->lookupQualified(superContexts, membersName,
+    // FIXME: This suggests we need to use TypeChecker's high-level lookup
+    // entrypoints.  But first we need one that supports additive qualified
+    // lookup.
+    for (auto *ctx : superContexts) {
+      ctx->synthesizeSemanticMembersIfNeeded(membersName);
+    }
+    dc->lookupQualified(superContexts, DeclNameRef(membersName),
                         NL_QualifiedDefault, members);
   }
 
@@ -1292,6 +1298,7 @@ namespace  {
     UNINTERESTING_ATTR(IBInspectable)
     UNINTERESTING_ATTR(IBOutlet)
     UNINTERESTING_ATTR(IBSegueAction)
+    UNINTERESTING_ATTR(ImplicitlySynthesizesNestedRequirement)
     UNINTERESTING_ATTR(Indirect)
     UNINTERESTING_ATTR(InheritsConvenienceInitializers)
     UNINTERESTING_ATTR(Inline)
@@ -1331,6 +1338,7 @@ namespace  {
 
     // Differentiation-related attributes.
     UNINTERESTING_ATTR(Differentiable)
+    UNINTERESTING_ATTR(Derivative)
 
     // These can't appear on overridable declarations.
     UNINTERESTING_ATTR(Prefix)

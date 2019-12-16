@@ -1670,18 +1670,6 @@
         },
         {
           "kind": "Conformance",
-          "name": "MirrorPath",
-          "printedName": "MirrorPath",
-          "usr": "s:s10MirrorPathP"
-        },
-        {
-          "kind": "Conformance",
-          "name": "CVarArg",
-          "printedName": "CVarArg",
-          "usr": "s:s7CVarArgP"
-        },
-        {
-          "kind": "Conformance",
           "name": "Encodable",
           "printedName": "Encodable",
           "usr": "s:SE"
@@ -1691,6 +1679,30 @@
           "name": "Decodable",
           "printedName": "Decodable",
           "usr": "s:Se"
+        },
+        {
+          "kind": "Conformance",
+          "name": "CustomReflectable",
+          "printedName": "CustomReflectable",
+          "usr": "s:s17CustomReflectableP"
+        },
+        {
+          "kind": "Conformance",
+          "name": "_CustomPlaygroundQuickLookable",
+          "printedName": "_CustomPlaygroundQuickLookable",
+          "usr": "s:s30_CustomPlaygroundQuickLookableP"
+        },
+        {
+          "kind": "Conformance",
+          "name": "MirrorPath",
+          "printedName": "MirrorPath",
+          "usr": "s:s10MirrorPathP"
+        },
+        {
+          "kind": "Conformance",
+          "name": "CVarArg",
+          "printedName": "CVarArg",
+          "usr": "s:s7CVarArgP"
         },
         {
           "kind": "Conformance",
@@ -1709,18 +1721,6 @@
           "name": "_HasCustomAnyHashableRepresentation",
           "printedName": "_HasCustomAnyHashableRepresentation",
           "usr": "s:s35_HasCustomAnyHashableRepresentationP"
-        },
-        {
-          "kind": "Conformance",
-          "name": "CustomReflectable",
-          "printedName": "CustomReflectable",
-          "usr": "s:s17CustomReflectableP"
-        },
-        {
-          "kind": "Conformance",
-          "name": "_CustomPlaygroundQuickLookable",
-          "printedName": "_CustomPlaygroundQuickLookable",
-          "usr": "s:s30_CustomPlaygroundQuickLookableP"
         },
         {
           "kind": "Conformance",
