@@ -297,6 +297,9 @@ public:
   /// Retrieve the generic parameter opened by this type variable.
   GenericTypeParamType *getGenericParameter() const;
 
+  /// Determine whether this type variable represents a closure type.
+  bool isClosureType() const;
+
   /// Determine whether this type variable represents a closure result type.
   bool isClosureResultType() const;
 
