@@ -1228,41 +1228,13 @@ namespace {
                          bool hasTrailingClosure,
                          ConstraintLocatorBuilder locator, bool isImplicit,
                          AccessSemantics semantics,
-                         Optional<SelectedOverload> selected = None) {
-
-      // Determine the declaration selected for this subscript operation.
-      if (!selected)
-        selected = solution.getOverloadChoiceIfAvailable(
-                          cs.getConstraintLocator(
-                            locator.withPathElement(
-                              ConstraintLocator::SubscriptMember)));
-
-      // Handles situation where there was a solution available but it didn't
-      // have a proper overload selected from subscript call, might be because
-      // solver was allowed to return free or unresolved types, which can
-      // happen while running diagnostics on one of the expressions.
-      if (!selected.hasValue()) {
-        auto &de = cs.getASTContext().Diags;
-        auto baseType = cs.getType(base);
-
-        if (auto errorType = baseType->getAs<ErrorType>()) {
-          de.diagnose(base->getLoc(), diag::cannot_subscript_base,
-                      errorType->getOriginalType())
-              .highlight(base->getSourceRange());
-        } else {
-          de.diagnose(base->getLoc(), diag::cannot_subscript_ambiguous_base)
-              .highlight(base->getSourceRange());
-        }
-
-        return nullptr;
-      }
-
+                         const SelectedOverload &selected) {
       // Build the new subscript.
       auto newSubscript = buildSubscriptHelper(base, index, argLabels,
-                                               *selected, hasTrailingClosure,
+                                               selected, hasTrailingClosure,
                                                locator, isImplicit, semantics);
 
-      if (selected->choice.getKind() == OverloadChoiceKind::DeclViaDynamic) {
+      if (selected.choice.getKind() == OverloadChoiceKind::DeclViaDynamic) {
         // Rewrite for implicit unwrapping if the solution requires it.
         auto *dynamicLocator = cs.getConstraintLocator(
             locator, {ConstraintLocator::SubscriptMember,
@@ -1277,19 +1249,19 @@ namespace {
         }
       }
 
-      if (selected->choice.isDecl()) {
+      if (selected.choice.isDecl()) {
         auto locatorKind = ConstraintLocator::SubscriptMember;
-        if (selected->choice.getKind() ==
+        if (selected.choice.getKind() ==
             OverloadChoiceKind::DynamicMemberLookup)
           locatorKind = ConstraintLocator::Member;
 
-        if (selected->choice.getKind() ==
+        if (selected.choice.getKind() ==
                 OverloadChoiceKind::KeyPathDynamicMemberLookup &&
             !isa<SubscriptExpr>(locator.getAnchor()))
           locatorKind = ConstraintLocator::Member;
 
         newSubscript =
-            forceUnwrapIfExpected(newSubscript, selected->choice,
+            forceUnwrapIfExpected(newSubscript, selected.choice,
                                   locator.withPathElement(locatorKind));
       }
 
@@ -1298,7 +1270,7 @@ namespace {
 
     Expr *buildSubscriptHelper(Expr *base, Expr *index,
                                ArrayRef<Identifier> argLabels,
-                               SelectedOverload &selected,
+                               const SelectedOverload &selected,
                                bool hasTrailingClosure,
                                ConstraintLocatorBuilder locator,
                                bool isImplicit, AccessSemantics semantics) {
@@ -2862,8 +2834,29 @@ namespace {
           cs.getConstraintLocator(expr, ConstraintLocator::SubscriptMember);
       auto overload = solution.getOverloadChoiceIfAvailable(memberLocator);
 
-      if (overload && overload->choice.getKind() ==
-                          OverloadChoiceKind::KeyPathDynamicMemberLookup) {
+      // Handles situation where there was a solution available but it didn't
+      // have a proper overload selected from subscript call, might be because
+      // solver was allowed to return free or unresolved types, which can
+      // happen while running diagnostics on one of the expressions.
+      if (!overload) {
+        const auto *base = expr->getBase();
+        auto &de = cs.getASTContext().Diags;
+        auto baseType = cs.getType(base);
+
+        if (auto errorType = baseType->getAs<ErrorType>()) {
+          de.diagnose(base->getLoc(), diag::cannot_subscript_base,
+                      errorType->getOriginalType())
+              .highlight(base->getSourceRange());
+        } else {
+          de.diagnose(base->getLoc(), diag::cannot_subscript_ambiguous_base)
+              .highlight(base->getSourceRange());
+        }
+
+        return nullptr;
+      }
+
+      if (overload->choice.getKind() ==
+              OverloadChoiceKind::KeyPathDynamicMemberLookup) {
         return buildDynamicMemberLookupRef(
             expr, expr->getBase(), expr->getIndex()->getStartLoc(), SourceLoc(),
             *overload, memberLocator);
@@ -2872,7 +2865,7 @@ namespace {
       return buildSubscript(
           expr->getBase(), expr->getIndex(), expr->getArgumentLabels(),
           expr->hasTrailingClosure(), cs.getConstraintLocator(expr),
-          expr->isImplicit(), expr->getAccessSemantics(), overload);
+          expr->isImplicit(), expr->getAccessSemantics(), *overload);
     }
 
     /// "Finish" an array expression by filling in the semantic expression.
@@ -2967,11 +2960,14 @@ namespace {
     }
 
     Expr *visitDynamicSubscriptExpr(DynamicSubscriptExpr *expr) {
+      auto *memberLocator =
+          cs.getConstraintLocator(expr, ConstraintLocator::SubscriptMember);
       return buildSubscript(expr->getBase(), expr->getIndex(),
                             expr->getArgumentLabels(),
                             expr->hasTrailingClosure(),
                             cs.getConstraintLocator(expr),
-                            expr->isImplicit(), AccessSemantics::Ordinary);
+                            expr->isImplicit(), AccessSemantics::Ordinary,
+                            solution.getOverloadChoice(memberLocator));
     }
 
     Expr *visitTupleElementExpr(TupleElementExpr *expr) {
@@ -4193,8 +4189,6 @@ namespace {
         }
 
         auto kind = origComponent.getKind();
-        Optional<SelectedOverload> foundDecl;
-
         auto locator = cs.getConstraintLocator(
             E, LocatorPathElt::KeyPathComponent(i));
 
@@ -4207,48 +4201,42 @@ namespace {
         // If this is an unresolved link, make sure we resolved it.
         if (kind == KeyPathExpr::Component::Kind::UnresolvedProperty ||
             kind == KeyPathExpr::Component::Kind::UnresolvedSubscript) {
-          foundDecl = solution.getOverloadChoiceIfAvailable(locator);
-          // Leave the component unresolved if the overload was not resolved.
-          if (foundDecl) {
-            isDynamicMember =
-                foundDecl->choice.getKind() ==
-                    OverloadChoiceKind::DynamicMemberLookup ||
-                foundDecl->choice.getKind() ==
-                    OverloadChoiceKind::KeyPathDynamicMemberLookup;
+          auto foundDecl = solution.getOverloadChoiceIfAvailable(locator);
+          if (!foundDecl) {
+            // If we couldn't resolve the component, leave it alone.
+            resolvedComponents.push_back(origComponent);
+            baseTy = origComponent.getComponentType();
+            continue;
+          }
 
-            // If this was a @dynamicMemberLookup property, then we actually
-            // form a subscript reference, so switch the kind.
-            if (isDynamicMember) {
-              kind = KeyPathExpr::Component::Kind::UnresolvedSubscript;
-            }
+          isDynamicMember =
+              foundDecl->choice.getKind() ==
+                  OverloadChoiceKind::DynamicMemberLookup ||
+              foundDecl->choice.getKind() ==
+                  OverloadChoiceKind::KeyPathDynamicMemberLookup;
+
+          // If this was a @dynamicMemberLookup property, then we actually
+          // form a subscript reference, so switch the kind.
+          if (isDynamicMember) {
+            kind = KeyPathExpr::Component::Kind::UnresolvedSubscript;
           }
         }
 
         switch (kind) {
         case KeyPathExpr::Component::Kind::UnresolvedProperty: {
-          // If we couldn't resolve the component, leave it alone.
-          if (!foundDecl) {
-            resolvedComponents.push_back(origComponent);
-            break;
-          }
-
-          buildKeyPathPropertyComponent(*foundDecl, origComponent.getLoc(),
+          buildKeyPathPropertyComponent(solution.getOverloadChoice(locator),
+                                        origComponent.getLoc(),
                                         locator, resolvedComponents);
           break;
         }
         case KeyPathExpr::Component::Kind::UnresolvedSubscript: {
-          // Leave the component unresolved if the overload was not resolved.
-          if (!foundDecl) {
-            resolvedComponents.push_back(origComponent);
-            break;
-          }
-
           ArrayRef<Identifier> subscriptLabels;
           if (!isDynamicMember)
             subscriptLabels = origComponent.getSubscriptLabels();
 
           buildKeyPathSubscriptComponent(
-              *foundDecl, origComponent.getLoc(), origComponent.getIndexExpr(),
+              solution.getOverloadChoice(locator),
+              origComponent.getLoc(), origComponent.getIndexExpr(),
               subscriptLabels, locator, resolvedComponents);
           break;
         }
@@ -4485,7 +4473,8 @@ namespace {
     }
 
     void buildKeyPathSubscriptComponent(
-        SelectedOverload &overload, SourceLoc componentLoc, Expr *indexExpr,
+        const SelectedOverload &overload,
+        SourceLoc componentLoc, Expr *indexExpr,
         ArrayRef<Identifier> labels, ConstraintLocator *locator,
         SmallVectorImpl<KeyPathExpr::Component> &components) {
       auto subscript = cast<SubscriptDecl>(overload.choice.getDecl());
