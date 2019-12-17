@@ -276,7 +276,7 @@ func req1<T>(_ x: T) -> T {
   return x
 }
 @derivative(of: req1)
-func vjpReq1<T: Differentiable>(_ x: T) -> (
+func vjpExtraConformanceConstraint<T: Differentiable>(_ x: T) -> (
   value: T, pullback: (T.TangentVector) -> T.TangentVector
 ) {
   return (x, { $0 })
@@ -286,10 +286,40 @@ func req2<T, U>(_ x: T, _ y: U) -> T {
   return x
 }
 @derivative(of: req2)
-func vjpReq2<T: Differentiable, U: Differentiable>(_ x: T, _ y: U)
-  -> (value: T, pullback: (T) -> (T, U))
-where T == T.TangentVector, U == U.TangentVector, T: CustomStringConvertible {
+func vjpExtraConformanceConstraints<T: Differentiable, U: Differentiable>( _ x: T, _ y: U) -> (
+  value: T, pullback: (T) -> (T, U)
+) where T == T.TangentVector, U == U.TangentVector, T: CustomStringConvertible {
   return (x, { ($0, .zero) })
+}
+
+// Test `@derivative` declaration with extra same-type requirements.
+func req3<T>(_ x: T) -> T {
+  return x
+}
+@derivative(of: req3)
+func vjpSameTypeRequirementsGenericParametersAllConcrete<T>(_ x: T) -> (
+  value: T, pullback: (T.TangentVector) -> T.TangentVector
+) where T: Differentiable, T.TangentVector == Float {
+  return (x, { $0 })
+}
+
+struct Wrapper<T: Equatable>: Equatable {
+  var x: T
+  init(_ x: T) { self.x = x }
+}
+extension Wrapper: AdditiveArithmetic where T: AdditiveArithmetic {
+  static var zero: Self { .init(.zero) }
+  static func + (lhs: Self, rhs: Self) -> Self { .init(lhs.x + rhs.x) }
+  static func - (lhs: Self, rhs: Self) -> Self { .init(lhs.x - rhs.x) }
+}
+extension Wrapper: Differentiable where T: Differentiable, T == T.TangentVector {
+  typealias TangentVector = Wrapper<T.TangentVector>
+}
+extension Wrapper where T: Differentiable, T == T.TangentVector {
+  @derivative(of: init(_:))
+  static func vjpInit(_ x: T) -> (value: Self, pullback: (Wrapper<T>.TangentVector) -> (T)) {
+    fatalError()
+  }
 }
 
 // Test class methods.
