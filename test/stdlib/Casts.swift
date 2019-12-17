@@ -102,19 +102,20 @@ CastsTests.test("Cast from ObjC existential to Protocol (SR-3871)") {
 }
 #endif
 
+protocol P3 {}
 CastsTests.test("Cast from Swift existential to Protocol") {
-  struct S: P2 {}
+  struct S: P3 {}
   class SwiftWrapper {
     let any: Any = S()
     init() {}
   }
   let a = SwiftWrapper().any
-  expectTrue(a is P2)
-  expectNotNil(a as? P2)
+  expectTrue(a is P3)
+  expectNotNil(a as? P3)
   expectNotNil(a as? S)
   let b = a as AnyObject
-  expectTrue(b is P2)
-  expectNotNil(b as? P2)
+  expectTrue(b is P3)
+  expectNotNil(b as? P3)
   expectNotNil(b as? S)
 }
 
