@@ -125,6 +125,7 @@ KNOWN_SETTINGS=(
     skip-build-benchmarks       ""               "set to skip building Swift Benchmark Suite"
     skip-build-external-benchmarks "1"            "set to skip building the external Swift Benchmark Suite. (skipped by default)"
     skip-build-playgroundsupport ""              "set to skip building PlaygroundSupport"
+    skip-build-clang-tools-extra ""              "set to skip building clang-tools-extra as part of llvm"
     skip-local-build            ""               "set to skip building for the current host (useful when crosscompiling)"
     skip-test-cmark             ""               "set to skip testing CommonMark"
     skip-test-lldb              ""               "set to skip testing lldb"
@@ -680,6 +681,18 @@ function set_build_options_for_host() {
                 -DSWIFT_DARWIN_DEPLOYMENT_VERSION_WATCHOS="${DARWIN_DEPLOYMENT_VERSION_WATCHOS}"
             )
             ;;
+        android-*)
+            SWIFT_HOST_VARIANT="android"
+            SWIFT_HOST_VARIANT_SDK="ANDROID"
+            case ${host} in
+                android-armv7)
+                    SWIFT_HOST_VARIANT_ARCH="armv7"
+                    ;;
+                android-aarch64)
+                    SWIFT_HOST_VARIANT_ARCH="aarch64"
+                    ;;
+                esac
+        ;;
         *)
             echo "Unknown host tools target: ${host}"
             exit 1
@@ -1677,8 +1690,21 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DLLVM_INCLUDE_DOCS:BOOL=TRUE
                     -DLLVM_ENABLE_LTO:STRING="${LLVM_ENABLE_LTO}"
                     -DCOMPILER_RT_INTERCEPT_LIBDISPATCH=ON
-                    -DLLVM_ENABLE_PROJECTS="clang;clang-tools-extra;compiler-rt;"
                     "${llvm_cmake_options[@]}"
+                )
+
+                llvm_enable_projects=("clang")
+
+                if [[ ! "${SKIP_BUILD_COMPILER_RT}" ]]; then
+                    llvm_enable_projects+=("compiler-rt")
+                fi
+
+                if [[ ! "${SKIP_BUILD_CLANG_TOOLS_EXTRA}" ]]; then
+                    llvm_enable_projects+=("clang-tools-extra")
+                fi
+
+                cmake_options+=(
+                    -DLLVM_ENABLE_PROJECTS="$(join ";" ${llvm_enable_projects[@]})"
                 )
 
                 cmake_options+=(
@@ -2089,6 +2115,20 @@ for host in "${ALL_HOSTS[@]}"; do
                     -Ddispatch_DIR:PATH=$(build_directory ${host} libdispatch)/cmake/modules
                     -DFoundation_DIR:PATH=$(build_directory ${host} foundation)/cmake/modules
                 )
+
+                # Ensure on Darwin platforms that we consider only the SQLite headers
+                # from the SDK instead of picking ones found elsewhere
+                # (e.g. in /usr/include )
+                # Also consider only the SQLite dylib shipped with the OS
+                # to avoid mismatch with the headers
+                if [[ "$(uname -s)" = "Darwin" ]]; then
+                    cmake_options=(
+                        "${cmake_options[@]}"
+
+                        -DSQLite3_INCLUDE_DIR:PATH="$(xcrun -sdk macosx -show-sdk-path)/usr/include"
+                        -DSQLite3_LIBRARY:PATH="/usr/lib/libsqlite3.dylib"
+                    )
+                fi
                 ;;
             xctest)
                 SWIFTC_BIN="$(build_directory_bin ${LOCAL_HOST} swift)/swiftc"
@@ -2905,7 +2945,7 @@ for host in "${ALL_HOSTS[@]}"; do
                 fi
 
                 case ${host} in
-                  linux-*|freebsd-*|cygwin-*|haiku-*) ;;
+                  linux-*|freebsd-*|cygwin-*|haiku-*|android-*) ;;
                   *)
                     echo "error: --install-xctest is not supported on this platform"
                     exit 1

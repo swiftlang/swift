@@ -1219,7 +1219,7 @@ bool swift::isValidKeyPathDynamicMemberLookup(SubscriptDecl *decl,
     return false;
 
   const auto *param = decl->getIndices()->get(0);
-  if (auto NTD = param->getType()->getAnyNominal()) {
+  if (auto NTD = param->getInterfaceType()->getAnyNominal()) {
     return NTD == ctx.getKeyPathDecl() ||
            NTD == ctx.getWritableKeyPathDecl() ||
            NTD == ctx.getReferenceWritableKeyPathDecl();
@@ -2072,10 +2072,10 @@ void AttributeChecker::visitDiscardableResultAttr(DiscardableResultAttr *attr) {
 }
 
 /// Lookup the replaced decl in the replacments scope.
-void lookupReplacedDecl(DeclName replacedDeclName,
-                        const DynamicReplacementAttr *attr,
-                        const ValueDecl *replacement,
-                        SmallVectorImpl<ValueDecl *> &results) {
+static void lookupReplacedDecl(DeclName replacedDeclName,
+                               const DynamicReplacementAttr *attr,
+                               const ValueDecl *replacement,
+                               SmallVectorImpl<ValueDecl *> &results) {
   auto *declCtxt = replacement->getDeclContext();
 
   // Look at the accessors' storage's context.
@@ -2232,11 +2232,12 @@ findReplacedFunction(DeclName replacedFunctionName,
     // Check for static/instance mismatch.
     if (result->isStatic() != replacement->isStatic())
       continue;
-    
+
+    auto resultTy = result->getInterfaceType();
+    auto replaceTy = replacement->getInterfaceType();
     TypeMatchOptions matchMode = TypeMatchFlags::AllowABICompatible;
     matchMode |= TypeMatchFlags::AllowCompatibleOpaqueTypeArchetypes;
-    if (result->getInterfaceType()->getCanonicalType()->matches(
-            replacement->getInterfaceType()->getCanonicalType(), matchMode)) {
+    if (resultTy->matches(replaceTy, matchMode)) {
       if (!result->isDynamic()) {
         if (Diags) {
           Diags->diagnose(attr->getLocation(),
@@ -2286,9 +2287,11 @@ findReplacedStorageDecl(DeclName replacedFunctionName,
     // Check for static/instance mismatch.
     if (result->isStatic() != replacement->isStatic())
       continue;
-    if (result->getInterfaceType()->getCanonicalType()->matches(
-            replacement->getInterfaceType()->getCanonicalType(),
-            TypeMatchFlags::AllowABICompatible)) {
+    auto resultTy = result->getInterfaceType();
+    auto replaceTy = replacement->getInterfaceType();
+    TypeMatchOptions matchMode = TypeMatchFlags::AllowABICompatible;
+    matchMode |= TypeMatchFlags::AllowCompatibleOpaqueTypeArchetypes;
+    if (resultTy->matches(replaceTy, matchMode)) {
       if (!result->isDynamic()) {
         return nullptr;
       }
@@ -2298,113 +2301,48 @@ findReplacedStorageDecl(DeclName replacedFunctionName,
   return nullptr;
 }
 
-ValueDecl *TypeChecker::findReplacedDynamicFunction(const ValueDecl *vd) {
-  assert(isa<AbstractFunctionDecl>(vd) || isa<AbstractStorageDecl>(vd));
-  if (isa<AccessorDecl>(vd))
-    return nullptr;
-
-  auto *attr = vd->getAttrs().getAttribute<DynamicReplacementAttr>();
-  if (!attr)
-    return nullptr;
-
-  auto *afd = dyn_cast<AbstractFunctionDecl>(vd);
-  if (afd) {
-    // When we pass nullptr as the type checker argument attr is truely const.
-    return findReplacedFunction(attr->getReplacedFunctionName(), afd,
-                                const_cast<DynamicReplacementAttr *>(attr),
-                                nullptr);
-  }
-  auto *storageDecl = dyn_cast<AbstractStorageDecl>(vd);
-  if (!storageDecl)
-    return nullptr;
-  return findReplacedStorageDecl(attr->getReplacedFunctionName(), storageDecl, attr);
-}
-
 void AttributeChecker::visitDynamicReplacementAttr(DynamicReplacementAttr *attr) {
   assert(isa<AbstractFunctionDecl>(D) || isa<AbstractStorageDecl>(D));
-  auto *VD = cast<ValueDecl>(D);
+  auto *replacement = cast<ValueDecl>(D);
 
-  if (!isa<ExtensionDecl>(VD->getDeclContext()) &&
-      !VD->getDeclContext()->isModuleScopeContext()) {
+  if (!isa<ExtensionDecl>(replacement->getDeclContext()) &&
+      !replacement->getDeclContext()->isModuleScopeContext()) {
     diagnose(attr->getLocation(), diag::dynamic_replacement_not_in_extension,
-             VD->getBaseName());
+             replacement->getBaseName());
     attr->setInvalid();
     return;
   }
 
-  if (VD->isNativeDynamic()) {
+  if (replacement->isNativeDynamic()) {
     diagnose(attr->getLocation(), diag::dynamic_replacement_must_not_be_dynamic,
-             VD->getBaseName());
+             replacement->getBaseName());
     attr->setInvalid();
     return;
   }
 
-  // Don't process a declaration twice. This will happen to accessor decls after
-  // we have processed their var decls.
-  if (attr->getReplacedFunction())
+  auto *original = replacement->getDynamicallyReplacedDecl();
+  if (!original) {
+    attr->setInvalid();
     return;
-
-  SmallVector<AbstractFunctionDecl *, 4> replacements;
-  SmallVector<AbstractFunctionDecl *, 4> origs;
-
-  // Collect the accessor replacement mapping if this is an abstract storage.
-  if (auto *var = dyn_cast<AbstractStorageDecl>(VD)) {
-    var->visitParsedAccessors([&](AccessorDecl *accessor) {
-      if (attr->isInvalid())
-        return;
-
-       auto *orig = findReplacedAccessor(attr->getReplacedFunctionName(),
-                                         accessor, attr, Ctx);
-       if (!orig)
-         return;
-
-       origs.push_back(orig);
-       replacements.push_back(accessor);
-     });
-  } else {
-    // Otherwise, find the matching function.
-    auto *fun = cast<AbstractFunctionDecl>(VD);
-    if (auto *orig = findReplacedFunction(attr->getReplacedFunctionName(), fun,
-                                          attr, &Ctx.Diags)) {
-      origs.push_back(orig);
-      replacements.push_back(fun);
-    } else
-      return;
   }
 
-  // Annotate the replacement with the original func decl.
-  for (auto index : indices(replacements)) {
-    if (auto *attr = replacements[index]
-                         ->getAttrs()
-                         .getAttribute<DynamicReplacementAttr>()) {
-      auto *replacedFun = origs[index];
-      auto *replacement = replacements[index];
-      if (replacedFun->isObjC() && !replacement->isObjC()) {
-        diagnose(attr->getLocation(),
-                 diag::dynamic_replacement_replacement_not_objc_dynamic,
-                 attr->getReplacedFunctionName());
-        attr->setInvalid();
-        return;
-      }
-      if (!replacedFun->isObjC() && replacement->isObjC()) {
-        diagnose(attr->getLocation(),
-                 diag::dynamic_replacement_replaced_not_objc_dynamic,
-                 attr->getReplacedFunctionName());
-        attr->setInvalid();
-        return;
-      }
-      attr->setReplacedFunction(replacedFun);
-      continue;
-    }
-    auto *newAttr = DynamicReplacementAttr::create(
-        VD->getASTContext(), attr->getReplacedFunctionName(), origs[index]);
-    DeclAttributes &attrs = replacements[index]->getAttrs();
-    attrs.add(newAttr);
+  if (original->isObjC() && !replacement->isObjC()) {
+    diagnose(attr->getLocation(),
+             diag::dynamic_replacement_replacement_not_objc_dynamic,
+             attr->getReplacedFunctionName());
+    attr->setInvalid();
   }
-  if (auto *CD = dyn_cast<ConstructorDecl>(VD)) {
+  if (!original->isObjC() && replacement->isObjC()) {
+    diagnose(attr->getLocation(),
+             diag::dynamic_replacement_replaced_not_objc_dynamic,
+             attr->getReplacedFunctionName());
+    attr->setInvalid();
+  }
+
+  if (auto *CD = dyn_cast<ConstructorDecl>(replacement)) {
     auto *attr = CD->getAttrs().getAttribute<DynamicReplacementAttr>();
     auto replacedIsConvenienceInit =
-        cast<ConstructorDecl>(attr->getReplacedFunction())->isConvenienceInit();
+        cast<ConstructorDecl>(original)->isConvenienceInit();
     if (replacedIsConvenienceInit &&!CD->isConvenienceInit()) {
       diagnose(attr->getLocation(),
                diag::dynamic_replacement_replaced_constructor_is_convenience,
@@ -2416,13 +2354,6 @@ void AttributeChecker::visitDynamicReplacementAttr(DynamicReplacementAttr *attr)
           attr->getReplacedFunctionName());
     }
   }
-
-
-  // Remove the attribute on the abstract storage (we have moved it to the
-  // accessor decl).
-  if (!isa<AbstractStorageDecl>(VD))
-    return;
-  D->getAttrs().removeAttribute(attr);
 }
 
 void AttributeChecker::visitImplementsAttr(ImplementsAttr *attr) {
@@ -2910,4 +2841,54 @@ void TypeChecker::addImplicitDynamicAttribute(Decl *D) {
     auto attr = new (D->getASTContext()) DynamicAttr(/*implicit=*/true);
     D->getAttrs().add(attr);
   }
+}
+
+llvm::Expected<ValueDecl *>
+DynamicallyReplacedDeclRequest::evaluate(Evaluator &evaluator,
+                                         ValueDecl *VD) const {
+  // Dynamic replacements must be explicit.
+  if (VD->isImplicit())
+    return nullptr;
+
+  auto *attr = VD->getAttrs().getAttribute<DynamicReplacementAttr>();
+  if (!attr) {
+    // It's likely that the accessor isn't annotated but its storage is.
+    if (auto *AD = dyn_cast<AccessorDecl>(VD)) {
+      // Try to grab the attribute from the storage.
+      attr = AD->getStorage()->getAttrs().getAttribute<DynamicReplacementAttr>();
+    }
+
+    if (!attr) {
+      // Otherwise, it's not dynamically replacing anything.
+      return nullptr;
+    }
+  }
+
+  // If the attribute is invalid, bail.
+  if (attr->isInvalid())
+    return nullptr;
+
+  // If we can lazily resolve the function, do so now.
+  if (auto *LazyResolver = attr->Resolver) {
+    auto decl = attr->Resolver->loadDynamicallyReplacedFunctionDecl(
+        attr, attr->ResolverContextData);
+    attr->Resolver = nullptr;
+    return decl;
+  }
+
+  auto &Ctx = VD->getASTContext();
+  if (auto *AD = dyn_cast<AccessorDecl>(VD)) {
+    return findReplacedAccessor(attr->getReplacedFunctionName(), AD, attr, Ctx);
+  }
+
+  if (auto *AFD = dyn_cast<AbstractFunctionDecl>(VD)) {
+    return findReplacedFunction(attr->getReplacedFunctionName(), AFD,
+                                attr, &Ctx.Diags);
+  }
+
+  if (auto *SD = dyn_cast<AbstractStorageDecl>(VD)) {
+    return findReplacedStorageDecl(attr->getReplacedFunctionName(), SD, attr);
+  }
+
+  return nullptr;
 }

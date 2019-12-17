@@ -615,6 +615,11 @@ def create_argument_parser():
     option(['--build-libparser-only'], store_true('build_libparser_only'),
            help='build only libParser for SwiftSyntax')
 
+    option('--skip-build-clang-tools-extra',
+           toggle_false('build_clang_tools_extra'),
+           default=True,
+           help='skip building clang-tools-extra as part of llvm')
+
     # -------------------------------------------------------------------------
     in_group('Extra actions to perform before or in addition to building')
 

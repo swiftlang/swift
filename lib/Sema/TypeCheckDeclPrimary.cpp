@@ -2056,7 +2056,8 @@ public:
     // Force these requests in case they emit diagnostics.
     (void) FD->getInterfaceType();
     (void) FD->getOperatorDecl();
-
+    (void) FD->getDynamicallyReplacedDecl();
+    
     if (!FD->isInvalid()) {
       checkGenericParams(FD);
       TypeChecker::checkReferencedGenericParams(FD);

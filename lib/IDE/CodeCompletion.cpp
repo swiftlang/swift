@@ -2168,6 +2168,14 @@ public:
     addValueBaseName(Builder, Name);
     setClangDeclKeywords(VD, Pairs, Builder);
 
+    // "not recommended" in its own getter.
+    if (Kind == LookupKind::ValueInDeclContext) {
+      if (auto accessor = dyn_cast<AccessorDecl>(CurrDeclContext)) {
+        if (accessor->getStorage() == VD && accessor->isGetter())
+          Builder.setNotRecommended(CodeCompletionResult::NoReason);
+      }
+    }
+
     if (!VD->hasInterfaceType())
       return;
 

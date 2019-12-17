@@ -262,6 +262,8 @@ macro(configure_sdk_unix name architectures)
         set(_swift_android_prebuilt_build linux-x86_64)
       elseif(CMAKE_HOST_SYSTEM_NAME STREQUAL Windows)
         set(_swift_android_prebuilt_build Windows-x86_64)
+      elseif(CMAKE_HOST_SYSTEM_NAME STREQUAL Android)
+        # When building natively on an Android host, there's no NDK or prebuilt suffix.
       else()
         message(SEND_ERROR "cannot cross-compile to android from ${CMAKE_HOST_SYSTEM_NAME}")
       endif()

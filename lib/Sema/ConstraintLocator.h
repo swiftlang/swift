@@ -811,8 +811,10 @@ public:
     : previous(locator), element(),
       summaryFlags(locator ? locator->getSummaryFlags() : 0) { }
 
-  /// Retrieve a new path with the given path element added to it.
-  ConstraintLocatorBuilder withPathElement(LocatorPathElt newElt) {
+  /// Retrieve a new path with the given path element added to it. Note that
+  /// the produced locator stores a reference to this locator, and therefore
+  /// must not outlive it.
+  ConstraintLocatorBuilder withPathElement(LocatorPathElt newElt) & {
     unsigned newFlags = summaryFlags | newElt.getNewSummaryFlags();
     if (!element)
       return ConstraintLocatorBuilder(previous, newElt, newFlags);

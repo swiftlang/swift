@@ -738,6 +738,13 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) const {
   if (shouldAttemptFixes() && result.Bindings.empty() &&
       typeVar->getImpl().canBindToHole()) {
     result.IsHole = true;
+    // If the base of the unresolved member reference like `.foo`
+    // couldn't be resolved we'd want to bind it to a hole at the
+    // very last moment possible, just like generic parameters.
+    auto *locator = typeVar->getImpl().getLocator();
+    if (locator->isLastElement<LocatorPathElt::MemberRefBase>())
+      result.PotentiallyIncomplete = true;
+
     result.addPotentialBinding({getASTContext().TheUnresolvedType,
         AllowedBindingKind::Exact, ConstraintKind::Defaultable, nullptr,
         typeVar->getImpl().getLocator()});

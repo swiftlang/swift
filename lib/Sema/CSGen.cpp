@@ -1507,10 +1507,13 @@ namespace {
 
       auto memberLocator
         = CS.getConstraintLocator(expr, ConstraintLocator::UnresolvedMember);
-      auto baseTy = CS.createTypeVariable(baseLocator, TVO_CanBindToNoEscape);
-      auto memberTy = CS.createTypeVariable(memberLocator,
-                                            TVO_CanBindToLValue |
-                                            TVO_CanBindToNoEscape);
+
+      // Since base type in this case is completely dependent on context it
+      // should be marked as a potential hole.
+      auto baseTy = CS.createTypeVariable(baseLocator, TVO_CanBindToNoEscape |
+                                                           TVO_CanBindToHole);
+      auto memberTy = CS.createTypeVariable(
+          memberLocator, TVO_CanBindToLValue | TVO_CanBindToNoEscape);
 
       // An unresolved member expression '.member' is modeled as a value member
       // constraint
@@ -1852,7 +1855,6 @@ namespace {
 
       // Introduce conversions from each element to the element type of the
       // array.
-      ConstraintLocatorBuilder builder(locator);
       unsigned index = 0;
       for (auto element : expr->getElements()) {
         CS.addConstraint(ConstraintKind::Conversion,
@@ -2515,10 +2517,6 @@ namespace {
     }
 
     Type visitDefaultArgumentExpr(DefaultArgumentExpr *expr) {
-      return expr->getType();
-    }
-
-    Type visitCallerDefaultArgumentExpr(CallerDefaultArgumentExpr *expr) {
       return expr->getType();
     }
 
@@ -3462,8 +3460,7 @@ namespace {
     }
 
     bool isSyntheticArgumentExpr(const Expr *expr) {
-      if (isa<DefaultArgumentExpr>(expr) ||
-          isa<CallerDefaultArgumentExpr>(expr))
+      if (isa<DefaultArgumentExpr>(expr))
         return true;
 
       if (auto *varargExpr = dyn_cast<VarargExpansionExpr>(expr))
@@ -3917,8 +3914,7 @@ swift::getOriginalArgumentList(Expr *expr) {
   OriginalArgumentList result;
 
   auto add = [&](Expr *arg, Identifier label, SourceLoc labelLoc) {
-    if (isa<DefaultArgumentExpr>(arg) ||
-        isa<CallerDefaultArgumentExpr>(arg)) {
+    if (isa<DefaultArgumentExpr>(arg)) {
       return;
     }
 

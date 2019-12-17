@@ -392,7 +392,6 @@ removeCodeCompletionTokens(StringRef Input, StringRef TokenName,
     if (match[1].str() != TokenName)
       continue;
     *CompletionOffset = CleanFile.size();
-    CleanFile.push_back('\0');
     if (match.size() == 2 || !match[2].matched)
       continue;
 

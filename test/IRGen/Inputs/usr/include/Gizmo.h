@@ -45,6 +45,7 @@ typedef long NSInteger;
 - (void) setFrame: (struct NSRect) rect;
 - (void) frob;
 - (void) test: (struct Fob) fob;
+- (void) perform: (void (^)(NS_CONSUMED Gizmo*)) block;
 + (void) runce;
 @end
 

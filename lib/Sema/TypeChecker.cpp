@@ -35,6 +35,7 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/Timer.h"
@@ -289,6 +290,7 @@ static void bindExtensions(SourceFile &SF) {
 
 static void typeCheckFunctionsAndExternalDecls(SourceFile &SF, TypeChecker &TC) {
   unsigned currentFunctionIdx = 0;
+  unsigned currentSynthesizedDecl = SF.LastCheckedSynthesizedDecl;
   do {
     // Type check the body of each of the function in turn.  Note that outside
     // functions must be visited before nested functions for type-checking to
@@ -300,7 +302,18 @@ static void typeCheckFunctionsAndExternalDecls(SourceFile &SF, TypeChecker &TC) 
 
       TypeChecker::typeCheckAbstractFunctionBody(AFD);
     }
-  } while (currentFunctionIdx < TC.definedFunctions.size());
+
+    // Type check synthesized functions and their bodies.
+    for (unsigned n = SF.SynthesizedDecls.size();
+         currentSynthesizedDecl != n;
+         ++currentSynthesizedDecl) {
+      auto decl = SF.SynthesizedDecls[currentSynthesizedDecl];
+      TypeChecker::typeCheckDecl(decl);
+    }
+
+  } while (currentFunctionIdx < TC.definedFunctions.size() ||
+           currentSynthesizedDecl < SF.SynthesizedDecls.size());
+
 
   for (AbstractFunctionDecl *FD : llvm::reverse(TC.definedFunctions)) {
     TypeChecker::computeCaptures(FD);
@@ -310,26 +323,35 @@ static void typeCheckFunctionsAndExternalDecls(SourceFile &SF, TypeChecker &TC) 
 }
 
 void swift::performTypeChecking(SourceFile &SF, unsigned StartElem) {
-  if (SF.ASTStage == SourceFile::TypeChecked)
-    return;
+  return (void)evaluateOrDefault(SF.getASTContext().evaluator,
+                                 TypeCheckSourceFileRequest{&SF, StartElem},
+                                 false);
+}
+
+llvm::Expected<bool>
+TypeCheckSourceFileRequest::evaluate(Evaluator &eval,
+                                     SourceFile *SF, unsigned StartElem) const {
+  assert(SF && "Source file cannot be null!");
+  assert(SF->ASTStage != SourceFile::TypeChecked &&
+         "Should not be re-typechecking this file!");
 
   // Eagerly build the top-level scopes tree before type checking
   // because type-checking expressions mutates the AST and that throws off the
   // scope-based lookups. Only the top-level scopes because extensions have not
   // been bound yet.
-  auto &Ctx = SF.getASTContext();
-  if (Ctx.LangOpts.EnableASTScopeLookup && SF.isSuitableForASTScopes())
-    SF.getScope()
+  auto &Ctx = SF->getASTContext();
+  if (Ctx.LangOpts.EnableASTScopeLookup && SF->isSuitableForASTScopes())
+    SF->getScope()
         .buildEnoughOfTreeForTopLevelExpressionsButDontRequestGenericsOrExtendedNominals();
 
-  BufferIndirectlyCausingDiagnosticRAII cpr(SF);
+  BufferIndirectlyCausingDiagnosticRAII cpr(*SF);
 
   // Make sure we have a type checker.
   TypeChecker &TC = createTypeChecker(Ctx);
 
   // Make sure that name binding has been completed before doing any type
   // checking.
-  performNameBinding(SF, StartElem);
+  performNameBinding(*SF, StartElem);
                                   
   // Could build scope maps here because the AST is stable now.
 
@@ -340,22 +362,22 @@ void swift::performTypeChecking(SourceFile &SF, unsigned StartElem) {
       // Disable this optimization if we're compiling SwiftOnoneSupport, because
       // we _definitely_ need to look inside every declaration to figure out
       // what gets prespecialized.
-      if (SF.getParentModule()->isOnoneSupportModule())
+      if (SF->getParentModule()->isOnoneSupportModule())
         Ctx.TypeCheckerOpts.SkipNonInlinableFunctionBodies = false;
 
     if (!Ctx.LangOpts.DisableAvailabilityChecking) {
       // Build the type refinement hierarchy for the primary
       // file before type checking.
-      TypeChecker::buildTypeRefinementContextHierarchy(SF, StartElem);
+      TypeChecker::buildTypeRefinementContextHierarchy(*SF, StartElem);
     }
 
     // Resolve extensions. This has to occur first during type checking,
     // because the extensions need to be wired into the AST for name lookup
     // to work.
-    ::bindExtensions(SF);
+    ::bindExtensions(*SF);
 
     // Type check the top-level elements of the source file.
-    for (auto D : llvm::makeArrayRef(SF.Decls).slice(StartElem)) {
+    for (auto D : llvm::makeArrayRef(SF->Decls).slice(StartElem)) {
       if (auto *TLCD = dyn_cast<TopLevelCodeDecl>(D)) {
         // Immediately perform global name-binding etc.
         TypeChecker::typeCheckTopLevelCodeDecl(TLCD);
@@ -367,44 +389,18 @@ void swift::performTypeChecking(SourceFile &SF, unsigned StartElem) {
 
     // If we're in REPL mode, inject temporary result variables and other stuff
     // that the REPL needs to synthesize.
-    if (SF.Kind == SourceFileKind::REPL && !Ctx.hadError())
-      TypeChecker::processREPLTopLevel(SF, StartElem);
+    if (SF->Kind == SourceFileKind::REPL && !Ctx.hadError())
+      TypeChecker::processREPLTopLevel(*SF, StartElem);
 
-    typeCheckFunctionsAndExternalDecls(SF, TC);
+    typeCheckFunctionsAndExternalDecls(*SF, TC);
   }
 
   // Checking that benefits from having the whole module available.
   if (!Ctx.TypeCheckerOpts.DelayWholeModuleChecking) {
-    performWholeModuleTypeChecking(SF);
+    performWholeModuleTypeChecking(*SF);
   }
 
-  // Verify that we've checked types correctly.
-  SF.ASTStage = SourceFile::TypeChecked;
-
-  {
-    FrontendStatsTracer tracer(Ctx.Stats, "AST verification");
-    // Verify the SourceFile.
-    verify(SF);
-
-    // Verify imported modules.
-    //
-    // Skip per-file verification in whole-module mode. Verifying imports
-    // between files could cause the importer to cache declarations without
-    // adding them to the ASTContext. This happens when the importer registers a
-    // declaration without a valid TypeChecker instance, as is the case during
-    // verification. A subsequent file may require that declaration to be fully
-    // imported (e.g. to synthesized a function body), but since it has already
-    // been cached, it will never be added to the ASTContext. The solution is to
-    // skip verification and avoid caching it.
-#ifndef NDEBUG
-    if (!Ctx.TypeCheckerOpts.DelayWholeModuleChecking &&
-        SF.Kind != SourceFileKind::REPL &&
-        SF.Kind != SourceFileKind::SIL &&
-        !Ctx.LangOpts.DebuggerSupport) {
-      Ctx.verifyAllLoadedModules();
-    }
-#endif
-  }
+  return true;
 }
 
 void swift::performWholeModuleTypeChecking(SourceFile &SF) {

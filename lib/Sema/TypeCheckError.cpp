@@ -679,8 +679,7 @@ private:
   Classification classifyRethrowsArgument(Expr *arg, Type paramType) {
     arg = arg->getValueProvidingExpr();
 
-    if (isa<DefaultArgumentExpr>(arg) ||
-        isa<CallerDefaultArgumentExpr>(arg)) {
+    if (isa<DefaultArgumentExpr>(arg)) {
       return classifyArgumentByType(arg->getType(),
                                     PotentialReason::forDefaultArgument());
     }

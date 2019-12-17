@@ -2339,7 +2339,7 @@ std::string Demangler::demangleBridgedMethodParams() {
 
   while (!nextIf('_')) {
     auto c = nextChar();
-    if (c != 'n' && c != 'b')
+    if (c != 'n' && c != 'b' && c != 'g')
       return std::string();
     Str.push_back(c);
   }

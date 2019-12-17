@@ -411,6 +411,26 @@ public:
   }
 };
 
+// Decl was not deserialized because its attributes did not match the filter.
+//
+// \sa getDeclChecked
+class DeclAttributesDidNotMatch : public llvm::ErrorInfo<DeclAttributesDidNotMatch> {
+  friend ErrorInfo;
+  static const char ID;
+  void anchor() override;
+
+public:
+  DeclAttributesDidNotMatch() {}
+
+  void log(raw_ostream &OS) const override {
+    OS << "Decl attributes did not match filter";
+  }
+
+  std::error_code convertToErrorCode() const override {
+    return llvm::inconvertibleErrorCode();
+  }
+};
+
 LLVM_NODISCARD
 static inline std::unique_ptr<llvm::ErrorInfoBase>
 takeErrorInfo(llvm::Error error) {

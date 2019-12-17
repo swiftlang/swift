@@ -154,6 +154,11 @@ namespace {
         return { false, E };
       }
 
+      // Caller-side default arguments need their @autoclosures checked.
+      if (auto *DAE = dyn_cast<DefaultArgumentExpr>(E))
+        if (DAE->isCallerSide() && DAE->getParamDecl()->isAutoClosure())
+          DAE->getCallerSideDefaultExpr()->walk(*this);
+
       return { true, E };
     }
 
@@ -2121,15 +2126,11 @@ TypeCheckFunctionBodyUntilRequest::evaluate(Evaluator &evaluator,
                                                             builderType);
       if (!body)
         return true;
-    } else if (func->hasSingleExpressionBody()) {
-      auto resultTypeLoc = func->getBodyResultTypeLoc();
-      auto expr = func->getSingleExpressionBody();
-
-      if (resultTypeLoc.isNull() || resultTypeLoc.getType()->isVoid()) {
-        // The function returns void.  We don't need an explicit return, no matter
-        // what the type of the expression is.  Take the inserted return back out.
-        body->setFirstElement(expr);
-      }
+    } else if (func->hasSingleExpressionBody() &&
+               func->getResultInterfaceType()->isVoid()) {
+      // The function returns void.  We don't need an explicit return, no matter
+      // what the type of the expression is.  Take the inserted return back out.
+      body->setFirstElement(func->getSingleExpressionBody());
     }
   } else if (isa<ConstructorDecl>(AFD) &&
              (body->empty() ||

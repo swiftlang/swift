@@ -527,12 +527,13 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
     replacedObjectiveCFunc = MF->getIdentifier(replacedFunctionID);
   }
 
-  auto linkage = fromStableSILLinkage(rawLinkage);
-  if (!linkage) {
+  auto linkageOpt = fromStableSILLinkage(rawLinkage);
+  if (!linkageOpt) {
     LLVM_DEBUG(llvm::dbgs() << "invalid linkage code " << rawLinkage
                             << " for SILFunction\n");
     MF->fatal();
   }
+  SILLinkage linkage = linkageOpt.getValue();
 
   ValueDecl *clangNodeOwner = nullptr;
   if (clangNodeOwnerID != 0) {
@@ -569,16 +570,22 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
     fn->setSerialized(IsSerialized_t(isSerialized));
 
     if (SILMod.getOptions().MergePartialModules)
-      fn->setLinkage(*linkage);
+      fn->setLinkage(linkage);
 
     // Don't override the transparency or linkage of a function with
     // an existing declaration, except if we deserialized a
     // PublicNonABI function, which has HiddenExternal when
     // referenced as a declaration, and SharedExternal when it has
     // a deserialized body.
-    if (fn->getLinkage() == SILLinkage::HiddenExternal &&
-        linkage == SILLinkage::PublicNonABI) {
-      fn->setLinkage(SILLinkage::SharedExternal);
+    if (isAvailableExternally(fn->getLinkage())) {
+      if (linkage == SILLinkage::PublicNonABI) {
+        fn->setLinkage(SILLinkage::SharedExternal);
+      } else if (hasPublicVisibility(linkage)) {
+        // Cross-module-optimization can change the linkage to public. In this
+        // case we need to update the linkage of the function (which is
+        // originally just derived from the AST).
+        fn->setLinkage(SILLinkage::PublicExternal);
+      }
     }
 
     if (fn->isDynamicallyReplaceable() != isDynamic) {
@@ -589,7 +596,7 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
   } else {
     // Otherwise, create a new function.
     fn = builder.createDeclaration(name, ty, loc);
-    fn->setLinkage(linkage.getValue());
+    fn->setLinkage(linkage);
     fn->setTransparent(IsTransparent_t(isTransparent == 1));
     fn->setSerialized(IsSerialized_t(isSerialized));
     fn->setThunk(IsThunk_t(isThunk));
@@ -2545,7 +2552,8 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   return false;
 }
 
-SILFunction *SILDeserializer::lookupSILFunction(SILFunction *InFunc) {
+SILFunction *SILDeserializer::lookupSILFunction(SILFunction *InFunc,
+                                                bool onlyUpdateLinkage) {
   StringRef name = InFunc->getName();
   if (!FuncTable)
     return nullptr;
@@ -2553,8 +2561,9 @@ SILFunction *SILDeserializer::lookupSILFunction(SILFunction *InFunc) {
   if (iter == FuncTable->end())
     return nullptr;
 
+  // Re-reading the function as declaration will update the linkage.
   auto maybeFunc = readSILFunctionChecked(*iter, InFunc, name,
-                                          /*declarationOnly*/ false);
+                                        /*declarationOnly*/ onlyUpdateLinkage);
   if (!maybeFunc) {
     // Ignore the error; treat it as if we didn't have a definition.
     consumeError(maybeFunc.takeError());

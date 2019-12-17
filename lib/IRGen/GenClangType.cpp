@@ -12,6 +12,8 @@
 //
 //  This file implements generation of Clang AST types from Swift AST types
 //  for types that are representable in Objective-C interfaces.
+//  AST/ClangTypeConverter.cpp duplicates a bunch of code from here, so make
+//  sure to keep the two in sync.
 //
 //===----------------------------------------------------------------------===//
 
@@ -191,7 +193,7 @@ static clang::CanQualType getClangVectorType(const clang::ASTContext &ctx,
                                         clang::VectorType::VectorKind vecKind,
                                              StringRef numEltsString) {
   unsigned numElts;
-  bool failedParse = numEltsString.getAsInteger<unsigned>(10, numElts);
+  bool failedParse = numEltsString.getAsInteger(10, numElts);
   assert(!failedParse && "vector type name didn't end in count?");
   (void) failedParse;
 
@@ -366,36 +368,38 @@ clang::CanQualType GenClangType::visitTupleType(CanTupleType type) {
   return ctx.getCanonicalType(
       ctx.getConstantArrayType(clangEltTy, size,
           clang::ArrayType::Normal, 0));
-
-  llvm_unreachable("Unexpected tuple type in Clang type generation!");
 }
 
 clang::CanQualType GenClangType::visitProtocolType(CanProtocolType type) {
   auto proto = type->getDecl();
+  auto &clangCtx = getClangASTContext();
 
-  // Single protocol -> id<Proto>
-  if (proto->isObjC()) {
-    auto &clangCtx = getClangASTContext();
-    clang::IdentifierInfo *name = &clangCtx.Idents.get(proto->getName().get());
-    auto *PDecl = clang::ObjCProtocolDecl::Create(
-                    const_cast<clang::ASTContext &>(clangCtx),
-                    clangCtx.getTranslationUnitDecl(), name,
-                    clang::SourceLocation(), clang::SourceLocation(), nullptr);
-
-    // Attach an objc_runtime_name attribute with the Objective-C name to use
-    // for this protocol.
-    SmallString<64> runtimeNameBuffer;
-    PDecl->addAttr(clang::ObjCRuntimeNameAttr::CreateImplicit(
-                     PDecl->getASTContext(),
-                     proto->getObjCRuntimeName(runtimeNameBuffer)));
-
-    auto clangType  = clangCtx.getObjCObjectType(clangCtx.ObjCBuiltinIdTy,
-                                                 &PDecl, 1);
-    auto ptrTy = clangCtx.getObjCObjectPointerType(clangType);
-    return clangCtx.getCanonicalType(ptrTy);
+  if (!proto->isObjC()) {
+    std::string s;
+    llvm::raw_string_ostream err(s);
+    err << "Trying to compute the clang type for a non-ObjC protocol type\n";
+    proto->dump(err);
+    llvm::report_fatal_error(err.str());
   }
 
-  return getClangIdType(getClangASTContext());
+  // Single protocol -> id<Proto>
+  clang::IdentifierInfo *name = &clangCtx.Idents.get(proto->getName().get());
+  auto *PDecl = clang::ObjCProtocolDecl::Create(
+                  const_cast<clang::ASTContext &>(clangCtx),
+                  clangCtx.getTranslationUnitDecl(), name,
+                  clang::SourceLocation(), clang::SourceLocation(), nullptr);
+
+  // Attach an objc_runtime_name attribute with the Objective-C name to use
+  // for this protocol.
+  SmallString<64> runtimeNameBuffer;
+  PDecl->addAttr(clang::ObjCRuntimeNameAttr::CreateImplicit(
+                   PDecl->getASTContext(),
+                   proto->getObjCRuntimeName(runtimeNameBuffer)));
+
+  auto clangType  = clangCtx.getObjCObjectType(clangCtx.ObjCBuiltinIdTy,
+                                               &PDecl, 1);
+  auto ptrTy = clangCtx.getObjCObjectPointerType(clangType);
+  return clangCtx.getCanonicalType(ptrTy);
 }
 
 clang::CanQualType GenClangType::visitMetatypeType(CanMetatypeType type) {
@@ -409,29 +413,33 @@ GenClangType::visitExistentialMetatypeType(CanExistentialMetatypeType type) {
 
 clang::CanQualType GenClangType::visitClassType(CanClassType type) {
   auto &clangCtx = getClangASTContext();
-  // produce the clang type INTF * if it is imported ObjC object.
   auto swiftDecl = type->getDecl();
-  if (swiftDecl->isObjC()) {
-    clang::IdentifierInfo *ForwardClassId =
-      &clangCtx.Idents.get(swiftDecl->getName().get());
-    auto *CDecl = clang::ObjCInterfaceDecl::Create(
-                          clangCtx, clangCtx.getTranslationUnitDecl(),
-                          clang::SourceLocation(), ForwardClassId,
-                          /*typeParamList*/nullptr, /*PrevDecl=*/nullptr,
-                          clang::SourceLocation());
 
-    // Attach an objc_runtime_name attribute with the Objective-C name to use
-    // for this class.
-    SmallString<64> runtimeNameBuffer;
-    CDecl->addAttr(clang::ObjCRuntimeNameAttr::CreateImplicit(
-                     CDecl->getASTContext(),
-                     swiftDecl->getObjCRuntimeName(runtimeNameBuffer)));
+  // TODO: [non-objc-class-clang-type-conversion]
+  // Crashing here instead of returning a bogus 'id' leads to test failures,
+  // which is surprising.
+  if (!swiftDecl->isObjC())
+    return getClangIdType(clangCtx);
 
-    auto clangType  = clangCtx.getObjCInterfaceType(CDecl);
-    auto ptrTy = clangCtx.getObjCObjectPointerType(clangType);
-    return clangCtx.getCanonicalType(ptrTy);
-  }
-  return getClangIdType(clangCtx);
+  // produce the clang type INTF * if it is imported ObjC object.
+  clang::IdentifierInfo *ForwardClassId =
+    &clangCtx.Idents.get(swiftDecl->getName().get());
+  auto *CDecl = clang::ObjCInterfaceDecl::Create(
+                        clangCtx, clangCtx.getTranslationUnitDecl(),
+                        clang::SourceLocation(), ForwardClassId,
+                        /*typeParamList*/nullptr, /*PrevDecl=*/nullptr,
+                        clang::SourceLocation());
+
+  // Attach an objc_runtime_name attribute with the Objective-C name to use
+  // for this class.
+  SmallString<64> runtimeNameBuffer;
+  CDecl->addAttr(clang::ObjCRuntimeNameAttr::CreateImplicit(
+                   CDecl->getASTContext(),
+                   swiftDecl->getObjCRuntimeName(runtimeNameBuffer)));
+
+  auto clangType  = clangCtx.getObjCInterfaceType(CDecl);
+  auto ptrTy = clangCtx.getObjCObjectPointerType(clangType);
+  return clangCtx.getCanonicalType(ptrTy);
 }
 
 clang::CanQualType GenClangType::visitBoundGenericClassType(
@@ -443,8 +451,7 @@ clang::CanQualType GenClangType::visitBoundGenericClassType(
 
 clang::CanQualType
 GenClangType::visitBoundGenericType(CanBoundGenericType type) {
-  // We only expect *Pointer<T>, ImplicitlyUnwrappedOptional<T>, and Optional<T>.
-  // The first two are structs; the last is an enum.
+  // We only expect *Pointer<T>, SIMD*<T> and Optional<T>.
   if (auto underlyingTy =
           SILType::getPrimitiveObjectType(type).getOptionalObjectType()) {
     // The underlying type could be a bridged type, which makes any
@@ -585,7 +592,10 @@ clang::CanQualType GenClangType::visitSILFunctionType(CanSILFunctionType type) {
   }
   
   SmallVector<clang::QualType, 4> paramTypes;
+  SmallVector<clang::FunctionProtoType::ExtParameterInfo, 4> extParamInfos;
   for (auto paramTy : type->getParameters()) {
+    clang::FunctionProtoType::ExtParameterInfo extParamInfo;
+
     // Blocks should only take direct +0 parameters.
     switch (paramTy.getConvention()) {
     case ParameterConvention::Direct_Guaranteed:
@@ -594,7 +604,9 @@ clang::CanQualType GenClangType::visitSILFunctionType(CanSILFunctionType type) {
       break;
 
     case ParameterConvention::Direct_Owned:
-      llvm_unreachable("block takes owned parameter");
+      extParamInfo = extParamInfo.withIsConsumed(true);
+      break;
+
     case ParameterConvention::Indirect_In:
     case ParameterConvention::Indirect_In_Constant:
     case ParameterConvention::Indirect_Inout:
@@ -606,12 +618,16 @@ clang::CanQualType GenClangType::visitSILFunctionType(CanSILFunctionType type) {
                              paramTy.getArgumentType(IGM.getSILModule(), type));
     if (param.isNull())
       return clang::CanQualType();
+
     paramTypes.push_back(param);
+    extParamInfos.push_back(extParamInfo);
   }
   
   // Build the Clang function type.
-  clang::FunctionProtoType::ExtProtoInfo defaultEPI;
-  auto fnTy = clangCtx.getFunctionType(resultType, paramTypes, defaultEPI);
+  clang::FunctionProtoType::ExtProtoInfo extProtoInfo;
+  extProtoInfo.ExtParameterInfos = extParamInfos.begin();
+
+  auto fnTy = clangCtx.getFunctionType(resultType, paramTypes, extProtoInfo);
   clang::QualType ptrTy;
   
   switch (kind) {
@@ -685,15 +701,13 @@ clang::CanQualType GenClangType::visitBuiltinRawPointerType(
 clang::CanQualType GenClangType::visitBuiltinIntegerType(
                                                    CanBuiltinIntegerType type) {
   auto &ctx = getClangASTContext();
-  if (type->getWidth().isPointerWidth()) {
+  if (type->getWidth().isPointerWidth())
     return ctx.getCanonicalType(ctx.getUIntPtrType());
-  }
-  if (type->getWidth().isFixedWidth()) {
-    auto width = type->getWidth().getFixedWidth();
-    if (width == 1) return ctx.BoolTy;
-    return ctx.getCanonicalType(ctx.getIntTypeForBitwidth(width, /*signed*/ 0));
-  }
-  llvm_unreachable("");
+  assert(type->getWidth().isFixedWidth());
+  auto width = type->getWidth().getFixedWidth();
+  if (width == 1)
+    return ctx.BoolTy;
+  return ctx.getCanonicalType(ctx.getIntTypeForBitwidth(width, /*signed*/ 0));
 }
 
 clang::CanQualType GenClangType::visitBuiltinFloatType(
@@ -732,21 +746,25 @@ clang::CanQualType GenClangType::visitType(CanType type) {
 }
 
 clang::CanQualType ClangTypeConverter::convert(IRGenModule &IGM, CanType type) {
+  // Look in the cache.
+  auto it = Cache.find(type);
+  if (it != Cache.end()) {
+    return it->second;
+  }
+
   // Try to do this without making cache entries for obvious cases.
   if (auto nominal = dyn_cast<NominalType>(type)) {
     auto decl = nominal->getDecl();
     if (auto clangDecl = decl->getClangDecl()) {
+      auto &ctx = IGM.getClangASTContext();
       if (auto clangTypeDecl = dyn_cast<clang::TypeDecl>(clangDecl)) {
-        auto &ctx = IGM.getClangASTContext();
         return ctx.getCanonicalType(ctx.getTypeDeclType(clangTypeDecl))
             .getUnqualifiedType();
       } else if (auto ifaceDecl = dyn_cast<clang::ObjCInterfaceDecl>(clangDecl)) {
-        auto &ctx = IGM.getClangASTContext();
         auto clangType  = ctx.getObjCInterfaceType(ifaceDecl);
         auto ptrTy = ctx.getObjCObjectPointerType(clangType);
         return ctx.getCanonicalType(ptrTy);
       } else if (auto protoDecl = dyn_cast<clang::ObjCProtocolDecl>(clangDecl)){
-        auto &ctx = IGM.getClangASTContext();
         auto clangType  = ctx.getObjCObjectType(
                             ctx.ObjCBuiltinIdTy,
                             const_cast<clang::ObjCProtocolDecl **>(&protoDecl),
@@ -755,12 +773,6 @@ clang::CanQualType ClangTypeConverter::convert(IRGenModule &IGM, CanType type) {
         return ctx.getCanonicalType(ptrTy);
       }
     }
-  }
-
-  // Look in the cache.
-  auto it = Cache.find(type);
-  if (it != Cache.end()) {
-    return it->second;
   }
 
   // If that failed, convert the type, cache, and return.

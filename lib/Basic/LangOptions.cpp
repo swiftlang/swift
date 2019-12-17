@@ -39,6 +39,7 @@ static const StringRef SupportedConditionalCompilationOSs[] = {
   "PS4",
   "Cygwin",
   "Haiku",
+  "WASI",
 };
 
 static const StringRef SupportedConditionalCompilationArches[] = {
@@ -48,7 +49,8 @@ static const StringRef SupportedConditionalCompilationArches[] = {
   "x86_64",
   "powerpc64",
   "powerpc64le",
-  "s390x"
+  "s390x",
+  "wasm32",
 };
 
 static const StringRef SupportedConditionalCompilationEndianness[] = {
@@ -208,30 +210,51 @@ std::pair<bool, bool> LangOptions::setTarget(llvm::Triple triple) {
   bool UnsupportedOS = false;
 
   // Set the "os" platform condition.
-  if (Target.isMacOSX())
+  switch (Target.getOS()) {
+  case llvm::Triple::Darwin:
+  case llvm::Triple::MacOSX:
     addPlatformConditionValue(PlatformConditionKind::OS, "OSX");
-  else if (Target.isTvOS())
+    break;
+  case llvm::Triple::TvOS:
     addPlatformConditionValue(PlatformConditionKind::OS, "tvOS");
-  else if (Target.isWatchOS())
+    break;
+  case llvm::Triple::WatchOS:
     addPlatformConditionValue(PlatformConditionKind::OS, "watchOS");
-  else if (Target.isiOS())
+    break;
+  case llvm::Triple::IOS:
     addPlatformConditionValue(PlatformConditionKind::OS, "iOS");
-  else if (Target.isAndroid())
-    addPlatformConditionValue(PlatformConditionKind::OS, "Android");
-  else if (Target.isOSLinux())
-    addPlatformConditionValue(PlatformConditionKind::OS, "Linux");
-  else if (Target.isOSFreeBSD())
+    break;
+  case llvm::Triple::Linux:
+    if (Target.getEnvironment() == llvm::Triple::Android)
+      addPlatformConditionValue(PlatformConditionKind::OS, "Android");
+    else
+      addPlatformConditionValue(PlatformConditionKind::OS, "Linux");
+    break;
+  case llvm::Triple::FreeBSD:
     addPlatformConditionValue(PlatformConditionKind::OS, "FreeBSD");
-  else if (Target.isWindowsCygwinEnvironment())
-    addPlatformConditionValue(PlatformConditionKind::OS, "Cygwin");
-  else if (Target.isOSWindows())
-    addPlatformConditionValue(PlatformConditionKind::OS, "Windows");
-  else if (Target.isPS4())
-    addPlatformConditionValue(PlatformConditionKind::OS, "PS4");
-  else if (Target.isOSHaiku())
+    break;
+  case llvm::Triple::Win32:
+    if (Target.getEnvironment() == llvm::Triple::Cygnus)
+      addPlatformConditionValue(PlatformConditionKind::OS, "Cygwin");
+    else
+      addPlatformConditionValue(PlatformConditionKind::OS, "Windows");
+    break;
+  case llvm::Triple::PS4:
+    if (Target.getVendor() == llvm::Triple::SCEI)
+      addPlatformConditionValue(PlatformConditionKind::OS, "PS4");
+    else
+      UnsupportedOS = false;
+    break;
+  case llvm::Triple::Haiku:
     addPlatformConditionValue(PlatformConditionKind::OS, "Haiku");
-  else
+    break;
+  case llvm::Triple::WASI:
+    addPlatformConditionValue(PlatformConditionKind::OS, "WASI");
+    break;
+  default:
     UnsupportedOS = true;
+    break;
+  }
 
   bool UnsupportedArch = false;
 
@@ -259,6 +282,9 @@ std::pair<bool, bool> LangOptions::setTarget(llvm::Triple triple) {
   case llvm::Triple::ArchType::systemz:
     addPlatformConditionValue(PlatformConditionKind::Arch, "s390x");
     break;
+  case llvm::Triple::ArchType::wasm32:
+    addPlatformConditionValue(PlatformConditionKind::Arch, "wasm32");
+    break;
   default:
     UnsupportedArch = true;
   }
@@ -268,37 +294,25 @@ std::pair<bool, bool> LangOptions::setTarget(llvm::Triple triple) {
 
   // Set the "_endian" platform condition.
   switch (Target.getArch()) {
+  default: llvm_unreachable("undefined architecture endianness");
   case llvm::Triple::ArchType::arm:
   case llvm::Triple::ArchType::thumb:
-    addPlatformConditionValue(PlatformConditionKind::Endianness, "little");
-    break;
   case llvm::Triple::ArchType::aarch64:
-    addPlatformConditionValue(PlatformConditionKind::Endianness, "little");
-    break;
-  case llvm::Triple::ArchType::ppc64:
-    addPlatformConditionValue(PlatformConditionKind::Endianness, "big");
-    break;
   case llvm::Triple::ArchType::ppc64le:
-    addPlatformConditionValue(PlatformConditionKind::Endianness, "little");
-    break;
+  case llvm::Triple::ArchType::wasm32:
   case llvm::Triple::ArchType::x86:
-    addPlatformConditionValue(PlatformConditionKind::Endianness, "little");
-    break;
   case llvm::Triple::ArchType::x86_64:
     addPlatformConditionValue(PlatformConditionKind::Endianness, "little");
     break;
+  case llvm::Triple::ArchType::ppc64:
   case llvm::Triple::ArchType::systemz:
     addPlatformConditionValue(PlatformConditionKind::Endianness, "big");
     break;
-  default:
-    llvm_unreachable("undefined architecture endianness");
   }
 
   // Set the "runtime" platform condition.
-  if (EnableObjCInterop)
-    addPlatformConditionValue(PlatformConditionKind::Runtime, "_ObjC");
-  else
-    addPlatformConditionValue(PlatformConditionKind::Runtime, "_Native");
+  addPlatformConditionValue(PlatformConditionKind::Runtime,
+                            EnableObjCInterop ? "_ObjC" : "_Native");
 
   // Set the "targetEnvironment" platform condition if targeting a simulator
   // environment. Otherwise _no_ value is present for targetEnvironment; it's

@@ -28,8 +28,8 @@
 #include "swift/Subsystems.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/DiagnosticsSema.h"
-#include "swift/AST/ExperimentalDependencies.h"
 #include "swift/AST/FileSystem.h"
+#include "swift/AST/FineGrainedDependencies.h"
 #include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/NameLookup.h"
@@ -979,8 +979,8 @@ static void emitReferenceDependenciesForAllPrimaryInputsIfNeeded(
         Invocation.getReferenceDependenciesFilePathForPrimary(
             SF->getFilename());
     if (!referenceDependenciesFilePath.empty()) {
-      if (Invocation.getLangOptions().EnableExperimentalDependencies)
-        (void)experimental_dependencies::emitReferenceDependencies(
+      if (Invocation.getLangOptions().EnableFineGrainedDependencies)
+        (void)fine_grained_dependencies::emitReferenceDependencies(
             Instance.getASTContext().Diags, SF,
             *Instance.getDependencyTracker(), referenceDependenciesFilePath);
       else
@@ -1376,6 +1376,12 @@ static bool processCommandLineAndRunImmediately(CompilerInvocation &Invocation,
       ProcessCmdLine(opts.ImmediateArgv.begin(), opts.ImmediateArgv.end());
   Instance.setSILModule(std::move(SM));
 
+
+  PrettyStackTraceStringAction trace(
+      "running user code",
+      MSF.is<SourceFile *>() ? MSF.get<SourceFile *>()->getFilename()
+                     : MSF.get<ModuleDecl *>()->getModuleFilename());
+
   ReturnValue =
       RunImmediately(Instance, CmdLine, IRGenOpts, Invocation.getSILOptions());
   return Instance.getASTContext().hadError();
@@ -1388,6 +1394,9 @@ static bool validateTBDIfNeeded(CompilerInvocation &Invocation,
   if (!astGuaranteedToCorrespondToSIL ||
       !inputFileKindCanHaveTBDValidated(Invocation.getInputKind()))
     return false;
+    
+  if (Invocation.getSILOptions().CrossModuleOptimization)
+    return false;
 
   const auto &frontendOpts = Invocation.getFrontendOptions();
   auto mode = frontendOpts.ValidateTBDAgainstIR;
@@ -1395,15 +1404,13 @@ static bool validateTBDIfNeeded(CompilerInvocation &Invocation,
   switch (mode) {
   case FrontendOptions::TBDValidationMode::Default:
 #ifndef NDEBUG
-    // When a debug compiler is targeting an apple platform, we do some
-    // validation by default.
-    if (Invocation.getLangOptions().Target.getVendor() == llvm::Triple::Apple) {
-      mode = FrontendOptions::TBDValidationMode::MissingFromTBD;
-      break;
-    }
-#endif
+    // With a debug compiler, we do some validation by default.
+    mode = FrontendOptions::TBDValidationMode::MissingFromTBD;
+    break;
+#else
     // Otherwise, the default is to do nothing.
     LLVM_FALLTHROUGH;
+#endif
   case FrontendOptions::TBDValidationMode::None:
     return false;
   case FrontendOptions::TBDValidationMode::All:

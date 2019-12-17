@@ -349,6 +349,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.StressASTScopeLookup |= Args.hasArg(OPT_stress_astscope_lookup);
   Opts.WarnIfASTScopeLookup |= Args.hasArg(OPT_warn_if_astscope_lookup);
   Opts.LazyASTScopes |= Args.hasArg(OPT_lazy_astscopes);
+  Opts.UseClangFunctionTypes |= Args.hasArg(OPT_use_clang_function_types);
 
   Opts.NamedLazyMemberLoading &= !Args.hasArg(OPT_disable_named_lazy_member_loading);
 
@@ -357,11 +358,11 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.VerifySyntaxTree = true;
   }
   
-  if (Args.hasArg(OPT_enable_experimental_dependencies))
-    Opts.EnableExperimentalDependencies = true;
+  if (Args.hasArg(OPT_enable_fine_grained_dependencies))
+    Opts.EnableFineGrainedDependencies = true;
 
-  if (Args.hasArg(OPT_experimental_dependency_include_intrafile))
-    Opts.ExperimentalDependenciesIncludeIntrafileOnes = true;
+  if (Args.hasArg(OPT_fine_grained_dependency_include_intrafile))
+    Opts.FineGrainedDependenciesIncludeIntrafileOnes = true;
 
   if (Args.hasArg(OPT_enable_experimental_differentiable_programming))
     Opts.EnableExperimentalDifferentiableProgramming = true;
@@ -871,6 +872,7 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   Opts.EnableARCOptimizations &= !Args.hasArg(OPT_disable_arc_opts);
   Opts.EnableOSSAOptimizations &= !Args.hasArg(OPT_disable_ossa_opts);
   Opts.DisableSILPerfOptimizations |= Args.hasArg(OPT_disable_sil_perf_optzns);
+  Opts.CrossModuleOptimization |= Args.hasArg(OPT_CrossModuleOptimization);
   Opts.VerifyAll |= Args.hasArg(OPT_sil_verify_all);
   Opts.DebugSerialization |= Args.hasArg(OPT_sil_debug_serialization);
   Opts.EmitVerboseSIL |= Args.hasArg(OPT_emit_verbose_sil);

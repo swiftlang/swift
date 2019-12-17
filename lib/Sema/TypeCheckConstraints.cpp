@@ -36,6 +36,7 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/TypeCheckerDebugConsumer.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Parse/Confusables.h"
 #include "swift/Parse/Lexer.h"
@@ -80,14 +81,6 @@ void SavedTypeVariableBinding::restore() {
 GenericTypeParamType *
 TypeVariableType::Implementation::getGenericParameter() const {
   return locator ? locator->getGenericParameter() : nullptr;
-}
-
-// Only allow allocation of resolved overload set list items using the
-// allocator in ASTContext.
-void *ResolvedOverloadSetListItem::operator new(size_t bytes,
-                                                ConstraintSystem &cs,
-                                                unsigned alignment) {
-  return cs.getAllocator().Allocate(bytes, alignment);
 }
 
 void *operator new(size_t bytes, ConstraintSystem& cs,
@@ -2301,7 +2294,7 @@ Type TypeChecker::typeCheckExpressionImpl(Expr *&expr, DeclContext *dc,
 
 Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
                                             DeclContext *DC, Type paramType,
-                                            bool isAutoClosure, bool canFail) {
+                                            bool isAutoClosure) {
   assert(paramType && !paramType->hasError());
 
   if (isAutoClosure) {
@@ -2323,12 +2316,12 @@ Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
     AutoClosureListener listener(fnType);
     return typeCheckExpression(defaultValue, DC,
                                TypeLoc::withoutLoc(fnType->getResult()),
-                               canFail ? CTP_DefaultParameter : CTP_CannotFail,
-                               TypeCheckExprOptions(), &listener);
+                               CTP_DefaultParameter, TypeCheckExprOptions(),
+                               &listener);
   }
 
   return typeCheckExpression(defaultValue, DC, TypeLoc::withoutLoc(paramType),
-                             canFail ? CTP_DefaultParameter : CTP_CannotFail);
+                             CTP_DefaultParameter);
 }
 
 Type TypeChecker::
@@ -2610,26 +2603,25 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
       if (cs) {
         Type valueType = LValueType::get(initType);
         auto dc = wrappedVar->getInnermostDeclContext();
-        auto emptyLocator = cs->getConstraintLocator(nullptr);
+        auto *loc = cs->getConstraintLocator(initializer);
 
         for (unsigned i : indices(wrappedVar->getAttachedPropertyWrappers())) {
           auto wrapperInfo = wrappedVar->getAttachedPropertyWrapperTypeInfo(i);
           if (!wrapperInfo)
             break;
 
-          Type memberType =
-              cs->createTypeVariable(emptyLocator, TVO_CanBindToLValue);
+          loc = cs->getConstraintLocator(loc, ConstraintLocator::Member);
+          Type memberType = cs->createTypeVariable(loc, TVO_CanBindToLValue);
           cs->addValueMemberConstraint(
               valueType, wrapperInfo.valueVar->getFullName(),
-              memberType, dc, FunctionRefKind::Unapplied, { }, emptyLocator);
+              memberType, dc, FunctionRefKind::Unapplied, { }, loc);
           valueType = memberType;
         }
         
         // Set up an equality constraint to drop the lvalue-ness of the value
         // type we produced.
-        Type propertyType = cs->createTypeVariable(emptyLocator, 0);
-        cs->addConstraint(ConstraintKind::Equal, propertyType, valueType,
-                          emptyLocator);
+        Type propertyType = cs->createTypeVariable(loc, 0);
+        cs->addConstraint(ConstraintKind::Equal, propertyType, valueType, loc);
         return propertyType;
       }
 
@@ -3540,7 +3532,7 @@ void Solution::dump(raw_ostream &out) const {
     out.indent(2);
     Type(typeVar).print(out, PO);
     out << " as ";
-    binding.second.print(out);
+    binding.second.print(out, PO);
     if (auto *locator = typeVar->getImpl().getLocator()) {
       out << " @ ";
       locator->dump(sm, out);
@@ -3757,13 +3749,13 @@ void ConstraintSystem::print(raw_ostream &out) const {
     });
   }
 
-  if (resolvedOverloadSets) {
+  if (!ResolvedOverloads.empty()) {
     out << "Resolved overloads:\n";
 
     // Otherwise, report the resolved overloads.
-    for (auto resolved = resolvedOverloadSets;
-         resolved; resolved = resolved->Previous) {
-      auto &choice = resolved->Choice;
+    for (auto elt : ResolvedOverloads) {
+      auto resolved = elt.second;
+      auto &choice = resolved.choice;
       out << "  selected overload set choice ";
       switch (choice.getKind()) {
       case OverloadChoiceKind::Decl:
@@ -3773,8 +3765,8 @@ void ConstraintSystem::print(raw_ostream &out) const {
         if (choice.getBaseType())
           out << choice.getBaseType()->getString(PO) << ".";
         out << choice.getDecl()->getBaseName() << ": "
-            << resolved->BoundType->getString(PO) << " == "
-            << resolved->ImpliedType->getString(PO) << "\n";
+            << resolved.boundType->getString(PO) << " == "
+            << resolved.openedType->getString(PO) << "\n";
         break;
 
       case OverloadChoiceKind::BaseType:
@@ -4568,4 +4560,23 @@ ForcedCheckedCastExpr *swift::findForcedDowncast(ASTContext &ctx, Expr *expr) {
   }
 
   return nullptr;
+}
+
+llvm::Expected<bool>
+IsCallableNominalTypeRequest::evaluate(Evaluator &evaluator, CanType ty,
+                                       DeclContext *dc) const {
+  auto options = defaultMemberLookupOptions;
+  options |= NameLookupFlags::IgnoreAccessControl;
+  if (isa<AbstractFunctionDecl>(dc))
+    options |= NameLookupFlags::KnownPrivate;
+
+  // Look for a callAsFunction method.
+  auto &ctx = ty->getASTContext();
+  auto results =
+      TypeChecker::lookupMember(dc, ty, ctx.Id_callAsFunction, options);
+  return llvm::any_of(results, [](LookupResultEntry entry) -> bool {
+    if (auto *fd = dyn_cast<FuncDecl>(entry.getValueDecl()))
+      return fd->isCallAsFunctionMethod();
+    return false;
+  });
 }

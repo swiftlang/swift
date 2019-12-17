@@ -375,8 +375,8 @@ ValidationInfo serialization::validateSerializedAST(
   ValidationInfo result;
 
   // Check 32-bit alignment.
-  if (data.size() % 4 != 0 ||
-      reinterpret_cast<uintptr_t>(data.data()) % 4 != 0)
+  if (data.size() % SWIFTMODULE_ALIGNMENT != 0 ||
+      reinterpret_cast<uintptr_t>(data.data()) % SWIFTMODULE_ALIGNMENT != 0)
     return result;
 
   llvm::BitstreamCursor cursor(data);
@@ -2539,11 +2539,20 @@ ModuleFile::collectLinkLibraries(ModuleDecl::LinkLibraryCallback callback) const
     callback(LinkLibrary(Name, LibraryKind::Framework));
 }
 
-void ModuleFile::getTopLevelDecls(SmallVectorImpl<Decl *> &results) {
+void ModuleFile::getTopLevelDecls(
+       SmallVectorImpl<Decl *> &results,
+       llvm::function_ref<bool(DeclAttributes)> matchAttributes) {
   PrettyStackTraceModuleFile stackEntry(*this);
   for (DeclID entry : OrderedTopLevelDecls) {
-    Expected<Decl *> declOrError = getDeclChecked(entry);
+    Expected<Decl *> declOrError = getDeclChecked(entry, matchAttributes);
     if (!declOrError) {
+      if (declOrError.errorIsA<DeclAttributesDidNotMatch>()) {
+        // Decl rejected by matchAttributes, ignore it.
+        assert(matchAttributes);
+        consumeError(declOrError.takeError());
+        continue;
+      }
+
       if (!getContext().LangOpts.EnableDeserializationRecovery)
         fatal(declOrError.takeError());
       consumeError(declOrError.takeError());

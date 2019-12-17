@@ -164,6 +164,9 @@ def warn_if_astscope_lookup : Flag<["-"], "warn-if-astscope-lookup">,
 def lazy_astscopes : Flag<["-"], "lazy-astscopes">,
   HelpText<"Build ASTScopes lazily">;
 
+def use_clang_function_types : Flag<["-"], "use-clang-function-types">,
+  HelpText<"Use stored Clang function types for computing canonical types.">;
+
 def print_clang_stats : Flag<["-"], "print-clang-stats">,
   HelpText<"Print Clang importer statistics">;
 
