@@ -667,9 +667,8 @@ ParserResult<TypeRepr> Parser::parseTypeIdentifier() {
   SourceLoc EndLoc;
   while (true) {
     DeclNameLoc Loc;
-    DeclNameRef Name = parseUnqualifiedDeclBaseName(
-        /*afterDot=*/false, Loc,
-        diag::expected_identifier_in_dotted_type);
+    DeclNameRef Name =
+        parseDeclNameRef(Loc, diag::expected_identifier_in_dotted_type, {});
     if (!Name)
       Status.setIsParseError();
 
