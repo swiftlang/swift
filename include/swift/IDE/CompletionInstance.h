@@ -47,9 +47,9 @@ class CompletionInstance {
   /// changed, primary file is not the same, the \c Offset is not in function
   /// bodies, or the interface hash of the file has changed.
   swift::CompilerInstance *
-  getReusingCompilerInstance(const swift::CompilerInvocation &Invocation,
-                             llvm::MemoryBuffer *completionBuffer,
-                             unsigned int Offset, DiagnosticConsumer *DiagC);
+  getCachedCompilerInstance(const swift::CompilerInvocation &Invocation,
+                            llvm::MemoryBuffer *completionBuffer,
+                            unsigned int Offset, DiagnosticConsumer *DiagC);
 
   /// Returns new \c CompilerInstance for the completion request. Users still
   /// have to call \c performParseAndResolveImportsOnly() , and perform the
