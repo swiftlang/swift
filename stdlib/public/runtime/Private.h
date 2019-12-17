@@ -50,10 +50,8 @@ public:
 
 #define REF_STORAGE(Name, ...) \
   void set##Name() { Data |= Name; } \
-  bool is##Name() const { return Data == Name; }
+  bool is##Name() const { return Data & Name; }
 #include "swift/AST/ReferenceStorage.def"
-
-  bool isStrong() const { return Data == 0; }
 };
 
 /// Type information consists of metadata and its ownership info,
@@ -78,11 +76,9 @@ public:
   const Metadata *getMetadata() const { return Response.Value; }
   MetadataResponse getResponse() const { return Response; }
 
-#define REF_STORAGE(Name, ...) \
-  bool is##Name() const { return ReferenceOwnership.is##Name(); }
-#include "swift/AST/ReferenceStorage.def"
-
-  bool isStrong() const { return ReferenceOwnership.isStrong(); }
+  bool isWeak() const { return ReferenceOwnership.isWeak(); }
+  bool isUnowned() const { return ReferenceOwnership.isUnowned(); }
+  bool isUnmanaged() const { return ReferenceOwnership.isUnmanaged(); }
 
   TypeReferenceOwnership getReferenceOwnership() const {
     return ReferenceOwnership;

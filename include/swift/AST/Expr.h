@@ -1741,17 +1741,6 @@ public:
          llvm::function_ref<Type(const Expr *)> getType =
              [](const Expr *E) -> Type { return E->getType(); });
 
-  /// Create a new dynamic subscript.
-  static DynamicSubscriptExpr *create(ASTContext &ctx, Expr *base,
-                                      SourceLoc lSquareLoc,
-                                      ArrayRef<Expr *> indexArgs,
-                                      ArrayRef<Identifier> indexArgLabels,
-                                      ArrayRef<SourceLoc> indexArgLabelLocs,
-                                      SourceLoc rSquareLoc,
-                                      Expr *trailingClosure,
-                                      ConcreteDeclRef decl,
-                                      bool implicit);
-
   /// getIndex - Retrieve the index of the subscript expression, i.e., the
   /// "offset" into the base value.
   Expr *getIndex() const { return Index; }

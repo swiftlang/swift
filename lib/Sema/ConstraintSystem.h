@@ -471,19 +471,19 @@ enum class SolutionCompareResult {
 /// declaration was opened, which may involve type variables.
 struct SelectedOverload {
   /// The overload choice.
-  OverloadChoice choice;
+  const OverloadChoice choice;
 
   /// The opened type of the base of the reference to this overload, if
   /// we're referencing a member.
-  Type openedFullType;
+  const Type openedFullType;
 
   /// The opened type produced by referring to this overload.
-  Type openedType;
+  const Type openedType;
 
   /// The type that this overload binds. Note that this may differ from
   /// openedType, for example it will include any IUO unwrapping that has taken
   /// place.
-  Type boundType;
+  const Type boundType;
 };
 
 /// Provides information about the application of a function argument to a
