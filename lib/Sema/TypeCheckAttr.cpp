@@ -251,19 +251,15 @@ class AttributeChecker : public AttributeVisitor<AttributeChecker> {
   void visitNonEphemeralAttr(NonEphemeralAttr *attr);
   void checkOriginalDefinedInAttrs(ArrayRef<OriginallyDefinedInAttr*> Attrs);
 
-<<<<<<< HEAD
+  void visitDerivativeAttr(DerivativeAttr *attr);
   // SWIFT_ENABLE_TENSORFLOW
   void visitDifferentiableAttr(DifferentiableAttr *attr);
-  void visitDerivativeAttr(DerivativeAttr *attr);
   void visitTransposeAttr(TransposeAttr *attr);
   // TODO(TF-999): Remove deprecated `@differentiating` attribute.
   void visitDifferentiatingAttr(DerivativeAttr *attr);
   void visitCompilerEvaluableAttr(CompilerEvaluableAttr *attr);
   void visitNoDerivativeAttr(NoDerivativeAttr *attr);
   // SWIFT_ENABLE_TENSORFLOW END
-=======
-  void visitDerivativeAttr(DerivativeAttr *attr);
->>>>>>> upstream_20191216
 };
 } // end anonymous namespace
 
