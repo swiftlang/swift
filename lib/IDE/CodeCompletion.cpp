@@ -1264,6 +1264,57 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
   /// to the \c Consumer.
   bool DeliveredResults = false;
 
+  std::pair<Type, ConcreteDeclRef> getReferencedDecl(Expr *expr) {
+    auto exprTy = ParsedExpr->getType();
+
+    // Look through unbound instance member accesses.
+    if (auto *dotSyntaxExpr = dyn_cast<DotSyntaxBaseIgnoredExpr>(expr))
+      expr = dotSyntaxExpr->getRHS();
+
+    // Look through the 'self' application.
+    if (auto *selfApplyExpr = dyn_cast<SelfApplyExpr>(expr))
+      expr = selfApplyExpr->getFn();
+
+    // Look through curry thunks.
+    if (auto *closure = dyn_cast<AutoClosureExpr>(expr)) {
+      if (closure->isThunk()) {
+        auto *body = closure->getSingleExpressionBody();
+        if (isa<AutoClosureExpr>(body) &&
+            closure->getParameters()->size() == 1)
+         expr = closure->getSingleExpressionBody();
+      }
+    }
+
+    if (auto *closure = dyn_cast<AutoClosureExpr>(expr)) {
+      if (closure->isThunk()) {
+        auto *body = closure->getSingleExpressionBody();
+        body = body->getSemanticsProvidingExpr();
+        if (auto *outerCall = dyn_cast<ApplyExpr>(body)) {
+          if (auto *innerCall = dyn_cast<ApplyExpr>(outerCall->getFn())) {
+            if (auto *declRef = dyn_cast<DeclRefExpr>(innerCall->getFn())) {
+              expr = declRef;
+            }
+          }
+        }
+      }
+    }
+
+    // If this is an IUO result, unwrap the optional type.
+    auto refDecl = expr->getReferencedDecl();
+    if (!refDecl) {
+      if (auto *applyExpr = dyn_cast<ApplyExpr>(expr)) {
+        auto fnDecl = applyExpr->getFn()->getReferencedDecl();
+        if (auto *func = fnDecl.getDecl()) {
+          if (func->isImplicitlyUnwrappedOptional()) {
+            if (auto objectTy = exprTy->getOptionalObjectType())
+              exprTy = objectTy;
+          }
+        }
+      }
+    }
+
+    return std::make_pair(exprTy, refDecl);
+  }
 
   Optional<std::pair<Type, ConcreteDeclRef>> typeCheckParsedExpr() {
     assert(ParsedExpr && "should have an expression");
@@ -1279,24 +1330,7 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
     // typecheck again. rdar://21466394
     if (CheckKind == CompletionTypeCheckKind::Normal &&
         ParsedExpr->getType() && !ParsedExpr->getType()->is<ErrorType>()) {
-      auto refDecl = ParsedExpr->getReferencedDecl();
-      auto exprTy = ParsedExpr->getType();
-      if (!refDecl) {
-        // FIXME: do this in the not-already-type-checked branch too?
-        if (auto *apply = dyn_cast<SelfApplyExpr>(ParsedExpr)) {
-          refDecl = apply->getFn()->getReferencedDecl();
-        } else if (auto *apply = dyn_cast<ApplyExpr>(ParsedExpr)) {
-          // If this is an IUO, use the underlying non-optional type instead
-          auto fnDecl = apply->getFn()->getReferencedDecl();
-          if (auto FD = fnDecl.getDecl()) {
-            if (FD->isImplicitlyUnwrappedOptional()) {
-              if (auto OT = exprTy->getOptionalObjectType())
-                exprTy = OT;
-            }
-          }
-        }
-      }
-      return std::make_pair(exprTy, refDecl);
+      return getReferencedDecl(ParsedExpr);
     }
 
     ConcreteDeclRef ReferencedDecl = nullptr;
