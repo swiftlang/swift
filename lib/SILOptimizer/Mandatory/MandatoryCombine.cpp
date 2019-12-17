@@ -284,7 +284,9 @@ SILInstruction *MandatoryCombiner::visitPartialApplyInst(PartialApplyInst *i) {
   // Remove the stack dealloc, then the partial apply, then the function ref.
   instModCallbacks.deleteInst(user->getUser());
   instModCallbacks.deleteInst(i);
-  instModCallbacks.deleteInst(cast<FunctionRefInst>(i->getCallee()));
+  // If the only use of the function_ref is us, then remove it.
+  if (i->getCallee()->getSingleUse()->getUser() == i)
+    instModCallbacks.deleteInst(cast<FunctionRefInst>(i->getCallee()));
   return nullptr;
 }
 
