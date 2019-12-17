@@ -195,7 +195,7 @@ static llvm::hash_code calculateInvocationHash(const CompilerInvocation &Inv) {
 
 } // namespace
 
-CompilerInstance *CompletionInstance::getReusingCompilerInstance(
+CompilerInstance *CompletionInstance::getCachedCompilerInstance(
     const swift::CompilerInvocation &Invocation,
     llvm::MemoryBuffer *completionBuffer, unsigned int Offset,
     DiagnosticConsumer *DiagC) {
@@ -348,8 +348,8 @@ CompilerInstance *swift::ide::CompletionInstance::getCompilerInstance(
   // FIXME: ASTScopeLookup doesn't support code completion yet.
   Invocation.disableASTScopeLookup();
 
-  if (auto *cached = getReusingCompilerInstance(Invocation, completionBuffer,
-                                                Offset, DiagC))
+  if (auto *cached = getCachedCompilerInstance(Invocation, completionBuffer,
+                                              Offset, DiagC))
     return cached;
 
   if (auto *renewed = renewCompilerInstance(
