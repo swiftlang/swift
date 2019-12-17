@@ -2479,44 +2479,44 @@ bool EscapeAnalysis::mergeSummaryGraph(ConnectionGraph *SummaryGraph,
   return SummaryGraph->mergeFrom(Graph, Mapping);
 }
 
-bool EscapeAnalysis::canEscapeToUsePoint(SILValue V, SILNode *UsePoint,
-                                         ConnectionGraph *ConGraph) {
+// Return true if any content within the logical object pointed to by \p value
+// escapes.
+//
+// Get the value's content node and check the escaping flag on all nodes within
+// that object. An interior CG node points to content within the same object.
+bool EscapeAnalysis::canEscapeToUsePoint(SILValue value,
+                                         SILInstruction *usePoint,
+                                         ConnectionGraph *conGraph) {
 
-  assert((FullApplySite::isa(UsePoint) || isa<RefCountingInst>(UsePoint)) &&
-         "use points are only created for calls and refcount instructions");
+  assert((FullApplySite::isa(usePoint) || isa<RefCountingInst>(usePoint))
+         && "use points are only created for calls and refcount instructions");
 
-  CGNode *Node = ConGraph->getNodeOrNull(V);
-  if (!Node)
+  CGNode *node = conGraph->getValueContent(value);
+  if (!node)
     return true;
 
-  // First check if there are escape paths which we don't explicitly see
-  // in the graph.
-  if (Node->valueEscapesInsideFunction(V))
-    return true;
+  // Follow points-to edges and return true if the current 'node' may escape at
+  // 'usePoint'.
+  while (node) {
+    // First check if 'node' may escape in a way not represented by the
+    // connection graph, assuming that it may represent part of the object
+    // pointed to by 'value'. If 'node' happens to represent another object
+    // indirectly reachabe from 'value', then it cannot actually escape to this
+    // usePoint, so passing the original value is still conservatively correct.
+    if (node->valueEscapesInsideFunction(value))
+      return true;
 
-  // No hidden escapes: check if the Node is reachable from the UsePoint.
-  // Check if the object itself can escape to the called function.
-  if (ConGraph->isUsePoint(UsePoint, Node))
-    return true;
+    // No hidden escapes; check if 'usePoint' may access memory at 'node'.
+    if (conGraph->isUsePoint(usePoint, node))
+      return true;
 
-  assert(isPointer(V) && "should not have a node for a non-pointer");
+    if (!node->isInterior())
+      break;
 
-  // Check if the object "content" can escape to the called function.
-  // This will catch cases where V is a reference and a pointer to a stored
-  // property escapes.
-  // It's also important in case of a pointer assignment, e.g.
-  //    V = V1
-  //    apply(V1)
-  // In this case the apply is only a use-point for V1 and V1's content node.
-  // As V1's content node is the same as V's content node, we also make the
-  // check for the content node.
-  CGNode *ContentNode = getValueContent(ConGraph, V);
-  if (ContentNode->valueEscapesInsideFunction(V))
-    return true;
-
-  if (ConGraph->isUsePoint(UsePoint, ContentNode))
-    return true;
-
+    // Continue to check for escaping content whenever 'content' may point to
+    // the same object as 'node'.
+    node = node->getContentNodeOrNull();
+  }
   return false;
 }
 
