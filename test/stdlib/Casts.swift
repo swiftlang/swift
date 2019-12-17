@@ -81,6 +81,7 @@ CastsTests.test("Optional<T>.none can be casted to Optional<U>.none in generic c
 }
 
 // Test for SR-3871: Cannot cast from ObjC existential without going through AnyObject
+#if _runtime(_ObjC)
 protocol P2 {}
 CastsTests.test("Cast from ObjC existential to Protocol (SR-3871)") {
   struct S: P2 {}
@@ -99,6 +100,7 @@ CastsTests.test("Cast from ObjC existential to Protocol (SR-3871)") {
   expectNotNil(b as? P2)
   expectNotNil(b as? S)
 }
+#endif
 
 CastsTests.test("Cast from Swift existential to Protocol") {
   struct S: P2 {}
