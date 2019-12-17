@@ -14,6 +14,7 @@
 #define SWIFT_IDE_COMPLETIONINSTANCE_H
 
 #include "swift/Frontend/Frontend.h"
+#include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringRef.h"
@@ -37,6 +38,7 @@ makeCodeCompletionMemoryBuffer(const llvm::MemoryBuffer *origBuf,
 /// Manages \c CompilerInstance for completion like operations.
 class CompletionInstance {
   std::unique_ptr<CompilerInstance> CachedCI = nullptr;
+  llvm::hash_code CachedArgsHash;
   bool EnableASTCaching = false;
   unsigned MaxASTReuseCount = 100;
   unsigned CurrentASTReuseCount = 0;
@@ -48,6 +50,7 @@ class CompletionInstance {
   /// bodies, or the interface hash of the file has changed.
   swift::CompilerInstance *
   getCachedCompilerInstance(const swift::CompilerInvocation &Invocation,
+                            llvm::hash_code ArgsHash,
                             llvm::MemoryBuffer *completionBuffer,
                             unsigned int Offset, DiagnosticConsumer *DiagC);
 
@@ -55,20 +58,23 @@ class CompletionInstance {
   /// have to call \c performParseAndResolveImportsOnly() , and perform the
   /// second pass on it.
   swift::CompilerInstance *renewCompilerInstance(
-      swift::CompilerInvocation &Invocation,
+      swift::CompilerInvocation &Invocation, llvm::hash_code ArgsHash,
       llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
       llvm::MemoryBuffer *completionBuffer, unsigned int Offset,
       std::string &Error, DiagnosticConsumer *DiagC);
 
 public:
-  void setEnableASTCaching(bool Flag) {
-    EnableASTCaching = Flag;
-  }
+  void setEnableASTCaching(bool Flag) { EnableASTCaching = Flag; }
 
   /// Returns \C CompilerInstance for the completion request. Users can check if
   /// it's cached or not by 'hasPersistentParserState()'.
+  ///
+  /// NOTE: \p Args is only used for checking the equaity of the invocation.
+  /// Since this function assumes that it is already normalized, exact the same
+  /// arguments including their order is considered as the same invocation.
   swift::CompilerInstance *getCompilerInstance(
       swift::CompilerInvocation &Invocation,
+      llvm::ArrayRef<const char *> Args,
       llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
       llvm::MemoryBuffer *completionBuffer, unsigned int Offset,
       std::string &Error, DiagnosticConsumer *DiagC);

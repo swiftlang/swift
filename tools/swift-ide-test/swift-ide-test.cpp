@@ -758,8 +758,8 @@ static bool doCodeCompletionImpl(
   PrintingDiagnosticConsumer PrintDiags;
   CompletionInstance CompletionInst;
   auto *CI = CompletionInst.getCompilerInstance(
-      Invocation, llvm::vfs::getRealFileSystem(), CleanFile.get(), Offset,
-      Error, CodeCompletionDiagnostics ? &PrintDiags : nullptr);
+      Invocation, /*Args=*/{}, llvm::vfs::getRealFileSystem(), CleanFile.get(),
+      Offset, Error, CodeCompletionDiagnostics ? &PrintDiags : nullptr);
   if (!CI)
     return 1;
 
