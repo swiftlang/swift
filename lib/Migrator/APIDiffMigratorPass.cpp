@@ -231,21 +231,6 @@ public:
   }
 };
 
-static ValueDecl* getReferencedDecl(Expr *E) {
-  // Get the syntactic expression out of an implicit expression.
-  if (auto *ICE = dyn_cast<ImplicitConversionExpr>(E))
-    E = ICE->getSyntacticSubExpr();
-  if (auto *DRE = dyn_cast<DeclRefExpr>(E)) {
-    return DRE->getDecl();
-  } else if (auto *MRE = dyn_cast<MemberRefExpr>(E)) {
-    return MRE->getMember().getDecl();
-  } else if (auto OtherCtorE = dyn_cast<OtherConstructorDeclRefExpr>(E)) {
-    return OtherCtorE->getDecl();
-  } else {
-    return nullptr;
-  }
-}
-
 struct ConversionFunctionInfo {
   Expr *ExpressionToWrap;
   SmallString<256> Buffer;
@@ -582,15 +567,10 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
       }
       return false;
     };
-    if (auto *DSC = dyn_cast<DotSyntaxCallExpr>(Call)) {
-      if (auto FD = DSC->getFn()->getReferencedDecl().getDecl()) {
-        if (handleDecl(FD, Call->getSourceRange()))
-          return true;
-      }
-    } else if (auto MRE = dyn_cast<MemberRefExpr>(Call)) {
-      if (handleDecl(MRE->getReferencedDecl().getDecl(), MRE->getSourceRange()))
+    if (auto *VD = getReferencedDecl(Call).second.getDecl())
+      if (handleDecl(VD, Call->getSourceRange()))
         return true;
-    }
+
     return false;
   }
 
@@ -858,11 +838,12 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
       Lexer::getLocForEndOfToken(SM, E->getEndLoc())), Text);
   }
 
-  bool wrapAttributeReference(Expr* Reference, Expr* WrapperTarget,
+  bool wrapAttributeReference(Expr *Reference, Expr *WrapperTarget,
                               bool FromString) {
-    auto *RD = getReferencedDecl(Reference);
+    auto *RD = Reference->getReferencedDecl().getDecl();
     if (!RD)
       return false;
+
     std::string Rename;
     Optional<NodeAnnotation> Kind;
     StringRef LeftComment;
@@ -1110,7 +1091,7 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
   // reference of the property.
   bool handlePropertyTypeChange(Expr *E) {
     if (auto MRE = dyn_cast<MemberRefExpr>(E)) {
-      if (auto *VD = MRE->getReferencedDecl().getDecl()) {
+      if (auto *VD = MRE->getMember().getDecl()) {
         for (auto *I: getRelatedDiffItems(VD)) {
           if (auto *Item = dyn_cast<CommonDiffItem>(I)) {
             if (Item->DiffKind == NodeAnnotation::WrapOptional &&
@@ -1143,46 +1124,36 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
     if (auto *CE = dyn_cast<CallExpr>(E)) {
       auto Fn = CE->getFn();
       auto Args = CE->getArg();
-      switch (Fn->getKind()) {
-      case ExprKind::DeclRef: {
-        if (auto FD = Fn->getReferencedDecl().getDecl()) {
-          handleFuncRename(FD, Fn, Args);
-          handleTypeHoist(FD, CE, Args);
-          handleSpecialCases(FD, CE, Args);
-          handleStringRepresentableArg(FD, Args, CE);
-          handleResultTypeChange(FD, CE);
+
+      if (auto *DRE = dyn_cast<DeclRefExpr>(Fn)) {
+        if (auto *VD = DRE->getDecl()) {
+          if (VD->getNumCurryLevels() == 1) {
+            handleFuncRename(VD, Fn, Args);
+            handleTypeHoist(VD, CE, Args);
+            handleSpecialCases(VD, CE, Args);
+            handleStringRepresentableArg(VD, Args, CE);
+            handleResultTypeChange(VD, CE);
+          }
         }
-        break;
       }
-      case ExprKind::DotSyntaxCall: {
-        auto DSC = cast<DotSyntaxCallExpr>(Fn);
-        if (auto FD = DSC->getFn()->getReferencedDecl().getDecl()) {
-          handleFuncRename(FD, DSC->getFn(), Args);
-          handleFunctionCallToPropertyChange(FD, DSC->getFn(), Args);
-          handleSpecialCases(FD, CE, Args);
-          handleStringRepresentableArg(FD, Args, CE);
-          handleResultTypeChange(FD, CE);
+
+      if (auto *SelfApply = dyn_cast<ApplyExpr>(Fn)) {
+        if (auto VD = SelfApply->getFn()->getReferencedDecl().getDecl()) {
+          if (VD->getNumCurryLevels() == 2) {
+            handleFuncRename(VD, SelfApply->getFn(), Args);
+            handleFunctionCallToPropertyChange(VD, SelfApply->getFn(), Args);
+            handleSpecialCases(VD, CE, Args);
+            handleStringRepresentableArg(VD, Args, CE);
+            handleResultTypeChange(VD, CE);
+          }
         }
-        break;
-      }
-      case ExprKind::ConstructorRefCall: {
-        auto CCE = cast<ConstructorRefCallExpr>(Fn);
-        if (auto FD = CCE->getFn()->getReferencedDecl().getDecl()) {
-          handleFuncRename(FD, CE, Args);
-          handleStringRepresentableArg(FD, Args, CE);
-          handleResultTypeChange(FD, CE);
-        }
-        break;
-      }
-      default:
-        break;
       }
     }
     return true;
   }
 
-  static void collectParamters(AbstractFunctionDecl *AFD,
-                               SmallVectorImpl<ParamDecl*> &Results) {
+  static void collectParameters(AbstractFunctionDecl *AFD,
+                                SmallVectorImpl<ParamDecl*> &Results) {
     for (auto PD : *AFD->getParameters()) {
       Results.push_back(PD);
     }
@@ -1197,7 +1168,7 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
         Editor.replace(NameRange, View.base());
       unsigned Index = 0;
       SmallVector<ParamDecl*, 4> Params;
-      collectParamters(AFD, Params);
+      collectParameters(AFD, Params);
       for (auto *PD: Params) {
         if (Index == View.argSize())
           break;
@@ -1322,7 +1293,7 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
       return;
     Idx --;
     SmallVector<ParamDecl*, 4> Params;
-    collectParamters(AFD, Params);
+    collectParameters(AFD, Params);
     if (Params.size() <= Idx)
       return;
 
@@ -1397,11 +1368,11 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
       Editor(Editor), USRs(USRs) {}
     bool isSuperExpr(Expr *E) {
       if (E->isImplicit())
-	return false;
+        return false;
       // Check if the expression is super.foo().
       if (auto *CE = dyn_cast<CallExpr>(E)) {
         if (auto *DSC = dyn_cast<DotSyntaxCallExpr>(CE->getFn())) {
-          if (DSC->getBase()->getKind() != ExprKind::SuperRef)
+          if (!isa<SuperRefExpr>(DSC->getBase()))
             return false;
           llvm::SmallString<64> Buffer;
           llvm::raw_svector_ostream OS(Buffer);
@@ -1419,9 +1390,9 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
     }
     std::pair<bool, Stmt*> walkToStmtPre(Stmt *S) override {
       if (auto *BS = dyn_cast<BraceStmt>(S)) {
-	for(auto Ele: BS->getElements()) {
-	  if (Ele.is<Expr*>() && isSuperExpr(Ele.get<Expr*>())) {
-	    Editor.remove(Ele.getSourceRange());
+        for(auto Ele: BS->getElements()) {
+          if (Ele.is<Expr*>() && isSuperExpr(Ele.get<Expr*>())) {
+            Editor.remove(Ele.getSourceRange());
           }
 	}
       }
