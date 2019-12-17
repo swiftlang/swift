@@ -1878,9 +1878,6 @@ static bool tryDynamicCastBoxedSwiftValue(OpaqueValue *dest,
   assert(!(flags & DynamicCastFlags::Unconditional));
   assert(!(flags & DynamicCastFlags::DestroyOnFailure));
 
-  auto srcTypeName = swift_getTypeName(srcType, true); // UNUSED -- REMOVE -- FOR DEBUGGING ONLY
-  auto destTypeName = swift_getTypeName(targetType, true); // UNUSED -- REMOVE -- FOR DEBUGGING ONLY
-
   // Swift type should be AnyObject or a class type.
   while (true) {
     if (srcType->isAnyClass()) {
@@ -1894,8 +1891,8 @@ static bool tryDynamicCastBoxedSwiftValue(OpaqueValue *dest,
       // If it's a Class object, it must be `AnyObject`
       if (isAnyObjectExistentialType(existentialType)) {
         goto validated;
-			}
-			return false;
+      }
+      return false;
     }
     case ExistentialTypeRepresentation::Opaque: {
       // If it's an opaque existential, unwrap it and check again
@@ -2262,7 +2259,7 @@ static bool swift_dynamicCastImpl(OpaqueValue *dest, OpaqueValue *src,
   {
     auto innerFlags = flags - DynamicCastFlags::Unconditional
                             - DynamicCastFlags::DestroyOnFailure;
-    if (tryDynamicCastBoxedSwiftValue(dest, src, srcType,        // XXX succeeds for AnyObject, but not Any
+    if (tryDynamicCastBoxedSwiftValue(dest, src, srcType,
                                       targetType, innerFlags)) {
       // TakeOnSuccess was handled inside tryDynamicCastBoxedSwiftValue().
       return true;
