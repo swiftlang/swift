@@ -2265,6 +2265,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
 
   // Validate use of @autoclosure
   if (attrs.has(TAK_autoclosure)) {
+    bool didDiagnose = false;
     if (attrs.hasConvention()) {
       if (attrs.getConventionName() == "c" ||
           attrs.getConventionName() == "block") {
@@ -2272,16 +2273,23 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
                  diag::invalid_autoclosure_and_convention_attributes,
                  attrs.getConventionName());
         attrs.clearAttribute(TAK_convention);
+        didDiagnose = true;
       }
     } else if (options.is(TypeResolverContext::VariadicFunctionInput) &&
                !options.hasBase(TypeResolverContext::EnumElementDecl)) {
       diagnose(attrs.getLoc(TAK_autoclosure),
                diag::attr_not_on_variadic_parameters, "@autoclosure");
       attrs.clearAttribute(TAK_autoclosure);
+      didDiagnose = true;
     } else if (!options.is(TypeResolverContext::FunctionInput)) {
       diagnose(attrs.getLoc(TAK_autoclosure), diag::attr_only_on_parameters,
                "@autoclosure");
       attrs.clearAttribute(TAK_autoclosure);
+      didDiagnose = true;
+    }
+
+    if (didDiagnose) {
+      ty = ErrorType::get(Context);
     }
   }
 
