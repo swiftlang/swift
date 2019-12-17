@@ -160,6 +160,7 @@ using TargetRelativeIndirectablePointer
 
 struct HeapObject;
 class WeakReference;
+struct UnownedReference;
   
 template <typename Runtime> struct TargetMetadata;
 using Metadata = TargetMetadata<InProcess>;
@@ -644,6 +645,9 @@ public:
   // type don't fit in the ValueBuffer.
   // NOTE: This *is* a box for copy-on-write existentials.
   OpaqueValue *allocateBoxForExistentialIn(ValueBuffer *Buffer) const;
+
+  // Deallocate an out-of-line buffer box if one is present.
+  void deallocateBoxForExistentialIn(ValueBuffer *Buffer) const;
 
   /// Get the nominal type descriptor if this metadata describes a nominal type,
   /// or return null if it does not.
