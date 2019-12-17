@@ -826,15 +826,6 @@ void EscapeAnalysis::ConnectionGraph::computeUsePoints() {
 #endif
   // First scan the whole function and add relevant instructions as use-points.
   for (auto &BB : *F) {
-    for (SILArgument *BBArg : BB.getArguments()) {
-      /// In addition to releasing instructions (see below) we also add block
-      /// arguments as use points. In case of loops, block arguments can
-      /// "extend" the liferange of a reference in upward direction.
-      if (CGNode *ArgNode = lookupNode(BBArg)) {
-        addUsePoint(ArgNode, BBArg);
-      }
-    }
-
     for (auto &I : BB) {
       switch (I.getKind()) {
 #define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
