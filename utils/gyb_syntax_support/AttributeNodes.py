@@ -62,7 +62,7 @@ ATTRIBUTE_NODES = [
                              kind='ImplementsAttributeArguments'),
                        Child('DifferentiableArguments',
                              kind='DifferentiableAttributeArguments'),
-                       Child('DerivativeArguments',
+                       Child('DerivativeRegistrationArguments',
                              kind='DerivativeRegistrationAttributeArguments'),
                        Child('NamedAttributeString',
                              kind='NamedAttributeStringArgument'),

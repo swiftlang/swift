@@ -1498,6 +1498,13 @@ bool TypeBase::isCallableNominalType(DeclContext *dc) {
                            IsCallableNominalTypeRequest{canTy, dc}, false);
 }
 
+bool TypeBase::hasDynamicMemberLookupAttribute() {
+  auto canTy = getCanonicalType();
+  auto &ctx = canTy->getASTContext();
+  return evaluateOrDefault(
+      ctx.evaluator, HasDynamicMemberLookupAttributeRequest{canTy}, false);
+}
+
 Type TypeBase::getSuperclass(bool useArchetypes) {
   auto *nominalDecl = getAnyNominal();
   auto *classDecl = dyn_cast_or_null<ClassDecl>(nominalDecl);
@@ -4856,4 +4863,11 @@ SILFunctionType::withSubstitutions(SubstitutionMap subs) const {
                           getOptionalErrorResult(),
                           subs, isGenericSignatureImplied(),
                           const_cast<SILFunctionType*>(this)->getASTContext());
+}
+
+SourceLoc swift::extractNearestSourceLoc(Type ty) {
+  if (auto nominal = ty->getAnyNominal())
+    return extractNearestSourceLoc(nominal);
+
+  return SourceLoc();
 }

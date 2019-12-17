@@ -919,6 +919,21 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     break;
   }
 
+  case DAK_Derivative: {
+    Printer.printAttrName("@derivative");
+    Printer << "(of: ";
+    auto *attr = cast<DerivativeAttr>(this);
+    Printer << attr->getOriginalFunctionName().Name;
+    auto *derivative = cast<AbstractFunctionDecl>(D);
+    auto diffParamsString = getDifferentiationParametersClauseString(
+        derivative, attr->getParameterIndices(), attr->getParsedParameters(),
+        DifferentiationParameterPrintingStyle::Name);
+    if (!diffParamsString.empty())
+      Printer << ", " << diffParamsString;
+    Printer << ')';
+    break;
+  }
+
   case DAK_Transpose: {
     Printer.printAttrName("@transpose");
     Printer << "(of: ";

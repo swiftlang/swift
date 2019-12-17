@@ -8,12 +8,12 @@
 // Check that we produced superclass type requests.
 // RUN: %{python} %utils/process-stats-dir.py --evaluate 'SuperclassTypeRequest == 18' %t/stats-dir
 
-class Left // expected-error {{circular reference}}
+class Left // expected-error {{circular reference}} expected-note {{through reference here}}
     : Right.Hand { // expected-note {{through reference here}}
   class Hand {}
 }
 
-class Right // expected-note {{through reference here}}
+class Right // expected-note 2 {{through reference here}}
   : Left.Hand { // expected-note {{through reference here}}
   class Hand {}
 }
@@ -35,13 +35,13 @@ class Outer {
   class Inner : Outer {}
 }
 
-class Outer2 // expected-error {{circular reference}}
+class Outer2 // expected-error {{circular reference}} expected-note {{through reference here}}
     : Outer2.Inner { // expected-note {{through reference here}}
 
   class Inner {}
 }
 
-class Outer3 // expected-error {{circular reference}}
+class Outer3 // expected-error {{circular reference}} expected-note {{through reference here}}
     : Outer3.Inner<Int> { // expected-note {{through reference here}}
   class Inner<T> {}
 }
@@ -79,6 +79,7 @@ class WithDesignatedInit : WithDesignatedInit {
   // expected-error@-1 {{'WithDesignatedInit' inherits from itself}}
   // expected-error@-2 {{circular reference}}
   // expected-note@-3 {{through reference here}}
+  // expected-note@-4 2 {{through reference here}}
 
   init(x: Int) {} // expected-error {{circular reference}}
 }

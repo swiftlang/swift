@@ -2149,6 +2149,63 @@ namespace {
     }
   };
 
+  /// Search the member tables for this class and its superclasses and try to identify the nearest VarDecl
+  /// that serves as a base for an override.  We have to do this ourselves because Objective-C has no
+  /// semantic notion of overrides, and freely allows users to refine the type of any member property in a
+  /// derived class.
+  ///
+  /// The override must be the nearest possible one so there are not breaks in the override chain. That is,
+  /// suppose C refines B refines A and each successively redeclares a member with a different type.  It
+  /// should be the case that the nearest override from C is B and from B is A.  If the override point from
+  /// C were A, then B would record an override on A as well and we would introduce a semantic ambiguity.
+  ///
+  /// There is also a special case for finding a method that stomps over a getter.  If this is the case and no
+  /// override point is identified, we will not import the property to force users to explicitly call the method.
+  static std::pair<VarDecl *, bool>
+  identifyNearestOverridenDecl(ClangImporter::Implementation &Impl,
+                               DeclContext *dc,
+                               const clang::ObjCPropertyDecl *decl,
+                               Identifier name,
+                               ClassDecl *subject) {
+    bool foundMethod = false;
+    for (; subject; (subject = subject->getSuperclassDecl())) {
+      llvm::SmallVector<ValueDecl *, 8> lookup;
+      auto found = Impl.MembersForNominal.find(subject);
+      if (found != Impl.MembersForNominal.end()) {
+        lookup.append(found->second.begin(), found->second.end());
+        namelookup::pruneLookupResultSet(dc, NL_QualifiedDefault, lookup);
+      }
+
+      for (auto *&result : lookup) {
+        // Skip declarations that don't match the name we're looking for.
+        if (result->getBaseName() != name)
+          continue;
+
+        if (auto *fd = dyn_cast<FuncDecl>(result)) {
+          if (fd->isInstanceMember() != decl->isInstanceProperty())
+            continue;
+
+          if (fd->getFullName().getArgumentNames().empty()) {
+            foundMethod = true;
+          }
+        } else {
+          auto *var = cast<VarDecl>(result);
+          if (var->isInstanceMember() != decl->isInstanceProperty())
+            continue;
+
+          // If the selectors of the getter match in Objective-C, we have an
+          // override.
+          if (var->getObjCGetterSelector() ==
+              Impl.importSelector(decl->getGetterName())) {
+            return {var, foundMethod};
+          }
+        }
+      }
+    }
+
+    return {nullptr, foundMethod};
+  }
+
   /// Convert Clang declarations into the corresponding Swift
   /// declarations.
   class SwiftDeclConverter
@@ -5013,47 +5070,14 @@ namespace {
       // property. If so, suppress the property; the user will have to use
       // the methods directly, to avoid ambiguities.
       if (auto *subject = dc->getSelfClassDecl()) {
-        bool foundMethod = false;
-
         if (auto *classDecl = dyn_cast<ClassDecl>(dc)) {
           // Start looking into the superclass.
           subject = classDecl->getSuperclassDecl();
         }
 
-        for (; subject; (subject = subject->getSuperclassDecl())) {
-          llvm::SmallVector<ValueDecl *, 8> lookup;
-          auto found = Impl.MembersForNominal.find(subject);
-          if (found != Impl.MembersForNominal.end()) {
-            lookup.append(found->second.begin(), found->second.end());
-            namelookup::pruneLookupResultSet(dc, NL_QualifiedDefault, lookup);
-          }
-
-          for (auto *&result : lookup) {
-            // Skip declarations that don't match the name we're looking for.
-            if (result->getBaseName() != name)
-              continue;
-
-            if (auto *fd = dyn_cast<FuncDecl>(result)) {
-              if (fd->isInstanceMember() != decl->isInstanceProperty())
-                continue;
-
-              if (fd->getFullName().getArgumentNames().empty()) {
-                foundMethod = true;
-              }
-            } else {
-              auto *var = cast<VarDecl>(result);
-              if (var->isInstanceMember() != decl->isInstanceProperty())
-                continue;
-
-              // If the selectors of the getter match in Objective-C, we have an
-              // override.
-              if (var->getObjCGetterSelector() ==
-                  Impl.importSelector(decl->getGetterName())) {
-                overridden = var;
-              }
-            }
-          }
-        }
+        bool foundMethod = false;
+        std::tie(overridden, foundMethod)
+          = identifyNearestOverridenDecl(Impl, dc, decl, name, subject);
 
         if (foundMethod && !overridden)
           return nullptr;

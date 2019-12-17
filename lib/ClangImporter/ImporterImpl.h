@@ -605,6 +605,10 @@ public:
   bool shouldIgnoreBridgeHeaderTopLevelDecl(clang::Decl *D);
 
 private:
+  /// When set, ClangImporter is disabled, and all requests go to the
+  /// DWARFImporter delegate.
+  bool DisableSourceImport;
+  
   /// The DWARF importer delegate, if installed.
   DWARFImporterDelegate *DWARFImporter = nullptr;
 public:
@@ -614,7 +618,7 @@ public:
 private:
   /// The list of Clang modules found in the debug info.
   llvm::DenseMap<Identifier, LoadedFile *> DWARFModuleUnits;
-public:
+
   /// Load a module using the clang::CompilerInstance.
   ModuleDecl *loadModuleClang(SourceLoc importLoc,
                               ArrayRef<std::pair<Identifier, SourceLoc>> path);
@@ -624,7 +628,11 @@ public:
   ModuleDecl *loadModuleDWARF(SourceLoc importLoc,
                               ArrayRef<std::pair<Identifier, SourceLoc>> path);
 
-  
+public:
+  /// Load a module using either method.
+  ModuleDecl *loadModule(SourceLoc importLoc,
+                         ArrayRef<std::pair<Identifier, SourceLoc>> path);
+
   void recordImplicitUnwrapForDecl(ValueDecl *decl, bool isIUO) {
     if (!isIUO)
       return;

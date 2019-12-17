@@ -268,6 +268,10 @@ def debug_crash_after_parse : Flag<["-"], "debug-crash-after-parse">,
 def debugger_support : Flag<["-"], "debugger-support">,
   HelpText<"Process swift code as if running in the debugger">;
 
+def disable_clangimporter_source_import : Flag<["-"],
+  "disable-clangimporter-source-import">,
+  HelpText<"Disable ClangImporter and forward all requests straight the DWARF importer.">;
+
 def disable_arc_opts : Flag<["-"], "disable-arc-opts">,
   HelpText<"Don't run SIL ARC optimization passes.">;
 def disable_ossa_opts : Flag<["-"], "disable-ossa-opts">,

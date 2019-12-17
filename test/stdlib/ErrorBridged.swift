@@ -785,6 +785,11 @@ ErrorBridgingTests.test("error-to-NSObject casts") {
 
     // "is" check
     expectTrue(error is NSObject)
+
+    // Unconditional cast to a dictionary.
+    let dict = ["key" : NoisyError()]
+    let anyOfDict = dict as AnyObject
+    let dict2 = anyOfDict as! [String: NSObject]
   }
 }
 
@@ -812,6 +817,22 @@ ErrorBridgingTests.test("CFError-to-Error casts") {
     // TODO: Wrap some leak checking around this
     // Until then, this is a helpful debug tool
 		should_not_leak_cferror()
+  }
+}
+
+enum MyError: Error {
+  case someThing
+}
+
+ErrorBridgingTests.test("SR-9207 crash in failed cast to NSError") {
+
+  if #available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) {
+    let error = MyError.someThing
+    let foundationError = error as NSError
+
+    if let urlError = foundationError as? URLError {
+      expectUnreachable()
+    }
   }
 }
 

@@ -2349,16 +2349,11 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       DeclID origDeclID = S.addDeclRef(attr->getOriginalFunction());
       auto derivativeKind =
           getRawStableAutoDiffDerivativeFunctionKind(attr->getDerivativeKind());
-      auto paramIndices = attr->getParameterIndices();
-      // NOTE(TF-837): `@derivative` attribute serialization is blocked by
-      // `@derivative` attribute type-checking (TF-829), which resolves
-      // parameter indices (`IndexSubset *`).
-      if (!paramIndices)
-        return;
-      assert(paramIndices && "Parameter indices must be resolved");
+      auto *parameterIndices = attr->getParameterIndices();
+      assert(parameterIndices && "Parameter indices must be resolved");
       SmallVector<bool, 4> indices;
-      for (unsigned i : range(paramIndices->getCapacity()))
-        indices.push_back(paramIndices->contains(i));
+      for (unsigned i : range(parameterIndices->getCapacity()))
+        indices.push_back(parameterIndices->contains(i));
       DerivativeDeclAttrLayout::emitRecord(
           S.Out, S.ScratchRecord, abbrCode, attr->isImplicit(), origNameId,
           origDeclID, derivativeKind, indices);
