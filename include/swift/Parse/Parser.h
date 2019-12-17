@@ -1412,38 +1412,43 @@ public:
   /// \param loc The location of the label (empty if it doesn't exist)
   void parseOptionalArgumentLabel(Identifier &name, SourceLoc &loc);
 
-  /// Parse an unqualified-decl-base-name.
-  ///
-  ///   unqualified-decl-name:
-  ///     identifier
-  ///
-  /// \param afterDot Whether this identifier is coming after a period, which
-  /// enables '.init' and '.default' like expressions.
-  /// \param loc Will be populated with the location of the name.
-  /// \param diag The diagnostic to emit if this is not a name.
-  /// \param allowOperators Whether to allow operator basenames too.
-  DeclNameRef parseUnqualifiedDeclBaseName(bool afterDot, DeclNameLoc &loc,
-                                           const Diagnostic &diag,
-                                           bool allowOperators=false,
-                                           bool allowDeinitAndSubscript=false);
+  enum class DeclNameFlag : uint8_t {
+    /// If passed, operator basenames are allowed.
+    AllowOperators = 1 << 0,
 
-  /// Parse an unqualified-decl-name.
+    /// If passed, names that coincide with keywords are allowed. Used after a
+    /// dot to enable things like '.init' and '.default'.
+    AllowKeywords = 1 << 1,
+
+    /// If passed, 'deinit' and 'subscript' should be parsed as special names,
+    /// not ordinary identifiers.
+    AllowKeywordsUsingSpecialNames = AllowKeywords | 1 << 2,
+
+    /// If passed, compound names with argument lists are allowed, unless they
+    /// have empty argument lists.
+    AllowCompoundNames = 1 << 4,
+
+    /// If passed, compound names with empty argument lists are allowed.
+    AllowZeroArgCompoundNames = AllowCompoundNames | 1 << 5,
+  };
+  using DeclNameOptions = OptionSet<DeclNameFlag>;
+
+  friend DeclNameOptions operator|(DeclNameFlag flag1, DeclNameFlag flag2) {
+    return DeclNameOptions(flag1) | flag2;
+  }
+
+  /// Without \c DeclNameFlag::AllowCompoundNames, parse an
+  /// unqualified-decl-base-name.
+  ///
+  ///   unqualified-decl-base-name: identifier
+  ///
+  /// With \c DeclNameFlag::AllowCompoundNames, parse an unqualified-base-name.
   ///
   ///   unqualified-decl-name:
   ///     unqualified-decl-base-name
   ///     unqualified-decl-base-name '(' ((identifier | '_') ':') + ')'
-  ///
-  /// \param afterDot Whether this identifier is coming after a period, which
-  /// enables '.init' and '.default' like expressions.
-  /// \param loc Will be populated with the location of the name.
-  /// \param diag The diagnostic to emit if this is not a name.
-  /// \param allowOperators Whether to allow operator basenames too.
-  /// \param allowZeroArgCompoundNames Whether to allow empty argument lists.
-  DeclNameRef parseUnqualifiedDeclName(bool afterDot, DeclNameLoc &loc,
-                                       const Diagnostic &diag,
-                                       bool allowOperators=false,
-                                       bool allowZeroArgCompoundNames=false,
-                                       bool allowDeinitAndSubscript=false);
+  DeclNameRef parseDeclNameRef(DeclNameLoc &loc, const Diagnostic &diag,
+                               DeclNameOptions flags);
 
   Expr *parseExprIdentifier();
   Expr *parseExprEditorPlaceholder(Token PlaceholderTok,

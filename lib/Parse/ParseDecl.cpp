@@ -768,11 +768,10 @@ Parser::parseImplementsAttribute(SourceLoc AtLoc, SourceLoc Loc) {
     }
 
     if (!Status.shouldStopParsing()) {
-      MemberName =
-          parseUnqualifiedDeclName(/*afterDot=*/false, MemberNameLoc,
-                                   diag::attr_implements_expected_member_name,
-                                   /*allowOperators=*/true,
-                                   /*allowZeroArgCompoundNames=*/true);
+      MemberName = parseDeclNameRef(MemberNameLoc,
+          diag::attr_implements_expected_member_name,
+          DeclNameFlag::AllowZeroArgCompoundNames |
+          DeclNameFlag::AllowOperators);
       if (!MemberName) {
         Status.setIsParseError();
       }
@@ -1022,10 +1021,8 @@ bool Parser::parseDifferentiableAttributeArguments(
          SyntaxContext, SyntaxKind::FunctionDeclName);
     Diagnostic funcDiag(diag::attr_differentiable_expected_function_name.ID,
                         { label });
-    result.Name =
-        parseUnqualifiedDeclName(/*afterDot=*/false, result.Loc,
-                                 funcDiag, /*allowOperators=*/true,
-                                 /*allowZeroArgCompoundNames=*/true);
+    result.Name = parseDeclNameRef(result.Loc, funcDiag,
+        DeclNameFlag::AllowZeroArgCompoundNames | DeclNameFlag::AllowOperators);
     // If no trailing comma or 'where' clause, terminate parsing arguments.
     if (Tok.isNot(tok::comma, tok::kw_where))
       terminateParsingArgs = true;
@@ -1129,10 +1126,11 @@ ParserResult<DerivativeAttr> Parser::parseDerivativeAttribute(SourceLoc atLoc,
                                                SyntaxKind::FunctionDeclName);
       // NOTE: Use `afterDot = true` and `allowDeinitAndSubscript = true` to
       // enable, e.g. `@derivative(of: init)` and `@derivative(of: subscript)`.
-      original.Name = parseUnqualifiedDeclName(
-          /*afterDot*/ true, original.Loc,
-          diag::attr_derivative_expected_original_name, /*allowOperators*/ true,
-          /*allowZeroArgCompoundNames*/ true, /*allowDeinitAndSubscript*/ true);
+      original.Name = parseDeclNameRef(original.Loc,
+          diag::attr_derivative_expected_original_name,
+          DeclNameFlag::AllowZeroArgCompoundNames |
+          DeclNameFlag::AllowKeywordsUsingSpecialNames |
+          DeclNameFlag::AllowOperators);
     }
     if (consumeIfTrailingComma())
       return makeParserError();
@@ -2060,10 +2058,11 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
                                             SyntaxKind::DeclName);
 
         DeclNameLoc loc;
-        replacedFunction = parseUnqualifiedDeclName(
-            true, loc, diag::attr_dynamic_replacement_expected_function,
-            /*allowOperators*/ true, /*allowZeroArgCompoundNames*/ true,
-            /*allowDeinitAndSubscript*/ true);
+        replacedFunction = parseDeclNameRef(loc,
+            diag::attr_dynamic_replacement_expected_function,
+            DeclNameFlag::AllowZeroArgCompoundNames |
+            DeclNameFlag::AllowKeywordsUsingSpecialNames |
+            DeclNameFlag::AllowOperators);
       }
     }
 
@@ -2572,11 +2571,9 @@ bool Parser::parseConventionAttributeInternal(
       return true;
     }
 
-    DeclNameLoc unusedWitnessMethodProtocolLoc;
-    convention.WitnessMethodProtocol = parseUnqualifiedDeclBaseName(
-        /*afterDot=*/false, unusedWitnessMethodProtocolLoc,
-       diag::convention_attribute_witness_method_expected_protocol
-    );
+    DeclNameLoc unusedLoc;
+    convention.WitnessMethodProtocol = parseDeclNameRef(unusedLoc,
+        diag::convention_attribute_witness_method_expected_protocol, {});
   }
   
   // Parse the ')'.  We can't use parseMatchingToken if we're in
