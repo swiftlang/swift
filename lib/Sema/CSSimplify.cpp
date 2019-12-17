@@ -2358,6 +2358,12 @@ ConstraintSystem::matchTypesBindTypeVar(
     });
   }
 
+  if (typeVar->getImpl().isClosureType()) {
+    return resolveClosure(typeVar, type, locator)
+               ? getTypeMatchSuccess()
+               : getTypeMatchFailure(locator);
+  }
+
   assignFixedType(typeVar, type);
 
   return getTypeMatchSuccess();

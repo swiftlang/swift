@@ -143,15 +143,14 @@ namespace {
         return { false, expr };
       }
 
+      if (isa<ClosureExpr>(expr))
+        return {false, expr};
+
       // Store top-level binary exprs for further analysis.
       if (isa<BinaryExpr>(expr) ||
           
           // Literal exprs are contextually typed, so store them off as well.
           isa<LiteralExpr>(expr) ||
-
-          // We'd like to take a look at implicit closure params, so store
-          // them.
-          isa<ClosureExpr>(expr) ||
 
           // We'd like to look at the elements of arrays and dictionaries.
           isa<ArrayExpr>(expr) ||
@@ -258,7 +257,7 @@ namespace {
 
 
       if (isa<ClosureExpr>(expr)) {
-        return { true, expr };
+        return {false, expr};
       }
 
       if (auto FVE = dyn_cast<ForceValueExpr>(expr)) {
@@ -894,7 +893,10 @@ namespace {
                             CS.getFavoredType(parenExpr->getSubExpr()));
         }
       }
-      
+
+      if (isa<ClosureExpr>(expr))
+        return {false, expr};
+
       return { true, expr };
     }
     
@@ -2064,6 +2066,81 @@ namespace {
                                      /*outerAlternatives=*/{});
     }
 
+    FunctionType *inferClosureType(ClosureExpr *closure) {
+      SmallVector<AnyFunctionType::Param, 4> closureParams;
+
+      if (auto *paramList = closure->getParameters()) {
+        for (unsigned i = 0, n = paramList->size(); i != n; ++i) {
+          const auto *param = paramList->get(i);
+          auto *paramLoc =
+              CS.getConstraintLocator(closure, LocatorPathElt::TupleElement(i));
+
+          Type externalType;
+          if (param->getTypeRepr()) {
+            auto declaredTy =
+                closure->mapTypeIntoContext(param->getInterfaceType());
+            externalType = CS.openUnboundGenericType(declaredTy, paramLoc);
+          } else {
+            externalType = CS.createTypeVariable(
+                paramLoc, TVO_CanBindToInOut | TVO_CanBindToNoEscape);
+          }
+
+          closureParams.push_back(param->toFunctionParam(externalType));
+        }
+      }
+
+      auto extInfo = FunctionType::ExtInfo();
+      if (closureCanThrow(closure))
+        extInfo = extInfo.withThrows();
+
+      // Closure expressions always have function type. In cases where a
+      // parameter or return type is omitted, a fresh type variable is used to
+      // stand in for that parameter or return type, allowing it to be inferred
+      // from context.
+      Type resultTy;
+      if (closure->hasExplicitResultType() &&
+          closure->getExplicitResultTypeLoc().getType()) {
+        resultTy = closure->getExplicitResultTypeLoc().getType();
+      } else {
+        auto &ctx = CS.getASTContext();
+        auto *resultLoc =
+            CS.getConstraintLocator(closure, ConstraintLocator::ClosureResult);
+
+        auto getContextualResultType = [&]() -> Type {
+          if (auto contextualType = CS.getContextualType(closure)) {
+            if (auto fnType = contextualType->getAs<FunctionType>())
+              return fnType->getResult();
+          }
+          return Type();
+        };
+
+        if (closure->hasEmptyBody()) {
+          // Closures with empty bodies should be inferred to return
+          // ().
+          resultTy = ctx.TheEmptyTupleType;
+        } else if (auto contextualResultTy = getContextualResultType()) {
+          resultTy = contextualResultTy;
+        } else {
+          // If no return type was specified, create a fresh type
+          // variable for it and mark it as possible hole.
+          //
+          // If this is a multi-statement closure, let's mark result
+          // as potential hole right away.
+          resultTy = CS.createTypeVariable(
+              resultLoc,
+              closure->hasSingleExpressionBody() ? 0 : TVO_CanBindToHole);
+
+          if (closureHasNoResult(closure)) {
+            // Allow it to default to () if there are no return statements.
+            CS.addConstraint(ConstraintKind::Defaultable, resultTy,
+                             ctx.TheEmptyTupleType, resultLoc);
+          }
+        }
+      }
+
+      return FunctionType::get(closureParams, resultTy, extInfo);
+    }
+
     /// Give each parameter in a ClosureExpr a fresh type variable if parameter
     /// types were not specified, and return the eventual function type.
     void getClosureParams(ClosureExpr *closureExpr,
@@ -2418,69 +2495,47 @@ namespace {
       body->walk(tryFinder);
       return tryFinder.foundThrow();
     }
-    
 
-    Type visitClosureExpr(ClosureExpr *expr) {
-      
-      // If a contextual function type exists, we can use that to obtain the
-      // expected return type, rather than allocating a fresh type variable.
-      auto contextualType = CS.getContextualType(expr);
-      Type crt;
-      
-      if (contextualType) {
-        if (auto cft = contextualType->getAs<AnyFunctionType>()) {
-          crt = cft->getResult();
-        }
-      }
-      
-      // Closure expressions always have function type. In cases where a
-      // parameter or return type is omitted, a fresh type variable is used to
-      // stand in for that parameter or return type, allowing it to be inferred
-      // from context.
-      Type resultTy;
-      if (expr->hasExplicitResultType() &&
-          expr->getExplicitResultTypeLoc().getType()) {
-        resultTy = expr->getExplicitResultTypeLoc().getType();
-        CS.setFavoredType(expr, resultTy.getPointer());
-      } else {
-        auto locator =
-          CS.getConstraintLocator(expr, ConstraintLocator::ClosureResult);
-
-        if (expr->hasEmptyBody()) {
-          resultTy = CS.createTypeVariable(
-              locator, expr->hasSingleExpressionBody() ? 0 : TVO_CanBindToHole);
-
-          // Closures with empty bodies should be inferred to return
-          // ().
-          CS.addConstraint(ConstraintKind::Bind, resultTy,
-                           TupleType::getEmpty(CS.getASTContext()), locator);
-        } else if (crt) {
-          // Otherwise, use the contextual type if present.
-          resultTy = crt;
-        } else {
-          // If no return type was specified, create a fresh type
-          // variable for it.
-          resultTy = CS.createTypeVariable(
-              locator, expr->hasSingleExpressionBody() ? 0 : TVO_CanBindToHole);
-
-          if (closureHasNoResult(expr)) {
-            // Allow it to default to () if there are no return statements.
-            CS.addConstraint(ConstraintKind::Defaultable, resultTy,
-                             TupleType::getEmpty(CS.getASTContext()), locator);
+    void collectParameterRefs(Expr *expr,
+                              llvm::SmallVectorImpl<TypeVariableType *> &refs) {
+      expr->forEachChildExpr([&](Expr *childExpr) -> Expr * {
+        if (auto *closure = dyn_cast<ClosureExpr>(childExpr)) {
+          if (closure->hasSingleExpressionBody()) {
+            collectParameterRefs(closure->getSingleExpressionBody(), refs);
+            return childExpr;
           }
         }
-      }
 
-      // Give each parameter in a ClosureExpr a fresh type variable if parameter
-      // types were not specified, and return the eventual function type.
-      SmallVector<AnyFunctionType::Param, 4> paramTy;
-      getClosureParams(expr, paramTy);
+        if (auto *DRE = dyn_cast<DeclRefExpr>(childExpr)) {
+          if (auto *PD = dyn_cast<ParamDecl>(DRE->getDecl())) {
+            if (CS.hasType(PD)) {
+              if (auto *paramType = CS.getType(PD)->getAs<TypeVariableType>())
+                refs.push_back(paramType);
+            }
+          }
+        }
 
-      auto extInfo = FunctionType::ExtInfo();
-      if (closureCanThrow(expr))
-        extInfo = extInfo.withThrows();
+        return childExpr;
+      });
+    }
 
-      return FunctionType::get(paramTy, resultTy, extInfo);
+    Type visitClosureExpr(ClosureExpr *closure) {
+      auto *locator = CS.getConstraintLocator(closure);
+      auto closureType = CS.createTypeVariable(locator, TVO_CanBindToNoEscape);
+
+      llvm::SmallVector<TypeVariableType *, 4> paramRefs;
+      collectParameterRefs(closure, paramRefs);
+
+      auto inferredType = inferClosureType(closure);
+      if (!inferredType || inferredType->hasError())
+        return Type();
+
+      CS.addUnsolvedConstraint(
+          Constraint::create(CS, ConstraintKind::DefaultClosureType,
+                             closureType, inferredType, locator, paramRefs));
+
+      CS.setClosureType(closure, inferredType);
+      return closureType;
     }
 
     Type visitAutoClosureExpr(AutoClosureExpr *expr) {
@@ -3663,11 +3718,12 @@ namespace {
       if (auto closure = dyn_cast<ClosureExpr>(expr)) {
         auto &CS = CG.getConstraintSystem();
         if (closure->hasSingleExpressionBody()) {
-          CG.enterClosure(closure);
+          auto closureType = CG.visitClosureExpr(closure);
+          if (!closureType)
+            return {false, nullptr};
 
-          // Visit the closure itself, which produces a function type.
-          auto funcTy = CG.visit(expr)->castTo<FunctionType>();
-          CS.setType(expr, funcTy);
+          CS.setType(expr, closureType);
+          return {false, expr};
         }
 
         return { true, expr };
@@ -3696,11 +3752,11 @@ namespace {
     /// Once we've visited the children of the given expression,
     /// generate constraints from the expression.
     Expr *walkToExprPost(Expr *expr) override {
+      auto &CS = CG.getConstraintSystem();
       // Translate special type-checker Builtin calls into simpler expressions.
       if (auto *apply = dyn_cast<ApplyExpr>(expr)) {
         auto fnExpr = apply->getFn();
         if (auto *UDE = dyn_cast<UnresolvedDotExpr>(fnExpr)) {
-          auto &CS = CG.getConstraintSystem();
           auto typeOperation =
               ConstraintGenerator::getTypeOperation(UDE, CS.getASTContext());
 
@@ -3733,34 +3789,11 @@ namespace {
 
       if (auto closure = dyn_cast<ClosureExpr>(expr)) {
         if (closure->hasSingleExpressionBody()) {
-          CG.exitClosure(closure);
-
-          auto &CS = CG.getConstraintSystem();
-          Type closureTy = CS.getType(closure);
-
-          // If the function type has an error in it, we don't want to solve the
-          // system.
-          if (closureTy && closureTy->hasError())
-            return nullptr;
-
-          // Visit the body. It's type needs to be convertible to the function's
-          // return type.
-          auto resultTy = closureTy->castTo<FunctionType>()->getResult();
-          Type bodyTy = CS.getType(closure->getSingleExpressionBody());
-          CG.getConstraintSystem().setFavoredType(expr, bodyTy.getPointer());
-          CG.getConstraintSystem()
-            .addConstraint(ConstraintKind::Conversion, bodyTy,
-                           resultTy,
-                           CG.getConstraintSystem()
-                             .getConstraintLocator(
-                               expr,
-                               ConstraintLocator::ClosureResult));
           return expr;
         }
       }
 
       if (auto type = CG.visit(expr)) {
-        auto &CS = CG.getConstraintSystem();
         auto simplifiedType = CS.simplifyType(type);
 
         CS.setType(expr, simplifiedType);
