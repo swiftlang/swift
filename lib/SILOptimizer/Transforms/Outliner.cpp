@@ -491,8 +491,11 @@ static bool matchSwitch(SwitchInfo &SI, SILInstruction *Inst,
   auto NativeType = Apply->getType().getASTType();
   auto *BridgeFun = FunRef->getInitiallyReferencedFunction();
   auto *SwiftModule = BridgeFun->getModule().getSwiftModule();
+  // Not every type conforms to the ObjectiveCBridgeable protocol in such a case
+  // getBridgeFromObjectiveC returns SILDeclRef().
   auto bridgeWitness = getBridgeFromObjectiveC(NativeType, SwiftModule);
-  if (BridgeFun->getName() != bridgeWitness.mangle())
+  if (bridgeWitness == SILDeclRef() ||
+      BridgeFun->getName() != bridgeWitness.mangle())
     return false;
 
   // %41 = enum $Optional<String>, #Optional.some!enumelt.1, %40 : $String
@@ -761,7 +764,15 @@ BridgedArgument BridgedArgument::match(unsigned ArgIdx, SILValue Arg,
   auto *BridgeCall =
       dyn_cast<ApplyInst>(std::prev(SILBasicBlock::iterator(Enum)));
   if (!BridgeCall || BridgeCall->getNumArguments() != 1 ||
-      Enum->getOperand() != BridgeCall || !BridgeCall->hasOneUse())
+      Enum->getOperand() != BridgeCall || !BridgeCall->hasOneUse() ||
+      !FullApplySite(BridgeCall).hasSelfArgument())
+    return BridgedArgument();
+
+  auto &selfArg = FullApplySite(BridgeCall).getSelfArgumentOperand();
+  auto selfConvention =
+      FullApplySite(BridgeCall).getArgumentConvention(selfArg);
+  if (selfConvention != SILArgumentConvention::Direct_Guaranteed &&
+      selfConvention != SILArgumentConvention::Direct_Owned)
     return BridgedArgument();
 
   auto BridgedValue = BridgeCall->getArgument(0);
@@ -801,8 +812,11 @@ BridgedArgument BridgedArgument::match(unsigned ArgIdx, SILValue Arg,
   auto NativeType = BridgedValue->getType().getASTType();
   auto *BridgeFun = FunRef->getInitiallyReferencedFunction();
   auto *SwiftModule = BridgeFun->getModule().getSwiftModule();
+  // Not every type conforms to the ObjectiveCBridgeable protocol in such a case
+  // getBridgeToObjectiveC returns SILDeclRef().
   auto bridgeWitness = getBridgeToObjectiveC(NativeType, SwiftModule);
-  if (BridgeFun->getName() != bridgeWitness.mangle())
+  if (bridgeWitness == SILDeclRef() ||
+      BridgeFun->getName() != bridgeWitness.mangle())
     return BridgedArgument();
 
   return BridgedArgument(ArgIdx, FunRef, BridgeCall, Enum, BridgedValueRelease,

@@ -158,14 +158,13 @@ protected:
 
   /// See CoarseGrainedDependencyGraph::markTransitive.
 
-  void markTransitive(SmallVectorImpl<const void *> &visited,
-                      const void *node, MarkTracerImpl *tracer = nullptr);
+  std::vector<const void*> markTransitive(const void *node, MarkTracerImpl *tracer = nullptr);
+
   bool markIntransitive(const void *node) {
     assert(Provides.count(node) && "node is not in the graph");
     return Marked.insert(node).second;
   }
-  void markExternal(SmallVectorImpl<const void *> &visited,
-                    StringRef externalDependency);
+  std::vector<const void*> markExternal(StringRef externalDependency);
 
 public:
   void forEachUnmarkedJobDirectlyDependentOnExternalSwiftdeps(
@@ -202,13 +201,14 @@ class CoarseGrainedDependencyGraph : public CoarseGrainedDependencyGraphImpl {
   using Traits = llvm::PointerLikeTypeTraits<T>;
   static_assert(Traits::NumLowBitsAvailable >= 0, "not a pointer-like type");
 
-  static void copyBack(SmallVectorImpl<T> &result,
-                       ArrayRef<const void *> rawNodes) {
-    result.reserve(result.size() + rawNodes.size());
+  static std::vector<T> copyBack(ArrayRef<const void *> rawNodes) {
+    std::vector<T> result;
+    result.reserve(rawNodes.size());
     std::transform(rawNodes.begin(), rawNodes.end(), std::back_inserter(result),
                    [](const void *rawNode) {
       return Traits::getFromVoidPointer(const_cast<void *>(rawNode));
     });
+    return result;
   }
 
 public:
@@ -286,23 +286,20 @@ public:
   ///
   /// The traversal routines use
   /// \p visited to avoid endless recursion.
-  template <unsigned N>
-  void markTransitive(SmallVector<T, N> &visited, T node,
+  std::vector<T> markTransitive(T node,
                       MarkTracer *tracer = nullptr) {
-    SmallVector<const void *, N> rawMarked;
+    std::vector<const void *> rawMarked =
     CoarseGrainedDependencyGraphImpl::markTransitive(
-        rawMarked, Traits::getAsVoidPointer(node), tracer);
+        Traits::getAsVoidPointer(node), tracer);
     // FIXME: How can we avoid this copy?
-    copyBack(visited, rawMarked);
+    return copyBack(rawMarked);
   }
 
-  template <unsigned N>
-  void markExternal(SmallVector<T, N> &visited, StringRef externalDependency) {
-    SmallVector<const void *, N> rawMarked;
-    CoarseGrainedDependencyGraphImpl::markExternal(rawMarked,
-                                                   externalDependency);
+  std::vector<T>
+  markExternal(StringRef externalDependency) {
+    const auto rawMarked = CoarseGrainedDependencyGraphImpl::markExternal(externalDependency);
     // FIXME: How can we avoid this copy?
-    copyBack(visited, rawMarked);
+    return copyBack(rawMarked);
   }
 
   /// Marks \p node without marking any dependencies.

@@ -73,3 +73,24 @@ extension Error {
 func throwErrorCode() throws {
   throw FictionalServerError.meltedDown // expected-error{{thrown error code type 'FictionalServerError.Code' does not conform to 'Error'; construct an 'FictionalServerError' instance}}{{29-29=(}}{{40-40=)}}
 }
+
+class MyErrorClass { }
+extension MyErrorClass: Error { }
+
+class MyClass { }
+
+func testUnknownErrorBridge(cond: Bool, mc: MyClass) -> NSObject? {
+  if cond {
+    return mc as? NSError // okay
+  }
+
+  return mc as? NSObject // okay
+}
+
+func testAlwaysErrorBridge(cond: Bool, mec: MyErrorClass) -> NSObject? {
+  if cond {
+    return mec as? NSError // expected-warning{{conditional cast from 'MyErrorClass}}' to 'NSError' always succeeds
+  }
+
+  return mec as? NSObject // expected-warning{{conditional cast from 'MyErrorClass}}' to 'NSObject' always succeeds
+}

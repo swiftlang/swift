@@ -102,9 +102,7 @@ struct Mutating {
   }
 }
 func testMutating(_ x: Mutating, _ y: inout Mutating) {
-  // TODO(SR-11378): Improve this error to match the error using a direct `callAsFunction` member reference.
-  // expected-error @+2 {{cannot call value of non-function type 'Mutating'}}
-  // expected-error @+1 {{cannot invoke 'x' with no arguments}}
+  // expected-error @+1 {{cannot use mutating member on immutable value: 'x' is a 'let' constant}}
   _ = x()
   // expected-error @+1 {{cannot use mutating member on immutable value: 'x' is a 'let' constant}}
   _ = x.callAsFunction()

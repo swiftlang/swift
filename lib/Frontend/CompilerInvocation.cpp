@@ -453,6 +453,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.OptimizationRemarkMissedPattern =
         generateOptimizationRemarkRegex(Diags, Args, A);
 
+  Opts.EnableConcisePoundFile =
+      Args.hasArg(OPT_enable_experimental_concise_pound_file);
+
   llvm::Triple Target = Opts.Target;
   StringRef TargetArg;
   if (const Arg *A = Args.getLastArg(OPT_target)) {

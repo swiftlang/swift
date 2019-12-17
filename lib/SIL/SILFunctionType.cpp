@@ -203,7 +203,7 @@ static CanType getKnownType(Optional<CanType> &cacheSlot, ASTContext &C,
       // lookupValue would only give us types actually declared in the overlays
       // themselves.
       SmallVector<ValueDecl *, 2> decls;
-      mod->lookupQualified(mod, C.getIdentifier(typeName),
+      mod->lookupQualified(mod, DeclNameRef(C.getIdentifier(typeName)),
                            NL_QualifiedDefault | NL_KnownNonCascadingDependency,
                            decls);
       if (decls.size() != 1)
@@ -3332,17 +3332,6 @@ StringRef SILFunctionType::ABICompatibilityCheckResult::getMessage() const {
     return "Escape to no escape conversion";
   }
   llvm_unreachable("Covered switch isn't completely covered?!");
-}
-
-CanSILFunctionType
-SILFunctionType::withSubstitutions(SubstitutionMap subs) const {
-  return SILFunctionType::get(getSubstGenericSignature(),
-                          getExtInfo(), getCoroutineKind(),
-                          getCalleeConvention(),
-                          getParameters(), getYields(), getResults(),
-                          getOptionalErrorResult(),
-                          subs, isGenericSignatureImplied(),
-                          const_cast<SILFunctionType*>(this)->getASTContext());
 }
 
 static DeclContext *getDeclContextForExpansion(const SILFunction &f) {
