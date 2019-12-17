@@ -206,6 +206,22 @@ bool ConstraintSystem::PotentialBindings::isViable(
   return true;
 }
 
+bool ConstraintSystem::PotentialBindings::favoredOverDisjunction() const {
+  if (IsHole || FullyBound)
+    return false;
+
+  // If this bindings are for a closure and there are no holes,
+  // it shouldn't matter whether it there are any type variables
+  // or not because e.g. parameter type can have type variables,
+  // but we still want to resolve closure body early (instead of
+  // attempting any disjunction) to gain additional contextual
+  // information.
+  if (TypeVar->getImpl().isClosureType())
+    return true;
+
+  return !InvolvesTypeVariables;
+}
+
 static bool hasNilLiteralConstraint(TypeVariableType *typeVar,
                                     const ConstraintSystem &CS) {
   // Look for a literal-conformance constraint on the type variable.
