@@ -193,10 +193,6 @@ set(SWIFTLIB_ESSENTIAL
 
 set(SWIFTLIB_ESSENTIAL_GYB_SOURCES
   AtomicInt.swift.gyb
-<<<<<<< HEAD
-  Codable.swift.gyb
-=======
->>>>>>> upstream_20191216
   FloatingPointParsing.swift.gyb
   FloatingPointTypes.swift.gyb
   IntegerTypes.swift.gyb
@@ -240,11 +236,6 @@ set(SWIFTLIB_SOURCES
 
 set(SWIFTLIB_GYB_SOURCES
   ${SWIFTLIB_ESSENTIAL_GYB_SOURCES}
-<<<<<<< HEAD
-  ExistentialCollection.swift.gyb
-  MathFunctions.swift.gyb
-=======
->>>>>>> upstream_20191216
   SIMDVectorTypes.swift.gyb
   Tuple.swift.gyb
   )
