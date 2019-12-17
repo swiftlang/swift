@@ -198,15 +198,11 @@ void LoadableTypeInfo::addScalarToAggLowering(IRGenModule &IGM,
                         offset.asCharUnits() + storageSize.asCharUnits());
 }
 
-static llvm::Constant *asSizeConstant(IRGenModule &IGM, Size size) {
-  return llvm::ConstantInt::get(IGM.SizeTy, size.getValue());
-}
-
 llvm::Value *FixedTypeInfo::getSize(IRGenFunction &IGF, SILType T) const {
   return FixedTypeInfo::getStaticSize(IGF.IGM);
 }
 llvm::Constant *FixedTypeInfo::getStaticSize(IRGenModule &IGM) const {
-  return asSizeConstant(IGM, getFixedSize());
+  return IGM.getSize(getFixedSize());
 }
 
 llvm::Value *FixedTypeInfo::getAlignmentMask(IRGenFunction &IGF,
@@ -214,7 +210,7 @@ llvm::Value *FixedTypeInfo::getAlignmentMask(IRGenFunction &IGF,
   return FixedTypeInfo::getStaticAlignmentMask(IGF.IGM);
 }
 llvm::Constant *FixedTypeInfo::getStaticAlignmentMask(IRGenModule &IGM) const {
-  return asSizeConstant(IGM, Size(getFixedAlignment().getValue() - 1));
+  return IGM.getSize(Size(getFixedAlignment().getValue() - 1));
 }
 
 llvm::Value *FixedTypeInfo::getStride(IRGenFunction &IGF, SILType T) const {
@@ -229,7 +225,7 @@ llvm::Value *FixedTypeInfo::getIsBitwiseTakable(IRGenFunction &IGF, SILType T) c
                                 isBitwiseTakable(ResilienceExpansion::Maximal) == IsBitwiseTakable);
 }
 llvm::Constant *FixedTypeInfo::getStaticStride(IRGenModule &IGM) const {
-  return asSizeConstant(IGM, getFixedStride());
+  return IGM.getSize(getFixedStride());
 }
 
 llvm::Value *FixedTypeInfo::isDynamicallyPackedInline(IRGenFunction &IGF,
@@ -399,7 +395,7 @@ static llvm::Value *computeExtraTagBytes(IRGenFunction &IGF, IRBuilder &Builder,
   }
 
   auto *entryBB = Builder.GetInsertBlock();
-  llvm::Value *size = asSizeConstant(IGM, fixedSize);
+  llvm::Value *size = IGM.getSize(fixedSize);
   auto *returnBB = llvm::BasicBlock::Create(Ctx);
   size = Builder.CreateZExtOrTrunc(size, int32Ty); // We know size < 4.
 
