@@ -284,6 +284,12 @@ protected:
     Discriminator : 16
   );
 
+  SWIFT_INLINE_BITFIELD(AutoClosureExpr, AbstractClosureExpr, 1,
+    /// True if this autoclosure was built for a function conversion, and
+    /// not an actual @autoclosure parameter.
+    IsThunk : 1
+  );
+
   SWIFT_INLINE_BITFIELD(ClosureExpr, AbstractClosureExpr, 1,
     /// True if closure parameters were synthesized from anonymous closure
     /// variables.
@@ -3762,6 +3768,16 @@ public:
                             Discriminator, Parent) {
     if (Body != nullptr)
       setBody(Body);
+
+    Bits.AutoClosureExpr.IsThunk = false;
+  }
+
+  bool isThunk() const {
+    return Bits.AutoClosureExpr.IsThunk;
+  }
+
+  void setIsThunk(bool isThunk) {
+    Bits.AutoClosureExpr.IsThunk = isThunk;
   }
 
   SourceRange getSourceRange() const;
