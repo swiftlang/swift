@@ -74,7 +74,7 @@ template <typename Range> Decl *getElementAt(const Range &Decls, unsigned N) {
 /// This assumes the AST which contains \p DC has exact the same structure with
 /// \p SF.
 /// FIXME: This doesn't support IfConfigDecl blocks. If \p DC is in an inactive
-///        config block, this function probably returns false.
+///        config block, this function returns \c false.
 static DeclContext *getEquivalentDeclContextFromSourceFile(DeclContext *DC,
                                                            SourceFile *SF) {
   auto *newDC = DC;
