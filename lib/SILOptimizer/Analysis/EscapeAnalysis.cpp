@@ -804,10 +804,14 @@ void EscapeAnalysis::ConnectionGraph::propagateEscapeStates() {
     Changed = false;
 
     for (CGNode *Node : Nodes) {
-      // Propagate the state to all successor nodes.
+      // Propagate the state to all pointsTo nodes. It would be sufficient to
+      // only follow proper pointsTo edges, since this loop also follows defer
+      // edges, but this may converge faster.
       if (Node->pointsTo) {
         Changed |= Node->pointsTo->mergeEscapeState(Node->State);
       }
+      // Note: Propagating along defer edges may be interesting from an SSA
+      // standpoint, but it is entirely irrelevant alias analysis.
       for (CGNode *Def : Node->defersTo) {
         Changed |= Def->mergeEscapeState(Node->State);
       }
@@ -845,14 +849,13 @@ void EscapeAnalysis::ConnectionGraph::computeUsePoints() {
           /// liferange. And that must be a releasing instruction.
           int ValueIdx = -1;
           for (const Operand &Op : I.getAllOperands()) {
-            ValueBase *OpV = Op.get();
-            if (CGNode *OpNd = lookupNode(EA->getPointerRoot(OpV))) {
-              if (ValueIdx < 0) {
-                ValueIdx = addUsePoint(OpNd, &I);
-              } else {
-                OpNd->setUsePointBit(ValueIdx);
-              }
-            }
+            CGNode *content = getValueContent(Op.get());
+            if (!content)
+              continue;
+            if (ValueIdx < 0)
+              ValueIdx = addUsePoint(content, &I);
+            else
+              content->setUsePointBit(ValueIdx);
           }
           break;
         }
@@ -867,11 +870,10 @@ void EscapeAnalysis::ConnectionGraph::computeUsePoints() {
   do {
     Changed = false;
     for (CGNode *Node : Nodes) {
-      // Propagate the bits to all successor nodes.
-      Node->visitSuccessors([&Changed, Node](CGNode *succ) {
-        Changed |= succ->mergeUsePoints(Node);
-        return true;
-      });
+      // Propagate the bits to pointsTo. A release of a node may also release
+      // any content pointed to be the node.
+      if (Node->pointsTo)
+        Changed |= Node->pointsTo->mergeUsePoints(Node);
     }
   } while (Changed);
 }
@@ -1097,11 +1099,10 @@ bool EscapeAnalysis::ConnectionGraph::mergeFrom(ConnectionGraph *SourceGraph,
 /// somehow refer to the Node's value.
 /// Use-points are only values which are relevant for lifeness computation,
 /// e.g. release or apply instructions.
-bool EscapeAnalysis::ConnectionGraph::isUsePoint(SILNode *UsePoint,
+bool EscapeAnalysis::ConnectionGraph::isUsePoint(SILInstruction *UsePoint,
                                                  CGNode *Node) {
   assert(Node->getEscapeState() < EscapeState::Global &&
          "Use points are only valid for non-escaping nodes");
-  UsePoint = UsePoint->getRepresentativeSILNodeInObject();
   auto Iter = UsePoints.find(UsePoint);
   if (Iter == UsePoints.end())
     return false;
@@ -1111,8 +1112,8 @@ bool EscapeAnalysis::ConnectionGraph::isUsePoint(SILNode *UsePoint,
   return Node->UsePoints.test(Idx);
 }
 
-void EscapeAnalysis::ConnectionGraph::
-getUsePoints(CGNode *Node, llvm::SmallVectorImpl<SILNode *> &UsePoints) {
+void EscapeAnalysis::ConnectionGraph::getUsePoints(
+    CGNode *Node, llvm::SmallVectorImpl<SILInstruction *> &UsePoints) {
   assert(Node->getEscapeState() < EscapeState::Global &&
          "Use points are only valid for non-escaping nodes");
   for (int Idx = Node->UsePoints.find_first(); Idx >= 0;
@@ -2571,13 +2572,13 @@ bool EscapeAnalysis::canEscapeToValue(SILValue V, SILValue To) {
     return true;
   auto *ConGraph = getConnectionGraph(F);
 
-  CGNode *Node = ConGraph->getNodeOrNull(V);
-  if (!Node)
+  CGNode *valueContent = ConGraph->getValueContent(V);
+  if (!valueContent)
     return true;
-  CGNode *ToNode = ConGraph->getNodeOrNull(To);
-  if (!ToNode)
+  CGNode *userContent = ConGraph->getValueContent(To);
+  if (!userContent)
     return true;
-  return ConGraph->mayReach(ToNode, Node);
+  return ConGraph->mayReach(userContent, valueContent);
 }
 
 bool EscapeAnalysis::canPointToSameMemory(SILValue V1, SILValue V2) {
@@ -2592,27 +2593,26 @@ bool EscapeAnalysis::canPointToSameMemory(SILValue V1, SILValue V2) {
     return true;
   auto *ConGraph = getConnectionGraph(F);
 
-  CGNode *Node1 = ConGraph->getNodeOrNull(V1);
-  if (!Node1)
+  CGNode *Content1 = ConGraph->getValueContent(V1);
+  if (!Content1)
     return true;
-  CGNode *Node2 = ConGraph->getNodeOrNull(V2);
-  if (!Node2)
+
+  CGNode *Content2 = ConGraph->getValueContent(V2);
+  if (!Content2)
     return true;
 
   // Finish the check for one value being a non-escaping local object.
-  if (isUniq1 && Node1->valueEscapesInsideFunction(V1))
+  if (isUniq1 && Content1->valueEscapesInsideFunction(V1))
     isUniq1 = false;
 
-  if (isUniq2 && Node2->valueEscapesInsideFunction(V2))
+  if (isUniq2 && Content2->valueEscapesInsideFunction(V2))
     isUniq2 = false;
 
   if (!isUniq1 && !isUniq2)
     return true;
 
   // Check if both nodes may point to the same content.
-  CGNode *Content1 = getValueContent(ConGraph, V1);
-  CGNode *Content2 = getValueContent(ConGraph, V2);
-
+  // FIXME!!!: This will be rewritten to use node flags in the next commit.
   SILType T1 = V1->getType();
   SILType T2 = V2->getType();
   if (T1.isAddress() && T2.isAddress()) {

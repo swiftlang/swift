@@ -737,8 +737,8 @@ bool AliasAnalysis::mayValueReleaseInterfereWithInstruction(SILInstruction *User
   // The most important check: does the object escape the current function?
   auto LO = getUnderlyingObject(V);
   auto *ConGraph = EA->getConnectionGraph(User->getFunction());
-  auto *Node = ConGraph->getNodeOrNull(LO);
-  if (Node && !Node->escapes())
+  auto *Content = ConGraph->getValueContent(LO);
+  if (Content && !Content->escapes())
     return false;
 
   // This is either a non-local allocation or a scoped allocation that escapes.

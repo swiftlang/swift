@@ -641,10 +641,10 @@ public:
     CGNode *ReturnNode = nullptr;
 
     /// The list of use points.
-    llvm::SmallVector<SILNode *, 16> UsePointTable;
+    llvm::SmallVector<SILInstruction *, 16> UsePointTable;
 
     /// Mapping of use points to bit indices in CGNode::UsePoints.
-    llvm::DenseMap<SILNode *, int> UsePoints;
+    llvm::DenseMap<SILInstruction *, int> UsePoints;
 
     /// The allocator for nodes.
     llvm::SpecificBumpPtrAllocator<CGNode> NodeAllocator;
@@ -798,19 +798,6 @@ public:
         Node->mappedValue = V;
     }
 
-    /// Adds an argument/instruction in which the node's value is used.
-    int addUsePoint(CGNode *Node, SILNode *User) {
-      if (Node->getEscapeState() >= EscapeState::Global)
-        return -1;
-
-      User = User->getRepresentativeSILNodeInObject();
-      int Idx = (int)UsePoints.size();
-      assert(UsePoints.count(User) == 0 && "value is already a use-point");
-      UsePoints[User] = Idx;
-      UsePointTable.push_back(User);
-      assert(UsePoints.size() == UsePointTable.size());
-      Node->setUsePointBit(Idx);
-      return Idx;
     /// If \p pointer is a pointer, set it's content to global escaping.
     ///
     /// Only mark the content node as escaping. Marking a pointer node as
@@ -828,13 +815,8 @@ public:
         content->markEscaping();
     }
 
-    void escapeContentsOf(CGNode *Node) {
-      CGNode *escapedContent = Node->getContentNodeOrNull();
-      if (!escapedContent) {
-        escapedContent = createContentNode(Node, /*hasRC=*/false);
-      }
-      escapedContent->markEscaping();
-    }
+    /// Adds an argument/instruction in which the node's value is used.
+    int addUsePoint(CGNode *Node, SILInstruction *User);
 
     /// Creates a defer-edge between \p From and \p To.
     /// This may trigger node merges to keep the graph invariance 4).
@@ -920,11 +902,11 @@ public:
     /// (indirectly) somehow refer to the Node's value.
     /// Use-points are only values which are relevant for lifeness computation,
     /// e.g. release or apply instructions.
-    bool isUsePoint(SILNode *UsePoint, CGNode *Node);
+    bool isUsePoint(SILInstruction *UsePoint, CGNode *Node);
 
     /// Returns all use points of \p Node in \p UsePoints.
     void getUsePoints(CGNode *Node,
-                      llvm::SmallVectorImpl<SILNode *> &UsePoints);
+                      llvm::SmallVectorImpl<SILInstruction *> &UsePoints);
 
     /// Computes the use point information.
     void computeUsePoints();
@@ -1108,10 +1090,11 @@ private:
   bool mergeSummaryGraph(ConnectionGraph *SummaryGraph,
                          ConnectionGraph *Graph);
 
-  /// Returns true if the value \p V can escape to the \p UsePoint, where
-  /// \p UsePoint is either a release-instruction or a function call.
-  bool canEscapeToUsePoint(SILValue V, SILNode *UsePoint,
-                           ConnectionGraph *ConGraph);
+  /// Returns true if the value \p value or any address within that value can
+  /// escape to the \p usePoint, where \p usePoint is either a
+  /// release-instruction or a function call.
+  bool canEscapeToUsePoint(SILValue value, SILInstruction *usePoint,
+                           ConnectionGraph *conGraph);
 
   friend struct ::CGForDotView;
 
