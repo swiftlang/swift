@@ -2172,7 +2172,10 @@ namespace {
 #if __POINTER_WIDTH__ == 64
     uint32_t Reserved;
 #endif
-    const uint8_t *IvarLayout;
+    union {
+      const uint8_t *IvarLayout;
+      ClassMetadata *NonMetaClass;
+    };
     const char *Name;
     const void *MethodList;
     const void *ProtocolList;
@@ -2249,12 +2252,7 @@ static bool installLazyClassNameHandler() {
     return false;
 
   _objc_setLazyClassNamer([](Class theClass) {
-    ClassMetadata *metadata;
-    if (class_isMetaClass(theClass)) {
-      metadata = (ClassMetadata *)class_getIvarLayout(theClass);
-    } else {
-      metadata = (ClassMetadata *)theClass;
-    }
+    ClassMetadata *metadata = (ClassMetadata *)theClass;
     return copyGenericClassObjCName(metadata);
   });
   return true;
@@ -2266,7 +2264,7 @@ static void setUpGenericClassObjCName(ClassMetadata *theClass) {
     getROData(theClass)->Name = nullptr;
     auto theMetaclass = (ClassMetadata *)object_getClass((id)theClass);
     getROData(theMetaclass)->Name = nullptr;
-    getROData(theMetaclass)->IvarLayout = (const uint8_t *)theClass;
+    getROData(theMetaclass)->NonMetaClass = theClass;
   } else {
     initGenericClassObjCName(theClass);
   }
