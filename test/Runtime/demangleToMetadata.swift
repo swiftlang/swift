@@ -423,5 +423,33 @@ DemangleToMetadataTests.test("Nested types in same-type-constrained extensions")
   // V !: P3 in InnerTEqualsConformsToP1
 }
 
+@available(OSX 10.9, *)
+@_originallyDefinedIn(module: "foo", OSX 10.13)
+struct MovedS {
+  struct Nested { }
+}
+
+@available(OSX 10.9, *)
+@_originallyDefinedIn(module: "foo", OSX 10.13)
+enum MovedE { case e }
+
+@available(OSX 10.9, *)
+@_originallyDefinedIn(module: "bar", OSX 10.13)
+class MovedC {}
+
+DemangleToMetadataTests.test("Moved Symbols") {
+  // Simple Struct
+  expectEqual(type(of: MovedS()), _typeByName("3foo6MovedSV")!)
+
+  // Simple Enum
+  expectEqual(type(of: MovedE.e), _typeByName("3foo6MovedEO")!)
+
+  // Nested struct
+  expectEqual(type(of: MovedS.Nested()), _typeByName("3foo6MovedSV6NestedV")!)
+
+  // Simple Class
+  expectEqual(type(of: MovedC()), _typeByName("3bar6MovedCC")!)
+}
+
 runAllTests()
 
