@@ -1,4 +1,5 @@
 // RUN: %target-typecheck-verify-swift
+// REQUIRES: OS=macosx
 
 @_originallyDefinedIn(module: "foo", OSX 13.13) // expected-error {{need @available attribute for @_originallyDefinedIn}}
 func foo() {}
