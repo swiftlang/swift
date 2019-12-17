@@ -471,7 +471,9 @@ class Klass2 {}
 
 // CHECK-LABEL: sil [ossa] @constant_fold_diagnose_unreachable_succ_match : $@convention(thin) (@owned Klass1) -> () {
 // CHECK: bb0([[ARG:%.*]] :
-// CHECK:   destroy_value [[ARG]]
+// CHECK:   [[ENUM_VAL:%.*]] = enum $Either<Klass1, Klass2>, #Either.left!enumelt.1, [[ARG]]
+// CHECK:   [[RESULT:%.*]] = unchecked_enum_data [[ENUM_VAL]]
+// CHECK:   destroy_value [[RESULT]]
 // CHECK: } // end sil function 'constant_fold_diagnose_unreachable_succ_match'
 sil [ossa] @constant_fold_diagnose_unreachable_succ_match : $@convention(thin) (@owned Klass1) -> () {
 bb0(%0 : @owned $Klass1):
@@ -759,4 +761,24 @@ bb2:
   dealloc_stack %1 : $*Singleton
   %9999 = tuple()
   return %9999 : $()
+}
+
+// Just make sure we apply the optimization and do not trigger the ownership verifier
+//
+// CHECK-LABEL: sil [ossa] @constant_fold_switch_enum_with_owned_payload :
+// CHECK: bb0(
+// CHECK:   br bb1
+// CHECK: bb1:
+// CHECK:   return
+// CHECK: } // end sil function 'constant_fold_switch_enum_with_owned_payload'
+sil [ossa] @constant_fold_switch_enum_with_owned_payload : $@convention(thin) (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %1 = enum $FakeOptional<Builtin.NativeObject>, #FakeOptional.some!enumelt.1, %0 : $Builtin.NativeObject
+  switch_enum %1 : $FakeOptional<Builtin.NativeObject>, case #FakeOptional.some!enumelt.1: bb1, case #FakeOptional.none!enumelt: bb2
+
+bb1(%2 : @owned $Builtin.NativeObject):
+  return %2 : $Builtin.NativeObject
+
+bb2:
+  unreachable
 }

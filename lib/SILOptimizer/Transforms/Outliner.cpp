@@ -491,6 +491,8 @@ static bool matchSwitch(SwitchInfo &SI, SILInstruction *Inst,
   auto NativeType = Apply->getType().getASTType();
   auto *BridgeFun = FunRef->getInitiallyReferencedFunction();
   auto *SwiftModule = BridgeFun->getModule().getSwiftModule();
+  // Not every type conforms to the ObjectiveCBridgeable protocol in such a case
+  // getBridgeFromObjectiveC returns SILDeclRef().
   auto bridgeWitness = getBridgeFromObjectiveC(NativeType, SwiftModule);
   if (bridgeWitness == SILDeclRef() ||
       BridgeFun->getName() != bridgeWitness.mangle())
@@ -762,7 +764,8 @@ BridgedArgument BridgedArgument::match(unsigned ArgIdx, SILValue Arg,
   auto *BridgeCall =
       dyn_cast<ApplyInst>(std::prev(SILBasicBlock::iterator(Enum)));
   if (!BridgeCall || BridgeCall->getNumArguments() != 1 ||
-      Enum->getOperand() != BridgeCall || !BridgeCall->hasOneUse())
+      Enum->getOperand() != BridgeCall || !BridgeCall->hasOneUse() ||
+      !FullApplySite(BridgeCall).hasSelfArgument())
     return BridgedArgument();
 
   auto &selfArg = FullApplySite(BridgeCall).getSelfArgumentOperand();
@@ -809,6 +812,8 @@ BridgedArgument BridgedArgument::match(unsigned ArgIdx, SILValue Arg,
   auto NativeType = BridgedValue->getType().getASTType();
   auto *BridgeFun = FunRef->getInitiallyReferencedFunction();
   auto *SwiftModule = BridgeFun->getModule().getSwiftModule();
+  // Not every type conforms to the ObjectiveCBridgeable protocol in such a case
+  // getBridgeToObjectiveC returns SILDeclRef().
   auto bridgeWitness = getBridgeToObjectiveC(NativeType, SwiftModule);
   if (bridgeWitness == SILDeclRef() ||
       BridgeFun->getName() != bridgeWitness.mangle())

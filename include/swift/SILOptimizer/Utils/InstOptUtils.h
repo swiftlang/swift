@@ -161,12 +161,21 @@ bool tryCheckedCastBrJumpThreading(
 /// A structure containing callbacks that are called when an instruction is
 /// removed or added.
 struct InstModCallbacks {
-  using CallbackTy = std::function<void(SILInstruction *)>;
-  CallbackTy deleteInst = [](SILInstruction *inst) { inst->eraseFromParent(); };
-  CallbackTy createdNewInst = [](SILInstruction *) {};
+  std::function<void(SILInstruction *)> deleteInst = [](SILInstruction *inst) {
+    inst->eraseFromParent();
+  };
+  std::function<void(SILInstruction *)> createdNewInst = [](SILInstruction *) {
+  };
+  std::function<void(SILValue, SILValue)> replaceValueUsesWith =
+      [](SILValue oldValue, SILValue newValue) {
+        oldValue->replaceAllUsesWith(newValue);
+      };
 
-  InstModCallbacks(CallbackTy deleteInst, CallbackTy createdNewInst)
-      : deleteInst(deleteInst), createdNewInst(createdNewInst) {}
+  InstModCallbacks(decltype(deleteInst) deleteInst,
+                   decltype(createdNewInst) createdNewInst,
+                   decltype(replaceValueUsesWith) replaceValueUsesWith)
+      : deleteInst(deleteInst), createdNewInst(createdNewInst),
+        replaceValueUsesWith(replaceValueUsesWith) {}
   InstModCallbacks() = default;
   ~InstModCallbacks() = default;
   InstModCallbacks(const InstModCallbacks &) = default;
@@ -390,6 +399,10 @@ findLocalApplySites(FunctionRefBaseInst *fri);
 
 /// Gets the base implementation of a method.
 AbstractFunctionDecl *getBaseMethod(AbstractFunctionDecl *FD);
+
+SILInstruction *
+tryOptimizeApplyOfPartialApply(PartialApplyInst *pai, SILBuilder &builder,
+                               InstModCallbacks callbacks = InstModCallbacks());
 
 } // end namespace swift
 

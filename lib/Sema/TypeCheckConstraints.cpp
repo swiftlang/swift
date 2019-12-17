@@ -4580,3 +4580,54 @@ IsCallableNominalTypeRequest::evaluate(Evaluator &evaluator, CanType ty,
     return false;
   });
 }
+
+llvm::Expected<bool>
+HasDynamicMemberLookupAttributeRequest::evaluate(Evaluator &evaluator,
+                                                 CanType ty) const {
+  // If this is an archetype type, check if any types it conforms to
+  // (superclass or protocols) have the attribute.
+  if (auto archetype = dyn_cast<ArchetypeType>(ty)) {
+    for (auto proto : archetype->getConformsTo()) {
+      if (proto->getDeclaredType()->hasDynamicMemberLookupAttribute())
+        return true;
+    }
+    if (auto superclass = archetype->getSuperclass()) {
+      if (superclass->hasDynamicMemberLookupAttribute())
+        return true;
+    }
+  }
+
+  // If this is a protocol composition, check if any of its members have the
+  // attribute.
+  if (auto protocolComp = dyn_cast<ProtocolCompositionType>(ty)) {
+    for (auto member : protocolComp->getMembers()) {
+      if (member->hasDynamicMemberLookupAttribute())
+        return true;
+    }
+  }
+
+  // Otherwise, this must be a nominal type.
+  // Dynamic member lookup doesn't work for tuples, etc.
+  auto nominal = ty->getAnyNominal();
+  if (!nominal)
+    return false;
+
+  // If this type has the attribute on it, then yes!
+  if (nominal->getAttrs().hasAttribute<DynamicMemberLookupAttr>())
+    return true;
+
+  // Check the protocols the type conforms to.
+  for (auto proto : nominal->getAllProtocols()) {
+    if (proto->getDeclaredType()->hasDynamicMemberLookupAttribute())
+      return true;
+  }
+
+  // Check the superclass if present.
+  if (auto classDecl = dyn_cast<ClassDecl>(nominal)) {
+    if (auto superclass = classDecl->getSuperclass()) {
+      if (superclass->hasDynamicMemberLookupAttribute())
+        return true;
+    }
+  }
+  return false;
+}

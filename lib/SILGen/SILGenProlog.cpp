@@ -443,19 +443,6 @@ void SILGenFunction::emitProlog(CaptureInfo captureInfo,
   uint16_t ArgNo = emitProlog(paramList, selfParam, resultType,
                               DC, throws, throwsLoc);
   
-  // Emit an unreachable instruction if a parameter type is
-  // uninhabited
-  if (paramList) {
-    for (auto *param : *paramList) {
-      if (param->getType()->isStructurallyUninhabited()) {
-        SILLocation unreachableLoc(param);
-        unreachableLoc.markAsPrologue();
-        B.createUnreachable(unreachableLoc);
-        break;
-      }
-    }
-  }
-
   // Emit the capture argument variables. These are placed last because they
   // become the first curry level of the SIL function.
   assert((captureInfo.hasBeenComputed() ||
@@ -490,6 +477,19 @@ void SILGenFunction::emitProlog(CaptureInfo captureInfo,
 
     emitCaptureArguments(*this, DC->getGenericSignatureOfContext(),
                          capture, ++ArgNo);
+  }
+
+  // Emit an unreachable instruction if a parameter type is
+  // uninhabited
+  if (paramList) {
+    for (auto *param : *paramList) {
+      if (param->getType()->isStructurallyUninhabited()) {
+        SILLocation unreachableLoc(param);
+        unreachableLoc.markAsPrologue();
+        B.createUnreachable(unreachableLoc);
+        break;
+      }
+    }
   }
 }
 

@@ -11,7 +11,7 @@ func takesGenericClosure<T>(_ a : Int, _ fn : @noescape () -> T) {} // expected-
 
 var globalAny: Any = 0
 
-func assignToGlobal<T>(_ t: T) {
+func assignToGlobal<T>(_ t: T) { // expected-note {{generic parameters are always considered '@escaping'}}
   globalAny = t
 }
 
@@ -23,7 +23,7 @@ func takesVariadic(_ fns: () -> Int...) {
   doesEscape(fns[0]) // Okay - variadic-of-function parameters are escaping
 }
 
-func takesNoEscapeClosure(_ fn : () -> Int) {
+func takesNoEscapeClosure(_ fn : () -> Int) { // expected-note 2 {{parameter 'fn' is implicitly non-escaping}} {{34-34=@escaping }}
   // expected-note@-1 5{{parameter 'fn' is implicitly non-escaping}} {{34-34=@escaping }}
   takesNoEscapeClosure { 4 }  // ok
 
@@ -36,14 +36,14 @@ func takesNoEscapeClosure(_ fn : () -> Int) {
   takesGenericClosure(4, fn)       // ok
   takesGenericClosure(4) { fn() }  // ok.
 
-  _ = [fn] // expected-error {{converting non-escaping value to 'Element' may allow it to escape}}
+  _ = [fn] // expected-error {{using non-escaping parameter 'fn' in a context expecting an @escaping closure}}
   _ = [doesEscape(fn)] // expected-error {{passing non-escaping parameter 'fn' to function expecting an @escaping closure}}
-  _ = [1 : fn] // expected-error {{converting non-escaping value to 'Value' may allow it to escape}}
+  _ = [1 : fn] // expected-error {{using non-escaping parameter 'fn' in a context expecting an @escaping closure}}
   _ = [1 : doesEscape(fn)] // expected-error {{passing non-escaping parameter 'fn' to function expecting an @escaping closure}}
   _ = "\(doesEscape(fn))" // expected-error {{passing non-escaping parameter 'fn' to function expecting an @escaping closure}}
   _ = "\(takesArray([fn]))" // expected-error {{using non-escaping parameter 'fn' in a context expecting an @escaping closure}}
 
-  assignToGlobal(fn) // expected-error {{converting non-escaping value to 'T' may allow it to escape}}
+  assignToGlobal(fn) // expected-error {{converting non-escaping parameter 'fn' to generic parameter 'T' may allow it to escape}}
   assignToGlobal((fn, fn)) // expected-error {{converting non-escaping value to 'T' may allow it to escape}}
 }
 

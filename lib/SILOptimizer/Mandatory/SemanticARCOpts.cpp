@@ -14,7 +14,6 @@
 #include "swift/Basic/BlotSetVector.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/SIL/BasicBlockUtils.h"
-#include "swift/SIL/BranchPropagatedUser.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/OwnershipUtils.h"
@@ -577,21 +576,19 @@ bool SemanticARCOptVisitor::performGuaranteedCopyValueOptimization(CopyValueInst
   //    need to insert an end_borrow since all of our borrow introducers are
   //    non-local scopes.
   {
-    SmallVector<BranchPropagatedUser, 8> destroysForLinearLifetimeCheck;
     bool foundNonDeadEnd = false;
     for (auto *dvi : destroys) {
       foundNonDeadEnd |= !getDeadEndBlocks().isDeadEnd(dvi->getParent());
-      destroysForLinearLifetimeCheck.push_back(&dvi->getAllOperands()[0]);
     }
     if (!foundNonDeadEnd && haveAnyLocalScopes)
       return false;
-    SmallVector<BranchPropagatedUser, 8> scratchSpace;
+    SmallVector<SILInstruction *, 8> scratchSpace;
     SmallPtrSet<SILBasicBlock *, 4> visitedBlocks;
     if (llvm::any_of(borrowScopeIntroducers,
                      [&](BorrowScopeIntroducingValue borrowScope) {
                        return !borrowScope.areInstructionsWithinScope(
-                           destroysForLinearLifetimeCheck, scratchSpace,
-                           visitedBlocks, getDeadEndBlocks());
+                           destroys, scratchSpace, visitedBlocks,
+                           getDeadEndBlocks());
                      })) {
       return false;
     }
@@ -786,22 +783,15 @@ public:
 
     // Use the linear lifetime checker to check whether the copied
     // value is dominated by the lifetime of the borrow it's based on.
-    SmallVector<BranchPropagatedUser, 4> baseEndBorrows;
-    for (auto *use : borrowInst->getUses()) {
-      if (isa<EndBorrowInst>(use->getUser())) {
-        baseEndBorrows.emplace_back(use);
-      }
-    }
-    
-    SmallVector<BranchPropagatedUser, 4> valueDestroys;
-    for (auto *use : Load->getUses()) {
-      if (isa<DestroyValueInst>(use->getUser())) {
-        valueDestroys.emplace_back(use);
-      }
-    }
-    
-    SmallPtrSet<SILBasicBlock *, 4> visitedBlocks;
+    SmallVector<SILInstruction *, 4> baseEndBorrows;
+    llvm::copy(borrowInst->getUsersOfType<EndBorrowInst>(),
+               std::back_inserter(baseEndBorrows));
 
+    SmallVector<SILInstruction *, 4> valueDestroys;
+    llvm::copy(Load->getUsersOfType<DestroyValueInst>(),
+               std::back_inserter(valueDestroys));
+
+    SmallPtrSet<SILBasicBlock *, 4> visitedBlocks;
     LinearLifetimeChecker checker(visitedBlocks, ARCOpt.getDeadEndBlocks());
     // Returns true on success. So we invert.
     bool foundError =
