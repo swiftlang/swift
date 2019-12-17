@@ -920,7 +920,6 @@ namespace {
     ConstraintSystem &CS;
     DeclContext *CurDC;
     ConstraintSystemPhase CurrPhase;
-    SmallVector<DeclContext*, 4> DCStack;
 
     static const unsigned numEditorPlaceholderVariables = 2;
 
@@ -1131,25 +1130,10 @@ namespace {
 
     virtual ~ConstraintGenerator() {
       CS.setPhase(CurrPhase);
-      // We really ought to have this assertion:
-      //   assert(DCStack.empty() && CurDC == CS.DC);
-      // Unfortunately, ASTWalker is really bad at letting us establish
-      // invariants like this because walkToExprPost isn't called if
-      // something early-aborts the walk.
     }
 
     ConstraintSystem &getConstraintSystem() const { return CS; }
 
-    void enterClosure(ClosureExpr *closure) {
-      DCStack.push_back(CurDC);
-      CurDC = closure;
-    }
-
-    void exitClosure(ClosureExpr *closure) {
-      assert(CurDC == closure);
-      CurDC = DCStack.pop_back_val();
-    }
-    
     virtual Type visitErrorExpr(ErrorExpr *E) {
       // FIXME: Can we do anything with error expressions at this point?
       return nullptr;
@@ -2139,40 +2123,6 @@ namespace {
       }
 
       return FunctionType::get(closureParams, resultTy, extInfo);
-    }
-
-    /// Give each parameter in a ClosureExpr a fresh type variable if parameter
-    /// types were not specified, and return the eventual function type.
-    void getClosureParams(ClosureExpr *closureExpr,
-                          SmallVectorImpl<AnyFunctionType::Param> &params) {
-      auto *paramList = closureExpr->getParameters();
-      unsigned i = 0;
-
-      for (auto *param : *paramList) {
-        auto *locator = CS.getConstraintLocator(
-            closureExpr, LocatorPathElt::TupleElement(i++));
-        Type paramType, internalType;
-
-        // If a type was explicitly specified, use its opened type.
-        if (param->getTypeRepr()) {
-          paramType = closureExpr->mapTypeIntoContext(param->getInterfaceType());
-          // FIXME: Need a better locator for a pattern as a base.
-          paramType = CS.openUnboundGenericType(paramType, locator);
-          internalType = paramType;
-        } else {
-          // Otherwise, create fresh type variables.
-          paramType = CS.createTypeVariable(locator,
-                                            TVO_CanBindToInOut |
-                                            TVO_CanBindToNoEscape);
-          internalType = CS.createTypeVariable(locator,
-                                               TVO_CanBindToLValue |
-                                               TVO_CanBindToNoEscape);
-          CS.addConstraint(ConstraintKind::BindParam, paramType, internalType,
-                           locator);
-        }
-        CS.setType(param, internalType);
-        params.push_back(param->toFunctionParam(paramType));
-      }
     }
 
     /// Produces a type for the given pattern, filling in any missing
