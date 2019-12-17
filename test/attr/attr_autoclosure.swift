@@ -1,7 +1,7 @@
 // RUN: %target-typecheck-verify-swift -swift-version 5
 
 // Simple case.
-var fn : @autoclosure () -> Int = 4  // expected-error {{'@autoclosure' may only be used on parameters}}  expected-error {{cannot convert value of type 'Int' to specified type '() -> Int'}}
+var fn : @autoclosure () -> Int = 4  // expected-error {{'@autoclosure' may only be used on parameters}}
 
 @autoclosure func func1() {}  // expected-error {{attribute can only be applied to types, not declarations}}
 

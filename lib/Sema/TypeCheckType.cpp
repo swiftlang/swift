@@ -2261,22 +2261,30 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
 
   // Validate use of @autoclosure
   if (attrs.has(TAK_autoclosure)) {
+    bool didDiagnose = false;
     if (attrs.hasConvention()) {
       if (attrs.getConvention() == "c" || attrs.getConvention() == "block") {
         diagnose(attrs.getLoc(TAK_convention),
                  diag::invalid_autoclosure_and_convention_attributes,
                  attrs.getConvention());
         attrs.clearAttribute(TAK_convention);
+        didDiagnose = true;
       }
     } else if (options.is(TypeResolverContext::VariadicFunctionInput) &&
                !options.hasBase(TypeResolverContext::EnumElementDecl)) {
       diagnose(attrs.getLoc(TAK_autoclosure),
                diag::attr_not_on_variadic_parameters, "@autoclosure");
       attrs.clearAttribute(TAK_autoclosure);
+      didDiagnose = true;
     } else if (!options.is(TypeResolverContext::FunctionInput)) {
       diagnose(attrs.getLoc(TAK_autoclosure), diag::attr_only_on_parameters,
                "@autoclosure");
       attrs.clearAttribute(TAK_autoclosure);
+      didDiagnose = true;
+    }
+
+    if (didDiagnose) {
+      ty = ErrorType::get(Context);
     }
   }
 
