@@ -788,6 +788,17 @@ IRGenModule::getAddrOfContextDescriptorForParent(DeclContext *parent,
     LLVM_FALLTHROUGH;
       
   case DeclContextKind::Module:
+    if (auto *D = ofChild->getAsDecl()) {
+      // If the top-level decl has been marked as moved from another module,
+      // using @_originallyDefinedIn, we should emit the original module as
+      // the context because all run-time names of this decl are based on the
+      // original module name.
+      auto OriginalModule = D->getAlternateModuleName();
+      if (!OriginalModule.empty()) {
+        return {getAddrOfOriginalModuleContextDescriptor(OriginalModule),
+          ConstantReference::Direct};
+      }
+    }
     return {getAddrOfModuleContextDescriptor(cast<ModuleDecl>(parent)),
             ConstantReference::Direct};
   }
