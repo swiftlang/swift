@@ -438,36 +438,16 @@ public:
   bool diagnoseAsNote() override;
 };
 
-/// Diagnose errors related to converting function type which
-/// isn't explicitly '@escaping' to some other type.
-class NoEscapeFuncToTypeConversionFailure final : public FailureDiagnostic {
-  Type ConvertTo;
-
-public:
-  NoEscapeFuncToTypeConversionFailure(ConstraintSystem &cs,
-                                      ConstraintLocator *locator,
-                                      Type toType = Type())
-      : FailureDiagnostic(cs, locator), ConvertTo(toType) {}
-
-  bool diagnoseAsError() override;
-
-private:
-  /// Emit tailored diagnostics for no-escape parameter conversions e.g.
-  /// passing such parameter as an @escaping argument, or trying to
-  /// assign it to a variable which expects @escaping function.
-  bool diagnoseParameterUse() const;
-};
-
 /// Diagnose failures related to attempting member access on optional base
 /// type without optional chaining or force-unwrapping it first.
 class MemberAccessOnOptionalBaseFailure final : public FailureDiagnostic {
-  DeclName Member;
+  DeclNameRef Member;
   bool ResultTypeIsOptional;
 
 public:
   MemberAccessOnOptionalBaseFailure(ConstraintSystem &cs,
                                     ConstraintLocator *locator,
-                                    DeclName memberName, bool resultOptional)
+                                    DeclNameRef memberName, bool resultOptional)
       : FailureDiagnostic(cs, locator), Member(memberName),
         ResultTypeIsOptional(resultOptional) {}
 
@@ -547,7 +527,7 @@ private:
 /// e.g. argument/parameter, closure result, conversions etc.
 class ContextualFailure : public FailureDiagnostic {
   ContextualTypePurpose CTP;
-  Type FromType, ToType;
+  Type RawFromType, RawToType;
 
 public:
   ContextualFailure(ConstraintSystem &cs, Type lhs, Type rhs,
@@ -555,15 +535,18 @@ public:
       : ContextualFailure(cs, cs.getContextualTypePurpose(), lhs, rhs,
                           locator) {}
 
-  ContextualFailure(ConstraintSystem &cs,
-                    ContextualTypePurpose purpose, Type lhs, Type rhs,
-                    ConstraintLocator *locator)
-      : FailureDiagnostic(cs, locator), CTP(purpose),
-        FromType(resolve(lhs)), ToType(resolve(rhs)) {}
+  ContextualFailure(ConstraintSystem &cs, ContextualTypePurpose purpose,
+                    Type lhs, Type rhs, ConstraintLocator *locator)
+      : FailureDiagnostic(cs, locator), CTP(purpose), RawFromType(lhs),
+        RawToType(rhs) {}
 
-  Type getFromType() const { return FromType; }
+  Type getFromType() const { return resolve(RawFromType); }
 
-  Type getToType() const { return ToType; }
+  Type getToType() const { return resolve(RawToType); }
+
+  Type getRawFromType() const { return RawFromType; }
+
+  Type getRawToType() const { return RawToType; }
 
   bool diagnoseAsError() override;
 
@@ -644,7 +627,7 @@ protected:
                                             Type contextualType);
 
 private:
-  Type resolve(Type rawType) {
+  Type resolve(Type rawType) const {
     return resolveType(rawType)->getWithoutSpecifierType();
   }
 
@@ -667,6 +650,23 @@ protected:
 
   static Optional<Diag<Type, Type>>
   getDiagnosticFor(ContextualTypePurpose context, bool forProtocol);
+};
+
+/// Diagnose errors related to converting function type which
+/// isn't explicitly '@escaping' to some other type.
+class NoEscapeFuncToTypeConversionFailure final : public ContextualFailure {
+public:
+  NoEscapeFuncToTypeConversionFailure(ConstraintSystem &cs, Type fromType,
+                                      Type toType, ConstraintLocator *locator)
+      : ContextualFailure(cs, fromType, toType, locator) {}
+
+  bool diagnoseAsError() override;
+
+private:
+  /// Emit tailored diagnostics for no-escape parameter conversions e.g.
+  /// passing such parameter as an @escaping argument, or trying to
+  /// assign it to a variable which expects @escaping function.
+  bool diagnoseParameterUse() const;
 };
 
 /// Diagnose failures related to use of the unwrapped optional types,
@@ -852,6 +852,23 @@ public:
   }
 };
 
+class FunctionTypeMismatch final : public ContextualFailure {
+  /// Indices of the parameters whose types do not match.
+  llvm::SmallVector<unsigned, 4> Indices;
+
+public:
+  FunctionTypeMismatch(ConstraintSystem &cs, ContextualTypePurpose purpose,
+                         Type lhs, Type rhs, llvm::ArrayRef<unsigned> indices,
+                         ConstraintLocator *locator)
+      : ContextualFailure(cs, purpose, lhs, rhs, locator),
+        Indices(indices.begin(), indices.end()) {
+    std::sort(Indices.begin(), Indices.end());
+    assert(getFromType()->is<AnyFunctionType>() && getToType()->is<AnyFunctionType>());
+  }
+
+  bool diagnoseAsError() override;
+};
+
 /// Diagnose situations when @autoclosure argument is passed to @autoclosure
 /// parameter directly without calling it first.
 class AutoClosureForwardingFailure final : public FailureDiagnostic {
@@ -977,17 +994,17 @@ public:
 
 class InvalidMemberRefFailure : public FailureDiagnostic {
   Type BaseType;
-  DeclName Name;
+  DeclNameRef Name;
 
 public:
   InvalidMemberRefFailure(ConstraintSystem &cs, Type baseType,
-                          DeclName memberName, ConstraintLocator *locator)
+                          DeclNameRef memberName, ConstraintLocator *locator)
       : FailureDiagnostic(cs, locator), BaseType(baseType->getRValueType()),
         Name(memberName) {}
 
 protected:
   Type getBaseType() const { return BaseType; }
-  DeclName getName() const { return Name; }
+  DeclNameRef getName() const { return Name; }
 };
 
 /// Diagnose situations when member referenced by name is missing
@@ -1002,7 +1019,7 @@ protected:
 class MissingMemberFailure final : public InvalidMemberRefFailure {
 public:
   MissingMemberFailure(ConstraintSystem &cs, Type baseType,
-                       DeclName memberName, ConstraintLocator *locator)
+                       DeclNameRef memberName, ConstraintLocator *locator)
       : InvalidMemberRefFailure(cs, baseType, memberName, locator) {}
 
   bool diagnoseAsError() override;
@@ -1016,7 +1033,7 @@ private:
 
   static DeclName findCorrectEnumCaseName(Type Ty,
                                           TypoCorrectionResults &corrections,
-                                          DeclName memberName);
+                                          DeclNameRef memberName);
 };
 
 /// Diagnose cases where a member only accessible on generic constraints
@@ -1035,7 +1052,7 @@ private:
 class InvalidMemberRefOnExistential final : public InvalidMemberRefFailure {
 public:
   InvalidMemberRefOnExistential(ConstraintSystem &cs, Type baseType,
-                                DeclName memberName, ConstraintLocator *locator)
+                                DeclNameRef memberName, ConstraintLocator *locator)
       : InvalidMemberRefFailure(cs, baseType, memberName, locator) {}
 
   bool diagnoseAsError() override;
@@ -1060,12 +1077,12 @@ public:
 class AllowTypeOrInstanceMemberFailure final : public FailureDiagnostic {
   Type BaseType;
   ValueDecl *Member;
-  DeclName Name;
+  DeclNameRef Name;
 
 public:
   AllowTypeOrInstanceMemberFailure(ConstraintSystem &cs,
                                    Type baseType, ValueDecl *member,
-                                   DeclName name, ConstraintLocator *locator)
+                                   DeclNameRef name, ConstraintLocator *locator)
       : FailureDiagnostic(cs, locator),
         BaseType(baseType->getRValueType()), Member(member), Name(name) {
     assert(member);
@@ -1884,10 +1901,11 @@ private:
 };
 
 class MissingContextualBaseInMemberRefFailure final : public FailureDiagnostic {
-  DeclName MemberName;
+  DeclNameRef MemberName;
 
 public:
-  MissingContextualBaseInMemberRefFailure(ConstraintSystem &cs, DeclName member,
+  MissingContextualBaseInMemberRefFailure(ConstraintSystem &cs,
+                                          DeclNameRef member,
                                           ConstraintLocator *locator)
       : FailureDiagnostic(cs, locator), MemberName(member) {}
 

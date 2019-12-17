@@ -94,7 +94,7 @@ void TypeAttributes::getConventionArguments(SmallVectorImpl<char> &buf) const {
   llvm::raw_svector_ostream stream(buf);
   auto &convention = ConventionArguments.getValue();
   stream << convention.Name;
-  if (!convention.WitnessMethodProtocol.empty()) {
+  if (convention.WitnessMethodProtocol) {
     stream << ": " << convention.WitnessMethodProtocol;
     return;
   }
@@ -924,7 +924,10 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     break;
   }
 
+<<<<<<< HEAD
   // SWIFT_ENABLE_TENSORFLOW
+=======
+>>>>>>> upstream_20191216
   case DAK_Derivative: {
     Printer.printAttrName("@derivative");
     Printer << "(of: ";
@@ -932,14 +935,19 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     Printer << attr->getOriginalFunctionName().Name;
     auto *derivative = cast<AbstractFunctionDecl>(D);
     auto diffParamsString = getDifferentiationParametersClauseString(
+<<<<<<< HEAD
         derivative, attr->getParameterIndices(), attr->getParsedParameters(),
         DifferentiationParameterPrintingStyle::Name);
+=======
+        derivative, attr->getParameterIndices(), attr->getParsedParameters());
+>>>>>>> upstream_20191216
     if (!diffParamsString.empty())
       Printer << ", " << diffParamsString;
     Printer << ')';
     break;
   }
 
+<<<<<<< HEAD
   // SWIFT_ENABLE_TENSORFLOW
   case DAK_Transpose: {
     Printer.printAttrName("@transpose");
@@ -955,6 +963,12 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     Printer << ')';
     break;
   }
+=======
+  case DAK_ImplicitlySynthesizesNestedRequirement:
+    Printer.printAttrName("@_implicitly_synthesizes_nested_requirement");
+    Printer << "(\"" << cast<ImplicitlySynthesizesNestedRequirementAttr>(this)->Value << "\")";
+    break;
+>>>>>>> upstream_20191216
 
   case DAK_Count:
     llvm_unreachable("exceed declaration attribute kinds");
@@ -1017,6 +1031,8 @@ StringRef DeclAttribute::getAttrName() const {
     return "_swift_native_objc_runtime_base";
   case DAK_Semantics:
     return "_semantics";
+  case DAK_ImplicitlySynthesizesNestedRequirement:
+    return "_implicitly_synthesizes_nested_requirement";
   case DAK_Available:
     return "availability";
   case DAK_ObjC:
@@ -1086,10 +1102,9 @@ StringRef DeclAttribute::getAttrName() const {
     return "<<custom>>";
   case DAK_ProjectedValueProperty:
     return "_projectedValueProperty";
-  case DAK_Differentiable:
-    return "differentiable";
   case DAK_OriginallyDefinedIn:
     return "_originallyDefinedIn";
+<<<<<<< HEAD
   // SWIFT_ENABLE_TENSORFLOW
   case DAK_Derivative:
     return "derivative";
@@ -1100,6 +1115,12 @@ StringRef DeclAttribute::getAttrName() const {
   case DAK_Quoted:
     return "quoted";
   // SWIFT_ENABLE_TENSORFLOW END
+=======
+  case DAK_Differentiable:
+    return "differentiable";
+  case DAK_Derivative:
+    return "derivative";
+>>>>>>> upstream_20191216
   }
   llvm_unreachable("bad DeclAttrKind");
 }
@@ -1226,7 +1247,7 @@ PrivateImportAttr *PrivateImportAttr::create(ASTContext &Ctxt, SourceLoc AtLoc,
 
 DynamicReplacementAttr::DynamicReplacementAttr(SourceLoc atLoc,
                                                SourceRange baseRange,
-                                               DeclName name,
+                                               DeclNameRef name,
                                                SourceRange parenRange)
     : DeclAttribute(DAK_DynamicReplacement, atLoc, baseRange,
                     /*Implicit=*/false),
@@ -1239,7 +1260,7 @@ DynamicReplacementAttr::DynamicReplacementAttr(SourceLoc atLoc,
 DynamicReplacementAttr *
 DynamicReplacementAttr::create(ASTContext &Ctx, SourceLoc AtLoc,
                                SourceLoc DynReplLoc, SourceLoc LParenLoc,
-                               DeclName ReplacedFunction, SourceLoc RParenLoc) {
+                               DeclNameRef ReplacedFunction, SourceLoc RParenLoc) {
   void *mem = Ctx.Allocate(totalSizeToAlloc<SourceLoc>(2),
                            alignof(DynamicReplacementAttr));
   return new (mem) DynamicReplacementAttr(
@@ -1248,13 +1269,13 @@ DynamicReplacementAttr::create(ASTContext &Ctx, SourceLoc AtLoc,
 }
 
 DynamicReplacementAttr *
-DynamicReplacementAttr::create(ASTContext &Ctx, DeclName name,
+DynamicReplacementAttr::create(ASTContext &Ctx, DeclNameRef name,
                                AbstractFunctionDecl *f) {
   return new (Ctx) DynamicReplacementAttr(name, f);
 }
 
 DynamicReplacementAttr *
-DynamicReplacementAttr::create(ASTContext &Ctx, DeclName name,
+DynamicReplacementAttr::create(ASTContext &Ctx, DeclNameRef name,
                                LazyMemberLoader *Resolver, uint64_t Data) {
   return new (Ctx) DynamicReplacementAttr(name, Resolver, Data);
 }
@@ -1437,8 +1458,8 @@ SpecializeAttr *SpecializeAttr::create(ASTContext &Ctx, SourceLoc atLoc,
 DifferentiableAttr::DifferentiableAttr(bool implicit, SourceLoc atLoc,
                                        SourceRange baseRange, bool linear,
                                        ArrayRef<ParsedAutoDiffParameter> params,
-                                       Optional<DeclNameWithLoc> jvp,
-                                       Optional<DeclNameWithLoc> vjp,
+                                       Optional<DeclNameRefWithLoc> jvp,
+                                       Optional<DeclNameRefWithLoc> vjp,
                                        TrailingWhereClause *clause)
   : DeclAttribute(DAK_Differentiable, atLoc, baseRange, implicit),
     Linear(linear), NumParsedParameters(params.size()), JVP(std::move(jvp)),
@@ -1449,6 +1470,7 @@ DifferentiableAttr::DifferentiableAttr(bool implicit, SourceLoc atLoc,
 
 DifferentiableAttr::DifferentiableAttr(Decl *original, bool implicit,
                                        SourceLoc atLoc, SourceRange baseRange,
+<<<<<<< HEAD
                                        bool linear, IndexSubset *indices,
                                        Optional<DeclNameWithLoc> jvp,
                                        Optional<DeclNameWithLoc> vjp,
@@ -1457,6 +1479,16 @@ DifferentiableAttr::DifferentiableAttr(Decl *original, bool implicit,
       Linear(linear), JVP(std::move(jvp)), VJP(std::move(vjp)) {
   setOriginalDeclaration(original);
   setParameterIndices(indices);
+=======
+                                       bool linear,
+                                       IndexSubset *parameterIndices,
+                                       Optional<DeclNameRefWithLoc> jvp,
+                                       Optional<DeclNameRefWithLoc> vjp,
+                                       GenericSignature derivativeGenSig)
+    : DeclAttribute(DAK_Differentiable, atLoc, baseRange, implicit),
+      Linear(linear), JVP(std::move(jvp)), VJP(std::move(vjp)) {
+  setParameterIndices(parameterIndices);
+>>>>>>> upstream_20191216
   setDerivativeGenericSignature(derivativeGenSig);
 }
 
@@ -1465,8 +1497,8 @@ DifferentiableAttr::create(ASTContext &context, bool implicit,
                            SourceLoc atLoc, SourceRange baseRange,
                            bool linear,
                            ArrayRef<ParsedAutoDiffParameter> parameters,
-                           Optional<DeclNameWithLoc> jvp,
-                           Optional<DeclNameWithLoc> vjp,
+                           Optional<DeclNameRefWithLoc> jvp,
+                           Optional<DeclNameRefWithLoc> vjp,
                            TrailingWhereClause *clause) {
   unsigned size = totalSizeToAlloc<ParsedAutoDiffParameter>(parameters.size());
   void *mem = context.Allocate(size, alignof(DifferentiableAttr));
@@ -1479,12 +1511,18 @@ DifferentiableAttr *
 DifferentiableAttr::create(AbstractFunctionDecl *original, bool implicit,
                            SourceLoc atLoc, SourceRange baseRange, bool linear,
                            IndexSubset *parameterIndices,
+<<<<<<< HEAD
                            Optional<DeclNameWithLoc> jvp,
                            Optional<DeclNameWithLoc> vjp,
+=======
+                           Optional<DeclNameRefWithLoc> jvp,
+                           Optional<DeclNameRefWithLoc> vjp,
+>>>>>>> upstream_20191216
                            GenericSignature derivativeGenSig) {
   auto &ctx = original->getASTContext();
   void *mem = ctx.Allocate(sizeof(DifferentiableAttr),
                            alignof(DifferentiableAttr));
+<<<<<<< HEAD
   // Register derivative function configuration for the given original
   // declaration.
   // NOTE(TF-1038): `@differentiable` attributes currently always have
@@ -1492,6 +1530,8 @@ DifferentiableAttr::create(AbstractFunctionDecl *original, bool implicit,
   auto *resultIndices = IndexSubset::get(ctx, 1, {0});
   original->addDerivativeFunctionConfiguration(
       {parameterIndices, resultIndices, derivativeGenSig});
+=======
+>>>>>>> upstream_20191216
   return new (mem) DifferentiableAttr(original, implicit, atLoc, baseRange,
                                       linear, parameterIndices, std::move(jvp),
                                       std::move(vjp), derivativeGenSig);
@@ -1534,13 +1574,13 @@ void DifferentiableAttr::setParameterIndices(IndexSubset *paramIndices) {
 void DifferentiableAttr::setJVPFunction(FuncDecl *decl) {
   JVPFunction = decl;
   if (decl && !JVP)
-    JVP = {decl->getFullName(), DeclNameLoc(decl->getNameLoc())};
+    JVP = {decl->createNameRef(), DeclNameLoc(decl->getNameLoc())};
 }
 
 void DifferentiableAttr::setVJPFunction(FuncDecl *decl) {
   VJPFunction = decl;
   if (decl && !VJP)
-    VJP = {decl->getFullName(), DeclNameLoc(decl->getNameLoc())};
+    VJP = {decl->createNameRef(), DeclNameLoc(decl->getNameLoc())};
 }
 
 GenericEnvironment *DifferentiableAttr::getDerivativeGenericEnvironment(
@@ -1636,6 +1676,44 @@ TransposeAttr *TransposeAttr::create(ASTContext &context, bool implicit,
   void *mem = context.Allocate(sizeof(TransposeAttr), alignof(TransposeAttr));
   return new (mem) TransposeAttr(implicit, atLoc, baseRange, baseType,
                                  std::move(originalName), indices);
+}
+
+DerivativeAttr::DerivativeAttr(bool implicit, SourceLoc atLoc,
+                               SourceRange baseRange,
+                               DeclNameRefWithLoc originalName,
+                               ArrayRef<ParsedAutoDiffParameter> params)
+    : DeclAttribute(DAK_Derivative, atLoc, baseRange, implicit),
+      OriginalFunctionName(std::move(originalName)),
+      NumParsedParameters(params.size()) {
+  std::copy(params.begin(), params.end(),
+            getTrailingObjects<ParsedAutoDiffParameter>());
+}
+
+DerivativeAttr::DerivativeAttr(bool implicit, SourceLoc atLoc,
+                               SourceRange baseRange,
+                               DeclNameRefWithLoc originalName,
+                               IndexSubset *indices)
+    : DeclAttribute(DAK_Derivative, atLoc, baseRange, implicit),
+      OriginalFunctionName(std::move(originalName)), ParameterIndices(indices) {
+}
+
+DerivativeAttr *
+DerivativeAttr::create(ASTContext &context, bool implicit, SourceLoc atLoc,
+                       SourceRange baseRange, DeclNameRefWithLoc originalName,
+                       ArrayRef<ParsedAutoDiffParameter> params) {
+  unsigned size = totalSizeToAlloc<ParsedAutoDiffParameter>(params.size());
+  void *mem = context.Allocate(size, alignof(DerivativeAttr));
+  return new (mem) DerivativeAttr(implicit, atLoc, baseRange,
+                                  std::move(originalName), params);
+}
+
+DerivativeAttr *DerivativeAttr::create(ASTContext &context, bool implicit,
+                                       SourceLoc atLoc, SourceRange baseRange,
+                                       DeclNameRefWithLoc originalName,
+                                       IndexSubset *indices) {
+  void *mem = context.Allocate(sizeof(DerivativeAttr), alignof(DerivativeAttr));
+  return new (mem) DerivativeAttr(implicit, atLoc, baseRange,
+                                  std::move(originalName), indices);
 }
 
 ImplementsAttr::ImplementsAttr(SourceLoc atLoc, SourceRange range,

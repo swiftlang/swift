@@ -397,11 +397,11 @@ public:
 class NamedDeclConsumer : public VisibleDeclConsumer {
   virtual void anchor() override;
 public:
-  DeclName name;
+  DeclNameRef name;
   SmallVectorImpl<LookupResultEntry> &results;
   bool isTypeLookup;
 
-  NamedDeclConsumer(DeclName name,
+  NamedDeclConsumer(DeclNameRef name,
                     SmallVectorImpl<LookupResultEntry> &results,
                     bool isTypeLookup)
     : name(name), results(results), isTypeLookup(isTypeLookup) {}
@@ -412,7 +412,7 @@ public:
     // to avoid circular validation.
     if (isTypeLookup && !isa<TypeDecl>(VD))
       return;
-    if (VD->getFullName().matchesRef(name))
+    if (VD->getFullName().matchesRef(name.getFullName()))
       results.push_back(LookupResultEntry(VD));
   }
 };
@@ -666,7 +666,7 @@ public:
 
   /// \return the scopes traversed
   static llvm::SmallVector<const ast_scope::ASTScopeImpl *, 0>
-  unqualifiedLookup(SourceFile *, DeclName, SourceLoc,
+  unqualifiedLookup(SourceFile *, DeclNameRef, SourceLoc,
                     const DeclContext *startingContext,
                     namelookup::AbstractASTScopeDeclConsumer &);
 

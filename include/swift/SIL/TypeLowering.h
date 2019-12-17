@@ -967,23 +967,27 @@ public:
   enum class ABIDifference : uint8_t {
     // Types have compatible calling conventions and representations, so can
     // be trivially bitcast.
+    //
+    // Furthermore, if two function types have
+    // arguments of function type that differ only in
+    // `CompatibleRepresentation`, those outer function types are transitively
+    // `CompatibleRepresentation`. (In all other cases, the outer function types
+    // would fall into the `NeedsThunk` case, because a thunk would be needed
+    // to change the representation of the function argument.)
     CompatibleRepresentation,
     
-    // No convention differences, function can be cast via `convert_function`
-    // without a thunk.
-    //
-    // There may still be a representation difference between values of the
-    // compared function types. This means that, if two function types
-    // have a matching argument or return of function type with
-    // `SameCallingConvention`, then the outer function types may not themselves
-    // have the `SameCallingConvention` because they need a thunk to convert
-    // the inner function value representation.
+    // No convention differences, but there may still be a representation
+    // difference between values of the compared function types, such as a
+    // different ptrauth discriminator. The conversion can be performed by a
+    // `convert_function` instruction.
     CompatibleCallingConvention,
     
-    // Representation difference requires thin-to-thick conversion.
+    // Representation difference requires thin-to-thick conversion with a
+    // `thin_to_thick_function` conversion.
     CompatibleRepresentation_ThinToThick,
-    // Function types have the `SameCallingConvention` but additionally need
-    // a thin-to-thick conversion.
+    // Function types have `CompatibleCallingConvention` but additionally need
+    // a thin-to-thick conversion, so a `convert_function` followed by a
+    // `thin_to_thick_function` sequence is necessary to convert.
     CompatibleCallingConvention_ThinToThick,
     
     // Non-trivial difference requires thunk.

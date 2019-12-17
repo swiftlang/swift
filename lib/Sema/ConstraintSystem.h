@@ -471,19 +471,19 @@ enum class SolutionCompareResult {
 /// declaration was opened, which may involve type variables.
 struct SelectedOverload {
   /// The overload choice.
-  OverloadChoice choice;
+  const OverloadChoice choice;
 
   /// The opened type of the base of the reference to this overload, if
   /// we're referencing a member.
-  Type openedFullType;
+  const Type openedFullType;
 
   /// The opened type produced by referring to this overload.
-  Type openedType;
+  const Type openedType;
 
   /// The type that this overload binds. Note that this may differ from
   /// openedType, for example it will include any IUO unwrapping that has taken
   /// place.
-  Type boundType;
+  const Type boundType;
 };
 
 /// Provides information about the application of a function argument to a
@@ -939,13 +939,6 @@ public:
   explicit SolutionDiff(ArrayRef<Solution> solutions);
 };
 
-/// Identifies a specific conversion from
-struct SpecificConstraint {
-  CanType First;
-  CanType Second;
-  ConstraintKind Kind;
-};
-
 /// An intrusive, doubly-linked list of constraints.
 using ConstraintList = llvm::ilist<Constraint>;
 
@@ -1184,7 +1177,7 @@ private:
   size_t MaxMemory = 0;
 
   /// Cached member lookups.
-  llvm::DenseMap<std::pair<Type, DeclName>, Optional<LookupResult>>
+  llvm::DenseMap<std::pair<Type, DeclNameRef>, Optional<LookupResult>>
     MemberLookups;
 
   /// Cached sets of "alternative" literal types.
@@ -1303,9 +1296,6 @@ public:
   /// A cache that stores the @dynamicCallable required methods implemented by
   /// types.
   llvm::DenseMap<CanType, DynamicCallableMethods> DynamicCallableCache;
-
-  /// A cache that stores whether types are valid @dynamicMemberLookup types.
-  llvm::DenseMap<CanType, bool> DynamicMemberLookupCache;
 
 private:
   /// Describe the candidate expression for partial solving.
@@ -1914,7 +1904,7 @@ public:
   /// and no new names are introduced after name binding.
   ///
   /// \returns A reference to the member-lookup result.
-  LookupResult &lookupMember(Type base, DeclName name);
+  LookupResult &lookupMember(Type base, DeclNameRef name);
 
   /// Retrieve the set of "alternative" literal types that we'll explore
   /// for a given literal protocol kind.
@@ -2313,7 +2303,7 @@ public:
   }
 
   /// Add a value member constraint to the constraint system.
-  void addValueMemberConstraint(Type baseTy, DeclName name, Type memberTy,
+  void addValueMemberConstraint(Type baseTy, DeclNameRef name, Type memberTy,
                                 DeclContext *useDC,
                                 FunctionRefKind functionRefKind,
                                 ArrayRef<OverloadChoice> outerAlternatives,
@@ -2343,7 +2333,7 @@ public:
 
   /// Add a value member constraint for an UnresolvedMemberRef
   /// to the constraint system.
-  void addUnresolvedValueMemberConstraint(Type baseTy, DeclName name,
+  void addUnresolvedValueMemberConstraint(Type baseTy, DeclNameRef name,
                                           Type memberTy, DeclContext *useDC,
                                           FunctionRefKind functionRefKind,
                                           ConstraintLocatorBuilder locator) {
@@ -2824,7 +2814,12 @@ private:
   /// this member and a bit indicating whether or not a bind constraint was added.
   std::pair<Type, bool> adjustTypeOfOverloadReference(
       const OverloadChoice &choice, ConstraintLocator *locator, Type boundType,
-      Type refType, DeclContext *useDC,
+      Type refType);
+
+  /// Add the constraints needed to bind an overload's type variable.
+  void bindOverloadType(
+      const SelectedOverload &overload, Type boundType,
+      ConstraintLocator *locator, DeclContext *useDC,
       llvm::function_ref<void(unsigned int, Type, ConstraintLocator *)>
           verifyThatArgumentIsHashable);
 
@@ -3188,7 +3183,7 @@ public:
   /// try to identify and classify inaccessible members that may be being
   /// referenced.
   MemberLookupResult performMemberLookup(ConstraintKind constraintKind,
-                                         DeclName memberName, Type baseTy,
+                                         DeclNameRef memberName, Type baseTy,
                                          FunctionRefKind functionRefKind,
                                          ConstraintLocator *memberLocator,
                                          bool includeInaccessibleMembers);
@@ -3265,7 +3260,7 @@ private:
 
   /// Attempt to simplify the given member constraint.
   SolutionKind simplifyMemberConstraint(
-      ConstraintKind kind, Type baseType, DeclName member, Type memberType,
+      ConstraintKind kind, Type baseType, DeclNameRef member, Type memberType,
       DeclContext *useDC, FunctionRefKind functionRefKind,
       ArrayRef<OverloadChoice> outerAlternatives, TypeMatchOptions flags,
       ConstraintLocatorBuilder locator);
@@ -3433,28 +3428,64 @@ private:
     /// The kind of bindings permitted.
     AllowedBindingKind Kind;
 
-    /// The kind of the constraint this binding came from.
-    ConstraintKind BindingSource;
-
-    /// The defaulted protocol associated with this binding.
-    ProtocolDecl *DefaultedProtocol;
-
-    /// If this is a binding that comes from a \c Defaultable constraint,
-    /// the locator of that constraint.
-    ConstraintLocator *DefaultableBinding = nullptr;
+  protected:
+    /// The source of the type information.
+    ///
+    /// Determines whether this binding represents a "hole" in
+    /// constraint system. Such bindings have no originating constraint
+    /// because they are synthetic, they have a locator instead.
+    PointerUnion<Constraint *, ConstraintLocator *> BindingSource;
 
     PotentialBinding(Type type, AllowedBindingKind kind,
-                     ConstraintKind bindingSource,
-                     ProtocolDecl *defaultedProtocol = nullptr,
-                     ConstraintLocator *defaultableBinding = nullptr)
+                     PointerUnion<Constraint *, ConstraintLocator *> source)
         : BindingType(type->getWithoutParens()), Kind(kind),
-          BindingSource(bindingSource), DefaultedProtocol(defaultedProtocol),
-          DefaultableBinding(defaultableBinding) {}
+          BindingSource(source) {}
 
-    bool isDefaultableBinding() const { return DefaultableBinding != nullptr; }
+  public:
+    PotentialBinding(Type type, AllowedBindingKind kind, Constraint *source)
+        : BindingType(type->getWithoutParens()), Kind(kind),
+          BindingSource(source) {}
+
+    bool isDefaultableBinding() const {
+      if (auto *constraint = BindingSource.dyn_cast<Constraint *>())
+        return constraint->getKind() == ConstraintKind::Defaultable;
+      // If binding source is not constraint - it's a hole, which is
+      // a last resort default binding for a type variable.
+      return true;
+    }
+
+    bool hasDefaultedLiteralProtocol() const {
+      return bool(getDefaultedLiteralProtocol());
+    }
+
+    ProtocolDecl *getDefaultedLiteralProtocol() const {
+      auto *constraint = BindingSource.dyn_cast<Constraint *>();
+      if (!constraint)
+        return nullptr;
+
+      return constraint->getKind() == ConstraintKind::LiteralConformsTo
+                 ? constraint->getProtocol()
+                 : nullptr;
+    }
+
+    ConstraintLocator *getLocator() const {
+      if (auto *constraint = BindingSource.dyn_cast<Constraint *>())
+        return constraint->getLocator();
+      return BindingSource.get<ConstraintLocator *>();
+    }
 
     PotentialBinding withType(Type type) const {
-      return {type, Kind, BindingSource, DefaultedProtocol, DefaultableBinding};
+      return {type, Kind, BindingSource};
+    }
+
+    PotentialBinding withSameSource(Type type, AllowedBindingKind kind) const {
+      return {type, kind, BindingSource};
+    }
+
+    static PotentialBinding forHole(ASTContext &ctx,
+                                    ConstraintLocator *locator) {
+      return {ctx.TheUnresolvedType, AllowedBindingKind::Exact,
+              /*source=*/locator};
     }
   };
 
@@ -3609,9 +3640,8 @@ private:
                      out << "(supertypes of) ";
                      break;
                    }
-                   if (binding.DefaultedProtocol)
-                     out << "(default from "
-                         << binding.DefaultedProtocol->getName() << ") ";
+                   if (auto *literal = binding.getDefaultedLiteralProtocol())
+                     out << "(default from " << literal->getName() << ") ";
                    out << type.getString(PO);
                  },
                  [&]() { out << "; "; });
@@ -4341,7 +4371,9 @@ public:
 
   bool isDefaultable() const { return Binding.isDefaultableBinding(); }
 
-  bool hasDefaultedProtocol() const { return Binding.DefaultedProtocol; }
+  bool hasDefaultedProtocol() const {
+    return Binding.hasDefaultedLiteralProtocol();
+  }
 
   bool attempt(ConstraintSystem &cs) const;
 

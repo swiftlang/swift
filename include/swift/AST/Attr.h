@@ -69,7 +69,7 @@ public:
 
   struct Convention {
     StringRef Name = {};
-    StringRef WitnessMethodProtocol = {};
+    DeclNameRef WitnessMethodProtocol = {};
     StringRef ClangType = {};
     // Carry the source location for diagnostics.
     SourceLoc ClangTypeLoc = {};
@@ -79,7 +79,7 @@ public:
     /// Don't use this function if you are creating a C convention as you
     /// probably need a ClangType field as well.
     static Convention makeSwiftConvention(StringRef name) {
-      return {name, "", "", {}};
+      return {name, DeclNameRef(), "", {}};
     }
   };
 
@@ -688,6 +688,23 @@ public:
   }
 };
 
+/// Defines the @_implicitly_synthesizes_nested_requirement attribute.
+class ImplicitlySynthesizesNestedRequirementAttr : public DeclAttribute {
+public:
+  ImplicitlySynthesizesNestedRequirementAttr(StringRef Value, SourceLoc AtLoc,
+                                             SourceRange Range)
+    : DeclAttribute(DAK_ImplicitlySynthesizesNestedRequirement,
+                    AtLoc, Range, /*Implicit*/false),
+      Value(Value) {}
+
+  /// The name of the phantom requirement.
+  const StringRef Value;
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DAK_ImplicitlySynthesizesNestedRequirement;
+  }
+};
+
 /// Determine the result of comparing an availability attribute to a specific
 /// platform or language version.
 enum class AvailableVersionComparison {
@@ -1041,15 +1058,16 @@ class DynamicReplacementAttr final
   friend TrailingObjects;
   friend class DynamicallyReplacedDeclRequest;
 
-  DeclName ReplacedFunctionName;
+  DeclNameRef ReplacedFunctionName;
   LazyMemberLoader *Resolver = nullptr;
   uint64_t ResolverContextData;
 
   /// Create an @_dynamicReplacement(for:) attribute written in the source.
   DynamicReplacementAttr(SourceLoc atLoc, SourceRange baseRange,
-                         DeclName replacedFunctionName, SourceRange parenRange);
+                         DeclNameRef replacedFunctionName,
+                         SourceRange parenRange);
 
-  DynamicReplacementAttr(DeclName name, AbstractFunctionDecl *f)
+  DynamicReplacementAttr(DeclNameRef name, AbstractFunctionDecl *f)
       : DeclAttribute(DAK_DynamicReplacement, SourceLoc(), SourceRange(),
                       /*Implicit=*/false),
         ReplacedFunctionName(name),
@@ -1057,7 +1075,7 @@ class DynamicReplacementAttr final
     Bits.DynamicReplacementAttr.HasTrailingLocationInfo = false;
   }
 
-  DynamicReplacementAttr(DeclName name,
+  DynamicReplacementAttr(DeclNameRef name,
                          LazyMemberLoader *Resolver = nullptr,
                          uint64_t Data = 0)
       : DeclAttribute(DAK_DynamicReplacement, SourceLoc(), SourceRange(),
@@ -1084,18 +1102,18 @@ class DynamicReplacementAttr final
 public:
   static DynamicReplacementAttr *
   create(ASTContext &Context, SourceLoc AtLoc, SourceLoc DynReplLoc,
-         SourceLoc LParenLoc, DeclName replacedFunction, SourceLoc RParenLoc);
+         SourceLoc LParenLoc, DeclNameRef replacedFunction, SourceLoc RParenLoc);
 
   static DynamicReplacementAttr *create(ASTContext &ctx,
-                                        DeclName replacedFunction,
+                                        DeclNameRef replacedFunction,
                                         AbstractFunctionDecl *replacedFuncDecl);
 
   static DynamicReplacementAttr *create(ASTContext &ctx,
-                                        DeclName replacedFunction,
+                                        DeclNameRef replacedFunction,
                                         LazyMemberLoader *Resolver,
                                         uint64_t Data);
 
-  DeclName getReplacedFunctionName() const {
+  DeclNameRef getReplacedFunctionName() const {
     return ReplacedFunctionName;
   }
 
@@ -1613,6 +1631,7 @@ public:
   }
 };
 
+<<<<<<< HEAD
 /// Attribute that asks the compiler to generate a function that returns a
 /// quoted representation of the attributed declaration.
 ///
@@ -1672,6 +1691,234 @@ public:
 
   static QuotedAttr *create(ASTContext &context, FuncDecl *quoteDecl,
                             SourceLoc atLoc, SourceRange range, bool implicit);
+=======
+/// A declaration name with location.
+struct DeclNameRefWithLoc {
+  DeclNameRef Name;
+  DeclNameLoc Loc;
+};
+
+/// Attribute that marks a function as differentiable and optionally specifies
+/// custom associated derivative functions: 'jvp' and 'vjp'.
+///
+/// Examples:
+///   @differentiable(jvp: jvpFoo where T : FloatingPoint)
+///   @differentiable(wrt: (self, x, y), jvp: jvpFoo)
+class DifferentiableAttr final
+    : public DeclAttribute,
+      private llvm::TrailingObjects<DifferentiableAttr,
+                                    ParsedAutoDiffParameter> {
+  friend TrailingObjects;
+
+  /// Whether this function is linear (optional).
+  bool Linear;
+  /// The number of parsed parameters specified in 'wrt:'.
+  unsigned NumParsedParameters = 0;
+  /// The JVP function.
+  Optional<DeclNameRefWithLoc> JVP;
+  /// The VJP function.
+  Optional<DeclNameRefWithLoc> VJP;
+  /// The JVP function (optional), resolved by the type checker if JVP name is
+  /// specified.
+  FuncDecl *JVPFunction = nullptr;
+  /// The VJP function (optional), resolved by the type checker if VJP name is
+  /// specified.
+  FuncDecl *VJPFunction = nullptr;
+  /// The differentiation parameters' indices, resolved by the type checker.
+  IndexSubset *ParameterIndices = nullptr;
+  /// The trailing where clause (optional).
+  TrailingWhereClause *WhereClause = nullptr;
+  /// The generic signature for autodiff associated functions. Resolved by the
+  /// type checker based on the original function's generic signature and the
+  /// attribute's where clause requirements. This is set only if the attribute
+  /// has a where clause.
+  GenericSignature DerivativeGenericSignature;
+
+  explicit DifferentiableAttr(bool implicit, SourceLoc atLoc,
+                              SourceRange baseRange, bool linear,
+                              ArrayRef<ParsedAutoDiffParameter> parameters,
+                              Optional<DeclNameRefWithLoc> jvp,
+                              Optional<DeclNameRefWithLoc> vjp,
+                              TrailingWhereClause *clause);
+
+  explicit DifferentiableAttr(Decl *original, bool implicit, SourceLoc atLoc,
+                              SourceRange baseRange, bool linear,
+                              IndexSubset *parameterIndices,
+                              Optional<DeclNameRefWithLoc> jvp,
+                              Optional<DeclNameRefWithLoc> vjp,
+                              GenericSignature derivativeGenericSignature);
+
+public:
+  static DifferentiableAttr *create(ASTContext &context, bool implicit,
+                                    SourceLoc atLoc, SourceRange baseRange,
+                                    bool linear,
+                                    ArrayRef<ParsedAutoDiffParameter> params,
+                                    Optional<DeclNameRefWithLoc> jvp,
+                                    Optional<DeclNameRefWithLoc> vjp,
+                                    TrailingWhereClause *clause);
+
+  static DifferentiableAttr *create(AbstractFunctionDecl *original,
+                                    bool implicit, SourceLoc atLoc,
+                                    SourceRange baseRange, bool linear,
+                                    IndexSubset *parameterIndices,
+                                    Optional<DeclNameRefWithLoc> jvp,
+                                    Optional<DeclNameRefWithLoc> vjp,
+                                    GenericSignature derivativeGenSig);
+
+  /// Get the optional 'jvp:' function name and location.
+  /// Use this instead of `getJVPFunction` to check whether the attribute has a
+  /// registered JVP.
+  Optional<DeclNameRefWithLoc> getJVP() const { return JVP; }
+
+  /// Get the optional 'vjp:' function name and location.
+  /// Use this instead of `getVJPFunction` to check whether the attribute has a
+  /// registered VJP.
+  Optional<DeclNameRefWithLoc> getVJP() const { return VJP; }
+
+  IndexSubset *getParameterIndices() const {
+    return ParameterIndices;
+  }
+  void setParameterIndices(IndexSubset *parameterIndices) {
+    ParameterIndices = parameterIndices;
+  }
+
+  /// The parsed differentiation parameters, i.e. the list of parameters
+  /// specified in 'wrt:'.
+  ArrayRef<ParsedAutoDiffParameter> getParsedParameters() const {
+    return {getTrailingObjects<ParsedAutoDiffParameter>(), NumParsedParameters};
+  }
+  MutableArrayRef<ParsedAutoDiffParameter> getParsedParameters() {
+    return {getTrailingObjects<ParsedAutoDiffParameter>(), NumParsedParameters};
+  }
+  size_t numTrailingObjects(OverloadToken<ParsedAutoDiffParameter>) const {
+    return NumParsedParameters;
+  }
+
+  bool isLinear() const { return Linear; }
+
+  TrailingWhereClause *getWhereClause() const { return WhereClause; }
+
+  GenericSignature getDerivativeGenericSignature() const {
+    return DerivativeGenericSignature;
+  }
+  void setDerivativeGenericSignature(GenericSignature derivativeGenSig) {
+    DerivativeGenericSignature = derivativeGenSig;
+  }
+
+  FuncDecl *getJVPFunction() const { return JVPFunction; }
+  void setJVPFunction(FuncDecl *decl);
+  FuncDecl *getVJPFunction() const { return VJPFunction; }
+  void setVJPFunction(FuncDecl *decl);
+
+  /// Get the derivative generic environment for the given `@differentiable`
+  /// attribute and original function.
+  GenericEnvironment *
+  getDerivativeGenericEnvironment(AbstractFunctionDecl *original) const;
+
+  // Print the attribute to the given stream.
+  // If `omitWrtClause` is true, omit printing the `wrt:` clause.
+  // If `omitAssociatedFunctions` is true, omit printing associated functions.
+  void print(llvm::raw_ostream &OS, const Decl *D,
+             bool omitWrtClause = false,
+             bool omitAssociatedFunctions = false) const;
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DAK_Differentiable;
+  }
+};
+
+/// The `@derivative` attribute registers a function as a derivative of another
+/// function-like declaration: a 'func', 'init', 'subscript', or 'var' computed
+/// property declaration.
+///
+/// The `@derivative` attribute also has an optional `wrt:` clause specifying
+/// the parameters that are differentiated "with respect to", i.e. the
+/// differentiation parameters. The differentiation parameters must conform to
+/// the `Differentiable` protocol.
+///
+/// If the `wrt:` clause is unspecified, the differentiation parameters are
+/// inferred to be all parameters that conform to `Differentiable`.
+///
+/// `@derivative` attribute type-checking verifies that the type of the
+/// derivative function declaration is consistent with the type of the
+/// referenced original declaration and the differentiation parameters.
+///
+/// Examples:
+///   @derivative(of: sin(_:))
+///   @derivative(of: +, wrt: (lhs, rhs))
+class DerivativeAttr final
+    : public DeclAttribute,
+      private llvm::TrailingObjects<DerivativeAttr, ParsedAutoDiffParameter> {
+  friend TrailingObjects;
+
+  /// The original function name.
+  DeclNameRefWithLoc OriginalFunctionName;
+  /// The original function declaration, resolved by the type checker.
+  AbstractFunctionDecl *OriginalFunction = nullptr;
+  /// The number of parsed parameters specified in 'wrt:'.
+  unsigned NumParsedParameters = 0;
+  /// The differentiation parameters' indices, resolved by the type checker.
+  IndexSubset *ParameterIndices = nullptr;
+  /// The derivative function kind (JVP or VJP), resolved by the type checker.
+  Optional<AutoDiffDerivativeFunctionKind> Kind = None;
+
+  explicit DerivativeAttr(bool implicit, SourceLoc atLoc, SourceRange baseRange,
+                          DeclNameRefWithLoc original,
+                          ArrayRef<ParsedAutoDiffParameter> params);
+
+  explicit DerivativeAttr(bool implicit, SourceLoc atLoc, SourceRange baseRange,
+                          DeclNameRefWithLoc original, IndexSubset *indices);
+
+public:
+  static DerivativeAttr *create(ASTContext &context, bool implicit,
+                                SourceLoc atLoc, SourceRange baseRange,
+                                DeclNameRefWithLoc original,
+                                ArrayRef<ParsedAutoDiffParameter> params);
+
+  static DerivativeAttr *create(ASTContext &context, bool implicit,
+                                SourceLoc atLoc, SourceRange baseRange,
+                                DeclNameRefWithLoc original,
+                                IndexSubset *indices);
+
+  DeclNameRefWithLoc getOriginalFunctionName() const {
+    return OriginalFunctionName;
+  }
+  AbstractFunctionDecl *getOriginalFunction() const {
+    return OriginalFunction;
+  }
+  void setOriginalFunction(AbstractFunctionDecl *decl) {
+    OriginalFunction = decl;
+  }
+
+  AutoDiffDerivativeFunctionKind getDerivativeKind() const {
+    assert(Kind && "Derivative function kind has not yet been resolved");
+    return *Kind;
+  }
+  void setDerivativeKind(AutoDiffDerivativeFunctionKind kind) { Kind = kind; }
+
+  /// The parsed differentiation parameters, i.e. the list of parameters
+  /// specified in 'wrt:'.
+  ArrayRef<ParsedAutoDiffParameter> getParsedParameters() const {
+    return {getTrailingObjects<ParsedAutoDiffParameter>(), NumParsedParameters};
+  }
+  MutableArrayRef<ParsedAutoDiffParameter> getParsedParameters() {
+    return {getTrailingObjects<ParsedAutoDiffParameter>(), NumParsedParameters};
+  }
+  size_t numTrailingObjects(OverloadToken<ParsedAutoDiffParameter>) const {
+    return NumParsedParameters;
+  }
+
+  IndexSubset *getParameterIndices() const {
+    return ParameterIndices;
+  }
+  void setParameterIndices(IndexSubset *parameterIndices) {
+    ParameterIndices = parameterIndices;
+  }
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DAK_Derivative;
+  }
+>>>>>>> upstream_20191216
 };
 
 /// Attributes that may be applied to declarations.
@@ -1853,6 +2100,7 @@ public:
   SourceLoc getStartLoc(bool forModifiers = false) const;
 };
 
+<<<<<<< HEAD
 struct DeclNameWithLoc {
   DeclName Name;
   DeclNameLoc Loc;
@@ -2151,6 +2399,8 @@ public:
   }
 };
 
+=======
+>>>>>>> upstream_20191216
 void simple_display(llvm::raw_ostream &out, const DeclAttribute *attr);
 
 inline SourceLoc extractNearestSourceLoc(const DeclAttribute *attr) {

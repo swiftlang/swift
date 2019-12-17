@@ -533,6 +533,7 @@ DECL_ATTR(_originallyDefinedIn, OriginallyDefinedIn,
   ABIBreakingToAdd | ABIBreakingToRemove | APIStableToAdd | APIStableToRemove,
   96)
 
+<<<<<<< HEAD
 // SWIFT_ENABLE_TENSORFLOW
 DECL_ATTR(quoted, Quoted,
   OnFunc |
@@ -560,6 +561,18 @@ DECL_ATTR(transpose, Transpose,
   ABIStableToAdd | ABIBreakingToRemove | APIStableToAdd | APIBreakingToRemove,
   102)
 // SWIFT_ENABLE_TENSORFLOW END
+=======
+DECL_ATTR(derivative, Derivative,
+  OnFunc | LongAttribute | AllowMultipleAttributes |
+  ABIStableToAdd | ABIBreakingToRemove | APIStableToAdd | APIBreakingToRemove,
+  97)
+
+DECL_ATTR(_implicitly_synthesizes_nested_requirement, ImplicitlySynthesizesNestedRequirement,
+  OnProtocol |
+  UserInaccessible |
+  ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
+  98)
+>>>>>>> upstream_20191216
 
 #undef TYPE_ATTR
 #undef DECL_ATTR_ALIAS

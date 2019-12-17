@@ -1,5 +1,3 @@
-// SWIFT_ENABLE_TENSORFLOW
-
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend %s -emit-module -parse-as-library -o %t
 // RUN: llvm-bcanalyzer %t/differentiable_attr.swiftmodule | %FileCheck %s -check-prefix=BCANALYZER
@@ -7,12 +5,17 @@
 // REQUIRES: differentiable_programming
 
 // TODO(TF-836): Enable this test.
+<<<<<<< HEAD
 // Blocked by TF-828: `@differentiating` attribute type-checking.
 // SWIFT_ENABLE_TENSORFLOW
 // This test currently only fails on `master` branch.
 // Disable the XFAIL on `tensorflow` branch.
 // XFAI: *
 // SWIFT_ENABLE_TENSORFLOW END
+=======
+// Blocked by TF-828: `@differentiable` attribute type-checking.
+// XFAIL: *
+>>>>>>> upstream_20191216
 
 // BCANALYZER-NOT: UnknownCode
 

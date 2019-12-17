@@ -207,7 +207,7 @@ ERROR(lex_conflict_marker_in_file,none,
 //------------------------------------------------------------------------------
 
 NOTE(note_in_decl_extension,none,
-     "in %select{declaration|extension}0 of %1", (bool, Identifier))
+     "in %select{declaration|extension}0 of %1", (bool, DeclNameRef))
 ERROR(line_directive_style_deprecated,none,
         "#line directive was renamed to #sourceLocation",
         ())
@@ -813,6 +813,12 @@ ERROR(sil_box_expected_r_brace,none,
       "expected '}' to complete SIL box field type list", ())
 ERROR(sil_box_expected_r_angle,none,
       "expected '>' to complete SIL box generic argument list", ())
+
+// SIL function types
+ERROR(sil_function_subst_expected_l_angle,none,
+      "expected '<' to begin SIL function type substitution list after 'for'", ())
+ERROR(sil_function_subst_expected_r_angle,none,
+      "expected '>' to begin SIL function type substitution list after 'for'", ())
 
 // Opaque types
 ERROR(opaque_mid_composition,none,
@@ -1641,6 +1647,10 @@ ERROR(sil_inst_autodiff_invalid_witness_generic_signature,PointsToFirstBadToken,
 ERROR(attr_quoted_enable_experimental_quasiquotes,PointsToFirstBadToken,
       "'@quoted' is unsupported; pass -enable-experimental-quasiquotes to "
       "enable support for quasiquotes", ())
+
+// derivative
+ERROR(attr_derivative_expected_original_name,PointsToFirstBadToken,
+      "expected an original function name", ())
 
 //------------------------------------------------------------------------------
 // MARK: Generics parsing diagnostics

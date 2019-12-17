@@ -489,11 +489,12 @@ bool SemaAnnotator::walkToTypeReprPre(TypeRepr *T) {
 
   if (auto IdT = dyn_cast<ComponentIdentTypeRepr>(T)) {
     if (ValueDecl *VD = IdT->getBoundDecl()) {
-      if (auto *ModD = dyn_cast<ModuleDecl>(VD))
-        return passReference(ModD, std::make_pair(IdT->getIdentifier(),
-                                                  IdT->getIdLoc()));
+      if (auto *ModD = dyn_cast<ModuleDecl>(VD)) {
+        auto ident = IdT->getNameRef().getBaseIdentifier();
+        return passReference(ModD, std::make_pair(ident, IdT->getLoc()));
+      }
 
-      return passReference(VD, Type(), DeclNameLoc(IdT->getIdLoc()),
+      return passReference(VD, Type(), IdT->getNameLoc(),
                            ReferenceMetaData(SemaReferenceKind::TypeRef, None));
     }
   }

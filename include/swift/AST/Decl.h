@@ -467,10 +467,14 @@ protected:
     IsDebuggerAlias : 1
   );
 
-  SWIFT_INLINE_BITFIELD(NominalTypeDecl, GenericTypeDecl, 1+1+1,
+  SWIFT_INLINE_BITFIELD(NominalTypeDecl, GenericTypeDecl, 1+1+1+1,
     /// Whether we have already added implicitly-defined initializers
     /// to this declaration.
     AddedImplicitInitializers : 1,
+
+    /// Whether we have already added the phantom CodingKeys
+    /// nested requirement to this declaration.
+    AddedPhantomCodingKeys : 1,
 
     /// Whether there is are lazily-loaded conformances for this nominal type.
     HasLazyConformances : 1,
@@ -2455,6 +2459,12 @@ public:
   /// names.
   DeclBaseName getBaseName() const { return Name.getBaseName(); }
 
+  /// Generates a DeclNameRef referring to this declaration with as much
+  /// specificity as possible.
+  DeclNameRef createNameRef() const {
+    return DeclNameRef(getFullName());
+  }
+
   /// Retrieve the name to use for this declaration when interoperating
   /// with the Objective-C runtime.
   ///
@@ -3323,6 +3333,7 @@ protected:
     IterableDeclContext(IterableDeclContextKind::NominalTypeDecl)
   {
     Bits.NominalTypeDecl.AddedImplicitInitializers = false;
+    Bits.NominalTypeDecl.AddedPhantomCodingKeys = false;
     ExtensionGeneration = 0;
     Bits.NominalTypeDecl.HasLazyConformances = false;
     Bits.NominalTypeDecl.IsComputingSemanticMembers = false;
@@ -3361,6 +3372,18 @@ public:
   /// Note that we have attempted to add implicit initializers.
   void setAddedImplicitInitializers() {
     Bits.NominalTypeDecl.AddedImplicitInitializers = true;
+  }
+
+  /// Determine whether we have already attempted to add the
+  /// phantom CodingKeys type to this declaration.
+  bool addedPhantomCodingKeys() const {
+    return Bits.NominalTypeDecl.AddedPhantomCodingKeys;
+  }
+
+  /// Note that we have attempted to add the phantom CodingKeys type
+  /// to this declaration.
+  void setAddedPhantomCodingKeys() {
+    Bits.NominalTypeDecl.AddedPhantomCodingKeys = true;
   }
 
   /// getDeclaredType - Retrieve the type declared by this entity, without
@@ -7032,6 +7055,13 @@ public:
   SourceLoc getNameLoc() const { return NameLoc; }
   Identifier getName() const { return name; }
 
+  /// Get the list of identifiers after the colon in the operator declaration.
+  ///
+  /// This list includes the names of designated types. For infix operators, the
+  /// first item in the list is a precedence group instead.
+  ///
+  /// \todo These two purposes really ought to be in separate properties and the
+  /// designated type list should be of TypeReprs instead of Identifiers.
   ArrayRef<Identifier> getIdentifiers() const {
     return Identifiers;
   }

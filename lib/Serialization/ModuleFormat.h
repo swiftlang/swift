@@ -55,7 +55,11 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
+<<<<<<< HEAD
 const uint16_t SWIFTMODULE_VERSION_MINOR = 530; // tensorflow merge
+=======
+const uint16_t SWIFTMODULE_VERSION_MINOR = 530; // @_implicitly_synthesizes_nested_requirement
+>>>>>>> upstream_20191216
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -235,7 +239,10 @@ enum class DifferentiabilityKind : uint8_t {
 };
 using DifferentiabilityKindField = BCFixed<2>;
 
+<<<<<<< HEAD
 // SWIFT_ENABLE_TENSORFLOW
+=======
+>>>>>>> upstream_20191216
 // These IDs must \em not be renumbered or reordered without incrementing the
 // module version.
 enum class AutoDiffDerivativeFunctionKind : uint8_t {
@@ -243,7 +250,10 @@ enum class AutoDiffDerivativeFunctionKind : uint8_t {
   VJP
 };
 using AutoDiffDerivativeFunctionKindField = BCFixed<1>;
+<<<<<<< HEAD
 // SWIFT_ENABLE_TENSORFLOW END
+=======
+>>>>>>> upstream_20191216
 
 enum class ForeignErrorConventionKind : uint8_t {
   ZeroResult,
@@ -998,13 +1008,20 @@ namespace decls_block {
     BCVBR<6>,              // number of parameters
     BCVBR<5>,              // number of yields
     BCVBR<5>,              // number of results
+    BCFixed<1>,            // generic signature implied
     GenericSignatureIDField, // generic signature
+<<<<<<< HEAD
     // SWIFT_ENABLE_TENSORFLOW
     BCArray<TypeIDField>   // for each parameter: type, convention, and (if
                            // function is differentiable) differentiability,
+=======
+    SubstitutionMapIDField, // substitutions
+    BCArray<TypeIDField>   // parameter types/conventions, alternating
+>>>>>>> upstream_20191216
                            // followed by result types/conventions, alternating
                            // followed by error result type/convention
     // Optionally a protocol conformance (for witness_methods)
+    // Optionally a substitution map (for substituted function types)
   >;
   
   using SILBlockStorageTypeLayout = BCRecordLayout<
@@ -1788,7 +1805,10 @@ namespace decls_block {
     BCArray<BCFixed<1>> // Differentiation parameter indices' bitvector.
   >;
 
+<<<<<<< HEAD
   // SWIFT_ENABLE_TENSORFLOW
+=======
+>>>>>>> upstream_20191216
   using DerivativeDeclAttrLayout = BCRecordLayout<
     Derivative_DECL_ATTR,
     BCFixed<1>, // Implicit flag.
@@ -1798,6 +1818,7 @@ namespace decls_block {
     BCArray<BCFixed<1>> // Differentiation parameter indices' bitvector.
   >;
 
+<<<<<<< HEAD
   // TODO(TF-999): Remove deprecated `@differentiating` attribute.
   using DifferentiatingDeclAttrLayout = DerivativeDeclAttrLayout;
 
@@ -1810,6 +1831,8 @@ namespace decls_block {
     BCArray<BCFixed<1>> // Transposed parameter indices' bitvector.
   >;
 
+=======
+>>>>>>> upstream_20191216
 #define SIMPLE_DECL_ATTR(X, CLASS, ...)         \
   using CLASS##DeclAttrLayout = BCRecordLayout< \
     CLASS##_DECL_ATTR, \
@@ -1831,10 +1854,17 @@ namespace decls_block {
     TypeIDField // type referenced by this custom attribute
   >;
 
+<<<<<<< HEAD
   using QuotedDeclAttrLayout = BCRecordLayout<Quoted_DECL_ATTR,
                                               BCFixed<1>, // implicit flag
                                               DeclIDField // quote decl
                                               >;
+=======
+  using ImplicitlySynthesizesNestedRequirementDeclAttrLayout = BCRecordLayout<
+    ImplicitlySynthesizesNestedRequirement_DECL_ATTR,
+    BCBlob      // member name
+  >;
+>>>>>>> upstream_20191216
 }
 
 /// Returns the encoding kind for the given decl.

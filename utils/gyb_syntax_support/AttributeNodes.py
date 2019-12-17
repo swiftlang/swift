@@ -64,12 +64,17 @@ ATTRIBUTE_NODES = [
                              kind='ImplementsAttributeArguments'),
                        Child('DifferentiableArguments',
                              kind='DifferentiableAttributeArguments'),
+<<<<<<< HEAD
                        # SWIFT_ENABLE_TENSORFLOW
                        Child('DerivativeRegistrationArguments',
                              kind='DerivativeRegistrationAttributeArguments'),
                        Child('DeprecatedDerivativeRegistrationArguments',
                              kind='DeprecatedDerivativeRegistrationAttributeArguments'),
                        # SWIFT_ENABLE_TENSORFLOW END
+=======
+                       Child('DerivativeArguments',
+                             kind='DerivativeRegistrationAttributeArguments'),
+>>>>>>> upstream_20191216
                        Child('NamedAttributeString',
                              kind='NamedAttributeStringArgument'),
                    ], description='''
@@ -301,6 +306,7 @@ ATTRIBUTE_NODES = [
              Child('TrailingComma', kind='CommaToken', is_optional=True),
          ]),
 
+<<<<<<< HEAD
     # An optionally qualified declaration name.
     # qualified-decl-name ->
     #     base-type? '.'? (identifier | operator) decl-name-arguments?
@@ -338,6 +344,30 @@ ATTRIBUTE_NODES = [
                    The argument labels of the referenced function, optionally
                    specified.
                    '''),
+=======
+    # The argument of the derivative registration attribute
+    # '@derivative(of: ...)'.
+    # derivative-registration-attr-arguments ->
+    #     'of' ':' func-decl-name ','? differentiation-params-clause?
+    Node('DerivativeRegistrationAttributeArguments', kind='Syntax',
+         description='''
+         The arguments for the '@derivative(of:)' attribute: the 'of:' label,
+         the original declaration name, and an optional differentiation
+         parameter list.
+         ''',
+         children=[
+             Child('OfLabel', kind='IdentifierToken', text_choices=['of'],
+                   description='The "of" label.'),
+             Child('Colon', kind='ColonToken', description='''
+                   The colon separating the "of" label and the original
+                   declaration name.
+                   '''),
+             Child('Original', kind='FunctionDeclName',
+                   description='The referenced original declaration.'),
+             Child('Comma', kind='CommaToken', is_optional=True),
+             Child('DiffParams', kind='DifferentiationParamsClause',
+                   is_optional=True),
+>>>>>>> upstream_20191216
          ]),
 
     # func-decl-name -> (identifier | operator) decl-name-arguments?

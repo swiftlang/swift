@@ -374,12 +374,15 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
 
   // Parse generic parameters in SIL mode.
   GenericParamList *generics = nullptr;
+  bool isImplied = false;
   if (isInSILMode()) {
     // If this is part of a sil function decl, generic parameters are visible in
     // the function body; otherwise, they are visible when parsing the type.
     if (!IsSILFuncDecl)
       GenericsScope.emplace(this, ScopeKind::Generics);
     generics = maybeParseGenericParams().getPtrOrNull();
+    
+    isImplied = consumeIf(tok::kw_in);
   }
   
   // In SIL mode, parse box types { ... }.
@@ -459,7 +462,7 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
     } else {
       bool isVoid = false;
       if (const auto Void = dyn_cast<SimpleIdentTypeRepr>(tyR)) {
-        if (Void->getIdentifier().str() == "Void") {
+        if (Void->getNameRef().isSimpleName(Context.Id_Void)) {
           isVoid = true;
         }
       }
@@ -477,9 +480,42 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
                                         tyR->getSourceRange());
       }
     }
+    
+    // Parse substitutions for substituted SIL types.
+    SourceLoc SubsLAngleLoc, SubsRAngleLoc;
+    MutableArrayRef<TypeRepr *> SubsTypes;
+    if (isInSILMode() && consumeIf(tok::kw_for)) {
+      if (!Tok.isContextualPunctuator("<")) {
+        diagnose(Tok, diag::sil_function_subst_expected_l_angle);
+        return makeParserError();
+      }
+      
+      SubsLAngleLoc = consumeToken();
+
+      SmallVector<TypeRepr*, 4> SubsTypesVec;
+      for (;;) {
+        auto argTy = parseType();
+        if (!argTy.getPtrOrNull())
+          return makeParserError();
+        SubsTypesVec.push_back(argTy.get());
+        if (consumeIf(tok::comma))
+          continue;
+        break;
+      }
+      if (!Tok.isContextualPunctuator(">")) {
+        diagnose(Tok, diag::sil_function_subst_expected_r_angle);
+        return makeParserError();
+      }
+      
+      SubsRAngleLoc = consumeToken();
+
+      SubsTypes = Context.AllocateCopy(SubsTypesVec);
+    }
 
     tyR = new (Context) FunctionTypeRepr(generics, argsTyR, throwsLoc, arrowLoc,
-                                         SecondHalf.get());
+                                         SecondHalf.get(),
+                                         isImplied,
+                                         SubsTypes);
   } else if (generics) {
     // Only function types may be generic.
     auto brackets = generics->getSourceRange();
@@ -493,7 +529,7 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
         if (auto ident = dyn_cast<ComponentIdentTypeRepr>(T)) {
           if (auto decl = ident->getBoundDecl()) {
             if (auto genericParam = dyn_cast<GenericTypeParamDecl>(decl))
-              ident->overwriteIdentifier(genericParam->getName());
+              ident->overwriteNameRef(genericParam->createNameRef());
           }
         }
         return true;
@@ -660,17 +696,12 @@ ParserResult<TypeRepr> Parser::parseTypeIdentifier(bool isParsingQualifiedDeclNa
   SmallVector<ComponentIdentTypeRepr *, 4> ComponentsR;
   SourceLoc EndLoc;
   while (true) {
-    SourceLoc Loc;
-    Identifier Name;
-    if (Tok.is(tok::kw_Self)) {
-      Loc = consumeIdentifier(&Name);
-    } else {
-      // FIXME: specialize diagnostic for 'Type': type cannot start with
-      // 'metatype'
-      // FIXME: offer a fixit: 'self' -> 'Self'
-      if (parseIdentifier(Name, Loc, diag::expected_identifier_in_dotted_type))
-        Status.setIsParseError();
-    }
+    DeclNameLoc Loc;
+    DeclNameRef Name = parseUnqualifiedDeclBaseName(
+        /*afterDot=*/false, Loc,
+        diag::expected_identifier_in_dotted_type);
+    if (!Name)
+      Status.setIsParseError();
 
     if (Loc.isValid()) {
       SourceLoc LAngle, RAngle;
@@ -680,7 +711,7 @@ ParserResult<TypeRepr> Parser::parseTypeIdentifier(bool isParsingQualifiedDeclNa
         if (genericArgsStatus.isError())
           return genericArgsStatus;
       }
-      EndLoc = Loc;
+      EndLoc = Loc.getEndLoc();
 
       ComponentIdentTypeRepr *CompT;
       if (!GenericArgs.empty())
@@ -730,7 +761,7 @@ ParserResult<TypeRepr> Parser::parseTypeIdentifier(bool isParsingQualifiedDeclNa
   if (!ComponentsR.empty()) {
     // Lookup element #0 through our current scope chains in case it is some
     // thing local (this returns null if nothing is found).
-    if (auto Entry = lookupInScope(ComponentsR[0]->getIdentifier()))
+    if (auto Entry = lookupInScope(ComponentsR[0]->getNameRef()))
       if (auto *TD = dyn_cast<TypeDecl>(Entry))
         ComponentsR[0]->setValue(TD, nullptr);
 

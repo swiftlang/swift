@@ -1273,7 +1273,7 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
       baseModule->lookupMember(values, baseModule, name,
                                getIdentifier(privateDiscriminator));
     } else {
-      baseModule->lookupQualified(baseModule, name,
+      baseModule->lookupQualified(baseModule, DeclNameRef(name),
                                   NL_QualifiedDefault | NL_KnownNoDependency,
                                   values);
     }
@@ -2124,7 +2124,10 @@ getActualReadWriteImplKind(unsigned rawKind) {
   return None;
 }
 
+<<<<<<< HEAD
 // SWIFT_ENABLE_TENSORFLOW
+=======
+>>>>>>> upstream_20191216
 /// Translate from the serialization DifferentiabilityKind enumerators, which
 /// are guaranteed to be stable, to the AST ones.
 static Optional<swift::AutoDiffDerivativeFunctionKind>
@@ -4270,8 +4273,7 @@ llvm::Error DeclDeserializer::deserializeDeclAttributes() {
         assert(numArgs != 0);
         assert(!isImplicit && "Need to update for implicit");
         Attr = DynamicReplacementAttr::create(
-            ctx, DeclName(ctx, baseName, ArrayRef<Identifier>(pieces)), &MF,
-            replacedFunID);
+            ctx, DeclNameRef({ ctx, baseName, pieces }), &MF, replacedFunID);
         break;
       }
 
@@ -4311,6 +4313,7 @@ llvm::Error DeclDeserializer::deserializeDeclAttributes() {
         break;
       }
 
+<<<<<<< HEAD
       case decls_block::Quoted_DECL_ATTR: {
         bool isImplicit;
         DeclID quoteDeclID;
@@ -4323,6 +4326,43 @@ llvm::Error DeclDeserializer::deserializeDeclAttributes() {
 
         Attr = QuotedAttr::create(ctx, cast<FuncDecl>(*quoteDecl), SourceLoc(),
                                   SourceRange(), isImplicit);
+=======
+      case decls_block::Derivative_DECL_ATTR: {
+        bool isImplicit;
+        uint64_t origNameId;
+        DeclID origDeclId;
+        uint64_t rawDerivativeKind;
+        ArrayRef<uint64_t> parameters;
+
+        serialization::decls_block::DerivativeDeclAttrLayout::readRecord(
+            scratch, isImplicit, origNameId, origDeclId, rawDerivativeKind,
+            parameters);
+
+        DeclNameRefWithLoc origName{
+            DeclNameRef(MF.getDeclBaseName(origNameId)), DeclNameLoc()};
+        auto *origDecl = cast<AbstractFunctionDecl>(MF.getDecl(origDeclId));
+        auto derivativeKind =
+            getActualAutoDiffDerivativeFunctionKind(rawDerivativeKind);
+        if (!derivativeKind)
+          MF.fatal();
+        llvm::SmallBitVector parametersBitVector(parameters.size());
+        for (unsigned i : indices(parameters))
+          parametersBitVector[i] = parameters[i];
+        auto *indices = IndexSubset::get(ctx, parametersBitVector);
+
+        auto *derivAttr = DerivativeAttr::create(
+            ctx, isImplicit, SourceLoc(), SourceRange(), origName, indices);
+        derivAttr->setOriginalFunction(origDecl);
+        derivAttr->setDerivativeKind(*derivativeKind);
+        Attr = derivAttr;
+        break;
+      }
+
+      case decls_block::ImplicitlySynthesizesNestedRequirement_DECL_ATTR: {
+        serialization::decls_block::ImplicitlySynthesizesNestedRequirementDeclAttrLayout
+            ::readRecord(scratch);
+        Attr = new (ctx) ImplicitlySynthesizesNestedRequirementAttr(blobData, {}, {});
+>>>>>>> upstream_20191216
         break;
       }
 
@@ -5216,7 +5256,9 @@ public:
     unsigned numParams;
     unsigned numYields;
     unsigned numResults;
+    bool isGenericSignatureImplied;
     GenericSignatureID rawGenericSig;
+    SubstitutionMapID rawSubs;
     ArrayRef<uint64_t> variableData;
     clang::FunctionType *clangFunctionType = nullptr;
 
@@ -5233,7 +5275,9 @@ public:
                                              numParams,
                                              numYields,
                                              numResults,
+                                             isGenericSignatureImplied,
                                              rawGenericSig,
+                                             rawSubs,
                                              variableData);
 
     // Process the ExtInfo.
@@ -5376,11 +5420,13 @@ public:
     }
 
     GenericSignature genericSig = MF.getGenericSignature(rawGenericSig);
+    SubstitutionMap subs = MF.getSubstitutionMap(rawSubs).getCanonical();
+    
     return SILFunctionType::get(genericSig, extInfo, coroutineKind.getValue(),
                                 calleeConvention.getValue(),
                                 allParams, allYields, allResults,
                                 errorResult,
-                                SubstitutionMap(), false,
+                                subs, isGenericSignatureImplied,
                                 ctx, witnessMethodConformance);
   }
 

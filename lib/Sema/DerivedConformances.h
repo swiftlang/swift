@@ -189,6 +189,7 @@ public:
   /// \returns the derived member, which will also be added to the type.
   ValueDecl *deriveDecodable(ValueDecl *requirement);
 
+<<<<<<< HEAD
   // SWIFT_ENABLE_TENSORFLOW
   /// Determine if a KeyPathIterable requirement can be derived for a type.
   ///
@@ -307,6 +308,10 @@ public:
   ///
   /// \returns the derived member, which will also be added to the type.
   Type deriveDifferentiable(AssociatedTypeDecl *assocType);
+=======
+  /// Derive the CodingKeys requirement for a value type.
+  TypeDecl *derivePhantomCodingKeysRequirement();
+>>>>>>> upstream_20191216
 
   /// Declare a read-only property.
   std::pair<VarDecl *, PatternBindingDecl *>

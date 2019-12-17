@@ -1020,7 +1020,7 @@ void swift::releasePartialApplyCapturedArg(SILBuilder &builder, SILLocation loc,
   // possible for that value.
 
   // If we have qualified ownership, we should just emit a destroy value.
-  if (arg->getFunction()->hasOwnership()) {
+  if (builder.getFunction().hasOwnership()) {
     callbacks.createdNewInst(builder.createDestroyValue(loc, arg));
     return;
   }

@@ -236,3 +236,14 @@ public func useClassKeypath<T>(_ t: T) -> Int {
   return c[keyPath: getClassKeypath(t)]
 }
 
+@inline(never)
+func unrelated<U>(_ u: U) {
+  print(u)
+}
+
+@inline(never)
+public func callUnrelated<T>(_ t: T) -> T {
+  unrelated(43)
+  return t
+}
+

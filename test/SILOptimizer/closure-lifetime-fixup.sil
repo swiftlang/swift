@@ -155,3 +155,26 @@ bb1:
   %86 = tuple ()
   return %86 : $()
 }
+
+sil [ossa] @closureImpl :  $@convention(thin) (@guaranteed Klass, @guaranteed Klass) -> Bool
+sil [ossa] @useClosure : $@convention(thin) (@noescape @callee_guaranteed () -> Bool) -> ()
+
+// Don't crash.
+// CHECK-LABEL: sil hidden [ossa] @testUndefined
+// CHECK:  [[PA:%.*]] = partial_apply [callee_guaranteed] [on_stack]
+// CHECK:  mark_dependence
+// CHECK:  mark_dependence
+// CHECK:  dealloc_stack [[PA]] : $@noescape @callee_guaranteed () -> Bool
+// CHECK:  destroy_value
+sil hidden [ossa] @testUndefined : $@convention(method) (@guaranteed Klass, @guaranteed Klass) -> () {
+bb0(%0 : @guaranteed $Klass, %1 : @guaranteed $Klass):
+  %4 = function_ref @closureImpl : $@convention(thin) (@guaranteed Klass, @guaranteed Klass) -> Bool
+  %5 = copy_value %1 : $Klass
+  %6 = partial_apply [callee_guaranteed] %4(%5, undef) : $@convention(thin) (@guaranteed Klass, @guaranteed Klass) -> Bool
+  %7 = convert_escape_to_noescape [not_guaranteed] %6 : $@callee_guaranteed () -> Bool to $@noescape @callee_guaranteed () -> Bool
+  %21 = function_ref @useClosure : $@convention(thin) (@noescape @callee_guaranteed () -> Bool) -> ()
+  %22 = apply %21(%7) : $@convention(thin) (@noescape @callee_guaranteed () -> Bool) -> ()
+  destroy_value %6 : $@callee_guaranteed () -> Bool
+  %42 = tuple ()
+  return %42 : $()
+}

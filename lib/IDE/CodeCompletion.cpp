@@ -1325,8 +1325,8 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
     if (auto *ITR = dyn_cast<IdentTypeRepr>(ParsedTypeLoc.getTypeRepr())) {
       SmallVector<ImportDecl::AccessPathElement, 4> AccessPath;
       for (auto Component : ITR->getComponentRange())
-        AccessPath.push_back({ Component->getIdentifier(),
-                               Component->getIdLoc() });
+        AccessPath.push_back({ Component->getNameRef().getBaseIdentifier(),
+                               Component->getLoc() });
       if (auto Module = Context.getLoadedModule(AccessPath))
         ParsedTypeLoc.setType(ModuleType::get(Module));
         return true;
@@ -2745,22 +2745,21 @@ public:
       return;
 
     assert(CurrDeclContext);
-    SmallVector<ValueDecl *, 16> initializers;
-    if (CurrDeclContext->lookupQualified(type, DeclBaseName::createConstructor(),
-                                         NL_QualifiedDefault,
-                                         initializers)) {
-      for (auto *init : initializers) {
-        if (init->shouldHideFromEditor())
-          continue;
-        if (IsUnresolvedMember &&
-            cast<ConstructorDecl>(init)->isFailable() &&
-            !cast<ConstructorDecl>(init)->isImplicitlyUnwrappedOptional()) {
-          continue;
-        }
-        addConstructorCall(cast<ConstructorDecl>(init), Reason,
-                           dynamicLookupInfo, type, None,
-                           /*IsOnType=*/true, name);
+
+    auto results =
+        swift::lookupSemanticMember(const_cast<DeclContext *>(CurrDeclContext),
+                                    type, DeclBaseName::createConstructor());
+    for (const auto &entry : results.allResults()) {
+      auto *init = cast<ConstructorDecl>(entry.getValueDecl());
+      if (init->shouldHideFromEditor())
+        continue;
+      if (IsUnresolvedMember && init->isFailable() &&
+          !init->isImplicitlyUnwrappedOptional()) {
+        continue;
       }
+      addConstructorCall(cast<ConstructorDecl>(init), Reason,
+                         dynamicLookupInfo, type, None,
+                         /*IsOnType=*/true, name);
     }
   }
 

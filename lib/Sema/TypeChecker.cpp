@@ -720,3 +720,8 @@ TypeChecker::getDeclTypeCheckingSemantics(ValueDecl *decl) {
 void swift::bindExtensions(SourceFile &SF) {
   ::bindExtensions(SF);
 }
+
+LookupResult
+swift::lookupSemanticMember(DeclContext *DC, Type ty, DeclName name) {
+  return TypeChecker::lookupMember(DC, ty, DeclNameRef(name), None);
+}

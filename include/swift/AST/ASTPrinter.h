@@ -188,7 +188,10 @@ public:
   ASTPrinter &operator<<(unsigned long long N);
   ASTPrinter &operator<<(UUID UU);
 
+  ASTPrinter &operator<<(Identifier name);
+  ASTPrinter &operator<<(DeclBaseName name);
   ASTPrinter &operator<<(DeclName name);
+  ASTPrinter &operator<<(DeclNameRef name);
 
   // Special case for 'char', but not arbitrary things that convert to 'char'.
   template <typename T>

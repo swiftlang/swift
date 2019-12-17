@@ -837,7 +837,13 @@ SmallVector<OverrideMatch, 2> OverrideMatcher::match(
   if (members.empty() || name != membersName) {
     membersName = name;
     members.clear();
-    dc->lookupQualified(superContexts, membersName,
+    // FIXME: This suggests we need to use TypeChecker's high-level lookup
+    // entrypoints.  But first we need one that supports additive qualified
+    // lookup.
+    for (auto *ctx : superContexts) {
+      ctx->synthesizeSemanticMembersIfNeeded(membersName);
+    }
+    dc->lookupQualified(superContexts, DeclNameRef(membersName),
                         NL_QualifiedDefault, members);
   }
 
@@ -1396,6 +1402,7 @@ namespace  {
     UNINTERESTING_ATTR(IBInspectable)
     UNINTERESTING_ATTR(IBOutlet)
     UNINTERESTING_ATTR(IBSegueAction)
+    UNINTERESTING_ATTR(ImplicitlySynthesizesNestedRequirement)
     UNINTERESTING_ATTR(Indirect)
     UNINTERESTING_ATTR(InheritsConvenienceInitializers)
     UNINTERESTING_ATTR(Inline)
@@ -1435,6 +1442,7 @@ namespace  {
 
     // Differentiation-related attributes.
     UNINTERESTING_ATTR(Differentiable)
+<<<<<<< HEAD
     // SWIFT_ENABLE_TENSORFLOW
     UNINTERESTING_ATTR(Derivative)
     UNINTERESTING_ATTR(Transpose)
@@ -1442,6 +1450,9 @@ namespace  {
     UNINTERESTING_ATTR(NoDerivative)
     UNINTERESTING_ATTR(CompilerEvaluable)
     // SWIFT_ENABLE_TENSORFLOW END
+=======
+    UNINTERESTING_ATTR(Derivative)
+>>>>>>> upstream_20191216
 
     // These can't appear on overridable declarations.
     UNINTERESTING_ATTR(Prefix)
