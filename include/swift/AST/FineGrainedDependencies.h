@@ -325,7 +325,7 @@ private:
 /// Write out the .swiftdeps file for a frontend compilation of a primary file.
 bool emitReferenceDependencies(DiagnosticEngine &diags, SourceFile *SF,
                                const DependencyTracker &depTracker,
-                               StringRef outputPath);
+                               StringRef outputPath, bool alsoEmitDotFile);
 //==============================================================================
 // MARK: Enums
 //==============================================================================

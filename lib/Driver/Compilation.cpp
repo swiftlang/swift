@@ -432,7 +432,7 @@ namespace driver {
                                  diag::warn_unable_to_load_dependencies,
                                  DependenciesFile);
       Comp.disableIncrementalBuild(
-          Twine("Malformed swift dependencies file ' ") + DependenciesFile +
+          Twine("malformed swift dependencies file ' ") + DependenciesFile +
           "'");
     }
 

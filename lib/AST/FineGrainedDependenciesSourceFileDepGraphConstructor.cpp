@@ -779,7 +779,8 @@ void SourceFileDepGraphConstructor::recordThatThisWholeFileDependsOn(
 
 bool swift::fine_grained_dependencies::emitReferenceDependencies(
     DiagnosticEngine &diags, SourceFile *const SF,
-    const DependencyTracker &depTracker, StringRef outputPath) {
+    const DependencyTracker &depTracker, StringRef outputPath,
+    const bool alsoEmitDotFile) {
 
   // Before writing to the dependencies file path, preserve any previous file
   // that may have been there. No error handling -- this is just a nicety, it
@@ -802,11 +803,13 @@ bool swift::fine_grained_dependencies::emitReferenceDependencies(
 
   assert(g.verifyReadsWhatIsWritten(outputPath));
 
-  std::string dotFileName = outputPath.str() + ".dot";
-  withOutputFile(diags, dotFileName, [&](llvm::raw_pwrite_stream &out) {
-    DotFileEmitter<SourceFileDepGraph>(out, g, false, false).emit();
-    return false;
-  });
+  if (alsoEmitDotFile) {
+    std::string dotFileName = outputPath.str() + ".dot";
+    withOutputFile(diags, dotFileName, [&](llvm::raw_pwrite_stream &out) {
+      DotFileEmitter<SourceFileDepGraph>(out, g, false, false).emit();
+      return false;
+    });
+  }
   return hadError;
 }
 
