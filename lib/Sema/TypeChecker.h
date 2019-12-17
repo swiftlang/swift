@@ -1666,30 +1666,19 @@ public:
   static DeclTypeCheckingSemantics
   getDeclTypeCheckingSemantics(ValueDecl *decl);
 
-<<<<<<< HEAD
-  /// SWIFT_ENABLE_TENSORFLOW
-  /// Creates an `IndexSubset` for the given function type, representing
-  /// all inferred differentiation parameters.
-=======
   /// Creates an `IndexSubset` for the given function type, representing
   /// all inferred differentiation parameters. Used by `@differentiable` and
   /// `@derivative` attribute type-checking.
   ///
->>>>>>> upstream_20191216
   /// The differentiation parameters are inferred to be:
   /// - All parameters of the function type that conform to `Differentiable`.
   /// - If the function type's result is a function type (i.e. it is a curried
   ///   method type), then also all parameters of the function result type that
   ///   conform to `Differentiable`.
   static IndexSubset *
-<<<<<<< HEAD
-  inferDifferentiableParameters(AbstractFunctionDecl *AFD,
-                                GenericEnvironment *derivativeGenEnv);
-=======
   inferDifferentiationParameters(AbstractFunctionDecl *AFD,
                                  GenericEnvironment *derivativeGenEnv);
 
->>>>>>> upstream_20191216
 public:
   /// Require that the library intrinsics for working with Optional<T>
   /// exist.
