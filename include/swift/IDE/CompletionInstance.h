@@ -28,23 +28,32 @@ class DiagnosticConsumer;
 
 namespace ide {
 
-/// Copy a memory buffer inserting '0' at the position of \c origBuf.
+/// Copy a memory buffer inserting '\0' at the position of \c origBuf.
 std::unique_ptr<llvm::MemoryBuffer>
 makeCodeCompletionMemoryBuffer(const llvm::MemoryBuffer *origBuf,
                                unsigned &Offset,
                                llvm::StringRef bufferIdentifier);
 
+/// Manages \c CompilerInstance for completion like operations.
 class CompletionInstance {
   std::unique_ptr<CompilerInstance> CachedCI = nullptr;
   bool EnableASTCaching = false;
   unsigned MaxASTReuseCount = 100;
   unsigned CurrentASTReuseCount = 0;
 
+  /// Returns cached \c CompilerInstance if it's usable for the specified
+  /// completion request.
+  /// Returns \c nullptr if the functionality is disabled, compiler argument has
+  /// changed, primary file is not the same, the \c Offset is not in function
+  /// bodies, or the interface hash of the file has changed.
   swift::CompilerInstance *
   getReusingCompilerInstance(const swift::CompilerInvocation &Invocation,
                              llvm::MemoryBuffer *completionBuffer,
                              unsigned int Offset, DiagnosticConsumer *DiagC);
 
+  /// Returns new \c CompilerInstance for the completion request. Users still
+  /// have to call \c performParseAndResolveImportsOnly() , and perform the
+  /// second pass on it.
   swift::CompilerInstance *renewCompilerInstance(
       swift::CompilerInvocation &Invocation,
       llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
@@ -56,6 +65,8 @@ public:
     EnableASTCaching = Flag;
   }
 
+  /// Returns \C CompilerInstance for the completion request. Users can check if
+  /// it's cached or not by 'hasPersistentParserState()'.
   swift::CompilerInstance *getCompilerInstance(
       swift::CompilerInvocation &Invocation,
       llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
