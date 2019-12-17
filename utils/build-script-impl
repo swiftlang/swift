@@ -542,10 +542,14 @@ function set_build_options_for_host() {
             esac
 
             if [[ "${DARWIN_SDK_DEPLOYMENT_TARGETS}" != "" ]]; then
-                local IFS=";"; DARWIN_SDK_DEPLOYMENT_TARGETS=($DARWIN_SDK_DEPLOYMENT_TARGETS)
+                # IFS is immediately unset after its use to avoid unwanted
+                # replacement of characters in subsequent lines.
+                local IFS=";"; DARWIN_SDK_DEPLOYMENT_TARGETS=($DARWIN_SDK_DEPLOYMENT_TARGETS); unset IFS
 
                 for target in "${DARWIN_SDK_DEPLOYMENT_TARGETS[@]}"; do
-                    local IFS="-"; triple=($target)
+                    # IFS is immediately unset after its use to avoid unwanted
+                    # replacement of characters in subsequent lines.
+                    local IFS="-"; triple=($target); unset IFS
                     sdk_target=$(toupper ${triple[0]}_${triple[1]})
                     swift_cmake_options+=(
                         "-DSWIFTLIB_DEPLOYMENT_VERSION_${sdk_target}=${triple[2]}"
