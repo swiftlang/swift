@@ -23,8 +23,8 @@
 #include "swift/Frontend/Frontend.h"
 #include "swift/Parse/PersistentParserState.h"
 #include "swift/Subsystems.h"
-#include "llvm/Support/MemoryBuffer.h"
 #include "llvm/ADT/Hashing.h"
+#include "llvm/Support/MemoryBuffer.h"
 
 using namespace swift;
 using namespace ide;
@@ -127,76 +127,10 @@ static DeclContext *getEquivalentDeclContextFromSourceFile(DeclContext *DC,
   return newDC;
 }
 
-/// Calculate the hash value of the \c CompilerInvocation.
-/// This should take all options affecting completion results into account.
-/// If the hashes between multiple completion invocation are different, we
-/// cannot reuse the CompilerInstance.
-static llvm::hash_code calculateInvocationHash(const CompilerInvocation &Inv) {
-  llvm::hash_code hash(0);
-
-  auto &frontendOpts = Inv.getFrontendOptions();
-  for (const InputFile &Input : frontendOpts.InputsAndOutputs.getAllInputs())
-    hash = llvm::hash_combine(hash, Input.file());
-  hash = llvm::hash_combine(
-      hash,
-      frontendOpts.InputKind,
-      llvm::makeArrayRef(frontendOpts.ImplicitImportModuleNames),
-      frontendOpts.ImplicitObjCHeaderPath,
-      frontendOpts.ModuleName,
-      frontendOpts.PrebuiltModuleCachePath,
-      llvm::makeArrayRef(frontendOpts.PreferInterfaceForModules),
-      frontendOpts.ParseStdlib,
-      frontendOpts.EnableSourceImport,
-      frontendOpts.ImportUnderlyingModule);
-
-  auto &langOpts = Inv.getLangOptions();
-  hash = llvm::hash_combine(
-      hash,
-      langOpts.Target.str(),
-      llvm::VersionTuple(langOpts.EffectiveLanguageVersion).getAsString(),
-      llvm::VersionTuple(langOpts.PackageDescriptionVersion).getAsString(),
-      langOpts.DisableAvailabilityChecking,
-      langOpts.EnableAccessControl,
-      langOpts.EnableAppExtensionRestrictions,
-      langOpts.RequireExplicitAvailability,
-      langOpts.RequireExplicitAvailabilityTarget,
-      langOpts.EnableObjCInterop,
-      langOpts.EnableCXXInterop,
-      langOpts.InferImportAsMember,
-      langOpts.EnableSwift3ObjCInference);
-
-  auto &searchPathOpts = Inv.getSearchPathOptions();
-  hash = llvm::hash_combine(
-      hash,
-      searchPathOpts.SDKPath,
-      llvm::makeArrayRef(searchPathOpts.ImportSearchPaths),
-      llvm::makeArrayRef(searchPathOpts.VFSOverlayFiles),
-      searchPathOpts.RuntimeResourcePath,
-      llvm::makeArrayRef(searchPathOpts.RuntimeLibraryImportPaths),
-      llvm::makeArrayRef(searchPathOpts.SkipRuntimeLibraryImportPaths));
-  for (auto &P : searchPathOpts.FrameworkSearchPaths)
-    hash = llvm::hash_combine(hash, P.IsSystem, P.Path);
-
-  auto &clangOpts = Inv.getClangImporterOptions();
-  hash = llvm::hash_combine(
-      hash,
-      clangOpts.ModuleCachePath,
-      llvm::makeArrayRef(clangOpts.ExtraArgs),
-      clangOpts.OverrideResourceDir,
-      clangOpts.TargetCPU,
-      static_cast<uint8_t>(clangOpts.Mode),
-      clangOpts.ImportForwardDeclarations,
-      clangOpts.InferImportAsMember,
-      clangOpts.DisableSwiftBridgeAttr,
-      clangOpts.DisableOverlayModules);
-
-  return hash;
-}
-
 } // namespace
 
 CompilerInstance *CompletionInstance::getCachedCompilerInstance(
-    const swift::CompilerInvocation &Invocation,
+    const swift::CompilerInvocation &Invocation, llvm::hash_code ArgsHash,
     llvm::MemoryBuffer *completionBuffer, unsigned int Offset,
     DiagnosticConsumer *DiagC) {
   if (!EnableASTCaching)
@@ -210,8 +144,7 @@ CompilerInstance *CompletionInstance::getCachedCompilerInstance(
   if (!CachedCI)
     return nullptr;
 
-  if (calculateInvocationHash(Invocation) !=
-      calculateInvocationHash(CachedCI->getInvocation()))
+  if (ArgsHash != CachedArgsHash)
     return nullptr;
 
   auto &oldState = CachedCI->getPersistentParserState();
@@ -307,12 +240,13 @@ CompilerInstance *CompletionInstance::getCachedCompilerInstance(
 }
 
 CompilerInstance *CompletionInstance::renewCompilerInstance(
-    swift::CompilerInvocation &Invocation,
+    swift::CompilerInvocation &Invocation, llvm::hash_code ArgsHash,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
     llvm::MemoryBuffer *completionBuffer, unsigned int Offset,
     std::string &Error, DiagnosticConsumer *DiagC) {
   CachedCI.reset();
   CachedCI = std::make_unique<CompilerInstance>();
+  CachedArgsHash = ArgsHash;
   auto *CI = CachedCI.get();
   if (DiagC)
     CachedCI->addDiagnosticConsumer(DiagC);
@@ -332,7 +266,7 @@ CompilerInstance *CompletionInstance::renewCompilerInstance(
 }
 
 CompilerInstance *swift::ide::CompletionInstance::getCompilerInstance(
-    swift::CompilerInvocation &Invocation,
+    swift::CompilerInvocation &Invocation, llvm::ArrayRef<const char *> Args,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
     llvm::MemoryBuffer *completionBuffer, unsigned int Offset,
     std::string &Error, DiagnosticConsumer *DiagC) {
@@ -348,12 +282,18 @@ CompilerInstance *swift::ide::CompletionInstance::getCompilerInstance(
   // FIXME: ASTScopeLookup doesn't support code completion yet.
   Invocation.disableASTScopeLookup();
 
-  if (auto *cached = getCachedCompilerInstance(Invocation, completionBuffer,
-                                              Offset, DiagC))
+  // Compute the signature of the invocation.
+  llvm::hash_code ArgsHash(0);
+  for (auto arg : Args)
+    ArgsHash = llvm::hash_combine(ArgsHash, StringRef(arg));
+
+  if (auto *cached = getCachedCompilerInstance(Invocation, ArgsHash,
+                                               completionBuffer, Offset, DiagC))
     return cached;
 
-  if (auto *renewed = renewCompilerInstance(
-          Invocation, FileSystem, completionBuffer, Offset, Error, DiagC))
+  if (auto *renewed =
+          renewCompilerInstance(Invocation, ArgsHash, FileSystem,
+                                completionBuffer, Offset, Error, DiagC))
     return renewed;
 
   assert(!Error.empty());

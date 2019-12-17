@@ -176,7 +176,7 @@ static bool swiftCodeCompleteImpl(
   // Pin completion instance.
   auto CompletionInst =  Lang.getCompletionInstance();
   CompilerInstance *CI = CompletionInst->getCompilerInstance(
-      Invocation, FileSystem, newBuffer.get(), Offset, Error, &CIDiags);
+      Invocation, Args, FileSystem, newBuffer.get(), Offset, Error, &CIDiags);
   if (!CI)
     return false;
   SWIFT_DEFER { CI->removeDiagnosticConsumer(&CIDiags); };
