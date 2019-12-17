@@ -1442,17 +1442,13 @@ namespace  {
 
     // Differentiation-related attributes.
     UNINTERESTING_ATTR(Differentiable)
-<<<<<<< HEAD
-    // SWIFT_ENABLE_TENSORFLOW
     UNINTERESTING_ATTR(Derivative)
+    // SWIFT_ENABLE_TENSORFLOW
     UNINTERESTING_ATTR(Transpose)
     UNINTERESTING_ATTR(Differentiating)
     UNINTERESTING_ATTR(NoDerivative)
     UNINTERESTING_ATTR(CompilerEvaluable)
     // SWIFT_ENABLE_TENSORFLOW END
-=======
-    UNINTERESTING_ATTR(Derivative)
->>>>>>> upstream_20191216
 
     // These can't appear on overridable declarations.
     UNINTERESTING_ATTR(Prefix)
