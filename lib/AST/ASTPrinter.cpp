@@ -4828,6 +4828,12 @@ void ProtocolConformance::printName(llvm::raw_ostream &os,
     os << ")";
     break;
   }
+  case ProtocolConformanceKind::Builtin: {
+    auto builtin = cast<BuiltinProtocolConformance>(this);
+    os << builtin->getProtocol()->getName()
+       << " type " << builtin->getType();
+    break;
+  }
   }
 }
 

@@ -2215,6 +2215,7 @@ public:
     // in the future) are just never used in these lists.
     case TypeReferenceKind::DirectObjCClassName:
     case TypeReferenceKind::IndirectObjCClass:
+    case TypeReferenceKind::DirectTypeMetadata:
       return nullptr;
     }
     
@@ -2304,6 +2305,10 @@ struct TargetTypeReference {
     /// A direct reference to an Objective-C class name.
     RelativeDirectPointer<const char>
       DirectObjCClassName;
+
+    /// A direct reference to some non-nominal Metadata record.
+    RelativeDirectPointer<TargetMetadata<Runtime>>
+      DirectTypeMetadata;
   };
 
   const TargetContextDescriptor<Runtime> *
@@ -2317,10 +2322,16 @@ struct TargetTypeReference {
 
     case TypeReferenceKind::DirectObjCClassName:
     case TypeReferenceKind::IndirectObjCClass:
+    case TypeReferenceKind::DirectTypeMetadata:
       return nullptr;
     }
 
     return nullptr;
+  }
+
+  const TargetMetadata<Runtime> *getTypeMetadata(TypeReferenceKind kind) const {
+    assert(kind == TypeReferenceKind::DirectTypeMetadata);
+    return DirectTypeMetadata;
   }
 
 #if SWIFT_OBJC_INTEROP
@@ -2428,6 +2439,10 @@ public:
     if (getTypeKind() != TypeReferenceKind::IndirectTypeDescriptor)
       return nullptr;
     return TypeRef.IndirectTypeDescriptor.get();
+  }
+
+  const TargetMetadata<Runtime> *getTypeMetadata() const {
+    return TypeRef.getTypeMetadata(getTypeKind());
   }
 
   /// Retrieve the context of a retroactive conformance.

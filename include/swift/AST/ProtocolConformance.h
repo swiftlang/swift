@@ -68,7 +68,10 @@ enum class ProtocolConformanceKind {
   Specialized,
   /// Conformance of a generic class type projected through one of its
   /// superclass's conformances.
-  Inherited
+  Inherited,
+  /// Builtin conformances are special conformaces that the runtime handles
+  /// and isn't implemented directly in Swift.
+  Builtin
 };
 
 /// Describes the state of a protocol conformance, which may be complete,
@@ -331,7 +334,9 @@ public:
 /// - the type is directly declared to conform to the protocol (a
 ///   normal conformance) or
 /// - the protocol's existential type is known to conform to itself (a
-///   self-conformance).
+///   self-conformance) or
+/// - the type's conformance is declared within the runtime (a builtin
+///   conformance).
 class RootProtocolConformance : public ProtocolConformance {
 protected:
   RootProtocolConformance(ProtocolConformanceKind kind, Type conformingType)
@@ -382,7 +387,8 @@ public:
 
   static bool classof(const ProtocolConformance *conformance) {
     return conformance->getKind() == ProtocolConformanceKind::Normal ||
-           conformance->getKind() == ProtocolConformanceKind::Self;
+           conformance->getKind() == ProtocolConformanceKind::Self ||
+           conformance->getKind() == ProtocolConformanceKind::Builtin;
   }
 };
 
@@ -1012,6 +1018,89 @@ public:
 
   static bool classof(const ProtocolConformance *conformance) {
     return conformance->getKind() == ProtocolConformanceKind::Inherited;
+  }
+};
+
+/// A builtin conformance appears when a special non-nominal type has a runtime
+/// declared conformance. E.g. the runtime implements equatable for all Void.
+class BuiltinProtocolConformance : public RootProtocolConformance {
+  friend class ASTContext;
+
+  ProtocolDecl *protocol = nullptr;
+
+  BuiltinProtocolConformance(Type conformingType, ProtocolDecl *protocol) : 
+    RootProtocolConformance(ProtocolConformanceKind::Builtin, conformingType),
+    protocol(protocol) {}
+
+public:
+  /// Get the protocol being conformed to.
+  ProtocolDecl *getProtocol() const {
+    return protocol;
+  }
+
+  /// Get any requirements that must be satisfied for this conformance to apply.
+  Optional<ArrayRef<Requirement>>
+  getConditionalRequirementsIfAvailable() const {
+    return ArrayRef<Requirement>();
+  }
+
+  /// Get any requirements that must be satisfied for this conformance to apply.
+  ArrayRef<Requirement> getConditionalRequirements() const {
+    return ArrayRef<Requirement>();
+  }
+
+  /// Get the declaration context that contains the nominal type declaration.
+  DeclContext *getDeclContext() const {
+    return getProtocol();
+  }
+
+  /// Retrieve the state of this conformance.
+  ProtocolConformanceState getState() const {
+    return ProtocolConformanceState::Complete;
+  }
+
+  /// Get the kind of source from which this conformance comes.
+  ConformanceEntryKind getSourceKind() const {
+    return ConformanceEntryKind::Synthesized;
+  }
+  /// Get the protocol conformance which implied this implied conformance.
+  NormalProtocolConformance *getImplyingConformance() const {
+    return nullptr;
+  }
+
+  bool hasTypeWitness(AssociatedTypeDecl *assocType) const {
+    llvm_unreachable("builtin-conformances never have associated types");
+  }
+
+  /// Retrieve the type witness and type decl (if one exists)
+  /// for the given associated type.
+  TypeWitnessAndDecl
+  getTypeWitnessAndDecl(AssociatedTypeDecl *assocType,
+                        SubstOptions options=None) const {
+    llvm_unreachable("builtin-conformances never have associated types");
+  }
+
+  /// Given that the requirement signature of the protocol directly states
+  /// that the given dependent type must conform to the given protocol,
+  /// return its associated conformance.
+  ProtocolConformanceRef
+  getAssociatedConformance(Type assocType, ProtocolDecl *protocol) const {
+    llvm_unreachable("builtin-conformances never have associated types");
+  }
+
+  /// Retrieve the witness corresponding to the given value requirement.
+  ConcreteDeclRef getWitnessDeclRef(ValueDecl *requirement) const {
+    return ConcreteDeclRef(requirement);
+  }
+
+  /// Determine whether the witness for the given requirement
+  /// is either the default definition or was otherwise deduced.
+  bool usesDefaultDefinition(AssociatedTypeDecl *requirement) const {
+    llvm_unreachable("builtin-conformances never have associated types");
+  }
+
+  static bool classof(const ProtocolConformance *conformance) {
+    return conformance->getKind() == ProtocolConformanceKind::Builtin;
   }
 };
 

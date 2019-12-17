@@ -3166,6 +3166,10 @@ static void dumpProtocolConformanceRec(
                                visited);
     break;
   }
+
+  case ProtocolConformanceKind::Builtin: {
+    printCommon("builtin");
+  }
   }
 
   PrintWithColorRAII(out, ParenthesisColor) << ')';

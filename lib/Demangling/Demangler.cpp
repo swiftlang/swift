@@ -1823,6 +1823,9 @@ NodePointer Demangler::demangleMetatype() {
     case 'A':
       return createWithChild(Node::Kind::ReflectionMetadataAssocTypeDescriptor,
                              popProtocolConformance());
+    case 'b':
+      return createWithChild(Node::Kind::BuiltinConformanceDescriptor,
+                             popProtocolConformance());
     case 'B':
       return createWithChild(Node::Kind::ReflectionMetadataBuiltinDescriptor,
                                popNode(Node::Kind::Type));
@@ -2163,6 +2166,12 @@ NodePointer Demangler::demangleThunkOrSpecialization() {
       NodePointer Entity = popNode(isEntity);
       NodePointer Conf = popProtocolConformance();
       return createWithChildren(Node::Kind::ProtocolWitness, Conf, Entity);
+    }
+    case 'B': {
+      NodePointer Entity = popNode(isEntity);
+      NodePointer Conf = popProtocolConformance();
+      return createWithChildren(Node::Kind::BuiltinProtocolWitness, Conf,
+                                Entity);
     }
     case 'S':
       return createWithChild(Node::Kind::ProtocolSelfConformanceWitness,
@@ -2612,6 +2621,9 @@ NodePointer Demangler::demangleWitness() {
                         createNode(Node::Kind::Directness, Directness),
                         popNode(isEntity));
     }
+    case 'B':
+      return createWithChild(Node::Kind::BuiltinConformanceWitnessTable,
+                             popProtocolConformance());
     case 'S':
       return createWithChild(Node::Kind::ProtocolSelfConformanceWitnessTable,
                              popProtocol());

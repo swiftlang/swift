@@ -1470,6 +1470,8 @@ Serializer::writeConformance(ProtocolConformanceRef conformanceRef,
     writeConformance(conf->getInheritedConformance(), abbrCodes, genericEnv);
     break;
   }
+  case ProtocolConformanceKind::Builtin:
+    llvm_unreachable("not yet");
   }
 }
 
