@@ -295,7 +295,7 @@ class SwiftLangSupport : public LangSupport {
   ThreadSafeRefCntPtr<SwiftCustomCompletions> CustomCompletions;
   std::shared_ptr<SwiftStatistics> Stats;
   llvm::StringMap<std::unique_ptr<FileSystemProvider>> FileSystemProviders;
-  std::unique_ptr<swift::ide::CompletionInstance> CompletionInst;
+  std::shared_ptr<swift::ide::CompletionInstance> CompletionInst;
 
 public:
   explicit SwiftLangSupport(SourceKit::Context &SKCtx);
@@ -315,8 +315,8 @@ public:
     return CCCache;
   }
 
-  swift::ide::CompletionInstance &getCompletionInstance() {
-    return *CompletionInst;
+  std::shared_ptr<swift::ide::CompletionInstance> getCompletionInstance() {
+    return CompletionInst;
   }
 
   /// Returns the FileSystemProvider registered under Name, or nullptr if not
