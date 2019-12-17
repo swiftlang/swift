@@ -180,6 +180,9 @@ computeMetadataBoundsForSuperclass(const void *ref,
     break;
 #endif
   }
+  // Type metadata type ref is unsupported here.
+  case TypeReferenceKind::DirectTypeMetadata:
+    break;
   }
   swift_runtime_unreachable("unsupported superclass reference kind");
 }

@@ -86,6 +86,9 @@ template<> void ProtocolConformanceDescriptor::dump() const {
   case TypeReferenceKind::IndirectTypeDescriptor:
     printf("unique nominal type descriptor %s", symbolName(getTypeDescriptor()));
     break;
+  case TypeReferenceKind::DirectTypeMetadata:
+    printf("direct non-nominal type metadata %s", symbolName(getTypeMetadata()));
+    break;
   }
   
   printf(" => ");
@@ -118,6 +121,7 @@ const ClassMetadata *TypeReference::getObjCClass(TypeReferenceKind kind) const {
 
   case TypeReferenceKind::DirectTypeDescriptor:
   case TypeReferenceKind::IndirectTypeDescriptor:
+  case TypeReferenceKind::DirectTypeMetadata:
     return nullptr;
   }
 
@@ -157,6 +161,9 @@ ProtocolConformanceDescriptor::getCanonicalTypeMetadata() const {
     }
 
     return nullptr;
+  }
+  case TypeReferenceKind::DirectTypeMetadata: {
+    return getTypeMetadata();
   }
   }
 

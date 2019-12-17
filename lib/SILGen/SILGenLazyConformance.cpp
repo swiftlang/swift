@@ -31,7 +31,7 @@ void SILGenModule::useConformance(ProtocolConformanceRef conformanceRef) {
   if (auto *inherited = dyn_cast<InheritedProtocolConformance>(conformance))
     conformance = inherited->getInheritedConformance();
 
-  // Get the normal conformance. If we don't have one, this is a self
+  // Get the normal conformance. If we don't have one, this is a self or builtin
   // conformance, which we can ignore.
   auto normal = dyn_cast<NormalProtocolConformance>(
       conformance->getRootConformance());

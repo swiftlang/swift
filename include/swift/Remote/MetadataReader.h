@@ -1363,6 +1363,13 @@ public:
 
       return metadataFn(metadata);
     }
+    case TypeReferenceKind::DirectTypeMetadata: {
+      auto metadata = readMetadata(ref);
+      if (!metadata)
+        return None;
+
+      return metadataFn(metadata);
+    }
     }
 
     return None;

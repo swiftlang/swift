@@ -859,6 +859,11 @@ bool IRGenerator::canEmitWitnessTableLazily(SILWitnessTable *wt) {
   if (wt->getLinkage() == SILLinkage::Shared)
     return true;
 
+  // If we happen to see a builtin witness table here, we can't emit those.
+  // The runtime has those for us.
+  if (isa<BuiltinProtocolConformance>(wt->getConformance()))
+    return false;
+
   NominalTypeDecl *ConformingTy =
     wt->getConformingType()->getNominalOrBoundGenericNominal();
 

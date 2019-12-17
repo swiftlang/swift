@@ -574,6 +574,11 @@ void Remangler::mangleProtocolSelfConformanceDescriptor(Node *node) {
   mangleProtocol(node->begin()[0]);
 }
 
+void Remangler::mangleBuiltinConformanceDescriptor(Node *node) {
+  Buffer << "Mb";
+  mangleProtocolConformance(node->begin()[0]);
+}
+
 void Remangler::manglePartialApplyForwarder(Node *node) {
   Buffer << "PA__T";
   mangleSingleChildNode(node); // global
@@ -639,6 +644,11 @@ void Remangler::mangleFieldOffset(Node *node) {
 void Remangler::mangleEnumCase(Node *node) {
   Buffer << "WC";
   mangleSingleChildNode(node); // enum case
+}
+
+void Remangler::mangleBuiltinConformanceWitnessTable(Node *node) {
+  Buffer << "WB";
+  mangleSingleChildNode(node); // protocol-conformance
 }
 
 void Remangler::mangleProtocolSelfConformanceWitnessTable(Node *node) {
@@ -728,6 +738,11 @@ void Remangler::mangleReabstractionThunkHelperWithSelf(Node *node) {
 
 void Remangler::mangleReabstractionThunk(Node *node) {
   Buffer << "<reabstraction-thunk>";
+}
+
+void Remangler::mangleBuiltinProtocolWitness(Node *node) {
+  Buffer << "TB";
+  mangleChildNodes(node); // protocol conformance, entity
 }
 
 void Remangler::mangleProtocolSelfConformanceWitness(Node *node) {

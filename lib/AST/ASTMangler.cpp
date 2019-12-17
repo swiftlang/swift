@@ -198,9 +198,18 @@ std::string ASTMangler::mangleWitnessTable(const RootProtocolConformance *C) {
   if (isa<NormalProtocolConformance>(C)) {
     appendProtocolConformance(C);
     appendOperator("WP");
-  } else {
+  } else if (isa<SelfProtocolConformance>(C)) {
     appendProtocolName(cast<SelfProtocolConformance>(C)->getProtocol());
     appendOperator("WS");
+  } else if (isa<BuiltinProtocolConformance>(C)) {
+    appendType(C->getType()->getCanonicalType());
+    auto swiftProto = cast<BuiltinProtocolConformance>(C)->getProtocol();
+    appendProtocolName(swiftProto);
+    appendModule(swiftProto->getModuleContext(),
+                 swiftProto->getAlternateModuleName());
+    appendOperator("WB");
+  } else {
+    llvm_unreachable("mangling unknown conformance kind");
   }
   return finalize();
 }
@@ -1300,7 +1309,8 @@ void ASTMangler::appendBoundGenericArgs(Type type, bool &isFirstArgList) {
 static bool conformanceHasIdentity(const RootProtocolConformance *root) {
   auto conformance = dyn_cast<NormalProtocolConformance>(root);
   if (!conformance) {
-    assert(isa<SelfProtocolConformance>(root));
+    assert(isa<SelfProtocolConformance>(root) ||
+           isa<BuiltinProtocolConformance>(root));
     return true;
   }
 
@@ -1321,8 +1331,9 @@ static bool conformanceHasIdentity(const RootProtocolConformance *root) {
 static bool isRetroactiveConformance(const RootProtocolConformance *root) {
   auto conformance = dyn_cast<NormalProtocolConformance>(root);
   if (!conformance) {
-    assert(isa<SelfProtocolConformance>(root));
-    return false; // self-conformances are never retroactive.
+    assert(isa<SelfProtocolConformance>(root) ||
+           isa<BuiltinProtocolConformance>(root));
+    return false; // self-conformances are never retroactive. nor are builtin.
   }
 
   return conformance->isRetroactive();
@@ -2610,6 +2621,9 @@ void ASTMangler::appendProtocolConformanceRef(
     assert(DC->getAsDecl());
     appendModule(conformance->getDeclContext()->getParentModule(),
                  DC->getAsDecl()->getAlternateModuleName());
+  // Builtin conformances are always from the Swift module.
+  } else if (isa<BuiltinProtocolConformance>(conformance)) {
+    appendOperator("HP");
   } else if (conformance->getDeclContext()->getParentModule() ==
                conformance->getType()->getAnyNominal()->getParentModule()) {
     appendOperator("HP");

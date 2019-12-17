@@ -382,6 +382,10 @@ struct ASTContext::Implementation {
     /// The set of inherited protocol conformances.
     llvm::FoldingSet<InheritedProtocolConformance> InheritedConformances;
 
+    /// The set of builtin protocol conformances.
+    llvm::DenseMap<std::pair<Type, ProtocolDecl *>,
+                   BuiltinProtocolConformance *> BuiltinConformances;
+
     /// The set of substitution maps (uniqued by their storage).
     llvm::FoldingSet<SubstitutionMap::Storage> SubstitutionMaps;
 
@@ -1879,6 +1883,22 @@ ASTContext::getSelfConformance(ProtocolDecl *protocol) {
   return entry;
 }
 
+/// Produce the builtin-conformance for (): Equatable
+BuiltinProtocolConformance *
+ASTContext::getBuiltinVoidEquatableConformance() {
+  auto key = std::make_pair(TheEmptyTupleType,
+                            getProtocol(KnownProtocolKind::Equatable));
+  auto &builtinConformances =
+    getImpl().getArena(AllocationArena::Permanent).BuiltinConformances;
+  auto &entry = builtinConformances[key];
+  if (!entry) {
+    entry = new (*this, AllocationArena::Permanent)
+      BuiltinProtocolConformance(TheEmptyTupleType,
+                                 getProtocol(KnownProtocolKind::Equatable));
+  }
+  return entry;
+}
+
 /// If one of the ancestor conformances already has a matching type, use
 /// that instead.
 static ProtocolConformance *collapseSpecializedConformance(
@@ -1895,6 +1915,7 @@ static ProtocolConformance *collapseSpecializedConformance(
     case ProtocolConformanceKind::Normal:
     case ProtocolConformanceKind::Inherited:
     case ProtocolConformanceKind::Self:
+    case ProtocolConformanceKind::Builtin:
       // If the conformance matches, return it.
       if (conformance->getType()->isEqual(type)) {
         for (auto subConformance : substitutions.getConformances())
@@ -2115,6 +2136,7 @@ size_t ASTContext::Implementation::Arena::getTotalMemory() const {
     // NormalConformances ?
     // SpecializedConformances ?
     // InheritedConformances ?
+    // BuiltinConformances ?
 }
 
 void AbstractFunctionDecl::setForeignErrorConvention(

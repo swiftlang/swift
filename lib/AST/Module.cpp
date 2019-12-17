@@ -835,6 +835,12 @@ ProtocolConformanceRef ModuleDecl::lookupConformance(Type type,
   if (type->is<UnresolvedType>())
     return ProtocolConformanceRef(protocol);
 
+  // Void (aka ()) has builtin conformances implemented within the runtime.
+  // These conformances so far consist of Equatable.
+  if (type->isVoid() &&
+      protocol == ctx.getProtocol(KnownProtocolKind::Equatable))
+    return ProtocolConformanceRef(ctx.getBuiltinVoidEquatableConformance());
+
   auto nominal = type->getAnyNominal();
 
   // If we don't have a nominal type, there are no conformances.

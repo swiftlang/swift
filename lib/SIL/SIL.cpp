@@ -80,6 +80,11 @@ swift::getLinkageForProtocolConformance(const RootProtocolConformance *C,
   if (isa<ClangModuleUnit>(C->getDeclContext()->getModuleScopeContext()))
     return SILLinkage::Shared;
 
+  // If the conforming type is (), give it public linkage. These conformances
+  // are implemented within the runtime.
+  if (C->getType()->isVoid())
+    return SILLinkage::Public;
+
   auto typeDecl = C->getType()->getNominalOrBoundGenericNominal();
   AccessLevel access = std::min(C->getProtocol()->getEffectiveAccess(),
                                 typeDecl->getEffectiveAccess());

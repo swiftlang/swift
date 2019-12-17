@@ -361,10 +361,14 @@ enum class TypeReferenceKind : unsigned {
   /// unused.
   IndirectObjCClass = 0x03,
 
+  /// The conformance is for a non-nominal type referenced directly;
+  /// getTypeMetadata() points to the type metadata.
+  DirectTypeMetadata = 0x04,
+
   // We only reserve three bits for this in the various places we store it.
 
   First_Kind = DirectTypeDescriptor,
-  Last_Kind = IndirectObjCClass,
+  Last_Kind = DirectTypeMetadata,
 };
 
 /// Flag that indicates whether an existential type is class-constrained or not.

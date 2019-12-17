@@ -279,5 +279,10 @@ NODE(OpaqueTypeDescriptorAccessorVar)
 NODE(OpaqueReturnType)
 CONTEXT_NODE(OpaqueReturnTypeOf)
 
+// Added in Swift 5.2
+NODE(BuiltinConformanceWitnessTable)
+NODE(BuiltinConformanceDescriptor)
+NODE(BuiltinProtocolWitness)
+
 #undef CONTEXT_NODE
 #undef NODE
