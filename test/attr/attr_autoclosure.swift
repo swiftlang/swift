@@ -281,3 +281,14 @@ func test_autoclosure_with_generic_argument_mismatch() {
 
   foo(S<String>()) // expected-error {{cannot convert value of type 'S<String>' to expected argument type 'S<Int>'}}
 }
+
+// SR-11934
+func sr_11934(_ x: @autoclosure String...) {} // expected-error {{'@autoclosure' must not be used on variadic parameters}}
+
+// SR-11938
+let sr_11938_1: Array<@autoclosure String> = [] // expected-error {{'@autoclosure' may only be used on parameters}}
+func sr_11938_2() -> @autoclosure String { "" } // expected-error {{'@autoclosure' may only be used on parameters}}
+func sr_11938_3(_ x: [@autoclosure String]) {} // expected-error {{'@autoclosure' may only be used on parameters}}
+
+protocol SR_11938_P {}
+struct SR_11938_S : @autoclosure SR_11938_P {} // expected-error {{'@autoclosure' may only be used on parameters}}

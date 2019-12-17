@@ -2237,31 +2237,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
           rep = FunctionType::Representation::Swift;
         } else {
           rep = *parsedRep;
-          
-          if (attrs.has(TAK_autoclosure)) {
-            // @convention(c) and @convention(block) are not allowed with an @autoclosure type.
-            if (rep == FunctionType::Representation::CFunctionPointer ||
-                rep == FunctionType::Representation::Block) {
-              diagnose(attrs.getLoc(TAK_convention),
-                       diag::invalid_autoclosure_and_convention_attributes,
-                       attrs.getConvention());
-              attrs.clearAttribute(TAK_convention);
-            }
-          }
         }
-      }
-
-      // @autoclosure is only valid on parameters.
-      if (!isParam && attrs.has(TAK_autoclosure)) {
-        bool isVariadicFunctionParam =
-            options.is(TypeResolverContext::VariadicFunctionInput) &&
-            !options.hasBase(TypeResolverContext::EnumElementDecl);
-
-        diagnose(attrs.getLoc(TAK_autoclosure),
-                 isVariadicFunctionParam ? diag::attr_not_on_variadic_parameters
-                                         : diag::attr_only_on_parameters,
-                 "@autoclosure");
-        attrs.clearAttribute(TAK_autoclosure);
       }
 
       if (attrs.has(TAK_differentiable) &&
@@ -2280,6 +2256,27 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
                                   diffKind);
       if (!ty || ty->hasError())
         return ty;
+    }
+  }
+
+  // Validate use of @autoclosure
+  if (attrs.has(TAK_autoclosure)) {
+    if (attrs.hasConvention()) {
+      if (attrs.getConvention() == "c" || attrs.getConvention() == "block") {
+        diagnose(attrs.getLoc(TAK_convention),
+                 diag::invalid_autoclosure_and_convention_attributes,
+                 attrs.getConvention());
+        attrs.clearAttribute(TAK_convention);
+      }
+    } else if (options.is(TypeResolverContext::VariadicFunctionInput) &&
+               !options.hasBase(TypeResolverContext::EnumElementDecl)) {
+      diagnose(attrs.getLoc(TAK_autoclosure),
+               diag::attr_not_on_variadic_parameters, "@autoclosure");
+      attrs.clearAttribute(TAK_autoclosure);
+    } else if (!options.is(TypeResolverContext::FunctionInput)) {
+      diagnose(attrs.getLoc(TAK_autoclosure), diag::attr_only_on_parameters,
+               "@autoclosure");
+      attrs.clearAttribute(TAK_autoclosure);
     }
   }
 
