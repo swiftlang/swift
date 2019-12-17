@@ -1504,33 +1504,6 @@ DynamicSubscriptExpr::create(ASTContext &ctx, Expr *base, Expr *index,
                                            hasTrailingClosure, decl, implicit);
 }
 
-DynamicSubscriptExpr *
-DynamicSubscriptExpr::create(ASTContext &ctx, Expr *base, SourceLoc lSquareLoc,
-                             ArrayRef<Expr *> indexArgs,
-                             ArrayRef<Identifier> indexArgLabels,
-                             ArrayRef<SourceLoc> indexArgLabelLocs,
-                             SourceLoc rSquareLoc,
-                             Expr *trailingClosure,
-                             ConcreteDeclRef decl,
-                             bool implicit) {
-  SmallVector<Identifier, 4> indexArgLabelsScratch;
-  SmallVector<SourceLoc, 4> indexArgLabelLocsScratch;
-  Expr *index = packSingleArgument(ctx, lSquareLoc, indexArgs, indexArgLabels,
-                                   indexArgLabelLocs, rSquareLoc,
-                                   trailingClosure, implicit,
-                                   indexArgLabelsScratch,
-                                   indexArgLabelLocsScratch);
-
-  size_t size = totalSizeToAlloc(indexArgLabels, indexArgLabelLocs,
-                                 trailingClosure != nullptr);
-
-  void *memory = ctx.Allocate(size, alignof(DynamicSubscriptExpr));
-  return new (memory) DynamicSubscriptExpr(base, index, indexArgLabels,
-                                           indexArgLabelLocs,
-                                           trailingClosure != nullptr,
-                                           decl, implicit);
-}
-
 UnresolvedMemberExpr::UnresolvedMemberExpr(SourceLoc dotLoc,
                                            DeclNameLoc nameLoc,
                                            DeclNameRef name, Expr *argument,
