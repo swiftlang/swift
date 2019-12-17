@@ -2003,7 +2003,8 @@ static uint8_t getRawStableAutoDiffDerivativeFunctionKind(
     swift::AutoDiffDerivativeFunctionKind kind) {
   switch (kind) {
   case swift::AutoDiffDerivativeFunctionKind::JVP:
-    return uint8_t(serialization::AutoDiffDerivativeFunctionKind::JVP);  case swift::AutoDiffDerivativeFunctionKind::VJP:
+    return uint8_t(serialization::AutoDiffDerivativeFunctionKind::JVP);
+  case swift::AutoDiffDerivativeFunctionKind::VJP:
     return uint8_t(serialization::AutoDiffDerivativeFunctionKind::VJP);
   }
   llvm_unreachable("bad derivative function kind");
