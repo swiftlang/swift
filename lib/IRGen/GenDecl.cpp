@@ -788,6 +788,17 @@ IRGenModule::getAddrOfContextDescriptorForParent(DeclContext *parent,
     LLVM_FALLTHROUGH;
       
   case DeclContextKind::Module:
+    if (auto *D = ofChild->getAsDecl()) {
+      // If the top-level decl has been marked as moved from another module,
+      // using @_originallyDefinedIn, we should emit the original module as
+      // the context because all run-time names of this decl are based on the
+      // original module name.
+      auto OriginalModule = D->getAlternateModuleName();
+      if (!OriginalModule.empty()) {
+        return {getAddrOfOriginalModuleContextDescriptor(OriginalModule),
+          ConstantReference::Direct};
+      }
+    }
     return {getAddrOfModuleContextDescriptor(cast<ModuleDecl>(parent)),
             ConstantReference::Direct};
   }
@@ -998,7 +1009,7 @@ static bool hasCodeCoverageInstrumentation(SILFunction &f, SILModule &m) {
   return f.getProfiler() && m.getOptions().EmitProfileCoverageMapping;
 }
 
-void IRGenerator::emitGlobalTopLevel() {
+void IRGenerator::emitGlobalTopLevel(llvm::StringSet<> *linkerDirectives) {
   // Generate order numbers for the functions in the SIL module that
   // correspond to definitions in the LLVM module.
   unsigned nextOrderNumber = 0;
@@ -1018,7 +1029,11 @@ void IRGenerator::emitGlobalTopLevel() {
     CurrentIGMPtr IGM = getGenModule(wt.getProtocol()->getDeclContext());
     ensureRelativeSymbolCollocation(wt);
   }
-
+  if (linkerDirectives) {
+    for (auto &entry: *linkerDirectives) {
+      createLinkerDirectiveVariable(*PrimaryIGM, entry.getKey());
+    }
+  }
   for (SILGlobalVariable &v : PrimaryIGM->getSILModule().getSILGlobals()) {
     Decl *decl = v.getDecl();
     CurrentIGMPtr IGM = getGenModule(decl ? decl->getDeclContext() : nullptr);
@@ -1926,6 +1941,49 @@ llvm::GlobalVariable *swift::irgen::createVariable(
         var, DebugName.empty() ? name : DebugName, name, DbgTy,
         var->hasInternalLinkage(), inFixedBuffer, DebugLoc);
 
+  return var;
+}
+
+llvm::GlobalVariable *
+swift::irgen::createLinkerDirectiveVariable(IRGenModule &IGM, StringRef name) {
+
+  // A prefix of \1 can avoid further mangling of the symbol (prefixing _).
+  llvm::SmallString<32> NameWithFlag;
+  NameWithFlag.push_back('\1');
+  NameWithFlag.append(name);
+  name = NameWithFlag.str();
+  static const uint8_t Size = 8;
+  static const uint8_t Alignment = 8;
+
+  // Use a char type as the type for this linker directive.
+  auto ProperlySizedIntTy = SILType::getBuiltinIntegerType(
+      Size, IGM.getSwiftModule()->getASTContext());
+  auto storageType = IGM.getStorageType(ProperlySizedIntTy);
+
+  llvm::GlobalValue *existingValue = IGM.Module.getNamedGlobal(name);
+  if (existingValue) {
+    auto existingVar = dyn_cast<llvm::GlobalVariable>(existingValue);
+    if (existingVar && isPointerTo(existingVar->getType(), storageType))
+      return existingVar;
+
+    IGM.error(SourceLoc(),
+              "program too clever: variable collides with existing symbol " +
+                  name);
+
+    // Note that this will implicitly unique if the .unique name is also taken.
+    existingValue->setName(name + ".unique");
+  }
+
+  llvm::GlobalValue::LinkageTypes Linkage =
+    llvm::GlobalValue::LinkageTypes::ExternalLinkage;
+  auto var = new llvm::GlobalVariable(IGM.Module, storageType, /*constant*/true,
+    Linkage, /*Init to zero*/llvm::Constant::getNullValue(storageType), name);
+  ApplyIRLinkage({Linkage,
+                  llvm::GlobalValue::VisibilityTypes::DefaultVisibility,
+        llvm::GlobalValue::DLLStorageClassTypes::DefaultStorageClass}).to(var);
+  var->setAlignment(Alignment);
+  disableAddressSanitizer(IGM, var);
+  IGM.addUsedGlobal(var);
   return var;
 }
 

@@ -53,6 +53,9 @@ namespace irgen {
                  Optional<SILLocation> DebugLoc = None,
                  StringRef DebugName = StringRef(), bool heapAllocated = false);
 
+  llvm::GlobalVariable *
+  createLinkerDirectiveVariable(IRGenModule &IGM, StringRef Name);
+
   void disableAddressSanitizer(IRGenModule &IGM, llvm::GlobalVariable *var);
 }
 }

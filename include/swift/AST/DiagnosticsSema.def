@@ -1467,6 +1467,15 @@ NOTE(option_set_empty_set_init,none,
 ERROR(originally_defined_in_dupe_platform,none,
       "duplicate version number for platform %0", (StringRef))
 
+ERROR(originally_definedin_topleve_decl,none,
+      "@%0 is only applicable to top-level decl", (StringRef))
+
+ERROR(originally_definedin_need_available,none,
+      "need @available attribute for @%0", (StringRef))
+
+ERROR(originally_definedin_must_after_available_version,none,
+      "moved version from @%0 must after introduced OS version", (StringRef))
+
 // Alignment attribute
 ERROR(alignment_not_power_of_two,none,
       "alignment value must be a power of two", ())

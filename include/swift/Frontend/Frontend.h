@@ -385,6 +385,8 @@ public:
   /// fail an assert if not in that mode.
   std::string getModuleInterfaceOutputPathForWholeModule() const;
 
+  std::string getLdAddCFileOutputPathForWholeModule() const;
+
   SerializationOptions
   computeSerializationOptions(const SupplementaryOutputPaths &outs,
                               bool moduleIsPublic);

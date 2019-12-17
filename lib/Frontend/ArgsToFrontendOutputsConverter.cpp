@@ -302,11 +302,12 @@ SupplementaryOutputPathsComputer::getSupplementaryOutputPathsFromArguments()
       options::OPT_emit_module_interface_path);
   auto moduleSourceInfoOutput = getSupplementaryFilenamesFromArguments(
       options::OPT_emit_module_source_info_path);
-
+  auto ldAddCFileOutput  = getSupplementaryFilenamesFromArguments(
+      options::OPT_emit_ldadd_cfile_path);
   if (!objCHeaderOutput || !moduleOutput || !moduleDocOutput ||
       !dependenciesFile || !referenceDependenciesFile ||
       !serializedDiagnostics || !fixItsOutput || !loadedModuleTrace || !TBD ||
-      !moduleInterfaceOutput || !moduleSourceInfoOutput) {
+      !moduleInterfaceOutput || !moduleSourceInfoOutput || !ldAddCFileOutput) {
     return None;
   }
   std::vector<SupplementaryOutputPaths> result;
@@ -328,6 +329,7 @@ SupplementaryOutputPathsComputer::getSupplementaryOutputPathsFromArguments()
     sop.TBDPath = (*TBD)[i];
     sop.ModuleInterfaceOutputPath = (*moduleInterfaceOutput)[i];
     sop.ModuleSourceInfoOutputPath = (*moduleSourceInfoOutput)[i];
+    sop.LdAddCFilePath = (*ldAddCFileOutput)[i];
     result.push_back(sop);
   }
   return result;
@@ -446,6 +448,7 @@ SupplementaryOutputPathsComputer::computeOutputPathsForOneInput(
   sop.TBDPath = tbdPath;
   sop.ModuleInterfaceOutputPath = ModuleInterfaceOutputPath;
   sop.ModuleSourceInfoOutputPath = moduleSourceInfoOutputPath;
+  sop.LdAddCFilePath = pathsFromArguments.LdAddCFilePath;
   return sop;
 }
 
@@ -546,7 +549,8 @@ SupplementaryOutputPathsComputer::readSupplementaryOutputFileMap() const {
         options::OPT_emit_loaded_module_trace_path,
         options::OPT_emit_module_interface_path,
         options::OPT_emit_module_source_info_path,
-        options::OPT_emit_tbd_path)) {
+        options::OPT_emit_tbd_path,
+        options::OPT_emit_ldadd_cfile_path)) {
     Diags.diagnose(SourceLoc(),
                    diag::error_cannot_have_supplementary_outputs,
                    A->getSpelling(), "-supplementary-output-file-map");
