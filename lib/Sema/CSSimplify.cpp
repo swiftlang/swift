@@ -788,9 +788,7 @@ getCalleeDeclAndArgs(ConstraintSystem &cs,
 
   // Our remaining path can only be 'ApplyArgument'.
   auto path = callLocator->getPath();
-  if (!path.empty() &&
-      !(path.size() <= 2 &&
-        path.back().getKind() == ConstraintLocator::ApplyArgument))
+  if (!path.empty() && !path.back().is<LocatorPathElt::ApplyArgument>())
     return formUnknownCallee();
 
   // Dig out the callee information.
