@@ -533,35 +533,6 @@ DECL_ATTR(_originallyDefinedIn, OriginallyDefinedIn,
   ABIBreakingToAdd | ABIBreakingToRemove | APIStableToAdd | APIStableToRemove,
   96)
 
-<<<<<<< HEAD
-// SWIFT_ENABLE_TENSORFLOW
-DECL_ATTR(quoted, Quoted,
-  OnFunc |
-  ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
-  97)
-// TODO(TF-999): Remove deprecated `@differentiating` attribute.
-DECL_ATTR(differentiating, Differentiating,
-  OnFunc | LongAttribute | AllowMultipleAttributes |
-  ABIStableToAdd | ABIBreakingToRemove | APIStableToAdd | APIBreakingToRemove,
-  98)
-DECL_ATTR(derivative, Derivative,
-  OnFunc | LongAttribute | AllowMultipleAttributes |
-  ABIStableToAdd | ABIBreakingToRemove | APIStableToAdd | APIBreakingToRemove,
-  99)
-SIMPLE_DECL_ATTR(compilerEvaluable, CompilerEvaluable,
-  OnAccessor | OnFunc | OnConstructor | OnSubscript |
-  ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove |
-  NotSerialized, 100)
-SIMPLE_DECL_ATTR(noDerivative, NoDerivative,
-  OnVar |
-  ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove,
-  101)
-DECL_ATTR(transpose, Transpose,
-  OnFunc | LongAttribute | AllowMultipleAttributes |
-  ABIStableToAdd | ABIBreakingToRemove | APIStableToAdd | APIBreakingToRemove,
-  102)
-// SWIFT_ENABLE_TENSORFLOW END
-=======
 DECL_ATTR(derivative, Derivative,
   OnFunc | LongAttribute | AllowMultipleAttributes |
   ABIStableToAdd | ABIBreakingToRemove | APIStableToAdd | APIBreakingToRemove,
@@ -572,7 +543,30 @@ DECL_ATTR(_implicitly_synthesizes_nested_requirement, ImplicitlySynthesizesNeste
   UserInaccessible |
   ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
   98)
->>>>>>> upstream_20191216
+
+// SWIFT_ENABLE_TENSORFLOW
+DECL_ATTR(quoted, Quoted,
+  OnFunc |
+  ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
+  99)
+// TODO(TF-999): Remove deprecated `@differentiating` attribute.
+DECL_ATTR(differentiating, Differentiating,
+  OnFunc | LongAttribute | AllowMultipleAttributes |
+  ABIStableToAdd | ABIBreakingToRemove | APIStableToAdd | APIBreakingToRemove,
+  100)
+SIMPLE_DECL_ATTR(compilerEvaluable, CompilerEvaluable,
+  OnAccessor | OnFunc | OnConstructor | OnSubscript |
+  ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove |
+  NotSerialized, 101)
+SIMPLE_DECL_ATTR(noDerivative, NoDerivative,
+  OnVar |
+  ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove,
+  102)
+DECL_ATTR(transpose, Transpose,
+  OnFunc | LongAttribute | AllowMultipleAttributes |
+  ABIStableToAdd | ABIBreakingToRemove | APIStableToAdd | APIBreakingToRemove,
+  103)
+// SWIFT_ENABLE_TENSORFLOW END
 
 #undef TYPE_ATTR
 #undef DECL_ATTR_ALIAS
