@@ -33,6 +33,9 @@ struct TBDGenOptions {
   /// Whether this compilation is producing a TBD for InstallAPI.
   bool IsInstallAPI;
 
+  /// Only collect linker directive symbols.
+  bool LinkerDirectivesOnly = false;
+
   /// The install_name to use in the TBD file.
   std::string InstallName;
 

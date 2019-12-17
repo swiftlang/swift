@@ -1244,6 +1244,10 @@ bool AvailableAttr::isActivePlatform(const ASTContext &ctx) const {
   return isPlatformActive(Platform, ctx.LangOpts);
 }
 
+bool OriginallyDefinedInAttr::isActivePlatform(const ASTContext &ctx) const {
+  return isPlatformActive(Platform, ctx.LangOpts);
+}
+
 bool AvailableAttr::isLanguageVersionSpecific() const {
   if (PlatformAgnostic ==
       PlatformAgnosticAvailabilityKind::SwiftVersionSpecific)

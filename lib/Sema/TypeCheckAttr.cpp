@@ -250,8 +250,7 @@ public:
 
   void visitImplementationOnlyAttr(ImplementationOnlyAttr *attr);
   void visitNonEphemeralAttr(NonEphemeralAttr *attr);
-  void checkOriginalDefinedInAttrs(ArrayRef<OriginallyDefinedInAttr*> Attrs);
-
+  void checkOriginalDefinedInAttrs(Decl *D, ArrayRef<OriginallyDefinedInAttr*> Attrs);
   void visitDerivativeAttr(DerivativeAttr *attr);
 };
 } // end anonymous namespace
@@ -1070,7 +1069,7 @@ void TypeChecker::checkDeclAttributes(Decl *D) {
     else
       Checker.diagnoseAndRemoveAttr(attr, diag::invalid_decl_attribute, attr);
   }
-  Checker.checkOriginalDefinedInAttrs(ODIAttrs);
+  Checker.checkOriginalDefinedInAttrs(D, ODIAttrs);
 }
 
 /// Returns true if the given method is an valid implementation of a
@@ -2632,20 +2631,47 @@ void TypeChecker::checkParameterAttributes(ParameterList *params) {
   }
 }
 
-void
-AttributeChecker::checkOriginalDefinedInAttrs(
+void AttributeChecker::checkOriginalDefinedInAttrs(Decl *D,
     ArrayRef<OriginallyDefinedInAttr*> Attrs) {
-  llvm::SmallSet<PlatformKind, 4> AllPlatforms;
+  if (Attrs.empty())
+    return;
+  auto &Ctx = D->getASTContext();
+  OriginallyDefinedInAttr* theAttr = nullptr;
   // Attrs are in the reverse order of the source order. We need to visit them
   // in source order to diagnose the later attribute.
-  for (auto It = Attrs.rbegin(), End = Attrs.rend(); It != End; ++ It) {
-    auto *Attr = *It;
-    auto CurPlat = Attr->Platform;
-    if (!AllPlatforms.insert(CurPlat).second) {
+  for (auto *Attr: Attrs) {
+    if (!Attr->isActivePlatform(Ctx))
+      continue;
+    if (theAttr) {
       // Only one version number is allowed for one platform name.
-      diagnose(Attr->AtLoc, diag::originally_defined_in_dupe_platform,
+      diagnose(theAttr->AtLoc, diag::originally_defined_in_dupe_platform,
                platformString(Attr->Platform));
+      return;
+    } else {
+      theAttr = Attr;
     }
+  }
+  if (!theAttr)
+    return;
+  assert(theAttr);
+  static StringRef AttrName = "_originallyDefinedIn";
+  auto AtLoc = theAttr->AtLoc;
+  if (!D->getDeclContext()->isModuleScopeContext()) {
+    diagnose(AtLoc, diag::originally_definedin_topleve_decl, AttrName);
+    return;
+  }
+  auto AvailRange = AvailabilityInference::availableRange(D, Ctx);
+  if (!AvailRange.getOSVersion().hasLowerEndpoint()) {
+    diagnose(AtLoc, diag::originally_definedin_need_available,
+             AttrName);
+    return;
+  }
+  auto AvailBegin = AvailRange.getOSVersion().getLowerEndpoint();
+  if (AvailBegin >= theAttr->MovedVersion) {
+    diagnose(AtLoc,
+             diag::originally_definedin_must_after_available_version,
+             AttrName);
+    return;
   }
 }
 

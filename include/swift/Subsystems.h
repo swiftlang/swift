@@ -25,6 +25,7 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/ADT/StringSet.h"
 #include "llvm/Support/Mutex.h"
 
 #include <memory>
@@ -277,7 +278,8 @@ namespace swift {
                       StringRef ModuleName, const PrimarySpecificPaths &PSPs,
                       llvm::LLVMContext &LLVMContext,
                       ArrayRef<std::string> parallelOutputFilenames,
-                      llvm::GlobalVariable **outModuleHash = nullptr);
+                      llvm::GlobalVariable **outModuleHash = nullptr,
+                      llvm::StringSet<> *LinkerDirectives = nullptr);
 
   /// Turn the given Swift module into either LLVM IR or native code
   /// and return the generated LLVM IR module.
@@ -287,7 +289,8 @@ namespace swift {
                       std::unique_ptr<SILModule> SILMod,
                       StringRef ModuleName, const PrimarySpecificPaths &PSPs,
                       llvm::LLVMContext &LLVMContext,
-                      llvm::GlobalVariable **outModuleHash = nullptr);
+                      llvm::GlobalVariable **outModuleHash = nullptr,
+                      llvm::StringSet<> *LinkerDirectives = nullptr);
 
   /// Given an already created LLVM module, construct a pass pipeline and run
   /// the Swift LLVM Pipeline upon it. This does not cause the module to be

@@ -1908,6 +1908,13 @@ IRGenModule::getAddrOfAnonymousContextDescriptor(
     [&]{ AnonymousContextDescriptorBuilder(*this, DC).emit(); });
 }
 
+llvm::Constant *
+IRGenModule::getAddrOfOriginalModuleContextDescriptor(StringRef Name) {
+  return getAddrOfModuleContextDescriptor(OriginalModules.insert({Name,
+    ModuleDecl::create(Context.getIdentifier(Name), Context)})
+                                          .first->getValue());
+}
+
 static void emitInitializeFieldOffsetVector(IRGenFunction &IGF,
                                             SILType T,
                                             llvm::Value *metadata,
