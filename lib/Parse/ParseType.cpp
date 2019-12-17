@@ -734,18 +734,19 @@ Parser::parseTypeIdentifier(bool isParsingQualifiedDeclBaseType) {
       }
       if (!peekToken().isContextualKeyword("Type")
           && !peekToken().isContextualKeyword("Protocol")) {
-        // Consume the period.
-        consumeToken();
         // If parsing a qualified declaration name, break before parsing the
-        // final declaration name component.
+        // period before the final declaration name component.
         if (isParsingQualifiedDeclBaseType) {
-          BacktrackingScope backtrack(*this);
           // If qualified name base type cannot be parsed from the current
           // point (i.e. the next type identifier is not followed by a '.'),
           // then the next identifier is the final declaration name component.
+          BacktrackingScope backtrack(*this);
+          consumeStartingCharacterOfCurrentToken(tok::period);
           if (!canParseBaseTypeForQualifiedDeclName())
             break;
         }
+        // Consume the period.
+        consumeToken();
         continue;
       }
     } else if (Tok.is(tok::code_complete)) {

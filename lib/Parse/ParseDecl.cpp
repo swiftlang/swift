@@ -1093,22 +1093,23 @@ bool Parser::parseDifferentiableAttributeArguments(
 static bool parseBaseTypeForQualifiedDeclName(Parser &P, TypeRepr *&baseType) {
   baseType = nullptr;
 
+  // If base type cannot be parsed, return false (no error).
   if (!P.canParseBaseTypeForQualifiedDeclName())
     return false;
 
   auto result = P.parseTypeIdentifier(/*isParsingQualifiedDeclName*/ true);
+  // If base type should be parseable but the actual base type result is null,
+  // return true (error).
   if (result.isNull())
     return true;
 
-  // Consume a leading period. This is relevant only for qualified operators.
-  // TODO(TF-1065): Consider disallowing qualified operator names. There is no
-  // precedent for qualified operator syntax elsewhere in Swift.
-  if (P.startsWithSymbol(P.Tok, '.')) {
-    assert(P.Tok.isAnyOperator() &&
-           "Only operators should have leading period here");
-    P.consumeStartingCharacterOfCurrentToken(tok::period);
-  }
+  // Consume the leading period before the final declaration name component.
+  // `parseTypeIdentifier(/*isParsingQualifiedDeclName*/ true)` leaves the
+  // leading period unparsed to avoid syntax verification errors.
+  assert(P.startsWithSymbol(P.Tok, '.') && "false");
+  P.consumeStartingCharacterOfCurrentToken(tok::period);
 
+  // Set base type and return false (no error).
   baseType = result.getPtrOrNull();
   return false;
 }

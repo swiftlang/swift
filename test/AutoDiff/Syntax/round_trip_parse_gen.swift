@@ -50,6 +50,12 @@ func bazDerivative(_ x: Float, y: Float)
   return (x, { v in v })
 }
 
+@derivative(of: A.B.C.foo(label:_:), wrt: (x))
+func qualifiedDerivative(_ x: Float, y: Float)
+    -> (value: Float, pullback: (Float) -> Float) {
+  return (x, { v in v })
+}
+
 @transpose(of: +)
 func addTranspose(_ v: Float) -> (Float, Float) {
   return (v, v)
@@ -57,5 +63,15 @@ func addTranspose(_ v: Float) -> (Float, Float) {
 
 @transpose(of: -, wrt: (0, 1))
 func subtractTranspose(_ v: Float) -> (Float, Float) {
+  return (v, -v)
+}
+
+@transpose(of: Float.-, wrt: (0, 1))
+func subtractTranspose(_ v: Float) -> (Float, Float) {
+  return (v, -v)
+}
+
+@transpose(of: A.B.C.foo(label:_:), wrt: (0))
+func qualifiedTranspose(_ v: Float) -> (Float, Float) {
   return (v, -v)
 }
