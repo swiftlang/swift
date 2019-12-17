@@ -1765,19 +1765,19 @@ public:
   }
 };
 
-/// The `@derivative` attribute registers a function as a derivative of another
-/// function-like declaration: a 'func', 'init', 'subscript', or 'var' computed
-/// property declaration.
+/// The `@derivative(of:)` attribute registers a function as a derivative of
+/// another function-like declaration: a 'func', 'init', 'subscript', or 'var'
+/// computed property declaration.
 ///
-/// The `@derivative` attribute also has an optional `wrt:` clause specifying
-/// the parameters that are differentiated "with respect to", i.e. the
-/// differentiation parameters. The differentiation parameters must conform to
-/// the `Differentiable` protocol.
+/// The `@derivative(of:)` attribute also has an optional `wrt:` clause
+/// specifying the parameters that are differentiated "with respect to", i.e.
+/// the differentiation parameters. The differentiation parameters must conform
+/// to the `Differentiable` protocol.
 ///
 /// If the `wrt:` clause is unspecified, the differentiation parameters are
 /// inferred to be all parameters that conform to `Differentiable`.
 ///
-/// `@derivative` attribute type-checking verifies that the type of the
+/// `@derivative(of:)` attribute type-checking verifies that the type of the
 /// derivative function declaration is consistent with the type of the
 /// referenced original declaration and the differentiation parameters.
 ///
@@ -1858,17 +1858,17 @@ public:
   }
 };
 
-/// The `@transpose` attribute registers a function as a transpose of another
-/// function-like declaration: a 'func', 'init', 'subscript', or 'var' computed
-/// property declaration.
+/// The `@transpose(of:)` attribute registers a function as a transpose of
+/// another function-like declaration: a 'func', 'init', 'subscript', or 'var'
+/// computed property declaration.
 ///
-/// The `@transpose` attribute also has a `wrt:` clause specifying the
+/// The `@transpose(of:)` attribute also has a `wrt:` clause specifying the
 /// parameters that are transposed "with respect to", i.e. the transposed
 /// parameters.
 ///
 /// Examples:
 ///   @transpose(of: foo)
-///   @transpose(of: +, wrt: (lhs, rhs))
+///   @transpose(of: +, wrt: (0, 1))
 class TransposeAttr final
     : public DeclAttribute,
       private llvm::TrailingObjects<TransposeAttr, ParsedAutoDiffParameter> {
