@@ -108,20 +108,32 @@ bool StackPromotion::tryPromoteAlloc(AllocRefInst *ARI, EscapeAnalysis *EA,
     return false;
 
   auto *ConGraph = EA->getConnectionGraph(ARI->getFunction());
-  auto *contentNode = ConGraph->getValueContent(ARI);
-  if (!contentNode)
+  auto *Node = ConGraph->getNodeOrNull(ARI);
+  if (!Node)
     return false;
 
   // The most important check: does the object escape the current function?
-  if (contentNode->escapes())
+  if (Node->escapes())
     return false;
 
   LLVM_DEBUG(llvm::dbgs() << "Promote " << *ARI);
 
   // Collect all use-points of the allocation. These are refcount instructions
   // and apply instructions.
+  llvm::SmallVector<SILNode *, 8> BaseUsePoints;
   llvm::SmallVector<SILInstruction *, 8> UsePoints;
-  ConGraph->getUsePoints(contentNode, UsePoints);
+  ConGraph->getUsePoints(Node, BaseUsePoints);
+  for (SILNode *UsePoint : BaseUsePoints) {
+    if (SILInstruction *I = dyn_cast<SILInstruction>(UsePoint)) {
+      UsePoints.push_back(I);
+    } else {
+      // Also block arguments can be use points.
+      SILBasicBlock *UseBB = cast<SILPhiArgument>(UsePoint)->getParent();
+      // For simplicity we just add the first instruction of the block as use
+      // point.
+      UsePoints.push_back(&UseBB->front());
+    }
+  }
 
   ValueLifetimeAnalysis VLA(ARI, UsePoints);
   // Check if there is a use point before the allocation (this can happen e.g.
