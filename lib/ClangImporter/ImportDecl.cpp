@@ -6941,8 +6941,7 @@ Optional<GenericParamList *> SwiftDeclConverter::importObjCGenericParams(
 
 void SwiftDeclConverter::importMirroredProtocolMembers(
     const clang::ObjCContainerDecl *decl, DeclContext *dc,
-    ArrayRef<ProtocolDecl *> protocols, SmallVectorImpl<Decl *> &members,
-    ASTContext &Ctx) {
+    ArrayRef<ProtocolDecl *> protocols, SmallVectorImpl<Decl *> &members) {
   assert(dc);
   const clang::ObjCInterfaceDecl *interfaceDecl = nullptr;
   const ClangModuleUnit *declModule;
@@ -8703,8 +8702,7 @@ void ClangImporter::Implementation::collectMembersToAdd(
   // Import mirrored declarations for protocols to which this category
   // or extension conforms.
   // FIXME: This is supposed to be a short-term hack.
-  converter.importMirroredProtocolMembers(objcContainer, DC,
-                                          protos, members, SwiftContext);
+  converter.importMirroredProtocolMembers(objcContainer, DC, protos, members);
 }
 
 void ClangImporter::Implementation::loadAllConformances(
