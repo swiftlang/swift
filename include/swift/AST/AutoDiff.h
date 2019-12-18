@@ -529,12 +529,18 @@ template <typename T> struct DenseMapInfo;
 template <> struct DenseMapInfo<AutoDiffConfig> {
   static AutoDiffConfig getEmptyKey() {
     auto *ptr = llvm::DenseMapInfo<void *>::getEmptyKey();
+    // The `derivativeGenericSignature` component must be `nullptr` so that
+    // `getHashValue` and `isEqual` do not try to `getCanonicalSignature()` on
+    // an invalid pointer.
     return {static_cast<IndexSubset *>(ptr), static_cast<IndexSubset *>(ptr),
             nullptr};
   }
 
   static AutoDiffConfig getTombstoneKey() {
     auto *ptr = llvm::DenseMapInfo<void *>::getTombstoneKey();
+    // The `derivativeGenericSignature` component must be `nullptr` so that
+    // `getHashValue` and `isEqual` do not try to `getCanonicalSignature()` on
+    // an invalid pointer.
     return {static_cast<IndexSubset *>(ptr), static_cast<IndexSubset *>(ptr),
             nullptr};
   }
