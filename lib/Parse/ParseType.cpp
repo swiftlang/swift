@@ -1559,16 +1559,24 @@ bool Parser::canParseTypeIdentifierOrTypeComposition() {
   }
 }
 
+bool Parser::canParseSimpleTypeIdentifier() {
+  // Parse an identifier.
+  if (!Tok.isAny(tok::identifier, tok::kw_Self, tok::kw_Any))
+    return false;
+  consumeToken();
+
+  // Parse an optional generic argument list.
+  if (startsWithLess(Tok))
+    if (!canParseGenericArguments())
+      return false;
+
+  return true;
+}
+
 bool Parser::canParseTypeIdentifier() {
   while (true) {
-    if (!Tok.isAny(tok::identifier, tok::kw_Self, tok::kw_Any))
+    if (!canParseSimpleTypeIdentifier())
       return false;
-    consumeToken();
-    
-    if (startsWithLess(Tok)) {
-      if (!canParseGenericArguments())
-        return false;
-    }
 
     // Treat 'Foo.<anything>' as an attempt to write a dotted type
     // unless <anything> is 'Type' or 'Protocol'.
@@ -1585,14 +1593,9 @@ bool Parser::canParseTypeIdentifier() {
 bool Parser::canParseBaseTypeForQualifiedDeclName() {
   BacktrackingScope backtrack(*this);
 
-  // First, parse a single type identifier component.
-  if (!Tok.isAny(tok::identifier, tok::kw_Self, tok::kw_Any))
+  // Parse a simple type identifier.
+  if (!canParseSimpleTypeIdentifier())
     return false;
-  consumeToken();
-  if (startsWithLess(Tok)) {
-    if (!canParseGenericArguments())
-      return false;
-  }
 
   // Qualified name base types must be followed by a period.
   // If the next token starts with a period, return true.

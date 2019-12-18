@@ -1377,6 +1377,14 @@ public:
   bool canParseAsGenericArgumentList();
 
   bool canParseType();
+
+  /// Returns true if a simple type identifier can be parsed.
+  ///
+  /// \verbatim
+  ///   simple-type-identifier: identifier generic-argument-list?
+  /// \endverbatim
+  bool canParseSimpleTypeIdentifier();
+
   bool canParseTypeIdentifier();
   bool canParseTypeIdentifierOrTypeComposition();
   bool canParseOldStyleProtocolComposition();
@@ -1386,13 +1394,11 @@ public:
 
   bool canParseTypedPattern();
 
-  /// Returns true if a base type for a qualified declaration name can be
-  /// parsed.
+  /// Returns true if a qualified declaration name base type can be parsed.
   ///
-  /// Examples:
-  ///   'Foo.f' -> true
-  ///   'Foo.Bar.f' -> true
-  ///   'f' -> false
+  /// \verbatim
+  ///   qualified-decl-name-base-type: simple-type-identifier '.'
+  /// \endverbatim
   bool canParseBaseTypeForQualifiedDeclName();
 
   //===--------------------------------------------------------------------===//
