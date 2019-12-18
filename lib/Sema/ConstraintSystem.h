@@ -2270,15 +2270,26 @@ public:
   /// callee locator will only be returned for a direct reference such as
   /// \c x.foo rather than \c x.foo().
   /// \param getType The callback to fetch a type for given expression.
-  ConstraintLocator *
-  getCalleeLocator(ConstraintLocator *locator, bool lookThroughApply,
-                   llvm::function_ref<Type(const Expr *)> getType);
+  /// \param simplifyType The callback to attempt to resolve any type
+  ///                     variables which appear in the given type.
+  /// \param getOverloadFor The callback to fetch overload for a given
+  ///                       locator if available.
+  ConstraintLocator *getCalleeLocator(
+      ConstraintLocator *locator, bool lookThroughApply,
+      llvm::function_ref<Type(const Expr *)> getType,
+      llvm::function_ref<Type(Type)> simplifyType,
+      llvm::function_ref<Optional<SelectedOverload>(ConstraintLocator *)>
+          getOverloadFor);
 
   ConstraintLocator *getCalleeLocator(ConstraintLocator *locator,
                                       bool lookThroughApply = true) {
     return getCalleeLocator(
         locator, lookThroughApply,
-        [&](const Expr *expr) -> Type { return getType(expr); });
+        [&](const Expr *expr) -> Type { return getType(expr); },
+        [&](Type type) -> Type { return simplifyType(type)->getRValueType(); },
+        [&](ConstraintLocator *locator) -> Optional<SelectedOverload> {
+          return findSelectedOverloadFor(locator);
+        });
   }
 
 public:

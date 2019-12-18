@@ -434,7 +434,10 @@ ConstraintLocator *ConstraintSystem::getConstraintLocator(
 
 ConstraintLocator *ConstraintSystem::getCalleeLocator(
     ConstraintLocator *locator, bool lookThroughApply,
-    llvm::function_ref<Type(const Expr *)> getType) {
+    llvm::function_ref<Type(const Expr *)> getType,
+    llvm::function_ref<Type(Type)> simplifyType,
+    llvm::function_ref<Optional<SelectedOverload>(ConstraintLocator *)>
+        getOverloadFor) {
   auto *anchor = locator->getAnchor();
   assert(anchor && "Expected an anchor!");
 
@@ -494,7 +497,7 @@ ConstraintLocator *ConstraintSystem::getCalleeLocator(
     // Unfortunately CSDiag currently calls into getCalleeLocator, so all bets
     // are off. Once we remove that legacy diagnostic logic, we should be able
     // to assert here.
-    fnTy = getFixedTypeRecursive(fnTy, /*wantRValue*/ true);
+    fnTy = simplifyType(fnTy);
 
     // For an apply of a metatype, we have a short-form constructor. Unlike
     // other locators to callees, these are anchored on the apply expression
@@ -550,7 +553,7 @@ ConstraintLocator *ConstraintSystem::getCalleeLocator(
     // and clean up a bunch of other special cases. Doing so may require a bit
     // of hacking in CSGen though.
     if (UME->hasArguments()) {
-      if (auto overload = findSelectedOverloadFor(calleeLoc)) {
+      if (auto overload = getOverloadFor(calleeLoc)) {
         if (auto *loc = getSpecialFnCalleeLoc(overload->boundType))
           return loc;
       }
@@ -2790,7 +2793,7 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
           locator = getConstraintLocator(assignExpr->getSrc());
       }
 
-      auto *calleeLocator = getCalleeLocator(locator);
+      auto *calleeLocator = solution.getCalleeLocator(locator);
       if (!commonCalleeLocator)
         commonCalleeLocator = calleeLocator;
       else if (commonCalleeLocator != calleeLocator)

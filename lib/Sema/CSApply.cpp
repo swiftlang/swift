@@ -157,7 +157,11 @@ ConstraintLocator *Solution::getCalleeLocator(ConstraintLocator *locator,
   auto &cs = getConstraintSystem();
   return cs.getCalleeLocator(
       locator, lookThroughApply,
-      [&](const Expr *expr) -> Type { return getType(expr); });
+      [&](const Expr *expr) -> Type { return getType(expr); },
+      [&](Type type) -> Type { return simplifyType(type)->getRValueType(); },
+      [&](ConstraintLocator *locator) -> Optional<SelectedOverload> {
+        return getOverloadChoiceIfAvailable(locator);
+      });
 }
 
 /// Return the implicit access kind for a MemberRefExpr with the
