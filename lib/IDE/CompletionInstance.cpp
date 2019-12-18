@@ -139,21 +139,23 @@ bool CompletionInstance::performCachedOperaitonIfPossible(
     return false;
 
   // Temporary move the CI so other threads don't use the same instance.
-  std::shared_ptr<CompilerInstance> CI;
-  CI.swap(CachedCI);
+  std::shared_ptr<CachedInstance> CachedI(nullptr);
+  CachedInst.swap(CachedI);
 
-  if (!CI)
+  if (!CachedI)
     return false;
-  if (CurrentASTReuseCount >= MaxASTReuseCount)
+  if (CachedI->ReuseCound >= MaxASTReuseCount)
     return false;
-  if (ArgsHash != CachedArgsHash)
+  if (CachedI->ArgHash != ArgsHash)
     return false;
 
-  auto &oldState = CI->getPersistentParserState();
+  auto &CI = CachedI->CI;
+
+  auto &oldState = CachedI->CI.getPersistentParserState();
   if (!oldState.hasCodeCompletionDelayedDeclState())
     return false;
 
-  auto &SM = CI->getSourceMgr();
+  auto &SM = CI.getSourceMgr();
   if (SM.getIdentifierForBuffer(SM.getCodeCompletionBufferID()) !=
       completionBuffer->getBufferIdentifier())
     return false;
@@ -230,19 +232,18 @@ bool CompletionInstance::performCachedOperaitonIfPossible(
   if (AFD->isBodySkipped())
     AFD->setBodyDelayed(AFD->getBodySourceRange());
   if (DiagC)
-    CI->addDiagnosticConsumer(DiagC);
+    CI.addDiagnosticConsumer(DiagC);
 
-  CI->getDiags().diagnose(SM.getLocForOffset(BufferID, newInfo.StartOffset),
+  CI.getDiags().diagnose(SM.getLocForOffset(BufferID, newInfo.StartOffset),
                           diag::completion_reusing_astcontext);
 
-  Callback(*CI);
+  Callback(CI);
 
   if (DiagC)
-    CI->removeDiagnosticConsumer(DiagC);
+    CI.removeDiagnosticConsumer(DiagC);
 
-  CachedCI.swap(CI);
-  CachedArgsHash = ArgsHash;
-  CurrentASTReuseCount += 1;
+  CachedI->ReuseCound += 1;
+  CachedInst.swap(CachedI);
 
   return true;
 }
@@ -253,32 +254,32 @@ bool CompletionInstance::performNewOperation(
     llvm::MemoryBuffer *completionBuffer, unsigned int Offset,
     std::string &Error, DiagnosticConsumer *DiagC,
     llvm::function_ref<void(CompilerInstance &)> Callback) {
-  CachedCI.reset();
-  auto CI = std::make_shared<CompilerInstance>();
+  CachedInst.reset();
+  auto TheInstance = std::make_shared<CachedInstance>();
+  auto &CI = TheInstance->CI;
   if (DiagC)
-    CI->addDiagnosticConsumer(DiagC);
+    CI.addDiagnosticConsumer(DiagC);
 
   if (FileSystem != llvm::vfs::getRealFileSystem())
-    CI->getSourceMgr().setFileSystem(FileSystem);
+    CI.getSourceMgr().setFileSystem(FileSystem);
 
   Invocation.setCodeCompletionPoint(completionBuffer, Offset);
 
-  if (CI->setup(Invocation)) {
+  if (CI.setup(Invocation)) {
     Error = "failed to setup compiler instance";
     return false;
   }
-  registerIDERequestFunctions(CI->getASTContext().evaluator);
+  registerIDERequestFunctions(CI.getASTContext().evaluator);
 
-  CI->performParseAndResolveImportsOnly();
-  Callback(*CI);
+  CI.performParseAndResolveImportsOnly();
+  Callback(CI);
 
   if (DiagC)
-    CI->removeDiagnosticConsumer(DiagC);
+    CI.removeDiagnosticConsumer(DiagC);
 
   if (EnableASTCaching) {
-    CachedCI.swap(CI);
-    CachedArgsHash = ArgsHash;
-    CurrentASTReuseCount = 0;
+    TheInstance->ArgHash = ArgsHash;
+    CachedInst.swap(TheInstance);
   }
 
   return true;
