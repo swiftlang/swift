@@ -3292,25 +3292,34 @@ static bool checkFunctionSignature(
     return false;
   }
 
+  // Map type into the required function type's generic signature, if it exists.
+  // This is significant when the required generic signature has same-type
+  // requirements while the candidate generic signature does not.
+  auto mapType = [&](Type type) {
+    if (!requiredGenSig)
+      return type->getCanonicalType();
+    return requiredGenSig->getCanonicalTypeInContext(type);
+  };
+
   // Check that parameter types match, disregarding labels.
   if (required->getNumParams() != candidateFnTy->getNumParams())
     return false;
   if (!std::equal(required->getParams().begin(), required->getParams().end(),
                   candidateFnTy->getParams().begin(),
-                  [](AnyFunctionType::Param x, AnyFunctionType::Param y) {
-                    return x.getPlainType()->isEqual(y.getPlainType());
+                  [&](AnyFunctionType::Param x, AnyFunctionType::Param y) {
+                    return x.getPlainType()->isEqual(mapType(y.getPlainType()));
                   }))
     return false;
 
   // If required result type is not a function type, check that result types
   // match exactly.
   auto requiredResultFnTy = dyn_cast<AnyFunctionType>(required.getResult());
+  auto candidateResultTy = mapType(candidateFnTy.getResult());
   if (!requiredResultFnTy) {
     auto requiredResultTupleTy = dyn_cast<TupleType>(required.getResult());
-    auto candidateResultTupleTy =
-        dyn_cast<TupleType>(candidateFnTy.getResult());
+    auto candidateResultTupleTy = dyn_cast<TupleType>(candidateResultTy);
     if (!requiredResultTupleTy || !candidateResultTupleTy)
-      return required.getResult()->isEqual(candidateFnTy.getResult());
+      return required.getResult()->isEqual(candidateResultTy);
     // If result types are tuple types, check that element types match,
     // ignoring labels.
     if (requiredResultTupleTy->getNumElements() !=
@@ -3323,7 +3332,7 @@ static bool checkFunctionSignature(
   }
 
   // Required result type is a function. Recurse.
-  return checkFunctionSignature(requiredResultFnTy, candidateFnTy.getResult());
+  return checkFunctionSignature(requiredResultFnTy, candidateResultTy);
 };
 
 // Returns an `AnyFunctionType` with the same `ExtInfo` as `fnType`, but with
@@ -3607,8 +3616,20 @@ void AttributeChecker::visitDerivativeAttr(DerivativeAttr *attr) {
   auto resultTanType = valueResultConf.getTypeWitnessByName(
       valueResultType, Ctx.Id_TangentVector);
 
+  // Compute the actual differential/pullback type that we use for comparison
+  // with the expected type. We must canonicalize the derivative interface type
+  // before extracting the differential/pullback type from it, so that the
+  // derivative interface type generic signature is available for simplifying
+  // types.
+  CanType canActualResultType = derivativeInterfaceType->getCanonicalType();
+  while (isa<AnyFunctionType>(canActualResultType)) {
+    canActualResultType =
+        cast<AnyFunctionType>(canActualResultType).getResult();
+  }
+  CanType actualFuncEltType =
+      cast<TupleType>(canActualResultType).getElementType(1);
+
   // Compute expected differential/pullback type.
-  auto funcEltType = funcResultElt.getType();
   Type expectedFuncEltType;
   if (kind == AutoDiffDerivativeFunctionKind::JVP) {
     auto diffParams = map<SmallVector<AnyFunctionType::Param, 4>>(
@@ -3624,7 +3645,7 @@ void AttributeChecker::visitDerivativeAttr(DerivativeAttr *attr) {
   expectedFuncEltType = expectedFuncEltType->mapTypeOutOfContext();
 
   // Check if differential/pullback type matches expected type.
-  if (!funcEltType->isEqual(expectedFuncEltType)) {
+  if (!actualFuncEltType->isEqual(expectedFuncEltType)) {
     // Emit differential/pullback type mismatch error on attribute.
     diagnoseAndRemoveAttr(attr, diag::derivative_attr_result_func_type_mismatch,
                           funcResultElt.getName(), originalAFD->getFullName());
