@@ -25,7 +25,7 @@ jobs:
 
   macos_build:
     timeout-minutes: 0
-    runs-on: macOS-10.14
+    runs-on: macos-latest
 
     steps:
       - uses: actions/checkout@v1
@@ -100,7 +100,7 @@ jobs:
 
   macos_smoke_test:
     name: Compile hello.swift on macOS
-    runs-on: macOS-10.14
+    runs-on: macos-latest
     needs: package
     steps:
       - name: Download SwiftWasm macOS package
