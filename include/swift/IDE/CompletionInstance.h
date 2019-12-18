@@ -40,9 +40,12 @@ class CompletionInstance {
   unsigned MaxASTReuseCount = 100;
   bool EnableASTCaching = false;
 
-  std::shared_ptr<CompilerInstance> CachedCI = nullptr;
-  llvm::hash_code CachedArgsHash;
-  unsigned CurrentASTReuseCount = 0;
+  struct CachedInstance {
+    CompilerInstance CI;
+    llvm::hash_code ArgHash;
+    unsigned ReuseCound = 0;
+  };
+  std::shared_ptr<CachedInstance> CachedInst;
 
   /// Calls \p Callback with cached \c CompilerInstance if it's usable for the
   /// specified completion request.
