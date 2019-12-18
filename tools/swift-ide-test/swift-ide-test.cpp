@@ -757,16 +757,14 @@ static bool doCodeCompletionImpl(
   std::string Error;
   PrintingDiagnosticConsumer PrintDiags;
   CompletionInstance CompletionInst;
-  auto *CI = CompletionInst.getCompilerInstance(
+  auto isSuccess = CompletionInst.performOperation(
       Invocation, /*Args=*/{}, llvm::vfs::getRealFileSystem(), CleanFile.get(),
-      Offset, Error, CodeCompletionDiagnostics ? &PrintDiags : nullptr);
-  if (!CI)
-    return 1;
-
-  CI->performParseAndResolveImportsOnly();
-  performCodeCompletionSecondPass(CI->getPersistentParserState(),
-                                  *callbacksFactory);
-  return 0;
+      Offset, Error, CodeCompletionDiagnostics ? &PrintDiags : nullptr,
+                                                [&](CompilerInstance &CI) {
+    performCodeCompletionSecondPass(CI.getPersistentParserState(),
+                                    *callbacksFactory);
+  });
+  return isSuccess ? 0 : 1;
 }
 
 static int doTypeContextInfo(const CompilerInvocation &InitInvok,

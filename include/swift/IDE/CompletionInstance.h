@@ -37,47 +37,56 @@ makeCodeCompletionMemoryBuffer(const llvm::MemoryBuffer *origBuf,
 
 /// Manages \c CompilerInstance for completion like operations.
 class CompletionInstance {
-  std::unique_ptr<CompilerInstance> CachedCI = nullptr;
-  llvm::hash_code CachedArgsHash;
-  bool EnableASTCaching = false;
   unsigned MaxASTReuseCount = 100;
+  bool EnableASTCaching = false;
+
+  std::shared_ptr<CompilerInstance> CachedCI = nullptr;
+  llvm::hash_code CachedArgsHash;
   unsigned CurrentASTReuseCount = 0;
 
-  /// Returns cached \c CompilerInstance if it's usable for the specified
-  /// completion request.
-  /// Returns \c nullptr if the functionality is disabled, compiler argument has
+  /// Calls \p Callback with cached \c CompilerInstance if it's usable for the
+  /// specified completion request.
+  /// Returns \c if the callback was called. Returns \c false if the
+  /// functionality is disabled, compiler argument has
   /// changed, primary file is not the same, the \c Offset is not in function
   /// bodies, or the interface hash of the file has changed.
-  swift::CompilerInstance *
-  getCachedCompilerInstance(const swift::CompilerInvocation &Invocation,
-                            llvm::hash_code ArgsHash,
-                            llvm::MemoryBuffer *completionBuffer,
-                            unsigned int Offset, DiagnosticConsumer *DiagC);
+  bool performCachedOperaitonIfPossible(
+      const swift::CompilerInvocation &Invocation, llvm::hash_code ArgsHash,
+      llvm::MemoryBuffer *completionBuffer, unsigned int Offset,
+      DiagnosticConsumer *DiagC,
+      llvm::function_ref<void(CompilerInstance &)> Callback);
 
-  /// Returns new \c CompilerInstance for the completion request. Users still
-  /// have to call \c performParseAndResolveImportsOnly() , and perform the
-  /// second pass on it.
-  swift::CompilerInstance *renewCompilerInstance(
+  /// Calls \p Callback with new \c CompilerInstance for the completion
+  /// request. The \c CompilerInstace passed to the callback already performed
+  /// the first pass.
+  /// Returns \c false if it fails to setup the \c CompilerInstance.
+  bool performNewOperation(
       swift::CompilerInvocation &Invocation, llvm::hash_code ArgsHash,
       llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
       llvm::MemoryBuffer *completionBuffer, unsigned int Offset,
-      std::string &Error, DiagnosticConsumer *DiagC);
+      std::string &Error, DiagnosticConsumer *DiagC,
+      llvm::function_ref<void(CompilerInstance &)> Callback);
 
 public:
   void setEnableASTCaching(bool Flag) { EnableASTCaching = Flag; }
 
-  /// Returns \C CompilerInstance for the completion request. Users can check if
-  /// it's cached or not by 'hasPersistentParserState()'.
+  /// Calls \p Callback with a \c CompilerInstance which is prepared for the
+  /// second pass. \p Callback is resposible to perform the second pass on it.
+  /// The \c CompilerInstance may be reused from the previous completions,
+  /// and may be cached for the next completion.
+  /// Return \c true if \p is successfully called, \c it fails. In failure
+  /// cases \p Error is populated with an error message.
   ///
   /// NOTE: \p Args is only used for checking the equaity of the invocation.
   /// Since this function assumes that it is already normalized, exact the same
   /// arguments including their order is considered as the same invocation.
-  swift::CompilerInstance *getCompilerInstance(
-      swift::CompilerInvocation &Invocation,
-      llvm::ArrayRef<const char *> Args,
-      llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
-      llvm::MemoryBuffer *completionBuffer, unsigned int Offset,
-      std::string &Error, DiagnosticConsumer *DiagC);
+  bool
+  performOperation(swift::CompilerInvocation &Invocation,
+                   llvm::ArrayRef<const char *> Args,
+                   llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
+                   llvm::MemoryBuffer *completionBuffer, unsigned int Offset,
+                   std::string &Error, DiagnosticConsumer *DiagC,
+                   llvm::function_ref<void(CompilerInstance &)> Callback);
 };
 
 } // namespace ide
