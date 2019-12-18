@@ -17,6 +17,7 @@
 
 #include "CodeSynthesis.h"
 #include "TypeChecker.h"
+#include "TypeCheckAvailability.h"
 #include "TypeCheckDecl.h"
 #include "TypeCheckType.h"
 #include "swift/AST/ASTContext.h"
@@ -694,7 +695,20 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
     // Perform accesses to the wrappedValues along the composition chain.
     for (unsigned i : range(firstWrapperIdx, lastWrapperIdx)) {
       auto wrapperInfo = var->getAttachedPropertyWrapperTypeInfo(i);
-      underlyingVars.push_back(wrapperInfo.valueVar);
+      auto wrappedValue = wrapperInfo.valueVar;
+
+      // Check for availability of wrappedValue.
+      if (accessor->getAccessorKind() == AccessorKind::Get ||
+          accessor->getAccessorKind() == AccessorKind::Read) {
+        if (auto *attr = wrappedValue->getAttrs().getUnavailable(ctx)) {
+          diagnoseExplicitUnavailability(
+              wrappedValue,
+              var->getAttachedPropertyWrappers()[i]->getRangeWithAt(),
+              var->getDeclContext(), nullptr);
+        }
+      }
+
+      underlyingVars.push_back(wrappedValue);
     }
     semantics = AccessSemantics::DirectToStorage;
     selfAccessKind = SelfAccessorKind::Peer;
