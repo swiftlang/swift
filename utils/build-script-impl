@@ -1295,7 +1295,7 @@ function common_cross_c_flags() {
         android-armv7)
             echo -n " -arch armv7"
             ;;
-        android-arm64)
+        android-aarch64)
             echo -n " -arch aarch64"
             ;;
     esac
