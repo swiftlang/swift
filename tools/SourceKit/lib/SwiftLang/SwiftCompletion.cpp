@@ -124,82 +124,23 @@ static bool swiftCodeCompleteImpl(
     ArrayRef<const char *> Args,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
     std::string &Error) {
-  assert(FileSystem);
+  return Lang.performCompletionLikeOperation(
+      UnresolvedInputFile, Offset, Args, FileSystem, Error,
+      [&](CompilerInstance &CI) {
+        // Create a factory for code completion callbacks that will feed the
+        // Consumer.
+        auto swiftCache = Lang.getCodeCompletionCache(); // Pin the cache.
+        ide::CodeCompletionContext CompletionContext(swiftCache->getCache());
+        std::unique_ptr<CodeCompletionCallbacksFactory> callbacksFactory(
+            ide::makeCodeCompletionCallbacksFactory(CompletionContext,
+                                                    SwiftConsumer));
 
-  // Resolve symlinks for the input file; we resolve them for the input files
-  // in the arguments as well.
-  // FIXME: We need the Swift equivalent of Clang's FileEntry.
-  llvm::SmallString<128> bufferIdentifier;
-  if (auto err = FileSystem->getRealPath(
-          UnresolvedInputFile->getBufferIdentifier(), bufferIdentifier))
-    bufferIdentifier = UnresolvedInputFile->getBufferIdentifier();
-
-  // Create a buffer for code completion. This contains '\0' at 'Offset'
-  // position of 'UnresolvedInputFile' buffer.
-  auto origOffset = Offset;
-  auto newBuffer = ide::makeCodeCompletionMemoryBuffer(
-      UnresolvedInputFile, Offset, bufferIdentifier);
-
-  SourceManager SM;
-  DiagnosticEngine Diags(SM);
-  PrintingDiagnosticConsumer PrintDiags;
-  EditorDiagConsumer TraceDiags;
-  trace::TracedOperation TracedOp{trace::OperationKind::CodeCompletion};
-
-  Diags.addConsumer(PrintDiags);
-  if (TracedOp.enabled()) {
-    Diags.addConsumer(TraceDiags);
-    trace::SwiftInvocation SwiftArgs;
-    trace::initTraceInfo(SwiftArgs, bufferIdentifier, Args);
-    TracedOp.setDiagnosticProvider(
-        [&](SmallVectorImpl<DiagnosticEntryInfo> &diags) {
-          TraceDiags.getAllDiagnostics(diags);
-        });
-    TracedOp.start(
-        SwiftArgs,
-        {std::make_pair("OriginalOffset", std::to_string(origOffset)),
-         std::make_pair("Offset", std::to_string(Offset))});
-  }
-  ForwardingDiagnosticConsumer CIDiags(Diags);
-
-  CompilerInvocation Invocation;
-  bool Failed = Lang.getASTManager()->initCompilerInvocation(
-      Invocation, Args, Diags, newBuffer->getBufferIdentifier(), FileSystem,
-      Error);
-  if (Failed)
-    return false;
-  if (!Invocation.getFrontendOptions().InputsAndOutputs.hasInputs()) {
-    Error = "no input filenames specified";
-    return false;
-  }
-
-  // Pin completion instance.
-  auto CompletionInst =  Lang.getCompletionInstance();
-  CompilerInstance *CI = CompletionInst->getCompilerInstance(
-      Invocation, Args, FileSystem, newBuffer.get(), Offset, Error, &CIDiags);
-  if (!CI)
-    return false;
-  SWIFT_DEFER { CI->removeDiagnosticConsumer(&CIDiags); };
-
-  // Perform the parsing and completion.
-  if (!CI->hasPersistentParserState())
-    CI->performParseAndResolveImportsOnly();
-
-  // Create a factory for code completion callbacks that will feed the
-  // Consumer.
-  auto swiftCache = Lang.getCodeCompletionCache(); // Pin the cache.
-  ide::CodeCompletionContext CompletionContext(swiftCache->getCache());
-  std::unique_ptr<CodeCompletionCallbacksFactory> callbacksFactory(
-      ide::makeCodeCompletionCallbacksFactory(CompletionContext,
-                                              SwiftConsumer));
-
-  SwiftConsumer.setContext(&CI->getASTContext(), &CI->getInvocation(),
-                           &CompletionContext);
-  performCodeCompletionSecondPass(CI->getPersistentParserState(),
-                                  *callbacksFactory);
-  SwiftConsumer.clearContext();
-
-  return true;
+        SwiftConsumer.setContext(&CI.getASTContext(), &CI.getInvocation(),
+                                 &CompletionContext);
+        performCodeCompletionSecondPass(CI.getPersistentParserState(),
+                                        *callbacksFactory);
+        SwiftConsumer.clearContext();
+      });
 }
 
 static void translateCodeCompletionOptions(OptionsDictionary &from,

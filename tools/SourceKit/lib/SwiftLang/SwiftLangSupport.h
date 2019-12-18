@@ -436,6 +436,16 @@ public:
   /// returns the original path;
   static std::string resolvePathSymlinks(StringRef FilePath);
 
+  /// Perform a completion like operation. It initializes a \c CompilerInstance,
+  /// the calls \p Callback with it. \p Callback must perform the second pass
+  /// using that instance.
+  bool performCompletionLikeOperation(
+      llvm::MemoryBuffer *UnresolvedInputFile, unsigned Offset,
+      ArrayRef<const char *> Args,
+      llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
+      std::string &Error,
+      llvm::function_ref<void(swift::CompilerInstance &)> Callback);
+
   //==========================================================================//
   // LangSupport Interface
   //==========================================================================//

@@ -129,38 +129,40 @@ static DeclContext *getEquivalentDeclContextFromSourceFile(DeclContext *DC,
 
 } // namespace
 
-CompilerInstance *CompletionInstance::getCachedCompilerInstance(
+bool CompletionInstance::performCachedOperaitonIfPossible(
     const swift::CompilerInvocation &Invocation, llvm::hash_code ArgsHash,
     llvm::MemoryBuffer *completionBuffer, unsigned int Offset,
-    DiagnosticConsumer *DiagC) {
+    DiagnosticConsumer *DiagC,
+    llvm::function_ref<void(CompilerInstance &)> Callback) {
+
   if (!EnableASTCaching)
-    return nullptr;
+    return false;
 
-  if (CurrentASTReuseCount >= MaxASTReuseCount) {
-    CurrentASTReuseCount = 0;
-    return nullptr;
-  }
+  // Temporary move the CI so other threads don't use the same instance.
+  std::shared_ptr<CompilerInstance> CI;
+  CI.swap(CachedCI);
 
-  if (!CachedCI)
-    return nullptr;
-
+  if (!CI)
+    return false;
+  if (CurrentASTReuseCount >= MaxASTReuseCount)
+    return false;
   if (ArgsHash != CachedArgsHash)
-    return nullptr;
+    return false;
 
-  auto &oldState = CachedCI->getPersistentParserState();
+  auto &oldState = CI->getPersistentParserState();
   if (!oldState.hasCodeCompletionDelayedDeclState())
-    return nullptr;
+    return false;
 
-  auto &SM = CachedCI->getSourceMgr();
+  auto &SM = CI->getSourceMgr();
   if (SM.getIdentifierForBuffer(SM.getCodeCompletionBufferID()) !=
       completionBuffer->getBufferIdentifier())
-    return nullptr;
+    return false;
 
   auto &oldInfo = oldState.getCodeCompletionDelayedDeclState();
 
   // Currently, only completions within a function body is supported.
   if (oldInfo.Kind != CodeCompletionDelayedDeclKind::FunctionBody)
-    return nullptr;
+    return false;
 
   auto newBufferID = SM.addMemBufferCopy(completionBuffer);
   SM.setCodeCompletionPoint(newBufferID, Offset);
@@ -185,13 +187,13 @@ CompilerInstance *CompletionInstance::getCachedCompilerInstance(
   parseIntoSourceFileFull(*newSF, BufferID, &newState);
   // Couldn't find any completion token?
   if (!newState.hasCodeCompletionDelayedDeclState())
-    return nullptr;
+    return false;
 
   auto &newInfo = newState.getCodeCompletionDelayedDeclState();
 
   // The new completion must happens in function body too.
   if (newInfo.Kind != CodeCompletionDelayedDeclKind::FunctionBody)
-    return nullptr;
+    return false;
 
   auto *oldSF = oldInfo.ParentContext->getParentSourceFile();
 
@@ -201,12 +203,12 @@ CompilerInstance *CompletionInstance::getCachedCompilerInstance(
   oldSF->getInterfaceHash(oldInterfaceHash);
   newSF->getInterfaceHash(newInterfaceHash);
   if (oldInterfaceHash != newInterfaceHash)
-    return nullptr;
+    return false;
 
   DeclContext *DC =
       getEquivalentDeclContextFromSourceFile(newInfo.ParentContext, oldSF);
   if (!DC)
-    return nullptr;
+    return false;
 
   // OK, we can perform fast completion for this. Update the orignal delayed
   // decl state.
@@ -228,28 +230,33 @@ CompilerInstance *CompletionInstance::getCachedCompilerInstance(
   if (AFD->isBodySkipped())
     AFD->setBodyDelayed(AFD->getBodySourceRange());
   if (DiagC)
-    CachedCI->addDiagnosticConsumer(DiagC);
+    CI->addDiagnosticConsumer(DiagC);
 
-  CachedCI->getDiags().diagnose(
-      SM.getLocForOffset(BufferID, newInfo.StartOffset),
-      diag::completion_reusing_astcontext);
+  CI->getDiags().diagnose(SM.getLocForOffset(BufferID, newInfo.StartOffset),
+                          diag::completion_reusing_astcontext);
 
+  Callback(*CI);
+
+  if (DiagC)
+    CI->removeDiagnosticConsumer(DiagC);
+
+  CachedCI.swap(CI);
+  CachedArgsHash = ArgsHash;
   CurrentASTReuseCount += 1;
 
-  return CachedCI.get();
+  return true;
 }
 
-CompilerInstance *CompletionInstance::renewCompilerInstance(
+bool CompletionInstance::performNewOperation(
     swift::CompilerInvocation &Invocation, llvm::hash_code ArgsHash,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
     llvm::MemoryBuffer *completionBuffer, unsigned int Offset,
-    std::string &Error, DiagnosticConsumer *DiagC) {
+    std::string &Error, DiagnosticConsumer *DiagC,
+    llvm::function_ref<void(CompilerInstance &)> Callback) {
   CachedCI.reset();
-  CachedCI = std::make_unique<CompilerInstance>();
-  CachedArgsHash = ArgsHash;
-  auto *CI = CachedCI.get();
+  auto CI = std::make_shared<CompilerInstance>();
   if (DiagC)
-    CachedCI->addDiagnosticConsumer(DiagC);
+    CI->addDiagnosticConsumer(DiagC);
 
   if (FileSystem != llvm::vfs::getRealFileSystem())
     CI->getSourceMgr().setFileSystem(FileSystem);
@@ -258,18 +265,31 @@ CompilerInstance *CompletionInstance::renewCompilerInstance(
 
   if (CI->setup(Invocation)) {
     Error = "failed to setup compiler instance";
-    return nullptr;
+    return false;
   }
   registerIDERequestFunctions(CI->getASTContext().evaluator);
 
-  return CI;
+  CI->performParseAndResolveImportsOnly();
+  Callback(*CI);
+
+  if (DiagC)
+    CI->removeDiagnosticConsumer(DiagC);
+
+  if (EnableASTCaching) {
+    CachedCI.swap(CI);
+    CachedArgsHash = ArgsHash;
+    CurrentASTReuseCount = 0;
+  }
+
+  return true;
 }
 
-CompilerInstance *swift::ide::CompletionInstance::getCompilerInstance(
+bool swift::ide::CompletionInstance::performOperation(
     swift::CompilerInvocation &Invocation, llvm::ArrayRef<const char *> Args,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
     llvm::MemoryBuffer *completionBuffer, unsigned int Offset,
-    std::string &Error, DiagnosticConsumer *DiagC) {
+    std::string &Error, DiagnosticConsumer *DiagC,
+    llvm::function_ref<void(CompilerInstance &)> Callback) {
 
   // Always disable source location resolutions from .swiftsourceinfo file
   // because they're somewhat heavy operations and aren't needed for completion.
@@ -287,15 +307,14 @@ CompilerInstance *swift::ide::CompletionInstance::getCompilerInstance(
   for (auto arg : Args)
     ArgsHash = llvm::hash_combine(ArgsHash, StringRef(arg));
 
-  if (auto *cached = getCachedCompilerInstance(Invocation, ArgsHash,
-                                               completionBuffer, Offset, DiagC))
-    return cached;
+  if (performCachedOperaitonIfPossible(Invocation, ArgsHash, completionBuffer,
+                                       Offset, DiagC, Callback))
+    return true;
 
-  if (auto *renewed =
-          renewCompilerInstance(Invocation, ArgsHash, FileSystem,
-                                completionBuffer, Offset, Error, DiagC))
-    return renewed;
+  if (performNewOperation(Invocation, ArgsHash, FileSystem, completionBuffer,
+                          Offset, Error, DiagC, Callback))
+    return true;
 
   assert(!Error.empty());
-  return nullptr;
+  return false;
 }

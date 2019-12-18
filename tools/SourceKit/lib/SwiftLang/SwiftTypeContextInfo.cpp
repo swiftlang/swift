@@ -31,71 +31,17 @@ static bool swiftTypeContextInfoImpl(
     ArrayRef<const char *> Args,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
     std::string &Error) {
+  return Lang.performCompletionLikeOperation(
+      UnresolvedInputFile, Offset, Args, FileSystem, Error,
+      [&](CompilerInstance &CI) {
+        // Create a factory for code completion callbacks that will feed the
+        // Consumer.
+        std::unique_ptr<CodeCompletionCallbacksFactory> callbacksFactory(
+            ide::makeTypeContextInfoCallbacksFactory(Consumer));
 
-  // Resolve symlinks for the input file.
-  llvm::SmallString<128> bufferIdentifier;
-  if (auto err = FileSystem->getRealPath(
-          UnresolvedInputFile->getBufferIdentifier(), bufferIdentifier))
-    bufferIdentifier = UnresolvedInputFile->getBufferIdentifier();
-
-  auto origOffset = Offset;
-  auto newBuffer = ide::makeCodeCompletionMemoryBuffer(
-      UnresolvedInputFile, Offset, bufferIdentifier);
-
-  SourceManager SM;
-  DiagnosticEngine Diags(SM);
-  PrintingDiagnosticConsumer PrintDiags;
-  EditorDiagConsumer TraceDiags;
-  trace::TracedOperation TracedOp{trace::OperationKind::CodeCompletion};
-
-  Diags.addConsumer(PrintDiags);
-  if (TracedOp.enabled()) {
-    Diags.addConsumer(TraceDiags);
-    trace::SwiftInvocation SwiftArgs;
-    trace::initTraceInfo(SwiftArgs, bufferIdentifier, Args);
-    TracedOp.setDiagnosticProvider(
-        [&](SmallVectorImpl<DiagnosticEntryInfo> &diags) {
-          TraceDiags.getAllDiagnostics(diags);
-        });
-    TracedOp.start(
-        SwiftArgs,
-        {std::make_pair("OriginalOffset", std::to_string(origOffset)),
-         std::make_pair("Offset", std::to_string(Offset))});
-  }
-  ForwardingDiagnosticConsumer CIDiags(Diags);
-
-  CompilerInvocation Invocation;
-  bool Failed = Lang.getASTManager()->initCompilerInvocation(
-      Invocation, Args, Diags, newBuffer->getBufferIdentifier(), FileSystem,
-      Error);
-  if (Failed)
-    return false;
-  if (!Invocation.getFrontendOptions().InputsAndOutputs.hasInputs()) {
-    Error = "no input filenames specified";
-    return false;
-  }
-
-  // Pin completion instance.
-  auto CompletionInst =  Lang.getCompletionInstance();
-  CompilerInstance *CI = CompletionInst->getCompilerInstance(
-      Invocation, Args, FileSystem, newBuffer.get(), Offset, Error, &CIDiags);
-  if (!CI)
-    return false;
-  SWIFT_DEFER { CI->removeDiagnosticConsumer(&CIDiags); };
-
-  // Perform the parsing and completion.
-  if (!CI->hasPersistentParserState())
-    CI->performParseAndResolveImportsOnly();
-
-  // Create a factory for code completion callbacks that will feed the
-  // Consumer.
-  std::unique_ptr<CodeCompletionCallbacksFactory> callbacksFactory(
-      ide::makeTypeContextInfoCallbacksFactory(Consumer));
-
-  performCodeCompletionSecondPass(CI->getPersistentParserState(),
-                                  *callbacksFactory);
-
-  return true;
+        performCodeCompletionSecondPass(CI.getPersistentParserState(),
+                                        *callbacksFactory);
+      });
 }
 
 void SwiftLangSupport::getExpressionContextInfo(
