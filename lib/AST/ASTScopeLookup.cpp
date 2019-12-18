@@ -39,7 +39,7 @@ using namespace ast_scope;
 static bool isLocWithinAnInactiveClause(const SourceLoc loc, SourceFile *SF);
 
 llvm::SmallVector<const ASTScopeImpl *, 0> ASTScopeImpl::unqualifiedLookup(
-    SourceFile *sourceFile, const DeclName name, const SourceLoc loc,
+    SourceFile *sourceFile, const DeclNameRef name, const SourceLoc loc,
     const DeclContext *const startingContext, DeclConsumer consumer) {
   SmallVector<const ASTScopeImpl *, 0> history;
   const auto *start =
@@ -50,7 +50,7 @@ llvm::SmallVector<const ASTScopeImpl *, 0> ASTScopeImpl::unqualifiedLookup(
 }
 
 const ASTScopeImpl *ASTScopeImpl::findStartingScopeForLookup(
-    SourceFile *sourceFile, const DeclName name, const SourceLoc loc,
+    SourceFile *sourceFile, const DeclNameRef name, const SourceLoc loc,
     const DeclContext *const startingContext) {
   // At present, use legacy code in unqualifiedLookup.cpp to handle module-level
   // lookups

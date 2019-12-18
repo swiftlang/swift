@@ -919,7 +919,7 @@ bool IndexSwiftASTWalker::reportRelatedTypeRef(const TypeLoc &Ty, SymbolRoleSet 
 
   if (auto *T = dyn_cast_or_null<IdentTypeRepr>(Ty.getTypeRepr())) {
     auto Comps = T->getComponentRange();
-    SourceLoc IdLoc = Comps.back()->getIdLoc();
+    SourceLoc IdLoc = Comps.back()->getLoc();
     NominalTypeDecl *NTD = nullptr;
     bool isImplicit = false;
     if (auto *VD = Comps.back()->getBoundDecl()) {

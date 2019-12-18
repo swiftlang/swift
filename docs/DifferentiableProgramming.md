@@ -72,6 +72,7 @@ Backticks were added manually.
             *   [Upcasting to non-`@differentiable` functions](#upcasting-to-non-differentiable-functions)
         *   [Implied generic constraints](#implied-generic-constraints)
         *   [Non-differentiable parameters](#non-differentiable-parameters)
+        *   [Higher-order functions and currying](#higher-order-functions-and-currying)
     *   [Differential operators](#differential-operators)
         *   [Differential-producing differential operators](#differential-producing-differential-operators)
         *   [Pullback-producing differential operators](#pullback-producing-differential-operators)
@@ -88,7 +89,6 @@ Backticks were added manually.
         *   [Convolutional neural networks (CNN)](#convolutional-neural-networks-cnn)
         *   [Recurrent neural networks (RNN)](#recurrent-neural-networks-rnn)
 *   [Future directions](#future-directions)
-    *   [Differentiation of higher-order functions](#differentiation-of-higher-order-functions)
     *   [Higher-order differentiation](#higher-order-differentiation)
     *   [Naming conventions for numerical computing](#naming-conventions-for-numerical-computing)
 *   [Source compatibility](#source-compatibility)
@@ -1452,8 +1452,11 @@ making the other function linear.
 
 A protocol requirement or class method/property/subscript can be made
 differentiable via a derivative function or transpose function defined in an
-extension. A dispatched call to such a member can be differentiated even if the
-concrete implementation is not differentiable.
+extension. When a protocol requirement is not marked with `@differentiable` but
+has been made differentiable by a `@derivative` or `@transpose` declaration in a
+protocol extension, a dispatched call to such a member can be differentiated,
+and the derivative or transpose is always the one provided in the protocol
+extension.
 
 #### Linear maps
 
@@ -1696,48 +1699,49 @@ public protocol ElementaryFunctions {
     ...
 }
 
-public extension ElementaryFunctions where Self: Differentiable, Self == Self.TangentVector {
+public extension ElementaryFunctions
+where Self: Differentiable & FloatingPoint, Self == Self.TangentVector {
     @inlinable
     @derivative(of: sqrt)
-    func _(_ x: Self) -> (value: Self, differential: @differential(linear) (Self) -> Self) {
+    static func _(_ x: Self) -> (value: Self, differential: @differentiable(linear) (Self) -> Self) {
         (sqrt(x), { dx in (1 / 2) * (1 / sqrt(x)) * dx })
     }
 
     @inlinable
     @derivative(of: cos)
-    func _(_ x: Self) -> (value: Self, differential: @differential(linear) (Self) -> Self) {
+    static func _(_ x: Self) -> (value: Self, differential: @differentiable(linear) (Self) -> Self) {
         (cos(x), { dx in -sin(x) * dx })
     }
 
     @inlinable
     @derivative(of: asinh)
-    func _(_ x: Self) -> (value: Self, differential: @differential(linear) (Self) -> Self) {
+    static func _(_ x: Self) -> (value: Self, differential: @differentiable(linear) (Self) -> Self) {
         (asinh(x), { dx in 1 / (1 + x * x) * dx })
     }
 
     @inlinable
     @derivative(of: exp)
-    func _(_ x: Self) -> (value: Self, differential: @differential(linear) (Self) -> Self) {
+    static func _(_ x: Self) -> (value: Self, differential: @differentiable(linear) (Self) -> Self) {
         let ret = exp(x)
         return (ret, { dx in ret * dx })
     }
 
     @inlinable
     @derivative(of: exp10)
-    func _(_ x: Self) -> (value: Self, differential: @differential(linear) (Self) -> Self) {
+    static func _(_ x: Self) -> (value: Self, differential: @differentiable(linear) (Self) -> Self) {
         let ret = exp10(x)
         return (ret, { dx in exp(10) * ret * dx })
     }
 
     @inlinable
     @derivative(of: log)
-    func _(_ x: Self) -> (value: Self, differential: @differential(linear) (Self) -> Self) { dx in
-        (log(x), { 1 / x * dx })
+    static func _(_ x: Self) -> (value: Self, differential: @differentiable(linear) (Self) -> Self) {
+        (log(x), { dx in 1 / x * dx })
     }
 
     @inlinable
     @derivative(of: pow)
-    func _(_ x: Self, _ y: Self) -> (value: Self, differential: @differential(linear) (Self, Self) -> Self) {
+    static func _(_ x: Self, _ y: Self) -> (value: Self, differential: @differentiable(linear) (Self, Self) -> Self) {
         (pow(x, y), { (dx, dy) in
             let l = y * pow(x, y-1) * dx
             let r = pow(x, y) * log(x) * dy
@@ -1747,6 +1751,73 @@ public extension ElementaryFunctions where Self: Differentiable, Self == Self.Ta
 
     ...
 }
+```
+
+#### Default derivatives
+
+In a protocol extension, class definition, or class extension, providing a
+derivative or transpose for a protocol extension or a non-final class member is
+considered as providing a default derivative for that member. Types that conform
+to the protocol or inherit from the class can inherit the default derivative.
+
+If the original member does not have a `@differentiable` attribute, a default
+derivative is implicitly added to all conforming/overriding implementations.
+
+```swift
+protocol P {
+    func foo(_ x: Float) -> Float
+}
+
+extension P {
+    @derivative(of: foo(x:))
+    func _(_ x: Float) -> (value: Float, differential: (Float) -> Float) {
+        (value: foo(x), differential: { _ in 42 })
+    }
+}
+
+struct S: P {
+    func foo(_ x: Float) -> Float {
+        33
+    }
+}
+
+let s = S()
+let d = derivative(at: 0) { x in
+   s.foo(x)
+} // ==> 42
+```
+
+When a protocol requirement or class member is marked with `@differentiable`, it
+is considered as a _differentiability customization point_. This means that all
+conforming/overriding implementation must provide a corresponding
+`@differentiable` attribute, which causes the implementation to be
+differentiated. To inherit the default derivative without differentiating the
+implementation, add `default` to the `@differentiable` attribute.
+
+```swift
+protocol P {
+    @differentiable
+    func foo(_ x: Float) -> Float
+}
+
+extension P {
+    @derivative(of: foo(x:))
+    func _(_ x: Float) -> (value: Float, differential: (Float) -> Float) {
+        (value: foo(x), differential: { _ in 42 })
+    }
+}
+
+struct S: P {
+    @differentiable(default) // Inherits default derivative for `P.foo(_:)`.
+    func foo(_ x: Float) -> Float {
+        33
+    }
+}
+
+let s = S()
+let d = derivative(at: 0) { x in
+   s.foo(x)
+} // ==> 42
 ```
 
 ### Differentiable function types
@@ -2002,6 +2073,43 @@ _ = f0 as @differentiable (@noDerivative Float, Float) -> Float
 _ = f0 as @differentiable (@noDerivative Float, @noDerivative Float) -> Float
 ```
 
+#### Higher-order functions and currying
+
+As defined above, the `@differentiable` function type attributes requires all
+non-`@noDerivative` arguments and results to conform to the `@differentiable`
+attribute. However, there is one exception: when the type of an argument or
+result is a function type, e.g. `@differentiable (T) -> @differentiable (U) ->
+V`. This is because we need to differentiate higher-order funtions.
+
+Mathematically, the differentiability of `@differentiable (T, U) -> V` is
+similar to that of `@differentiable (T) -> @differentiable (U) -> V` in that
+differentiating either one will provide derivatives with respect to parameters
+`T` and `U`. Here are some examples of first-order function types and their
+corresponding curried function types:
+
+| First-order function type                   | Curried function type                             |
+|---------------------------------------------|---------------------------------------------------|
+| `@differentiable (T, U) -> V`               | `@differentiable (T) -> @differentiable (U) -> V` |
+| `@differentiable (T, @noDerivative U) -> V` | `@differentiable (T) -> (U) -> V`                 |
+| `@differentiable (@noDerivative T, U) -> V` | `(T) -> @differentiable (U) -> V`                 |
+
+A curried differentiable function can be formed like any curried
+non-differentiable function in Swift.
+
+```swift
+func curry<T, U, V>(
+    _ f: @differentiable (T, U) -> V
+) -> @differentiable (T) -> @differentiable (U) -> V {
+    { x in { y in f(x, y) } }
+}
+```
+
+The way this works is that the compiler internally assigns a tangent bundle to a
+closure that captures variables. This tangent bundle is existentially typed,
+because closure contexts are type-erased in Swift. The theory behind the typing
+rules has been published as [The Differentiable
+Curry](https://www.semanticscholar.org/paper/The-Differentiable-Curry-Plotkin-Brain/187078bfb159c78cc8c78c3bbe81a9176b3a6e02).
+
 ### Differential operators
 
 The core differentiation APIs are the differential operators. Differential
@@ -2021,7 +2129,7 @@ func valueWithDifferential<T, R>(
 ) -> (value: R,
       differential: @differentiable(linear) (T.TangentVector) -> R.TangentVector) {
     // Compiler built-in.
-    Builtin.autodiffApply_jvp_arity1(body, x)
+    Builtin.applyDerivative_arity1(body, x)
 }
 
 
@@ -2030,7 +2138,7 @@ func transpose<T, R>(
     of body: @escaping @differentiable(linear) (T) -> R
 ) -> @differentiable(linear) (R) -> T {
     // Compiler built-in.
-    { x in Builtin.autodiffApply_transpose(body, x) }
+    { x in Builtin.applyTranspose_arity1(body, x) }
 }
 ```
 
@@ -2203,13 +2311,13 @@ whether the derivative is always zero and warns the user.
 
 ```swift
 let grad = gradient(at: 1.0) { x in
-    3.squareRoot()
+    Double(3).squareRoot()
 }
 ```
 
 ```console
-test.swift:4:18: warning: result does not depend on differentiation arguments and will always have a zero derivative; do you want to add '.withoutDerivative()' to make it explicit?
-    3.squareRoot()
+test.swift:4:18: warning: result does not depend on differentiation arguments and will always have a zero derivative; do you want to use 'withoutDerivative(at:)' to make it explicit?
+    Double(3).squareRoot()
     ^
     withoutDerivative(at:)
 ```
@@ -2456,30 +2564,6 @@ typealias LSTM<Scalar: TensorFlowFloatingPoint> = RNN<LSTMCell<Scalar>>
 
 ## Future directions
 
-### Differentiation of higher-order functions
-
-Mathematically, the differentiability of `@differentiable (T, U) -> V` is
-similar to that of `@differentiable (T) -> @differentiable (U) -> V` in that
-differentiating either one will provide derivatives with respect to parameters
-`T` and `U`.
-
-To form a `@differentiable (T) -> @differentiable (U) -> V`, the most natural
-thing to do is currying, which one might implement as:
-
-```swift
-func curry<T, U, V>(
-    _ f: @differentiable (T, U) -> V
-) -> @differentiable (T) -> @differentiable (U) -> V {
-    { x in { y in f(x, y) } }
-}
-```
-
-However, the compiler does not support currying today due to known
-type-theoretical constraints and implementation complexity regarding
-differentiating a closure with respect to the values it captures. Fortunately,
-we have a formally proven solution in the works, but we would like to defer this
-to a future proposal since it is purely additive to the existing semantics.
-
 ### Higher-order differentiation
 
 Distinct from differentiation of higher-order functions, higher-order
@@ -2528,9 +2612,7 @@ func valueWithDifferential<T: FloatingPoint, U: Differentiable>(
 
 To differentiate `valueWithDifferential`, we need to be able to differentiate
 its return value, a tuple of the original value and the differential, with
-respect to its `x` argument. Since the return type contains a function,
-[differentiation of higher-order functions](#differentiation-of-higher-order-functions)
-is required for differentiating this differential operator.
+respect to its `x` argument.
 
 A kneejerk solution is to differentiate derivative functions generated by the
 differentiation transform at compile-time, but this leads to problems. For

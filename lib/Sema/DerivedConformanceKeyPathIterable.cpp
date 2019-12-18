@@ -82,7 +82,7 @@ deriveBodyKeyPathIterable_allKeyPaths(AbstractFunctionDecl *funcDecl, void *) {
   auto partialKeyPathType =
       parentDC->mapTypeIntoContext(partialKeyPathInterfaceType);
 
-  auto *nominalTypeExpr = TypeExpr::createForDecl(SourceLoc(), nominal,
+  auto *nominalTypeExpr = TypeExpr::createForDecl(DeclNameLoc(), nominal,
                                                   funcDecl, /*Implicit*/ true);
 
   // Create array of key path expressions to stored properties.
@@ -96,7 +96,8 @@ deriveBodyKeyPathIterable_allKeyPaths(AbstractFunctionDecl *funcDecl, void *) {
         continue;
 
     auto *dotExpr = new (C)
-        UnresolvedDotExpr(nominalTypeExpr, SourceLoc(), member->getFullName(),
+        UnresolvedDotExpr(nominalTypeExpr, SourceLoc(),
+                          DeclNameRef(member->getFullName()),
                           DeclNameLoc(), /*Implicit*/ true);
     Expr *keyPathExpr =
         new (C) KeyPathExpr(SourceLoc(), dotExpr, nullptr, /*Implicit*/ true);

@@ -1302,6 +1302,10 @@ extension ${Self} : VectorProtocol {
   }
 }
 
+//===----------------------------------------------------------------------===//
+// EuclideanDifferentiable Conformance
+//===----------------------------------------------------------------------===//
+
 extension ${Self} : EuclideanDifferentiable {
   public typealias TangentVector = ${Self}
 

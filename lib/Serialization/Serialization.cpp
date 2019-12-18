@@ -2029,7 +2029,6 @@ static uint8_t getRawStableVarDeclIntroducer(swift::VarDecl::Introducer intr) {
   llvm_unreachable("bad variable decl introducer kind");
 }
 
-// SWIFT_ENABLE_TENSORFLOW
 /// Translate from the AST derivative function kind enum to the Serialization
 /// enum values, which are guaranteed to be stable.
 static uint8_t getRawStableAutoDiffDerivativeFunctionKind(
@@ -2042,7 +2041,6 @@ static uint8_t getRawStableAutoDiffDerivativeFunctionKind(
   }
   llvm_unreachable("bad derivative function kind");
 }
-// SWIFT_ENABLE_TENSORFLOW END
 
 /// Returns true if the declaration of \p decl depends on \p problemContext
 /// based on lexical nesting.
@@ -2371,8 +2369,8 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       return;
     }
 
-    // SWIFT_ENABLE_TENSORFLOW
     case DAK_Derivative:
+    // SWIFT_ENABLE_TENSORFLOW
     case DAK_Differentiating: {
       auto abbrCode = S.DeclTypeAbbrCodes[DerivativeDeclAttrLayout::Code];
       auto *attr = cast<DerivativeAttr>(DA);
@@ -2384,17 +2382,18 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       DeclID origDeclID = S.addDeclRef(attr->getOriginalFunction());
       auto derivativeKind =
           getRawStableAutoDiffDerivativeFunctionKind(attr->getDerivativeKind());
-      auto paramIndices = attr->getParameterIndices();
-      assert(paramIndices && "Parameter indices must be resolved");
+      auto *parameterIndices = attr->getParameterIndices();
+      assert(parameterIndices && "Parameter indices must be resolved");
       SmallVector<bool, 4> indices;
-      for (unsigned i : range(paramIndices->getCapacity()))
-        indices.push_back(paramIndices->contains(i));
+      for (unsigned i : range(parameterIndices->getCapacity()))
+        indices.push_back(parameterIndices->contains(i));
       DerivativeDeclAttrLayout::emitRecord(
           S.Out, S.ScratchRecord, abbrCode, attr->isImplicit(), origNameId,
           origDeclID, derivativeKind, indices);
       return;
     }
 
+    // SWIFT_ENABLE_TENSORFLOW
     case DAK_Transpose: {
       auto abbrCode = S.DeclTypeAbbrCodes[TransposeDeclAttrLayout::Code];
       auto *attr = cast<TransposeAttr>(DA);
@@ -2425,6 +2424,14 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       return;
     }
     // SWIFT_ENABLE_TENSORFLOW END
+
+    case DAK_ImplicitlySynthesizesNestedRequirement: {
+      auto *theAttr = cast<ImplicitlySynthesizesNestedRequirementAttr>(DA);
+      auto abbrCode = S.DeclTypeAbbrCodes[ImplicitlySynthesizesNestedRequirementDeclAttrLayout::Code];
+      ImplicitlySynthesizesNestedRequirementDeclAttrLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+                                                          theAttr->Value);
+      return;
+    }
     }
   }
 
@@ -4169,7 +4176,10 @@ public:
         stableRepresentation, fnTy->isPseudogeneric(), fnTy->isNoEscape(),
         stableDiffKind, fnTy->hasErrorResult(), fnTy->getParameters().size(),
         fnTy->getNumYields(), fnTy->getNumResults(),
-        S.addGenericSignatureRef(sig), variableData);
+        fnTy->isGenericSignatureImplied(),
+        S.addGenericSignatureRef(sig),
+        S.addSubstitutionMapRef(fnTy->getSubstitutions()),
+        variableData);
 
     if (auto conformance = fnTy->getWitnessMethodConformanceOrInvalid())
       S.writeConformance(conformance, S.DeclTypeAbbrCodes);

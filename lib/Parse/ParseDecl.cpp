@@ -758,7 +758,7 @@ Parser::parseImplementsAttribute(SourceLoc AtLoc, SourceLoc Loc) {
   SourceLoc lParenLoc = consumeToken();
 
   DeclNameLoc MemberNameLoc;
-  DeclName MemberName;
+  DeclNameRef MemberName;
   ParserResult<TypeRepr> ProtocolType;
   {
     SyntaxParsingContext ContentContext(
@@ -799,9 +799,12 @@ Parser::parseImplementsAttribute(SourceLoc AtLoc, SourceLoc Loc) {
     return Status;
   }
 
+  // FIXME(ModQual): Reject module qualification on MemberName.
+
   return ParserResult<ImplementsAttr>(
     ImplementsAttr::create(Context, AtLoc, SourceRange(Loc, rParenLoc),
-                           ProtocolType.get(), MemberName, MemberNameLoc));
+                           ProtocolType.get(), MemberName.getFullName(),
+                           MemberNameLoc));
 }
 
 /// Parse a `@differentiable` attribute, returning true on error.
@@ -822,8 +825,8 @@ Parser::parseDifferentiableAttribute(SourceLoc atLoc, SourceLoc loc) {
   SourceLoc lParenLoc = loc, rParenLoc = loc;
   bool linear = false;
   SmallVector<ParsedAutoDiffParameter, 8> params;
-  Optional<DeclNameWithLoc> jvpSpec;
-  Optional<DeclNameWithLoc> vjpSpec;
+  Optional<DeclNameRefWithLoc> jvpSpec;
+  Optional<DeclNameRefWithLoc> vjpSpec;
   TrailingWhereClause *whereClause = nullptr;
 
   // Parse '('.
@@ -846,7 +849,6 @@ Parser::parseDifferentiableAttribute(SourceLoc atLoc, SourceLoc loc) {
                                  params, jvpSpec, vjpSpec, whereClause));
 }
 
-// SWIFT_ENABLE_TENSORFLOW
 // Attribute parsing error helper.
 // For the given parentheses depth, skip until ')' and consume it if possible.
 // If no ')' is found, produce error.
@@ -957,7 +959,8 @@ bool Parser::parseDifferentiationParametersClause(
 
 bool Parser::parseDifferentiableAttributeArguments(
     bool &linear, SmallVectorImpl<ParsedAutoDiffParameter> &params,
-    Optional<DeclNameWithLoc> &jvpSpec, Optional<DeclNameWithLoc> &vjpSpec,
+    Optional<DeclNameRefWithLoc> &jvpSpec,
+    Optional<DeclNameRefWithLoc> &vjpSpec,
     TrailingWhereClause *&whereClause) {
   StringRef AttrName = "differentiable";
 
@@ -1017,7 +1020,7 @@ bool Parser::parseDifferentiableAttributeArguments(
 
   // Function that parses a label and a function specifier, e.g. 'vjp: foo(_:)'.
   // Return true on error.
-  auto parseFuncSpec = [&](StringRef label, DeclNameWithLoc &result,
+  auto parseFuncSpec = [&](StringRef label, DeclNameRefWithLoc &result,
                            bool &terminateParsingArgs) -> bool {
     // Parse label.
     if (parseSpecificIdentifier(label, diag::attr_missing_label, label,
@@ -1046,7 +1049,7 @@ bool Parser::parseDifferentiableAttributeArguments(
   if (isIdentifier(Tok, "jvp")) {
     SyntaxParsingContext JvpContext(
         SyntaxContext, SyntaxKind::DifferentiableAttributeFuncSpecifier);
-    jvpSpec = DeclNameWithLoc();
+    jvpSpec = DeclNameRefWithLoc();
     if (parseFuncSpec("jvp", *jvpSpec, terminateParsingArgs))
       return errorAndSkipUntilConsumeRightParen(*this, AttrName);
     if (terminateParsingArgs)
@@ -1059,7 +1062,7 @@ bool Parser::parseDifferentiableAttributeArguments(
   if (isIdentifier(Tok, "vjp")) {
     SyntaxParsingContext VjpContext(
         SyntaxContext, SyntaxKind::DifferentiableAttributeFuncSpecifier);
-    vjpSpec = DeclNameWithLoc();
+    vjpSpec = DeclNameRefWithLoc();
     if (parseFuncSpec("vjp", *vjpSpec, terminateParsingArgs))
       return errorAndSkipUntilConsumeRightParen(*this, AttrName);
     if (terminateParsingArgs)
@@ -1088,7 +1091,6 @@ bool Parser::parseDifferentiableAttributeArguments(
   return false;
 }
 
-// SWIFT_ENABLE_TENSORFLOW
 /// Parse a `@derivative(of:)` attribute, returning true on error.
 ///
 /// \verbatim
@@ -1099,7 +1101,7 @@ ParserResult<DerivativeAttr> Parser::parseDerivativeAttribute(SourceLoc atLoc,
                                                               SourceLoc loc) {
   StringRef AttrName = "derivative";
   SourceLoc lParenLoc = loc, rParenLoc = loc;
-  DeclNameWithLoc original;
+  DeclNameRefWithLoc original;
   SmallVector<ParsedAutoDiffParameter, 8> params;
 
   // Parse trailing comma, if it exists, and check for errors.
@@ -1168,7 +1170,7 @@ ParserResult<DerivativeAttr>
 Parser::parseDifferentiatingAttribute(SourceLoc atLoc, SourceLoc loc) {
   StringRef AttrName = "differentiating";
   SourceLoc lParenLoc = loc, rParenLoc = loc;
-  DeclNameWithLoc original;
+  DeclNameRefWithLoc original;
   SmallVector<ParsedAutoDiffParameter, 8> params;
 
   // Parse trailing comma, if it exists, and check for errors.
@@ -1268,8 +1270,9 @@ static bool parseBaseTypeForQualifiedDeclName(Parser &P, TypeRepr *&baseType) {
 ///
 /// Parses an optional base type, followed by a declaration name.
 /// Returns true on error (if function decl name could not be parsed).
-bool parseQualifiedDeclName(Parser &P, Diag<> nameParseError,
-                            TypeRepr *&baseType, DeclNameWithLoc &original) {
+static bool parseQualifiedDeclName(Parser &P, Diag<> nameParseError,
+                                   TypeRepr *&baseType,
+                                   DeclNameRefWithLoc &original) {
   SyntaxParsingContext DeclNameContext(P.SyntaxContext,
                                        SyntaxKind::QualifiedDeclName);
   if (parseBaseTypeForQualifiedDeclName(P, baseType))
@@ -1301,7 +1304,7 @@ ParserResult<TransposeAttr> Parser::parseTransposeAttribute(SourceLoc atLoc,
   StringRef AttrName = "transpose";
   SourceLoc lParenLoc = loc, rParenLoc = loc;
   TypeRepr *baseType;
-  DeclNameWithLoc original;
+  DeclNameRefWithLoc original;
   SmallVector<ParsedAutoDiffParameter, 8> params;
 
   // Parse trailing comma, if it exists, and check for errors.
@@ -1962,6 +1965,43 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
     }
     break;
   }
+
+  case DAK_ImplicitlySynthesizesNestedRequirement: {
+    if (!consumeIf(tok::l_paren)) {
+      diagnose(Loc, diag::attr_expected_lparen, AttrName,
+               DeclAttribute::isDeclModifier(DK));
+      return false;
+    }
+
+    if (Tok.isNot(tok::string_literal)) {
+      diagnose(Loc, diag::attr_expected_string_literal, AttrName);
+      return false;
+    }
+
+    auto Value = getStringLiteralIfNotInterpolated(
+        Loc, ("'" + AttrName + "'").str());
+
+    consumeToken(tok::string_literal);
+
+    if (Value.hasValue())
+      AttrRange = SourceRange(Loc, Tok.getRange().getStart());
+    else
+      DiscardAttribute = true;
+
+    if (!consumeIf(tok::r_paren)) {
+      diagnose(Loc, diag::attr_expected_rparen, AttrName,
+               DeclAttribute::isDeclModifier(DK));
+      return false;
+    }
+
+    if (!DiscardAttribute) {
+      Attributes.add(new (Context)
+                     ImplicitlySynthesizesNestedRequirementAttr(Value.getValue(), AtLoc,
+                                                   AttrRange));
+    }
+    break;
+  }
+
   case DAK_Available: {
     if (!consumeIf(tok::l_paren)) {
       diagnose(Loc, diag::attr_expected_lparen, AttrName,
@@ -2222,7 +2262,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
     }
 
     SourceLoc LParenLoc = consumeToken(tok::l_paren);
-    DeclName replacedFunction;
+    DeclNameRef replacedFunction;
     {
       SyntaxParsingContext ContentContext(
           SyntaxContext, SyntaxKind::NamedAttributeStringArgument);
@@ -2306,7 +2346,6 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
     break;
   }
 
-  // SWIFT_ENABLE_TENSORFLOW
   case DAK_Derivative: {
     // `@derivative` in a local scope is not allowed.
     if (CurDeclContext->isLocalContext())
@@ -2800,15 +2839,12 @@ bool Parser::parseConventionAttributeInternal(
                  diag::convention_attribute_witness_method_expected_colon);
       return true;
     }
-    if (Tok.isNot(tok::identifier)) {
-      if (!justChecking)
-        diagnose(Tok,
-                 diag::convention_attribute_witness_method_expected_protocol);
-      return true;
-    }
 
-    convention.WitnessMethodProtocol = Tok.getText();
-    consumeToken(tok::identifier);
+    DeclNameLoc unusedWitnessMethodProtocolLoc;
+    convention.WitnessMethodProtocol = parseUnqualifiedDeclBaseName(
+        /*afterDot=*/false, unusedWitnessMethodProtocolLoc,
+       diag::convention_attribute_witness_method_expected_protocol
+    );
   }
   
   // Parse the ')'.  We can't use parseMatchingToken if we're in
@@ -3896,12 +3932,12 @@ Parser::parseDecl(ParseDeclOptions Flags,
     if (CurDeclContext) {
       if (auto nominal = dyn_cast<NominalTypeDecl>(CurDeclContext)) {
         diagnose(nominal->getLoc(), diag::note_in_decl_extension, false,
-                 nominal->getName());
+                 nominal->createNameRef());
       } else if (auto extension = dyn_cast<ExtensionDecl>(CurDeclContext)) {
         if (auto repr = extension->getExtendedTypeRepr()) {
           if (auto idRepr = dyn_cast<IdentTypeRepr>(repr)) {
             diagnose(extension->getLoc(), diag::note_in_decl_extension, true,
-                     idRepr->getComponentRange().front()->getIdentifier());
+                     idRepr->getComponentRange().front()->getNameRef());
           }
         }
       }
@@ -3997,7 +4033,8 @@ Parser::parseDecl(ParseDeclOptions Flags,
           auto params =
               ParameterList::create(Context, SourceLoc(), {}, SourceLoc());
           auto ret = new (Context)
-              SimpleIdentTypeRepr(SourceLoc(), Context.getIdentifier("Tree"));
+              SimpleIdentTypeRepr(DeclNameLoc(),
+                                  DeclNameRef(Context.getIdentifier("Tree")));
           auto quoteDecl = FuncDecl::create(
               Context, SourceLoc(), kind, SourceLoc(), name, SourceLoc(),
               /*Throws=*/false, SourceLoc(),
@@ -4329,8 +4366,8 @@ ParserStatus Parser::parseInheritance(SmallVectorImpl<TypeLoc> &Inherited,
 
       // Add 'AnyObject' to the inherited list.
       Inherited.push_back(
-        new (Context) SimpleIdentTypeRepr(classLoc,
-                                          Context.getIdentifier("AnyObject")));
+        new (Context) SimpleIdentTypeRepr(DeclNameLoc(classLoc), DeclNameRef(
+                                          Context.getIdentifier("AnyObject"))));
       continue;
     }
 

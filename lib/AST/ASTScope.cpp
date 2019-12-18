@@ -39,7 +39,7 @@ using namespace ast_scope;
 #pragma mark ASTScope
 
 llvm::SmallVector<const ASTScopeImpl *, 0> ASTScope::unqualifiedLookup(
-    SourceFile *SF, DeclName name, SourceLoc loc,
+    SourceFile *SF, DeclNameRef name, SourceLoc loc,
     const DeclContext *startingContext,
     namelookup::AbstractASTScopeDeclConsumer &consumer) {
   if (auto *s = SF->getASTContext().Stats)

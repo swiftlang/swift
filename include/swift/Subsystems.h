@@ -167,7 +167,8 @@ namespace swift {
   
   /// Once parsing and name-binding are complete this optionally walks the ASTs
   /// to add calls to externally provided functions that simulate
-  /// "program counter"-like debugging events.
+  /// "program counter"-like debugging events. See the comment at the top of
+  /// lib/Sema/PCMacro.cpp for a description of the calls inserted.
   void performPCMacro(SourceFile &SF);
 
   /// Creates a type checker instance on the given AST context, if it

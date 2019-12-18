@@ -1556,36 +1556,9 @@ DynamicSubscriptExpr::create(ASTContext &ctx, Expr *base, Expr *index,
                                            hasTrailingClosure, decl, implicit);
 }
 
-DynamicSubscriptExpr *
-DynamicSubscriptExpr::create(ASTContext &ctx, Expr *base, SourceLoc lSquareLoc,
-                             ArrayRef<Expr *> indexArgs,
-                             ArrayRef<Identifier> indexArgLabels,
-                             ArrayRef<SourceLoc> indexArgLabelLocs,
-                             SourceLoc rSquareLoc,
-                             Expr *trailingClosure,
-                             ConcreteDeclRef decl,
-                             bool implicit) {
-  SmallVector<Identifier, 4> indexArgLabelsScratch;
-  SmallVector<SourceLoc, 4> indexArgLabelLocsScratch;
-  Expr *index = packSingleArgument(ctx, lSquareLoc, indexArgs, indexArgLabels,
-                                   indexArgLabelLocs, rSquareLoc,
-                                   trailingClosure, implicit,
-                                   indexArgLabelsScratch,
-                                   indexArgLabelLocsScratch);
-
-  size_t size = totalSizeToAlloc(indexArgLabels, indexArgLabelLocs,
-                                 trailingClosure != nullptr);
-
-  void *memory = ctx.Allocate(size, alignof(DynamicSubscriptExpr));
-  return new (memory) DynamicSubscriptExpr(base, index, indexArgLabels,
-                                           indexArgLabelLocs,
-                                           trailingClosure != nullptr,
-                                           decl, implicit);
-}
-
 UnresolvedMemberExpr::UnresolvedMemberExpr(SourceLoc dotLoc,
                                            DeclNameLoc nameLoc,
-                                           DeclName name, Expr *argument,
+                                           DeclNameRef name, Expr *argument,
                                            ArrayRef<Identifier> argLabels,
                                            ArrayRef<SourceLoc> argLabelLocs,
                                            bool hasTrailingClosure,
@@ -1602,7 +1575,7 @@ UnresolvedMemberExpr::UnresolvedMemberExpr(SourceLoc dotLoc,
 UnresolvedMemberExpr *UnresolvedMemberExpr::create(ASTContext &ctx,
                                                    SourceLoc dotLoc,
                                                    DeclNameLoc nameLoc,
-                                                   DeclName name,
+                                                   DeclNameRef name,
                                                    bool implicit) {
   size_t size = totalSizeToAlloc({ }, { }, /*hasTrailingClosure=*/false);
 
@@ -1615,7 +1588,7 @@ UnresolvedMemberExpr *UnresolvedMemberExpr::create(ASTContext &ctx,
 
 UnresolvedMemberExpr *
 UnresolvedMemberExpr::create(ASTContext &ctx, SourceLoc dotLoc,
-                             DeclNameLoc nameLoc, DeclName name,
+                             DeclNameLoc nameLoc, DeclNameRef name,
                              SourceLoc lParenLoc,
                              ArrayRef<Expr *> args,
                              ArrayRef<Identifier> argLabels,
@@ -1934,12 +1907,12 @@ Type TypeExpr::getInstanceType(
 }
 
 
-TypeExpr *TypeExpr::createForDecl(SourceLoc Loc, TypeDecl *Decl,
+TypeExpr *TypeExpr::createForDecl(DeclNameLoc Loc, TypeDecl *Decl,
                                   DeclContext *DC,
                                   bool isImplicit) {
   ASTContext &C = Decl->getASTContext();
   assert(Loc.isValid() || isImplicit);
-  auto *Repr = new (C) SimpleIdentTypeRepr(Loc, Decl->getName());
+  auto *Repr = new (C) SimpleIdentTypeRepr(Loc, Decl->createNameRef());
   Repr->setValue(Decl, DC);
   auto result = new (C) TypeExpr(TypeLoc(Repr, Type()));
   if (isImplicit)
@@ -1947,9 +1920,9 @@ TypeExpr *TypeExpr::createForDecl(SourceLoc Loc, TypeDecl *Decl,
   return result;
 }
 
-TypeExpr *TypeExpr::createForMemberDecl(SourceLoc ParentNameLoc,
+TypeExpr *TypeExpr::createForMemberDecl(DeclNameLoc ParentNameLoc,
                                         TypeDecl *Parent,
-                                        SourceLoc NameLoc,
+                                        DeclNameLoc NameLoc,
                                         TypeDecl *Decl) {
   ASTContext &C = Decl->getASTContext();
   assert(ParentNameLoc.isValid());
@@ -1960,13 +1933,13 @@ TypeExpr *TypeExpr::createForMemberDecl(SourceLoc ParentNameLoc,
 
   // The first component is the parent type.
   auto *ParentComp = new (C) SimpleIdentTypeRepr(ParentNameLoc,
-                                                 Parent->getName());
+                                                 Parent->createNameRef());
   ParentComp->setValue(Parent, nullptr);
   Components.push_back(ParentComp);
 
   // The second component is the member we just found.
   auto *NewComp = new (C) SimpleIdentTypeRepr(NameLoc,
-                                              Decl->getName());
+                                              Decl->createNameRef());
   NewComp->setValue(Decl, nullptr);
   Components.push_back(NewComp);
 
@@ -1975,7 +1948,7 @@ TypeExpr *TypeExpr::createForMemberDecl(SourceLoc ParentNameLoc,
 }
 
 TypeExpr *TypeExpr::createForMemberDecl(IdentTypeRepr *ParentTR,
-                                        SourceLoc NameLoc,
+                                        DeclNameLoc NameLoc,
                                         TypeDecl *Decl) {
   ASTContext &C = Decl->getASTContext();
 
@@ -1987,7 +1960,7 @@ TypeExpr *TypeExpr::createForMemberDecl(IdentTypeRepr *ParentTR,
   assert(!Components.empty());
 
   // Add a new component for the member we just found.
-  auto *NewComp = new (C) SimpleIdentTypeRepr(NameLoc, Decl->getName());
+  auto *NewComp = new (C) SimpleIdentTypeRepr(NameLoc, Decl->createNameRef());
   NewComp->setValue(Decl, nullptr);
   Components.push_back(NewComp);
 
@@ -2035,7 +2008,7 @@ TypeExpr *TypeExpr::createForSpecializedDecl(IdentTypeRepr *ParentTR,
     }
 
     auto *genericComp = GenericIdentTypeRepr::create(C,
-      last->getIdLoc(), last->getIdentifier(),
+      last->getNameLoc(), last->getNameRef(),
       Args, AngleLocs);
     genericComp->setValue(last->getBoundDecl(), last->getDeclContext());
     components.push_back(genericComp);
@@ -2224,7 +2197,7 @@ void InterpolatedStringLiteralExpr::forEachSegment(ASTContext &Ctx,
           name = fn->getFullName();
         } else if (auto unresolvedDot =
                       dyn_cast<UnresolvedDotExpr>(call->getFn())) {
-          name = unresolvedDot->getName();
+          name = unresolvedDot->getName().getFullName();
         }
 
         bool isInterpolation = (name.getBaseName() ==

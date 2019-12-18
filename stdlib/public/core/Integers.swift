@@ -2746,7 +2746,7 @@ extension FixedWidthInteger {
     // If we used &+ instead, the result would be zero, which isn't helpful,
     // so we actually need to handle this case separately.
     if delta == Magnitude.max {
-      return Self(truncatingIfNeeded: generator.next() as Magnitude)
+      return Self(truncatingIfNeeded: generator.next())
     }
     // Need to widen delta to account for the right-endpoint of a closed range.
     delta += 1
@@ -3366,7 +3366,7 @@ extension FixedWidthInteger {
     using generator: inout R
   ) -> Self {
     if bitWidth <= UInt64.bitWidth {
-      return Self(truncatingIfNeeded: generator.next() as UInt64)
+      return Self(truncatingIfNeeded: generator.next())
     }
 
     let (quotient, remainder) = bitWidth.quotientAndRemainder(

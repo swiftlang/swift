@@ -189,6 +189,9 @@ public:
   /// \returns the derived member, which will also be added to the type.
   ValueDecl *deriveDecodable(ValueDecl *requirement);
 
+  /// Derive the CodingKeys requirement for a value type.
+  TypeDecl *derivePhantomCodingKeysRequirement();
+
   // SWIFT_ENABLE_TENSORFLOW
   /// Determine if a KeyPathIterable requirement can be derived for a type.
   ///
@@ -205,7 +208,6 @@ public:
   /// \returns the derived member, which will also be added to the type.
   Type deriveKeyPathIterable(AssociatedTypeDecl *assocType);
 
-  // SWIFT_ENABLE_TENSORFLOW
   /// Determine if a TensorArrayProtocol requirement can be derived for a type.
   ///
   /// \returns True if the requirement can be derived.
@@ -217,7 +219,6 @@ public:
   /// \returns the derived member, which will also be added to the type.
   ValueDecl *deriveTensorArrayProtocol(ValueDecl *requirement);
 
-  // SWIFT_ENABLE_TENSORFLOW
   /// Determine if a TensorGroup requirement can be derived for a type.
   ///
   /// \returns True if the requirement can be derived.
@@ -228,7 +229,6 @@ public:
   /// \returns the derived member, which will also be added to the type.
   ValueDecl *deriveTensorGroup(ValueDecl *requirement);
 
-  // SWIFT_ENABLE_TENSORFLOW
   /// Determine if an AdditiveArithmetic requirement can be derived for a type.
   ///
   /// \returns True if the requirement can be derived.
@@ -240,7 +240,6 @@ public:
   /// \returns the derived member, which will also be added to the type.
   ValueDecl *deriveAdditiveArithmetic(ValueDecl *requirement);
 
-  // SWIFT_ENABLE_TENSORFLOW
   /// Determine if a PointwiseMultiplicative requirement can be derived for a type.
   ///
   /// \returns True if the requirement can be derived.
@@ -252,7 +251,6 @@ public:
   /// \returns the derived member, which will also be added to the type.
   ValueDecl *derivePointwiseMultiplicative(ValueDecl *requirement);
 
-  // SWIFT_ENABLE_TENSORFLOW
   /// Determine if an ElementaryFunctions requirement can be derived for a
   /// type.
   ///
@@ -307,6 +305,7 @@ public:
   ///
   /// \returns the derived member, which will also be added to the type.
   Type deriveDifferentiable(AssociatedTypeDecl *assocType);
+  // SWIFT_ENABLE_TENSORFLOW END
 
   /// Declare a read-only property.
   std::pair<VarDecl *, PatternBindingDecl *>
