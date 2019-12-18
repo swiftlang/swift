@@ -25,6 +25,7 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/ADT/StringSet.h"
 #include "llvm/Support/Mutex.h"
 
 #include <memory>
@@ -167,7 +168,8 @@ namespace swift {
   
   /// Once parsing and name-binding are complete this optionally walks the ASTs
   /// to add calls to externally provided functions that simulate
-  /// "program counter"-like debugging events.
+  /// "program counter"-like debugging events. See the comment at the top of
+  /// lib/Sema/PCMacro.cpp for a description of the calls inserted.
   void performPCMacro(SourceFile &SF);
 
   /// Creates a type checker instance on the given AST context, if it
@@ -276,7 +278,8 @@ namespace swift {
                       StringRef ModuleName, const PrimarySpecificPaths &PSPs,
                       llvm::LLVMContext &LLVMContext,
                       ArrayRef<std::string> parallelOutputFilenames,
-                      llvm::GlobalVariable **outModuleHash = nullptr);
+                      llvm::GlobalVariable **outModuleHash = nullptr,
+                      llvm::StringSet<> *LinkerDirectives = nullptr);
 
   /// Turn the given Swift module into either LLVM IR or native code
   /// and return the generated LLVM IR module.
@@ -286,7 +289,8 @@ namespace swift {
                       std::unique_ptr<SILModule> SILMod,
                       StringRef ModuleName, const PrimarySpecificPaths &PSPs,
                       llvm::LLVMContext &LLVMContext,
-                      llvm::GlobalVariable **outModuleHash = nullptr);
+                      llvm::GlobalVariable **outModuleHash = nullptr,
+                      llvm::StringSet<> *LinkerDirectives = nullptr);
 
   /// Given an already created LLVM module, construct a pass pipeline and run
   /// the Swift LLVM Pipeline upon it. This does not cause the module to be

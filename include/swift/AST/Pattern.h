@@ -504,14 +504,14 @@ public:
 class EnumElementPattern : public Pattern {
   TypeLoc ParentType;
   SourceLoc DotLoc;
-  SourceLoc NameLoc;
-  Identifier Name;
+  DeclNameLoc NameLoc;
+  DeclNameRef Name;
   PointerUnion<EnumElementDecl *, Expr*> ElementDeclOrUnresolvedOriginalExpr;
   Pattern /*nullable*/ *SubPattern;
   
 public:
-  EnumElementPattern(TypeLoc ParentType, SourceLoc DotLoc, SourceLoc NameLoc,
-                     Identifier Name, EnumElementDecl *Element,
+  EnumElementPattern(TypeLoc ParentType, SourceLoc DotLoc, DeclNameLoc NameLoc,
+                     DeclNameRef Name, EnumElementDecl *Element,
                      Pattern *SubPattern, Optional<bool> Implicit = None)
     : Pattern(PatternKind::EnumElement),
       ParentType(ParentType), DotLoc(DotLoc), NameLoc(NameLoc), Name(Name),
@@ -524,8 +524,8 @@ public:
   /// Create an unresolved EnumElementPattern for a `.foo` pattern relying on
   /// contextual type.
   EnumElementPattern(SourceLoc DotLoc,
-                     SourceLoc NameLoc,
-                     Identifier Name,
+                     DeclNameLoc NameLoc,
+                     DeclNameRef Name,
                      Pattern *SubPattern,
                      Expr *UnresolvedOriginalExpr)
     : Pattern(PatternKind::EnumElement),
@@ -551,7 +551,7 @@ public:
   
   void setSubPattern(Pattern *p) { SubPattern = p; }
   
-  Identifier getName() const { return Name; }
+  DeclNameRef getName() const { return Name; }
   
   EnumElementDecl *getElementDecl() const {
     return ElementDeclOrUnresolvedOriginalExpr.dyn_cast<EnumElementDecl*>();
@@ -567,18 +567,18 @@ public:
     return ElementDeclOrUnresolvedOriginalExpr.is<Expr*>();
   }
   
-  SourceLoc getNameLoc() const { return NameLoc; }
-  SourceLoc getLoc() const { return NameLoc; }
+  DeclNameLoc getNameLoc() const { return NameLoc; }
+  SourceLoc getLoc() const { return NameLoc.getBaseNameLoc(); }
   SourceLoc getStartLoc() const {
     return ParentType.hasLocation() ? ParentType.getSourceRange().Start :
            DotLoc.isValid()         ? DotLoc
-                                    : NameLoc;
+                                    : NameLoc.getBaseNameLoc();
   }
   SourceLoc getEndLoc() const {
     if (SubPattern && SubPattern->getSourceRange().isValid()) {
       return SubPattern->getSourceRange().End;
     }
-    return NameLoc;
+    return NameLoc.getEndLoc();
   }
   SourceRange getSourceRange() const { return {getStartLoc(), getEndLoc()}; }
   

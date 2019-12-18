@@ -52,6 +52,12 @@ toolchains::Windows::constructInvocation(const DynamicLinkJobAction &job,
 
   ArgStringList Arguments;
 
+  std::string Target = getTriple().str();
+  if (!Target.empty()) {
+    Arguments.push_back("-target");
+    Arguments.push_back(context.Args.MakeArgString(Target));
+  }
+
   switch (job.getKind()) {
   case LinkKind::None:
     llvm_unreachable("invalid link kind");
@@ -102,12 +108,6 @@ toolchains::Windows::constructInvocation(const DynamicLinkJobAction &job,
     // If there is a clang in the toolchain folder, use that instead.
     if (auto tool = llvm::sys::findProgramByName("clang", {toolchainPath}))
       Clang = context.Args.MakeArgString(tool.get());
-  }
-
-  std::string Target = getTriple().str();
-  if (!Target.empty()) {
-    Arguments.push_back("-target");
-    Arguments.push_back(context.Args.MakeArgString(Target));
   }
 
   // Rely on `-libc` to correctly identify the MSVC Runtime Library.  We use

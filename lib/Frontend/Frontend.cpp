@@ -19,7 +19,10 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/DiagnosticsSema.h"
+#include "swift/AST/FileSystem.h"
+#include "swift/AST/IncrementalRanges.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/FileTypes.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
@@ -100,6 +103,16 @@ std::string CompilerInvocation::getReferenceDependenciesFilePathForPrimary(
       .SupplementaryOutputs.ReferenceDependenciesFilePath;
 }
 std::string
+CompilerInvocation::getSwiftRangesFilePathForPrimary(StringRef filename) const {
+  return getPrimarySpecificPathsForPrimary(filename)
+      .SupplementaryOutputs.SwiftRangesFilePath;
+}
+std::string CompilerInvocation::getCompiledSourceFilePathForPrimary(
+    StringRef filename) const {
+  return getPrimarySpecificPathsForPrimary(filename)
+      .SupplementaryOutputs.CompiledSourceFilePath;
+}
+std::string
 CompilerInvocation::getSerializedDiagnosticsPathForAtMostOnePrimary() const {
   return getPrimarySpecificPathsForAtMostOnePrimary()
       .SupplementaryOutputs.SerializedDiagnosticsPath;
@@ -109,6 +122,14 @@ std::string CompilerInvocation::getTBDPathForWholeModule() const {
          "TBDPath only makes sense when the whole module can be seen");
   return getPrimarySpecificPathsForAtMostOnePrimary()
       .SupplementaryOutputs.TBDPath;
+}
+
+std::string
+CompilerInvocation::getLdAddCFileOutputPathForWholeModule() const {
+  assert(getFrontendOptions().InputsAndOutputs.isWholeModule() &&
+         "LdAdd cfile only makes sense when the whole module can be seen");
+  return getPrimarySpecificPathsForAtMostOnePrimary()
+    .SupplementaryOutputs.LdAddCFilePath;
 }
 
 std::string
@@ -838,8 +859,8 @@ void CompilerInstance::parseAndCheckTypesUpTo(
 
   // Type-check main file after parsing all other files so that
   // it can use declarations from other files.
-  // In addition, the main file has parsing and type-checking
-  // interwined.
+  // In addition, in SIL mode the main file has parsing and
+  // type-checking interwined.
   if (MainBufferID != NO_SUCH_BUFFER) {
     parseAndTypeCheckMainFileUpTo(limitStage);
   }
@@ -964,24 +985,35 @@ void CompilerInstance::parseAndTypeCheckMainFileUpTo(
     parseIntoSourceFile(MainFile, MainFile.getBufferID().getValue(), &Done,
                         TheSILModule ? &SILContext : nullptr,
                         PersistentState.get(),
-                        /*DelayedBodyParsing=*/false);
+                        !mainIsPrimary);
 
-    if (mainIsPrimary && (Done || CurTUElem < MainFile.Decls.size())) {
-      switch (LimitStage) {
-      case SourceFile::Parsing:
-      case SourceFile::Parsed:
-        llvm_unreachable("invalid limit stage");
-      case SourceFile::NameBound:
-        performNameBinding(MainFile, CurTUElem);
-        break;
-      case SourceFile::TypeChecked:
+    // For SIL we actually have to interleave parsing and type checking
+    // because the SIL parser expects to see fully type checked declarations.
+    if (TheSILModule) {
+      if (Done || CurTUElem < MainFile.Decls.size()) {
+        assert(mainIsPrimary);
         performTypeChecking(MainFile, CurTUElem);
-        break;
       }
     }
 
     CurTUElem = MainFile.Decls.size();
   } while (!Done);
+
+  if (!TheSILModule) {
+    if (mainIsPrimary) {
+      switch (LimitStage) {
+      case SourceFile::Parsing:
+      case SourceFile::Parsed:
+        llvm_unreachable("invalid limit stage");
+      case SourceFile::NameBound:
+        performNameBinding(MainFile);
+        break;
+      case SourceFile::TypeChecked:
+        performTypeChecking(MainFile);
+        break;
+      }
+    }
+  }
 
   Diags.setSuppressWarnings(DidSuppressWarnings);
 
@@ -990,8 +1022,10 @@ void CompilerInstance::parseAndTypeCheckMainFileUpTo(
     performDebuggerTestingTransform(MainFile);
   }
 
-  if (!mainIsPrimary) {
-    performNameBinding(MainFile);
+  if (!TheSILModule) {
+    if (!mainIsPrimary) {
+      performNameBinding(MainFile);
+    }
   }
 }
 
@@ -1139,7 +1173,8 @@ static bool performMandatorySILPasses(CompilerInvocation &Invocation,
 /// These may change across compiler versions.
 static void performSILOptimizations(CompilerInvocation &Invocation,
                                     SILModule *SM) {
-  SharedTimer timer("SIL optimization");
+  FrontendStatsTracer tracer(SM->getASTContext().Stats,
+                             "SIL optimization");
   if (Invocation.getFrontendOptions().RequestedAction ==
       FrontendOptions::ActionType::MergeModules ||
       !Invocation.getSILOptions().shouldOptimize()) {
@@ -1182,7 +1217,8 @@ bool CompilerInstance::performSILProcessing(SILModule *silModule,
     return true;
 
   {
-    SharedTimer timer("SIL verification, pre-optimization");
+    FrontendStatsTracer tracer(silModule->getASTContext().Stats,
+                               "SIL verification, pre-optimization");
     silModule->verify();
   }
 
@@ -1192,7 +1228,8 @@ bool CompilerInstance::performSILProcessing(SILModule *silModule,
     countStatsPostSILOpt(*stats, *silModule);
 
   {
-    SharedTimer timer("SIL verification, post-optimization");
+    FrontendStatsTracer tracer(silModule->getASTContext().Stats,
+                               "SIL verification, post-optimization");
     silModule->verify();
   }
 
@@ -1218,4 +1255,21 @@ const PrimarySpecificPaths &
 CompilerInstance::getPrimarySpecificPathsForSourceFile(
     const SourceFile &SF) const {
   return Invocation.getPrimarySpecificPathsForSourceFile(SF);
+}
+
+bool CompilerInstance::emitSwiftRanges(DiagnosticEngine &diags,
+                                       SourceFile *primaryFile,
+                                       StringRef outputPath) const {
+  return incremental_ranges::SwiftRangesEmitter(outputPath, primaryFile,
+                                                SourceMgr, diags)
+      .emit();
+  return false;
+}
+
+bool CompilerInstance::emitCompiledSource(DiagnosticEngine &diags,
+                                          const SourceFile *primaryFile,
+                                          StringRef outputPath) const {
+  return incremental_ranges::CompiledSourceEmitter(outputPath, primaryFile,
+                                                   SourceMgr, diags)
+      .emit();
 }

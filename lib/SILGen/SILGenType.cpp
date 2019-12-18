@@ -125,11 +125,24 @@ SILGenModule::emitVTableMethod(ClassDecl *theClass,
   // The override member type is semantically a subtype of the base
   // member type. If the override is ABI compatible, we do not need
   // a thunk.
-  if (doesNotHaveGenericRequirementDifference && !baseLessVisibleThanDerived &&
-      M.Types.checkFunctionForABIDifferences(M,
-                                             derivedInfo.SILFnType,
-                                             overrideInfo.SILFnType) ==
-          TypeConverter::ABIDifference::Trivial)
+  bool compatibleCallingConvention;
+  switch (M.Types.checkFunctionForABIDifferences(M,
+                                                 derivedInfo.SILFnType,
+                                                 overrideInfo.SILFnType)) {
+  case TypeConverter::ABIDifference::CompatibleCallingConvention:
+  case TypeConverter::ABIDifference::CompatibleRepresentation:
+    compatibleCallingConvention = true;
+    break;
+  case TypeConverter::ABIDifference::NeedsThunk:
+    compatibleCallingConvention = false;
+    break;
+  case TypeConverter::ABIDifference::CompatibleCallingConvention_ThinToThick:
+  case TypeConverter::ABIDifference::CompatibleRepresentation_ThinToThick:
+    llvm_unreachable("shouldn't be thick methods");
+  }
+  if (doesNotHaveGenericRequirementDifference
+      && !baseLessVisibleThanDerived
+      && compatibleCallingConvention)
     return SILVTable::Entry(base, implFn, implKind);
 
   // Generate the thunk name.

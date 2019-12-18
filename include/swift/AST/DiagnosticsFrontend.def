@@ -120,6 +120,10 @@ ERROR(error_mode_cannot_emit_dependencies,none,
       "this mode does not support emitting dependency files", ())
 ERROR(error_mode_cannot_emit_reference_dependencies,none,
       "this mode does not support emitting reference dependency files", ())
+ERROR(error_mode_cannot_emit_swift_ranges,none,
+"this mode does not support emitting unparsed ranges files", ())
+ERROR(error_mode_cannot_emit_compiled_source,none,
+"this mode does not support emitting compiled source files", ())
 ERROR(error_mode_cannot_emit_header,none,
       "this mode does not support emitting Objective-C headers", ())
 ERROR(error_mode_cannot_emit_loaded_module_trace,none,
@@ -138,6 +142,10 @@ ERROR(cannot_emit_ir_skipping_function_bodies,none,
 
 WARNING(emit_reference_dependencies_without_primary_file,none,
   "ignoring -emit-reference-dependencies (requires -primary-file)", ())
+WARNING(emit_swift_ranges_without_primary_file,none,
+"ignoring -emit-swift-ranges (requires -primary-file)", ())
+WARNING(emit_compiled_source_without_primary_file,none,
+"ignoring -emit-compiled-source (requires -primary-file)", ())
 
 ERROR(error_bad_module_name,none,
       "module name \"%0\" is not a valid identifier"
@@ -283,6 +291,14 @@ ERROR(error_invalid_debug_prefix_map, none,
       "invalid argument '%0' to -debug-prefix-map; it must be of the form "
       "'original=remapped'", (StringRef))
 
+
+ERROR(error_unable_to_write_swift_ranges_file, none,
+"unable to write unparsed ranges file '$0': %1", (StringRef, StringRef))
+
+ERROR(error_unable_to_write_compiled_source_file, none,
+"unable to write compiled source file: '$0': %1", (StringRef, StringRef))
+
+
 ERROR(invalid_vfs_overlay_file,none,
       "invalid virtual overlay file '%0'", (StringRef))
 
@@ -320,9 +336,6 @@ NOTE(compiled_module_invalid,none,
 NOTE(compiled_module_invalid_reason,none,
      "unable to load compiled module '%0': %1",
      (StringRef, StringRef))
-ERROR(error_extracting_dependencies_from_cached_module,none,
-      "error extracting dependencies from cached module '%0'",
-      (StringRef))
 ERROR(unknown_forced_module_loading_mode,none,
       "unknown value for SWIFT_FORCE_MODULE_LOADING variable: '%0'",
       (StringRef))

@@ -77,11 +77,13 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/Basic/OptimizationMode.h"
+#include "swift/AST/SemanticAttrs.h"
 #include "swift/Demangling/Demangle.h"
 #include "swift/Demangling/Demangler.h"
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/CFG.h"
 #include "swift/SIL/InstructionUtils.h"
+#include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILConstants.h"
@@ -121,7 +123,7 @@ static SILFunction *getStringMakeUTF8Init(SILInstruction *inst) {
     return nullptr;
 
   SILFunction *callee = apply->getCalleeFunction();
-  if (!callee || !callee->hasSemanticsAttr("string.makeUTF8"))
+  if (!callee || !callee->hasSemanticsAttr(semantics::STRING_MAKE_UTF8))
     return nullptr;
   return callee;
 }
@@ -510,7 +512,6 @@ static SILValue emitCodeForConstantArray(ArrayRef<SILValue> elements,
   assert(astContext.getArrayDecl() ==
          arrayType->getNominalOrBoundGenericNominal());
   SILModule &module = builder.getModule();
-  SILFunction &fun = builder.getFunction();
 
   // Create a SILValue for the number of elements.
   unsigned numElements = elements.size();
@@ -538,19 +539,10 @@ static SILValue emitCodeForConstantArray(ArrayRef<SILValue> elements,
       loc, arrayAllocateRef, subMap, ArrayRef<SILValue>(numElementsSIL), false);
 
   // Extract the elements of the tuple returned by the call to the allocator.
-  SILValue arraySIL;
-  SILValue storagePointerSIL;
-  if (fun.hasOwnership()) {
-    DestructureTupleInst *destructureInst =
-        builder.createDestructureTuple(loc, applyInst);
-    arraySIL = destructureInst->getResults()[0];
-    storagePointerSIL = destructureInst->getResults()[1];
-  } else {
-    SILType arraySILType = SILType::getPrimitiveObjectType(arrayType);
-    arraySIL = builder.createTupleExtract(loc, applyInst, 0, arraySILType);
-    storagePointerSIL = builder.createTupleExtract(
-        loc, applyInst, 1, SILType::getRawPointerType(astContext));
-  }
+  DestructureTupleInst *destructureInst =
+      builder.createDestructureTuple(loc, applyInst);
+  SILValue arraySIL = destructureInst->getResults()[0];
+  SILValue storagePointerSIL = destructureInst->getResults()[1];
 
   if (elements.empty()) {
     // Nothing more to be done if we are creating an empty array.
@@ -846,20 +838,21 @@ getEndPointsOfDataDependentChain(SILValue value, SILFunction *fun,
   }
 }
 
-/// Given an instruction \p inst, invoke the given clean-up function \p cleanup
-/// on its lifetime frontier, which are instructions that follow the last use of
-/// the results of \c inst. E.g. the clean-up function could destory/release
-/// the function result.
-static void
-cleanupAtEndOfLifetime(SILInstruction *inst,
-                       llvm::function_ref<void(SILInstruction *)> cleanup) {
-  ValueLifetimeAnalysis lifetimeAnalysis = ValueLifetimeAnalysis(inst);
-  ValueLifetimeAnalysis::Frontier frontier;
-  (void)lifetimeAnalysis.computeFrontier(
-      frontier, ValueLifetimeAnalysis::AllowToModifyCFG);
-  for (SILInstruction *lifetimeEndInst : frontier) {
-    cleanup(lifetimeEndInst);
-  }
+/// Given a guaranteed SILValue \p value, return a borrow-scope introducing
+/// value, if there is exactly one such introducing value. Otherwise, return
+/// None. There can be multiple borrow scopes for a SILValue iff it is derived
+/// from a guaranteed basic block parameter representing a phi node.
+static Optional<BorrowScopeIntroducingValue>
+getUniqueBorrowScopeIntroducingValue(SILValue value) {
+  assert(value.getOwnershipKind() == ValueOwnershipKind::Guaranteed &&
+         "parameter must be a guarenteed value");
+  SmallVector<BorrowScopeIntroducingValue, 4> borrowIntroducers;
+  getUnderlyingBorrowIntroducingValues(value, borrowIntroducers);
+  assert(borrowIntroducers.size() > 0 &&
+         "folding guaranteed value with no borrow introducer");
+  if (borrowIntroducers.size() > 1)
+    return None;
+  return borrowIntroducers[0];
 }
 
 /// Replace all uses of \c originalVal by \c foldedVal and adjust lifetimes of
@@ -888,45 +881,7 @@ static void replaceAllUsesAndFixLifetimes(SILValue foldedVal,
     return;
   }
   assert(!foldedVal->getType().isTrivial(*fun));
-
-  if (!fun->hasOwnership()) {
-    // In non-ownership SIL, handle only folding of struct_extract instruction,
-    // which is the only important instruction that should be folded by this
-    // pass. The logic used here is not correct in general and overfits a
-    // specific form of SIL. This code should be removed once OSSA is enabled
-    // for this pass.
-    // TODO: this code can be safely removed once ownership SIL becomes the
-    // default SIL this pass works on.
-    assert(isa<StructExtractInst>(originalInst) &&
-           !originalVal->getType().isAddress());
-
-    // First, replace all uses of originalVal by foldedVal, and then adjust
-    // their lifetimes if necessary.
-    originalVal->replaceAllUsesWith(foldedVal);
-
-    unsigned retainCount = 0;
-    unsigned consumeCount = 0;
-    for (Operand *use : foldedVal->getUses()) {
-      SILInstruction *user = use->getUser();
-      if (isa<ReleaseValueInst>(user) || isa<StoreInst>(user))
-        consumeCount++;
-      if (isa<RetainValueInst>(user))
-        retainCount++;
-      // Note that there could other consuming operations but they are not
-      // handled here as this code should be phased out soon.
-    }
-    if (consumeCount > retainCount) {
-      // The original value was at +1 and therefore consumed at the end. Since
-      // the foldedVal is also at +1 there is nothing to be done.
-      return;
-    }
-    cleanupAtEndOfLifetime(foldedInst, [&](SILInstruction *lifetimeEndInst) {
-      SILBuilderWithScope builder(lifetimeEndInst);
-      builder.emitReleaseValue(lifetimeEndInst->getLoc(), foldedVal);
-    });
-    return;
-  }
-
+  assert(fun->hasOwnership());
   assert(foldedVal.getOwnershipKind() == ValueOwnershipKind::Owned &&
          "constant value must have owned ownership kind");
 
@@ -942,22 +897,36 @@ static void replaceAllUsesAndFixLifetimes(SILValue foldedVal,
     return;
   }
 
-  // Here, originalVal is not owned. Hence, borrow form foldedVal and use the
-  // borrow in place of originalVal. Also, destroy foldedVal at the end of its
-  // lifetime.
+  // Here, originalVal is guaranteed. It must belong to a borrow scope that
+  // begins at a scope introducing instruction e.g. begin_borrow or load_borrow.
+  // The foldedVal should also have been inserted at the beginning of the scope.
+  // Therefore, create a borrow of foldedVal at the beginning of the scope and
+  // use the borrow in place of the originalVal. Also, end the borrow and
+  // destroy foldedVal at the end of the borrow scope.
   assert(originalVal.getOwnershipKind() == ValueOwnershipKind::Guaranteed);
 
-  SILBuilderWithScope builder(&*std::next(foldedInst->getIterator()));
-  BeginBorrowInst *borrow =
-      builder.createBeginBorrow(foldedInst->getLoc(), foldedVal);
+  Optional<BorrowScopeIntroducingValue> originalScopeBegin =
+      getUniqueBorrowScopeIntroducingValue(originalVal);
+  assert(originalScopeBegin &&
+         "value without a unique borrow scope should not have been folded");
+  SILInstruction *scopeBeginInst =
+      originalScopeBegin->value->getDefiningInstruction();
+  assert(scopeBeginInst);
+
+  SILBuilderWithScope builder(scopeBeginInst);
+  SILValue borrow =
+      builder.emitBeginBorrowOperation(scopeBeginInst->getLoc(), foldedVal);
 
   originalVal->replaceAllUsesWith(borrow);
 
-  cleanupAtEndOfLifetime(borrow, [&](SILInstruction *lifetimeEndInst) {
-    SILBuilderWithScope builder(lifetimeEndInst);
-    builder.createEndBorrow(lifetimeEndInst->getLoc(), borrow);
-    builder.emitDestroyValueOperation(lifetimeEndInst->getLoc(), foldedVal);
-  });
+  SmallVector<SILInstruction *, 4> scopeEndingInsts;
+  originalScopeBegin->getLocalScopeEndingInstructions(scopeEndingInsts);
+
+  for (SILInstruction *scopeEndingInst : scopeEndingInsts) {
+    SILBuilderWithScope builder(scopeEndingInst);
+    builder.emitEndBorrowOperation(scopeEndingInst->getLoc(), borrow);
+    builder.emitDestroyValueOperation(scopeEndingInst->getLoc(), foldedVal);
+  }
   return;
 }
 
@@ -977,13 +946,31 @@ static void substituteConstants(FoldState &foldState) {
     assert(definingInst);
     SILFunction *fun = definingInst->getFunction();
 
-    // Do not attempt to fold anything but struct_extract in non-OSSA.
-    // TODO: this condition should be removed once migration OSSA is complete.
-    if (!fun->hasOwnership() && !isa<StructExtractInst>(definingInst))
-      continue;
+    // Find an insertion point for inserting the new constant value. If we are
+    // folding a value like struct_extract within a borrow scope, we need to
+    // insert the constant value at the beginning of the borrow scope. This
+    // is because the borrowed value is expected to be alive during its entire
+    // borrow scope and could be stored into memory and accessed indirectly
+    // without a copy e.g. using store_borrow within the borrow scope. On the
+    // other hand, if we are folding an owned value, we can insert the constant
+    // value at the point where the owned value is defined.
+    SILInstruction *insertionPoint = definingInst;
+    if (constantSILValue.getOwnershipKind() == ValueOwnershipKind::Guaranteed) {
+      Optional<BorrowScopeIntroducingValue> borrowIntroducer =
+          getUniqueBorrowScopeIntroducingValue(constantSILValue);
+      if (!borrowIntroducer) {
+        // This case happens only if constantSILValue is derived from a
+        // guaranteed basic block parameter. This is unlikley because the values
+        // that have to be folded should just be a struct-extract of an owned
+        // instance of OSLogMessage.
+        continue;
+      }
+      insertionPoint = borrowIntroducer->value->getDefiningInstruction();
+      assert(insertionPoint && "borrow scope begnning is a parameter");
+    }
 
-    SILBuilderWithScope builder(definingInst);
-    SILLocation loc = definingInst->getLoc();
+    SILBuilderWithScope builder(insertionPoint);
+    SILLocation loc = insertionPoint->getLoc();
     CanType instType = constantSILValue->getType().getASTType();
     SILValue foldedSILVal = emitCodeForSymbolicValue(
         constantSymbolicVal, instType, builder, loc, foldState.stringInfo);
@@ -1063,10 +1050,11 @@ static bool checkOSLogMessageIsConstant(SingleValueInstruction *osLogMessage,
 
 /// Constant evaluate instructions starting from 'start' and fold the uses
 /// of the value 'oslogMessage'. Stop when oslogMessageValue is released.
-static void constantFold(SILInstruction *start,
+static bool constantFold(SILInstruction *start,
                          SingleValueInstruction *oslogMessage,
                          unsigned assertConfig) {
   SILFunction *fun = start->getFunction();
+  assert(fun->hasOwnership() && "function not in ownership SIL");
 
   // Initialize fold state.
   SmallVector<SILInstruction *, 2> endUsersOfOSLogMessage;
@@ -1077,7 +1065,7 @@ static void constantFold(SILInstruction *start,
 
   auto errorInfo = collectConstants(state);
   if (errorInfo) // Evaluation failed with diagnostics.
-    return;
+    return false;
 
   // At this point, the `OSLogMessage` instance should be mapped to a constant
   // value in the interpreter state. If this is not the case, it means the
@@ -1085,9 +1073,10 @@ static void constantFold(SILInstruction *start,
   // incorrect. Detect and diagnose this scenario.
   bool errorDetected = checkOSLogMessageIsConstant(oslogMessage, state);
   if (errorDetected)
-    return;
+    return false;
 
   substituteConstants(state);
+  return true;
 }
 
 /// Given a call to the initializer of OSLogMessage, which conforms to
@@ -1283,13 +1272,20 @@ class OSLogOptimization : public SILFunctionTransform {
       }
     }
 
+    bool madeChange = false;
+
     // Constant fold the uses of properties of OSLogMessage instance. Note that
     // the function body will change due to constant folding, after each
     // iteration.
     for (auto *oslogInit : oslogMessageInits) {
       SILInstruction *interpolationStart = beginOfInterpolation(oslogInit);
       assert(interpolationStart);
-      constantFold(interpolationStart, oslogInit, assertConfig);
+      madeChange |= constantFold(interpolationStart, oslogInit, assertConfig);
+    }
+
+    // TODO: Can we be more conservative here with our invalidation?
+    if (madeChange) {
+      invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
     }
   }
 };

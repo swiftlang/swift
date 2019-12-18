@@ -94,6 +94,8 @@ bool file_types::isTextual(ID Id) {
   case file_types::TY_SerializedDiagnostics:
   case file_types::TY_ClangModuleFile:
   case file_types::TY_SwiftDeps:
+  case file_types::TY_SwiftRanges:
+  case file_types::TY_CompiledSource:
   case file_types::TY_Nothing:
   case file_types::TY_Remapping:
   case file_types::TY_IndexData:
@@ -133,6 +135,8 @@ bool file_types::isAfterLLVM(ID Id) {
   case file_types::TY_SerializedDiagnostics:
   case file_types::TY_ClangModuleFile:
   case file_types::TY_SwiftDeps:
+  case file_types::TY_SwiftRanges:
+  case file_types::TY_CompiledSource:
   case file_types::TY_Nothing:
   case file_types::TY_Remapping:
   case file_types::TY_IndexData:
@@ -175,6 +179,8 @@ bool file_types::isPartOfSwiftCompilation(ID Id) {
   case file_types::TY_SerializedDiagnostics:
   case file_types::TY_ClangModuleFile:
   case file_types::TY_SwiftDeps:
+  case file_types::TY_SwiftRanges:
+  case file_types::TY_CompiledSource:
   case file_types::TY_Nothing:
   case file_types::TY_ASTDump:
   case file_types::TY_Remapping:

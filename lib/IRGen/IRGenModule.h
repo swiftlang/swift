@@ -331,7 +331,7 @@ public:
   
   /// Emit functions, variables and tables which are needed anyway, e.g. because
   /// they are externally visible.
-  void emitGlobalTopLevel();
+  void emitGlobalTopLevel(llvm::StringSet<> *LinkerDirectives);
 
   /// Emit references to each of the protocol descriptors defined in this
   /// IR module.
@@ -510,6 +510,7 @@ public:
   ModuleDecl *ClangImporterModule = nullptr;
   SourceFile *CurSourceFile = nullptr;
 
+  llvm::StringMap<ModuleDecl*> OriginalModules;
   llvm::SmallString<128> OutputFilename;
   llvm::SmallString<128> MainInputFilenameForDebugInfo;
 
@@ -858,7 +859,7 @@ public:
 
 private:
   TypeConverter &Types;
-  friend class TypeConverter;
+  friend TypeConverter;
 
   const clang::ASTContext *ClangASTContext;
   ClangTypeConverter *ClangTypes;
@@ -1340,6 +1341,7 @@ public:
                                       ConstantInit definition = ConstantInit());
   llvm::Constant *getAddrOfObjCModuleContextDescriptor();
   llvm::Constant *getAddrOfClangImporterModuleContextDescriptor();
+  llvm::Constant *getAddrOfOriginalModuleContextDescriptor(StringRef Name);
   ConstantReference getAddrOfParentContextDescriptor(DeclContext *from,
                                                      bool fromAnonymousContext);
   ConstantReference getAddrOfContextDescriptorForParent(DeclContext *parent,
@@ -1423,6 +1425,10 @@ public:
 
   Address getAddrOfObjCISAMask();
 
+  /// Retrieve the generic signature for the current generic context, or null if no
+  /// generic environment is active.
+  CanGenericSignature getCurGenericContext();
+  
   /// Retrieve the generic environment for the current generic context.
   ///
   /// Fails if there is no generic context.

@@ -64,7 +64,7 @@ enum E1 {
 // CHECK: RESULT #12: 12 = 11
 sil @test_rcid_preserving_casts : $@convention(thin) (Builtin.NativeObject) -> () {
 bb0(%0 : $Builtin.NativeObject):
-  %1 = unconditional_checked_cast %0 : $Builtin.NativeObject to $D
+  %1 = unconditional_checked_cast %0 : $Builtin.NativeObject to D
   %2 = upcast %1 : $D to $C
   %3 = unchecked_ref_cast %2 : $C to $E
   %4 = integer_literal $Builtin.Word, 0

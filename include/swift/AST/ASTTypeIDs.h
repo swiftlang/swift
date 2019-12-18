@@ -50,6 +50,7 @@ struct PropertyWrapperMutability;
 class ProtocolDecl;
 class Requirement;
 enum class ResilienceExpansion : unsigned;
+class SourceFile;
 class Type;
 class ValueDecl;
 class VarDecl;

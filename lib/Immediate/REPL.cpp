@@ -20,6 +20,7 @@
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/AST/NameLookupRequests.h"
 #include "swift/Basic/LLVMContext.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/IDE/REPLCodeCompletion.h"
@@ -1091,8 +1092,11 @@ public:
           ASTContext &ctx = CI.getASTContext();
           SourceFile &SF =
               MostRecentModule->getMainSourceFile(SourceFileKind::REPL);
-          UnqualifiedLookup lookup(ctx.getIdentifier(Tok.getText()), &SF);
-          for (auto result : lookup.Results) {
+          DeclNameRef name(ctx.getIdentifier(Tok.getText()));
+          auto descriptor = UnqualifiedLookupDescriptor(name, &SF);
+          auto lookup = evaluateOrDefault(
+              ctx.evaluator, UnqualifiedLookupRequest{descriptor}, {});
+          for (auto result : lookup) {
             printOrDumpDecl(result.getValueDecl(), doPrint);
               
             if (auto typeDecl = dyn_cast<TypeDecl>(result.getValueDecl())) {

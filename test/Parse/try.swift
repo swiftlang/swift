@@ -236,12 +236,14 @@ struct ThingProducer {
 }
 
 let optProducer: ThingProducer? = ThingProducer()
-let _: Int? = try? optProducer?.produceInt() // expected-error {{value of optional type 'Int??' not unwrapped; did you mean to use 'try!' or chain with '?'?}}
+// In Swift 4 mode try? always adds a new level of optionality so suggesting `try!` doesn't really help in these examples.
+let _: Int? = try? optProducer?.produceInt() // expected-error {{cannot convert value of type 'Int??' to specified type 'Int?'}}
 let _: Int = try? optProducer?.produceInt() // expected-error {{cannot convert value of type 'Int??' to specified type 'Int'}}
 let _: String = try? optProducer?.produceInt() // expected-error {{cannot convert value of type 'Int??' to specified type 'String'}}
 let _: Int?? = try? optProducer?.produceInt() // good
 
-let _: Int? = try? optProducer?.produceIntNoThrowing() // expected-error {{value of optional type 'Int??' not unwrapped; did you mean to use 'try!' or chain with '?'?}}
+let _: Int? = try? optProducer?.produceIntNoThrowing() // expected-error {{cannot convert value of type 'Int??' to specified type 'Int?'}}
+// expected-warning@-1 {{no calls to throwing functions occur within 'try' expression}}
 let _: Int?? = try? optProducer?.produceIntNoThrowing() // expected-warning {{no calls to throwing functions occur within 'try' expression}}
 
 let _: Int? = (try? optProducer?.produceAny()) as? Int // good
@@ -253,7 +255,7 @@ let _: String = try? optProducer?.produceDoubleOptionalInt() // expected-error {
 
 let producer = ThingProducer()
 
-let _: Int = try? producer.produceDoubleOptionalInt() // expected-error {{cannot convert value of type 'Int???' to specified type 'Int'}}
+let _: Int = try? producer.produceDoubleOptionalInt() // expected-error {{value of optional type 'Int???' not unwrapped; did you mean to use 'try!' or chain with '?'?}}
 let _: Int? = try? producer.produceDoubleOptionalInt() // expected-error {{value of optional type 'Int???' not unwrapped; did you mean to use 'try!' or chain with '?'?}}
 let _: Int?? = try? producer.produceDoubleOptionalInt() // expected-error {{value of optional type 'Int???' not unwrapped; did you mean to use 'try!' or chain with '?'?}}
 let _: Int??? = try? producer.produceDoubleOptionalInt() // good

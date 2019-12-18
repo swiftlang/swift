@@ -64,6 +64,8 @@ PASS(AccessEnforcementSelection, "access-enforcement-selection",
      "Access Enforcement Selection")
 PASS(AccessEnforcementWMO, "access-enforcement-wmo",
      "Access Enforcement Whole Module Optimization")
+PASS(CrossModuleSerializationSetup, "cross-module-serialization-setup",
+     "Setup serialization flags for cross-module optimization")
 PASS(AccessSummaryDumper, "access-summary-dump",
      "Dump Address Parameter Access Summary")
 PASS(AccessedStorageDumper, "accessed-storage-dump",
@@ -293,7 +295,7 @@ PASS(StackPromotion, "stack-promotion",
      "Stack Promotion of Class Objects")
 PASS(StripDebugInfo, "strip-debug-info",
      "Strip Debug Information")
-PASS(SwiftArrayOpts, "array-specialize",
+PASS(SwiftArrayPropertyOpt, "array-property-opt",
      "Loop Specialization for Array Properties")
 PASS(UnsafeGuaranteedPeephole, "unsafe-guaranteed-peephole",
      "SIL retain/release Peephole Removal for Builtin.unsafeGuaranteed")
@@ -309,6 +311,8 @@ PASS(SimplifyUnreachableContainingBlocks, "simplify-unreachable-containing-block
      "Utility pass. Removes all non-term insts from blocks with unreachable terms")
 PASS(SerializeSILPass, "serialize-sil",
      "Utility pass. Serializes the current SILModule")
+PASS(CMOSerializeSILPass, "cmo-serialize-sil",
+     "Utility pass. Serializes the current SILModule for cross-module-optimization")
 PASS(NonInlinableFunctionSkippingChecker, "check-non-inlinable-function-skipping",
      "Utility pass to ensure -experimental-skip-non-inlinable-function-bodies "
      "skips everything it should")

@@ -41,3 +41,19 @@ let genericString = GenericType<[String]>(collection: ["Hello", "world", "!"])
 _ = genericString("Hello")
 let genericInt = GenericType<Set<Int>>(collection: [1, 2, 3])
 _ = genericInt(initialValue: 1)
+
+// SR-11386
+class C<T> {}
+protocol P1 {}
+extension C where T : P1 { // expected-note {{where 'T' = 'Int'}}
+  func callAsFunction(t: T) {}
+}
+
+struct S0 : P1 {}
+
+func testCallAsFunctionWithWhereClause(_ c1: C<Int>, _ c2: C<S0>, _ s0: S0) {
+  c1(42) // expected-error {{referencing instance method 'callAsFunction(t:)' on 'C' requires that 'Int' conform to 'P1'}}
+  // expected-error@-1 {{missing argument label 't:' in call}}
+
+  c2(t: s0) // Okay.
+}

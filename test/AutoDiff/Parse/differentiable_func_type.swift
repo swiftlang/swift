@@ -21,6 +21,14 @@ let c: @differentiable (Float, @noDerivative Float) -> Float // okay
 // CHECK-NEXT:    (type_ident
 // CHECK-NEXT:      (component id='Float' bind=none)))))
 
+let d: @differentiable (Float) throws -> Float // okay
+// CHECK: (pattern_named 'd'
+// CHECK-NEXT: (type_attributed attrs=@differentiable{{[^(]}}
+
+let e: @differentiable(linear) (Float) throws -> Float // okay
+// CHECK: (pattern_named 'e'
+// CHECK-NEXT: (type_attributed attrs=@differentiable(linear)
+
 // Generic type test.
 struct A<T> {
   func foo() {

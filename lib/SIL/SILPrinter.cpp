@@ -222,9 +222,10 @@ static void printFullContext(const DeclContext *Context, raw_ostream &Buffer) {
 
 static void printValueDecl(ValueDecl *Decl, raw_ostream &OS) {
   printFullContext(Decl->getDeclContext(), OS);
-  assert(Decl->hasName());
 
-  if (Decl->isOperator()) {
+  if (!Decl->hasName()) {
+    OS << "anonname=" << (const void*)Decl;
+  } else if (Decl->isOperator()) {
     OS << '"' << Decl->getBaseName() << '"';
   } else {
     bool shouldEscape = !Decl->getBaseName().isSpecial() &&
@@ -1387,13 +1388,13 @@ public:
   }
   
   void visitUnconditionalCheckedCastInst(UnconditionalCheckedCastInst *CI) {
-    *this << getIDAndType(CI->getOperand()) << " to " << CI->getType();
+    *this << getIDAndType(CI->getOperand()) << " to " << CI->getTargetFormalType();
   }
   
   void visitCheckedCastBranchInst(CheckedCastBranchInst *CI) {
     if (CI->isExact())
       *this << "[exact] ";
-    *this << getIDAndType(CI->getOperand()) << " to " << CI->getCastType()
+    *this << getIDAndType(CI->getOperand()) << " to " << CI->getTargetFormalType()
           << ", " << Ctx.getID(CI->getSuccessBB()) << ", "
           << Ctx.getID(CI->getFailureBB());
     if (CI->getTrueBBCount())
@@ -1403,26 +1404,28 @@ public:
   }
 
   void visitCheckedCastValueBranchInst(CheckedCastValueBranchInst *CI) {
-    *this << getIDAndType(CI->getOperand()) << " to " << CI->getCastType()
+    *this << CI->getSourceFormalType() << " in "
+          << getIDAndType(CI->getOperand()) << " to " << CI->getTargetFormalType()
           << ", " << Ctx.getID(CI->getSuccessBB()) << ", "
           << Ctx.getID(CI->getFailureBB());
   }
 
   void visitUnconditionalCheckedCastAddrInst(UnconditionalCheckedCastAddrInst *CI) {
-    *this << CI->getSourceType() << " in " << getIDAndType(CI->getSrc())
-          << " to " << CI->getTargetType() << " in "
+    *this << CI->getSourceFormalType() << " in " << getIDAndType(CI->getSrc())
+          << " to " << CI->getTargetFormalType() << " in "
           << getIDAndType(CI->getDest());
   }
 
   void visitUnconditionalCheckedCastValueInst(
       UnconditionalCheckedCastValueInst *CI) {
-    *this << getIDAndType(CI->getOperand()) << " to " << CI->getType();
+    *this << CI->getSourceFormalType() << " in " << getIDAndType(CI->getOperand())
+          << " to " << CI->getTargetFormalType();
   }
 
   void visitCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *CI) {
     *this << getCastConsumptionKindName(CI->getConsumptionKind()) << ' '
-          << CI->getSourceType() << " in " << getIDAndType(CI->getSrc())
-          << " to " << CI->getTargetType() << " in "
+          << CI->getSourceFormalType() << " in " << getIDAndType(CI->getSrc())
+          << " to " << CI->getTargetFormalType() << " in "
           << getIDAndType(CI->getDest()) << ", "
           << Ctx.getID(CI->getSuccessBB()) << ", "
           << Ctx.getID(CI->getFailureBB());
@@ -1477,8 +1480,8 @@ public:
     printUncheckedConversionInst(CI, CI->getOperand());
   }
   void visitUncheckedRefCastAddrInst(UncheckedRefCastAddrInst *CI) {
-    *this << ' ' << CI->getSourceType() << " in " << getIDAndType(CI->getSrc())
-          << " to " << CI->getTargetType() << " in "
+    *this << ' ' << CI->getSourceFormalType() << " in " << getIDAndType(CI->getSrc())
+          << " to " << CI->getTargetFormalType() << " in "
           << getIDAndType(CI->getDest());
   }
   void visitUncheckedAddrCastInst(UncheckedAddrCastInst *CI) {
@@ -2693,6 +2696,18 @@ static void printSILProperties(SILPrintContext &Ctx,
   }
 }
 
+static void printExternallyVisibleDecls(SILPrintContext &Ctx,
+                                        ArrayRef<ValueDecl *> decls) {
+  if (decls.empty())
+    return;
+  Ctx.OS() << "/* externally visible decls: \n";
+  for (ValueDecl *decl : decls) {
+    printValueDecl(decl, Ctx.OS());
+    Ctx.OS() << '\n';
+  }
+  Ctx.OS() << "*/\n";
+}
+
 /// Pretty-print the SILModule to the designated stream.
 void SILModule::print(SILPrintContext &PrintCtx, ModuleDecl *M,
                       bool PrintASTDecls) const {
@@ -2759,7 +2774,8 @@ void SILModule::print(SILPrintContext &PrintCtx, ModuleDecl *M,
   printSILDefaultWitnessTables(PrintCtx, getDefaultWitnessTableList());
   printSILCoverageMaps(PrintCtx, getCoverageMaps());
   printSILProperties(PrintCtx, getPropertyList());
-  
+  printExternallyVisibleDecls(PrintCtx, externallyVisible.getArrayRef());
+
   OS << "\n\n";
 }
 

@@ -513,10 +513,7 @@ void SILGenFunction::emitClosure(AbstractClosureExpr *ace) {
     emitStmt(ce->getBody());
   } else {
     auto *autoclosure = cast<AutoClosureExpr>(ace);
-    // Closure expressions implicitly return the result of their body
-    // expression.
-    emitReturnExpr(ImplicitReturnLocation(ace),
-                   autoclosure->getSingleExpressionBody());
+    emitStmt(autoclosure->getBody());
   }
   emitEpilog(ace);
 }
@@ -550,7 +547,7 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
     assert(UIKit && "couldn't find UIKit objc module?!");
     SmallVector<ValueDecl *, 1> results;
     UIKit->lookupQualified(UIKit,
-                           ctx.getIdentifier("UIApplicationMain"),
+                           DeclNameRef(ctx.getIdentifier("UIApplicationMain")),
                            NL_QualifiedDefault,
                            results);
     assert(results.size() == 1
@@ -812,7 +809,7 @@ void SILGenFunction::emitGeneratorFunction(SILDeclRef function, VarDecl *var) {
   // wrapper that was initialized with '=', the stored property initializer
   // will be in terms of the original property's type.
   if (auto originalProperty = var->getOriginalWrappedProperty()) {
-    if (originalProperty->isPropertyWrapperInitializedWithInitialValue()) {
+    if (originalProperty->isPropertyMemberwiseInitializedWithWrappedType()) {
       interfaceType = originalProperty->getValueInterfaceType();
       varType = originalProperty->getType();
     }

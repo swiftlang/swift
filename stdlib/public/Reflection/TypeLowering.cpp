@@ -1007,10 +1007,22 @@ public:
     // NoPayloadEnumImplStrategy
     if (PayloadCases.empty()) {
       Kind = RecordKind::NoPayloadEnum;
-      Size += getEnumTagCounts(/*size=*/0,
-                               NoPayloadCases,
-                               /*payloadCases=*/0).numTagBytes;
-
+      switch (NoPayloadCases) {
+      case 0:
+      case 1: // Zero or one tag has size = 0, extra_inhab = 0
+        NumExtraInhabitants = 0;
+        break;
+      default: { // 2 or more tags
+        auto tagCounts = getEnumTagCounts(/*size=*/0,
+                                          NoPayloadCases,
+                                          /*payloadCases=*/0);
+        Size += tagCounts.numTagBytes;
+        NumExtraInhabitants =
+          (1 << (tagCounts.numTagBytes * 8)) - tagCounts.numTags;
+        NumExtraInhabitants = std::min(NumExtraInhabitants,
+                     unsigned(ValueWitnessFlags::MaxNumExtraInhabitants));
+      }
+      }
     // SinglePayloadEnumImplStrategy
     } else if (PayloadCases.size() == 1) {
       auto *CaseTR = getCaseTypeRef(PayloadCases[0]);

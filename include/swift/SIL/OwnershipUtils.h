@@ -183,6 +183,29 @@ public:
                        nullptr /*leakingBlocks*/)
                 .getFoundError();
   }
+
+  bool validateLifetime(SILValue value,
+                        ArrayRef<SILInstruction *> consumingUses,
+                        ArrayRef<SILInstruction *> nonConsumingUses) {
+    assert(llvm::all_of(
+               consumingUses,
+               [](SILInstruction *i) { return !isa<CondBranchInst>(i); }) &&
+           "Passed cond branch to a non-BranchPropagatedUser API");
+    assert(llvm::all_of(
+               nonConsumingUses,
+               [](SILInstruction *i) { return !isa<CondBranchInst>(i); }) &&
+           "Passed cond branch to a non-BranchPropagatedUser API");
+    auto *consumingUsesCast =
+        reinterpret_cast<const BranchPropagatedUser *>(consumingUses.data());
+    auto *nonConsumingUsesCast =
+        reinterpret_cast<const BranchPropagatedUser *>(nonConsumingUses.data());
+    ArrayRef<BranchPropagatedUser> consumingUsesCastArray(consumingUsesCast,
+                                                          consumingUses.size());
+    ArrayRef<BranchPropagatedUser> nonConsumingUsesCastArray(
+        nonConsumingUsesCast, nonConsumingUses.size());
+    return validateLifetime(value, consumingUsesCastArray,
+                            nonConsumingUsesCastArray);
+  }
 };
 
 /// Returns true if v is an address or trivial.
@@ -405,11 +428,11 @@ struct BorrowScopeIntroducingValue {
   ///
   /// NOTE: Scratch space is used internally to this method to store the end
   /// borrow scopes if needed.
-  bool areInstructionsWithinScope(
-      ArrayRef<BranchPropagatedUser> instructions,
-      SmallVectorImpl<BranchPropagatedUser> &scratchSpace,
-      SmallPtrSetImpl<SILBasicBlock *> &visitedBlocks,
-      DeadEndBlocks &deadEndBlocks) const;
+  bool
+  areInstructionsWithinScope(ArrayRef<SILInstruction *> instructions,
+                             SmallVectorImpl<SILInstruction *> &scratchSpace,
+                             SmallPtrSetImpl<SILBasicBlock *> &visitedBlocks,
+                             DeadEndBlocks &deadEndBlocks) const;
 
 private:
   /// Internal constructor for failable static constructor. Please do not expand

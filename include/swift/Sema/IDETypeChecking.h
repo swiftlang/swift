@@ -35,6 +35,7 @@ namespace swift {
   class Expr;
   class ExtensionDecl;
   class FunctionType;
+  class LookupResult;
   class NominalTypeDecl;
   class PatternBindingDecl;
   class ProtocolDecl;
@@ -81,6 +82,11 @@ namespace swift {
     ArrayRef<ValueDecl*> getMemberDecls(InterestedMemberKind Kind);
   };
 
+  /// Look up a member with the given name in the given type.
+  ///
+  /// Unlike other member lookup functions, \c swift::resolveValueMember()
+  /// should be used when you want to look up declarations with the same name as
+  /// one you already have.
   ResolvedMemberResult resolveValueMember(DeclContext &DC, Type BaseTy,
                                          DeclName Name);
 
@@ -136,6 +142,9 @@ namespace swift {
   ///
   /// \returns true on success, false on error.
   bool typeCheckTopLevelCodeDecl(TopLevelCodeDecl *TLCD);
+
+  LookupResult
+  lookupSemanticMember(DeclContext *DC, Type ty, DeclName name);
 
   struct ExtensionInfo {
     // The extension with the declarations to apply.
@@ -222,10 +231,6 @@ namespace swift {
   /// Sometimes for diagnostics we want to work on the original argument list as
   /// written by the user; this performs the reverse transformation.
   OriginalArgumentList getOriginalArgumentList(Expr *expr);
-
-  /// Return true if the specified type or a super-class/super-protocol has the
-  /// @dynamicMemberLookup attribute on it.
-  bool hasDynamicMemberLookupAttribute(Type type);
 
   /// Returns the root type and result type of the keypath type in a keypath
   /// dynamic member lookup subscript, or \c None if it cannot be determined.

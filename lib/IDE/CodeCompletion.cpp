@@ -1325,8 +1325,8 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
     if (auto *ITR = dyn_cast<IdentTypeRepr>(ParsedTypeLoc.getTypeRepr())) {
       SmallVector<ImportDecl::AccessPathElement, 4> AccessPath;
       for (auto Component : ITR->getComponentRange())
-        AccessPath.push_back({ Component->getIdentifier(),
-                               Component->getIdLoc() });
+        AccessPath.push_back({ Component->getNameRef().getBaseIdentifier(),
+                               Component->getLoc() });
       if (auto Module = Context.getLoadedModule(AccessPath))
         ParsedTypeLoc.setType(ModuleType::get(Module));
         return true;
@@ -1923,6 +1923,8 @@ public:
       PrintOptions PO;
       PO.OpaqueReturnTypePrinting =
           PrintOptions::OpaqueReturnTypePrintingMode::WithoutOpaqueKeyword;
+      if (auto typeContext = CurrDeclContext->getInnermostTypeContext())
+        PO.setBaseType(typeContext->getDeclaredTypeInContext());
       Builder.addTypeAnnotation(T.getString(PO));
     }
   }
@@ -1944,6 +1946,8 @@ public:
     PO.PrintOptionalAsImplicitlyUnwrapped = true;
     PO.OpaqueReturnTypePrinting =
         PrintOptions::OpaqueReturnTypePrintingMode::WithoutOpaqueKeyword;
+    if (auto typeContext = CurrDeclContext->getInnermostTypeContext())
+      PO.setBaseType(typeContext->getDeclaredTypeInContext());
     Builder.addTypeAnnotation(T.getString(PO) + suffix);
   }
 
@@ -2168,6 +2172,14 @@ public:
     addValueBaseName(Builder, Name);
     setClangDeclKeywords(VD, Pairs, Builder);
 
+    // "not recommended" in its own getter.
+    if (Kind == LookupKind::ValueInDeclContext) {
+      if (auto accessor = dyn_cast<AccessorDecl>(CurrDeclContext)) {
+        if (accessor->getStorage() == VD && accessor->isGetter())
+          Builder.setNotRecommended(CodeCompletionResult::NoReason);
+      }
+    }
+
     if (!VD->hasInterfaceType())
       return;
 
@@ -2236,6 +2248,7 @@ public:
         return !includeDefaultArgs;
 
       case DefaultArgumentKind::File:
+      case DefaultArgumentKind::FilePath:
       case DefaultArgumentKind::Line:
       case DefaultArgumentKind::Column:
       case DefaultArgumentKind::Function:
@@ -2279,9 +2292,12 @@ public:
 
       if (NeedComma)
         Builder.addComma();
+      Type contextTy;
+      if (auto typeContext = CurrDeclContext->getInnermostTypeContext())
+        contextTy = typeContext->getDeclaredTypeInContext();
 
-      Builder.addCallParameter(argName, bodyName, paramTy, isVariadic, isInOut,
-                               isIUO, isAutoclosure);
+      Builder.addCallParameter(argName, bodyName, paramTy, contextTy,
+                               isVariadic, isInOut, isIUO, isAutoclosure);
 
       modifiedBuilder = true;
       NeedComma = true;
@@ -2627,6 +2643,8 @@ public:
           PO.OpaqueReturnTypePrinting =
               PrintOptions::OpaqueReturnTypePrintingMode::WithoutOpaqueKeyword;
           PO.PrintOptionalAsImplicitlyUnwrapped = IsIUO;
+          if (auto typeContext = CurrDeclContext->getInnermostTypeContext())
+            PO.setBaseType(typeContext->getDeclaredTypeInContext());
           ResultType.print(OS, PO);
         }
       }
@@ -2730,22 +2748,21 @@ public:
       return;
 
     assert(CurrDeclContext);
-    SmallVector<ValueDecl *, 16> initializers;
-    if (CurrDeclContext->lookupQualified(type, DeclBaseName::createConstructor(),
-                                         NL_QualifiedDefault,
-                                         initializers)) {
-      for (auto *init : initializers) {
-        if (init->shouldHideFromEditor())
-          continue;
-        if (IsUnresolvedMember &&
-            cast<ConstructorDecl>(init)->isFailable() &&
-            !cast<ConstructorDecl>(init)->isImplicitlyUnwrappedOptional()) {
-          continue;
-        }
-        addConstructorCall(cast<ConstructorDecl>(init), Reason,
-                           dynamicLookupInfo, type, None,
-                           /*IsOnType=*/true, name);
+
+    auto results =
+        swift::lookupSemanticMember(const_cast<DeclContext *>(CurrDeclContext),
+                                    type, DeclBaseName::createConstructor());
+    for (const auto &entry : results.allResults()) {
+      auto *init = cast<ConstructorDecl>(entry.getValueDecl());
+      if (init->shouldHideFromEditor())
+        continue;
+      if (IsUnresolvedMember && init->isFailable() &&
+          !init->isImplicitlyUnwrappedOptional()) {
+        continue;
       }
+      addConstructorCall(cast<ConstructorDecl>(init), Reason,
+                         dynamicLookupInfo, type, None,
+                         /*IsOnType=*/true, name);
     }
   }
 
@@ -3464,9 +3481,10 @@ public:
     builder.addEqual();
     builder.addWhitespace(" ");
     assert(RHSType && resultType);
-    builder.addCallParameter(Identifier(), Identifier(), RHSType,
-                             /*IsVarArg*/ false, /*IsInOut*/ false,
-                             /*isIUO*/ false, /*isAutoClosure*/ false);
+    Type contextTy;
+    if (auto typeContext = CurrDeclContext->getInnermostTypeContext())
+      contextTy = typeContext->getDeclaredTypeInContext();
+    builder.addCallParameter(Identifier(), RHSType, contextTy);
     addTypeAnnotation(builder, resultType);
   }
 
@@ -3487,10 +3505,12 @@ public:
       builder.addWhitespace(" ");
     builder.addTextChunk(op->getName().str());
     builder.addWhitespace(" ");
-    if (RHSType)
-      builder.addCallParameter(Identifier(), Identifier(), RHSType,
-                               /*IsVarArg*/ false, /*IsInOut*/ false,
-                               /*isIUO*/ false, /*isAutoClosure*/ false);
+    if (RHSType) {
+      Type contextTy;
+      if (auto typeContext = CurrDeclContext->getInnermostTypeContext())
+        contextTy = typeContext->getDeclaredTypeInContext();
+      builder.addCallParameter(Identifier(), RHSType, contextTy);
+    }
     if (resultType)
       addTypeAnnotation(builder, resultType);
   }
@@ -3645,6 +3665,10 @@ public:
                  CodeCompletionLiteralKind::StringLiteral, "String");
     addFromProto("#file", CodeCompletionKeywordKind::pound_file,
                  CodeCompletionLiteralKind::StringLiteral, "String");
+    if (Ctx.LangOpts.EnableConcisePoundFile) {
+      addFromProto("#filePath", CodeCompletionKeywordKind::pound_file,
+                   CodeCompletionLiteralKind::StringLiteral, "String");
+    }
     addFromProto("#line", CodeCompletionKeywordKind::pound_line,
                  CodeCompletionLiteralKind::IntegerLiteral, "Int");
     addFromProto("#column", CodeCompletionKeywordKind::pound_column,
@@ -3710,21 +3734,13 @@ public:
     addFromProto(LK::ColorLiteral, "", [&](Builder &builder) {
       builder.addTextChunk("#colorLiteral");
       builder.addLeftParen();
-      builder.addCallParameter(context.getIdentifier("red"), floatType,
-                               /*IsVarArg*/ false, /*IsInOut*/ false,
-                               /*isIUO*/ false, /*isAutoClosure*/ false);
+      builder.addCallParameter(context.getIdentifier("red"), floatType);
       builder.addComma();
-      builder.addCallParameter(context.getIdentifier("green"), floatType,
-                               /*IsVarArg*/ false, /*IsInOut*/ false,
-                               /*isIUO*/ false, /*isAutoClosure*/ false);
+      builder.addCallParameter(context.getIdentifier("green"), floatType);
       builder.addComma();
-      builder.addCallParameter(context.getIdentifier("blue"), floatType,
-                               /*IsVarArg*/ false, /*IsInOut*/ false,
-                               /*isIUO*/ false, /*isAutoClosure*/ false);
+      builder.addCallParameter(context.getIdentifier("blue"), floatType);
       builder.addComma();
-      builder.addCallParameter(context.getIdentifier("alpha"), floatType,
-                               /*IsVarArg*/ false, /*IsInOut*/ false,
-                               /*isIUO*/ false, /*isAutoClosure*/ false);
+      builder.addCallParameter(context.getIdentifier("alpha"), floatType);
       builder.addRightParen();
     });
 
@@ -3733,9 +3749,7 @@ public:
       builder.addTextChunk("#imageLiteral");
       builder.addLeftParen();
       builder.addCallParameter(context.getIdentifier("resourceName"),
-                               stringType, /*IsVarArg*/ false,
-                               /*IsInOut*/ false, /*isIUO*/ false,
-                               /*isAutoClosure*/ false);
+                               stringType);
       builder.addRightParen();
     });
 
@@ -4379,6 +4393,8 @@ public:
     {
       llvm::raw_svector_ostream OS(DeclStr);
       PrintOptions Options;
+      if (auto transformType = CurrDeclContext->getDeclaredTypeInContext())
+        Options.setBaseType(transformType);
       Options.PrintImplicitAttrs = false;
       Options.SkipAttributes = true;
       CD->print(OS, Options);

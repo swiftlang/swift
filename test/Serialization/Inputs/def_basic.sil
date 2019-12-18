@@ -204,8 +204,8 @@ bb0:
   // CHECK: upcast {{.*}} : $D to $C
   %a = upcast %D : $D to $C
 
-  // CHECK: unconditional_checked_cast {{.*}} : $C to $D
-  %5 = unconditional_checked_cast %C : $C to $D
+  // CHECK: unconditional_checked_cast {{.*}} : $C to D
+  %5 = unconditional_checked_cast %C : $C to D
   %6 = tuple ()
   return %6 : $()
 }
@@ -445,7 +445,7 @@ bb0(%0 : $B):
   store %0 to %1a : $*B
   %3 = load %1a : $*B
   strong_retain %3 : $B
-  checked_cast_br %3 : $B to $E, yes, no     // CHECK: checked_cast_br
+  checked_cast_br %3 : $B to E, yes, no     // CHECK: checked_cast_br
 yes(%5 : $E):
   %y = integer_literal $Builtin.Int1, 1
   br isa(%y : $Builtin.Int1)

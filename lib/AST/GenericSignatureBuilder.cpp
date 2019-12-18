@@ -1886,7 +1886,7 @@ TypeDecl *EquivalenceClass::lookupNestedType(
     if (decl) {
       SmallVector<ValueDecl *, 2> foundMembers;
       decl->getParentModule()->lookupQualified(
-          decl, name,
+          decl, DeclNameRef(name),
           NL_QualifiedDefault | NL_OnlyTypes | NL_ProtocolMembers,
           foundMembers);
       for (auto member : foundMembers) {
@@ -4101,6 +4101,10 @@ ConstraintResult GenericSignatureBuilder::expandConformanceRequirement(
         // We only want concrete type declarations.
         auto type = dyn_cast<TypeDecl>(found);
         if (!type || isa<AssociatedTypeDecl>(type)) continue;
+
+        // Ignore nominal types. They're always invalid declarations.
+        if (isa<NominalTypeDecl>(type))
+          continue;
 
         // ... from the same module as the protocol.
         if (type->getModuleContext() != proto->getModuleContext()) continue;

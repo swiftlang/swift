@@ -26,7 +26,7 @@
 
 
 // RUN: touch -t 201401240006 %t/a.swift
-// RUN: cd %t && not %swiftc_driver -c -driver-use-frontend-path "%{python};%S/Inputs/update-dependencies-bad.py" -output-file-map %t/output.json -incremental -driver-always-rebuild-dependents ./a.swift ./b.swift ./c.swift ./d.swift ./e.swift ./f.swift ./bad.swift -module-name main -j1 -v > %t/a.txt 2>&1
+// RUN: cd %t && not %swiftc_driver -c -driver-use-frontend-path "%{python};%S/Inputs/update-dependencies-bad.py" -output-file-map %t/output.json -incremental -driver-always-rebuild-dependents ./a.swift ./bad.swift ./b.swift ./c.swift ./d.swift ./e.swift ./f.swift -module-name main -j1 -v > %t/a.txt 2>&1
 // RUN: %FileCheck -check-prefix=CHECK-A %s < %t/a.txt
 // RUN: %FileCheck -check-prefix=NEGATIVE-A %s < %t/a.txt
 // RUN: %FileCheck -check-prefix=CHECK-RECORD-A %s < %t/main~buildrecord.swiftdeps
@@ -110,7 +110,7 @@
 // RUN: cd %t && %swiftc_driver -c -driver-use-frontend-path "%{python};%S/Inputs/update-dependencies.py" -output-file-map %t/output.json -incremental -driver-always-rebuild-dependents ./a.swift ./b.swift ./c.swift ./d.swift ./e.swift ./f.swift ./bad.swift -module-name main -j1 -v 2>&1 | %FileCheck -check-prefix=CHECK-FIRST %s
 
 // RUN: touch -t 201401240006 %t/bad.swift
-// RUN: cd %t && not %swiftc_driver -c -driver-use-frontend-path "%{python};%S/Inputs/update-dependencies-bad.py" -output-file-map %t/output.json -incremental -driver-always-rebuild-dependents ./a.swift ./b.swift ./c.swift ./d.swift ./e.swift ./f.swift ./bad.swift -module-name main -j1 -v > %t/bad.txt 2>&1
+// RUN: cd %t && not %swiftc_driver -c -driver-use-frontend-path "%{python};%S/Inputs/update-dependencies-bad.py" -output-file-map %t/output.json -incremental -driver-always-rebuild-dependents ./bad.swift ./a.swift ./b.swift ./c.swift ./d.swift ./e.swift ./f.swift -module-name main -j1 -v > %t/bad.txt 2>&1
 // RUN: %FileCheck -check-prefix=CHECK-BAD %s < %t/bad.txt
 // RUN: %FileCheck -check-prefix=NEGATIVE-BAD %s < %t/bad.txt
 // RUN: %FileCheck -check-prefix=CHECK-RECORD-A %s < %t/main~buildrecord.swiftdeps

@@ -111,9 +111,8 @@ class TestClass :
     HasAssocWithDefault,
     HasAssocWithConstraintAndDefault {
   #^OVERRIDE_TestClass^#
-// OVERRIDE: found code completion token OVERRIDE_[[BASETYPE:[A-Za-z0-9]+]] at
 // OVERRIDE: Begin completions
-// OVERRIDE-DAG: Decl[InstanceMethod]/Super:         func returnAssocPlain() -> [[BASETYPE]].AssocPlain {|};
+// OVERRIDE-DAG: Decl[InstanceMethod]/Super:         func returnAssocPlain() -> AssocPlain {|};
 // OVERRIDE-DAG: Decl[InstanceMethod]/Super:         func returnAssocWithConformanceConstraint(fn: (Int) -> Int) -> some MyProtocol {|};
 // OVERRIDE-DAG: Decl[InstanceVar]/Super:            var valAssocWithSuperClassConstraint: some MyClass;
 // OVERRIDE-DAG: Decl[Subscript]/Super:              subscript<T>(idx: T) -> some MyClass & MyProtocol where T : Comparable {|};

@@ -60,7 +60,7 @@ extension OSLogInterpolation {
     arguments.append(header)
 
     // Append number of bytes needed to serialize the argument.
-    let byteCount = sizeForEncoding()
+    let byteCount = pointerSizeInBytes()
     arguments.append(UInt8(byteCount))
 
     // Increment total byte size by the number of bytes needed for this
@@ -102,11 +102,10 @@ extension OSLogArguments {
 /// evaluator, this function returns the byte size of Int, which must equal the
 /// word length of the target architecture and hence the pointer size.
 /// This function must be constant evaluable.
+@_semantics("constant_evaluable")
 @inlinable
 @_optimize(none)
-@_effects(readonly)
-@_semantics("constant_evaluable")
-internal func sizeForEncoding() -> Int {
+internal func pointerSizeInBytes() -> Int {
   return Int.bitWidth &>> logBitsPerByte
 }
 
@@ -114,8 +113,9 @@ internal func sizeForEncoding() -> Int {
 /// pointed by `bufferPosition`. When necessary, this function would copy the
 /// string contents to a storage with a stable pointer. If that happens, a reference
 /// to the storage will be added to `storageObjects`.
-@usableFromInline
+@inlinable
 @_alwaysEmitIntoClient
+@inline(__always)
 internal func serialize(
   _ stringValue: String,
   at bufferPosition: inout ByteBufferPointer,
@@ -129,7 +129,7 @@ internal func serialize(
     storageObjects.append(storage)
   }
 
-  let byteCount = sizeForEncoding()
+  let byteCount = pointerSizeInBytes()
   let dest =
     UnsafeMutableRawBufferPointer(start: bufferPosition, count: byteCount)
   withUnsafeBytes(of: bytePointer) { dest.copyMemory(from: $0) }

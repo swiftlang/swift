@@ -474,6 +474,34 @@ func testWrapperInitWithDefaultArg() {
   // CHECK-NEXT: Init
 }
 
+// rdar://problem/57350503 - DI failure due to an unnecessary cycle breaker
+public class Test57350503 {
+  @Synchronized
+  public private(set) var anchor: Int
+
+  public init(anchor: Int) {
+    self.anchor = anchor
+    printMe()
+  }
+
+  private func printMe() { }
+}
+
+@propertyWrapper
+public final class Synchronized<Value> {
+  private var value: Value
+
+  public var wrappedValue: Value {
+    get { value }
+    set { value = newValue }
+  }
+
+  public init(wrappedValue: Value) {
+    value = wrappedValue
+  }
+}
+
+
 testIntStruct()
 testIntClass()
 testRefStruct()

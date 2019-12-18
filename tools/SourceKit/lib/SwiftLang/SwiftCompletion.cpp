@@ -100,7 +100,6 @@ struct SwiftCodeCompletionConsumer
 
   void handleResults(MutableArrayRef<CodeCompletionResult *> Results) override {
     assert(swiftContext.swiftASTContext);
-    CodeCompletionContext::sortCompletionResults(Results);
     handleResultsImpl(Results, swiftContext);
   }
 };
@@ -171,6 +170,10 @@ static bool swiftCodeCompleteImpl(
     Error = "no input filenames specified";
     return false;
   }
+
+  // Always disable source location resolutions from .swiftsourceinfo file
+  // because they're somewhat heavy operations and aren't needed for completion.
+  Invocation.getFrontendOptions().IgnoreSwiftSourceInfo = true;
 
   const char *Position = InputFile->getBufferStart() + CodeCompletionOffset;
   std::unique_ptr<llvm::WritableMemoryBuffer> NewBuffer =

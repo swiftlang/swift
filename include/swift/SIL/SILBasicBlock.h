@@ -26,8 +26,6 @@ namespace swift {
 
 class SILFunction;
 class SILArgument;
-class SILPhiArgument;
-class SILFunctionArgument;
 class SILPrintContext;
 
 class SILBasicBlock :
@@ -193,14 +191,10 @@ public:
 
   ArrayRef<SILArgument *> getArguments() const { return ArgumentList; }
 
-  /// Returns a transform array ref that performs llvm::cast<SILPhiArgument> on
+  /// Returns a transform array ref that performs llvm::cast<NAME>
   /// each argument and then returns the downcasted value.
-  PhiArgumentArrayRef getPhiArguments() const;
-
-  /// Returns a transform array ref that performs
-  /// llvm::cast<SILFunctionArgument> on each argument and then returns the
-  /// downcasted value.
-  FunctionArgumentArrayRef getFunctionArguments() const;
+#define ARGUMENT(NAME, PARENT) NAME##ArrayRef get##NAME##s() const;
+#include "swift/SIL/SILNodes.def"
 
   unsigned getNumArguments() const { return ArgumentList.size(); }
   const SILArgument *getArgument(unsigned i) const { return ArgumentList[i]; }

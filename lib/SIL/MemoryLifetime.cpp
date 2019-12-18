@@ -435,7 +435,10 @@ void MemoryDataflow::exitReachableAnalysis() {
   llvm::SmallVector<BlockState *, 16> workList;
   for (BlockState &state : blockStates) {
     if (state.block->getTerminator()->isFunctionExiting()) {
-      state.exitReachable = true;
+      state.exitReachability = ExitReachability::ReachesExit;
+      workList.push_back(&state);
+    } else if (isa<UnreachableInst>(state.block->getTerminator())) {
+      state.exitReachability = ExitReachability::ReachesUnreachable;
       workList.push_back(&state);
     }
   }
@@ -443,8 +446,10 @@ void MemoryDataflow::exitReachableAnalysis() {
     BlockState *state = workList.pop_back_val();
     for (SILBasicBlock *pred : state->block->getPredecessorBlocks()) {
       BlockState *predState = block2State[pred];
-      if (!predState->exitReachable) {
-        predState->exitReachable = true;
+      if (predState->exitReachability < state->exitReachability) {
+        // As there are 3 states, each block can be put into the workList 2
+        // times maximum.
+        predState->exitReachability = state->exitReachability;
         workList.push_back(predState);
       }
     }
@@ -806,7 +811,7 @@ void MemoryLifetimeVerifier::checkFunction(MemoryDataflow &dataFlow) {
   const Bits &nonTrivialLocations = locations.getNonTrivialLocations();
   Bits bits(locations.getNumLocations());
   for (BlockState &st : dataFlow) {
-    if (!st.reachableFromEntry || !st.exitReachable)
+    if (!st.reachableFromEntry || !st.exitReachable())
       continue;
 
     // Check all instructions in the block.

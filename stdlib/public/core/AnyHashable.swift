@@ -120,7 +120,7 @@ internal struct _ConcreteHashableBox<Base: Hashable>: _AnyHashableBox {
 ///         AnyHashable(Set(["a", "b"])): "a set of strings"
 ///     ]
 ///     print(descriptions[AnyHashable(42)]!)      // prints "an Int"
-///     print(descriptions[AnyHashable(43)])       // prints "nil"
+///     print(descriptions[AnyHashable(45)])       // prints "nil"
 ///     print(descriptions[AnyHashable(Int8(43))]!) // prints "an Int8"
 ///     print(descriptions[AnyHashable(Set(["a", "b"]))]!) // prints "a set of strings"
 @frozen

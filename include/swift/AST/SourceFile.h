@@ -147,6 +147,11 @@ public:
   /// A set of synthesized declarations that need to be type checked.
   llvm::SmallVector<Decl *, 8> SynthesizedDecls;
 
+  /// We might perform type checking on the same source file more than once,
+  /// if its the main file or a REPL instance, so keep track of the last
+  /// checked synthesized declaration to avoid duplicating work.
+  unsigned LastCheckedSynthesizedDecl = 0;
+
   /// A mapping from Objective-C selectors to the methods that have
   /// those selectors.
   llvm::DenseMap<ObjCSelector, llvm::TinyPtrVector<AbstractFunctionDecl *>>
@@ -477,6 +482,11 @@ inline bool ModuleDecl::EntryPointInfoTy::markDiagnosedMainClassWithScript() {
   return !res;
 }
 
+inline void simple_display(llvm::raw_ostream &out, const SourceFile *SF) {
+  assert(SF && "Cannot display null source file!");
+
+  out << "source_file " << '\"' << SF->getFilename() << '\"';
+}
 } // end namespace swift
 
 #endif

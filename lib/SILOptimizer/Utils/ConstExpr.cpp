@@ -16,6 +16,7 @@
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/NullablePtr.h"
+#include "swift/AST/SemanticAttrs.h"
 #include "swift/Demangling/Demangle.h"
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/FormalLinkage.h"
@@ -62,24 +63,24 @@ enum class WellKnownFunction {
 };
 
 static llvm::Optional<WellKnownFunction> classifyFunction(SILFunction *fn) {
-  if (fn->hasSemanticsAttr("array.init.empty"))
+  if (fn->hasSemanticsAttr(semantics::ARRAY_INIT_EMPTY))
     return WellKnownFunction::ArrayInitEmpty;
-  if (fn->hasSemanticsAttr("array.uninitialized_intrinsic"))
+  if (fn->hasSemanticsAttr(semantics::ARRAY_UNINITIALIZED_INTRINSIC))
     return WellKnownFunction::AllocateUninitializedArray;
-  if (fn->hasSemanticsAttr("array.append_element"))
+  if (fn->hasSemanticsAttr(semantics::ARRAY_APPEND_ELEMENT))
     return WellKnownFunction::ArrayAppendElement;
-  if (fn->hasSemanticsAttr("string.init_empty"))
+  if (fn->hasSemanticsAttr(semantics::STRING_INIT_EMPTY))
     return WellKnownFunction::StringInitEmpty;
   // There are two string initializers in the standard library with the
   // semantics "string.makeUTF8". They are identical from the perspective of
   // the interpreter. One of those functions is probably redundant and not used.
-  if (fn->hasSemanticsAttr("string.makeUTF8"))
+  if (fn->hasSemanticsAttr(semantics::STRING_MAKE_UTF8))
     return WellKnownFunction::StringMakeUTF8;
-  if (fn->hasSemanticsAttr("string.append"))
+  if (fn->hasSemanticsAttr(semantics::STRING_APPEND))
     return WellKnownFunction::StringAppend;
-  if (fn->hasSemanticsAttr("string.equals"))
+  if (fn->hasSemanticsAttr(semantics::STRING_EQUALS))
     return WellKnownFunction::StringEquals;
-  if (fn->hasSemanticsAttr("string.escapePercent.get"))
+  if (fn->hasSemanticsAttr(semantics::STRING_ESCAPE_PERCENT_GET))
     return WellKnownFunction::StringEscapePercent;
   if (fn->hasSemanticsAttrThatStartsWith("programtermination_point"))
     return WellKnownFunction::AssertionFailure;
@@ -1146,8 +1147,10 @@ ConstExprFunctionState::computeCallResult(ApplyInst *apply) {
           calleeFnType->getWitnessMethodConformanceOrInvalid().getRequirement();
       // Compute a mapping that maps the Self type of the protocol given by
       // 'requirement' to the concrete type available in the substitutionMap.
-      auto protoSelfToConcreteType =
-          apply->getSubstitutionMap().subst(substitutionMap);
+      SubstitutionMap applySubstMap = apply->getSubstitutionMap();
+      auto protoSelfToConcreteType = substitutionMap.empty()
+                                         ? applySubstMap
+                                         : applySubstMap.subst(substitutionMap);
       // Get a concrete protocol conformance by using the mapping for the
       // Self type of the requirement.
       auto conf = protoSelfToConcreteType.lookupConformance(
@@ -1173,7 +1176,8 @@ ConstExprFunctionState::computeCallResult(ApplyInst *apply) {
     // or conformance, with the mapping introduced by the call itself.  This
     // ensures that the callee's substitution map can map from its type
     // namespace back to concrete types and conformances.
-    calleeSubMap = callSubMap.subst(substitutionMap);
+    calleeSubMap = substitutionMap.empty() ? callSubMap
+                                           : callSubMap.subst(substitutionMap);
   }
 
   // Now that we have successfully folded all of the parameters, we can evaluate
@@ -1605,13 +1609,14 @@ llvm::Optional<SymbolicValue> ConstExprFunctionState::evaluateClosureCreation(
       }
       captures.push_back({capturedSILValue, capturedSymbolicValue});
     }
-    callSubstMap = papply->getSubstitutionMap().subst(this->substitutionMap);
+    SubstitutionMap applySubstMap = papply->getSubstitutionMap();
+    callSubstMap = substitutionMap.empty()
+                       ? applySubstMap
+                       : applySubstMap.subst(substitutionMap);
   }
 
-  SILType closureType = closureInst->getType();
-  assert(closureType.is<SILFunctionType>());
   auto closureVal = SymbolicValue::makeClosure(
-      target, captures, callSubstMap, closureType, evaluator.getAllocator());
+      target, captures, callSubstMap, closureInst, evaluator.getAllocator());
   setValue(closureInst, closureVal);
   return None;
 }

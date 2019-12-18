@@ -168,6 +168,13 @@ macro(add_sourcekit_library name)
     endif()
   endif()
 
+  if("${CMAKE_SYSTEM_NAME}" STREQUAL "Android")
+    if(SOURCEKITLIB_SHARED)
+      set_target_properties(${name} PROPERTIES BUILD_WITH_INSTALL_RPATH TRUE)
+      set_target_properties(${name} PROPERTIES INSTALL_RPATH "$ORIGIN/../lib/swift/android")
+    endif()
+  endif()
+
   if("${SOURCEKITLIB_INSTALL_IN_COMPONENT}" STREQUAL "")
     if(SOURCEKITLIB_SHARED)
       set(SOURCEKITLIB_INSTALL_IN_COMPONENT tools)
@@ -191,6 +198,13 @@ macro(add_sourcekit_library name)
                              COMPONENT "${SOURCEKITLIB_INSTALL_IN_COMPONENT}")
   set_target_properties(${name} PROPERTIES FOLDER "SourceKit libraries")
   add_sourcekit_default_compiler_flags("${name}")
+
+  swift_is_installing_component("${SOURCEKITLIB_INSTALL_IN_COMPONENT}" is_installing)
+  if(NOT is_installing)
+    set_property(GLOBAL APPEND PROPERTY SWIFT_BUILDTREE_EXPORTS ${name})
+  else()
+    set_property(GLOBAL APPEND PROPERTY SWIFT_EXPORTS ${name})
+  endif()
 endmacro()
 
 # Add a new SourceKit executable.
@@ -317,7 +331,6 @@ macro(add_sourcekit_framework name)
     endif()
   endif()
 
-
   if (SOURCEKIT_DEPLOYMENT_OS MATCHES "^macosx")
     set_output_directory(${name}
         BINARY_DIR ${SOURCEKIT_RUNTIME_OUTPUT_INTDIR}
@@ -367,6 +380,14 @@ macro(add_sourcekit_framework name)
         COMMAND ${CMAKE_COMMAND} -E copy "${hdr}" "${framework_location}/Headers/${hdrname}")
     endforeach()
   endif()
+
+  swift_is_installing_component("${SOURCEKITFW_INSTALL_IN_COMPONENT}" is_installing)
+  if(NOT is_installing)
+    set_property(GLOBAL APPEND PROPERTY SWIFT_BUILDTREE_EXPORTS ${name})
+  else()
+    set_property(GLOBAL APPEND PROPERTY SWIFT_EXPORTS ${name})
+  endif()
+
   add_sourcekit_default_compiler_flags("${name}")
 endmacro(add_sourcekit_framework)
 

@@ -243,7 +243,7 @@ bb0:
   %a = upcast %D : $D to $C
 
 
-  %5 = unconditional_checked_cast %C : $C to $D   // CHECK: unconditional_checked_cast
+  %5 = unconditional_checked_cast %C : $C to D   // CHECK: unconditional_checked_cast
   %6 = tuple ()
   return %6 : $()
 }
@@ -510,7 +510,7 @@ bb0(%0 : $B):
   store %0 to %1a : $*B
   %3 = load %1a : $*B                        // CHECK: load
   strong_retain %3 : $B
-  checked_cast_br %3 : $B to $E, yes, no     // CHECK: checked_cast_br
+  checked_cast_br %3 : $B to E, yes, no     // CHECK: checked_cast_br
 yes(%5 : $E):
   %y = integer_literal $Builtin.Int1, 1
   br isa(%y : $Builtin.Int1)
@@ -798,13 +798,13 @@ bb0:
 
 sil @test_super_to_archetype_ref : $@convention(thin) <T : Class1> (Class1) -> T {
 bb0(%c : $Class1):
-  %0 = unconditional_checked_cast %c : $Class1 to $T
+  %0 = unconditional_checked_cast %c : $Class1 to T
   return %0 : $T
 }
 
 sil @test_downcast_archetype_ref : $@convention(thin) <T:Class1, U:Class1> (T) -> () {
 bb0(%t : $T):
-  %0 = unconditional_checked_cast %t : $T to $U
+  %0 = unconditional_checked_cast %t : $T to U
   %1 = tuple ()
   return %1 : $()
 }

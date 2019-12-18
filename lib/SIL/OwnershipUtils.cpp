@@ -163,6 +163,13 @@ bool swift::getUnderlyingBorrowIntroducingValues(
       continue;
     }
 
+    // If v produces .none ownership, then we can ignore it. It is important
+    // that we put this before checking for guaranteed forwarding instructions,
+    // since we want to ignore guaranteed forwarding instructions that in this
+    // specific case produce a .none value.
+    if (v.getOwnershipKind() == ValueOwnershipKind::None)
+      continue;
+
     // Otherwise if v is an ownership forwarding value, add its defining
     // instruction
     if (isGuaranteedForwardingValue(v)) {
@@ -173,10 +180,9 @@ bool swift::getUnderlyingBorrowIntroducingValues(
       continue;
     }
 
-    // If v produces any ownership, then we can ignore it. Otherwise, we need to
-    // return false since this is an introducer we do not understand.
-    if (v.getOwnershipKind() != ValueOwnershipKind::None)
-      return false;
+    // Otherwise, this is an introducer we do not understand. Bail and return
+    // false.
+    return false;
   }
 
   return true;
@@ -189,8 +195,8 @@ llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &os,
 }
 
 bool BorrowScopeIntroducingValue::areInstructionsWithinScope(
-    ArrayRef<BranchPropagatedUser> instructions,
-    SmallVectorImpl<BranchPropagatedUser> &scratchSpace,
+    ArrayRef<SILInstruction *> instructions,
+    SmallVectorImpl<SILInstruction *> &scratchSpace,
     SmallPtrSetImpl<SILBasicBlock *> &visitedBlocks,
     DeadEndBlocks &deadEndBlocks) const {
   // Make sure that we clear our scratch space/utilities before we exit.
@@ -208,8 +214,9 @@ bool BorrowScopeIntroducingValue::areInstructionsWithinScope(
     return true;
 
   // Otherwise, gather up our local scope ending instructions.
-  visitLocalScopeEndingUses(
-      [&scratchSpace](Operand *op) { scratchSpace.emplace_back(op); });
+  visitLocalScopeEndingUses([&scratchSpace](Operand *op) {
+    scratchSpace.emplace_back(op->getUser());
+  });
 
   LinearLifetimeChecker checker(visitedBlocks, deadEndBlocks);
   return checker.validateLifetime(value, scratchSpace, instructions);

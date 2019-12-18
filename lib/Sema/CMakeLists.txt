@@ -46,6 +46,7 @@ add_swift_host_library(swiftSema STATIC
   TypeCheckDecl.cpp
   TypeCheckDeclObjC.cpp
   TypeCheckDeclOverride.cpp
+  TypeCheckDeclPrimary.cpp
   TypeCheckError.cpp
   TypeCheckExpr.cpp
   TypeCheckExprObjC.cpp
