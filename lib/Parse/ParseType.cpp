@@ -638,7 +638,13 @@ ParserStatus Parser::parseGenericArguments(SmallVectorImpl<TypeRepr *> &Args,
 ///   type-identifier:
 ///     identifier generic-args? ('.' identifier generic-args?)*
 ///
-ParserResult<TypeRepr> Parser::parseTypeIdentifier() {
+ParserResult<TypeRepr>
+Parser::parseTypeIdentifier(bool isParsingQualifiedDeclBaseType) {
+  // If parsing a qualified declaration name, return error if base type cannot
+  // be parsed.
+  if (isParsingQualifiedDeclBaseType && !canParseBaseTypeForQualifiedDeclName())
+    return makeParserError();
+
   if (Tok.isNot(tok::identifier) && Tok.isNot(tok::kw_Self)) {
     // is this the 'Any' type
     if (Tok.is(tok::kw_Any)) {
@@ -703,6 +709,18 @@ ParserResult<TypeRepr> Parser::parseTypeIdentifier() {
       }
       if (!peekToken().isContextualKeyword("Type")
           && !peekToken().isContextualKeyword("Protocol")) {
+        // If parsing a qualified declaration name, break before parsing the
+        // period before the final declaration name component.
+        if (isParsingQualifiedDeclBaseType) {
+          // If qualified name base type cannot be parsed from the current
+          // point (i.e. the next type identifier is not followed by a '.'),
+          // then the next identifier is the final declaration name component.
+          BacktrackingScope backtrack(*this);
+          consumeStartingCharacterOfCurrentToken(tok::period);
+          if (!canParseBaseTypeForQualifiedDeclName())
+            break;
+        }
+        // Consume the period.
         consumeToken();
         continue;
       }
@@ -1541,19 +1559,27 @@ bool Parser::canParseTypeIdentifierOrTypeComposition() {
   }
 }
 
+bool Parser::canParseSimpleTypeIdentifier() {
+  // Parse an identifier.
+  if (!Tok.isAny(tok::identifier, tok::kw_Self, tok::kw_Any))
+    return false;
+  consumeToken();
+
+  // Parse an optional generic argument list.
+  if (startsWithLess(Tok))
+    if (!canParseGenericArguments())
+      return false;
+
+  return true;
+}
+
 bool Parser::canParseTypeIdentifier() {
   while (true) {
-    if (!Tok.isAny(tok::identifier, tok::kw_Self, tok::kw_Any))
+    if (!canParseSimpleTypeIdentifier())
       return false;
-    consumeToken();
-    
-    if (startsWithLess(Tok)) {
-      if (!canParseGenericArguments())
-        return false;
-    }
 
     // Treat 'Foo.<anything>' as an attempt to write a dotted type
-    // unless <anything> is 'Type'.
+    // unless <anything> is 'Type' or 'Protocol'.
     if ((Tok.is(tok::period) || Tok.is(tok::period_prefix)) &&
         !peekToken().isContextualKeyword("Type") &&
         !peekToken().isContextualKeyword("Protocol")) {
@@ -1564,6 +1590,17 @@ bool Parser::canParseTypeIdentifier() {
   }
 }
 
+bool Parser::canParseBaseTypeForQualifiedDeclName() {
+  BacktrackingScope backtrack(*this);
+
+  // Parse a simple type identifier.
+  if (!canParseSimpleTypeIdentifier())
+    return false;
+
+  // Qualified name base types must be followed by a period.
+  // If the next token starts with a period, return true.
+  return startsWithSymbol(Tok, '.');
+}
 
 bool Parser::canParseOldStyleProtocolComposition() {
   consumeToken(tok::kw_protocol);
