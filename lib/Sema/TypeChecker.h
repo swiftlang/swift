@@ -1595,6 +1595,10 @@ public:
   // SWIFT_ENABLE_TENSORFLOW
   void checkFunctionBodyCompilerEvaluable(AbstractFunctionDecl *D);
 
+  /// Typechecks all derivative attributes in the module that can affect
+  /// derivative configurations of functions in `sourceFile`.
+  static void typeCheckDerivativeAttrs(SourceFile &sourceFile);
+
   /// If an expression references 'self.init' or 'super.init' in an
   /// initializer context, returns the implicit 'self' decl of the constructor.
   /// Otherwise, return nil.

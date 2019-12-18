@@ -222,7 +222,7 @@ DerivativeRegistrationTests.testWithLeakChecking("FunctionInOtherFile_Fileprivat
 
 extension FunctionInOtherFile_DerivativeInMainFile {
   @derivative(of: f)
-  static fileprivate func df(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
+  static func df(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
     (x, { expectedGradient * $0 })
   }
 }

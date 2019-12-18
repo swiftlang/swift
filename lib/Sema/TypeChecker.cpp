@@ -385,6 +385,16 @@ TypeCheckSourceFileRequest::evaluate(Evaluator &eval,
     // to work.
     ::bindExtensions(*SF);
 
+    // SWIFT_ENABLE_TENSORFLOW
+    // Type check all `@derivative` attributes in the module. Later, attribute
+    // checking re-checks all `@derivative` attributes in the primary file(s).
+    // This initial checking pass must occur before the re-checking, so that
+    // re-checking can diagnose duplicate attributes using information about all
+    // the derivatives in the module. The differentiation pass also relies on
+    // the information collected by this initial checking pass to see
+    // derivatives defined in the whole module.
+    TypeChecker::typeCheckDerivativeAttrs(*SF);
+
     // Type check the top-level elements of the source file.
     for (auto D : llvm::makeArrayRef(SF->Decls).slice(StartElem)) {
       if (auto *TLCD = dyn_cast<TopLevelCodeDecl>(D)) {
@@ -405,9 +415,8 @@ TypeCheckSourceFileRequest::evaluate(Evaluator &eval,
   }
 
   // Checking that benefits from having the whole module available.
-  if (!Ctx.TypeCheckerOpts.DelayWholeModuleChecking) {
+  if (!Ctx.TypeCheckerOpts.DelayWholeModuleChecking)
     performWholeModuleTypeChecking(*SF);
-  }
 
   return true;
 }

@@ -11,13 +11,15 @@ func sin(_ x: Float) -> Float {
 func jvpSin(x: @nondiff Float) -> (value: Float, differential: (Float) -> (Float)) {
   return (x, { $0 })
 }
+// expected-error @+2 {{a derivative already exists for 'sin'}}
 // expected-note @+1 {{other attribute declared here}}
 @derivative(of: sin, wrt: x) // ok
 func vjpSinExplicitWrt(x: Float) -> (value: Float, pullback: (Float) -> Float) {
   return (x, { $0 })
 }
 
-// expected-error @+1 {{a derivative already exists for 'sin'}}
+// expected-error @+2 {{a derivative already exists for 'sin'}}
+// expected-note @+1 {{other attribute declared here}}
 @derivative(of: sin)
 func vjpDuplicate(x: Float) -> (value: Float, pullback: (Float) -> Float) {
   return (x, { $0 })
@@ -554,6 +556,7 @@ func dDerivativesHaveDifferentAccessLevels2(_ x: Float) -> (value: Float, pullba
 
 // Check that cross-file and cross-module duplicate derivatives are rejected.
 
+// expected-error @+2 {{a derivative already exists for 'functionDefinedInOtherFile_publicDerivativeInOtherFile'}}
 // expected-note @+1 {{other attribute declared here}}
 @derivative(of: functionDefinedInOtherFile_publicDerivativeInOtherFile)
 public func crossFileDuplicateDerivative2(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {

@@ -734,10 +734,6 @@ SILDifferentiabilityWitness *getOrCreateMinimalASTDifferentiabilityWitness(
   if (existingWitness)
     return existingWitness;
 
-  assert(original->isExternalDeclaration() &&
-         "SILGen should create differentiability witnesses for all function "
-         "definitions with explicit differentiable attributes");
-
   return SILDifferentiabilityWitness::createDeclaration(
       module, SILLinkage::PublicExternal, original,
       minimalConfig->parameterIndices, minimalConfig->resultIndices,

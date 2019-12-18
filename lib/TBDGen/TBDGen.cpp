@@ -67,8 +67,6 @@ void TBDGenVisitor::addSymbol(StringRef name, SymbolKind kind) {
   if (StringSymbols && kind == SymbolKind::GlobalSymbol) {
     auto isNewValue = StringSymbols->insert(mangled).second;
     (void)isNewValue;
-    if (!isNewValue)
-      llvm::dbgs() << mangled << "\n";
     assert(isNewValue && "symbol appears twice");
   }
 }

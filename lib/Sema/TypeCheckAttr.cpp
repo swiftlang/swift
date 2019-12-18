@@ -19,6 +19,7 @@
 #include "TypeCheckType.h"
 #include "TypeChecker.h"
 #include "swift/AST/ASTVisitor.h"
+#include "swift/AST/ASTWalker.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -3592,7 +3593,24 @@ DifferentiableAttributeParameterIndicesRequest::evaluate(
 }
 
 // SWIFT_ENABLE_TENSORFLOW
-void AttributeChecker::visitDerivativeAttr(DerivativeAttr *attr) {
+/// Typechecks the given derivative attribute `attr` on decl `D`.
+///
+/// Effects are:
+/// - Sets the parameter indices on `attr`.
+/// - Diagnoses errors.
+/// - Stores the attribute in the `ASTContext` list of derivative attributes.
+/// - Stores the derivative configuration in the original function's list of
+///   derivative configurations.
+///
+/// \returns true on error, false on success.
+static bool typeCheckDerivativeAttr(ASTContext &Ctx, Decl *D,
+                                    DerivativeAttr *attr) {
+
+  // Note: Implementation must be idempotent because it can get called multiple
+  // times for the same attribute.
+
+  auto &diags = Ctx.Diags;
+
   FuncDecl *derivative = cast<FuncDecl>(D);
   auto lookupConformance =
       LookUpConformanceInModule(D->getDeclContext()->getParentModule());
@@ -3612,29 +3630,27 @@ void AttributeChecker::visitDerivativeAttr(DerivativeAttr *attr) {
   auto derivativeResultTupleType = derivativeResultType->getAs<TupleType>();
   if (!derivativeResultTupleType ||
       derivativeResultTupleType->getNumElements() != 2) {
-    diagnose(attr->getLocation(), diag::derivative_attr_expected_result_tuple);
-    attr->setInvalid();
-    return;
+    diags.diagnose(attr->getLocation(),
+                   diag::derivative_attr_expected_result_tuple);
+    return true;
   }
   auto valueResultElt = derivativeResultTupleType->getElement(0);
   auto funcResultElt = derivativeResultTupleType->getElement(1);
   // Get derivative kind and derivative function identifier.
   AutoDiffDerivativeFunctionKind kind;
   if (valueResultElt.getName().str() != "value") {
-    diagnose(attr->getLocation(),
-             diag::derivative_attr_invalid_result_tuple_value_label);
-    attr->setInvalid();
-    return;
+    diags.diagnose(attr->getLocation(),
+                   diag::derivative_attr_invalid_result_tuple_value_label);
+    return true;
   }
   if (funcResultElt.getName().str() == "differential") {
     kind = AutoDiffDerivativeFunctionKind::JVP;
   } else if (funcResultElt.getName().str() == "pullback") {
     kind = AutoDiffDerivativeFunctionKind::VJP;
   } else {
-    diagnose(attr->getLocation(),
-             diag::derivative_attr_invalid_result_tuple_func_label);
-    attr->setInvalid();
-    return;
+    diags.diagnose(attr->getLocation(),
+                   diag::derivative_attr_invalid_result_tuple_func_label);
+    return true;
   }
   attr->setDerivativeKind(kind);
   // `value: R` result tuple element must conform to `Differentiable`.
@@ -3645,11 +3661,10 @@ void AttributeChecker::visitDerivativeAttr(DerivativeAttr *attr) {
   auto valueResultConf = TypeChecker::conformsToProtocol(
       valueResultType, diffableProto, derivative->getDeclContext(), None);
   if (!valueResultConf) {
-    diagnose(attr->getLocation(),
-             diag::derivative_attr_result_value_not_differentiable,
-             valueResultElt.getType());
-    attr->setInvalid();
-    return;
+    diags.diagnose(attr->getLocation(),
+                   diag::derivative_attr_result_value_not_differentiable,
+                   valueResultElt.getType());
+    return true;
   }
 
   // Compute expected original function type and look up original function.
@@ -3693,23 +3708,23 @@ void AttributeChecker::visitDerivativeAttr(DerivativeAttr *attr) {
   };
 
   auto noneValidDiagnostic = [&]() {
-    diagnose(originalName.Loc,
-             diag::autodiff_attr_original_decl_none_valid_found,
-             originalName.Name, originalFnType);
+    diags.diagnose(originalName.Loc,
+                   diag::autodiff_attr_original_decl_none_valid_found,
+                   originalName.Name, originalFnType);
   };
   auto ambiguousDiagnostic = [&]() {
-    diagnose(originalName.Loc, diag::attr_ambiguous_reference_to_decl,
-             originalName.Name, attr->getAttrName());
+    diags.diagnose(originalName.Loc, diag::attr_ambiguous_reference_to_decl,
+                   originalName.Name, attr->getAttrName());
   };
   auto notFunctionDiagnostic = [&]() {
-    diagnose(originalName.Loc,
-             diag::autodiff_attr_original_decl_invalid_kind,
-             originalName.Name);
+    diags.diagnose(originalName.Loc,
+                   diag::autodiff_attr_original_decl_invalid_kind,
+                   originalName.Name);
   };
   std::function<void()> invalidTypeContextDiagnostic = [&]() {
-    diagnose(originalName.Loc,
-             diag::autodiff_attr_original_decl_not_same_type_context,
-             originalName.Name);
+    diags.diagnose(originalName.Loc,
+                   diag::autodiff_attr_original_decl_not_same_type_context,
+                   originalName.Name);
   };
 
   // Returns true if the derivative function and original function candidate are
@@ -3743,52 +3758,39 @@ void AttributeChecker::visitDerivativeAttr(DerivativeAttr *attr) {
       ambiguousDiagnostic, notFunctionDiagnostic, lookupOptions,
       hasValidTypeContext, invalidTypeContextDiagnostic);
   if (!originalAFD) {
-    attr->setInvalid();
-    return;
+    return true;
   }
   // Diagnose original stored properties. Stored properties cannot have custom
   // registered derivatives.
   if (auto *accessorDecl = dyn_cast<AccessorDecl>(originalAFD)) {
     auto *asd = accessorDecl->getStorage();
     if (asd->hasStorage()) {
-      diagnose(originalName.Loc,
-               diag::derivative_attr_original_stored_property_unsupported,
-               originalName.Name);
-      diagnose(originalAFD->getLoc(), diag::decl_declared_here,
-               asd->getFullName());
-      attr->setInvalid();
-      return;
+      diags.diagnose(originalName.Loc,
+                     diag::derivative_attr_original_stored_property_unsupported,
+                     originalName.Name);
+      diags.diagnose(originalAFD->getLoc(), diag::decl_declared_here,
+                     asd->getFullName());
+      return true;
     }
   }
   attr->setOriginalFunction(originalAFD);
-
-  // Get checked wrt param indices.
-  auto *checkedWrtParamIndices = attr->getParameterIndices();
 
   // Get the parsed wrt param indices, which have not yet been checked.
   // This is defined for parsed attributes.
   auto parsedWrtParams = attr->getParsedParameters();
 
-  // If checked wrt param indices are not specified, compute them.
+  auto *checkedWrtParamIndices = computeDifferentiationParameters(
+      parsedWrtParams, derivative, derivative->getGenericEnvironment(),
+      attr->getAttrName(), attr->getLocation());
   if (!checkedWrtParamIndices)
-    checkedWrtParamIndices =
-        computeDifferentiationParameters(parsedWrtParams, derivative,
-                                         derivative->getGenericEnvironment(),
-                                         attr->getAttrName(),
-                                         attr->getLocation());
-  if (!checkedWrtParamIndices) {
-    attr->setInvalid();
-    return;
-  }
+    return true;
 
   // Check if differentiation parameter indices are valid.
   if (checkDifferentiationParameters(
           originalAFD, checkedWrtParamIndices, originalFnType,
           derivative->getGenericEnvironment(), derivative->getModuleContext(),
-          parsedWrtParams, attr->getLocation())) {
-    attr->setInvalid();
-    return;
-  }
+          parsedWrtParams, attr->getLocation()))
+    return true;
 
   // Set the checked differentiation parameter indices in the attribute.
   attr->setParameterIndices(checkedWrtParamIndices);
@@ -3846,25 +3848,25 @@ void AttributeChecker::visitDerivativeAttr(DerivativeAttr *attr) {
   // Check if differential/pullback type matches expected type.
   if (!actualFuncEltType->isEqual(expectedFuncEltType)) {
     // Emit differential/pullback type mismatch error on attribute.
-    diagnose(attr->getLocation(),
-             diag::derivative_attr_result_func_type_mismatch,
-             funcResultElt.getName(), originalAFD->getFullName());
+    diags.diagnose(attr->getLocation(),
+                   diag::derivative_attr_result_func_type_mismatch,
+                   funcResultElt.getName(), originalAFD->getFullName());
     // Emit note with expected differential/pullback type on actual type
     // location.
     auto *tupleReturnTypeRepr =
         cast<TupleTypeRepr>(derivative->getBodyResultTypeLoc().getTypeRepr());
     auto *funcEltTypeRepr = tupleReturnTypeRepr->getElementType(1);
-    diagnose(funcEltTypeRepr->getStartLoc(),
-             diag::derivative_attr_result_func_type_mismatch_note,
-             funcResultElt.getName(), expectedFuncEltType)
+    diags
+        .diagnose(funcEltTypeRepr->getStartLoc(),
+                  diag::derivative_attr_result_func_type_mismatch_note,
+                  funcResultElt.getName(), expectedFuncEltType)
         .highlight(funcEltTypeRepr->getSourceRange());
     // Emit note showing original function location, if possible.
     if (originalAFD->getLoc().isValid())
-      diagnose(originalAFD->getLoc(),
-               diag::derivative_attr_result_func_original_note,
-               originalAFD->getFullName());
-    attr->setInvalid();
-    return;
+      diags.diagnose(originalAFD->getLoc(),
+                     diag::derivative_attr_result_func_original_note,
+                     originalAFD->getFullName());
+    return true;
   }
 
   // Check that derivative visibility is at least as restricted as original
@@ -3873,22 +3875,28 @@ void AttributeChecker::visitDerivativeAttr(DerivativeAttr *attr) {
           originalAFD->getFormalAccessScope() &&
       !derivative->getFormalAccessScope().isChildOf(
           originalAFD->getFormalAccessScope())) {
-    diagnoseAndRemoveAttr(attr, diag::derivative_attr_visibility_too_broad);
-    diagnose(originalAFD->getLoc(),
-             diag::derivative_attr_visibility_too_broad_note);
-    return;
+    diags.diagnose(attr->getLocation(),
+                   diag::derivative_attr_visibility_too_broad);
+    diags.diagnose(originalAFD->getLoc(),
+                   diag::derivative_attr_visibility_too_broad_note);
+    return true;
   }
 
   // Reject duplicate `@derivative` attributes.
-  auto insertion = Ctx.DerivativeAttrs.try_emplace(
-      {originalAFD, checkedWrtParamIndices, kind}, attr);
-  if (!insertion.second) {
-    diagnoseAndRemoveAttr(attr,
-                          diag::derivative_attr_original_already_has_derivative,
-                          originalAFD->getFullName());
-    diagnose(insertion.first->getSecond()->getLocation(),
-             diag::differentiable_attr_duplicate_note);
-    return;
+  auto &derivativeAttrs =
+      Ctx.DerivativeAttrs[{originalAFD, checkedWrtParamIndices, kind}];
+  derivativeAttrs.insert(attr);
+  if (derivativeAttrs.size() > 1) {
+    diags.diagnose(attr->getLocation(),
+                   diag::derivative_attr_original_already_has_derivative,
+                   originalAFD->getFullName());
+    for (auto *duplicateAttr : derivativeAttrs) {
+      if (duplicateAttr == attr)
+        continue;
+      diags.diagnose(duplicateAttr->getLocation(),
+                     diag::differentiable_attr_duplicate_note);
+    }
+    return true;
   }
 
   // Register derivative function configuration.
@@ -3896,6 +3904,13 @@ void AttributeChecker::visitDerivativeAttr(DerivativeAttr *attr) {
   originalAFD->addDerivativeFunctionConfiguration(
       {checkedWrtParamIndices, resultIndices,
        derivative->getGenericSignature()});
+
+  return false;
+}
+
+void AttributeChecker::visitDerivativeAttr(DerivativeAttr *attr) {
+  if (typeCheckDerivativeAttr(Ctx, D, attr))
+    attr->setInvalid();
 }
 
 void AttributeChecker::visitTransposeAttr(TransposeAttr *attr) {
@@ -4526,4 +4541,24 @@ DynamicallyReplacedDeclRequest::evaluate(Evaluator &evaluator,
   }
 
   return nullptr;
+}
+
+// SWIFT_ENABLE_TENSORFLOW
+void TypeChecker::typeCheckDerivativeAttrs(SourceFile &sourceFile) {
+  class DerivativeAttrBindingWalker : public ASTWalker {
+    bool walkToDeclPre(Decl *decl) override {
+      auto f = dyn_cast<AbstractFunctionDecl>(decl);
+      if (!f)
+        return true;
+      for (auto *attr : f->getAttrs())
+        if (auto *da = dyn_cast<DerivativeAttr>(attr))
+          typeCheckDerivativeAttr(f->getASTContext(), f, da);
+      return true;
+    }
+  };
+
+  DiagnosticTransaction diagTxn(sourceFile.getASTContext().Diags);
+  DerivativeAttrBindingWalker walker;
+  sourceFile.getParentModule()->walk(walker);
+  diagTxn.abort();
 }
