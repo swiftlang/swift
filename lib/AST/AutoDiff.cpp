@@ -1,16 +1,8 @@
-<<<<<<< HEAD
-//===--------- AutoDiff.cpp - Swift Differentiable Programming ------------===//
-//
-// This source file is part of the Swift.org open source project
-//
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
-=======
 //===--- AutoDiff.cpp - Swift automatic differentiation utilities ---------===//
 //
 // This source file is part of the Swift.org open source project
 //
 // Copyright (c) 2019 Apple Inc. and the Swift project authors
->>>>>>> upstream_20191216
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -19,10 +11,67 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/AutoDiff.h"
-<<<<<<< HEAD
+#include "swift/AST/Types.h"
+
+using namespace swift;
+
+// TODO(TF-874): This helper is inefficient and should be removed. Unwrapping at
+// most once (for curried method types) is sufficient.
+static void unwrapCurryLevels(AnyFunctionType *fnTy,
+                              SmallVectorImpl<AnyFunctionType *> &results) {
+  while (fnTy != nullptr) {
+    results.push_back(fnTy);
+    fnTy = fnTy->getResult()->getAs<AnyFunctionType>();
+  }
+}
+
+static unsigned countNumFlattenedElementTypes(Type type) {
+  if (auto *tupleTy = type->getCanonicalType()->getAs<TupleType>())
+    return accumulate(tupleTy->getElementTypes(), 0,
+                      [&](unsigned num, Type type) {
+                        return num + countNumFlattenedElementTypes(type);
+                      });
+  return 1;
+}
+
+// TODO(TF-874): Simplify this helper and remove the `reverseCurryLevels` flag.
+// See TF-874 for WIP.
+void autodiff::getSubsetParameterTypes(IndexSubset *subset,
+                                       AnyFunctionType *type,
+                                       SmallVectorImpl<Type> &results,
+                                       bool reverseCurryLevels) {
+  SmallVector<AnyFunctionType *, 2> curryLevels;
+  unwrapCurryLevels(type, curryLevels);
+
+  SmallVector<unsigned, 2> curryLevelParameterIndexOffsets(curryLevels.size());
+  unsigned currentOffset = 0;
+  for (unsigned curryLevelIndex : llvm::reverse(indices(curryLevels))) {
+    curryLevelParameterIndexOffsets[curryLevelIndex] = currentOffset;
+    currentOffset += curryLevels[curryLevelIndex]->getNumParams();
+  }
+
+  // If `reverseCurryLevels` is true, reverse the curry levels and offsets.
+  if (reverseCurryLevels) {
+    std::reverse(curryLevels.begin(), curryLevels.end());
+    std::reverse(curryLevelParameterIndexOffsets.begin(),
+                 curryLevelParameterIndexOffsets.end());
+  }
+
+  for (unsigned curryLevelIndex : indices(curryLevels)) {
+    auto *curryLevel = curryLevels[curryLevelIndex];
+    unsigned parameterIndexOffset =
+        curryLevelParameterIndexOffsets[curryLevelIndex];
+    for (unsigned paramIndex : range(curryLevel->getNumParams()))
+      if (subset->contains(parameterIndexOffset + paramIndex))
+        results.push_back(curryLevel->getParams()[paramIndex].getOldType());
+  }
+}
+
+// SWIFT_ENABLE_TENSORFLOW
+// Not-yet-upstreamed `tensorflow` branch additions are below.
+
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Module.h"
-#include "swift/AST/Types.h"
 #include "swift/SIL/SILLinkage.h"
 #include "llvm/ADT/StringSwitch.h"
 
@@ -131,38 +180,6 @@ void AutoDiffConfig::dump() const {
   llvm::errs() << '\n';
 }
 
-// TODO(TF-874): This helper is inefficient and should be removed. Unwrapping at
-// most once (for curried method types) is sufficient.
-static void unwrapCurryLevels(AnyFunctionType *fnTy,
-                              SmallVectorImpl<AnyFunctionType *> &result) {
-  while (fnTy != nullptr) {
-    result.push_back(fnTy);
-=======
-#include "swift/AST/Types.h"
-
-using namespace swift;
-
-// TODO(TF-874): This helper is inefficient and should be removed. Unwrapping at
-// most once (for curried method types) is sufficient.
-static void unwrapCurryLevels(AnyFunctionType *fnTy,
-                              SmallVectorImpl<AnyFunctionType *> &results) {
-  while (fnTy != nullptr) {
-    results.push_back(fnTy);
->>>>>>> upstream_20191216
-    fnTy = fnTy->getResult()->getAs<AnyFunctionType>();
-  }
-}
-
-static unsigned countNumFlattenedElementTypes(Type type) {
-  if (auto *tupleTy = type->getCanonicalType()->getAs<TupleType>())
-    return accumulate(tupleTy->getElementTypes(), 0,
-                      [&](unsigned num, Type type) {
-                        return num + countNumFlattenedElementTypes(type);
-                      });
-  return 1;
-}
-
-<<<<<<< HEAD
 // TODO(TF-874): Simplify this helper. See TF-874 for WIP.
 IndexSubset *
 autodiff::getLoweredParameterIndices(IndexSubset *indices,
@@ -197,47 +214,6 @@ autodiff::getLoweredParameterIndices(IndexSubset *indices,
 
   return IndexSubset::get(
       type->getASTContext(), totalLoweredSize, loweredIndices);
-}
-
-=======
->>>>>>> upstream_20191216
-// TODO(TF-874): Simplify this helper and remove the `reverseCurryLevels` flag.
-// See TF-874 for WIP.
-void autodiff::getSubsetParameterTypes(IndexSubset *subset,
-                                       AnyFunctionType *type,
-<<<<<<< HEAD
-                                       SmallVectorImpl<Type> &result,
-=======
-                                       SmallVectorImpl<Type> &results,
->>>>>>> upstream_20191216
-                                       bool reverseCurryLevels) {
-  SmallVector<AnyFunctionType *, 2> curryLevels;
-  unwrapCurryLevels(type, curryLevels);
-
-  SmallVector<unsigned, 2> curryLevelParameterIndexOffsets(curryLevels.size());
-  unsigned currentOffset = 0;
-  for (unsigned curryLevelIndex : llvm::reverse(indices(curryLevels))) {
-    curryLevelParameterIndexOffsets[curryLevelIndex] = currentOffset;
-    currentOffset += curryLevels[curryLevelIndex]->getNumParams();
-  }
-
-  // If `reverseCurryLevels` is true, reverse the curry levels and offsets.
-  if (reverseCurryLevels) {
-    std::reverse(curryLevels.begin(), curryLevels.end());
-    std::reverse(curryLevelParameterIndexOffsets.begin(),
-                 curryLevelParameterIndexOffsets.end());
-  }
-
-  for (unsigned curryLevelIndex : indices(curryLevels)) {
-    auto *curryLevel = curryLevels[curryLevelIndex];
-    unsigned parameterIndexOffset =
-        curryLevelParameterIndexOffsets[curryLevelIndex];
-    for (unsigned paramIndex : range(curryLevel->getNumParams()))
-      if (subset->contains(parameterIndexOffset + paramIndex))
-<<<<<<< HEAD
-        result.push_back(
-            curryLevel->getParams()[paramIndex].getOldType());
-  }
 }
 
 // Given the rest of a `Builtin.applyDerivative_{jvp|vjp}` or
@@ -329,8 +305,4 @@ CanType VectorSpace::getCanonicalType() const {
 NominalTypeDecl *VectorSpace::getNominal() const {
   return getVector()->getNominalOrBoundGenericNominal();
 }
-=======
-        results.push_back(curryLevel->getParams()[paramIndex].getOldType());
-  }
-}
->>>>>>> upstream_20191216
+// SWIFT_ENABLE_TENSORFLOW END

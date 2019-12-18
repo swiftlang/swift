@@ -640,7 +640,7 @@ static bool overridesDifferentiableAttribute(ValueDecl *derivedDecl,
     diagnosed = true;
     // Omit printing wrt clause if attribute differentiation parameters match
     // inferred differentiation parameters.
-    auto *inferredParameters = TypeChecker::inferDifferentiableParameters(
+    auto *inferredParameters = TypeChecker::inferDifferentiationParameters(
         derivedAFD, nullptr);
     bool omitWrtClause = !baseParameters ||
         baseParameters->getNumIndices() == inferredParameters->getNumIndices();

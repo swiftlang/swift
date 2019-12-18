@@ -1018,10 +1018,6 @@ public:
   /// Parse the @quoted attribute.
   ParserResult<QuotedAttr> parseQuotedAttribute(SourceLoc AtLoc, SourceLoc Loc);
 
-  /// Parse the @derivative attribute.
-  ParserResult<DerivativeAttr> parseDerivativeAttribute(SourceLoc AtLoc,
-                                                        SourceLoc Loc);
-
   /// Parse a specific attribute.
   ParserStatus parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc);
 

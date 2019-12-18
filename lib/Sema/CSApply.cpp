@@ -2246,8 +2246,7 @@ namespace {
         auto treeProto = ctx.getTreeDecl();
         if (treeProto) {
           quotedExpr =
-              coerceExistential(quotedExpr, treeProto->getDeclaredType(),
-                                cs.getConstraintLocator(expr));
+              coerceExistential(quotedExpr, treeProto->getDeclaredType());
           expr->setSemanticExpr(quotedExpr);
           return expr;
         } else {

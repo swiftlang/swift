@@ -79,7 +79,6 @@ public extension Differentiable where TangentVector == Self {
   }
 }
 
-<<<<<<< HEAD
 // SWIFT_ENABLE_TENSORFLOW
 public extension Differentiable {
   // This is a temporary solution enabling the addition of
@@ -102,20 +101,3 @@ public extension Differentiable {
   var zeroTangentVector: TangentVector { zeroTangentVectorInitializer() }
 }
 // SWIFT_ENABLE_TENSORFLOW END
-=======
-//===----------------------------------------------------------------------===//
-// `Differentiable` conformances
-//===----------------------------------------------------------------------===//
-
-extension Float: Differentiable {
-  public typealias TangentVector = Self
-}
-extension Double: Differentiable {
-  public typealias TangentVector = Self
-}
-#if (arch(i386) || arch(x86_64)) && !(os(Windows) || os(Android))
-extension Float80: Differentiable {
-  public typealias TangentVector = Self
-}
-#endif
->>>>>>> upstream_20191216

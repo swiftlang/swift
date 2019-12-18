@@ -5021,45 +5021,6 @@ AnyFunctionType *AnyFunctionType::getAutoDiffDerivativeFunctionType(
   return derivativeFunction;
 }
 
-// SWIFT_ENABLE_TENSORFLOW
-// Compute the original function type corresponding to the given derivative
-// function type.
-AnyFunctionType *
-AnyFunctionType::getAutoDiffOriginalFunctionType() {
-  // Unwrap curry levels. At most, two parameter lists are necessary, for
-  // curried method types with a `(Self)` parameter list.
-  SmallVector<AnyFunctionType *, 2> curryLevels;
-  auto *currentLevel = this;
-  for (unsigned i : range(2)) {
-    (void)i;
-    if (currentLevel == nullptr)
-      break;
-    curryLevels.push_back(currentLevel);
-    currentLevel = currentLevel->getResult()->getAs<AnyFunctionType>();
-  }
-
-  auto derivativeResult = curryLevels.back()->getResult()->getAs<TupleType>();
-  assert(derivativeResult && derivativeResult->getNumElements() == 2 &&
-         "Expected derivative result to be a two-element tuple");
-  auto originalResult = derivativeResult->getElement(0).getType();
-  auto *originalType = makeFunctionType(
-      curryLevels.back(), curryLevels.back()->getParams(), originalResult,
-      curryLevels.size() == 1 ? getOptGenericSignature() : nullptr);
-
-  // Wrap the derivative function type in additional curry levels.
-  auto curryLevelsWithoutLast =
-      ArrayRef<AnyFunctionType *>(curryLevels).drop_back(1);
-  for (auto pair : enumerate(llvm::reverse(curryLevelsWithoutLast))) {
-    unsigned i = pair.index();
-    AnyFunctionType *curryLevel = pair.value();
-    originalType = makeFunctionType(
-        curryLevel, curryLevel->getParams(), originalType,
-        i == curryLevelsWithoutLast.size() - 1 ? getOptGenericSignature()
-                                               : nullptr);
-  }
-  return originalType;
-}
-
 bool TypeBase::hasOpaqueArchetypePropertiesOrCases() {
   if (auto *structDecl = getStructOrBoundGenericStruct()) {
     for (auto *field : structDecl->getStoredProperties()) {
@@ -5098,7 +5059,6 @@ CanType swift::substOpaqueTypesWithUnderlyingTypes(CanType ty,
   return ty.subst(replacer, replacer, flags)->getCanonicalType();
 }
 
-<<<<<<< HEAD
 // SWIFT_ENABLE_TENSORFLOW
 static AnyFunctionType *
 makeFunctionType(ArrayRef<AnyFunctionType::Param> params, Type retTy,
@@ -5216,7 +5176,7 @@ AnyFunctionType *AnyFunctionType::getWithoutDifferentiability() const {
                                   getResult(), nonDiffExtInfo);
 }
 // SWIFT_ENABLE_TENSORFLOW END
-=======
+
 CanSILFunctionType
 SILFunctionType::withSubstitutions(SubstitutionMap subs) const {
   return SILFunctionType::get(getSubstGenericSignature(),
@@ -5234,4 +5194,3 @@ SourceLoc swift::extractNearestSourceLoc(Type ty) {
 
   return SourceLoc();
 }
->>>>>>> upstream_20191216

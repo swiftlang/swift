@@ -1709,7 +1709,15 @@ class DifferentiableAttr final
       private llvm::TrailingObjects<DifferentiableAttr,
                                     ParsedAutoDiffParameter> {
   friend TrailingObjects;
+  // SWIFT_ENABLE_TENSORFLOW
+  friend class DifferentiableAttributeParameterIndicesRequest;
+  // SWIFT_ENABLE_TENSORFLOW END
 
+  // SWIFT_ENABLE_TENSORFLOW
+  /// The declaration on which the `@differentiable` attribute is declared.
+  /// Resolved during parsing and deserialization.
+  Decl *OriginalDeclaration = nullptr;
+  // SWIFT_ENABLE_TENSORFLOW END
   /// Whether this function is linear (optional).
   bool Linear;
   /// The number of parsed parameters specified in 'wrt:'.
@@ -1724,8 +1732,13 @@ class DifferentiableAttr final
   /// The VJP function (optional), resolved by the type checker if VJP name is
   /// specified.
   FuncDecl *VJPFunction = nullptr;
+  // SWIFT_ENABLE_TENSORFLOW
+  // NOTE: Parameter indices requestification is done on `tensorflow` branch but
+  // has not yet been upstreamed to `master` branch.
   /// The differentiation parameters' indices, resolved by the type checker.
-  IndexSubset *ParameterIndices = nullptr;
+  /// The bit stores whether the parameter indices have been computed.
+  llvm::PointerIntPair<IndexSubset *, 1, bool> ParameterIndicesAndBit;
+  // SWIFT_ENABLE_TENSORFLOW END
   /// The trailing where clause (optional).
   TrailingWhereClause *WhereClause = nullptr;
   /// The generic signature for autodiff associated functions. Resolved by the
@@ -1765,6 +1778,9 @@ public:
                                     Optional<DeclNameRefWithLoc> vjp,
                                     GenericSignature derivativeGenSig);
 
+  Decl *getOriginalDeclaration() const { return OriginalDeclaration; }
+  void setOriginalDeclaration(Decl *decl);
+
   /// Get the optional 'jvp:' function name and location.
   /// Use this instead of `getJVPFunction` to check whether the attribute has a
   /// registered JVP.
@@ -1775,12 +1791,13 @@ public:
   /// registered VJP.
   Optional<DeclNameRefWithLoc> getVJP() const { return VJP; }
 
-  IndexSubset *getParameterIndices() const {
-    return ParameterIndices;
-  }
-  void setParameterIndices(IndexSubset *parameterIndices) {
-    ParameterIndices = parameterIndices;
-  }
+  // SWIFT_ENABLE_TENSORFLOW
+  // NOTE: Parameter indices requestification is done on `tensorflow` branch but
+  // has not yet been upstreamed to `master` branch.
+  bool hasComputedParameterIndices() const;
+  IndexSubset *getParameterIndices() const;
+  void setParameterIndices(IndexSubset *paramIndices);
+  // SWIFT_ENABLE_TENSORFLOW END
 
   /// The parsed differentiation parameters, i.e. the list of parameters
   /// specified in 'wrt:'.
@@ -1919,6 +1936,89 @@ public:
     return DA->getKind() == DAK_Derivative;
   }
 };
+
+// SWIFT_ENABLE_TENSORFLOW
+// TODO(TF-999): Remove deprecated `@differentiating` attribute.
+using DifferentiatingAttr = DerivativeAttr;
+
+/// Attribute that registers a function as a transpose of another function.
+///
+/// Examples:
+///   @transpose(of: foo)
+///   @transpose(of: +, wrt: (lhs, rhs))
+class TransposeAttr final
+    : public DeclAttribute,
+      private llvm::TrailingObjects<TransposeAttr, ParsedAutoDiffParameter> {
+  friend TrailingObjects;
+
+  /// The base type for the referenced original declaration. This field is
+  /// non-null only for parsed attributes that reference a qualified original
+  /// declaration. This field is not serialized; type-checking uses it to
+  /// resolve the original declaration, which is serialized.
+  TypeRepr *BaseTypeRepr;
+  /// The original function name.
+  DeclNameRefWithLoc OriginalFunctionName;
+  /// The original function declaration, resolved by the type checker.
+  AbstractFunctionDecl *OriginalFunction = nullptr;
+  /// The number of parsed parameters specified in 'wrt:'.
+  unsigned NumParsedParameters = 0;
+  /// The transposed parameters' indices, resolved by the type checker.
+  IndexSubset *ParameterIndices = nullptr;
+
+  explicit TransposeAttr(bool implicit, SourceLoc atLoc, SourceRange baseRange,
+                         TypeRepr *baseTypeRepr, DeclNameRefWithLoc original,
+                         ArrayRef<ParsedAutoDiffParameter> params);
+
+  explicit TransposeAttr(bool implicit, SourceLoc atLoc, SourceRange baseRange,
+                         TypeRepr *baseTypeRepr, DeclNameRefWithLoc original,
+                         IndexSubset *indices);
+
+public:
+  static TransposeAttr *create(ASTContext &context, bool implicit,
+                               SourceLoc atLoc, SourceRange baseRange,
+                               TypeRepr *baseTypeRepr, DeclNameRefWithLoc original,
+                               ArrayRef<ParsedAutoDiffParameter> params);
+
+  static TransposeAttr *create(ASTContext &context, bool implicit,
+                               SourceLoc atLoc, SourceRange baseRange,
+                               TypeRepr *baseTypeRepr, DeclNameRefWithLoc original,
+                               IndexSubset *indices);
+
+  TypeRepr *getBaseTypeRepr() const { return BaseTypeRepr; }
+  DeclNameRefWithLoc getOriginalFunctionName() const {
+    return OriginalFunctionName;
+  }
+  AbstractFunctionDecl *getOriginalFunction() const {
+    return OriginalFunction;
+  }
+  void setOriginalFunction(AbstractFunctionDecl *decl) {
+    OriginalFunction = decl;
+  }
+
+  /// The parsed transposed parameters, i.e. the list of parameters specified in
+  /// 'wrt:'.
+  ArrayRef<ParsedAutoDiffParameter> getParsedParameters() const {
+    return {getTrailingObjects<ParsedAutoDiffParameter>(), NumParsedParameters};
+  }
+  MutableArrayRef<ParsedAutoDiffParameter> getParsedParameters() {
+    return {getTrailingObjects<ParsedAutoDiffParameter>(), NumParsedParameters};
+  }
+  size_t numTrailingObjects(OverloadToken<ParsedAutoDiffParameter>) const {
+    return NumParsedParameters;
+  }
+
+  IndexSubset *getParameterIndices() const {
+    return ParameterIndices;
+  }
+  void setParameterIndices(IndexSubset *parameterIndices) {
+    ParameterIndices = parameterIndices;
+  }
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DAK_Transpose;
+  }
+};
+// SWIFT_ENABLE_TENSORFLOW END
 
 /// Attributes that may be applied to declarations.
 class DeclAttributes {
@@ -2097,87 +2197,6 @@ public:
   }
 
   SourceLoc getStartLoc(bool forModifiers = false) const;
-};
-
-// TODO(TF-999): Remove deprecated `@differentiating` attribute.
-using DifferentiatingAttr = DerivativeAttr;
-
-/// Attribute that registers a function as a transpose of another function.
-///
-/// Examples:
-///   @transpose(of: foo)
-///   @transpose(of: +, wrt: (lhs, rhs))
-class TransposeAttr final
-    : public DeclAttribute,
-      private llvm::TrailingObjects<TransposeAttr, ParsedAutoDiffParameter> {
-  friend TrailingObjects;
-
-  /// The base type for the referenced original declaration. This field is
-  /// non-null only for parsed attributes that reference a qualified original
-  /// declaration. This field is not serialized; type-checking uses it to
-  /// resolve the original declaration, which is serialized.
-  TypeRepr *BaseTypeRepr;
-  /// The original function name.
-  DeclNameRefWithLoc OriginalFunctionName;
-  /// The original function declaration, resolved by the type checker.
-  AbstractFunctionDecl *OriginalFunction = nullptr;
-  /// The number of parsed parameters specified in 'wrt:'.
-  unsigned NumParsedParameters = 0;
-  /// The transposed parameters' indices, resolved by the type checker.
-  IndexSubset *ParameterIndices = nullptr;
-
-  explicit TransposeAttr(bool implicit, SourceLoc atLoc, SourceRange baseRange,
-                         TypeRepr *baseTypeRepr, DeclNameRefWithLoc original,
-                         ArrayRef<ParsedAutoDiffParameter> params);
-
-  explicit TransposeAttr(bool implicit, SourceLoc atLoc, SourceRange baseRange,
-                         TypeRepr *baseTypeRepr, DeclNameRefWithLoc original,
-                         IndexSubset *indices);
-
-public:
-  static TransposeAttr *create(ASTContext &context, bool implicit,
-                               SourceLoc atLoc, SourceRange baseRange,
-                               TypeRepr *baseTypeRepr, DeclNameRefWithLoc original,
-                               ArrayRef<ParsedAutoDiffParameter> params);
-
-  static TransposeAttr *create(ASTContext &context, bool implicit,
-                               SourceLoc atLoc, SourceRange baseRange,
-                               TypeRepr *baseTypeRepr, DeclNameRefWithLoc original,
-                               IndexSubset *indices);
-
-  TypeRepr *getBaseTypeRepr() const { return BaseTypeRepr; }
-  DeclNameRefWithLoc getOriginalFunctionName() const {
-    return OriginalFunctionName;
-  }
-  AbstractFunctionDecl *getOriginalFunction() const {
-    return OriginalFunction;
-  }
-  void setOriginalFunction(AbstractFunctionDecl *decl) {
-    OriginalFunction = decl;
-  }
-
-  /// The parsed transposed parameters, i.e. the list of parameters specified in
-  /// 'wrt:'.
-  ArrayRef<ParsedAutoDiffParameter> getParsedParameters() const {
-    return {getTrailingObjects<ParsedAutoDiffParameter>(), NumParsedParameters};
-  }
-  MutableArrayRef<ParsedAutoDiffParameter> getParsedParameters() {
-    return {getTrailingObjects<ParsedAutoDiffParameter>(), NumParsedParameters};
-  }
-  size_t numTrailingObjects(OverloadToken<ParsedAutoDiffParameter>) const {
-    return NumParsedParameters;
-  }
-
-  IndexSubset *getParameterIndices() const {
-    return ParameterIndices;
-  }
-  void setParameterIndices(IndexSubset *parameterIndices) {
-    ParameterIndices = parameterIndices;
-  }
-
-  static bool classof(const DeclAttribute *DA) {
-    return DA->getKind() == DAK_Transpose;
-  }
 };
 
 void simple_display(llvm::raw_ostream &out, const DeclAttribute *attr);

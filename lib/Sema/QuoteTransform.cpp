@@ -109,7 +109,8 @@ protected:
   // TODO(TF-735): Implement ExpressibleByQuoteLiteral.
   Expr *makeQuote(const char *name, ArrayRef<Expr *> quotedSubnodes) {
     auto nodeInit = new (ctx) UnresolvedDeclRefExpr(
-        ctx.getIdentifier(name), DeclRefKind::Ordinary, DeclNameLoc());
+        DeclNameRef(ctx.getIdentifier(name)), DeclRefKind::Ordinary,
+        DeclNameLoc());
     return CallExpr::createImplicit(ctx, nodeInit, quotedSubnodes, {});
   }
 
@@ -825,8 +826,8 @@ public:
     Breadcrumb bc(bcs, expr);
     auto value = new (ctx)
         UnresolvedDotExpr(expr->getSubExpr(), SourceLoc(),
-                          ctx.getIdentifier("expression"), DeclNameLoc(),
-                          /*Implicit=*/true);
+                          DeclNameRef(ctx.getIdentifier("expression")),
+                          DeclNameLoc(), /*Implicit=*/true);
     return makeQuote("Unquote", {quoteExpr(expr->getSubExpr()), value,
                                  quoteType(expr->getType())});
   }
@@ -1209,7 +1210,8 @@ private:
   // TODO(TF-735): Implement ExpressibleByQuoteLiteral.
   Expr *makeQuote(const char *name, ArrayRef<Expr *> quotedSubnodes) {
     auto nodeInit = new (ctx) UnresolvedDeclRefExpr(
-        ctx.getIdentifier(name), DeclRefKind::Ordinary, DeclNameLoc());
+        DeclNameRef(ctx.getIdentifier(name)), DeclRefKind::Ordinary,
+        DeclNameLoc());
     return CallExpr::createImplicit(ctx, nodeInit, quotedSubnodes, {});
   }
 };
@@ -1238,7 +1240,7 @@ Expr *TypeChecker::quoteExpr(Expr *expr, DeclContext *dc) {
   }
 
   auto quoteRef = new (ctx) UnresolvedDeclRefExpr(
-      quoteClassType->getDecl()->getName(), DeclRefKind::Ordinary,
+      DeclNameRef(quoteClassType->getDecl()->getName()), DeclRefKind::Ordinary,
       DeclNameLoc());
   SmallVector<TypeLoc, 4> quoteTargs;
   for (auto targ : quoteClassType->getGenericArgs()) {

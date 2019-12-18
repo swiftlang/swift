@@ -7509,60 +7509,6 @@ ConstraintSystem::simplifyApplicableFnConstraint(
     return simplified;
   }
 
-  // SWIFT_ENABLE_TENSORFLOW
-  // Handle applications of types with call methods.
-  if (desugar2->mayHaveMembers()) {
-    auto &ctx = getASTContext();
-    // Get all call methods of the nominal type.
-    SmallVector<FuncDecl *, 4> callMethods;
-    auto candidates = lookupMember(desugar2, DeclName(ctx.Id_callAsFunction));
-    for (auto entry : candidates) {
-      auto callMethod = dyn_cast<FuncDecl>(entry.getValueDecl());
-      if (!callMethod)
-        continue;
-      callMethods.push_back(callMethod);
-    }
-
-    // Handle call methods calls.
-    if (!callMethods.empty()) {
-      // Create a type variable for the call method.
-      auto loc = getConstraintLocator(locator);
-      auto tv = createTypeVariable(loc, TVO_CanBindToLValue);
-
-      // Record the call method overload set.
-      SmallVector<OverloadChoice, 4> choices;
-      for (auto candidate : callMethods) {
-        (void)candidate->getInterfaceType();
-        if (candidate->isInvalid()) continue;
-        choices.push_back(
-            OverloadChoice(type2, candidate, FunctionRefKind::SingleApply));
-      }
-      if (choices.empty()) return SolutionKind::Error;
-      addOverloadSet(tv, choices, DC, loc);
-
-      // Create type variables for each parameter type.
-      SmallVector<AnyFunctionType::Param, 4> tvParams;
-      for (unsigned i : range(func1->getNumParams())) {
-        auto param = func1->getParams()[i];
-        auto paramType = param.getPlainType();
-
-        auto *tvParam = createTypeVariable(loc, TVO_CanBindToNoEscape);
-        auto locatorBuilder =
-            locator.withPathElement(LocatorPathElt::TupleElement(i));
-        addConstraint(ConstraintKind::ArgumentConversion, paramType,
-                      tvParam, locatorBuilder);
-        tvParams.push_back(AnyFunctionType::Param(
-            tvParam, Identifier(), param.getParameterFlags()));
-      }
-      // Create target function type and an applicable function constraint.
-      AnyFunctionType *funcType =
-          FunctionType::get(tvParams, func1->getResult());
-      addConstraint(ConstraintKind::ApplicableFunction, funcType, tv, locator);
-
-      return SolutionKind::Solved;
-    }
-  }
-
   // Handle applications of @dynamicCallable types.
   auto result = simplifyDynamicCallableApplicableFnConstraint(
       type1, origType2, subflags, locator);

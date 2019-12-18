@@ -2124,10 +2124,6 @@ getActualReadWriteImplKind(unsigned rawKind) {
   return None;
 }
 
-<<<<<<< HEAD
-// SWIFT_ENABLE_TENSORFLOW
-=======
->>>>>>> upstream_20191216
 /// Translate from the serialization DifferentiabilityKind enumerators, which
 /// are guaranteed to be stable, to the AST ones.
 static Optional<swift::AutoDiffDerivativeFunctionKind>
@@ -4153,110 +4149,6 @@ llvm::Error DeclDeserializer::deserializeDeclAttributes() {
         break;
       }
 
-      case decls_block::Differentiable_DECL_ATTR: {
-        bool isImplicit;
-        bool linear;
-        uint64_t jvpNameId;
-        DeclID jvpDeclId;
-        uint64_t vjpNameId;
-        DeclID vjpDeclId;
-        GenericSignatureID derivativeGenSigId;
-        ArrayRef<uint64_t> parameters;
-
-        serialization::decls_block::DifferentiableDeclAttrLayout::readRecord(
-            scratch, isImplicit, linear, jvpNameId, jvpDeclId, vjpNameId,
-            vjpDeclId, derivativeGenSigId, parameters);
-
-        Optional<DeclNameWithLoc> jvp;
-        FuncDecl *jvpDecl = nullptr;
-        if (jvpNameId != 0)
-          jvp = { MF.getIdentifier(jvpNameId), DeclNameLoc() };
-        if (jvpDeclId != 0)
-          jvpDecl = cast<FuncDecl>(MF.getDecl(jvpDeclId));
-
-        Optional<DeclNameWithLoc> vjp;
-        FuncDecl *vjpDecl = nullptr;
-        if (vjpNameId != 0)
-          vjp = { MF.getIdentifier(vjpNameId), DeclNameLoc() };
-        if (vjpDeclId != 0)
-          vjpDecl = cast<FuncDecl>(MF.getDecl(vjpDeclId));
-
-        auto derivativeGenSig = MF.getGenericSignature(derivativeGenSigId);
-
-        llvm::SmallBitVector parametersBitVector(parameters.size());
-        for (unsigned i : indices(parameters))
-          parametersBitVector[i] = parameters[i];
-        auto *indices = IndexSubset::get(ctx, parametersBitVector);
-
-        auto *diffAttr = DifferentiableAttr::create(
-            ctx, isImplicit, SourceLoc(), SourceRange(), linear,
-            /*parsedParameters*/ {}, jvp, vjp, /*trailingWhereClause*/ nullptr);
-        // Cache parameter indices so that they can set later.
-        // `DifferentiableAttr::setParameterIndices` cannot be called here
-        // because it requires `DifferentiableAttr::setOriginalDeclaration` to
-        // be called first.
-        diffAttrParamIndicesMap[diffAttr] = indices;
-        diffAttr->setDerivativeGenericSignature(derivativeGenSig);
-        diffAttr->setJVPFunction(jvpDecl);
-        diffAttr->setVJPFunction(vjpDecl);
-        Attr = diffAttr;
-        break;
-      }
-
-      case decls_block::Derivative_DECL_ATTR: {
-        bool isImplicit;
-        uint64_t origNameId;
-        DeclID origDeclId;
-        uint64_t rawDerivativeKind;
-        ArrayRef<uint64_t> parameters;
-
-        serialization::decls_block::DerivativeDeclAttrLayout::readRecord(
-            scratch, isImplicit, origNameId, origDeclId, rawDerivativeKind,
-            parameters);
-
-        DeclNameWithLoc origName{MF.getDeclBaseName(origNameId), DeclNameLoc()};
-        auto *origDecl = cast<AbstractFunctionDecl>(MF.getDecl(origDeclId));
-        auto derivativeKind =
-            getActualAutoDiffDerivativeFunctionKind(rawDerivativeKind);
-        if (!derivativeKind)
-          MF.fatal();
-        llvm::SmallBitVector parametersBitVector(parameters.size());
-        for (unsigned i : indices(parameters))
-          parametersBitVector[i] = parameters[i];
-        auto *indices = IndexSubset::get(ctx, parametersBitVector);
-
-        auto *derivAttr = DerivativeAttr::create(
-            ctx, isImplicit, SourceLoc(), SourceRange(), origName, indices);
-        derivAttr->setOriginalFunction(origDecl);
-        derivAttr->setDerivativeKind(*derivativeKind);
-        Attr = derivAttr;
-        break;
-      }
-
-      case decls_block::Transpose_DECL_ATTR: {
-        bool isImplicit;
-        uint64_t origNameId;
-        DeclID origDeclId;
-        ArrayRef<uint64_t> parameters;
-
-        serialization::decls_block::TransposeDeclAttrLayout::readRecord(
-            scratch, isImplicit, origNameId, origDeclId, parameters);
-
-        DeclNameWithLoc origName{MF.getDeclBaseName(origNameId), DeclNameLoc()};
-        auto *origDecl = cast<AbstractFunctionDecl>(MF.getDecl(origDeclId));
-        llvm::SmallBitVector parametersBitVector(parameters.size());
-        for (unsigned i : indices(parameters))
-          parametersBitVector[i] = parameters[i];
-        auto *indices = IndexSubset::get(ctx, parametersBitVector);
-        auto *transposeAttr =
-            TransposeAttr::create(ctx, isImplicit, SourceLoc(), SourceRange(),
-                                  /*baseTypeRepr*/ nullptr, origName, indices);
-        transposeAttr->setOriginalFunction(origDecl);
-        Attr = transposeAttr;
-        break;
-      }
-      // SWIFT_ENABLE_TENSORFLOW END
-
       case decls_block::DynamicReplacement_DECL_ATTR: {
         bool isImplicit;
         uint64_t numArgs;
@@ -4313,20 +4205,6 @@ llvm::Error DeclDeserializer::deserializeDeclAttributes() {
         break;
       }
 
-<<<<<<< HEAD
-      case decls_block::Quoted_DECL_ATTR: {
-        bool isImplicit;
-        DeclID quoteDeclID;
-        serialization::decls_block::QuotedDeclAttrLayout::readRecord(
-            scratch, isImplicit, quoteDeclID);
-
-        auto quoteDecl = MF.getDeclChecked(quoteDeclID);
-        if (!quoteDecl)
-          return quoteDecl.takeError();
-
-        Attr = QuotedAttr::create(ctx, cast<FuncDecl>(*quoteDecl), SourceLoc(),
-                                  SourceRange(), isImplicit);
-=======
       case decls_block::Derivative_DECL_ATTR: {
         bool isImplicit;
         uint64_t origNameId;
@@ -4358,11 +4236,101 @@ llvm::Error DeclDeserializer::deserializeDeclAttributes() {
         break;
       }
 
+      // SWIFT_ENABLE_TENSORFLOW
+      case decls_block::Differentiable_DECL_ATTR: {
+        bool isImplicit;
+        bool linear;
+        uint64_t jvpNameId;
+        DeclID jvpDeclId;
+        uint64_t vjpNameId;
+        DeclID vjpDeclId;
+        GenericSignatureID derivativeGenSigId;
+        ArrayRef<uint64_t> parameters;
+
+        serialization::decls_block::DifferentiableDeclAttrLayout::readRecord(
+            scratch, isImplicit, linear, jvpNameId, jvpDeclId, vjpNameId,
+            vjpDeclId, derivativeGenSigId, parameters);
+
+        Optional<DeclNameRefWithLoc> jvp;
+        FuncDecl *jvpDecl = nullptr;
+        if (jvpNameId != 0)
+          jvp = {DeclNameRef(MF.getDeclBaseName(jvpNameId)), DeclNameLoc()};
+        if (jvpDeclId != 0)
+          jvpDecl = cast<FuncDecl>(MF.getDecl(jvpDeclId));
+
+        Optional<DeclNameRefWithLoc> vjp;
+        FuncDecl *vjpDecl = nullptr;
+        if (vjpNameId != 0)
+          vjp = {DeclNameRef(MF.getDeclBaseName(vjpNameId)), DeclNameLoc()};
+        if (vjpDeclId != 0)
+          vjpDecl = cast<FuncDecl>(MF.getDecl(vjpDeclId));
+
+        auto derivativeGenSig = MF.getGenericSignature(derivativeGenSigId);
+
+        llvm::SmallBitVector parametersBitVector(parameters.size());
+        for (unsigned i : indices(parameters))
+          parametersBitVector[i] = parameters[i];
+        auto *indices = IndexSubset::get(ctx, parametersBitVector);
+
+        auto *diffAttr = DifferentiableAttr::create(
+            ctx, isImplicit, SourceLoc(), SourceRange(), linear,
+            /*parsedParameters*/ {}, jvp, vjp, /*trailingWhereClause*/ nullptr);
+        // Cache parameter indices so that they can set later.
+        // `DifferentiableAttr::setParameterIndices` cannot be called here
+        // because it requires `DifferentiableAttr::setOriginalDeclaration` to
+        // be called first.
+        diffAttrParamIndicesMap[diffAttr] = indices;
+        diffAttr->setDerivativeGenericSignature(derivativeGenSig);
+        diffAttr->setJVPFunction(jvpDecl);
+        diffAttr->setVJPFunction(vjpDecl);
+        Attr = diffAttr;
+        break;
+      }
+
+      case decls_block::Transpose_DECL_ATTR: {
+        bool isImplicit;
+        uint64_t origNameId;
+        DeclID origDeclId;
+        ArrayRef<uint64_t> parameters;
+
+        serialization::decls_block::TransposeDeclAttrLayout::readRecord(
+            scratch, isImplicit, origNameId, origDeclId, parameters);
+
+        DeclNameRefWithLoc origName{
+            DeclNameRef(MF.getDeclBaseName(origNameId)), DeclNameLoc()};
+        auto *origDecl = cast<AbstractFunctionDecl>(MF.getDecl(origDeclId));
+        llvm::SmallBitVector parametersBitVector(parameters.size());
+        for (unsigned i : indices(parameters))
+          parametersBitVector[i] = parameters[i];
+        auto *indices = IndexSubset::get(ctx, parametersBitVector);
+        auto *transposeAttr =
+            TransposeAttr::create(ctx, isImplicit, SourceLoc(), SourceRange(),
+                                  /*baseTypeRepr*/ nullptr, origName, indices);
+        transposeAttr->setOriginalFunction(origDecl);
+        Attr = transposeAttr;
+        break;
+      }
+      // SWIFT_ENABLE_TENSORFLOW END
+
+      case decls_block::Quoted_DECL_ATTR: {
+        bool isImplicit;
+        DeclID quoteDeclID;
+        serialization::decls_block::QuotedDeclAttrLayout::readRecord(
+            scratch, isImplicit, quoteDeclID);
+
+        auto quoteDecl = MF.getDeclChecked(quoteDeclID);
+        if (!quoteDecl)
+          return quoteDecl.takeError();
+
+        Attr = QuotedAttr::create(ctx, cast<FuncDecl>(*quoteDecl), SourceLoc(),
+                                  SourceRange(), isImplicit);
+        break;
+      }
+
       case decls_block::ImplicitlySynthesizesNestedRequirement_DECL_ATTR: {
         serialization::decls_block::ImplicitlySynthesizesNestedRequirementDeclAttrLayout
             ::readRecord(scratch);
         Attr = new (ctx) ImplicitlySynthesizesNestedRequirementAttr(blobData, {}, {});
->>>>>>> upstream_20191216
         break;
       }
 

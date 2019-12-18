@@ -236,6 +236,9 @@ set(SWIFTLIB_SOURCES
 
 set(SWIFTLIB_GYB_SOURCES
   ${SWIFTLIB_ESSENTIAL_GYB_SOURCES}
+  # SWIFT_ENABLE_TENSORFLOW
+  MathFunctions.swift.gyb
+  # SWIFT_ENABLE_TENSORFLOW END
   SIMDVectorTypes.swift.gyb
   Tuple.swift.gyb
   )

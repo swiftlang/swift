@@ -849,10 +849,6 @@ Parser::parseDifferentiableAttribute(SourceLoc atLoc, SourceLoc loc) {
                                  params, jvpSpec, vjpSpec, whereClause));
 }
 
-<<<<<<< HEAD
-// SWIFT_ENABLE_TENSORFLOW
-=======
->>>>>>> upstream_20191216
 // Attribute parsing error helper.
 // For the given parentheses depth, skip until ')' and consume it if possible.
 // If no ')' is found, produce error.
@@ -878,18 +874,11 @@ static bool errorAndSkipUntilConsumeRightParen(Parser &P, StringRef attrName,
 ///   differentiation-params:
 ///     '(' differentiation-param (',' differentiation-param)* ')'
 ///   differentiation-param:
-<<<<<<< HEAD
 ///     'self' | identifier | [0-9]+
 /// \endverbatim
 bool Parser::parseDifferentiationParametersClause(
     SmallVectorImpl<ParsedAutoDiffParameter> &params, StringRef attrName,
     bool allowNamedParameters) {
-=======
-///     'self' | identifier
-/// \endverbatim
-bool Parser::parseDifferentiationParametersClause(
-    SmallVectorImpl<ParsedAutoDiffParameter> &params, StringRef attrName) {
->>>>>>> upstream_20191216
   SyntaxParsingContext DiffParamsClauseContext(
       SyntaxContext, SyntaxKind::DifferentiationParamsClause);
   consumeToken(tok::identifier);
@@ -1102,10 +1091,6 @@ bool Parser::parseDifferentiableAttributeArguments(
   return false;
 }
 
-<<<<<<< HEAD
-// SWIFT_ENABLE_TENSORFLOW
-=======
->>>>>>> upstream_20191216
 /// Parse a `@derivative(of:)` attribute, returning true on error.
 ///
 /// \verbatim
@@ -1116,11 +1101,7 @@ ParserResult<DerivativeAttr> Parser::parseDerivativeAttribute(SourceLoc atLoc,
                                                               SourceLoc loc) {
   StringRef AttrName = "derivative";
   SourceLoc lParenLoc = loc, rParenLoc = loc;
-<<<<<<< HEAD
-  DeclNameWithLoc original;
-=======
   DeclNameRefWithLoc original;
->>>>>>> upstream_20191216
   SmallVector<ParsedAutoDiffParameter, 8> params;
 
   // Parse trailing comma, if it exists, and check for errors.
@@ -1154,27 +1135,17 @@ ParserResult<DerivativeAttr> Parser::parseDerivativeAttribute(SourceLoc atLoc,
     }
     {
       // Parse the name of the function.
-<<<<<<< HEAD
       // TODO(TF-1058): Make `@derivative` attribute support qualified
       // original declarations.
       SyntaxParsingContext DeclNameContext(SyntaxContext,
                                            SyntaxKind::QualifiedDeclName);
-=======
-      SyntaxParsingContext FuncDeclNameContext(SyntaxContext,
-                                               SyntaxKind::FunctionDeclName);
->>>>>>> upstream_20191216
       // NOTE: Use `afterDot = true` and `allowDeinitAndSubscript = true` to
       // enable, e.g. `@derivative(of: init)` and `@derivative(of: subscript)`.
       original.Name = parseUnqualifiedDeclName(
           /*afterDot*/ true, original.Loc,
-<<<<<<< HEAD
           diag::autodiff_attr_expected_original_decl_name,
           /*allowOperators*/ true, /*allowZeroArgCompoundNames*/ true,
           /*allowDeinitAndSubscript*/ true);
-=======
-          diag::attr_derivative_expected_original_name, /*allowOperators*/ true,
-          /*allowZeroArgCompoundNames*/ true, /*allowDeinitAndSubscript*/ true);
->>>>>>> upstream_20191216
     }
     if (consumeIfTrailingComma())
       return makeParserError();
@@ -1193,14 +1164,13 @@ ParserResult<DerivativeAttr> Parser::parseDerivativeAttribute(SourceLoc atLoc,
       DerivativeAttr::create(Context, /*implicit*/ false, atLoc,
                              SourceRange(loc, rParenLoc), original, params));
 }
-<<<<<<< HEAD
 
 // SWIFT_ENABLE_TENSORFLOW
 ParserResult<DerivativeAttr>
 Parser::parseDifferentiatingAttribute(SourceLoc atLoc, SourceLoc loc) {
   StringRef AttrName = "differentiating";
   SourceLoc lParenLoc = loc, rParenLoc = loc;
-  DeclNameWithLoc original;
+  DeclNameRefWithLoc original;
   SmallVector<ParsedAutoDiffParameter, 8> params;
 
   // Parse trailing comma, if it exists, and check for errors.
@@ -1300,8 +1270,9 @@ static bool parseBaseTypeForQualifiedDeclName(Parser &P, TypeRepr *&baseType) {
 ///
 /// Parses an optional base type, followed by a declaration name.
 /// Returns true on error (if function decl name could not be parsed).
-bool parseQualifiedDeclName(Parser &P, Diag<> nameParseError,
-                            TypeRepr *&baseType, DeclNameWithLoc &original) {
+static bool parseQualifiedDeclName(Parser &P, Diag<> nameParseError,
+                                   TypeRepr *&baseType,
+                                   DeclNameRefWithLoc &original) {
   SyntaxParsingContext DeclNameContext(P.SyntaxContext,
                                        SyntaxKind::QualifiedDeclName);
   if (parseBaseTypeForQualifiedDeclName(P, baseType))
@@ -1333,7 +1304,7 @@ ParserResult<TransposeAttr> Parser::parseTransposeAttribute(SourceLoc atLoc,
   StringRef AttrName = "transpose";
   SourceLoc lParenLoc = loc, rParenLoc = loc;
   TypeRepr *baseType;
-  DeclNameWithLoc original;
+  DeclNameRefWithLoc original;
   SmallVector<ParsedAutoDiffParameter, 8> params;
 
   // Parse trailing comma, if it exists, and check for errors.
@@ -1405,8 +1376,6 @@ ParserResult<QuotedAttr> Parser::parseQuotedAttribute(SourceLoc atLoc,
   }
 }
 // SWIFT_ENABLE_TENSORFLOW END
-=======
->>>>>>> upstream_20191216
 
 void Parser::parseObjCSelector(SmallVector<Identifier, 4> &Names,
                                SmallVector<SourceLoc, 4> &NameLocs,
@@ -2377,7 +2346,6 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
     break;
   }
 
-  // SWIFT_ENABLE_TENSORFLOW
   case DAK_Derivative: {
     // `@derivative` in a local scope is not allowed.
     if (CurDeclContext->isLocalContext())
@@ -2411,17 +2379,6 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
       diagnose(Loc, diag::attr_only_at_non_local_scope, '@' + AttrName.str());
 
     auto Attr = parseDifferentiatingAttribute(AtLoc, Loc);
-    if (Attr.isNonNull())
-      Attributes.add(Attr.get());
-    break;
-  }
-
-  case DAK_Derivative: {
-    // `@derivative` in a local scope is not allowed.
-    if (CurDeclContext->isLocalContext())
-      diagnose(Loc, diag::attr_only_at_non_local_scope, '@' + AttrName.str());
-
-    auto Attr = parseDerivativeAttribute(AtLoc, Loc);
     if (Attr.isNonNull())
       Attributes.add(Attr.get());
     break;
@@ -4076,7 +4033,8 @@ Parser::parseDecl(ParseDeclOptions Flags,
           auto params =
               ParameterList::create(Context, SourceLoc(), {}, SourceLoc());
           auto ret = new (Context)
-              SimpleIdentTypeRepr(SourceLoc(), Context.getIdentifier("Tree"));
+              SimpleIdentTypeRepr(DeclNameLoc(),
+                                  DeclNameRef(Context.getIdentifier("Tree")));
           auto quoteDecl = FuncDecl::create(
               Context, SourceLoc(), kind, SourceLoc(), name, SourceLoc(),
               /*Throws=*/false, SourceLoc(),

@@ -2029,30 +2029,18 @@ static uint8_t getRawStableVarDeclIntroducer(swift::VarDecl::Introducer intr) {
   llvm_unreachable("bad variable decl introducer kind");
 }
 
-<<<<<<< HEAD
-// SWIFT_ENABLE_TENSORFLOW
-=======
->>>>>>> upstream_20191216
 /// Translate from the AST derivative function kind enum to the Serialization
 /// enum values, which are guaranteed to be stable.
 static uint8_t getRawStableAutoDiffDerivativeFunctionKind(
     swift::AutoDiffDerivativeFunctionKind kind) {
   switch (kind) {
   case swift::AutoDiffDerivativeFunctionKind::JVP:
-<<<<<<< HEAD
     return uint8_t(serialization::AutoDiffDerivativeFunctionKind::JVP);
   case swift::AutoDiffDerivativeFunctionKind::VJP:
-=======
-    return uint8_t(serialization::AutoDiffDerivativeFunctionKind::JVP);  case swift::AutoDiffDerivativeFunctionKind::VJP:
->>>>>>> upstream_20191216
     return uint8_t(serialization::AutoDiffDerivativeFunctionKind::VJP);
   }
   llvm_unreachable("bad derivative function kind");
 }
-<<<<<<< HEAD
-// SWIFT_ENABLE_TENSORFLOW END
-=======
->>>>>>> upstream_20191216
 
 /// Returns true if the declaration of \p decl depends on \p problemContext
 /// based on lexical nesting.
@@ -2368,16 +2356,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
         vjpRef = S.addDeclRef(vjpFunction);
 
       auto paramIndices = attr->getParameterIndices();
-<<<<<<< HEAD
       assert(paramIndices && "Checked parameter indices must be resolved");
-=======
-      // NOTE(TF-836): `@differentiable` attribute serialization is blocked by
-      // `@differentiable` attribute type-checking (TF-828), which resolves
-      // parameter indices (`IndexSubset *`).
-      if (!paramIndices)
-        return;
-      assert(paramIndices && "Parameter indices must be resolved");
->>>>>>> upstream_20191216
       SmallVector<bool, 4> indices;
       for (unsigned i : range(paramIndices->getCapacity()))
         indices.push_back(paramIndices->contains(i));
@@ -2390,13 +2369,9 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       return;
     }
 
-<<<<<<< HEAD
-    // SWIFT_ENABLE_TENSORFLOW
     case DAK_Derivative:
+    // SWIFT_ENABLE_TENSORFLOW
     case DAK_Differentiating: {
-=======
-    case DAK_Derivative: {
->>>>>>> upstream_20191216
       auto abbrCode = S.DeclTypeAbbrCodes[DerivativeDeclAttrLayout::Code];
       auto *attr = cast<DerivativeAttr>(DA);
       assert(attr->getOriginalFunction() &&
@@ -2407,26 +2382,18 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       DeclID origDeclID = S.addDeclRef(attr->getOriginalFunction());
       auto derivativeKind =
           getRawStableAutoDiffDerivativeFunctionKind(attr->getDerivativeKind());
-<<<<<<< HEAD
-      auto paramIndices = attr->getParameterIndices();
-      assert(paramIndices && "Parameter indices must be resolved");
-      SmallVector<bool, 4> indices;
-      for (unsigned i : range(paramIndices->getCapacity()))
-        indices.push_back(paramIndices->contains(i));
-=======
       auto *parameterIndices = attr->getParameterIndices();
       assert(parameterIndices && "Parameter indices must be resolved");
       SmallVector<bool, 4> indices;
       for (unsigned i : range(parameterIndices->getCapacity()))
         indices.push_back(parameterIndices->contains(i));
->>>>>>> upstream_20191216
       DerivativeDeclAttrLayout::emitRecord(
           S.Out, S.ScratchRecord, abbrCode, attr->isImplicit(), origNameId,
           origDeclID, derivativeKind, indices);
       return;
     }
 
-<<<<<<< HEAD
+    // SWIFT_ENABLE_TENSORFLOW
     case DAK_Transpose: {
       auto abbrCode = S.DeclTypeAbbrCodes[TransposeDeclAttrLayout::Code];
       auto *attr = cast<TransposeAttr>(DA);
@@ -2457,7 +2424,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       return;
     }
     // SWIFT_ENABLE_TENSORFLOW END
-=======
+
     case DAK_ImplicitlySynthesizesNestedRequirement: {
       auto *theAttr = cast<ImplicitlySynthesizesNestedRequirementAttr>(DA);
       auto abbrCode = S.DeclTypeAbbrCodes[ImplicitlySynthesizesNestedRequirementDeclAttrLayout::Code];
@@ -2465,7 +2432,6 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
                                                           theAttr->Value);
       return;
     }
->>>>>>> upstream_20191216
     }
   }
 

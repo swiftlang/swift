@@ -27,12 +27,9 @@
 
 namespace swift {
 
-<<<<<<< HEAD
-=======
 class AnyFunctionType;
 
 /// A function type differentiability kind.
->>>>>>> upstream_20191216
 enum class DifferentiabilityKind : uint8_t {
   NonDifferentiable = 0,
   Normal = 1,
@@ -136,11 +133,51 @@ public:
   }
 };
 
-<<<<<<< HEAD
+/// Automatic differentiation utility namespace.
+namespace autodiff {
+
+/// Appends the subset's parameter's types to `results`, in the order in
+/// which they appear in the function type.
+void getSubsetParameterTypes(IndexSubset *indices, AnyFunctionType *type,
+                             SmallVectorImpl<Type> &results,
+                             bool reverseCurryLevels = false);
+
+} // end namespace autodiff
+
 } // end namespace swift
 
+namespace llvm {
+
+using swift::AutoDiffDerivativeFunctionKind;
+
+template <typename T> struct DenseMapInfo;
+
+template <> struct DenseMapInfo<AutoDiffDerivativeFunctionKind> {
+  static AutoDiffDerivativeFunctionKind getEmptyKey() {
+    return static_cast<AutoDiffDerivativeFunctionKind::innerty>(
+        DenseMapInfo<unsigned>::getEmptyKey());
+  }
+
+  static AutoDiffDerivativeFunctionKind getTombstoneKey() {
+    return static_cast<AutoDiffDerivativeFunctionKind::innerty>(
+        DenseMapInfo<unsigned>::getTombstoneKey());
+  }
+
+  static unsigned getHashValue(const AutoDiffDerivativeFunctionKind &Val) {
+    return DenseMapInfo<unsigned>::getHashValue(Val);
+  }
+
+  static bool isEqual(const AutoDiffDerivativeFunctionKind &LHS,
+                      const AutoDiffDerivativeFunctionKind &RHS) {
+    return static_cast<AutoDiffDerivativeFunctionKind::innerty>(LHS) ==
+        static_cast<AutoDiffDerivativeFunctionKind::innerty>(RHS);
+  }
+};
+
+} // end namespace llvm
+
 // SWIFT_ENABLE_TENSORFLOW
-// Not-yet-upstreamed additions on `tensorflow` branch is below.
+// Not-yet-upstreamed `tensorflow` branch additions are below.
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/IndexSubset.h"
@@ -352,12 +389,6 @@ using SILDifferentiabilityWitnessKey = std::pair<StringRef, AutoDiffConfig>;
 
 /// Automatic differentiation utility namespace.
 namespace autodiff {
-/// Appends the subset's parameter's types to `result`, in the order in
-/// which they appear in the function type.
-void getSubsetParameterTypes(IndexSubset *indices,
-                             AnyFunctionType *type,
-                             SmallVectorImpl<Type> &result,
-                             bool reverseCurryLevels = false);
 
 /// Returns an index subset for the SIL function parameters corresponding to the
 /// parameters in this subset. In particular, this explodes tuples. For example,
@@ -483,33 +514,19 @@ public:
   CanType getCanonicalType() const;
   NominalTypeDecl *getNominal() const;
 };
-=======
-/// Automatic differentiation utility namespace.
-namespace autodiff {
-
-/// Appends the subset's parameter's types to `results`, in the order in
-/// which they appear in the function type.
-void getSubsetParameterTypes(IndexSubset *indices, AnyFunctionType *type,
-                             SmallVectorImpl<Type> &results,
-                             bool reverseCurryLevels = false);
-
-} // end namespace autodiff
->>>>>>> upstream_20191216
 
 } // end namespace swift
 
 namespace llvm {
 
-<<<<<<< HEAD
 using swift::AutoDiffConfig;
-using swift::AutoDiffDerivativeFunctionKind;
 using swift::GenericSignature;
 using swift::IndexSubset;
 using swift::SILAutoDiffIndices;
 
-template<typename T> struct DenseMapInfo;
+template <typename T> struct DenseMapInfo;
 
-template<> struct DenseMapInfo<AutoDiffConfig> {
+template <> struct DenseMapInfo<AutoDiffConfig> {
   static AutoDiffConfig getEmptyKey() {
     auto *ptr = llvm::DenseMapInfo<void *>::getEmptyKey();
     return {static_cast<IndexSubset *>(ptr), static_cast<IndexSubset *>(ptr),
@@ -549,36 +566,7 @@ template<> struct DenseMapInfo<AutoDiffConfig> {
   }
 };
 
-template<> struct DenseMapInfo<AutoDiffDerivativeFunctionKind> {
-=======
-using swift::AutoDiffDerivativeFunctionKind;
-
-template <typename T> struct DenseMapInfo;
-
-template <> struct DenseMapInfo<AutoDiffDerivativeFunctionKind> {
->>>>>>> upstream_20191216
-  static AutoDiffDerivativeFunctionKind getEmptyKey() {
-    return static_cast<AutoDiffDerivativeFunctionKind::innerty>(
-        DenseMapInfo<unsigned>::getEmptyKey());
-  }
-
-  static AutoDiffDerivativeFunctionKind getTombstoneKey() {
-    return static_cast<AutoDiffDerivativeFunctionKind::innerty>(
-        DenseMapInfo<unsigned>::getTombstoneKey());
-  }
-
-  static unsigned getHashValue(const AutoDiffDerivativeFunctionKind &Val) {
-    return DenseMapInfo<unsigned>::getHashValue(Val);
-  }
-
-  static bool isEqual(const AutoDiffDerivativeFunctionKind &LHS,
-                      const AutoDiffDerivativeFunctionKind &RHS) {
-<<<<<<< HEAD
-    return LHS == RHS;
-  }
-};
-
-template<> struct DenseMapInfo<SILAutoDiffIndices> {
+template <> struct DenseMapInfo<SILAutoDiffIndices> {
   static SILAutoDiffIndices getEmptyKey() {
     return { DenseMapInfo<unsigned>::getEmptyKey(), nullptr };
   }
@@ -598,17 +586,10 @@ template<> struct DenseMapInfo<SILAutoDiffIndices> {
   static bool isEqual(const SILAutoDiffIndices &LHS,
                       const SILAutoDiffIndices &RHS) {
     return LHS == RHS;
-=======
-    return static_cast<AutoDiffDerivativeFunctionKind::innerty>(LHS) ==
-        static_cast<AutoDiffDerivativeFunctionKind::innerty>(RHS);
->>>>>>> upstream_20191216
   }
 };
 
 } // end namespace llvm
-<<<<<<< HEAD
 // SWIFT_ENABLE_TENSORFLOW END
-=======
->>>>>>> upstream_20191216
 
 #endif // SWIFT_AST_AUTODIFF_H

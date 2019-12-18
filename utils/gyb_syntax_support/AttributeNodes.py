@@ -358,7 +358,7 @@ ATTRIBUTE_NODES = [
                    The colon separating the "of" label and the original
                    declaration name.
                    '''),
-             Child('Original', kind='FunctionDeclName',
+             Child('Original', kind='QualifiedDeclName',
                    description='The referenced original declaration.'),
              Child('Comma', kind='CommaToken', is_optional=True),
              Child('DiffParams', kind='DifferentiationParamsClause',

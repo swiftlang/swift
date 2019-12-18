@@ -4,9 +4,14 @@
 // RUN: %target-sil-opt -disable-sil-linking -enable-sil-verify-all %t/differentiable_attr.swiftmodule -o - | %FileCheck %s
 // REQUIRES: differentiable_programming
 
+// SWIFT_ENABLE_TENSORFLOW
+// This test is enabled on `tensorflow` branch.
+// `@differentiable` attribute serialization does not yet work on `master`
+// branch only.
+
 // TODO(TF-836): Enable this test.
 // Blocked by TF-828: `@differentiable` attribute type-checking.
-// XFAIL: *
+// FAIL: *
 
 // BCANALYZER-NOT: UnknownCode
 
