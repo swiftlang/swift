@@ -179,6 +179,31 @@ const Metadata *swift::getNSErrorMetadata() {
     swift_getObjCClassMetadata((const ClassMetadata *)getNSErrorClass()));
 }
 
+extern "C" const ProtocolDescriptor PROTOCOL_DESCR_SYM(s5Error);
+
+const WitnessTable *swift::findErrorWitness(const Metadata *srcType) {
+  return swift_conformsToProtocol(srcType, &PROTOCOL_DESCR_SYM(s5Error));
+}
+
+id swift::dynamicCastValueToNSError(OpaqueValue *src,
+                                    const Metadata *srcType,
+                                    const WitnessTable *srcErrorWitness,
+                                    DynamicCastFlags flags) {
+  // Check whether there is an embedded NSError.
+  if (id embedded = getErrorEmbeddedNSErrorIndirect(src, srcType,
+                                                    srcErrorWitness)) {
+    if (flags & DynamicCastFlags::TakeOnSuccess)
+      srcType->vw_destroy(src);
+
+    return embedded;
+  }
+
+  BoxPair errorBox = swift_allocError(srcType, srcErrorWitness, src,
+                            /*isTake*/ flags & DynamicCastFlags::TakeOnSuccess);
+  auto *error = (SwiftError *)errorBox.object;
+  return _swift_stdlib_bridgeErrorToNSError(error);
+}
+
 static Class getAndBridgeSwiftNativeNSErrorClass() {
   Class nsErrorClass = swift::getNSErrorClass();
   Class ourClass = [__SwiftNativeNSError class];
