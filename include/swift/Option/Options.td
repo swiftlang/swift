@@ -513,6 +513,10 @@ def save_optimization_record_path :
   Flags<[FrontendOption, ArgumentIsPath]>,
   HelpText<"Specify the file name of any generated YAML optimization record">;
 
+def warn_unused_function_params : Flag<["-"], "warn-unused-function-params">,
+  Flags<[FrontendOption]>,
+  HelpText<"Emit a warning when function parameters are not used in the body">;
+
 // Platform options.
 def enable_app_extension : Flag<["-"], "application-extension">,
   Flags<[FrontendOption, NoInteractiveOption]>,

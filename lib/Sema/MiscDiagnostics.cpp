@@ -2421,6 +2421,31 @@ public:
   }
 };
 
+/// An AST walker that determines whether a function parameter is used within
+/// the body of the function.
+class ParamUsageChecker : public ASTWalker {
+  bool isUnused = true;
+  Identifier ParamName;
+
+public:
+  ParamUsageChecker(Identifier paramName) : ParamName(paramName) {}
+
+  std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+    if (auto DRE = dyn_cast<DeclRefExpr>(E)) {
+      if (auto decl = DRE->getDeclRef().getDecl()) {
+        if (decl->getBaseName() == ParamName && isa<ParamDecl>(decl)) {
+          isUnused = false;
+          return {false, nullptr};
+        }
+      }
+    }
+
+    return {true, E};
+  }
+
+  bool isParamUnused() { return isUnused; }
+};
+
 } // end anonymous namespace
 
 // After we have scanned the entire region, diagnose variables that could be
@@ -2900,11 +2925,103 @@ performTopLevelDeclDiagnostics(TopLevelCodeDecl *TLCD) {
   TLCD->walk(checker);
 }
 
+/// This enum describes the kind of diagnostic and fix-it we need to create
+/// for an unused function parameter.
+enum class UnusedFunctionParamDiagnosticKind : unsigned {
+  /// We have foo(x: Int) and we need to replace 'x' with '_'
+  ArgumentNeedsReplacement = 0,
+  /// We have foo(x y: Int) and we need to replace the entire param with '_'
+  ParameterNeedsReplacement = 1,
+  /// We have foo(_ y: Int) and we need to remove 'y'
+  ParameterNeedsRemoval = 2
+};
+
+/// Emit a diagnostic if a function parameter is not used in the body of the
+/// function.
+static void diagnoseUnusedFunctionParam(ParamDecl *param, BraceStmt *body,
+                                        ASTContext &ctx) {
+  // TODO: Handle default args as well
+  if (param->isDefaultArgument())
+    return;
+
+  Optional<UnusedFunctionParamDiagnosticKind> kind = None;
+
+  // If we only have an parameter name, then we can either replace it with '_'
+  // or explicitly ignore it with '_'.
+  //
+  // Example 1: foo(x: Int) -> foo(_: Int)
+  // Example 2: foo(x: Int) -> foo(x _: Int)
+  if (!param->getArgumentName().empty() && !param->getParameterName().empty() &&
+      param->getArgumentName() == param->getParameterName()) {
+    kind = UnusedFunctionParamDiagnosticKind::ArgumentNeedsReplacement;
+  } else if (param->getArgumentName().empty() &&
+             !param->getParameterName().empty()) {
+    // If we have an ignored argument name, then we can remove the parameter
+    // name.
+    //
+    // Example: foo(_ y: Int) -> foo(_: Int)
+    kind = UnusedFunctionParamDiagnosticKind::ParameterNeedsRemoval;
+  } else if (!param->getArgumentName().empty() &&
+             !param->getParameterName().empty()) {
+    // If we have both an argument name and parameter name,
+    // then we can replace it entirely with '_' or just replace the parameter
+    // name with '_'.
+    //
+    // Example 1: foo(x y: Int) -> foo(_: Int)
+    // Example 2: foo(x y: Int) -> foo(x _: Int)
+    kind = UnusedFunctionParamDiagnosticKind::ParameterNeedsReplacement;
+  }
+
+  if (!kind)
+    return;
+
+  auto paramName = param->getParameterName();
+  auto kindValue = static_cast<unsigned>(kind.getValue());
+  auto paramUsageChecker = ParamUsageChecker(paramName);
+  body->walk(paramUsageChecker);
+  if (!paramUsageChecker.isParamUnused())
+    return;
+
+  switch (kind.getValue()) {
+  case UnusedFunctionParamDiagnosticKind::ArgumentNeedsReplacement: {
+    auto endLoc =
+        Lexer::getLocForEndOfToken(ctx.SourceMgr, param->getParameterNameLoc());
+    param->diagnose(diag::param_never_used, paramName, kindValue)
+        .fixItReplace(param->getParameterNameLoc(), "_");
+    param->diagnose(diag::param_never_used_fixit_ignore_param, paramName)
+        .fixItInsert(endLoc, " _");
+    break;
+  }
+  case UnusedFunctionParamDiagnosticKind::ParameterNeedsReplacement: {
+    auto startLoc = Lexer::getLocForStartOfToken(ctx.SourceMgr,
+                                                 param->getArgumentNameLoc());
+    auto endLoc =
+        Lexer::getLocForEndOfToken(ctx.SourceMgr, param->getParameterNameLoc());
+    param->diagnose(diag::param_never_used, paramName, kindValue)
+        .fixItReplaceChars(startLoc, endLoc, "_");
+    param->diagnose(diag::param_never_used_fixit_remove_only_param, paramName)
+        .fixItReplaceChars(param->getParameterNameLoc(), endLoc, "_");
+    break;
+  }
+  case UnusedFunctionParamDiagnosticKind::ParameterNeedsRemoval: {
+    auto startLoc =
+        Lexer::getLocForEndOfToken(ctx.SourceMgr, param->getArgumentNameLoc());
+    auto endLoc =
+        Lexer::getLocForEndOfToken(ctx.SourceMgr, param->getParameterNameLoc());
+    param->diagnose(diag::param_never_used, paramName, kindValue)
+        .fixItRemoveChars(startLoc, endLoc);
+    break;
+  }
+  }
+}
+
 /// Perform diagnostics for func/init/deinit declarations.
 void swift::performAbstractFuncDeclDiagnostics(AbstractFunctionDecl *AFD,
                                                BraceStmt *body) {
   assert(body && "Need a body to check");
-  
+
+  auto &ctx = AFD->getASTContext();
+
   // Don't produce these diagnostics for implicitly generated code.
   if (AFD->getLoc().isInvalid() || AFD->isImplicit() || AFD->isInvalid())
     return;
@@ -2912,7 +3029,14 @@ void swift::performAbstractFuncDeclDiagnostics(AbstractFunctionDecl *AFD,
   // Check for unused variables, as well as variables that are could be
   // declared as constants.
   body->walk(VarDeclUsageChecker(AFD));
-  
+
+  if (ctx.LangOpts.WarnUnusedFunctionParams) {
+    // Check and diagnose unused function parameters
+    for (auto param : AFD->getParameters()->getArray()) {
+      diagnoseUnusedFunctionParam(param, body, ctx);
+    }
+  }
+
   // If the function has an opaque return type, check the return expressions
   // to determine the underlying type.
   if (auto opaqueResultTy = AFD->getOpaqueResultTypeDecl()) {

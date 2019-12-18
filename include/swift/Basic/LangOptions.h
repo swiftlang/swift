@@ -98,6 +98,10 @@ namespace swift {
     /// human-readable string.
     bool EnableConcisePoundFile = false;
 
+    /// If false, we do not warn when function parameters are
+    /// unused.
+    bool WarnUnusedFunctionParams = false;
+
     ///
     /// Support for alternate usage modes
     ///

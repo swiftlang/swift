@@ -4588,6 +4588,15 @@ WARNING(variable_never_read, none,
 WARNING(observe_keypath_property_not_objc_dynamic, none,
         "passing reference to non-'@objc dynamic' property %0 to KVO method %1 "
         "may lead to unexpected behavior or runtime trap", (DeclName, DeclName))
+WARNING(param_never_used, none,
+        "function parameter %0 was never used; "
+        "consider %select{replacing it with '_'|"
+        "replacing the whole parameter with '_'|removing it}1",
+        (Identifier, unsigned))
+NOTE(param_never_used_fixit_remove_only_param, none,
+     "replace %0 with '_' instead", (Identifier))
+NOTE(param_never_used_fixit_ignore_param, none,
+     "insert '_' to ignore %0 instead", (Identifier))
 
 //------------------------------------------------------------------------------
 // MARK: Debug diagnostics
