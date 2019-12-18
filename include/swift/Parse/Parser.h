@@ -869,7 +869,7 @@ public:
   /// Return true if parser is at the start of a decl or decl-import.
   bool isStartOfDecl();
 
-  bool parseTopLevel();
+  void parseTopLevel();
 
   /// Flags that control the parsing of declarations.
   enum ParseDeclFlags {
