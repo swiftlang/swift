@@ -26,6 +26,8 @@
 // Don't conform to the protocol; that loads all protocol members.
 @interface SimpleDoer
 
+- (instancetype)initWithValue: (int)value;
+
 // These are names we're hoping don't interfere with Doer, above.
 + (SimpleDoer*)Doer;
 + (SimpleDoer*)DoerOfNoWork;
@@ -107,4 +109,14 @@
 @interface SimpleDoerSubclass : SimpleDoer
 - (void)simplyDoSomeWorkWithSpeed:(int)s thoroughness:(int)t
   NS_SWIFT_NAME(simplyDoVeryImportantWork(speed:thoroughness:));
+
+- (void)exuberantlyGoForWalk;
+- (void)exuberantlyTakeNap;
+- (void)exuberantlyEatMeal;
+- (void)exuberantlyTidyHome;
+- (void)exuberantlyCallFamily;
+- (void)exuberantlySingSong;
+- (void)exuberantlyReadBook;
+- (void)exuberantlyAttendLecture;
+- (void)exuberantlyWriteLetter;
 @end

@@ -4518,8 +4518,7 @@ namespace {
     void importMirroredProtocolMembers(const clang::ObjCContainerDecl *decl,
                                        DeclContext *dc,
                                        ArrayRef<ProtocolDecl *> protocols,
-                                       SmallVectorImpl<Decl *> &members,
-                                       ASTContext &Ctx);
+                                       SmallVectorImpl<Decl *> &members);
 
     void importNonOverriddenMirroredMethods(DeclContext *dc,
                                   MutableArrayRef<MirroredMethodEntry> entries,
@@ -8672,6 +8671,15 @@ void ClangImporter::Implementation::insertMembersAndAlternates(
   });
 }
 
+void ClangImporter::Implementation::importInheritedConstructors(
+     const clang::ObjCInterfaceDecl *curObjCClass,
+     const ClassDecl *classDecl, SmallVectorImpl<Decl *> &newMembers) {
+   if (curObjCClass->getName() != "Protocol") {
+     SwiftDeclConverter converter(*this, CurrentVersion);
+     converter.importInheritedConstructors(classDecl, newMembers);
+   }
+ }
+
 void ClangImporter::Implementation::collectMembersToAdd(
     const clang::ObjCContainerDecl *objcContainer, Decl *D, DeclContext *DC,
     SmallVectorImpl<Decl *> &members) {
@@ -8686,15 +8694,8 @@ void ClangImporter::Implementation::collectMembersToAdd(
 
   auto protos = getImportedProtocols(D);
   if (auto clangClass = dyn_cast<clang::ObjCInterfaceDecl>(objcContainer)) {
-    auto swiftClass = cast<ClassDecl>(D);
     objcContainer = clangClass = clangClass->getDefinition();
-
-    // Imported inherited initializers.
-    if (clangClass->getName() != "Protocol") {
-      converter.importInheritedConstructors(const_cast<ClassDecl *>(swiftClass),
-                                            members);
-    }
-
+    importInheritedConstructors(clangClass, cast<ClassDecl>(D), members);
   } else if (auto clangProto
                = dyn_cast<clang::ObjCProtocolDecl>(objcContainer)) {
     objcContainer = clangProto->getDefinition();
