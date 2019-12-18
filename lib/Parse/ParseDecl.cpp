@@ -189,7 +189,7 @@ namespace {
 ///     decl-sil       [[only in SIL mode]
 ///     decl-sil-stage [[only in SIL mode]
 /// \endverbatim
-bool Parser::parseTopLevel() {
+void Parser::parseTopLevel() {
   SF.ASTStage = SourceFile::Parsing;
 
   // Prime the lexer.
@@ -246,17 +246,6 @@ bool Parser::parseTopLevel() {
     consumeToken();
   }
 
-  // If this is a Main source file, determine if we found code that needs to be
-  // executed (this is used by the repl to know whether to compile and run the
-  // newly parsed stuff).
-  bool FoundTopLevelCodeToExecute = false;
-  if (allowTopLevelCode()) {
-    for (auto V : Items) {
-      if (isa<TopLevelCodeDecl>(V.get<Decl*>()))
-        FoundTopLevelCodeToExecute = true;
-    }
-  }
-
   // Add newly parsed decls to the module.
   for (auto Item : Items) {
     if (auto *D = Item.dyn_cast<Decl*>()) {
@@ -279,8 +268,6 @@ bool Parser::parseTopLevel() {
     SyntaxContext->addToken(Tok, LeadingTrivia, TrailingTrivia);
     TokReceiver->finalize();
   }
-
-  return FoundTopLevelCodeToExecute;
 }
 
 ParserResult<AvailableAttr> Parser::parseExtendedAvailabilitySpecList(
