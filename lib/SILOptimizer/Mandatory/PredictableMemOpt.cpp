@@ -261,10 +261,9 @@ public:
   }
 
   AvailableValue emitBeginBorrow(SILBuilder &b, SILLocation loc) const {
-    // If we do not have ownership or already are guaranteed, just return a copy
-    // of our state.
-    if (!b.hasOwnership() || Value.getOwnershipKind().isCompatibleWith(
-                                 ValueOwnershipKind::Guaranteed)) {
+    // If we are already guaranteed, just return a copy of our state.
+    if (Value.getOwnershipKind().isCompatibleWith(
+            ValueOwnershipKind::Guaranteed)) {
       return {Value, SubElementNumber, InsertionPoints};
     }
 
@@ -379,8 +378,6 @@ static SILValue nonDestructivelyExtractSubElement(const AvailableValue &Val,
   // load [copy] or a load [trivial], while in non-[ossa] SIL we will
   // be replacing unqualified loads.
   assert(SubElementNumber == 0 && "Miscalculation indexing subelements");
-  if (!B.hasOwnership())
-    return Val.getValue();
   return B.emitCopyValueOperation(Loc, Val.getValue());
 }
 
@@ -539,12 +536,6 @@ bool AvailableValueAggregator::isFullyAvailable(SILType loadTy,
 // address.
 bool AvailableValueAggregator::canTake(SILType loadTy,
                                        unsigned firstElt) const {
-  // If we do not have ownership, we can always take since we do not need to
-  // keep any ownership invariants up to date. In the future, we should be able
-  // to chop up larger values before they are being stored.
-  if (!B.hasOwnership())
-    return true;
-
   // If we are trivially fully available, just return true.
   if (isFullyAvailable(loadTy, firstElt))
     return true;
@@ -662,11 +653,7 @@ AvailableValueAggregator::aggregateFullyAvailableValue(SILType loadTy,
   auto &firstVal = AvailableValueList[firstElt];
 
   // Ok, we know that all of our available values are all parts of the same
-  // value. Without ownership, we can just return the underlying first value.
-  if (!B.hasOwnership())
-    return firstVal.getValue();
-
-  // Otherwise, we need to put in a copy. This is b/c we only propagate along +1
+  // value. So, we need to put in a copy. This is b/c we only propagate along +1
   // values and we are eliminating a load [copy].
   ArrayRef<StoreInst *> insertPts = firstVal.getInsertionPoints();
   if (insertPts.size() == 1) {
@@ -718,7 +705,7 @@ AvailableValueAggregator::aggregateFullyAvailableValue(SILType loadTy,
     // we know we will never go down this code path is since we have been
     // inserting copy_values implying that our potential singular value would be
     // of the copy_values which are guaranteed to all be different.
-    assert((!B.hasOwnership() || isTake() ||
+    assert((isTake() ||
             val->getType().isTrivial(*B.getInsertionBB()->getParent())) &&
            "Should never reach this code path if we are in ossa and have a "
            "non-trivial value");
@@ -728,7 +715,7 @@ AvailableValueAggregator::aggregateFullyAvailableValue(SILType loadTy,
   // Finally, grab the value from the SSA updater.
   SILValue result = updater.GetValueInMiddleOfBlock(B.getInsertionBB());
   assert(result.getOwnershipKind().isCompatibleWith(ValueOwnershipKind::Owned));
-  if (isTake() || !B.hasOwnership()) {
+  if (isTake()) {
     return result;
   }
 
@@ -822,12 +809,9 @@ SILValue AvailableValueAggregator::handlePrimitiveValue(SILType loadTy,
   auto &val = AvailableValueList[firstElt];
   if (!val) {
     LoadInst *load = ([&]() {
-      if (B.hasOwnership()) {
         SILBuilderWithScope builder(&*B.getInsertionPoint(), &insertedInsts);
         return builder.createTrivialLoadOr(Loc, address,
                                            LoadOwnershipQualifier::Copy);
-      }
-      return B.createLoad(Loc, address, LoadOwnershipQualifier::Unqualified);
     }());
     Uses.emplace_back(load, PMOUseKind::Load);
     return load;
@@ -844,13 +828,8 @@ SILValue AvailableValueAggregator::handlePrimitiveValue(SILType loadTy,
     SILLocation loc = insertPts[0]->getLoc();
     SILValue eltVal = nonDestructivelyExtractSubElement(val, builder, loc);
     assert(
-        !builder.hasOwnership() ||
         eltVal.getOwnershipKind().isCompatibleWith(ValueOwnershipKind::Owned));
     assert(eltVal->getType() == loadTy && "Subelement types mismatch");
-
-    if (!builder.hasOwnership()) {
-      return eltVal;
-    }
 
     SILBuilderWithScope builder2(&*B.getInsertionPoint(), &insertedInsts);
     return builder2.emitCopyValueOperation(Loc, eltVal);
@@ -871,7 +850,6 @@ SILValue AvailableValueAggregator::handlePrimitiveValue(SILType loadTy,
     SILLocation loc = i->getLoc();
     SILValue eltVal = nonDestructivelyExtractSubElement(val, builder, loc);
     assert(
-        !builder.hasOwnership() ||
         eltVal.getOwnershipKind().isCompatibleWith(ValueOwnershipKind::Owned));
 
     if (!singularValue.hasValue()) {
@@ -893,8 +871,7 @@ SILValue AvailableValueAggregator::handlePrimitiveValue(SILType loadTy,
   // /will/ have a copy and thus are guaranteed (since each copy yields a
   // different value) to not be singular values.
   if (auto val = singularValue.getValueOr(SILValue())) {
-    assert((!B.hasOwnership() ||
-            val->getType().isTrivial(*insertBlock->getParent())) &&
+    assert((val->getType().isTrivial(*insertBlock->getParent())) &&
            "Should have inserted copies for each insertion point, so shouldn't "
            "have a singular value if non-trivial?!");
     return val;
@@ -902,11 +879,8 @@ SILValue AvailableValueAggregator::handlePrimitiveValue(SILType loadTy,
 
   // Finally, grab the value from the SSA updater.
   SILValue eltVal = updater.GetValueInMiddleOfBlock(insertBlock);
-  assert(!B.hasOwnership() ||
-         eltVal.getOwnershipKind().isCompatibleWith(ValueOwnershipKind::Owned));
+  assert(eltVal.getOwnershipKind().isCompatibleWith(ValueOwnershipKind::Owned));
   assert(eltVal->getType() == loadTy && "Subelement types mismatch");
-  if (!B.hasOwnership())
-    return eltVal;
   SILBuilderWithScope builder(&*B.getInsertionPoint(), &insertedInsts);
   return builder.emitCopyValueOperation(Loc, eltVal);
 }
@@ -1266,9 +1240,6 @@ void AvailableValueAggregator::addHandOffCopyDestroysForPhis(
 
 void AvailableValueAggregator::addMissingDestroysForCopiedValues(
     SILInstruction *load, SILValue newVal) {
-  assert(B.hasOwnership() &&
-         "We assume this is only called if we have ownership");
-
   SmallPtrSet<SILBasicBlock *, 8> visitedBlocks;
   SmallVector<SILBasicBlock *, 8> leakingBlocks;
   auto loc = RegularLocation::getAutoGeneratedLocation();
@@ -2111,17 +2082,6 @@ bool AllocOptimize::promoteLoadCopy(LoadInst *li) {
   LLVM_DEBUG(llvm::dbgs() << "      To value: " << *newVal);
   ++NumLoadPromoted;
 
-  // If we did not have ownership, we did not insert extra copies at our stores,
-  // so we can just RAUW and return.
-  if (!li->getFunction()->hasOwnership()) {
-    li->replaceAllUsesWith(newVal);
-    SILValue addr = li->getOperand();
-    li->eraseFromParent();
-    if (auto *addrI = addr->getDefiningInstruction())
-      recursivelyDeleteTriviallyDeadInstructions(addrI);
-    return true;
-  }
-
   // If we inserted any copies, we created the copies at our stores. We know
   // that in our load block, we will reform the aggregate as appropriate at the
   // load implying that the value /must/ be fully consumed. If we promoted a +0
@@ -2722,16 +2682,22 @@ class PredictableMemoryAccessOptimizations : public SILFunctionTransform {
   /// either indicates that this pass missing some opportunities the first time,
   /// or has a pass order dependency on other early passes.
   void run() override {
+    SILFunction *fn = getFunction();
+    assert(fn->hasOwnership() && "Only support running on ownership SIL!");
     // TODO: Can we invalidate here just instructions?
-    if (optimizeMemoryAccesses(*getFunction()))
+    if (optimizeMemoryAccesses(*fn)) {
       invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
+    }
   }
 };
 
 class PredictableDeadAllocationElimination : public SILFunctionTransform {
   void run() override {
-    if (eliminateDeadAllocations(*getFunction()))
+    SILFunction *fn = getFunction();
+    assert(fn->hasOwnership() && "Only support running on ownership SIL!");
+    if (eliminateDeadAllocations(*fn)) {
       invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
+    }
   }
 };
 

@@ -70,8 +70,7 @@ static SILValue scalarizeLoad(LoadInst *LI,
 
   for (unsigned i = 0, e = ElementAddrs.size(); i != e; ++i) {
     auto *SubLI = B.createTrivialLoadOr(LI->getLoc(), ElementAddrs[i],
-                                        LI->getOwnershipQualifier(),
-                                        true /*supports unqualified*/);
+                                        LI->getOwnershipQualifier());
     ElementTmps.push_back(SubLI);
   }
 
@@ -480,8 +479,7 @@ bool ElementUseCollector::collectUses(SILValue Pointer) {
             [&](unsigned index, SILValue v) { ElementTmps.push_back(v); });
         for (unsigned i = 0, e = ElementAddrs.size(); i != e; ++i)
           B.createTrivialStoreOr(SI->getLoc(), ElementTmps[i], ElementAddrs[i],
-                                 SI->getOwnershipQualifier(),
-                                 true /*supports unqualified*/);
+                                 SI->getOwnershipQualifier());
         SI->eraseFromParent();
         continue;
       }
