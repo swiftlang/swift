@@ -1388,6 +1388,7 @@ public:
 
   /// Returns true if a base type for a qualified declaration name can be
   /// parsed.
+  ///
   /// Examples:
   ///   'Foo.f' -> true
   ///   'Foo.Bar.f' -> true

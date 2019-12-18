@@ -338,24 +338,20 @@ ATTRIBUTE_NODES = [
          children=[
              Child('BaseType', kind='Type', description='''
                    The base type of the qualified name, optionally specified.
-                   ''',
-                   node_choices=[
-                       Child('MemberType', kind='MemberTypeIdentifier'),
-                       Child('SimpleType', kind='SimpleTypeIdentifier'),
-                   ], is_optional=True),
+                   ''', is_optional=True),
              Child('Dot', kind='Token',
                    token_choices=[
                        'PeriodToken', 'PrefixPeriodToken'
                    ], is_optional=True),
-             Child('Name', kind='Syntax', description='''
+             Child('Name', kind='Token', description='''
                    The base name of the referenced function.
                    ''',
-                   node_choices=[
-                       Child('Identifier', kind='IdentifierToken'),
-                       Child('PrefixOperator', kind='PrefixOperatorToken'),
-                       Child('PostfixOperator', kind='PostfixOperatorToken'),
-                       Child('SpacedBinaryOperator',
-                             kind='SpacedBinaryOperatorToken'),
+                   token_choices=[
+                       'IdentifierToken',
+                       'UnspacedBinaryOperatorToken',
+                       'SpacedBinaryOperatorToken',
+                       'PrefixOperatorToken',
+                       'PostfixOperatorToken',
                    ]),
              Child('Arguments', kind='DeclNameArguments',
                    is_optional=True, description='''

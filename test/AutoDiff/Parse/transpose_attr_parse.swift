@@ -24,6 +24,10 @@ func transpose(v: Float) -> (Float, Float, Float, Float)
 @transpose(of: A.B.C.foo(x:y:_:z:))
 func transpose(v: Float) -> Float
 
+// Qualified declaration with specialized generic type.
+@transpose(of: A<T>.B<U, V>.C.foo(x:y:_:z:))
+func transpose(v: Float) -> Float
+
 // Qualified operator.
 // TODO(TF-1065): Consider disallowing qualified operators.
 @transpose(of: Swift.Float.+)

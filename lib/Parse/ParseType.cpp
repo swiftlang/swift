@@ -633,30 +633,6 @@ ParserStatus Parser::parseGenericArguments(SmallVectorImpl<TypeRepr *> &Args,
   return makeParserSuccess();
 }
 
-/// Returns true if a base type for a qualified declaration name can be
-/// parsed.
-///
-/// Examples:
-///   'Foo.f' -> true
-///   'Foo.Bar.f' -> true
-///   'f' -> false, no base type
-bool Parser::canParseBaseTypeForQualifiedDeclName() {
-  BacktrackingScope backtrack(*this);
-
-  // First, parse a single type identifier component.
-  if (!Tok.isAny(tok::identifier, tok::kw_Self, tok::kw_Any))
-    return false;
-  consumeToken();
-  if (startsWithLess(Tok)) {
-    if (!canParseGenericArguments())
-      return false;
-  }
-
-  // If the next token is a period or starts with a period, then this can be
-  // parsed as a type qualifier.
-  return startsWithSymbol(Tok, '.');
-}
-
 /// parseTypeIdentifier
 ///   
 ///   type-identifier:
@@ -1595,7 +1571,7 @@ bool Parser::canParseTypeIdentifier() {
     }
 
     // Treat 'Foo.<anything>' as an attempt to write a dotted type
-    // unless <anything> is 'Type'.
+    // unless <anything> is 'Type' or 'Protocol'.
     if ((Tok.is(tok::period) || Tok.is(tok::period_prefix)) &&
         !peekToken().isContextualKeyword("Type") &&
         !peekToken().isContextualKeyword("Protocol")) {
@@ -1606,6 +1582,22 @@ bool Parser::canParseTypeIdentifier() {
   }
 }
 
+bool Parser::canParseBaseTypeForQualifiedDeclName() {
+  BacktrackingScope backtrack(*this);
+
+  // First, parse a single type identifier component.
+  if (!Tok.isAny(tok::identifier, tok::kw_Self, tok::kw_Any))
+    return false;
+  consumeToken();
+  if (startsWithLess(Tok)) {
+    if (!canParseGenericArguments())
+      return false;
+  }
+
+  // Qualified name base types must be followed by a period.
+  // If the next token starts with a period, return true.
+  return startsWithSymbol(Tok, '.');
+}
 
 bool Parser::canParseOldStyleProtocolComposition() {
   consumeToken(tok::kw_protocol);
