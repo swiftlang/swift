@@ -2244,22 +2244,35 @@ static void initGenericClassObjCName(ClassMetadata *theClass) {
   getROData(theMetaclass)->Name = name;
 }
 
-static bool installLazyClassNameHandler() {
-  auto _objc_setLazyClassNamer =
-    (void (*)(char * (*)(Class)))
-    dlsym(RTLD_NEXT, "_objc_setLazyClassNamer");  
-  if (_objc_setLazyClassNamer == nullptr)
-    return false;
+static bool installLazyClassNameHook() {
+#if !OBJC_SETHOOK_LAZYCLASSNAMER_DEFINED
+  using objc_hook_lazyClassNamer =
+    const char * _Nullable (*)(_Nonnull Class cls);
+  auto objc_setHook_lazyClassNamer =
+    (void (*)(objc_hook_lazyClassNamer, objc_hook_lazyClassNamer *))
+    dlsym(RTLD_NEXT, "objc_setHook_lazyClassNamer");  
+#endif
 
-  _objc_setLazyClassNamer([](Class theClass) {
+  static objc_hook_lazyClassNamer oldHook;
+  auto myHook = [](Class theClass) -> const char * {
     ClassMetadata *metadata = (ClassMetadata *)theClass;
-    return copyGenericClassObjCName(metadata);
-  });
+    if (metadata->isTypeMetadata())
+      return copyGenericClassObjCName(metadata);
+    return oldHook(theClass);
+  };
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunguarded-availability"
+  if (objc_setHook_lazyClassNamer == nullptr)
+    return false;
+  objc_setHook_lazyClassNamer(myHook, &oldHook);
+#pragma clang diagnostic pop
+
   return true;
 }
 
 static void setUpGenericClassObjCName(ClassMetadata *theClass) {
-  bool supportsLazyNames = SWIFT_LAZY_CONSTANT(installLazyClassNameHandler());
+  bool supportsLazyNames = SWIFT_LAZY_CONSTANT(installLazyClassNameHook());
   if (supportsLazyNames) {
     getROData(theClass)->Name = nullptr;
     auto theMetaclass = (ClassMetadata *)object_getClass((id)theClass);
