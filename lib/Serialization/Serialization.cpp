@@ -2361,6 +2361,31 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       return;
     }
 
+    case DAK_Transpose: {
+      auto abbrCode = S.DeclTypeAbbrCodes[TransposeDeclAttrLayout::Code];
+      auto *attr = cast<TransposeAttr>(DA);
+      // NOTE(TF-838): `@transpose` attribute serialization is blocked by
+      // `@transpose` attribute type-checking (TF-830), which resolves
+      // the original declaration.
+      if (!attr->getOriginalFunction())
+        return;
+      assert(attr->getOriginalFunction() &&
+             "`@transpose` attribute should have original declaration set "
+             "during construction or parsing");
+      auto origName = attr->getOriginalFunctionName().Name.getBaseName();
+      IdentifierID origNameId = S.addDeclBaseNameRef(origName);
+      DeclID origDeclID = S.addDeclRef(attr->getOriginalFunction());
+      auto *parameterIndices = attr->getParameterIndices();
+      assert(parameterIndices && "Parameter indices must be resolved");
+      SmallVector<bool, 4> indices;
+      for (unsigned i : range(parameterIndices->getCapacity()))
+        indices.push_back(parameterIndices->contains(i));
+      TransposeDeclAttrLayout::emitRecord(
+          S.Out, S.ScratchRecord, abbrCode, attr->isImplicit(), origNameId,
+          origDeclID, indices);
+      return;
+    }
+
     case DAK_ImplicitlySynthesizesNestedRequirement: {
       auto *theAttr = cast<ImplicitlySynthesizesNestedRequirementAttr>(DA);
       auto abbrCode = S.DeclTypeAbbrCodes[ImplicitlySynthesizesNestedRequirementDeclAttrLayout::Code];
