@@ -7391,18 +7391,16 @@ ConstraintSystem::simplifyApplicableFnConstraint(
   // is true.
   if (desugar2->isCallableNominalType(DC)) {
     auto memberLoc = getConstraintLocator(
-        outerLocator.withPathElement(ConstraintLocator::Member));
+        locator.withPathElement(ConstraintLocator::ImplicitCallAsFunction));
     // Add a `callAsFunction` member constraint, binding the member type to a
     // type variable.
     auto memberTy = createTypeVariable(memberLoc, /*options=*/0);
     // TODO: Revisit this if `static func callAsFunction` is to be supported.
     // Static member constraint requires `FunctionRefKind::DoubleApply`.
-    // TODO: Use a custom locator element to identify this member constraint
-    // instead of just pointing to the function expr.
     addValueMemberConstraint(origLValueType2,
                              DeclNameRef(ctx.Id_callAsFunction),
                              memberTy, DC, FunctionRefKind::SingleApply,
-                             /*outerAlternatives*/ {}, locator);
+                             /*outerAlternatives*/ {}, memberLoc);
     // Add new applicable function constraint based on the member type
     // variable.
     addConstraint(ConstraintKind::ApplicableFunction, func1, memberTy,
