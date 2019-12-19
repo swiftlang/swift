@@ -2418,7 +2418,7 @@ static StringRef getOutputFilename(Compilation &C,
                                    const JobAction *JA,
                                    const TypeToPathMap *OutputMap,
                                    StringRef workingDirectory,
-                                   bool AtTopLevel,
+                                   const bool AtTopLevel,
                                    StringRef BaseInput,
                                    StringRef PrimaryInput,
                                    llvm::SmallString<128> &Buffer) {
@@ -2437,7 +2437,10 @@ static StringRef getOutputFilename(Compilation &C,
   const OutputInfo &OI = C.getOutputInfo();
   const llvm::opt::DerivedArgList &Args = C.getArgs();
 
+  bool ShouldUseDefaultFileName = AtTopLevel;
+
   if (isa<MergeModuleJobAction>(JA)) {
+    ShouldUseDefaultFileName = OI.ShouldTreatModuleAsTopLevelOutput;
     auto optFilename = getOutputFilenameFromPathArgOrAsTopLevel(
         OI, Args, options::OPT_emit_module_path, file_types::TY_SwiftModuleFile,
         OI.ShouldTreatModuleAsTopLevelOutput, workingDirectory, Buffer);
@@ -2464,7 +2467,7 @@ static StringRef getOutputFilename(Compilation &C,
 
   // We don't have an output from an Action-specific command line option,
   // so figure one out using the defaults.
-  if (AtTopLevel) {
+  if (ShouldUseDefaultFileName) {
     if (Arg *FinalOutput = Args.getLastArg(options::OPT_o))
       return FinalOutput->getValue();
     if (file_types::isTextual(JA->getType()))
