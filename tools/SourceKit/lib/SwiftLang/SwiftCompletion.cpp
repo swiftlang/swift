@@ -123,9 +123,9 @@ static bool swiftCodeCompleteImpl(
     unsigned Offset, SwiftCodeCompletionConsumer &SwiftConsumer,
     ArrayRef<const char *> Args,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
-    std::string &Error) {
+    bool EnableASTCaching, std::string &Error) {
   return Lang.performCompletionLikeOperation(
-      UnresolvedInputFile, Offset, Args, FileSystem, Error,
+      UnresolvedInputFile, Offset, Args, FileSystem, EnableASTCaching, Error,
       [&](CompilerInstance &CI) {
         // Create a factory for code completion callbacks that will feed the
         // Consumer.
@@ -155,7 +155,6 @@ void SwiftLangSupport::codeComplete(
     SourceKit::CodeCompletionConsumer &SKConsumer, ArrayRef<const char *> Args,
     Optional<VFSOptions> vfsOptions) {
 
-
   CodeCompletion::Options CCOpts;
   if (options) {
     StringRef filterText;
@@ -164,7 +163,6 @@ void SwiftLangSupport::codeComplete(
     translateCodeCompletionOptions(*options, CCOpts, filterText, resultOffset,
                                    maxResults);
   }
-  CompletionInst->setEnableASTCaching(CCOpts.reuseASTContextIfPossible);
 
   std::string error;
   // FIXME: the use of None as primary file is to match the fact we do not read
@@ -210,7 +208,8 @@ void SwiftLangSupport::codeComplete(
 
   std::string Error;
   if (!swiftCodeCompleteImpl(*this, UnresolvedInputFile, Offset, SwiftConsumer,
-                             Args, fileSystem, Error)) {
+                             Args, fileSystem,
+                             CCOpts.reuseASTContextIfPossible, Error)) {
     SKConsumer.failed(Error);
   }
 }
@@ -1080,7 +1079,8 @@ static void transformAndForwardResults(
       cargs.push_back(arg.c_str());
     std::string error;
     if (!swiftCodeCompleteImpl(lang, buffer.get(), str.size(), swiftConsumer,
-                               cargs, session->getFileSystem(), error)) {
+                               cargs, session->getFileSystem(),
+                               options.reuseASTContextIfPossible, error)) {
       consumer.failed(error);
       return;
     }
@@ -1128,7 +1128,6 @@ void SwiftLangSupport::codeCompleteOpen(
   if (options)
     translateCodeCompletionOptions(*options, CCOpts, filterText, resultOffset,
                                    maxResults);
-  CompletionInst->setEnableASTCaching(CCOpts.reuseASTContextIfPossible);
 
   std::string error;
   // FIXME: the use of None as primary file is to match the fact we do not read
@@ -1179,7 +1178,8 @@ void SwiftLangSupport::codeCompleteOpen(
 
   // Invoke completion.
   if (!swiftCodeCompleteImpl(*this, inputBuf, offset, swiftConsumer,
-                             extendedArgs, fileSystem, error)) {
+                             extendedArgs, fileSystem,
+                             CCOpts.reuseASTContextIfPossible, error)) {
     consumer.failed(error);
     return;
   }
@@ -1249,7 +1249,6 @@ void SwiftLangSupport::codeCompleteUpdate(
   if (options)
     translateCodeCompletionOptions(*options, CCOpts, filterText, resultOffset,
                                    maxResults);
-  CompletionInst->setEnableASTCaching(CCOpts.reuseASTContextIfPossible);
 
   NameToPopularityMap *nameToPopularity = nullptr;
   // This reference must outlive the uses of nameToPopularity.

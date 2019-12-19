@@ -30,9 +30,9 @@ static bool swiftTypeContextInfoImpl(
     unsigned Offset, ide::TypeContextInfoConsumer &Consumer,
     ArrayRef<const char *> Args,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
-    std::string &Error) {
+    bool EnableASTCaching, std::string &Error) {
   return Lang.performCompletionLikeOperation(
-      UnresolvedInputFile, Offset, Args, FileSystem, Error,
+      UnresolvedInputFile, Offset, Args, FileSystem, EnableASTCaching, Error,
       [&](CompilerInstance &CI) {
         // Create a factory for code completion callbacks that will feed the
         // Consumer.
@@ -151,7 +151,8 @@ void SwiftLangSupport::getExpressionContextInfo(
   } Consumer(SKConsumer);
 
   if (!swiftTypeContextInfoImpl(*this, UnresolvedInputFile, Offset, Consumer,
-                                Args, fileSystem, error)) {
+                                Args, fileSystem, /*EnableASTCaching=*/false,
+                                error)) {
     SKConsumer.failed(error);
   }
 }

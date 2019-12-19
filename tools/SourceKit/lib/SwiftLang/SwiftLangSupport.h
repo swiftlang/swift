@@ -443,7 +443,7 @@ public:
       llvm::MemoryBuffer *UnresolvedInputFile, unsigned Offset,
       ArrayRef<const char *> Args,
       llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
-      std::string &Error,
+      bool EnableASTCaching, std::string &Error,
       llvm::function_ref<void(swift::CompilerInstance &)> Callback);
 
   //==========================================================================//
