@@ -7,6 +7,7 @@ add_swift_target_library(swiftSwiftPrivate ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} I
   # filename.
   SwiftPrivate.swift
 
+  ForEachField.swift
   IO.swift
   ShardedAtomicCounter.swift
 
