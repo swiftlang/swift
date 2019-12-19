@@ -133,6 +133,37 @@ struct UsesVoid : HasSimpleAssoc {
   typealias Assoc = ()
 }
 
+// SR-11642: Failure to canonicalize type in associated type witness.
+struct Validator<T> {
+  let validatorFailureType: Any.Type
+}
+
+
+protocol ValidatorType {
+  associatedtype Data
+  associatedtype Failure
+  func validator() -> Validator<Data>
+}
+
+
+extension ValidatorType {
+  func validator() -> Validator<Data> {
+    .init(validatorFailureType: Failure.self)
+  }
+}
+
+
+// MARK: Failing example
+extension Validator where T == String {
+  // GLOBAL: @"symbolic _____ySS__G 23associated_type_witness9ValidatorVAASSRszlE1VV7FailureV"
+  struct V: ValidatorType {
+    typealias Data = T // or String
+
+    struct Failure {}
+  }
+}
+
+
 //   Protocol conformance descriptor for Computed : Assocked.
 // GLOBAL-LABEL: @"$s23associated_type_witness8ComputedVyxq_GAA8AssockedAAMc" = hidden constant
 // GLOBAL-SAME:    i16 4,
