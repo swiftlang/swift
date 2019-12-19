@@ -202,6 +202,8 @@ bool Parser::isTerminatorForBraceItemListKind(BraceItemListKind Kind,
                                               ArrayRef<ASTNode> ParsedDecls) {
   switch (Kind) {
   case BraceItemListKind::Brace:
+  case BraceItemListKind::TopLevelCode:
+  case BraceItemListKind::TopLevelLibrary:
     return false;
   case BraceItemListKind::Case: {
     if (Tok.is(tok::pound_if)) {
@@ -220,26 +222,6 @@ bool Parser::isTerminatorForBraceItemListKind(BraceItemListKind Kind,
     }
     return isAtStartOfSwitchCase(*this);
   }
-  case BraceItemListKind::TopLevelCode:
-    // When parsing the top level executable code for a module, if we parsed
-    // some executable code, then we're done.  We want to process (name bind,
-    // type check, etc) decls one at a time to make sure that there are not
-    // forward type references, etc.  There is an outer loop around the parser
-    // that will reinvoke the parser at the top level on each statement until
-    // EOF.  In contrast, it is ok to have forward references between classes,
-    // functions, etc.
-    for (auto I : ParsedDecls) {
-      if (isa<TopLevelCodeDecl>(I.get<Decl*>()))
-        // Only bail out if the next token is at the start of a line.  If we
-        // don't, then we may accidentally allow things like "a = 1 b = 4".
-        // FIXME: This is really dubious.  This will reject some things, but
-        // allow other things we don't want.
-        if (Tok.isAtStartOfLine())
-          return true;
-    }
-    return false;
-  case BraceItemListKind::TopLevelLibrary:
-    return false;
   case BraceItemListKind::ActiveConditionalBlock:
   case BraceItemListKind::InactiveConditionalBlock:
     return Tok.isNot(tok::pound_else) && Tok.isNot(tok::pound_endif) &&
