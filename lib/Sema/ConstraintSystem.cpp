@@ -506,9 +506,11 @@ ConstraintSystem::getCalleeLocator(ConstraintLocator *locator,
     }
 
     // Handle an apply of a nominal type which supports callAsFunction.
-    if (fnTy->isCallableNominalType(DC))
-      return getConstraintLocator(anchor, ConstraintLocator::ApplyFunction);
-
+    if (fnTy->isCallableNominalType(DC)) {
+      return getConstraintLocator(anchor,
+                                  {LocatorPathElt::ApplyFunction(),
+                                   LocatorPathElt::ImplicitCallAsFunction()});
+    }
     return nullptr;
   };
 
@@ -3145,8 +3147,9 @@ void constraints::simplifyLocator(Expr *&anchor,
     case ConstraintLocator::LValueConversion:
     case ConstraintLocator::RValueAdjustment:
     case ConstraintLocator::UnresolvedMember:
-      // Arguments in autoclosure positions, lvalue and rvalue adjustments, and
-      // scalar-to-tuple conversions, and unresolved members are
+    case ConstraintLocator::ImplicitCallAsFunction:
+      // Arguments in autoclosure positions, lvalue and rvalue adjustments,
+      // unresolved members, and implicit callAsFunction references are
       // implicit.
       path = path.slice(1);
       continue;
