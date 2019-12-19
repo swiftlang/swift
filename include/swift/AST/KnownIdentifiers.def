@@ -159,7 +159,6 @@ IDENTIFIER(by)
 IDENTIFIER(scale)
 IDENTIFIER(x)
 // Differentiable
-IDENTIFIER(TangentVector)
 IDENTIFIER(move)
 IDENTIFIER(differentiableVectorView)
 
@@ -229,6 +228,8 @@ IDENTIFIER_(nsError)
 // Custom string interpolation type used by os log APIs.
 IDENTIFIER(OSLogMessage)
 
+// Differentiable programming
+IDENTIFIER(TangentVector)
 // Module that supports #quote(...) literals.
 IDENTIFIER(Quote)
 

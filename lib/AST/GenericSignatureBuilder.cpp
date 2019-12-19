@@ -1886,7 +1886,7 @@ TypeDecl *EquivalenceClass::lookupNestedType(
     if (decl) {
       SmallVector<ValueDecl *, 2> foundMembers;
       decl->getParentModule()->lookupQualified(
-          decl, name,
+          decl, DeclNameRef(name),
           NL_QualifiedDefault | NL_OnlyTypes | NL_ProtocolMembers,
           foundMembers);
       for (auto member : foundMembers) {

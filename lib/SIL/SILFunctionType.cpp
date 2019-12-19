@@ -391,7 +391,10 @@ CanSILFunctionType SILFunctionType::getAutoDiffDerivativeFunctionType(
 
   SmallVector<SILParameterInfo, 4> newParameters;
   newParameters.reserve(getNumParameters());
-  newParameters.append(getParameters().begin(), getParameters().end());
+  for (auto &param : getParameters()) {
+    newParameters.push_back(param.getWithInterfaceType(
+        param.getInterfaceType()->getCanonicalType(derivativeFnGenSig)));
+  }
   // Reabstraction thunks have a function-typed parameter (the function to
   // reabstract) as their last parameter. Reabstraction thunk JVPs/VJPs have a
   // `@differentiable` function-typed last parameter instead.
@@ -414,9 +417,11 @@ CanSILFunctionType SILFunctionType::getAutoDiffDerivativeFunctionType(
   newResults.push_back({closureType->getCanonicalType(derivativeFnGenSig),
                         ResultConvention::Owned});
   // Derivative function type has a generic signature only if the original
-  // function type does.
+  // function type does, and if `derivativeFnGenSig` does not have all concrete
+  // generic parameters.
   CanGenericSignature canGenSig;
-  if (getSubstGenericSignature())
+  if (getSubstGenericSignature() && derivativeFnGenSig &&
+      !derivativeFnGenSig->areAllParamsConcrete())
     canGenSig = derivativeFnGenSig;
   return SILFunctionType::get(canGenSig, getExtInfo(), getCoroutineKind(),
                               getCalleeConvention(), newParameters, getYields(),
@@ -535,7 +540,7 @@ static CanType getKnownType(Optional<CanType> &cacheSlot, ASTContext &C,
       // lookupValue would only give us types actually declared in the overlays
       // themselves.
       SmallVector<ValueDecl *, 2> decls;
-      mod->lookupQualified(mod, C.getIdentifier(typeName),
+      mod->lookupQualified(mod, DeclNameRef(C.getIdentifier(typeName)),
                            NL_QualifiedDefault | NL_KnownNonCascadingDependency,
                            decls);
       if (decls.size() != 1)
@@ -3697,17 +3702,6 @@ StringRef SILFunctionType::ABICompatibilityCheckResult::getMessage() const {
     return "Escape to no escape conversion";
   }
   llvm_unreachable("Covered switch isn't completely covered?!");
-}
-
-CanSILFunctionType
-SILFunctionType::withSubstitutions(SubstitutionMap subs) const {
-  return SILFunctionType::get(getSubstGenericSignature(),
-                          getExtInfo(), getCoroutineKind(),
-                          getCalleeConvention(),
-                          getParameters(), getYields(), getResults(),
-                          getOptionalErrorResult(),
-                          subs, isGenericSignatureImplied(),
-                          const_cast<SILFunctionType*>(this)->getASTContext());
 }
 
 static DeclContext *getDeclContextForExpansion(const SILFunction &f) {

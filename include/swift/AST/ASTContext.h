@@ -62,6 +62,7 @@ namespace swift {
   class Decl;
   class DeclContext;
   class DefaultArgumentInitializer;
+  class DerivativeAttr;
   class ExtensionDecl;
   class ForeignRepresentationInfo;
   class FuncDecl;
@@ -301,6 +302,7 @@ public:
   // same parameter indices but different derivative generic signatures.
   llvm::DenseMap<std::pair<Decl *, IndexSubset *>, DifferentiableAttr *>
       DifferentiableAttrs;
+  // SWIFT_ENABLE_TENSORFLOW END
 
   /// Cache of `@derivative` attributes keyed by parameter indices and
   /// derivative function kind. Used to diagnose duplicate `@derivative`
@@ -313,7 +315,6 @@ public:
       std::tuple<Decl *, IndexSubset *, AutoDiffDerivativeFunctionKind>,
       llvm::SmallPtrSet<DerivativeAttr *, 1>>
       DerivativeAttrs;
-  // SWIFT_ENABLE_TENSORFLOW END
 
 private:
   /// The current generation number, which reflects the number of

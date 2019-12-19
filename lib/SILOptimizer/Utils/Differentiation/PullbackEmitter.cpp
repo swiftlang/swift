@@ -22,6 +22,7 @@
 #include "swift/SILOptimizer/PassManager/PrettyStackTrace.h"
 #include "swift/SILOptimizer/Utils/Differentiation/ADContext.h"
 #include "swift/SILOptimizer/Utils/Differentiation/PullbackEmitter.h"
+#include "swift/SILOptimizer/Utils/Differentiation/Thunk.h"
 #include "swift/SILOptimizer/Utils/Differentiation/VJPEmitter.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 
@@ -162,6 +163,9 @@ SILType PullbackEmitter::remapType(SILType ty) {
 }
 
 Optional<VectorSpace> PullbackEmitter::getTangentSpace(CanType type) {
+  // Use witness generic signature to remap types.
+  if (auto witnessGenSig = getWitness()->getDerivativeGenericSignature())
+    type = witnessGenSig->getCanonicalTypeInContext(type);
   return type->getAutoDiffAssociatedTangentSpace(
       LookUpConformanceInModule(getModule().getSwiftModule()));
 }

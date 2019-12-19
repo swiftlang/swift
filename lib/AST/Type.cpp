@@ -1498,6 +1498,13 @@ bool TypeBase::isCallableNominalType(DeclContext *dc) {
                            IsCallableNominalTypeRequest{canTy, dc}, false);
 }
 
+bool TypeBase::hasDynamicMemberLookupAttribute() {
+  auto canTy = getCanonicalType();
+  auto &ctx = canTy->getASTContext();
+  return evaluateOrDefault(
+      ctx.evaluator, HasDynamicMemberLookupAttributeRequest{canTy}, false);
+}
+
 Type TypeBase::getSuperclass(bool useArchetypes) {
   auto *nominalDecl = getAnyNominal();
   auto *classDecl = dyn_cast_or_null<ClassDecl>(nominalDecl);
@@ -3235,10 +3242,13 @@ Type ProtocolCompositionType::get(const ASTContext &C,
 void
 AnyFunctionType::ExtInfo::assertIsFunctionType(const clang::Type *type) {
 #ifndef NDEBUG
-  if (!type->isFunctionType()) {
-    llvm::errs() << "Expected a Clang function type but found\n";
-    type->dump(llvm::errs());
-    llvm_unreachable("");
+  if (!(type->isFunctionPointerType() || type->isBlockPointerType())) {
+    SmallString<256> buf;
+    llvm::raw_svector_ostream os(buf);
+    os << "Expected a Clang function type wrapped in a pointer type or "
+       << "a block pointer type but found:\n";
+    type->dump(os);
+    llvm_unreachable(os.str().data());
   }
 #endif
   return;
@@ -3250,7 +3260,7 @@ const clang::Type *AnyFunctionType::getClangFunctionType() const {
     return cast<FunctionType>(this)->getClangFunctionType();
   case TypeKind::GenericFunction:
     // Generic functions do not have C types.
-  return nullptr;
+    return nullptr;
   default:
     llvm_unreachable("Illegal type kind for AnyFunctionType.");
   }
@@ -3559,8 +3569,8 @@ static Type substType(Type derivedType,
            "should not be doing AST type-substitution on a lowered SIL type;"
            "use SILType::subst");
 
-    // Special-case handle SILBoxTypes; we want to structurally substitute the
-    // substitutions.
+    // Special-case handle SILBoxTypes and substituted SILFunctionTypes;
+    // we want to structurally substitute the substitutions.
     if (auto boxTy = dyn_cast<SILBoxType>(type)) {
       auto subMap = boxTy->getSubstitutions();
       auto newSubMap = subMap.subst(substitutions, lookupConformances);
@@ -3569,6 +3579,14 @@ static Type substType(Type derivedType,
                              boxTy->getLayout(),
                              newSubMap);
     }
+    
+    if (auto silFnTy = dyn_cast<SILFunctionType>(type)) {
+      if (auto subs = silFnTy->getSubstitutions()) {
+        auto newSubs = subs.subst(substitutions, lookupConformances);
+        return silFnTy->withSubstitutions(newSubs);
+      }
+    }
+    
 
     // Special-case TypeAliasType; we need to substitute conformances.
     if (auto aliasTy = dyn_cast<TypeAliasType>(type)) {
@@ -5003,45 +5021,6 @@ AnyFunctionType *AnyFunctionType::getAutoDiffDerivativeFunctionType(
   return derivativeFunction;
 }
 
-// SWIFT_ENABLE_TENSORFLOW
-// Compute the original function type corresponding to the given derivative
-// function type.
-AnyFunctionType *
-AnyFunctionType::getAutoDiffOriginalFunctionType() {
-  // Unwrap curry levels. At most, two parameter lists are necessary, for
-  // curried method types with a `(Self)` parameter list.
-  SmallVector<AnyFunctionType *, 2> curryLevels;
-  auto *currentLevel = this;
-  for (unsigned i : range(2)) {
-    (void)i;
-    if (currentLevel == nullptr)
-      break;
-    curryLevels.push_back(currentLevel);
-    currentLevel = currentLevel->getResult()->getAs<AnyFunctionType>();
-  }
-
-  auto derivativeResult = curryLevels.back()->getResult()->getAs<TupleType>();
-  assert(derivativeResult && derivativeResult->getNumElements() == 2 &&
-         "Expected derivative result to be a two-element tuple");
-  auto originalResult = derivativeResult->getElement(0).getType();
-  auto *originalType = makeFunctionType(
-      curryLevels.back(), curryLevels.back()->getParams(), originalResult,
-      curryLevels.size() == 1 ? getOptGenericSignature() : nullptr);
-
-  // Wrap the derivative function type in additional curry levels.
-  auto curryLevelsWithoutLast =
-      ArrayRef<AnyFunctionType *>(curryLevels).drop_back(1);
-  for (auto pair : enumerate(llvm::reverse(curryLevelsWithoutLast))) {
-    unsigned i = pair.index();
-    AnyFunctionType *curryLevel = pair.value();
-    originalType = makeFunctionType(
-        curryLevel, curryLevel->getParams(), originalType,
-        i == curryLevelsWithoutLast.size() - 1 ? getOptGenericSignature()
-                                               : nullptr);
-  }
-  return originalType;
-}
-
 bool TypeBase::hasOpaqueArchetypePropertiesOrCases() {
   if (auto *structDecl = getStructOrBoundGenericStruct()) {
     for (auto *field : structDecl->getStoredProperties()) {
@@ -5197,3 +5176,21 @@ AnyFunctionType *AnyFunctionType::getWithoutDifferentiability() const {
                                   getResult(), nonDiffExtInfo);
 }
 // SWIFT_ENABLE_TENSORFLOW END
+
+CanSILFunctionType
+SILFunctionType::withSubstitutions(SubstitutionMap subs) const {
+  return SILFunctionType::get(getSubstGenericSignature(),
+                          getExtInfo(), getCoroutineKind(),
+                          getCalleeConvention(),
+                          getParameters(), getYields(), getResults(),
+                          getOptionalErrorResult(),
+                          subs, isGenericSignatureImplied(),
+                          const_cast<SILFunctionType*>(this)->getASTContext());
+}
+
+SourceLoc swift::extractNearestSourceLoc(Type ty) {
+  if (auto nominal = ty->getAnyNominal())
+    return extractNearestSourceLoc(nominal);
+
+  return SourceLoc();
+}

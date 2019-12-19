@@ -2298,7 +2298,7 @@ void ModuleFile::getImportDecls(SmallVectorImpl<Decl *> &Results) {
 
           SmallVector<ValueDecl *, 8> Decls;
           TopLevelModule->lookupQualified(
-              TopLevelModule, ScopeID,
+              TopLevelModule, DeclNameRef(ScopeID),
               NL_QualifiedDefault | NL_KnownNoDependency, Decls);
           Optional<ImportKind> FoundKind = ImportDecl::findBestImportKind(Decls);
           assert(FoundKind.hasValue() &&

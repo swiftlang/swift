@@ -3734,10 +3734,13 @@ SILFunction *SILGenModule::getOrCreateAutoDiffDerivativeReabstractionThunk(
   auto origFnType = original->getLoweredFunctionType();
   assert(config.resultIndices->getNumIndices() == 1 &&
          "Only single result index is currently supported");
+  CanGenericSignature derivativeCanGenSig;
+  if (auto derivativeGenSig = config.derivativeGenericSignature)
+    derivativeCanGenSig = derivativeGenSig->getCanonicalSignature();
   auto origDerivativeFnType = origFnType->getAutoDiffDerivativeFunctionType(
       config.parameterIndices, *config.resultIndices->getIndices().begin(),
       derivativeFnKind, Types, LookUpConformanceInModule(M.getSwiftModule()),
-      derivativeFnType->getSubstGenericSignature());
+      derivativeCanGenSig);
   assert(!origDerivativeFnType->getExtInfo().hasContext());
 
   auto loc = derivativeFn->getLocation();

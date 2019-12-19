@@ -836,6 +836,10 @@ public:
   /// check access control.
   bool isCallableNominalType(DeclContext *dc);
 
+  /// Return true if the specified type or a super-class/super-protocol has the
+  /// @dynamicMemberLookup attribute on it.
+  bool hasDynamicMemberLookupAttribute();
+
   /// Retrieve the superclass of this type.
   ///
   /// \param useArchetypes Whether to use context archetypes for outer generic
@@ -2970,8 +2974,11 @@ public:
       friend ExtInfo;
       friend class AnyFunctionType;
       friend class FunctionType;
-      // We preserve a full clang::Type *, not a clang::FunctionType *, so
-      // we can keep sugar in case we need to present an error to the user.
+      // We preserve a full clang::Type *, not a clang::FunctionType * as:
+      // 1. We need to keep sugar in case we need to present an error to the user.
+      // 2. The actual type being stored is [ignoring sugar] either a
+      //    clang::PointerType or a clang::BlockPointerType which points to a
+      //    clang::FunctionType.
       const clang::Type *ClangFunctionType;
 
       bool empty() const { return !ClangFunctionType; }
@@ -4466,7 +4473,8 @@ public:
   /// This "constrained derivative generic signature" is used for
   /// parameter/result type lowering. It is used as the actual generic signature
   /// of the derivative function type iff the original function type has a
-  /// generic signature; otherwise, no derivative generic signature is used.
+  /// generic signature and not all generic parameters are bound to concrete
+  /// types. Otherwise, no derivative generic signature is used.
   ///
   /// Other properties of the original function type are copied exactly:
   /// `ExtInfo`, coroutine kind, callee convention, yields, optional error

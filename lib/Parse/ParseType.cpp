@@ -374,12 +374,15 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
 
   // Parse generic parameters in SIL mode.
   GenericParamList *generics = nullptr;
+  bool isImplied = false;
   if (isInSILMode()) {
     // If this is part of a sil function decl, generic parameters are visible in
     // the function body; otherwise, they are visible when parsing the type.
     if (!IsSILFuncDecl)
       GenericsScope.emplace(this, ScopeKind::Generics);
     generics = maybeParseGenericParams().getPtrOrNull();
+    
+    isImplied = consumeIf(tok::kw_in);
   }
   
   // In SIL mode, parse box types { ... }.
@@ -459,7 +462,7 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
     } else {
       bool isVoid = false;
       if (const auto Void = dyn_cast<SimpleIdentTypeRepr>(tyR)) {
-        if (Void->getIdentifier().str() == "Void") {
+        if (Void->getNameRef().isSimpleName(Context.Id_Void)) {
           isVoid = true;
         }
       }
@@ -477,9 +480,42 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
                                         tyR->getSourceRange());
       }
     }
+    
+    // Parse substitutions for substituted SIL types.
+    SourceLoc SubsLAngleLoc, SubsRAngleLoc;
+    MutableArrayRef<TypeRepr *> SubsTypes;
+    if (isInSILMode() && consumeIf(tok::kw_for)) {
+      if (!Tok.isContextualPunctuator("<")) {
+        diagnose(Tok, diag::sil_function_subst_expected_l_angle);
+        return makeParserError();
+      }
+      
+      SubsLAngleLoc = consumeToken();
+
+      SmallVector<TypeRepr*, 4> SubsTypesVec;
+      for (;;) {
+        auto argTy = parseType();
+        if (!argTy.getPtrOrNull())
+          return makeParserError();
+        SubsTypesVec.push_back(argTy.get());
+        if (consumeIf(tok::comma))
+          continue;
+        break;
+      }
+      if (!Tok.isContextualPunctuator(">")) {
+        diagnose(Tok, diag::sil_function_subst_expected_r_angle);
+        return makeParserError();
+      }
+      
+      SubsRAngleLoc = consumeToken();
+
+      SubsTypes = Context.AllocateCopy(SubsTypesVec);
+    }
 
     tyR = new (Context) FunctionTypeRepr(generics, argsTyR, throwsLoc, arrowLoc,
-                                         SecondHalf.get());
+                                         SecondHalf.get(),
+                                         isImplied,
+                                         SubsTypes);
   } else if (generics) {
     // Only function types may be generic.
     auto brackets = generics->getSourceRange();
@@ -493,7 +529,7 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
         if (auto ident = dyn_cast<ComponentIdentTypeRepr>(T)) {
           if (auto decl = ident->getBoundDecl()) {
             if (auto genericParam = dyn_cast<GenericTypeParamDecl>(decl))
-              ident->overwriteIdentifier(genericParam->getName());
+              ident->overwriteNameRef(genericParam->createNameRef());
           }
         }
         return true;
@@ -598,18 +634,23 @@ ParserStatus Parser::parseGenericArguments(SmallVectorImpl<TypeRepr *> &Args,
 }
 
 /// SWIFT_ENABLE_TENSORFLOW
-bool Parser::canParseTypeQualifierForDeclName() {
+/// Returns true if a base type for a qualified declaration name can be
+/// parsed.
+///
+/// Examples:
+///   'Foo.f' -> true
+///   'Foo.Bar.f' -> true
+///   'f' -> false, no base type
+bool Parser::canParseBaseTypeForQualifiedDeclName() {
   BacktrackingScope backtrack(*this);
 
   // First, parse a single type identifier component.
   if (!Tok.isAny(tok::identifier, tok::kw_Self, tok::kw_Any))
     return false;
   consumeToken();
-
-  if (startsWithLess(Tok)) {
+  if (startsWithLess(Tok))
     if (!canParseGenericArguments())
       return false;
-  }
 
   // If the next token is a period or starts with a period, then this can be
   // parsed as a type qualifier.
@@ -623,12 +664,11 @@ bool Parser::canParseTypeQualifierForDeclName() {
 ///
 // SWIFT_ENABLE_TENSORFLOW: Added `isParsingQualifiedDeclName` flag.
 ParserResult<TypeRepr> Parser::parseTypeIdentifier(bool isParsingQualifiedDeclName) {
-  if (isParsingQualifiedDeclName && !canParseTypeQualifierForDeclName())
+  // If parsing a qualified declaration name, return error if base type cannot
+  // be parsed.
+  if (isParsingQualifiedDeclName && !canParseBaseTypeForQualifiedDeclName())
     return makeParserError();
 
-  // SWIFT_ENABLE_TENSORFLOW: Condition body intentionally not indented, to
-  // reduce merge conflicts.
-  if (!isParsingQualifiedDeclName || Tok.isNotAnyOperator()) {
   if (Tok.isNot(tok::identifier) && Tok.isNot(tok::kw_Self)) {
     // is this the 'Any' type
     if (Tok.is(tok::kw_Any)) {
@@ -650,24 +690,18 @@ ParserResult<TypeRepr> Parser::parseTypeIdentifier(bool isParsingQualifiedDeclNa
 
     return nullptr;
   }
-  }
   SyntaxParsingContext IdentTypeCtxt(SyntaxContext, SyntaxContextKind::Type);
 
   ParserStatus Status;
   SmallVector<ComponentIdentTypeRepr *, 4> ComponentsR;
   SourceLoc EndLoc;
   while (true) {
-    SourceLoc Loc;
-    Identifier Name;
-    if (Tok.is(tok::kw_Self)) {
-      Loc = consumeIdentifier(&Name);
-    } else {
-      // FIXME: specialize diagnostic for 'Type': type cannot start with
-      // 'metatype'
-      // FIXME: offer a fixit: 'self' -> 'Self'
-      if (parseIdentifier(Name, Loc, diag::expected_identifier_in_dotted_type))
-        Status.setIsParseError();
-    }
+    DeclNameLoc Loc;
+    DeclNameRef Name = parseUnqualifiedDeclBaseName(
+        /*afterDot=*/false, Loc,
+        diag::expected_identifier_in_dotted_type);
+    if (!Name)
+      Status.setIsParseError();
 
     if (Loc.isValid()) {
       SourceLoc LAngle, RAngle;
@@ -677,7 +711,7 @@ ParserResult<TypeRepr> Parser::parseTypeIdentifier(bool isParsingQualifiedDeclNa
         if (genericArgsStatus.isError())
           return genericArgsStatus;
       }
-      EndLoc = Loc;
+      EndLoc = Loc.getEndLoc();
 
       ComponentIdentTypeRepr *CompT;
       if (!GenericArgs.empty())
@@ -700,27 +734,19 @@ ParserResult<TypeRepr> Parser::parseTypeIdentifier(bool isParsingQualifiedDeclNa
       }
       if (!peekToken().isContextualKeyword("Type")
           && !peekToken().isContextualKeyword("Protocol")) {
-
+        consumeToken();
+        // SWIFT_ENABLE_TENSORFLOW
+        // If parsing a qualified declaration name, break before parsing the
+        // final declaration name component.
         if (isParsingQualifiedDeclName) {
-          // If we're parsing a qualified decl name, break out before parsing the
-          // last period.
-
+          // If qualified name base type cannot be parsed from the current
+          // point (i.e. the next type identifier is not followed by a '.'),
+          // then the next identifier is the final declaration name component.
           BacktrackingScope backtrack(*this);
-
-          if (Tok.is(tok::period) || Tok.is(tok::period_prefix))
-            consumeToken();
-          else if (startsWithSymbol(Tok, '.'))
-            consumeStartingCharacterOfCurrentToken(tok::period);
-
-          if (!canParseTypeQualifierForDeclName())
+          if (!canParseBaseTypeForQualifiedDeclName())
             break;
         }
-        consumeToken();
-
-        if (isParsingQualifiedDeclName && Tok.isAnyOperator()) {
-          // If an operator is encountered, break and do not backtrack later.
-          break;
-        }
+        // SWIFT_ENABLE_TENSORFLOW END
         continue;
       }
     } else if (Tok.is(tok::code_complete)) {
@@ -735,7 +761,7 @@ ParserResult<TypeRepr> Parser::parseTypeIdentifier(bool isParsingQualifiedDeclNa
   if (!ComponentsR.empty()) {
     // Lookup element #0 through our current scope chains in case it is some
     // thing local (this returns null if nothing is found).
-    if (auto Entry = lookupInScope(ComponentsR[0]->getIdentifier()))
+    if (auto Entry = lookupInScope(ComponentsR[0]->getNameRef()))
       if (auto *TD = dyn_cast<TypeDecl>(Entry))
         ComponentsR[0]->setValue(TD, nullptr);
 

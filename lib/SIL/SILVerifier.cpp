@@ -1633,6 +1633,12 @@ public:
   }
 
   void checkPartialApplyInst(PartialApplyInst *PAI) {
+    if (PAI->getModule().getStage() != SILStage::Raw) {
+      require(!PAI->getFunctionType()->isDifferentiable(),
+              "partial_apply of differentiable funtions is only allowed "
+              "in raw SIL");
+    }
+
     auto resultInfo = requireObjectType(SILFunctionType, PAI,
                                         "result of partial_apply");
     verifySILFunctionType(resultInfo);

@@ -274,9 +274,19 @@ struct A : Differentiable & AdditiveArithmetic {
     return A(x: -a.x)
   }
 
-  @transpose(of: A.-, wrt: 0)
-  func negationT(a: A.Type) -> A {
-    return A(x: 1)
+  @transpose(of: -, wrt: 0)
+  func transposeNegate(a: A.Type) -> A {
+    return A(x: -x)
+  }
+
+  static prefix func +(a: A) -> A {
+    return a
+  }
+
+  // TODO(TF-1065): Consider disallowing qualified operator names.
+  @transpose(of: A.+, wrt: 0)
+  func transposeIdQualified(a: A.Type) -> A {
+    return self
   }
 }
 

@@ -64,9 +64,9 @@ ATTRIBUTE_NODES = [
                              kind='ImplementsAttributeArguments'),
                        Child('DifferentiableArguments',
                              kind='DifferentiableAttributeArguments'),
-                       # SWIFT_ENABLE_TENSORFLOW
                        Child('DerivativeRegistrationArguments',
                              kind='DerivativeRegistrationAttributeArguments'),
+                       # SWIFT_ENABLE_TENSORFLOW
                        Child('DeprecatedDerivativeRegistrationArguments',
                              kind='DeprecatedDerivativeRegistrationAttributeArguments'),
                        # SWIFT_ENABLE_TENSORFLOW END
@@ -340,6 +340,31 @@ ATTRIBUTE_NODES = [
                    '''),
          ]),
 
+    # The argument of the derivative registration attribute
+    # '@derivative(of: ...)' and the transpose registration attribute
+    # '@transpose(of: ...)'.
+    # derivative-registration-attr-arguments ->
+    #     'of' ':' func-decl-name ','? differentiation-params-clause?
+    Node('DerivativeRegistrationAttributeArguments', kind='Syntax',
+         description='''
+         The arguments for the '@derivative(of:)' and '@transpose(of:)'
+         attributes: the 'of:' label, the original declaration name, and an
+         optional differentiation parameter list.
+         ''',
+         children=[
+             Child('OfLabel', kind='IdentifierToken', text_choices=['of'],
+                   description='The "of" label.'),
+             Child('Colon', kind='ColonToken', description='''
+                   The colon separating the "of" label and the original
+                   declaration name.
+                   '''),
+             Child('Original', kind='QualifiedDeclName',
+                   description='The referenced original declaration.'),
+             Child('Comma', kind='CommaToken', is_optional=True),
+             Child('DiffParams', kind='DifferentiationParamsClause',
+                   is_optional=True),
+         ]),
+
     # func-decl-name -> (identifier | operator) decl-name-arguments?
     # NOTE: This is duplicated with `DeclName` above. Change `DeclName`
     # description and use it if possible.
@@ -363,34 +388,6 @@ ATTRIBUTE_NODES = [
          ]),
 
     # SWIFT_ENABLE_TENSORFLOW
-    # The argument of the derivative registration attribute
-    # '@derivative(of: ...)' and the transpose registration attribute
-    # '@transpose(of: ...)'.
-    # derivative-registration-attr-arguments ->
-    #     'of' ':' func-decl-name ','? differentiation-params-clause?
-    # TODO(TF-1009): Add syntax support for dot-separated qualified names in
-    # `@transpose(of:)` attributes.
-    Node('DerivativeRegistrationAttributeArguments', kind='Syntax',
-         description='''
-         The arguments for the '@derivative(of:)' and '@transpose(of:)'
-         attributes: the 'of:' label, the original declaration name, and an
-         optional differentiation parameter list.
-         ''',
-         children=[
-             Child('OfLabel', kind='IdentifierToken', text_choices=['of'],
-                   description='The "of" label.'),
-             Child('Colon', kind='ColonToken', description='''
-                   The colon separating the "of" label and the original
-                   declaration name.
-                   '''),
-             Child('OriginalDeclName', kind='QualifiedDeclName',
-                   description='The referenced original declaration name.'),
-             Child('Comma', kind='CommaToken', is_optional=True),
-             Child('DiffParams', kind='DifferentiationParamsClause',
-                   is_optional=True),
-         ]),
-
-    # SWIFT_ENABLE_TENSORFLOW
     # The argument of the deprecated derivative registration attribute
     # '@differentiating'.
     # deprecated-derivative-registration-attr-arguments ->
@@ -408,4 +405,5 @@ ATTRIBUTE_NODES = [
              Child('DiffParams', kind='DifferentiationParamsClause',
                    is_optional=True),
          ]),
+    # SWIFT_ENABLE_TENSORFLOW END
 ]

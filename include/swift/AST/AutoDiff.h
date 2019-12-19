@@ -1,4 +1,4 @@
-//===--- AutoDiff.h - Swift Automatic Differentiation ---------------------===//
+//===--- AutoDiff.h - Swift automatic differentiation utilities -----------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-//  This file defines AST support for automatic differentiation.
+//  This file defines utilities for automatic differentiation.
 //
 //===----------------------------------------------------------------------===//
 
@@ -21,11 +21,15 @@
 
 #include "swift/AST/Identifier.h"
 #include "swift/AST/IndexSubset.h"
-#include "swift/Basic/SourceLoc.h"
+#include "swift/AST/Type.h"
 #include "swift/Basic/Range.h"
+#include "swift/Basic/SourceLoc.h"
 
 namespace swift {
 
+class AnyFunctionType;
+
+/// A function type differentiability kind.
 enum class DifferentiabilityKind : uint8_t {
   NonDifferentiable = 0,
   Normal = 1,
@@ -129,10 +133,51 @@ public:
   }
 };
 
+/// Automatic differentiation utility namespace.
+namespace autodiff {
+
+/// Appends the subset's parameter's types to `results`, in the order in
+/// which they appear in the function type.
+void getSubsetParameterTypes(IndexSubset *indices, AnyFunctionType *type,
+                             SmallVectorImpl<Type> &results,
+                             bool reverseCurryLevels = false);
+
+} // end namespace autodiff
+
 } // end namespace swift
 
+namespace llvm {
+
+using swift::AutoDiffDerivativeFunctionKind;
+
+template <typename T> struct DenseMapInfo;
+
+template <> struct DenseMapInfo<AutoDiffDerivativeFunctionKind> {
+  static AutoDiffDerivativeFunctionKind getEmptyKey() {
+    return static_cast<AutoDiffDerivativeFunctionKind::innerty>(
+        DenseMapInfo<unsigned>::getEmptyKey());
+  }
+
+  static AutoDiffDerivativeFunctionKind getTombstoneKey() {
+    return static_cast<AutoDiffDerivativeFunctionKind::innerty>(
+        DenseMapInfo<unsigned>::getTombstoneKey());
+  }
+
+  static unsigned getHashValue(const AutoDiffDerivativeFunctionKind &Val) {
+    return DenseMapInfo<unsigned>::getHashValue(Val);
+  }
+
+  static bool isEqual(const AutoDiffDerivativeFunctionKind &LHS,
+                      const AutoDiffDerivativeFunctionKind &RHS) {
+    return static_cast<AutoDiffDerivativeFunctionKind::innerty>(LHS) ==
+        static_cast<AutoDiffDerivativeFunctionKind::innerty>(RHS);
+  }
+};
+
+} // end namespace llvm
+
 // SWIFT_ENABLE_TENSORFLOW
-// Not-yet-upstreamed additions on `tensorflow` branch is below.
+// Not-yet-upstreamed `tensorflow` branch additions are below.
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/IndexSubset.h"
@@ -344,12 +389,6 @@ using SILDifferentiabilityWitnessKey = std::pair<StringRef, AutoDiffConfig>;
 
 /// Automatic differentiation utility namespace.
 namespace autodiff {
-/// Appends the subset's parameter's types to `result`, in the order in
-/// which they appear in the function type.
-void getSubsetParameterTypes(IndexSubset *indices,
-                             AnyFunctionType *type,
-                             SmallVectorImpl<Type> &result,
-                             bool reverseCurryLevels = false);
 
 /// Returns an index subset for the SIL function parameters corresponding to the
 /// parameters in this subset. In particular, this explodes tuples. For example,
@@ -481,22 +520,27 @@ public:
 namespace llvm {
 
 using swift::AutoDiffConfig;
-using swift::AutoDiffDerivativeFunctionKind;
 using swift::GenericSignature;
 using swift::IndexSubset;
 using swift::SILAutoDiffIndices;
 
-template<typename T> struct DenseMapInfo;
+template <typename T> struct DenseMapInfo;
 
-template<> struct DenseMapInfo<AutoDiffConfig> {
+template <> struct DenseMapInfo<AutoDiffConfig> {
   static AutoDiffConfig getEmptyKey() {
     auto *ptr = llvm::DenseMapInfo<void *>::getEmptyKey();
+    // The `derivativeGenericSignature` component must be `nullptr` so that
+    // `getHashValue` and `isEqual` do not try to `getCanonicalSignature()` on
+    // an invalid pointer.
     return {static_cast<IndexSubset *>(ptr), static_cast<IndexSubset *>(ptr),
             nullptr};
   }
 
   static AutoDiffConfig getTombstoneKey() {
     auto *ptr = llvm::DenseMapInfo<void *>::getTombstoneKey();
+    // The `derivativeGenericSignature` component must be `nullptr` so that
+    // `getHashValue` and `isEqual` do not try to `getCanonicalSignature()` on
+    // an invalid pointer.
     return {static_cast<IndexSubset *>(ptr), static_cast<IndexSubset *>(ptr),
             nullptr};
   }
@@ -528,28 +572,7 @@ template<> struct DenseMapInfo<AutoDiffConfig> {
   }
 };
 
-template<> struct DenseMapInfo<AutoDiffDerivativeFunctionKind> {
-  static AutoDiffDerivativeFunctionKind getEmptyKey() {
-    return static_cast<AutoDiffDerivativeFunctionKind::innerty>(
-        DenseMapInfo<unsigned>::getEmptyKey());
-  }
-
-  static AutoDiffDerivativeFunctionKind getTombstoneKey() {
-    return static_cast<AutoDiffDerivativeFunctionKind::innerty>(
-        DenseMapInfo<unsigned>::getTombstoneKey());
-  }
-
-  static unsigned getHashValue(const AutoDiffDerivativeFunctionKind &Val) {
-    return DenseMapInfo<unsigned>::getHashValue(Val);
-  }
-
-  static bool isEqual(const AutoDiffDerivativeFunctionKind &LHS,
-                      const AutoDiffDerivativeFunctionKind &RHS) {
-    return LHS == RHS;
-  }
-};
-
-template<> struct DenseMapInfo<SILAutoDiffIndices> {
+template <> struct DenseMapInfo<SILAutoDiffIndices> {
   static SILAutoDiffIndices getEmptyKey() {
     return { DenseMapInfo<unsigned>::getEmptyKey(), nullptr };
   }

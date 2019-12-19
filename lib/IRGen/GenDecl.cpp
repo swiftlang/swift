@@ -2606,20 +2606,15 @@ static llvm::GlobalVariable *createGOTEquivalent(IRGenModule &IGM,
                                       global,
                                       llvm::Twine("got.") + globalName);
   
-  // rdar://problem/50968433: Unnamed_addr constants appear to get emitted
-  // with incorrect alignment by the LLVM JIT in some cases. Don't use
-  // unnamed_addr as a workaround.
   // rdar://problem/53836960: i386 ld64 also mis-links relative references
   // to GOT entries.
-  if (!IGM.getOptions().UseJIT
-      && (!IGM.Triple.isOSDarwin()
-          || IGM.Triple.getArch() != llvm::Triple::x86)) {
+  if (!IGM.Triple.isOSDarwin() || IGM.Triple.getArch() != llvm::Triple::x86) {
     gotEquivalent->setUnnamedAddr(llvm::GlobalValue::UnnamedAddr::Global);
   } else {
     ApplyIRLinkage(IRLinkage::InternalLinkOnceODR)
       .to(gotEquivalent);
   }
-  
+
   return gotEquivalent;
 }
 

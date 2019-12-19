@@ -269,7 +269,7 @@ deriveBodyTensorGroup_init(AbstractFunctionDecl *funcDecl, void *) {
         currAddressDecl, DeclNameLoc(), /*implicit*/ true);
     auto *advancedMethodExpr =
         new (C) UnresolvedDotExpr(addressDRE, SourceLoc(),
-                                  advancedName, DeclNameLoc(),
+                                  DeclNameRef(advancedName), DeclNameLoc(),
                                   /*Implicit*/ true);
 
     // Obtain `MemberType._tensorHandleCount`.
@@ -281,7 +281,7 @@ deriveBodyTensorGroup_init(AbstractFunctionDecl *funcDecl, void *) {
     auto intInitName = DeclName(C, DeclBaseName::createConstructor(),
                                 {Identifier()});
     auto *intInitExpr =
-        new (C) UnresolvedDotExpr(intTE, SourceLoc(), intInitName,
+        new (C) UnresolvedDotExpr(intTE, SourceLoc(), DeclNameRef(intInitName),
                                   DeclNameLoc(), /*Implicit*/ true);
     auto *intInitCallExpr = CallExpr::createImplicit(
         C, intInitExpr, {memberCountMRE}, {Identifier()});

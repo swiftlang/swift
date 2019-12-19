@@ -131,7 +131,7 @@ namespace {
       
     public:
       /// Do the lookups and add matches to results.
-      void findResults(const DeclName &Name, bool isCascadingUse,
+      void findResults(const DeclNameRef &Name, bool isCascadingUse,
                        NLOptions baseNLOptions, DeclContext *contextForLookup,
                        SmallVectorImpl<LookupResultEntry> &results) const;
     };
@@ -147,7 +147,7 @@ namespace {
       
     public:
       InstrumentedNamedDeclConsumer(UnqualifiedLookupFactory *factory,
-                                    DeclName name,
+                                    DeclNameRef name,
                                     SmallVectorImpl<LookupResultEntry> &results,
                                     bool isTypeLookup)
       : NamedDeclConsumer(name, results, isTypeLookup), factory(factory) {}
@@ -163,7 +163,7 @@ namespace {
     };
 #endif
     // Inputs
-    const DeclName Name;
+    const DeclNameRef Name;
     DeclContext *const DC;
     ModuleDecl &M;
     const ASTContext &Ctx;
@@ -199,7 +199,7 @@ namespace {
     
   public:
     // clang-format off
-    UnqualifiedLookupFactory(DeclName Name,
+    UnqualifiedLookupFactory(DeclNameRef Name,
                              DeclContext *const DC,
                              SourceLoc Loc,
                              Options options,
@@ -320,7 +320,7 @@ namespace {
     void setAsideUnavailableResults(size_t firstPossiblyUnavailableResult);
     
     void recordDependencyOnTopLevelName(DeclContext *topLevelContext,
-                                        DeclName name, bool isCascadingUse);
+                                        DeclNameRef name, bool isCascadingUse);
     
     void addImportedResults(DeclContext *const dc);
     
@@ -424,7 +424,7 @@ public:
 
 // clang-format off
 UnqualifiedLookupFactory::UnqualifiedLookupFactory(
-                            DeclName Name,
+                            DeclNameRef Name,
                             DeclContext *const DC,
                             SourceLoc Loc,
                             Options options,
@@ -906,7 +906,7 @@ void UnqualifiedLookupFactory::addGenericParametersForFunction(
 }
 
 void UnqualifiedLookupFactory::ResultFinderForTypeContext::findResults(
-    const DeclName &Name, bool isCascadingUse, NLOptions baseNLOptions,
+    const DeclNameRef &Name, bool isCascadingUse, NLOptions baseNLOptions,
     DeclContext *contextForLookup,
     SmallVectorImpl<LookupResultEntry> &results) const {
   // An optimization:
@@ -960,8 +960,8 @@ void UnqualifiedLookupFactory::setAsideUnavailableResults(
 
 
 void UnqualifiedLookupFactory::recordDependencyOnTopLevelName(
-    DeclContext *topLevelContext, DeclName name, bool isCascadingUse) {
-  recordLookupOfTopLevelName(topLevelContext, Name, isCascadingUse);
+    DeclContext *topLevelContext, DeclNameRef name, bool isCascadingUse) {
+  recordLookupOfTopLevelName(topLevelContext, Name.getFullName(), isCascadingUse);
   recordedSF = dyn_cast<SourceFile>(topLevelContext);
   recordedIsCascadingUse = isCascadingUse;
 }
@@ -971,7 +971,7 @@ void UnqualifiedLookupFactory::addImportedResults(DeclContext *const dc) {
   SmallVector<ValueDecl *, 8> CurModuleResults;
   auto resolutionKind = isOriginallyTypeLookup ? ResolutionKind::TypesOnly
                                                : ResolutionKind::Overloadable;
-  lookupInModule(dc, Name, CurModuleResults, NLKind::UnqualifiedLookup,
+  lookupInModule(dc, Name.getFullName(), CurModuleResults, NLKind::UnqualifiedLookup,
                  resolutionKind, dc);
 
   // Always perform name shadowing for type lookup.
@@ -1014,7 +1014,7 @@ void UnqualifiedLookupFactory::lookForAModuleWithTheGivenName(
     return;
   }
   ModuleDecl *desiredModule = Ctx.getLoadedModule(Name.getBaseIdentifier());
-  if (!desiredModule && Name == Ctx.TheBuiltinModule->getName())
+  if (!desiredModule && Name.getFullName() == Ctx.TheBuiltinModule->getName())
     desiredModule = Ctx.TheBuiltinModule;
   if (desiredModule) {
     // Make sure the desired module is actually visible from the current
@@ -1135,7 +1135,7 @@ bool ASTScopeDeclConsumerForUnqualifiedLookup::consume(
   for (auto *value: values) {
     if (factory.isOriginallyTypeLookup && !isa<TypeDecl>(value))
       continue;
-    if (!value->getFullName().matchesRef(factory.Name))
+    if (!value->getFullName().matchesRef(factory.Name.getFullName()))
       continue;
 
     // In order to preserve the behavior of the existing context-based lookup,

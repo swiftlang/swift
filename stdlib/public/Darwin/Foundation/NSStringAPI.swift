@@ -353,7 +353,7 @@ extension String {
     usedEncoding: inout Encoding
   ) throws {
     var enc: UInt = 0
-    let ns = try NSString(contentsOf: url as URL, usedEncoding: &enc)
+    let ns = try NSString(contentsOf: url, usedEncoding: &enc)
     usedEncoding = Encoding(rawValue: enc)
     self = String._unconditionallyBridgeFromObjectiveC(ns)
   }
@@ -566,7 +566,7 @@ extension StringProtocol where Index == String.Index {
   /// Case transformations aren’t guaranteed to be symmetrical or to produce
   /// strings of the same lengths as the originals.
   public var capitalized: String {
-    return _ns.capitalized as String
+    return _ns.capitalized
   }
 
   // @property (readonly, copy) NSString *localizedCapitalizedString NS_AVAILABLE(10_11, 9_0);
@@ -583,7 +583,7 @@ extension StringProtocol where Index == String.Index {
   /// Returns a capitalized representation of the string
   /// using the specified locale.
   public func capitalized(with locale: Locale?) -> String {
-    return _ns.capitalized(with: locale) as String
+    return _ns.capitalized(with: locale)
   }
 
   // - (NSComparisonResult)caseInsensitiveCompare:(NSString *)aString
@@ -1166,7 +1166,7 @@ extension StringProtocol where Index == String.Index {
   /// locale.
   @available(macOS 10.11, iOS 9.0, *)
   public var localizedUppercase: String {
-    return _ns.localizedUppercase as String
+    return _ns.localizedUppercase
   }
 
   // - (NSString *)uppercaseStringWithLocale:(Locale *)locale

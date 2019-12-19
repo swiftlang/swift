@@ -421,7 +421,7 @@ namespace {
             funcTy->getExtInfo()
               .withRepresentation(
                 AnyFunctionType::Representation::CFunctionPointer)
-              .withClangFunctionType(pointeeQualType.getTypePtr())),
+              .withClangFunctionType(type)),
           ImportHint::CFunctionPointer
         };
       }

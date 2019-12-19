@@ -2,71 +2,87 @@
 
 /// Good
 
-@transpose(of: linearFunc) // ok
-func transpose(x: @nondiff Float) -> Float {
-  return (x, { 2 * $0 })
-}
+@transpose(of: foo)
+func transpose(v: Float) -> Float
 
-@transpose(of: linearFunc, wrt: 0) // ok
-func transposeWrt(t: @nondiff Float) -> Float {
-  return 2 * t
-}
+@transpose(of: foo(_:_:))
+func transpose(v: Float) -> Float
 
-@transpose(of: add, wrt: (0, 1)) // ok
-func transposeWrtList(t: Float) -> (Float, Float) {
-  return (t, t)
-}
+@transpose(of: wrt, wrt: 0)
+func transpose(v: Float) -> Float
 
-extension AdditiveArithmetic where Self : Differentiable {
-  @transpose(of: +) // ok
-  static func addTranspose(t: Self) -> (TangentVector, TangentVector) {
-    return (t, t)
-  }
-}
+@transpose(of: foo, wrt: 0)
+func transpose(v: Float) -> Float
+
+@transpose(of: foo, wrt: (0, 1))
+func transpose(v: Float) -> (Float, Float)
+
+@transpose(of: foo, wrt: (self, 0, 1, 2))
+func transpose(v: Float) -> (Float, Float, Float, Float)
+
+// Qualified declaration.
+@transpose(of: A.B.C.foo(x:y:_:z:))
+func transpose(v: Float) -> Float
+
+// Qualified operator.
+// TODO(TF-1065): Consider disallowing qualified operators.
+@transpose(of: Swift.Float.+)
+func transpose(v: Float) -> Float
+
+// Qualified leading-period operator (confusing).
+// TODO(TF-1065): Consider disallowing qualified operators.
+@transpose(of: Swift.Float..<)
+func transpose(v: Float) -> Float
+
+// `init` keyword edge case.
+@transpose(of: Swift.Float.init(_:))
+func transpose(v: Float) -> Float
+
+// `subscript` keyword edge case.
+@transpose(of: Swift.Array.subscript(_:))
+func transpose(v: Float) -> Float
 
 /// Bad
-
-// expected-error @+1 {{expected label 'wrt:' in '@transpose' attribute}}
-@transpose(of: linearFunc, linear)
-func tfoo(t: Float) -> Float {
-  return t
-}
 
 // expected-error @+2 {{expected an original function name}}
 // expected-error @+1 {{expected declaration}}
 @transpose(of: 3)
-func tfoo(t: Float) -> Float {
-  return t
-}
+func transpose(v: Float) -> Float
+
+// expected-error @+1 {{expected label 'wrt:' in '@transpose' attribute}}
+@transpose(of: foo, blah)
+func transpose(v: Float) -> Float
 
 // expected-error @+1 {{unexpected ',' separator}}
 @transpose(of: foo,)
-func tfoo(t: Float) -> Float {
-  return t
-}
+func transpose(v: Float) -> Float
 
 // expected-error @+2 {{expected ')' in 'transpose' attribute}}
 // expected-error @+1 {{expected declaration}}
 @transpose(of: foo, wrt: 0,)
-func tfoo(t: Float) -> Float {
-  return t
-}
+func transpose(v: Float) -> Float
 
-// expected-error @+1 {{expected a parameter, which can be a 'unsigned int' parameter number or 'self'}}
-@transpose(of: foo, wrt: x)
-func tfoo(t: Float) -> Float {
-  return t
-}
+// expected-error @+1 {{expected a parameter, which can be a function parameter index or 'self'}}
+@transpose(of: foo, wrt: v)
+func transpose(v: Float) -> Float
 
-// expected-error @+1 {{expected a parameter, which can be a 'unsigned int' parameter number or 'self'}}
-@transpose(of: foo, wrt: (0, x))
-func tfoo(t: Float) -> Float {
-  return t
-}
+// expected-error @+1 {{expected a parameter, which can be a function parameter index or 'self'}}
+@transpose(of: foo, wrt: (0, v))
+func transpose(v: Float) -> Float
 
-func localTransposeRegistration() {
-  // Not okay. Transpose registration can only be non-local.
+// expected-error @+2 {{expected ')' in 'transpose' attribute}}
+// expected-error @+1 {{expected declaration}}
+@transpose(of: Swift.Float.+(_:_))
+func transpose(v: Float) -> Float
+
+// expected-error @+2 {{expected ')' in 'transpose' attribute}}
+// expected-error @+1 {{expected declaration}}
+@transpose(of: Swift.Float.+.a)
+func transpose(v: Float) -> Float
+
+func testLocalTransposeRegistration() {
+  // Transpose registration can only be non-local.
   // expected-error @+1 {{attribute '@transpose' can only be used in a non-local scope}}
   @transpose(of: +)
-  func foo(_ x: Float) -> (Float, Float)
+  func transpose(_ x: Float) -> (Float, Float)
 }

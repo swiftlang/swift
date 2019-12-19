@@ -776,9 +776,10 @@ void SILGenModule::postEmitFunction(SILDeclRef constant,
         if (auto *vjpDecl = diffAttr->getVJPFunction())
           vjp = getFunction(SILDeclRef(vjpDecl), NotForDefinition);
         auto *resultIndices = IndexSubset::get(getASTContext(), 1, {0});
-        assert((!AFD->getGenericSignature() || diffAttr->getDerivativeGenericSignature()) &&
-               "type-checking should resolve derivative generic signatures for "
-               "all functions with generic signatures");
+        assert((!F->getLoweredFunctionType()->getSubstGenericSignature() ||
+                diffAttr->getDerivativeGenericSignature()) &&
+               "Type-checking should resolve derivative generic signatures for "
+               "all original SIL functions with generic signatures");
         AutoDiffConfig config(diffAttr->getParameterIndices(), resultIndices,
                               diffAttr->getDerivativeGenericSignature());
         emitDifferentiabilityWitness(AFD, F, config, jvp, vjp, diffAttr,

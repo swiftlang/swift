@@ -207,7 +207,7 @@ ERROR(lex_conflict_marker_in_file,none,
 //------------------------------------------------------------------------------
 
 NOTE(note_in_decl_extension,none,
-     "in %select{declaration|extension}0 of %1", (bool, Identifier))
+     "in %select{declaration|extension}0 of %1", (bool, DeclNameRef))
 ERROR(line_directive_style_deprecated,none,
         "#line directive was renamed to #sourceLocation",
         ())
@@ -813,6 +813,12 @@ ERROR(sil_box_expected_r_brace,none,
       "expected '}' to complete SIL box field type list", ())
 ERROR(sil_box_expected_r_angle,none,
       "expected '>' to complete SIL box generic argument list", ())
+
+// SIL function types
+ERROR(sil_function_subst_expected_l_angle,none,
+      "expected '<' to begin SIL function type substitution list after 'for'", ())
+ERROR(sil_function_subst_expected_r_angle,none,
+      "expected '>' to begin SIL function type substitution list after 'for'", ())
 
 // Opaque types
 ERROR(opaque_mid_composition,none,
@@ -1581,30 +1587,24 @@ ERROR(differentiable_attribute_expected_rparen,none,
 ERROR(unexpected_argument_differentiable,none,
       "unexpected argument '%0' in '@differentiable' attribute", (StringRef))
 
+// derivative
+WARNING(attr_differentiating_deprecated,PointsToFirstBadToken,
+        "'@differentiating' attribute is deprecated; use '@derivative(of:)' "
+        "instead", ())
+
 // differentiation `wrt` parameters clause
 ERROR(expected_colon_after_label,PointsToFirstBadToken,
       "expected a colon ':' after '%0'", (StringRef))
 ERROR(diff_params_clause_expected_parameter,PointsToFirstBadToken,
       "expected a parameter, which can be a function parameter name, "
       "parameter index, or 'self'", ())
+ERROR(diff_params_clause_expected_parameter_unnamed,PointsToFirstBadToken,
+      "expected a parameter, which can be a function parameter index or 'self'",
+      ())
 
-// derivative
-ERROR(attr_derivative_expected_original_name,PointsToFirstBadToken,
+// Automatic differentiation attributes
+ERROR(autodiff_attr_expected_original_decl_name,PointsToFirstBadToken,
       "expected an original function name", ())
-WARNING(attr_differentiating_deprecated,PointsToFirstBadToken,
-        "'@differentiating' attribute is deprecated; use '@derivative(of:)' "
-        "instead", ())
-
-// transpose
-ERROR(attr_transpose_expected_original_name,PointsToFirstBadToken,
-      "expected an original function name", ())
-ERROR(attr_transpose_expected_label_linear_or_wrt,none,
-      "expected 'wrt:'", ())
-
-// transpose `wrt` parameters clause
-ERROR(transpose_params_clause_expected_parameter,PointsToFirstBadToken,
-      "expected a parameter, which can be a 'unsigned int' parameter number "
-      "or 'self'", ())
 
 // SIL autodiff
 ERROR(sil_autodiff_expected_lsquare,PointsToFirstBadToken,
@@ -1647,6 +1647,10 @@ ERROR(sil_inst_autodiff_invalid_witness_generic_signature,PointsToFirstBadToken,
 ERROR(attr_quoted_enable_experimental_quasiquotes,PointsToFirstBadToken,
       "'@quoted' is unsupported; pass -enable-experimental-quasiquotes to "
       "enable support for quasiquotes", ())
+
+// derivative
+ERROR(attr_derivative_expected_original_name,PointsToFirstBadToken,
+      "expected an original function name", ())
 
 //------------------------------------------------------------------------------
 // MARK: Generics parsing diagnostics

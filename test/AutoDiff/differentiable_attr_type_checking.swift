@@ -76,13 +76,13 @@ func invalidDiffWrtClass(_ x: Class) -> Class {
 }
 
 protocol Proto {}
-// expected-error @+1 {{cannot differentiate with respect to protocol existential ('Proto')}}
+// expected-error @+1 {{can only differentiate with respect to parameters that conform to 'Differentiable', but 'Proto' does not conform to 'Differentiable'}}
 @differentiable(wrt: x)
 func invalidDiffWrtExistential(_ x: Proto) -> Proto {
   return x
 }
 
-// expected-error @+1 {{functions ('@differentiable (Float) -> Float') cannot be differentiated with respect to}}
+// expected-error @+1 {{can only differentiate with respect to parameters that conform to 'Differentiable', but '@differentiable (Float) -> Float' does not conform to 'Differentiable'}}
 @differentiable(wrt: fn)
 func invalidDiffWrtFunction(_ fn: @differentiable(Float) -> Float) -> Float {
   return fn(.pi)
@@ -234,7 +234,7 @@ func jvpNonDiffResult2(x: Float) -> (Float, Int) {
   return (x, Int(x))
 }
 
-// expected-error @+1 {{ambiguous or overloaded identifier 'jvpAmbiguousVJP' cannot be used in '@differentiable' attribute}}
+// expected-error @+1 {{ambiguous reference to 'jvpAmbiguousVJP' in '@differentiable' attribute}}
 @differentiable(jvp: jvpAmbiguousVJP)
 func jvpAmbiguous(x: Float) -> Float {
   return x
@@ -941,7 +941,7 @@ func inout1(x: Float, y: inout Float) -> Void {
   let _ = x + y
 }
 
-@differentiable(wrt: y) // expected-error {{'inout' parameters ('inout Float') cannot be differentiated with respect to}}
+@differentiable(wrt: y) // expected-error {{cannot differentiate with respect to 'inout' parameter ('inout Float')}}
 func inout2(x: Float, y: inout Float) -> Float {
   let _ = x + y
 }

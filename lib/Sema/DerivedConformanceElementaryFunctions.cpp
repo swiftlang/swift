@@ -148,7 +148,7 @@ deriveBodyElementaryFunction(AbstractFunctionDecl *funcDecl,
   auto *initDRE =
       new (C) DeclRefExpr(memberwiseInitDecl, DeclNameLoc(), /*Implicit*/ true);
   initDRE->setFunctionRefKind(FunctionRefKind::SingleApply);
-  auto *nominalTypeExpr = TypeExpr::createForDecl(SourceLoc(), nominal,
+  auto *nominalTypeExpr = TypeExpr::createForDecl(DeclNameLoc(), nominal,
                                                   funcDecl, /*Implicit*/ true);
   auto *initExpr = new (C) ConstructorRefCallExpr(initDRE, nominalTypeExpr);
 

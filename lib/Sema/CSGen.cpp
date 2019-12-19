@@ -932,7 +932,7 @@ namespace {
 
     /// Add constraints for a reference to a named member of the given
     /// base type, and return the type of such a reference.
-    Type addMemberRefConstraints(Expr *expr, Expr *base, DeclName name,
+    Type addMemberRefConstraints(Expr *expr, Expr *base, DeclNameRef name,
                                  FunctionRefKind functionRefKind,
                                  ArrayRef<ValueDecl *> outerAlternatives) {
       // The base must have a member of the given name, such that accessing
@@ -1077,7 +1077,7 @@ namespace {
         CS.addBindOverloadConstraint(memberTy, choice, memberLocator,
                                      CurDC);
       } else {
-        CS.addValueMemberConstraint(baseTy, DeclBaseName::createSubscript(),
+        CS.addValueMemberConstraint(baseTy, DeclNameRef::createSubscript(),
                                     memberTy, CurDC,
                                     FunctionRefKind::DoubleApply,
                                     /*outerAlternatives=*/{},
@@ -2057,8 +2057,8 @@ namespace {
 
     Type visitTupleElementExpr(TupleElementExpr *expr) {
       ASTContext &context = CS.getASTContext();
-      Identifier name
-        = context.getIdentifier(llvm::utostr(expr->getFieldNumber()));
+      DeclNameRef name(
+          context.getIdentifier(llvm::utostr(expr->getFieldNumber())));
       return addMemberRefConstraints(expr, expr->getBase(), name,
                                      FunctionRefKind::Unapplied,
                                      /*outerAlternatives=*/{});
@@ -3067,8 +3067,8 @@ namespace {
                                                 TVO_CanBindToNoEscape);
           componentTypeVars.push_back(memberTy);
           auto lookupName = kind == KeyPathExpr::Component::Kind::UnresolvedProperty
-            ? component.getUnresolvedDeclName()
-            : component.getDeclRef().getDecl()->getFullName();
+            ? DeclNameRef(component.getUnresolvedDeclName()) // FIXME: type change needed
+            : component.getDeclRef().getDecl()->createNameRef();
           
           auto refKind = lookupName.isSimpleName()
             ? FunctionRefKind::Unapplied
@@ -3888,8 +3888,8 @@ swift::resolveValueMember(DeclContext &DC, Type BaseTy, DeclName Name) {
 
   // Look up all members of BaseTy with the given Name.
   MemberLookupResult LookupResult = CS.performMemberLookup(
-    ConstraintKind::ValueMember, Name, BaseTy, FunctionRefKind::SingleApply,
-    nullptr, false);
+    ConstraintKind::ValueMember, DeclNameRef(Name), BaseTy,
+    FunctionRefKind::SingleApply, nullptr, false);
 
   // Keep track of all the unviable members.
   for (auto Can : LookupResult.UnviableCandidates)

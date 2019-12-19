@@ -108,7 +108,7 @@ extension UnsafeBufferPointer where Element == UInt8 {
     if index == 0 || index == count {
       return true
     }
-    assert(!UTF8.isContinuation(self[_unchecked: index]))
+    _internalInvariant(!UTF8.isContinuation(self[_unchecked: index]))
 
     // Sub-300 latiny fast-path
     if self[_unchecked: index] < 0xCC { return true }

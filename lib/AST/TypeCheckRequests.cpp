@@ -1103,12 +1103,6 @@ void swift::simple_display(llvm::raw_ostream &out,
   case ImplicitMemberAction::ResolveCodingKeys:
     out << "resolve CodingKeys";
     break;
-  case ImplicitMemberAction::ResolveEncodable:
-    out << "resolve Encodable.encode(to:)";
-    break;
-  case ImplicitMemberAction::ResolveDecodable:
-    out << "resolve Decodable.init(from:)";
-    break;
   }
 }
 
