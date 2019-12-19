@@ -1951,6 +1951,10 @@ static void printTargetInfo(CompilerInvocation &invocation,
   out.write_escaped(langOpts.Target.getTriple());
   out << "\",\n";
 
+  out << "    \"unversionedTriple\": \"";
+  out.write_escaped(getUnversionedTriple(langOpts.Target).getTriple());
+  out << "\",\n";
+
   out << "    \"moduleTriple\": \"";
   out.write_escaped(getTargetSpecificModuleTriple(langOpts.Target).getTriple());
   out << "\",\n";
