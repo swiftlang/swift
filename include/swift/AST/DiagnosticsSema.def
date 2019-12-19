@@ -107,7 +107,7 @@ ERROR(could_not_find_subscript_member_did_you_mean,none,
       (Type))
 
 ERROR(could_not_find_enum_case,none,
-      "enum type %0 has no case %1; did you mean %2",
+      "enum type %0 has no case %1; did you mean %2?",
       (Type, DeclNameRef, DeclName))
 
 NOTE(did_you_mean_raw_type,none,
@@ -951,7 +951,7 @@ NOTE(in_cast_expr_types,none,
       (Type, Type))
 
 ERROR(types_not_convertible_use_bool_value,none,
-      "%0 is not convertible to %1; did you mean %0.boolValue", (Type, Type))
+      "%0 is not convertible to %1; did you mean %0.boolValue?", (Type, Type))
 
 ERROR(tuple_types_not_convertible_nelts,none,
       "%0 is not convertible to %1, "
