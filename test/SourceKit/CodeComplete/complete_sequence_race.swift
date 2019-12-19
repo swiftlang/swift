@@ -23,10 +23,12 @@ func bar(arg: Bar) {
 // RUN:   -req=complete -pos=15:11 %s -async -- %s == \
 // RUN:   -req=complete -pos=12:11 %s -async -- %s == \
 // RUN:   -req=complete -pos=15:11 %s -async -- %s == \
+// RUN:   -req=complete -pos=17:1 %s -async -- %s == \
 // RUN:   -req=complete -pos=12:11 %s -async -- %s == \
 // RUN:   -req=complete -pos=15:11 %s -async -- %s == \
 // RUN:   -req=complete -pos=12:11 %s -async -- %s == \
 // RUN:   -req=complete -pos=15:11 %s -async -- %s == \
+// RUN:   -req=complete -pos=17:1 %s -async -- %s == \
 // RUN:   -req=complete -pos=12:11 %s -async -- %s == \
 // RUN:   -req=complete -pos=15:11 %s -async -- %s
 
@@ -36,9 +38,11 @@ func bar(arg: Bar) {
 // RUN:   -req=complete -req-opts=reuseastcontext=1 -pos=15:11 %s -async -- %s == \
 // RUN:   -req=complete -req-opts=reuseastcontext=1 -pos=12:11 %s -async -- %s == \
 // RUN:   -req=complete -req-opts=reuseastcontext=1 -pos=15:11 %s -async -- %s == \
+// RUN:   -req=complete -req-opts=reuseastcontext=1 -pos=17:1 %s -async -- %s == \
 // RUN:   -req=complete -req-opts=reuseastcontext=1 -pos=12:11 %s -async -- %s == \
 // RUN:   -req=complete -req-opts=reuseastcontext=1 -pos=15:11 %s -async -- %s == \
 // RUN:   -req=complete -req-opts=reuseastcontext=1 -pos=12:11 %s -async -- %s == \
 // RUN:   -req=complete -req-opts=reuseastcontext=1 -pos=15:11 %s -async -- %s == \
+// RUN:   -req=complete -req-opts=reuseastcontext=1 -pos=17:1 %s -async -- %s == \
 // RUN:   -req=complete -req-opts=reuseastcontext=1 -pos=12:11 %s -async -- %s == \
 // RUN:   -req=complete -req-opts=reuseastcontext=1 -pos=15:11 %s -async -- %s

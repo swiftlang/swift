@@ -138,20 +138,17 @@ bool CompletionInstance::performCachedOperaitonIfPossible(
   if (!EnableASTCaching)
     return false;
 
-  // Temporary move the CI so other threads don't use the same instance.
-  std::shared_ptr<CachedInstance> CachedI(nullptr);
-  CachedInst.swap(CachedI);
-
-  if (!CachedI)
-    return false;
-  if (CachedI->ReuseCound >= MaxASTReuseCount)
-    return false;
-  if (CachedI->ArgHash != ArgsHash)
+  if (!CachedCI)
     return false;
 
-  auto &CI = CachedI->CI;
+  if (CachedReuseCound >= MaxASTReuseCount)
+    return false;
+  if (CachedArgHash != ArgsHash)
+    return false;
 
-  auto &oldState = CachedI->CI.getPersistentParserState();
+  auto &CI = *CachedCI;
+
+  auto &oldState = CI.getPersistentParserState();
   if (!oldState.hasCodeCompletionDelayedDeclState())
     return false;
 
@@ -242,8 +239,7 @@ bool CompletionInstance::performCachedOperaitonIfPossible(
   if (DiagC)
     CI.removeDiagnosticConsumer(DiagC);
 
-  CachedI->ReuseCound += 1;
-  CachedInst.swap(CachedI);
+  CachedReuseCound += 1;
 
   return true;
 }
@@ -254,9 +250,9 @@ bool CompletionInstance::performNewOperation(
     llvm::MemoryBuffer *completionBuffer, unsigned int Offset,
     std::string &Error, DiagnosticConsumer *DiagC,
     llvm::function_ref<void(CompilerInstance &)> Callback) {
-  CachedInst.reset();
-  auto TheInstance = std::make_shared<CachedInstance>();
-  auto &CI = TheInstance->CI;
+
+  auto TheInstance = std::make_unique<CompilerInstance>();
+  auto &CI = *TheInstance;
   if (DiagC)
     CI.addDiagnosticConsumer(DiagC);
 
@@ -278,8 +274,9 @@ bool CompletionInstance::performNewOperation(
     CI.removeDiagnosticConsumer(DiagC);
 
   if (EnableASTCaching) {
-    TheInstance->ArgHash = ArgsHash;
-    CachedInst.swap(TheInstance);
+    CachedCI = std::move(TheInstance);
+    CachedArgHash = ArgsHash;
+    CachedReuseCound = 0;
   }
 
   return true;
@@ -307,6 +304,12 @@ bool swift::ide::CompletionInstance::performOperation(
   llvm::hash_code ArgsHash(0);
   for (auto arg : Args)
     ArgsHash = llvm::hash_combine(ArgsHash, StringRef(arg));
+
+  // If AST caching is enabled, block completions in other threads. So they
+  // have higher chance to use the cached completion instance.
+  Optional<std::lock_guard<std::mutex>> lock;
+  if (EnableASTCaching)
+    lock.emplace(mtx);
 
   if (performCachedOperaitonIfPossible(Invocation, ArgsHash, completionBuffer,
                                        Offset, DiagC, Callback))
