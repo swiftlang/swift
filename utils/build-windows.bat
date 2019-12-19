@@ -21,7 +21,7 @@
 :: The user will need permission to write files into the Windows SDK and the
 :: VisualC++ folder.
 
-@echo off
+:: @echo off
 
 setlocal enableextensions enabledelayedexpansion
 
@@ -52,6 +52,9 @@ set install_directory=%build_root%\Library\Developer\Toolchains\unknown-Asserts-
 
 call :clone_repositories %exitOnError%
 call :download_icu %exitOnError%
+call :download_xml2 %exitOnError%
+call :download_zlib %exitOnError%
+call :download_curl %exitOnError%
 :: TODO: Disabled until we need LLBuild/SwiftPM in this build script.
 :: call :download_sqlite3
 
@@ -340,6 +343,75 @@ endlocal
 setlocal enableextensions enabledelayedexpansion
 
 cmake --build "%build_root%\swift-corelibs-libdispatch" --target ExperimentalTest %exitOnError%
+
+goto :eof
+endlocal
+
+
+:download_xml2
+:: Downloads libxml2 from the Azure artifacts
+setlocal enableextensions enabledelayedexpansion
+
+set pipeline_id=10
+set build_name=xml2-windows-x64
+set file_name=%build_name%.zip
+
+for /f "tokens=*" %%G IN ('curl "https://dev.azure.com/compnerd/windows-swift/_apis/build/builds?definitions=%pipeline_id%&resultFilter=succeeded,partiallySucceeded&$top=1&api-version-string=5.0" ^| jq ".value[0].id"') DO (
+    for /f "tokens=*" %%H IN ('curl "https://dev.azure.com/compnerd/windows-swift/_apis/build/builds/%%G/artifacts?api-version-string=5.0" ^| jq -r ".value[] | select(.name == \"%build_name%\") | .resource.downloadUrl"') DO (
+        curl -L -o %file_name% "%%H"
+    )
+)
+
+:: unzip warns about the paths in the zip using slashes, which raises the
+:: errorLevel to 1. We cannot use exitOnError, and have to ignore errors.
+unzip -o %file_name% -d "%source_root%"
+exit /b 0
+
+goto :eof
+endlocal
+
+
+:download_zlib
+:: Downloads zlib from the Azure artifacts
+setlocal enableextensions enabledelayedexpansion
+
+set pipeline_id=16
+set build_name=zlib-windows-x64
+set file_name=%build_name%.zip
+
+for /f "tokens=*" %%G IN ('curl "https://dev.azure.com/compnerd/windows-swift/_apis/build/builds?definitions=%pipeline_id%&resultFilter=succeeded,partiallySucceeded&$top=1&api-version-string=5.0" ^| jq ".value[0].id"') DO (
+    for /f "tokens=*" %%H IN ('curl "https://dev.azure.com/compnerd/windows-swift/_apis/build/builds/%%G/artifacts?api-version-string=5.0" ^| jq -r ".value[] | select(.name == \"%build_name%\") | .resource.downloadUrl"') DO (
+        curl -L -o %file_name% "%%H"
+    )
+)
+
+:: unzip warns about the paths in the zip using slashes, which raises the
+:: errorLevel to 1. We cannot use exitOnError, and have to ignore errors.
+unzip -o %file_name% -d "%source_root%"
+exit /b 0
+
+goto :eof
+endlocal
+
+
+:download_curl
+:: Downloads libcurl from the Azure artifacts
+setlocal enableextensions enabledelayedexpansion
+
+set pipeline_id=11
+set build_name=curl-windows-x64
+set file_name=%build_name%.zip
+
+for /f "tokens=*" %%G IN ('curl "https://dev.azure.com/compnerd/windows-swift/_apis/build/builds?definitions=%pipeline_id%&resultFilter=succeeded,partiallySucceeded&$top=1&api-version-string=5.0" ^| jq ".value[0].id"') DO (
+    for /f "tokens=*" %%H IN ('curl "https://dev.azure.com/compnerd/windows-swift/_apis/build/builds/%%G/artifacts?api-version-string=5.0" ^| jq -r ".value[] | select(.name == \"%build_name%\") | .resource.downloadUrl"') DO (
+        curl -L -o %file_name% "%%H"
+    )
+)
+
+:: unzip warns about the paths in the zip using slashes, which raises the
+:: errorLevel to 1. We cannot use exitOnError, and have to ignore errors.
+unzip -o %file_name% -d "%source_root%"
+exit /b 0
 
 goto :eof
 endlocal
