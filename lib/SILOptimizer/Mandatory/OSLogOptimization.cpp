@@ -262,8 +262,7 @@ static bool shouldAttemptEvaluation(SILInstruction *inst) {
   SILFunction *calleeFun = apply->getCalleeFunction();
   if (!calleeFun)
     return false;
-  return isKnownConstantEvaluableFunction(calleeFun) ||
-         isConstantEvaluable(calleeFun);
+  return isConstantEvaluable(calleeFun);
 }
 
 /// Skip or evaluate the given instruction based on the evaluation policy and
@@ -780,20 +779,11 @@ static SILValue emitCodeForSymbolicValue(SymbolicValue symVal,
   }
 }
 
-/// Collect the end points of the instructions that are data dependent on \c
-/// value. A instruction is data dependent on \c value if its result may
-/// transitively depends on \c value. Note that data dependencies through
-/// addresses are not tracked by this function.
-///
-/// \param value SILValue that is not an address.
-/// \param fun SILFunction that defines \c value.
-/// \param endUsers buffer for storing the found end points of the data
-/// dependence chain.
-static void
-getEndPointsOfDataDependentChain(SILValue value, SILFunction *fun,
-                                 SmallVectorImpl<SILInstruction *> &endUsers) {
-  assert(!value->getType().isAddress());
-
+/// Given a SILValue \p value, compute the set of transitive users of the value
+/// (excluding value itself) by following the use-def chain starting at value.
+/// Note that this function does not follow use-def chains though branches.
+static void getTransitiveUsers(SILValue value,
+                               SmallVectorImpl<SILInstruction *> &users) {
   // Collect the instructions that are data dependent on the value using a
   // fix point iteration.
   SmallPtrSet<SILInstruction *, 16> visitedUsers;
@@ -810,17 +800,40 @@ getEndPointsOfDataDependentChain(SILValue value, SILFunction *fun,
       llvm::copy(user->getResults(), std::back_inserter(worklist));
     }
   }
-
   // At this point, visitedUsers have all the transitive, data-dependent uses.
-  // Compute the lifetime frontier of all the uses which are the instructions
-  // following the last uses. Every exit from the last uses will have a
-  // lifetime frontier.
+  users.append(visitedUsers.begin(), visitedUsers.end());
+}
+
+/// Collect the end points of the instructions that are data dependent on \c
+/// value. A instruction is data dependent on \c value if its result may
+/// transitively depends on \c value. Note that data dependencies through
+/// addresses are not tracked by this function.
+///
+/// \param value SILValue that is not an address.
+/// \param fun SILFunction that defines \c value.
+/// \param endUsers buffer for storing the found end points of the data
+/// dependence chain.
+static void
+getEndPointsOfDataDependentChain(SILValue value, SILFunction *fun,
+                                 SmallVectorImpl<SILInstruction *> &endUsers) {
+  assert(!value->getType().isAddress());
+
+  SmallVector<SILInstruction *, 16> transitiveUsers;
+  // Get transitive users of value, ignoring use-def chain going through
+  // branches. These transitive users define the end points of the constant
+  // evaluation. Igoring use-def chains through branches causes constant
+  // evaluation to miss some constant folding opportunities. This can be
+  // relaxed in the future, if necessary.
+  getTransitiveUsers(value, transitiveUsers);
+
+  // Compute the lifetime frontier of all the transitive uses which are the
+  // instructions following the last uses. Every exit from the last uses will
+  // have a lifetime frontier.
   SILInstruction *valueDefinition = value->getDefiningInstruction();
   SILInstruction *def =
       valueDefinition ? valueDefinition : &(value->getParentBlock()->front());
   ValueLifetimeAnalysis lifetimeAnalysis =
-      ValueLifetimeAnalysis(def, SmallVector<SILInstruction *, 16>(
-                                     visitedUsers.begin(), visitedUsers.end()));
+      ValueLifetimeAnalysis(def, transitiveUsers);
   ValueLifetimeAnalysis::Frontier frontier;
   bool hasCriticlEdges = lifetimeAnalysis.computeFrontier(
       frontier, ValueLifetimeAnalysis::DontModifyCFG);
@@ -936,7 +949,7 @@ static void replaceAllUsesAndFixLifetimes(SILValue foldedVal,
 static void substituteConstants(FoldState &foldState) {
   ConstExprStepEvaluator &evaluator = foldState.constantEvaluator;
   // Instructions that are possibly dead since their results are folded.
-  SmallVector<SILInstruction *, 4> possiblyDeadInsts;
+  SmallVector<SILInstruction *, 8> possiblyDeadInsts;
 
   for (SILValue constantSILValue : foldState.getConstantSILValues()) {
     SymbolicValue constantSymbolicVal =
@@ -980,13 +993,11 @@ static void substituteConstants(FoldState &foldState) {
     replaceAllUsesAndFixLifetimes(foldedSILVal, constantSILValue, fun);
     possiblyDeadInsts.push_back(definingInst);
   }
-  recursivelyDeleteTriviallyDeadInstructions(possiblyDeadInsts, /*force*/ false,
-                                             [&](SILInstruction *DeadI) {});
 }
 
 /// Check whether OSLogMessage and OSLogInterpolation instances and all their
 /// stored properties are constants. If not, it indicates errors that are due to
-/// incorrect implementation OSLogMessage either in the overlay or in the
+/// incorrect implementation of OSLogMessage either in the overlay or in the
 /// extensions created by users. Detect and emit diagnostics for such errors.
 /// The diagnostics here are for os log library authors.
 static bool checkOSLogMessageIsConstant(SingleValueInstruction *osLogMessage,
@@ -1048,6 +1059,37 @@ static bool checkOSLogMessageIsConstant(SingleValueInstruction *osLogMessage,
   return errorDetected;
 }
 
+/// Try to dead-code eliminate the OSLogMessage instance \c oslogMessage passed
+/// to the os log call and clean up its dependencies. If the instance cannot be
+/// eliminated, it implies that either the instance is not auto-generated or the
+/// implementation of the os log overlay is incorrect. Therefore emit
+/// diagnostics in such cases.
+static void tryEliminateOSLogMessage(SingleValueInstruction *oslogMessage) {
+  // Collect the set of root instructions that could be dead due to constant
+  // folding. These include the oslogMessage initialzer call and its transitive
+  // users.
+  SmallVector<SILInstruction *, 8> oslogMessageUsers;
+  getTransitiveUsers(oslogMessage, oslogMessageUsers);
+
+  InstructionDeleter deleter;
+  for (SILInstruction *user : oslogMessageUsers)
+    deleter.trackIfDead(user);
+  deleter.trackIfDead(oslogMessage);
+
+  bool isOSLogMessageDead = false;
+  deleter.cleanUpDeadInstructions([&](SILInstruction *deadInst) {
+    if (deadInst == oslogMessage)
+      isOSLogMessageDead = true;
+  });
+  // At this point, the OSLogMessage instance must be deleted if
+  // the overlay implementation (or its extensions by users) is correct.
+  if (!isOSLogMessageDead) {
+    SILFunction *fun = oslogMessage->getFunction();
+    diagnose(fun->getASTContext(), oslogMessage->getLoc().getSourceLoc(),
+             diag::oslog_message_alive_after_opts);
+  }
+}
+
 /// Constant evaluate instructions starting from 'start' and fold the uses
 /// of the value 'oslogMessage'. Stop when oslogMessageValue is released.
 static bool constantFold(SILInstruction *start,
@@ -1076,6 +1118,8 @@ static bool constantFold(SILInstruction *start,
     return false;
 
   substituteConstants(state);
+
+  tryEliminateOSLogMessage(oslogMessage);
   return true;
 }
 
