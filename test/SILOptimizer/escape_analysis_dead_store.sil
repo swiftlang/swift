@@ -1,0 +1,138 @@
+// RUN: %target-sil-opt %s -dead-store-elim -enable-sil-verify-all | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+final class X {
+  init()
+}
+
+public struct S {
+  @_hasStorage var x: X { get set }
+  @_hasStorage var i: Int { get set }
+  init(x: X, i: Int)
+}
+
+@_hasStorage @_hasInitialValue var gg: X { get set }
+
+@inline(never) func takex(_ x: X)
+
+sil [noinline] @takeX : $@convention(thin) (@guaranteed X) -> ()
+
+// Test that escape analysis does not consider an inout argument to
+// escape at a call site even though it's reference-type field does
+// escape. Dead store elimination asks MemoryBehaviorVisitor whether
+// the apply may read from the inout argument. This call into
+// canEscapeToUsePoint, which should return false because the inout
+// structure itself is not exposed to the call, only it's
+// reference-type field is.
+//
+// CHECK-LABEL: sil @testInoutNoEscape
+// CHECK-NOT: store
+// CHECK:     apply
+// CHECK:     store
+// CHECK-NOT: store
+// CHECK:    } // end sil function 'testInoutNoEscape'
+sil @testInoutNoEscape : $@convention(thin) (@inout S, @guaranteed S) -> () {
+bb0(%0 : $*S, %1 : $S):
+  %4 = struct_extract %1 : $S, #S.x
+  %5 = struct_element_addr %0 : $*S, #S.x
+  %6 = load %5 : $*X
+  strong_retain %4 : $X
+  strong_release %6 : $X
+  store %1 to %0 : $*S
+  %10 = function_ref @takeX : $@convention(thin) (@guaranteed X) -> ()
+  strong_retain %4 : $X
+  %12 = apply %10(%4) : $@convention(thin) (@guaranteed X) -> ()
+  release_value %1 : $S
+  store %1 to %0 : $*S
+  %15 = tuple ()
+  return %15 : $()
+}
+
+// =============================================================================
+// Test that a store writing back into a container is not eliminated
+// when the container's interior pointer later escapes into a function
+// that reads from the pointer.
+
+final internal class TestArrayContainer {
+  @_hasStorage @_hasInitialValue internal final var pointer: UnsafeMutablePointer<Int32> { get set }
+  @_hasStorage @_hasInitialValue internal final var storage: ContiguousArray<Int32> { get set }
+  @_optimize(none) @inline(never) internal final func append(_ arg: Int32)
+  internal final func va_list() -> UnsafeMutableRawPointer
+  init()
+}
+
+sil @UnsafeMutablePointer_load_Int64 : $@convention(method) (Int64, UnsafeMutableRawPointer) -> Optional<UnsafeMutablePointer<Int32>> // user: %5
+// ContiguousArray.append(_:)
+sil @$ss15ContiguousArrayV6appendyyxnF : $@convention(method) <τ_0_0> (@in τ_0_0, @inout ContiguousArray<τ_0_0>) -> ()
+
+
+// Helper that reads from a raw pointer.
+sil hidden [noinline] @takeRawPtr : $@convention(thin) (UnsafeMutableRawPointer) -> Bool {
+bb0(%0 : $UnsafeMutableRawPointer):
+  %1 = integer_literal $Builtin.Int64, 0
+  %2 = struct $Int64 (%1 : $Builtin.Int64)
+  %3 = function_ref @UnsafeMutablePointer_load_Int64 : $@convention(method) (Int64, UnsafeMutableRawPointer) -> Optional<UnsafeMutablePointer<Int32>>
+  %4 = apply %3(%2, %0) : $@convention(method) (Int64, UnsafeMutableRawPointer) -> Optional<UnsafeMutablePointer<Int32>> // users: %18, %6
+  %5 = integer_literal $Builtin.Int1, -1
+  %6 = struct $Bool (%5 : $Builtin.Int1)
+  return %6 : $Bool
+}
+
+// TestArrayContainer.append(_:)
+// Helper that produces a nonempty array.
+sil hidden [noinline] [Onone] @TestArrayContainer_append : $@convention(method) (Int32, @guaranteed TestArrayContainer) -> () {
+bb0(%0 : $Int32, %1 : $TestArrayContainer):
+  %2 = alloc_stack $Int32
+  store %0 to %2 : $*Int32
+  %4 = ref_element_addr %1 : $TestArrayContainer, #TestArrayContainer.storage
+  %5 = function_ref @$ss15ContiguousArrayV6appendyyxnF : $@convention(method) <τ_0_0> (@in τ_0_0, @inout ContiguousArray<τ_0_0>) -> ()
+  %6 = apply %5<Int32>(%2, %4) : $@convention(method) <τ_0_0> (@in τ_0_0, @inout ContiguousArray<τ_0_0>) -> ()
+  dealloc_stack %2 : $*Int32
+  %8 = tuple ()
+  return %8 : $()
+}
+
+// CHECK-LABEL: sil [noinline] @testContainerPointer : $@convention(thin) () -> Bool {
+// CHECK: [[ALLOC:%.*]] = alloc_ref [stack] $TestArrayContainer
+// CHECK: [[PTR:%.*]] = ref_element_addr %0 : $TestArrayContainer, #TestArrayContainer.pointer
+// CHECK: [[LOAD:%.*]] = load %{{.*}} : $*__ContiguousArrayStorageBase
+// CHECK: [[ELTS:%.*]] = ref_tail_addr [[LOAD]] : $__ContiguousArrayStorageBase, $Int32
+// CHECK: [[ELTPTR:%.*]] = address_to_pointer [[ELTS]] : $*Int32 to $Builtin.RawPointer
+// CHECK: [[UMP:%.*]] = struct $UnsafeMutablePointer<Int32> ([[ELTPTR]] : $Builtin.RawPointer)
+// CHECK: store [[UMP]] to [[PTR]] : $*UnsafeMutablePointer<Int32>
+// CHECK: [[F:%.*]] = function_ref @takeRawPtr : $@convention(thin) (UnsafeMutableRawPointer) -> Bool
+// CHECK: apply [[F]](%{{.*}}) : $@convention(thin) (UnsafeMutableRawPointer) -> Bool
+// CHECK: fix_lifetime %0 : $TestArrayContainer
+// CHECK-LABEL: } // end sil function 'testContainerPointer'
+sil [noinline] @testContainerPointer : $@convention(thin) () -> Bool {
+bb0:
+  %0 = alloc_ref [stack] $TestArrayContainer
+  %1 = ref_element_addr %0 : $TestArrayContainer, #TestArrayContainer.pointer
+  %2 = ref_element_addr %0 : $TestArrayContainer, #TestArrayContainer.storage
+  %3 = integer_literal $Builtin.Int32, 42
+  %4 = struct $Int32 (%3 : $Builtin.Int32)
+  %5 = function_ref @TestArrayContainer_append : $@convention(method) (Int32, @guaranteed TestArrayContainer) -> ()
+  %6 = apply %5(%4, %0) : $@convention(method) (Int32, @guaranteed TestArrayContainer) -> ()
+  %7 = struct_element_addr %2 : $*ContiguousArray<Int32>, #ContiguousArray._buffer
+  %8 = struct_element_addr %7 : $*_ContiguousArrayBuffer<Int32>, #_ContiguousArrayBuffer._storage
+  %9 = load %8 : $*__ContiguousArrayStorageBase
+  %10 = ref_tail_addr %9 : $__ContiguousArrayStorageBase, $Int32
+  %11 = address_to_pointer %10 : $*Int32 to $Builtin.RawPointer
+  %12 = struct $UnsafeMutablePointer<Int32> (%11 : $Builtin.RawPointer)
+  store %12 to %1 : $*UnsafeMutablePointer<Int32>
+  %14 = address_to_pointer %1 : $*UnsafeMutablePointer<Int32> to $Builtin.RawPointer
+  %15 = struct $UnsafeMutableRawPointer (%14 : $Builtin.RawPointer)
+  %16 = function_ref @takeRawPtr : $@convention(thin) (UnsafeMutableRawPointer) -> Bool
+  %17 = apply %16(%15) : $@convention(thin) (UnsafeMutableRawPointer) -> Bool
+  fix_lifetime %0 : $TestArrayContainer
+  set_deallocating %0 : $TestArrayContainer
+  strong_release %9 : $__ContiguousArrayStorageBase
+  dealloc_ref %0 : $TestArrayContainer
+  dealloc_ref [stack] %0 : $TestArrayContainer
+  return %17 : $Bool
+}
