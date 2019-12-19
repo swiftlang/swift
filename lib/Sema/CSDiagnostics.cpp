@@ -5915,3 +5915,31 @@ bool MissingContextualBaseInMemberRefFailure::diagnoseAsError() {
       .highlight(anchor->getSourceRange());
   return true;
 }
+
+bool UnableToInferClosureReturnType::diagnoseAsError() {
+  auto *closure = cast<ClosureExpr>(getRawAnchor());
+
+  auto diagnostic =
+      emitDiagnostic(closure->getLoc(),
+                     diag::cannot_infer_closure_result_type,
+                     closure->hasSingleExpressionBody());
+
+  // If there is a location for an 'in' token, then the argument list was
+  // specified somehow but no return type was.  Insert a "-> ReturnType "
+  // before the in token.
+  if (closure->getInLoc().isValid()) {
+    diagnostic.fixItInsert(closure->getInLoc(),
+                           diag::insert_closure_return_type_placeholder,
+                           /*argListSpecified=*/false);
+  } else if (closure->getParameters()->size() == 0) {
+    // Otherwise, the closure must take zero arguments.
+    //
+    // As such, we insert " () -> ReturnType in " right after the '{' that
+    // starts the closure body.
+    diagnostic.fixItInsertAfter(closure->getBody()->getLBraceLoc(),
+                                diag::insert_closure_return_type_placeholder,
+                                /*argListSpecified=*/true);
+  }
+
+  return true;
+}
