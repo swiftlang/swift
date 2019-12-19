@@ -22,6 +22,10 @@ using namespace swift;
 extern const ProtocolDescriptor
 PROTOCOL_DESCRIPTOR_SYM(SWIFT_EQUATABLE_MANGLING);
 
+extern const ProtocolConformanceDescriptor
+BUILTIN_PROTOCOL_CONFORMANCE_DESCRIPTOR_SYM(EMPTY_TUPLE_MANGLING,
+                                            SWIFT_EQUATABLE_MANGLING);
+
 const _WitnessTable swift::
 BUILTIN_PROTOCOL_WITNESS_TABLE_SYM(EMPTY_TUPLE_MANGLING,
                                    SWIFT_EQUATABLE_MANGLING) = {
@@ -42,27 +46,3 @@ BUILTIN_PROTOCOL_WITNESS_SYM(EMPTY_TUPLE_MANGLING,
 (Metadata *swiftSelf, Metadata *existentialSelf, void *witnessTable) {
   return true;
 }
-
-const _ProtocolConformanceDescriptor swift::
-BUILTIN_PROTOCOL_CONFORMANCE_DESCRIPTOR_SYM(EMPTY_TUPLE_MANGLING,
-                                            SWIFT_EQUATABLE_MANGLING) = {
-    (int32_t)(
-      (intptr_t)&PROTOCOL_DESCRIPTOR_SYM(SWIFT_EQUATABLE_MANGLING) - 
-      (intptr_t)&BUILTIN_PROTOCOL_CONFORMANCE_DESCRIPTOR_SYM(
-                    EMPTY_TUPLE_MANGLING, SWIFT_EQUATABLE_MANGLING)),
-    (int32_t)(
-      (intptr_t)&METADATA_SYM(EMPTY_TUPLE_MANGLING) -
-      (intptr_t)&BUILTIN_PROTOCOL_CONFORMANCE_DESCRIPTOR_SYM(
-                    EMPTY_TUPLE_MANGLING, SWIFT_EQUATABLE_MANGLING) -
-      4 /* Relative to the field above */),
-    (int32_t)(
-      (intptr_t)&BUILTIN_PROTOCOL_WITNESS_TABLE_SYM(
-                    EMPTY_TUPLE_MANGLING, SWIFT_EQUATABLE_MANGLING) -
-      (intptr_t)&BUILTIN_PROTOCOL_CONFORMANCE_DESCRIPTOR_SYM(
-                    EMPTY_TUPLE_MANGLING, SWIFT_EQUATABLE_MANGLING) -
-      8 /* Relative to the other two fields above */),
-    (int32_t)ConformanceFlags()
-        .withTypeReferenceKind(TypeReferenceKind::DirectTypeMetadata)
-        .getIntValue()
-};
-

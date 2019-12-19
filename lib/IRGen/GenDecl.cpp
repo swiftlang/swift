@@ -2808,9 +2808,18 @@ IRGenModule::getAddrOfLLVMVariable(LinkEntity entity,
   ForDefinition_t forDefinition = (ForDefinition_t) (definitionType != nullptr);
   LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
 
-  // Clang may have defined the variable already.
-  if (auto existing = Module.getNamedGlobal(link.getName()))
+  // Clang may have defined the variable already, or we're referencing an entity
+  // which is known by IRGen, such as ().
+  if (auto existing = Module.getNamedGlobal(link.getName())) {
+    // If we're looking for ()'s type metadata, just return IRGen's already
+    // created global variable. We want the link entity to mangle for the
+    // address point, but ()'s metadata is the full metadata type, so the
+    // element bit cast is wrong for both address types.
+    if (entity.isTypeMetadata(Context.TheEmptyTupleType))
+      return existing;
+
     return getElementBitCast(existing, defaultType);
+  }
 
   // If we're not defining the object now, forward declare it with the default
   // type.
@@ -2892,7 +2901,7 @@ IRGenModule::getAddrOfLLVMVariableOrGOTEquivalent(LinkEntity entity) {
   }
   
   // Ensure the variable is at least forward-declared.
-  getAddrOfLLVMVariable(entity, ConstantInit(), DebugTypeInfo());
+  auto var = getAddrOfLLVMVariable(entity, ConstantInit(), DebugTypeInfo());
 
   auto entry = GlobalVars[entity];
   

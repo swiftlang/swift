@@ -988,6 +988,9 @@ GenerateTBDRequest::evaluate(Evaluator &evaluator,
   auto visitFile = [&](FileUnit *file) {
     if (file == M->getFiles()[0]) {
       visitor.addFirstFileSymbols();
+
+      if (M->isStdlibModule())
+        visitor.addKnownProtocolConformances();
     }
 
     SmallVector<Decl *, 16> decls;
