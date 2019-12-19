@@ -492,7 +492,7 @@ public:
   /// Keep track of initializer declarations that correspond to
   /// imported methods.
   llvm::DenseMap<
-      std::tuple<const clang::ObjCMethodDecl *, DeclContext *, Version>,
+      std::tuple<const clang::ObjCMethodDecl *, const DeclContext *, Version>,
       ConstructorDecl *> Constructors;
 
   /// Keep track of all initializers that have been imported into a
@@ -812,6 +812,10 @@ public:
   Decl *importMirroredDecl(const clang::NamedDecl *decl, DeclContext *dc,
                            Version version, ProtocolDecl *proto);
 
+  void importInheritedConstructors(const clang::ObjCInterfaceDecl *curObjCClass,
+                                   const ClassDecl *classDecl,
+                                   SmallVectorImpl<Decl *> &newMembers);
+  
   /// Utility function for building simple generic signatures.
   GenericSignature buildGenericSignature(GenericParamList *genericParams,
                                           DeclContext *dc);
