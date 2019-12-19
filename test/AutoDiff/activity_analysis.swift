@@ -221,32 +221,32 @@ func testArrayUninitializedIntrinsicNested(_ x: Float, _ y: Float) -> [Float] {
 // CHECK: [VARIED] %1 = argument of bb0 : $Float
 // CHECK: [NONE]   %4 = integer_literal $Builtin.Word, 2
 // CHECK: [NONE]   // function_ref _allocateUninitializedArray<A>(_:)
-// CHECK: [VARIED]   %6 = apply %5<Float>(%4) : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer) // user: %7
-// CHECK: [VARIED] (**%7**, %8) = destructure_tuple %6 : $(Array<Float>, Builtin.RawPointer) // users: %39, %30, %21, %14
-// CHECK: [VARIED] (%7, **%8**) = destructure_tuple %6 : $(Array<Float>, Builtin.RawPointer) // user: %9
-// CHECK: [VARIED]   %9 = pointer_to_address %8 : $Builtin.RawPointer to [strict] $*Float // users: %12, %10
-// CHECK: [VARIED]   %11 = integer_literal $Builtin.Word, 1          // user: %12
-// CHECK: [VARIED]   %12 = index_addr %9 : $*Float, %11 : $Builtin.Word // user: %13
-// CHECK: [USEFUL]   %15 = integer_literal $Builtin.Word, 2          // user: %17
+// CHECK: [VARIED]   %6 = apply %5<Float>(%4) : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer)
+// CHECK: [VARIED] (**%7**, %8) = destructure_tuple %6 : $(Array<Float>, Builtin.RawPointer)
+// CHECK: [VARIED] (%7, **%8**) = destructure_tuple %6 : $(Array<Float>, Builtin.RawPointer)
+// CHECK: [VARIED]   %9 = pointer_to_address %8 : $Builtin.RawPointer to [strict] $*Float
+// CHECK: [VARIED]   %11 = integer_literal $Builtin.Word, 1
+// CHECK: [VARIED]   %12 = index_addr %9 : $*Float, %11 : $Builtin.Word
+// CHECK: [USEFUL]   %15 = integer_literal $Builtin.Word, 2
 // CHECK: [NONE]   // function_ref _allocateUninitializedArray<A>(_:)
-// CHECK: [ACTIVE]   %17 = apply %16<Float>(%15) : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer) // user: %18
-// CHECK: [ACTIVE] (**%18**, %19) = destructure_tuple %17 : $(Array<Float>, Builtin.RawPointer) // user: %40
-// CHECK: [VARIED] (%18, **%19**) = destructure_tuple %17 : $(Array<Float>, Builtin.RawPointer) // user: %20
-// CHECK: [VARIED]   %20 = pointer_to_address %19 : $Builtin.RawPointer to [strict] $*Float // users: %29, %27
-// CHECK: [VARIED]   %21 = begin_borrow %7 : $Array<Float>           // users: %38, %27
-// CHECK: [NONE]   %22 = integer_literal $Builtin.IntLiteral, 0    // user: %25
-// CHECK: [NONE]   %23 = metatype $@thin Int.Type                  // user: %25
+// CHECK: [ACTIVE]   %17 = apply %16<Float>(%15) : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer)
+// CHECK: [ACTIVE] (**%18**, %19) = destructure_tuple %17 : $(Array<Float>, Builtin.RawPointer)
+// CHECK: [VARIED] (%18, **%19**) = destructure_tuple %17 : $(Array<Float>, Builtin.RawPointer)
+// CHECK: [VARIED]   %20 = pointer_to_address %19 : $Builtin.RawPointer to [strict] $*Float
+// CHECK: [VARIED]   %21 = begin_borrow %7 : $Array<Float>
+// CHECK: [NONE]   %22 = integer_literal $Builtin.IntLiteral, 0
+// CHECK: [NONE]   %23 = metatype $@thin Int.Type
 // CHECK: [NONE]   // function_ref Int.init(_builtinIntegerLiteral:)
-// CHECK: [NONE]   %25 = apply %24(%22, %23) : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int // user: %27
+// CHECK: [NONE]   %25 = apply %24(%22, %23) : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int
 // CHECK: [NONE]   // function_ref Array.subscript.getter
 // CHECK: [NONE]   %27 = apply %26<Float>(%20, %25, %21) : $@convention(method) <τ_0_0> (Int, @guaranteed Array<τ_0_0>) -> @out τ_0_0
-// CHECK: [VARIED]   %28 = integer_literal $Builtin.Word, 1          // user: %29
-// CHECK: [VARIED]   %29 = index_addr %20 : $*Float, %28 : $Builtin.Word // user: %36
-// CHECK: [VARIED]   %30 = begin_borrow %7 : $Array<Float>           // users: %37, %36
-// CHECK: [NONE]   %31 = integer_literal $Builtin.IntLiteral, 1    // user: %34
-// CHECK: [NONE]   %32 = metatype $@thin Int.Type                  // user: %34
+// CHECK: [VARIED]   %28 = integer_literal $Builtin.Word, 1
+// CHECK: [VARIED]   %29 = index_addr %20 : $*Float, %28 : $Builtin.Word
+// CHECK: [VARIED]   %30 = begin_borrow %7 : $Array<Float>
+// CHECK: [NONE]   %31 = integer_literal $Builtin.IntLiteral, 1
+// CHECK: [NONE]   %32 = metatype $@thin Int.Type
 // CHECK: [NONE]   // function_ref Int.init(_builtinIntegerLiteral:)
-// CHECK: [NONE]   %34 = apply %33(%31, %32) : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int // user: %36
+// CHECK: [NONE]   %34 = apply %33(%31, %32) : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int
 // CHECK: [NONE]   // function_ref Array.subscript.getter
 // CHECK: [NONE]   %36 = apply %35<Float>(%29, %34, %30) : $@convention(method) <τ_0_0> (Int, @guaranteed Array<τ_0_0>) -> @out τ_0_0
 
