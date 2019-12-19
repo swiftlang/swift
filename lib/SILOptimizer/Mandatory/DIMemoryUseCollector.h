@@ -98,6 +98,11 @@ public:
   /// instruction. For alloc_box though it returns the project_box associated
   /// with the memory info.
   SingleValueInstruction *getUninitializedValue() const {
+    if (auto *mui = dyn_cast<MarkUninitializedInst>(MemoryInst)) {
+      if (auto *pbi = mui->getSingleUserOfType<ProjectBoxInst>()) {
+        return pbi;
+      }
+    }
     return MemoryInst;
   }
 
@@ -209,10 +214,9 @@ public:
 
   /// Given an element number (in the flattened sense) return a pointer to a
   /// leaf element of the specified number.
-  SILValue
-  emitElementAddress(unsigned TupleEltNo, SILLocation Loc, SILBuilder &B,
-                     llvm::SmallVectorImpl<std::pair<SILValue, SILValue>>
-                         &EndBorrowList) const;
+  SILValue emitElementAddress(
+      unsigned TupleEltNo, SILLocation Loc, SILBuilder &B,
+      SmallVectorImpl<std::pair<SILValue, SILValue>> &EndBorrowList) const;
 
   /// Return the swift type of the specified element.
   SILType getElementType(unsigned EltNo) const;
