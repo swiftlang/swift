@@ -1,4 +1,4 @@
-// Without the only-one-dependency-file mode, all compile jobs are batchable, since the have the same output types.
+// When -enable-only-one-dependency-file (which is the default) the one compile job with the dependency output is unbatchable.
 
 // RUN: %empty-directory(%t)
 // RUN: touch  %t/f_1_1.swift %t/f_1_2.swift %t/f_1_3.swift %t/f_1_4.swift %t/f_1_5.swift %t/f_1_6.swift %t/f_1_7.swift %t/f_1_8.swift %t/f_1_9.swift %t/f_1_10.swift
@@ -11,26 +11,26 @@
 // RUN: touch  %t/f_8_1.swift %t/f_8_2.swift %t/f_8_3.swift %t/f_8_4.swift %t/f_8_5.swift %t/f_8_6.swift %t/f_8_7.swift %t/f_8_8.swift %t/f_8_9.swift %t/f_8_10.swift
 // RUN: touch  %t/f_9_1.swift %t/f_9_2.swift %t/f_9_3.swift %t/f_9_4.swift %t/f_9_5.swift %t/f_9_6.swift %t/f_9_7.swift %t/f_9_8.swift %t/f_9_9.swift %t/f_9_10.swift
 // RUN: touch  %t/f_10_1.swift %t/f_10_2.swift %t/f_10_3.swift %t/f_10_4.swift %t/f_10_5.swift %t/f_10_6.swift %t/f_10_7.swift %t/f_10_8.swift %t/f_10_9.swift %t/f_10_10.swift
-// RUN: %swiftc_driver -disable-only-one-dependency-file -driver-show-job-lifecycle -v -c -module-name foo -emit-module -serialize-diagnostics -emit-dependencies -j 1 -enable-batch-mode %t/f_*.swift >%t/out.txt 2>&1
+// RUN: %swiftc_driver -driver-show-job-lifecycle -v -c -module-name foo -emit-module -serialize-diagnostics -emit-dependencies -j 1 -enable-batch-mode %t/f_*.swift >%t/out.txt 2>&1
 // RUN: %FileCheck %s <%t/out.txt
 // CHECK-NOT: unable to execute command
 // CHECK: Forming into 4 batches
-// CHECK: Forming batch job from 25 constituents
-// CHECK: Forming batch job from 25 constituents
-// CHECK: Forming batch job from 25 constituents
-// CHECK: Forming batch job from 25 constituents
+// CHECK-DAG: Forming batch job from 25 constituents
+// CHECK-DAG: Forming batch job from 25 constituents
+// CHECK-DAG: Forming batch job from 25 constituents
+// CHECK-DAG: Forming batch job from 24 constituents
 //
-// RUN: %swiftc_driver -disable-only-one-dependency-file -driver-show-job-lifecycle -driver-batch-size-limit 10 -v -c -module-name foo -emit-module -serialize-diagnostics -emit-dependencies -j 1 -enable-batch-mode %t/f_*.swift >%t/out2.txt 2>&1
+// RUN: %swiftc_driver -driver-show-job-lifecycle -driver-batch-size-limit 10 -v -c -module-name foo -emit-module -serialize-diagnostics -emit-dependencies -j 1 -enable-batch-mode %t/f_*.swift >%t/out2.txt 2>&1
 // RUN: %FileCheck %s <%t/out2.txt -check-prefix=EXPLICIT-ARG
 // EXPLICIT-ARG-NOT: unable to execute command
 // EXPLICIT-ARG: Forming into 10 batches
-// EXPLICIT-ARG: Forming batch job from 10 constituents
-// EXPLICIT-ARG: Forming batch job from 10 constituents
-// EXPLICIT-ARG: Forming batch job from 10 constituents
-// EXPLICIT-ARG: Forming batch job from 10 constituents
-// EXPLICIT-ARG: Forming batch job from 10 constituents
-// EXPLICIT-ARG: Forming batch job from 10 constituents
-// EXPLICIT-ARG: Forming batch job from 10 constituents
-// EXPLICIT-ARG: Forming batch job from 10 constituents
-// EXPLICIT-ARG: Forming batch job from 10 constituents
-// EXPLICIT-ARG: Forming batch job from 10 constituents
+// EXPLICIT-ARG-DAG: Forming batch job from 10 constituents
+// EXPLICIT-ARG-DAG: Forming batch job from 10 constituents
+// EXPLICIT-ARG-DAG: Forming batch job from 10 constituents
+// EXPLICIT-ARG-DAG: Forming batch job from 10 constituents
+// EXPLICIT-ARG-DAG: Forming batch job from 10 constituents
+// EXPLICIT-ARG-DAG: Forming batch job from 10 constituents
+// EXPLICIT-ARG-DAG: Forming batch job from 10 constituents
+// EXPLICIT-ARG-DAG: Forming batch job from 10 constituents
+// EXPLICIT-ARG-DAG: Forming batch job from 10 constituents
+// EXPLICIT-ARG-DAG: Forming batch job from 9 constituents
