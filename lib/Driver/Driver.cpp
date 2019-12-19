@@ -954,7 +954,7 @@ Driver::buildCompilation(const ToolChain &TC,
 
     const bool OnlyOneDependencyFile =
         ArgList->hasFlag(options::OPT_enable_only_one_dependency_file,
-                         options::OPT_disable_only_one_dependency_file, false);
+                         options::OPT_disable_only_one_dependency_file, true);
 
     // relies on the new dependency graph
     const bool EnableFineGrainedDependencies =
