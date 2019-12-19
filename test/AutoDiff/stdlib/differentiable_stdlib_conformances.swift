@@ -2,6 +2,9 @@
 // REQUIRES: executable_test
 // REQUIRES: differentiable_programming
 
+// We currently lack availability information (rdar://57975086)
+// UNSUPPORTED: use_os_stdlib
+
 import _Differentiation
 
 // Test `Differentiable` protocol conformances for stdlib types.
