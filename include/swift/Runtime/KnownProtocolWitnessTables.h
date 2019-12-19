@@ -55,15 +55,8 @@ namespace swift {
           MANGLE_SYM(MANGLING_CONCAT2(_PROTOCOL_CONFORMANCE_SYM(Ty, Proto, s), \
                               BUILTIN_PROTOCOL_CONFORMANCE_DESCRIPTOR_MANGLING))
 
-struct _ProtocolConformanceDescriptor {
-  int32_t Protocol;
-  int32_t TypeRef;
-  int32_t WitnessTablePattern;
-  int32_t Flags;
-};
-
 struct _WitnessTable {
-  const _ProtocolConformanceDescriptor *Conformance;
+  const ProtocolConformanceDescriptor *Conformance;
   const void *Witness;
 };
 
@@ -81,11 +74,5 @@ bool BUILTIN_PROTOCOL_WITNESS_SYM(EMPTY_TUPLE_MANGLING,
                                   SWIFT_EQUATABLE_MANGLING,
                                   SWIFT_EQUAL_OPERATOR_MANGLING)
 (Metadata *swiftSelf, Metadata *existentialSelf, void *witnessTable);
-
-/// The protocol conformance descriptor for () : Swift.Equatable in Swift.
-SWIFT_RUNTIME_EXPORT
-const _ProtocolConformanceDescriptor
-BUILTIN_PROTOCOL_CONFORMANCE_DESCRIPTOR_SYM(EMPTY_TUPLE_MANGLING,
-                                            SWIFT_EQUATABLE_MANGLING);
 
 } // end namespace swift

@@ -202,11 +202,7 @@ std::string ASTMangler::mangleWitnessTable(const RootProtocolConformance *C) {
     appendProtocolName(cast<SelfProtocolConformance>(C)->getProtocol());
     appendOperator("WS");
   } else if (isa<BuiltinProtocolConformance>(C)) {
-    appendType(C->getType()->getCanonicalType());
-    auto swiftProto = cast<BuiltinProtocolConformance>(C)->getProtocol();
-    appendProtocolName(swiftProto);
-    appendModule(swiftProto->getModuleContext(),
-                 swiftProto->getAlternateModuleName());
+    appendProtocolConformance(C);
     appendOperator("WB");
   } else {
     llvm_unreachable("mangling unknown conformance kind");
@@ -2596,6 +2592,10 @@ ASTMangler::appendProtocolConformance(const ProtocolConformance *conformance) {
     assert(DC->getAsDecl());
     appendModule(Mod, DC->getAsDecl()->getAlternateModuleName());
   }
+
+  // If this is a non-nominal type, we're done.
+  if (!conformingType->getAnyNominal())
+    return;
 
   contextSig =
     conformingType->getAnyNominal()->getGenericSignatureOfContext();

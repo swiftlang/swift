@@ -1789,6 +1789,19 @@ namespace {
     }
 
     void addConformingType() {
+      // If this is a builtin conformance, add a relative reference to the
+      // (currently) non-nominal metadata.
+      if (auto builtin = dyn_cast<BuiltinProtocolConformance>(Conformance)) {
+        auto entity = LinkEntity::forTypeMetadata(
+                                         builtin->getType()->getCanonicalType(),
+                                             TypeMetadataAddress::AddressPoint);
+        auto ref = IGM.getAddrOfLLVMVariableOrGOTEquivalent(entity);
+        B.addRelativeAddress(ref.getValue());
+        Flags = Flags.withTypeReferenceKind(
+                  TypeReferenceKind::DirectTypeMetadata);
+        return;
+      }
+
       // Add a relative reference to the type, with the type reference
       // kind stored in the flags.
       auto ref = IGM.getTypeEntityReference(
@@ -1804,6 +1817,15 @@ namespace {
         numConditional = normal->getConditionalRequirements().size();
       }
       Flags = Flags.withNumConditionalRequirements(numConditional);
+
+      // If this is a builtin conformance, reference the witness table in the
+      // runtime.
+      if (auto builtin = dyn_cast<BuiltinProtocolConformance>(Conformance)) {
+        auto entity = LinkEntity::forProtocolWitnessTable(Conformance);
+        auto ref = IGM.getAddrOfLLVMVariableOrGOTEquivalent(entity);
+        B.addRelativeAddress(ref);
+        return;
+      }
 
       // Relative reference to the witness table.
       B.addRelativeAddressOrNull(Description.pattern);
@@ -3395,4 +3417,38 @@ llvm::Constant *IRGenModule::getAddrOfGenericEnvironment(
                                       signature->getRequirements());
         return fields.finishAndCreateFuture();
       });
+}
+
+//===----------------------------------------------------------------------===//
+// Known Protocol Conformances
+//==-----------------------------------------------------------------------===//
+
+void IRGenModule::emitKnownProtocolConformances() {
+  // We only emit these for the stdlib.
+  if (!getSwiftModule()->isStdlibModule())
+    return;
+
+  // For now, the only known conformance is () to Equatable.
+  auto voidEquatableConf = Context.getBuiltinVoidEquatableConformance();
+
+  // Slight edge case: If this conformance doesn't have a valid protocol decl,
+  // we're compiling some module that has asked be to compiled as the stdlib
+  // and said module hasn't declared an equatable protocol. Void does not
+  // conform in those cases, so don't emit a conformance descriptor.
+  if (!voidEquatableConf->getProtocol())
+    return;
+
+  auto description = ConformanceDescription(voidEquatableConf,
+                                            /* witness table */ nullptr,
+                                            /* pattern */ nullptr,
+                                            /* table size */ 0,
+                                            /* private size */ 0,
+                                            /* is resilient */ false);
+  emitProtocolConformance(description);
+}
+
+void IRGenerator::emitKnownProtocolConformances() {
+  for (auto &m : *this) {
+    m.second->emitKnownProtocolConformances();
+  }
 }

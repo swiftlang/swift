@@ -120,6 +120,23 @@ public:
   /// Adds the global symbols associated with the first file.
   void addFirstFileSymbols();
 
+  void addKnownProtocolConformances() {
+    // Hack: We emit known conformance descriptors in IRGen for the stdlib
+    // module. Add them here too.
+
+    // As of right now, the only known conformance is equatable for ()
+    auto voidEquatable = SwiftModule->getASTContext()
+                                    .getBuiltinVoidEquatableConformance();
+
+    // If this conformance is coming from a minimal stdlib with no equatable
+    // protocol, don't add it.
+    if (!voidEquatable->getProtocol())
+      return;
+
+    auto entity = LinkEntity::forProtocolConformanceDescriptor(voidEquatable);
+    addSymbol(entity);
+  }
+
   void visitDefaultArguments(ValueDecl *VD, ParameterList *PL);
 
   void visitAbstractFunctionDecl(AbstractFunctionDecl *AFD);

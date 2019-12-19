@@ -2789,9 +2789,18 @@ IRGenModule::getAddrOfLLVMVariable(LinkEntity entity,
   ForDefinition_t forDefinition = (ForDefinition_t) (definitionType != nullptr);
   LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
 
-  // Clang may have defined the variable already.
-  if (auto existing = Module.getNamedGlobal(link.getName()))
+  // Clang may have defined the variable already, or we're referencing an entity
+  // which is known by IRGen, such as ().
+  if (auto existing = Module.getNamedGlobal(link.getName())) {
+    // If we're looking for ()'s type metadata, just return IRGen's already
+    // created global variable. We want the link entity to mangle for the
+    // address point, but ()'s metadata is the full metadata type, so the
+    // element bit cast is wrong for both address types.
+    if (entity.isTypeMetadata(Context.TheEmptyTupleType))
+      return existing;
+
     return getElementBitCast(existing, defaultType);
+  }
 
   // If we're not defining the object now, forward declare it with the default
   // type.
@@ -2870,7 +2879,7 @@ IRGenModule::getAddrOfLLVMVariableOrGOTEquivalent(LinkEntity entity,
   }
   
   // Ensure the variable is at least forward-declared.
-  getAddrOfLLVMVariable(entity, ConstantInit(), DebugTypeInfo());
+  auto var = getAddrOfLLVMVariable(entity, ConstantInit(), DebugTypeInfo());
 
   // Guess whether a global entry is a definition from this TU. This isn't
   // bulletproof, but at the point we emit conformance tables, we're far enough
@@ -2887,9 +2896,9 @@ IRGenModule::getAddrOfLLVMVariableOrGOTEquivalent(LinkEntity entity,
     return false;
   };
   
-  //
+  // Retrieve the variable entry.
   auto entry = GlobalVars[entity];
-  
+
   /// Returns a direct reference.
   auto direct = [&]() -> ConstantReference {
     // FIXME: Relative references to aliases break MC on 32-bit Mach-O
@@ -2906,7 +2915,15 @@ IRGenModule::getAddrOfLLVMVariableOrGOTEquivalent(LinkEntity entity,
       cast<llvm::GlobalValue>(entry), entity);
     return {gotEquivalent, ConstantReference::Indirect};
   };
-  
+
+  // If there isn't an entry in GlobalVars, but we know that the variable is
+  // forward-declared, it's most likely an entity known by IRGen. We're still
+  // asking for a GOT equivalent, so go ahead and make it.
+  if (!entry && var) {
+    entry = var;
+    return indirect();
+  }
+
   // Return the GOT entry if we were asked to.
   if (forceIndirectness == ConstantReference::Indirect)
     return indirect();

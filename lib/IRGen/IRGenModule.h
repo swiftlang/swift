@@ -362,6 +362,10 @@ public:
   /// from this module.
   void emitBuiltinReflectionMetadata();
 
+  /// Emit the known protocol conformances that the standard library has for
+  /// non-nominal types.
+  void emitKnownProtocolConformances();
+
   /// Emit a symbol identifying the reflection metadata version.
   void emitReflectionMetadataVersion();
 
@@ -1165,6 +1169,10 @@ public:
   /// Emit reflection metadata records for builtin and imported types referenced
   /// from this module.
   void emitBuiltinReflectionMetadata();
+
+  /// Emit the known protocol conformances that the standard library has for
+  /// non-nominal types.
+  void emitKnownProtocolConformances();
 
   /// Emit a symbol identifying the reflection metadata version.
   void emitReflectionMetadataVersion();

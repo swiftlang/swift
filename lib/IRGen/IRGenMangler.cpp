@@ -149,10 +149,14 @@ std::string IRGenMangler::mangleProtocolConformanceDescriptor(
   if (isa<NormalProtocolConformance>(conformance)) {
     appendProtocolConformance(conformance);
     appendOperator("Mc");
-  } else {
-    auto protocol = cast<SelfProtocolConformance>(conformance)->getProtocol();
+  } else if (auto self = dyn_cast<SelfProtocolConformance>(conformance)) {
+    auto protocol = self->getProtocol();
     appendProtocolName(protocol);
     appendOperator("MS");
+  } else {
+    auto builtin = cast<BuiltinProtocolConformance>(conformance);
+    appendProtocolConformance(builtin);
+    appendOperator("Mb");
   }
   return finalize();
 }
