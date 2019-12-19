@@ -37,10 +37,6 @@ STATISTIC(NumLoadCopyConvertedToLoadBorrow,
           "number of load_copy converted to load_borrow");
 
 //===----------------------------------------------------------------------===//
-//                                  Utility
-//===----------------------------------------------------------------------===//
-
-//===----------------------------------------------------------------------===//
 //                            Live Range Modeling
 //===----------------------------------------------------------------------===//
 
@@ -653,12 +649,14 @@ bool SemanticARCOptVisitor::eliminateDeadLiveRangeCopyValue(CopyValueInst *cvi) 
 bool SemanticARCOptVisitor::visitCopyValueInst(CopyValueInst *cvi) {
   // If our copy value inst has only destroy_value users, it is a dead live
   // range. Try to eliminate them.
-  if (eliminateDeadLiveRangeCopyValue(cvi))
+  if (eliminateDeadLiveRangeCopyValue(cvi)) {
     return true;
+  }
 
   // Then try to perform the guaranteed copy value optimization.
-  if (performGuaranteedCopyValueOptimization(cvi))
+  if (performGuaranteedCopyValueOptimization(cvi)) {
     return true;
+  }
 
   return false;
 }
@@ -667,35 +665,12 @@ bool SemanticARCOptVisitor::visitCopyValueInst(CopyValueInst *cvi) {
 //                         load [copy] Optimizations
 //===----------------------------------------------------------------------===//
 
-// A flow insensitive analysis that tells the load [copy] analysis if the
-// storage has 0, 1, >1 writes to it.
-//
-// In the case of 0 writes, we return CanOptimizeLoadCopyResult::Always.
-//
-// In the case of 1 write, we return OnlyIfStorageIsLocal. We are taking
-// advantage of definite initialization implying that an alloc_stack must be
-// written to once before any loads from the memory location. Thus if we are
-// local and see 1 write, we can still change to load_borrow if all other uses
-// check out.
-//
-// If there is 2+ writes, we can not optimize = (.
-
-bool mayFunctionMutateArgument(const AccessedStorage &storage, SILFunction &f) {
-  auto *arg = cast<SILFunctionArgument>(storage.getArgument());
-
-  // Then check if we have an in_guaranteed argument. In this case, we can
-  // always optimize load [copy] from this.
-  if (arg->hasConvention(SILArgumentConvention::Indirect_In_Guaranteed))
-    return false;
-
-  // For now just return false.
-  return true;
-}
-
-// Then find our accessed storage to determine whether it provides a guarantee
-// for the loaded value.
 namespace {
 
+/// A class that computes in a flow insensitive way if we can prove that our
+/// storage is either never written to, or is initialized exactly once and never
+/// written to again. In both cases, we can convert load [copy] -> load_borrow
+/// safely.
 class StorageGuaranteesLoadVisitor
   : public AccessUseDefChainVisitor<StorageGuaranteesLoadVisitor>
 {
@@ -733,9 +708,21 @@ public:
   }
   
   void visitArgumentAccess(SILFunctionArgument *arg) {
-    return answer(mayFunctionMutateArgument(
-                             AccessedStorage(arg, AccessedStorage::Argument),
-                             ARCOpt.F));
+    // If this load_copy is from an indirect in_guaranteed argument, then we
+    // know for sure that it will never be written to.
+    if (arg->hasConvention(SILArgumentConvention::Indirect_In_Guaranteed)) {
+      return answer(false);
+    }
+
+    // TODO: This should be extended:
+    //
+    // 1. We should be able to analyze inout arguments and see if the inout
+    //    argument is never actually written to in a flow insensitive way.
+    //
+    // 2. We should be able to analyze in arguments and see if they are only
+    //    ever destroyed at the end of the function. In such a case, we may be
+    //    able to also to promote load [copy] from such args to load_borrow.
+    return answer(true);
   }
   
   void visitGlobalAccess(SILValue global) {
