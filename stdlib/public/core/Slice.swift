@@ -215,6 +215,18 @@ extension Slice: Collection {
   public func _failEarlyRangeCheck(_ range: Range<Index>, bounds: Range<Index>) {
     _base._failEarlyRangeCheck(range, bounds: bounds)
   }
+
+  @_alwaysEmitIntoClient @inlinable
+  public func withContiguousStorageIfAvailable<R>(
+    _ body: (UnsafeBufferPointer<Element>) throws -> R
+  ) rethrows -> R? {
+    try _base.withContiguousStorageIfAvailable { buffer in
+      let start = _base.distance(from: _base.startIndex, to: _startIndex)
+      let count = _base.distance(from: _startIndex, to: _endIndex)
+      let slice = UnsafeBufferPointer(rebasing: buffer[start ..< start + count])
+      return try body(slice)
+    }
+  }
 }
 
 extension Slice: BidirectionalCollection where Base: BidirectionalCollection {
@@ -256,6 +268,28 @@ extension Slice: MutableCollection where Base: MutableCollection {
     }
     set {
       _writeBackMutableSlice(&self, bounds: bounds, slice: newValue)
+    }
+  }
+
+  @_alwaysEmitIntoClient @inlinable
+  public mutating func withContiguousMutableStorageIfAvailable<R>(
+    _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
+  ) rethrows -> R? {
+    // FIXME: We need to calculate these distances even if the base collection
+    // doesn't provide access to a mutable buffer, because the collection
+    // isn't available within the closure.
+    let start = _base.distance(from: _base.startIndex, to: _startIndex)
+    let count = _base.distance(from: _startIndex, to: _endIndex)
+    return try _base.withContiguousMutableStorageIfAvailable { buffer in
+      var slice = UnsafeMutableBufferPointer(rebasing: buffer[start ..< start + count])
+      let copy = slice
+      defer {
+        _precondition(
+          slice.baseAddress == copy.baseAddress &&
+          slice.count == copy.count,
+          "Slice.withUnsafeMutableBufferPointer: replacing the buffer is not allowed")
+      }
+      return try body(&slice)
     }
   }
 }

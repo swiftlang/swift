@@ -361,6 +361,31 @@ UnsafeMutableBufferPointerTestSuite.test("withContiguous(Mutable)StorageIfAvaila
   expectEqual(result1, result2)
 }
 
+UnsafeMutableBufferPointerTestSuite.test("Slice.withContiguousStorageIfAvailable") {
+  guard #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) else {
+    return
+  }
+
+  for test in subscriptRangeTests {
+    let c = test.collection.map { MinimalEquatableValue($0.value) }
+    let buffer = UnsafeMutableBufferPointer<MinimalEquatableValue>.allocate(
+      capacity: test.collection.count)
+    var (it, idx) = buffer.initialize(from: c)
+    expectEqual(buffer.endIndex, idx)
+    expectNil(it.next())
+
+    let expected = test.expected.map { MinimalEquatableValue($0.value) }
+    let r1: Void? = buffer[test.bounds].withContiguousStorageIfAvailable { b in
+      expectTrue(expected.elementsEqual(b))
+    }
+    expectNotNil(r1)
+    let r2: Void? = buffer[test.bounds].withContiguousMutableStorageIfAvailable { b in
+      expectTrue(expected.elementsEqual(b))
+    }
+    expectNotNil(r2)
+  }
+}
+
 UnsafeMutableBufferPointerTestSuite.test("sort") {
   var values = (0..<1000).map({ _ in Int.random(in: 0..<100) })
   let sortedValues = values.sorted()
