@@ -238,6 +238,11 @@ bool ToolChain::jobIsBatchable(const Compilation &C, const Job *A) const {
   auto const *CJActA = dyn_cast<const CompileJobAction>(&A->getSource());
   if (!CJActA)
     return false;
+  // When having only one job output a dependency file, that job is not
+  // batchable since it has an oddball set of additional output types.
+  if (C.OnlyOneDependencyFile &&
+      A->getOutput().hasAdditionalOutputForType(file_types::TY_Dependencies))
+    return false;
   return findSingleSwiftInput(CJActA) != nullptr;
 }
 
