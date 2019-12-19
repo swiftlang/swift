@@ -3926,6 +3926,11 @@ ERROR(opaque_type_in_protocol_requirement,none,
       "'some' type cannot be the return type of a protocol requirement; did you mean to add an associated type?",
       ())
 
+// Function differentiability
+ERROR(attr_only_on_parameters_of_differentiable,none,
+      "'%0' may only be used on parameters of '@differentiable' function "
+      "types", (StringRef))
+
 // SIL
 ERROR(opened_non_protocol,none,
       "@opened cannot be applied to non-protocol type %0", (Type))

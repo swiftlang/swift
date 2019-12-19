@@ -2893,9 +2893,10 @@ void AnyFunctionType::decomposeInput(
   }
       
   default:
-    result.emplace_back(type->getInOutObjectType(), Identifier(),
-                        ParameterTypeFlags::fromParameterType(
-                          type, false, false, false, ValueOwnership::Default));
+    result.emplace_back(
+        type->getInOutObjectType(), Identifier(),
+        ParameterTypeFlags::fromParameterType(type, false, false, false,
+                                              ValueOwnership::Default, false));
     return;
   }
 }
