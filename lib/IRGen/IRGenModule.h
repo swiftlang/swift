@@ -1123,7 +1123,8 @@ public:
                                          CanGenericSignature genericSig);
 
   /// Produce an associated type witness that refers to the given type.
-  llvm::Constant *getAssociatedTypeWitness(Type type, bool inProtocolContext);
+  llvm::Constant *getAssociatedTypeWitness(Type type, GenericSignature sig,
+                                           bool inProtocolContext);
 
   void emitAssociatedTypeMetadataRecord(const RootProtocolConformance *C);
   void emitFieldDescriptor(const NominalTypeDecl *Decl);

@@ -824,6 +824,7 @@ namespace {
         auto witness =
             entry.getAssociatedTypeWitness().Witness->mapTypeOutOfContext();
         return IGM.getAssociatedTypeWitness(witness,
+                                            Proto->getGenericSignature(),
                                             /*inProtocolContext=*/true);
       }
 
@@ -1593,8 +1594,7 @@ namespace {
       // TargetRelativeDirectPointer<Runtime, const char> SuperclassType;
       if (auto superclassType = getType()->getSuperclass()) {
         GenericSignature genericSig = getType()->getGenericSignature();
-        B.addRelativeAddress(IGM.getTypeRef(superclassType->getCanonicalType(),
-                                            genericSig,
+        B.addRelativeAddress(IGM.getTypeRef(superclassType, genericSig,
                                             MangledTypeRefRole::Metadata)
                                .first);
       } else {
