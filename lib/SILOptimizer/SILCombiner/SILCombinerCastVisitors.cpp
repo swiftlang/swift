@@ -164,11 +164,13 @@ visitPointerToAddressInst(PointerToAddressInst *PTAI) {
   //   %addr = pointer_to_address %ptr, [strict] $T
   //   %result = index_addr %addr, %distance
   //
-  BuiltinInst *Bytes;
+  BuiltinInst *Bytes = nullptr;
   if (match(PTAI->getOperand(),
             m_IndexRawPointerInst(
                 m_ValueBase(),
                 m_TupleExtractOperation(m_BuiltinInst(Bytes), 0)))) {
+    assert(Bytes != nullptr &&
+           "Bytes should have been assigned a non-null value");
     if (match(Bytes, m_ApplyInst(BuiltinValueKind::SMulOver, m_ValueBase(),
                                  m_ApplyInst(BuiltinValueKind::Strideof,
                                              m_MetatypeInst(Metatype)),

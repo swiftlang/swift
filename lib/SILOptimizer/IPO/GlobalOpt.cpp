@@ -567,7 +567,7 @@ static SILFunction *genGetterFromInit(SILOptFunctionBuilder &FunctionBuilder,
   // Find the store instruction
   auto *BB = GetterF->getEntryBlock();
   SILValue Val;
-  SILInstruction *Store;
+  SILInstruction *Store = nullptr;
   for (auto II = BB->begin(), E = BB->end(); II != E;) {
     auto &I = *II++;
     if (isa<AllocGlobalInst>(&I)) {
@@ -586,6 +586,7 @@ static SILFunction *genGetterFromInit(SILOptFunctionBuilder &FunctionBuilder,
       B.createReturn(RI->getLoc(), Val);
       eraseUsesOfInstruction(RI);
       recursivelyDeleteTriviallyDeadInstructions(RI, true);
+      assert(Store && "Did not find a store?!");
       recursivelyDeleteTriviallyDeadInstructions(Store, true);
       return GetterF;
     }
