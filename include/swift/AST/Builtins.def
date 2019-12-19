@@ -641,8 +641,10 @@ BUILTIN_MISC_OPERATION(PoundAssert, "poundAssert", "", Special)
 
 /// globalStringTablePointer has type String -> Builtin.RawPointer.
 /// It returns an immortal, global string table pointer for strings constructed
-/// from string literals.
-BUILTIN_MISC_OPERATION_WITH_SILGEN(GlobalStringTablePointer, "globalStringTablePointer", "", Special)
+/// from string literals. We consider it effects as readnone meaning that it
+/// does not read any memory (note that even though it reads from a string, it
+/// is a pure value and therefore we can consider it as readnone).
+BUILTIN_MISC_OPERATION_WITH_SILGEN(GlobalStringTablePointer, "globalStringTablePointer", "n", Special)
 
 #undef BUILTIN_MISC_OPERATION_WITH_SILGEN
 

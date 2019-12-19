@@ -2010,8 +2010,13 @@ void LifetimeChecker::deleteDeadRelease(unsigned ReleaseID) {
   SILInstruction *Release = Destroys[ReleaseID];
   if (isa<DestroyAddrInst>(Release)) {
     SILValue Addr = Release->getOperand(0);
-    if (auto *AddrI = Addr->getDefiningInstruction())
+    if (auto *AddrI = Addr->getDefiningInstruction()) {
+      // FIXME: AddrI will not be deleted (nor its operands) when Release is
+      // still using AddrI's result. Fix this, and migrate to using
+      // InstructionDeleter utility instead of
+      // recursivelyDeadTriviallyDeadInstructions.
       recursivelyDeleteTriviallyDeadInstructions(AddrI);
+    }
   }
   Release->eraseFromParent();
   Destroys[ReleaseID] = nullptr;
