@@ -6,6 +6,7 @@
 
 // CHECK-IOS:   "target": {
 // CHECK-IOS:     "triple": "arm64-apple-ios12.0",
+// CHECK-IOS:     "unversionedTriple": "arm64-apple-ios",
 // CHECK-IOS:     "moduleTriple": "arm64-apple-ios",
 // CHECK-IOS:     "swiftRuntimeCompatibilityVersion": "5.0",
 // CHECK-IOS:     "librariesRequireRPath": true
