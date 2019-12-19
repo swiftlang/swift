@@ -18,7 +18,8 @@ if(SWIFT_BUILD_SDK_OVERLAY)
 
   add_subdirectory(OSLog)
 
-  if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+  list_intersect("${SWIFT_APPLE_PLATFORMS}" "${SWIFT_SDKS}" building_darwin_sdks)
+  if(building_darwin_sdks)
     add_subdirectory(StdlibUnittestFoundationExtras)
     if (SWIFT_INCLUDE_TESTS)
       add_subdirectory(SwiftReflectionTest)

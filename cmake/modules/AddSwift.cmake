@@ -582,9 +582,7 @@ function(_add_variant_link_flags)
   if(NOT SWIFT_COMPILER_IS_MSVC_LIKE)
     # FIXME: On Apple platforms, find_program needs to look for "ld64.lld"
     find_program(LDLLD_PATH "ld.lld")
-    if("${SWIFT_SDK_${LFLAGS_SDK}_OBJECT_FORMAT}" STREQUAL "WASM")
-      list(APPEND result "-fuse-ld=${CMAKE_SOURCE_DIR}/fakeld")
-    elseif((SWIFT_ENABLE_LLD_LINKER AND LDLLD_PATH AND NOT APPLE) OR
+    if((SWIFT_ENABLE_LLD_LINKER AND LDLLD_PATH AND NOT APPLE) OR
        ("${LFLAGS_SDK}" STREQUAL "WINDOWS" AND
         NOT "${CMAKE_SYSTEM_NAME}" STREQUAL "WINDOWS"))
       list(APPEND result "-fuse-ld=lld")
@@ -1402,6 +1400,12 @@ function(_add_swift_library_single target name)
   if(SWIFTLIB_SINGLE_SDK STREQUAL WINDOWS)
     if(libkind STREQUAL SHARED)
       list(APPEND c_compile_flags -D_WINDLL)
+    endif()
+  endif()
+  # Double-check that we're not trying to build a dynamic library for WASM.
+  if(SWIFTLIB_SINGLE_SDK MATCHES WASM)
+    if(libkind STREQUAL SHARED)
+      message(FATAL_ERROR "WASM does not support shared libraries.")
     endif()
   endif()
   _add_variant_link_flags(
