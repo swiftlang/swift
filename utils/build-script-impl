@@ -922,14 +922,6 @@ function cmake_needs_to_specify_standard_computed_defaults() {
     fi
 }
 
-function make_relative_symlink() {
-    local SOURCE=$1
-    local TARGET=$2
-    local TARGET_DIR=$(dirname "$2")
-    local RELATIVE_SOURCE=$(python -c "import os.path; print(os.path.relpath(\"${SOURCE}\", \"${TARGET_DIR}\"))")
-    call ln -sf "${RELATIVE_SOURCE}" "${TARGET}"
-}
-
 # Sanitize the list of cross-compilation targets.
 #
 # In the Build/Host/Target paradigm:
