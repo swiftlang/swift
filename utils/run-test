@@ -47,8 +47,19 @@ SWIFT_SOURCE_DIR = os.path.join(SWIFT_SOURCE_ROOT, 'swift')
 TEST_SOURCE_DIR = os.path.join(SWIFT_SOURCE_DIR, 'test')
 VALIDATION_TEST_SOURCE_DIR = os.path.join(SWIFT_SOURCE_DIR, 'validation-test')
 
-LIT_BIN_DEFAULT = os.path.join(SWIFT_SOURCE_ROOT, 'llvm',
+
+def _get_default_llvm_source_dir():
+    legacy_llvm_dir_path = os.path.join(SWIFT_SOURCE_ROOT, 'llvm')
+    if os.path.isdir(legacy_llvm_dir_path):
+        return legacy_llvm_dir_path
+    return os.path.join(SWIFT_SOURCE_ROOT, 'llvm-project', 'llvm')
+
+
+# Default path for "lit.py" executable.
+LIT_BIN_DEFAULT = os.path.join(os.environ.get("LLVM_SOURCE_DIR",
+                                              _get_default_llvm_source_dir()),
                                'utils', 'lit', 'lit.py')
+
 host_target = StdlibDeploymentTarget.host_target().name
 
 
