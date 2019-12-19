@@ -38,20 +38,18 @@ makeCodeCompletionMemoryBuffer(const llvm::MemoryBuffer *origBuf,
 /// Manages \c CompilerInstance for completion like operations.
 class CompletionInstance {
   unsigned MaxASTReuseCount = 100;
-  bool EnableASTCaching = false;
 
   std::mutex mtx;
 
   std::unique_ptr<CompilerInstance> CachedCI;
   llvm::hash_code CachedArgHash;
-  unsigned CachedReuseCound = 0;
+  unsigned CachedReuseCount = 0;
 
   /// Calls \p Callback with cached \c CompilerInstance if it's usable for the
   /// specified completion request.
-  /// Returns \c if the callback was called. Returns \c false if the
-  /// functionality is disabled, compiler argument has
-  /// changed, primary file is not the same, the \c Offset is not in function
-  /// bodies, or the interface hash of the file has changed.
+  /// Returns \c if the callback was called. Returns \c false if the compiler
+  /// argument has changed, primary file is not the same, the \c Offset is not
+  /// in function bodies, or the interface hash of the file has changed.
   bool performCachedOperaitonIfPossible(
       const swift::CompilerInvocation &Invocation, llvm::hash_code ArgsHash,
       llvm::MemoryBuffer *completionBuffer, unsigned int Offset,
@@ -63,15 +61,14 @@ class CompletionInstance {
   /// the first pass.
   /// Returns \c false if it fails to setup the \c CompilerInstance.
   bool performNewOperation(
-      swift::CompilerInvocation &Invocation, llvm::hash_code ArgsHash,
+      llvm::Optional<llvm::hash_code> ArgsHash,
+      swift::CompilerInvocation &Invocation,
       llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
       llvm::MemoryBuffer *completionBuffer, unsigned int Offset,
       std::string &Error, DiagnosticConsumer *DiagC,
       llvm::function_ref<void(CompilerInstance &)> Callback);
 
 public:
-  void setEnableASTCaching(bool Flag) { EnableASTCaching = Flag; }
-
   /// Calls \p Callback with a \c CompilerInstance which is prepared for the
   /// second pass. \p Callback is resposible to perform the second pass on it.
   /// The \c CompilerInstance may be reused from the previous completions,
@@ -82,13 +79,12 @@ public:
   /// NOTE: \p Args is only used for checking the equaity of the invocation.
   /// Since this function assumes that it is already normalized, exact the same
   /// arguments including their order is considered as the same invocation.
-  bool
-  performOperation(swift::CompilerInvocation &Invocation,
-                   llvm::ArrayRef<const char *> Args,
-                   llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
-                   llvm::MemoryBuffer *completionBuffer, unsigned int Offset,
-                   std::string &Error, DiagnosticConsumer *DiagC,
-                   llvm::function_ref<void(CompilerInstance &)> Callback);
+  bool performOperation(
+      swift::CompilerInvocation &Invocation, llvm::ArrayRef<const char *> Args,
+      llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
+      llvm::MemoryBuffer *completionBuffer, unsigned int Offset,
+      bool EnableASTCaching, std::string &Error, DiagnosticConsumer *DiagC,
+      llvm::function_ref<void(CompilerInstance &)> Callback);
 };
 
 } // namespace ide

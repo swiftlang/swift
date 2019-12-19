@@ -957,7 +957,8 @@ bool SwiftLangSupport::performCompletionLikeOperation(
     llvm::MemoryBuffer *UnresolvedInputFile, unsigned Offset,
     ArrayRef<const char *> Args,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
-    std::string &Error, llvm::function_ref<void(CompilerInstance &)> Callback) {
+    bool EnableASTCaching, std::string &Error,
+    llvm::function_ref<void(CompilerInstance &)> Callback) {
   assert(FileSystem);
 
   // Resolve symlinks for the input file; we resolve them for the input files
@@ -1011,7 +1012,8 @@ bool SwiftLangSupport::performCompletionLikeOperation(
   auto CompletionInst = getCompletionInstance();
 
   return CompletionInst->performOperation(Invocation, Args, FileSystem,
-                                          newBuffer.get(), Offset, Error,
+                                          newBuffer.get(), Offset,
+                                          EnableASTCaching, Error,
                                           &CIDiags, Callback);
 }
 

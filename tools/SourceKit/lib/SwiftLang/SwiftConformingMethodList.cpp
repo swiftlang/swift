@@ -32,9 +32,9 @@ static bool swiftConformingMethodListImpl(
     ArrayRef<const char *> ExpectedTypeNames,
     ide::ConformingMethodListConsumer &Consumer,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
-    std::string &Error) {
+    bool EnableASTCaching, std::string &Error) {
   return Lang.performCompletionLikeOperation(
-      UnresolvedInputFile, Offset, Args, FileSystem, Error,
+      UnresolvedInputFile, Offset, Args, FileSystem, EnableASTCaching, Error,
       [&](CompilerInstance &CI) {
         // Create a factory for code completion callbacks that will feed the
         // Consumer.
@@ -176,7 +176,7 @@ void SwiftLangSupport::getConformingMethodList(
 
   if (!swiftConformingMethodListImpl(*this, UnresolvedInputFile, Offset, Args,
                                      ExpectedTypeNames, Consumer, fileSystem,
-                                     error)) {
+                                     /*EnableASTCaching=*/false, error)) {
     SKConsumer.failed(error);
   }
 }

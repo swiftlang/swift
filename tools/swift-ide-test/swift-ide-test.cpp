@@ -759,11 +759,12 @@ static bool doCodeCompletionImpl(
   CompletionInstance CompletionInst;
   auto isSuccess = CompletionInst.performOperation(
       Invocation, /*Args=*/{}, llvm::vfs::getRealFileSystem(), CleanFile.get(),
-      Offset, Error, CodeCompletionDiagnostics ? &PrintDiags : nullptr,
-                                                [&](CompilerInstance &CI) {
-    performCodeCompletionSecondPass(CI.getPersistentParserState(),
-                                    *callbacksFactory);
-  });
+      Offset, /*EnableASTCaching=*/false, Error,
+      CodeCompletionDiagnostics ? &PrintDiags : nullptr,
+      [&](CompilerInstance &CI) {
+        performCodeCompletionSecondPass(CI.getPersistentParserState(),
+                                        *callbacksFactory);
+      });
   return isSuccess ? 0 : 1;
 }
 

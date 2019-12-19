@@ -135,13 +135,9 @@ bool CompletionInstance::performCachedOperaitonIfPossible(
     DiagnosticConsumer *DiagC,
     llvm::function_ref<void(CompilerInstance &)> Callback) {
 
-  if (!EnableASTCaching)
-    return false;
-
   if (!CachedCI)
     return false;
-
-  if (CachedReuseCound >= MaxASTReuseCount)
+  if (CachedReuseCount >= MaxASTReuseCount)
     return false;
   if (CachedArgHash != ArgsHash)
     return false;
@@ -239,13 +235,13 @@ bool CompletionInstance::performCachedOperaitonIfPossible(
   if (DiagC)
     CI.removeDiagnosticConsumer(DiagC);
 
-  CachedReuseCound += 1;
+  CachedReuseCount += 1;
 
   return true;
 }
 
 bool CompletionInstance::performNewOperation(
-    swift::CompilerInvocation &Invocation, llvm::hash_code ArgsHash,
+    Optional<llvm::hash_code> ArgsHash, swift::CompilerInvocation &Invocation,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
     llvm::MemoryBuffer *completionBuffer, unsigned int Offset,
     std::string &Error, DiagnosticConsumer *DiagC,
@@ -273,10 +269,10 @@ bool CompletionInstance::performNewOperation(
   if (DiagC)
     CI.removeDiagnosticConsumer(DiagC);
 
-  if (EnableASTCaching) {
+  if (ArgsHash.hasValue()) {
     CachedCI = std::move(TheInstance);
-    CachedArgHash = ArgsHash;
-    CachedReuseCound = 0;
+    CachedArgHash = *ArgsHash;
+    CachedReuseCount = 0;
   }
 
   return true;
@@ -286,7 +282,7 @@ bool swift::ide::CompletionInstance::performOperation(
     swift::CompilerInvocation &Invocation, llvm::ArrayRef<const char *> Args,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
     llvm::MemoryBuffer *completionBuffer, unsigned int Offset,
-    std::string &Error, DiagnosticConsumer *DiagC,
+    bool EnableASTCaching, std::string &Error, DiagnosticConsumer *DiagC,
     llvm::function_ref<void(CompilerInstance &)> Callback) {
 
   // Always disable source location resolutions from .swiftsourceinfo file
@@ -300,24 +296,29 @@ bool swift::ide::CompletionInstance::performOperation(
   // FIXME: ASTScopeLookup doesn't support code completion yet.
   Invocation.disableASTScopeLookup();
 
-  // Compute the signature of the invocation.
-  llvm::hash_code ArgsHash(0);
-  for (auto arg : Args)
-    ArgsHash = llvm::hash_combine(ArgsHash, StringRef(arg));
+  if (EnableASTCaching) {
+    // Compute the signature of the invocation.
+    llvm::hash_code ArgsHash(0);
+    for (auto arg : Args)
+      ArgsHash = llvm::hash_combine(ArgsHash, StringRef(arg));
 
-  // If AST caching is enabled, block completions in other threads. So they
-  // have higher chance to use the cached completion instance.
-  Optional<std::lock_guard<std::mutex>> lock;
-  if (EnableASTCaching)
-    lock.emplace(mtx);
+    // Concurrent completions will block so that they have higher chance to use
+    // the cached completion instance.
+    std::lock_guard<std::mutex> lock(mtx);
 
-  if (performCachedOperaitonIfPossible(Invocation, ArgsHash, completionBuffer,
-                                       Offset, DiagC, Callback))
-    return true;
+    if (performCachedOperaitonIfPossible(Invocation, ArgsHash, completionBuffer,
+                                         Offset, DiagC, Callback))
+      return true;
 
-  if (performNewOperation(Invocation, ArgsHash, FileSystem, completionBuffer,
-                          Offset, Error, DiagC, Callback))
-    return true;
+    if (performNewOperation(ArgsHash, Invocation, FileSystem, completionBuffer,
+                            Offset, Error, DiagC, Callback))
+      return true;
+  } else {
+    // Concurrent completions may happen in parallel when caching is disabled.
+    if (performNewOperation(None, Invocation, FileSystem, completionBuffer,
+                            Offset, Error, DiagC, Callback))
+      return true;
+  }
 
   assert(!Error.empty());
   return false;
