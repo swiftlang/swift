@@ -404,9 +404,11 @@ public:
     InterfaceHash->update(a);
   }
 
-  void getInterfaceHash(llvm::SmallString<32> &str) {
+  void getInterfaceHash(llvm::SmallString<32> &str) const {
+    // Copy to preserve idempotence.
+    llvm::MD5 md5 = *InterfaceHash;
     llvm::MD5::MD5Result result;
-    InterfaceHash->final(result);
+    md5.final(result);
     llvm::MD5::stringifyResult(result, str);
   }
 

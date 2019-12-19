@@ -894,12 +894,6 @@ void CompilerInstance::parseAndCheckTypesUpTo(
     }
   });
 
-  if (Invocation.isCodeCompletion()) {
-    assert(limitStage == SourceFile::NameBound);
-    performCodeCompletionSecondPass(*PersistentState.get(),
-                                    *Invocation.getCodeCompletionFactory());
-  }
-
   // If the limiting AST stage is name binding, we're done.
   if (limitStage <= SourceFile::NameBound) {
     return;
