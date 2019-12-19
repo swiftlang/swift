@@ -214,6 +214,9 @@ ERROR(repl_must_be_initialized,none,
 ERROR(error_doing_code_completion,none,
       "compiler is in code completion mode (benign diagnostic)", ())
 
+WARNING(completion_reusing_astcontext,none,
+        "completion reusing previous ASTContext (benign diagnostic)", ())
+
 ERROR(verify_encountered_fatal,none,
       "fatal error encountered while in -verify mode", ())
 

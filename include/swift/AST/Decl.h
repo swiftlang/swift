@@ -5841,13 +5841,7 @@ public:
   /// \sa hasBody()
   BraceStmt *getBody(bool canSynthesize = true) const;
 
-  void setBody(BraceStmt *S, BodyKind NewBodyKind = BodyKind::Parsed) {
-    assert(getBodyKind() != BodyKind::Skipped &&
-           "cannot set a body if it was skipped");
-
-    Body = S;
-    setBodyKind(NewBodyKind);
-  }
+  void setBody(BraceStmt *S, BodyKind NewBodyKind = BodyKind::Parsed);
 
   /// Note that the body was skipped for this function.  Function body
   /// cannot be attached after this call.
@@ -5866,7 +5860,8 @@ public:
 
   /// Note that parsing for the body was delayed.
   void setBodyDelayed(SourceRange bodyRange) {
-    assert(getBodyKind() == BodyKind::None);
+    assert(getBodyKind() == BodyKind::None ||
+           getBodyKind() == BodyKind::Skipped);
     assert(bodyRange.isValid());
     BodyRange = bodyRange;
     setBodyKind(BodyKind::Unparsed);
@@ -6657,6 +6652,9 @@ public:
   /// initializer.
   BodyInitKind getDelegatingOrChainedInitKind(DiagnosticEngine *diags,
                                               ApplyExpr **init = nullptr) const;
+  void clearCachedDelegatingOrChainedInitKind() {
+    Bits.ConstructorDecl.ComputedBodyInitKind = 0;
+  }
 
   /// Whether this constructor is required.
   bool isRequired() const {
