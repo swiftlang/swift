@@ -1793,6 +1793,7 @@ namespace {
     resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
                                  TypeResolutionOptions options,
                                  bool requiresMappingOut,
+                                 DifferentiabilityKind diffKind,
                                  SmallVectorImpl<AnyFunctionType::Param> &ps);
 
     Type resolveSILFunctionType(FunctionTypeRepr *repr,
@@ -2025,6 +2026,11 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
 
   // Remember whether this is a function parameter.
   bool isParam = options.is(TypeResolverContext::FunctionInput);
+
+  // Remember whether this is a variadic function parameter.
+  bool isVariadicFunctionParam =
+      options.is(TypeResolverContext::VariadicFunctionInput) &&
+      !options.hasBase(TypeResolverContext::EnumElementDecl);
 
   // The type we're working with, in case we want to build it differently
   // based on the attributes we see.
@@ -2370,6 +2376,21 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
     attrs.ConventionArguments = None;
   }
 
+  if (attrs.has(TAK_noDerivative)) {
+    if (!Context.LangOpts.EnableExperimentalDifferentiableProgramming) {
+      diagnose(attrs.getLoc(TAK_noDerivative),
+               diag::experimental_differentiable_programming_disabled);
+    } else if (!isParam) {
+      // @noDerivative is only valid on parameters.
+      diagnose(attrs.getLoc(TAK_noDerivative),
+               (isVariadicFunctionParam
+                    ? diag::attr_not_on_variadic_parameters
+                    : diag::attr_only_on_parameters_of_differentiable),
+               "@noDerivative");
+    }
+    attrs.clearAttribute(TAK_noDerivative);
+  }
+
   // In SIL, handle @opened (n), which creates an existential archetype.
   if (attrs.has(TAK_opened)) {
     if (!ty->isExistentialType()) {
@@ -2422,7 +2443,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
 
 bool TypeResolver::resolveASTFunctionTypeParams(
     TupleTypeRepr *inputRepr, TypeResolutionOptions options,
-    bool requiresMappingOut,
+    bool requiresMappingOut, DifferentiabilityKind diffKind,
     SmallVectorImpl<AnyFunctionType::Param> &elements) {
   elements.reserve(inputRepr->getNumElements());
 
@@ -2486,8 +2507,24 @@ bool TypeResolver::resolveASTFunctionTypeParams(
       ownership = ValueOwnership::Default;
       break;
     }
+
+    bool noDerivative = false;
+    if (auto *attrTypeRepr = dyn_cast<AttributedTypeRepr>(eltTypeRepr)) {
+      if (attrTypeRepr->getAttrs().has(TAK_noDerivative)) {
+        if (diffKind == DifferentiabilityKind::NonDifferentiable &&
+            Context.LangOpts.EnableExperimentalDifferentiableProgramming)
+          diagnose(eltTypeRepr->getLoc(),
+                   diag::attr_only_on_parameters_of_differentiable,
+                   "@noDerivative")
+              .highlight(eltTypeRepr->getSourceRange());
+        else
+          noDerivative = true;
+      }
+    }
+
     auto paramFlags = ParameterTypeFlags::fromParameterType(
-        ty, variadic, autoclosure, /*isNonEphemeral*/ false, ownership);
+        ty, variadic, autoclosure, /*isNonEphemeral*/ false, ownership,
+        noDerivative);
     elements.emplace_back(ty, Identifier(), paramFlags);
   }
 
@@ -2541,7 +2578,8 @@ Type TypeResolver::resolveASTFunctionType(
 
   SmallVector<AnyFunctionType::Param, 8> params;
   if (resolveASTFunctionTypeParams(repr->getArgsTypeRepr(), options,
-                         repr->getGenericEnvironment() != nullptr, params)) {
+                                   repr->getGenericEnvironment() != nullptr,
+                                   diffKind, params)) {
     return Type();
   }
 

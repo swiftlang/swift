@@ -2430,7 +2430,8 @@ namespace {
           CS.getConstraintLocator(expr, ConstraintLocator::ClosureResult);
 
         if (expr->hasEmptyBody()) {
-          resultTy = CS.createTypeVariable(locator, 0);
+          resultTy = CS.createTypeVariable(
+              locator, expr->hasSingleExpressionBody() ? 0 : TVO_CanBindToHole);
 
           // Closures with empty bodies should be inferred to return
           // ().
@@ -2442,7 +2443,8 @@ namespace {
         } else {
           // If no return type was specified, create a fresh type
           // variable for it.
-          resultTy = CS.createTypeVariable(locator, 0);
+          resultTy = CS.createTypeVariable(
+              locator, expr->hasSingleExpressionBody() ? 0 : TVO_CanBindToHole);
 
           if (closureHasNoResult(expr)) {
             // Allow it to default to () if there are no return statements.

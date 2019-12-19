@@ -1155,3 +1155,15 @@ SpecifyBaseTypeForContextualMember *SpecifyBaseTypeForContextualMember::create(
   return new (cs.getAllocator())
       SpecifyBaseTypeForContextualMember(cs, member, locator);
 }
+
+bool SpecifyClosureReturnType::diagnose(bool asNote) const {
+  auto &cs = getConstraintSystem();
+  UnableToInferClosureReturnType failure(cs, getLocator());
+  return failure.diagnose(asNote);
+}
+
+SpecifyClosureReturnType *
+SpecifyClosureReturnType::create(ConstraintSystem &cs,
+                                 ConstraintLocator *locator) {
+  return new (cs.getAllocator()) SpecifyClosureReturnType(cs, locator);
+}

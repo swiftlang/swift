@@ -1808,8 +1808,8 @@ class ParameterTypeFlags {
     NonEphemeral = 1 << 2,
     OwnershipShift = 3,
     Ownership    = 7 << OwnershipShift,
-
-    NumBits = 6
+    NoDerivative = 1 << 7,
+    NumBits = 7
   };
   OptionSet<ParameterFlags> value;
   static_assert(NumBits < 8*sizeof(OptionSet<ParameterFlags>), "overflowed");
@@ -1823,15 +1823,17 @@ public:
   }
 
   ParameterTypeFlags(bool variadic, bool autoclosure, bool nonEphemeral,
-                     ValueOwnership ownership)
+                     ValueOwnership ownership, bool noDerivative)
       : value((variadic ? Variadic : 0) | (autoclosure ? AutoClosure : 0) |
               (nonEphemeral ? NonEphemeral : 0) |
-              uint8_t(ownership) << OwnershipShift) {}
+              uint8_t(ownership) << OwnershipShift |
+              (noDerivative ? NoDerivative : 0)) {}
 
   /// Create one from what's present in the parameter type
   inline static ParameterTypeFlags
   fromParameterType(Type paramTy, bool isVariadic, bool isAutoClosure,
-                    bool isNonEphemeral, ValueOwnership ownership);
+                    bool isNonEphemeral, ValueOwnership ownership,
+                    bool isNoDerivative);
 
   bool isNone() const { return !value; }
   bool isVariadic() const { return value.contains(Variadic); }
@@ -1840,6 +1842,7 @@ public:
   bool isInOut() const { return getValueOwnership() == ValueOwnership::InOut; }
   bool isShared() const { return getValueOwnership() == ValueOwnership::Shared;}
   bool isOwned() const { return getValueOwnership() == ValueOwnership::Owned; }
+  bool isNoDerivative() const { return value.contains(NoDerivative); }
 
   ValueOwnership getValueOwnership() const {
     return ValueOwnership((value.toRaw() & Ownership) >> OwnershipShift);
@@ -1880,6 +1883,12 @@ public:
     return ParameterTypeFlags(isNonEphemeral
                                   ? value | ParameterTypeFlags::NonEphemeral
                                   : value - ParameterTypeFlags::NonEphemeral);
+  }
+
+  ParameterTypeFlags withNoDerivative(bool noDerivative) const {
+    return ParameterTypeFlags(noDerivative
+                                  ? value | ParameterTypeFlags::NoDerivative
+                                  : value - ParameterTypeFlags::NoDerivative);
   }
 
   bool operator ==(const ParameterTypeFlags &other) const {
@@ -1948,8 +1957,8 @@ public:
   ParameterTypeFlags asParamFlags() const {
     return ParameterTypeFlags(/*variadic*/ false,
                               /*autoclosure*/ false,
-                              /*nonEphemeral*/ false,
-                              getValueOwnership());
+                              /*nonEphemeral*/ false, getValueOwnership(),
+                              /*noDerivative*/ false);
   }
 
   bool operator ==(const YieldTypeFlags &other) const {
@@ -2820,6 +2829,9 @@ public:
 
     /// Whether the parameter is marked '@_nonEphemeral'
     bool isNonEphemeral() const { return Flags.isNonEphemeral(); }
+
+    /// Whether the parameter is marked '@noDerivative'.
+    bool isNoDerivative() const { return Flags.isNoDerivative(); }
 
     ValueOwnership getValueOwnership() const {
       return Flags.getValueOwnership();
@@ -5818,10 +5830,9 @@ inline TupleTypeElt TupleTypeElt::getWithType(Type T) const {
 }
 
 /// Create one from what's present in the parameter decl and type
-inline ParameterTypeFlags
-ParameterTypeFlags::fromParameterType(Type paramTy, bool isVariadic,
-                                      bool isAutoClosure, bool isNonEphemeral,
-                                      ValueOwnership ownership) {
+inline ParameterTypeFlags ParameterTypeFlags::fromParameterType(
+    Type paramTy, bool isVariadic, bool isAutoClosure, bool isNonEphemeral,
+    ValueOwnership ownership, bool isNoDerivative) {
   // FIXME(Remove InOut): The last caller that needs this is argument
   // decomposition.  Start by enabling the assertion there and fixing up those
   // callers, then remove this, then remove
@@ -5831,7 +5842,7 @@ ParameterTypeFlags::fromParameterType(Type paramTy, bool isVariadic,
            ownership == ValueOwnership::InOut);
     ownership = ValueOwnership::InOut;
   }
-  return {isVariadic, isAutoClosure, isNonEphemeral, ownership};
+  return {isVariadic, isAutoClosure, isNonEphemeral, ownership, isNoDerivative};
 }
 
 inline const Type *BoundGenericType::getTrailingObjectsPointer() const {

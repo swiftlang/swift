@@ -302,11 +302,11 @@ ERROR(cannot_invoke_closure_type,none,
 ERROR(cannot_infer_closure_type,none,
       "unable to infer closure type in the current context", ())
 ERROR(cannot_infer_closure_result_type,none,
-      "unable to infer complex closure return type; "
-      "add explicit type to disambiguate", ())
-FIXIT(insert_closure_return_type,
-      "%select{| () }1-> %0 %select{|in }1",
-      (Type, bool))
+      "unable to infer%select{ complex|}0 closure return type; "
+      "add explicit type to disambiguate", (bool))
+FIXIT(insert_closure_return_type_placeholder,
+      "%select{| () }0-> <#Result#> %select{|in }0",
+      (bool))
 
 ERROR(incorrect_explicit_closure_result,none,
       "declared closure result %0 is incompatible with contextual type %1",
@@ -3925,6 +3925,11 @@ ERROR(opaque_type_unsupported_pattern,none,
 ERROR(opaque_type_in_protocol_requirement,none,
       "'some' type cannot be the return type of a protocol requirement; did you mean to add an associated type?",
       ())
+
+// Function differentiability
+ERROR(attr_only_on_parameters_of_differentiable,none,
+      "'%0' may only be used on parameters of '@differentiable' function "
+      "types", (StringRef))
 
 // SIL
 ERROR(opened_non_protocol,none,
