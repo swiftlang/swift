@@ -57,16 +57,16 @@ struct TF_30 : Differentiable {
 // Make sure this passes SIL verification.
 let _: @differentiable (TF_30) -> Float = { s in s.x }
 
-// Make sure `@nondiff` gets propagated through SIL.
-// Make sure `@nondiff` with non-`Differentiable` also works.
-public func nondiffs(_ f: @differentiable (Float, @nondiff Float) -> Float,
-                     _ g: @differentiable (Float, @nondiff Int) -> Float) {
+// Make sure `@noDerivative` gets propagated through SIL.
+// Make sure `@noDerivative` with non-`Differentiable` also works.
+public func nondiffs(_ f: @differentiable (Float, @noDerivative Float) -> Float,
+                     _ g: @differentiable (Float, @noDerivative Int) -> Float) {
   _ = gradient(at: 0) { f($0, 1) }
   _ = gradient(at: 0) { g($0, 1) }
 }
 nondiffs({ x, y in x }, { x, y in x })
 
-// Crasher when SILGen'ing @differentiable functions with generic @nondiff parameters.
-func foo<T>(_ f: @differentiable (Float, @nondiff T) -> Float, _ t: T) -> Float {
+// Crasher when SILGen'ing @differentiable functions with generic @noDerivative parameters.
+func foo<T>(_ f: @differentiable (Float, @noDerivative T) -> Float, _ t: T) -> Float {
   return f(1, t)
 }

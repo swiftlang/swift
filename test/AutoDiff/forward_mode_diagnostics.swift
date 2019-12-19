@@ -165,8 +165,8 @@ func nonVariedResult(_ x: Float) -> Float {
 // Subset parameters
 //===----------------------------------------------------------------------===//
 
-func nondiff(_ f: @differentiable (Float, @nondiff Float) -> Float) -> Float {
-  // expected-note @+2 {{cannot differentiate with respect to a '@nondiff' parameter}}
+func nondiff(_ f: @differentiable (Float, @noDerivative Float) -> Float) -> Float {
+  // expected-note @+2 {{cannot differentiate with respect to a '@noDerivative' parameter}}
   // expected-error @+1 {{function is not differentiable}}
   return derivative(at: 2, 3) { (x, y) in f(x * x, y) }
 }

@@ -509,7 +509,7 @@ emitDerivativeFunctionReference(
       for (auto i : desiredIndices.parameters->getIndices()) {
         if (!paramIndices->contains(i)) {
           context.emitNondifferentiabilityError(functionSource, invoker,
-              diag::autodiff_function_nondiff_parameter_not_differentiable);
+              diag::autodiff_function_noderivative_parameter_not_differentiable);
           return None;
         }
       }

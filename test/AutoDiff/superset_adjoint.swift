@@ -54,12 +54,12 @@ SupersetVJPTests.test("ApplySubset") {
   expectEqual(1, gradient(at: Tracked<Float>(0)) { x in foo(x, 0) { $0 + $1 } })
 }
 
-// FIXME: The expression `(+) as @differentiable (Float, @nondiff Float) -> Float)`
+// FIXME: The expression `(+) as @differentiable (Float, @noDerivative Float) -> Float)`
 // forms a curry thunk of `Float.+` before conversion to @differentiable, and AD
 // doesn't know how to differentiate the curry thunk, so it produces a
 // "function is not differentiable" error.
 // SupersetVJPTests.test("CrossModule") {
-//   let grad = gradient(at: Float(1), Float(2), in: (+) as @differentiable (Float, @nondiff Float) -> Float)
+//   let grad = gradient(at: Float(1), Float(2), in: (+) as @differentiable (Float, @noDerivative Float) -> Float)
 //   expectEqual(Float(1), grad)
 // }
 

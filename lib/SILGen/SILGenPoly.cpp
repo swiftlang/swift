@@ -3337,7 +3337,7 @@ static ManagedValue createAutoDiffThunk(SILGenFunction &SGF,
   }
   llvm::SmallBitVector parameterBits(numUncurriedParams);
   for (auto i : range(inputSubstType->getNumParams()))
-    if (!inputSubstType->getParams()[i].isNonDifferentiable())
+    if (!inputSubstType->getParams()[i].isNoDerivative())
       parameterBits.set(i);
   auto *parameterIndices = IndexSubset::get(SGF.getASTContext(), parameterBits);
 

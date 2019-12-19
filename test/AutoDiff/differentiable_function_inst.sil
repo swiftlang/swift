@@ -23,8 +23,8 @@ bb0:
   %2 = differentiable_function_extract [vjp] %1 : $@differentiable @convention(thin) (Float, Float, Float) -> Float
   %3 = differentiable_function [parameters 0] %0 : $@convention(thin) (Float, Float, Float) -> Float
 
-  // CHECK: %4 = differentiable_function_extract [vjp] %3 : $@differentiable @convention(thin) (Float, @nondiff Float, @nondiff Float) -> Float
-  %4 = differentiable_function_extract [vjp] %3 : $@differentiable @convention(thin) (Float, @nondiff Float, @nondiff Float) -> Float
+  // CHECK: %4 = differentiable_function_extract [vjp] %3 : $@differentiable @convention(thin) (Float, @noDerivative Float, @noDerivative Float) -> Float
+  %4 = differentiable_function_extract [vjp] %3 : $@differentiable @convention(thin) (Float, @noDerivative Float, @noDerivative Float) -> Float
   %5 = function_ref @examplemethod : $@convention(method) (Float, Float, Float) -> Float
   %6 = differentiable_function [parameters 0 1 2] %5 : $@convention(method) (Float, Float, Float) -> Float
 
@@ -32,8 +32,8 @@ bb0:
   %7 = differentiable_function_extract [vjp] %6 : $@differentiable @convention(method) (Float, Float, Float) -> Float
   %8 = differentiable_function [parameters 0] %5 : $@convention(method) (Float, Float, Float) -> Float
 
-  // CHECK: %9 = differentiable_function_extract [vjp] %8 : $@differentiable @convention(method) (Float, @nondiff Float, @nondiff Float) -> Float
-  %9 = differentiable_function_extract [vjp] %8 : $@differentiable @convention(method) (Float, @nondiff Float, @nondiff Float) -> Float
+  // CHECK: %9 = differentiable_function_extract [vjp] %8 : $@differentiable @convention(method) (Float, @noDerivative Float, @noDerivative Float) -> Float
+  %9 = differentiable_function_extract [vjp] %8 : $@differentiable @convention(method) (Float, @noDerivative Float, @noDerivative Float) -> Float
 
   %ret = tuple ()
   return %ret : $()

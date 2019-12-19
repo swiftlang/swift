@@ -367,7 +367,7 @@ Type ASTBuilder::createFunctionType(
                               .withVariadic(flags.isVariadic())
                               // SWIFT_ENABLE_TENSORFLOW
                               .withAutoClosure(flags.isAutoClosure())
-                              .withNonDifferentiable(flags.isNonDifferentiable());
+                              .withNoDerivative(flags.isNoDerivative());
 
     funcParams.push_back(AnyFunctionType::Param(type, label, parameterFlags));
   }

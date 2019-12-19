@@ -3083,11 +3083,10 @@ void AnyFunctionType::decomposeInput(
   }
       
   default:
-    result.emplace_back(type->getInOutObjectType(), Identifier(),
-                        ParameterTypeFlags::fromParameterType(
-                          // SWIFT_ENABLE_TENSORFLOW
-                          type, false, false, false, ValueOwnership::Default,
-                          /*nonDifferentiable*/ false));
+    result.emplace_back(
+        type->getInOutObjectType(), Identifier(),
+        ParameterTypeFlags::fromParameterType(type, false, false, false,
+                                              ValueOwnership::Default, false));
     return;
   }
 }

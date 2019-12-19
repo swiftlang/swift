@@ -2497,9 +2497,8 @@ static void printParameterFlags(ASTPrinter &printer, PrintOptions options,
                                 ParameterTypeFlags flags, bool escaping) {
   if (!options.excludeAttrKind(TAK_autoclosure) && flags.isAutoClosure())
     printer << "@autoclosure ";
-  // SWIFT_ENABLE_TENSORFLOW
-  if (!options.excludeAttrKind(TAK_nondiff) && flags.isNonDifferentiable())
-    printer << "@nondiff ";
+  if (!options.excludeAttrKind(TAK_noDerivative) && flags.isNoDerivative())
+    printer << "@noDerivative ";
 
   switch (flags.getValueOwnership()) {
   case ValueOwnership::Default:
@@ -4577,7 +4576,7 @@ void SILParameterInfo::print(ASTPrinter &Printer,
   /// SWIFT_ENABLE_TENSORFLOW
   switch (getDifferentiability()) {
   case SILParameterDifferentiability::NotDifferentiable:
-    Printer << "@nondiff ";
+    Printer << "@noDerivative ";
     break;
   default:
     break;

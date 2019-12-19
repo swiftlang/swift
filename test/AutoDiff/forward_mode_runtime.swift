@@ -1240,7 +1240,7 @@ ForwardModeTests.test("SubsetIndices") {
   }
   expectEqual(2, deriv { x, y in x + y })
 
-  func derivWRTNonDiff(_ lossFunction: @differentiable (Float, @nondiff Int) -> Float) -> Float {
+  func derivWRTNonDiff(_ lossFunction: @differentiable (Float, @noDerivative Int) -> Float) -> Float {
     return derivative(at: 2) { x in lossFunction(x * x, 10) }
   }
   expectEqual(4, derivWRTNonDiff { x, y in x + Float(y) })

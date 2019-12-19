@@ -1793,8 +1793,7 @@ namespace {
     resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
                                  TypeResolutionOptions options,
                                  bool requiresMappingOut,
-                                 // SWIFT_ENABLE_TENSORFLOW
-                                 bool isDifferentiable,
+                                 DifferentiabilityKind diffKind,
                                  SmallVectorImpl<AnyFunctionType::Param> &ps);
 
     Type resolveSILFunctionType(FunctionTypeRepr *repr,
@@ -2031,6 +2030,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
   // Remember whether this is a function parameter.
   bool isParam = options.is(TypeResolverContext::FunctionInput);
 
+  // Remember whether this is a variadic function parameter.
   bool isVariadicFunctionParam =
       options.is(TypeResolverContext::VariadicFunctionInput) &&
       !options.hasBase(TypeResolverContext::EnumElementDecl);
@@ -2369,14 +2369,34 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
     attrs.ConventionArguments = None;
   }
 
-  // SWIFT_ENABLE_TENSORFLOW
-  // @nondiff is only valid on parameters.
+  if (attrs.has(TAK_noDerivative)) {
+    if (!Context.LangOpts.EnableExperimentalDifferentiableProgramming) {
+      diagnose(attrs.getLoc(TAK_noDerivative),
+               diag::experimental_differentiable_programming_disabled);
+    } else if (!isParam) {
+      // @noDerivative is only valid on parameters.
+      diagnose(attrs.getLoc(TAK_noDerivative),
+               (isVariadicFunctionParam
+                    ? diag::attr_not_on_variadic_parameters
+                    : diag::attr_only_on_parameters_of_differentiable),
+               "@noDerivative");
+    }
+    attrs.clearAttribute(TAK_noDerivative);
+  }
+
   if (attrs.has(TAK_nondiff)) {
-    if (!isParam)
-        diagnose(attrs.getLoc(TAK_nondiff),
-                 isVariadicFunctionParam
-                     ? diag::attr_not_on_variadic_parameters
-                     : diag::attr_not_on_variadic_parameters, "@nondiff");
+    diagnose(attrs.getLoc(TAK_nondiff), diag::nondiff_attr_deprecated);
+    if (!Context.LangOpts.EnableExperimentalDifferentiableProgramming) {
+      diagnose(attrs.getLoc(TAK_nondiff),
+               diag::experimental_differentiable_programming_disabled);
+    } else if (!isParam) {
+      // @nondiff is only valid on parameters.
+      diagnose(attrs.getLoc(TAK_nondiff),
+               (isVariadicFunctionParam
+                    ? diag::attr_not_on_variadic_parameters
+                    : diag::attr_only_on_parameters_of_differentiable),
+               "@nondiff");
+    }
     attrs.clearAttribute(TAK_nondiff);
   }
 
@@ -2432,8 +2452,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
 
 bool TypeResolver::resolveASTFunctionTypeParams(
     TupleTypeRepr *inputRepr, TypeResolutionOptions options,
-    // SWIFT_ENABLE_TENSORFLOW
-    bool requiresMappingOut, bool isDifferentiable,
+    bool requiresMappingOut, DifferentiabilityKind diffKind,
     SmallVectorImpl<AnyFunctionType::Param> &elements) {
   elements.reserve(inputRepr->getNumElements());
 
@@ -2498,31 +2517,43 @@ bool TypeResolver::resolveASTFunctionTypeParams(
       break;
     }
 
-    // SWIFT_ENABLE_TENSORFLOW
-    bool nondiff = false;
+    bool noDerivative = false;
     if (auto *attrTypeRepr = dyn_cast<AttributedTypeRepr>(eltTypeRepr)) {
-      if (attrTypeRepr->getAttrs().has(TAK_nondiff)) {
-        if (!isDifferentiable)
+      if (attrTypeRepr->getAttrs().has(TAK_noDerivative)) {
+        if (diffKind == DifferentiabilityKind::NonDifferentiable &&
+            Context.LangOpts.EnableExperimentalDifferentiableProgramming)
           diagnose(eltTypeRepr->getLoc(),
-                   diag::nondiff_attr_invalid_on_nondifferentiable_function)
+                   diag::attr_only_on_parameters_of_differentiable,
+                   "@noDerivative")
               .highlight(eltTypeRepr->getSourceRange());
         else
-          nondiff = true;
+          noDerivative = true;
       }
-    }
-
-    if (isDifferentiable &&
-        resolution.getStage() != TypeResolutionStage::Structural) {
-      if (!nondiff && !isDifferentiableType(ty)) {
-        diagnose(eltTypeRepr->getLoc(),
-                 diag::autodiff_attr_argument_not_differentiable)
-            .fixItInsert(eltTypeRepr->getLoc(), "@nondiff ");
+      if (attrTypeRepr->getAttrs().has(TAK_nondiff)) {
+        if (diffKind == DifferentiabilityKind::NonDifferentiable &&
+            Context.LangOpts.EnableExperimentalDifferentiableProgramming)
+          diagnose(eltTypeRepr->getLoc(),
+                   diag::attr_only_on_parameters_of_differentiable,
+                   "@nondiff")
+              .highlight(eltTypeRepr->getSourceRange());
+        else
+          noDerivative = true;
       }
     }
 
     // SWIFT_ENABLE_TENSORFLOW
+    if (diffKind != DifferentiabilityKind::NonDifferentiable &&
+        resolution.getStage() != TypeResolutionStage::Structural) {
+      if (!noDerivative && !isDifferentiableType(ty)) {
+        diagnose(eltTypeRepr->getLoc(),
+                 diag::autodiff_attr_argument_not_differentiable)
+            .fixItInsert(eltTypeRepr->getLoc(), "@noDerivative ");
+      }
+    }
+
     auto paramFlags = ParameterTypeFlags::fromParameterType(
-      ty, variadic, autoclosure, /*isNonEphemeral*/ false, ownership, nondiff);
+        ty, variadic, autoclosure, /*isNonEphemeral*/ false, ownership,
+        noDerivative);
     elements.emplace_back(ty, Identifier(), paramFlags);
   }
 
@@ -2575,11 +2606,9 @@ Type TypeResolver::resolveASTFunctionType(
   options |= parentOptions.withoutContext().getFlags();
 
   SmallVector<AnyFunctionType::Param, 8> params;
-  bool isDifferentiable = diffKind != DifferentiabilityKind::NonDifferentiable;
   if (resolveASTFunctionTypeParams(repr->getArgsTypeRepr(), options,
-                                   // SWIFT_ENABLE_TENSORFLOW
                                    repr->getGenericEnvironment() != nullptr,
-                                   isDifferentiable, params)) {
+                                   diffKind, params)) {
     return Type();
   }
 
@@ -2942,6 +2971,10 @@ SILParameterInfo TypeResolver::resolveSILParameter(
              ParameterConvention::Direct_Guaranteed);
 
     // SWIFT_ENABLE_TENSORFLOW
+    if (attrs.has(TAK_noDerivative)) {
+      attrs.clearAttribute(TAK_noDerivative);
+      differentiability = SILParameterDifferentiability::NotDifferentiable;
+    }
     if (attrs.has(TAK_nondiff)) {
       attrs.clearAttribute(TAK_nondiff);
       differentiability = SILParameterDifferentiability::NotDifferentiable;

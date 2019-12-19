@@ -298,6 +298,8 @@ void AttributedTypeRepr::printAttrs(ASTPrinter &Printer,
     Printer.printSimpleAttr("@autoclosure") << " ";
   if (hasAttr(TAK_escaping))
     Printer.printSimpleAttr("@escaping") << " ";
+  if (hasAttr(TAK_noDerivative) || hasAttr(TAK_nondiff))
+    Printer.printSimpleAttr("@noDerivative") << " ";
 
   if (hasAttr(TAK_differentiable)) {
     if (Attrs.isLinear()) {

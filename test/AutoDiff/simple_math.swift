@@ -355,7 +355,7 @@ SimpleMathTests.test("SubsetIndices") {
   }
   expectEqual(2, grad { x, y in x + y })
 
-  func gradWRTNonDiff(_ lossFunction: @differentiable (Float, @nondiff Int) -> Float) -> Float {
+  func gradWRTNonDiff(_ lossFunction: @differentiable (Float, @noDerivative Int) -> Float) -> Float {
     return gradient(at: 2) { x in lossFunction(x * x, 10) }
   }
   expectEqual(4, gradWRTNonDiff { x, y in x + Float(y) })
