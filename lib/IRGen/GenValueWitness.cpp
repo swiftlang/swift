@@ -1038,10 +1038,6 @@ ConstantReference irgen::emitValueWitnessTable(IRGenModule &IGM,
                                              CanType abstractType,
                                              bool isPattern,
                                              bool relativeReference) {
-  // We shouldn't emit global value witness tables for generic type instances.
-  assert(!isa<BoundGenericType>(abstractType) &&
-         "emitting VWT for generic instance");
-  
   // See if we can use a prefab witness table from the runtime.
   if (!isPattern) {
     if (auto known = getAddrOfKnownValueWitnessTable(IGM, abstractType,

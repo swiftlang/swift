@@ -3740,10 +3740,12 @@ namespace {
 
     SILType getLoweredType() { return SILType::getPrimitiveObjectType(type); }
 
+    ConstantReference emitValueWitnessTable(bool relativeReference) {
+      return irgen::emitValueWitnessTable(IGM, type, false, relativeReference);
+    }
+
     ConstantReference getValueWitnessTable(bool relativeReference) {
-      auto type = this->Target->getDeclaredType()->getCanonicalType();
-      return ConstantReference(IGM.getAddrOfEffectiveValueWitnessTable(type),
-                               irgen::ConstantReference::Direct);
+      return emitValueWitnessTable(relativeReference);
     }
 
     void addGenericArgument(GenericRequirement requirement) {

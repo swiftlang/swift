@@ -4069,10 +4069,6 @@ Optional<llvm::Function*> IRGenModule::getAddrOfIVarInitDestroy(
 llvm::Function *IRGenModule::getAddrOfValueWitness(CanType abstractType,
                                                    ValueWitness index,
                                                 ForDefinition_t forDefinition) {
-  // We shouldn't emit value witness symbols for generic type instances.
-  assert(!isa<BoundGenericType>(abstractType) &&
-         "emitting value witness for generic type instance?!");
-  
   LinkEntity entity = LinkEntity::forValueWitness(abstractType, index);
 
   llvm::Function *&entry = GlobalFuncs[entity];
