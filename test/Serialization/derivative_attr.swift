@@ -37,6 +37,10 @@ protocol InstanceMethod : Differentiable {
   func bar<T : Differentiable>(_ x: T) -> Self
 }
 extension InstanceMethod {
+  func foo(_ x: Self) -> Self { self }
+  func bar<T : Differentiable>(_ x: T) -> Self { self }
+}
+extension InstanceMethod {
   // CHECK: @derivative(of: foo, wrt: (self, x))
   @derivative(of: foo)
   func vjpFoo(x: Self) -> (value: Self, pullback: (TangentVector) -> (TangentVector, TangentVector)) {
