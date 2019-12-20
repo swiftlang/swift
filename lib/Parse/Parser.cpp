@@ -113,12 +113,6 @@ void SILParserTUStateBase::anchor() { }
 void swift::performCodeCompletionSecondPass(
     PersistentParserState &ParserState,
     CodeCompletionCallbacksFactory &Factory) {
-  Parser::performCodeCompletionSecondPass(ParserState, Factory);
-}
-
-void Parser::performCodeCompletionSecondPass(
-    PersistentParserState &ParserState,
-    CodeCompletionCallbacksFactory &Factory) {
   if (!ParserState.hasCodeCompletionDelayedDeclState())
     return;
 
@@ -128,7 +122,7 @@ void Parser::performCodeCompletionSecondPass(
 
   FrontendStatsTracer tracer(Ctx.Stats, "CodeCompletionSecondPass");
 
-  auto BufferID = Ctx.SourceMgr.findBufferContainingLoc(state->BodyPos.Loc);
+  auto BufferID = Ctx.SourceMgr.getCodeCompletionBufferID();
   Parser TheParser(BufferID, SF, nullptr, &ParserState, nullptr);
 
   std::unique_ptr<CodeCompletionCallbacks> CodeCompletion(
@@ -139,12 +133,17 @@ void Parser::performCodeCompletionSecondPass(
 }
 
 void Parser::performCodeCompletionSecondPassImpl(
-    PersistentParserState::CodeCompletionDelayedDeclState &info) {
+    CodeCompletionDelayedDeclState &info) {
   // Disable libSyntax creation in the delayed parsing.
   SyntaxContext->disable();
 
+  auto BufferID = L->getBufferID();
+  auto startLoc = SourceMgr.getLocForOffset(BufferID, info.StartOffset);
+  SourceLoc prevLoc;
+  if (info.PrevOffset != ~0U)
+    prevLoc = SourceMgr.getLocForOffset(BufferID, info.PrevOffset);
   // Set the parser position to the start of the delayed decl or the body.
-  restoreParserPosition(getParserPosition(info.BodyPos));
+  restoreParserPosition(getParserPosition({startLoc, prevLoc}));
 
   // Do not delay parsing in the second pass.
   llvm::SaveAndRestore<bool> DisableDelayedBody(DelayBodyParsing, false);
@@ -155,7 +154,7 @@ void Parser::performCodeCompletionSecondPassImpl(
   DeclContext *DC = info.ParentContext;
 
   switch (info.Kind) {
-  case PersistentParserState::CodeCompletionDelayedDeclKind::TopLevelCodeDecl: {
+  case CodeCompletionDelayedDeclKind::TopLevelCodeDecl: {
     // Re-enter the top-level code decl context.
     // FIXME: this can issue discriminators out-of-order?
     auto *TLCD = cast<TopLevelCodeDecl>(DC);
@@ -171,7 +170,7 @@ void Parser::performCodeCompletionSecondPassImpl(
     break;
   }
 
-  case PersistentParserState::CodeCompletionDelayedDeclKind::Decl: {
+  case CodeCompletionDelayedDeclKind::Decl: {
     assert((DC->isTypeContext() || DC->isModuleScopeContext()) &&
            "Delayed decl must be a type member or a top-level decl");
     ContextChange CC(*this, DC);
@@ -191,8 +190,13 @@ void Parser::performCodeCompletionSecondPassImpl(
     break;
   }
 
-  case PersistentParserState::CodeCompletionDelayedDeclKind::FunctionBody: {
+  case CodeCompletionDelayedDeclKind::FunctionBody: {
     auto *AFD = cast<AbstractFunctionDecl>(DC);
+
+    if (auto *P = AFD->getImplicitSelfDecl())
+      addToScope(P);
+    addParametersToScope(AFD->getParameters());
+
     ParseFunctionBody CC(*this, AFD);
     setLocalDiscriminatorToParamList(AFD->getParameters());
 
@@ -206,6 +210,8 @@ void Parser::performCodeCompletionSecondPassImpl(
          "Second pass should not set any code completion info");
 
   CodeCompletion->doneParsing();
+
+  State->restoreCodeCompletionDelayedDeclState(info);
 }
 
 swift::Parser::BacktrackingScope::~BacktrackingScope() {
@@ -431,11 +437,11 @@ class TokenRecorder: public ConsumeTokenReceiver {
   }
 
 public:
-  TokenRecorder(SourceFile &SF):
+  TokenRecorder(SourceFile &SF, unsigned BufferID):
   Ctx(SF.getASTContext()),
   SM(SF.getASTContext().SourceMgr),
   Bag(SF.getTokenVector()),
-  BufferID(SF.getBufferID().getValue()) {};
+  BufferID(BufferID) {};
 
   void finalize() override {
 
@@ -517,7 +523,7 @@ Parser::Parser(std::unique_ptr<Lexer> Lex, SourceFile &SF,
     Context(SF.getASTContext()),
     DelayBodyParsing(DelayBodyParsing),
     TokReceiver(SF.shouldCollectToken() ?
-                new TokenRecorder(SF) :
+                new TokenRecorder(SF, L->getBufferID()) :
                 new ConsumeTokenReceiver()),
     SyntaxContext(new SyntaxParsingContext(SyntaxContext, SF,
                                            L->getBufferID(),

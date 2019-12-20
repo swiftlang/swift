@@ -42,6 +42,7 @@ struct Options {
   bool hideLowPriority = true;
   bool hideByNameStyle = true;
   bool fuzzyMatching = true;
+  bool reuseASTContextIfPossible = false;
   unsigned minFuzzyLength = 2;
   unsigned showTopNonLiteralResults = 3;
 
@@ -53,7 +54,7 @@ struct Options {
 
 struct SwiftCompletionInfo {
   swift::ASTContext *swiftASTContext = nullptr;
-  swift::CompilerInvocation *invocation = nullptr;
+  const swift::CompilerInvocation *invocation = nullptr;
   swift::ide::CodeCompletionContext *completionContext = nullptr;
 };
 

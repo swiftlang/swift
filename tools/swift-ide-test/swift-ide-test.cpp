@@ -33,6 +33,7 @@
 #include "swift/Driver/FrontendUtil.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
+#include "swift/IDE/CompletionInstance.h"
 #include "swift/IDE/CodeCompletion.h"
 #include "swift/IDE/CommentConversion.h"
 #include "swift/IDE/ConformingMethodList.h"
@@ -716,11 +717,13 @@ removeCodeCompletionTokens(llvm::MemoryBuffer *Input,
                                            Input->getBufferIdentifier()));
 }
 
-static int doTypeContextInfo(const CompilerInvocation &InitInvok,
-                             StringRef SourceFilename,
-                             StringRef SecondSourceFileName,
-                             StringRef CodeCompletionToken,
-                             bool CodeCompletionDiagnostics) {
+static bool doCodeCompletionImpl(
+    CodeCompletionCallbacksFactory *callbacksFactory,
+    const CompilerInvocation &InitInvok,
+    StringRef SourceFilename,
+    StringRef SecondSourceFileName,
+    StringRef CodeCompletionToken,
+    bool CodeCompletionDiagnostics) {
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
       llvm::MemoryBuffer::getFile(SourceFilename);
   if (!FileBufOrErr) {
@@ -746,16 +749,30 @@ static int doTypeContextInfo(const CompilerInvocation &InitInvok,
 
   CompilerInvocation Invocation(InitInvok);
 
-  // Disable source location resolutions from .swiftsourceinfo file because
-  // they are somewhat heavy operations and are not needed for completions.
-  Invocation.getFrontendOptions().IgnoreSwiftSourceInfo = true;
+  if (!SecondSourceFileName.empty()) {
+    Invocation.getFrontendOptions().InputsAndOutputs.addInputFile(
+        SecondSourceFileName);
+  }
 
-  // Disable to build syntax tree because code-completion skips some portion of
-  // source text. That breaks an invariant of syntax tree building.
-  Invocation.getLangOptions().BuildSyntaxTree = false;
+  std::string Error;
+  PrintingDiagnosticConsumer PrintDiags;
+  CompletionInstance CompletionInst;
+  auto isSuccess = CompletionInst.performOperation(
+      Invocation, /*Args=*/{}, llvm::vfs::getRealFileSystem(), CleanFile.get(),
+      Offset, /*EnableASTCaching=*/false, Error,
+      CodeCompletionDiagnostics ? &PrintDiags : nullptr,
+      [&](CompilerInstance &CI) {
+        performCodeCompletionSecondPass(CI.getPersistentParserState(),
+                                        *callbacksFactory);
+      });
+  return isSuccess ? 0 : 1;
+}
 
-  Invocation.setCodeCompletionPoint(CleanFile.get(), Offset);
-
+static int doTypeContextInfo(const CompilerInvocation &InitInvok,
+                             StringRef SourceFilename,
+                             StringRef SecondSourceFileName,
+                             StringRef CodeCompletionToken,
+                             bool CodeCompletionDiagnostics) {
   // Create a CodeCompletionConsumer.
   std::unique_ptr<ide::TypeContextInfoConsumer> Consumer(
       new ide::PrintingTypeContextInfoConsumer(llvm::outs()));
@@ -765,23 +782,9 @@ static int doTypeContextInfo(const CompilerInvocation &InitInvok,
   std::unique_ptr<CodeCompletionCallbacksFactory> callbacksFactory(
       ide::makeTypeContextInfoCallbacksFactory(*Consumer));
 
-  Invocation.setCodeCompletionFactory(callbacksFactory.get());
-  if (!SecondSourceFileName.empty()) {
-    Invocation.getFrontendOptions().InputsAndOutputs.addInputFile(
-        SecondSourceFileName);
-  }
-  CompilerInstance CI;
-
-  PrintingDiagnosticConsumer PrintDiags;
-  if (CodeCompletionDiagnostics) {
-    // Display diagnostics to stderr.
-    CI.addDiagnosticConsumer(&PrintDiags);
-  }
-  if (CI.setup(Invocation))
-    return 1;
-  registerIDERequestFunctions(CI.getASTContext().evaluator);
-  CI.performParseAndResolveImportsOnly();
-  return 0;
+  return doCodeCompletionImpl(callbacksFactory.get(), InitInvok, SourceFilename,
+                              SecondSourceFileName, CodeCompletionToken,
+                              CodeCompletionDiagnostics);
 }
 
 static int
@@ -790,41 +793,6 @@ doConformingMethodList(const CompilerInvocation &InitInvok,
                        StringRef CodeCompletionToken,
                        bool CodeCompletionDiagnostics,
                        const std::vector<std::string> expectedTypeNames) {
-  llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
-      llvm::MemoryBuffer::getFile(SourceFilename);
-  if (!FileBufOrErr) {
-    llvm::errs() << "error opening input file: "
-                 << FileBufOrErr.getError().message() << '\n';
-    return 1;
-  }
-
-  unsigned Offset;
-
-  std::unique_ptr<llvm::MemoryBuffer> CleanFile(removeCodeCompletionTokens(
-      FileBufOrErr.get().get(), CodeCompletionToken, &Offset));
-
-  if (Offset == ~0U) {
-    llvm::errs() << "could not find code completion token \""
-                 << CodeCompletionToken << "\"\n";
-    return 1;
-  }
-  llvm::outs() << "found code completion token " << CodeCompletionToken
-               << " at offset " << Offset << "\n";
-  llvm::errs() << "found code completion token " << CodeCompletionToken
-               << " at offset " << Offset << "\n";
-
-  CompilerInvocation Invocation(InitInvok);
-
-  // Disable source location resolutions from .swiftsourceinfo file because
-  // they are somewhat heavy operations and are not needed for completions.
-  Invocation.getFrontendOptions().IgnoreSwiftSourceInfo = true;
-
-  // Disable to build syntax tree because code-completion skips some portion of
-  // source text. That breaks an invariant of syntax tree building.
-  Invocation.getLangOptions().BuildSyntaxTree = false;
-
-  Invocation.setCodeCompletionPoint(CleanFile.get(), Offset);
-
   SmallVector<const char *, 4> typeNames;
   for (auto &name : expectedTypeNames)
     typeNames.push_back(name.c_str());
@@ -838,23 +806,9 @@ doConformingMethodList(const CompilerInvocation &InitInvok,
   std::unique_ptr<CodeCompletionCallbacksFactory> callbacksFactory(
       ide::makeConformingMethodListCallbacksFactory(typeNames, *Consumer));
 
-  Invocation.setCodeCompletionFactory(callbacksFactory.get());
-  if (!SecondSourceFileName.empty()) {
-    Invocation.getFrontendOptions().InputsAndOutputs.addInputFile(
-        SecondSourceFileName);
-  }
-  CompilerInstance CI;
-
-  PrintingDiagnosticConsumer PrintDiags;
-  if (CodeCompletionDiagnostics) {
-    // Display diagnostics to stderr.
-    CI.addDiagnosticConsumer(&PrintDiags);
-  }
-  if (CI.setup(Invocation))
-    return 1;
-  registerIDERequestFunctions(CI.getASTContext().evaluator);
-  CI.performParseAndResolveImportsOnly();
-  return 0;
+  return doCodeCompletionImpl(callbacksFactory.get(), InitInvok, SourceFilename,
+                              SecondSourceFileName, CodeCompletionToken,
+                              CodeCompletionDiagnostics);
 }
 
 static int doCodeCompletion(const CompilerInvocation &InitInvok,
@@ -864,42 +818,6 @@ static int doCodeCompletion(const CompilerInvocation &InitInvok,
                             bool CodeCompletionDiagnostics,
                             bool CodeCompletionKeywords,
                             bool CodeCompletionComments) {
-  llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
-    llvm::MemoryBuffer::getFile(SourceFilename);
-  if (!FileBufOrErr) {
-    llvm::errs() << "error opening input file: "
-                 << FileBufOrErr.getError().message() << '\n';
-    return 1;
-  }
-
-  unsigned CodeCompletionOffset;
-
-  std::unique_ptr<llvm::MemoryBuffer> CleanFile(
-      removeCodeCompletionTokens(FileBufOrErr.get().get(), CodeCompletionToken,
-                                 &CodeCompletionOffset));
-
-  if (CodeCompletionOffset == ~0U) {
-    llvm::errs() << "could not find code completion token \""
-                 << CodeCompletionToken << "\"\n";
-    return 1;
-  }
-  llvm::outs() << "found code completion token " << CodeCompletionToken
-               << " at offset " << CodeCompletionOffset << "\n";
-  llvm::errs() << "found code completion token " << CodeCompletionToken
-               << " at offset " << CodeCompletionOffset << "\n";
-
-  CompilerInvocation Invocation(InitInvok);
-
-  Invocation.setCodeCompletionPoint(CleanFile.get(), CodeCompletionOffset);
-
-  // Disable source location resolutions from .swiftsourceinfo file because
-  // they are somewhat heavy operations and are not needed for completions.
-  Invocation.getFrontendOptions().IgnoreSwiftSourceInfo = true;
-
-  // Disable to build syntax tree because code-completion skips some portion of
-  // source text. That breaks an invariant of syntax tree building.
-  Invocation.getLangOptions().BuildSyntaxTree = false;
-
   std::unique_ptr<ide::OnDiskCodeCompletionCache> OnDiskCache;
   if (!options::CompletionCachePath.empty()) {
     OnDiskCache = llvm::make_unique<ide::OnDiskCodeCompletionCache>(
@@ -915,27 +833,12 @@ static int doCodeCompletion(const CompilerInvocation &InitInvok,
 
   // Create a factory for code completion callbacks that will feed the
   // Consumer.
-  std::unique_ptr<CodeCompletionCallbacksFactory> CompletionCallbacksFactory(
-      ide::makeCodeCompletionCallbacksFactory(CompletionContext,
-                                              *Consumer));
+  std::unique_ptr<CodeCompletionCallbacksFactory> callbacksFactory(
+      ide::makeCodeCompletionCallbacksFactory(CompletionContext, *Consumer));
 
-  Invocation.setCodeCompletionFactory(CompletionCallbacksFactory.get());
-  if (!SecondSourceFileName.empty()) {
-    Invocation.getFrontendOptions().InputsAndOutputs.addInputFile(
-        SecondSourceFileName);
-  }
-  CompilerInstance CI;
-
-  PrintingDiagnosticConsumer PrintDiags;
-  if (CodeCompletionDiagnostics) {
-    // Display diagnostics to stderr.
-    CI.addDiagnosticConsumer(&PrintDiags);
-  }
-  if (CI.setup(Invocation))
-    return 1;
-  registerIDERequestFunctions(CI.getASTContext().evaluator);
-  CI.performParseAndResolveImportsOnly();
-  return 0;
+  return doCodeCompletionImpl(callbacksFactory.get(), InitInvok, SourceFilename,
+                              SecondSourceFileName, CodeCompletionToken,
+                              CodeCompletionDiagnostics);
 }
 
 static int doREPLCodeCompletion(const CompilerInvocation &InitInvok,

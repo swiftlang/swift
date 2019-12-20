@@ -141,6 +141,8 @@ class Scope {
   bool isResolvable() const;
 
 public:
+  Scope(ScopeInfo &SI, ScopeKind SC, bool isInactiveConfigBlock = false);
+
   /// Create a lexical scope of the specified kind.
   Scope(Parser *P, ScopeKind SC, bool isInactiveConfigBlock = false);
 

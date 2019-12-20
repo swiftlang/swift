@@ -3118,7 +3118,8 @@ void Parser::consumeDecl(ParserPosition BeginParserPosition,
   SourceLoc BeginLoc = Tok.getLoc();
 
   State->setCodeCompletionDelayedDeclState(
-      PersistentParserState::CodeCompletionDelayedDeclKind::Decl,
+      SourceMgr, L->getBufferID(),
+      CodeCompletionDelayedDeclKind::Decl,
       Flags.toRaw(), CurDeclContext, {BeginLoc, EndLoc},
       BeginParserPosition.PreviousLoc);
 
@@ -3634,7 +3635,7 @@ std::vector<Decl *> Parser::parseDeclListDelayed(IterableDeclContext *IDC) {
     return { };
   }
 
-  auto BeginParserPosition = getParserPosition({BodyRange.Start,BodyRange.End});
+  auto BeginParserPosition = getParserPosition({BodyRange.Start, SourceLoc()});
   auto EndLexerState = L->getStateForEndOfTokenLoc(BodyRange.End);
 
   // ParserPositionRAII needs a primed parser to restore to.
@@ -5695,7 +5696,8 @@ void Parser::consumeAbstractFunctionBody(AbstractFunctionDecl *AFD,
   if (isCodeCompletionFirstPass()) {
     if (SourceMgr.rangeContainsCodeCompletionLoc(BodyRange)) {
       State->setCodeCompletionDelayedDeclState(
-          PersistentParserState::CodeCompletionDelayedDeclKind::FunctionBody,
+          SourceMgr, L->getBufferID(),
+          CodeCompletionDelayedDeclKind::FunctionBody,
           PD_Default, AFD, BodyRange, BeginParserPosition.PreviousLoc);
     } else {
       AFD->setBodySkipped(BodyRange);
@@ -5890,19 +5892,6 @@ ParserResult<FuncDecl> Parser::parseDeclFunc(SourceLoc StaticLoc,
 
 /// Parse function body into \p AFD.
 void Parser::parseAbstractFunctionBody(AbstractFunctionDecl *AFD) {
-  Scope S(this, ScopeKind::FunctionBody);
-
-  // Enter the arguments for the function into a new function-body scope.  We
-  // need this even if there is no function body to detect argument name
-  // duplication.
-  if (auto *P = AFD->getImplicitSelfDecl())
-    addToScope(P);
-  addParametersToScope(AFD->getParameters());
-
-   // Establish the new context.
-  ParseFunctionBody CC(*this, AFD);
-  setLocalDiscriminatorToParamList(AFD->getParameters());
-
   if (!Tok.is(tok::l_brace)) {
     checkForInputIncomplete();
     return;
@@ -5919,6 +5908,19 @@ void Parser::parseAbstractFunctionBody(AbstractFunctionDecl *AFD) {
     consumeAbstractFunctionBody(AFD, AFD->getAttrs());
     return;
   }
+
+  Scope S(this, ScopeKind::FunctionBody);
+
+  // Enter the arguments for the function into a new function-body scope.  We
+  // need this even if there is no function body to detect argument name
+  // duplication.
+  if (auto *P = AFD->getImplicitSelfDecl())
+    addToScope(P);
+  addParametersToScope(AFD->getParameters());
+
+   // Establish the new context.
+  ParseFunctionBody CC(*this, AFD);
+  setLocalDiscriminatorToParamList(AFD->getParameters());
 
   if (Context.Stats)
     Context.Stats->getFrontendCounters().NumFunctionsParsed++;
@@ -5983,7 +5985,7 @@ BraceStmt *Parser::parseAbstractFunctionBodyDelayed(AbstractFunctionDecl *AFD) {
          "function body should be delayed");
 
   auto bodyRange = AFD->getBodySourceRange();
-  auto BeginParserPosition = getParserPosition({bodyRange.Start,bodyRange.End});
+  auto BeginParserPosition = getParserPosition({bodyRange.Start, SourceLoc()});
   auto EndLexerState = L->getStateForEndOfTokenLoc(AFD->getEndLoc());
 
   // ParserPositionRAII needs a primed parser to restore to.
@@ -6005,6 +6007,9 @@ BraceStmt *Parser::parseAbstractFunctionBodyDelayed(AbstractFunctionDecl *AFD) {
   // Re-enter the lexical scope.
   Scope TopLevelScope(this, ScopeKind::TopLevel);
   Scope S(this, ScopeKind::FunctionBody);
+  if (auto *P = AFD->getImplicitSelfDecl())
+    addToScope(P);
+  addParametersToScope(AFD->getParameters());
   ParseFunctionBody CC(*this, AFD);
   setLocalDiscriminatorToParamList(AFD->getParameters());
 
