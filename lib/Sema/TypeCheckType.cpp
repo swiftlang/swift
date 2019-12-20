@@ -1782,6 +1782,14 @@ namespace {
       return diags.diagnose(std::forward<ArgTypes>(Args)...);
     }
 
+    template <typename... ArgTypes>
+    InFlightDiagnostic diagnoseInvalid(TypeRepr *repr,
+                                       ArgTypes &&... Args) const {
+      auto &diags = Context.Diags;
+      repr->setInvalid();
+      return diags.diagnose(std::forward<ArgTypes>(Args)...);
+    }
+
     Type resolveAttributedType(AttributedTypeRepr *repr,
                                TypeResolutionOptions options);
     Type resolveAttributedType(TypeAttributes &attrs, TypeRepr *repr,
@@ -2080,18 +2088,21 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
 
           // Check for @thick.
           if (attrs.has(TAK_thick)) {
-            if (storedRepr)
-              diagnose(repr->getStartLoc(), diag::sil_metatype_multiple_reprs);
-              
+            if (storedRepr) {
+              diagnoseInvalid(repr, repr->getStartLoc(),
+                              diag::sil_metatype_multiple_reprs);
+            }
+
             storedRepr = MetatypeRepresentation::Thick;
             attrs.clearAttribute(TAK_thick);
           }
 
           // Check for @objc_metatype.
           if (attrs.has(TAK_objc_metatype)) {
-            if (storedRepr)
-              diagnose(repr->getStartLoc(), diag::sil_metatype_multiple_reprs);
-              
+            if (storedRepr) {
+              diagnoseInvalid(repr, repr->getStartLoc(),
+                              diag::sil_metatype_multiple_reprs);
+            }
             storedRepr = MetatypeRepresentation::ObjC;
             attrs.clearAttribute(TAK_objc_metatype);
           }
@@ -2119,8 +2130,8 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
 
   auto checkUnsupportedAttr = [&](TypeAttrKind attr) {
     if (attrs.has(attr)) {
-      diagnose(attrs.getLoc(attr), diag::unknown_attribute,
-               TypeAttributes::getAttrName(attr));
+      diagnoseInvalid(repr, attrs.getLoc(attr), diag::unknown_attribute,
+                      TypeAttributes::getAttrName(attr));
       attrs.clearAttribute(attr);
     }
   };
@@ -2170,8 +2181,8 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
       auto calleeConvention = ParameterConvention::Direct_Unowned;
       if (attrs.has(TAK_callee_owned)) {
         if (attrs.has(TAK_callee_guaranteed)) {
-          diagnose(attrs.getLoc(TAK_callee_owned),
-                   diag::sil_function_repeat_convention, /*callee*/ 2);
+          diagnoseInvalid(repr, attrs.getLoc(TAK_callee_owned),
+                          diag::sil_function_repeat_convention, /*callee*/ 2);
         }
         calleeConvention = ParameterConvention::Direct_Owned;
       } else if (attrs.has(TAK_callee_guaranteed)) {
@@ -2197,8 +2208,9 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
                       SILFunctionType::Representation::WitnessMethod)
                 .Default(None);
         if (!parsedRep) {
-          diagnose(attrs.getLoc(TAK_convention),
-                   diag::unsupported_sil_convention, attrs.getConventionName());
+          diagnoseInvalid(repr, attrs.getLoc(TAK_convention),
+                          diag::unsupported_sil_convention,
+                          attrs.getConventionName());
           rep = SILFunctionType::Representation::Thin;
         } else {
           rep = *parsedRep;
@@ -2214,8 +2226,8 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
 
       if (attrs.has(TAK_differentiable) &&
           !Context.LangOpts.EnableExperimentalDifferentiableProgramming) {
-        diagnose(attrs.getLoc(TAK_differentiable),
-                 diag::experimental_differentiable_programming_disabled);
+        diagnoseInvalid(repr, attrs.getLoc(TAK_differentiable),
+                        diag::experimental_differentiable_programming_disabled);
       }
 
       DifferentiabilityKind diffKind = DifferentiabilityKind::NonDifferentiable;
@@ -2246,8 +2258,9 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
                 .Case("c", FunctionType::Representation::CFunctionPointer)
                 .Default(None);
         if (!parsedRep) {
-          diagnose(attrs.getLoc(TAK_convention), diag::unsupported_convention,
-                   attrs.getConventionName());
+          diagnoseInvalid(repr, attrs.getLoc(TAK_convention),
+                          diag::unsupported_convention,
+                          attrs.getConventionName());
           rep = FunctionType::Representation::Swift;
         } else {
           rep = *parsedRep;
@@ -2256,8 +2269,8 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
 
       if (attrs.has(TAK_differentiable) &&
           !Context.LangOpts.EnableExperimentalDifferentiableProgramming) {
-        diagnose(attrs.getLoc(TAK_differentiable),
-                 diag::experimental_differentiable_programming_disabled);
+        diagnoseInvalid(repr, attrs.getLoc(TAK_differentiable),
+                        diag::experimental_differentiable_programming_disabled);
       }
 
       DifferentiabilityKind diffKind = DifferentiabilityKind::NonDifferentiable;
@@ -2279,21 +2292,21 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
     if (attrs.hasConvention()) {
       if (attrs.getConventionName() == "c" ||
           attrs.getConventionName() == "block") {
-        diagnose(attrs.getLoc(TAK_convention),
-                 diag::invalid_autoclosure_and_convention_attributes,
-                 attrs.getConventionName());
+        diagnoseInvalid(repr, attrs.getLoc(TAK_convention),
+                        diag::invalid_autoclosure_and_convention_attributes,
+                        attrs.getConventionName());
         attrs.clearAttribute(TAK_convention);
         didDiagnose = true;
       }
     } else if (options.is(TypeResolverContext::VariadicFunctionInput) &&
                !options.hasBase(TypeResolverContext::EnumElementDecl)) {
-      diagnose(attrs.getLoc(TAK_autoclosure),
-               diag::attr_not_on_variadic_parameters, "@autoclosure");
+      diagnoseInvalid(repr, attrs.getLoc(TAK_autoclosure),
+                      diag::attr_not_on_variadic_parameters, "@autoclosure");
       attrs.clearAttribute(TAK_autoclosure);
       didDiagnose = true;
     } else if (!options.is(TypeResolverContext::FunctionInput)) {
-      diagnose(attrs.getLoc(TAK_autoclosure), diag::attr_only_on_parameters,
-               "@autoclosure");
+      diagnoseInvalid(repr, attrs.getLoc(TAK_autoclosure),
+                      diag::attr_only_on_parameters, "@autoclosure");
       attrs.clearAttribute(TAK_autoclosure);
       didDiagnose = true;
     }
@@ -2328,12 +2341,13 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
         auto loc = attrs.getLoc(TAK_escaping);
         auto attrRange = getTypeAttrRangeWithAt(Context, loc);
 
-        diagnose(loc, diag::escaping_non_function_parameter)
-          .fixItRemove(attrRange);
+        diagnoseInvalid(repr, loc, diag::escaping_non_function_parameter)
+            .fixItRemove(attrRange);
 
         // Try to find a helpful note based on how the type is being used
         if (options.is(TypeResolverContext::ImmediateOptionalTypeArgument)) {
-          diagnose(repr->getLoc(), diag::escaping_optional_type_argument);
+          diagnoseInvalid(repr, repr->getLoc(),
+                          diag::escaping_optional_type_argument);
         }
       }
 
@@ -2349,6 +2363,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
       // @autoclosure is going to be diagnosed when type of
       // the parameter is validated, because that attribute
       // applies to the declaration now.
+      repr->setInvalid();
       attrs.clearAttribute(TAK_autoclosure);
     }
 
@@ -2356,9 +2371,9 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
       if (!attrs.has(i))
         continue;
 
-      auto diag = diagnose(attrs.getLoc(i),
-                           diag::attribute_requires_function_type,
-                           TypeAttributes::getAttrName(i));
+      auto diag = diagnoseInvalid(repr, attrs.getLoc(i),
+                                  diag::attribute_requires_function_type,
+                                  TypeAttributes::getAttrName(i));
 
       // If we see @escaping among the attributes on this type, because it isn't
       // a function type, we'll remove it.
@@ -2368,7 +2383,8 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
         // Specialize the diagnostic for Optionals.
         if (ty->getOptionalObjectType()) {
           diag.flush();
-          diagnose(repr->getLoc(), diag::escaping_optional_type_argument);
+          diagnoseInvalid(repr, repr->getLoc(),
+                          diag::escaping_optional_type_argument);
         }
       }
       attrs.clearAttribute(i);
@@ -2398,7 +2414,8 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
   // In SIL, handle @opened (n), which creates an existential archetype.
   if (attrs.has(TAK_opened)) {
     if (!ty->isExistentialType()) {
-      diagnose(attrs.getLoc(TAK_opened), diag::opened_non_protocol, ty);
+      diagnoseInvalid(repr, attrs.getLoc(TAK_opened), diag::opened_non_protocol,
+                      ty);
     } else {
       ty = OpenedArchetypeType::get(ty, attrs.OpenedID);
     }
@@ -2438,9 +2455,10 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
   }
 
   for (unsigned i = 0; i != TypeAttrKind::TAK_Count; ++i)
-    if (attrs.has((TypeAttrKind)i))
-      diagnose(attrs.getLoc((TypeAttrKind)i),
-               diag::attribute_does_not_apply_to_type);
+    if (attrs.has((TypeAttrKind)i)) {
+      diagnoseInvalid(repr, attrs.getLoc((TypeAttrKind)i),
+                      diag::attribute_does_not_apply_to_type);
+    }
 
   return ty;
 }
@@ -3080,8 +3098,7 @@ Type TypeResolver::resolveSpecifierTypeRepr(SpecifierTypeRepr *repr,
     default:
       llvm_unreachable("unknown SpecifierTypeRepr kind");
     }
-    diagnose(repr->getSpecifierLoc(), diagID, name);
-    repr->setInvalid();
+    diagnoseInvalid(repr, repr->getSpecifierLoc(), diagID, name);
     return ErrorType::get(Context);
   }
 
