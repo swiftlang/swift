@@ -512,6 +512,8 @@ static SILValue scalarizeLoad(LoadInst *LI,
 
 namespace {
 
+/// Gathers information about a specific address and its uses to determine
+/// definite initialization.
 class ElementUseCollector {
   SILModule &Module;
   const DIMemoryObjectInfo &TheMemory;
@@ -587,8 +589,6 @@ private:
   void addElementUses(unsigned BaseEltNo, SILType UseTy, SILInstruction *User,
                       DIUseKind Kind);
   void collectTupleElementUses(TupleElementAddrInst *TEAI, unsigned BaseEltNo);
-  void collectDestructureTupleResultUses(DestructureTupleResult *DTR,
-                                         unsigned BaseEltNo);
   void collectStructElementUses(StructElementAddrInst *SEAI,
                                 unsigned BaseEltNo);
 };
@@ -638,34 +638,6 @@ void ElementUseCollector::collectTupleElementUses(TupleElementAddrInst *TEAI,
   }
 
   collectUses(TEAI, BaseEltNo);
-}
-
-/// Given a destructure_tuple, compute the new BaseEltNo implicit in the
-/// selected member, and recursively add uses of the instruction.
-void ElementUseCollector::collectDestructureTupleResultUses(
-    DestructureTupleResult *DTR, unsigned BaseEltNo) {
-
-  // If we're walking into a tuple within a struct or enum, don't adjust the
-  // BaseElt.  The uses hanging off the tuple_element_addr are going to be
-  // counted as uses of the struct or enum itself.
-  if (InStructSubElement || InEnumSubElement)
-    return collectUses(DTR, BaseEltNo);
-
-  assert(!IsSelfOfNonDelegatingInitializer && "self doesn't have tuple type");
-
-  // tuple_element_addr P, 42 indexes into the current tuple element.
-  // Recursively process its uses with the adjusted element number.
-  unsigned FieldNo = DTR->getIndex();
-  auto T = DTR->getParent()->getOperand()->getType();
-  if (T.is<TupleType>()) {
-    for (unsigned i = 0; i != FieldNo; ++i) {
-      SILType EltTy = T.getTupleElementType(i);
-      BaseEltNo += getElementCountRec(TypeExpansionContext(*DTR->getFunction()),
-                                      Module, EltTy, false);
-    }
-  }
-
-  collectUses(DTR, BaseEltNo);
 }
 
 void ElementUseCollector::collectStructElementUses(StructElementAddrInst *SEAI,
@@ -733,15 +705,15 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
       continue;
     }
 
-    // Look through begin_access and begin_borrow
-    if (isa<BeginAccessInst>(User) || isa<BeginBorrowInst>(User)) {
+    // Look through begin_access.
+    if (isa<BeginAccessInst>(User)) {
       auto begin = cast<SingleValueInstruction>(User);
       collectUses(begin, BaseEltNo);
       continue;
     }
 
-    // Ignore end_access and end_borrow.
-    if (isa<EndAccessInst>(User) || isa<EndBorrowInst>(User)) {
+    // Ignore end_access.
+    if (isa<EndAccessInst>(User)) {
       continue;
     }
 
@@ -1114,9 +1086,6 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
         collectTupleElementUses(TEAI, BaseEltNo);
         continue;
       }
-
-      auto *DTRI = cast<DestructureTupleResult>(EltPtr);
-      collectDestructureTupleResultUses(DTRI, BaseEltNo);
     }
   }
 }
