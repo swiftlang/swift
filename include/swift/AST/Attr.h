@@ -1791,6 +1791,11 @@ class DerivativeAttr final
       private llvm::TrailingObjects<DerivativeAttr, ParsedAutoDiffParameter> {
   friend TrailingObjects;
 
+  /// The base type repr for the referenced original function. This field is
+  /// non-null only for parsed attributes that reference a qualified original
+  /// declaration. This field is not serialized; type-checking uses it to
+  /// resolve the original declaration, which is serialized.
+  TypeRepr *BaseTypeRepr;
   /// The original function name.
   DeclNameRefWithLoc OriginalFunctionName;
   /// The original function declaration, resolved by the type checker.
@@ -1803,23 +1808,27 @@ class DerivativeAttr final
   Optional<AutoDiffDerivativeFunctionKind> Kind = None;
 
   explicit DerivativeAttr(bool implicit, SourceLoc atLoc, SourceRange baseRange,
-                          DeclNameRefWithLoc original,
+                          TypeRepr *baseTypeRepr, DeclNameRefWithLoc original,
                           ArrayRef<ParsedAutoDiffParameter> params);
 
   explicit DerivativeAttr(bool implicit, SourceLoc atLoc, SourceRange baseRange,
-                          DeclNameRefWithLoc original, IndexSubset *indices);
+                          TypeRepr *baseTypeRepr, DeclNameRefWithLoc original,
+                          IndexSubset *parameterIndices);
 
 public:
   static DerivativeAttr *create(ASTContext &context, bool implicit,
                                 SourceLoc atLoc, SourceRange baseRange,
+                                TypeRepr *baseTypeRepr,
                                 DeclNameRefWithLoc original,
                                 ArrayRef<ParsedAutoDiffParameter> params);
 
   static DerivativeAttr *create(ASTContext &context, bool implicit,
                                 SourceLoc atLoc, SourceRange baseRange,
+                                TypeRepr *baseTypeRepr,
                                 DeclNameRefWithLoc original,
-                                IndexSubset *indices);
+                                IndexSubset *parameterIndices);
 
+  TypeRepr *getBaseTypeRepr() const { return BaseTypeRepr; }
   DeclNameRefWithLoc getOriginalFunctionName() const {
     return OriginalFunctionName;
   }
@@ -1876,9 +1885,10 @@ class TransposeAttr final
       private llvm::TrailingObjects<TransposeAttr, ParsedAutoDiffParameter> {
   friend TrailingObjects;
 
-  /// The base type of the original function.
-  /// This is non-null only when the original function is not top-level (i.e. it
-  /// is an instance/static method).
+  /// The base type repr for the referenced original function. This field is
+  /// non-null only for parsed attributes that reference a qualified original
+  /// declaration. This field is not serialized; type-checking uses it to
+  /// resolve the original declaration, which is serialized.
   TypeRepr *BaseTypeRepr;
   /// The original function name.
   DeclNameRefWithLoc OriginalFunctionName;
@@ -1895,7 +1905,7 @@ class TransposeAttr final
 
   explicit TransposeAttr(bool implicit, SourceLoc atLoc, SourceRange baseRange,
                          TypeRepr *baseType, DeclNameRefWithLoc original,
-                         IndexSubset *indices);
+                         IndexSubset *parameterIndices);
 
 public:
   static TransposeAttr *create(ASTContext &context, bool implicit,
@@ -1906,7 +1916,7 @@ public:
   static TransposeAttr *create(ASTContext &context, bool implicit,
                                SourceLoc atLoc, SourceRange baseRange,
                                TypeRepr *baseType, DeclNameRefWithLoc original,
-                               IndexSubset *indices);
+                               IndexSubset *parameterIndices);
 
   TypeRepr *getBaseTypeRepr() const { return BaseTypeRepr; }
   DeclNameRefWithLoc getOriginalFunctionName() const {

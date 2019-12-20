@@ -1,9 +1,6 @@
 // RUN: %target-swift-frontend-typecheck -enable-experimental-differentiable-programming -verify %s
 // REQUIRES: differentiable_programming
 
-// We currently lack availability information (rdar://57975086)
-// UNSUPPORTED: use_os_stdlib
-
 import _Differentiation
 
 // Test top-level functions.
@@ -195,7 +192,8 @@ extension StaticMethod {
     return (x, { $0 })
   }
 
-  @derivative(of: foo)
+  // Test qualified declaration name.
+  @derivative(of: StaticMethod.foo)
   static func vjpFoo(x: Float) -> (value: Float, pullback: (Float) -> Float) {
     return (x, { $0 })
   }
@@ -230,6 +228,14 @@ extension InstanceMethod {
     value: Self, differential: (TangentVector, TangentVector) -> (TangentVector)
   ) {
     return (x, { $0 + $1 })
+  }
+
+  // Test qualified declaration name.
+  @derivative(of: InstanceMethod.foo, wrt: x)
+  func jvpFooWrtX(x: Self) -> (
+    value: Self, differential: (TangentVector) -> (TangentVector)
+  ) {
+    return (x, { $0 })
   }
 
   @derivative(of: generic)

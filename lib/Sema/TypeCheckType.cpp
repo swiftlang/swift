@@ -1644,6 +1644,10 @@ Type TypeChecker::resolveIdentifierType(
   if (!result) return nullptr;
 
   if (auto moduleTy = result->getAs<ModuleType>()) {
+    // Allow module types only if flag is specified.
+    if (options.contains(TypeResolutionFlags::AllowModule))
+      return moduleTy;
+    // Otherwise, emit an error.
     if (!options.contains(TypeResolutionFlags::SilenceErrors)) {
       auto moduleName = moduleTy->getModule()->getName();
       diags.diagnose(Components.back()->getNameLoc(),

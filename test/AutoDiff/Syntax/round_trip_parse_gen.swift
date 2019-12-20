@@ -50,7 +50,7 @@ func bazDerivative(_ x: Float, y: Float)
   return (x, { v in v })
 }
 
-@derivative(of: A.B.C.foo(label:_:), wrt: (x))
+@derivative(of: A<T>.B<U, V>.C.foo(label:_:), wrt: x)
 func qualifiedDerivative(_ x: Float, y: Float)
     -> (value: Float, pullback: (Float) -> Float) {
   return (x, { v in v })
@@ -71,7 +71,7 @@ func subtractTranspose(_ v: Float) -> (Float, Float) {
   return (v, -v)
 }
 
-@transpose(of: A.B.C.foo(label:_:), wrt: (0))
+@derivative(of: A<T>.B<U, V>.C.foo(label:_:), wrt: 0)
 func qualifiedTranspose(_ v: Float) -> (Float, Float) {
   return (v, -v)
 }
