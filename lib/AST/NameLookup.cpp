@@ -1028,25 +1028,25 @@ void MemberLookupTable::updateLookupTable(NominalTypeDecl *nominal) {
   }
 }
 
-void NominalTypeDecl::addedMember(Decl *member) {
-  auto *vd = dyn_cast<ValueDecl>(member);
-  if (!vd)
-    return;
+void NominalTypeDecl::addedExtension(ExtensionDecl *ext) {
+  if (!LookupTable) return;
 
+  if (ext->hasLazyMembers()) {
+    LookupTable->addMembers(ext->getCurrentMembersWithoutLoading());
+  } else {
+    LookupTable->addMembers(ext->getMembers());
+  }
+}
+
+void NominalTypeDecl::addedMember(Decl *member) {
   // If we have a lookup table, add the new member to it. If not, we'll pick up
   // this member when we first create the table.
-  if (auto *lookup = LookupTable) {
-    if (hasLazyMembers()) {
-      // If we have lazy members, only add the new member to the lookup
-      // table if we already have another member with the same name.
-      // The presence of a lookup table entry indicates that the
-      // nominal as well as all extensions have already been searched.
-      if (lookup->find(vd->getBaseName()) == lookup->end())
-        return;
-    }
+  auto *vd = dyn_cast<ValueDecl>(member);
+  auto *lookup = LookupTable;
+  if (!vd || !lookup)
+    return;
 
-    lookup->addMember(vd);
-  }
+  lookup->addMember(vd);
 }
 
 void ExtensionDecl::addedMember(Decl *member) {
@@ -1079,8 +1079,8 @@ void ExtensionDecl::addedMember(Decl *member) {
 // │ExtensionDecl *LastExtension ─┼───────┐│      │                   └───┐
 // │                              │       ││      └──────────────────────┐│
 // │MemberLookupTable *LookupTable├─┐     ││                             ││
-// │bool LookupTableComplete      │ │     ││     ┌─────────────────┐     ││
-// └──────────────────────────────┘ │     ││     │ExtensionDecl    │     ││
+// └──────────────────────────────┘ │     ││     ┌─────────────────┐     ││
+//                                  │     ││     │ExtensionDecl    │     ││
 //                                  │     ││     │-------------    │     ││
 //                    ┌─────────────┘     │└────▶│ExtensionDecl    │     ││
 //                    │                   │      │  *NextExtension ├──┐  ││
@@ -1141,34 +1141,27 @@ populateLookupTableEntryFromLazyIDCLoader(ASTContext &ctx,
   }
 }
 
-static void populateLookupTableEntryFromCurrentMembers(
-    ASTContext &ctx, MemberLookupTable &LookupTable, DeclBaseName name,
-    IterableDeclContext *IDC) {
-  for (auto m : IDC->getMembers()) {
-    if (auto v = dyn_cast<ValueDecl>(m)) {
-      if (v->getBaseName() == name) {
-        LookupTable.addMember(m);
-      }
-    }
-  }
-}
-
 static void
 populateLookupTableEntryFromExtensions(ASTContext &ctx,
                                        MemberLookupTable &table,
                                        NominalTypeDecl *nominal,
                                        DeclBaseName name) {
   for (auto e : nominal->getExtensions()) {
-    // If we can retrieve the members of this extension without deserializing
-    // anything, do so now.
-    if (!e->wasDeserialized() && !e->hasClangNode()) {
-      populateLookupTableEntryFromCurrentMembers(ctx, table, name, e);
+    // If there's no lazy members to look at, all the members of this extension
+    // are present in the lookup table.
+    if (!e->hasLazyMembers()) {
       continue;
     }
 
+    assert(e->wasDeserialized() || e->hasClangNode() &&
+           "Extension without deserializable content has lazy members!");
     assert(!e->hasUnparsedMembers());
+
+    // Try lazy loading. If that fails, then we fall back by loading the
+    // entire extension. FIXME: It's rather unfortunate that we fall off the
+    // happy path because the Clang Importer can't handle lazy import-as-member.
     if (populateLookupTableEntryFromLazyIDCLoader(ctx, table, name, e)) {
-      populateLookupTableEntryFromCurrentMembers(ctx, table, name, e);
+      e->loadAllMembers();
     }
   }
 }
@@ -1189,19 +1182,18 @@ void NominalTypeDecl::prepareLookupTable() {
 
     // Lazy members: if the table needs population, populate the table _only
     // from those members already in the IDC member list_ such as implicits or
-    // globals-as-members, then update table entries from the extensions that
-    // have the same names as any such initial-population members.
+    // globals-as-members.
     LookupTable->addMembers(getCurrentMembersWithoutLoading());
-
-    llvm::SmallSet<DeclBaseName, 4> baseNamesPresent;
-    for (auto entry : *LookupTable) {
-      auto baseName = entry.getFirst().getBaseName();
-      if (!baseNamesPresent.insert(baseName).second)
+    for (auto e : getExtensions()) {
+      // If we can lazy-load this extension, only take the members we've loaded
+      // so far.
+      if (e->wasDeserialized() || e->hasClangNode()) {
+        LookupTable->addMembers(e->getCurrentMembersWithoutLoading());
         continue;
+      }
 
-      populateLookupTableEntryFromExtensions(getASTContext(),
-                                             *LookupTable,
-                                             this, baseName);
+      // Else, load all the members into the table.
+      LookupTable->addMembers(e->getMembers());
     }
   } else {
     LookupTable->addMembers(getMembers());
@@ -1261,8 +1253,9 @@ NominalTypeDecl::lookupDirect(DeclName name,
           DeclName name) -> Optional<TinyPtrVector<ValueDecl *>> {
     // Look for a declaration with this name.
     auto known = table->find(name);
-    if (known == table->end())
+    if (known == table->end()) {
       return None;
+    }
 
     // We found something; return it.
     return maybeFilterOutAttrImplements(known->second, name,
@@ -1282,29 +1275,17 @@ NominalTypeDecl::lookupDirect(DeclName name,
 
   if (!useNamedLazyMemberLoading) {
     updateLookupTable(LookupTable);
+  } else {
+    if (populateLookupTableEntryFromLazyIDCLoader(ctx, *LookupTable,
+                                                  name.getBaseName(), this)) {
+      updateLookupTable(LookupTable);
+    } else {
+      populateLookupTableEntryFromExtensions(ctx, *LookupTable, this,
+                                             name.getBaseName());
+    }
   }
 
   // Look for a declaration with this name.
-  if (auto lookup = tryCacheLookup(LookupTable, name))
-    return lookup.getValue();
-
-  if (!useNamedLazyMemberLoading) {
-    return { };
-  }
-
-  // If we get here, we had a cache-miss and _are_ using
-  // NamedLazyMemberLoading. Try to populate a _single_ entry in the
-  // MemberLookupTable from both this nominal and all of its extensions, and
-  // retry.
-  auto &Table = *LookupTable;
-  if (populateLookupTableEntryFromLazyIDCLoader(ctx, Table,
-                                                name.getBaseName(), this)) {
-    updateLookupTable(LookupTable);
-  } else {
-    populateLookupTableEntryFromExtensions(ctx, Table, this,
-                                           name.getBaseName());
-  }
-
   return tryCacheLookup(LookupTable, name)
             .getValueOr(TinyPtrVector<ValueDecl *>());
 }
