@@ -3531,8 +3531,18 @@ void AttributeChecker::visitDerivativeAttr(DerivativeAttr *attr) {
         return derivative->getParent() == func->getParent();
       };
 
-  auto lookupOptions =
-      defaultMemberLookupOptions | NameLookupFlags::IgnoreAccessControl;
+  auto resolution = TypeResolution::forContextual(derivative->getDeclContext());
+  Type baseType;
+  if (auto *baseTypeRepr = attr->getBaseTypeRepr()) {
+    TypeResolutionOptions options = None;
+    options |= TypeResolutionFlags::AllowModule;
+    baseType = resolution.resolveType(baseTypeRepr, options);
+  }
+  if (baseType && baseType->hasError())
+    return;
+  auto lookupOptions = attr->getBaseTypeRepr()
+                           ? defaultMemberLookupOptions
+                           : defaultUnqualifiedLookupOptions;
   auto derivativeTypeCtx = derivative->getInnermostTypeContext();
   if (!derivativeTypeCtx)
     derivativeTypeCtx = derivative->getParent();
@@ -3540,7 +3550,7 @@ void AttributeChecker::visitDerivativeAttr(DerivativeAttr *attr) {
 
   // Look up original function.
   auto *originalAFD = findAbstractFunctionDecl(
-      originalName.Name, originalName.Loc.getBaseNameLoc(), /*baseType*/ Type(),
+      originalName.Name, originalName.Loc.getBaseNameLoc(), baseType,
       derivativeTypeCtx, isValidOriginal, noneValidDiagnostic,
       ambiguousDiagnostic, notFunctionDiagnostic, lookupOptions,
       hasValidTypeContext, invalidTypeContextDiagnostic);
@@ -3667,7 +3677,7 @@ void AttributeChecker::visitDerivativeAttr(DerivativeAttr *attr) {
   }
 
   // Reject different-file derivative registration.
-  // TODO(TF-1021): Lift this restriction.
+  // TODO(TF-1021): Lift same-file derivative registration restriction.
   if (originalAFD->getParentSourceFile() != derivative->getParentSourceFile()) {
     diagnoseAndRemoveAttr(attr,
                           diag::derivative_attr_not_in_same_file_as_original);

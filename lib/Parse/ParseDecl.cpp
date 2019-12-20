@@ -1111,7 +1111,8 @@ static bool parseBaseTypeForQualifiedDeclName(Parser &P, TypeRepr *&baseType) {
   return false;
 }
 
-/// parseQualifiedDeclName
+/// Parses an optional base type, followed by a declaration name.
+/// Returns true on error (if declaration name could not be parsed).
 ///
 /// \verbatim
 ///   qualified-decl-name:
@@ -1120,8 +1121,6 @@ static bool parseBaseTypeForQualifiedDeclName(Parser &P, TypeRepr *&baseType) {
 ///     identifier generic-args? ('.' identifier generic-args?)*
 /// \endverbatim
 ///
-/// Parses an optional base type, followed by a declaration name.
-/// Returns true on error (if declaration name could not be parsed).
 // TODO(TF-1066): Use module qualified name syntax/parsing instead of custom
 // qualified name syntax/parsing.
 static bool parseQualifiedDeclName(Parser &P, Diag<> nameParseError,
@@ -1147,7 +1146,8 @@ static bool parseQualifiedDeclName(Parser &P, Diag<> nameParseError,
 ///
 /// \verbatim
 ///   derivative-attribute-arguments:
-///     '(' 'of' ':' decl-name (',' differentiation-params-clause)? ')'
+///     '(' 'of' ':' qualified-decl-name (',' differentiation-params-clause)?
+///     ')'
 /// \endverbatim
 ParserResult<DerivativeAttr> Parser::parseDerivativeAttribute(SourceLoc atLoc,
                                                               SourceLoc loc) {
@@ -1206,16 +1206,16 @@ ParserResult<DerivativeAttr> Parser::parseDerivativeAttribute(SourceLoc atLoc,
              /*DeclModifier*/ false);
     return makeParserError();
   }
-  return ParserResult<DerivativeAttr>(
-      DerivativeAttr::create(Context, /*implicit*/ false, atLoc,
-                             SourceRange(loc, rParenLoc), original, params));
+  return ParserResult<DerivativeAttr>(DerivativeAttr::create(
+      Context, /*implicit*/ false, atLoc, SourceRange(loc, rParenLoc), baseType,
+      original, params));
 }
 
 /// Parse a `@transpose(of:)` attribute, returning true on error.
 ///
 /// \verbatim
 ///   transpose-attribute-arguments:
-///     '(' 'of' ':' decl-name (',' transposed-params-clause)? ')'
+///     '(' 'of' ':' qualified-decl-name (',' transposed-params-clause)? ')'
 /// \endverbatim
 ParserResult<TransposeAttr> Parser::parseTransposeAttribute(SourceLoc atLoc,
                                                             SourceLoc loc) {
