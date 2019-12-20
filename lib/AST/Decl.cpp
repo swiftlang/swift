@@ -7669,6 +7669,12 @@ bool FuncDecl::isPotentialIBActionTarget() const {
     !isa<AccessorDecl>(this);
 }
 
+void FuncDecl::setHasTopLevelLocalContextCaptures(bool hasCaptures) {
+  assert(!hasCaptures || isa<SourceFile>(getDeclContext()));
+  
+  Bits.FuncDecl.HasTopLevelLocalContextCaptures = hasCaptures;
+}
+
 Type TypeBase::getSwiftNewtypeUnderlyingType() {
   auto structDecl = getStructOrBoundGenericStruct();
   if (!structDecl)

@@ -271,7 +271,8 @@ void Parser::consumeTopLevelDecl(ParserPosition BeginParserPosition,
 ///     expr '=' expr
 ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
                                      BraceItemListKind Kind,
-                                     BraceItemListKind ConditionalBlockKind) {
+                                     BraceItemListKind ConditionalBlockKind,
+                                     bool &IsFollowingGuard) {
   bool isRootCtx = SyntaxContext->isRoot();
   SyntaxParsingContext ItemListContext(SyntaxContext,
                                        SyntaxKind::CodeBlockItemList);
@@ -364,7 +365,8 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
         [&](SmallVectorImpl<ASTNode> &Elements, bool IsActive) {
           parseBraceItems(Elements, Kind, IsActive
                             ? BraceItemListKind::ActiveConditionalBlock
-                            : BraceItemListKind::InactiveConditionalBlock);
+                            : BraceItemListKind::InactiveConditionalBlock,
+                          IsFollowingGuard);
         });
       if (IfConfigResult.hasCodeCompletion() && isCodeCompletionFirstPass()) {
         consumeDecl(BeginParserPosition, None, IsTopLevel);
@@ -401,7 +403,18 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
       ParserResult<Decl> DeclResult = 
           parseDecl(IsTopLevel ? PD_AllowTopLevel : PD_Default,
                     IsAtStartOfLineOrPreviousHadSemi,
-                    [&](Decl *D) {TmpDecls.push_back(D);});
+                    [&](Decl *D) {
+                      TmpDecls.push_back(D);
+
+                      // Any function after a 'guard' statement is marked as
+                      // possibly having local captures. This allows SILGen
+                      // to correctly determine its capture list, since
+                      // otherwise it would be skipped because it is not
+                      // defined inside a local context.
+                      if (IsFollowingGuard)
+                        if (auto *FD = dyn_cast<FuncDecl>(D))
+                          FD->setHasTopLevelLocalContextCaptures();
+                    });
       BraceItemsStatus |= DeclResult;
       if (DeclResult.isParseError()) {
         NeedParseErrorRecovery = true;
@@ -451,6 +464,14 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
                                        Result, Result.getEndLoc());
         TLCD->setBody(Brace);
         Entries.push_back(TLCD);
+
+        // A top-level 'guard' statement can introduce local bindings, so we
+        // must mark all functions following one. This makes them behave
+        // as if they were in local context for the purposes of capture
+        // emission in SILGen.
+        if (auto *stmt = Result.dyn_cast<Stmt *>())
+          if (isa<GuardStmt>(stmt))
+            IsFollowingGuard = true;
       }
     } else if (Tok.is(tok::kw_init) && isa<ConstructorDecl>(CurDeclContext)) {
       SourceLoc StartLoc = Tok.getLoc();
