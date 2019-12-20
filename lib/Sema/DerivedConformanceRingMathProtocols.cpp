@@ -75,18 +75,6 @@ static ValueDecl *getProtocolRequirement(ProtocolDecl *proto, Identifier name) {
   return lookup.front();
 }
 
-// Get the effective memberwise initializer of the given nominal type, or create
-// it if it does not exist.
-static ConstructorDecl *getOrCreateEffectiveMemberwiseInitializer(
-    ASTContext &ctx, NominalTypeDecl *nominal) {
-  if (auto *initDecl = nominal->getEffectiveMemberwiseInitializer())
-    return initDecl;
-  auto *initDecl = createMemberwiseImplicitConstructor(
-      ctx, nominal);
-  nominal->addMember(initDecl);
-  return initDecl;
-}
-
 // Return true if given nominal type has a `let` stored with an initial value.
 // TODO: Move function to shared place for use with other derived conformances.
 static bool hasLetStoredPropertyWithInitialValue(NominalTypeDecl *nominal) {

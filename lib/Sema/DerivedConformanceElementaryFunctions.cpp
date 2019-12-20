@@ -100,17 +100,6 @@ static ValueDecl *getElementaryFunctionRequirement(
   }
 }
 
-// Get the effective memberwise initializer of the given nominal type, or create
-// it if it does not exist.
-static ConstructorDecl *getOrCreateEffectiveMemberwiseInitializer(
-    ASTContext &ctx, NominalTypeDecl *nominal) {
-  if (auto *initDecl = nominal->getEffectiveMemberwiseInitializer())
-    return initDecl;
-  auto *initDecl = createMemberwiseImplicitConstructor(ctx, nominal);
-  nominal->addMember(initDecl);
-  return initDecl;
-}
-
 bool DerivedConformance::canDeriveElementaryFunctions(NominalTypeDecl *nominal,
                                                       DeclContext *DC) {
   // Nominal type must be a struct. (Zero stored properties is okay.)
