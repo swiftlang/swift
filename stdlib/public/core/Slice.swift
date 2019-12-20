@@ -275,13 +275,19 @@ extension Slice: MutableCollection where Base: MutableCollection {
   public mutating func withContiguousMutableStorageIfAvailable<R>(
     _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R? {
-    // FIXME: We need to calculate these distances even if the base collection
-    // doesn't provide access to a mutable buffer, because the collection
-    // isn't available within the closure.
+    // We're calling `withContiguousMutableStorageIfAvailable` twice here so
+    // that we don't calculate index distances unless we know we'll use them.
+    // The expectation here is that the base collection will make itself
+    // contiguous on the first try and the second call will be relatively cheap.
+    guard _base.withContiguousMutableStorageIfAvailable({ _ in }) != nil
+    else {
+      return nil
+    }
     let start = _base.distance(from: _base.startIndex, to: _startIndex)
     let count = _base.distance(from: _startIndex, to: _endIndex)
     return try _base.withContiguousMutableStorageIfAvailable { buffer in
-      var slice = UnsafeMutableBufferPointer(rebasing: buffer[start ..< start + count])
+      var slice = UnsafeMutableBufferPointer(
+        rebasing: buffer[start ..< start + count])
       let copy = slice
       defer {
         _precondition(
