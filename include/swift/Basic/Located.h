@@ -39,15 +39,15 @@ struct Located {
   /// The original source location from which the item was parsed.
   SourceLoc Loc;
 
-  Located(): Item(), Loc() {}
+  Located() : Item(), Loc() {}
 
-  Located(T Item, SourceLoc loc): Item(Item), Loc(loc) {}
+  Located(T Item, SourceLoc loc) : Item(Item), Loc(loc) {}
 
   SWIFT_DEBUG_DUMP;
   void dump(raw_ostream &os) const;
 
   template<typename U>
-  friend bool operator ==(const Located<U>& lhs, const Located<U>& rhs) {
+  friend bool operator ==(const Located<U> &lhs, const Located<U> &rhs) {
     return lhs.Item == rhs.Item && lhs.Loc == rhs.Loc;
   }
 };

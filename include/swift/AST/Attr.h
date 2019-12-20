@@ -70,7 +70,7 @@ public:
   struct Convention {
     StringRef Name = {};
     DeclNameRef WitnessMethodProtocol = {};
-    Located<StringRef> ClangType = {};
+    Located<StringRef> ClangType = Located<StringRef>(StringRef(), {});
     /// Convenience factory function to create a Swift convention.
     ///
     /// Don't use this function if you are creating a C convention as you
