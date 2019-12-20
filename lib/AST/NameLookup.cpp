@@ -926,21 +926,6 @@ public:
     dump(llvm::errs());
   }
 
-  // Mark all Decls in this table as not-resident in a table, drop
-  // references to them. Should only be called when this was not fully-populated
-  // from an IterableDeclContext.
-  void clear() {
-    // LastExtensionIncluded would only be non-null if this was populated from
-    // an IterableDeclContext (though it might still be null in that case).
-    assert(LastExtensionIncluded == nullptr);
-    for (auto const &i : Lookup) {
-      for (auto d : i.getSecond()) {
-        d->setAlreadyInLookupTable(false);
-      }
-    }
-    Lookup.clear();
-  }
-
   // Only allow allocation of member lookup tables using the allocator in
   // ASTContext or by doing a placement new.
   void *operator new(size_t Bytes, ASTContext &C,
