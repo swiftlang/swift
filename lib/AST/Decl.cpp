@@ -5249,6 +5249,7 @@ VarDecl::VarDecl(DeclKind kind, bool isStatic, VarDecl::Introducer introducer,
 {
   Bits.VarDecl.Introducer = unsigned(introducer);
   Bits.VarDecl.IsCaptureList = isCaptureList;
+  Bits.VarDecl.IsSelfParamCapture = false;
   Bits.VarDecl.IsDebuggerVar = false;
   Bits.VarDecl.IsLazyStorageProperty = false;
   Bits.VarDecl.HasNonPatternBindingInit = false;
