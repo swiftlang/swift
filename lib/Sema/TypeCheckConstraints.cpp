@@ -4075,27 +4075,32 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
     }
   }
 
+  auto checkElementCast = [&](Type fromElt, Type toElt,
+                              CheckedCastKind castKind) -> CheckedCastKind {
+    switch (typeCheckCheckedCast(fromElt, toElt, CheckedCastContextKind::None,
+                                 dc, SourceLoc(), nullptr, SourceRange())) {
+    case CheckedCastKind::Coercion:
+      return CheckedCastKind::Coercion;
+
+    case CheckedCastKind::BridgingCoercion:
+      return CheckedCastKind::BridgingCoercion;
+
+    case CheckedCastKind::ArrayDowncast:
+    case CheckedCastKind::DictionaryDowncast:
+    case CheckedCastKind::SetDowncast:
+    case CheckedCastKind::ValueCast:
+      return castKind;
+
+    case CheckedCastKind::Unresolved:
+      return failed();
+    }
+  };
+
   // Check for casts between specific concrete types that cannot succeed.
   if (auto toElementType = ConstraintSystem::isArrayType(toType)) {
     if (auto fromElementType = ConstraintSystem::isArrayType(fromType)) {
-      switch (typeCheckCheckedCast(*fromElementType, *toElementType,
-                                   CheckedCastContextKind::None, dc,
-                                   SourceLoc(), nullptr, SourceRange())) {
-      case CheckedCastKind::Coercion:
-        return CheckedCastKind::Coercion;
-
-      case CheckedCastKind::BridgingCoercion:
-        return CheckedCastKind::BridgingCoercion;
-
-      case CheckedCastKind::ArrayDowncast:
-      case CheckedCastKind::DictionaryDowncast:
-      case CheckedCastKind::SetDowncast:
-      case CheckedCastKind::ValueCast:
-        return CheckedCastKind::ArrayDowncast;
-
-      case CheckedCastKind::Unresolved:
-        return failed();
-      }
+      return checkElementCast(*fromElementType, *toElementType,
+                              CheckedCastKind::ArrayDowncast);
     }
   }
 
@@ -4165,24 +4170,8 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
 
   if (auto toElementType = ConstraintSystem::isSetType(toType)) {
     if (auto fromElementType = ConstraintSystem::isSetType(fromType)) {
-      switch (typeCheckCheckedCast(*fromElementType, *toElementType,
-                                   CheckedCastContextKind::None, dc,
-                                   SourceLoc(), nullptr, SourceRange())) {
-      case CheckedCastKind::Coercion:
-        return CheckedCastKind::Coercion;
-
-      case CheckedCastKind::BridgingCoercion:
-        return CheckedCastKind::BridgingCoercion;
-      
-      case CheckedCastKind::ArrayDowncast:
-      case CheckedCastKind::DictionaryDowncast:
-      case CheckedCastKind::SetDowncast:
-      case CheckedCastKind::ValueCast:
-        return CheckedCastKind::SetDowncast;
-
-      case CheckedCastKind::Unresolved:
-        return failed();
-      }
+      return checkElementCast(*fromElementType, *toElementType,
+                              CheckedCastKind::SetDowncast);
     }
   }
 
