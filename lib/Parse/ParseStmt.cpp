@@ -167,10 +167,6 @@ ParserStatus Parser::parseExprOrStmt(ASTNode &Result) {
     }
   }
 
-  if (ResultExpr.hasCodeCompletion() && CodeCompletion) {
-    CodeCompletion->completeExpr();
-  }
-
   return ResultExpr;
 }
 

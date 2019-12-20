@@ -1260,10 +1260,6 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
     Builder.addTypeAnnotation(ST.getString());
   }
 
-  /// Set to true when we have delivered code completion results
-  /// to the \c Consumer.
-  bool DeliveredResults = false;
-
   Optional<std::pair<Type, ConcreteDeclRef>> typeCheckParsedExpr() {
     assert(ParsedExpr && "should have an expression");
 
@@ -1335,7 +1331,6 @@ public:
       AttTargetDK = DK;
   }
 
-  void completeExpr() override;
   void completeDotExpr(Expr *E, SourceLoc DotLoc) override;
   void completeStmtOrExpr(CodeCompletionExpr *E) override;
   void completePostfixExprBeginning(CodeCompletionExpr *E) override;
@@ -1380,18 +1375,6 @@ private:
   void deliverCompletionResults();
 };
 } // end anonymous namespace
-
-void CodeCompletionCallbacksImpl::completeExpr() {
-  if (DeliveredResults)
-    return;
-
-  Parser::ParserPositionRAII RestorePosition(P);
-  P.restoreParserPosition(ExprBeginPosition);
-
-  // FIXME: implement fallback code completion.
-
-  deliverCompletionResults();
-}
 
 namespace {
 static bool isTopLevelContext(const DeclContext *DC) {
@@ -5631,7 +5614,6 @@ void CodeCompletionCallbacksImpl::deliverCompletionResults() {
   Consumer.handleResultsAndModules(CompletionContext, RequestedModules,
                                    DCForModules);
   RequestedModules.clear();
-  DeliveredResults = true;
 }
 
 void PrintingCodeCompletionConsumer::handleResults(
