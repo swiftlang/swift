@@ -161,8 +161,6 @@ public:
     return {isInterstingRange(S), S};
   }
 
-  bool walkToDeclPre(Decl *D) override { return isInterstingRange(D); }
-
   bool walkToTypeLocPre(TypeLoc &TL) override { return false; }
   bool walkToTypeReprPre(TypeRepr *T) override { return false; }
 };
