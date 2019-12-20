@@ -3555,7 +3555,7 @@ static bool typeCheckDerivativeAttr(ASTContext &Ctx, Decl *D,
     baseType = resolution.resolveType(baseTypeRepr, options);
   }
   if (baseType && baseType->hasError())
-    return;
+    return true;
   auto lookupOptions = attr->getBaseTypeRepr()
                            ? defaultMemberLookupOptions
                            : defaultUnqualifiedLookupOptions;
