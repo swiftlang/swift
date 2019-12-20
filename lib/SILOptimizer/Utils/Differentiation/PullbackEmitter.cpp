@@ -248,7 +248,51 @@ void PullbackEmitter::addAdjointValue(SILBasicBlock *origBB,
   auto existingValue = it->getSecond();
   valueMap.erase(it);
   auto adjVal = accumulateAdjointsDirect(existingValue, newAdjointValue, loc);
+  // If the original value is the `Array` result of an
+  // `array.uninitialized_intrinsic` application, accumulate adjoint buffers
+  // for the array element addresses.
+  accumulateArrayLiteralElementAddressAdjoints(origBB, originalValue, adjVal,
+                                               loc);
   setAdjointValue(origBB, originalValue, adjVal);
+}
+
+void PullbackEmitter::accumulateArrayLiteralElementAddressAdjoints(
+    SILBasicBlock *origBB, SILValue originalValue,
+    AdjointValue arrayAdjointValue, SILLocation loc) {
+  // Return if the original value is not the `Array` result of an
+  // `array.uninitialized_intrinsic` application.
+  auto *dti = dyn_cast_or_null<DestructureTupleInst>(
+      originalValue->getDefiningInstruction());
+  if (!dti)
+    return;
+  if (!getAllocateUninitializedArrayIntrinsic(dti->getOperand()))
+    return;
+  if (originalValue != dti->getResult(0))
+    return;
+  // Accumulate the array's adjoint value into the adjoint buffers of its
+  // element addresses: `pointer_to_address` and `index_addr` instructions.
+  LLVM_DEBUG(getADDebugStream()
+             << "Accumulating adjoint value for array literal into element "
+                "address adjoint buffers"
+             << originalValue);
+  auto arrayAdjoint = materializeAdjointDirect(arrayAdjointValue, loc);
+  builder.setInsertionPoint(arrayAdjoint->getParentBlock());
+  for (auto use : dti->getResult(1)->getUses()) {
+    auto *ptai = dyn_cast<PointerToAddressInst>(use->getUser());
+    auto adjBuf = getAdjointBuffer(origBB, ptai);
+    auto *eltAdjBuf = getArrayAdjointElementBuffer(arrayAdjoint, 0, loc);
+    accumulateIndirect(adjBuf, eltAdjBuf, loc);
+    for (auto use : ptai->getUses()) {
+      if (auto *iai = dyn_cast<IndexAddrInst>(use->getUser())) {
+        auto *ili = cast<IntegerLiteralInst>(iai->getIndex());
+        auto eltIndex = ili->getValue().getLimitedValue();
+        auto adjBuf = getAdjointBuffer(origBB, iai);
+        auto *eltAdjBuf =
+            getArrayAdjointElementBuffer(arrayAdjoint, eltIndex, loc);
+        accumulateIndirect(adjBuf, eltAdjBuf, loc);
+      }
+    }
+  }
 }
 
 SILArgument *
@@ -278,6 +322,7 @@ void PullbackEmitter::setAdjointBuffer(SILBasicBlock *origBB,
 SILValue PullbackEmitter::getAdjointProjection(SILBasicBlock *origBB,
                                                SILValue originalProjection) {
   // Handle `struct_element_addr`.
+  // Adjoint projection: a `struct_element_addr` into the base adjoint buffer.
   if (auto *seai = dyn_cast<StructElementAddrInst>(originalProjection)) {
     assert(!seai->getField()->getAttrs().hasAttribute<NoDerivativeAttr>() &&
            "`@noDerivative` struct projections should never be active");
@@ -291,6 +336,7 @@ SILValue PullbackEmitter::getAdjointProjection(SILBasicBlock *origBB,
     return builder.createStructElementAddr(seai->getLoc(), adjSource, tanField);
   }
   // Handle `tuple_element_addr`.
+  // Adjoint projection: a `tuple_element_addr` into the base adjoint buffer.
   if (auto *teai = dyn_cast<TupleElementAddrInst>(originalProjection)) {
     auto source = teai->getOperand();
     auto adjSource = getAdjointBuffer(origBB, source);
@@ -306,12 +352,50 @@ SILValue PullbackEmitter::getAdjointProjection(SILBasicBlock *origBB,
     return builder.createTupleElementAddr(teai->getLoc(), adjSource, adjIndex);
   }
   // Handle `begin_access`.
+  // Adjoint projection: the base adjoint buffer itself.
   if (auto *bai = dyn_cast<BeginAccessInst>(originalProjection)) {
     auto adjBase = getAdjointBuffer(origBB, bai->getOperand());
     if (errorOccurred)
       return (bufferMap[{origBB, originalProjection}] = SILValue());
     // Return the base buffer's adjoint buffer.
     return adjBase;
+  }
+  // Handle `array.uninitialized_intrinsic` application element addresses.
+  // Adjoint projection: a local allocation initialized by applying
+  // `Array.TangentVector.subscript` to the base array's adjoint value.
+  auto *ai =
+      getAllocateUninitializedArrayIntrinsicElementAddress(originalProjection);
+  auto *definingInst = dyn_cast_or_null<SingleValueInstruction>(
+      originalProjection->getDefiningInstruction());
+  bool isAllocateUninitializedArrayIntrinsicElementAddress =
+      ai && definingInst &&
+      (isa<PointerToAddressInst>(definingInst) ||
+       isa<IndexAddrInst>(definingInst));
+  if (isAllocateUninitializedArrayIntrinsicElementAddress) {
+    // Get the array element index of the result address.
+    int eltIndex = 0;
+    if (auto *iai = dyn_cast<IndexAddrInst>(definingInst)) {
+      auto *ili = cast<IntegerLiteralInst>(iai->getIndex());
+      eltIndex = ili->getValue().getLimitedValue();
+    }
+    // Get the array adjoint value.
+    SILValue arrayAdjoint;
+    assert(ai && "Expected `array.uninitialized_intrinsic` application");
+    for (auto use : ai->getUses()) {
+      auto *dti = dyn_cast<DestructureTupleInst>(use->getUser());
+      if (!dti)
+        continue;
+      assert(!arrayAdjoint && "Array adjoint already found");
+      // The first `destructure_tuple` result is the `Array` value.
+      auto arrayValue = dti->getResult(0);
+      arrayAdjoint = materializeAdjointDirect(
+          getAdjointValue(origBB, arrayValue), definingInst->getLoc());
+    }
+    assert(arrayAdjoint && "Array does not have adjoint value");
+    // Apply `Array.TangentVector.subscript` to get array element adjoint value.
+    auto *eltAdjBuffer =
+        getArrayAdjointElementBuffer(arrayAdjoint, eltIndex, ai->getLoc());
+    return eltAdjBuffer;
   }
   return SILValue();
 }
@@ -923,11 +1007,15 @@ void PullbackEmitter::visitSILInstruction(SILInstruction *inst) {
   errorOccurred = true;
 }
 
-AllocStackInst *PullbackEmitter::getArrayAdjointElementBuffer(
-    SILValue arrayAdjoint, int eltIndex, SILType eltTanType, SILLocation loc) {
+AllocStackInst *
+PullbackEmitter::getArrayAdjointElementBuffer(SILValue arrayAdjoint,
+                                              int eltIndex, SILLocation loc) {
+  auto arrayTanType = cast<StructType>(arrayAdjoint->getType().getASTType());
+  auto arrayType = arrayTanType->getParent()->castTo<BoundGenericStructType>();
+  auto eltTanType = arrayType->getGenericArgs().front()->getCanonicalType();
+  auto eltTanSILType = SILType::getPrimitiveAddressType(eltTanType);
   // Get `function_ref` and generic signature of
   // `Array.TangentVector.subscript.getter`.
-  auto arrayTanType = arrayAdjoint->getType().getASTType();
   auto *arrayTanStructDecl = arrayTanType->getStructOrBoundGenericStruct();
   auto subscriptLookup =
       arrayTanStructDecl->lookupDirect(DeclBaseName::createSubscript());
@@ -944,7 +1032,6 @@ AllocStackInst *PullbackEmitter::getArrayAdjointElementBuffer(
   // Apply `Array.TangentVector.subscript.getter` to get array element adjoint
   // buffer.
   auto &ctx = builder.getASTContext();
-  auto eltTanAstType = eltTanType.getASTType();
   // %index_literal = integer_literal $Builtin.Int64, <index>
   auto *eltIndexLiteral = builder.createIntegerLiteral(
       loc, SILType::getBuiltinIntegerType(64, ctx), eltIndex);
@@ -954,91 +1041,40 @@ AllocStackInst *PullbackEmitter::getArrayAdjointElementBuffer(
   auto *eltIndexInt = builder.createStruct(loc, intType, {eltIndexLiteral});
   auto *swiftModule = getModule().getSwiftModule();
   auto *diffProto = ctx.getProtocol(KnownProtocolKind::Differentiable);
-  auto diffConf = swiftModule->lookupConformance(eltTanAstType, diffProto);
+  auto diffConf = swiftModule->lookupConformance(eltTanType, diffProto);
   assert(!diffConf.isInvalid() && "Missing conformance to `Differentiable`");
   auto *addArithProto = ctx.getProtocol(KnownProtocolKind::AdditiveArithmetic);
-  auto addArithConf =
-      swiftModule->lookupConformance(eltTanAstType, addArithProto);
+  auto addArithConf = swiftModule->lookupConformance(eltTanType, addArithProto);
   assert(!addArithConf.isInvalid() &&
          "Missing conformance to `AdditiveArithmetic`");
-  auto subMap = SubstitutionMap::get(subscriptFnGenSig, {eltTanAstType},
+  auto subMap = SubstitutionMap::get(subscriptFnGenSig, {eltTanType},
                                      {addArithConf, diffConf});
   // %elt_adj = alloc_stack $T.TangentVector
-  auto *eltAdjBuffer = builder.createAllocStack(loc, eltTanType);
+  // Create a local allocation and register it.
+  localAllocBuilder.setInsertionPoint(
+      getPullback().getEntryBlock(),
+      getNextFunctionLocalAllocationInsertionPoint());
+  auto *eltAdjBuffer = localAllocBuilder.createAllocStack(loc, eltTanSILType);
+  functionLocalAllocations.push_back(eltAdjBuffer);
+  // Temporarily change global builder insertion point and emit zero into the
+  // local buffer.
+  auto insertionPoint = builder.getInsertionBB();
+  builder.setInsertionPoint(localAllocBuilder.getInsertionBB(),
+                            localAllocBuilder.getInsertionPoint());
+  emitZeroIndirect(eltTanType, eltAdjBuffer, loc);
+  builder.setInsertionPoint(insertionPoint);
+  // Immediately destroy the emitted zero value.
+  // NOTE: It is not efficient to emit a zero value then immediately destroy
+  // it. However, it was the easiest way to to avoid "lifetime mismatch in
+  // predecessors" memory lifetime verification errors for control flow
+  // differentiation.
+  // Perhaps we can avoid emitting a zero value if local allocations are created
+  // per pullback bb instead of all in the pullback entry: TF-1075.
+  builder.emitDestroyOperation(loc, eltAdjBuffer);
   // apply %subscript_fn<T.TangentVector>(%elt_adj, %index_int, %array_adj)
   builder.createApply(loc, subscriptFnRef, subMap,
                       {eltAdjBuffer, eltIndexInt, arrayAdjoint});
   return eltAdjBuffer;
-}
-
-void PullbackEmitter::accumulateArrayElementAdjointDirect(
-    StoreInst *si, AllocStackInst *eltAdjBuffer) {
-  auto eltAdjValue = builder.emitLoadValueOperation(
-      si->getLoc(), eltAdjBuffer, LoadOwnershipQualifier::Take);
-  recordTemporary(eltAdjValue);
-  addAdjointValue(si->getParent(), si->getSrc(),
-                  makeConcreteAdjointValue(eltAdjValue), si->getLoc());
-  builder.createDeallocStack(si->getLoc(), eltAdjBuffer);
-}
-
-void PullbackEmitter::accumulateArrayElementAdjointIndirect(
-    CopyAddrInst *cai, AllocStackInst *eltAdjBuffer) {
-  addToAdjointBuffer(cai->getParent(), cai->getSrc(), eltAdjBuffer,
-                     cai->getLoc());
-  builder.emitDestroyAddrAndFold(cai->getLoc(), eltAdjBuffer);
-  builder.createDeallocStack(cai->getLoc(), eltAdjBuffer);
-}
-
-void PullbackEmitter::accumulateArrayElementAdjoint(SILInstruction *inst) {
-  assert(isa<StoreInst>(inst) ||
-         isa<CopyAddrInst>(inst) &&
-             "Expected only `store` or `copy_addr` to "
-             "`array.uninitialized_intrinsic` result address");
-  LLVM_DEBUG(getADDebugStream()
-             << "Visiting array initialization element store instruction:\n"
-             << *inst);
-  // Get the source and destination of the `store` or `copy_addr`.
-  SILValue src;
-  SILValue dest;
-  if (auto *si = dyn_cast<StoreInst>(inst)) {
-    src = si->getSrc();
-    dest = si->getDest();
-  } else if (auto *cai = dyn_cast<CopyAddrInst>(inst)) {
-    src = cai->getSrc();
-    dest = cai->getDest();
-  }
-  // Get the array element index of the result address.
-  int eltIndex = 0;
-  if (auto *iai = dyn_cast<IndexAddrInst>(dest->getDefiningInstruction())) {
-    auto *ili = cast<IntegerLiteralInst>(iai->getIndex());
-    eltIndex = ili->getValue().getLimitedValue();
-  } else {
-    assert(isa<PointerToAddressInst>(dest->getDefiningInstruction()));
-  }
-  // Get the array adjoint value.
-  SILValue arrayAdjoint;
-  auto *ai = getAllocateUninitializedArrayIntrinsicElementAddress(dest);
-  assert(ai && "Expected `array.uninitialized_intrinsic` application");
-  for (auto use : ai->getUses()) {
-    auto *dti = dyn_cast<DestructureTupleInst>(use->getUser());
-    if (!dti)
-      continue;
-    // The first `destructure_tuple` result is the `Array` value.
-    auto arrayValue = dti->getResult(0);
-    arrayAdjoint =
-        getAdjointValue(ai->getParent(), arrayValue).getConcreteValue();
-  }
-  assert(arrayAdjoint && "Array does not have adjoint value");
-  // Apply `Array.TangentVector.subscript` to get array element adjoint value.
-  auto eltTanType = getRemappedTangentType(src->getType());
-  auto *eltAdjBuffer = getArrayAdjointElementBuffer(arrayAdjoint, eltIndex,
-                                                    eltTanType, ai->getLoc());
-  // Accumulate array element adjoint into source's adjoint.
-  if (auto *si = dyn_cast<StoreInst>(inst)) {
-    accumulateArrayElementAdjointDirect(si, eltAdjBuffer);
-  } else if (auto *cai = dyn_cast<CopyAddrInst>(inst)) {
-    accumulateArrayElementAdjointIndirect(cai, eltAdjBuffer);
-  }
 }
 
 void PullbackEmitter::visitApplyInst(ApplyInst *ai) {
@@ -1445,25 +1481,11 @@ void PullbackEmitter::visitStoreOperation(SILBasicBlock *bb, SILLocation loc,
 }
 
 void PullbackEmitter::visitStoreInst(StoreInst *si) {
-  // Handle `store` to `array.uninitialized_intrinsic` element address
-  // specially.
-  if (auto *ai =
-          getAllocateUninitializedArrayIntrinsicElementAddress(si->getDest())) {
-    accumulateArrayElementAdjoint(si);
-    return;
-  }
   visitStoreOperation(si->getParent(), si->getLoc(), si->getSrc(),
                       si->getDest());
 }
 
 void PullbackEmitter::visitCopyAddrInst(CopyAddrInst *cai) {
-  // Handle `copy_addr` to `array.uninitialized_intrinsic` element address
-  // specially.
-  if (auto *ai = getAllocateUninitializedArrayIntrinsicElementAddress(
-          cai->getDest())) {
-    accumulateArrayElementAdjoint(cai);
-    return;
-  }
   auto *bb = cai->getParent();
   auto &adjDest = getAdjointBuffer(bb, cai->getDest());
   auto destType = remapType(adjDest->getType());
