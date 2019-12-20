@@ -2866,6 +2866,16 @@ bool ValueDecl::isImplicitlyUnwrappedOptional() const {
     false);
 }
 
+bool ValueDecl::isLocalCapture() const {
+  auto *dc = getDeclContext();
+
+  if (auto *fd = dyn_cast<FuncDecl>(this))
+    if (isa<SourceFile>(dc))
+      return fd->hasTopLevelLocalContextCaptures();
+
+  return dc->isLocalContext();
+}
+
 ArrayRef<ValueDecl *>
 ValueDecl::getSatisfiedProtocolRequirements(bool Sorted) const {
   // Dig out the nominal type.

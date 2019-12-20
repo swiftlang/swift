@@ -2713,6 +2713,10 @@ public:
   AccessSemantics getAccessSemanticsFromContext(const DeclContext *DC,
                                                 bool isAccessOnSelf) const;
 
+  /// Determines if a reference to this declaration from a nested function
+  /// should be treated like a capture of a local value.
+  bool isLocalCapture() const;
+
   /// Print a reference to the given declaration.
   std::string printRef() const;
 
