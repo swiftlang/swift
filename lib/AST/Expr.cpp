@@ -254,13 +254,7 @@ ConcreteDeclRef Expr::getReferencedDecl() const {
   SIMPLE_REFERENCE(DeclRef, getDeclRef);
   SIMPLE_REFERENCE(SuperRef, getSelf);
 
-  case ExprKind::Type: {
-    auto typeRepr = cast<TypeExpr>(this)->getTypeRepr();
-    if (!typeRepr) return ConcreteDeclRef();
-    auto ident = dyn_cast<IdentTypeRepr>(typeRepr);
-    if (!ident) return ConcreteDeclRef();
-    return ident->getComponentRange().back()->getBoundDecl();
-  }
+  NO_REFERENCE(Type);
 
   SIMPLE_REFERENCE(OtherConstructorDeclRef, getDeclRef);
 
@@ -324,8 +318,8 @@ ConcreteDeclRef Expr::getReferencedDecl() const {
   NO_REFERENCE(Binary);
   NO_REFERENCE(DotSyntaxCall);
   NO_REFERENCE(MakeTemporarilyEscapable);
+  NO_REFERENCE(ConstructorRefCall);
 
-  PASS_THROUGH_REFERENCE(ConstructorRefCall, getFn);
   PASS_THROUGH_REFERENCE(Load, getSubExpr);
   NO_REFERENCE(DestructureTuple);
   NO_REFERENCE(UnresolvedTypeConversion);

@@ -3409,8 +3409,11 @@ namespace {
 
         // Restore '@autoclosure'd value.
         if (auto ACE = dyn_cast<AutoClosureExpr>(expr)) {
-          expr = ACE->getSingleExpressionBody();
-          continue;
+          // This is only valid if the closure doesn't have parameters.
+          if (ACE->getParameters()->size() == 0) {
+            expr = ACE->getSingleExpressionBody();
+            continue;
+          }
         }
 
         // Remove any semantic expression injected by typechecking.

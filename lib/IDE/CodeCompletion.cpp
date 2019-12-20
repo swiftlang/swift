@@ -1264,7 +1264,6 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
   /// to the \c Consumer.
   bool DeliveredResults = false;
 
-
   Optional<std::pair<Type, ConcreteDeclRef>> typeCheckParsedExpr() {
     assert(ParsedExpr && "should have an expression");
 
@@ -1279,24 +1278,7 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
     // typecheck again. rdar://21466394
     if (CheckKind == CompletionTypeCheckKind::Normal &&
         ParsedExpr->getType() && !ParsedExpr->getType()->is<ErrorType>()) {
-      auto refDecl = ParsedExpr->getReferencedDecl();
-      auto exprTy = ParsedExpr->getType();
-      if (!refDecl) {
-        // FIXME: do this in the not-already-type-checked branch too?
-        if (auto *apply = dyn_cast<SelfApplyExpr>(ParsedExpr)) {
-          refDecl = apply->getFn()->getReferencedDecl();
-        } else if (auto *apply = dyn_cast<ApplyExpr>(ParsedExpr)) {
-          // If this is an IUO, use the underlying non-optional type instead
-          auto fnDecl = apply->getFn()->getReferencedDecl();
-          if (auto FD = fnDecl.getDecl()) {
-            if (FD->isImplicitlyUnwrappedOptional()) {
-              if (auto OT = exprTy->getOptionalObjectType())
-                exprTy = OT;
-            }
-          }
-        }
-      }
-      return std::make_pair(exprTy, refDecl);
+      return getReferencedDecl(ParsedExpr);
     }
 
     ConcreteDeclRef ReferencedDecl = nullptr;

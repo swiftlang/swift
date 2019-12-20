@@ -7208,7 +7208,7 @@ bool ConstraintSystem::applySolutionFixes(const Solution &solution) {
 Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr,
                                       Type convertType,
                                       bool discardedExpr,
-                                      bool skipClosures) {
+                                      bool performingDiagnostics) {
   // If any fixes needed to be applied to arrive at this solution, resolve
   // them to specific expressions.
   if (!solution.Fixes.empty()) {
@@ -7242,7 +7242,7 @@ Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr,
 
   // If we're re-typechecking an expression for diagnostics, don't
   // visit closures that have non-single expression bodies.
-  if (!skipClosures) {
+  if (!performingDiagnostics) {
     bool hadError = false;
     for (auto *closure : walker.getClosuresToTypeCheck())
       hadError |= TypeChecker::typeCheckClosureBody(closure);
