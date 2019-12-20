@@ -6,9 +6,6 @@
 // BCANALYZER-NOT: UnknownCode
 // REQUIRES: differentiable_programming
 
-// We currently lack availability information (rdar://57975086)
-// UNSUPPORTED: use_os_stdlib
-
 // TODO(TF-838): Enable this test.
 // Blocked by TF-830: `@transpose` attribute type-checking.
 // XFAIL: *
