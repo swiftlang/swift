@@ -70,7 +70,12 @@ ConstructorDecl *createMemberwiseImplicitConstructor(ASTContext &ctx,
 // Get the effective memberwise initializer of the given nominal type, or create
 // it if it does not exist.
 // Sets the access level of the memberwise initializer to the minimum of:
-// - The access level of the nominal type declaration itself.
+// - Public, by default. This enables public nominal types to have public
+//   memberwise initializers.
+//   - NOTE(TF-1077): The `public` default is important for `TangentVector`
+//     structs synthesized during `Differentiable` derived conformances.
+//     Manually extending `TangentVector` structs to define a public
+//     memberwise initializer causes a redeclaration error.
 // - The access level of each memberwise-initialized property in the nominal
 //   type declaration.
 ConstructorDecl *getOrCreateEffectiveMemberwiseInitializer(

@@ -282,10 +282,11 @@ ConstructorDecl *swift::createMemberwiseImplicitConstructor(
 ConstructorDecl *swift::getOrCreateEffectiveMemberwiseInitializer(
     ASTContext &ctx, NominalTypeDecl *nominal) {
   // Compute the access level for the memberwise initializer: the minimum of:
-  // - The access level of the nominal type declaration itself.
+  // - Public, by default. This enables public nominal types to have public
+  //   memberwise initializers.
   // - The access level of each memberwise-initialized property in the nominal
   //   type declaration.
-  auto accessLevel = std::min(AccessLevel::Public, nominal->getFormalAccess());
+  auto accessLevel = AccessLevel::Public;
   for (auto *member : nominal->getMembers()) {
     auto var = dyn_cast<VarDecl>(member);
     if (!var ||

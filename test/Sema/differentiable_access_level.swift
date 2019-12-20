@@ -19,14 +19,14 @@ private struct PrivateStruct: Differentiable {}
 // CHECK-LABEL: internal struct InternalStruct : Differentiable {
 // CHECK:   internal init()
 // CHECK:   internal struct TangentVector : Differentiable, AdditiveArithmetic, PointwiseMultiplicative, ElementaryFunctions {
-// CHECK:     internal init()
+// CHECK:     public init()
 // CHECK:   }
 // CHECK: }
 
 // CHECK-LABEL: private struct PrivateStruct : Differentiable {
 // CHECK:   internal init()
 // CHECK:   fileprivate struct TangentVector : Differentiable, AdditiveArithmetic, PointwiseMultiplicative, ElementaryFunctions {
-// CHECK:     fileprivate init()
+// CHECK:     public init()
 // CHECK:   }
 // CHECK: }
 
@@ -44,13 +44,13 @@ private class PrivateClass: Differentiable {}
 // CHECK-LABEL: internal class InternalClass : Differentiable {
 // CHECK:   internal init()
 // CHECK:   internal struct TangentVector : Differentiable, AdditiveArithmetic, PointwiseMultiplicative, ElementaryFunctions {
-// CHECK:     internal init()
+// CHECK:     public init()
 // CHECK:   }
 // CHECK: }
 
 // CHECK-LABEL: private class PrivateClass : Differentiable {
 // CHECK:   internal init()
 // CHECK:   fileprivate struct TangentVector : Differentiable, AdditiveArithmetic, PointwiseMultiplicative, ElementaryFunctions {
-// CHECK:     fileprivate init()
+// CHECK:     public init()
 // CHECK:   }
 // CHECK: }
