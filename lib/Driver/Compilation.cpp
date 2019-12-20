@@ -2049,6 +2049,8 @@ void Compilation::addDependencyPathOrCreateDummy(
     HaveAlreadyAddedDependencyPath = true;
   } else if (!depPath.empty()) {
     // Create dummy empty file
-    std::ofstream(depPath.str().c_str());
+    std::ofstream empty;
+    empty.open(depPath.str());
+    empty.close();
   }
 }
