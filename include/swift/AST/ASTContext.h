@@ -290,7 +290,7 @@ public:
   // derivative function configurations per original `AbstractFunctionDecl`.
   llvm::DenseMap<
       std::tuple<Decl *, IndexSubset *, AutoDiffDerivativeFunctionKind>,
-      DerivativeAttr *>
+      llvm::SmallPtrSet<DerivativeAttr *, 1>>
       DerivativeAttrs;
 
 private:
