@@ -6109,13 +6109,10 @@ AnyFunctionType::Param ParamDecl::toFunctionParam(Type type) const {
     type = ParamDecl::getVarargBaseTy(type);
 
   auto label = getArgumentName();
-  auto flags = ParameterTypeFlags::fromParameterType(type,
-                                                     isVariadic(),
-                                                     isAutoClosure(),
-                                                     isNonEphemeral(),
-                                                     // SWIFT_ENABLE_TENSORFLOW
-                                                     getValueOwnership(),
-                                                     /*nondifferentiable*/ false);
+  auto flags = ParameterTypeFlags::fromParameterType(
+      type, isVariadic(), isAutoClosure(), isNonEphemeral(),
+      getValueOwnership(),
+      /*isNoDerivative*/ false);
   return AnyFunctionType::Param(type, label, flags);
 }
 

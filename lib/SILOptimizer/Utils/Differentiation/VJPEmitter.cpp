@@ -499,7 +499,7 @@ void VJPEmitter::visitApplyInst(ApplyInst *ai) {
       if (!paramIndices->contains(i)) {
         context.emitNondifferentiabilityError(
             original, invoker,
-            diag::autodiff_function_nondiff_parameter_not_differentiable);
+            diag::autodiff_function_noderivative_parameter_not_differentiable);
         errorOccurred = true;
         return;
       }

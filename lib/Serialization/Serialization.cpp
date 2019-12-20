@@ -4071,10 +4071,8 @@ public:
           S.Out, S.ScratchRecord, abbrCode,
           S.addDeclBaseNameRef(param.getLabel()),
           S.addTypeRef(param.getPlainType()), paramFlags.isVariadic(),
-          // SWIFT_ENABLE_TENSORFLOW
-          paramFlags.isAutoClosure(), paramFlags.isNonEphemeral(),
-          rawOwnership,
-          paramFlags.isNonDifferentiable());
+          paramFlags.isAutoClosure(), paramFlags.isNonEphemeral(), rawOwnership,
+          paramFlags.isNoDerivative());
     }
   }
 

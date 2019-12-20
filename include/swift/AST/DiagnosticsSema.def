@@ -3089,6 +3089,11 @@ ERROR(noderivative_only_on_differentiable_struct_or_class_fields,none,
       "'@noDerivative' is only allowed on stored properties in structure or "
       "class types that declare a conformance to 'Differentiable'", ())
 
+// SWIFT_ENABLE_TENSORFLOW
+// @nonDiff attribute
+WARNING(nondiff_attr_deprecated,none,
+        "'@nondiff' is deprecated; use '@noDerivative' instead", ())
+
 //------------------------------------------------------------------------------
 // MARK: Type Check Expressions
 //------------------------------------------------------------------------------
@@ -4070,17 +4075,20 @@ ERROR(opaque_type_in_protocol_requirement,none,
 // Function differentiability
 ERROR(autodiff_attr_argument_not_differentiable,none,
       "argument is not differentiable, but the enclosing function type is "
-      "marked '@differentiable'; did you want to add '@nondiff' to this argument?",
+      "marked '@differentiable'; did you want to add '@noDerivative' to this argument?",
       ())
 ERROR(autodiff_attr_result_not_differentiable,none,
       "result is not differentiable, but the function type is marked "
       "'@differentiable'", ())
-ERROR(nondiff_attr_invalid_on_nondifferentiable_function,none,
-      "'nondiff' cannot be applied to arguments of a non-differentiable "
-      "function", ())
 ERROR(attr_differentiable_no_vjp_or_jvp_when_linear,none,
       "cannot specify 'vjp:' or 'jvp:' for linear functions; use "
       "'transpose:' instead", ())
+
+// Function differentiability
+ERROR(attr_only_on_parameters_of_differentiable,none,
+      "'%0' may only be used on parameters of '@differentiable' function "
+      "types", (StringRef))
+
 // SIL
 ERROR(opened_non_protocol,none,
       "@opened cannot be applied to non-protocol type %0", (Type))

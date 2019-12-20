@@ -8,12 +8,25 @@ let b: @differentiable(linear) (Float) -> Float // okay
 // CHECK: (pattern_named 'b'
 // CHECK-NEXT: (type_attributed attrs=@differentiable(linear)
 
-let c: @differentiable (Float) throws -> Float // okay
+let c: @differentiable (Float, @noDerivative Float) -> Float // okay
 // CHECK: (pattern_named 'c'
+// CHECK-NEXT: (type_attributed attrs=@differentiable
+// CHECK-NEXT:  (type_function
+// CHECK-NEXT:    (type_tuple
+// CHECK-NEXT:      (type_ident
+// CHECK-NEXT:        (component id='Float' bind=none))
+// CHECK-NEXT:      (type_attributed attrs=@noDerivative
+// CHECK-NEXT:        (type_ident
+// CHECK-NEXT:          (component id='Float' bind=none)))
+// CHECK-NEXT:    (type_ident
+// CHECK-NEXT:      (component id='Float' bind=none)))))
+
+let d: @differentiable (Float) throws -> Float // okay
+// CHECK: (pattern_named 'd'
 // CHECK-NEXT: (type_attributed attrs=@differentiable{{[^(]}}
 
-let d: @differentiable(linear) (Float) throws -> Float // okay
-// CHECK: (pattern_named 'd'
+let e: @differentiable(linear) (Float) throws -> Float // okay
+// CHECK: (pattern_named 'e'
 // CHECK-NEXT: (type_attributed attrs=@differentiable(linear)
 
 // Generic type test.

@@ -438,8 +438,8 @@ func tupleArrayLiteralInitialization(_ x: Float, _ y: Float) -> Float {
 // Subset parameters
 //===----------------------------------------------------------------------===//
 
-func nondiff(_ f: @differentiable (Float, @nondiff Float) -> Float) -> Float {
-  // expected-note @+2 {{cannot differentiate with respect to a '@nondiff' parameter}}
+func nondiff(_ f: @differentiable (Float, @noDerivative Float) -> Float) -> Float {
+  // expected-note @+2 {{cannot differentiate with respect to a '@noDerivative' parameter}}
   // expected-error @+1 {{function is not differentiable}}
   return gradient(at: 2) { x in f(x * x, x) }
 }
@@ -458,7 +458,7 @@ let _: @differentiable (Float) -> Float = TF_675().method
 // TF-918: test parameter subset thunk + partially-applied original function.
 // expected-error @+2 {{function is not differentiable}}
 // expected-note @+1 {{cannot convert a direct method reference to a '@differentiable' function; use an explicit closure instead}}
-_ = gradient(at: Float(1), Float(2), in: (+) as @differentiable (Float, @nondiff Float) -> Float)
+_ = gradient(at: Float(1), Float(2), in: (+) as @differentiable (Float, @noDerivative Float) -> Float)
 
 //===----------------------------------------------------------------------===//
 // Conversion to `@differentiable(linear)` (not yet supported)

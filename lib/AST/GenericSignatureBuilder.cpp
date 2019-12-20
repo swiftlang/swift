@@ -5084,7 +5084,7 @@ public:
         };
         auto constrainParametersAndResult = [&](ProtocolDecl *protocol) {
           for (auto &param : fnTy->getParams())
-            if (!param.isNonDifferentiable())
+            if (!param.isNoDerivative())
               addConstraint(param.getPlainType(), protocol);
           addConstraint(fnTy->getResult(), protocol);
         };

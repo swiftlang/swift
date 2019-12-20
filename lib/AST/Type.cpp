@@ -5164,7 +5164,7 @@ AnyFunctionType *AnyFunctionType::getWithoutDifferentiability() const {
   SmallVector<Param, 8> newParams;
   for (auto &param : getParams()) {
     Param newParam(param.getPlainType(), param.getLabel(),
-                   param.getParameterFlags().withNonDifferentiable(false));
+                   param.getParameterFlags().withNoDerivative(false));
     newParams.push_back(newParam);
   }
   auto nonDiffExtInfo = getExtInfo()

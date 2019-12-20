@@ -26,25 +26,25 @@ bb0(%0 : $Float, %1 : $Float):
   return %2 : $(Float, Float)
 }
 
-sil @make_diff_func : $@convention(thin) () -> @differentiable(linear) @convention(thin) (Float, @nondiff Float, @nondiff Float) -> Float {
+sil @make_diff_func : $@convention(thin) () -> @differentiable(linear) @convention(thin) (Float, @noDerivative Float, @noDerivative Float) -> Float {
 bb0:
   %orig = function_ref @foo : $@convention(thin) (Float, Float, Float) -> Float
   %linear_orig = linear_function [parameters 0] %orig : $@convention(thin) (Float, Float, Float) -> Float
   %trans = function_ref @foo_t_wrt_0 : $@convention(thin) (Float, Float, Float) -> Float
   %linear_orig_with_trans = linear_function [parameters 0] %orig : $@convention(thin) (Float, Float, Float) -> Float with_transpose %trans : $@convention(thin) (Float, Float, Float) -> Float
-  %extracted_orig = linear_function_extract [original] %linear_orig : $@differentiable(linear) @convention(thin) (Float, @nondiff Float, @nondiff Float) -> Float
-  %extracted_trans = linear_function_extract [transpose] %linear_orig : $@differentiable(linear) @convention(thin) (Float, @nondiff Float, @nondiff Float) -> Float
-  return %linear_orig_with_trans : $@differentiable(linear) @convention(thin) (Float, @nondiff Float, @nondiff Float) -> Float
+  %extracted_orig = linear_function_extract [original] %linear_orig : $@differentiable(linear) @convention(thin) (Float, @noDerivative Float, @noDerivative Float) -> Float
+  %extracted_trans = linear_function_extract [transpose] %linear_orig : $@differentiable(linear) @convention(thin) (Float, @noDerivative Float, @noDerivative Float) -> Float
+  return %linear_orig_with_trans : $@differentiable(linear) @convention(thin) (Float, @noDerivative Float, @noDerivative Float) -> Float
 }
 
 
-// CHECK-LABEL: sil @make_diff_func : $@convention(thin) () -> @differentiable(linear) @convention(thin) (Float, @nondiff Float, @nondiff Float) -> Float {
+// CHECK-LABEL: sil @make_diff_func : $@convention(thin) () -> @differentiable(linear) @convention(thin) (Float, @noDerivative Float, @noDerivative Float) -> Float {
 // CHECK: bb0:
 // CHECK:   [[ORIG:%.*]] = function_ref @foo : $@convention(thin) (Float, Float, Float) -> Float
 // CHECK:   [[LIN_ORIG:%.*]] = linear_function [parameters 0] [[ORIG]] : $@convention(thin) (Float, Float, Float) -> Float
 // CHECK:   [[TRANS:%.*]] = function_ref @foo_t_wrt_0 : $@convention(thin) (Float, Float, Float) -> Float
 // CHECK:   [[LIN_ORIG_WITH_TRANS:%.*]] = linear_function [parameters 0] [[ORIG]] : $@convention(thin) (Float, Float, Float) -> Float with_transpose [[TRANS]] : $@convention(thin) (Float, Float, Float) -> Float
-// CHECK:   [[EXTRACTED_ORIG:%.*]] = linear_function_extract [original] [[LIN_ORIG]] : $@differentiable(linear) @convention(thin) (Float, @nondiff Float, @nondiff Float) -> Float
-// CHECK:   [[EXTRACTED_TRANS:%.*]] = linear_function_extract [transpose] [[LIN_ORIG]] : $@differentiable(linear) @convention(thin) (Float, @nondiff Float, @nondiff Float) -> Float
-// CHECK:   return [[LIN_ORIG_WITH_TRANS]] : $@differentiable(linear) @convention(thin) (Float, @nondiff Float, @nondiff Float) -> Float
+// CHECK:   [[EXTRACTED_ORIG:%.*]] = linear_function_extract [original] [[LIN_ORIG]] : $@differentiable(linear) @convention(thin) (Float, @noDerivative Float, @noDerivative Float) -> Float
+// CHECK:   [[EXTRACTED_TRANS:%.*]] = linear_function_extract [transpose] [[LIN_ORIG]] : $@differentiable(linear) @convention(thin) (Float, @noDerivative Float, @noDerivative Float) -> Float
+// CHECK:   return [[LIN_ORIG_WITH_TRANS]] : $@differentiable(linear) @convention(thin) (Float, @noDerivative Float, @noDerivative Float) -> Float
 // CHECK: }
