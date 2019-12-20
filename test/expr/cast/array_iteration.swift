@@ -16,7 +16,7 @@ for view in rootView.subviews as! [View] { // expected-warning{{immutable value 
   doFoo()
 }
 
-for view:View in rootView.subviews { // expected-error{{'AnyObject' is not convertible to 'View'}}
+for view:View in rootView.subviews { // expected-error{{cannot convert sequence element type 'AnyObject' to expected type 'View'}}
   doFoo()
 }
 

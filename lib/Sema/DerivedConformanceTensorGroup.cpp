@@ -41,9 +41,7 @@ bool DerivedConformance::canDeriveTensorGroup(NominalTypeDecl *nominal,
   auto &C = nominal->getASTContext();
   auto *tensorGroupProto = C.getProtocol(KnownProtocolKind::TensorGroup);
   return llvm::all_of(structDecl->getStoredProperties(), [&](VarDecl *v) {
-    if (!v->hasInterfaceType())
-      C.getLazyResolver()->resolveDeclSignature(v);
-    if (!v->hasInterfaceType())
+    if (v->getInterfaceType()->hasError())
       return false;
     auto varType = DC->mapTypeIntoContext(v->getValueInterfaceType());
     return (bool)TypeChecker::conformsToProtocol(varType, tensorGroupProto, DC,
@@ -116,8 +114,7 @@ deriveBodyTensorGroup_typeList(AbstractFunctionDecl *funcDecl, void *) {
 /// Derive a '_typeList' implementation.
 static ValueDecl *deriveTensorGroup_typeList(DerivedConformance &derived) {
   auto nominal = derived.Nominal;
-  auto &TC = derived.TC;
-  ASTContext &C = TC.Context;
+  ASTContext &C = derived.Context;
 
   auto parentDC = derived.getConformanceContext();
   Type dataTypeArrayType = BoundGenericType::get(
@@ -175,7 +172,6 @@ deriveBodyTensorGroup_init(AbstractFunctionDecl *funcDecl, void *) {
   currAddressDecl->setImplicit();
   currAddressDecl->setHasNonPatternBindingInit(true);
   currAddressDecl->setInterfaceType(baseAddressType);
-  currAddressDecl->setValidationToChecked();
 
   Pattern *currAddressPat = new (C)
       NamedPattern(currAddressDecl, /*implicit*/ true);
@@ -220,8 +216,8 @@ deriveBodyTensorGroup_init(AbstractFunctionDecl *funcDecl, void *) {
     ValueDecl *memberInitDecl = initReq;
     // If conformance reference is concrete, then use concrete witness
     // declaration for the constructor.
-    if (confRef->isConcrete())
-      memberInitDecl = confRef->getConcrete()->getWitnessDecl(initReq);
+    if (confRef.isConcrete())
+      memberInitDecl = confRef.getConcrete()->getWitnessDecl(initReq);
     assert(memberInitDecl && "Member constructor declaration must exist");
     auto memberInitDRE = new (C) DeclRefExpr(
         memberInitDecl, DeclNameLoc(), /*implicit*/ true);
@@ -267,9 +263,13 @@ deriveBodyTensorGroup_init(AbstractFunctionDecl *funcDecl, void *) {
     // Advance the current address.
     DeclName advancedName(C, C.getIdentifier("advanced"),
                           {C.getIdentifier("by")});
+    // NOTE(TF-1054): create new `DeclRefExpr` to avoid
+    // `ConstraintSystem::resolveOverload` error.
+    addressDRE = new (C) DeclRefExpr(
+        currAddressDecl, DeclNameLoc(), /*implicit*/ true);
     auto *advancedMethodExpr =
         new (C) UnresolvedDotExpr(addressDRE, SourceLoc(),
-                                  advancedName, DeclNameLoc(),
+                                  DeclNameRef(advancedName), DeclNameLoc(),
                                   /*Implicit*/ true);
 
     // Obtain `MemberType._tensorHandleCount`.
@@ -281,7 +281,7 @@ deriveBodyTensorGroup_init(AbstractFunctionDecl *funcDecl, void *) {
     auto intInitName = DeclName(C, DeclBaseName::createConstructor(),
                                 {Identifier()});
     auto *intInitExpr =
-        new (C) UnresolvedDotExpr(intTE, SourceLoc(), intInitName,
+        new (C) UnresolvedDotExpr(intTE, SourceLoc(), DeclNameRef(intInitName),
                                   DeclNameLoc(), /*Implicit*/ true);
     auto *intInitCallExpr = CallExpr::createImplicit(
         C, intInitExpr, {memberCountMRE}, {Identifier()});
@@ -289,6 +289,10 @@ deriveBodyTensorGroup_init(AbstractFunctionDecl *funcDecl, void *) {
     // Assign the new address.
     auto *assignAddrCallExpr = CallExpr::createImplicit(
         C, advancedMethodExpr, {intInitCallExpr}, {C.getIdentifier("by")});
+    // NOTE(TF-1054): create new `DeclRefExpr` to avoid
+    // `ConstraintSystem::resolveOverload` error.
+    addressDRE = new (C) DeclRefExpr(
+        currAddressDecl, DeclNameLoc(), /*implicit*/ true);
     auto *assignAddrExpr = new (C) AssignExpr(addressDRE, SourceLoc(),
                                               assignAddrCallExpr,
                                               /*Implicit*/ true);
@@ -320,39 +324,35 @@ static ValueDecl *deriveTensorGroup_constructor(
     Identifier parameterName, Type parameterType, Type returnType,
     AbstractFunctionDecl::BodySynthesizer bodySynthesizer) {
   auto nominal = derived.Nominal;
-  auto &C = derived.TC.Context;
+  auto &C = derived.Context;
   auto parentDC = derived.getConformanceContext();
 
   auto *param =
-      new (C) ParamDecl(ParamDecl::Specifier::Default, SourceLoc(), SourceLoc(),
-                        argumentName, SourceLoc(), parameterName, parentDC);
+      new (C) ParamDecl(SourceLoc(), SourceLoc(), argumentName, SourceLoc(),
+                        parameterName, parentDC);
+  param->setSpecifier(ParamDecl::Specifier::Default);
   param->setInterfaceType(parameterType);
   ParameterList *params = ParameterList::create(C, {param});
 
   DeclName name(C, DeclBaseName::createConstructor(), params);
   auto *initDecl =
-      new (C) ConstructorDecl(name, SourceLoc(), OTK_None, SourceLoc(),
-                              /*Throws*/ false, SourceLoc(), params,
-                              /*GenericParams*/ nullptr, parentDC);
+      new (C) ConstructorDecl(name, SourceLoc(), /*Failable*/ false,
+                              SourceLoc(), /*Throws*/ false, SourceLoc(),
+                              params, /*GenericParams*/ nullptr, parentDC);
   initDecl->setImplicit();
   initDecl->setSynthesized();
   initDecl->setBodySynthesizer(bodySynthesizer.Fn, bodySynthesizer.Context);
 
-  if (auto env = parentDC->getGenericEnvironmentOfContext())
-    initDecl->setGenericEnvironment(env);
-  initDecl->computeType(AnyFunctionType::ExtInfo().withThrows(false));
+  initDecl->setGenericSignature(parentDC->getGenericSignatureOfContext());
   initDecl->copyFormalAccessFrom(nominal, /*sourceIsParentContext*/ true);
-  initDecl->setValidationToChecked();
 
   derived.addMembersToConformanceContext({initDecl});
-  C.addSynthesizedDecl(initDecl);
-
   return initDecl;
 }
 
 // Synthesize the `init(_owning:)` function declaration.
 static ValueDecl *deriveTensorGroup_init(DerivedConformance &derived) {
-  auto &C = derived.TC.Context;
+  auto &C = derived.Context;
 
   // Obtain the address type.
   auto cTensorHandleType = C.getOpaquePointerDecl()->getDeclaredType();
@@ -372,10 +372,10 @@ ValueDecl *DerivedConformance::deriveTensorGroup(ValueDecl *requirement) {
   // Diagnose conformances in disallowed contexts.
   if (checkAndDiagnoseDisallowedContext(requirement))
     return nullptr;
-  if (requirement->getBaseName() == TC.Context.Id_typeList)
+  if (requirement->getBaseName() == Context.Id_typeList)
     return deriveTensorGroup_typeList(*this);
   if (requirement->getBaseName() == DeclBaseName::createConstructor())
     return deriveTensorGroup_init(*this);
-  TC.diagnose(requirement->getLoc(), diag::broken_tensor_group_requirement);
+  Context.Diags.diagnose(requirement->getLoc(), diag::broken_tensor_group_requirement);
   return nullptr;
 }

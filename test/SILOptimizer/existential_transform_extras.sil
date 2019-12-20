@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -enable-sil-existential-specializer -existential-specializer   | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -enable-existential-specializer -existential-specializer   | %FileCheck %s
 
 // Additional tests for existential_specializer
 
@@ -146,13 +146,9 @@ bb3:
 // CHECK:   alloc_stack
 // CHECK:   init_existential_addr
 // CHECK:   copy_addr
-// CHECK:   destroy_addr
 // CHECK:   alloc_stack
 // CHECK:   init_existential_addr
 // CHECK:   copy_addr
-// CHECK:   destroy_addr
-// CHECK:   debug_value_addr
-// CHECK:   debug_value_addr
 // CHECK:   alloc_stack
 // CHECK:   copy_addr
 // CHECK:   destroy_addr
@@ -165,14 +161,6 @@ bb3:
 // CHECK:   open_existential_addr
 // CHECK:   witness_method
 // CHECK:   apply
-// CHECK:   struct_extract
-// CHECK:   struct_extract
-// CHECK:   integer_literal
-// CHECK:   builtin
-// CHECK:   tuple_extract
-// CHECK:   tuple_extract
-// CHECK:   cond_fail
-// CHECK:   struct
 // CHECK:   dealloc_stack
 // CHECK:   dealloc_stack
 // CHECK:   dealloc_stack
@@ -214,4 +202,62 @@ sil_witness_table hidden Klass1: P module dealloc {
 
 sil_witness_table hidden Klass2: P module dealloc {
   method #P.foo!1: <Self where Self : P> (Self) -> () -> Int32 : nil
+}
+
+// -----------------------------------------------------------------------------
+// Test composite conformances with superclass constraints where one of
+// the protocol constraints is satisfied by the superclass constraint.
+//
+// <rdar://problem/57025861> "Assertion failed: (conformances.size()
+// == numConformanceRequirements)" in ExistentialSpecializer on
+protocol Plotable {}
+
+class PlotLayer : Plotable {
+  init()
+}
+
+protocol InView {}
+
+class PlotLayerInView : PlotLayer & InView {
+  override init()
+}
+
+class PlotView {
+  @_hasStorage @_hasInitialValue var layers: Container<PlotLayer & Plotable & InView> { get set }
+  public func resolveLayers()
+  init()
+}
+
+struct Container<T> {
+  @_hasStorage @_hasInitialValue var val: T { get set }
+}
+
+// Check that the init_existential instruction was created with all
+// three requirements (the generic parameter only has two
+// requirements).  Relies on assertions during specialization and on
+// the SILVerifier to catch other inconsistencies.
+//
+// CHECK-LABEL: sil shared @$s40testExistentialSpecializeCompositeHelperTf4en_n : $@convention(thin) <τ_0_0 where τ_0_0 : PlotLayer, τ_0_0 : InView> (@owned τ_0_0, @inout Container<PlotLayer & InView & Plotable>) -> () {
+// CHECK: bb0(%0 : $τ_0_0, %1 : $*Container<PlotLayer & InView & Plotable>):
+// CHECK:   init_existential_ref %0 : $τ_0_0 : $τ_0_0, $PlotLayer & InView & Plotable
+// CHECK-LABEL: } // end sil function '$s40testExistentialSpecializeCompositeHelperTf4en_n'
+sil shared @testExistentialSpecializeCompositeHelper : $@convention(method) (@owned PlotLayer & Plotable & InView, @inout Container<PlotLayer & Plotable & InView>) -> () {
+bb0(%0 : $PlotLayer & Plotable & InView, %1 : $*Container<PlotLayer & Plotable & InView>):
+  %adr = struct_element_addr %1 : $*Container<PlotLayer & Plotable & InView>, #Container.val
+  store %0 to %adr : $*PlotLayer & Plotable & InView
+  %v = tuple ()
+  return %v : $()
+}
+
+sil @testExistentialSpecializeComposite : $@convention(method) (@guaranteed PlotView) -> () {
+bb0(%0 : $PlotView):
+  %ref = alloc_ref $PlotLayerInView
+  strong_retain %ref : $PlotLayerInView
+  %exis = init_existential_ref %ref : $PlotLayerInView : $PlotLayerInView, $PlotLayer & Plotable & InView
+  %array = ref_element_addr %0 : $PlotView, #PlotView.layers
+  %f = function_ref @testExistentialSpecializeCompositeHelper : $@convention(method) (@owned PlotLayer & Plotable & InView, @inout Container<PlotLayer & Plotable & InView>) -> ()
+  %call = apply %f(%exis, %array) : $@convention(method) (@owned PlotLayer & Plotable & InView, @inout Container<PlotLayer & Plotable & InView>) -> ()
+  strong_release %ref : $PlotLayerInView
+  %v = tuple ()
+  return %v : $()
 }

@@ -8,7 +8,7 @@ public struct Wrapper : Differentiable, AdditiveArithmetic {
     return Wrapper(lhs.x + rhs.x)
   }
 
-  @differentiating(+)
+  @derivative(of: +)
   public static func vjpAdd(lhs: Wrapper, rhs: Wrapper)
     -> (value: Wrapper, pullback: (Wrapper) -> (Wrapper, Wrapper)) {
     return (lhs + rhs, { v in (v, v) })
@@ -18,13 +18,13 @@ public struct Wrapper : Differentiable, AdditiveArithmetic {
     return Wrapper(lhs.x * rhs.x)
   }
 
-  @differentiating(*)
+  @derivative(of: *)
   public static func jvpMultiply(lhs: Wrapper, rhs: Wrapper)
     -> (value: Wrapper, differential: (Wrapper, Wrapper) -> Wrapper) {
     return (lhs * rhs, { dlhs, drhs in dlhs * rhs + lhs * drhs })
   }
 
-  @differentiating(*)
+  @derivative(of: *)
   public static func vjpMultiply(lhs: Wrapper, rhs: Wrapper)
     -> (value: Wrapper, pullback: (Wrapper) -> (Wrapper, Wrapper)) {
     return (lhs * rhs, { v in (v * rhs, v * lhs) })

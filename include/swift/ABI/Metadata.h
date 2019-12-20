@@ -160,6 +160,7 @@ using TargetRelativeIndirectablePointer
 
 struct HeapObject;
 class WeakReference;
+struct UnownedReference;
   
 template <typename Runtime> struct TargetMetadata;
 using Metadata = TargetMetadata<InProcess>;
@@ -645,6 +646,9 @@ public:
   // NOTE: This *is* a box for copy-on-write existentials.
   OpaqueValue *allocateBoxForExistentialIn(ValueBuffer *Buffer) const;
 
+  // Deallocate an out-of-line buffer box if one is present.
+  void deallocateBoxForExistentialIn(ValueBuffer *Buffer) const;
+
   /// Get the nominal type descriptor if this metadata describes a nominal type,
   /// or return null if it does not.
   ConstTargetMetadataPointer<Runtime, TargetTypeContextDescriptor>
@@ -997,8 +1001,6 @@ template <typename Runtime>
 struct TargetClassMetadata : public TargetAnyClassMetadata<Runtime> {
   using StoredPointer = typename Runtime::StoredPointer;
   using StoredSize = typename Runtime::StoredSize;
-
-  friend class ReflectionContext;
 
   TargetClassMetadata() = default;
   constexpr TargetClassMetadata(const TargetAnyClassMetadata<Runtime> &base,
@@ -2340,6 +2342,12 @@ public:
     return TypeRef.getTypeDescriptor(getTypeKind());
   }
 
+  const TargetContextDescriptor<Runtime> **_getTypeDescriptorLocation() const {
+    if (getTypeKind() != TypeReferenceKind::IndirectTypeDescriptor)
+      return nullptr;
+    return TypeRef.IndirectTypeDescriptor.get();
+  }
+
   /// Retrieve the context of a retroactive conformance.
   const TargetContextDescriptor<Runtime> *getRetroactiveContext() const {
     if (!Flags.isRetroactive()) return nullptr;
@@ -3220,6 +3228,8 @@ public:
   /// metadata header (e.g. after the last members declared in StructMetadata).
   /// In class metadata, this section is relative to the end of the entire
   /// class metadata.
+  ///
+  /// See also: [pre-5.2-extra-data-zeroing]
   const GenericMetadataPartialPattern *getExtraDataPattern() const {
     assert(asSelf()->hasExtraDataPattern());
     return this->template getTrailingObjects<GenericMetadataPartialPattern>();

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil -verify %s | %FileCheck %s -check-prefix=CHECK-SIL
+// RUN: %target-swift-emit-sil -verify %s | %FileCheck %s -check-prefix=CHECK-SIL
 
 @_silgen_name("identity")
 func identity<T : Differentiable>(_ x: T) -> T {
@@ -9,38 +9,57 @@ _ = gradient(at: Float(1), in: { x in identity(x) })
 // Test AdjointEmitter local buffer allocation.
 // Verify that local buffers are immediately set to zero.
 
-// CHECK-SIL-LABEL: sil hidden @AD__identity__pullback_src_0_wrt_0
+// CHECK-SIL-LABEL: sil private @AD__identity__pullback_src_0_wrt_0_s14DifferentiableRzl
 // CHECK-SIL:      [[ORIG_COTAN:%.*]] = alloc_stack $τ_0_0.TangentVector
 // CHECK-SIL-NEXT: [[ZERO_WITNESS:%.*]] = witness_method $τ_0_0.TangentVector, #AdditiveArithmetic.zero!getter.1
 // CHECK-SIL-NEXT: [[ORIG_COTAN_METATYPE:%.*]] = metatype $@thick τ_0_0.TangentVector.Type
 // CHECK-SIL-NEXT: [[EMIT_ZERO_INDIRECT:%.*]] = apply [[ZERO_WITNESS]]<τ_0_0.TangentVector>([[ORIG_COTAN]], [[ORIG_COTAN_METATYPE]])
 // CHECK-SIL: }
 
-struct Tensor<Scalar : FloatingPoint & Differentiable> : VectorProtocol, Differentiable {
-  // NOTE: `value` must have type with known size (e.g. `Float`, not `Scalar`)
-  // until differentiation has indirect passing support.
-  var value: Float
-  init(_ value: Float) { self.value = value }
-}
+// Test TF-201: differentiate direct references to generic function.
+// This involves reabstraction thunk differentiation.
 
-func generic<T : FloatingPoint & Differentiable>(_ x: Tensor<T>) -> Float {
-  return x.value + x.value
+_ = gradient(at: Float(1), in: identity)
+
+protocol DifferentiableAdditiveArithmetic: Differentiable & AdditiveArithmetic {
+  @differentiable
+  static func + (lhs: Self, rhs: Self) -> Self
 }
-_ = gradient(at: Tensor<Float>(1), in: generic)
+extension Float: DifferentiableAdditiveArithmetic {}
+func generic<T: DifferentiableAdditiveArithmetic>(_ x: T) -> T {
+  x + x + x
+}
+_ = gradient(at: Float(10), in: generic)
+
+struct Wrapper<Scalar : Differentiable> : Differentiable {
+  var value: Scalar
+  init(_ value: Scalar) { self.value = value }
+}
+func generic<T>(_ x: Wrapper<T>) -> T {
+  return x.value
+}
+_ = gradient(at: Wrapper<Float>(1), in: generic)
+
+func generic2<T: Differentiable, U: Differentiable>(_ x: T, _ y: Float, _ z: U) -> T {
+  return x
+}
+func foo<T>(_ x: Wrapper<T>) {
+  _ = gradient(at: Float(1), 2, x, in: generic2)
+}
 
 // Test case where associated derivative function's requirements are met.
-extension Tensor where Scalar : Numeric {
+extension Wrapper where Scalar : Numeric {
   @differentiable(wrt: self where Scalar : Differentiable & FloatingPoint)
-  func mean() -> Tensor {
+  func mean() -> Wrapper {
     return self
   }
 
   @differentiable(wrt: self where Scalar : Differentiable & FloatingPoint)
-  func variance() -> Tensor {
+  func variance() -> Wrapper {
     return mean() // ok
   }
 }
-_ = pullback(at: Tensor<Float>(1), in: { $0.variance() })
+_ = pullback(at: Wrapper<Float>(1), in: { $0.variance() })
 
 // Tests TF-277.
 protocol Layer : Differentiable {
@@ -245,7 +264,7 @@ public func TF_688<Scalar: Differentiable>(
   reduction(x)
 }
 
-// TF-697: Test generic requirements of generated AD associated function.
+// TF-697: Test generic requirements of generated derivative function.
 protocol TF_697_Module: Differentiable {
     associatedtype Input
     associatedtype Output: Differentiable
@@ -273,5 +292,94 @@ extension TF_697_Sequential: TF_697_Layer where Layer1: TF_697_Layer {
         layer2.callLayer(layer1.callLayer(input))
     }
 }
+
+// TF-817: Test remapping `apply` callee types in derivative function context.
+struct TF_817<T> {
+  func foo(_ index: Int) -> T {
+    fatalError()
+  }
+}
+extension TF_817: Differentiable where T: Differentiable {
+  @derivative(of: foo)
+  func vjpFoo(index: Int) -> (value: T, pullback: (T.TangentVector) -> (TangentVector)) {
+    fatalError()
+  }
+}
+extension TF_817 {
+  @differentiable(wrt: self where T: Differentiable)
+  public func test(index: Int) -> T {
+    return self.foo(0) // crash happened here
+  }
+}
+
+// TF-886: Test `partial_apply` of linear map subset parameters thunk.
+@differentiable
+func TF_886_foo<T, U: Differentiable>(_: Float, _: T, _: U) -> Float {
+  return 0
+}
+@differentiable
+func TF_886_bar<T>(x: Float, y: T) -> Float {
+  return TF_886_foo(x, y, 0)
+}
+
+// Test layout requirements.
+
+// The layout requirement is "contextual": the requirement is not on `T`, the
+// differentiable function parameter/result type.
+struct ContextualLayoutRequirement<T: Differentiable, U: AnyObject> {
+  var stored: T
+}
+extension ContextualLayoutRequirement {
+  func test(_ x: T) {
+    let _: @differentiable (T) -> T = { _ in self.stored }
+    let _: @differentiable (T) -> T = { $0 }
+  }
+}
+// The layout requirement directly involves `T`, the differentiable function
+// parameter/result type.
+// TODO(TF-851): Uncomment the tests below after `@differentiable` function
+// SILGen thunking is fixed.
+/*
+struct LayoutRequirement<T: AnyObject & Differentiable> {
+  var stored: T
+}
+extension LayoutRequirement {
+  func test(_ x: T) {
+    let _: @differentiable (T) -> T = { _ in self.stored }
+    let _: @differentiable (T) -> T = { $0 }
+  }
+}
+*/
+
+// Test superclass requirements.
+
+class Super: Differentiable {}
+
+// The superclass requirement is "contextual": the requirement is not on `T`,
+// the differentiable function parameter/result type.
+struct ContextualSuperclassRequirement<T: Differentiable, U: Super> {
+  var stored: T
+}
+extension ContextualSuperclassRequirement {
+  func test(_ x: T) {
+    let _: @differentiable (T) -> T = { _ in self.stored }
+    let _: @differentiable (T) -> T = { $0 }
+  }
+}
+// The superclass requirement directly involves `T`, the differentiable
+// function parameter/result type.
+// TODO(TF-851): Uncomment the tests below after `@differentiable` function
+// SILGen thunking is fixed.
+/*
+struct SuperclassRequirement<T: Super & Differentiable> {
+  var stored: T
+}
+extension SuperclassRequirement {
+  func test(_ x: T) {
+    let _: @differentiable (T) -> T = { _ in self.stored }
+    let _: @differentiable (T) -> T = { $0 }
+  }
+}
+*/
 
 // TODO: add more tests.

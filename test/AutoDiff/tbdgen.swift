@@ -12,6 +12,13 @@
 @differentiable public func publicDiffable(_ x: Float, _ y: Float) -> Float { return x }
 @differentiable(wrt: (x)) public func publicDiffableWRT(_ x: Float, _ y: Float) -> Float { return x }
 
+// Tests SILGen derivative "forwarding thunk" (no derivative reabstraction/self-reordering).
+@differentiable(vjp: publicNoDerivativeReabstractionVJP)
+public func publicNoDerivativeReabstraction<T: Differentiable>(_ x: T) -> T { return x }
+public func publicNoDerivativeReabstractionVJP<T: Differentiable>(_ x: T) -> (T, (T.TangentVector) -> T.TangentVector) {
+  return (x, { $0 })
+}
+
 @differentiable internal func internalDiffable(_ x: Float, _ y: Float) -> Float { return x }
 @differentiable(wrt: (x)) internal func internalDiffableWRT(_ x: Float, _ y: Float) -> Float { return x }
 
@@ -114,3 +121,7 @@ func invokeIndirect() {
   print(gradient(of: internalDiffableIndirect)(1, 2))
   print(gradient(of: privateDiffableIndirect)(1, 2))
 }
+
+@inlinable
+@differentiable
+public func inlinableDifferentiable(_ x: Float) -> Float { x }

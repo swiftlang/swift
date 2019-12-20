@@ -372,9 +372,10 @@ extension ManagedBufferPointer {
     return try body(_headerPointer, _elementPointer)
   }
 
-  /// Returns `true` iff `self` holds the only strong reference to its buffer.
+  /// Returns `true` if `self` holds the only strong reference to its
+  /// buffer. Otherwise, returns `false`.
   ///
-  /// See `isUniquelyReferenced` for details.
+  /// See `isKnownUniquelyReferenced` for details.
   @inlinable
   public mutating func isUniqueReference() -> Bool {
     return _isUnique(&_nativeBuffer)

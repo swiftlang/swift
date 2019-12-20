@@ -148,18 +148,20 @@ public:
                                CanSILFunctionType constantTy);
 
   // SWIFT_ENABLE_TENSORFLOW
-  /// Get or create an autodiff associated function thunk for the given
-  /// SILDeclRef, SILFunction, and associated function type.
-  SILFunction *getOrCreateAutoDiffThunk(SILDeclRef assocFnRef,
-                                        SILFunction *assocFn,
-                                        CanSILFunctionType assocFnTy);
+  /// Get or create an autodiff derivative function forwarding thunk for the
+  /// given derivative SILDeclRef, SILFunction, and function type.
+  /// The thunk simply forwards arguments and returns results: use this when no
+  /// reabstraction or self reordering is necessary.
+  SILFunction *getOrCreateAutoDiffDerivativeForwardingThunk(
+      SILDeclRef derivativeFnRef, SILFunction *derivativeFn,
+      CanSILFunctionType derivativeFnTy);
 
   // SWIFT_ENABLE_TENSORFLOW
-  /// Get or create an autodiff associated function vtable entry thunk for the
-  /// given SILDeclRef and associated function type.
+  /// Get or create an autodiff derivative function vtable entry thunk for the
+  /// given SILDeclRef and derivative function type.
   SILFunction *
-  getOrCreateAutoDiffClassMethodThunk(SILDeclRef assocFnRef,
-                                      CanSILFunctionType assocFnTy);
+  getOrCreateAutoDiffClassMethodThunk(SILDeclRef derivativeFnRef,
+                                      CanSILFunctionType derivativeFnTy);
 
   /// Emit a vtable thunk for a derived method if its natural abstraction level
   /// diverges from the overridden base method. If no thunking is needed,
@@ -180,15 +182,53 @@ public:
                                            CanType dynamicSelfType);
 
   // SWIFT_ENABLE_TENSORFLOW
-  /// Get or create a thunk for reabstracting user-defined JVP/VJP functions.
+  /// Get or create an autodiff derivative function thunk performing
+  /// reabstraction and/or self-reordering.
+  ///
+  /// Self-reordering is done for canonicalizing the types of derivative
+  /// functions for instance methods wrt self. We want users to define
+  /// derivatives with the following AST function types:
+  ///
+  /// JVP:
+  /// - Takes `Self` as first parameter.
+  /// - Returns differential taking `Self.Tan` as first parameter.
+  ///
+  ///     (Self) -> (T, ...) -> (R, (Self.Tan, T.Tan, ...) -> R.Tan)
+  ///
+  /// VJP:
+  /// - Takes `Self` as first parameter.
+  /// - Returns pullback returning `Self.Tan` as first result.
+  ///
+  ///     (Self) -> (T, ...) -> (R, (R.Tan) -> (Self.Tan, T.Tan, ...))
+  ///
+  /// However, the curried `Self` parameter in the AST JVP/VJP function types
+  /// becomes the *last* parameter in the flattened parameter list of their
+  /// lowered SIL function types.
+  ///
+  /// JVP:
+  /// - Takes `Self` as *last* parameter.
+  /// - Returns differential taking `Self.Tan` as *first* parameter.
+  ///
+  ///     $(T, ..., Self) -> (R, (Self.Tan, T.Tan, ...) -> R.Tan)
+  ///
+  /// VJP:
+  /// - Takes `Self` as *last* parameter.
+  /// - Returns pullback returning `Self.Tan` as *first* result.
+  ///
+  ///     $(T, ..., Self) -> (R, (R.Tan) -> (Self.Tan, T.Tan, ...))
+  ///
+  /// This leads to a parameter ordering inconsistency, and would require the
+  /// Differentiation transform to handle "wrt self instance method derivatives"
+  /// specially. However, canonicalization during SILGen makes the parameter
+  /// ordering uniform for "wrt self instance method derivatives" and simplifies
+  /// the transform rules.
   ///
   /// If `reorderSelf` is true, reorder self so that it appears as:
   /// - The last parameter in the returned differential.
   /// - The last result in the returned pullback.
-  SILFunction *getOrCreateAutoDiffAssociatedFunctionThunk(
-      SILFunction *original, SILAutoDiffIndices &indices,
-      SILFunction *assocFn, AutoDiffAssociatedFunctionKind assocFnKind,
-      bool reorderSelf);
+  SILFunction *getOrCreateAutoDiffDerivativeReabstractionThunk(
+      SILFunction *original, AutoDiffConfig config, SILFunction *derivativeFn,
+      AutoDiffDerivativeFunctionKind derivativeFnKind, bool reorderSelf);
 
   /// Determine whether the given class has any instance variables that
   /// need to be destroyed.
@@ -264,6 +304,9 @@ public:
   /// Emits the stored property initializer for the given pattern.
   void emitStoredPropertyInitialization(PatternBindingDecl *pd, unsigned i);
 
+  /// Emits the backing initializer for a property with an attached wrapper.
+  void emitPropertyWrapperBackingInitializer(VarDecl *var);
+
   /// Emits default argument generators for the given parameter list.
   void emitDefaultArgGenerators(SILDeclRef::Loc decl,
                                 ParameterList *paramList);
@@ -314,6 +357,17 @@ public:
 
   /// Emit the self-conformance witness table for a protocol.
   void emitSelfConformanceWitnessTable(ProtocolDecl *protocol);
+
+  // SWIFT_ENABLE_TENSORFLOW
+  /// Emit the differentiability witness for the given original function
+  /// declaration and SIL function, autodiff configuration, and JVP and VJP
+  /// functions (null if undefined).
+  void emitDifferentiabilityWitness(AbstractFunctionDecl *originalAFD,
+                                    SILFunction *originalFunction,
+                                    const AutoDiffConfig &config,
+                                    SILFunction *jvp, SILFunction *vjp,
+                                    const DeclAttribute *diffAttr);
+  // SWIFT_ENABLE_TENSORFLOW END
 
   /// Emit the lazy initializer function for a global pattern binding
   /// declaration.
@@ -415,8 +469,8 @@ public:
 
   /// Find the conformance of the given Swift type to the
   /// _BridgedStoredNSError protocol.
-  Optional<ProtocolConformanceRef>
-  getConformanceToBridgedStoredNSError(SILLocation loc, Type type);
+  ProtocolConformanceRef getConformanceToBridgedStoredNSError(SILLocation loc,
+                                                              Type type);
 
   /// Retrieve the conformance of NSError to the Error protocol.
   ProtocolConformance *getNSErrorConformanceToError();
@@ -466,7 +520,7 @@ public:
   /// Emit a `mark_function_escape` instruction for top-level code when a
   /// function or closure at top level refers to script globals.
   void emitMarkFunctionEscapeForTopLevelCodeGlobals(SILLocation loc,
-                                                const CaptureInfo &captureInfo);
+                                                    CaptureInfo captureInfo);
 
   /// Map the substitutions for the original declaration to substitutions for
   /// the overridden declaration.

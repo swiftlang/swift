@@ -353,7 +353,7 @@ extension String {
     usedEncoding: inout Encoding
   ) throws {
     var enc: UInt = 0
-    let ns = try NSString(contentsOf: url as URL, usedEncoding: &enc)
+    let ns = try NSString(contentsOf: url, usedEncoding: &enc)
     usedEncoding = Encoding(rawValue: enc)
     self = String._unconditionallyBridgeFromObjectiveC(ns)
   }
@@ -566,7 +566,7 @@ extension StringProtocol where Index == String.Index {
   /// Case transformations aren’t guaranteed to be symmetrical or to produce
   /// strings of the same lengths as the originals.
   public var capitalized: String {
-    return _ns.capitalized as String
+    return _ns.capitalized
   }
 
   // @property (readonly, copy) NSString *localizedCapitalizedString NS_AVAILABLE(10_11, 9_0);
@@ -583,7 +583,7 @@ extension StringProtocol where Index == String.Index {
   /// Returns a capitalized representation of the string
   /// using the specified locale.
   public func capitalized(with locale: Locale?) -> String {
-    return _ns.capitalized(with: locale) as String
+    return _ns.capitalized(with: locale)
   }
 
   // - (NSComparisonResult)caseInsensitiveCompare:(NSString *)aString
@@ -1166,7 +1166,7 @@ extension StringProtocol where Index == String.Index {
   /// locale.
   @available(macOS 10.11, iOS 9.0, *)
   public var localizedUppercase: String {
-    return _ns.localizedUppercase as String
+    return _ns.localizedUppercase
   }
 
   // - (NSString *)uppercaseStringWithLocale:(Locale *)locale
@@ -1368,7 +1368,7 @@ extension StringProtocol where Index == String.Index {
   /// - Parameter leftover: The remaining range. Pass `nil` If you do
   ///   not need this value.
   ///
-  /// - Returns: `true` iff some characters were converted.
+  /// - Returns: `true` if some characters were converted, `false` otherwise.
   ///
   /// - Note: Conversion stops when the buffer fills or when the
   ///   conversion isn't possible due to the chosen encoding.
@@ -1668,10 +1668,10 @@ extension StringProtocol where Index == String.Index {
   // No need to make these unavailable on earlier OSes, since they can
   // forward trivially to rangeOfString.
 
-  /// Returns `true` iff `other` is non-empty and contained within
-  /// `self` by case-sensitive, non-literal search.
+  /// Returns `true` if `other` is non-empty and contained within `self` by
+  /// case-sensitive, non-literal search. Otherwise, returns `false`.
   ///
-  /// Equivalent to `self.rangeOfString(other) != nil`
+  /// Equivalent to `self.range(of: other) != nil`
   public func contains<T : StringProtocol>(_ other: T) -> Bool {
     let r = self.range(of: other) != nil
     if #available(macOS 10.10, iOS 8.0, *) {

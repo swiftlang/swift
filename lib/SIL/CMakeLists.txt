@@ -10,6 +10,7 @@ add_swift_host_library(swiftSIL STATIC
   Linker.cpp
   LinearLifetimeChecker.cpp
   LoopInfo.cpp
+  MemoryLifetime.cpp
   Notifications.cpp
   OperandOwnership.cpp
   OptimizationRemark.cpp
@@ -25,11 +26,14 @@ add_swift_host_library(swiftSIL STATIC
   SILDebugScope.cpp
   SILDeclRef.cpp
   SILDefaultWitnessTable.cpp
+  # SWIFT_ENABLE_TENSORFLOW
+  SILDifferentiabilityWitness.cpp
   SILFunction.cpp
   SILFunctionType.cpp
   SILGlobalVariable.cpp
   SILInstruction.cpp
   SILInstructions.cpp
+  SILInstructionWorklist.cpp
   SILLocation.cpp
   SILModule.cpp
   SILFunctionBuilder.cpp

@@ -114,14 +114,32 @@ struct DummyOptimizer<P : KeyPathIterable, Scalar : BinaryFloatingPoint>
   }
 }
 
+// TF-575: Test overloaded key path component name.
+protocol NameLookupConflictProtocol {}
+extension NameLookupConflictProtocol {
+  func member() {}
+}
+struct NameLookupConflict: NameLookupConflictProtocol & KeyPathIterable {
+  // Note: `NameLookupConflict.member` is overloaded with
+  // `MemberNameConflictProtocol.member`.
+  // This makes the following generated code fail:
+  //
+  //   var allKeyPaths: [PartialKeyPath<Self>] {
+  //     [\Self.member]
+  //   }
+  //
+  // error: cannot convert value of type
+  // 'WritableKeyPath<NameLookupConflict, Float>' to expected element type
+  // 'PartialKeyPath<NameLookupConflict>'
+  var member: Float
+}
+
 // Test derived conformances in disallowed contexts.
 
-// expected-error @+3 {{type 'OtherFileNonconforming' does not conform to protocol 'KeyPathIterable'}}
-// expected-error @+2 {{implementation of 'KeyPathIterable' cannot be automatically synthesized in an extension in a different file to the type}}
-// expected-note @+1 {{do you want to add protocol stubs?}}
+// expected-error @+2 {{type 'OtherFileNonconforming' does not conform to protocol 'KeyPathIterable'}}
+// expected-error @+1 {{implementation of 'KeyPathIterable' cannot be automatically synthesized in an extension in a different file to the type}}
 extension OtherFileNonconforming : KeyPathIterable {}
 
-// expected-error @+3 {{type 'GenericOtherFileNonconforming<T>' does not conform to protocol 'KeyPathIterable'}}
-// expected-error @+2 {{implementation of 'KeyPathIterable' cannot be automatically synthesized in an extension in a different file to the type}}
-// expected-note @+1 {{do you want to add protocol stubs?}}
+// expected-error @+2 {{type 'GenericOtherFileNonconforming<T>' does not conform to protocol 'KeyPathIterable'}}
+// expected-error @+1 {{implementation of 'KeyPathIterable' cannot be automatically synthesized in an extension in a different file to the type}}
 extension GenericOtherFileNonconforming : KeyPathIterable {}

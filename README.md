@@ -2,8 +2,8 @@
 
 | OS | CI platform | x86_64 | GPU |
 |---|:---:|:---:|:---:|
-| **macOS** | Google Kokoro | ![Build Status](https://storage.googleapis.com/tensorflow-kokoro-build-badges/macos-swift-tf-release.svg) | _coming soon_ |
-| **Ubuntu 16.04** | Swift.org CI | [![Build Status](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-16.04-tensorflow/lastCompletedBuild/badge/icon)](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-16.04-tensorflow) | N/A |
+| **macOS** | Google Kokoro | ![Build Status](https://storage.googleapis.com/tensorflow-kokoro-build-badges/macos-swift-tf-release.svg) | - |
+| **Ubuntu 16.04** | Swift.org CI | [![Build Status](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-16.04-tensorflow/lastCompletedBuild/badge/icon)](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-16.04-tensorflow) | [![Build Status](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-16.04-tensorflow-gpu/lastCompletedBuild/badge/icon)](https://ci-external.swift.org/job/oss-swift-RA-linux-ubuntu-16.04-tensorflow-gpu) |
 
 Welcome to Swift for TensorFlow!
 
@@ -15,11 +15,14 @@ This repository covers the compiler and standard libraries. Please visit the [do
 
 ## Building Swift for TensorFlow
 
-These instructions give the most direct path to a working development environment for Swift for TensorFlow.
+**Note:** Building from source is necessary only if you want to modify the source
+code or build with a custom version of TensorFlow.
 
-**Note:** Building from source is necessary only if you want to modify the source code or build with a custom version of TensorFlow.
-
-To build from source you will need 2 GB of disk space for the source code and over 20 GB of disk space for the build artifacts. A clean build can take multiple hours, but incremental builds will finish much faster.
+These instructions give the most direct path to a working Swift for TensorFlow development
+environment. To build from source you will need about 2 GB of disk space for the
+source code and up to 70 GB of disk space for the build artifacts with full
+debugging. Depending on your machine, a clean build can take a few minutes to
+several hours. Naturally, incremental builds are much faster.
 
 ### System Requirements
 
@@ -30,7 +33,7 @@ Please make sure you use Python 2.x. Python 3.x is not supported currently.
 
 #### macOS
 
-To build for macOS, you need [Xcode 11 beta 5](https://developer.apple.com/xcode/downloads/).
+To build for macOS, you need [Xcode 11.3](https://developer.apple.com/xcode/downloads/).
 The required version of Xcode changes frequently, and is often a beta release.
 Check this document for the current required version.
 
@@ -103,6 +106,10 @@ There are two primary build systems to use: Xcode and Ninja. The Xcode build
 system allows you to work in Xcode, but Ninja is a bit faster and supports
 more environments.
 
+First, make sure that you're in the swift directory:
+
+    cd swift
+
 To build using Ninja, run:
 
     swift/utils/build-script --enable-tensorflow --release-debuginfo
@@ -124,7 +131,7 @@ the entire project in debug, you can run:
 For documentation of all available arguments, as well as additional usage
 information, see the inline help:
 
-    swift/utils/build-script -h
+    utils/build-script -h
 
 ### Customize TensorFlow support
 
@@ -149,7 +156,7 @@ Below is more information about TensorFlow-related build arguments.
     * Default: None.
 * `tensorflow-host-include-dir`: A directory containing custom TensorFlow headers.
     * Default value: None.
-* `tensorflow-host-lib-dir`: A directory containing custom TensorFlow shared libraries (`libtensorflow.so` and `libtensorflow_framework.so`).
+* `tensorflow-host-lib-dir`: A directory containing custom TensorFlow shared libraries (`libtensorflow.so`).
     * Default value: None.
 * `tensorflow-swift-apis`: A path to the [tensorflow/swift-apis](https://github.com/tensorflow/swift-apis) deep learning library repository.
     * Default value: `tensorflow-swift-apis` if the [tensorflow/swift-apis](https://github.com/tensorflow/swift-apis) repository is cloned. Otherwise, none.
@@ -214,7 +221,8 @@ then run the build product in Terminal.
 Swift toolchains are created using the script
 [build-toolchain-tensorflow](https://github.com/apple/swift/blob/tensorflow/utils/build-toolchain-tensorflow).
 This script is used by swift.org's CI to produce snapshots and can allow for one to
-locally reproduce such builds for development or distribution purposes. E.x.:
+locally reproduce such builds for development or distribution purposes. A typical 
+invocation looks like the following:
 
 ```
   $ ./swift/utils/build-toolchain-tensorflow $BUNDLE_PREFIX
@@ -266,7 +274,7 @@ compiler crashes.
 Make sure you are using the [correct release](#macos) of Xcode.
 
 If you have changed Xcode versions but still encounter errors that appear to
-be related to the Xcode version, try passing `--rebuild` to `build-script`.
+be related to the Xcode version, try passing `--clean` to `build-script`.
 
 When a new version of Xcode is released, you can update your build without
 recompiling the entire project by passing the `--reconfigure` option.

@@ -62,6 +62,8 @@
 #include <unwind.h>
 #endif
 
+#include <inttypes.h>
+
 namespace FatalErrorFlags {
 enum: uint32_t {
   ReportBacktrace = 1 << 0

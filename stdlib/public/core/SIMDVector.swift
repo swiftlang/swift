@@ -1500,6 +1500,19 @@ where T: SIMD, T.Scalar: FloatingPoint {
   return result
 }
 
+// Break the ambiguity between AdditiveArithmetic and SIMD for += and -=
+extension SIMD where Self: AdditiveArithmetic, Self.Scalar: FloatingPoint {
+  @_alwaysEmitIntoClient
+  public static func +=(lhs: inout Self, rhs: Self) {
+    lhs = lhs + rhs
+  }
+
+  @_alwaysEmitIntoClient
+  public static func -=(lhs: inout Self, rhs: Self) {
+    lhs = lhs - rhs
+  }
+}
+
 // SWIFT_ENABLE_TENSORFLOW
 extension SIMD
   where Self : Differentiable,

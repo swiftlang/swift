@@ -562,8 +562,11 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
                     SingleValueInstruction, MayHaveSideEffects, DoesNotRelease)
   SINGLE_VALUE_INST(CopyValueInst, copy_value,
                     SingleValueInstruction, MayHaveSideEffects, DoesNotRelease)
+#define UNCHECKED_REF_STORAGE(Name, name, ...) \
+  SINGLE_VALUE_INST(StrongCopy##Name##ValueInst, strong_copy_##name##_value, \
+                    SingleValueInstruction, MayHaveSideEffects, DoesNotRelease)
 #define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, name, ...) \
-  SINGLE_VALUE_INST(Copy##Name##ValueInst, copy_##name##_value, \
+  SINGLE_VALUE_INST(StrongCopy##Name##ValueInst, strong_copy_##name##_value, \
                     SingleValueInstruction, MayHaveSideEffects, DoesNotRelease)
 #include "swift/AST/ReferenceStorage.def"
   SINGLE_VALUE_INST(UncheckedOwnershipConversionInst, unchecked_ownership_conversion,
@@ -686,11 +689,21 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
                     SingleValueInstruction, None, DoesNotRelease)
 
   // SWIFT_ENABLE_TENSORFLOW
-  // Automatic differentiation
-  SINGLE_VALUE_INST(AutoDiffFunctionInst, autodiff_function,
+  // Differentiable programming
+  SINGLE_VALUE_INST(DifferentiableFunctionInst, differentiable_function,
                     SingleValueInstruction, None, DoesNotRelease)
-  SINGLE_VALUE_INST(AutoDiffFunctionExtractInst, autodiff_function_extract,
+  SINGLE_VALUE_INST(LinearFunctionInst, linear_function,
                     SingleValueInstruction, None, DoesNotRelease)
+  SINGLE_VALUE_INST(DifferentiableFunctionExtractInst,
+                    differentiable_function_extract,
+                    SingleValueInstruction, None, DoesNotRelease)
+  SINGLE_VALUE_INST(LinearFunctionExtractInst,
+                    linear_function_extract,
+                    SingleValueInstruction, None, DoesNotRelease)
+  SINGLE_VALUE_INST(DifferentiabilityWitnessFunctionInst,
+                    differentiability_witness_function,
+                    SingleValueInstruction, None, DoesNotRelease)
+  // SWIFT_ENABLE_TENSORFLOW END
 
   // Key paths
   // TODO: The only "side effect" is potentially retaining the returned key path

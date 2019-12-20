@@ -104,16 +104,23 @@ extension Array : KeyPathIterable {
   }
 }
 
-extension Array.DifferentiableView : KeyPathIterable {
+// TODO(TF-938): Remove 'Element : Differentiable' constraint.
+extension Array.DifferentiableView : KeyPathIterable where Element : Differentiable {
   public typealias AllKeyPaths = [PartialKeyPath<Array.DifferentiableView>]
   public var allKeyPaths: [PartialKeyPath<Array.DifferentiableView>] {
     return [\Array.DifferentiableView.base]
   }
 }
 
+// TODO(TF-938): Remove this.
+// This is neccessary now because otherwise the compiler complains:
+//   error: conditional conformance of type 'Array<Element>.DifferentiableView' to protocol
+//   'KeyPathIterable' does not imply conformance to inherited protocol '_KeyPathIterableBase'
+extension Array.DifferentiableView : _KeyPathIterableBase where Element : Differentiable {}
+
 extension Dictionary : KeyPathIterable {
   public typealias AllKeyPaths = [PartialKeyPath<Dictionary>]
   public var allKeyPaths: [PartialKeyPath<Dictionary>] {
-    return keys.map { \Dictionary[$0]! }
+    return values.indices.map { \Dictionary[$0].value }
   }
 }

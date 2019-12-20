@@ -23,28 +23,30 @@ using namespace swift;
 // SILArgument Implementation
 //===----------------------------------------------------------------------===//
 
-SILArgument::SILArgument(ValueKind ChildKind, SILBasicBlock *ParentBB,
-                         SILType Ty, ValueOwnershipKind OwnershipKind,
-                         const ValueDecl *D)
-    : ValueBase(ChildKind, Ty, IsRepresentative::Yes), ParentBB(ParentBB),
-      Decl(D) {
-  Bits.SILArgument.VOKind = static_cast<unsigned>(OwnershipKind);
-  ParentBB->insertArgument(ParentBB->args_end(), this);
+SILArgument::SILArgument(ValueKind subClassKind,
+                         SILBasicBlock *inputParentBlock, SILType type,
+                         ValueOwnershipKind ownershipKind,
+                         const ValueDecl *inputDecl)
+    : ValueBase(subClassKind, type, IsRepresentative::Yes),
+      parentBlock(inputParentBlock), decl(inputDecl) {
+  Bits.SILArgument.VOKind = static_cast<unsigned>(ownershipKind);
+  inputParentBlock->insertArgument(inputParentBlock->args_end(), this);
 }
 
-SILArgument::SILArgument(ValueKind ChildKind, SILBasicBlock *ParentBB,
-                         SILBasicBlock::arg_iterator Pos, SILType Ty,
-                         ValueOwnershipKind OwnershipKind, const ValueDecl *D)
-    : ValueBase(ChildKind, Ty, IsRepresentative::Yes), ParentBB(ParentBB),
-      Decl(D) {
-  Bits.SILArgument.VOKind = static_cast<unsigned>(OwnershipKind);
+SILArgument::SILArgument(ValueKind subClassKind,
+                         SILBasicBlock *inputParentBlock,
+                         SILBasicBlock::arg_iterator argArrayInsertPt,
+                         SILType type, ValueOwnershipKind ownershipKind,
+                         const ValueDecl *inputDecl)
+    : ValueBase(subClassKind, type, IsRepresentative::Yes),
+      parentBlock(inputParentBlock), decl(inputDecl) {
+  Bits.SILArgument.VOKind = static_cast<unsigned>(ownershipKind);
   // Function arguments need to have a decl.
-  assert(
-    !ParentBB->getParent()->isBare() &&
-    ParentBB->getParent()->size() == 1
-          ? D != nullptr
-          : true);
-  ParentBB->insertArgument(Pos, this);
+  assert(!inputParentBlock->getParent()->isBare() &&
+                 inputParentBlock->getParent()->size() == 1
+             ? decl != nullptr
+             : true);
+  inputParentBlock->insertArgument(argArrayInsertPt, this);
 }
 
 
@@ -70,90 +72,95 @@ SILModule &SILArgument::getModule() const {
 // expensive to call this helper instead of simply specifying phis with an
 // opcode. It results in repeated CFG traversals and repeated, unnecessary
 // switching over terminator opcodes.
-bool SILPhiArgument::isPhiArgument() {
+bool SILPhiArgument::isPhiArgument() const {
   // No predecessors indicates an unreachable block.
   if (getParent()->pred_empty())
     return false;
 
   // Multiple predecessors require phis.
-  auto *predBB = getParent()->getSinglePredecessorBlock();
-  if (!predBB)
+  auto *predBlock = getParent()->getSinglePredecessorBlock();
+  if (!predBlock)
     return true;
 
-  auto *TI = predBB->getTerminator();
-  return isa<BranchInst>(TI) || isa<CondBranchInst>(TI);
+  auto *termInst = predBlock->getTerminator();
+  return isa<BranchInst>(termInst) || isa<CondBranchInst>(termInst);
 }
 
-static SILValue getIncomingPhiValueForPred(const SILBasicBlock *BB,
-                                           const SILBasicBlock *Pred,
-                                           unsigned Index) {
-  const TermInst *TI = Pred->getTerminator();
-  if (auto *BI = dyn_cast<BranchInst>(TI))
-    return BI->getArg(Index);
+static SILValue getIncomingPhiValueForPred(const SILBasicBlock *parentBlock,
+                                           const SILBasicBlock *predBlock,
+                                           unsigned argIndex) {
+  const auto *predBlockTermInst = predBlock->getTerminator();
+  if (auto *bi = dyn_cast<BranchInst>(predBlockTermInst))
+    return bi->getArg(argIndex);
 
   // FIXME: Disallowing critical edges in SIL would enormously simplify phi and
   // branch handling and reduce expensive analysis invalidation. If that is
   // done, then only BranchInst will participate in phi operands, eliminating
   // the need to search for the appropriate CondBranchInst operand.
-  return cast<CondBranchInst>(TI)->getArgForDestBB(BB, Index);
+  return cast<CondBranchInst>(predBlockTermInst)
+      ->getArgForDestBB(parentBlock, argIndex);
 }
 
-SILValue SILPhiArgument::getIncomingPhiValue(SILBasicBlock *predBB) {
+SILValue SILPhiArgument::getIncomingPhiValue(SILBasicBlock *predBlock) const {
   if (!isPhiArgument())
     return SILValue();
 
-  SILBasicBlock *Parent = getParent();
-  assert(!Parent->pred_empty());
+  const auto *parentBlock = getParent();
+  assert(!parentBlock->pred_empty());
 
-  unsigned Index = getIndex();
+  unsigned argIndex = getIndex();
 
-  assert(Parent->pred_end()
-         != std::find(Parent->pred_begin(), Parent->pred_end(), predBB));
+  assert(parentBlock->pred_end() != std::find(parentBlock->pred_begin(),
+                                              parentBlock->pred_end(),
+                                              predBlock));
 
-  return getIncomingPhiValueForPred(Parent, predBB, Index);
+  return getIncomingPhiValueForPred(parentBlock, predBlock, argIndex);
 }
 
 bool SILPhiArgument::getIncomingPhiValues(
-    llvm::SmallVectorImpl<SILValue> &ReturnedPhiValues) {
+    SmallVectorImpl<SILValue> &returnedPhiValues) const {
   if (!isPhiArgument())
     return false;
 
-  SILBasicBlock *Parent = getParent();
-  assert(!Parent->pred_empty());
+  const auto *parentBlock = getParent();
+  assert(!parentBlock->pred_empty());
 
-  unsigned Index = getIndex();
-  for (SILBasicBlock *Pred : getParent()->getPredecessorBlocks()) {
-    SILValue Value = getIncomingPhiValueForPred(Parent, Pred, Index);
-    assert(Value);
-    ReturnedPhiValues.push_back(Value);
+  unsigned argIndex = getIndex();
+  for (auto *predBlock : getParent()->getPredecessorBlocks()) {
+    SILValue incomingValue =
+        getIncomingPhiValueForPred(parentBlock, predBlock, argIndex);
+    assert(incomingValue);
+    returnedPhiValues.push_back(incomingValue);
   }
   return true;
 }
 
 bool SILPhiArgument::getIncomingPhiValues(
-    llvm::SmallVectorImpl<std::pair<SILBasicBlock *, SILValue>>
-        &ReturnedPredBBAndPhiValuePairs) {
+    SmallVectorImpl<std::pair<SILBasicBlock *, SILValue>>
+        &returnedPredBBAndPhiValuePairs) const {
   if (!isPhiArgument())
     return false;
 
-  SILBasicBlock *Parent = getParent();
-  assert(!Parent->pred_empty());
+  const auto *parentBlock = getParent();
+  assert(!parentBlock->pred_empty());
 
-  unsigned Index = getIndex();
-  for (SILBasicBlock *Pred : getParent()->getPredecessorBlocks()) {
-    SILValue Value = getIncomingPhiValueForPred(Parent, Pred, Index);
-    assert(Value);
-    ReturnedPredBBAndPhiValuePairs.push_back({Pred, Value});
+  unsigned argIndex = getIndex();
+  for (auto *predBlock : getParent()->getPredecessorBlocks()) {
+    SILValue incomingValue =
+        getIncomingPhiValueForPred(parentBlock, predBlock, argIndex);
+    assert(incomingValue);
+    returnedPredBBAndPhiValuePairs.push_back({predBlock, incomingValue});
   }
   return true;
 }
 
-static SILValue getSingleTerminatorOperandForPred(const SILBasicBlock *BB,
-                                                  const SILBasicBlock *Pred,
-                                                  unsigned Index) {
-  const TermInst *TI = Pred->getTerminator();
+static SILValue
+getSingleTerminatorOperandForPred(const SILBasicBlock *parentBlock,
+                                  const SILBasicBlock *predBlock,
+                                  unsigned argIndex) {
+  const auto *predTermInst = predBlock->getTerminator();
 
-  switch (TI->getTermKind()) {
+  switch (predTermInst->getTermKind()) {
   case TermKind::UnreachableInst:
   case TermKind::ReturnInst:
   case TermKind::ThrowInst:
@@ -167,61 +174,65 @@ static SILValue getSingleTerminatorOperandForPred(const SILBasicBlock *BB,
   case TermKind::YieldInst:
     return SILValue();
   case TermKind::BranchInst:
-    return cast<const BranchInst>(TI)->getArg(Index);
+    return cast<const BranchInst>(predTermInst)->getArg(argIndex);
   case TermKind::CondBranchInst:
-    return cast<const CondBranchInst>(TI)->getArgForDestBB(BB, Index);
+    return cast<const CondBranchInst>(predTermInst)
+        ->getArgForDestBB(parentBlock, argIndex);
   case TermKind::CheckedCastBranchInst:
-    return cast<const CheckedCastBranchInst>(TI)->getOperand();
+    return cast<const CheckedCastBranchInst>(predTermInst)->getOperand();
   case TermKind::CheckedCastValueBranchInst:
-    return cast<const CheckedCastValueBranchInst>(TI)->getOperand();
+    return cast<const CheckedCastValueBranchInst>(predTermInst)->getOperand();
   case TermKind::SwitchEnumInst:
-    return cast<const SwitchEnumInst>(TI)->getOperand();
+    return cast<const SwitchEnumInst>(predTermInst)->getOperand();
   }
   llvm_unreachable("Unhandled TermKind?!");
 }
 
 bool SILPhiArgument::getSingleTerminatorOperands(
-    llvm::SmallVectorImpl<SILValue> &OutArray) {
-  SILBasicBlock *Parent = getParent();
+    SmallVectorImpl<SILValue> &returnedSingleTermOperands) const {
+  const auto *parentBlock = getParent();
 
-  if (Parent->pred_empty())
+  if (parentBlock->pred_empty())
     return false;
 
-  unsigned Index = getIndex();
-  for (SILBasicBlock *Pred : getParent()->getPredecessorBlocks()) {
-    SILValue Value = getSingleTerminatorOperandForPred(Parent, Pred, Index);
-    if (!Value)
+  unsigned argIndex = getIndex();
+  for (auto *predBlock : getParent()->getPredecessorBlocks()) {
+    SILValue incomingValue =
+        getSingleTerminatorOperandForPred(parentBlock, predBlock, argIndex);
+    if (!incomingValue)
       return false;
-    OutArray.push_back(Value);
+    returnedSingleTermOperands.push_back(incomingValue);
   }
 
   return true;
 }
 
 bool SILPhiArgument::getSingleTerminatorOperands(
-    llvm::SmallVectorImpl<std::pair<SILBasicBlock *, SILValue>> &OutArray) {
-  SILBasicBlock *Parent = getParent();
+    SmallVectorImpl<std::pair<SILBasicBlock *, SILValue>>
+        &returnedSingleTermOperands) const {
+  const auto *parentBlock = getParent();
 
-  if (Parent->pred_empty())
+  if (parentBlock->pred_empty())
     return false;
 
-  unsigned Index = getIndex();
-  for (SILBasicBlock *Pred : getParent()->getPredecessorBlocks()) {
-    SILValue Value = getSingleTerminatorOperandForPred(Parent, Pred, Index);
-    if (!Value)
+  unsigned argIndex = getIndex();
+  for (auto *predBlock : getParent()->getPredecessorBlocks()) {
+    SILValue incomingValue =
+        getSingleTerminatorOperandForPred(parentBlock, predBlock, argIndex);
+    if (!incomingValue)
       return false;
-    OutArray.push_back({Pred, Value});
+    returnedSingleTermOperands.push_back({predBlock, incomingValue});
   }
 
   return true;
 }
 
 SILValue SILPhiArgument::getSingleTerminatorOperand() const {
-  const SILBasicBlock *Parent = getParent();
-  const SILBasicBlock *PredBB = Parent->getSinglePredecessorBlock();
-  if (!PredBB)
+  const auto *parentBlock = getParent();
+  const auto *predBlock = parentBlock->getSinglePredecessorBlock();
+  if (!predBlock)
     return SILValue();
-  return getSingleTerminatorOperandForPred(Parent, PredBB, getIndex());
+  return getSingleTerminatorOperandForPred(parentBlock, predBlock, getIndex());
 }
 
 const SILPhiArgument *BranchInst::getArgForOperand(const Operand *oper) const {

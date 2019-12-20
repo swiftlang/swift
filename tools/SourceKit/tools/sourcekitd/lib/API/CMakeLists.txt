@@ -1,5 +1,8 @@
+set(LLVM_OPTIONAL_SOURCES
+  sourcekitdAPI-XPC.cpp
+  sourcekitdAPI-InProc.cpp)
 
-set(sourcekitdAPI_sources
+add_sourcekit_library(sourcekitdAPI
   CodeCompletionResultsArray.cpp
   CompactArray.cpp
   DocStructureArray.cpp
@@ -10,21 +13,14 @@ set(sourcekitdAPI_sources
   TokenAnnotationsArray.cpp
   ExpressionTypeArray.cpp
 )
-
-set(sourcekitdAPI_Darwin_sources
-  sourcekitdAPI-XPC.cpp)
-set(sourcekitdAPI_NonDarwin_InProc_sources
-  sourcekitdAPI-InProc.cpp)
-set(LLVM_OPTIONAL_SOURCES ${sourcekitdAPI_Darwin_sources} ${sourcekitdAPI_NonDarwin_InProc_sources})
+target_link_libraries(sourcekitdAPI PRIVATE
+  SourceKitSupport
+  SourceKitSwiftLang)
 
 if(APPLE AND HAVE_XPC_H)
-  list(APPEND sourcekitdAPI_sources ${sourcekitdAPI_Darwin_sources})
+  target_sources(sourcekitdAPI PRIVATE
+    sourcekitdAPI-XPC.cpp)
 elseif(SWIFT_SOURCEKIT_USE_INPROC_LIBRARY)
-  list(APPEND sourcekitdAPI_sources ${sourcekitdAPI_NonDarwin_InProc_sources})
+  target_sources(sourcekitdAPI PRIVATE
+    sourcekitdAPI-InProc.cpp)
 endif()
-
-add_sourcekit_library(sourcekitdAPI
-  ${sourcekitdAPI_sources}
-  LINK_LIBS
-      SourceKitSupport SourceKitSwiftLang
-)

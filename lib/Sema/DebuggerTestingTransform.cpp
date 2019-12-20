@@ -23,6 +23,7 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/Stmt.h"
 #include "swift/Subsystems.h"
 
@@ -66,10 +67,15 @@ class DebuggerTestingTransform : public ASTWalker {
   ASTContext &Ctx;
   DiscriminatorFinder &DF;
   std::vector<DeclContext *> LocalDeclContextStack;
+  const DeclNameRef StringForPrintObjectName;
+  const DeclNameRef DebuggerTestingCheckExpectName;
 
 public:
   DebuggerTestingTransform(ASTContext &Ctx, DiscriminatorFinder &DF)
-      : Ctx(Ctx), DF(DF) {}
+      : Ctx(Ctx), DF(DF),
+        StringForPrintObjectName(Ctx.getIdentifier("_stringForPrintObject")),
+        DebuggerTestingCheckExpectName(
+            Ctx.getIdentifier("_debuggerTestingCheckExpect")) {}
 
   bool walkToDeclPre(Decl *D) override {
     pushLocalDeclContext(D);
@@ -199,7 +205,7 @@ private:
 
     // Create _stringForPrintObject($Varname).
     auto *PODeclRef = new (Ctx)
-        UnresolvedDeclRefExpr(Ctx.getIdentifier("_stringForPrintObject"),
+        UnresolvedDeclRefExpr(StringForPrintObjectName,
                               DeclRefKind::Ordinary, DeclNameLoc());
     Expr *POArgs[] = {DstRef};
     Identifier POLabels[] = {Identifier()};
@@ -210,14 +216,13 @@ private:
     Identifier CheckExpectLabels[] = {Identifier(), Identifier()};
     Expr *CheckExpectArgs[] = {Varname, POCall};
     UnresolvedDeclRefExpr *CheckExpectDRE = new (Ctx)
-        UnresolvedDeclRefExpr(Ctx.getIdentifier("_debuggerTestingCheckExpect"),
+        UnresolvedDeclRefExpr(DebuggerTestingCheckExpectName,
                               DeclRefKind::Ordinary, DeclNameLoc());
     auto *CheckExpectExpr = CallExpr::createImplicit(
         Ctx, CheckExpectDRE, CheckExpectArgs, CheckExpectLabels);
     CheckExpectExpr->setThrows(false);
 
     // Create the closure.
-    TypeChecker &TC = TypeChecker::createForContext(Ctx);
     auto *Params = ParameterList::createEmpty(Ctx);
     auto *Closure = new (Ctx)
         ClosureExpr(Params, SourceLoc(), SourceLoc(), SourceLoc(), TypeLoc(),
@@ -237,12 +242,13 @@ private:
     // TODO: typeCheckExpression() seems to assign types to everything here,
     // but may not be sufficient in some cases.
     Expr *FinalExpr = ClosureCall;
-    if (!TC.typeCheckExpression(FinalExpr, getCurrentDeclContext()))
+    (void)swift::createTypeChecker(Ctx);
+    if (!TypeChecker::typeCheckExpression(FinalExpr, getCurrentDeclContext()))
       llvm::report_fatal_error("Could not type-check instrumentation");
 
     // Captures have to be computed after the closure is type-checked. This
     // ensures that the type checker can infer <noescape> for captured values.
-    TC.computeCaptures(Closure);
+    TypeChecker::computeCaptures(Closure);
 
     return {false, FinalExpr};
   }

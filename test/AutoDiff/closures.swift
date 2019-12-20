@@ -11,7 +11,7 @@ func diffableClosureInStruct(s: Foo) {
 // CHECK-LABEL: @{{.*}}diffableClosureInStruct{{.*}} : $@convention(thin) (@guaranteed Foo) -> () {
 // CHECK:   [[CLOSURE:%.*]] = struct_extract {{%.*}} : $Foo, #Foo.f
 // CHECK:   retain_value [[CLOSURE]] : $@differentiable @callee_guaranteed (Float) -> Float
-// CHECK:   autodiff_function_extract [original] [[CLOSURE]] : $@differentiable @callee_guaranteed (Float) -> Float
+// CHECK:   differentiable_function_extract [original] [[CLOSURE]] : $@differentiable @callee_guaranteed (Float) -> Float
 
 struct InoutAliasableCapture {
   var x: Float = .zero
@@ -26,11 +26,12 @@ struct InoutAliasableCapture {
 
 // CHECK-LABEL: @{{.*}}InoutAliasableCapture{{.*}}foo{{.*}} : $@convention(method) (@inout InoutAliasableCapture) -> () {
 // CHECK: bb0([[SELF:%.*]] : $*InoutAliasableCapture):
-// CHECK:   [[JVP:%.*]] = function_ref @{{.*}}capturesMutableSelf{{.*}}__jvp_src_0_wrt_0 : $@convention(thin) (Float, @inout_aliasable InoutAliasableCapture) -> (Float, @owned @callee_guaranteed (Float) -> Float)
+// CHECK:   [[JVP:%.*]] = differentiability_witness_function [jvp] [parameters 0] [results 0] @{{.*}}capturesMutableSelf{{.*}} : $@convention(thin) (Float, @inout_aliasable InoutAliasableCapture) -> Float
 // CHECK-NOT:  retain_value_addr [[SELF]]
 // CHECK-NOT:  copy_addr [[SELF]]
 // CHECK:   [[JVP_CAPTURED:%.*]] = partial_apply [callee_guaranteed] [[JVP]]([[SELF]]) : $@convention(thin) (Float, @inout_aliasable InoutAliasableCapture) -> (Float, @owned @callee_guaranteed (Float) -> Float)
-// CHECK:   [[VJP:%.*]] = function_ref @{{.*}}capturesMutableSelf{{.*}}__vjp_src_0_wrt_0 : $@convention(thin) (Float, @inout_aliasable InoutAliasableCapture) -> (Float, @owned @callee_guaranteed (Float) -> Float)
+// CHECK:   [[VJP:%.*]] = differentiability_witness_function [vjp] [parameters 0] [results 0] @{{.*}}capturesMutableSelf{{.*}} : $@convention(thin) (Float, @inout_aliasable InoutAliasableCapture) -> Float
+// CHECK-NOT:  retain_value_addr [[SELF]]
 // CHECK-NOT:  retain_value_addr [[SELF]]
 // CHECK-NOT:  copy_addr [[SELF]]
 // CHECK:   [[VJP_CAPTURED:%.*]] = partial_apply [callee_guaranteed] [[VJP]]([[SELF]]) : $@convention(thin) (Float, @inout_aliasable InoutAliasableCapture) -> (Float, @owned @callee_guaranteed (Float) -> Float)
@@ -56,16 +57,16 @@ struct TF_30 : Differentiable {
 // Make sure this passes SIL verification.
 let _: @differentiable (TF_30) -> Float = { s in s.x }
 
-// Make sure `@nondiff` gets propagated through SIL.
-// Make sure `@nondiff` with non-`Differentiable` also works.
-public func nondiffs(_ f: @differentiable (Float, @nondiff Float) -> Float,
-                     _ g: @differentiable (Float, @nondiff Int) -> Float) {
+// Make sure `@noDerivative` gets propagated through SIL.
+// Make sure `@noDerivative` with non-`Differentiable` also works.
+public func nondiffs(_ f: @differentiable (Float, @noDerivative Float) -> Float,
+                     _ g: @differentiable (Float, @noDerivative Int) -> Float) {
   _ = gradient(at: 0) { f($0, 1) }
   _ = gradient(at: 0) { g($0, 1) }
 }
 nondiffs({ x, y in x }, { x, y in x })
 
-// Crasher when SILGen'ing @differentiable functions with generic @nondiff parameters.
-func foo<T>(_ f: @differentiable (Float, @nondiff T) -> Float, _ t: T) -> Float {
+// Crasher when SILGen'ing @differentiable functions with generic @noDerivative parameters.
+func foo<T>(_ f: @differentiable (Float, @noDerivative T) -> Float, _ t: T) -> Float {
   return f(1, t)
 }

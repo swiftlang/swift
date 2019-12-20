@@ -5,20 +5,21 @@ import Builtin
 
 // CHECK-LABEL: sil [ossa] @non_trivial : $@convention(thin) (@in Builtin.NativeObject, @owned Builtin.NativeObject) -> () {
 // CHECK: bb0([[ARG1:%[0-9]+]] : $*Builtin.NativeObject, [[ARG2:%[0-9]+]] : @owned $Builtin.NativeObject):
-// CHECK: load [take] [[ARG1]] : $*Builtin.NativeObject
 // CHECK: load [copy] [[ARG1]] : $*Builtin.NativeObject
+// CHECK: load [take] [[ARG1]] : $*Builtin.NativeObject
 // CHECK: [[COPY_ARG2:%.*]] = copy_value [[ARG2]]
 // CHECK: store [[COPY_ARG2]] to [init] [[ARG1]] : $*Builtin.NativeObject
 // CHECK: store [[ARG2]] to [assign] [[ARG1]] : $*Builtin.NativeObject
 sil [ossa] @non_trivial : $@convention(thin) (@in Builtin.NativeObject, @owned Builtin.NativeObject) -> () {
 bb0(%0 : $*Builtin.NativeObject, %1 : @owned $Builtin.NativeObject):
-  %2 = load [take] %0 : $*Builtin.NativeObject
-  %3 = load [copy] %0 : $*Builtin.NativeObject
+  %2 = load [copy] %0 : $*Builtin.NativeObject
+  %3 = load [take] %0 : $*Builtin.NativeObject
   %4 = copy_value %1 : $Builtin.NativeObject
   store %4 to [init] %0 : $*Builtin.NativeObject
   store %1 to [assign] %0 : $*Builtin.NativeObject
   destroy_value %2 : $Builtin.NativeObject
   destroy_value %3 : $Builtin.NativeObject
+  destroy_addr %0 : $*Builtin.NativeObject
   %9999 = tuple()
   return %9999 : $()
 }

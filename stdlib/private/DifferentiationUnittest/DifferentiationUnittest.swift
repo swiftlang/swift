@@ -65,12 +65,12 @@ public struct Tracked<T> {
   }
   private var handle: Box
 
-  @differentiable(vjp: _vjpInit where T : Differentiable, T == T.TangentVector)
+  @differentiable(where T : Differentiable, T == T.TangentVector)
   public init(_ value: T) {
     self.handle = Box(value)
   }
 
-  @differentiable(vjp: _vjpValue where T : Differentiable, T == T.TangentVector)
+  @differentiable(where T : Differentiable, T == T.TangentVector)
   public var value: T {
     get { handle.value }
     set { handle.value = newValue }
@@ -172,81 +172,132 @@ extension Tracked : Differentiable where T : Differentiable, T == T.TangentVecto
 
 extension Tracked where T : Differentiable, T == T.TangentVector {
   @usableFromInline
+  @derivative(of: init)
   internal static func _vjpInit(_ value: T)
       -> (value: Self, pullback: (Self.TangentVector) -> (T.TangentVector)) {
     return (Tracked(value), { v in v.value })
   }
 
   @usableFromInline
-  internal func _vjpValue() -> (T, (T.TangentVector) -> Self.TangentVector) {
+  @derivative(of: init)
+  internal static func _jvpInit(_ value: T)
+      -> (value: Self, differential: (T.TangentVector) -> (Self.TangentVector)) {
+    return (Tracked(value), { v in Tracked(v) })
+  }
+
+  @usableFromInline
+  @derivative(of: value)
+  internal func _vjpValue() -> (value: T, pullback: (T.TangentVector) -> Self.TangentVector) {
     return (value, { v in Tracked(v) })
+  }
+
+  @usableFromInline
+  @derivative(of: value)
+  internal func _jvpValue() -> (value: T, differential: (Self.TangentVector) -> T.TangentVector) {
+    return (value, { v in v.value })
   }
 }
 
 extension Tracked where T : Differentiable, T == T.TangentVector {
   @usableFromInline
-  @differentiating(+)
+  @derivative(of: +)
   internal static func _vjpAdd(lhs: Self, rhs: Self)
       -> (value: Self, pullback: (Self) -> (Self, Self)) {
     return (lhs + rhs, { v in (v, v) })
   }
 
   @usableFromInline
-  @differentiating(-)
+  @derivative(of: +)
+  internal static func _jvpAdd(lhs: Self, rhs: Self)
+      -> (value: Self, differential: (Self, Self) -> Self) {
+    return (lhs + rhs, { $0 + $1 })
+  }
+
+  @usableFromInline
+  @derivative(of: -)
   internal static func _vjpSubtract(lhs: Self, rhs: Self)
       -> (value: Self, pullback: (Self) -> (Self, Self)) {
     return (lhs - rhs, { v in (v, .zero - v) })
+  }
+
+  @usableFromInline
+  @derivative(of: -)
+  internal static func _jvpSubtract(lhs: Self, rhs: Self)
+      -> (value: Self, differential: (Self, Self) -> Self) {
+    return (lhs - rhs, { $0 - $1 })
   }
 }
 
 extension Tracked where T : Differentiable & SignedNumeric, T == T.Magnitude,
                         T == T.TangentVector {
   @usableFromInline
-  @differentiating(*)
+  @derivative(of: *)
   internal static func _vjpMultiply(lhs: Self, rhs: Self)
       -> (value: Self, pullback: (Self) -> (Self, Self)) {
     return (lhs * rhs, { v in (v * rhs, v * lhs) })
+  }
+
+  @usableFromInline
+  @derivative(of: *)
+  internal static func _jvpMultiply(lhs: Self, rhs: Self)
+      -> (value: Self, differential: (Self, Self) -> (Self)) {
+    return (lhs * rhs, { (dx, dy) in dx * rhs + dy * lhs })
   }
 }
 
 extension Tracked where T : Differentiable & FloatingPoint, T == T.TangentVector {
   @usableFromInline
-  @differentiating(/)
+  @derivative(of: /)
   internal static func _vjpDivide(lhs: Self, rhs: Self)
       -> (value: Self, pullback: (Self) -> (Self, Self)) {
     return (lhs / rhs, { v in (v / rhs, -lhs / (rhs * rhs) * v) })
   }
+
+  @usableFromInline
+  @derivative(of: /)
+  internal static func _jvpDivide(lhs: Self, rhs: Self)
+      -> (value: Self, differential: (Self, Self) -> (Self)) {
+    return (lhs / rhs, { (dx, dy) in dx / rhs - lhs / (rhs * rhs) * dy })
+  }
 }
 
-// Differential operators for `Tracked<Float>`.
-public extension Differentiable {
-  @inlinable
-  func gradient(
-    in f: @differentiable (Self) -> Tracked<Float>
-  ) -> TangentVector {
-    return self.pullback(in: f)(1)
-  }
+// Differential operators for `Tracked<T>`.
 
-  @inlinable
-  func gradient<T : Differentiable>(
-    at x: T, in f: @differentiable (Self, T) -> Tracked<Float>
-  ) -> (TangentVector, T.TangentVector) {
-    return self.pullback(at: x, in: f)(1)
-  }
+public func gradient<T, R: FloatingPoint>(
+  at x: T, in f: @differentiable (T) -> Tracked<R>
+) -> T.TangentVector where R.TangentVector == R {
+  return pullback(at: x, in: f)(1)
+}
 
-  @inlinable
-  func valueWithGradient(
-    in f: @differentiable (Self) -> Tracked<Float>
-  ) -> (value: Tracked<Float>, gradient: TangentVector) {
-    let (y, pb) = self.valueWithPullback(in: f)
-    return (y, pb(1))
-  }
+public func gradient<T, U, R: FloatingPoint>(
+  at x: T, _ y: U, in f: @differentiable (T, U) -> Tracked<R>
+) -> (T.TangentVector, U.TangentVector) where R.TangentVector == R {
+  return pullback(at: x, y, in: f)(1)
+}
 
-  @inlinable
-  func valueWithGradient<T : Differentiable>(
-    at x: T, in f: @differentiable (Self, T) -> Tracked<Float>
-  ) -> (value: Tracked<Float>, gradient: (TangentVector, T.TangentVector)) {
-    let (y, pb) = self.valueWithPullback(at: x, in: f)
-    return (y, pb(1))
-  }
+public func derivative<T: FloatingPoint, R>(
+  at x: Tracked<T>, in f: @differentiable (Tracked<T>) -> R
+) -> R.TangentVector where T.TangentVector == T {
+  return differential(at: x, in: f)(1)
+}
+
+public func derivative<T: FloatingPoint, U: FloatingPoint, R>(
+  at x: Tracked<T>, _ y: Tracked<U>,
+  in f: @differentiable (Tracked<T>, Tracked<U>) -> R
+) -> R.TangentVector where T.TangentVector == T, U.TangentVector == U {
+  return differential(at: x, y, in: f)(1, 1)
+}
+
+public func valueWithGradient<T, R: FloatingPoint>(
+  at x: T, in f: @differentiable (T) -> Tracked<R>
+) -> (value: Tracked<R>, gradient: T.TangentVector) {
+  let (y, pullback) = valueWithPullback(at: x, in: f)
+  return (y, pullback(1))
+}
+
+public func valueWithDerivative<T: FloatingPoint, R>(
+  at x: Tracked<T>, in f: @differentiable (Tracked<T>) -> R
+) -> (value: R, derivative: R.TangentVector) {
+  let (y, differential) = valueWithDifferential(at: x, in: f)
+  return (y, differential(1))
 }

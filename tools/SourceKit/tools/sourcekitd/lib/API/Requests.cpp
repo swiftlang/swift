@@ -431,6 +431,21 @@ void handleRequestImpl(sourcekitd_object_t ReqObj, ResponseReceiver Rec) {
   if (!ReqUID)
     return Rec(createErrorRequestInvalid("missing 'key.request' with UID value"));
 
+  if (ReqUID == RequestGlobalConfiguration) {
+    auto Config = getGlobalContext().getGlobalConfiguration();
+    ResponseBuilder RB;
+    auto dict = RB.getDictionary();
+
+    Optional<bool> OptimizeForIDE;
+    int64_t EditorMode = true;
+    if (!Req.getInt64(KeyOptimizeForIDE, EditorMode, true)) {
+      OptimizeForIDE = EditorMode;
+    }
+
+    GlobalConfig::Settings UpdatedConfig = Config->update(OptimizeForIDE);
+    dict.set(KeyOptimizeForIDE, UpdatedConfig.OptimizeForIDE);
+    return Rec(RB.createResponse());
+  }
   if (ReqUID == RequestProtocolVersion) {
     ResponseBuilder RB;
     auto dict = RB.getDictionary();
@@ -1008,7 +1023,8 @@ static void handleSemanticRequest(
       Req.getInt64(KeyRetrieveRefactorActions, Actionables, /*isOptional=*/true);
       return Lang.getCursorInfo(
           *SourceFile, Offset, Length, Actionables, CancelOnSubsequentRequest,
-          Args, std::move(vfsOptions), [Rec](const RequestResult<CursorInfoData> &Result) {
+          Args, std::move(vfsOptions),
+          [Rec](const RequestResult<CursorInfoData> &Result) {
             reportCursorInfo(Result, Rec);
           });
     }

@@ -1,0 +1,76 @@
+// RUN: %empty-directory(%t)
+// RUN: %target-sil-opt %s -emit-sib -o %t/tmp.sib -module-name differentiable_func_type
+// RUN: %target-sil-opt %t/tmp.sib -o %t/tmp.2.sib -module-name differentiable_func_type
+// RUN: %target-sil-opt %t/tmp.2.sib -module-name differentiable_func_type | %FileCheck %s -check-prefix=CHECK-SIL
+
+// RUN: %target-swift-frontend %s -emit-ir -module-name differentiable_func_type | %FileCheck %s -check-prefix=CHECK-LLVM
+
+sil_stage raw
+
+import Swift
+
+sil @takeAndReturnLinear : $@convention(thin) (@differentiable(linear) (Float) -> Float) -> @differentiable(linear) (Float) -> Float {
+bb0(%0 : $@differentiable(linear) (Float) -> Float):
+  return %0 : $@differentiable(linear) (Float) -> Float
+}
+
+// CHECK-SIL-LABEL: sil @takeAndReturnLinear : $@convention(thin) (@differentiable(linear) (Float) -> Float) -> @differentiable(linear) (Float) -> Float {
+// CHECK-SIL: bb0([[ARG:%.*]] : $@differentiable(linear) (Float) -> Float):
+// CHECK-SIL:   return [[ARG]] : $@differentiable(linear) (Float) -> Float
+// CHECK-SIL: }
+
+// CHECK-LLVM-LABEL: define{{.*}} swiftcc { i8*, %swift.refcounted*, i8*, %swift.refcounted* } @takeAndReturnLinear(i8*, %swift.refcounted*, i8*, %swift.refcounted*) #0 {
+// CHECK-LLVM: entry:
+// CHECK-LLVM:   %4 = insertvalue { i8*, %swift.refcounted*, i8*, %swift.refcounted* } undef, i8* %0, 0
+// CHECK-LLVM:   %5 = insertvalue { i8*, %swift.refcounted*, i8*, %swift.refcounted* } %4, %swift.refcounted* %1, 1
+// CHECK-LLVM:   %6 = insertvalue { i8*, %swift.refcounted*, i8*, %swift.refcounted* } %5, i8* %2, 2
+// CHECK-LLVM:   %7 = insertvalue { i8*, %swift.refcounted*, i8*, %swift.refcounted* } %6, %swift.refcounted* %3, 3
+// CHECK-LLVM:   ret { i8*, %swift.refcounted*, i8*, %swift.refcounted* } %7
+// CHECK-LLVM: }
+
+
+sil @takeAndReturnDifferentiable : $@convention(thin) (@differentiable (Float) -> Float) -> @differentiable (Float) -> Float {
+bb0(%0 : $@differentiable (Float) -> Float):
+  return %0 : $@differentiable (Float) -> Float
+}
+
+// CHECK-SIL-LABEL: sil @takeAndReturnDifferentiable : $@convention(thin) (@differentiable (Float) -> Float) -> @differentiable (Float) -> Float {
+// CHECK-SIL: bb0([[ARG:%.*]] : $@differentiable (Float) -> Float):
+// CHECK-SIL:   return [[ARG]] : $@differentiable (Float) -> Float
+// CHECK-SIL: }
+
+// CHECK-LLVM-LABEL: define{{.*}} swiftcc void @takeAndReturnDifferentiable(<{ %swift.function, %swift.function, %swift.function }>* noalias nocapture sret, <{ %swift.function, %swift.function, %swift.function }>* noalias nocapture dereferenceable(48)) #0 {
+// CHECK-LLVM: entry:
+// CHECK-LLVM:   %.original = getelementptr inbounds <{ %swift.function, %swift.function, %swift.function }>, <{ %swift.function, %swift.function, %swift.function }>* %1, i32 0, i32 0
+// CHECK-LLVM:   %.original.fn = getelementptr inbounds %swift.function, %swift.function* %.original, i32 0, i32 0
+// CHECK-LLVM:   %2 = load i8*, i8** %.original.fn, align 8
+// CHECK-LLVM:   %.original.data = getelementptr inbounds %swift.function, %swift.function* %.original, i32 0, i32 1
+// CHECK-LLVM:   %3 = load %swift.refcounted*, %swift.refcounted** %.original.data, align 8
+// CHECK-LLVM:   %.jvp = getelementptr inbounds <{ %swift.function, %swift.function, %swift.function }>, <{ %swift.function, %swift.function, %swift.function }>* %1, i32 0, i32 1
+// CHECK-LLVM:   %.jvp.fn = getelementptr inbounds %swift.function, %swift.function* %.jvp, i32 0, i32 0
+// CHECK-LLVM:   %4 = load i8*, i8** %.jvp.fn, align 8
+// CHECK-LLVM:   %.jvp.data = getelementptr inbounds %swift.function, %swift.function* %.jvp, i32 0, i32 1
+// CHECK-LLVM:   %5 = load %swift.refcounted*, %swift.refcounted** %.jvp.data, align 8
+// CHECK-LLVM:   %.vjp = getelementptr inbounds <{ %swift.function, %swift.function, %swift.function }>, <{ %swift.function, %swift.function, %swift.function }>* %1, i32 0, i32 2
+// CHECK-LLVM:   %.vjp.fn = getelementptr inbounds %swift.function, %swift.function* %.vjp, i32 0, i32 0
+// CHECK-LLVM:   %6 = load i8*, i8** %.vjp.fn, align 8
+// CHECK-LLVM:   %.vjp.data = getelementptr inbounds %swift.function, %swift.function* %.vjp, i32 0, i32 1
+// CHECK-LLVM:   %7 = load %swift.refcounted*, %swift.refcounted** %.vjp.data, align 8
+// CHECK-LLVM:   %.original1 = getelementptr inbounds <{ %swift.function, %swift.function, %swift.function }>, <{ %swift.function, %swift.function, %swift.function }>* %0, i32 0, i32 0
+// CHECK-LLVM:   %.original1.fn = getelementptr inbounds %swift.function, %swift.function* %.original1, i32 0, i32 0
+// CHECK-LLVM:   store i8* %2, i8** %.original1.fn, align 8
+// CHECK-LLVM:   %.original1.data = getelementptr inbounds %swift.function, %swift.function* %.original1, i32 0, i32 1
+// CHECK-LLVM:   store %swift.refcounted* %3, %swift.refcounted** %.original1.data, align 8
+// CHECK-LLVM:   %.jvp2 = getelementptr inbounds <{ %swift.function, %swift.function, %swift.function }>, <{ %swift.function, %swift.function, %swift.function }>* %0, i32 0, i32 1
+// CHECK-LLVM:   %.jvp2.fn = getelementptr inbounds %swift.function, %swift.function* %.jvp2, i32 0, i32 0
+// CHECK-LLVM:   store i8* %4, i8** %.jvp2.fn, align 8
+// CHECK-LLVM:   %.jvp2.data = getelementptr inbounds %swift.function, %swift.function* %.jvp2, i32 0, i32 1
+// CHECK-LLVM:   store %swift.refcounted* %5, %swift.refcounted** %.jvp2.data, align 8
+// CHECK-LLVM:   %.vjp3 = getelementptr inbounds <{ %swift.function, %swift.function, %swift.function }>, <{ %swift.function, %swift.function, %swift.function }>* %0, i32 0, i32 2
+// CHECK-LLVM:   %.vjp3.fn = getelementptr inbounds %swift.function, %swift.function* %.vjp3, i32 0, i32 0
+// CHECK-LLVM:   store i8* %6, i8** %.vjp3.fn, align 8
+// CHECK-LLVM:   %.vjp3.data = getelementptr inbounds %swift.function, %swift.function* %.vjp3, i32 0, i32 1
+// CHECK-LLVM:   store %swift.refcounted* %7, %swift.refcounted** %.vjp3.data, align 8
+// CHECK-LLVM:   ret void
+// CHECK-LLVM: }
+

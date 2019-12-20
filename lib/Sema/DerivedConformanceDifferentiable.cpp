@@ -32,8 +32,8 @@
 
 using namespace swift;
 
-// Return the protocol requirement with the specified name.
-// TODO: Move function to shared place for use with other derived conformances.
+/// Return the protocol requirement with the specified name.
+/// TODO: Move function to shared place for use with other derived conformances.
 static ValueDecl *getProtocolRequirement(ProtocolDecl *proto, Identifier name) {
   auto lookup = proto->lookupDirect(name);
   // Erase declarations that are not protocol requirements.
@@ -46,8 +46,8 @@ static ValueDecl *getProtocolRequirement(ProtocolDecl *proto, Identifier name) {
   return lookup.front();
 }
 
-// Get the stored properties of a nominal type that are relevant for
-// differentiation, except the ones tagged `@noDerivative`.
+/// Get the stored properties of a nominal type that are relevant for
+/// differentiation, except the ones tagged `@noDerivative`.
 static void
 getStoredPropertiesForDifferentiation(NominalTypeDecl *nominal,
                                       DeclContext *DC,
@@ -59,9 +59,7 @@ getStoredPropertiesForDifferentiation(NominalTypeDecl *nominal,
       continue;
     if (vd->isLet())
       continue;
-    if (!vd->hasInterfaceType())
-      C.getLazyResolver()->resolveDeclSignature(vd);
-    if (!vd->hasInterfaceType())
+    if (vd->getInterfaceType()->hasError())
       continue;
     auto varType = DC->mapTypeIntoContext(vd->getValueInterfaceType());
     if (!TypeChecker::conformsToProtocol(varType, diffableProto, nominal,
@@ -71,8 +69,8 @@ getStoredPropertiesForDifferentiation(NominalTypeDecl *nominal,
   }
 }
 
-// Convert the given `ValueDecl` to a `StructDecl` if it is a `StructDecl` or a
-// `TypeDecl` with an underlying struct type. Otherwise, return `nullptr`.
+/// Convert the given `ValueDecl` to a `StructDecl` if it is a `StructDecl` or a
+/// `TypeDecl` with an underlying struct type. Otherwise, return `nullptr`.
 static StructDecl *convertToStructDecl(ValueDecl *v) {
   if (auto *structDecl = dyn_cast<StructDecl>(v))
     return structDecl;
@@ -83,21 +81,19 @@ static StructDecl *convertToStructDecl(ValueDecl *v) {
       typeDecl->getDeclaredInterfaceType()->getAnyNominal());
 }
 
-// Get the `Differentiable` protocol `TangentVector` associated type for the
-// given `VarDecl`.
-// TODO: Generalize and move function to shared place for use with other derived
-// conformances.
+/// Get the `Differentiable` protocol `TangentVector` associated type for the
+/// given `VarDecl`.
+/// TODO: Generalize and move function to shared place for use with other derived
+/// conformances.
 static Type getTangentVectorType(VarDecl *decl, DeclContext *DC) {
   auto &C = decl->getASTContext();
   auto *diffableProto = C.getProtocol(KnownProtocolKind::Differentiable);
-  if (!decl->hasInterfaceType())
-    C.getLazyResolver()->resolveDeclSignature(decl);
   auto varType = DC->mapTypeIntoContext(decl->getValueInterfaceType());
   auto conf = TypeChecker::conformsToProtocol(varType, diffableProto, DC,
                                               None);
   if (!conf)
     return nullptr;
-  Type tangentType = conf->getTypeWitnessByName(varType, C.Id_TangentVector);
+  Type tangentType = conf.getTypeWitnessByName(varType, C.Id_TangentVector);
   return tangentType;
 }
 
@@ -112,7 +108,7 @@ static StructDecl *getTangentVectorStructDecl(DeclContext *DC) {
   auto conf = TypeChecker::conformsToProtocol(DC->getSelfTypeInContext(),
                                               diffableProto, DC, None);
   assert(conf && "Nominal must conform to `Differentiable`");
-  auto assocType = conf->getTypeWitnessByName(
+  auto assocType = conf.getTypeWitnessByName(
       DC->getSelfTypeInContext(), C.Id_TangentVector);
   assert(assocType && "`Differentiable.TangentVector` type not found");
   auto *structDecl = dyn_cast<StructDecl>(assocType->getAnyNominal());
@@ -126,7 +122,6 @@ bool DerivedConformance::canDeriveDifferentiable(NominalTypeDecl *nominal,
   if (!isa<StructDecl>(nominal) && !isa<ClassDecl>(nominal))
     return false;
   auto &C = nominal->getASTContext();
-  auto *lazyResolver = C.getLazyResolver();
   auto *diffableProto = C.getProtocol(KnownProtocolKind::Differentiable);
   auto *addArithProto = C.getProtocol(KnownProtocolKind::AdditiveArithmetic);
 
@@ -186,9 +181,7 @@ bool DerivedConformance::canDeriveDifferentiable(NominalTypeDecl *nominal,
   SmallVector<VarDecl *, 16> diffProperties;
   getStoredPropertiesForDifferentiation(nominal, DC, diffProperties);
   return llvm::all_of(diffProperties, [&](VarDecl *v) {
-    if (!v->hasInterfaceType())
-      lazyResolver->resolveDeclSignature(v);
-    if (!v->hasInterfaceType())
+    if (v->getInterfaceType()->hasError())
       return false;
     auto varType = DC->mapTypeIntoContext(v->getValueInterfaceType());
     return (bool)TypeChecker::conformsToProtocol(varType, diffableProto, DC,
@@ -196,7 +189,30 @@ bool DerivedConformance::canDeriveDifferentiable(NominalTypeDecl *nominal,
   });
 }
 
-// Synthesize body for a `Differentiable` method requirement.
+/// Determine if a EuclideanDifferentiable requirement can be derived for a type.
+///
+/// \returns True if the requirement can be derived.
+bool DerivedConformance::canDeriveEuclideanDifferentiable(
+    NominalTypeDecl *nominal, DeclContext *DC) {
+  if (!canDeriveDifferentiable(nominal, DC))
+    return false;
+  auto &C = nominal->getASTContext();
+  auto *eucDiffProto =
+      C.getProtocol(KnownProtocolKind::EuclideanDifferentiable);
+  // Return true if all differentiation stored properties conform to
+  // `AdditiveArithmetic` and their `TangentVector` equals themselves.
+  SmallVector<VarDecl *, 16> diffProperties;
+  getStoredPropertiesForDifferentiation(nominal, DC, diffProperties);
+  return llvm::all_of(diffProperties, [&](VarDecl *member) {
+    if (member->getInterfaceType()->hasError())
+      return false;
+    auto varType = DC->mapTypeIntoContext(member->getValueInterfaceType());
+    return (bool)TypeChecker::conformsToProtocol(
+        varType, eucDiffProto, DC, None);
+  });
+}
+
+/// Synthesize body for a `Differentiable` method requirement.
 static std::pair<BraceStmt *, bool>
 deriveBodyDifferentiable_method(AbstractFunctionDecl *funcDecl,
                                 Identifier methodName,
@@ -236,8 +252,8 @@ deriveBodyDifferentiable_method(AbstractFunctionDecl *funcDecl,
     ValueDecl *memberMethodDecl = methodReq;
     // If conformance reference is concrete, then use concrete witness
     // declaration for the operator.
-    if (confRef->isConcrete())
-      memberMethodDecl = confRef->getConcrete()->getWitnessDecl(
+    if (confRef.isConcrete())
+      memberMethodDecl = confRef.getConcrete()->getWitnessDecl(
           methodReq);
     assert(memberMethodDecl && "Member method declaration must exist");
     auto memberMethodDRE =
@@ -283,7 +299,7 @@ deriveBodyDifferentiable_method(AbstractFunctionDecl *funcDecl,
   return std::pair<BraceStmt *, bool>(braceStmt, false);
 }
 
-// Synthesize body for `move(along:)`.
+/// Synthesize body for `move(along:)`.
 static std::pair<BraceStmt *, bool>
 deriveBodyDifferentiable_move(AbstractFunctionDecl *funcDecl, void *) {
   auto &C = funcDecl->getASTContext();
@@ -291,18 +307,18 @@ deriveBodyDifferentiable_move(AbstractFunctionDecl *funcDecl, void *) {
                                          C.getIdentifier("along"));
 }
 
-// Synthesize function declaration for a `Differentiable` method requirement.
+/// Synthesize function declaration for a `Differentiable` method requirement.
 static ValueDecl *deriveDifferentiable_method(
     DerivedConformance &derived, Identifier methodName, Identifier argumentName,
     Identifier parameterName, Type parameterType, Type returnType,
     AbstractFunctionDecl::BodySynthesizer bodySynthesizer) {
   auto *nominal = derived.Nominal;
-  auto &C = derived.TC.Context;
+  auto &C = derived.Context;
   auto *parentDC = derived.getConformanceContext();
 
-  auto *param =
-      new (C) ParamDecl(ParamDecl::Specifier::Default, SourceLoc(), SourceLoc(),
-                        argumentName, SourceLoc(), parameterName, parentDC);
+  auto *param = new (C) ParamDecl(SourceLoc(), SourceLoc(), argumentName,
+                                  SourceLoc(), parameterName, parentDC);
+  param->setSpecifier(ParamDecl::Specifier::Default);
   param->setInterfaceType(parameterType);
   ParameterList *params = ParameterList::create(C, {param});
 
@@ -317,21 +333,16 @@ static ValueDecl *deriveDifferentiable_method(
   funcDecl->setImplicit();
   funcDecl->setBodySynthesizer(bodySynthesizer.Fn, bodySynthesizer.Context);
 
-  if (auto *env = parentDC->getGenericEnvironmentOfContext())
-    funcDecl->setGenericEnvironment(env);
-  funcDecl->computeType();
+  funcDecl->setGenericSignature(parentDC->getGenericSignatureOfContext());
   funcDecl->copyFormalAccessFrom(nominal, /*sourceIsParentContext*/ true);
-  funcDecl->setValidationToChecked();
 
   derived.addMembersToConformanceContext({funcDecl});
-  C.addSynthesizedDecl(funcDecl);
-
   return funcDecl;
 }
 
-// Synthesize the `move(along:)` function declaration.
+/// Synthesize the `move(along:)` function declaration.
 static ValueDecl *deriveDifferentiable_move(DerivedConformance &derived) {
-  auto &C = derived.TC.Context;
+  auto &C = derived.Context;
   auto *parentDC = derived.getConformanceContext();
 
   auto *tangentDecl = getTangentVectorStructDecl(parentDC);
@@ -343,11 +354,113 @@ static ValueDecl *deriveDifferentiable_move(DerivedConformance &derived) {
       {deriveBodyDifferentiable_move, nullptr});
 }
 
-// Return associated `TangentVector` struct for a nominal type, if it exists.
-// If not, synthesize the struct.
+/// Synthesize the `differentiableVectorView` property declaration.
+static ValueDecl *deriveEuclideanDifferentiable_differentiableVectorView(
+    DerivedConformance &derived) {
+  auto &C = derived.Context;
+  auto *parentDC = derived.getConformanceContext();
+
+  auto *tangentDecl = getTangentVectorStructDecl(parentDC);
+  auto tangentType = tangentDecl->getDeclaredInterfaceType();
+  auto tangentContextualType = parentDC->mapTypeIntoContext(tangentType);
+
+  VarDecl *vectorViewDecl;
+  PatternBindingDecl *pbDecl;
+  std::tie(vectorViewDecl, pbDecl) = derived.declareDerivedProperty(
+      C.Id_differentiableVectorView, tangentType, tangentContextualType,
+      /*isStatic*/ false, /*isFinal*/ true);
+
+  struct GetterSynthesizerContext {
+    StructDecl *tangentDecl;
+    Type tangentContextualType;
+  };
+
+  auto getterSynthesizer = [](AbstractFunctionDecl *getterDecl, void *ctx)
+      -> std::pair<BraceStmt *, bool> {
+    auto *context = reinterpret_cast<GetterSynthesizerContext *>(ctx);
+    assert(context && "Invalid context");
+    auto *parentDC = getterDecl->getParent();
+    auto *nominal = parentDC->getSelfNominalTypeDecl();
+    auto *module = nominal->getModuleContext();
+    auto &C = nominal->getASTContext();
+    auto *eucDiffProto =
+        C.getProtocol(KnownProtocolKind::EuclideanDifferentiable);
+    auto *vectorViewReq =
+        eucDiffProto->lookupDirect(C.Id_differentiableVectorView).front();
+
+    SmallVector<VarDecl *, 8> diffProperties;
+    getStoredPropertiesForDifferentiation(nominal, parentDC, diffProperties);
+
+    // Create a reference to the memberwise initializer: `TangentVector.init`.
+    auto *memberwiseInitDecl =
+        context->tangentDecl->getEffectiveMemberwiseInitializer();
+    assert(memberwiseInitDecl && "Memberwise initializer must exist");
+    assert(diffProperties.size() ==
+               memberwiseInitDecl->getParameters()->size());
+    // `TangentVector`
+    auto *tangentTypeExpr =
+        TypeExpr::createImplicit(context->tangentContextualType, C);
+    // `TangentVector.init`
+    auto *initDRE = new (C) DeclRefExpr(memberwiseInitDecl, DeclNameLoc(),
+                                        /*Implicit*/ true);
+    initDRE->setFunctionRefKind(FunctionRefKind::SingleApply);
+    auto *initExpr = new (C) ConstructorRefCallExpr(initDRE, tangentTypeExpr);
+    initExpr->setThrows(false);
+    initExpr->setImplicit();
+
+    // Create a call:
+    //   TangentVector.init(
+    //     <property_name_1...>:
+    //        self.<property_name_1>.differentiableVectorView,
+    //     <property_name_2...>:
+    //        self.<property_name_2>.differentiableVectorView,
+    //     ...
+    //   )
+    SmallVector<Identifier, 8> argLabels;
+    SmallVector<Expr *, 8> memberRefs;
+    for (auto *member : diffProperties) {
+      auto *selfDRE = new (C) DeclRefExpr(getterDecl->getImplicitSelfDecl(),
+                                          DeclNameLoc(),
+                                          /*Implicit*/ true);
+      auto *memberExpr = new (C) MemberRefExpr(
+          selfDRE, SourceLoc(), member, DeclNameLoc(), /*Implicit*/ true);
+      auto memberType =
+          parentDC->mapTypeIntoContext(member->getValueInterfaceType());
+      auto confRef = module->lookupConformance(memberType, eucDiffProto);
+      assert(confRef &&
+             "Member missing conformance to `EuclideanDifferentiable`");
+      ConcreteDeclRef memberDeclRef = vectorViewReq;
+      if (confRef.isConcrete())
+        memberDeclRef = confRef.getConcrete()->getWitnessDecl(vectorViewReq);
+      argLabels.push_back(member->getName());
+      memberRefs.push_back(new (C) MemberRefExpr(
+          memberExpr, SourceLoc(), memberDeclRef, DeclNameLoc(),
+          /*Implicit*/ true));
+    }
+    assert(memberRefs.size() == argLabels.size());
+    CallExpr *callExpr =
+        CallExpr::createImplicit(C, initExpr, memberRefs, argLabels);
+
+    // Create a return statement: `return TangentVector.init(...)`.
+    ASTNode retStmt =
+        new (C) ReturnStmt(SourceLoc(), callExpr, /*implicit*/ true);
+    auto *braceStmt = BraceStmt::create(C, SourceLoc(), retStmt, SourceLoc(),
+                                        /*implicit*/ true);
+    return std::make_pair(braceStmt, false);
+  };
+  auto *getterDecl = derived.addGetterToReadOnlyDerivedProperty(
+      vectorViewDecl, tangentContextualType);
+  getterDecl->setBodySynthesizer(
+      getterSynthesizer, /*context*/ C.AllocateObjectCopy(
+          GetterSynthesizerContext{tangentDecl, tangentContextualType}));
+  derived.addMembersToConformanceContext({vectorViewDecl, pbDecl});
+  return vectorViewDecl;
+}
+
+/// Return associated `TangentVector` struct for a nominal type, if it exists.
+/// If not, synthesize the struct.
 static StructDecl *
 getOrSynthesizeTangentVectorStruct(DerivedConformance &derived, Identifier id) {
-  auto &TC = derived.TC;
   auto *parentDC = derived.getConformanceContext();
   auto *nominal = derived.Nominal;
   auto &C = nominal->getASTContext();
@@ -362,8 +475,7 @@ getOrSynthesizeTangentVectorStruct(DerivedConformance &derived, Identifier id) {
     return structDecl;
   }
 
-  // Otherwise, synthesize a new struct. The struct must conform to
-  // `Differentiable`.
+  // Otherwise, synthesize a new struct.
   auto *diffableProto = C.getProtocol(KnownProtocolKind::Differentiable);
   auto diffableType = TypeLoc::withoutLoc(diffableProto->getDeclaredType());
   auto *addArithProto = C.getProtocol(KnownProtocolKind::AdditiveArithmetic);
@@ -378,9 +490,9 @@ getOrSynthesizeTangentVectorStruct(DerivedConformance &derived, Identifier id) {
   auto *kpIterableProto = C.getProtocol(KnownProtocolKind::KeyPathIterable);
   auto kpIterableType = TypeLoc::withoutLoc(kpIterableProto->getDeclaredType());
 
-  SmallVector<TypeLoc, 4> inherited{diffableType};
-  // `TangentVector` must conform to `AdditiveArithmetic`.
-  inherited.push_back(addArithType);
+  // By definition, `TangentVector` must conform to `Differentiable` and
+  // `AdditiveArithmetic`.
+  SmallVector<TypeLoc, 4> inherited{diffableType, addArithType};
 
   // Cache original members and their associated types for later use.
   SmallVector<VarDecl *, 8> diffProperties;
@@ -395,7 +507,7 @@ getOrSynthesizeTangentVectorStruct(DerivedConformance &derived, Identifier id) {
   // `PointwiseMultiplicative`.
   bool canDerivePointwiseMultiplicative =
       llvm::all_of(diffProperties, [&](VarDecl *vd) {
-        return TC.conformsToProtocol(getTangentVectorType(vd, parentDC),
+        return TypeChecker::conformsToProtocol(getTangentVectorType(vd, parentDC),
                                      pointMulProto, parentDC, None);
       });
 
@@ -404,7 +516,7 @@ getOrSynthesizeTangentVectorStruct(DerivedConformance &derived, Identifier id) {
   // `ElementaryFunctions`.
   bool canDeriveElementaryFunctions =
       llvm::all_of(diffProperties, [&](VarDecl *vd) {
-        return TC.conformsToProtocol(getTangentVectorType(vd, parentDC),
+        return TypeChecker::conformsToProtocol(getTangentVectorType(vd, parentDC),
                                      mathProto, parentDC, None);
       });
 
@@ -414,12 +526,12 @@ getOrSynthesizeTangentVectorStruct(DerivedConformance &derived, Identifier id) {
   Type sameScalarType;
   bool canDeriveVectorProtocol = !diffProperties.empty() &&
       llvm::all_of(diffProperties, [&](VarDecl *vd) {
-        auto conf = TC.conformsToProtocol(getTangentVectorType(vd, parentDC),
-                                          vectorProto, nominal, None);
+        auto tanType = getTangentVectorType(vd, parentDC);
+        auto conf = TypeChecker::conformsToProtocol(tanType, vectorProto, nominal, None);
         if (!conf)
           return false;
         auto scalarType =
-            conf->getTypeWitnessByName(vd->getType(), C.Id_VectorSpaceScalar);
+            conf.getTypeWitnessByName(tanType, C.Id_VectorSpaceScalar);
         if (!sameScalarType) {
           sameScalarType = scalarType;
           return true;
@@ -430,8 +542,8 @@ getOrSynthesizeTangentVectorStruct(DerivedConformance &derived, Identifier id) {
   // `TangentVector` struct should derive `KeyPathIterable` if the parent struct
   // conforms to `KeyPathIterable`.
   bool shouldDeriveKeyPathIterable =
-      TC.conformsToProtocol(nominal->getDeclaredInterfaceType(),
-                            kpIterableProto, parentDC, None).hasValue();
+      !TypeChecker::conformsToProtocol(nominal->getDeclaredInterfaceType(),
+                            kpIterableProto, parentDC, None).isInvalid();
 
   // If all members conform to `PointwiseMultiplicative`, make the
   // `TangentVector` struct conform to `PointwiseMultiplicative`.
@@ -474,7 +586,6 @@ getOrSynthesizeTangentVectorStruct(DerivedConformance &derived, Identifier id) {
     auto memberAssocContextualType =
         parentDC->mapTypeIntoContext(memberAssocInterfaceType);
     newMember->setInterfaceType(memberAssocInterfaceType);
-    newMember->setType(memberAssocContextualType);
     Pattern *memberPattern =
         new (C) NamedPattern(newMember, /*implicit*/ true);
     memberPattern->setType(memberAssocContextualType);
@@ -487,48 +598,35 @@ getOrSynthesizeTangentVectorStruct(DerivedConformance &derived, Identifier id) {
     structDecl->addMember(newMember);
     structDecl->addMember(memberBinding);
     newMember->copyFormalAccessFrom(member, /*sourceIsParentContext*/ true);
-    newMember->setValidationToChecked();
     newMember->setSetterAccess(member->getFormalAccess());
-    addExpectedOpaqueAccessorsToStorage(newMember);
-    C.addSynthesizedDecl(newMember);
-    C.addSynthesizedDecl(memberBinding);
 
     // Now that this member is in the `TangentVector` type, it should be marked
     // `@differentiable` so that the differentiation transform will synthesize
-    // associated functions for it. We only add this to public stored
+    // derivative functions for it. We only add this to public stored
     // properties, because their access outside the module will go through a
     // call to the getter.
     if (member->getEffectiveAccess() > AccessLevel::Internal &&
         !member->getAttrs().hasAttribute<DifferentiableAttr>()) {
-      // If getter does not exist, trigger synthesis and compute type.
-      if (!member->getAccessor(AccessorKind::Get))
-        addExpectedOpaqueAccessorsToStorage(member);
-      if (!member->getAccessor(AccessorKind::Get)->hasInterfaceType())
-        TC.resolveDeclSignature(member->getAccessor(AccessorKind::Get));
+      auto *getter = member->getSynthesizedAccessor(AccessorKind::Get);
+      (void)getter->getInterfaceType();
       // If member or its getter already has a `@differentiable` attribute,
       // continue.
       if (member->getAttrs().hasAttribute<DifferentiableAttr>() ||
-          member->getAccessor(AccessorKind::Get)
-              ->getAttrs()
-              .hasAttribute<DifferentiableAttr>())
+          getter->getAttrs().hasAttribute<DifferentiableAttr>())
         continue;
-      ArrayRef<Requirement> requirements;
+      GenericSignature derivativeGenericSignature =
+          getter->getGenericSignature();
       // If the parent declaration context is an extension, the nominal type may
-      // conditionally conform to `Differentiable`. Use the conditional
-      // conformance requirements in getter `@differentiable` attributes.
+      // conditionally conform to `Differentiable`. Use the extension generic
+      // requirements in getter `@differentiable` attributes.
       if (auto *extDecl = dyn_cast<ExtensionDecl>(parentDC->getAsDecl()))
-        requirements = extDecl->getGenericRequirements();
+        if (auto extGenSig = extDecl->getGenericSignature())
+          derivativeGenericSignature = extGenSig;
       auto *diffableAttr = DifferentiableAttr::create(
-          C, /*implicit*/ true, SourceLoc(), SourceLoc(),
-          /*linear*/ false, {}, None, None, requirements);
+          getter, /*implicit*/ true, SourceLoc(), SourceLoc(),
+          /*linear*/ false, /*parameterIndices*/ IndexSubset::get(C, 1, {0}),
+          /*jvp*/ None, /*vjp*/ None, derivativeGenericSignature);
       member->getAttrs().add(diffableAttr);
-      // Compute getter parameter indices.
-      auto *getterType = member->getAccessor(AccessorKind::Get)
-                             ->getInterfaceType()
-                             ->castTo<AnyFunctionType>();
-      AutoDiffParameterIndicesBuilder builder(getterType);
-      builder.setParameter(0);
-      diffableAttr->setParameterIndices(builder.build(C));
     }
   }
 
@@ -540,28 +638,23 @@ getOrSynthesizeTangentVectorStruct(DerivedConformance &derived, Identifier id) {
   // The implicit memberwise constructor must be explicitly created so that it
   // can called in `AdditiveArithmetic` and `Differentiable` methods. Normally,
   // the memberwise constructor is synthesized during SILGen, which is too late.
-  auto *initDecl = createImplicitConstructor(
-      TC, structDecl, ImplicitConstructorKind::Memberwise);
+  auto *initDecl = createMemberwiseImplicitConstructor(C, structDecl);
   structDecl->addMember(initDecl);
-  C.addSynthesizedDecl(initDecl);
 
   // After memberwise initializer is synthesized, mark members as implicit.
   for (auto *member : structDecl->getStoredProperties())
     member->setImplicit();
 
   derived.addMembersToConformanceContext({structDecl});
-  C.addSynthesizedDecl(structDecl);
-
   return structDecl;
 }
 
-// Add a typealias declaration with the given name and underlying target
-// struct type to the given source nominal declaration context.
+/// Add a typealias declaration with the given name and underlying target
+/// struct type to the given source nominal declaration context.
 static void addAssociatedTypeAliasDecl(Identifier name,
                                        DeclContext *sourceDC,
                                        StructDecl *target,
-                                       TypeChecker &TC) {
-  auto &C = TC.Context;
+                                       ASTContext &Context) {
   auto *nominal = sourceDC->getSelfNominalTypeDecl();
   assert(nominal && "Expected `DeclContext` to be a nominal type");
   auto lookup = nominal->lookupDirect(name);
@@ -576,48 +669,42 @@ static void addAssociatedTypeAliasDecl(Identifier name,
     return;
   }
   // Otherwise, create a new typealias.
-  auto *aliasDecl = new (C)
+  auto *aliasDecl = new (Context)
       TypeAliasDecl(SourceLoc(), SourceLoc(), name, SourceLoc(), {}, sourceDC);
   aliasDecl->setUnderlyingType(target->getDeclaredInterfaceType());
   aliasDecl->setImplicit();
-  if (auto env = sourceDC->getGenericEnvironmentOfContext())
-    aliasDecl->setGenericEnvironment(env);
+  aliasDecl->setGenericSignature(sourceDC->getGenericSignatureOfContext());
   cast<IterableDeclContext>(sourceDC->getAsDecl())->addMember(aliasDecl);
   aliasDecl->copyFormalAccessFrom(nominal, /*sourceIsParentContext*/ true);
-  aliasDecl->setValidationToChecked();
-  TC.validateDecl(aliasDecl);
-  C.addSynthesizedDecl(aliasDecl);
 };
 
-// Diagnose stored properties in the nominal that do not have an explicit
-// `@noDerivative` attribute, but either:
-// - Do not conform to `Differentiable`.
-// - Are a `let` stored property.
-// Emit a warning and a fixit so that users will make the attribute explicit.
-static void checkAndDiagnoseImplicitNoDerivative(TypeChecker &TC,
+/// Diagnose stored properties in the nominal that do not have an explicit
+/// `@noDerivative` attribute, but either:
+/// - Do not conform to `Differentiable`.
+/// - Are a `let` stored property.
+/// Emit a warning and a fixit so that users will make the attribute explicit.
+static void checkAndDiagnoseImplicitNoDerivative(ASTContext &Context,
                                                  NominalTypeDecl *nominal,
                                                  DeclContext* DC) {
   auto *diffableProto =
-      TC.Context.getProtocol(KnownProtocolKind::Differentiable);
+      Context.getProtocol(KnownProtocolKind::Differentiable);
   bool nominalCanDeriveAdditiveArithmetic =
       DerivedConformance::canDeriveAdditiveArithmetic(nominal, DC);
   for (auto *vd : nominal->getStoredProperties()) {
-    if (!vd->hasInterfaceType())
-      TC.resolveDeclSignature(vd);
-    if (!vd->hasInterfaceType())
+    if (vd->getInterfaceType()->hasError())
       continue;
     auto varType = DC->mapTypeIntoContext(vd->getValueInterfaceType());
     if (vd->getAttrs().hasAttribute<NoDerivativeAttr>())
       continue;
     // Check whether to diagnose stored property.
     bool conformsToDifferentiable =
-        TC.conformsToProtocol(varType, diffableProto, nominal, None).hasValue();
+        !TypeChecker::conformsToProtocol(varType, diffableProto, nominal, None).isInvalid();
     // If stored property should not be diagnosed, continue.
     if (conformsToDifferentiable && !vd->isLet())
       continue;
     // Otherwise, add an implicit `@noDerivative` attribute.
     vd->getAttrs().add(
-        new (TC.Context) NoDerivativeAttr(/*Implicit*/ true));
+        new (Context) NoDerivativeAttr(/*Implicit*/ true));
     auto loc = vd->getAttributeInsertionLoc(/*forModifier*/ false);
     assert(loc.isValid() && "Expected valid source location");
     // If nominal type can conform to `AdditiveArithmetic`, suggest conforming
@@ -626,14 +713,14 @@ static void checkAndDiagnoseImplicitNoDerivative(TypeChecker &TC,
     // when `Self` conforms to `AdditiveArithmetic`, so `Differentiable`
     // derived conformances will no longer be necessary.
     if (!conformsToDifferentiable) {
-      TC.diagnose(loc,
+      Context.Diags.diagnose(loc,
                   diag::differentiable_nondiff_type_implicit_noderivative_fixit,
                   vd->getName(), nominal->getName(),
                   nominalCanDeriveAdditiveArithmetic)
           .fixItInsert(loc, "@noDerivative ");
       continue;
     }
-    TC.diagnose(loc,
+    Context.Diags.diagnose(loc,
                 diag::differentiable_let_property_implicit_noderivative_fixit,
                 vd->getName(), nominal->getName(),
                 nominalCanDeriveAdditiveArithmetic)
@@ -641,10 +728,9 @@ static void checkAndDiagnoseImplicitNoDerivative(TypeChecker &TC,
   }
 }
 
-// Get or synthesize `TangentVector` struct type.
+/// Get or synthesize `TangentVector` struct type.
 static Type
 getOrSynthesizeTangentVectorStructType(DerivedConformance &derived) {
-  auto &TC = derived.TC;
   auto *parentDC = derived.getConformanceContext();
   auto *nominal = derived.Nominal;
   auto &C = nominal->getASTContext();
@@ -655,11 +741,10 @@ getOrSynthesizeTangentVectorStructType(DerivedConformance &derived) {
   if (!tangentStruct)
     return nullptr;
   // Check and emit warnings for implicit `@noDerivative` members.
-  checkAndDiagnoseImplicitNoDerivative(TC, nominal, parentDC);
+  checkAndDiagnoseImplicitNoDerivative(C, nominal, parentDC);
   // Add `TangentVector` typealias for `TangentVector` struct.
   addAssociatedTypeAliasDecl(C.Id_TangentVector,
-                             tangentStruct, tangentStruct, TC);
-  TC.validateDecl(tangentStruct);
+                             tangentStruct, tangentStruct, C);
 
   // Sanity checks for synthesized struct.
   assert(DerivedConformance::canDeriveAdditiveArithmetic(tangentStruct,
@@ -673,10 +758,9 @@ getOrSynthesizeTangentVectorStructType(DerivedConformance &derived) {
       tangentStruct->getDeclaredInterfaceType());
 }
 
-// Synthesize the `TangentVector` struct type.
+/// Synthesize the `TangentVector` struct type.
 static Type
 deriveDifferentiable_TangentVectorStruct(DerivedConformance &derived) {
-  auto &TC = derived.TC;
   auto *parentDC = derived.getConformanceContext();
   auto *nominal = derived.Nominal;
   auto &C = nominal->getASTContext();
@@ -717,7 +801,7 @@ deriveDifferentiable_TangentVectorStruct(DerivedConformance &derived) {
 
   auto *addArithProto = C.getProtocol(KnownProtocolKind::AdditiveArithmetic);
   auto nominalConformsToAddArith =
-      TC.conformsToProtocol(parentDC->getSelfTypeInContext(), addArithProto,
+      TypeChecker::conformsToProtocol(parentDC->getSelfTypeInContext(), addArithProto,
                             parentDC, None);
 
   // Return `Self` if conditions are met.
@@ -730,10 +814,7 @@ deriveDifferentiable_TangentVectorStruct(DerivedConformance &derived) {
     aliasDecl->setUnderlyingType(selfType);
     aliasDecl->setImplicit();
     aliasDecl->copyFormalAccessFrom(nominal, /*sourceIsParentContext*/ true);
-    aliasDecl->setValidationToChecked();
-    TC.validateDecl(aliasDecl);
     derived.addMembersToConformanceContext({aliasDecl});
-    C.addSynthesizedDecl(aliasDecl);
     return selfType;
   }
 
@@ -745,9 +826,9 @@ ValueDecl *DerivedConformance::deriveDifferentiable(ValueDecl *requirement) {
   // Diagnose conformances in disallowed contexts.
   if (checkAndDiagnoseDisallowedContext(requirement))
     return nullptr;
-  if (requirement->getBaseName() == TC.Context.Id_move)
+  if (requirement->getBaseName() == Context.Id_move)
     return deriveDifferentiable_move(*this);
-  TC.diagnose(requirement->getLoc(), diag::broken_differentiable_requirement);
+  Context.Diags.diagnose(requirement->getLoc(), diag::broken_differentiable_requirement);
   return nullptr;
 }
 
@@ -755,8 +836,23 @@ Type DerivedConformance::deriveDifferentiable(AssociatedTypeDecl *requirement) {
   // Diagnose conformances in disallowed contexts.
   if (checkAndDiagnoseDisallowedContext(requirement))
     return nullptr;
-  if (requirement->getBaseName() == TC.Context.Id_TangentVector)
+  if (requirement->getBaseName() == Context.Id_TangentVector)
     return deriveDifferentiable_TangentVectorStruct(*this);
-  TC.diagnose(requirement->getLoc(), diag::broken_differentiable_requirement);
+  Context.Diags.diagnose(requirement->getLoc(), diag::broken_differentiable_requirement);
+  return nullptr;
+}
+
+/// Derive a EuclideanDifferentiable requirement for a nominal type.
+///
+/// \returns the derived member, which will also be added to the type.
+ValueDecl *DerivedConformance::deriveEuclideanDifferentiable(
+    ValueDecl *requirement) {
+  // Diagnose conformances in disallowed contexts.
+  if (checkAndDiagnoseDisallowedContext(requirement))
+    return nullptr;
+  if (requirement->getFullName() == Context.Id_differentiableVectorView)
+    return deriveEuclideanDifferentiable_differentiableVectorView(*this);
+  Context.Diags.diagnose(requirement->getLoc(),
+              diag::broken_euclidean_differentiable_requirement);
   return nullptr;
 }

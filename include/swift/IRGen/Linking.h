@@ -346,6 +346,11 @@ class LinkEntity {
     /// ProtocolConformance*.
     ProtocolWitnessTableLazyCacheVariable,
 
+    // SWIFT_ENABLE_TENSORFLOW
+    /// A SIL differentiability witness.
+    DifferentiabilityWitness,
+    // SWIFT_ENABLE_TENSORFLOW_END
+
     // Everything following this is a type kind.
 
     /// A value witness for a type.
@@ -467,6 +472,16 @@ class LinkEntity {
                                 getAssociatedConformanceIndex(c, associatedType,
                                                           associatedProtocol));
   }
+
+  // SWIFT_ENABLE_TENSORFLOW
+  void
+  setForDifferentiabilityWitness(Kind kind,
+                                 const SILDifferentiabilityWitness *witness) {
+    Pointer = const_cast<void *>(static_cast<const void *>(witness));
+    SecondaryPointer = nullptr;
+    Data = LINKENTITY_SET_FIELD(Kind, unsigned(kind));
+  }
+  // SWIFT_ENABLE_TENSORFLOW_END
 
   // We store associated types using their index in their parent protocol
   // in order to avoid bloating LinkEntity out to three key pointers.
@@ -848,6 +863,16 @@ public:
     return entity;
   }
 
+  // SWIFT_ENABLE_TENSORFLOW
+  static LinkEntity
+  forDifferentiabilityWitness(const SILDifferentiabilityWitness *witness) {
+    LinkEntity entity;
+    entity.setForDifferentiabilityWitness(Kind::DifferentiabilityWitness,
+                                          witness);
+    return entity;
+  }
+  // SWIFT_ENABLE_TENSORFLOW_END
+
   static LinkEntity
   forGenericProtocolWitnessTableInstantiationFunction(
                                       const ProtocolConformance *C) {
@@ -1043,6 +1068,11 @@ public:
     return reinterpret_cast<SILGlobalVariable*>(Pointer);
   }
 
+  SILDifferentiabilityWitness *getSILDifferentiabilityWitness() const {
+    assert(getKind() == Kind::DifferentiabilityWitness);
+    return reinterpret_cast<SILDifferentiabilityWitness *>(Pointer);
+  }
+
   const RootProtocolConformance *getRootProtocolConformance() const {
     assert(isRootProtocolConformanceKind(getKind()));
     return cast<RootProtocolConformance>(getProtocolConformance());
@@ -1111,8 +1141,7 @@ public:
   }
 
   /// Determine whether this entity will be weak-imported.
-  bool isWeakImported(ModuleDecl *module,
-                      AvailabilityContext fromContext) const;
+  bool isWeakImported(ModuleDecl *module) const;
   
   /// Return the source file whose codegen should trigger emission of this
   /// link entity, if one can be identified.
@@ -1182,7 +1211,6 @@ public:
 
   static LinkInfo get(const UniversalLinkageInfo &linkInfo,
                       ModuleDecl *swiftModule,
-                      AvailabilityContext availabilityContext,
                       const LinkEntity &entity,
                       ForDefinition_t forDefinition);
 

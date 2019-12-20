@@ -592,3 +592,14 @@ func unusedArgPattern(_ xx: [Int]) {
     loopBodyEnd()
   }
 }
+
+// Test for SR-11269. Make sure that the sil contains the needed upcast.
+//
+// CHECK-LABEL: sil hidden [ossa] @$s7foreach25genericFuncWithConversion4listySayxG_tAA1CCRbzlF
+// CHECK: bb2([[ITER_VAL:%.*]] : @owned $T):
+// CHECK:   [[ITER_VAL_UPCAST:%.*]] = upcast [[ITER_VAL]] : $T to $C
+func genericFuncWithConversion<T: C>(list : [T]) {
+  for item: C in list {
+    print(item)
+  }
+}

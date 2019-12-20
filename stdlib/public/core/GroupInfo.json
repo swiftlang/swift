@@ -157,6 +157,7 @@
   ],
   "Math": [
     "SetAlgebra.swift",
+    "BuiltinMath.swift",
     "MathFunctions.swift",
     {
     "Integers": [
@@ -170,9 +171,6 @@
     "Vector": [
       "SIMDVector.swift",
       "SIMDVectorTypes.swift"]}
-  ],
-  "AutoDiff": [
-    "AutoDiff.swift",
   ],
   "Optional": [
     "Optional.swift"
@@ -231,5 +229,9 @@
   ],
   "Result": [
     "Result.swift"
+  ],
+  "DifferentiableProgramming": [
+    "Differentiable.swift",
+    "DifferentiationSupport.swift"
   ]
 }

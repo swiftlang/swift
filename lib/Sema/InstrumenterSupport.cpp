@@ -17,6 +17,7 @@
 
 #include "InstrumenterSupport.h"
 #include "swift/AST/DiagnosticSuppression.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/Demangling/Punycode.h"
 #include "llvm/Support/Path.h"
 
@@ -35,17 +36,13 @@ public:
     diags.addConsumer(*this);
   }
   ~ErrorGatherer() override { diags.takeConsumers(); }
-  void
-  handleDiagnostic(SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind,
-                   StringRef FormatString,
-                   ArrayRef<DiagnosticArgument> FormatArgs,
-                   const DiagnosticInfo &Info,
-                   const SourceLoc bufferIndirectlyCausingDiagnostic) override {
-    if (Kind == swift::DiagnosticKind::Error) {
+  void handleDiagnostic(SourceManager &SM,
+                        const DiagnosticInfo &Info) override {
+    if (Info.Kind == swift::DiagnosticKind::Error) {
       error = true;
     }
-    DiagnosticEngine::formatDiagnosticText(llvm::errs(), FormatString,
-                                           FormatArgs);
+    DiagnosticEngine::formatDiagnosticText(llvm::errs(), Info.FormatString,
+                                           Info.FormatArgs);
     llvm::errs() << "\n";
   }
   bool hadError() { return error; }
@@ -91,9 +88,10 @@ InstrumenterBase::InstrumenterBase(ASTContext &C, DeclContext *DC)
 
   SmallVector<ValueDecl *, 1> results;
   TypeCheckDC->getParentModule()->lookupValue(
-      {}, moduleIdentifier, NLKind::UnqualifiedLookup, results);
+      moduleIdentifier, NLKind::UnqualifiedLookup, results);
 
-  ModuleIdentifier = (results.size() == 1) ? moduleIdentifier : Identifier();
+  if (results.size() == 1)
+    ModuleIdentifier = results.front()->createNameRef();
 
   // Setup File identifier
   StringRef filePath = TypeCheckDC->getParentSourceFile()->getFilename();
@@ -107,9 +105,10 @@ InstrumenterBase::InstrumenterBase(ASTContext &C, DeclContext *DC)
 
   results.clear();
   TypeCheckDC->getParentModule()->lookupValue(
-      {}, fileIdentifier, NLKind::UnqualifiedLookup, results);
+      fileIdentifier, NLKind::UnqualifiedLookup, results);
 
-  FileIdentifier = (results.size() == 1) ? fileIdentifier : Identifier();
+  if (results.size() == 1)
+    FileIdentifier = results.front()->createNameRef();
 }
 
 void InstrumenterBase::anchor() {}
@@ -119,9 +118,7 @@ bool InstrumenterBase::doTypeCheckImpl(ASTContext &Ctx, DeclContext *DC,
   DiagnosticSuppression suppression(Ctx.Diags);
   ErrorGatherer errorGatherer(Ctx.Diags);
 
-  TypeChecker &TC = TypeChecker::createForContext(Ctx);
-
-  TC.typeCheckExpression(parsedExpr, DC);
+  TypeChecker::typeCheckExpression(parsedExpr, DC);
 
   if (parsedExpr) {
     ErrorFinder errorFinder;
@@ -133,3 +130,13 @@ bool InstrumenterBase::doTypeCheckImpl(ASTContext &Ctx, DeclContext *DC,
 
   return false;
 }
+
+Expr *InstrumenterBase::buildIDArgumentExpr(Optional<DeclNameRef> name,
+                                            SourceRange SR) {
+  if (!name)
+    return IntegerLiteralExpr::createFromUnsigned(Context, 0);
+
+  return new (Context) UnresolvedDeclRefExpr(*name, DeclRefKind::Ordinary,
+                                             DeclNameLoc(SR.End));
+}
+

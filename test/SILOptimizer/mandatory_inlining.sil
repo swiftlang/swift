@@ -1320,7 +1320,7 @@ bb5:
 // CHECK-NEXT: strong_release [[ARG]]
 // CHECK-NEXT: tuple
 // CHECK-NEXT: return
-// CHECK-NEXT: } // end sil function 'test_apply_pai_in_diamond'
+// CHECK: } // end sil function 'test_apply_pai_in_diamond'
 sil @test_apply_pai_in_diamond : $@convention(thin) (@guaranteed C) ->  () {
 bb0(%0: $C):
   strong_retain %0 : $C
@@ -1339,4 +1339,92 @@ bb3:
   strong_release %0: $C
   %tuple = tuple()
   return %tuple : $()
+}
+
+// CHECK-LABEL: sil @test_apply_pai_in_diamond_non_post_dominate_non_post_dominate : $@convention(thin) (@guaranteed C) ->  () {
+// CHECK: bb0([[ARG:%.*]] : $C):
+// CHECK-NEXT:   cond_br undef, [[BB_TRAMPOLINE:bb[0-9]+]], [[BB_DIAMOND_BEGIN:bb[0-9]+]]
+//
+// CHECK: [[BB_TRAMPOLINE]]:
+// CHECK-NEXT: br [[BB_END:bb[0-9]+]]
+//
+// CHECK: [[BB_DIAMOND_BEGIN]]:
+// CHECK-NEXT:   strong_retain [[ARG]]
+// CHECK-NEXT:   strong_retain [[ARG]]
+// CHECK-NEXT:   cond_br undef, [[NO_CALL_BB:bb[0-9]+]], [[CALL_BB:bb[0-9]+]]
+//
+// CHECK: [[NO_CALL_BB]]:
+// CHECK-NEXT: strong_release [[ARG]]
+// CHECK-NEXT: br [[MERGE_BB:bb[0-9]+]]
+//
+// CHECK: [[CALL_BB]]:
+// CHECK-NEXT:  function_ref use_c
+// CHECK-NEXT:  [[FUNC:%.*]] = function_ref @use_c : $@convention(thin)
+// CHECK-NEXT:  apply [[FUNC]]
+// CHECK-NEXT:  tuple
+// CHECK-NEXT:  strong_release [[ARG]]
+// CHECK-NEXT:  br [[MERGE_BB]]
+//
+// CHECK: [[MERGE_BB]]:
+// CHECK-NEXT: strong_release [[ARG]]
+// CHECK-NEXT: br [[BB_END]]
+//
+// CHECK: [[BB_END]]:
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+// CHECK: } // end sil function 'test_apply_pai_in_diamond_non_post_dominate_non_post_dominate'
+sil @test_apply_pai_in_diamond_non_post_dominate_non_post_dominate : $@convention(thin) (@guaranteed C) ->  () {
+bb0(%0: $C):
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb6
+
+bb2:
+  strong_retain %0 : $C
+  %closure_fun = function_ref @guaranteed_closure_func : $@convention(thin) (@guaranteed C) -> ()
+  %closure = partial_apply [callee_guaranteed] %closure_fun(%0) : $@convention(thin) (@guaranteed C) -> ()
+  cond_br undef, bb3, bb4
+
+bb3:
+  br bb5
+
+bb4:
+  apply %closure() : $@callee_guaranteed () -> ()
+  br bb5
+
+bb5:
+  strong_release %closure : $@callee_guaranteed () -> ()
+  br bb6
+
+bb6:
+  %tuple = tuple()
+  return %tuple : $()
+}
+
+sil [transparent] @escaping_thunk : $@convention(thin) (@guaranteed @callee_guaranteed () -> ()) -> () {
+bb0(%1 : $@callee_guaranteed () -> ()):
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// Make sure that we do not crash here.
+//
+// CHECK-LABEL: sil @partial_apply_stack_failure : $@convention(thin) (@callee_guaranteed () -> ()) -> () {
+// CHECK: } // end sil function 'partial_apply_stack_failure'
+sil @partial_apply_stack_failure : $@convention(thin) (@callee_guaranteed () -> ()) -> () {
+bb0(%0 : $@callee_guaranteed () -> ()):
+  %1 = alloc_stack $@callee_guaranteed () -> ()
+  store %0 to %1 : $*@callee_guaranteed () -> ()
+  %2 = load %1 : $*@callee_guaranteed () -> ()
+  strong_retain %2 : $@callee_guaranteed () -> ()
+  %thunk = function_ref @escaping_thunk : $@convention(thin) (@guaranteed @callee_guaranteed () -> ()) -> ()
+  %2a = partial_apply [callee_guaranteed] [on_stack] %thunk(%2) : $@convention(thin) (@guaranteed @callee_guaranteed () -> ()) -> ()
+  %2b = mark_dependence %2a : $@noescape @callee_guaranteed () -> () on %2 : $@callee_guaranteed () -> ()
+  apply %2b() : $@noescape @callee_guaranteed () -> ()
+  dealloc_stack %2a : $@noescape @callee_guaranteed () -> ()
+  destroy_addr %1 : $*@callee_guaranteed () -> ()
+  dealloc_stack %1 : $*@callee_guaranteed () -> ()
+  %9999 = tuple()
+  return %9999 : $()
 }

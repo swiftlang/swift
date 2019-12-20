@@ -30,9 +30,9 @@ ConcreteDeclRef ConcreteDeclRef::getOverriddenDecl() const {
   auto *derivedDecl = getDecl();
   auto *baseDecl = derivedDecl->getOverriddenDecl();
 
-  auto *baseSig = baseDecl->getInnermostDeclContext()
+  auto baseSig = baseDecl->getInnermostDeclContext()
       ->getGenericSignatureOfContext();
-  auto *derivedSig = derivedDecl->getInnermostDeclContext()
+  auto derivedSig = derivedDecl->getInnermostDeclContext()
       ->getGenericSignatureOfContext();
 
   SubstitutionMap subs;
@@ -46,7 +46,7 @@ ConcreteDeclRef ConcreteDeclRef::getOverriddenDecl() const {
   return ConcreteDeclRef(baseDecl, subs);
 }
 
-void ConcreteDeclRef::dump(raw_ostream &os) {
+void ConcreteDeclRef::dump(raw_ostream &os) const {
   if (!getDecl()) {
     os << "**NULL**";
     return;
@@ -62,6 +62,6 @@ void ConcreteDeclRef::dump(raw_ostream &os) {
   }
 }
 
-void ConcreteDeclRef::dump() {
+void ConcreteDeclRef::dump() const {
   dump(llvm::errs());
 }

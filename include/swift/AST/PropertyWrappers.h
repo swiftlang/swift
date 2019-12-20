@@ -35,16 +35,20 @@ struct PropertyWrapperTypeInfo {
   /// directed.
   VarDecl *valueVar = nullptr;
 
-  /// The initializer init(wrappedValue:) that will be called when the
+  /// Whether there is an init(wrappedValue:) that will be called when the
   /// initializing the property wrapper type from a value of the property type.
-  ///
-  /// This initializer is optional, but if present will be used for the `=`
-  /// initialization syntax.
-  ConstructorDecl *wrappedValueInit = nullptr;
+  enum {
+    NoWrappedValueInit = 0,
+    HasWrappedValueInit,
+    HasInitialValueInit
+  } wrappedValueInit = NoWrappedValueInit;
 
-  /// The initializer `init()` that will be called to default-initialize a
+  /// The initializer that will be called to default-initialize a
   /// value with an attached property wrapper.
-  ConstructorDecl *defaultInit = nullptr;
+  enum {
+    NoDefaultValueInit = 0,
+    HasDefaultValueInit
+  } defaultInit = NoDefaultValueInit;
 
   /// The property through which the projection value ($foo) will be accessed.
   ///
@@ -109,6 +113,7 @@ struct PropertyWrapperMutability {
       }
       return std::max(Getter, Setter);
     }
+    llvm_unreachable("Unhandled Value in switch");
   }
   
   bool operator==(PropertyWrapperMutability other) const {
@@ -183,6 +188,9 @@ void simple_display(
 
 /// Given the initializer for the given property with an attached property
 /// wrapper, dig out the original initialization expression.
+///
+/// Cannot just dig out the getOriginalInit() value because this function checks
+/// types, etc. Erroneous code won't return a result from here.
 Expr *findOriginalPropertyWrapperInitialValue(VarDecl *var, Expr *init);
 
 } // end namespace swift

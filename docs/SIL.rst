@@ -17,8 +17,10 @@ the Swift programming language. SIL accommodates the following use cases:
   such as definitive initialization of variables and constructors, code
   reachability, switch coverage.
 - High-level optimization passes, including retain/release optimization,
-  dynamic method devirtualization, closure inlining, memory allocation promotion,
-  and generic function instantiation.
+  dynamic method devirtualization, closure inlining, promoting heap allocations
+  to stack allocations, promoting stack allocations to SSA registers, scalar
+  replacement of aggregates (splitting aggregate allocations into multiple
+  smaller allocations), and generic function instantiation.
 - A stable distribution format that can be used to distribute "fragile"
   inlineable or generic code with Swift library modules, to be optimized into
   client binaries.
@@ -1908,9 +1910,7 @@ Allocates uninitialized memory that is sufficiently aligned on the stack
 to contain a value of type ``T``. The result of the instruction is the address
 of the allocated memory.
 
-If a type is runtime-sized, the compiler must emit code to potentially
-dynamically allocate memory. So there is no guarantee that the allocated
-memory is really located on the stack.
+``alloc_stack`` always allocates memory on the stack even for runtime-sized type.
 
 ``alloc_stack`` marks the start of the lifetime of the value; the
 allocation must be balanced with a ``dealloc_stack`` instruction to
@@ -2342,8 +2342,8 @@ assign_by_wrapper
   assign_by_wrapper %0 : $S to %1 : $*T, init %2 : $F, set %3 : $G
   // $S can be a value or address type
   // $T must be the type of a property wrapper.
-  // $F must be a function type, taking $S as a single argument and returning $T
-  // $G must be a function type, taking $S as a single argument and with not return value
+  // $F must be a function type, taking $S as a single argument (or multiple arguments in case of a tuple) and returning $T
+  // $G must be a function type, taking $S as a single argument (or multiple arguments in case of a tuple) and without a return value
 
 Similar to the ``assign`` instruction, but the assignment is done via a
 delegate.
@@ -2525,7 +2525,10 @@ except that ``destroy_addr`` may be used even if ``%0`` is of an
 address-only type.  This does not deallocate memory; it only destroys the
 pointed-to value, leaving the memory uninitialized.
 
-If ``T`` is a trivial type, then ``destroy_addr`` is a no-op.
+If ``T`` is a trivial type, then ``destroy_addr`` can be safely
+eliminated. However, a memory location ``%a`` must not be accessed
+after ``destroy_addr %a`` (which has not yet been eliminated)
+regardless of its type.
 
 index_addr
 ``````````
@@ -2801,6 +2804,21 @@ it calls the deallocator of the object.
 It is expected that the strong reference count of the object is one.
 Furthermore, no other thread may increment the strong reference count during
 execution of this instruction.
+
+strong_copy_unowned_value
+`````````````````````````
+::
+
+  sil-instruction ::= 'strong_copy_unowned_value' sil-operand
+
+  %1 = strong_copy_unowned_value %0 : $@unowned T
+  // %1 will be a strong @owned value of type $T.
+  // $T must be a reference type
+
+Asserts that the strong reference count of the heap object referenced by ``%0``
+is still positive, then increments the reference count and returns a new strong
+reference to ``%0``. The intention is that this instruction is used as a "safe
+ownership conversion" from ``unowned`` to ``strong``.
 
 strong_retain_unowned
 `````````````````````
@@ -3484,13 +3502,14 @@ has an escaping function type (not ``[on_stack]``) the closure context will be
 allocated with retain count 1 and initialized to contain the values ``%1``,
 ``%2``, etc.  The closed-over values will not be retained; that must be done
 separately before the ``partial_apply``. The closure does however take ownership
-of the partially applied arguments; when the closure reference count reaches
-zero, the contained values will be destroyed. If the ``partial_apply`` has a
-``@noescape`` function type (``partial_apply [on_stack]``) the closure context
-is allocated on the stack and initialized to contain the closed-over values. The
-closed-over values are not retained, lifetime of the closed-over values must be
-managed separately. The lifetime of the stack context of a ``partial_apply
-[on_stack]`` must be terminated with a ``dealloc_stack``.
+of the partially applied arguments (except for ``@inout_aliasable`` parameters);
+when the closure reference count reaches zero, the contained values will be
+destroyed. If the ``partial_apply`` has a ``@noescape`` function type
+(``partial_apply [on_stack]``) the closure context is allocated on the stack and
+initialized to contain the closed-over values. The closed-over values are not
+retained, lifetime of the closed-over values must be managed separately. The
+lifetime of the stack context of a ``partial_apply [on_stack]`` must be
+terminated with a ``dealloc_stack``.
 
 If the callee is generic, all of its generic parameters must be bound by the
 given substitution list. The arguments are given with these generic
@@ -3498,6 +3517,11 @@ substitutions applied, and the resulting closure is of concrete function
 type with the given substitutions applied. The generic parameters themselves
 cannot be partially applied; all of them must be bound. The result is always
 a concrete function.
+
+If an address argument has ``@inout_aliasable`` convention, the closure
+obtained from ``partial_apply`` will not own its underlying value.
+The ``@inout_aliasable`` parameter convention is used when a ``@noescape``
+closure captures an ``inout`` argument.
 
 TODO: The instruction, when applied to a generic function,
 currently implicitly performs abstraction difference transformations enabled
@@ -3705,6 +3729,24 @@ This instruction has the same local semantics as ``retain_value`` but:
 
 The intention is that this instruction is used to implement unmanaged
 constructs.
+
+strong_copy_unmanaged_value
+```````````````````````````
+
+::
+
+  sil-instruction ::= 'strong_copy_unmanaged_value' sil-value
+
+  %1 = strong_copy_unmanaged_value %0 : $@sil_unmanaged A
+  // %1 will be a strong @owned $A.
+
+This instruction has the same semantics as ``copy_value`` except that its input
+is a trivial ``@sil_unmanaged`` type that doesn't require ref counting. This is
+intended to be used semantically as a "conversion" like instruction from
+``unmanaged`` to ``strong`` and thus should never be removed by the optimizer.
+Since the returned value is a strong owned value, this instruction semantically
+should be treated as performing a strong copy of the underlying value as if by
+the value's type lowering.
 
 copy_value
 ``````````
@@ -4879,7 +4921,7 @@ convert_escape_to_noescape
   //   (see convert_function)
   // %1 will be of the trivial type $@noescape T -> U
 
-Converts an escaping (non-trivial) function type to an ``@noescape`` trivial
+Converts an escaping (non-trivial) function type to a ``@noescape`` trivial
 function type. Something must guarantee the lifetime of the input ``%0`` for the
 duration of the use ``%1``.
 
@@ -5559,70 +5601,147 @@ The rules on generic substitutions are identical to those of ``apply``.
 Automatic Differentiation
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
-autodiff_function
-`````````````````
-
+differentiable_function
+```````````````````````
 ::
 
-  sil-instruction ::= 'autodiff_function'
-                      sil-autodiff-function-parameter-indices?
-                      sil-autodiff-function-order?
+  sil-instruction ::= 'differentiable_function'
+                      sil-differentiable-function-parameter-indices?
                       sil-value ':' sil-type
-                      sil-autodiff-associated-functions-clause?
+                      sil-differentiable-function-derivative-functions-clause?
                       
-  sil-autodiff-function-parameter-indices ::= '[' 'wrt' [0-9]+ (',', [0-9]+)* ']'
-  sil-autodiff-function-differentiation-order ::= '[' 'order' [0-9]+ ']'
-  sil-autodiff-associated-functions-clause ::= 'with' sil-autodiff-associated-function-list
-                                               (',' sil-autodiff-associated-function-list)*
-  sil-autodiff-associated-function-list ::= '{' sil-value ',' sil-value '}'
+  sil-differentiable-function-parameter-indices ::=
+      '[' 'parameters' [0-9]+ (' ' [0-9]+)* ']'
+  sil-differentiable-derivative-functions-clause ::=
+      'with_derivative'
+      '{' sil-value ':' sil-type ',' sil-value ':' sil-type '}'
 
+  differentiable_function [parameters 0] %0 : $(T) -> T \
+    with_derivative {%1 : $(T) -> (T, (T) -> T), %2 : $(T) -> (T, (T) -> T)}
 
-  autodiff_function [wrt 0] [order 1] %0 : $(T) -> T \
-    with {%1 : $(T) -> (T) -> T, %2 : $(T) -> (T) -> T}
+Bundles a function with its derivative functions into a ``@differentiable``
+function. There are two derivative functions: a Jacobian-vector products (JVP)
+function and a vector-Jacobian products (VJP) function.
 
-Bundles a function with its associated differentiation functions up to a
-specified differentiation order into an ``@differentiable`` function. There are
-2 associated functions per differentiation order: a Jacobian-vector products
-(JVP) function and a vector-Jacobian products (VJP) function.
-
-``[wrt ...]`` specifies parameter indices that the original function is
+``[parameters ...]`` specifies parameter indices that the original function is
 differentiable with respect to. When not specified, it defaults to all
 parameters.
 
-``[order ...]`` specifies the maximum differentiation order for the resulting
-function. The number of lists of associated functions is equal to the order.
+A ``with_derivative`` clause specifies the differentiation functions associated
+with the original function. When a ``with_derivative`` clause is not specified,
+the first operand will be differentiated to produce derivative functions, and a
+``with_derivative`` clause will be added to the instruction.
 
-A ``with`` clause specifies the differentiation functions associated
-with the original function. When a ``with`` clause is not specified, the first
-operand will be differentiated to produce associated functions, and a ``with``
-clause will be added to the instruction.
-
-In raw SIL, it is optional to provide a ``with`` clause. In canonical SIL, a
-``with`` clause is mandatory.
+In raw SIL, it is optional to provide a derivative function ``with_derivative``
+clause. In canonical SIL, a ``with_derivative`` clause is mandatory.
 
 
-autodiff_function_extract
-`````````````````````````
-
+linear_function
+```````````````
 ::
 
-  sil-instruction ::= 'autodiff_function_extract'
-                      sil-autodiff-associated-function-kind
-                      sil-autodiff-function-order
+  sil-instruction ::= 'linear_function'
+                      sil-linear-function-parameter-indices?
+                      sil-value ':' sil-type
+                      sil-linear-function-transpose-function-clause?
+
+  sil-linear-function-parameter-indices ::=
+      '[' 'parameters' [0-9]+ (' ' [0-9]+)* ']'
+  sil-linear-transpose-function-clause ::=
+      with_transpose sil-value ':' sil-type
+
+  linear_function [parameters 0] %0 : $(T) -> T with_transpose %1 : $(T) -> T
+
+Bundles a function with its transpose function into a
+``@differentiable(linear)`` function.
+
+``[parameters ...]`` specifies parameter indices that the original function is
+linear with respect to. When not specified, it defaults to all parameters.
+
+A ``with_transpose`` clause specifies the transpose function associated
+with the original function. When a ``with_transpose`` clause is not specified,
+the mandatory differentiation transform  will add a ``with_transpose`` clause to
+the instruction.
+
+In raw SIL, it is optional to provide a transpose function ``with`` clause.
+In canonical SIL, a ``with`` clause is mandatory.
+
+
+differentiable_function_extract
+```````````````````````````````
+::
+
+  sil-instruction ::= 'differentiable_function_extract'
+                      '[' sil-differentiable-function-extractee ']'
+                      sil-value ':' sil-type
+                      ('as' sil-type)?
+
+  sil-differentiable-function-extractee ::= 'original' | 'jvp' | 'vjp'
+
+  differentiable_function_extract [original] %0 : $@differentiable (T) -> T
+  differentiable_function_extract [jvp] %0 : $@differentiable (T) -> T
+  differentiable_function_extract [vjp] %0 : $@differentiable (T) -> T
+  differentiable_function_extract [jvp] %0 : $@differentiable (T) -> T \
+    as $(@in_constant T) -> (T, (T.TangentVector) -> T.TangentVector)
+
+Extracts the original function or a derivative function from the given
+``@differentiable`` function. It must be provided with an extractee:
+``[original]``, ``[jvp]`` or ``[vjp]``.
+
+An explicit extractee type may be provided in lowered SIL. This is currently
+used by the LoadableByAddress transformation, which rewrites function types.
+
+
+linear_function_extract
+```````````````````````
+::
+
+  sil-instruction ::= 'linear_function_extract'
+                      '[' sil-linear-function-extractee ']'
                       sil-value ':' sil-type
 
-  sil-autodiff-function-extractee ::= '[' sil-autodiff-function-extractee ']'
-  sil-autodiff-function-extractee-name ::= 'original' | 'jvp' | 'vjp'
-  sil-autodiff-function-differentiation-order ::= '[' 'order' [0-9]+ ']'
+  sil-linear-function-extractee ::= 'original' | 'transpose'
+
+  linear_function_extract [original] %0 : $@differentiable(linear) (T) -> T
+  linear_function_extract [transpose] %0 : $@differentiable(linear) (T) -> T
+
+Extracts the original function or a transpose function from the given
+``@differentiable(linear)`` function. It must be provided with an extractee:
+``[original]`` or ``[transpose]``.
 
 
-  autodiff_function_extract [original] %0 : $@differentiable (T) -> T
-  autodiff_function_extract [jvp] [order 1] %0 : $@differentiable (T) -> T
-  autodiff_function_extract [vjp] [order 1] %0 : $@differentiable (T) -> T
+differentiability_witness_function
+``````````````````````````````````
+::
 
-Extracts the original function or an associated function from the given
-``@differentiable`` function at a specific differentiation order. It must be
-provided with an extractee: ``[original]``, ``[jvp]`` or ``[vjp]``.
+  sil-instruction ::=
+      'differentiability_witness_function'
+      '[' sil-differentiability-witness-function-kind ']'
+      '[' 'parameters' sil-differentiability-witness-function-index-list ']'
+      '[' 'results' sil-differentiability-witness-function-index-list ']'
+      generic-parameter-clause?
+      sil-function-name ':' sil-type
+
+  sil-differentiability-witness-function-kind ::= 'jvp' | 'vjp' | 'transpose'
+  sil-differentiability-witness-function-index-list ::= [0-9]+ (' ' [0-9]+)*
+
+  differentiability_witness_function [jvp] [parameters 0] [results 0] \
+    <T where T: Differentiable> @foo : $(T) -> T
+
+Looks up the differentiability witness function for the referenced function
+using SIL differentiability witnesses.
+
+The differentiability witness function kind identifies the witness function to
+look up: ``[jvp]``, ``[vjp]``, or ``[transpose]``.
+
+The remaining components identify the SIL differentiability witness:
+
+- Original function name.
+- Parameter indices.
+- Result indices.
+- Witness generic parameter clause (optional). When parsing SIL, the parsed
+  witness generic parameter clause is combined with the original function's
+  generic signature to form the full witness generic signature.
 
 
 Assertion configuration

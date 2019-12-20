@@ -212,6 +212,7 @@ bb0(%0 : @owned $Derived1):
   %8 = unchecked_ref_cast %7 : $Base to $Derived1
   %9 = copy_value %8 : $Derived1
   store %8 to [assign] %1 : $*Derived1
+  destroy_addr %1 : $*Derived1
   dealloc_stack %1 : $*Derived1
   return %9 : $Derived1
 }
@@ -294,6 +295,7 @@ bb0(%0 : @owned $Derived2):
   %8 = unchecked_ref_cast %7 : $Base to $Derived2
   %9 = copy_value %8 : $Derived2
   store %8 to [assign] %1 : $*Derived2
+  destroy_addr %1 : $*Derived2
   dealloc_stack %1 : $*Derived2
   return %9 : $Derived2
 }
@@ -400,6 +402,7 @@ bb0(%0 : @owned $CP2):
   %8 = unchecked_ref_cast %7 : $CP1 to $CP2
   %9 = copy_value %8 : $CP2
   store %8 to [assign] %1 : $*CP2
+  destroy_addr %1 : $*CP2
   dealloc_stack %1 : $*CP2
   return %9 : $CP2
 }

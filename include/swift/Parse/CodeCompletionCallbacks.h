@@ -200,8 +200,6 @@ public:
   virtual void completeUnresolvedMember(CodeCompletionExpr *E,
                                         SourceLoc DotLoc) {};
 
-  virtual void completeAssignmentRHS(AssignExpr *E) {};
-
   virtual void completeCallArg(CodeCompletionExpr *E, bool isFirst) {};
 
   virtual void completeReturnStmt(CodeCompletionExpr *E) {};

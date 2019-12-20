@@ -274,42 +274,59 @@ extension MutableCollection where Self: RandomAccessCollection {
   }
 }
 
-//===--- ConcatenatedCollection -------------------------------------------===//
+//===--- Concatenation ----------------------------------------------------===//
 //===----------------------------------------------------------------------===//
 
-// ConcatenatedCollection improves on a flattened array or other collection by
+// Concatenation improves on a flattened array or other collection by
 // allowing random-access traversal if the underlying collections are
 // random-access.
-//
-// Q: Add a ConcatenatedSequence for consistency? Would be nice to be able to
-// call `let seqAB = concatenate(seqA, seqB)`.
 
-/// A concatenation of two collections with the same element type.
-public struct Concatenation<C1 : Collection, C2: Collection>: Collection
-  where C1.Element == C2.Element
+/// A concatenation of two sequences with the same element type.
+public struct Concatenation<Base1: Sequence, Base2: Sequence>: Sequence
+  where Base1.Element == Base2.Element
 {
-  let _base1: C1
-  let _base2: C2
+  let _base1: Base1
+  let _base2: Base2
 
-  init(_base1: C1, base2: C2) {
+  init(_base1: Base1, base2: Base2) {
     self._base1 = _base1
     self._base2 = base2
   }
+  
+  public struct Iterator: IteratorProtocol {
+    var _iterator1: Base1.Iterator
+    var _iterator2: Base2.Iterator
+    
+    init(_ concatenation: Concatenation) {
+      _iterator1 = concatenation._base1.makeIterator()
+      _iterator2 = concatenation._base2.makeIterator()
+    }
+    
+    public mutating func next() -> Base1.Element? {
+      return _iterator1.next() ?? _iterator2.next()
+    }
+  }
+  
+  public func makeIterator() -> Iterator {
+    Iterator(self)
+  }
+}
 
+extension Concatenation: Collection where Base1: Collection, Base2: Collection {
   /// A position in a `Concatenation`.
   public struct Index : Comparable {
     internal enum _Representation : Equatable {
-      case first(C1.Index)
-      case second(C2.Index)
+      case first(Base1.Index)
+      case second(Base2.Index)
     }
 
     /// Creates a new index into the first underlying collection.
-    internal init(first i: C1.Index) {
+    internal init(first i: Base1.Index) {
       _position = .first(i)
     }
 
     /// Creates a new index into the second underlying collection.
-    internal init(second i: C2.Index) {
+    internal init(second i: Base2.Index) {
       _position = .second(i)
     }
 
@@ -341,7 +358,7 @@ public struct Concatenation<C1 : Collection, C2: Collection>: Collection
     return Index(second: _base2.endIndex)
   }
 
-  public subscript(i: Index) -> C1.Element {
+  public subscript(i: Index) -> Base1.Element {
     switch i._position {
     case let .first(i):
       return _base1[i]
@@ -365,7 +382,7 @@ public struct Concatenation<C1 : Collection, C2: Collection>: Collection
 }
 
 extension Concatenation : BidirectionalCollection
-  where C1: BidirectionalCollection, C2: BidirectionalCollection
+  where Base1: BidirectionalCollection, Base2: BidirectionalCollection
 {
   public func index(before i: Index) -> Index {
     assert(i != startIndex, "Can't advance before startIndex")
@@ -381,7 +398,7 @@ extension Concatenation : BidirectionalCollection
 }
 
 extension Concatenation : RandomAccessCollection
-  where C1: RandomAccessCollection, C2: RandomAccessCollection
+  where Base1: RandomAccessCollection, Base2: RandomAccessCollection
 {
   public func index(_ i: Index, offsetBy n: Int) -> Index {
     if n == 0 { return i }
@@ -425,12 +442,20 @@ extension Concatenation : RandomAccessCollection
 
 /// Returns a new collection that presents a view onto the elements of the
 /// first collection and then the elements of the second collection.
-func concatenate<C1 : Collection, C2 : Collection>(
-  _ first: C1,
-  _ second: C2)
-  -> Concatenation<C1, C2> where C1.Element == C2.Element
+func concatenate<S1: Sequence, S2: Sequence>(
+  _ first: S1,
+  _ second: S2)
+  -> Concatenation<S1, S2> where S1.Element == S2.Element
 {
   return Concatenation(_base1: first, base2: second)
+}
+
+extension Sequence {
+  func followed<S: Sequence>(by other: S) -> Concatenation<Self, S>
+    where Element == S.Element
+  {
+    return concatenate(self, other)
+  }
 }
 
 //===--- RotatedCollection ------------------------------------------------===//
@@ -763,6 +788,9 @@ suite.test("concatenate") {
   let w = "world!"
   let hw = concatenate(h, w)
   expectEqual("Hello, world!", String(hw))
+  
+  let run = (1...).prefix(10).followed(by: 20...)
+  expectEqual(Array(run.prefix(20)), Array(1...10) + (20..<30))
 }
 
 suite.test("stablePartition") {

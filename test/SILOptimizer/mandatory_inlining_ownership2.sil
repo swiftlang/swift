@@ -486,7 +486,7 @@ bb0(%0 : @owned $Builtin.NativeObject):
 // CHECK-NEXT: return
 // CHECK: } // end sil function 'test_recursive_nativeobject_baz'
 sil [transparent] [ossa] @test_recursive_nativeobject_baz : $@convention(thin) (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject {
-bb0(%0 : $Builtin.NativeObject):
+bb0(%0 : @owned $Builtin.NativeObject):
   return %0 : $Builtin.NativeObject
 }
 

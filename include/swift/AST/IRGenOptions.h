@@ -26,6 +26,7 @@
 // FIXME: This include is just for llvm::SanitizerCoverageOptions. We should
 // split the header upstream so we don't include so much.
 #include "llvm/Transforms/Instrumentation.h"
+#include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/VersionTuple.h"
 #include <string>
 #include <vector>
@@ -104,6 +105,9 @@ public:
 
   /// Which sanitizer is turned on.
   OptionSet<SanitizerKind> Sanitizers;
+
+  /// Which sanitizer(s) have recovery instrumentation enabled.
+  OptionSet<SanitizerKind> SanitizersWithRecoveryInstrumentation;
 
   /// Path prefixes that should be rewritten in debug info.
   PathRemapper DebugPrefixMap;
@@ -208,6 +212,10 @@ public:
   /// Disable round-trip verification of mangled debug types.
   unsigned DisableRoundTripDebugTypes : 1;
 
+  /// Whether to disable shadow copies for local variables on the stack. This is
+  /// only used for testing.
+  unsigned DisableDebuggerShadowCopies : 1;
+
   /// Path to the profdata file to be used for PGO, or the empty string.
   std::string UseProfile = "";
 
@@ -234,10 +242,10 @@ public:
       : DWARFVersion(2), OutputKind(IRGenOutputKind::LLVMAssembly),
         Verify(true), OptMode(OptimizationMode::NotSet),
         Sanitizers(OptionSet<SanitizerKind>()),
+        SanitizersWithRecoveryInstrumentation(OptionSet<SanitizerKind>()),
         DebugInfoLevel(IRGenDebugInfoLevel::None),
         DebugInfoFormat(IRGenDebugInfoFormat::None),
-        DisableClangModuleSkeletonCUs(false),
-        UseJIT(false),
+        DisableClangModuleSkeletonCUs(false), UseJIT(false),
         IntegratedREPL(false), DisableLLVMOptzns(false),
         DisableSwiftSpecificLLVMOptzns(false), DisableLLVMSLPVectorizer(false),
         DisableFPElim(true), Playground(false), EmitStackPromotionChecks(false),
@@ -251,17 +259,22 @@ public:
         GenerateProfile(false), EnableDynamicReplacementChaining(false),
         // SWIFT_ENABLE_TENSORFLOW
         // TODO(TF-486): Reenable round type debug types.
-        DisableRoundTripDebugTypes(true), CmdArgs(),
-        SanitizeCoverage(llvm::SanitizerCoverageOptions()),
+        DisableRoundTripDebugTypes(true), DisableDebuggerShadowCopies(false),
+        CmdArgs(), SanitizeCoverage(llvm::SanitizerCoverageOptions()),
         TypeInfoFilter(TypeInfoDumpFilter::All) {}
 
-  // Get a hash of all options which influence the llvm compilation but are not
-  // reflected in the llvm module itself.
-  unsigned getLLVMCodeGenOptionsHash() {
-    unsigned Hash = (unsigned)OptMode;
-    Hash = (Hash << 1) | DisableLLVMOptzns;
-    Hash = (Hash << 1) | DisableSwiftSpecificLLVMOptzns;
-    return Hash;
+  /// Appends to \p os an arbitrary string representing all options which
+  /// influence the llvm compilation but are not reflected in the llvm module
+  /// itself.
+  void writeLLVMCodeGenOptionsTo(llvm::raw_ostream &os) {
+    // We put a letter between each value simply to keep them from running into
+    // one another. There might be a vague correspondence between meaning and
+    // letter, but don't sweat it.
+    os << 'O' << (unsigned)OptMode
+       << 'd' << DisableLLVMOptzns
+       << 'D' << DisableSwiftSpecificLLVMOptzns
+       << 'p' << GenerateProfile
+       << 's' << Sanitizers.toRaw();
   }
 
   /// Should LLVM IR value names be emitted and preserved?

@@ -91,16 +91,16 @@ template <class T> class SILVTableVisitor {
     // SWIFT_ENABLE_TENSORFLOW
     for (auto *DA : fd->getAttrs().getAttributes<DifferentiableAttr>()) {
       auto constant = SILDeclRef(fd, SILDeclRef::Kind::Func);
-      auto jvpConstant = constant.asAutoDiffAssociatedFunction(
-          AutoDiffAssociatedFunctionIdentifier::get(
-              AutoDiffAssociatedFunctionKind::JVP, /*differentiationOrder*/ 1,
-              DA->getParameterIndices(), fd->getASTContext()));
+      auto jvpConstant = constant.asAutoDiffDerivativeFunction(
+          AutoDiffDerivativeFunctionIdentifier::get(
+              AutoDiffDerivativeFunctionKind::JVP, DA->getParameterIndices(),
+              DA->getDerivativeGenericSignature(), fd->getASTContext()));
       maybeAddEntry(jvpConstant);
 
-      auto vjpConstant = constant.asAutoDiffAssociatedFunction(
-          AutoDiffAssociatedFunctionIdentifier::get(
-              AutoDiffAssociatedFunctionKind::VJP, /*differentiationOrder*/ 1,
-              DA->getParameterIndices(), fd->getASTContext()));
+      auto vjpConstant = constant.asAutoDiffDerivativeFunction(
+          AutoDiffDerivativeFunctionIdentifier::get(
+              AutoDiffDerivativeFunctionKind::VJP, DA->getParameterIndices(),
+              DA->getDerivativeGenericSignature(), fd->getASTContext()));
       maybeAddEntry(vjpConstant);
     }
     // SWIFT_ENABLE_TENSORFLOW END
@@ -118,16 +118,16 @@ template <class T> class SILVTableVisitor {
     // SWIFT_ENABLE_TENSORFLOW
     for (auto *DA : cd->getAttrs().getAttributes<DifferentiableAttr>()) {
       auto constant = SILDeclRef(cd, SILDeclRef::Kind::Allocator);
-      auto jvpConstant = constant.asAutoDiffAssociatedFunction(
-          AutoDiffAssociatedFunctionIdentifier::get(
-              AutoDiffAssociatedFunctionKind::JVP, /*differentiationOrder*/ 1,
-              DA->getParameterIndices(), cd->getASTContext()));
+      auto jvpConstant = constant.asAutoDiffDerivativeFunction(
+          AutoDiffDerivativeFunctionIdentifier::get(
+              AutoDiffDerivativeFunctionKind::JVP, DA->getParameterIndices(),
+              DA->getDerivativeGenericSignature(), cd->getASTContext()));
       maybeAddEntry(jvpConstant);
 
-      auto vjpConstant = constant.asAutoDiffAssociatedFunction(
-          AutoDiffAssociatedFunctionIdentifier::get(
-              AutoDiffAssociatedFunctionKind::VJP, /*differentiationOrder*/ 1,
-              DA->getParameterIndices(), cd->getASTContext()));
+      auto vjpConstant = constant.asAutoDiffDerivativeFunction(
+          AutoDiffDerivativeFunctionIdentifier::get(
+              AutoDiffDerivativeFunctionKind::VJP, DA->getParameterIndices(),
+              DA->getDerivativeGenericSignature(), cd->getASTContext()));
       maybeAddEntry(vjpConstant);
     }
     // SWIFT_ENABLE_TENSORFLOW END
@@ -174,7 +174,7 @@ template <class T> class SILVTableVisitor {
   }
 
   void maybeAddMember(Decl *member) {
-    if (auto *ad = dyn_cast<AccessorDecl>(member))
+    if (isa<AccessorDecl>(member))
       /* handled as part of its storage */;
     else if (auto *fd = dyn_cast<FuncDecl>(member))
       maybeAddMethod(fd);
@@ -200,7 +200,7 @@ protected:
     // forced at the end.
     SortedFuncList synthesizedMembers;
 
-    for (auto member : theClass->getMembers()) {
+    for (auto member : theClass->getEmittedMembers()) {
       if (auto *afd = dyn_cast<AbstractFunctionDecl>(member)) {
         if (afd->isSynthesized()) {
           synthesizedMembers.add(afd);

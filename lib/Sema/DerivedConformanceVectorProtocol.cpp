@@ -59,22 +59,19 @@ static Type getVectorProtocolVectorSpaceScalarAssocType(
     VarDecl *varDecl, DeclContext *DC) {
   auto &C = varDecl->getASTContext();
   auto *vectorProto = C.getProtocol(KnownProtocolKind::VectorProtocol);
-  if (!varDecl->hasInterfaceType())
-    C.getLazyResolver()->resolveDeclSignature(varDecl);
-  if (!varDecl->hasInterfaceType())
+  if (varDecl->getInterfaceType()->hasError())
     return nullptr;
   auto varType = DC->mapTypeIntoContext(varDecl->getValueInterfaceType());
   auto conf = TypeChecker::conformsToProtocol(varType, vectorProto, DC, None);
   if (!conf)
     return nullptr;
-  return conf->getTypeWitnessByName(varType, C.Id_VectorSpaceScalar);
+  return conf.getTypeWitnessByName(varType, C.Id_VectorSpaceScalar);
 }
 
 // Return the `VectorSpaceScalar` associated type for the given nominal type in
 // the given context, or `nullptr` if `VectorSpaceScalar` cannot be derived.
 static Type deriveVectorProtocol_VectorSpaceScalar(NominalTypeDecl *nominal,
                                                    DeclContext *DC) {
-  auto &C = DC->getASTContext();
   // Nominal type must be a struct. (Zero stored properties is okay.)
   if (!isa<StructDecl>(nominal))
     return nullptr;
@@ -83,9 +80,7 @@ static Type deriveVectorProtocol_VectorSpaceScalar(NominalTypeDecl *nominal,
   // associated type. Otherwise, the `VectorSpaceScalar` type cannot be derived.
   Type sameScalarType;
   for (auto member : nominal->getStoredProperties()) {
-    if (!member->hasInterfaceType())
-      C.getLazyResolver()->resolveDeclSignature(member);
-    if (!member->hasInterfaceType())
+    if (member->getInterfaceType()->hasError())
       return nullptr;
     auto scalarType = getVectorProtocolVectorSpaceScalarAssocType(member, DC);
     // If stored property does not conform to `VectorProtocol`, return nullptr.
@@ -132,7 +127,7 @@ deriveBodyVectorProtocol_method(AbstractFunctionDecl *funcDecl,
   auto *initDRE =
       new (C) DeclRefExpr(memberwiseInitDecl, DeclNameLoc(), /*Implicit*/ true);
   initDRE->setFunctionRefKind(FunctionRefKind::SingleApply);
-  auto *nominalTypeExpr = TypeExpr::createForDecl(SourceLoc(), nominal,
+  auto *nominalTypeExpr = TypeExpr::createForDecl(DeclNameLoc(), nominal,
                                                   funcDecl, /*Implicit*/ true);
   auto *initExpr = new (C) ConstructorRefCallExpr(initDRE, nominalTypeExpr);
 
@@ -142,11 +137,7 @@ deriveBodyVectorProtocol_method(AbstractFunctionDecl *funcDecl,
 
   // Get references to `self` and parameter declarations.
   auto *selfDecl = funcDecl->getImplicitSelfDecl();
-  auto *selfDRE =
-      new (C) DeclRefExpr(selfDecl, DeclNameLoc(), /*Implicit*/ true);
   auto *paramDecl = funcDecl->getParameters()->get(0);
-  auto *paramDRE =
-      new (C) DeclRefExpr(paramDecl, DeclNameLoc(), /*Implicit*/ true);
 
   // Create call expression applying a member method to the parameter.
   // Format: `<member>.method(<parameter>)`.
@@ -164,9 +155,9 @@ deriveBodyVectorProtocol_method(AbstractFunctionDecl *funcDecl,
     ValueDecl *memberMethodDecl = methodReq;
     // If conformance reference is concrete, then use concrete witness
     // declaration for the operator.
-    if (confRef->isConcrete()) {
+    if (confRef.isConcrete()) {
       if (auto *concreteMemberMethodDecl =
-              confRef->getConcrete()->getWitnessDecl(methodReq))
+              confRef.getConcrete()->getWitnessDecl(methodReq))
         memberMethodDecl = concreteMemberMethodDecl;
       assert(memberMethodDecl);
     }
@@ -176,6 +167,12 @@ deriveBodyVectorProtocol_method(AbstractFunctionDecl *funcDecl,
     memberMethodDRE->setFunctionRefKind(FunctionRefKind::SingleApply);
 
     // Create reference to member method: `x.scaled(by:)`.
+    // NOTE(TF-1054): create new `DeclRefExpr`s per loop iteration to avoid
+    // `ConstraintSystem::resolveOverload` error.
+    auto *selfDRE =
+        new (C) DeclRefExpr(selfDecl, DeclNameLoc(), /*Implicit*/ true);
+    auto *paramDRE =
+        new (C) DeclRefExpr(paramDecl, DeclNameLoc(), /*Implicit*/ true);
     auto memberExpr =
         new (C) MemberRefExpr(selfDRE, SourceLoc(), member, DeclNameLoc(),
                               /*Implicit*/ true);
@@ -209,13 +206,13 @@ static ValueDecl *deriveVectorProtocol_method(
     Identifier argumentLabel, Identifier parameterName, Type parameterType,
     Type returnType, AbstractFunctionDecl::BodySynthesizer bodySynthesizer) {
   auto nominal = derived.Nominal;
-  auto &TC = derived.TC;
-  auto &C = derived.TC.Context;
+  auto &C = derived.Context;
   auto parentDC = derived.getConformanceContext();
 
   auto *param =
-      new (C) ParamDecl(ParamDecl::Specifier::Default, SourceLoc(), SourceLoc(),
-                        argumentLabel, SourceLoc(), parameterName, parentDC);
+      new (C) ParamDecl(SourceLoc(), SourceLoc(), argumentLabel, SourceLoc(),
+                        parameterName, parentDC);
+  param->setSpecifier(ParamDecl::Specifier::Default);
   param->setInterfaceType(parameterType);
   ParameterList *params = ParameterList::create(C, {param});
 
@@ -228,14 +225,10 @@ static ValueDecl *deriveVectorProtocol_method(
   funcDecl->setImplicit();
   funcDecl->setBodySynthesizer(bodySynthesizer.Fn, bodySynthesizer.Context);
 
-  if (auto env = parentDC->getGenericEnvironmentOfContext())
-    funcDecl->setGenericEnvironment(env);
-  funcDecl->computeType();
+  funcDecl->setGenericSignature(parentDC->getGenericSignatureOfContext());
   funcDecl->copyFormalAccessFrom(nominal, /*sourceIsParentContext*/ true);
-  funcDecl->setValidationToChecked();
 
   derived.addMembersToConformanceContext({funcDecl});
-  C.addSynthesizedDecl(funcDecl);
 
   // Returned nominal type must define a memberwise initializer.
   // Add memberwise initializer if necessary.
@@ -243,10 +236,8 @@ static ValueDecl *deriveVectorProtocol_method(
     // The implicit memberwise constructor must be explicitly created so that
     // it can called in `VectorProtocol` methods. Normally, the memberwise
     // constructor is synthesized during SILGen, which is too late.
-    auto *initDecl = createImplicitConstructor(
-        TC, nominal, ImplicitConstructorKind::Memberwise);
+    auto *initDecl = createMemberwiseImplicitConstructor(C, nominal);
     nominal->addMember(initDecl);
-    C.addSynthesizedDecl(initDecl);
   }
 
   return funcDecl;
@@ -259,7 +250,7 @@ static ValueDecl *deriveVectorProtocol_method(
 static ValueDecl *deriveVectorProtocol_unaryMethodOnScalar(
     DerivedConformance &derived, Identifier methodBaseName,
     Identifier argumentLabel, Identifier parameterName) {
-  auto &C = derived.TC.Context;
+  auto &C = derived.Context;
   auto *nominal = derived.Nominal;
   auto *parentDC = derived.getConformanceContext();
 
@@ -285,16 +276,16 @@ ValueDecl *DerivedConformance::deriveVectorProtocol(ValueDecl *requirement) {
   if (checkAndDiagnoseDisallowedContext(requirement))
     return nullptr;
   auto &C = requirement->getASTContext();
-  if (requirement->getBaseName() == TC.Context.Id_scaled)
+  if (requirement->getBaseName() == Context.Id_scaled)
     return deriveVectorProtocol_unaryMethodOnScalar(
         *this, C.Id_scaled, C.Id_by, C.Id_scale);
-  if (requirement->getBaseName() == TC.Context.Id_adding)
+  if (requirement->getBaseName() == Context.Id_adding)
     return deriveVectorProtocol_unaryMethodOnScalar(
         *this, C.Id_adding, Identifier(), C.Id_x);
-  if (requirement->getBaseName() == TC.Context.Id_subtracting)
+  if (requirement->getBaseName() == Context.Id_subtracting)
     return deriveVectorProtocol_unaryMethodOnScalar(
         *this, C.Id_subtracting, Identifier(), C.Id_x);
-  TC.diagnose(requirement->getLoc(), diag::broken_vector_protocol_requirement);
+  Context.Diags.diagnose(requirement->getLoc(), diag::broken_vector_protocol_requirement);
   return nullptr;
 }
 
@@ -302,9 +293,9 @@ Type DerivedConformance::deriveVectorProtocol(AssociatedTypeDecl *requirement) {
   // Diagnose conformances in disallowed contexts.
   if (checkAndDiagnoseDisallowedContext(requirement))
     return nullptr;
-  if (requirement->getBaseName() == TC.Context.Id_VectorSpaceScalar)
+  if (requirement->getBaseName() == Context.Id_VectorSpaceScalar)
     return deriveVectorProtocol_VectorSpaceScalar(
         Nominal, getConformanceContext());
-  TC.diagnose(requirement->getLoc(), diag::broken_vector_protocol_requirement);
+  Context.Diags.diagnose(requirement->getLoc(), diag::broken_vector_protocol_requirement);
   return nullptr;
 }

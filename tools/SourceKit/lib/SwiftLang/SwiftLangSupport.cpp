@@ -326,8 +326,9 @@ SwiftLangSupport::SwiftLangSupport(SourceKit::Context &SKCtx)
 
   Stats = std::make_shared<SwiftStatistics>();
   EditorDocuments = std::make_shared<SwiftEditorDocumentFileMap>();
-  ASTMgr = std::make_shared<SwiftASTManager>(EditorDocuments, Stats,
-                                             RuntimeResourcePath);
+  ASTMgr = std::make_shared<SwiftASTManager>(EditorDocuments,
+                                             SKCtx.getGlobalConfiguration(),
+                                             Stats, RuntimeResourcePath);
   // By default, just use the in-memory cache.
   CCCache->inMemory = llvm::make_unique<ide::CodeCompletionCache>();
 
@@ -857,6 +858,7 @@ Optional<UIdent> SwiftLangSupport::getUIDForDeclAttribute(const swift::DeclAttri
     }
 
     // Ignore these.
+    case DAK_ImplicitlySynthesizesNestedRequirement:
     case DAK_ShowInInterface:
     case DAK_RawDocComment:
     case DAK_HasInitialValue:
@@ -902,7 +904,7 @@ bool SwiftLangSupport::printDisplayName(const swift::ValueDecl *D,
 }
 
 bool SwiftLangSupport::printUSR(const ValueDecl *D, llvm::raw_ostream &OS) {
-  return ide::printDeclUSR(D, OS);
+  return ide::printValueDeclUSR(D, OS);
 }
 
 bool SwiftLangSupport::printDeclTypeUSR(const ValueDecl *D, llvm::raw_ostream &OS) {
@@ -946,12 +948,10 @@ void SwiftLangSupport::printMemberDeclDescription(const swift::ValueDecl *VD,
     if (usePlaceholder)
       OS << "<#T##";
 
-    if (auto substitutedTy = paramTy.subst(substMap))
-      paramTy = substitutedTy;
-
-    if (paramTy->hasError() && param->getTypeLoc().hasLocation()) {
+    paramTy = paramTy.subst(substMap);
+    if (paramTy->hasError() && param->getTypeRepr()) {
       // Fallback to 'TypeRepr' printing.
-      param->getTypeLoc().getTypeRepr()->print(OS);
+      param->getTypeRepr()->print(OS);
     } else {
       paramTy.print(OS);
     }
@@ -986,36 +986,10 @@ void SwiftLangSupport::printMemberDeclDescription(const swift::ValueDecl *VD,
 
 std::string SwiftLangSupport::resolvePathSymlinks(StringRef FilePath) {
   std::string InputPath = FilePath;
-#if !defined(_WIN32)
-  char full_path[MAXPATHLEN];
-  if (const char *path = realpath(InputPath.c_str(), full_path))
-    return path;
-
-  return InputPath;
-#else
-  wchar_t full_path[MAX_PATH] = {0};
-  llvm::SmallVector<llvm::UTF16, 50> utf16Path;
-  llvm::convertUTF8ToUTF16String(InputPath.c_str(), utf16Path);
-
-  HANDLE fileHandle = CreateFileW(
-      (LPCWSTR)utf16Path.data(), 0, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr,
-      OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, nullptr);
-
-  if (fileHandle == INVALID_HANDLE_VALUE)
+  llvm::SmallString<256> output;
+  if (llvm::sys::fs::real_path(InputPath, output))
     return InputPath;
-
-  DWORD numChars = GetFinalPathNameByHandleW(fileHandle, full_path, MAX_PATH,
-                                            FILE_NAME_NORMALIZED);
-  CloseHandle(fileHandle);
-  std::string utf8Path;
-  if (numChars > 0 && numChars <= MAX_PATH) {
-    llvm::ArrayRef<char> pathRef((const char *)full_path,
-                                 (const char *)(full_path + numChars));
-    return llvm::convertUTF16ToUTF8String(pathRef, utf8Path) ? utf8Path
-                                                             : InputPath;
-  }
-  return InputPath;
-#endif
+  return output.str();
 }
 
 void SwiftLangSupport::getStatistics(StatisticsReceiver receiver) {

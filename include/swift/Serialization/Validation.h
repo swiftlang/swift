@@ -92,7 +92,6 @@ struct ValidationInfo {
 class ExtendedValidationInfo {
   SmallVector<StringRef, 4> ExtraClangImporterOpts;
   StringRef SDKPath;
-  StringRef ParseableInterface;
   struct {
     unsigned ArePrivateImportsEnabled : 1;
     unsigned IsSIB : 1;
@@ -114,8 +113,6 @@ public:
   void addExtraClangImporterOption(StringRef option) {
     ExtraClangImporterOpts.push_back(option);
   }
-  StringRef getParseableInterface() const { return ParseableInterface; }
-  void setParseableInterface(StringRef PI) { ParseableInterface = PI; }
 
   bool isSIB() const { return Bits.IsSIB; }
   void setIsSIB(bool val) {

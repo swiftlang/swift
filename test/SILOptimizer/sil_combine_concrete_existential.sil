@@ -323,7 +323,7 @@ bb0(%0 : $C_PQ):
   strong_retain %0 : $C_PQ
   %3 = init_existential_ref %0 : $C_PQ : $C_PQ, $P & Q
   %5 = open_existential_ref %3 : $P & Q to $@opened("044D530E-7327-11E8-A998-ACDE48001122") P & Q
-  // function_ref P<>.witnessComposition()
+  // function_ref P<>.witnessCompositionOwned()
   %6 = function_ref @$s32sil_combine_concrete_existential1PPA2A1QRzrlE18witnessCompositionyyF : $@convention(method) <τ_0_0 where τ_0_0 : P, τ_0_0 : Q> (@guaranteed τ_0_0) -> ()
   %7 = apply %6<@opened("044D530E-7327-11E8-A998-ACDE48001122") P & Q>(%5) : $@convention(method) <τ_0_0 where τ_0_0 : P, τ_0_0 : Q> (@guaranteed τ_0_0) -> ()
   strong_release %3 : $P & Q
@@ -509,12 +509,17 @@ extension InGuaranteedArgTestNativeObjectWrapper : InGuaranteedArgTestProtocol {
 
 sil @in_guaranteed_arg_test_callee : $@convention(thin) <τ_0_0 where τ_0_0 : InGuaranteedArgTestProtocol> (@in τ_0_0) -> ()
 
-// The current transformation is not smart enough to remove the
-// destroy_addr. Simply substituting the copy source for the apply argument
-// would introduce a use-after-free. = (.
-//
 // CHECK-LABEL: sil @in_guaranteed_arg_test_caller : $@convention(thin) <τ_0_0 where τ_0_0 : InGuaranteedArgTestProtocol> (@in τ_0_0) -> () {
-// CHECK: apply {{%.*}}<@opened("C494A60E-71EA-11E9-B8C0-D0817AD3F8AD") InGuaranteedArgTestProtocol>
+// CHECK: bb0(%0 : $*τ_0_0):
+// CHECK: [[ALLOC1:%.*]] = alloc_stack $τ_0_0
+// CHECK: copy_addr [take] %0 to [initialization] [[ALLOC1]] : $*τ_0_0
+// CHECK: [[F:%.*]] = function_ref @in_guaranteed_arg_test_callee : $@convention(thin) <τ_0_0 where τ_0_0 : InGuaranteedArgTestProtocol> (@in τ_0_0) -> ()
+// CHECK: [[ALLOC2:%.*]] = alloc_stack $τ_0_0
+// CHECK: copy_addr %1 to [initialization] [[ALLOC2]] : $*τ_0_0
+// CHECK: apply [[F]]<τ_0_0>(%4) : $@convention(thin) <τ_0_0 where τ_0_0 : InGuaranteedArgTestProtocol> (@in τ_0_0) -> ()
+// CHECK: dealloc_stack [[ALLOC2]] : $*τ_0_0
+// CHECK: destroy_addr [[ALLOC1]] : $*τ_0_0
+// CHECK: dealloc_stack [[ALLOC1]] : $*τ_0_0
 // CHECK: } // end sil function 'in_guaranteed_arg_test_caller'
 sil @in_guaranteed_arg_test_caller : $@convention(thin) <τ_0_0 where τ_0_0 : InGuaranteedArgTestProtocol> (@in τ_0_0) -> () {
 bb0(%0 : $*τ_0_0):
@@ -531,4 +536,82 @@ bb0(%0 : $*τ_0_0):
   dealloc_stack %1 : $*InGuaranteedArgTestProtocol
   %9999 = tuple()
   return %9999 : $()
+}
+
+//===----------------------------------------------------------------------===//
+// Test concrete substitution for an owned references.
+//===----------------------------------------------------------------------===//
+
+extension P {
+  public func witnessOwned()
+}
+
+extension C {
+  public func witnessOwned()
+}
+
+sil @$s32sil_combine_concrete_existential1PPAAE12witnessOwnedyyF : $@convention(method) <Self where Self : P> (@owned Self) -> ()
+
+// CHECK-LABEL: sil hidden @$s1t12testOwnedRef1cyAA1CC_tF : $@convention(thin) (@guaranteed C) -> () {
+// CHECK: bb0(%0 : $C):
+// CHECK:   strong_retain %0 : $C                           // id: %1
+// CHECK:   [[F:%.*]] = function_ref @$s32sil_combine_concrete_existential1PPAAE12witnessOwnedyyF : $@convention(method) <τ_0_0 where τ_0_0 : P> (@owned τ_0_0) -> ()
+// CHECK:   apply [[F]]<C>(%0) : $@convention(method) <τ_0_0 where τ_0_0 : P> (@owned τ_0_0) -> ()
+// CHECK-NEXT:   tuple
+// CHECK-NEXT:   return
+// CHECK-LABEL: } // end sil function '$s1t12testOwnedRef1cyAA1CC_tF'
+sil hidden @$s1t12testOwnedRef1cyAA1CC_tF : $@convention(thin) (@guaranteed C) -> () {
+bb0(%0 : $C):
+  strong_retain %0 : $C
+  %3 = init_existential_ref %0 : $C : $C, $P
+  %5 = open_existential_ref %3 : $P to $@opened("044D530E-7327-11E8-A998-ACDE48001133") P
+  %6 = function_ref @$s32sil_combine_concrete_existential1PPAAE12witnessOwnedyyF : $@convention(method) <τ_0_0 where τ_0_0 : P> (@owned τ_0_0) -> ()
+  %7 = apply %6<@opened("044D530E-7327-11E8-A998-ACDE48001133") P>(%5) : $@convention(method) <τ_0_0 where τ_0_0 : P> (@owned τ_0_0) -> ()
+  %9 = tuple ()
+  return %9 : $()
+}
+
+protocol P1 { }
+protocol P2 { }
+protocol P3 { }
+
+sil @callee : $@convention(thin) <τ_0_0, τ_0_1, τ_0_2 where τ_0_0 : P1, τ_0_1 : P2, τ_0_2 : P3> (@in τ_0_0, @in τ_0_2, @in τ_0_1) -> ()
+
+// Check that the deallocations are created in the right order and the SILVerifier does not complain.
+
+// CHECK-LABEL: sil @test_multiple_propagated_args
+// CHECK-NOT: open_existential_addr
+// CHECK-LABEL: } // end sil function 'test_multiple_propagated_args'
+sil @test_multiple_propagated_args : $@convention(thin) <τ_0_0, τ_0_1, τ_0_2 where τ_0_0 : P1, τ_0_1 : P2, τ_0_2 : P3> (@in τ_0_0, @in τ_0_2, @in τ_0_1) -> () {
+bb0(%0 : $*τ_0_0, %1 : $*τ_0_2, %2 : $*τ_0_1):
+  %5 = alloc_stack $P1
+  %6 = init_existential_addr %5 : $*P1, $τ_0_0
+  copy_addr [take] %0 to [initialization] %6 : $*τ_0_0
+  %8 = alloc_stack $P3
+  %9 = init_existential_addr %8 : $*P3, $τ_0_2
+  copy_addr [take] %1 to [initialization] %9 : $*τ_0_2
+  %11 = alloc_stack $P2
+  %12 = init_existential_addr %11 : $*P2, $τ_0_1
+  copy_addr [take] %2 to [initialization] %12 : $*τ_0_1
+  %15 = function_ref @callee : $@convention(thin) <τ_0_0, τ_0_1, τ_0_2 where τ_0_0 : P1, τ_0_1 : P2, τ_0_2 : P3> (@in τ_0_0, @in τ_0_2, @in τ_0_1) -> ()
+  %16 = open_existential_addr mutable_access %5 : $*P1 to $*@opened("76D54B80-FF66-11E9-B604-8C8590A6A134") P1
+  %17 = alloc_stack $@opened("76D54B80-FF66-11E9-B604-8C8590A6A134") P1
+  copy_addr %16 to [initialization] %17 : $*@opened("76D54B80-FF66-11E9-B604-8C8590A6A134") P1
+  %19 = open_existential_addr mutable_access %8 : $*P3 to $*@opened("76D54C34-FF66-11E9-B604-8C8590A6A134") P3
+  %20 = alloc_stack $@opened("76D54C34-FF66-11E9-B604-8C8590A6A134") P3
+  copy_addr %19 to [initialization] %20 : $*@opened("76D54C34-FF66-11E9-B604-8C8590A6A134") P3
+  %22 = open_existential_addr mutable_access %11 : $*P2 to $*@opened("76D54C84-FF66-11E9-B604-8C8590A6A134") P2
+  %23 = alloc_stack $@opened("76D54C84-FF66-11E9-B604-8C8590A6A134") P2
+  copy_addr %22 to [initialization] %23 : $*@opened("76D54C84-FF66-11E9-B604-8C8590A6A134") P2
+  %25 = apply %15<@opened("76D54B80-FF66-11E9-B604-8C8590A6A134") P1, @opened("76D54C84-FF66-11E9-B604-8C8590A6A134") P2, @opened("76D54C34-FF66-11E9-B604-8C8590A6A134") P3>(%17, %20, %23) : $@convention(thin) <τ_0_0, τ_0_1, τ_0_2 where τ_0_0 : P1, τ_0_1 : P2, τ_0_2 : P3> (@in τ_0_0, @in τ_0_2, @in τ_0_1) -> ()
+  destroy_addr %11 : $*P2
+  dealloc_stack %23 : $*@opened("76D54C84-FF66-11E9-B604-8C8590A6A134") P2
+  destroy_addr %8 : $*P3
+  dealloc_stack %20 : $*@opened("76D54C34-FF66-11E9-B604-8C8590A6A134") P3
+  destroy_addr %5 : $*P1
+  dealloc_stack %17 : $*@opened("76D54B80-FF66-11E9-B604-8C8590A6A134") P1
+  dealloc_stack %11 : $*P2
+  dealloc_stack %8 : $*P3
+  dealloc_stack %5 : $*P1
+  return %25 : $()
 }

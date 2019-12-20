@@ -2,23 +2,24 @@
 // RUN: %target-swift-frontend -emit-silgen %s | %FileCheck %s --check-prefix=CHECK-SILGEN
 // RUN: %target-swift-frontend -emit-sil -verify %s
 
-struct PointwiseMultiplicativeDummy : Differentiable, PointwiseMultiplicative {}
+struct PointwiseMultiplicativeDummy : EuclideanDifferentiable, PointwiseMultiplicative {}
 
-public struct Foo : Differentiable {
+public struct Foo : EuclideanDifferentiable {
   public var a: Float
 }
 
-// CHECK-AST-LABEL: public struct Foo : Differentiable {
+// CHECK-AST-LABEL: public struct Foo : EuclideanDifferentiable {
 // CHECK-AST:   @differentiable
 // CHECK-AST:   public var a: Float
 // CHECK-AST:   internal init(a: Float)
 // CHECK-AST:   public struct TangentVector
 // CHECK-AST:     public typealias TangentVector = Foo.TangentVector
+// CHECK-AST:   public var differentiableVectorView: Foo.TangentVector { get }
 
-// CHECK-SILGEN-LABEL: // Foo.a.getter
-// CHECK-SILGEN-NEXT: sil [transparent] [serialized] [differentiable source 0 wrt 0] [ossa] @$s22derived_differentiable3FooV1aSfvg : $@convention(method) (Foo) -> Float
+// CHECK-SILGEN-LABEL: // differentiability witness for Foo.a.getter
+// CHECK-SILGEN-NEXT: sil_differentiability_witness [serialized] [parameters 0] [results 0]
 
-struct AdditiveTangentIsSelf : AdditiveArithmetic, Differentiable {
+struct AdditiveTangentIsSelf : AdditiveArithmetic, EuclideanDifferentiable {
   var a: Float
   var dummy: PointwiseMultiplicativeDummy
 }
@@ -26,23 +27,26 @@ let _: @differentiable (AdditiveTangentIsSelf) -> Float = { x in
   x.a + x.a
 }
 
-// CHECK-AST-LABEL: internal struct AdditiveTangentIsSelf : AdditiveArithmetic, Differentiable {
+// CHECK-AST-LABEL: internal struct AdditiveTangentIsSelf : AdditiveArithmetic, EuclideanDifferentiable {
 // CHECK-AST:         internal var a: Float
 // CHECK-AST:         internal var dummy: PointwiseMultiplicativeDummy
 // CHECK-AST:         internal init(a: Float, dummy: PointwiseMultiplicativeDummy)
 // CHECK-AST:         internal typealias TangentVector = AdditiveTangentIsSelf
+// The following should not exist because when `Self == Self.TangentVector`, `differentiableVectorView` is not synthesized.
+// CHECK-AST-NOT:     internal var differentiableVectorView: AdditiveTangentIsSelf { get }
 
-struct TestNoDerivative : Differentiable {
+struct TestNoDerivative : EuclideanDifferentiable {
   var w: Float
   @noDerivative var technicallyDifferentiable: Float
 }
 
-// CHECK-AST-LABEL: internal struct TestNoDerivative : Differentiable {
+// CHECK-AST-LABEL: internal struct TestNoDerivative : EuclideanDifferentiable {
 // CHECK-AST:         var w: Float
 // CHECK-AST:         @noDerivative internal var technicallyDifferentiable: Float
 // CHECK-AST:         internal init(w: Float, technicallyDifferentiable: Float)
-// CHECK-AST:         internal struct TangentVector : Differentiable, AdditiveArithmetic, ElementaryFunctions, VectorProtocol
+// CHECK-AST:         internal struct TangentVector : Differentiable, AdditiveArithmetic, ElementaryFunctions
 // CHECK-AST:           internal typealias TangentVector = TestNoDerivative.TangentVector
+// CHECK-AST:         internal var differentiableVectorView: TestNoDerivative.TangentVector { get }
 
 struct TestPointwiseMultiplicative : Differentiable {
   var w: PointwiseMultiplicativeDummy

@@ -357,7 +357,7 @@ public class ReferenceWritableKeyPath<
   internal final func _projectMutableAddress(from origBase: Root)
       -> (pointer: UnsafeMutablePointer<Value>, owner: AnyObject?) {
     var keepAlive: AnyObject?
-    var address: UnsafeMutablePointer<Value> = withBuffer {
+    let address: UnsafeMutablePointer<Value> = withBuffer {
       var buffer = $0
       // Project out the reference prefix.
       var base: Any = origBase
@@ -3151,7 +3151,7 @@ internal struct InstantiateKeyPathBuffer: KeyPathPatternVisitor {
       case .unresolvedIndirectOffset(let pointerToOffset):
         // Look up offset in the indirectly-referenced variable we have a
         // pointer.
-        assert(pointerToOffset.pointee <= UInt32.max)
+        _internalInvariant(pointerToOffset.pointee <= UInt32.max)
         let offset = UInt32(truncatingIfNeeded: pointerToOffset.pointee)
         let header = RawKeyPathComponent.Header(storedWithOutOfLineOffset: kind,
                                                 mutable: mutable)

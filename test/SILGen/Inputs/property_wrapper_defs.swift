@@ -16,3 +16,7 @@ public struct MyPublished<Value> {
 		set { self = newValue }
 	}
 }
+
+public class UsesMyPublished {
+  @MyPublished public var foo: Int = 17
+}

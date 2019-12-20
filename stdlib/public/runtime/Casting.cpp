@@ -37,6 +37,7 @@
 #include "llvm/Support/Compiler.h"
 #if SWIFT_OBJC_INTEROP
 #include "swift/Runtime/ObjCBridge.h"
+#include "SwiftObject.h"
 #include "SwiftValue.h"
 #endif
 
@@ -99,10 +100,6 @@ static void _buildNameForMetadata(const Metadata *type,
   // Use the remangler to generate a mangled name from the type metadata.
   
   Demangle::Demangler Dem;
-  // We want to resolve symbolic references to a user-comprehensible
-  // representation of the referenced context.
-  Dem.setSymbolicReferenceResolver(ResolveToDemanglingForContext(Dem));
-  
   auto demangling = _swift_buildDemanglingForMetadata(type, Dem);
   if (demangling == nullptr) {
     result = "<<< invalid type >>>";
@@ -407,7 +404,7 @@ static bool _conformsToProtocols(const OpaqueValue *value,
   for (auto protocol : existentialType->getProtocols()) {
     if (!_conformsToProtocol(value, type, protocol, conformances))
       return false;
-    if (protocol.needsWitnessTable()) {
+    if (conformances != nullptr && protocol.needsWitnessTable()) {
       assert(*conformances != nullptr);
       ++conformances;
     }
@@ -590,15 +587,6 @@ swift_dynamicCastMetatypeToObjectUnconditional(const Metadata *metatype,
   }
   }
 }
-
-// internal func _getErrorEmbeddedNSErrorIndirect<T : Error>(
-//   _ x: UnsafePointer<T>) -> AnyObject?
-#define getErrorEmbeddedNSErrorIndirect \
-  MANGLE_SYM(s32_getErrorEmbeddedNSErrorIndirectyyXlSgSPyxGs0B0RzlF)
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
-id getErrorEmbeddedNSErrorIndirect(const OpaqueValue *error,
-                                   const Metadata *T,
-                                   const WitnessTable *Error);
 
 #endif
 
@@ -914,7 +902,9 @@ static bool _dynamicCastToExistential(OpaqueValue *dest,
                                                         srcDynamicType,
                                                         errorWitness)) {
       *destBoxAddr = reinterpret_cast<SwiftError*>(embedded);
-      maybeDeallocateSource(true);
+      if (shouldDeallocateSource(true, flags)) {
+        srcType->vw_destroy(src);
+      }
       return true;
     }
 #endif
@@ -1119,6 +1109,13 @@ swift_dynamicCastMetatypeImpl(const Metadata *sourceType,
     }
     break;
 
+  case MetadataKind::Existential: {
+    auto targetTypeAsExistential = static_cast<const ExistentialTypeMetadata *>(targetType);
+    if (!_conformsToProtocols(nullptr, sourceType, targetTypeAsExistential, nullptr))
+      return nullptr;
+    return origSourceType;
+  }
+
   default:
     // The cast succeeds only if the metadata pointers are statically
     // equivalent.
@@ -1250,7 +1247,6 @@ static bool _dynamicCastUnknownClassIndirect(OpaqueValue *dest,
   // Okay, we're doing a conditional cast.
   void *result =
     const_cast<void*>(swift_dynamicCastUnknownClass(object, targetType));
-  assert(result == nullptr || object == result);
 
   // If the cast failed, destroy the input and return false.
   if (!result) {
@@ -1272,14 +1268,6 @@ static bool _dynamicCastUnknownClassIndirect(OpaqueValue *dest,
 /******************************** Existentials ********************************/
 /******************************************************************************/
 
-#if SWIFT_OBJC_INTEROP
-extern "C" const ProtocolDescriptor PROTOCOL_DESCR_SYM(s5Error);
-
-static const WitnessTable *findErrorWitness(const Metadata *srcType) {
-  return swift_conformsToProtocol(srcType, &PROTOCOL_DESCR_SYM(s5Error));
-}
-#endif
-
 /// Perform a dynamic cast from an existential type to some kind of
 /// class type.
 static bool _dynamicCastToUnknownClassFromExistential(OpaqueValue *dest,
@@ -1292,14 +1280,6 @@ static bool _dynamicCastToUnknownClassFromExistential(OpaqueValue *dest,
     auto classContainer =
       reinterpret_cast<ClassExistentialContainer*>(src);
     void *obj = classContainer->Value;
-#if SWIFT_OBJC_INTEROP
-    // If we're casting to NSError, we may need a representation change,
-    // so fall into the general swift_dynamicCast path.
-    if (targetType == getNSErrorMetadata()) {
-      return swift_dynamicCast(dest, src, swift_getObjectType((HeapObject*)obj),
-                               targetType, flags);
-    }
-#endif
     return _dynamicCastUnknownClassIndirect(dest, obj, targetType, flags);
   }
   case ExistentialTypeRepresentation::Opaque: {
@@ -1809,32 +1789,6 @@ static bool _dynamicCastToFunction(OpaqueValue *dest,
 }
 
 /******************************************************************************/
-/****************************** Bridging NSError ******************************/
-/******************************************************************************/
-
-#if SWIFT_OBJC_INTEROP
-static id dynamicCastValueToNSError(OpaqueValue *src,
-                                    const Metadata *srcType,
-                                    const WitnessTable *srcErrorWitness,
-                                    DynamicCastFlags flags) {
-  // Check whether there is an embedded NSError.
-  if (auto embedded = getErrorEmbeddedNSErrorIndirect(src, srcType,
-                                                      srcErrorWitness)) {
-    if (flags & DynamicCastFlags::TakeOnSuccess)
-      srcType->vw_destroy(src);
-
-    return embedded;
-  }
-
-  BoxPair errorBox = swift_allocError(srcType, srcErrorWitness, src,
-                            /*isTake*/ flags & DynamicCastFlags::TakeOnSuccess);
-  auto *error = (SwiftError *)errorBox.object;
-  return _swift_stdlib_bridgeErrorToNSError(error);
-}
-
-#endif
-
-/******************************************************************************/
 /********************************* Optionals **********************************/
 /******************************************************************************/
 
@@ -2326,25 +2280,6 @@ static bool swift_dynamicCastImpl(OpaqueValue *dest, OpaqueValue *src,
   // Casts to class type.
   case MetadataKind::Class:
   case MetadataKind::ObjCClassWrapper:
-#if SWIFT_OBJC_INTEROP
-    // If the destination type is an NSError, and the source type is an
-    // Error, then the cast can succeed by NSError bridging.
-    if (targetType == getNSErrorMetadata()) {
-      // Don't rebridge if the source is already some kind of NSError.
-      if (srcType->isAnyClass()
-          && swift_dynamicCastObjCClass(*reinterpret_cast<id*>(src),
-               static_cast<const ObjCClassWrapperMetadata*>(targetType)->Class))
-        return _succeed(dest, src, srcType, flags);
-      if (auto srcErrorWitness = findErrorWitness(srcType)) {
-        auto error = dynamicCastValueToNSError(src, srcType,
-                                               srcErrorWitness, flags);
-        *reinterpret_cast<id *>(dest) = error;
-        return true;
-      }
-    }
-    LLVM_FALLTHROUGH;
-#endif
-
   case MetadataKind::ForeignClass:
     switch (srcType->getKind()) {
     case MetadataKind::Class:
@@ -2380,6 +2315,21 @@ static bool swift_dynamicCastImpl(OpaqueValue *dest, OpaqueValue *src,
                                                          srcBridgeWitness,
                                                          flags);
       }
+
+#if SWIFT_OBJC_INTEROP
+      // If the destination type is an NSError or NSObject, and the source type
+      // is an Error, then the cast can succeed by NSError bridging.
+      if (targetType == getNSErrorMetadata() ||
+          targetType == getNSObjectMetadata()) {
+        if (auto srcErrorWitness = findErrorWitness(srcType)) {
+          auto error = dynamicCastValueToNSError(src, srcType,
+                                                 srcErrorWitness, flags);
+          *reinterpret_cast<id *>(dest) = error;
+          return true;
+        }
+      }
+#endif
+
       return _fail(src, srcType, targetType, flags);
     }
 
@@ -2839,9 +2789,9 @@ static id bridgeAnythingNonVerbatimToObjectiveC(OpaqueValue *src,
   // Handle Errors.
   } else if (auto srcErrorWitness = findErrorWitness(srcType)) {
     // Bridge the source value to an NSError.
-    auto box = swift_allocError(srcType, srcErrorWitness, src, consume)
-      .object;
-    return _swift_stdlib_bridgeErrorToNSError((SwiftError*)box);
+    auto flags = consume ? DynamicCastFlags::TakeOnSuccess
+                         : DynamicCastFlags::Default;
+    return dynamicCastValueToNSError(src, srcType, srcErrorWitness, flags);
   }
 
   // Fall back to boxing.

@@ -154,6 +154,14 @@ public func expectFailure(
   _anyExpectFailed.orAndFetch(startAnyExpectFailed)
 }
 
+/// An opaque function that ignores its argument and returns nothing.
+public func noop<T>(_ value: T) {}
+
+/// An opaque function that simply returns its argument.
+public func identity<T>(_ value: T) -> T {
+  return value
+}
+
 public func identity(_ element: OpaqueValue<Int>) -> OpaqueValue<Int> {
   return element
 }

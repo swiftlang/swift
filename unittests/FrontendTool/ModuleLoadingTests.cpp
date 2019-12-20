@@ -13,7 +13,7 @@
 #include "gtest/gtest.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/Frontend/Frontend.h"
-#include "swift/Frontend/ParseableInterfaceModuleLoader.h"
+#include "swift/Frontend/ModuleInterfaceLoader.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/Serialization/Validation.h"
 #include "llvm/ADT/SmallString.h"
@@ -64,12 +64,12 @@ public:
   }
 };
 
-class ParseableInterfaceModuleLoaderTest : public testing::Test {
+class ModuleInterfaceLoaderTest : public testing::Test {
 protected:
-  void setupAndLoadParseableModule() {
+  void setupAndLoadModuleInterface() {
     SmallString<256> tempDir;
     ASSERT_FALSE(llvm::sys::fs::createUniqueDirectory(
-        "ParseableModuleBufferTests.emitModuleInMemory", tempDir));
+        "ModuleInterfaceBufferTests.emitModuleInMemory", tempDir));
     SWIFT_DEFER { llvm::sys::fs::remove_directories(tempDir); };
 
     auto cacheDir = createFilename(tempDir, "ModuleCache");
@@ -94,12 +94,14 @@ protected:
     PrintingDiagnosticConsumer printingConsumer;
     DiagnosticEngine diags(sourceMgr);
     diags.addConsumer(printingConsumer);
+    TypeCheckerOptions typeckOpts;
     LangOptions langOpts;
     langOpts.Target = llvm::Triple(llvm::sys::getDefaultTargetTriple());
     SearchPathOptions searchPathOpts;
-    auto ctx = ASTContext::get(langOpts, searchPathOpts, sourceMgr, diags);
+    auto ctx =
+        ASTContext::get(langOpts, typeckOpts, searchPathOpts, sourceMgr, diags);
 
-    auto loader = ParseableInterfaceModuleLoader::create(
+    auto loader = ModuleInterfaceLoader::create(
         *ctx, cacheDir, prebuiltCacheDir,
         /*dependencyTracker*/nullptr,
         ModuleLoadingMode::PreferSerialized);
@@ -108,11 +110,13 @@ protected:
 
     std::unique_ptr<llvm::MemoryBuffer> moduleBuffer;
     std::unique_ptr<llvm::MemoryBuffer> moduleDocBuffer;
+    std::unique_ptr<llvm::MemoryBuffer> moduleSourceInfoBuffer;
 
     auto error =
       loader->findModuleFilesInDirectory({moduleName, SourceLoc()}, tempDir,
-        "Library.swiftmodule", "Library.swiftdoc",
-        &moduleBuffer, &moduleDocBuffer);
+        "Library.swiftmodule", "Library.swiftdoc", "Library.swiftsourceinfo",
+        /*ModuleInterfacePath*/nullptr,
+        &moduleBuffer, &moduleDocBuffer, &moduleSourceInfoBuffer);
     ASSERT_FALSE(error);
     ASSERT_FALSE(diags.hadAnyError());
 
@@ -138,8 +142,8 @@ protected:
   }
 };
 
-TEST_F(ParseableInterfaceModuleLoaderTest, LoadModuleFromBuffer) {
-  setupAndLoadParseableModule();
+TEST_F(ModuleInterfaceLoaderTest, LoadModuleFromBuffer) {
+  setupAndLoadModuleInterface();
 }
 
 } // end namespace unittest

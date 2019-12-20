@@ -39,13 +39,13 @@ LeakCheckingTests.testWithLeakChecking("BasicLetLeakChecking") {
   do {
     let model = ExampleLeakModel()
     let x: Tracked<Float> = 1.0
-    _ = model.gradient(at: x) { m, x in m.applied(to: x) }
+    _ = gradient(at: model, x) { m, x in m.applied(to: x) }
   }
 
   do {
     let model = ExampleLeakModel()
     let x: Tracked<Float> = 1.0
-    _ = model.gradient(at: x) { m, x in
+    _ = gradient(at: model, x) { m, x -> Tracked<Float> in
       let (y0, y1) = (m.applied(to: x), m.applied(to: x))
       return y0 + y0 - y1
     }
@@ -95,7 +95,7 @@ LeakCheckingTests.testWithLeakChecking("TestProtocolDefaultDerivative") {
 
   let x = Tracked<Float>(1)
   let model = Foo()
-  _ = model.valueWithGradient { model in
+  _ = valueWithGradient(at: model) { model in
     // Call the protocol default implementation method.
     model.defaultImpl(x)
   }
@@ -130,7 +130,7 @@ LeakCheckingTests.testWithLeakChecking("ProtocolRequirements") {
   }
   let x = Tracked<Int>(1)
   let model = Model()
-  _ = model.valueWithGradient { model in
+  _ = valueWithGradient(at: model) { model in
     model(x)
   }
 }
@@ -140,7 +140,7 @@ LeakCheckingTests.testWithLeakChecking("LetStructs") {
     let z = Tracked(x)
     return z.value
   }
-  _ = Tracked<Float>(4).valueWithGradient(in: structConstructionWithOwnedParams)
+  _ = valueWithGradient(at: 4, in: structConstructionWithOwnedParams)
 }
 
 LeakCheckingTests.testWithLeakChecking("NestedVarStructs") {
@@ -154,7 +154,7 @@ LeakCheckingTests.testWithLeakChecking("NestedVarStructs") {
                                 z.first.value.second + y.first))
     return y.first + y.second - z.first.value.first + z.first.value.second
   }
-  expectEqual((8, 2), Tracked<Float>(4).valueWithGradient(in: nestedstruct_var))
+  expectEqual((8, 2), valueWithGradient(at: 4, in: nestedstruct_var))
 }
 
 LeakCheckingTests.testWithLeakChecking("NestedVarTuples") {
@@ -168,7 +168,7 @@ LeakCheckingTests.testWithLeakChecking("NestedVarTuples") {
     z.0.1 = z.0.1 + y.0
     return y.0 + y.1 - z.0.0 + z.0.1
   }
-  expectEqual((8, 2), Tracked<Float>(4).valueWithGradient(in: nestedtuple_var))
+  expectEqual((8, 2), valueWithGradient(at: 4, in: nestedtuple_var))
 }
 
 // Tests class method differentiation and JVP/VJP vtable entry thunks.
@@ -207,7 +207,7 @@ LeakCheckingTests.testWithLeakChecking("ClassMethods") {
   }
 
   func classValueWithGradient(_ c: Super) -> (Tracked<Float>, Tracked<Float>) {
-    return Tracked<Float>(1).valueWithGradient { c.f($0) }
+    return valueWithGradient(at: 1) { c.f($0) }
   }
   expectEqual((2, 2), classValueWithGradient(Super()))
   expectEqual((3, 3), classValueWithGradient(SubOverride()))
@@ -377,14 +377,15 @@ LeakCheckingTests.testWithLeakChecking("ParameterConventionMismatchLeakChecking"
   }
   let v = MyTrackedFloat<Any>.TangentVector(base: 10)
   expectEqual(10, pullback(at: Tracked<Float>(1)) { x in MyTrackedFloat(x, dummy: 1.0) }(v))
-  _ = Tracked<Float>(1).gradient { x in MyTrackedFloat<Any>(x, dummy: 1).ownedParameter(x) }
-  _ = Tracked<Float>(1).gradient { x in MyTrackedFloat<Any>(x, dummy: 1).sharedParameter(x) }
-  _ = Tracked<Float>(1).gradient { x in MyTrackedFloat<Any>(x, dummy: 1).ownedParameterGeneric(x) }
-  _ = Tracked<Float>(1).gradient { x in MyTrackedFloat<Any>(x, dummy: 1).sharedParameterGeneric(x) }
-  _ = Tracked<Float>(1).gradient { x in MyTrackedFloat<Any>(x, dummy: 1).consuming(x) }
-  _ = Tracked<Float>(1).gradient { x in MyTrackedFloat<Any>(x, dummy: 1).consumingGeneric(x) }
-  _ = Tracked<Float>(1).gradient { x in MyTrackedFloat<Any>(x, dummy: 1).nonconsuming(x) }
-  _ = Tracked<Float>(1).gradient { x in MyTrackedFloat<Any>(x, dummy: 1).nonconsumingGeneric(x) }
+  let x: Tracked<Float> = 1
+  _ = gradient(at: x) { x in MyTrackedFloat<Any>(x, dummy: 1).ownedParameter(x) }
+  _ = gradient(at: x) { x in MyTrackedFloat<Any>(x, dummy: 1).sharedParameter(x) }
+  _ = gradient(at: x) { x in MyTrackedFloat<Any>(x, dummy: 1).ownedParameterGeneric(x) }
+  _ = gradient(at: x) { x in MyTrackedFloat<Any>(x, dummy: 1).sharedParameterGeneric(x) }
+  _ = gradient(at: x) { x in MyTrackedFloat<Any>(x, dummy: 1).consuming(x) }
+  _ = gradient(at: x) { x in MyTrackedFloat<Any>(x, dummy: 1).consumingGeneric(x) }
+  _ = gradient(at: x) { x in MyTrackedFloat<Any>(x, dummy: 1).nonconsuming(x) }
+  _ = gradient(at: x) { x in MyTrackedFloat<Any>(x, dummy: 1).nonconsumingGeneric(x) }
 }
 
 LeakCheckingTests.testWithLeakChecking("ClosureCaptureLeakChecking") {
@@ -392,16 +393,16 @@ LeakCheckingTests.testWithLeakChecking("ClosureCaptureLeakChecking") {
     var model = ExampleLeakModel()
     let x: Tracked<Float> = 1.0
 
-    _ = model.gradient { m in m.applied(to: x) }
+    _ = gradient(at: model) { m in m.applied(to: x) }
     for _ in 0..<10 {
-      _ = model.gradient { m in m.applied(to: x) }
+      _ = gradient(at: model) { m in m.applied(to: x) }
     }
   }
 
   do {
     var model = ExampleLeakModel()
     var x: Tracked<Float> = 1.0
-    _ = model.gradient { m in
+    _ = gradient(at: model) { m -> Tracked<Float> in
       x = x + x
       var y = x + Tracked<Float>(x.value)
       return m.applied(to: y)
@@ -411,7 +412,7 @@ LeakCheckingTests.testWithLeakChecking("ClosureCaptureLeakChecking") {
   do {
     var model = ExampleLeakModel()
     let x: Tracked<Float> = 1.0
-    _ = model.gradient { m in
+    _ = gradient(at: model) { m -> Tracked<Float> in
       var model = m
       model.bias = x
       return model.applied(to: x)
@@ -423,7 +424,7 @@ LeakCheckingTests.testWithLeakChecking("ClosureCaptureLeakChecking") {
       let x: Tracked<Float> = .zero
       var y: Tracked<Float> = .zero
       mutating func differentiateSomethingThatCapturesSelf() {
-        _ = x.gradient { x in
+        _ = gradient(at: x) { x -> Tracked<Float> in
           self.y += .zero
           return .zero
         }
@@ -439,8 +440,7 @@ LeakCheckingTests.testWithLeakChecking("ControlFlowWithTrivialUnconditionalMath"
     if true {}
     return x
   }
-  var x: Tracked<Float> = 1.0
-  _ = x.valueWithGradient(in: ControlFlowWithTrivialUnconditionalMath)
+  _ = valueWithGradient(at: 1, in: ControlFlowWithTrivialUnconditionalMath)
 }
 
 LeakCheckingTests.testWithLeakChecking("ControlFlowWithTrivialNestedIfElse") {
@@ -453,8 +453,7 @@ LeakCheckingTests.testWithLeakChecking("ControlFlowWithTrivialNestedIfElse") {
       }
     }
   }
-  var x: Tracked<Float> = 1.0
-  _ = x.valueWithGradient(in: ControlFlowNestedWithTrivialIfElse)
+  _ = valueWithGradient(at: 1, in: ControlFlowNestedWithTrivialIfElse)
 }
 
 LeakCheckingTests.testWithLeakChecking("ControlFlowWithActiveCFCondition") {
@@ -467,13 +466,13 @@ LeakCheckingTests.testWithLeakChecking("ControlFlowWithActiveCFCondition") {
       return x
     }
   }
-  _ = model.gradient(at: x, in: ControlFlowWithActiveCFCondition)
+  _ = gradient(at: model, x, in: ControlFlowWithActiveCFCondition)
 }
 
 LeakCheckingTests.testWithLeakChecking("ControlFlowWithIf") {
   var model = ExampleLeakModel()
   let x: Tracked<Float> = 1.0
-  _ = model.gradient(at: x) { m, x in
+  _ = gradient(at: model, x) { m, x -> Tracked<Float> in
     var result: Tracked<Float> = x
     if x > 0 {
       result = result + m.applied(to: x)
@@ -494,10 +493,12 @@ LeakCheckingTests.testWithLeakChecking("ControlFlowWithIfInMethod") {
       return input * w1
     }
   }
+  let dense = Dense(w1: 4, w2: 5)
+  let denseNil = Dense(w1: 4, w2: nil)
   expectEqual((Dense.TangentVector(w1: 10), 20),
-              Dense(w1: 4, w2: 5).gradient(at: 2, in: { dense, x in dense(x) }))
+              gradient(at: dense, 2, in: { dense, x in dense(x) }))
   expectEqual((Dense.TangentVector(w1: 2), 4),
-              Dense(w1: 4, w2: nil).gradient(at: 2, in: { dense, x in dense(x) }))
+              gradient(at: denseNil, 2, in: { dense, x in dense(x) }))
 }
 
 
@@ -509,8 +510,8 @@ LeakCheckingTests.testWithLeakChecking("ControlFlowWithLoop") {
     }
     return result
   }
-  expectEqual((8, 12), Tracked<Float>(2).valueWithGradient(in: for_loop))
-  expectEqual((27, 27), Tracked<Float>(3).valueWithGradient(in: for_loop))
+  expectEqual((8, 12), valueWithGradient(at: 2, in: for_loop))
+  expectEqual((27, 27), valueWithGradient(at: 3, in: for_loop))
 }
 
 LeakCheckingTests.testWithLeakChecking("ControlFlowWithNestedLoop") {
@@ -529,8 +530,8 @@ LeakCheckingTests.testWithLeakChecking("ControlFlowWithNestedLoop") {
     }
     return outer
   }
-  expectEqual((0.5, -0.25), Tracked<Float>(2).valueWithGradient(in: nested_loop))
-  expectEqual((0.25, -0.0625), Tracked<Float>(4).valueWithGradient(in: nested_loop))
+  expectEqual((0.5, -0.25), valueWithGradient(at: 2, in: nested_loop))
+  expectEqual((0.25, -0.0625), valueWithGradient(at: 4, in: nested_loop))
 }
 
 LeakCheckingTests.testWithLeakChecking("ControlFlowWithNestedTuples") {
@@ -549,9 +550,9 @@ LeakCheckingTests.testWithLeakChecking("ControlFlowWithNestedTuples") {
     }
     return y.0 + y.1 - z.0.0 + z.0.1
   }
-  expectEqual((8, 2), Tracked<Float>(4).valueWithGradient(in: cond_nestedtuple_var))
-  expectEqual((-20, 2), Tracked<Float>(-10).valueWithGradient(in: cond_nestedtuple_var))
-  expectEqual((-2674, 2), Tracked<Float>(-1337).valueWithGradient(in: cond_nestedtuple_var))
+  expectEqual((8, 2), valueWithGradient(at: 4, in: cond_nestedtuple_var))
+  expectEqual((-20, 2), valueWithGradient(at: -10, in: cond_nestedtuple_var))
+  expectEqual((-2674, 2), valueWithGradient(at: -1337, in: cond_nestedtuple_var))
 }
 
 LeakCheckingTests.testWithLeakChecking("ControlFlowWithNestedStructs") {
@@ -570,9 +571,9 @@ LeakCheckingTests.testWithLeakChecking("ControlFlowWithNestedStructs") {
     }
     return y.first + y.second - z.first.value.first + z.first.value.second
   }
-  expectEqual((8, 2), Tracked<Float>(4).valueWithGradient(in: cond_nestedstruct_var))
-  expectEqual((-20, 2), Tracked<Float>(-10).valueWithGradient(in: cond_nestedstruct_var))
-  expectEqual((-2674, 2), Tracked<Float>(-1337).valueWithGradient(in: cond_nestedstruct_var))
+  expectEqual((8, 2), valueWithGradient(at: 4, in: cond_nestedstruct_var))
+  expectEqual((-20, 2), valueWithGradient(at: -10, in: cond_nestedstruct_var))
+  expectEqual((-2674, 2), valueWithGradient(at: -1337, in: cond_nestedstruct_var))
 }
 
 LeakCheckingTests.testWithLeakChecking("ControlFlowWithSwitchEnumWithPayload") {
@@ -598,10 +599,19 @@ LeakCheckingTests.testWithLeakChecking("ControlFlowWithSwitchEnumWithPayload") {
     }
     return x + y
   }
-  expectEqual((8, 2), Tracked<Float>(4).valueWithGradient(in: { x in enum_notactive2(.a(10), x) }))
-  expectEqual((20, 2), Tracked<Float>(10).valueWithGradient(in: { x in enum_notactive2(.b(4, 5), x) }))
-  expectEqual((-20, 2), Tracked<Float>(-10).valueWithGradient(in: { x in enum_notactive2(.a(10), x) }))
-  expectEqual((-2674, 2), Tracked<Float>(-1337).valueWithGradient(in: { x in enum_notactive2(.b(4, 5), x) }))
+  expectEqual((8, 2), valueWithGradient(at: 4, in: { x in enum_notactive2(.a(10), x) }))
+  expectEqual((20, 2), valueWithGradient(at: 10, in: { x in enum_notactive2(.b(4, 5), x) }))
+  expectEqual((-20, 2), valueWithGradient(at: -10, in: { x in enum_notactive2(.a(10), x) }))
+  expectEqual((-2674, 2), valueWithGradient(at: -1337, in: { x in enum_notactive2(.b(4, 5), x) }))
+}
+
+LeakCheckingTests.testWithLeakChecking("ArrayLiteralInitialization") {
+  func concat(_ x: [Tracked<Float>]) -> Tracked<Float> { return x[0] }
+  func foo(_ x: Tracked<Float>) -> Float {
+    let y = x + x
+    return concat([x, y]).value
+  }
+  expectEqual(Tracked<Float>(1), gradient(at: .zero, in: foo))
 }
 
 runAllTests()

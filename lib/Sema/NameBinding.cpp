@@ -17,7 +17,9 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ModuleLoader.h"
+#include "swift/AST/ModuleNameLookup.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/ClangImporter/ClangModule.h"
@@ -294,9 +296,9 @@ void NameBinder::addImport(
     // FIXME: Doesn't handle scoped testable imports correctly.
     assert(declPath.size() == 1 && "can't handle sub-decl imports");
     SmallVector<ValueDecl *, 8> decls;
-    lookupInModule(topLevelModule, declPath, declPath.front().first, decls,
+    lookupInModule(topLevelModule, declPath.front().first, decls,
                    NLKind::QualifiedLookup, ResolutionKind::Overloadable,
-                   /*resolver*/nullptr, &SF);
+                   &SF);
 
     if (decls.empty()) {
       diagnose(ID, diag::decl_does_not_exist_in_module,
@@ -332,7 +334,7 @@ void NameBinder::addImport(
             diag::imported_decl_is_wrong_kind_typealias,
             typealias->getDescriptiveKind(),
             TypeAliasType::get(typealias, Type(), SubstitutionMap(),
-                                typealias->getUnderlyingTypeLoc().getType()),
+                                typealias->getUnderlyingType()),
             getImportKindString(ID->getImportKind())));
       } else {
         emittedDiag.emplace(diagnose(ID, diag::imported_decl_is_wrong_kind,
@@ -396,7 +398,8 @@ static void insertPrecedenceGroupDecl(NameBinder &binder, SourceFile &SF,
 /// unresolved type names as well. This handles import directives and forward
 /// references.
 void swift::performNameBinding(SourceFile &SF, unsigned StartElem) {
-  SharedTimer timer("Name binding");
+  FrontendStatsTracer tracer(SF.getASTContext().Stats, "Name binding");
+
   // Make sure we skip adding the standard library imports if the
   // source file is empty.
   if (SF.ASTStage == SourceFile::NameBound || SF.Decls.empty()) {

@@ -7,20 +7,21 @@ import Darwin.C
 #else
 import Glibc
 #endif
+import DifferentiationUnittest
 
 var SeparateTangentTypeTests = TestSuite("SeparateTangentType")
 
 struct DifferentiableSubset : Differentiable {
   @differentiable(wrt: self)
-  var w: Float
+  var w: Tracked<Float>
   @differentiable(wrt: self)
-  var b: Float
+  var b: Tracked<Float>
   @noDerivative var flag: Bool
 
-  struct TangentVector : Differentiable, VectorProtocol {
+  struct TangentVector : Differentiable, AdditiveArithmetic {
     typealias TangentVector = DifferentiableSubset.TangentVector
-    var w: Float
-    var b: Float
+    var w: Tracked<Float>
+    var b: Tracked<Float>
   }
   mutating func move(along v: TangentVector) {
     w.move(along: v.w)
@@ -28,19 +29,19 @@ struct DifferentiableSubset : Differentiable {
   }
 }
 
-SeparateTangentTypeTests.test("Trivial") {
+SeparateTangentTypeTests.testWithLeakChecking("Trivial") {
   let x = DifferentiableSubset(w: 0, b: 1, flag: false)
   let pb = pullback(at: x) { x in x }
   expectEqual(pb(DifferentiableSubset.TangentVector.zero), DifferentiableSubset.TangentVector.zero)
 }
 
-SeparateTangentTypeTests.test("Initialization") {
+SeparateTangentTypeTests.testWithLeakChecking("Initialization") {
   let x = DifferentiableSubset(w: 0, b: 1, flag: false)
   let pb = pullback(at: x) { x in DifferentiableSubset(w: 1, b: 2, flag: true) }
   expectEqual(pb(DifferentiableSubset.TangentVector.zero), DifferentiableSubset.TangentVector.zero)
 }
 
-SeparateTangentTypeTests.test("SomeArithmetics") {
+SeparateTangentTypeTests.testWithLeakChecking("SomeArithmetics") {
   let x = DifferentiableSubset(w: 0, b: 1, flag: false)
   let pb = pullback(at: x) { x in DifferentiableSubset(w: x.w * x.w, b: x.b * x.b, flag: true) }
   expectEqual(pb(DifferentiableSubset.TangentVector.zero), DifferentiableSubset.TangentVector.zero)

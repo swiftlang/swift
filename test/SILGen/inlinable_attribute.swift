@@ -26,7 +26,7 @@ public class MyCls {
 
   // Allocating entry point is [serialized]
 
-  // CHECK-LABEL: sil [serialized] [ossa] @$s19inlinable_attribute5MyClsC14designatedInitACyt_tcfC : $@convention(method) (@thick MyCls.Type) -> @owned MyCls
+  // CHECK-LABEL: sil [serialized] [exact_self_class] [ossa] @$s19inlinable_attribute5MyClsC14designatedInitACyt_tcfC : $@convention(method) (@thick MyCls.Type) -> @owned MyCls
   public init(designatedInit: ()) {}
 
   // Note -- convenience init is intentionally not [serialized]
@@ -142,7 +142,7 @@ public func bas() {
   }
 
   // CHECK-LABEL: sil shared [serialized] [ossa] @$s19inlinable_attribute3bas{{[_0-9a-zA-Z]*}}U_
-  let zung = {
+  let _ = {
     // CHECK-LABEL: sil shared [serializable] [ossa] @$s19inlinable_attribute3basyyFyycfU_7zippityL_yyF
     func zippity() { }
   }

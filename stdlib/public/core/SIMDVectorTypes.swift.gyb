@@ -47,7 +47,7 @@ public struct SIMD${n}<Scalar>: SIMD where Scalar: SIMDScalar {
   /// Accesses the scalar at the specified position.
   // SWIFT_ENABLE_TENSORFLOW
   @differentiable(vjp: _vjpSubscript
-    where Scalar : Differentiable & BinaryFloatingPoint,
+    where Scalar : EuclideanDifferentiable & BinaryFloatingPoint,
           Scalar.TangentVector : BinaryFloatingPoint)
   public subscript(index: Int) -> Scalar {
     @_transparent get {
@@ -198,8 +198,13 @@ extension SIMD${n} : Differentiable
   public typealias TangentVector = SIMD${n}
 }
 
+extension SIMD${n} : EuclideanDifferentiable
+  where Scalar : EuclideanDifferentiable & BinaryFloatingPoint,
+        Scalar.TangentVector : BinaryFloatingPoint {
+}
+
 extension SIMD${n}
-  where Scalar : Differentiable & BinaryFloatingPoint,
+  where Scalar : EuclideanDifferentiable & BinaryFloatingPoint,
         Scalar.TangentVector : BinaryFloatingPoint {
   @usableFromInline
   internal func _vjpSubscript(index: Int)

@@ -23,6 +23,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ReferenceCounting.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/Basic/ClusteredBitVector.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/OptimizationMode.h"
@@ -638,6 +639,10 @@ public:
       *DynamicReplacementLinkEntryPtrTy; // %link_entry*
   llvm::StructType *DynamicReplacementKeyTy; // { i32, i32}
 
+  // SWIFT_ENABLE_TENSORFLOW
+  llvm::StructType *DifferentiabilityWitnessTy; // { i8*, i8* }
+  // SWIFT_ENABLE_TENSORFLOW_END
+
   llvm::GlobalVariable *TheTrivialPropertyDescriptor = nullptr;
 
   /// Used to create unique names for class layout types with tail allocated
@@ -726,6 +731,7 @@ public:
                                                ReferenceCounting style) const;
 
   llvm::Type *getFixedBufferTy();
+  llvm::PointerType *getExistentialPtrTy(unsigned numTables);
   llvm::Type *getValueWitnessTy(ValueWitness index);
   Signature getValueWitnessSignature(ValueWitness index);
 
@@ -812,7 +818,8 @@ public:
   llvm::StructType *createNominalType(ProtocolCompositionType *T);
   clang::CanQual<clang::Type> getClangType(CanType type);
   clang::CanQual<clang::Type> getClangType(SILType type);
-  clang::CanQual<clang::Type> getClangType(SILParameterInfo param);
+  clang::CanQual<clang::Type> getClangType(SILParameterInfo param,
+                                           CanSILFunctionType funcTy);
 
   const clang::ASTContext &getClangASTContext() {
     assert(ClangASTContext &&
@@ -821,12 +828,21 @@ public:
   }
 
   clang::CodeGen::CodeGenModule &getClangCGM() const;
+  
+  CanType getRuntimeReifiedType(CanType type);
+  CanType substOpaqueTypesWithUnderlyingTypes(CanType type);
+  SILType substOpaqueTypesWithUnderlyingTypes(SILType type, CanGenericSignature genericSig);
+  std::pair<CanType, ProtocolConformanceRef>
+  substOpaqueTypesWithUnderlyingTypes(CanType type,
+                                      ProtocolConformanceRef conformance);
 
   bool isResilient(NominalTypeDecl *decl, ResilienceExpansion expansion);
   bool hasResilientMetadata(ClassDecl *decl, ResilienceExpansion expansion);
   ResilienceExpansion getResilienceExpansionForAccess(NominalTypeDecl *decl);
   ResilienceExpansion getResilienceExpansionForLayout(NominalTypeDecl *decl);
   ResilienceExpansion getResilienceExpansionForLayout(SILGlobalVariable *var);
+
+  TypeExpansionContext getMaximalTypeExpansionContext() const;
 
   bool isResilientConformance(const NormalProtocolConformance *conformance);
   bool isResilientConformance(const RootProtocolConformance *root);
@@ -847,7 +863,7 @@ public:
 
 private:
   TypeConverter &Types;
-  friend class TypeConverter;
+  friend TypeConverter;
 
   const clang::ASTContext *ClangASTContext;
   ClangTypeConverter *ClangTypes;
@@ -1061,14 +1077,18 @@ public:
   llvm::SetVector<CanType> BuiltinTypes;
 
   std::pair<llvm::Constant *, unsigned>
-  getTypeRef(Type type, GenericSignature *genericSig, MangledTypeRefRole role);
+  getTypeRef(Type type, GenericSignature genericSig, MangledTypeRefRole role);
   
   std::pair<llvm::Constant *, unsigned>
-  getTypeRef(CanType type, MangledTypeRefRole role);
-  
+  getTypeRef(CanType type, CanGenericSignature sig, MangledTypeRefRole role);
+
+  std::pair<llvm::Constant *, unsigned>
+  getLoweredTypeRef(SILType loweredType, CanGenericSignature genericSig,
+                    MangledTypeRefRole role);
+
   llvm::Constant *emitWitnessTableRefString(CanType type,
                                             ProtocolConformanceRef conformance,
-                                            GenericSignature *genericSig,
+                                            GenericSignature genericSig,
                                             bool shouldSetLowBit);
   llvm::Constant *getMangledAssociatedConformance(
                                   const NormalProtocolConformance *conformance,
@@ -1103,7 +1123,8 @@ public:
                                              CanSILFunctionType substCalleeType,
                                              SubstitutionMap subs,
                                              const HeapLayout &layout);
-  llvm::Constant *getAddrOfBoxDescriptor(CanType boxedType);
+  llvm::Constant *getAddrOfBoxDescriptor(SILType boxedType,
+                                         CanGenericSignature genericSig);
 
   /// Produce an associated type witness that refers to the given type.
   llvm::Constant *getAssociatedTypeWitness(Type type, bool inProtocolContext);
@@ -1203,6 +1224,8 @@ public:
   void constructInitialFnAttributes(llvm::AttrBuilder &Attrs,
                                     OptimizationMode FuncOptMode =
                                       OptimizationMode::NotSet);
+  void setHasFramePointer(llvm::AttrBuilder &Attrs, bool HasFP);
+  void setHasFramePointer(llvm::Function *F, bool HasFP);
   llvm::AttributeList constructInitialAttributes();
 
   void emitProtocolDecl(ProtocolDecl *D);
@@ -1216,6 +1239,9 @@ public:
   void emitSILFunction(SILFunction *f);
   void emitSILWitnessTable(SILWitnessTable *wt);
   void emitSILProperty(SILProperty *prop);
+  // SWIFT_ENABLE_TENSORFLOW
+  void emitSILDifferentiabilityWitness(SILDifferentiabilityWitness *dw);
+  // SWIFT_ENABLE_TENSORFLOW END
   void emitSILStaticInitializers();
   llvm::Constant *emitFixedTypeLayout(CanType t, const FixedTypeInfo &ti);
   void emitProtocolConformance(const ConformanceDescription &record);
@@ -1394,6 +1420,12 @@ public:
                                       const NormalProtocolConformance *C,
                                       ConstantInit definition = ConstantInit());
 
+  // SWIFT_ENABLE_TENSORFLOW
+  llvm::Constant *
+  getAddrOfDifferentiabilityWitness(const SILDifferentiabilityWitness *witness,
+                                    ConstantInit definition = ConstantInit());
+  // SWIFT_ENABLE_TENSORFLOW_END
+
   llvm::Function *
   getAddrOfGenericWitnessTableInstantiationFunction(
                                     const NormalProtocolConformance *C);
@@ -1405,6 +1437,10 @@ public:
 
   Address getAddrOfObjCISAMask();
 
+  /// Retrieve the generic signature for the current generic context, or null if no
+  /// generic environment is active.
+  CanGenericSignature getCurGenericContext();
+  
   /// Retrieve the generic environment for the current generic context.
   ///
   /// Fails if there is no generic context.

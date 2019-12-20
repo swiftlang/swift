@@ -100,7 +100,6 @@ struct SwiftCodeCompletionConsumer
 
   void handleResults(MutableArrayRef<CodeCompletionResult *> Results) override {
     assert(swiftContext.swiftASTContext);
-    CodeCompletionContext::sortCompletionResults(Results);
     handleResultsImpl(Results, swiftContext);
   }
 };
@@ -172,6 +171,10 @@ static bool swiftCodeCompleteImpl(
     return false;
   }
 
+  // Always disable source location resolutions from .swiftsourceinfo file
+  // because they're somewhat heavy operations and aren't needed for completion.
+  Invocation.getFrontendOptions().IgnoreSwiftSourceInfo = true;
+
   const char *Position = InputFile->getBufferStart() + CodeCompletionOffset;
   std::unique_ptr<llvm::WritableMemoryBuffer> NewBuffer =
       llvm::WritableMemoryBuffer::getNewUninitMemBuffer(
@@ -200,7 +203,6 @@ static bool swiftCodeCompleteImpl(
 
   if (FileSystem != llvm::vfs::getRealFileSystem()) {
     CI.getSourceMgr().setFileSystem(FileSystem);
-    Invocation.getClangImporterOptions().ForceUseSwiftVirtualFileSystem = true;
   }
 
   if (CI.setup(Invocation)) {
@@ -213,7 +215,7 @@ static bool swiftCodeCompleteImpl(
   SwiftConsumer.setContext(&CI.getASTContext(), &Invocation,
                            &CompletionContext);
   registerIDETypeCheckRequestFunctions(CI.getASTContext().evaluator);
-  CI.performSema();
+  CI.performParseAndResolveImportsOnly();
   SwiftConsumer.clearContext();
 
   return true;

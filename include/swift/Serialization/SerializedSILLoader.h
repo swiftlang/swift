@@ -13,6 +13,9 @@
 #ifndef SWIFT_SERIALIZATION_SILLOADER_H
 #define SWIFT_SERIALIZATION_SILLOADER_H
 
+// SWIFT_ENABLE_TENSORFLOW
+#include "swift/AST/AutoDiff.h"
+// SWIFT_ENABLE_TENSORFLOW END
 #include "swift/AST/Decl.h"
 #include "swift/AST/Identifier.h"
 #include "swift/SIL/Notifications.h"
@@ -32,6 +35,9 @@ class SILModule;
 class SILVTable;
 class SILWitnessTable;
 class SILDefaultWitnessTable;
+// SWIFT_ENABLE_TENSORFLOW
+class SILDifferentiabilityWitness;
+// SWIFT_ENABLE_TENSORFLOW END
 
 /// Maintains a list of SILDeserializer, one for each serialized modules
 /// in ASTContext. It provides lookupSILFunction that will perform lookup
@@ -56,7 +62,7 @@ public:
   }
   ~SerializedSILLoader();
 
-  SILFunction *lookupSILFunction(SILFunction *Callee);
+  SILFunction *lookupSILFunction(SILFunction *Callee, bool onlyUpdateLinkage);
   SILFunction *
   lookupSILFunction(StringRef Name, bool declarationOnly = false,
                     Optional<SILLinkage> linkage = None);
@@ -64,6 +70,10 @@ public:
   SILVTable *lookupVTable(const ClassDecl *C);
   SILWitnessTable *lookupWitnessTable(SILWitnessTable *C);
   SILDefaultWitnessTable *lookupDefaultWitnessTable(SILDefaultWitnessTable *C);
+  // SWIFT_ENABLE_TENSORFLOW
+  SILDifferentiabilityWitness *
+  lookupDifferentiabilityWitness(SILDifferentiabilityWitnessKey key);
+  // SWIFT_ENABLE_TENSORFLOW END
 
   /// Invalidate the cached entries for deserialized SILFunctions.
   void invalidateCaches();
@@ -98,6 +108,11 @@ public:
 
   /// Deserialize all Properties in all SILModules.
   void getAllProperties();
+
+  // SWIFT_ENABLE_TENSORFLOW
+  /// Deserialize all DifferentiabilityWitnesses in all SILModules.
+  void getAllDifferentiabilityWitnesses();
+  // SWIFT_ENABLE_TENSORFLOW END
 
   SerializedSILLoader(const SerializedSILLoader &) = delete;
   SerializedSILLoader(SerializedSILLoader &&) = delete;

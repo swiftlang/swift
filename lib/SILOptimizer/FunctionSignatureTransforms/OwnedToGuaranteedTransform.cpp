@@ -56,7 +56,7 @@ static SILInstruction *findOnlyApply(SILFunction *F) {
 
 bool FunctionSignatureTransform::OwnedToGuaranteedAnalyzeParameters() {
   SILFunction *F = TransformDescriptor.OriginalFunction;
-  auto Args = F->begin()->getFunctionArguments();
+  auto Args = F->begin()->getSILFunctionArguments();
   // A map from consumed SILArguments to the release associated with an
   // argument.
   //

@@ -75,13 +75,10 @@ void EditorDiagConsumer::getAllDiagnostics(
   }
 }
 
-void EditorDiagConsumer::handleDiagnostic(
-    SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind,
-    StringRef FormatString, ArrayRef<DiagnosticArgument> FormatArgs,
-    const DiagnosticInfo &Info,
-    const SourceLoc bufferIndirectlyCausingDiagnostic) {
+void EditorDiagConsumer::handleDiagnostic(SourceManager &SM,
+                                          const DiagnosticInfo &Info) {
 
-  if (Kind == DiagnosticKind::Error) {
+  if (Info.Kind == DiagnosticKind::Error) {
     HadAnyError = true;
   }
 
@@ -90,13 +87,13 @@ void EditorDiagConsumer::handleDiagnostic(
       Info.ID == diag::error_doing_code_completion.ID)
     return;
 
-  bool IsNote = (Kind == DiagnosticKind::Note);
+  bool IsNote = (Info.Kind == DiagnosticKind::Note);
 
   if (IsNote && !haveLastDiag())
     // Is this possible?
     return;
 
-  if (Kind == DiagnosticKind::Remark) {
+  if (Info.Kind == DiagnosticKind::Remark) {
     // FIXME: we may want to handle optimization remarks in sourcekitd.
     LOG_WARN_FUNC("unhandled optimization remark");
     return;
@@ -108,13 +105,14 @@ void EditorDiagConsumer::handleDiagnostic(
   llvm::SmallString<256> Text;
   {
     llvm::raw_svector_ostream Out(Text);
-    DiagnosticEngine::formatDiagnosticText(Out, FormatString, FormatArgs);
+    DiagnosticEngine::formatDiagnosticText(Out, Info.FormatString,
+                                           Info.FormatArgs);
   }
   SKInfo.Description = Text.str();
 
   Optional<unsigned> BufferIDOpt;
-  if (Loc.isValid()) {
-    BufferIDOpt =  SM.findBufferContainingLoc(Loc);
+  if (Info.Loc.isValid()) {
+    BufferIDOpt = SM.findBufferContainingLoc(Info.Loc);
   }
 
   if (BufferIDOpt && !isInputBufferID(*BufferIDOpt)) {
@@ -147,9 +145,10 @@ void EditorDiagConsumer::handleDiagnostic(
   if (BufferIDOpt.hasValue()) {
     unsigned BufferID = *BufferIDOpt;
 
-    SKInfo.Offset = SM.getLocOffsetInBuffer(Loc, BufferID);
-    std::tie(SKInfo.Line, SKInfo.Column) = SM.getLineAndColumn(Loc, BufferID);
-    SKInfo.Filename = SM.getDisplayNameForLoc(Loc);
+    SKInfo.Offset = SM.getLocOffsetInBuffer(Info.Loc, BufferID);
+    std::tie(SKInfo.Line, SKInfo.Column) =
+        SM.getLineAndColumn(Info.Loc, BufferID);
+    SKInfo.Filename = SM.getDisplayNameForLoc(Info.Loc);
 
     for (auto R : Info.Ranges) {
       if (R.isInvalid() || SM.findBufferContainingLoc(R.getStart()) != BufferID)
@@ -177,16 +176,16 @@ void EditorDiagConsumer::handleDiagnostic(
     return;
   }
 
-  switch (Kind) {
-    case DiagnosticKind::Error:
-      SKInfo.Severity = DiagnosticSeverityKind::Error;
-      break;
-    case DiagnosticKind::Warning:
-      SKInfo.Severity = DiagnosticSeverityKind::Warning;
-      break;
-    case DiagnosticKind::Note:
-    case DiagnosticKind::Remark:
-      llvm_unreachable("already covered");
+  switch (Info.Kind) {
+  case DiagnosticKind::Error:
+    SKInfo.Severity = DiagnosticSeverityKind::Error;
+    break;
+  case DiagnosticKind::Warning:
+    SKInfo.Severity = DiagnosticSeverityKind::Warning;
+    break;
+  case DiagnosticKind::Note:
+  case DiagnosticKind::Remark:
+    llvm_unreachable("already covered");
   }
 
   if (!BufferIDOpt) {
@@ -701,11 +700,13 @@ public:
     Parser.reset(
                  new ParserUnit(SM, SourceFileKind::Main, BufferID,
                      CompInv.getLangOptions(),
+                     CompInv.getTypeCheckerOptions(),
                      CompInv.getModuleName(),
                      SynTreeCreator,
                      CompInv.getMainFileSyntaxParsingCache())
     );
 
+    registerParseRequestFunctions(Parser->getParser().Context.evaluator);
     registerTypeCheckerRequestFunctions(
         Parser->getParser().Context.evaluator);
     Parser->getDiagnosticEngine().addConsumer(DiagConsumer);
@@ -1119,6 +1120,76 @@ static UIdent getAccessLevelUID(AccessLevel Access) {
   llvm_unreachable("Unhandled access level in switch.");
 }
 
+static Optional<AccessLevel>
+inferDefaultAccessSyntactically(const ExtensionDecl *ED) {
+  // Check if the extension has an explicit access control attribute.
+  if (auto *AA = ED->getAttrs().getAttribute<AccessControlAttr>())
+    return std::min(std::max(AA->getAccess(), AccessLevel::FilePrivate),
+                    AccessLevel::Public);
+  return None;
+}
+
+/// Document structure is a purely syntactic request that shouldn't require name lookup
+/// or type-checking, so this is a best-effort computation, particularly where extensions
+/// are concerned.
+static Optional<AccessLevel> inferAccessSyntactically(const ValueDecl *D) {
+  assert(D);
+
+  // Check if the decl has an explicit access control attribute.
+  if (auto *AA = D->getAttrs().getAttribute<AccessControlAttr>())
+    return AA->getAccess();
+
+  DeclContext *DC = D->getDeclContext();
+
+  if (D->getKind() == DeclKind::Destructor ||
+      D->getKind() == DeclKind::EnumElement) {
+    if (auto container = dyn_cast<NominalTypeDecl>(D->getDeclContext())) {
+      if (auto containerAccess = inferAccessSyntactically(container))
+        return std::max(containerAccess.getValue(), AccessLevel::Internal);
+      return None;
+    }
+    return AccessLevel::Private;
+  }
+
+  switch (DC->getContextKind()) {
+  case DeclContextKind::TopLevelCodeDecl:
+    return AccessLevel::FilePrivate;
+  case DeclContextKind::SerializedLocal:
+  case DeclContextKind::AbstractClosureExpr:
+  case DeclContextKind::EnumElementDecl:
+  case DeclContextKind::Initializer:
+  case DeclContextKind::AbstractFunctionDecl:
+  case DeclContextKind::SubscriptDecl:
+    return AccessLevel::Private;
+  case DeclContextKind::Module:
+  case DeclContextKind::FileUnit:
+    return AccessLevel::Internal;
+  case DeclContextKind::GenericTypeDecl: {
+    auto generic = cast<GenericTypeDecl>(DC);
+    AccessLevel access = AccessLevel::Internal;
+    if (isa<ProtocolDecl>(generic)) {
+      if (auto protoAccess = inferAccessSyntactically(generic))
+        access = std::max(AccessLevel::FilePrivate, protoAccess.getValue());
+    }
+    return access;
+  }
+  case DeclContextKind::ExtensionDecl:
+    auto *ED = cast<ExtensionDecl>(DC);
+    return inferDefaultAccessSyntactically(ED);
+  }
+
+  llvm_unreachable("Unhandled DeclContextKind in switch.");
+}
+
+static Optional<AccessLevel>
+inferSetterAccessSyntactically(const AbstractStorageDecl *D) {
+  if (!D->isSettable(/*UseDC=*/nullptr))
+    return None;
+  if (auto *AA = D->getAttrs().getAttribute<SetterAccessAttr>())
+    return AA->getAccess();
+  return inferAccessSyntactically(D);
+}
+
 class SwiftDocumentStructureWalker: public ide::SyntaxModelWalker {
   SourceManager &SrcManager;
   EditorConsumer &Consumer;
@@ -1175,16 +1246,15 @@ public:
         Node.Kind != SyntaxStructureKind::LocalVariable &&
         Node.Kind != SyntaxStructureKind::GenericTypeParam) {
       if (auto *VD = dyn_cast_or_null<ValueDecl>(Node.Dcl)) {
-        AccessLevel = getAccessLevelUID(VD->getFormalAccess());
+        if (auto Access = inferAccessSyntactically(VD))
+          AccessLevel = getAccessLevelUID(Access.getValue());
       } else if (auto *ED = dyn_cast_or_null<ExtensionDecl>(Node.Dcl)) {
-        auto StrictAccess = ED->getDefaultAccessLevel();
-        AccessLevel = getAccessLevelUID(StrictAccess);
+        if (auto DefaultAccess = inferDefaultAccessSyntactically(ED))
+          AccessLevel = getAccessLevelUID(DefaultAccess.getValue());
       }
       if (auto *ASD = dyn_cast_or_null<AbstractStorageDecl>(Node.Dcl)) {
-        if (ASD->isSettable(/*UseDC=*/nullptr)) {
-          swift::AccessLevel SetAccess = ASD->getSetterFormalAccess();
-          SetterAccessLevel = getAccessLevelUID(SetAccess);
-        }
+        if (auto SetAccess = inferSetterAccessSyntactically(ASD))
+          SetterAccessLevel = getAccessLevelUID(SetAccess.getValue());
       }
     }
 
@@ -1264,12 +1334,12 @@ public:
   }
 
   StringRef getObjCRuntimeName(const Decl *D, SmallString<64> &Buf) {
-    if (!D || D->isInvalid())
+    if (!D)
       return StringRef();
     if (!isa<ClassDecl>(D) && !isa<ProtocolDecl>(D))
       return StringRef();
     auto *VD = cast<ValueDecl>(D);
-    if (!VD->hasName())
+    if (!VD->hasName() || (VD->hasInterfaceType() && VD->isInvalid()))
       return StringRef();
     auto ident = VD->getBaseName().getIdentifier().str();
     if (ident.empty() || Mangle::isDigit(ident.front()))
@@ -1904,6 +1974,7 @@ void SwiftEditorDocument::readSyntaxInfo(EditorConsumer &Consumer) {
 
 void SwiftEditorDocument::readSemanticInfo(ImmutableTextSnapshotRef Snapshot,
                                            EditorConsumer& Consumer) {
+  llvm::sys::ScopedLock L(Impl.AccessMtx);
   std::vector<SwiftSemanticToken> SemaToks;
   Optional<std::vector<DiagnosticEntryInfo>> SemaDiags;
   Impl.SemanticInfo->readSemanticInfo(Snapshot, SemaToks, SemaDiags,

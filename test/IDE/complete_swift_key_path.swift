@@ -57,13 +57,13 @@ let _ = \Person.friends#^ARRAY_NODOT^#
 // ARRAY-NODOT: Begin completions
 // ARRAY-NODOT-DAG: Decl[Subscript]/CurrNominal:        [{#(index): Int#}][#Person#]; name=[index: Int]
 // ARRAY-NODOT-DAG: Decl[InstanceVar]/CurrNominal:      .count[#Int#]; name=count
-// ARRAY-NODOT-DAG: Decl[InstanceVar]/Super:            .first[#Person?#]; name=first
+// ARRAY-NODOT-DAG: Decl[InstanceVar]/CurrNominal:      .first[#Person?#]; name=first
 
 let _ = \Person.friends.#^ARRAY_DOT^#
 // ARRAY-DOT: Begin completions
 // ARRAY-DOT-NOT: Decl[Subscript]/CurrNominal:        [{#(index): Int#}][#Element#]; name=[Int]
 // ARRAY-DOT-DAG: Decl[InstanceVar]/CurrNominal:      count[#Int#]; name=count
-// ARRAY-DOT-DAG: Decl[InstanceVar]/Super:            first[#Person?#]; name=first
+// ARRAY-DOT-DAG: Decl[InstanceVar]/CurrNominal:      first[#Person?#]; name=first
 // ARRAY-DOT-NOT: Decl[Subscript]/CurrNominal:        [{#(index): Int#}][#Element#]; name=[Int]
 
 let _ = \Person.friends[0]#^OBJ_NODOT^#
@@ -114,13 +114,13 @@ let _ = \[Person]#^ARRAYTYPE_NODOT^#
 // ARRAYTYPE-NODOT: Begin completions
 // ARRAYTYPE-NODOT-DAG: Decl[Subscript]/CurrNominal:        .[{#(index): Int#}][#Person#]; name=[index: Int]
 // ARRAYTYPE-NODOT-DAG: Decl[InstanceVar]/CurrNominal:      .count[#Int#]; name=count
-// ARRAYTYPE-NODOT-DAG: Decl[InstanceVar]/Super:            .first[#Person?#]; name=first
+// ARRAYTYPE-NODOT-DAG: Decl[InstanceVar]/CurrNominal:      .first[#Person?#]; name=first
 
 let _ = \[Person].#^ARRAYTYPE_DOT^#
 // ARRAYTYPE-DOT: Begin completions
 // ARRAYTYPE-DOT-DAG: Decl[Subscript]/CurrNominal:        [{#(index): Int#}][#Person#]; name=[index: Int]
 // ARRAYTYPE-DOT-DAG: Decl[InstanceVar]/CurrNominal:      count[#Int#]; name=count
-// ARRAYTYPE-DOT-DAG: Decl[InstanceVar]/Super:            first[#Person?#]; name=first
+// ARRAYTYPE-DOT-DAG: Decl[InstanceVar]/CurrNominal:      first[#Person?#]; name=first
 
 func test(_ p: Person) {
   let _ = p[keyPath: \Person.#^APPLY_TYPE_DOT^#]

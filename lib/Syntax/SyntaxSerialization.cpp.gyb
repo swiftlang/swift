@@ -48,6 +48,9 @@ uint8_t WrapperTypeTraits<tok>::numericValue(const tok &Value) {
     case tok::kw_sil_global:
     case tok::kw_sil_witness_table:
     case tok::kw_sil_default_witness_table:
+    // SWIFT_ENABLE_TENSORFLOW
+    case tok::kw_sil_differentiability_witness:
+    // SWIFT_ENABLE_TENSORFLOW END
     case tok::kw_sil_coverage_map:
     case tok::kw_sil_scope:
     case tok::sil_dollar:

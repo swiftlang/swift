@@ -204,6 +204,221 @@ const long long $ssSeVMn[1] = {0};
 SWIFT_RUNTIME_STDLIB_INTERNAL
 const long long $sShMn[1] = {0};
 
+// Bool
+
+SWIFT_RUNTIME_STDLIB_INTERNAL
+const long long $sSbMn[1] = {0};
+
+// Binary Floating Point
+
+SWIFT_RUNTIME_STDLIB_INTERNAL
+const long long $sSBMp[1] = {0};
+
+// Double
+
+SWIFT_RUNTIME_STDLIB_INTERNAL
+const long long $sSdMn[1] = {0};
+
+// RandomNumberGenerator
+
+SWIFT_RUNTIME_STDLIB_INTERNAL
+const long long $sSGMp[1] = {0};
+
+// Int
+
+SWIFT_RUNTIME_STDLIB_INTERNAL
+const long long $sSiMn[1] = {0};
+
+// DefaultIndicis
+
+SWIFT_RUNTIME_STDLIB_INTERNAL
+const long long $sSIMn[1] = {0};
+
+// Character
+
+SWIFT_RUNTIME_STDLIB_INTERNAL
+const long long $sSJMn[1] = {0};
+
+// Numeric
+
+SWIFT_RUNTIME_STDLIB_INTERNAL
+const long long $sSjMp[1] = {0};
+
+// RandomAccessCollection
+
+SWIFT_RUNTIME_STDLIB_INTERNAL
+const long long $sSkMp[1] = {0};
+
+// BidirectionalCollection
+
+SWIFT_RUNTIME_STDLIB_INTERNAL
+const long long $sSKMp[1] = {0};
+
+// RangeReplacementCollection
+
+SWIFT_RUNTIME_STDLIB_INTERNAL
+const long long $sSmMp[1] = {0};
+
+// MutationCollection
+
+SWIFT_RUNTIME_STDLIB_INTERNAL
+const long long $sSMMp[1] = {0};
+
+// Range
+
+SWIFT_RUNTIME_STDLIB_INTERNAL
+const long long $sSnMn[1] = {0};
+
+// ClosedRange
+
+SWIFT_RUNTIME_STDLIB_INTERNAL
+const long long $sSNMn[1] = {0};
+
+// ObjectIdentifier
+
+SWIFT_RUNTIME_STDLIB_INTERNAL
+const long long $sSOMn[1] = {0};
+
+// UnsafeMutablePointer
+
+SWIFT_RUNTIME_STDLIB_INTERNAL
+const long long $sSpMn[1] = {0};
+
+// Optional
+
+SWIFT_RUNTIME_STDLIB_INTERNAL
+const long long $sSqMn[1] = {0};
+
+// Equatable
+
+SWIFT_RUNTIME_STDLIB_INTERNAL
+const long long $sSQMp[1] = {0};
+
+// UnsafeMutableBufferPointer
+
+SWIFT_RUNTIME_STDLIB_INTERNAL
+const long long $sSrMn[1] = {0};
+
+// UnsafeBufferPointer
+
+SWIFT_RUNTIME_STDLIB_INTERNAL
+const long long $sSRMn[1] = {0};
+
+// String
+
+SWIFT_RUNTIME_STDLIB_INTERNAL
+const long long $sSSMn[1] = {0};
+
+// Sequence
+
+SWIFT_RUNTIME_STDLIB_INTERNAL
+const long long $sSTMp[1] = {0};
+
+// UInt
+
+SWIFT_RUNTIME_STDLIB_INTERNAL
+const long long $sSuMn[1] = {0};
+
+// UnsignedInteger
+
+SWIFT_RUNTIME_STDLIB_INTERNAL
+const long long $sSUMp[1] = {0};
+
+// UnsafeMutableRawPointer
+
+SWIFT_RUNTIME_STDLIB_INTERNAL
+const long long $sSvMn[1] = {0};
+
+// Strideable
+
+SWIFT_RUNTIME_STDLIB_INTERNAL
+const long long $sSxMp[1] = {0};
+
+// RangeExpression
+
+SWIFT_RUNTIME_STDLIB_INTERNAL
+const long long $sSXMp[1] = {0};
+
+// StringProtocol
+
+SWIFT_RUNTIME_STDLIB_INTERNAL
+const long long $sSyMp[1] = {0};
+
+// RawRepresentable
+
+SWIFT_RUNTIME_STDLIB_INTERNAL
+const long long $sSYMp[1] = {0};
+
+// BinaryInteger
+
+SWIFT_RUNTIME_STDLIB_INTERNAL
+const long long $sSzMp[1] = {0};
+
+// Decodable
+
+SWIFT_RUNTIME_STDLIB_INTERNAL
+const long long $sSeMp[1] = {0};
+
+// Encodable
+
+SWIFT_RUNTIME_STDLIB_INTERNAL
+const long long $sSEMp[1] = {0};
+
+// Float
+
+SWIFT_RUNTIME_STDLIB_INTERNAL
+const long long $sSfMn[1] = {0};
+
+// FloatingPoint
+
+SWIFT_RUNTIME_STDLIB_INTERNAL
+const long long $sSFMp[1] = {0};
+
+// Collection
+
+SWIFT_RUNTIME_STDLIB_INTERNAL
+const long long $sSlMp[1] = {0};
+
+// Comparable
+
+SWIFT_RUNTIME_STDLIB_INTERNAL
+const long long $sSLMp[1] = {0};
+
+// UnsafePointer
+
+SWIFT_RUNTIME_STDLIB_INTERNAL
+const long long $sSPMn[1] = {0};
+
+// Substring
+
+SWIFT_RUNTIME_STDLIB_INTERNAL
+const long long $sSsMn[1] = {0};
+
+// IteratorProtocol
+
+SWIFT_RUNTIME_STDLIB_INTERNAL
+const long long $sStMp[1] = {0};
+
+// UnsafeRawPointer
+
+SWIFT_RUNTIME_STDLIB_INTERNAL
+const long long $sSVMn[1] = {0};
+
+// UnsafeMutableRawBufferPointer
+
+SWIFT_RUNTIME_STDLIB_INTERNAL
+const long long $sSwMn[1] = {0};
+
+// UnsafeRawBufferPointer
+
+SWIFT_RUNTIME_STDLIB_INTERNAL
+const long long $sSWMn[1] = {0};
+
+// SignedInteger
+
+SWIFT_RUNTIME_STDLIB_INTERNAL
+const long long $sSZMp[1] = {0};
+
 // Mirror
 
 // protocol witness table for Swift._ClassSuperMirror : Swift._Mirror in Swift

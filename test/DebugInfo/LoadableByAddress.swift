@@ -1,6 +1,4 @@
-// SWIFT_ENABLE_TENSORFLOW
-// NOTE(TF-11): Added explicit `-enable-large-loadable-types` flag.
-// RUN: %target-swift-frontend %s -module-name A -emit-ir -enable-large-loadable-types -g -o - | %FileCheck %s
+// RUN: %target-swift-frontend %s -module-name A -emit-ir -g -o - | %FileCheck %s
 // REQUIRES: CPU=x86_64
 public struct Continuation<A> {
    private let magicToken = "Hello World"

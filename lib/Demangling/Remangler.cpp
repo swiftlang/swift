@@ -424,7 +424,11 @@ std::pair<int, Node *> Remangler::mangleConstrainedType(Node *node) {
     Chain.push_back(node->getChild(1), Factory);
     node = getChildOfType(node->getFirstChild());
   }
-  assert(node->getKind() == Node::Kind::DependentGenericParamType);
+  
+  if (node->getKind() != Node::Kind::DependentGenericParamType) {
+    mangle(node);
+    node = nullptr;
+  }
 
   const char *ListSeparator = (Chain.size() > 1 ? "_" : "");
   for (unsigned i = 1, n = Chain.size(); i <= n; ++i) {
@@ -483,6 +487,12 @@ void Remangler::mangleAnyNominalType(Node *node) {
 void Remangler::mangleGenericArgs(Node *node, char &Separator,
                                   bool fullSubstitutionMap) {
   switch (node->getKind()) {
+    case Node::Kind::Protocol:
+      // A protocol cannot be the parent of a nominal type, so this case should
+      // never be hit by valid swift code. But the indexer might generate a URL
+      // from invalid swift code, which has a bound generic inside a protocol.
+      // The ASTMangler treats a protocol like any other nominal type in this
+      // case, so we also support it in the remangler.
     case Node::Kind::Structure:
     case Node::Kind::Enum:
     case Node::Kind::Class:
@@ -514,6 +524,7 @@ void Remangler::mangleGenericArgs(Node *node, char &Separator,
     case Node::Kind::ImplicitClosure:
     case Node::Kind::DefaultArgumentInitializer:
     case Node::Kind::Initializer:
+    case Node::Kind::PropertyWrapperBackingInitializer:
       if (!fullSubstitutionMap)
         break;
 
@@ -811,6 +822,7 @@ void Remangler::mangleDependentGenericConformanceRequirement(Node *node) {
   if (ProtoOrClass->getFirstChild()->getKind() == Node::Kind::Protocol) {
     manglePureProtocol(ProtoOrClass);
     auto NumMembersAndParamIdx = mangleConstrainedType(node->getChild(0));
+    assert(NumMembersAndParamIdx.first < 0 || NumMembersAndParamIdx.second);
     switch (NumMembersAndParamIdx.first) {
       case -1: Buffer << "RQ"; return; // substitution
       case 0: Buffer << "R"; break;
@@ -822,6 +834,7 @@ void Remangler::mangleDependentGenericConformanceRequirement(Node *node) {
   }
   mangle(ProtoOrClass);
   auto NumMembersAndParamIdx = mangleConstrainedType(node->getChild(0));
+  assert(NumMembersAndParamIdx.first < 0 || NumMembersAndParamIdx.second);
   switch (NumMembersAndParamIdx.first) {
     case -1: Buffer << "RB"; return; // substitution
     case 0: Buffer << "Rb"; break;
@@ -849,6 +862,7 @@ void Remangler::mangleDependentGenericParamType(Node *node) {
 void Remangler::mangleDependentGenericSameTypeRequirement(Node *node) {
   mangleChildNode(node, 1);
   auto NumMembersAndParamIdx = mangleConstrainedType(node->getChild(0));
+  assert(NumMembersAndParamIdx.first < 0 || NumMembersAndParamIdx.second);
   switch (NumMembersAndParamIdx.first) {
     case -1: Buffer << "RS"; return; // substitution
     case 0: Buffer << "Rs"; break;
@@ -860,6 +874,7 @@ void Remangler::mangleDependentGenericSameTypeRequirement(Node *node) {
 
 void Remangler::mangleDependentGenericLayoutRequirement(Node *node) {
   auto NumMembersAndParamIdx = mangleConstrainedType(node->getChild(0));
+  assert(NumMembersAndParamIdx.first < 0 || NumMembersAndParamIdx.second);
   switch (NumMembersAndParamIdx.first) {
     case -1: Buffer << "RL"; break; // substitution
     case 0: Buffer << "Rl"; break;
@@ -922,11 +937,19 @@ void Remangler::mangleDependentMemberType(Node *node) {
       unreachable("wrong dependent member type");
     case 1:
       Buffer << 'Q';
-      mangleDependentGenericParamIndex(NumMembersAndParamIdx.second, "y", 'z');
+      if (auto dependentBase = NumMembersAndParamIdx.second) {
+        mangleDependentGenericParamIndex(dependentBase, "y", 'z');
+      } else {
+        Buffer << 'x';
+      }
       break;
     default:
       Buffer << 'Q';
-      mangleDependentGenericParamIndex(NumMembersAndParamIdx.second, "Y", 'Z');
+      if (auto dependentBase = NumMembersAndParamIdx.second) {
+        mangleDependentGenericParamIndex(dependentBase, "Y", 'Z');
+      } else {
+        Buffer << 'X';
+      }
       break;
   }
 }
@@ -1405,30 +1428,59 @@ void Remangler::mangleImplFunctionAttribute(Node *node) {
   unreachable("handled inline");
 }
 
+void Remangler::mangleImplSubstitutions(Node *node) {
+  unreachable("handled inline");
+}
+
+void Remangler::mangleImplImpliedSubstitutions(Node *node) {
+  unreachable("handled inline");
+}
+
 void Remangler::mangleImplFunctionType(Node *node) {
   const char *PseudoGeneric = "";
   Node *GenSig = nullptr;
+  Node *GenSubs = nullptr;
+  bool isImplied;
   for (NodePointer Child : *node) {
-    switch (Child->getKind()) {
-      case Node::Kind::ImplParameter:
-      case Node::Kind::ImplResult:
-      case Node::Kind::ImplErrorResult:
-        mangleChildNode(Child, 1);
-        break;
-      case Node::Kind::DependentPseudogenericSignature:
-        PseudoGeneric = "P";
-        LLVM_FALLTHROUGH;
-      case Node::Kind::DependentGenericSignature:
-        GenSig = Child;
-        break;
-      default:
-        break;
+    switch (auto kind = Child->getKind()) {
+    case Node::Kind::ImplParameter:
+    case Node::Kind::ImplResult:
+    case Node::Kind::ImplErrorResult:
+      mangleChildNode(Child, 1);
+      break;
+    case Node::Kind::DependentPseudogenericSignature:
+      PseudoGeneric = "P";
+      LLVM_FALLTHROUGH;
+    case Node::Kind::DependentGenericSignature:
+      GenSig = Child;
+      break;
+    case Node::Kind::ImplSubstitutions:
+    case Node::Kind::ImplImpliedSubstitutions:
+      GenSubs = Child;
+      isImplied = kind == Node::Kind::ImplImpliedSubstitutions;
+      break;
+    default:
+      break;
     }
   }
   if (GenSig)
     mangle(GenSig);
+  if (GenSubs) {
+    Buffer << 'y';
+    mangleChildNodes(GenSubs->getChild(0));
+    if (GenSubs->getNumChildren() >= 2)
+      mangleRetroactiveConformance(GenSubs->getChild(1));
+  }
 
-  Buffer << 'I' << PseudoGeneric;
+  Buffer << 'I';
+
+  if (GenSubs) {
+    Buffer << 's';
+    if (!isImplied)
+      Buffer << 'i';
+  }
+
+  Buffer << PseudoGeneric;
   for (NodePointer Child : *node) {
     switch (Child->getKind()) {
       // SWIFT_ENABLE_TENSORFLOW
@@ -1547,6 +1599,11 @@ void Remangler::mangleInfixOperator(Node *node) {
 void Remangler::mangleInitializer(Node *node) {
   mangleChildNodes(node);
   Buffer << "fi";
+}
+
+void Remangler::manglePropertyWrapperBackingInitializer(Node *node) {
+  mangleChildNodes(node);
+  Buffer << "fP";
 }
 
 void Remangler::mangleLazyProtocolWitnessTableAccessor(Node *node) {
@@ -2506,6 +2563,7 @@ bool Demangle::isSpecialized(Node *node) {
     case Node::Kind::ExplicitClosure:
     case Node::Kind::ImplicitClosure:
     case Node::Kind::Initializer:
+    case Node::Kind::PropertyWrapperBackingInitializer:
     case Node::Kind::DefaultArgumentInitializer:
     case Node::Kind::Getter:
     case Node::Kind::Setter:
@@ -2545,6 +2603,7 @@ NodePointer Demangle::getUnspecialized(Node *node, NodeFactory &Factory) {
     case Node::Kind::ExplicitClosure:
     case Node::Kind::ImplicitClosure:
     case Node::Kind::Initializer:
+    case Node::Kind::PropertyWrapperBackingInitializer:
     case Node::Kind::DefaultArgumentInitializer:
       NumToCopy = node->getNumChildren();
       LLVM_FALLTHROUGH;

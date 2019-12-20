@@ -13,8 +13,6 @@
 #include "swift/SIL/SILFunctionBuilder.h"
 #include "swift/AST/Availability.h"
 #include "swift/AST/Decl.h"
-// SWIFT_ENABLE_TENSORFLOW
-#include "swift/AST/ASTMangler.h"
 using namespace swift;
 
 SILFunction *SILFunctionBuilder::getOrCreateFunction(
@@ -33,7 +31,8 @@ SILFunction *SILFunctionBuilder::getOrCreateFunction(
 
   auto fn = SILFunction::create(mod, linkage, name, type, nullptr, loc,
                                 isBareSILFunction, isTransparent, isSerialized,
-                                entryCount, isDynamic, isThunk, subclassScope);
+                                entryCount, isDynamic, IsNotExactSelfClass,
+                                isThunk, subclassScope);
   fn->setDebugScope(new (mod) SILDebugScope(loc, fn));
   return fn;
 }
@@ -53,8 +52,9 @@ void SILFunctionBuilder::addFunctionAttributes(SILFunction *F,
         SA->getSpecializationKind() == SpecializeAttr::SpecializationKind::Full
             ? SILSpecializeAttr::SpecializationKind::Full
             : SILSpecializeAttr::SpecializationKind::Partial;
-    F->addSpecializeAttr(SILSpecializeAttr::create(M, SA->getRequirements(),
-                                                   SA->isExported(), kind));
+    F->addSpecializeAttr(
+        SILSpecializeAttr::create(M, SA->getSpecializedSgnature(),
+                                  SA->isExported(), kind));
   }
 
   if (auto *OA = Attrs.getAttribute<OptimizeAttr>()) {
@@ -65,65 +65,24 @@ void SILFunctionBuilder::addFunctionAttributes(SILFunction *F,
   if (Attrs.hasAttribute<SILGenNameAttr>() || Attrs.hasAttribute<CDeclAttr>())
     F->setHasCReferences(true);
 
+  // NOTE: Validate `@differentiable` attributes by calling
+  // `getParameterIndices`. This is important for:
+  // - Skipping invalid `@differentiable` attributes in non-primary files.
+  // - Preventing duplicate SIL differentiability witness creation for
+  //   `@differentiable` attributes on `AbstractStorageDecl` declarations.
+  //   Such `@differentiable` attributes are deleted and recreated on the getter
+  //   `AccessorDecl` of the `AbstractStorageDecl`.
+  // NOTE(TF-988): Consider creating SIL differentiability witnesses from
+  // `@differentiable` and `@derivative` attributes here instead of in
+  // `SILGenModule::postEmitFunction`. This supports differentiating external
+  // functions in roundtrip SIL tests.
+  for (auto *A : Attrs.getAttributes<DifferentiableAttr>())
+    (void)A->getParameterIndices();
+
   // Propagate @_dynamicReplacement(for:).
   if (constant.isNull())
     return;
   auto *decl = constant.getDecl();
-
-  // SWIFT_ENABLE_TENSORFLOW
-  // Propagate @differentiable attributes.
-  // Don't propagate @differentiable to:
-  // - Non-getter accessors (setters, modifiers, etc).
-  // - Default argument generator functions.
-  // - Thunks. Those are currently handled in SILGenThunk.cpp.
-  if ((!isa<AccessorDecl>(decl) || cast<AccessorDecl>(decl)->isGetter()) &&
-      constant.kind != SILDeclRef::Kind::DefaultArgGenerator &&
-      !constant.autoDiffAssociatedFunctionIdentifier &&
-      !constant.isStoredPropertyInitializer() &&
-      !constant.isThunk()) {
-    for (auto *A : Attrs.getAttributes<DifferentiableAttr>()) {
-      // Get lowered argument indices.
-      auto *paramIndices = A->getParameterIndices();
-      // NOTE: If `A->getParameterIndices()` is `nullptr`, continue. This is a
-      // necessary hack regarding deserialization.
-      if (!paramIndices)
-        continue;
-      auto *loweredParamIndices = paramIndices->getLowered(
-          F->getASTContext(),
-          decl->getInterfaceType()->castTo<AnyFunctionType>());
-      SILAutoDiffIndices indices(/*source*/ 0, loweredParamIndices);
-      // Get JVP/VJP names.
-      std::string jvpName, vjpName;
-      auto &ctx = F->getASTContext();
-      if (auto *jvpFn = A->getJVPFunction()) {
-        Mangle::ASTMangler mangler;
-        jvpName = ctx.getIdentifier(
-            mangler.mangleAutoDiffAssociatedFunctionHelper(
-                constant.mangle(), AutoDiffAssociatedFunctionKind::JVP,
-                indices)).str();
-      }
-      if (auto *vjpFn = A->getVJPFunction()) {
-        Mangle::ASTMangler mangler;
-        vjpName = ctx.getIdentifier(
-            mangler.mangleAutoDiffAssociatedFunctionHelper(
-                constant.mangle(), AutoDiffAssociatedFunctionKind::VJP,
-                indices)).str();
-      }
-      auto *silDiffAttr = SILDifferentiableAttr::create(
-          M, indices, A->getRequirements(), M.allocateCopy(jvpName),
-          M.allocateCopy(vjpName));
-#ifndef NDEBUG
-      // Verify that no existing attributes have the same indices.
-      for (auto *existingAttr : F->getDifferentiableAttrs()) {
-        bool sameAttributeConfig =
-            silDiffAttr->getIndices() == existingAttr->getIndices();
-        assert(!sameAttributeConfig &&
-               "Duplicate `[differentiable]` attribute");
-      }
-#endif
-      F->addDifferentiableAttr(silDiffAttr);
-    }
-  }
 
   // Only emit replacements for the objc entry point of objc methods.
   if (decl->isObjC() &&
@@ -131,12 +90,12 @@ void SILFunctionBuilder::addFunctionAttributes(SILFunction *F,
           SILFunctionTypeRepresentation::ObjCMethod)
     return;
 
-  auto *replacedFuncAttr = Attrs.getAttribute<DynamicReplacementAttr>();
-  if (!replacedFuncAttr)
+  // Only assign replacements when the thing being replaced is function-like and
+  // explicitly declared.  
+  auto *origDecl = decl->getDynamicallyReplacedDecl();
+  auto *replacedDecl = dyn_cast_or_null<AbstractFunctionDecl>(origDecl);
+  if (!replacedDecl)
     return;
-
-  auto *replacedDecl = replacedFuncAttr->getReplacedFunction();
-  assert(replacedDecl);
 
   if (decl->isObjC()) {
     F->setObjCReplacement(replacedDecl);
@@ -155,7 +114,6 @@ void SILFunctionBuilder::addFunctionAttributes(SILFunction *F,
          replacedFunc->getLoweredFunctionType()->hasOpaqueArchetype());
 
   F->setDynamicallyReplacedFunction(replacedFunc);
-
 }
 
 SILFunction *
@@ -163,7 +121,8 @@ SILFunctionBuilder::getOrCreateFunction(SILLocation loc, SILDeclRef constant,
                                         ForDefinition_t forDefinition,
                                         ProfileCounter entryCount) {
   auto nameTmp = constant.mangle();
-  auto constantType = mod.Types.getConstantFunctionType(constant);
+  auto constantType = mod.Types.getConstantFunctionType(
+      TypeExpansionContext::minimal(), constant);
   SILLinkage linkage = constant.getLinkage(forDefinition);
 
   if (auto fn = mod.lookUpFunction(nameTmp)) {
@@ -206,6 +165,7 @@ SILFunctionBuilder::getOrCreateFunction(SILLocation loc, SILDeclRef constant,
 
   auto *F = SILFunction::create(mod, linkage, name, constantType, nullptr, None,
                                 IsNotBare, IsTrans, IsSer, entryCount, IsDyn,
+                                IsNotExactSelfClass,
                                 IsNotThunk, constant.getSubclassScope(),
                                 inlineStrategy, EK);
   F->setDebugScope(new (mod) SILDebugScope(loc, F));
@@ -217,13 +177,13 @@ SILFunctionBuilder::getOrCreateFunction(SILLocation loc, SILDeclRef constant,
     if (constant.isForeign && decl->hasClangNode())
       F->setClangNodeOwner(decl);
 
-    if (decl->isWeakImported(/*forModule=*/nullptr, availCtx))
-      F->setWeakLinked();
+    F->setAvailabilityForLinkage(decl->getAvailabilityForLinkage());
+    F->setAlwaysWeakImported(decl->isAlwaysWeakImported());
 
     if (auto *accessor = dyn_cast<AccessorDecl>(decl)) {
       auto *storage = accessor->getStorage();
-      // SWIFT_ENABLE_TENSORFLOW
-      addFunctionAttributes(F, storage->getAttrs(), mod, constant);
+      // Add attributes for e.g. computed properties.
+      addFunctionAttributes(F, storage->getAttrs(), mod);
     }
     addFunctionAttributes(F, decl->getAttrs(), mod, constant);
   }
@@ -252,6 +212,7 @@ SILFunction *SILFunctionBuilder::createFunction(
     const SILDebugScope *DebugScope) {
   return SILFunction::create(mod, linkage, name, loweredType, genericEnv, loc,
                              isBareSILFunction, isTrans, isSerialized,
-                             entryCount, isDynamic, isThunk, subclassScope,
+                             entryCount, isDynamic, IsNotExactSelfClass,
+                             isThunk, subclassScope,
                              inlineStrategy, EK, InsertBefore, DebugScope);
 }

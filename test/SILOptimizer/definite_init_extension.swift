@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -emit-sil -verify %s -o /dev/null
+// RUN: %target-swift-frontend -emit-sil -verify %s -o /dev/null -enable-ownership-stripping-after-serialization
 
 struct S<T> {
   let t: T // expected-note {{'self.t.1' not initialized}}

@@ -173,10 +173,15 @@ collectASTModules(llvm::cl::list<std::string> &InputNames,
           (ELF && Name == swift::ELFASTSectionName) ||
           (COFF && Name == swift::COFFASTSectionName)) {
         uint64_t Size = Section.getSize();
-        StringRef ContentsReference;
-        Section.getContents(ContentsReference);
+
+        llvm::Expected<llvm::StringRef> ContentsReference = Section.getContents();
+        if (!ContentsReference) {
+          llvm::errs() << "error: " << name << " "
+            << errorToErrorCode(OF.takeError()).message() << "\n";
+          return false;
+        }
         char *Module = Alloc.Allocate<char>(Size);
-        std::memcpy(Module, (void *)ContentsReference.begin(), Size);
+        std::memcpy(Module, (void *)ContentsReference->begin(), Size);
         Modules.push_back({Module, Size});
       }
     }
@@ -220,9 +225,9 @@ int main(int argc, char **argv) {
       desc("The directory that holds the compiler resource files"),
       cat(Visible));
 
-  opt<bool> EnableDWARFImporter(
-      "enable-dwarf-importer",
-      desc("Import with LangOptions.EnableDWARFImporter = true"), cat(Visible));
+  opt<bool> DummyDWARFImporter(
+      "dummy-dwarfimporter",
+      desc("Install a dummy DWARFImporterDelegate"), cat(Visible));
 
   ParseCommandLineOptions(argc, argv);
 
@@ -290,7 +295,6 @@ int main(int argc, char **argv) {
   Invocation.setModuleName("lldbtest");
   Invocation.getClangImporterOptions().ModuleCachePath = ModuleCachePath;
   Invocation.getLangOptions().EnableMemoryBufferImporter = true;
-  Invocation.getLangOptions().EnableDWARFImporter = EnableDWARFImporter;
 
   if (!ResourceDir.empty()) {
     Invocation.setRuntimeResourcePath(ResourceDir);
@@ -299,6 +303,13 @@ int main(int argc, char **argv) {
   if (CI.setup(Invocation)) {
     llvm::errs() << "error: Failed setup invocation!\n";
     return 1;
+  }
+
+  swift::DWARFImporterDelegate dummyDWARFImporter;
+  if (DummyDWARFImporter) {
+    auto *ClangImporter = static_cast<swift::ClangImporter *>(
+        CI.getASTContext().getClangModuleLoader());
+    ClangImporter->setDWARFImporterDelegate(dummyDWARFImporter);
   }
 
   for (auto &Module : Modules)

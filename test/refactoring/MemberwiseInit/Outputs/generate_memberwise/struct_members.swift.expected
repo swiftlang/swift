@@ -1,0 +1,41 @@
+class Person {
+  var firstName: String!
+  var lastName: String!
+  var age: Int!
+  var planet = "Earth", solarSystem = "Milky Way"
+  var avgHeight = 175
+  let line = #line, file = #file, handle = #dsohandle
+  lazy var idea: Idea = { fatalError() }()
+}
+
+struct Place {
+internal init(person: Person, street: String, apartment: Optional<String>, city: String, state: String, postalCode: Int, plusFour: Int?) {
+self.person = person
+self.street = street
+self.apartment = apartment
+self.city = city
+self.state = state
+self.postalCode = postalCode
+self.plusFour = plusFour
+}
+
+  let person: Person
+  let street: String
+  let apartment: Optional<String>
+  let city: String
+  let state: String
+  let postalCode: Int
+  let plusFour: Int?
+}
+
+protocol Thing {
+  var idea: Idea { get }
+}
+
+enum Idea {
+  var subject: String { fatalError() }
+}
+
+
+
+

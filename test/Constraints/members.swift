@@ -301,7 +301,7 @@ func test15117741(_ s: r15117741S) {
 // <rdar://problem/22491394> References to unavailable decls sometimes diagnosed as ambiguous
 struct UnavailMember {
   @available(*, unavailable)
-  static var XYZ : X { get {} } // expected-note {{'XYZ' has been explicitly marked unavailable here}}
+  static var XYZ : UnavailMember { get {} } // expected-note {{'XYZ' has been explicitly marked unavailable here}}
 }
 
 let _ : [UnavailMember] = [.XYZ] // expected-error {{'XYZ' is unavailable}}
@@ -316,7 +316,7 @@ struct S22490787 {
 func f22490787() {
   var path: S22490787 = S22490787()
 
-  for p in path {  // expected-error {{type 'S22490787' does not conform to protocol 'Sequence'}}
+  for p in path {  // expected-error {{for-in loop requires 'S22490787' to conform to 'Sequence'}}
   }
 }
 
@@ -325,6 +325,7 @@ enum r23942743 {
   case Tomato(cloud: String)
 }
 let _ = .Tomato(cloud: .none)  // expected-error {{reference to member 'Tomato' cannot be resolved without a contextual type}}
+// expected-error@-1 {{cannot infer contextual base in reference to member 'none'}}
 
 
 
@@ -465,7 +466,7 @@ struct Outer {
 }
 
 // rdar://problem/39514009 - don't crash when trying to diagnose members with special names
-print("hello")[0] // expected-error {{value of tuple type '()' has no member 'subscript'}}
+print("hello")[0] // expected-error {{value of type '()' has no subscripts}}
 
 
 func rdar40537782() {
@@ -566,15 +567,15 @@ func rdar_48114578() {
 }
 
 struct S_Min {
-  var min: Int = 42
+  var xmin: Int = 42
 }
 
-func min(_: Int, _: Float) -> Int { return 0 }
-func min(_: Float, _: Int) -> Int { return 0 }
+func xmin(_: Int, _: Float) -> Int { return 0 }
+func xmin(_: Float, _: Int) -> Int { return 0 }
 
 extension S_Min : CustomStringConvertible {
   public var description: String {
-    return "\(min)" // Ok
+    return "\(xmin)" // Ok
   }
 }
 
@@ -602,8 +603,10 @@ func rdar50679161() {
         var _ = Q(
           a: v + foo.w,
           // expected-error@-1 {{instance member 'w' cannot be used on type 'S'}}
+          // expected-error@-2 {{cannot convert value of type 'Point' to expected argument type 'Int'}}
           b: v + foo.h
           // expected-error@-1 {{instance member 'h' cannot be used on type 'S'}}
+          // expected-error@-2 {{cannot convert value of type 'Point' to expected argument type 'Int'}}
         )
       }
     }
@@ -618,13 +621,14 @@ func rdar_50467583_and_50909555() {
 
   // rdar://problem/50909555
   struct S {
-    static subscript(x: Int, y: Int) -> Int {
+    static subscript(x: Int, y: Int) -> Int { // expected-note {{'subscript(_:_:)' declared here}}
       return 1
     }
   }
 
   func test(_ s: S) {
     s[1] // expected-error {{static member 'subscript' cannot be used on instance of type 'S'}} {{5-6=S}}
+    // expected-error@-1 {{missing argument for parameter #2 in call}} {{8-8=, <#Int#>}}
   }
 }
 

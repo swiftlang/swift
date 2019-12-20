@@ -261,4 +261,11 @@ public:
 };
 }
 
+namespace llvm {
+  template <typename T, unsigned N>
+  llvm::hash_code hash_value(const SmallVector<T, N> &vec) {
+    return hash_combine_range(vec.begin(), vec.end());
+  }
+}
+
 #endif // SWIFT_BASIC_SIMPLEREQUEST_H

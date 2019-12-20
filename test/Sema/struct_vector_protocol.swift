@@ -104,14 +104,12 @@ extension GenericExtended : Equatable, AdditiveArithmetic, VectorProtocol where 
 
 // Test errors.
 
-// expected-error @+2 {{type 'Empty' does not conform to protocol 'VectorProtocol'}}
-// expected-note @+1 {{do you want to add protocol stubs?}}
+// expected-error @+1 {{type 'Empty' does not conform to protocol 'VectorProtocol'}}
 struct Empty : VectorProtocol {}
 
 // Test type whose members conform to `VectorProtocol`
 // but have different `VectorSpaceScalar` associated type.
-// expected-error @+2 {{type 'InvalidMixedScalar' does not conform to protocol 'VectorProtocol'}}
-// expected-note @+1 {{do you want to add protocol stubs?}}
+// expected-error @+1 {{type 'InvalidMixedScalar' does not conform to protocol 'VectorProtocol'}}
 struct InvalidMixedScalar: VectorProtocol {
   var float: Float
   var double: Double
@@ -135,12 +133,10 @@ extension NoMemberwiseInitializerExtended : VectorProtocol
 
 // Test derived conformances in disallowed contexts.
 
-// expected-error @+3 {{type 'OtherFileNonconforming' does not conform to protocol 'VectorProtocol'}}
-// expected-error @+2 {{implementation of 'VectorProtocol' cannot be automatically synthesized in an extension in a different file to the type}}
-// expected-note @+1 {{do you want to add protocol stubs?}}
+// expected-error @+2 {{type 'OtherFileNonconforming' does not conform to protocol 'VectorProtocol'}}
+// expected-error @+1 {{implementation of 'VectorProtocol' cannot be automatically synthesized in an extension in a different file to the type}}
 extension OtherFileNonconforming : VectorProtocol {}
 
-// expected-error @+3 {{type 'GenericOtherFileNonconforming<T>' does not conform to protocol 'VectorProtocol'}}
-// expected-error @+2 {{implementation of 'VectorProtocol' cannot be automatically synthesized in an extension in a different file to the type}}
-// expected-note @+1 {{do you want to add protocol stubs?}}
+// expected-error @+2 {{type 'GenericOtherFileNonconforming<T>' does not conform to protocol 'VectorProtocol'}}
+// expected-error @+1 {{implementation of 'VectorProtocol' cannot be automatically synthesized in an extension in a different file to the type}}
 extension GenericOtherFileNonconforming : VectorProtocol {}

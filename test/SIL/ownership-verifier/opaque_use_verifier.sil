@@ -11,7 +11,7 @@ import Builtin
 
 sil [ossa] @unconditional_checked_cast_value_test : $@convention(thin) <T> (Builtin.Int32) -> @out T {
 bb0(%0 : $Builtin.Int32):
-  %1 = unconditional_checked_cast_value %0 : $Builtin.Int32 to $T
+  %1 = unconditional_checked_cast_value Builtin.Int32 in %0 : $Builtin.Int32 to T
   return %1 : $T
 }
 
@@ -72,7 +72,7 @@ bb0(%0 : @owned $AnyObject):
   %6 = function_ref @takeType : $@convention(thin) (@thick AnyObject.Type) -> ()
   %8 = begin_borrow %0 : $AnyObject
   %9 = copy_value %8 : $AnyObject
-  %10 = unconditional_checked_cast_value %9 : $AnyObject to $@thick AnyObject.Type
+  %10 = unconditional_checked_cast_value AnyObject in %9 : $AnyObject to @thick AnyObject.Type
   %11 = apply %6(%10) : $@convention(thin) (@thick AnyObject.Type) -> ()
   end_borrow %8 : $AnyObject
   destroy_value %0 : $AnyObject

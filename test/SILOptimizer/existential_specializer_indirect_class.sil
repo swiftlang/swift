@@ -1,0 +1,82 @@
+// RUN: %target-sil-opt  -wmo -enable-sil-verify-all -emit-sorted-sil %s -enable-existential-specializer -existential-specializer  -inline -sil-combine -generic-specializer -devirtualizer 2>&1 | %FileCheck %s
+
+sil_stage canonical
+
+import Swift
+
+protocol ClassProtocol: AnyObject { func method() }
+
+class C: ClassProtocol { func method() {} }
+
+// CHECK-LABEL: sil shared @$s28test_indirect_class_protocolTf4e_n : $@convention(thin) <τ_0_0 where τ_0_0 : ClassProtocol> (@in τ_0_0) -> ()
+sil hidden @test_indirect_class_protocol : $@convention(thin) (@in ClassProtocol) -> () {
+// CHECK-NEXT: //
+// CHECK-NEXT: bb0(%0 : $*τ_0_0):
+// CHECK-NEXT:   %1 = load %0
+// CHECK-NEXT:   %2 = init_existential_ref %1
+// CHECK-NEXT:   %3 = alloc_stack $ClassProtocol
+// CHECK-NEXT:   store %2 to %3
+bb0(%0 : $*ClassProtocol):
+  // CHECK-NEXT: destroy_addr %3
+  destroy_addr %0 : $*ClassProtocol
+  // CHECK-NEXT: dealloc_stack %3
+  // CHECK-NEXT: return undef
+  return undef : $()
+}
+
+// CHECK-LABEL: sil shared @$s39test_indirect_class_protocol_guaranteedTf4e_n : $@convention(thin) <τ_0_0 where τ_0_0 : ClassProtocol> (@in_guaranteed τ_0_0) -> ()
+sil hidden @test_indirect_class_protocol_guaranteed : $@convention(thin) (@in_guaranteed ClassProtocol) -> () {
+// CHECK-NEXT: //
+// CHECK-NEXT: bb0(%0 : $*τ_0_0):
+// CHECK-NEXT:   %1 = load %0
+// CHECK-NEXT:   %2 = init_existential_ref %1
+// CHECK-NEXT:   %3 = alloc_stack $ClassProtocol
+// CHECK-NEXT:   store %2 to %3
+bb0(%0 : $*ClassProtocol):
+  // CHECK-NEXT: %5 = load %3 : $*ClassProtocol
+  %1 = load %0 : $*ClassProtocol
+  // CHECK-NEXT: %6 = open_existential_ref %5
+  %2 = open_existential_ref %1 : $ClassProtocol to $@opened("ABCDEF01-ABCD-ABCD-ABCD-ABCDEFABCDEF") ClassProtocol
+  // CHECK-NEXT: %7 = witness_method $C, #ClassProtocol.method
+  %f = witness_method $@opened("ABCDEF01-ABCD-ABCD-ABCD-ABCDEFABCDEF") ClassProtocol, #ClassProtocol.method!1 : <Self: ClassProtocol> (Self) -> () -> (), %2 : $@opened("ABCDEF01-ABCD-ABCD-ABCD-ABCDEFABCDEF") ClassProtocol : $@convention(witness_method : ClassProtocol) <Self: ClassProtocol> (@guaranteed Self) -> ()
+  // CHECK-NEXT: %8 = unchecked_ref_cast %6
+  // CHECK-NEXT: %9 = apply %7<C>(%8)
+  apply %f<@opened("ABCDEF01-ABCD-ABCD-ABCD-ABCDEFABCDEF") ClassProtocol>(%2) : $@convention(witness_method : ClassProtocol) <Self: ClassProtocol> (@guaranteed Self) -> ()
+  // CHECK-NEXT: dealloc_stack %3
+  // CHECK-NEXT: return undef
+  return undef : $()
+}
+
+// CHECK-LABEL: sil hidden @invoke_indirect_class_protocol
+sil hidden @invoke_indirect_class_protocol : $@convention(thin) (@guaranteed C) -> () {
+bb0(%0 : $C):
+  %1 = init_existential_ref %0 : $C : $C, $ClassProtocol
+
+  // CHECK: [[INPUT:%.*]] = alloc_stack $ClassProtocol
+  %z = alloc_stack $ClassProtocol
+  retain_value %1 : $ClassProtocol
+  store %1 to %z : $*ClassProtocol
+
+  // CHECK: [[SPECIALIZATION:%.*]] = function_ref @$s39test_indirect_class_protocol_guaranteedTf4e_n
+  %f = function_ref @test_indirect_class_protocol_guaranteed : $@convention(thin) (@in_guaranteed ClassProtocol) -> ()
+  // CHECK-NEXT: [[INPUT_LOAD:%.*]] = load [[INPUT]]
+  // CHECK-NEXT: [[INPUT_OPEN:%.*]] = open_existential_ref [[INPUT_LOAD]] : $ClassProtocol to $[[OPENED_TYPE:@opened(.*) ClassProtocol]]
+  // CHECK-NEXT: [[INPUT_OPEN_BUF:%.*]] = alloc_stack $[[OPENED_TYPE]]
+  // CHECK-NEXT: store [[INPUT_OPEN]] to [[INPUT_OPEN_BUF]]
+  // CHECK-NEXT: apply [[SPECIALIZATION]]<[[OPENED_TYPE]]>([[INPUT_OPEN_BUF]])
+  apply %f(%z) : $@convention(thin) (@in_guaranteed ClassProtocol) -> ()
+  // CHECK-NEXT: dealloc_stack [[INPUT_OPEN_BUF]]
+
+  // CHECK: [[SPECIALIZATION:%.*]] = function_ref @$s28test_indirect_class_protocolTf4e_n
+  %g = function_ref @test_indirect_class_protocol : $@convention(thin) (@in ClassProtocol) -> ()
+  // CHECK-NEXT: [[INPUT_LOAD:%.*]] = load [[INPUT]]
+  // CHECK-NEXT: [[INPUT_OPEN:%.*]] = open_existential_ref [[INPUT_LOAD]] : $ClassProtocol to $[[OPENED_TYPE:@opened(.*) ClassProtocol]]
+  // CHECK-NEXT: [[INPUT_OPEN_BUF:%.*]] = alloc_stack $[[OPENED_TYPE]]
+  // CHECK-NEXT: store [[INPUT_OPEN]] to [[INPUT_OPEN_BUF]]
+  // CHECK-NEXT: apply [[SPECIALIZATION]]<[[OPENED_TYPE]]>([[INPUT_OPEN_BUF]])
+  apply %g(%z) : $@convention(thin) (@in ClassProtocol) -> ()
+  // CHECK-NEXT: dealloc_stack [[INPUT_OPEN_BUF]]
+
+  dealloc_stack %z : $*ClassProtocol
+  return undef : $()
+}

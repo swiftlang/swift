@@ -16,11 +16,13 @@
 
 #include "TypeCheckAvailability.h"
 #include "TypeChecker.h"
+#include "TypeCheckObjC.h"
 #include "MiscDiagnostics.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/Pattern.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeRefinementContext.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/SourceManager.h"
@@ -70,7 +72,7 @@ class TypeRefinementContextBuilder : private ASTWalker {
   };
 
   std::vector<ContextInfo> ContextStack;
-  TypeChecker &TC;
+  ASTContext &Context;
 
   /// A mapping from abstract storage declarations with accessors to
   /// to the type refinement contexts for those declarations. We refer to
@@ -91,8 +93,8 @@ class TypeRefinementContextBuilder : private ASTWalker {
   }
 
 public:
-  TypeRefinementContextBuilder(TypeRefinementContext *TRC, TypeChecker &TC)
-      : TC(TC) {
+  TypeRefinementContextBuilder(TypeRefinementContext *TRC, ASTContext &Context)
+      : Context(Context) {
     assert(TRC);
     pushContext(TRC, ParentTy());
   }
@@ -169,11 +171,11 @@ private:
     // the declared availability of the declaration and the potential versions
     // of its lexical context.
     AvailabilityContext DeclInfo =
-        swift::AvailabilityInference::availableRange(D, TC.Context);
+        swift::AvailabilityInference::availableRange(D, Context);
     DeclInfo.intersectWith(getCurrentTRC()->getAvailabilityInfo());
 
     TypeRefinementContext *NewTRC =
-        TypeRefinementContext::createForDecl(TC.Context, D, getCurrentTRC(),
+        TypeRefinementContext::createForDecl(Context, D, getCurrentTRC(),
                                              DeclInfo,
                                              refinementSourceRangeForDecl(D));
     
@@ -181,7 +183,7 @@ private:
     // when we process the accessor, we can use this TRC as the
     // parent.
     if (auto *StorageDecl = dyn_cast<AbstractStorageDecl>(D)) {
-      if (StorageDecl->hasAnyAccessors()) {
+      if (StorageDecl->hasParsedAccessors()) {
         StorageContexts[StorageDecl] = NewTRC;
       }
     }
@@ -197,7 +199,7 @@ private:
     
     // No need to introduce a context if the declaration does not have an
     // availability attribute.
-    if (!hasActiveAvailableAttribute(D, TC.Context)) {
+    if (!hasActiveAvailableAttribute(D, Context)) {
       return false;
     }
     
@@ -230,7 +232,7 @@ private:
       // locations and have callers of that method provide appropriate source
       // locations.
       SourceLoc BracesEnd = storageDecl->getBracesRange().End;
-      if (storageDecl->hasAnyAccessors() && BracesEnd.isValid()) {
+      if (storageDecl->hasParsedAccessors() && BracesEnd.isValid()) {
         return SourceRange(storageDecl->getStartLoc(),
                            BracesEnd);
       }
@@ -293,10 +295,10 @@ private:
       // Create a new context for the Then branch and traverse it in that new
       // context.
       auto *ThenTRC =
-          TypeRefinementContext::createForIfStmtThen(TC.Context, IS,
+          TypeRefinementContext::createForIfStmtThen(Context, IS,
                                                      getCurrentTRC(),
                                                      ThenRange.getValue());
-      TypeRefinementContextBuilder(ThenTRC, TC).build(IS->getThenStmt());
+      TypeRefinementContextBuilder(ThenTRC, Context).build(IS->getThenStmt());
     } else {
       build(IS->getThenStmt());
     }
@@ -316,10 +318,10 @@ private:
       // Create a new context for the Then branch and traverse it in that new
       // context.
       auto *ElseTRC =
-          TypeRefinementContext::createForIfStmtElse(TC.Context, IS,
+          TypeRefinementContext::createForIfStmtElse(Context, IS,
                                                      getCurrentTRC(),
                                                      ElseRange.getValue());
-      TypeRefinementContextBuilder(ElseTRC, TC).build(ElseStmt);
+      TypeRefinementContextBuilder(ElseTRC, Context).build(ElseStmt);
     } else {
       build(IS->getElseStmt());
     }
@@ -337,8 +339,8 @@ private:
       // Create a new context for the body and traverse it in the new
       // context.
       auto *BodyTRC = TypeRefinementContext::createForWhileStmtBody(
-          TC.Context, WS, getCurrentTRC(), BodyRange.getValue());
-      TypeRefinementContextBuilder(BodyTRC, TC).build(WS->getBody());
+          Context, WS, getCurrentTRC(), BodyRange.getValue());
+      TypeRefinementContextBuilder(BodyTRC, Context).build(WS->getBody());
     } else {
       build(WS->getBody());
     }
@@ -368,9 +370,9 @@ private:
     if (Stmt *ElseBody = GS->getBody()) {
       if (ElseRange.hasValue()) {
         auto *TrueTRC = TypeRefinementContext::createForGuardStmtElse(
-            TC.Context, GS, getCurrentTRC(), ElseRange.getValue());
+            Context, GS, getCurrentTRC(), ElseRange.getValue());
 
-        TypeRefinementContextBuilder(TrueTRC, TC).build(ElseBody);
+        TypeRefinementContextBuilder(TrueTRC, Context).build(ElseBody);
       } else {
         build(ElseBody);
       }
@@ -384,7 +386,7 @@ private:
     // Create a new context for the fallthrough.
 
     auto *FallthroughTRC =
-          TypeRefinementContext::createForGuardStmtFallthrough(TC.Context, GS,
+          TypeRefinementContext::createForGuardStmtFallthrough(Context, GS,
               ParentBrace, getCurrentTRC(), FallthroughRange.getValue());
 
     pushContext(FallthroughTRC, ParentBrace);
@@ -443,9 +445,10 @@ private:
         // We couldn't find an appropriate spec for the current platform,
         // so rather than refining, emit a diagnostic and just use the current
         // TRC.
-        TC.Diags.diagnose(Query->getLoc(),
-                          diag::availability_query_required_for_platform,
-                          platformString(targetPlatform(TC.getLangOpts())));
+        Context.Diags.diagnose(
+            Query->getLoc(),
+            diag::availability_query_required_for_platform,
+            platformString(targetPlatform(Context.LangOpts)));
         
         continue;
       }
@@ -467,7 +470,7 @@ private:
       // the range for the spec, then a version query can never be false, so the
       // spec is useless. If so, report this.
       if (CurrentInfo.isContainedIn(NewConstraint)) {
-        DiagnosticEngine &Diags = TC.Diags;
+        DiagnosticEngine &Diags = Context.Diags;
         // Some availability checks will always pass because the minimum
         // deployment target guarantees they will never be false. We don't
         // diagnose these checks as useless because the source file may
@@ -479,7 +482,7 @@ private:
         if (CurrentTRC->getReason() != TypeRefinementContext::Reason::Root) {
           Diags.diagnose(Query->getLoc(),
                          diag::availability_query_useless_enclosing_scope,
-                         platformString(targetPlatform(TC.getLangOpts())));
+                         platformString(targetPlatform(Context.LangOpts)));
           Diags.diagnose(CurrentTRC->getIntroductionLoc(),
                          diag::availability_query_useless_enclosing_scope_here);
         }
@@ -497,7 +500,7 @@ private:
       FalseFlow.unionWith(CurrentInfo);
 
       auto *TRC = TypeRefinementContext::createForConditionFollowingQuery(
-          TC.Context, Query, LastElement, CurrentTRC, NewConstraint);
+          Context, Query, LastElement, CurrentTRC, NewConstraint);
 
       pushContext(TRC, ParentTy());
       NestedCount++;
@@ -548,7 +551,7 @@ private:
       // properly. For example, on the OSXApplicationExtension platform
       // we want to chose the OS X spec unless there is an explicit
       // OSXApplicationExtension spec.
-      if (isPlatformActive(VersionSpec->getPlatform(), TC.getLangOpts())) {
+      if (isPlatformActive(VersionSpec->getPlatform(), Context.LangOpts)) {
         return VersionSpec;
       }
     }
@@ -587,20 +590,20 @@ void TypeChecker::buildTypeRefinementContextHierarchy(SourceFile &SF,
   // already have a root type refinement context.
   assert(StartElem == 0 || RootTRC);
 
-  ASTContext &AC = SF.getASTContext();
+  ASTContext &Context = SF.getASTContext();
 
   if (!RootTRC) {
     // The root type refinement context reflects the fact that all parts of
     // the source file are guaranteed to be executing on at least the minimum
     // platform version.
-    auto MinPlatformReq = AvailabilityContext::forDeploymentTarget(AC);
+    auto MinPlatformReq = AvailabilityContext::forDeploymentTarget(Context);
     RootTRC = TypeRefinementContext::createRoot(&SF, MinPlatformReq);
     SF.setTypeRefinementContext(RootTRC);
   }
 
   // Build refinement contexts, if necessary, for all declarations starting
   // with StartElem.
-  TypeRefinementContextBuilder Builder(RootTRC, *this);
+  TypeRefinementContextBuilder Builder(RootTRC, Context);
   for (auto D : llvm::makeArrayRef(SF.Decls).slice(StartElem)) {
     Builder.build(D);
   }
@@ -622,6 +625,7 @@ TypeChecker::overApproximateAvailabilityAtLocation(SourceLoc loc,
                                                    const DeclContext *DC,
                                                    const TypeRefinementContext **MostRefined) {
   SourceFile *SF = DC->getParentSourceFile();
+  auto &Context = DC->getASTContext();
 
   // If our source location is invalid (this may be synthesized code), climb
   // the decl context hierarchy until we find a location that is valid,
@@ -640,8 +644,10 @@ TypeChecker::overApproximateAvailabilityAtLocation(SourceLoc loc,
   // We can assume we are running on at least the minimum deployment target.
   auto OverApproximateContext =
     AvailabilityContext::forDeploymentTarget(Context);
-
-  while (DC && loc.isInvalid()) {
+  auto isInvalidLoc = [SF](SourceLoc loc) {
+    return SF ? loc.isInvalid() : true;
+  };
+  while (DC && isInvalidLoc(loc)) {
     const Decl *D = DC->getInnermostDeclarationDeclContext();
     if (!D)
       break;
@@ -674,6 +680,7 @@ TypeChecker::overApproximateAvailabilityAtLocation(SourceLoc loc,
 bool TypeChecker::isDeclAvailable(const Decl *D, SourceLoc referenceLoc,
                                   const DeclContext *referenceDC,
                                   AvailabilityContext &OutAvailableInfo) {
+  ASTContext &Context = referenceDC->getASTContext();
 
   AvailabilityContext safeRangeUnderApprox{
       AvailabilityInference::availableRange(D, Context)};
@@ -696,6 +703,7 @@ bool TypeChecker::isDeclAvailable(const Decl *D, SourceLoc referenceLoc,
 Optional<UnavailabilityReason>
 TypeChecker::checkDeclarationAvailability(const Decl *D, SourceLoc referenceLoc,
                                           const DeclContext *referenceDC) {
+  ASTContext &Context = referenceDC->getASTContext();
   if (Context.LangOpts.DisableAvailabilityChecking) {
     return None;
   }
@@ -949,15 +957,8 @@ abstractSyntaxDeclForAvailableAttribute(const Decl *ConcreteSyntaxDecl) {
     // all parsed attribute that appear in the concrete syntax upon on the
     // PatternBindingDecl are added to all of the VarDecls for the pattern
     // binding.
-    ArrayRef<PatternBindingEntry> Entries = PBD->getPatternList();
-    if (!Entries.empty()) {
-      const VarDecl *AnyVD = nullptr;
-      // FIXME: This is wasteful; we only need the first variable.
-      Entries.front().getPattern()->forEachVariable([&](const VarDecl *VD) {
-        AnyVD = VD;
-      });
-      if (AnyVD)
-        return AnyVD;
+    if (PBD->getNumPatternEntries() != 0) {
+      return PBD->getAnchoringVarDecl(0);
     }
   } else if (auto *ECD = dyn_cast<EnumCaseDecl>(ConcreteSyntaxDecl)) {
     // Similar to the PatternBindingDecl case above, we return the
@@ -1135,15 +1136,15 @@ static void findAvailabilityFixItNodes(SourceRange ReferenceRange,
 /// on the given declaration for the given version range.
 static void fixAvailabilityForDecl(SourceRange ReferenceRange, const Decl *D,
                                    const VersionRange &RequiredRange,
-                                   TypeChecker &TC) {
+                                   ASTContext &Context) {
   assert(D);
 
   // Don't suggest adding an @available() to a declaration where we would
   // emit a diagnostic saying it is not allowed.
-  if (TC.diagnosticIfDeclCannotBePotentiallyUnavailable(D).hasValue())
+  if (TypeChecker::diagnosticIfDeclCannotBePotentiallyUnavailable(D).hasValue())
     return;
 
-  if (getActiveAvailableAttribute(D, TC.Context)) {
+  if (getActiveAvailableAttribute(D, Context)) {
     // For QoI, in future should emit a fixit to update the existing attribute.
     return;
   }
@@ -1178,21 +1179,14 @@ static void fixAvailabilityForDecl(SourceRange ReferenceRange, const Decl *D,
     return;
 
   StringRef OriginalIndent =
-      Lexer::getIndentationForLine(TC.Context.SourceMgr, InsertLoc);
+      Lexer::getIndentationForLine(Context.SourceMgr, InsertLoc);
+  PlatformKind Target = targetPlatform(Context.LangOpts);
 
-  std::string AttrText;
-  {
-    llvm::raw_string_ostream Out(AttrText);
-
-    PlatformKind Target = targetPlatform(TC.getLangOpts());
-    Out << "@available(" << platformString(Target) << " "
-        << RequiredRange.getLowerEndpoint().getAsString() << ", *)\n"
-        << OriginalIndent;
-  }
-
-  TC.diagnose(D, diag::availability_add_attribute,
-              KindForDiagnostic)
-      .fixItInsert(InsertLoc, AttrText);
+  D->diagnose(diag::availability_add_attribute, KindForDiagnostic)
+      .fixItInsert(InsertLoc, diag::insert_available_attr,
+                   platformString(Target),
+                   RequiredRange.getLowerEndpoint().getAsString(),
+                   OriginalIndent);
 }
 
 /// In the special case of being in an existing, nontrivial type refinement
@@ -1204,12 +1198,12 @@ static bool fixAvailabilityByNarrowingNearbyVersionCheck(
     SourceRange ReferenceRange,
     const DeclContext *ReferenceDC,
     const VersionRange &RequiredRange,
-    TypeChecker &TC,
+    ASTContext &Context,
     InFlightDiagnostic &Err) {
   const TypeRefinementContext *TRC = nullptr;
   AvailabilityContext RunningOSOverApprox =
-    TC.overApproximateAvailabilityAtLocation(ReferenceRange.Start,
-                                             ReferenceDC, &TRC);
+    TypeChecker::overApproximateAvailabilityAtLocation(ReferenceRange.Start,
+                                                       ReferenceDC, &TRC);
   VersionRange RunningRange = RunningOSOverApprox.getOSVersion();
   if (RunningRange.hasLowerEndpoint() &&
       RequiredRange.hasLowerEndpoint() &&
@@ -1221,7 +1215,7 @@ static bool fixAvailabilityByNarrowingNearbyVersionCheck(
     // or disagreement on a subminor-or-less version for macOS.
     auto RunningVers = RunningRange.getLowerEndpoint();
     auto RequiredVers = RequiredRange.getLowerEndpoint();
-    auto Platform = targetPlatform(TC.Context.LangOpts);
+    auto Platform = targetPlatform(Context.LangOpts);
     if (RunningVers.getMajor() != RequiredVers.getMajor())
       return false;
     if ((Platform == PlatformKind::OSX ||
@@ -1247,7 +1241,7 @@ static bool fixAvailabilityByNarrowingNearbyVersionCheck(
 /// that checks for the given version range around the given node.
 static void fixAvailabilityByAddingVersionCheck(
     ASTNode NodeToWrap, const VersionRange &RequiredRange,
-    SourceRange ReferenceRange, TypeChecker &TC) {
+    SourceRange ReferenceRange, ASTContext &Context) {
   SourceRange RangeToWrap = NodeToWrap.getSourceRange();
   if (RangeToWrap.isInvalid())
     return;
@@ -1255,19 +1249,19 @@ static void fixAvailabilityByAddingVersionCheck(
   SourceLoc ReplaceLocStart = RangeToWrap.Start;
   StringRef ExtraIndent;
   StringRef OriginalIndent = Lexer::getIndentationForLine(
-      TC.Context.SourceMgr, ReplaceLocStart, &ExtraIndent);
+      Context.SourceMgr, ReplaceLocStart, &ExtraIndent);
 
   std::string IfText;
   {
     llvm::raw_string_ostream Out(IfText);
 
     SourceLoc ReplaceLocEnd =
-        Lexer::getLocForEndOfToken(TC.Context.SourceMgr, RangeToWrap.End);
+        Lexer::getLocForEndOfToken(Context.SourceMgr, RangeToWrap.End);
 
     std::string GuardedText =
-        TC.Context.SourceMgr.extractText(CharSourceRange(TC.Context.SourceMgr,
-                                                         ReplaceLocStart,
-                                                         ReplaceLocEnd)).str();
+        Context.SourceMgr.extractText(CharSourceRange(Context.SourceMgr,
+                                                      ReplaceLocStart,
+                                                      ReplaceLocEnd)).str();
 
     std::string NewLine = "\n";
     std::string NewLineReplacement = (NewLine + ExtraIndent).str();
@@ -1281,7 +1275,7 @@ static void fixAvailabilityByAddingVersionCheck(
       StartAt += NewLine.length();
     }
 
-    PlatformKind Target = targetPlatform(TC.getLangOpts());
+    PlatformKind Target = targetPlatform(Context.LangOpts);
 
     Out << "if #available(" << platformString(Target)
         << " " << RequiredRange.getLowerEndpoint().getAsString()
@@ -1296,7 +1290,8 @@ static void fixAvailabilityByAddingVersionCheck(
     Out << OriginalIndent << "}";
   }
 
-  TC.diagnose(ReferenceRange.Start, diag::availability_guard_with_version_check)
+  Context.Diags.diagnose(
+      ReferenceRange.Start, diag::availability_guard_with_version_check)
       .fixItReplace(RangeToWrap, IfText);
 }
 
@@ -1305,7 +1300,7 @@ static void fixAvailabilityByAddingVersionCheck(
 static void fixAvailability(SourceRange ReferenceRange,
                             const DeclContext *ReferenceDC,
                             const VersionRange &RequiredRange,
-                            TypeChecker &TC) {
+                            ASTContext &Context) {
   if (ReferenceRange.isInvalid())
     return;
 
@@ -1313,30 +1308,33 @@ static void fixAvailability(SourceRange ReferenceRange,
   const Decl *FoundMemberDecl = nullptr;
   const Decl *FoundTypeLevelDecl = nullptr;
 
-  findAvailabilityFixItNodes(ReferenceRange, ReferenceDC, TC.Context.SourceMgr,
+  findAvailabilityFixItNodes(ReferenceRange, ReferenceDC, Context.SourceMgr,
                              NodeToWrapInVersionCheck, FoundMemberDecl,
                              FoundTypeLevelDecl);
 
   // Suggest wrapping in if #available(...) { ... } if possible.
   if (NodeToWrapInVersionCheck.hasValue()) {
     fixAvailabilityByAddingVersionCheck(NodeToWrapInVersionCheck.getValue(),
-                                        RequiredRange, ReferenceRange, TC);
+                                        RequiredRange, ReferenceRange, Context);
   }
 
   // Suggest adding availability attributes.
   if (FoundMemberDecl) {
-    fixAvailabilityForDecl(ReferenceRange, FoundMemberDecl, RequiredRange, TC);
+    fixAvailabilityForDecl(ReferenceRange, FoundMemberDecl, RequiredRange,
+                           Context);
   }
 
   if (FoundTypeLevelDecl) {
     fixAvailabilityForDecl(ReferenceRange, FoundTypeLevelDecl, RequiredRange,
-                           TC);
+                           Context);
   }
 }
 
 void TypeChecker::diagnosePotentialOpaqueTypeUnavailability(
     SourceRange ReferenceRange, const DeclContext *ReferenceDC,
     const UnavailabilityReason &Reason) {
+  ASTContext &Context = ReferenceDC->getASTContext();
+
   // We only emit diagnostics for API unavailability, not for explicitly
   // weak-linked symbols.
   if (Reason.getReasonKind() !=
@@ -1347,22 +1345,24 @@ void TypeChecker::diagnosePotentialOpaqueTypeUnavailability(
   auto RequiredRange = Reason.getRequiredOSVersionRange();
   {
     auto Err =
-      diagnose(ReferenceRange.Start, diag::availability_opaque_types_only_version_newer,
+      Context.Diags.diagnose(
+               ReferenceRange.Start, diag::availability_opaque_types_only_version_newer,
                prettyPlatformString(targetPlatform(Context.LangOpts)),
                Reason.getRequiredOSVersionRange().getLowerEndpoint());
 
     // Direct a fixit to the error if an existing guard is nearly-correct
     if (fixAvailabilityByNarrowingNearbyVersionCheck(ReferenceRange,
                                                      ReferenceDC,
-                                                     RequiredRange, *this, Err))
+                                                     RequiredRange, Context, Err))
       return;
   }
-  fixAvailability(ReferenceRange, ReferenceDC, RequiredRange, *this);
+  fixAvailability(ReferenceRange, ReferenceDC, RequiredRange, Context);
 }
 
 void TypeChecker::diagnosePotentialUnavailability(
     const Decl *D, DeclName Name, SourceRange ReferenceRange,
     const DeclContext *ReferenceDC, const UnavailabilityReason &Reason) {
+  ASTContext &Context = ReferenceDC->getASTContext();
 
   // We only emit diagnostics for API unavailability, not for explicitly
   // weak-linked symbols.
@@ -1374,24 +1374,27 @@ void TypeChecker::diagnosePotentialUnavailability(
   auto RequiredRange = Reason.getRequiredOSVersionRange();
   {
     auto Err =
-      diagnose(ReferenceRange.Start, diag::availability_decl_only_version_newer,
+      Context.Diags.diagnose(
+               ReferenceRange.Start, diag::availability_decl_only_version_newer,
                Name, prettyPlatformString(targetPlatform(Context.LangOpts)),
                Reason.getRequiredOSVersionRange().getLowerEndpoint());
 
     // Direct a fixit to the error if an existing guard is nearly-correct
     if (fixAvailabilityByNarrowingNearbyVersionCheck(ReferenceRange,
                                                      ReferenceDC,
-                                                     RequiredRange, *this, Err))
+                                                     RequiredRange, Context, Err))
       return;
   }
 
-  fixAvailability(ReferenceRange, ReferenceDC, RequiredRange, *this);
+  fixAvailability(ReferenceRange, ReferenceDC, RequiredRange, Context);
 }
 
 void TypeChecker::diagnosePotentialAccessorUnavailability(
     const AccessorDecl *Accessor, SourceRange ReferenceRange,
     const DeclContext *ReferenceDC, const UnavailabilityReason &Reason,
     bool ForInout) {
+  ASTContext &Context = ReferenceDC->getASTContext();
+
   assert(Accessor->isGetterOrSetter());
 
   const AbstractStorageDecl *ASD = Accessor->getStorage();
@@ -1403,7 +1406,8 @@ void TypeChecker::diagnosePotentialAccessorUnavailability(
   auto RequiredRange = Reason.getRequiredOSVersionRange();
   {
     auto Err =
-      diagnose(ReferenceRange.Start, diag,
+      Context.Diags.diagnose(
+               ReferenceRange.Start, diag,
                static_cast<unsigned>(Accessor->getAccessorKind()), Name,
                prettyPlatformString(targetPlatform(Context.LangOpts)),
                Reason.getRequiredOSVersionRange().getLowerEndpoint());
@@ -1412,11 +1416,11 @@ void TypeChecker::diagnosePotentialAccessorUnavailability(
     // Direct a fixit to the error if an existing guard is nearly-correct
     if (fixAvailabilityByNarrowingNearbyVersionCheck(ReferenceRange,
                                                      ReferenceDC,
-                                                     RequiredRange, *this, Err))
+                                                     RequiredRange, Context, Err))
       return;
   }
 
-  fixAvailability(ReferenceRange, ReferenceDC, RequiredRange, *this);
+  fixAvailability(ReferenceRange, ReferenceDC, RequiredRange, Context);
 }
 
 const AvailableAttr *TypeChecker::getDeprecated(const Decl *D) {
@@ -1780,12 +1784,14 @@ static void fixItAvailableAttrRename(InFlightDiagnostic &diag,
   //   argumentLabelIDs = {"w", "x", "", "", "z"}
   auto I = argumentLabelIDs.begin();
 
-  auto updateLabelsForArg = [&](Expr *expr) {
-    if (isa<DefaultArgumentExpr>(expr) ||
-        isa<CallerDefaultArgumentExpr>(expr)) {
+  auto updateLabelsForArg = [&](Expr *expr) -> bool {
+    if (isa<DefaultArgumentExpr>(expr)) {
       // Defaulted: remove param label of it.
+      if (I == argumentLabelIDs.end())
+        return true;
+
       I = argumentLabelIDs.erase(I);
-      return;
+      return false;
     }
 
     if (auto *varargExpr = dyn_cast<VarargExpansionExpr>(expr)) {
@@ -1805,19 +1811,26 @@ static void fixItAvailableAttrRename(InFlightDiagnostic &diag,
           I = argumentLabelIDs.insert(I, variadicArgsNum, Identifier());
           I += variadicArgsNum;
         }
-        return;
+        return false;
       }
     }
 
     // Normal: Just advance.
+    if (I == argumentLabelIDs.end())
+      return true;
+
     ++I;
+    return false;
   };
 
   if (auto *parenExpr = dyn_cast<ParenExpr>(argExpr)) {
-    updateLabelsForArg(parenExpr->getSubExpr());
+    if (updateLabelsForArg(parenExpr->getSubExpr()))
+      return;
   } else {
-    for (auto *arg : cast<TupleExpr>(argExpr)->getElements())
-      updateLabelsForArg(arg);
+    for (auto *arg : cast<TupleExpr>(argExpr)->getElements()) {
+      if (updateLabelsForArg(arg))
+        return;
+    }
   }
 
   if (argumentLabelIDs.size() != argList.args.size()) {
@@ -1931,6 +1944,7 @@ void TypeChecker::diagnoseIfDeprecated(SourceRange ReferenceRange,
     return;
   }
 
+  auto &Context = ReferenceDC->getASTContext();
   if (!Context.LangOpts.DisableAvailabilityChecking) {
     AvailabilityContext RunningOSVersions =
         overApproximateAvailabilityAtLocation(ReferenceRange.Start,ReferenceDC);
@@ -1953,10 +1967,12 @@ void TypeChecker::diagnoseIfDeprecated(SourceRange ReferenceRange,
     DeprecatedVersion = Attr->Deprecated.getValue();
 
   if (Attr->Message.empty() && Attr->Rename.empty()) {
-    diagnose(ReferenceRange.Start, diag::availability_deprecated,
+    Context.Diags.diagnose(
+             ReferenceRange.Start, diag::availability_deprecated,
              RawAccessorKind, Name, Attr->hasPlatform(), Platform,
-             Attr->Deprecated.hasValue(), DeprecatedVersion)
-      .highlight(Attr->getRange());
+             Attr->Deprecated.hasValue(), DeprecatedVersion,
+             /*message*/ StringRef())
+        .highlight(Attr->getRange());
     return;
   }
 
@@ -1967,15 +1983,17 @@ void TypeChecker::diagnoseIfDeprecated(SourceRange ReferenceRange,
 
   if (!Attr->Message.empty()) {
     EncodedDiagnosticMessage EncodedMessage(Attr->Message);
-    diagnose(ReferenceRange.Start, diag::availability_deprecated_msg,
+    Context.Diags.diagnose(
+             ReferenceRange.Start, diag::availability_deprecated,
              RawAccessorKind, Name, Attr->hasPlatform(), Platform,
              Attr->Deprecated.hasValue(), DeprecatedVersion,
              EncodedMessage.Message)
-      .highlight(Attr->getRange());
+        .highlight(Attr->getRange());
   } else {
     unsigned rawReplaceKind = static_cast<unsigned>(
         replacementDeclKind.getValueOr(ReplacementDeclKind::None));
-    diagnose(ReferenceRange.Start, diag::availability_deprecated_rename,
+    Context.Diags.diagnose(
+             ReferenceRange.Start, diag::availability_deprecated_rename,
              RawAccessorKind, Name, Attr->hasPlatform(), Platform,
              Attr->Deprecated.hasValue(), DeprecatedVersion,
              replacementDeclKind.hasValue(), rawReplaceKind, newName)
@@ -1983,7 +2001,8 @@ void TypeChecker::diagnoseIfDeprecated(SourceRange ReferenceRange,
   }
 
   if (!Attr->Rename.empty() && !isa<AccessorDecl>(DeprecatedDecl)) {
-    auto renameDiag = diagnose(ReferenceRange.Start,
+    auto renameDiag = Context.Diags.diagnose(
+                               ReferenceRange.Start,
                                diag::note_deprecated_rename,
                                newName);
     fixItAvailableAttrRename(renameDiag, ReferenceRange, DeprecatedDecl,
@@ -1998,12 +2017,9 @@ void swift::diagnoseUnavailableOverride(ValueDecl *override,
   ASTContext &ctx = override->getASTContext();
   auto &diags = ctx.Diags;
   if (attr->Rename.empty()) {
-    if (attr->Message.empty())
-      diags.diagnose(override, diag::override_unavailable,
-                     override->getBaseName());
-    else
-      diags.diagnose(override, diag::override_unavailable_msg,
-                     override->getBaseName(), attr->Message);
+    EncodedDiagnosticMessage EncodedMessage(attr->Message);
+    diags.diagnose(override, diag::override_unavailable,
+                   override->getBaseName(), EncodedMessage.Message);
 
     DeclName name;
     unsigned rawAccessorKind;
@@ -2185,22 +2201,12 @@ bool swift::diagnoseExplicitUnavailability(
     unsigned rawReplaceKind = static_cast<unsigned>(
         replaceKind.getValueOr(ReplacementDeclKind::None));
     StringRef newName = replaceKind ? newNameBuf.str() : Attr->Rename;
-
-    if (Attr->Message.empty()) {
-      auto diag = diags.diagnose(Loc,
-                                 diag::availability_decl_unavailable_rename,
-                                 RawAccessorKind, Name,
-                                 replaceKind.hasValue(),
-                                 rawReplaceKind, newName);
-      attachRenameFixIts(diag);
-    } else {
       EncodedDiagnosticMessage EncodedMessage(Attr->Message);
       auto diag =
-        diags.diagnose(Loc, diag::availability_decl_unavailable_rename_msg,
-                       RawAccessorKind, Name, replaceKind.hasValue(),
-                       rawReplaceKind, newName, EncodedMessage.Message);
+          diags.diagnose(Loc, diag::availability_decl_unavailable_rename,
+                         RawAccessorKind, Name, replaceKind.hasValue(),
+                         rawReplaceKind, newName, EncodedMessage.Message);
       attachRenameFixIts(diag);
-    }
   } else if (isSubscriptReturningString(D, ctx)) {
     diags.diagnose(Loc, diag::availabilty_string_subscript_migration)
       .highlight(R)
@@ -2209,16 +2215,12 @@ bool swift::diagnoseExplicitUnavailability(
 
     // Skip the note emitted below.
     return true;
-  } else if (Attr->Message.empty()) {
-    diags.diagnose(Loc, diag::availability_decl_unavailable,
-                   RawAccessorKind, Name, platform.empty(), platform)
-      .highlight(R);
   } else {
     EncodedDiagnosticMessage EncodedMessage(Attr->Message);
-    diags.diagnose(Loc, diag::availability_decl_unavailable_msg,
-                   RawAccessorKind, Name, platform.empty(), platform,
-                   EncodedMessage.Message)
-      .highlight(R);
+    diags
+        .diagnose(Loc, diag::availability_decl_unavailable, RawAccessorKind,
+                  Name, platform.empty(), platform, EncodedMessage.Message)
+        .highlight(R);
   }
 
   switch (Attr->getVersionAvailability(ctx)) {
@@ -2284,7 +2286,7 @@ class AvailabilityWalker : public ASTWalker {
     InOut
   };
 
-  TypeChecker &TC;
+  ASTContext &Context;
   DeclContext *DC;
   MemberAccessContext AccessContext = MemberAccessContext::Getter;
   SmallVector<const Expr *, 16> ExprStack;
@@ -2302,16 +2304,15 @@ class AvailabilityWalker : public ASTWalker {
            init->isImplicit() &&
            init->getParameters()->size() == 1 &&
            init->getParameters()->get(0)->getArgumentName() ==
-                   TC.Context.Id_rawValue;
+                   Context.Id_rawValue;
   }
 
 public:
-  AvailabilityWalker(
-      TypeChecker &TC, DeclContext *DC) : TC(TC), DC(DC) {
+  AvailabilityWalker(DeclContext *DC) : Context(DC->getASTContext()), DC(DC) {
     Expansion = DC->getResilienceExpansion();
     if (Expansion == ResilienceExpansion::Minimal)
       std::tie(FragileKind, TreatUsableFromInlineAsPublic)
-        = TC.getFragileFunctionKind(DC);
+        = TypeChecker::getFragileFunctionKind(DC);
   }
 
   // FIXME: Remove this
@@ -2512,7 +2513,7 @@ private:
   void maybeDiagStorageAccess(const ValueDecl *VD,
                               SourceRange ReferenceRange,
                               const DeclContext *ReferenceDC) const {
-    if (TC.getLangOpts().DisableAvailabilityChecking)
+    if (Context.LangOpts.DisableAvailabilityChecking)
       return;
 
     auto *D = dyn_cast<AbstractStorageDecl>(VD);
@@ -2591,8 +2592,8 @@ AvailabilityWalker::diagAvailability(ConcreteDeclRef declRef, SourceRange R,
 
   if (FragileKind)
     if (R.isValid())
-      if (TC.diagnoseInlinableDeclRef(R.Start, declRef, DC, *FragileKind,
-                                      TreatUsableFromInlineAsPublic))
+      if (TypeChecker::diagnoseInlinableDeclRef(R.Start, declRef, DC, *FragileKind,
+                                                TreatUsableFromInlineAsPublic))
         return true;
 
   if (diagnoseExplicitUnavailability(D, R, DC, call))
@@ -2605,7 +2606,7 @@ AvailabilityWalker::diagAvailability(ConcreteDeclRef declRef, SourceRange R,
 
   // Diagnose for deprecation
   if (!isAccessorWithDeprecatedStorage)
-    TC.diagnoseIfDeprecated(R, DC, D, call);
+    TypeChecker::diagnoseIfDeprecated(R, DC, D, call);
 
   if (Flags.contains(DeclAvailabilityFlag::AllowPotentiallyUnavailable))
     return false;
@@ -2615,15 +2616,15 @@ AvailabilityWalker::diagAvailability(ConcreteDeclRef declRef, SourceRange R,
     return false;
 
   // Diagnose (and possibly signal) for potential unavailability
-  auto maybeUnavail = TC.checkDeclarationAvailability(D, R.Start, DC);
+  auto maybeUnavail = TypeChecker::checkDeclarationAvailability(D, R.Start, DC);
   if (maybeUnavail.hasValue()) {
     if (accessor) {
       bool forInout = Flags.contains(DeclAvailabilityFlag::ForInout);
-      TC.diagnosePotentialAccessorUnavailability(accessor, R, DC,
-                                                 maybeUnavail.getValue(),
-                                                 forInout);
+      TypeChecker::diagnosePotentialAccessorUnavailability(accessor, R, DC,
+                                                           maybeUnavail.getValue(),
+                                                           forInout);
     } else {
-      TC.diagnosePotentialUnavailability(D, R, DC, maybeUnavail.getValue());
+      TypeChecker::diagnosePotentialUnavailability(D, R, DC, maybeUnavail.getValue());
     }
     if (!Flags.contains(DeclAvailabilityFlag::ContinueOnPotentialUnavailability))
       return true;
@@ -2635,20 +2636,17 @@ AvailabilityWalker::diagAvailability(ConcreteDeclRef declRef, SourceRange R,
 /// Return true if the specified type looks like an integer of floating point
 /// type.
 static bool isIntegerOrFloatingPointType(Type ty, DeclContext *DC,
-                                         TypeChecker &TC) {
+                                         ASTContext &Context) {
   auto integerType =
-    TC.getProtocol(SourceLoc(),
-                   KnownProtocolKind::ExpressibleByIntegerLiteral);
+    Context.getProtocol(KnownProtocolKind::ExpressibleByIntegerLiteral);
   auto floatingType =
-    TC.getProtocol(SourceLoc(),
-                   KnownProtocolKind::ExpressibleByFloatLiteral);
+    Context.getProtocol(KnownProtocolKind::ExpressibleByFloatLiteral);
   if (!integerType || !floatingType) return false;
 
-  return
-    TypeChecker::conformsToProtocol(ty, integerType, DC,
-                                    ConformanceCheckFlags::InExpression) ||
-    TypeChecker::conformsToProtocol(ty, floatingType, DC,
-                                    ConformanceCheckFlags::InExpression);
+  return TypeChecker::conformsToProtocol(ty, integerType, DC,
+                                         ConformanceCheckFlags::InExpression) ||
+         TypeChecker::conformsToProtocol(ty, floatingType, DC,
+                                         ConformanceCheckFlags::InExpression);
 }
 
 
@@ -2677,12 +2675,12 @@ AvailabilityWalker::diagnoseIncDecRemoval(const ValueDecl *D, SourceRange R,
   // If the expression type is integer or floating point, then we can rewrite it
   // to "lvalue += 1".
   std::string replacement;
-  if (isIntegerOrFloatingPointType(call->getType(), DC, TC))
+  if (isIntegerOrFloatingPointType(call->getType(), DC, Context))
     replacement = isInc ? " += 1" : " -= 1";
   else {
     // Otherwise, it must be an index type.  Rewrite to:
     // "lvalue = lvalue.successor()".
-    auto &SM = TC.Context.SourceMgr;
+    auto &SM = Context.SourceMgr;
     auto CSR = Lexer::getCharSourceRangeFromSourceRange(SM,
                                          call->getArg()->getSourceRange());
     replacement = " = " + SM.extractText(CSR).str();
@@ -2695,9 +2693,10 @@ AvailabilityWalker::diagnoseIncDecRemoval(const ValueDecl *D, SourceRange R,
     std::tie(RawAccessorKind, Name) = getAccessorKindAndNameForDiagnostics(D);
 
     // If we emit a deprecation diagnostic, produce a fixit hint as well.
-    auto diag = TC.diagnose(R.Start, diag::availability_decl_unavailable_msg,
-                            RawAccessorKind, Name, true, "",
-                            "it has been removed in Swift 3");
+    auto diag = Context.Diags.diagnose(
+        R.Start, diag::availability_decl_unavailable,
+        RawAccessorKind, Name, true, "",
+        "it has been removed in Swift 3");
     if (isa<PrefixUnaryExpr>(call)) {
       // Prefix: remove the ++ or --.
       diag.fixItRemove(call->getFn()->getSourceRange());
@@ -2746,9 +2745,10 @@ AvailabilityWalker::diagnoseMemoryLayoutMigration(const ValueDecl *D,
   std::tie(RawAccessorKind, Name) = getAccessorKindAndNameForDiagnostics(D);
 
   EncodedDiagnosticMessage EncodedMessage(Attr->Message);
-  auto diag = TC.diagnose(R.Start, diag::availability_decl_unavailable_msg,
-                          RawAccessorKind, Name, true, "",
-                          EncodedMessage.Message);
+  auto diag =
+      Context.Diags.diagnose(
+          R.Start, diag::availability_decl_unavailable, RawAccessorKind,
+          Name, true, "", EncodedMessage.Message);
   diag.highlight(R);
 
   auto subject = args->getSubExpr();
@@ -2788,9 +2788,8 @@ AvailabilityWalker::diagnoseMemoryLayoutMigration(const ValueDecl *D,
 }
 
 /// Diagnose uses of unavailable declarations.
-void swift::diagAvailability(TypeChecker &TC, const Expr *E,
-                             DeclContext *DC) {
-  AvailabilityWalker walker(TC, DC);
+void swift::diagAvailability(const Expr *E, DeclContext *DC) {
+  AvailabilityWalker walker(DC);
   const_cast<Expr*>(E)->walk(walker);
 }
 
@@ -2798,12 +2797,11 @@ void swift::diagAvailability(TypeChecker &TC, const Expr *E,
 /// context, but for non-expr contexts such as TypeDecls referenced from
 /// TypeReprs.
 bool swift::diagnoseDeclAvailability(const ValueDecl *Decl,
-                                     TypeChecker &TC,
                                      DeclContext *DC,
                                      SourceRange R,
                                      DeclAvailabilityFlags Flags)
 {
-  AvailabilityWalker AW(TC, DC);
+  AvailabilityWalker AW(DC);
   return AW.diagAvailability(const_cast<ValueDecl *>(Decl), R, nullptr, Flags);
 }
 
@@ -2837,7 +2835,9 @@ void swift::checkExplicitAvailability(Decl *decl) {
   // Warn on decls without an introduction version.
   auto &ctx = decl->getASTContext();
   auto safeRangeUnderApprox = AvailabilityInference::availableRange(decl, ctx);
-  if (!safeRangeUnderApprox.getOSVersion().hasLowerEndpoint()) {
+  if (!safeRangeUnderApprox.getOSVersion().hasLowerEndpoint() &&
+      !decl->getAttrs().isUnavailable(ctx)) {
+
     auto diag = decl->diagnose(diag::public_decl_needs_availability);
 
     auto suggestPlatform = decl->getASTContext().LangOpts.RequireExplicitAvailabilityTarget;

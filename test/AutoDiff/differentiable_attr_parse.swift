@@ -178,3 +178,14 @@ func slope5(_ x: Float) -> Float {
 func slope5(_ x: Float) -> Float {
   return 6 * x
 }
+
+func localDifferentiableDeclaration() {
+  // Okay
+  @differentiable
+  func foo1(_ x: Float) -> Float
+
+  // Not okay. Derivative registration can only be non-local.
+  // expected-error @+1 {{attribute '@differentiable(jvp:vjp:)' can only be used in a non-local scope}}
+  @differentiable(vjp: dfoo2)
+  func foo2(_ x: Float) -> Float
+}

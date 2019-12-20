@@ -2,20 +2,21 @@
 // REQUIRES: executable_test
 
 import StdlibUnittest
+import DifferentiationUnittest
 
 var SimpleModelTests = TestSuite("SimpleModel")
 
 struct DenseLayer : Equatable {
   @differentiable
-  let w: Float
+  let w: Tracked<Float>
 
   @differentiable
-  let b: Float
+  let b: Tracked<Float>
 }
 
-extension DenseLayer : Differentiable, VectorProtocol {
+extension DenseLayer : Differentiable, AdditiveArithmetic {
   typealias TangentVector = DenseLayer
-  typealias Scalar = Float
+  typealias Scalar = Tracked<Float>
   static var zero: DenseLayer {
     return DenseLayer(w: 0, b: 0)
   }
@@ -28,13 +29,13 @@ extension DenseLayer : Differentiable, VectorProtocol {
   static func * (lhs: DenseLayer, rhs: DenseLayer) -> DenseLayer {
     return DenseLayer(w: lhs.w * rhs.w, b: lhs.b * rhs.b)
   }
-  static func * (lhs: Float, rhs: DenseLayer) -> DenseLayer {
+  static func * (lhs: Tracked<Float>, rhs: DenseLayer) -> DenseLayer {
     return DenseLayer(w: lhs * rhs.w, b: lhs * rhs.b)
   }
 }
 
 extension DenseLayer {
-  func prediction(for input: Float) -> Float {
+  func prediction(for input: Tracked<Float>) -> Tracked<Float> {
     return input * w + b
   }
 }
@@ -50,9 +51,9 @@ struct Model : Equatable {
   let l3: DenseLayer
 }
 
-extension Model : Differentiable, VectorProtocol {
+extension Model : Differentiable, AdditiveArithmetic {
   typealias TangentVector = Model
-  typealias Scalar = Float
+  typealias Scalar = Tracked<Float>
   static var zero: Model {
     return Model(l1: DenseLayer.zero, l2: DenseLayer.zero, l3: DenseLayer.zero)
   }
@@ -65,13 +66,13 @@ extension Model : Differentiable, VectorProtocol {
   static func * (lhs: Model, rhs: Model) -> Model {
     return Model(l1: lhs.l1 * rhs.l1, l2: lhs.l2 * rhs.l2, l3: lhs.l3 * rhs.l3)
   }
-  static func * (lhs: Float, rhs: Model) -> Model {
+  static func * (lhs: Tracked<Float>, rhs: Model) -> Model {
     return Model(l1: lhs * rhs.l1, l2: lhs * rhs.l2, l3: lhs * rhs.l3)
   }
 }
 
 extension Model {
-  func prediction(for input: Float) -> Float {
+  func prediction(for input: Tracked<Float>) -> Tracked<Float> {
     // This "model" is silly because it doesn't have nonlinearities. But it's
     // simple and good enough for testing purposes.
     let activation1 = l1.prediction(for: input)
@@ -79,17 +80,17 @@ extension Model {
     return l3.prediction(for: activation2)
   }
 
-  func loss(of prediction: Float, from label: Float) -> Float {
+  func loss(of prediction: Tracked<Float>, from label: Tracked<Float>) -> Tracked<Float> {
     return (prediction - label) * (prediction - label)
   }
 }
 
-SimpleModelTests.test("gradient") {
+SimpleModelTests.testWithLeakChecking("gradient") {
   let layer = DenseLayer(w: 1.0, b: 0.0)
   let model = Model(l1: layer, l2: layer, l3: layer)
-  let label: Float = 3
-  let input: Float = 1
-  let gradModel = model.gradient { model -> Float in
+  let label: Tracked<Float> = 3
+  let input: Tracked<Float> = 1
+  let gradModel = gradient(at: model) { model -> Tracked<Float> in
     let pred = model.prediction(for: input)
     return model.loss(of: pred, from: label)
   }

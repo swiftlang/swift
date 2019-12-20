@@ -13,7 +13,9 @@ func testDictionary() {
 func testString() throws {
   // Optional
   let stringOpt = NSString(path: "blah", encoding: 0)
-  _ = stringOpt as NSString // expected-error{{'NSString?' is not convertible to 'NSString'; did you mean to use 'as!' to force downcast?}}
+  _ = stringOpt as NSString // expected-error{{value of optional type 'NSString?' must be unwrapped to a value of type 'NSString'}}
+  // expected-note@-1 {{coalesce using '??' to provide a default when the optional value contains 'nil'}}
+  // expected-note@-2 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
 
   // Implicitly unwrapped optional
   let stringIUO = NSString(path: "blah")

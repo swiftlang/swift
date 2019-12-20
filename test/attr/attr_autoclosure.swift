@@ -183,10 +183,10 @@ func passAutoClosureToEnumCase(_ fn: @autoclosure () -> Int) {
 func rdar_20591571() {
   func foo(_ g: @autoclosure () -> Int) {
     typealias G = ()->Int
-    let _ = unsafeBitCast(g, to: G.self) // expected-error {{converting non-escaping value to 'T' may allow it to escape}}
+    let _ = unsafeBitCast(g, to: G.self) // expected-error {{converting non-escaping parameter 'g' to generic parameter 'T' may allow it to escape}}
   }
 
-  func id<T>(_: T) -> T {}
+  func id<T>(_: T) -> T {} // expected-note {{eneric parameters are always considered '@escaping'}}
   func same<T>(_: T, _: T) {}
   // expected-note@-1 2 {{generic parameters are always considered '@escaping'}}
 
@@ -198,7 +198,7 @@ func rdar_20591571() {
     var _ = efn
     let _ = efn
 
-    _ = id(fn)          // expected-error {{converting non-escaping value to 'T' may allow it to escape}}
+    _ = id(fn)          // expected-error {{converting non-escaping parameter 'fn' to generic parameter 'T' may allow it to escape}}
     _ = same(fn, { 3 }) // expected-error {{converting non-escaping parameter 'fn' to generic parameter 'T' may allow it to escape}}
     _ = same({ 3 }, fn) // expected-error {{converting non-escaping parameter 'fn' to generic parameter 'T' may allow it to escape}}
 
@@ -251,7 +251,7 @@ func overloaded_autoclj(_: @autoclosure () -> Int) {}
 
 func autoclosure_param_returning_func_type() {
   func foo(_ fn: @autoclosure () -> (() -> Int)) {}
-  func generic_foo<T>(_ fn: @autoclosure () -> T) {}
+  func generic_foo<T>(_ fn: @autoclosure () -> T) {} // expected-note {{generic parameters are always considered '@escaping'}}
 
   func bar_1(_ fn: @autoclosure @escaping () -> Int) { foo(fn) } // Ok
   func bar_2(_ fn: @autoclosure () -> Int) { foo(fn) } // expected-note {{parameter 'fn' is implicitly non-escaping}}
@@ -259,7 +259,7 @@ func autoclosure_param_returning_func_type() {
   func baz_1(_ fn: @autoclosure @escaping () -> Int) { generic_foo(fn) }   // Ok (T is inferred as () -> Int)
   func baz_2(_ fn: @autoclosure @escaping () -> Int) { generic_foo(fn()) } // Ok (T is inferred as Int)
   func baz_3(_ fn: @autoclosure () -> Int) { generic_foo(fn) } // Fails because fn is not marked as @escaping
-  // expected-error@-1 {{converting non-escaping value to 'T' may allow it to escape}}
+  // expected-error@-1 {{converting non-escaping parameter 'fn' to generic parameter 'T' may allow it to escape}}
 
   // Let's make sure using `fn` as value works fine in presence of overloading
   func biz_1(_ fn: @autoclosure @escaping () -> Int) { overloaded_autoclj(fn) }   // Ok
@@ -273,4 +273,11 @@ func autoclosure_param_returning_func_type() {
   // expected-error@-1 {{add () to forward @autoclosure parameter}} {{70-70=()}}
   func biz_5(_ fn: @escaping () -> (() -> Int)) { fiz(fn) } // Can't forward in Swift >= 5 mode
   // expected-error@-1 {{add () to forward @autoclosure parameter}} {{57-57=()}}
+}
+
+func test_autoclosure_with_generic_argument_mismatch() {
+  struct S<T> {} // expected-note {{arguments to generic parameter 'T' ('String' and 'Int') are expected to be equal}}
+  func foo(_: @autoclosure () -> S<Int>) {}
+
+  foo(S<String>()) // expected-error {{cannot convert value of type 'S<String>' to expected argument type 'S<Int>'}}
 }

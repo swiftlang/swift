@@ -452,21 +452,18 @@ withOpaqueTypeGenericArgs(IRGenFunction &IGF,
 
 bool shouldUseOpaqueTypeDescriptorAccessor(OpaqueTypeDecl *opaque) {
   auto *namingDecl = opaque->getNamingDecl();
-  auto *abstractStorage = dyn_cast<AbstractStorageDecl>(namingDecl);
 
   // Don't emit accessors for abstract storage that is not dynamic or a dynamic
   // replacement.
-  if (abstractStorage) {
+  if (auto *abstractStorage = dyn_cast<AbstractStorageDecl>(namingDecl)) {
     return abstractStorage->hasAnyNativeDynamicAccessors() ||
-           abstractStorage->hasAnyDynamicReplacementAccessors();
+           abstractStorage->getDynamicallyReplacedDecl();
   }
 
   // Don't emit accessors for functions that are not dynamic or dynamic
   // replacements.
-  return opaque->getNamingDecl()->isNativeDynamic() ||
-         opaque->getNamingDecl()
-             ->getAttrs()
-             .hasAttribute<DynamicReplacementAttr>();
+  return namingDecl->isNativeDynamic() ||
+         (bool)namingDecl->getDynamicallyReplacedDecl();
 }
 
 static llvm::Value *

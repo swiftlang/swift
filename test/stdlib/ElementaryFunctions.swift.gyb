@@ -47,10 +47,17 @@ struct Wrapper<T: ElementaryFunctions & Equatable>: ElementaryFunctions & Equata
   var values: [T] { [x, y] }
 }
 
+// Prevent any optimizers from const-evaluating any of the math, which can
+// cause results that are different from the results calculated at runtime.
+@inline(never)
+func makeValues<T: BinaryFloatingPoint>() -> [T] {
+  return [-0.375, 0.375]
+}
+
 @available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
 internal extension ElementaryFunctions where Self: BinaryFloatingPoint {
   static func elementaryFunctionTests() {
-    let values: [Self] = [-0.375, 0.375]
+    let values: [Self] = makeValues()
     let wrapper = Wrapper<Self>(x: values[0], y: values[1])
 
     expectEqualWithNaNEquality(values.map(Self.acos), Wrapper<Self>.acos(wrapper).values)

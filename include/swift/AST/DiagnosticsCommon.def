@@ -41,6 +41,10 @@
   DIAG(REMARK,ID,Options,Text,Signature)
 #endif
 
+#ifndef FIXIT
+#  define FIXIT(ID, Text, Signature)
+#endif
+
 ERROR(invalid_diagnostic,none,
       "INTERNAL ERROR: this diagnostic should not be produced", ())
 
@@ -141,9 +145,6 @@ ERROR(sdk_node_unrecognized_accessor_kind,none,
 ERROR(circular_reference, none,
       "circular reference", ())
 
-ERROR(redundant_type_alias_define, none,
-      "redundant type alias declaration", ())
-
 NOTE(circular_reference_through, none,
      "through reference here", ())
 
@@ -159,6 +160,11 @@ ERROR(circular_protocol_def,none,
 NOTE(kind_declname_declared_here,none,
      "%0 %1 declared here", (DescriptiveDeclKind, DeclName))
 
+WARNING(warn_property_wrapper_module_scope,none,
+        "ignoring associated type %0 in favor of module-scoped property "
+        "wrapper %0; please qualify the reference with %1",
+        (DeclNameRef, Identifier))
+
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)
 #  undef DIAG
@@ -166,4 +172,5 @@ NOTE(kind_declname_declared_here,none,
 # undef NOTE
 # undef WARNING
 # undef ERROR
+# undef FIXIT
 #endif

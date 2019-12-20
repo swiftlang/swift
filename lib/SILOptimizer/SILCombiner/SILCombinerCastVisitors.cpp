@@ -12,19 +12,19 @@
 
 #define DEBUG_TYPE "sil-combine"
 #include "SILCombiner.h"
+#include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/PatternMatch.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILVisitor.h"
-#include "swift/SIL/DebugUtils.h"
-#include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
 #include "swift/SILOptimizer/Analysis/ARCAnalysis.h"
-#include "swift/SILOptimizer/Analysis/CFG.h"
+#include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
 #include "swift/SILOptimizer/Analysis/ValueTracking.h"
-#include "swift/SILOptimizer/Utils/Local.h"
+#include "swift/SILOptimizer/Utils/CFGOptUtils.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
+#include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
-#include "llvm/ADT/DenseMap.h"
 
 using namespace swift;
 using namespace swift::PatternMatch;
@@ -113,9 +113,9 @@ visitPointerToAddressInst(PointerToAddressInst *PTAI) {
           m_IndexRawPointerInst(IndexRawPtr))) {
     SILValue Ptr = IndexRawPtr->getOperand(0);
     SILValue TruncOrBitCast = IndexRawPtr->getOperand(1);
-    if (match(TruncOrBitCast,
-              m_ApplyInst(BuiltinValueKind::TruncOrBitCast,
-                          m_TupleExtractInst(m_BuiltinInst(StrideMul), 0)))) {
+    if (match(TruncOrBitCast, m_ApplyInst(BuiltinValueKind::TruncOrBitCast,
+                                          m_TupleExtractOperation(
+                                              m_BuiltinInst(StrideMul), 0)))) {
       if (match(StrideMul,
                 m_ApplyInst(
                     BuiltinValueKind::SMulOver, m_SILValue(Distance),
@@ -166,9 +166,9 @@ visitPointerToAddressInst(PointerToAddressInst *PTAI) {
   //
   BuiltinInst *Bytes;
   if (match(PTAI->getOperand(),
-            m_IndexRawPointerInst(m_ValueBase(),
-                                  m_TupleExtractInst(m_BuiltinInst(Bytes),
-                                                     0)))) {
+            m_IndexRawPointerInst(
+                m_ValueBase(),
+                m_TupleExtractOperation(m_BuiltinInst(Bytes), 0)))) {
     if (match(Bytes, m_ApplyInst(BuiltinValueKind::SMulOver, m_ValueBase(),
                                  m_ApplyInst(BuiltinValueKind::Strideof,
                                              m_MetatypeInst(Metatype)),

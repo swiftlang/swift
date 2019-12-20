@@ -13,6 +13,7 @@
 #define DEBUG_TYPE "sil-serialize"
 #include "SILFormat.h"
 #include "Serialization.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ProtocolConformance.h"
@@ -109,8 +110,7 @@ namespace {
 
     hash_value_type ComputeHash(key_type_ref key) {
       assert(!key.empty());
-      // FIXME: DJB seed=0, audit whether the default seed could be used.
-      return llvm::djbHash(key, 0);
+      return llvm::djbHash(key, SWIFTMODULE_HASH_SEED);
     }
 
     std::pair<unsigned, unsigned> EmitKeyDataLength(raw_ostream &out,
@@ -183,6 +183,14 @@ namespace {
     /// Holds the list of Properties.
     std::vector<BitOffset> PropertyOffset;
 
+    // SWIFT_ENABLE_TENSORFLOW
+    /// Maps differentiability witness identifier to an ID.
+    Table DifferentiabilityWitnessList;
+    /// Holds the list of SIL differentiability witnesses.
+    std::vector<BitOffset> DifferentiabilityWitnessOffset;
+    uint32_t /*DeclID*/ NextDifferentiabilityWitnessID = 1;
+    // SWIFT_ENABLE_TENSORFLOW END
+
     /// Give each SILBasicBlock a unique ID.
     llvm::DenseMap<const SILBasicBlock *, unsigned> BasicBlockMap;
 
@@ -192,6 +200,12 @@ namespace {
 
     /// Global variables that we've emitted a reference to.
     llvm::DenseSet<const SILGlobalVariable *> GlobalsToEmit;
+
+    // SWIFT_ENABLE_TENSORFLOW
+    /// Referenced differentiability witnesses that need to be emitted.
+    llvm::DenseSet<const SILDifferentiabilityWitness *>
+        DifferentiabilityWitnessesToEmit;
+    // SWIFT_ENABLE_TENSORFLOW END
 
     /// Additional functions we might need to serialize.
     llvm::SmallVector<const SILFunction *, 16> Worklist;
@@ -232,6 +246,10 @@ namespace {
     void writeSILWitnessTable(const SILWitnessTable &wt);
     void writeSILWitnessTableEntry(const SILWitnessTable::Entry &entry);
     void writeSILDefaultWitnessTable(const SILDefaultWitnessTable &wt);
+    // SWIFT_ENABLE_TENSORFLOW
+    void writeSILDifferentiabilityWitness(
+        const SILDifferentiabilityWitness &dw);
+    // SWIFT_ENABLE_TENSORFLOW END
     void writeSILProperty(const SILProperty &prop);
 
     void writeSILBlock(const SILModule *SILMod);
@@ -239,7 +257,8 @@ namespace {
 
     void writeConversionLikeInstruction(const SingleValueInstruction *I,
                                         unsigned attrs);
-    void writeOneTypeLayout(SILInstructionKind valueKind, SILType type);
+    void writeOneTypeLayout(SILInstructionKind valueKind,
+                            unsigned attrs, SILType type);
     void writeOneTypeOneOperandLayout(SILInstructionKind valueKind,
                                       unsigned attrs,
                                       SILType type,
@@ -346,7 +365,7 @@ ValueID SILSerializer::addValueRef(const ValueBase *Val) {
 
   if (auto *Undef = dyn_cast<SILUndef>(Val)) {
     // The first two IDs are reserved for SILUndef.
-    if (Undef->getOwnershipKind() == ValueOwnershipKind::Any)
+    if (Undef->getOwnershipKind() == ValueOwnershipKind::None)
       return 0;
 
     assert(Undef->getOwnershipKind() == ValueOwnershipKind::Owned);
@@ -390,9 +409,10 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
   }
 
   // If we have a body, we might have a generic environment.
-  GenericEnvironmentID genericEnvID = 0;
+  GenericSignatureID genericSigID = 0;
   if (!NoBody)
-    genericEnvID = S.addGenericEnvironmentRef(F.getGenericEnvironment());
+    if (auto *genericEnv = F.getGenericEnvironment())
+      genericSigID = S.addGenericSignatureRef(genericEnv->getGenericSignature());
 
   DeclID clangNodeOwnerID;
   if (F.hasClangNode())
@@ -408,53 +428,37 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
         S.addUniquedStringRef(F.getObjCReplacement().str());
   }
   unsigned numSpecAttrs = NoBody ? 0 : F.getSpecializeAttrs().size();
-  unsigned numDiffAttrs = NoBody ? 0 : F.getDifferentiableAttrs().size();
+
+  Optional<llvm::VersionTuple> available;
+  auto availability = F.getAvailabilityForLinkage();
+  if (!availability.isAlwaysAvailable()) {
+    available = availability.getOSVersion().getLowerEndpoint();
+  }
+  ENCODE_VER_TUPLE(available, available)
+
   SILFunctionLayout::emitRecord(
       Out, ScratchRecord, abbrCode, toStableSILLinkage(Linkage),
       (unsigned)F.isTransparent(), (unsigned)F.isSerialized(),
       (unsigned)F.isThunk(), (unsigned)F.isWithoutActuallyEscapingThunk(),
       (unsigned)F.isGlobalInit(), (unsigned)F.getInlineStrategy(),
       (unsigned)F.getOptimizationMode(), (unsigned)F.getEffectsKind(),
-      // SWIFT_ENABLE_TENSORFLOW
-      (unsigned)numSpecAttrs, (unsigned)numDiffAttrs,
+      (unsigned)numSpecAttrs,
       (unsigned)F.hasOwnership(),
-      F.isWeakLinked(), (unsigned)F.isDynamicallyReplaceable(), FnID,
-      replacedFunctionID, genericEnvID, clangNodeOwnerID, SemanticsIDs);
+      F.isAlwaysWeakImported(), LIST_VER_TUPLE_PIECES(available),
+      (unsigned)F.isDynamicallyReplaceable(),
+      (unsigned)F.isExactSelfClass(),
+      FnID, replacedFunctionID, genericSigID, clangNodeOwnerID, SemanticsIDs);
 
   if (NoBody)
     return;
 
   for (auto *SA : F.getSpecializeAttrs()) {
     unsigned specAttrAbbrCode = SILAbbrCodes[SILSpecializeAttrLayout::Code];
-    SILSpecializeAttrLayout::emitRecord(Out, ScratchRecord, specAttrAbbrCode,
-                                        (unsigned)SA->isExported(),
-                                        (unsigned)SA->getSpecializationKind());
-    S.writeGenericRequirements(SA->getRequirements(), SILAbbrCodes);
-  }
-
-  // SWIFT_ENABLE_TENSORFLOW
-  auto &Ctx = F.getASTContext();
-  for (auto *DA : F.getDifferentiableAttrs()) {
-    unsigned differentiableAttrAbbrCode =
-        SILAbbrCodes[SILDifferentiableAttrLayout::Code];
-
-    if (F.getModule().getStage() == SILStage::Canonical)
-      assert(DA->hasJVP() && DA->hasVJP() &&
-             "JVP and VJP must exist in canonical SIL");
-
-    auto &indices = DA->getIndices();
-    SmallVector<unsigned, 8> parameters(indices.parameters->begin(),
-                                        indices.parameters->end());
-    SILDifferentiableAttrLayout::emitRecord(
-        Out, ScratchRecord, differentiableAttrAbbrCode,
-        DA->hasJVP()
-            ? S.addDeclBaseNameRef(Ctx.getIdentifier(DA->getJVPName()))
-            : IdentifierID(),
-        DA->hasVJP()
-            ? S.addDeclBaseNameRef(Ctx.getIdentifier(DA->getVJPName()))
-            : IdentifierID(),
-        indices.source, parameters);
-    S.writeGenericRequirements(DA->getRequirements(), SILAbbrCodes);
+    SILSpecializeAttrLayout::emitRecord(
+        Out, ScratchRecord, specAttrAbbrCode,
+        (unsigned)SA->isExported(),
+        (unsigned)SA->getSpecializationKind(),
+        S.addGenericSignatureRef(SA->getSpecializedSignature()));
   }
 
   // Assign a unique ID to each basic block of the SILFunction.
@@ -564,10 +568,10 @@ void SILSerializer::handleMethodInst(const MethodInst *MI,
 }
 
 void SILSerializer::writeOneTypeLayout(SILInstructionKind valueKind,
-                                       SILType type) {
+                                       unsigned attrs, SILType type) {
   unsigned abbrCode = SILAbbrCodes[SILOneTypeLayout::Code];
   SILOneTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
-        (unsigned) valueKind,
+        (unsigned) valueKind, attrs,
         S.addTypeRef(type.getASTType()),
         (unsigned)type.getCategory());
 }
@@ -876,7 +880,8 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   }
   case SILInstructionKind::AllocBoxInst: {
     const AllocBoxInst *ABI = cast<AllocBoxInst>(&SI);
-    writeOneTypeLayout(ABI->getKind(), ABI->getType());
+    writeOneTypeLayout(ABI->getKind(), ABI->hasDynamicLifetime() ? 1 : 0,
+                       ABI->getType());
     break;
   }
   case SILInstructionKind::AllocRefInst:
@@ -913,7 +918,8 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   }
   case SILInstructionKind::AllocStackInst: {
     const AllocStackInst *ASI = cast<AllocStackInst>(&SI);
-    writeOneTypeLayout(ASI->getKind(), ASI->getElementType());
+    writeOneTypeLayout(ASI->getKind(), ASI->hasDynamicLifetime() ? 1 : 0,
+                       ASI->getElementType());
     break;
   }
   case SILInstructionKind::ProjectValueBufferInst: {
@@ -971,36 +977,85 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     break;
   }
   // SWIFT_ENABLE_TENSORFLOW
-  case SILInstructionKind::AutoDiffFunctionInst: {
-    auto *adfi = cast<AutoDiffFunctionInst>(&SI);
+  case SILInstructionKind::DifferentiableFunctionInst: {
+    auto *dfi = cast<DifferentiableFunctionInst>(&SI);
     SmallVector<ValueID, 4> trailingInfo;
-    auto *paramIndices = adfi->getParameterIndices();
+    auto *paramIndices = dfi->getParameterIndices();
     for (unsigned idx : paramIndices->getIndices())
       trailingInfo.push_back(idx);
-    for (auto &op : adfi->getAllOperands()) {
+    for (auto &op : dfi->getAllOperands()) {
       auto val = op.get();
       trailingInfo.push_back(S.addTypeRef(val->getType().getASTType()));
       trailingInfo.push_back((unsigned)val->getType().getCategory());
       trailingInfo.push_back(addValueRef(val));
     }
-    SILInstAutoDiffFunctionLayout::emitRecord(Out, ScratchRecord,
-        SILAbbrCodes[SILInstAutoDiffFunctionLayout::Code],
-        adfi->getDifferentiationOrder(), paramIndices->getCapacity(),
-        adfi->getNumOperands(), trailingInfo);
+    SILInstDifferentiableFunctionLayout::emitRecord(Out, ScratchRecord,
+        SILAbbrCodes[SILInstDifferentiableFunctionLayout::Code],
+        paramIndices->getCapacity(), dfi->hasDerivativeFunctions(),
+        trailingInfo);
     break;
   }
-  case SILInstructionKind::AutoDiffFunctionExtractInst: {
-    auto *adfei = cast<AutoDiffFunctionExtractInst>(&SI);
-    auto operandRef = addValueRef(adfei->getFunctionOperand());
-    auto operandType = adfei->getFunctionOperand()->getType();
+  case SILInstructionKind::LinearFunctionInst: {
+    auto *lfi = cast<LinearFunctionInst>(&SI);
+    SmallVector<ValueID, 4> trailingInfo;
+    auto *paramIndices = lfi->getParameterIndices();
+    for (unsigned idx : paramIndices->getIndices())
+      trailingInfo.push_back(idx);
+    for (auto &op : lfi->getAllOperands()) {
+      auto val = op.get();
+      trailingInfo.push_back(S.addTypeRef(val->getType().getASTType()));
+      trailingInfo.push_back((unsigned)val->getType().getCategory());
+      trailingInfo.push_back(addValueRef(val));
+    }
+    SILInstLinearFunctionLayout::emitRecord(Out, ScratchRecord,
+        SILAbbrCodes[SILInstLinearFunctionLayout::Code],
+        paramIndices->getCapacity(), lfi->hasTransposeFunction(),
+        trailingInfo);
+    break;
+  }
+  case SILInstructionKind::DifferentiableFunctionExtractInst: {
+    auto *dfei = cast<DifferentiableFunctionExtractInst>(&SI);
+    auto operandRef = addValueRef(dfei->getFunctionOperand());
+    auto operandType = dfei->getFunctionOperand()->getType();
     auto operandTypeRef = S.addTypeRef(operandType.getASTType());
-    auto rawExtractee = (unsigned)adfei->getExtractee();
-    SILInstAutoDiffFunctionExtractLayout::emitRecord(Out, ScratchRecord,
-        SILAbbrCodes[SILInstAutoDiffFunctionExtractLayout::Code],
+    auto rawExtractee = (unsigned)dfei->getExtractee();
+    SILInstDifferentiableFunctionExtractLayout::emitRecord(Out, ScratchRecord,
+        SILAbbrCodes[SILInstDifferentiableFunctionExtractLayout::Code],
         operandTypeRef, (unsigned)operandType.getCategory(), operandRef,
-        rawExtractee, adfei->getDifferentiationOrder());
+        rawExtractee, (unsigned)dfei->hasExplicitExtracteeType());
     break;
   }
+  case SILInstructionKind::LinearFunctionExtractInst: {
+    auto *lfei = cast<LinearFunctionExtractInst>(&SI);
+    auto operandRef = addValueRef(lfei->getFunctionOperand());
+    auto operandType = lfei->getFunctionOperand()->getType();
+    auto operandTypeRef = S.addTypeRef(operandType.getASTType());
+    auto rawExtractee = (unsigned)lfei->getExtractee();
+    SILInstLinearFunctionExtractLayout::emitRecord(Out, ScratchRecord,
+        SILAbbrCodes[SILInstLinearFunctionExtractLayout::Code],
+        operandTypeRef, (unsigned)operandType.getCategory(), operandRef,
+        rawExtractee);
+    break;
+  }
+  case SILInstructionKind::DifferentiabilityWitnessFunctionInst: {
+    auto *dwfi = cast<DifferentiabilityWitnessFunctionInst>(&SI);
+    auto *witness = dwfi->getWitness();
+    DifferentiabilityWitnessesToEmit.insert(witness);
+    Mangle::ASTMangler mangler;
+    auto mangledKey = mangler.mangleSILDifferentiabilityWitnessKey(
+        witness->getKey());
+    auto rawWitnessKind = (unsigned)dwfi->getWitnessKind();
+    // We only store the type when the instruction has an explicit type.
+    bool hasExplicitFnTy = dwfi->getHasExplicitFunctionType();
+    SILOneOperandLayout::emitRecord(
+        Out, ScratchRecord, SILAbbrCodes[SILOneOperandLayout::Code],
+        (unsigned)dwfi->getKind(), rawWitnessKind,
+        hasExplicitFnTy ? S.addTypeRef(dwfi->getType().getASTType()) : TypeID(),
+        hasExplicitFnTy ? (unsigned)dwfi->getType().getCategory() : 0,
+        S.addUniquedStringRef(mangledKey));
+    break;
+  }
+  // SWIFT_ENABLE_TENSORFLOW END
   case SILInstructionKind::ApplyInst: {
     // Format: attributes such as transparent and number of substitutions,
     // the callee's substituted and unsubstituted types, a value for
@@ -1278,13 +1333,15 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         ListOfValues);
     break;
   }
+#define UNCHECKED_REF_STORAGE(Name, ...)                                       \
+  case SILInstructionKind::StrongCopy##Name##ValueInst:
 #define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
   case SILInstructionKind::Load##Name##Inst:
-#define ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
-  case SILInstructionKind::Name##RetainInst: \
-  case SILInstructionKind::Name##ReleaseInst: \
-  case SILInstructionKind::StrongRetain##Name##Inst: \
-  case SILInstructionKind::Copy##Name##ValueInst:
+#define ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, ...)                         \
+  case SILInstructionKind::Name##RetainInst:                                   \
+  case SILInstructionKind::Name##ReleaseInst:                                  \
+  case SILInstructionKind::StrongRetain##Name##Inst:                           \
+  case SILInstructionKind::StrongCopy##Name##ValueInst:
 #define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
   NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, "...") \
   ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, "...")
@@ -1522,7 +1579,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   }
   case SILInstructionKind::MetatypeInst: {
     auto &MI = cast<MetatypeInst>(SI);
-    writeOneTypeLayout(MI.getKind(), MI.getType());
+    writeOneTypeLayout(MI.getKind(), 0, MI.getType());
     break;
   }
   case SILInstructionKind::ObjCProtocolInst: {
@@ -1611,60 +1668,67 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   // Checked Conversion instructions.
   case SILInstructionKind::UnconditionalCheckedCastInst: {
     auto CI = cast<UnconditionalCheckedCastInst>(&SI);
-    SILInstCastLayout::emitRecord(Out, ScratchRecord,
-        SILAbbrCodes[SILInstCastLayout::Code],
-        (unsigned)SI.getKind(), /*attr*/ 0,
-        S.addTypeRef(CI->getType().getASTType()),
-        (unsigned)CI->getType().getCategory(),
-        S.addTypeRef(CI->getOperand()->getType().getASTType()),
-        (unsigned)CI->getOperand()->getType().getCategory(),
-        addValueRef(CI->getOperand()));
+    ValueID listOfValues[] = {
+      addValueRef(CI->getOperand()),
+      S.addTypeRef(CI->getSourceLoweredType().getASTType()),
+      (unsigned)CI->getSourceLoweredType().getCategory(),
+      S.addTypeRef(CI->getTargetFormalType())
+    };
+
+    SILOneTypeValuesLayout::emitRecord(Out, ScratchRecord,
+             SILAbbrCodes[SILOneTypeValuesLayout::Code], (unsigned)SI.getKind(),
+             S.addTypeRef(CI->getTargetLoweredType().getASTType()),
+             (unsigned)CI->getTargetLoweredType().getCategory(),
+             llvm::makeArrayRef(listOfValues));
     break;
   }
   case SILInstructionKind::UnconditionalCheckedCastAddrInst: {
     auto CI = cast<UnconditionalCheckedCastAddrInst>(&SI);
     ValueID listOfValues[] = {
-      S.addTypeRef(CI->getSourceType()),
+      S.addTypeRef(CI->getSourceFormalType()),
       addValueRef(CI->getSrc()),
-      S.addTypeRef(CI->getSrc()->getType().getASTType()),
-      (unsigned)CI->getSrc()->getType().getCategory(),
-      S.addTypeRef(CI->getTargetType()),
+      S.addTypeRef(CI->getSourceLoweredType().getASTType()),
+      (unsigned)CI->getSourceLoweredType().getCategory(),
+      S.addTypeRef(CI->getTargetFormalType()),
       addValueRef(CI->getDest())
     };
     SILOneTypeValuesLayout::emitRecord(Out, ScratchRecord,
              SILAbbrCodes[SILOneTypeValuesLayout::Code], (unsigned)SI.getKind(),
-             S.addTypeRef(CI->getDest()->getType().getASTType()),
-             (unsigned)CI->getDest()->getType().getCategory(),
+             S.addTypeRef(CI->getTargetLoweredType().getASTType()),
+             (unsigned)CI->getTargetLoweredType().getCategory(),
              llvm::makeArrayRef(listOfValues));
     break;
   }
   case SILInstructionKind::UnconditionalCheckedCastValueInst: {
     auto CI = cast<UnconditionalCheckedCastValueInst>(&SI);
-    SILInstCastLayout::emitRecord(
-        Out, ScratchRecord, SILAbbrCodes[SILInstCastLayout::Code],
-        (unsigned)SI.getKind(),
-        /*attr*/ 0,
-        S.addTypeRef(CI->getType().getASTType()),
-        (unsigned)CI->getType().getCategory(),
-        S.addTypeRef(CI->getOperand()->getType().getASTType()),
-        (unsigned)CI->getOperand()->getType().getCategory(),
-        addValueRef(CI->getOperand()));
+    ValueID listOfValues[] = {
+      S.addTypeRef(CI->getSourceFormalType()),
+      addValueRef(CI->getOperand()),
+      S.addTypeRef(CI->getSourceLoweredType().getASTType()),
+      (unsigned)CI->getSourceLoweredType().getCategory(),
+      S.addTypeRef(CI->getTargetFormalType())
+    };
+    SILOneTypeValuesLayout::emitRecord(Out, ScratchRecord,
+             SILAbbrCodes[SILOneTypeValuesLayout::Code], (unsigned)SI.getKind(),
+             S.addTypeRef(CI->getTargetLoweredType().getASTType()),
+             (unsigned)CI->getTargetLoweredType().getCategory(),
+             llvm::makeArrayRef(listOfValues));
     break;
   }
   case SILInstructionKind::UncheckedRefCastAddrInst: {
     auto CI = cast<UncheckedRefCastAddrInst>(&SI);
     ValueID listOfValues[] = {
-      S.addTypeRef(CI->getSourceType()),
+      S.addTypeRef(CI->getSourceFormalType()),
       addValueRef(CI->getSrc()),
-      S.addTypeRef(CI->getSrc()->getType().getASTType()),
-      (unsigned)CI->getSrc()->getType().getCategory(),
-      S.addTypeRef(CI->getTargetType()),
+      S.addTypeRef(CI->getSourceLoweredType().getASTType()),
+      (unsigned)CI->getSourceLoweredType().getCategory(),
+      S.addTypeRef(CI->getTargetFormalType()),
       addValueRef(CI->getDest())
     };
     SILOneTypeValuesLayout::emitRecord(Out, ScratchRecord,
              SILAbbrCodes[SILOneTypeValuesLayout::Code], (unsigned)SI.getKind(),
-             S.addTypeRef(CI->getDest()->getType().getASTType()),
-             (unsigned)CI->getDest()->getType().getCategory(),
+             S.addTypeRef(CI->getTargetLoweredType().getASTType()),
+             (unsigned)CI->getTargetLoweredType().getCategory(),
              llvm::makeArrayRef(listOfValues));
     break;
   }
@@ -2046,66 +2110,62 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     break;
   }
   case SILInstructionKind::CheckedCastBranchInst: {
-    // Format: the cast kind, a typed value, a BasicBlock ID for success,
-    // a BasicBlock ID for failure. Uses SILOneTypeValuesLayout.
     const CheckedCastBranchInst *CBI = cast<CheckedCastBranchInst>(&SI);
-    SmallVector<ValueID, 8> ListOfValues;
-    ListOfValues.push_back(CBI->isExact()),
-    ListOfValues.push_back(addValueRef(CBI->getOperand()));
-    ListOfValues.push_back(
-               S.addTypeRef(CBI->getOperand()->getType().getASTType()));
-    ListOfValues.push_back((unsigned)CBI->getOperand()->getType().getCategory());
-    ListOfValues.push_back(BasicBlockMap[CBI->getSuccessBB()]);
-    ListOfValues.push_back(BasicBlockMap[CBI->getFailureBB()]);
+    ValueID listOfValues[] = {
+      CBI->isExact(),
+      addValueRef(CBI->getOperand()),
+      S.addTypeRef(CBI->getSourceLoweredType().getASTType()),
+      (unsigned)CBI->getSourceLoweredType().getCategory(),
+      S.addTypeRef(CBI->getTargetFormalType()),
+      BasicBlockMap[CBI->getSuccessBB()],
+      BasicBlockMap[CBI->getFailureBB()]
+    };
 
     SILOneTypeValuesLayout::emitRecord(Out, ScratchRecord,
              SILAbbrCodes[SILOneTypeValuesLayout::Code], (unsigned)SI.getKind(),
-             S.addTypeRef(CBI->getCastType().getASTType()),
-             (unsigned)CBI->getCastType().getCategory(),
-             ListOfValues);
+             S.addTypeRef(CBI->getTargetLoweredType().getASTType()),
+             (unsigned)CBI->getTargetLoweredType().getCategory(),
+             llvm::makeArrayRef(listOfValues));
     break;
   }
   case SILInstructionKind::CheckedCastValueBranchInst: {
-    // Format: the cast kind, a typed value, a BasicBlock ID for success,
-    // a BasicBlock ID for failure. Uses SILOneTypeValuesLayout.
     const CheckedCastValueBranchInst *CBI =
         cast<CheckedCastValueBranchInst>(&SI);
-    SmallVector<ValueID, 8> ListOfValues;
-    ListOfValues.push_back(addValueRef(CBI->getOperand()));
-    ListOfValues.push_back(
-        S.addTypeRef(CBI->getOperand()->getType().getASTType()));
-    ListOfValues.push_back(
-        (unsigned)CBI->getOperand()->getType().getCategory());
-    ListOfValues.push_back(BasicBlockMap[CBI->getSuccessBB()]);
-    ListOfValues.push_back(BasicBlockMap[CBI->getFailureBB()]);
+    ValueID listOfValues[] = {
+      S.addTypeRef(CBI->getSourceFormalType()),
+      addValueRef(CBI->getOperand()),
+      S.addTypeRef(CBI->getSourceLoweredType().getASTType()),
+      (unsigned)CBI->getSourceLoweredType().getCategory(),
+      S.addTypeRef(CBI->getTargetFormalType()),
+      BasicBlockMap[CBI->getSuccessBB()],
+      BasicBlockMap[CBI->getFailureBB()]
+    };
 
     SILOneTypeValuesLayout::emitRecord(
         Out, ScratchRecord, SILAbbrCodes[SILOneTypeValuesLayout::Code],
         (unsigned)SI.getKind(),
-        S.addTypeRef(CBI->getCastType().getASTType()),
-        (unsigned)CBI->getCastType().getCategory(), ListOfValues);
+        S.addTypeRef(CBI->getTargetLoweredType().getASTType()),
+        (unsigned)CBI->getTargetLoweredType().getCategory(),
+        llvm::makeArrayRef(listOfValues));
     break;
   }
   case SILInstructionKind::CheckedCastAddrBranchInst: {
-    // Format: the cast kind, two typed values, a BasicBlock ID for
-    // success, a BasicBlock ID for failure.  Uses SILOneTypeValuesLayout;
-    // the type is the type of the second (dest) operand.
     auto CBI = cast<CheckedCastAddrBranchInst>(&SI);
     ValueID listOfValues[] = {
       toStableCastConsumptionKind(CBI->getConsumptionKind()),
-      S.addTypeRef(CBI->getSourceType()),
+      S.addTypeRef(CBI->getSourceFormalType()),
       addValueRef(CBI->getSrc()),
-      S.addTypeRef(CBI->getSrc()->getType().getASTType()),
-      (unsigned)CBI->getSrc()->getType().getCategory(),
-      S.addTypeRef(CBI->getTargetType()),
+      S.addTypeRef(CBI->getSourceLoweredType().getASTType()),
+      (unsigned)CBI->getSourceLoweredType().getCategory(),
+      S.addTypeRef(CBI->getTargetFormalType()),
       addValueRef(CBI->getDest()),
       BasicBlockMap[CBI->getSuccessBB()],
       BasicBlockMap[CBI->getFailureBB()]
     };
     SILOneTypeValuesLayout::emitRecord(Out, ScratchRecord,
              SILAbbrCodes[SILOneTypeValuesLayout::Code], (unsigned)SI.getKind(),
-             S.addTypeRef(CBI->getDest()->getType().getASTType()),
-             (unsigned)CBI->getDest()->getType().getCategory(),
+             S.addTypeRef(CBI->getTargetLoweredType().getASTType()),
+             (unsigned)CBI->getTargetLoweredType().getCategory(),
              llvm::makeArrayRef(listOfValues));
     break;
   }
@@ -2198,7 +2258,13 @@ static void writeIndexTable(Serializer &S,
           kind == sil_index_block::SIL_VTABLE_NAMES ||
           kind == sil_index_block::SIL_GLOBALVAR_NAMES ||
           kind == sil_index_block::SIL_WITNESS_TABLE_NAMES ||
-          kind == sil_index_block::SIL_DEFAULT_WITNESS_TABLE_NAMES) &&
+          kind == sil_index_block::SIL_DEFAULT_WITNESS_TABLE_NAMES ||
+          // SWIFT_ENABLE_TENSORFLOW
+          // TODO(TF-893): Update surrounding comment/assertion text when
+          // upstreaming code to master. Comments/assertions have not been
+          // updated to keep the code diff small.
+          kind == sil_index_block::SIL_DIFFERENTIABILITY_WITNESS_NAMES) &&
+          // SWIFT_ENABLE_TENSORFLOW END
          "SIL function table, global, vtable and (default) witness table "
          "are supported");
   llvm::SmallString<4096> hashTableBlob;
@@ -2256,11 +2322,22 @@ void SILSerializer::writeIndexTables() {
                 DefaultWitnessTableOffset);
   }
 
+  // SWIFT_ENABLE_TENSORFLOW
+  if (!DifferentiabilityWitnessList.empty()) {
+    writeIndexTable(S, List,
+                    sil_index_block::SIL_DIFFERENTIABILITY_WITNESS_NAMES,
+                    DifferentiabilityWitnessList);
+    Offset.emit(ScratchRecord,
+                sil_index_block::SIL_DIFFERENTIABILITY_WITNESS_OFFSETS,
+                DifferentiabilityWitnessOffset);
+  }
+  // SWIFT_ENABLE_TENSORFLOW END
+
   if (!PropertyOffset.empty()) {
     Offset.emit(ScratchRecord, sil_index_block::SIL_PROPERTY_OFFSETS,
                 PropertyOffset);
   }
-  
+
 }
 
 void SILSerializer::writeSILGlobalVar(const SILGlobalVariable &g) {
@@ -2452,6 +2529,54 @@ writeSILDefaultWitnessTable(const SILDefaultWitnessTable &wt) {
   }
 }
 
+// SWIFT_ENABLE_TENSORFLOW
+void SILSerializer::
+writeSILDifferentiabilityWitness(const SILDifferentiabilityWitness &dw) {
+  Mangle::ASTMangler mangler;
+  auto mangledKey = mangler.mangleSILDifferentiabilityWitnessKey(dw.getKey());
+  size_t nameLength = mangledKey.size();
+  char *stringStorage =
+      static_cast<char *>(StringTable.Allocate(nameLength, 1));
+  std::memcpy(stringStorage, mangledKey.data(), nameLength);
+  DifferentiabilityWitnessList[StringRef(stringStorage, nameLength)] =
+      NextDifferentiabilityWitnessID++;
+  DifferentiabilityWitnessOffset.push_back(Out.GetCurrentBitNo());
+
+  auto *original = dw.getOriginalFunction();
+  IdentifierID jvpID = 0;
+  IdentifierID vjpID = 0;
+  if (auto *jvp = dw.getJVP())
+    jvpID = addSILFunctionRef(jvp);
+  if (auto *vjp = dw.getVJP())
+    vjpID = addSILFunctionRef(vjp);
+  SmallVector<unsigned, 8> parameterAndResultIndices(
+      dw.getParameterIndices()->begin(), dw.getParameterIndices()->end());
+  parameterAndResultIndices.append(dw.getResultIndices()->begin(),
+                                   dw.getResultIndices()->end());
+  auto originalFnType = original->getLoweredFunctionType();
+  assert(originalFnType->getNumParameters() ==
+         dw.getParameterIndices()->getCapacity() &&
+         "Original function parameter count should match differentiability "
+         "witness parameter indices capacity");
+  assert(originalFnType->getNumResults() ==
+         dw.getResultIndices()->getCapacity() &&
+         "Original function result count should match differentiability "
+         "witness result indices capacity");
+
+  DifferentiabilityWitnessLayout::emitRecord(
+      Out, ScratchRecord, SILAbbrCodes[DifferentiabilityWitnessLayout::Code],
+      addSILFunctionRef(original),
+      toStableSILLinkage(dw.getLinkage()),
+      dw.isDeclaration(),
+      dw.isSerialized(),
+      S.addGenericSignatureRef(dw.getDerivativeGenericSignature()),
+      jvpID, vjpID,
+      dw.getParameterIndices()->getNumIndices(),
+      dw.getResultIndices()->getNumIndices(),
+      parameterAndResultIndices);
+}
+// SWIFT_ENABLE_TENSORFLOW END
+
 /// Helper function for whether to emit a function body.
 bool SILSerializer::shouldEmitFunctionBody(const SILFunction *F,
                                            bool isReference) {
@@ -2512,14 +2637,18 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
   registerSILAbbr<DefaultWitnessTableLayout>();
   registerSILAbbr<DefaultWitnessTableNoEntryLayout>();
   registerSILAbbr<PropertyLayout>();
+  // SWIFT_ENABLE_TENSORFLOW
+  registerSILAbbr<DifferentiabilityWitnessLayout>();
+  // SWIFT_ENABLE_TENSORFLOW END
 
-  registerSILAbbr<SILInstCastLayout>();
   registerSILAbbr<SILInstWitnessMethodLayout>();
   registerSILAbbr<SILSpecializeAttrLayout>();
   // SWIFT_ENABLE_TENSORFLOW
-  registerSILAbbr<SILDifferentiableAttrLayout>();
-  registerSILAbbr<SILInstAutoDiffFunctionLayout>();
-  registerSILAbbr<SILInstAutoDiffFunctionExtractLayout>();
+  registerSILAbbr<SILInstDifferentiableFunctionLayout>();
+  registerSILAbbr<SILInstLinearFunctionLayout>();
+  registerSILAbbr<SILInstDifferentiableFunctionExtractLayout>();
+  registerSILAbbr<SILInstLinearFunctionExtractLayout>();
+  // SWIFT_ENABLE_TENSORFLOW END
 
   // Register the abbreviation codes so these layouts can exist in both
   // decl blocks and sil blocks.
@@ -2593,6 +2722,26 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
     addMandatorySILFunction(&F, emitDeclarationsForOnoneSupport);
     processSILFunctionWorklist();
   }
+
+  // SWIFT_ENABLE_TENSORFLOW
+  // Write out differentiability witnesses.
+  // Note: this must be done after visiting SIL functions above so that
+  // differentiability witness references (`differentiability_witness_function`
+  // instructions) have been tracked.
+  for (const auto &diffWitness : SILMod->getDifferentiabilityWitnessList()) {
+    // TODO(TF-893): Consider checking
+    // `SILMod->shouldSerializeEntitiesAssociatedWithDeclContext` on the JVP/VJP
+    // functions.
+    if ((ShouldSerializeAll || diffWitness.isSerialized()))
+      DifferentiabilityWitnessesToEmit.insert(&diffWitness);
+  }
+  for (auto *diffWitness : DifferentiabilityWitnessesToEmit)
+    writeSILDifferentiabilityWitness(*diffWitness);
+  // Process SIL functions referenced by differentiability witnesses.
+  // Note: this is necessary despite processing `FuncsToEmit` below because
+  // `Worklist` is processed separately.
+  processSILFunctionWorklist();
+  // SWIFT_ENABLE_TENSORFLOW END
 
   // Now write function declarations for every function we've
   // emitted a reference to without emitting a function body for.

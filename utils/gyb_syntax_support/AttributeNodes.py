@@ -21,7 +21,7 @@ ATTRIBUTE_NODES = [
                    description='The name of the attribute.'),
              Child('LeftParen', kind='LeftParenToken',
                    is_optional=True),
-             Child('ArgumentList', kind='FunctionCallArgumentList',
+             Child('ArgumentList', kind='TupleExprElementList',
                    collection_element_name='Argument', is_optional=True),
              Child('RightParen', kind='RightParenToken',
                    is_optional=True),
@@ -35,6 +35,7 @@ ATTRIBUTE_NODES = [
     #                | specialize-attr-spec-list
     #                | implements-attr-arguments
     #                | differentiable-attr-arguments
+    #                | derivative-registration-attr-arguments
     #                | named-attribute-string-argument
     #              )? ')'?
     Node('Attribute', kind='Syntax',
@@ -61,20 +62,19 @@ ATTRIBUTE_NODES = [
                        Child('ObjCName', kind='ObjCSelector'),
                        Child('ImplementsArguments',
                              kind='ImplementsAttributeArguments'),
-                       # SWIFT_ENABLE_TENSORFLOW
                        Child('DifferentiableArguments',
                              kind='DifferentiableAttributeArguments'),
+                       Child('DerivativeRegistrationArguments',
+                             kind='DerivativeRegistrationAttributeArguments'),
                        # SWIFT_ENABLE_TENSORFLOW
-                       Child('DifferentiatingArguments',
-                             kind='DifferentiatingAttributeArguments'),
-                       # SWIFT_ENABLE_TENSORFLOW
-                       Child('TransposingArguments',
-                             kind='DifferentiatingAttributeArguments'),
+                       Child('DeprecatedDerivativeRegistrationArguments',
+                             kind='DeprecatedDerivativeRegistrationAttributeArguments'),
+                       # SWIFT_ENABLE_TENSORFLOW END
                        Child('NamedAttributeString',
                              kind='NamedAttributeStringArgument'),
                    ], description='''
-                   The arguments of the attribute. In case the attribute  \
-                   takes multiple arguments, they are gather in the \
+                   The arguments of the attribute. In case the attribute
+                   takes multiple arguments, they are gather in the
                    appropriate takes first.
                    '''),
              Child('RightParen', kind='RightParenToken', is_optional=True,
@@ -89,6 +89,7 @@ ATTRIBUTE_NODES = [
 
     # attribute-list -> attribute attribute-list?
     Node('AttributeList', kind='SyntaxCollection',
+         omit_when_empty=True,
          element='Syntax', element_name='Attribute',
          element_choices=[
              'Attribute',
@@ -114,7 +115,7 @@ ATTRIBUTE_NODES = [
     # labeled-specialize-entry -> identifier ':' token ','?
     Node('LabeledSpecializeEntry', kind='Syntax',
          description='''
-         A labeled argument for the `@_specialize` attribute like \
+         A labeled argument for the `@_specialize` attribute like
          `exported: true`
          ''',
          traits=['WithTrailingComma'],
@@ -134,8 +135,8 @@ ATTRIBUTE_NODES = [
     # named-attribute-string-arg -> 'name': string-literal
     Node('NamedAttributeStringArgument', kind='Syntax',
          description='''
-         The argument for the `@_dynamic_replacement` or `@_private` \
-         attribute of the form `for: "function()"` or `sourceFile: \
+         The argument for the `@_dynamic_replacement` or `@_private`
+         attribute of the form `for: "function()"` or `sourceFile:
          "Src.swift"`
          ''',
          children=[
@@ -158,7 +159,7 @@ ATTRIBUTE_NODES = [
                ]),
          Child('DeclNameArguments', kind='DeclNameArguments',
                is_optional=True, description='''
-               The argument labels of the protocol\'s requirement if it \
+               The argument labels of the protocol\'s requirement if it
                is a function requirement.
                '''),
          ]),
@@ -167,12 +168,12 @@ ATTRIBUTE_NODES = [
     #                              (identifier | operator) decl-name-arguments
     Node('ImplementsAttributeArguments', kind='Syntax',
          description='''
-         The arguments for the `@_implements` attribute of the form \
+         The arguments for the `@_implements` attribute of the form
          `Type, methodName(arg1Label:arg2Label:)`
          ''',
          children=[
              Child('Type', kind='SimpleTypeIdentifier', description='''
-                   The type for which the method with this attribute \
+                   The type for which the method with this attribute
                    implements a requirement.
                    '''),
              Child('Comma', kind='CommaToken',
@@ -188,28 +189,35 @@ ATTRIBUTE_NODES = [
                    ]),
              Child('DeclNameArguments', kind='DeclNameArguments',
                    is_optional=True, description='''
-                   The argument labels of the protocol\'s requirement if it \
+                   The argument labels of the protocol\'s requirement if it
                    is a function requirement.
                    '''),
          ]),
 
-    # SWIFT_ENABLE_TENSORFLOW
+    # objc-selector-piece -> identifier? ':'?
+    Node('ObjCSelectorPiece', kind='Syntax',
+         description='''
+         A piece of an Objective-C selector. Either consisiting of just an
+         identifier for a nullary selector, an identifier and a colon for a
+         labeled argument or just a colon for an unlabeled argument
+         ''',
+         children=[
+             Child('Name', kind='IdentifierToken', is_optional=True),
+             Child('Colon', kind='ColonToken', is_optional=True),
+         ]),
+
+    # objc-selector -> objc-selector-piece objc-selector?
+    Node('ObjCSelector', kind='SyntaxCollection', element='ObjCSelectorPiece'),
+
     # The argument of '@differentiable(...)'.
     # differentiable-attr-arguments ->
     #     differentiation-params-clause? ','?
-    #     differentiable-attr-func-specifier? # primal
-    #     differentiable-attr-func-specifier? # adjoint
     #     differentiable-attr-func-specifier? # jvp
     #     differentiable-attr-func-specifier? # vjp
     #     generic-where-clause?
-    # FIXME: There is currently no guarantee that 'MaybePrimal' is in fact
-    # the primal specifier, it could be any specifier. The current syntax
-    # definitions only ensure that there are between 0 and 4 function
-    # specifiers. A more robust definition would enforce that specific function
-    # specifiers appear only once, in order.
     Node('DifferentiableAttributeArguments', kind='Syntax',
          description='''
-         The arguments for the `@differentiable` attribute: an optional \
+         The arguments for the `@differentiable` attribute: an optional
          differentiation parameter list and associated functions.
          ''',
          children=[
@@ -219,10 +227,6 @@ ATTRIBUTE_NODES = [
                    The comma following the differentiation parameters clause,
                    if it exists.
                    ''', is_optional=True),
-             Child('MaybePrimal', kind='DifferentiableAttributeFuncSpecifier',
-                   is_optional=True),
-             Child('MaybeAdjoint', kind='DifferentiableAttributeFuncSpecifier',
-                   is_optional=True),
              Child('MaybeJVP', kind='DifferentiableAttributeFuncSpecifier',
                    is_optional=True),
              Child('MaybeVJP', kind='DifferentiableAttributeFuncSpecifier',
@@ -263,11 +267,11 @@ ATTRIBUTE_NODES = [
     Node('DifferentiationParamList', kind='SyntaxCollection',
          element='DifferentiationParam'),
 
-    # differentiation-param -> ('self' | identifer) ','?
+    # differentiation-param -> ('self' | identifer | integer-literal) ','?
     Node('DifferentiationParam', kind='Syntax',
          description='''
-         A differentiation parameter: either the "self" identifier or a \
-         function parameter name.
+         A differentiation parameter: either the "self" identifier, a
+         function parameter name, or a function parameter index.
          ''',
          traits=['WithTrailingComma'],
          children=[
@@ -275,6 +279,7 @@ ATTRIBUTE_NODES = [
                    node_choices=[
                        Child('Self', kind='SelfToken'),
                        Child('Name', kind='IdentifierToken'),
+                       Child('Index', kind='IntegerLiteralToken'),
                    ]),
              Child('TrailingComma', kind='CommaToken', is_optional=True),
          ]),
@@ -283,7 +288,7 @@ ATTRIBUTE_NODES = [
     #     ('jvp' | 'vjp') ':' func-decl-name ','?
     Node('DifferentiableAttributeFuncSpecifier', kind='Syntax',
          description='''
-         A function specifier, consisting of an identifier, colon, and a \
+         A function specifier, consisting of an identifier, colon, and a
          function declaration name (e.g. `vjp: foo(_:_:)`).
          ''',
          traits=['WithTrailingComma'],
@@ -294,6 +299,70 @@ ATTRIBUTE_NODES = [
              Child('FunctionDeclName', kind='FunctionDeclName',
                    description='The referenced function name.'),
              Child('TrailingComma', kind='CommaToken', is_optional=True),
+         ]),
+
+    # An optionally qualified declaration name.
+    # qualified-decl-name ->
+    #     base-type? '.'? (identifier | operator) decl-name-arguments?
+    # base-type ->
+    #     member-type-identifier | base-type-identifier
+    Node('QualifiedDeclName', kind='Syntax',
+         description='''
+         An optionally qualified function declaration name (e.g. `foo(_:_:)`,
+         `Swift.Float.+(_:_:)`).
+         ''',
+         children=[
+             Child('BaseType', kind='Type', description='''
+                   The base type of the qualified name, optionally specified.
+                   ''',
+                   node_choices=[
+                       Child('MemberType', kind='MemberTypeIdentifier'),
+                       Child('SimpleType', kind='SimpleTypeIdentifier'),
+                   ], is_optional=True),
+             Child('Dot', kind='Token',
+                   token_choices=[
+                       'PeriodToken', 'PrefixPeriodToken'
+                   ], is_optional=True),
+             Child('Name', kind='Syntax', description='''
+                   The base name of the referenced function.
+                   ''',
+                   node_choices=[
+                       Child('Identifier', kind='IdentifierToken'),
+                       Child('PrefixOperator', kind='PrefixOperatorToken'),
+                       Child('PostfixOperator', kind='PostfixOperatorToken'),
+                       Child('SpacedBinaryOperator',
+                             kind='SpacedBinaryOperatorToken'),
+                   ]),
+             Child('Arguments', kind='DeclNameArguments',
+                   is_optional=True, description='''
+                   The argument labels of the referenced function, optionally
+                   specified.
+                   '''),
+         ]),
+
+    # The argument of the derivative registration attribute
+    # '@derivative(of: ...)' and the transpose registration attribute
+    # '@transpose(of: ...)'.
+    # derivative-registration-attr-arguments ->
+    #     'of' ':' func-decl-name ','? differentiation-params-clause?
+    Node('DerivativeRegistrationAttributeArguments', kind='Syntax',
+         description='''
+         The arguments for the '@derivative(of:)' and '@transpose(of:)'
+         attributes: the 'of:' label, the original declaration name, and an
+         optional differentiation parameter list.
+         ''',
+         children=[
+             Child('OfLabel', kind='IdentifierToken', text_choices=['of'],
+                   description='The "of" label.'),
+             Child('Colon', kind='ColonToken', description='''
+                   The colon separating the "of" label and the original
+                   declaration name.
+                   '''),
+             Child('Original', kind='QualifiedDeclName',
+                   description='The referenced original declaration.'),
+             Child('Comma', kind='CommaToken', is_optional=True),
+             Child('DiffParams', kind='DifferentiationParamsClause',
+                   is_optional=True),
          ]),
 
     # func-decl-name -> (identifier | operator) decl-name-arguments?
@@ -313,57 +382,28 @@ ATTRIBUTE_NODES = [
                    ]),
              Child('Arguments', kind='DeclNameArguments',
                    is_optional=True, description='''
-                   The argument labels of the referenced function, optionally \
+                   The argument labels of the referenced function, optionally
                    specified.
                    '''),
          ]),
 
     # SWIFT_ENABLE_TENSORFLOW
-    # The argument of '@differentiating(...)'.
-    # differentiating-attr-arguments ->
-    #     func-decl-name ','? differentiable-attr-parameters?
-    Node('DifferentiatingAttributeArguments', kind='Syntax',
+    # The argument of the deprecated derivative registration attribute
+    # '@differentiating'.
+    # deprecated-derivative-registration-attr-arguments ->
+    #     func-decl-name ','? differentiation-params-clause?
+    # TODO(TF-999): Remove deprecated `@differentiating` attribute.
+    Node('DeprecatedDerivativeRegistrationAttributeArguments', kind='Syntax',
          description='''
-         The arguments for the `@differentiating` attribute: the original
-         function and an optional differentiation parameter list.
+         The arguments for the '@differentiating' attribute: the original
+         declaration name and an optional differentiation parameter list.
          ''',
          children=[
-             Child('Original', kind='FunctionDeclName',
-                   description='The referenced original function.'),
+             Child('OriginalDeclName', kind='QualifiedDeclName',
+                   description='The referenced original declaration name.'),
              Child('Comma', kind='CommaToken', is_optional=True),
              Child('DiffParams', kind='DifferentiationParamsClause',
                    is_optional=True),
          ]),
-
-     # SWIFT_ENABLE_TENSORFLOW
-     # The argument of '@transposing(...)'.
-     # transposing-attr-arguments ->
-     #     func-decl-name ','? differentiable-attr-parameters?
-     Node('TransposingAttributeArguments', kind='Syntax',
-          description='''
-            The arguments for the `@transposing` attribute: the original
-            function and an optional differentiation parameter list.
-            ''',
-          children=[
-                    Child('Original', kind='FunctionDeclName',
-                          description='The referenced original function.'),
-                    Child('Comma', kind='CommaToken', is_optional=True),
-                    Child('DiffParams', kind='DifferentiationParamsClause',
-                          is_optional=True),
-                    ]),
-
-    # objc-selector-piece -> identifier? ':'?
-    Node('ObjCSelectorPiece', kind='Syntax',
-         description='''
-         A piece of an Objective-C selector. Either consisiting of just an \
-         identifier for a nullary selector, an identifier and a colon for a \
-         labeled argument or just a colon for an unlabeled argument
-         ''',
-         children=[
-             Child('Name', kind='IdentifierToken', is_optional=True),
-             Child('Colon', kind='ColonToken', is_optional=True),
-         ]),
-
-    # objc-selector -> objc-selector-piece objc-selector?
-    Node('ObjCSelector', kind='SyntaxCollection', element='ObjCSelectorPiece')
+    # SWIFT_ENABLE_TENSORFLOW END
 ]

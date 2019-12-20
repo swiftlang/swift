@@ -1,6 +1,4 @@
-// SWIFT_ENABLE_TENSORFLOW
-// NOTE(TF-11): Added explicit `-enable-large-loadable-types` flag.
-// RUN: %target-swift-frontend %s -emit-ir -enable-large-loadable-types | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
+// RUN: %target-swift-frontend %s -emit-ir | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
 
 // REQUIRES: CPU=x86_64
 
@@ -379,8 +377,8 @@ sil_vtable Sub {}
 
 sil @parametric_casting_closure : $@convention(thin) <C where C : Base> (@owned Base) -> @owned C {
 bb0(%0 : $Base):
-  %1 = unconditional_checked_cast %0 : $Base to $C
-   return %1 : $C
+  %1 = unconditional_checked_cast %0 : $Base to C
+  return %1 : $C
 }
 
 sil public_external @receive_closure : $@convention(thin) <C where C : Base> (@owned @callee_owned () -> (@owned C)) -> ()
@@ -529,7 +527,14 @@ enum GenericEnum2<T> {
 sil public_external @generic_indirect_return2 : $@convention(thin) <T> (Int) -> @owned GenericEnum2<T>
 
 // CHECK-LABEL: define{{.*}} @partial_apply_generic_indirect_return2
-// CHECK: insertvalue {{.*}}$s24generic_indirect_return2TA
+// CHECK: [[CTX:%.]] = call noalias %swift.refcounted* @swift_allocObject
+// CHECK: store {{.*}}$s24generic_indirect_return2TA
+// CHECK: store %swift.refcounted* [[CTX]]
+// CHECK: [[FN:%.*]] = load i8*
+// CHECK: [[CTX2:%.*]] = load %swift.refcounted*
+// CHECK: [[R1:%.]] = insertvalue { i8*, %swift.refcounted* } undef, i8* [[FN]], 0
+// CHECK: [[R2:%.*]] = insertvalue { i8*, %swift.refcounted* } [[R1]], %swift.refcounted* [[CTX2]], 1
+// CHECK: ret { i8*, %swift.refcounted* } [[R2]]
 
 // CHECK-LABEL: define internal swiftcc void @"$s24generic_indirect_return2TA"(%T13partial_apply12GenericEnum2OySiG* noalias nocapture sret, %swift.refcounted* swiftself)
 // CHECK:  [[CASTED_ADDR:%.*]] = bitcast %T13partial_apply12GenericEnum2OySiG* %0 to %T13partial_apply12GenericEnum2O*

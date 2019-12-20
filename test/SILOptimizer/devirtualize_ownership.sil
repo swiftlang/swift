@@ -99,7 +99,7 @@ bb0(%0 : @guaranteed $Node):
 
 // CHECK-LABEL: sil private [transparent] [noinline] [ossa] @transparent_target
 sil private [transparent] [noinline] [ossa] @transparent_target : $@convention(method) (@guaranteed Node) -> Int {
-bb0(%0 : @owned $Node):
+bb0(%0 : @guaranteed $Node):
   %2 = ref_element_addr %0 : $Node, #Node.index
   %3 = load [trivial] %2 : $*Int
   // CHECK: return

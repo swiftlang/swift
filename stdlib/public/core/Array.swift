@@ -767,6 +767,12 @@ extension Array: RandomAccessCollection, MutableCollection {
   public var count: Int {
     return _getCount()
   }
+  
+  @inlinable
+  @_alwaysEmitIntoClient
+  public var first: Element? {
+    _getCount() == 0 ? nil : _buffer[0]
+  }
 }
 
 extension Array: ExpressibleByArrayLiteral {
@@ -785,10 +791,6 @@ extension Array: ExpressibleByArrayLiteral {
   ///
   /// - Parameter elements: A variadic list of elements of the new array.
   @inlinable
-  // SWIFT_ENABLE_TENSORFLOW
-  // FIXME: We can probably remove @_transparent once constexpr folding is
-  // more fleshed out.
-  @_transparent
   public init(arrayLiteral elements: Element...) {
     self = elements
   }
@@ -871,6 +873,8 @@ extension Array: RangeReplaceableCollection {
   ///     `repeating` parameter. `count` must be zero or greater.
   @inlinable
   @_semantics("array.init")
+  @differentiable(wrt: repeatedValue, vjp: _vjpInit(repeating:count:)
+                  where Element: Differentiable)
   public init(repeating repeatedValue: Element, count: Int) {
     var p: UnsafeMutablePointer<Element>
     (self, p) = Array._allocateUninitialized(count)
@@ -1168,7 +1172,7 @@ extension Array: RangeReplaceableCollection {
       "newElements.underestimatedCount was an overestimate")
     // can't check for overflow as sequences can underestimate
 
-    // This check prevents a data race writting to _swiftEmptyArrayStorage
+    // This check prevents a data race writing to _swiftEmptyArrayStorage
     if writtenCount > 0 {
       _buffer.count += writtenCount
     }
@@ -1429,7 +1433,7 @@ extension Array {
   ///     of the new array.
   ///     - Parameters:
   ///       - buffer: A buffer covering uninitialized memory with room for the
-  ///         specified number of of elements.
+  ///         specified number of elements.
   ///       - initializedCount: The count of initialized elements in the array,
   ///         which begins as zero. Set `initializedCount` to the number of
   ///         elements you initialize.
@@ -1913,59 +1917,64 @@ internal struct _ArrayAnyHashableBox<Element: Hashable>
 }
 
 // SWIFT_ENABLE_TENSORFLOW
-extension Array where Element : Differentiable {
+// TODO(TF-938): Add 'Element : Differentiable' constraint.
+extension Array {
   /// The view of an array as the differentiable product manifold of `Element`
   /// multiplied with itself `count` times.
   @frozen
-  public struct DifferentiableView : Differentiable {
-    private var _base: [Element]
+  public struct DifferentiableView {
+    var _base: [Element]
+  }
+}
 
-    /// The viewed array.
-    // I'm implementing this as a computed property instead of directly
-    // exposing `_base` because the `@differentiable` annotation does not make
-    // the stored property actually differentiable. I think this is a bug.
-    // Maybe it's related to `@frozen`?
-    // TODO: Determine if that is a bug, and fix.
-    public var base: [Element] {
-      @differentiable(wrt: self, vjp: _vjpBase)
-      get { return _base }
-      _modify { yield &_base }
-    }
+extension Array.DifferentiableView : Differentiable where Element : Differentiable {
+  /// The viewed array.
+  public var base: [Element] {
+    @differentiable(wrt: self, vjp: _vjpBase)
+    get { return _base }
+    _modify { yield &_base }
+  }
 
-    @usableFromInline
-    func _vjpBase() ->
-      ([Element], (Array<Element>.TangentVector) -> TangentVector) {
-      return (base, { $0 })
-    }
+  @usableFromInline
+  func _vjpBase() ->
+    ([Element], (Array<Element>.TangentVector) -> TangentVector) {
+    return (base, { $0 })
+  }
 
-    /// Creates a differentiable view of the given array.
-    @differentiable(wrt: base, vjp: _vjpInit)
-    public init(_ base: [Element]) { self._base = base }
+  /// Creates a differentiable view of the given array.
+  @differentiable(wrt: base, vjp: _vjpInit)
+  public init(_ base: [Element]) { self._base = base }
 
-    @usableFromInline
-    static func _vjpInit(_ base: [Element]) ->
-      (Array.DifferentiableView, (TangentVector) -> TangentVector) {
-      return (Array.DifferentiableView(base), { $0 })
-    }
+  @usableFromInline
+  static func _vjpInit(_ base: [Element]) ->
+    (Array.DifferentiableView, (TangentVector) -> TangentVector) {
+    return (Array.DifferentiableView(base), { $0 })
+  }
 
-    // MARK: - Differentiable conformance.
+  public typealias TangentVector =
+    Array<Element.TangentVector>.DifferentiableView
 
-    public typealias TangentVector =
-      Array<Element.TangentVector>.DifferentiableView
-
-    public mutating func move(along direction: TangentVector) {
-      precondition(
-        base.count == direction.base.count,
-        "cannot move Array.DifferentiableView with count \(base.count) along " +
-          "direction with different count \(direction.base.count)")
-      for i in base.indices {
-        base[i].move(along: direction.base[i])
-      }
+  public mutating func move(along direction: TangentVector) {
+    precondition(
+      base.count == direction.base.count,
+      "cannot move Array.DifferentiableView with count \(base.count) along " +
+        "direction with different count \(direction.base.count)")
+    for i in base.indices {
+      base[i].move(along: direction.base[i])
     }
   }
 }
 
-extension Array.DifferentiableView : Equatable where Element : Equatable {
+extension Array.DifferentiableView : EuclideanDifferentiable
+  where Element : EuclideanDifferentiable {
+  public var differentiableVectorView: Array.DifferentiableView.TangentVector {
+    Array.DifferentiableView.TangentVector(
+      base.map { $0.differentiableVectorView })
+  }
+}
+
+extension Array.DifferentiableView : Equatable
+  where Element : Differentiable & Equatable {
   public static func == (
     lhs: Array.DifferentiableView,
     rhs: Array.DifferentiableView
@@ -1974,13 +1983,15 @@ extension Array.DifferentiableView : Equatable where Element : Equatable {
   }
 }
 
-extension Array.DifferentiableView : ExpressibleByArrayLiteral {
+extension Array.DifferentiableView : ExpressibleByArrayLiteral
+  where Element : Differentiable {
   public init(arrayLiteral elements: Element...) {
     self.init(elements)
   }
 }
 
-extension Array.DifferentiableView : CustomStringConvertible {
+extension Array.DifferentiableView : CustomStringConvertible
+  where Element : Differentiable {
   public var description: String {
     return base.description
   }
@@ -1991,7 +2002,7 @@ extension Array.DifferentiableView : CustomStringConvertible {
 /// Note that `Array.DifferentiableView([])` is the zero in the product spaces
 /// of all counts.
 extension Array.DifferentiableView : AdditiveArithmetic
-  where Element : AdditiveArithmetic {
+  where Element : AdditiveArithmetic & Differentiable {
 
   public static var zero: Array.DifferentiableView {
     return Array.DifferentiableView([])
@@ -2059,6 +2070,21 @@ extension Array : Differentiable where Element : Differentiable {
     view.move(along: direction)
     self = view.base
   }
+
+  /// A closure that produces a `TangentVector` of zeros with the same
+  /// `count` as `self`.
+  public var zeroTangentVectorInitializer: () -> TangentVector {
+    { [count = self.count] in
+      TangentVector(.init(repeating: .zero, count: count))
+    }
+  }
+}
+
+extension Array : EuclideanDifferentiable
+  where Element : EuclideanDifferentiable {
+  public var differentiableVectorView: TangentVector {
+    TangentVector(map { $0.differentiableVectorView })
+  }
 }
 
 extension Array where Element : Differentiable {
@@ -2091,5 +2117,16 @@ extension Array where Element : Differentiable {
             gradientIn.base[lhs.count...])))
       }
       return (lhs + rhs, pullback)
+  }
+}
+
+extension Array where Element: Differentiable {
+  @usableFromInline
+  static func _vjpInit(repeating repeatedValue: Element, count: Int) -> (
+    value: Self, pullback: (TangentVector) -> Element.TangentVector
+  ) {
+    (value: Self(repeating: repeatedValue, count: count), pullback: { v in
+      v.base.reduce(.zero, +)
+    })
   }
 }

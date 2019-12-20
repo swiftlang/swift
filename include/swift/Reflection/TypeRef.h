@@ -24,8 +24,6 @@
 #include "swift/Remote/MetadataReader.h"
 #include "swift/Runtime/Unreachable.h"
 
-#include <iostream>
-
 namespace swift {
 namespace reflection {
 
@@ -150,7 +148,7 @@ public:
   }
 
   void dump() const;
-  void dump(std::ostream &OS, unsigned Indent = 0) const;
+  void dump(FILE *file, unsigned Indent = 0) const;
 
   bool isConcrete() const;
   bool isConcreteAfterSubstitutions(const GenericArgumentMap &Subs) const;

@@ -14,10 +14,12 @@
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/Basic/NullablePtr.h"
+#include "swift/Basic/STLExtras.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/Projection.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBasicBlock.h"
+#include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILVisitor.h"
 
 using namespace swift;
@@ -36,6 +38,7 @@ SILValue swift::stripOwnershipInsts(SILValue v) {
 
 /// Strip off casts/indexing insts/address projections from V until there is
 /// nothing left to strip.
+///
 /// FIXME: Why don't we strip projections after stripping indexes?
 SILValue swift::getUnderlyingObject(SILValue v) {
   while (true) {
@@ -52,24 +55,24 @@ SILValue swift::getUnderlyingObject(SILValue v) {
 /// Strip off casts and address projections into the interior of a value. Unlike
 /// getUnderlyingObject, this does not find the root of a heap object--a class
 /// property is itself an address root.
-SILValue swift::getUnderlyingAddressRoot(SILValue V) {
+SILValue swift::getUnderlyingAddressRoot(SILValue v) {
   while (true) {
-    SILValue V2 = stripIndexingInsts(stripCasts(V));
-    switch (V2->getKind()) {
-      case ValueKind::StructElementAddrInst:
-      case ValueKind::TupleElementAddrInst:
-      case ValueKind::UncheckedTakeEnumDataAddrInst:
-        V2 = cast<SingleValueInstruction>(V2)->getOperand(0);
-        break;
-      default:
-        break;
+    SILValue v2 = stripIndexingInsts(stripCasts(v));
+    v2 = stripOwnershipInsts(v2);
+    switch (v2->getKind()) {
+    case ValueKind::StructElementAddrInst:
+    case ValueKind::TupleElementAddrInst:
+    case ValueKind::UncheckedTakeEnumDataAddrInst:
+      v2 = cast<SingleValueInstruction>(v2)->getOperand(0);
+      break;
+    default:
+      break;
     }
-    if (V2 == V)
-      return V2;
-    V = V2;
+    if (v2 == v)
+      return v2;
+    v = v2;
   }
 }
-
 
 SILValue swift::getUnderlyingObjectStopAtMarkDependence(SILValue v) {
   while (true) {
@@ -324,12 +327,15 @@ bool swift::onlyAffectsRefCount(SILInstruction *user) {
   case SILInstructionKind::StrongReleaseInst:
   case SILInstructionKind::StrongRetainInst:
   case SILInstructionKind::UnmanagedAutoreleaseValueInst:
-  case SILInstructionKind::UnmanagedReleaseValueInst:
-  case SILInstructionKind::UnmanagedRetainValueInst:
-#define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
-  case SILInstructionKind::Name##RetainInst: \
-  case SILInstructionKind::Name##ReleaseInst: \
-  case SILInstructionKind::StrongRetain##Name##Inst:
+#define UNCHECKED_REF_STORAGE(Name, ...)                                       \
+  case SILInstructionKind::Name##RetainValueInst:                              \
+  case SILInstructionKind::Name##ReleaseValueInst:                             \
+  case SILInstructionKind::StrongCopy##Name##ValueInst:
+#define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...)            \
+  case SILInstructionKind::Name##RetainInst:                                   \
+  case SILInstructionKind::Name##ReleaseInst:                                  \
+  case SILInstructionKind::StrongRetain##Name##Inst:                           \
+  case SILInstructionKind::StrongCopy##Name##ValueInst:
 #include "swift/AST/ReferenceStorage.def"
     return true;
   }
@@ -484,8 +490,8 @@ void swift::findClosuresForFunctionValue(
         continue;
       }
       // SWIFT_ENABLE_TENSORFLOW
-      if (auto *ADFI = dyn_cast<AutoDiffFunctionInst>(I)) {
-        worklistInsert(ADFI->getOperand(0));
+      if (auto *DFI = dyn_cast<DifferentiableFunctionInst>(I)) {
+        worklistInsert(DFI->getOperand(0));
         continue;
       }
     }
@@ -533,93 +539,147 @@ void swift::findClosuresForFunctionValue(
   }
 }
 
-namespace {
+bool PolymorphicBuiltinSpecializedOverloadInfo::init(
+    SILFunction *fn, BuiltinValueKind builtinKind,
+    ArrayRef<SILType> oldOperandTypes, SILType oldResultType) {
+  assert(!isInitialized && "Expected uninitialized info");
+  SWIFT_DEFER { isInitialized = true; };
+  if (!isPolymorphicBuiltin(builtinKind))
+    return false;
 
-enum class OwnershipQualifiedKind {
-  NotApplicable,
-  Qualified,
-  Unqualified,
-};
+  // Ok, at this point we know that we have a true polymorphic builtin. See if
+  // we have an overload for its current operand type.
+  StringRef name = getBuiltinName(builtinKind);
+  StringRef prefix = "generic_";
+  assert(name.startswith(prefix) &&
+         "Invalid polymorphic builtin name! Prefix should be Generic$OP?!");
+  SmallString<32> staticOverloadName;
+  staticOverloadName.append(name.drop_front(prefix.size()));
 
-struct OwnershipQualifiedKindVisitor : SILInstructionVisitor<OwnershipQualifiedKindVisitor, OwnershipQualifiedKind> {
-
-  OwnershipQualifiedKind visitSILInstruction(SILInstruction *I) {
-    return OwnershipQualifiedKind::NotApplicable;
-  }
-
-#define QUALIFIED_INST(CLASS) \
-  OwnershipQualifiedKind visit ## CLASS(CLASS *I) { \
-    return OwnershipQualifiedKind::Qualified;             \
-  }
-  QUALIFIED_INST(EndBorrowInst)
-  QUALIFIED_INST(LoadBorrowInst)
-  QUALIFIED_INST(CopyValueInst)
-  QUALIFIED_INST(DestroyValueInst)
-#define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
-  QUALIFIED_INST(Copy##Name##ValueInst)
-#include "swift/AST/ReferenceStorage.def"
-#undef QUALIFIED_INST
-
-  OwnershipQualifiedKind visitLoadInst(LoadInst *LI) {
-    if (LI->getOwnershipQualifier() == LoadOwnershipQualifier::Unqualified)
-      return OwnershipQualifiedKind::Unqualified;
-    return OwnershipQualifiedKind::Qualified;
-  }
-
-  OwnershipQualifiedKind visitStoreInst(StoreInst *SI) {
-    if (SI->getOwnershipQualifier() == StoreOwnershipQualifier::Unqualified)
-      return OwnershipQualifiedKind::Unqualified;
-    return OwnershipQualifiedKind::Qualified;
-  }
-};
-
-} // end anonymous namespace
-
-bool FunctionOwnershipEvaluator::evaluate(SILInstruction *I) {
-  assert(I->getFunction() == F.get() && "Can not evaluate function ownership "
-         "implications of an instruction that "
-         "does not belong to the instruction "
-         "that we are evaluating");
-
-  switch (OwnershipQualifiedKindVisitor().visit(I)) {
-  case OwnershipQualifiedKind::Unqualified: {
-    // If we already know that the function has unqualified ownership, just
-    // return early.
-    if (!F.get()->hasOwnership())
-      return true;
-
-    // Ok, so we know at this point that we have qualified ownership. If we have
-    // seen any instructions with qualified ownership, we have an error since
-    // the function mixes qualified and unqualified instructions.
-    if (HasOwnershipQualifiedInstruction)
+  // If our first argument is an address, we know we have an indirect @out
+  // parameter by convention since all of these polymorphic builtins today never
+  // take indirect parameters without an indirect out result parameter. We stash
+  // this information and validate that if we have an out param, that our result
+  // is equal to the empty tuple type.
+  if (oldOperandTypes[0].isAddress()) {
+    if (oldResultType != fn->getModule().Types.getEmptyTupleType())
       return false;
 
-    // Otherwise, set the function to have unqualified ownership. This will
-    // ensure that no more Qualified instructions can be added to the given
-    // function.
-    F.get()->setOwnershipEliminated();
-    return true;
-  }
-  case OwnershipQualifiedKind::Qualified: {
-    // First check if our function has unqualified ownership. If we already do
-    // have unqualified ownership, then we know that we have already seen an
-    // unqualified ownership instruction. This means the function has both
-    // qualified and unqualified instructions. =><=.
-    if (!F.get()->hasOwnership())
+    hasOutParam = true;
+    SILType firstType = oldOperandTypes.front();
+
+    // We only handle polymorphic builtins with trivial types today.
+    if (!firstType.is<BuiltinType>() || !firstType.isTrivial(*fn)) {
       return false;
+    }
 
-    // Ok, at this point we know that we are still qualified. Since functions
-    // start as qualified, we need to set the HasOwnershipQualifiedInstructions
-    // so we do not need to look back through the function if we see an
-    // unqualified instruction later on.
-    HasOwnershipQualifiedInstruction = true;
-    return true;
-  }
-  case OwnershipQualifiedKind::NotApplicable: {
-    // Not Applicable instr
-    return true;
-  }
+    resultType = firstType.getObjectType();
+    oldOperandTypes = oldOperandTypes.drop_front();
+  } else {
+    resultType = oldResultType;
   }
 
-  llvm_unreachable("Unhandled OwnershipQualifiedKind in switch.");
+  // Then go through all of our values and bail if any after substitution are
+  // not concrete builtin types. Otherwise, stash each of them in the argTypes
+  // array as objects. We will convert them as appropriate.
+  for (SILType ty : oldOperandTypes) {
+    // If after specialization, we do not have a trivial builtin type, bail.
+    if (!ty.is<BuiltinType>() || !ty.isTrivial(*fn)) {
+      return false;
+    }
+
+    // Otherwise, we have an object builtin type ready to go.
+    argTypes.push_back(ty.getObjectType());
+  }
+
+  // Ok, we have all builtin types. Infer the underlying polymorphic builtin
+  // name form our first argument.
+  CanBuiltinType builtinType = argTypes.front().getAs<BuiltinType>();
+  SmallString<32> builtinTypeNameStorage;
+  StringRef typeName = builtinType->getTypeName(builtinTypeNameStorage, false);
+  staticOverloadName.append("_");
+  staticOverloadName.append(typeName);
+
+  auto &ctx = fn->getASTContext();
+  staticOverloadIdentifier = ctx.getIdentifier(staticOverloadName);
+
+  // Ok, we have our overload identifier. Grab the builtin info from the
+  // cache. If we did not actually found a valid builtin value kind for our
+  // overload, then we do not have a static overload for the passed in types, so
+  // return false.
+  builtinInfo = &fn->getModule().getBuiltinInfo(staticOverloadIdentifier);
+  return true;
+}
+
+bool PolymorphicBuiltinSpecializedOverloadInfo::init(BuiltinInst *bi) {
+  assert(!isInitialized && "Can not init twice?!");
+  SWIFT_DEFER { isInitialized = true; };
+
+  // First quickly make sure we have a /real/ BuiltinValueKind, not an intrinsic
+  // or None.
+  auto kind = bi->getBuiltinKind();
+  if (!kind)
+    return false;
+
+  SmallVector<SILType, 8> oldOperandTypes;
+  copy(bi->getOperandTypes(), std::back_inserter(oldOperandTypes));
+  assert(bi->getNumResults() == 1 &&
+         "We expect a tuple here instead of real args");
+  SILType oldResultType = bi->getResult(0)->getType();
+  return init(bi->getFunction(), *kind, oldOperandTypes, oldResultType);
+}
+
+SILValue
+swift::getStaticOverloadForSpecializedPolymorphicBuiltin(BuiltinInst *bi) {
+
+  PolymorphicBuiltinSpecializedOverloadInfo info;
+  if (!info.init(bi))
+    return SILValue();
+
+  SmallVector<SILValue, 8> rawArgsData;
+  copy(bi->getOperandValues(), std::back_inserter(rawArgsData));
+
+  SILValue result = bi->getResult(0);
+  MutableArrayRef<SILValue> rawArgs = rawArgsData;
+
+  if (info.hasOutParam) {
+    result = rawArgs.front();
+    rawArgs = rawArgs.drop_front();
+  }
+
+  assert(bi->getNumResults() == 1 &&
+         "We assume that builtins have a single result today. If/when this "
+         "changes, this code needs to be updated");
+
+  SILBuilderWithScope builder(bi);
+
+  // Ok, now we know that we can convert this to our specialized
+  // builtin. Prepare the arguments for the specialized value, loading the
+  // values if needed and storing the result into an out parameter if needed.
+  //
+  // NOTE: We only support polymorphic builtins with trivial types today, so we
+  // use load/store trivial as a result.
+  SmallVector<SILValue, 8> newArgs;
+  for (SILValue arg : rawArgs) {
+    if (arg->getType().isObject()) {
+      newArgs.push_back(arg);
+      continue;
+    }
+
+    SILValue load = builder.emitLoadValueOperation(
+        bi->getLoc(), arg, LoadOwnershipQualifier::Trivial);
+    newArgs.push_back(load);
+  }
+
+  BuiltinInst *newBI =
+      builder.createBuiltin(bi->getLoc(), info.staticOverloadIdentifier,
+                            info.resultType, {}, newArgs);
+
+  // If we have an out parameter initialize it now.
+  if (info.hasOutParam) {
+    builder.emitStoreValueOperation(newBI->getLoc(), newBI->getResult(0),
+                                    result, StoreOwnershipQualifier::Trivial);
+  }
+
+  return newBI;
 }

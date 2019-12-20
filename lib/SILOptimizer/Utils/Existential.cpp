@@ -15,8 +15,8 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/InstructionUtils.h"
-#include "swift/SILOptimizer/Utils/CFG.h"
-#include "swift/SILOptimizer/Utils/Local.h"
+#include "swift/SILOptimizer/Utils/CFGOptUtils.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "llvm/ADT/SmallPtrSet.h"
 
 using namespace swift;
@@ -243,11 +243,34 @@ void ConcreteExistentialInfo::initializeSubstitutionMap(
 
   // Construct a single-generic-parameter substitution map directly to the
   // ConcreteType with this existential's full list of conformances.
+  //
+  // NOTE: getOpenedArchetypeSignature() generates the signature for passing an
+  // opened existential as a generic parameter. No opened archetypes are
+  // actually involved here--the API is only used as a convenient way to create
+  // a substitution map. Since opened archetypes have different conformances
+  // than their corresponding existential, ExistentialConformances needs to be
+  // filtered when using it with this (phony) generic signature.
   CanGenericSignature ExistentialSig =
-      M->getASTContext().getExistentialSignature(ExistentialType,
-                                                 M->getSwiftModule());
-  ExistentialSubs = SubstitutionMap::get(ExistentialSig, {ConcreteType},
-                                         ExistentialConformances);
+      M->getASTContext().getOpenedArchetypeSignature(ExistentialType,
+                                                     M->getSwiftModule());
+  ExistentialSubs = SubstitutionMap::get(
+      ExistentialSig, [&](SubstitutableType *type) { return ConcreteType; },
+      [&](CanType /*depType*/, Type /*replaceType*/,
+          ProtocolDecl *proto) -> ProtocolConformanceRef {
+        // Directly providing ExistentialConformances to the SubstitionMap will
+        // fail because of the mismatch between opened archetype conformance and
+        // existential value conformance. Instead, provide a conformance lookup
+        // function that pulls only the necessary conformances out of
+        // ExistentialConformances. This assumes that existential conformances
+        // are a superset of opened archetype conformances.
+        auto iter =
+            llvm::find_if(ExistentialConformances,
+                          [&](const ProtocolConformanceRef &conformance) {
+                            return conformance.getRequirement() == proto;
+                          });
+        assert(iter != ExistentialConformances.end() && "missing conformance");
+        return *iter;
+      });
   assert(isValid());
 }
 
@@ -362,11 +385,11 @@ ConcreteExistentialInfo::ConcreteExistentialInfo(SILValue existential,
   // We have the open_existential; we still need the conformance.
   auto ConformanceRef =
       M->getSwiftModule()->conformsToProtocol(ConcreteTypeCandidate, Protocol);
-  if (!ConformanceRef)
+  if (ConformanceRef.isInvalid())
     return;
 
   // Assert that the conformance is complete.
-  auto *ConcreteConformance = ConformanceRef.getValue().getConcrete();
+  auto *ConcreteConformance = ConformanceRef.getConcrete();
   assert(ConcreteConformance->isComplete());
 
   ConcreteType = ConcreteTypeCandidate;

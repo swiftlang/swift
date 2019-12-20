@@ -19,7 +19,6 @@
 
 #include "llvm/IR/Intrinsics.h"
 #include "llvm/IR/Module.h"
-#include "llvm/IR/TypeBuilder.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "swift/AST/Builtins.h"
 #include "swift/AST/Types.h"
@@ -180,6 +179,13 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     return;
   }
 
+  if (Builtin.ID == BuiltinValueKind::IsConcrete) {
+    (void)args.claimAll();
+    auto isConcrete = !substitutions.getReplacementTypes()[0]->hasArchetype();
+    out.add(llvm::ConstantInt::get(IGF.IGM.Int1Ty, isConcrete));
+    return;
+  }
+
   if (Builtin.ID == BuiltinValueKind::IsBitwiseTakable) {
     (void)args.claimAll();
     auto valueTy = getLoweredTypeAndTypeInfo(IGF.IGM,
@@ -257,15 +263,6 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     replacement.add(NameGEP);
     replacement.add(args.claimAll());
     args = std::move(replacement);
-
-    if (Opts.EmitProfileCoverageMapping) {
-      // Update the associated coverage mapping: it's now safe to emit, because
-      // a symtab entry for this function is guaranteed (r://39146527).
-      auto &coverageMaps = SILMod.getCoverageMaps();
-      auto CovMapIt = coverageMaps.find(PGOFuncName);
-      if (CovMapIt != coverageMaps.end())
-        CovMapIt->second->setSymtabEntryGuaranteed();
-    }
   }
 
   if (IID != llvm::Intrinsic::not_intrinsic) {
@@ -308,13 +305,22 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
   if (Builtin.ID == BuiltinValueKind::id) \
     return emitCastOrBitCastBuiltin(IGF, resultType, out, args, \
                                     BuiltinValueKind::id);
-  
-#define BUILTIN_BINARY_OPERATION(id, name, attrs, overload) \
-  if (Builtin.ID == BuiltinValueKind::id) { \
-    llvm::Value *lhs = args.claimNext(); \
-    llvm::Value *rhs = args.claimNext(); \
-    llvm::Value *v = IGF.Builder.Create##id(lhs, rhs); \
-    return out.add(v); \
+
+#define BUILTIN_BINARY_OPERATION_OVERLOADED_STATIC(id, name, attrs, overload)  \
+  if (Builtin.ID == BuiltinValueKind::id) {                                    \
+    llvm::Value *lhs = args.claimNext();                                       \
+    llvm::Value *rhs = args.claimNext();                                       \
+    llvm::Value *v = IGF.Builder.Create##id(lhs, rhs);                         \
+    return out.add(v);                                                         \
+  }
+#define BUILTIN_BINARY_OPERATION_POLYMORPHIC(id, name, attrs)                  \
+  if (Builtin.ID == BuiltinValueKind::id) {                                    \
+    /* This builtin must be guarded so that dynamically it is never called. */ \
+    IGF.emitTrap("invalid use of polymorphic builtin", /*Unreachable*/ false); \
+    auto returnValue = llvm::UndefValue::get(IGF.IGM.Int8PtrTy);               \
+    /* Consume the arguments of the builtin. */                                \
+    (void)args.claimAll();                                                     \
+    return out.add(returnValue);                                               \
   }
 
 #define BUILTIN_RUNTIME_CALL(id, name, attrs)                                  \

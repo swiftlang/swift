@@ -94,6 +94,10 @@ def main():
         '-num-samples', type=int,
         help='The (minimum) number of samples to run', default=3)
     argparser.add_argument(
+        '-num-reruns', type=int,
+        help="The number of re-runs until it's assumed to be a real change",
+        default=8)
+    argparser.add_argument(
         '-platform', type=str,
         help='The benchmark build platform', default='macosx')
     argparser.add_argument(
@@ -120,7 +124,7 @@ def test_opt_levels(args):
             if test_performance(opt_level, args.oldbuilddir[0],
                                 args.newbuilddir[0],
                                 float(args.threshold) / 100, args.num_samples,
-                                output_file):
+                                args.num_reruns, output_file):
                 changes = True
 
         # There is no point in reporting code size for Onone.
@@ -171,7 +175,7 @@ def merge(results, other_results):
 
 
 def test_performance(opt_level, old_dir, new_dir, threshold, num_samples,
-                     output_file):
+                     num_reruns, output_file):
     """Detect performance changes in benchmarks.
 
     Start fast with few samples per benchmark and gradually spend more time
@@ -185,7 +189,7 @@ def test_performance(opt_level, old_dir, new_dir, threshold, num_samples,
     tests = TestComparator(results[0], results[1], threshold)
     changed = tests.decreased + tests.increased
 
-    while len(changed) > 0 and unchanged_length_count < 10:
+    while len(changed) > 0 and unchanged_length_count < num_reruns:
         i += 1
         if VERBOSE:
             log('        test again: ' + str([test.name for test in changed]))

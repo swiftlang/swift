@@ -20,6 +20,7 @@
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/type_traits.h"
 #include "swift/AST/Decl.h"
+#include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/Types.h"
@@ -221,9 +222,7 @@ public:
   
   void print(llvm::raw_ostream &OS,
              const PrintOptions &Options = PrintOptions()) const;
-  LLVM_ATTRIBUTE_DEPRECATED(
-      void dump() const LLVM_ATTRIBUTE_USED,
-      "only for use within the debugger");
+  SWIFT_DEBUG_DUMP;
   
   /// walk - This recursively walks the AST rooted at this pattern.
   Pattern *walk(ASTWalker &walker);
@@ -505,14 +504,14 @@ public:
 class EnumElementPattern : public Pattern {
   TypeLoc ParentType;
   SourceLoc DotLoc;
-  SourceLoc NameLoc;
-  Identifier Name;
+  DeclNameLoc NameLoc;
+  DeclNameRef Name;
   PointerUnion<EnumElementDecl *, Expr*> ElementDeclOrUnresolvedOriginalExpr;
   Pattern /*nullable*/ *SubPattern;
   
 public:
-  EnumElementPattern(TypeLoc ParentType, SourceLoc DotLoc, SourceLoc NameLoc,
-                     Identifier Name, EnumElementDecl *Element,
+  EnumElementPattern(TypeLoc ParentType, SourceLoc DotLoc, DeclNameLoc NameLoc,
+                     DeclNameRef Name, EnumElementDecl *Element,
                      Pattern *SubPattern, Optional<bool> Implicit = None)
     : Pattern(PatternKind::EnumElement),
       ParentType(ParentType), DotLoc(DotLoc), NameLoc(NameLoc), Name(Name),
@@ -525,8 +524,8 @@ public:
   /// Create an unresolved EnumElementPattern for a `.foo` pattern relying on
   /// contextual type.
   EnumElementPattern(SourceLoc DotLoc,
-                     SourceLoc NameLoc,
-                     Identifier Name,
+                     DeclNameLoc NameLoc,
+                     DeclNameRef Name,
                      Pattern *SubPattern,
                      Expr *UnresolvedOriginalExpr)
     : Pattern(PatternKind::EnumElement),
@@ -552,7 +551,7 @@ public:
   
   void setSubPattern(Pattern *p) { SubPattern = p; }
   
-  Identifier getName() const { return Name; }
+  DeclNameRef getName() const { return Name; }
   
   EnumElementDecl *getElementDecl() const {
     return ElementDeclOrUnresolvedOriginalExpr.dyn_cast<EnumElementDecl*>();
@@ -568,18 +567,18 @@ public:
     return ElementDeclOrUnresolvedOriginalExpr.is<Expr*>();
   }
   
-  SourceLoc getNameLoc() const { return NameLoc; }
-  SourceLoc getLoc() const { return NameLoc; }
+  DeclNameLoc getNameLoc() const { return NameLoc; }
+  SourceLoc getLoc() const { return NameLoc.getBaseNameLoc(); }
   SourceLoc getStartLoc() const {
     return ParentType.hasLocation() ? ParentType.getSourceRange().Start :
            DotLoc.isValid()         ? DotLoc
-                                    : NameLoc;
+                                    : NameLoc.getBaseNameLoc();
   }
   SourceLoc getEndLoc() const {
     if (SubPattern && SubPattern->getSourceRange().isValid()) {
       return SubPattern->getSourceRange().End;
     }
-    return NameLoc;
+    return NameLoc.getEndLoc();
   }
   SourceRange getSourceRange() const { return {getStartLoc(), getEndLoc()}; }
   

@@ -1,22 +1,24 @@
 // RUN: %target-run-simple-swift
 
 import StdlibUnittest
+import DifferentiationUnittest
 
 var CurryingAutodiffTests = TestSuite("CurryingAutodiff")
 
-CurryingAutodiffTests.test("StructMember") {
+CurryingAutodiffTests.testWithLeakChecking("StructMember") {
   struct A {
     @differentiable(wrt: (value))
-    func v(_ value: Float) -> Float { return value * value }
+    func instanceMethod(_ value: Tracked<Float>) -> Tracked<Float> { return value * value }
   }
 
   let a = A()
-  // This implicitly constructs a function (A) -> (Float) -> Float
-  // which gets called with a:
-  let g: @differentiable (Float) -> Float = a.v
+  // Referencing `a.instanceMethod` implicitly applies the curried function
+  // `A.instanceMethod` of type `(A) -> (Tracked<Float>) -> Tracked<Float>` to
+  // the value `a`, producing a `(Tracked<Float>) -> Tracked<Float>` value.
+  // This value is then converted to a `@differentiable` function-typed value.
+  let g: @differentiable (Tracked<Float>) -> Tracked<Float> = a.instanceMethod
 
-
-  expectEqual(6.0, Float(3.0).gradient(in: g))
+  expectEqual(6.0, gradient(at: 3, in: g))
 }
 
 runAllTests()

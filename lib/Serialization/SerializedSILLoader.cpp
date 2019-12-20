@@ -13,7 +13,7 @@
 #define DEBUG_TYPE "serialized-sil-loader"
 #include "swift/Serialization/SerializedSILLoader.h"
 #include "DeserializeSIL.h"
-#include "swift/Serialization/ModuleFile.h"
+#include "ModuleFile.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/AST/ASTMangler.h"
@@ -42,12 +42,13 @@ SerializedSILLoader::SerializedSILLoader(
 
 SerializedSILLoader::~SerializedSILLoader() {}
 
-SILFunction *SerializedSILLoader::lookupSILFunction(SILFunction *Callee) {
+SILFunction *SerializedSILLoader::lookupSILFunction(SILFunction *Callee,
+                                                    bool onlyUpdateLinkage) {
   // It is possible that one module has a declaration of a SILFunction, while
   // another has the full definition.
   SILFunction *retVal = nullptr;
   for (auto &Des : LoadedSILSections) {
-    if (auto Func = Des->lookupSILFunction(Callee)) {
+    if (auto Func = Des->lookupSILFunction(Callee, onlyUpdateLinkage)) {
       LLVM_DEBUG(llvm::dbgs() << "Deserialized " << Func->getName() << " from "
                  << Des->getModuleIdentifier().str() << "\n");
       if (!Func->empty())
@@ -127,6 +128,24 @@ lookupDefaultWitnessTable(SILDefaultWitnessTable *WT) {
   return nullptr;
 }
 
+// SWIFT_ENABLE_TENSORFLOW
+SILDifferentiabilityWitness *
+SerializedSILLoader::lookupDifferentiabilityWitness(
+    SILDifferentiabilityWitnessKey key) {
+  Mangle::ASTMangler mangler;
+  std::string mangledKey = mangler.mangleSILDifferentiabilityWitnessKey(key);
+  // It is possible that one module has a declaration of a
+  // SILDifferentiabilityWitness, while another has the full definition.
+  SILDifferentiabilityWitness *wit = nullptr;
+  for (auto &Des : LoadedSILSections) {
+    wit = Des->lookupDifferentiabilityWitness(mangledKey);
+    if (wit && wit->isDefinition())
+      return wit;
+  }
+  return wit;
+}
+// SWIFT_ENABLE_TENSORFLOW END
+
 void SerializedSILLoader::invalidateCaches() {
   for (auto &Des : LoadedSILSections)
     Des->invalidateFunctionCache();
@@ -185,3 +204,10 @@ void SerializedSILLoader::getAllProperties() {
     Des->getAllProperties();
 }
 
+// SWIFT_ENABLE_TENSORFLOW
+/// Deserialize all DifferentiabilityWitnesses in all SILModules.
+void SerializedSILLoader::getAllDifferentiabilityWitnesses() {
+  for (auto &Des : LoadedSILSections)
+    Des->getAllDifferentiabilityWitnesses();
+}
+// SWIFT_ENABLE_TENSORFLOW END

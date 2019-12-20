@@ -1,9 +1,4 @@
 if(NOT SWIFT_SOURCEKIT_USE_INPROC_LIBRARY AND SWIFT_BUILD_STDLIB AND SWIFT_BUILD_SDK_OVERLAY)
-  set(EXTRA_COMPILE_FLAGS "-F" "${SWIFT_LIBRARY_OUTPUT_INTDIR}")
-  set(SOURCEKITD_LINK_LIBS sourcekitd)
-  set(INSTALLED_COMP sourcekit-xpc-service)
-  set(DEPENDS_LIST "sourcekitd-test")
-
   # The build type of swiftlang should agree with stdlib
   # This setting could avoid us adding additional search paths when building
   # executables using SwiftLang.
@@ -25,11 +20,11 @@ if(NOT SWIFT_SOURCEKIT_USE_INPROC_LIBRARY AND SWIFT_BUILD_STDLIB AND SWIFT_BUILD
     GYB_SOURCES
       UIDs.swift.gyb
 
-    DEPENDS ${DEPENDS_LIST}
+    DEPENDS sourcekitd-test
     SWIFT_MODULE_DEPENDS_OSX Darwin Foundation
-    PRIVATE_LINK_LIBRARIES ${SOURCEKITD_LINK_LIBS}
-    SWIFT_COMPILE_FLAGS ${EXTRA_COMPILE_FLAGS}
-    INSTALL_IN_COMPONENT ${INSTALLED_COMP}
+    PRIVATE_LINK_LIBRARIES sourcekitd
+    SWIFT_COMPILE_FLAGS -F${SWIFT_LIBRARY_OUTPUT_INTDIR}
+    INSTALL_IN_COMPONENT sourcekit-xpc-service
     DARWIN_INSTALL_NAME_DIR "@rpath"
     TARGET_SDKS ${SOURCEKIT_DEFAULT_TARGET_SDK}
     IS_STDLIB)

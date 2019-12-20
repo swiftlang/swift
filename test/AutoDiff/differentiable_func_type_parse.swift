@@ -11,7 +11,7 @@ struct A<T: Differentiable> {
   }
 }
 
-// expected-error @+1 {{expected ')' after 'linear' in '@differentiable' attribute}}
+// expected-error @+1 {{expected ')' in '@differentiable' attribute}}
 let c: @differentiable(linear (Float) -> Float
 
 // expected-error @+1 {{unexpected argument 'notValidArg' in '@differentiable' attribute}}
@@ -27,7 +27,7 @@ struct A {
   let property: @differentiable (Float, linear) -> linear // okay
   let property: @differentiable(linear) (linear, linear, Float, linear)
     -> Float // okay
-  // expected-error @+1 {{expected ')' after 'linear' in '@differentiable' attribute}}
+  // expected-error @+1 {{expected ')' in '@differentiable' attribute}}
   let property: @differentiable(linear (linear) -> Float
 }
 
@@ -38,6 +38,6 @@ struct B {
   let property: @differentiable(linear) (linear) -> linear // okay
   let property: @differentiable linear // okay
   let property: linear // okay
-  // FIXME(bartchr): TF-576 have this able to be parsed.
-  //let property: @differentiable(linear) linear // okay
+  let property: @differentiable(linear) linear // okay
+  let property: @differentiable(linear) @convention(c) linear // okay
 }

@@ -1,8 +1,8 @@
-//===--- AutoDiff.h - Swift Automatic Differentiation ---------------------===//
+//===--- AutoDiff.h - Swift automatic differentiation utilities -----------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2019 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -10,24 +10,64 @@
 //
 //===----------------------------------------------------------------------===//
 //
-//  SWIFT_ENABLE_TENSORFLOW
-//  This file defines AST support for automatic differentiation.
+//  This file defines utilities for automatic differentiation.
 //
 //===----------------------------------------------------------------------===//
 
 #ifndef SWIFT_AST_AUTODIFF_H
 #define SWIFT_AST_AUTODIFF_H
 
-#include "ASTContext.h"
-#include "llvm/ADT/SmallBitVector.h"
+#include <cstdint>
+
+#include "swift/AST/Identifier.h"
+#include "swift/AST/IndexSubset.h"
+#include "swift/AST/Type.h"
 #include "swift/Basic/Range.h"
+#include "swift/Basic/SourceLoc.h"
 
 namespace swift {
 
-enum class DifferentiabilityKind: uint8_t {
-  NonDifferentiable = 0b00,
-  Normal = 0b01,
-  Linear = 0b11
+class AnyFunctionType;
+
+/// A function type differentiability kind.
+enum class DifferentiabilityKind : uint8_t {
+  NonDifferentiable = 0,
+  Normal = 1,
+  Linear = 2
+};
+
+/// The kind of an linear map.
+struct AutoDiffLinearMapKind {
+  enum innerty : uint8_t {
+    // The differential function.
+    Differential = 0,
+    // The pullback function.
+    Pullback = 1
+  } rawValue;
+
+  AutoDiffLinearMapKind() = default;
+  AutoDiffLinearMapKind(innerty rawValue) : rawValue(rawValue) {}
+  operator innerty() const { return rawValue; }
+};
+
+/// The kind of a derivative function.
+struct AutoDiffDerivativeFunctionKind {
+  enum innerty : uint8_t {
+    // The Jacobian-vector products function.
+    JVP = 0,
+    // The vector-Jacobian products function.
+    VJP = 1
+  } rawValue;
+
+  AutoDiffDerivativeFunctionKind() = default;
+  AutoDiffDerivativeFunctionKind(innerty rawValue) : rawValue(rawValue) {}
+  AutoDiffDerivativeFunctionKind(AutoDiffLinearMapKind linMapKind)
+      : rawValue(static_cast<innerty>(linMapKind.rawValue)) {}
+  explicit AutoDiffDerivativeFunctionKind(StringRef string);
+  operator innerty() const { return rawValue; }
+  AutoDiffLinearMapKind getLinearMapKind() {
+    return (AutoDiffLinearMapKind::innerty)rawValue;
+  }
 };
 
 class ParsedAutoDiffParameter {
@@ -35,29 +75,29 @@ public:
   enum class Kind { Named, Ordered, Self };
 
 private:
-  SourceLoc Loc;
-  Kind Kind;
+  SourceLoc loc;
+  Kind kind;
   union Value {
-    struct { Identifier Name; }; // Named
-    struct { unsigned Index; }; // Ordered
-    struct {};                  // Self
-    Value(Identifier name) : Name(name) {}
-    Value(unsigned index) : Index(index) {}
+    struct { Identifier name; } Named;
+    struct { unsigned index; } Ordered;
+    struct {} self;
+    Value(Identifier name) : Named({name}) {}
+    Value(unsigned index) : Ordered({index}) {}
     Value() {}
-  } V;
+  } value;
 
 public:
-  ParsedAutoDiffParameter(SourceLoc loc, enum Kind kind, Value value)
-    : Loc(loc), Kind(kind), V(value) {}
-  
-  ParsedAutoDiffParameter(SourceLoc loc, enum Kind kind, unsigned index)
-  : Loc(loc), Kind(kind), V(index) {}
+  ParsedAutoDiffParameter(SourceLoc loc, Kind kind, Value value)
+    : loc(loc), kind(kind), value(value) {}
+
+  ParsedAutoDiffParameter(SourceLoc loc, Kind kind, unsigned index)
+    : loc(loc), kind(kind), value(index) {}
 
   static ParsedAutoDiffParameter getNamedParameter(SourceLoc loc,
                                                    Identifier name) {
     return { loc, Kind::Named, name };
   }
-  
+
   static ParsedAutoDiffParameter getOrderedParameter(SourceLoc loc,
                                                      unsigned index) {
     return { loc, Kind::Ordered, index };
@@ -68,20 +108,20 @@ public:
   }
 
   Identifier getName() const {
-    assert(Kind == Kind::Named);
-    return V.Name;
-  }
-  
-  unsigned getIndex() const {
-    return V.Index;
+    assert(kind == Kind::Named);
+    return value.Named.name;
   }
 
-  enum Kind getKind() const {
-    return Kind;
+  unsigned getIndex() const {
+    return value.Ordered.index;
+  }
+
+  Kind getKind() const {
+    return kind;
   }
 
   SourceLoc getLoc() const {
-    return Loc;
+    return loc;
   }
 
   bool isEqual(const ParsedAutoDiffParameter &other) const {
@@ -93,376 +133,126 @@ public:
   }
 };
 
+/// Automatic differentiation utility namespace.
+namespace autodiff {
+
+/// Appends the subset's parameter's types to `results`, in the order in
+/// which they appear in the function type.
+void getSubsetParameterTypes(IndexSubset *indices, AnyFunctionType *type,
+                             SmallVectorImpl<Type> &results,
+                             bool reverseCurryLevels = false);
+
+} // end namespace autodiff
+
+} // end namespace swift
+
+namespace llvm {
+
+using swift::AutoDiffDerivativeFunctionKind;
+
+template <typename T> struct DenseMapInfo;
+
+template <> struct DenseMapInfo<AutoDiffDerivativeFunctionKind> {
+  static AutoDiffDerivativeFunctionKind getEmptyKey() {
+    return static_cast<AutoDiffDerivativeFunctionKind::innerty>(
+        DenseMapInfo<unsigned>::getEmptyKey());
+  }
+
+  static AutoDiffDerivativeFunctionKind getTombstoneKey() {
+    return static_cast<AutoDiffDerivativeFunctionKind::innerty>(
+        DenseMapInfo<unsigned>::getTombstoneKey());
+  }
+
+  static unsigned getHashValue(const AutoDiffDerivativeFunctionKind &Val) {
+    return DenseMapInfo<unsigned>::getHashValue(Val);
+  }
+
+  static bool isEqual(const AutoDiffDerivativeFunctionKind &LHS,
+                      const AutoDiffDerivativeFunctionKind &RHS) {
+    return static_cast<AutoDiffDerivativeFunctionKind::innerty>(LHS) ==
+        static_cast<AutoDiffDerivativeFunctionKind::innerty>(RHS);
+  }
+};
+
+} // end namespace llvm
+
+// SWIFT_ENABLE_TENSORFLOW
+// Not-yet-upstreamed `tensorflow` branch additions are below.
+#include "swift/AST/GenericSignature.h"
+#include "swift/AST/Identifier.h"
+#include "swift/AST/IndexSubset.h"
+#include "swift/AST/Type.h"
+#include "swift/Basic/LLVM.h"
+#include "swift/Basic/Range.h"
+#include "swift/Basic/SourceLoc.h"
+#include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/SmallBitVector.h"
+#include "llvm/ADT/StringExtras.h"
+#include "llvm/Support/raw_ostream.h"
+
+namespace swift {
+
+class ASTContext;
 class AnyFunctionType;
-class AutoDiffIndexSubset;
-class AutoDiffParameterIndicesBuilder;
-class Type;
+class SILFunctionType;
+typedef CanTypeWrapper<SILFunctionType> CanSILFunctionType;
 enum class SILLinkage : uint8_t;
 
-/// Identifies a subset of a function's parameters.
-///
-/// When a function is curried, identifies a subset of all parameters from all
-/// parameter lists. When differentiating such functions, we treat them as fully
-/// uncurried.
-///
-/// Works with AST-level function decls and types. Requires further lowering to
-/// work with SIL-level functions and types. (In particular, tuples must be
-/// exploded).
-///
-/// Is uniquely allocated within an ASTContext so that it can be hashed and
-/// compared by opaque pointer value.
-class AutoDiffParameterIndices : public llvm::FoldingSetNode {
-  friend AutoDiffParameterIndicesBuilder;
+/// The kind of a differentiability witness function.
+struct DifferentiabilityWitnessFunctionKind {
+  enum innerty : uint8_t {
+    // The Jacobian-vector products function.
+    JVP = 0,
+    // The vector-Jacobian products function.
+    VJP = 1,
+    // The transpose function.
+    Transpose = 2
+  } rawValue;
 
-public:
-  /// Bits corresponding to parameters in the set are "on", and bits
-  /// corresponding to parameters not in the set are "off".
-  ///
-  /// The bits correspond to the function's parameters in order. For example,
-  ///
-  ///   Function type: (A, B, C) -> R
-  ///   Bits: [A][B][C]
-  ///
-  /// When the function is curried, the bits for the first parameter list come
-  /// last. For example,
-  ///
-  ///   Function type: (A, B) -> (C, D) -> R
-  ///   Bits: [C][D][A][B]
-  ///
-  /// Methods follow the same pattern:
-  ///
-  ///   Function type: (Self) -> (A, B, C) -> R
-  ///   Bits: [A][B][C][Self]
-  ///
-  const llvm::SmallBitVector parameters;
+  DifferentiabilityWitnessFunctionKind() = default;
+  DifferentiabilityWitnessFunctionKind(innerty rawValue) : rawValue(rawValue) {}
+  explicit DifferentiabilityWitnessFunctionKind(unsigned rawValue)
+      : rawValue(static_cast<innerty>(rawValue)) {}
+  explicit DifferentiabilityWitnessFunctionKind(StringRef name);
+  operator innerty() const { return rawValue; }
 
-  static AutoDiffParameterIndices *get(llvm::SmallBitVector parameters,
-                                       ASTContext &C);
-
-private:
-  AutoDiffParameterIndices(const llvm::SmallBitVector &parameters)
-      : parameters(parameters) {}
-
-public:
-  /// Allocates and initializes an `AutoDiffParameterIndices` corresponding to
-  /// the given `string` generated by `getString()`. If the string is invalid,
-  /// returns nullptr.
-  static AutoDiffParameterIndices *create(ASTContext &C, StringRef string);
-
-  /// Returns a textual string description of these indices,
-  ///
-  ///   [SU]+
-  ///
-  /// "S" means that the corresponding index is set
-  /// "U" means that the corresponding index is unset
-  std::string getString() const;
-
-  /// Tests whether this set of parameters is empty.
-  bool isEmpty() const { return parameters.none(); }
-
-  /// Pushes the subset's parameter's types to `paramTypes`, in the order in
-  /// which they appear in the function type. For example,
-  ///
-  ///   functionType = (A, B, C) -> R
-  ///   if "A" and "C" are in the set,
-  ///   ==> pushes {A, C} to `paramTypes`.
-  ///
-  ///   functionType = (A, B) -> (C, D) -> R
-  ///   if "A", "C", and "D" are in the set,
-  ///   ==> pushes {A, C, D} to `paramTypes` if `reverseCurryLevels` is false,
-  ///    or pushes {C, D, A} otherwise.
-  ///
-  ///   functionType = (Self) -> (A, B, C) -> R
-  ///   if "Self" and "C" are in the set,
-  ///   ==> pushes {Self, C} to `paramTypes` if `reverseCurryLevels` is false,
-  ///    or pushes {C, Self} otherwise.
-  ///
-  void getSubsetParameterTypes(AnyFunctionType *functionType,
-                               SmallVectorImpl<Type> &paramTypes,
-                               bool reverseCurryLevels = false) const;
-
-  /// Returns a bitvector for the SILFunction parameters corresponding to the
-  /// parameters in this set. In particular, this explodes tuples. For example,
-  ///
-  ///   functionType = (A, B, C) -> R
-  ///   if "A" and "C" are in the set,
-  ///   ==> returns 101
-  ///   (because the lowered SIL type is (A, B, C) -> R)
-  ///
-  ///   functionType = (Self) -> (A, B, C) -> R
-  ///   if "Self" and "C" are in the set,
-  ///   ==> returns 0011
-  ///   (because the lowered SIL type is (A, B, C, Self) -> R)
-  ///
-  ///   functionType = (A, (B, C), D) -> R
-  ///   if "A" and "(B, C)" are in the set,
-  ///   ==> returns 1110
-  ///   (because the lowered SIL type is (A, B, C, D) -> R)
-  ///
-  AutoDiffIndexSubset *getLowered(ASTContext &ctx,
-                                  AnyFunctionType *functionType) const;
-
-  void Profile(llvm::FoldingSetNodeID &ID) const {
-    ID.AddInteger(parameters.size());
-    for (unsigned setBit : parameters.set_bits())
-      ID.AddInteger(setBit);
-  }
+  Optional<AutoDiffDerivativeFunctionKind> getAsDerivativeFunctionKind() const;
 };
 
-/// Builder for `AutoDiffParameterIndices`.
-class AutoDiffParameterIndicesBuilder {
-  llvm::SmallBitVector parameters;
+struct NormalDifferentiableFunctionTypeComponent {
+  enum innerty : unsigned {
+    Original = 0,
+    JVP = 1,
+    VJP = 2
+  } rawValue;
 
-public:
-  /// Creates a `AutoDiffParameterIndicesBuilder` for the given function type.
-  AutoDiffParameterIndicesBuilder(AnyFunctionType *functionType);
+  NormalDifferentiableFunctionTypeComponent() = default;
+  NormalDifferentiableFunctionTypeComponent(innerty rawValue)
+      : rawValue(rawValue) {}
+  NormalDifferentiableFunctionTypeComponent(
+      AutoDiffDerivativeFunctionKind kind);
+  explicit NormalDifferentiableFunctionTypeComponent(unsigned rawValue)
+      : NormalDifferentiableFunctionTypeComponent((innerty)rawValue) {}
+  explicit NormalDifferentiableFunctionTypeComponent(StringRef name);
+  operator innerty() const { return rawValue; }
 
-  /// Builds the `AutoDiffParameterIndices`, returning a pointer to an existing
-  /// one if it has already been allocated in the `ASTContext`.
-  AutoDiffParameterIndices *build(ASTContext &C) const;
-
-  /// Sets the parameter at `parameterIndex`. See
-  /// `AutoDiffParameterIndices::parameters` for documentation about the order.
-  void setParameter(unsigned parameterIndex);
-
-  /// Sets the parameters at indices in the specified range.
-  void setParameters(unsigned lowerBound, unsigned upperBound);
-
-  /// Returns the number of set parameters.
-  unsigned count() { return parameters.count(); }
-
-  /// Returns the number of bits in the `parameters` bitvector.
-  // TODO: After `getNumAutoDiffParameterIndices` is fixed to compute exact
-  // parameter count, update doc comment to "Returns the number of parameters".
-  unsigned size() { return parameters.size(); }
+  Optional<AutoDiffDerivativeFunctionKind> getAsDerivativeFunctionKind() const;
 };
 
-/// An efficient index subset data structure.
-/// Stores a bit vector representing set indices and a total capacity.
-class AutoDiffIndexSubset : public llvm::FoldingSetNode {
-public:
-  typedef uint64_t BitWord;
+struct LinearDifferentiableFunctionTypeComponent {
+  enum innerty : unsigned {
+    Original = 0,
+    Transpose = 1,
+  } rawValue;
 
-  static constexpr unsigned bitWordSize = sizeof(BitWord);
-  static constexpr unsigned numBitsPerBitWord = bitWordSize * 8;
-
-  static std::pair<unsigned, unsigned>
-  getBitWordIndexAndOffset(unsigned index) {
-    auto bitWordIndex = index / numBitsPerBitWord;
-    auto bitWordOffset = index % numBitsPerBitWord;
-    return {bitWordIndex, bitWordOffset};
-  }
-
-  static unsigned getNumBitWordsNeededForCapacity(unsigned capacity) {
-    if (capacity == 0) return 0;
-    return capacity / numBitsPerBitWord + 1;
-  }
-  
-private:
-  /// The total capacity of the index subset, which is `1` less than the largest
-  /// index.
-  unsigned capacity;
-  /// The number of bit words in the index subset.
-  unsigned numBitWords;
-
-  BitWord *getBitWordsData() {
-    return reinterpret_cast<BitWord *>(this + 1);
-  }
-
-  const BitWord *getBitWordsData() const {
-    return reinterpret_cast<const BitWord *>(this + 1);
-  }
-
-  ArrayRef<BitWord> getBitWords() const {
-    return {getBitWordsData(), getNumBitWords()};
-  }
-
-  BitWord getBitWord(unsigned i) const {
-    return getBitWordsData()[i];
-  }
-
-  BitWord &getBitWord(unsigned i) {
-    return getBitWordsData()[i];
-  }
-
-  MutableArrayRef<BitWord> getMutableBitWords() {
-    return {const_cast<BitWord *>(getBitWordsData()), getNumBitWords()};
-  }
-
-  explicit AutoDiffIndexSubset(const SmallBitVector &indices)
-      : capacity((unsigned)indices.size()),
-        numBitWords(getNumBitWordsNeededForCapacity(capacity)) {
-    std::uninitialized_fill_n(getBitWordsData(), numBitWords, 0);
-    for (auto i : indices.set_bits()) {
-      unsigned bitWordIndex, offset;
-      std::tie(bitWordIndex, offset) = getBitWordIndexAndOffset(i);
-      getBitWord(bitWordIndex) |= (1 << offset);
-    }
-  }
-
-public:
-  AutoDiffIndexSubset() = delete;
-  AutoDiffIndexSubset(const AutoDiffIndexSubset &) = delete;
-  AutoDiffIndexSubset &operator=(const AutoDiffIndexSubset &) = delete;
-
-  // Defined in ASTContext.cpp.
-  static AutoDiffIndexSubset *get(ASTContext &ctx,
-                                  const SmallBitVector &indices);
-
-  static AutoDiffIndexSubset *get(ASTContext &ctx, unsigned capacity,
-                                  ArrayRef<unsigned> indices) {
-    SmallBitVector indicesBitVec(capacity, false);
-    for (auto index : indices)
-      indicesBitVec.set(index);
-    return AutoDiffIndexSubset::get(ctx, indicesBitVec);
-  }
-
-  static AutoDiffIndexSubset *getDefault(ASTContext &ctx, unsigned capacity,
-                                         bool includeAll = false) {
-    return get(ctx, SmallBitVector(capacity, includeAll));
-  }
-
-  static AutoDiffIndexSubset *getFromRange(ASTContext &ctx, unsigned capacity,
-                                           unsigned start, unsigned end) {
-    assert(start < capacity);
-    assert(end <= capacity);
-    SmallBitVector bitVec(capacity);
-    bitVec.set(start, end);
-    return get(ctx, bitVec);
-  }
-
-  // Use `getCapacity()` to get the total index subset capacity.
-  // This is public only for unit testing
-  // (in unittests/AST/SILAutoDiffIndices.cpp).
-  unsigned getNumBitWords() const {
-    return numBitWords;
-  }
-
-  unsigned getCapacity() const {
-    return capacity;
-  }
-
-  class iterator;
-
-  iterator begin() const {
-    return iterator(this);
-  }
-  
-  iterator end() const {
-    return iterator(this, (int)capacity);
-  }
-  
-  iterator_range<iterator> getIndices() const {
-    return make_range(begin(), end());
-  }
-
-  unsigned getNumIndices() const {
-    return (unsigned)std::distance(begin(), end());
-  }
-  
-  SmallBitVector getBitVector() const {
-    SmallBitVector indicesBitVec(capacity, false);
-    for (auto index : getIndices())
-      indicesBitVec.set(index);
-    return indicesBitVec;
-  }
-
-  bool contains(unsigned index) const {
-    unsigned bitWordIndex, offset;
-    std::tie(bitWordIndex, offset) = getBitWordIndexAndOffset(index);
-    return getBitWord(bitWordIndex) & (1 << offset);
-  }
-
-  bool isEmpty() const {
-    return llvm::all_of(getBitWords(), [](BitWord bw) { return !(bool)bw; });
-  }
-  
-  bool equals(AutoDiffIndexSubset *other) const {
-    return capacity == other->getCapacity() &&
-        getBitWords().equals(other->getBitWords());
-  }
-
-  bool isSubsetOf(AutoDiffIndexSubset *other) const;
-  bool isSupersetOf(AutoDiffIndexSubset *other) const;
-
-  AutoDiffIndexSubset *adding(unsigned index, ASTContext &ctx) const;
-  AutoDiffIndexSubset *extendingCapacity(ASTContext &ctx,
-                                         unsigned newCapacity) const;
-
-  void Profile(llvm::FoldingSetNodeID &id) const {
-    id.AddInteger(capacity);
-    for (auto index : getIndices())
-      id.AddInteger(index);
-  }
-
-  void print(llvm::raw_ostream &s = llvm::outs()) const {
-    s << '{';
-    interleave(range(capacity), [this, &s](unsigned i) { s << contains(i); },
-               [&s] { s << ", "; });
-    s << '}';
-  }
-
-  void dump(llvm::raw_ostream &s = llvm::errs()) const {
-    s << "(autodiff_index_subset capacity=" << capacity << " indices=(";
-    interleave(getIndices(), [&s](unsigned i) { s << i; },
-               [&s] { s << ", "; });
-    s << "))";
-  }
-
-  int findNext(int startIndex) const;
-  int findFirst() const { return findNext(-1); }
-  int findPrevious(int endIndex) const;
-  int findLast() const { return findPrevious(capacity); }
-
-  class iterator {
-  public:
-    typedef unsigned value_type;
-    typedef unsigned difference_type;
-    typedef unsigned * pointer;
-    typedef unsigned & reference;
-    typedef std::forward_iterator_tag iterator_category;
-
-  private:
-    const AutoDiffIndexSubset *parent;
-    int current = 0;
-
-    void advance() {
-      assert(current != -1 && "Trying to advance past end.");
-      current = parent->findNext(current);
-    }
-
-  public:
-    iterator(const AutoDiffIndexSubset *parent, int current)
-        : parent(parent), current(current) {}
-    explicit iterator(const AutoDiffIndexSubset *parent)
-        : iterator(parent, parent->findFirst()) {}
-    iterator(const iterator &) = default;
-
-    iterator operator++(int) {
-      auto prev = *this;
-      advance();
-      return prev;
-    }
-
-    iterator &operator++() {
-      advance();
-      return *this;
-    }
-
-    unsigned operator*() const { return current; }
-
-    bool operator==(const iterator &other) const {
-      assert(parent == other.parent &&
-             "Comparing iterators from different AutoDiffIndexSubsets");
-      return current == other.current;
-    }
-
-    bool operator!=(const iterator &other) const {
-      assert(parent == other.parent &&
-             "Comparing iterators from different AutoDiffIndexSubsets");
-      return current != other.current;
-    }
-  };
+  LinearDifferentiableFunctionTypeComponent() = default;
+  LinearDifferentiableFunctionTypeComponent(innerty rawValue)
+      : rawValue(rawValue) {}
+  explicit LinearDifferentiableFunctionTypeComponent(unsigned rawValue)
+      : LinearDifferentiableFunctionTypeComponent((innerty)rawValue) {}
+  explicit LinearDifferentiableFunctionTypeComponent(StringRef name);
+  operator innerty() const { return rawValue; }
 };
 
 /// SIL-level automatic differentiation indices. Consists of a source index,
@@ -488,12 +278,12 @@ struct SILAutoDiffIndices {
   ///   Function type: (A, B) -> (C, D) -> R
   ///   Bits: [C][D][A][B]
   ///
-  AutoDiffIndexSubset *parameters;
+  IndexSubset *parameters;
 
   /// Creates a set of AD indices from the given source index and a bit vector
   /// representing parameter indices.
   /*implicit*/ SILAutoDiffIndices(unsigned source,
-                                  AutoDiffIndexSubset *parameters)
+                                  IndexSubset *parameters)
       : source(source), parameters(parameters) {}
 
   bool operator==(const SILAutoDiffIndices &other) const;
@@ -509,12 +299,9 @@ struct SILAutoDiffIndices {
            parameters->contains(parameterIndex);
   }
 
-  void print(llvm::raw_ostream &s = llvm::outs()) const {
-    s << "(source=" << source << " parameters=(";
-    interleave(parameters->getIndices(),
-               [&s](unsigned p) { s << p; }, [&s]{ s << ' '; });
-    s << "))";
-  }
+  void print(llvm::raw_ostream &s = llvm::outs()) const;
+  LLVM_ATTRIBUTE_DEPRECATED(void dump() const LLVM_ATTRIBUTE_USED,
+                            "only for use within the debugger");
 
   std::string mangle() const {
     std::string result = "src_" + llvm::utostr(source) + "_wrt_";
@@ -531,105 +318,130 @@ inline llvm::raw_ostream &operator<<(llvm::raw_ostream &s,
   return s;
 }
 
-/// The kind of an linear map.
-struct AutoDiffLinearMapKind {
-  enum innerty : uint8_t {
-    // The differential function.
-    Differential = 0,
-    // The pullback function.
-    Pullback = 1
-  } rawValue;
+/// Identifies an autodiff derivative function configuration:
+/// - Parameter indices.
+/// - Result indices.
+/// - Derivative generic signature (optional).
+struct AutoDiffConfig {
+  IndexSubset *parameterIndices;
+  IndexSubset *resultIndices;
+  GenericSignature derivativeGenericSignature;
 
-  AutoDiffLinearMapKind() = default;
-  AutoDiffLinearMapKind(innerty rawValue) : rawValue(rawValue) {}
-  operator innerty() const { return rawValue; }
-};
+  /*implicit*/ AutoDiffConfig(IndexSubset *parameterIndices,
+                              IndexSubset *resultIndices,
+                              GenericSignature derivativeGenericSignature)
+      : parameterIndices(parameterIndices), resultIndices(resultIndices),
+        derivativeGenericSignature(derivativeGenericSignature) {}
 
-/// The kind of an associated function.
-struct AutoDiffAssociatedFunctionKind {
-  enum innerty : uint8_t {
-   // The Jacobian-vector products function.
-   JVP = 0,
-   // The vector-Jacobian products function.
-   VJP = 1
-  } rawValue;
+  /// Returns the `SILAutoDiffIndices` corresponding to this config's indices.
+  // TODO(TF-893): This is a temporary shim for incremental removal of
+  // `SILAutoDiffIndices`. Eventually remove this.
+  SILAutoDiffIndices getSILAutoDiffIndices() const;
 
-  AutoDiffAssociatedFunctionKind() = default;
-  AutoDiffAssociatedFunctionKind(innerty rawValue) : rawValue(rawValue) {}
-  explicit AutoDiffAssociatedFunctionKind(StringRef string);
-  operator innerty() const { return rawValue; }
-  AutoDiffLinearMapKind getLinearMapKind() {
-    return (AutoDiffLinearMapKind::innerty)rawValue;
-  }
+  void print(llvm::raw_ostream &s = llvm::outs()) const;
+  LLVM_ATTRIBUTE_DEPRECATED(void dump() const LLVM_ATTRIBUTE_USED,
+                            "only for use within the debugger");
 };
 
 /// In conjunction with the original function declaration, identifies an
-/// autodiff associated function.
+/// autodiff derivative function.
 ///
 /// Is uniquely allocated within an ASTContext so that it can be hashed and
 /// compared by opaque pointer value.
-class AutoDiffAssociatedFunctionIdentifier : public llvm::FoldingSetNode {
-  const AutoDiffAssociatedFunctionKind kind;
-  const unsigned differentiationOrder;
-  AutoDiffParameterIndices *const parameterIndices;
+class AutoDiffDerivativeFunctionIdentifier : public llvm::FoldingSetNode {
+  const AutoDiffDerivativeFunctionKind kind;
+  IndexSubset *const parameterIndices;
+  GenericSignature derivativeGenericSignature;
 
-  AutoDiffAssociatedFunctionIdentifier(
-      AutoDiffAssociatedFunctionKind kind, unsigned differentiationOrder,
-      AutoDiffParameterIndices *parameterIndices) :
-    kind(kind), differentiationOrder(differentiationOrder),
-    parameterIndices(parameterIndices) {}
+  AutoDiffDerivativeFunctionIdentifier(
+      AutoDiffDerivativeFunctionKind kind, IndexSubset *parameterIndices,
+      GenericSignature derivativeGenericSignature)
+      : kind(kind), parameterIndices(parameterIndices),
+        derivativeGenericSignature(derivativeGenericSignature) {}
 
 public:
-  AutoDiffAssociatedFunctionKind getKind() const { return kind; }
-  unsigned getDifferentiationOrder() const { return differentiationOrder; }
-  AutoDiffParameterIndices *getParameterIndices() const {
+  AutoDiffDerivativeFunctionKind getKind() const { return kind; }
+  IndexSubset *getParameterIndices() const {
     return parameterIndices;
   }
+  GenericSignature getDerivativeGenericSignature() const {
+    return derivativeGenericSignature;
+  }
 
-  static AutoDiffAssociatedFunctionIdentifier *get(
-      AutoDiffAssociatedFunctionKind kind, unsigned differentiationOrder,
-      AutoDiffParameterIndices *parameterIndices, ASTContext &C);
+  static AutoDiffDerivativeFunctionIdentifier *
+  get(AutoDiffDerivativeFunctionKind kind, IndexSubset *parameterIndices,
+      GenericSignature derivativeGenericSignature, ASTContext &C);
 
   void Profile(llvm::FoldingSetNodeID &ID) {
     ID.AddInteger(kind);
-    ID.AddInteger(differentiationOrder);
     ID.AddPointer(parameterIndices);
+    CanGenericSignature derivativeCanGenSig;
+    if (derivativeGenericSignature)
+      derivativeCanGenSig = derivativeGenericSignature->getCanonicalSignature();
+    ID.AddPointer(derivativeCanGenSig.getPointer());
   }
 };
+
+/// The key type used for uniquing `SILDifferentiabilityWitness` in
+/// `SILModule`: original function name, parameter indices, result indices, and
+/// derivative generic signature.
+using SILDifferentiabilityWitnessKey = std::pair<StringRef, AutoDiffConfig>;
 
 /// Automatic differentiation utility namespace.
 namespace autodiff {
 
-/// Returns the offset for an associated function at a specific differentiation
-/// order.
-/// This is used for both ordering in the `autodiff_function` instruction and
-/// ABI layout.
+/// Returns an index subset for the SIL function parameters corresponding to the
+/// parameters in this subset. In particular, this explodes tuples. For example,
 ///
-///                Order 1       Order 2     ...
-/// |----------| |-----|-----| |-----|-----| ...
-/// | Original | | JVP | VJP | | JVP | VJP | ...
-/// |----------| |-----|-----| |-----|-----| ...
-unsigned
-getOffsetForAutoDiffAssociatedFunction(unsigned order,
-                                       AutoDiffAssociatedFunctionKind kind);
-
-unsigned
-getNumAutoDiffAssociatedFunctions(unsigned differentiationOrder);
+///   functionType = (A, B, C) -> R
+///   if "A" and "C" are in the set,
+///   ==> returns 101
+///   (because the lowered SIL type is (A, B, C) -> R)
+///
+///   functionType = (Self) -> (A, B, C) -> R
+///   if "Self" and "C" are in the set,
+///   ==> returns 0011
+///   (because the lowered SIL type is (A, B, C, Self) -> R)
+///
+///   functionType = (A, (B, C), D) -> R
+///   if "A" and "(B, C)" are in the set,
+///   ==> returns 1110
+///   (because the lowered SIL type is (A, B, C, D) -> R)
+///
+/// Note:
+/// - The function must not be curried unless it's a method. Otherwise, the
+///   behavior is undefined.
+/// - For methods, whether the self parameter is set is represented by the
+///   inclusion of the `0` index in `indices`.
+IndexSubset *getLoweredParameterIndices(IndexSubset *indices,
+                                        AnyFunctionType *type);
 
 /// Retrieve config from the function name of a variant of
-/// `Builtin.autodiffApply`, e.g. `Builtin.autodiffApply_jvp_arity2_order1`.
+/// `Builtin.applyDerivative`, e.g. `Builtin.applyDerivative_jvp_arity2`.
 /// Returns true if the function name is parsed successfully.
-bool getBuiltinAutoDiffApplyConfig(StringRef operationName,
-                                   AutoDiffAssociatedFunctionKind &kind,
-                                   unsigned &arity, unsigned &order,
-                                   bool &rethrows);
+bool getBuiltinApplyDerivativeConfig(
+    StringRef operationName, AutoDiffDerivativeFunctionKind &kind,
+    unsigned &arity, bool &rethrows);
 
-/// Computes the correct linkage for an associated function given the linkage of
-/// the original function. If the original linkage is not external and
-/// `isAssocFnExported` is true, use the original function's linkage. Otherwise,
-/// return hidden linkage.
-SILLinkage getAutoDiffAssociatedFunctionLinkage(SILLinkage originalLinkage,
-                                                bool isAssocFnExported);
+/// Retrieve config from the function name of a variant of
+/// `Builtin.applyTranspose`, e.g. `Builtin.applyTranspose_arity2`.
+/// Returns true if the function name is parsed successfully.
+bool getBuiltinApplyTransposeConfig(
+  StringRef operationName, unsigned &arity, bool &rethrows);
+
+/// Retrieve config from the function name of a variant of
+/// `Builtin.differentiableFunction` or `Builtin.linearFunction`, e.g.
+/// `Builtin.differentiableFunction_arity1_throws`.
+/// Returns true if the function name is parsed successfully.
+bool getBuiltinDifferentiableOrLinearFunctionConfig(
+    StringRef operationName, unsigned &arity, bool &throws);
+
+/// Retrieve config from the function name of a variant of
+/// `Builtin.differentiableFunction` or `Builtin.linearFunction`, e.g.
+/// `Builtin.differentiableFunction_arity1_throws`.
+/// Returns true if the function name is parsed successfully.
+bool getBuiltinDifferentiableOrLinearFunctionConfig(
+    StringRef operationName, unsigned &arity, bool &throws);
 
 } // end namespace autodiff
 
@@ -707,12 +519,60 @@ public:
 
 namespace llvm {
 
+using swift::AutoDiffConfig;
+using swift::GenericSignature;
+using swift::IndexSubset;
 using swift::SILAutoDiffIndices;
-using swift::OptionSet;
 
-template<typename T> struct DenseMapInfo;
+template <typename T> struct DenseMapInfo;
 
-template<> struct DenseMapInfo<SILAutoDiffIndices> {
+template <> struct DenseMapInfo<AutoDiffConfig> {
+  static AutoDiffConfig getEmptyKey() {
+    auto *ptr = llvm::DenseMapInfo<void *>::getEmptyKey();
+    // The `derivativeGenericSignature` component must be `nullptr` so that
+    // `getHashValue` and `isEqual` do not try to `getCanonicalSignature()` on
+    // an invalid pointer.
+    return {static_cast<IndexSubset *>(ptr), static_cast<IndexSubset *>(ptr),
+            nullptr};
+  }
+
+  static AutoDiffConfig getTombstoneKey() {
+    auto *ptr = llvm::DenseMapInfo<void *>::getTombstoneKey();
+    // The `derivativeGenericSignature` component must be `nullptr` so that
+    // `getHashValue` and `isEqual` do not try to `getCanonicalSignature()` on
+    // an invalid pointer.
+    return {static_cast<IndexSubset *>(ptr), static_cast<IndexSubset *>(ptr),
+            nullptr};
+  }
+
+  static unsigned getHashValue(const AutoDiffConfig &Val) {
+    auto canGenSig =
+        Val.derivativeGenericSignature
+            ? Val.derivativeGenericSignature->getCanonicalSignature()
+            : nullptr;
+    unsigned combinedHash = hash_combine(
+        ~1U, DenseMapInfo<void *>::getHashValue(Val.parameterIndices),
+        DenseMapInfo<void *>::getHashValue(Val.resultIndices),
+        DenseMapInfo<GenericSignature>::getHashValue(canGenSig));
+    return combinedHash;
+  }
+
+  static bool isEqual(const AutoDiffConfig &LHS, const AutoDiffConfig &RHS) {
+    auto lhsCanGenSig =
+        LHS.derivativeGenericSignature
+            ? LHS.derivativeGenericSignature->getCanonicalSignature()
+            : nullptr;
+    auto rhsCanGenSig =
+        RHS.derivativeGenericSignature
+            ? RHS.derivativeGenericSignature->getCanonicalSignature()
+            : nullptr;
+    return LHS.parameterIndices == RHS.parameterIndices &&
+           LHS.resultIndices == RHS.resultIndices &&
+           DenseMapInfo<GenericSignature>::isEqual(lhsCanGenSig, rhsCanGenSig);
+  }
+};
+
+template <> struct DenseMapInfo<SILAutoDiffIndices> {
   static SILAutoDiffIndices getEmptyKey() {
     return { DenseMapInfo<unsigned>::getEmptyKey(), nullptr };
   }
@@ -736,5 +596,6 @@ template<> struct DenseMapInfo<SILAutoDiffIndices> {
 };
 
 } // end namespace llvm
+// SWIFT_ENABLE_TENSORFLOW END
 
 #endif // SWIFT_AST_AUTODIFF_H

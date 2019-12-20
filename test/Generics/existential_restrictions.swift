@@ -9,16 +9,22 @@ protocol CP : class { }
 }
 
 func fP<T : P>(_ t: T) { }
+// expected-note@-1 {{required by global function 'fP' where 'T' = 'P'}}
+// expected-note@-2 {{required by global function 'fP' where 'T' = 'OP & P'}}
 func fOP<T : OP>(_ t: T) { }
+// expected-note@-1 {{required by global function 'fOP' where 'T' = 'OP & P'}}
 func fOPE(_ t: OP) { }
 func fSP<T : SP>(_ t: T) { }
 func fAO<T : AnyObject>(_ t: T) { }
+// expected-note@-1 {{where 'T' = 'P'}}
+// expected-note@-2 {{where 'T' = 'CP'}}
+// expected-note@-3 {{where 'T' = 'OP & P'}}
 func fAOE(_ t: AnyObject) { }
 func fT<T>(_ t: T) { }
 
 func testPassExistential(_ p: P, op: OP, opp: OP & P, cp: CP, sp: SP, any: Any, ao: AnyObject) {
-  fP(p) // expected-error{{protocol type 'P' cannot conform to 'P' because only concrete types can conform to protocols}}
-  fAO(p) // expected-error{{cannot invoke 'fAO' with an argument list of type '(P)'}} // expected-note{{expected an argument list of type '(T)'}}
+  fP(p) // expected-error{{value of protocol type 'P' cannot conform to 'P'; only struct/enum/class types can conform to protocols}}
+  fAO(p) // expected-error{{global function 'fAO' requires that 'P' be a class type}}
   fAOE(p) // expected-error{{argument type 'P' does not conform to expected type 'AnyObject'}}
   fT(p)
 
@@ -27,13 +33,13 @@ func testPassExistential(_ p: P, op: OP, opp: OP & P, cp: CP, sp: SP, any: Any, 
   fAOE(op)
   fT(op)
 
-  fAO(cp) // expected-error{{cannot invoke 'fAO' with an argument list of type '(CP)'}} // expected-note{{expected an argument list of type '(T)'}}
+  fAO(cp) // expected-error{{global function 'fAO' requires that 'CP' be a class type}}
   fAOE(cp)
   fT(cp)
 
-  fP(opp) // expected-error{{protocol type 'OP & P' cannot conform to 'P' because only concrete types can conform to protocols}}
-  fOP(opp) // expected-error{{protocol type 'OP & P' cannot conform to 'OP' because only concrete types can conform to protocols}}
-  fAO(opp) // expected-error{{cannot invoke 'fAO' with an argument list of type '(OP & P)'}} // expected-note{{expected an argument list of type '(T)'}}
+  fP(opp) // expected-error{{value of protocol type 'OP & P' cannot conform to 'P'; only struct/enum/class types can conform to protocols}}
+  fOP(opp) // expected-error{{value of protocol type 'OP & P' cannot conform to 'OP'; only struct/enum/class types can conform to protocols}}
+  fAO(opp) // expected-error{{global function 'fAO' requires that 'OP & P' be a class type}}
   fAOE(opp)
   fT(opp)
 
@@ -58,9 +64,9 @@ class GAO<T : AnyObject> {} // expected-note 2{{requirement specified as 'T' : '
 func blackHole(_ t: Any) {}
 
 func testBindExistential() {
-  blackHole(GP<P>()) // expected-error{{protocol type 'P' cannot conform to 'P' because only concrete types can conform to protocols}}
+  blackHole(GP<P>()) // expected-error{{value of protocol type 'P' cannot conform to 'P'; only struct/enum/class types can conform to protocols}}
   blackHole(GOP<OP>())
-  blackHole(GCP<CP>()) // expected-error{{protocol type 'CP' cannot conform to 'CP' because only concrete types can conform to protocols}}
+  blackHole(GCP<CP>()) // expected-error{{value of protocol type 'CP' cannot conform to 'CP'; only struct/enum/class types can conform to protocols}}
   blackHole(GAO<P>()) // expected-error{{'GAO' requires that 'P' be a class type}}
   blackHole(GAO<OP>())
   blackHole(GAO<CP>()) // expected-error{{'GAO' requires that 'CP' be a class type}}
@@ -73,6 +79,7 @@ protocol Mine {}
 class M1: Mine {}
 class M2: Mine {}
 extension Collection where Iterator.Element : Mine {
+// expected-note@-1 {{required by referencing instance method 'takeAll()' on 'Collection'}}
     func takeAll() {}
 }
 
@@ -85,5 +92,5 @@ func foo() {
   // generic no overloads error path. The error should actually talk
   // about the return type, and this can happen in other contexts as well;
   // <rdar://problem/21900971> tracks improving QoI here.
-  allMine.takeAll() // expected-error{{protocol type 'Mine' cannot conform to 'Mine' because only concrete types can conform to protocols}}
+  allMine.takeAll() // expected-error{{value of protocol type 'Mine' cannot conform to 'Mine'; only struct/enum/class types can conform to protocols}}
 }

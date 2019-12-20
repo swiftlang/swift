@@ -1,10 +1,18 @@
 
-struct X {}
+sil_stage raw
+
+import Builtin
+
+struct X {
+  let x: Builtin.NativeObject
+}
 
 // Make sure that we can deserialize an apply with various parameter calling
 // conventions.
 sil [serialized] [ossa] @foo : $@convention(thin) (@in X, @inout X, @in_guaranteed X, @owned X, X, @guaranteed X) -> @out X {
 bb0(%0 : $*X, %1 : $*X, %2 : $*X, %3 : $*X, %4 : @owned $X, %5 : @unowned $X, %6 : @guaranteed $X):
+  copy_addr [take] %1 to [initialization] %0 : $*X
+  destroy_value %4 : $X
   %9999 = tuple()
   return %9999 : $()
 }

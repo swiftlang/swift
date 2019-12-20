@@ -16,7 +16,6 @@
 
 #include "swift/Parse/Parser.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
-#include "swift/Parse/DelayedParsingCallbacks.h"
 #include "swift/Parse/ParsedSyntaxRecorder.h"
 #include "swift/Parse/ParseSILSupport.h"
 #include "swift/Parse/SyntaxParsingContext.h"
@@ -29,6 +28,8 @@
 #include "swift/AST/Initializer.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/ParseRequests.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/StringExtras.h"
@@ -182,27 +183,6 @@ namespace {
   };
 } // end anonymous namespace
 
-void PersistentParserState::parseMembers(IterableDeclContext *IDC) {
-  SourceFile &SF = *IDC->getDecl()->getDeclContext()->getParentSourceFile();
-  assert(!SF.hasInterfaceHash() &&
-    "Cannot delay parsing if we care about the interface hash.");
-  assert(SF.Kind != SourceFileKind::SIL && "cannot delay parsing SIL");
-  unsigned BufferID = *SF.getBufferID();
-
-  // MarkedPos is not useful for delayed parsing because we know where we should
-  // jump the parser to. However, we should recover the MarkedPos here in case
-  // the PersistentParserState will be used to continuously parse the rest of
-  // the file linearly.
-  llvm::SaveAndRestore<ParserPosition> Pos(MarkedPos, ParserPosition());
-
-  // Lexer diaganostics have been emitted during skipping, so we disable lexer's
-  // diagnostic engine here.
-  Parser TheParser(BufferID, SF, /*No Lexer Diags*/nullptr, nullptr, this);
-  // Disable libSyntax creation in the delayed parsing.
-  TheParser.SyntaxContext->setDiscard();
-  TheParser.parseDeclListDelayed(IDC);
-}
-
 /// Main entrypoint for the parser.
 ///
 /// \verbatim
@@ -226,43 +206,35 @@ bool Parser::parseTopLevel() {
   // allows type declarations and other things to be parsed, name bound, and
   // type checked in batches, similar to immediate mode.  This also enforces
   // that SIL bodies can only be at the top level.
-  if (Tok.is(tok::kw_sil)) {
-    assert(isInSILMode() && "'sil' should only be a keyword in SIL mode");
-    SIL->parseDeclSIL(*this);
-  } else if (Tok.is(tok::kw_sil_stage)) {
-    assert(isInSILMode() && "'sil_stage' should only be a keyword in SIL mode");
-    SIL->parseDeclSILStage(*this);
-  } else if (Tok.is(tok::kw_sil_vtable)) {
-    assert(isInSILMode() &&
-           "'sil_vtable' should only be a keyword in SIL mode");
-    SIL->parseSILVTable(*this);
-  } else if (Tok.is(tok::kw_sil_global)) {
-    assert(isInSILMode() &&
-           "'sil_global' should only be a keyword in SIL mode");
-    SIL->parseSILGlobal(*this);
-  } else if (Tok.is(tok::kw_sil_witness_table)) {
-    assert(isInSILMode() &&
-           "'sil_witness_table' should only be a keyword in SIL mode");
-    SIL->parseSILWitnessTable(*this);
-  } else if (Tok.is(tok::kw_sil_default_witness_table)) {
-    assert(isInSILMode() &&
-           "'sil_default_witness_table' should only be a keyword in SIL mode");
-    SIL->parseSILDefaultWitnessTable(*this);
-  } else if (Tok.is(tok::kw_sil_coverage_map)) {
-    assert(isInSILMode() &&
-           "'sil_coverage_map' should only be a keyword in SIL mode");
-    SIL->parseSILCoverageMap(*this);
-  } else if (Tok.is(tok::kw_sil_property)) {
-    assert(isInSILMode() &&
-           "'sil_property' should only be a keyword in SIL mode");
-    SIL->parseSILProperty(*this);
-  } else if (Tok.is(tok::kw_sil_scope)) {
-    assert(isInSILMode() && "'sil_scope' should only be a keyword in SIL mode");
-    SIL->parseSILScope(*this);
-  } else {
-    parseBraceItems(Items,
-                    allowTopLevelCode() ? BraceItemListKind::TopLevelCode
-                                        : BraceItemListKind::TopLevelLibrary);
+  switch (Tok.getKind()) {
+  default:
+    parseBraceItems(Items, allowTopLevelCode()
+                               ? BraceItemListKind::TopLevelCode
+                               : BraceItemListKind::TopLevelLibrary);
+    break;
+
+// For now, create 'UnknownDecl' for all SIL declarations.
+#define CASE_SIL(KW, NAME)                                                     \
+  case tok::kw_##KW: {                                                         \
+    assert(isInSILMode() && "'" #KW "' should only be a keyword in SIL mode"); \
+    SyntaxParsingContext itemCtxt(SyntaxContext, SyntaxKind::CodeBlockItem);   \
+    SyntaxParsingContext declCtxt(SyntaxContext, SyntaxContextKind::Decl);     \
+    SIL->parse##NAME(*this);                                                   \
+    break;                                                                     \
+  }
+    CASE_SIL(sil, DeclSIL)
+    CASE_SIL(sil_stage, DeclSILStage)
+    CASE_SIL(sil_vtable, SILVTable)
+    CASE_SIL(sil_global, SILGlobal)
+    CASE_SIL(sil_witness_table, SILWitnessTable)
+    CASE_SIL(sil_default_witness_table, SILDefaultWitnessTable)
+    // SWIFT_ENABLE_TENSORFLOW
+    CASE_SIL(sil_differentiability_witness, SILDifferentiabilityWitness)
+    // SWIFT_ENABLE_TENSORFLOW END
+    CASE_SIL(sil_coverage_map, SILCoverageMap)
+    CASE_SIL(sil_property, SILProperty)
+    CASE_SIL(sil_scope, SILScope)
+#undef CASE_SIL
   }
   
   // In the case of a catastrophic parse error, consume any trailing
@@ -272,6 +244,10 @@ bool Parser::parseTopLevel() {
       Tok.is(tok::pound_endif)) {
     diagnose(Tok.getLoc(),
              diag::unexpected_conditional_compilation_block_terminator);
+    // Create 'UnknownDecl' for orphan directives.
+    SyntaxParsingContext itemCtxt(SyntaxContext, SyntaxKind::CodeBlockItem);
+    SyntaxParsingContext declCtxt(SyntaxContext, SyntaxContextKind::Decl);
+
     consumeToken();
   }
 
@@ -782,7 +758,7 @@ Parser::parseImplementsAttribute(SourceLoc AtLoc, SourceLoc Loc) {
   SourceLoc lParenLoc = consumeToken();
 
   DeclNameLoc MemberNameLoc;
-  DeclName MemberName;
+  DeclNameRef MemberName;
   ParserResult<TypeRepr> ProtocolType;
   {
     SyntaxParsingContext ContentContext(
@@ -823,20 +799,34 @@ Parser::parseImplementsAttribute(SourceLoc AtLoc, SourceLoc Loc) {
     return Status;
   }
 
+  // FIXME(ModQual): Reject module qualification on MemberName.
+
   return ParserResult<ImplementsAttr>(
     ImplementsAttr::create(Context, AtLoc, SourceRange(Loc, rParenLoc),
-                           ProtocolType.get(), MemberName, MemberNameLoc));
+                           ProtocolType.get(), MemberName.getFullName(),
+                           MemberNameLoc));
 }
 
-/// SWIFT_ENABLE_TENSORFLOW
+/// Parse a `@differentiable` attribute, returning true on error.
+///
+/// \verbatim
+///   differentiable-attribute-arguments:
+///     '(' (differentiation-params-clause ',')?
+///         (differentiable-attr-func-specifier ',')?
+///         differentiable-attr-func-specifier?
+///         where-clause?
+///     ')'
+///   differentiable-attr-func-specifier:
+///     ('jvp' | 'vjp') ':' decl-name
+/// \endverbatim
 ParserResult<DifferentiableAttr>
 Parser::parseDifferentiableAttribute(SourceLoc atLoc, SourceLoc loc) {
   StringRef AttrName = "differentiable";
   SourceLoc lParenLoc = loc, rParenLoc = loc;
   bool linear = false;
   SmallVector<ParsedAutoDiffParameter, 8> params;
-  Optional<DeclNameWithLoc> jvpSpec;
-  Optional<DeclNameWithLoc> vjpSpec;
+  Optional<DeclNameRefWithLoc> jvpSpec;
+  Optional<DeclNameRefWithLoc> vjpSpec;
   TrailingWhereClause *whereClause = nullptr;
 
   // Parse '('.
@@ -859,112 +849,42 @@ Parser::parseDifferentiableAttribute(SourceLoc atLoc, SourceLoc loc) {
                                  params, jvpSpec, vjpSpec, whereClause));
 }
 
+// Attribute parsing error helper.
+// For the given parentheses depth, skip until ')' and consume it if possible.
+// If no ')' is found, produce error.
+// Always returns true to indicate a parsing error has occurred.
+static bool errorAndSkipUntilConsumeRightParen(Parser &P, StringRef attrName,
+                                               int parenDepth = 1) {
+  for (int i = 0; i < parenDepth; ++i) {
+    P.skipUntil(tok::r_paren);
+    if (!P.consumeIf(tok::r_paren)) {
+      P.diagnose(P.Tok, diag::attr_expected_rparen, attrName,
+                 /*DeclModifier=*/false);
+      return true;
+    }
+  }
+  return true;
+};
+
+/// Parse a differentiation parameters 'wrt:' clause, returning true on error.
+///
+/// \verbatim
+///   differentiation-params-clause:
+///     'wrt' ':' (differentiation-param | differentiation-params)
+///   differentiation-params:
+///     '(' differentiation-param (',' differentiation-param)* ')'
+///   differentiation-param:
+///     'self' | identifier | [0-9]+
+/// \endverbatim
 bool Parser::parseDifferentiationParametersClause(
-    SmallVectorImpl<ParsedAutoDiffParameter> &params, StringRef attrName) {
-  // Set parse error, skip until ')' and parse it.
-  auto errorAndSkipToEnd = [&](int parenDepth = 1) -> bool {
-    for (int i = 0; i < parenDepth; i++) {
-      skipUntil(tok::r_paren);
-      if (!consumeIf(tok::r_paren))
-        diagnose(Tok, diag::attr_expected_rparen, attrName,
-                 /*DeclModifier=*/false);
-    }
-    return true;
-  };
-
-  SyntaxParsingContext DiffParamsClauseContext(
-       SyntaxContext, SyntaxKind::DifferentiationParamsClause);
-  consumeToken(tok::identifier);
-  if (!consumeIf(tok::colon)) {
-    diagnose(Tok, diag::expected_colon_after_label, "wrt");
-    return errorAndSkipToEnd();
-  }
-
-  // Function that parses a parameter into `params`. Returns true if error
-  // occurred.
-  auto parseParam = [&](bool parseTrailingComma = true) -> bool {
-    SyntaxParsingContext DiffParamContext(
-        SyntaxContext, SyntaxKind::DifferentiationParam);
-    SourceLoc paramLoc;
-    switch (Tok.getKind()) {
-      case tok::identifier: {
-        Identifier paramName;
-        if (parseIdentifier(paramName, paramLoc,
-                            diag::diff_params_clause_expected_parameter))
-          return true;
-        params.push_back(ParsedAutoDiffParameter::getNamedParameter(
-            paramLoc, paramName));
-        break;
-      }
-      case tok::integer_literal: {
-        unsigned paramNum;
-        if (parseUnsignedInteger(
-                paramNum, paramLoc,
-                diag::diff_params_clause_expected_parameter))
-          return true;
-
-        params.push_back(ParsedAutoDiffParameter::getOrderedParameter(
-            paramLoc, paramNum));
-        break;
-      }
-      case tok::kw_self: {
-        paramLoc = consumeToken(tok::kw_self);
-        params.push_back(ParsedAutoDiffParameter::getSelfParameter(paramLoc));
-        break;
-      }
-      default:
-        diagnose(Tok, diag::diff_params_clause_expected_parameter);
-        return true;
-    }
-    if (parseTrailingComma && Tok.isNot(tok::r_paren))
-      return parseToken(tok::comma, diag::attr_expected_comma, attrName,
-                        /*isDeclModifier=*/false);
-    return false;
-  };
-
-  // Parse opening '(' of the parameter list.
-  if (Tok.is(tok::l_paren)) {
-    SyntaxParsingContext DiffParamsContext(
-        SyntaxContext, SyntaxKind::DifferentiationParams);
-    consumeToken(tok::l_paren);
-    // Parse first parameter. At least one is required.
-    if (parseParam())
-      return errorAndSkipToEnd(2);
-    // Parse remaining parameters until ')'.
-    while (Tok.isNot(tok::r_paren))
-      if (parseParam())
-        return errorAndSkipToEnd(2);
-    SyntaxContext->collectNodesInPlace(SyntaxKind::DifferentiationParamList);
-    // Parse closing ')' of the parameter list.
-    consumeToken(tok::r_paren);
-  }
-  // If no opening '(' for parameter list, parse a single parameter.
-  else {
-    if (parseParam(/*parseTrailingComma*/ false))
-      return errorAndSkipToEnd();
-  }
-  return false;
-}
-
-bool Parser::parseTransposingParametersClause(
-    SmallVectorImpl<ParsedAutoDiffParameter> &params, StringRef attrName) {
-  // Set parse error, skip until ')' and parse it.
-  auto errorAndSkipToEnd = [&](int parenDepth = 1) -> bool {
-    for (int i = 0; i < parenDepth; i++) {
-      skipUntil(tok::r_paren);
-      if (!consumeIf(tok::r_paren))
-        diagnose(Tok, diag::attr_expected_rparen, attrName,
-                 /*DeclModifier=*/false);
-    }
-    return true;
-  };
-
+    SmallVectorImpl<ParsedAutoDiffParameter> &params, StringRef attrName,
+    bool allowNamedParameters) {
   SyntaxParsingContext DiffParamsClauseContext(
       SyntaxContext, SyntaxKind::DifferentiationParamsClause);
   consumeToken(tok::identifier);
   if (!consumeIf(tok::colon)) {
     diagnose(Tok, diag::expected_colon_after_label, "wrt");
-    return errorAndSkipToEnd();
+    return errorAndSkipUntilConsumeRightParen(*this, attrName);
   }
 
   // Function that parses a parameter into `params`. Returns true if error
@@ -974,25 +894,38 @@ bool Parser::parseTransposingParametersClause(
         SyntaxContext, SyntaxKind::DifferentiationParam);
     SourceLoc paramLoc;
     switch (Tok.getKind()) {
-      case tok::integer_literal: {
-        unsigned int paramNum;
-        if (parseUnsignedInteger(
-                paramNum, paramLoc,
-                diag::transposing_params_clause_expected_parameter))
-          return true;
-
-        params.push_back(
-            ParsedAutoDiffParameter::getOrderedParameter(paramLoc, paramNum));
-        break;
-      }
-      case tok::kw_self: {
-        paramLoc = consumeToken(tok::kw_self);
-        params.push_back(ParsedAutoDiffParameter::getSelfParameter(paramLoc));
-        break;
-      }
-      default:
-        diagnose(Tok, diag::transposing_params_clause_expected_parameter);
+    case tok::identifier: {
+      // If named parameters are not allowed, diagnose.
+      if (!allowNamedParameters) {
+        diagnose(Tok, diag::diff_params_clause_expected_parameter_unnamed);
         return true;
+      }
+      Identifier paramName;
+      if (parseIdentifier(paramName, paramLoc,
+                          diag::diff_params_clause_expected_parameter))
+        return true;
+      params.push_back(
+          ParsedAutoDiffParameter::getNamedParameter(paramLoc, paramName));
+      break;
+    }
+    case tok::integer_literal: {
+      unsigned paramNum;
+      if (parseUnsignedInteger(paramNum, paramLoc,
+                               diag::diff_params_clause_expected_parameter))
+        return true;
+
+      params.push_back(
+          ParsedAutoDiffParameter::getOrderedParameter(paramLoc, paramNum));
+      break;
+    }
+    case tok::kw_self: {
+      paramLoc = consumeToken(tok::kw_self);
+      params.push_back(ParsedAutoDiffParameter::getSelfParameter(paramLoc));
+      break;
+    }
+    default:
+      diagnose(Tok, diag::diff_params_clause_expected_parameter);
+      return true;
     }
     if (parseTrailingComma && Tok.isNot(tok::r_paren))
       return parseToken(tok::comma, diag::attr_expected_comma, attrName,
@@ -1007,11 +940,11 @@ bool Parser::parseTransposingParametersClause(
     consumeToken(tok::l_paren);
     // Parse first parameter. At least one is required.
     if (parseParam())
-      return errorAndSkipToEnd(2);
+      return errorAndSkipUntilConsumeRightParen(*this, attrName, 2);
     // Parse remaining parameters until ')'.
     while (Tok.isNot(tok::r_paren))
       if (parseParam())
-        return errorAndSkipToEnd(2);
+        return errorAndSkipUntilConsumeRightParen(*this, attrName, 2);
     SyntaxContext->collectNodesInPlace(SyntaxKind::DifferentiationParamList);
     // Parse closing ')' of the parameter list.
     consumeToken(tok::r_paren);
@@ -1019,27 +952,17 @@ bool Parser::parseTransposingParametersClause(
   // If no opening '(' for parameter list, parse a single parameter.
   else {
     if (parseParam(/*parseTrailingComma*/ false))
-      return errorAndSkipToEnd();
+      return errorAndSkipUntilConsumeRightParen(*this, attrName);
   }
   return false;
 }
 
 bool Parser::parseDifferentiableAttributeArguments(
     bool &linear, SmallVectorImpl<ParsedAutoDiffParameter> &params,
-    Optional<DeclNameWithLoc> &jvpSpec, Optional<DeclNameWithLoc> &vjpSpec,
+    Optional<DeclNameRefWithLoc> &jvpSpec,
+    Optional<DeclNameRefWithLoc> &vjpSpec,
     TrailingWhereClause *&whereClause) {
   StringRef AttrName = "differentiable";
-
-  // Set parse error, skip until ')' and parse it.
-  auto errorAndSkipToEnd = [&](int parenDepth = 1) -> bool {
-    for (int i = 0; i < parenDepth; i++) {
-      skipUntil(tok::r_paren);
-      if (!consumeIf(tok::r_paren))
-        diagnose(Tok, diag::attr_expected_rparen, AttrName,
-                 /*DeclModifier=*/false);
-    }
-    return true;
-  };
 
   // Parse trailing comma, if it exists, and check for errors.
   auto consumeIfTrailingComma = [&]() -> bool {
@@ -1049,14 +972,13 @@ bool Parser::parseDifferentiableAttributeArguments(
       diagnose(Tok, diag::unexpected_separator, ",");
       return true;
     }
-    // Check that token after comma is 'wrt:' or a function specifier label.
-    if (!Tok.is(tok::identifier) || !(Tok.getText() == "wrt" ||
-                                      Tok.getText() == "jvp" ||
-                                      Tok.getText() == "vjp")) {
-      diagnose(Tok, diag::attr_differentiable_expected_label);
-      return true;
+    // Check that token after comma is 'wrt' or a function specifier label.
+    if (isIdentifier(Tok, "wrt") || isIdentifier(Tok, "jvp") ||
+        isIdentifier(Tok, "vjp")) {
+      return false;
     }
-    return false;
+    diagnose(Tok, diag::attr_differentiable_expected_label);
+    return true;
   };
 
   // Store starting parser position.
@@ -1067,54 +989,55 @@ bool Parser::parseDifferentiableAttributeArguments(
   // Parse optional differentiation parameters.
   // Parse 'linear' label (optional).
   linear = false;
-  if (Tok.is(tok::identifier) && Tok.getText() == "linear") {
+  if (isIdentifier(Tok, "linear")) {
     linear = true;
     consumeToken(tok::identifier);
     // If no trailing comma or 'where' clause, terminate parsing arguments.
-    if (Tok.isNot(tok::comma) && Tok.isNot(tok::kw_where))
+    if (Tok.isNot(tok::comma, tok::kw_where))
       return false;
     if (consumeIfTrailingComma())
-      return errorAndSkipToEnd();
+      return errorAndSkipUntilConsumeRightParen(*this, AttrName);
   }
 
   // If 'withRespectTo' is used, make the user change it to 'wrt'.
-  if (Tok.is(tok::identifier) && Tok.getText() == "withRespectTo") {
+  if (isIdentifier(Tok, "withRespectTo")) {
     SourceRange withRespectToRange(Tok.getLoc(), peekToken().getLoc());
     diagnose(Tok, diag::attr_differentiable_use_wrt_not_withrespectto)
         .highlight(withRespectToRange)
         .fixItReplace(withRespectToRange, "wrt:");
-    return errorAndSkipToEnd();
+    return errorAndSkipUntilConsumeRightParen(*this, AttrName);
   }
-  if (Tok.is(tok::identifier) && Tok.getText() == "wrt") {
+  // Parse differentiation parameters' clause.
+  if (isIdentifier(Tok, "wrt")) {
     if (parseDifferentiationParametersClause(params, AttrName))
       return true;
     // If no trailing comma or 'where' clause, terminate parsing arguments.
-    if (Tok.isNot(tok::comma) && Tok.isNot(tok::kw_where))
+    if (Tok.isNot(tok::comma, tok::kw_where))
       return false;
     if (consumeIfTrailingComma())
-      return errorAndSkipToEnd();
+      return errorAndSkipUntilConsumeRightParen(*this, AttrName);
   }
 
   // Function that parses a label and a function specifier, e.g. 'vjp: foo(_:)'.
   // Return true on error.
-  auto parseFuncSpec = [&](StringRef label, DeclNameWithLoc &result,
+  auto parseFuncSpec = [&](StringRef label, DeclNameRefWithLoc &result,
                            bool &terminateParsingArgs) -> bool {
     // Parse label.
-    if (parseSpecificIdentifier(label,
-            diag::attr_differentiable_missing_label, label) ||
+    if (parseSpecificIdentifier(label, diag::attr_missing_label, label,
+                                AttrName) ||
         parseToken(tok::colon, diag::expected_colon_after_label, label))
       return true;
     // Parse the name of the function.
     SyntaxParsingContext FuncDeclNameContext(
          SyntaxContext, SyntaxKind::FunctionDeclName);
     Diagnostic funcDiag(diag::attr_differentiable_expected_function_name.ID,
-                        { label });
+                        {label});
     result.Name =
         parseUnqualifiedDeclName(/*afterDot=*/false, result.Loc,
                                  funcDiag, /*allowOperators=*/true,
                                  /*allowZeroArgCompoundNames=*/true);
     // If no trailing comma or 'where' clause, terminate parsing arguments.
-    if (Tok.isNot(tok::comma) && Tok.isNot(tok::kw_where))
+    if (Tok.isNot(tok::comma, tok::kw_where))
       terminateParsingArgs = true;
     return !result.Name;
   };
@@ -1123,38 +1046,37 @@ bool Parser::parseDifferentiableAttributeArguments(
   bool terminateParsingArgs = false;
 
   // Parse 'jvp: <func_name>' (optional).
-  if (Tok.is(tok::identifier) && Tok.getText() == "jvp") {
+  if (isIdentifier(Tok, "jvp")) {
     SyntaxParsingContext JvpContext(
         SyntaxContext, SyntaxKind::DifferentiableAttributeFuncSpecifier);
-    jvpSpec = DeclNameWithLoc();
+    jvpSpec = DeclNameRefWithLoc();
     if (parseFuncSpec("jvp", *jvpSpec, terminateParsingArgs))
-      return errorAndSkipToEnd();
+      return errorAndSkipUntilConsumeRightParen(*this, AttrName);
     if (terminateParsingArgs)
       return false;
     if (consumeIfTrailingComma())
-      return errorAndSkipToEnd();
+      return errorAndSkipUntilConsumeRightParen(*this, AttrName);
   }
 
   // Parse 'vjp: <func_name>' (optional).
-  if (Tok.is(tok::identifier) && Tok.getText() == "vjp") {
+  if (isIdentifier(Tok, "vjp")) {
     SyntaxParsingContext VjpContext(
         SyntaxContext, SyntaxKind::DifferentiableAttributeFuncSpecifier);
-    vjpSpec = DeclNameWithLoc();
+    vjpSpec = DeclNameRefWithLoc();
     if (parseFuncSpec("vjp", *vjpSpec, terminateParsingArgs))
-      return errorAndSkipToEnd();
+      return errorAndSkipUntilConsumeRightParen(*this, AttrName);
     if (terminateParsingArgs)
       return false;
     // Note: intentionally parse trailing comma here, even though it's the last
     // function specifier. `consumeIfTrailingComma` will emit an error.
     if (consumeIfTrailingComma())
-      return errorAndSkipToEnd();
+      return errorAndSkipUntilConsumeRightParen(*this, AttrName);
   }
 
   // If parser has not advanced and token is not 'where' or ')', emit error.
-  if (Tok.getLoc() == startingLoc &&
-      Tok.isNot(tok::kw_where) && Tok.isNot(tok::r_paren)) {
+  if (Tok.getLoc() == startingLoc && Tok.isNot(tok::kw_where, tok::r_paren)) {
     diagnose(Tok, diag::attr_differentiable_expected_label);
-    return errorAndSkipToEnd();
+    return errorAndSkipUntilConsumeRightParen(*this, AttrName);
   }
 
   // Parse a trailing 'where' clause if any.
@@ -1169,83 +1091,176 @@ bool Parser::parseDifferentiableAttributeArguments(
   return false;
 }
 
-/// SWIFT_ENABLE_TENSORFLOW
-ParserResult<DifferentiatingAttr>
-Parser::parseDifferentiatingAttribute(SourceLoc atLoc, SourceLoc loc) {
-  StringRef AttrName = "differentiating";
+/// Parse a `@derivative(of:)` attribute, returning true on error.
+///
+/// \verbatim
+///   derivative-attribute-arguments:
+///     '(' 'of' ':' decl-name (',' differentiation-params-clause)? ')'
+/// \endverbatim
+ParserResult<DerivativeAttr> Parser::parseDerivativeAttribute(SourceLoc atLoc,
+                                                              SourceLoc loc) {
+  StringRef AttrName = "derivative";
   SourceLoc lParenLoc = loc, rParenLoc = loc;
-  DeclNameWithLoc original;
-  bool linear = false;
+  DeclNameRefWithLoc original;
   SmallVector<ParsedAutoDiffParameter, 8> params;
-  
+
   // Parse trailing comma, if it exists, and check for errors.
   auto consumeIfTrailingComma = [&]() -> bool {
     if (!consumeIf(tok::comma)) return false;
     // Diagnose trailing comma before ')'.
     if (Tok.is(tok::r_paren)) {
       diagnose(Tok, diag::unexpected_separator, ",");
-      return true;
+      return errorAndSkipUntilConsumeRightParen(*this, AttrName);
     }
-    // Check that token after comma is 'linear' or 'wrt:'.
-    if (!Tok.is(tok::identifier) ||
-        !(Tok.getText() == "linear" || Tok.getText() == "wrt")) {
-      diagnose(Tok, diag::attr_differentiating_expected_label_linear_or_wrt);
-      return true;
-    }
-    return false;
+    // Check that token after comma is 'wrt:'.
+    if (isIdentifier(Tok, "wrt"))
+      return false;
+    diagnose(Tok, diag::attr_expected_label, "wrt", AttrName);
+    return errorAndSkipUntilConsumeRightParen(*this, AttrName);
   };
-
   // Parse '('.
   if (!consumeIf(tok::l_paren, lParenLoc)) {
     diagnose(getEndOfPreviousLoc(), diag::attr_expected_lparen, AttrName,
              /*DeclModifier*/ false);
     return makeParserError();
   }
-
   {
     SyntaxParsingContext ContentContext(
-        SyntaxContext, SyntaxKind::DifferentiatingAttributeArguments);
-
+        SyntaxContext, SyntaxKind::DerivativeRegistrationAttributeArguments);
+    // Parse the 'of:' label and colon.
+    if (parseSpecificIdentifier("of", diag::attr_missing_label, "of",
+                                AttrName) ||
+        parseToken(tok::colon, diag::expected_colon_after_label, "of")) {
+      return makeParserError();
+    }
     {
       // Parse the name of the function.
-      SyntaxParsingContext FuncDeclNameContext(
-          SyntaxContext, SyntaxKind::FunctionDeclName);
+      // TODO(TF-1058): Make `@derivative` attribute support qualified
+      // original declarations.
+      SyntaxParsingContext DeclNameContext(SyntaxContext,
+                                           SyntaxKind::QualifiedDeclName);
+      // NOTE: Use `afterDot = true` and `allowDeinitAndSubscript = true` to
+      // enable, e.g. `@derivative(of: init)` and `@derivative(of: subscript)`.
       original.Name = parseUnqualifiedDeclName(
-          /*afterDot*/ false, original.Loc,
-          diag::attr_differentiating_expected_original_name,
-          /*allowOperators*/ true, /*allowZeroArgCompoundNames*/ true);
-      
-      if (consumeIfTrailingComma())
-        return makeParserError();
+          /*afterDot*/ true, original.Loc,
+          diag::autodiff_attr_expected_original_decl_name,
+          /*allowOperators*/ true, /*allowZeroArgCompoundNames*/ true,
+          /*allowDeinitAndSubscript*/ true);
     }
-    
-    // Parse the optional 'linear' differentiation flag.
-    if (Tok.is(tok::identifier) && Tok.getText() == "linear") {
-      linear = true;
-      consumeToken(tok::identifier);
-      if (consumeIfTrailingComma())
-        return makeParserError();
-    }
-    
+    if (consumeIfTrailingComma())
+      return makeParserError();
     // Parse the optional 'wrt' differentiation parameters clause.
-    if (Tok.is(tok::identifier) && Tok.getText() == "wrt" &&
+    if (isIdentifier(Tok, "wrt") &&
         parseDifferentiationParametersClause(params, AttrName))
       return makeParserError();
   }
-
   // Parse ')'.
   if (!consumeIf(tok::r_paren, rParenLoc)) {
     diagnose(getEndOfPreviousLoc(), diag::attr_expected_rparen, AttrName,
              /*DeclModifier*/ false);
     return makeParserError();
   }
-  return ParserResult<DifferentiatingAttr>(
-      DifferentiatingAttr::create(Context, /*implicit*/ false, atLoc,
-                                  SourceRange(loc, rParenLoc),
-                                  original, linear, params));
+  return ParserResult<DerivativeAttr>(
+      DerivativeAttr::create(Context, /*implicit*/ false, atLoc,
+                             SourceRange(loc, rParenLoc), original, params));
 }
 
-/// SWIFT_ENABLE_TENSORFLOW
+// SWIFT_ENABLE_TENSORFLOW
+ParserResult<DerivativeAttr>
+Parser::parseDifferentiatingAttribute(SourceLoc atLoc, SourceLoc loc) {
+  StringRef AttrName = "differentiating";
+  SourceLoc lParenLoc = loc, rParenLoc = loc;
+  DeclNameRefWithLoc original;
+  SmallVector<ParsedAutoDiffParameter, 8> params;
+
+  // Parse trailing comma, if it exists, and check for errors.
+  auto consumeIfTrailingComma = [&]() -> bool {
+    if (!consumeIf(tok::comma))
+      return false;
+    // Diagnose trailing comma before ')'.
+    if (Tok.is(tok::r_paren)) {
+      diagnose(Tok, diag::unexpected_separator, ",");
+      return errorAndSkipUntilConsumeRightParen(*this, AttrName);
+    }
+    // Check that token after comma is 'wrt:'.
+    if (isIdentifier(Tok, "wrt"))
+      return false;
+    diagnose(Tok, diag::attr_expected_label, "wrt", AttrName);
+    return errorAndSkipUntilConsumeRightParen(*this, AttrName);
+  };
+  // Parse '('.
+  if (!consumeIf(tok::l_paren, lParenLoc)) {
+    diagnose(getEndOfPreviousLoc(), diag::attr_expected_lparen, AttrName,
+             /*DeclModifier*/ false);
+    return makeParserError();
+  }
+  {
+    SyntaxParsingContext ContentContext(
+        SyntaxContext,
+        SyntaxKind::DeprecatedDerivativeRegistrationAttributeArguments);
+    {
+      // Parse the name of the function.
+      // TODO(TF-1058): Make `@differentiating` attribute support qualified
+      // original declarations.
+      SyntaxParsingContext DeclNameContext(SyntaxContext,
+                                           SyntaxKind::QualifiedDeclName);
+      // NOTE: Use `afterDot = true` and `allowDeinitAndSubscript = true` to
+      // enable, e.g. `@differentiating(init)` and
+      // `@differentiating(subscript)`.
+      original.Name = parseUnqualifiedDeclName(
+          /*afterDot*/ true, original.Loc,
+          diag::autodiff_attr_expected_original_decl_name,
+          /*allowOperators*/ true, /*allowZeroArgCompoundNames*/ true,
+          /*allowDeinitAndSubscript*/ true);
+    }
+    if (consumeIfTrailingComma())
+      return makeParserError();
+    // Parse the optional 'wrt' differentiation parameters clause.
+    if (isIdentifier(Tok, "wrt") &&
+        parseDifferentiationParametersClause(params, AttrName))
+      return makeParserError();
+  }
+  // Parse ')'.
+  if (!consumeIf(tok::r_paren, rParenLoc)) {
+    diagnose(getEndOfPreviousLoc(), diag::attr_expected_rparen, AttrName,
+             /*DeclModifier*/ false);
+    return makeParserError();
+  }
+  return ParserResult<DerivativeAttr>(
+      DerivativeAttr::create(Context, /*implicit*/ false, atLoc,
+                             SourceRange(loc, rParenLoc), original, params));
+}
+// SWIFT_ENABLE_TENSORFLOW END
+
+// SWIFT_ENABLE_TENSORFLOW
+/// Helper function that parses 'type-identifier' for `parseQualifiedDeclName`.
+/// Returns true on error. Sets `baseType` to the parsed type, if present, or to
+/// `nullptr` if not. A missing base type is not considered an error.
+static bool parseBaseTypeForQualifiedDeclName(Parser &P, TypeRepr *&baseType) {
+  baseType = nullptr;
+
+  if (!P.canParseBaseTypeForQualifiedDeclName())
+    return false;
+
+  auto result = P.parseTypeIdentifier(/*isParsingQualifiedDeclName*/ true);
+  if (result.isNull())
+    return true;
+
+  // Optionally consume a leading period. This is relevant for
+  // qualified operator names.
+  // TODO(TF-1065): Consider disallowing qualified operator names.
+  if (P.startsWithSymbol(P.Tok, '.')) {
+    assert(P.Tok.isAnyOperator() &&
+           "Only operators should have leading period here");
+    P.consumeStartingCharacterOfCurrentToken(tok::period);
+  }
+
+  baseType = result.getPtrOrNull();
+  return false;
+}
+// SWIFT_ENABLE_TENSORFLOW END
+
+// SWIFT_ENABLE_TENSORFLOW
 /// parseQualifiedDeclName
 ///
 ///   qualified-decl-name:
@@ -1255,44 +1270,41 @@ Parser::parseDifferentiatingAttribute(SourceLoc atLoc, SourceLoc loc) {
 ///
 /// Parses an optional base type, followed by a declaration name.
 /// Returns true on error (if function decl name could not be parsed).
-bool parseQualifiedDeclName(Parser &P, Diag<> nameParseError,
-                            TypeRepr *&baseType, DeclNameWithLoc &original) {
-  // If the current token is an identifier or `Self` or `Any`, then attempt to
-  // parse the base type. Otherwise, base type is null.
-  auto currentPosition = P.getParserPosition();
-  bool canParseBaseType = P.canParseTypeIdentifier();
-  P.backtrackToPosition(currentPosition);
-  if (canParseBaseType)
-    baseType = P.parseTypeIdentifier(/*isParsingQualifiedDeclName*/ true)
-                   .getPtrOrNull();
-  else
-    baseType = nullptr;
-  
-  // If base type was parsed and has at least one component, then there was a
-  // dot before the current token.
-  bool afterDot = false;
-  if (baseType) {
-    if (auto ident = dyn_cast<IdentTypeRepr>(baseType)) {
-      auto components = ident->getComponentRange();
-      afterDot = std::distance(components.begin(), components.end()) > 0;
-    }
-  }
+static bool parseQualifiedDeclName(Parser &P, Diag<> nameParseError,
+                                   TypeRepr *&baseType,
+                                   DeclNameRefWithLoc &original) {
+  SyntaxParsingContext DeclNameContext(P.SyntaxContext,
+                                       SyntaxKind::QualifiedDeclName);
+  if (parseBaseTypeForQualifiedDeclName(P, baseType))
+    return true;
+
+  // NOTE: Use `afterDot = true` and `allowDeinitAndSubscript = true` to enable
+  // initializer and subscript lookup.
   original.Name =
-      P.parseUnqualifiedDeclName(afterDot, original.Loc, nameParseError,
-                                 /*allowOperators*/ true,
-                                 /*allowZeroArgCompoundNames*/ true);
+      P.parseUnqualifiedDeclName(/*afterDot*/ true, original.Loc,
+                                 nameParseError, /*allowOperators*/ true,
+                                 /*allowZeroArgCompoundNames*/ true,
+                                 /*allowDeinitAndSubscript*/ true);
 
   // The base type is optional, but the final unqualified decl name is not.
   // If name could not be parsed, return true for error.
   return !original.Name;
 }
+// SWIFT_ENABLE_TENSORFLOW END
 
-ParserResult<TransposingAttr> Parser::parseTransposingAttribute(SourceLoc atLoc,
-                                                                SourceLoc loc) {
-  StringRef AttrName = "transposing";
+// SWIFT_ENABLE_TENSORFLOW
+/// Parse a `@transpose(of:)` attribute, returning true on error.
+///
+/// \verbatim
+///   transpose-attribute-arguments:
+///     '(' 'of' ':' decl-name (',' transposed-params-clause)? ')'
+/// \endverbatim
+ParserResult<TransposeAttr> Parser::parseTransposeAttribute(SourceLoc atLoc,
+                                                            SourceLoc loc) {
+  StringRef AttrName = "transpose";
   SourceLoc lParenLoc = loc, rParenLoc = loc;
   TypeRepr *baseType;
-  DeclNameWithLoc original;
+  DeclNameRefWithLoc original;
   SmallVector<ParsedAutoDiffParameter, 8> params;
 
   // Parse trailing comma, if it exists, and check for errors.
@@ -1301,14 +1313,13 @@ ParserResult<TransposingAttr> Parser::parseTransposingAttribute(SourceLoc atLoc,
     // Diagnose trailing comma before ')'.
     if (Tok.is(tok::r_paren)) {
       diagnose(Tok, diag::unexpected_separator, ",");
-      return true;
+      return errorAndSkipUntilConsumeRightParen(*this, AttrName);
     }
     // Check that token after comma is 'wrt:'.
-    if (!Tok.is(tok::identifier) || !(Tok.getText() == "wrt")) {
-      diagnose(Tok, diag::attr_transposing_expected_label_linear_or_wrt);
-      return true;
-    }
-    return false;
+    if (isIdentifier(Tok, "wrt"))
+      return false;
+    diagnose(Tok, diag::attr_expected_label, "wrt", AttrName);
+    return errorAndSkipUntilConsumeRightParen(*this, AttrName);
   };
 
   // Parse '('.
@@ -1317,39 +1328,43 @@ ParserResult<TransposingAttr> Parser::parseTransposingAttribute(SourceLoc atLoc,
              /*DeclModifier*/ false);
     return makeParserError();
   }
-
   {
     SyntaxParsingContext ContentContext(
-        SyntaxContext, SyntaxKind::TransposingAttributeArguments);
-  
+        SyntaxContext, SyntaxKind::DerivativeRegistrationAttributeArguments);
+    // Parse the 'of:' label and colon.
+    if (parseSpecificIdentifier("of", diag::attr_missing_label, "of",
+                                AttrName) ||
+        parseToken(tok::colon, diag::expected_colon_after_label, "of")) {
+      return makeParserError();
+    }
     {
-      // Parse the optionally qualified function.
-      if (parseQualifiedDeclName(*this,
-                                 diag::attr_transposing_expected_original_name,
-                                 baseType, original))
-        return makeParserError();
-      
-      if (consumeIfTrailingComma())
+      // Parse the optionally qualified function name.
+      if (parseQualifiedDeclName(
+              *this, diag::autodiff_attr_expected_original_decl_name, baseType,
+              original))
         return makeParserError();
     }
-
-    // Parse the optional 'wrt' differentiation parameters clause.
+    if (consumeIfTrailingComma())
+      return makeParserError();
+    // Parse the optional 'wrt' transposed parameters clause.
     if (Tok.is(tok::identifier) && Tok.getText() == "wrt" &&
-        parseTransposingParametersClause(params, AttrName))
+        parseDifferentiationParametersClause(params, AttrName,
+                                             /*allowNamedParameters*/ false))
       return makeParserError();
   }
-
   // Parse ')'.
   if (!consumeIf(tok::r_paren, rParenLoc)) {
     diagnose(getEndOfPreviousLoc(), diag::attr_expected_rparen, AttrName,
              /*DeclModifier*/ false);
     return makeParserError();
   }
-  return ParserResult<TransposingAttr>(TransposingAttr::create(
+  return ParserResult<TransposeAttr>(TransposeAttr::create(
       Context, /*implicit*/ false, atLoc, SourceRange(loc, rParenLoc), baseType,
       original, params));
 }
+// SWIFT_ENABLE_TENSORFLOW END
 
+// SWIFT_ENABLE_TENSORFLOW
 ParserResult<QuotedAttr> Parser::parseQuotedAttribute(SourceLoc atLoc,
                                                       SourceLoc loc) {
   if (Context.LangOpts.EnableExperimentalQuasiquotes) {
@@ -1360,6 +1375,7 @@ ParserResult<QuotedAttr> Parser::parseQuotedAttribute(SourceLoc atLoc,
     return makeParserError();
   }
 }
+// SWIFT_ENABLE_TENSORFLOW END
 
 void Parser::parseObjCSelector(SmallVector<Identifier, 4> &Names,
                                SmallVector<SourceLoc, 4> &NameLocs,
@@ -1825,18 +1841,164 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
       return false;
     }
 
-    // Diagnose using @_semantics in a local scope.  These don't
-    // actually work.
-    if (CurDeclContext->isLocalContext()) {
-      // Emit an error, but do not discard the attribute.  This enables
-      // better recovery in the parser.
-      diagnose(Loc, diag::attr_only_at_non_local_scope, AttrName);
-    }
-
     if (!DiscardAttribute)
       Attributes.add(new (Context) SemanticsAttr(Value.getValue(), AtLoc,
                                                  AttrRange,
                                                  /*Implicit=*/false));
+    break;
+  }
+  case DAK_OriginallyDefinedIn: {
+    auto LeftLoc = Tok.getLoc();
+    if (!consumeIf(tok::l_paren)) {
+      diagnose(Loc, diag::attr_expected_lparen, AttrName,
+               DeclAttribute::isDeclModifier(DK));
+      return false;
+    }
+    SourceLoc RightLoc;
+    enum class NextSegmentKind: uint8_t {
+      ModuleName = 0,
+      PlatformVersion,
+    };
+    NextSegmentKind NK = NextSegmentKind::ModuleName;
+    StringRef OriginalModuleName;
+    llvm::SmallVector<std::pair<PlatformKind, llvm::VersionTuple>, 4>
+      PlatformAndVersions;
+
+    StringRef AttrName = "@_originalDefinedIn";
+    if (parseList(tok::r_paren, LeftLoc, RightLoc, false,
+                  diag::originally_defined_in_missing_rparen,
+                  SyntaxKind::Unknown, [&]() -> ParserStatus {
+      SWIFT_DEFER {
+        if (NK != NextSegmentKind::PlatformVersion) {
+          NK = (NextSegmentKind)((uint8_t)NK + (uint8_t)1);
+        }
+      };
+      switch (NK) {
+      // Parse 'module: "original_module_name"'.
+      case NextSegmentKind::ModuleName: {
+        // Parse 'module' ':'.
+        if (!Tok.is(tok::identifier) || Tok.getText() != "module" ||
+            !peekToken().is(tok::colon)) {
+          diagnose(Tok, diag::originally_defined_in_need_original_module_name);
+          return makeParserError();
+        }
+        consumeToken(tok::identifier);
+        consumeToken(tok::colon);
+        // Parse the next string literal as the original module name.
+        auto ModuleNameLoc = Tok.getLoc();
+        if (Tok.is(tok::string_literal)) {
+          auto NameOp = getStringLiteralIfNotInterpolated(Tok.getLoc(),
+                                                          "original module name");
+          if (NameOp.hasValue())
+            OriginalModuleName = *NameOp;
+          consumeToken();
+        }
+        if (OriginalModuleName.empty()) {
+          diagnose(ModuleNameLoc,
+                   diag::originally_defined_in_need_nonempty_module_name);
+          return makeParserError();
+        }
+        return makeParserSuccess();
+      }
+      // Parse 'OSX 13.13'.
+      case NextSegmentKind::PlatformVersion: {
+        if ((Tok.is(tok::identifier) || Tok.is(tok::oper_binary_spaced)) &&
+            (peekToken().is(tok::floating_literal) ||
+             peekToken().is(tok::integer_literal))) {
+          PlatformKind Platform;
+          // Parse platform name.
+          auto Plat = platformFromString(Tok.getText());
+          if (!Plat.hasValue()) {
+            diagnose(Tok.getLoc(),
+                     diag::originally_defined_in_unrecognized_platform);
+            return makeParserError();
+          } else {
+            consumeToken();
+            Platform = *Plat;
+          }
+          // Parse version number
+          llvm::VersionTuple VerTuple;
+          SourceRange VersionRange;
+          if (parseVersionTuple(VerTuple, VersionRange,
+              Diagnostic(diag::attr_availability_expected_version, AttrName))) {
+            return makeParserError();
+          } else {
+            if (VerTuple.getSubminor().hasValue() ||
+                VerTuple.getBuild().hasValue()) {
+              diagnose(Tok.getLoc(), diag::originally_defined_in_major_minor_only);
+            }
+            // * as platform name isn't supported.
+            if (Platform == PlatformKind::none) {
+              diagnose(AtLoc, diag::originally_defined_in_missing_platform_name);
+            } else {
+              PlatformAndVersions.emplace_back(Platform, VerTuple);
+            }
+            return makeParserSuccess();
+          }
+        }
+        diagnose(AtLoc, diag::originally_defined_in_need_platform_version);
+        return makeParserError();
+      }
+      }
+    }).isError()) {
+      return false;
+    }
+    if (OriginalModuleName.empty()) {
+      diagnose(AtLoc, diag::originally_defined_in_need_nonempty_module_name);
+      return false;
+    }
+    if (PlatformAndVersions.empty()) {
+      diagnose(AtLoc, diag::originally_defined_in_need_platform_version);
+      return false;
+    }
+
+    assert(!OriginalModuleName.empty());
+    assert(!PlatformAndVersions.empty());
+    assert(NK == NextSegmentKind::PlatformVersion);
+    AttrRange = SourceRange(Loc, Tok.getLoc());
+    for (auto &Item: PlatformAndVersions) {
+      Attributes.add(new (Context) OriginallyDefinedInAttr(AtLoc, AttrRange,
+                                                           OriginalModuleName,
+                                                           Item.first,
+                                                           Item.second,
+                                                           /*IsImplicit*/false));
+    }
+    break;
+  }
+
+  case DAK_ImplicitlySynthesizesNestedRequirement: {
+    if (!consumeIf(tok::l_paren)) {
+      diagnose(Loc, diag::attr_expected_lparen, AttrName,
+               DeclAttribute::isDeclModifier(DK));
+      return false;
+    }
+
+    if (Tok.isNot(tok::string_literal)) {
+      diagnose(Loc, diag::attr_expected_string_literal, AttrName);
+      return false;
+    }
+
+    auto Value = getStringLiteralIfNotInterpolated(
+        Loc, ("'" + AttrName + "'").str());
+
+    consumeToken(tok::string_literal);
+
+    if (Value.hasValue())
+      AttrRange = SourceRange(Loc, Tok.getRange().getStart());
+    else
+      DiscardAttribute = true;
+
+    if (!consumeIf(tok::r_paren)) {
+      diagnose(Loc, diag::attr_expected_rparen, AttrName,
+               DeclAttribute::isDeclModifier(DK));
+      return false;
+    }
+
+    if (!DiscardAttribute) {
+      Attributes.add(new (Context)
+                     ImplicitlySynthesizesNestedRequirementAttr(Value.getValue(), AtLoc,
+                                                   AttrRange));
+    }
     break;
   }
 
@@ -2100,7 +2262,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
     }
 
     SourceLoc LParenLoc = consumeToken(tok::l_paren);
-    DeclName replacedFunction;
+    DeclNameRef replacedFunction;
     {
       SyntaxParsingContext ContentContext(
           SyntaxContext, SyntaxKind::NamedAttributeStringArgument);
@@ -2168,9 +2330,40 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
     break;
   }
 
-  // SWIFT_ENABLE_TENSORFLOW
   case DAK_Differentiable: {
     auto Attr = parseDifferentiableAttribute(AtLoc, Loc);
+    if (Attr.isNonNull())
+      Attributes.add(Attr.get());
+
+    // TODO(TF-1001): Remove 'jvp:' and 'vjp:' parameters from '@differentiable'
+    // attribute, and remove the following check.
+    // `@differentiable` with derivative registration in a local scope is not
+    // allowed.
+    if (Attr.isNonNull() && CurDeclContext->isLocalContext() &&
+        (Attr.get()->getJVP() || Attr.get()->getVJP()))
+      diagnose(Loc, diag::attr_only_at_non_local_scope,
+               '@' + AttrName.str() + "(jvp:vjp:)");
+    break;
+  }
+
+  case DAK_Derivative: {
+    // `@derivative` in a local scope is not allowed.
+    if (CurDeclContext->isLocalContext())
+      diagnose(Loc, diag::attr_only_at_non_local_scope, '@' + AttrName.str());
+
+    auto Attr = parseDerivativeAttribute(AtLoc, Loc);
+    if (Attr.isNonNull())
+      Attributes.add(Attr.get());
+    break;
+  }
+
+  // SWIFT_ENABLE_TENSORFLOW
+  case DAK_Transpose: {
+    // `@transpose` in a local scope is not allowed.
+    if (CurDeclContext->isLocalContext())
+      diagnose(Loc, diag::attr_only_at_non_local_scope, '@' + AttrName.str());
+
+    auto Attr = parseTransposeAttribute(AtLoc, Loc);
     if (Attr.isNonNull())
       Attributes.add(Attr.get());
     break;
@@ -2178,15 +2371,14 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
 
   // SWIFT_ENABLE_TENSORFLOW
   case DAK_Differentiating: {
-    auto Attr = parseDifferentiatingAttribute(AtLoc, Loc);
-    if (Attr.isNonNull())
-      Attributes.add(Attr.get());
-    break;
-  }
+    // Diagnose deprecated `@differentiating` attribute.
+    diagnose(Loc, diag::attr_differentiating_deprecated);
 
-  // SWIFT_ENABLE_TENSORFLOW
-  case DAK_Transposing: {
-    auto Attr = parseTransposingAttribute(AtLoc, Loc);
+    // `@differentiating` in a local scope is not allowed.
+    if (CurDeclContext->isLocalContext())
+      diagnose(Loc, diag::attr_only_at_non_local_scope, '@' + AttrName.str());
+
+    auto Attr = parseDifferentiatingAttribute(AtLoc, Loc);
     if (Attr.isNonNull())
       Attributes.add(Attr.get());
     break;
@@ -2509,7 +2701,7 @@ ParserStatus Parser::parseDeclAttribute(DeclAttributes &Attributes, SourceLoc At
                                 /*isPostfix=*/false, /*isExprBasic=*/true,
                                 lParenLoc, args, argLabels, argLabelLocs,
                                 rParenLoc, trailingClosure,
-                                SyntaxKind::FunctionCallArgumentList);
+                                SyntaxKind::TupleExprElementList);
         assert(!trailingClosure && "Cannot parse a trailing closure here");
         hasInitializer = true;
       }
@@ -2533,7 +2725,138 @@ ParserStatus Parser::parseDeclAttribute(DeclAttributes &Attributes, SourceLoc At
 
 bool Parser::canParseTypeAttribute() {
   TypeAttributes attrs; // ignored
-  return !parseTypeAttribute(attrs, /*justChecking*/ true);
+  return !parseTypeAttribute(attrs, /*atLoc=*/SourceLoc(),
+                             /*justChecking*/ true);
+}
+
+/// Parses the '@differentiable' argument (no argument list, or '(linear)'),
+/// and sets the appropriate fields on `Attributes`.
+///
+/// \param emitDiagnostics - if false, doesn't emit diagnostics
+/// \returns true on error, false on success
+static bool parseDifferentiableAttributeArgument(Parser &P,
+                                                 TypeAttributes &Attributes,
+                                                 bool emitDiagnostics) {
+  Parser::BacktrackingScope backtrack(P);
+
+  // Match '( <identifier> )', and store the identifier token to `argument`.
+  if (!P.consumeIf(tok::l_paren))
+    return false;
+  auto argument = P.Tok;
+  if (!P.consumeIf(tok::identifier))
+    return false;
+  if (!P.consumeIf(tok::r_paren)) {
+    // Special case handling for '( <identifier> (' so that we don't produce the
+    // misleading diagnostic "expected ',' separator" when the real issue is
+    // that the user forgot the ')' closing the '@differentiable' argument list.
+    if (P.Tok.is(tok::l_paren)) {
+      backtrack.cancelBacktrack();
+      if (emitDiagnostics)
+        P.diagnose(P.Tok, diag::differentiable_attribute_expected_rparen);
+      return true;
+    }
+    return false;
+  }
+
+  // If the next token is not a `(`, `@`, or an identifier, then the
+  // matched '( <identifier> )' is actually the parameter type list,
+  // not an argument to '@differentiable'.
+  if (P.Tok.isNot(tok::l_paren, tok::at_sign, tok::identifier))
+    return false;
+
+  backtrack.cancelBacktrack();
+
+  if (argument.getText() != "linear") {
+    if (emitDiagnostics)
+      P.diagnose(argument, diag::unexpected_argument_differentiable,
+                 argument.getText());
+    return true;
+  }
+
+  Attributes.linear = true;
+  return false;
+}
+
+/// Parse the inside of a convention attribute '(...)'.
+///
+/// The '@convention' prefix should've been parsed by the caller.
+/// See `Parser::parseTypeAttribute` for the justChecking argument.
+///
+/// Returns true if there was an error.
+bool Parser::parseConventionAttributeInternal(
+    bool justChecking, TypeAttributes::Convention &convention) {
+  SourceLoc LPLoc;
+  if (!consumeIfNotAtStartOfLine(tok::l_paren)) {
+    if (!justChecking)
+      diagnose(Tok, diag::convention_attribute_expected_lparen);
+    return true;
+  }
+
+  if (Tok.isNot(tok::identifier)) {
+    if (!justChecking)
+      diagnose(Tok, diag::convention_attribute_expected_name);
+    return true;
+  }
+
+  convention.Name = Tok.getText();
+  consumeToken(tok::identifier);
+
+  // Consume extra (optional) ', cType: " blah blah "'
+  if (consumeIf(tok::comma)) {
+    if (Tok.isNot(tok::identifier)) {
+      if (!justChecking)
+        diagnose(Tok, diag::convention_attribute_ctype_expected_label);
+      return true;
+    }
+    auto cTypeLabel = Tok.getText();
+    consumeToken(tok::identifier);
+    if (cTypeLabel != "cType") {
+      if (!justChecking)
+        diagnose(Tok, diag::convention_attribute_ctype_expected_label);
+      return true;
+    }
+    if (!consumeIf(tok::colon)) {
+      if (!justChecking)
+        diagnose(Tok, diag::convention_attribute_ctype_expected_colon);
+      return true;
+    }
+    if (Tok.isNot(tok::string_literal)) {
+      if (!justChecking)
+        diagnose(Tok, diag::convention_attribute_ctype_expected_string);
+      return true;
+    }
+    if (auto ty = getStringLiteralIfNotInterpolated(Tok.getLoc(), "(C type)")) {
+      convention.ClangType = ty.getValue();
+      convention.ClangTypeLoc = Tok.getLoc();
+    }
+    consumeToken(tok::string_literal);
+  }
+
+  if (convention.Name == "witness_method") {
+    if (!consumeIf(tok::colon)) {
+      if (!justChecking)
+        diagnose(Tok,
+                 diag::convention_attribute_witness_method_expected_colon);
+      return true;
+    }
+
+    DeclNameLoc unusedWitnessMethodProtocolLoc;
+    convention.WitnessMethodProtocol = parseUnqualifiedDeclBaseName(
+        /*afterDot=*/false, unusedWitnessMethodProtocolLoc,
+       diag::convention_attribute_witness_method_expected_protocol
+    );
+  }
+  
+  // Parse the ')'.  We can't use parseMatchingToken if we're in
+  // just-checking mode.
+  if (justChecking && Tok.isNot(tok::r_paren))
+    return true;
+
+  SourceLoc RPLoc;
+  parseMatchingToken(tok::r_paren, RPLoc,
+                     diag::convention_attribute_expected_rparen,
+                     LPLoc);
+  return false;
 }
 
 /// \verbatim
@@ -2544,7 +2867,8 @@ bool Parser::canParseTypeAttribute() {
 /// \param justChecking - if true, we're just checking whether we
 ///   canParseTypeAttribute; don't emit any diagnostics, and there's
 ///   no need to actually record the attribute
-bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
+bool Parser::parseTypeAttribute(TypeAttributes &Attributes, SourceLoc AtLoc,
+                                bool justChecking) {
   // If this not an identifier, the attribute is malformed.
   if (Tok.isNot(tok::identifier) &&
       // These are keywords that we accept as attribute names.
@@ -2606,101 +2930,16 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
   
   // Ok, it is a valid attribute, eat it, and then process it.
   StringRef Text = Tok.getText();
-  SourceLoc Loc = consumeToken();
-
-  StringRef conventionName;
-  StringRef witnessMethodProtocol;
-
-  if (attr == TAK_convention) {
-    SourceLoc LPLoc;
-    if (!consumeIfNotAtStartOfLine(tok::l_paren)) {
-      if (!justChecking)
-        diagnose(Tok, diag::convention_attribute_expected_lparen);
-      return true;
-    }
-
-    if (Tok.isNot(tok::identifier)) {
-      if (!justChecking)
-        diagnose(Tok, diag::convention_attribute_expected_name);
-      return true;
-    }
-
-    conventionName = Tok.getText();
-    consumeToken(tok::identifier);
-
-    if (conventionName == "witness_method") {
-      if (Tok.isNot(tok::colon)) {
-        if (!justChecking)
-          diagnose(Tok,
-                   diag::convention_attribute_witness_method_expected_colon);
-        return true;
-      }
-      consumeToken(tok::colon);
-      if (Tok.isNot(tok::identifier)) {
-        if (!justChecking)
-          diagnose(Tok,
-                   diag::convention_attribute_witness_method_expected_protocol);
-        return true;
-      }
-
-      witnessMethodProtocol = Tok.getText();
-      consumeToken(tok::identifier);
-    }
-
-    // Parse the ')'.  We can't use parseMatchingToken if we're in
-    // just-checking mode.
-    if (justChecking && Tok.isNot(tok::r_paren))
-      return true;
-
-    SourceLoc RPLoc;
-    parseMatchingToken(tok::r_paren, RPLoc,
-                       diag::convention_attribute_expected_rparen,
-                       LPLoc);
-  }
+  consumeToken();
   
-  // SWIFT_ENABLE_TENSORFLOW
-  bool linear = false;
-  if (attr == TAK_differentiable) {
-    // Check if there is a 'linear' argument.
-    if (Tok.is(tok::l_paren) && peekToken().is(tok::identifier)) {
-      Parser::BacktrackingScope backtrack(*this);
-      consumeToken(tok::l_paren);
-      
-      // Determine if we have '@differentiable(linear) (T) -> U'
-      // or '@differentiable (linear) -> U'.
-      if (Tok.getText() == "linear" && consumeIf(tok::identifier)) {
-        if (Tok.is(tok::r_paren) && peekToken().is(tok::l_paren)) {
-          // It is being used as an attribute argument, so cancel backtrack
-          // as function is linear differentiable.
-          linear = true;
-          backtrack.cancelBacktrack();
-          consumeToken(tok::r_paren);
-        } else if (Tok.is(tok::l_paren)) {
-          // Handle invalid '@differentiable(linear (T) -> U'
-          if (!justChecking)
-            diagnose(Tok,
-                     diag::differentiable_attribute_expected_rparen);
-          backtrack.cancelBacktrack();
-          return false;
-        }
-      } else if (Tok.is(tok::identifier)) {
-        // No 'linear' arg or param type, but now checking if the token is being
-        // passed in as an invalid argument to '@differentiable'.
-        auto possibleArg = Tok.getText();
-        auto t = Tok; // get ref to the argument for clearer diagnostics.
-        consumeToken(tok::identifier);
-        // Check if there is an invalid argument getting passed into
-        // '@differentiable'.
-        if (Tok.is(tok::r_paren) && peekToken().is(tok::l_paren)) {
-          // Handling '@differentiable(wrong) (...'.
-          if (!justChecking)
-            diagnose(t, diag::unexpected_argument_differentiable,
-                     possibleArg);
-          consumeToken(tok::r_paren);
-          backtrack.cancelBacktrack();
-          return false;
-        }
-      }
+  TypeAttributes::Convention convention;
+  if (attr == TAK_convention) {
+    bool failedToParse =
+      parseConventionAttributeInternal(justChecking, convention);
+    if (failedToParse) {
+      if (Tok.is(tok::r_paren))
+        consumeToken();
+      return true;
     }
   }
 
@@ -2711,7 +2950,7 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
 
   // Diagnose duplicated attributes.
   if (Attributes.has(attr)) {
-    diagnose(Loc, diag::duplicate_attribute, /*isModifier=*/false);
+    diagnose(AtLoc, diag::duplicate_attribute, /*isModifier=*/false);
     return false;
   }
 
@@ -2733,7 +2972,7 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
   case TAK_callee_guaranteed:
   case TAK_objc_metatype:
     if (!isInSILMode()) {
-      diagnose(Loc, diag::only_allowed_in_sil, Text);
+      diagnose(AtLoc, diag::only_allowed_in_sil, Text);
       return false;
     }
     break;
@@ -2742,12 +2981,12 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
   case TAK_sil_weak:
   case TAK_sil_unowned:
     if (!isInSILMode()) {
-      diagnose(Loc, diag::only_allowed_in_sil, Text);
+      diagnose(AtLoc, diag::only_allowed_in_sil, Text);
       return false;
     }
       
     if (Attributes.hasOwnership()) {
-      diagnose(Loc, diag::duplicate_attribute, /*isModifier*/false);
+      diagnose(AtLoc, diag::duplicate_attribute, /*isModifier*/false);
       return false;
     }
     break;
@@ -2755,14 +2994,14 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
   // 'inout' attribute.
   case TAK_inout:
     if (!isInSILMode()) {
-      diagnose(Loc, diag::inout_not_attribute);
+      diagnose(AtLoc, diag::inout_not_attribute);
       return false;
     }
     break;
       
   case TAK_opened: {
     if (!isInSILMode()) {
-      diagnose(Loc, diag::only_allowed_in_sil, "opened");
+      diagnose(AtLoc, diag::only_allowed_in_sil, "opened");
       return false;
     }
 
@@ -2793,10 +3032,16 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
     break;
   }
 
+  case TAK_differentiable: {
+    if (parseDifferentiableAttributeArgument(*this, Attributes,
+                                             /*emitDiagnostics=*/!justChecking))
+      return true;
+    break;
+  }
+
   // Convention attribute.
   case TAK_convention:
-    Attributes.convention = conventionName;
-    Attributes.conventionWitnessMethodProtocol = witnessMethodProtocol;
+    Attributes.ConventionArguments = convention;
     break;
       
   case TAK__opaqueReturnTypeOf: {
@@ -2840,14 +3085,9 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
     Attributes.setOpaqueReturnTypeOf(mangling, index);
     break;
   }
-  // SWIFT_ENABLE_TENSORFLOW
-  // @differentiable(...) attribute.
-  case TAK_differentiable:
-    Attributes.linear = linear;
-    break;
   }
 
-  Attributes.setAttr(attr, Loc);
+  Attributes.setAttr(attr, AtLoc);
   return false;
 }
 
@@ -3064,8 +3304,8 @@ bool Parser::parseTypeAttributeListPresent(ParamDecl::Specifier &Specifier,
     if (Attributes.AtLoc.isInvalid())
       Attributes.AtLoc = Tok.getLoc();
     SyntaxParsingContext AttrCtx(SyntaxContext, SyntaxKind::Attribute);
-    consumeToken();
-    if (parseTypeAttribute(Attributes))
+    SourceLoc AtLoc = consumeToken();
+    if (parseTypeAttribute(Attributes, AtLoc))
       return true;
   }
   
@@ -3124,20 +3364,29 @@ static void diagnoseOperatorFixityAttributes(Parser &P,
   }
 }
 
-static unsigned skipUntilMatchingRBrace(Parser &P, bool &HasPoundDirective,
-                                        SyntaxParsingContext *&SyntaxContext) {
+static unsigned skipUntilMatchingRBrace(Parser &P,
+                                        bool &HasPoundDirective,
+                                        bool &HasOperatorDeclarations,
+                                        bool &HasNestedClassDeclarations) {
   HasPoundDirective = false;
-  bool isRootCtx = SyntaxContext->isRoot();
-  SyntaxParsingContext BlockItemListContext(SyntaxContext,
-                                            SyntaxKind::CodeBlockItemList);
-  if (isRootCtx) {
-    BlockItemListContext.setTransparent();
-  }
-  SyntaxParsingContext BlockItemContext(SyntaxContext,
-                                        SyntaxKind::CodeBlockItem);
-  SyntaxParsingContext BodyContext(SyntaxContext, SyntaxKind::TokenList);
+  HasOperatorDeclarations = false;
+  HasNestedClassDeclarations = false;
+
   unsigned OpenBraces = 1;
+
+  bool LastTokenWasFunc = false;
+
   while (OpenBraces != 0 && P.Tok.isNot(tok::eof)) {
+    // Detect 'func' followed by an operator identifier.
+    if (LastTokenWasFunc) {
+      LastTokenWasFunc = false;
+      HasOperatorDeclarations |= P.Tok.isAnyOperator();
+    } else {
+      LastTokenWasFunc = P.Tok.is(tok::kw_func);
+    }
+
+    HasNestedClassDeclarations |= P.Tok.is(tok::kw_class);
+
     HasPoundDirective |= P.Tok.isAny(tok::pound_sourceLocation, tok::pound_line,
       tok::pound_if, tok::pound_else, tok::pound_endif, tok::pound_elseif);
     if (P.consumeIf(tok::l_brace)) {
@@ -3308,15 +3557,18 @@ bool Parser::isStartOfDecl() {
 void Parser::consumeDecl(ParserPosition BeginParserPosition,
                          ParseDeclOptions Flags,
                          bool IsTopLevel) {
+  SyntaxParsingContext Discarding(SyntaxContext);
+  Discarding.disable();
   SourceLoc CurrentLoc = Tok.getLoc();
 
   SourceLoc EndLoc = PreviousLoc;
   backtrackToPosition(BeginParserPosition);
   SourceLoc BeginLoc = Tok.getLoc();
 
-  State->delayDecl(PersistentParserState::DelayedDeclKind::Decl, Flags.toRaw(),
-                   CurDeclContext, {BeginLoc, EndLoc},
-                   BeginParserPosition.PreviousLoc);
+  State->setCodeCompletionDelayedDeclState(
+      PersistentParserState::CodeCompletionDelayedDeclKind::Decl,
+      Flags.toRaw(), CurDeclContext, {BeginLoc, EndLoc},
+      BeginParserPosition.PreviousLoc);
 
   while (SourceMgr.isBeforeInBuffer(Tok.getLoc(), CurrentLoc))
     consumeToken();
@@ -3351,20 +3603,13 @@ void Parser::setLocalDiscriminatorToParamList(ParameterList *PL) {
   }
 }
 
-void Parser::delayParseFromBeginningToHere(ParserPosition BeginParserPosition,
-                                           ParseDeclOptions Flags) {
-  auto CurLoc = Tok.getLoc();
-  backtrackToPosition(BeginParserPosition);
-  SourceLoc BeginLoc = Tok.getLoc();
-  SourceLoc EndLoc = CurLoc;
-  State->delayDecl(PersistentParserState::DelayedDeclKind::Decl,
-                   Flags.toRaw(),
-                   CurDeclContext, {BeginLoc, EndLoc},
-                   BeginParserPosition.PreviousLoc);
-
-  while (Tok.isNot(tok::eof))
-    consumeToken();
+// SWIFT_ENABLE_TENSORFLOW
+static void setOriginalFunctionInDifferentiableAttributes(
+    DeclAttributes Attributes, Decl *D) {
+  for (auto *attr : Attributes.getAttributes<DifferentiableAttr>())
+    const_cast<DifferentiableAttr *>(attr)->setOriginalDeclaration(D);
 }
+// SWIFT_ENABLE_TENSORFLOW END
 
 /// Parse a single syntactic declaration and return a list of decl
 /// ASTs.  This can return multiple results for var decls that bind to multiple
@@ -3687,12 +3932,12 @@ Parser::parseDecl(ParseDeclOptions Flags,
     if (CurDeclContext) {
       if (auto nominal = dyn_cast<NominalTypeDecl>(CurDeclContext)) {
         diagnose(nominal->getLoc(), diag::note_in_decl_extension, false,
-                 nominal->getName());
+                 nominal->createNameRef());
       } else if (auto extension = dyn_cast<ExtensionDecl>(CurDeclContext)) {
-        if (auto repr = extension->getExtendedTypeLoc().getTypeRepr()) {
+        if (auto repr = extension->getExtendedTypeRepr()) {
           if (auto idRepr = dyn_cast<IdentTypeRepr>(repr)) {
             diagnose(extension->getLoc(), diag::note_in_decl_extension, true,
-                     idRepr->getComponentRange().front()->getIdentifier());
+                     idRepr->getComponentRange().front()->getNameRef());
           }
         }
       }
@@ -3735,34 +3980,29 @@ Parser::parseDecl(ParseDeclOptions Flags,
     consumeToken(tok::code_complete);
   }
 
-  if (AttrStatus.hasCodeCompletion()) {
-    if (CodeCompletion) {
+  if (AttrStatus.hasCodeCompletion() || DeclResult.hasCodeCompletion()) {
+    if (isCodeCompletionFirstPass() &&
+        !CurDeclContext->isModuleScopeContext() &&
+        !isa<TopLevelCodeDecl>(CurDeclContext) &&
+        !isa<AbstractClosureExpr>(CurDeclContext)) {
+      // Only consume non-toplevel decls.
+      consumeDecl(BeginParserPosition, Flags, /*IsTopLevel=*/false);
+
+      return makeParserError();
+    }
+    if (AttrStatus.hasCodeCompletion() && CodeCompletion) {
       Optional<DeclKind> DK;
       if (DeclResult.isNonNull())
         DK = DeclResult.get()->getKind();
       CodeCompletion->setAttrTargetDeclKind(DK);
-    } else {
-      delayParseFromBeginningToHere(BeginParserPosition, Flags);
-      return makeParserError();
     }
-  }
-
-  if (DeclResult.hasCodeCompletion() && isCodeCompletionFirstPass() &&
-      !CurDeclContext->isModuleScopeContext() &&
-      !isa<TopLevelCodeDecl>(CurDeclContext)) {
-    // Only consume non-toplevel decls.
-    consumeDecl(BeginParserPosition, Flags, /*IsTopLevel=*/false);
-
-    return makeParserError();
+    DeclResult.setHasCodeCompletion();
   }
 
   if (auto SF = CurDeclContext->getParentSourceFile()) {
     if (!getScopeInfo().isInactiveConfigBlock()) {
       for (auto Attr : Attributes) {
-        if (isa<ObjCAttr>(Attr) ||
-            /* Pre Swift 5 dymamic implied @objc */
-            (!Context.LangOpts.isSwiftVersionAtLeast(5) &&
-             isa<DynamicAttr>(Attr)))
+        if (isa<ObjCAttr>(Attr))
           SF->AttrsRequiringFoundation.insert(Attr);
       }
     }
@@ -3772,6 +4012,7 @@ Parser::parseDecl(ParseDeclOptions Flags,
     Decl *D = DeclResult.get();
     if (!declWasHandledAlready(D)) {
       Handler(D);
+      // SWIFT_ENABLE_TENSORFLOW
       if (auto FD = dyn_cast<FuncDecl>(D)) {
         if (auto attr = D->getAttrs().getAttribute<QuotedAttr>()) {
           // TODO(TF-718): Properly mangle names for quote decls.
@@ -3792,7 +4033,8 @@ Parser::parseDecl(ParseDeclOptions Flags,
           auto params =
               ParameterList::create(Context, SourceLoc(), {}, SourceLoc());
           auto ret = new (Context)
-              SimpleIdentTypeRepr(SourceLoc(), Context.getIdentifier("Tree"));
+              SimpleIdentTypeRepr(DeclNameLoc(),
+                                  DeclNameRef(Context.getIdentifier("Tree")));
           auto quoteDecl = FuncDecl::create(
               Context, SourceLoc(), kind, SourceLoc(), name, SourceLoc(),
               /*Throws=*/false, SourceLoc(),
@@ -3809,7 +4051,12 @@ Parser::parseDecl(ParseDeclOptions Flags,
           Handler(quoteDecl);
         }
       }
+      // SWIFT_ENABLE_TENSORFLOW END
     }
+    // SWIFT_ENABLE_TENSORFLOW
+    // Set original declaration in `@differentiable` attributes.
+    setOriginalFunctionInDifferentiableAttributes(D->getAttrs(), D);
+    // SWIFT_ENABLE_TENSORFLOW END
   }
 
   if (!DeclResult.isParseError()) {
@@ -3824,12 +4071,72 @@ Parser::parseDecl(ParseDeclOptions Flags,
   return DeclResult;
 }
 
-void Parser::parseDeclListDelayed(IterableDeclContext *IDC) {
-  auto DelayedState = State->takeDelayedDeclListState(IDC);
-  assert(DelayedState.get() && "should have delayed state");
+/// Determine the declaration parsing options to use when parsing the members
+/// of the given context.
+static Parser::ParseDeclOptions getMemberParseDeclOptions(
+                                                    IterableDeclContext *idc) {
+  using ParseDeclOptions = Parser::ParseDeclOptions;
 
-  auto BeginParserPosition = getParserPosition(DelayedState->BodyPos);
-  auto EndLexerState = L->getStateForEndOfTokenLoc(DelayedState->BodyEnd);
+  auto decl = idc->getDecl();
+  switch (decl->getKind()) {
+  case DeclKind::Extension:
+    return ParseDeclOptions(
+        Parser::PD_HasContainerType | Parser::PD_InExtension);
+  case DeclKind::Enum:
+    return ParseDeclOptions(
+        Parser::PD_HasContainerType | Parser::PD_AllowEnumElement |
+        Parser::PD_InEnum);
+
+  case DeclKind::Protocol:
+    return ParseDeclOptions(
+        Parser::PD_HasContainerType | Parser::PD_DisallowInit |
+        Parser::PD_InProtocol);
+
+  case DeclKind::Class:
+    return ParseDeclOptions(
+        Parser::PD_HasContainerType | Parser::PD_AllowDestructor |
+        Parser::PD_InClass);
+
+  case DeclKind::Struct:
+    return ParseDeclOptions(Parser::PD_HasContainerType | Parser::PD_InStruct);
+
+  default:
+    llvm_unreachable("Bad iterable decl context kinds.");
+  }
+}
+
+static ScopeKind getMemberParseScopeKind(IterableDeclContext *idc) {
+  auto decl = idc->getDecl();
+  switch (decl->getKind()) {
+  case DeclKind::Extension: return ScopeKind::Extension;
+  case DeclKind::Enum: return ScopeKind::EnumBody;
+  case DeclKind::Protocol: return ScopeKind::ProtocolBody;
+  case DeclKind::Class: return ScopeKind::ClassBody;
+  case DeclKind::Struct: return ScopeKind::StructBody;
+
+  default:
+    llvm_unreachable("Bad iterable decl context kinds.");
+  }
+}
+
+std::vector<Decl *> Parser::parseDeclListDelayed(IterableDeclContext *IDC) {
+  Decl *D = const_cast<Decl*>(IDC->getDecl());
+  DeclContext *DC = cast<DeclContext>(D);
+  SourceRange BodyRange;
+  if (auto ext = dyn_cast<ExtensionDecl>(IDC)) {
+    BodyRange = ext->getBraces();
+  } else {
+    auto *ntd = cast<NominalTypeDecl>(IDC);
+    BodyRange = ntd->getBraces();
+  }
+
+  if (BodyRange.isInvalid()) {
+    assert(D->isImplicit());
+    return { };
+  }
+
+  auto BeginParserPosition = getParserPosition({BodyRange.Start,BodyRange.End});
+  auto EndLexerState = L->getStateForEndOfTokenLoc(BodyRange.End);
 
   // ParserPositionRAII needs a primed parser to restore to.
   if (Tok.is(tok::NUM_TOKENS))
@@ -3844,14 +4151,25 @@ void Parser::parseDeclListDelayed(IterableDeclContext *IDC) {
   // Temporarily swap out the parser's current lexer with our new one.
   llvm::SaveAndRestore<Lexer *> T(L, &LocalLex);
 
-  // Rewind to the beginning of the decl.
+  // Rewind to the start of the member list, which is a '{' in well-formed
+  // code.
   restoreParserPosition(BeginParserPosition);
 
-  // Re-enter the lexical scope.
-  Scope S(this, DelayedState->takeScope());
-  ContextChange CC(*this, DelayedState->ParentContext);
-  Decl *D = const_cast<Decl*>(IDC->getDecl());
+  // If there is no left brace, then return an empty list of declarations;
+  // we will have already diagnosed this.
+  if (!Tok.is(tok::l_brace))
+    return { };
+
+  // Re-enter the lexical scope. The top-level scope is needed because
+  // delayed parsing of members happens with a fresh parser, where there is
+  // no context.
+  Scope TopLevelScope(this, ScopeKind::TopLevel);
+
+  Scope S(this, getMemberParseScopeKind(IDC));
+  ContextChange CC(*this, DC);
   SourceLoc LBLoc = consumeToken(tok::l_brace);
+  (void)LBLoc;
+  assert(LBLoc == BodyRange.Start);
   SourceLoc RBLoc;
   Diag<> Id;
   switch (D->getKind()) {
@@ -3863,60 +4181,9 @@ void Parser::parseDeclListDelayed(IterableDeclContext *IDC) {
   default:
     llvm_unreachable("Bad iterable decl context kinds.");
   }
-  if (auto *ext = dyn_cast<ExtensionDecl>(D)) {
-    parseDeclList(ext->getBraces().Start, RBLoc, Id,
-                  ParseDeclOptions(DelayedState->Flags),
-                  ext);
-    ext->setBraces({LBLoc, RBLoc});
-  } else {
-    auto *ntd = cast<NominalTypeDecl>(D);
-    parseDeclList(ntd->getBraces().Start, RBLoc, Id,
-                  ParseDeclOptions(DelayedState->Flags),
-                  ntd);
-    ntd->setBraces({LBLoc, RBLoc});
-  }
-}
-
-void Parser::parseDeclDelayed() {
-  auto DelayedState = State->takeDelayedDeclState();
-  assert(DelayedState.get() && "should have delayed state");
-
-  auto BeginParserPosition = getParserPosition(DelayedState->BodyPos);
-  auto EndLexerState = L->getStateForEndOfTokenLoc(DelayedState->BodyEnd);
-
-  // ParserPositionRAII needs a primed parser to restore to.
-  if (Tok.is(tok::NUM_TOKENS))
-    consumeTokenWithoutFeedingReceiver();
-
-  // Ensure that we restore the parser state at exit.
-  ParserPositionRAII PPR(*this);
-
-  // Create a lexer that cannot go past the end state.
-  Lexer LocalLex(*L, BeginParserPosition.LS, EndLexerState);
-
-  // Temporarily swap out the parser's current lexer with our new one.
-  llvm::SaveAndRestore<Lexer *> T(L, &LocalLex);
-
-  // Rewind to the beginning of the decl.
-  restoreParserPosition(BeginParserPosition);
-
-  // Re-enter the lexical scope.
-  Scope S(this, DelayedState->takeScope());
-  ContextChange CC(*this, DelayedState->ParentContext);
-
-  parseDecl(ParseDeclOptions(DelayedState->Flags),
-            /*IsAtStartOfLineOrPreviousHadSemi=*/true,
-            [&](Decl *D) {
-    if (auto *parent = DelayedState->ParentContext) {
-      if (auto *NTD = dyn_cast<NominalTypeDecl>(parent)) {
-        NTD->addMember(D);
-      } else if (auto *ED = dyn_cast<ExtensionDecl>(parent)) {
-        ED->addMember(D);
-      } else if (auto *SF = dyn_cast<SourceFile>(parent)) {
-        SF->Decls.push_back(D);
-      }
-    }
-  });
+  bool hadError = false;
+  ParseDeclOptions Options = getMemberParseDeclOptions(IDC);
+  return parseDeclList(LBLoc, RBLoc, Id, Options, IDC, hadError);
 }
 
 /// Parse an 'import' declaration, doing no token skipping on error.
@@ -4099,8 +4366,8 @@ ParserStatus Parser::parseInheritance(SmallVectorImpl<TypeLoc> &Inherited,
 
       // Add 'AnyObject' to the inherited list.
       Inherited.push_back(
-        new (Context) SimpleIdentTypeRepr(classLoc,
-                                          Context.getIdentifier("AnyObject")));
+        new (Context) SimpleIdentTypeRepr(DeclNameLoc(classLoc), DeclNameRef(
+                                          Context.getIdentifier("AnyObject"))));
       continue;
     }
 
@@ -4115,16 +4382,10 @@ ParserStatus Parser::parseInheritance(SmallVectorImpl<TypeLoc> &Inherited,
   return Status;
 }
 
-enum class TokenProperty {
-  None,
-  StartsWithLess,
-};
-
 static ParserStatus
 parseIdentifierDeclName(Parser &P, Identifier &Result, SourceLoc &Loc,
-                        StringRef DeclKindName, tok ResyncT1, tok ResyncT2,
-                        tok ResyncT3, tok ResyncT4,
-                        TokenProperty ResyncP1) {
+                        StringRef DeclKindName,
+                        llvm::function_ref<bool(const Token &)> canRecover) {
   if (P.Tok.is(tok::identifier)) {
     Loc = P.consumeIdentifier(&Result);
 
@@ -4163,9 +4424,7 @@ parseIdentifierDeclName(Parser &P, Identifier &Result, SourceLoc &Loc,
       .fixItReplace(P.Tok.getLoc(), "`" + P.Tok.getText().str() + "`");
 
     // Recover if the next token is one of the expected tokens.
-    auto Next = P.peekToken();
-    if (Next.isAny(ResyncT1, ResyncT2, ResyncT3, ResyncT4) ||
-        (ResyncP1 != TokenProperty::None && P.startsWithLess(Next))) {
+    if (canRecover(P.peekToken())) {
       llvm::SmallString<32> Name(P.Tok.getText());
       // Append an invalid character so that nothing can resolve to this name.
       Name += "#";
@@ -4180,38 +4439,6 @@ parseIdentifierDeclName(Parser &P, Identifier &Result, SourceLoc &Loc,
 
   P.diagnose(P.Tok, diag::expected_identifier_in_decl, DeclKindName);
   return makeParserError();
-}
-
-static ParserStatus
-parseIdentifierDeclName(Parser &P, Identifier &Result, SourceLoc &L,
-                        StringRef DeclKindName, tok ResyncT1, tok ResyncT2) {
-  return parseIdentifierDeclName(P, Result, L, DeclKindName, ResyncT1, ResyncT2,
-                                 tok::NUM_TOKENS, tok::NUM_TOKENS,
-                                 TokenProperty::None);
-}
-
-static ParserStatus
-parseIdentifierDeclName(Parser &P, Identifier &Result, SourceLoc &L,
-                        StringRef DeclKindName, tok ResyncT1, tok ResyncT2,
-                        tok ResyncT3, tok ResyncT4) {
-  return parseIdentifierDeclName(P, Result, L, DeclKindName, ResyncT1, ResyncT2,
-                                 ResyncT3, ResyncT4, TokenProperty::None);
-}
-
-static ParserStatus
-parseIdentifierDeclName(Parser &P, Identifier &Result, SourceLoc &L,
-                        StringRef DeclKindName, tok ResyncT1, tok ResyncT2,
-                        TokenProperty ResyncP1) {
-  return parseIdentifierDeclName(P, Result, L, DeclKindName, ResyncT1, ResyncT2,
-                                 tok::NUM_TOKENS, tok::NUM_TOKENS, ResyncP1);
-}
-
-static ParserStatus
-parseIdentifierDeclName(Parser &P, Identifier &Result, SourceLoc &L,
-                        StringRef DeclKindName, tok ResyncT1, tok ResyncT2,
-                        tok ResyncT3, TokenProperty ResyncP1) {
-  return parseIdentifierDeclName(P, Result, L, DeclKindName, ResyncT1, ResyncT2,
-                                 ResyncT3, tok::NUM_TOKENS, ResyncP1);
 }
 
 /// Add a fix-it to remove the space in consecutive identifiers.
@@ -4288,21 +4515,59 @@ ParserStatus Parser::parseDeclItem(bool &PreviousHadSemi,
   return Result;
 }
 
+bool Parser::parseMemberDeclList(SourceLoc LBLoc, SourceLoc &RBLoc,
+                                 SourceLoc PosBeforeLB,
+                                 Diag<> ErrorDiag,
+                                 IterableDeclContext *IDC) {
+  bool HasOperatorDeclarations;
+  bool HasNestedClassDeclarations;
+
+  if (canDelayMemberDeclParsing(HasOperatorDeclarations,
+                                HasNestedClassDeclarations)) {
+    if (HasOperatorDeclarations)
+      IDC->setMaybeHasOperatorDeclarations();
+    if (HasNestedClassDeclarations)
+      IDC->setMaybeHasNestedClassDeclarations();
+
+    if (delayParsingDeclList(LBLoc, RBLoc, IDC))
+      return true;
+  } else {
+    // When forced to eagerly parse, do so and cache the results in the
+    // evaluator.
+    bool hadError = false;
+    ParseDeclOptions Options = getMemberParseDeclOptions(IDC);
+    auto members = parseDeclList(
+        LBLoc, RBLoc, ErrorDiag, Options, IDC, hadError);
+    IDC->setMaybeHasOperatorDeclarations();
+    IDC->setMaybeHasNestedClassDeclarations();
+    Context.evaluator.cacheOutput(
+        ParseMembersRequest{IDC},
+        Context.AllocateCopy(llvm::makeArrayRef(members)));
+
+    if (hadError)
+      return true;
+  }
+
+  return false;
+}
+
 /// Parse the members in a struct/class/enum/protocol/extension.
 ///
 /// \verbatim
 ///    decl* '}'
 /// \endverbatim
-bool Parser::parseDeclList(SourceLoc LBLoc, SourceLoc &RBLoc,
-                           Diag<> ErrorDiag, ParseDeclOptions Options,
-                           IterableDeclContext *IDC) {
+std::vector<Decl *> Parser::parseDeclList(
+    SourceLoc LBLoc, SourceLoc &RBLoc, Diag<> ErrorDiag,
+    ParseDeclOptions Options, IterableDeclContext *IDC,
+    bool &hadError) {
+  std::vector<Decl *> decls;
   ParserStatus Status;
   bool PreviousHadSemi = true;
   {
     SyntaxParsingContext ListContext(SyntaxContext, SyntaxKind::MemberDeclList);
     while (Tok.isNot(tok::r_brace)) {
       Status |= parseDeclItem(PreviousHadSemi, Options,
-                              [&](Decl *D) { IDC->addMember(D); });
+                              [&](Decl *D) { decls.push_back(D); });
       if (Tok.isAny(tok::eof, tok::pound_endif, tok::pound_else,
                     tok::pound_elseif)) {
         IsInputIncomplete = true;
@@ -4321,10 +4586,13 @@ bool Parser::parseDeclList(SourceLoc LBLoc, SourceLoc &RBLoc,
   }
   // If we found the closing brace, then the caller should not care if there
   // were errors while parsing inner decls, because we recovered.
-  return !RBLoc.isValid();
+  if (RBLoc.isInvalid())
+    hadError = true;
+  return decls;
 }
 
-bool Parser::canDelayMemberDeclParsing() {
+bool Parser::canDelayMemberDeclParsing(bool &HasOperatorDeclarations,
+                                       bool &HasNestedClassDeclarations) {
   // If explicitly disabled, respect the flag.
   if (!DelayBodyParsing)
     return false;
@@ -4337,15 +4605,16 @@ bool Parser::canDelayMemberDeclParsing() {
   // we can't lazily parse.
   BacktrackingScope BackTrack(*this);
   bool HasPoundDirective;
-  skipUntilMatchingRBrace(*this, HasPoundDirective, SyntaxContext);
+  skipUntilMatchingRBrace(*this,
+                          HasPoundDirective,
+                          HasOperatorDeclarations,
+                          HasNestedClassDeclarations);
   if (!HasPoundDirective)
     BackTrack.cancelBacktrack();
   return !BackTrack.willBacktrack();
 }
 
 bool Parser::delayParsingDeclList(SourceLoc LBLoc, SourceLoc &RBLoc,
-                                  SourceLoc PosBeforeLB,
-                                  ParseDeclOptions Options,
                                   IterableDeclContext *IDC) {
   bool error = false;
 
@@ -4355,8 +4624,8 @@ bool Parser::delayParsingDeclList(SourceLoc LBLoc, SourceLoc &RBLoc,
     RBLoc = Tok.getLoc();
     error = true;
   }
-  State->delayDeclList(IDC, Options.toRaw(), CurDeclContext, { LBLoc, RBLoc },
-                        PosBeforeLB);
+
+  State->delayDeclList(IDC);
   return error;
 }
 
@@ -4422,15 +4691,11 @@ Parser::parseDeclExtension(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   } else {
     ContextChange CC(*this, ext);
     Scope S(this, ScopeKind::Extension);
-    ParseDeclOptions Options(PD_HasContainerType | PD_InExtension);
-    if (canDelayMemberDeclParsing()) {
-      if (delayParsingDeclList(LBLoc, RBLoc, PosBeforeLB, Options, ext))
-        status.setIsParseError();
-    } else {
-      if (parseDeclList(LBLoc, RBLoc, diag::expected_rbrace_extension,
-                        Options, ext))
-        status.setIsParseError();
-    }
+
+    if (parseMemberDeclList(LBLoc, RBLoc, PosBeforeLB,
+                            diag::expected_rbrace_extension,
+                            ext))
+      status.setIsParseError();
 
     // Don't propagate the code completion bit from members: we cannot help
     // code completion inside a member decl, and our callers cannot do
@@ -4685,7 +4950,7 @@ parseDeclTypeAlias(Parser::ParseDeclOptions Flags, DeclAttributes &Attributes) {
   ParserPosition startPosition = getParserPosition();
   llvm::Optional<SyntaxParsingContext> TmpCtxt;
   TmpCtxt.emplace(SyntaxContext);
-  TmpCtxt->setTransparent();
+  TmpCtxt->setBackTracking();
 
   SourceLoc TypeAliasLoc = consumeToken(tok::kw_typealias);
   SourceLoc EqualLoc;
@@ -4693,10 +4958,13 @@ parseDeclTypeAlias(Parser::ParseDeclOptions Flags, DeclAttributes &Attributes) {
   SourceLoc IdLoc;
   ParserStatus Status;
 
-  Status |= parseIdentifierDeclName(*this, Id, IdLoc, "typealias",
-                                    tok::colon, tok::equal);
-  if (Status.isError())
+  Status |= parseIdentifierDeclName(
+      *this, Id, IdLoc, "typealias",
+      [](const Token &next) { return next.isAny(tok::colon, tok::equal); });
+  if (Status.isError()) {
+    TmpCtxt->setTransparent();
     return nullptr;
+  }
     
   DebuggerContextChange DCC(*this, Id, DeclKind::TypeAlias);
 
@@ -4722,18 +4990,17 @@ parseDeclTypeAlias(Parser::ParseDeclOptions Flags, DeclAttributes &Attributes) {
   }
 
   if (Flags.contains(PD_InProtocol) && !genericParams && !Tok.is(tok::equal)) {
-    TmpCtxt->setBackTracking();
     TmpCtxt.reset();
     // If we're in a protocol and don't see an '=' this looks like leftover Swift 2
     // code intending to be an associatedtype.
     backtrackToPosition(startPosition);
     return parseDeclAssociatedType(Flags, Attributes);
   }
+  TmpCtxt->setTransparent();
   TmpCtxt.reset();
 
   auto *TAD = new (Context) TypeAliasDecl(TypeAliasLoc, EqualLoc, Id, IdLoc,
-                                          /*genericParams*/nullptr,
-                                          CurDeclContext);
+                                          genericParams, CurDeclContext);
   setLocalDiscriminator(TAD);
   ParserResult<TypeRepr> UnderlyingTy;
 
@@ -4757,7 +5024,7 @@ parseDeclTypeAlias(Parser::ParseDeclOptions Flags, DeclAttributes &Attributes) {
     Status |= UnderlyingTy;
   }
 
-  TAD->getUnderlyingTypeLoc() = UnderlyingTy.getPtrOrNull();
+  TAD->setUnderlyingTypeRepr(UnderlyingTy.getPtrOrNull());
   TAD->getAttrs() = Attributes;
 
   // Parse a 'where' clause if present, adding it to our GenericParamList.
@@ -4765,9 +5032,6 @@ parseDeclTypeAlias(Parser::ParseDeclOptions Flags, DeclAttributes &Attributes) {
     ContextChange CC(*this, TAD);
     Status |= parseFreestandingGenericWhereClause(genericParams);
   }
-
-  // Set after parsing the where clause, which might create genericParams.
-  TAD->setGenericParams(genericParams);
 
   if (UnderlyingTy.isNull()) {
     // If there is an attempt to do code completion
@@ -4810,9 +5074,10 @@ ParserResult<TypeDecl> Parser::parseDeclAssociatedType(Parser::ParseDeclOptions 
   } else {
     AssociatedTypeLoc = consumeToken(tok::kw_associatedtype);
   }
-  
-  Status = parseIdentifierDeclName(*this, Id, IdLoc, "associatedtype",
-                                   tok::colon, tok::equal);
+
+  Status = parseIdentifierDeclName(
+      *this, Id, IdLoc, "associatedtype",
+      [](const Token &next) { return next.isAny(tok::colon, tok::equal); });
   if (Status.isError())
     return nullptr;
   
@@ -4885,7 +5150,6 @@ static AccessorDecl *createAccessorFunc(SourceLoc DeclLoc,
                                     ParameterList *param,
                                     GenericParamList *GenericParams,
                                     ParameterList *Indices,
-                                    TypeLoc ElementTy,
                                     SourceLoc StaticLoc,
                                     Parser::ParseDeclOptions Flags,
                                     AccessorKind Kind,
@@ -4916,8 +5180,7 @@ static AccessorDecl *createAccessorFunc(SourceLoc DeclLoc,
         // Clone the parameter.  Do not clone the parameter type;
         // this will be filled in by the type-checker.
         auto accessorParam =
-          new (P->Context) ParamDecl(storageParam->getSpecifier(),
-                                     storageParam->getSpecifierLoc(),
+          new (P->Context) ParamDecl(storageParam->getSpecifierLoc(),
                                      storageParam->getArgumentNameLoc(),
                                      storageParam->getArgumentName(),
                                      storageParam->getNameLoc(),
@@ -4968,7 +5231,7 @@ static AccessorDecl *createAccessorFunc(SourceLoc DeclLoc,
 static ParamDecl *createSetterAccessorArgument(SourceLoc nameLoc,
                                                Identifier name,
                                                AccessorKind accessorKind,
-                                               Parser &P, TypeLoc elementType) {
+                                               Parser &P) {
   // Add the parameter. If no name was specified, the name defaults to
   // 'value'.
   bool isNameImplicit = name.empty();
@@ -4979,21 +5242,11 @@ static ParamDecl *createSetterAccessorArgument(SourceLoc nameLoc,
   }
 
   auto result = new (P.Context)
-      ParamDecl(ParamDecl::Specifier::Default, SourceLoc(), SourceLoc(),
+      ParamDecl(SourceLoc(), SourceLoc(),
                 Identifier(), nameLoc, name, P.CurDeclContext);
+
   if (isNameImplicit)
     result->setImplicit();
-
-  // AST Walker shouldn't go into the type recursively.
-  result->setIsTypeLocImplicit(true);
-
-  if (auto *repr = elementType.getTypeRepr()) {
-    if (repr->getKind() ==
-        TypeReprKind::ImplicitlyUnwrappedOptional) {
-      result->getAttrs().add(
-          new (P.Context) ImplicitlyUnwrappedOptionalAttr(/* implicit= */ true));
-    }
-  }
 
   return result;
 }
@@ -5003,8 +5256,7 @@ static ParamDecl *createSetterAccessorArgument(SourceLoc nameLoc,
 /// present.
 static ParameterList *parseOptionalAccessorArgument(SourceLoc SpecifierLoc,
                                                     Parser &P,
-                                                    AccessorKind Kind,
-                                                    TypeLoc ElementTy) {
+                                                    AccessorKind Kind) {
   // 'set' and 'willSet' have a (value) parameter, 'didSet' takes an (oldValue)
   // parameter and 'get' and always takes a () parameter.
   if (Kind != AccessorKind::Set && Kind != AccessorKind::WillSet &&
@@ -5043,20 +5295,28 @@ static ParameterList *parseOptionalAccessorArgument(SourceLoc SpecifierLoc,
   }
 
   if (Name.empty()) NameLoc = SpecifierLoc;
-  auto param = createSetterAccessorArgument(NameLoc, Name, Kind, P, ElementTy);
+  auto param = createSetterAccessorArgument(NameLoc, Name, Kind, P);
   return ParameterList::create(P.Context, StartLoc, param, EndLoc);
 }
 
-static unsigned skipBracedBlock(Parser &P,
-                                SyntaxParsingContext *&SyntaxContext) {
-  SyntaxParsingContext CodeBlockContext(SyntaxContext, SyntaxKind::CodeBlock);
-  P.consumeToken(tok::l_brace);
+bool Parser::skipBracedBlock() {
+  SyntaxParsingContext disabled(SyntaxContext);
+  SyntaxContext->disable();
+  consumeToken(tok::l_brace);
+
+  // We don't care if a skipped function body contained any of these, so
+  // just ignore them.
   bool HasPoundDirectives;
-  unsigned OpenBraces = skipUntilMatchingRBrace(P, HasPoundDirectives,
-                                                SyntaxContext);
-  if (P.consumeIf(tok::r_brace))
+  bool HasOperatorDeclarations;
+  bool HasNestedClassDeclarations;
+
+  unsigned OpenBraces = skipUntilMatchingRBrace(*this,
+                                                HasPoundDirectives,
+                                                HasOperatorDeclarations,
+                                                HasNestedClassDeclarations);
+  if (consumeIf(tok::r_brace))
     OpenBraces--;
-  return OpenBraces;
+  return OpenBraces != 0;
 }
 
 /// Returns a descriptive name for the given accessor/addressor kind.
@@ -5197,13 +5457,13 @@ static bool parseAccessorIntroducer(Parser &P,
 ParserStatus Parser::parseGetSet(ParseDeclOptions Flags,
                                  GenericParamList *GenericParams,
                                  ParameterList *Indices,
-                                 TypeLoc ElementTy, ParsedAccessors &accessors,
+                                 ParsedAccessors &accessors,
                                  AbstractStorageDecl *storage,
                                  SourceLoc StaticLoc) {
   assert(Tok.is(tok::l_brace));
 
   // Properties in protocols use a very limited syntax.
-  // SIL mode and parseable interfaces use the same syntax.
+  // SIL mode and module interfaces use the same syntax.
   // Otherwise, we have a normal var or subscript declaration and we need
   // parse the full complement of specifiers, along with their bodies.
   bool parsingLimitedSyntax = Flags.contains(PD_InProtocol) ||
@@ -5217,9 +5477,11 @@ ParserStatus Parser::parseGetSet(ParseDeclOptions Flags,
   if (peekToken().is(tok::r_brace)) {
     accessors.LBLoc = consumeToken(tok::l_brace);
     // Give syntax node an empty accessor list.
-    SourceLoc listLoc = accessors.LBLoc.getAdvancedLoc(1);
-    SyntaxContext->addSyntax(
-      ParsedSyntaxRecorder::makeBlankAccessorList(listLoc, *SyntaxContext));
+    if (SyntaxContext->isEnabled()) {
+      SourceLoc listLoc = leadingTriviaLoc();
+      SyntaxContext->addSyntax(
+          ParsedSyntaxRecorder::makeBlankAccessorList(listLoc, *SyntaxContext));
+    }
     accessors.RBLoc = consumeToken(tok::r_brace);
 
     // In the limited syntax, fall out and let the caller handle it.
@@ -5236,7 +5498,7 @@ ParserStatus Parser::parseGetSet(ParseDeclOptions Flags,
     accessors.LBLoc = Tok.getLoc();
     auto getter =
         createAccessorFunc(Tok.getLoc(), /*ValueNamePattern*/ nullptr,
-                           GenericParams, Indices, ElementTy, StaticLoc, Flags,
+                           GenericParams, Indices, StaticLoc, Flags,
                            AccessorKind::Get, storage, this,
                            /*AccessorKeywordLoc*/ SourceLoc());
     accessors.add(getter);
@@ -5280,7 +5542,7 @@ ParserStatus Parser::parseGetSet(ParseDeclOptions Flags,
             // expression in a multi-statement body.
             auto getter = createAccessorFunc(
                 accessors.LBLoc, /*ValueNamePattern*/ nullptr, GenericParams,
-                Indices, ElementTy, StaticLoc, Flags, AccessorKind::Get,
+                Indices, StaticLoc, Flags, AccessorKind::Get,
                 storage, this, /*AccessorKeywordLoc*/ SourceLoc());
             CCE = new (Context) CodeCompletionExpr(Tok.getLoc());
             getter->setBodyParsed(BraceStmt::create(Context, Tok.getLoc(),
@@ -5336,12 +5598,11 @@ ParserStatus Parser::parseGetSet(ParseDeclOptions Flags,
     if (parsingLimitedSyntax && Tok.is(tok::l_paren)) {
       diagnose(Loc, diag::protocol_setter_name);
     }
-    auto *ValueNamePattern =
-        parseOptionalAccessorArgument(Loc, *this, Kind, ElementTy);
+    auto *ValueNamePattern = parseOptionalAccessorArgument(Loc, *this, Kind);
 
     // Set up a function declaration.
     auto accessor = createAccessorFunc(Loc, ValueNamePattern, GenericParams,
-                                       Indices, ElementTy, StaticLoc, Flags,
+                                       Indices, StaticLoc, Flags,
                                        Kind, storage, this, Loc);
     accessor->getAttrs() = Attributes;
 
@@ -5358,7 +5619,7 @@ ParserStatus Parser::parseGetSet(ParseDeclOptions Flags,
 
     // It's okay not to have a body if there's an external asm name.
     if (!Tok.is(tok::l_brace)) {
-      // Accessors don't need bodies in parseable interfaces
+      // Accessors don't need bodies in module interfaces
       if (SF.Kind == SourceFileKind::Interface)
         continue;
       // _silgen_name'd accessors don't need bodies.
@@ -5432,13 +5693,6 @@ Parser::parseDeclVarGetSet(Pattern *pattern, ParseDeclOptions Flags,
     Invalid = true;
   }
 
-  TypeLoc TyLoc;
-  if (auto *TP = dyn_cast<TypedPattern>(pattern)) {
-    TyLoc = TP->getTypeLoc();
-  } else if (!PrimaryVar) {
-    TyLoc = TypeLoc::withoutLoc(ErrorType::get(Context));
-  }
-
   // Create a fake VarDecl and PBD so that we don't have to weaken the
   // formation rule that an AccessorDecl always has a VarDecl.
   VarDecl *storage = PrimaryVar;
@@ -5449,7 +5703,7 @@ Parser::parseDeclVarGetSet(Pattern *pattern, ParseDeclOptions Flags,
                                     VarLoc, Identifier(),
                                     CurDeclContext);
     storage->setImplicit(true);
-    storage->setInvalid(true);
+    storage->setInvalid();
 
     Pattern *pattern =
       TypedPattern::createImplicit(Context, new (Context) NamedPattern(storage),
@@ -5459,7 +5713,7 @@ Parser::parseDeclVarGetSet(Pattern *pattern, ParseDeclOptions Flags,
     auto binding = PatternBindingDecl::create(Context, StaticLoc,
                                               StaticSpelling,
                                               VarLoc, entry, CurDeclContext);
-    binding->setInvalid(true);
+    binding->setInvalid();
     storage->setParentPatternBinding(binding);
 
     Decls.push_back(binding);
@@ -5469,7 +5723,7 @@ Parser::parseDeclVarGetSet(Pattern *pattern, ParseDeclOptions Flags,
   // Parse getter and setter.
   ParsedAccessors accessors;
   auto AccessorStatus = parseGetSet(Flags, /*GenericParams=*/nullptr,
-                                    /*Indices=*/nullptr, TyLoc, accessors,
+                                    /*Indices=*/nullptr, accessors,
                                     storage, StaticLoc);
   if (AccessorStatus.hasCodeCompletion())
     return makeParserCodeCompletionStatus();
@@ -5479,6 +5733,11 @@ Parser::parseDeclVarGetSet(Pattern *pattern, ParseDeclOptions Flags,
   // If we have an invalid case, bail out now.
   if (!PrimaryVar)
     return nullptr;
+
+  TypeLoc TyLoc;
+  if (auto *TP = dyn_cast<TypedPattern>(pattern)) {
+    TyLoc = TP->getTypeLoc();
+  }
 
   if (!TyLoc.hasLocation()) {
     if (accessors.Get || accessors.Set || accessors.Address ||
@@ -5506,6 +5765,13 @@ Parser::parseDeclVarGetSet(Pattern *pattern, ParseDeclOptions Flags,
   }
 
   accessors.record(*this, PrimaryVar, Invalid);
+
+  // SWIFT_ENABLE_TENSORFLOW
+  // Set original declaration in `@differentiable` attributes.
+  for (auto *accessor : accessors.Accessors)
+    setOriginalFunctionInDifferentiableAttributes(accessor->getAttrs(),
+                                                  accessor);
+  // SWIFT_ENABLE_TENSORFLOW END
 
   return makeParserResult(PrimaryVar);
 }
@@ -5537,12 +5803,6 @@ void Parser::ParsedAccessors::record(Parser &P, AbstractStorageDecl *storage,
   storage->setAccessors(LBLoc, Accessors, RBLoc);
 }
 
-static void flagInvalidAccessor(AccessorDecl *func) {
-  if (func) {
-    func->setInvalid();
-  }
-}
-
 static void diagnoseConflictingAccessors(Parser &P, AccessorDecl *first,
                                          AccessorDecl *&second) {
   if (!second) return;
@@ -5553,7 +5813,7 @@ static void diagnoseConflictingAccessors(Parser &P, AccessorDecl *first,
   P.diagnose(first->getLoc(), diag::previous_accessor,
              getAccessorNameForDiagnostic(first, /*article*/ false),
              /*already*/ false);
-  flagInvalidAccessor(second);
+  second->setInvalid();
 }
 
 template <class... DiagArgs>
@@ -5563,11 +5823,11 @@ static void diagnoseAndIgnoreObservers(Parser &P,
                         typename std::enable_if<true, DiagArgs>::type... args) {
   if (auto &accessor = accessors.WillSet) {
     P.diagnose(accessor->getLoc(), diagnostic, /*willSet*/ 0, args...);
-    flagInvalidAccessor(accessor);
+    accessor->setInvalid();
   }
   if (auto &accessor = accessors.DidSet) {
     P.diagnose(accessor->getLoc(), diagnostic, /*didSet*/ 1, args...);
-    flagInvalidAccessor(accessor);
+    accessor->setInvalid();
   }
 }
 
@@ -5579,7 +5839,7 @@ void Parser::ParsedAccessors::classify(Parser &P, AbstractStorageDecl *storage,
   // was invalid.
   if (invalid) {
     for (auto accessor : Accessors) {
-      flagInvalidAccessor(accessor);
+      accessor->setInvalid();
     }
   }
 
@@ -5707,12 +5967,12 @@ Parser::parseDeclVar(ParseDeclOptions Flags,
     // Now that we've parsed all of our patterns, initializers and accessors, we
     // can finally create our PatternBindingDecl to represent the
     // pattern/initializer pairs.
-    auto PBD = PatternBindingDecl::create(Context, StaticLoc, StaticSpelling,
-                                          VarLoc, PBDEntries, BaseContext);
+    auto *PBD = PatternBindingDecl::create(Context, StaticLoc, StaticSpelling,
+                                           VarLoc, PBDEntries, BaseContext);
 
     // Wire up any initializer contexts we needed.
     for (unsigned i : indices(PBDEntries)) {
-      if (auto initContext = PBDEntries[i].getInitContext())
+      if (auto initContext = PBD->getInitContext(i))
         cast<PatternBindingInitializer>(initContext)->setBinding(PBD, i);
     }
 
@@ -5767,9 +6027,13 @@ Parser::parseDeclVar(ParseDeclOptions Flags,
     pattern->forEachVariable([&](VarDecl *VD) {
       VD->setStatic(StaticLoc.isValid());
       VD->getAttrs() = Attributes;
+      // SWIFT_ENABLE_TENSORFLOW
+      // Set original declaration in `@differentiable` attributes.
+      setOriginalFunctionInDifferentiableAttributes(Attributes, VD);
+      // SWIFT_ENABLE_TENSORFLOW END
       setLocalDiscriminator(VD);
       Decls.push_back(VD);
-      if (hasOpaqueReturnTy && sf) {
+      if (hasOpaqueReturnTy && sf && !InInactiveClauseEnvironment) {
         sf->addUnvalidatedDeclWithOpaqueResultType(VD);
       }
     });
@@ -5828,7 +6092,8 @@ Parser::parseDeclVar(ParseDeclOptions Flags,
       PBDEntries.back().setEqualLoc(EqualLoc);
 
       ParserResult<Expr> init = parseExpr(diag::expected_init_value);
-      
+      PBDEntries.back().setOriginalInit(init.getPtrOrNull());
+
       // If this Pattern binding was not supposed to have an initializer, but it
       // did, diagnose this and remove it.
       if (Flags & PD_DisallowInit && init.isNonNull()) {
@@ -5932,31 +6197,21 @@ void Parser::consumeAbstractFunctionBody(AbstractFunctionDecl *AFD,
   SourceRange BodyRange;
   BodyRange.Start = Tok.getLoc();
 
-  // Consume the '{', and find the matching '}'.
-  unsigned OpenBraces = skipBracedBlock(*this, SyntaxContext);
-  if (OpenBraces != 0 && Tok.isNot(tok::code_complete)) {
-    assert(Tok.is(tok::eof));
-    // We hit EOF, and not every brace has a pair.  Recover by searching
-    // for the next decl except variable decls and cutting off before
-    // that point.
-    backtrackToPosition(BeginParserPosition);
-    consumeToken(tok::l_brace);
-    while (Tok.is(tok::kw_var) || Tok.is(tok::kw_let) ||
-           (Tok.isNot(tok::eof) && !isStartOfDecl())) {
-      consumeToken();
-    }
-  }
+  // Advance the parser to the end of the block; '{' ... '}'.
+  skipBracedBlock();
 
   BodyRange.End = PreviousLoc;
 
-  if (DelayedParseCB &&
-      DelayedParseCB->shouldDelayFunctionBodyParsing(*this, AFD, Attrs,
-                                                     BodyRange)) {
-    State->delayFunctionBodyParsing(AFD, BodyRange,
-                                    BeginParserPosition.PreviousLoc);
-    AFD->setBodyDelayed(BodyRange);
-  } else {
-    AFD->setBodySkipped(BodyRange);
+  AFD->setBodyDelayed(BodyRange);
+
+  if (isCodeCompletionFirstPass()) {
+    if (SourceMgr.rangeContainsCodeCompletionLoc(BodyRange)) {
+      State->setCodeCompletionDelayedDeclState(
+          PersistentParserState::CodeCompletionDelayedDeclKind::FunctionBody,
+          PD_Default, AFD, BodyRange, BeginParserPosition.PreviousLoc);
+    } else {
+      AFD->setBodySkipped(BodyRange);
+    }
   }
 }
 
@@ -5997,6 +6252,7 @@ ParserResult<FuncDecl> Parser::parseDeclFunc(SourceLoc StaticLoc,
     }
   }
 
+  ParserStatus Status;
   SourceLoc FuncLoc =
       HasFuncKeyword ? consumeToken(tok::kw_func) : Tok.getLoc();
 
@@ -6039,8 +6295,10 @@ ParserResult<FuncDecl> Parser::parseDeclFunc(SourceLoc StaticLoc,
     // because we're aggressive about recovering/providing good diagnostics for
     // beginners.
     auto NameStatus = parseIdentifierDeclName(
-        *this, SimpleName, NameLoc, "function", tok::l_paren, tok::arrow,
-        tok::l_brace, TokenProperty::StartsWithLess);
+        *this, SimpleName, NameLoc, "function", [&](const Token &next) {
+          return next.isAny(tok::l_paren, tok::arrow, tok::l_brace) ||
+                 startsWithLess(next);
+        });
     if (NameStatus.isError())
       return nullptr;
   }
@@ -6051,12 +6309,13 @@ ParserResult<FuncDecl> Parser::parseDeclFunc(SourceLoc StaticLoc,
   Optional<Scope> GenericsScope;
   GenericsScope.emplace(this, ScopeKind::Generics);
   GenericParamList *GenericParams;
-  bool SignatureHasCodeCompletion = false;
   auto GenericParamResult = maybeParseGenericParams();
   GenericParams = GenericParamResult.getPtrOrNull();
-  SignatureHasCodeCompletion |= GenericParamResult.hasCodeCompletion();
-  if (SignatureHasCodeCompletion && !CodeCompletion)
-    return makeParserCodeCompletionStatus();
+  if (GenericParamResult.hasCodeCompletion()) {
+    Status.setHasCodeCompletion();
+    if (!CodeCompletion)
+      return Status;
+  }
 
   DefaultArgumentInfo DefaultArgs;
   TypeRepr *FuncRetTy = nullptr;
@@ -6064,14 +6323,11 @@ ParserResult<FuncDecl> Parser::parseDeclFunc(SourceLoc StaticLoc,
   ParameterList *BodyParams;
   SourceLoc throwsLoc;
   bool rethrows;
-  ParserStatus SignatureStatus =
-      parseFunctionSignature(SimpleName, FullName, BodyParams, DefaultArgs,
-                             throwsLoc, rethrows, FuncRetTy);
-
-  SignatureHasCodeCompletion |= SignatureStatus.hasCodeCompletion();
-  if (SignatureStatus.hasCodeCompletion() && !CodeCompletion) {
+  Status |= parseFunctionSignature(SimpleName, FullName, BodyParams,
+                                   DefaultArgs, throwsLoc, rethrows, FuncRetTy);
+  if (Status.hasCodeCompletion() && !CodeCompletion) {
     // Trigger delayed parsing, no need to continue.
-    return SignatureStatus;
+    return Status;
   }
 
   diagnoseWhereClauseInGenericParamList(GenericParams);
@@ -6080,12 +6336,13 @@ ParserResult<FuncDecl> Parser::parseDeclFunc(SourceLoc StaticLoc,
   auto *FD = FuncDecl::create(Context, StaticLoc, StaticSpelling,
                               FuncLoc, FullName, NameLoc,
                               /*Throws=*/throwsLoc.isValid(), throwsLoc,
-                              /*GenericParams=*/nullptr,
+                              GenericParams,
                               BodyParams, FuncRetTy,
                               CurDeclContext);
 
   // Let the source file track the opaque return type mapping, if any.
-  if (FuncRetTy && isa<OpaqueReturnTypeRepr>(FuncRetTy)) {
+  if (FuncRetTy && isa<OpaqueReturnTypeRepr>(FuncRetTy) &&
+      !InInactiveClauseEnvironment) {
     if (auto sf = CurDeclContext->getParentSourceFile()) {
       sf->addUnvalidatedDeclWithOpaqueResultType(FD);
     }
@@ -6095,15 +6352,12 @@ ParserResult<FuncDecl> Parser::parseDeclFunc(SourceLoc StaticLoc,
   if (Tok.is(tok::kw_where)) {
     ContextChange CC(*this, FD);
 
-    auto whereStatus = parseFreestandingGenericWhereClause(GenericParams);
-    SignatureHasCodeCompletion |= whereStatus.hasCodeCompletion();
-    if (whereStatus.hasCodeCompletion() && !CodeCompletion) {
+    Status |= parseFreestandingGenericWhereClause(GenericParams);
+    if (Status.hasCodeCompletion() && !CodeCompletion) {
       // Trigger delayed parsing, no need to continue.
-      return whereStatus;
+      return Status;
     }
   }
-
-  FD->setGenericParams(GenericParams);
   
   // Protocol method arguments may not have default values.
   if (Flags.contains(PD_InProtocol) && DefaultArgs.HasDefaultArgument) {
@@ -6122,8 +6376,10 @@ ParserResult<FuncDecl> Parser::parseDeclFunc(SourceLoc StaticLoc,
   FD->getAttrs() = Attributes;
 
   // Pass the function signature to code completion.
-  if (SignatureHasCodeCompletion)
+  if (Status.hasCodeCompletion()) {
+    assert(CodeCompletion && "must be code completion second pass");
     CodeCompletion->setParsedDecl(FD);
+  }
 
   DefaultArgs.setFunctionContext(FD, FD->getParameters());
   setLocalDiscriminator(FD);
@@ -6133,7 +6389,7 @@ ParserResult<FuncDecl> Parser::parseDeclFunc(SourceLoc StaticLoc,
       diagnose(Tok, diag::protocol_method_with_body);
       skipSingle();
     }
-  } else {
+  } else if (!Status.hasCodeCompletion()) {
     parseAbstractFunctionBody(FD);
   }
 
@@ -6191,7 +6447,7 @@ void Parser::parseAbstractFunctionBody(AbstractFunctionDecl *AFD) {
     // may be incomplete and the type mismatch in return statement will just
     // confuse the type checker.
     if (!Body.hasCodeCompletion() && BS->getNumElements() == 1) {
-      auto Element = BS->getElement(0);
+      auto Element = BS->getFirstElement();
       if (auto *stmt = Element.dyn_cast<Stmt *>()) {
         if (isa<FuncDecl>(AFD)) {
           if (auto *returnStmt = dyn_cast<ReturnStmt>(stmt)) {
@@ -6216,15 +6472,15 @@ void Parser::parseAbstractFunctionBody(AbstractFunctionDecl *AFD) {
         }
         if (auto F = dyn_cast<FuncDecl>(AFD)) {
           auto RS = new (Context) ReturnStmt(SourceLoc(), E);
-          BS->setElement(0, RS); 
+          BS->setFirstElement(RS);
           AFD->setHasSingleExpressionBody();
           AFD->setSingleExpressionBody(E);
         } else if (auto *F = dyn_cast<ConstructorDecl>(AFD)) {
-          if (F->getFailability() != OTK_None && isa<NilLiteralExpr>(E)) {
+          if (F->isFailable() && isa<NilLiteralExpr>(E)) {
             // If it's a nil literal, just insert return.  This is the only 
             // legal thing to return.
             auto RS = new (Context) ReturnStmt(E->getStartLoc(), E);
-            BS->setElement(0, RS); 
+            BS->setFirstElement(RS);
             AFD->setHasSingleExpressionBody();
             AFD->setSingleExpressionBody(E);
           }
@@ -6234,15 +6490,12 @@ void Parser::parseAbstractFunctionBody(AbstractFunctionDecl *AFD) {
   }
 }
 
-bool Parser::parseAbstractFunctionBodyDelayed(AbstractFunctionDecl *AFD) {
-  assert(!AFD->getBody() && "function should not have a parsed body");
+BraceStmt *Parser::parseAbstractFunctionBodyDelayed(AbstractFunctionDecl *AFD) {
   assert(AFD->getBodyKind() == AbstractFunctionDecl::BodyKind::Unparsed &&
          "function body should be delayed");
 
-  auto FunctionParserState = State->takeFunctionBodyState(AFD);
-  assert(FunctionParserState.get() && "should have a valid state");
-
-  auto BeginParserPosition = getParserPosition(FunctionParserState->BodyPos);
+  auto bodyRange = AFD->getBodySourceRange();
+  auto BeginParserPosition = getParserPosition({bodyRange.Start,bodyRange.End});
   auto EndLexerState = L->getStateForEndOfTokenLoc(AFD->getEndLoc());
 
   // ParserPositionRAII needs a primed parser to restore to.
@@ -6262,20 +6515,12 @@ bool Parser::parseAbstractFunctionBodyDelayed(AbstractFunctionDecl *AFD) {
   restoreParserPosition(BeginParserPosition);
 
   // Re-enter the lexical scope.
-  Scope S(this, FunctionParserState->takeScope());
+  Scope TopLevelScope(this, ScopeKind::TopLevel);
+  Scope S(this, ScopeKind::FunctionBody);
   ParseFunctionBody CC(*this, AFD);
   setLocalDiscriminatorToParamList(AFD->getParameters());
 
-  ParserResult<BraceStmt> Body =
-      parseBraceItemList(diag::func_decl_without_brace);
-  if (Body.isNull()) {
-    // FIXME: Should do some sort of error recovery here?
-    return true;
-  } else {
-    AFD->setBodyParsed(Body.get());
-  }
-
-  return false;
+  return parseBraceItemList(diag::func_decl_without_brace).getPtrOrNull();
 }
 
 /// Parse a 'enum' declaration, returning true (and doing no token
@@ -6296,9 +6541,10 @@ ParserResult<EnumDecl> Parser::parseDeclEnum(ParseDeclOptions Flags,
   SourceLoc EnumNameLoc;
   ParserStatus Status;
 
-  Status |= parseIdentifierDeclName(*this, EnumName, EnumNameLoc, "enum",
-                                    tok::colon, tok::l_brace,
-                                    TokenProperty::StartsWithLess);
+  Status |= parseIdentifierDeclName(
+      *this, EnumName, EnumNameLoc, "enum", [&](const Token &next) {
+        return next.isAny(tok::colon, tok::l_brace) || startsWithLess(next);
+      });
   if (Status.isError())
     return nullptr;
 
@@ -6315,7 +6561,7 @@ ParserResult<EnumDecl> Parser::parseDeclEnum(ParseDeclOptions Flags,
   }
 
   EnumDecl *ED = new (Context) EnumDecl(EnumLoc, EnumName, EnumNameLoc,
-                                        { }, nullptr, CurDeclContext);
+                                        { }, GenericParams, CurDeclContext);
   setLocalDiscriminator(ED);
   ED->getAttrs() = Attributes;
 
@@ -6342,8 +6588,6 @@ ParserResult<EnumDecl> Parser::parseDeclEnum(ParseDeclOptions Flags,
     }
   }
 
-  ED->setGenericParams(GenericParams);
-
   SyntaxParsingContext BlockContext(SyntaxContext, SyntaxKind::MemberDeclBlock);
   SourceLoc LBLoc, RBLoc;
   SourceLoc PosBeforeLB = Tok.getLoc();
@@ -6353,15 +6597,11 @@ ParserResult<EnumDecl> Parser::parseDeclEnum(ParseDeclOptions Flags,
     Status.setIsParseError();
   } else {
     Scope S(this, ScopeKind::EnumBody);
-    ParseDeclOptions Options(PD_HasContainerType | PD_AllowEnumElement | PD_InEnum);
-    if (canDelayMemberDeclParsing()) {
-      if (delayParsingDeclList(LBLoc, RBLoc, PosBeforeLB, Options, ED))
-        Status.setIsParseError();
-    } else {
-      if (parseDeclList(LBLoc, RBLoc, diag::expected_rbrace_enum,
-                        Options, ED))
-        Status.setIsParseError();
-    }
+
+    if (parseMemberDeclList(LBLoc, RBLoc, PosBeforeLB,
+                            diag::expected_rbrace_enum,
+                            ED))
+      Status.setIsParseError();
   }
 
   ED->setBraces({LBLoc, RBLoc});
@@ -6408,9 +6648,11 @@ Parser::parseDeclEnumCase(ParseDeclOptions Flags,
     }
 
     if (Tok.is(tok::identifier)) {
-      Status |= parseIdentifierDeclName(*this, Name, NameLoc, "enum 'case'",
-                                        tok::l_paren, tok::kw_case, tok::colon,
-                                        tok::r_brace);
+      Status |= parseIdentifierDeclName(
+          *this, Name, NameLoc, "enum 'case'", [](const Token &next) {
+            return next.isAny(tok::l_paren, tok::kw_case, tok::colon,
+                              tok::r_brace);
+          });
       assert(Status.isSuccess());
       if (DotLoc.isValid())
         diagnose(DotLoc, diag::enum_case_dot_prefix)
@@ -6423,24 +6665,32 @@ Parser::parseDeclEnumCase(ParseDeclOptions Flags,
 
       // For recovery, see if the user typed something resembling a switch
       // "case" label.
-      llvm::SaveAndRestore<decltype(InVarOrLetPattern)>
-      T(InVarOrLetPattern, Parser::IVOLP_InMatchingPattern);
-      parseMatchingPattern(/*isExprBasic*/false);
-
-      if (consumeIf(tok::colon)) {
-        diagnose(CaseLoc, diag::case_outside_of_switch, "case");
-        Status.setIsParseError();
-        return Status;
+      {
+        BacktrackingScope backtrack(*this);
+        llvm::SaveAndRestore<decltype(InVarOrLetPattern)>
+        T(InVarOrLetPattern, Parser::IVOLP_InMatchingPattern);
+        parseMatchingPattern(/*isExprBasic*/false);
+        
+        if (consumeIf(tok::colon)) {
+          backtrack.cancelBacktrack();
+          diagnose(CaseLoc, diag::case_outside_of_switch, "case");
+          Status.setIsParseError();
+          return Status;
+        }
       }
-      if (CommaLoc.isValid()) {
-        diagnose(Tok, diag::expected_identifier_after_case_comma);
-        Status.setIsParseError();
-        return Status;
-      }
+      
       if (NameIsKeyword) {
         diagnose(TokLoc, diag::keyword_cant_be_identifier, TokText);
         diagnose(TokLoc, diag::backticks_to_escape)
           .fixItReplace(TokLoc, "`" + TokText.str() + "`");
+        if (!Tok.isAtStartOfLine()) {
+          Name = Context.getIdentifier(Tok.getText());
+          NameLoc = consumeToken();
+        }
+      } else if (CommaLoc.isValid()) {
+        diagnose(Tok, diag::expected_identifier_after_case_comma);
+        Status.setIsParseError();
+        return Status;
       } else {
         diagnose(CaseLoc, diag::expected_identifier_in_decl, "enum 'case'");
       }
@@ -6574,9 +6824,10 @@ ParserResult<StructDecl> Parser::parseDeclStruct(ParseDeclOptions Flags,
   SourceLoc StructNameLoc;
   ParserStatus Status;
 
-  Status |= parseIdentifierDeclName(*this, StructName, StructNameLoc, "struct",
-                                    tok::colon, tok::l_brace,
-                                    TokenProperty::StartsWithLess);
+  Status |= parseIdentifierDeclName(
+      *this, StructName, StructNameLoc, "struct", [&](const Token &next) {
+        return next.isAny(tok::colon, tok::l_brace) || startsWithLess(next);
+      });
   if (Status.isError())
     return nullptr;
 
@@ -6595,7 +6846,7 @@ ParserResult<StructDecl> Parser::parseDeclStruct(ParseDeclOptions Flags,
   StructDecl *SD = new (Context) StructDecl(StructLoc, StructName,
                                             StructNameLoc,
                                             { },
-                                            nullptr,
+                                            GenericParams,
                                             CurDeclContext);
   setLocalDiscriminator(SD);
   SD->getAttrs() = Attributes;
@@ -6623,7 +6874,6 @@ ParserResult<StructDecl> Parser::parseDeclStruct(ParseDeclOptions Flags,
     }
   }
 
-  SD->setGenericParams(GenericParams);
   // Make the entities of the struct as a code block.
   SyntaxParsingContext BlockContext(SyntaxContext, SyntaxKind::MemberDeclBlock);
   SourceLoc LBLoc, RBLoc;
@@ -6635,15 +6885,11 @@ ParserResult<StructDecl> Parser::parseDeclStruct(ParseDeclOptions Flags,
   } else {
     // Parse the body.
     Scope S(this, ScopeKind::StructBody);
-    ParseDeclOptions Options(PD_HasContainerType | PD_InStruct);
-    if (canDelayMemberDeclParsing()) {
-      if (delayParsingDeclList(LBLoc, RBLoc, PosBeforeLB, Options, SD))
-        Status.setIsParseError();
-    } else {
-      if (parseDeclList(LBLoc, RBLoc, diag::expected_rbrace_struct,
-                        Options,SD))
-        Status.setIsParseError();
-    }
+
+    if (parseMemberDeclList(LBLoc, RBLoc, PosBeforeLB,
+                            diag::expected_rbrace_struct,
+                            SD))
+      Status.setIsParseError();
   }
 
   SD->setBraces({LBLoc, RBLoc});
@@ -6670,9 +6916,10 @@ ParserResult<ClassDecl> Parser::parseDeclClass(ParseDeclOptions Flags,
   SourceLoc ClassNameLoc;
   ParserStatus Status;
 
-  Status |= parseIdentifierDeclName(*this, ClassName, ClassNameLoc, "class",
-                                    tok::colon, tok::l_brace,
-                                    TokenProperty::StartsWithLess);
+  Status |= parseIdentifierDeclName(
+      *this, ClassName, ClassNameLoc, "class", [&](const Token &next) {
+        return next.isAny(tok::colon, tok::l_brace) || startsWithLess(next);
+      });
   if (Status.isError())
     return nullptr;
 
@@ -6690,9 +6937,12 @@ ParserResult<ClassDecl> Parser::parseDeclClass(ParseDeclOptions Flags,
 
   // Create the class.
   ClassDecl *CD = new (Context) ClassDecl(ClassLoc, ClassName, ClassNameLoc,
-                                          { }, nullptr, CurDeclContext);
+                                          { }, GenericParams, CurDeclContext);
   setLocalDiscriminator(CD);
   CD->getAttrs() = Attributes;
+
+  // Parsed classes never have missing vtable entries.
+  CD->setHasMissingVTableEntries(false);
 
   ContextChange CC(*this, CD);
 
@@ -6740,8 +6990,6 @@ ParserResult<ClassDecl> Parser::parseDeclClass(ParseDeclOptions Flags,
     }
   }
 
-  CD->setGenericParams(GenericParams);
-
   SyntaxParsingContext BlockContext(SyntaxContext, SyntaxKind::MemberDeclBlock);
   SourceLoc LBLoc, RBLoc;
   auto PosBeforeLB = Tok.getLoc();
@@ -6752,16 +7000,11 @@ ParserResult<ClassDecl> Parser::parseDeclClass(ParseDeclOptions Flags,
   } else {
     // Parse the body.
     Scope S(this, ScopeKind::ClassBody);
-    ParseDeclOptions Options(PD_HasContainerType | PD_AllowDestructor |
-                             PD_InClass);
-    if (canDelayMemberDeclParsing()) {
-      if (delayParsingDeclList(LBLoc, RBLoc, PosBeforeLB, Options, CD))
-        Status.setIsParseError();
-    } else {
-      if (parseDeclList(LBLoc, RBLoc, diag::expected_rbrace_class,
-                        Options, CD))
-        Status.setIsParseError();
-    }
+
+    if (parseMemberDeclList(LBLoc, RBLoc, PosBeforeLB,
+                            diag::expected_rbrace_class,
+                            CD))
+      Status.setIsParseError();
   }
 
   CD->setBraces({LBLoc, RBLoc});
@@ -6793,8 +7036,9 @@ parseDeclProtocol(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   Identifier ProtocolName;
   ParserStatus Status;
 
-  Status |= parseIdentifierDeclName(*this, ProtocolName, NameLoc, "protocol",
-                                    tok::colon, tok::l_brace);
+  Status |= parseIdentifierDeclName(
+      *this, ProtocolName, NameLoc, "protocol",
+      [&](const Token &next) { return next.isAny(tok::colon, tok::l_brace); });
   if (Status.isError())
     return nullptr;
 
@@ -6850,17 +7094,10 @@ parseDeclProtocol(ParseDeclOptions Flags, DeclAttributes &Attributes) {
       Status.setIsParseError();
     } else {
       // Parse the members.
-      ParseDeclOptions Options(PD_HasContainerType |
-                               PD_DisallowInit |
-                               PD_InProtocol);
-      if (canDelayMemberDeclParsing()) {
-        if (delayParsingDeclList(LBraceLoc, RBraceLoc, PosBeforeLB, Options, Proto))
-          Status.setIsParseError();
-      } else {
-        if (parseDeclList(LBraceLoc, RBraceLoc, diag::expected_rbrace_protocol,
-                          Options, Proto))
-          Status.setIsParseError();
-      }
+      if (parseMemberDeclList(LBraceLoc, RBraceLoc, PosBeforeLB,
+                              diag::expected_rbrace_protocol,
+                              Proto))
+        Status.setIsParseError();
     }
 
     // Install the protocol elements.
@@ -6914,14 +7151,14 @@ Parser::parseDeclSubscript(SourceLoc StaticLoc,
   Optional<Scope> GenericsScope;
   GenericsScope.emplace(this, ScopeKind::Generics);
   GenericParamList *GenericParams;
-  bool SignatureHasCodeCompletion = false;
 
   auto Result = maybeParseGenericParams();
   GenericParams = Result.getPtrOrNull();
-  SignatureHasCodeCompletion |= Result.hasCodeCompletion();
-
-  if (SignatureHasCodeCompletion && !CodeCompletion)
-    return makeParserCodeCompletionStatus();
+  if (Result.hasCodeCompletion()) {
+    Status.setHasCodeCompletion();
+    if (!CodeCompletion)
+      return Status;
+  }
 
   // Parse the parameter list.
   DefaultArgumentInfo DefaultArgs;
@@ -6930,10 +7167,8 @@ Parser::parseDeclSubscript(SourceLoc StaticLoc,
     = parseSingleParameterClause(ParameterContextKind::Subscript,
                                  &argumentNames, &DefaultArgs);
   Status |= Indices;
-
-  SignatureHasCodeCompletion |= Indices.hasCodeCompletion();
-  if (SignatureHasCodeCompletion && !CodeCompletion)
-    return makeParserCodeCompletionStatus();
+  if (Status.hasCodeCompletion() && !CodeCompletion)
+    return Status;
   
   SourceLoc ArrowLoc;
   ParserResult<TypeRepr> ElementTy;
@@ -6957,10 +7192,9 @@ Parser::parseDeclSubscript(SourceLoc StaticLoc,
     // type
     ElementTy = parseDeclResultType(diag::expected_type_subscript);
     Status |= ElementTy;
-    SignatureHasCodeCompletion |= ElementTy.hasCodeCompletion();
-    if (SignatureHasCodeCompletion && !CodeCompletion) {
-      return makeParserCodeCompletionStatus();
-    }
+    if (Status.hasCodeCompletion() && !CodeCompletion)
+      return Status;
+
     if (ElementTy.isNull()) {
       // Always set an element type.
       ElementTy = makeParserResult(ElementTy, new (Context) ErrorTypeRepr());
@@ -6977,11 +7211,12 @@ Parser::parseDeclSubscript(SourceLoc StaticLoc,
                                                 SubscriptLoc, Indices.get(),
                                                 ArrowLoc, ElementTy.get(),
                                                 CurDeclContext,
-                                                nullptr);
+                                                GenericParams);
   Subscript->getAttrs() = Attributes;
   
   // Let the source file track the opaque return type mapping, if any.
-  if (ElementTy.get() && isa<OpaqueReturnTypeRepr>(ElementTy.get())) {
+  if (ElementTy.get() && isa<OpaqueReturnTypeRepr>(ElementTy.get()) &&
+      !InInactiveClauseEnvironment) {
     if (auto sf = CurDeclContext->getParentSourceFile()) {
       sf->addUnvalidatedDeclWithOpaqueResultType(Subscript);
     }
@@ -6993,18 +7228,16 @@ Parser::parseDeclSubscript(SourceLoc StaticLoc,
   if (Tok.is(tok::kw_where)) {
     ContextChange CC(*this, Subscript);
 
-    auto whereStatus = parseFreestandingGenericWhereClause(GenericParams);
-    SignatureHasCodeCompletion |= whereStatus.hasCodeCompletion();
-    if (whereStatus.hasCodeCompletion() && !CodeCompletion) {
+    Status |= parseFreestandingGenericWhereClause(GenericParams);
+    if (Status.hasCodeCompletion() && !CodeCompletion) {
       // Trigger delayed parsing, no need to continue.
-      return whereStatus;
+      return Status;
     }
   }
 
-  Subscript->setGenericParams(GenericParams);
-
   // Pass the function signature to code completion.
-  if (SignatureHasCodeCompletion && CodeCompletion) {
+  if (Status.hasCodeCompletion()) {
+    assert(CodeCompletion && "must be code completion second pass");
     CodeCompletion->setParsedDecl(Subscript);
   }
 
@@ -7025,9 +7258,8 @@ Parser::parseDeclSubscript(SourceLoc StaticLoc,
       }
       Status.setIsParseError();
     }
-  } else {
-    Status |= parseGetSet(Flags, GenericParams,
-                          Indices.get(), ElementTy.get(),
+  } else if (!Status.hasCodeCompletion()) {
+    Status |= parseGetSet(Flags, GenericParams, Indices.get(),
                           accessors, Subscript, StaticLoc);
   }
 
@@ -7043,6 +7275,13 @@ Parser::parseDeclSubscript(SourceLoc StaticLoc,
 
   accessors.record(*this, Subscript, (Invalid || !Status.isSuccess()));
 
+  // SWIFT_ENABLE_TENSORFLOW
+  // Set original declaration in `@differentiable` attributes.
+  for (auto *accessor : accessors.Accessors)
+    setOriginalFunctionInDifferentiableAttributes(accessor->getAttrs(),
+                                                  accessor);
+  // SWIFT_ENABLE_TENSORFLOW END
+
   // No need to setLocalDiscriminator because subscripts cannot
   // validly appear outside of type decls.
   return makeParserResult(Status, Subscript);
@@ -7051,8 +7290,9 @@ Parser::parseDeclSubscript(SourceLoc StaticLoc,
 ParserResult<ConstructorDecl>
 Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   assert(Tok.is(tok::kw_init));
+  ParserStatus Status;
   SourceLoc ConstructorLoc = consumeToken();
-  OptionalTypeKind Failability = OTK_None;
+  bool Failable = false, IUO = false;
   SourceLoc FailabilityLoc;
 
   const bool ConstructorsNotAllowed = !(Flags & PD_HasContainerType);
@@ -7065,10 +7305,11 @@ Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   // Parse the '!' or '?' for a failable initializer.
   if (Tok.isAny(tok::exclaim_postfix, tok::sil_exclamation) ||
       (Tok.isAnyOperator() && Tok.getText() == "!")) {
-    Failability = OTK_ImplicitlyUnwrappedOptional;
+    Failable = true;
+    IUO = true;
     FailabilityLoc = consumeToken();
   } else if (Tok.isAny(tok::question_postfix, tok::question_infix)) {
-    Failability = OTK_Optional;
+    Failable = true;
     FailabilityLoc = consumeToken();
   }
 
@@ -7084,21 +7325,22 @@ Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   Scope S(this, ScopeKind::Generics);
   auto GPResult = maybeParseGenericParams();
   GenericParamList *GenericParams = GPResult.getPtrOrNull();
-  if (GPResult.hasCodeCompletion())
-    return makeParserCodeCompletionStatus();
+  if (GPResult.hasCodeCompletion()) {
+    Status.setHasCodeCompletion();
+    if (!CodeCompletion)
+      return Status;
+  }
 
   // Parse the parameters.
   DefaultArgumentInfo DefaultArgs;
   llvm::SmallVector<Identifier, 4> namePieces;
-  bool SignatureHasCodeCompletion = false;
   ParserResult<ParameterList> Params
     = parseSingleParameterClause(ParameterContextKind::Initializer,
                                  &namePieces, &DefaultArgs);
-
-  SignatureHasCodeCompletion |= Params.hasCodeCompletion();
-  if (Params.hasCodeCompletion() && !CodeCompletion) {
+  Status |= Params;
+  if (Status.hasCodeCompletion() && !CodeCompletion) {
     // Trigger delayed parsing, no need to continue.
-    return makeParserCodeCompletionStatus();
+    return Status;
   }
 
   // Protocol initializer arguments may not have default values.
@@ -7119,33 +7361,33 @@ Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
 
   DeclName FullName(Context, DeclBaseName::createConstructor(), namePieces);
   auto *CD = new (Context) ConstructorDecl(FullName, ConstructorLoc,
-                                           Failability, FailabilityLoc,
+                                           Failable, FailabilityLoc,
                                            throwsLoc.isValid(), throwsLoc,
-                                           Params.get(), nullptr,
+                                           Params.get(), GenericParams,
                                            CurDeclContext);
+  CD->setImplicitlyUnwrappedOptional(IUO);
   CD->getAttrs() = Attributes;
 
   // Parse a 'where' clause if present, adding it to our GenericParamList.
   if (Tok.is(tok::kw_where)) {
     ContextChange(*this, CD);
 
-    auto whereStatus = parseFreestandingGenericWhereClause(GenericParams);
-    SignatureHasCodeCompletion |= whereStatus.hasCodeCompletion();
-    if (whereStatus.hasCodeCompletion() && !CodeCompletion) {
+    Status |= parseFreestandingGenericWhereClause(GenericParams);
+    if (Status.hasCodeCompletion() && !CodeCompletion) {
       // Trigger delayed parsing, no need to continue.
-      return whereStatus;
+      return Status;
     }
   }
-
-  CD->setGenericParams(GenericParams);
 
   // No need to setLocalDiscriminator.
 
   DefaultArgs.setFunctionContext(CD, CD->getParameters());
 
   // Pass the function signature to code completion.
-  if (SignatureHasCodeCompletion)
+  if (Status.hasCodeCompletion()) {
+    assert(CodeCompletion && "must be code completion second pass");
     CodeCompletion->setParsedDecl(CD);
+  }
 
   if (ConstructorsNotAllowed || Params.isParseError()) {
     // Tell the type checker not to touch this constructor.
@@ -7157,11 +7399,11 @@ Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
       diagnose(Tok, diag::protocol_init_with_body);
       skipSingle();
     }
-  } else {
+  } else if(!Status.hasCodeCompletion()) {
     parseAbstractFunctionBody(CD);
   }
 
-  return makeParserResult(CD);
+  return makeParserResult(Status, CD);
 }
 
 ParserResult<DestructorDecl> Parser::
@@ -7191,7 +7433,7 @@ parseDeclDeinit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
     switch (SF.Kind) {
     case SourceFileKind::Interface:
     case SourceFileKind::SIL:
-      // It's okay to have no body for SIL code or parseable interfaces.
+      // It's okay to have no body for SIL code or module interfaces.
       break;
     case SourceFileKind::Library:
     case SourceFileKind::Main:
@@ -7299,7 +7541,7 @@ Parser::parseDeclOperatorImpl(SourceLoc OperatorLoc, Identifier Name,
       return makeParserCodeCompletionResult<OperatorDecl>();
     }
 
-    if (Context.LangOpts.EnableOperatorDesignatedTypes) {
+    if (Context.TypeCheckerOpts.EnableOperatorDesignatedTypes) {
       if (Tok.is(tok::identifier)) {
         SyntaxParsingContext GroupCtxt(SyntaxContext,
                                        SyntaxKind::IdentifierList);
@@ -7405,12 +7647,13 @@ Parser::parseDeclPrecedenceGroup(ParseDeclOptions flags,
   if (parseIdentifier(name, nameLoc, diag::expected_precedencegroup_name)) {
     // If the identifier is missing or a keyword or something, try to
     // skip the entire body.
-    if (consumeIf(tok::l_brace)) {
+    if (!Tok.isAtStartOfLine() && Tok.isNot(tok::eof) &&
+         peekToken().is(tok::l_brace))
+      consumeToken();
+    if (Tok.is(tok::l_brace)) {
+      consumeToken(tok::l_brace);
       skipUntilDeclRBrace();
       (void) consumeIf(tok::r_brace);
-    } else if (Tok.isNot(tok::eof) && peekToken().is(tok::l_brace)) {
-      consumeToken();
-      skipBracedBlock(*this, SyntaxContext);
     }
     return nullptr;
   }

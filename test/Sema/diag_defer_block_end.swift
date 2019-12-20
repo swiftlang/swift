@@ -11,7 +11,7 @@ if (x > y) {
 func sr7307(_ value: Bool) {
     let negated = !value 
     defer { // expected-warning {{'defer' statement at end of scope always executes immediately}}{{5-10=do}}
-        print("negated value is {negated}")
+        print("negated value is \(negated)")
     }
 }
 

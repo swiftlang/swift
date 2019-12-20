@@ -857,7 +857,7 @@ class TargetParameterTypeFlags {
     ValueOwnershipMask    = 0x7F,
     VariadicMask          = 0x80,
     AutoClosureMask       = 0x100,
-    NonDifferentiableMask = 0x200
+    NoDerivativeMask      = 0x200
   };
   int_type Data;
 
@@ -888,7 +888,7 @@ public:
   bool isVariadic() const { return Data & VariadicMask; }
   bool isAutoClosure() const { return Data & AutoClosureMask; }
   // SWIFT_ENABLE_TENSORFLOW
-  bool isNonDifferentiable() const { return Data & NonDifferentiableMask; }
+  bool isNoDerivative() const { return Data & NoDerivativeMask; }
 
   ValueOwnership getValueOwnership() const {
     return (ValueOwnership)(Data & ValueOwnershipMask);
@@ -951,55 +951,6 @@ public:
   }
 };
 using TupleTypeFlags = TargetTupleTypeFlags<size_t>;
-
-/// Field types and flags as represented in a nominal type's field/case type
-/// vector.
-class FieldType {
-  typedef uintptr_t int_type;
-  // Type metadata is always at least pointer-aligned, so we get at least two
-  // low bits to stash flags. We could use three low bits on 64-bit, and maybe
-  // some high bits as well.
-  enum : int_type {
-    Indirect = 1,
-    Weak = 2,
-
-    TypeMask = ((uintptr_t)-1) & ~(alignof(void*) - 1),
-  };
-  int_type Data;
-
-  constexpr FieldType(int_type Data) : Data(Data) {}
-public:
-  constexpr FieldType() : Data(0) {}
-  FieldType withType(const Metadata *T) const {
-    return FieldType((Data & ~TypeMask) | (uintptr_t)T);
-  }
-
-  constexpr FieldType withIndirect(bool indirect) const {
-    return FieldType((Data & ~Indirect)
-                     | (indirect ? Indirect : 0));
-  }
-
-  constexpr FieldType withWeak(bool weak) const {
-    return FieldType((Data & ~Weak)
-                     | (weak ? Weak : 0));
-  }
-
-  bool isIndirect() const {
-    return bool(Data & Indirect);
-  }
-
-  bool isWeak() const {
-    return bool(Data & Weak);
-  }
-
-  const Metadata *getType() const {
-    return (const Metadata *)(Data & TypeMask);
-  }
-
-  int_type getIntValue() const {
-    return Data;
-  }
-};
 
 /// Flags for exclusivity-checking operations.
 enum class ExclusivityFlags : uintptr_t {

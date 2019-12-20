@@ -24,6 +24,7 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/PrettyStackTrace.h"
+#include "swift/AST/TypeRepr.h"
 #include "swift/AST/TypeVisitor.h"
 #include "swift/Basic/SourceManager.h"
 #include "llvm/Support/raw_ostream.h"
@@ -102,6 +103,17 @@ void swift::printDeclDescription(llvm::raw_ostream &out, const Decl *D,
     out << " (in module '" << D->getModuleContext()->getName() << "')";
   }
   if (addNewline) out << '\n';
+}
+
+void PrettyStackTraceAnyFunctionRef::print(llvm::raw_ostream &out) const {
+  out << "While " << Action << ' ';
+  auto &Context = TheRef.getAsDeclContext()->getASTContext();
+  if (auto *AFD = TheRef.getAbstractFunctionDecl())
+    printDeclDescription(out, AFD, Context);
+  else {
+    auto *ACE = TheRef.getAbstractClosureExpr();
+    printExprDescription(out, ACE, Context);
+  }
 }
 
 void PrettyStackTraceExpr::print(llvm::raw_ostream &out) const {
@@ -250,4 +262,19 @@ void PrettyStackTraceGenericSignature::print(llvm::raw_ostream &out) const {
 
 void PrettyStackTraceSelector::print(llvm::raw_ostream &out) const {
   out << "While " << Action << " '" << Selector << "'";
+}
+
+void PrettyStackTraceDifferentiabilityWitness::print(
+    llvm::raw_ostream &out) const {
+  out << "While " << Action << ' ';
+  printDifferentiabilityWitnessDescription(out, Key);
+}
+
+void swift::printDifferentiabilityWitnessDescription(
+    llvm::raw_ostream &out, const SILDifferentiabilityWitnessKey key,
+    bool addNewline) {
+  out << key.first << " ";
+  key.second.print(out);
+  if (addNewline)
+    out << '\n';
 }

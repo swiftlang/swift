@@ -9,7 +9,13 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
+//
 // SWIFT_ENABLE_TENSORFLOW
+//
+// This file implements IR generation for `@differentiable` function types in
+// Swift.
+//
+//===----------------------------------------------------------------------===//
 
 #include "swift/AST/Decl.h"
 #include "swift/AST/Pattern.h"
@@ -32,66 +38,65 @@
 using namespace swift;
 using namespace irgen;
 
-/// A pair of `@differentiable` function extractee and differentiation order.
-using DiffFuncIndex =
-    std::pair<AutoDiffFunctionExtractInst::Extractee, unsigned>;
-
+//----------------------------------------------------------------------------//
+// `@differentiable` (non-linear) function type info
+//----------------------------------------------------------------------------//
 namespace {
-class DiffFuncFieldInfo final : public RecordField<DiffFuncFieldInfo> {
+class DifferentiableFuncFieldInfo final
+    : public RecordField<DifferentiableFuncFieldInfo> {
 public:
-  DiffFuncFieldInfo(DiffFuncIndex index, const TypeInfo &type,
-                    AutoDiffIndexSubset *parameterIndices)
-      : RecordField(type), Index(index), ParameterIndices(parameterIndices) {}
+  DifferentiableFuncFieldInfo(
+      NormalDifferentiableFunctionTypeComponent component, const TypeInfo &type,
+      IndexSubset *parameterIndices)
+      : RecordField(type), component(component),
+        parameterIndices(parameterIndices) {}
 
   /// The field index.
-  const DiffFuncIndex Index;
+  const NormalDifferentiableFunctionTypeComponent component;
 
   /// The parameter indices.
-  AutoDiffIndexSubset *ParameterIndices;
+  IndexSubset *parameterIndices;
 
   std::string getFieldName() const {
-    auto extractee = std::get<0>(Index);
-    auto differentiationOrder = std::get<1>(Index);
-    switch (extractee) {
-    case AutoDiffFunctionExtractInst::Extractee::Original:
+    switch (component) {
+    case NormalDifferentiableFunctionTypeComponent::Original:
       return "original";
-    case AutoDiffFunctionExtractInst::Extractee::JVP:
-      return "jvp_" + llvm::itostr(differentiationOrder);
-    case AutoDiffFunctionExtractInst::Extractee::VJP:
-      return "vjp_" + llvm::itostr(differentiationOrder);
+    case NormalDifferentiableFunctionTypeComponent::JVP:
+      return "jvp";
+    case NormalDifferentiableFunctionTypeComponent::VJP:
+      return "vjp";
     }
   }
 
   SILType getType(IRGenModule &IGM, SILType t) const {
     auto fnTy = t.castTo<SILFunctionType>();
     auto origFnTy = fnTy->getWithoutDifferentiability();
-    if (std::get<0>(Index) == AutoDiffFunctionExtractInst::Extractee::Original)
+    if (component == NormalDifferentiableFunctionTypeComponent::Original)
       return SILType::getPrimitiveObjectType(origFnTy);
-    auto differentiationOrder = std::get<1>(Index);
-    auto kind = *std::get<0>(Index).getExtracteeAsAssociatedFunction();
-    auto assocTy = origFnTy->getAutoDiffAssociatedFunctionType(
-        ParameterIndices, /*resultIndex*/ 0, differentiationOrder, kind,
-        IGM.getSILModule(), LookUpConformanceInModule(IGM.getSwiftModule()));
+    auto kind = *component.getAsDerivativeFunctionKind();
+    auto assocTy = origFnTy->getAutoDiffDerivativeFunctionType(
+        parameterIndices, /*resultIndex*/ 0, kind,
+        IGM.getSILTypes(), LookUpConformanceInModule(IGM.getSwiftModule()));
     return SILType::getPrimitiveObjectType(assocTy);
   }
 };
 
-class DiffFuncTypeInfo final
-    : public RecordTypeInfo<DiffFuncTypeInfo, LoadableTypeInfo,
-                            DiffFuncFieldInfo> {
-  using super =
-      RecordTypeInfo<DiffFuncTypeInfo, LoadableTypeInfo, DiffFuncFieldInfo>;
+class DifferentiableFuncTypeInfo final
+    : public RecordTypeInfo<DifferentiableFuncTypeInfo, LoadableTypeInfo,
+                            DifferentiableFuncFieldInfo> {
+  using super = RecordTypeInfo<DifferentiableFuncTypeInfo, LoadableTypeInfo,
+                               DifferentiableFuncFieldInfo>;
 
 public:
-  DiffFuncTypeInfo(ArrayRef<DiffFuncFieldInfo> fields, unsigned explosionSize,
-                   llvm::Type *ty, Size size, SpareBitVector &&spareBits,
-                   Alignment align, IsPOD_t isPOD,
-                   IsFixedSize_t alwaysFixedSize)
+  DifferentiableFuncTypeInfo(
+      ArrayRef<DifferentiableFuncFieldInfo> fields, unsigned explosionSize,
+      llvm::Type *ty, Size size, SpareBitVector &&spareBits, Alignment align,
+      IsPOD_t isPOD, IsFixedSize_t alwaysFixedSize)
       : super(fields, explosionSize, ty, size, std::move(spareBits), align,
               isPOD, alwaysFixedSize) {}
 
   Address projectFieldAddress(IRGenFunction &IGF, Address addr, SILType T,
-                              const DiffFuncFieldInfo &field) const {
+                              const DifferentiableFuncFieldInfo &field) const {
     return field.projectAddress(IGF, addr, getNonFixedOffsets(IGF, T));
   }
 
@@ -115,53 +120,54 @@ public:
   }
 };
 
-class DiffFuncTypeBuilder
-    : public RecordTypeBuilder<DiffFuncTypeBuilder, DiffFuncFieldInfo,
-                               DiffFuncIndex> {
+class DifferentiableFuncTypeBuilder
+    : public RecordTypeBuilder<DifferentiableFuncTypeBuilder, DifferentiableFuncFieldInfo,
+                               NormalDifferentiableFunctionTypeComponent> {
 
-  SILFunctionType *origFnTy;
-  AutoDiffIndexSubset *parameterIndices;
+  SILFunctionType *originalType;
+  IndexSubset *parameterIndices;
 
 public:
-  DiffFuncTypeBuilder(IRGenModule &IGM, SILFunctionType *fnTy)
-      : RecordTypeBuilder(IGM), origFnTy(fnTy->getWithoutDifferentiability()),
+  DifferentiableFuncTypeBuilder(IRGenModule &IGM, SILFunctionType *fnTy)
+      : RecordTypeBuilder(IGM),
+        originalType(fnTy->getWithoutDifferentiability()),
         parameterIndices(fnTy->getDifferentiationParameterIndices()) {
-    assert(fnTy->isDifferentiable());
+    assert(fnTy->getDifferentiabilityKind() == DifferentiabilityKind::Normal);
   }
 
-  TypeInfo *createFixed(ArrayRef<DiffFuncFieldInfo> fields,
+  TypeInfo *createFixed(ArrayRef<DifferentiableFuncFieldInfo> fields,
                         StructLayout &&layout) {
     llvm_unreachable("@differentiable functions are always loadable");
   }
 
-  DiffFuncTypeInfo *createLoadable(ArrayRef<DiffFuncFieldInfo> fields,
-                                   StructLayout &&layout,
-                                   unsigned explosionSize) {
-    return DiffFuncTypeInfo::create(
+  DifferentiableFuncTypeInfo *createLoadable(
+      ArrayRef<DifferentiableFuncFieldInfo> fields, StructLayout &&layout,
+      unsigned explosionSize) {
+    return DifferentiableFuncTypeInfo::create(
         fields, explosionSize, layout.getType(), layout.getSize(),
         std::move(layout.getSpareBits()), layout.getAlignment(), layout.isPOD(),
         layout.isAlwaysFixedSize());
   }
 
-  TypeInfo *createNonFixed(ArrayRef<DiffFuncFieldInfo> fields,
+  TypeInfo *createNonFixed(ArrayRef<DifferentiableFuncFieldInfo> fields,
                            FieldsAreABIAccessible_t fieldsAccessible,
                            StructLayout &&layout) {
     llvm_unreachable("@differentiable functions are always loadable");
   }
 
-  DiffFuncFieldInfo getFieldInfo(unsigned index, DiffFuncIndex field,
-                                 const TypeInfo &fieldTI) {
-    return DiffFuncFieldInfo(field, fieldTI, parameterIndices);
+  DifferentiableFuncFieldInfo getFieldInfo(
+      unsigned index, NormalDifferentiableFunctionTypeComponent component,
+      const TypeInfo &fieldTI) {
+    return DifferentiableFuncFieldInfo(component, fieldTI, parameterIndices);
   }
 
-  SILType getType(DiffFuncIndex field) {
-    if (std::get<0>(field) == AutoDiffFunctionExtractInst::Extractee::Original)
-      return SILType::getPrimitiveObjectType(origFnTy->getCanonicalType());
-    auto differentiationOrder = std::get<1>(field);
-    auto kind = *std::get<0>(field).getExtracteeAsAssociatedFunction();
-    auto assocTy = origFnTy->getAutoDiffAssociatedFunctionType(
-        parameterIndices, /*resultIndex*/ 0, differentiationOrder, kind,
-        IGM.getSILModule(), LookUpConformanceInModule(IGM.getSwiftModule()));
+  SILType getType(NormalDifferentiableFunctionTypeComponent component) {
+    if (component == NormalDifferentiableFunctionTypeComponent::Original)
+      return SILType::getPrimitiveObjectType(originalType->getCanonicalType());
+    auto kind = *component.getAsDerivativeFunctionKind();
+    auto assocTy = originalType->getAutoDiffDerivativeFunctionType(
+        parameterIndices, /*resultIndex*/ 0, kind, IGM.getSILTypes(),
+        LookUpConformanceInModule(IGM.getSwiftModule()));
     return SILType::getPrimitiveObjectType(assocTy);
   }
 
@@ -172,16 +178,161 @@ public:
 };
 } // end anonymous namespace
 
+//----------------------------------------------------------------------------//
+// `@differentiable(linear)` function type info
+//----------------------------------------------------------------------------//
+namespace {
+class LinearFuncFieldInfo final : public RecordField<LinearFuncFieldInfo> {
+public:
+  LinearFuncFieldInfo(LinearDifferentiableFunctionTypeComponent component,
+                      const TypeInfo &type, IndexSubset *parameterIndices)
+      : RecordField(type), component(component),
+        parameterIndices(parameterIndices) {}
+
+  /// The field index.
+  const LinearDifferentiableFunctionTypeComponent component;
+
+  /// The parameter indices.
+  IndexSubset *parameterIndices;
+
+  std::string getFieldName() const {
+    switch (component) {
+    case LinearDifferentiableFunctionTypeComponent::Original:
+      return "original";
+    case LinearDifferentiableFunctionTypeComponent::Transpose:
+      return "transpose";
+    }
+  }
+
+  SILType getType(IRGenModule &IGM, SILType t) const {
+    auto fnTy = t.castTo<SILFunctionType>();
+    auto origFnTy = fnTy->getWithoutDifferentiability();
+    switch (component) {
+    case LinearDifferentiableFunctionTypeComponent::Original:
+      return SILType::getPrimitiveObjectType(origFnTy);
+    case LinearDifferentiableFunctionTypeComponent::Transpose:
+      auto transposeTy = origFnTy->getAutoDiffTransposeFunctionType(
+          parameterIndices, IGM.getSILTypes(),
+          LookUpConformanceInModule(IGM.getSwiftModule()));
+      return SILType::getPrimitiveObjectType(transposeTy);
+    }
+  }
+};
+
+class LinearFuncTypeInfo final
+    : public RecordTypeInfo<LinearFuncTypeInfo, LoadableTypeInfo,
+                            LinearFuncFieldInfo> {
+  using super =
+      RecordTypeInfo<LinearFuncTypeInfo, LoadableTypeInfo, LinearFuncFieldInfo>;
+
+public:
+  LinearFuncTypeInfo(
+      ArrayRef<LinearFuncFieldInfo> fields, unsigned explosionSize,
+      llvm::Type *ty, Size size, SpareBitVector &&spareBits, Alignment align,
+      IsPOD_t isPOD, IsFixedSize_t alwaysFixedSize)
+      : super(fields, explosionSize, ty, size, std::move(spareBits), align,
+              isPOD, alwaysFixedSize) {}
+
+  Address projectFieldAddress(IRGenFunction &IGF, Address addr, SILType T,
+                              const LinearFuncFieldInfo &field) const {
+    return field.projectAddress(IGF, addr, getNonFixedOffsets(IGF, T));
+  }
+
+  void initializeFromParams(IRGenFunction &IGF, Explosion &params, Address src,
+                            SILType T, bool isOutlined) const override {
+    llvm_unreachable("unexploded @differentiable function as argument?");
+  }
+
+  void addToAggLowering(IRGenModule &IGM, SwiftAggLowering &lowering,
+                        Size offset) const override {
+    for (auto &field : getFields()) {
+      auto fieldOffset = offset + field.getFixedByteOffset();
+      cast<LoadableTypeInfo>(field.getTypeInfo())
+          .addToAggLowering(IGM, lowering, fieldOffset);
+    }
+  }
+
+  llvm::NoneType getNonFixedOffsets(IRGenFunction &IGF) const { return None; }
+  llvm::NoneType getNonFixedOffsets(IRGenFunction &IGF, SILType T) const {
+    return None;
+  }
+};
+
+class LinearFuncTypeBuilder
+    : public RecordTypeBuilder<LinearFuncTypeBuilder, LinearFuncFieldInfo,
+                               LinearDifferentiableFunctionTypeComponent> {
+
+  SILFunctionType *originalType;
+  IndexSubset *parameterIndices;
+
+public:
+  LinearFuncTypeBuilder(IRGenModule &IGM, SILFunctionType *fnTy)
+      : RecordTypeBuilder(IGM),
+        originalType(fnTy->getWithoutDifferentiability()),
+        parameterIndices(fnTy->getDifferentiationParameterIndices()) {
+    assert(fnTy->getDifferentiabilityKind() == DifferentiabilityKind::Linear);
+  }
+
+  TypeInfo *createFixed(ArrayRef<LinearFuncFieldInfo> fields,
+                        StructLayout &&layout) {
+    llvm_unreachable("@differentiable functions are always loadable");
+  }
+
+  LinearFuncTypeInfo *createLoadable(ArrayRef<LinearFuncFieldInfo> fields,
+                                     StructLayout &&layout,
+                                     unsigned explosionSize) {
+    return LinearFuncTypeInfo::create(
+        fields, explosionSize, layout.getType(), layout.getSize(),
+        std::move(layout.getSpareBits()), layout.getAlignment(), layout.isPOD(),
+        layout.isAlwaysFixedSize());
+  }
+
+  TypeInfo *createNonFixed(ArrayRef<LinearFuncFieldInfo> fields,
+                           FieldsAreABIAccessible_t fieldsAccessible,
+                           StructLayout &&layout) {
+    llvm_unreachable("@differentiable functions are always loadable");
+  }
+
+  LinearFuncFieldInfo getFieldInfo(
+      unsigned index, LinearDifferentiableFunctionTypeComponent field,
+      const TypeInfo &fieldTI) {
+    return LinearFuncFieldInfo(field, fieldTI, parameterIndices);
+  }
+
+  SILType getType(LinearDifferentiableFunctionTypeComponent component) {
+    switch (component) {
+    case LinearDifferentiableFunctionTypeComponent::Original:
+      return SILType::getPrimitiveObjectType(originalType->getCanonicalType());
+    case LinearDifferentiableFunctionTypeComponent::Transpose:
+      auto transposeTy = originalType->getAutoDiffTransposeFunctionType(
+          parameterIndices, IGM.getSILTypes(),
+          LookUpConformanceInModule(IGM.getSwiftModule()));
+      return SILType::getPrimitiveObjectType(transposeTy);
+    }
+  }
+
+  StructLayout performLayout(ArrayRef<const TypeInfo *> fieldTypes) {
+    return StructLayout(IGM, /*decl=*/nullptr, LayoutKind::NonHeapObject,
+                        LayoutStrategy::Universal, fieldTypes);
+  }
+};
+} // end anonymous namespace
+
+//----------------------------------------------------------------------------//
+// Type converter entry points
+//----------------------------------------------------------------------------//
+
 const TypeInfo *
-TypeConverter::convertDifferentiableFunctionType(SILFunctionType *type) {
-  assert(type->isDifferentiable());
-  DiffFuncTypeBuilder builder(IGM, type);
-  SmallVector<DiffFuncIndex, 3> fields;
-  fields.push_back(
-      std::make_pair(AutoDiffFunctionExtractInst::Extractee::Original, 0));
-  fields.push_back(
-      std::make_pair(AutoDiffFunctionExtractInst::Extractee::JVP, 1));
-  fields.push_back(
-      std::make_pair(AutoDiffFunctionExtractInst::Extractee::VJP, 1));
-  return builder.layout(fields);
+TypeConverter::convertNormalDifferentiableFunctionType(SILFunctionType *type) {
+  DifferentiableFuncTypeBuilder builder(IGM, type);
+  return builder.layout({NormalDifferentiableFunctionTypeComponent::Original,
+                         NormalDifferentiableFunctionTypeComponent::JVP,
+                         NormalDifferentiableFunctionTypeComponent::VJP});
+}
+
+const TypeInfo *
+TypeConverter::convertLinearDifferentiableFunctionType(SILFunctionType *type) {
+  LinearFuncTypeBuilder builder(IGM, type);
+  return builder.layout({LinearDifferentiableFunctionTypeComponent::Original,
+                         LinearDifferentiableFunctionTypeComponent::Transpose});
 }

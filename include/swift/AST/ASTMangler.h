@@ -124,6 +124,8 @@ public:
                                           SymbolKind SKind);
 
   std::string mangleInitializerEntity(const VarDecl *var, SymbolKind SKind);
+  std::string mangleBackingInitializerEntity(const VarDecl *var,
+                                             SymbolKind SKind);
 
   std::string mangleNominalType(const NominalTypeDecl *decl);
 
@@ -153,38 +155,49 @@ public:
                                              ModuleDecl *Module);
 
   // SWIFT_ENABLE_TENSORFLOW
-  // Mangle the autodiff associated function (JVP/VJP) with the given:
-  // - Mangled original function name.
-  // - Associated function kind.
-  // - Parameter/result indices.
-  std::string mangleAutoDiffAssociatedFunctionHelper(
-      StringRef name, AutoDiffAssociatedFunctionKind kind,
-      const SILAutoDiffIndices &indices);
+  /// Mangle the derivative function (JVP/VJP) with the given:
+  /// - Mangled original function name.
+  /// - Derivative function kind.
+  /// - Derivative function configuration: parameter/result indices and
+  ///   derivative generic signature.
+  std::string
+  mangleAutoDiffDerivativeFunctionHelper(StringRef name,
+                                         AutoDiffDerivativeFunctionKind kind,
+                                         AutoDiffConfig config);
 
-  // SWIFT_ENABLE_TENSORFLOW
-  // Mangle the autodiff linear map (differential/pullback) with the given:
-  // - Mangled original function name.
-  // - Linear map kind.
-  // - Parameter/result indices.
-  std::string mangleAutoDiffLinearMapHelper(
-      StringRef name, AutoDiffLinearMapKind kind,
-      const SILAutoDiffIndices &indices);
+  /// Mangle the autodiff linear map (differential/pullback) with the given:
+  /// - Mangled original function name.
+  /// - Linear map kind.
+  /// - Derivative function configuration: parameter/result indices and
+  ///   derivative generic signature.
+  std::string mangleAutoDiffLinearMapHelper(StringRef name,
+                                            AutoDiffLinearMapKind kind,
+                                            AutoDiffConfig config);
+
+  /// Mangle a SIL differentiability witness key.
+  /// - Mangled original function name.
+  /// - Parameter indices.
+  /// - Result indices.
+  /// - Derivative generic signature (optional).
+  std::string mangleSILDifferentiabilityWitnessKey(
+      SILDifferentiabilityWitnessKey key);
+  // SWIFT_ENABLE_TENSORFLOW END
 
   std::string mangleKeyPathGetterThunkHelper(const AbstractStorageDecl *property,
-                                             GenericSignature *signature,
+                                             GenericSignature signature,
                                              CanType baseType,
                                              SubstitutionMap subs,
                                              ResilienceExpansion expansion);
   std::string mangleKeyPathSetterThunkHelper(const AbstractStorageDecl *property,
-                                             GenericSignature *signature,
+                                             GenericSignature signature,
                                              CanType baseType,
                                              SubstitutionMap subs,
                                              ResilienceExpansion expansion);
   std::string mangleKeyPathEqualsHelper(ArrayRef<CanType> indices,
-                                        GenericSignature *signature,
+                                        GenericSignature signature,
                                         ResilienceExpansion expansion);
   std::string mangleKeyPathHashHelper(ArrayRef<CanType> indices,
-                                      GenericSignature *signature,
+                                      GenericSignature signature,
                                       ResilienceExpansion expansion);
 
   std::string mangleTypeForDebugger(Type decl, const DeclContext *DC);
@@ -208,7 +221,8 @@ public:
 
   std::string mangleAccessorEntityAsUSR(AccessorKind kind,
                                         const AbstractStorageDecl *decl,
-                                        StringRef USRPrefix);
+                                        StringRef USRPrefix,
+                                        bool IsStatic);
 
   std::string mangleLocalTypeDecl(const TypeDecl *type);
 
@@ -260,6 +274,9 @@ protected:
   unsigned appendBoundGenericArgs(DeclContext *dc,
                                   SubstitutionMap subs,
                                   bool &isFirstArgList);
+  
+  /// Append the bound generic arguments as a flat list, disregarding depth.
+  void appendFlatGenericArgs(SubstitutionMap subs);
 
   /// Append any retroactive conformances.
   void appendRetroactiveConformances(Type type);
@@ -269,9 +286,9 @@ protected:
 
   void appendContextOf(const ValueDecl *decl);
 
-  void appendContext(const DeclContext *ctx);
+  void appendContext(const DeclContext *ctx, StringRef useModuleName);
 
-  void appendModule(const ModuleDecl *module);
+  void appendModule(const ModuleDecl *module, StringRef useModuleName);
 
   void appendProtocolName(const ProtocolDecl *protocol,
                           bool allowStandardSubstitution = true);
@@ -305,8 +322,8 @@ protected:
   ///
   /// \returns \c true if a generic signature was appended, \c false
   /// if it was empty.
-  bool appendGenericSignature(const GenericSignature *sig,
-                              GenericSignature *contextSig = nullptr);
+  bool appendGenericSignature(GenericSignature sig,
+                              GenericSignature contextSig = GenericSignature());
 
   void appendRequirement(const Requirement &reqt);
 
@@ -329,10 +346,11 @@ protected:
   void appendDefaultArgumentEntity(const DeclContext *ctx, unsigned index);
 
   void appendInitializerEntity(const VarDecl *var);
+  void appendBackingInitializerEntity(const VarDecl *var);
 
   CanType getDeclTypeForMangling(const ValueDecl *decl,
-                                 GenericSignature *&genericSig,
-                                 GenericSignature *&parentGenericSig);
+                                 GenericSignature &genericSig,
+                                 GenericSignature &parentGenericSig);
 
   void appendDeclType(const ValueDecl *decl, bool isFunctionMangling = false);
 

@@ -4,7 +4,7 @@ protocol P1 {
   typealias DependentInConcreteConformance = Self
 }
 
-class Base<T> : P1 {
+class Base<T> : P1 { // expected-note {{arguments to generic parameter 'T' ('String' and 'Int') are expected to be equal}}
   typealias DependentClass = T
 
   required init(classInit: ()) {}
@@ -105,7 +105,8 @@ func basicSubtyping(
   let _: Derived = baseAndP2 // expected-error {{cannot convert value of type 'Base<Int> & P2' to specified type 'Derived'}}
   let _: Derived & P2 = baseAndP2 // expected-error {{value of type 'Base<Int> & P2' does not conform to specified type 'Derived & P2'}}
 
-  let _ = Unrelated() as Derived & P2 // expected-error {{value of type 'Unrelated' does not conform to 'Derived & P2' in coercion}}
+  // TODO(diagnostics): Diagnostic regression, better message is `value of type 'Unrelated' does not conform to 'Derived & P2' in coercion`
+  let _ = Unrelated() as Derived & P2 // expected-error {{cannot convert value of type 'Unrelated' to type 'Derived' in coercion}}
   let _ = Unrelated() as? Derived & P2 // expected-warning {{always fails}}
   let _ = baseAndP2 as Unrelated // expected-error {{cannot convert value of type 'Base<Int> & P2' to type 'Unrelated' in coercion}}
   let _ = baseAndP2 as? Unrelated // expected-warning {{always fails}}
@@ -298,15 +299,18 @@ func dependentMemberTypes<T : BaseIntAndP2>(
   _: BaseIntAndP2.FullyConcrete) {}
 
 func conformsToAnyObject<T : AnyObject>(_: T) {}
+// expected-note@-1 {{where 'T' = 'P1'}}
 func conformsToP1<T : P1>(_: T) {}
+// expected-note@-1 {{required by global function 'conformsToP1' where 'T' = 'P1'}}
 func conformsToP2<T : P2>(_: T) {}
 func conformsToBaseIntAndP2<T : Base<Int> & P2>(_: T) {}
-// expected-note@-1 2 {{where 'T' = 'Base<String>'}}
-// expected-note@-2   {{where 'T' = 'Base<Int>'}}
+// expected-note@-1 {{where 'T' = 'FakeDerived'}}
+// expected-note@-2 {{where 'T' = 'T1'}}
+// expected-note@-3 2 {{where 'T' = 'Base<Int>'}}
 
 func conformsToBaseIntAndP2WithWhereClause<T>(_: T) where T : Base<Int> & P2 {}
-// expected-note@-1 {{where 'T' = 'Base<String>'}}
-// expected-note@-2 {{where 'T' = 'Base<Int>'}}
+// expected-note@-1 {{where 'T' = 'FakeDerived'}}
+// expected-note@-2 {{where 'T' = 'T1'}}
 
 class FakeDerived : Base<String>, P2 {
   required init(classInit: ()) {
@@ -407,34 +411,33 @@ func conformsTo<T1 : P2, T2 : Base<Int> & P2>(
 
   // Errors
   conformsToAnyObject(p1)
-  // expected-error@-1 {{cannot invoke 'conformsToAnyObject' with an argument list of type '(P1)'}}
-  // expected-note@-2 {{expected an argument list of type '(T)'}}
+  // expected-error@-1 {{global function 'conformsToAnyObject' requires that 'P1' be a class type}}
 
   conformsToP1(p1)
-  // expected-error@-1 {{protocol type 'P1' cannot conform to 'P1' because only concrete types can conform to protocols}}
+  // expected-error@-1 {{value of protocol type 'P1' cannot conform to 'P1'; only struct/enum/class types can conform to protocols}}
 
   // FIXME: Following diagnostics are not great because when
   // `conformsTo*` methods are re-typechecked, they loose information
   // about `& P2` in generic parameter.
 
   conformsToBaseIntAndP2(base)
-  // expected-error@-1 {{argument type 'Base<Int>' does not conform to expected type 'P2'}}
-
-  conformsToBaseIntAndP2(badBase)
-  // expected-error@-1 {{global function 'conformsToBaseIntAndP2' requires that 'Base<String>' inherit from 'Base<Int>'}}
-  // expected-error@-2 {{argument type 'Base<String>' does not conform to expected type 'P2'}}
-
-  conformsToBaseIntAndP2(fakeDerived)
-  // expected-error@-1 {{global function 'conformsToBaseIntAndP2' requires that 'Base<String>' inherit from 'Base<Int>'}}
-
-  conformsToBaseIntAndP2WithWhereClause(fakeDerived)
-  // expected-error@-1 {{global function 'conformsToBaseIntAndP2WithWhereClause' requires that 'Base<String>' inherit from 'Base<Int>'}}
-
-  conformsToBaseIntAndP2(p2Archetype)
   // expected-error@-1 {{global function 'conformsToBaseIntAndP2' requires that 'Base<Int>' conform to 'P2'}}
 
+  conformsToBaseIntAndP2(badBase)
+  // expected-error@-1 {{global function 'conformsToBaseIntAndP2' requires that 'Base<Int>' conform to 'P2'}}
+  // expected-error@-2 {{cannot convert value of type 'Base<String>' to expected argument type 'Base<Int>'}}
+
+  conformsToBaseIntAndP2(fakeDerived)
+  // expected-error@-1 {{global function 'conformsToBaseIntAndP2' requires that 'FakeDerived' inherit from 'Base<Int>'}}
+
+  conformsToBaseIntAndP2WithWhereClause(fakeDerived)
+  // expected-error@-1 {{global function 'conformsToBaseIntAndP2WithWhereClause' requires that 'FakeDerived' inherit from 'Base<Int>'}}
+
+  conformsToBaseIntAndP2(p2Archetype)
+  // expected-error@-1 {{global function 'conformsToBaseIntAndP2' requires that 'T1' inherit from 'Base<Int>'}}
+
   conformsToBaseIntAndP2WithWhereClause(p2Archetype)
-  // expected-error@-1 {{global function 'conformsToBaseIntAndP2WithWhereClause' requires that 'Base<Int>' conform to 'P2'}}
+  // expected-error@-1 {{global function 'conformsToBaseIntAndP2WithWhereClause' requires that 'T1' inherit from 'Base<Int>'}}
 
   // Good
   conformsToAnyObject(anyObject)

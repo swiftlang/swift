@@ -22,6 +22,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Builtins.h"
 #include "swift/AST/DiagnosticsSIL.h"
+#include "swift/AST/FileUnit.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ReferenceCounting.h"
@@ -1030,29 +1031,34 @@ static ManagedValue emitBuiltinTypeTrait(SILGenFunction &SGF,
 }
 
 // SWIFT_ENABLE_TENSORFLOW
-static ManagedValue emitBuiltinAutoDiffApplyAssociatedFunction(
-    AutoDiffAssociatedFunctionKind kind, unsigned arity, unsigned order,
-    bool rethrows, SILGenFunction &SGF, SILLocation loc,
+// FIXME(SR-11852): This should not perform curry-level unwrapping. Clean up
+// this function.
+static ManagedValue emitBuiltinAutoDiffApplyDerivativeFunction(
+    AutoDiffDerivativeFunctionKind kind, unsigned arity,
+    bool throws, SILGenFunction &SGF, SILLocation loc,
     SubstitutionMap substitutions, ArrayRef<ManagedValue> args, SGFContext C) {
+  // FIXME(SR-11853): Support throwing functions.
+  assert(!throws && "Throwing functions are not yet supported");
+
   auto origFnVal = args[0].getValue();
   SmallVector<SILValue, 2> origFnArgVals;
   for (auto& arg : args.drop_front(1))
     origFnArgVals.push_back(arg.getValue());
 
-  // Get the associated function.
-  SILValue assocFn = SGF.B.createAutoDiffFunctionExtract(
-          loc, kind, /*differentiationOrder*/ 1, origFnVal);
-  auto assocFnType = assocFn->getType().castTo<SILFunctionType>();
+  // Get the derivative function.
+  SILValue derivativeFn = SGF.B.createDifferentiableFunctionExtract(
+      loc, kind, origFnVal);
+  auto derivativeFnType = derivativeFn->getType().castTo<SILFunctionType>();
 
-  // We don't need to destroy the original function or retain the `assocFn`,
-  // because they are trivial (because they are @noescape).
+  // We don't need to destroy the original function or retain the
+  // `derivativeFn`, because they are trivial (because they are @noescape).
   assert(origFnVal->getType().isTrivial(SGF.F));
-  assert(assocFn->getType().isTrivial(SGF.F));
-  bool assocFnNeedsDestroy = false;
+  assert(derivativeFn->getType().isTrivial(SGF.F));
+  bool derivativeFnNeedsDestroy = false;
 
   // Unwrap curry levels.
   SmallVector<SILFunctionType *, 2> curryLevels;
-  SILFunctionType *currentLevel = assocFnType;
+  SILFunctionType *currentLevel = derivativeFnType;
   unsigned numParameters = 0;
   while (currentLevel != nullptr) {
     curryLevels.push_back(currentLevel);
@@ -1060,7 +1066,7 @@ static ManagedValue emitBuiltinAutoDiffApplyAssociatedFunction(
     if (currentLevel->getNumResults() != 1)
       break;
     currentLevel =
-        currentLevel->getSingleResult().getType()->getAs<SILFunctionType>();
+        currentLevel->getSingleResult().getInterfaceType()->getAs<SILFunctionType>();
   }
   assert(numParameters == origFnArgVals.size());
 
@@ -1073,7 +1079,7 @@ static ManagedValue emitBuiltinAutoDiffApplyAssociatedFunction(
 #endif
 
   // Apply all the curry levels except the last one, whose results we handle
-  // specially. We overwrite `assocFn` with the application results.
+  // specially. We overwrite `derivativeFn` with the application results.
   unsigned currentParameter = 0;
   auto curryLevelsWithoutLast =
       ArrayRef<SILFunctionType *>(curryLevels).drop_back(1);
@@ -1081,17 +1087,17 @@ static ManagedValue emitBuiltinAutoDiffApplyAssociatedFunction(
     auto curryLevelArgVals = ArrayRef<SILValue>(origFnArgVals).slice(
         currentParameter, curryLevel->getNumParameters());
     auto applyResult = SGF.B.createApply(
-        loc, assocFn, SubstitutionMap(), curryLevelArgVals,
+        loc, derivativeFn, SubstitutionMap(), curryLevelArgVals,
         /*isNonThrowing*/ false);
     currentParameter += curryLevel->getNumParameters();
 
-    assocFn = applyResult;
+    derivativeFn = applyResult;
 
-    // Our new `assocFn` needs to be released because it's an owned result from
-    // a function call.
+    // Our new `derivativeFn` needs to be released because it's an owned result
+    // from a function call.
     assert(curryLevel->getSingleResult().getConvention() ==
            ResultConvention::Owned);
-    assocFnNeedsDestroy = true;
+    derivativeFnNeedsDestroy = true;
   }
 
   assert(curryLevels.back()->getNumResults() == 2);
@@ -1101,17 +1107,17 @@ static ManagedValue emitBuiltinAutoDiffApplyAssociatedFunction(
   // Apply the last curry level, in the case where it has indirect results.
   if (curryLevels.back()->hasIndirectFormalResults()) {
     auto indResBuffer = SGF.getBufferForExprResult(
-        loc, curryLevels.back()->getAllResultsType(), C);
+        loc, curryLevels.back()->getAllResultsInterfaceType(), C);
     SmallVector<SILValue, 3> applyArgs;
     applyArgs.push_back(SGF.B.createTupleElementAddr(loc, indResBuffer, 0));
     auto curryLevelArgVals = ArrayRef<SILValue>(origFnArgVals).slice(
         currentParameter);
     for (auto origFnArgVal : curryLevelArgVals)
       applyArgs.push_back(origFnArgVal);
-    auto differential = SGF.B.createApply(
-        loc, assocFn, SubstitutionMap(), applyArgs, /*isNonThrowing*/ false);
+    auto differential = SGF.B.createApply(loc, derivativeFn, SubstitutionMap(),
+                                          applyArgs, /*isNonThrowing*/ false);
 
-    assocFn = SILValue();
+    derivativeFn = SILValue();
 
     SGF.B.createStore(loc, differential,
                       SGF.B.createTupleElementAddr(loc, indResBuffer, 1),
@@ -1124,33 +1130,117 @@ static ManagedValue emitBuiltinAutoDiffApplyAssociatedFunction(
   auto curryLevelArgVals = ArrayRef<SILValue>(origFnArgVals).slice(
       currentParameter);
   auto resultTuple = SGF.B.createApply(
-      loc, assocFn, SubstitutionMap(), curryLevelArgVals,
+      loc, derivativeFn, SubstitutionMap(), curryLevelArgVals,
       /*isNonThrowing*/ false);
 
-  assocFn = SILValue();
+  derivativeFn = SILValue();
 
   return SGF.emitManagedRValueWithCleanup(resultTuple);
 }
 
-static ManagedValue emitBuiltinAutoDiffApply(SILGenFunction &SGF,
-                                             SILLocation loc,
-                                             SubstitutionMap substitutions,
-                                             ArrayRef<ManagedValue> args,
-                                             SGFContext C) {
+// SWIFT_ENABLE_TENSORFLOW
+static ManagedValue emitBuiltinAutoDiffApplyTransposeFunction(
+    unsigned arity, bool throws, SILGenFunction &SGF, SILLocation loc,
+    SubstitutionMap substitutions, ArrayRef<ManagedValue> args, SGFContext C) {
+  // FIXME(SR-11853): Support throwing functions.
+  assert(!throws && "Throwing functions are not yet supported");
+
+  auto origFnVal = args.front().getValue();
+  SmallVector<SILValue, 2> origFnArgVals;
+  for (auto &arg : args.drop_front(1))
+    origFnArgVals.push_back(arg.getValue());
+
+  // Get the transpose function.
+  SILValue transposeFn = SGF.B.createLinearFunctionExtract(
+      loc, LinearDifferentiableFunctionTypeComponent::Transpose, origFnVal);
+  auto transposeFnType = transposeFn->getType().castTo<SILFunctionType>();
+
+  SmallVector<SILValue, 2> applyArgs;
+  if (transposeFnType->hasIndirectFormalResults())
+    applyArgs.push_back(
+        SGF.getBufferForExprResult(
+            loc, transposeFnType->getAllResultsInterfaceType(), C));
+  for (auto paramArg : args.drop_front()) {
+    applyArgs.push_back(paramArg.getValue());
+  }
+  auto *apply = SGF.B.createApply(
+      loc, transposeFn, SubstitutionMap(), applyArgs);
+  if (transposeFnType->hasIndirectFormalResults()) {
+    auto resBuffer = applyArgs.front();
+    return SGF.manageBufferForExprResult(
+        resBuffer, SGF.getTypeLowering(resBuffer->getType()), C);
+  } else {
+    return SGF.emitManagedRValueWithCleanup(apply);
+  }
+}
+
+static ManagedValue emitBuiltinApplyDerivative(
+    SILGenFunction &SGF, SILLocation loc, SubstitutionMap substitutions,
+    ArrayRef<ManagedValue> args, SGFContext C) {
   auto *callExpr = loc.castToASTNode<CallExpr>();
   auto builtinDecl = cast<FuncDecl>(cast<DeclRefExpr>(
       cast<DotSyntaxBaseIgnoredExpr>(callExpr->getDirectCallee())->getRHS())
           ->getDecl());
   auto builtinName = builtinDecl->getName().str();
-  AutoDiffAssociatedFunctionKind kind;
-  unsigned arity, order;
-  bool rethrows;
-  auto successfullyParsed = autodiff::getBuiltinAutoDiffApplyConfig(
-      builtinName, kind, arity, order, rethrows);
+  AutoDiffDerivativeFunctionKind kind;
+  unsigned arity;
+  bool throws;
+  auto successfullyParsed = autodiff::getBuiltinApplyDerivativeConfig(
+      builtinName, kind, arity, throws);
   assert(successfullyParsed);
-  return emitBuiltinAutoDiffApplyAssociatedFunction(kind, arity, order,
-                                                    rethrows, SGF, loc,
-                                                    substitutions, args, C);
+  return emitBuiltinAutoDiffApplyDerivativeFunction(
+      kind, arity, throws, SGF, loc, substitutions, args, C);
+}
+
+// SWIFT_ENABLE_TENSORFLOW
+static ManagedValue emitBuiltinApplyTranspose(
+    SILGenFunction &SGF, SILLocation loc, SubstitutionMap substitutions,
+    ArrayRef<ManagedValue> args, SGFContext C) {
+  auto *callExpr = loc.castToASTNode<CallExpr>();
+  auto builtinDecl = cast<FuncDecl>(cast<DeclRefExpr>(
+      cast<DotSyntaxBaseIgnoredExpr>(callExpr->getDirectCallee())->getRHS())
+          ->getDecl());
+  auto builtinName = builtinDecl->getName().str();
+  unsigned arity;
+  bool throws;
+  auto successfullyParsed = autodiff::getBuiltinApplyTransposeConfig(
+      builtinName, arity, throws);
+  assert(successfullyParsed);
+  return emitBuiltinAutoDiffApplyTransposeFunction(
+      arity, throws, SGF, loc, substitutions, args, C);
+}
+
+// SWIFT_ENABLE_TENSORFLOW
+static ManagedValue emitBuiltinDifferentiableFunction(
+    SILGenFunction &SGF, SILLocation loc, SubstitutionMap substitutions,
+    ArrayRef<ManagedValue> args, SGFContext C) {
+  assert(args.size() == 3);
+  auto origFn = args.front();
+  auto origType = origFn.getType().castTo<SILFunctionType>();
+  auto diffFn = SGF.B.createDifferentiableFunction(
+      loc,
+      IndexSubset::getDefault(
+          SGF.getASTContext(), origType->getNumParameters(),
+          /*includeAll*/ true),
+      origFn.forward(SGF),
+      std::make_pair(args[1].forward(SGF), args[2].forward(SGF)));
+  return SGF.emitManagedRValueWithCleanup(diffFn);
+}
+
+// SWIFT_ENABLE_TENSORFLOW
+static ManagedValue emitBuiltinLinearFunction(
+    SILGenFunction &SGF, SILLocation loc, SubstitutionMap substitutions,
+    ArrayRef<ManagedValue> args, SGFContext C) {
+  assert(args.size() == 2);
+  auto origFn = args.front();
+  auto origType = origFn.getType().castTo<SILFunctionType>();
+  auto linearFn = SGF.B.createLinearFunction(
+      loc,
+      IndexSubset::getDefault(
+          SGF.getASTContext(), origType->getNumParameters(),
+          /*includeAll*/ true),
+      origFn.forward(SGF), args[1].forward(SGF));
+  return SGF.emitManagedRValueWithCleanup(linearFn);
 }
 
 /// Emit SIL for the named builtin: globalStringTablePointer. Unlike the default

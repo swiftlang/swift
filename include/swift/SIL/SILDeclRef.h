@@ -35,7 +35,7 @@ namespace swift {
   class AbstractFunctionDecl;
   class AbstractClosureExpr;
   // SWIFT_ENABLE_TENSORFLOW
-  class AutoDiffAssociatedFunctionIdentifier;
+  class AutoDiffDerivativeFunctionIdentifier;
   class ValueDecl;
   class FuncDecl;
   class ClosureExpr;
@@ -135,6 +135,10 @@ struct SILDeclRef {
     /// routines have an ivar destroyer, which is emitted as
     /// .cxx_destruct.
     IVarDestroyer,
+
+    /// References the wrapped value injection function used to initialize
+    /// the backing storage property from a wrapped value.
+    PropertyWrapperBackingInitializer,
   };
   
   /// The ValueDecl or AbstractClosureExpr represented by this SILDeclRef.
@@ -153,22 +157,22 @@ struct SILDeclRef {
   
   // SWIFT_ENABLE_TENSORFLOW
   /// When this is non-null, it modifies the SILDeclRef to refer to the
-  /// corresponding autodiff associated function.
-  AutoDiffAssociatedFunctionIdentifier *autoDiffAssociatedFunctionIdentifier;
+  /// corresponding autodiff derivative function.
+  AutoDiffDerivativeFunctionIdentifier *autoDiffDerivativeFunctionIdentifier;
 
   /// Produces a null SILDeclRef.
   SILDeclRef() : loc(), kind(Kind::Func),
                  isCurried(0), isForeign(0), isDirectReference(0),
                  // SWIFT_ENABLE_TENSORFLOW
                  defaultArgIndex(0),
-                 autoDiffAssociatedFunctionIdentifier(nullptr) {}
+                 autoDiffDerivativeFunctionIdentifier(nullptr) {}
   
   /// Produces a SILDeclRef of the given kind for the given decl.
   explicit SILDeclRef(ValueDecl *decl, Kind kind,
                       bool isCurried = false,
                       // SWIFT_ENABLE_TENSORFLOW
                       bool isForeign = false,
-                      AutoDiffAssociatedFunctionIdentifier *autoDiffFuncId =
+                      AutoDiffDerivativeFunctionIdentifier *autoDiffFuncId =
                           nullptr);
   
   /// Produces a SILDeclRef for the given ValueDecl or
@@ -257,6 +261,11 @@ struct SILDeclRef {
   bool isStoredPropertyInitializer() const {
     return kind == Kind::StoredPropertyInitializer;
   }
+  /// True if the SILDeclRef references the initializer for the backing storage
+  /// of a property wrapper.
+  bool isPropertyWrapperBackingInitializer() const {
+    return kind == Kind::PropertyWrapperBackingInitializer;
+  }
 
   /// True if the SILDeclRef references the ivar initializer or deinitializer of
   /// a class.
@@ -304,8 +313,8 @@ struct SILDeclRef {
       && isDirectReference == rhs.isDirectReference
       // SWIFT_ENABLE_TENSORFLOW
       && defaultArgIndex == rhs.defaultArgIndex
-      && autoDiffAssociatedFunctionIdentifier ==
-             rhs.autoDiffAssociatedFunctionIdentifier;
+      && autoDiffDerivativeFunctionIdentifier ==
+             rhs.autoDiffDerivativeFunctionIdentifier;
   }
   bool operator!=(SILDeclRef rhs) const {
     return !(*this == rhs);
@@ -326,7 +335,7 @@ struct SILDeclRef {
                       curried, willBeDirect, willBeForeign,
                       // SWIFT_ENABLE_TENSORFLOW
                       defaultArgIndex,
-                      autoDiffAssociatedFunctionIdentifier);
+                      autoDiffDerivativeFunctionIdentifier);
   }
   
   /// Returns the foreign (or native) entry point corresponding to the same
@@ -336,7 +345,7 @@ struct SILDeclRef {
     return SILDeclRef(loc.getOpaqueValue(), kind,
                       // SWIFT_ENABLE_TENSORFLOW
                       isCurried, isDirectReference, foreign, defaultArgIndex,
-                      autoDiffAssociatedFunctionIdentifier);
+                      autoDiffDerivativeFunctionIdentifier);
   }
   
   SILDeclRef asDirectReference(bool direct = true) const {
@@ -350,20 +359,20 @@ struct SILDeclRef {
   // SWIFT_ENABLE_TENSORFLOW
   /// Returns the entry point for the corresponding autodiff associated
   /// function.
-  SILDeclRef asAutoDiffAssociatedFunction(
-      AutoDiffAssociatedFunctionIdentifier *id) const {
-    assert(!autoDiffAssociatedFunctionIdentifier);
+  SILDeclRef asAutoDiffDerivativeFunction(
+      AutoDiffDerivativeFunctionIdentifier *id) const {
+    assert(!autoDiffDerivativeFunctionIdentifier);
     SILDeclRef r = *this;
-    r.autoDiffAssociatedFunctionIdentifier = id;
+    r.autoDiffDerivativeFunctionIdentifier = id;
     return r;
   }
 
   /// Returns the entry point for the original function corresponding to an
-  /// autodiff associated function.
+  /// autodiff derivative function.
   SILDeclRef asAutoDiffOriginalFunction() const {
-    assert(autoDiffAssociatedFunctionIdentifier);
+    assert(autoDiffDerivativeFunctionIdentifier);
     SILDeclRef r = *this;
-    r.autoDiffAssociatedFunctionIdentifier = nullptr;
+    r.autoDiffDerivativeFunctionIdentifier = nullptr;
     return r;
   }
 
@@ -450,14 +459,14 @@ private:
                       bool isForeign,
                       // SWIFT_ENABLE_TENSORFLOW
                       unsigned defaultArgIndex,
-                      AutoDiffAssociatedFunctionIdentifier *autoDiffFuncId)
+                      AutoDiffDerivativeFunctionIdentifier *autoDiffFuncId)
     : loc(Loc::getFromOpaqueValue(opaqueLoc)),
       kind(kind),
       isCurried(isCurried),
       isForeign(isForeign), isDirectReference(isDirectReference),
       // SWIFT_ENABLE_TENSORFLOW
       defaultArgIndex(defaultArgIndex),
-      autoDiffAssociatedFunctionIdentifier(autoDiffFuncId)
+      autoDiffDerivativeFunctionIdentifier(autoDiffFuncId)
   {}
 
 };
@@ -499,7 +508,7 @@ template<> struct DenseMapInfo<swift::SILDeclRef> {
     unsigned h5 = UnsignedInfo::getHashValue(Val.isDirectReference);
     // SWIFT_ENABLE_TENSORFLOW
     unsigned h6 =
-        PointerInfo::getHashValue(Val.autoDiffAssociatedFunctionIdentifier);
+        PointerInfo::getHashValue(Val.autoDiffDerivativeFunctionIdentifier);
     return h1 ^ (h2 << 4) ^ (h3 << 9) ^ (h4 << 7) ^ (h5 << 11) ^ (h6 << 13);
   }
   static bool isEqual(swift::SILDeclRef const &LHS,

@@ -56,6 +56,20 @@ ControlFlowTests.test("Conditionals") {
   expectEqual((5, 4), gradient(at: 4, 5, in: cond3))
   expectEqual((-1, 1), gradient(at: -3, -2, in: cond3))
 
+  func cond4_var(_ x: Float) -> Float {
+    var outer = x
+    outerIf: if true {
+      var inner = outer
+      inner = inner * x
+      if false {
+        break outerIf
+      }
+      outer = inner
+    }
+    return outer
+  }
+  expectEqual((9, 6), valueWithGradient(at: 3, in: cond4_var))
+
   func cond_tuple(_ x: Float) -> Float {
     // Convoluted function returning `x + x`.
     let y: (Float, Float) = (x, x)
@@ -355,6 +369,44 @@ ControlFlowTests.test("NestedConditionals") {
   expectEqual((0, -1), gradient(at: 4, 21, in: nested3))
   expectEqual((1, 1), gradient(at: 4, 5, in: nested3))
   expectEqual((0, -1), gradient(at: -3, -2, in: nested3))
+
+  // TF-781: nested if derivative correctness.
+  do {
+    struct TF_781: Differentiable {
+      var w: Float = 3
+
+      @differentiable(wrt: self) // wrt only self is important
+      func callAsFunction(_ input: Float) -> Float {
+        var x = input
+        if true {
+          if true {
+            // Function application below should make `self` have non-zero
+            // derivative.
+            x = x * w
+          }
+        }
+        return x
+      }
+    }
+    let x: Float = 10
+    expectEqual(TF_781.TangentVector(w: x), gradient(at: TF_781()) { $0(x) })
+  }
+
+  // Non-method version of TF-781.
+  do {
+    @differentiable(wrt: x)
+    func TF_781(_ x: Float, _ y: Float) -> Float {
+      var result = y
+      if true {
+        if true {
+          result = result * x
+        }
+      }
+      return result
+    }
+    let x: Float = 10
+    expectEqual(x, gradient(at: 3) { TF_781($0, x) })
+  }
 }
 
 ControlFlowTests.test("Recursion") {
@@ -397,20 +449,11 @@ ControlFlowTests.test("Recursion") {
     }
     return y
   }
-  // FIXME: Fix zero gradients (related to activity analysis).
-  // See `factorial_var1` for the working version.
-  /*
   expectEqual(0, gradient(at: 1, in: factorial_var2))
   expectEqual(1, gradient(at: 2, in: factorial_var2))
   expectEqual(5, gradient(at: 3, in: factorial_var2))
   expectEqual(26, gradient(at: 4, in: factorial_var2))
   expectEqual(154, gradient(at: 5, in: factorial_var2))
-  */
-  expectEqual(0, gradient(at: 1, in: factorial_var2))
-  expectEqual(0, gradient(at: 2, in: factorial_var2))
-  expectEqual(0, gradient(at: 3, in: factorial_var2))
-  expectEqual(0, gradient(at: 4, in: factorial_var2))
-  expectEqual(0, gradient(at: 5, in: factorial_var2))
 
   func product(_ x: Float, count: Int) -> Float {
     precondition(count > 0)
@@ -522,7 +565,7 @@ ControlFlowTests.test("Enums") {
 ControlFlowTests.test("Loops") {
   func for_loop(_ x: Float) -> Float {
     var result = x
-    for _ in 1..<3 {
+    for _ in 0..<2 {
       result = result * x
     }
     return result
@@ -530,10 +573,20 @@ ControlFlowTests.test("Loops") {
   expectEqual((8, 12), valueWithGradient(at: 2, in: for_loop))
   expectEqual((27, 27), valueWithGradient(at: 3, in: for_loop))
 
+  func for_loop_nonactive_initial_value(_ x: Float) -> Float {
+    var result: Float = 1
+    for _ in 0..<2 {
+      result = result * x
+    }
+    return result
+  }
+  expectEqual((4, 4), valueWithGradient(at: 2, in: for_loop_nonactive_initial_value))
+  expectEqual((9, 6), valueWithGradient(at: 3, in: for_loop_nonactive_initial_value))
+
   func while_loop(_ x: Float) -> Float {
     var result = x
-    var i = 1
-    while i < 3 {
+    var i = 0
+    while i < 2 {
       result = result * x
       i += 1
     }
@@ -542,21 +595,49 @@ ControlFlowTests.test("Loops") {
   expectEqual((8, 12), valueWithGradient(at: 2, in: while_loop))
   expectEqual((27, 27), valueWithGradient(at: 3, in: while_loop))
 
+  func while_loop_nonactive_initial_value(_ x: Float) -> Float {
+    var result: Float = 1
+    var i = 0
+    while i < 2 {
+      result = result * x
+      i += 1
+    }
+    return result
+  }
+  expectEqual((4, 4), valueWithGradient(at: 2, in: while_loop_nonactive_initial_value))
+  expectEqual((9, 6), valueWithGradient(at: 3, in: while_loop_nonactive_initial_value))
+
   func repeat_while_loop(_ x: Float) -> Float {
     var result = x
-    var i = 1
+    var i = 0
     repeat {
       result = result * x
       i += 1
-    } while i < 3
+    } while i < 2
     return result
   }
-  // FIXME(TF-584): Investigate incorrect (too big) gradient values
-  // for repeat-while loops.
+  // FIXME(TF-584): Investigate incorrect (too big) gradient values for
+  // repeat-while loops.
   // expectEqual((8, 12), valueWithGradient(at: 2, in: repeat_while_loop))
   // expectEqual((27, 27), valueWithGradient(at: 3, in: repeat_while_loop))
   expectEqual((8, 18), valueWithGradient(at: 2, in: repeat_while_loop))
   expectEqual((27, 36), valueWithGradient(at: 3, in: repeat_while_loop))
+
+  func repeat_while_loop_nonactive_initial_value(_ x: Float) -> Float {
+    var result: Float = 1
+    var i = 0
+    repeat {
+      result = result * x
+      i += 1
+    } while i < 2
+    return result
+  }
+  // FIXME(TF-584): Investigate incorrect (too big) gradient values for
+  // repeat-while loops.
+  // expectEqual((4, 4), valueWithGradient(at: 2, in: repeat_while_loop_nonactive_initial_value))
+  // expectEqual((9, 6), valueWithGradient(at: 3, in: repeat_while_loop_nonactive_initial_value))
+  expectEqual((4, 5), valueWithGradient(at: 2, in: repeat_while_loop_nonactive_initial_value))
+  expectEqual((9, 7), valueWithGradient(at: 3, in: repeat_while_loop_nonactive_initial_value))
 
   func loop_continue(_ x: Float) -> Float {
     var result = x
@@ -586,12 +667,12 @@ ControlFlowTests.test("Loops") {
 
   func nested_loop1(_ x: Float) -> Float {
     var outer = x
-    for _ in 1..<3 {
+    for _ in 0..<2 {
       outer = outer * x
 
       var inner = outer
-      var i = 1
-      while i < 3 {
+      var i = 0
+      while i < 2 {
         inner = inner + x
         i += 1
       }
@@ -604,11 +685,11 @@ ControlFlowTests.test("Loops") {
 
   func nested_loop2(_ x: Float, count: Int) -> Float {
     var outer = x
-    outerLoop: for _ in 1..<count {
+    outerLoop: for _ in 0..<count {
       outer = outer * x
 
       var inner = outer
-      var i = 1
+      var i = 0
       while i < count {
         inner = inner + x
         i += 1
@@ -623,8 +704,10 @@ ControlFlowTests.test("Loops") {
     }
     return outer
   }
-  expectEqual((24, 12), valueWithGradient(at: 2, in: { x in nested_loop2(x, count: 5) }))
-  expectEqual((16, 8), valueWithGradient(at: 4, in: { x in nested_loop2(x, count: 5) }))
+  expectEqual((6, 5), valueWithGradient(at: 2, in: { x in nested_loop2(x, count: 1) }))
+  expectEqual((20, 22), valueWithGradient(at: 2, in: { x in nested_loop2(x, count: 2) }))
+  expectEqual((52, 80), valueWithGradient(at: 2, in: { x in nested_loop2(x, count: 3) }))
+  expectEqual((24, 28), valueWithGradient(at: 2, in: { x in nested_loop2(x, count: 4) }))
 }
 
 runAllTests()

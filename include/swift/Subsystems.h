@@ -43,7 +43,6 @@ namespace swift {
   class CodeCompletionCallbacksFactory;
   class Decl;
   class DeclContext;
-  class DelayedParsingCallbacks;
   class DiagnosticConsumer;
   class DiagnosticEngine;
   class Evaluator;
@@ -66,9 +65,15 @@ namespace swift {
   class SyntaxParsingCache;
   class Token;
   class TopLevelContext;
+  class TypeChecker;
+  class TypeCheckerOptions;
   struct TypeLoc;
   class UnifiedStatsReporter;
   enum class SourceFileKind;
+
+  namespace Lowering {
+    class TypeConverter;
+  }
 
   /// Used to optionally maintain SIL parsing context for the parser.
   ///
@@ -114,14 +119,10 @@ namespace swift {
   /// \param PersistentState if non-null the same PersistentState object can
   /// be used to resume parsing or parse delayed function bodies.
   ///
-  /// \param DelayedParseCB if non-null enables delayed parsing for function
-  /// bodies.
-  ///
   /// \return true if the parser found code with side effects.
   bool parseIntoSourceFile(SourceFile &SF, unsigned BufferID, bool *Done,
                            SILParserState *SIL = nullptr,
                            PersistentParserState *PersistentState = nullptr,
-                           DelayedParsingCallbacks *DelayedParseCB = nullptr,
                            bool DelayBodyParsing = true);
 
   /// Parse a single buffer into the given source file, until the full source
@@ -129,15 +130,12 @@ namespace swift {
   ///
   /// \return true if the parser found code with side effects.
   bool parseIntoSourceFileFull(SourceFile &SF, unsigned BufferID,
-                             PersistentParserState *PersistentState = nullptr,
-                             DelayedParsingCallbacks *DelayedParseCB = nullptr,
+                               PersistentParserState *PersistentState = nullptr,
                                bool DelayBodyParsing = true);
 
-  /// Finish the parsing by going over the nodes that were delayed
-  /// during the first parsing pass.
-  void performDelayedParsing(DeclContext *DC,
-                             PersistentParserState &PersistentState,
-                             CodeCompletionCallbacksFactory *Factory);
+  /// Finish the code completion.
+  void performCodeCompletionSecondPass(PersistentParserState &PersistentState,
+                                       CodeCompletionCallbacksFactory &Factory);
 
   /// Lex and return a vector of tokens for the given buffer.
   std::vector<Token> tokenize(const LangOptions &LangOpts,
@@ -169,43 +167,25 @@ namespace swift {
   
   /// Once parsing and name-binding are complete this optionally walks the ASTs
   /// to add calls to externally provided functions that simulate
-  /// "program counter"-like debugging events.
-  void performPCMacro(SourceFile &SF, TopLevelContext &TLC);
-  
-  /// Flags used to control type checking.
-  enum class TypeCheckingFlags : unsigned {
-    /// Whether to delay checking that benefits from having the entire
-    /// module parsed, e.g., Objective-C method override checking.
-    DelayWholeModuleChecking = 1 << 0,
+  /// "program counter"-like debugging events. See the comment at the top of
+  /// lib/Sema/PCMacro.cpp for a description of the calls inserted.
+  void performPCMacro(SourceFile &SF);
 
-    /// If set, dumps wall time taken to check each function body to
-    /// llvm::errs().
-    DebugTimeFunctionBodies = 1 << 1,
+  /// Creates a type checker instance on the given AST context, if it
+  /// doesn't already have one.
+  ///
+  /// \returns a reference to the type checker instance.
+  TypeChecker &createTypeChecker(ASTContext &Ctx);
 
-    /// Indicates that the type checker is checking code that will be
-    /// immediately executed.
-    ForImmediateMode = 1 << 2,
-
-    /// If set, dumps wall time taken to type check each expression to
-    /// llvm::errs().
-    DebugTimeExpressions = 1 << 3,
-  };
+  /// Bind all 'extension' visible from \p SF to the extended nominal.
+  void bindExtensions(SourceFile &SF);
 
   /// Once parsing and name-binding are complete, this walks the AST to resolve
   /// types and diagnose problems therein.
   ///
   /// \param StartElem Where to start for incremental type-checking in the main
   /// source file.
-  ///
-  /// \param WarnLongFunctionBodies If non-zero, warn when a function body takes
-  /// longer than this many milliseconds to type-check
-  void performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
-                           OptionSet<TypeCheckingFlags> Options,
-                           unsigned StartElem = 0,
-                           unsigned WarnLongFunctionBodies = 0,
-                           unsigned WarnLongExpressionTypeChecking = 0,
-                           unsigned ExpressionTimeoutThreshold = 0,
-                           unsigned SwitchCheckingInvocationThreshold = 0);
+  void performTypeChecking(SourceFile &SF, unsigned StartElem = 0);
 
   /// Now that we have type-checked an entire module, perform any type
   /// checking that requires the full module, e.g., Objective-C method
@@ -223,9 +203,6 @@ namespace swift {
   /// swift::performWholeModuleTypeChecking because it's linear in the number
   /// of declarations in the module.
   void checkInconsistentImplementationOnlyImports(ModuleDecl *M);
-
-  /// Incrementally type-check only added external definitions.
-  void typeCheckExternalDefinitions(SourceFile &SF);
 
   /// Recursively validate the specified type.
   ///
@@ -251,8 +228,7 @@ namespace swift {
                               bool ProduceDiagnostics = true);
 
   /// Expose TypeChecker's handling of GenericParamList to SIL parsing.
-  GenericEnvironment *handleSILGenericParams(ASTContext &Ctx,
-                                             GenericParamList *genericParams,
+  GenericEnvironment *handleSILGenericParams(GenericParamList *genericParams,
                                              DeclContext *DC);
 
   /// Turn the given module into SIL IR.
@@ -260,11 +236,13 @@ namespace swift {
   /// The module must contain source files. The optimizer will assume that the
   /// SIL of all files in the module is present in the SILModule.
   std::unique_ptr<SILModule>
-  performSILGeneration(ModuleDecl *M, SILOptions &options);
+  performSILGeneration(ModuleDecl *M, Lowering::TypeConverter &TC,
+                       SILOptions &options);
 
   /// Turn a source file into SIL IR.
   std::unique_ptr<SILModule>
-  performSILGeneration(FileUnit &SF, SILOptions &options);
+  performSILGeneration(FileUnit &SF, Lowering::TypeConverter &TC,
+                       SILOptions &options);
 
   using ModuleOrSourceFile = PointerUnion<ModuleDecl *, SourceFile *>;
 
@@ -282,7 +260,25 @@ namespace swift {
                           const SerializationOptions &opts,
                           std::unique_ptr<llvm::MemoryBuffer> *moduleBuffer,
                           std::unique_ptr<llvm::MemoryBuffer> *moduleDocBuffer,
+                          std::unique_ptr<llvm::MemoryBuffer> *moduleSourceInfoBuffer,
                           const SILModule *M = nullptr);
+
+  // SWIFT_ENABLE_TENSORFLOW
+  /// Serializes a module or single source file to a memory buffer, and returns
+  /// the memory buffer in an output parameter. Does not write to the
+  /// filesystem.
+  ///
+  /// \param moduleBuffer will be set to a pointer to the serialized module
+  ///                     buffer. nullptr is allowed, in which case the module
+  ///                     will not be serialized.
+  /// \param moduleDocBuffer will be set to a pointer to the serialized module
+  ///                        doc buffer. nullptr is allowed, in which case the
+  ///                        module doc will not be serialized.
+  void serializeToMemory(ModuleOrSourceFile DC,
+                         const SerializationOptions &options,
+                         std::unique_ptr<llvm::MemoryBuffer> *moduleBuffer,
+                         std::unique_ptr<llvm::MemoryBuffer> *moduleDocBuffer,
+                         const SILModule *M = nullptr);
 
   /// Get the CPU, subtarget feature options, and triple to use when emitting code.
   std::tuple<llvm::TargetOptions, std::string, std::vector<std::string>,
@@ -358,7 +354,8 @@ namespace swift {
   class ParserUnit {
   public:
     ParserUnit(SourceManager &SM, SourceFileKind SFKind, unsigned BufferID,
-               const LangOptions &LangOpts, StringRef ModuleName,
+               const LangOptions &LangOpts, const TypeCheckerOptions &TyOpts,
+               StringRef ModuleName,
                std::shared_ptr<SyntaxParseActions> spActions = nullptr,
                SyntaxParsingCache *SyntaxCache = nullptr);
     ParserUnit(SourceManager &SM, SourceFileKind SFKind, unsigned BufferID);
@@ -388,6 +385,13 @@ namespace swift {
   ///
   /// The ASTContext will automatically call these upon construction.
   void registerNameLookupRequestFunctions(Evaluator &evaluator);
+
+  /// Register Parse-level request functions with the evaluator.
+  ///
+  /// Clients that form an ASTContext and will perform any parsing queries
+  /// using Parse-level logic should call these functions after forming the
+  /// ASTContext.
+  void registerParseRequestFunctions(Evaluator &evaluator);
 
   /// Register Sema-level request functions with the evaluator.
   ///

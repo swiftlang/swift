@@ -43,7 +43,7 @@ protected:
   /// analysis information for a function.
   /// This base class stores the administrative information needed for
   /// invalidation and updating the analysis.
-  /// In the following "this function" refers to the associated function.
+  /// In the following "this function" refers to the derivative function.
   template<typename FunctionInfo> class FunctionInfoBase {
   public:
 

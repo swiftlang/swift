@@ -11,7 +11,6 @@ endif()
 
 # Add generated libSyntax headers to global dependencies.
 list(APPEND LLVM_COMMON_DEPENDS swift-syntax-generated-headers)
-list(APPEND LLVM_COMMON_DEPENDS swift-parse-syntax-generated-headers)
 if(SWIFT_BUILD_SOURCEKIT)
   list(APPEND LLVM_COMMON_DEPENDS generated_sourcekit_uids)
 endif()
@@ -58,3 +57,6 @@ if(SWIFT_HOST_VARIANT STREQUAL "macosx")
 endif()
 
 add_swift_tool_subdirectory(swift-reflection-dump)
+
+# SWIFT_ENABLE_TENSORFLOW
+add_swift_tool_subdirectory(libInMemoryFrontend)

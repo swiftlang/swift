@@ -26,6 +26,7 @@
 #include "swift/Subsystems.h"
 #include "swift/Syntax/TokenSyntax.h"
 #include "llvm/ADT/PointerUnion.h"
+#include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/SaveAndRestore.h"
@@ -122,6 +123,7 @@ ParserStatus Parser::parseExprOrStmt(ASTNode &Result) {
 
   if (Tok.is(tok::pound) && Tok.isAtStartOfLine() &&
       peekToken().is(tok::code_complete)) {
+    SyntaxParsingContext CCCtxt(SyntaxContext, SyntaxContextKind::Decl);
     consumeToken();
     if (CodeCompletion)
       CodeCompletion->completeAfterPoundDirective();
@@ -249,11 +251,14 @@ bool Parser::isTerminatorForBraceItemListKind(BraceItemListKind Kind,
 
 void Parser::consumeTopLevelDecl(ParserPosition BeginParserPosition,
                                  TopLevelCodeDecl *TLCD) {
+  SyntaxParsingContext Discarding(SyntaxContext);
+  Discarding.disable();
   SourceLoc EndLoc = PreviousLoc;
   backtrackToPosition(BeginParserPosition);
   SourceLoc BeginLoc = Tok.getLoc();
-  State->delayTopLevel(TLCD, {BeginLoc, EndLoc},
-                       BeginParserPosition.PreviousLoc);
+  State->setCodeCompletionDelayedDeclState(
+      PersistentParserState::CodeCompletionDelayedDeclKind::TopLevelCodeDecl,
+      PD_Default, TLCD, {BeginLoc, EndLoc}, BeginParserPosition.PreviousLoc);
 
   // Skip the rest of the file to prevent the parser from constructing the AST
   // for it.  Forward references are not allowed at the top level.
@@ -322,6 +327,9 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
          Tok.isNot(tok::kw_sil_global) &&
          Tok.isNot(tok::kw_sil_witness_table) &&
          Tok.isNot(tok::kw_sil_default_witness_table) &&
+         // SWIFT_ENABLE_TENSORFLOW
+         Tok.isNot(tok::kw_sil_differentiability_witness) &&
+         // SWIFT_ENABLE_TENSORFLOW_END
          Tok.isNot(tok::kw_sil_property) &&
          (isConditionalBlock ||
           !isTerminatorForBraceItemListKind(Kind, Entries))) {
@@ -513,53 +521,6 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
   }
 
   return BraceItemsStatus;
-}
-
-void Parser::parseTopLevelCodeDeclDelayed() {
-  auto DelayedState = State->takeDelayedDeclState();
-  assert(DelayedState.get() && "should have delayed state");
-
-  auto BeginParserPosition = getParserPosition(DelayedState->BodyPos);
-  auto EndLexerState = L->getStateForEndOfTokenLoc(DelayedState->BodyEnd);
-
-  // ParserPositionRAII needs a primed parser to restore to.
-  if (Tok.is(tok::NUM_TOKENS))
-    consumeTokenWithoutFeedingReceiver();
-
-  // Ensure that we restore the parser state at exit.
-  ParserPositionRAII PPR(*this);
-
-  // Create a lexer that cannot go past the end state.
-  Lexer LocalLex(*L, BeginParserPosition.LS, EndLexerState);
-
-  // Temporarily swap out the parser's current lexer with our new one.
-  llvm::SaveAndRestore<Lexer *> T(L, &LocalLex);
-
-  // Rewind to the beginning of the top-level code.
-  restoreParserPosition(BeginParserPosition);
-
-  // Re-enter the lexical scope.
-  Scope S(this, DelayedState->takeScope());
-
-  // Re-enter the top-level decl context.
-  // FIXME: this can issue discriminators out-of-order?
-  auto *TLCD = cast<TopLevelCodeDecl>(DelayedState->ParentContext);
-  ContextChange CC(*this, TLCD, &State->getTopLevelContext());
-
-  SourceLoc StartLoc = Tok.getLoc();
-  ASTNode Result;
-
-  // Expressions can't begin with a closure literal at statement position. This
-  // prevents potential ambiguities with trailing closure syntax.
-  if (Tok.is(tok::l_brace)) {
-    diagnose(Tok, diag::statement_begins_with_closure);
-  }
-
-  parseExprOrStmt(Result);
-  if (!Result.isNull()) {
-    auto Brace = BraceStmt::create(Context, StartLoc, Result, Tok.getLoc());
-    TLCD->setBody(Brace);
-  }
 }
 
 /// Recover from a 'case' or 'default' outside of a 'switch' by consuming up to

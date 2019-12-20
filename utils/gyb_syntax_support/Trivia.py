@@ -8,15 +8,17 @@ class Trivia(object):
         self.name = name
         self.comment = comment
         self.serialization_code = serialization_code
-        self.characters = characters
+        self.characters = tuple(characters)
         self.lower_name = lowercase_first_word(name)
         self.is_new_line = is_new_line
         self.is_comment = is_comment
 
         # Swift sometimes doesn't support escaped characters like \f or \v;
         # we should allow specifying alternatives explicitly.
-        self.swift_characters = swift_characters if swift_characters else\
-            characters
+        if swift_characters:
+            self.swift_characters = tuple(swift_characters)
+        else:
+            self.swift_characters = characters
         assert len(self.swift_characters) == len(self.characters)
 
     def characters_len(self):
@@ -43,9 +45,6 @@ TRIVIAS = [
     Trivia('CarriageReturnLineFeed',
            'A newline consists of contiguous \'\\r\' and \'\\n\' characters.',
            characters=['\\r', '\\n'], is_new_line=True, serialization_code=6),
-    Trivia('Backtick',
-           'A backtick \'`\' character, used to escape identifiers.',
-           characters=['`'], serialization_code=7),
     Trivia('LineComment', 'A developer line comment, starting with \'//\'',
            is_comment=True, serialization_code=8),
     Trivia('BlockComment',

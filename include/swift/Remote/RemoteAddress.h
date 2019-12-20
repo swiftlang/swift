@@ -19,6 +19,9 @@
 #define SWIFT_REMOTE_REMOTEADDRESS_H
 
 #include <cstdint>
+#include <string>
+#include <llvm/ADT/StringRef.h>
+#include <cassert>
 
 namespace swift {
 namespace remote {
@@ -43,6 +46,40 @@ public:
 
   uint64_t getAddressData() const {
     return Data;
+  }
+};
+
+/// A symbolic relocated absolute pointer value.
+class RemoteAbsolutePointer {
+  /// The symbol name that the pointer refers to. Empty if the value is absolute.
+  std::string Symbol;
+  /// The offset from the symbol, or the resolved remote address if \c Symbol is empty.
+  int64_t Offset;
+
+public:
+  RemoteAbsolutePointer()
+    : Symbol(), Offset(0)
+  {}
+  
+  RemoteAbsolutePointer(std::nullptr_t)
+    : RemoteAbsolutePointer()
+  {}
+  
+  RemoteAbsolutePointer(llvm::StringRef Symbol, int64_t Offset)
+    : Symbol(Symbol), Offset(Offset)
+  {}
+  
+  bool isResolved() const { return Symbol.empty(); }
+  llvm::StringRef getSymbol() const { return Symbol; }
+  int64_t getOffset() const { return Offset; }
+  
+  RemoteAddress getResolvedAddress() const {
+    assert(isResolved());
+    return RemoteAddress(Offset);
+  }
+  
+  explicit operator bool() const {
+    return Offset != 0 || !Symbol.empty();
   }
 };
 

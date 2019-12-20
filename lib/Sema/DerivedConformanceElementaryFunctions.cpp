@@ -103,14 +103,11 @@ static ValueDecl *getElementaryFunctionRequirement(
 // Get the effective memberwise initializer of the given nominal type, or create
 // it if it does not exist.
 static ConstructorDecl *getOrCreateEffectiveMemberwiseInitializer(
-    TypeChecker &TC, NominalTypeDecl *nominal) {
-  auto &C = nominal->getASTContext();
+    ASTContext &ctx, NominalTypeDecl *nominal) {
   if (auto *initDecl = nominal->getEffectiveMemberwiseInitializer())
     return initDecl;
-  auto *initDecl = createImplicitConstructor(
-      TC, nominal, ImplicitConstructorKind::Memberwise);
+  auto *initDecl = createMemberwiseImplicitConstructor(ctx, nominal);
   nominal->addMember(initDecl);
-  C.addSynthesizedDecl(initDecl);
   return initDecl;
 }
 
@@ -130,9 +127,7 @@ bool DerivedConformance::canDeriveElementaryFunctions(NominalTypeDecl *nominal,
   auto &C = nominal->getASTContext();
   auto *mathProto = C.getProtocol(KnownProtocolKind::ElementaryFunctions);
   return llvm::all_of(structDecl->getStoredProperties(), [&](VarDecl *v) {
-    if (!v->hasInterfaceType())
-      C.getLazyResolver()->resolveDeclSignature(v);
-    if (!v->hasInterfaceType())
+    if (v->getInterfaceType()->hasError())
       return false;
     auto varType = DC->mapTypeIntoContext(v->getValueInterfaceType());
     return (bool)TypeChecker::conformsToProtocol(varType, mathProto, DC, None);
@@ -153,7 +148,7 @@ deriveBodyElementaryFunction(AbstractFunctionDecl *funcDecl,
   auto *initDRE =
       new (C) DeclRefExpr(memberwiseInitDecl, DeclNameLoc(), /*Implicit*/ true);
   initDRE->setFunctionRefKind(FunctionRefKind::SingleApply);
-  auto *nominalTypeExpr = TypeExpr::createForDecl(SourceLoc(), nominal,
+  auto *nominalTypeExpr = TypeExpr::createForDecl(DeclNameLoc(), nominal,
                                                   funcDecl, /*Implicit*/ true);
   auto *initExpr = new (C) ConstructorRefCallExpr(initDRE, nominalTypeExpr);
 
@@ -164,12 +159,6 @@ deriveBodyElementaryFunction(AbstractFunctionDecl *funcDecl,
   // Create reference(s) to operator parameters: one for unary functions and two
   // for binary functions.
   auto params = funcDecl->getParameters();
-  auto *firstParamDRE =
-      new (C) DeclRefExpr(params->get(0), DeclNameLoc(), /*Implicit*/ true);
-  Expr *secondParamDRE = nullptr;
-  if (params->size() == 2)
-    secondParamDRE =
-        new (C) DeclRefExpr(params->get(1), DeclNameLoc(), /*Implicit*/ true);
 
   // Create call expression combining lhs and rhs members using member operator.
   auto createMemberOpCallExpr = [&](VarDecl *member) -> Expr * {
@@ -185,8 +174,8 @@ deriveBodyElementaryFunction(AbstractFunctionDecl *funcDecl,
     ValueDecl *memberOpDecl = operatorReq;
     // If conformance reference is concrete, then use concrete witness
     // declaration for the operator.
-    if (confRef->isConcrete())
-      memberOpDecl = confRef->getConcrete()->getWitnessDecl(
+    if (confRef.isConcrete())
+      memberOpDecl = confRef.getConcrete()->getWitnessDecl(
           operatorReq);
     assert(memberOpDecl && "Member operator declaration must exist");
     auto memberOpDRE =
@@ -201,6 +190,14 @@ deriveBodyElementaryFunction(AbstractFunctionDecl *funcDecl,
     //   `<op>(x.member, y.member)`.
     // - For `pow(_ x: Self, _ n: Int)` and `root(_ x: Self, n: Int)`, create:
     //   `<op>(x.member, n)`.
+    // NOTE(TF-1054): create new `DeclRefExpr`s per loop iteration to avoid
+    // `ConstraintSystem::resolveOverload` error.
+    auto *firstParamDRE =
+        new (C) DeclRefExpr(params->get(0), DeclNameLoc(), /*Implicit*/ true);
+    Expr *secondParamDRE = nullptr;
+    if (params->size() == 2)
+      secondParamDRE =
+          new (C) DeclRefExpr(params->get(1), DeclNameLoc(), /*Implicit*/ true);
     Expr *firstArg = new (C) MemberRefExpr(firstParamDRE, SourceLoc(), member,
                                          DeclNameLoc(), /*Implicit*/ true);
     Expr *secondArg = nullptr;
@@ -248,14 +245,15 @@ static ValueDecl *deriveElementaryFunction(DerivedConformance &derived,
 ElementaryFunction op) {
   auto nominal = derived.Nominal;
   auto parentDC = derived.getConformanceContext();
-  auto &C = derived.TC.Context;
+  auto &C = derived.Context;
   auto selfInterfaceType = parentDC->getDeclaredInterfaceType();
 
   // Create parameter declaration with the given name and type.
   auto createParamDecl = [&](StringRef name, Type type) -> ParamDecl * {
     auto *param = new (C)
-        ParamDecl(ParamDecl::Specifier::Default, SourceLoc(), SourceLoc(),
-                  Identifier(), SourceLoc(), C.getIdentifier(name), parentDC);
+        ParamDecl(SourceLoc(), SourceLoc(), Identifier(), SourceLoc(),
+                  C.getIdentifier(name), parentDC);
+    param->setSpecifier(ParamDecl::Specifier::Default);
     param->setInterfaceType(type);
     return param;
   };
@@ -301,15 +299,10 @@ ElementaryFunction op) {
 #include "DerivedConformanceElementaryFunctions.def"
 #undef ELEMENTARY_FUNCTION
   }
-  if (auto env = parentDC->getGenericEnvironmentOfContext())
-    operatorDecl->setGenericEnvironment(env);
-  operatorDecl->computeType();
+  operatorDecl->setGenericSignature(parentDC->getGenericSignatureOfContext());
   operatorDecl->copyFormalAccessFrom(nominal, /*sourceIsParentContext*/ true);
-  operatorDecl->setValidationToChecked();
 
   derived.addMembersToConformanceContext({operatorDecl});
-  C.addSynthesizedDecl(operatorDecl);
-
   return operatorDecl;
 }
 
@@ -319,21 +312,21 @@ DerivedConformance::deriveElementaryFunctions(ValueDecl *requirement) {
   if (checkAndDiagnoseDisallowedContext(requirement))
     return nullptr;
   // Create memberwise initializer for nominal type if it doesn't already exist.
-  getOrCreateEffectiveMemberwiseInitializer(TC, Nominal);
+  getOrCreateEffectiveMemberwiseInitializer(Context, Nominal);
 #define ELEMENTARY_FUNCTION_UNARY(ID, NAME)                                    \
-  if (requirement->getBaseName() == TC.Context.getIdentifier(NAME))            \
+  if (requirement->getBaseName() == Context.getIdentifier(NAME))            \
     return deriveElementaryFunction(*this, ID);
 #include "DerivedConformanceElementaryFunctions.def"
 #undef ELEMENTARY_FUNCTION_UNARY
-  if (requirement->getBaseName() == TC.Context.getIdentifier("root"))
+  if (requirement->getBaseName() == Context.getIdentifier("root"))
     return deriveElementaryFunction(*this, Root);
-  if (requirement->getBaseName() == TC.Context.getIdentifier("pow")) {
+  if (requirement->getBaseName() == Context.getIdentifier("pow")) {
     auto *powFuncDecl = cast<FuncDecl>(requirement);
     return powFuncDecl->getParameters()->get(1)->getName().str() == "n"
         ? deriveElementaryFunction(*this, PowInt)
         : deriveElementaryFunction(*this, Pow);
   }
-  TC.diagnose(requirement->getLoc(),
+  Context.Diags.diagnose(requirement->getLoc(),
               diag::broken_elementary_functions_requirement);
   return nullptr;
 }

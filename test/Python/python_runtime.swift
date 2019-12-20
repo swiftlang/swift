@@ -180,7 +180,7 @@ PythonRuntimeTestSuite.testWithLeakChecking("Comparable") {
 }
 
 PythonRuntimeTestSuite.testWithLeakChecking("Hashable") {
-  func compareHashValues(_ x: PythonConvertible) {
+  func compareHashValues<T: PythonConvertible>(_ x: T) {
     let a = x.pythonObject
     let b = x.pythonObject
     expectEqual(a.hashValue, b.hashValue)

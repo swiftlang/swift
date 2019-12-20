@@ -58,6 +58,7 @@ add_swift_host_library(swiftSema STATIC
   TypeCheckDecl.cpp
   TypeCheckDeclObjC.cpp
   TypeCheckDeclOverride.cpp
+  TypeCheckDeclPrimary.cpp
   TypeCheckError.cpp
   TypeCheckExpr.cpp
   TypeCheckExprObjC.cpp
@@ -70,6 +71,7 @@ add_swift_host_library(swiftSema STATIC
   TypeCheckREPL.cpp
   TypeCheckRequestFunctions.cpp
   TypeCheckStmt.cpp
+  TypeCheckStorage.cpp
   TypeCheckSwitchStmt.cpp
   TypeCheckType.cpp
   TypeChecker.cpp

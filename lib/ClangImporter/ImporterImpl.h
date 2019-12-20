@@ -18,6 +18,7 @@
 #define SWIFT_CLANG_IMPORTER_IMPL_H
 
 #include "ClangAdapter.h"
+#include "ClangSourceBufferImporter.h"
 #include "ImportEnumInfo.h"
 #include "ImportName.h"
 #include "SwiftLookupTable.h"
@@ -152,13 +153,6 @@ enum class ImportTypeKind {
   /// This ensures that the parameter is not marked as Unmanaged.
   CFUnretainedOutParameter,
 
-  /// Import the type pointed to by a pointer or reference.
-  ///
-  /// This provides special treatment for pointer-to-ObjC-pointer
-  /// types, which get imported as pointers to *checked* optional,
-  /// *Pointer<NSFoo?>, instead of implicitly unwrapped optional as usual.
-  Pointee,
-
   /// Import the type of an ObjC property.
   ///
   /// This enables the conversion of bridged types. Properties are always
@@ -178,19 +172,18 @@ enum class ImportTypeKind {
   Enum
 };
 
-/// Controls whether a typedef for \p type should name the fully-bridged Swift
-/// type or the original Clang type.
+/// Controls whether \p decl, when imported, should name the fully-bridged
+/// Swift type or the original Clang type.
 ///
 /// In either case we end up losing sugar at some uses sites, so this is more
 /// about what the right default is.
-static inline Bridgeability getTypedefBridgeability(
-                                          const clang::TypedefNameDecl *decl,
-                                          clang::QualType type) {
-    return decl->hasAttr<clang::SwiftBridgedTypedefAttr>()
-      ? Bridgeability::Full
-        : type->isBlockPointerType()
-        ? Bridgeability::Full
-          : Bridgeability::None;
+static inline Bridgeability
+getTypedefBridgeability(const clang::TypedefNameDecl *decl) {
+  if (decl->hasAttr<clang::SwiftBridgedTypedefAttr>() ||
+      decl->getUnderlyingType()->isBlockPointerType()) {
+    return Bridgeability::Full;
+  }
+  return Bridgeability::None;
 }
 
 /// Describes the kind of the C type that can be mapped to a stdlib
@@ -227,8 +220,6 @@ enum class SpecialMethodKind {
   Constructor,
   NSDictionarySubscriptGetter
 };
-
-#define SWIFT_NATIVE_ANNOTATION_STRING "__swift native"
 
 #define SWIFT_PROTOCOL_SUFFIX "Protocol"
 #define SWIFT_CFTYPE_SUFFIX "Ref"
@@ -321,7 +312,8 @@ class LLVM_LIBRARY_VISIBILITY ClangImporter::Implementation
   using Version = importer::ImportNameVersion;
 
 public:
-  Implementation(ASTContext &ctx, const ClangImporterOptions &opts);
+  Implementation(ASTContext &ctx, const ClangImporterOptions &opts,
+                 DWARFImporterDelegate *dwarfImporterDelegate);
   ~Implementation();
 
   /// Swift AST context.
@@ -353,6 +345,13 @@ private:
   /// the underlying Clang instances that reference it
   /// (through the Swift name lookup module file extension).
   LookupTableMap LookupTables;
+
+  /// A helper class used to bring Clang buffers into Swift's SourceManager
+  /// for the purpose of emitting diagnostics.
+  ///
+  /// Listed early so that it gets torn down after the underlying Clang
+  /// instances that also use these buffers.
+  importer::ClangSourceBufferImporter BuffersForDiagnostics;
 
   /// The fake buffer used to import modules.
   ///
@@ -389,12 +388,6 @@ private:
 
   /// Clang parser, which is used to load textual headers.
   std::unique_ptr<clang::MangleContext> Mangler;
-
-  /// The active type checker, or null if there is no active type checker.
-  ///
-  /// The flag is \c true if there has ever been a type resolver assigned, i.e.
-  /// if type checking has begun.
-  llvm::PointerIntPair<LazyResolver *, 1, bool> typeResolver;
 
 public:
   /// Mapping of already-imported declarations.
@@ -454,6 +447,10 @@ public:
   // Mapping from imported types to their raw value types.
   llvm::DenseMap<const NominalTypeDecl *, Type> RawTypes;
 
+  /// Keep track of all member declarations that have been imported into a nominal type.
+  llvm::DenseMap<const NominalTypeDecl *, std::vector<ValueDecl *>>
+      MembersForNominal;
+
   clang::CompilerInstance *getClangInstance() {
     return Instance.get();
   }
@@ -497,6 +494,15 @@ public:
   llvm::DenseMap<
       std::tuple<const clang::ObjCMethodDecl *, DeclContext *, Version>,
       ConstructorDecl *> Constructors;
+
+  /// Keep track of all initializers that have been imported into a
+  /// nominal type.
+  llvm::DenseMap<const NominalTypeDecl *, TinyPtrVector<ConstructorDecl *>>
+      ConstructorsForNominal;
+
+  /// Keep track of the nested 'Code' enum for imported error wrapper
+  /// structs.
+  llvm::DenseMap<const StructDecl *, EnumDecl *> ErrorCodeEnums;
 
   /// Retrieve the alternative declaration for the given imported
   /// Swift declaration.
@@ -555,18 +561,14 @@ private:
   /// Records those modules that we have looked up.
   llvm::DenseMap<Identifier, ModuleDecl *> checkedModules;
 
-  /// Mapping from delayed conformance IDs to the set of delayed
-  /// protocol conformances.
-  llvm::DenseMap<unsigned, SmallVector<ProtocolConformance *, 4>>
-    DelayedConformances;
-
-  /// The next delayed conformance ID to use with \c DelayedConformances.
-  unsigned NextDelayedConformanceID = 0;
-
   /// The set of imported protocols for a declaration, used only to
   /// load all members of the declaration.
-  llvm::DenseMap<const Decl *, SmallVector<ProtocolDecl *, 4>>
+  llvm::DenseMap<const Decl *, ArrayRef<ProtocolDecl *>>
     ImportedProtocols;
+
+  /// The set of declaration context for which we've already ruled out the
+  /// presence of globals-as-members.
+  llvm::DenseSet<const IterableDeclContext *> checkedGlobalsAsMembers;
 
   void startedImportingEntity();
 
@@ -602,29 +604,44 @@ public:
   void addBridgeHeaderTopLevelDecls(clang::Decl *D);
   bool shouldIgnoreBridgeHeaderTopLevelDecl(clang::Decl *D);
 
+private:
+  /// The DWARF importer delegate, if installed.
+  DWARFImporterDelegate *DWARFImporter = nullptr;
 public:
-  void recordImplicitUnwrapForDecl(Decl *decl, bool isIUO) {
+  /// Only used for testing.
+  void setDWARFImporterDelegate(DWARFImporterDelegate &delegate);
+
+private:
+  /// The list of Clang modules found in the debug info.
+  llvm::DenseMap<Identifier, LoadedFile *> DWARFModuleUnits;
+public:
+  /// Load a module using the clang::CompilerInstance.
+  ModuleDecl *loadModuleClang(SourceLoc importLoc,
+                              ArrayRef<std::pair<Identifier, SourceLoc>> path);
+  
+  /// "Load" a module from debug info. Because debug info types are read on
+  /// demand, this doesn't really do any work.
+  ModuleDecl *loadModuleDWARF(SourceLoc importLoc,
+                              ArrayRef<std::pair<Identifier, SourceLoc>> path);
+
+  
+  void recordImplicitUnwrapForDecl(ValueDecl *decl, bool isIUO) {
+    if (!isIUO)
+      return;
+
 #if !defined(NDEBUG)
     Type ty;
     if (auto *FD = dyn_cast<FuncDecl>(decl)) {
-      assert(FD->getInterfaceType());
       ty = FD->getResultInterfaceType();
     } else if (auto *CD = dyn_cast<ConstructorDecl>(decl)) {
-      assert(CD->getInterfaceType());
       ty = CD->getResultInterfaceType();
     } else {
       ty = cast<AbstractStorageDecl>(decl)->getValueInterfaceType();
     }
+    assert(ty->getOptionalObjectType());
 #endif
 
-    if (!isIUO)
-      return;
-
-    assert(ty->getOptionalObjectType());
-
-    auto *IUOAttr = new (SwiftContext)
-        ImplicitlyUnwrappedOptionalAttr(/* implicit= */ true);
-    decl->getAttrs().add(IUOAttr);
+    decl->setImplicitlyUnwrappedOptional(true);
   }
 
   /// Retrieve the Clang AST context.
@@ -644,6 +661,10 @@ public:
   
   clang::CodeGenOptions &getClangCodeGenOpts() const {
     return Instance->getCodeGenOpts();
+  }
+
+  importer::ClangSourceBufferImporter &getBufferImporterForDiagnostics() {
+    return BuffersForDiagnostics;
   }
 
   /// Imports the given header contents into the Clang context.
@@ -784,12 +805,8 @@ public:
                            Version version, ProtocolDecl *proto);
 
   /// Utility function for building simple generic signatures.
-  GenericSignature *buildGenericSignature(GenericParamList *genericParams,
+  GenericSignature buildGenericSignature(GenericParamList *genericParams,
                                           DeclContext *dc);
-
-  /// Utility function for building simple generic environments.
-  GenericEnvironment *buildGenericEnvironment(GenericParamList *genericParams,
-                                              DeclContext *dc);
 
   /// Import the given Clang declaration context into Swift.
   ///
@@ -913,30 +930,11 @@ public:
   /// \returns The named type, or null if the type could not be found.
   Type getNamedSwiftType(ModuleDecl *module, StringRef name);
 
-  /// Retrieve a specialization of the named Swift type, e.g.,
-  /// UnsafeMutablePointer<T>.
-  ///
-  /// \param module The name of the module in which the type should occur.
-  ///
-  /// \param name The name of the type to find.
-  ///
-  /// \param args The arguments to use in the specialization.
-  ///
-  /// \returns The named type, or null if the type could not be found.
-  Type getNamedSwiftTypeSpecialization(ModuleDecl *module, StringRef name,
-                                       ArrayRef<Type> args);
-
   /// Retrieve the NSObject type.
   Type getNSObjectType();
 
   /// Retrieve the NSObject protocol type.
   Type getNSObjectProtocolType();
-
-  /// Retrieve the NSCopying protocol type.
-  Type getNSCopyingType();
-
-  /// Retrieve a sugared referenece to the given (imported) type.
-  Type getSugaredTypeReference(TypeDecl *type);
 
   /// Determines whether the given type matches an implicit type
   /// bound of "Hashable", which is used to validate NSDictionary/NSSet.
@@ -1041,11 +1039,13 @@ public:
   ///   to system APIs.
   /// \param name The name of the function.
   /// \param[out] parameterList The parameters visible inside the function body.
-  ImportedType importFunctionType(DeclContext *dc,
-                                  const clang::FunctionDecl *clangDecl,
-                                  ArrayRef<const clang::ParmVarDecl *> params,
-                                  bool isVariadic, bool isFromSystemModule,
-                                  DeclName name, ParameterList *&parameterList);
+  ImportedType
+  importFunctionParamsAndReturnType(DeclContext *dc,
+                                    const clang::FunctionDecl *clangDecl,
+                                    ArrayRef<const clang::ParmVarDecl *> params,
+                                    bool isVariadic, bool isFromSystemModule,
+                                    DeclName name,
+                                    ParameterList *&parameterList);
 
   /// Import the given function return type.
   ///
@@ -1086,9 +1086,9 @@ public:
   /// given Clang \c type, \c baseName, and optionality.
   static DefaultArgumentKind
   inferDefaultArgument(clang::QualType type, OptionalTypeKind clangOptionality,
-                       DeclBaseName baseName, unsigned numParams,
-                       StringRef argumentLabel, bool isFirstParameter,
-                       bool isLastParameter, importer::NameImporter &);
+                       DeclBaseName baseName, StringRef argumentLabel,
+                       bool isFirstParameter, bool isLastParameter,
+                       importer::NameImporter &nameImporter);
 
   /// Import the parameter and return types of an Objective-C method.
   ///
@@ -1096,7 +1096,7 @@ public:
   /// the return type of this method.
   ///
   /// Note that this is not appropriate to use for property accessor methods.
-  /// Use #importAccessorMethodType instead.
+  /// Use #importAccessorParamsAndReturnType instead.
   ///
   /// \param dc The context the method is being imported into.
   /// \param clangDecl The underlying declaration.
@@ -1107,20 +1107,22 @@ public:
   ///   to system APIs.
   /// \param[out] bodyParams The patterns visible inside the function body.
   /// \param importedName How to import the name of the method.
-  /// \param[out] errorConvention Whether and how the method throws NSErrors.
+  /// \param[out] errorConv Whether and how the method throws NSErrors.
   /// \param kind Controls whether we're building a type for a method that
   ///   needs special handling.
   ///
   /// \returns the imported result type, or null if the type cannot be
   /// imported.
   ImportedType
-  importMethodType(const DeclContext *dc,
-                   const clang::ObjCMethodDecl *clangDecl,
-                   ArrayRef<const clang::ParmVarDecl *> params, bool isVariadic,
-                   bool isFromSystemModule, ParameterList **bodyParams,
-                   importer::ImportedName importedName,
-                   Optional<ForeignErrorConvention> &errorConvention,
-                   SpecialMethodKind kind);
+  importMethodParamsAndReturnType(const DeclContext *dc,
+                                  const clang::ObjCMethodDecl *clangDecl,
+                                  ArrayRef<const clang::ParmVarDecl *> params,
+                                  bool isVariadic,
+                                  bool isFromSystemModule,
+                                  ParameterList **bodyParams,
+                                  importer::ImportedName importedName,
+                                  Optional<ForeignErrorConvention> &errorConv,
+                                  SpecialMethodKind kind);
 
   /// Import the type of an Objective-C method that will be imported as an
   /// accessor for \p property.
@@ -1140,12 +1142,13 @@ public:
   ///
   /// \returns the imported result type, or null if the type cannot be
   /// imported.
-  ImportedType importAccessorMethodType(const DeclContext *dc,
-                                        const clang::ObjCPropertyDecl *property,
-                                        const clang::ObjCMethodDecl *clangDecl,
-                                        bool isFromSystemModule,
-                                        importer::ImportedName importedName,
-                                        ParameterList **params);
+  ImportedType
+  importAccessorParamsAndReturnType(const DeclContext *dc,
+                                    const clang::ObjCPropertyDecl *property,
+                                    const clang::ObjCMethodDecl *clangDecl,
+                                    bool isFromSystemModule,
+                                    importer::ImportedName importedName,
+                                    ParameterList **params);
 
   /// Determine whether the given typedef-name is "special", meaning
   /// that it has performed some non-trivial mapping of its underlying type
@@ -1160,33 +1163,6 @@ public:
   /// 'let' declaration as opposed to 'var'.
   bool shouldImportGlobalAsLet(clang::QualType type);
 
-  LazyResolver *getTypeResolver() const {
-    return typeResolver.getPointer();
-  }
-  void setTypeResolver(LazyResolver *newResolver) {
-    assert((!typeResolver.getPointer() || !newResolver) &&
-           "already have a type resolver");
-    typeResolver.setPointerAndInt(newResolver, true);
-  }
-
-  /// Allocate a new delayed conformance ID with the given set of
-  /// conformances.
-  unsigned allocateDelayedConformance(
-             SmallVector<ProtocolConformance *, 4> &&conformances) {
-    unsigned id = NextDelayedConformanceID++;
-    DelayedConformances[id] = std::move(conformances);
-    return id;
-  }
-
-  /// Take the delayed conformances associated with the given id.
-  SmallVector<ProtocolConformance *, 4> takeDelayedConformance(unsigned id) {
-    auto conformances = DelayedConformances.find(id);
-    SmallVector<ProtocolConformance *, 4> result
-      = std::move(conformances->second);
-    DelayedConformances.erase(conformances);
-    return result;
-  }
-
   /// Record the set of imported protocols for the given declaration,
   /// to be used by member loading.
   ///
@@ -1197,21 +1173,22 @@ public:
     if (protocols.empty())
       return;
 
-    auto &recorded = ImportedProtocols[decl];
-    recorded.insert(recorded.end(), protocols.begin(), protocols.end());
+    ImportedProtocols[decl] = SwiftContext.AllocateCopy(protocols);
   }
 
   /// Retrieve the imported protocols for the given declaration.
-  SmallVector<ProtocolDecl *, 4> takeImportedProtocols(const Decl *decl) {
-    SmallVector<ProtocolDecl *, 4> result;
-
+  ArrayRef<ProtocolDecl *> getImportedProtocols(const Decl *decl) {
     auto known = ImportedProtocols.find(decl);
-    if (known != ImportedProtocols.end()) {
-      result = std::move(known->second);
-      ImportedProtocols.erase(known);
-    }
+    if (known != ImportedProtocols.end())
+      return known->second;
+    return ArrayRef<ProtocolDecl *>();
+  }
 
-    return result;
+  EnumDecl *lookupErrorCodeEnum(const StructDecl *errorWrapper) {
+    auto found = ErrorCodeEnums.find(errorWrapper);
+    if (found == ErrorCodeEnums.end())
+      return nullptr;
+    return found->second;
   }
 
   virtual void
@@ -1256,10 +1233,10 @@ public:
                                  uint64_t contextData) override {
     llvm_unreachable("unimplemented for ClangImporter");
   }
-  
-  /// Returns the generic environment.
-  virtual GenericEnvironment *loadGenericEnvironment(const DeclContext *decl,
-                                                     uint64_t contextData) override {
+
+  ValueDecl *
+  loadDynamicallyReplacedFunctionDecl(const DynamicReplacementAttr *DRA,
+                                      uint64_t contextData) override {
     llvm_unreachable("unimplemented for ClangImporter");
   }
 
@@ -1276,14 +1253,9 @@ public:
                                                   true);
     auto D = ::new (DeclPtr) DeclTy(std::forward<Targs>(Args)...);
     D->setClangNode(ClangN);
-    D->setEarlyAttrValidation(true);
     D->setAccess(access);
     if (auto ASD = dyn_cast<AbstractStorageDecl>(D))
       ASD->setSetterAccess(access);
-    // All imported decls are constructed fully validated.
-    D->setValidationToChecked();
-    if (auto AFD = dyn_cast<AbstractFunctionDecl>(static_cast<Decl *>(D)))
-      AFD->setNeedsNewVTableEntry(false);
     return D;
   }
 
@@ -1306,6 +1278,17 @@ public:
   /// Swift lookup table.
   void lookupValue(SwiftLookupTable &table, DeclName name,
                    VisibleDeclConsumer &consumer);
+
+  /// Look for namespace-scope values with the given name using the
+  /// DWARFImporterDelegate.
+  /// \param inModule only return results from this module.
+  void lookupValueDWARF(DeclName name, NLKind lookupKind, Identifier inModule,
+                        SmallVectorImpl<ValueDecl *> &results);
+
+  /// Look for top-level scope types with a name and kind using the
+  /// DWARFImporterDelegate.
+  void lookupTypeDeclDWARF(StringRef rawName, ClangTypeKind kind,
+                           llvm::function_ref<void(TypeDecl *)> receiver);
 
   /// Look for namespace-scope values in the given Swift lookup table.
   void lookupVisibleDecls(SwiftLookupTable &table,
@@ -1407,15 +1390,18 @@ class SwiftNameLookupExtension : public clang::ModuleFileExtension {
   std::unique_ptr<SwiftLookupTable> &pchLookupTable;
   LookupTableMap &lookupTables;
   ASTContext &swiftCtx;
+  ClangSourceBufferImporter &buffersForDiagnostics;
   const PlatformAvailability &availability;
   const bool inferImportAsMember;
 
 public:
   SwiftNameLookupExtension(std::unique_ptr<SwiftLookupTable> &pchLookupTable,
                            LookupTableMap &tables, ASTContext &ctx,
+                           ClangSourceBufferImporter &buffersForDiagnostics,
                            const PlatformAvailability &avail, bool inferIAM)
       : pchLookupTable(pchLookupTable), lookupTables(tables), swiftCtx(ctx),
-        availability(avail), inferImportAsMember(inferIAM) {}
+        buffersForDiagnostics(buffersForDiagnostics), availability(avail),
+        inferImportAsMember(inferIAM) {}
 
   clang::ModuleFileExtensionMetadata getExtensionMetadata() const override;
   llvm::hash_code hashExtension(llvm::hash_code code) const override;

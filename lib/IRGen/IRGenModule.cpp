@@ -22,6 +22,7 @@
 #include "swift/Basic/Dwarf.h"
 #include "swift/Demangling/ManglingMacros.h"
 #include "swift/ClangImporter/ClangImporter.h"
+#include "swift/IRGen/IRGenPublic.h"
 #include "swift/IRGen/Linking.h"
 #include "swift/Runtime/RuntimeFnWrappersGen.h"
 #include "swift/Runtime/Config.h"
@@ -94,7 +95,9 @@ static clang::CodeGenerator *createClangCodeGenerator(ASTContext &Context,
 
   auto &CGO = Importer->getClangCodeGenOpts();
   CGO.OptimizationLevel = Opts.shouldOptimize() ? 3 : 0;
-  CGO.DisableFPElim = Opts.DisableFPElim;
+  CGO.setFramePointer(Opts.DisableFPElim
+                          ? clang::CodeGenOptions::FramePointerKind::All
+                          : clang::CodeGenOptions::FramePointerKind::None);
   CGO.DiscardValueNames = !Opts.shouldProvideValueNames();
   switch (Opts.DebugInfoLevel) {
   case IRGenDebugInfoLevel::None:
@@ -521,6 +524,11 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
 
   DynamicReplacementKeyTy = createStructType(*this, "swift.dyn_repl_key",
                                              {RelativeAddressTy, Int32Ty});
+
+  // SWIFT_ENABLE_TENSORFLOW
+  DifferentiabilityWitnessTy = createStructType(
+      *this, "swift.differentiability_witness", {Int8PtrTy, Int8PtrTy});
+  // SWIFT_ENABLE_TENSORFLOW_END
 }
 
 IRGenModule::~IRGenModule() {
@@ -560,6 +568,16 @@ namespace RuntimeConstants {
   RuntimeAvailability OpaqueTypeAvailability(ASTContext &Context) {
     auto featureAvailability = Context.getOpaqueTypeAvailability();
     if (!isDeploymentAvailabilityContainedIn(Context, featureAvailability)) {
+      return RuntimeAvailability::ConditionallyAvailable;
+    }
+    return RuntimeAvailability::AlwaysAvailable;
+  }
+
+  RuntimeAvailability
+  GetTypesInAbstractMetadataStateAvailability(ASTContext &context) {
+    auto featureAvailability =
+        context.getTypesInAbstractMetadataStateAvailability();
+    if (!isDeploymentAvailabilityContainedIn(context, featureAvailability)) {
       return RuntimeAvailability::ConditionallyAvailable;
     }
     return RuntimeAvailability::AlwaysAvailable;
@@ -657,10 +675,16 @@ llvm::Constant *swift::getRuntimeFn(llvm::Module &Module,
                                       {argTypes.begin(), argTypes.end()},
                                       /*isVararg*/ false);
 
-  cache = Module.getOrInsertFunction(functionName.c_str(), fnTy);
+  auto addr = Module.getOrInsertFunction(functionName.c_str(), fnTy).getCallee();
+  auto fnptr = addr;
+  // Strip off any bitcast we might have due to this function being declared of
+  // a different type previously.
+  if (auto bitcast = dyn_cast<llvm::BitCastInst>(fnptr))
+    fnptr = cast<llvm::Constant>(bitcast->getOperand(0));
+  cache = cast<llvm::Constant>(addr);
 
   // Add any function attributes and set the calling convention.
-  if (auto fn = dyn_cast<llvm::Function>(cache)) {
+  if (auto fn = dyn_cast<llvm::Function>(fnptr)) {
     fn->setCallingConv(cc);
 
     bool IsExternal =
@@ -902,17 +926,24 @@ bool swift::irgen::shouldRemoveTargetFeature(StringRef feature) {
   return feature == "+thumb-mode";
 }
 
+void IRGenModule::setHasFramePointer(llvm::AttrBuilder &Attrs,
+                                     bool HasFramePointer) {
+  Attrs.addAttribute("frame-pointer", HasFramePointer ? "all" : "none");
+}
+
+void IRGenModule::setHasFramePointer(llvm::Function *F,
+                                     bool HasFramePointer) {
+  llvm::AttrBuilder b;
+  setHasFramePointer(b, HasFramePointer);
+  F->addAttributes(llvm::AttributeList::FunctionIndex, b);
+}
+
 /// Construct initial function attributes from options.
 void IRGenModule::constructInitialFnAttributes(llvm::AttrBuilder &Attrs,
                                                OptimizationMode FuncOptMode) {
-  // Add DisableFPElim. 
-  if (!IRGen.Opts.DisableFPElim) {
-    Attrs.addAttribute("no-frame-pointer-elim", "false");
-  } else {
-    Attrs.addAttribute("no-frame-pointer-elim", "true");
-    Attrs.addAttribute("no-frame-pointer-elim-non-leaf");
-  }
-
+  // Add frame pointer attributes.
+  setHasFramePointer(Attrs, IRGen.Opts.DisableFPElim);
+  
   // Add target-cpu and target-features if they are non-null.
   auto *Clang = static_cast<ClangImporter *>(Context.getClangModuleLoader());
   clang::TargetOptions &ClangOpts = Clang->getTargetInfo().getTargetOpts();
@@ -1054,8 +1085,9 @@ void IRGenModule::addLinkLibrary(const LinkLibrary &linkLib) {
   if (linkLib.shouldForceLoad()) {
     llvm::SmallString<64> buf;
     encodeForceLoadSymbolName(buf, linkLib.getName());
-    auto ForceImportThunk =
-        Module.getOrInsertFunction(buf, llvm::FunctionType::get(VoidTy, false));
+    auto ForceImportThunk = cast<llvm::Function>(
+        Module.getOrInsertFunction(buf, llvm::FunctionType::get(VoidTy, false))
+            .getCallee());
 
     const IRLinkage IRL =
         llvm::Triple(Module.getTargetTriple()).isOSBinFormatCOFF()
@@ -1137,21 +1169,17 @@ void IRGenModule::emitAutolinkInfo() {
                                        }),
                         AutolinkEntries.end());
 
-  if ((TargetInfo.OutputObjectFormat == llvm::Triple::COFF &&
-       !Triple.isOSCygMing()) ||
-      TargetInfo.OutputObjectFormat == llvm::Triple::MachO || Triple.isPS4()) {
+  const bool AutolinkExtractRequired =
+      (TargetInfo.OutputObjectFormat == llvm::Triple::ELF && !Triple.isPS4()) ||
+      TargetInfo.OutputObjectFormat == llvm::Triple::Wasm ||
+      Triple.isOSCygMing();
 
+  if (!AutolinkExtractRequired) {
     // On platforms that support autolinking, continue to use the metadata.
     Metadata->clearOperands();
     for (auto *Entry : AutolinkEntries)
       Metadata->addOperand(Entry);
-
   } else {
-    assert((TargetInfo.OutputObjectFormat == llvm::Triple::ELF ||
-            TargetInfo.OutputObjectFormat == llvm::Triple::Wasm ||
-            Triple.isOSCygMing()) &&
-           "expected ELF output format or COFF format for Cygwin/MinGW");
-
     // Merge the entries into null-separated string.
     llvm::SmallString<64> EntriesString;
     for (auto &EntryNode : AutolinkEntries) {
@@ -1164,7 +1192,13 @@ void IRGenModule::emitAutolinkInfo() {
     }
     auto EntriesConstant = llvm::ConstantDataArray::getString(
         LLVMContext, EntriesString, /*AddNull=*/false);
-
+    // Mark the swift1_autolink_entries section with the SHF_EXCLUDE attribute
+    // to get the linker to drop it in the final linked binary.
+    // LLVM doesn't provide an interface to specify section attributs in the IR
+    // so we pass the attribute with inline assembly.
+    if (TargetInfo.OutputObjectFormat == llvm::Triple::ELF)
+      Module.appendModuleInlineAsm(".section .swift1_autolink_entries,"
+                                   "\"0x80000000\"");
     auto var =
         new llvm::GlobalVariable(*getModule(), EntriesConstant->getType(), true,
                                  llvm::GlobalValue::PrivateLinkage,
@@ -1176,7 +1210,7 @@ void IRGenModule::emitAutolinkInfo() {
   }
 
   if (!IRGen.Opts.ForceLoadSymbolName.empty() &&
-      isFirstObjectFileInModule(*this)) {
+      (Triple.supportsCOMDAT() || isFirstObjectFileInModule(*this))) {
     llvm::SmallString<64> buf;
     encodeForceLoadSymbolName(buf, IRGen.Opts.ForceLoadSymbolName);
     auto ForceImportThunk =
@@ -1184,6 +1218,9 @@ void IRGenModule::emitAutolinkInfo() {
                                llvm::GlobalValue::ExternalLinkage, buf,
                                &Module);
     ApplyIRLinkage(IRLinkage::ExternalExport).to(ForceImportThunk);
+    if (Triple.supportsCOMDAT())
+      if (auto *GO = cast<llvm::GlobalObject>(ForceImportThunk))
+        GO->setComdat(Module.getOrInsertComdat(ForceImportThunk->getName()));
 
     auto BB = llvm::BasicBlock::Create(getLLVMContext(), "", ForceImportThunk);
     llvm::IRBuilder<> IRB(BB);
@@ -1244,6 +1281,7 @@ bool IRGenModule::finalize() {
       ModuleHash->setSection("__LLVM,__swift_modhash");
       break;
     case llvm::Triple::ELF:
+    case llvm::Triple::Wasm:
       ModuleHash->setSection(".swift_modhash");
       break;
     case llvm::Triple::COFF:
@@ -1344,6 +1382,10 @@ IRGenModule *IRGenerator::getGenModule(SILFunction *f) {
   return getPrimaryIGM();
 }
 
+uint32_t swift::irgen::getSwiftABIVersion() {
+  return IRGenModule::swiftVersion;
+}
+
 llvm::Triple IRGenerator::getEffectiveClangTriple() {
   auto CI = static_cast<ClangImporter *>(
       &*SIL.getASTContext().getClangModuleLoader());
@@ -1357,3 +1399,8 @@ const llvm::DataLayout &IRGenerator::getClangDataLayout() {
       ->getTargetInfo()
       .getDataLayout();
   }
+
+TypeExpansionContext IRGenModule::getMaximalTypeExpansionContext() const {
+  return TypeExpansionContext::maximal(getSwiftModule(),
+                                       getSILModule().isWholeModule());
+}

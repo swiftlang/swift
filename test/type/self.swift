@@ -162,6 +162,13 @@ class C {
   }
 }
 
+extension C {
+  static var rdar57188331 = Self.staticFunc() // expected-error {{covariant 'Self' type cannot be referenced from a stored property initializer}} expected-error {{stored property cannot have covariant 'Self' type}}
+  static var rdar57188331Var = ""
+  static let rdar57188331Ref = UnsafeRawPointer(&Self.rdar57188331Var) // expected-error {{covariant 'Self' type cannot be referenced from a stored property initializer}}
+}
+
+
 struct S1 {
   typealias _SELF = Self
   let j = 99.1
@@ -253,4 +260,13 @@ class SelfStoredPropertyInit {
   static func myValue() -> Int { return 123 }
 
   var value = Self.myValue() // expected-error {{covariant 'Self' type cannot be referenced from a stored property initializer}}
+}
+
+// rdar://problem/55273931 - erroneously rejecting 'Self' in lazy initializer
+class Foo {
+  static var value: Int = 17
+
+  lazy var doubledValue: Int = {
+    Self.value * 2
+  }()
 }

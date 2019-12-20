@@ -18,7 +18,6 @@
 #include "IRGenMangler.h"
 #include "IRGenModule.h"
 #include "swift/AST/ASTMangler.h"
-#include "swift/AST/Availability.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/SIL/SILGlobalVariable.h"
@@ -415,6 +414,12 @@ std::string LinkEntity::mangleAsString() const {
   case Kind::ReflectionAssociatedTypeDescriptor:
     return mangler.mangleReflectionAssociatedTypeDescriptor(
                                                     getProtocolConformance());
+  // SWIFT_ENABLE_TENSORFLOW
+  case Kind::DifferentiabilityWitness:
+    return mangler.mangleSILDifferentiabilityWitnessKey(
+        {getSILDifferentiabilityWitness()->getOriginalFunction()->getName(),
+         getSILDifferentiabilityWitness()->getConfig()});
+    // SWIFT_ENABLE_TENSORFLOW_END
   }
   llvm_unreachable("bad entity kind!");
 }
@@ -660,6 +665,10 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
   case Kind::ExtensionDescriptor:
   case Kind::AnonymousDescriptor:
     return SILLinkage::Shared;
+  // SWIFT_ENABLE_TENSORFLOW
+  case Kind::DifferentiabilityWitness:
+    return getSILDifferentiabilityWitness()->getLinkage();
+  // SWIFT_ENABLE_TENSORFLOW_END
   }
   llvm_unreachable("bad link entity kind");
 }
@@ -804,6 +813,10 @@ bool LinkEntity::isAvailableExternally(IRGenModule &IGM) const {
   case Kind::DynamicallyReplaceableFunctionImpl:
   case Kind::DynamicallyReplaceableFunctionKeyAST:
     llvm_unreachable("Relative reference to unsupported link entity");
+  // SWIFT_ENABLE_TENSORFLOW
+  case Kind::DifferentiabilityWitness:
+    return true;
+  // SWIFT_ENABLE_TENSORFLOW_END
   }
   llvm_unreachable("bad link entity kind");
 }
@@ -905,6 +918,10 @@ llvm::Type *LinkEntity::getDefaultDeclarationType(IRGenModule &IGM) const {
       return IGM.ObjCResilientClassStubTy;
     }
     llvm_unreachable("invalid metadata address");
+  // SWIFT_ENABLE_TENSORFLOW
+  case Kind::DifferentiabilityWitness:
+    return IGM.DifferentiabilityWitnessTy;
+  // SWIFT_ENABLE_TENSORFLOW_END
   default:
     llvm_unreachable("declaration LLVM type not specified");
   }
@@ -957,32 +974,26 @@ Alignment LinkEntity::getAlignment(IRGenModule &IGM) const {
     return Alignment(8);
   case Kind::SILFunction:
     return Alignment(1);
+  // SWIFT_ENABLE_TENSORFLOW
+  case Kind::DifferentiabilityWitness:
+    return IGM.getPointerAlignment();
+  // SWIFT_ENABLE_TENSORFLOW_END
   default:
     llvm_unreachable("alignment not specified");
   }
 }
 
-bool LinkEntity::isWeakImported(ModuleDecl *module,
-                                AvailabilityContext context) const {
+bool LinkEntity::isWeakImported(ModuleDecl *module) const {
   switch (getKind()) {
   case Kind::SILGlobalVariable:
     if (getSILGlobalVariable()->getDecl()) {
-      return getSILGlobalVariable()->getDecl()
-          ->isWeakImported(module, context);
+      return getSILGlobalVariable()->getDecl()->isWeakImported(module);
     }
     return false;
   case Kind::DynamicallyReplaceableFunctionKey:
   case Kind::DynamicallyReplaceableFunctionVariable:
   case Kind::SILFunction: {
-    // For imported functions check the Clang declaration.
-    if (auto clangOwner = getSILFunction()->getClangNodeOwner())
-      return clangOwner->isWeakImported(module, context);
-
-    // For native functions check a flag on the SILFunction
-    // itself.
-    if (getSILFunction()->isWeakLinked())
-      return getSILFunction()->isAvailableExternally();
-    return false;
+    return getSILFunction()->isWeakImported();
   }
 
   case Kind::AssociatedConformanceDescriptor:
@@ -992,16 +1003,16 @@ bool LinkEntity::isWeakImported(ModuleDecl *module,
     // type stored in extra storage area is weak linked.
     auto assocConformance = getAssociatedConformance();
     auto *depMemTy = assocConformance.first->castTo<DependentMemberType>();
-    return depMemTy->getAssocType()->isWeakImported(module, context);
+    return depMemTy->getAssocType()->isWeakImported(module);
   }
 
   case Kind::BaseConformanceDescriptor:
-    return cast<ProtocolDecl>(getDecl())->isWeakImported(module, context);
+    return cast<ProtocolDecl>(getDecl())->isWeakImported(module);
 
   case Kind::TypeMetadata:
   case Kind::TypeMetadataAccessFunction: {
     if (auto *nominalDecl = getType()->getAnyNominal())
-      return nominalDecl->isWeakImported(module, context);
+      return nominalDecl->isWeakImported(module);
     return false;
   }
 
@@ -1033,12 +1044,12 @@ bool LinkEntity::isWeakImported(ModuleDecl *module,
   case Kind::OpaqueTypeDescriptorAccessorImpl:
   case Kind::OpaqueTypeDescriptorAccessorKey:
   case Kind::OpaqueTypeDescriptorAccessorVar:
-    return getDecl()->isWeakImported(module, context);
+    return getDecl()->isWeakImported(module);
 
   case Kind::ProtocolWitnessTable:
   case Kind::ProtocolConformanceDescriptor:
     return getProtocolConformance()->getRootConformance()
-                                   ->isWeakImported(module, context);
+                                   ->isWeakImported(module);
 
   // TODO: Revisit some of the below, for weak conformances.
   case Kind::ObjCMetadataUpdateFunction:
@@ -1064,6 +1075,11 @@ bool LinkEntity::isWeakImported(ModuleDecl *module,
   case Kind::ReflectionFieldDescriptor:
   case Kind::CoroutineContinuationPrototype:
     return false;
+
+  // SWIFT_ENABLE_TENSORFLOW
+  case Kind::DifferentiabilityWitness:
+    return false;
+  // SWIFT_ENABLE_TENSORFLOW_END
   }
 
   llvm_unreachable("Bad link entity kind");
@@ -1193,6 +1209,11 @@ const SourceFile *LinkEntity::getSourceFileForEmission() const {
   case Kind::ValueWitness:
   case Kind::ValueWitnessTable:
     return nullptr;
+
+  // SWIFT_ENABLE_TENSORFLOW
+  case Kind::DifferentiabilityWitness:
+    return nullptr;
+  // SWIFT_ENABLE_TENSORFLOW_END
   }
   
   return sf;

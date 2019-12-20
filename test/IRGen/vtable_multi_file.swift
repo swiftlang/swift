@@ -2,6 +2,12 @@
 
 // REQUIRES: CPU=x86_64
 
+// CHECK-LABEL: @"$s17vtable_multi_file7DerivedCMf" = internal global
+// CHECK-SAME: @"$s17vtable_multi_file4BaseC6methodyyF"
+class Derived : Base {
+  func another() {}
+}
+
 func markUsed<T>(_ t: T) {}
 
 // CHECK-LABEL: define hidden swiftcc void @"$s17vtable_multi_file36baseClassVtablesIncludeImplicitInitsyyF"() {{.*}} {

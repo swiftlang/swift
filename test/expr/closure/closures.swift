@@ -12,6 +12,7 @@ var closure1 : () -> Int = {4}  // Function producing 4 whenever it is called.
 var closure2 : (Int,Int) -> Int = { 4 } // expected-error{{contextual type for closure argument list expects 2 arguments, which cannot be implicitly ignored}} {{36-36= _,_ in}}
 var closure3a : () -> () -> (Int,Int) = {{ (4, 2) }} // multi-level closing.
 var closure3b : (Int,Int) -> (Int) -> (Int,Int) = {{ (4, 2) }} // expected-error{{contextual type for closure argument list expects 2 arguments, which cannot be implicitly ignored}}  {{52-52=_,_ in }}
+// expected-error@-1 {{contextual type for closure argument list expects 1 argument, which cannot be implicitly ignored}} {{53-53= _ in}}
 var closure4 : (Int,Int) -> Int = { $0 + $1 }
 var closure5 : (Double) -> Int = {
        $0 + 1.0
@@ -43,6 +44,7 @@ func funcdecl5(_ a: Int, _ y: Int) {
 
   var testfunc : ((), Int) -> Int  // expected-note {{'testfunc' declared here}}
   testfunc({$0+1})  // expected-error {{missing argument for parameter #2 in call}}
+  // expected-error@-1 {{cannot convert value of type '(Int) -> Int' to expected argument type '()'}}
 
   funcdecl5(1, 2) // recursion.
 
@@ -70,7 +72,7 @@ func funcdecl5(_ a: Int, _ y: Int) {
   func6({a,b in 4.0 })  // expected-error {{cannot convert value of type 'Double' to closure result type 'Int'}}
   
   // TODO: This diagnostic can be improved: rdar://22128205
-  func6({(a : Float, b) in 4 }) // expected-error {{cannot convert value of type '(Float, _) -> Int' to expected argument type '(Int, Int) -> Int'}}
+  func6({(a : Float, b) in 4 }) // expected-error {{cannot convert value of type '(Float, Int) -> Int' to expected argument type '(Int, Int) -> Int'}}
 
   
   
@@ -229,7 +231,7 @@ extension SomeClass {
 
 // <rdar://problem/16955318> Observed variable in a closure triggers an assertion
 var closureWithObservedProperty: () -> () = {
-  var a: Int = 42 {
+  var a: Int = 42 { // expected-warning {{variable 'a' was never used; consider replacing with '_' or removing it}}
   willSet {
     _ = "Will set a to \(newValue)"
   }
@@ -353,4 +355,10 @@ func lvalueCapture<T>(c: GenericClass<T>) {
 
     cc = wc!
   }
+}
+
+// Don't expose @lvalue-ness in diagnostics.
+let closure = { // expected-error {{unable to infer complex closure return type; add explicit type to disambiguate}} {{16-16= () -> Bool in }}
+  var helper = true
+  return helper
 }

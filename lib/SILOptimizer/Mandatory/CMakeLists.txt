@@ -7,6 +7,7 @@ silopt_register_sources(
   DefiniteInitialization.cpp
   # SWIFT_ENABLE_TENSORFLOW
   Differentiation.cpp
+  # SWIFT_ENABLE_TENSORFLOW END
   DIMemoryUseCollector.cpp
   DataflowDiagnostics.cpp
   DiagnoseInfiniteRecursion.cpp
@@ -23,5 +24,7 @@ silopt_register_sources(
   SemanticARCOpts.cpp
   SILGenCleanup.cpp
   YieldOnceCheck.cpp
+  MandatoryCombine.cpp
   OSLogOptimization.cpp
+  OwnershipModelEliminator.cpp
 )

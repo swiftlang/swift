@@ -99,9 +99,9 @@ public class D {
 }
 
 // CHECK: define void @testDynamicSelfMetatype(i8*, i8*)
-// CHECK:   [[C:%.*]] = bitcast i8* %0 to %T27objc_generic_class_metadata1DC*
-// CHECK:   [[O:%.*]] = bitcast %T27objc_generic_class_metadata1DC* [[C]] to %objc_object*
-// CHECK:   call %swift.type* @swift_getObjectType(%objc_object* [[O]]
+// CHECK:   [[T0:%.*]] = bitcast {{.*}} %0
+// CHECK:   [[T1:%.*]] = bitcast {{.*}} [[T0]]
+// CHECK:   [[TYPE:%.*]] = load {{.*}} [[T1]]
 sil @testDynamicSelfMetatype : $@convention(objc_method) (@owned D) -> () {
 bb0(%0 : $D):
   %1 = metatype $@thick @dynamic_self D.Type

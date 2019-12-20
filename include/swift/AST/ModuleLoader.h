@@ -24,17 +24,25 @@
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/TinyPtrVector.h"
 
+namespace llvm {
+class FileCollector;
+}
+
 namespace clang {
 class DependencyCollector;
 }
 
 namespace swift {
 
+// SWIFT_ENABLE_TENSORFLOW
+struct AutoDiffConfig;
+// SWIFT_ENABLE_TENSORFLOW END
 class AbstractFunctionDecl;
 class ClangImporterOptions;
 class ClassDecl;
 class ModuleDecl;
 class NominalTypeDecl;
+class TypeDecl;
 
 enum class KnownProtocolKind : uint8_t;
 
@@ -53,8 +61,9 @@ enum class Bridgeability : unsigned {
 class DependencyTracker {
   std::shared_ptr<clang::DependencyCollector> clangCollector;
 public:
-
-  explicit DependencyTracker(bool TrackSystemDeps);
+  explicit DependencyTracker(
+      bool TrackSystemDeps,
+      std::shared_ptr<llvm::FileCollector> FileCollector = {});
 
   /// Adds a file as a dependency.
   ///
@@ -144,6 +153,25 @@ public:
                  bool isInstanceMethod,
                  unsigned previousGeneration,
                  llvm::TinyPtrVector<AbstractFunctionDecl *> &methods) = 0;
+
+  // SWIFT_ENABLE_TENSORFLOW
+  /// Load derivative function configurations for the given
+  /// AbstractFunctionDecl.
+  ///
+  /// \param originalAFD The declaration whose derivative function
+  /// configurations should be loaded.
+  ///
+  /// \param previousGeneration The previous generation number. The AST already
+  /// contains derivative function configurations loaded from any generation up
+  /// to and including this one.
+  ///
+  /// \param results The result list of derivative function configurations.
+  /// This list will be extended with any methods found in subsequent
+  /// generations.
+  virtual void loadDerivativeFunctionConfigurations(
+      AbstractFunctionDecl *originalAFD, unsigned previousGeneration,
+      llvm::SetVector<AutoDiffConfig> &results) {};
+  // SWIFT_ENABLE_TENSORFLOW END
 
   /// Verify all modules loaded by this loader.
   virtual void verifyAllModules() { }

@@ -172,12 +172,6 @@ emitApplyWithRethrow(SILBuilder &Builder,
     SILValue Error = ErrorBB->createPhiArgument(fnConv.getSILErrorType(),
                                                 ValueOwnershipKind::Owned);
 
-    Builder.createBuiltin(Loc,
-                          Builder.getASTContext().getIdentifier("willThrow"),
-                          Builder.getModule().Types.getEmptyTupleType(),
-                          SubstitutionMap(),
-                          {Error});
-
     EmitCleanup(Builder, Loc);
     addThrowValue(ErrorBB, Error);
   }
@@ -231,7 +225,8 @@ emitInvocation(SILBuilder &Builder,
     if (ReInfo.getSpecializedType()->isPolymorphic()) {
       Subs = ReInfo.getCallerParamSubstitutionMap();
       CalleeSubstFnTy = CanSILFuncTy->substGenericArgs(
-          Builder.getModule(), ReInfo.getCallerParamSubstitutionMap());
+          Builder.getModule(), ReInfo.getCallerParamSubstitutionMap(),
+          Builder.getTypeExpansionContext());
       assert(!CalleeSubstFnTy->isPolymorphic() &&
              "Substituted callee type should not be polymorphic");
       assert(!CalleeSubstFnTy->hasTypeParameter() &&
@@ -345,7 +340,7 @@ void EagerDispatch::emitDispatchTo(SILFunction *NewFunc) {
   // the specialized attribute's substitution list. Visit only
   // SubstitutableTypes, skipping DependentTypes.
   auto GenericSig =
-    GenericFunc->getLoweredFunctionType()->getGenericSignature();
+    GenericFunc->getLoweredFunctionType()->getInvocationGenericSignature();
   auto SubMap = ReInfo.getClonerParamSubstitutionMap();
 
   GenericSig->forEachParam([&](GenericTypeParamType *ParamTy, bool Canonical) {
@@ -580,11 +575,10 @@ void EagerDispatch::emitRefCountedObjectCheck(SILBasicBlock *FailedTypeCheckBB,
                                                  {GenericMT});
   // Extract the i1 from the Bool struct.
   StructDecl *BoolStruct = cast<StructDecl>(Ctx.getBoolDecl());
-  auto Members = BoolStruct->lookupDirect(Ctx.Id_value_);
+  auto Members = BoolStruct->getStoredProperties();
   assert(Members.size() == 1 &&
          "Bool should have only one property with name '_value'");
-  auto Member = dyn_cast<VarDecl>(Members[0]);
-  assert(Member &&"Bool should have a property with name '_value' of type Int1");
+  auto Member = Members[0];
   auto BoolValue =
       Builder.emitStructExtract(Loc, IsClassRuntimeCheck, Member, BoolTy);
   Builder.createCondBranch(Loc, BoolValue, SuccessBB, FailedTypeCheckBB);
@@ -619,7 +613,7 @@ SILValue EagerDispatch::emitArgumentCast(CanSILFunctionType CalleeSubstFnTy,
 /// has a direct result.
 SILValue EagerDispatch::
 emitArgumentConversion(SmallVectorImpl<SILValue> &CallArgs) {
-  auto OrigArgs = GenericFunc->begin()->getFunctionArguments();
+  auto OrigArgs = GenericFunc->begin()->getSILFunctionArguments();
   assert(OrigArgs.size() == substConv.getNumSILArguments()
          && "signature mismatch");
   // Create a substituted callee type.
@@ -629,7 +623,8 @@ emitArgumentConversion(SmallVectorImpl<SILValue> &CallArgs) {
   auto CalleeSubstFnTy = CanSILFuncTy;
   if (CanSILFuncTy->isPolymorphic()) {
     CalleeSubstFnTy = CanSILFuncTy->substGenericArgs(
-        Builder.getModule(), ReInfo.getCallerParamSubstitutionMap());
+        Builder.getModule(), ReInfo.getCallerParamSubstitutionMap(),
+        Builder.getTypeExpansionContext());
     assert(!CalleeSubstFnTy->isPolymorphic() &&
            "Substituted callee type should not be polymorphic");
     assert(!CalleeSubstFnTy->hasTypeParameter() &&
@@ -714,7 +709,7 @@ static SILFunction *eagerSpecialize(SILOptFunctionBuilder &FuncBuilder,
 
   LLVM_DEBUG(auto FT = GenericFunc->getLoweredFunctionType();
              dbgs() << "  Generic Sig:";
-             dbgs().indent(2); FT->getGenericSignature()->print(dbgs());
+             dbgs().indent(2); FT->getInvocationGenericSignature()->print(dbgs());
              dbgs() << "  Generic Env:";
              dbgs().indent(2);
              GenericFunc->getGenericEnvironment()->dump(dbgs());
@@ -753,7 +748,7 @@ void EagerSpecializerTransform::run() {
     if (F.isDynamicallyReplaceable())
       continue;
 
-    if (!F.getLoweredFunctionType()->getGenericSignature())
+    if (!F.getLoweredFunctionType()->getInvocationGenericSignature())
       continue;
 
     // Create a specialized function with ReabstractionInfo for each attribute.
@@ -764,8 +759,9 @@ void EagerSpecializerTransform::run() {
     // TODO: Use a decision-tree to reduce the amount of dynamic checks being
     // performed.
     for (auto *SA : F.getSpecializeAttrs()) {
-      auto AttrRequirements = SA->getRequirements();
-      ReInfoVec.emplace_back(&F, AttrRequirements);
+      ReInfoVec.emplace_back(FuncBuilder.getModule().getSwiftModule(),
+                             FuncBuilder.getModule().isWholeModule(), &F,
+                             SA->getSpecializedSignature());
       auto *NewFunc = eagerSpecialize(FuncBuilder, &F, *SA, ReInfoVec.back());
 
       SpecializedFuncs.push_back(NewFunc);

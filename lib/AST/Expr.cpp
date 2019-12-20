@@ -25,6 +25,7 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/AvailabilitySpec.h"
 #include "swift/AST/PrettyStackTrace.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeLoc.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/PointerUnion.h"
@@ -312,7 +313,6 @@ ConcreteDeclRef Expr::getReferencedDecl() const {
 
   NO_REFERENCE(OpaqueValue);
   NO_REFERENCE(DefaultArgument);
-  NO_REFERENCE(CallerDefaultArgument);
 
   PASS_THROUGH_REFERENCE(BindOptional, getSubExpr);
   PASS_THROUGH_REFERENCE(OptionalEvaluation, getSubExpr);
@@ -351,8 +351,12 @@ ConcreteDeclRef Expr::getReferencedDecl() const {
   PASS_THROUGH_REFERENCE(ForeignObjectConversion, getSubExpr);
   PASS_THROUGH_REFERENCE(UnevaluatedInstance, getSubExpr);
   // SWIFT_ENABLE_TENSORFLOW
-  PASS_THROUGH_REFERENCE(AutoDiffFunction, getSubExpr);
-  PASS_THROUGH_REFERENCE(AutoDiffFunctionExtractOriginal, getSubExpr);
+  PASS_THROUGH_REFERENCE(DifferentiableFunction, getSubExpr);
+  PASS_THROUGH_REFERENCE(LinearFunction, getSubExpr);
+  PASS_THROUGH_REFERENCE(DifferentiableFunctionExtractOriginal, getSubExpr);
+  PASS_THROUGH_REFERENCE(LinearFunctionExtractOriginal, getSubExpr);
+  PASS_THROUGH_REFERENCE(LinearToDifferentiableFunction, getSubExpr);
+  // SWIFT_ENABLE_TENSORFLOW END
   PASS_THROUGH_REFERENCE(BridgeToObjC, getSubExpr);
   PASS_THROUGH_REFERENCE(BridgeFromObjC, getSubExpr);
   PASS_THROUGH_REFERENCE(ConditionalBridgeFromObjC, getSubExpr);
@@ -372,6 +376,7 @@ ConcreteDeclRef Expr::getReferencedDecl() const {
   NO_REFERENCE(ObjCSelector);
   NO_REFERENCE(KeyPath);
   NO_REFERENCE(KeyPathDot);
+  PASS_THROUGH_REFERENCE(OneWay, getSubExpr);
   NO_REFERENCE(Tap);
   NO_REFERENCE(Unquote);
   SIMPLE_REFERENCE(DeclQuote, getQuotedDecl);
@@ -545,6 +550,7 @@ bool Expr::canAppendPostfixExpression(bool appendingPostfixOperator) const {
   case ExprKind::Error:
   case ExprKind::CodeCompletion:
   case ExprKind::LazyInitializer:
+  case ExprKind::OneWay:
     return false;
 
   case ExprKind::NilLiteral:
@@ -625,7 +631,6 @@ bool Expr::canAppendPostfixExpression(bool appendingPostfixOperator) const {
   case ExprKind::RebindSelfInConstructor:
   case ExprKind::OpaqueValue:
   case ExprKind::DefaultArgument:
-  case ExprKind::CallerDefaultArgument:
   case ExprKind::BindOptional:
   case ExprKind::OptionalEvaluation:
     return false;
@@ -674,8 +679,12 @@ bool Expr::canAppendPostfixExpression(bool appendingPostfixOperator) const {
   case ExprKind::ForeignObjectConversion:
   case ExprKind::UnevaluatedInstance:
   // SWIFT_ENABLE_TENSORFLOW
-  case ExprKind::AutoDiffFunction:
-  case ExprKind::AutoDiffFunctionExtractOriginal:
+  case ExprKind::DifferentiableFunction:
+  case ExprKind::LinearFunction:
+  case ExprKind::DifferentiableFunctionExtractOriginal:
+  case ExprKind::LinearFunctionExtractOriginal:
+  case ExprKind::LinearToDifferentiableFunction:
+  // SWIFT_ENABLE_TENSORFLOW END
   case ExprKind::EnumIsCase:
   case ExprKind::ConditionalBridgeFromObjC:
   case ExprKind::BridgeFromObjC:
@@ -729,56 +738,6 @@ llvm::DenseMap<Expr *, Expr *> Expr::getParentMap() {
   RecordingTraversal traversal(parentMap);
   walk(traversal);
   return parentMap;
-}
-
-llvm::DenseMap<Expr *, std::pair<unsigned, Expr *>> Expr::getDepthMap() {
-  class RecordingTraversal : public ASTWalker {
-  public:
-    llvm::DenseMap<Expr *, std::pair<unsigned, Expr *>> &DepthMap;
-    unsigned Depth = 0;
-
-    explicit RecordingTraversal(
-        llvm::DenseMap<Expr *, std::pair<unsigned, Expr *>> &depthMap)
-        : DepthMap(depthMap) {}
-
-    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
-      DepthMap[E] = {Depth, Parent.getAsExpr()};
-      Depth++;
-      return { true, E };
-    }
-
-    Expr *walkToExprPost(Expr *E) override {
-      Depth--;
-      return E;
-    }
-  };
-
-  llvm::DenseMap<Expr *, std::pair<unsigned, Expr *>> depthMap;
-  RecordingTraversal traversal(depthMap);
-  walk(traversal);
-  return depthMap;
-}
-
-llvm::DenseMap<Expr *, unsigned> Expr::getPreorderIndexMap() {
-  class RecordingTraversal : public ASTWalker {
-  public:
-    llvm::DenseMap<Expr *, unsigned> &IndexMap;
-    unsigned Index = 0;
-
-    explicit RecordingTraversal(llvm::DenseMap<Expr *, unsigned> &indexMap)
-      : IndexMap(indexMap) { }
-
-    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
-      IndexMap[E] = Index;
-      Index++;
-      return { true, E };
-    }
-  };
-
-  llvm::DenseMap<Expr *, unsigned> indexMap;
-  RecordingTraversal traversal(indexMap);
-  walk(traversal);
-  return indexMap;
 }
 
 //===----------------------------------------------------------------------===//
@@ -1312,7 +1271,7 @@ SourceRange TupleExpr::getSourceRange() const {
       return { SourceLoc(), SourceLoc() };
     } else {
       // Scan backwards for a valid source loc.
-      for (Expr *expr : reversed(getElements())) {
+      for (Expr *expr : llvm::reverse(getElements())) {
         end = expr->getEndLoc();
         if (end.isValid()) {
           break;
@@ -1474,6 +1433,23 @@ static ValueDecl *getCalledValue(Expr *E) {
   return nullptr;
 }
 
+const ParamDecl *DefaultArgumentExpr::getParamDecl() const {
+  return getParameterAt(DefaultArgsOwner.getDecl(), ParamIndex);
+}
+
+bool DefaultArgumentExpr::isCallerSide() const {
+  return getParamDecl()->hasCallerSideDefaultExpr();
+}
+
+Expr *DefaultArgumentExpr::getCallerSideDefaultExpr() const {
+  assert(isCallerSide());
+  auto &ctx = DefaultArgsOwner.getDecl()->getASTContext();
+  auto *mutableThis = const_cast<DefaultArgumentExpr *>(this);
+  return evaluateOrDefault(ctx.evaluator,
+                           CallerSideDefaultArgExprRequest{mutableThis},
+                           new (ctx) ErrorExpr(getSourceRange(), getType()));
+}
+
 ValueDecl *ApplyExpr::getCalledValue() const {
   return ::getCalledValue(Fn);
 }
@@ -1580,36 +1556,9 @@ DynamicSubscriptExpr::create(ASTContext &ctx, Expr *base, Expr *index,
                                            hasTrailingClosure, decl, implicit);
 }
 
-DynamicSubscriptExpr *
-DynamicSubscriptExpr::create(ASTContext &ctx, Expr *base, SourceLoc lSquareLoc,
-                             ArrayRef<Expr *> indexArgs,
-                             ArrayRef<Identifier> indexArgLabels,
-                             ArrayRef<SourceLoc> indexArgLabelLocs,
-                             SourceLoc rSquareLoc,
-                             Expr *trailingClosure,
-                             ConcreteDeclRef decl,
-                             bool implicit) {
-  SmallVector<Identifier, 4> indexArgLabelsScratch;
-  SmallVector<SourceLoc, 4> indexArgLabelLocsScratch;
-  Expr *index = packSingleArgument(ctx, lSquareLoc, indexArgs, indexArgLabels,
-                                   indexArgLabelLocs, rSquareLoc,
-                                   trailingClosure, implicit,
-                                   indexArgLabelsScratch,
-                                   indexArgLabelLocsScratch);
-
-  size_t size = totalSizeToAlloc(indexArgLabels, indexArgLabelLocs,
-                                 trailingClosure != nullptr);
-
-  void *memory = ctx.Allocate(size, alignof(DynamicSubscriptExpr));
-  return new (memory) DynamicSubscriptExpr(base, index, indexArgLabels,
-                                           indexArgLabelLocs,
-                                           trailingClosure != nullptr,
-                                           decl, implicit);
-}
-
 UnresolvedMemberExpr::UnresolvedMemberExpr(SourceLoc dotLoc,
                                            DeclNameLoc nameLoc,
-                                           DeclName name, Expr *argument,
+                                           DeclNameRef name, Expr *argument,
                                            ArrayRef<Identifier> argLabels,
                                            ArrayRef<SourceLoc> argLabelLocs,
                                            bool hasTrailingClosure,
@@ -1626,7 +1575,7 @@ UnresolvedMemberExpr::UnresolvedMemberExpr(SourceLoc dotLoc,
 UnresolvedMemberExpr *UnresolvedMemberExpr::create(ASTContext &ctx,
                                                    SourceLoc dotLoc,
                                                    DeclNameLoc nameLoc,
-                                                   DeclName name,
+                                                   DeclNameRef name,
                                                    bool implicit) {
   size_t size = totalSizeToAlloc({ }, { }, /*hasTrailingClosure=*/false);
 
@@ -1639,7 +1588,7 @@ UnresolvedMemberExpr *UnresolvedMemberExpr::create(ASTContext &ctx,
 
 UnresolvedMemberExpr *
 UnresolvedMemberExpr::create(ASTContext &ctx, SourceLoc dotLoc,
-                             DeclNameLoc nameLoc, DeclName name,
+                             DeclNameLoc nameLoc, DeclNameRef name,
                              SourceLoc lParenLoc,
                              ArrayRef<Expr *> args,
                              ArrayRef<Identifier> argLabels,
@@ -1770,6 +1719,11 @@ Expr *CallExpr::getDirectCallee() const {
       continue;
     }
 
+    if (auto ctorCall = dyn_cast<ConstructorRefCallExpr>(fn)) {
+      fn = ctorCall->getFn();
+      continue;
+    }
+
     return fn;
   }
 }
@@ -1891,7 +1845,7 @@ FORWARD_SOURCE_LOCS_TO(ClosureExpr, Body.getPointer())
 
 Expr *ClosureExpr::getSingleExpressionBody() const {
   assert(hasSingleExpressionBody() && "Not a single-expression body");
-  auto body = getBody()->getElement(0);
+  auto body = getBody()->getFirstElement();
   if (body.is<Stmt *>())
     return cast<ReturnStmt>(body.get<Stmt *>())->getResult();
   return body.get<Expr *>();
@@ -1899,16 +1853,16 @@ Expr *ClosureExpr::getSingleExpressionBody() const {
 
 void ClosureExpr::setSingleExpressionBody(Expr *NewBody) {
   assert(hasSingleExpressionBody() && "Not a single-expression body");
-  auto body = getBody()->getElement(0);
+  auto body = getBody()->getFirstElement();
   if (body.is<Stmt *>()) {
     cast<ReturnStmt>(body.get<Stmt *>())->setResult(NewBody);
     return;
   }
-  getBody()->setElement(0, NewBody);
+  getBody()->setFirstElement(NewBody);
 }
 
 bool ClosureExpr::hasEmptyBody() const {
-  return getBody()->getNumElements() == 0;
+  return getBody()->empty();
 }
 
 FORWARD_SOURCE_LOCS_TO(AutoClosureExpr, Body)
@@ -1920,7 +1874,7 @@ void AutoClosureExpr::setBody(Expr *E) {
 }
 
 Expr *AutoClosureExpr::getSingleExpressionBody() const {
-  return cast<ReturnStmt>(Body->getElement(0).get<Stmt *>())->getResult();
+  return cast<ReturnStmt>(Body->getFirstElement().get<Stmt *>())->getResult();
 }
 
 FORWARD_SOURCE_LOCS_TO(UnresolvedPatternExpr, subPattern)
@@ -1953,12 +1907,12 @@ Type TypeExpr::getInstanceType(
 }
 
 
-TypeExpr *TypeExpr::createForDecl(SourceLoc Loc, TypeDecl *Decl,
+TypeExpr *TypeExpr::createForDecl(DeclNameLoc Loc, TypeDecl *Decl,
                                   DeclContext *DC,
                                   bool isImplicit) {
   ASTContext &C = Decl->getASTContext();
   assert(Loc.isValid() || isImplicit);
-  auto *Repr = new (C) SimpleIdentTypeRepr(Loc, Decl->getName());
+  auto *Repr = new (C) SimpleIdentTypeRepr(Loc, Decl->createNameRef());
   Repr->setValue(Decl, DC);
   auto result = new (C) TypeExpr(TypeLoc(Repr, Type()));
   if (isImplicit)
@@ -1966,9 +1920,9 @@ TypeExpr *TypeExpr::createForDecl(SourceLoc Loc, TypeDecl *Decl,
   return result;
 }
 
-TypeExpr *TypeExpr::createForMemberDecl(SourceLoc ParentNameLoc,
+TypeExpr *TypeExpr::createForMemberDecl(DeclNameLoc ParentNameLoc,
                                         TypeDecl *Parent,
-                                        SourceLoc NameLoc,
+                                        DeclNameLoc NameLoc,
                                         TypeDecl *Decl) {
   ASTContext &C = Decl->getASTContext();
   assert(ParentNameLoc.isValid());
@@ -1979,13 +1933,13 @@ TypeExpr *TypeExpr::createForMemberDecl(SourceLoc ParentNameLoc,
 
   // The first component is the parent type.
   auto *ParentComp = new (C) SimpleIdentTypeRepr(ParentNameLoc,
-                                                 Parent->getName());
+                                                 Parent->createNameRef());
   ParentComp->setValue(Parent, nullptr);
   Components.push_back(ParentComp);
 
   // The second component is the member we just found.
   auto *NewComp = new (C) SimpleIdentTypeRepr(NameLoc,
-                                              Decl->getName());
+                                              Decl->createNameRef());
   NewComp->setValue(Decl, nullptr);
   Components.push_back(NewComp);
 
@@ -1994,7 +1948,7 @@ TypeExpr *TypeExpr::createForMemberDecl(SourceLoc ParentNameLoc,
 }
 
 TypeExpr *TypeExpr::createForMemberDecl(IdentTypeRepr *ParentTR,
-                                        SourceLoc NameLoc,
+                                        DeclNameLoc NameLoc,
                                         TypeDecl *Decl) {
   ASTContext &C = Decl->getASTContext();
 
@@ -2006,7 +1960,7 @@ TypeExpr *TypeExpr::createForMemberDecl(IdentTypeRepr *ParentTR,
   assert(!Components.empty());
 
   // Add a new component for the member we just found.
-  auto *NewComp = new (C) SimpleIdentTypeRepr(NameLoc, Decl->getName());
+  auto *NewComp = new (C) SimpleIdentTypeRepr(NameLoc, Decl->createNameRef());
   NewComp->setValue(Decl, nullptr);
   Components.push_back(NewComp);
 
@@ -2054,7 +2008,7 @@ TypeExpr *TypeExpr::createForSpecializedDecl(IdentTypeRepr *ParentTR,
     }
 
     auto *genericComp = GenericIdentTypeRepr::create(C,
-      last->getIdLoc(), last->getIdentifier(),
+      last->getNameLoc(), last->getNameRef(),
       Args, AngleLocs);
     genericComp->setValue(last->getBoundDecl(), last->getDeclContext());
     components.push_back(genericComp);
@@ -2243,7 +2197,7 @@ void InterpolatedStringLiteralExpr::forEachSegment(ASTContext &Ctx,
           name = fn->getFullName();
         } else if (auto unresolvedDot =
                       dyn_cast<UnresolvedDotExpr>(call->getFn())) {
-          name = unresolvedDot->getName();
+          name = unresolvedDot->getName().getFullName();
         }
 
         bool isInterpolation = (name.getBaseName() ==
@@ -2259,14 +2213,58 @@ TapExpr::TapExpr(Expr * SubExpr, BraceStmt *Body)
     : Expr(ExprKind::Tap, /*Implicit=*/true),
       SubExpr(SubExpr), Body(Body) {
   if (Body) {
-    assert(Body->getNumElements() > 0 &&
-         Body->getElement(0).isDecl(DeclKind::Var) &&
+    assert(!Body->empty() &&
+         Body->getFirstElement().isDecl(DeclKind::Var) &&
          "First element of Body should be a variable to init with the subExpr");
   }
 }
 
 VarDecl * TapExpr::getVar() const {
-  return dyn_cast<VarDecl>(Body->getElement(0).dyn_cast<Decl *>());
+  return dyn_cast<VarDecl>(Body->getFirstElement().dyn_cast<Decl *>());
+}
+
+SourceLoc TapExpr::getEndLoc() const {
+  // Include the body in the range, assuming the body follows the SubExpr.
+  // Also, be (perhaps overly) defensive about null pointers & invalid
+  // locations.
+  if (auto *const b = getBody()) {
+    const auto be = b->getEndLoc();
+    if (be.isValid())
+      return be;
+  }
+  if (auto *const se = getSubExpr())
+    return se->getEndLoc();
+  return SourceLoc();
+}
+
+void swift::simple_display(llvm::raw_ostream &out, const ClosureExpr *CE) {
+  if (!CE) {
+    out << "(null)";
+    return;
+  }
+
+  if (CE->hasSingleExpressionBody()) {
+    out << "single expression closure";
+  } else {
+    out << "closure";
+  }
+}
+
+void swift::simple_display(llvm::raw_ostream &out,
+                           const DefaultArgumentExpr *expr) {
+  if (!expr) {
+    out << "(null)";
+    return;
+  }
+
+  out << "default arg for param ";
+  out << "#" << expr->getParamIndex() + 1 << " ";
+  out << "of ";
+  simple_display(out, expr->getDefaultArgsOwner().getDecl());
+}
+
+SourceLoc swift::extractNearestSourceLoc(const DefaultArgumentExpr *expr) {
+  return expr->getLoc();
 }
 
 // See swift/Basic/Statistic.h for declaration: this enables tracing Exprs, is

@@ -18,9 +18,10 @@
 #ifndef SWIFT_SIL_CONSTANTS_H
 #define SWIFT_SIL_CONSTANTS_H
 
+#include "swift/AST/SubstitutionMap.h"
+#include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILValue.h"
 #include "llvm/Support/CommandLine.h"
-
 
 namespace swift {
 class SingleValueInstruction;
@@ -28,77 +29,15 @@ class SILValue;
 class SILBuilder;
 class SerializedSILLoader;
 
-struct APIntSymbolicValue;
-struct ArraySymbolicValue;
+struct AggregateSymbolicValue;
+struct SymbolicArrayStorage;
 struct DerivedAddressValue;
 struct EnumWithPayloadSymbolicValue;
 struct SymbolicValueMemoryObject;
 struct UnknownSymbolicValue;
+struct SymbolicClosure;
 
 extern llvm::cl::opt<unsigned> ConstExprLimit;
-
-/// When we fail to constant fold a value, this captures a reason why,
-/// allowing the caller to produce a specific diagnostic.  The "Unknown"
-/// SymbolicValue representation also includes a pointer to the SILNode in
-/// question that was problematic.
-enum class UnknownReason {
-  // TODO: Eliminate the default code, by making classifications for each
-  // failure mode.
-  Default,
-
-  /// The constant expression was too big.  This is reported on a random
-  /// instruction within the constexpr that triggered the issue.
-  TooManyInstructions,
-
-  /// A control flow loop was found.
-  Loop,
-
-  /// Integer overflow detected.
-  Overflow,
-
-  /// Unspecified trap detected.
-  Trap,
-
-  /// An operation was applied over operands whose symbolic values were
-  /// constants but were not valid for the operation.
-  InvalidOperandValue,
-
-  /// Encountered an instruction not supported by the interpreter.
-  UnsupportedInstruction,
-
-  /// Encountered a function call where the body of the called function is
-  /// not available.
-  CalleeImplementationUnknown,
-
-  /// Attempted to load from/store into a SIL value that was not tracked by
-  /// the interpreter.
-  UntrackedSILValue,
-
-  /// Attempted to find a concrete protocol conformance for a witness method
-  /// and failed.
-  UnknownWitnessMethodConformance,
-
-  /// Attempted to determine the SIL function of a witness method (based on a
-  /// concrete protocol conformance) and failed.
-  UnresolvableWitnessMethod,
-
-  /// The value of a top-level variable cannot be determined to be a constant.
-  /// This is only relevant in the backward evaluation mode, which is used by
-  /// #assert.
-  NotTopLevelConstant,
-
-  /// A top-level value has multiple writers. This is only relevant in the
-  /// non-flow-sensitive evaluation mode,  which is used by #assert.
-  MutipleTopLevelWriters,
-
-  /// Indicates the return value of an instruction that was not evaluated during
-  /// interpretation.
-  ReturnedByUnevaluatedInstruction,
-
-  /// Indicates that the value was possibly modified by an instruction
-  /// that was not evaluated during the interpretation.
-  MutatedByUnevaluatedInstruction,
-};
 
 /// An abstract class that exposes functions for allocating symbolic values.
 /// The implementors of this class have to determine where to allocate them and
@@ -136,6 +75,149 @@ public:
 
   void *allocate(unsigned long byteSize, unsigned alignment) {
     return bumpAllocator.Allocate(byteSize, alignment);
+  }
+};
+
+/// When we fail to constant fold a value, this captures a reason why,
+/// allowing the caller to produce a specific diagnostic.  The "Unknown"
+/// SymbolicValue representation also includes a pointer to the SILNode in
+/// question that was problematic.
+class UnknownReason {
+public:
+  enum UnknownKind {
+    // TODO: Eliminate the default kind, by making classifications for each
+    // failure mode.
+    Default,
+
+    /// The constant expression was too big.  This is reported on a random
+    /// instruction within the constexpr that triggered the issue.
+    TooManyInstructions,
+
+    /// A control flow loop was found.
+    Loop,
+
+    /// Integer overflow detected.
+    Overflow,
+
+    /// Trap detected. Traps will a message as a payload.
+    Trap,
+
+    /// An operation was applied over operands whose symbolic values were
+    /// constants but were not valid for the operation.
+    InvalidOperandValue,
+
+    /// Encountered an instruction not supported by the interpreter.
+    UnsupportedInstruction,
+
+    /// Encountered a function call whose arguments are not constants.
+    CallArgumentUnknown,
+
+    /// Encountered a function call where the body of the called function is
+    /// not available.
+    CalleeImplementationUnknown,
+
+    /// Attempted to load from/store into a SIL value that was not tracked by
+    /// the interpreter.
+    UntrackedSILValue,
+
+    /// Attempted to find a concrete protocol conformance for a witness method
+    /// and failed.
+    UnknownWitnessMethodConformance,
+
+    /// Attempted to determine the SIL function of a witness method  and failed.
+    NoWitnesTableEntry,
+
+    /// The value of a top-level variable cannot be determined to be a constant.
+    /// This is only relevant in the backward evaluation mode, which is used by
+    /// #assert.
+    NotTopLevelConstant,
+
+    /// A top-level value has multiple writers. This is only relevant in the
+    /// non-flow-sensitive evaluation mode,  which is used by #assert.
+    MutipleTopLevelWriters,
+
+    /// Indicates the return value of an instruction that was not evaluated
+    /// during interpretation.
+    ReturnedByUnevaluatedInstruction,
+
+    /// Indicates that the value was possibly modified by an instruction
+    /// that was not evaluated during the interpretation.
+    MutatedByUnevaluatedInstruction,
+  };
+
+private:
+  UnknownKind kind;
+
+  // Auxiliary information for different unknown kinds.
+  union {
+    SILFunction *function;   // For CalleeImplementationUnknown
+    const char *trapMessage; // For Trap.
+    unsigned argumentIndex;  // For CallArgumentUnknown
+  } payload;
+
+public:
+  UnknownKind getKind() { return kind; }
+
+  static bool isUnknownKindWithPayload(UnknownKind kind) {
+    switch (kind) {
+    case UnknownKind::CalleeImplementationUnknown:
+    case UnknownKind::Trap:
+    case UnknownKind::CallArgumentUnknown:
+      return true;
+    default:
+      return false;
+    }
+  }
+
+  static UnknownReason create(UnknownKind kind) {
+    assert(!isUnknownKindWithPayload(kind));
+    UnknownReason reason;
+    reason.kind = kind;
+    return reason;
+  }
+
+  static UnknownReason createCalleeImplementationUnknown(SILFunction *callee) {
+    assert(callee);
+    UnknownReason reason;
+    reason.kind = UnknownKind::CalleeImplementationUnknown;
+    reason.payload.function = callee;
+    return reason;
+  }
+
+  SILFunction *getCalleeWithoutImplmentation() {
+    assert(kind == UnknownKind::CalleeImplementationUnknown);
+    return payload.function;
+  }
+
+  static UnknownReason createTrap(StringRef message,
+                                  SymbolicValueAllocator &allocator) {
+    // Copy and null terminate the string.
+    size_t size = message.size();
+    char *messagePtr = allocator.allocate<char>(size + 1);
+    std::uninitialized_copy(message.begin(), message.end(), messagePtr);
+    messagePtr[size] = '\0';
+
+    UnknownReason reason;
+    reason.kind = UnknownKind::Trap;
+    reason.payload.trapMessage = messagePtr;
+    return reason;
+  }
+
+  const char *getTrapMessage() {
+    assert(kind == UnknownKind::Trap);
+    return payload.trapMessage;
+  }
+
+  static UnknownReason createCallArgumentUnknown(unsigned argIndex) {
+    UnknownReason reason;
+    reason.kind = UnknownKind::CallArgumentUnknown;
+    reason.payload.argumentIndex = argIndex;
+    return reason;
+  }
+
+  unsigned getArgumentIndex() {
+    assert(kind == UnknownKind::CallArgumentUnknown);
+    return payload.argumentIndex;
   }
 };
 
@@ -193,6 +275,15 @@ private:
 
     /// This represents an index *into* a memory object.
     RK_DerivedAddress,
+
+    /// This represents the internal storage of an array.
+    RK_ArrayStorage,
+
+    /// This represents an array.
+    RK_Array,
+
+    /// This represents a closure.
+    RK_Closure,
   };
 
   union {
@@ -218,8 +309,8 @@ private:
     const char *string;
 
     /// When this SymbolicValue is of "Aggregate" kind, this pointer stores
-    /// information about the array elements and count.
-    const SymbolicValue *aggregate;
+    /// information about the aggregate elements, its type and count.
+    const AggregateSymbolicValue *aggregate;
 
     /// When this SymbolicValue is of "Enum" kind, this pointer stores
     /// information about the enum case type.
@@ -236,23 +327,46 @@ private:
     /// When this SymbolicValue is of "DerivedAddress" kind, this pointer stores
     /// information about the memory object and access path of the access.
     DerivedAddressValue *derivedAddress;
+
+    // The following two fields are for representing an Array.
+    //
+    // In Swift, an array is a non-trivial struct that stores a reference to an
+    // internal storage: _ContiguousArrayStorage. Though arrays have value
+    // semantics in Swift, it is not the case in SIL. In SIL, an array can be
+    // mutated by taking the address of the internal storage i.e., through a
+    // shared, mutable pointer to the internal storage of the array. In fact,
+    // this is how an array initialization is lowered in SIL. Therefore, the
+    // symbolic representation of an array is an addressable "memory cell"
+    // (i.e., a SymbolicValueMemoryObject) containing the array storage. The
+    // array storage is modeled by the type: SymbolicArrayStorage. This
+    // representation of the array enables obtaining the address of the internal
+    // storage and modifying the array through that address. Array operations
+    // such as `append` that mutate an array must clone the internal storage of
+    // the array, following the semantics of the Swift implementation of those
+    // operations.
+
+    /// Representation of array storage (RK_ArrayStorage). SymbolicArrayStorage
+    /// is a container for a sequence of symbolic values.
+    SymbolicArrayStorage *arrayStorage;
+
+    /// When this symbolic value is of an "Array" kind, this stores a memory
+    /// object that contains a SymbolicArrayStorage value.
+    SymbolicValueMemoryObject *array;
+
+    /// When this symbolic value is of "Closure" kind, store a pointer to the
+    /// symbolic representation of the closure.
+    SymbolicClosure *closure;
   } value;
 
   RepresentationKind representationKind : 8;
 
   union {
-    /// This is the reason code for RK_Unknown values.
-    UnknownReason unknownReason : 32;
-
     /// This is the number of bits in an RK_Integer or RK_IntegerInline
     /// representation, which makes the number of entries in the list derivable.
     unsigned integerBitwidth;
 
     /// This is the number of bytes for an RK_String representation.
     unsigned stringNumBytes;
-
-    /// This is the number of elements for an RK_Aggregate representation.
-    unsigned aggregateNumElements;
   } auxInfo;
 
 public:
@@ -287,6 +401,15 @@ public:
 
     /// This value represents the address of, or into, a memory object.
     Address,
+
+    /// This represents an internal array storage.
+    ArrayStorage,
+
+    /// This represents an array value.
+    Array,
+
+    /// This represents a closure.
+    Closure,
 
     /// These values are generally only seen internally to the system, external
     /// clients shouldn't have to deal with them.
@@ -364,11 +487,15 @@ public:
   StringRef getStringValue() const;
 
   /// This returns an aggregate value with the specified elements in it.  This
-  /// copies the elements into the specified Allocator.
-  static SymbolicValue getAggregate(ArrayRef<SymbolicValue> elements,
+  /// copies the member values into the specified Allocator.
+  static SymbolicValue getAggregate(ArrayRef<SymbolicValue> members,
+                                    Type aggregateType,
                                     SymbolicValueAllocator &allocator);
 
-  ArrayRef<SymbolicValue> getAggregateValue() const;
+  ArrayRef<SymbolicValue> getAggregateMembers() const;
+
+  /// Return the type of this aggregate symbolic value.
+  Type getAggregateType() const;
 
   /// This returns a constant Symbolic value for the enum case in `decl`, which
   /// must not have an associated value.
@@ -411,6 +538,49 @@ public:
   /// Return just the memory object for an address value.
   SymbolicValueMemoryObject *getAddressValueMemoryObject() const;
 
+  /// Create a symbolic array storage containing \c elements.
+  static SymbolicValue
+  getSymbolicArrayStorage(ArrayRef<SymbolicValue> elements, CanType elementType,
+                          SymbolicValueAllocator &allocator);
+
+  /// Create a symbolic array using the given symbolic array storage, which
+  /// contains the array elements.
+  static SymbolicValue getArray(Type arrayType, SymbolicValue arrayStorage,
+                                SymbolicValueAllocator &allocator);
+
+  /// Return the elements stored in this SymbolicValue of "ArrayStorage" kind.
+  ArrayRef<SymbolicValue> getStoredElements(CanType &elementType) const;
+
+  /// Return the symbolic value representing the internal storage of this array.
+  SymbolicValue getStorageOfArray() const;
+
+  /// Return the symbolic value representing the address of the element of this
+  /// array at the given \c index. The return value is a derived address whose
+  /// base is the memory object \c value.array (which contains the array
+  /// storage) and whose accesspath is \c index.
+  SymbolicValue getAddressOfArrayElement(SymbolicValueAllocator &allocator,
+                                         unsigned index) const;
+
+  /// Return the type of this array symbolic value.
+  Type getArrayType() const;
+
+  /// Create and return a symbolic value that represents a closure.
+  /// \param target SILFunction corresponding the target of the closure.
+  /// \param capturedArguments an array consisting of SILValues of captured
+  /// arguments along with their symbolic values when available.
+  /// \param allocator the allocator to use for storing the contents of this
+  /// symbolic value.
+  static SymbolicValue makeClosure(
+      SILFunction *target,
+      ArrayRef<std::pair<SILValue, Optional<SymbolicValue>>> capturedArguments,
+      SubstitutionMap substMap, SingleValueInstruction *closureInst,
+      SymbolicValueAllocator &allocator);
+
+  SymbolicClosure *getClosure() const {
+    assert(getKind() == Closure);
+    return value.closure;
+  }
+
   //===--------------------------------------------------------------------===//
   // Helpers
 
@@ -434,7 +604,7 @@ public:
   void dump() const;
 };
 
-static_assert(sizeof(SymbolicValue) == 2 * sizeof(void *),
+static_assert(sizeof(SymbolicValue) == 2 * sizeof(uint64_t),
               "SymbolicValue should stay small");
 static_assert(std::is_pod<SymbolicValue>::value,
               "SymbolicValue should stay POD");
@@ -451,7 +621,12 @@ struct SymbolicValueMemoryObject {
   Type getType() const { return type; }
 
   SymbolicValue getValue() const { return value; }
-  void setValue(SymbolicValue newValue) { value = newValue; }
+  void setValue(SymbolicValue newValue) {
+    assert((newValue.getKind() != SymbolicValue::Aggregate ||
+            newValue.getAggregateType()->isEqual(type)) &&
+           "Memory object type does not match the type of the symbolic value");
+    value = newValue;
+  }
 
   /// Create a new memory object whose overall type is as specified.
   static SymbolicValueMemoryObject *create(Type type, SymbolicValue value,
@@ -484,6 +659,76 @@ private:
       : type(type), value(value) {}
   SymbolicValueMemoryObject(const SymbolicValueMemoryObject &) = delete;
   void operator=(const SymbolicValueMemoryObject &) = delete;
+};
+
+using SymbolicClosureArgument = std::pair<SILValue, Optional<SymbolicValue>>;
+
+/// Representation of a symbolic closure. A symbolic closure consists of a
+/// SILFunction and an array of SIL values, corresponding to the captured
+/// arguments, and (optional) symbolic values representing the constant values
+/// of the captured arguments. The symbolic values are optional as it is not
+/// necessary for every captured argument to be a constant, which enables
+/// representing closures whose captured arguments are not compile-time
+/// constants.
+struct SymbolicClosure final
+  : private llvm::TrailingObjects<SymbolicClosure, SymbolicClosureArgument> {
+
+  friend class llvm::TrailingObjects<SymbolicClosure, SymbolicClosureArgument>;
+
+private:
+
+  SILFunction *target;
+
+  // The number of SIL values captured by the closure.
+  unsigned numCaptures;
+
+  // True iff there exists a captured argument whose constant value is not
+  // known.
+  bool hasNonConstantCaptures = true;
+
+  // A substitution map that partially maps the generic paramters of the
+  // applied function to the generic arguments of passed to the call.
+  SubstitutionMap substitutionMap;
+
+  // The closure instruction such as partial apply that resulted in this
+  // symbolic value. This is tracked to obtain SILType and other SIL-level
+  // information of the symbolic closure.
+  SingleValueInstruction *closureInst;
+
+  SymbolicClosure() = delete;
+  SymbolicClosure(const SymbolicClosure &) = delete;
+  SymbolicClosure(SILFunction *callee, unsigned numArguments,
+                  SubstitutionMap substMap, SingleValueInstruction *inst,
+                  bool nonConstantCaptures)
+      : target(callee), numCaptures(numArguments),
+        hasNonConstantCaptures(nonConstantCaptures), substitutionMap(substMap),
+        closureInst(inst) {}
+
+public:
+  static SymbolicClosure *create(SILFunction *callee,
+                                 ArrayRef<SymbolicClosureArgument> args,
+                                 SubstitutionMap substMap,
+                                 SingleValueInstruction *closureInst,
+                                 SymbolicValueAllocator &allocator);
+
+  ArrayRef<SymbolicClosureArgument> getCaptures() const {
+    return {getTrailingObjects<SymbolicClosureArgument>(), numCaptures};
+  }
+
+  // This is used by the llvm::TrailingObjects base class.
+  size_t numTrailingObjects(OverloadToken<SymbolicClosureArgument>) const {
+    return numCaptures;
+  }
+
+  SILFunction *getTarget() {
+    return target;
+  }
+
+  SingleValueInstruction *getClosureInst() { return closureInst; }
+
+  SILType getClosureType() { return closureInst->getType(); }
+
+  SubstitutionMap getCallSubstitutionMap() { return substitutionMap; }
 };
 
 } // end namespace swift

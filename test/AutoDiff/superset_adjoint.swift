@@ -2,69 +2,79 @@
 // REQUIRES: executable_test
 
 import StdlibUnittest
+import DifferentiationUnittest
 
 var SupersetVJPTests = TestSuite("SupersetVJP")
 
 @differentiable(wrt: (x, y), vjp: dmulxy)
-func mulxy(_ x: Float, _ y: Float) -> Float {
+func mulxy(_ x: Tracked<Float>, _ y: Tracked<Float>) -> Tracked<Float> {
   // use control flow to prevent AD; NB fix when control flow is supported
   if x > 1000 {
     return y
   }
   return x * y
 }
-func dmulxy(_ x: Float, _ y: Float) -> (Float, (Float) -> (Float, Float)) {
+func dmulxy(
+  _ x: Tracked<Float>,
+  _ y: Tracked<Float>
+) -> (Tracked<Float>, (Tracked<Float>) -> (Tracked<Float>, Tracked<Float>)) {
   return (mulxy(x, y), { v in (y * v, x * v) })
 }
 
-func calls_mulxy(_ x: Float, _ y: Float) -> Float {
+func calls_mulxy(_ x: Tracked<Float>, _ y: Tracked<Float>) -> Tracked<Float> {
   return mulxy(x, y)
 }
 
-SupersetVJPTests.test("Superset") {
+SupersetVJPTests.testWithLeakChecking("Superset") {
   expectEqual(3, gradient(at: 2) { x in mulxy(x, 3) })
 }
 
-SupersetVJPTests.test("SupersetNested") {
+SupersetVJPTests.testWithLeakChecking("SupersetNested") {
   expectEqual(2, gradient(at: 3) { y in calls_mulxy(2, y) })
 }
 
-SupersetVJPTests.test("CrossModuleClosure") {
-  expectEqual(1, gradient(at: Float(1)) { x in x + 2 })
+SupersetVJPTests.testWithLeakChecking("CrossModuleClosure") {
+  expectEqual(1, gradient(at: Tracked<Float>(1)) { x in x + 2 })
 }
 
-SupersetVJPTests.test("SubsetOfSubset") {
+SupersetVJPTests.testWithLeakChecking("SubsetOfSubset") {
   @differentiable(wrt: (x, z))
-  func foo(_ x: Float, _ y: Float, _ z: Float) -> Float {
+  func foo(_ x: Tracked<Float>, _ y: Tracked<Float>, _ z: Tracked<Float>) -> Tracked<Float> {
     withoutDerivative(at: 0)
   }
   expectEqual(0, gradient(at: 0, in: { x in foo(x, 0, 0) }))
 }
 
-// FIXME: The expression `(+) as @differentiable (Float, @nondiff Float) -> Float)`
+SupersetVJPTests.test("ApplySubset") {
+  // TF-914
+  @differentiable(wrt: x)
+  func foo<T: Differentiable>(_ x: T, _ y: T, apply: @differentiable (T, T) -> T) -> T {
+    return apply(x, y)
+  }
+  expectEqual(1, gradient(at: Tracked<Float>(0)) { x in foo(x, 0) { $0 + $1 } })
+}
+
+// FIXME: The expression `(+) as @differentiable (Float, @noDerivative Float) -> Float)`
 // forms a curry thunk of `Float.+` before conversion to @differentiable, and AD
 // doesn't know how to differentiate the curry thunk, so it produces a
 // "function is not differentiable" error.
-// FIXME: Propagate wrt indices correctly so that this actually takes the
-// gradient wrt only the first parameter, as intended.
 // SupersetVJPTests.test("CrossModule") {
-//   expectEqual(1, gradient(at: 1, 2, in: (+) as @differentiable (Float, @nondiff Float) -> Float))
+//   let grad = gradient(at: Float(1), Float(2), in: (+) as @differentiable (Float, @noDerivative Float) -> Float)
+//   expectEqual(Float(1), grad)
 // }
 
-// FIXME: Unbreak this one.
-//
-// @differentiable(wrt: (.0, .1), vjp: dx_T)
-// func x_T<T : Differentiable>(_ x: Float, _ y: T) -> Float {
-//   if x > 1000 {
-//     return x
-//   }
-//   return x
-// }
-// func dx_T<T>(_ x: Float, _ y: T) -> (Float, (Float) -> (Float, T.TangentVector)) {
-//   return (x_T(x, y), { seed in (x, y) })
-// }
-// SupersetVJPTests.test("IndirectResults") {
-//   expectEqual(3, gradient(at: 2) { x in x_T(x, Float(3)) })
-// }
+@differentiable(wrt: (x, y), vjp: dx_T)
+func x_T<T : Differentiable>(_ x: Tracked<Float>, _ y: T) -> Tracked<Float> {
+  if x > 1000 { return x }
+  return x
+}
+func dx_T<T : Differentiable>(
+  _ x: Tracked<Float>, _ y: T
+) -> (Tracked<Float>, (Tracked<Float>) -> (Tracked<Float>, T.TangentVector)) {
+  return (x_T(x, y), { v in (x * v, .zero) })
+}
+SupersetVJPTests.testWithLeakChecking("IndirectResults") {
+  expectEqual(2, gradient(at: 2) { x in x_T(x, Tracked<Float>(3)) })
+}
 
 runAllTests()

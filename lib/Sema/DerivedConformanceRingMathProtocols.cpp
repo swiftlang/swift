@@ -78,14 +78,12 @@ static ValueDecl *getProtocolRequirement(ProtocolDecl *proto, Identifier name) {
 // Get the effective memberwise initializer of the given nominal type, or create
 // it if it does not exist.
 static ConstructorDecl *getOrCreateEffectiveMemberwiseInitializer(
-    TypeChecker &TC, NominalTypeDecl *nominal) {
-  auto &C = nominal->getASTContext();
+    ASTContext &ctx, NominalTypeDecl *nominal) {
   if (auto *initDecl = nominal->getEffectiveMemberwiseInitializer())
     return initDecl;
-  auto *initDecl = createImplicitConstructor(
-      TC, nominal, ImplicitConstructorKind::Memberwise);
+  auto *initDecl = createMemberwiseImplicitConstructor(
+      ctx, nominal);
   nominal->addMember(initDecl);
-  C.addSynthesizedDecl(initDecl);
   return initDecl;
 }
 
@@ -113,9 +111,7 @@ static bool canDeriveRingProtocol(KnownProtocolKind knownProtoKind,
   auto &C = nominal->getASTContext();
   auto *proto = C.getProtocol(knownProtoKind);
   return llvm::all_of(structDecl->getStoredProperties(), [&](VarDecl *v) {
-    if (!v->hasInterfaceType())
-      C.getLazyResolver()->resolveDeclSignature(v);
-    if (!v->hasInterfaceType())
+    if (v->getInterfaceType()->hasError())
       return false;
     auto varType = DC->mapTypeIntoContext(v->getValueInterfaceType());
     return (bool)TypeChecker::conformsToProtocol(varType, proto, DC, None);
@@ -147,7 +143,7 @@ deriveBodyMathOperator(AbstractFunctionDecl *funcDecl, MathOperator op) {
   auto *initDRE =
       new (C) DeclRefExpr(memberwiseInitDecl, DeclNameLoc(), /*Implicit*/ true);
   initDRE->setFunctionRefKind(FunctionRefKind::SingleApply);
-  auto *nominalTypeExpr = TypeExpr::createForDecl(SourceLoc(), nominal,
+  auto *nominalTypeExpr = TypeExpr::createForDecl(DeclNameLoc(), nominal,
                                                   funcDecl, /*Implicit*/ true);
   auto *initExpr = new (C) ConstructorRefCallExpr(initDRE, nominalTypeExpr);
 
@@ -158,10 +154,6 @@ deriveBodyMathOperator(AbstractFunctionDecl *funcDecl, MathOperator op) {
 
   // Create reference to operator parameters: lhs and rhs.
   auto params = funcDecl->getParameters();
-  auto *lhsDRE =
-      new (C) DeclRefExpr(params->get(0), DeclNameLoc(), /*Implicit*/ true);
-  auto *rhsDRE =
-      new (C) DeclRefExpr(params->get(1), DeclNameLoc(), /*Implicit*/ true);
 
   // Create expression combining lhs and rhs members using member operator.
   auto createMemberOpExpr = [&](VarDecl *member) -> Expr * {
@@ -177,9 +169,9 @@ deriveBodyMathOperator(AbstractFunctionDecl *funcDecl, MathOperator op) {
     ValueDecl *memberOpDecl = operatorReq;
     // If conformance reference is concrete, then use concrete witness
     // declaration for the operator.
-    if (confRef->isConcrete())
+    if (confRef.isConcrete())
       if (auto *concreteMemberMethodDecl =
-              confRef->getConcrete()->getWitnessDecl(operatorReq))
+              confRef.getConcrete()->getWitnessDecl(operatorReq))
         memberOpDecl = concreteMemberMethodDecl;
     assert(memberOpDecl && "Member operator declaration must exist");
     auto memberOpDRE =
@@ -189,6 +181,12 @@ deriveBodyMathOperator(AbstractFunctionDecl *funcDecl, MathOperator op) {
         new (C) DotSyntaxCallExpr(memberOpDRE, SourceLoc(), memberTypeExpr);
 
     // Create expression `lhs.member <op> rhs.member`.
+    // NOTE(TF-1054): create new `DeclRefExpr`s per loop iteration to avoid
+    // `ConstraintSystem::resolveOverload` error.
+    auto *lhsDRE =
+        new (C) DeclRefExpr(params->get(0), DeclNameLoc(), /*Implicit*/ true);
+    auto *rhsDRE =
+        new (C) DeclRefExpr(params->get(1), DeclNameLoc(), /*Implicit*/ true);
     Expr *lhsArg = new (C) MemberRefExpr(lhsDRE, SourceLoc(), member,
                                          DeclNameLoc(), /*Implicit*/ true);
     auto *rhsArg = new (C) MemberRefExpr(rhsDRE, SourceLoc(), member,
@@ -222,14 +220,15 @@ static ValueDecl *deriveMathOperator(DerivedConformance &derived,
                                      MathOperator op) {
   auto nominal = derived.Nominal;
   auto parentDC = derived.getConformanceContext();
-  auto &C = derived.TC.Context;
+  auto &C = derived.Context;
   auto selfInterfaceType = parentDC->getDeclaredInterfaceType();
 
   // Create parameter declaration with the given name and type.
   auto createParamDecl = [&](StringRef name, Type type) -> ParamDecl * {
     auto *param = new (C)
-        ParamDecl(ParamDecl::Specifier::Default, SourceLoc(), SourceLoc(),
-                  Identifier(), SourceLoc(), C.getIdentifier(name), parentDC);
+        ParamDecl(SourceLoc(), SourceLoc(), Identifier(), SourceLoc(),
+                  C.getIdentifier(name), parentDC);
+    param->setSpecifier(ParamDecl::Specifier::Default);
     param->setInterfaceType(type);
     return param;
   };
@@ -253,15 +252,10 @@ static ValueDecl *deriveMathOperator(DerivedConformance &derived,
     return deriveBodyMathOperator(funcDecl, op);
   };
   operatorDecl->setBodySynthesizer(bodySynthesizer, (void *) op);
-  if (auto env = parentDC->getGenericEnvironmentOfContext())
-    operatorDecl->setGenericEnvironment(env);
-  operatorDecl->computeType();
+  operatorDecl->setGenericSignature(parentDC->getGenericSignatureOfContext());
   operatorDecl->copyFormalAccessFrom(nominal, /*sourceIsParentContext*/ true);
-  operatorDecl->setValidationToChecked();
 
   derived.addMembersToConformanceContext({operatorDecl});
-  C.addSynthesizedDecl(operatorDecl);
-
   return operatorDecl;
 }
 
@@ -279,7 +273,7 @@ deriveBodyRingPropertyGetter(AbstractFunctionDecl *funcDecl,
       new (C) DeclRefExpr(memberwiseInitDecl, DeclNameLoc(), /*Implicit*/ true);
   initDRE->setFunctionRefKind(FunctionRefKind::SingleApply);
 
-  auto *nominalTypeExpr = TypeExpr::createForDecl(SourceLoc(), nominal,
+  auto *nominalTypeExpr = TypeExpr::createForDecl(DeclNameLoc(), nominal,
                                                   funcDecl, /*Implicit*/ true);
   auto *initExpr = new (C) ConstructorRefCallExpr(initDRE, nominalTypeExpr);
 
@@ -307,12 +301,12 @@ deriveBodyRingPropertyGetter(AbstractFunctionDecl *funcDecl,
     // If conformance reference is not concrete, then concrete witness
     // declaration for ring property cannot be resolved. Return reference to
     // protocol requirement: this will be dynamically dispatched.
-    if (!confRef->isConcrete()) {
+    if (!confRef.isConcrete()) {
       return new (C) MemberRefExpr(memberExpr, SourceLoc(), reqDecl,
                                    DeclNameLoc(), /*Implicit*/ true);
     }
     // Otherwise, return reference to concrete witness declaration.
-    auto conf = confRef->getConcrete();
+    auto conf = confRef.getConcrete();
     auto witnessDecl = conf->getWitnessDecl(reqDecl);
     return new (C) MemberRefExpr(memberExpr, SourceLoc(), witnessDecl,
                                  DeclNameLoc(), /*Implicit*/ true);
@@ -395,7 +389,7 @@ deriveRingProperty(DerivedConformance &derived, Identifier propertyName,
 
 // Synthesize the static property declaration for `AdditiveArithmetic.zero`.
 static ValueDecl *deriveAdditiveArithmetic_zero(DerivedConformance &derived) {
-  auto &C = derived.TC.Context;
+  auto &C = derived.Context;
   return deriveRingProperty(derived, C.Id_zero, /*isStatic*/ true,
                             {deriveBodyAdditiveArithmetic_zero, nullptr});
 }
@@ -404,7 +398,7 @@ static ValueDecl *deriveAdditiveArithmetic_zero(DerivedConformance &derived) {
 // `PointwiseMultiplicative.one`.
 static ValueDecl *
 derivePointwiseMultiplicative_one(DerivedConformance &derived) {
-  auto &C = derived.TC.Context;
+  auto &C = derived.Context;
   return deriveRingProperty(derived, C.Id_one, /*isStatic*/ true,
                             {deriveBodyPointwiseMultiplicative_one, nullptr});
 }
@@ -413,7 +407,7 @@ derivePointwiseMultiplicative_one(DerivedConformance &derived) {
 // `PointwiseMultiplicative.reciprocal`.
 static ValueDecl *
 derivePointwiseMultiplicative_reciprocal(DerivedConformance &derived) {
-  auto &C = derived.TC.Context;
+  auto &C = derived.Context;
   return deriveRingProperty(
       derived, C.Id_reciprocal, /*isStatic*/ false,
       {deriveBodyPointwiseMultiplicative_reciprocal, nullptr});
@@ -425,14 +419,14 @@ DerivedConformance::deriveAdditiveArithmetic(ValueDecl *requirement) {
   if (checkAndDiagnoseDisallowedContext(requirement))
     return nullptr;
   // Create memberwise initializer for nominal type if it doesn't already exist.
-  getOrCreateEffectiveMemberwiseInitializer(TC, Nominal);
-  if (requirement->getBaseName() == TC.Context.getIdentifier("+"))
+  getOrCreateEffectiveMemberwiseInitializer(Context, Nominal);
+  if (requirement->getBaseName() == Context.getIdentifier("+"))
     return deriveMathOperator(*this, Add);
-  if (requirement->getBaseName() == TC.Context.getIdentifier("-"))
+  if (requirement->getBaseName() == Context.getIdentifier("-"))
     return deriveMathOperator(*this, Subtract);
-  if (requirement->getBaseName() == TC.Context.Id_zero)
+  if (requirement->getBaseName() == Context.Id_zero)
     return deriveAdditiveArithmetic_zero(*this);
-  TC.diagnose(requirement->getLoc(),
+  Context.Diags.diagnose(requirement->getLoc(),
               diag::broken_additive_arithmetic_requirement);
   return nullptr;
 }
@@ -443,14 +437,14 @@ DerivedConformance::derivePointwiseMultiplicative(ValueDecl *requirement) {
   if (checkAndDiagnoseDisallowedContext(requirement))
     return nullptr;
   // Create memberwise initializer for nominal type if it doesn't already exist.
-  getOrCreateEffectiveMemberwiseInitializer(TC, Nominal);
-  if (requirement->getBaseName() == TC.Context.getIdentifier(".*"))
+  getOrCreateEffectiveMemberwiseInitializer(Context, Nominal);
+  if (requirement->getBaseName() == Context.getIdentifier(".*"))
     return deriveMathOperator(*this, Multiply);
-  if (requirement->getBaseName() == TC.Context.Id_one)
+  if (requirement->getBaseName() == Context.Id_one)
     return derivePointwiseMultiplicative_one(*this);
-  if (requirement->getBaseName() == TC.Context.Id_reciprocal)
+  if (requirement->getBaseName() == Context.Id_reciprocal)
     return derivePointwiseMultiplicative_reciprocal(*this);
-  TC.diagnose(requirement->getLoc(),
+  Context.Diags.diagnose(requirement->getLoc(),
               diag::broken_pointwise_multiplicative_requirement);
   return nullptr;
 }

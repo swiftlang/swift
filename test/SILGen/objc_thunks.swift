@@ -369,7 +369,7 @@ class Hoozit : Gizmo {
   // CHECK: [[SUPERMETHOD:%[0-9]+]] = objc_super_method [[CAST_BORROWED_GIZMO]] : $Hoozit, #Gizmo.init!initializer.1.foreign : (Gizmo.Type) -> (Int) -> Gizmo?, $@convention(objc_method) (Int, @owned Gizmo) -> @owned Optional<Gizmo>
   // CHECK-NEXT: end_borrow [[BORROWED_GIZMO]]
   // CHECK-NEXT: [[SELF_REPLACED:%[0-9]+]] = apply [[SUPERMETHOD]](%0, [[X:%[0-9]+]]) : $@convention(objc_method) (Int, @owned Gizmo) -> @owned Optional<Gizmo>
-  // CHECK-NOT: unconditional_checked_cast downcast [[SELF_REPLACED]] : $Gizmo to $Hoozit
+  // CHECK-NOT: unconditional_checked_cast downcast [[SELF_REPLACED]] : $Gizmo to Hoozit
   // CHECK: unchecked_ref_cast
   // CHECK: return
   override init(bellsOn x : Int) {
@@ -454,12 +454,13 @@ class Wotsit<T> : Gizmo {
     return "Hello, world."
   }
 
+  // Ivar destroyer
+  // CHECK-LABEL: sil hidden [ossa] @$s11objc_thunks6WotsitCfETo
+
   // CHECK-LABEL: sil hidden [thunk] [ossa] @$s11objc_thunks6WotsitCACyxGSgycfcTo : $@convention(objc_method) <T> (@owned Wotsit<T>) -> @owned Optional<Wotsit<T>>
 
   // CHECK-LABEL: sil hidden [thunk] [ossa] @$s11objc_thunks6WotsitC7bellsOnACyxGSgSi_tcfcTo : $@convention(objc_method) <T> (Int, @owned Wotsit<T>) -> @owned Optional<Wotsit<T>>
 
-  // Ivar destroyer
-  // CHECK-LABEL: sil hidden [ossa] @$s11objc_thunks6WotsitCfETo
 }
 
 // CHECK-NOT: sil hidden [thunk] [ossa] @_TToF{{.*}}Wotsit{{.*}}

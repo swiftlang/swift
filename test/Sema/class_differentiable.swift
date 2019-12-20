@@ -34,6 +34,8 @@ func testEmpty() {
   assertConformsToElementaryFunctions(Empty.TangentVector.self)
 }
 
+class EmptyEuclidean : EuclideanDifferentiable {}
+
 // Test structs with `let` stored properties.
 // Derived conformances fail because `mutating func move` requires all stored
 // properties to be mutable.
@@ -55,7 +57,7 @@ class ImmutableStoredProperties : Differentiable {
 func testImmutableStoredProperties() {
   _ = ImmutableStoredProperties.TangentVector(okay: 1)
 }
-class MutableStoredPropertiesWithInitialValue : Differentiable {
+class MutableStoredPropertiesWithInitialValue : Differentiable, EuclideanDifferentiable {
   var x = Float(1)
   var y = Double(1)
 }
@@ -69,7 +71,7 @@ class AllMixedStoredPropertiesHaveInitialValue : Differentiable {
   }
 }
 /*
-class HasCustomConstructor: Differentiable {
+class HasCustomConstructor: Differentiable, EuclideanDifferentiable {
   var x = Float(1)
   var y = Float(1)
   // Custom constructor should not affect synthesis.
@@ -77,7 +79,7 @@ class HasCustomConstructor: Differentiable {
 }
 */
 
-class Simple : Differentiable {
+class Simple : Differentiable, EuclideanDifferentiable {
   var w: Float
   var b: Float
 
@@ -137,8 +139,8 @@ extension VectorSpacesEqualSelf : Equatable, AdditiveArithmetic {
 */
 
 // Test generic type with vector space types to `Self`.
-class GenericVectorSpacesEqualSelf<T> : Differentiable
-  where T : Differentiable, T == T.TangentVector
+class GenericVectorSpacesEqualSelf<T> : Differentiable, EuclideanDifferentiable
+  where T : EuclideanDifferentiable, T == T.TangentVector
 {
   var w: T
   var b: T
@@ -178,7 +180,7 @@ func testNested(
 // Vector space structs types must be synthesized.
 // Note: it would be nice to emit a warning if conforming `Self` to
 // `AdditiveArithmetic` is possible.
-class AllMembersAdditiveArithmetic : Differentiable {
+class AllMembersAdditiveArithmetic : Differentiable, EuclideanDifferentiable {
   var w: Float
   var b: Float
 
@@ -190,7 +192,7 @@ class AllMembersAdditiveArithmetic : Differentiable {
 
 // Test type `AllMembersVectorProtocol` whose members conforms to `VectorProtocol`,
 // in which case we should make `TangentVector` conform to `VectorProtocol`.
-struct MyVector : VectorProtocol, Differentiable {
+struct MyVector : VectorProtocol, Differentiable, EuclideanDifferentiable {
   var w: Float
   var b: Float
 
@@ -199,7 +201,7 @@ struct MyVector : VectorProtocol, Differentiable {
     self.b = b
   }
 }
-class AllMembersVectorProtocol : Differentiable {
+class AllMembersVectorProtocol : Differentiable, EuclideanDifferentiable {
   var v1: MyVector
   var v2: MyVector
 
@@ -214,7 +216,7 @@ func testAllMembersVectorProtocol() {
 
 // Test type `AllMembersElementaryFunctions` whose members conforms to `ElementaryFunctions`,
 // in which case we should make `TangentVector` conform to `ElementaryFunctions`.
-struct MyVector2 : ElementaryFunctions, Differentiable {
+struct MyVector2 : ElementaryFunctions, Differentiable, EuclideanDifferentiable {
   var w: Float
   var b: Float
 
@@ -223,7 +225,7 @@ struct MyVector2 : ElementaryFunctions, Differentiable {
     self.b = b
   }
 }
-class AllMembersElementaryFunctions : Differentiable {
+class AllMembersElementaryFunctions : Differentiable, EuclideanDifferentiable {
   var v1: MyVector2
   var v2: MyVector2
 
@@ -237,7 +239,7 @@ func testAllMembersElementaryFunctions() {
 }
 
 // Test type whose properties are not all differentiable.
-class DifferentiableSubset : Differentiable {
+class DifferentiableSubset : Differentiable, EuclideanDifferentiable {
   var w: Float
   var b: Float
   @noDerivative var flag: Bool
@@ -471,10 +473,9 @@ final class TangentVectorWB : DummyAdditiveArithmetic, Differentiable {
     self.b = b
   }
 }
-// expected-error @+4 {{'Differentiable' requires the types 'VectorSpaceTypeAlias.TangentVector' (aka 'TangentVectorWB') and 'TangentVectorWB.TangentVector' be equivalent}}
-// expected-note @+3 {{requirement specified as 'Self.TangentVector' == 'Self.TangentVector.TangentVector' [with Self = VectorSpaceTypeAlias]}}
-// expected-error @+2 {{type 'VectorSpaceTypeAlias' does not conform to protocol 'Differentiable'}}
-// expected-note @+1 {{do you want to add protocol stubs?}}
+// expected-error @+3 {{'Differentiable' requires the types 'VectorSpaceTypeAlias.TangentVector' (aka 'TangentVectorWB') and 'TangentVectorWB.TangentVector' be equivalent}}
+// expected-note @+2 {{requirement specified as 'Self.TangentVector' == 'Self.TangentVector.TangentVector' [with Self = VectorSpaceTypeAlias]}}
+// expected-error @+1 {{type 'VectorSpaceTypeAlias' does not conform to protocol 'Differentiable'}}
 final class VectorSpaceTypeAlias : DummyAdditiveArithmetic, Differentiable {
   var w: Float
   var b: Float
@@ -485,8 +486,7 @@ final class VectorSpaceTypeAlias : DummyAdditiveArithmetic, Differentiable {
     self.b = b
   }
 }
-// expected-error @+2 {{type 'VectorSpaceCustomStruct' does not conform to protocol 'Differentiable'}}
-// expected-note @+1 {{do you want to add protocol stubs?}}
+// expected-error @+1 {{type 'VectorSpaceCustomStruct' does not conform to protocol 'Differentiable'}}
 final class VectorSpaceCustomStruct : DummyAdditiveArithmetic, Differentiable {
   var w: Float
   var b: Float
@@ -525,6 +525,42 @@ class ImplicitNoDerivativeWithSeparateTangent : Differentiable {
   }
 }
 
+// TF-1018: verify that `@noDerivative` warnings are always silenceable, even
+// when the `Differentiable` conformance context is not the nominal type
+// declaration.
+
+class ExtensionDifferentiableNoDerivative<T> {
+  // expected-warning @+2 {{stored property 'x' has no derivative because it does not conform to 'Differentiable'; add an explicit '@noDerivative' attribute}}
+  // expected-warning @+1 {{stored property 'y' has no derivative because it does not conform to 'Differentiable'; add an explicit '@noDerivative' attribute}}
+  var x, y: T
+  // expected-warning @+1 {{stored property 'nondiff' has no derivative because it does not conform to 'Differentiable'; add an explicit '@noDerivative' attribute}}
+  var nondiff: Bool
+  init() { fatalError() }
+}
+extension ExtensionDifferentiableNoDerivative: Differentiable {}
+
+class ExtensionDifferentiableNoDerivativeFixed<T> {
+  @noDerivative var x, y: T
+  @noDerivative var nondiff: Bool
+  init() { fatalError() }
+}
+extension ExtensionDifferentiableNoDerivativeFixed: Differentiable {}
+
+class ConditionalDifferentiableNoDerivative<T> {
+  var x, y: T
+  // expected-warning @+1 {{stored property 'nondiff' has no derivative because it does not conform to 'Differentiable'; add an explicit '@noDerivative' attribute}}
+  var nondiff: Bool
+  init() { fatalError() }
+}
+extension ConditionalDifferentiableNoDerivative: Differentiable where T: Differentiable {}
+
+class ConditionalDifferentiableNoDerivativeFixed<T> {
+  var x, y: T
+  @noDerivative var nondiff: Bool
+  init() { fatalError() }
+}
+extension ConditionalDifferentiableNoDerivativeFixed: Differentiable where T: Differentiable {}
+
 // TF-265: Test invalid initializer (that uses a non-existent type).
 class InvalidInitializer : Differentiable {
   init(filterShape: (Int, Int, Int, Int), blah: NonExistentType) {} // expected-error {{use of undeclared type 'NonExistentType'}}
@@ -544,12 +580,10 @@ extension NoMemberwiseInitializerExtended: Differentiable
 
 // Test derived conformances in disallowed contexts.
 
-// expected-error @+3 {{type 'OtherFileNonconforming' does not conform to protocol 'Differentiable'}}
-// expected-error @+2 {{implementation of 'Differentiable' cannot be automatically synthesized in an extension in a different file to the type}}
-// expected-note @+1 {{do you want to add protocol stubs?}}
+// expected-error @+2 {{type 'OtherFileNonconforming' does not conform to protocol 'Differentiable'}}
+// expected-error @+1 {{implementation of 'Differentiable' cannot be automatically synthesized in an extension in a different file to the type}}
 extension OtherFileNonconforming : Differentiable {}
 
-// expected-error @+3 {{type 'GenericOtherFileNonconforming<T>' does not conform to protocol 'Differentiable'}}
-// expected-error @+2 {{implementation of 'Differentiable' cannot be automatically synthesized in an extension in a different file to the type}}
-// expected-note @+1 {{do you want to add protocol stubs?}}
+// expected-error @+2 {{type 'GenericOtherFileNonconforming<T>' does not conform to protocol 'Differentiable'}}
+// expected-error @+1 {{implementation of 'Differentiable' cannot be automatically synthesized in an extension in a different file to the type}}
 extension GenericOtherFileNonconforming : Differentiable {}

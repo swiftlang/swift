@@ -17,16 +17,17 @@
 #include "swift/AST/Pattern.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/Types.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "DerivedConformances.h"
 
 using namespace swift;
 
-DerivedConformance::DerivedConformance(TypeChecker &tc, Decl *conformanceDecl,
+DerivedConformance::DerivedConformance(ASTContext &ctx, Decl *conformanceDecl,
                                        NominalTypeDecl *nominal,
                                        ProtocolDecl *protocol)
-    : TC(tc), ConformanceDecl(conformanceDecl), Nominal(nominal),
+    : Context(ctx), ConformanceDecl(conformanceDecl), Nominal(nominal),
       Protocol(protocol) {
   assert(getConformanceContext()->getSelfNominalTypeDecl() == nominal);
 }
@@ -38,8 +39,11 @@ DeclContext *DerivedConformance::getConformanceContext() const {
 void DerivedConformance::addMembersToConformanceContext(
     ArrayRef<Decl *> children) {
   auto IDC = cast<IterableDeclContext>(ConformanceDecl);
+  auto *SF = ConformanceDecl->getDeclContext()->getParentSourceFile();
   for (auto child : children) {
     IDC->addMember(child);
+    if (SF)
+      SF->SynthesizedDecls.push_back(child);
   }
 }
 
@@ -94,6 +98,10 @@ bool DerivedConformance::derivesProtocolConformance(DeclContext *DC,
   if (*knownProtocol == KnownProtocolKind::Differentiable)
     return canDeriveDifferentiable(Nominal, DC);
 
+  // SWIFT_ENABLE_TENSORFLOW
+  if (*knownProtocol == KnownProtocolKind::EuclideanDifferentiable)
+    return canDeriveEuclideanDifferentiable(Nominal, DC);
+
   if (auto *enumDecl = dyn_cast<EnumDecl>(Nominal)) {
     switch (*knownProtocol) {
         // The presence of a raw type is an explicit declaration that
@@ -132,7 +140,7 @@ bool DerivedConformance::derivesProtocolConformance(DeclContext *DC,
         }
 
         // hasOnlyCasesWithoutAssociatedValues will return true for empty enums;
-        // empty enumas are allowed to conform as well.
+        // empty enums are allowed to conform as well.
         return enumDecl->hasOnlyCasesWithoutAssociatedValues();
       }
 
@@ -202,10 +210,11 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
     auto proto = ctx.getProtocol(kind);
     if (!proto) return nullptr;
 
-    if (auto conformance = TypeChecker::conformsToProtocol(
-            nominal->getDeclaredInterfaceType(), proto, nominal,
-            ConformanceCheckFlags::SkipConditionalRequirements)) {
-      auto DC = conformance->getConcrete()->getDeclContext();
+    auto conformance = TypeChecker::conformsToProtocol(
+        nominal->getDeclaredInterfaceType(), proto, nominal,
+        ConformanceCheckFlags::SkipConditionalRequirements);
+    if (conformance) {
+      auto DC = conformance.getConcrete()->getDeclContext();
       // Check whether this nominal type derives conformances to the protocol.
       if (!DerivedConformance::derivesProtocolConformance(DC, nominal, proto))
         return nullptr;
@@ -222,6 +231,7 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
       });
     }
     return results.empty() ? nullptr : results.front();
+    // SWIFT_ENABLE_TENSORFLOW END
   };
 
   // Properties.
@@ -256,6 +266,11 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
       return getRequirement(KnownProtocolKind::AdditiveArithmetic);
 
     // SWIFT_ENABLE_TENSORFLOW
+    // EuclideanDifferentiable.differentiableVectorView
+    if (name.isSimpleName(ctx.Id_differentiableVectorView))
+      return getRequirement(KnownProtocolKind::EuclideanDifferentiable);
+
+    // SWIFT_ENABLE_TENSORFLOW
     // PointwiseMultiplicative.one
     if (name.isSimpleName(ctx.Id_one))
       return getRequirement(KnownProtocolKind::PointwiseMultiplicative);
@@ -274,7 +289,7 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
     // TensorArrayProtocol._tensorHandleCount
     if (name.isSimpleName(ctx.Id_tensorHandleCount))
       return getRequirement(KnownProtocolKind::TensorArrayProtocol);
-    
+
     // SWIFT_ENABLE_TENSORFLOW
     // TensorArrayProtocol._typeList
     if (name.isSimpleName(ctx.Id_typeList) && !requirement->isStatic())
@@ -375,7 +390,7 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
 
     // SWIFT_ENABLE_TENSORFLOW
     // TensorArrayProtocol._unpackTensorHandles(into:)
-    if (name.isCompoundName() && 
+    if (name.isCompoundName() &&
         name.getBaseName() == ctx.Id_unpackTensorHandles) {
       auto argumentNames = name.getArgumentNames();
       if (argumentNames.size() == 1 &&
@@ -406,7 +421,8 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
         return getRequirement(KnownProtocolKind::RawRepresentable);
 
       // CodingKey.init?(stringValue:), CodingKey.init?(intValue:)
-      if (ctor->getFailability() == OTK_Optional &&
+      if (ctor->isFailable() &&
+          !ctor->isImplicitlyUnwrappedOptional() &&
           (argumentNames[0] == ctx.Id_stringValue ||
            argumentNames[0] == ctx.Id_intValue))
         return getRequirement(KnownProtocolKind::CodingKey);
@@ -423,7 +439,7 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
     } else if (argumentNames.size() == 2) {
       // SWIFT_ENABLE_TENSORFLOW
       // TensorArrayProtocol.init(_owning:count)
-      if (argumentNames[0] == ctx.getIdentifier("_owning") && 
+      if (argumentNames[0] == ctx.getIdentifier("_owning") &&
           argumentNames[1] == ctx.getIdentifier("count")) {
         return getRequirement(KnownProtocolKind::TensorArrayProtocol);
       }
@@ -483,21 +499,9 @@ addGetterToReadOnlyDerivedProperty(VarDecl *property,
   return getter;
 }
 
-std::pair<AccessorDecl *, AccessorDecl *>
-DerivedConformance::addGetterAndSetterToMutableDerivedProperty(
-    VarDecl *property, Type propertyContextType) {
-  auto *getter = declareDerivedPropertyGetter(property, propertyContextType);
-  auto *setter = declareDerivedPropertySetter(property, propertyContextType);
-  property->setImplInfo(StorageImplInfo::getMutableComputed());
-  property->setAccessors(SourceLoc(), {getter, setter}, SourceLoc());
-  return std::make_pair(getter, setter);
-}
-
 AccessorDecl *
 DerivedConformance::declareDerivedPropertyGetter(VarDecl *property,
                                                  Type propertyContextType) {
-  bool isStatic = property->isStatic();
-
   auto &C = property->getASTContext();
   auto parentDC = property->getDeclContext();
   ParameterList *params = ParameterList::createEmpty(C);
@@ -512,21 +516,25 @@ DerivedConformance::declareDerivedPropertyGetter(VarDecl *property,
     /*GenericParams=*/nullptr, params,
     TypeLoc::withoutLoc(propertyInterfaceType), parentDC);
   getterDecl->setImplicit();
-  getterDecl->setStatic(isStatic);
   getterDecl->setIsTransparent(false);
 
-  // Compute the interface type of the getter.
-  if (auto env = parentDC->getGenericEnvironmentOfContext())
-    getterDecl->setGenericEnvironment(env);
-  getterDecl->computeType();
-
   getterDecl->copyFormalAccessFrom(property);
-  getterDecl->setValidationToChecked();
 
-  C.addSynthesizedDecl(getterDecl);
 
   return getterDecl;
 }
+
+// SWIFT_ENABLE_TENSORFLOW
+std::pair<AccessorDecl *, AccessorDecl *>
+DerivedConformance::addGetterAndSetterToMutableDerivedProperty(
+    VarDecl *property, Type propertyContextType) {
+  auto *getter = declareDerivedPropertyGetter(property, propertyContextType);
+  auto *setter = declareDerivedPropertySetter(property, propertyContextType);
+  property->setImplInfo(StorageImplInfo::getMutableComputed());
+  property->setAccessors(SourceLoc(), {getter, setter}, SourceLoc());
+  return std::make_pair(getter, setter);
+}
+// SWIFT_ENABLE_TENSORFLOW END
 
 // SWIFT_ENABLE_TENSORFLOW
 AccessorDecl *
@@ -539,10 +547,9 @@ DerivedConformance::declareDerivedPropertySetter(VarDecl *property,
   auto parentDC = property->getDeclContext();
 
   auto propertyInterfaceType = property->getInterfaceType();
-  auto propertyParam = new (C)
-    ParamDecl(ParamDecl::Specifier::Default, SourceLoc(), SourceLoc(),
-              Identifier(), property->getLoc(), C.getIdentifier("newValue"),
-              parentDC);
+  auto propertyParam = new (C) ParamDecl(SourceLoc(), SourceLoc(), Identifier(),
+              property->getLoc(), C.getIdentifier("newValue"), parentDC);
+  propertyParam->setSpecifier(ParamDecl::Specifier::Default);
   propertyParam->setInterfaceType(propertyInterfaceType);
 
   ParameterList *params = ParameterList::create(C, propertyParam);
@@ -565,13 +572,9 @@ DerivedConformance::declareDerivedPropertySetter(VarDecl *property,
     setterDecl->getAttrs().add(new (C) FinalAttr(/*Implicit*/ true));
 
   // Compute the interface type of the setter.
-  if (auto env = parentDC->getGenericEnvironmentOfContext())
-    setterDecl->setGenericEnvironment(env);
-  setterDecl->computeType();
+  setterDecl->setGenericSignature(parentDC->getGenericSignatureOfContext());
   setterDecl->copyFormalAccessFrom(property);
-  setterDecl->setValidationToChecked();
 
-  C.addSynthesizedDecl(setterDecl);
   return setterDecl;
 }
 
@@ -580,29 +583,28 @@ DerivedConformance::declareDerivedProperty(Identifier name,
                                            Type propertyInterfaceType,
                                            Type propertyContextType,
                                            bool isStatic, bool isFinal) {
-  auto &C = TC.Context;
   auto parentDC = getConformanceContext();
 
-  VarDecl *propDecl = new (C) VarDecl(/*IsStatic*/isStatic, VarDecl::Introducer::Var,
-                                      /*IsCaptureList*/false, SourceLoc(), name,
-                                      parentDC);
+  VarDecl *propDecl = new (Context)
+      VarDecl(/*IsStatic*/ isStatic, VarDecl::Introducer::Var,
+              /*IsCaptureList*/ false, SourceLoc(), name, parentDC);
   // SWIFT_ENABLE_TENSORFLOW
   // TODO: Upstream this change to master.
   if (isFinal && parentDC->getSelfClassDecl())
-    propDecl->getAttrs().add(new (C) FinalAttr(/*Implicit*/ true));
+    propDecl->getAttrs().add(new (Context) FinalAttr(/*Implicit*/ true));
   propDecl->setImplicit();
   propDecl->copyFormalAccessFrom(Nominal, /*sourceIsParentContext*/ true);
   propDecl->setInterfaceType(propertyInterfaceType);
-  propDecl->setValidationToChecked();
 
-  Pattern *propPat = new (C) NamedPattern(propDecl, /*implicit*/ true);
+  Pattern *propPat = new (Context) NamedPattern(propDecl, /*implicit*/ true);
   propPat->setType(propertyContextType);
 
-  propPat = TypedPattern::createImplicit(C, propPat, propertyContextType);
+  propPat = TypedPattern::createImplicit(Context, propPat, propertyContextType);
   propPat->setType(propertyContextType);
 
   auto *pbDecl = PatternBindingDecl::createImplicit(
-      C, StaticSpellingKind::None, propPat, /*InitExpr*/ nullptr, parentDC);
+      Context, StaticSpellingKind::None, propPat, /*InitExpr*/ nullptr,
+      parentDC);
   return {propDecl, pbDecl};
 }
 
@@ -621,11 +623,9 @@ bool DerivedConformance::checkAndDiagnoseDisallowedContext(
   if (!allowCrossfileExtensions &&
       Nominal->getModuleScopeContext() !=
           getConformanceContext()->getModuleScopeContext()) {
-    TC.diagnose(ConformanceDecl->getLoc(),
-                diag::cannot_synthesize_in_crossfile_extension,
-                getProtocolType());
-    TC.diagnose(Nominal->getLoc(), diag::kind_declared_here,
-                DescriptiveDeclKind::Type);
+    ConformanceDecl->diagnose(diag::cannot_synthesize_in_crossfile_extension,
+                              getProtocolType());
+    Nominal->diagnose(diag::kind_declared_here, DescriptiveDeclKind::Type);
     return true;
   }
 
@@ -634,9 +634,9 @@ bool DerivedConformance::checkAndDiagnoseDisallowedContext(
   if (auto CD = dyn_cast<ClassDecl>(Nominal)) {
     if (!CD->isFinal() && isa<ConstructorDecl>(synthesizing) &&
         isa<ExtensionDecl>(ConformanceDecl)) {
-      TC.diagnose(ConformanceDecl->getLoc(),
-                  diag::cannot_synthesize_init_in_extension_of_nonfinal,
-                  getProtocolType(), synthesizing->getFullName());
+      ConformanceDecl->diagnose(
+          diag::cannot_synthesize_init_in_extension_of_nonfinal,
+          getProtocolType(), synthesizing->getFullName());
       return true;
     }
   }

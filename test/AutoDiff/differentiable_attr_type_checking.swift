@@ -29,7 +29,7 @@ func no_jvp_or_vjp(_ x: Float) -> Float {
   return x * x
 }
 
-// Test duplicated `@differentiable` attributes.
+// Test duplicate `@differentiable` attributes.
 
 @differentiable // expected-error {{duplicate '@differentiable' attribute with same parameters}}
 @differentiable // expected-note {{other attribute declared here}}
@@ -43,9 +43,9 @@ func dupe_attributes(arg1: Float, arg2: Float) -> Float { return arg1 }
 struct ComputedPropertyDupeAttributes<T : Differentiable> : Differentiable {
   var value: T
 
-  @differentiable // expected-error {{duplicate '@differentiable' attribute with same parameters}}
+  @differentiable // expected-note {{other attribute declared here}}
   var computed1: T {
-    @differentiable // expected-note {{other attribute declared here}}
+    @differentiable // expected-error {{duplicate '@differentiable' attribute with same parameters}}
     get { value }
     set { value = newValue }
   }
@@ -76,13 +76,13 @@ func invalidDiffWrtClass(_ x: Class) -> Class {
 }
 
 protocol Proto {}
-// expected-error @+1 {{cannot differentiate with respect to protocol existential ('Proto')}}
+// expected-error @+1 {{can only differentiate with respect to parameters that conform to 'Differentiable', but 'Proto' does not conform to 'Differentiable'}}
 @differentiable(wrt: x)
 func invalidDiffWrtExistential(_ x: Proto) -> Proto {
   return x
 }
 
-// expected-error @+1 {{functions ('@differentiable (Float) -> Float') cannot be differentiated with respect to}}
+// expected-error @+1 {{can only differentiate with respect to parameters that conform to 'Differentiable', but '@differentiable (Float) -> Float' does not conform to 'Differentiable'}}
 @differentiable(wrt: fn)
 func invalidDiffWrtFunction(_ fn: @differentiable(Float) -> Float) -> Float {
   return fn(.pi)
@@ -234,7 +234,7 @@ func jvpNonDiffResult2(x: Float) -> (Float, Int) {
   return (x, Int(x))
 }
 
-// expected-error @+1 {{ambiguous or overloaded identifier 'jvpAmbiguousVJP' cannot be used in '@differentiable' attribute}}
+// expected-error @+1 {{ambiguous reference to 'jvpAmbiguousVJP' in '@differentiable' attribute}}
 @differentiable(jvp: jvpAmbiguousVJP)
 func jvpAmbiguous(x: Float) -> Float {
   return x
@@ -271,7 +271,7 @@ extension JVPStruct {
   }
 }
 
-extension JVPStruct : VectorProtocol {
+extension JVPStruct : AdditiveArithmetic {
   static var zero: JVPStruct { fatalError("unimplemented") }
   static func + (lhs: JVPStruct, rhs: JVPStruct) -> JVPStruct {
     fatalError("unimplemented")
@@ -419,7 +419,7 @@ extension VJPStruct {
   }
 }
 
-extension VJPStruct : VectorProtocol {
+extension VJPStruct : AdditiveArithmetic {
   static var zero: VJPStruct { fatalError("unimplemented") }
   static func + (lhs: VJPStruct, rhs: VJPStruct) -> VJPStruct {
     fatalError("unimplemented")
@@ -765,8 +765,7 @@ struct TF_521<T: FloatingPoint> {
     self.imaginary = imaginary
   }
 }
-// expected-error @+2 {{type 'TF_521<T>' does not conform to protocol 'Differentiable'}}
-// expected-note @+1 {{do you want to add protocol stubs}}
+// expected-error @+1 {{type 'TF_521<T>' does not conform to protocol 'Differentiable'}}
 extension TF_521: Differentiable where T: Differentiable {
   // expected-note @+1 {{possibly intended match 'TF_521<T>.TangentVector' does not conform to 'AdditiveArithmetic'}}
   typealias TangentVector = TF_521
@@ -825,6 +824,39 @@ func slope2(_ x: Float) -> Float {
 @differentiable(linear, jvp: const3, vjp: const3) // expected-error {{cannot specify 'vjp:' or 'jvp:' for linear functions; use 'transpose:' instead}}
 func slope3(_ x: Float) -> Float {
   return 3 * x
+}
+
+// Check that `@differentiable` attribute rejects stored properties.
+struct StoredProperty : Differentiable {
+  // expected-error @+1 {{'@differentiable' attribute on stored property cannot specify 'jvp:' or 'vjp:'}}
+  @differentiable(vjp: vjpStored)
+  var stored: Float
+
+  func vjpStored() -> (Float, (Float) -> TangentVector) {
+    (stored, { _ in .zero })
+  }
+}
+
+// Check that `@differentiable` attribute rejects non-`func` derivatives.
+struct Struct: Differentiable {
+  // expected-error @+1 {{registered derivative 'computedPropertyVJP' must be a 'func' declaration}}
+  @differentiable(vjp: computedPropertyVJP)
+  func testComputedProperty() -> Float { 1 }
+  var computedPropertyVJP: (Float, (Float) -> TangentVector) {
+    (1, { _ in .zero })
+  }
+
+  // expected-error @+1 {{expected a vjp function name}}
+  @differentiable(vjp: init)
+  func testInitializer() -> Struct { self }
+  init(_ x: Struct) {}
+
+  // expected-error @+1 {{expected a vjp function name}}
+  @differentiable(vjp: subscript)
+  func testSubscript() -> Float { 1 }
+  subscript() -> (Float, (Float) -> TangentVector) {
+    (1, { _ in .zero })
+  }
 }
 
 // Index based 'wrt:'
@@ -909,7 +941,7 @@ func inout1(x: Float, y: inout Float) -> Void {
   let _ = x + y
 }
 
-@differentiable(wrt: y) // expected-error {{'inout' parameters ('inout Float') cannot be differentiated with respect to}}
+@differentiable(wrt: y) // expected-error {{cannot differentiate with respect to 'inout' parameter ('inout Float')}}
 func inout2(x: Float, y: inout Float) -> Float {
   let _ = x + y
 }
@@ -965,6 +997,21 @@ class Super : Differentiable {
     self.base = base
   }
 
+  // NOTE(TF-1040): `@differentiable` attribute on class methods currently
+  // does two orthogonal things:
+  // - Requests derivative generation for the class method.
+  // - Adds JVP/VJP vtable entries for the class method.
+  // There's currently no way using `@differentiable` to do only one of the
+  // above.
+  @differentiable
+  func testClassMethod(_ x: Float) -> Float { x }
+
+  @differentiable
+  final func testFinalMethod(_ x: Float) -> Float { x }
+
+  @differentiable
+  static func testStaticMethod(_ x: Float) -> Float { x }
+
   @differentiable(wrt: (self, x))
   @differentiable(wrt: x, vjp: vjp)
   // expected-note @+1 2 {{overridden declaration is here}}
@@ -976,6 +1023,13 @@ class Super : Differentiable {
   final func vjp(_ x: Float) -> (Float, (Float) -> Float) {
     fatalError()
   }
+
+  // Test duplicate attributes with different derivative generic signatures.
+  // expected-error @+1 {{duplicate '@differentiable' attribute with same parameters}}
+  @differentiable(wrt: x where T: Differentiable)
+  // expected-note @+1 {{other attribute declared here}}
+  @differentiable(wrt: x)
+  func instanceMethod<T>(_ x: Float, y: T) -> Float { x }
 
   // expected-error @+1 {{'@differentiable' attribute cannot be declared on class methods returning 'Self'}}
   @differentiable(vjp: vjpDynamicSelfResult)

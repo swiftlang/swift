@@ -10,8 +10,8 @@ class A {
   @objc(do_b_2:) func do_b(_ x: Int) {}
   @objc func do_b(_ x: Float) {}
 
-  @objc func do_c(x: Int) {}
-  @objc func do_c(y: Int) {}
+  @objc func do_c(x: Int) {} // expected-note {{incorrect labels for candidate (have: '(_:)', expected: '(x:)')}}
+  @objc func do_c(y: Int) {} // expected-note {{incorrect labels for candidate (have: '(_:)', expected: '(y:)')}}
 }
 
 func test0(_ a: AnyObject) {
@@ -20,7 +20,7 @@ func test0(_ a: AnyObject) {
   a.do_b?(1)
   a.do_b?(5.0)
 
-  a.do_c?(1) // expected-error {{cannot invoke value of function type with argument list '(Int)'}}
+  a.do_c?(1) // expected-error {{no exact matches in call to instance method 'do_c'}}
   a.do_c?(x: 1)
 }
 
@@ -217,7 +217,7 @@ struct SR_3248 {
 
 SR_3248().callback?("test") // expected-error {{cannot convert value of type 'String' to expected argument type '[AnyObject]'}}
 SR_3248().callback!("test") // expected-error {{cannot convert value of type 'String' to expected argument type '[AnyObject]'}}
-SR_3248().callback("test")  // expected-error {{cannot invoke 'callback' with an argument list of type '(String)'}}
+SR_3248().callback("test")  // expected-error {{cannot convert value of type 'String' to expected argument type '[AnyObject]'}}
 
 _? = nil  // expected-error {{'nil' requires a contextual type}}
 _?? = nil // expected-error {{'nil' requires a contextual type}}
@@ -371,5 +371,52 @@ func rdar_53238058() {
     _ = S(Double(str)) // expected-error {{value of optional type 'Double?' must be unwrapped to a value of type 'Double'}}
     // expected-note@-1 {{coalesce using '??' to provide a default when the optional value contains 'nil'}}
     // expected-note@-2 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
+  }
+}
+
+// SR-8411 - Inconsistent ambiguity with optional and non-optional inout-to-pointer
+func sr8411() {
+  struct S {
+    init(_ x: UnsafeMutablePointer<Int>) {}
+    init(_ x: UnsafeMutablePointer<Int>?) {}
+
+    static func foo(_ x: UnsafeMutablePointer<Int>) {}
+    static func foo(_ x: UnsafeMutablePointer<Int>?) {}
+
+    static func bar(_ x: UnsafeMutablePointer<Int>, _ y: Int) {}
+    static func bar(_ x: UnsafeMutablePointer<Int>?, _ y: Int) {}
+  }
+
+  var foo = 0
+
+  _ = S(&foo)      // Ok
+  _ = S.init(&foo) // Ok
+  _ = S.foo(&foo)  // Ok
+  _ = S.bar(&foo, 42) // Ok
+}
+
+// SR-11104 - Slightly misleading diagnostics for contextual failures with multiple fixes
+func sr_11104() {
+  func bar(_: Int) {}
+
+  bar(["hello"].first)
+  // expected-error@-1 {{cannot convert value of type 'String?' to expected argument type 'Int'}}
+}
+
+// rdar://problem/57668873 - Too eager force optional unwrap fix
+
+@objc class Window {}
+
+@objc protocol WindowDelegate {
+  @objc optional var window: Window? { get set }
+}
+
+func test_force_unwrap_not_being_too_eager() {
+  struct WindowContainer {
+    unowned(unsafe) var delegate: WindowDelegate? = nil
+  }
+
+  let obj: WindowContainer = WindowContainer()
+  if let _ = obj.delegate?.window { // Ok
   }
 }

@@ -29,6 +29,7 @@
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/Path.h"
 #include "llvm/Support/Regex.h"
 #include "llvm/Support/Signals.h"
 #include "llvm/Support/Threading.h"
@@ -53,39 +54,12 @@ using namespace sourcekitd_test;
 #if defined(_WIN32)
 namespace {
 int STDOUT_FILENO = _fileno(stdout);
-const constexpr size_t MAXPATHLEN = MAX_PATH + 1;
-char *realpath(const char *path, char *resolved_path) {
-  wchar_t full_path[MAXPATHLEN] = {0};
-  llvm::SmallVector<llvm::UTF16, 50> utf16Path;
-  llvm::convertUTF8ToUTF16String(path, utf16Path);
-
-  HANDLE fileHandle = CreateFileW(
-      (LPCWSTR)utf16Path.data(), 0, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr,
-      OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, nullptr);
-
-  if (fileHandle == INVALID_HANDLE_VALUE)
-    return nullptr;
-  DWORD success = GetFinalPathNameByHandleW(fileHandle, full_path, MAX_PATH,
-                                            FILE_NAME_NORMALIZED);
-  CloseHandle(fileHandle);
-  if (!success) return nullptr;
-
-  std::string utf8Path;
-  llvm::ArrayRef<char> pathRef((const char *)full_path,
-                               (const char *)(full_path + MAX_PATH));
-  if (!llvm::convertUTF16ToUTF8String(pathRef, utf8Path))
-    return nullptr;
-
-  if (!resolved_path) {
-    resolved_path = static_cast<char *>(malloc(utf8Path.length() + 1));
-  }
-  std::copy(std::begin(utf8Path), std::end(utf8Path), resolved_path);
-  return resolved_path;
-}
 }
 #endif
 
-static int handleTestInvocation(ArrayRef<const char *> Args, TestOptions &InitOpts);
+static bool sendGlobalConfigRequest();
+static int handleTestInvocation(ArrayRef<const char *> Args, TestOptions &InitOpts,
+                                bool IsFirstInvocation);
 static bool handleResponse(sourcekitd_response_t Resp, const TestOptions &Opts,
                            const std::string &SourceFile,
                            std::unique_ptr<llvm::MemoryBuffer> SourceBuf,
@@ -270,6 +244,7 @@ static void skt_main(skt_args *args) {
   // invocations.
   TestOptions InitOpts;
   auto Args = llvm::makeArrayRef(argv+1, argc-1);
+  bool firstInvocation = true;
   while (1) {
     unsigned i = 0;
     for (auto Arg: Args) {
@@ -279,15 +254,17 @@ static void skt_main(skt_args *args) {
     }
     if (i == Args.size())
       break;
-    if (int ret = handleTestInvocation(Args.slice(0, i), InitOpts)) {
+    if (int ret = handleTestInvocation(Args.slice(0, i), InitOpts,
+                                       firstInvocation)) {
       sourcekitd_shutdown();
       args->ret = ret;
       return;
     }
     Args = Args.slice(i + 1);
+    firstInvocation = false;
   }
 
-  if (int ret = handleTestInvocation(Args, InitOpts)) {
+  if (int ret = handleTestInvocation(Args, InitOpts, firstInvocation)) {
     sourcekitd_shutdown();
     args->ret = ret;
     return;
@@ -316,6 +293,7 @@ static inline std::string getInterfaceGenDocumentName() {
   // "Absolute path" on all platforms since handleTestInvocation will attempt to make this absolute
   llvm::SmallString<64> path = llvm::StringRef("/<interface-gen>");
   llvm::sys::fs::make_absolute(path);
+  llvm::sys::path::native(path);
   return path.str();
 }
 
@@ -416,7 +394,7 @@ static int handleJsonRequestPath(StringRef QueryPath, const TestOptions &Opts) {
 static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts);
 
 static int handleTestInvocation(ArrayRef<const char *> Args,
-                                TestOptions &InitOpts) {
+                                TestOptions &InitOpts, bool firstInvocation) {
 
   unsigned Optargc = 0;
   for (auto Arg: Args) {
@@ -431,6 +409,16 @@ static int handleTestInvocation(ArrayRef<const char *> Args,
 
   if (Optargc < Args.size())
     Opts.CompilerArgs = Args.slice(Optargc+1);
+
+  if (firstInvocation && Opts.Request != SourceKitRequest::GlobalConfiguration &&
+      !Opts.SuppressDefaultConfigRequest) {
+    // We don't fail if this request fails for now so that sourcekitd-test is
+    // still usable with older versions of sourcekitd that don't have the
+    // global-configuration request.
+    if (sendGlobalConfigRequest()) {
+      llvm::outs() << "warning: global configuration request failed\n";
+    }
+  }
 
   assert(Opts.repeatRequest >= 1);
   for (unsigned i = 0; i < Opts.repeatRequest; ++i) {
@@ -466,6 +454,28 @@ static int setExpectedTypes(const sourcekitd_test::TestOptions &Opts,
   return 0;
 }
 
+static bool sendGlobalConfigRequest() {
+  TestOptions Opts;
+  sourcekitd_object_t Req = sourcekitd_request_dictionary_create(nullptr,
+                                                                 nullptr, 0);
+  sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestGlobalConfiguration);
+
+  // For test invocations we default to setting OptimizeForIDE to true. This
+  // matches the use case of the most popular clients of sourcekitd (editors)
+  // and also disables loading locations from .swiftsourceinfo files. This is
+  // desirable for testing because the .swiftsourceinfo for the stdlib is
+  // available when sourcekitd is tested, and can make some stdlib-dependent
+  // sourcekitd tests unstable due to changing source locations from the stdlib
+  // module.
+  sourcekitd_request_dictionary_set_int64(Req, KeyOptimizeForIDE, static_cast<int64_t>(true));
+  sourcekitd_response_t Resp = sendRequestSync(Req, Opts);
+  bool IsError = sourcekitd_response_is_error(Resp);
+  if (IsError)
+    sourcekitd_response_description_dump(Resp);
+  sourcekitd_request_release(Req);
+  return IsError;
+}
+
 static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
   // SWIFT_ENABLE_TENSORFLOW
 #ifdef SWIFT_SOURCEKIT_USE_INPROC_LIBRARY
@@ -489,6 +499,7 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
     llvm::SmallString<64> AbsSourceFile;
     AbsSourceFile += SourceFile;
     llvm::sys::fs::make_absolute(AbsSourceFile);
+    llvm::sys::path::native(AbsSourceFile);
     SourceFile = AbsSourceFile.str();
   }
   std::string SemaName = !Opts.Name.empty() ? Opts.Name : SourceFile;
@@ -528,6 +539,12 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
     //        In other words, despite returning 1 here, the program still exits
     //        with a zero (successful) exit code.
     return 1;
+
+  case SourceKitRequest::GlobalConfiguration:
+    sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestGlobalConfiguration);
+    if (Opts.OptimizeForIde.hasValue())
+      sourcekitd_request_dictionary_set_int64(Req, KeyOptimizeForIDE, static_cast<int64_t>(Opts.OptimizeForIde.getValue()));
+    break;
 
   case SourceKitRequest::ProtocolVersion:
     sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestProtocolVersion);
@@ -1119,6 +1136,7 @@ static bool handleResponse(sourcekitd_response_t Resp, const TestOptions &Opts,
       printMangleResults(sourcekitd_response_get_value(Resp), outs());
       break;
 
+    case SourceKitRequest::GlobalConfiguration:
     case SourceKitRequest::ProtocolVersion:
     case SourceKitRequest::CompilerVersion:
     case SourceKitRequest::Close:
@@ -1446,9 +1464,9 @@ static void printCursorInfo(sourcekitd_variant_t Info, StringRef FilenameIn,
   }
 
   std::string Filename = FilenameIn;
-  char full_path[MAXPATHLEN];
-  if (const char *path = realpath(Filename.c_str(), full_path))
-    Filename = path;
+  llvm::SmallString<256> output;
+  if (!llvm::sys::fs::real_path(Filename, output))
+    Filename = output.str();
 
   const char *Kind = sourcekitd_uid_get_string_ptr(KindUID);
   const char *USR = sourcekitd_variant_dictionary_get_string(Info, KeyUSR);
@@ -1618,9 +1636,9 @@ static void printRangeInfo(sourcekitd_variant_t Info, StringRef FilenameIn,
   }
 
   std::string Filename = FilenameIn;
-  char full_path[MAXPATHLEN];
-  if (const char *path = realpath(Filename.c_str(), full_path))
-    Filename = path;
+  llvm::SmallString<256> output;
+  if (llvm::sys::fs::real_path(Filename, output))
+    Filename = output.str();
 
   sourcekitd_variant_t OffsetObj =
     sourcekitd_variant_dictionary_get_value(Info, KeyOffset);

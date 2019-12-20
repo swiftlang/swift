@@ -14,6 +14,9 @@
 #include "swift/SIL/SILModule.h"
 #include "Linker.h"
 #include "swift/AST/GenericEnvironment.h"
+// SWIFT_ENABLE_TENSORFLOW
+#include "swift/AST/ASTMangler.h"
+// SWIFT_ENABLE_TENSORFLOW_END
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/SIL/FormalLinkage.h"
@@ -89,11 +92,13 @@ class SILModule::SerializationCallback final
   }
 };
 
-SILModule::SILModule(ModuleDecl *SwiftModule, SILOptions &Options,
-                     const DeclContext *associatedDC, bool wholeModule)
-    : TheSwiftModule(SwiftModule), AssociatedDeclContext(associatedDC),
+SILModule::SILModule(ModuleDecl *SwiftModule, TypeConverter &TC,
+                     SILOptions &Options, const DeclContext *associatedDC,
+                     bool wholeModule)
+    : TheSwiftModule(SwiftModule),
+      AssociatedDeclContext(associatedDC),
       Stage(SILStage::Raw), wholeModule(wholeModule), Options(Options),
-      serialized(false), SerializeSILAction(), Types(*this) {
+      serialized(false), SerializeSILAction(), Types(TC) {
   // We always add the base SILModule serialization callback.
   std::unique_ptr<DeserializationNotificationHandler> callback(
       new SILModule::SerializationCallback());
@@ -118,10 +123,10 @@ SILModule::~SILModule() {
 }
 
 std::unique_ptr<SILModule>
-SILModule::createEmptyModule(ModuleDecl *M, SILOptions &Options,
+SILModule::createEmptyModule(ModuleDecl *M, TypeConverter &TC, SILOptions &Options,
                              bool WholeModule) {
   return std::unique_ptr<SILModule>(
-      new SILModule(M, Options, M, WholeModule));
+      new SILModule(M, TC, Options, M, WholeModule));
 }
 
 ASTContext &SILModule::getASTContext() const {
@@ -305,8 +310,14 @@ const BuiltinInfo &SILModule::getBuiltinInfo(Identifier ID) {
   else if (OperationName.startswith("allocWithTailElems_"))
     Info.ID = BuiltinValueKind::AllocWithTailElems;
   // SWIFT_ENABLE_TENSORFLOW
-  else if (OperationName.startswith("autodiffApply_"))
-    Info.ID = BuiltinValueKind::AutoDiffApply;
+  else if (OperationName.startswith("applyDerivative_"))
+    Info.ID = BuiltinValueKind::ApplyDerivative;
+  else if (OperationName.startswith("applyTranspose_"))
+    Info.ID = BuiltinValueKind::ApplyTranspose;
+  else if (OperationName.startswith("differentiableFunction_"))
+    Info.ID = BuiltinValueKind::DifferentiableFunction;
+  else if (OperationName.startswith("linearFunction_"))
+    Info.ID = BuiltinValueKind::LinearFunction;
   else
     Info.ID = llvm::StringSwitch<BuiltinValueKind>(OperationName)
 #define BUILTIN(id, name, attrs) .Case(name, BuiltinValueKind::id)
@@ -322,12 +333,17 @@ SILFunction *SILModule::lookUpFunction(SILDeclRef fnRef) {
 }
 
 bool SILModule::loadFunction(SILFunction *F) {
-  SILFunction *NewF = getSILLoader()->lookupSILFunction(F);
+  SILFunction *NewF =
+    getSILLoader()->lookupSILFunction(F, /*onlyUpdateLinkage*/ false);
   if (!NewF)
     return false;
 
   assert(F == NewF);
   return true;
+}
+
+void SILModule::updateFunctionLinkage(SILFunction *F) {
+  getSILLoader()->lookupSILFunction(F, /*onlyUpdateLinkage*/ true);
 }
 
 bool SILModule::linkFunction(SILFunction *F, SILModule::LinkingMode Mode) {
@@ -492,7 +508,7 @@ SILModule::lookUpFunctionInWitnessTable(ProtocolConformanceRef C,
   if (!Ret) {
     LLVM_DEBUG(llvm::dbgs() << "        Failed speculative lookup of "
                "witness for: ";
-               C.dump(); Requirement.dump());
+               C.dump(llvm::dbgs()); Requirement.dump());
     return std::make_pair(nullptr, nullptr);
   }
 
@@ -570,6 +586,37 @@ lookUpFunctionInVTable(ClassDecl *Class, SILDeclRef Member) {
     return E->Implementation;
 
   return nullptr;
+}
+
+SILDifferentiabilityWitness *
+SILModule::lookUpDifferentiabilityWitness(StringRef name) {
+  auto it = DifferentiabilityWitnessMap.find(name);
+  if (it != DifferentiabilityWitnessMap.end()) {
+    return it->second;
+  }
+  return nullptr;
+}
+
+SILDifferentiabilityWitness *
+SILModule::lookUpDifferentiabilityWitness(SILDifferentiabilityWitnessKey key) {
+  Mangle::ASTMangler mangler;
+  return lookUpDifferentiabilityWitness(
+      mangler.mangleSILDifferentiabilityWitnessKey(key));
+}
+
+/// Look up the differentiability witness corresponding to the given indices.
+llvm::ArrayRef<SILDifferentiabilityWitness *>
+SILModule::lookUpDifferentiabilityWitnessesForFunction(StringRef name) {
+  return DifferentiabilityWitnessesByFunction[name];
+}
+
+bool SILModule::loadDifferentiabilityWitness(SILDifferentiabilityWitness *W) {
+  auto *NewW = getSILLoader()->lookupDifferentiabilityWitness(W->getKey());
+  if (!NewW)
+    return false;
+
+  assert(W == NewW);
+  return true;
 }
 
 void SILModule::registerDeserializationNotificationHandler(

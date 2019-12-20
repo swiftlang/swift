@@ -33,12 +33,12 @@ class VarDecl;
 
 class DerivedConformance {
 public:
-  TypeChecker &TC;
+  ASTContext &Context;
   Decl *ConformanceDecl;
   NominalTypeDecl *Nominal;
   ProtocolDecl *Protocol;
 
-  DerivedConformance(TypeChecker &tc, Decl *conformanceDecl,
+  DerivedConformance(ASTContext &ctx, Decl *conformanceDecl,
                      NominalTypeDecl *nominal, ProtocolDecl *protocol);
 
   /// Retrieve the context in which the conformance is declared (either the
@@ -189,6 +189,9 @@ public:
   /// \returns the derived member, which will also be added to the type.
   ValueDecl *deriveDecodable(ValueDecl *requirement);
 
+  /// Derive the CodingKeys requirement for a value type.
+  TypeDecl *derivePhantomCodingKeysRequirement();
+
   // SWIFT_ENABLE_TENSORFLOW
   /// Determine if a KeyPathIterable requirement can be derived for a type.
   ///
@@ -205,11 +208,10 @@ public:
   /// \returns the derived member, which will also be added to the type.
   Type deriveKeyPathIterable(AssociatedTypeDecl *assocType);
 
-  // SWIFT_ENABLE_TENSORFLOW
   /// Determine if a TensorArrayProtocol requirement can be derived for a type.
   ///
   /// \returns True if the requirement can be derived.
-  static bool canDeriveTensorArrayProtocol(NominalTypeDecl *type, 
+  static bool canDeriveTensorArrayProtocol(NominalTypeDecl *type,
                                            DeclContext *DC);
 
   /// Derive a TensorArrayProtocol requirement for a nominal type.
@@ -217,7 +219,6 @@ public:
   /// \returns the derived member, which will also be added to the type.
   ValueDecl *deriveTensorArrayProtocol(ValueDecl *requirement);
 
-  // SWIFT_ENABLE_TENSORFLOW
   /// Determine if a TensorGroup requirement can be derived for a type.
   ///
   /// \returns True if the requirement can be derived.
@@ -228,7 +229,6 @@ public:
   /// \returns the derived member, which will also be added to the type.
   ValueDecl *deriveTensorGroup(ValueDecl *requirement);
 
-  // SWIFT_ENABLE_TENSORFLOW
   /// Determine if an AdditiveArithmetic requirement can be derived for a type.
   ///
   /// \returns True if the requirement can be derived.
@@ -240,7 +240,6 @@ public:
   /// \returns the derived member, which will also be added to the type.
   ValueDecl *deriveAdditiveArithmetic(ValueDecl *requirement);
 
-  // SWIFT_ENABLE_TENSORFLOW
   /// Determine if a PointwiseMultiplicative requirement can be derived for a type.
   ///
   /// \returns True if the requirement can be derived.
@@ -252,7 +251,6 @@ public:
   /// \returns the derived member, which will also be added to the type.
   ValueDecl *derivePointwiseMultiplicative(ValueDecl *requirement);
 
-  // SWIFT_ENABLE_TENSORFLOW
   /// Determine if an ElementaryFunctions requirement can be derived for a
   /// type.
   ///
@@ -292,10 +290,22 @@ public:
   /// \returns the derived member, which will also be added to the type.
   ValueDecl *deriveDifferentiable(ValueDecl *requirement);
 
+  /// Determine if a Differentiable requirement can be derived for a type.
+  ///
+  /// \returns True if the requirement can be derived.
+  static bool canDeriveEuclideanDifferentiable(NominalTypeDecl *type,
+                                               DeclContext *DC);
+
+  /// Derive a EuclideanDifferentiable requirement for a nominal type.
+  ///
+  /// \returns the derived member, which will also be added to the type.
+  ValueDecl *deriveEuclideanDifferentiable(ValueDecl *requirement);
+
   /// Derive a Differentiable type witness for a nominal type.
   ///
   /// \returns the derived member, which will also be added to the type.
   Type deriveDifferentiable(AssociatedTypeDecl *assocType);
+  // SWIFT_ENABLE_TENSORFLOW END
 
   /// Declare a read-only property.
   std::pair<VarDecl *, PatternBindingDecl *>
@@ -307,6 +317,11 @@ public:
   addGetterToReadOnlyDerivedProperty(VarDecl *property,
                                      Type propertyContextType);
 
+  /// Declare a getter for a derived property.
+  /// The getter will not be added to the property yet.
+  static AccessorDecl *declareDerivedPropertyGetter(VarDecl *property,
+                                                    Type propertyContextType);
+
   // SWIFT_ENABLE_TENSORFLOW
   /// Add a getter and setter to a derived property. The property becomes
   /// mutable.
@@ -314,16 +329,11 @@ public:
   addGetterAndSetterToMutableDerivedProperty(VarDecl *property,
                                              Type propertyContextType);
 
-  /// Declare a getter for a derived property.
-  /// The getter will not be added to the property yet.
-  static AccessorDecl *declareDerivedPropertyGetter(VarDecl *property,
-                                                    Type propertyContextType);
-
-  /// SWIFT_ENABLE_TENSORFLOW
   /// Declare a setter for a derived property.
   /// The setter will not be added to the property yet.
   static AccessorDecl *declareDerivedPropertySetter(VarDecl *property,
                                                     Type propertyContextType);
+  // SWIFT_ENABLE_TENSORFLOW END
 
   /// Build a reference to the 'self' decl of a derived function.
   static DeclRefExpr *createSelfDeclRef(AbstractFunctionDecl *fn);

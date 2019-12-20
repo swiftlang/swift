@@ -1,7 +1,11 @@
 // RUN: %target-run-simple-swift
+// NOTE(TF-813): verify that enabling forward-mode does not affect reverse-mode.
+// RUN: %target_run_simple_swift_forward_mode_differentiation
+// RUN: %target-swift-frontend -Xllvm -sil-print-after=differentiation %s -emit-sil -o /dev/null 2>&1 | %FileCheck %s
 // REQUIRES: executable_test
 
 import StdlibUnittest
+import DifferentiationUnittest
 #if os(macOS)
 import Darwin.C
 #else
@@ -79,13 +83,13 @@ SimpleMathTests.test("GlobalDiffableFunc") {
   expectEqual(2, gradient(at: 1, in: foo_diffable))
   expectEqual(2, gradient(at: 1, in: { x in foo_diffable(x) }))
   expectEqual(1, gradient(at: 1, in: { (x: Float) -> Float in
-    foo_diffable = { x in x + 1 };
+    foo_diffable = { x in x + 1 }
     return foo_diffable(x)
   }))
   expectEqual(1, gradient(at: 1, in: foo_diffable))
 }
 
-SimpleMathTests.test("SideEffects") {
+SimpleMathTests.test("Mutation") {
   func fourthPower(x: Float) -> Float {
     var a = x
     a = a * x
@@ -95,7 +99,16 @@ SimpleMathTests.test("SideEffects") {
   expectEqual(4 * 27, gradient(at: 3, in: fourthPower))
 }
 
-SimpleMathTests.test("TupleSideEffects") {
+SimpleMathTests.test("Tuple") {
+  // TF-945: Nested tuple projections.
+  func nested(_ x: Float) -> Float {
+    var tuple = (1, 1, ((x, 1), 1))
+    return tuple.2.0.0
+  }
+  expectEqual(1, gradient(at: 3, in: nested))
+}
+
+SimpleMathTests.test("TupleMutation") {
   func foo(_ x: Float) -> Float {
     var tuple = (x, x)
     tuple.0 = tuple.0 * x
@@ -119,36 +132,54 @@ SimpleMathTests.test("TupleSideEffects") {
   }
   expectEqual(405, gradient(at: 3, in: nested))
 
-  // FIXME(TF-201): Update after reabstraction thunks can be directly differentiated.
-  /*
-  func generic<T : Differentiable & AdditiveArithmetic>(_ x: T) -> T {
+  func generic<T: Differentiable & AdditiveArithmetic>(_ x: T) -> T {
     var tuple = (x, x)
-    tuple.0 += x
-    tuple.1 += x
-    return tuple.0 + tuple.0
+    return tuple.0
   }
   expectEqual(1, gradient(at: 3.0, in: generic))
+
+  // FIXME(TF-1033): Fix forward-mode ownership error for tuple with non-active
+  // initial values.
+  /*
+  func genericInitialNonactive<T: Differentiable & AdditiveArithmetic>(
+    _ x: T
+  ) -> T {
+    var tuple = (T.zero, T.zero)
+    tuple.0 = x
+    tuple.1 = x
+    return tuple.0
+  }
+  expectEqual(1, gradient(at: 3.0, in: genericInitialNonactive))
   */
 }
 
 // Tests TF-321.
 SimpleMathTests.test("TupleNonDifferentiableElements") {
-  func foo(_ x: Float) -> Float {
+  // TF-964: Test tuple with non-tuple-typed adjoint value.
+  func tupleLet(_ x: Tracked<Float>) -> Tracked<Float> {
+    let tuple = (2 * x, 1)
+    return tuple.0
+  }
+  expectEqual((8, 2), valueWithGradient(at: 4, in: tupleLet))
+
+  func tupleVar(_ x: Tracked<Float>) -> Tracked<Float> {
     var tuple = (x, 1)
     tuple.0 = x
     tuple.1 = 1
     return tuple.0
   }
-  expectEqual(1, gradient(at: 1, in: foo))
+  expectEqual((3, 1), valueWithGradient(at: 3, in: tupleVar))
 
-  func bar(_ x: Float) -> Float {
-    var tuple: (Int, Int, Float, Float) = (1, 1, x, x)
+  func nested(_ x: Tracked<Float>) -> Tracked<Float> {
+    // Convoluted function computing `x * x`.
+    var tuple: (Int, (Int, Tracked<Float>), Tracked<Float>) = (1, (1, 0), 0)
     tuple.0 = 1
-    tuple.1 = 1
-    tuple.3 = x
-    return tuple.3
+    tuple.1.0 = 1
+    tuple.1.1 = x
+    tuple.2 = x
+    return tuple.1.1 * tuple.2
   }
-  expectEqual(1, gradient(at: 1, in: bar))
+  expectEqual((16, 8), valueWithGradient(at: 4, in: nested))
 
   struct Wrapper<T> {
     @differentiable(where T : Differentiable)
@@ -160,10 +191,11 @@ SimpleMathTests.test("TupleNonDifferentiableElements") {
       return tuple.2
     }
   }
-  expectEqual(1, gradient(at: Float(1), in: { x -> Float in
-    let wrapper = Wrapper<Float>()
-    return wrapper.baz(x)
-  }))
+  func wrapper(_ x: Tracked<Float>) -> Tracked<Float> {
+    let w = Wrapper<Tracked<Float>>()
+    return w.baz(x)
+  }
+  expectEqual((3, 1), valueWithGradient(at: 3, in: wrapper))
 }
 
 // Tests TF-21.
@@ -192,7 +224,7 @@ SimpleMathTests.test("StructMemberwiseInitializer") {
     let foo = Foo(stored: input)
     return foo.computed * foo.stored
   }
-  expectEqual(16, 𝛁product)
+  expectEqual(48, 𝛁product)
 
   struct Custom : AdditiveArithmetic, Differentiable {
     var x: Float
@@ -237,7 +269,7 @@ SimpleMathTests.test("StructConstantStoredProperty") {
   expectEqual(20, gradient(at: 3, in: testStructInit))
 }
 
-SimpleMathTests.test("StructSideEffects") {
+SimpleMathTests.test("StructMutation") {
   struct Point : AdditiveArithmetic, Differentiable {
     var x: Float
     var y: Float
@@ -299,8 +331,22 @@ SimpleMathTests.test("StructGeneric") {
     generic.y = generic.x * input
     return generic.x * generic.y
   }
-  // FIXME(TF-274): The true expected result is `405`, like other variants of `fifthPower` above.
   expectEqual(405, gradient(at: 3, in: fifthPower))
+}
+
+SimpleMathTests.test("StructWithNoDerivativeProperty") {
+  struct NoDerivativeProperty : Differentiable {
+    var x: Float
+    @noDerivative var y: Float
+  }
+  expectEqual(
+    NoDerivativeProperty.TangentVector(x: 1),
+    gradient(at: NoDerivativeProperty(x: 1, y: 1)) { s -> Float in
+      var tmp = s
+      tmp.y = tmp.x
+      return tmp.x
+    }
+  )
 }
 
 SimpleMathTests.test("SubsetIndices") {
@@ -309,10 +355,53 @@ SimpleMathTests.test("SubsetIndices") {
   }
   expectEqual(2, grad { x, y in x + y })
 
-  func gradWRTNonDiff(_ lossFunction: @differentiable (Float, @nondiff Int) -> Float) -> Float {
+  func gradWRTNonDiff(_ lossFunction: @differentiable (Float, @noDerivative Int) -> Float) -> Float {
     return gradient(at: 2) { x in lossFunction(x * x, 10) }
   }
   expectEqual(4, gradWRTNonDiff { x, y in x + Float(y) })
+}
+
+SimpleMathTests.test("ForceUnwrapping") {
+  func forceUnwrap<T: Differentiable & FloatingPoint>(_ t: T)
+    -> (T, Float) where T == T.TangentVector {
+    gradient(at: t, Float(1)) { (x, y) in
+      (x as! Float) * y
+    }
+  }
+  expectEqual((1, 2), forceUnwrap(Float(2)))
+}
+
+// CHECK-LABEL: sil private [ossa] @AD__${{.*}}jumpTimesTwo{{.*}}pullback_src_0_wrt_0 : $@convention(thin) (Float, @owned _AD__$s4nullyycfU18_12jumpTimesTwoL_5modelSfAAyycfU18_14SmallTestModelL_V_tF_bb0__PB__src_0_wrt_0) -> SmallTestModel.TangentVector {
+// CHECK: bb0([[DX:%.*]] : $Float,  [[PB_STRUCT:%.*]] : {{.*}}):
+// CHECK:   ([[PB0:%.*]], [[PB1:%.*]]) = destructure_struct [[PB_STRUCT]]
+// CHECK:   [[ADJ_TUPLE:%.*]] = apply [[PB1]]([[DX]]) : $@callee_guaranteed (Float) -> (Float, Float)
+// CHECK:   ([[TMP0:%.*]], [[ADJ_CONCRETE:%.*]]) = destructure_tuple [[ADJ_TUPLE]] : $(Float, Float)
+// CHECK:   [[TMP1:%.*]] = apply [[PB0]]([[TMP0]]) : $@callee_guaranteed (Float) -> SmallTestModel.TangentVector
+// CHECK:   [[ADJ_STRUCT_FIELD:%.*]] = destructure_struct [[TMP1]] : $SmallTestModel.TangentVector
+// CHECK:   [[TMP_RES:%.*]] = alloc_stack $Float
+// CHECK:   [[TMP_ADJ_STRUCT_FIELD:%.*]] = alloc_stack $Float
+// CHECK:   [[TMP_ADJ_CONCRETE:%.*]] = alloc_stack $Float
+// CHECK:   store [[ADJ_STRUCT_FIELD]] to [trivial] [[TMP_ADJ_STRUCT_FIELD]] : $*Float
+// CHECK:   store [[ADJ_CONCRETE]] to [trivial] [[TMP_ADJ_CONCRETE]] : $*Float
+// CHECK:   [[PLUS_EQUAL:%.*]] = witness_method $Float, #AdditiveArithmetic."+"
+// CHECK:   %{{.*}} = apply [[PLUS_EQUAL]]<Float>([[TMP_RES]], [[TMP_ADJ_CONCRETE]], [[TMP_ADJ_STRUCT_FIELD]], {{.*}})
+// CHECK:   [[RES:%.*]] = load [trivial] [[TMP_RES]] : $*Float
+// CHECK:   [[RES_STRUCT:%.*]] = struct $SmallTestModel.TangentVector ([[RES]] : $Float)
+// CHECK:   return [[RES_STRUCT]] : $SmallTestModel.TangentVector
+// CHECK: }
+
+SimpleMathTests.test("Struct") {
+  // TF-943: Test adjoint value accumulation for aggregate lhs and concrete rhs.
+  struct SmallTestModel : Differentiable {
+    public var jump: Float = 3.0
+    @differentiable public func callAsFunction() -> Float { return jump }
+  }
+
+  func jumpTimesTwo(model: SmallTestModel) -> Float{
+    return model() + model.jump
+  }
+  let grads = gradient(at: SmallTestModel(), in: jumpTimesTwo)
+  expectEqual(2.0, grads.jump)
 }
 
 runAllTests()

@@ -16,9 +16,14 @@ func testEmpty() {
   assertConformsToElementaryFunctions(Empty.TangentVector.self)
 }
 
+struct EmptyEuclidean : EuclideanDifferentiable {}
+
 // Test interaction with `AdditiveArithmetic` derived conformances.
 // Previously, this crashed due to duplicate memberwise initializer synthesis.
 struct EmptyAdditiveArithmetic : AdditiveArithmetic, Differentiable {}
+
+// Test interaction with `AdditiveArithmetic` derived conformances.
+struct EmptyAdditiveArithmeticEuclidean : AdditiveArithmetic, EuclideanDifferentiable {}
 
 // Test structs with `let` stored properties.
 // Derived conformances fail because `mutating func move` requires all stored
@@ -35,12 +40,12 @@ struct ImmutableStoredProperties : Differentiable {
 func testImmutableStoredProperties() {
   _ = ImmutableStoredProperties.TangentVector(okay: 1)
 }
-struct MutableStoredPropertiesWithInitialValue : Differentiable {
+struct MutableStoredPropertiesWithInitialValue : Differentiable, EuclideanDifferentiable {
   var x = Float(1)
   var y = Double(1)
 }
 // Test struct with both an empty constructor and memberwise initializer.
-struct AllMixedStoredPropertiesHaveInitialValue : Differentiable {
+struct AllMixedStoredPropertiesHaveInitialValue : Differentiable, EuclideanDifferentiable {
   let x = Float(1) // expected-warning {{synthesis of the 'Differentiable.move(along:)' requirement for 'AllMixedStoredPropertiesHaveInitialValue' requires all stored properties to be mutable; use 'var' instead, or add an explicit '@noDerivative' attribute}} {{3-3=@noDerivative }}
   var y = Float(1)
   // Memberwise initializer should be `init(y:)` since `x` is immutable.
@@ -48,7 +53,7 @@ struct AllMixedStoredPropertiesHaveInitialValue : Differentiable {
     _ = AllMixedStoredPropertiesHaveInitialValue(y: 1)
   }
 }
-struct HasCustomConstructor: Differentiable {
+struct HasCustomConstructor: Differentiable, EuclideanDifferentiable {
   var x = Float(1)
   var y = Float(1)
   // Custom constructor should not affect synthesis.
@@ -65,7 +70,7 @@ func testSimple() {
 }
 
 // Test type with mixed members.
-struct Mixed : AdditiveArithmetic, Differentiable {
+struct Mixed : AdditiveArithmetic, Differentiable, EuclideanDifferentiable {
   var simple: Simple
   var float: Float
 }
@@ -75,14 +80,15 @@ func testMixed(_ simple: Simple) {
 }
 
 // Test type with manual definition of vector space types to `Self`.
-struct VectorSpacesEqualSelf : AdditiveArithmetic, Differentiable {
+struct VectorSpacesEqualSelf : AdditiveArithmetic, Differentiable, EuclideanDifferentiable {
   var w: Float
   var b: Float
   typealias TangentVector = VectorSpacesEqualSelf
 }
 
 // Test generic type with vector space types to `Self`.
-struct GenericVectorSpacesEqualSelf<T> : AdditiveArithmetic, Differentiable
+struct GenericVectorSpacesEqualSelf<T>
+  : AdditiveArithmetic, EuclideanDifferentiable
   where T : Differentiable, T == T.TangentVector
 {
   var w: T
@@ -91,10 +97,11 @@ struct GenericVectorSpacesEqualSelf<T> : AdditiveArithmetic, Differentiable
 func testGenericVectorSpacesEqualSelf() {
   var genericSame = GenericVectorSpacesEqualSelf<Double>(w: 1, b: 1)
   genericSame.move(along: genericSame)
+  genericSame.move(along: genericSame.differentiableVectorView)
 }
 
 // Test nested type.
-struct Nested : AdditiveArithmetic, Differentiable {
+struct Nested : AdditiveArithmetic, Differentiable, EuclideanDifferentiable {
   var simple: Simple
   var mixed: Mixed
   var generic: GenericVectorSpacesEqualSelf<Double>
@@ -116,18 +123,18 @@ func testNested(
 // Vector space structs types must be synthesized.
 // Note: it would be nice to emit a warning if conforming `Self` to
 // `AdditiveArithmetic` is possible.
-struct AllMembersAdditiveArithmetic : Differentiable {
+struct AllMembersAdditiveArithmetic : Differentiable, EuclideanDifferentiable {
   var w: Float
   var b: Float
 }
 
 // Test type `AllMembersVectorProtocol` whose members conforms to `VectorProtocol`,
 // in which case we should make `TangentVector` conform to `VectorProtocol`.
-struct MyVector : VectorProtocol, Differentiable {
+struct MyVector : VectorProtocol, Differentiable, EuclideanDifferentiable {
   var w: Float
   var b: Float
 }
-struct AllMembersVectorProtocol : Differentiable {
+struct AllMembersVectorProtocol : Differentiable, EuclideanDifferentiable {
   var v1: MyVector
   var v2: MyVector
 }
@@ -135,13 +142,24 @@ func testAllMembersVectorProtocol() {
   assertConformsToVectorProtocol(AllMembersVectorProtocol.TangentVector.self)
 }
 
+// Test generic `VectorProtocol`-conforming members.
+protocol Module: Differentiable where TangentVector: VectorProtocol {}
+struct Sequential<Layer1: Module, Layer2: Module>: Module
+where
+  Layer1.TangentVector.VectorSpaceScalar == Layer2.TangentVector.VectorSpaceScalar
+{
+  var layer1: Layer1
+  var layer2: Layer2
+}
+
 // Test type `AllMembersElementaryFunctions` whose members conforms to `ElementaryFunctions`,
 // in which case we should make `TangentVector` conform to `ElementaryFunctions`.
-struct MyVector2 : ElementaryFunctions, Differentiable {
+struct MyVector2 : ElementaryFunctions, Differentiable, EuclideanDifferentiable {
   var w: Float
   var b: Float
 }
-struct AllMembersElementaryFunctions : Differentiable {
+
+struct AllMembersElementaryFunctions : Differentiable, EuclideanDifferentiable {
   var v1: MyVector2
   var v2: MyVector2
 }
@@ -161,6 +179,24 @@ func testDifferentiableSubset() {
   _ = DifferentiableSubset.TangentVector(w: 1, b: 1)
 
   _ = pullback(at: DifferentiableSubset(w: 1, b: 2, flag: false)) { model in
+    model.w + model.b
+  }
+}
+
+// Test type whose properties are not all differentiable, with a vector space view.
+struct EuclideanDifferentiableSubset : EuclideanDifferentiable {
+  var w: Float
+  var b: Float
+  @noDerivative var flag: Bool
+  @noDerivative let technicallyDifferentiable: Float = .pi
+}
+func testEuclideanDifferentiableSubset() {
+  let x = EuclideanDifferentiableSubset(w: 1, b: 2, flag: false)
+  let tan = EuclideanDifferentiableSubset.TangentVector(w: 1, b: 1)
+  _ = x.differentiableVectorView.w * tan.w
+  _ = x.differentiableVectorView.b * tan.b
+
+  _ = pullback(at: x) { model in
     model.w + model.b
   }
 }
@@ -259,7 +295,8 @@ struct GenericConstrained<T> {
 extension GenericConstrained : Differentiable
   where T : Differentiable {}
 
-struct TF_260<T : Differentiable> : Differentiable & AdditiveArithmetic {
+struct TF_260<T : Differentiable>
+  : Differentiable, EuclideanDifferentiable, AdditiveArithmetic {
   var x: T.TangentVector
 }
 
@@ -288,15 +325,13 @@ public struct TF_269 : TF_269_Layer {
 // Test manually customizing vector space types.
 // Thees should fail. Synthesis is semantically unsupported if vector space
 // types are customized.
-// expected-error @+2 {{type 'VectorSpaceTypeAlias' does not conform to protocol 'Differentiable'}}
-// expected-note @+1 {{do you want to add protocol stubs?}}
+// expected-error @+1 {{type 'VectorSpaceTypeAlias' does not conform to protocol 'Differentiable'}}
 struct VectorSpaceTypeAlias : AdditiveArithmetic, Differentiable {
   var w: Float
   var b: Float
   typealias TangentVector = Simple
 }
-// expected-error @+2 {{type 'VectorSpaceCustomStruct' does not conform to protocol 'Differentiable'}}
-// expected-note @+1 {{do you want to add protocol stubs?}}
+// expected-error @+1 {{type 'VectorSpaceCustomStruct' does not conform to protocol 'Differentiable'}}
 struct VectorSpaceCustomStruct : AdditiveArithmetic, Differentiable {
   var w: Float
   var b: Float
@@ -326,6 +361,38 @@ struct ImplicitNoDerivativeWithSeparateTangent : Differentiable {
   var b: Bool // expected-warning {{stored property 'b' has no derivative because it does not conform to 'Differentiable'; add an explicit '@noDerivative' attribute}} {{3-3=@noDerivative }}
 }
 
+// TF-1018: verify that `@noDerivative` warnings are always silenceable, even
+// when the `Differentiable` conformance context is not the nominal type
+// declaration.
+
+struct ExtensionDifferentiableNoDerivative<T> {
+  // expected-warning @+2 {{stored property 'x' has no derivative because it does not conform to 'Differentiable'; add an explicit '@noDerivative' attribute}}
+  // expected-warning @+1 {{stored property 'y' has no derivative because it does not conform to 'Differentiable'; add an explicit '@noDerivative' attribute}}
+  var x, y: T
+  // expected-warning @+1 {{stored property 'nondiff' has no derivative because it does not conform to 'Differentiable'; add an explicit '@noDerivative' attribute}}
+  var nondiff: Bool
+}
+extension ExtensionDifferentiableNoDerivative: Differentiable {}
+
+struct ExtensionDifferentiableNoDerivativeFixed<T> {
+  @noDerivative var x, y: T
+  @noDerivative var nondiff: Bool
+}
+extension ExtensionDifferentiableNoDerivativeFixed: Differentiable {}
+
+struct ConditionalDifferentiableNoDerivative<T> {
+  var x, y: T
+  // expected-warning @+1 {{stored property 'nondiff' has no derivative because it does not conform to 'Differentiable'; add an explicit '@noDerivative' attribute}}
+  var nondiff: Bool
+}
+extension ConditionalDifferentiableNoDerivative: Differentiable where T: Differentiable {}
+
+struct ConditionalDifferentiableNoDerivativeFixed<T> {
+  var x, y: T
+  @noDerivative var nondiff: Bool
+}
+extension ConditionalDifferentiableNoDerivativeFixed: Differentiable where T: Differentiable {}
+
 // TF-265: Test invalid initializer (that uses a non-existent type).
 struct InvalidInitializer : Differentiable {
   init(filterShape: (Int, Int, Int, Int), blah: NonExistentType) {} // expected-error {{use of undeclared type 'NonExistentType'}}
@@ -342,15 +409,17 @@ extension NoMemberwiseInitializerExtended: Equatable, AdditiveArithmetic
   where T : AdditiveArithmetic {}
 extension NoMemberwiseInitializerExtended: Differentiable
   where T : Differentiable & AdditiveArithmetic {}
+// Test that `MemberwiseInitializerExtended` cannot conform to `EuclideanDifferentiable` because `T.TangentVector != T`.
+// expected-error @+1 {{type 'NoMemberwiseInitializerExtended<T>' does not conform to protocol 'EuclideanDifferentiable'}}
+extension NoMemberwiseInitializerExtended: EuclideanDifferentiable
+  where T : Differentiable & AdditiveArithmetic {}
 
 // Test derived conformances in disallowed contexts.
 
-// expected-error @+3 {{type 'OtherFileNonconforming' does not conform to protocol 'Differentiable'}}
-// expected-error @+2 {{implementation of 'Differentiable' cannot be automatically synthesized in an extension in a different file to the type}}
-// expected-note @+1 {{do you want to add protocol stubs?}}
+// expected-error @+2 {{type 'OtherFileNonconforming' does not conform to protocol 'Differentiable'}}
+// expected-error @+1 {{implementation of 'Differentiable' cannot be automatically synthesized in an extension in a different file to the type}}
 extension OtherFileNonconforming : Differentiable {}
 
-// expected-error @+3 {{type 'GenericOtherFileNonconforming<T>' does not conform to protocol 'Differentiable'}}
-// expected-error @+2 {{implementation of 'Differentiable' cannot be automatically synthesized in an extension in a different file to the type}}
-// expected-note @+1 {{do you want to add protocol stubs?}}
+// expected-error @+2 {{type 'GenericOtherFileNonconforming<T>' does not conform to protocol 'Differentiable'}}
+// expected-error @+1 {{implementation of 'Differentiable' cannot be automatically synthesized in an extension in a different file to the type}}
 extension GenericOtherFileNonconforming : Differentiable {}

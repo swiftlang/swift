@@ -21,12 +21,9 @@
 #include "clang/Basic/CharInfo.h"
 using namespace swift;
 
-void *DeclBaseName::SubscriptIdentifierData =
-    &DeclBaseName::SubscriptIdentifierData;
-void *DeclBaseName::ConstructorIdentifierData =
-    &DeclBaseName::ConstructorIdentifierData;
-void *DeclBaseName::DestructorIdentifierData =
-    &DeclBaseName::DestructorIdentifierData;
+constexpr const Identifier::Aligner DeclBaseName::SubscriptIdentifierData{};
+constexpr const Identifier::Aligner DeclBaseName::ConstructorIdentifierData{};
+constexpr const Identifier::Aligner DeclBaseName::DestructorIdentifierData{};
 
 raw_ostream &llvm::operator<<(raw_ostream &OS, Identifier I) {
   if (I.get() == nullptr)
@@ -48,6 +45,19 @@ raw_ostream &llvm::operator<<(raw_ostream &OS, DeclName I) {
   }
   OS << ")";
   return OS;
+}
+
+void swift::simple_display(llvm::raw_ostream &out, DeclName name) {
+  out << "'" << name << "'";
+}
+
+raw_ostream &llvm::operator<<(raw_ostream &OS, DeclNameRef I) {
+  OS << I.getFullName();
+  return OS;
+}
+
+void swift::simple_display(llvm::raw_ostream &out, DeclNameRef name) {
+  out << "'" << name << "'";
 }
 
 raw_ostream &llvm::operator<<(raw_ostream &OS, swift::ObjCSelector S) {
@@ -186,6 +196,24 @@ llvm::raw_ostream &DeclName::print(llvm::raw_ostream &os,
 
 llvm::raw_ostream &DeclName::printPretty(llvm::raw_ostream &os) const {
   return print(os, /*skipEmptyArgumentNames=*/!isSpecial());
+}
+
+void DeclNameRef::dump() const {
+  llvm::errs() << *this << "\n";
+}
+
+StringRef DeclNameRef::getString(llvm::SmallVectorImpl<char> &scratch,
+                             bool skipEmptyArgumentNames) const {
+  return FullName.getString(scratch, skipEmptyArgumentNames);
+}
+
+llvm::raw_ostream &DeclNameRef::print(llvm::raw_ostream &os,
+                                  bool skipEmptyArgumentNames) const {
+  return FullName.print(os, skipEmptyArgumentNames);
+}
+
+llvm::raw_ostream &DeclNameRef::printPretty(llvm::raw_ostream &os) const {
+  return FullName.printPretty(os);
 }
 
 ObjCSelector::ObjCSelector(ASTContext &ctx, unsigned numArgs,

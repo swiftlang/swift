@@ -47,6 +47,18 @@ bool SILLoop::canDuplicate(SILInstruction *I) const {
     }
     return true;
   }
+  if (I->isDeallocatingStack()) {
+    SILInstruction *alloc = nullptr;
+    if (auto *dealloc = dyn_cast<DeallocStackInst>(I)) {
+      SILValue address = dealloc->getOperand();
+      if (isa<AllocStackInst>(address) || isa<PartialApplyInst>(address))
+        alloc = cast<SingleValueInstruction>(address);
+    }
+    if (auto *dealloc = dyn_cast<DeallocRefInst>(I))
+      alloc = dyn_cast<AllocRefInst>(dealloc->getOperand());
+
+    return alloc && contains(alloc);
+  }
 
   // CodeGen can't build ssa for objc methods.
   if (auto *Method = dyn_cast<MethodInst>(I)) {
@@ -71,13 +83,17 @@ bool SILLoop::canDuplicate(SILInstruction *I) const {
     return true;
   }
 
-  if (auto *Dealloc = dyn_cast<DeallocStackInst>(I)) {
-    // The matching alloc_stack must be in the loop.
-    if (auto *Alloc = dyn_cast<AllocStackInst>(Dealloc->getOperand()))
-        return contains(Alloc->getParent());
+  if (isa<ThrowInst>(I))
     return false;
-  }
 
+  // The entire access must be within the loop.
+  if (auto BAI = dyn_cast<BeginAccessInst>(I)) {
+    for (auto *UI : BAI->getUses()) {
+      if (!contains(UI->getUser()))
+        return false;
+    }
+    return true;
+  }
   // The entire coroutine execution must be within the loop.
   // Note that we don't have to worry about the reverse --- a loop which
   // contains an end_apply or abort_apply of an external begin_apply ---
@@ -92,18 +108,11 @@ bool SILLoop::canDuplicate(SILInstruction *I) const {
     return true;
   }
 
-  if (isa<ThrowInst>(I))
-    return false;
-
-  if (isa<BeginAccessInst>(I))
-    return false;
-
   if (isa<DynamicMethodBranchInst>(I))
     return false;
 
-  if (auto *PA = dyn_cast<PartialApplyInst>(I))
-    return !PA->isOnStack();
-
+  // Some special cases above that aren't considered isTriviallyDuplicatable
+  // return true early.
   assert(I->isTriviallyDuplicatable() &&
     "Code here must match isTriviallyDuplicatable in SILInstruction");
   return true;

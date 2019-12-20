@@ -79,7 +79,7 @@ bool file_types::isTextual(ID Id) {
   case file_types::TY_TBD:
   case file_types::TY_ModuleTrace:
   case file_types::TY_OptRecord:
-  case file_types::TY_SwiftParseableInterfaceFile:
+  case file_types::TY_SwiftModuleInterfaceFile:
     return true;
   case file_types::TY_Image:
   case file_types::TY_Object:
@@ -89,10 +89,13 @@ bool file_types::isTextual(ID Id) {
   case file_types::TY_RawSIB:
   case file_types::TY_SwiftModuleFile:
   case file_types::TY_SwiftModuleDocFile:
+  case file_types::TY_SwiftSourceInfoFile:
   case file_types::TY_LLVM_BC:
   case file_types::TY_SerializedDiagnostics:
   case file_types::TY_ClangModuleFile:
   case file_types::TY_SwiftDeps:
+  case file_types::TY_SwiftRanges:
+  case file_types::TY_CompiledSource:
   case file_types::TY_Nothing:
   case file_types::TY_Remapping:
   case file_types::TY_IndexData:
@@ -128,15 +131,18 @@ bool file_types::isAfterLLVM(ID Id) {
   case file_types::TY_RawSIB:
   case file_types::TY_SwiftModuleFile:
   case file_types::TY_SwiftModuleDocFile:
+  case file_types::TY_SwiftSourceInfoFile:
   case file_types::TY_SerializedDiagnostics:
   case file_types::TY_ClangModuleFile:
   case file_types::TY_SwiftDeps:
+  case file_types::TY_SwiftRanges:
+  case file_types::TY_CompiledSource:
   case file_types::TY_Nothing:
   case file_types::TY_Remapping:
   case file_types::TY_IndexData:
   case file_types::TY_ModuleTrace:
   case file_types::TY_OptRecord:
-  case file_types::TY_SwiftParseableInterfaceFile:
+  case file_types::TY_SwiftModuleInterfaceFile:
     return false;
   case file_types::TY_INVALID:
     llvm_unreachable("Invalid type ID.");
@@ -168,10 +174,13 @@ bool file_types::isPartOfSwiftCompilation(ID Id) {
   case file_types::TY_dSYM:
   case file_types::TY_SwiftModuleFile:
   case file_types::TY_SwiftModuleDocFile:
-  case file_types::TY_SwiftParseableInterfaceFile:
+  case file_types::TY_SwiftModuleInterfaceFile:
+  case file_types::TY_SwiftSourceInfoFile:
   case file_types::TY_SerializedDiagnostics:
   case file_types::TY_ClangModuleFile:
   case file_types::TY_SwiftDeps:
+  case file_types::TY_SwiftRanges:
+  case file_types::TY_CompiledSource:
   case file_types::TY_Nothing:
   case file_types::TY_ASTDump:
   case file_types::TY_Remapping:

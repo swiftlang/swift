@@ -158,6 +158,7 @@ class SR4812 {
     let bar = { [weak self] in
     // expected-error@-1 {{closure captures 'bar' before it is declared}}
     // expected-note@-2 {{captured value declared here}}
+    // expected-warning@-3 {{variable 'self' was written to, but never read}}
       bar2()
     }
     func bar2() {
@@ -191,10 +192,10 @@ class rdar40600800 {
     }
 
     func innerFunction() {
-      let closure = { // expected-note {{captured here}}
+      let closure = {
       // FIXME: Bogus warning!
       // expected-warning@-2 {{initialization of immutable value 'closure' was never used; consider replacing with assignment to '_' or removing it}}
-        callback()
+        callback() // expected-note {{captured here}}
       }
     }
   }

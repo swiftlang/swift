@@ -21,7 +21,9 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/ForeignErrorConvention.h"
+#include "swift/AST/ImportCache.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/StringExtras.h"
 using namespace swift;
@@ -223,13 +225,10 @@ static void diagnoseFunctionParamNotRepresentable(
     AFD->diagnose(diag::objc_invalid_on_func_param_type,
                   ParamIndex + 1, getObjCDiagnosticAttrKind(Reason));
   }
-  if (P->hasType()) {
-    Type ParamTy = P->getType();
-    SourceRange SR;
-    if (auto typeRepr = P->getTypeLoc().getTypeRepr())
-      SR = typeRepr->getSourceRange();
-    diagnoseTypeNotRepresentableInObjC(AFD, ParamTy, SR);
-  }
+  SourceRange SR;
+  if (auto typeRepr = P->getTypeRepr())
+    SR = typeRepr->getSourceRange();
+  diagnoseTypeNotRepresentableInObjC(AFD, P->getType(), SR);
   describeObjCReason(AFD, Reason);
 }
 
@@ -239,12 +238,6 @@ static bool isParamListRepresentableInObjC(const AbstractFunctionDecl *AFD,
   // If you change this function, you must add or modify a test in PrintAsObjC.
   ASTContext &ctx = AFD->getASTContext();
   auto &diags = ctx.Diags;
-
-  if (!AFD->hasInterfaceType()) {
-    ctx.getLazyResolver()->resolveDeclSignature(
-                                      const_cast<AbstractFunctionDecl *>(AFD));
-  }
-
   bool Diagnose = shouldDiagnoseObjCReason(Reason, ctx);
   bool IsObjC = true;
   unsigned NumParams = PL->size();
@@ -492,6 +485,7 @@ bool swift::isRepresentableInObjC(
 
   // If you change this function, you must add or modify a test in PrintAsObjC.
   ASTContext &ctx = AFD->getASTContext();
+
   bool Diagnose = shouldDiagnoseObjCReason(Reason, ctx);
 
   if (checkObjCInForeignClassContext(AFD, Reason))
@@ -627,7 +621,7 @@ bool swift::isRepresentableInObjC(
       kind = ForeignErrorConvention::NilResult;
 
       // Only non-failing initializers can throw.
-      if (ctor->getFailability() != OTK_None) {
+      if (ctor->isFailable()) {
         if (Diagnose) {
           AFD->diagnose(diag::objc_invalid_on_failing_init,
                         getObjCDiagnosticAttrKind(Reason))
@@ -684,16 +678,10 @@ bool swift::isRepresentableInObjC(
     }
 
     // The error type is always 'AutoreleasingUnsafeMutablePointer<NSError?>?'.
-    auto nsError = ctx.getNSErrorDecl();
+    auto nsErrorTy = ctx.getNSErrorType();
     Type errorParameterType;
-    if (nsError) {
-      if (!nsError->hasInterfaceType()) {
-        auto resolver = ctx.getLazyResolver();
-        assert(resolver);
-        resolver->resolveDeclSignature(nsError);
-      }
-      errorParameterType = nsError->getDeclaredInterfaceType();
-      errorParameterType = OptionalType::get(errorParameterType);
+    if (nsErrorTy) {
+      errorParameterType = OptionalType::get(nsErrorTy);
       errorParameterType
         = BoundGenericType::get(
             ctx.getAutoreleasingUnsafeMutablePointerDecl(),
@@ -819,19 +807,9 @@ bool swift::isRepresentableInObjC(
 
 bool swift::isRepresentableInObjC(const VarDecl *VD, ObjCReason Reason) {
   // If you change this function, you must add or modify a test in PrintAsObjC.
-
+  
   if (VD->isInvalid())
     return false;
-
-  if (!VD->hasInterfaceType()) {
-    VD->getASTContext().getLazyResolver()->resolveDeclSignature(
-                                              const_cast<VarDecl *>(VD));
-    if (!VD->hasInterfaceType()) {
-      VD->diagnose(diag::recursive_decl_reference, VD->getDescriptiveKind(),
-                   VD->getName());
-      return false;
-    }
-  }
 
   Type T = VD->getDeclContext()->mapTypeIntoContext(VD->getInterfaceType());
   if (auto *RST = T->getAs<ReferenceStorageType>()) {
@@ -886,11 +864,6 @@ bool swift::isRepresentableInObjC(const SubscriptDecl *SD, ObjCReason Reason) {
       describeObjCReason(SD, Reason);
     }
     return true;
-  }
-
-  if (!SD->hasInterfaceType()) {
-    SD->getASTContext().getLazyResolver()->resolveDeclSignature(
-                                              const_cast<SubscriptDecl *>(SD));
   }
 
   // Figure out the type of the indices.
@@ -961,96 +934,6 @@ bool swift::canBeRepresentedInObjC(const ValueDecl *decl) {
                                  ObjCReason::MemberOfObjCMembersClass);
 
   return false;
-}
-
-static Type getObjectiveCNominalType(Type &cache,
-                                     Identifier ModuleName,
-                                     Identifier TypeName,
-                                     DeclContext *dc) {
-  if (cache)
-    return cache;
-
-  // FIXME: Does not respect visibility of the module.
-  ASTContext &ctx = dc->getASTContext();
-  ModuleDecl *module = ctx.getLoadedModule(ModuleName);
-  if (!module)
-    return nullptr;
-
-  SmallVector<ValueDecl *, 4> decls;
-  NLOptions options = NL_QualifiedDefault | NL_OnlyTypes;
-  dc->lookupQualified(module, TypeName, options, decls);
-  for (auto decl : decls) {
-    if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
-      cache = nominal->getDeclaredType();
-      return cache;
-    }
-  }
-
-  return nullptr;
-}
-
-#pragma mark Objective-C-specific types
-
-Type TypeChecker::getNSObjectType(DeclContext *dc) {
-  return getObjectiveCNominalType(NSObjectType, Context.Id_ObjectiveC,
-                                Context.getSwiftId(
-                                  KnownFoundationEntity::NSObject),
-                                dc);
-}
-
-Type TypeChecker::getObjCSelectorType(DeclContext *dc) {
-  return getObjectiveCNominalType(ObjCSelectorType,
-                                  Context.Id_ObjectiveC,
-                                  Context.Id_Selector,
-                                  dc);
-}
-
-#pragma mark Bridging support
-
-/// Check runtime functions responsible for implicit bridging of Objective-C
-/// types.
-static void checkObjCBridgingFunctions(ModuleDecl *mod,
-                                       StringRef bridgedTypeName,
-                                       StringRef forwardConversion,
-                                       StringRef reverseConversion) {
-  assert(mod);
-  ModuleDecl::AccessPathTy unscopedAccess = {};
-  SmallVector<ValueDecl *, 4> results;
-
-  auto &ctx = mod->getASTContext();
-  mod->lookupValue(unscopedAccess, ctx.getIdentifier(bridgedTypeName),
-                   NLKind::QualifiedLookup, results);
-  mod->lookupValue(unscopedAccess, ctx.getIdentifier(forwardConversion),
-                   NLKind::QualifiedLookup, results);
-  mod->lookupValue(unscopedAccess, ctx.getIdentifier(reverseConversion),
-                   NLKind::QualifiedLookup, results);
-
-  for (auto D : results) {
-    if (!D->hasInterfaceType()) {
-      auto resolver = ctx.getLazyResolver();
-      assert(resolver);
-      resolver->resolveDeclSignature(D);
-    }
-  }
-}
-
-void swift::checkBridgedFunctions(ASTContext &ctx) {
-  #define BRIDGE_TYPE(BRIDGED_MOD, BRIDGED_TYPE, _, NATIVE_TYPE, OPT) \
-  Identifier ID_##BRIDGED_MOD = ctx.getIdentifier(#BRIDGED_MOD);\
-  if (ModuleDecl *module = ctx.getLoadedModule(ID_##BRIDGED_MOD)) {\
-    checkObjCBridgingFunctions(module, #BRIDGED_TYPE, \
-    "_convert" #BRIDGED_TYPE "To" #NATIVE_TYPE, \
-    "_convert" #NATIVE_TYPE "To" #BRIDGED_TYPE); \
-  }
-  #include "swift/SIL/BridgedTypes.def"
-
-  if (ModuleDecl *module = ctx.getLoadedModule(ctx.Id_Foundation)) {
-    checkObjCBridgingFunctions(module,
-                               ctx.getSwiftName(
-                                 KnownFoundationEntity::NSError),
-                               "_convertNSErrorToError",
-                               "_convertErrorToNSError");
-  }
 }
 
 #pragma mark "@objc declaration handling"
@@ -1162,11 +1045,7 @@ Optional<ObjCReason> shouldMarkAsObjC(const ValueDecl *VD, bool allowImplicit) {
   if (isa<AbstractFunctionDecl>(VD) || isa<AbstractStorageDecl>(VD))
     if (auto *replacementAttr =
             VD->getAttrs().getAttribute<DynamicReplacementAttr>()) {
-      if (auto *replaced = replacementAttr->getReplacedFunction()) {
-        if (replaced->isObjC())
-          return ObjCReason(ObjCReason::ImplicitlyObjC);
-      } else if (auto *replaced =
-                     TypeChecker::findReplacedDynamicFunction(VD)) {
+      if (auto *replaced = VD->getDynamicallyReplacedDecl()) {
         if (replaced->isObjC())
           return ObjCReason(ObjCReason::ImplicitlyObjC);
       }
@@ -1339,17 +1218,12 @@ static bool isCIntegerType(Type type) {
   auto matchesStdlibTypeNamed = [&](StringRef name) {
     auto identifier = ctx.getIdentifier(name);
     SmallVector<ValueDecl *, 2> foundDecls;
-    stdlibModule->lookupValue({ }, identifier, NLKind::UnqualifiedLookup,
+    stdlibModule->lookupValue(identifier, NLKind::UnqualifiedLookup,
                               foundDecls);
     for (auto found : foundDecls) {
       auto foundType = dyn_cast<TypeDecl>(found);
-      if (!foundType) continue;
-
-      if (!foundType->hasInterfaceType()) {
-        auto resolver = ctx.getLazyResolver();
-        assert(resolver);
-        resolver->resolveDeclSignature(foundType);
-      }
+      if (!foundType)
+        continue;
 
       if (foundType->getDeclaredInterfaceType()->isEqual(type))
         return true;
@@ -1397,6 +1271,11 @@ static bool isEnumObjC(EnumDecl *enumDecl) {
     return false;
   }
 
+  // We need at least one case to have a raw value.
+  if (enumDecl->getAllElements().empty()) {
+    enumDecl->diagnose(diag::empty_enum_raw_type);
+  }
+  
   return true;
 }
 
@@ -1417,7 +1296,7 @@ IsObjCRequest::evaluate(Evaluator &evaluator, ValueDecl *VD) const {
     // Classes can be @objc.
 
     // Protocols and enums can also be @objc, but this is covered by the
-    // isObjC() check a the beginning.;
+    // isObjC() check at the beginning.
     isObjC = shouldMarkAsObjC(VD, /*allowImplicit=*/false);
   } else if (auto enumDecl = dyn_cast<EnumDecl>(VD)) {
     // Enums can be @objc so long as they have a raw type that is representable
@@ -1795,10 +1674,12 @@ void swift::diagnoseAttrsRequiringFoundation(SourceFile &SF) {
       return;
   }
 
-  SF.forAllVisibleModules([&](ModuleDecl::ImportedModule import) {
-    if (import.second->getName() == Ctx.Id_Foundation)
+  for (auto import : namelookup::getAllImports(&SF)) {
+    if (import.second->getName() == Ctx.Id_Foundation) {
       ImportsFoundationModule = true;
-  });
+      break;
+    }
+  }
 
   if (ImportsFoundationModule)
     return;
@@ -1851,7 +1732,7 @@ std::pair<unsigned, DeclName> swift::getObjCMethodDiagInfo(
   return { 4, func->getFullName() };
 }
 
-bool swift::fixDeclarationName(InFlightDiagnostic &diag, ValueDecl *decl,
+bool swift::fixDeclarationName(InFlightDiagnostic &diag, const ValueDecl *decl,
                                DeclName targetName) {
   if (decl->isImplicit()) return false;
   if (decl->getFullName() == targetName) return false;
@@ -1919,7 +1800,7 @@ bool swift::fixDeclarationName(InFlightDiagnostic &diag, ValueDecl *decl,
   return false;
 }
 
-bool swift::fixDeclarationObjCName(InFlightDiagnostic &diag, ValueDecl *decl,
+bool swift::fixDeclarationObjCName(InFlightDiagnostic &diag, const ValueDecl *decl,
                                    Optional<ObjCSelector> nameOpt,
                                    Optional<ObjCSelector> targetNameOpt,
                                    bool ignoreImpliedName) {

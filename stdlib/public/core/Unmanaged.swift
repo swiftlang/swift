@@ -31,7 +31,9 @@ public struct Unmanaged<Instance: AnyObject> {
   /// - Parameter value: An opaque C pointer.
   /// - Returns: An unmanaged class reference to `value`.
   @_transparent
-  public static func fromOpaque(_ value: UnsafeRawPointer) -> Unmanaged {
+  public static func fromOpaque(
+    @_nonEphemeral _ value: UnsafeRawPointer
+  ) -> Unmanaged {
     return Unmanaged(_private: unsafeBitCast(value, to: Instance.self))
   }
 
@@ -89,7 +91,7 @@ public struct Unmanaged<Instance: AnyObject> {
   /// and you know that you're not responsible for releasing the result.
   ///
   /// - Returns: The object referenced by this `Unmanaged` instance.
-  @inlinable // unsafe-performance
+  @_transparent // unsafe-performance
   public func takeUnretainedValue() -> Instance {
     return _value
   }
@@ -101,7 +103,7 @@ public struct Unmanaged<Instance: AnyObject> {
   /// and you know that you're responsible for releasing the result.
   ///
   /// - Returns: The object referenced by this `Unmanaged` instance.
-  @inlinable // unsafe-performance
+  @_transparent // unsafe-performance
   public func takeRetainedValue() -> Instance {
     let result = _value
     release()

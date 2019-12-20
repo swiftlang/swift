@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend -emit-sil %s | %FileCheck %s
 
-// CHECK-LABEL: sil hidden [noinline] @$s10super_init3FooCyACSicfC : $@convention(method) (Int, @thick Foo.Type) -> @owned Foo
+// CHECK-LABEL: sil hidden [exact_self_class] [noinline] @$s10super_init3FooCyACSicfC : $@convention(method) (Int, @thick Foo.Type) -> @owned Foo
 // CHECK-NOT:     class_method
 // CHECK-NOT:     super_method
 // CHECK:         [[SUPER_INIT:%.*]] = function_ref @$s10super_init3FooCyACSicfc

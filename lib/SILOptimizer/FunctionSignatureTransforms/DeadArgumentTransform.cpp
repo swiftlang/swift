@@ -29,7 +29,7 @@ bool FunctionSignatureTransform::DeadArgumentAnalyzeParameters() {
   // Did we decide we should optimize any parameter?
   SILFunction *F = TransformDescriptor.OriginalFunction;
   bool SignatureOptimize = false;
-  auto Args = F->begin()->getFunctionArguments();
+  auto Args = F->begin()->getSILFunctionArguments();
   auto OrigShouldModifySelfArgument =
       TransformDescriptor.shouldModifySelfArgument;
   // Analyze the argument information.

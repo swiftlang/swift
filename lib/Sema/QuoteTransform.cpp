@@ -16,6 +16,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "TypeChecker.h"
+#include "swift/Subsystems.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/TypeVisitor.h"
@@ -39,7 +40,7 @@ public:
   void pop() { locs.pop_back(); }
 
   SourceLoc getLoc() {
-    for (auto loc : reversed(locs)) {
+    for (auto loc : llvm::reverse(locs)) {
       if (loc.isValid()) {
         return loc.Start;
       }
@@ -62,12 +63,11 @@ public:
 
 class AbstractQuoter {
 protected:
-  TypeChecker &tc;
   ASTContext &ctx;
   Breadcrumbs &bcs;
 
-  AbstractQuoter(TypeChecker &tc, Breadcrumbs &bcs)
-      : tc(tc), ctx(tc.Context), bcs(bcs) {}
+  AbstractQuoter(ASTContext& ctx, Breadcrumbs &bcs)
+      : ctx(ctx), bcs(bcs) {}
 
   Expr *quoteArray(ArrayRef<Expr *> quotedTrees) {
     auto arrayExpr =
@@ -109,7 +109,8 @@ protected:
   // TODO(TF-735): Implement ExpressibleByQuoteLiteral.
   Expr *makeQuote(const char *name, ArrayRef<Expr *> quotedSubnodes) {
     auto nodeInit = new (ctx) UnresolvedDeclRefExpr(
-        ctx.getIdentifier(name), DeclRefKind::Ordinary, DeclNameLoc());
+        DeclNameRef(ctx.getIdentifier(name)), DeclRefKind::Ordinary,
+        DeclNameLoc());
     return CallExpr::createImplicit(ctx, nodeInit, quotedSubnodes, {});
   }
 
@@ -133,9 +134,9 @@ protected:
     if (culprit) {
       auto str =
           allocateString([&](raw_ostream &os) { return culprit->dump(os); });
-      tc.diagnose(bcs.getLoc(), diag::quote_literal_unsupported_detailed, str);
+      ctx.Diags.diagnose(bcs.getLoc(), diag::quote_literal_unsupported_detailed, str);
     } else {
-      tc.diagnose(bcs.getLoc(), diag::quote_literal_unsupported_brief);
+      ctx.Diags.diagnose(bcs.getLoc(), diag::quote_literal_unsupported_brief);
     }
   }
 
@@ -158,7 +159,8 @@ private:
 class TypeQuoter : public TypeVisitor<TypeQuoter, Expr *>,
                    private AbstractQuoter {
 public:
-  TypeQuoter(TypeChecker &tc, Breadcrumbs &bcs) : AbstractQuoter(tc, bcs) {}
+  TypeQuoter(ASTContext &ctx, Breadcrumbs &bcs)
+    : AbstractQuoter(ctx, bcs) {}
 
 #define UNSUPPORTED_TYPE(TYPE)                                                 \
   Expr *visit##TYPE(TYPE *type) { return unknownTree(type); }
@@ -296,8 +298,8 @@ class ASTQuoter
   TypeQuoter typeQuoter;
 
 public:
-  ASTQuoter(TypeChecker &tc, Breadcrumbs &bcs)
-      : AbstractQuoter(tc, bcs), typeQuoter(TypeQuoter(tc, bcs)) {}
+  ASTQuoter(ASTContext& ctx, Breadcrumbs &bcs)
+    : AbstractQuoter(ctx, bcs), typeQuoter(TypeQuoter(ctx, bcs)) {}
 
 #define UNSUPPORTED_EXPR(EXPR)                                                 \
   Expr *visit##EXPR(EXPR *expr) {                                              \
@@ -347,11 +349,6 @@ public:
     auto type = ctx.getBoolDecl()->getDeclaredType();
     return makeQuote("BooleanLiteral",
                      {quoteBool(expr->getValue()), quoteType(type)});
-  }
-
-  Expr *visitCallerDefaultArgumentExpr(CallerDefaultArgumentExpr *expr) {
-    Breadcrumb bc(bcs, expr);
-    return quoteExpr(expr->getSubExpr());
   }
 
   Expr *visitCallExpr(CallExpr *expr) {
@@ -416,8 +413,8 @@ public:
           DeclRefExpr(ConcreteDeclRef(attr->getQuoteDecl()), DeclNameLoc(),
                       /*Implicit=*/true);
       auto quoteCall = CallExpr::createImplicit(ctx, quoteRef, {}, {});
-      auto &tc = TypeChecker::createForContext(ctx);
-      auto type = tc.getTypeOfQuoteExpr(expr->getType(), expr->getLoc());
+      auto type =
+          TypeChecker::getTypeOfQuoteExpr(expr->getType(), expr->getLoc());
       return makeQuote("Unquote", {quotedExpr, quoteCall, quoteType(type)});
     } else {
       return quotedExpr;
@@ -497,8 +494,7 @@ public:
         auto quoteDot =
             new (ctx) DotSyntaxCallExpr(quoteRef, SourceLoc(), quoteBase);
         auto quoteCall = CallExpr::createImplicit(ctx, quoteDot, {}, {});
-        auto &tc = TypeChecker::createForContext(ctx);
-        auto type = tc.getTypeOfQuoteExpr(refType, ref->getLoc());
+        auto type = TypeChecker::getTypeOfQuoteExpr(refType, ref->getLoc());
         return makeQuote("Unquote", {quotedExpr, quoteCall, quoteType(type)});
       } else {
         return quotedExpr;
@@ -530,8 +526,8 @@ public:
           auto quoteDot =
               new (ctx) DotSyntaxCallExpr(quoteRef, SourceLoc(), quoteBase);
           auto quoteCall = CallExpr::createImplicit(ctx, quoteDot, {}, {});
-          auto &tc = TypeChecker::createForContext(ctx);
-          auto type = tc.getTypeOfQuoteExpr(expr->getType(), expr->getLoc());
+          auto type =
+              TypeChecker::getTypeOfQuoteExpr(expr->getType(), expr->getLoc());
           return makeQuote("Unquote", {quotedExpr, quoteCall, quoteType(type)});
         } else {
           return quotedExpr;
@@ -649,6 +645,9 @@ public:
     case MagicIdentifierLiteralExpr::File:
       kind = "file";
       break;
+    case MagicIdentifierLiteralExpr::FilePath:
+      kind = "filePath";
+      break;
     case MagicIdentifierLiteralExpr::Line:
       kind = "line";
       break;
@@ -696,6 +695,8 @@ public:
 
   // TODO(TF-723): Quote playground literals.
   UNSUPPORTED_EXPR(ObjectLiteralExpr)
+
+  UNSUPPORTED_EXPR(OneWayExpr)
 
   // NOTE: TapExpr nodes are handled during quoting of their parent nodes.
   // We don't have a directly equivalent node in our trees.
@@ -825,8 +826,8 @@ public:
     Breadcrumb bc(bcs, expr);
     auto value = new (ctx)
         UnresolvedDotExpr(expr->getSubExpr(), SourceLoc(),
-                          ctx.getIdentifier("expression"), DeclNameLoc(),
-                          /*Implicit=*/true);
+                          DeclNameRef(ctx.getIdentifier("expression")),
+                          DeclNameLoc(), /*Implicit=*/true);
     return makeQuote("Unquote", {quoteExpr(expr->getSubExpr()), value,
                                  quoteType(expr->getType())});
   }
@@ -1209,7 +1210,8 @@ private:
   // TODO(TF-735): Implement ExpressibleByQuoteLiteral.
   Expr *makeQuote(const char *name, ArrayRef<Expr *> quotedSubnodes) {
     auto nodeInit = new (ctx) UnresolvedDeclRefExpr(
-        ctx.getIdentifier(name), DeclRefKind::Ordinary, DeclNameLoc());
+        DeclNameRef(ctx.getIdentifier(name)), DeclRefKind::Ordinary,
+        DeclNameLoc());
     return CallExpr::createImplicit(ctx, nodeInit, quotedSubnodes, {});
   }
 };
@@ -1220,7 +1222,8 @@ Expr *TypeChecker::quoteExpr(Expr *expr, DeclContext *dc) {
   assert(expr->getType());
 
   Breadcrumbs bcs;
-  ASTQuoter astQuoter(*this, bcs);
+  auto &ctx = dc->getASTContext();
+  ASTQuoter astQuoter(ctx, bcs);
   Expr *quotedExpr = astQuoter.visit(expr);
   if (!quotedExpr) {
     return nullptr;
@@ -1236,19 +1239,18 @@ Expr *TypeChecker::quoteExpr(Expr *expr, DeclContext *dc) {
     return nullptr;
   }
 
-  auto quoteRef =
-      new (Context) UnresolvedDeclRefExpr(quoteClassType->getDecl()->getName(),
-                                          DeclRefKind::Ordinary, DeclNameLoc());
+  auto quoteRef = new (ctx) UnresolvedDeclRefExpr(
+      DeclNameRef(quoteClassType->getDecl()->getName()), DeclRefKind::Ordinary,
+      DeclNameLoc());
   SmallVector<TypeLoc, 4> quoteTargs;
   for (auto targ : quoteClassType->getGenericArgs()) {
-    auto targRepr = new (Context) FixedTypeRepr(targ, SourceLoc());
+    auto targRepr = new (ctx) FixedTypeRepr(targ, SourceLoc());
     quoteTargs.push_back(TypeLoc(targRepr));
   }
   auto quoteInit = UnresolvedSpecializeExpr::create(
-      Context, quoteRef, SourceLoc(), quoteTargs, SourceLoc());
+      ctx, quoteRef, SourceLoc(), quoteTargs, SourceLoc());
   quoteInit->setImplicit();
-  Expr *quoteCall =
-      CallExpr::createImplicit(Context, quoteInit, {quotedExpr}, {});
+  Expr *quoteCall = CallExpr::createImplicit(ctx, quoteInit, {quotedExpr}, {});
 
   // TODO(TF-727): Improve error reporting when quoting fails.
   if (!typeCheckExpression(quoteCall, dc)) {
@@ -1268,31 +1270,32 @@ Expr *TypeChecker::quoteExpr(Expr *expr, DeclContext *dc) {
 
 Type TypeChecker::getTypeOfQuoteExpr(Type exprType, SourceLoc loc) {
   assert(exprType);
-  if (!Context.getQuoteModule()) {
-    diagnose(loc, diag::quote_literal_no_quote_module);
+  auto &ctx = exprType->getASTContext();
+  if (!ctx.getQuoteModule()) {
+    ctx.Diags.diagnose(loc, diag::quote_literal_no_quote_module);
     return Type();
   }
   if (auto fnExprType = exprType->getAs<FunctionType>()) {
     auto n = fnExprType->getParams().size();
-    auto quoteClass = Context.getFunctionQuoteDecl(n);
+    auto quoteClass = ctx.getFunctionQuoteDecl(n);
     if (!quoteClass) {
-      diagnose(loc, diag::quote_literal_no_function_quote_class, n);
+      ctx.Diags.diagnose(loc, diag::quote_literal_no_function_quote_class, n);
       return Type();
     }
     SmallVector<Type, 4> typeArgs;
     for (auto param : fnExprType->getParams()) {
       auto paramType = param.getPlainType();
       if (param.isInOut()) {
-        paramType = getUnsafeMutablePointerType(SourceLoc(), paramType);
+        paramType = paramType->wrapInPointer(PTK_UnsafeMutablePointer);
       }
       typeArgs.push_back(paramType);
     }
     typeArgs.push_back(fnExprType->getResult());
     return BoundGenericClassType::get(quoteClass, Type(), typeArgs);
   } else {
-    auto quoteClass = Context.getQuoteDecl();
+    auto quoteClass = ctx.getQuoteDecl();
     if (!quoteClass) {
-      diagnose(loc, diag::quote_literal_no_quote_class);
+      ctx.Diags.diagnose(loc, diag::quote_literal_no_quote_class);
       return Type();
     }
     if (auto lvalueExprType = exprType->getAs<LValueType>()) {
@@ -1304,19 +1307,19 @@ Type TypeChecker::getTypeOfQuoteExpr(Type exprType, SourceLoc loc) {
 
 Type TypeChecker::getTypeOfUnquoteExpr(Type exprType, SourceLoc loc) {
   assert(exprType);
+  auto &ctx = exprType->getASTContext();
   if (auto genericType = exprType->getAs<BoundGenericClassType>()) {
     auto classDecl = genericType->getDecl();
     auto typeArgs = genericType->getGenericArgs();
-    if (classDecl == Context.getQuoteDecl()) {
+    if (classDecl == ctx.getQuoteDecl()) {
       return typeArgs[0];
-    } else if (classDecl == Context.getFunctionQuoteDecl(typeArgs.size() - 1)) {
+    } else if (classDecl == ctx.getFunctionQuoteDecl(typeArgs.size() - 1)) {
       SmallVector<AnyFunctionType::Param, 4> paramTypes;
       for (unsigned i = 0; i < typeArgs.size() - 1; ++i) {
         auto typeArg = typeArgs[i];
         auto flags = ParameterTypeFlags();
         if (auto genericTypeArg = typeArg->getAs<BoundGenericClassType>()) {
-          if (genericTypeArg->getDecl() ==
-              Context.getUnsafeMutablePointerDecl()) {
+          if (genericTypeArg->getDecl() == ctx.getUnsafeMutablePointerDecl()) {
             flags = flags.withInOut(true);
           }
         }
@@ -1325,18 +1328,18 @@ Type TypeChecker::getTypeOfUnquoteExpr(Type exprType, SourceLoc loc) {
       }
       return FunctionType::get(paramTypes, typeArgs[typeArgs.size() - 1]);
     } else {
-      diagnose(loc, diag::unquote_wrong_type);
+      ctx.Diags.diagnose(loc, diag::unquote_wrong_type);
       return Type();
     }
   } else {
-    diagnose(loc, diag::unquote_wrong_type);
+    ctx.Diags.diagnose(loc, diag::unquote_wrong_type);
     return Type();
   }
 }
 
 Expr *TypeChecker::quoteDecl(Decl *decl, DeclContext *dc) {
   Breadcrumbs bcs;
-  ASTQuoter astQuoter(*this, bcs);
+  ASTQuoter astQuoter(dc->getASTContext(), bcs);
   Expr *quotedDecl = astQuoter.visit(decl);
   if (!quotedDecl) {
     return nullptr;
@@ -1350,14 +1353,14 @@ Expr *TypeChecker::quoteDecl(Decl *decl, DeclContext *dc) {
   return quotedDecl;
 }
 
-Type TypeChecker::getTypeOfQuoteDecl(SourceLoc loc) {
-  if (!Context.getQuoteModule()) {
-    diagnose(loc, diag::quote_literal_no_quote_module);
+Type TypeChecker::getTypeOfQuoteDecl(ASTContext &ctx, SourceLoc loc) {
+  if (!ctx.getQuoteModule()) {
+    ctx.Diags.diagnose(loc, diag::quote_literal_no_quote_module);
     return Type();
   }
-  auto treeProto = Context.getTreeDecl();
+  auto treeProto = ctx.getTreeDecl();
   if (!treeProto) {
-    diagnose(loc, diag::quote_literal_no_tree_proto);
+    ctx.Diags.diagnose(loc, diag::quote_literal_no_tree_proto);
     return Type();
   }
   return treeProto->getDeclaredType();

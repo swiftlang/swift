@@ -67,6 +67,10 @@ static bool swiftTypeContextInfoImpl(SwiftLangSupport &Lang,
     return false;
   }
 
+  // Always disable source location resolutions from .swiftsourceinfo file
+  // because they're somewhat heavy operations and aren't needed for completion.
+  Invocation.getFrontendOptions().IgnoreSwiftSourceInfo = true;
+
   Invocation.setCodeCompletionPoint(newBuffer.get(), Offset);
 
   // Create a factory for code completion callbacks that will feed the
@@ -81,7 +85,7 @@ static bool swiftTypeContextInfoImpl(SwiftLangSupport &Lang,
     return true;
   }
   registerIDETypeCheckRequestFunctions(CI.getASTContext().evaluator);
-  CI.performSema();
+  CI.performParseAndResolveImportsOnly();
 
   return true;
 }

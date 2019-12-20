@@ -199,8 +199,8 @@ struct d0100_FooStruct {
 
   class NestedClass {}
 // PASS_COMMON-NEXT: {{^}}  class NestedClass {{{$}}
-// PASS_COMMON-NEXT: {{^}}    init(){{$}}
 // PASS_COMMON-NEXT: {{^}}    @objc deinit{{$}}
+// PASS_COMMON-NEXT: {{^}}    init(){{$}}
 // PASS_COMMON-NEXT: {{^}}  }{{$}}
 
   enum NestedEnum {}
@@ -275,8 +275,8 @@ extension d0100_FooStruct {
 
   class ExtNestedClass {}
 // PASS_COMMON-NEXT: {{^}}  class ExtNestedClass {{{$}}
-// PASS_COMMON-NEXT: {{^}}    init(){{$}}
 // PASS_COMMON-NEXT: {{^}}    @objc deinit{{$}}
+// PASS_COMMON-NEXT: {{^}}    init(){{$}}
 // PASS_COMMON-NEXT: {{^}}  }{{$}}
 
   enum ExtNestedEnum {
@@ -551,7 +551,7 @@ class d0170_TestAvailability {
 // PASS_EXPLODE_PATTERN-LABEL: {{^}}@objc class d0181_TestIBAttrs {{{$}}
 
   @IBOutlet weak var anOutlet: d0181_TestIBAttrs!
-// PASS_EXPLODE_PATTERN-NEXT: {{^}}  @objc @IBOutlet @_implicitly_unwrapped_optional @_hasInitialValue weak var anOutlet: @sil_weak d0181_TestIBAttrs!{{$}}
+// PASS_EXPLODE_PATTERN-NEXT: {{^}}  @objc @IBOutlet @_hasInitialValue weak var anOutlet: @sil_weak d0181_TestIBAttrs!{{$}}
 
   @IBInspectable var inspectableProp: Int = 0
 // PASS_EXPLODE_PATTERN-NEXT: {{^}}  @objc @IBInspectable @_hasInitialValue var inspectableProp: Int{{$}}
@@ -602,8 +602,8 @@ struct d0200_EscapedIdentifiers {
 
   class `class` {}
 // PASS_COMMON-NEXT: {{^}}  class `class` {{{$}}
-// PASS_COMMON-NEXT: {{^}}    init(){{$}}
 // PASS_COMMON-NEXT: {{^}}    @objc deinit{{$}}
+// PASS_COMMON-NEXT: {{^}}    init(){{$}}
 // PASS_COMMON-NEXT: {{^}}  }{{$}}
 
   typealias `protocol` = `class`
@@ -613,8 +613,8 @@ struct d0200_EscapedIdentifiers {
   class `extension` : `class` {}
 // PASS_ONE_LINE_TYPE-DAG: {{^}}  class `extension` : d0200_EscapedIdentifiers.`class` {{{$}}
 // PASS_ONE_LINE_TYPEREPR-DAG: {{^}}  class `extension` : `class` {{{$}}
-// PASS_COMMON:      {{^}}    {{(override )?}}init(){{$}}
-// PASS_COMMON-NEXT: {{^}}    @objc deinit{{$}}
+// PASS_COMMON:      {{^}}    @objc deinit{{$}}
+// PASS_COMMON-NEXT: {{^}}    {{(override )?}}init(){{$}}
 // PASS_COMMON-NEXT: {{^}}  }{{$}}
 
   func `func`<`let`: `protocol`, `where`>(
@@ -1345,6 +1345,20 @@ class FooClassComputed {
   }
 
 // PASS_PRINT_AST: }
+}
+
+// PASS_PRINT_AST: struct HasDefaultTupleOfNils {
+// PASS_PRINT_AST:   var x: (Int?, Int?)
+// PASS_PRINT_AST:   var y: Int?
+// PASS_PRINT_AST:   var z: Int
+// PASS_PRINT_AST:   var w: ((Int?, (), Int?), (Int?, Int?))
+// PASS_PRINT_AST:   init(x: (Int?, Int?) = (nil, nil), y: Int? = nil, z: Int, w: ((Int?, (), Int?), (Int?, Int?)) = ((nil, (), nil), (nil, nil)))
+// PASS_PRINT_AST: }
+struct HasDefaultTupleOfNils {
+  var x: (Int?, Int?)
+  var y: Int?
+  var z: Int
+  var w: ((Int?, (), Int?), (Int?, Int?))
 }
 
 // Protocol extensions

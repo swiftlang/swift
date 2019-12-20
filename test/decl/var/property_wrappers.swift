@@ -99,13 +99,13 @@ struct InitialValueTypeMismatch<Value> {
 }
 
 @propertyWrapper
-struct MultipleInitialValues<Value> { // expected-error{{property wrapper type 'MultipleInitialValues' has multiple initial-value initializers}}
-  var wrappedValue: Value? = nil
+struct MultipleInitialValues<Value> {
+  var wrappedValue: Value? = nil // expected-note 2{{'wrappedValue' declared here}}
 
-  init(wrappedValue initialValue: Int) { // expected-note{{initializer 'init(wrappedValue:)' declared here}}
+  init(wrappedValue initialValue: Int) { // expected-error{{'init(wrappedValue:)' parameter type ('Int') must be the same as its 'wrappedValue' property type ('Value?') or an @autoclosure thereof}}
   }
 
-  init(wrappedValue initialValue: Double) { // expected-note{{initializer 'init(wrappedValue:)' declared here}}
+  init(wrappedValue initialValue: Double) { // expected-error{{'init(wrappedValue:)' parameter type ('Double') must be the same as its 'wrappedValue' property type ('Value?') or an @autoclosure thereof}}
   }
 }
 
@@ -216,7 +216,11 @@ struct BadCombinations {
 }
 
 struct MultipleWrappers {
-  @Wrapper(stored: 17)
+  // FIXME: The diagnostics here aren't great. The problem is that we're
+  // attempting to splice a 'wrappedValue:' argument into the call to Wrapper's
+  // init, but it doesn't have a matching init. We're then attempting to access
+  // the nested 'wrappedValue', but Wrapper's 'wrappedValue' is Int.
+  @Wrapper(stored: 17) // expected-error{{value of type 'Int' has no member 'wrappedValue'}}
   @WrapperWithInitialValue // expected-error{{extra argument 'wrappedValue' in call}}
   var x: Int = 17
 
@@ -236,7 +240,7 @@ struct Initialization {
   var x2: Double
 
   @Wrapper(stored: 17)
-  var x3 = 42 // expected-error{{extra argument 'wrappedValue' in call}}
+  var x3 = 42 // expected-error {{extra argument 'wrappedValue' in call}}
 
   @Wrapper(stored: 17)
   var x4
@@ -244,9 +248,8 @@ struct Initialization {
   @WrapperWithInitialValue
   var y = true
 
-  // FIXME: It would be nice if we had a more detailed diagnostic here.
   @WrapperWithInitialValue<Int>
-  var y2 = true // expected-error{{'Bool' is not convertible to 'Int'}}
+  var y2 = true // expected-error{{cannot convert value of type 'Bool' to specified type 'Int'}}
 
   mutating func checkTypes(s: String) {
     x2 = s // expected-error{{cannot assign value of type 'String' to type 'Double'}}
@@ -718,7 +721,7 @@ struct DefaultedPrivateMemberwiseLets {
 func testDefaultedPrivateMemberwiseLets() {
   _ = DefaultedPrivateMemberwiseLets()
   _ = DefaultedPrivateMemberwiseLets(y: 42)
-  _ = DefaultedPrivateMemberwiseLets(x: Wrapper(stored: false)) // expected-error{{incorrect argument label in call (have 'x:', expected 'y:')}}
+  _ = DefaultedPrivateMemberwiseLets(x: Wrapper(stored: false)) // expected-error{{argument passed to call that takes no arguments}}
 }
 
 
@@ -965,14 +968,21 @@ struct TestComposition {
   @WrapperD<WrapperC, Int, String> @WrapperC var p4: Int?
   @WrapperD<WrapperC, Int, String> @WrapperE var p5: Int // expected-error{{property type 'Int' does not match that of the 'wrappedValue' property of its wrapper type 'WrapperD<WrapperC, Int, String>'}}
 
-	func triggerErrors(d: Double) {
-		p1 = d // expected-error{{cannot assign value of type 'Double' to type 'Int?'}}
-		p2 = d // expected-error{{cannot assign value of type 'Double' to type 'String?'}}
-    p3 = d // expected-error{{cannot assign value of type 'Double' to type 'Int?'}}
+	func triggerErrors(d: Double) { // expected-note 6 {{mark method 'mutating' to make 'self' mutable}} {{2-2=mutating }}
+		p1 = d // expected-error{{cannot assign value of type 'Double' to type 'Int'}} {{8-8=Int(}} {{9-9=)}}
+    // expected-error@-1 {{cannot assign to property: 'self' is immutable}}
+		p2 = d // expected-error{{cannot assign value of type 'Double' to type 'String'}}
+    // expected-error@-1 {{cannot assign to property: 'self' is immutable}}
+    // TODO(diagnostics): Looks like source range for 'd' here is reported as starting at 10, but it should be 8
+    p3 = d // expected-error{{cannot assign value of type 'Double' to type 'Int'}} {{10-10=Int(}} {{11-11=)}}
+    // expected-error@-1 {{cannot assign to property: 'self' is immutable}}
 
 		_p1 = d // expected-error{{cannot assign value of type 'Double' to type 'WrapperA<WrapperB<WrapperC<Int>>>'}}
+    // expected-error@-1 {{cannot assign to property: 'self' is immutable}}
 		_p2 = d // expected-error{{cannot assign value of type 'Double' to type 'WrapperA<WrapperB<WrapperC<String>>>'}}
+    // expected-error@-1 {{cannot assign to property: 'self' is immutable}}
     _p3 = d // expected-error{{cannot assign value of type 'Double' to type 'WrapperD<WrapperE<Int?>, Int, String>'}}
+    // expected-error@-1 {{cannot assign to property: 'self' is immutable}}
 	}
 }
 
@@ -1008,6 +1018,18 @@ struct Foo<T> { // expected-note {{arguments to generic parameter 'T' ('W' and '
   subscript(q q: String, a: Int) -> Bool {
     get { return false }
     set { }
+  }
+}
+
+extension Foo : Equatable where T : Equatable {
+  static func == (lhs: Foo, rhs: Foo) -> Bool {
+    lhs.wrappedValue == rhs.wrappedValue
+  }
+}
+
+extension Foo : Hashable where T : Hashable {
+  func hash(into hasher: inout Hasher) {
+    hasher.combine(wrappedValue)
   }
 }
 
@@ -1059,6 +1081,8 @@ struct MissingPropertyWrapperUnwrap {
   func d(_: W) {}
   func e(_: Foo<W>) {}
 
+  subscript<T : Hashable>(takesFoo x: Foo<T>) -> Foo<T> { x }
+
   func baz() {
     self.x.foo() // expected-error {{referencing instance method 'foo()' requires wrapper 'Foo<Int>'}}{{10-10=_}}
     self.x.prop  // expected-error {{referencing property 'prop' requires wrapper 'Foo<Int>'}} {{10-10=_}}
@@ -1092,12 +1116,16 @@ struct MissingPropertyWrapperUnwrap {
 
     self.x[q: "ultimate question", 42] // expected-error {{referencing subscript 'subscript(q:_:)' requires wrapper 'Foo<Int>'}} {{10-10=_}}
     self.x[q: "ultimate question", 42] = true // expected-error {{referencing subscript 'subscript(q:_:)' requires wrapper 'Foo<Int>'}} {{10-10=_}}
+
+    // SR-11476
+    _ = \Self.[takesFoo: self.x] // expected-error {{cannot convert value 'x' of type 'Int' to expected type 'Foo<Int>', use wrapper instead}}{{31-31=_}}
+    _ = \Foo<W>.[x: self._x] // expected-error {{cannot convert value '_x' of type 'Foo<Int>' to expected type 'Int', use wrapped value instead}} {{26-27=}}
   }
 }
 
 struct InvalidPropertyDelegateUse {
-  @Foo var x: Int = 42 // expected-error {{cannot invoke initializer for ty}}
-  // expected-note@-1{{overloads for 'Foo<_>' exist with these partially matching paramet}}
+  // TODO(diagnostics): We need to a tailored diagnostic for extraneous arguments in property delegate initialization
+  @Foo var x: Int = 42 // expected-error@:21 {{argument passed to call that takes no arguments}}
 
   func test() {
     self.x.foo() // expected-error {{value of type 'Int' has no member 'foo'}}
@@ -1504,3 +1532,306 @@ struct AllCompositionsStruct {
   }
 }
 
+// rdar://problem/54184846 - crash while trying to retrieve wrapper info on l-value base type
+func test_missing_method_with_lvalue_base() {
+  @propertyWrapper
+  struct Ref<T> {
+    var wrappedValue: T
+  }
+
+  struct S<T> where T: RandomAccessCollection, T.Element: Equatable {
+    @Ref var v: T.Element
+
+    init(items: T, v: Ref<T.Element>) {
+      self.v.binding = v // expected-error {{value of type 'T.Element' has no member 'binding'}}
+    }
+  }
+}
+
+// SR-11288
+// Look into the protocols that the type conforms to
+
+// typealias as propertyWrapper //
+
+@propertyWrapper
+struct SR_11288_S0 {
+  var wrappedValue: Int
+}
+
+protocol SR_11288_P1 {
+  typealias SR_11288_Wrapper1 = SR_11288_S0
+}
+
+struct SR_11288_S1: SR_11288_P1 {
+  @SR_11288_Wrapper1 var answer = 42 // Okay
+}
+
+// associatedtype as propertyWrapper //
+
+protocol SR_11288_P2 {
+  associatedtype SR_11288_Wrapper2 = SR_11288_S0
+}
+
+struct SR_11288_S2: SR_11288_P2 {
+  @SR_11288_Wrapper2 var answer = 42 // expected-error {{unknown attribute 'SR_11288_Wrapper2'}}
+}
+
+protocol SR_11288_P3 {
+  associatedtype SR_11288_Wrapper3
+}
+
+struct SR_11288_S3: SR_11288_P3 {
+  typealias SR_11288_Wrapper3 = SR_11288_S0
+  @SR_11288_Wrapper3 var answer = 42 // Okay
+}
+
+// typealias as propertyWrapper in a constrained protocol extension //
+
+protocol SR_11288_P4 {}
+extension SR_11288_P4 where Self: AnyObject { // expected-note {{requirement specified as 'Self' : 'AnyObject' [with Self = SR_11288_S4]}}
+  typealias SR_11288_Wrapper4 = SR_11288_S0
+}
+
+struct SR_11288_S4: SR_11288_P4 {
+  @SR_11288_Wrapper4 var answer = 42 // expected-error {{'SR_11288_S4.SR_11288_Wrapper4' (aka 'SR_11288_S0') requires that 'SR_11288_S4' be a class type}}
+}
+
+class SR_11288_C0: SR_11288_P4 {
+  @SR_11288_Wrapper4 var answer = 42 // Okay
+}
+
+// typealias as propertyWrapper in a generic type //
+
+protocol SR_11288_P5 {
+  typealias SR_11288_Wrapper5 = SR_11288_S0
+}
+
+struct SR_11288_S5<T>: SR_11288_P5 {
+  @SR_11288_Wrapper5 var answer = 42 // Okay
+}
+
+// SR-11393
+protocol Copyable: AnyObject {
+    func copy() -> Self
+}
+
+@propertyWrapper
+struct CopyOnWrite<Value: Copyable> {
+  init(wrappedValue: Value) {
+    self.wrappedValue = wrappedValue
+  }
+
+  var wrappedValue: Value
+
+  var projectedValue: Value {
+    mutating get {
+      if !isKnownUniquelyReferenced(&wrappedValue) {
+        wrappedValue = wrappedValue.copy()
+      }
+      return wrappedValue
+    }
+    set {
+      wrappedValue = newValue
+    }
+  }
+}
+
+final class CopyOnWriteTest: Copyable {
+    let a: Int
+    init(a: Int) {
+        self.a = a
+    }
+
+    func copy() -> Self {
+        Self.init(a: a)
+    }
+}
+
+struct CopyOnWriteDemo1 {
+  @CopyOnWrite var a = CopyOnWriteTest(a: 3)
+
+  func foo() { // expected-note{{mark method 'mutating' to make 'self' mutable}}
+    _ = $a // expected-error{{cannot use mutating getter on immutable value: 'self' is immutable}}
+  }
+}
+
+@propertyWrapper
+struct NonMutatingProjectedValueSetWrapper<Value> {
+  var wrappedValue: Value
+  var projectedValue: Value {
+    get { wrappedValue }
+    nonmutating set { } 
+  }
+}
+
+struct UseNonMutatingProjectedValueSet {
+  @NonMutatingProjectedValueSetWrapper var x = 17
+
+  func test() { // expected-note{{mark method 'mutating' to make 'self' mutable}}
+    $x = 42 // okay
+    x = 42  // expected-error{{cannot assign to property: 'self' is immutable}}
+  }
+}
+
+// SR-11478
+
+@propertyWrapper
+struct SR_11478_W<Value> {
+  var wrappedValue: Value
+}
+
+class SR_11478_C1 {
+  @SR_11478_W static var bool1: Bool = true // Ok
+  @SR_11478_W class var bool2: Bool = true // expected-error {{class stored properties not supported in classes; did you mean 'static'?}}
+  @SR_11478_W class final var bool3: Bool = true // expected-error {{class stored properties not supported in classes; did you mean 'static'?}}
+}
+
+final class SR_11478_C2 {
+  @SR_11478_W static var bool1: Bool = true // Ok
+  @SR_11478_W class var bool2: Bool = true // expected-error {{class stored properties not supported in classes; did you mean 'static'?}}
+  @SR_11478_W class final var bool3: Bool = true // expected-error {{class stored properties not supported in classes; did you mean 'static'?}}
+}
+
+// SR-11381
+
+@propertyWrapper
+struct SR_11381_W<T> {
+  init(wrappedValue: T) {}
+  var wrappedValue: T {
+    fatalError()
+  }
+}
+
+struct SR_11381_S {
+  @SR_11381_W var foo: Int = nil // expected-error {{'nil' is not compatible with expected argument type 'Int'}}
+}
+
+// rdar://problem/53349209 - regression in property wrapper inference
+struct Concrete1: P {}
+
+@propertyWrapper struct ConcreteWrapper {
+  var wrappedValue: Concrete1 { get { fatalError() } }
+}
+
+struct TestConcrete1 {
+  @ConcreteWrapper() var s1
+
+  func f() {
+    // Good:
+    let _: P = self.s1
+
+    // Bad:
+    self.g(s1: self.s1)
+
+    // Ugly:
+    self.g(s1: self.s1 as P)
+  }
+
+  func g(s1: P) {
+    // ...
+  }
+}
+
+// SR-11477
+
+// Two initializers that can default initialize the wrapper //
+
+@propertyWrapper
+struct SR_11477_W1 { // Okay
+  let name: String
+
+  init() {
+    self.name = "Init"
+  }
+
+  init(name: String = "DefaultParamInit") {
+    self.name = name
+  }
+
+  var wrappedValue: Int {
+    get { return 0 }
+  }
+}
+
+// Two initializers with default arguments that can default initialize the wrapper //
+
+@propertyWrapper
+struct SR_11477_W2 { // Okay
+  let name: String
+
+  init(anotherName: String = "DefaultParamInit1") {
+    self.name = anotherName
+  }
+
+  init(name: String = "DefaultParamInit2") {
+    self.name = name
+  }
+
+  var wrappedValue: Int {
+    get { return 0 }
+  }
+}
+
+// Single initializer that can default initialize the wrapper //
+
+@propertyWrapper
+struct SR_11477_W3 { // Okay
+  let name: String
+
+  init() {
+    self.name = "Init"
+  }
+
+  var wrappedValue: Int {
+    get { return 0 }
+  }
+}
+
+// rdar://problem/56213175 - backward compatibility issue with Swift 5.1,
+// which unconditionally skipped protocol members.
+protocol ProtocolWithWrapper {
+  associatedtype Wrapper = Float // expected-note{{associated type 'Wrapper' declared here}}
+}
+
+struct UsesProtocolWithWrapper: ProtocolWithWrapper {
+  @Wrapper var foo: Int // expected-warning{{ignoring associated type 'Wrapper' in favor of module-scoped property wrapper 'Wrapper'; please qualify the reference with 'property_wrappers'}}{{4-4=property_wrappers.}}
+}
+
+// rdar://problem/56350060 - [Dynamic key path member lookup] Assertion when subscripting with a key path
+func test_rdar56350060() {
+  @propertyWrapper
+  @dynamicMemberLookup
+  struct DynamicWrapper<Value> {
+    var wrappedValue: Value { fatalError() }
+
+    subscript<T>(keyPath keyPath: KeyPath<Value, T>) -> DynamicWrapper<T> {
+      fatalError()
+    }
+
+    subscript<T>(dynamicMember keyPath: KeyPath<Value, T>) -> DynamicWrapper<T> {
+      return self[keyPath: keyPath] // Ok
+    }
+  }
+}
+
+// rdar://problem/57411331 - crash due to incorrectly synthesized "nil" default
+// argument.
+@propertyWrapper
+struct Blah<Value> {
+  init(blah _: Int) { }
+
+  var wrappedValue: Value {
+    let val: Value? = nil
+    return val!
+  }
+}
+
+struct UseRdar57411331 {
+  let x = Rdar57411331(other: 5)
+}
+
+struct Rdar57411331 {
+  @Blah(blah: 17) var something: Int?
+
+  var other: Int
+}

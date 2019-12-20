@@ -1,8 +1,8 @@
-// RUN: %target-swift-frontend -emit-sil -verify -verify-ignore-unknown %s
+// RUN: %target-swift-emit-sil -verify %s
 
-// FIXME(TF-201): Remove `-verify-ignore-unknown`. This is currently necessary
-// due to direct differentiation of reabstraction thunks, which emits errors
-// with unknown location.
+//===----------------------------------------------------------------------===//
+// Non-differentiable arguments and results
+//===----------------------------------------------------------------------===//
 
 @differentiable
 func generic<T: Differentiable & FloatingPoint>(_ x: T) -> T {
@@ -45,7 +45,7 @@ struct Tensor<Scalar> {
 }
 extension Tensor : Differentiable where Scalar : Differentiable & FloatingPoint {}
 extension Tensor where Scalar : BinaryFloatingPoint {
-  @differentiable(wrt: (self) where Scalar : Differentiable)
+  @differentiable(wrt: self where Scalar : Differentiable)
   func TF_6(_ x: Float) -> Tensor {
     return self + Scalar(x)
   }

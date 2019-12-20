@@ -25,6 +25,7 @@
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/ResilienceExpansion.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/Timer.h"
@@ -86,7 +87,7 @@ getBridgingFn(Optional<SILDeclRef> &cacheSlot,
     }
 
     SmallVector<ValueDecl *, 2> decls;
-    mod->lookupValue(/*AccessPath=*/{}, ctx.getIdentifier(functionName),
+    mod->lookupValue(ctx.getIdentifier(functionName),
                      NLKind::QualifiedLookup, decls);
     if (decls.empty()) {
       SGM.diagnose(SourceLoc(), diag::bridging_function_missing,
@@ -106,16 +107,15 @@ getBridgingFn(Optional<SILDeclRef> &cacheSlot,
       llvm::report_fatal_error("unable to set up the ObjC bridge!");
     }
 
-    assert(fd->hasInterfaceType() && "bridging functions must be type-checked");
-
     // Check that the function takes the expected arguments and returns the
     // expected result type.
     SILDeclRef c(fd);
-    auto funcTy = SGM.Types.getConstantFunctionType(c);
+    auto funcTy =
+        SGM.Types.getConstantFunctionType(TypeExpansionContext::minimal(), c);
     SILFunctionConventions fnConv(funcTy, SGM.M);
 
     auto toSILType = [&SGM](Type ty) {
-      return SGM.Types.getLoweredType(ty, ResilienceExpansion::Minimal);
+      return SGM.Types.getLoweredType(ty, TypeExpansionContext::minimal());
     };
 
     if (inputTypes) {
@@ -219,16 +219,9 @@ FuncDecl *SILGenModule::getBridgeToObjectiveCRequirement(SILLocation loc) {
 
   // Look for _bridgeToObjectiveC().
   auto &ctx = getASTContext();
-  FuncDecl *found = nullptr;
   DeclName name(ctx, ctx.Id_bridgeToObjectiveC, llvm::ArrayRef<Identifier>());
-  auto flags = OptionSet<NominalTypeDecl::LookupDirectFlags>();
-  flags |= NominalTypeDecl::LookupDirectFlags::IgnoreNewExtensions;
-  for (auto member : proto->lookupDirect(name, flags)) {
-    if (auto func = dyn_cast<FuncDecl>(member)) {
-      found = func;
-      break;
-    }
-  }
+  auto *found = dyn_cast_or_null<FuncDecl>(
+    proto->getSingleRequirement(name));
 
   if (!found)
     diagnose(loc, diag::bridging_objcbridgeable_broken, name);
@@ -251,17 +244,10 @@ FuncDecl *SILGenModule::getUnconditionallyBridgeFromObjectiveCRequirement(
 
   // Look for _bridgeToObjectiveC().
   auto &ctx = getASTContext();
-  FuncDecl *found = nullptr;
   DeclName name(ctx, ctx.getIdentifier("_unconditionallyBridgeFromObjectiveC"),
                 llvm::makeArrayRef(Identifier()));
-  auto flags = OptionSet<NominalTypeDecl::LookupDirectFlags>();
-  flags |= NominalTypeDecl::LookupDirectFlags::IgnoreNewExtensions;
-  for (auto member : proto->lookupDirect(name, flags)) {
-    if (auto func = dyn_cast<FuncDecl>(member)) {
-      found = func;
-      break;
-    }
-  }
+  auto *found = dyn_cast_or_null<FuncDecl>(
+    proto->getSingleRequirement(name));
 
   if (!found)
     diagnose(loc, diag::bridging_objcbridgeable_broken, name);
@@ -284,19 +270,9 @@ SILGenModule::getBridgedObjectiveCTypeRequirement(SILLocation loc) {
 
   // Look for _bridgeToObjectiveC().
   auto &ctx = getASTContext();
-  AssociatedTypeDecl *found = nullptr;
-  DeclName name(ctx.Id_ObjectiveCType);
-  auto flags = OptionSet<NominalTypeDecl::LookupDirectFlags>();
-  flags |= NominalTypeDecl::LookupDirectFlags::IgnoreNewExtensions;
-  for (auto member : proto->lookupDirect(name, flags)) {
-    if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
-      found = assocType;
-      break;
-    }
-  }
-
+  auto *found = proto->getAssociatedType(ctx.Id_ObjectiveCType);
   if (!found)
-    diagnose(loc, diag::bridging_objcbridgeable_broken, name);
+    diagnose(loc, diag::bridging_objcbridgeable_broken, ctx.Id_ObjectiveCType);
 
   BridgedObjectiveCType = found;
   return found;
@@ -309,8 +285,10 @@ SILGenModule::getConformanceToObjectiveCBridgeable(SILLocation loc, Type type) {
 
   // Find the conformance to _ObjectiveCBridgeable.
   auto result = SwiftModule->lookupConformance(type, proto);
-  if (result) return result->getConcrete();
-  return nullptr;
+  if (result.isInvalid())
+    return nullptr;
+
+  return result.getConcrete();
 }
 
 ProtocolDecl *SILGenModule::getBridgedStoredNSError(SILLocation loc) {
@@ -337,24 +315,18 @@ VarDecl *SILGenModule::getNSErrorRequirement(SILLocation loc) {
 
   // Look for _nsError.
   auto &ctx = getASTContext();
-  VarDecl *found = nullptr;
-  auto flags = OptionSet<NominalTypeDecl::LookupDirectFlags>();
-  flags |= NominalTypeDecl::LookupDirectFlags::IgnoreNewExtensions;
-  for (auto member : proto->lookupDirect(ctx.Id_nsError, flags)) {
-    if (auto var = dyn_cast<VarDecl>(member)) {
-      found = var;
-      break;
-    }
-  }
+  auto *found = dyn_cast_or_null<VarDecl>(
+      proto->getSingleRequirement(ctx.Id_nsError));
 
   NSErrorRequirement = found;
   return found;
 }
 
-Optional<ProtocolConformanceRef>
+ProtocolConformanceRef
 SILGenModule::getConformanceToBridgedStoredNSError(SILLocation loc, Type type) {
   auto proto = getBridgedStoredNSError(loc);
-  if (!proto) return None;
+  if (!proto)
+    return ProtocolConformanceRef::forInvalid();
 
   // Find the conformance to _BridgedStoredNSError.
   return SwiftModule->lookupConformance(type, proto);
@@ -365,8 +337,8 @@ ProtocolConformance *SILGenModule::getNSErrorConformanceToError() {
     return *NSErrorConformanceToError;
 
   auto &ctx = getASTContext();
-  auto nsError = ctx.getNSErrorDecl();
-  if (!nsError) {
+  auto nsErrorTy = ctx.getNSErrorType();
+  if (!nsErrorTy) {
     NSErrorConformanceToError = nullptr;
     return nullptr;
   }
@@ -378,11 +350,10 @@ ProtocolConformance *SILGenModule::getNSErrorConformanceToError() {
   }
 
   auto conformance =
-    SwiftModule->lookupConformance(nsError->getDeclaredInterfaceType(),
-                                   cast<ProtocolDecl>(error));
+    SwiftModule->lookupConformance(nsErrorTy, cast<ProtocolDecl>(error));
 
-  if (conformance && conformance->isConcrete())
-    NSErrorConformanceToError = conformance->getConcrete();
+  if (conformance.isConcrete())
+    NSErrorConformanceToError = conformance.getConcrete();
   else
     NSErrorConformanceToError = nullptr;
   return *NSErrorConformanceToError;
@@ -445,12 +416,12 @@ SILGenModule::getKeyPathProjectionCoroutine(bool isReadAccess,
                     : ParameterConvention::Indirect_In_Guaranteed },
   };
 
-  auto extInfo =
-    SILFunctionType::ExtInfo(SILFunctionTypeRepresentation::Thin,
-                             /*pseudogeneric*/false,
-                             // SWIFT_ENABLE_TENSORFLOW
-                             /*non-escaping*/false,
-                             DifferentiabilityKind::NonDifferentiable);
+  auto extInfo = SILFunctionType::ExtInfo(
+      SILFunctionTypeRepresentation::Thin,
+      /*pseudogeneric*/ false,
+      /*non-escaping*/ false,
+      DifferentiabilityKind::NonDifferentiable,
+      /*clangFunctionType*/ nullptr);
 
   auto functionTy = SILFunctionType::get(sig, extInfo,
                                          SILCoroutineKind::YieldOnce,
@@ -459,9 +430,10 @@ SILGenModule::getKeyPathProjectionCoroutine(bool isReadAccess,
                                          yields,
                                          /*results*/ {},
                                          /*error result*/ {},
+                                         SubstitutionMap(), false,
                                          getASTContext());
 
-  auto env = sig->createGenericEnvironment();
+  auto env = sig->getGenericEnvironment();
 
   SILGenFunctionBuilder builder(*this);
   fn = builder.createFunction(SILLinkage::PublicExternal,
@@ -519,6 +491,7 @@ SILFunction *SILGenModule::emitTopLevelFunction(SILLocation Loc) {
                                    SILResultInfo(Int32Ty,
                                                  ResultConvention::Unowned),
                                    None,
+                                   SubstitutionMap(), false,
                                    C);
 
   SILGenFunctionBuilder builder(*this);
@@ -782,90 +755,159 @@ void SILGenModule::postEmitFunction(SILDeclRef constant,
              F->print(llvm::dbgs()));
 
   // SWIFT_ENABLE_TENSORFLOW
-  // Create self-reordering thunks for JVPs/VJPs of `@differentiable` methods.
-  if (constant.hasDecl() && constant.getAbstractFunctionDecl()) {
+  // Visit `@differentiable` attributes and generate SIL differentiability
+  // witnesses.
+  // TODO(TF-835): Visit `@derivative` attributes when type-checking no longer
+  // generates implicit `@differentiable` attributes. See TF-835 for replacement
+  // code.
+  // Skip if the SILDeclRef is a:
+  // - Default argument generator function.
+  // - Thunk.
+  if (constant.hasDecl() && constant.getAbstractFunctionDecl() &&
+      constant.kind != SILDeclRef::Kind::DefaultArgGenerator &&
+      !constant.isThunk()) {
     auto *AFD = constant.getAbstractFunctionDecl();
-    auto origFnType = AFD->getInterfaceType()->castTo<AnyFunctionType>();
-    auto origSilFnType = F->getLoweredFunctionType();
-    // Jointly iterate over AST `@differentiable` attributes and SIL
-    // `[differentiable]` attributes.
-    auto diffAttrs = AFD->getAttrs().getAttributes<DifferentiableAttr>();
-    auto silDiffAttrs = F->getDifferentiableAttrs();
-    for (auto pair : llvm::zip(diffAttrs, silDiffAttrs)) {
-      auto *diffAttr = const_cast<DifferentiableAttr *>(std::get<0>(pair));
-      auto *silDiffAttr = std::get<1>(pair);
-      // Compute autodiff indices.
-      auto paramIndices = diffAttr->getParameterIndices();
-      auto loweredParamIndices = paramIndices->getLowered(
-          getASTContext(), origFnType);
-      SILAutoDiffIndices indices(/*source*/ 0, loweredParamIndices);
-      assert(silDiffAttr->getIndices() == indices &&
-             "Expected matching @differentiable and [differentiable]");
-
-      auto lookUpConformance = LookUpConformanceInModule(M.getSwiftModule());
-      auto expectedJVPType = origSilFnType->getAutoDiffAssociatedFunctionType(
-          indices.parameters, indices.source, /*differentiationOrder*/ 1,
-          AutoDiffAssociatedFunctionKind::JVP, M, lookUpConformance);
-      auto expectedVJPType = origSilFnType->getAutoDiffAssociatedFunctionType(
-          indices.parameters, indices.source, /*differentiationOrder*/ 1,
-          AutoDiffAssociatedFunctionKind::VJP, M, lookUpConformance);
-
-      // Self reordering is necessary if wrt at least two parameters, including
-      // self.
-      auto shouldReorderSelf = [&]() {
-        if (!F->hasSelfParam())
-          return false;
-        auto selfParamIndex = origSilFnType->getNumParameters() - 1;
-        if (!indices.isWrtParameter(selfParamIndex))
-          return false;
-        return indices.parameters->getNumIndices() > 1;
-      };
-      bool reorderSelf = shouldReorderSelf();
-
-      // Thunk JVP method, if it is defined.
-      if (auto *jvpDecl = diffAttr->getJVPFunction()) {
-        SILFunction *jvpThunk;
-        auto *jvpFn = getFunction(SILDeclRef(jvpDecl), NotForDefinition);
-        if (reorderSelf || jvpFn->getLoweredFunctionType() != expectedJVPType) {
-          jvpThunk = getOrCreateAutoDiffAssociatedFunctionThunk(
-              F, indices, jvpFn, AutoDiffAssociatedFunctionKind::JVP,
-              reorderSelf);
-        } else {
-          auto *id = AutoDiffAssociatedFunctionIdentifier::get(
-              AutoDiffAssociatedFunctionKind::JVP, /*differentiationOrder*/ 1,
-              diffAttr->getParameterIndices(), AFD->getASTContext());
-          jvpThunk = getOrCreateAutoDiffThunk(
-              constant.asAutoDiffAssociatedFunction(id), jvpFn,
-              expectedJVPType);
-        }
-        silDiffAttr->setJVPName(jvpThunk->getName());
+    auto emitWitnesses = [&](DeclAttributes &Attrs) {
+      for (auto *diffAttr : Attrs.getAttributes<DifferentiableAttr>()) {
+        SILFunction *jvp = nullptr;
+        SILFunction *vjp = nullptr;
+        if (auto *jvpDecl = diffAttr->getJVPFunction())
+          jvp = getFunction(SILDeclRef(jvpDecl), NotForDefinition);
+        if (auto *vjpDecl = diffAttr->getVJPFunction())
+          vjp = getFunction(SILDeclRef(vjpDecl), NotForDefinition);
+        auto *resultIndices = IndexSubset::get(getASTContext(), 1, {0});
+        assert((!F->getLoweredFunctionType()->getSubstGenericSignature() ||
+                diffAttr->getDerivativeGenericSignature()) &&
+               "Type-checking should resolve derivative generic signatures for "
+               "all original SIL functions with generic signatures");
+        AutoDiffConfig config(diffAttr->getParameterIndices(), resultIndices,
+                              diffAttr->getDerivativeGenericSignature());
+        emitDifferentiabilityWitness(AFD, F, config, jvp, vjp, diffAttr);
       }
-      // Thunk VJP method, if it is defined.
-      if (auto *vjpDecl = diffAttr->getVJPFunction()) {
-        SILFunction *vjpThunk;
-        auto *vjpFn = getFunction(SILDeclRef(vjpDecl), NotForDefinition);
-        if (reorderSelf || vjpFn->getLoweredFunctionType() != expectedVJPType) {
-          vjpThunk = getOrCreateAutoDiffAssociatedFunctionThunk(
-              F, indices, vjpFn, AutoDiffAssociatedFunctionKind::VJP,
-              reorderSelf);
-        } else {
-          auto *id = AutoDiffAssociatedFunctionIdentifier::get(
-              AutoDiffAssociatedFunctionKind::VJP, /*differentiationOrder*/ 1,
-              diffAttr->getParameterIndices(), AFD->getASTContext());
-          vjpThunk = getOrCreateAutoDiffThunk(
-              constant.asAutoDiffAssociatedFunction(id), vjpFn,
-              expectedVJPType);
+      for (auto *derivAttr : Attrs.getAttributes<DerivativeAttr>()) {
+        SILFunction *jvp = nullptr;
+        SILFunction *vjp = nullptr;
+        switch (derivAttr->getDerivativeKind()) {
+        case AutoDiffDerivativeFunctionKind::JVP:
+          jvp = F;
+          break;
+        case AutoDiffDerivativeFunctionKind::VJP:
+          vjp = F;
+          break;
         }
-        silDiffAttr->setVJPName(vjpThunk->getName());
+        auto *origAFD = derivAttr->getOriginalFunction();
+        auto *origFn = getFunction(SILDeclRef(origAFD), NotForDefinition);
+        auto derivativeGenSig = AFD->getGenericSignature();
+        auto *resultIndices = IndexSubset::get(getASTContext(), 1, {0});
+        AutoDiffConfig config(derivAttr->getParameterIndices(), resultIndices,
+                              derivativeGenSig);
+        emitDifferentiabilityWitness(origAFD, origFn, config, jvp, vjp,
+                                     derivAttr);
       }
-    }
+    };
+    if (auto *accessor = dyn_cast<AccessorDecl>(AFD))
+      if (accessor->isGetter())
+        emitWitnesses(accessor->getStorage()->getAttrs());
+    emitWitnesses(AFD->getAttrs());
   }
   F->verify();
 }
 
+void SILGenModule::emitDifferentiabilityWitness(
+    AbstractFunctionDecl *originalAFD, SILFunction *originalFunction,
+    const AutoDiffConfig &config, SILFunction *jvp, SILFunction *vjp,
+    const DeclAttribute *attr) {
+  assert(isa<DifferentiableAttr>(attr) || isa<DerivativeAttr>(attr));
+  auto *origFnType = originalAFD->getInterfaceType()->castTo<AnyFunctionType>();
+  auto origSilFnType = originalFunction->getLoweredFunctionType();
+  auto *silParamIndices =
+      autodiff::getLoweredParameterIndices(config.parameterIndices, origFnType);
+  // NOTE(TF-893): Extending capacity is necessary when `origSilFnType` has
+  // parameters corresponding to captured variables. These parameters do not
+  // appear in the type of `origFnType`.
+  // TODO: If posssible, change `autodiff::getLoweredParameterIndices` to
+  // take `CaptureInfo` into account.
+  if (origSilFnType->getNumParameters() > silParamIndices->getCapacity())
+    silParamIndices = silParamIndices->extendingCapacity(
+        getASTContext(), origSilFnType->getNumParameters());
+  // TODO(TF-913): Replace usages of `SILAutoDiffIndices` with `AutoDiffConfig`.
+  SILAutoDiffIndices indices(/*source*/ 0, silParamIndices);
+
+  // Self reordering thunk is necessary if wrt at least two parameters,
+  // including self.
+  auto shouldReorderSelf = [&]() {
+    if (!originalFunction->hasSelfParam())
+      return false;
+    auto selfParamIndex = origSilFnType->getNumParameters() - 1;
+    if (!indices.isWrtParameter(selfParamIndex))
+      return false;
+    return indices.parameters->getNumIndices() > 1;
+  };
+  bool reorderSelf = shouldReorderSelf();
+
+  // Get or create new SIL differentiability witness.
+  // Witness already exists when there are two `@derivative` attributes (JVP and
+  // VJP) for the same derivative function configuration.
+  // Witness JVP and VJP are set below.
+  AutoDiffConfig silConfig(silParamIndices, config.resultIndices,
+                           config.derivativeGenericSignature);
+  SILDifferentiabilityWitnessKey key{originalFunction->getName(), silConfig};
+  auto *diffWitness = M.lookUpDifferentiabilityWitness(key);
+  if (!diffWitness) {
+    diffWitness = SILDifferentiabilityWitness::createDefinition(
+        M, originalFunction->getLinkage(), originalFunction,
+        silConfig.parameterIndices, silConfig.resultIndices,
+        config.derivativeGenericSignature, /*jvp*/ nullptr, /*vjp*/ nullptr,
+        /*isSerialized*/ hasPublicVisibility(originalFunction->getLinkage()),
+        attr);
+  }
+
+  // Set derivative function in differentiability witness.
+  auto setDerivativeInDifferentiabilityWitness =
+      [&](AutoDiffDerivativeFunctionKind kind, SILFunction *derivative) {
+    auto expectedDerivativeType =
+        origSilFnType->getAutoDiffDerivativeFunctionType(
+            indices.parameters, indices.source, kind, Types,
+            LookUpConformanceInModule(M.getSwiftModule()));
+    // Thunk derivative function.
+    SILFunction *derivativeThunk;
+    if (reorderSelf ||
+        derivative->getLoweredFunctionType() != expectedDerivativeType) {
+      derivativeThunk = getOrCreateAutoDiffDerivativeReabstractionThunk(
+          originalFunction, silConfig, derivative, kind, reorderSelf);
+    } else {
+      // Note: `AutoDiffDerivativeFunctionIdentifier` must be constructed with
+      // the AST-level parameter indices, not the SIL-level ones.
+      auto *id = AutoDiffDerivativeFunctionIdentifier::get(
+          kind, config.parameterIndices, config.derivativeGenericSignature,
+          getASTContext());
+      derivativeThunk = getOrCreateAutoDiffDerivativeForwardingThunk(
+          SILDeclRef(originalAFD).asAutoDiffDerivativeFunction(id), derivative,
+          expectedDerivativeType);
+    }
+    // Check for existing same derivative.
+    // TODO(TF-835): Remove condition below and simplify assertion to
+    // `!diffWitness->getDerivative(kind)` after `@derivative` attribute
+    // type-checking no longer generates implicit `@differentiable` attributes.
+    auto *existingDerivative = diffWitness->getDerivative(kind);
+    if (existingDerivative && existingDerivative == derivativeThunk)
+      return;
+    assert(!existingDerivative &&
+           "SIL differentiability witness already has a different existing "
+           "derivative");
+    diffWitness->setDerivative(kind, derivativeThunk);
+  };
+  if (jvp)
+    setDerivativeInDifferentiabilityWitness(AutoDiffDerivativeFunctionKind::JVP,
+                                            jvp);
+  if (vjp)
+    setDerivativeInDifferentiabilityWitness(AutoDiffDerivativeFunctionKind::VJP,
+                                            vjp);
+}
+
 void SILGenModule::
 emitMarkFunctionEscapeForTopLevelCodeGlobals(SILLocation loc,
-                                             const CaptureInfo &captureInfo) {
+                                             CaptureInfo captureInfo) {
   assert(TopLevelSGF && TopLevelSGF->B.hasValidInsertionPoint()
          && "no valid code generator for top-level function?!");
 
@@ -905,10 +947,6 @@ void SILGenModule::emitAbstractFuncDecl(AbstractFunctionDecl *AFD) {
     if (!hasFunction(thunk))
       emitNativeToForeignThunk(thunk);
   }
-
-  // TODO: Handle SILGen for `@differentiating` attribute.
-  // Tentative solution: SILGen derivative function normally but also emit
-  // mangled redirection thunk for retroactive differentiation.
 }
 
 void SILGenModule::emitFunction(FuncDecl *fd) {
@@ -973,7 +1011,7 @@ void SILGenModule::emitConstructor(ConstructorDecl *decl) {
           });
 
       // Constructors may not have bodies if they've been imported, or if they've
-      // been parsed from a parseable interface.
+      // been parsed from a module interface.
       if (decl->hasBody()) {
         SILDeclRef initConstant(decl, SILDeclRef::Kind::Initializer);
         emitOrDelayFunction(
@@ -1030,7 +1068,6 @@ SILFunction *SILGenModule::emitClosure(AbstractClosureExpr *ce) {
   // initializer of the containing type.
   if (!f->isExternalDeclaration())
     return f;
-
   preEmitFunction(constant, ce, f, ce);
   PrettyStackTraceSILFunction X("silgen closureexpr", f);
   SILGenFunction(*this, *f, ce).emitClosure(ce);
@@ -1048,8 +1085,8 @@ static bool requiresIVarInitialization(SILGenModule &SGM, ClassDecl *cd) {
     auto pbd = dyn_cast<PatternBindingDecl>(member);
     if (!pbd) continue;
 
-    for (auto entry : pbd->getPatternList())
-      if (entry.getExecutableInit())
+    for (auto i : range(pbd->getNumPatternEntries()))
+      if (pbd->getExecutableInit(i))
         return true;
   }
 
@@ -1061,8 +1098,8 @@ bool SILGenModule::hasNonTrivialIVars(ClassDecl *cd) {
     auto *vd = dyn_cast<VarDecl>(member);
     if (!vd || !vd->hasStorage()) continue;
 
-    auto &ti = Types.getTypeLowering(vd->getType(),
-                                     ResilienceExpansion::Maximal);
+    auto &ti = Types.getTypeLowering(
+        vd->getType(), TypeExpansionContext::maximalResilienceExpansionOnly());
     if (!ti.isTrivial())
       return true;
   }
@@ -1095,7 +1132,7 @@ void SILGenModule::emitObjCAllocatorDestructor(ClassDecl *cd,
 
   // Emit the Objective-C -dealloc entry point if it has
   // something to do beyond messaging the superclass's -dealloc.
-  if (dd->hasBody() && dd->getBody()->getNumElements() != 0)
+  if (dd->hasBody() && !dd->getBody()->empty())
     emitObjCDestructorThunk(dd);
 
   // Emit the ivar initializer, if needed.
@@ -1174,7 +1211,7 @@ void SILGenModule::emitDefaultArgGenerator(SILDeclRef constant,
     llvm_unreachable("No default argument here?");
 
   case DefaultArgumentKind::Normal: {
-    auto arg = param->getDefaultValue();
+    auto arg = param->getTypeCheckedDefaultExpr();
     emitOrDelayFunction(*this, constant,
         [this,constant,arg,initDC](SILFunction *f) {
       preEmitFunction(constant, arg, f, arg);
@@ -1202,6 +1239,7 @@ void SILGenModule::emitDefaultArgGenerator(SILDeclRef constant,
   case DefaultArgumentKind::Inherited:
   case DefaultArgumentKind::Column:
   case DefaultArgumentKind::File:
+  case DefaultArgumentKind::FilePath:
   case DefaultArgumentKind::Line:
   case DefaultArgumentKind::Function:
   case DefaultArgumentKind::DSOHandle:
@@ -1214,12 +1252,11 @@ void SILGenModule::emitDefaultArgGenerator(SILDeclRef constant,
 
 void SILGenModule::
 emitStoredPropertyInitialization(PatternBindingDecl *pbd, unsigned i) {
-  const PatternBindingEntry &pbdEntry = pbd->getPatternList()[i];
-  auto *var = pbdEntry.getAnchoringVarDecl();
-  auto *init = pbdEntry.getInit();
-  auto *initDC = pbdEntry.getInitContext();
-  auto &captureInfo = pbdEntry.getCaptureInfo();
-  assert(!pbdEntry.isInitializerSubsumed());
+  auto *var = pbd->getAnchoringVarDecl(i);
+  auto *init = pbd->getInit(i);
+  auto *initDC = pbd->getInitContext(i);
+  auto captureInfo = pbd->getCaptureInfo(i);
+  assert(!pbd->isInitializerSubsumed(i));
 
   // If this is the backing storage for a property with an attached wrapper
   // that was initialized with `=`, use that expression as the initializer.
@@ -1228,8 +1265,8 @@ emitStoredPropertyInitialization(PatternBindingDecl *pbd, unsigned i) {
             ->isPropertyMemberwiseInitializedWithWrappedType()) {
       auto wrapperInfo =
           originalProperty->getPropertyWrapperBackingPropertyInfo();
-      if (wrapperInfo.originalInitialValue)
-        init = wrapperInfo.originalInitialValue;
+      assert(wrapperInfo.originalInitialValue);
+      init = wrapperInfo.originalInitialValue;
     }
   }
 
@@ -1256,6 +1293,24 @@ emitStoredPropertyInitialization(PatternBindingDecl *pbd, unsigned i) {
   });
 }
 
+void SILGenModule::
+emitPropertyWrapperBackingInitializer(VarDecl *var) {
+  SILDeclRef constant(var, SILDeclRef::Kind::PropertyWrapperBackingInitializer);
+  emitOrDelayFunction(*this, constant, [this, constant, var](SILFunction *f) {
+    preEmitFunction(constant, var, f, var);
+    PrettyStackTraceSILFunction X(
+        "silgen emitPropertyWrapperBackingInitializer", f);
+    auto wrapperInfo = var->getPropertyWrapperBackingPropertyInfo();
+    assert(wrapperInfo.initializeFromOriginal);
+    f->createProfiler(wrapperInfo.initializeFromOriginal, constant,
+                      ForDefinition);
+    auto varDC = var->getInnermostDeclContext();
+    SILGenFunction SGF(*this, *f, varDC);
+    SGF.emitGeneratorFunction(constant, wrapperInfo.initializeFromOriginal);
+    postEmitFunction(constant, f);
+  });
+}
+
 SILFunction *SILGenModule::emitLazyGlobalInitializer(StringRef funcName,
                                                  PatternBindingDecl *binding,
                                                      unsigned pbdEntry) {
@@ -1267,7 +1322,7 @@ SILFunction *SILGenModule::emitLazyGlobalInitializer(StringRef funcName,
   Type initType = FunctionType::get({}, TupleType::getEmpty(C),
                                     type->getExtInfo());
   auto initSILType = cast<SILFunctionType>(
-      Types.getLoweredRValueType(initType));
+      Types.getLoweredRValueType(TypeExpansionContext::minimal(), initType));
 
   SILGenFunctionBuilder builder(*this);
   auto *f = builder.createFunction(
@@ -1405,7 +1460,7 @@ void SILGenModule::emitObjCDestructorThunk(DestructorDecl *destructor) {
 
 void SILGenModule::visitPatternBindingDecl(PatternBindingDecl *pd) {
   assert(!TopLevelSGF && "script mode PBDs should be in TopLevelCodeDecls");
-  for (unsigned i = 0, e = pd->getNumPatternEntries(); i != e; ++i)
+  for (auto i : range(pd->getNumPatternEntries()))
     if (pd->getExecutableInit(i))
       emitGlobalInitialization(pd, i);
 }
@@ -1414,15 +1469,15 @@ void SILGenModule::visitVarDecl(VarDecl *vd) {
   if (vd->hasStorage())
     addGlobalVariable(vd);
 
-  for (auto *accessor : vd->getAllAccessors())
+  vd->visitEmittedAccessors([&](AccessorDecl *accessor) {
     emitFunction(accessor);
+  });
 
   tryEmitPropertyDescriptor(vd);
 }
 
 void SILGenModule::visitSubscriptDecl(SubscriptDecl *sd) {
-  for (auto *accessor : sd->getAllAccessors())
-    emitFunction(accessor);
+  llvm_unreachable("top-level subscript?");
 }
 
 bool
@@ -1451,11 +1506,12 @@ SILGenModule::canStorageUseStoredKeyPathComponent(AbstractStorageDecl *decl,
     if (auto genericEnv =
               decl->getInnermostDeclContext()->getGenericEnvironmentOfContext())
       componentObjTy = genericEnv->mapTypeIntoContext(componentObjTy);
-    auto storageTy = M.Types.getSubstitutedStorageType(decl, componentObjTy);
-    auto opaqueTy =
-      M.Types.getLoweredRValueType(AbstractionPattern::getOpaque(),
-                                   componentObjTy);
-    
+    auto storageTy = M.Types.getSubstitutedStorageType(
+        TypeExpansionContext::minimal(), decl, componentObjTy);
+    auto opaqueTy = M.Types.getLoweredRValueType(
+        TypeExpansionContext::noOpaqueTypeArchetypesSubstitution(expansion),
+        AbstractionPattern::getOpaque(), componentObjTy);
+
     return storageTy.getASTType() == opaqueTy;
   }
   case AccessStrategy::DirectToAccessor:
@@ -1768,9 +1824,13 @@ void SILGenModule::emitSourceFile(SourceFile *sf) {
     visit(D);
   }
 
-  for (Decl *D : sf->LocalTypeDecls) {
-    FrontendStatsTracer StatsTracer(getASTContext().Stats, "SILgen-tydecl", D);
-    visit(D);
+  for (TypeDecl *TD : sf->LocalTypeDecls) {
+    FrontendStatsTracer StatsTracer(getASTContext().Stats, "SILgen-tydecl", TD);
+    // FIXME: Delayed parsing would prevent these types from being added to the
+    //        module in the first place.
+    if (TD->getDeclContext()->getInnermostSkippedFunctionContext())
+      continue;
+    visit(TD);
   }
 }
 
@@ -1779,8 +1839,9 @@ void SILGenModule::emitSourceFile(SourceFile *sf) {
 //===----------------------------------------------------------------------===//
 
 std::unique_ptr<SILModule>
-SILModule::constructSIL(ModuleDecl *mod, SILOptions &options, FileUnit *SF) {
-  SharedTimer timer("SILGen");
+SILModule::constructSIL(ModuleDecl *mod, TypeConverter &tc,
+                        SILOptions &options, FileUnit *SF) {
+  FrontendStatsTracer tracer(mod->getASTContext().Stats, "SILGen");
   const DeclContext *DC;
   if (SF) {
     DC = SF;
@@ -1789,7 +1850,7 @@ SILModule::constructSIL(ModuleDecl *mod, SILOptions &options, FileUnit *SF) {
   }
 
   std::unique_ptr<SILModule> M(
-      new SILModule(mod, options, DC, /*wholeModule*/ SF == nullptr));
+      new SILModule(mod, tc, options, DC, /*wholeModule*/ SF == nullptr));
   SILGenModule SGM(*M, mod);
 
   if (SF) {
@@ -1838,11 +1899,13 @@ SILModule::constructSIL(ModuleDecl *mod, SILOptions &options, FileUnit *SF) {
 }
 
 std::unique_ptr<SILModule>
-swift::performSILGeneration(ModuleDecl *mod, SILOptions &options) {
-  return SILModule::constructSIL(mod, options, nullptr);
+swift::performSILGeneration(ModuleDecl *mod, Lowering::TypeConverter &tc,
+                            SILOptions &options) {
+  return SILModule::constructSIL(mod, tc, options, nullptr);
 }
 
 std::unique_ptr<SILModule>
-swift::performSILGeneration(FileUnit &sf, SILOptions &options) {
-  return SILModule::constructSIL(sf.getParentModule(), options, &sf);
+swift::performSILGeneration(FileUnit &sf, Lowering::TypeConverter &tc,
+                            SILOptions &options) {
+  return SILModule::constructSIL(sf.getParentModule(), tc, options, &sf);
 }

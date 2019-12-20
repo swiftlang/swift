@@ -212,6 +212,18 @@ print(mbuilders.methodBuilder(13))
 // CHECK: ("propertyBuilder", 12)
 print(mbuilders.propertyBuilder)
 
+// SR-11439: Operator builders
+infix operator ^^^
+func ^^^ (lhs: Int, @TupleBuilder rhs: (Int) -> (String, Int)) -> (String, Int) {
+  return rhs(lhs)
+}
+
+// CHECK: ("hello", 6)
+print(5 ^^^ {
+  "hello"
+  $0 + 1
+})
+
 struct Tagged<Tag, Entity> {
   let tag: Tag
   let entity: Entity
@@ -276,18 +288,20 @@ struct TagAccepter<Tag> {
 }
 
 func testAcceptColorTagged(b: Bool, i: Int, s: String, d: Double) {
+  // FIXME: When we support buildExpression, drop the "Color" prefix
   // CHECK: Tagged<
   acceptColorTagged {
-    i.tag(.red)
-    s.tag(.green)
-    d.tag(.blue)
+    i.tag(Color.red)
+    s.tag(Color.green)
+    d.tag(Color.blue)
   }
 
+  // FIXME: When we support buildExpression, drop the "Color" prefix
   // CHECK: Tagged<
   TagAccepter<Color>.acceptTagged {
-    i.tag(.red)
-    s.tag(.green)
-    d.tag(.blue)
+    i.tag(Color.red)
+    s.tag(Color.green)
+    d.tag(Color.blue)
   }
 
   // CHECK: Tagged<
@@ -301,6 +315,51 @@ func testAcceptColorTagged(b: Bool, i: Int, s: String, d: Double) {
 }
 
 testAcceptColorTagged(b: true, i: 17, s: "Hello", d: 3.14159)
+
+// Use buildExpression() when it's available.
+enum Component {
+  case string(StaticString)
+  case floating(Double)
+  case color(Color)
+  indirect case array([Component])
+  indirect case optional(Component?)
+}
+
+@_functionBuilder
+struct ComponentBuilder {
+  static func buildExpression(_ string: StaticString) -> Component {
+    return .string(string)
+  }
+
+  static func buildExpression(_ float: Double) -> Component {
+    return .floating(float)
+  }
+
+  static func buildExpression(_ color: Color) -> Component {
+    return .color(color)
+  }
+
+  static func buildBlock(_ components: Component...) -> Component {
+    return .array(components)
+  }
+
+  static func buildIf(_ value: Component?) -> Component {
+    return .optional(value)
+  }
+}
+
+func acceptComponentBuilder(@ComponentBuilder _ body: () -> Component) {
+  print(body())
+}
+
+acceptComponentBuilder {
+  "hello"
+  if true {
+    3.14159
+  }
+  .red
+}
+// CHECK: array([main.Component.string("hello"), main.Component.optional(Optional(main.Component.array([main.Component.floating(3.14159)]))), main.Component.color(main.Color.red)])
 
 // rdar://53325810
 

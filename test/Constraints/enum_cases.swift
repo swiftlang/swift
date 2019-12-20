@@ -27,8 +27,7 @@ let _ = arr.map(E.tuple) // expected-error {{cannot invoke 'map' with an argumen
 
 let _ = arr.map(G_E<String>.foo) // Ok
 let _ = arr.map(G_E<String>.bar) // Ok
-let _ = arr.map(G_E<String>.two) // expected-error {{cannot invoke 'map' with an argument list of type '(@escaping (String, String) -> G_E<String>)'}}
-// expected-note@-1{{expected an argument list of type '((Self.Element) throws -> T)'}}
+let _ = arr.map(G_E<String>.two) // expected-error {{cannot convert value of type '(String, String) -> G_E<String>' to expected argument type '(String) throws -> G_E<String>'}}
 let _ = arr.map(G_E<Int>.tuple) // expected-error {{cannot invoke 'map' with an argument list of type '(@escaping ((x: Int, y: Int)) -> G_E<Int>)'}}
 // expected-note@-1{{expected an argument list of type '((Self.Element) throws -> T)'}}
 
@@ -54,7 +53,7 @@ bar_1(E.tuple) // Ok - it's going to be ((x: Int, y: Int))
 
 bar_2(G_E<String>.foo) // Ok
 bar_2(G_E<Int>.bar) // Ok
-bar_2(G_E<Int>.two) // expected-error {{cannot convert value of type '(Int, Int) -> G_E<Int>' to expected argument type '(_) -> G_E<_>'}}
+bar_2(G_E<Int>.two) // expected-error {{cannot convert value of type '(Int, Int) -> G_E<Int>' to expected argument type '(Int) -> G_E<Int>'}}
 bar_2(G_E<Int>.tuple) // expected-error {{cannot convert value of type '((x: Int, y: Int)) -> G_E<Int>' to expected argument type '(_) -> G_E<_>'}}
 bar_3(G_E<Int>.tuple) // Ok
 
@@ -97,14 +96,17 @@ foo(Foo.a, Foo.b) // Ok in Swift 4 because we strip labels from the arguments
 
 // rdar://problem/32551313 - Useless SE-0110 diagnostic
 
-enum E_32551313<L, R> {
+enum E_32551313<L, R> { // expected-note {{'R' declared as parameter to type 'E_32551313'}}
   case Left(L)
   case Right(R)
 }
 
 struct Foo_32551313 {
+  // FIXME(diagnostics): We should be able to figure out L and R from contextual type
   static func bar() -> E_32551313<(String, Foo_32551313?), (String, String)>? {
     return E_32551313.Left("", Foo_32551313()) // expected-error {{extra argument in call}}
+    // expected-error@-1 {{generic parameter 'R' could not be inferred}} expected-note@-1 {{explicitly specify the generic arguments to fix this issue}}
+    // expected-error@-2 {{cannot convert return expression of type 'E_32551313<String, R>' to return type 'E_32551313<(String, Foo_32551313?), (String, String)>?'}}
   }
 }
 

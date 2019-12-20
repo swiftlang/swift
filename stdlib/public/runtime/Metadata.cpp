@@ -404,7 +404,10 @@ initializeClassMetadataFromPattern(ClassMetadata *metadata,
     auto extraDataPattern = pattern->getExtraDataPattern();
 
     // Zero memory up to the offset.
-    memset(metadataExtraData, 0, size_t(extraDataPattern->OffsetInWords));
+    // [pre-5.2-extra-data-zeroing] Before Swift 5.2, the runtime did not
+    // correctly zero the zero-prefix of the extra-data pattern.
+    memset(metadataExtraData, 0,
+           size_t(extraDataPattern->OffsetInWords) * sizeof(void *));
 
     // Copy the pattern into the rest of the extra data.
     copyMetadataPattern(metadataExtraData, extraDataPattern);
@@ -1009,8 +1012,8 @@ FunctionCacheEntry::FunctionCacheEntry(const Key &key) {
 
   case FunctionMetadataConvention::Block:
 #if SWIFT_OBJC_INTEROP
-    // Blocks are ObjC objects, so can share the Builtin.UnknownObject value
-    // witnesses.
+    // Blocks are ObjC objects, so can share the AnyObject value
+    // witnesses (stored as "BO" rather than "yXl" for ABI compat).
     Data.ValueWitnesses = &VALUE_WITNESS_SYM(BO);
 #else
     assert(false && "objc block without objc interop?");
@@ -2197,9 +2200,6 @@ static inline ClassROData *getROData(ClassMetadata *theClass) {
 static void initGenericClassObjCName(ClassMetadata *theClass) {
   // Use the remangler to generate a mangled name from the type metadata.
   Demangle::StackAllocatedDemangler<4096> Dem;
-  // Resolve symbolic references to a unique mangling that can be encoded in
-  // the class name.
-  Dem.setSymbolicReferenceResolver(ResolveToDemanglingForContext(Dem));
 
   auto demangling = _swift_buildDemanglingForMetadata(theClass, Dem);
 
@@ -3862,6 +3862,13 @@ template <> OpaqueValue *Metadata::allocateBoxForExistentialIn(ValueBuffer *buff
   return refAndValueAddr.buffer;
 }
 
+template <> void Metadata::deallocateBoxForExistentialIn(ValueBuffer *buffer) const {
+  auto *vwt = getValueWitnesses();
+  if (vwt->isValueInline())
+    return;
+  swift_deallocBox(reinterpret_cast<HeapObject *>(buffer->PrivateData[0]));
+}
+
 template <> OpaqueValue *Metadata::allocateBufferIn(ValueBuffer *buffer) const {
   auto *vwt = getValueWitnesses();
   if (vwt->isValueInline())
@@ -3952,10 +3959,44 @@ void Metadata::dump() const {
   printf("Kind: %s.\n", getStringForMetadataKind(getKind()).data());
   printf("Value Witnesses: %p.\n", getValueWitnesses());
 
-  auto *contextDescriptor = getTypeContextDescriptor();
-  printf("Name: %s.\n", contextDescriptor->Name.get());
-  printf("Type Context Description: %p.\n", contextDescriptor);
-  printf("Generic Args: %p.\n", getGenericArgs());
+  if (auto *contextDescriptor = getTypeContextDescriptor()) {
+    printf("Name: %s.\n", contextDescriptor->Name.get());
+    printf("Type Context Description: %p.\n", contextDescriptor);
+
+    if (contextDescriptor->isGeneric()) {
+      auto genericCount = contextDescriptor->getFullGenericContextHeader().Base.getNumArguments();
+      auto *args = getGenericArgs();
+      printf("Generic Args: %u: [", genericCount);
+      for (uint32_t i = 0; i < genericCount; i++) {
+        if (i > 0)
+          printf(", ");
+        printf("%p", args[i]);
+      }
+      printf("]\n");
+    }
+  }
+
+  if (auto *tuple = dyn_cast<TupleTypeMetadata>(this)) {
+    printf("Labels: %s.\n", tuple->Labels);
+  }
+
+  if (auto *existential = dyn_cast<ExistentialTypeMetadata>(this)) {
+    printf("Is class bounded: %s.\n",
+           existential->isClassBounded() ? "true" : "false");
+    auto protocols = existential->getProtocols();
+    bool first = true;
+    printf("Protocols: ");
+    for (auto protocol : protocols) {
+      if (!first)
+        printf(" & ");
+      printf("%s", protocol.getName());
+      first = false;
+    }
+    if (auto *superclass = existential->getSuperclassConstraint())
+      if (auto *contextDescriptor = superclass->getTypeContextDescriptor())
+        printf("Superclass constraint: %s.\n", contextDescriptor->Name.get());
+    printf("\n");
+  }
 
 #if SWIFT_OBJC_INTEROP
   if (auto *classObject = getClassObject()) {
@@ -5149,8 +5190,6 @@ void swift::verifyMangledNameRoundtrip(const Metadata *metadata) {
   if (!verificationEnabled) return;
   
   Demangle::StackAllocatedDemangler<1024> Dem;
-  Dem.setSymbolicReferenceResolver(ResolveToDemanglingForContext(Dem));
-
   auto node = _swift_buildDemanglingForMetadata(metadata, Dem);
   // If the mangled node involves types in an AnonymousContext, then by design,
   // it cannot be looked up by name.

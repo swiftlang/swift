@@ -1,0 +1,104 @@
+// Round-trip parsing/printing test.
+
+// RUN: %target-sil-opt %s | %FileCheck %s
+
+// Round-trip serialization-deserialization test.
+
+// RUN: %empty-directory(%t)
+// RUN: %target-sil-opt %s -emit-sib -o %t/tmp.sib -module-name main
+// RUN: %target-sil-opt %t/tmp.sib -o %t/tmp.2.sib -module-name main
+// RUN: %target-sil-opt %t/tmp.2.sib -module-name main | %FileCheck %s
+
+// IRGen test.
+
+// RUN: %target-swift-frontend -emit-ir %s | %FileCheck --check-prefix=IRGEN %s
+
+sil_stage raw
+
+import Swift
+import Builtin
+
+sil_differentiability_witness [parameters 0] [results 0] @foo : $@convention(thin) (Float, Float, Float) -> Float
+
+sil_differentiability_witness [parameters 0 1] [results 0] @foo : $@convention(thin) (Float, Float, Float) -> Float
+
+sil_differentiability_witness [parameters 0] [results 0] @bar : $@convention(thin) (Float, Float, Float) -> (Float, Float)
+
+sil_differentiability_witness [parameters 0 1] [results 0 1] @bar : $@convention(thin) (Float, Float, Float) -> (Float, Float)
+
+sil_differentiability_witness [parameters 0] [results 0] <T where T : Differentiable> @generic : $@convention(thin) <T> (@in_guaranteed T, Float) -> @out T
+
+sil_differentiability_witness [parameters 0 1] [results 0] <T where T : Differentiable> @generic : $@convention(thin) <T> (@in_guaranteed T, Float) -> @out T
+
+sil_differentiability_witness [parameters 0 1] [results 0] <T where T : Differentiable, T == T.TangentVector> @generic : $@convention(thin) <T> (@in_guaranteed T, Float) -> @out T
+
+sil_differentiability_witness [parameters 0 1] [results 0] <T where T : Differentiable, T: AdditiveArithmetic> @generic : $@convention(thin) <T> (@in_guaranteed T, Float) -> @out T
+
+sil @foo : $@convention(thin) (Float, Float, Float) -> Float
+
+sil @bar : $@convention(thin) (Float, Float, Float) -> (Float, Float)
+
+sil @generic : $@convention(thin) <T> (@in_guaranteed T, Float) -> @out T
+
+sil @genericreq : $@convention(thin) <T : FloatingPoint> (@in_guaranteed T, Float) -> @out T
+
+sil @test_derivative_witnesses : $@convention(thin) () -> () {
+bb0:
+  %foo_jvp_wrt_0 = differentiability_witness_function [jvp] [parameters 0] [results 0] @foo : $@convention(thin) (Float, Float, Float) -> Float
+  %foo_vjp_wrt_0_1 = differentiability_witness_function [vjp] [parameters 0 1] [results 0] @foo : $@convention(thin) (Float, Float, Float) -> Float
+
+  // Test multiple results.
+  %bar_jvp_wrt_0_results_0 = differentiability_witness_function [jvp] [parameters 0] [results 0] @bar : $@convention(thin) (Float, Float, Float) -> (Float, Float)
+  %bar_vjp_wrt_0_1_results_0_1 = differentiability_witness_function [vjp] [parameters 0 1] [results 0 1] @bar : $@convention(thin) (Float, Float, Float) -> (Float, Float)
+
+  // Test generic requirements.
+  %generic_jvp_wrt_0 = differentiability_witness_function [jvp] [parameters 0] [results 0] <T : Differentiable> @generic : $@convention(thin) <T> (@in_guaranteed T, Float) -> @out T
+  %generic_vjp_wrt_0_1 = differentiability_witness_function [vjp] [parameters 0 1] [results 0] <T : Differentiable & AdditiveArithmetic> @generic : $@convention(thin) <T> (@in_guaranteed T, Float) -> @out T
+
+  // Test "dependent" generic requirements: `T == T.TangentVector` depends on `T: Differentiable`.
+  %generic_vjp_wrt_0_1_dependent_req = differentiability_witness_function [vjp] [parameters 0 1] [results 0] <T where T: Differentiable, T == T.TangentVector> @generic : $@convention(thin) <T> (@in_guaranteed T, Float) -> @out T
+
+  return undef : $()
+}
+
+// CHECK-LABEL: sil @test_derivative_witnesses : $@convention(thin) () -> () {
+// CHECK: bb0:
+// CHECK:   {{%.*}} = differentiability_witness_function [jvp] [parameters 0] [results 0] @foo : $@convention(thin) (Float, Float, Float) -> Float
+// CHECK:   {{%.*}} = differentiability_witness_function [vjp] [parameters 0 1] [results 0] @foo : $@convention(thin) (Float, Float, Float) -> Float
+// CHECK:   {{%.*}} = differentiability_witness_function [jvp] [parameters 0] [results 0] @bar : $@convention(thin) (Float, Float, Float) -> (Float, Float)
+// CHECK:   {{%.*}} = differentiability_witness_function [vjp] [parameters 0 1] [results 0 1] @bar : $@convention(thin) (Float, Float, Float) -> (Float, Float)
+// CHECK:   {{%.*}} = differentiability_witness_function [jvp] [parameters 0] [results 0] <τ_0_0 where τ_0_0 : Differentiable> @generic : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0, Float) -> @out τ_0_0
+// CHECK:   {{%.*}} = differentiability_witness_function [vjp] [parameters 0 1] [results 0] <τ_0_0 where τ_0_0 : AdditiveArithmetic, τ_0_0 : Differentiable> @generic : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0, Float) -> @out τ_0_0
+// CHECK:   {{%.*}} = differentiability_witness_function [vjp] [parameters 0 1] [results 0] <τ_0_0 where τ_0_0 : Differentiable, τ_0_0 == τ_0_0.TangentVector> @generic : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0, Float) -> @out τ_0_0
+// CHECK: }
+
+// IRGEN: @AD__foo_PSUURS = external global %swift.differentiability_witness, align 8
+// IRGEN: @AD__foo_PSSURS = external global %swift.differentiability_witness, align 8
+// IRGEN: @AD__bar_PSUURSU = external global %swift.differentiability_witness, align 8
+// IRGEN: @AD__bar_PSSURSS = external global %swift.differentiability_witness, align 8
+// IRGEN: @AD__generic_PSURSs14DifferentiableRzl = external global %swift.differentiability_witness, align 8
+// IRGEN: @AD__generic_PSSRSs18AdditiveArithmeticRzs14DifferentiableRzl = external global %swift.differentiability_witness, align 8
+// IRGEN: @AD__generic_PSSRSs14DifferentiableRz13TangentVectorsAAPQzRszl = external global %swift.differentiability_witness, align 8
+
+// IRGEN-LABEL: define {{.*}} @test_derivative_witnesses()
+
+// IRGEN: [[PTR1:%.*]] = load i8*, i8** getelementptr inbounds (%swift.differentiability_witness, %swift.differentiability_witness* @AD__foo_PSUURS, i32 0, i32 0), align 8
+// IRGEN: [[FNPTR1:%.*]] = bitcast i8* [[PTR1]] to { float, i8*, %swift.refcounted* } (float, float, float)*
+
+// IRGEN: [[PTR2:%.*]] = load i8*, i8** getelementptr inbounds (%swift.differentiability_witness, %swift.differentiability_witness* @AD__foo_PSSURS, i32 0, i32 1), align 8
+// IRGEN: [[FNPTR2:%.*]] = bitcast i8* [[PTR2]] to { float, i8*, %swift.refcounted* } (float, float, float)*
+
+// IRGEN: [[PTR3:%.*]] = load i8*, i8** getelementptr inbounds (%swift.differentiability_witness, %swift.differentiability_witness* @AD__bar_PSUURSU, i32 0, i32 0), align 8
+// IRGEN: [[FNPTR3:%.*]] = bitcast i8* [[PTR3]] to { float, float, i8*, %swift.refcounted* } (float, float, float)*
+
+// IRGEN: [[PTR4:%.*]] = load i8*, i8** getelementptr inbounds (%swift.differentiability_witness, %swift.differentiability_witness* @AD__bar_PSSURSS, i32 0, i32 1), align 8
+// IRGEN: [[FNPTR4:%.*]] = bitcast i8* [[PTR4]] to { float, float, i8*, %swift.refcounted* } (float, float, float)*
+
+// IRGEN: [[PTR5:%.*]] = load i8*, i8** getelementptr inbounds (%swift.differentiability_witness, %swift.differentiability_witness* @AD__generic_PSURSs14DifferentiableRzl, i32 0, i32 0), align 8
+// IRGEN: [[FNPTR5:%.*]] = bitcast i8* [[PTR5]] to { i8*, %swift.refcounted* } (%swift.opaque*, %swift.opaque*, float, %swift.type*, i8**)*
+
+// IRGEN: [[PTR6:%.*]] = load i8*, i8** getelementptr inbounds (%swift.differentiability_witness, %swift.differentiability_witness* @AD__generic_PSSRSs18AdditiveArithmeticRzs14DifferentiableRzl, i32 0, i32 1), align 8
+// IRGEN: [[FNPTR6:%.*]] = bitcast i8* [[PTR6]] to { i8*, %swift.refcounted* } (%swift.opaque*, %swift.opaque*, float, %swift.type*, i8**, i8**)*
+
+// IRGEN: [[PTR7:%.*]] = load i8*, i8** getelementptr inbounds (%swift.differentiability_witness, %swift.differentiability_witness* @AD__generic_PSSRSs14DifferentiableRz13TangentVectorsAAPQzRszl, i32 0, i32 1), align 8
+// IRGEN: [[FNPTR7:%.*]] = bitcast i8* [[PTR7]] to { i8*, %swift.refcounted* } (%swift.opaque*, %swift.opaque*, float, %swift.type*, i8**)*

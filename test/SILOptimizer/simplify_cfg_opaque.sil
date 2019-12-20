@@ -12,7 +12,7 @@ protocol P {}
 // CHECK: bb1:
 // CHECK:   retain_value %0 : $Any
 // CHECK:   release_value %0 : $Any
-// CHECK:   checked_cast_value_br %0 : $Any to $P, bb3, bb2
+// CHECK:   checked_cast_value_br Any in %0 : $Any to P, bb3, bb2
 // CHECK-LABEL: } // end sil function 'testJumpThread'
 sil @testJumpThread : $@convention(thin) (Any, Any) -> () {
 bb0(%0 : $Any, %1 : $Any):
@@ -24,7 +24,7 @@ bb2:
   br bb6(%1 : $Any)
 bb6(%any : $Any):
   release_value %any : $Any // force jump-threading
-  checked_cast_value_br %any : $Any to $P, bb7, bb8
+  checked_cast_value_br Any in %any : $Any to P, bb7, bb8
 bb7(%p : $P):
   br bb9
 bb8:

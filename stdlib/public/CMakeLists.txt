@@ -63,6 +63,12 @@ if(SWIFT_BUILD_STDLIB)
   add_subdirectory(SwiftOnoneSupport)
 endif()
 
+# Build differentiable programming support library only if enabled.
+if(SWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING AND SWIFT_BUILD_STDLIB)
+  message(STATUS "Building Swift differentiable programming support library.")
+  add_subdirectory(Differentiation)
+endif()
+
 # SWIFT_ENABLE_TENSORFLOW
 if(SWIFT_BUILD_STDLIB)
   add_subdirectory(Python)
