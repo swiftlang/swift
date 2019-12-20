@@ -2483,8 +2483,9 @@ parseClosureSignatureIfPresent(SourceRange &bracketRange,
     
     SyntaxParsingContext CaptureCtx(SyntaxContext,
                                     SyntaxKind::ClosureCaptureSignature);
-    bracketRange = SourceRange(consumeToken(tok::l_square),
-                               consumeToken(tok::r_square));
+    SourceLoc lBracketLoc = consumeToken(tok::l_square);
+    SourceLoc rBracketLoc = consumeToken(tok::r_square);
+    bracketRange = SourceRange(lBracketLoc, rBracketLoc);
   } else if (Tok.is(tok::l_square) && !peekToken().is(tok::r_square)) {
     SyntaxParsingContext CaptureCtx(SyntaxContext,
                                     SyntaxKind::ClosureCaptureSignature);
