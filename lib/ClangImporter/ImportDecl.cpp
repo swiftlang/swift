@@ -7555,6 +7555,15 @@ void ClangImporter::Implementation::importAttributes(
     }
   }
 
+  if (auto method = dyn_cast<clang::ObjCMethodDecl>(ClangDecl)) {
+    if (method->isDirectMethod() && !AnyUnavailable) {
+      auto attr = AvailableAttr::createPlatformAgnostic(
+          C, "", "", PlatformAgnosticAvailabilityKind::UnavailableInSwift);
+      MappedDecl->getAttrs().add(attr);
+      AnyUnavailable = true;
+    }
+  }
+
   // If the declaration is unavailable, we're done.
   if (AnyUnavailable)
     return;
