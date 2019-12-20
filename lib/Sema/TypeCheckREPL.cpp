@@ -256,9 +256,8 @@ void REPLChecker::generatePrintOfExpression(StringRef NameStr, Expr *E) {
   unsigned discriminator = DF.getNextDiscriminator();
 
   ClosureExpr *CE =
-      new (Context) ClosureExpr(SourceRange(), nullptr, params, SourceLoc(),
-                                SourceLoc(), SourceLoc(), TypeLoc(),
-                                discriminator, newTopLevel);
+      new (Context) ClosureExpr(params, SourceLoc(), SourceLoc(), SourceLoc(),
+                                TypeLoc(), discriminator, newTopLevel);
 
   SmallVector<AnyFunctionType::Param, 1> args;
   params->getParams(args);

@@ -225,9 +225,8 @@ private:
     // Create the closure.
     auto *Params = ParameterList::createEmpty(Ctx);
     auto *Closure = new (Ctx)
-        ClosureExpr(SourceRange(), nullptr, Params, SourceLoc(), SourceLoc(),
-                    SourceLoc(), TypeLoc(), DF.getNextDiscriminator(),
-                    getCurrentDeclContext());
+        ClosureExpr(Params, SourceLoc(), SourceLoc(), SourceLoc(), TypeLoc(),
+                    DF.getNextDiscriminator(), getCurrentDeclContext());
     Closure->setImplicit(true);
 
     // TODO: Save and return the value of $OriginalExpr.

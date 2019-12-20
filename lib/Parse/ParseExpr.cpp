@@ -2403,15 +2403,11 @@ static void printTupleNames(const TypeRepr *typeRepr, llvm::raw_ostream &OS) {
 }
 
 bool Parser::
-parseClosureSignatureIfPresent(SourceRange &bracketRange,
-                               SmallVectorImpl<CaptureListEntry> &captureList,
-                               VarDecl *&capturedSelfDecl,
+parseClosureSignatureIfPresent(SmallVectorImpl<CaptureListEntry> &captureList,
                                ParameterList *&params, SourceLoc &throwsLoc,
                                SourceLoc &arrowLoc,
                                TypeRepr *&explicitResultType, SourceLoc &inLoc){
   // Clear out result parameters.
-  bracketRange = SourceRange();
-  capturedSelfDecl = nullptr;
   params = nullptr;
   throwsLoc = SourceLoc();
   arrowLoc = SourceLoc();
@@ -2480,15 +2476,14 @@ parseClosureSignatureIfPresent(SourceRange &bracketRange,
   }
   SyntaxParsingContext ClosureSigCtx(SyntaxContext, SyntaxKind::ClosureSignature);
   if (Tok.is(tok::l_square) && peekToken().is(tok::r_square)) {
-    
     SyntaxParsingContext CaptureCtx(SyntaxContext,
                                     SyntaxKind::ClosureCaptureSignature);
-    bracketRange = SourceRange(consumeToken(tok::l_square),
-                               consumeToken(tok::r_square));
+    consumeToken(tok::l_square);
+    consumeToken(tok::r_square);
   } else if (Tok.is(tok::l_square) && !peekToken().is(tok::r_square)) {
     SyntaxParsingContext CaptureCtx(SyntaxContext,
                                     SyntaxKind::ClosureCaptureSignature);
-    SourceLoc lBracketLoc = consumeToken(tok::l_square);
+    consumeToken(tok::l_square);
     // At this point, we know we have a closure signature. Parse the capture list
     // and parameters.
     bool HasNext;
@@ -2578,10 +2573,6 @@ parseClosureSignatureIfPresent(SourceRange &bracketRange,
       auto *VD = new (Context) VarDecl(/*isStatic*/false, introducer,
                                        /*isCaptureList*/true,
                                        nameLoc, name, CurDeclContext);
-        
-      // If we captured something under the name "self", remember that.
-      if (name == Context.Id_self)
-        capturedSelfDecl = VD;
 
       // Attributes.
       if (ownershipKind != ReferenceOwnership::Strong)
@@ -2595,22 +2586,17 @@ parseClosureSignatureIfPresent(SourceRange &bracketRange,
           /*VarLoc*/ nameLoc, pattern, /*EqualLoc*/ equalLoc, initializer,
           CurDeclContext);
 
-        auto CLE = CaptureListEntry(VD, PBD);
-        if (CLE.isSimpleSelfCapture())
-          VD->setIsSelfParamCapture();
-      captureList.push_back(CLE);
+      captureList.push_back(CaptureListEntry(VD, PBD));
     } while (HasNext);
 
     SyntaxContext->collectNodesInPlace(SyntaxKind::ClosureCaptureItemList);
     // The capture list needs to be closed off with a ']'.
-    SourceLoc rBracketLoc = Tok.getLoc();
     if (!consumeIf(tok::r_square)) {
       diagnose(Tok, diag::expected_capture_list_end_rsquare);
       skipUntil(tok::r_square);
       if (Tok.is(tok::r_square))
-        rBracketLoc = consumeToken(tok::r_square);
+        consumeToken(tok::r_square);
     }
-    bracketRange = SourceRange(lBracketLoc, rBracketLoc);
   }
   
   bool invalid = false;
@@ -2768,17 +2754,14 @@ ParserResult<Expr> Parser::parseExprClosure() {
   SourceLoc leftBrace = consumeToken();
 
   // Parse the closure-signature, if present.
-  SourceRange bracketRange;
-  SmallVector<CaptureListEntry, 2> captureList;
-  VarDecl *capturedSelfDecl;
   ParameterList *params = nullptr;
   SourceLoc throwsLoc;
   SourceLoc arrowLoc;
   TypeRepr *explicitResultType;
   SourceLoc inLoc;
-  parseClosureSignatureIfPresent(bracketRange, captureList,
-                                 capturedSelfDecl, params, throwsLoc,
-                                 arrowLoc, explicitResultType, inLoc);
+  SmallVector<CaptureListEntry, 2> captureList;
+  parseClosureSignatureIfPresent(captureList, params, throwsLoc, arrowLoc,
+                                 explicitResultType, inLoc);
 
   // If the closure was created in the context of an array type signature's
   // size expression, there will not be a local context. A parse error will
@@ -2793,10 +2776,9 @@ ParserResult<Expr> Parser::parseExprClosure() {
   unsigned discriminator = CurLocalContext->claimNextClosureDiscriminator();
 
   // Create the closure expression and enter its context.
-  auto *closure = new (Context) ClosureExpr(bracketRange, capturedSelfDecl,
-                                            params, throwsLoc, arrowLoc, inLoc,
-                                            explicitResultType, discriminator,
-                                            CurDeclContext);
+  auto *closure = new (Context) ClosureExpr(params, throwsLoc, arrowLoc, inLoc,
+                                            explicitResultType,
+                                            discriminator, CurDeclContext);
   // The arguments to the func are defined in their own scope.
   Scope S(this, ScopeKind::ClosureParams);
   ParseFunctionBody cc(*this, closure);

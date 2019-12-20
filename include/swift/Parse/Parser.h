@@ -1522,8 +1522,6 @@ public:
   ///     identifier (',' identifier)* func-signature-result? 'in'
   /// \endverbatim
   ///
-  /// \param bracketRange The range of the brackets enclosing a capture list, if
-  /// present. Needed to offer fix-its for inserting 'self' into a capture list.
   /// \param captureList The entries in the capture list.
   /// \param params The parsed parameter list, or null if none was provided.
   /// \param arrowLoc The location of the arrow, if present.
@@ -1532,14 +1530,12 @@ public:
   ///
   /// \returns true if an error occurred, false otherwise.
   bool parseClosureSignatureIfPresent(
-          SourceRange &bracketRange,
-          SmallVectorImpl<CaptureListEntry> &captureList,
-          VarDecl *&capturedSelfParamDecl,
-          ParameterList *&params,
-          SourceLoc &throwsLoc,
-          SourceLoc &arrowLoc,
-          TypeRepr *&explicitResultType,
-          SourceLoc &inLoc);
+                                SmallVectorImpl<CaptureListEntry> &captureList,
+                                      ParameterList *&params,
+                                      SourceLoc &throwsLoc,
+                                      SourceLoc &arrowLoc,
+                                      TypeRepr *&explicitResultType,
+                                      SourceLoc &inLoc);
 
   Expr *parseExprAnonClosureArg();
   ParserResult<Expr> parseExprList(tok LeftTok, tok RightTok,

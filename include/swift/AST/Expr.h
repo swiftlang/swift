@@ -65,7 +65,6 @@ namespace swift {
   class EnumElementDecl;
   class CallExpr;
   class KeyPathExpr;
-  class CaptureListExpr;
 
 enum class ExprKind : uint8_t {
 #define EXPR(Id, Parent) Id,
@@ -3589,18 +3588,6 @@ public:
 /// \endcode
 class ClosureExpr : public AbstractClosureExpr {
 
-  /// The range of the brackets of the capture list, if present.
-  SourceRange BracketRange;
-    
-  /// The (possibly null) VarDecl captured by this closure with the literal name
-  /// "self". In order to recover this information at the time of name lookup,
-  /// we must be able to access it from the associated DeclContext.
-  /// Because the DeclContext inside a closure is the closure itself (and not
-  /// the CaptureListExpr which would normally maintain this sort of
-  /// information about captured variables), we need to have some way to access
-  /// this information directly on the ClosureExpr.
-  VarDecl *CapturedSelfDecl;
-  
   /// The location of the "throws", if present.
   SourceLoc ThrowsLoc;
   
@@ -3617,16 +3604,16 @@ class ClosureExpr : public AbstractClosureExpr {
   /// The body of the closure, along with a bit indicating whether it
   /// was originally just a single expression.
   llvm::PointerIntPair<BraceStmt *, 1, bool> Body;
+  
 public:
-  ClosureExpr(SourceRange bracketRange, VarDecl *capturedSelfDecl,
-              ParameterList *params, SourceLoc throwsLoc, SourceLoc arrowLoc,
+  ClosureExpr(ParameterList *params, SourceLoc throwsLoc, SourceLoc arrowLoc,
               SourceLoc inLoc, TypeLoc explicitResultType,
               unsigned discriminator, DeclContext *parent)
     : AbstractClosureExpr(ExprKind::Closure, Type(), /*Implicit=*/false,
                           discriminator, parent),
-      BracketRange(bracketRange), CapturedSelfDecl(capturedSelfDecl),
       ThrowsLoc(throwsLoc), ArrowLoc(arrowLoc), InLoc(inLoc),
-      ExplicitResultType(explicitResultType), Body(nullptr) {
+      ExplicitResultType(explicitResultType),
+      Body(nullptr) {
     setParameterList(params);
     Bits.ClosureExpr.HasAnonymousClosureVars = false;
   }
@@ -3658,8 +3645,6 @@ public:
   /// explicitly-specified result type.
   bool hasExplicitResultType() const { return ArrowLoc.isValid(); }
 
-  /// Retrieve the range of the \c '[' and \c ']' that enclose the capture list.
-  SourceRange getBracketRange() const { return BracketRange; }
   
   /// Retrieve the location of the \c '->' for closures with an
   /// explicit result type.
@@ -3724,14 +3709,6 @@ public:
 
   /// Is this a completely empty closure?
   bool hasEmptyBody() const;
-
-  /// VarDecl captured by this closure under the literal name \c self , if any.
-  VarDecl *getCapturedSelfDecl() const { return CapturedSelfDecl; }
-  
-  /// Whether this closure captures the \c self param in its body in such a
-  /// way that implicit \c self is enabled within its body (i.e. \c self is
-  /// captured non-weakly).
-  bool capturesSelfEnablingImplictSelf() const;
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::Closure;
@@ -3817,8 +3794,6 @@ struct CaptureListEntry {
   CaptureListEntry(VarDecl *Var, PatternBindingDecl *Init)
   : Var(Var), Init(Init) {
   }
-
-  bool isSimpleSelfCapture() const;
 };
 
 /// CaptureListExpr - This expression represents the capture list on an explicit

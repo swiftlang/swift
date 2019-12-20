@@ -277,21 +277,13 @@ LookupResult TypeChecker::lookupUnqualified(DeclContext *dc, DeclNameRef name,
     // Determine which type we looked through to find this result.
     Type foundInType;
 
-    if (auto *typeDC = found.getDeclContext()) {
-      if (!typeDC->isTypeContext()) {
-        // If we don't have a type context this is an implicit 'self' reference.
-        if (auto *CE = dyn_cast<ClosureExpr>(typeDC)) {
-          // If we found the result in a self capture, look through the capture.
-          assert(CE->getCapturedSelfDecl());
-          typeDC = found.getValueDecl()->getDeclContext();
-        } else {
-          // Otherwise, we must have the method context.
-          typeDC = typeDC->getParent();
-        }
-        assert(typeDC->isTypeContext());
+    if (auto *baseDC = found.getDeclContext()) {
+      if (!baseDC->isTypeContext()) {
+        baseDC = baseDC->getParent();
+        assert(baseDC->isTypeContext());
       }
       foundInType = dc->mapTypeIntoContext(
-        typeDC->getDeclaredInterfaceType());
+        baseDC->getDeclaredInterfaceType());
       assert(foundInType && "bogus base declaration?");
     }
 

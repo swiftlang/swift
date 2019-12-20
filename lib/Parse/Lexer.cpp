@@ -2482,8 +2482,7 @@ void Lexer::lexImpl() {
   }
 }
 
-Token Lexer::getTokenAtLocation(const SourceManager &SM, SourceLoc Loc,
-                                CommentRetentionMode CRM) {
+Token Lexer::getTokenAtLocation(const SourceManager &SM, SourceLoc Loc) {
   // Don't try to do anything with an invalid location.
   if (!Loc.isValid())
     return Token();
@@ -2502,7 +2501,7 @@ Token Lexer::getTokenAtLocation(const SourceManager &SM, SourceLoc Loc,
   // (making this option irrelevant), or the caller lexed comments and
   // we need to lex just the comment token.
   Lexer L(FakeLangOpts, SM, BufferID, nullptr, LexerMode::Swift,
-          HashbangMode::Allowed, CRM);
+          HashbangMode::Allowed, CommentRetentionMode::ReturnAsTokens);
   L.restoreState(State(Loc));
   return L.peekNextToken();
 }
