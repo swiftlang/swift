@@ -25,6 +25,7 @@
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PrettyStackTrace.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeWalker.h"
 #include "swift/Basic/Defer.h"
 #include "llvm/ADT/SmallPtrSet.h"
@@ -219,10 +220,14 @@ public:
     if (D->getBaseName() == Context.Id_dollarInterpolation)
       return { false, DRE };
 
+    // DC is the DeclContext where D was defined
+    // CurDC is the DeclContext where D was referenced
+    auto DC = D->getDeclContext();
+
     // Capture the generic parameters of the decl, unless it's a
     // local declaration in which case we will pick up generic
     // parameter references transitively.
-    if (!D->getDeclContext()->isLocalContext()) {
+    if (!DC->isLocalContext()) {
       if (!ObjC || !D->isObjC() || isa<ConstructorDecl>(D)) {
         if (auto subMap = DRE->getDeclRef().getSubstitutions()) {
           for (auto type : subMap.getReplacementTypes()) {
@@ -232,40 +237,57 @@ public:
       }
     }
 
-    // DC is the DeclContext where D was defined
-    // CurDC is the DeclContext where D was referenced
-    auto DC = D->getDeclContext();
+    // Don't "capture" type definitions at all.
+    if (isa<TypeDecl>(D))
+      return { false, DRE };
 
     // A local reference is not a capture.
-    if (CurDC == DC)
+    if (CurDC == DC || isa<TopLevelCodeDecl>(CurDC))
       return { false, DRE };
 
     auto TmpDC = CurDC;
+    while (TmpDC != nullptr) {
+      // Variables defined inside TopLevelCodeDecls are semantically
+      // local variables. If the reference is not from the top level,
+      // we have a capture.
+      if (isa<TopLevelCodeDecl>(DC) &&
+          (isa<SourceFile>(TmpDC) || isa<TopLevelCodeDecl>(TmpDC)))
+        break;
 
-    if (!isa<TopLevelCodeDecl>(DC)) {
-      while (TmpDC != nullptr) {
-        if (TmpDC == DC)
-          break;
+      if (TmpDC == DC)
+        break;
 
-        // The initializer of a lazy property will eventually get
-        // recontextualized into it, so treat it as if it's already there.
-        if (auto init = dyn_cast<PatternBindingInitializer>(TmpDC)) {
-          if (auto lazyVar = init->getInitializedLazyVar()) {
-            // If we have a getter with a body, we're already re-parented
-            // everything so pretend we're inside the getter.
-            if (auto getter = lazyVar->getAccessor(AccessorKind::Get)) {
-              if (getter->getBody(/*canSynthesize=*/false)) {
-                TmpDC = getter;
-                continue;
-              }
+      // The initializer of a lazy property will eventually get
+      // recontextualized into it, so treat it as if it's already there.
+      if (auto init = dyn_cast<PatternBindingInitializer>(TmpDC)) {
+        if (auto lazyVar = init->getInitializedLazyVar()) {
+          // If we have a getter with a body, we're already re-parented
+          // everything so pretend we're inside the getter.
+          if (auto getter = lazyVar->getAccessor(AccessorKind::Get)) {
+            if (getter->getBody(/*canSynthesize=*/false)) {
+              TmpDC = getter;
+              continue;
             }
           }
         }
+      }
 
-        // We have an intervening nominal type context that is not the
-        // declaration context, and the declaration context is not global.
-        // This is not supported since nominal types cannot capture values.
-        if (auto NTD = dyn_cast<NominalTypeDecl>(TmpDC)) {
+      // We have an intervening nominal type context that is not the
+      // declaration context, and the declaration context is not global.
+      // This is not supported since nominal types cannot capture values.
+      if (auto NTD = dyn_cast<NominalTypeDecl>(TmpDC)) {
+        // Allow references to local functions from inside methods of a
+        // local type, because if the local function has captures, we'll
+        // diagnose them in SILGen. It's a bit unfortunate that we can't
+        // ban this outright, but people rely on code like this working:
+        //
+        // do {
+        //   func local() {}
+        //   class C {
+        //     func method() { local() }
+        //   }
+        // }
+        if (!isa<FuncDecl>(D)) {
           if (DC->isLocalContext()) {
             Context.Diags.diagnose(DRE->getLoc(), diag::capture_across_type_decl,
                                    NTD->getDescriptiveKind(),
@@ -278,23 +300,19 @@ public:
             return { false, DRE };
           }
         }
-
-        TmpDC = TmpDC->getParent();
       }
 
-      // We walked all the way up to the root without finding the declaration,
-      // so this is not a capture.
-      if (TmpDC == nullptr)
-        return { false, DRE };
+      TmpDC = TmpDC->getParent();
     }
 
-    // Don't "capture" type definitions at all.
-    if (isa<TypeDecl>(D))
+    // We walked all the way up to the root without finding the declaration,
+    // so this is not a capture.
+    if (TmpDC == nullptr)
       return { false, DRE };
 
     // Only capture var decls at global scope.  Other things can be captured
     // if they are local.
-    if (!isa<VarDecl>(D) && !DC->isLocalContext())
+    if (!isa<VarDecl>(D) && !D->isLocalCapture())
       return { false, DRE };
 
     // We're going to capture this, compute flags for the capture.

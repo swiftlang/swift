@@ -119,18 +119,14 @@ namespace swift {
   ///
   /// \param PersistentState if non-null the same PersistentState object can
   /// be used to resume parsing or parse delayed function bodies.
-  ///
-  /// \return true if the parser found code with side effects.
-  bool parseIntoSourceFile(SourceFile &SF, unsigned BufferID, bool *Done,
+  void parseIntoSourceFile(SourceFile &SF, unsigned BufferID, bool *Done,
                            SILParserState *SIL = nullptr,
                            PersistentParserState *PersistentState = nullptr,
                            bool DelayBodyParsing = true);
 
   /// Parse a single buffer into the given source file, until the full source
   /// contents are parsed.
-  ///
-  /// \return true if the parser found code with side effects.
-  bool parseIntoSourceFileFull(SourceFile &SF, unsigned BufferID,
+  void parseIntoSourceFileFull(SourceFile &SF, unsigned BufferID,
                                PersistentParserState *PersistentState = nullptr,
                                bool DelayBodyParsing = true);
 

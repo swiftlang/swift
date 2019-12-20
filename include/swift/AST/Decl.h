@@ -399,7 +399,7 @@ protected:
     HasSingleExpressionBody : 1
   );
 
-  SWIFT_INLINE_BITFIELD(FuncDecl, AbstractFunctionDecl, 1+1+2+1+1+2,
+  SWIFT_INLINE_BITFIELD(FuncDecl, AbstractFunctionDecl, 1+1+2+1+1+2+1,
     /// Whether we've computed the 'static' flag yet.
     IsStaticComputed : 1,
 
@@ -416,7 +416,12 @@ protected:
     SelfAccessComputed : 1,
 
     /// Backing bits for 'self' access kind.
-    SelfAccess : 2
+    SelfAccess : 2,
+
+    /// Whether this is a top-level function which should be treated
+    /// as if it were in local context for the purposes of capture
+    /// analysis.
+    HasTopLevelLocalContextCaptures : 1
   );
 
   SWIFT_INLINE_BITFIELD(AccessorDecl, FuncDecl, 4+1+1,
@@ -2707,6 +2712,10 @@ public:
   ///        'self' declaration of the declaration context.
   AccessSemantics getAccessSemanticsFromContext(const DeclContext *DC,
                                                 bool isAccessOnSelf) const;
+
+  /// Determines if a reference to this declaration from a nested function
+  /// should be treated like a capture of a local value.
+  bool isLocalCapture() const;
 
   /// Print a reference to the given declaration.
   std::string printRef() const;
@@ -6078,6 +6087,7 @@ protected:
     Bits.FuncDecl.SelfAccessComputed = false;
     Bits.FuncDecl.IsStaticComputed = false;
     Bits.FuncDecl.IsStatic = false;
+    Bits.FuncDecl.HasTopLevelLocalContextCaptures = false;
   }
 
 private:
@@ -6235,6 +6245,12 @@ public:
   /// Perform basic checking to determine whether the @IBAction or
   /// @IBSegueAction attribute can be applied to this function.
   bool isPotentialIBActionTarget() const;
+
+  bool hasTopLevelLocalContextCaptures() const {
+    return Bits.FuncDecl.HasTopLevelLocalContextCaptures;
+  }
+
+  void setHasTopLevelLocalContextCaptures(bool hasCaptures=true);
 };
 
 /// This represents an accessor function, such as a getter or setter.
