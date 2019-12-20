@@ -3473,10 +3473,12 @@ void AttributeChecker::visitDerivativeAttr(DerivativeAttr *attr) {
       };
 
   auto isValidOriginal = [&](AbstractFunctionDecl *originalCandidate) {
-    return checkFunctionSignature(
-        cast<AnyFunctionType>(originalFnType->getCanonicalType()),
-        originalCandidate->getInterfaceType()->getCanonicalType(),
-        checkGenericSignatureSatisfied);
+    // TODO(TF-982): Allow derivatives on protocol requirements.
+    return !isa<ProtocolDecl>(originalCandidate->getDeclContext()) &&
+           checkFunctionSignature(
+               cast<AnyFunctionType>(originalFnType->getCanonicalType()),
+               originalCandidate->getInterfaceType()->getCanonicalType(),
+               checkGenericSignatureSatisfied);
   };
 
   auto noneValidDiagnostic = [&]() {
