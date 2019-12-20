@@ -56,14 +56,18 @@ public:
   /// The uninitialized memory that we are analyzing.
   MarkUninitializedInst *MemoryInst;
 
+private:
   /// This is the base type of the memory allocation.
   SILType MemorySILType;
 
+public:
   /// This is the count of elements being analyzed.  For memory objects that are
   /// tuples, this is the flattened element count.  For 'self' members in init
-  /// methods, this is the local field count (+1 for derive classes).
+  /// methods, this is the local field count (+1 for super/self classes were
+  /// initialized).
   unsigned NumElements;
 
+private:
   /// True if the memory object being analyzed represents a 'let', which is
   /// initialize-only (reassignments are not allowed).
   bool IsLet = false;
@@ -81,23 +85,31 @@ public:
   /// Return the first instruction of the function containing the memory object.
   SILInstruction *getFunctionEntryPoint() const;
 
-  CanType getType() const { return MemorySILType.getASTType(); }
+  CanType getASTType() const { return MemorySILType.getASTType(); }
+  SILType getType() const { return MemorySILType; }
+
+  /// Returns true if this memory object is of trivial type.
+  bool hasTrivialType() const { return MemorySILType.isTrivial(getFunction()); }
+
+  /// Returns true if NumElements has a dummy value in it to force a struct to
+  /// be non-empty.
+  bool hasDummyElement() const { return HasDummyElement; }
 
   SingleValueInstruction *getAddress() const { return MemoryInst; }
 
-  /// getNumMemoryElements - Return the number of elements, without the extra
-  /// "super.init" tracker in initializers of derived classes.
+  /// Return the number of elements, without the extra "super.init" tracker in
+  /// initializers of derived classes.
   unsigned getNumMemoryElements() const {
     return NumElements - (unsigned)isDerivedClassSelf();
   }
 
-  /// isAnyInitSelf - Return true if this is 'self' in any kind of initializer.
+  /// Return true if this is 'self' in any kind of initializer.
   bool isAnyInitSelf() const { return !MemoryInst->isVar(); }
 
   /// True if the memory object is the 'self' argument of a struct initializer.
   bool isStructInitSelf() const {
     if (MemoryInst->isRootSelf() || MemoryInst->isCrossModuleRootSelf()) {
-      if (auto decl = getType()->getAnyNominal()) {
+      if (auto decl = getASTType()->getAnyNominal()) {
         if (isa<StructDecl>(decl)) {
           return true;
         }
@@ -123,7 +135,7 @@ public:
       return false;
 
     if (!MemoryInst->isVar()) {
-      if (auto decl = getType()->getAnyNominal()) {
+      if (auto decl = getASTType()->getAnyNominal()) {
         if (isa<ClassDecl>(decl)) {
           return true;
         }
@@ -176,14 +188,14 @@ public:
     return false;
   }
 
-  /// emitElementAddress - Given an element number (in the flattened sense)
-  /// return a pointer to a leaf element of the specified number.
+  /// Given an element number (in the flattened sense) return a pointer to a
+  /// leaf element of the specified number.
   SILValue
   emitElementAddress(unsigned TupleEltNo, SILLocation Loc, SILBuilder &B,
                      llvm::SmallVectorImpl<std::pair<SILValue, SILValue>>
                          &EndBorrowList) const;
 
-  /// getElementType - Return the swift type of the specified element.
+  /// Return the swift type of the specified element.
   SILType getElementType(unsigned EltNo) const;
 
   /// Push the symbolic path name to the specified element number onto the
