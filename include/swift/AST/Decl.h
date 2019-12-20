@@ -3281,27 +3281,15 @@ class NominalTypeDecl : public GenericTypeDecl, public IterableDeclContext {
   /// its extensions.
   ///
   /// The table itself is lazily constructed and updated when
-  /// lookupDirect() is called. The bit indicates whether the lookup
-  /// table has already added members by walking the declarations in
-  /// scope; it should be manipulated through \c isLookupTablePopulated()
-  /// and \c setLookupTablePopulated().
-  llvm::PointerIntPair<MemberLookupTable *, 1, bool> LookupTable;
+  /// lookupDirect() is called.
+  MemberLookupTable *LookupTable = nullptr;
 
   /// Prepare the lookup table to make it ready for lookups.
   void prepareLookupTable();
 
-  /// True if the entries in \c LookupTable are complete--that is, if a
-  /// name is present, it contains all members with that name.
-  bool isLookupTablePopulated() const;
-  void setLookupTablePopulated(bool value);
-
   /// Note that we have added a member into the iterable declaration context,
   /// so that it can also be added to the lookup table (if needed).
   void addedMember(Decl *member);
-
-  /// Note that we have added an extension into the nominal type,
-  /// so that its members can eventually be added to the lookup table.
-  void addedExtension(ExtensionDecl *ext);
 
   /// A lookup table used to find the protocol conformances of
   /// a given nominal type.
@@ -3322,7 +3310,7 @@ class NominalTypeDecl : public GenericTypeDecl, public IterableDeclContext {
   friend class DeclContext;
   friend class IterableDeclContext;
   friend ArrayRef<ValueDecl *>
-           ValueDecl::getSatisfiedProtocolRequirements(bool Sorted) const;
+  ValueDecl::getSatisfiedProtocolRequirements(bool Sorted) const;
 
 protected:
   Type DeclaredTy;
