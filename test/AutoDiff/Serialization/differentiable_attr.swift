@@ -4,9 +4,6 @@
 // RUN: %target-sil-opt -disable-sil-linking -enable-sil-verify-all %t/differentiable_attr.swiftmodule -o - | %FileCheck %s
 // REQUIRES: differentiable_programming
 
-// We currently lack availability information (rdar://57975086)
-// UNSUPPORTED: use_os_stdlib
-
 // TODO(TF-836): Enable this test.
 // Blocked by TF-828: `@differentiable` attribute type-checking.
 // XFAIL: *
