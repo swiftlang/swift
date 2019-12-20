@@ -913,6 +913,11 @@ public:
   /// Returns the decl context with the given ID, deserializing it if needed.
   DeclContext *getDeclContext(serialization::DeclContextID DID);
 
+  /// Returns the decl context with the given ID, deserializing it if needed,
+  /// or the first error.
+  llvm::Expected<DeclContext *>
+  getDeclContextChecked(serialization::DeclContextID DCID);
+
   /// Returns the local decl context with the given ID, deserializing it if needed.
   DeclContext *getLocalDeclContext(serialization::LocalDeclContextID DID);
 
