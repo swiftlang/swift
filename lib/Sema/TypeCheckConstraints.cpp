@@ -4175,6 +4175,29 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
     }
   }
 
+  if (auto toTuple = toType->getAs<TupleType>()) {
+    if (auto fromTuple = fromType->getAs<TupleType>()) {
+      if (fromTuple->getNumElements() != toTuple->getNumElements())
+        return failed();
+
+      for (unsigned i = 0, n = toTuple->getNumElements(); i != n; ++i) {
+        const auto &fromElt = fromTuple->getElement(i);
+        const auto &toElt = toTuple->getElement(i);
+
+        if (fromElt.getName() != toElt.getName())
+          return failed();
+
+        auto result = checkElementCast(fromElt.getType(), toElt.getType(),
+                                       CheckedCastKind::ValueCast);
+
+        if (result == CheckedCastKind::Unresolved)
+          return result;
+      }
+
+      return CheckedCastKind::ValueCast;
+    }
+  }
+
   assert(!toType->isAny() && "casts to 'Any' should've been handled above");
   assert(!toType->isAnyObject() &&
          "casts to 'AnyObject' should've been handled above");
