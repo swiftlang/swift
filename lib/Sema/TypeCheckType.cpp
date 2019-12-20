@@ -2070,18 +2070,21 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
 
           // Check for @thick.
           if (attrs.has(TAK_thick)) {
-            if (storedRepr)
+            if (storedRepr) {
               diagnose(repr->getStartLoc(), diag::sil_metatype_multiple_reprs);
-              
+              repr->setInvalid();
+            }
+
             storedRepr = MetatypeRepresentation::Thick;
             attrs.clearAttribute(TAK_thick);
           }
 
           // Check for @objc_metatype.
           if (attrs.has(TAK_objc_metatype)) {
-            if (storedRepr)
+            if (storedRepr) {
               diagnose(repr->getStartLoc(), diag::sil_metatype_multiple_reprs);
-              
+              repr->setInvalid();
+            }
             storedRepr = MetatypeRepresentation::ObjC;
             attrs.clearAttribute(TAK_objc_metatype);
           }
@@ -2111,6 +2114,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
     if (attrs.has(attr)) {
       diagnose(attrs.getLoc(attr), diag::unknown_attribute,
                TypeAttributes::getAttrName(attr));
+      repr->setInvalid();
       attrs.clearAttribute(attr);
     }
   };
@@ -2162,6 +2166,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
         if (attrs.has(TAK_callee_guaranteed)) {
           diagnose(attrs.getLoc(TAK_callee_owned),
                    diag::sil_function_repeat_convention, /*callee*/ 2);
+          repr->setInvalid();
         }
         calleeConvention = ParameterConvention::Direct_Owned;
       } else if (attrs.has(TAK_callee_guaranteed)) {
@@ -2190,6 +2195,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
           diagnose(attrs.getLoc(TAK_convention),
                    diag::unsupported_sil_convention, attrs.getConventionName());
           rep = SILFunctionType::Representation::Thin;
+          repr->setInvalid();
         } else {
           rep = *parsedRep;
         }
@@ -2206,6 +2212,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
           !Context.LangOpts.EnableExperimentalDifferentiableProgramming) {
         diagnose(attrs.getLoc(TAK_differentiable),
                  diag::experimental_differentiable_programming_disabled);
+        repr->setInvalid();
       }
 
       DifferentiabilityKind diffKind = DifferentiabilityKind::NonDifferentiable;
@@ -2238,6 +2245,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
         if (!parsedRep) {
           diagnose(attrs.getLoc(TAK_convention), diag::unsupported_convention,
                    attrs.getConventionName());
+          repr->setInvalid();
           rep = FunctionType::Representation::Swift;
         } else {
           rep = *parsedRep;
@@ -2248,6 +2256,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
           !Context.LangOpts.EnableExperimentalDifferentiableProgramming) {
         diagnose(attrs.getLoc(TAK_differentiable),
                  diag::experimental_differentiable_programming_disabled);
+        repr->setInvalid();
       }
 
       DifferentiabilityKind diffKind = DifferentiabilityKind::NonDifferentiable;
@@ -2289,6 +2298,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
     }
 
     if (didDiagnose) {
+      repr->setInvalid();
       ty = ErrorType::get(Context);
     }
   }
@@ -2325,6 +2335,8 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
         if (options.is(TypeResolverContext::ImmediateOptionalTypeArgument)) {
           diagnose(repr->getLoc(), diag::escaping_optional_type_argument);
         }
+
+        repr->setInvalid();
       }
 
       attrs.clearAttribute(TAK_escaping);
@@ -2339,6 +2351,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
       // @autoclosure is going to be diagnosed when type of
       // the parameter is validated, because that attribute
       // applies to the declaration now.
+      repr->setInvalid();
       attrs.clearAttribute(TAK_autoclosure);
     }
 
@@ -2361,6 +2374,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
           diagnose(repr->getLoc(), diag::escaping_optional_type_argument);
         }
       }
+      repr->setInvalid();
       attrs.clearAttribute(i);
     }
   } else if (hasFunctionAttr && fnRepr) {
@@ -2374,6 +2388,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
   if (attrs.has(TAK_opened)) {
     if (!ty->isExistentialType()) {
       diagnose(attrs.getLoc(TAK_opened), diag::opened_non_protocol, ty);
+      repr->setInvalid();
     } else {
       ty = OpenedArchetypeType::get(ty, attrs.OpenedID);
     }
@@ -2413,9 +2428,11 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
   }
 
   for (unsigned i = 0; i != TypeAttrKind::TAK_Count; ++i)
-    if (attrs.has((TypeAttrKind)i))
+    if (attrs.has((TypeAttrKind)i)) {
       diagnose(attrs.getLoc((TypeAttrKind)i),
                diag::attribute_does_not_apply_to_type);
+      repr->setInvalid();
+    }
 
   return ty;
 }

@@ -226,3 +226,6 @@ extension SR_9760 {
   func fiz<T>(_: T, _: @escaping F) {} // Ok
   func baz<T>(_: @escaping G<T>) {} // Ok
 }
+
+// SR-9178
+func foo<T>(_ x: @escaping T) {} // expected-error 1{{@escaping attribute only applies to function types}}

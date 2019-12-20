@@ -292,3 +292,6 @@ func sr_11938_3(_ x: [@autoclosure String]) {} // expected-error {{'@autoclosure
 
 protocol SR_11938_P {}
 struct SR_11938_S : @autoclosure SR_11938_P {} // expected-error {{'@autoclosure' may only be used on parameters}}
+
+// SR-9178
+func bar<T>(_ x: @autoclosure T) {} // expected-error 1{{@autoclosure attribute only applies to function types}}
