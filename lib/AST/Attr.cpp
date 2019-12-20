@@ -1518,41 +1518,43 @@ void DifferentiableAttr::print(llvm::raw_ostream &OS, const Decl *D,
 }
 
 DerivativeAttr::DerivativeAttr(bool implicit, SourceLoc atLoc,
-                               SourceRange baseRange,
+                               SourceRange baseRange, TypeRepr *baseTypeRepr,
                                DeclNameRefWithLoc originalName,
                                ArrayRef<ParsedAutoDiffParameter> params)
     : DeclAttribute(DAK_Derivative, atLoc, baseRange, implicit),
-      OriginalFunctionName(std::move(originalName)),
+      BaseTypeRepr(baseTypeRepr), OriginalFunctionName(std::move(originalName)),
       NumParsedParameters(params.size()) {
   std::copy(params.begin(), params.end(),
             getTrailingObjects<ParsedAutoDiffParameter>());
 }
 
 DerivativeAttr::DerivativeAttr(bool implicit, SourceLoc atLoc,
-                               SourceRange baseRange,
+                               SourceRange baseRange, TypeRepr *baseTypeRepr,
                                DeclNameRefWithLoc originalName,
-                               IndexSubset *indices)
+                               IndexSubset *parameterIndices)
     : DeclAttribute(DAK_Derivative, atLoc, baseRange, implicit),
-      OriginalFunctionName(std::move(originalName)), ParameterIndices(indices) {
-}
+      BaseTypeRepr(baseTypeRepr), OriginalFunctionName(std::move(originalName)),
+      ParameterIndices(parameterIndices) {}
 
 DerivativeAttr *
 DerivativeAttr::create(ASTContext &context, bool implicit, SourceLoc atLoc,
-                       SourceRange baseRange, DeclNameRefWithLoc originalName,
+                       SourceRange baseRange, TypeRepr *baseTypeRepr,
+                       DeclNameRefWithLoc originalName,
                        ArrayRef<ParsedAutoDiffParameter> params) {
   unsigned size = totalSizeToAlloc<ParsedAutoDiffParameter>(params.size());
   void *mem = context.Allocate(size, alignof(DerivativeAttr));
-  return new (mem) DerivativeAttr(implicit, atLoc, baseRange,
+  return new (mem) DerivativeAttr(implicit, atLoc, baseRange, baseTypeRepr,
                                   std::move(originalName), params);
 }
 
 DerivativeAttr *DerivativeAttr::create(ASTContext &context, bool implicit,
                                        SourceLoc atLoc, SourceRange baseRange,
+                                       TypeRepr *baseTypeRepr,
                                        DeclNameRefWithLoc originalName,
-                                       IndexSubset *indices) {
+                                       IndexSubset *parameterIndices) {
   void *mem = context.Allocate(sizeof(DerivativeAttr), alignof(DerivativeAttr));
-  return new (mem) DerivativeAttr(implicit, atLoc, baseRange,
-                                  std::move(originalName), indices);
+  return new (mem) DerivativeAttr(implicit, atLoc, baseRange, baseTypeRepr,
+                                  std::move(originalName), parameterIndices);
 }
 
 TransposeAttr::TransposeAttr(bool implicit, SourceLoc atLoc,
@@ -1568,10 +1570,11 @@ TransposeAttr::TransposeAttr(bool implicit, SourceLoc atLoc,
 
 TransposeAttr::TransposeAttr(bool implicit, SourceLoc atLoc,
                              SourceRange baseRange, TypeRepr *baseTypeRepr,
-                             DeclNameRefWithLoc originalName, IndexSubset *indices)
+                             DeclNameRefWithLoc originalName,
+                             IndexSubset *parameterIndices)
     : DeclAttribute(DAK_Transpose, atLoc, baseRange, implicit),
       BaseTypeRepr(baseTypeRepr), OriginalFunctionName(std::move(originalName)),
-      ParameterIndices(indices) {}
+      ParameterIndices(parameterIndices) {}
 
 TransposeAttr *TransposeAttr::create(ASTContext &context, bool implicit,
                                      SourceLoc atLoc, SourceRange baseRange,
@@ -1588,10 +1591,10 @@ TransposeAttr *TransposeAttr::create(ASTContext &context, bool implicit,
                                      SourceLoc atLoc, SourceRange baseRange,
                                      TypeRepr *baseType,
                                      DeclNameRefWithLoc originalName,
-                                     IndexSubset *indices) {
+                                     IndexSubset *parameterIndices) {
   void *mem = context.Allocate(sizeof(TransposeAttr), alignof(TransposeAttr));
   return new (mem) TransposeAttr(implicit, atLoc, baseRange, baseType,
-                                 std::move(originalName), indices);
+                                 std::move(originalName), parameterIndices);
 }
 
 ImplementsAttr::ImplementsAttr(SourceLoc atLoc, SourceRange range,
