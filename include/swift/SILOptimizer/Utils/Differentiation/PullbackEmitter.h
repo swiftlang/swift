@@ -274,6 +274,20 @@ private:
   void addToAdjointBuffer(SILBasicBlock *origBB, SILValue originalBuffer,
                           SILValue rhsBufferAccess, SILLocation loc);
 
+  /// Given the adjoint value of an array initialized from an
+  /// `array.uninitialized_intrinsic` application and an array element index,
+  /// returns an `alloc_stack` containing the adjoint value of the array element
+  /// at the given index by applying `Array.TangentVector.subscript`.
+  AllocStackInst *getArrayAdjointElementBuffer(SILValue arrayAdjoint,
+                                               int eltIndex, SILLocation loc);
+
+  /// Given the adjoint value of an array initialized from an
+  /// `array.uninitialized_intrinsic` application, accumulate the adjoint
+  /// value's elements into the adjoint buffers of its element addresses.
+  void accumulateArrayLiteralElementAddressAdjoints(
+      SILBasicBlock *origBB, SILValue originalValue,
+      AdjointValue arrayAdjointValue, SILLocation loc);
+
   //--------------------------------------------------------------------------//
   // CFG mapping
   //--------------------------------------------------------------------------//
@@ -321,25 +335,6 @@ public:
   void visit(SILInstruction *inst);
 
   void visitSILInstruction(SILInstruction *inst);
-
-  /// Given an array adjoint value, array element index and element tangent
-  /// type, returns an `alloc_stack` containing the array element adjoint value.
-  AllocStackInst *getArrayAdjointElementBuffer(SILValue arrayAdjoint,
-                                               int eltIndex, SILType eltTanType,
-                                               SILLocation loc);
-
-  /// Accumulate array element adjoint buffer into `store` source.
-  void accumulateArrayElementAdjointDirect(StoreInst *si,
-                                           AllocStackInst *eltAdjBuffer);
-
-  /// Accumulate array element adjoint buffer into `copy_addr` source.
-  void accumulateArrayElementAdjointIndirect(CopyAddrInst *cai,
-                                             AllocStackInst *eltAdjBuffer);
-
-  /// Given a `store` or `copy_addr` instruction whose destination is an element
-  /// address from an `array.uninitialized_intrinsic` application, accumulate
-  /// array element adjoint into the source's adjoint.
-  void accumulateArrayElementAdjoint(SILInstruction *inst);
 
   void visitApplyInst(ApplyInst *ai);
 
