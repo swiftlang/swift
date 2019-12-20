@@ -35,8 +35,15 @@
 #include "swift/Sema/IDETypeChecking.h"
 #include "clang/Basic/CharInfo.h"
 #include "llvm/Support/Debug.h"
+// SWIFT_ENABLE_TENSORFLOW
+#include "llvm/Support/Options.h"
 
 using namespace swift;
+
+// SWIFT_ENABLE_TENSORFLOW
+static llvm::cl::opt<bool> EnableExperimentalCrossFileDerivativeRegistration(
+    "enable-experimental-cross-file-derivative-registration",
+    llvm::cl::init(false));
 
 namespace {
   /// This emits a diagnostic with a fixit to remove the attribute.
@@ -3646,7 +3653,8 @@ void AttributeChecker::visitDerivativeAttr(DerivativeAttr *attr) {
 
   // Reject different-file derivative registration.
   // TODO(TF-1021): Lift this restriction.
-  if (originalAFD->getParentSourceFile() != derivative->getParentSourceFile()) {
+  if (!EnableExperimentalCrossFileDerivativeRegistration &&
+      originalAFD->getParentSourceFile() != derivative->getParentSourceFile()) {
     diagnoseAndRemoveAttr(attr,
                           diag::derivative_attr_not_in_same_file_as_original);
     return;
