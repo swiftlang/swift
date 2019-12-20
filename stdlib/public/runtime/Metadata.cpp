@@ -2362,9 +2362,13 @@ static bool installLazyClassNameHook() {
   return true;
 }
 
+__attribute__((constructor)) SWIFT_RUNTIME_ATTRIBUTE_ALWAYS_INLINE static bool
+supportsLazyObjcClassNames() {
+  return SWIFT_LAZY_CONSTANT(installLazyClassNameHook());
+}
+
 static void setUpGenericClassObjCName(ClassMetadata *theClass) {
-  bool supportsLazyNames = SWIFT_LAZY_CONSTANT(installLazyClassNameHook());
-  if (supportsLazyNames) {
+  if (supportsLazyObjcClassNames()) {
     getROData(theClass)->Name = nullptr;
     auto theMetaclass = (ClassMetadata *)object_getClass((id)theClass);
     getROData(theMetaclass)->Name = nullptr;

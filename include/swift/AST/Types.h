@@ -851,7 +851,17 @@ public:
   /// \returns The superclass of this type, or a null type if it has no
   ///          superclass.
   Type getSuperclass(bool useArchetypes = true);
-  
+
+  /// Retrieve the root class of this type by repeatedly retrieving the
+  /// superclass.
+  ///
+  /// \param useArchetypes Whether to use context archetypes for outer generic
+  /// parameters if the class is nested inside a generic function.
+  ///
+  /// \returns The base class of this type, or this type itself if it has no
+  ///          superclasses.
+  Type getRootClass(bool useArchetypes = true);
+
   /// True if this type is the exact superclass of another type.
   ///
   /// \param ty       The potential subclass.

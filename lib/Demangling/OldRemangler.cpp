@@ -2133,6 +2133,17 @@ void Remangler::mangleAccessorFunctionReference(Node *node) {
   unreachable("can't remangle");
 }
 
+void Remangler::mangleCanonicalSpecializedGenericMetaclass(Node *node) {
+  Buffer << "MM";
+  mangleSingleChildNode(node); // type
+}
+
+void Remangler::mangleCanonicalSpecializedGenericTypeMetadataAccessFunction(
+    Node *node) {
+  mangleSingleChildNode(node);
+  Buffer << "Mb";
+}
+
 /// The top-level interface to the remangler.
 std::string Demangle::mangleNodeOld(NodePointer node) {
   if (!node) return "";

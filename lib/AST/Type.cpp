@@ -1553,6 +1553,17 @@ Type TypeBase::getSuperclass(bool useArchetypes) {
   return superclassTy.subst(subMap);
 }
 
+Type TypeBase::getRootClass(bool useArchetypes) {
+  Type iterator = this;
+  assert(iterator);
+
+  while (auto superclass = iterator->getSuperclass(useArchetypes)) {
+    iterator = superclass;
+  }
+
+  return iterator;
+}
+
 bool TypeBase::isExactSuperclassOf(Type ty) {
   // For there to be a superclass relationship, we must be a class, and
   // the potential subtype must be a class, superclass-bounded archetype,

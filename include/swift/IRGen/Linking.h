@@ -193,7 +193,7 @@ class LinkEntity {
     /// The nominal type descriptor for a nominal type.
     /// The pointer is a NominalTypeDecl*.
     NominalTypeDescriptor,
-    
+
     /// The descriptor for an opaque type.
     /// The pointer is an OpaqueTypeDecl*.
     OpaqueTypeDescriptor,
@@ -295,12 +295,12 @@ class LinkEntity {
     /// The descriptor for an extension.
     /// The pointer is an ExtensionDecl*.
     ExtensionDescriptor,
-    
+
     /// The descriptor for a runtime-anonymous context.
     /// The pointer is the DeclContext* of a child of the context that should
     /// be considered private.
     AnonymousDescriptor,
-    
+
     /// A SIL global variable. The pointer is a SILGlobalVariable*.
     SILGlobalVariable,
 
@@ -384,6 +384,15 @@ class LinkEntity {
 
     /// A global function pointer for dynamically replaceable functions.
     DynamicallyReplaceableFunctionVariable,
+
+    /// A reference to a metaclass-stub for a statically specialized generic
+    /// class.
+    /// The pointer is a canonical TypeBase*.
+    CanonicalSpecializedGenericSwiftMetaclassStub,
+
+    /// An access function for prespecialized type metadata.
+    /// The pointer is a canonical TypeBase*.
+    CanonicalSpecializedGenericTypeMetadataAccessFunction,
   };
   friend struct llvm::DenseMapInfo<LinkEntity>;
 
@@ -1017,6 +1026,22 @@ public:
     LinkEntity entity;
     entity.setForDecl(Kind::DynamicallyReplaceableFunctionImpl, decl);
     entity.SecondaryPointer = isAllocator ? decl : nullptr;
+    return entity;
+  }
+
+  static LinkEntity
+  forSpecializedGenericSwiftMetaclassStub(CanType concreteType) {
+    LinkEntity entity;
+    entity.setForType(Kind::CanonicalSpecializedGenericSwiftMetaclassStub,
+                      concreteType);
+    return entity;
+  }
+
+  static LinkEntity
+  forPrespecializedTypeMetadataAccessFunction(CanType theType) {
+    LinkEntity entity;
+    entity.setForType(
+        Kind::CanonicalSpecializedGenericTypeMetadataAccessFunction, theType);
     return entity;
   }
 

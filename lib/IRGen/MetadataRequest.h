@@ -505,9 +505,14 @@ bool isCompleteTypeMetadataStaticallyAddressable(IRGenModule &IGM, CanType type)
 /// Should requests for the given type's metadata be cached?
 bool shouldCacheTypeMetadataAccess(IRGenModule &IGM, CanType type);
 
-bool isNominalGenericContextTypeMetadataAccessTrivial(IRGenModule &IGM,
-                                                      NominalTypeDecl &nominal,
+bool isInitializableTypeMetadataStaticallyAddressable(IRGenModule &IGM,
                                                       CanType type);
+
+bool isInitializableGenericNominalTypeMetadataStaticallyAddressable(
+    IRGenModule &IGM, NominalTypeDecl &nominal, CanType type);
+
+bool isCompleteGenericNominalTypeMetadataStaticallyAddressable(
+    IRGenModule &IGM, NominalTypeDecl &nominal, CanType type);
 
 /// Determine how the given type metadata should be accessed.
 MetadataAccessStrategy getTypeMetadataAccessStrategy(CanType type);
@@ -593,6 +598,9 @@ MetadataResponse
 emitGenericTypeMetadataAccessFunction(IRGenFunction &IGF, Explosion &params,
                                       NominalTypeDecl *nominal,
                                       GenericArguments &genericArgs);
+
+MetadataResponse emitCanonicalSpecializedGenericTypeMetadataAccessFunction(
+    IRGenFunction &IGF, Explosion &params, CanType theType);
 
 /// Emit a declaration reference to a metatype object.
 void emitMetatypeRef(IRGenFunction &IGF, CanMetatypeType type,

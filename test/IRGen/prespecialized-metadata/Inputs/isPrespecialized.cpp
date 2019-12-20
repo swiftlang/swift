@@ -20,7 +20,7 @@ bool isCanonicalStaticallySpecializedGenericMetadata(Metadata *self) {
   return false;
 }
 
-int isCanonicalStaticallySpecializedGenericMetadata(void *ptr) {
+bool isCanonicalStaticallySpecializedGenericMetadata(void *ptr) {
   auto metadata = static_cast<Metadata *>(ptr);
   auto isCanonical =
       isCanonicalStaticallySpecializedGenericMetadata(metadata);

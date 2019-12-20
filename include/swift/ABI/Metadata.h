@@ -1022,7 +1022,7 @@ struct TargetAnyClassMetadata : public TargetHeapMetadata<Runtime> {
   using TargetMetadata<Runtime>::setClassISA;
 #endif
 
-  // Note that ObjC classes does not have a metadata header.
+  // Note that ObjC classes do not have a metadata header.
 
   /// The metadata for the superclass.  This is null for the root class.
   ConstTargetMetadataPointer<Runtime, swift::TargetClassMetadata> Superclass;
