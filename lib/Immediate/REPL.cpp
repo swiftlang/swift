@@ -187,12 +187,10 @@ typeCheckREPLInput(ModuleDecl *MostRecentModule, StringRef Name,
     REPLInputFile.addImports(ImportsWithOptions);
   }
 
-  bool FoundAnySideEffects = false;
   bool Done;
   do {
-    FoundAnySideEffects |=
-        parseIntoSourceFile(REPLInputFile, BufferID, &Done, nullptr,
-                            &PersistentState);
+    parseIntoSourceFile(REPLInputFile, BufferID, &Done, nullptr,
+                        &PersistentState);
   } while (!Done);
   performTypeChecking(REPLInputFile);
   return REPLModule;

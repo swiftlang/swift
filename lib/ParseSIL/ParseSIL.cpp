@@ -112,13 +112,13 @@ void PrettyStackTraceParser::print(llvm::raw_ostream &out) const {
   out << '\n';
 }
 
-static bool parseIntoSourceFileImpl(SourceFile &SF,
-                                unsigned BufferID,
-                                bool *Done,
-                                SILParserState *SIL,
-                                PersistentParserState *PersistentState,
-                                bool FullParse,
-                                bool DelayBodyParsing) {
+static void parseIntoSourceFileImpl(SourceFile &SF,
+                                    unsigned BufferID,
+                                    bool *Done,
+                                    SILParserState *SIL,
+                                    PersistentParserState *PersistentState,
+                                    bool FullParse,
+                                    bool DelayBodyParsing) {
   assert((!FullParse || (SF.canBeParsedInFull() && !SIL)) &&
          "cannot parse in full with the given parameters!");
 
@@ -149,10 +149,8 @@ static bool parseIntoSourceFileImpl(SourceFile &SF,
   llvm::SaveAndRestore<bool> S(P.IsParsingInterfaceTokens,
                                SF.hasInterfaceHash());
 
-  bool FoundSideEffects = false;
   do {
-    bool hasSideEffects = P.parseTopLevel();
-    FoundSideEffects = FoundSideEffects || hasSideEffects;
+    P.parseTopLevel();
     *Done = P.Tok.is(tok::eof);
   } while (FullParse && !*Done);
 
@@ -160,29 +158,27 @@ static bool parseIntoSourceFileImpl(SourceFile &SF,
     auto rawNode = P.finalizeSyntaxTree();
     STreeCreator->acceptSyntaxRoot(rawNode, SF);
   }
-
-  return FoundSideEffects;
 }
 
-bool swift::parseIntoSourceFile(SourceFile &SF,
+void swift::parseIntoSourceFile(SourceFile &SF,
                                 unsigned BufferID,
                                 bool *Done,
                                 SILParserState *SIL,
                                 PersistentParserState *PersistentState,
                                 bool DelayBodyParsing) {
-  return parseIntoSourceFileImpl(SF, BufferID, Done, SIL,
-                                 PersistentState,
-                                 /*FullParse=*/SF.shouldBuildSyntaxTree(),
-                                 DelayBodyParsing);
+  parseIntoSourceFileImpl(SF, BufferID, Done, SIL,
+                          PersistentState,
+                          /*FullParse=*/SF.shouldBuildSyntaxTree(),
+                          DelayBodyParsing);
 }
 
-bool swift::parseIntoSourceFileFull(SourceFile &SF, unsigned BufferID,
+void swift::parseIntoSourceFileFull(SourceFile &SF, unsigned BufferID,
                                     PersistentParserState *PersistentState,
                                     bool DelayBodyParsing) {
   bool Done = false;
-  return parseIntoSourceFileImpl(SF, BufferID, &Done, /*SIL=*/nullptr,
-                                 PersistentState, /*FullParse=*/true,
-                                 DelayBodyParsing);
+  parseIntoSourceFileImpl(SF, BufferID, &Done, /*SIL=*/nullptr,
+                          PersistentState, /*FullParse=*/true,
+                          DelayBodyParsing);
 }
 
 
