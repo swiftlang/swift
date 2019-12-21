@@ -2272,6 +2272,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       auto theAttr = cast<DynamicReplacementAttr>(DA);
       auto replacedFun = theAttr->getReplacedFunctionName();
       SmallVector<IdentifierID, 4> pieces;
+      pieces.push_back(S.addDeclBaseNameRef(replacedFun.getModuleSelector()));
       pieces.push_back(S.addDeclBaseNameRef(replacedFun.getBaseName()));
       for (auto argName : replacedFun.getArgumentNames())
         pieces.push_back(S.addDeclBaseNameRef(argName));
@@ -2306,17 +2307,23 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       auto abbrCode = S.DeclTypeAbbrCodes[DifferentiableDeclAttrLayout::Code];
       auto *attr = cast<DifferentiableAttr>(DA);
 
+      IdentifierID jvpModuleSelector = 0;
       IdentifierID jvpName = 0;
       DeclID jvpRef = 0;
-      if (auto jvp = attr->getJVP())
+      if (auto jvp = attr->getJVP()) {
+        jvpModuleSelector = S.addDeclBaseNameRef(jvp->Name.getModuleSelector());
         jvpName = S.addDeclBaseNameRef(jvp->Name.getBaseName());
+      }
       if (auto jvpFunction = attr->getJVPFunction())
         jvpRef = S.addDeclRef(jvpFunction);
 
+      IdentifierID vjpModuleSelector = 0;
       IdentifierID vjpName = 0;
       DeclID vjpRef = 0;
-      if (auto vjp = attr->getVJP())
+      if (auto vjp = attr->getVJP()) {
+        vjpModuleSelector = S.addDeclBaseNameRef(vjp->Name.getModuleSelector());
         vjpName = S.addDeclBaseNameRef(vjp->Name.getBaseName());
+      }
       if (auto vjpFunction = attr->getVJPFunction())
         vjpRef = S.addDeclRef(vjpFunction);
 
@@ -2333,7 +2340,9 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
 
       DifferentiableDeclAttrLayout::emitRecord(
           S.Out, S.ScratchRecord, abbrCode, attr->isImplicit(),
-          attr->isLinear(), jvpName, jvpRef, vjpName, vjpRef,
+          attr->isLinear(),
+          jvpModuleSelector, jvpName, jvpRef,
+          vjpModuleSelector, vjpName, vjpRef,
           S.addGenericSignatureRef(attr->getDerivativeGenericSignature()),
           indices);
       return;
@@ -2345,6 +2354,10 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       assert(attr->getOriginalFunction() &&
              "`@derivative` attribute should have original declaration set "
              "during construction or parsing");
+      auto origModuleSelector =
+          attr->getOriginalFunctionName().Name.getModuleSelector();
+      IdentifierID origModuleSelectorId =
+          S.addDeclBaseNameRef(origModuleSelector);
       auto origName = attr->getOriginalFunctionName().Name.getBaseName();
       IdentifierID origNameId = S.addDeclBaseNameRef(origName);
       DeclID origDeclID = S.addDeclRef(attr->getOriginalFunction());
@@ -2356,8 +2369,9 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       for (unsigned i : range(parameterIndices->getCapacity()))
         indices.push_back(parameterIndices->contains(i));
       DerivativeDeclAttrLayout::emitRecord(
-          S.Out, S.ScratchRecord, abbrCode, attr->isImplicit(), origNameId,
-          origDeclID, derivativeKind, indices);
+          S.Out, S.ScratchRecord, abbrCode, attr->isImplicit(),
+          origModuleSelectorId, origNameId, origDeclID, derivativeKind,
+          indices);
       return;
     }
 
