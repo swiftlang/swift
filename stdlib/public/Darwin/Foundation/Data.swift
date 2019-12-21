@@ -62,6 +62,39 @@ internal func __NSDataIsCompact(_ data: NSData) -> Bool {
 
 #endif
 
+@_alwaysEmitIntoClient
+internal func _withStackOrHeapBuffer(capacity: Int, _ body: (UnsafeMutableBufferPointer<UInt8>) -> Void) {
+    guard capacity > 0 else {
+        body(UnsafeMutableBufferPointer(start: nil, count: 0))
+        return
+    }
+    typealias InlineBuffer = ( // 32 bytes
+        UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8,
+        UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8,
+        UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8,
+        UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8
+    )
+    let inlineCount = MemoryLayout<InlineBuffer>.size
+    if capacity <= inlineCount {
+        var buffer: InlineBuffer = (
+            0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0
+        )
+        withUnsafeMutableBytes(of: &buffer) { buffer in
+            assert(buffer.count == inlineCount)
+            let start = buffer.baseAddress!.assumingMemoryBound(to: UInt8.self)
+            body(UnsafeMutableBufferPointer(start: start, count: capacity))
+        }
+        return
+    }
+
+    let buffer = UnsafeMutableBufferPointer<UInt8>.allocate(capacity: capacity)
+    defer { buffer.deallocate() }
+    body(buffer)
+}
+
 // Underlying storage representation for medium and large data.
 // Inlinability strategy: methods from here should not inline into InlineSlice or LargeSlice unless trivial.
 // NOTE: older overlays called this class _DataStorage. The two must
@@ -2054,43 +2087,42 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
         // The sequence might still be able to provide direct access to typed memory.
         // NOTE: It's safe to do this because we're already guarding on S's element as `UInt8`. This would not be safe on arbitrary sequences.
         let representation = elements.withContiguousStorageIfAvailable {
-            return _Representation(UnsafeRawBufferPointer($0))
+            _Representation(UnsafeRawBufferPointer($0))
         }
-
         if let representation = representation {
             _representation = representation
-        } else {
-            // Dummy assignment so we can capture below.
-            _representation = _Representation(capacity: 0)
+            return
+        }
 
-            // Copy as much as we can in one shot from the sequence.
-            let underestimatedCount = Swift.max(elements.underestimatedCount, 1)
-            _withStackOrHeapBuffer(underestimatedCount) { (buffer) in
-                // In order to copy from the sequence, we have to bind the buffer to UInt8.
-                // This is safe since we'll copy out of this buffer as raw memory later.
-                let capacity = buffer.pointee.capacity
-                let base = buffer.pointee.memory.bindMemory(to: UInt8.self, capacity: capacity)
-                var (iter, endIndex) = elements._copyContents(initializing: UnsafeMutableBufferPointer(start: base, count: capacity))
+        // Copy as much as we can in one shot from the sequence.
+        let underestimatedCount = elements.underestimatedCount
+        _representation = _Representation(count: underestimatedCount)
+        var (iter, endIndex): (S.Iterator, Int) = _representation.withUnsafeMutableBytes { buffer in
+            let start = buffer.baseAddress!.assumingMemoryBound(to: UInt8.self)
+            let b = UnsafeMutableBufferPointer(start: start, count: buffer.count)
+            return elements._copyContents(initializing: b)
+        }
+        guard endIndex == _representation.count else {
+            // We can't trap here. We have to allow an underfilled buffer
+            // to emulate the previous implementation.
+            _representation.replaceSubrange(endIndex ..< _representation.endIndex, with: nil, count: 0)
+            return
+        }
 
-                // Copy the contents of buffer...
-                _representation = _Representation(UnsafeRawBufferPointer(start: base, count: endIndex))
-
-                // ... and append the rest byte-wise, buffering through an InlineData.
-                var buffer = InlineData()
-                while let element = iter.next() {
-                    buffer.append(byte: element)
-                    if buffer.count == buffer.capacity {
-                        buffer.withUnsafeBytes { _representation.append(contentsOf: $0) }
-                        buffer.count = 0
-                    }
-                }
-
-                // If we've still got bytes left in the buffer (i.e. the loop ended before we filled up the buffer and cleared it out), append them.
-                if buffer.count > 0 {
-                    buffer.withUnsafeBytes { _representation.append(contentsOf: $0) }
-                    buffer.count = 0
-                }
+        // Append the rest byte-wise, buffering through an InlineData.
+        var buffer = InlineData()
+        while let element = iter.next() {
+            buffer.append(byte: element)
+            if buffer.count == buffer.capacity {
+                buffer.withUnsafeBytes { _representation.append(contentsOf: $0) }
+                buffer.count = 0
             }
+        }
+
+        // If we've still got bytes left in the buffer (i.e. the loop ended before we filled up the buffer and cleared it out), append them.
+        if buffer.count > 0 {
+            buffer.withUnsafeBytes { _representation.append(contentsOf: $0) }
+            buffer.count = 0
         }
     }
     
@@ -2347,42 +2379,42 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
 
         // The sequence might still be able to provide direct access to typed memory.
         // NOTE: It's safe to do this because we're already guarding on S's element as `UInt8`. This would not be safe on arbitrary sequences.
-        var appended = false
-        elements.withContiguousStorageIfAvailable {
+        let appended: Void? = elements.withContiguousStorageIfAvailable {
             _representation.append(contentsOf: UnsafeRawBufferPointer($0))
-            appended = true
         }
-
-        guard !appended else { return }
+        guard appended == nil else { return }
 
         // The sequence is really not contiguous.
         // Copy as much as we can in one shot.
-        let underestimatedCount = Swift.max(elements.underestimatedCount, 1)
-        _withStackOrHeapBuffer(underestimatedCount) { (buffer) in
-            // In order to copy from the sequence, we have to bind the temporary buffer to `UInt8`.
-            // This is safe since we're the only owners of the buffer and we copy out as raw memory below anyway.
-            let capacity = buffer.pointee.capacity
-            let base = buffer.pointee.memory.bindMemory(to: UInt8.self, capacity: capacity)
-            var (iter, endIndex) = elements._copyContents(initializing: UnsafeMutableBufferPointer(start: base, count: capacity))
+        let underestimatedCount = elements.underestimatedCount
+        let originalCount = _representation.count
+        _representation.count += underestimatedCount
+        var (iter, endIndex): (S.Iterator, Int) = _representation.withUnsafeMutableBytes { buffer in
+            let start = buffer.baseAddress!.assumingMemoryBound(to: UInt8.self) + originalCount
+            let b = UnsafeMutableBufferPointer(start: start, count: buffer.count - originalCount)
+            return elements._copyContents(initializing: b)
+        }
+        guard endIndex == underestimatedCount else {
+            // We can't trap here. We have to allow an underfilled buffer
+            // to emulate the previous implementation.
+            _representation.replaceSubrange(originalCount + endIndex ..< _representation.endIndex, with: nil, count: 0)
+            return
+        }
 
-            // Copy the contents of the buffer...
-            _representation.append(contentsOf: UnsafeRawBufferPointer(start: base, count: endIndex))
-
-            // ... and append the rest byte-wise, buffering through an InlineData.
-            var buffer = InlineData()
-            while let element = iter.next() {
-                buffer.append(byte: element)
-                if buffer.count == buffer.capacity {
-                    buffer.withUnsafeBytes { _representation.append(contentsOf: $0) }
-                    buffer.count = 0
-                }
-            }
-
-            // If we've still got bytes left in the buffer (i.e. the loop ended before we filled up the buffer and cleared it out), append them.
-            if buffer.count > 0 {
+        // Append the rest byte-wise, buffering through an InlineData.
+        var buffer = InlineData()
+        while let element = iter.next() {
+            buffer.append(byte: element)
+            if buffer.count == buffer.capacity {
                 buffer.withUnsafeBytes { _representation.append(contentsOf: $0) }
                 buffer.count = 0
             }
+        }
+
+        // If we've still got bytes left in the buffer (i.e. the loop ended before we filled up the buffer and cleared it out), append them.
+        if buffer.count > 0 {
+            buffer.withUnsafeBytes { _representation.append(contentsOf: $0) }
+            buffer.count = 0
         }
     }
     
@@ -2436,15 +2468,26 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     /// - parameter newElements: The replacement bytes.
     @inlinable // This is @inlinable as generic and reasonably small.
     public mutating func replaceSubrange<ByteCollection : Collection>(_ subrange: Range<Index>, with newElements: ByteCollection) where ByteCollection.Iterator.Element == Data.Iterator.Element {
-        let totalCount = Int(newElements.count)
-        _withStackOrHeapBuffer(totalCount) { conditionalBuffer in
-            let buffer = UnsafeMutableBufferPointer(start: conditionalBuffer.pointee.memory.assumingMemoryBound(to: UInt8.self), count: totalCount)
-            var (iterator, index) = newElements._copyContents(initializing: buffer)
-            while let byte = iterator.next() {
-                buffer[index] = byte
-                index = buffer.index(after: index)
+        // If the collection is already contiguous, access the underlying raw memory directly.
+        if let contiguous = newElements as? ContiguousBytes {
+            contiguous.withUnsafeBytes { buffer in
+                _representation.replaceSubrange(subrange, with: buffer.baseAddress, count: buffer.count)
             }
-            replaceSubrange(subrange, with: conditionalBuffer.pointee.memory, count: totalCount)
+            return
+        }
+        // The collection might still be able to provide direct access to typed memory.
+        // NOTE: It's safe to do this because we're already guarding on ByteCollection's element as `UInt8`. This would not be safe on arbitrary collections.
+        let replaced: Void? = newElements.withContiguousStorageIfAvailable { buffer in
+            _representation.replaceSubrange(subrange, with: buffer.baseAddress, count: buffer.count)
+        }
+        guard replaced == nil else { return }
+
+        let totalCount = Int(newElements.count)
+        _withStackOrHeapBuffer(capacity: totalCount) { buffer in
+            var (iterator, index) = newElements._copyContents(initializing: buffer)
+            precondition(index == buffer.endIndex, "Collection has less elements than its count")
+            precondition(iterator.next() == nil, "Collection has more elements than its count")
+            _representation.replaceSubrange(subrange, with: buffer.baseAddress, count: totalCount)
         }
     }
     
