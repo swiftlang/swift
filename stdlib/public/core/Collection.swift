@@ -123,10 +123,9 @@ extension IndexingIterator: IteratorProtocol, Sequence {
   @inlinable
   @inline(__always)
   public mutating func next() -> Elements.Element? {
-    if _position == _elements.endIndex { return nil }
-    let element = _elements[_position]
-    _elements.formIndex(after: &_position)
-    return element
+    guard _position < _elements.endIndex else { return nil }
+    defer { _elements.formIndex(after: &_position) }    
+    return _elements[_position]
   }
 }
 
