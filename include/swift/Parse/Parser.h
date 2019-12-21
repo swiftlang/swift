@@ -737,6 +737,17 @@ public:
   consumeStartingCharacterOfCurrentToken(tok Kind = tok::oper_binary_unspaced,
                                          size_t Len = 1);
 
+  /// If the next token is \c tok::colon, consume it; if the next token is
+  /// \c tok::colon_colon, split it into two \c tok::colons and consume the
+  /// first; otherwise, do nothing and return false.
+  bool consumeIfColonSplittingDoubles() {
+    if (!Tok.isAny(tok::colon, tok::colon_colon))
+      return false;
+
+    consumeStartingCharacterOfCurrentToken(tok::colon);
+    return true;
+  }
+
   swift::ScopeInfo &getScopeInfo() { return State->getScopeInfo(); }
 
   /// Add the given Decl to the current scope.
