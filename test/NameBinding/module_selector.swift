@@ -119,16 +119,16 @@ extension C {}
 
 extension ModuleSelectorTestingKit::C: ModuleSelectorTestingKit::Equatable {
 // expected-error@-1 {{type 'Equatable' is not imported through module 'ModuleSelectorTestingKit'}}
-// expected-note@-2 {{did you mean module 'Swift'?}} {{39-62=Swift}}
+// expected-note@-2 {{did you mean module 'Swift'?}} {{40-64=Swift}}
 
   @_implements(ModuleSelectorTestingKit::Equatable, ModuleSelectorTestingKit::==(_:_:))
-  // expected-error@-1 {{name cannot be qualified with module selector here}} {{52-77=}}
+  // expected-error@-1 {{name cannot be qualified with module selector here}} {{53-79=}}
   // expected-error@-2 {{type 'Equatable' is not imported through module 'ModuleSelectorTestingKit'}}
-  // expected-note@-3 {{did you mean module 'Swift'?}} {{16-39=Swift}}
+  // expected-note@-3 {{did you mean module 'Swift'?}} {{16-40=Swift}}
 
   public static func equals(_: ModuleSelectorTestingKit::C, _: ModuleSelectorTestingKit::C) -> ModuleSelectorTestingKit::Bool {
   // expected-error@-1 {{type 'Bool' is not imported through module 'ModuleSelectorTestingKit'}}
-  // expected-note@-2 {{did you mean module 'Swift'?}} {{94-117=Swift}}
+  // expected-note@-2 {{did you mean module 'Swift'?}} {{96-120=Swift}}
     ModuleSelectorTestingKit::fatalError()
     // expected-EVENTUALLY-error@-1 {{type 'fatalError' is not imported through module 'main'}}
     // expected-EVENTUALLY-note@-2 {{did you mean module 'Swift'?}} {{4-8=Swift}}
@@ -143,9 +143,9 @@ extension ModuleSelectorTestingKit::C: ModuleSelectorTestingKit::Equatable {
 
     let fn: (ModuleSelectorTestingKit::Int, ModuleSelectorTestingKit::Int) -> ModuleSelectorTestingKit::Int =
     // expected-error@-1 3{{type 'Int' is not imported through module 'ModuleSelectorTestingKit'}}
-    // expected-note@-2 {{did you mean module 'Swift'?}} {{14-37=Swift}}
-    // expected-note@-3 {{did you mean module 'Swift'?}} {{44-67=Swift}}
-    // expected-note@-4 {{did you mean module 'Swift'?}} {{77-100=Swift}}
+    // expected-note@-2 {{did you mean module 'Swift'?}} {{14-38=Swift}}
+    // expected-note@-3 {{did you mean module 'Swift'?}} {{45-69=Swift}}
+    // expected-note@-4 {{did you mean module 'Swift'?}} {{79-103=Swift}}
       (ModuleSelectorTestingKit::+)
       // FIXME: it'd be nice to handle module selectors on operators.
       // expected-error@-2 {{expected expression}}
@@ -153,12 +153,12 @@ extension ModuleSelectorTestingKit::C: ModuleSelectorTestingKit::Equatable {
 
     let magnitude: Int.ModuleSelectorTestingKit::Magnitude = ModuleSelectorTestingKit::magnitude
     // expected-error@-1 {{type 'Magnitude' is not imported through module 'ModuleSelectorTestingKit'}}
-    // expected-note@-2 {{did you mean module 'Swift'?}} {{24-47=Swift}}
+    // expected-note@-2 {{did you mean module 'Swift'?}} {{24-48=Swift}}
     // FIXME incorrect: expected-error@-3 {{variable used within its own initial value}}
 
     if ModuleSelectorTestingKit::Bool.ModuleSelectorTestingKit::random() {
     // expected-error@-1 {{declaration 'Bool' is not imported through module 'ModuleSelectorTestingKit'}}
-    // expected-note@-2 {{did you mean module 'Swift'?}} {{8-31=Swift}}
+    // expected-note@-2 {{did you mean module 'Swift'?}} {{8-32=Swift}}
 
       ModuleSelectorTestingKit::negate()
       // expected-error@-1 {{declaration 'negate' is not imported through module 'ModuleSelectorTestingKit'}}
