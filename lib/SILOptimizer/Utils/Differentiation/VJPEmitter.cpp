@@ -430,7 +430,7 @@ void VJPEmitter::visitSwitchEnumInst(SwitchEnumInst *sei) {
 void VJPEmitter::visitApplyInst(ApplyInst *ai) {
   // If the function should not be differentiated or its the array literal
   // initialization intrinsic, just do standard cloning.
-  if (!pullbackInfo.shouldDifferentiateApplyInst(ai) ||
+  if (!pullbackInfo.shouldDifferentiateApplySite(ai) ||
       isArrayLiteralIntrinsic(ai)) {
     LLVM_DEBUG(getADDebugStream() << "No active results:\n" << *ai << '\n');
     TypeSubstCloner::visitApplyInst(ai);

@@ -1053,3 +1053,25 @@ class Sub : Super {
   @differentiable(wrt: x, vjp: vjp)
   override func testSuperclassDerivatives(_ x: Float) -> Float { x }
 }
+
+// Test unsupported accessors: `set`, `_read`, `_modify`.
+
+struct UnsupportedAccessors: Differentiable {
+  var stored: Float
+  var computed: Float {
+    // `set` has an `inout` parameter: `(inout Self) -> (Float) -> ()`.
+    // expected-error @+1 {{'@differentiable' attribute cannot be applied to this declaration}}
+    @differentiable
+    set { stored = newValue }
+
+    // `_read` is a coroutine: `(Self) -> () -> ()`.
+    // expected-error @+1 {{'@differentiable' attribute cannot be applied to this declaration}}
+    @differentiable
+    _read { yield stored }
+
+    // `_modify` is a coroutine: `(inout Self) -> () -> ()`.
+    // expected-error @+1 {{'@differentiable' attribute cannot be applied to this declaration}}
+    @differentiable
+    _modify { yield &stored }
+  }
+}

@@ -411,7 +411,7 @@ void LinearMapInfo::generateDifferentiationDataStructures(
         // Add linear map field to struct for active `apply` instructions.
         // Skip array literal intrinsic applications since array literal
         // initialization is linear and handled separately.
-        if (!shouldDifferentiateApplyInst(ai) || isArrayLiteralIntrinsic(ai))
+        if (!shouldDifferentiateApplySite(ai) || isArrayLiteralIntrinsic(ai))
           continue;
 
         LLVM_DEBUG(getADDebugStream() << "Adding linear map struct field for "
@@ -454,26 +454,29 @@ void LinearMapInfo::generateDifferentiationDataStructures(
 ///    there is a `store` of an active value into the array's buffer.
 /// 3. The instruction has both an active result (direct or indirect) and an
 ///    active argument.
-bool LinearMapInfo::shouldDifferentiateApplyInst(ApplyInst *ai) {
+bool LinearMapInfo::shouldDifferentiateApplySite(FullApplySite applySite) {
   // Function applications with an inout argument should be differentiated.
-  for (auto inoutArg : ai->getInoutArguments())
+  for (auto inoutArg : applySite.getInoutArguments())
     if (activityInfo.isActive(inoutArg, indices))
       return true;
 
   bool hasActiveDirectResults = false;
-  forEachApplyDirectResult(ai, [&](SILValue directResult) {
+  forEachApplyDirectResult(applySite, [&](SILValue directResult) {
     hasActiveDirectResults |= activityInfo.isActive(directResult, indices);
   });
-  bool hasActiveIndirectResults = llvm::any_of(ai->getIndirectSILResults(),
-      [&](SILValue result) { return activityInfo.isActive(result, indices); });
+  bool hasActiveIndirectResults =
+      llvm::any_of(applySite.getIndirectSILResults(), [&](SILValue result) {
+        return activityInfo.isActive(result, indices);
+      });
   bool hasActiveResults = hasActiveDirectResults || hasActiveIndirectResults;
 
   // TODO: Pattern match to make sure there is at least one `store` to the
   // array's active buffer.
-  if (isArrayLiteralIntrinsic(ai) && hasActiveResults)
+  // if (isArrayLiteralIntrinsic(ai) && hasActiveResults)
+  if (isArrayLiteralIntrinsic(applySite) && hasActiveResults)
     return true;
 
-  auto arguments = ai->getArgumentsWithoutIndirectResults();
+  auto arguments = applySite.getArgumentsWithoutIndirectResults();
   bool hasActiveArguments = llvm::any_of(arguments,
       [&](SILValue arg) { return activityInfo.isActive(arg, indices); });
   return hasActiveResults && hasActiveArguments;
@@ -483,8 +486,8 @@ bool LinearMapInfo::shouldDifferentiateApplyInst(ApplyInst *ai) {
 /// given the differentiation indices of the instruction's parent function.
 /// Whether the instruction should be differentiated is determined sequentially
 /// from any of the following conditions:
-/// 1. The instruction is an `apply` and `shouldDifferentiateApplyInst` returns
-///    true.
+/// 1. The instruction is a full apply site and `shouldDifferentiateApplyInst`
+///    returns true.
 /// 2. The instruction has a source operand and a destination operand, both
 ///    being active.
 /// 3. The instruction is an allocation instruction and has an active result.
@@ -492,10 +495,10 @@ bool LinearMapInfo::shouldDifferentiateApplyInst(ApplyInst *ai) {
 ///    ending, or destroying on an active operand.
 /// 5. The instruction creates an SSA copy of an active operand.
 bool LinearMapInfo::shouldDifferentiateInstruction(SILInstruction *inst) {
-  // An `apply` with an active argument and an active result (direct or
+  // A full apply site with an active argument and an active result (direct or
   // indirect) should be differentiated.
-  if (auto *ai = dyn_cast<ApplyInst>(inst))
-    return shouldDifferentiateApplyInst(ai);
+  if (FullApplySite::isa(inst))
+    return shouldDifferentiateApplySite(FullApplySite(inst));
   // Anything with an active result and an active operand should be
   // differentiated.
   auto hasActiveOperands = llvm::any_of(inst->getAllOperands(),

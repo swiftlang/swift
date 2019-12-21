@@ -338,6 +338,8 @@ public:
 
   void visitApplyInst(ApplyInst *ai);
 
+  void visitBeginApplyInst(BeginApplyInst *bai);
+
   /// Handle `struct` instruction.
   ///   Original: y = struct (x0, x1, x2, ...)
   ///    Adjoint: adj[x0] += struct_extract adj[y], #x0

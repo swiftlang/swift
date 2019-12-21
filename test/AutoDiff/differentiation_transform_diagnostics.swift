@@ -461,6 +461,41 @@ let _: @differentiable (Float) -> Float = TF_675().method
 _ = gradient(at: Float(1), Float(2), in: (+) as @differentiable (Float, @noDerivative Float) -> Float)
 
 //===----------------------------------------------------------------------===//
+// Coroutines (SIL function yields, `begin_apply`) (not yet supported)
+//===----------------------------------------------------------------------===//
+
+struct HasCoroutineAccessors: Differentiable {
+  var stored: Float
+  var computed: Float {
+    // `_read` is a coroutine: `(Self) -> () -> ()`.
+    _read { yield stored }
+    // `_modify` is a coroutine: `(inout Self) -> () -> ()`.
+    _modify { yield &stored }
+  }
+}
+// expected-error @+1 {{function is not differentiable}}
+@differentiable
+// expected-note @+1 {{when differentiating this function definition}}
+func testAccessorCoroutines(_ x: HasCoroutineAccessors) -> HasCoroutineAccessors {
+  var x = x
+  // expected-note @+1 {{differentiation of coroutine calls is not yet supported}}
+  x.computed = x.computed
+  return x
+}
+
+// TF-1078: `Array.subscript.modify` is a coroutine.
+// expected-error @+1 {{function is not differentiable}}
+@differentiable
+// expected-note @+1 {{when differentiating this function definition}}
+func TF_1078(array: [Float], x: Float) -> Float {
+  var array = array
+  // Array subscript assignment below calls `Array.subscript.modify`.
+  // expected-note @+1 {{differentiation of coroutine calls is not yet supported}}
+  array[0] = x
+  return array[0]
+}
+
+//===----------------------------------------------------------------------===//
 // Conversion to `@differentiable(linear)` (not yet supported)
 //===----------------------------------------------------------------------===//
 
