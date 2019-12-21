@@ -226,6 +226,17 @@ static void validateAutolinkingArgs(DiagnosticEngine &diags,
                  forceLoadArg->getSpelling(), incrementalArg->getSpelling());
 }
 
+static void validateLibraryEvolutionInTestMode(DiagnosticEngine &diags,
+                                               const ArgList &args) {
+  // SR-11918: Testability and library evolution have compatibility issues so
+  // validating if we see -enable-testing and -enable-library-evolution together
+  if (args.hasArg(options::OPT_enable_testing) &&
+      args.hasArg(options::OPT_enable_library_evolution)) {
+    diags.diagnose(SourceLoc(),
+                   diag::warn_library_evolution_test_mode_compatibility);
+  }
+}
+
 /// Perform miscellaneous early validation of arguments.
 static void validateArgs(DiagnosticEngine &diags, const ArgList &args,
                          const llvm::Triple &T) {
@@ -236,6 +247,7 @@ static void validateArgs(DiagnosticEngine &diags, const ArgList &args,
   validateCompilationConditionArgs(diags, args);
   validateSearchPathArgs(diags, args);
   validateAutolinkingArgs(diags, args, T);
+  validateLibraryEvolutionInTestMode(diags, args);
 }
 
 std::unique_ptr<ToolChain>

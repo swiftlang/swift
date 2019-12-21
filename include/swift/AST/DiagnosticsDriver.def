@@ -183,22 +183,27 @@ WARNING(warn_use_filelists_deprecated, none,
         "'-driver-filelist-threshold=0' instead", ())
 
 WARNING(warn_unable_to_load_swift_ranges, none,
-"unable to load swift ranges file \"%0\", %1",
-(StringRef, StringRef))
+       "unable to load swift ranges file \"%0\", %1",
+       (StringRef, StringRef))
 
 WARNING(warn_unable_to_load_compiled_swift, none,
-"unable to load previously compiled swift file \"%0\", %1",
-(StringRef, StringRef))
+       "unable to load previously compiled swift file \"%0\", %1",
+       (StringRef, StringRef))
 
 WARNING(warn_unable_to_load_primary, none,
-"unable to load primary swift file \"%0\", %1",
-(StringRef, StringRef))
+       "unable to load primary swift file \"%0\", %1",
+       (StringRef, StringRef))
 
 ERROR(cannot_find_migration_script, none,
       "missing migration script from path '%0'", (StringRef))
 
 ERROR(error_darwin_static_stdlib_not_supported, none,
       "-static-stdlib is no longer supported on Apple platforms", ())
+
+WARNING(warn_library_evolution_test_mode_compatibility, none,
+       "'-enable-library-evolution' and '-enable-testing' together "
+       "can cause unexpected compatibility compilation and runtime errors", 
+       ())
 
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)
