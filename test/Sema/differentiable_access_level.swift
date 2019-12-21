@@ -1,9 +1,11 @@
 // SWIFT_ENABLE_TENSORFLOW
 // RUN: %target-swift-frontend -print-ast %s | %FileCheck %s
 
-// Test `Differentiable` derived conformances.
-// Verify access levels of synthesized `TangentVector` types and their memberwise initializers.
-// `TangentVector` memberwise initializer access level should match `TangentVector` access level.
+// TF-1077: Verify access levels of `TangentVector` types and their memberwise
+// initializers, synthesized during `Differentiable` derived conformances.
+
+// `TangentVector` memberwise initializer access level should default to true,
+// for usability.
 
 public struct PublicStruct: Differentiable {}
 internal struct InternalStruct: Differentiable {}

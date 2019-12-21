@@ -290,7 +290,7 @@ ConstructorDecl *swift::getOrCreateEffectiveMemberwiseInitializer(
   for (auto *member : nominal->getMembers()) {
     auto var = dyn_cast<VarDecl>(member);
     if (!var ||
-        !var->isMemberwiseInitialized(/*preferDeclaredProperties=*/true))
+        !var->isMemberwiseInitialized(/*preferDeclaredProperties*/ true))
       continue;
     accessLevel = std::min(accessLevel, var->getFormalAccess());
   }
