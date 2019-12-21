@@ -2173,7 +2173,8 @@ namespace {
       auto found = Impl.MembersForNominal.find(subject);
       if (found != Impl.MembersForNominal.end()) {
         lookup.append(found->second.begin(), found->second.end());
-        namelookup::pruneLookupResultSet(dc, NL_QualifiedDefault, lookup);
+        namelookup::pruneLookupResultSet(dc, NL_QualifiedDefault,
+            /*moduleSelector=*/Identifier(), lookup);
       }
 
       for (auto *&result : lookup) {

@@ -21,6 +21,7 @@ extension main::B: main::Equatable {
   // @_derivative(of:)
   
   @_dynamicReplacement(for: main::negate())
+  // FIXME improve: expected-error@-1 {{replaced function 'main::negate()' could not be found}}
   mutating func myNegate() {
     let fn: (main::Int, main::Int) -> main::Int =
     // FIXME:
@@ -30,11 +31,12 @@ extension main::B: main::Equatable {
       // expected-error@-3 {{expected expression after operator}}
 
     let magnitude: main::Int.main::Magnitude = main::magnitude
-    // expected-EVENTUALLY-error@-1 {{a type mismatch with 'Never'}}
-    // FIXME: expected-error@-2 {{variable used within its own initial value}}
+    // expected-EVENTUALLY-error@-1 {{can't find 'Int'}}
+    // FIXME improve: expected-error@-2 {{type alias 'Magnitude' is not a member type of 'Int'}}
+    // FIXME: expected-error@-3 {{variable used within its own initial value}}
     if main::Bool.main::random() {
       main::negate()
-      // expected-EVENTUALLY-error@-1 {{something about not finding 'negate' because we didn't look in self}}
+      // FIXME improve: expected-error@-1 {{use of unresolved identifier 'main::negate'}}
     }
     else {
       self = main::B(value: .main::min)
@@ -66,7 +68,8 @@ extension ModuleSelectorTestingKit::C: ModuleSelectorTestingKit::Equatable {
       // expected-error@-3 {{expected expression after operator}}
     let magnitude: ModuleSelectorTestingKit::Int.ModuleSelectorTestingKit::Magnitude = ModuleSelectorTestingKit::magnitude
     // expected-EVENTUALLY-error@-1 {{something about not finding 'magnitude' because we didn't look in self}}
-    // FIXME: expected-error@-2 {{variable used within its own initial value}}
+    // FIXME improve: expected-error@-2 {{type alias 'Magnitude' is not a member type of 'Int'}}
+    // FIXME: expected-error@-3 {{variable used within its own initial value}}
     if ModuleSelectorTestingKit::Bool.ModuleSelectorTestingKit::random() {
       ModuleSelectorTestingKit::negate()
       // expected-EVENTUALLY-error@-1 {{something about not finding 'negate' because we didn't look in self}}
@@ -94,6 +97,7 @@ extension Swift::D: Swift::Equatable {
   // @_derivative(of:)
   
   @_dynamicReplacement(for: Swift::negate())
+  // FIXME improve: expected-error@-1 {{replaced function 'Swift::negate()' could not be found}}
   mutating func myNegate() {
     let fn: (Swift::Int, Swift::Int) -> Swift::Int =
     // FIXME:
@@ -106,7 +110,7 @@ extension Swift::D: Swift::Equatable {
     // FIXME: expected-error@-2 {{variable used within its own initial value}}
     if Swift::Bool.Swift::random() {
       Swift::negate()
-      // expected-EVENTUALLY-error@-1 {{something about not finding 'negate' because we didn't look in self}}
+      // FIXME improve: expected-error@-1 {{use of unresolved identifier 'Swift::negate'}}
     }
     else {
       self = Swift::D(value: .ModuleSelectorTestingKit::min)
