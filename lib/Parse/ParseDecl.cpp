@@ -1683,6 +1683,10 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
       return false;
     }
 
+    diagnoseAndConsumeIfModuleSelector(
+        "Objective-C class name in @_swift_native_objc_runtime_base",
+        /*IsDef=*/true);
+
     if (Tok.isNot(tok::identifier)) {
       diagnose(Loc, diag::swift_native_objc_runtime_base_must_be_identifier);
       return false;
@@ -2253,6 +2257,8 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
   }
 
   case DAK_ProjectedValueProperty: {
+    diagnoseAndConsumeIfModuleSelector("@_projectedValueProperty attribute");
+
     if (!consumeIf(tok::l_paren)) {
       diagnose(Loc, diag::attr_expected_lparen, AttrName,
                DeclAttribute::isDeclModifier(DK));
@@ -4199,10 +4205,28 @@ ParserStatus Parser::parseInheritance(SmallVectorImpl<TypeLoc> &Inherited,
   return Status;
 }
 
+bool Parser::diagnoseAndConsumeIfModuleSelector(StringRef KindName,
+                                               bool IsDefinition) {
+  if (!Context.LangOpts.EnableExperimentalModuleSelector ||
+      peekToken().isNot(tok::colon_colon))
+    return false;
+
+  // Diagnose an error and consume the module selector so we can continue.
+  SourceLoc start = consumeToken();
+  SourceLoc end = consumeToken(tok::colon_colon);
+  diagnose(end, diag::module_selector_not_allowed_in_decl, IsDefinition,
+           KindName)
+      .fixItRemove({start, end});
+
+  return true;
+}
+
 static ParserStatus
 parseIdentifierDeclName(Parser &P, Identifier &Result, SourceLoc &Loc,
                         StringRef DeclKindName,
                         llvm::function_ref<bool(const Token &)> canRecover) {
+  P.diagnoseAndConsumeIfModuleSelector(DeclKindName);
+
   if (P.Tok.is(tok::identifier)) {
     Loc = P.consumeIdentifier(&Result);
 
@@ -5088,6 +5112,9 @@ static ParameterList *parseOptionalAccessorArgument(SourceLoc SpecifierLoc,
   if (SpecifierLoc.isValid() && P.Tok.is(tok::l_paren)) {
     SyntaxParsingContext ParamCtx(P.SyntaxContext, SyntaxKind::AccessorParameter);
     StartLoc = P.consumeToken(tok::l_paren);
+
+    P.diagnoseAndConsumeIfModuleSelector("accessor parameter");
+
     if (P.Tok.isNot(tok::identifier)) {
       P.diagnose(P.Tok, diag::expected_accessor_parameter_name,
                  Kind == AccessorKind::Set ? 0 :
@@ -6457,6 +6484,8 @@ Parser::parseDeclEnumCase(ParseDeclOptions Flags,
       return Status;
     }
 
+    diagnoseAndConsumeIfModuleSelector("enum 'case'");
+
     if (Tok.is(tok::identifier)) {
       Status |= parseIdentifierDeclName(
           *this, Name, NameLoc, "enum 'case'", [](const Token &next) {
@@ -7349,12 +7378,20 @@ Parser::parseDeclOperatorImpl(SourceLoc OperatorLoc, Identifier Name,
         SyntaxParsingContext GroupCtxt(SyntaxContext,
                                        SyntaxKind::IdentifierList);
 
+        diagnoseAndConsumeIfModuleSelector("precedence group specifier",
+                                          /*isDef=*/false);
+
         Identifier name;
         identifierLocs.push_back(consumeIdentifier(&name));
         identifiers.push_back(name);
 
         while (Tok.is(tok::comma)) {
           auto comma = consumeToken();
+
+          // FIXME: We should probably allow this someday if designated types
+          // become more real.
+          diagnoseAndConsumeIfModuleSelector("designated type specifier",
+                                            /*isDef=*/false);
 
           if (Tok.is(tok::identifier)) {
             Identifier name;
@@ -7370,20 +7407,27 @@ Parser::parseDeclOperatorImpl(SourceLoc OperatorLoc, Identifier Name,
           }
         }
       }
-    } else if (Tok.is(tok::identifier)) {
-      SyntaxParsingContext GroupCtxt(SyntaxContext,
-                                     SyntaxKind::IdentifierList);
+    } else {
+      diagnoseAndConsumeIfModuleSelector("precedence group specifier",
+                                        /*isDef=*/false);
 
-      identifiers.push_back(Context.getIdentifier(Tok.getText()));
-      identifierLocs.push_back(consumeToken(tok::identifier));
+      if (Tok.is(tok::identifier)) {
+        SyntaxParsingContext GroupCtxt(SyntaxContext,
+                                       SyntaxKind::IdentifierList);
 
-      if (isPrefix || isPostfix) {
-        diagnose(colonLoc, diag::precedencegroup_not_infix)
-            .fixItRemove({colonLoc, identifierLocs.back()});
+        identifiers.push_back(Context.getIdentifier(Tok.getText()));
+        identifierLocs.push_back(consumeToken(tok::identifier));
+
+        if (isPrefix || isPostfix) {
+          diagnose(colonLoc, diag::precedencegroup_not_infix)
+              .fixItRemove({colonLoc, identifierLocs.back()});
+        }
+        // Nothing to complete here, simply consume the token.
+        if (Tok.is(tok::code_complete))
+          consumeToken();
       }
-      // Nothing to complete here, simply consume the token.
-      if (Tok.is(tok::code_complete))
-        consumeToken();
+      // FIXME: Shouldn't we diagnose if you write a colon but don't include
+      // identifiers after it?
     }
   }
 
@@ -7444,6 +7488,8 @@ Parser::parseDeclPrecedenceGroup(ParseDeclOptions flags,
     diagnose(precedenceGroupLoc, diag::decl_inner_scope);
     return nullptr;
   }
+
+  diagnoseAndConsumeIfModuleSelector("precedence group");
 
   Identifier name;
   SourceLoc nameLoc;
@@ -7647,6 +7693,9 @@ Parser::parseDeclPrecedenceGroup(ParseDeclOptions flags,
         if (checkCodeCompletion(SyntaxKind::PrecedenceGroupRelation)) {
           return abortBody(/*hasCodeCompletion*/true);
         }
+
+        diagnoseAndConsumeIfModuleSelector("precedence group specifier",
+                                          /*IsDef=*/false);
 
         if (Tok.isNot(tok::identifier)) {
           diagnose(Tok, diag::expected_precedencegroup_relation, attrName);

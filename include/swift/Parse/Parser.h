@@ -576,6 +576,21 @@ public:
              Context.getIdentifier(tok.getText()));
   }
 
+  /// If the next two tokens appear to form a module selector, consume them and
+  /// diagnose an error. Call this method before consuming an identifier that
+  /// should *not* have a module selector before it.
+  ///
+  /// \param KindName A string describing the name or declaration being written.
+  /// \param IsDef If \c true, the identifier defines a declaration's name, and
+  /// \p KindName should be a string describing the declaration; if \c false,
+  /// the identifier does something else, and \p KindName should be a more
+  /// complete string.
+  ///
+  /// \returns true if a module selector was consumed and an error was diagnosed;
+  /// false otherwise.
+  bool
+  diagnoseAndConsumeIfModuleSelector(StringRef KindName, bool IsDef = true);
+
   /// Retrieve the location just past the end of the previous
   /// source location.
   SourceLoc getEndOfPreviousLoc() const;

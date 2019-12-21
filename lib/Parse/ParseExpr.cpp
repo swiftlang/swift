@@ -1500,6 +1500,10 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
         // call pattern.
         peekToken().isNot(tok::period, tok::period_prefix, tok::l_paren)) {
       DeferringContextRAII Deferring(*SyntaxContext);
+
+      diagnoseAndConsumeIfModuleSelector(InVarOrLetPattern != IVOLP_InVar
+                                         ? "constant" : "variable");
+
       Identifier name;
       SourceLoc loc = consumeIdentifier(&name, /*allowDollarIdentifier=*/true);
       auto introducer = (InVarOrLetPattern != IVOLP_InVar
@@ -2495,9 +2499,23 @@ parseClosureSignatureIfPresent(SourceRange &bracketRange,
 
       // Okay, we have a closure signature.
     } else if (Tok.isIdentifierOrUnderscore()) {
-      // Parse identifier (',' identifier)*
+      // Parse module-selector? identifier (',' module-selector? identifier)*
+      // The module selectors aren't legal, but we want to diagnose them if
+      // they're present.
+      if (Context.LangOpts.EnableExperimentalModuleSelector &&
+          peekToken().is(tok::colon_colon)) {
+        consumeToken();
+        consumeToken(tok::colon_colon);
+      }
+
       consumeToken();
       while (consumeIf(tok::comma)) {
+        if (Context.LangOpts.EnableExperimentalModuleSelector &&
+            peekToken().is(tok::colon_colon)) {
+          consumeToken();
+          consumeToken(tok::colon_colon);
+        }
+
         if (Tok.isIdentifierOrUnderscore()) {
           consumeToken();
           continue;
@@ -2568,8 +2586,11 @@ parseClosureSignatureIfPresent(SourceRange &bracketRange,
             diagnose(Tok, diag::attr_unowned_expected_rparen);
         }
       } else if (Tok.isAny(tok::identifier, tok::kw_self) &&
-                 peekToken().isAny(tok::equal, tok::comma, tok::r_square)) {
+                 peekToken().isAny(tok::equal, tok::comma, tok::r_square,
+                                   tok::colon_colon)) {
         // "x = 42", "x," and "x]" are all strong captures of x.
+        // "x::" is not permitted, but we want to diagnose it as though it were
+        // a strong capture.
       } else {
         diagnose(Tok, diag::expected_capture_specifier);
         skipUntil(tok::comma, tok::r_square);
@@ -2587,10 +2608,17 @@ parseClosureSignatureIfPresent(SourceRange &bracketRange,
 
       // The thing being capture specified is an identifier, or as an identifier
       // followed by an expression.
+
       Expr *initializer;
       Identifier name;
       SourceLoc nameLoc = Tok.getLoc();
       SourceLoc equalLoc;
+
+      // FIXME: It'd be nice to be able to capture with a module selector, but
+      // define a local name; however, that would complicate the equals check
+      // here.
+      diagnoseAndConsumeIfModuleSelector("captured variable");
+
       if (peekToken().isNot(tok::equal)) {
         // If this is the simple case, then the identifier is both the name and
         // the expression to capture.
@@ -2677,6 +2705,9 @@ parseClosureSignatureIfPresent(SourceRange &bracketRange,
       bool HasNext;
       do {
         SyntaxParsingContext ClParamCtx(SyntaxContext, SyntaxKind::ClosureParam);
+
+        diagnoseAndConsumeIfModuleSelector("parameter");
+
         if (Tok.isNot(tok::identifier, tok::kw__)) {
           diagnose(Tok, diag::expected_closure_parameter_name);
           invalid = true;

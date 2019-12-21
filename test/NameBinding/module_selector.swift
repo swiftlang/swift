@@ -125,3 +125,81 @@ func whitespace() {
   ::
   print // expected-error{{expression resolves to an unused function}}
 }
+
+// Error cases
+
+func main::decl1( // expected-error {{name of function declaration cannot be qualified with module selector}}
+  main::p1: main::A, // expected-error {{argument label cannot be qualified with module selector}}
+  main::label p2: main::A, // expected-error {{argument label cannot be qualified with module selector}}
+  label main::p3: main::A // expected-error {{name of parameter declaration cannot be qualified with module selector}}
+) {
+  let main::decl1a = "a" // expected-error {{name of constant declaration cannot be qualified with module selector}} expected-warning {{never used}}
+  var main::decl1b = "b" // expected-error {{name of variable declaration cannot be qualified with module selector}} expected-warning {{never used}}
+  let (main::decl1c, main::decl1d) = ("c", "d") // expected-error {{name of constant declaration cannot be qualified with module selector}} expected-error {{name of constant declaration cannot be qualified with module selector}} expected-warning 2{{never used}}
+
+  if let (main::decl1e, main::decl1f) = Optional(("e", "f")) {} // expected-error {{name of constant declaration cannot be qualified with module selector}} expected-error {{name of constant declaration cannot be qualified with module selector}} expected-warning 2{{never used}}
+  guard let (main::decl1g, main::decl1h) = Optional(("g", "h")) else { return }  // expected-error {{name of constant declaration cannot be qualified with module selector}} expected-error {{name of constant declaration cannot be qualified with module selector}} expected-warning {{never used}}
+
+  switch Optional(main::decl1g) { // FIXME expecting an error later
+  case Optional.some(let main::decl1i): // expected-error {{name of constant declaration cannot be qualified with module selector}} expected-warning {{never used}}
+    break
+  case .none:
+    break
+  }
+
+  switch Optional(main::decl1g) { // FIXME expecting an error later
+  case let Optional.some(main::decl1j): // expected-error {{name of constant declaration cannot be qualified with module selector}} expected-warning {{never used}}
+    break
+  case .none:
+    break
+  }
+
+  switch Optional(main::decl1g) {
+  case let main::decl1k?: // expected-error {{name of constant declaration cannot be qualified with module selector}} expected-warning {{never used}}
+    break
+  case .none:
+    break
+  }
+
+  for main::decl1l in "lll" {} // expected-error {{name of constant declaration cannot be qualified with module selector}} expected-warning {{never used}}
+
+  "lll".forEach { [main::magnitude] // expected-error {{name of captured variable declaration cannot be qualified with module selector}} expected-warning {{never used}}
+    main::elem in print(elem) // expected-error {{name of parameter declaration cannot be qualified with module selector}}
+  }
+  "lll".forEach { (main::elem) in print(elem) } // expected-error {{name of parameter declaration cannot be qualified with module selector}}
+  "lll".forEach { (main::elem) -> Void in print(elem) } // expected-error {{name of parameter declaration cannot be qualified with module selector}}
+  "lll".forEach { (main::elem: Character) -> Void in print(elem) } // expected-error {{name of parameter declaration cannot be qualified with module selector}}
+}
+enum main::decl2 { // expected-error {{name of enum declaration cannot be qualified with module selector}}
+  case main::decl2a // expected-error {{name of enum 'case' declaration cannot be qualified with module selector}}
+}
+struct main::decl3 {} // expected-error {{name of struct declaration cannot be qualified with module selector}}
+class main::decl4<main::T> {} // expected-error {{name of class declaration cannot be qualified with module selector}} expected-error {{name of generic parameter declaration cannot be qualified with module selector}}
+typealias main::decl5 = main::Bool // expected-error {{name of typealias declaration cannot be qualified with module selector}}
+protocol main::decl6 { // expected-error {{name of protocol declaration cannot be qualified with module selector}}
+  associatedtype main::decl6a // expected-error {{name of associatedtype declaration cannot be qualified with module selector}}
+}
+let main::decl7 = 7 // expected-error {{name of constant declaration cannot be qualified with module selector}}
+var main::decl8 = 8 { // expected-error {{name of variable declaration cannot be qualified with module selector}}
+  willSet(main::newValue) {} // expected-error {{name of accessor parameter declaration cannot be qualified with module selector}}
+  didSet(main::oldValue) {} // expected-error {{name of accessor parameter declaration cannot be qualified with module selector}}
+}
+
+struct Parent {
+  func main::decl1() {} // expected-error {{name of function declaration cannot be qualified with module selector}}
+  enum main::decl2 { // expected-error {{name of enum declaration cannot be qualified with module selector}}
+    case main::decl2a // expected-error {{name of enum 'case' declaration cannot be qualified with module selector}}
+  }
+  struct main::decl3 {} // expected-error {{name of struct declaration cannot be qualified with module selector}}
+  class main::decl4 {} // expected-error {{name of class declaration cannot be qualified with module selector}}
+  typealias main::decl5 = main::Bool // expected-error {{name of typealias declaration cannot be qualified with module selector}}
+}
+
+@_swift_native_objc_runtime_base(main::BaseClass) // expected-error {{Objective-C class name in @_swift_native_objc_runtime_base}}
+class C1 {}
+
+infix operator <<<<< : Swift::AdditionPrecedence // expected-error {{precedence group specifier cannot be qualified with module selector}}
+
+precedencegroup main::PG1 { // expected-error {{name of precedence group declaration cannot be qualified with module selector}}
+  higherThan: Swift::AdditionPrecedence // expected-error {{precedence group specifier cannot be qualified with module selector}}
+}
