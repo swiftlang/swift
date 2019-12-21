@@ -13,6 +13,40 @@ import struct ModuleSelectorTestingKit::A
 
 let magnitude: Never = fatalError()
 
+// Test correct code using `A`
+
+extension ModuleSelectorTestingKit::A: Swift::Equatable {
+  @_implements(Swift::Equatable, ==(_:_:))
+  public static func equals(_: ModuleSelectorTestingKit::A, _: ModuleSelectorTestingKit::A) -> Swift::Bool {
+    Swift::fatalError()
+  }
+
+  // FIXME: Add tests with autodiff @_differentiable(jvp:vjp:) and
+  // @_derivative(of:)
+
+  @_dynamicReplacement(for: ModuleSelectorTestingKit::negate())
+  mutating func myNegate() {
+    let fn: (Swift::Int, Swift::Int) -> Swift::Int =
+      (+)
+      // FIXME: it'd be nice to handle module selectors on operators.
+
+    let magnitude: Int.Swift::Magnitude = main::magnitude
+    // FIXME incorrect: expected-error@-1 {{variable used within its own initial value}}
+    // expected-EVENTUALLY-error@-1 {{something about type mismatch between 'Never' and 'Int.Swift::Magnitude'}}
+
+    if Swift::Bool.Swift::random() {
+      self.ModuleSelectorTestingKit::negate()
+    }
+    else {
+      self = ModuleSelectorTestingKit::A(value: .Swift::min)
+    }
+
+    self.main::myNegate()
+  }
+
+  // FIXME: Can we test @convention(witness_method:)?
+}
+
 // Test resolution of main:: using `B`
 
 extension main::B {}
