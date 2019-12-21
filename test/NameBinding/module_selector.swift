@@ -94,14 +94,17 @@ extension B: main::Equatable {
     // FIXME incorrect: expected-error@-3 {{variable used within its own initial value}}
 
     if main::Bool.main::random() {
-    // FIXME improve: expected-error@-1 {{use of unresolved identifier 'main::Bool'}}
+    // expected-error@-1 {{declaration 'Bool' is not imported through module 'main'}}
+    // expected-note@-2 {{did you mean module 'Swift'?}} {{8-12=Swift}}
 
       main::negate()
-      // FIXME improve, suggest adding 'self.': expected-error@-1 {{use of unresolved identifier 'main::negate'}}
+      // expected-error@-1 {{declaration 'negate' is not imported through module 'main'}}
+      // expected-note@-2 {{did you mean module 'ModuleSelectorTestingKit'?}} {{7-11=self.ModuleSelectorTestingKit}}
     }
     else {
       self = main::B(value: .main::min)
-      // FIXME improve: expected-error@-1 {{use of unresolved identifier 'main::B'}}
+      // expected-error@-1 {{declaration 'B' is not imported through module 'main'}}
+      // expected-note@-2 {{did you mean module 'ModuleSelectorTestingKit'?}} {{14-18=ModuleSelectorTestingKit}}
     }
     
     self.main::myNegate()
@@ -152,10 +155,12 @@ extension ModuleSelectorTestingKit::C: ModuleSelectorTestingKit::Equatable {
     // FIXME incorrect: expected-error@-3 {{variable used within its own initial value}}
 
     if ModuleSelectorTestingKit::Bool.ModuleSelectorTestingKit::random() {
-    // FIXME improve: expected-error@-1 {{use of unresolved identifier 'ModuleSelectorTestingKit::Bool'}}
+    // expected-error@-1 {{declaration 'Bool' is not imported through module 'ModuleSelectorTestingKit'}}
+    // expected-note@-2 {{did you mean module 'Swift'?}} {{8-31=Swift}}
 
       ModuleSelectorTestingKit::negate()
-      // FIXME improve, suggest adding 'self.': expected-error@-1 {{use of unresolved identifier 'ModuleSelectorTestingKit::negate'}}
+      // expected-error@-1 {{declaration 'negate' is not imported through module 'ModuleSelectorTestingKit'}}
+      // expected-note@-2 {{did you mean the member of 'self'?}} {{7-7=self.}}
     }
     else {
       self = ModuleSelectorTestingKit::C(value: .ModuleSelectorTestingKit::min)
@@ -176,7 +181,7 @@ extension Swift::D {}
 // expected-note@-2 {{did you mean module 'ModuleSelectorTestingKit'?}} {{11-16=ModuleSelectorTestingKit}}
 
 extension D: Swift::Equatable {
-// FIXME wat: expected-error@-1 2{{implementation of 'Equatable' cannot be automatically synthesized in an extension in a different file to the type}}
+// FIXME wat: expected-error@-1 {{implementation of 'Equatable' cannot be automatically synthesized in an extension in a different file to the type}}
 
   @_implements(Swift::Equatable, Swift::==(_:_:))
   // expected-error@-1 {{name cannot be qualified with module selector here}} {{34-41=}}
@@ -205,11 +210,13 @@ extension D: Swift::Equatable {
     // FIXME: expected-error@-2 {{variable used within its own initial value}}
     if Swift::Bool.Swift::random() {
       Swift::negate()
-      // FIXME improve: expected-error@-1 {{use of unresolved identifier 'Swift::negate'}}
+      // expected-error@-1 {{declaration 'negate' is not imported through module 'Swift'}}
+      // expected-note@-2 {{did you mean module 'ModuleSelectorTestingKit'?}} {{7-12=self.ModuleSelectorTestingKit}}
     }
     else {
       self = Swift::D(value: .ModuleSelectorTestingKit::min)
-      // FIXME improve: expected-error@-1 {{use of unresolved identifier 'Swift::D'}}
+      // expected-error@-1 {{declaration 'D' is not imported through module 'Swift'}}
+      // expected-note@-2 {{did you mean module 'ModuleSelectorTestingKit'?}} {{14-19=ModuleSelectorTestingKit}}
     }
     
     self.Swift::myNegate()
@@ -314,10 +321,10 @@ func main::decl1(
   // expected-error@-2 {{name of constant declaration cannot be qualified with module selector}}
 
   // From uses in the switch statements below:
-  // expected-note@-5 3{{did you mean 'decl1g'?}}
+  // expected-note@-5 3{{did you mean the local declaration?}}
 
   switch Optional(main::decl1g) {
-  // expected-error@-1 {{use of unresolved identifier 'main::decl1g'}}
+  // expected-error@-1 {{declaration 'decl1g' is not imported through module 'main'}}
   case Optional.some(let main::decl1i):
     // expected-error@-1 {{name of constant declaration cannot be qualified with module selector}}
     break
@@ -326,7 +333,7 @@ func main::decl1(
   }
 
   switch Optional(main::decl1g) {
-  // expected-error@-1 {{use of unresolved identifier 'main::decl1g'}}
+  // expected-error@-1 {{declaration 'decl1g' is not imported through module 'main'}}
   case let Optional.some(main::decl1j):
     // expected-error@-1 {{name of constant declaration cannot be qualified with module selector}}
     break
@@ -335,7 +342,7 @@ func main::decl1(
   }
 
   switch Optional(main::decl1g) {
- // expected-error@-1 {{use of unresolved identifier 'main::decl1g'}}
+ // expected-error@-1 {{declaration 'decl1g' is not imported through module 'main'}}
  case let main::decl1k?:
     // expected-error@-1 {{name of constant declaration cannot be qualified with module selector}}
     break

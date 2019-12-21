@@ -488,6 +488,50 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
       return new (Context) ErrorExpr(UDRE->getSourceRange());
     }
 
+    // Is there an incorrect module selector?
+    if (Name.hasModuleSelector()) {
+      auto anyModuleName = DeclNameRef(Name.getFullName());
+      auto anyModuleResults = TypeChecker::lookupUnqualified(DC, anyModuleName,
+                                                             Loc,
+                                                             lookupOptions);
+      if (!anyModuleResults.empty()) {
+        Context.Diags.diagnose(UDRE->getNameLoc(), diag::decl_not_in_module,
+                               Name.getFullName(), Name.getModuleSelector());
+
+        SourceLoc moduleSelectorLoc = UDRE->getNameLoc().getModuleSelectorLoc();
+
+        for (auto result : anyModuleResults) {
+          ValueDecl * decl = result.getValueDecl();
+          Identifier moduleName = decl->getModuleContext()->getName();
+
+          if (moduleName != Name.getModuleSelector()) {
+            SmallString<64> replacement;
+            if (decl->isInstanceMember())
+              replacement += "self.";
+            replacement += moduleName.str();
+
+            Context.Diags.diagnose(moduleSelectorLoc,
+                                   diag::note_change_module_selector,
+                                   moduleName)
+                .fixItReplace(moduleSelectorLoc, replacement);
+          } else {
+            // It's just something we need to pick up contextually.
+            if (decl->getDeclContext()->getLocalContext())
+              decl->diagnose(diag::note_remove_module_selector)
+                  .fixItRemove(moduleSelectorLoc);
+
+            if (decl->isInstanceMember())
+              Context.Diags.diagnose(moduleSelectorLoc,
+                  diag::note_add_explicit_self_with_module_selector)
+                  .fixItInsert(moduleSelectorLoc, "self.");
+          }
+        }
+
+        // FIXME: Can we recover by assuming the first/best result is correct?
+        return new (Context) ErrorExpr(UDRE->getSourceRange());
+      }
+    }
+
     // Try ignoring access control.
     NameLookupOptions relookupOptions = lookupOptions;
     relookupOptions |= NameLookupFlags::KnownPrivate;
