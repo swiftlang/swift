@@ -1078,7 +1078,7 @@ PullbackEmitter::getArrayAdjointElementBuffer(SILValue arrayAdjoint,
 }
 
 void PullbackEmitter::visitApplyInst(ApplyInst *ai) {
-  assert(getPullbackInfo().shouldDifferentiateApplyInst(ai));
+  assert(getPullbackInfo().shouldDifferentiateApplySite(ai));
   // Skip `array.uninitialized_intrinsic` intrinsic applications, which have
   // special `store` and `copy_addr` support.
   if (isArrayLiteralIntrinsic(ai))
@@ -1271,6 +1271,15 @@ void PullbackEmitter::visitStructInst(StructInst *si) {
                      "instructions");
   }
   }
+}
+
+void PullbackEmitter::visitBeginApplyInst(BeginApplyInst *bai) {
+  // Diagnose `begin_apply` instructions.
+  // Coroutine differentiation is not yet supported.
+  getContext().emitNondifferentiabilityError(
+      bai, getInvoker(), diag::autodiff_coroutines_not_supported);
+  errorOccurred = true;
+  return;
 }
 
 void PullbackEmitter::visitStructExtractInst(StructExtractInst *sei) {

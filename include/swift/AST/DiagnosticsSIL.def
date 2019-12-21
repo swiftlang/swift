@@ -541,6 +541,9 @@ NOTE(autodiff_control_flow_not_supported,none,
 // TODO(TF-645): Remove when differentiation supports `ref_element_addr`.
 NOTE(autodiff_class_property_not_supported,none,
      "differentiating class properties is not yet supported", ())
+// TODO(TF-1080): Remove when differentiation supports `begin_apply`.
+NOTE(autodiff_coroutines_not_supported,none,
+     "differentiation of coroutine calls is not yet supported", ())
 NOTE(autodiff_missing_return,none,
      "missing return for differentiation", ())
 

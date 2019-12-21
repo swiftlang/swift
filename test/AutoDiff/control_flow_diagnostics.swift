@@ -72,7 +72,18 @@ func nested_loop(_ x: Float) -> Float {
   return outer
 }
 
-// Test `try_apply`.
+// TF-433: Test throwing functions.
+
+func rethrowing(_ x: () throws -> Void) rethrows -> Void {}
+
+// expected-error @+1 {{function is not differentiable}}
+@differentiable
+// expected-note @+1 {{when differentiating this function definition}}
+func testTryApply(_ x: Float) -> Float {
+  // expected-note @+1 {{cannot differentiate unsupported control flow}}
+  rethrowing({})
+  return x
+}
 
 // expected-error @+1 {{function is not differentiable}}
 @differentiable

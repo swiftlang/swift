@@ -3857,10 +3857,12 @@ DifferentiableAttributeParameterIndicesRequest::evaluate(
       original = nullptr;
     }
   }
-  // Setters are not yet supported.
-  // TODO(TF-129): Remove this when differentiation supports inout parameters.
+  // Non-`get` accessors are not yet supported: `set`, `read`, and `modify`.
+  // TODO(TF-129): Enable `set` when differentiation supports inout parameters.
+  // TODO(TF-1080): Enable `read` and `modify` when differentiation supports
+  // coroutines.
   if (auto *accessor = dyn_cast_or_null<AccessorDecl>(original))
-    if (accessor->isSetter())
+    if (!accessor->isGetter())
       original = nullptr;
 
   // Global immutable vars, for example, have no getter, and therefore trigger

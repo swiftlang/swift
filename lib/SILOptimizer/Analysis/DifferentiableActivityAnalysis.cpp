@@ -126,19 +126,21 @@ void DifferentiableActivityInfo::propagateVaried(
   // General rule: mark results as varied and recursively propagate variedness
   // to users of results.
   auto i = independentVariableIndex;
-  // Handle `apply`.
-  if (auto *ai = dyn_cast<ApplyInst>(inst)) {
+  // Handle full apply sites: `apply`, `try_apply`, and `begin_apply`.
+  if (FullApplySite::isa(inst)) {
+    FullApplySite applySite(inst);
     // If callee is non-varying, skip.
-    if (isWithoutDerivative(ai->getCallee()))
+    if (isWithoutDerivative(applySite.getCallee()))
       return;
     // If operand is varied, set all direct/indirect results and inout arguments
     // as varied.
     if (isVaried(operand->get(), i)) {
-      for (auto indRes : ai->getIndirectSILResults())
+      for (auto indRes : applySite.getIndirectSILResults())
         propagateVariedInwardsThroughProjections(indRes, i);
-      for (auto inoutArg : ai->getInoutArguments())
+      for (auto inoutArg : applySite.getInoutArguments())
         propagateVariedInwardsThroughProjections(inoutArg, i);
-      forEachApplyDirectResult(ai, [&](SILValue directResult) {
+      // Propagate variedness to apply site direct results.
+      forEachApplyDirectResult(applySite, [&](SILValue directResult) {
         setVariedAndPropagateToUsers(directResult, i);
       });
     }
@@ -218,7 +220,7 @@ void DifferentiableActivityInfo::propagateVariedInwardsThroughProjections(
   // Set value as varied and propagate to users.
   setVariedAndPropagateToUsers(value, independentVariableIndex);
   auto *inst = value->getDefiningInstruction();
-  if (!inst || isa<ApplyInst>(inst))
+  if (!inst || ApplySite::isa(inst))
     return;
   // Standard propagation.
   for (auto &op : inst->getAllOperands())
@@ -262,11 +264,13 @@ void DifferentiableActivityInfo::propagateUseful(
   // Propagate usefulness for the given instruction: mark operands as useful and
   // recursively propagate usefulness to defining instructions of operands.
   auto i = dependentVariableIndex;
-  // Handle indirect results in `apply`.
-  if (auto *ai = dyn_cast<ApplyInst>(inst)) {
-    if (isWithoutDerivative(ai->getCallee()))
+  // Handle full apply sites: `apply`, `try_apply`, and `begin_apply`.
+  if (FullApplySite::isa(inst)) {
+    FullApplySite applySite(inst);
+    // If callee is non-varying, skip.
+    if (isWithoutDerivative(applySite.getCallee()))
       return;
-    for (auto arg : ai->getArgumentsWithoutIndirectResults())
+    for (auto arg : applySite.getArgumentsWithoutIndirectResults())
       setUsefulAndPropagateToOperands(arg, i);
   }
   // Handle store-like instructions:
