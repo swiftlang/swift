@@ -68,7 +68,7 @@ extension B: main::Equatable {
   // expected-error@-4 {{type 'Bool' is not imported through module 'main'}}
   // expected-note@-5 {{did you mean module 'Swift'?}} {{56-60=Swift}}
     main::fatalError()
-    // expected-EVENTUALLY-error@-1 {{type 'fatalError' is not imported through module 'main'}}
+    // expected-EVENTUALLY-error@-1 {{declaration 'fatalError' is not imported through module 'main'}}
     // expected-EVENTUALLY-note@-2 {{did you mean module 'Swift'?}} {{4-8=Swift}}
   }
 
@@ -139,6 +139,8 @@ extension ModuleSelectorTestingKit::C: ModuleSelectorTestingKit::Equatable {
   
   @_dynamicReplacement(for: ModuleSelectorTestingKit::negate())
   mutating func myNegate() {
+  // FIXME improve: expected-note@-1 {{did you mean 'myNegate'?}}
+
     let fn: (ModuleSelectorTestingKit::Int, ModuleSelectorTestingKit::Int) -> ModuleSelectorTestingKit::Int =
     // expected-error@-1 3{{type 'Int' is not imported through module 'ModuleSelectorTestingKit'}}
     // expected-note@-2 {{did you mean module 'Swift'?}} {{14-37=Swift}}
@@ -164,10 +166,11 @@ extension ModuleSelectorTestingKit::C: ModuleSelectorTestingKit::Equatable {
     }
     else {
       self = ModuleSelectorTestingKit::C(value: .ModuleSelectorTestingKit::min)
+      // FIXME improve: expected-error@-1 {{type 'Int' has no member 'ModuleSelectorTestingKit::min'}}
     }
     
     self.ModuleSelectorTestingKit::myNegate()
-    // expected-EVENTUALLY-error@-2 {{can't find 'myNegate' in ModuleSelectorTestingKit}}
+    // FIXME improve: expected-error@-1 {{value of type 'C' has no member 'ModuleSelectorTestingKit::myNegate'}}
   }
 
   // FIXME: Can we test @convention(witness_method:)?
@@ -181,7 +184,7 @@ extension Swift::D {}
 // expected-note@-2 {{did you mean module 'ModuleSelectorTestingKit'?}} {{11-16=ModuleSelectorTestingKit}}
 
 extension D: Swift::Equatable {
-// FIXME wat: expected-error@-1 {{implementation of 'Equatable' cannot be automatically synthesized in an extension in a different file to the type}}
+// FIXME wat: expected-error@-1 *{{implementation of 'Equatable' cannot be automatically synthesized in an extension in a different file to the type}}
 
   @_implements(Swift::Equatable, Swift::==(_:_:))
   // expected-error@-1 {{name cannot be qualified with module selector here}} {{34-41=}}
@@ -199,6 +202,8 @@ extension D: Swift::Equatable {
   @_dynamicReplacement(for: Swift::negate())
   // FIXME improve: expected-error@-1 {{replaced function 'Swift::negate()' could not be found}}
   mutating func myNegate() {
+  // FIXME improve: expected-note@-1 {{did you mean 'myNegate'?}}
+
     let fn: (Swift::Int, Swift::Int) -> Swift::Int =
     // FIXME:
       (Swift::+)
@@ -220,7 +225,7 @@ extension D: Swift::Equatable {
     }
     
     self.Swift::myNegate()
-    // expected-EVENTUALLY-error@-1 {{can't find 'myNegate' in Swift}}
+    // FIXME improve: expected-error@-1 {{value of type 'D' has no member 'Swift::myNegate'}}
   }
 
   // FIXME: Can we test @convention(witness_method:)?
