@@ -414,7 +414,7 @@ extension NoMemberwiseInitializerExtended: Differentiable
 extension NoMemberwiseInitializerExtended: EuclideanDifferentiable
   where T : Differentiable & AdditiveArithmetic {}
 
-// Test derived conformances in disallowed contexts.
+// Verify that cross-file derived conformances are disallowed.
 
 // expected-error @+2 {{type 'OtherFileNonconforming' does not conform to protocol 'Differentiable'}}
 // expected-error @+1 {{implementation of 'Differentiable' cannot be automatically synthesized in an extension in a different file to the type}}
