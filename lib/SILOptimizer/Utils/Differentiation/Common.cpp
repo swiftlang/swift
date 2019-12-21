@@ -82,8 +82,8 @@ void forEachApplyDirectResult(
       return;
     }
     if (auto *dti = getSingleDestructureTupleUser(ai))
-      for (auto directtResult : dti->getResults())
-        resultCallback(directtResult);
+      for (auto directResult : dti->getResults())
+        resultCallback(directResult);
     break;
   }
   case FullApplySiteKind::BeginApplyInst: {
