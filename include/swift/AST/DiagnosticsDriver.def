@@ -201,9 +201,9 @@ ERROR(error_darwin_static_stdlib_not_supported, none,
       "-static-stdlib is no longer supported on Apple platforms", ())
 
 WARNING(warn_library_evolution_test_mode_compatibility, none,
-       "'-enable-library-evolution' and '-enable-testing' together "
-       "can cause unexpected compatibility compilation and runtime errors", 
-       ())
+        "'-enable-library-evolution' and '-enable-testing' together "
+        "can cause unexpected compatibility compilation and runtime errors", 
+        ())
 
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)
