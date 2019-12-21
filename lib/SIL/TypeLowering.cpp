@@ -26,7 +26,6 @@
 #include "swift/AST/Pattern.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/PropertyWrappers.h"
-#include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/Types.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/SIL/PrettyStackTrace.h"
@@ -1425,24 +1424,7 @@ static CanTupleType computeLoweredTupleType(TypeConverter &tc,
                                             TypeExpansionContext context,
                                             AbstractionPattern origType,
                                             CanTupleType substType) {
-
-  // Don't trigger this assertion for () when it's being returned as an opaque
-  // return for `some Equatable`
-  bool isOpaqueEquatableVoid = false;
-  if (!origType.isTypeParameter()) {
-    auto type = origType.getType();
-    if (auto opaqueType = dyn_cast<OpaqueTypeArchetypeType>(type)) {
-      auto conforms = opaqueType->getConformsTo();
-      if (conforms.size() == 1) {
-        auto proto = conforms.front();
-        auto equatable = tc.Context.getProtocol(KnownProtocolKind::Equatable);
-        if (proto == equatable && substType == tc.Context.TheEmptyTupleType)
-          isOpaqueEquatableVoid = true;
-      }
-    }
-  }
-
-  assert(origType.matchesTuple(substType) || isOpaqueEquatableVoid);
+  assert(origType.matchesTuple(substType));
 
   // Does the lowered tuple type differ from the substituted type in
   // any interesting way?
