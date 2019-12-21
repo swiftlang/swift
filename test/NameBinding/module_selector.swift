@@ -1,9 +1,12 @@
-// RUN: %target-typecheck-verify-swift -module-name main -I %S/Inputs -enable-experimental-module-selector
+// RUN: %target-typecheck-verify-swift -sdk %clang-importer-sdk -module-name main -I %S/Inputs -enable-experimental-module-selector
 
 // Make sure the lack of the experimental flag disables the feature:
-// RUN: not %target-typecheck-verify-swift -module-name main -I %S/Inputs 2>/dev/null
+// RUN: not %target-typecheck-verify-swift -sdk %clang-importer-sdk -module-name main -I %S/Inputs 2>/dev/null
 
 import ModuleSelectorTestingKit
+
+import ctypes::bits
+import struct ModuleSelectorTestingKit::A
 
 let magnitude: Never = fatalError()
 
