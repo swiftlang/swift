@@ -615,39 +615,86 @@ void simple_display(llvm::raw_ostream &out, DeclName name);
 /// An in-source reference to another declaration, including qualification
 /// information.
 class DeclNameRef {
-  DeclName FullName;
+  friend class ASTContext;
+
+  /// Contains the name and module for a DeclNameRef with a module selector.
+  struct alignas(Identifier) SelectiveDeclNameRef : llvm::FoldingSetNode {
+    Identifier moduleSelector;   // Note: currently can never be empty().
+    DeclName fullName;
+
+    SelectiveDeclNameRef(Identifier moduleSelector, DeclName fullName)
+      : moduleSelector(moduleSelector), fullName(fullName) { }
+
+    /// Uniquing for the ASTContext.
+    static void Profile(llvm::FoldingSetNodeID &id, Identifier moduleSelector,
+                        DeclName fullName);
+
+    void Profile(llvm::FoldingSetNodeID &id) {
+      Profile(id, moduleSelector, fullName);
+    }
+
+    // Make vanilla new/delete illegal for SelectiveDeclNameRef.
+    void *operator new(size_t Bytes) = delete;
+    void operator delete(void *Data) = delete;
+
+    // Only allow allocation of SelectiveDeclNameRef using the allocator
+    // in ASTContext or by doing a placement new.
+    void *operator new(size_t Bytes, const ASTContext &C,
+                       unsigned Alignment = alignof(SelectiveDeclNameRef));
+    void *operator new(size_t Bytes, void *Mem) {
+      assert(Mem);
+      return Mem;
+    }
+  };
+
+  llvm::PointerUnion<DeclName, SelectiveDeclNameRef *> storage;
+
+  explicit DeclNameRef(void *Opaque)
+    : storage(decltype(storage)::getFromOpaqueValue(Opaque)) { }
+
+  void initialize(ASTContext &C, Identifier moduleScope, DeclName fullName);
 
 public:
   static DeclNameRef createSubscript();
   static DeclNameRef createConstructor();
 
-  DeclNameRef() : FullName() { }
+  DeclNameRef() : storage(DeclName()) { }
 
-  void *getOpaqueValue() const { return FullName.getOpaqueValue(); }
+  void *getOpaqueValue() const {
+    return storage.getOpaqueValue();
+  }
   static DeclNameRef getFromOpaqueValue(void *p);
 
   explicit DeclNameRef(ASTContext &C, Identifier moduleSelector,
-                       DeclName fullName)
-    : FullName(fullName) { }
+                       DeclName fullName) {
+    initialize(C, moduleSelector, fullName);
+  }
 
   explicit DeclNameRef(ASTContext &C, Identifier moduleSelector,
-                       DeclBaseName baseName, ArrayRef<Identifier> argLabels)
-    : FullName(C, baseName, argLabels) { }
+                       DeclBaseName baseName, ArrayRef<Identifier> argLabels) {
+    initialize(C, moduleSelector, DeclName(C, baseName, argLabels));
+  }
 
   explicit DeclNameRef(DeclName FullName)
-    : FullName(BaseName) { }
+    : storage(FullName) { }
 
   bool hasModuleSelector() const {
-    return false;
+    return storage.is<SelectiveDeclNameRef *>();
   }
 
   Identifier getModuleSelector() const {
-    return Identifier();
+    if (!hasModuleSelector())
+      return Identifier();
+
+    return storage.get<SelectiveDeclNameRef *>()->moduleSelector;
   }
 
   /// The name of the declaration being referenced.
   DeclName getFullName() const {
-    return FullName;
+    if (!hasModuleSelector())
+      return storage.get<DeclName>();
+
+    return storage.get<SelectiveDeclNameRef *>()->fullName;
   }
 
   /// The base name of the declaration being referenced.
@@ -759,7 +806,7 @@ public:
 };
 
 inline DeclNameRef DeclNameRef::getFromOpaqueValue(void *p) {
-  return DeclNameRef(DeclName::getFromOpaqueValue(p));
+  return DeclNameRef(p);
 }
 
 inline DeclNameRef DeclNameRef::withoutArgumentLabels(ASTContext &C) const {
@@ -936,7 +983,7 @@ namespace llvm {
     static inline swift::DeclNameRef getFromVoidPointer(void *ptr) {
       return swift::DeclNameRef::getFromOpaqueValue(ptr);
     }
-    enum { NumLowBitsAvailable = PointerLikeTypeTraits<swift::DeclName>::NumLowBitsAvailable };
+    enum { NumLowBitsAvailable = PointerLikeTypeTraits<swift::DeclName>::NumLowBitsAvailable - 1 };
   };
 
   // DeclNameRefs hash just like DeclNames.
