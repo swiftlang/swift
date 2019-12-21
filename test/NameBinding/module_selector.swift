@@ -448,3 +448,19 @@ precedencegroup main::PG1 {
   higherThan: Swift::AdditionPrecedence
   // expected-error@-1 {{precedence group specifier cannot be qualified with module selector}}
 }
+
+func badModuleNames() {
+  NonexistentModule::print()
+  // expected-error@-1 {{declaration 'print' is not imported through module 'NonexistentModule'}}
+  // expected-note@-2 {{did you mean module 'Swift'?}} {{3-20=Swift}}
+  // FIXME redundant: expected-note@-3  {{did you mean module 'Swift'?}}
+
+  _ = "foo".NonexistentModule::count
+  // FIXME improve: expected-error@-1 {{value of type 'String' has no member 'NonexistentModule::count'}}
+
+  let x: NonexistentModule::MyType = NonexistentModule::MyType()
+  // expected-error@-1 {{use of undeclared type 'NonexistentModule::MyType'}}
+
+  let y: A.NonexistentModule::MyChildType = fatalError()
+  // expected-error@-1 {{'NonexistentModule::MyChildType' is not a member type of 'A'}}
+}

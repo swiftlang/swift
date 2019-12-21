@@ -1038,6 +1038,8 @@ void UnqualifiedLookupFactory::recordDependencyOnTopLevelName(
 }
 
 void UnqualifiedLookupFactory::addImportedResults(DeclContext *const dc) {
+  assert(dc);
+
   using namespace namelookup;
   SmallVector<ValueDecl *, 8> CurModuleResults;
   auto resolutionKind = isOriginallyTypeLookup ? ResolutionKind::TypesOnly
@@ -1049,6 +1051,10 @@ void UnqualifiedLookupFactory::addImportedResults(DeclContext *const dc) {
     // We'd need a new ResolutionKind.
     moduleToLookIn =
         dc->getASTContext().getLoadedModule(Name.getModuleSelector());
+  
+  // If we didn't find the module, it obviously can't have any results.
+  if (!moduleToLookIn)
+    return;
 
   lookupInModule(moduleToLookIn, Name.getFullName(), CurModuleResults,
                  NLKind::UnqualifiedLookup, resolutionKind, dc);
