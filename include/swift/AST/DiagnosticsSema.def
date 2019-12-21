@@ -832,6 +832,10 @@ ERROR(use_undeclared_type,none,
       "use of undeclared type %0", (DeclNameRef))
 ERROR(use_undeclared_type_did_you_mean,none,
       "use of undeclared type %0; did you mean to use '%1'?", (DeclNameRef, StringRef))
+ERROR(type_not_in_module,none,
+      "type %0 is not imported through module %1", (DeclName, Identifier))
+NOTE(note_change_module_selector,none,
+     "did you mean module %0?", (Identifier))
 NOTE(note_typo_candidate_implicit_member,none,
      "did you mean the implicitly-synthesized %1 '%0'?", (StringRef, StringRef))
 NOTE(note_remapped_type,none,
