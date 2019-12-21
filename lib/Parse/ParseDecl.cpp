@@ -1015,7 +1015,8 @@ bool Parser::parseDifferentiableAttributeArguments(
     Diagnostic funcDiag(diag::attr_differentiable_expected_function_name.ID,
                         { label });
     result.Name = parseDeclNameRef(result.Loc, funcDiag,
-        DeclNameFlag::AllowZeroArgCompoundNames | DeclNameFlag::AllowOperators);
+        DeclNameFlag::AllowZeroArgCompoundNames | DeclNameFlag::AllowOperators |
+        DeclNameFlag::AllowModuleSelector);
     // If no trailing comma or 'where' clause, terminate parsing arguments.
     if (Tok.isNot(tok::comma, tok::kw_where))
       terminateParsingArgs = true;
@@ -1123,7 +1124,8 @@ static bool parseQualifiedDeclName(Parser &P, Diag<> nameParseError,
       original.Loc, nameParseError,
       Parser::DeclNameFlag::AllowZeroArgCompoundNames |
       Parser::DeclNameFlag::AllowKeywordsUsingSpecialNames |
-      Parser::DeclNameFlag::AllowOperators);
+      Parser::DeclNameFlag::AllowOperators |
+      Parser::DeclNameFlag::AllowModuleSelector);
   // The base type is optional, but the final unqualified declaration name is
   // not. If name could not be parsed, return true for error.
   return !original.Name;
@@ -2178,7 +2180,8 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
             diag::attr_dynamic_replacement_expected_function,
             DeclNameFlag::AllowZeroArgCompoundNames |
             DeclNameFlag::AllowKeywordsUsingSpecialNames |
-            DeclNameFlag::AllowOperators);
+            DeclNameFlag::AllowOperators |
+            DeclNameFlag::AllowModuleSelector);
       }
     }
 
@@ -2394,10 +2397,14 @@ static PatternBindingInitializer *findAttributeInitContent(
 /// but rejected since they have context-sensitive keywords.
 ///
 ParserStatus Parser::parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc) {
+  bool hasModuleSelector = Context.LangOpts.EnableExperimentalModuleSelector &&
+                               peekToken().is(tok::colon_colon);
+
   // If this not an identifier, the attribute is malformed.
   if (Tok.isNot(tok::identifier) &&
       Tok.isNot(tok::kw_in) &&
-      Tok.isNot(tok::kw_inout)) {
+      Tok.isNot(tok::kw_inout) &&
+      !hasModuleSelector) {
 
     if (Tok.is(tok::code_complete)) {
       if (CodeCompletion) {
@@ -2417,13 +2424,16 @@ ParserStatus Parser::parseDeclAttribute(DeclAttributes &Attributes, SourceLoc At
 
   // If the attribute follows the new representation, switch
   // over to the alternate parsing path.
-  DeclAttrKind DK = DeclAttribute::getAttrKindFromString(Tok.getText());
+  // All module-selected names are custom attributes, so we always use DAK_Count
+  // if a module selector is present.
+  DeclAttrKind DK = hasModuleSelector ? DAK_Count :
+      DeclAttribute::getAttrKindFromString(Tok.getText());
   
   auto checkInvalidAttrName = [&](StringRef invalidName,
                                   StringRef correctName,
                                   DeclAttrKind kind,
                                   Optional<Diag<StringRef, StringRef>> diag = None) {
-    if (DK == DAK_Count && Tok.getText() == invalidName) {
+    if (DK == DAK_Count && !hasModuleSelector && Tok.getText() == invalidName) {
       DK = kind;
 
       if (diag) {
@@ -2458,7 +2468,8 @@ ParserStatus Parser::parseDeclAttribute(DeclAttributes &Attributes, SourceLoc At
   checkInvalidAttrName("_propertyWrapper", "propertyWrapper",
                        DAK_PropertyWrapper, diag::attr_renamed_warning);
 
-  if (DK == DAK_Count && Tok.getText() == "warn_unused_result") {
+  if (DK == DAK_Count && !hasModuleSelector &&
+      Tok.getText() == "warn_unused_result") {
     // The behavior created by @warn_unused_result is now the default. Emit a
     // Fix-It to remove.
     SourceLoc attrLoc = consumeToken();
@@ -2499,9 +2510,10 @@ ParserStatus Parser::parseDeclAttribute(DeclAttributes &Attributes, SourceLoc At
     return makeParserSuccess();
   }
 
-  if (TypeAttributes::getAttrKindFromString(Tok.getText()) != TAK_Count)
+  if (!hasModuleSelector &&
+      TypeAttributes::getAttrKindFromString(Tok.getText()) != TAK_Count)
     diagnose(Tok, diag::type_attribute_applied_to_decl);
-  else if (Tok.isContextualKeyword("unknown")) {
+  else if (!hasModuleSelector && Tok.isContextualKeyword("unknown")) {
     diagnose(Tok, diag::unknown_attribute, "unknown");
   } else {
     // Change the context to create a custom attribute syntax.
@@ -2700,7 +2712,8 @@ bool Parser::parseConventionAttributeInternal(
 
     DeclNameLoc unusedLoc;
     convention.WitnessMethodProtocol = parseDeclNameRef(unusedLoc,
-        diag::convention_attribute_witness_method_expected_protocol, {});
+        diag::convention_attribute_witness_method_expected_protocol,
+        DeclNameFlag::AllowModuleSelector);
   }
   
   // Parse the ')'.  We can't use parseMatchingToken if we're in

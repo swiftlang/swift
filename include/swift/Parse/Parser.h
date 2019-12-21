@@ -1478,6 +1478,10 @@ public:
     /// not ordinary identifiers.
     AllowKeywordsUsingSpecialNames = AllowKeywords | 1 << 2,
 
+    /// If passed, a module selector (ModuleName::) is permitted before the base
+    /// name.
+    AllowModuleSelector = 1 << 3,
+
     /// If passed, compound names with argument lists are allowed, unless they
     /// have empty argument lists.
     AllowCompoundNames = 1 << 4,
