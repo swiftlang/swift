@@ -1042,8 +1042,16 @@ void UnqualifiedLookupFactory::addImportedResults(DeclContext *const dc) {
   SmallVector<ValueDecl *, 8> CurModuleResults;
   auto resolutionKind = isOriginallyTypeLookup ? ResolutionKind::TypesOnly
                                                : ResolutionKind::Overloadable;
-  lookupInModule(dc, Name.getFullName(), CurModuleResults, NLKind::UnqualifiedLookup,
-                 resolutionKind, dc);
+
+  auto moduleToLookIn = dc;
+  if (Name.hasModuleSelector())
+    // FIXME: Should we look this up relative to dc?
+    // We'd need a new ResolutionKind.
+    moduleToLookIn =
+        dc->getASTContext().getLoadedModule(Name.getModuleSelector());
+
+  lookupInModule(moduleToLookIn, Name.getFullName(), CurModuleResults,
+                 NLKind::UnqualifiedLookup, resolutionKind, dc);
 
   // Always perform name shadowing for type lookup.
   if (options.contains(Flags::TypeLookup)) {

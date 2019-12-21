@@ -15,7 +15,10 @@ let magnitude: Never = fatalError()
 
 // Test resolution of main:: using `B`
 
-extension main::B: main::Equatable {
+extension main::B {}
+// FIXME improve: expected-error@-1 {{use of undeclared type 'main::B'}}
+
+extension B: main::Equatable {
   @_implements(main::Equatable, main::==(_:_:))
   // expected-error@-1 {{name cannot be qualified with module selector here}} {{33-39=}}
   public static func equals(_: main::B, _: main::B) -> main::Bool { main::fatalError() }
@@ -33,7 +36,7 @@ extension main::B: main::Equatable {
       // expected-error@-2 {{expected expression}}
       // expected-error@-3 {{expected expression after operator}}
 
-    let magnitude: main::Int.main::Magnitude = main::magnitude
+    let magnitude: Int.main::Magnitude = main::magnitude
     // expected-EVENTUALLY-error@-1 {{can't find 'Int'}}
     // FIXME improve: expected-error@-2 {{type alias 'Magnitude' is not a member type of 'Int'}}
     // FIXME: expected-error@-3 {{variable used within its own initial value}}
@@ -53,27 +56,33 @@ extension main::B: main::Equatable {
 
 // Test resolution of ModuleSelectorTestingKit:: using `C`
 
+extension C {}
+
 extension ModuleSelectorTestingKit::C: ModuleSelectorTestingKit::Equatable {
+// FIXME improve: expected-error@-1 {{use of undeclared type 'ModuleSelectorTestingKit::Equatable'}}
   @_implements(ModuleSelectorTestingKit::Equatable, ModuleSelectorTestingKit::==(_:_:))
-  // expected-error@-1 {{name cannot be qualified with module selector here}} {{52-77=}}
+  // FIXME improve: expected-error@-1 {{use of undeclared type 'ModuleSelectorTestingKit::Equatable'}}
+  // expected-error@-2 {{name cannot be qualified with module selector here}} {{52-77=}}
   public static func equals(_: ModuleSelectorTestingKit::C, _: ModuleSelectorTestingKit::C) -> ModuleSelectorTestingKit::Bool { ModuleSelectorTestingKit::fatalError() }
-  
+  // FIXME improve: expected-error@-1 {{use of undeclared type 'ModuleSelectorTestingKit::Bool'}}
+
   // FIXME: Add tests with autodiff @_differentiable(jvp:vjp:) and
   // @_derivative(of:)
   
   @_dynamicReplacement(for: ModuleSelectorTestingKit::negate())
   mutating func myNegate() {
     let fn: (ModuleSelectorTestingKit::Int, ModuleSelectorTestingKit::Int) -> ModuleSelectorTestingKit::Int =
+    // FIXME improve: expected-error@-1 3{{use of undeclared type 'ModuleSelectorTestingKit::Int'}}
     // FIXME:
       (ModuleSelectorTestingKit::+)
-      // expected-error@-1 {{cannot convert value of type '()' to specified type '(Int, Int) -> Int'}}
-      // expected-error@-2 {{expected expression}}
-      // expected-error@-3 {{expected expression after operator}}
-    let magnitude: ModuleSelectorTestingKit::Int.ModuleSelectorTestingKit::Magnitude = ModuleSelectorTestingKit::magnitude
+      // expected-error@-1 {{expected expression}}
+      // expected-error@-2 {{expected expression after operator}}
+    let magnitude: Int.ModuleSelectorTestingKit::Magnitude = ModuleSelectorTestingKit::magnitude
     // expected-EVENTUALLY-error@-1 {{something about not finding 'magnitude' because we didn't look in self}}
     // FIXME improve: expected-error@-2 {{type alias 'Magnitude' is not a member type of 'Int'}}
     // FIXME: expected-error@-3 {{variable used within its own initial value}}
     if ModuleSelectorTestingKit::Bool.ModuleSelectorTestingKit::random() {
+    // FIXME improve: expected-error@-1 {{use of unresolved identifier 'ModuleSelectorTestingKit::Bool'}}
       ModuleSelectorTestingKit::negate()
       // FIXME improve, suggest adding 'self.': expected-error@-1 {{use of unresolved identifier 'ModuleSelectorTestingKit::negate'}}
     }
@@ -91,7 +100,10 @@ extension ModuleSelectorTestingKit::C: ModuleSelectorTestingKit::Equatable {
 // Test resolution of Swift:: using `D`
 // FIXME: Many more of these should fail once the feature is actually implemented.
 
-extension Swift::D: Swift::Equatable {
+extension Swift::D {}
+// FIXME improve: expected-error@-1 {{use of undeclared type 'Swift::D'}}
+
+extension D: Swift::Equatable {
   @_implements(Swift::Equatable, Swift::==(_:_:))
   // expected-error@-1 {{name cannot be qualified with module selector here}} {{34-41=}}
   public static func equals(_: Swift::D, _: Swift::D) -> Swift::Bool { Swift::fatalError() }
@@ -108,7 +120,7 @@ extension Swift::D: Swift::Equatable {
       // expected-error@-1 {{cannot convert value of type '()' to specified type '(Int, Int) -> Int'}}
       // expected-error@-2 {{expected expression}}
       // expected-error@-3 {{expected expression after operator}}
-    let magnitude: Swift::Int.Swift::Magnitude = Swift::magnitude
+    let magnitude: Int.Swift::Magnitude = Swift::magnitude
     // expected-EVENTUALLY-error@-1 {{something about not finding 'magnitude' because we didn't look in self}}
     // FIXME: expected-error@-2 {{variable used within its own initial value}}
     if Swift::Bool.Swift::random() {
@@ -130,15 +142,25 @@ struct AvailableUser {
   @available(macOS 10.15, *) var use1: String { "foo" }
 
   @main::available() var use2
+  // FIXME improve: expected-error@-1 {{unknown attribute 'available'}}
+  // FIXME suppress: expected-error@-2 {{type annotation missing in pattern}}
+
   @ModuleSelectorTestingKit::available() var use4
+  // no-error
+
   @Swift::available() var use5
-  // expected-EVENTUALLY-error@-1 {{can't find because not in 'Swift'}}
+  // FIXME improve: expected-error@-1 {{unknown attribute 'available'}}
+  // FIXME suppress: expected-error@-2 {{type annotation missing in pattern}}
 }
 
 func builderUser2(@main::MyBuilder fn: () -> Void) {}
+// FIXME improve: expected-error@-1 {{unknown attribute 'MyBuilder'}}
+
 func builderUser3(@ModuleSelectorTestingKit::MyBuilder fn: () -> Void) {}
+// no-error
+
 func builderUser4(@Swift::MyBuilder fn: () -> Void) {}
-// expected-EVENTUALLY-error@-1 {{can't find because not in 'Swift'}}
+// FIXME improve: expected-error@-1 {{unknown attribute 'MyBuilder'}}
 
 func whitespace() {
   Swift::print
@@ -181,10 +203,13 @@ func main::decl1(
   // expected-error@-1 {{name of function declaration cannot be qualified with module selector}}
   main::p1: main::A,
   // expected-error@-1 {{argument label cannot be qualified with module selector}}
+  // FIXME access path: expected-error@-2 {{use of undeclared type 'main::A'}}
   main::label p2: main::A,
   // expected-error@-1 {{argument label cannot be qualified with module selector}}
+  // FIXME access path: expected-error@-2 {{use of undeclared type 'main::A'}}
   label main::p3: main::A
   // expected-error@-1 {{name of parameter declaration cannot be qualified with module selector}}
+  // FIXME access path: expected-error@-2 {{use of undeclared type 'main::A'}}
 ) {
   let main::decl1a = "a"
   // expected-error@-1 {{name of constant declaration cannot be qualified with module selector}}
@@ -268,6 +293,7 @@ class main::decl4<main::T> {}
 
 typealias main::decl5 = main::Bool
 // expected-error@-1 {{name of typealias declaration cannot be qualified with module selector}}
+// FIXME improve: expected-error@-2 {{use of undeclared type 'main::Bool'}}
 
 protocol main::decl6 {
   // expected-error@-1 {{name of protocol declaration cannot be qualified with module selector}}
@@ -308,6 +334,7 @@ struct Parent {
 
   typealias main::decl5 = main::Bool
   // expected-error@-1 {{name of typealias declaration cannot be qualified with module selector}}
+  // FIXME improve: expected-error@-2 {{use of undeclared type 'main::Bool'}}
 }
 
 @_swift_native_objc_runtime_base(main::BaseClass)
