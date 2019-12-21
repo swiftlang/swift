@@ -306,9 +306,7 @@ struct DIElementUseInfo {
 /// instruction (alloc_box, alloc_stack or mark_uninitialized), classifying them
 /// and storing the information found into the Uses and Releases lists.
 void collectDIElementUsesFrom(const DIMemoryObjectInfo &MemoryInfo,
-                              DIElementUseInfo &UseInfo,
-                              bool isDefiniteInitFinished,
-                              bool TreatAddressToPointerAsInout);
+                              DIElementUseInfo &UseInfo);
 
 } // end namespace ownership
 } // end namespace swift

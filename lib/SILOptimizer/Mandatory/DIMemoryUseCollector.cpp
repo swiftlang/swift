@@ -519,22 +519,9 @@ class ElementUseCollector {
   const DIMemoryObjectInfo &TheMemory;
   DIElementUseInfo &UseInfo;
 
-  /// This is true if definite initialization has finished processing assign
-  /// and other ambiguous instructions into init vs assign classes.
-  bool isDefiniteInitFinished;
-
   /// IsSelfOfNonDelegatingInitializer - This is true if we're looking at the
   /// top level of a 'self' variable in a non-delegating init method.
   bool IsSelfOfNonDelegatingInitializer;
-
-  /// How should address_to_pointer be handled?
-  ///
-  /// In DefiniteInitialization it is considered as an inout parameter to get
-  /// diagnostics about passing a let variable to an inout mutable-pointer
-  /// argument.
-  /// In PredictableMemOpt it is considered as an escape point to be
-  /// conservative.
-  bool TreatAddressToPointerAsInout;
 
   /// When walking the use list, if we index into a struct element, keep track
   /// of this, so that any indexes into tuple subelements don't affect the
@@ -547,11 +534,9 @@ class ElementUseCollector {
 
 public:
   ElementUseCollector(const DIMemoryObjectInfo &TheMemory,
-                      DIElementUseInfo &UseInfo, bool isDefiniteInitFinished,
-                      bool TreatAddressToPointerAsInout)
+                      DIElementUseInfo &UseInfo)
       : Module(TheMemory.MemoryInst->getModule()), TheMemory(TheMemory),
-        UseInfo(UseInfo), isDefiniteInitFinished(isDefiniteInitFinished),
-        TreatAddressToPointerAsInout(TreatAddressToPointerAsInout) {}
+        UseInfo(UseInfo) {}
 
   /// This is the main entry point for the use walker.  It collects uses from
   /// the address and the refcount result of the allocation.
@@ -775,8 +760,6 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
           Kind = DIUseKind::PartialStore; \
         else if (SWI->isInitializationOfDest()) \
           Kind = DIUseKind::Initialization; \
-        else if (isDefiniteInitFinished) \
-          Kind = DIUseKind::Assign; \
         else \
           Kind = DIUseKind::InitOrAssign; \
         trackUse(DIMemoryUse(User, Kind, BaseEltNo, 1)); \
@@ -803,8 +786,6 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
         Kind = DIUseKind::PartialStore;
       else if (CAI->isInitializationOfDest())
         Kind = DIUseKind::Initialization;
-      else if (isDefiniteInitFinished)
-        Kind = DIUseKind::Assign;
       else
         Kind = DIUseKind::InitOrAssign;
 
@@ -900,7 +881,7 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
       llvm_unreachable("bad parameter convention");
     }
 
-    if (isa<AddressToPointerInst>(User) && TreatAddressToPointerAsInout) {
+    if (isa<AddressToPointerInst>(User)) {
       // address_to_pointer is a mutable escape, which we model as an inout use.
       addElementUses(BaseEltNo, PointeeType, User,
                      DIUseKind::InOutArgument);
@@ -1830,12 +1811,11 @@ static bool shouldPerformClassInitSelf(const DIMemoryObjectInfo &MemoryInfo) {
          MemoryInfo.isDerivedClassSelfOnly();
 }
 
-/// collectDIElementUsesFrom - Analyze all uses of the specified allocation
-/// instruction (alloc_box, alloc_stack or mark_uninitialized), classifying them
-/// and storing the information found into the Uses and Releases lists.
+/// Analyze all uses of the specified allocation instruction (alloc_box,
+/// alloc_stack or mark_uninitialized), classifying them and storing the
+/// information found into the Uses and Releases lists.
 void swift::ownership::collectDIElementUsesFrom(
-    const DIMemoryObjectInfo &MemoryInfo, DIElementUseInfo &UseInfo,
-    bool isDIFinished, bool TreatAddressToPointerAsInout) {
+    const DIMemoryObjectInfo &MemoryInfo, DIElementUseInfo &UseInfo) {
 
   if (shouldPerformClassInitSelf(MemoryInfo)) {
     ClassInitElementUseCollector UseCollector(MemoryInfo, UseInfo);
@@ -1852,7 +1832,5 @@ void swift::ownership::collectDIElementUsesFrom(
     return;
   }
 
-  ElementUseCollector(MemoryInfo, UseInfo, isDIFinished,
-                      TreatAddressToPointerAsInout)
-      .collectFrom();
+  ElementUseCollector(MemoryInfo, UseInfo).collectFrom();
 }

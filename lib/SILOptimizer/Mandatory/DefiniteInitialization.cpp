@@ -2888,8 +2888,7 @@ static void processMemoryObject(MarkUninitializedInst *I) {
   DIElementUseInfo UseInfo;
 
   // Walk the use list of the pointer, collecting them into the Uses array.
-  collectDIElementUsesFrom(MemInfo, UseInfo, false,
-                           /*TreatAddressToPointerAsInout*/ true);
+  collectDIElementUsesFrom(MemInfo, UseInfo);
 
   LifetimeChecker(MemInfo, UseInfo).doIt();
 }
