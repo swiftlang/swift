@@ -2257,15 +2257,15 @@ DeclNameRef Parser::parseDeclNameRef(DeclNameLoc &loc,
                                          rparenLoc);
 
   if (argumentLabelLocs.empty() || !hadArgList)
-    loc = DeclNameLoc(baseNameLoc);
+    loc = DeclNameLoc(Context, moduleSelectorLoc, baseNameLoc);
   else
-    loc = DeclNameLoc(Context, baseNameLoc, lparenLoc, argumentLabelLocs,
-                      rparenLoc);
+    loc = DeclNameLoc(Context, moduleSelectorLoc, baseNameLoc,
+                      lparenLoc, argumentLabelLocs, rparenLoc);
 
   if (!hadArgList)
-    return DeclNameRef(baseName);
+    return DeclNameRef(Context, moduleSelector, baseName);
 
-  return DeclNameRef({ Context, baseName, argumentLabels });
+  return DeclNameRef(Context, moduleSelector, baseName, argumentLabels);
 }
 
 ///   expr-identifier:

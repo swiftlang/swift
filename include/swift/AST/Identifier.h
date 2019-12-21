@@ -626,63 +626,69 @@ public:
   void *getOpaqueValue() const { return FullName.getOpaqueValue(); }
   static DeclNameRef getFromOpaqueValue(void *p);
 
+  explicit DeclNameRef(ASTContext &C, Identifier moduleSelector,
+                       DeclName fullName)
+    : FullName(fullName) { }
+
+  explicit DeclNameRef(ASTContext &C, Identifier moduleSelector,
+                       DeclBaseName baseName, ArrayRef<Identifier> argLabels)
+    : FullName(C, baseName, argLabels) { }
+
   explicit DeclNameRef(DeclName FullName)
-    : FullName(FullName) { }
-
-  explicit DeclNameRef(DeclBaseName BaseName)
     : FullName(BaseName) { }
 
-  explicit DeclNameRef(Identifier BaseName)
-    : FullName(BaseName) { }
+  bool hasModuleSelector() const {
+    return false;
+  }
+
+  Identifier getModuleSelector() const {
+    return Identifier();
+  }
 
   /// The name of the declaration being referenced.
   DeclName getFullName() const {
     return FullName;
   }
 
-  DeclName &getFullName() {
-    return FullName;
-  }
-
   /// The base name of the declaration being referenced.
   DeclBaseName getBaseName() const {
-    return FullName.getBaseName();
+    return getFullName().getBaseName();
   }
 
   Identifier getBaseIdentifier() const {
-    return FullName.getBaseIdentifier();
+    return getFullName().getBaseIdentifier();
   }
 
   ArrayRef<Identifier> getArgumentNames() const {
-    return FullName.getArgumentNames();
+    return getFullName().getArgumentNames();
   }
 
   bool isSimpleName() const {
-    return FullName.isSimpleName();
+    return getFullName().isSimpleName();
   }
 
   bool isSimpleName(DeclBaseName name) const {
-    return FullName.isSimpleName(name);
+    return getFullName().isSimpleName(name);
   }
 
   bool isSimpleName(StringRef name) const {
-    return FullName.isSimpleName(name);
+    return getFullName().isSimpleName(name);
   }
 
   bool isSpecial() const {
-    return FullName.isSpecial();
+    return getFullName().isSpecial();
   }
 
   bool isOperator() const {
-    return FullName.isOperator();
+    return getFullName().isOperator();
   }
 
   bool isCompoundName() const {
-    return FullName.isCompoundName();
+    return getFullName().isCompoundName();
   }
 
   explicit operator bool() const {
-    return (bool)FullName;
+    return (bool)getFullName();
   }
 
   /// Compare two declaration names, producing -1 if \c *this comes before
@@ -757,12 +763,12 @@ inline DeclNameRef DeclNameRef::getFromOpaqueValue(void *p) {
 }
 
 inline DeclNameRef DeclNameRef::withoutArgumentLabels(ASTContext &C) const {
-  return DeclNameRef(getBaseName());
+  return DeclNameRef(C, getModuleSelector(), getBaseName());
 }
 
 inline DeclNameRef DeclNameRef::withArgumentLabels(
     ASTContext &C, ArrayRef<Identifier> argumentNames) const {
-  return DeclNameRef(DeclName(C, getBaseName(), argumentNames));
+  return DeclNameRef(C, getModuleSelector(), getBaseName(), argumentNames);
 }
 
 inline DeclNameRef DeclNameRef::createSubscript() {
