@@ -60,8 +60,9 @@ const ASTScopeImpl *ASTScopeImpl::findStartingScopeForLookup(
 
   auto *const fileScope = sourceFile->getScope().impl;
   // Parser may have added decls to source file, since previous lookup
-  if (name.isOperator())
-    return fileScope; // operators always at file scope
+  if (name.isOperator() || name.hasModuleSelector())
+    // operators and module-selector names always at file scope
+    return fileScope;
 
   const auto *innermost = fileScope->findInnermostEnclosingScope(loc, nullptr);
   ASTScopeAssert(innermost->getWasExpanded(),

@@ -1,5 +1,8 @@
 // RUN: %target-typecheck-verify-swift -sdk %clang-importer-sdk -module-name main -I %S/Inputs -enable-experimental-module-selector
 
+// FIXME: This only works with ASTScopes, and we might not care about that by the time this feature is ready.
+// RUN-DISABLED: %target-typecheck-verify-swift -sdk %clang-importer-sdk -module-name main -I %S/Inputs -enable-experimental-module-selector -disable-astscope-lookup
+
 // Make sure the lack of the experimental flag disables the feature:
 // RUN: not %target-typecheck-verify-swift -sdk %clang-importer-sdk -module-name main -I %S/Inputs 2>/dev/null
 
@@ -72,7 +75,7 @@ extension ModuleSelectorTestingKit::C: ModuleSelectorTestingKit::Equatable {
     // FIXME: expected-error@-3 {{variable used within its own initial value}}
     if ModuleSelectorTestingKit::Bool.ModuleSelectorTestingKit::random() {
       ModuleSelectorTestingKit::negate()
-      // expected-EVENTUALLY-error@-1 {{something about not finding 'negate' because we didn't look in self}}
+      // FIXME improve, suggest adding 'self.': expected-error@-1 {{use of unresolved identifier 'ModuleSelectorTestingKit::negate'}}
     }
     else {
       self = ModuleSelectorTestingKit::C(value: .ModuleSelectorTestingKit::min)
@@ -185,49 +188,47 @@ func main::decl1(
 ) {
   let main::decl1a = "a"
   // expected-error@-1 {{name of constant declaration cannot be qualified with module selector}}
-  // expected-warning@-2 {{never used}}
 
   var main::decl1b = "b"
   // expected-error@-1 {{name of variable declaration cannot be qualified with module selector}}
-  // expected-warning@-2 {{never used}}
 
   let (main::decl1c, main::decl1d) = ("c", "d")
   // expected-error@-1 {{name of constant declaration cannot be qualified with module selector}}
   // expected-error@-2 {{name of constant declaration cannot be qualified with module selector}}
-  // expected-warning@-3 2{{never used}}
 
   if let (main::decl1e, main::decl1f) = Optional(("e", "f")) {}
   // expected-error@-1 {{name of constant declaration cannot be qualified with module selector}}
   // expected-error@-2 {{name of constant declaration cannot be qualified with module selector}}
-  // expected-warning@-3 2{{never used}}
 
   guard let (main::decl1g, main::decl1h) = Optional(("g", "h")) else { return }
   // expected-error@-1 {{name of constant declaration cannot be qualified with module selector}}
   // expected-error@-2 {{name of constant declaration cannot be qualified with module selector}}
-  // expected-warning@-3 {{never used}}
 
-  switch Optional(main::decl1g) { // FIXME expecting an error later
+  // From uses in the switch statements below:
+  // expected-note@-5 3{{did you mean 'decl1g'?}}
+
+  switch Optional(main::decl1g) {
+  // expected-error@-1 {{use of unresolved identifier 'main::decl1g'}}
   case Optional.some(let main::decl1i):
     // expected-error@-1 {{name of constant declaration cannot be qualified with module selector}}
-    // expected-warning@-2 {{never used}}
-    break
-  case .none:
-    break
-  }
-
-  switch Optional(main::decl1g) { // FIXME expecting an error later
-  case let Optional.some(main::decl1j):
-    // expected-error@-1 {{name of constant declaration cannot be qualified with module selector}}
-    // expected-warning@-2 {{never used}}
     break
   case .none:
     break
   }
 
   switch Optional(main::decl1g) {
-  case let main::decl1k?:
+  // expected-error@-1 {{use of unresolved identifier 'main::decl1g'}}
+  case let Optional.some(main::decl1j):
     // expected-error@-1 {{name of constant declaration cannot be qualified with module selector}}
-    // expected-warning@-2 {{never used}}
+    break
+  case .none:
+    break
+  }
+
+  switch Optional(main::decl1g) {
+ // expected-error@-1 {{use of unresolved identifier 'main::decl1g'}}
+ case let main::decl1k?:
+    // expected-error@-1 {{name of constant declaration cannot be qualified with module selector}}
     break
   case .none:
     break
@@ -235,11 +236,9 @@ func main::decl1(
 
   for main::decl1l in "lll" {}
   // expected-error@-1 {{name of constant declaration cannot be qualified with module selector}}
-  // expected-warning@-2 {{never used}}
 
   "lll".forEach { [main::magnitude]
     // expected-error@-1 {{name of captured variable declaration cannot be qualified with module selector}}
-    // expected-warning@-2 {{never used}}
     main::elem in print(elem)
     // expected-error@-1 {{name of parameter declaration cannot be qualified with module selector}}
   }
