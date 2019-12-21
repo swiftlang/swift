@@ -880,6 +880,11 @@ class swift::MemberLookupTable {
   /// Lookup table mapping names to the set of declarations with that name.
   LookupTable Lookup;
 
+  /// The set of names of lazily-loaded members that the lookup table has a
+  /// complete accounting of with respect to all known extensions of its
+  /// parent nominal type.
+  llvm::DenseSet<DeclBaseName> LazilyCompleteNames;
+
 public:
   /// Create a new member lookup table.
   explicit MemberLookupTable(ASTContext &ctx);
@@ -892,6 +897,24 @@ public:
 
   /// Add the given members to the lookup table.
   void addMembers(DeclRange members);
+
+  /// Returns \c true if the lookup table has a complete accounting of the
+  /// given name.
+  bool isLazilyComplete(DeclBaseName name) const {
+    return LazilyCompleteNames.find(name) != LazilyCompleteNames.end();
+  }
+
+  /// Mark a given lazily-loaded name as being complete.
+  void markLazilyComplete(DeclBaseName name) {
+    LazilyCompleteNames.insert(name);
+  }
+
+  /// Clears the cache of lazily-complete names.  This _must_ be called when
+  /// new extensions with lazy members are added to the type, or direct lookup
+  /// will return inconsistent or stale results.
+  void clearLazilyCompleteCache() {
+    LazilyCompleteNames.clear();
+  }
 
   /// Iterator into the lookup table.
   typedef LookupTable::iterator iterator;
@@ -912,7 +935,11 @@ public:
 
     os << "Lookup:\n  ";
     for (auto &pair : Lookup) {
-      pair.getFirst().print(os) << ":\n  ";
+      pair.getFirst().print(os);
+      if (isLazilyComplete(pair.getFirst().getBaseName())) {
+        os << " (lazily complete)";
+      }
+      os << ":\n  ";
       for (auto &decl : pair.getSecond()) {
         os << "- ";
         decl->dumpRef(os);
@@ -1033,6 +1060,7 @@ void NominalTypeDecl::addedExtension(ExtensionDecl *ext) {
 
   if (ext->hasLazyMembers()) {
     LookupTable->addMembers(ext->getCurrentMembersWithoutLoading());
+    LookupTable->clearLazilyCompleteCache();
   } else {
     LookupTable->addMembers(ext->getMembers());
   }
@@ -1146,6 +1174,9 @@ populateLookupTableEntryFromExtensions(ASTContext &ctx,
                                        MemberLookupTable &table,
                                        NominalTypeDecl *nominal,
                                        DeclBaseName name) {
+  assert(!table.isLazilyComplete(name) &&
+         "Should not be searching extensions for complete name!");
+
   for (auto e : nominal->getExtensions()) {
     // If there's no lazy members to look at, all the members of this extension
     // are present in the lookup table.
@@ -1275,14 +1306,19 @@ NominalTypeDecl::lookupDirect(DeclName name,
 
   if (!useNamedLazyMemberLoading) {
     updateLookupTable(LookupTable);
-  } else {
-    if (populateLookupTableEntryFromLazyIDCLoader(ctx, *LookupTable,
-                                                  name.getBaseName(), this)) {
+  } else if (!LookupTable->isLazilyComplete(name.getBaseName())) {
+    // The lookup table believes it doesn't have a complete accounting of this
+    // name - either because we're never seen it before, or another extension
+    // was registered since the last time we searched. Ask the loaders to give
+    // us a hand.
+    auto &Table = *LookupTable;
+    DeclBaseName baseName(name.getBaseName());
+    if (populateLookupTableEntryFromLazyIDCLoader(ctx, Table, baseName, this)) {
       updateLookupTable(LookupTable);
     } else {
-      populateLookupTableEntryFromExtensions(ctx, *LookupTable, this,
-                                             name.getBaseName());
+      populateLookupTableEntryFromExtensions(ctx, Table, this, baseName);
     }
+    Table.markLazilyComplete(baseName);
   }
 
   // Look for a declaration with this name.
