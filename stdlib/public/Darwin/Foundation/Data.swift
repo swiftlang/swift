@@ -41,7 +41,7 @@ internal func __NSDataIsCompact(_ data: NSData) -> Bool {
 #else
 
 @_exported import Foundation // Clang module
-import _SwiftFoundationOverlayShims
+@_implementationOnly import _SwiftFoundationOverlayShims
 import _SwiftCoreFoundationOverlayShims
 
 internal func __NSDataIsCompact(_ data: NSData) -> Bool {

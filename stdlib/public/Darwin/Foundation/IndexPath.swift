@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 @_exported import Foundation // Clang module
-import _SwiftFoundationOverlayShims
+@_implementationOnly import _SwiftFoundationOverlayShims
 
 /**
  `IndexPath` represents the path to a specific node in a tree of nested array collections.
