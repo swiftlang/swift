@@ -6,6 +6,15 @@
 // Make sure the lack of the experimental flag disables the feature:
 // RUN: not %target-typecheck-verify-swift -sdk %clang-importer-sdk -module-name main -I %S/Inputs 2>/dev/null
 
+// FIXME: This test doesn't really cover:
+//
+// * Whether X::foo finds foos in X's re-exports
+// * Whether we handle access paths correctly
+// * Interaction with ClangImporter
+// * Cross-module overlays, when those happen
+//
+// It also might not cover all combinations of name lookup paths and inputs.
+
 import ModuleSelectorTestingKit
 
 import ctypes::bits
