@@ -277,8 +277,26 @@ bool AbstractionPattern::matchesTuple(CanTupleType substType) {
   case Kind::Discard:
     if (isTypeParameter())
       return true;
-    auto tuple = dyn_cast<TupleType>(getType());
-    return (tuple && tuple->getNumElements() == substType->getNumElements());
+
+    // Tuple and tuple check.
+    if (auto tuple = dyn_cast<TupleType>(getType()))
+      return tuple->getNumElements() == substType->getNumElements();
+
+    // If this abstraction pattern has some opaque return type here, check for
+    // builtin conformances, notably Equatable for () at the moment.
+    if (auto opaque = dyn_cast<OpaqueTypeArchetypeType>(getType())) {
+      auto conforms = opaque->getConformsTo();
+      if (conforms.size() == 1) {
+        auto proto = conforms.front();
+        auto equatable = opaque->getASTContext()
+                               .getProtocol(KnownProtocolKind::Equatable);
+        if (proto == equatable &&
+            substType == opaque->getASTContext().TheEmptyTupleType)
+          return true;
+      }
+    }
+
+    return false;
   }
   llvm_unreachable("bad kind");
 }

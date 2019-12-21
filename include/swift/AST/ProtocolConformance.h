@@ -1022,7 +1022,7 @@ public:
 };
 
 /// A builtin conformance appears when a special non-nominal type has a runtime
-/// declared conformance. E.g. the runtime implements equatable for all Void.
+/// declared conformance. E.g. the runtime implements Equatable for Void.
 class BuiltinProtocolConformance : public RootProtocolConformance {
   friend class ASTContext;
 

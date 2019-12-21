@@ -2899,6 +2899,11 @@ IRGenModule::getAddrOfLLVMVariableOrGOTEquivalent(LinkEntity entity,
   // Retrieve the variable entry.
   auto entry = GlobalVars[entity];
 
+  // If there isn't an entry in GlobalVars, but we know that the variable is
+  // forward-declared, it's most likely an entity known by IRGen.
+  if (!entry && var)
+    entry = var;
+
   /// Returns a direct reference.
   auto direct = [&]() -> ConstantReference {
     // FIXME: Relative references to aliases break MC on 32-bit Mach-O
@@ -2915,14 +2920,6 @@ IRGenModule::getAddrOfLLVMVariableOrGOTEquivalent(LinkEntity entity,
       cast<llvm::GlobalValue>(entry), entity);
     return {gotEquivalent, ConstantReference::Indirect};
   };
-
-  // If there isn't an entry in GlobalVars, but we know that the variable is
-  // forward-declared, it's most likely an entity known by IRGen. We're still
-  // asking for a GOT equivalent, so go ahead and make it.
-  if (!entry && var) {
-    entry = var;
-    return indirect();
-  }
 
   // Return the GOT entry if we were asked to.
   if (forceIndirectness == ConstantReference::Indirect)
