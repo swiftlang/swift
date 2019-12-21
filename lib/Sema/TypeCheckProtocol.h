@@ -211,6 +211,10 @@ enum class MatchKind : uint8_t {
 
   /// The witness is missing a `@differentiable` attribute from the requirement.
   MissingDifferentiableAttr,
+  
+  /// The witness did not match because it is an enum case with
+  /// associated values.
+  EnumCaseWithAssociatedValues,
 };
 
 /// Describes the kind of optional adjustment performed when
@@ -436,7 +440,12 @@ struct RequirementMatch {
     case MatchKind::RethrowsConflict:
     case MatchKind::ThrowsConflict:
     case MatchKind::NonObjC:
+<<<<<<< HEAD
     case MatchKind::MissingDifferentiableAttr:
+=======
+    case MatchKind::DifferentiableConflict:
+    case MatchKind::EnumCaseWithAssociatedValues:
+>>>>>>> [Typechecker] Allow enum cases without payload to witness a static get-only property with Self type protocol requirement
       return false;
     }
 
@@ -466,7 +475,12 @@ struct RequirementMatch {
     case MatchKind::RethrowsConflict:
     case MatchKind::ThrowsConflict:
     case MatchKind::NonObjC:
+<<<<<<< HEAD
     case MatchKind::MissingDifferentiableAttr:
+=======
+    case MatchKind::DifferentiableConflict:
+    case MatchKind::EnumCaseWithAssociatedValues:
+>>>>>>> [Typechecker] Allow enum cases without payload to witness a static get-only property with Self type protocol requirement
       return false;
     }
 

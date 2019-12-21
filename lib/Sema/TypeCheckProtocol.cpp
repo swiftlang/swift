@@ -479,8 +479,13 @@ swift::matchWitness(
   assert(!req->isInvalid() && "Cannot have an invalid requirement here");
 
   /// Make sure the witness is of the same kind as the requirement.
-  if (req->getKind() != witness->getKind())
-    return RequirementMatch(witness, MatchKind::KindConflict);
+  if (req->getKind() != witness->getKind()) {
+    // A static get-only property with Self type can be satisfied by an
+    // enum case with no associated values. If there are any discrepencies,
+    // we'll diagnose it later. For now, let's assume the match is valid.
+    if (!(isa<VarDecl>(req) && isa<EnumElementDecl>(witness)))
+      return RequirementMatch(witness, MatchKind::KindConflict);
+  }
 
   // If we're currently validating the witness, bail out.
   if (witness->isRecursiveValidation())
@@ -559,6 +564,17 @@ swift::matchWitness(
   } else if (isa<ConstructorDecl>(witness)) {
     decomposeFunctionType = true;
     ignoreReturnType = true;
+  } else if (isa<EnumElementDecl>(witness)) {
+    auto enumCase = cast<EnumElementDecl>(witness);
+    if (enumCase->hasAssociatedValues())
+      return RequirementMatch(witness, MatchKind::EnumCaseWithAssociatedValues);
+    auto var = dyn_cast<VarDecl>(req);
+    if (!var)
+      return RequirementMatch(witness, MatchKind::KindConflict);
+    if (!var->isStatic())
+      return RequirementMatch(witness, MatchKind::StaticNonStaticConflict);
+    if (var->getParsedAccessor(AccessorKind::Set))
+      return RequirementMatch(witness, MatchKind::SettableConflict);
   }
 
   // If the requirement is @objc, the witness must not be marked with @nonobjc.
@@ -2177,7 +2193,8 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
   if (match.Kind != MatchKind::RenamedMatch &&
       !match.Witness->getAttrs().hasAttribute<ImplementsAttr>() &&
       match.Witness->getFullName() &&
-      req->getFullName() != match.Witness->getFullName())
+      req->getFullName() != match.Witness->getFullName() &&
+      !isa<EnumElementDecl>(match.Witness))
     return;
 
   // Form a string describing the associated type deductions.
@@ -2229,7 +2246,7 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
     break;
 
   case MatchKind::TypeConflict: {
-    if (!isa<TypeDecl>(req)) {
+    if (!isa<TypeDecl>(req) && !isa<EnumElementDecl>(match.Witness)) {
       computeFixitsForOverridenDeclaration(match.Witness, req, [&](bool){
         return diags.diagnose(match.Witness,
                               diag::protocol_witness_type_conflict,
@@ -2273,6 +2290,8 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
     auto witness = match.Witness;
     auto diag = diags.diagnose(witness, diag::protocol_witness_static_conflict,
                                !req->isInstanceMember());
+    if (isa<EnumElementDecl>(witness))
+      break;
     if (req->isInstanceMember()) {
       SourceLoc loc;
       if (auto FD = dyn_cast<FuncDecl>(witness)) {
@@ -2398,6 +2417,9 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
     }
     break;
   }
+  case MatchKind::EnumCaseWithAssociatedValues:
+    diags.diagnose(match.Witness, diag::protocol_witness_enum_case_payload);
+    break;
   }
 }
 
