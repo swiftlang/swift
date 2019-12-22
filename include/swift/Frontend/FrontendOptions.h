@@ -247,6 +247,10 @@ public:
   /// Indicates whether full help (including "hidden" options) should be shown.
   bool PrintHelpHidden = false;
 
+  /// Indicates that the frontend should print the target triple and then
+  /// exit.
+  bool PrintTargetInfo = false;
+
   /// Should we sort SIL functions, vtables, witness tables, and global
   /// variables by name when we print it out. This eases diffing of SIL files.
   bool EmitSortedSIL = false;

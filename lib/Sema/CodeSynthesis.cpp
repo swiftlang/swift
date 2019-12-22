@@ -145,7 +145,8 @@ static void maybeAddMemberwiseDefaultArg(ParamDecl *arg, VarDecl *var,
     var->getAttrs().hasAttribute<LazyAttr>() ||
     (!isExplicitlyInitialized && isDefaultInitializable &&
      var->getValueInterfaceType()->getAnyNominal() == ctx.getOptionalDecl() &&
-     !var->getAttachedPropertyWrapperTypeInfo(0).defaultInit);
+     (var->getAttachedPropertyWrappers().empty() ||
+      var->isPropertyMemberwiseInitializedWithWrappedType()));
   if (isNilInitialized) {
     arg->setDefaultArgumentKind(DefaultArgumentKind::NilLiteral);
     return;
@@ -641,7 +642,8 @@ createDesignatedInitOverride(ClassDecl *classDecl,
   // Create the initializer parameter patterns.
   OptionSet<ParameterList::CloneFlags> options
     = (ParameterList::Implicit |
-       ParameterList::Inherited);
+       ParameterList::Inherited |
+       ParameterList::NamedArguments);
   auto *superclassParams = superclassCtor->getParameters();
   auto *bodyParams = superclassParams->clone(ctx, options);
 
@@ -1069,11 +1071,8 @@ ResolveImplicitMemberRequest::evaluate(Evaluator &evaluator,
   // FIXME: This entire request is a layering violation made of smaller,
   // finickier layering violations. See rdar://56844567
 
-  // Checks whether the target conforms to the given protocol. If the
-  // conformance is incomplete, force the conformance.
-  //
-  // Returns whether the target conforms to the protocol.
-  auto evaluateTargetConformanceTo = [&](ProtocolDecl *protocol) {
+  auto &Context = target->getASTContext();
+  auto tryToInstallCodingKeys = [&](ProtocolDecl *protocol) {
     if (!protocol)
       return false;
 
@@ -1096,7 +1095,6 @@ ResolveImplicitMemberRequest::evaluate(Evaluator &evaluator,
     return true;
   };
 
-  auto &Context = target->getASTContext();
   switch (action) {
   case ImplicitMemberAction::ResolveImplicitInit:
     TypeChecker::addImplicitConstructors(target);
@@ -1114,28 +1112,9 @@ ResolveImplicitMemberRequest::evaluate(Evaluator &evaluator,
     // synthesized, it will be synthesized.
     auto *decodableProto = Context.getProtocol(KnownProtocolKind::Decodable);
     auto *encodableProto = Context.getProtocol(KnownProtocolKind::Encodable);
-    if (!evaluateTargetConformanceTo(decodableProto)) {
-      (void)evaluateTargetConformanceTo(encodableProto);
+    if (!tryToInstallCodingKeys(decodableProto)) {
+      (void)tryToInstallCodingKeys(encodableProto);
     }
-  }
-    break;
-  case ImplicitMemberAction::ResolveEncodable: {
-    // encode(to:) may be synthesized as part of derived conformance to the
-    // Encodable protocol.
-    // If the target should conform to the Encodable protocol, check the
-    // conformance here to attempt synthesis.
-    auto *encodableProto = Context.getProtocol(KnownProtocolKind::Encodable);
-    (void)evaluateTargetConformanceTo(encodableProto);
-  }
-    break;
-  case ImplicitMemberAction::ResolveDecodable: {
-    // init(from:) may be synthesized as part of derived conformance to the
-    // Decodable protocol.
-    // If the target should conform to the Decodable protocol, check the
-    // conformance here to attempt synthesis.
-    TypeChecker::addImplicitConstructors(target);
-    auto *decodableProto = Context.getProtocol(KnownProtocolKind::Decodable);
-    (void)evaluateTargetConformanceTo(decodableProto);
   }
     break;
   }

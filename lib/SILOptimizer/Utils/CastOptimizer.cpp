@@ -997,6 +997,9 @@ CastOptimizer::simplifyCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
   // Check if we can statically predict the outcome of the cast.
   auto Feasibility =
       dynamicCast.classifyFeasibility(false /*allow whole module*/);
+  if (Feasibility == DynamicCastFeasibility::MaySucceed) {
+    return nullptr;
+  }
 
   SILBuilderWithScope Builder(Inst, builderContext);
   if (Feasibility == DynamicCastFeasibility::WillFail) {
@@ -1008,6 +1011,8 @@ CastOptimizer::simplifyCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
     willFailAction();
     return NewI;
   }
+
+  assert(Feasibility == DynamicCastFeasibility::WillSucceed);
 
   bool ResultNotUsed = SuccessBB->getArgument(0)->use_empty();
   SILValue CastedValue;
@@ -1022,14 +1027,6 @@ CastOptimizer::simplifyCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
       llvm_unreachable(
           "Bridged casts cannot be expressed by checked_cast_br yet");
     } else {
-      // If the cast may succeed or fail and can't be turned into a bridging
-      // call, then let it be.
-      if (Feasibility == DynamicCastFeasibility::MaySucceed) {
-        return nullptr;
-      }
-
-      assert(Feasibility == DynamicCastFeasibility::WillSucceed);
-
       // Replace by unconditional_cast, followed by a branch.
       // The unconditional_cast can be skipped, if the result of a cast
       // is not used afterwards.

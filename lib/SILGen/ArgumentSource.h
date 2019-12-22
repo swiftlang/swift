@@ -172,15 +172,22 @@ public:
   bool isRValue() const & { return StoredKind == Kind::RValue; }
   bool isLValue() const & { return StoredKind == Kind::LValue; }
 
-  bool isDefaultArg() const {
+  /// Whether this argument is for a default argument that should be delayed.
+  /// Note that this will return false for caller-side default arguments which
+  /// are emitted directly.
+  bool isDelayedDefaultArg() const {
     switch (StoredKind) {
     case Kind::Invalid:
       llvm_unreachable("argument source is invalid");
     case Kind::RValue:
     case Kind::LValue:
       return false;
-    case Kind::Expr:
-      return isa<DefaultArgumentExpr>(asKnownExpr());
+    case Kind::Expr: {
+      auto *defaultArg = dyn_cast<DefaultArgumentExpr>(asKnownExpr());
+      if (!defaultArg)
+        return false;
+      return !defaultArg->isCallerSide();
+    }
     }
     llvm_unreachable("bad kind");
   }

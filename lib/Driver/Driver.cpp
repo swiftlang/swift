@@ -265,6 +265,8 @@ Driver::buildToolChain(const llvm::opt::InputArgList &ArgList) {
     return llvm::make_unique<toolchains::Windows>(*this, target);
   case llvm::Triple::Haiku:
     return llvm::make_unique<toolchains::GenericUnix>(*this, target);
+  case llvm::Triple::WASI:
+    return llvm::make_unique<toolchains::GenericUnix>(*this, target);
   default:
     Diags.diagnose(SourceLoc(), diag::error_unknown_target,
                    ArgList.getLastArg(options::OPT_target)->getValue());
@@ -375,7 +377,7 @@ static bool getCompilationRecordPath(std::string &buildRecordPath,
   return false;
 }
 
-static StringRef failedToReadOutOfDateMap(bool ShowIncrementalBuildDecisions,
+static std::string failedToReadOutOfDateMap(bool ShowIncrementalBuildDecisions,
                                           StringRef buildRecordPath,
                                           StringRef reason = "") {
   std::string why = "malformed build record file";
@@ -398,7 +400,7 @@ static void dealWithRemovedInputs(ArrayRef<StringRef> removedInputs,
                                   bool ShowIncrementalBuildDecisions);
 
 /// Returns why ignore incrementality
-static StringRef
+static std::string
 populateOutOfDateMap(InputInfoMap &map, llvm::sys::TimePoint<> &LastBuildTime,
                      StringRef argsHashStr, const InputFileList &inputs,
                      StringRef buildRecordPath,
@@ -893,7 +895,7 @@ Driver::buildCompilation(const ToolChain &TC,
   computeArgsHash(ArgsHash, *TranslatedArgList);
   llvm::sys::TimePoint<> LastBuildTime = llvm::sys::TimePoint<>::min();
   InputInfoMap outOfDateMap;
-  StringRef whyIgnoreIncrementallity =
+  std::string whyIgnoreIncrementallity =
       !Incremental
           ? ""
           : buildRecordPath.empty()
@@ -950,17 +952,17 @@ Driver::buildCompilation(const ToolChain &TC,
     std::unique_ptr<UnifiedStatsReporter> StatsReporter =
         createStatsReporter(ArgList.get(), Inputs, OI, DefaultTargetTriple);
     // relies on the new dependency graph
-    const bool EnableExperimentalDependencies =
-        ArgList->hasArg(options::OPT_enable_experimental_dependencies);
+    const bool EnableFineGrainedDependencies =
+        ArgList->hasArg(options::OPT_enable_fine_grained_dependencies);
 
-    const bool VerifyExperimentalDependencyGraphAfterEveryImport = ArgList->hasArg(
+    const bool VerifyFineGrainedDependencyGraphAfterEveryImport = ArgList->hasArg(
         options::
-            OPT_driver_verify_experimental_dependency_graph_after_every_import);
-    const bool EmitExperimentalDependencyDotFileAfterEveryImport = ArgList->hasArg(
+            OPT_driver_verify_fine_grained_dependency_graph_after_every_import);
+    const bool EmitFineGrainedDependencyDotFileAfterEveryImport = ArgList->hasArg(
         options::
-            OPT_driver_emit_experimental_dependency_dot_file_after_every_import);
-    const bool ExperimentalDependenciesIncludeIntrafileOnes = ArgList->hasArg(
-        options::OPT_experimental_dependency_include_intrafile);
+            OPT_driver_emit_fine_grained_dependency_dot_file_after_every_import);
+    const bool FineGrainedDependenciesIncludeIntrafileOnes =
+        ArgList->hasArg(options::OPT_fine_grained_dependency_include_intrafile);
 
     // clang-format off
     C = llvm::make_unique<Compilation>(
@@ -982,10 +984,10 @@ Driver::buildCompilation(const ToolChain &TC,
         SaveTemps,
         ShowDriverTimeCompilation,
         std::move(StatsReporter),
-        EnableExperimentalDependencies,
-        VerifyExperimentalDependencyGraphAfterEveryImport,
-        EmitExperimentalDependencyDotFileAfterEveryImport,
-        ExperimentalDependenciesIncludeIntrafileOnes,
+        EnableFineGrainedDependencies,
+        VerifyFineGrainedDependencyGraphAfterEveryImport,
+        EmitFineGrainedDependencyDotFileAfterEveryImport,
+        FineGrainedDependenciesIncludeIntrafileOnes,
         EnableSourceRangeDependencies,
         CompareIncrementalSchemes,
         CompareIncrementalSchemesPath);
@@ -1027,7 +1029,7 @@ Driver::buildCompilation(const ToolChain &TC,
   // This has to happen after building jobs, because otherwise we won't even
   // emit .swiftdeps files for the next build.
   if (!whyIgnoreIncrementallity.empty())
-    C->disableIncrementalBuild(whyIgnoreIncrementallity.str());
+    C->disableIncrementalBuild(whyIgnoreIncrementallity);
 
   if (Diags.hadAnyError())
     return nullptr;
@@ -2041,9 +2043,12 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
     for (const Action *A : AllLinkerInputs)
       if (A->getType() == file_types::TY_Object)
         AutolinkExtractInputs.push_back(A);
-    if (!AutolinkExtractInputs.empty() &&
-        (TC.getTriple().getObjectFormat() == llvm::Triple::ELF ||
-         TC.getTriple().isOSCygMing())) {
+    const auto &Triple = TC.getTriple();
+    const bool AutolinkExtractRequired =
+        (Triple.getObjectFormat() == llvm::Triple::ELF && !Triple.isPS4()) ||
+        Triple.getObjectFormat() == llvm::Triple::Wasm ||
+        Triple.isOSCygMing();
+    if (!AutolinkExtractInputs.empty() && AutolinkExtractRequired) {
       auto *AutolinkExtractAction =
           C.createAction<AutolinkExtractJobAction>(AutolinkExtractInputs);
       // Takes the same inputs as the linker...
@@ -2053,8 +2058,9 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
 
     if (MergeModuleAction) {
       if (OI.DebugInfoLevel == IRGenDebugInfoLevel::Normal) {
-        if (TC.getTriple().getObjectFormat() == llvm::Triple::ELF ||
-            TC.getTriple().getObjectFormat() == llvm::Triple::COFF) {
+        const bool ModuleWrapRequired =
+            Triple.getObjectFormat() != llvm::Triple::MachO;
+        if (ModuleWrapRequired) {
           auto *ModuleWrapAction =
               C.createAction<ModuleWrapJobAction>(MergeModuleAction);
           LinkAction->addInput(ModuleWrapAction);
@@ -2120,6 +2126,40 @@ bool Driver::handleImmediateArgs(const ArgList &Args, const ToolChain &TC) {
     DriverExecutable = commandArgs[0];
     DriverExecutableArgs.assign(std::begin(commandArgs) + 1,
                                 std::end(commandArgs));
+  }
+
+  if (Args.hasArg(options::OPT_print_target_info)) {
+    SmallVector<const char *, 5> commandLine;
+    commandLine.push_back("-frontend");
+    commandLine.push_back("-print-target-info");
+    if (const Arg *targetArg = Args.getLastArg(options::OPT_target)) {
+      commandLine.push_back("-target");
+      commandLine.push_back(targetArg->getValue());
+    }
+    if (const Arg *sdkArg = Args.getLastArg(options::OPT_sdk)) {
+      commandLine.push_back("-sdk");
+      commandLine.push_back(sdkArg->getValue());
+    }
+
+    if (const Arg *resourceDirArg = Args.getLastArg(options::OPT_resource_dir)) {
+      commandLine.push_back("-resource-dir");
+      commandLine.push_back(resourceDirArg->getValue());
+    }
+
+    std::string executable = getSwiftProgramPath();
+
+    sys::TaskQueue queue;
+    queue.addTask(executable.c_str(), commandLine);
+    queue.execute(nullptr,
+                  [](sys::ProcessId PID, int returnCode,
+                      StringRef output, StringRef errors,
+                      sys::TaskProcessInformation ProcInfo,
+                      void *unused) -> sys::TaskFinishedResponse {
+      llvm::outs() << output;
+      llvm::errs() << errors;
+      return sys::TaskFinishedResponse::ContinueExecution;
+    });
+    return false;
   }
 
   return true;

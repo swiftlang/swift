@@ -404,7 +404,10 @@ initializeClassMetadataFromPattern(ClassMetadata *metadata,
     auto extraDataPattern = pattern->getExtraDataPattern();
 
     // Zero memory up to the offset.
-    memset(metadataExtraData, 0, size_t(extraDataPattern->OffsetInWords));
+    // [pre-5.2-extra-data-zeroing] Before Swift 5.2, the runtime did not
+    // correctly zero the zero-prefix of the extra-data pattern.
+    memset(metadataExtraData, 0,
+           size_t(extraDataPattern->OffsetInWords) * sizeof(void *));
 
     // Copy the pattern into the rest of the extra data.
     copyMetadataPattern(metadataExtraData, extraDataPattern);
@@ -3952,6 +3955,18 @@ void Metadata::dump() const {
   if (auto *contextDescriptor = getTypeContextDescriptor()) {
     printf("Name: %s.\n", contextDescriptor->Name.get());
     printf("Type Context Description: %p.\n", contextDescriptor);
+
+    if (contextDescriptor->isGeneric()) {
+      auto genericCount = contextDescriptor->getFullGenericContextHeader().Base.getNumArguments();
+      auto *args = getGenericArgs();
+      printf("Generic Args: %u: [", genericCount);
+      for (uint32_t i = 0; i < genericCount; i++) {
+        if (i > 0)
+          printf(", ");
+        printf("%p", args[i]);
+      }
+      printf("]\n");
+    }
   }
 
   if (auto *tuple = dyn_cast<TupleTypeMetadata>(this)) {
@@ -3975,8 +3990,6 @@ void Metadata::dump() const {
         printf("Superclass constraint: %s.\n", contextDescriptor->Name.get());
     printf("\n");
   }
-
-  printf("Generic Args: %p.\n", getGenericArgs());
 
 #if SWIFT_OBJC_INTEROP
   if (auto *classObject = getClassObject()) {

@@ -43,7 +43,8 @@ static VarDecl *findValueProperty(ASTContext &ctx, NominalTypeDecl *nominal,
   SmallVector<VarDecl *, 2> vars;
   {
     SmallVector<ValueDecl *, 2> decls;
-    nominal->lookupQualified(nominal, name, NL_QualifiedDefault, decls);
+    nominal->lookupQualified(nominal, DeclNameRef(name), NL_QualifiedDefault,
+                             decls);
     for (const auto &foundDecl : decls) {
       auto foundVar = dyn_cast<VarDecl>(foundDecl);
       if (!foundVar || foundVar->isStatic() ||
@@ -117,7 +118,7 @@ findSuitableWrapperInit(ASTContext &ctx, NominalTypeDecl *nominal,
     break;
   }
 
-  nominal->lookupQualified(nominal, DeclBaseName::createConstructor(),
+  nominal->lookupQualified(nominal, DeclNameRef::createConstructor(),
                            NL_QualifiedDefault, decls);
   for (const auto &decl : decls) {
     auto init = dyn_cast<ConstructorDecl>(decl);

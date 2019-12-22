@@ -140,7 +140,7 @@ public:
     FileUnit *getFile() const {
       return MF->getFile();
     }
-    SILFunction *lookupSILFunction(SILFunction *InFunc);
+    SILFunction *lookupSILFunction(SILFunction *InFunc, bool onlyUpdateLinkage);
     SILFunction *lookupSILFunction(StringRef Name,
                                    bool declarationOnly = false);
     bool hasSILFunction(StringRef Name, Optional<SILLinkage> Linkage = None);

@@ -100,7 +100,8 @@ func test3a(_ a: ZeroOneTwoThree) {
   // Overload resolution can resolve this to the right constructor.
   var h = ZeroOneTwoThree(1)
   
-  var i = 0 > 3 ? .none : .some(3) // expected-error {{reference to member 'none' cannot be resolved without a contextual type}}
+  var i = 0 > 3 ? .none : .some(3) // expected-error {{cannot infer contextual base in reference to member 'none'}}
+  // expected-error@-1 {{cannot infer contextual base in reference to member 'some'}}
   
   test3a;  // expected-error {{unused function}}
   .Zero   // expected-error {{reference to member 'Zero' cannot be resolved without a contextual type}}

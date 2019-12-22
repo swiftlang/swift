@@ -679,7 +679,7 @@ func a(s: S[{{g) -> Int {}
 // expected-error@+3{{expected '(' for initializer parameters}}
 // expected-error@+2{{initializers may only be declared within a type}}
 // expected-error@+1{{expected an identifier to name generic parameter}}
-func F() { init<( } )} // expected-note {{did you mean 'F'?}}
+func F() { init<( } )} // expected-note 2{{did you mean 'F'?}}
 
 struct InitializerWithName {
   init x() {} // expected-error {{initializers cannot have a name}} {{8-9=}}
@@ -695,9 +695,6 @@ struct InitializerWithNameAndParam {
 struct InitializerWithLabels {
   init c d: Int {}
   // expected-error @-1 {{expected '(' for initializer parameters}}
-  // expected-error @-2 {{expected declaration}}
-  // expected-error @-3 {{consecutive declarations on a line must be separated by ';'}}
-  // expected-note @-5 {{in declaration of 'InitializerWithLabels'}}
 }
 
 // rdar://20337695
@@ -841,7 +838,7 @@ func postfixDot(a : String) {
 }
 
 // <rdar://problem/22290244> QoI: "UIColor." gives two issues, should only give one
-func f() {
+func f() { // expected-note 2{{did you mean 'f'?}}
   _ = ClassWithStaticDecls.  // expected-error {{expected member name following '.'}}
 }
 

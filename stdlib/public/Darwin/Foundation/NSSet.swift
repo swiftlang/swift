@@ -55,7 +55,7 @@ extension NSOrderedSet : Sequence {
 extension Set : _ObjectiveCBridgeable {
   @_semantics("convertToObjectiveC")
   public func _bridgeToObjectiveC() -> NSSet {
-    return unsafeBitCast(_bridgeToObjectiveCImpl() as AnyObject, to: NSSet.self)
+    return unsafeBitCast(_bridgeToObjectiveCImpl(), to: NSSet.self)
   }
 
   public static func _forceBridgeFromObjectiveC(_ s: NSSet, result: inout Set?) {

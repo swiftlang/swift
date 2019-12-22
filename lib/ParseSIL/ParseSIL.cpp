@@ -902,7 +902,7 @@ namespace {
     bool walkToTypeReprPre(TypeRepr *Ty) override {
       auto *T = dyn_cast_or_null<IdentTypeRepr>(Ty);
       auto Comp = T->getComponentRange().front();
-      if (auto Entry = P.lookupInScope(Comp->getIdentifier()))
+      if (auto Entry = P.lookupInScope(Comp->getNameRef()))
         if (auto *TD = dyn_cast<TypeDecl>(Entry)) {
           Comp->setValue(TD, nullptr);
           return false;
@@ -1187,7 +1187,7 @@ lookupTopDecl(Parser &P, DeclBaseName Name, bool typeLookup) {
     options |= UnqualifiedLookupFlags::TypeLookup;
 
   auto &ctx = P.SF.getASTContext();
-  auto descriptor = UnqualifiedLookupDescriptor(Name, &P.SF);
+  auto descriptor = UnqualifiedLookupDescriptor(DeclNameRef(Name), &P.SF);
   auto lookup = evaluateOrDefault(ctx.evaluator,
                                   UnqualifiedLookupRequest{descriptor}, {});
   assert(lookup.size() == 1);
@@ -1272,7 +1272,8 @@ bool SILParser::parseSILType(SILType &Result,
   if (IsFuncDecl && !attrs.has(TAK_convention)) {
     // Use a random location.
     attrs.setAttr(TAK_convention, P.PreviousLoc);
-    attrs.convention = "thin";
+    attrs.ConventionArguments =
+      TypeAttributes::Convention::makeSwiftConvention("thin");
   }
 
   ParserResult<TypeRepr> TyR = P.parseType(diag::expected_sil_type,
@@ -1702,7 +1703,7 @@ static void bindProtocolSelfInTypeRepr(TypeLoc &TL, ProtocolDecl *proto) {
       virtual bool walkToTypeReprPre(TypeRepr *T) override {
         if (auto ident = dyn_cast<IdentTypeRepr>(T)) {
           auto firstComponent = ident->getComponentRange().front();
-          if (firstComponent->getIdentifier() == selfId)
+          if (firstComponent->getNameRef().isSimpleName(selfId))
             firstComponent->setValue(selfParam, proto);
         }
 
@@ -3175,9 +3176,6 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     SmallVector<SILValue, 4> operands;
     
     if (P.consumeIf(tok::l_paren)) {
-      Lowering::GenericContextScope scope(SILMod.Types,
-        patternEnv ? patternEnv->getGenericSignature()->getCanonicalSignature()
-                   : nullptr);
       while (true) {
         SILValue v;
         

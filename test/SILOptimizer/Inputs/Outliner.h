@@ -34,6 +34,7 @@ typedef NS_ENUM(NSUInteger, MyEventType) {
 
 @interface MyView : NSObject
 @property (nonatomic, nullable, readonly, strong) MyWindow *window;
+@property (nonatomic, nullable, strong) MyWindow *window2;
 @end
 
 typedef struct MyPoint {
@@ -57,5 +58,11 @@ NSInteger y;
 NS_ASSUME_NONNULL_BEGIN
 @protocol Treeish <NSObject>
 - (nullable NSArray *) treeishChildren;
+@end
+NS_ASSUME_NONNULL_END
+
+NS_ASSUME_NONNULL_BEGIN
+@interface MyObject : NSObject
+@property (nullable) NSError *error;
 @end
 NS_ASSUME_NONNULL_END

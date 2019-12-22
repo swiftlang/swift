@@ -1017,7 +1017,7 @@ void swift::releasePartialApplyCapturedArg(SILBuilder &builder, SILLocation loc,
   // possible for that value.
 
   // If we have qualified ownership, we should just emit a destroy value.
-  if (arg->getFunction()->hasOwnership()) {
+  if (builder.getFunction().hasOwnership()) {
     callbacks.createdNewInst(builder.createDestroyValue(loc, arg));
     return;
   }
@@ -1578,4 +1578,11 @@ void swift::insertDestroyOfCapturedArguments(
     auto paramInfo = calleeConv.getParamInfoForSILArg(calleeArgumentIndex);
     releasePartialApplyCapturedArg(builder, loc, arg.get(), paramInfo);
   }
+}
+
+AbstractFunctionDecl *swift::getBaseMethod(AbstractFunctionDecl *FD) {
+  while (FD->getOverriddenDecl()) {
+    FD = FD->getOverriddenDecl();
+  }
+  return FD;
 }

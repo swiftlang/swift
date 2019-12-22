@@ -145,6 +145,10 @@ enum class FixKind : uint8_t {
   /// types.
   AllowTupleTypeMismatch,
 
+  /// Allow a function type to be destructured with mismatched parameter types
+  /// or return type.
+  AllowFunctionTypeMismatch,
+
   /// Allow an invalid member access on a value of protocol type as if
   /// that protocol type were a generic constraint requiring conformance
   /// to that protocol.
@@ -223,6 +227,10 @@ enum class FixKind : uint8_t {
   /// Allow an ephemeral argument conversion for a parameter marked as being
   /// non-ephemeral.
   TreatEphemeralAsNonEphemeral,
+
+  /// Base type in reference to the contextual member e.g. `.foo` couldn't be
+  /// inferred and has to be specified explicitly.
+  SpecifyBaseTypeForContextualMember,
 };
 
 class ConstraintFix {
@@ -280,9 +288,9 @@ protected:
 
 /// Unwrap an optional base when we have a member access.
 class UnwrapOptionalBase final : public ConstraintFix {
-  DeclName MemberName;
+  DeclNameRef MemberName;
 
-  UnwrapOptionalBase(ConstraintSystem &cs, FixKind kind, DeclName member,
+  UnwrapOptionalBase(ConstraintSystem &cs, FixKind kind, DeclNameRef member,
                      ConstraintLocator *locator)
       : ConstraintFix(cs, kind, locator), MemberName(member) {
     assert(kind == FixKind::UnwrapOptionalBase ||
@@ -296,11 +304,11 @@ public:
 
   bool diagnose(bool asNote = false) const override;
 
-  static UnwrapOptionalBase *create(ConstraintSystem &cs, DeclName member,
+  static UnwrapOptionalBase *create(ConstraintSystem &cs, DeclNameRef member,
                                     ConstraintLocator *locator);
 
   static UnwrapOptionalBase *
-  createWithOptionalResult(ConstraintSystem &cs, DeclName member,
+  createWithOptionalResult(ConstraintSystem &cs, DeclNameRef member,
                            ConstraintLocator *locator);
 };
 
@@ -316,27 +324,6 @@ public:
 
   static TreatRValueAsLValue *create(ConstraintSystem &cs,
                                      ConstraintLocator *locator);
-};
-
-/// Mark function type as explicitly '@escaping'.
-class MarkExplicitlyEscaping final : public ConstraintFix {
-  /// Sometimes function type has to be marked as '@escaping'
-  /// to be converted to some other generic type.
-  Type ConvertTo;
-
-  MarkExplicitlyEscaping(ConstraintSystem &cs, ConstraintLocator *locator,
-                         Type convertingTo = Type())
-      : ConstraintFix(cs, FixKind::ExplicitlyEscaping, locator),
-        ConvertTo(convertingTo) {}
-
-public:
-  std::string getName() const override { return "add @escaping"; }
-
-  bool diagnose(bool asNote = false) const override;
-
-  static MarkExplicitlyEscaping *create(ConstraintSystem &cs,
-                                        ConstraintLocator *locator,
-                                        Type convertingTo = Type());
 };
 
 /// Arguments have labeling failures - missing/extraneous or incorrect
@@ -490,6 +477,22 @@ public:
 
   static ContextualMismatch *create(ConstraintSystem &cs, Type lhs, Type rhs,
                                     ConstraintLocator *locator);
+};
+
+/// Mark function type as explicitly '@escaping'.
+class MarkExplicitlyEscaping final : public ContextualMismatch {
+  MarkExplicitlyEscaping(ConstraintSystem &cs, Type lhs, Type rhs,
+                         ConstraintLocator *locator)
+      : ContextualMismatch(cs, FixKind::ExplicitlyEscaping, lhs, rhs, locator) {
+  }
+
+public:
+  std::string getName() const override { return "add @escaping"; }
+
+  bool diagnose(bool asNote = false) const override;
+
+  static MarkExplicitlyEscaping *create(ConstraintSystem &cs, Type lhs,
+                                        Type rhs, ConstraintLocator *locator);
 };
 
 /// Introduce a '!' to force an optional unwrap.
@@ -797,9 +800,9 @@ public:
 
 class DefineMemberBasedOnUse final : public ConstraintFix {
   Type BaseType;
-  DeclName Name;
+  DeclNameRef Name;
 
-  DefineMemberBasedOnUse(ConstraintSystem &cs, Type baseType, DeclName member,
+  DefineMemberBasedOnUse(ConstraintSystem &cs, Type baseType, DeclNameRef member,
                          ConstraintLocator *locator)
       : ConstraintFix(cs, FixKind::DefineMemberBasedOnUse, locator),
         BaseType(baseType), Name(member) {}
@@ -815,18 +818,18 @@ public:
   bool diagnose(bool asNote = false) const override;
 
   static DefineMemberBasedOnUse *create(ConstraintSystem &cs, Type baseType,
-                                        DeclName member,
+                                        DeclNameRef member,
                                         ConstraintLocator *locator);
 };
 
 class AllowInvalidMemberRef : public ConstraintFix {
   Type BaseType;
   ValueDecl *Member;
-  DeclName Name;
+  DeclNameRef Name;
 
 protected:
   AllowInvalidMemberRef(ConstraintSystem &cs, FixKind kind, Type baseType,
-                        ValueDecl *member, DeclName name,
+                        ValueDecl *member, DeclNameRef name,
                         ConstraintLocator *locator)
       : ConstraintFix(cs, kind, locator), BaseType(baseType), Member(member),
         Name(name) {}
@@ -836,12 +839,12 @@ public:
 
   ValueDecl *getMember() const { return Member; }
 
-  DeclName getMemberName() const { return Name; }
+  DeclNameRef getMemberName() const { return Name; }
 };
 
 class AllowMemberRefOnExistential final : public AllowInvalidMemberRef {
   AllowMemberRefOnExistential(ConstraintSystem &cs, Type baseType,
-                              DeclName memberName, ValueDecl *member,
+                              DeclNameRef memberName, ValueDecl *member,
                               ConstraintLocator *locator)
       : AllowInvalidMemberRef(cs, FixKind::AllowMemberRefOnExistential,
                               baseType, member, memberName, locator) {}
@@ -858,13 +861,13 @@ public:
 
   static AllowMemberRefOnExistential *create(ConstraintSystem &cs,
                                              Type baseType, ValueDecl *member,
-                                             DeclName memberName,
+                                             DeclNameRef memberName,
                                              ConstraintLocator *locator);
 };
 
 class AllowTypeOrInstanceMember final : public AllowInvalidMemberRef {
   AllowTypeOrInstanceMember(ConstraintSystem &cs, Type baseType,
-                            ValueDecl *member, DeclName name,
+                            ValueDecl *member, DeclNameRef name,
                             ConstraintLocator *locator)
       : AllowInvalidMemberRef(cs, FixKind::AllowTypeOrInstanceMember, baseType,
                               member, name, locator) {
@@ -879,7 +882,7 @@ public:
   bool diagnose(bool asNote = false) const override;
 
   static AllowTypeOrInstanceMember *create(ConstraintSystem &cs, Type baseType,
-                                           ValueDecl *member, DeclName usedName,
+                                           ValueDecl *member, DeclNameRef usedName,
                                            ConstraintLocator *locator);
 };
 
@@ -950,25 +953,71 @@ private:
 };
 
 class AllowTupleTypeMismatch final : public ContextualMismatch {
+  /// If this is an element mismatch, \c Index is the element index where the
+  /// type mismatch occurred. If this is an arity or label mismatch, \c Index
+  /// will be \c None.
+  Optional<unsigned> Index;
+
   AllowTupleTypeMismatch(ConstraintSystem &cs, Type lhs, Type rhs,
-                         ConstraintLocator *locator)
+                         ConstraintLocator *locator, Optional<unsigned> index)
       : ContextualMismatch(cs, FixKind::AllowTupleTypeMismatch, lhs, rhs,
-                           locator) {}
+                           locator), Index(index) {}
 
 public:
   static AllowTupleTypeMismatch *create(ConstraintSystem &cs, Type lhs,
-                                        Type rhs, ConstraintLocator *locator);
+                                        Type rhs, ConstraintLocator *locator,
+                                        Optional<unsigned> index = None);
+
+  static bool classof(const ConstraintFix *fix) {
+    return fix->getKind() == FixKind::AllowTupleTypeMismatch;
+  }
 
   std::string getName() const override {
     return "fix tuple mismatches in type and arity";
   }
 
+  bool isElementMismatch() const {
+    return Index.hasValue();
+  }
+
+  bool coalesceAndDiagnose(ArrayRef<ConstraintFix *> secondaryFixes,
+                           bool asNote = false) const override;
+
   bool diagnose(bool asNote = false) const override;
 };
 
+class AllowFunctionTypeMismatch final : public ContextualMismatch {
+  /// The index of the parameter where the type mismatch occurred.
+  unsigned ParamIndex;
+
+  AllowFunctionTypeMismatch(ConstraintSystem &cs, Type lhs, Type rhs,
+                            ConstraintLocator *locator, unsigned index)
+      : ContextualMismatch(cs, FixKind::AllowFunctionTypeMismatch, lhs, rhs,
+                           locator), ParamIndex(index) {}
+
+public:
+  static AllowFunctionTypeMismatch *create(ConstraintSystem &cs, Type lhs,
+                                           Type rhs, ConstraintLocator *locator,
+                                           unsigned index);
+
+  static bool classof(const ConstraintFix *fix) {
+    return fix->getKind() == FixKind::AllowFunctionTypeMismatch;
+  }
+
+  std::string getName() const override {
+    return "allow function type mismatch";
+  }
+
+  bool coalesceAndDiagnose(ArrayRef<ConstraintFix *> secondaryFixes,
+                           bool asNote = false) const override;
+
+  bool diagnose(bool asNote = false) const override;
+};
+
+
 class AllowMutatingMemberOnRValueBase final : public AllowInvalidMemberRef {
   AllowMutatingMemberOnRValueBase(ConstraintSystem &cs, Type baseType,
-                                  ValueDecl *member, DeclName name,
+                                  ValueDecl *member, DeclNameRef name,
                                   ConstraintLocator *locator)
       : AllowInvalidMemberRef(cs, FixKind::AllowMutatingMemberOnRValueBase,
                               baseType, member, name, locator) {}
@@ -981,8 +1030,8 @@ public:
   bool diagnose(bool asNote = false) const override;
 
   static AllowMutatingMemberOnRValueBase *
-  create(ConstraintSystem &cs, Type baseType, ValueDecl *member, DeclName name,
-         ConstraintLocator *locator);
+  create(ConstraintSystem &cs, Type baseType, ValueDecl *member,
+         DeclNameRef name, ConstraintLocator *locator);
 };
 
 class AllowClosureParamDestructuring final : public ConstraintFix {
@@ -1124,7 +1173,7 @@ public:
 
 class AllowInaccessibleMember final : public AllowInvalidMemberRef {
   AllowInaccessibleMember(ConstraintSystem &cs, Type baseType,
-                          ValueDecl *member, DeclName name,
+                          ValueDecl *member, DeclNameRef name,
                           ConstraintLocator *locator)
       : AllowInvalidMemberRef(cs, FixKind::AllowInaccessibleMember, baseType,
                               member, name, locator) {}
@@ -1137,7 +1186,7 @@ public:
   bool diagnose(bool asNote = false) const override;
 
   static AllowInaccessibleMember *create(ConstraintSystem &cs, Type baseType,
-                                         ValueDecl *member, DeclName name,
+                                         ValueDecl *member, DeclNameRef name,
                                          ConstraintLocator *locator);
 };
 
@@ -1533,6 +1582,27 @@ public:
   create(ConstraintSystem &cs, ConstraintLocator *locator, Type srcType,
          Type dstType, ConversionRestrictionKind conversionKind,
          bool downgradeToWarning);
+};
+
+class SpecifyBaseTypeForContextualMember final : public ConstraintFix {
+  DeclNameRef MemberName;
+
+  SpecifyBaseTypeForContextualMember(ConstraintSystem &cs, DeclNameRef member,
+                                     ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::SpecifyBaseTypeForContextualMember, locator),
+        MemberName(member) {}
+
+public:
+  std::string getName() const {
+    const auto baseName = MemberName.getBaseName();
+    return "specify base type in reference to member '" +
+           baseName.userFacingName().str() + "'";
+  }
+
+  bool diagnose(bool asNote = false) const;
+
+  static SpecifyBaseTypeForContextualMember *
+  create(ConstraintSystem &cs, DeclNameRef member, ConstraintLocator *locator);
 };
 
 } // end namespace constraints

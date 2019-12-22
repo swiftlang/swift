@@ -349,9 +349,9 @@ func testUnresolvedMemberSubscriptFixit(_ s0: GenSubscriptFixitTest) {
 
 struct SubscriptTest1 {
   subscript(keyword:String) -> Bool { return true }
-  // expected-note@-1 4 {{found this candidate}}
+  // expected-note@-1 3 {{found this candidate}} expected-note@-1 {{found candidate with type 'Bool'}}
   subscript(keyword:String) -> String? {return nil }
-  // expected-note@-1 4 {{found this candidate}}
+  // expected-note@-1 3 {{found this candidate}} expected-note@-1 {{found candidate with type 'String?'}}
 
   subscript(arg: SubClass) -> Bool { return true } // expected-note {{declared here}}
   subscript(arg: Protocol) -> Bool { return true } // expected-note 2 {{declared here}}
@@ -361,7 +361,7 @@ struct SubscriptTest1 {
 }
 
 func testSubscript1(_ s1 : SubscriptTest1) {
-  let _ : Int = s1["hello"]  // expected-error {{ambiguous subscript with base type 'SubscriptTest1' and index type 'String'}}
+  let _ : Int = s1["hello"]  // expected-error {{no 'subscript' candidates produce the expected contextual result type 'Int'}}
 
   if s1["hello"] {}
 

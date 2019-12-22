@@ -266,7 +266,7 @@ extension _ArrayBuffer {
   internal var count: Int {
     @inline(__always)
     get {
-      return _fastPath(_isNative) ? _native.count : _nonNative.count
+      return _fastPath(_isNative) ? _native.count : _nonNative.endIndex
     }
     set {
       _internalInvariant(_isNative, "attempting to update count of Cocoa array")

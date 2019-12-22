@@ -746,3 +746,22 @@ struct SR_10557_S1 {
     fatalError()
   }
 }
+
+@dynamicMemberLookup
+struct SR11877 {
+  subscript(dynamicMember member: Substring) -> Int { 0 }
+}
+
+_ = \SR11877.okay
+
+func test_infinite_self_recursion() {
+  @dynamicMemberLookup
+  struct Recurse<T> {
+    subscript<U>(dynamicMember member: KeyPath<Recurse<T>, U>) -> Int {
+      return 1
+    }
+  }
+
+  _ = Recurse<Int>().foo
+  // expected-error@-1 {{value of type 'Recurse<Int>' has no dynamic member 'foo' using key path from root type 'Recurse<Int>'}}
+}

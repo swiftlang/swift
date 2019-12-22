@@ -30,12 +30,9 @@ class SwiftPM(product.Product):
 
     def run_bootstrap_script(self, action, host_target, additional_params=[]):
         script_path = os.path.join(
-            self.source_dir, 'Utilities', 'bootstrap')
+            self.source_dir, 'Utilities', 'new-bootstrap')
         toolchain_path = self.install_toolchain_path()
         swiftc = os.path.join(toolchain_path, "usr", "bin", "swiftc")
-        sbt = os.path.join(toolchain_path, "usr", "bin", "swift-build-tool")
-
-        llbuild_src = os.path.join(os.path.dirname(self.source_dir), "llbuild")
 
         # FIXME: We require llbuild build directory in order to build. Is
         # there a better way to get this?
@@ -43,20 +40,18 @@ class SwiftPM(product.Product):
         llbuild_build_dir = os.path.join(
             build_root, '%s-%s' % ("llbuild", host_target))
 
-        helper_cmd = [script_path]
-
-        if action != "build":
-            helper_cmd.append(action)
+        helper_cmd = [script_path, action]
 
         if self.is_release():
             helper_cmd.append("--release")
 
         helper_cmd += [
-            "--swiftc", swiftc,
-            "--sbt", sbt,
-            "--build", self.build_dir,
-            "--llbuild-source-dir", llbuild_src,
-            "--llbuild-build-dir", llbuild_build_dir,
+            "--swiftc-path", swiftc,
+            "--clang-path", self.toolchain.cc,
+            "--cmake-path", self.toolchain.cmake,
+            "--ninja-path", self.toolchain.ninja,
+            "--build-dir", self.build_dir,
+            "--llbuild-build-dir", llbuild_build_dir
         ]
         helper_cmd.extend(additional_params)
 

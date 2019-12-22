@@ -1,4 +1,5 @@
 // REQUIRES: no_asan
+// XFAIL: OS=windows-msvc
 // RUN: %empty-directory(%t)
 
 // RUN: %target-build-swift -Xfrontend -disable-availability-checking %S/Inputs/TypeLowering.swift -parse-as-library -emit-module -emit-library -module-name TypeLowering -o %t/%target-library-name(TypesToReflect)

@@ -28,8 +28,8 @@
 #include "swift/Subsystems.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/DiagnosticsSema.h"
-#include "swift/AST/ExperimentalDependencies.h"
 #include "swift/AST/FileSystem.h"
+#include "swift/AST/FineGrainedDependencies.h"
 #include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/NameLookup.h"
@@ -42,6 +42,7 @@
 #include "swift/Basic/JSONSerialization.h"
 #include "swift/Basic/LLVMContext.h"
 #include "swift/Basic/LLVMInitialize.h"
+#include "swift/Basic/Platform.h"
 #include "swift/Basic/PrettyStackTrace.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
@@ -979,8 +980,8 @@ static void emitReferenceDependenciesForAllPrimaryInputsIfNeeded(
         Invocation.getReferenceDependenciesFilePathForPrimary(
             SF->getFilename());
     if (!referenceDependenciesFilePath.empty()) {
-      if (Invocation.getLangOptions().EnableExperimentalDependencies)
-        (void)experimental_dependencies::emitReferenceDependencies(
+      if (Invocation.getLangOptions().EnableFineGrainedDependencies)
+        (void)fine_grained_dependencies::emitReferenceDependencies(
             Instance.getASTContext().Diags, SF,
             *Instance.getDependencyTracker(), referenceDependenciesFilePath);
       else
@@ -1376,6 +1377,12 @@ static bool processCommandLineAndRunImmediately(CompilerInvocation &Invocation,
       ProcessCmdLine(opts.ImmediateArgv.begin(), opts.ImmediateArgv.end());
   Instance.setSILModule(std::move(SM));
 
+
+  PrettyStackTraceStringAction trace(
+      "running user code",
+      MSF.is<SourceFile *>() ? MSF.get<SourceFile *>()->getFilename()
+                     : MSF.get<ModuleDecl *>()->getModuleFilename());
+
   ReturnValue =
       RunImmediately(Instance, CmdLine, IRGenOpts, Invocation.getSILOptions());
   return Instance.getASTContext().hadError();
@@ -1388,6 +1395,9 @@ static bool validateTBDIfNeeded(CompilerInvocation &Invocation,
   if (!astGuaranteedToCorrespondToSIL ||
       !inputFileKindCanHaveTBDValidated(Invocation.getInputKind()))
     return false;
+    
+  if (Invocation.getSILOptions().CrossModuleOptimization)
+    return false;
 
   const auto &frontendOpts = Invocation.getFrontendOptions();
   auto mode = frontendOpts.ValidateTBDAgainstIR;
@@ -1395,15 +1405,13 @@ static bool validateTBDIfNeeded(CompilerInvocation &Invocation,
   switch (mode) {
   case FrontendOptions::TBDValidationMode::Default:
 #ifndef NDEBUG
-    // When a debug compiler is targeting an apple platform, we do some
-    // validation by default.
-    if (Invocation.getLangOptions().Target.getVendor() == llvm::Triple::Apple) {
-      mode = FrontendOptions::TBDValidationMode::MissingFromTBD;
-      break;
-    }
-#endif
+    // With a debug compiler, we do some validation by default.
+    mode = FrontendOptions::TBDValidationMode::MissingFromTBD;
+    break;
+#else
     // Otherwise, the default is to do nothing.
     LLVM_FALLTHROUGH;
+#endif
   case FrontendOptions::TBDValidationMode::None:
     return false;
   case FrontendOptions::TBDValidationMode::All:
@@ -1859,6 +1867,70 @@ createJSONFixItDiagnosticConsumerIfNeeded(
   });
 }
 
+/// Print information about the selected target in JSON.
+static void printTargetInfo(CompilerInvocation &invocation,
+                            llvm::raw_ostream &out) {
+  out << "{\n";
+
+  // Target information.
+  auto &langOpts = invocation.getLangOptions();
+  out << "  \"target\": {\n";
+
+  out << "    \"triple\": \"";
+  out.write_escaped(langOpts.Target.getTriple());
+  out << "\",\n";
+
+  out << "    \"moduleTriple\": \"";
+  out.write_escaped(getTargetSpecificModuleTriple(langOpts.Target).getTriple());
+  out << "\",\n";
+
+  if (auto runtimeVersion = getSwiftRuntimeCompatibilityVersionForTarget(
+          langOpts.Target)) {
+    out << "    \"swiftRuntimeCompatibilityVersion\": \"";
+    out.write_escaped(runtimeVersion->getAsString());
+    out << "\",\n";
+  }
+
+  out << "    \"librariesRequireRPath\": "
+      << (tripleRequiresRPathForSwiftInOS(langOpts.Target) ? "true" : "false")
+      << "\n";
+
+  out << "  },\n";
+
+  // Various paths.
+  auto &searchOpts = invocation.getSearchPathOptions();
+  out << "  \"paths\": {\n";
+
+  if (!searchOpts.SDKPath.empty()) {
+    out << "    \"sdkPath\": \"";
+    out.write_escaped(searchOpts.SDKPath);
+    out << "\",\n";
+  }
+
+  auto outputPaths = [&](StringRef name, const std::vector<std::string> &paths){
+    out << "    \"" << name << "\": [\n";
+    interleave(paths, [&out](const std::string &path) {
+      out << "      \"";
+      out.write_escaped(path);
+      out << "\"";
+    }, [&out] {
+      out << ",\n";
+    });
+    out << "\n    ],\n";
+  };
+
+  outputPaths("runtimeLibraryPaths", searchOpts.RuntimeLibraryPaths);
+  outputPaths("runtimeLibraryImportPaths",
+              searchOpts.RuntimeLibraryImportPaths);
+
+  out << "    \"runtimeResourcePath\": \"";
+  out.write_escaped(searchOpts.RuntimeResourcePath);
+  out << "\"\n";
+
+  out << "  }\n";
+
+  out << "}\n";
+}
 
 int swift::performFrontend(ArrayRef<const char *> Args,
                            const char *Argv0, void *MainAddr,
@@ -1980,6 +2052,11 @@ int swift::performFrontend(ArrayRef<const char *> Args,
     Options->PrintHelp(llvm::outs(), displayName(MainExecutablePath).c_str(),
                        "Swift frontend", IncludedFlagsBitmask,
                        ExcludedFlagsBitmask, /*ShowAllAliases*/false);
+    return finishDiagProcessing(0);
+  }
+
+  if (Invocation.getFrontendOptions().PrintTargetInfo) {
+    printTargetInfo(Invocation, llvm::outs());
     return finishDiagProcessing(0);
   }
 

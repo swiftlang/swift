@@ -337,10 +337,7 @@ computeNewArgInterfaceTypes(SILFunction *F, IndicesSet &PromotableIndices,
 
   LLVM_DEBUG(llvm::dbgs() << "Preparing New Args!\n");
 
-  auto fnTy = F->getLoweredFunctionType();
-
   auto &Types = F->getModule().Types;
-  Lowering::GenericContextScope scope(Types, fnTy->getInvocationGenericSignature());
 
   // For each parameter in the old function...
   for (unsigned Index : indices(Parameters)) {
@@ -371,8 +368,7 @@ computeNewArgInterfaceTypes(SILFunction *F, IndicesSet &PromotableIndices,
     auto paramBoxedTy =
         getSILBoxFieldType(TypeExpansionContext(*F), paramBoxTy, Types, 0);
     assert(expansion == F->getResilienceExpansion());
-    auto &paramTL =
-        Types.getTypeLowering(paramBoxedTy, TypeExpansionContext(*F));
+    auto &paramTL = Types.getTypeLowering(paramBoxedTy, *F);
     ParameterConvention convention;
     if (paramTL.isAddressOnly()) {
       convention = ParameterConvention::Indirect_In;

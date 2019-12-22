@@ -898,8 +898,8 @@ WitnessChecker::lookupValueWitnessesViaImplementsAttr(
   auto lookupOptions = defaultMemberTypeLookupOptions;
   lookupOptions -= NameLookupFlags::PerformConformanceCheck;
   lookupOptions |= NameLookupFlags::IncludeAttributeImplements;
-  auto candidates =
-      TypeChecker::lookupMember(DC, Adoptee, req->getFullName(), lookupOptions);
+  auto candidates = TypeChecker::lookupMember(DC, Adoptee, req->createNameRef(),
+                                              lookupOptions);
   for (auto candidate : candidates) {
     if (witnessHasImplementsAttrForExactRequirement(candidate.getValueDecl(), req)) {
       witnesses.push_back(candidate.getValueDecl());
@@ -918,14 +918,17 @@ WitnessChecker::lookupValueWitnesses(ValueDecl *req, bool *ignoringNames) {
   // for this requirement.
   lookupValueWitnessesViaImplementsAttr(req, witnesses);
 
+  auto reqName = req->createNameRef();
+  auto reqBaseName = reqName.withoutArgumentLabels();
+
   if (req->isOperator()) {
     // Operator lookup is always global.
     auto lookupOptions = defaultUnqualifiedLookupOptions;
     if (!DC->isCascadingContextForLookup(false))
       lookupOptions |= NameLookupFlags::KnownPrivate;
     auto lookup = TypeChecker::lookupUnqualified(DC->getModuleScopeContext(),
-                                                 req->getBaseName(),
-                                                 SourceLoc(), lookupOptions);
+                                                 reqBaseName, SourceLoc(),
+                                                 lookupOptions);
     for (auto candidate : lookup) {
       auto decl = candidate.getValueDecl();
       if (swift::isMemberOperator(cast<FuncDecl>(decl), Adoptee)) {
@@ -937,13 +940,13 @@ WitnessChecker::lookupValueWitnesses(ValueDecl *req, bool *ignoringNames) {
     auto lookupOptions = defaultMemberTypeLookupOptions;
     lookupOptions -= NameLookupFlags::PerformConformanceCheck;
 
-    auto candidates = TypeChecker::lookupMember(DC, Adoptee, req->getFullName(),
+    auto candidates = TypeChecker::lookupMember(DC, Adoptee, reqName,
                                                 lookupOptions);
 
     // If we didn't find anything with the appropriate name, look
     // again using only the base name.
     if (candidates.empty() && ignoringNames) {
-      candidates = TypeChecker::lookupMember(DC, Adoptee, req->getBaseName(),
+      candidates = TypeChecker::lookupMember(DC, Adoptee, reqBaseName,
                                              lookupOptions);
       *ignoringNames = true;
     }
@@ -997,7 +1000,7 @@ bool WitnessChecker::findBestWitness(
       auto lookupOptions = defaultUnqualifiedLookupOptions;
       lookupOptions |= NameLookupFlags::KnownPrivate;
       auto lookup = TypeChecker::lookupUnqualified(
-          overlay, requirement->getBaseName(), SourceLoc(), lookupOptions);
+          overlay, requirement->createNameRef(), SourceLoc(), lookupOptions);
       for (auto candidate : lookup)
         witnesses.push_back(candidate.getValueDecl());
       break;
@@ -2578,6 +2581,14 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
   }
 }
 
+/// Whether this protocol is the Objective-C "NSObject" protocol.
+static bool isNSObjectProtocol(ProtocolDecl *proto) {
+  if (proto->getNameStr() != "NSObjectProtocol")
+    return false;
+
+  return proto->hasClangNode();
+}
+
 bool swift::
 printRequirementStub(ValueDecl *Requirement, DeclContext *Adopter,
                      Type AdopterTy, SourceLoc TypeLoc, raw_ostream &OS) {
@@ -2707,6 +2718,7 @@ diagnoseMissingWitnesses(MissingWitnessDiagnosisKind Kind) {
   // If this conformance has nothing to complain, return.
   if (LocalMissing.empty())
     return;
+
   SourceLoc ComplainLoc = Loc;
   bool EditorMode = getASTContext().LangOpts.DiagnosticsEditorMode;
   llvm::SetVector<ValueDecl*> MissingWitnesses(GlobalMissingWitnesses.begin(),
@@ -2748,6 +2760,11 @@ diagnoseMissingWitnesses(MissingWitnessDiagnosisKind Kind) {
     auto &SM = DC->getASTContext().SourceMgr;
     auto FixitBufferId = SM.findBufferContainingLoc(FixitLocation);
     for (auto VD : MissingWitnesses) {
+      // Don't ever emit a diagnostic for a requirement in the NSObject
+      // protocol. They're not implementable.
+      if (isNSObjectProtocol(VD->getDeclContext()->getSelfProtocolDecl()))
+        continue;
+
       // Whether this VD has a stub printed.
       bool AddFixit = !NoStubRequirements.count(VD);
       bool SameFile = VD->getLoc().isValid() ?
@@ -2773,6 +2790,7 @@ diagnoseMissingWitnesses(MissingWitnessDiagnosisKind Kind) {
         }
         continue;
       }
+
       // Issue diagnostics for witness values.
       Type RequirementType =
         getRequirementTypeForDisplay(DC->getParentModule(), Conf, VD);
@@ -3376,6 +3394,14 @@ ResolveWitnessResult ConformanceChecker::resolveWitnessViaDerivation(
     return ResolveWitnessResult::Missing;
   }
 
+  // If the protocol has a phantom nested type requirement, resolve it now.
+  auto &attrs = Proto->getAttrs();
+  if (auto *IARA =
+          attrs.getAttribute<ImplicitlySynthesizesNestedRequirementAttr>()) {
+    (void)TypeChecker::derivePhantomWitness(DC, derivingTypeDecl,
+                                            Proto, IARA->Value);
+  }
+
   // Attempt to derive the witness.
   auto derived =
       TypeChecker::deriveProtocolRequirement(DC, derivingTypeDecl, requirement);
@@ -3511,7 +3537,8 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaLookup(
 
   // Look for a member type with the same name as the associated type.
   auto candidates = TypeChecker::lookupMemberType(
-      DC, Adoptee, assocType->getName(), NameLookupFlags::ProtocolMembers);
+      DC, Adoptee, assocType->createNameRef(),
+      NameLookupFlags::ProtocolMembers);
 
   // If there aren't any candidates, we're done.
   if (!candidates) {
@@ -4046,6 +4073,45 @@ static void diagnoseConformanceFailure(Type T,
         SourceLoc loc = enumDecl->getInherited()[0].getSourceRange().Start;
         diags.diagnose(loc, diag::enum_raw_type_not_equatable, rawType);
         return;
+      }
+
+      return;
+    }
+  }
+
+  // One cannot meaningfully declare conformance to the NSObject protocol
+  // in Swift. Suggest inheritance from NSObject instead.
+  if (isNSObjectProtocol(Proto)) {
+    if (T->getClassOrBoundGenericClass()) {
+      auto diag =
+          diags.diagnose(ComplainLoc, diag::type_cannot_conform_to_nsobject,
+                         T);
+
+      // Try to suggest inheriting from NSObject instead.
+      auto classDecl = dyn_cast<ClassDecl>(DC);
+      if (!classDecl)
+        return;
+
+      auto inheritedClause = classDecl->getInherited();
+      for (unsigned i : indices(inheritedClause)) {
+        auto &inherited = inheritedClause[i];
+
+        // Find the inherited type.
+        InheritedTypeRequest request{classDecl, i, TypeResolutionStage::Interface};
+        Type inheritedTy = evaluateOrDefault(ctx.evaluator, request, Type());
+
+        // If it's a class, we cannot suggest a different class to inherit
+        // from.
+        if (inheritedTy->getClassOrBoundGenericClass())
+          return;
+
+        // Is it the NSObject protocol?
+        if (auto protoTy = inheritedTy->getAs<ProtocolType>()) {
+          if (isNSObjectProtocol(protoTy->getDecl())) {
+            diag.fixItReplace(inherited.getSourceRange(), "NSObject");
+            return;
+          }
+        }
       }
 
       return;
@@ -4734,8 +4800,7 @@ diagnoseMissingAppendInterpolationMethod(NominalTypeDecl *typeDecl) {
     static bool hasValidMethod(NominalTypeDecl *typeDecl,
                                SmallVectorImpl<InvalidMethod> &invalid) {
       auto type = typeDecl->getDeclaredType();
-      auto baseName =
-          DeclName(typeDecl->getASTContext().Id_appendInterpolation);
+      DeclNameRef baseName(typeDecl->getASTContext().Id_appendInterpolation);
       auto lookupOptions = defaultMemberTypeLookupOptions;
       lookupOptions -= NameLookupFlags::PerformConformanceCheck;
 
@@ -5349,6 +5414,34 @@ Type TypeChecker::deriveTypeWitness(DeclContext *DC,
   }
 }
 
+
+TypeDecl *TypeChecker::derivePhantomWitness(DeclContext *DC,
+                                            NominalTypeDecl *nominal,
+                                            ProtocolDecl *proto,
+                                            const StringRef Name) {
+  assert(proto->getASTContext().Id_CodingKeys.is(Name) &&
+         "CodingKeys is the only supported phantom requirement");
+
+  if (nominal->addedPhantomCodingKeys())
+    return nullptr;
+  nominal->setAddedPhantomCodingKeys();
+
+  auto knownKind = proto->getKnownProtocolKind();
+  if (!knownKind)
+    return nullptr;
+
+  auto Decl = DC->getInnermostDeclarationDeclContext();
+
+  DerivedConformance derived(nominal->getASTContext(), Decl, nominal, proto);
+  switch (*knownKind) {
+  case KnownProtocolKind::Decodable:
+  case KnownProtocolKind::Encodable:
+    return derived.derivePhantomCodingKeysRequirement();
+  default:
+    return nullptr;
+  }
+}
+
 namespace {
   class DefaultWitnessChecker : public WitnessChecker {
     
@@ -5475,7 +5568,7 @@ void TypeChecker::inferDefaultWitnesses(ProtocolDecl *proto) {
     if (assocType->getProtocol() != proto) {
       SmallVector<ValueDecl *, 2> found;
       proto->getModuleContext()->lookupQualified(
-                           proto, assocType->getFullName(),
+                           proto, DeclNameRef(assocType->getFullName()),
                            NL_QualifiedDefault|NL_ProtocolMembers|NL_OnlyTypes,
                            found);
       if (found.size() == 1 && isa<AssociatedTypeDecl>(found[0]))

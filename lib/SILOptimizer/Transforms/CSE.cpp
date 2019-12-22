@@ -618,7 +618,7 @@ static void updateBasicBlockArgTypes(SILBasicBlock *BB,
                                      ArchetypeType *OldOpenedArchetype,
                                      ArchetypeType *NewOpenedArchetype) {
   // Check types of all BB arguments.
-  for (auto *Arg : BB->getPhiArguments()) {
+  for (auto *Arg : BB->getSILPhiArguments()) {
     if (!Arg->getType().hasOpenedExistential())
       continue;
     // Type of this BB argument uses an opened existential.

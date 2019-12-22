@@ -113,7 +113,7 @@ std::string ASTMangler::mangleIVarInitDestroyEntity(const ClassDecl *decl,
                                                     bool isDestroyer,
                                                     SymbolKind SKind) {
   beginMangling();
-  appendContext(decl);
+  appendContext(decl, decl->getAlternateModuleName());
   appendOperator(isDestroyer ? "fE" : "fe");
   appendSymbolKind(SKind);
   return finalize();
@@ -436,7 +436,7 @@ std::string ASTMangler::mangleObjCRuntimeName(const NominalTypeDecl *Nominal) {
       assert(isa<ProtocolDecl>(Nominal));
       Buffer << 'P';
     }
-    appendModule(Ctx->getParentModule());
+    appendModule(Ctx->getParentModule(), StringRef());
     appendIdentifier(Nominal->getName().str());
     if (isProto)
       Buffer << '_';
@@ -479,7 +479,7 @@ std::string ASTMangler::mangleObjCRuntimeName(const NominalTypeDecl *Nominal) {
 std::string ASTMangler::mangleTypeAsContextUSR(const NominalTypeDecl *type) {
   beginManglingWithoutPrefix();
   llvm::SaveAndRestore<bool> allowUnnamedRAII(AllowNamelessEntities, true);
-  appendContext(type);
+  appendContext(type, type->getAlternateModuleName());
   return finalize();
 }
 
@@ -527,11 +527,12 @@ std::string ASTMangler::mangleDeclAsUSR(const ValueDecl *Decl,
 
 std::string ASTMangler::mangleAccessorEntityAsUSR(AccessorKind kind,
                                                   const AbstractStorageDecl *decl,
-                                                  StringRef USRPrefix) {
+                                                  StringRef USRPrefix,
+                                                  bool isStatic) {
   beginManglingWithoutPrefix();
   llvm::SaveAndRestore<bool> allowUnnamedRAII(AllowNamelessEntities, true);
   Buffer << USRPrefix;
-  appendAccessorEntity(getCodeForAccessorKind(kind), decl, /*isStatic*/ false);
+  appendAccessorEntity(getCodeForAccessorKind(kind), decl, isStatic);
   // We have a custom prefix, so finalize() won't verify for us. Do it manually.
   verify(Storage.str().drop_front(USRPrefix.size()));
   return finalize();
@@ -1200,6 +1201,16 @@ void ASTMangler::bindGenericParameters(const DeclContext *DC) {
     bindGenericParameters(sig->getCanonicalSignature());
 }
 
+void ASTMangler::appendFlatGenericArgs(SubstitutionMap subs) {
+  appendOperator("y");
+
+  for (auto replacement : subs.getReplacementTypes()) {
+    if (replacement->hasArchetype())
+      replacement = replacement->mapTypeOutOfContext();
+    appendType(replacement);
+  }
+}
+
 unsigned ASTMangler::appendBoundGenericArgs(DeclContext *dc,
                                             SubstitutionMap subs,
                                             bool &isFirstArgList) {
@@ -1428,6 +1439,13 @@ void ASTMangler::appendImplFunctionType(SILFunctionType *fn) {
 
   llvm::SmallVector<char, 32> OpArgs;
 
+  if (fn->getSubstitutions()) {
+    OpArgs.push_back('s');
+    if (!fn->isGenericSignatureImplied()) {
+      OpArgs.push_back('i');
+    }
+  }
+  
   if (fn->isPolymorphic() && fn->isPseudogeneric())
     OpArgs.push_back('P');
 
@@ -1464,7 +1482,7 @@ void ASTMangler::appendImplFunctionType(SILFunctionType *fn) {
       OpArgs.push_back('W');
       break;
   }
-
+  
   // Mangle the parameters.
   for (auto param : fn->getParameters()) {
     OpArgs.push_back(getParamConvention(param.getConvention()));
@@ -1484,8 +1502,13 @@ void ASTMangler::appendImplFunctionType(SILFunctionType *fn) {
     OpArgs.push_back(getResultConvention(error.getConvention()));
     appendType(error.getInterfaceType());
   }
-  if (fn->isPolymorphic())
-    appendGenericSignature(fn->getSubstGenericSignature());
+  if (auto sig = fn->getSubstGenericSignature()) {
+    appendGenericSignature(sig);
+  }
+  if (auto subs = fn->getSubstitutions()) {
+    appendFlatGenericArgs(subs);
+    appendRetroactiveConformances(subs, Mod);
+  }
 
   OpArgs.push_back('_');
 
@@ -1561,7 +1584,7 @@ void ASTMangler::appendContextOf(const ValueDecl *decl) {
   }
 
   // Just mangle the decl's DC.
-  appendContext(decl->getDeclContext());
+  appendContext(decl->getDeclContext(), decl->getAlternateModuleName());
 }
 
 namespace {
@@ -1617,14 +1640,14 @@ static Optional<VarDecl*> findFirstVariable(PatternBindingDecl *binding) {
   return None;
 }
 
-void ASTMangler::appendContext(const DeclContext *ctx) {
+void ASTMangler::appendContext(const DeclContext *ctx, StringRef useModuleName) {
   switch (ctx->getContextKind()) {
   case DeclContextKind::Module:
-    return appendModule(cast<ModuleDecl>(ctx));
+    return appendModule(cast<ModuleDecl>(ctx), useModuleName);
 
   case DeclContextKind::FileUnit:
     assert(!isa<BuiltinUnit>(ctx) && "mangling member of builtin module!");
-    appendContext(ctx->getParent());
+    appendContext(ctx->getParent(), useModuleName);
     return;
 
   case DeclContextKind::SerializedLocal: {
@@ -1645,12 +1668,12 @@ void ASTMangler::appendContext(const DeclContext *ctx) {
       } else {
         // This is incorrect in that it does not produce a /unique/ mangling,
         // but it will at least produce a /valid/ mangling.
-        appendContext(ctx->getParent());
+        appendContext(ctx->getParent(), useModuleName);
       }
       return;
     }
     case LocalDeclContextKind::TopLevelCodeDecl:
-      return appendContext(local->getParent());
+      return appendContext(local->getParent(), useModuleName);
     }
   }
 
@@ -1663,7 +1686,7 @@ void ASTMangler::appendContext(const DeclContext *ctx) {
     auto decl = ExtD->getExtendedNominal();
     // Recover from erroneous extension.
     if (!decl)
-      return appendContext(ExtD->getDeclContext());
+      return appendContext(ExtD->getDeclContext(), useModuleName);
 
     if (!ExtD->isEquivalentToExtendedContext()) {
     // Mangle the extension if:
@@ -1679,7 +1702,7 @@ void ASTMangler::appendContext(const DeclContext *ctx) {
       // If the extension is constrained, mangle the generic signature that
       // constrains it.
       appendAnyGenericType(decl);
-      appendModule(ExtD->getParentModule());
+      appendModule(ExtD->getParentModule(), useModuleName);
       if (sig && ExtD->isConstrainedExtension()) {
         Mod = ExtD->getModuleContext();
         auto nominalSig = ExtD->getSelfNominalTypeDecl()
@@ -1733,7 +1756,7 @@ void ASTMangler::appendContext(const DeclContext *ctx) {
       } else {
         // This is incorrect in that it does not produce a /unique/ mangling,
         // but it will at least produce a /valid/ mangling.
-        appendContext(ctx->getParent());
+        appendContext(ctx->getParent(), useModuleName);
       }
       return;
     }
@@ -1742,26 +1765,35 @@ void ASTMangler::appendContext(const DeclContext *ctx) {
 
   case DeclContextKind::TopLevelCodeDecl:
     // Mangle the containing module context.
-    return appendContext(ctx->getParent());
+    return appendContext(ctx->getParent(), useModuleName);
   }
 
   llvm_unreachable("bad decl context");
 }
 
-void ASTMangler::appendModule(const ModuleDecl *module) {
+void ASTMangler::appendModule(const ModuleDecl *module,
+                              StringRef useModuleName) {
   assert(!module->getParent() && "cannot mangle nested modules!");
 
   // Try the special 'swift' substitution.
-  if (module->isStdlibModule())
+  if (module->isStdlibModule()) {
+    assert(useModuleName.empty());
     return appendOperator("s");
+  }
 
   StringRef ModName = module->getName().str();
-  if (ModName == MANGLING_MODULE_OBJC)
+  if (ModName == MANGLING_MODULE_OBJC) {
+    assert(useModuleName.empty());
     return appendOperator("So");
-  if (ModName == MANGLING_MODULE_CLANG_IMPORTER)
+  }
+  if (ModName == MANGLING_MODULE_CLANG_IMPORTER) {
+    assert(useModuleName.empty());
     return appendOperator("SC");
-
-  appendIdentifier(ModName);
+  }
+  if (!useModuleName.empty())
+    appendIdentifier(useModuleName);
+  else
+    appendIdentifier(ModName);
 }
 
 /// Mangle the name of a protocol as a substitution candidate.
@@ -2327,7 +2359,7 @@ void ASTMangler::appendClosureComponents(Type Ty, unsigned discriminator,
   assert(discriminator != AbstractClosureExpr::InvalidDiscriminator
          && "closure must be marked correctly with discriminator");
 
-  appendContext(parentContext);
+  appendContext(parentContext, StringRef());
 
   if (!Ty)
     Ty = ErrorType::get(parentContext->getASTContext());
@@ -2339,7 +2371,7 @@ void ASTMangler::appendClosureComponents(Type Ty, unsigned discriminator,
 
 void ASTMangler::appendDefaultArgumentEntity(const DeclContext *func,
                                              unsigned index) {
-  appendContext(func);
+  appendContext(func, StringRef());
   appendOperator("fA", Index(index));
 }
 
@@ -2542,8 +2574,11 @@ ASTMangler::appendProtocolConformance(const ProtocolConformance *conformance) {
       needsModule = false;
     }
   }
-  if (needsModule)
-    appendModule(Mod);
+  if (needsModule) {
+    auto *DC = conformance->getDeclContext();
+    assert(DC->getAsDecl());
+    appendModule(Mod, DC->getAsDecl()->getAlternateModuleName());
+  }
 
   contextSig =
     conformingType->getAnyNominal()->getGenericSignatureOfContext();
@@ -2565,7 +2600,10 @@ void ASTMangler::appendProtocolConformanceRef(
     // Same as "conformance module matches type", below.
     appendOperator("HP");
   } else if (isRetroactiveConformance(conformance)) {
-    appendModule(conformance->getDeclContext()->getParentModule());
+    auto *DC = conformance->getDeclContext();
+    assert(DC->getAsDecl());
+    appendModule(conformance->getDeclContext()->getParentModule(),
+                 DC->getAsDecl()->getAlternateModuleName());
   } else if (conformance->getDeclContext()->getParentModule() ==
                conformance->getType()->getAnyNominal()->getParentModule()) {
     appendOperator("HP");

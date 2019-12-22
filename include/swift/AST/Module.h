@@ -476,6 +476,20 @@ public:
   /// The order of the results is not guaranteed to be meaningful.
   void getTopLevelDecls(SmallVectorImpl<Decl*> &Results) const;
 
+  /// Finds top-level decls of this module filtered by their attributes.
+  ///
+  /// This does a simple local lookup, not recursively looking through imports.
+  /// The order of the results is not guaranteed to be meaningful.
+  ///
+  /// \param Results Vector collecting the decls.
+  ///
+  /// \param matchAttributes Check on the attributes of a decl to
+  /// filter which decls to fully deserialize. Only decls with accepted
+  /// attributes are deserialized and added to Results.
+  void getTopLevelDeclsWhereAttributesMatch(
+               SmallVectorImpl<Decl*> &Results,
+               llvm::function_ref<bool(DeclAttributes)> matchAttributes) const;
+
   /// Finds all local type decls of this module.
   ///
   /// This does a simple local lookup, not recursively looking through imports.
@@ -613,6 +627,11 @@ inline bool DeclContext::isModuleScopeContext() const {
   if (ParentAndKind.getInt() == ASTHierarchy::FileUnit)
     return true;
   return isModuleContext();
+}
+
+/// Extract the source location from the given module declaration.
+inline SourceLoc extractNearestSourceLoc(const ModuleDecl *mod) {
+  return extractNearestSourceLoc(static_cast<const Decl *>(mod));
 }
 
 } // end namespace swift

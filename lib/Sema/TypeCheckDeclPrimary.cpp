@@ -333,6 +333,12 @@ static void checkInheritanceClause(
   }
 }
 
+static void installCodingKeysIfNecessary(NominalTypeDecl *NTD) {
+  auto req =
+    ResolveImplicitMemberRequest{NTD, ImplicitMemberAction::ResolveCodingKeys};
+  (void)evaluateOrDefault(NTD->getASTContext().evaluator, req, false);
+}
+
 // Check for static properties that produce empty option sets
 // using a rawValue initializer with a value of '0'
 static void checkForEmptyOptionSet(const VarDecl *VD) {
@@ -958,7 +964,8 @@ static void diagnoseClassWithoutInitializers(ClassDecl *classDecl) {
       // We're going to diagnose on the concrete init(from:) decl if it exists
       // and isn't implicit; otherwise, on the subclass itself.
       ValueDecl *diagDest = classDecl;
-      auto initFrom = DeclName(C, DeclBaseName::createConstructor(), C.Id_from);
+      DeclNameRef initFrom(
+          { C, DeclBaseName::createConstructor(), { C.Id_from } });
       auto result =
           TypeChecker::lookupMember(superclassDecl, superclassType, initFrom,
                                     NameLookupFlags::ProtocolMembers |
@@ -1666,6 +1673,8 @@ public:
 
     TypeChecker::addImplicitConstructors(SD);
 
+    installCodingKeysIfNecessary(SD);
+
     for (Decl *Member : SD->getMembers())
       visit(Member);
 
@@ -2056,7 +2065,8 @@ public:
     // Force these requests in case they emit diagnostics.
     (void) FD->getInterfaceType();
     (void) FD->getOperatorDecl();
-
+    (void) FD->getDynamicallyReplacedDecl();
+    
     if (!FD->isInvalid()) {
       checkGenericParams(FD);
       TypeChecker::checkReferencedGenericParams(FD);

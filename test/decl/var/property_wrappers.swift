@@ -216,7 +216,11 @@ struct BadCombinations {
 }
 
 struct MultipleWrappers {
-  @Wrapper(stored: 17)
+  // FIXME: The diagnostics here aren't great. The problem is that we're
+  // attempting to splice a 'wrappedValue:' argument into the call to Wrapper's
+  // init, but it doesn't have a matching init. We're then attempting to access
+  // the nested 'wrappedValue', but Wrapper's 'wrappedValue' is Int.
+  @Wrapper(stored: 17) // expected-error{{value of type 'Int' has no member 'wrappedValue'}}
   @WrapperWithInitialValue // expected-error{{extra argument 'wrappedValue' in call}}
   var x: Int = 17
 
@@ -1808,4 +1812,26 @@ func test_rdar56350060() {
       return self[keyPath: keyPath] // Ok
     }
   }
+}
+
+// rdar://problem/57411331 - crash due to incorrectly synthesized "nil" default
+// argument.
+@propertyWrapper
+struct Blah<Value> {
+  init(blah _: Int) { }
+
+  var wrappedValue: Value {
+    let val: Value? = nil
+    return val!
+  }
+}
+
+struct UseRdar57411331 {
+  let x = Rdar57411331(other: 5)
+}
+
+struct Rdar57411331 {
+  @Blah(blah: 17) var something: Int?
+
+  var other: Int
 }

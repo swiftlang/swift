@@ -371,6 +371,9 @@ private:
   void operator!=(Type T) const = delete;
 };
 
+/// Extract the source location from a given type.
+SourceLoc extractNearestSourceLoc(Type ty);
+
 /// CanType - This is a Type that is statically known to be canonical.  To get
 /// one of these, use Type->getCanonicalType().  Since all CanType's can be used
 /// as 'Type' (they just don't have sugar) we derive from Type.

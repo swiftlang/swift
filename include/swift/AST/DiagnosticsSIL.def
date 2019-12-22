@@ -116,7 +116,7 @@ ERROR(unsupported_c_function_pointer_conversion,none,
 ERROR(c_function_pointer_from_function_with_context,none,
       "a C function pointer cannot be formed from a "
       "%select{local function|closure}0 that captures "
-      "%select{context|generic parameters|dynamic Self type|<<error>}1",
+      "%select{context|generic parameters|dynamic Self type}1",
       (bool, unsigned))
 
 ERROR(objc_selector_malformed,none,"the type ObjectiveC.Selector is malformed",
@@ -540,6 +540,11 @@ ERROR(polymorphic_builtin_passed_type_without_static_overload, none, "Static"
       " overload %0 does not exist for polymorphic builtin '%1'. Static "
       "overload implied by passing argument of type %2",
       (Identifier, StringRef, Type))
+
+ERROR(box_to_stack_cannot_promote_box_to_stack_due_to_escape_alloc, none,
+      "Can not promote value from heap to stack due to value escaping", ())
+NOTE(box_to_stack_cannot_promote_box_to_stack_due_to_escape_location, none,
+     "value escapes here", ())
 
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)

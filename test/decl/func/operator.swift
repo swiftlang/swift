@@ -168,7 +168,7 @@ prefix operator ++
 prefix postfix func ++(x: Int) {} // expected-error {{'postfix' contradicts previous modifier 'prefix'}} {{8-16=}}
 postfix prefix func ++(x: Float) {} // expected-error {{'prefix' contradicts previous modifier 'postfix'}} {{9-16=}}
 postfix prefix infix func ++(x: Double) {} // expected-error {{'prefix' contradicts previous modifier 'postfix'}} {{9-16=}} expected-error {{'infix' contradicts previous modifier 'postfix'}} {{16-22=}}
-infix prefix func +-+(x: Int, y: Int) {} // expected-error {{'infix' modifier is not required or allowed on func declarations}} {{1-7=}} expected-error{{'prefix' contradicts previous modifier 'infix'}} {{7-14=}}
+infix prefix func +-+(x: Double, y: Double) {} // expected-error {{'infix' modifier is not required or allowed on func declarations}} {{1-7=}} expected-error{{'prefix' contradicts previous modifier 'infix'}} {{7-14=}}
 
 // Don't allow one to define a postfix '!'; it's built into the
 // language. Also illegal to have any postfix operator starting with '!'.

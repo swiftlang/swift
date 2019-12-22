@@ -47,8 +47,6 @@
 #include "swift/Sema/IDETypeChecking.h"
 #include "swift/Markup/Markup.h"
 #include "swift/Config.h"
-#include "clang/APINotes/APINotesReader.h"
-#include "clang/APINotes/APINotesWriter.h"
 #include "clang/Rewrite/Core/RewriteBuffer.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/Statistic.h"
@@ -696,6 +694,13 @@ GraphVisPath("output-request-graphviz",
 static llvm::cl::opt<bool>
 CanonicalizeType("canonicalize-type", llvm::cl::Hidden,
                    llvm::cl::cat(Category), llvm::cl::init(false));
+
+static llvm::cl::opt<bool>
+EnableSwiftSourceInfo("enable-swiftsourceinfo",
+                 llvm::cl::desc("Whether to consume .swiftsourceinfo files"),
+                 llvm::cl::cat(Category),
+                 llvm::cl::init(false));
+
 } // namespace options
 
 static std::unique_ptr<llvm::MemoryBuffer>
@@ -744,6 +749,10 @@ static int doTypeContextInfo(const CompilerInvocation &InitInvok,
   // Disable source location resolutions from .swiftsourceinfo file because
   // they are somewhat heavy operations and are not needed for completions.
   Invocation.getFrontendOptions().IgnoreSwiftSourceInfo = true;
+
+  // Disable to build syntax tree because code-completion skips some portion of
+  // source text. That breaks an invariant of syntax tree building.
+  Invocation.getLangOptions().BuildSyntaxTree = false;
 
   Invocation.setCodeCompletionPoint(CleanFile.get(), Offset);
 
@@ -809,6 +818,10 @@ doConformingMethodList(const CompilerInvocation &InitInvok,
   // Disable source location resolutions from .swiftsourceinfo file because
   // they are somewhat heavy operations and are not needed for completions.
   Invocation.getFrontendOptions().IgnoreSwiftSourceInfo = true;
+
+  // Disable to build syntax tree because code-completion skips some portion of
+  // source text. That breaks an invariant of syntax tree building.
+  Invocation.getLangOptions().BuildSyntaxTree = false;
 
   Invocation.setCodeCompletionPoint(CleanFile.get(), Offset);
 
@@ -2246,8 +2259,9 @@ static int doPrintDecls(const CompilerInvocation &InitInvok,
 
   for (const auto &name : DeclsToPrint) {
     ASTContext &ctx = CI.getASTContext();
-    auto descriptor = UnqualifiedLookupDescriptor(ctx.getIdentifier(name),
-                                                  CI.getPrimarySourceFile());
+    auto descriptor =
+        UnqualifiedLookupDescriptor(DeclNameRef(ctx.getIdentifier(name)),
+                                    CI.getPrimarySourceFile());
     auto lookup = evaluateOrDefault(ctx.evaluator,
                                     UnqualifiedLookupRequest{descriptor}, {});
     for (auto result : lookup) {
@@ -3319,6 +3333,12 @@ int main(int argc, char *argv[]) {
     InitInvok.getLangOptions().EnableObjCInterop =
         llvm::Triple(options::Triple).isOSDarwin();
   }
+
+  // We disable source location resolutions from .swiftsourceinfo files by
+  // default to match sourcekitd-test's and ide clients' expected behavior
+  // (passing optimize-for-ide in the global configuration request).
+  if (!options::EnableSwiftSourceInfo)
+    InitInvok.getFrontendOptions().IgnoreSwiftSourceInfo = true;
   if (!options::Triple.empty())
     InitInvok.setTargetTriple(options::Triple);
   if (!options::SwiftVersion.empty()) {
