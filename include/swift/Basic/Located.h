@@ -54,4 +54,33 @@ struct Located {
 
 } // end namespace swift
 
+namespace llvm {
+
+template <typename T> struct DenseMapInfo;
+
+template<typename T>
+struct DenseMapInfo<swift::Located<T>> {
+
+  static inline swift::Located<T> getEmptyKey() {
+    return swift::Located<T>(DenseMapInfo<T>::getEmptyKey(),
+                             DenseMapInfo<swift::SourceLoc>::getEmptyKey());
+  }
+
+  static inline swift::Located<T> getTombstoneKey() {
+    return swift::Located<T>(DenseMapInfo<T>::getTombstoneKey(),
+                             DenseMapInfo<swift::SourceLoc>::getTombstoneKey());
+  }
+
+  static unsigned getHashValue(const swift::Located<T> &LocatedVal) {
+    return combineHashValue(DenseMapInfo<T>::getHashValue(LocatedVal.Item),
+                            DenseMapInfo<swift::SourceLoc>::getHashValue(LocatedVal.Loc));
+  }
+
+  static bool isEqual(const swift::Located<T> &LHS, const swift::Located<T> &RHS) {
+    return DenseMapInfo<T>::isEqual(LHS.Item, RHS.Item) &&
+           DenseMapInfo<T>::isEqual(LHS.Loc, RHS.Loc);
+  }
+};
+} // namespace llvm
+
 #endif // SWIFT_BASIC_LOCATED_H
