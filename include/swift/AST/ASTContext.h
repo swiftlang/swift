@@ -313,7 +313,7 @@ public:
   // same parameter indices but different derivative generic signatures.
   llvm::DenseMap<
       std::tuple<Decl *, IndexSubset *, AutoDiffDerivativeFunctionKind>,
-      DerivativeAttr *>
+      llvm::SmallPtrSet<DerivativeAttr *, 1>>
       DerivativeAttrs;
 
 private:

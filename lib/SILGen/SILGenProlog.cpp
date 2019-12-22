@@ -445,8 +445,7 @@ void SILGenFunction::emitProlog(CaptureInfo captureInfo,
   
   // Emit the capture argument variables. These are placed last because they
   // become the first curry level of the SIL function.
-  assert((captureInfo.hasBeenComputed() ||
-          !TypeConverter::canCaptureFromParent(DC)) &&
+  assert(captureInfo.hasBeenComputed() &&
          "can't emit prolog of function with uncomputed captures");
   for (auto capture : captureInfo.getCaptures()) {
     if (capture.isDynamicSelfMetadata()) {

@@ -951,6 +951,11 @@ Driver::buildCompilation(const ToolChain &TC,
         ArgList->hasArg(options::OPT_driver_time_compilation);
     std::unique_ptr<UnifiedStatsReporter> StatsReporter =
         createStatsReporter(ArgList.get(), Inputs, OI, DefaultTargetTriple);
+
+    const bool OnlyOneDependencyFile =
+        ArgList->hasFlag(options::OPT_enable_only_one_dependency_file,
+                         options::OPT_disable_only_one_dependency_file, true);
+
     // relies on the new dependency graph
     const bool EnableFineGrainedDependencies =
         ArgList->hasArg(options::OPT_enable_fine_grained_dependencies);
@@ -984,6 +989,7 @@ Driver::buildCompilation(const ToolChain &TC,
         SaveTemps,
         ShowDriverTimeCompilation,
         std::move(StatsReporter),
+        OnlyOneDependencyFile,
         EnableFineGrainedDependencies,
         VerifyFineGrainedDependencyGraphAfterEveryImport,
         EmitFineGrainedDependencyDotFileAfterEveryImport,
@@ -1758,6 +1764,17 @@ Driver::computeCompilerMode(const DerivedArgList &Args,
   const Arg *ArgRequiringSinglePrimaryCompile =
       Args.getLastArg(options::OPT_enable_source_range_dependencies);
 
+  // AST dump doesn't work with `-wmo`. Since it's not common to want to dump
+  // the AST, we assume that's the priority and ignore `-wmo`, but we warn the
+  // user about this decision.
+  // FIXME: AST dump also doesn't work with `-index-file`, but that fix is a bit
+  // more complicated than this.
+  if (Args.hasArg(options::OPT_whole_module_optimization) &&
+      Args.hasArg(options::OPT_dump_ast)) {
+    Diags.diagnose(SourceLoc(), diag::warn_ignoring_wmo);
+    return OutputInfo::Mode::StandardCompile;
+  }
+
   // Override batch mode if given -wmo or -index-file.
   if (ArgRequiringSingleCompile) {
     if (BatchModeOut) {
@@ -2425,60 +2442,74 @@ static bool hasExistingAdditionalOutput(CommandOutput &output,
   return false;
 }
 
-static void addAuxiliaryOutput(
+static llvm::SmallString<128> computeAuxiliaryOutputPath(
     Compilation &C, CommandOutput &output, file_types::ID outputType,
     const TypeToPathMap *outputMap, StringRef workingDirectory,
     StringRef outputPath = StringRef(),
     llvm::opt::OptSpecifier requireArg = llvm::opt::OptSpecifier()) {
 
   if (hasExistingAdditionalOutput(output, outputType, outputPath))
-    return;
+    return {};
 
-  StringRef outputMapPath;
   if (outputMap) {
     auto iter = outputMap->find(outputType);
-    if (iter != outputMap->end())
-      outputMapPath = iter->second;
+    if (iter != outputMap->end()) {
+      StringRef outputMapPath = iter->second;
+      // Prefer a path from the OutputMap.
+      if (!outputMapPath.empty())
+        return outputMapPath;
+    }
   }
+  if (!outputPath.empty())
+    return outputPath;
 
-  if (!outputMapPath.empty()) {
-    // Prefer a path from the OutputMap.
-    output.setAdditionalOutputForType(outputType, outputMapPath);
-  } else if (!outputPath.empty()) {
-    output.setAdditionalOutputForType(outputType, outputPath);
-  } else if (requireArg.isValid() && !C.getArgs().getLastArg(requireArg)) {
+  if (requireArg.isValid() && !C.getArgs().getLastArg(requireArg)) {
     // This auxiliary output only exists if requireArg is passed, but it
     // wasn't this time.
-    return;
-  } else {
-    // Put the auxiliary output file next to "the" primary output file.
-    //
-    // FIXME: when we're in WMO and have multiple primary outputs, we derive the
-    // additional filename here from the _first_ primary output name, which
-    // means that in the derived OFM (in Job.cpp) the additional output will
-    // have a possibly-surprising name. But that's only half the problem: it
-    // also get associated with the first primary _input_, even when there are
-    // multiple primary inputs; really it should be associated with the build as
-    // a whole -- derived OFM input "" -- but that's a more general thing to
-    // fix.
-    llvm::SmallString<128> path;
-    if (output.getPrimaryOutputType() != file_types::TY_Nothing)
-      path = output.getPrimaryOutputFilenames()[0];
-    else if (!output.getBaseInput(0).empty())
-      path = llvm::sys::path::filename(output.getBaseInput(0));
-    else {
-      formFilenameFromBaseAndExt(C.getOutputInfo().ModuleName, /*newExt=*/"",
-                                 workingDirectory, path);
-    }
-    assert(!path.empty());
-
-    bool isTempFile = C.isTemporaryFile(path);
-    llvm::sys::path::replace_extension(
-        path, file_types::getExtension(outputType));
-    output.setAdditionalOutputForType(outputType, path);
-    if (isTempFile)
-      C.addTemporaryFile(path);
+    return {};
   }
+
+  // Put the auxiliary output file next to "the" primary output file.
+  //
+  // FIXME: when we're in WMO and have multiple primary outputs, we derive the
+  // additional filename here from the _first_ primary output name, which
+  // means that in the derived OFM (in Job.cpp) the additional output will
+  // have a possibly-surprising name. But that's only half the problem: it
+  // also get associated with the first primary _input_, even when there are
+  // multiple primary inputs; really it should be associated with the build as
+  // a whole -- derived OFM input "" -- but that's a more general thing to
+  // fix.
+  llvm::SmallString<128> path;
+  if (output.getPrimaryOutputType() != file_types::TY_Nothing)
+    path = output.getPrimaryOutputFilenames()[0];
+  else if (!output.getBaseInput(0).empty())
+    path = llvm::sys::path::filename(output.getBaseInput(0));
+  else {
+    formFilenameFromBaseAndExt(C.getOutputInfo().ModuleName, /*newExt=*/"",
+                               workingDirectory, path);
+  }
+  assert(!path.empty());
+
+  const bool isTempFile = C.isTemporaryFile(path);
+  llvm::sys::path::replace_extension(path,
+                                     file_types::getExtension(outputType));
+  if (isTempFile)
+    C.addTemporaryFile(path);
+  return path;
+}
+
+static void addAuxiliaryOutput(
+    Compilation &C, CommandOutput &output, file_types::ID outputType,
+    const TypeToPathMap *outputMap, StringRef workingDirectory,
+    StringRef outputPath = StringRef(),
+    llvm::opt::OptSpecifier requireArg = llvm::opt::OptSpecifier()) {
+
+  const auto path =
+      computeAuxiliaryOutputPath(C, output, outputType, outputMap,
+                                 workingDirectory, outputPath, requireArg);
+  if (path.empty())
+    return;
+  output.setAdditionalOutputForType(outputType, path);
 }
 
 static void addDiagFileOutputForPersistentPCHAction(
@@ -3057,8 +3088,12 @@ void Driver::chooseDependenciesOutputPaths(Compilation &C,
                                            llvm::SmallString<128> &Buf,
                                            CommandOutput *Output) const {
   if (C.getArgs().hasArg(options::OPT_emit_dependencies)) {
-    addAuxiliaryOutput(C, *Output, file_types::TY_Dependencies, OutputMap,
-                       workingDirectory);
+    auto depPath = computeAuxiliaryOutputPath(
+        C, *Output, file_types::TY_Dependencies, OutputMap, workingDirectory);
+    C.addDependencyPathOrCreateDummy(depPath, [&] {
+      addAuxiliaryOutput(C, *Output, file_types::TY_Dependencies, OutputMap,
+                         workingDirectory);
+    });
   }
   if (C.getIncrementalBuildEnabled()) {
     file_types::forEachIncrementalOutputType([&](file_types::ID type) {

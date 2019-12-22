@@ -1912,6 +1912,15 @@ public:
   bool diagnoseAsError();
 };
 
+class UnableToInferClosureReturnType final : public FailureDiagnostic {
+public:
+  UnableToInferClosureReturnType(ConstraintSystem &cs,
+                                 ConstraintLocator *locator)
+      : FailureDiagnostic(cs, locator) {}
+
+  bool diagnoseAsError();
+};
+
 } // end namespace constraints
 } // end namespace swift
 

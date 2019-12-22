@@ -236,6 +236,10 @@ CommandOutput::getAdditionalOutputsForType(file_types::ID Type) const {
   return V;
 }
 
+bool CommandOutput::hasAdditionalOutputForType(file_types::ID type) const {
+  return AdditionalOutputTypes.count(type);
+}
+
 StringRef CommandOutput::getAnyOutputForType(file_types::ID Type) const {
   if (PrimaryOutputType == Type)
     return getPrimaryOutputFilename();

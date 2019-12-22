@@ -857,7 +857,7 @@ struct MissingAssoc: AssocAndMethod {
   func #^MISSING_ASSOC_1^#
 }
 // MISSING_ASSOC_1: Begin completions
-// MISSING_ASSOC_1-DAG: Decl[InstanceMethod]/Super:         f1(_: MissingAssoc.T) {|};
-// MISSING_ASSOC_1-DAG: Decl[InstanceMethod]/Super:         f2(_: MissingAssoc.U) {|};
-// MISSING_ASSOC_1-DAG: Decl[InstanceMethod]/Super:         f3(_: MissingAssoc.V) {|};
+// MISSING_ASSOC_1-DAG: Decl[InstanceMethod]/Super:         f1(_: T) {|};
+// MISSING_ASSOC_1-DAG: Decl[InstanceMethod]/Super:         f2(_: U) {|};
+// MISSING_ASSOC_1-DAG: Decl[InstanceMethod]/Super:         f3(_: V) {|};
 // MISSING_ASSOC_1: End completions

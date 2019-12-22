@@ -298,7 +298,11 @@ void AttributedTypeRepr::printAttrs(ASTPrinter &Printer,
     Printer.printSimpleAttr("@autoclosure") << " ";
   if (hasAttr(TAK_escaping))
     Printer.printSimpleAttr("@escaping") << " ";
+<<<<<<< HEAD
   if (hasAttr(TAK_noDerivative) || hasAttr(TAK_nondiff))
+=======
+  if (hasAttr(TAK_noDerivative))
+>>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-12-20-a
     Printer.printSimpleAttr("@noDerivative") << " ";
 
   if (hasAttr(TAK_differentiable)) {

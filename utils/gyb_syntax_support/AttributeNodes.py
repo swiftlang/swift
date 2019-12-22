@@ -270,8 +270,13 @@ ATTRIBUTE_NODES = [
     # differentiation-param -> ('self' | identifer | integer-literal) ','?
     Node('DifferentiationParam', kind='Syntax',
          description='''
+<<<<<<< HEAD
          A differentiation parameter: either the "self" identifier, a
          function parameter name, or a function parameter index.
+=======
+         A differentiation parameter: either the "self" identifier, a function
+         parameter name, or a function parameter index.
+>>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-12-20-a
          ''',
          traits=['WithTrailingComma'],
          children=[
@@ -343,6 +348,10 @@ ATTRIBUTE_NODES = [
     # The argument of the derivative registration attribute
     # '@derivative(of: ...)' and the transpose registration attribute
     # '@transpose(of: ...)'.
+<<<<<<< HEAD
+=======
+    #
+>>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-12-20-a
     # derivative-registration-attr-arguments ->
     #     'of' ':' func-decl-name ','? differentiation-params-clause?
     Node('DerivativeRegistrationAttributeArguments', kind='Syntax',
@@ -358,11 +367,55 @@ ATTRIBUTE_NODES = [
                    The colon separating the "of" label and the original
                    declaration name.
                    '''),
+<<<<<<< HEAD
              Child('Original', kind='QualifiedDeclName',
                    description='The referenced original declaration.'),
+=======
+             Child('OriginalDeclName', kind='QualifiedDeclName',
+                   description='The referenced original declaration name.'),
+>>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-12-20-a
              Child('Comma', kind='CommaToken', is_optional=True),
              Child('DiffParams', kind='DifferentiationParamsClause',
                    is_optional=True),
+         ]),
+
+    # An optionally qualified declaration name.
+    # Currently used only for `@derivative` and `@transpose` attribute.
+    # TODO(TF-1066): Use module qualified name syntax/parsing instead of custom
+    # qualified name syntax/parsing.
+    #
+    # qualified-decl-name ->
+    #     base-type? '.'? (identifier | operator) decl-name-arguments?
+    # base-type ->
+    #     member-type-identifier | base-type-identifier
+    Node('QualifiedDeclName', kind='Syntax',
+         description='''
+         An optionally qualified function declaration name (e.g. `+(_:_:)`,
+         `A.B.C.foo(_:_:)`).
+         ''',
+         children=[
+             Child('BaseType', kind='Type', description='''
+                   The base type of the qualified name, optionally specified.
+                   ''', is_optional=True),
+             Child('Dot', kind='Token',
+                   token_choices=[
+                       'PeriodToken', 'PrefixPeriodToken'
+                   ], is_optional=True),
+             Child('Name', kind='Token', description='''
+                   The base name of the referenced function.
+                   ''',
+                   token_choices=[
+                       'IdentifierToken',
+                       'UnspacedBinaryOperatorToken',
+                       'SpacedBinaryOperatorToken',
+                       'PrefixOperatorToken',
+                       'PostfixOperatorToken',
+                   ]),
+             Child('Arguments', kind='DeclNameArguments',
+                   is_optional=True, description='''
+                   The argument labels of the referenced function, optionally
+                   specified.
+                   '''),
          ]),
 
     # func-decl-name -> (identifier | operator) decl-name-arguments?

@@ -107,7 +107,7 @@ ERROR(could_not_find_subscript_member_did_you_mean,none,
       (Type))
 
 ERROR(could_not_find_enum_case,none,
-      "enum type %0 has no case %1; did you mean %2",
+      "enum type %0 has no case %1; did you mean %2?",
       (Type, DeclNameRef, DeclName))
 
 NOTE(did_you_mean_raw_type,none,
@@ -302,11 +302,11 @@ ERROR(cannot_invoke_closure_type,none,
 ERROR(cannot_infer_closure_type,none,
       "unable to infer closure type in the current context", ())
 ERROR(cannot_infer_closure_result_type,none,
-      "unable to infer complex closure return type; "
-      "add explicit type to disambiguate", ())
-FIXIT(insert_closure_return_type,
-      "%select{| () }1-> %0 %select{|in }1",
-      (Type, bool))
+      "unable to infer%select{ complex|}0 closure return type; "
+      "add explicit type to disambiguate", (bool))
+FIXIT(insert_closure_return_type_placeholder,
+      "%select{| () }0-> <#Result#> %select{|in }0",
+      (bool))
 
 ERROR(incorrect_explicit_closure_result,none,
       "declared closure result %0 is incompatible with contextual type %1",
@@ -951,7 +951,7 @@ NOTE(in_cast_expr_types,none,
       (Type, Type))
 
 ERROR(types_not_convertible_use_bool_value,none,
-      "%0 is not convertible to %1; did you mean %0.boolValue", (Type, Type))
+      "%0 is not convertible to %1; did you mean %0.boolValue?", (Type, Type))
 
 ERROR(tuple_types_not_convertible_nelts,none,
       "%0 is not convertible to %1, "
@@ -1478,6 +1478,15 @@ NOTE(option_set_empty_set_init,none,
 
 ERROR(originally_defined_in_dupe_platform,none,
       "duplicate version number for platform %0", (StringRef))
+
+ERROR(originally_definedin_topleve_decl,none,
+      "@%0 is only applicable to top-level decl", (StringRef))
+
+ERROR(originally_definedin_need_available,none,
+      "need @available attribute for @%0", (StringRef))
+
+ERROR(originally_definedin_must_after_available_version,none,
+      "moved version from @%0 must after introduced OS version", (StringRef))
 
 // Alignment attribute
 ERROR(alignment_not_power_of_two,none,
@@ -3389,11 +3398,20 @@ ERROR(self_assignment_var,none,
 ERROR(self_assignment_prop,none,
       "assigning a property to itself", ())
 ERROR(property_use_in_closure_without_explicit_self,none,
-      "reference to property %0 in closure requires explicit 'self.' to make"
-      " capture semantics explicit", (Identifier))
+      "reference to property %0 in closure requires explicit use of 'self' to"
+      " make capture semantics explicit", (Identifier))
 ERROR(method_call_in_closure_without_explicit_self,none,
-      "call to method %0 in closure requires explicit 'self.' to make"
+      "call to method %0 in closure requires explicit use of 'self' to make"
       " capture semantics explicit", (Identifier))
+NOTE(note_capture_self_explicitly,none,
+      "capture 'self' explicitly to enable implicit 'self' in this closure", ())
+NOTE(note_reference_self_explicitly,none,
+      "reference 'self.' explicitly", ())
+NOTE(note_other_self_capture,none,
+      "variable other than 'self' captured here under the name 'self' does not "
+      "enable implicit 'self'", ())
+NOTE(note_self_captured_weakly,none,
+      "weak capture of 'self' here does not enable implicit 'self'", ())
 ERROR(implicit_use_of_self_in_closure,none,
       "implicit use of 'self' in closure; use 'self.' to make"
       " capture semantics explicit", ())
@@ -4071,6 +4089,7 @@ ERROR(opaque_type_in_protocol_requirement,none,
       "'some' type cannot be the return type of a protocol requirement; did you mean to add an associated type?",
       ())
 
+<<<<<<< HEAD
 // SWIFT_ENABLE_TENSORFLOW
 // Function differentiability
 ERROR(autodiff_attr_argument_not_differentiable,none,
@@ -4084,6 +4103,8 @@ ERROR(attr_differentiable_no_vjp_or_jvp_when_linear,none,
       "cannot specify 'vjp:' or 'jvp:' for linear functions; use "
       "'transpose:' instead", ())
 
+=======
+>>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-12-20-a
 // Function differentiability
 ERROR(attr_only_on_parameters_of_differentiable,none,
       "'%0' may only be used on parameters of '@differentiable' function "

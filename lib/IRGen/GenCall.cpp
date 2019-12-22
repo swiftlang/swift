@@ -692,7 +692,7 @@ namespace {
       case clang::Type::Class:
 #define NON_CANONICAL_UNLESS_DEPENDENT_TYPE(Class, Base) \
       case clang::Type::Class:
-#include "clang/AST/TypeNodes.def"
+#include "clang/AST/TypeNodes.inc"
         llvm_unreachable("canonical or dependent type in ABI lowering");
 
       // These shouldn't occur in expandable struct types.

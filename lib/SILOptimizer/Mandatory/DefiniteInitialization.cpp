@@ -792,11 +792,11 @@ void LifetimeChecker::doIt() {
   // memory object will destruct the memory.  If the memory (or some element
   // thereof) is not initialized on some path, the bad things happen.  Process
   // releases to adjust for this.
-  if (!TheMemory.MemorySILType.isTrivial(F)) {
+  if (!TheMemory.hasTrivialType()) {
     for (unsigned i = 0, e = Destroys.size(); i != e; ++i)
       processNonTrivialRelease(i);
   }
-  
+
   // If the memory object had any non-trivial stores that are init or assign
   // based on the control flow path reaching them, then insert dynamic control
   // logic and CFG diamonds to handle this.
@@ -1020,7 +1020,7 @@ void LifetimeChecker::handleStoreUse(unsigned UseID) {
     if (auto *ctor = fnLoc.getAsASTNode<ConstructorDecl>())
       selfTy = ctor->getImplicitSelfDecl()->getType();
     else
-      selfTy = TheMemory.getType();
+      selfTy = TheMemory.getASTType();
 
     StructDecl *theStruct = selfTy->getStructOrBoundGenericStruct();
     assert(theStruct);
@@ -1284,7 +1284,7 @@ void LifetimeChecker::handleEscapeUse(const DIMemoryUse &Use) {
         diagnose(Module, Inst->getLoc(), diag::self_before_selfinit_value_type);
         if (!HasSuggestedNoArgSelfInit && FullyUninitialized) {
           auto *maybeStruct =
-              TheMemory.getType().getStructOrBoundGenericStruct();
+              TheMemory.getASTType().getStructOrBoundGenericStruct();
           maybeSuggestNoArgSelfInit(Module, Inst->getLoc(), maybeStruct);
           HasSuggestedNoArgSelfInit = true;
         }
@@ -1618,9 +1618,8 @@ bool LifetimeChecker::diagnoseReturnWithoutInitializingStoredProperties(
   if (!shouldEmitError(Inst))
     return true;
 
-  if (TheMemory.isCrossModuleStructInitSelf() &&
-      TheMemory.HasDummyElement) {
-    Type selfTy = TheMemory.getType();
+  if (TheMemory.isCrossModuleStructInitSelf() && TheMemory.hasDummyElement()) {
+    Type selfTy = TheMemory.getASTType();
     const StructDecl *theStruct = selfTy->getStructOrBoundGenericStruct();
     assert(theStruct);
 
@@ -1813,7 +1812,7 @@ void LifetimeChecker::handleSelfInitUse(unsigned UseID) {
 
   assert(TheMemory.isAnyInitSelf());
   assert(!TheMemory.isClassInitSelf() || TheMemory.isNonRootClassSelf());
-  assert(TheMemory.getType()->hasReferenceSemantics());
+  assert(TheMemory.getASTType()->hasReferenceSemantics());
 
   // Determine the liveness states of the memory object, including the
   // self/super.init state.
@@ -1981,7 +1980,7 @@ void LifetimeChecker::processUninitializedRelease(SILInstruction *Release,
     if (Pointer->getType().isAddress())
       Pointer = B.createLoad(Loc, Pointer, LoadOwnershipQualifier::Take);
 
-    auto MetatypeTy = CanMetatypeType::get(TheMemory.MemorySILType.getASTType(),
+    auto MetatypeTy = CanMetatypeType::get(TheMemory.getASTType(),
                                            MetatypeRepresentation::Thick);
     auto SILMetatypeTy = SILType::getPrimitiveObjectType(MetatypeTy);
     SILValue Metatype;
@@ -2010,8 +2009,13 @@ void LifetimeChecker::deleteDeadRelease(unsigned ReleaseID) {
   SILInstruction *Release = Destroys[ReleaseID];
   if (isa<DestroyAddrInst>(Release)) {
     SILValue Addr = Release->getOperand(0);
-    if (auto *AddrI = Addr->getDefiningInstruction())
+    if (auto *AddrI = Addr->getDefiningInstruction()) {
+      // FIXME: AddrI will not be deleted (nor its operands) when Release is
+      // still using AddrI's result. Fix this, and migrate to using
+      // InstructionDeleter utility instead of
+      // recursivelyDeadTriviallyDeadInstructions.
       recursivelyDeleteTriviallyDeadInstructions(AddrI);
+    }
   }
   Release->eraseFromParent();
   Destroys[ReleaseID] = nullptr;

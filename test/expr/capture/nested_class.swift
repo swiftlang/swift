@@ -36,3 +36,20 @@ struct StructWithInnerStruct {
     }
   }
 }
+
+// Types cannot close over top-level guard bindings
+guard let x: Int = nil else { fatalError() }
+// expected-note@-1 {{'x' declared here}}
+
+func getX() -> Int { return x }
+
+class ClosesOverGuard { // expected-note {{type declared here}}
+  func foo() {
+    _ = x
+    // expected-error@-1 {{class declaration cannot close over value 'x' defined in outer scope}}
+  }
+
+  func bar() {
+    _ = getX() // This is diagnosed by SILGen.
+  }
+}

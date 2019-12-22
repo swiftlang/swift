@@ -53,10 +53,13 @@ TYPE_ATTR(noescape)
 TYPE_ATTR(escaping)
 TYPE_ATTR(differentiable)
 TYPE_ATTR(noDerivative)
+<<<<<<< HEAD
 // SWIFT_ENABLE_TENSORFLOW
 TYPE_ATTR(autodiff)
 TYPE_ATTR(nondiff)
 TYPE_ATTR(quoted)
+=======
+>>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-12-20-a
 
 // SIL-specific attributes
 TYPE_ATTR(block_storage)
@@ -545,6 +548,7 @@ DECL_ATTR(_implicitly_synthesizes_nested_requirement, ImplicitlySynthesizesNeste
   ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
   98)
 
+<<<<<<< HEAD
 // SWIFT_ENABLE_TENSORFLOW
 DECL_ATTR(quoted, Quoted,
   OnFunc |
@@ -568,6 +572,12 @@ DECL_ATTR(transpose, Transpose,
   ABIStableToAdd | ABIBreakingToRemove | APIStableToAdd | APIBreakingToRemove,
   103)
 // SWIFT_ENABLE_TENSORFLOW END
+=======
+DECL_ATTR(transpose, Transpose,
+  OnFunc | LongAttribute | AllowMultipleAttributes |
+  ABIStableToAdd | ABIBreakingToRemove | APIStableToAdd | APIBreakingToRemove,
+  99)
+>>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-12-20-a
 
 #undef TYPE_ATTR
 #undef DECL_ATTR_ALIAS

@@ -584,6 +584,11 @@ ClangNode getEffectiveClangNode(const Decl *decl);
 /// Retrieve the Clang node for the given extension, if it has one.
 ClangNode extensionGetClangNode(const ExtensionDecl *ext);
 
+/// Utility for finding the referenced declaration from a call, which might
+/// include a second level of function application for a 'self.' expression,
+/// or a curry thunk, etc.
+std::pair<Type, ConcreteDeclRef> getReferencedDecl(Expr *expr);
+
 } // namespace ide
 } // namespace swift
 

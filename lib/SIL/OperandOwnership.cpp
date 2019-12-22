@@ -336,7 +336,6 @@ FORWARD_ANY_OWNERSHIP_INST(ConvertFunction)
 FORWARD_ANY_OWNERSHIP_INST(RefToBridgeObject)
 FORWARD_ANY_OWNERSHIP_INST(BridgeObjectToRef)
 FORWARD_ANY_OWNERSHIP_INST(UnconditionalCheckedCast)
-FORWARD_ANY_OWNERSHIP_INST(MarkUninitialized)
 FORWARD_ANY_OWNERSHIP_INST(UncheckedEnumData)
 FORWARD_ANY_OWNERSHIP_INST(DestructureStruct)
 FORWARD_ANY_OWNERSHIP_INST(DestructureTuple)
@@ -361,11 +360,16 @@ FORWARD_ANY_OWNERSHIP_INST(LinearFunction)
   }
 FORWARD_CONSTANT_OR_NONE_OWNERSHIP_INST(Guaranteed, MustBeLive, TupleExtract)
 FORWARD_CONSTANT_OR_NONE_OWNERSHIP_INST(Guaranteed, MustBeLive, StructExtract)
+<<<<<<< HEAD
 // SWIFT_ENABLE_TENSORFLOW
 FORWARD_CONSTANT_OR_NONE_OWNERSHIP_INST(Guaranteed, MustBeLive,
                                         DifferentiableFunctionExtract)
 FORWARD_CONSTANT_OR_NONE_OWNERSHIP_INST(Guaranteed, MustBeLive,
                                         LinearFunctionExtract)
+=======
+FORWARD_CONSTANT_OR_NONE_OWNERSHIP_INST(Owned, MustBeInvalidated,
+                                        MarkUninitialized)
+>>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-12-20-a
 #undef CONSTANT_OR_NONE_OWNERSHIP_INST
 
 OperandOwnershipKindMap

@@ -1601,6 +1601,7 @@ ERROR(diff_params_clause_expected_parameter,PointsToFirstBadToken,
 ERROR(diff_params_clause_expected_parameter_unnamed,PointsToFirstBadToken,
       "expected a parameter, which can be a function parameter index or 'self'",
       ())
+<<<<<<< HEAD
 
 // Automatic differentiation attributes
 ERROR(autodiff_attr_expected_original_decl_name,PointsToFirstBadToken,
@@ -1647,9 +1648,11 @@ ERROR(sil_inst_autodiff_invalid_witness_generic_signature,PointsToFirstBadToken,
 ERROR(attr_quoted_enable_experimental_quasiquotes,PointsToFirstBadToken,
       "'@quoted' is unsupported; pass -enable-experimental-quasiquotes to "
       "enable support for quasiquotes", ())
+=======
+>>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-12-20-a
 
-// derivative
-ERROR(attr_derivative_expected_original_name,PointsToFirstBadToken,
+// Automatic differentiation attributes
+ERROR(autodiff_attr_expected_original_decl_name,PointsToFirstBadToken,
       "expected an original function name", ())
 
 //------------------------------------------------------------------------------

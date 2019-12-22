@@ -101,12 +101,18 @@ public:
   /// When set, don't enforce warnings with -Werror.
   bool DebuggerSupport = false;
 
+<<<<<<< HEAD
   // SWIFT_ENABLE_TENSORFLOW
   /// When set, clang writes its output files (module caches) to this instead
   /// of to the real filesystem.
   llvm::IntrusiveRefCntPtr<clang::InMemoryOutputFileSystem>
       InMemoryOutputFileSystem;
 
+=======
+  /// When set, ClangImporter is disabled, and all requests go to the
+  /// DWARFImporter delegate.
+  bool DisableSourceImport = false;
+>>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-12-20-a
 
   /// Return a hash code of any components from these options that should
   /// contribute to a Swift Bridging PCH hash.

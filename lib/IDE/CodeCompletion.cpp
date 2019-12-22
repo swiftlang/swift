@@ -1260,11 +1260,6 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
     Builder.addTypeAnnotation(ST.getString());
   }
 
-  /// Set to true when we have delivered code completion results
-  /// to the \c Consumer.
-  bool DeliveredResults = false;
-
-
   Optional<std::pair<Type, ConcreteDeclRef>> typeCheckParsedExpr() {
     assert(ParsedExpr && "should have an expression");
 
@@ -1279,24 +1274,7 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
     // typecheck again. rdar://21466394
     if (CheckKind == CompletionTypeCheckKind::Normal &&
         ParsedExpr->getType() && !ParsedExpr->getType()->is<ErrorType>()) {
-      auto refDecl = ParsedExpr->getReferencedDecl();
-      auto exprTy = ParsedExpr->getType();
-      if (!refDecl) {
-        // FIXME: do this in the not-already-type-checked branch too?
-        if (auto *apply = dyn_cast<SelfApplyExpr>(ParsedExpr)) {
-          refDecl = apply->getFn()->getReferencedDecl();
-        } else if (auto *apply = dyn_cast<ApplyExpr>(ParsedExpr)) {
-          // If this is an IUO, use the underlying non-optional type instead
-          auto fnDecl = apply->getFn()->getReferencedDecl();
-          if (auto FD = fnDecl.getDecl()) {
-            if (FD->isImplicitlyUnwrappedOptional()) {
-              if (auto OT = exprTy->getOptionalObjectType())
-                exprTy = OT;
-            }
-          }
-        }
-      }
-      return std::make_pair(exprTy, refDecl);
+      return getReferencedDecl(ParsedExpr);
     }
 
     ConcreteDeclRef ReferencedDecl = nullptr;
@@ -1353,7 +1331,6 @@ public:
       AttTargetDK = DK;
   }
 
-  void completeExpr() override;
   void completeDotExpr(Expr *E, SourceLoc DotLoc) override;
   void completeStmtOrExpr(CodeCompletionExpr *E) override;
   void completePostfixExprBeginning(CodeCompletionExpr *E) override;
@@ -1398,18 +1375,6 @@ private:
   void deliverCompletionResults();
 };
 } // end anonymous namespace
-
-void CodeCompletionCallbacksImpl::completeExpr() {
-  if (DeliveredResults)
-    return;
-
-  Parser::ParserPositionRAII RestorePosition(P);
-  P.restoreParserPosition(ExprBeginPosition);
-
-  // FIXME: implement fallback code completion.
-
-  deliverCompletionResults();
-}
 
 namespace {
 static bool isTopLevelContext(const DeclContext *DC) {
@@ -1923,6 +1888,8 @@ public:
       PrintOptions PO;
       PO.OpaqueReturnTypePrinting =
           PrintOptions::OpaqueReturnTypePrintingMode::WithoutOpaqueKeyword;
+      if (auto typeContext = CurrDeclContext->getInnermostTypeContext())
+        PO.setBaseType(typeContext->getDeclaredTypeInContext());
       Builder.addTypeAnnotation(T.getString(PO));
     }
   }
@@ -1944,6 +1911,8 @@ public:
     PO.PrintOptionalAsImplicitlyUnwrapped = true;
     PO.OpaqueReturnTypePrinting =
         PrintOptions::OpaqueReturnTypePrintingMode::WithoutOpaqueKeyword;
+    if (auto typeContext = CurrDeclContext->getInnermostTypeContext())
+      PO.setBaseType(typeContext->getDeclaredTypeInContext());
     Builder.addTypeAnnotation(T.getString(PO) + suffix);
   }
 
@@ -2288,9 +2257,12 @@ public:
 
       if (NeedComma)
         Builder.addComma();
+      Type contextTy;
+      if (auto typeContext = CurrDeclContext->getInnermostTypeContext())
+        contextTy = typeContext->getDeclaredTypeInContext();
 
-      Builder.addCallParameter(argName, bodyName, paramTy, isVariadic, isInOut,
-                               isIUO, isAutoclosure);
+      Builder.addCallParameter(argName, bodyName, paramTy, contextTy,
+                               isVariadic, isInOut, isIUO, isAutoclosure);
 
       modifiedBuilder = true;
       NeedComma = true;
@@ -2642,6 +2614,8 @@ public:
           PO.OpaqueReturnTypePrinting =
               PrintOptions::OpaqueReturnTypePrintingMode::WithoutOpaqueKeyword;
           PO.PrintOptionalAsImplicitlyUnwrapped = IsIUO;
+          if (auto typeContext = CurrDeclContext->getInnermostTypeContext())
+            PO.setBaseType(typeContext->getDeclaredTypeInContext());
           ResultType.print(OS, PO);
         }
       }
@@ -3478,9 +3452,10 @@ public:
     builder.addEqual();
     builder.addWhitespace(" ");
     assert(RHSType && resultType);
-    builder.addCallParameter(Identifier(), Identifier(), RHSType,
-                             /*IsVarArg*/ false, /*IsInOut*/ false,
-                             /*isIUO*/ false, /*isAutoClosure*/ false);
+    Type contextTy;
+    if (auto typeContext = CurrDeclContext->getInnermostTypeContext())
+      contextTy = typeContext->getDeclaredTypeInContext();
+    builder.addCallParameter(Identifier(), RHSType, contextTy);
     addTypeAnnotation(builder, resultType);
   }
 
@@ -3501,10 +3476,12 @@ public:
       builder.addWhitespace(" ");
     builder.addTextChunk(op->getName().str());
     builder.addWhitespace(" ");
-    if (RHSType)
-      builder.addCallParameter(Identifier(), Identifier(), RHSType,
-                               /*IsVarArg*/ false, /*IsInOut*/ false,
-                               /*isIUO*/ false, /*isAutoClosure*/ false);
+    if (RHSType) {
+      Type contextTy;
+      if (auto typeContext = CurrDeclContext->getInnermostTypeContext())
+        contextTy = typeContext->getDeclaredTypeInContext();
+      builder.addCallParameter(Identifier(), RHSType, contextTy);
+    }
     if (resultType)
       addTypeAnnotation(builder, resultType);
   }
@@ -3728,21 +3705,13 @@ public:
     addFromProto(LK::ColorLiteral, "", [&](Builder &builder) {
       builder.addTextChunk("#colorLiteral");
       builder.addLeftParen();
-      builder.addCallParameter(context.getIdentifier("red"), floatType,
-                               /*IsVarArg*/ false, /*IsInOut*/ false,
-                               /*isIUO*/ false, /*isAutoClosure*/ false);
+      builder.addCallParameter(context.getIdentifier("red"), floatType);
       builder.addComma();
-      builder.addCallParameter(context.getIdentifier("green"), floatType,
-                               /*IsVarArg*/ false, /*IsInOut*/ false,
-                               /*isIUO*/ false, /*isAutoClosure*/ false);
+      builder.addCallParameter(context.getIdentifier("green"), floatType);
       builder.addComma();
-      builder.addCallParameter(context.getIdentifier("blue"), floatType,
-                               /*IsVarArg*/ false, /*IsInOut*/ false,
-                               /*isIUO*/ false, /*isAutoClosure*/ false);
+      builder.addCallParameter(context.getIdentifier("blue"), floatType);
       builder.addComma();
-      builder.addCallParameter(context.getIdentifier("alpha"), floatType,
-                               /*IsVarArg*/ false, /*IsInOut*/ false,
-                               /*isIUO*/ false, /*isAutoClosure*/ false);
+      builder.addCallParameter(context.getIdentifier("alpha"), floatType);
       builder.addRightParen();
     });
 
@@ -3751,9 +3720,7 @@ public:
       builder.addTextChunk("#imageLiteral");
       builder.addLeftParen();
       builder.addCallParameter(context.getIdentifier("resourceName"),
-                               stringType, /*IsVarArg*/ false,
-                               /*IsInOut*/ false, /*isIUO*/ false,
-                               /*isAutoClosure*/ false);
+                               stringType);
       builder.addRightParen();
     });
 
@@ -4397,6 +4364,8 @@ public:
     {
       llvm::raw_svector_ostream OS(DeclStr);
       PrintOptions Options;
+      if (auto transformType = CurrDeclContext->getDeclaredTypeInContext())
+        Options.setBaseType(transformType);
       Options.PrintImplicitAttrs = false;
       Options.SkipAttributes = true;
       CD->print(OS, Options);
@@ -5651,7 +5620,6 @@ void CodeCompletionCallbacksImpl::deliverCompletionResults() {
   Consumer.handleResultsAndModules(CompletionContext, RequestedModules,
                                    DCForModules);
   RequestedModules.clear();
-  DeliveredResults = true;
 }
 
 void PrintingCodeCompletionConsumer::handleResults(

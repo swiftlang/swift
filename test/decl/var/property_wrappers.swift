@@ -9,12 +9,11 @@ struct Wrapper<T> {
   init(stored: T) {
     self._stored = stored
   }
-  
+
   var wrappedValue: T {
     get { _stored }
     set { _stored = newValue }
   }
-  
 }
 
 @propertyWrapper
@@ -835,6 +834,42 @@ struct UsesExplicitClosures {
 
   @WrapperAcceptingAutoclosure(body: { return 42 })
   var y: Int
+}
+
+// ---------------------------------------------------------------------------
+// Enclosing instance diagnostics
+// ---------------------------------------------------------------------------
+@propertyWrapper
+struct Observable<Value> {
+  private var stored: Value
+
+  init(wrappedValue: Value) {
+    self.stored = wrappedValue
+  }
+
+  @available(*, unavailable, message: "must be in a class")
+  var wrappedValue: Value { // expected-note{{'wrappedValue' has been explicitly marked unavailable here}}
+    get { fatalError("called wrappedValue getter") }
+    set { fatalError("called wrappedValue setter") }
+  }
+
+  static subscript<EnclosingSelf>(
+      _enclosingInstance observed: EnclosingSelf,
+      wrapped wrappedKeyPath: ReferenceWritableKeyPath<EnclosingSelf, Value>,
+      storage storageKeyPath: ReferenceWritableKeyPath<EnclosingSelf, Self>
+    ) -> Value {
+    get {
+      observed[keyPath: storageKeyPath].stored
+    }
+    set {
+      observed[keyPath: storageKeyPath].stored = newValue
+    }
+  }
+}
+
+struct MyObservedValueType {
+  @Observable // expected-error{{'wrappedValue' is unavailable: must be in a class}}
+  var observedProperty = 17
 }
 
 // ---------------------------------------------------------------------------

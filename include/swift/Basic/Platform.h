@@ -91,7 +91,9 @@ namespace swift {
   /// llvm::Triple::normalize() would not affect it.
   llvm::Triple getTargetSpecificModuleTriple(const llvm::Triple &triple);
   
-  
+  /// Computes the target triple without version information.
+  llvm::Triple getUnversionedTriple(const llvm::Triple &triple);
+
   /// Get the Swift runtime version to deploy back to, given a deployment target expressed as an
   /// LLVM target triple.
   Optional<llvm::VersionTuple>
