@@ -2581,28 +2581,47 @@ bool TypeResolver::resolveASTFunctionTypeParams(
       // SWIFT_ENABLE_TENSORFLOW END
     }
 
-    // SWIFT_ENABLE_TENSORFLOW
-    // All non-`@noDerivative` parameters of `@differentiable` and
-    // `@differentiable(linear)` function types must be differentiable.
-    if (diffKind != DifferentiabilityKind::NonDifferentiable &&
-        resolution.getStage() != TypeResolutionStage::Structural) {
-      if (!noDerivative) {
-        bool isLinear = diffKind == DifferentiabilityKind::Linear;
-        if (!isDifferentiable(ty, /*tangentVectorEqualsSelf*/ isLinear)) {
-          diagnose(eltTypeRepr->getLoc(),
-                   diag::differentiable_function_type_invalid_parameter,
-                   ty->getString(), isLinear)
-              .fixItInsert(eltTypeRepr->getLoc(), "@noDerivative ");
-        }
-      }
-    }
-    // SWIFT_ENABLE_TENSORFLOW END
-
     auto paramFlags = ParameterTypeFlags::fromParameterType(
         ty, variadic, autoclosure, /*isNonEphemeral*/ false, ownership,
         noDerivative);
     elements.emplace_back(ty, Identifier(), paramFlags);
   }
+
+  // SWIFT_ENABLE_TENSORFLOW
+  // All non-`@noDerivative` parameters of `@differentiable` and
+  // `@differentiable(linear)` function types must be differentiable.
+  if (diffKind != DifferentiabilityKind::NonDifferentiable &&
+      resolution.getStage() != TypeResolutionStage::Structural) {
+    bool isLinear = diffKind == DifferentiabilityKind::Linear;
+    // Emit `@noDerivative` fixit only if there is at least one valid
+    // differentiability/linearity parameter. Otherwise, adding `@noDerivative`
+    // produces an ill-formed function type.
+    auto hasValidDifferentiabilityParam =
+        llvm::find_if(elements, [&](AnyFunctionType::Param param) {
+          if (param.isNoDerivative())
+            return false;
+          return isDifferentiable(param.getPlainType(),
+                                  /*tangentVectorEqualsSelf*/ isLinear);
+        }) != elements.end();
+    // });
+    for (unsigned i = 0, end = inputRepr->getNumElements(); i != end; ++i) {
+      auto *eltTypeRepr = inputRepr->getElementType(i);
+      auto param = elements[i];
+      if (param.isNoDerivative())
+        continue;
+      auto paramType = param.getPlainType();
+      if (isDifferentiable(paramType, /*tangentVectorEqualsSelf*/ isLinear))
+        continue;
+      auto paramTypeString = paramType->getString();
+      auto diagnostic =
+          diagnose(eltTypeRepr->getLoc(),
+                   diag::differentiable_function_type_invalid_parameter,
+                   paramTypeString, isLinear, hasValidDifferentiabilityParam);
+      if (hasValidDifferentiabilityParam)
+        diagnostic.fixItInsert(eltTypeRepr->getLoc(), "@noDerivative ");
+    }
+  }
+  // SWIFT_ENABLE_TENSORFLOW END
 
   return false;
 }

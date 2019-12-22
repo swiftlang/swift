@@ -4097,8 +4097,10 @@ ERROR(attr_only_on_parameters_of_differentiable,none,
 ERROR(differentiable_function_type_invalid_parameter,none,
       "parameter type '%0' does not conform to 'Differentiable'"
       "%select{| and satisfy '%0 == %0.TangentVector'}1, but the enclosing "
-      "function type is '@differentiable%select{|(linear)}1'; did you want to "
-      "add '@noDerivative' to this parameter?", (StringRef, bool))
+      "function type is '@differentiable%select{|(linear)}1'"
+      "%select{|; did you want to add '@noDerivative' to this parameter?}2",
+      (StringRef, /*tangentVectorEqualsSelf*/ bool,
+       /*hasValidDifferentiabilityParameter*/ bool))
 ERROR(differentiable_function_type_invalid_result,none,
       "result type '%0' does not conform to 'Differentiable'"
       "%select{| and satisfy '%0 == %0.TangentVector'}1, but the enclosing "

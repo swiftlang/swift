@@ -8,11 +8,27 @@ let _: @differentiable (Float) throws -> Float
 //===----------------------------------------------------------------------===//
 
 struct NonDiffType { var x: Int }
+
 // FIXME: Properly type-check parameters and the result's differentiability
-// expected-error @+1 {{parameter type 'NonDiffType' does not conform to 'Differentiable', but the enclosing function type is '@differentiable'; did you want to add '@noDerivative' to this parameter?}} {{25-25=@noDerivative }}
+// expected-error @+1 {{parameter type 'NonDiffType' does not conform to 'Differentiable', but the enclosing function type is '@differentiable'}}
 let _: @differentiable (NonDiffType) -> Float
+
+// Emit `@noDerivative` fixit iff there is at least one valid differentiability parameter.
+// expected-error @+1 {{parameter type 'NonDiffType' does not conform to 'Differentiable', but the enclosing function type is '@differentiable'; did you want to add '@noDerivative' to this parameter?}} {{32-32=@noDerivative }}
+let _: @differentiable (Float, NonDiffType) -> Float
+
+// expected-error @+1 {{result type 'NonDiffType' does not conform to 'Differentiable' and satisfy 'NonDiffType == NonDiffType.TangentVector', but the enclosing function type is '@differentiable(linear)'}}
+let _: @differentiable(linear) (Float) -> NonDiffType
+
+// Emit `@noDerivative` fixit iff there is at least one valid linearity parameter.
+// expected-error @+1 {{parameter type 'NonDiffType' does not conform to 'Differentiable' and satisfy 'NonDiffType == NonDiffType.TangentVector', but the enclosing function type is '@differentiable(linear)'; did you want to add '@noDerivative' to this parameter?}} {{40-40=@noDerivative }}
+let _: @differentiable(linear) (Float, NonDiffType) -> Float
+
 // expected-error @+1 {{result type 'NonDiffType' does not conform to 'Differentiable', but the enclosing function type is '@differentiable'}}
 let _: @differentiable (Float) -> NonDiffType
+
+// expected-error @+1 {{result type 'NonDiffType' does not conform to 'Differentiable' and satisfy 'NonDiffType == NonDiffType.TangentVector', but the enclosing function type is '@differentiable(linear)'}}
+let _: @differentiable(linear) (Float) -> NonDiffType
 
 let _: @differentiable(linear) (Float) -> Float
 
@@ -115,7 +131,7 @@ func inferredConformancesGeneric<T, U>(_: @differentiable (Vector<T>) -> Vector<
 
 // expected-error @+5 {{generic signature requires types 'Vector<T>' and 'Vector<T>.TangentVector' to be the same}}
 // expected-error @+4 {{generic signature requires types 'Vector<U>' and 'Vector<U>.TangentVector' to be the same}}
-// expected-error @+3 {{parameter type 'Vector<T>' does not conform to 'Differentiable' and satisfy 'Vector<T> == Vector<T>.TangentVector', but the enclosing function type is '@differentiable(linear)'; did you want to add '@noDerivative' to this parameter?}}
+// expected-error @+3 {{parameter type 'Vector<T>' does not conform to 'Differentiable' and satisfy 'Vector<T> == Vector<T>.TangentVector', but the enclosing function type is '@differentiable(linear)'}}
 // expected-error @+2 {{result type 'Vector<U>' does not conform to 'Differentiable' and satisfy 'Vector<U> == Vector<U>.TangentVector', but the enclosing function type is '@differentiable(linear)'}}
 // expected-note @+1 2 {{where 'T' = 'Int'}}
 func inferredConformancesGenericLinear<T, U>(_: @differentiable(linear) (Vector<T>) -> Vector<U>) {}
@@ -132,7 +148,7 @@ inferredConformancesGeneric(diff) // okay!
 func inferredConformancesGenericResult<T, U>() -> @differentiable (Vector<T>) -> Vector<U> {}
 // expected-error @+4 {{generic signature requires types 'Vector<T>' and 'Vector<T>.TangentVector' to be the same}}
 // expected-error @+3 {{generic signature requires types 'Vector<U>' and 'Vector<U>.TangentVector' to be the same}}
-// expected-error @+2 {{parameter type 'Vector<T>' does not conform to 'Differentiable' and satisfy 'Vector<T> == Vector<T>.TangentVector', but the enclosing function type is '@differentiable(linear)'; did you want to add '@noDerivative' to this parameter?}}
+// expected-error @+2 {{parameter type 'Vector<T>' does not conform to 'Differentiable' and satisfy 'Vector<T> == Vector<T>.TangentVector', but the enclosing function type is '@differentiable(linear)'}}
 // expected-error @+1 {{result type 'Vector<U>' does not conform to 'Differentiable' and satisfy 'Vector<U> == Vector<U>.TangentVector', but the enclosing function type is '@differentiable(linear)'}}
 func inferredConformancesGenericResultLinear<T, U>() -> @differentiable(linear) (Vector<T>) -> Vector<U> {}
 
