@@ -47,11 +47,7 @@ endif()
 # on the presence of symbols in libSupport to identify how the code was
 # built and cause link failures for mismatches. Without linking that library,
 # we get link failures regardless, so instead, this just disables the checks.
-if(CMAKE_VERSION VERSION_LESS 3.12)
-  append("-DLLVM_DISABLE_ABI_BREAKING_CHECKS_ENFORCING=1" CMAKE_C_FLAGS CMAKE_CXX_FLAGS)
-else()
-  add_compile_definitions(LLVM_DISABLE_ABI_BREAKING_CHECKS_ENFORCING=1)
-endif()
+add_compile_definitions(LLVM_DISABLE_ABI_BREAKING_CHECKS_ENFORCING=1)
 
 
 add_subdirectory(legacy_layouts)
