@@ -231,6 +231,10 @@ enum class FixKind : uint8_t {
   /// Base type in reference to the contextual member e.g. `.foo` couldn't be
   /// inferred and has to be specified explicitly.
   SpecifyBaseTypeForContextualMember,
+
+  /// Closure return type has to be explicitly specified because it can't be
+  /// inferred in current context e.g. because it's a multi-statement closure.
+  SpecifyClosureReturnType,
 };
 
 class ConstraintFix {
@@ -1603,6 +1607,21 @@ public:
 
   static SpecifyBaseTypeForContextualMember *
   create(ConstraintSystem &cs, DeclNameRef member, ConstraintLocator *locator);
+};
+
+class SpecifyClosureReturnType final : public ConstraintFix {
+  SpecifyClosureReturnType(ConstraintSystem &cs, ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::SpecifyClosureReturnType, locator) {}
+
+public:
+  std::string getName() const {
+    return "specify closure return type";
+  }
+
+  bool diagnose(bool asNote = false) const;
+
+  static SpecifyClosureReturnType *create(ConstraintSystem &cs,
+                                          ConstraintLocator *locator);
 };
 
 } // end namespace constraints

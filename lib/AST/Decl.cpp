@@ -587,8 +587,12 @@ Result->X = SM.getLocFromExternalSource(Locs->SourceFilePath, Locs->X.Line,   \
 }
 
 StringRef Decl::getAlternateModuleName() const {
-  if (auto *OD = Attrs.getAttribute(DeclAttrKind::DAK_OriginallyDefinedIn)) {
-    return static_cast<const OriginallyDefinedInAttr*>(OD)->OriginalModuleName;
+  for (auto *Att: Attrs) {
+    if (auto *OD = dyn_cast<OriginallyDefinedInAttr>(Att)) {
+      if (OD->isActivePlatform(getASTContext())) {
+        return OD->OriginalModuleName;
+      }
+    }
   }
   for (auto *DC = getDeclContext(); DC; DC = DC->getParent()) {
     if (auto decl = DC->getAsDecl()) {
@@ -2873,6 +2877,16 @@ bool ValueDecl::isImplicitlyUnwrappedOptional() const {
     false);
 }
 
+bool ValueDecl::isLocalCapture() const {
+  auto *dc = getDeclContext();
+
+  if (auto *fd = dyn_cast<FuncDecl>(this))
+    if (isa<SourceFile>(dc))
+      return fd->hasTopLevelLocalContextCaptures();
+
+  return dc->isLocalContext();
+}
+
 ArrayRef<ValueDecl *>
 ValueDecl::getSatisfiedProtocolRequirements(bool Sorted) const {
   // Dig out the nominal type.
@@ -3540,13 +3554,25 @@ bool NominalTypeDecl::isResilient() const {
   return getModuleContext()->isResilient();
 }
 
+static bool isOriginallyDefinedIn(const Decl *D, const ModuleDecl* MD) {
+  if (!MD)
+    return false;
+  if (D->getAlternateModuleName().empty())
+    return false;
+  return D->getAlternateModuleName() == MD->getName().str();
+}
+
 bool NominalTypeDecl::isResilient(ModuleDecl *M,
                                   ResilienceExpansion expansion) const {
   switch (expansion) {
   case ResilienceExpansion::Minimal:
     return isResilient();
   case ResilienceExpansion::Maximal:
-    return M != getModuleContext() && isResilient();
+    // We consider this decl belongs to the module either it's currently
+    // defined in this module or it's originally defined in this module, which
+    // is specified by @_originallyDefinedIn
+    return M != getModuleContext() && !isOriginallyDefinedIn(this, M) &&
+      isResilient();
   }
   llvm_unreachable("bad resilience expansion");
 }
@@ -3655,8 +3681,6 @@ void NominalTypeDecl::addExtension(ExtensionDecl *extension) {
   // Add to the end of the list.
   LastExtension->NextExtension.setPointer(extension);
   LastExtension = extension;
-
-  addedExtension(extension);
 }
 
 ArrayRef<VarDecl *> NominalTypeDecl::getStoredProperties() const {
@@ -5319,6 +5343,7 @@ VarDecl::VarDecl(DeclKind kind, bool isStatic, VarDecl::Introducer introducer,
 {
   Bits.VarDecl.Introducer = unsigned(introducer);
   Bits.VarDecl.IsCaptureList = isCaptureList;
+  Bits.VarDecl.IsSelfParamCapture = false;
   Bits.VarDecl.IsDebuggerVar = false;
   Bits.VarDecl.IsLazyStorageProperty = false;
   Bits.VarDecl.HasNonPatternBindingInit = false;
@@ -6698,6 +6723,20 @@ BraceStmt *AbstractFunctionDecl::getBody(bool canSynthesize) const {
                            nullptr);
 }
 
+void AbstractFunctionDecl::setBody(BraceStmt *S, BodyKind NewBodyKind) {
+  assert(getBodyKind() != BodyKind::Skipped &&
+         "cannot set a body if it was skipped");
+
+  Body = S;
+  setBodyKind(NewBodyKind);
+
+  // Need to recompute init body kind.
+  if (NewBodyKind < BodyKind::TypeChecked) {
+    if (auto *ctor = dyn_cast<ConstructorDecl>(this))
+      ctor->clearCachedDelegatingOrChainedInitKind();
+  }
+}
+
 SourceRange AbstractFunctionDecl::getBodySourceRange() const {
   switch (getBodyKind()) {
   case BodyKind::None:
@@ -7517,8 +7556,11 @@ ConstructorDecl::getDelegatingOrChainedInitKind(DiagnosticEngine *diags,
 
   // If we already computed the result, return it.
   if (Bits.ConstructorDecl.ComputedBodyInitKind) {
-    return static_cast<BodyInitKind>(
-             Bits.ConstructorDecl.ComputedBodyInitKind - 1);
+    auto Kind = static_cast<BodyInitKind>(
+        Bits.ConstructorDecl.ComputedBodyInitKind - 1);
+    assert((Kind == BodyInitKind::None || !init) &&
+           "can't return cached result with the init expr");
+    return Kind;
   }
 
 
@@ -7764,6 +7806,12 @@ bool FuncDecl::isPotentialIBActionTarget() const {
   return isInstanceMember() &&
     getDeclContext()->getSelfClassDecl() &&
     !isa<AccessorDecl>(this);
+}
+
+void FuncDecl::setHasTopLevelLocalContextCaptures(bool hasCaptures) {
+  assert(!hasCaptures || isa<SourceFile>(getDeclContext()));
+  
+  Bits.FuncDecl.HasTopLevelLocalContextCaptures = hasCaptures;
 }
 
 Type TypeBase::getSwiftNewtypeUnderlyingType() {

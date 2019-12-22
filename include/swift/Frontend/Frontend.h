@@ -318,18 +318,9 @@ public:
     return CodeCompletionOffset != ~0U;
   }
 
-  void setCodeCompletionFactory(CodeCompletionCallbacksFactory *Factory) {
-    CodeCompletionFactory = Factory;
-    disableASTScopeLookup();
-  }
-  
   /// Called from lldb, see rdar://53971116
   void disableASTScopeLookup() {
     LangOpts.EnableASTScopeLookup = false;
-  }
-
-  CodeCompletionCallbacksFactory *getCodeCompletionFactory() const {
-    return CodeCompletionFactory;
   }
 
   /// Retrieve a module hash string that is suitable for uniquely
@@ -384,6 +375,8 @@ public:
   /// mode, so return the ModuleInterfaceOutputPath when in that mode and
   /// fail an assert if not in that mode.
   std::string getModuleInterfaceOutputPathForWholeModule() const;
+
+  std::string getLdAddCFileOutputPathForWholeModule() const;
 
   SerializationOptions
   computeSerializationOptions(const SupplementaryOutputPaths &outs,
@@ -481,6 +474,10 @@ public:
     Diagnostics.addConsumer(*DC);
   }
 
+  void removeDiagnosticConsumer(DiagnosticConsumer *DC) {
+    Diagnostics.removeConsumer(*DC);
+  }
+
   void createDependencyTracker(bool TrackSystemDeps) {
     assert(!Context && "must be called before setup()");
     DepTracker = llvm::make_unique<DependencyTracker>(TrackSystemDeps);
@@ -544,6 +541,18 @@ public:
 
   /// Returns true if there was an error during setup.
   bool setup(const CompilerInvocation &Invocation);
+
+  const CompilerInvocation &getInvocation() {
+    return Invocation;
+  }
+
+  bool hasPersistentParserState() const {
+    return bool(PersistentState);
+  }
+
+  PersistentParserState &getPersistentParserState() {
+    return *PersistentState.get();
+  }
 
 private:
   /// Set up the file system by loading and validating all VFS overlay YAML

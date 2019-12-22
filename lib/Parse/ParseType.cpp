@@ -633,40 +633,16 @@ ParserStatus Parser::parseGenericArguments(SmallVectorImpl<TypeRepr *> &Args,
   return makeParserSuccess();
 }
 
-/// SWIFT_ENABLE_TENSORFLOW
-/// Returns true if a base type for a qualified declaration name can be
-/// parsed.
-///
-/// Examples:
-///   'Foo.f' -> true
-///   'Foo.Bar.f' -> true
-///   'f' -> false, no base type
-bool Parser::canParseBaseTypeForQualifiedDeclName() {
-  BacktrackingScope backtrack(*this);
-
-  // First, parse a single type identifier component.
-  if (!Tok.isAny(tok::identifier, tok::kw_Self, tok::kw_Any))
-    return false;
-  consumeToken();
-  if (startsWithLess(Tok))
-    if (!canParseGenericArguments())
-      return false;
-
-  // If the next token is a period or starts with a period, then this can be
-  // parsed as a type qualifier.
-  return startsWithSymbol(Tok, '.');
-}
-
 /// parseTypeIdentifier
 ///   
 ///   type-identifier:
 ///     identifier generic-args? ('.' identifier generic-args?)*
 ///
-// SWIFT_ENABLE_TENSORFLOW: Added `isParsingQualifiedDeclName` flag.
-ParserResult<TypeRepr> Parser::parseTypeIdentifier(bool isParsingQualifiedDeclName) {
+ParserResult<TypeRepr>
+Parser::parseTypeIdentifier(bool isParsingQualifiedDeclBaseType) {
   // If parsing a qualified declaration name, return error if base type cannot
   // be parsed.
-  if (isParsingQualifiedDeclName && !canParseBaseTypeForQualifiedDeclName())
+  if (isParsingQualifiedDeclBaseType && !canParseBaseTypeForQualifiedDeclName())
     return makeParserError();
 
   if (Tok.isNot(tok::identifier) && Tok.isNot(tok::kw_Self)) {
@@ -697,9 +673,8 @@ ParserResult<TypeRepr> Parser::parseTypeIdentifier(bool isParsingQualifiedDeclNa
   SourceLoc EndLoc;
   while (true) {
     DeclNameLoc Loc;
-    DeclNameRef Name = parseUnqualifiedDeclBaseName(
-        /*afterDot=*/false, Loc,
-        diag::expected_identifier_in_dotted_type);
+    DeclNameRef Name =
+        parseDeclNameRef(Loc, diag::expected_identifier_in_dotted_type, {});
     if (!Name)
       Status.setIsParseError();
 
@@ -734,19 +709,19 @@ ParserResult<TypeRepr> Parser::parseTypeIdentifier(bool isParsingQualifiedDeclNa
       }
       if (!peekToken().isContextualKeyword("Type")
           && !peekToken().isContextualKeyword("Protocol")) {
-        consumeToken();
-        // SWIFT_ENABLE_TENSORFLOW
         // If parsing a qualified declaration name, break before parsing the
-        // final declaration name component.
-        if (isParsingQualifiedDeclName) {
+        // period before the final declaration name component.
+        if (isParsingQualifiedDeclBaseType) {
           // If qualified name base type cannot be parsed from the current
           // point (i.e. the next type identifier is not followed by a '.'),
           // then the next identifier is the final declaration name component.
           BacktrackingScope backtrack(*this);
+          consumeStartingCharacterOfCurrentToken(tok::period);
           if (!canParseBaseTypeForQualifiedDeclName())
             break;
         }
-        // SWIFT_ENABLE_TENSORFLOW END
+        // Consume the period.
+        consumeToken();
         continue;
       }
     } else if (Tok.is(tok::code_complete)) {
@@ -1584,19 +1559,27 @@ bool Parser::canParseTypeIdentifierOrTypeComposition() {
   }
 }
 
+bool Parser::canParseSimpleTypeIdentifier() {
+  // Parse an identifier.
+  if (!Tok.isAny(tok::identifier, tok::kw_Self, tok::kw_Any))
+    return false;
+  consumeToken();
+
+  // Parse an optional generic argument list.
+  if (startsWithLess(Tok))
+    if (!canParseGenericArguments())
+      return false;
+
+  return true;
+}
+
 bool Parser::canParseTypeIdentifier() {
   while (true) {
-    if (!Tok.isAny(tok::identifier, tok::kw_Self, tok::kw_Any))
+    if (!canParseSimpleTypeIdentifier())
       return false;
-    consumeToken();
-    
-    if (startsWithLess(Tok)) {
-      if (!canParseGenericArguments())
-        return false;
-    }
 
     // Treat 'Foo.<anything>' as an attempt to write a dotted type
-    // unless <anything> is 'Type'.
+    // unless <anything> is 'Type' or 'Protocol'.
     if ((Tok.is(tok::period) || Tok.is(tok::period_prefix)) &&
         !peekToken().isContextualKeyword("Type") &&
         !peekToken().isContextualKeyword("Protocol")) {
@@ -1607,6 +1590,17 @@ bool Parser::canParseTypeIdentifier() {
   }
 }
 
+bool Parser::canParseBaseTypeForQualifiedDeclName() {
+  BacktrackingScope backtrack(*this);
+
+  // Parse a simple type identifier.
+  if (!canParseSimpleTypeIdentifier())
+    return false;
+
+  // Qualified name base types must be followed by a period.
+  // If the next token starts with a period, return true.
+  return startsWithSymbol(Tok, '.');
+}
 
 bool Parser::canParseOldStyleProtocolComposition() {
   consumeToken(tok::kw_protocol);

@@ -48,6 +48,7 @@
 
 #include "CompilationRecord.h"
 
+#include <fstream>
 #include <signal.h>
 
 #define DEBUG_TYPE "batch-mode"
@@ -121,6 +122,7 @@ Compilation::Compilation(DiagnosticEngine &Diags,
                          bool SaveTemps,
                          bool ShowDriverTimeCompilation,
                          std::unique_ptr<UnifiedStatsReporter> StatsReporter,
+                         bool OnlyOneDependencyFile,
                          bool EnableFineGrainedDependencies,
                          bool VerifyFineGrainedDependencyGraphAfterEveryImport,
                          bool EmitFineGrainedDependencyDotFileAfterEveryImport,
@@ -149,6 +151,7 @@ Compilation::Compilation(DiagnosticEngine &Diags,
     ShowDriverTimeCompilation(ShowDriverTimeCompilation),
     Stats(std::move(StatsReporter)),
     FilelistThreshold(FilelistThreshold),
+    OnlyOneDependencyFile(OnlyOneDependencyFile),
     EnableFineGrainedDependencies(EnableFineGrainedDependencies),
     VerifyFineGrainedDependencyGraphAfterEveryImport(
       VerifyFineGrainedDependencyGraphAfterEveryImport),
@@ -156,7 +159,8 @@ Compilation::Compilation(DiagnosticEngine &Diags,
       EmitFineGrainedDependencyDotFileAfterEveryImport),
     FineGrainedDependenciesIncludeIntrafileOnes(
       FineGrainedDependenciesIncludeIntrafileOnes),
-    EnableSourceRangeDependencies(EnableSourceRangeDependencies) {
+    EnableSourceRangeDependencies(EnableSourceRangeDependencies)
+    {
     if (CompareIncrementalSchemes)
       IncrementalComparator.emplace(
       // Ensure the references are to inst vars, NOT arguments
@@ -2031,4 +2035,21 @@ unsigned Compilation::countSwiftInputs() const {
     if (p.first == file_types::TY_Swift)
       ++inputCount;
   return inputCount;
+}
+
+void Compilation::addDependencyPathOrCreateDummy(
+    StringRef depPath, function_ref<void()> addDependencyPath) {
+
+  if (!OnlyOneDependencyFile) {
+    addDependencyPath();
+    return;
+  }
+  if (!HaveAlreadyAddedDependencyPath) {
+    addDependencyPath();
+    HaveAlreadyAddedDependencyPath = true;
+  } else if (!depPath.empty()) {
+    // Create dummy empty file
+    std::error_code EC;
+    llvm::raw_fd_ostream(depPath, EC, llvm::sys::fs::F_None);
+  }
 }

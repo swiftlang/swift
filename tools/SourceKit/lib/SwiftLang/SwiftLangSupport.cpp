@@ -12,6 +12,7 @@
 
 #include "SwiftLangSupport.h"
 #include "SwiftASTManager.h"
+#include "SwiftEditorDiagConsumer.h"
 #include "SourceKit/Core/Context.h"
 #include "SourceKit/SwiftLang/Factory.h"
 #include "SourceKit/Support/FileSystemProvider.h"
@@ -23,8 +24,10 @@
 #include "swift/AST/SILOptions.h"
 #include "swift/AST/USRGeneration.h"
 #include "swift/Config.h"
+#include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/IDE/CodeCompletion.h"
 #include "swift/IDE/CodeCompletionCache.h"
+#include "swift/IDE/CompletionInstance.h"
 #include "swift/IDE/SyntaxModel.h"
 #include "swift/IDE/Utils.h"
 
@@ -329,6 +332,9 @@ SwiftLangSupport::SwiftLangSupport(SourceKit::Context &SKCtx)
   ASTMgr = std::make_shared<SwiftASTManager>(EditorDocuments,
                                              SKCtx.getGlobalConfiguration(),
                                              Stats, RuntimeResourcePath);
+
+  CompletionInst = std::make_unique<CompletionInstance>();
+
   // By default, just use the in-memory cache.
   CCCache->inMemory = llvm::make_unique<ide::CodeCompletionCache>();
 
@@ -348,26 +354,7 @@ void SwiftLangSupport::setInMemoryOutputFileSystem(
     llvm::IntrusiveRefCntPtr<clang::InMemoryOutputFileSystem> FS) {
   ASTMgr->setInMemoryOutputFileSystem(std::move(FS));
 }
-
-std::unique_ptr<llvm::MemoryBuffer>
-SwiftLangSupport::makeCodeCompletionMemoryBuffer(
-    const llvm::MemoryBuffer *origBuf, unsigned &Offset,
-    const std::string bufferIdentifier) {
-
-  auto origBuffSize = origBuf->getBufferSize();
-  if (Offset > origBuffSize)
-    Offset = origBuffSize;
-
-  auto newBuffer = llvm::WritableMemoryBuffer::getNewUninitMemBuffer(
-      origBuffSize + 1, bufferIdentifier);
-  auto *pos = origBuf->getBufferStart() + Offset;
-  auto *newPos =
-      std::copy(origBuf->getBufferStart(), pos, newBuffer->getBufferStart());
-  *newPos = '\0';
-  std::copy(pos, origBuf->getBufferEnd(), newPos + 1);
-
-  return std::unique_ptr<llvm::MemoryBuffer>(newBuffer.release());
-}
+// SWIFT_ENABLE_TENSORFLOW END
 
 UIdent SwiftLangSupport::getUIDForDecl(const Decl *D, bool IsRef) {
   return UIdentVisitor(IsRef).visit(const_cast<Decl*>(D));
@@ -1013,9 +1000,11 @@ void SwiftLangSupport::codeComplete(
   auto options = provider->addFileSystem(FS);
   vfsOptions.options =
       llvm::make_unique<DirectlyPassedFileSystemProvider::Options>(options);
-  codeComplete(InputBuf, Offset, Consumer, Args, std::move(vfsOptions));
+  codeComplete(InputBuf, Offset, vfsOptions.options.get(), Consumer, Args,
+               std::move(vfsOptions));
   provider->removeFileSystem(options);
 }
+// SWIFT_ENABLE_TENSORFLOW END
 
 void SwiftLangSupport::editorOpen(
     StringRef Name, llvm::MemoryBuffer *Buf, EditorConsumer &Consumer,
@@ -1072,6 +1061,70 @@ SwiftLangSupport::getFileSystem(const Optional<VFSOptions> &vfsOptions,
 
   // Fallback to the real filesystem.
   return llvm::vfs::getRealFileSystem();
+}
+
+bool SwiftLangSupport::performCompletionLikeOperation(
+    llvm::MemoryBuffer *UnresolvedInputFile, unsigned Offset,
+    ArrayRef<const char *> Args,
+    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
+    bool EnableASTCaching, std::string &Error,
+    llvm::function_ref<void(CompilerInstance &)> Callback) {
+  assert(FileSystem);
+
+  // Resolve symlinks for the input file; we resolve them for the input files
+  // in the arguments as well.
+  // FIXME: We need the Swift equivalent of Clang's FileEntry.
+  llvm::SmallString<128> bufferIdentifier;
+  if (auto err = FileSystem->getRealPath(
+          UnresolvedInputFile->getBufferIdentifier(), bufferIdentifier))
+    bufferIdentifier = UnresolvedInputFile->getBufferIdentifier();
+
+  // Create a buffer for code completion. This contains '\0' at 'Offset'
+  // position of 'UnresolvedInputFile' buffer.
+  auto origOffset = Offset;
+  auto newBuffer = ide::makeCodeCompletionMemoryBuffer(
+      UnresolvedInputFile, Offset, bufferIdentifier);
+
+  SourceManager SM;
+  DiagnosticEngine Diags(SM);
+  PrintingDiagnosticConsumer PrintDiags;
+  EditorDiagConsumer TraceDiags;
+  trace::TracedOperation TracedOp{trace::OperationKind::CodeCompletion};
+
+  Diags.addConsumer(PrintDiags);
+  if (TracedOp.enabled()) {
+    Diags.addConsumer(TraceDiags);
+    trace::SwiftInvocation SwiftArgs;
+    trace::initTraceInfo(SwiftArgs, bufferIdentifier, Args);
+    TracedOp.setDiagnosticProvider(
+        [&](SmallVectorImpl<DiagnosticEntryInfo> &diags) {
+          TraceDiags.getAllDiagnostics(diags);
+        });
+    TracedOp.start(
+        SwiftArgs,
+        {std::make_pair("OriginalOffset", std::to_string(origOffset)),
+         std::make_pair("Offset", std::to_string(Offset))});
+  }
+  ForwardingDiagnosticConsumer CIDiags(Diags);
+
+  CompilerInvocation Invocation;
+  bool Failed = getASTManager()->initCompilerInvocation(
+      Invocation, Args, Diags, newBuffer->getBufferIdentifier(), FileSystem,
+      Error);
+  if (Failed)
+    return false;
+  if (!Invocation.getFrontendOptions().InputsAndOutputs.hasInputs()) {
+    Error = "no input filenames specified";
+    return false;
+  }
+
+  // Pin completion instance.
+  auto CompletionInst = getCompletionInstance();
+
+  return CompletionInst->performOperation(Invocation, Args, FileSystem,
+                                          newBuffer.get(), Offset,
+                                          EnableASTCaching, Error,
+                                          &CIDiags, Callback);
 }
 
 CloseClangModuleFiles::~CloseClangModuleFiles() {

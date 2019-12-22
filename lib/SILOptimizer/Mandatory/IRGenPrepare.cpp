@@ -56,12 +56,17 @@ static bool cleanFunction(SILFunction &fn) {
           LLVM_FALLTHROUGH;
         }
         case BuiltinValueKind::PoundAssert:
-        case BuiltinValueKind::StaticReport:
+        case BuiltinValueKind::StaticReport: {
           // The call to the builtin should get removed before we reach
           // IRGen.
-          recursivelyDeleteTriviallyDeadInstructions(bi, /* Force */ true);
+          InstructionDeleter deleter;
+          deleter.forceDelete(bi);
+          // StaticReport only takes trivial operands, and therefore doesn't
+          // require fixing the lifetime of its operands.
+          deleter.cleanUpDeadInstructions();
           madeChange = true;
           break;
+        }
         default:
           break;
       }
