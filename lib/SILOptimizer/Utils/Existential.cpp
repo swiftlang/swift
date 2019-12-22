@@ -157,9 +157,9 @@ static SILInstruction *getStackInitInst(SILValue allocStackAddr,
   if (BB != allocStackAddr->getParentBlock() && BB != ASIUser->getParent())
     return nullptr;
 
-  if(auto *store = dyn_cast<StoreInst>(SingleWrite))
+  if (auto *store = dyn_cast<StoreInst>(SingleWrite))
     return store;
-  
+
   if (auto *IE = dyn_cast<InitExistentialAddrInst>(SingleWrite))
     return IE;
 
@@ -210,7 +210,7 @@ static SILValue getAddressOfStackInit(SILValue allocStackAddr,
 
   if (auto *CAI = dyn_cast<CopyAddrInst>(initI))
     return CAI->getSrc();
-  
+
   if (auto *store = dyn_cast<StoreInst>(initI))
     return store->getSrc();
 
