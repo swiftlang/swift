@@ -175,7 +175,7 @@ namespace {
       DebuggerClient *debug_client = getDebuggerClient();
       assert (debug_client);
       debug_client->didGlobalize(D);
-      SF->Decls.push_back(D);
+      SF->addTopLevelDecl(D);
       P.markWasHandled(D);
     }
   };
@@ -250,7 +250,7 @@ void Parser::parseTopLevel() {
   for (auto Item : Items) {
     if (auto *D = Item.dyn_cast<Decl*>()) {
       assert(!isa<AccessorDecl>(D) && "accessors should not be added here");
-      SF.Decls.push_back(D);
+      SF.addTopLevelDecl(D);
     }
   }
 

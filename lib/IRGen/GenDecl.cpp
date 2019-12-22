@@ -431,7 +431,7 @@ void IRGenModule::emitSourceFile(SourceFile &SF) {
   llvm::SaveAndRestore<SourceFile *> SetCurSourceFile(CurSourceFile, &SF);
 
   // Emit types and other global decls.
-  for (auto *decl : SF.Decls)
+  for (auto *decl : SF.getTopLevelDecls())
     emitGlobalDecl(decl);
   for (auto *localDecl : SF.LocalTypeDecls)
     emitGlobalDecl(localDecl);

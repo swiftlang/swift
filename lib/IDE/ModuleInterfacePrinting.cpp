@@ -667,7 +667,7 @@ static SourceLoc getDeclStartPosition(SourceFile &File) {
     return false;
   };
 
-  for (auto D : File.Decls) {
+  for (auto D : File.getTopLevelDecls()) {
     if (tryUpdateStart(D->getStartLoc())) {
       tryUpdateStart(D->getAttrs().getStartLoc());
       auto RawComment = D->getRawComment();

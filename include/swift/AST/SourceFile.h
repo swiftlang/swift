@@ -125,11 +125,28 @@ private:
   /// been validated.
   llvm::SetVector<ValueDecl *> UnvalidatedDeclsWithOpaqueReturnTypes;
 
+  /// The list of top-level declarations in the source file.
+  std::vector<Decl *> Decls;
+
   friend ASTContext;
   friend Impl;
+
 public:
-  /// The list of top-level declarations in the source file.
-  std::vector<Decl*> Decls;
+  /// Appends the given declaration to the end of the top-level decls list.
+  void addTopLevelDecl(Decl *d) {
+    Decls.push_back(d);
+  }
+
+  /// Retrieves an immutable view of the list of top-level decls in this file.
+  ArrayRef<Decl *> getTopLevelDecls() const {
+    return Decls;
+  }
+
+  /// Truncates the list of top-level decls so it contains \c count elements.
+  void truncateTopLevelDecls(unsigned count) {
+    assert(count <= Decls.size() && "Can only truncate top-level decls!");
+    Decls.resize(count);
+  }
 
   /// A cache of syntax nodes that can be reused when creating the syntax tree
   /// for this file.

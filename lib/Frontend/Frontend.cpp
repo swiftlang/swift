@@ -984,13 +984,13 @@ void CompilerInstance::parseAndTypeCheckMainFileUpTo(
     // For SIL we actually have to interleave parsing and type checking
     // because the SIL parser expects to see fully type checked declarations.
     if (TheSILModule) {
-      if (Done || CurTUElem < MainFile.Decls.size()) {
+      if (Done || CurTUElem < MainFile.getTopLevelDecls().size()) {
         assert(mainIsPrimary);
         performTypeChecking(MainFile, CurTUElem);
       }
     }
 
-    CurTUElem = MainFile.Decls.size();
+    CurTUElem = MainFile.getTopLevelDecls().size();
   } while (!Done);
 
   if (!TheSILModule) {

@@ -402,7 +402,7 @@ void swift::performNameBinding(SourceFile &SF, unsigned StartElem) {
 
   // Make sure we skip adding the standard library imports if the
   // source file is empty.
-  if (SF.ASTStage == SourceFile::NameBound || SF.Decls.empty()) {
+  if (SF.ASTStage == SourceFile::NameBound || SF.getTopLevelDecls().empty()) {
     SF.ASTStage = SourceFile::NameBound;
     return;
   }
@@ -417,7 +417,7 @@ void swift::performNameBinding(SourceFile &SF, unsigned StartElem) {
 
   // Do a prepass over the declarations to find and load the imported modules
   // and map operator decls.
-  for (auto D : llvm::makeArrayRef(SF.Decls).slice(StartElem)) {
+  for (auto D : SF.getTopLevelDecls().slice(StartElem)) {
     if (auto *ID = dyn_cast<ImportDecl>(D)) {
       Binder.addImport(ImportedModules, ID);
     } else if (auto *OD = dyn_cast<PrefixOperatorDecl>(D)) {
