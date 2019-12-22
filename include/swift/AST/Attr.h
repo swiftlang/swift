@@ -1757,10 +1757,10 @@ public:
 
   // Print the attribute to the given stream.
   // If `omitWrtClause` is true, omit printing the `wrt:` clause.
-  // If `omitAssociatedFunctions` is true, omit printing associated functions.
+  // If `omitDerivativeFunctions` is true, omit printing derivative functions.
   void print(llvm::raw_ostream &OS, const Decl *D,
              bool omitWrtClause = false,
-             bool omitAssociatedFunctions = false) const;
+             bool omitDerivativeFunctions = false) const;
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_Differentiable;
@@ -1791,7 +1791,7 @@ class DerivativeAttr final
       private llvm::TrailingObjects<DerivativeAttr, ParsedAutoDiffParameter> {
   friend TrailingObjects;
 
-  /// The base type repr for the referenced original function. This field is
+  /// The base type for the referenced original declaration. This field is
   /// non-null only for parsed attributes that reference a qualified original
   /// declaration. This field is not serialized; type-checking uses it to
   /// resolve the original declaration, which is serialized.
@@ -1885,7 +1885,7 @@ class TransposeAttr final
       private llvm::TrailingObjects<TransposeAttr, ParsedAutoDiffParameter> {
   friend TrailingObjects;
 
-  /// The base type repr for the referenced original function. This field is
+  /// The base type for the referenced original declaration. This field is
   /// non-null only for parsed attributes that reference a qualified original
   /// declaration. This field is not serialized; type-checking uses it to
   /// resolve the original declaration, which is serialized.

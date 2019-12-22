@@ -862,7 +862,7 @@ bool Parser::parseDifferentiationParametersClause(
     SmallVectorImpl<ParsedAutoDiffParameter> &params, StringRef attrName,
     bool allowNamedParameters) {
   SyntaxParsingContext DiffParamsClauseContext(
-       SyntaxContext, SyntaxKind::DifferentiationParamsClause);
+      SyntaxContext, SyntaxKind::DifferentiationParamsClause);
   consumeToken(tok::identifier);
   if (!consumeIf(tok::colon)) {
     diagnose(Tok, diag::expected_colon_after_label, "wrt");
@@ -1005,8 +1005,8 @@ bool Parser::parseDifferentiableAttributeArguments(
   auto parseFuncSpec = [&](StringRef label, DeclNameRefWithLoc &result,
                            bool &terminateParsingArgs) -> bool {
     // Parse label.
-    if (parseSpecificIdentifier(label,
-            diag::attr_differentiable_missing_label, label) ||
+    if (parseSpecificIdentifier(label, diag::attr_missing_label, label,
+                                AttrName) ||
         parseToken(tok::colon, diag::expected_colon_after_label, label))
       return true;
     // Parse the name of the function.

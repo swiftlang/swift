@@ -1510,11 +1510,11 @@ GenericEnvironment *DifferentiableAttr::getDerivativeGenericEnvironment(
 
 void DifferentiableAttr::print(llvm::raw_ostream &OS, const Decl *D,
                                bool omitWrtClause,
-                               bool omitAssociatedFunctions) const {
+                               bool omitDerivativeFunctions) const {
   StreamPrinter P(OS);
   P << "@" << getAttrName();
   printDifferentiableAttrArguments(this, P, PrintOptions(), D, omitWrtClause,
-                                   omitAssociatedFunctions);
+                                   omitDerivativeFunctions);
 }
 
 DerivativeAttr::DerivativeAttr(bool implicit, SourceLoc atLoc,
