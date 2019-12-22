@@ -232,8 +232,20 @@ static void validateLibraryEvolutionInTestMode(DiagnosticEngine &diags,
   // validating if we see -enable-testing and -enable-library-evolution together
   if (args.hasArg(options::OPT_enable_testing) &&
       args.hasArg(options::OPT_enable_library_evolution)) {
+
+    bool isReleaseCompilation = false;
+    if (const Arg *A = args.getLastArg(options::OPT_O_Group)) {
+      if (A->getOption().matches(options::OPT_O) ||
+          A->getOption().matches(options::OPT_Ounchecked) ||
+          A->getOption().matches(options::OPT_Osize)) {
+        isReleaseCompilation = true;
+      }
+    }
+
+    // Suggesting removing one of the flags based on Debug/Release configuration.
+    auto flag = isReleaseCompilation ? "-enable-testing" : "-enable-library-evolution";
     diags.diagnose(SourceLoc(),
-                   diag::warn_library_evolution_test_mode_compatibility);
+                   diag::warn_library_evolution_test_mode_compatibility, flag);
   }
 }
 

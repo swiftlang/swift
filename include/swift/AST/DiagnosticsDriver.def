@@ -205,8 +205,9 @@ ERROR(error_darwin_static_stdlib_not_supported, none,
 
 WARNING(warn_library_evolution_test_mode_compatibility, none,
         "specifying '-enable-library-evolution' and '-enable-testing' "
-        "together will cause program instability", 
-        ())
+        "together will cause program instability; consider disabling the "
+        "'%0' flag", 
+        (StringRef))
 
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)
