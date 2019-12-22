@@ -776,7 +776,7 @@ extension TF_521 where T: Differentiable, T == T.TangentVector {
     return (TF_521(real: real, imaginary: imaginary), { ($0.real, $0.imaginary) })
   }
 }
-// expected-error @+1 {{result is not differentiable, but the function type is marked '@differentiable'}}
+// expected-error @+1 {{result type 'TF_521<Float>' does not conform to 'Differentiable', but the enclosing function type is '@differentiable'}}
 let _: @differentiable(Float, Float) -> TF_521<Float> = { r, i in
   TF_521(real: r, imaginary: i)
 }

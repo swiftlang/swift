@@ -5073,31 +5073,47 @@ public:
     }
 
     // SWIFT_ENABLE_TENSORFLOW
-    // Infer `Differentiable` or `Differentiable & AdditiveArithmetic` generic
-    // constraints from `@differentiable` or `@differentiable(linear)`.
+    // Infer requirements from `@differentiable` or `@differentiable(linear)`
+    // function types.
+    // For all non-`@noDerivative` parameter and result types:
+    // - `@differentiable`: add `T: Differentiable` requirement.
+    // - `@differentiable(linear)`: add
+    //   `T: Differentiable`, `T == T.TangentVector` requirements.
     if (auto *fnTy = ty->getAs<AnyFunctionType>()) {
       if (fnTy->isDifferentiable()) {
-        auto addConstraint = [&](Type typeToConstrain, ProtocolDecl *protocol) {
-          Requirement req(RequirementKind::Conformance, typeToConstrain,
+        auto addConformanceConstraint = [&](Type type, ProtocolDecl *protocol) {
+          Requirement req(RequirementKind::Conformance, type,
                           protocol->getDeclaredType());
           Builder.addRequirement(req, source, nullptr);
         };
-        auto constrainParametersAndResult = [&](ProtocolDecl *protocol) {
+        auto addSameTypeConstraint = [&](Type firstType,
+                                         AssociatedTypeDecl *assocType) {
+          auto *protocol = assocType->getProtocol();
+          auto conf = Builder.lookupConformance(CanType(), firstType, protocol);
+          auto secondType = conf.getAssociatedType(
+              firstType, assocType->getDeclaredInterfaceType());
+          Requirement req(RequirementKind::SameType, firstType, secondType);
+          Builder.addRequirement(req, source, nullptr);
+        };
+        auto &ctx = Builder.getASTContext();
+        auto *differentiableProtocol =
+            ctx.getProtocol(KnownProtocolKind::Differentiable);
+        auto *tangentVectorAssocType =
+            differentiableProtocol->getAssociatedType(ctx.Id_TangentVector);
+        auto addRequirements = [&](Type type, bool isLinear) {
+          addConformanceConstraint(type, differentiableProtocol);
+          if (isLinear)
+            addSameTypeConstraint(type, tangentVectorAssocType);
+        };
+        auto constrainParametersAndResult = [&](bool isLinear) {
           for (auto &param : fnTy->getParams())
             if (!param.isNoDerivative())
-              addConstraint(param.getPlainType(), protocol);
-          addConstraint(fnTy->getResult(), protocol);
+              addRequirements(param.getPlainType(), isLinear);
+          addRequirements(fnTy->getResult(), isLinear);
         };
-        // Add `Differentiable` constraints.
-        constrainParametersAndResult(
-            Builder.getASTContext()
-                .getProtocol(KnownProtocolKind::Differentiable));
-        // Add `AdditiveArithmetic` constraints if the function is linear.
-        if (fnTy->getDifferentiabilityKind() == DifferentiabilityKind::Linear) {
-          constrainParametersAndResult(
-              Builder.getASTContext()
-                  .getProtocol(KnownProtocolKind::AdditiveArithmetic));
-        }
+        // Add requirements.
+        constrainParametersAndResult(fnTy->getDifferentiabilityKind() ==
+                                     DifferentiabilityKind::Linear);
       }
     }
 
