@@ -111,6 +111,19 @@ static SILInstruction *getStackInitInst(SILValue allocStackAddr,
       }
       continue;
     }
+    if (auto *store = dyn_cast<StoreInst>(User)) {
+      if (store->getDest() == allocStackAddr) {
+        if (SingleWrite)
+          return nullptr;
+        SingleWrite = store;
+        // When we support OSSA here, we need to insert a new copy of the value
+        // before `store` (and make sure that the copy is destroyed when
+        // replacing the apply operand).
+        assert(store->getOwnershipQualifier() ==
+               StoreOwnershipQualifier::Unqualified);
+      }
+      continue;
+    }
     if (isa<InitExistentialAddrInst>(User)) {
       if (SingleWrite)
         return nullptr;
@@ -144,6 +157,9 @@ static SILInstruction *getStackInitInst(SILValue allocStackAddr,
   if (BB != allocStackAddr->getParentBlock() && BB != ASIUser->getParent())
     return nullptr;
 
+  if(auto *store = dyn_cast<StoreInst>(SingleWrite))
+    return store;
+  
   if (auto *IE = dyn_cast<InitExistentialAddrInst>(SingleWrite))
     return IE;
 
@@ -194,6 +210,9 @@ static SILValue getAddressOfStackInit(SILValue allocStackAddr,
 
   if (auto *CAI = dyn_cast<CopyAddrInst>(initI))
     return CAI->getSrc();
+  
+  if (auto *store = dyn_cast<StoreInst>(initI))
+    return store->getSrc();
 
   return SILValue();
 }
@@ -212,39 +231,6 @@ OpenedArchetypeInfo::OpenedArchetypeInfo(Operand &use) {
     if (auto stackInitVal =
             getAddressOfStackInit(instance, user, isOpenedValueCopied)) {
       openedVal = stackInitVal;
-    }
-
-    // Handle:
-    //   %4 = open_existential_ref
-    //   %5 = alloc_stack
-    //   store %4 to %5
-    //   apply <fn>(%5)
-    // It's important that the only uses of %5 (instance) are in
-    // a store and an apply.
-    StoreInst *store = nullptr;
-    ApplyInst *apply = nullptr;
-    DeallocStackInst *dealloc = nullptr;
-    bool shouldOptimize = true;
-
-    for (auto *use : instance->getUses()) {
-      if (auto *foundStore = dyn_cast<StoreInst>(use->getUser())) {
-        store = foundStore;
-      } else if (auto *foundApply = dyn_cast<ApplyInst>(use->getUser())) {
-        apply = foundApply;
-      } else if (auto *foundDealloc = dyn_cast<DeallocStackInst>(use->getUser())) {
-        dealloc = foundDealloc;
-      } else {
-        // TODO: this may be too harsh
-        shouldOptimize = false;
-      }
-    }
-
-    if (shouldOptimize && store && apply && dealloc) {
-      DominanceInfo domInfo(store->getFunction());
-      bool correctOrder = domInfo.dominates(store, apply) &&
-                          domInfo.dominates(apply, dealloc);
-      if (correctOrder)
-        openedVal = store->getSrc();
     }
   }
   if (auto *Open = dyn_cast<OpenExistentialAddrInst>(openedVal)) {
