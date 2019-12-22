@@ -182,10 +182,6 @@ enum class TypeCheckExprFlags {
   /// not affect type checking itself.
   IsExprStmt = 0x20,
 
-  /// If set, this expression is being re-type checked as part of diagnostics,
-  /// and so we should not visit bodies of non-single expression closures.
-  SkipMultiStmtClosures = 0x40,
-
   /// This is an inout yield.
   IsInOutYield = 0x100,
 

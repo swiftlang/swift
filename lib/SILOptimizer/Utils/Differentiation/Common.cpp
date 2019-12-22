@@ -26,8 +26,9 @@ namespace autodiff {
 
 raw_ostream &getADDebugStream() { return llvm::dbgs() << "[AD] "; }
 
-bool isArrayLiteralIntrinsic(ApplyInst *ai) {
-  return ai->hasSemantics("array.uninitialized_intrinsic");
+bool isArrayLiteralIntrinsic(FullApplySite applySite) {
+  return doesApplyCalleeHaveSemantics(applySite.getCalleeOrigin(),
+                                      "array.uninitialized_intrinsic");
 }
 
 ApplyInst *getAllocateUninitializedArrayIntrinsic(SILValue v) {
@@ -71,14 +72,34 @@ DestructureTupleInst *getSingleDestructureTupleUser(SILValue value) {
 }
 
 void forEachApplyDirectResult(
-    ApplyInst *ai, llvm::function_ref<void(SILValue)> resultCallback) {
-  if (!ai->getType().is<TupleType>()) {
-    resultCallback(ai);
-    return;
+    FullApplySite applySite,
+    llvm::function_ref<void(SILValue)> resultCallback) {
+  switch (applySite.getKind()) {
+  case FullApplySiteKind::ApplyInst: {
+    auto *ai = cast<ApplyInst>(applySite.getInstruction());
+    if (!ai->getType().is<TupleType>()) {
+      resultCallback(ai);
+      return;
+    }
+    if (auto *dti = getSingleDestructureTupleUser(ai))
+      for (auto directResult : dti->getResults())
+        resultCallback(directResult);
+    break;
   }
-  if (auto *dti = getSingleDestructureTupleUser(ai))
-    for (auto result : dti->getResults())
-      resultCallback(result);
+  case FullApplySiteKind::BeginApplyInst: {
+    auto *bai = cast<BeginApplyInst>(applySite.getInstruction());
+    for (auto directResult : bai->getResults())
+      resultCallback(directResult);
+    break;
+  }
+  case FullApplySiteKind::TryApplyInst: {
+    auto *tai = cast<TryApplyInst>(applySite.getInstruction());
+    for (auto *succBB : tai->getSuccessorBlocks())
+      for (auto *arg : succBB->getArguments())
+        resultCallback(arg);
+    break;
+  }
+  }
 }
 
 void collectAllFormalResultsInTypeOrder(SILFunction &function,

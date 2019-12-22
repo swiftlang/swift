@@ -125,6 +125,14 @@ std::string CompilerInvocation::getTBDPathForWholeModule() const {
 }
 
 std::string
+CompilerInvocation::getLdAddCFileOutputPathForWholeModule() const {
+  assert(getFrontendOptions().InputsAndOutputs.isWholeModule() &&
+         "LdAdd cfile only makes sense when the whole module can be seen");
+  return getPrimarySpecificPathsForAtMostOnePrimary()
+    .SupplementaryOutputs.LdAddCFilePath;
+}
+
+std::string
 CompilerInvocation::getModuleInterfaceOutputPathForWholeModule() const {
   assert(getFrontendOptions().InputsAndOutputs.isWholeModule() &&
          "ModuleInterfaceOutputPath only makes sense when the whole module "
@@ -885,12 +893,6 @@ void CompilerInstance::parseAndCheckTypesUpTo(
           SF, Invocation.getFrontendOptions().PlaygroundHighPerformance);
     }
   });
-
-  if (Invocation.isCodeCompletion()) {
-    assert(limitStage == SourceFile::NameBound);
-    performCodeCompletionSecondPass(*PersistentState.get(),
-                                    *Invocation.getCodeCompletionFactory());
-  }
 
   // If the limiting AST stage is name binding, we're done.
   if (limitStage <= SourceFile::NameBound) {

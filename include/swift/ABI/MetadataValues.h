@@ -857,7 +857,7 @@ class TargetParameterTypeFlags {
     ValueOwnershipMask    = 0x7F,
     VariadicMask          = 0x80,
     AutoClosureMask       = 0x100,
-    NonDifferentiableMask = 0x200
+    NoDerivativeMask      = 0x200
   };
   int_type Data;
 
@@ -888,7 +888,7 @@ public:
   bool isVariadic() const { return Data & VariadicMask; }
   bool isAutoClosure() const { return Data & AutoClosureMask; }
   // SWIFT_ENABLE_TENSORFLOW
-  bool isNonDifferentiable() const { return Data & NonDifferentiableMask; }
+  bool isNoDerivative() const { return Data & NoDerivativeMask; }
 
   ValueOwnership getValueOwnership() const {
     return (ValueOwnership)(Data & ValueOwnershipMask);

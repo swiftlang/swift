@@ -56,6 +56,8 @@
 using namespace swift;
 
 void PrintOptions::setBaseType(Type T) {
+  if (T->is<ErrorType>())
+    return;
   TransformContext = TypeTransformContext(T);
 }
 
@@ -670,6 +672,7 @@ class PrintAST : public ASTVisitor<PrintAST> {
       FreshOptions.ExcludeAttrList = options.ExcludeAttrList;
       FreshOptions.ExclusiveAttrList = options.ExclusiveAttrList;
       FreshOptions.PrintOptionalAsImplicitlyUnwrapped = options.PrintOptionalAsImplicitlyUnwrapped;
+      FreshOptions.TransformContext = options.TransformContext;
       T.print(Printer, FreshOptions);
       return;
     }
@@ -700,6 +703,8 @@ class PrintAST : public ASTVisitor<PrintAST> {
       }
 
       T = T.subst(subMap, SubstFlags::DesugarMemberTypes);
+
+      options.TransformContext = TypeTransformContext(CurrentType);
     }
 
     printTypeWithOptions(T, options);
@@ -2497,9 +2502,8 @@ static void printParameterFlags(ASTPrinter &printer, PrintOptions options,
                                 ParameterTypeFlags flags, bool escaping) {
   if (!options.excludeAttrKind(TAK_autoclosure) && flags.isAutoClosure())
     printer << "@autoclosure ";
-  // SWIFT_ENABLE_TENSORFLOW
-  if (!options.excludeAttrKind(TAK_nondiff) && flags.isNonDifferentiable())
-    printer << "@nondiff ";
+  if (!options.excludeAttrKind(TAK_noDerivative) && flags.isNoDerivative())
+    printer << "@noDerivative ";
 
   switch (flags.getValueOwnership()) {
   case ValueOwnership::Default:
@@ -3610,7 +3614,6 @@ public:
     // know we're printing a type member so it escapes `Type` and `Protocol`.
     if (auto parent = Ty->getParent()) {
       visitParentType(parent);
-      Printer << ".";
       NameContext = PrintNameContext::TypeMember;
     } else if (shouldPrintFullyQualified(Ty)) {
       printModuleContext(Ty);
@@ -3750,13 +3753,32 @@ public:
   }
 
   void visitParentType(Type T) {
+    /// Don't print the parent type if it's being printed in that type context.
+    if (Options.TransformContext) {
+       if (auto currentType = Options.TransformContext->getBaseType()) {
+         auto printingType = T;
+         if (currentType->hasArchetype())
+           currentType = currentType->mapTypeOutOfContext();
+
+         if (auto errorTy = printingType->getAs<ErrorType>())
+           if (auto origTy = errorTy->getOriginalType())
+             printingType = origTy;
+
+         if (printingType->hasArchetype())
+           printingType = printingType->mapTypeOutOfContext();
+
+         if (currentType->isEqual(printingType))
+           return;
+       }
+    }
     PrintOptions innerOptions = Options;
     innerOptions.SynthesizeSugarOnTypes = false;
 
     if (auto sugarType = dyn_cast<SyntaxSugarType>(T.getPointer()))
       T = sugarType->getImplementationType();
 
-    TypePrinter(Printer, innerOptions).visit(T);
+    TypePrinter(Printer, innerOptions).printWithParensIfNotSimple(T);
+    Printer << ".";
   }
 
   void visitEnumType(EnumType *T) {
@@ -4266,8 +4288,7 @@ public:
   }
   
   void visitNestedArchetypeType(NestedArchetypeType *T) {
-    printWithParensIfNotSimple(T->getParent());
-    Printer << ".";
+    visitParentType(T->getParent());
     printArchetypeCommon(T);
   }
   
@@ -4358,7 +4379,6 @@ public:
 
   void visitDependentMemberType(DependentMemberType *T) {
     visitParentType(T->getBase());
-    Printer << ".";
     Printer.printName(T->getName());
   }
 
@@ -4577,7 +4597,7 @@ void SILParameterInfo::print(ASTPrinter &Printer,
   /// SWIFT_ENABLE_TENSORFLOW
   switch (getDifferentiability()) {
   case SILParameterDifferentiability::NotDifferentiable:
-    Printer << "@nondiff ";
+    Printer << "@noDerivative ";
     break;
   default:
     break;

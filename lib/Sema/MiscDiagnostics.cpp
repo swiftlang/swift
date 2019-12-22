@@ -1316,21 +1316,27 @@ static void diagRecursivePropertyAccess(const Expr *E, const DeclContext *DC) {
   const_cast<Expr *>(E)->walk(walker);
 }
 
-/// Look for any property references in closures that lack a "self." qualifier.
-/// Within a closure, we require that the source code contain "self." explicitly
-/// because 'self' is captured, not the property value.  This is a common source
-/// of confusion, so we force an explicit self.
+/// Look for any property references in closures that lack a 'self.' qualifier.
+/// Within a closure, we require that the source code contain 'self.' explicitly
+/// (or that the closure explicitly capture 'self' in the capture list) because
+/// 'self' is captured, not the property value.  This is a common source of
+/// confusion, so we force an explicit self.
 static void diagnoseImplicitSelfUseInClosure(const Expr *E,
                                              const DeclContext *DC) {
   class DiagnoseWalker : public ASTWalker {
     ASTContext &Ctx;
-    unsigned InClosure;
+    SmallVector<AbstractClosureExpr *, 4> Closures;
   public:
-    explicit DiagnoseWalker(ASTContext &ctx, bool isAlreadyInClosure)
-        : Ctx(ctx), InClosure(isAlreadyInClosure) {}
+    explicit DiagnoseWalker(ASTContext &ctx, AbstractClosureExpr *ACE)
+        : Ctx(ctx), Closures() {
+          if (ACE)
+            Closures.push_back(ACE);
+        }
 
-    /// Return true if this is an implicit reference to self.
-    static bool isImplicitSelfUse(Expr *E) {
+    /// Return true if this is an implicit reference to self which is required
+    /// to be explicit in an escaping closure. Metatype references and value
+    /// type references are excluded.
+    static bool isImplicitSelfParamUseLikelyToCauseCycle(Expr *E) {
       auto *DRE = dyn_cast<DeclRefExpr>(E);
 
       if (!DRE || !DRE->isImplicit() || !isa<VarDecl>(DRE->getDecl()) ||
@@ -1345,11 +1351,19 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
         return false;
 
       // Metatype self captures don't extend the lifetime of an object.
-      return !ty->is<MetatypeType>();
+      if (ty->is<MetatypeType>())
+        return false;
+
+      // If self does not have reference semantics, it is very unlikely that
+      // capturing it will create a reference cycle.
+      if (!ty->hasReferenceSemantics())
+        return false;
+
+      return true;
     }
 
-    /// Return true if this is a closure expression that will require "self."
-    /// qualification of member references.
+    /// Return true if this is a closure expression that will require explicit
+    /// use or capture of "self." for qualification of member references.
     static bool isClosureRequiringSelfQualification(
                   const AbstractClosureExpr *CE) {
       // If the closure's type was inferred to be noescape, then it doesn't
@@ -1371,43 +1385,48 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
         // If this is a potentially-escaping closure expression, start looking
         // for references to self if we aren't already.
         if (isClosureRequiringSelfQualification(CE))
-          ++InClosure;
+          Closures.push_back(CE);
       }
 
 
       // If we aren't in a closure, no diagnostics will be produced.
-      if (!InClosure)
+      if (Closures.size() == 0)
         return { true, E };
 
-      // If we see a property reference with an implicit base from within a
-      // closure, then reject it as requiring an explicit "self." qualifier.  We
-      // do this in explicit closures, not autoclosures, because otherwise the
-      // transparence of autoclosures is lost.
       auto &Diags = Ctx.Diags;
+      
+      // Diagnostics should correct the innermost closure
+      auto *ACE = Closures[Closures.size() - 1];
+      assert(ACE);
+      
+      SourceLoc memberLoc = SourceLoc();
       if (auto *MRE = dyn_cast<MemberRefExpr>(E))
-        if (isImplicitSelfUse(MRE->getBase())) {
+        if (isImplicitSelfParamUseLikelyToCauseCycle(MRE->getBase())) {
           auto baseName = MRE->getMember().getDecl()->getBaseName();
-          Diags.diagnose(MRE->getLoc(),
+          memberLoc = MRE->getLoc();
+          Diags.diagnose(memberLoc,
                          diag::property_use_in_closure_without_explicit_self,
-                         baseName.getIdentifier())
-            .fixItInsert(MRE->getLoc(), "self.");
-          return { false, E };
+                         baseName.getIdentifier());
         }
 
       // Handle method calls with a specific diagnostic + fixit.
       if (auto *DSCE = dyn_cast<DotSyntaxCallExpr>(E))
-        if (isImplicitSelfUse(DSCE->getBase()) &&
+        if (isImplicitSelfParamUseLikelyToCauseCycle(DSCE->getBase()) &&
             isa<DeclRefExpr>(DSCE->getFn())) {
           auto MethodExpr = cast<DeclRefExpr>(DSCE->getFn());
+          memberLoc = DSCE->getLoc();
           Diags.diagnose(DSCE->getLoc(),
                          diag::method_call_in_closure_without_explicit_self,
-                         MethodExpr->getDecl()->getBaseName().getIdentifier())
-              .fixItInsert(DSCE->getLoc(), "self.");
-          return { false, E };
+                         MethodExpr->getDecl()->getBaseName().getIdentifier());
         }
 
+      if (memberLoc.isValid()) {
+        emitFixIts(Diags, memberLoc, ACE);
+        return { false, E };
+      }
+      
       // Catch any other implicit uses of self with a generic diagnostic.
-      if (isImplicitSelfUse(E))
+      if (isImplicitSelfParamUseLikelyToCauseCycle(E))
         Diags.diagnose(E->getLoc(), diag::implicit_use_of_self_in_closure);
 
       return { true, E };
@@ -1416,26 +1435,144 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
     Expr *walkToExprPost(Expr *E) override {
       if (auto *CE = dyn_cast<AbstractClosureExpr>(E)) {
         if (isClosureRequiringSelfQualification(CE)) {
-          assert(InClosure);
-          --InClosure;
+          assert(Closures.size() > 0);
+          Closures.pop_back();
         }
       }
       
       return E;
     }
+
+    /// Emit any fix-its for this error.
+    void emitFixIts(DiagnosticEngine &Diags,
+                    SourceLoc memberLoc,
+                    const AbstractClosureExpr *ACE) {
+      // This error can be fixed by either capturing self explicitly (if in an
+      // explicit closure), or referencing self explicitly.
+      if (auto *CE = dyn_cast<const ClosureExpr>(ACE)) {
+        if (diagnoseAlmostMatchingCaptures(Diags, memberLoc, CE)) {
+          // Bail on the rest of the diagnostics. Offering the option to
+          // capture 'self' explicitly will result in an error, and using
+          // 'self.' explicitly will be accessing something other than the
+          // self param.
+          // FIXME: We could offer a special fixit in the [weak self] case to insert 'self?.'...
+          return;
+        }
+        emitFixItsForExplicitClosure(Diags, memberLoc, CE);
+      } else {
+        // If this wasn't an explicit closure, just offer the fix-it to
+        // reference self explicitly.
+        Diags.diagnose(memberLoc, diag::note_reference_self_explicitly)
+          .fixItInsert(memberLoc, "self.");
+      }
+    }
+    
+    /// Diagnose any captures which might have been an attempt to capture
+    /// \c self strongly, but do not actually enable implicit \c self. Returns
+    /// whether there were any such captures to diagnose.
+    bool diagnoseAlmostMatchingCaptures(DiagnosticEngine &Diags,
+                                        SourceLoc memberLoc,
+                                        const ClosureExpr *closureExpr) {
+      // If we've already captured something with the name "self" other than
+      // the actual self param, offer special diagnostics.
+      if (auto *VD = closureExpr->getCapturedSelfDecl()) {
+        // Either this is a weak capture of self...
+        if (VD->getType()->is<WeakStorageType>()) {
+          Diags.diagnose(VD->getLoc(), diag::note_self_captured_weakly);
+        // ...or something completely different.
+        } else {
+          Diags.diagnose(VD->getLoc(), diag::note_other_self_capture);
+        }
+        
+        return true;
+      }
+      return false;
+    }
+
+    /// Emit fix-its for invalid use of implicit \c self in an explicit closure.
+    /// The error can be solved by capturing self explicitly,
+    /// or by using \c self. explicitly.
+    void emitFixItsForExplicitClosure(DiagnosticEngine &Diags,
+                                      SourceLoc memberLoc,
+                                      const ClosureExpr *closureExpr) {
+      Diags.diagnose(memberLoc, diag::note_reference_self_explicitly)
+        .fixItInsert(memberLoc, "self.");
+      auto diag = Diags.diagnose(closureExpr->getLoc(),
+                                 diag::note_capture_self_explicitly);
+      // There are four different potential fix-its to offer based on the
+      // closure signature:
+      //   1. There is an existing capture list which already has some
+      //      entries. We need to insert 'self' into the capture list along
+      //      with a separating comma.
+      //   2. There is an existing capture list, but it is empty (jusr '[]').
+      //      We can just insert 'self'.
+      //   3. Arguments or types are already specified in the signature,
+      //      but there is no existing capture list. We will need to insert
+      //      the capture list, but 'in' will already be present.
+      //   4. The signature empty so far. We must insert the full capture
+      //      list as well as 'in'.
+      const auto brackets = closureExpr->getBracketRange();
+      if (brackets.isValid()) {
+        emitInsertSelfIntoCaptureListFixIt(brackets, diag);
+      }
+      else {
+        emitInsertNewCaptureListFixIt(closureExpr, diag);
+      }
+    }
+
+    /// Emit a fix-it for inserting \c self into in existing capture list, along
+    /// with a trailing comma if needed. The fix-it will be attached to the
+    /// provided diagnostic \c diag.
+    void emitInsertSelfIntoCaptureListFixIt(SourceRange brackets,
+                                            InFlightDiagnostic &diag) {
+      // Look for any non-comment token. If there's anything before the
+      // closing bracket, we assume that it is a valid capture list entry and
+      // insert 'self,'. If it wasn't a valid entry, then we will at least not
+      // be introducing any new errors/warnings...
+      const auto locAfterBracket = brackets.Start.getAdvancedLoc(1);
+      const auto nextAfterBracket =
+          Lexer::getTokenAtLocation(Ctx.SourceMgr, locAfterBracket,
+                                    CommentRetentionMode::None);
+      if (nextAfterBracket.getLoc() != brackets.End)
+        diag.fixItInsertAfter(brackets.Start, "self, ");
+      else
+        diag.fixItInsertAfter(brackets.Start, "self");
+    }
+
+    /// Emit a fix-it for inserting a capture list into a closure that does not
+    /// already have one, along with a trailing \c in if necessary. The fix-it
+    /// will be attached to the provided diagnostic \c diag.
+    void emitInsertNewCaptureListFixIt(const ClosureExpr *closureExpr,
+                                       InFlightDiagnostic &diag) {
+      if (closureExpr->getInLoc().isValid()) {
+        diag.fixItInsertAfter(closureExpr->getLoc(), " [self]");
+        return;
+      }
+
+      // If there's a (non-comment) token immediately following the
+      // opening brace of the closure, we may need to pad the fix-it
+      // with a space.
+      const auto nextLoc = closureExpr->getLoc().getAdvancedLoc(1);
+      const auto next =
+      Lexer::getTokenAtLocation(Ctx.SourceMgr, nextLoc,
+                                CommentRetentionMode::None);
+      std::string trailing = next.getLoc() == nextLoc ? " " : "";
+
+      diag.fixItInsertAfter(closureExpr->getLoc(), " [self] in" + trailing);
+    }
   };
 
-  bool isAlreadyInClosure = false;
+  AbstractClosureExpr *ACE = nullptr;
   if (DC->isLocalContext()) {
-    while (DC->getParent()->isLocalContext() && !isAlreadyInClosure) {
+    while (DC->getParent()->isLocalContext() && !ACE) {
       if (auto *closure = dyn_cast<AbstractClosureExpr>(DC))
         if (DiagnoseWalker::isClosureRequiringSelfQualification(closure))
-          isAlreadyInClosure = true;
+          ACE = const_cast<AbstractClosureExpr *>(closure);
       DC = DC->getParent();
     }
   }
   auto &ctx = DC->getASTContext();
-  const_cast<Expr *>(E)->walk(DiagnoseWalker(ctx, isAlreadyInClosure));
+  const_cast<Expr *>(E)->walk(DiagnoseWalker(ctx, ACE));
 }
 
 bool TypeChecker::getDefaultGenericArgumentsString(

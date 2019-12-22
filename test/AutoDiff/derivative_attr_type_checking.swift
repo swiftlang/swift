@@ -7,7 +7,7 @@ func sin(_ x: Float) -> Float {
   return x // dummy implementation
 }
 @derivative(of: sin) // ok
-func jvpSin(x: @nondiff Float) -> (value: Float, differential: (Float) -> (Float)) {
+func jvpSin(x: @noDerivative Float) -> (value: Float, differential: (Float) -> (Float)) {
   return (x, { $0 })
 }
 // expected-note @+1 {{other attribute declared here}}
@@ -23,7 +23,7 @@ func vjpDuplicate(x: Float) -> (value: Float, pullback: (Float) -> Float) {
 }
 // expected-error @+1 {{'@derivative(of:)' attribute requires function to return a two-element tuple of type '(value: T..., pullback: (U.TangentVector) -> T.TangentVector...)' or '(value: T..., differential: (T.TangentVector...) -> U.TangentVector)'}}
 @derivative(of: sin)
-func jvpSinResultInvalid(x: @nondiff Float) -> Float {
+func jvpSinResultInvalid(x: @noDerivative Float) -> Float {
   return x
 }
 // expected-error @+1 {{'@derivative(of:)' attribute requires function to return a two-element tuple (second element must have label 'pullback:' or 'differential:')}}

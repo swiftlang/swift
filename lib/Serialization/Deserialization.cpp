@@ -4228,11 +4228,12 @@ llvm::Error DeclDeserializer::deserializeDeclAttributes() {
           parametersBitVector[i] = parameters[i];
         auto *indices = IndexSubset::get(ctx, parametersBitVector);
 
-        auto *derivAttr = DerivativeAttr::create(
-            ctx, isImplicit, SourceLoc(), SourceRange(), origName, indices);
-        derivAttr->setOriginalFunction(origDecl);
-        derivAttr->setDerivativeKind(*derivativeKind);
-        Attr = derivAttr;
+        auto *derivativeAttr =
+            DerivativeAttr::create(ctx, isImplicit, SourceLoc(), SourceRange(),
+                                   /*baseType*/ nullptr, origName, indices);
+        derivativeAttr->setOriginalFunction(origDecl);
+        derivativeAttr->setDerivativeKind(*derivativeKind);
+        Attr = derivativeAttr;
         break;
       }
 
@@ -4911,13 +4912,11 @@ public:
 
       IdentifierID labelID;
       TypeID typeID;
-        bool isVariadic, isAutoClosure, isNonEphemeral, isNonDifferentiable;
+      bool isVariadic, isAutoClosure, isNonEphemeral, isNoDerivative;
       unsigned rawOwnership;
-      decls_block::FunctionParamLayout::readRecord(scratch, labelID, typeID,
-                                                   isVariadic, isAutoClosure,
-                                                   isNonEphemeral,
-                                                   rawOwnership,
-                                                   isNonDifferentiable);
+      decls_block::FunctionParamLayout::readRecord(
+          scratch, labelID, typeID, isVariadic, isAutoClosure, isNonEphemeral,
+          rawOwnership, isNoDerivative);
 
       auto ownership =
           getActualValueOwnership((serialization::ValueOwnership)rawOwnership);
@@ -4928,11 +4927,10 @@ public:
       if (!paramTy)
         return paramTy.takeError();
 
-      params.emplace_back(paramTy.get(),
-                          MF.getIdentifier(labelID),
+      params.emplace_back(paramTy.get(), MF.getIdentifier(labelID),
                           ParameterTypeFlags(isVariadic, isAutoClosure,
                                              isNonEphemeral, *ownership,
-                                             isNonDifferentiable));
+                                             isNoDerivative));
     }
 
     if (!isGeneric) {

@@ -747,7 +747,8 @@ void swift::serialization::diagnoseSerializedASTLoadFailure(
     auto circularDependencyIter =
         llvm::find_if(loadedModuleFile->getDependencies(),
                       [](const ModuleFile::Dependency &next) {
-                        return !next.Import.second->hasResolvedImports();
+                        return next.isLoaded() &&
+                               !next.Import.second->hasResolvedImports();
                       });
     assert(circularDependencyIter !=
                loadedModuleFile->getDependencies().end() &&

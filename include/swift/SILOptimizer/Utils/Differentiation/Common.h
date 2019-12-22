@@ -50,9 +50,9 @@ namespace autodiff {
 /// This is being used to print short debug messages within the AD pass.
 raw_ostream &getADDebugStream();
 
-/// Returns true if this is an `ApplyInst` with `array.uninitialized_intrinsic`
-/// semantics.
-bool isArrayLiteralIntrinsic(ApplyInst *ai);
+/// Returns true if this is an full apply site whose callee has
+/// `array.uninitialized_intrinsic` semantics.
+bool isArrayLiteralIntrinsic(FullApplySite applySite);
 
 /// If the given value `v` corresponds to an `ApplyInst` with
 /// `array.uninitialized_intrinsic` semantics, returns the corresponding
@@ -76,11 +76,22 @@ ApplyInst *getAllocateUninitializedArrayIntrinsicElementAddress(SILValue v);
 /// tuple-typed and such a user exists.
 DestructureTupleInst *getSingleDestructureTupleUser(SILValue value);
 
-/// Given an `apply` instruction, apply the given callback to each of its
-/// direct results. If the `apply` instruction has a single `destructure_tuple`
-/// user, apply the callback to the results of the `destructure_tuple` user.
+/// Given a full apply site, apply the given callback to each of its
+/// "direct results".
+///
+/// - `apply`
+/// Special case because `apply` returns a single (possibly tuple-typed) result
+/// instead of multiple results. If the `apply` has a single
+/// `destructure_tuple` user, treat the `destructure_tuple` results as the
+/// `apply` direct results.
+///
+/// - `begin_apply`
+/// Apply callback to each `begin_apply` direct result.
+///
+/// - `try_apply`
+/// Apply callback to each `try_apply` successor basic block argument.
 void forEachApplyDirectResult(
-    ApplyInst *ai, llvm::function_ref<void(SILValue)> resultCallback);
+    FullApplySite applySite, llvm::function_ref<void(SILValue)> resultCallback);
 
 /// Given a function, gathers all of its formal results (both direct and
 /// indirect) in an order defined by its result type. Note that "formal results"

@@ -1093,7 +1093,7 @@ private:
 
       visit(flags.getValueOwnership(), /*forSelf=*/false,
             // SWIFT_ENABLE_TENSORFLOW
-            eltPattern, ty, silRepresentation, flags.isNonDifferentiable());
+            eltPattern, ty, silRepresentation, flags.isNoDerivative());
     }
 
     // Process the self parameter.  Note that we implicitly drop self

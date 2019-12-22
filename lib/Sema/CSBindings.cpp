@@ -999,6 +999,11 @@ bool TypeVariableBinding::attempt(ConstraintSystem &cs) const {
             cs.getConstraintLocator(dstLocator->getAnchor(), path.drop_back()));
         if (cs.recordFix(fix))
           return true;
+      } else if (TypeVar->getImpl().isClosureResultType()) {
+        auto *fix = SpecifyClosureReturnType::create(
+            cs, TypeVar->getImpl().getLocator());
+        if (cs.recordFix(fix))
+          return true;
       }
     }
   }

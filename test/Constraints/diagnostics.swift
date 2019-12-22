@@ -146,7 +146,7 @@ func ***~(_: Int, _: String) { }
 i ***~ i // expected-error{{cannot convert value of type 'Int' to expected argument type 'String'}}
 
 @available(*, unavailable, message: "call the 'map()' method on the sequence")
-public func myMap<C : Collection, T>( // expected-note {{in call to function 'myMap'}}
+public func myMap<C : Collection, T>(
   _ source: C, _ transform: (C.Iterator.Element) -> T
 ) -> [T] {
   fatalError("unavailable function can't be called")
@@ -159,7 +159,7 @@ public func myMap<T, U>(_ x: T?, _ f: (T) -> U) -> U? {
 
 // <rdar://problem/20142523>
 func rdar20142523() {
-  myMap(0..<10, { x in // expected-error{{generic parameter 'T' could not be inferred}}
+  myMap(0..<10, { x in // expected-error{{unable to infer complex closure return type; add explicit type to disambiguate}} {{21-21=-> <#Result#> }}
     ()
     return x
   })
@@ -529,8 +529,8 @@ let _: Color = .frob(1, b: i)  // expected-error {{passing value of type 'Int' t
 let _: Color = .frob(1, &d) // expected-error {{missing argument label 'b:' in call}}
 // expected-error@-1 {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 let _: Color = .frob(1, b: &d) // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
-var someColor : Color = .red // expected-error {{enum type 'Color' has no case 'red'; did you mean 'Red'}}
-someColor = .red  // expected-error {{enum type 'Color' has no case 'red'; did you mean 'Red'}}
+var someColor : Color = .red // expected-error {{enum type 'Color' has no case 'red'; did you mean 'Red'?}}
+someColor = .red  // expected-error {{enum type 'Color' has no case 'red'; did you mean 'Red'?}}
 someColor = .svar() // expected-error {{cannot call value of non-function type 'Color'}}
 someColor = .svar(1) // expected-error {{cannot call value of non-function type 'Color'}}
 

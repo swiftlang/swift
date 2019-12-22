@@ -27,7 +27,7 @@ struct S : Proto, AdditiveArithmetic {
   // CHECK: [[JVP1_ORIG_FNREF:%.*]] = function_ref {{.*}}function1{{.*}} : $@convention(method) (Float, Double, S) -> Float
   // CHECK: [[JVP1_VJP_FNREF:%.*]] = differentiability_witness_function [vjp] [parameters 0 1] [results 0] @{{.*}}function1{{.*}}
   // CHECK: [[JVP1_ADFUNC:%.*]] = differentiable_function [parameters 0 1] [[JVP1_ORIG_FNREF]] : {{.*}} with_derivative {{{%.*}} : {{.*}}, [[JVP1_VJP_FNREF]] : {{.*}}}
-  // CHECK: [[JVP1:%.*]] = differentiable_function_extract [jvp] [[JVP1_ADFUNC]] : $@differentiable @convention(method) (Float, Double, @nondiff S) -> Float
+  // CHECK: [[JVP1:%.*]] = differentiable_function_extract [jvp] [[JVP1_ADFUNC]] : $@differentiable @convention(method) (Float, Double, @noDerivative S) -> Float
   // CHECK: apply [[JVP1]]
   // CHECK: } // end sil function 'AD__{{.*}}function1{{.*}}_jvp_SSU'
 
@@ -35,7 +35,7 @@ struct S : Proto, AdditiveArithmetic {
   // CHECK: [[VJP1_ORIG_FNREF:%.*]] = function_ref {{.*}}function1{{.*}} : $@convention(method) (Float, Double, S) -> Float
   // CHECK: [[VJP1_VJP_FNREF:%.*]] = differentiability_witness_function [vjp] [parameters 0 1] [results 0] @{{.*}}function1{{.*}}
   // CHECK: [[VJP1_ADFUNC:%.*]] = differentiable_function [parameters 0 1] [[VJP1_ORIG_FNREF]] : {{.*}} with_derivative {{{%.*}} : {{.*}}, [[VJP1_VJP_FNREF]] : {{.*}}}
-  // CHECK: [[VJP1:%.*]] = differentiable_function_extract [vjp] [[VJP1_ADFUNC]] : $@differentiable @convention(method) (Float, Double, @nondiff S) -> Float
+  // CHECK: [[VJP1:%.*]] = differentiable_function_extract [vjp] [[VJP1_ADFUNC]] : $@differentiable @convention(method) (Float, Double, @noDerivative S) -> Float
   // CHECK: apply [[VJP1]]
   // CHECK: } // end sil function 'AD__{{.*}}function1{{.*}}_vjp_SSU'
 
@@ -69,7 +69,7 @@ struct S : Proto, AdditiveArithmetic {
   // CHECK: [[JVP3_ORIG_FNREF:%.*]] = function_ref {{.*}}function3{{.*}} : $@convention(method) (Float, Double, S) -> Double
   // CHECK: [[JVP3_VJP_FNREF:%.*]] = differentiability_witness_function [vjp] [parameters 1] [results 0] @{{.*}}function3{{.*}}
   // CHECK: [[JVP3_ADFUNC:%.*]] = differentiable_function [parameters 1] [[JVP3_ORIG_FNREF]] : {{.*}} with_derivative {{{%.*}} : {{.*}}, [[JVP3_VJP_FNREF]] : {{.*}}}
-  // CHECK: [[JVP3:%.*]] = differentiable_function_extract [jvp] [[JVP3_ADFUNC]] : $@differentiable @convention(method) (@nondiff Float, Double, @nondiff S) -> Double
+  // CHECK: [[JVP3:%.*]] = differentiable_function_extract [jvp] [[JVP3_ADFUNC]] : $@differentiable @convention(method) (@noDerivative Float, Double, @noDerivative S) -> Double
   // CHECK: apply [[JVP3]]
   // CHECK: } // end sil function 'AD__{{.*}}function3{{.*}}_jvp_USU'
 
@@ -77,7 +77,7 @@ struct S : Proto, AdditiveArithmetic {
   // CHECK: [[VJP3_ORIG_FNREF:%.*]] = function_ref {{.*}}function3{{.*}} : $@convention(method) (Float, Double, S) -> Double
   // CHECK: [[VJP3_VJP_FNREF:%.*]] = differentiability_witness_function [vjp] [parameters 1] [results 0] @{{.*}}function3{{.*}}
   // CHECK: [[VJP3_ADFUNC:%.*]] = differentiable_function [parameters 1] [[VJP3_ORIG_FNREF]] : {{.*}} with_derivative {{{%.*}} : {{.*}}, [[VJP3_VJP_FNREF]] : {{.*}}}
-  // CHECK: [[VJP3:%.*]] = differentiable_function_extract [vjp] [[VJP3_ADFUNC]] : $@differentiable @convention(method) (@nondiff Float, Double, @nondiff S) -> Double
+  // CHECK: [[VJP3:%.*]] = differentiable_function_extract [vjp] [[VJP3_ADFUNC]] : $@differentiable @convention(method) (@noDerivative Float, Double, @noDerivative S) -> Double
   // CHECK: apply [[VJP3]]
   // CHECK: } // end sil function 'AD__{{.*}}function3{{.*}}_vjp_USU'
 }

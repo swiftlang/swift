@@ -194,6 +194,11 @@ public:
   /// first primary input.
   StringRef getAdditionalOutputForType(file_types::ID type) const;
 
+  /// Assuming (and asserting) that there are one or more input pairs, return true if there exists
+  /// an _additional_ (not primary) output of type \p type associated with the
+  /// first primary input.
+  bool hasAdditionalOutputForType(file_types::ID type) const;
+
   /// Return a vector of additional (not primary) outputs of type \p type
   /// associated with the primary inputs.
   ///

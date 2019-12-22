@@ -1443,8 +1443,8 @@ namespace  {
     // Differentiation-related attributes.
     UNINTERESTING_ATTR(Differentiable)
     UNINTERESTING_ATTR(Derivative)
-    // SWIFT_ENABLE_TENSORFLOW
     UNINTERESTING_ATTR(Transpose)
+    // SWIFT_ENABLE_TENSORFLOW
     UNINTERESTING_ATTR(Differentiating)
     UNINTERESTING_ATTR(NoDerivative)
     UNINTERESTING_ATTR(CompilerEvaluable)

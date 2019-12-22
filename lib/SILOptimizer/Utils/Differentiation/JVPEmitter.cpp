@@ -746,7 +746,7 @@ CLONE_AND_EMIT_TANGENT(DestructureTuple, dti) {
 void JVPEmitter::emitTangentForApplyInst(
     ApplyInst *ai, SILAutoDiffIndices actualIndices,
     CanSILFunctionType originalDifferentialType) {
-  assert(differentialInfo.shouldDifferentiateApplyInst(ai));
+  assert(differentialInfo.shouldDifferentiateApplySite(ai));
   auto *bb = ai->getParent();
   auto loc = ai->getLoc();
   auto &diffBuilder = getDifferentialBuilder();
@@ -1184,7 +1184,7 @@ void JVPEmitter::visitInstructionsInBlock(SILBasicBlock *bb) {
 void JVPEmitter::visitApplyInst(ApplyInst *ai) {
   // If the function should not be differentiated or its the array literal
   // initialization intrinsic, just do standard cloning.
-  if (!differentialInfo.shouldDifferentiateApplyInst(ai) ||
+  if (!differentialInfo.shouldDifferentiateApplySite(ai) ||
       isArrayLiteralIntrinsic(ai)) {
     LLVM_DEBUG(getADDebugStream() << "No active results:\n" << *ai << '\n');
     TypeSubstCloner::visitApplyInst(ai);
@@ -1253,7 +1253,7 @@ void JVPEmitter::visitApplyInst(ApplyInst *ai) {
       if (!paramIndices->contains(i)) {
         context.emitNondifferentiabilityError(
             original, invoker,
-            diag::autodiff_function_nondiff_parameter_not_differentiable);
+            diag::autodiff_function_noderivative_parameter_not_differentiable);
         errorOccurred = true;
         return;
       }

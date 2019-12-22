@@ -9,7 +9,7 @@ let _: @differentiable (Float) throws -> Float
 
 struct NonDiffType { var x: Int }
 // FIXME: Properly type-check parameters and the result's differentiability
-// expected-error @+1 {{argument is not differentiable, but the enclosing function type is marked '@differentiable'}} {{25-25=@nondiff }}
+// expected-error @+1 {{argument is not differentiable, but the enclosing function type is marked '@differentiable'}} {{25-25=@noDerivative }}
 let _: @differentiable (NonDiffType) -> Float
 // expected-error @+1 {{result is not differentiable, but the function type is marked '@differentiable'}}
 let _: @differentiable (Float) -> NonDiffType
@@ -62,13 +62,16 @@ func differentiableToLinear(_ f: @escaping @differentiable (Float) -> Float) {
 }
 
 //===----------------------------------------------------------------------===//
-// Parameter selection (@nondiff)
+// Parameter selection (@noDerivative)
 //===----------------------------------------------------------------------===//
 
-// expected-error @+1 {{'nondiff' cannot be applied to arguments of a non-differentiable function}}
-let _: (@nondiff Float, Float) -> Float
+// expected-warning @+1 {{'@nondiff' is deprecated; use '@noDerivative' instead}}
+let _: @differentiable (@nondiff Float, Float) -> Float
 
-let _: @differentiable (Float, @nondiff Float) -> Float // okay
+// expected-error @+1 {{'@noDerivative' may only be used on parameters of '@differentiable' function types}}
+let _: (@noDerivative Float, Float) -> Float
+
+let _: @differentiable (Float, @noDerivative Float) -> Float // okay
 
 func foo<T: Differentiable, U: Differentiable>(x: T) -> U {
   let fn: (@differentiable (T) -> U)? = nil
@@ -93,10 +96,10 @@ inferredConformancesLinear(linearFunc)
 func inferredConformancesResult<T, U>() -> @differentiable (T) -> U {}
 func inferredConformancesResultLinear<T, U>() -> @differentiable(linear) (T) -> U {}
 
-let diffFuncWithNondiff: @differentiable (Float, @nondiff Int) -> Float
-let linearFuncWithNondiff: @differentiable(linear) (Float, @nondiff Int) -> Float
-func inferredConformances<T, U, V>(_: @differentiable (T, @nondiff U) -> V) {}
-func inferredConformancesLinear<T, U, V>(_: @differentiable(linear) (T, @nondiff U) -> V) {}
+let diffFuncWithNondiff: @differentiable (Float, @noDerivative Int) -> Float
+let linearFuncWithNondiff: @differentiable(linear) (Float, @noDerivative Int) -> Float
+func inferredConformances<T, U, V>(_: @differentiable (T, @noDerivative U) -> V) {}
+func inferredConformancesLinear<T, U, V>(_: @differentiable(linear) (T, @noDerivative U) -> V) {}
 inferredConformances(diffFuncWithNondiff)
 inferredConformancesLinear(linearFuncWithNondiff)
 

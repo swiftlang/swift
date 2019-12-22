@@ -54,8 +54,12 @@ public:
   const UniversalLinkageInfo &UniversalLinkInfo;
   ModuleDecl *SwiftModule;
   const TBDGenOptions &Opts;
+  Decl* TopLevelDecl = nullptr;
 
 private:
+  void addSymbolInternal(StringRef name, llvm::MachO::SymbolKind kind,
+                         bool isLinkerDirective = false);
+  void addLinkerDirectiveSymbols(StringRef name, llvm::MachO::SymbolKind kind);
   void addSymbol(StringRef name, llvm::MachO::SymbolKind kind =
                                      llvm::MachO::SymbolKind::GlobalSymbol);
 

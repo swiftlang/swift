@@ -438,6 +438,18 @@ ConstraintSystem::getCalleeLocator(ConstraintLocator *locator,
   auto *anchor = locator->getAnchor();
   assert(anchor && "Expected an anchor!");
 
+  auto path = locator->getPath();
+  {
+    // If we have a locator for a member found through key path dynamic member
+    // lookup, then we need to chop off the elements after the
+    // KeyPathDynamicMember element to get the callee locator.
+    auto iter = path.rbegin();
+    if (locator->findLast<LocatorPathElt::KeyPathDynamicMember>(iter)) {
+      auto newPath = path.drop_back(iter - path.rbegin());
+      return getConstraintLocator(anchor, newPath);
+    }
+  }
+
   // If we have a locator that starts with a key path component element, we
   // may have a callee given by a property or subscript component.
   if (auto componentElt =
@@ -494,9 +506,11 @@ ConstraintSystem::getCalleeLocator(ConstraintLocator *locator,
     }
 
     // Handle an apply of a nominal type which supports callAsFunction.
-    if (fnTy->isCallableNominalType(DC))
-      return getConstraintLocator(anchor, ConstraintLocator::ApplyFunction);
-
+    if (fnTy->isCallableNominalType(DC)) {
+      return getConstraintLocator(anchor,
+                                  {LocatorPathElt::ApplyFunction(),
+                                   LocatorPathElt::ImplicitCallAsFunction()});
+    }
     return nullptr;
   };
 
@@ -2155,8 +2169,10 @@ void ConstraintSystem::bindOverloadType(
       auto adjustedFnTy =
           FunctionType::get(fnType->getParams(), subscriptResultTy);
 
-      addConstraint(ConstraintKind::ApplicableFunction, adjustedFnTy, memberTy,
-                    applicableFn->getLocator());
+      ConstraintLocatorBuilder kpLocBuilder(keyPathLoc);
+      addConstraint(
+          ConstraintKind::ApplicableFunction, adjustedFnTy, memberTy,
+          kpLocBuilder.withPathElement(ConstraintLocator::ApplyFunction));
 
       addConstraint(ConstraintKind::Bind, dynamicResultTy, fnType->getResult(),
                     keyPathLoc);
@@ -3149,8 +3165,9 @@ void constraints::simplifyLocator(Expr *&anchor,
     case ConstraintLocator::LValueConversion:
     case ConstraintLocator::RValueAdjustment:
     case ConstraintLocator::UnresolvedMember:
-      // Arguments in autoclosure positions, lvalue and rvalue adjustments, and
-      // scalar-to-tuple conversions, and unresolved members are
+    case ConstraintLocator::ImplicitCallAsFunction:
+      // Arguments in autoclosure positions, lvalue and rvalue adjustments,
+      // unresolved members, and implicit callAsFunction references are
       // implicit.
       path = path.slice(1);
       continue;
@@ -3441,6 +3458,18 @@ ConstraintSystem::getArgumentInfoLocator(ConstraintLocator *locator) {
 
   if (auto *UME = dyn_cast<UnresolvedMemberExpr>(anchor))
     return getConstraintLocator(UME);
+
+  auto path = locator->getPath();
+  {
+    // If this is for a dynamic member reference, the argument info is for the
+    // original call-site, which we can get by stripping away the
+    // KeyPathDynamicMember elements.
+    auto iter = path.begin();
+    if (locator->findFirst<LocatorPathElt::KeyPathDynamicMember>(iter)) {
+      ArrayRef<LocatorPathElt> newPath(path.begin(), iter);
+      return getConstraintLocator(anchor, newPath);
+    }
+  }
 
   return getCalleeLocator(locator);
 }

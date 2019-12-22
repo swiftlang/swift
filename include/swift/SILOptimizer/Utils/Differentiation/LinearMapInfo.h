@@ -141,7 +141,7 @@ private:
                                              SILFunction *derivative);
 
 public:
-  bool shouldDifferentiateApplyInst(ApplyInst *ai);
+  bool shouldDifferentiateApplySite(FullApplySite applySite);
   bool shouldDifferentiateInstruction(SILInstruction *inst);
 
   LinearMapInfo(const LinearMapInfo &) = delete;

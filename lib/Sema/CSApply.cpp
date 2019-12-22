@@ -1057,7 +1057,7 @@ namespace {
         }
       }
 
-      return finishApply(apply, memberRef, openedType, locator);
+      return finishApply(apply, openedType, locator, memberLocator);
     }
 
     /// Convert the given literal expression via a protocol pair.
@@ -1113,15 +1113,16 @@ namespace {
     /// \param apply The function application to finish type-checking, which
     /// may be a newly-built expression.
     ///
-    /// \param callee The callee for the function being applied.
-    ///
     /// \param openedType The "opened" type this expression had during
     /// type checking, which will be used to specialize the resulting,
     /// type-checked expression appropriately.
     ///
     /// \param locator The locator for the original expression.
-    Expr *finishApply(ApplyExpr *apply, ConcreteDeclRef callee, Type openedType,
-                      ConstraintLocatorBuilder locator);
+    ///
+    /// \param calleeLocator The locator that identifies the apply's callee.
+    Expr *finishApply(ApplyExpr *apply, Type openedType,
+                      ConstraintLocatorBuilder locator,
+                      ConstraintLocatorBuilder calleeLocator);
 
     // Resolve `@dynamicCallable` applications.
     Expr *finishApplyDynamicCallable(ApplyExpr *apply,
@@ -2425,17 +2426,16 @@ namespace {
 
       // If there was an argument, apply it.
       if (auto arg = expr->getArgument()) {
-        // Find the callee. Note this may be different to the member being
-        // referenced for things like callAsFunction.
+        // Get the callee locator. Note this may be different to the locator for
+        // the member being referenced for things like callAsFunction.
         auto *calleeLoc = cs.getCalleeLocator(exprLoc);
-        auto calleeOverload = solution.getOverloadChoice(calleeLoc);
-        auto callee = resolveConcreteDeclRef(calleeOverload.choice.getDecl(),
-                                             calleeLoc);
+
+        // Build and finish the apply.
         ApplyExpr *apply = CallExpr::create(
             ctx, result, arg, expr->getArgumentLabels(),
             expr->getArgumentLabelLocs(), expr->hasTrailingClosure(),
             /*implicit=*/expr->isImplicit(), Type(), getType);
-        result = finishApply(apply, callee, Type(), exprLoc);
+        result = finishApply(apply, Type(), exprLoc, calleeLoc);
 
         // FIXME: Application could fail, because some of the solutions
         // are not expressible in AST (yet?), like certain tuple-to-tuple
@@ -2614,9 +2614,8 @@ namespace {
       auto *call = new (cs.getASTContext()) DotSyntaxCallExpr(ctorRef, dotLoc,
                                                               base);
 
-      return finishApply(call, callee, cs.getType(expr),
-                         ConstraintLocatorBuilder(
-                           cs.getConstraintLocator(expr)));
+      return finishApply(call, cs.getType(expr), cs.getConstraintLocator(expr),
+                         ctorLocator);
     }
 
     Expr *applyMemberRefExpr(Expr *expr, Expr *base, SourceLoc dotLoc,
@@ -3062,17 +3061,8 @@ namespace {
     Expr *visitApplyExpr(ApplyExpr *expr) {
       auto *calleeLoc = CalleeLocators[expr];
       assert(calleeLoc);
-
-      // Resolve the callee for the application if we have one. Note that we're
-      // using `resolveConcreteDeclRef` instead `solution.resolveLocatorToDecl`
-      // here to benefit from ExprRewriter's cache of concrete refs.
-      ConcreteDeclRef callee;
-      if (auto overload = solution.getOverloadChoiceIfAvailable(calleeLoc)) {
-        auto *decl = overload->choice.getDeclOrNull();
-        callee = resolveConcreteDeclRef(decl, calleeLoc);
-      }
-      return finishApply(expr, callee, cs.getType(expr),
-                         cs.getConstraintLocator(expr));
+      return finishApply(expr, cs.getType(expr), cs.getConstraintLocator(expr),
+                         calleeLoc);
     }
 
     Expr *visitRebindSelfInConstructorExpr(RebindSelfInConstructorExpr *expr) {
@@ -6623,13 +6613,15 @@ static bool isValidDynamicCallableMethod(FuncDecl *method,
 // Build a reference to a `callAsFunction` method.
 static Expr *buildCallAsFunctionMethodRef(
     ExprRewriter &rewriter, ApplyExpr *apply, SelectedOverload selected,
-    ConstraintLocatorBuilder applyFunctionLoc) {
-  auto *fn = apply->getFn();
+    ConstraintLocator *calleeLoc) {
+  assert(calleeLoc->isLastElement<LocatorPathElt::ImplicitCallAsFunction>());
+  assert(cast<FuncDecl>(selected.choice.getDecl())->isCallAsFunctionMethod());
+
   // Create direct reference to `callAsFunction` method.
+  auto *fn = apply->getFn();
   auto *declRef = rewriter.buildMemberRef(
       fn, /*dotLoc*/ SourceLoc(), selected, DeclNameLoc(fn->getEndLoc()),
-      applyFunctionLoc, applyFunctionLoc, /*implicit*/ true,
-      AccessSemantics::Ordinary);
+      calleeLoc, calleeLoc, /*implicit*/ true, AccessSemantics::Ordinary);
   if (!declRef)
     return nullptr;
   declRef->setImplicit(apply->isImplicit());
@@ -6717,9 +6709,9 @@ ExprRewriter::finishApplyDynamicCallable(ApplyExpr *apply,
   return result;
 }
 
-Expr *ExprRewriter::finishApply(ApplyExpr *apply, ConcreteDeclRef callee,
-                                Type openedType,
-                                ConstraintLocatorBuilder locator) {
+Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
+                                ConstraintLocatorBuilder locator,
+                                ConstraintLocatorBuilder calleeLocator) {
   auto &ctx = cs.getASTContext();
   
   auto fn = apply->getFn();
@@ -6863,7 +6855,24 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, ConcreteDeclRef callee,
       llvm_unreachable("Unhandled DeclTypeCheckingSemantics in switch.");
     };
 
-  // Resolve `callAsFunction` and `@dynamicCallable` applications.
+  // Resolve the callee for the application if we have one.
+  ConcreteDeclRef callee;
+  auto *calleeLoc = cs.getConstraintLocator(calleeLocator);
+  auto overload = solution.getOverloadChoiceIfAvailable(calleeLoc);
+  if (overload) {
+    auto *decl = overload->choice.getDeclOrNull();
+    callee = resolveConcreteDeclRef(decl, calleeLoc);
+  }
+
+  // If this is an implicit call to a `callAsFunction` method, build the
+  // appropriate member reference.
+  if (cs.getType(fn)->getRValueType()->isCallableNominalType(dc)) {
+    fn = buildCallAsFunctionMethodRef(*this, apply, *overload, calleeLoc);
+    if (!fn)
+      return nullptr;
+  }
+
+  // Resolve a `@dynamicCallable` application.
   auto applyFunctionLoc =
       locator.withPathElement(ConstraintLocator::ApplyFunction);
   if (auto selected = solution.getOverloadChoiceIfAvailable(
@@ -6876,15 +6885,6 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, ConcreteDeclRef callee,
       if (isValidDynamicCallableMethod(method, methodType))
         return finishApplyDynamicCallable(
             apply, *selected, method, methodType, applyFunctionLoc);
-
-      // If this is an implicit call to a callAsFunction method, build the
-      // appropriate member reference.
-      if (method->isCallAsFunctionMethod()) {
-        fn = buildCallAsFunctionMethodRef(*this, apply, *selected,
-                                          applyFunctionLoc);
-        if (!fn)
-          return nullptr;
-      }
     }
   }
 
@@ -7012,12 +7012,8 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, ConcreteDeclRef callee,
   assert(ty->getNominalOrBoundGenericNominal() || ty->is<DynamicSelfType>() ||
          ty->isExistentialType() || ty->is<ArchetypeType>());
 
-  // We have the constructor.
-  auto choice = selected->choice;
-
   // Consider the constructor decl reference expr 'implicit', but the
   // constructor call expr itself has the apply's 'implicitness'.
-  auto ctorRef = resolveConcreteDeclRef(choice.getDecl(), ctorLocator);
   Expr *declRef = buildMemberRef(fn, /*dotLoc=*/SourceLoc(), *selected,
                                  DeclNameLoc(fn->getEndLoc()), locator,
                                  ctorLocator, /*Implicit=*/true,
@@ -7028,7 +7024,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, ConcreteDeclRef callee,
   apply->setFn(declRef);
 
   // Tail-recur to actually call the constructor.
-  return finishApply(apply, ctorRef, openedType, locator);
+  return finishApply(apply, openedType, locator, ctorLocator);
 }
 
 // Return the precedence-yielding parent of 'expr', along with the index of
@@ -7383,7 +7379,7 @@ bool ConstraintSystem::applySolutionFixes(const Solution &solution) {
 Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr,
                                       Type convertType,
                                       bool discardedExpr,
-                                      bool skipClosures) {
+                                      bool performingDiagnostics) {
   // If any fixes needed to be applied to arrive at this solution, resolve
   // them to specific expressions.
   if (!solution.Fixes.empty()) {
@@ -7417,7 +7413,7 @@ Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr,
 
   // If we're re-typechecking an expression for diagnostics, don't
   // visit closures that have non-single expression bodies.
-  if (!skipClosures) {
+  if (!performingDiagnostics) {
     bool hadError = false;
     for (auto *closure : walker.getClosuresToTypeCheck())
       hadError |= TypeChecker::typeCheckClosureBody(closure);

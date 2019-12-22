@@ -1643,14 +1643,10 @@ ERROR(sil_inst_autodiff_invalid_witness_generic_signature,PointsToFirstBadToken,
       "parameters as original function generic signature '%1'",
       (StringRef, StringRef))
 
-// Quoted attribute.
+// quoted
 ERROR(attr_quoted_enable_experimental_quasiquotes,PointsToFirstBadToken,
       "'@quoted' is unsupported; pass -enable-experimental-quasiquotes to "
       "enable support for quasiquotes", ())
-
-// derivative
-ERROR(attr_derivative_expected_original_name,PointsToFirstBadToken,
-      "expected an original function name", ())
 
 //------------------------------------------------------------------------------
 // MARK: Generics parsing diagnostics

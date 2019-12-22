@@ -2041,6 +2041,27 @@ public:
 /// does it have the given semantics?
 bool doesApplyCalleeHaveSemantics(SILValue callee, StringRef semantics);
 
+// SWIFT_ENABLE_TENSORFLOW
+/// Predicate used to filter InoutArgumentRange.
+struct OperandToInoutArgument {
+  ArrayRef<SILParameterInfo> paramInfos;
+  OperandValueArrayRef arguments;
+  OperandToInoutArgument(ArrayRef<SILParameterInfo> paramInfos,
+                         OperandValueArrayRef arguments)
+      : paramInfos(paramInfos), arguments(arguments) {
+    assert(paramInfos.size() == arguments.size());
+  }
+  Optional<SILValue> operator()(unsigned long i) const {
+    if (paramInfos[i].isIndirectMutating())
+      return arguments[i];
+    return None;
+  }
+};
+
+using InoutArgumentRange =
+    OptionalTransformRange<IntRange<unsigned long>, OperandToInoutArgument>;
+// SWIFT_ENABLE_TENSORFLOW END
+
 /// The partial specialization of ApplyInstBase for full applications.
 /// Adds some methods relating to 'self' and to result types that don't
 /// make sense for partial applications.
@@ -2147,31 +2168,14 @@ public:
   }
 
 // SWIFT_ENABLE_TENSORFLOW
-private:
-  /// Predicate used to filter InoutArgumentRange.
-  struct OperandToInoutArgument {
-    ArrayRef<SILParameterInfo> paramInfos;
-    OperandValueArrayRef arguments;
-    OperandToInoutArgument(const Impl &inst)
-        : paramInfos(inst.getSubstCalleeConv().getParameters()),
-          arguments(inst.getArgumentsWithoutIndirectResults()) {
-      assert(paramInfos.size() == arguments.size());
-    }
-    Optional<SILValue> operator()(unsigned long i) const {
-      if (paramInfos[i].isIndirectMutating())
-        return arguments[i];
-      return None;
-    }
-  };
-
-public:
-  using InoutArgumentRange =
-      OptionalTransformRange<IntRange<unsigned long>, OperandToInoutArgument>;
   /// Returns all `@inout` and `@inout_aliasable` arguments passed to the
   /// instruction.
   InoutArgumentRange getInoutArguments() const {
-    return InoutArgumentRange(indices(getArgumentsWithoutIndirectResults()),
-                              OperandToInoutArgument(asImpl()));
+    auto &impl = asImpl();
+    return InoutArgumentRange(
+        indices(getArgumentsWithoutIndirectResults()),
+        OperandToInoutArgument(impl.getSubstCalleeConv().getParameters(),
+                               impl.getArgumentsWithoutIndirectResults()));
   }
 // SWIFT_ENABLE_TENSORFLOW END
 };

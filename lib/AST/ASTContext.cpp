@@ -3083,11 +3083,10 @@ void AnyFunctionType::decomposeInput(
   }
       
   default:
-    result.emplace_back(type->getInOutObjectType(), Identifier(),
-                        ParameterTypeFlags::fromParameterType(
-                          // SWIFT_ENABLE_TENSORFLOW
-                          type, false, false, false, ValueOwnership::Default,
-                          /*nonDifferentiable*/ false));
+    result.emplace_back(
+        type->getInOutObjectType(), Identifier(),
+        ParameterTypeFlags::fromParameterType(type, false, false, false,
+                                              ValueOwnership::Default, false));
     return;
   }
 }
@@ -4140,18 +4139,13 @@ void DeclName::CompoundDeclName::Profile(llvm::FoldingSetNodeID &id,
 
 void DeclName::initialize(ASTContext &C, DeclBaseName baseName,
                           ArrayRef<Identifier> argumentNames) {
-  if (argumentNames.empty()) {
-    SimpleOrCompound = BaseNameAndCompound(baseName, true);
-    return;
-  }
-
   llvm::FoldingSetNodeID id;
   CompoundDeclName::Profile(id, baseName, argumentNames);
 
   void *insert = nullptr;
   if (CompoundDeclName *compoundName
         = C.getImpl().CompoundNames.FindNodeOrInsertPos(id, insert)) {
-    SimpleOrCompound = compoundName;
+    BaseNameOrCompound = compoundName;
     return;
   }
 
@@ -4161,7 +4155,7 @@ void DeclName::initialize(ASTContext &C, DeclBaseName baseName,
   auto compoundName = new (buf) CompoundDeclName(baseName,argumentNames.size());
   std::uninitialized_copy(argumentNames.begin(), argumentNames.end(),
                           compoundName->getArgumentNames().begin());
-  SimpleOrCompound = compoundName;
+  BaseNameOrCompound = compoundName;
   C.getImpl().CompoundNames.InsertNode(compoundName, insert);
 }
 

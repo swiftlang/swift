@@ -278,6 +278,33 @@ ConstructorDecl *swift::createMemberwiseImplicitConstructor(
                                    ctx);
 }
 
+// SWIFT_ENABLE_TENSORFLOW
+ConstructorDecl *swift::getOrCreateEffectiveMemberwiseInitializer(
+    ASTContext &ctx, NominalTypeDecl *nominal) {
+  // Compute the access level for the memberwise initializer: the minimum of:
+  // - Public, by default. This enables public nominal types to have public
+  //   memberwise initializers.
+  // - The access level of each memberwise-initialized property in the nominal
+  //   type declaration.
+  auto accessLevel = AccessLevel::Public;
+  for (auto *member : nominal->getMembers()) {
+    auto var = dyn_cast<VarDecl>(member);
+    if (!var ||
+        !var->isMemberwiseInitialized(/*preferDeclaredProperties*/ true))
+      continue;
+    accessLevel = std::min(accessLevel, var->getFormalAccess());
+  }
+  if (auto *initDecl = nominal->getEffectiveMemberwiseInitializer()) {
+    initDecl->overwriteAccess(accessLevel);
+    return initDecl;
+  }
+  auto *initDecl = createMemberwiseImplicitConstructor(ctx, nominal);
+  initDecl->overwriteAccess(accessLevel);
+  nominal->addMember(initDecl);
+  return initDecl;
+}
+// SWIFT_ENABLE_TENSORFLOW END
+
 /// Create a stub body that emits a fatal error message.
 static std::pair<BraceStmt *, bool>
 synthesizeStubBody(AbstractFunctionDecl *fn, void *) {

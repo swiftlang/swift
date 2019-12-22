@@ -83,6 +83,14 @@ TypeVariableType::Implementation::getGenericParameter() const {
   return locator ? locator->getGenericParameter() : nullptr;
 }
 
+bool TypeVariableType::Implementation::isClosureResultType() const {
+  if (!(locator && locator->getAnchor()))
+    return false;
+
+  return isa<ClosureExpr>(locator->getAnchor()) &&
+         locator->isLastElement<LocatorPathElt::ClosureResult>();
+}
+
 void *operator new(size_t bytes, ConstraintSystem& cs,
                    size_t alignment) {
   return cs.getAllocator().Allocate(bytes, alignment);
@@ -1221,13 +1229,6 @@ namespace {
         DC = ce->getParent();
       }
 
-      // Strip off any AutoClosures that were produced by a previous type check
-      // so that we don't choke in CSGen.
-      // FIXME: we shouldn't double typecheck, but it looks like code completion
-      // may do so in some circumstances. rdar://21466394
-      if (auto autoClosure = dyn_cast<AutoClosureExpr>(expr))
-        return autoClosure->getSingleExpressionBody();
-
       // A 'self.init' or 'super.init' application inside a constructor will
       // evaluate to void, with the initializer's result implicitly rebound
       // to 'self'. Recognize the unresolved constructor expression and
@@ -2258,7 +2259,7 @@ Type TypeChecker::typeCheckExpressionImpl(Expr *&expr, DeclContext *dc,
   result = cs.applySolution(
       solution, result, convertType.getType(),
       options.contains(TypeCheckExprFlags::IsDiscarded),
-      options.contains(TypeCheckExprFlags::SkipMultiStmtClosures));
+      options.contains(TypeCheckExprFlags::SubExpressionDiagnostics));
 
   if (!result) {
     listener.applySolutionFailed(solution, expr);
@@ -4453,11 +4454,13 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
   // type.  This is handled in the runtime, so it doesn't need a special cast
   // kind.
   if (Context.LangOpts.EnableObjCInterop) {
+    auto nsObject = Context.getNSObjectType();
+    auto nsErrorTy = Context.getNSErrorType();
+
     if (auto errorTypeProto = Context.getProtocol(KnownProtocolKind::Error)) {
       if (!conformsToProtocol(toType, errorTypeProto, dc,
                               ConformanceCheckFlags::InExpression)
                .isInvalid()) {
-        auto nsErrorTy = Context.getNSErrorType();
         if (nsErrorTy) {
           if (isSubtypeOf(fromType, nsErrorTy, dc)
               // Don't mask "always true" warnings if NSError is cast to
@@ -4466,6 +4469,23 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
             return CheckedCastKind::ValueCast;
         }
       }
+
+      if (!conformsToProtocol(fromType, errorTypeProto, dc,
+                                     ConformanceCheckFlags::InExpression)
+              .isInvalid()) {
+        // Cast of an error-conforming type to NSError or NSObject.
+        if ((nsObject && toType->isEqual(nsObject)) ||
+             (nsErrorTy && toType->isEqual(nsErrorTy)))
+            return CheckedCastKind::BridgingCoercion;
+      }
+    }
+
+    // Any class-like type could be dynamically cast to NSObject or NSError
+    // via an Error conformance.
+    if (fromType->mayHaveSuperclass() &&
+        ((nsObject && toType->isEqual(nsObject)) ||
+         (nsErrorTy && toType->isEqual(nsErrorTy)))) {
+      return CheckedCastKind::ValueCast;
     }
   }
 

@@ -9,6 +9,7 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
+
 #define DEBUG_TYPE "differentiation"
 
 #include "swift/SILOptimizer/Analysis/DifferentiableActivityAnalysis.h"
@@ -125,19 +126,21 @@ void DifferentiableActivityInfo::propagateVaried(
   // General rule: mark results as varied and recursively propagate variedness
   // to users of results.
   auto i = independentVariableIndex;
-  // Handle `apply`.
-  if (auto *ai = dyn_cast<ApplyInst>(inst)) {
+  // Handle full apply sites: `apply`, `try_apply`, and `begin_apply`.
+  if (FullApplySite::isa(inst)) {
+    FullApplySite applySite(inst);
     // If callee is non-varying, skip.
-    if (isWithoutDerivative(ai->getCallee()))
+    if (isWithoutDerivative(applySite.getCallee()))
       return;
     // If operand is varied, set all direct/indirect results and inout arguments
     // as varied.
     if (isVaried(operand->get(), i)) {
-      for (auto indRes : ai->getIndirectSILResults())
+      for (auto indRes : applySite.getIndirectSILResults())
         propagateVariedInwardsThroughProjections(indRes, i);
-      for (auto inoutArg : ai->getInoutArguments())
+      for (auto inoutArg : applySite.getInoutArguments())
         propagateVariedInwardsThroughProjections(inoutArg, i);
-      forEachApplyDirectResult(ai, [&](SILValue directResult) {
+      // Propagate variedness to apply site direct results.
+      forEachApplyDirectResult(applySite, [&](SILValue directResult) {
         setVariedAndPropagateToUsers(directResult, i);
       });
     }
@@ -217,7 +220,7 @@ void DifferentiableActivityInfo::propagateVariedInwardsThroughProjections(
   // Set value as varied and propagate to users.
   setVariedAndPropagateToUsers(value, independentVariableIndex);
   auto *inst = value->getDefiningInstruction();
-  if (!inst || isa<ApplyInst>(inst))
+  if (!inst || ApplySite::isa(inst))
     return;
   // Standard propagation.
   for (auto &op : inst->getAllOperands())
@@ -261,11 +264,13 @@ void DifferentiableActivityInfo::propagateUseful(
   // Propagate usefulness for the given instruction: mark operands as useful and
   // recursively propagate usefulness to defining instructions of operands.
   auto i = dependentVariableIndex;
-  // Handle indirect results in `apply`.
-  if (auto *ai = dyn_cast<ApplyInst>(inst)) {
-    if (isWithoutDerivative(ai->getCallee()))
+  // Handle full apply sites: `apply`, `try_apply`, and `begin_apply`.
+  if (FullApplySite::isa(inst)) {
+    FullApplySite applySite(inst);
+    // If callee is non-varying, skip.
+    if (isWithoutDerivative(applySite.getCallee()))
       return;
-    for (auto arg : ai->getArgumentsWithoutIndirectResults())
+    for (auto arg : applySite.getArgumentsWithoutIndirectResults())
       setUsefulAndPropagateToOperands(arg, i);
   }
   // Handle store-like instructions:
@@ -343,18 +348,25 @@ void DifferentiableActivityInfo::setUsefulThroughArrayInitialization(
       auto *ptai = dyn_cast<PointerToAddressInst>(use->getUser());
       assert(ptai && "Expected `pointer_to_address` user for uninitialized "
                      "array intrinsic");
-      // Propagate usefulness through array element addresses.
-      // - Find `store` and `copy_addr` instructions with array element
-      //   address destinations.
-      // - For each instruction, set destination (array element address) as
-      //   useful and propagate usefulness through source.
+      setUseful(ptai, dependentVariableIndex);
+      // Propagate usefulness through array element addresses:
+      // `pointer_to_address` and `index_addr` instructions.
       //
-      // Note: `propagateUseful(use->getUser(), ...)` is intentionally not used
+      // - Set all array element addresses as useful.
+      // - Find instructions with array element addresses as "result":
+      //   - `store` and `copy_addr` with array element address as destination.
+      //   - `apply` with array element address as an indirect result.
+      // - For each instruction, propagate usefulness through "arguments":
+      //   - `store` and `copy_addr`: propagate to source.
+      //   - `apply`: propagate to arguments.
+      //
+      // NOTE: `propagateUseful(use->getUser(), ...)` is intentionally not used
       // because it marks more values than necessary as useful, including:
       // - The `RawPointer` result of the intrinsic.
-      // - The `pointer_to_address` user of the `RawPointer`.
-      // - `index_addr` and `integer_literal` instructions for indexing the
+      // - `integer_literal` operands to `index_addr` for indexing the
       //   `RawPointer`.
+      // It is also blocked by TF-1032: control flow differentiation crash for
+      // active values with no tangent space.
       for (auto use : ptai->getUses()) {
         auto *user = use->getUser();
         if (auto *si = dyn_cast<StoreInst>(user)) {
@@ -364,7 +376,12 @@ void DifferentiableActivityInfo::setUsefulThroughArrayInitialization(
           setUseful(cai->getDest(), dependentVariableIndex);
           setUsefulAndPropagateToOperands(cai->getSrc(),
                                           dependentVariableIndex);
+        } else if (auto *ai = dyn_cast<ApplyInst>(user)) {
+          if (FullApplySite(ai).isIndirectResultOperand(*use))
+            for (auto arg : ai->getArgumentsWithoutIndirectResults())
+              setUsefulAndPropagateToOperands(arg, dependentVariableIndex);
         } else if (auto *iai = dyn_cast<IndexAddrInst>(user)) {
+          setUseful(iai, dependentVariableIndex);
           for (auto use : iai->getUses()) {
             auto *user = use->getUser();
             if (auto si = dyn_cast<StoreInst>(user)) {
@@ -375,6 +392,10 @@ void DifferentiableActivityInfo::setUsefulThroughArrayInitialization(
               setUseful(cai->getDest(), dependentVariableIndex);
               setUsefulAndPropagateToOperands(cai->getSrc(),
                                               dependentVariableIndex);
+            } else if (auto *ai = dyn_cast<ApplyInst>(user)) {
+              if (FullApplySite(ai).isIndirectResultOperand(*use))
+                for (auto arg : ai->getArgumentsWithoutIndirectResults())
+                  setUsefulAndPropagateToOperands(arg, dependentVariableIndex);
             }
           }
         }
