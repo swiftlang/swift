@@ -123,17 +123,10 @@ public:
   IGNORED_ATTR(ReferenceOwnership)
   IGNORED_ATTR(OriginallyDefinedIn)
 
-<<<<<<< HEAD
+  // SWIFT_ENABLE_TENSORFLOW
   // TODO(TF-715): Allow @quoted on more decls.
   IGNORED_ATTR(Quoted)
-=======
-  // TODO(TF-828): Upstream `@differentiable` attribute type-checking from
-  // tensorflow branch.
-  IGNORED_ATTR(Differentiable)
-  // TODO(TF-830): Upstream `@transpose` attribute type-checking from tensorflow
-  // branch.
-  IGNORED_ATTR(Transpose)
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-12-20-a
+  // SWIFT_ENABLE_TENSORFLOW END
 #undef IGNORED_ATTR
 
   void visitAlignmentAttr(AlignmentAttr *attr) {
@@ -3708,20 +3701,12 @@ static bool typeCheckDerivativeAttr(ASTContext &Ctx, Decl *D,
   }
 
   // Reject different-file derivative registration.
-<<<<<<< HEAD
-  // TODO(TF-1021): Lift this restriction.
+  // TODO(TF-1021): Lift same-file derivative registration restriction.
   if (!EnableExperimentalCrossFileDerivativeRegistration &&
       originalAFD->getParentSourceFile() != derivative->getParentSourceFile()) {
-    diagnoseAndRemoveAttr(attr,
-                          diag::derivative_attr_not_in_same_file_as_original);
-    return;
-=======
-  // TODO(TF-1021): Lift same-file derivative registration restriction.
-  if (originalAFD->getParentSourceFile() != derivative->getParentSourceFile()) {
     diags.diagnose(attr->getLocation(),
                    diag::derivative_attr_not_in_same_file_as_original);
     return true;
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-12-20-a
   }
 
   // Reject duplicate `@derivative` attributes.
@@ -3741,12 +3726,20 @@ static bool typeCheckDerivativeAttr(ASTContext &Ctx, Decl *D,
     return true;
   }
 
-<<<<<<< HEAD
-   // Register derivative function configuration.
-   auto *resultIndices = IndexSubset::get(Ctx, 1, {0});
-   originalAFD->addDerivativeFunctionConfiguration(
-       {resolvedWrtParamIndices, resultIndices,
-        derivative->getGenericSignature()});
+  // SWIFT_ENABLE_TENSORFLOW
+  // Register derivative function configuration.
+  auto *resultIndices = IndexSubset::get(Ctx, 1, {0});
+  originalAFD->addDerivativeFunctionConfiguration(
+      {resolvedWrtParamIndices, resultIndices,
+       derivative->getGenericSignature()});
+  // SWIFT_ENABLE_TENSORFLOW END
+
+  return false;
+}
+
+void AttributeChecker::visitDerivativeAttr(DerivativeAttr *attr) {
+  if (typeCheckDerivativeAttr(Ctx, D, attr))
+    attr->setInvalid();
 }
 
 // SWIFT_ENABLE_TENSORFLOW
@@ -4650,12 +4643,4 @@ void AttributeChecker::visitNoDerivativeAttr(NoDerivativeAttr *attr) {
         attr, diag::noderivative_only_on_differentiable_struct_or_class_fields);
     return;
   }
-=======
-  return false;
-}
-
-void AttributeChecker::visitDerivativeAttr(DerivativeAttr *attr) {
-  if (typeCheckDerivativeAttr(Ctx, D, attr))
-    attr->setInvalid();
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-12-20-a
 }

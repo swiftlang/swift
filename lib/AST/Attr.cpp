@@ -372,14 +372,9 @@ static void printShortFormAvailable(ArrayRef<const DeclAttribute *> Attrs,
   Printer.printNewline();
 }
 
-<<<<<<< HEAD
-/// Printing style for a differentiation parameter in a differentiation
-/// parameters clause.
-=======
 /// Printing style for a differentiation parameter in a `wrt:` differentiation
 /// parameters clause. Used for printing `@differentiable`, `@derivative`, and
 /// `@transpose` attributes.
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-12-20-a
 enum class DifferentiationParameterPrintingStyle {
   /// Print parameter by name.
   /// Used for `@differentiable` and `@derivative` attribute.
@@ -389,15 +384,9 @@ enum class DifferentiationParameterPrintingStyle {
   Index
 };
 
-<<<<<<< HEAD
-// Returns the differentiation parameters clause string for the given function,
-// parameter indices, parsed parameters, and parameter printing style. Use the
-// parameter indices if specified; otherwise, use the parsed parameters.
-=======
 /// Returns the differentiation parameters clause string for the given function,
 /// parameter indices, parsed parameters, . Use the parameter indices if
 /// specified; otherwise, use the parsed parameters.
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-12-20-a
 static std::string getDifferentiationParametersClauseString(
     const AbstractFunctionDecl *function, IndexSubset *paramIndices,
     ArrayRef<ParsedAutoDiffParameter> parsedParams,
@@ -951,10 +940,6 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     break;
   }
 
-<<<<<<< HEAD
-  // SWIFT_ENABLE_TENSORFLOW
-=======
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-12-20-a
   case DAK_Transpose: {
     Printer.printAttrName("@transpose");
     Printer << "(of: ";
@@ -969,10 +954,6 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     Printer << ')';
     break;
   }
-<<<<<<< HEAD
-  // SWIFT_ENABLE_TENSORFLOW END
-=======
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-12-20-a
 
   case DAK_ImplicitlySynthesizesNestedRequirement:
     Printer.printAttrName("@_implicitly_synthesizes_nested_requirement");
@@ -1117,19 +1098,14 @@ StringRef DeclAttribute::getAttrName() const {
     return "differentiable";
   case DAK_Derivative:
     return "derivative";
-<<<<<<< HEAD
-  // SWIFT_ENABLE_TENSORFLOW
   case DAK_Transpose:
     return "transpose";
+  // SWIFT_ENABLE_TENSORFLOW
   case DAK_Differentiating:
     return "differentiating";
   case DAK_Quoted:
     return "quoted";
   // SWIFT_ENABLE_TENSORFLOW END
-=======
-  case DAK_Transpose:
-    return "transpose";
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-12-20-a
   }
   llvm_unreachable("bad DeclAttrKind");
 }
@@ -1677,48 +1653,9 @@ TransposeAttr *TransposeAttr::create(ASTContext &context, bool implicit,
                                  std::move(originalName), parameterIndices);
 }
 
-// SWIFT_ENABLE_TENSORFLOW
-TransposeAttr::TransposeAttr(bool implicit, SourceLoc atLoc,
-                             SourceRange baseRange, TypeRepr *baseTypeRepr,
-                             DeclNameRefWithLoc originalName,
-                             ArrayRef<ParsedAutoDiffParameter> params)
-    : DeclAttribute(DAK_Transpose, atLoc, baseRange, implicit),
-      BaseTypeRepr(baseTypeRepr), OriginalFunctionName(std::move(originalName)),
-      NumParsedParameters(params.size()) {
-  std::uninitialized_copy(params.begin(), params.end(),
-                          getTrailingObjects<ParsedAutoDiffParameter>());
-}
-
-TransposeAttr::TransposeAttr(bool implicit, SourceLoc atLoc,
-                             SourceRange baseRange, TypeRepr *baseTypeRepr,
-                             DeclNameRefWithLoc originalName, IndexSubset *indices)
-    : DeclAttribute(DAK_Transpose, atLoc, baseRange, implicit),
-      BaseTypeRepr(baseTypeRepr), OriginalFunctionName(std::move(originalName)),
-      ParameterIndices(indices) {}
-
-TransposeAttr *TransposeAttr::create(ASTContext &context, bool implicit,
-                                     SourceLoc atLoc, SourceRange baseRange,
-                                     TypeRepr *baseType,
-                                     DeclNameRefWithLoc originalName,
-                                     ArrayRef<ParsedAutoDiffParameter> params) {
-  unsigned size = totalSizeToAlloc<ParsedAutoDiffParameter>(params.size());
-  void *mem = context.Allocate(size, alignof(TransposeAttr));
-  return new (mem) TransposeAttr(implicit, atLoc, baseRange, baseType,
-                                 std::move(originalName), params);
-}
-
-TransposeAttr *TransposeAttr::create(ASTContext &context, bool implicit,
-                                     SourceLoc atLoc, SourceRange baseRange,
-                                     TypeRepr *baseType,
-                                     DeclNameRefWithLoc originalName,
-                                     IndexSubset *indices) {
-  void *mem = context.Allocate(sizeof(TransposeAttr), alignof(TransposeAttr));
-  return new (mem) TransposeAttr(implicit, atLoc, baseRange, baseType,
-                                 std::move(originalName), indices);
-}
-
 ImplementsAttr::ImplementsAttr(SourceLoc atLoc, SourceRange range,
-                               TypeLoc ProtocolType, DeclName MemberName,
+                               TypeLoc ProtocolType,
+                               DeclName MemberName,
                                DeclNameLoc MemberNameLoc)
     : DeclAttribute(DAK_Implements, atLoc, range, /*Implicit=*/false),
       ProtocolType(ProtocolType),

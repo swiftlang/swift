@@ -55,11 +55,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-<<<<<<< HEAD
-const uint16_t SWIFTMODULE_VERSION_MINOR = 532; // function parameter noDerivative
-=======
-const uint16_t SWIFTMODULE_VERSION_MINOR = 531; // function parameter noDerivative
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-12-20-a
+const uint16_t SWIFTMODULE_VERSION_MINOR = 533; // tensorflow merge
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -1802,13 +1798,11 @@ namespace decls_block {
     BCArray<BCFixed<1>> // Differentiation parameter indices' bitvector.
   >;
 
-<<<<<<< HEAD
   // SWIFT_ENABLE_TENSORFLOW
   // TODO(TF-999): Remove deprecated `@differentiating` attribute.
   using DifferentiatingDeclAttrLayout = DerivativeDeclAttrLayout;
+  // SWIFT_ENABLE_TENSORFLOW END
 
-=======
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-12-20-a
   using TransposeDeclAttrLayout = BCRecordLayout<
     Transpose_DECL_ATTR,
     BCFixed<1>, // Implicit flag.
@@ -1816,10 +1810,6 @@ namespace decls_block {
     DeclIDField, // Original function declaration.
     BCArray<BCFixed<1>> // Transposed parameter indices' bitvector.
   >;
-<<<<<<< HEAD
-  // SWIFT_ENABLE_TENSORFLOWE END
-=======
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-12-20-a
 
 #define SIMPLE_DECL_ATTR(X, CLASS, ...)         \
   using CLASS##DeclAttrLayout = BCRecordLayout< \

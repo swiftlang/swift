@@ -1014,24 +1014,20 @@ public:
   ParserResult<DerivativeAttr> parseDerivativeAttribute(SourceLoc AtLoc,
                                                         SourceLoc Loc);
 
-<<<<<<< HEAD
+  /// Parse the @transpose attribute.
+  ParserResult<TransposeAttr> parseTransposeAttribute(SourceLoc AtLoc,
+                                                      SourceLoc Loc);
+
+  // SWIFT_ENABLE_TENSORFLOW
   /// Parse the deprecated @differentiating attribute.
   // TODO(TF-999): Remove the deprecated `@differentiating` attribute.
   ParserResult<DerivativeAttr> parseDifferentiatingAttribute(SourceLoc AtLoc,
                                                              SourceLoc Loc);
 
-=======
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-12-20-a
-  /// Parse the @transpose attribute.
-  ParserResult<TransposeAttr> parseTransposeAttribute(SourceLoc AtLoc,
-                                                      SourceLoc Loc);
-
-<<<<<<< HEAD
   /// Parse the @quoted attribute.
   ParserResult<QuotedAttr> parseQuotedAttribute(SourceLoc AtLoc, SourceLoc Loc);
+  // SWIFT_ENABLE_TENSORFLOW END
 
-=======
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-12-20-a
   /// Parse a specific attribute.
   ParserStatus parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc);
 
@@ -1173,20 +1169,6 @@ public:
                                      SourceLoc &LAngleLoc,
                                      SourceLoc &RAngleLoc);
 
-<<<<<<< HEAD
-  // SWIFT_ENABLE_TENSORFLOW: Added `isParsingQualifiedDeclName` flag.
-  /// Parses a type identifier (e.g. 'Foo' or 'Foo.Bar.Baz').
-  ///
-  /// When `isParsingQualifiedDeclName` is true:
-  /// - Parses the type qualifier from a qualified decl name, and returns a
-  ///   parser result for the type of the qualifier.
-  /// - Positions the parser at the '.' before the final declaration name.
-  /// - For example, 'Foo.Bar.f' parses as 'Foo.Bar' and the parser gets
-  ///   positioned at '.f'.
-  /// - If there is no type qualification (e.g. when parsing just 'f'), returns
-  ///   an empty parser error.
-  ParserResult<TypeRepr> parseTypeIdentifier(bool isParsingQualifiedDeclName = false);
-=======
   /// Parses a type identifier (e.g. 'Foo' or 'Foo.Bar.Baz').
   ///
   /// When `isParsingQualifiedDeclBaseType` is true:
@@ -1200,7 +1182,6 @@ public:
   ///   an empty parser error.
   ParserResult<TypeRepr> parseTypeIdentifier(
       bool isParsingQualifiedDeclBaseType = false);
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-12-20-a
   ParserResult<TypeRepr> parseOldStyleProtocolComposition();
   ParserResult<TypeRepr> parseAnyType();
   ParserResult<TypeRepr> parseSILBoxType(GenericParamList *generics,
@@ -1431,17 +1412,11 @@ public:
 
   bool canParseTypedPattern();
 
-<<<<<<< HEAD
-  // SWIFT_ENABLE_TENSORFLOW
-  /// Returns true if a base type for a qualified declaration name can be
-  /// parsed.
-=======
   /// Returns true if a qualified declaration name base type can be parsed.
   ///
   /// \verbatim
   ///   qualified-decl-name-base-type: simple-type-identifier '.'
   /// \endverbatim
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-12-20-a
   bool canParseBaseTypeForQualifiedDeclName();
 
   //===--------------------------------------------------------------------===//

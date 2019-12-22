@@ -2270,18 +2270,6 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
         }
       }
 
-<<<<<<< HEAD
-      // @autoclosure is only valid on parameters.
-      if (!isParam && attrs.has(TAK_autoclosure)) {
-        diagnose(attrs.getLoc(TAK_autoclosure),
-                 isVariadicFunctionParam ? diag::attr_not_on_variadic_parameters
-                                         : diag::attr_only_on_parameters,
-                 "@autoclosure");
-        attrs.clearAttribute(TAK_autoclosure);
-      }
-
-=======
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-12-20-a
       if (attrs.has(TAK_differentiable) &&
           !Context.LangOpts.EnableExperimentalDifferentiableProgramming) {
         diagnoseInvalid(repr, attrs.getLoc(TAK_differentiable),
@@ -2426,7 +2414,8 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
     attrs.clearAttribute(TAK_noDerivative);
   }
 
-<<<<<<< HEAD
+  // SWIFT_ENABLE_TENSORFLOW
+  // `@nondiff` is deprecated; it is renamed to `@noDerivative`.
   if (attrs.has(TAK_nondiff)) {
     diagnose(attrs.getLoc(TAK_nondiff), diag::nondiff_attr_deprecated);
     if (!Context.LangOpts.EnableExperimentalDifferentiableProgramming) {
@@ -2442,9 +2431,8 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
     }
     attrs.clearAttribute(TAK_nondiff);
   }
+  // SWIFT_ENABLE_TENSORFLOW END
 
-=======
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-12-20-a
   // In SIL, handle @opened (n), which creates an existential archetype.
   if (attrs.has(TAK_opened)) {
     if (!ty->isExistentialType()) {
@@ -2576,7 +2564,7 @@ bool TypeResolver::resolveASTFunctionTypeParams(
         else
           noDerivative = true;
       }
-<<<<<<< HEAD
+      // SWIFT_ENABLE_TENSORFLOW
       if (attrTypeRepr->getAttrs().has(TAK_nondiff)) {
         if (diffKind == DifferentiabilityKind::NonDifferentiable &&
             Context.LangOpts.EnableExperimentalDifferentiableProgramming)
@@ -2587,6 +2575,7 @@ bool TypeResolver::resolveASTFunctionTypeParams(
         else
           noDerivative = true;
       }
+      // SWIFT_ENABLE_TENSORFLOW END
     }
 
     // SWIFT_ENABLE_TENSORFLOW
@@ -2597,9 +2586,8 @@ bool TypeResolver::resolveASTFunctionTypeParams(
                  diag::autodiff_attr_argument_not_differentiable)
             .fixItInsert(eltTypeRepr->getLoc(), "@noDerivative ");
       }
-=======
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-12-20-a
     }
+    // SWIFT_ENABLE_TENSORFLOW END
 
     auto paramFlags = ParameterTypeFlags::fromParameterType(
         ty, variadic, autoclosure, /*isNonEphemeral*/ false, ownership,

@@ -360,16 +360,14 @@ FORWARD_ANY_OWNERSHIP_INST(LinearFunction)
   }
 FORWARD_CONSTANT_OR_NONE_OWNERSHIP_INST(Guaranteed, MustBeLive, TupleExtract)
 FORWARD_CONSTANT_OR_NONE_OWNERSHIP_INST(Guaranteed, MustBeLive, StructExtract)
-<<<<<<< HEAD
+FORWARD_CONSTANT_OR_NONE_OWNERSHIP_INST(Owned, MustBeInvalidated,
+                                        MarkUninitialized)
 // SWIFT_ENABLE_TENSORFLOW
 FORWARD_CONSTANT_OR_NONE_OWNERSHIP_INST(Guaranteed, MustBeLive,
                                         DifferentiableFunctionExtract)
 FORWARD_CONSTANT_OR_NONE_OWNERSHIP_INST(Guaranteed, MustBeLive,
                                         LinearFunctionExtract)
-=======
-FORWARD_CONSTANT_OR_NONE_OWNERSHIP_INST(Owned, MustBeInvalidated,
-                                        MarkUninitialized)
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-12-20-a
+// SWIFT_ENABLE_TENSORFLOW END
 #undef CONSTANT_OR_NONE_OWNERSHIP_INST
 
 OperandOwnershipKindMap

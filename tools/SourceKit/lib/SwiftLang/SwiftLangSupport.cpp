@@ -349,35 +349,13 @@ SwiftLangSupport::SwiftLangSupport(SourceKit::Context &SKCtx)
 SwiftLangSupport::~SwiftLangSupport() {
 }
 
-<<<<<<< HEAD
 // SWIFT_ENABLE_TENSORFLOW
 void SwiftLangSupport::setInMemoryOutputFileSystem(
     llvm::IntrusiveRefCntPtr<clang::InMemoryOutputFileSystem> FS) {
   ASTMgr->setInMemoryOutputFileSystem(std::move(FS));
 }
+// SWIFT_ENABLE_TENSORFLOW END
 
-std::unique_ptr<llvm::MemoryBuffer>
-SwiftLangSupport::makeCodeCompletionMemoryBuffer(
-    const llvm::MemoryBuffer *origBuf, unsigned &Offset,
-    const std::string bufferIdentifier) {
-
-  auto origBuffSize = origBuf->getBufferSize();
-  if (Offset > origBuffSize)
-    Offset = origBuffSize;
-
-  auto newBuffer = llvm::WritableMemoryBuffer::getNewUninitMemBuffer(
-      origBuffSize + 1, bufferIdentifier);
-  auto *pos = origBuf->getBufferStart() + Offset;
-  auto *newPos =
-      std::copy(origBuf->getBufferStart(), pos, newBuffer->getBufferStart());
-  *newPos = '\0';
-  std::copy(pos, origBuf->getBufferEnd(), newPos + 1);
-
-  return std::unique_ptr<llvm::MemoryBuffer>(newBuffer.release());
-}
-
-=======
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-12-20-a
 UIdent SwiftLangSupport::getUIDForDecl(const Decl *D, bool IsRef) {
   return UIdentVisitor(IsRef).visit(const_cast<Decl*>(D));
 }
@@ -1022,9 +1000,11 @@ void SwiftLangSupport::codeComplete(
   auto options = provider->addFileSystem(FS);
   vfsOptions.options =
       llvm::make_unique<DirectlyPassedFileSystemProvider::Options>(options);
-  codeComplete(InputBuf, Offset, Consumer, Args, std::move(vfsOptions));
+  codeComplete(InputBuf, Offset, vfsOptions.options.get(), Consumer, Args,
+               std::move(vfsOptions));
   provider->removeFileSystem(options);
 }
+// SWIFT_ENABLE_TENSORFLOW END
 
 void SwiftLangSupport::editorOpen(
     StringRef Name, llvm::MemoryBuffer *Buf, EditorConsumer &Consumer,

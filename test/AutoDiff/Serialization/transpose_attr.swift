@@ -6,9 +6,14 @@
 // BCANALYZER-NOT: UnknownCode
 // REQUIRES: differentiable_programming
 
+// SWIFT_ENABLE_TENSORFLOW
+// This test is enabled on `tensorflow` branch.
+// `@differentiable` attribute serialization does not yet work on `master`
+// branch only.
+
 // TODO(TF-838): Enable this test.
 // Blocked by TF-830: `@transpose` attribute type-checking.
-// XFAIL: *
+// FAIL: *
 
 import _Differentiation
 

@@ -1948,17 +1948,11 @@ public:
   }
 };
 
-<<<<<<< HEAD
 // SWIFT_ENABLE_TENSORFLOW
 // TODO(TF-999): Remove deprecated `@differentiating` attribute.
 using DifferentiatingAttr = DerivativeAttr;
+// SWIFT_ENABLE_TENSORFLOW END
 
-/// Attribute that registers a function as a transpose of another function.
-///
-/// Examples:
-///   @transpose(of: foo)
-///   @transpose(of: +, wrt: (lhs, rhs))
-=======
 /// The `@transpose(of:)` attribute registers a function as a transpose of
 /// another function-like declaration: a 'func', 'init', 'subscript', or 'var'
 /// computed property declaration.
@@ -1970,17 +1964,12 @@ using DifferentiatingAttr = DerivativeAttr;
 /// Examples:
 ///   @transpose(of: foo)
 ///   @transpose(of: +, wrt: (0, 1))
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-12-20-a
 class TransposeAttr final
     : public DeclAttribute,
       private llvm::TrailingObjects<TransposeAttr, ParsedAutoDiffParameter> {
   friend TrailingObjects;
 
-<<<<<<< HEAD
   /// The base type for the referenced original declaration. This field is
-=======
-  /// The base type repr for the referenced original function. This field is
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-12-20-a
   /// non-null only for parsed attributes that reference a qualified original
   /// declaration. This field is not serialized; type-checking uses it to
   /// resolve the original declaration, which is serialized.
@@ -1995,41 +1984,23 @@ class TransposeAttr final
   IndexSubset *ParameterIndices = nullptr;
 
   explicit TransposeAttr(bool implicit, SourceLoc atLoc, SourceRange baseRange,
-<<<<<<< HEAD
-                         TypeRepr *baseTypeRepr, DeclNameRefWithLoc original,
-                         ArrayRef<ParsedAutoDiffParameter> params);
-
-  explicit TransposeAttr(bool implicit, SourceLoc atLoc, SourceRange baseRange,
-                         TypeRepr *baseTypeRepr, DeclNameRefWithLoc original,
-                         IndexSubset *indices);
-=======
                          TypeRepr *baseType, DeclNameRefWithLoc original,
                          ArrayRef<ParsedAutoDiffParameter> params);
 
   explicit TransposeAttr(bool implicit, SourceLoc atLoc, SourceRange baseRange,
                          TypeRepr *baseType, DeclNameRefWithLoc original,
                          IndexSubset *parameterIndices);
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-12-20-a
 
 public:
   static TransposeAttr *create(ASTContext &context, bool implicit,
                                SourceLoc atLoc, SourceRange baseRange,
-<<<<<<< HEAD
-                               TypeRepr *baseTypeRepr, DeclNameRefWithLoc original,
-=======
                                TypeRepr *baseType, DeclNameRefWithLoc original,
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-12-20-a
                                ArrayRef<ParsedAutoDiffParameter> params);
 
   static TransposeAttr *create(ASTContext &context, bool implicit,
                                SourceLoc atLoc, SourceRange baseRange,
-<<<<<<< HEAD
-                               TypeRepr *baseTypeRepr, DeclNameRefWithLoc original,
-                               IndexSubset *indices);
-=======
                                TypeRepr *baseType, DeclNameRefWithLoc original,
                                IndexSubset *parameterIndices);
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-12-20-a
 
   TypeRepr *getBaseTypeRepr() const { return BaseTypeRepr; }
   DeclNameRefWithLoc getOriginalFunctionName() const {
@@ -2065,10 +2036,6 @@ public:
     return DA->getKind() == DAK_Transpose;
   }
 };
-<<<<<<< HEAD
-// SWIFT_ENABLE_TENSORFLOW END
-=======
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-12-20-a
 
 /// Attributes that may be applied to declarations.
 class DeclAttributes {

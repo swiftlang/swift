@@ -2393,47 +2393,27 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       return;
     }
 
-<<<<<<< HEAD
-    // SWIFT_ENABLE_TENSORFLOW
     case DAK_Transpose: {
       auto abbrCode = S.DeclTypeAbbrCodes[TransposeDeclAttrLayout::Code];
       auto *attr = cast<TransposeAttr>(DA);
-=======
-    case DAK_Transpose: {
-      auto abbrCode = S.DeclTypeAbbrCodes[TransposeDeclAttrLayout::Code];
-      auto *attr = cast<TransposeAttr>(DA);
-      // NOTE(TF-838): `@transpose` attribute serialization is blocked by
-      // `@transpose` attribute type-checking (TF-830), which resolves
-      // the original declaration.
-      if (!attr->getOriginalFunction())
-        return;
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-12-20-a
       assert(attr->getOriginalFunction() &&
              "`@transpose` attribute should have original declaration set "
              "during construction or parsing");
       auto origName = attr->getOriginalFunctionName().Name.getBaseName();
       IdentifierID origNameId = S.addDeclBaseNameRef(origName);
       DeclID origDeclID = S.addDeclRef(attr->getOriginalFunction());
-<<<<<<< HEAD
-      auto paramIndices = attr->getParameterIndices();
-      assert(paramIndices && "Parameter indices must be resolved");
-      SmallVector<bool, 4> indices;
-      for (unsigned i : range(paramIndices->getCapacity()))
-        indices.push_back(paramIndices->contains(i));
-=======
       auto *parameterIndices = attr->getParameterIndices();
       assert(parameterIndices && "Parameter indices must be resolved");
       SmallVector<bool, 4> indices;
       for (unsigned i : range(parameterIndices->getCapacity()))
         indices.push_back(parameterIndices->contains(i));
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-12-20-a
       TransposeDeclAttrLayout::emitRecord(
           S.Out, S.ScratchRecord, abbrCode, attr->isImplicit(), origNameId,
           origDeclID, indices);
       return;
     }
 
-<<<<<<< HEAD
+    // SWIFT_ENABLE_TENSORFLOW
     case DAK_Quoted: {
       auto abbrCode = S.DeclTypeAbbrCodes[QuotedDeclAttrLayout::Code];
       auto attr = cast<QuotedAttr>(DA);
@@ -2445,8 +2425,6 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
     }
     // SWIFT_ENABLE_TENSORFLOW END
 
-=======
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-12-20-a
     case DAK_ImplicitlySynthesizesNestedRequirement: {
       auto *theAttr = cast<ImplicitlySynthesizesNestedRequirementAttr>(DA);
       auto abbrCode = S.DeclTypeAbbrCodes[ImplicitlySynthesizesNestedRequirementDeclAttrLayout::Code];
