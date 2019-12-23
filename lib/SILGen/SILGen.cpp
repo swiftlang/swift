@@ -796,7 +796,9 @@ void SILGenModule::postEmitFunction(SILDeclRef constant,
           break;
         }
         auto *origAFD = derivAttr->getOriginalFunction();
-        auto *origFn = getFunction(SILDeclRef(origAFD), NotForDefinition);
+        auto origConstant =
+            SILDeclRef(origAFD).asForeign(requiresForeignEntryPoint(origAFD));
+        auto *origFn = getFunction(origConstant, NotForDefinition);
         auto derivativeGenSig = AFD->getGenericSignature();
         auto *resultIndices = IndexSubset::get(getASTContext(), 1, {0});
         AutoDiffConfig config(derivAttr->getParameterIndices(), resultIndices,
