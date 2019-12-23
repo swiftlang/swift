@@ -90,6 +90,12 @@ extension SIMD {
   
   /// A vector with the specified value in all lanes.
   @_transparent
+  // SWIFT_ENABLE_TENSORFLOW
+  @differentiable(where Self : Differentiable,
+                        Self.TangentVector : SIMD,
+                        Scalar : BinaryFloatingPoint & Differentiable,
+                        Self.TangentVector == Self,
+                        Scalar.TangentVector == Scalar)
   public init(repeating value: Scalar) {
     self.init()
     for i in indices { self[i] = value }
@@ -781,6 +787,11 @@ extension SIMD where Scalar: FixedWidthInteger {
 //  be replaced with @_semantics to lower directly to vector IR nodes.
 extension SIMD where Scalar : FloatingPoint {
   @_transparent
+  // SWIFT_ENABLE_TENSORFLOW
+  @differentiable(where Self : Differentiable,
+                        Self.TangentVector : SIMD,
+                        Scalar : BinaryFloatingPoint,
+                        Self.TangentVector.Scalar : BinaryFloatingPoint)
   public static func +(lhs: Self, rhs: Self) -> Self {
     var result = Self()
     for i in result.indices { result[i] = lhs[i] + rhs[i] }
@@ -788,6 +799,11 @@ extension SIMD where Scalar : FloatingPoint {
   }
   
   @_transparent
+  // SWIFT_ENABLE_TENSORFLOW
+  @differentiable(where Self : Differentiable,
+                        Self.TangentVector : SIMD,
+                        Scalar : BinaryFloatingPoint,
+                        Self.TangentVector.Scalar : BinaryFloatingPoint)
   public static func -(lhs: Self, rhs: Self) -> Self {
     var result = Self()
     for i in result.indices { result[i] = lhs[i] - rhs[i] }
@@ -795,6 +811,11 @@ extension SIMD where Scalar : FloatingPoint {
   }
   
   @_transparent
+  // SWIFT_ENABLE_TENSORFLOW
+  @differentiable(where Self : Differentiable,
+                        Self.TangentVector : SIMD,
+                        Scalar : BinaryFloatingPoint,
+                        Self.TangentVector == Self)
   public static func *(lhs: Self, rhs: Self) -> Self {
     var result = Self()
     for i in result.indices { result[i] = lhs[i] * rhs[i] }
@@ -802,6 +823,11 @@ extension SIMD where Scalar : FloatingPoint {
   }
   
   @_transparent
+  // SWIFT_ENABLE_TENSORFLOW
+  @differentiable(where Self : Differentiable,
+                        Self.TangentVector : SIMD,
+                        Scalar : BinaryFloatingPoint,
+                        Self.TangentVector == Self)
   public static func /(lhs: Self, rhs: Self) -> Self {
     var result = Self()
     for i in result.indices { result[i] = lhs[i] / rhs[i] }
@@ -846,6 +872,11 @@ extension SIMD where Scalar : FloatingPoint {
   // FIXME: TF-545 we want the sum() func to be marked as
   // `@_alwaysEmitIntoClient` like before when we define the VJP
   @inlinable
+  @differentiable(where Self : Differentiable,
+                        Self.TangentVector : SIMD,
+                        Scalar : BinaryFloatingPoint & Differentiable,
+                        Scalar.TangentVector : BinaryFloatingPoint,
+                        Self.TangentVector == Self)
   public func sum() -> Scalar {
     // Implementation note: this eventually be defined to lower to either
     // llvm.experimental.vector.reduce.fadd or an explicit tree-sum. Open-
@@ -1160,46 +1191,99 @@ extension SIMD where Scalar: FixedWidthInteger {
 extension SIMD where Scalar: FloatingPoint {
   
   @_transparent
+  // SWIFT_ENABLE_TENSORFLOW
+  @differentiable(where Self : Differentiable,
+                        Self.TangentVector : SIMD,
+                        Scalar : BinaryFloatingPoint,
+                        Self.TangentVector.Scalar : BinaryFloatingPoint)
   public static prefix func -(rhs: Self) -> Self {
     return 0 - rhs
   }
   
   @_transparent
+  // SWIFT_ENABLE_TENSORFLOW
+  @differentiable(where Self : Differentiable,
+                        Self.TangentVector : SIMD,
+                        Scalar : Differentiable & BinaryFloatingPoint,
+                        Scalar.TangentVector : BinaryFloatingPoint,
+                        Self.TangentVector.Scalar == Scalar.TangentVector)
   public static func +(lhs: Scalar, rhs: Self) -> Self {
     return Self(repeating: lhs) + rhs
   }
   
   @_transparent
+  // SWIFT_ENABLE_TENSORFLOW
+  @differentiable(where Self : Differentiable,
+                        Self.TangentVector : SIMD,
+                        Scalar : Differentiable & BinaryFloatingPoint,
+                        Scalar.TangentVector : BinaryFloatingPoint,
+                        Self.TangentVector.Scalar == Scalar.TangentVector)
   public static func -(lhs: Scalar, rhs: Self) -> Self {
     return Self(repeating: lhs) - rhs
   }
   
   @_transparent
+  // SWIFT_ENABLE_TENSORFLOW
+  @differentiable(where Self : Differentiable,
+                        Self.TangentVector : SIMD,
+                        Scalar : BinaryFloatingPoint & Differentiable,
+                        Self.TangentVector == Self,
+                        Scalar.TangentVector == Scalar)
   public static func *(lhs: Scalar, rhs: Self) -> Self {
     return Self(repeating: lhs) * rhs
   }
   
   @_transparent
+  // SWIFT_ENABLE_TENSORFLOW
+  @differentiable(where Self : Differentiable,
+                        Self.TangentVector : SIMD,
+                        Scalar : BinaryFloatingPoint & Differentiable,
+                        Self.TangentVector == Self,
+                        Scalar.TangentVector == Scalar)
   public static func /(lhs: Scalar, rhs: Self) -> Self {
     return Self(repeating: lhs) / rhs
   }
   
   @_transparent
+  // SWIFT_ENABLE_TENSORFLOW
+  @differentiable(where Self : Differentiable,
+                        Self.TangentVector : SIMD,
+                        Scalar : Differentiable & BinaryFloatingPoint,
+                        Scalar.TangentVector : BinaryFloatingPoint,
+                        Self.TangentVector.Scalar == Scalar.TangentVector)
   public static func +(lhs: Self, rhs: Scalar) -> Self {
     return lhs + Self(repeating: rhs)
   }
   
   @_transparent
+  // SWIFT_ENABLE_TENSORFLOW
+  @differentiable(where Self : Differentiable,
+                        Self.TangentVector : SIMD,
+                        Scalar : Differentiable & BinaryFloatingPoint,
+                        Scalar.TangentVector : BinaryFloatingPoint,
+                        Self.TangentVector.Scalar == Scalar.TangentVector)
   public static func -(lhs: Self, rhs: Scalar) -> Self {
     return lhs - Self(repeating: rhs)
   }
   
   @_transparent
+  // SWIFT_ENABLE_TENSORFLOW
+  @differentiable(where Self : Differentiable,
+                        Self.TangentVector : SIMD,
+                        Scalar : BinaryFloatingPoint & Differentiable,
+                        Self.TangentVector == Self,
+                        Scalar.TangentVector == Scalar)
   public static func *(lhs: Self, rhs: Scalar) -> Self {
     return lhs * Self(repeating: rhs)
   }
   
   @_transparent
+  // SWIFT_ENABLE_TENSORFLOW
+  @differentiable(where Self : Differentiable,
+                        Self.TangentVector : SIMD,
+                        Scalar : BinaryFloatingPoint & Differentiable,
+                        Self.TangentVector == Self,
+                        Scalar.TangentVector == Scalar)
   public static func /(lhs: Self, rhs: Scalar) -> Self {
     return lhs / Self(repeating: rhs)
   }
