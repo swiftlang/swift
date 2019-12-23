@@ -3197,6 +3197,9 @@ static AbstractFunctionDecl *findAbstractFunctionDecl(
   LookupResult results;
   if (baseType) {
     results = TypeChecker::lookupMember(lookupContext, baseType, funcName);
+  } else if (auto *typeDecl = lookupContext->getSelfNominalTypeDecl()) {
+    results = TypeChecker::lookupMember(lookupContext,
+                                        typeDecl->getDeclaredType(), funcName);
   } else {
     results = TypeChecker::lookupUnqualified(lookupContext, funcName,
                                              funcNameLoc, lookupOptions);
