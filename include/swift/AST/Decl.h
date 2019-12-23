@@ -927,7 +927,7 @@ public:
 
   // Make vanilla new/delete illegal for Decls.
   void *operator new(size_t Bytes) = delete;
-  void operator delete(void *Data) SWIFT_DELETE_OPERATOR_DELETED;
+  void operator delete(void *Data) = delete;
 
   // Only allow allocation of Decls using the allocator in ASTContext
   // or by doing a placement new.

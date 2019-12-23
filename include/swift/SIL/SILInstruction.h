@@ -318,7 +318,7 @@ class SILInstruction
 
   SILInstruction() = delete;
   void operator=(const SILInstruction &) = delete;
-  void operator delete(void *Ptr, size_t) SWIFT_DELETE_OPERATOR_DELETED
+  void operator delete(void *Ptr, size_t) = delete;
 
   /// Check any special state of instructions that are not represented in the
   /// instructions operands/type.
@@ -799,7 +799,7 @@ public:
   SILModule &getModule() const { return SILInstruction::getModule(); }
   SILInstructionKind getKind() const { return SILInstruction::getKind(); }
 
-  void operator delete(void *Ptr, size_t) SWIFT_DELETE_OPERATOR_DELETED
+  void operator delete(void *Ptr, size_t) = delete;
 
   ValueKind getValueKind() const {
     return ValueBase::getKind();
@@ -950,7 +950,7 @@ protected:
       : SILInstruction(kind, loc) {}
 
 public:
-  void operator delete(void *Ptr, size_t)SWIFT_DELETE_OPERATOR_DELETED;
+  void operator delete(void *Ptr, size_t) = delete;
 
   MultipleValueInstruction *clone(SILInstruction *insertPt = nullptr) {
     return cast<MultipleValueInstruction>(SILInstruction::clone(insertPt));
