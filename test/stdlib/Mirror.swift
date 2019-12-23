@@ -622,13 +622,15 @@ mirrors.test("Weak and Unowned Obj-C refs in class (SR-5289)") {
     }
   }
 
-  let objc = WeakUnownedObjCClass()
-  let classWithReferences = SwiftClassWithWeakAndUnowned(objc)
-  let m = Mirror(reflecting: classWithReferences)
-  expectEqual(m.displayStyle, .`class`)
-  expectEqual(m.description, "Mirror for SwiftClassWithWeakAndUnowned")
-  expectEqual(m.subjectType, SwiftClassWithWeakAndUnowned.self)
-  verifyWeakUnownedReflection(m, expectedClass: WeakUnownedObjCClass.self)
+	if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
+		let objc = WeakUnownedObjCClass()
+		let classWithReferences = SwiftClassWithWeakAndUnowned(objc)
+		let m = Mirror(reflecting: classWithReferences)
+		expectEqual(m.displayStyle, .`class`)
+		expectEqual(m.description, "Mirror for SwiftClassWithWeakAndUnowned")
+		expectEqual(m.subjectType, SwiftClassWithWeakAndUnowned.self)
+		verifyWeakUnownedReflection(m, expectedClass: WeakUnownedObjCClass.self)
+	}
 }
 
 mirrors.test("Weak and Unowned Obj-C refs in struct") {
@@ -654,13 +656,15 @@ mirrors.test("Weak and Unowned Obj-C refs in struct") {
     }
   }
 
-  let objc = WeakUnownedObjCClass()
-  let structWithReferences = SwiftStructWithWeakAndUnowned(objc)
-  let m = Mirror(reflecting: structWithReferences)
-  expectEqual(m.displayStyle, .`struct`)
-  expectEqual(m.description, "Mirror for SwiftStructWithWeakAndUnowned")
-  expectEqual(m.subjectType, SwiftStructWithWeakAndUnowned.self)
-  verifyWeakUnownedReflection(m, expectedClass: WeakUnownedObjCClass.self)
+	if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
+		let objc = WeakUnownedObjCClass()
+		let structWithReferences = SwiftStructWithWeakAndUnowned(objc)
+		let m = Mirror(reflecting: structWithReferences)
+		expectEqual(m.displayStyle, .`struct`)
+		expectEqual(m.description, "Mirror for SwiftStructWithWeakAndUnowned")
+		expectEqual(m.subjectType, SwiftStructWithWeakAndUnowned.self)
+		verifyWeakUnownedReflection(m, expectedClass: WeakUnownedObjCClass.self)
+	}
 }
 
 #endif
@@ -688,13 +692,15 @@ mirrors.test("Weak and Unowned Swift refs in class") {
     }
   }
 
-  let swift = WeakUnownedSwiftClass()
-  let classWithReferences = SwiftClassWithWeakAndUnowned(swift)
-  let m = Mirror(reflecting: classWithReferences)
-  expectEqual(m.displayStyle, .`class`)
-  expectEqual(m.description, "Mirror for SwiftClassWithWeakAndUnowned")
-  expectEqual(m.subjectType, SwiftClassWithWeakAndUnowned.self)
-  verifyWeakUnownedReflection(m, expectedClass: WeakUnownedSwiftClass.self)
+	if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
+		let swift = WeakUnownedSwiftClass()
+		let classWithReferences = SwiftClassWithWeakAndUnowned(swift)
+		let m = Mirror(reflecting: classWithReferences)
+		expectEqual(m.displayStyle, .`class`)
+		expectEqual(m.description, "Mirror for SwiftClassWithWeakAndUnowned")
+		expectEqual(m.subjectType, SwiftClassWithWeakAndUnowned.self)
+		verifyWeakUnownedReflection(m, expectedClass: WeakUnownedSwiftClass.self)
+	}
 }
 
 mirrors.test("Weak and Unowned Swift refs in struct") {
@@ -720,13 +726,15 @@ mirrors.test("Weak and Unowned Swift refs in struct") {
     }
   }
 
-  let swift = WeakUnownedSwiftClass()
-  let structWithReferences = SwiftStructWithWeakAndUnowned(swift)
-  let m = Mirror(reflecting: structWithReferences)
-  expectEqual(m.displayStyle, .`struct`)
-  expectEqual(m.description, "Mirror for SwiftStructWithWeakAndUnowned")
-  expectEqual(m.subjectType, SwiftStructWithWeakAndUnowned.self)
-  verifyWeakUnownedReflection(m, expectedClass: WeakUnownedSwiftClass.self)
+	if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
+		let swift = WeakUnownedSwiftClass()
+		let structWithReferences = SwiftStructWithWeakAndUnowned(swift)
+		let m = Mirror(reflecting: structWithReferences)
+		expectEqual(m.displayStyle, .`struct`)
+		expectEqual(m.description, "Mirror for SwiftStructWithWeakAndUnowned")
+		expectEqual(m.subjectType, SwiftStructWithWeakAndUnowned.self)
+		verifyWeakUnownedReflection(m, expectedClass: WeakUnownedSwiftClass.self)
+	}
 }
 
 //===--- Suppressed Superclass Mirrors ------------------------------------===//

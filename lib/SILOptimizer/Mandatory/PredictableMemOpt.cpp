@@ -2118,7 +2118,7 @@ bool AllocOptimize::promoteLoadCopy(LoadInst *li) {
     SILValue addr = li->getOperand();
     li->eraseFromParent();
     if (auto *addrI = addr->getDefiningInstruction())
-      recursivelyDeleteTriviallyDeadInstructions(addrI);
+      eliminateDeadInstruction(addrI);
     return true;
   }
 
@@ -2139,7 +2139,7 @@ bool AllocOptimize::promoteLoadCopy(LoadInst *li) {
   SILValue addr = li->getOperand();
   li->eraseFromParent();
   if (auto *addrI = addr->getDefiningInstruction())
-    recursivelyDeleteTriviallyDeadInstructions(addrI);
+    eliminateDeadInstruction(addrI);
   return true;
 }
 
@@ -2242,7 +2242,7 @@ bool AllocOptimize::promoteLoadBorrow(LoadBorrowInst *lbi) {
   SILValue addr = lbi->getOperand();
   lbi->eraseFromParent();
   if (auto *addrI = addr->getDefiningInstruction())
-    recursivelyDeleteTriviallyDeadInstructions(addrI);
+    eliminateDeadInstruction(addrI);
   return true;
 }
 

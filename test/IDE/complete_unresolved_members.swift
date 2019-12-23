@@ -53,7 +53,7 @@
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=WITH_LITERAL_1 | %FileCheck %s -check-prefix=WITH_LITERAL_1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=WITH_LITERAL_2 | %FileCheck %s -check-prefix=WITH_LITERAL_1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=WITH_LITERAL_3 | %FileCheck %s -check-prefix=WITH_LITERAL_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=WITH_LITERAL_3 | %FileCheck %s -check-prefix=WITH_LITERAL_3
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INVALID_1
 
@@ -443,6 +443,9 @@ func testWithLiteral3() {
     func takeEnum(thing: MyEnum, other: Double) {}
     func test(s: S) {
       _ = s.takeEnum(thing: .#^WITH_LITERAL_3^#, other: 1.0)
+// WITH_LITERAL_3: Begin completions, 1 items
+// WITH_LITERAL_3-NEXT: Decl[EnumElement]/ExprSpecific:     myCase[#MyEnum#];
+// WITH_LITERAL_3-NEXT: End completions
     }
   }
 }

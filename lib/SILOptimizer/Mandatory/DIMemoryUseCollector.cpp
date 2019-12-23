@@ -558,7 +558,7 @@ public:
 
     // If this is a delegating initializer, collect uses specially.
     if (IsSelfOfNonDelegatingInitializer &&
-        TheMemory.getType()->getClassOrBoundGenericClass() != nullptr) {
+        TheMemory.getASTType()->getClassOrBoundGenericClass() != nullptr) {
       assert(!TheMemory.isDerivedClassSelfOnly() &&
              "Should have been handled outside of here");
       // If this is a class pointer, we need to look through ref_element_addrs.
@@ -1125,14 +1125,14 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
 /// constructor.  The memory object has class type.
 void ElementUseCollector::collectClassSelfUses() {
   assert(IsSelfOfNonDelegatingInitializer &&
-         TheMemory.getType()->getClassOrBoundGenericClass() != nullptr);
+         TheMemory.getASTType()->getClassOrBoundGenericClass() != nullptr);
 
   // For efficiency of lookup below, compute a mapping of the local ivars in the
   // class to their element number.
   llvm::SmallDenseMap<VarDecl *, unsigned> EltNumbering;
 
   {
-    SILType T = TheMemory.MemorySILType;
+    SILType T = TheMemory.getType();
     auto *NTD = T.getNominalOrBoundGenericNominal();
     unsigned NumElements = 0;
     for (auto *VD : NTD->getStoredProperties()) {
@@ -1149,7 +1149,7 @@ void ElementUseCollector::collectClassSelfUses() {
   // MUI use-def chain directly to find our uses.
   auto *MemoryInst = TheMemory.MemoryInst;
   if (MemoryInst->getKind() == MarkUninitializedInst::RootSelf) {
-    collectClassSelfUses(MemoryInst, TheMemory.MemorySILType, EltNumbering);
+    collectClassSelfUses(MemoryInst, TheMemory.getType(), EltNumbering);
     return;
   }
 
@@ -1217,7 +1217,7 @@ void ElementUseCollector::collectClassSelfUses() {
     // Loads of the box produce self, so collect uses from them.
     if (isa<LoadInst>(User) || isa<LoadBorrowInst>(User)) {
       auto load = cast<SingleValueInstruction>(User);
-      collectClassSelfUses(load, TheMemory.MemorySILType, EltNumbering);
+      collectClassSelfUses(load, TheMemory.getType(), EltNumbering);
       continue;
     }
 
@@ -1857,7 +1857,7 @@ static bool shouldPerformClassInitSelf(const DIMemoryObjectInfo &MemoryInfo) {
     return true;
 
   return MemoryInfo.isNonDelegatingInit() &&
-         MemoryInfo.getType()->getClassOrBoundGenericClass() != nullptr &&
+         MemoryInfo.getASTType()->getClassOrBoundGenericClass() != nullptr &&
          MemoryInfo.isDerivedClassSelfOnly();
 }
 

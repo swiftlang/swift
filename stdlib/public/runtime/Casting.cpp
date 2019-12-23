@@ -2382,7 +2382,10 @@ static bool swift_dynamicCastImpl(OpaqueValue *dest, OpaqueValue *src,
 #if SWIFT_OBJC_INTEROP
       // If the source is an NSError, and the target is a bridgeable
       // Error, try to bridge.
-      if (tryDynamicCastNSErrorToValue(dest, src, srcType, targetType, flags)) {
+      auto innerFlags = flags - DynamicCastFlags::Unconditional
+                              - DynamicCastFlags::DestroyOnFailure;
+      if (tryDynamicCastNSErrorToValue(dest, src, srcType, targetType,
+                                       innerFlags)) {
         return true;
       }
 #endif

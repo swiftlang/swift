@@ -57,6 +57,7 @@ TYPE_ATTR(noDerivative)
 TYPE_ATTR(autodiff)
 TYPE_ATTR(nondiff)
 TYPE_ATTR(quoted)
+// SWIFT_ENABLE_TENSORFLOW END
 
 // SIL-specific attributes
 TYPE_ATTR(block_storage)
@@ -545,27 +546,28 @@ DECL_ATTR(_implicitly_synthesizes_nested_requirement, ImplicitlySynthesizesNeste
   ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
   98)
 
+DECL_ATTR(transpose, Transpose,
+  OnFunc | LongAttribute | AllowMultipleAttributes |
+  ABIStableToAdd | ABIBreakingToRemove | APIStableToAdd | APIBreakingToRemove,
+  99)
+
 // SWIFT_ENABLE_TENSORFLOW
 DECL_ATTR(quoted, Quoted,
   OnFunc |
   ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
-  99)
+  100)
 // TODO(TF-999): Remove deprecated `@differentiating` attribute.
 DECL_ATTR(differentiating, Differentiating,
   OnFunc | LongAttribute | AllowMultipleAttributes |
   ABIStableToAdd | ABIBreakingToRemove | APIStableToAdd | APIBreakingToRemove,
-  100)
+  101)
 SIMPLE_DECL_ATTR(compilerEvaluable, CompilerEvaluable,
   OnAccessor | OnFunc | OnConstructor | OnSubscript |
   ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove |
-  NotSerialized, 101)
+  NotSerialized, 102)
 SIMPLE_DECL_ATTR(noDerivative, NoDerivative,
   OnVar |
   ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove,
-  102)
-DECL_ATTR(transpose, Transpose,
-  OnFunc | LongAttribute | AllowMultipleAttributes |
-  ABIStableToAdd | ABIBreakingToRemove | APIStableToAdd | APIBreakingToRemove,
   103)
 // SWIFT_ENABLE_TENSORFLOW END
 

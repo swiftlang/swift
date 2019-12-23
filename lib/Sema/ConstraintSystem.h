@@ -297,6 +297,9 @@ public:
   /// Retrieve the generic parameter opened by this type variable.
   GenericTypeParamType *getGenericParameter() const;
 
+  /// Determine whether this type variable represents a closure result type.
+  bool isClosureResultType() const;
+
   /// Retrieve the representative of the equivalence class to which this
   /// type variable belongs.
   ///
@@ -3895,11 +3898,12 @@ public:
   /// expression should be converted, if any.
   /// \param discardedExpr if true, the result of the expression
   /// is contextually ignored.
-  /// \param skipClosures if true, don't descend into bodies of
-  /// non-single expression closures.
+  /// \param performingDiagnostics if true, don't descend into bodies of
+  /// non-single expression closures, or build curry thunks.
   Expr *applySolution(Solution &solution, Expr *expr,
-                      Type convertType, bool discardedExpr,
-                      bool skipClosures);
+                      Type convertType,
+                      bool discardedExpr,
+                      bool performingDiagnostics);
 
   /// Reorder the disjunctive clauses for a given expression to
   /// increase the likelihood that a favored constraint will be successfully

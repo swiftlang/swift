@@ -1,7 +1,7 @@
 // RUN: %target-typecheck-verify-swift -swift-version 5
 
 // Simple case.
-var fn : @autoclosure () -> Int = 4  // expected-error {{'@autoclosure' may only be used on parameters}}  expected-error {{cannot convert value of type 'Int' to specified type '() -> Int'}}
+var fn : @autoclosure () -> Int = 4  // expected-error {{'@autoclosure' may only be used on parameters}}
 
 @autoclosure func func1() {}  // expected-error {{attribute can only be applied to types, not declarations}}
 
@@ -98,9 +98,9 @@ class TestFunc12 {
 
   func test() {
     func12a(x + foo()) // okay
-    func12c(x + foo()) 
-    // expected-error@-1{{reference to property 'x' in closure requires explicit 'self.' to make capture semantics explicit}} {{13-13=self.}}
-    // expected-error@-2{{call to method 'foo' in closure requires explicit 'self.' to make capture semantics explicit}} {{17-17=self.}}
+    func12c(x + foo())
+    // expected-error@-1{{reference to property 'x' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note@-1{{reference 'self.' explicitly}} {{13-13=self.}}
+    // expected-error@-2{{call to method 'foo' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note@-2{{reference 'self.' explicitly}} {{17-17=self.}}
   }
 }
 
@@ -281,3 +281,17 @@ func test_autoclosure_with_generic_argument_mismatch() {
 
   foo(S<String>()) // expected-error {{cannot convert value of type 'S<String>' to expected argument type 'S<Int>'}}
 }
+
+// SR-11934
+func sr_11934(_ x: @autoclosure String...) {} // expected-error {{'@autoclosure' must not be used on variadic parameters}}
+
+// SR-11938
+let sr_11938_1: Array<@autoclosure String> = [] // expected-error {{'@autoclosure' may only be used on parameters}}
+func sr_11938_2() -> @autoclosure String { "" } // expected-error {{'@autoclosure' may only be used on parameters}}
+func sr_11938_3(_ x: [@autoclosure String]) {} // expected-error {{'@autoclosure' may only be used on parameters}}
+
+protocol SR_11938_P {}
+struct SR_11938_S : @autoclosure SR_11938_P {} // expected-error {{'@autoclosure' may only be used on parameters}}
+
+// SR-9178
+func bar<T>(_ x: @autoclosure T) {} // expected-error 1{{@autoclosure attribute only applies to function types}}

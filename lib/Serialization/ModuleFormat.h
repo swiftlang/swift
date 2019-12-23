@@ -55,7 +55,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 532; // function parameter noDerivative
+const uint16_t SWIFTMODULE_VERSION_MINOR = 533; // tensorflow merge
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -1801,6 +1801,7 @@ namespace decls_block {
   // SWIFT_ENABLE_TENSORFLOW
   // TODO(TF-999): Remove deprecated `@differentiating` attribute.
   using DifferentiatingDeclAttrLayout = DerivativeDeclAttrLayout;
+  // SWIFT_ENABLE_TENSORFLOW END
 
   using TransposeDeclAttrLayout = BCRecordLayout<
     Transpose_DECL_ATTR,
@@ -1809,7 +1810,6 @@ namespace decls_block {
     DeclIDField, // Original function declaration.
     BCArray<BCFixed<1>> // Transposed parameter indices' bitvector.
   >;
-  // SWIFT_ENABLE_TENSORFLOWE END
 
 #define SIMPLE_DECL_ATTR(X, CLASS, ...)         \
   using CLASS##DeclAttrLayout = BCRecordLayout< \

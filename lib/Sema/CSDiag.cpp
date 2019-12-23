@@ -220,11 +220,6 @@ private:
   std::pair<Type, ContextualTypePurpose>
   validateContextualType(Type contextualType, ContextualTypePurpose CTP);
 
-  /// Check the specified closure to see if it is a multi-statement closure with
-  /// an uninferred type.  If so, diagnose the problem with an error and return
-  /// true.
-  bool diagnoseAmbiguousMultiStatementClosure(ClosureExpr *closure);
-
   /// Given a result of name lookup that had no viable results, diagnose the
   /// unviable ones.
   void diagnoseUnviableLookupResults(MemberLookupResult &lookupResults,
@@ -602,10 +597,6 @@ Expr *FailureDiagnosis::typeCheckChildIndependently(
   // Make sure that typechecker knows that this is an attempt
   // to diagnose a problem.
   TCEOptions |= TypeCheckExprFlags::SubExpressionDiagnostics;
-
-  // Don't walk into non-single expression closure bodies, because
-  // ExprTypeSaver and TypeNullifier skip them too.
-  TCEOptions |= TypeCheckExprFlags::SkipMultiStmtClosures;
 
   // Claim that the result is discarded to preserve the lvalue type of
   // the expression.
@@ -2708,138 +2699,6 @@ FailureDiagnosis::validateContextualType(Type contextualType,
   return {contextualType, CTP};
 }
 
-/// Check the specified closure to see if it is a multi-statement closure with
-/// an uninferred type.  If so, diagnose the problem with an error and return
-/// true.
-bool FailureDiagnosis::
-diagnoseAmbiguousMultiStatementClosure(ClosureExpr *closure) {
-  if (closure->hasSingleExpressionBody() ||
-      closure->hasExplicitResultType())
-    return false;
-
-  auto closureType = CS.getType(closure)->getAs<AnyFunctionType>();
-  if (!closureType ||
-      !(closureType->getResult()->hasUnresolvedType() ||
-        closureType->getResult()->hasTypeVariable()))
-    return false;
-
-  // Okay, we have a multi-statement closure expr that has no inferred result,
-  // type, in the context of a larger expression.  The user probably expected
-  // the compiler to infer the result type of the closure from the body of the
-  // closure, which Swift doesn't do for multi-statement closures.  Try to be
-  // helpful by digging into the body of the closure, looking for a return
-  // statement, and inferring the result type from it.  If we can figure that
-  // out, we can produce a fixit hint.
-  class ReturnStmtFinder : public ASTWalker {
-    SmallVectorImpl<ReturnStmt*> &returnStmts;
-  public:
-    ReturnStmtFinder(SmallVectorImpl<ReturnStmt*> &returnStmts)
-      : returnStmts(returnStmts) {}
-
-    // Walk through statements, so we find returns hiding in if/else blocks etc.
-    std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
-      // Keep track of any return statements we find.
-      if (auto RS = dyn_cast<ReturnStmt>(S))
-        returnStmts.push_back(RS);
-      return { true, S };
-    }
-    
-    // Don't walk into anything else, since they cannot contain statements
-    // that can return from the current closure.
-    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
-      return { false, E };
-    }
-    std::pair<bool, Pattern*> walkToPatternPre(Pattern *P) override {
-      return { false, P };
-    }
-    bool walkToDeclPre(Decl *D) override { return false; }
-    bool walkToTypeLocPre(TypeLoc &TL) override { return false; }
-    bool walkToTypeReprPre(TypeRepr *T) override { return false; }
-    bool walkToParameterListPre(ParameterList *PL) override { return false; }
-  };
-  
-  SmallVector<ReturnStmt*, 4> Returns;
-  closure->getBody()->walk(ReturnStmtFinder(Returns));
-  
-  // If we found a return statement inside of the closure expression, then go
-  // ahead and type check the body to see if we can determine a type.
-  for (auto RS : Returns) {
-    llvm::SaveAndRestore<DeclContext *> SavedDC(CS.DC, closure);
-
-    // Otherwise, we're ok to type check the subexpr.
-    Type resultType;
-    if (RS->hasResult()) {
-      auto resultExpr = RS->getResult();
-      ConcreteDeclRef decl = nullptr;
-
-      // If return expression uses closure parameters, which have/are
-      // type variables, such means that we won't be able to
-      // type-check result correctly and, unfortunately,
-      // we are going to leak type variables from the parent
-      // constraint system through declaration types.
-      bool hasUnresolvedParams = false;
-      resultExpr->forEachChildExpr([&](Expr *childExpr) -> Expr *{
-        if (auto DRE = dyn_cast<DeclRefExpr>(childExpr)) {
-          if (auto param = dyn_cast<ParamDecl>(DRE->getDecl())) {
-            auto paramType =
-                param->hasInterfaceType() ? param->getType() : Type();
-            if (!paramType || paramType->hasTypeVariable()) {
-              hasUnresolvedParams = true;
-              return nullptr;
-            }
-          }
-        }
-        return childExpr;
-      });
-
-      if (hasUnresolvedParams)
-        continue;
-
-      ConstraintSystem::preCheckExpression(resultExpr, CS.DC, &CS);
-
-      // Obtain type of the result expression without applying solutions,
-      // because otherwise this might result in leaking of type variables,
-      // since we are not resetting result statement and if expression is
-      // successfully type-checked its type cleanup is going to be disabled
-      // (we are allowing unresolved types), and as a side-effect it might
-      // also be transformed e.g. OverloadedDeclRefExpr -> DeclRefExpr.
-      auto type = TypeChecker::getTypeOfExpressionWithoutApplying(
-          resultExpr, CS.DC, decl, FreeTypeVariableBinding::UnresolvedType);
-      if (type)
-        resultType = type->getRValueType();
-    }
-    
-    // If we found a type, presuppose it was the intended result and insert a
-    // fixit hint.
-    if (resultType && !isUnresolvedOrTypeVarType(resultType)) {
-      // If there is a location for an 'in' token, then the argument list was
-      // specified somehow but no return type was.  Insert a "-> ReturnType "
-      // before the in token.
-      if (closure->getInLoc().isValid()) {
-        diagnose(closure->getLoc(), diag::cannot_infer_closure_result_type)
-            .fixItInsert(closure->getInLoc(), diag::insert_closure_return_type,
-                         resultType, /*argListSpecified*/ false);
-        return true;
-      }
-      
-      // Otherwise, the closure must take zero arguments.  We know this
-      // because the if one or more argument is specified, a multi-statement
-      // closure *must* name them, or explicitly ignore them with "_ in".
-      //
-      // As such, we insert " () -> ReturnType in " right after the '{' that
-      // starts the closure body.
-      diagnose(closure->getLoc(), diag::cannot_infer_closure_result_type)
-          .fixItInsertAfter(closure->getBody()->getLBraceLoc(),
-                            diag::insert_closure_return_type, resultType,
-                            /*argListSpecified*/ true);
-      return true;
-    }
-  }
-  
-  diagnose(closure->getLoc(), diag::cannot_infer_closure_result_type);
-  return true;
-}
-
 /// Emit an ambiguity diagnostic about the specified expression.
 void FailureDiagnosis::diagnoseAmbiguity(Expr *E) {
   if (auto *assignment = dyn_cast<AssignExpr>(E)) {
@@ -2869,11 +2728,6 @@ void FailureDiagnosis::diagnoseAmbiguity(Expr *E) {
   // Unresolved/Anonymous ClosureExprs are common enough that we should give
   // them tailored diagnostics.
   if (auto CE = dyn_cast<ClosureExpr>(E->getValueProvidingExpr())) {
-    // If this is a multi-statement closure with no explicit result type, emit
-    // a note to clue the developer in.
-    if (diagnoseAmbiguousMultiStatementClosure(CE))
-      return;
-
     diagnose(E->getLoc(), diag::cannot_infer_closure_type)
       .highlight(E->getSourceRange());
     return;
@@ -2915,22 +2769,6 @@ void FailureDiagnosis::diagnoseAmbiguity(Expr *E) {
     return;
   }
 
-  // A very common cause of this diagnostic is a situation where a closure expr
-  // has no inferred type, due to being a multiline closure.  Check to see if
-  // this is the case and (if so), speculatively diagnose that as the problem.
-  bool didDiagnose = false;
-  E->forEachChildExpr([&](Expr *subExpr) -> Expr*{
-    auto closure = dyn_cast<ClosureExpr>(subExpr);
-    if (!didDiagnose && closure)
-      didDiagnose = diagnoseAmbiguousMultiStatementClosure(closure);
-    
-    return subExpr;
-  });
-  
-  if (didDiagnose) return;
-  
-
-  
   // Attempt to re-type-check the entire expression, allowing ambiguity, but
   // ignoring a contextual type.
   if (expr == E) {

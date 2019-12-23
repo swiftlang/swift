@@ -191,7 +191,7 @@ namespace {
 ///     decl-sil       [[only in SIL mode]
 ///     decl-sil-stage [[only in SIL mode]
 /// \endverbatim
-bool Parser::parseTopLevel() {
+void Parser::parseTopLevel() {
   SF.ASTStage = SourceFile::Parsing;
 
   // Prime the lexer.
@@ -251,17 +251,6 @@ bool Parser::parseTopLevel() {
     consumeToken();
   }
 
-  // If this is a Main source file, determine if we found code that needs to be
-  // executed (this is used by the repl to know whether to compile and run the
-  // newly parsed stuff).
-  bool FoundTopLevelCodeToExecute = false;
-  if (allowTopLevelCode()) {
-    for (auto V : Items) {
-      if (isa<TopLevelCodeDecl>(V.get<Decl*>()))
-        FoundTopLevelCodeToExecute = true;
-    }
-  }
-
   // Add newly parsed decls to the module.
   for (auto Item : Items) {
     if (auto *D = Item.dyn_cast<Decl*>()) {
@@ -284,8 +273,6 @@ bool Parser::parseTopLevel() {
     SyntaxContext->addToken(Tok, LeadingTrivia, TrailingTrivia);
     TokReceiver->finalize();
   }
-
-  return FoundTopLevelCodeToExecute;
 }
 
 ParserResult<AvailableAttr> Parser::parseExtendedAvailabilitySpecList(
@@ -773,11 +760,10 @@ Parser::parseImplementsAttribute(SourceLoc AtLoc, SourceLoc Loc) {
     }
 
     if (!Status.shouldStopParsing()) {
-      MemberName =
-          parseUnqualifiedDeclName(/*afterDot=*/false, MemberNameLoc,
-                                   diag::attr_implements_expected_member_name,
-                                   /*allowOperators=*/true,
-                                   /*allowZeroArgCompoundNames=*/true);
+      MemberName = parseDeclNameRef(MemberNameLoc,
+          diag::attr_implements_expected_member_name,
+          DeclNameFlag::AllowZeroArgCompoundNames |
+          DeclNameFlag::AllowOperators);
       if (!MemberName) {
         Status.setIsParseError();
       }
@@ -867,6 +853,7 @@ static bool errorAndSkipUntilConsumeRightParen(Parser &P, StringRef attrName,
 };
 
 /// Parse a differentiation parameters 'wrt:' clause, returning true on error.
+/// If `allowNamedParameters` is false, allow only index parameters and 'self'.
 ///
 /// \verbatim
 ///   differentiation-params-clause:
@@ -904,18 +891,18 @@ bool Parser::parseDifferentiationParametersClause(
       if (parseIdentifier(paramName, paramLoc,
                           diag::diff_params_clause_expected_parameter))
         return true;
-      params.push_back(
-          ParsedAutoDiffParameter::getNamedParameter(paramLoc, paramName));
+      params.push_back(ParsedAutoDiffParameter::getNamedParameter(
+          paramLoc, paramName));
       break;
     }
     case tok::integer_literal: {
       unsigned paramNum;
-      if (parseUnsignedInteger(paramNum, paramLoc,
-                               diag::diff_params_clause_expected_parameter))
+      if (parseUnsignedInteger(
+              paramNum, paramLoc,
+              diag::diff_params_clause_expected_parameter))
         return true;
-
-      params.push_back(
-          ParsedAutoDiffParameter::getOrderedParameter(paramLoc, paramNum));
+      params.push_back(ParsedAutoDiffParameter::getOrderedParameter(
+          paramLoc, paramNum));
       break;
     }
     case tok::kw_self: {
@@ -1031,11 +1018,9 @@ bool Parser::parseDifferentiableAttributeArguments(
     SyntaxParsingContext FuncDeclNameContext(
          SyntaxContext, SyntaxKind::FunctionDeclName);
     Diagnostic funcDiag(diag::attr_differentiable_expected_function_name.ID,
-                        {label});
-    result.Name =
-        parseUnqualifiedDeclName(/*afterDot=*/false, result.Loc,
-                                 funcDiag, /*allowOperators=*/true,
-                                 /*allowZeroArgCompoundNames=*/true);
+                        { label });
+    result.Name = parseDeclNameRef(result.Loc, funcDiag,
+        DeclNameFlag::AllowZeroArgCompoundNames | DeclNameFlag::AllowOperators);
     // If no trailing comma or 'where' clause, terminate parsing arguments.
     if (Tok.isNot(tok::comma, tok::kw_where))
       terminateParsingArgs = true;
@@ -1091,16 +1076,76 @@ bool Parser::parseDifferentiableAttributeArguments(
   return false;
 }
 
+/// Helper function that parses 'type-identifier' for `parseQualifiedDeclName`.
+/// Returns true on error. Sets `baseType` to the parsed base type if present,
+/// or to `nullptr` if not. A missing base type is not considered an error.
+static bool parseBaseTypeForQualifiedDeclName(Parser &P, TypeRepr *&baseType) {
+  baseType = nullptr;
+
+  // If base type cannot be parsed, return false (no error).
+  if (!P.canParseBaseTypeForQualifiedDeclName())
+    return false;
+
+  auto result = P.parseTypeIdentifier(/*isParsingQualifiedDeclName*/ true);
+  // If base type should be parseable but the actual base type result is null,
+  // return true (error).
+  if (result.isNull())
+    return true;
+
+  // Consume the leading period before the final declaration name component.
+  // `parseTypeIdentifier(/*isParsingQualifiedDeclName*/ true)` leaves the
+  // leading period unparsed to avoid syntax verification errors.
+  assert(P.startsWithSymbol(P.Tok, '.') && "false");
+  P.consumeStartingCharacterOfCurrentToken(tok::period);
+
+  // Set base type and return false (no error).
+  baseType = result.getPtrOrNull();
+  return false;
+}
+
+/// Parses an optional base type, followed by a declaration name.
+/// Returns true on error (if declaration name could not be parsed).
+///
+/// \verbatim
+///   qualified-decl-name:
+///     type-identifier? unqualified-decl-name
+///   type-identifier:
+///     identifier generic-args? ('.' identifier generic-args?)*
+/// \endverbatim
+///
+// TODO(TF-1066): Use module qualified name syntax/parsing instead of custom
+// qualified name syntax/parsing.
+static bool parseQualifiedDeclName(Parser &P, Diag<> nameParseError,
+                                   TypeRepr *&baseType,
+                                   DeclNameRefWithLoc &original) {
+  SyntaxParsingContext DeclNameContext(P.SyntaxContext,
+                                       SyntaxKind::QualifiedDeclName);
+  // Parse base type.
+  if (parseBaseTypeForQualifiedDeclName(P, baseType))
+    return true;
+  // Parse final declaration name.
+  original.Name = P.parseDeclNameRef(
+      original.Loc, nameParseError,
+      Parser::DeclNameFlag::AllowZeroArgCompoundNames |
+      Parser::DeclNameFlag::AllowKeywordsUsingSpecialNames |
+      Parser::DeclNameFlag::AllowOperators);
+  // The base type is optional, but the final unqualified declaration name is
+  // not. If name could not be parsed, return true for error.
+  return !original.Name;
+}
+
 /// Parse a `@derivative(of:)` attribute, returning true on error.
 ///
 /// \verbatim
 ///   derivative-attribute-arguments:
-///     '(' 'of' ':' decl-name (',' differentiation-params-clause)? ')'
+///     '(' 'of' ':' qualified-decl-name (',' differentiation-params-clause)?
+///     ')'
 /// \endverbatim
 ParserResult<DerivativeAttr> Parser::parseDerivativeAttribute(SourceLoc atLoc,
                                                               SourceLoc loc) {
   StringRef AttrName = "derivative";
   SourceLoc lParenLoc = loc, rParenLoc = loc;
+  TypeRepr *baseType = nullptr;
   DeclNameRefWithLoc original;
   SmallVector<ParsedAutoDiffParameter, 8> params;
 
@@ -1134,18 +1179,11 @@ ParserResult<DerivativeAttr> Parser::parseDerivativeAttribute(SourceLoc atLoc,
       return makeParserError();
     }
     {
-      // Parse the name of the function.
-      // TODO(TF-1058): Make `@derivative` attribute support qualified
-      // original declarations.
-      SyntaxParsingContext DeclNameContext(SyntaxContext,
-                                           SyntaxKind::QualifiedDeclName);
-      // NOTE: Use `afterDot = true` and `allowDeinitAndSubscript = true` to
-      // enable, e.g. `@derivative(of: init)` and `@derivative(of: subscript)`.
-      original.Name = parseUnqualifiedDeclName(
-          /*afterDot*/ true, original.Loc,
-          diag::autodiff_attr_expected_original_decl_name,
-          /*allowOperators*/ true, /*allowZeroArgCompoundNames*/ true,
-          /*allowDeinitAndSubscript*/ true);
+      // Parse the optionally qualified function name.
+      if (parseQualifiedDeclName(
+              *this, diag::autodiff_attr_expected_original_decl_name,
+              baseType, original))
+        return makeParserError();
     }
     if (consumeIfTrailingComma())
       return makeParserError();
@@ -1160,9 +1198,9 @@ ParserResult<DerivativeAttr> Parser::parseDerivativeAttribute(SourceLoc atLoc,
              /*DeclModifier*/ false);
     return makeParserError();
   }
-  return ParserResult<DerivativeAttr>(
-      DerivativeAttr::create(Context, /*implicit*/ false, atLoc,
-                             SourceRange(loc, rParenLoc), original, params));
+  return ParserResult<DerivativeAttr>(DerivativeAttr::create(
+      Context, /*implicit*/ false, atLoc, SourceRange(loc, rParenLoc), baseType,
+      original, params));
 }
 
 // SWIFT_ENABLE_TENSORFLOW
@@ -1170,6 +1208,7 @@ ParserResult<DerivativeAttr>
 Parser::parseDifferentiatingAttribute(SourceLoc atLoc, SourceLoc loc) {
   StringRef AttrName = "differentiating";
   SourceLoc lParenLoc = loc, rParenLoc = loc;
+  TypeRepr *baseType = nullptr;
   DeclNameRefWithLoc original;
   SmallVector<ParsedAutoDiffParameter, 8> params;
 
@@ -1199,19 +1238,11 @@ Parser::parseDifferentiatingAttribute(SourceLoc atLoc, SourceLoc loc) {
         SyntaxContext,
         SyntaxKind::DeprecatedDerivativeRegistrationAttributeArguments);
     {
-      // Parse the name of the function.
-      // TODO(TF-1058): Make `@differentiating` attribute support qualified
-      // original declarations.
-      SyntaxParsingContext DeclNameContext(SyntaxContext,
-                                           SyntaxKind::QualifiedDeclName);
-      // NOTE: Use `afterDot = true` and `allowDeinitAndSubscript = true` to
-      // enable, e.g. `@differentiating(init)` and
-      // `@differentiating(subscript)`.
-      original.Name = parseUnqualifiedDeclName(
-          /*afterDot*/ true, original.Loc,
-          diag::autodiff_attr_expected_original_decl_name,
-          /*allowOperators*/ true, /*allowZeroArgCompoundNames*/ true,
-          /*allowDeinitAndSubscript*/ true);
+      // Parse the optionally qualified function name.
+      if (parseQualifiedDeclName(
+              *this, diag::autodiff_attr_expected_original_decl_name,
+              baseType, original))
+        return makeParserError();
     }
     if (consumeIfTrailingComma())
       return makeParserError();
@@ -1226,84 +1257,22 @@ Parser::parseDifferentiatingAttribute(SourceLoc atLoc, SourceLoc loc) {
              /*DeclModifier*/ false);
     return makeParserError();
   }
-  return ParserResult<DerivativeAttr>(
-      DerivativeAttr::create(Context, /*implicit*/ false, atLoc,
-                             SourceRange(loc, rParenLoc), original, params));
+  return ParserResult<DerivativeAttr>(DerivativeAttr::create(
+      Context, /*implicit*/ false, atLoc, SourceRange(loc, rParenLoc), baseType,
+      original, params));
 }
-// SWIFT_ENABLE_TENSORFLOW END
 
-// SWIFT_ENABLE_TENSORFLOW
-/// Helper function that parses 'type-identifier' for `parseQualifiedDeclName`.
-/// Returns true on error. Sets `baseType` to the parsed type, if present, or to
-/// `nullptr` if not. A missing base type is not considered an error.
-static bool parseBaseTypeForQualifiedDeclName(Parser &P, TypeRepr *&baseType) {
-  baseType = nullptr;
-
-  if (!P.canParseBaseTypeForQualifiedDeclName())
-    return false;
-
-  auto result = P.parseTypeIdentifier(/*isParsingQualifiedDeclName*/ true);
-  if (result.isNull())
-    return true;
-
-  // Optionally consume a leading period. This is relevant for
-  // qualified operator names.
-  // TODO(TF-1065): Consider disallowing qualified operator names.
-  if (P.startsWithSymbol(P.Tok, '.')) {
-    assert(P.Tok.isAnyOperator() &&
-           "Only operators should have leading period here");
-    P.consumeStartingCharacterOfCurrentToken(tok::period);
-  }
-
-  baseType = result.getPtrOrNull();
-  return false;
-}
-// SWIFT_ENABLE_TENSORFLOW END
-
-// SWIFT_ENABLE_TENSORFLOW
-/// parseQualifiedDeclName
-///
-///   qualified-decl-name:
-///     type-identifier? unqualified-decl-name
-///   type-identifier:
-///     identifier generic-args? ('.' identifier generic-args?)*
-///
-/// Parses an optional base type, followed by a declaration name.
-/// Returns true on error (if function decl name could not be parsed).
-static bool parseQualifiedDeclName(Parser &P, Diag<> nameParseError,
-                                   TypeRepr *&baseType,
-                                   DeclNameRefWithLoc &original) {
-  SyntaxParsingContext DeclNameContext(P.SyntaxContext,
-                                       SyntaxKind::QualifiedDeclName);
-  if (parseBaseTypeForQualifiedDeclName(P, baseType))
-    return true;
-
-  // NOTE: Use `afterDot = true` and `allowDeinitAndSubscript = true` to enable
-  // initializer and subscript lookup.
-  original.Name =
-      P.parseUnqualifiedDeclName(/*afterDot*/ true, original.Loc,
-                                 nameParseError, /*allowOperators*/ true,
-                                 /*allowZeroArgCompoundNames*/ true,
-                                 /*allowDeinitAndSubscript*/ true);
-
-  // The base type is optional, but the final unqualified decl name is not.
-  // If name could not be parsed, return true for error.
-  return !original.Name;
-}
-// SWIFT_ENABLE_TENSORFLOW END
-
-// SWIFT_ENABLE_TENSORFLOW
 /// Parse a `@transpose(of:)` attribute, returning true on error.
 ///
 /// \verbatim
 ///   transpose-attribute-arguments:
-///     '(' 'of' ':' decl-name (',' transposed-params-clause)? ')'
+///     '(' 'of' ':' qualified-decl-name (',' transposed-params-clause)? ')'
 /// \endverbatim
 ParserResult<TransposeAttr> Parser::parseTransposeAttribute(SourceLoc atLoc,
                                                             SourceLoc loc) {
   StringRef AttrName = "transpose";
   SourceLoc lParenLoc = loc, rParenLoc = loc;
-  TypeRepr *baseType;
+  TypeRepr *baseType = nullptr;
   DeclNameRefWithLoc original;
   SmallVector<ParsedAutoDiffParameter, 8> params;
 
@@ -1340,8 +1309,8 @@ ParserResult<TransposeAttr> Parser::parseTransposeAttribute(SourceLoc atLoc,
     {
       // Parse the optionally qualified function name.
       if (parseQualifiedDeclName(
-              *this, diag::autodiff_attr_expected_original_decl_name, baseType,
-              original))
+              *this, diag::autodiff_attr_expected_original_decl_name,
+              baseType, original))
         return makeParserError();
     }
     if (consumeIfTrailingComma())
@@ -1362,7 +1331,6 @@ ParserResult<TransposeAttr> Parser::parseTransposeAttribute(SourceLoc atLoc,
       Context, /*implicit*/ false, atLoc, SourceRange(loc, rParenLoc), baseType,
       original, params));
 }
-// SWIFT_ENABLE_TENSORFLOW END
 
 // SWIFT_ENABLE_TENSORFLOW
 ParserResult<QuotedAttr> Parser::parseQuotedAttribute(SourceLoc atLoc,
@@ -2285,10 +2253,11 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
                                             SyntaxKind::DeclName);
 
         DeclNameLoc loc;
-        replacedFunction = parseUnqualifiedDeclName(
-            true, loc, diag::attr_dynamic_replacement_expected_function,
-            /*allowOperators*/ true, /*allowZeroArgCompoundNames*/ true,
-            /*allowDeinitAndSubscript*/ true);
+        replacedFunction = parseDeclNameRef(loc,
+            diag::attr_dynamic_replacement_expected_function,
+            DeclNameFlag::AllowZeroArgCompoundNames |
+            DeclNameFlag::AllowKeywordsUsingSpecialNames |
+            DeclNameFlag::AllowOperators);
       }
     }
 
@@ -2357,7 +2326,6 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
     break;
   }
 
-  // SWIFT_ENABLE_TENSORFLOW
   case DAK_Transpose: {
     // `@transpose` in a local scope is not allowed.
     if (CurDeclContext->isLocalContext())
@@ -2383,6 +2351,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
       Attributes.add(Attr.get());
     break;
   }
+  // SWIFT_ENABLE_TENSORFLOW END
 
   case DAK_ProjectedValueProperty: {
     if (!consumeIf(tok::l_paren)) {
@@ -2840,11 +2809,9 @@ bool Parser::parseConventionAttributeInternal(
       return true;
     }
 
-    DeclNameLoc unusedWitnessMethodProtocolLoc;
-    convention.WitnessMethodProtocol = parseUnqualifiedDeclBaseName(
-        /*afterDot=*/false, unusedWitnessMethodProtocolLoc,
-       diag::convention_attribute_witness_method_expected_protocol
-    );
+    DeclNameLoc unusedLoc;
+    convention.WitnessMethodProtocol = parseDeclNameRef(unusedLoc,
+        diag::convention_attribute_witness_method_expected_protocol, {});
   }
   
   // Parse the ')'.  We can't use parseMatchingToken if we're in
@@ -3566,7 +3533,8 @@ void Parser::consumeDecl(ParserPosition BeginParserPosition,
   SourceLoc BeginLoc = Tok.getLoc();
 
   State->setCodeCompletionDelayedDeclState(
-      PersistentParserState::CodeCompletionDelayedDeclKind::Decl,
+      SourceMgr, L->getBufferID(),
+      CodeCompletionDelayedDeclKind::Decl,
       Flags.toRaw(), CurDeclContext, {BeginLoc, EndLoc},
       BeginParserPosition.PreviousLoc);
 
@@ -4135,7 +4103,7 @@ std::vector<Decl *> Parser::parseDeclListDelayed(IterableDeclContext *IDC) {
     return { };
   }
 
-  auto BeginParserPosition = getParserPosition({BodyRange.Start,BodyRange.End});
+  auto BeginParserPosition = getParserPosition({BodyRange.Start, SourceLoc()});
   auto EndLexerState = L->getStateForEndOfTokenLoc(BodyRange.End);
 
   // ParserPositionRAII needs a primed parser to restore to.
@@ -6207,7 +6175,8 @@ void Parser::consumeAbstractFunctionBody(AbstractFunctionDecl *AFD,
   if (isCodeCompletionFirstPass()) {
     if (SourceMgr.rangeContainsCodeCompletionLoc(BodyRange)) {
       State->setCodeCompletionDelayedDeclState(
-          PersistentParserState::CodeCompletionDelayedDeclKind::FunctionBody,
+          SourceMgr, L->getBufferID(),
+          CodeCompletionDelayedDeclKind::FunctionBody,
           PD_Default, AFD, BodyRange, BeginParserPosition.PreviousLoc);
     } else {
       AFD->setBodySkipped(BodyRange);
@@ -6402,19 +6371,6 @@ ParserResult<FuncDecl> Parser::parseDeclFunc(SourceLoc StaticLoc,
 
 /// Parse function body into \p AFD.
 void Parser::parseAbstractFunctionBody(AbstractFunctionDecl *AFD) {
-  Scope S(this, ScopeKind::FunctionBody);
-
-  // Enter the arguments for the function into a new function-body scope.  We
-  // need this even if there is no function body to detect argument name
-  // duplication.
-  if (auto *P = AFD->getImplicitSelfDecl())
-    addToScope(P);
-  addParametersToScope(AFD->getParameters());
-
-   // Establish the new context.
-  ParseFunctionBody CC(*this, AFD);
-  setLocalDiscriminatorToParamList(AFD->getParameters());
-
   if (!Tok.is(tok::l_brace)) {
     checkForInputIncomplete();
     return;
@@ -6431,6 +6387,19 @@ void Parser::parseAbstractFunctionBody(AbstractFunctionDecl *AFD) {
     consumeAbstractFunctionBody(AFD, AFD->getAttrs());
     return;
   }
+
+  Scope S(this, ScopeKind::FunctionBody);
+
+  // Enter the arguments for the function into a new function-body scope.  We
+  // need this even if there is no function body to detect argument name
+  // duplication.
+  if (auto *P = AFD->getImplicitSelfDecl())
+    addToScope(P);
+  addParametersToScope(AFD->getParameters());
+
+   // Establish the new context.
+  ParseFunctionBody CC(*this, AFD);
+  setLocalDiscriminatorToParamList(AFD->getParameters());
 
   if (Context.Stats)
     Context.Stats->getFrontendCounters().NumFunctionsParsed++;
@@ -6495,7 +6464,7 @@ BraceStmt *Parser::parseAbstractFunctionBodyDelayed(AbstractFunctionDecl *AFD) {
          "function body should be delayed");
 
   auto bodyRange = AFD->getBodySourceRange();
-  auto BeginParserPosition = getParserPosition({bodyRange.Start,bodyRange.End});
+  auto BeginParserPosition = getParserPosition({bodyRange.Start, SourceLoc()});
   auto EndLexerState = L->getStateForEndOfTokenLoc(AFD->getEndLoc());
 
   // ParserPositionRAII needs a primed parser to restore to.
@@ -6517,6 +6486,9 @@ BraceStmt *Parser::parseAbstractFunctionBodyDelayed(AbstractFunctionDecl *AFD) {
   // Re-enter the lexical scope.
   Scope TopLevelScope(this, ScopeKind::TopLevel);
   Scope S(this, ScopeKind::FunctionBody);
+  if (auto *P = AFD->getImplicitSelfDecl())
+    addToScope(P);
+  addParametersToScope(AFD->getParameters());
   ParseFunctionBody CC(*this, AFD);
   setLocalDiscriminatorToParamList(AFD->getParameters());
 

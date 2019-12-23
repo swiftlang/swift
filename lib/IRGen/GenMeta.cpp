@@ -824,6 +824,7 @@ namespace {
         auto witness =
             entry.getAssociatedTypeWitness().Witness->mapTypeOutOfContext();
         return IGM.getAssociatedTypeWitness(witness,
+                                            Proto->getGenericSignature(),
                                             /*inProtocolContext=*/true);
       }
 
@@ -1593,8 +1594,7 @@ namespace {
       // TargetRelativeDirectPointer<Runtime, const char> SuperclassType;
       if (auto superclassType = getType()->getSuperclass()) {
         GenericSignature genericSig = getType()->getGenericSignature();
-        B.addRelativeAddress(IGM.getTypeRef(superclassType->getCanonicalType(),
-                                            genericSig,
+        B.addRelativeAddress(IGM.getTypeRef(superclassType, genericSig,
                                             MangledTypeRefRole::Metadata)
                                .first);
       } else {
@@ -1906,6 +1906,13 @@ IRGenModule::getAddrOfAnonymousContextDescriptor(
   auto entity = LinkEntity::forAnonymousDescriptor(DC);
   return getAddrOfSharedContextDescriptor(entity, definition,
     [&]{ AnonymousContextDescriptorBuilder(*this, DC).emit(); });
+}
+
+llvm::Constant *
+IRGenModule::getAddrOfOriginalModuleContextDescriptor(StringRef Name) {
+  return getAddrOfModuleContextDescriptor(OriginalModules.insert({Name,
+    ModuleDecl::create(Context.getIdentifier(Name), Context)})
+                                          .first->getValue());
 }
 
 static void emitInitializeFieldOffsetVector(IRGenFunction &IGF,

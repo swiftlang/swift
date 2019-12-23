@@ -118,10 +118,6 @@ public:
   /// Set target decl for attribute if the CC token is in attribute of the decl.
   virtual void setAttrTargetDeclKind(Optional<DeclKind> DK) {}
 
-  /// Complete the whole expression.  This is a fallback that should
-  /// produce results when more specific completion methods failed.
-  virtual void completeExpr() {};
-
   /// Complete expr-dot after we have consumed the dot.
   virtual void completeDotExpr(Expr *E, SourceLoc DotLoc) {};
 

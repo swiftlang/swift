@@ -96,7 +96,7 @@ class C4 {
   required init(x: Int) {}
 }
 
-class D4 : C4, P1 { // expected-note {{through reference here}}
+class D4 : C4, P1 { // expected-note 2 {{through reference here}}
   required init(x: X) { // expected-error {{circular reference}}
     // expected-note@-1 2{{through reference here}}
     super.init(x: x)

@@ -2393,7 +2393,6 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       return;
     }
 
-    // SWIFT_ENABLE_TENSORFLOW
     case DAK_Transpose: {
       auto abbrCode = S.DeclTypeAbbrCodes[TransposeDeclAttrLayout::Code];
       auto *attr = cast<TransposeAttr>(DA);
@@ -2403,17 +2402,18 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       auto origName = attr->getOriginalFunctionName().Name.getBaseName();
       IdentifierID origNameId = S.addDeclBaseNameRef(origName);
       DeclID origDeclID = S.addDeclRef(attr->getOriginalFunction());
-      auto paramIndices = attr->getParameterIndices();
-      assert(paramIndices && "Parameter indices must be resolved");
+      auto *parameterIndices = attr->getParameterIndices();
+      assert(parameterIndices && "Parameter indices must be resolved");
       SmallVector<bool, 4> indices;
-      for (unsigned i : range(paramIndices->getCapacity()))
-        indices.push_back(paramIndices->contains(i));
+      for (unsigned i : range(parameterIndices->getCapacity()))
+        indices.push_back(parameterIndices->contains(i));
       TransposeDeclAttrLayout::emitRecord(
           S.Out, S.ScratchRecord, abbrCode, attr->isImplicit(), origNameId,
           origDeclID, indices);
       return;
     }
 
+    // SWIFT_ENABLE_TENSORFLOW
     case DAK_Quoted: {
       auto abbrCode = S.DeclTypeAbbrCodes[QuotedDeclAttrLayout::Code];
       auto attr = cast<QuotedAttr>(DA);

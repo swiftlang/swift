@@ -1644,6 +1644,10 @@ Type TypeChecker::resolveIdentifierType(
   if (!result) return nullptr;
 
   if (auto moduleTy = result->getAs<ModuleType>()) {
+    // Allow module types only if flag is specified.
+    if (options.contains(TypeResolutionFlags::AllowModule))
+      return moduleTy;
+    // Otherwise, emit an error.
     if (!options.contains(TypeResolutionFlags::SilenceErrors)) {
       auto moduleName = moduleTy->getModule()->getName();
       diags.diagnose(Components.back()->getNameLoc(),
@@ -1778,6 +1782,14 @@ namespace {
       return diags.diagnose(std::forward<ArgTypes>(Args)...);
     }
 
+    template <typename... ArgTypes>
+    InFlightDiagnostic diagnoseInvalid(TypeRepr *repr,
+                                       ArgTypes &&... Args) const {
+      auto &diags = Context.Diags;
+      repr->setInvalid();
+      return diags.diagnose(std::forward<ArgTypes>(Args)...);
+    }
+
     Type resolveAttributedType(AttributedTypeRepr *repr,
                                TypeResolutionOptions options);
     Type resolveAttributedType(TypeAttributes &attrs, TypeRepr *repr,
@@ -1851,7 +1863,10 @@ namespace {
                                  TypeResolutionOptions options);
 
     // SWIFT_ENABLE_TENSORFLOW
-    bool isDifferentiableType(Type ty);
+    /// Returns true if the given type conforms to `Differentiable` in the
+    /// module of `DC`. If `tangentVectorEqualsSelf` is true, returns true iff
+    /// the given type additionally satisfies `Self == Self.TangentVector`.
+    bool isDifferentiable(Type type, bool tangentVectorEqualsSelf = false);
   };
 } // end anonymous namespace
 
@@ -2079,18 +2094,21 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
 
           // Check for @thick.
           if (attrs.has(TAK_thick)) {
-            if (storedRepr)
-              diagnose(repr->getStartLoc(), diag::sil_metatype_multiple_reprs);
-              
+            if (storedRepr) {
+              diagnoseInvalid(repr, repr->getStartLoc(),
+                              diag::sil_metatype_multiple_reprs);
+            }
+
             storedRepr = MetatypeRepresentation::Thick;
             attrs.clearAttribute(TAK_thick);
           }
 
           // Check for @objc_metatype.
           if (attrs.has(TAK_objc_metatype)) {
-            if (storedRepr)
-              diagnose(repr->getStartLoc(), diag::sil_metatype_multiple_reprs);
-              
+            if (storedRepr) {
+              diagnoseInvalid(repr, repr->getStartLoc(),
+                              diag::sil_metatype_multiple_reprs);
+            }
             storedRepr = MetatypeRepresentation::ObjC;
             attrs.clearAttribute(TAK_objc_metatype);
           }
@@ -2118,8 +2136,8 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
 
   auto checkUnsupportedAttr = [&](TypeAttrKind attr) {
     if (attrs.has(attr)) {
-      diagnose(attrs.getLoc(attr), diag::unknown_attribute,
-               TypeAttributes::getAttrName(attr));
+      diagnoseInvalid(repr, attrs.getLoc(attr), diag::unknown_attribute,
+                      TypeAttributes::getAttrName(attr));
       attrs.clearAttribute(attr);
     }
   };
@@ -2169,8 +2187,8 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
       auto calleeConvention = ParameterConvention::Direct_Unowned;
       if (attrs.has(TAK_callee_owned)) {
         if (attrs.has(TAK_callee_guaranteed)) {
-          diagnose(attrs.getLoc(TAK_callee_owned),
-                   diag::sil_function_repeat_convention, /*callee*/ 2);
+          diagnoseInvalid(repr, attrs.getLoc(TAK_callee_owned),
+                          diag::sil_function_repeat_convention, /*callee*/ 2);
         }
         calleeConvention = ParameterConvention::Direct_Owned;
       } else if (attrs.has(TAK_callee_guaranteed)) {
@@ -2196,8 +2214,9 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
                       SILFunctionType::Representation::WitnessMethod)
                 .Default(None);
         if (!parsedRep) {
-          diagnose(attrs.getLoc(TAK_convention),
-                   diag::unsupported_sil_convention, attrs.getConventionName());
+          diagnoseInvalid(repr, attrs.getLoc(TAK_convention),
+                          diag::unsupported_sil_convention,
+                          attrs.getConventionName());
           rep = SILFunctionType::Representation::Thin;
         } else {
           rep = *parsedRep;
@@ -2213,8 +2232,8 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
 
       if (attrs.has(TAK_differentiable) &&
           !Context.LangOpts.EnableExperimentalDifferentiableProgramming) {
-        diagnose(attrs.getLoc(TAK_differentiable),
-                 diag::experimental_differentiable_programming_disabled);
+        diagnoseInvalid(repr, attrs.getLoc(TAK_differentiable),
+                        diag::experimental_differentiable_programming_disabled);
       }
 
       DifferentiabilityKind diffKind = DifferentiabilityKind::NonDifferentiable;
@@ -2245,38 +2264,19 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
                 .Case("c", FunctionType::Representation::CFunctionPointer)
                 .Default(None);
         if (!parsedRep) {
-          diagnose(attrs.getLoc(TAK_convention), diag::unsupported_convention,
-                   attrs.getConventionName());
+          diagnoseInvalid(repr, attrs.getLoc(TAK_convention),
+                          diag::unsupported_convention,
+                          attrs.getConventionName());
           rep = FunctionType::Representation::Swift;
         } else {
           rep = *parsedRep;
-          
-          if (attrs.has(TAK_autoclosure)) {
-            // @convention(c) and @convention(block) are not allowed with an @autoclosure type.
-            if (rep == FunctionType::Representation::CFunctionPointer ||
-                rep == FunctionType::Representation::Block) {
-              diagnose(attrs.getLoc(TAK_convention),
-                       diag::invalid_autoclosure_and_convention_attributes,
-                       attrs.getConventionName());
-              attrs.clearAttribute(TAK_convention);
-            }
-          }
         }
-      }
-
-      // @autoclosure is only valid on parameters.
-      if (!isParam && attrs.has(TAK_autoclosure)) {
-        diagnose(attrs.getLoc(TAK_autoclosure),
-                 isVariadicFunctionParam ? diag::attr_not_on_variadic_parameters
-                                         : diag::attr_only_on_parameters,
-                 "@autoclosure");
-        attrs.clearAttribute(TAK_autoclosure);
       }
 
       if (attrs.has(TAK_differentiable) &&
           !Context.LangOpts.EnableExperimentalDifferentiableProgramming) {
-        diagnose(attrs.getLoc(TAK_differentiable),
-                 diag::experimental_differentiable_programming_disabled);
+        diagnoseInvalid(repr, attrs.getLoc(TAK_differentiable),
+                        diag::experimental_differentiable_programming_disabled);
       }
 
       DifferentiabilityKind diffKind = DifferentiabilityKind::NonDifferentiable;
@@ -2289,6 +2289,36 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
                                   diffKind);
       if (!ty || ty->hasError())
         return ty;
+    }
+  }
+
+  // Validate use of @autoclosure
+  if (attrs.has(TAK_autoclosure)) {
+    bool didDiagnose = false;
+    if (attrs.hasConvention()) {
+      if (attrs.getConventionName() == "c" ||
+          attrs.getConventionName() == "block") {
+        diagnoseInvalid(repr, attrs.getLoc(TAK_convention),
+                        diag::invalid_autoclosure_and_convention_attributes,
+                        attrs.getConventionName());
+        attrs.clearAttribute(TAK_convention);
+        didDiagnose = true;
+      }
+    } else if (options.is(TypeResolverContext::VariadicFunctionInput) &&
+               !options.hasBase(TypeResolverContext::EnumElementDecl)) {
+      diagnoseInvalid(repr, attrs.getLoc(TAK_autoclosure),
+                      diag::attr_not_on_variadic_parameters, "@autoclosure");
+      attrs.clearAttribute(TAK_autoclosure);
+      didDiagnose = true;
+    } else if (!options.is(TypeResolverContext::FunctionInput)) {
+      diagnoseInvalid(repr, attrs.getLoc(TAK_autoclosure),
+                      diag::attr_only_on_parameters, "@autoclosure");
+      attrs.clearAttribute(TAK_autoclosure);
+      didDiagnose = true;
+    }
+
+    if (didDiagnose) {
+      ty = ErrorType::get(Context);
     }
   }
 
@@ -2317,12 +2347,13 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
         auto loc = attrs.getLoc(TAK_escaping);
         auto attrRange = getTypeAttrRangeWithAt(Context, loc);
 
-        diagnose(loc, diag::escaping_non_function_parameter)
-          .fixItRemove(attrRange);
+        diagnoseInvalid(repr, loc, diag::escaping_non_function_parameter)
+            .fixItRemove(attrRange);
 
         // Try to find a helpful note based on how the type is being used
         if (options.is(TypeResolverContext::ImmediateOptionalTypeArgument)) {
-          diagnose(repr->getLoc(), diag::escaping_optional_type_argument);
+          diagnoseInvalid(repr, repr->getLoc(),
+                          diag::escaping_optional_type_argument);
         }
       }
 
@@ -2338,6 +2369,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
       // @autoclosure is going to be diagnosed when type of
       // the parameter is validated, because that attribute
       // applies to the declaration now.
+      repr->setInvalid();
       attrs.clearAttribute(TAK_autoclosure);
     }
 
@@ -2345,9 +2377,9 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
       if (!attrs.has(i))
         continue;
 
-      auto diag = diagnose(attrs.getLoc(i),
-                           diag::attribute_requires_function_type,
-                           TypeAttributes::getAttrName(i));
+      auto diag = diagnoseInvalid(repr, attrs.getLoc(i),
+                                  diag::attribute_requires_function_type,
+                                  TypeAttributes::getAttrName(i));
 
       // If we see @escaping among the attributes on this type, because it isn't
       // a function type, we'll remove it.
@@ -2357,7 +2389,8 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
         // Specialize the diagnostic for Optionals.
         if (ty->getOptionalObjectType()) {
           diag.flush();
-          diagnose(repr->getLoc(), diag::escaping_optional_type_argument);
+          diagnoseInvalid(repr, repr->getLoc(),
+                          diag::escaping_optional_type_argument);
         }
       }
       attrs.clearAttribute(i);
@@ -2384,6 +2417,8 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
     attrs.clearAttribute(TAK_noDerivative);
   }
 
+  // SWIFT_ENABLE_TENSORFLOW
+  // `@nondiff` is deprecated; it is renamed to `@noDerivative`.
   if (attrs.has(TAK_nondiff)) {
     diagnose(attrs.getLoc(TAK_nondiff), diag::nondiff_attr_deprecated);
     if (!Context.LangOpts.EnableExperimentalDifferentiableProgramming) {
@@ -2399,11 +2434,13 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
     }
     attrs.clearAttribute(TAK_nondiff);
   }
+  // SWIFT_ENABLE_TENSORFLOW END
 
   // In SIL, handle @opened (n), which creates an existential archetype.
   if (attrs.has(TAK_opened)) {
     if (!ty->isExistentialType()) {
-      diagnose(attrs.getLoc(TAK_opened), diag::opened_non_protocol, ty);
+      diagnoseInvalid(repr, attrs.getLoc(TAK_opened), diag::opened_non_protocol,
+                      ty);
     } else {
       ty = OpenedArchetypeType::get(ty, attrs.OpenedID);
     }
@@ -2443,9 +2480,10 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
   }
 
   for (unsigned i = 0; i != TypeAttrKind::TAK_Count; ++i)
-    if (attrs.has((TypeAttrKind)i))
-      diagnose(attrs.getLoc((TypeAttrKind)i),
-               diag::attribute_does_not_apply_to_type);
+    if (attrs.has((TypeAttrKind)i)) {
+      diagnoseInvalid(repr, attrs.getLoc((TypeAttrKind)i),
+                      diag::attribute_does_not_apply_to_type);
+    }
 
   return ty;
 }
@@ -2529,6 +2567,7 @@ bool TypeResolver::resolveASTFunctionTypeParams(
         else
           noDerivative = true;
       }
+      // SWIFT_ENABLE_TENSORFLOW
       if (attrTypeRepr->getAttrs().has(TAK_nondiff)) {
         if (diffKind == DifferentiabilityKind::NonDifferentiable &&
             Context.LangOpts.EnableExperimentalDifferentiableProgramming)
@@ -2539,16 +2578,7 @@ bool TypeResolver::resolveASTFunctionTypeParams(
         else
           noDerivative = true;
       }
-    }
-
-    // SWIFT_ENABLE_TENSORFLOW
-    if (diffKind != DifferentiabilityKind::NonDifferentiable &&
-        resolution.getStage() != TypeResolutionStage::Structural) {
-      if (!noDerivative && !isDifferentiableType(ty)) {
-        diagnose(eltTypeRepr->getLoc(),
-                 diag::autodiff_attr_argument_not_differentiable)
-            .fixItInsert(eltTypeRepr->getLoc(), "@noDerivative ");
-      }
+      // SWIFT_ENABLE_TENSORFLOW END
     }
 
     auto paramFlags = ParameterTypeFlags::fromParameterType(
@@ -2556,6 +2586,42 @@ bool TypeResolver::resolveASTFunctionTypeParams(
         noDerivative);
     elements.emplace_back(ty, Identifier(), paramFlags);
   }
+
+  // SWIFT_ENABLE_TENSORFLOW
+  // All non-`@noDerivative` parameters of `@differentiable` and
+  // `@differentiable(linear)` function types must be differentiable.
+  if (diffKind != DifferentiabilityKind::NonDifferentiable &&
+      resolution.getStage() != TypeResolutionStage::Structural) {
+    bool isLinear = diffKind == DifferentiabilityKind::Linear;
+    // Emit `@noDerivative` fixit only if there is at least one valid
+    // differentiability/linearity parameter. Otherwise, adding `@noDerivative`
+    // produces an ill-formed function type.
+    auto hasValidDifferentiabilityParam =
+        llvm::find_if(elements, [&](AnyFunctionType::Param param) {
+          if (param.isNoDerivative())
+            return false;
+          return isDifferentiable(param.getPlainType(),
+                                  /*tangentVectorEqualsSelf*/ isLinear);
+        }) != elements.end();
+    // });
+    for (unsigned i = 0, end = inputRepr->getNumElements(); i != end; ++i) {
+      auto *eltTypeRepr = inputRepr->getElementType(i);
+      auto param = elements[i];
+      if (param.isNoDerivative())
+        continue;
+      auto paramType = param.getPlainType();
+      if (isDifferentiable(paramType, /*tangentVectorEqualsSelf*/ isLinear))
+        continue;
+      auto paramTypeString = paramType->getString();
+      auto diagnostic =
+          diagnose(eltTypeRepr->getLoc(),
+                   diag::differentiable_function_type_invalid_parameter,
+                   paramTypeString, isLinear, hasValidDifferentiabilityParam);
+      if (hasValidDifferentiabilityParam)
+        diagnostic.fixItInsert(eltTypeRepr->getLoc(), "@noDerivative ");
+    }
+  }
+  // SWIFT_ENABLE_TENSORFLOW END
 
   return false;
 }
@@ -2679,30 +2745,38 @@ Type TypeResolver::resolveASTFunctionType(
   }
 
   // SWIFT_ENABLE_TENSORFLOW
-  // If the function is marked as `@differentiable`, the result must be a
-  // differentiable type.
+  // `@differentiable` and `@differentiable(linear)` function types must return
+  // a differentiable type.
   if (extInfo.isDifferentiable() &&
       resolution.getStage() != TypeResolutionStage::Structural) {
-    if (!isDifferentiableType(outputTy)) {
+    bool isLinear = diffKind == DifferentiabilityKind::Linear;
+    if (!isDifferentiable(outputTy, /*tangentVectorEqualsSelf*/ isLinear)) {
       diagnose(repr->getResultTypeRepr()->getLoc(),
-               diag::autodiff_attr_result_not_differentiable)
+               diag::differentiable_function_type_invalid_result,
+               outputTy->getString(), isLinear)
           .highlight(repr->getResultTypeRepr()->getSourceRange());
     }
   }
+// SWIFT_ENABLE_TENSORFLOW END
 
   return fnTy;
 }
 
 // SWIFT_ENABLE_TENSORFLOW
-bool TypeResolver::isDifferentiableType(Type ty) {
-  if (resolution.getStage() != TypeResolutionStage::Contextual) {
-    ty = DC->mapTypeIntoContext(ty);
-  }
-  return ty
-      ->getAutoDiffAssociatedTangentSpace(
-          LookUpConformanceInModule(DC->getParentModule()))
-      .hasValue();
+bool TypeResolver::isDifferentiable(Type type, bool tangentVectorEqualsSelf) {
+  if (resolution.getStage() != TypeResolutionStage::Contextual)
+    type = DC->mapTypeIntoContext(type);
+  auto tanSpace = type->getAutoDiffAssociatedTangentSpace(
+      LookUpConformanceInModule(DC->getParentModule()));
+  if (!tanSpace)
+    return false;
+  // If no `Self == Self.TangentVector` requirement, return true.
+  if (!tangentVectorEqualsSelf)
+    return true;
+  // Otherwise, return true if `Self == Self.TangentVector`.
+  return type->getCanonicalType() == tanSpace->getCanonicalType();
 }
+// SWIFT_ENABLE_TENSORFLOW END
 
 Type TypeResolver::resolveSILBoxType(SILBoxTypeRepr *repr,
                                      TypeResolutionOptions options) {
@@ -3144,8 +3218,7 @@ Type TypeResolver::resolveSpecifierTypeRepr(SpecifierTypeRepr *repr,
     default:
       llvm_unreachable("unknown SpecifierTypeRepr kind");
     }
-    diagnose(repr->getSpecifierLoc(), diagID, name);
-    repr->setInvalid();
+    diagnoseInvalid(repr, repr->getSpecifierLoc(), diagID, name);
     return ErrorType::get(Context);
   }
 
