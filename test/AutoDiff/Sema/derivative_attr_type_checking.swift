@@ -186,6 +186,11 @@ protocol StaticMethod: Differentiable {
 }
 
 extension StaticMethod {
+  static func foo(_ x: Float) -> Float { x }
+  static func generic<T: Differentiable>(_ x: T) -> T { x }
+}
+
+extension StaticMethod {
   @derivative(of: foo)
   static func jvpFoo(x: Float) -> (value: Float, differential: (Float) -> Float)
   {
@@ -215,11 +220,17 @@ extension StaticMethod {
 // Test instance methods.
 
 protocol InstanceMethod: Differentiable {
-  // expected-note @+1 {{'foo' defined here}}
   func foo(_ x: Self) -> Self
 
-  // expected-note @+1 {{'generic' defined here}}
   func generic<T: Differentiable>(_ x: T) -> Self
+}
+
+extension InstanceMethod {
+  // expected-note @+1 {{'foo' defined here}}
+  func foo(_ x: Self) -> Self { self }
+
+  // expected-note @+1 {{'generic' defined here}}
+  func generic<T: Differentiable>(_ x: T) -> Self { self }
 }
 
 extension InstanceMethod {
@@ -538,27 +549,15 @@ extension HasStoredProperty {
 
 // Test cross-file derivative registration. Currently unsupported.
 // TODO(TF-1021): Lift this restriction.
-
-extension AdditiveArithmetic where Self: Differentiable {
+extension FloatingPoint where Self: Differentiable {
   // expected-error @+1 {{derivative not in the same file as the original function}}
-  @derivative(of: +)
-  static func vjpPlus(x: Self, y: Self) -> (
-    value: Self,
-    pullback: (Self.TangentVector) -> (Self.TangentVector, Self.TangentVector)
-  ) {
-    return (x + y, { v in (v, v) })
+  @derivative(of: rounded)
+  func vjpRounded() -> (value: Self, pullback: (TangentVector) -> TangentVector) {
+    fatalError()
   }
 }
 
-extension FloatingPoint where Self: Differentiable, Self == Self.TangentVector {
-  // expected-error @+1 {{derivative not in the same file as the original function}}
-  @derivative(of: +)
-  static func vjpPlus(x: Self, y: Self) -> (
-    value: Self, pullback: (Self) -> (Self, Self)
-  ) {
-    return (x + y, { v in (v, v) })
-  }
-}
+// Test static methods.
 
 extension Differentiable where Self: AdditiveArithmetic {
   // expected-error @+1 {{'+' is not defined in the current type context}}
@@ -579,5 +578,31 @@ where Self: Differentiable, Self == Self.TangentVector {
     value: Self, pullback: (Self) -> (Self, Self)
   ) {
     return (x + y, { v in (v, v) })
+  }
+}
+
+// Test derivatives of default implementations.
+protocol HasADefaultImplementation {
+  func req(_ x: Float) -> Float
+}
+extension HasADefaultImplementation {
+  func req(_ x: Float) -> Float { x }
+  // ok
+  @derivative(of: req)
+  func req(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
+    (x, { 10 * $0 })
+  }
+}
+
+// Test default derivatives of requirements.
+protocol HasADefaultDerivative {
+  func req(_ x: Float) -> Float
+}
+extension HasADefaultDerivative {
+  // TODO(TF-982): Make this ok.
+  // expected-error @+1 {{could not find function 'req'}}
+  @derivative(of: req)
+  func req(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
+    (x, { 10 * $0 })
   }
 }

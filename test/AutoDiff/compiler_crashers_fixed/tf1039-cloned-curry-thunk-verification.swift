@@ -9,12 +9,6 @@ protocol P {
   @differentiable
   func foo(_ x: Float) -> Float
 }
-extension P {
-  @derivative(of: foo)
-  func vjpFoo(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
-    return (x, { $0 })
-  }
-}
 struct S: P {
   @differentiable
   func foo(_ x: Float) -> Float { x }
