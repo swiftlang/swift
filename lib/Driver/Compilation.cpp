@@ -244,7 +244,7 @@ namespace driver {
     /// Dependency graphs for deciding which jobs are dirty (need running)
     /// or clean (can be skipped).
     using CoarseGrainedDependencyGraph =
-        CoarseGrainedDependencyGraph<const Job *>;
+        swift::CoarseGrainedDependencyGraph<const Job *>;
     CoarseGrainedDependencyGraph CoarseGrainedDepGraph;
     CoarseGrainedDependencyGraph CoarseGrainedDepGraphForRanges;
 
