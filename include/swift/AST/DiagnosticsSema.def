@@ -4094,13 +4094,18 @@ ERROR(attr_only_on_parameters_of_differentiable,none,
       "'%0' may only be used on parameters of '@differentiable' function "
       "types", (StringRef))
 // SWIFT_ENABLE_TENSORFLOW
-ERROR(autodiff_attr_argument_not_differentiable,none,
-      "argument is not differentiable, but the enclosing function type is "
-      "marked '@differentiable'; did you want to add '@noDerivative' to this "
-      "argument?", ())
-ERROR(autodiff_attr_result_not_differentiable,none,
-      "result is not differentiable, but the function type is marked "
-      "'@differentiable'", ())
+ERROR(differentiable_function_type_invalid_parameter,none,
+      "parameter type '%0' does not conform to 'Differentiable'"
+      "%select{| and satisfy '%0 == %0.TangentVector'}1, but the enclosing "
+      "function type is '@differentiable%select{|(linear)}1'"
+      "%select{|; did you want to add '@noDerivative' to this parameter?}2",
+      (StringRef, /*tangentVectorEqualsSelf*/ bool,
+       /*hasValidDifferentiabilityParameter*/ bool))
+ERROR(differentiable_function_type_invalid_result,none,
+      "result type '%0' does not conform to 'Differentiable'"
+      "%select{| and satisfy '%0 == %0.TangentVector'}1, but the enclosing "
+      "function type is '@differentiable%select{|(linear)}1'",
+      (StringRef, bool))
 ERROR(attr_differentiable_no_vjp_or_jvp_when_linear,none,
       "cannot specify 'vjp:' or 'jvp:' for linear functions; use "
       "'transpose:' instead", ())

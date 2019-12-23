@@ -1573,10 +1573,12 @@ ERROR(attr_implements_expected_member_name,PointsToFirstBadToken,
       "expected a member name as second parameter in '_implements' attribute", ())
 
 // differentiable
+// TODO(TF-1001): Remove diagnostic when deprecated `jvp:`, `vjp:` are removed.
 ERROR(attr_differentiable_expected_function_name,PointsToFirstBadToken,
       "expected a %0 function name", (StringRef))
 ERROR(attr_differentiable_expected_parameter_list,PointsToFirstBadToken,
       "expected a list of parameters to differentiate with respect to", ())
+// TODO(TF-1001): Remove diagnostic when deprecated `jvp:`, `vjp:` are removed.
 ERROR(attr_differentiable_use_wrt_not_withrespectto,none,
       "use 'wrt:' to specify parameters to differentiate with respect to", ())
 ERROR(attr_differentiable_expected_label,none,
@@ -1586,6 +1588,11 @@ ERROR(differentiable_attribute_expected_rparen,none,
       "expected ')' in '@differentiable' attribute", ())
 ERROR(unexpected_argument_differentiable,none,
       "unexpected argument '%0' in '@differentiable' attribute", (StringRef))
+// TODO(TF-1001): Remove diagnostic when deprecated `jvp:`, `vjp:` are removed.
+WARNING(differentiable_attr_jvp_vjp_deprecated_warning,none,
+        "'jvp:' and 'vjp:' arguments in '@differentiable' attribute are "
+        "deprecated; use '@derivative' attribute for derivative registration "
+        "instead", ())
 
 // derivative
 WARNING(attr_differentiating_deprecated,PointsToFirstBadToken,
