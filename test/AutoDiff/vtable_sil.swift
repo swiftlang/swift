@@ -20,21 +20,11 @@ class Super : Differentiable {
     return (Super(base: base), { x in x.base })
   }
 
-  @differentiable(vjp: vjpProperty)
+  @differentiable
   var property: Float { base }
-  final func vjpProperty() -> (Float, (Float) -> TangentVector) {
+  @derivative(of: property)
+  final func vjpProperty() -> (value: Float, pullback: (Float) -> TangentVector) {
     return (property, { _ in .zero })
-  }
-
-  @differentiable(wrt: x, jvp: jvpf, vjp: vjpf)
-  func f(_ x: Float, _ y: Float) -> Float {
-    return x * y
-  }
-  final func jvpf(_ x: Float, _ y: Float) -> (Float, (Float) -> Float) {
-    return (f(x, y), { v in v * y })
-  }
-  final func vjpf(_ x: Float, _ y: Float) -> (Float, (Float) -> (Float)) {
-    return (f(x, y), { v in v * y })
   }
 
   @differentiable(wrt: x where T: Differentiable)
@@ -42,9 +32,25 @@ class Super : Differentiable {
     return x
   }
 
-  @differentiable(wrt: x, jvp: jvpf, vjp: vjpf)
+  @differentiable(wrt: x)
+  func f(_ x: Float, _ y: Float) -> Float {
+    return x * y
+  }
+
+  @differentiable(wrt: x)
   subscript(_ x: Float, _ y: Float) -> Float {
     return x * y
+  }
+
+  @derivative(of: f, wrt: x)
+  @derivative(of: subscript, wrt: x)
+  final func jvpf(_ x: Float, _ y: Float) -> (value: Float, differential: (Float) -> Float) {
+    return (f(x, y), { v in v * y })
+  }
+  @derivative(of: f, wrt: x)
+  @derivative(of: subscript, wrt: x)
+  final func vjpf(_ x: Float, _ y: Float) -> (value: Float, pullback: (Float) -> (Float)) {
+    return (f(x, y), { v in v * y })
   }
 }
 
@@ -60,28 +66,34 @@ class Sub : Super {
     return (Sub(base: base), { x in x.base })
   }
 
-  @differentiable(vjp: vjpProperty2)
+  @differentiable
   override var property: Float { base }
-  final func vjpProperty2() -> (Float, (Float) -> TangentVector) {
+  @derivative(of: property)
+  final func vjpProperty2() -> (value: Float, pullback: (Float) -> TangentVector) {
     return (property, { _ in .zero })
   }
 
-  @differentiable(wrt: x, jvp: jvpf2, vjp: vjpf2)
+  @differentiable(wrt: x)
   // New `@differentiable` attribute.
   @differentiable(wrt: (x, y))
   override func f(_ x: Float, _ y: Float) -> Float {
     return x * y
   }
-  final func jvpf2(_ x: Float, _ y: Float) -> (Float, (Float) -> Float) {
-    return (f(x, y), { v in v * y })
-  }
-  final func vjpf2(_ x: Float, _ y: Float) -> (Float, (Float) -> (Float)) {
-    return (f(x, y), { v in v * y })
-  }
 
-  @differentiable(wrt: x, jvp: jvpf2, vjp: vjpf2)
+  @differentiable(wrt: x)
   override subscript(_ x: Float, _ y: Float) -> Float {
     return x * y
+  }
+
+  @derivative(of: f, wrt: x)
+  @derivative(of: subscript, wrt: x)
+  final func jvpf2(_ x: Float, _ y: Float) -> (value: Float, differential: (Float) -> Float) {
+    return (f(x, y), { v in v * y })
+  }
+  @derivative(of: f, wrt: x)
+  @derivative(of: subscript, wrt: x)
+  final func vjpf2(_ x: Float, _ y: Float) -> (value: Float, pullback: (Float) -> (Float)) {
+    return (f(x, y), { v in v * y })
   }
 }
 
@@ -98,12 +110,12 @@ class SubSub : Sub {}
 // CHECK-NEXT:   #Super.property!getter.1: (Super) -> () -> Float : @$s10vtable_sil5SuperC8propertySfvg
 // CHECK-NEXT:   #Super.property!getter.1.jvp.S: (Super) -> () -> Float : @AD__$s10vtable_sil5SuperC8propertySfvg__jvp_src_0_wrt_0_vtable_entry_thunk
 // CHECK-NEXT:   #Super.property!getter.1.vjp.S: (Super) -> () -> Float : @AD__$s10vtable_sil5SuperC8propertySfvg__vjp_src_0_wrt_0_vtable_entry_thunk
-// CHECK-NEXT:   #Super.f!1: (Super) -> (Float, Float) -> Float : @$s10vtable_sil5SuperC1fyS2f_SftF
-// CHECK-NEXT:   #Super.f!1.jvp.SUU: (Super) -> (Float, Float) -> Float : @AD__$s10vtable_sil5SuperC1fyS2f_SftF__jvp_src_0_wrt_0_vtable_entry_thunk
-// CHECK-NEXT:   #Super.f!1.vjp.SUU: (Super) -> (Float, Float) -> Float : @AD__$s10vtable_sil5SuperC1fyS2f_SftF__vjp_src_0_wrt_0_vtable_entry_thunk
 // CHECK-NEXT:   #Super.generic!1: <T> (Super) -> (T, T) -> T : @$s10vtable_sil5SuperC7genericyxx_xtlF
 // CHECK-NEXT:   #Super.generic!1.jvp.SUU.<T where T : Differentiable>: <T> (Super) -> (T, T) -> T : @AD__$s10vtable_sil5SuperC7genericyxx_xtlF__jvp_src_0_wrt_0_s14DifferentiableRzl_vtable_entry_thunk
 // CHECK-NEXT:   #Super.generic!1.vjp.SUU.<T where T : Differentiable>: <T> (Super) -> (T, T) -> T : @AD__$s10vtable_sil5SuperC7genericyxx_xtlF__vjp_src_0_wrt_0_s14DifferentiableRzl_vtable_entry_thunk
+// CHECK-NEXT:   #Super.f!1: (Super) -> (Float, Float) -> Float : @$s10vtable_sil5SuperC1fyS2f_SftF
+// CHECK-NEXT:   #Super.f!1.jvp.SUU: (Super) -> (Float, Float) -> Float : @AD__$s10vtable_sil5SuperC1fyS2f_SftF__jvp_src_0_wrt_0_vtable_entry_thunk
+// CHECK-NEXT:   #Super.f!1.vjp.SUU: (Super) -> (Float, Float) -> Float : @AD__$s10vtable_sil5SuperC1fyS2f_SftF__vjp_src_0_wrt_0_vtable_entry_thunk
 // CHECK-NEXT:   #Super.subscript!getter.1: (Super) -> (Float, Float) -> Float : @$s10vtable_sil5SuperCyS2f_Sftcig
 // CHECK-NEXT:   #Super.subscript!getter.1.jvp.SUU: (Super) -> (Float, Float) -> Float : @AD__$s10vtable_sil5SuperCyS2f_Sftcig__jvp_src_0_wrt_0_vtable_entry_thunk
 // CHECK-NEXT:   #Super.subscript!getter.1.vjp.SUU: (Super) -> (Float, Float) -> Float : @AD__$s10vtable_sil5SuperCyS2f_Sftcig__vjp_src_0_wrt_0_vtable_entry_thunk
@@ -122,12 +134,12 @@ class SubSub : Sub {}
 // CHECK-NEXT:   #Super.property!getter.1: (Super) -> () -> Float : @$s10vtable_sil3SubC8propertySfvg [override]
 // CHECK-NEXT:   #Super.property!getter.1.jvp.S: (Super) -> () -> Float : @AD__$s10vtable_sil3SubC8propertySfvg__jvp_src_0_wrt_0_vtable_entry_thunk [override]
 // CHECK-NEXT:   #Super.property!getter.1.vjp.S: (Super) -> () -> Float : @AD__$s10vtable_sil3SubC8propertySfvg__vjp_src_0_wrt_0_vtable_entry_thunk [override]
-// CHECK-NEXT:   #Super.f!1: (Super) -> (Float, Float) -> Float : @$s10vtable_sil3SubC1fyS2f_SftF [override]
-// CHECK-NEXT:   #Super.f!1.jvp.SUU: (Super) -> (Float, Float) -> Float : @AD__$s10vtable_sil3SubC1fyS2f_SftF__jvp_src_0_wrt_0_vtable_entry_thunk [override]
-// CHECK-NEXT:   #Super.f!1.vjp.SUU: (Super) -> (Float, Float) -> Float : @AD__$s10vtable_sil3SubC1fyS2f_SftF__vjp_src_0_wrt_0_vtable_entry_thunk [override]
 // CHECK-NEXT:   #Super.generic!1: <T> (Super) -> (T, T) -> T : @$s10vtable_sil5SuperC7genericyxx_xtlF [inherited]
 // CHECK-NEXT:   #Super.generic!1.jvp.SUU.<T where T : Differentiable>: <T> (Super) -> (T, T) -> T : @AD__$s10vtable_sil5SuperC7genericyxx_xtlF__jvp_src_0_wrt_0_s14DifferentiableRzl_vtable_entry_thunk [inherited]
 // CHECK-NEXT:   #Super.generic!1.vjp.SUU.<T where T : Differentiable>: <T> (Super) -> (T, T) -> T : @AD__$s10vtable_sil5SuperC7genericyxx_xtlF__vjp_src_0_wrt_0_s14DifferentiableRzl_vtable_entry_thunk [inherited]
+// CHECK-NEXT:   #Super.f!1: (Super) -> (Float, Float) -> Float : @$s10vtable_sil3SubC1fyS2f_SftF [override]
+// CHECK-NEXT:   #Super.f!1.jvp.SUU: (Super) -> (Float, Float) -> Float : @AD__$s10vtable_sil3SubC1fyS2f_SftF__jvp_src_0_wrt_0_vtable_entry_thunk [override]
+// CHECK-NEXT:   #Super.f!1.vjp.SUU: (Super) -> (Float, Float) -> Float : @AD__$s10vtable_sil3SubC1fyS2f_SftF__vjp_src_0_wrt_0_vtable_entry_thunk [override]
 // CHECK-NEXT:   #Super.subscript!getter.1: (Super) -> (Float, Float) -> Float : @$s10vtable_sil3SubCyS2f_Sftcig [override]
 // CHECK-NEXT:   #Super.subscript!getter.1.jvp.SUU: (Super) -> (Float, Float) -> Float : @AD__$s10vtable_sil3SubCyS2f_Sftcig__jvp_src_0_wrt_0_vtable_entry_thunk [override]
 // CHECK-NEXT:   #Super.subscript!getter.1.vjp.SUU: (Super) -> (Float, Float) -> Float : @AD__$s10vtable_sil3SubCyS2f_Sftcig__vjp_src_0_wrt_0_vtable_entry_thunk [override]
@@ -148,12 +160,12 @@ class SubSub : Sub {}
 // CHECK-NEXT:   #Super.property!getter.1: (Super) -> () -> Float : @$s10vtable_sil3SubC8propertySfvg [inherited]
 // CHECK-NEXT:   #Super.property!getter.1.jvp.S: (Super) -> () -> Float : @AD__$s10vtable_sil3SubC8propertySfvg__jvp_src_0_wrt_0_vtable_entry_thunk [inherited]
 // CHECK-NEXT:   #Super.property!getter.1.vjp.S: (Super) -> () -> Float : @AD__$s10vtable_sil3SubC8propertySfvg__vjp_src_0_wrt_0_vtable_entry_thunk [inherited]
-// CHECK-NEXT:   #Super.f!1: (Super) -> (Float, Float) -> Float : @$s10vtable_sil3SubC1fyS2f_SftF [inherited]
-// CHECK-NEXT:   #Super.f!1.jvp.SUU: (Super) -> (Float, Float) -> Float : @AD__$s10vtable_sil3SubC1fyS2f_SftF__jvp_src_0_wrt_0_vtable_entry_thunk [inherited]
-// CHECK-NEXT:   #Super.f!1.vjp.SUU: (Super) -> (Float, Float) -> Float : @AD__$s10vtable_sil3SubC1fyS2f_SftF__vjp_src_0_wrt_0_vtable_entry_thunk [inherited]
 // CHECK-NEXT:   #Super.generic!1: <T> (Super) -> (T, T) -> T : @$s10vtable_sil5SuperC7genericyxx_xtlF [inherited]
 // CHECK-NEXT:   #Super.generic!1.jvp.SUU.<T where T : Differentiable>: <T> (Super) -> (T, T) -> T : @AD__$s10vtable_sil5SuperC7genericyxx_xtlF__jvp_src_0_wrt_0_s14DifferentiableRzl_vtable_entry_thunk [inherited]
 // CHECK-NEXT:   #Super.generic!1.vjp.SUU.<T where T : Differentiable>: <T> (Super) -> (T, T) -> T : @AD__$s10vtable_sil5SuperC7genericyxx_xtlF__vjp_src_0_wrt_0_s14DifferentiableRzl_vtable_entry_thunk [inherited]
+// CHECK-NEXT:   #Super.f!1: (Super) -> (Float, Float) -> Float : @$s10vtable_sil3SubC1fyS2f_SftF [inherited]
+// CHECK-NEXT:   #Super.f!1.jvp.SUU: (Super) -> (Float, Float) -> Float : @AD__$s10vtable_sil3SubC1fyS2f_SftF__jvp_src_0_wrt_0_vtable_entry_thunk [inherited]
+// CHECK-NEXT:   #Super.f!1.vjp.SUU: (Super) -> (Float, Float) -> Float : @AD__$s10vtable_sil3SubC1fyS2f_SftF__vjp_src_0_wrt_0_vtable_entry_thunk [inherited]
 // CHECK-NEXT:   #Super.subscript!getter.1: (Super) -> (Float, Float) -> Float : @$s10vtable_sil3SubCyS2f_Sftcig [inherited]
 // CHECK-NEXT:   #Super.subscript!getter.1.jvp.SUU: (Super) -> (Float, Float) -> Float : @AD__$s10vtable_sil3SubCyS2f_Sftcig__jvp_src_0_wrt_0_vtable_entry_thunk [inherited]
 // CHECK-NEXT:   #Super.subscript!getter.1.vjp.SUU: (Super) -> (Float, Float) -> Float : @AD__$s10vtable_sil3SubCyS2f_Sftcig__vjp_src_0_wrt_0_vtable_entry_thunk [inherited]

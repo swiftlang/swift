@@ -21,6 +21,7 @@ func testLocalVariables() {
   }
 }
 
+// expected-warning @+1 {{'jvp:' and 'vjp:' arguments in '@differentiable' attribute are deprecated}}
 @differentiable(vjp: dfoo) // expected-error {{'@differentiable' attribute cannot be applied to this declaration}}
 protocol P {}
 
@@ -162,6 +163,7 @@ struct SubscriptMethod {
 
 // JVP
 
+// expected-warning @+1 {{'jvp:' and 'vjp:' arguments in '@differentiable' attribute are deprecated}}
 @differentiable(jvp: jvpSimpleJVP)
 func jvpSimple(x: Float) -> Float {
   return x
@@ -171,11 +173,13 @@ func jvpSimpleJVP(x: Float) -> (Float, ((Float) -> Float)) {
   return (x, { v in v })
 }
 
+// expected-warning @+1 {{'jvp:' and 'vjp:' arguments in '@differentiable' attribute are deprecated}}
 @differentiable(wrt: y, jvp: jvpWrtSubsetJVP)
 func jvpWrtSubset1(x: Float, y: Float) -> Float {
   return x + y
 }
 
+// expected-warning @+1 {{'jvp:' and 'vjp:' arguments in '@differentiable' attribute are deprecated}}
 @differentiable(wrt: (y), jvp: jvpWrtSubsetJVP)
 func jvpWrtSubset2(x: Float, y: Float) -> Float {
   return x + y
@@ -185,6 +189,7 @@ func jvpWrtSubsetJVP(x: Float, y: Float) -> (Float, (Float) -> Float) {
   return (x + y, { v in v })
 }
 
+// expected-warning @+1 {{'jvp:' and 'vjp:' arguments in '@differentiable' attribute are deprecated}}
 @differentiable(jvp: jvp2ParamsJVP)
 func jvp2Params(x: Float, y: Float) -> Float {
   return x + y
@@ -206,6 +211,7 @@ func jvpParamOrderNotIncreasing(x: Float, y: Float) -> Float {
   return x * y
 }
 
+// expected-warning @+2 {{'jvp:' and 'vjp:' arguments in '@differentiable' attribute are deprecated}}
 // expected-error @+1 {{'jvpWrongTypeJVP' does not have expected type '(Float) -> (Float, (Float.TangentVector) -> Float.TangentVector)' (aka '(Float) -> (Float, (Float) -> Float)'}}
 @differentiable(jvp: jvpWrongTypeJVP)
 func jvpWrongType(x: Float) -> Float {
@@ -216,24 +222,28 @@ func jvpWrongTypeJVP(x: Float) -> (Float, (Float) -> Int) {
   return (x, { v in Int(v) })
 }
 
+// expected-warning @+2 {{'jvp:' and 'vjp:' arguments in '@differentiable' attribute are deprecated}}
 // expected-error @+1 {{no differentiation parameters could be inferred; must differentiate with respect to at least one parameter conforming to 'Differentiable'}}
 @differentiable(jvp: jvpSimpleJVP)
 func jvpNonDiffParam(x: Int) -> Float {
   return Float(x)
 }
 
+// expected-warning @+2 {{'jvp:' and 'vjp:' arguments in '@differentiable' attribute are deprecated}}
 // expected-error @+1 {{can only differentiate functions with results that conform to 'Differentiable', but 'Int' does not conform to 'Differentiable'}}
 @differentiable(jvp: jvpSimpleJVP)
 func jvpNonDiffResult(x: Float) -> Int {
   return Int(x)
 }
 
+// expected-warning @+2 {{'jvp:' and 'vjp:' arguments in '@differentiable' attribute are deprecated}}
 // expected-error @+1 {{can only differentiate functions with results that conform to 'Differentiable', but '(Float, Int)' does not conform to 'Differentiable'}}
 @differentiable(jvp: jvpSimpleJVP)
 func jvpNonDiffResult2(x: Float) -> (Float, Int) {
   return (x, Int(x))
 }
 
+// expected-warning @+2 {{'jvp:' and 'vjp:' arguments in '@differentiable' attribute are deprecated}}
 // expected-error @+1 {{ambiguous reference to 'jvpAmbiguousVJP' in '@differentiable' attribute}}
 @differentiable(jvp: jvpAmbiguousVJP)
 func jvpAmbiguous(x: Float) -> Float {
@@ -258,6 +268,7 @@ struct JVPStruct {
   @differentiable
   let p: Float
 
+  // expected-warning @+2 {{'jvp:' and 'vjp:' arguments in '@differentiable' attribute are deprecated}}
   // expected-error @+1 {{'funcJVP' does not have expected type '(JVPStruct) -> () -> (Double, (JVPStruct.TangentVector) -> Double.TangentVector)' (aka '(JVPStruct) -> () -> (Double, (JVPStruct) -> Double)'}}
   @differentiable(wrt: (self), jvp: funcJVP)
   func funcWrongType() -> Double {
@@ -290,6 +301,7 @@ extension JVPStruct : Differentiable {
 }
 
 extension JVPStruct {
+  // expected-warning @+1 {{'jvp:' and 'vjp:' arguments in '@differentiable' attribute are deprecated}}
   @differentiable(wrt: x, jvp: wrtAllNonSelfJVP)
   func wrtAllNonSelf(x: Float) -> Float {
     return x + p
@@ -301,6 +313,7 @@ extension JVPStruct {
 }
 
 extension JVPStruct {
+  // expected-warning @+1 {{'jvp:' and 'vjp:' arguments in '@differentiable' attribute are deprecated}}
   @differentiable(wrt: (self, x), jvp: wrtAllJVP)
   func wrtAll(x: Float) -> Float {
     return x + p
@@ -312,18 +325,21 @@ extension JVPStruct {
 }
 
 extension JVPStruct {
+  // expected-warning @+1 {{'jvp:' and 'vjp:' arguments in '@differentiable' attribute are deprecated}}
   @differentiable(jvp: computedPropJVP)
   var computedPropOk1: Float {
     return 0
   }
 
   var computedPropOk2: Float {
+    // expected-warning @+1 {{'jvp:' and 'vjp:' arguments in '@differentiable' attribute are deprecated}}
     @differentiable(jvp: computedPropJVP)
     get {
       return 0
     }
   }
 
+  // expected-warning @+2 {{'jvp:' and 'vjp:' arguments in '@differentiable' attribute are deprecated}}
   // expected-error @+1 {{'computedPropJVP' does not have expected type '(JVPStruct) -> () -> (Double, (JVPStruct.TangentVector) -> Double.TangentVector)' (aka '(JVPStruct) -> () -> (Double, (JVPStruct) -> Double)'}}
   @differentiable(jvp: computedPropJVP)
   var computedPropWrongType: Double {
@@ -334,6 +350,7 @@ extension JVPStruct {
     get {
       return 0
     }
+    // expected-warning @+2 {{'jvp:' and 'vjp:' arguments in '@differentiable' attribute are deprecated}}
     // expected-error @+1 {{'@differentiable' attribute cannot be applied to this declaration}}
     @differentiable(jvp: computedPropJVP)
     set {
@@ -348,6 +365,7 @@ extension JVPStruct {
 
 // VJP
 
+// expected-warning @+1 {{'jvp:' and 'vjp:' arguments in '@differentiable' attribute are deprecated}}
 @differentiable(vjp: vjpSimpleVJP)
 func vjpSimple(x: Float) -> Float {
   return x
@@ -357,6 +375,7 @@ func vjpSimpleVJP(x: Float) -> (Float, ((Float) -> Float)) {
   return (x, { v in v })
 }
 
+// expected-warning @+1 {{'jvp:' and 'vjp:' arguments in '@differentiable' attribute are deprecated}}
 @differentiable(wrt: (y), vjp: vjpWrtSubsetVJP)
 func vjpWrtSubset(x: Float, y: Float) -> Float {
   return x + y
@@ -366,6 +385,7 @@ func vjpWrtSubsetVJP(x: Float, y: Float) -> (Float, (Float) -> Float) {
   return (x + y, { v in v })
 }
 
+// expected-warning @+1 {{'jvp:' and 'vjp:' arguments in '@differentiable' attribute are deprecated}}
 @differentiable(vjp: vjp2ParamsVJP)
 func vjp2Params(x: Float, y: Float) -> Float {
   return x + y
@@ -375,6 +395,7 @@ func vjp2ParamsVJP(x: Float, y: Float) -> (Float, (Float) -> (Float, Float)) {
   return (x + y, { v in (v, v) })
 }
 
+// expected-warning @+2 {{'jvp:' and 'vjp:' arguments in '@differentiable' attribute are deprecated}}
 // expected-error @+1 {{'vjpWrongTypeVJP' does not have expected type '(Float) -> (Float, (Float.TangentVector) -> Float.TangentVector)' (aka '(Float) -> (Float, (Float) -> Float)'}}
 @differentiable(vjp: vjpWrongTypeVJP)
 func vjpWrongType(x: Float) -> Float {
@@ -385,18 +406,21 @@ func vjpWrongTypeVJP(x: Float) -> (Float, (Float) -> Int) {
   return (x, { v in Int(v) })
 }
 
+// expected-warning @+2 {{'jvp:' and 'vjp:' arguments in '@differentiable' attribute are deprecated}}
 // expected-error @+1 {{no differentiation parameters could be inferred; must differentiate with respect to at least one parameter conforming to 'Differentiable'}}
 @differentiable(vjp: vjpSimpleVJP)
 func vjpNonDiffParam(x: Int) -> Float {
   return Float(x)
 }
 
+// expected-warning @+2 {{'jvp:' and 'vjp:' arguments in '@differentiable' attribute are deprecated}}
 // expected-error @+1 {{can only differentiate functions with results that conform to 'Differentiable', but 'Int' does not conform to 'Differentiable'}}
 @differentiable(vjp: vjpSimpleVJP)
 func vjpNonDiffResult(x: Float) -> Int {
   return Int(x)
 }
 
+// expected-warning @+2 {{'jvp:' and 'vjp:' arguments in '@differentiable' attribute are deprecated}}
 // expected-error @+1 {{can only differentiate functions with results that conform to 'Differentiable', but '(Float, Int)' does not conform to 'Differentiable'}}
 @differentiable(vjp: vjpSimpleVJP)
 func vjpNonDiffResult2(x: Float) -> (Float, Int) {
@@ -406,6 +430,7 @@ func vjpNonDiffResult2(x: Float) -> (Float, Int) {
 struct VJPStruct {
   let p: Float
 
+  // expected-warning @+2 {{'jvp:' and 'vjp:' arguments in '@differentiable' attribute are deprecated}}
   // expected-error @+1 {{'funcVJP' does not have expected type '(VJPStruct) -> () -> (Double, (Double.TangentVector) -> VJPStruct.TangentVector)' (aka '(VJPStruct) -> () -> (Double, (Double) -> VJPStruct)'}}
   @differentiable(vjp: funcVJP)
   func funcWrongType() -> Double {
@@ -438,6 +463,7 @@ extension VJPStruct : Differentiable {
 }
 
 extension VJPStruct {
+  // expected-warning @+1 {{'jvp:' and 'vjp:' arguments in '@differentiable' attribute are deprecated}}
   @differentiable(wrt: x, vjp: wrtAllNonSelfVJP)
   func wrtAllNonSelf(x: Float) -> Float {
     return x + p
@@ -449,6 +475,7 @@ extension VJPStruct {
 }
 
 extension VJPStruct {
+  // expected-warning @+1 {{'jvp:' and 'vjp:' arguments in '@differentiable' attribute are deprecated}}
   @differentiable(wrt: (self, x), vjp: wrtAllVJP)
   func wrtAll(x: Float) -> Float {
     return x + p
@@ -460,18 +487,21 @@ extension VJPStruct {
 }
 
 extension VJPStruct {
+  // expected-warning @+1 {{'jvp:' and 'vjp:' arguments in '@differentiable' attribute are deprecated}}
   @differentiable(vjp: computedPropVJP)
   var computedPropOk1: Float {
     return 0
   }
 
   var computedPropOk2: Float {
+    // expected-warning @+1 {{'jvp:' and 'vjp:' arguments in '@differentiable' attribute are deprecated}}
     @differentiable(vjp: computedPropVJP)
     get {
       return 0
     }
   }
 
+  // expected-warning @+2 {{'jvp:' and 'vjp:' arguments in '@differentiable' attribute are deprecated}}
   // expected-error @+1 {{'computedPropVJP' does not have expected type '(VJPStruct) -> () -> (Double, (Double.TangentVector) -> VJPStruct.TangentVector)' (aka '(VJPStruct) -> () -> (Double, (Double) -> VJPStruct)'}}
   @differentiable(vjp: computedPropVJP)
   var computedPropWrongType: Double {
@@ -482,6 +512,7 @@ extension VJPStruct {
     get {
       return 0
     }
+    // expected-warning @+2 {{'jvp:' and 'vjp:' arguments in '@differentiable' attribute are deprecated}}
     // expected-error @+1 {{'@differentiable' attribute cannot be applied to this declaration}}
     @differentiable(vjp: computedPropVJP)
     set {
@@ -507,6 +538,7 @@ func nongenericWhereClause(x: Float) -> Float {
   return x
 }
 
+// expected-warning @+1 2 {{'jvp:' and 'vjp:' arguments in '@differentiable' attribute are deprecated}}
 @differentiable(jvp: jvpWhere1, vjp: vjpWhere1 where T : Differentiable)
 func where1<T>(x: T) -> T {
   return x
@@ -519,6 +551,7 @@ func vjpWhere1<T : Differentiable>(x: T) -> (T, (T.TangentVector) -> T.TangentVe
 }
 
 // Test derivative functions with result tuple type labels.
+// expected-warning @+1 2 {{'jvp:' and 'vjp:' arguments in '@differentiable' attribute are deprecated}}
 @differentiable(jvp: jvpResultLabels, vjp: vjpResultLabels)
 func derivativeResultLabels(_ x: Float) -> Float {
   return x
@@ -530,6 +563,7 @@ func vjpResultLabels(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
   return (x, { $0 })
 }
 struct ResultLabelTest {
+  // expected-warning @+1 2 {{'jvp:' and 'vjp:' arguments in '@differentiable' attribute are deprecated}}
   @differentiable(jvp: jvpResultLabels, vjp: vjpResultLabels)
   static func derivativeResultLabels(_ x: Float) -> Float {
     return x
@@ -541,6 +575,7 @@ struct ResultLabelTest {
     return (x, { $0 })
   }
 
+  // expected-warning @+1 2 {{'jvp:' and 'vjp:' arguments in '@differentiable' attribute are deprecated}}
   @differentiable(jvp: jvpResultLabels, vjp: vjpResultLabels)
   func derivativeResultLabels(_ x: Float) -> Float {
     return x
@@ -555,12 +590,10 @@ struct ResultLabelTest {
 
 struct Tensor<Scalar> : AdditiveArithmetic {}
 extension Tensor : Differentiable where Scalar : Differentiable {}
-@differentiable(where Scalar : Differentiable)
+// expected-warning @+1 2 {{'jvp:' and 'vjp:' arguments in '@differentiable' attribute are deprecated}}
+@differentiable(jvp: jvpWhere2, vjp: vjpWhere2 where Scalar : Differentiable)
 func where2<Scalar : Numeric>(x: Tensor<Scalar>) -> Tensor<Scalar> {
   return x
-}
-func adjWhere2<Scalar : Numeric & Differentiable>(seed: Tensor<Scalar>, originalResult: Tensor<Scalar>, x: Tensor<Scalar>) -> Tensor<Scalar> {
-  return seed
 }
 func jvpWhere2<Scalar : Numeric & Differentiable>(x: Tensor<Scalar>) -> (Tensor<Scalar>, (Tensor<Scalar>) -> Tensor<Scalar>) {
   return (x, { v in v })
@@ -584,7 +617,7 @@ extension FloatingPoint {
     return self
   }
 }
-
+// expected-warning @+2 {{'jvp:' and 'vjp:' arguments in '@differentiable' attribute are deprecated}}
 // expected-error @+1 {{'vjpNonvariadic' does not have expected type '(Float, Int32...) -> (Float, (Float.TangentVector) -> Float.TangentVector)' (aka '(Float, Int32...) -> (Float, (Float) -> Float)')}}
 @differentiable(wrt: x, vjp: vjpNonvariadic)
 func variadic(_ x: Float, indices: Int32...) -> Float {
@@ -758,6 +791,7 @@ struct TF_521<T: FloatingPoint> {
   var real: T
   var imaginary: T
 
+  // expected-warning @+2 {{'jvp:' and 'vjp:' arguments in '@differentiable' attribute are deprecated}}
   // expected-error @+1 {{can only differentiate functions with results that conform to 'Differentiable', but 'TF_521<T>' does not conform to 'Differentiable'}}
   @differentiable(vjp: _vjpInit where T: Differentiable, T == T.TangentVector)
   init(real: T = 0, imaginary: T = 0) {
@@ -811,16 +845,19 @@ struct NonDiffableStruct {
   }
 }
 
+// expected-warning @+1 {{'jvp:' and 'vjp:' arguments in '@differentiable' attribute are deprecated}}
 @differentiable(linear, wrt: x, vjp: const3) // expected-error {{cannot specify 'vjp:' or 'jvp:' for linear functions; use 'transpose:' instead}}
 func slope1(_ x: Float) -> Float {
   return 3 * x
 }
 
+// expected-warning @+1 {{'jvp:' and 'vjp:' arguments in '@differentiable' attribute are deprecated}}
 @differentiable(linear, wrt: x, jvp: const3) // expected-error {{cannot specify 'vjp:' or 'jvp:' for linear functions; use 'transpose:' instead}}
 func slope2(_ x: Float) -> Float {
   return 3 * x
 }
 
+// expected-warning @+1 2 {{'jvp:' and 'vjp:' arguments in '@differentiable' attribute are deprecated}}
 @differentiable(linear, jvp: const3, vjp: const3) // expected-error {{cannot specify 'vjp:' or 'jvp:' for linear functions; use 'transpose:' instead}}
 func slope3(_ x: Float) -> Float {
   return 3 * x
@@ -828,6 +865,7 @@ func slope3(_ x: Float) -> Float {
 
 // Check that `@differentiable` attribute rejects stored properties.
 struct StoredProperty : Differentiable {
+  // expected-warning @+2 {{'jvp:' and 'vjp:' arguments in '@differentiable' attribute are deprecated}}
   // expected-error @+1 {{'@differentiable' attribute on stored property cannot specify 'jvp:' or 'vjp:'}}
   @differentiable(vjp: vjpStored)
   var stored: Float
@@ -839,6 +877,7 @@ struct StoredProperty : Differentiable {
 
 // Check that `@differentiable` attribute rejects non-`func` derivatives.
 struct Struct: Differentiable {
+  // expected-warning @+2 {{'jvp:' and 'vjp:' arguments in '@differentiable' attribute are deprecated}}
   // expected-error @+1 {{registered derivative 'computedPropertyVJP' must be a 'func' declaration}}
   @differentiable(vjp: computedPropertyVJP)
   func testComputedProperty() -> Float { 1 }
@@ -975,6 +1014,7 @@ protocol ProtocolRequirementUnsupported : Differentiable {
   @differentiable(where Scalar: Differentiable)
   func unsupportedWhereClause(value: Scalar) -> Float
 
+  // expected-warning @+2 2 {{'jvp:' and 'vjp:' arguments in '@differentiable' attribute are deprecated}}
   // expected-error @+1 {{'@differentiable' attribute on protocol requirement cannot specify 'jvp:' or 'vjp:'}}
   @differentiable(wrt: x, jvp: dfoo, vjp: dfoo)
   func unsupportedDerivatives(_ x: Float) -> Float
@@ -1013,10 +1053,12 @@ class Super : Differentiable {
   static func testStaticMethod(_ x: Float) -> Float { x }
 
   @differentiable(wrt: (self, x))
+  // expected-warning @+1 {{'jvp:' and 'vjp:' arguments in '@differentiable' attribute are deprecated}}
   @differentiable(wrt: x, vjp: vjp)
   // expected-note @+1 2 {{overridden declaration is here}}
   func testMissingAttributes(_ x: Float) -> Float { x }
 
+  // expected-warning @+1 {{'jvp:' and 'vjp:' arguments in '@differentiable' attribute are deprecated}}
   @differentiable(wrt: x, vjp: vjp)
   func testSuperclassDerivatives(_ x: Float) -> Float { x }
 
@@ -1031,6 +1073,7 @@ class Super : Differentiable {
   @differentiable(wrt: x)
   func instanceMethod<T>(_ x: Float, y: T) -> Float { x }
 
+  // expected-warning @+2 {{'jvp:' and 'vjp:' arguments in '@differentiable' attribute are deprecated}}
   // expected-error @+1 {{'@differentiable' attribute cannot be declared on class methods returning 'Self'}}
   @differentiable(vjp: vjpDynamicSelfResult)
   func dynamicSelfResult() -> Self { self }
@@ -1049,6 +1092,7 @@ class Sub : Super {
   // expected-error @+1 {{overriding declaration is missing attribute '@differentiable'}}
   override func testMissingAttributes(_ x: Float) -> Float { x }
 
+  // expected-warning @+2 {{'jvp:' and 'vjp:' arguments in '@differentiable' attribute are deprecated}}
   // expected-error @+1 {{'vjp' is not defined in the current type context}}
   @differentiable(wrt: x, vjp: vjp)
   override func testSuperclassDerivatives(_ x: Float) -> Float { x }
