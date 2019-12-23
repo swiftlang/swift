@@ -45,6 +45,9 @@ public struct SIMD${n}<Scalar>: SIMD where Scalar: SIMDScalar {
   }
 
   /// Accesses the scalar at the specified position.
+  @differentiable(vjp: _vjpSubscript
+  where Scalar : EuclideanDifferentiable & BinaryFloatingPoint,
+        Scalar.TangentVector : BinaryFloatingPoint)
   public subscript(index: Int) -> Scalar {
     @_transparent get {
       _precondition(indices.contains(index))
@@ -203,9 +206,8 @@ extension SIMD${n}
   where Scalar : EuclideanDifferentiable & BinaryFloatingPoint,
         Scalar.TangentVector : BinaryFloatingPoint {
   @usableFromInline
-  @derivative(of: subscript(index:))
   internal func _vjpSubscript(index: Int)
-  -> (value: Scalar, pullback: (Scalar.TangentVector) -> TangentVector) {
+  -> (Scalar, (Scalar.TangentVector) -> TangentVector) {
     return (self[index], { v in
       var zeros = Self.zero
       zeros[index] = Scalar(v)
