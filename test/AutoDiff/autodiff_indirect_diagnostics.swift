@@ -14,18 +14,13 @@ _ = gradient(at: 1.0, in: generic)
 
 // Test unmet generic requirements.
 
-@differentiable(
-  vjp: vjpWeirdExtraRequirements
-  where T : Differentiable & CaseIterable, T.AllCases : ExpressibleByStringLiteral
-)
 func weird<T>(_ x: T) -> T {
   return x
 }
-func vjpWeirdExtraRequirements<
-  T : Differentiable & CaseIterable
->(_ x: T) -> (T, (T.TangentVector) -> T.TangentVector)
-  where T.AllCases : ExpressibleByStringLiteral
-{
+@derivative(of: weird)
+func vjpWeirdExtraRequirements<T : Differentiable & CaseIterable>(_ x: T) -> (
+  value: T, pullback: (T.TangentVector) -> T.TangentVector
+) where T.AllCases : ExpressibleByStringLiteral {
   return (x, { $0 })
 }
 func weirdWrapper<T : Differentiable>(_ x: T) -> T {

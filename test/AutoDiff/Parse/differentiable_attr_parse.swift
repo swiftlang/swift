@@ -7,21 +7,25 @@ struct Foo {
   var x: Float
 }
 
+// expected-warning @+1 {{'jvp:' and 'vjp:' arguments in '@differentiable' attribute are deprecated}}
 @differentiable(vjp: foo(_:_:)) // okay
 func bar(_ x: Float, _: Float) -> Float {
   return 1 + x
 }
 
+// expected-warning @+1 {{'jvp:' and 'vjp:' arguments in '@differentiable' attribute are deprecated}}
 @differentiable(vjp: foo(_:_:) where T : FloatingPoint) // okay
 func bar<T : Numeric>(_ x: T, _: T) -> T {
     return 1 + x
 }
 
+// expected-warning @+1 {{'jvp:' and 'vjp:' arguments in '@differentiable' attribute are deprecated}}
 @differentiable(wrt: (self, x, y), vjp: foo(_:_:)) // okay
 func bar(_ x: Float, _ y: Float) -> Float {
   return 1 + x
 }
 
+// expected-warning @+1 2 {{'jvp:' and 'vjp:' arguments in '@differentiable' attribute are deprecated}}
 @differentiable(wrt: (self, x, y), jvp: bar, vjp: foo(_:_:)) // okay
 func bar(_ x: Float, _ y: Float) -> Float {
   return 1 + x
@@ -55,6 +59,7 @@ func playWellWithOtherAttrs(_ x: Float, _: Float) -> Float {
 }
 
 @_transparent
+// expected-warning @+1 {{'jvp:' and 'vjp:' arguments in '@differentiable' attribute are deprecated}}
 @differentiable(wrt: (self), vjp: _vjpSquareRoot) // okay
 public func squareRoot() -> Self {
   var lhs = self
@@ -109,6 +114,7 @@ func bar(_ x: Float, _: Float) -> Float {
   return 1 + x
 }
 
+// expected-warning @+1 {{'jvp:' and 'vjp:' arguments in '@differentiable' attribute are deprecated}}
 @differentiable(vjp: foo(_:_:), 3) // expected-error {{expected either 'wrt:' or a function specifier label, e.g. 'jvp:', or 'vjp:'}}
 func bar(_ x: Float, _: Float) -> Float {
   return 1 + x
@@ -139,11 +145,13 @@ func two(x: Float, y: Float) -> Float {
   return x + y
 }
 
+// expected-warning @+1 {{'jvp:' and 'vjp:' arguments in '@differentiable' attribute are deprecated}}
 @differentiable(vjp: foo(_:_:) // expected-error {{expected ')' in 'differentiable' attribute}}
 func bar(_ x: Float, _: Float) -> Float {
   return 1 + x
 }
 
+// expected-warning @+1 {{'jvp:' and 'vjp:' arguments in '@differentiable' attribute are deprecated}}
 @differentiable(vjp: foo(_:_:) where T) // expected-error {{expected ':' or '==' to indicate a conformance or same-type requirement}}
 func bar<T : Numeric>(_ x: T, _: T) -> T {
     return 1 + x
@@ -154,11 +162,13 @@ func bar(_ x: Float, _: Float) -> Float {
   return 1 + x
 }
 
+// expected-warning @+1 {{'jvp:' and 'vjp:' arguments in '@differentiable' attribute are deprecated}}
 @differentiable(vjp: foo(_:_:),) // expected-error {{unexpected ',' separator}}
 func bar(_ x: Float, _: Float) -> Float {
   return 1 + x
 }
 
+// expected-warning @+1 {{'jvp:' and 'vjp:' arguments in '@differentiable' attribute are deprecated}}
 @differentiable(vjp: foo(_:_:), where T) // expected-error {{unexpected ',' separator}}
 func bar<T : Numeric>(_ x: T, _: T) -> T {
     return 1 + x
@@ -174,6 +184,7 @@ func slope5(_ x: Float) -> Float {
   return 5 * x
 }
 
+// expected-warning @+1 {{'jvp:' and 'vjp:' arguments in '@differentiable' attribute are deprecated}}
 @differentiable(wrt: x, vjp: const6, linear) // expected-error {{expected either 'wrt:' or a function specifier label, e.g. 'jvp:', or 'vjp:'}}
 func slope5(_ x: Float) -> Float {
   return 6 * x
