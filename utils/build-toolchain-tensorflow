@@ -127,6 +127,7 @@ set -x
 YEAR=$(date +"%Y")
 MONTH=$(date +"%m")
 DAY=$(date +"%d")
+TOOLCHAIN_VERSION_DATE="5.0.${YEAR}${MONTH}${DAY}"
 TOOLCHAIN_VERSION="swift-tensorflow-LOCAL-${YEAR}-${MONTH}-${DAY}-a"
 ARCHIVE="${TOOLCHAIN_VERSION}-${HOST}.tar.gz"
 SYM_ARCHIVE="${TOOLCHAIN_VERSION}-osx-symbols.tar.gz"
@@ -159,6 +160,6 @@ fi
         darwin_toolchain_display_name="${DISPLAY_NAME}" \
         darwin_toolchain_display_name_short="${DISPLAY_NAME_SHORT}" \
         darwin_toolchain_xctoolchain_name="${TOOLCHAIN_NAME}" \
-        darwin_toolchain_version="${TOOLCHAIN_VERSION}" \
+        darwin_toolchain_version="${TOOLCHAIN_VERSION_DATE}" \
         darwin_toolchain_alias="Swift for TensorFlow" \
         ${INSTALLER_PACKAGE}
