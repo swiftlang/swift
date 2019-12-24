@@ -1712,22 +1712,6 @@ bool EquivalenceClass::recordConformanceConstraint(
   return inserted;
 }
 
-template<typename T>
-bool Constraint<T>::isSubjectEqualTo(Type type) const {
-  return getSubjectDependentType({ })->isEqual(type);
-}
-
-template<typename T>
-bool Constraint<T>::isSubjectEqualTo(const PotentialArchetype *pa) const {
-  return getSubjectDependentType({ })->isEqual(pa->getDependentType({ }));
-}
-
-template<typename T>
-bool Constraint<T>::hasSameSubjectAs(const Constraint<T> &other) const {
-  return getSubjectDependentType({ })
-    ->isEqual(other.getSubjectDependentType({ }));
-}
-
 Optional<ConcreteConstraint>
 EquivalenceClass::findAnyConcreteConstraintAsWritten(Type preferredType) const {
   // If we don't have a concrete type, there's no source.
