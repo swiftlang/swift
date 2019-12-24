@@ -201,7 +201,8 @@ class ModuleDepGraph {
   /// def - use/def - use/def - ...
   Optional<std::vector<const ModuleDepGraphNode *>> currentPathIfTracing;
 
-  /// If tracing dependencies, holds the sequence of defs used to get to the job that is the key
+  /// If tracing dependencies, holds the sequence of defs used to get to the job
+  /// that is the key
   std::unordered_multimap<const driver::Job *,
                           std::vector<const ModuleDepGraphNode *>>
       dependencyPathsToJobs;
