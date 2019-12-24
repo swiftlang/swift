@@ -1199,7 +1199,8 @@ bool RemoveUnnecessaryCoercion::attempt(ConstraintSystem &cs, Type fromType,
     if (cs.hasFreeTypeVariables())
       return false;
     
-    if (auto *typeSourceLocator = cs.getTypeVariableBindingLocator(typeVariable)) {
+    auto representative = cs.getRepresentative(typeVariable);
+    if (auto *typeSourceLocator = cs.getTypeVariableBindingLocator(representative)) {
       // If the type variable binding source locator is the same the
       // contextual type equality is coming from this coercion.
       if (typeSourceLocator == cs.getConstraintLocator(locator))

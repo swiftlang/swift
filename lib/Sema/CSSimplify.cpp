@@ -4613,12 +4613,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
             return matchTypesBindTypeVar(typeVar1, type2, kind, flags, locator,
                                          formUnsolvedResult);
         }
-        if (!typeVar2) {
-          // If type1 is a type varaible and type2 type is a fixed type, 
-          // record this as the potential fixed type locator source.
-          recordTypeVariableBindingLocator(typeVar1,
-                                           getConstraintLocator(locator));
-        }
       }
 
       // If the left-hand side of a 'sequence element' constraint
