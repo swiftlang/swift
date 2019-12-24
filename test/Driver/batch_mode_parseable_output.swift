@@ -9,7 +9,7 @@
 // CHECK-NEXT: {
 // CHECK-NEXT:   "kind": "began",
 // CHECK-NEXT:   "name": "compile",
-// CHECK-NEXT:   "command": "{{.*[\\/]}}swift{{c?(\.exe)?(\\")?}} -frontend -c -primary-file {{.*}}/file-01.swift{{(\\")?}} {{.*}}file-02.swift{{(\\")?}} {{.*}}file-03.swift{{(\\")?}} {{.*}}main.swift{{(\\")?}} -emit-module-path {{.*}}file-01-[[MODULE01:[a-z0-9]+]].swiftmodule{{(\\")?}} -emit-module-doc-path {{.*}}file-01-[[SWIFTDOC01:[a-z0-9]+]].swiftdoc{{(\\")?}} {{.*}} -module-name main -o {{.*}}file-01-[[OBJ01:[a-z0-9]+]].o{{(\\")?}}",
+// CHECK-NEXT:   "command": "{{.*[\\/]}}swift{{c?(\.exe)?(\\")?}} -frontend -c -primary-file {{.*}}/file-01.swift{{(\\")?}} {{.*}}file-02.swift{{(\\")?}} {{.*}}file-03.swift{{(\\")?}} {{.*}}main.swift{{(\\")?}} -enable-fine-grained-dependencies -emit-module-path {{.*}}file-01-[[MODULE01:[a-z0-9]+]].swiftmodule{{(\\")?}} -emit-module-doc-path {{.*}}file-01-[[SWIFTDOC01:[a-z0-9]+]].swiftdoc{{(\\")?}} {{.*}} -module-name main -o {{.*}}file-01-[[OBJ01:[a-z0-9]+]].o{{(\\")?}}",
 // CHECK-NEXT:   "command_executable": "{{.*[\\/]}}swift{{c?(\.exe)?}}",
 // CHECK-NEXT:   "command_arguments": [
 // CHECK-NEXT:     "-frontend",
@@ -19,6 +19,7 @@
 // CHECK-NEXT:     "{{.*[\\/]}}file-02.swift",
 // CHECK-NEXT:     "{{.*[\\/]}}file-03.swift",
 // CHECK-NEXT:     "{{.*[\\/]}}main.swift",
+// CHECK-NEXT:     "-enable-fine-grained-dependencies",
 // CHECK-NEXT:     "-emit-module-path",
 // CHECK-NEXT:     "{{.*[\\/]}}file-01-[[MODULE01:[a-z0-9]+]].swiftmodule",
 // CHECK-NEXT:     "-emit-module-doc-path",
@@ -58,7 +59,7 @@
 // CHECK-NEXT: {
 // CHECK-NEXT:   "kind": "began",
 // CHECK-NEXT:   "name": "compile",
-// CHECK-NEXT:   "command": "{{.*[\\/]}}swift{{c?(\.exe)?(\\")?}} -frontend -c {{.*}}file-01.swift{{(\\")?}} -primary-file {{.*}}file-02.swift{{(\\")?}} {{.*}}file-03.swift{{(\\")?}} {{.*}}main.swift{{(\\")?}} -emit-module-path {{.*}}file-02-[[MODULE02:[a-z0-9]+]].swiftmodule{{(\\")?}} -emit-module-doc-path {{.*}}file-02-[[SWIFTDOC02:[a-z0-9]+]].swiftdoc{{(\\")?}} {{.*}} -module-name main -o {{.*}}file-02-[[OBJ02:[a-z0-9]+]].o{{(\\")?}}",
+// CHECK-NEXT:   "command": "{{.*[\\/]}}swift{{c?(\.exe)?(\\")?}} -frontend -c {{.*}}file-01.swift{{(\\")?}} -primary-file {{.*}}file-02.swift{{(\\")?}} {{.*}}file-03.swift{{(\\")?}} {{.*}}main.swift{{(\\")?}} -enable-fine-grained-dependencies -emit-module-path {{.*}}file-02-[[MODULE02:[a-z0-9]+]].swiftmodule{{(\\")?}} -emit-module-doc-path {{.*}}file-02-[[SWIFTDOC02:[a-z0-9]+]].swiftdoc{{(\\")?}} {{.*}} -module-name main -o {{.*}}file-02-[[OBJ02:[a-z0-9]+]].o{{(\\")?}}",
 // CHECK-NEXT:   "command_executable": "{{.*[\\/]}}swift{{c?(\.exe)?(\\")?}}",
 // CHECK-NEXT:   "command_arguments": [
 // CHECK-NEXT:     "-frontend",
@@ -68,6 +69,7 @@
 // CHECK-NEXT:     "{{.*[\\/]}}file-02.swift",
 // CHECK-NEXT:     "{{.*[\\/]}}file-03.swift",
 // CHECK-NEXT:     "{{.*[\\/]}}main.swift",
+// CHECK-NEXT:     "-enable-fine-grained-dependencies",
 // CHECK-NEXT:     "-emit-module-path",
 // CHECK-NEXT:     "{{.*[\\/]}}file-02-[[MODULE02:[a-z0-9]+]].swiftmodule",
 // CHECK-NEXT:     "-emit-module-doc-path",
@@ -107,7 +109,7 @@
 // CHECK-NEXT: {
 // CHECK-NEXT:   "kind": "began",
 // CHECK-NEXT:   "name": "compile",
-// CHECK-NEXT:   "command": "{{.*}}swift{{c?(\.exe)?(\\")?}} -frontend -c {{.*}}file-01.swift{{(\\")?}} {{.*}}file-02.swift{{(\\")?}} -primary-file {{.*}}file-03.swift{{(\\")?}} {{.*}}main.swift{{(\\")?}} -emit-module-path {{.*}}file-03-[[MODULE03:[a-z0-9]+]].swiftmodule{{(\\")?}} -emit-module-doc-path {{.*}}file-03-[[SWIFTDOC03:[a-z0-9]+]].swiftdoc{{(\\")?}} {{.*}} -module-name main -o {{.*}}file-03-[[OBJ03:[a-z0-9]+]].o{{(\\")?}}",
+// CHECK-NEXT:   "command": "{{.*}}swift{{c?(\.exe)?(\\")?}} -frontend -c {{.*}}file-01.swift{{(\\")?}} {{.*}}file-02.swift{{(\\")?}} -primary-file {{.*}}file-03.swift{{(\\")?}} {{.*}}main.swift{{(\\")?}} -enable-fine-grained-dependencies -emit-module-path {{.*}}file-03-[[MODULE03:[a-z0-9]+]].swiftmodule{{(\\")?}} -emit-module-doc-path {{.*}}file-03-[[SWIFTDOC03:[a-z0-9]+]].swiftdoc{{(\\")?}} {{.*}} -module-name main -o {{.*}}file-03-[[OBJ03:[a-z0-9]+]].o{{(\\")?}}",
 // CHECK-NEXT:   "command_executable": "{{.*[\\/]}}swift{{c?(\.exe)?}}",
 // CHECK-NEXT:   "command_arguments": [
 // CHECK-NEXT:     "-frontend",
@@ -117,6 +119,7 @@
 // CHECK-NEXT:     "-primary-file",
 // CHECK-NEXT:     "{{.*}}/file-03.swift",
 // CHECK-NEXT:     "{{.*}}/main.swift",
+// CHECK-NEXT:     "-enable-fine-grained-dependencies",
 // CHECK-NEXT:     "-emit-module-path",
 // CHECK-NEXT:     "{{.*[\\/]}}file-03-[[MODULE03:[a-z0-9]+]].swiftmodule",
 // CHECK-NEXT:     "-emit-module-doc-path",
@@ -156,7 +159,7 @@
 // CHECK-NEXT: {
 // CHECK-NEXT:   "kind": "began",
 // CHECK-NEXT:   "name": "compile",
-// CHECK-NEXT:   "command": "{{.*[\\/]}}swift{{c?(\.exe)?(\\")?}} -frontend -c {{.*[\\/]}}file-01.swift{{(\\")?}} {{.*[\\/]}}file-02.swift{{(\\")?}} {{.*[\\/]}}file-03.swift{{(\\")?}} -primary-file {{.*[\\/]}}main.swift{{(\\")?}} -emit-module-path {{.*[\\/]}}main-[[MODULEMAIN:[a-z0-9]+]].swiftmodule{{(\\")?}} -emit-module-doc-path {{.*[\\/]}}main-[[SWIFTDOCMAIN:[a-z0-9]+]].swiftdoc{{(\\")?}} {{.*}} -module-name main -o {{.*[\\/]}}main-[[OBJMAIN:[a-z0-9]+]].o{{(\\")?}}",
+// CHECK-NEXT:   "command": "{{.*[\\/]}}swift{{c?(\.exe)?(\\")?}} -frontend -c {{.*[\\/]}}file-01.swift{{(\\")?}} {{.*[\\/]}}file-02.swift{{(\\")?}} {{.*[\\/]}}file-03.swift{{(\\")?}} -primary-file {{.*[\\/]}}main.swift{{(\\")?}} -enable-fine-grained-dependencies -emit-module-path {{.*[\\/]}}main-[[MODULEMAIN:[a-z0-9]+]].swiftmodule{{(\\")?}} -emit-module-doc-path {{.*[\\/]}}main-[[SWIFTDOCMAIN:[a-z0-9]+]].swiftdoc{{(\\")?}} {{.*}} -module-name main -o {{.*[\\/]}}main-[[OBJMAIN:[a-z0-9]+]].o{{(\\")?}}",
 // CHECK-NEXT:   "command_executable": "{{.*[\\/]}}swift{{c?(\.exe)?}}",
 // CHECK-NEXT:   "command_arguments": [
 // CHECK-NEXT:     "-frontend",
@@ -166,6 +169,7 @@
 // CHECK-NEXT:     "{{.*[\\/]}}file-03.swift",
 // CHECK-NEXT:     "-primary-file",
 // CHECK-NEXT:     "{{.*[\\/]}}main.swift",
+// CHECK-NEXT:     "-enable-fine-grained-dependencies",
 // CHECK-NEXT:     "-emit-module-path",
 // CHECK-NEXT:     "{{.*[\\/]}}main-[[MODULEMAIN:[a-z0-9]+]].swiftmodule",
 // CHECK-NEXT:     "-emit-module-doc-path",
