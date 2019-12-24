@@ -57,11 +57,11 @@ SourceFileDepGraph::getSourceFileNodePair() const {
                                                                 getNode(1));
 }
 
-StringRef SourceFileDepGraph::getSwiftDepsFromSourceFileProvide() const {
+StringRef SourceFileDepGraph::getSwiftDepsOfJobThatProducedThisGraph() const {
   return getSourceFileNodePair()
       .getInterface()
       ->getKey()
-      .getSwiftDepsFromSourceFileProvide();
+      .getSwiftDepsFromASourceFileProvideNodeKey();
 }
 
 void SourceFileDepGraph::forEachArc(
@@ -77,8 +77,11 @@ void SourceFileDepGraph::forEachArc(
 
 InterfaceAndImplementationPair<SourceFileDepGraphNode>
 SourceFileDepGraph::findExistingNodePairOrCreateAndAddIfNew(
-    NodeKind k, StringRef context, StringRef name,
-    Optional<std::string> fingerprint) {
+    NodeKind k, const ContextNameFingerprint &contextNameFingerprint) {
+  const std::string &context = std::get<0>(contextNameFingerprint);
+  const std::string &name = std::get<1>(contextNameFingerprint);
+  const Optional<std::string> &fingerprint =
+      std::get<2>(contextNameFingerprint);
   InterfaceAndImplementationPair<SourceFileDepGraphNode> nodePair{
       findExistingNodeOrCreateIfNew(
           DependencyKey(k, DeclAspect::interface, context, name), fingerprint,
@@ -86,13 +89,16 @@ SourceFileDepGraph::findExistingNodePairOrCreateAndAddIfNew(
       findExistingNodeOrCreateIfNew(
           DependencyKey(k, DeclAspect::implementation, context, name),
           fingerprint, true /* = isProvides */)};
-  // if interface changes, have to rebuild implementation
-  addArc(nodePair.getInterface(), nodePair.getImplementation());
+  // if interface changes, have to rebuild implementation.
+  // But, if an arc is added for this, then *any* change that causes
+  // a same-named interface to be dirty will dirty this implementation,
+  // even if that interface is in another file.
+  // So, make the interface->implementation arc implicit.
   return nodePair;
 }
 
 SourceFileDepGraphNode *SourceFileDepGraph::findExistingNodeOrCreateIfNew(
-    DependencyKey key, Optional<std::string> fingerprint,
+    DependencyKey key, const Optional<std::string> &fingerprint,
     const bool isProvides) {
   SourceFileDepGraphNode *result = memoizedNodes.findExistingOrCreateIfNew(
       key, [&](DependencyKey key) -> SourceFileDepGraphNode * {
@@ -101,16 +107,39 @@ SourceFileDepGraphNode *SourceFileDepGraph::findExistingNodeOrCreateIfNew(
         addNode(n);
         return n;
       });
+  assert(result->getKey() == key && "Keys must match.");
+  if (!isProvides)
+    return result;
   // If have provides and depends with same key, result is one node that
   // isProvides
-  if (isProvides)
+  if (!result->getIsProvides() && fingerprint) {
     result->setIsProvides();
-  assert(result->getKey() == key && "Keys must match.");
+    assert(!result->getFingerprint() && "Depends should not have fingerprints");
+    result->setFingerprint(fingerprint);
+    return result;
+  }
+  // If there are two Decls with same base name but differ only in fingerprint,
+  // since we won't be able to tell which Decl is depended-upon (is this right?)
+  // just use the one node, but erase its print:
+  if (fingerprint != result->getFingerprint())
+    result->setFingerprint(None);
   return result;
 }
 
 std::string DependencyKey::demangleTypeAsContext(StringRef s) {
   return swift::Demangle::demangleTypeAsString(s.str());
+}
+
+DependencyKey DependencyKey::createTransitiveKeyForWholeSourceFile(
+    const StringRef swiftDeps) {
+  assert(!swiftDeps.empty());
+  const auto context = DependencyKey::computeContextForProvidedEntity<
+      NodeKind::sourceFileProvide>(swiftDeps);
+  const auto name =
+      DependencyKey::computeNameForProvidedEntity<NodeKind::sourceFileProvide>(
+          swiftDeps);
+  return DependencyKey(NodeKind::sourceFileProvide, DeclAspect::interface,
+                       context, name);
 }
 
 //==============================================================================
@@ -175,9 +204,8 @@ std::string DependencyKey::humanReadableName() const {
 }
 
 std::string DependencyKey::asString() const {
-  return NodeKindNames[size_t(kind)] + " " +
-         "aspect: " + DeclAspectNames[size_t(aspect)] + ", " +
-         humanReadableName();
+  return NodeKindNames[size_t(kind)] + " " + "aspect: " + aspectName().str() +
+         ", " + humanReadableName();
 }
 
 /// Needed for TwoStageMap::verify:
