@@ -641,6 +641,12 @@ void ToolChain::JobContext::addFrontendCommandLineInputArguments(
     if ((!isPrimary || usePrimaryFileList) && !useFileList)
       arguments.push_back(inputName);
   }
+  if (C.getEnableFineGrainedDependencies())
+    arguments.push_back("-enable-fine-grained-dependencies");
+
+  if (Args.hasArg(
+          options::OPT_emit_fine_grained_dependency_sourcefile_dot_files))
+    arguments.push_back("-emit-fine-grained-dependency-sourcefile-dot-files");
 }
 
 void ToolChain::JobContext::addFrontendSupplementaryOutputArguments(

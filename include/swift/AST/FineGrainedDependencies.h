@@ -325,7 +325,7 @@ private:
 /// Write out the .swiftdeps file for a frontend compilation of a primary file.
 bool emitReferenceDependencies(DiagnosticEngine &diags, SourceFile *SF,
                                const DependencyTracker &depTracker,
-                               StringRef outputPath);
+                               StringRef outputPath, bool alsoEmitDotFile);
 //==============================================================================
 // MARK: Enums
 //==============================================================================
@@ -449,7 +449,7 @@ public:
   StringRef getContext() const { return context; }
   StringRef getName() const { return name; }
 
-  StringRef getSwiftDepsFromSourceFileProvide() const {
+  StringRef getSwiftDepsFromASourceFileProvideNodeKey() const {
     assert(getKind() == NodeKind::sourceFileProvide &&
            "Receiver must be sourceFileProvide.");
     return getName();
@@ -494,8 +494,11 @@ public:
   static std::string computeNameForProvidedEntity(Entity);
 
   /// Given some type of depended-upon entity create the key.
-  template <NodeKind kind, typename Entity>
-  static DependencyKey createDependedUponKey(const Entity &);
+  static DependencyKey createDependedUponKey(StringRef mangledHolderName,
+                                             StringRef memberBaseName);
+
+  template <NodeKind kind>
+  static DependencyKey createDependedUponKey(StringRef);
 
   std::string humanReadableName() const;
 
@@ -684,6 +687,8 @@ public:
   }
 
   /// Record the sequence number, \p n, of another use.
+  /// The relationship between an interface and its implementation is NOT included here.
+  /// See \c SourceFileDepGraph::findExistingNodePairOrCreateAndAddIfNew.
   void addDefIDependUpon(size_t n) {
     if (n != getSequenceNumber())
       defsIDependUpon.insert(n);
@@ -727,6 +732,24 @@ public:
   SourceFileDepGraph(const SourceFileDepGraph &g) = delete;
   SourceFileDepGraph(SourceFileDepGraph &&g) = default;
 
+  /// Simulate loading for unit testing:
+  /// \param swiftDepsFileName The name of the swiftdeps file of the phony job
+  /// \param includePrivateDeps Whether the graph includes intra-file arcs
+  /// \param hadCompilationError Simulate a compilation error
+  /// \param interfaceHash The interface hash of the simulated graph
+  /// \param simpleNamesByRDK A map of vectors of names keyed by reference dependency key
+  /// \param compoundNamesByRDK A map of (mangledHolder,
+  /// baseName) pairs keyed by reference dependency key. For single-name dependencies, an initial
+  /// underscore indicates that the name does not cascade. For compound names, it is the
+  /// first name, the holder which indicates non-cascading. For member names, an
+  /// initial underscore indicates file-privacy.
+  static SourceFileDepGraph simulateLoad(
+      std::string swiftDepsFileName, const bool includePrivateDeps,
+      const bool hadCompilationError, std::string interfaceHash,
+      llvm::StringMap<std::vector<std::string>> simpleNamesByRDK,
+      llvm::StringMap<std::vector<std::pair<std::string, std::string>>>
+        compoundNamesByRDK);
+
   /// Nodes are owned by the graph.
   ~SourceFileDepGraph() {
     forEachNode([&](SourceFileDepGraphNode *n) { delete n; });
@@ -746,7 +769,7 @@ public:
   InterfaceAndImplementationPair<SourceFileDepGraphNode>
   getSourceFileNodePair() const;
 
-  StringRef getSwiftDepsFromSourceFileProvide() const;
+  StringRef getSwiftDepsOfJobThatProducedThisGraph() const;
 
   std::string getGraphID() const {
     return getSourceFileNodePair().getInterface()->getKey().humanReadableName();
@@ -892,7 +915,7 @@ private:
   }
   void emitArcs() {
     g.forEachArc([&](const NodeT *def, const NodeT *use) {
-      if (includeGraphArc(use, def))
+      if (includeGraphArc(def, use))
         emitGraphArc(def, use);
     });
   }
