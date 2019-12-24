@@ -1,0 +1,14 @@
+-static
+-lswiftCore
+-lswiftImageInspectionShared
+-lswiftSwiftOnoneSupport
+-licui18n
+-licuuc
+-licudata
+-ldl
+-lstdc++
+-lm
+-Xlinker --error-limit=0
+-Xlinker --no-gc-sections
+-Xlinker --no-threads
+

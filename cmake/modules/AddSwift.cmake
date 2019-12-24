@@ -366,6 +366,8 @@ function(_add_variant_c_compile_flags)
       list(APPEND result -isystem;${path})
     endforeach()
     list(APPEND result "-D__ANDROID_API__=${SWIFT_ANDROID_API_LEVEL}")
+  elseif("${CFLAGS_SDK}" STREQUAL "WASI")
+    list(APPEND result "-D_WASI_EMULATED_MMAN")
   elseif(CFLAGS_SDK STREQUAL WINDOWS)
     swift_windows_include_for_arch(${CFLAGS_ARCH} ${CFLAGS_ARCH}_INCLUDE)
     foreach(path ${${CFLAGS_ARCH}_INCLUDE})
@@ -439,6 +441,8 @@ function(_add_variant_swift_compile_flags
     foreach(path IN LISTS ${arch}_swift_include)
       list(APPEND result "\"${CMAKE_INCLUDE_FLAG_C}${path}\"")
     endforeach()
+  elseif("${sdk}" STREQUAL "WASI")
+    list(APPEND result "-Xcc" "-D_WASI_EMULATED_MMAN")
   endif()
 
   if(NOT BUILD_STANDALONE)
@@ -552,7 +556,7 @@ function(_add_variant_link_flags)
       list(APPEND library_search_directories ${path})
     endforeach()
   elseif("${LFLAGS_SDK}" STREQUAL "WASI")
-    # No extra libraries needed.
+    list(APPEND result "-Wl,wasi-emulated-mman")
   else()
     # If lto is enabled, we need to add the object path flag so that the LTO code
     # generator leaves the intermediate object file in a place where it will not

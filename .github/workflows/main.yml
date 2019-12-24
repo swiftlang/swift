@@ -16,12 +16,19 @@ jobs:
     steps:
       - uses: actions/checkout@v1
       - name: Build Linux installable archive
-        run: ./ci-linux.sh
+        run: ./utils/webassembly/ci-linux.sh
       - name: Upload Linux installable archive
         uses: actions/upload-artifact@v1
         with:
           name: linux-installable
           path: ../swiftwasm-linux.tar.gz
+      - name: Pack test results
+        run: tar cJf swift-test-results.tar.gz ../build/*/swift-linux-x86_64/swift-test-results
+      - name: Upload test results
+        uses: actions/upload-artifact@v1
+        with:
+          name: linux-test-results
+          path: ./swift-test-results.tar.gz
 
   macos_build:
     timeout-minutes: 0
@@ -30,7 +37,7 @@ jobs:
     steps:
       - uses: actions/checkout@v1
       - name: Build macOS installable archive
-        run: ./ci-mac.sh
+        run: ./utils/webassembly/ci-mac.sh
       - name: Upload macOS installable archive
         uses: actions/upload-artifact@v1
         with:
@@ -41,7 +48,13 @@ jobs:
         with:
           name: packaging-scripts
           path: utils/webassembly
-
+      - name: Pack test results
+        run: tar cJf swift-test-results.tar.gz ../build/*/swift-macosx-x86_64/swift-test-results
+      - name: Upload test results
+        uses: actions/upload-artifact@v1
+        with:
+          name: macos-test-results
+          path: ./swift-test-results.tar.gz
   package:
     name: Build SwiftWasm packages
     needs:

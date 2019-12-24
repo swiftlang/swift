@@ -1,8 +1,9 @@
 #/bin/bash
 
-export sourcedir=$PWD/..
+SOURCE_PATH="$( cd "$(dirname $0)/../../.." && pwd )"
+SWIFT_PATH=$SOURCE_PATH/swift
 
-./utils/build-script --release --wasm --verbose \
+$SWIFT_PATH/utils/build-script --wasm \
   --skip-build-benchmarks \
   --extra-cmake-options=" \
     -DSWIFT_PRIMARY_VARIANT_SDK:STRING=WASI \
@@ -10,6 +11,7 @@ export sourcedir=$PWD/..
     -DSWIFT_OSX_x86_64_ICU_STATICLIB=TRUE \
     -DSWIFT_BUILD_SOURCEKIT=FALSE \
     -DSWIFT_ENABLE_SOURCEKIT_TESTS=FALSE \
+    -DSWIFT_BUILD_SYNTAXPARSERLIB=FALSE \
     -DCMAKE_AR='/usr/local/opt/llvm/bin/llvm-ar' \
     -DCMAKE_RANLIB='/usr/local/opt/llvm/bin/llvm-ranlib' \
   " \
@@ -20,13 +22,14 @@ export sourcedir=$PWD/..
   --build-swift-static-stdlib \
   --llvm-targets-to-build "X86;WebAssembly" \
   --stdlib-deployment-targets "wasi-wasm32" \
-  --wasi-icu-data "todo-icu-data" \
-  --wasi-icu-i18n "$sourcedir/icu_out/lib" \
-  --wasi-icu-i18n-include "$sourcedir/icu_out/include" \
-  --wasi-icu-uc "$sourcedir/icu_out/lib" \
-  --wasi-icu-uc-include "$sourcedir/icu_out/include" \
-  --wasi-sdk "$sourcedir/wasi-sdk" \
+  --wasi-icu-data "$SOURCE_PATH/icu_out/lib/libicudata.a" \
+  --wasi-icu-i18n "$SOURCE_PATH/icu_out/lib/libicui18n.a" \
+  --wasi-icu-i18n-include "$SOURCE_PATH/icu_out/include" \
+  --wasi-icu-uc "$SOURCE_PATH/icu_out/lib/libicuuc.a" \
+  --wasi-icu-uc-include "$SOURCE_PATH/icu_out/include" \
+  --wasi-sdk "$SOURCE_PATH/wasi-sdk" \
   --install-swift \
   --install-prefix="/opt/swiftwasm-sdk" \
-  --install-destdir="$sourcedir/install" \
-  --installable-package="$sourcedir/swiftwasm-macos.tar.gz"
+  --install-destdir="$SOURCE_PATH/install" \
+  --installable-package="$SOURCE_PATH/swiftwasm-macos.tar.gz" \
+  "$@"

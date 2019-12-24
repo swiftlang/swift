@@ -76,7 +76,7 @@ function(get_test_dependencies SDK result_var_name)
      ("${SDK}" STREQUAL "ANDROID") OR
      ("${SDK}" STREQUAL "WINDOWS") OR
      ("${SDK}" STREQUAL "HAIKU") OR
-     ("${SDK}" STREQUAL "WASM"))
+     ("${SDK}" STREQUAL "WASI"))
     # No extra dependencies.
   else()
     message(FATAL_ERROR "Unknown SDK: ${SDK}")
@@ -225,28 +225,30 @@ foreach(SDK ${SWIFT_SDKS})
 
     # NOTE create a stub BlocksRuntime library that can be used for the
     # reflection tests
-    file(WRITE ${test_bin_dir}/Inputs/BlocksRuntime.c
+    if(NOT CMAKE_SYSTEM_NAME STREQUAL Darwin AND (SWIFT_BUILD_SYNTAXPARSERLIB OR SWIFT_BUILD_SOURCEKIT))
+      file(WRITE ${test_bin_dir}/Inputs/BlocksRuntime.c
       "void
 #if defined(_WIN32)
 __declspec(dllexport)
 #endif
 _Block_release(void) { }\n")
-    _add_swift_library_single(
-      BlocksRuntimeStub${VARIANT_SUFFIX}
-      BlocksRuntimeStub
-      SHARED
-      DONT_EMBED_BITCODE
-      NOSWIFTRT
-      ARCHITECTURE ${ARCH}
-      SDK ${SDK}
-      INSTALL_IN_COMPONENT dev
-      ${test_bin_dir}/Inputs/BlocksRuntime.c)
-    set_target_properties(BlocksRuntimeStub${VARIANT_SUFFIX} PROPERTIES
-      ARCHIVE_OUTPUT_DIRECTORY ${test_bin_dir}
-      LIBRARY_OUTPUT_DIRECTORY ${test_bin_dir}
-      RUNTIME_OUTPUT_DIRECTORY ${test_bin_dir}
-      OUTPUT_NAME BlocksRuntime)
-    list(APPEND test_dependencies BlocksRuntimeStub${VARIANT_SUFFIX})
+      _add_swift_library_single(
+        BlocksRuntimeStub${VARIANT_SUFFIX}
+        BlocksRuntimeStub
+        SHARED
+        DONT_EMBED_BITCODE
+        NOSWIFTRT
+        ARCHITECTURE ${ARCH}
+        SDK ${SDK}
+        INSTALL_IN_COMPONENT dev
+        ${test_bin_dir}/Inputs/BlocksRuntime.c)
+      set_target_properties(BlocksRuntimeStub${VARIANT_SUFFIX} PROPERTIES
+        ARCHIVE_OUTPUT_DIRECTORY ${test_bin_dir}
+        LIBRARY_OUTPUT_DIRECTORY ${test_bin_dir}
+        RUNTIME_OUTPUT_DIRECTORY ${test_bin_dir}
+        OUTPUT_NAME BlocksRuntime)
+      list(APPEND test_dependencies BlocksRuntimeStub${VARIANT_SUFFIX})
+    endif()
 
     if(SWIFT_BUILD_STDLIB AND SWIFT_INCLUDE_TESTS)
       list(APPEND test_dependencies
@@ -258,7 +260,9 @@ _Block_release(void) { }\n")
         # doesn't need to be build for macCatalyst.
         list(APPEND test_dependencies
             "swift-reflection-test${DEFAULT_OSX_VARIANT_SUFFIX}")
-      else()
+      if("${SDK}" STREQUAL "WASI")
+        # wasm: Avoid to build swift-reflection-test because it uses unsupported linker flags for wasm-ld
+      elseif()
         list(APPEND test_dependencies
             "swift-reflection-test${VARIANT_SUFFIX}_signed")
       endif()

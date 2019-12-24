@@ -529,10 +529,12 @@ module SwiftGlibc [system] {
       header "${GLIBC_INCLUDE_PATH}/unistd.h"
       export *
     }
+% if CMAKE_SDK != "WASI":
     module utime {
       header "${GLIBC_INCLUDE_PATH}/utime.h"
       export *
     }
+% end
   }
 }
 
