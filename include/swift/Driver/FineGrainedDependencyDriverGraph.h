@@ -492,6 +492,13 @@ public:
   void printPath(raw_ostream &out, const driver::Job *node) const;
 
 private:
+  /// Get a printable filename, given a node's swiftDeps.
+  StringRef getProvidingFilename(Optional<std::string> swiftDeps) const;
+
+  /// Print one node on the dependency path.
+  static void printOneNodeOfPath(raw_ostream &out, const DependencyKey &key,
+                                 const StringRef filename);
+
   bool isCurrentPathForTracingEmpty() const {
     return !currentPathIfTracing.hasValue() || currentPathIfTracing->empty();
   }

@@ -571,57 +571,59 @@ void ModuleDepGraph::printPath(raw_ostream &out,
       else
         out << " -> ";
 
-      const StringRef inputName =
-          n->getSwiftDeps().hasValue()
-              ? llvm::sys::path::filename(
-                    getJob(n->getSwiftDeps())->getFirstSwiftPrimaryInput())
-              : StringRef();
-      // FineGrainedDependencyGraphTests work with simulated jobs with empty
-      // input names.
-      const StringRef providerName =
-          !inputName.empty() ? inputName
-                             : n->getSwiftDeps().hasValue()
-                                   ? StringRef(n->getSwiftDeps().getValue())
-                                   : StringRef("<unknown>");
-
-      SmallString<64> fixedUpType{n->getKey().getContext()};
-      if (!fixedUpType.empty() && fixedUpType.front() == 'P')
-        fixedUpType.push_back('_');
-      switch (n->getKey().getKind()) {
-      case NodeKind::topLevel:
-        out << "top-level name '" << n->getKey().getName() << "' in "
-            << providerName;
-        break;
-      case NodeKind::nominal:
-        out << "type '"
-            << swift::Demangle::demangleTypeAsString(fixedUpType.str())
-            << "' in " << providerName;
-        break;
-      case NodeKind::potentialMember:
-        out << "non-private members of type '"
-            << swift::Demangle::demangleTypeAsString(fixedUpType) << "' in "
-            << providerName;
-        break;
-      case NodeKind::member:
-        out << "member '" << n->getKey().getName() << "' of type '"
-            << swift::Demangle::demangleTypeAsString(fixedUpType) << "' in "
-            << providerName;
-        break;
-      case NodeKind::dynamicLookup:
-        out << "AnyObject member '" << n->getKey().getName() << "' in "
-            << providerName;
-        break;
-      case NodeKind::externalDepend:
-        out << providerName << " depends on module '"
-            << llvm::sys::path::filename(n->getKey().getName()) << "'";
-        break;
-      case NodeKind::sourceFileProvide:
-        out << "source file " << providerName;
-        break;
-      default:
-        llvm_unreachable("unknown NodeKind");
-      }
+      const StringRef providerName = getProvidingFilename(n->getSwiftDeps());
+      printOneNodeOfPath(out, n->getKey(), providerName);
     }
     out << "\n";
+  }
+}
+
+StringRef ModuleDepGraph::getProvidingFilename(
+    const Optional<std::string> swiftDeps) const {
+  if (!swiftDeps)
+    return "<unknown";
+  const StringRef inputName =
+      llvm::sys::path::filename(getJob(swiftDeps)->getFirstSwiftPrimaryInput());
+  // FineGrainedDependencyGraphTests work with simulated jobs with empty
+  // input names.
+  return !inputName.empty() ? inputName : StringRef(swiftDeps.getValue());
+}
+
+void ModuleDepGraph::printOneNodeOfPath(raw_ostream &out,
+                                        const DependencyKey &key,
+                                        const StringRef filename) {
+  auto typeForPrinting = [](const DependencyKey &key) {
+    SmallString<64> fixedUpType{key.getContext()};
+    if (!fixedUpType.empty() && fixedUpType.front() == 'P')
+      fixedUpType.push_back('_');
+    return swift::Demangle::demangleTypeAsString(fixedUpType.str());
+  };
+  switch (key.getKind()) {
+  case NodeKind::topLevel:
+    out << "top-level name '" << key.getName() << "' in " << filename;
+    break;
+  case NodeKind::nominal:
+    out << "type '" << typeForPrinting(key) << "' in " << filename;
+    break;
+  case NodeKind::potentialMember:
+    out << "non-private members of type '" << typeForPrinting(key) << "' in "
+        << filename;
+    break;
+  case NodeKind::member:
+    out << "member '" << key.getName() << "' of type '" << typeForPrinting(key)
+        << "' in " << filename;
+    break;
+  case NodeKind::dynamicLookup:
+    out << "AnyObject member '" << key.getName() << "' in " << filename;
+    break;
+  case NodeKind::externalDepend:
+    out << filename << " depends on module '"
+        << llvm::sys::path::filename(key.getName()) << "'";
+    break;
+  case NodeKind::sourceFileProvide:
+    out << "source file " << filename;
+    break;
+  default:
+    llvm_unreachable("unknown NodeKind");
   }
 }
