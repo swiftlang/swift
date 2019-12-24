@@ -1,4 +1,4 @@
-// RUN: %empty-directory(%t)
+// RUN: %empty-directory(%t) 
 // RUN: cp -r %S/Inputs/range-lifecycle/* %t && cp %t/fileB{0-baseline,}.swift
 
 // =============================================================================
@@ -161,6 +161,6 @@
 // CHECK-EXERNAL-CHANGE: Queuing <With ranges> changed at [4:18--4:18): {compile: fileB.o <= fileB.swift}
 // CHECK-EXERNAL-CHANGE-NEXT:   - Will immediately schedule dependents of {compile: fileB.o <= fileB.swift} because changed outside a function body at: [4:18--4:18)
 // CHECK-EXERNAL-CHANGE: Queuing <With ranges> because of the initial set: {compile: fileA.o <= fileA.swift}
-// CHECK-EXERNAL-CHANGE-NEXT:   fileB.swift provides type 'main.Struct1InB'
+// CHECK-EXERNAL-CHANGE-NEXT:   top-level name 'Struct1InB' in fileB.swift -> source file fileB.swift -> {{.*}} in fileB.swift -> source file fileA.swift
 // CHECK-EXERNAL-CHANGE: Skipping <With ranges> : {compile: main.o <= main.swift}
 // CHECK-EXERNAL-CHANGE: *** Range benefit: 0 compilations, 1 stages, without ranges: 2, with ranges: 2, used ranges, total: 3 ***
