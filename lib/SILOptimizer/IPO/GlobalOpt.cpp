@@ -1147,14 +1147,7 @@ bool SILGlobalOpt::run() {
   // Optimize based on what we just collected.
   for (auto &InitCalls : GlobalInitCallMap) {
     // Don't optimize functions that are marked with the opt.never attribute.
-    bool shouldOptimize = true;
-    for (auto *apply : InitCalls.second) {
-      if (!apply->getFunction()->shouldOptimize()) {
-        shouldOptimize = false;
-        break;
-      }
-    }
-    if (!shouldOptimize)
+    if (!InitCalls.first->shouldOptimize())
       continue;
 
     // Optimize the addressors if possible.
