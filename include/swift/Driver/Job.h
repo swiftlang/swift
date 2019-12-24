@@ -150,6 +150,9 @@ class CommandOutput {
 public:
   CommandOutput(file_types::ID PrimaryOutputType, OutputFileMap &Derived);
 
+  /// For testing dependency graphs that use Jobs
+  CommandOutput(StringRef dummyBaseName, OutputFileMap &);
+
   /// Return the primary output type for this CommandOutput.
   file_types::ID getPrimaryOutputType() const;
 
@@ -318,6 +321,12 @@ public:
         Executable(Executable), Arguments(std::move(Arguments)),
         ExtraEnvironment(std::move(ExtraEnvironment)),
         FilelistFileInfos(std::move(Infos)), ResponseFile(ResponseFile) {}
+
+  /// For testing dependency graphs that use Jobs
+  Job(OutputFileMap &OFM, StringRef dummyBaseName)
+      : Job(CompileJobAction(file_types::TY_Object),
+            SmallVector<const Job *, 4>(),
+            std::make_unique<CommandOutput>(dummyBaseName, OFM), nullptr, {}) {}
 
   virtual ~Job();
 
