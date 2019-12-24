@@ -687,6 +687,8 @@ public:
   }
 
   /// Record the sequence number, \p n, of another use.
+  /// The relationship between an interface and its implementation is NOT included here.
+  /// See \c SourceFileDepGraph::findExistingNodePairOrCreateAndAddIfNew.
   void addDefIDependUpon(size_t n) {
     if (n != getSequenceNumber())
       defsIDependUpon.insert(n);

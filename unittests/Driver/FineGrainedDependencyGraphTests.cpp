@@ -405,29 +405,46 @@ TEST(ModuleDepGraph, ChainedNoncascadingDependents) {
 
   {
     auto marked = graph.markTransitive(&job0);
+    EXPECT_EQ(2u, marked.size());
+    EXPECT_TRUE(contains(marked, &job1));
+    EXPECT_TRUE(contains(marked, &job2));
+  }
+  EXPECT_TRUE(graph.isMarked(&job0));
+  EXPECT_TRUE(graph.isMarked(&job1));
+  EXPECT_TRUE(graph.isMarked(&job2));
+
+  EXPECT_EQ(0u, graph.markTransitive(&job0).size());
+  EXPECT_TRUE(graph.isMarked(&job0));
+  EXPECT_TRUE(graph.isMarked(&job1));
+  EXPECT_TRUE(graph.isMarked(&job2));
+}
+
+TEST(ModuleDepGraph, ChainedNoncascadingDependents2) {
+  ModuleDepGraph graph;
+
+  EXPECT_EQ(simulateLoad(graph, &job0, {{providesTopLevel, {"a", "_b", "c"}}}), LoadResult::AffectsDownstream);
+  EXPECT_EQ(simulateLoad(graph, &job1, {{dependsTopLevel,  {"x", "_b"}}, {providesNominal, {"z"}}}), LoadResult::AffectsDownstream);
+  EXPECT_EQ(simulateLoad(graph, &job2, {{dependsNominal,  {"z"}}}), LoadResult::AffectsDownstream);
+
+  {
+    auto marked = graph.markTransitive(&job0);
     EXPECT_EQ(1u, marked.size());
     EXPECT_TRUE(contains(marked, &job1));
   }
   EXPECT_TRUE(graph.isMarked(&job0));
   EXPECT_TRUE(graph.isMarked(&job1));
   EXPECT_FALSE(graph.isMarked(&job2));
-
-  EXPECT_EQ(0u, graph.markTransitive(&job0).size());
-  EXPECT_TRUE(graph.isMarked(&job0));
-  EXPECT_TRUE(graph.isMarked(&job1));
-  EXPECT_FALSE(graph.isMarked(&job2));
 }
-
 
 TEST(ModuleDepGraph, MarkTwoNodes) {
   ModuleDepGraph graph;
 
-  EXPECT_EQ(simulateLoad(graph, &job0,  {{providesNominal, {"a", "b"}}}), LoadResult::AffectsDownstream);
-  EXPECT_EQ(simulateLoad(graph, &job1,  {{dependsNominal,  {"a"}}, {providesNominal, {"z"}}}), LoadResult::AffectsDownstream);
-  EXPECT_EQ(simulateLoad(graph, &job2,  {{dependsNominal,  {"z"}}}), LoadResult::AffectsDownstream);
-  EXPECT_EQ(simulateLoad(graph, &job10, {{providesNominal, {"y", "z"}}, {dependsNominal, {"q"}}}), LoadResult::AffectsDownstream);
-  EXPECT_EQ(simulateLoad(graph, &job11, {{dependsNominal,  {"y"}}}), LoadResult::AffectsDownstream);
-  EXPECT_EQ(simulateLoad(graph, &job12, {{dependsNominal,  {"q"}}, {providesNominal, {"q"}}}), LoadResult::AffectsDownstream);
+  EXPECT_EQ(simulateLoad(graph, &job0,  {{providesTopLevel, {"a", "b"}}}), LoadResult::AffectsDownstream);
+  EXPECT_EQ(simulateLoad(graph, &job1,  {{dependsTopLevel,  {"a"}}, {providesTopLevel, {"z"}}}), LoadResult::AffectsDownstream);
+  EXPECT_EQ(simulateLoad(graph, &job2,  {{dependsTopLevel,  {"z"}}}), LoadResult::AffectsDownstream);
+  EXPECT_EQ(simulateLoad(graph, &job10, {{providesTopLevel, {"y", "z"}}, {dependsTopLevel, {"q"}}}), LoadResult::AffectsDownstream);
+  EXPECT_EQ(simulateLoad(graph, &job11, {{dependsTopLevel,  {"y"}}}), LoadResult::AffectsDownstream);
+  EXPECT_EQ(simulateLoad(graph, &job12, {{dependsTopLevel,  {"q"}}, {providesTopLevel, {"q"}}}), LoadResult::AffectsDownstream);
 
 
   {

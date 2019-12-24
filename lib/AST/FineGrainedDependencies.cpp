@@ -86,8 +86,11 @@ SourceFileDepGraph::findExistingNodePairOrCreateAndAddIfNew(
       findExistingNodeOrCreateIfNew(
           DependencyKey(k, DeclAspect::implementation, context, name),
           fingerprint, true /* = isProvides */)};
-  // if interface changes, have to rebuild implementation
-  addArc(nodePair.getInterface(), nodePair.getImplementation());
+  // if interface changes, have to rebuild implementation.
+  // But, if an arc is added for this, then *any* change that causes
+  // a same-named interface to be dirty will dirty this implementation,
+  // even if that interface is in another file.
+  // So, make the interface->implementation arc implicit.
   return nodePair;
 }
 

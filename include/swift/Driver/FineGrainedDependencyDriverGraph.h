@@ -197,10 +197,11 @@ class ModuleDepGraph {
   const bool verifyFineGrainedDependencyGraphAfterEveryImport;
   const bool emitFineGrainedDependencyDotFileAfterEveryImport;
 
-  /// If tracing dependencies, holds the current node traversal path
+  /// If tracing dependencies, holds a vector used to hold the current path
+  /// def - use/def - use/def - ...
   Optional<std::vector<const ModuleDepGraphNode *>> currentPathIfTracing;
 
-  /// If tracing dependencies, record the node sequence
+  /// If tracing dependencies, holds the sequence of defs used to get to the job that is the key
   std::unordered_multimap<const driver::Job *,
                           std::vector<const ModuleDepGraphNode *>>
       dependencyPathsToJobs;

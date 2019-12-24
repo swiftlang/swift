@@ -1007,10 +1007,6 @@ namespace driver {
 
       const bool isCascading = isCascadingJobAccordingToCondition(
           Cmd, Cond, HasDependenciesFileName);
-
-      if (Comp.getEnableFineGrainedDependencies())
-        assert(getFineGrainedDepGraph(/*forRanges=*/false)
-                   .emitDotFileAndVerify(Comp.getDiags()));
       return std::make_pair(shouldSched, isCascading);
     }
 
@@ -1824,8 +1820,6 @@ int Compilation::performJobsImpl(bool &abnormalExit,
                                CompilationRecordPath + "~moduleonly");
     }
   }
-  if (getEnableFineGrainedDependencies())
-    assert(State.FineGrainedDepGraph.emitDotFileAndVerify(getDiags()));
   abnormalExit = State.hadAnyAbnormalExit();
   return State.getResult();
 }

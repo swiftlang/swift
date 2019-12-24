@@ -127,7 +127,9 @@ llvm::StringSet<> ModuleDepGraph::computeSwiftDepsFromInterfaceNodes(
 
   llvm::StringSet<> swiftDepsOfNodes;
   for (const ModuleDepGraphNode *n : nodes) {
-    if (!n->doesNodeProvideAnInterface())
+//    if (!n->doesNodeProvideAnInterface())
+//      continue;
+    if (!n->getIsProvides())
       continue;
     const std::string &swiftDeps = n->getSwiftDepsOfProvides();
     if (swiftDepsOfNodes.insert(swiftDeps).second) {
@@ -335,6 +337,13 @@ void ModuleDepGraph::forEachUseOf(
     return;
   for (const ModuleDepGraphNode *useNode : iter->second)
     fn(useNode);
+  // Add in implicit interface->implementation dependency
+  if (def->getKey().isInterface() && def->getSwiftDeps()) {
+    const auto &dk = def->getKey();
+    const DependencyKey key(dk.getKind(), DeclAspect::interface, dk.getContext(), dk.getName());
+    if (const auto interfaceNode = nodeMap.find(def->getSwiftDeps().getValue(), dk))
+      fn(interfaceNode.getValue());
+  }
 }
 
 void ModuleDepGraph::forEachNode(
@@ -381,10 +390,8 @@ void ModuleDepGraph::findDependentNodes(
     // Cycle recording and check.
     if (!foundDependents.insert(u).second)
       return;
-    // An interface depends on something. Thus, if that something changes
-    // the interface must be recompiled. But if an interface changes, then
-    // anything using that interface must also be recompiled.
-    if (u->doesNodeProvideAnInterface())
+    // If this use also provides something, follow it
+    if (u->getIsProvides())
       findDependentNodes(foundDependents, u);
   });
   traceDeparture(pathLengthAfterArrival);
@@ -394,10 +401,9 @@ size_t ModuleDepGraph::traceArrival(const ModuleDepGraphNode *visitedNode) {
   if (!currentPathIfTracing.hasValue())
     return 0;
   auto &currentPath = currentPathIfTracing.getValue();
+  currentPath.push_back(visitedNode);
   const auto visitedSwiftDepsIfAny = visitedNode->getSwiftDeps();
   recordDependencyPathToJob(currentPath, getJob(visitedSwiftDepsIfAny));
-
-  currentPath.push_back(visitedNode);
   return currentPath.size();
 }
 
@@ -426,7 +432,7 @@ void ModuleDepGraph::emitDotFileForJob(DiagnosticEngine &diags,
 
 void ModuleDepGraph::emitDotFile(DiagnosticEngine &diags, StringRef baseName) {
   unsigned seqNo = dotFileSequenceNumber[baseName]++;
-  std::string fullName = baseName.str() + "." + std::to_string(seqNo) + ".dot";
+  std::string fullName = baseName.str() + "-post-integration." + std::to_string(seqNo) + ".dot";
   withOutputFile(diags, fullName, [&](llvm::raw_ostream &out) {
     emitDotFile(out);
     return false;
@@ -543,23 +549,66 @@ void ModuleDepGraph::verifyEachJobInGraphIsTracked() const {
       });
 }
 
-bool ModuleDepGraph::emitDotFileAndVerify(DiagnosticEngine &diags) {
-  if (!driverDotFileBasePath.empty())
-    emitDotFile(diags, driverDotFileBasePath);
-  return verify();
-}
-
-/// Dump the path that led to \p node.
-/// TODO: make output more like existing system's
+/// Dump the path(s) that led to \p node.
+/// TODO: break up
 void ModuleDepGraph::printPath(raw_ostream &out,
                                const driver::Job *jobToBeBuilt) const {
   assert(currentPathIfTracing.hasValue() &&
          "Cannot print paths of paths weren't tracked.");
-  auto const allPaths = dependencyPathsToJobs.find(jobToBeBuilt);
-  if (allPaths == dependencyPathsToJobs.cend())
-    return;
-  for (const auto *n : allPaths->second) {
-    out << n->humanReadableName() << "\n";
+
+  for (auto paths = dependencyPathsToJobs.find(jobToBeBuilt);
+      paths != dependencyPathsToJobs.end() && paths->first == jobToBeBuilt;
+       ++paths) {
+    const auto &path = paths->second;
+    bool first = true;
+    out << "\t";
+    for (const ModuleDepGraphNode *n: path) {
+      if (first)
+        first = false;
+      else
+        out << " -> ";
+
+      const StringRef inputName = n->getSwiftDeps().hasValue()
+      ? llvm::sys::path::filename(getJob(n->getSwiftDeps())->getFirstSwiftPrimaryInput())
+      : StringRef();
+      // FineGrainedDependencyGraphTests work with simulated jobs with empty input names.
+      const StringRef providerName = !inputName.empty() ? inputName
+      : n->getSwiftDeps().hasValue() ? StringRef(n->getSwiftDeps().getValue()) : StringRef("<unknown>");
+
+      SmallString<64> fixedUpType{n->getKey().getContext()};
+      if (!fixedUpType.empty() && fixedUpType.front() == 'P')
+        fixedUpType.push_back('_');
+      switch (n->getKey().getKind()) {
+        case NodeKind::topLevel:
+          out << "top-level name '" << n->getKey().getName() << "' in " << providerName;
+          break;
+        case NodeKind::nominal:
+          out << "type '"
+          << swift::Demangle::demangleTypeAsString(fixedUpType.str())
+           << "' in " << providerName;
+          break;
+        case NodeKind::potentialMember:
+          out << "non-private members of type '"
+          << swift::Demangle::demangleTypeAsString(fixedUpType)
+           << "' in " << providerName;
+          break;
+        case NodeKind::member:
+          out << "member '" << n->getKey().getName() << "' of type '"
+          << swift::Demangle::demangleTypeAsString(fixedUpType)
+           << "' in " << providerName;
+          break;
+        case NodeKind::dynamicLookup:
+          out << "AnyObject member '" << n->getKey().getName()  << "' in " << providerName;
+          break;
+        case NodeKind::externalDepend:
+          out << providerName << " depends on module '" << llvm::sys::path::filename(n->getKey().getName()) << "'";
+          break;
+        case NodeKind::sourceFileProvide:
+          out << "source file " << providerName;
+          break;
+        default: llvm_unreachable("unknown NodeKind");
+      }
+    }
+    out << "\n";
   }
-  out << "\n";
 }
