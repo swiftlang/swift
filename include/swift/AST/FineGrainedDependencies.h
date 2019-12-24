@@ -913,7 +913,7 @@ private:
   }
   void emitArcs() {
     g.forEachArc([&](const NodeT *def, const NodeT *use) {
-      if (includeGraphArc(use, def))
+      if (includeGraphArc(def, use))
         emitGraphArc(def, use);
     });
   }
