@@ -1,6 +1,6 @@
 -ldl
--lpthread
 -latomic
+-lswiftWasiPthread
 -lswiftCore
 -latomic
 -lswiftImageInspectionShared

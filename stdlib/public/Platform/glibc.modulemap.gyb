@@ -377,11 +377,11 @@ module SwiftGlibc [system] {
       header "${GLIBC_INCLUDE_PATH}/poll.h"
       export *
     }
+% if CMAKE_SDK != "WASI":
     module pthread {
       header "${GLIBC_INCLUDE_PATH}/pthread.h"
       export *
     }
-% if CMAKE_SDK != "WASI":
     module pwd {
       header "${GLIBC_INCLUDE_PATH}/pwd.h"
       export *

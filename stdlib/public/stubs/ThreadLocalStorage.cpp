@@ -25,6 +25,26 @@ void *_stdlib_createTLS(void);
 
 #if !SWIFT_TLS_HAS_RESERVED_PTHREAD_SPECIFIC || (defined(_WIN32) && !defined(__CYGWIN__))
 
+#if defined(__wasi__)
+#define STUB() do { /* fprintf(stderr, "%s is unsupported on WASI environment\n", __func__);*/ abort(); } while(0)
+void wasi_polyfill_call_once(int *flag, void *context, void (*func)(void *))
+ {
+    switch (*flag) {
+    case 0:
+      func(context);
+      *flag = 1;
+      return;
+    case 1:
+      return;
+    default:
+      STUB();
+    }
+  }
+int   wasi_polyfill_pthread_key_create(__swift_thread_key_t *key, void (*destructor)(void*)) { STUB(); }
+void *wasi_polyfill_pthread_getspecific(__swift_thread_key_t key) { STUB(); }
+int   wasi_polyfill_pthread_setspecific(__swift_thread_key_t key, const void *value) { STUB(); }
+#endif
+
 static void
 #if defined(_M_IX86)
 __stdcall
