@@ -1,4 +1,4 @@
-// RUN: %empty-directory(%t)
+// RUN: %empty-directory(%t) 
 // RUN: cp -r %S/Inputs/range-lifecycle/* %t && cp %t/fileB{0-baseline,}.swift
 
 // =============================================================================
