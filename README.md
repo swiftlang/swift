@@ -349,4 +349,4 @@ next to the other projects and it will be bootstrapped automatically:
 The Bazel website has detailed installation instructions for
 [macOS](https://docs.bazel.build/versions/master/install-os-x.html) and
 [Ubuntu](https://docs.bazel.build/versions/master/install-ubuntu.html).
-When picking the version to download in step 2, select a version between v0.24.1 and v0.25.2 (inclusive) which can be found in the release notes [here (v0.25.2)](https://github.com/bazelbuild/bazel/releases/tag/0.25.2).
+When picking the version to download in step 2, select a version between v0.27.1 and v0.29.1 (inclusive) which can be found in the release notes [here (v0.29.1)](https://github.com/bazelbuild/bazel/releases/tag/0.29.1).
