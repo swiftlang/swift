@@ -865,11 +865,20 @@ getCompoundDepends(
     ArrayRef<std::pair<std::string, std::string>> compoundNames) {
   std::vector<std::pair<std::tuple<std::string, std::string, bool>, bool>>
       result;
-  for (std::string n : simpleNames)
-    result.push_back({{n, "", false}, cascades(n)});
-  for (auto &p : compoundNames)
+  for (std::string n : simpleNames) {
+    // (On Linux, the compiler needs more verbosity than:
+    //  result.push_back({{n, "", false}, cascades(n)});
     result.push_back(
-        {{p.first, p.second, isPrivate(p.second)}, cascades(p.first)});
+        std::make_pair(std::make_tuple(n, std::string(), false), cascades(n)));
+  }
+  for (auto &p : compoundNames) {
+    // Likewise, for Linux expand the following out:
+    //    result.push_back(
+    //        {{p.first, p.second, isPrivate(p.second)}, cascades(p.first)});
+    result.push_back(
+        std::make_pair(std::make_tuple(p.first, p.second, isPrivate(p.second)),
+                       cascades(p.first)));
+  }
   return result;
 }
 
