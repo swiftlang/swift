@@ -1198,12 +1198,18 @@ bool RemoveUnnecessaryCoercion::attempt(ConstraintSystem &cs, Type fromType,
     // Only diagnose if we have all type variables resolved in the system.
     if (cs.hasFreeTypeVariables())
       return false;
-    
+
     auto representative = cs.getRepresentative(typeVariable);
-    if (auto *typeSourceLocator = cs.getTypeVariableBindingLocator(representative)) {
+    if (auto *typeSourceLocator =
+            cs.getTypeVariableBindingLocator(representative)) {
       // If the type variable binding source locator is the same the
       // contextual type equality is coming from this coercion.
       if (typeSourceLocator == cs.getConstraintLocator(locator))
+        return false;
+
+      // Not warn if locator points to a TupleElement to avoid
+      // incorrect warnings.
+      if (typeSourceLocator->isLastElement<LocatorPathElt::TupleElement>())
         return false;
     }
   }
