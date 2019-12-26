@@ -1917,18 +1917,21 @@ ParserResult<Stmt> Parser::parseStmtDo(LabeledStmtInfo labelInfo) {
       DoCatchStmt::create(Context, labelInfo, doLoc, body.get(), allClauses));
   }
 
-  SourceLoc whileLoc;
-
-  // If we don't see a 'while', this is just the bare 'do' scoping
-  // statement.
-  if (!consumeIf(tok::kw_while, whileLoc)) {
+  // If we dont see a 'while' or see a 'while' that starts
+  // from new line. This is just the bare `do` scoping statement.
+  if (Tok.getKind() != tok::kw_while || Tok.isAtStartOfLine()) {
     return makeParserResult(status,
-                         new (Context) DoStmt(labelInfo, doLoc, body.get()));
+                            new (Context) DoStmt(labelInfo, doLoc, body.get()));
   }
-
+  SourceLoc whileLoc = Tok.getLoc();
   // But if we do, advise the programmer that it's 'repeat' now.
-  diagnose(doLoc, diag::do_while_now_repeat_while)
+  diagnose(doLoc, diag::do_while_now_repeat_while);
+  diagnose(doLoc, diag::do_while_expected_repeat_while)
     .fixItReplace(doLoc, "repeat");
+  diagnose(doLoc, diag::do_while_expected_separate_stmt)
+    .fixItInsert(whileLoc, "\n");
+
+  consumeToken(tok::kw_while);
   status.setIsParseError();
   ParserResult<Expr> condition;
   if (Tok.is(tok::l_brace)) {
