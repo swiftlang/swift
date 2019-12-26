@@ -217,7 +217,17 @@ _ = (f11295_Overload as (Double, Double) -> Double)(0, 0)
 
 _ = (1 - 2 / 3 * 6) as UInt
 _ = 1/4 as Float > 3/2 as Float // Ok
-_ = 1/4 as Int > 3/2 as Int // Ok
+_ = 1/4 as Int > 3/2 as Int // Ok 
+
+// Coerce tuple elements
+func f11295_Tuple(_ a: (Int, Int)){}
+func f11295_TupleGeneric<T>(_ a: (T, T)){}
+
+let _: (Int, Int) = (1 as Int, 1) // Ok
+_ = (1 as Int, 1) // Ok 
+
+f11295_Tuple((1 as Int, 1)) // Ok
+f11295_TupleGeneric((1 as Int, 1)) // Ok
 
 // Special cases where the coerced expression type is inferred by context.
 
