@@ -176,4 +176,21 @@ DerivativeRegistrationTests.testWithLeakChecking("NonCanonicalizedGenericSignatu
   expectEqual(0, dx)
 }
 
+// Test derivatives of default implementations.
+protocol HasADefaultImplementation {
+  func req(_ x: Tracked<Float>) -> Tracked<Float>
+}
+extension HasADefaultImplementation {
+  func req(_ x: Tracked<Float>) -> Tracked<Float> { x }
+  @derivative(of: req)
+  func req(_ x: Tracked<Float>) -> (value: Tracked<Float>, pullback: (Tracked<Float>) -> Tracked<Float>) {
+    (x, { 10 * $0 })
+  }
+}
+struct StructConformingToHasADefaultImplementation : HasADefaultImplementation {}
+DerivativeRegistrationTests.testWithLeakChecking("DerivativeOfDefaultImplementation") {
+  let dx = gradient(at: Tracked<Float>(0)) { StructConformingToHasADefaultImplementation().req($0) }
+  expectEqual(Tracked<Float>(10), dx)
+}
+
 runAllTests()

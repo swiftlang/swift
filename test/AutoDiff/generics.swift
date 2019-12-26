@@ -102,7 +102,6 @@ protocol TF_508_Proto {
 }
 extension TF_508_Proto where Scalar : FloatingPoint {
   @differentiable(
-    vjp: vjpAdd
     where Self : Differentiable, Scalar : Differentiable,
           // Conformance requirement with dependent member type.
           Self.TangentVector : TF_508_Proto
@@ -112,7 +111,6 @@ extension TF_508_Proto where Scalar : FloatingPoint {
   }
 
   @differentiable(
-    vjp: vjpSubtract
     where Self : Differentiable, Scalar : Differentiable,
           // Same-type requirement with dependent member type.
           Self.TangentVector == Float
@@ -124,16 +122,18 @@ extension TF_508_Proto where Scalar : FloatingPoint {
 extension TF_508_Proto where Self : Differentiable,
                              Scalar : FloatingPoint & Differentiable,
                              Self.TangentVector : TF_508_Proto {
+  @derivative(of: +)
   static func vjpAdd(lhs: Self, rhs: Self)
-      -> (Self, (TangentVector) -> (TangentVector, TangentVector)) {
+      -> (value: Self, pullback: (TangentVector) -> (TangentVector, TangentVector)) {
     return (lhs, { v in (v, v) })
   }
 }
 extension TF_508_Proto where Self : Differentiable,
                              Scalar : FloatingPoint & Differentiable,
                              Self.TangentVector == Float {
+  @derivative(of: -)
   static func vjpSubtract(lhs: Self, rhs: Self)
-      -> (Self, (TangentVector) -> (TangentVector, TangentVector)) {
+      -> (value: Self, pullback: (TangentVector) -> (TangentVector, TangentVector)) {
     return (lhs, { v in (v, v) })
   }
 }
@@ -190,7 +190,7 @@ struct TF_546<T: FloatingPoint>: AdditiveArithmetic {
   var real: T
   var imaginary: T
 
-  @differentiable(vjp: _vjpInit where T: Differentiable, T == T.TangentVector)
+  @differentiable(where T: Differentiable, T == T.TangentVector)
   init(real: T = 0, imaginary: T = 0) {
     self.real = real
     self.imaginary = imaginary
@@ -200,7 +200,8 @@ extension TF_546: Differentiable where T: Differentiable {
   typealias TangentVector = TF_546
 }
 extension TF_546 where T: Differentiable, T == T.TangentVector {
-  static func _vjpInit(real: T, imaginary: T) -> (TF_546, (TF_546) -> (T, T)) {
+  @derivative(of: init)
+  static func _vjpInit(real: T, imaginary: T) -> (value: TF_546, pullback: (TF_546) -> (T, T)) {
     return (TF_546(real: real, imaginary: imaginary), { ($0.real, $0.imaginary) })
   }
 }
@@ -228,7 +229,6 @@ protocol TF_682_Proto {
 }
 extension TF_682_Proto where Scalar : FloatingPoint {
   @differentiable(
-    vjp: vjpFoo
     where Self : Differentiable, Scalar : Differentiable,
           // Same-type requirement with dependent member type.
           Self.TangentVector == Float
@@ -240,8 +240,8 @@ extension TF_682_Proto where Scalar : FloatingPoint {
 extension TF_682_Proto where Self : Differentiable,
                              Scalar : FloatingPoint & Differentiable,
                              Self.TangentVector == Float {
-  func vjpFoo(lhs: Self)
-      -> (Self, (TangentVector) -> (TangentVector, TangentVector)) {
+  @derivative(of: foo)
+  func vjpFoo(lhs: Self) -> (value: Self, pullback: (TangentVector) -> (TangentVector, TangentVector)) {
     return (lhs, { v in (v, v) })
   }
 }

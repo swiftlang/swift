@@ -151,23 +151,17 @@ func vjpFooExtraGenericRequirements<T : FloatingPoint & Differentiable & BinaryI
   return (x, { $0 })
 }
 
+// Test cross-file derivative registration. Currently unsupported.
+// TODO(TF-1021): Lift this restriction.
+extension FloatingPoint where Self: Differentiable {
+  // expected-error @+1 {{derivative not in the same file as the original function}}
+  @derivative(of: rounded)
+  func vjpRounded() -> (value: Self, pullback: (TangentVector) -> TangentVector) {
+    fatalError()
+  }
+}
+
 // Test static methods.
-
-extension AdditiveArithmetic where Self : Differentiable {
-  // expected-error @+1 {{derivative not in the same file as the original function}}
-  @derivative(of: +)
-  static func vjpPlus(x: Self, y: Self) -> (value: Self, pullback: (Self.TangentVector) -> (Self.TangentVector, Self.TangentVector)) {
-    return (x + y, { v in (v, v) })
-  }
-}
-
-extension FloatingPoint where Self : Differentiable, Self == Self.TangentVector {
-  // expected-error @+1 {{derivative not in the same file as the original function}}
-  @derivative(of: +)
-  static func vjpPlus(x: Self, y: Self) -> (value: Self, pullback: (Self) -> (Self, Self)) {
-    return (x + y, { v in (v, v) })
-  }
-}
 
 extension Differentiable where Self : AdditiveArithmetic {
   // expected-error @+1 {{'+' is not defined in the current type context}}
@@ -188,12 +182,19 @@ extension AdditiveArithmetic where Self : Differentiable, Self == Self.TangentVe
 // Test instance methods.
 
 protocol InstanceMethod : Differentiable {
-  // expected-note @+1 {{'foo' defined here}}
   func foo(_ x: Self) -> Self
   func foo2(_ x: Self) -> Self
-  // expected-note @+1 {{'bar' defined here}}
   func bar<T : Differentiable>(_ x: T) -> Self
   func bar2<T : Differentiable>(_ x: T) -> Self
+}
+
+extension InstanceMethod {
+  // expected-note @+1 {{'foo' defined here}}
+  func foo(_ x: Self) -> Self { self }
+  func foo2(_ x: Self) -> Self { self }
+  // expected-note @+1 {{'bar' defined here}}
+  func bar<T : Differentiable>(_ x: T) -> Self { self }
+  func bar2<T : Differentiable>(_ x: T) -> Self { self}
 }
 
 extension InstanceMethod {
@@ -262,6 +263,10 @@ protocol GenericInstanceMethod : Differentiable where Self == Self.TangentVector
 }
 
 extension GenericInstanceMethod {
+  func instanceMethod<T : Differentiable>(_ x: T) -> T { x }
+}
+
+extension GenericInstanceMethod {
   @derivative(of: instanceMethod)
   func jvpInstanceMethod<T : Differentiable>(_ x: T) -> (value: T, differential: (Self, T.TangentVector) -> (T.TangentVector)) {
     return (x, { (dself, dx) in dx })
@@ -297,6 +302,9 @@ func vjpBaz<T : Differentiable, U : Differentiable>(_ x: T, _ y: U)
 protocol InstanceMethodProto {
   func bar() -> Float
 }
+extension InstanceMethodProto {
+  func bar() -> Float { 0 }
+}
 extension InstanceMethodProto where Self : Differentiable {
   @derivative(of: bar)
   func vjpBar() -> (value: Float, pullback: (Float) -> TangentVector) {
@@ -318,6 +326,9 @@ protocol Protocol: Differentiable {
   func requirementOverlapping() -> Self
 }
 extension Protocol {
+  @differentiable
+  func requirementOverlapping() -> Self { self }
+
   func nonRequirementOnlyDerivativeAttr() -> Self { self }
 
   @differentiable
@@ -389,6 +400,7 @@ extension Class {
 // both attributes register the same derivatives. This was previously valid
 // but is now rejected.
 
+// expected-warning @+1 2 {{'jvp:' and 'vjp:' arguments in '@differentiable' attribute are deprecated; use '@derivative' attribute for derivative registration instead}}
 @differentiable(jvp: jvpConsistent, vjp: vjpConsistent)
 func consistentSpecifiedDerivatives(_ x: Float) -> Float {
   return x

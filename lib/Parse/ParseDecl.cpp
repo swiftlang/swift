@@ -1021,6 +1021,13 @@ bool Parser::parseDifferentiableAttributeArguments(
                         { label });
     result.Name = parseDeclNameRef(result.Loc, funcDiag,
         DeclNameFlag::AllowZeroArgCompoundNames | DeclNameFlag::AllowOperators);
+    // Emit warning for deprecated `jvp:` and `vjp:` arguments.
+    // TODO(TF-1001): Remove deprecated `jvp:` and `vjp:` arguments.
+    if (result.Loc.isValid()) {
+      diagnose(result.Loc.getStartLoc(),
+               diag::differentiable_attr_jvp_vjp_deprecated_warning)
+          .highlight(result.Loc.getSourceRange());
+    }
     // If no trailing comma or 'where' clause, terminate parsing arguments.
     if (Tok.isNot(tok::comma, tok::kw_where))
       terminateParsingArgs = true;
