@@ -470,70 +470,60 @@ function set_build_options_for_host() {
             watchos-* | watchsimulator-*)
             case ${host} in
                 macosx-x86_64)
-                    xcrun_sdk_name="macosx"
                     llvm_target_arch=""
                     SWIFT_HOST_TRIPLE="x86_64-apple-macosx${DARWIN_DEPLOYMENT_VERSION_OSX}"
                     SWIFT_HOST_VARIANT_SDK="OSX"
                     cmake_osx_deployment_target="${DARWIN_DEPLOYMENT_VERSION_OSX}"
                     ;;
                 iphonesimulator-i386)
-                    xcrun_sdk_name="iphonesimulator"
                     llvm_target_arch="X86"
                     SWIFT_HOST_TRIPLE="i386-apple-ios${DARWIN_DEPLOYMENT_VERSION_IOS}"
                     SWIFT_HOST_VARIANT_SDK="IOS_SIMULATOR"
                     cmake_osx_deployment_target=""
                     ;;
                 iphonesimulator-x86_64)
-                    xcrun_sdk_name="iphonesimulator"
                     llvm_target_arch="X86"
                     SWIFT_HOST_TRIPLE="x86_64-apple-ios${DARWIN_DEPLOYMENT_VERSION_IOS}"
                     SWIFT_HOST_VARIANT_SDK="IOS_SIMULATOR"
                     cmake_osx_deployment_target=""
                     ;;
                 iphoneos-armv7)
-                    xcrun_sdk_name="iphoneos"
                     llvm_target_arch="ARM"
                     SWIFT_HOST_TRIPLE="armv7-apple-ios${DARWIN_DEPLOYMENT_VERSION_IOS}"
                     SWIFT_HOST_VARIANT_SDK="IOS"
                     cmake_osx_deployment_target=""
                     ;;
                 iphoneos-armv7s)
-                    xcrun_sdk_name="iphoneos"
                     llvm_target_arch="ARM"
                     SWIFT_HOST_TRIPLE="armv7s-apple-ios${DARWIN_DEPLOYMENT_VERSION_IOS}"
                     SWIFT_HOST_VARIANT_SDK="IOS"
                     cmake_osx_deployment_target=""
                     ;;
                 iphoneos-arm64)
-                    xcrun_sdk_name="iphoneos"
                     llvm_target_arch="AArch64"
                     SWIFT_HOST_TRIPLE="arm64-apple-ios${DARWIN_DEPLOYMENT_VERSION_IOS}"
                     SWIFT_HOST_VARIANT_SDK="IOS"
                     cmake_osx_deployment_target=""
                     ;;
                 appletvsimulator-x86_64)
-                    xcrun_sdk_name="appletvsimulator"
                     llvm_target_arch="X86"
                     SWIFT_HOST_TRIPLE="x86_64-apple-tvos${DARWIN_DEPLOYMENT_VERSION_TVOS}"
                     SWIFT_HOST_VARIANT_SDK="TVOS_SIMULATOR"
                     cmake_osx_deployment_target=""
                     ;;
                 appletvos-arm64)
-                    xcrun_sdk_name="appletvos"
                     llvm_target_arch="AArch64"
                     SWIFT_HOST_TRIPLE="arm64-apple-tvos${DARWIN_DEPLOYMENT_VERSION_TVOS}"
                     SWIFT_HOST_VARIANT_SDK="TVOS"
                     cmake_osx_deployment_target=""
                     ;;
                 watchsimulator-i386)
-                    xcrun_sdk_name="watchsimulator"
                     llvm_target_arch="X86"
                     SWIFT_HOST_TRIPLE="i386-apple-watchos${DARWIN_DEPLOYMENT_VERSION_WATCHOS}"
                     SWIFT_HOST_VARIANT_SDK="WATCHOS_SIMULATOR"
                     cmake_osx_deployment_target=""
                     ;;
                 watchos-armv7k)
-                    xcrun_sdk_name="watchos"
                     llvm_target_arch="ARM"
                     SWIFT_HOST_TRIPLE="armv7k-apple-watchos${DARWIN_DEPLOYMENT_VERSION_WATCHOS}"
                     SWIFT_HOST_VARIANT_SDK="WATCHOS"
@@ -560,12 +550,12 @@ function set_build_options_for_host() {
             cmark_cmake_options=(
                 -DCMAKE_C_FLAGS="$(cmark_c_flags ${host})"
                 -DCMAKE_CXX_FLAGS="$(cmark_c_flags ${host})"
-                -DCMAKE_OSX_SYSROOT:PATH="$(xcrun --sdk ${xcrun_sdk_name} --show-sdk-path)"
+                -DCMAKE_OSX_SYSROOT:PATH="$(xcrun --sdk ${platform} --show-sdk-path)"
                 -DCMAKE_OSX_DEPLOYMENT_TARGET="${cmake_osx_deployment_target}"
             )
             llvm_cmake_options=(
                 -DCMAKE_OSX_DEPLOYMENT_TARGET:STRING="${cmake_osx_deployment_target}"
-                -DCMAKE_OSX_SYSROOT:PATH="$(xcrun --sdk ${xcrun_sdk_name} --show-sdk-path)"
+                -DCMAKE_OSX_SYSROOT:PATH="$(xcrun --sdk ${platform} --show-sdk-path)"
                 -DCOMPILER_RT_ENABLE_IOS:BOOL=FALSE
                 -DCOMPILER_RT_ENABLE_WATCHOS:BOOL=FALSE
                 -DCOMPILER_RT_ENABLE_TVOS:BOOL=FALSE
