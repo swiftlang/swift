@@ -695,7 +695,15 @@ namespace driver {
       noteBuildingJobs(DependentsInEffect, useRangesForScheduling,
                        "because of dependencies discovered later");
 
-      for (const Job *Cmd : DependentsInEffect) {
+      // Sort dependents for more deterministic behavior
+      llvm::SmallVector<const Job *, 16> UnsortedDependents;
+      for (const Job *j : DependentsInEffect)
+        UnsortedDependents.push_back(j);
+      llvm::SmallVector<const Job *, 16> SortedDependents;
+      Comp.sortJobsToMatchCompilationInputs(UnsortedDependents,
+                                            SortedDependents);
+
+      for (const Job *Cmd : SortedDependents) {
         DeferredCommands.erase(Cmd);
         scheduleCommandIfNecessaryAndPossible(Cmd);
       }
@@ -709,6 +717,7 @@ namespace driver {
 
       // Store this task's ReturnCode as our Result if we haven't stored
       // anything yet.
+
       if (Result == EXIT_SUCCESS)
         Result = ReturnCode;
 
