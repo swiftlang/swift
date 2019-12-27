@@ -175,8 +175,6 @@ void ModuleDepGraph::forEachUnmarkedJobDirectlyDependentOnExternalSwiftdeps(
   DependencyKey key =
       DependencyKey::createDependedUponKey<NodeKind::externalDepend>(
           externalSwiftDeps.str());
-  // collect answers into useSet
-  std::unordered_set<std::string> visitedSet;
   for (const ModuleDepGraphNode *useNode : usesByDef[key]) {
     const auto swiftDepsOfUse = useNode->getSwiftDepsOfProvides();
     const Job *job = getJob(swiftDepsOfUse);

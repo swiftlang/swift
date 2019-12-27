@@ -272,7 +272,7 @@ namespace driver {
 
     void noteBuilding(const Job *cmd, const bool willBeBuilding,
                       const bool isTentative, const bool forRanges,
-                      StringRef reason) {
+                      StringRef reason) const {
       if (!Comp.getShowIncrementalBuildDecisions())
         return;
       if (ScheduledCommands.count(cmd))
@@ -298,6 +298,23 @@ namespace driver {
                                      llvm::outs(), cmd, [](raw_ostream &out, const Job *base) {
                                        out << llvm::sys::path::filename(base->getOutput().getBaseInput(0));
                                      });
+    }
+
+    template <typename JobsCollection>
+    void noteBuildingJobs(const JobsCollection &unsortedJobsArg,
+                          const bool forRanges, const StringRef reason) const {
+      if (!Comp.getShowIncrementalBuildDecisions() &&
+          !Comp.getShowJobLifecycle())
+        return;
+      // Sigh, must manually convert SmallPtrSet to ArrayRef-able container
+      llvm::SmallVector<const Job *, 16> unsortedJobs;
+      for (const Job *j : unsortedJobsArg)
+        unsortedJobs.push_back(j);
+      llvm::SmallVector<const Job *, 16> sortedJobs;
+      Comp.sortJobsToMatchCompilationInputs(unsortedJobs, sortedJobs);
+      for (const Job *j : sortedJobs)
+        noteBuilding(j, /*willBeBuilding=*/true, /*isTentative=*/false,
+                     forRanges, reason);
     }
 
     const Job *findUnfinishedJob(ArrayRef<const Job *> JL) {
@@ -674,14 +691,14 @@ namespace driver {
       const CommandSet &DependentsInEffect = useRangesForScheduling
                                                  ? DependentsWithRanges
                                                  : DependentsWithoutRanges;
+
+      noteBuildingJobs(DependentsInEffect, useRangesForScheduling,
+                       "because of dependencies discovered later");
+
       for (const Job *Cmd : DependentsInEffect) {
         DeferredCommands.erase(Cmd);
-        noteBuilding(Cmd, /*willBeBuilding=*/true, useRangesForScheduling,
-                     /*isTentative=*/false,
-                     "because of dependencies discovered later");
         scheduleCommandIfNecessaryAndPossible(Cmd);
       }
-
       return TaskFinishedResponse::ContinueExecution;
     }
 
@@ -1114,11 +1131,7 @@ namespace driver {
                                  IncrementalTracer))
           CascadedJobs.insert(transitiveCmd);
       }
-      for (auto *transitiveCmd : CascadedJobs)
-        noteBuilding(transitiveCmd, /*willBeBuilding=*/true,
-                     /*isTentative=*/false, forRanges,
-                     "because of the initial set");
-
+      noteBuildingJobs(CascadedJobs, forRanges, "because of the initial set");
       return CascadedJobs;
     }
 
@@ -1134,11 +1147,8 @@ namespace driver {
         for (const Job * marked: markExternalInDepGraph(dependency, forRanges))
           ExternallyDependentJobs.push_back(marked);
       });
-      for (auto *externalCmd : ExternallyDependentJobs) {
-        noteBuilding(externalCmd, /*willBeBuilding=*/true,
-                     /*isTentative=*/false, forRanges,
-                     "because of external dependencies");
-      }
+      noteBuildingJobs(ExternallyDependentJobs, forRanges,
+                       "because of external dependencies");
       return ExternallyDependentJobs;
     }
 
@@ -2045,5 +2055,25 @@ void Compilation::addDependencyPathOrCreateDummy(
     // Create dummy empty file
     std::error_code EC;
     llvm::raw_fd_ostream(depPath, EC, llvm::sys::fs::F_None);
+  }
+}
+
+void Compilation::sortJobsToMatchCompilationInputs(
+    const ArrayRef<const Job *> unsortedJobs,
+    SmallVectorImpl<const Job *> &sortedJobs) const {
+  llvm::DenseMap<StringRef, const Job *> jobsByInput;
+  for (const Job *J : unsortedJobs) {
+    const CompileJobAction *CJA = cast<CompileJobAction>(&J->getSource());
+    const InputAction *IA = CJA->findSingleSwiftInput();
+    auto R =
+        jobsByInput.insert(std::make_pair(IA->getInputArg().getValue(), J));
+    assert(R.second);
+    (void)R;
+  }
+  for (const InputPair &P : getInputFiles()) {
+    auto I = jobsByInput.find(P.second->getValue());
+    if (I != jobsByInput.end()) {
+      sortedJobs.push_back(I->second);
+    }
   }
 }
