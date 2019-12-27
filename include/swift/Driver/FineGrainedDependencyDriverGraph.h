@@ -240,6 +240,28 @@ class ModuleDepGraph {
     return nodeToErase;
   }
 
+  void eraseNodeFromUsesByDef(ModuleDepGraphNode *nodeToErase) {
+    for (auto &defAndUses : usesByDef)
+      defAndUses.second.erase(nodeToErase);
+  }
+
+  void eraseNodeFromCurrentPathIfTracing(ModuleDepGraphNode *nodeToErase) {
+    if (currentPathIfTracing)
+      eraseNodeFromVector(currentPathIfTracing.getValue(), nodeToErase);
+  }
+
+  void eraseNodeFromDependencyPathToJobs(ModuleDepGraphNode *nodeToErase) {
+    for (auto &jobAndPath : dependencyPathsToJobs)
+      eraseNodeFromVector(jobAndPath.second, nodeToErase);
+  }
+
+  static void eraseNodeFromVector(std::vector<const ModuleDepGraphNode *> &v,
+                                  const ModuleDepGraphNode *n) {
+    const auto where = std::find(v.begin(), v.end(), n);
+    if (where != v.end())
+      v.erase(where);
+  }
+
   static StringRef getSwiftDeps(const driver::Job *cmd) {
     return cmd->getOutput().getAdditionalOutputForType(
         file_types::TY_SwiftDeps);

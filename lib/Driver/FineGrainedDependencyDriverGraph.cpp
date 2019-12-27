@@ -320,6 +320,10 @@ void ModuleDepGraph::recordWhatUseDependsUpon(
 
 void ModuleDepGraph::removeNode(ModuleDepGraphNode *n) {
   eraseNodeFromMap(n);
+  eraseNodeFromUsesByDef(n);
+  eraseNodeFromCurrentPathIfTracing(n);
+  eraseNodeFromDependencyPathToJobs(n);
+
   delete n;
 }
 
