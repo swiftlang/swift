@@ -292,7 +292,7 @@ struct SemanticARCOptVisitor
 
 #define FORWARDING_TERM(NAME)                                                  \
   bool visit##NAME##Inst(NAME##Inst *cls) {                                    \
-    for (auto succValues : cls->getSuccessorBlockArguments()) {                \
+    for (auto succValues : cls->getSuccessorBlockArgumentLists()) {            \
       for (SILValue v : succValues) {                                          \
         worklist.insert(v);                                                    \
       }                                                                        \

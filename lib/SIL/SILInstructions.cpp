@@ -1217,13 +1217,13 @@ bool TermInst::isProgramTerminating() const {
   llvm_unreachable("Unhandled TermKind in switch.");
 }
 
-TermInst::SuccessorBlockArgumentsListTy
-TermInst::getSuccessorBlockArguments() const {
+TermInst::SuccessorBlockArgumentListTy
+TermInst::getSuccessorBlockArgumentLists() const {
   function_ref<SILPhiArgumentArrayRef(const SILSuccessor &)> op;
   op = [](const SILSuccessor &succ) -> SILPhiArgumentArrayRef {
     return succ.getBB()->getSILPhiArguments();
   };
-  return SuccessorBlockArgumentsListTy(getSuccessors(), op);
+  return SuccessorBlockArgumentListTy(getSuccessors(), op);
 }
 
 YieldInst *YieldInst::create(SILDebugLocation loc,
