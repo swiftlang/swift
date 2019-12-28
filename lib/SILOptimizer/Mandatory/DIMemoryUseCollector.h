@@ -60,7 +60,6 @@ private:
   /// This is the base type of the memory allocation.
   SILType MemorySILType;
 
-public:
   /// This is the count of elements being analyzed.  For memory objects that are
   /// tuples, this is the flattened element count.  For 'self' members in init
   /// methods, this is the local field count (+1 for super/self classes were
@@ -102,6 +101,13 @@ public:
   unsigned getNumMemoryElements() const {
     return NumElements - (unsigned)isDerivedClassSelf();
   }
+
+  /// Return the number of elements, including the extra "super.init" tracker in
+  /// initializers of derived classes.
+  ///
+  /// \see getNumMemoryElements() for the number of elements, excluding the
+  /// extra "super.init" tracker in the initializers of derived classes.
+  unsigned getNumElements() const { return NumElements; }
 
   /// Return true if this is 'self' in any kind of initializer.
   bool isAnyInitSelf() const { return !MemoryInst->isVar(); }

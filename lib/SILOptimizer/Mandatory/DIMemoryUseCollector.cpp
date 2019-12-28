@@ -561,7 +561,8 @@ public:
 
   void trackDestroy(SILInstruction *Destroy) { UseInfo.trackDestroy(Destroy); }
 
-  unsigned getNumMemoryElements() const { return TheMemory.NumElements; }
+  /// Return the raw number of elements including the 'super.init' value.
+  unsigned getNumMemoryElements() const { return TheMemory.getNumElements(); }
 
   SILInstruction *getMemoryInst() const { return TheMemory.MemoryInst; }
 
@@ -588,7 +589,8 @@ void ElementUseCollector::addElementUses(unsigned BaseEltNo, SILType UseTy,
   // If we're in a subelement of a struct or enum, just mark the struct, not
   // things that come after it in a parent tuple.
   unsigned NumElements = 1;
-  if (TheMemory.NumElements != 1 && !InStructSubElement && !InEnumSubElement)
+  if (TheMemory.getNumElements() != 1 && !InStructSubElement &&
+      !InEnumSubElement)
     NumElements =
         getElementCountRec(TypeExpansionContext(*User->getFunction()), Module,
                            UseTy, IsSelfOfNonDelegatingInitializer);
@@ -843,14 +845,14 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
         // by the callee, and this is enforced by sema, so we can consider it
         // a nonmutating use.
         bool isLet = true;
-        
-        for (unsigned i = 0; i < TheMemory.NumElements; ++i) {
+
+        for (unsigned i = 0; i < TheMemory.getNumElements(); ++i) {
           if (!TheMemory.isElementLetProperty(i)) {
             isLet = false;
             break;
           }
         }
-        
+
         if (isLet) {
           addElementUses(BaseEltNo, PointeeType, User, DIUseKind::IndirectIn);
           continue;
@@ -1186,7 +1188,7 @@ void ElementUseCollector::collectClassSelfUses() {
     // We can safely handle anything else as an escape.  They should all happen
     // after super.init is invoked.  As such, all elements must be initialized
     // and super.init must be called.
-    trackUse(DIMemoryUse(User, DIUseKind::Load, 0, TheMemory.NumElements));
+    trackUse(DIMemoryUse(User, DIUseKind::Load, 0, TheMemory.getNumElements()));
   }
 
   assert(StoresOfArgumentToSelf == 1 &&
@@ -1461,7 +1463,7 @@ void ElementUseCollector::collectClassSelfUses(
       Kind = DIUseKind::Escape;
     }
 
-    trackUse(DIMemoryUse(User, Kind, 0, TheMemory.NumElements));
+    trackUse(DIMemoryUse(User, Kind, 0, TheMemory.getNumElements()));
   }
 }
 
@@ -1593,7 +1595,7 @@ void ClassInitElementUseCollector::collectClassInitSelfUses() {
   // When we're analyzing a delegating constructor, we aren't field sensitive at
   // all.  Just treat all members of self as uses of the single
   // non-field-sensitive value.
-  assert(TheMemory.NumElements == 1 && "delegating inits only have 1 bit");
+  assert(TheMemory.getNumElements() == 1 && "delegating inits only have 1 bit");
   auto *MUI = TheMemory.MemoryInst;
 
   // The number of stores of the initial 'self' argument into the self box
@@ -1827,7 +1829,8 @@ void swift::ownership::collectDIElementUsesFrom(
     // When we're analyzing a delegating constructor, we aren't field sensitive
     // at all. Just treat all members of self as uses of the single
     // non-field-sensitive value.
-    assert(MemoryInfo.NumElements == 1 && "delegating inits only have 1 bit");
+    assert(MemoryInfo.getNumElements() == 1 &&
+           "delegating inits only have 1 bit");
     collectDelegatingInitUses(MemoryInfo, UseInfo, MemoryInfo.MemoryInst);
     return;
   }
