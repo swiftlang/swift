@@ -28,34 +28,33 @@ using namespace ownership;
 //                                  Utility
 //===----------------------------------------------------------------------===//
 
-static void gatherDestroysOfContainer(const MarkUninitializedInst *MUI,
-                                      DIElementUseInfo &UseInfo) {
-  // The MUI must be used on an alloc_box, alloc_stack, or global_addr. If we
-  // have an alloc_stack or a global_addr, there is nothing further to do.
-  if (isa<AllocStackInst>(MUI->getOperand()) ||
-      isa<GlobalAddrInst>(MUI->getOperand()) ||
-      isa<SILArgument>(MUI->getOperand()) ||
+static void gatherDestroysOfContainer(const DIMemoryObjectInfo &memoryInfo,
+                                      DIElementUseInfo &useInfo) {
+  auto *uninitMemory = memoryInfo.getUninitializedValue();
+
+  // The uninitMemory must be used on an alloc_box, alloc_stack, or global_addr.
+  // If we have an alloc_stack or a global_addr, there is nothing further to do.
+  if (isa<AllocStackInst>(uninitMemory->getOperand(0)) ||
+      isa<GlobalAddrInst>(uninitMemory->getOperand(0)) ||
+      isa<SILArgument>(uninitMemory->getOperand(0)) ||
       // FIXME: We only support pointer to address here to not break LLDB. It is
       // important that long term we get rid of this since this is a situation
       // where LLDB is breaking SILGen/DI invariants by not creating a new
       // independent stack location for the pointer to address.
-      isa<PointerToAddressInst>(MUI->getOperand()))
+      isa<PointerToAddressInst>(uninitMemory->getOperand(0))) {
     return;
+  }
 
-  // Otherwise, we assume that we have a project_box. This is a hard cast to
-  // ensure that we catch any new patterns emitted by SILGen and assert.
-  auto *PBI = cast<ProjectBoxInst>(MUI->getOperand());
-  auto *ABI = cast<AllocBoxInst>(PBI->getOperand());
-
-  // Treat destroys of the container as load+destroys of the original value.
+  // Otherwise, we assume that we have an alloc_box. Treat destroys of the
+  // alloc_box as load+destroys of the value stored in the box.
   //
   // TODO: This should really be tracked separately from other destroys so that
   // we distinguish the lifetime of the container from the value itself.
-  for (auto *Op : ABI->getUses()) {
-    SILInstruction *User = Op->getUser();
-    if (isa<StrongReleaseInst>(User) || isa<DestroyValueInst>(User)) {
-      UseInfo.trackDestroy(User);
-    }
+  assert(isa<MarkUninitializedInst>(uninitMemory));
+  auto *pbi = cast<ProjectBoxInst>(uninitMemory->getOperand(0));
+  auto *abi = cast<AllocBoxInst>(pbi->getOperand());
+  for (auto *user : abi->getUsersOfType<DestroyValueInst>()) {
+    useInfo.trackDestroy(user);
   }
 }
 
@@ -215,7 +214,7 @@ SILType DIMemoryObjectInfo::getElementType(unsigned EltNo) const {
 SILValue DIMemoryObjectInfo::emitElementAddress(
     unsigned EltNo, SILLocation Loc, SILBuilder &B,
     llvm::SmallVectorImpl<std::pair<SILValue, SILValue>> &EndBorrowList) const {
-  SILValue Ptr = getAddress();
+  SILValue Ptr = getUninitializedValue();
   bool IsSelf = isNonDelegatingInit();
   auto &Module = MemoryInst->getModule();
 
@@ -535,8 +534,7 @@ class ElementUseCollector {
 public:
   ElementUseCollector(const DIMemoryObjectInfo &TheMemory,
                       DIElementUseInfo &UseInfo)
-      : Module(TheMemory.MemoryInst->getModule()), TheMemory(TheMemory),
-        UseInfo(UseInfo) {}
+      : Module(TheMemory.getModule()), TheMemory(TheMemory), UseInfo(UseInfo) {}
 
   /// This is the main entry point for the use walker.  It collects uses from
   /// the address and the refcount result of the allocation.
@@ -553,8 +551,8 @@ public:
       return;
     }
 
-    collectUses(TheMemory.MemoryInst, 0);
-    gatherDestroysOfContainer(TheMemory.MemoryInst, UseInfo);
+    collectUses(TheMemory.getUninitializedValue(), 0);
+    gatherDestroysOfContainer(TheMemory, UseInfo);
   }
 
   void trackUse(DIMemoryUse Use) { UseInfo.trackUse(Use); }
@@ -563,8 +561,6 @@ public:
 
   /// Return the raw number of elements including the 'super.init' value.
   unsigned getNumMemoryElements() const { return TheMemory.getNumElements(); }
-
-  SILInstruction *getMemoryInst() const { return TheMemory.MemoryInst; }
 
 private:
   void collectUses(SILValue Pointer, unsigned BaseEltNo);
@@ -867,7 +863,7 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
         // inout use.
         DIUseKind Kind;
         if (TheMemory.isStructInitSelf() &&
-            getAccessedPointer(Pointer) == TheMemory.getAddress()) {
+            getAccessedPointer(Pointer) == TheMemory.getUninitializedValue()) {
           Kind = DIUseKind::Escape;
         } else if (Apply.hasSelfArgument() &&
                    Op == &Apply.getSelfArgumentOperand()) {
@@ -1089,8 +1085,7 @@ void ElementUseCollector::collectClassSelfUses() {
     unsigned NumElements = 0;
     for (auto *VD : NTD->getStoredProperties()) {
       EltNumbering[VD] = NumElements;
-      auto expansionContext =
-          TypeExpansionContext(*TheMemory.MemoryInst->getFunction());
+      auto expansionContext = TypeExpansionContext(TheMemory.getFunction());
       NumElements += getElementCountRec(
           expansionContext, Module,
           T.getFieldType(VD, Module, expansionContext), false);
@@ -1099,9 +1094,9 @@ void ElementUseCollector::collectClassSelfUses() {
 
   // If we are looking at the init method for a root class, just walk the
   // MUI use-def chain directly to find our uses.
-  auto *MemoryInst = TheMemory.MemoryInst;
-  if (MemoryInst->getKind() == MarkUninitializedInst::RootSelf) {
-    collectClassSelfUses(MemoryInst, TheMemory.getType(), EltNumbering);
+  if (TheMemory.isRootSelf()) {
+    collectClassSelfUses(TheMemory.getUninitializedValue(), TheMemory.getType(),
+                         EltNumbering);
     return;
   }
 
@@ -1118,7 +1113,7 @@ void ElementUseCollector::collectClassSelfUses() {
   //   4) Potential escapes after super.init, if self is closed over.
   //
   // Handle each of these in turn.
-  SmallVector<Operand *, 8> Uses(MemoryInst->getUses());
+  SmallVector<Operand *, 8> Uses(TheMemory.getUninitializedValue()->getUses());
   while (!Uses.empty()) {
     Operand *Op = Uses.pop_back_val();
     SILInstruction *User = Op->getUser();
@@ -1129,7 +1124,7 @@ void ElementUseCollector::collectClassSelfUses() {
         // The initial store of 'self' into the box at the start of the
         // function. Ignore it.
         if (auto *Arg = dyn_cast<SILArgument>(SI->getSrc())) {
-          if (Arg->getParent() == MemoryInst->getParent()) {
+          if (Arg->getParent() == TheMemory.getParentBlock()) {
             StoresOfArgumentToSelf++;
             continue;
           }
@@ -1144,7 +1139,7 @@ void ElementUseCollector::collectClassSelfUses() {
           src = conversion->getConverted();
         
         if (auto *LI = dyn_cast<LoadInst>(src))
-          if (LI->getOperand() == MemoryInst)
+          if (LI->getOperand() == TheMemory.getUninitializedValue())
             continue;
 
         // Any other store needs to be recorded.
@@ -1583,7 +1578,7 @@ public:
 
   // *NOTE* Even though this takes a SILInstruction it actually only accepts
   // load_borrow and load instructions. This is enforced via an assert.
-  void collectClassInitSelfLoadUses(MarkUninitializedInst *MUI,
+  void collectClassInitSelfLoadUses(SingleValueInstruction *MUI,
                                     SingleValueInstruction *LI);
 };
 
@@ -1596,21 +1591,21 @@ void ClassInitElementUseCollector::collectClassInitSelfUses() {
   // all.  Just treat all members of self as uses of the single
   // non-field-sensitive value.
   assert(TheMemory.getNumElements() == 1 && "delegating inits only have 1 bit");
-  auto *MUI = TheMemory.MemoryInst;
+  auto *uninitMemory = TheMemory.getUninitializedValue();
 
   // The number of stores of the initial 'self' argument into the self box
   // that we saw.
   unsigned StoresOfArgumentToSelf = 0;
 
-  // We walk the use chains of the self MUI to find any accesses to it.  The
-  // possible uses are:
+  // We walk the use chains of the self uninitMemory to find any accesses to it.
+  // The possible uses are:
   //   1) The initialization store.
   //   2) Loads of the box, which have uses of self hanging off of them.
   //   3) An assign to the box, which happens at super.init.
   //   4) Potential escapes after super.init, if self is closed over.
   // Handle each of these in turn.
   //
-  SmallVector<Operand *, 8> Uses(MUI->getUses());
+  SmallVector<Operand *, 8> Uses(uninitMemory->getUses());
   while (!Uses.empty()) {
     Operand *Op = Uses.pop_back_val();
     SILInstruction *User = Op->getUser();
@@ -1634,7 +1629,7 @@ void ClassInitElementUseCollector::collectClassInitSelfUses() {
         // A store of 'self' into the box at the start of the
         // function. Ignore it.
         if (auto *Arg = dyn_cast<SILArgument>(SI->getSrc())) {
-          if (Arg->getParent() == MUI->getParent()) {
+          if (Arg->getParent() == uninitMemory->getParent()) {
             StoresOfArgumentToSelf++;
             continue;
           }
@@ -1649,7 +1644,7 @@ void ClassInitElementUseCollector::collectClassInitSelfUses() {
           src = conversion->getConverted();
         
         if (auto *LI = dyn_cast<LoadInst>(src))
-          if (LI->getOperand() == MUI)
+          if (LI->getOperand() == uninitMemory)
             continue;
 
         // Any other store needs to be recorded.
@@ -1699,7 +1694,8 @@ void ClassInitElementUseCollector::collectClassInitSelfUses() {
 
     // Loads of the box produce self, so collect uses from them.
     if (isa<LoadInst>(User) || isa<LoadBorrowInst>(User)) {
-      collectClassInitSelfLoadUses(MUI, cast<SingleValueInstruction>(User));
+      collectClassInitSelfLoadUses(uninitMemory,
+                                   cast<SingleValueInstruction>(User));
       continue;
     }
 
@@ -1718,12 +1714,12 @@ void ClassInitElementUseCollector::collectClassInitSelfUses() {
          "The 'self' argument should have been stored into the box exactly once");
 
   // Gather the uses of the
-  gatherDestroysOfContainer(MUI, UseInfo);
+  gatherDestroysOfContainer(TheMemory, UseInfo);
 }
 
-void ClassInitElementUseCollector::
-collectClassInitSelfLoadUses(MarkUninitializedInst *MUI,
-                                       SingleValueInstruction *LI) {
+void ClassInitElementUseCollector::collectClassInitSelfLoadUses(
+    SingleValueInstruction *MUI, SingleValueInstruction *LI) {
+  assert(isa<ProjectBoxInst>(MUI) || isa<MarkUninitializedInst>(MUI));
   assert(isa<LoadBorrowInst>(LI) || isa<LoadInst>(LI));
 
   // If we have a load, then this is a use of the box.  Look at the uses of
@@ -1805,7 +1801,7 @@ collectClassInitSelfLoadUses(MarkUninitializedInst *MUI,
 //===----------------------------------------------------------------------===//
 
 static bool shouldPerformClassInitSelf(const DIMemoryObjectInfo &MemoryInfo) {
-  if (MemoryInfo.MemoryInst->isDelegatingSelfAllocated())
+  if (MemoryInfo.isDelegatingSelfAllocated())
     return true;
 
   return MemoryInfo.isNonDelegatingInit() &&
@@ -1831,7 +1827,8 @@ void swift::ownership::collectDIElementUsesFrom(
     // non-field-sensitive value.
     assert(MemoryInfo.getNumElements() == 1 &&
            "delegating inits only have 1 bit");
-    collectDelegatingInitUses(MemoryInfo, UseInfo, MemoryInfo.MemoryInst);
+    collectDelegatingInitUses(MemoryInfo, UseInfo,
+                              MemoryInfo.getUninitializedValue());
     return;
   }
 

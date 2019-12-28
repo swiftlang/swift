@@ -52,11 +52,9 @@ struct DIElementUseInfo;
 /// Derived classes have an additional field at the end that models whether or
 /// not super.init() has been called or not.
 class DIMemoryObjectInfo {
-public:
   /// The uninitialized memory that we are analyzing.
   MarkUninitializedInst *MemoryInst;
 
-private:
   /// This is the base type of the memory allocation.
   SILType MemorySILType;
 
@@ -66,7 +64,6 @@ private:
   /// initialized).
   unsigned NumElements;
 
-private:
   /// True if the memory object being analyzed represents a 'let', which is
   /// initialize-only (reassignments are not allowed).
   bool IsLet = false;
@@ -80,6 +77,8 @@ public:
 
   SILLocation getLoc() const { return MemoryInst->getLoc(); }
   SILFunction &getFunction() const { return *MemoryInst->getFunction(); }
+  SILModule &getModule() const { return MemoryInst->getModule(); }
+  SILBasicBlock *getParentBlock() const { return MemoryInst->getParent(); }
 
   /// Return the first instruction of the function containing the memory object.
   SILInstruction *getFunctionEntryPoint() const;
@@ -94,7 +93,13 @@ public:
   /// be non-empty.
   bool hasDummyElement() const { return HasDummyElement; }
 
-  SingleValueInstruction *getAddress() const { return MemoryInst; }
+  /// Return the actual 'uninitialized' memory. In the case of alloc_ref,
+  /// alloc_stack, this always just returns the actual mark_uninitialized
+  /// instruction. For alloc_box though it returns the project_box associated
+  /// with the memory info.
+  SingleValueInstruction *getUninitializedValue() const {
+    return MemoryInst;
+  }
 
   /// Return the number of elements, without the extra "super.init" tracker in
   /// initializers of derived classes.
@@ -192,6 +197,14 @@ public:
       return false;
     }
     return false;
+  }
+
+  bool isRootSelf() const {
+    return MemoryInst->getKind() == MarkUninitializedInst::RootSelf;
+  }
+
+  bool isDelegatingSelfAllocated() const {
+    return MemoryInst->isDelegatingSelfAllocated();
   }
 
   /// Given an element number (in the flattened sense) return a pointer to a
