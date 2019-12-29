@@ -396,12 +396,8 @@ public:
     return InterfaceHash.hasValue();
   }
 
-  void recordInterfaceToken(StringRef token) {
-    assert(!token.empty());
-    InterfaceHash->update(token);
-    // Add null byte to separate tokens.
-    uint8_t a[1] = {0};
-    InterfaceHash->update(a);
+  NullablePtr<llvm::MD5> getInterfaceHashPtr() {
+    return InterfaceHash ? InterfaceHash.getPointer() : nullptr;
   }
 
   void getInterfaceHash(llvm::SmallString<32> &str) const {

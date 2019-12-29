@@ -52,8 +52,9 @@ ParseMembersRequest::evaluate(Evaluator &evaluator,
   // Disable libSyntax creation in the delayed parsing.
   parser.SyntaxContext->disable();
   ASTContext &ctx = idc->getDecl()->getASTContext();
+  auto declsAndHash = parser.parseDeclListDelayed(idc);
   FingerprintAndMembers fingerprintAndMembers = {
-      "gazorp", parser.parseDeclListDelayed(idc)};
+      declsAndHash.second.str().str(), declsAndHash.first};
   return FingerprintAndMembers{
       fingerprintAndMembers.fingerprint,
       ctx.AllocateCopy(llvm::makeArrayRef(fingerprintAndMembers.members))};

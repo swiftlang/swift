@@ -33,6 +33,7 @@
 #include "swift/Syntax/TokenSyntax.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/MD5.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/SaveAndRestore.h"
 #include "llvm/ADT/PointerUnion.h"
@@ -521,6 +522,7 @@ Parser::Parser(std::unique_ptr<Lexer> Lex, SourceFile &SF,
     SIL(SIL),
     CurDeclContext(&SF),
     Context(SF.getASTContext()),
+    CurrentTokenHash(SF.getInterfaceHashPtr()),
     DelayBodyParsing(DelayBodyParsing),
     TokReceiver(SF.shouldCollectToken() ?
                 new TokenRecorder(SF, L->getBufferID()) :
@@ -564,12 +566,21 @@ SourceLoc Parser::consumeTokenWithoutFeedingReceiver() {
   SourceLoc Loc = Tok.getLoc();
   assert(Tok.isNot(tok::eof) && "Lexing past eof!");
 
-  if (IsParsingInterfaceTokens && !Tok.getText().empty()) {
-    SF.recordInterfaceToken(Tok.getText());
-  }
+  recordTokenHash(Tok);
+
   L->lex(Tok, LeadingTrivia, TrailingTrivia);
   PreviousLoc = Loc;
   return Loc;
+}
+
+void Parser::recordTokenHash(StringRef token) {
+  assert(!token.empty());
+  if (llvm::MD5 *cth = CurrentTokenHash.getPtrOrNull()) {
+    cth->update(token);
+    // Add null byte to separate tokens.
+    uint8_t a[1] = {0};
+    cth->update(a);
+  }
 }
 
 void Parser::consumeExtraToken(Token Extra) {

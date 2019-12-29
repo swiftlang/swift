@@ -122,8 +122,14 @@ public:
   CodeCompletionCallbacks *CodeCompletion = nullptr;
   std::vector<std::pair<SourceLoc, std::vector<ParamDecl*>>> AnonClosureVars;
 
-  bool IsParsingInterfaceTokens = false;
-  
+  NullablePtr<llvm::MD5> CurrentTokenHash;
+  void recordTokenHash(const Token Tok) {
+    if (!Tok.getText().empty())
+      recordTokenHash(Tok.getText());
+  }
+
+  void recordTokenHash(StringRef token);
+
   /// DisabledVars is a list of variables for whom local name lookup is
   /// disabled.  This is used when parsing a PatternBindingDecl to reject self
   /// uses and to disable uses of the bound variables in a let/else block.  The
@@ -921,7 +927,8 @@ public:
                                bool IsAtStartOfLineOrPreviousHadSemi,
                                llvm::function_ref<void(Decl*)> Handler);
 
-  std::vector<Decl *> parseDeclListDelayed(IterableDeclContext *IDC);
+  std::pair<std::vector<Decl *>, llvm::SmallString<32>>
+  parseDeclListDelayed(IterableDeclContext *IDC);
 
   bool parseMemberDeclList(SourceLoc LBLoc, SourceLoc &RBLoc,
                            SourceLoc PosBeforeLB,
@@ -1058,10 +1065,10 @@ public:
   ParserStatus parseDeclItem(bool &PreviousHadSemi,
                              Parser::ParseDeclOptions Options,
                              llvm::function_ref<void(Decl*)> handler);
-  std::vector<Decl *> parseDeclList(SourceLoc LBLoc, SourceLoc &RBLoc,
-                                    Diag<> ErrorDiag, ParseDeclOptions Options,
-                                    IterableDeclContext *IDC,
-                                    bool &hadError);
+  std::pair<std::vector<Decl *>, llvm::SmallString<32>>
+  parseDeclList(SourceLoc LBLoc, SourceLoc &RBLoc, Diag<> ErrorDiag,
+                ParseDeclOptions Options, IterableDeclContext *IDC,
+                bool &hadError);
   ParserResult<ExtensionDecl> parseDeclExtension(ParseDeclOptions Flags,
                                                  DeclAttributes &Attributes);
   ParserResult<EnumDecl> parseDeclEnum(ParseDeclOptions Flags,

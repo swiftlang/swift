@@ -914,6 +914,10 @@ StringRef IterableDeclContext::getBodyFingerprint() const {
       .fingerprint;
 }
 
+bool IterableDeclContext::areDependenciesUsingTokenHashesForTypeBodies() const {
+  return getASTContext().LangOpts.EnableFineGrainedDependencies;
+}
+
 /// Return the DeclContext to compare when checking private access in
 /// Swift 4 mode. The context returned is the type declaration if the context
 /// and the type declaration are in the same file, otherwise it is the types
