@@ -839,8 +839,10 @@ void IterableDeclContext::loadAllMembers() const {
     // members to this context, this call is important for recording the
     // dependency edge.
     auto mutableThis = const_cast<IterableDeclContext *>(this);
-    auto members = evaluateOrDefault(
-        ctx.evaluator, ParseMembersRequest{mutableThis}, ArrayRef<Decl*>());
+    auto members =
+        evaluateOrDefault(ctx.evaluator, ParseMembersRequest{mutableThis},
+                          FingerprintAndMembers())
+            .members;
 
     // If we haven't already done so, add these members to this context.
     if (!AddedParsedMembers) {

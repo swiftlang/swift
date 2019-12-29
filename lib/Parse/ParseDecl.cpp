@@ -4348,7 +4348,8 @@ bool Parser::parseMemberDeclList(SourceLoc LBLoc, SourceLoc &RBLoc,
     IDC->setMaybeHasNestedClassDeclarations();
     Context.evaluator.cacheOutput(
         ParseMembersRequest{IDC},
-        Context.AllocateCopy(llvm::makeArrayRef(members)));
+        FingerprintAndMembers{
+            std::string(), Context.AllocateCopy(llvm::makeArrayRef(members))});
 
     if (hadError)
       return true;
