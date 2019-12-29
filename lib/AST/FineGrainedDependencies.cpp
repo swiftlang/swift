@@ -77,8 +77,13 @@ void SourceFileDepGraph::forEachArc(
 
 InterfaceAndImplementationPair<SourceFileDepGraphNode>
 SourceFileDepGraph::findExistingNodePairOrCreateAndAddIfNew(
-    NodeKind k, StringRef context, StringRef name,
-    Optional<std::string> fingerprint) {
+    NodeKind k,
+    const std::tuple<std::string, std::string, Optional<std::string>>
+        &contextNameFingerprint) {
+  const std::string &context = std::get<0>(contextNameFingerprint);
+  const std::string &name = std::get<1>(contextNameFingerprint);
+  const Optional<std::string> &fingerprint =
+      std::get<2>(contextNameFingerprint);
   InterfaceAndImplementationPair<SourceFileDepGraphNode> nodePair{
       findExistingNodeOrCreateIfNew(
           DependencyKey(k, DeclAspect::interface, context, name), fingerprint,
@@ -95,7 +100,7 @@ SourceFileDepGraph::findExistingNodePairOrCreateAndAddIfNew(
 }
 
 SourceFileDepGraphNode *SourceFileDepGraph::findExistingNodeOrCreateIfNew(
-    DependencyKey key, Optional<std::string> fingerprint,
+    DependencyKey key, const Optional<std::string> &fingerprint,
     const bool isProvides) {
   SourceFileDepGraphNode *result = memoizedNodes.findExistingOrCreateIfNew(
       key, [&](DependencyKey key) -> SourceFileDepGraphNode * {
@@ -104,11 +109,22 @@ SourceFileDepGraphNode *SourceFileDepGraph::findExistingNodeOrCreateIfNew(
         addNode(n);
         return n;
       });
+  assert(result->getKey() == key && "Keys must match.");
+  if (!isProvides)
+    return result;
   // If have provides and depends with same key, result is one node that
   // isProvides
-  if (isProvides)
+  if (!result->getIsProvides() && fingerprint) {
     result->setIsProvides();
-  assert(result->getKey() == key && "Keys must match.");
+    assert(!result->getFingerprint() && "Depends should not have fingerprints");
+    result->setFingerprint(fingerprint);
+    return result;
+  }
+  // If there are two Decls with same base name but differ only in fingerprint,
+  // since we won't be able to tell which Decl is depended-upon (is this right?)
+  // just use the one node, but erase its print:
+  if (fingerprint != result->getFingerprint())
+    result->setFingerprint(None);
   return result;
 }
 

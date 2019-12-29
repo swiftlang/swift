@@ -499,16 +499,15 @@ class SourceFileDepGraphConstructor {
   const std::vector<std::string> externalDependencies;
 
   /// Provided names
-
-  std::vector<std::pair<std::string, std::string>> precedenceGroups;
-  std::vector<std::pair<std::string, std::string>> memberOperatorDecls;
-  std::vector<std::pair<std::string, std::string>> operators;
-  std::vector<std::pair<std::string, std::string>> topNominals;
-  std::vector<std::pair<std::string, std::string>> topValues;
-  std::vector<std::pair<std::string, std::string>> allNominals;
-  std::vector<std::pair<std::string, std::string>> potentialMemberHolders;
-  std::vector<std::pair<std::string, std::string>> valuesInExtensions;
-  std::vector<std::pair<std::string, std::string>> classMembers;
+  std::vector<ContextNameFingerprint> precedenceGroups;
+  std::vector<ContextNameFingerprint> memberOperatorDecls;
+  std::vector<ContextNameFingerprint> operators;
+  std::vector<ContextNameFingerprint> topNominals;
+  std::vector<ContextNameFingerprint> topValues;
+  std::vector<ContextNameFingerprint> allNominals;
+  std::vector<ContextNameFingerprint> potentialMemberHolders;
+  std::vector<ContextNameFingerprint> valuesInExtensions;
+  std::vector<ContextNameFingerprint> classMembers;
 
   /// Graph under construction
   SourceFileDepGraph g;
@@ -527,15 +526,15 @@ public:
     ArrayRef<std::pair<std::string, bool>> dynamicLookupDepends,
     ArrayRef<std::string> externalDependencies,
 
-    ArrayRef<std::pair<std::string, std::string>> precedenceGroups,
-    ArrayRef<std::pair<std::string, std::string>> memberOperatorDecls,
-    ArrayRef<std::pair<std::string, std::string>> operators,
-    ArrayRef<std::pair<std::string, std::string>> topNominals,
-    ArrayRef<std::pair<std::string, std::string>> topValues,
-    ArrayRef<std::pair<std::string, std::string>> allNominals,
-    ArrayRef<std::pair<std::string, std::string>> potentialMemberHolders,
-    ArrayRef<std::pair<std::string, std::string>> valuesInExtensions,
-    ArrayRef<std::pair<std::string, std::string>> classMembers
+    ArrayRef<ContextNameFingerprint> precedenceGroups,
+    ArrayRef<ContextNameFingerprint> memberOperatorDecls,
+    ArrayRef<ContextNameFingerprint> operators,
+    ArrayRef<ContextNameFingerprint> topNominals,
+    ArrayRef<ContextNameFingerprint> topValues,
+    ArrayRef<ContextNameFingerprint> allNominals,
+    ArrayRef<ContextNameFingerprint> potentialMemberHolders,
+    ArrayRef<ContextNameFingerprint> valuesInExtensions,
+    ArrayRef<ContextNameFingerprint> classMembers
     ) :
     swiftDeps(swiftDeps),
     includePrivateDeps(includePrivateDeps),
@@ -638,26 +637,37 @@ private:
   /// Given an array of Decls or pairs of them in \p declsOrPairs
   /// create string pairs for context and name
   template <NodeKind kind, typename ContentsT>
-  static std::vector<std::pair<std::string, std::string>>
+  static std::vector<ContextNameFingerprint>
   namesForProvidersOfAGivenType(std::vector<ContentsT> &contentsVec) {
-    std::vector<std::pair<std::string, std::string>> result;
+    std::vector<ContextNameFingerprint> result;
     for (const auto declOrPair : contentsVec)
       result.push_back(
           {DependencyKey::computeContextForProvidedEntity<kind>(declOrPair),
-           DependencyKey::computeNameForProvidedEntity<kind>(declOrPair)});
+           DependencyKey::computeNameForProvidedEntity<kind>(declOrPair),
+           getFingerprintIfAny(declOrPair)});
     return result;
+  }
+
+  static Optional<std::string>
+  getFingerprintIfAny(std::pair<const NominalTypeDecl *, const ValueDecl *>) {
+    return None;
+  }
+  static Optional<std::string> getFingerprintIfAny(const Decl *d) {
+    if (const auto *idc = dyn_cast<IterableDeclContext>(d)) {
+      StringRef fp = idc->getBodyFingerprint();
+      if (!fp.empty())
+        return fp.str();
+    }
+    return None;
   }
 
   template <NodeKind kind>
   void addAllProviderNodesOfAGivenType(
-      ArrayRef<std::pair<std::string, std::string>> providers) {
-    for (const auto &contextAndName : providers) {
-      // No fingerprints for providers (Decls) yet.
-      // Someday ...
-      const Optional<std::string> fingerprint = None;
+      ArrayRef<ContextNameFingerprint> contextNameFingerprints) {
+    for (const auto &contextNameFingerprint : contextNameFingerprints) {
       auto p = g.findExistingNodePairOrCreateAndAddIfNew(
-          kind, contextAndName.first, contextAndName.second, fingerprint);
-      // Since we don't have fingerprints yet, must rebuild every provider when
+          kind, contextNameFingerprint);
+      // When we don't have a fingerprint yet, must rebuild every provider when
       // interfaceHash changes. So when interface (i.e. interface hash) of
       // sourceFile changes, every provides is dirty. And since we don't know
       // what happened, dirtyness might affect the interface.
@@ -730,11 +740,11 @@ void SourceFileDepGraphConstructor::addAllDependenciesFrom(
 void SourceFileDepGraphConstructor::addSourceFileNodesToGraph() {
   g.findExistingNodePairOrCreateAndAddIfNew(
       NodeKind::sourceFileProvide,
-      DependencyKey::computeContextForProvidedEntity<
-          NodeKind::sourceFileProvide>(swiftDeps),
-      DependencyKey::computeNameForProvidedEntity<NodeKind::sourceFileProvide>(
-          swiftDeps),
-      getSourceFileFingerprint());
+      {DependencyKey::computeContextForProvidedEntity<
+           NodeKind::sourceFileProvide>(swiftDeps),
+       DependencyKey::computeNameForProvidedEntity<NodeKind::sourceFileProvide>(
+           swiftDeps),
+       getSourceFileFingerprint()});
 }
 
 void SourceFileDepGraphConstructor::addProviderNodesToGraph() {
@@ -817,25 +827,28 @@ bool swift::fine_grained_dependencies::emitReferenceDependencies(
 // Entry point from the unit tests
 //==============================================================================
 
-static std::vector<std::pair<std::string, std::string>>
+static std::vector<ContextNameFingerprint>
 getBaseNameProvides(ArrayRef<std::string> simpleNames) {
-  std::vector<std::pair<std::string, std::string>> result;
+  std::vector<ContextNameFingerprint> result;
   for (StringRef n : simpleNames)
-    result.push_back({"", n.str()});
+    result.push_back({"", n.str(), None});
   return result;
 }
 
-static std::vector<std::pair<std::string, std::string>>
+static std::vector<ContextNameFingerprint>
 getMangledHolderProvides(ArrayRef<std::string> simpleNames) {
-  std::vector<std::pair<std::string, std::string>> result;
+  std::vector<ContextNameFingerprint> result;
   for (StringRef n : simpleNames)
-    result.push_back({n.str(), ""});
+    result.push_back({n.str(), "", None});
   return result;
 }
 
-static std::vector<std::pair<std::string, std::string>> getCompoundProvides(
+static std::vector<ContextNameFingerprint> getCompoundProvides(
     ArrayRef<std::pair<std::string, std::string>> compoundNames) {
-  return compoundNames;
+  std::vector<ContextNameFingerprint> result;
+  for (const auto &p : compoundNames)
+    result.push_back({p.first, p.second, None});
+  return result;
 }
 
 // Use '_' as a prefix indicating non-cascading

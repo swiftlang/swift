@@ -903,6 +903,17 @@ IterableDeclContext::castDeclToIterableDeclContext(const Decl *D) {
   }
 }
 
+StringRef IterableDeclContext::getBodyFingerprint() const {
+  // Only makes sense for contexts in a source file
+  if (!getDecl()->getDeclContext()->getParentSourceFile())
+    return "";
+  auto mutableThis = const_cast<IterableDeclContext *>(this);
+  return evaluateOrDefault(getASTContext().evaluator,
+                           ParseMembersRequest{mutableThis},
+                           FingerprintAndMembers())
+      .fingerprint;
+}
+
 /// Return the DeclContext to compare when checking private access in
 /// Swift 4 mode. The context returned is the type declaration if the context
 /// and the type declaration are in the same file, otherwise it is the types

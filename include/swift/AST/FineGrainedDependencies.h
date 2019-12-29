@@ -438,8 +438,8 @@ public:
         name() {}
 
   /// For constructing a key in the frontend.
-  DependencyKey(NodeKind kind, DeclAspect aspect, std::string context,
-                std::string name)
+  DependencyKey(NodeKind kind, DeclAspect aspect, const std::string &context,
+                const std::string &name)
       : kind(kind), aspect(aspect), context(context), name(name) {
     assert(verify());
   }
@@ -537,6 +537,13 @@ struct std::hash<typename swift::fine_grained_dependencies::DeclAspect> {
     return size_t(aspect);
   }
 };
+
+namespace swift {
+namespace fine_grained_dependencies {
+using ContextNameFingerprint =
+    std::tuple<std::string, std::string, Optional<std::string>>;
+}
+} // namespace swift
 
 //==============================================================================
 // MARK: DepGraphNode
@@ -793,12 +800,13 @@ public:
   /// The frontend creates a pair of nodes for every tracked Decl and the source
   /// file itself.
   InterfaceAndImplementationPair<SourceFileDepGraphNode>
-  findExistingNodePairOrCreateAndAddIfNew(NodeKind k, StringRef context,
-                                          StringRef name,
-                                          Optional<std::string> fingerprint);
+  findExistingNodePairOrCreateAndAddIfNew(
+      NodeKind k, const ContextNameFingerprint &contextNameFingerprint);
 
-  SourceFileDepGraphNode *findExistingNodeOrCreateIfNew(
-      DependencyKey key, Optional<std::string> fingerprint, bool isProvides);
+  SourceFileDepGraphNode *
+  findExistingNodeOrCreateIfNew(DependencyKey key,
+                                const Optional<std::string> &fingerprint,
+                                bool isProvides);
 
   /// \p Use is the Node that must be rebuilt when \p def changes.
   /// Record that fact in the graph.

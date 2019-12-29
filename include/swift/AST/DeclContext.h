@@ -824,6 +824,10 @@ public:
   // Some Decls are IterableDeclContexts, but not all.
   static bool classof(const Decl *D);
 
+  /// Return a hash of all tokens in the body for dependency analysis.
+  /// Empty string means no hash available.
+  StringRef getBodyFingerprint() const;
+
 private:
   /// Add a member to the list for iteration purposes, but do not notify the
   /// subclass that we have done so.
