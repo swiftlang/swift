@@ -138,6 +138,10 @@ void Parser::performCodeCompletionSecondPassImpl(
   // Disable libSyntax creation in the delayed parsing.
   SyntaxContext->disable();
 
+  // Disable updating the interface hash
+  llvm::SaveAndRestore<NullablePtr<llvm::MD5>> CurrentTokenHashSaver(CurrentTokenHash, nullptr);
+
+
   auto BufferID = L->getBufferID();
   auto startLoc = SourceMgr.getLocForOffset(BufferID, info.StartOffset);
   SourceLoc prevLoc;
