@@ -63,6 +63,19 @@ _ = { rdar27982012($0.0) }((1, 2)) // expected-error {{initializer is inaccessib
 _ = PrivateInit() // expected-error {{'PrivateInit' initializer is inaccessible due to 'private' protection level}}
 // TESTABLE: :[[@LINE-1]]:{{[^:]+}}: error: 'PrivateInit' initializer is inaccessible due to 'private' protection level
 
+_ = OtherModuleMemberwiseInit(x: 42) // expected-error {{memberwise initializer of 'OtherModuleMemberwiseInit' is inaccessible due to 'internal' protection level; public memberwise initializers must be declared explicitly}}
+
+public struct PrivateMemberwiseInit {
+  private let x: Int // expected-note {{'private' property 'x' prevents synthesizing a more accessible memberwise initializer}}
+  private let z: String // expected-note {{'private' property 'z' prevents synthesizing a more accessible memberwise initializer}}
+  let y: Bool // no note
+  fileprivate let yy: Bool // no note
+}
+
+_ = PrivateMemberwiseInit(x: 42, z: "", y: true, yy: false) // expected-error {{memberwise initializer of 'PrivateMemberwiseInit' is inaccessible due to 'private' protection level}}
+
+_ = OtherModuleDefaultInit() // expected-error {{default initializer of 'OtherModuleDefaultInit' is inaccessible due to 'internal' protection level; public default initializers must be declared explicitly}}
+
 var s = StructWithPrivateSetter()
 // expected-note@-1 3{{did you mean 's'?}}
 s.x = 42 // expected-error {{cannot assign to property: 'x' setter is inaccessible}}

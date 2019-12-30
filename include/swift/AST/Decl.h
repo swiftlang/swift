@@ -184,6 +184,25 @@ enum class StaticSpellingKind : uint8_t {
   KeywordClass,
 };
 
+/// Describes the kind of implicit constructor that will be
+/// generated.
+enum class ImplicitConstructorKind : uint8_t {
+  /// The default constructor, which default-initializes each
+  /// of the instance variables.
+  Default,
+  /// The memberwise constructor, which initializes each of
+  /// the instance variables from a parameter of the same type and
+  /// name.
+  Memberwise,
+  /// An implicit constructor imported from Objective-C.
+  Imported,
+  /// A constructor synthesized to fulfill a protocol requirement.
+  SynthesizedProtocolRequirement,
+  /// A synthesized designated initializer.
+  Designated
+};
+enum { NumImplicitConstructorKindBits = 3 };
+
 /// Keeps track of whether an enum has cases that have associated values.
 enum class AssociatedValueCheck {
   /// We have not yet checked.
@@ -444,7 +463,8 @@ protected:
                         /// Whether we have computed the above.
                         IsTransparentComputed : 1);
 
-  SWIFT_INLINE_BITFIELD(ConstructorDecl, AbstractFunctionDecl, 3+1+1,
+  SWIFT_INLINE_BITFIELD(ConstructorDecl, AbstractFunctionDecl,
+                        3 + 1 + 1 + NumImplicitConstructorKindBits,
     /// The body initialization kind (+1), or zero if not yet computed.
     ///
     /// This value is cached but is not serialized, because it is a property
@@ -462,7 +482,12 @@ protected:
     /// Initializer stubs can be invoked from Objective-C or through
     /// the Objective-C runtime; there is no way to directly express
     /// an object construction that will invoke a stub.
-    HasStubImplementation : 1
+    HasStubImplementation : 1,
+
+    /// If this constructor is implicit, the implicit constructor kind. If the
+    /// constructor is not implicit, the value is meaningless. Used to provide
+    /// better cross module initializer access diagnostics.
+    ImplicitConstructorKind : NumImplicitConstructorKindBits
   );
 
   SWIFT_INLINE_BITFIELD_EMPTY(TypeDecl, ValueDecl);
@@ -6889,6 +6914,19 @@ public:
   /// Whether the implementation of this method is a stub that traps at runtime.
   bool hasStubImplementation() const {
     return Bits.ConstructorDecl.HasStubImplementation;
+  }
+
+  void setImplicit(ImplicitConstructorKind kind) {
+    Decl::setImplicit();
+    Bits.ConstructorDecl.ImplicitConstructorKind = static_cast<unsigned>(kind);
+  }
+
+  Optional<ImplicitConstructorKind> getImplicitConstructorKind() const {
+    if (isImplicit()) {
+      return static_cast<ImplicitConstructorKind>(
+          Bits.ConstructorDecl.ImplicitConstructorKind);
+    }
+    return None;
   }
 
   /// Set whether the implementation of this method is a stub that

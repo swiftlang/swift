@@ -49,3 +49,11 @@ extension InternalProtocol {
 }
 
 extension ImplementsInternalProtocol : InternalProtocol {}
+
+public struct OtherModuleMemberwiseInit {
+  public let x: Int
+}
+
+public struct OtherModuleDefaultInit {
+  let x = 0
+}

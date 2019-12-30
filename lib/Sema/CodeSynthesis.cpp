@@ -191,18 +191,6 @@ static void maybeAddMemberwiseDefaultArg(ParamDecl *arg, VarDecl *var,
   arg->setDefaultArgumentKind(DefaultArgumentKind::StoredProperty);
 }
 
-/// Describes the kind of implicit constructor that will be
-/// generated.
-enum class ImplicitConstructorKind {
-  /// The default constructor, which default-initializes each
-  /// of the instance variables.
-  Default,
-  /// The memberwise constructor, which initializes each of
-  /// the instance variables from a parameter of the same type and
-  /// name.
-  Memberwise
-};
-
 /// Create an implicit struct or class constructor.
 ///
 /// \param decl The struct or class for which a constructor will be created.
@@ -214,6 +202,9 @@ static ConstructorDecl *createImplicitConstructor(NominalTypeDecl *decl,
                                                   ImplicitConstructorKind ICK,
                                                   ASTContext &ctx) {
   assert(!decl->hasClangNode());
+  assert((ICK == ImplicitConstructorKind::Memberwise ||
+          ICK == ImplicitConstructorKind::Default) &&
+         "Unsupported kind");
 
   SourceLoc Loc = decl->getLoc();
   auto accessLevel = AccessLevel::Internal;
@@ -289,7 +280,7 @@ static ConstructorDecl *createImplicitConstructor(NominalTypeDecl *decl,
                               paramList, /*GenericParams=*/nullptr, decl);
 
   // Mark implicit.
-  ctor->setImplicit();
+  ctor->setImplicit(ICK);
   ctor->setAccess(accessLevel);
 
   if (ICK == ImplicitConstructorKind::Memberwise) {
@@ -706,7 +697,7 @@ createDesignatedInitOverride(ClassDecl *classDecl,
                               /*ThrowsLoc=*/SourceLoc(),
                               bodyParams, genericParams, classDecl);
 
-  ctor->setImplicit();
+  ctor->setImplicit(ImplicitConstructorKind::Designated);
 
   // Set the interface type of the initializer.
   ctor->setGenericSignature(genericSig);

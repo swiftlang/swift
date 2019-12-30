@@ -55,7 +55,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 558; // SIL function type result differentiability
+const uint16_t SWIFTMODULE_VERSION_MINOR = 559; // ImplicitConstructorKind
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -494,6 +494,17 @@ enum class DefaultArgumentKind : uint8_t {
   StoredProperty,
 };
 using DefaultArgumentField = BCFixed<4>;
+
+// These IDs must \em not be renumbered or reordered without incrementing
+// the module version.
+enum class ImplicitConstructorKind : uint8_t {
+  Default = 0,
+  Memberwise,
+  Imported,
+  SynthesizedProtocolRequirement,
+  Designated,
+};
+using ImplicitConstructorField = BCFixed<3>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
 // the module version.
@@ -1222,7 +1233,9 @@ namespace decls_block {
     AccessLevelField, // access level
     BCFixed<1>,   // requires a new vtable slot
     BCFixed<1>,   // 'required' but overridden is not (used for recovery)
+    ImplicitConstructorField,  // Implicit constructor kind.
     BCVBR<5>,     // number of parameter name components
+
     BCArray<IdentifierIDField> // name components,
                                // followed by TypeID dependencies
     // This record is trailed by:

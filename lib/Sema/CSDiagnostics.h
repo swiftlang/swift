@@ -1387,6 +1387,11 @@ public:
       : FailureDiagnostic(solution, locator), Member(member) {}
 
   bool diagnoseAsError() override;
+
+private:
+  void diagnoseInaccessibleInitializer(ConstructorDecl *CD, SourceLoc Loc,
+                                       DeclNameLoc NameLoc,
+                                       AccessLevel AccessLevel);
 };
 
 /// Diagnose an attempt to reference member marked as `mutating`

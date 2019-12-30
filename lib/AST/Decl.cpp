@@ -7365,6 +7365,7 @@ ConstructorDecl::ConstructorDecl(DeclName Name, SourceLoc ConstructorLoc,
   Bits.ConstructorDecl.ComputedBodyInitKind = 0;
   Bits.ConstructorDecl.HasStubImplementation = 0;
   Bits.ConstructorDecl.Failable = Failable;
+  Bits.ConstructorDecl.ImplicitConstructorKind = 0;
 
   assert(Name.getBaseName() == DeclBaseName::createConstructor());
 }

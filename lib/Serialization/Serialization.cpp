@@ -1131,6 +1131,25 @@ static uint8_t getRawStableDefaultArgumentKind(swift::DefaultArgumentKind kind) 
   llvm_unreachable("Unhandled DefaultArgumentKind in switch.");
 }
 
+/// Translate AST default argument kind to the Serialization enum values, which
+/// are guaranteed to be stable.
+static uint8_t
+getRawStableImplicitConstructorKind(swift::ImplicitConstructorKind kind) {
+  switch (kind) {
+#define CASE(X)                                                                \
+  case swift::ImplicitConstructorKind::X:                                      \
+    return static_cast<uint8_t>(serialization::ImplicitConstructorKind::X);
+    CASE(Default)
+    CASE(Memberwise)
+    CASE(Imported)
+    CASE(SynthesizedProtocolRequirement)
+    CASE(Designated)
+#undef CASE
+  }
+
+  llvm_unreachable("Unhandled ImplicitConstructorKind in switch.");
+}
+
 static uint8_t
 getRawStableMetatypeRepresentation(const AnyMetatypeType *metatype) {
   if (!metatype->hasRepresentation()) {
@@ -3641,23 +3660,30 @@ public:
       if (firstTimeRequired && overridden->isRequired())
         firstTimeRequired = false;
 
+    // If the constructor is not implicit, the implicit constructor kind is
+    // arbitrary.
+    uint8_t implicitConstructorKind = 0;
+
+    if (auto kind = ctor->getImplicitConstructorKind()) {
+      implicitConstructorKind = getRawStableImplicitConstructorKind(*kind);
+    }
+
     unsigned abbrCode = S.DeclTypeAbbrCodes[ConstructorLayout::Code];
     ConstructorLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
-                                  contextID.getOpaqueValue(),
-                                  ctor->isFailable(),
+                                  contextID.getOpaqueValue(),ctor->isFailable(),
                                   ctor->isImplicitlyUnwrappedOptional(),
                                   ctor->isImplicit(),
                                   ctor->isObjC(),
                                   ctor->hasStubImplementation(),
                                   ctor->hasThrows(),
                                   getStableCtorInitializerKind(
-                                    ctor->getInitKind()),
+                                                ctor->getInitKind()),
                                   S.addGenericSignatureRef(
-                                                 ctor->getGenericSignature()),
+                                                ctor->getGenericSignature()),
                                   S.addDeclRef(ctor->getOverriddenDecl()),
-                                  rawAccessLevel,
-                                  ctor->needsNewVTableEntry(),
+                                  rawAccessLevel,ctor->needsNewVTableEntry(),
                                   firstTimeRequired,
+                                  implicitConstructorKind,
                                   ctor->getName().getArgumentNames().size(),
                                   nameComponentsAndDependencies);
 

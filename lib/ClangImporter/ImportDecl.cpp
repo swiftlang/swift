@@ -541,7 +541,7 @@ makeEnumRawValueConstructor(ClangImporter::Implementation &Impl,
                             /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
                             paramPL,
                             /*GenericParams=*/nullptr, enumDecl);
-  ctorDecl->setImplicit();
+  ctorDecl->setImplicit(ImplicitConstructorKind::Imported);
   ctorDecl->setAccess(AccessLevel::Public);
   ctorDecl->setBodySynthesizer(synthesizeEnumRawValueConstructorBody, enumDecl);
   return ctorDecl;
@@ -6483,7 +6483,7 @@ ConstructorDecl *SwiftDeclConverter::importConstructor(
                                    importedType.isImplicitlyUnwrapped());
 
   if (implicit)
-    result->setImplicit();
+    result->setImplicit(ImplicitConstructorKind::Imported);
 
   // Set the kind of initializer.
   result->getASTContext().evaluator.cacheOutput(InitKindRequest{result},

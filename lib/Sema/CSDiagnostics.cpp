@@ -4653,17 +4653,61 @@ bool InaccessibleMemberFailure::diagnoseAsError() {
   auto loc = nameLoc.isValid() ? nameLoc.getStartLoc() : ::getLoc(anchor);
   auto accessLevel = Member->getFormalAccessScope().accessLevelForDiagnostics();
   if (auto *CD = dyn_cast<ConstructorDecl>(Member)) {
-    emitDiagnosticAt(loc, diag::init_candidate_inaccessible,
-                     CD->getResultInterfaceType(), accessLevel)
-        .highlight(nameLoc.getSourceRange());
+    diagnoseInaccessibleInitializer(CD, loc, nameLoc, accessLevel);
   } else {
     emitDiagnosticAt(loc, diag::candidate_inaccessible, Member->getBaseName(),
                      accessLevel)
         .highlight(nameLoc.getSourceRange());
+    emitDiagnosticAt(Member, diag::decl_declared_here, Member->getName());
   }
 
-  emitDiagnosticAt(Member, diag::decl_declared_here, Member->getName());
   return true;
+}
+
+void InaccessibleMemberFailure::diagnoseInaccessibleInitializer(
+    ConstructorDecl *CD, SourceLoc Loc, DeclNameLoc NameLoc,
+    AccessLevel AccessLevel) {
+  // If this is a memberwise or default initializer, say so and explain why it
+  // was synthesized with a certain access level.
+  auto ICK = CD->getImplicitConstructorKind();
+  if (ICK && (*ICK == ImplicitConstructorKind::Default ||
+              *ICK == ImplicitConstructorKind::Memberwise)) {
+    // If the initializer is in a different module, it must be made public to be
+    // accessible from the anchor expression.
+    bool requiresPublicAccess =
+        CD->getModuleContext() != getDC()->getParentModule();
+    // Noting properties isn't helpful for default initializers or if the
+    // inititalizer needs to be made public to be usable in this context.
+    SmallVector<VarDecl *, 3> propertiesContributingToAccessLevel;
+    if (!requiresPublicAccess && *ICK == ImplicitConstructorKind::Memberwise) {
+      auto structDecl =
+          CD->getResultInterfaceType()->getStructOrBoundGenericStruct();
+      assert(structDecl &&
+             "only structs support default memberwise initializers");
+      for (auto var : structDecl->getStoredProperties()) {
+        // If a property participates in memberwise initialization and has the
+        // same access level as the memberwise initializer, it must have
+        // contributed to the initializer's access level.
+        if (var->isMemberwiseInitialized(/*preferDeclaredProperties=*/true) &&
+            var->getFormalAccess() == AccessLevel)
+          propertiesContributingToAccessLevel.push_back(var);
+      }
+    }
+    emitDiagnosticAt(Loc, diag::memberwise_init_candidate_inaccessible,
+                   static_cast<unsigned>(*ICK), CD->getResultInterfaceType(),
+                   AccessLevel, requiresPublicAccess)
+        .highlight(NameLoc.getSourceRange());
+    for (auto var : propertiesContributingToAccessLevel) {
+      emitDiagnosticAt(var, diag::memberwise_init_access_level_determined_by_var,
+                     var->getFormalAccess(), var->getName())
+          .highlight(var->getSourceRange());
+    }
+  } else {
+    emitDiagnosticAt(Loc, diag::init_candidate_inaccessible,
+                   CD->getResultInterfaceType(), AccessLevel)
+        .highlight(NameLoc.getSourceRange());
+    emitDiagnosticAt(Member, diag::decl_declared_here, Member->getName());
+  }
 }
 
 SourceLoc AnyObjectKeyPathRootFailure::getLoc() const {

@@ -134,7 +134,8 @@ static ValueDecl *deriveInitDecl(DerivedConformance &derived, Type paramType,
                             paramList,
                             /*GenericParams=*/nullptr, parentDC);
 
-  initDecl->setImplicit();
+  initDecl->setImplicit(
+      ImplicitConstructorKind::SynthesizedProtocolRequirement);
 
   // Synthesize the body.
   synthesizer(initDecl);

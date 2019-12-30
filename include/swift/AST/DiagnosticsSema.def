@@ -146,6 +146,18 @@ ERROR(init_candidate_inaccessible,none,
       "'%select{private|fileprivate|internal|@_spi|@_spi}1' protection level",
       (Type, AccessLevel))
 
+ERROR(memberwise_init_candidate_inaccessible,none,
+      "%select{default|memberwise|%error}0 initializer of %1 is inaccessible "
+      "due to '%select{private|fileprivate|internal|%error|%error}2' protection"
+      " level%select{|; public %select{default|memberwise|%error}0 initializers"
+      " must be declared explicitly}3",
+      (/*ImplicitConstructorKind*/ unsigned, Type, AccessLevel, bool))
+
+NOTE(memberwise_init_access_level_determined_by_var,none,
+     "'%select{private|fileprivate|internal|%error|%error}0' property %1 "
+     "prevents synthesizing a more accessible memberwise initializer",
+     (AccessLevel, DeclName))
+
 ERROR(cannot_pass_rvalue_mutating_subelement,none,
       "cannot use mutating member on immutable value: %0",
       (StringRef))

@@ -259,6 +259,25 @@ getActualClangDeclPathComponentKind(uint64_t raw) {
   return None;
 }
 
+/// Translate from the serialization ImplicitConstructorKind enumerators, which
+/// are guaranteed to be stable, to the AST ones.
+static Optional<swift::ImplicitConstructorKind>
+getActualImplicitConstructorKind(uint8_t raw) {
+  switch (static_cast<serialization::ImplicitConstructorKind>(raw)) {
+  case serialization::ImplicitConstructorKind::Default:
+    return swift::ImplicitConstructorKind::Default;
+  case serialization::ImplicitConstructorKind::Memberwise:
+    return swift::ImplicitConstructorKind::Memberwise;
+  case serialization::ImplicitConstructorKind::Imported:
+    return swift::ImplicitConstructorKind::Imported;
+  case serialization::ImplicitConstructorKind::SynthesizedProtocolRequirement:
+    return swift::ImplicitConstructorKind::SynthesizedProtocolRequirement;
+  case serialization::ImplicitConstructorKind::Designated:
+    return swift::ImplicitConstructorKind::Designated;
+  }
+  return None;
+}
+
 ParameterList *ModuleFile::readParameterList() {
   using namespace decls_block;
 
@@ -2628,6 +2647,7 @@ public:
     bool needsNewVTableEntry, firstTimeRequired;
     unsigned numArgNames;
     ArrayRef<uint64_t> argNameAndDependencyIDs;
+    uint8_t implicitConstructorKind;
 
     decls_block::ConstructorLayout::readRecord(scratch, contextID,
                                                isFailable, isIUO, isImplicit,
@@ -2638,6 +2658,7 @@ public:
                                                rawAccessLevel,
                                                needsNewVTableEntry,
                                                firstTimeRequired,
+                                               implicitConstructorKind,
                                                numArgNames,
                                                argNameAndDependencyIDs);
 
@@ -2711,7 +2732,8 @@ public:
       ctor->setBodyStringRepresentation(*bodyText);
 
     if (isImplicit)
-      ctor->setImplicit();
+      ctor->setImplicit(
+          *getActualImplicitConstructorKind(implicitConstructorKind));
     ctor->setIsObjC(isObjC);
     if (hasStubImplementation)
       ctor->setStubImplementation(true);

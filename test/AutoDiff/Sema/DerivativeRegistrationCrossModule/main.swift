@@ -11,7 +11,7 @@ import b
 
 func foo(_ s: Struct) {
   // Without this error, SR-12526 does not trigger.
-  // expected-error @+1 {{'Struct' initializer is inaccessible due to 'internal' protection level}}
+  // expected-error @+1 {{default initializer of 'Struct' is inaccessible due to 'internal' protection level; public default initializers must be declared explicitly}}
   _ = Struct()
   _ = s.method(1)
 }

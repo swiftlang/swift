@@ -425,8 +425,9 @@ deriveRawRepresentable_init(DerivedConformance &derived) {
                             /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
                             paramList,
                             /*GenericParams=*/nullptr, parentDC);
-  
-  initDecl->setImplicit();
+
+  initDecl->setImplicit(
+      ImplicitConstructorKind::SynthesizedProtocolRequirement);
   initDecl->setBodySynthesizer(&deriveBodyRawRepresentable_init);
 
   initDecl->copyFormalAccessFrom(enumDecl, /*sourceIsParentContext*/true);

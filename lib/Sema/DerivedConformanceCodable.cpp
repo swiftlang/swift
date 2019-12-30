@@ -1045,7 +1045,8 @@ static ValueDecl *deriveDecodable_init(DerivedConformance &derived) {
                               /*Failable=*/false,SourceLoc(),
                               /*Throws=*/true, SourceLoc(), paramList,
                               /*GenericParams=*/nullptr, conformanceDC);
-  initDecl->setImplicit();
+  initDecl->setImplicit(
+      ImplicitConstructorKind::SynthesizedProtocolRequirement);
   initDecl->setSynthesized();
   initDecl->setBodySynthesizer(&deriveBodyDecodable_init);
 
