@@ -775,7 +775,8 @@ SelfBoundsFromWhereClauseRequest::evaluate(
     bool isSelfLHS = false;
     if (auto typeRepr = req.getSubjectRepr()) {
       if (auto identTypeRepr = dyn_cast<SimpleIdentTypeRepr>(typeRepr))
-        isSelfLHS = (identTypeRepr->getIdentifier() == ctx.Id_Self);
+        isSelfLHS = (identTypeRepr->getNameRef().getBaseIdentifier() ==
+                     ctx.Id_Self);
     } else if (Type type = req.getSubject()) {
       isSelfLHS = type->isEqual(dc->getSelfInterfaceType());
     }
@@ -1130,7 +1131,7 @@ void ExtensionDecl::addedMember(Decl *member) {
 static bool
 populateLookupTableEntryFromLazyIDCLoader(ASTContext &ctx,
                                           MemberLookupTable &LookupTable,
-                                          DeclName name,
+                                          DeclBaseName name,
                                           IterableDeclContext *IDC) {
   if (IDC->isLoadingLazyMembers()) {
     return false;
@@ -1138,8 +1139,7 @@ populateLookupTableEntryFromLazyIDCLoader(ASTContext &ctx,
   IDC->setLoadingLazyMembers(true);
   auto ci = ctx.getOrCreateLazyIterableContextData(IDC,
                                                    /*lazyLoader=*/nullptr);
-  if (auto res = ci->loader->loadNamedMembers(IDC, name.getBaseName(),
-                                              ci->memberData)) {
+  if (auto res = ci->loader->loadNamedMembers(IDC, name, ci->memberData)) {
     IDC->setLoadingLazyMembers(false);
     if (auto s = ctx.Stats) {
       ++s->getFrontendCounters().NamedLazyMemberLoadSuccessCount;
@@ -1158,11 +1158,11 @@ populateLookupTableEntryFromLazyIDCLoader(ASTContext &ctx,
 }
 
 static void populateLookupTableEntryFromCurrentMembers(
-    ASTContext &ctx, MemberLookupTable &LookupTable, DeclName name,
+    ASTContext &ctx, MemberLookupTable &LookupTable, DeclBaseName name,
     IterableDeclContext *IDC) {
   for (auto m : IDC->getMembers()) {
     if (auto v = dyn_cast<ValueDecl>(m)) {
-      if (v->getFullName().matchesRef(name.getBaseName())) {
+      if (v->getBaseName() == name) {
         LookupTable.addMember(m);
       }
     }
@@ -1173,7 +1173,7 @@ static void
 populateLookupTableEntryFromExtensions(ASTContext &ctx,
                                        MemberLookupTable &table,
                                        NominalTypeDecl *nominal,
-                                       DeclName name) {
+                                       DeclBaseName name) {
   for (auto e : nominal->getExtensions()) {
     if (e->wasDeserialized() || e->hasClangNode()) {
       assert(!e->hasUnparsedMembers());
@@ -1213,7 +1213,7 @@ void NominalTypeDecl::prepareLookupTable() {
       setLookupTablePopulated(true);
       LookupTable.getPointer()->addMembers(getCurrentMembersWithoutLoading());
 
-      llvm::SetVector<DeclName> baseNamesPresent;
+      llvm::SetVector<DeclBaseName> baseNamesPresent;
       for (auto entry : *LookupTable.getPointer()) {
         baseNamesPresent.insert(entry.getFirst().getBaseName());
       }
@@ -1345,10 +1345,11 @@ TinyPtrVector<ValueDecl *> NominalTypeDecl::lookupDirect(
     // false, and we fall back to loading all members during the retry.
     auto &Table = *LookupTable.getPointer();
     if (populateLookupTableEntryFromLazyIDCLoader(ctx, Table,
-                                                  name, this)) {
+                                                  name.getBaseName(), this)) {
       useNamedLazyMemberLoading = false;
     } else {
-      populateLookupTableEntryFromExtensions(ctx, Table, this, name);
+      populateLookupTableEntryFromExtensions(ctx, Table, this,
+                                             name.getBaseName());
     }
   }
 
@@ -1558,15 +1559,18 @@ static void extractDirectlyReferencedNominalTypes(
 }
 
 bool DeclContext::lookupQualified(Type type,
-                                  DeclName member,
+                                  DeclNameRef member,
                                   NLOptions options,
                                   SmallVectorImpl<ValueDecl *> &decls) const {
   using namespace namelookup;
   assert(decls.empty() && "additive lookup not supported");
 
   // Handle AnyObject lookup.
-  if (type->isAnyObject())
-    return lookupAnyObject(member, options, decls);
+  if (type->isAnyObject()) {
+    AnyObjectLookupRequest req(this, member, options);
+    decls = evaluateOrDefault(getASTContext().evaluator, req, {});
+    return !decls.empty();
+  }
 
   // Handle lookup in a module.
   if (auto moduleTy = type->getAs<ModuleType>())
@@ -1579,49 +1583,28 @@ bool DeclContext::lookupQualified(Type type,
   return lookupQualified(nominalTypesToLookInto, member, options, decls);
 }
 
-static void installPropertyWrapperMembersIfNeeded(NominalTypeDecl *target,
-                                                  DeclName member) {
-  auto &Context = target->getASTContext();
-  auto baseName = member.getBaseName();
-  if (!member.isSimpleName() || baseName.isSpecial())
-    return;
-
-  if ((!baseName.getIdentifier().str().startswith("$") &&
-       !baseName.getIdentifier().str().startswith("_")) ||
-      baseName.getIdentifier().str().size() <= 1) {
-    return;
-  }
-
-  // $- and _-prefixed variables can be generated by properties that have
-  // attached property wrappers.
-  auto originalPropertyName =
-      Context.getIdentifier(baseName.getIdentifier().str().substr(1));
-  for (auto member : target->lookupDirect(originalPropertyName)) {
-    if (auto var = dyn_cast<VarDecl>(member)) {
-      if (var->hasAttachedPropertyWrapper()) {
-        auto sourceFile = var->getDeclContext()->getParentSourceFile();
-        if (sourceFile && sourceFile->Kind != SourceFileKind::Interface)
-          (void)var->getPropertyWrapperBackingProperty();
-      }
-    }
-  }
-}
-
 bool DeclContext::lookupQualified(ArrayRef<NominalTypeDecl *> typeDecls,
-                                  DeclName member,
+                                  DeclNameRef member,
                                   NLOptions options,
                                   SmallVectorImpl<ValueDecl *> &decls) const {
-  using namespace namelookup;
   assert(decls.empty() && "additive lookup not supported");
+  QualifiedLookupRequest req{this, {typeDecls.begin(), typeDecls.end()},
+                             member, options};
+  decls = evaluateOrDefault(getASTContext().evaluator, req, {});
+  return !decls.empty();
+}
 
-  auto *stats = getASTContext().Stats;
-  if (stats)
-    stats->getFrontendCounters().NumLookupQualifiedInNominal++;
+llvm::Expected<QualifiedLookupResult>
+QualifiedLookupRequest::evaluate(Evaluator &eval, const DeclContext *DC,
+                                 SmallVector<NominalTypeDecl *, 4> typeDecls,
+                                 DeclNameRef member, NLOptions options) const {
+  using namespace namelookup;
+  QualifiedLookupResult decls;
 
   // Configure lookup and dig out the tracker.
   ReferencedNameTracker *tracker = nullptr;
   bool isLookupCascading;
-  configureLookup(this, options, tracker, isLookupCascading);
+  configureLookup(DC, options, tracker, isLookupCascading);
 
   // Tracking for the nominal types we'll visit.
   SmallVector<NominalTypeDecl *, 4> stack;
@@ -1650,7 +1633,6 @@ bool DeclContext::lookupQualified(ArrayRef<NominalTypeDecl *> typeDecls,
 
   // Visit all of the nominal types we know about, discovering any others
   // we need along the way.
-  auto &ctx = getASTContext();
   bool wantProtocolMembers = (options & NL_ProtocolMembers);
   while (!stack.empty()) {
     auto current = stack.back();
@@ -1659,25 +1641,18 @@ bool DeclContext::lookupQualified(ArrayRef<NominalTypeDecl *> typeDecls,
     if (tracker)
       tracker->addUsedMember({current, member.getBaseName()},isLookupCascading);
 
-    // Make sure we've resolved implicit members, if we need them.
-    if (ctx.areSemanticQueriesEnabled()) {
-      current->synthesizeSemanticMembersIfNeeded(member);
-      installPropertyWrapperMembersIfNeeded(current, member);
-    }
-
     // Look for results within the current nominal type and its extensions.
     bool currentIsProtocol = isa<ProtocolDecl>(current);
     auto flags = OptionSet<NominalTypeDecl::LookupDirectFlags>();
     if (options & NL_IncludeAttributeImplements)
       flags |= NominalTypeDecl::LookupDirectFlags::IncludeAttrImplements;
-    for (auto decl : current->lookupDirect(member, flags)) {
+    for (auto decl : current->lookupDirect(member.getFullName(), flags)) {
       // If we're performing a type lookup, don't even attempt to validate
       // the decl if its not a type.
       if ((options & NL_OnlyTypes) && !isa<TypeDecl>(decl))
         continue;
 
-      if (isAcceptableLookupResult(this, options, decl,
-                                   onlyCompleteObjectInits))
+      if (isAcceptableLookupResult(DC, options, decl, onlyCompleteObjectInits))
         decls.push_back(decl);
     }
 
@@ -1737,39 +1712,46 @@ bool DeclContext::lookupQualified(ArrayRef<NominalTypeDecl *> typeDecls,
     }
   }
 
-  pruneLookupResultSet(this, options, decls);
-  if (auto *debugClient = this->getParentModule()->getDebugClient()) {
-    debugClient->finishLookupInNominals(this, typeDecls, member, options,
-                                        decls);
+  pruneLookupResultSet(DC, options, decls);
+  if (auto *debugClient = DC->getParentModule()->getDebugClient()) {
+    debugClient->finishLookupInNominals(DC, typeDecls, member.getFullName(),
+                                        options, decls);
   }
-  // We're done. Report success/failure.
+
+  return decls;
+}
+
+bool DeclContext::lookupQualified(ModuleDecl *module, DeclNameRef member,
+                                  NLOptions options,
+                                  SmallVectorImpl<ValueDecl *> &decls) const {
+  assert(decls.empty() && "additive lookup not supported");
+  ModuleQualifiedLookupRequest req{this, module, member, options};
+  decls = evaluateOrDefault(getASTContext().evaluator, req, {});
   return !decls.empty();
 }
 
-bool DeclContext::lookupQualified(ModuleDecl *module, DeclName member,
-                                  NLOptions options,
-                                  SmallVectorImpl<ValueDecl *> &decls) const {
+llvm::Expected<QualifiedLookupResult>
+ModuleQualifiedLookupRequest::evaluate(Evaluator &eval, const DeclContext *DC,
+                                       ModuleDecl *module, DeclNameRef member,
+                                       NLOptions options) const {
   using namespace namelookup;
-
-  auto &ctx = getASTContext();
-  auto *stats = ctx.Stats;
-  if (stats)
-    stats->getFrontendCounters().NumLookupQualifiedInModule++;
+  QualifiedLookupResult decls;
 
   // Configure lookup and dig out the tracker.
   ReferencedNameTracker *tracker = nullptr;
   bool isLookupCascading;
-  configureLookup(this, options, tracker, isLookupCascading);
+  configureLookup(DC, options, tracker, isLookupCascading);
 
   auto kind = (options & NL_OnlyTypes
                ? ResolutionKind::TypesOnly
                : ResolutionKind::Overloadable);
-  auto topLevelScope = getModuleScopeContext();
+  auto topLevelScope = DC->getModuleScopeContext();
   if (module == topLevelScope->getParentModule()) {
     if (tracker) {
-      recordLookupOfTopLevelName(topLevelScope, member, isLookupCascading);
+      recordLookupOfTopLevelName(topLevelScope, member.getFullName(),
+                                 isLookupCascading);
     }
-    lookupInModule(module, member, decls,
+    lookupInModule(module, member.getFullName(), decls,
                    NLKind::QualifiedLookup, kind, topLevelScope);
   } else {
     // Note: This is a lookup into another module. Unless we're compiling
@@ -1778,35 +1760,39 @@ bool DeclContext::lookupQualified(ModuleDecl *module, DeclName member,
     // anything in this one.
 
     // Perform the lookup in all imports of this module.
+    auto &ctx = DC->getASTContext();
     auto accessPaths = ctx.getImportCache().getAllVisibleAccessPaths(
         module, topLevelScope);
     if (llvm::any_of(accessPaths,
                      [&](ModuleDecl::AccessPathTy accessPath) {
-                       return ModuleDecl::matchesAccessPath(accessPath, member);
+                       return ModuleDecl::matchesAccessPath(accessPath,
+                                                            member.getFullName());
                      })) {
-      lookupInModule(module, member, decls,
+      lookupInModule(module, member.getFullName(), decls,
                      NLKind::QualifiedLookup, kind, topLevelScope);
     }
   }
 
-  pruneLookupResultSet(this, options, decls);
+  pruneLookupResultSet(DC, options, decls);
 
-  if (auto *debugClient = this->getParentModule()->getDebugClient()) {
-    debugClient->finishLookupInModule(this, module, member, options, decls);
+  if (auto *debugClient = DC->getParentModule()->getDebugClient()) {
+    debugClient->finishLookupInModule(DC, module, member.getFullName(),
+                                      options, decls);
   }
-  // We're done. Report success/failure.
-  return !decls.empty();
+
+  return decls;
 }
 
-bool DeclContext::lookupAnyObject(DeclName member, NLOptions options,
-                                  SmallVectorImpl<ValueDecl *> &decls) const {
+llvm::Expected<QualifiedLookupResult>
+AnyObjectLookupRequest::evaluate(Evaluator &evaluator, const DeclContext *dc,
+                                 DeclNameRef member, NLOptions options) const {
   using namespace namelookup;
-  assert(decls.empty() && "additive lookup not supported");
+  QualifiedLookupResult decls;
 
   // Configure lookup and dig out the tracker.
   ReferencedNameTracker *tracker = nullptr;
   bool isLookupCascading;
-  configureLookup(this, options, tracker, isLookupCascading);
+  configureLookup(dc, options, tracker, isLookupCascading);
 
   // Record this lookup.
   if (tracker)
@@ -1814,16 +1800,13 @@ bool DeclContext::lookupAnyObject(DeclName member, NLOptions options,
 
   // Type-only lookup won't find anything on AnyObject.
   if (options & NL_OnlyTypes)
-    return false;
-
-  auto *stats = getASTContext().Stats;
-  if (stats)
-    stats->getFrontendCounters().NumLookupQualifiedInAnyObject++;
+    return decls;
 
   // Collect all of the visible declarations.
   SmallVector<ValueDecl *, 4> allDecls;
-  for (auto import : namelookup::getAllImports(this)) {
-    import.second->lookupClassMember(import.first, member, allDecls);
+  for (auto import : namelookup::getAllImports(dc)) {
+    import.second->lookupClassMember(import.first, member.getFullName(),
+                                     allDecls);
   }
 
   // For each declaration whose context is not something we've
@@ -1840,26 +1823,24 @@ bool DeclContext::lookupAnyObject(DeclName member, NLOptions options,
     if (decl->getOverriddenDecl())
       continue;
 
-    auto dc = decl->getDeclContext();
-    auto nominal = dc->getSelfNominalTypeDecl();
-    assert(nominal && "Couldn't find nominal type?");
-    (void)nominal;
+    assert(decl->getDeclContext()->isTypeContext() &&
+           "Couldn't find nominal type?");
 
     // If we didn't see this declaration before, and it's an acceptable
     // result, add it to the list.
     // declaration to the list.
     if (knownDecls.insert(decl).second &&
-        isAcceptableLookupResult(this, options, decl,
+        isAcceptableLookupResult(dc, options, decl,
                                  /*onlyCompleteObjectInits=*/false))
       decls.push_back(decl);
   }
 
-  pruneLookupResultSet(this, options, decls);
-  if (auto *debugClient = this->getParentModule()->getDebugClient()) {
-    debugClient->finishLookupInAnyObject(this, member, options, decls);
+  pruneLookupResultSet(dc, options, decls);
+  if (auto *debugClient = dc->getParentModule()->getDebugClient()) {
+    debugClient->finishLookupInAnyObject(dc, member.getFullName(), options,
+                                         decls);
   }
-  // We're done. Report success/failure.
-  return !decls.empty();
+  return decls;
 }
 
 void DeclContext::lookupAllObjCMethods(
@@ -1927,8 +1908,8 @@ resolveTypeDeclsToNominal(Evaluator &evaluator,
           if (auto compound = dyn_cast<CompoundIdentTypeRepr>(typeRepr)) {
             auto components = compound->getComponents();
             if (components.size() == 2 &&
-                components[0]->getIdentifier().is("Builtin") &&
-                components[1]->getIdentifier().is("AnyObject")) {
+                components[0]->getNameRef().isSimpleName("Builtin") &&
+                components[1]->getNameRef().isSimpleName("AnyObject")) {
               anyObject = true;
             }
           }
@@ -1971,7 +1952,7 @@ resolveTypeDeclsToNominal(Evaluator &evaluator,
 
 /// Perform unqualified name lookup for types at the given location.
 static DirectlyReferencedTypeDecls
-directReferencesForUnqualifiedTypeLookup(DeclName name,
+directReferencesForUnqualifiedTypeLookup(DeclNameRef name,
                                          SourceLoc loc, DeclContext *dc,
                                          LookupOuterResults lookupOuter) {
   DirectlyReferencedTypeDecls results;
@@ -1998,7 +1979,7 @@ static DirectlyReferencedTypeDecls
 directReferencesForQualifiedTypeLookup(Evaluator &evaluator,
                                        ASTContext &ctx,
                                        ArrayRef<TypeDecl *> baseTypes,
-                                       DeclName name,
+                                       DeclNameRef name,
                                        DeclContext *dc) {
   DirectlyReferencedTypeDecls result;
   auto addResults = [&result](ArrayRef<ValueDecl *> found){
@@ -2029,7 +2010,9 @@ directReferencesForQualifiedTypeLookup(Evaluator &evaluator,
       auto innerOptions = options;
       innerOptions &= ~NL_RemoveOverridden;
       innerOptions &= ~NL_RemoveNonVisible;
-      dc->lookupQualified(module, name, innerOptions, members);
+      SmallVector<ValueDecl *, 4> moduleMembers;
+      dc->lookupQualified(module, name, innerOptions, moduleMembers);
+      members.append(moduleMembers.begin(), moduleMembers.end());
     }
 
     addResults(members);
@@ -2056,8 +2039,8 @@ directReferencesForIdentTypeRepr(Evaluator &evaluator,
     // For the first component, perform unqualified name lookup.
     if (current.empty()) {
       current =
-        directReferencesForUnqualifiedTypeLookup(component->getIdentifier(),
-                                                 component->getIdLoc(),
+        directReferencesForUnqualifiedTypeLookup(component->getNameRef(),
+                                                 component->getLoc(),
                                                  dc,
                                                  LookupOuterResults::Excluded);
 
@@ -2072,7 +2055,7 @@ directReferencesForIdentTypeRepr(Evaluator &evaluator,
     // For subsequent components, perform qualified name lookup.
     current =
         directReferencesForQualifiedTypeLookup(evaluator, ctx, current,
-                                               component->getIdentifier(), dc);
+                                               component->getNameRef(), dc);
     if (current.empty())
       return current;
   }
@@ -2342,7 +2325,7 @@ CustomAttrNominalRequest::evaluate(Evaluator &evaluator,
         modulesFound.clear();
         anyObject = false;
         decls = directReferencesForUnqualifiedTypeLookup(
-            identTypeRepr->getIdentifier(), identTypeRepr->getIdLoc(), dc,
+            identTypeRepr->getNameRef(), identTypeRepr->getLoc(), dc,
             LookupOuterResults::Included);
         nominals = resolveTypeDeclsToNominal(evaluator, ctx, decls,
                                              modulesFound, anyObject);
@@ -2353,7 +2336,7 @@ CustomAttrNominalRequest::evaluate(Evaluator &evaluator,
             auto moduleName = nominal->getParentModule()->getName();
             ctx.Diags.diagnose(typeRepr->getLoc(),
                                diag::warn_property_wrapper_module_scope,
-                               identTypeRepr->getIdentifier(),
+                               identTypeRepr->getNameRef(),
                                moduleName)
               .fixItInsert(typeRepr->getLoc(),
                            moduleName.str().str() + ".");
@@ -2362,7 +2345,8 @@ CustomAttrNominalRequest::evaluate(Evaluator &evaluator,
                                assocType->getFullName());
 
             ComponentIdentTypeRepr *components[2] = {
-              new (ctx) SimpleIdentTypeRepr(typeRepr->getLoc(), moduleName),
+              new (ctx) SimpleIdentTypeRepr(identTypeRepr->getNameLoc(),
+                                            DeclNameRef(moduleName)),
               identTypeRepr
             };
 
@@ -2655,4 +2639,41 @@ void FindLocalVal::visitCatchStmt(CatchStmt *S) {
   if (!isReferencePointInRange(S->getErrorPattern()->getSourceRange()))
     checkPattern(S->getErrorPattern(), DeclVisibilityKind::LocalVariable);
   visit(S->getBody());
+}
+
+void swift::simple_display(llvm::raw_ostream &out, NLKind kind) {
+  switch (kind) {
+  case NLKind::QualifiedLookup:
+    out << "QualifiedLookup";
+    return;
+  case NLKind::UnqualifiedLookup:
+    out << "UnqualifiedLookup";
+    return;
+  }
+  llvm_unreachable("Unhandled case in switch");
+}
+
+void swift::simple_display(llvm::raw_ostream &out, NLOptions options) {
+  using Flag = std::pair<NLOptions, StringRef>;
+  Flag possibleFlags[] = {
+#define FLAG(Name) {Name, #Name},
+    FLAG(NL_ProtocolMembers)
+    FLAG(NL_RemoveNonVisible)
+    FLAG(NL_RemoveOverridden)
+    FLAG(NL_IgnoreAccessControl)
+    FLAG(NL_KnownNonCascadingDependency)
+    FLAG(NL_KnownCascadingDependency)
+    FLAG(NL_OnlyTypes)
+    FLAG(NL_IncludeAttributeImplements)
+#undef FLAG
+  };
+
+  auto flagsToPrint = llvm::make_filter_range(
+      possibleFlags, [&](Flag flag) { return options & flag.first; });
+
+  out << "{ ";
+  interleave(
+      flagsToPrint, [&](Flag flag) { out << flag.second; },
+      [&] { out << ", "; });
+  out << " }";
 }

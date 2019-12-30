@@ -925,7 +925,7 @@ public:
         } else {
           unsigned distance =
             TypeChecker::getCallEditDistance(
-                S->getTargetName(), (*I)->getLabelInfo().Name,
+                DeclNameRef(S->getTargetName()), (*I)->getLabelInfo().Name,
                 TypeChecker::UnreasonableCallEditDistance);
           if (distance < TypeChecker::UnreasonableCallEditDistance)
             labelCorrections.insert(distance, std::move(*I));
@@ -990,7 +990,7 @@ public:
         } else {
           unsigned distance =
             TypeChecker::getCallEditDistance(
-                S->getTargetName(), (*I)->getLabelInfo().Name,
+                DeclNameRef(S->getTargetName()), (*I)->getLabelInfo().Name,
                 TypeChecker::UnreasonableCallEditDistance);
           if (distance < TypeChecker::UnreasonableCallEditDistance)
             labelCorrections.insert(distance, std::move(*I));
@@ -1531,6 +1531,7 @@ static void diagnoseIgnoredLiteral(ASTContext &Ctx, LiteralExpr *LE) {
     case ExprKind::MagicIdentifierLiteral:
       switch (cast<MagicIdentifierLiteralExpr>(LE)->getKind()) {
       case MagicIdentifierLiteralExpr::Kind::File: return "#file";
+      case MagicIdentifierLiteralExpr::Kind::FilePath: return "#filePath";
       case MagicIdentifierLiteralExpr::Kind::Line: return "#line";
       case MagicIdentifierLiteralExpr::Kind::Column: return "#column";
       case MagicIdentifierLiteralExpr::Kind::Function: return "#function";
@@ -1904,10 +1905,8 @@ static Expr* constructCallToSuperInit(ConstructorDecl *ctor,
   ASTContext &Context = ctor->getASTContext();
   Expr *superRef = new (Context) SuperRefExpr(ctor->getImplicitSelfDecl(),
                                               SourceLoc(), /*Implicit=*/true);
-  Expr *r = new (Context) UnresolvedDotExpr(superRef, SourceLoc(),
-                                            DeclBaseName::createConstructor(),
-                                            DeclNameLoc(),
-                                            /*Implicit=*/true);
+  Expr *r = UnresolvedDotExpr::createImplicit(
+      Context, superRef, DeclBaseName::createConstructor());
   r = CallExpr::createImplicit(Context, r, { }, { });
 
   if (ctor->hasThrows())

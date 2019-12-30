@@ -1153,21 +1153,17 @@ void IRGenModule::emitAutolinkInfo() {
                                        }),
                         AutolinkEntries.end());
 
-  if ((TargetInfo.OutputObjectFormat == llvm::Triple::COFF &&
-       !Triple.isOSCygMing()) ||
-      TargetInfo.OutputObjectFormat == llvm::Triple::MachO || Triple.isPS4()) {
+  const bool AutolinkExtractRequired =
+      (TargetInfo.OutputObjectFormat == llvm::Triple::ELF && !Triple.isPS4()) ||
+      TargetInfo.OutputObjectFormat == llvm::Triple::Wasm ||
+      Triple.isOSCygMing();
 
+  if (!AutolinkExtractRequired) {
     // On platforms that support autolinking, continue to use the metadata.
     Metadata->clearOperands();
     for (auto *Entry : AutolinkEntries)
       Metadata->addOperand(Entry);
-
   } else {
-    assert((TargetInfo.OutputObjectFormat == llvm::Triple::ELF ||
-            TargetInfo.OutputObjectFormat == llvm::Triple::Wasm ||
-            Triple.isOSCygMing()) &&
-           "expected ELF output format or COFF format for Cygwin/MinGW");
-
     // Merge the entries into null-separated string.
     llvm::SmallString<64> EntriesString;
     for (auto &EntryNode : AutolinkEntries) {
@@ -1269,6 +1265,7 @@ bool IRGenModule::finalize() {
       ModuleHash->setSection("__LLVM,__swift_modhash");
       break;
     case llvm::Triple::ELF:
+    case llvm::Triple::Wasm:
       ModuleHash->setSection(".swift_modhash");
       break;
     case llvm::Triple::COFF:

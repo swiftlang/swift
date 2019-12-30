@@ -47,3 +47,11 @@ if true {
 func genericFunc<T>(_ t: T) -> T { return t }
 
 let f: @convention(c) (Int) -> Int = genericFunc // expected-error{{cannot be formed from a reference to a generic function}}
+
+func ct1() -> () { print("") }
+
+let ct1ref0 : @convention(c, cType: "void *(void)") () -> () = ct1
+let ct1ref1 : @convention(c, cType: "void *(void)") = ct1 // expected-error{{expected type}}
+let ct1ref2 : @convention(c, ) () -> () = ct1 // expected-error{{expected 'cType' label in 'convention' attribute}}
+let ct1ref3 : @convention(c, cType) () -> () = ct1 // expected-error{{expected ':' after 'cType' for 'convention' attribute}}
+let ct1ref4 : @convention(c, cType: ) () -> () = ct1 // expected-error{{expected string literal containing clang type for 'cType' in 'convention' attribute}}

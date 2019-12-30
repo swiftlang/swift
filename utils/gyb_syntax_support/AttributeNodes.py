@@ -62,6 +62,8 @@ ATTRIBUTE_NODES = [
                              kind='ImplementsAttributeArguments'),
                        Child('DifferentiableArguments',
                              kind='DifferentiableAttributeArguments'),
+                       Child('DerivativeArguments',
+                             kind='DerivativeRegistrationAttributeArguments'),
                        Child('NamedAttributeString',
                              kind='NamedAttributeStringArgument'),
                    ], description='''
@@ -290,6 +292,30 @@ ATTRIBUTE_NODES = [
              Child('FunctionDeclName', kind='FunctionDeclName',
                    description='The referenced function name.'),
              Child('TrailingComma', kind='CommaToken', is_optional=True),
+         ]),
+
+    # The argument of the derivative registration attribute
+    # '@derivative(of: ...)'.
+    # derivative-registration-attr-arguments ->
+    #     'of' ':' func-decl-name ','? differentiation-params-clause?
+    Node('DerivativeRegistrationAttributeArguments', kind='Syntax',
+         description='''
+         The arguments for the '@derivative(of:)' attribute: the 'of:' label,
+         the original declaration name, and an optional differentiation
+         parameter list.
+         ''',
+         children=[
+             Child('OfLabel', kind='IdentifierToken', text_choices=['of'],
+                   description='The "of" label.'),
+             Child('Colon', kind='ColonToken', description='''
+                   The colon separating the "of" label and the original
+                   declaration name.
+                   '''),
+             Child('Original', kind='FunctionDeclName',
+                   description='The referenced original declaration.'),
+             Child('Comma', kind='CommaToken', is_optional=True),
+             Child('DiffParams', kind='DifferentiationParamsClause',
+                   is_optional=True),
          ]),
 
     # func-decl-name -> (identifier | operator) decl-name-arguments?

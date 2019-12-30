@@ -27,10 +27,12 @@ namespace swift {
 class ClassDecl;
 class DeclContext;
 class DeclName;
+class DeclNameRef;
 class DestructorDecl;
 class GenericContext;
 class GenericParamList;
 class LookupResult;
+enum class NLKind;
 class SourceLoc;
 class TypeAliasDecl;
 class TypeDecl;
@@ -39,6 +41,9 @@ namespace ast_scope {
 class ASTScopeImpl;
 class ScopeCreator;
 } // namespace ast_scope
+namespace namelookup {
+enum class ResolutionKind;
+} // namespace namelookup
 
 /// Display a nominal type or extension thereof.
 void simple_display(
@@ -312,15 +317,15 @@ class UnqualifiedLookupDescriptor {
   using LookupOptions = OptionSet<UnqualifiedLookupFlags>;
 
 public:
-  DeclName Name;
+  DeclNameRef Name;
   DeclContext *DC;
   SourceLoc Loc;
   LookupOptions Options;
 
-  UnqualifiedLookupDescriptor(DeclName name, DeclContext *dc,
+  UnqualifiedLookupDescriptor(DeclNameRef name, DeclContext *dc,
                               SourceLoc loc = SourceLoc(),
                               LookupOptions options = {})
-      : Name(name), DC(dc), Loc(loc), Options(options) {}
+      : Name(name), DC(dc), Loc(loc), Options(options) { }
 
   friend llvm::hash_code hash_value(const UnqualifiedLookupDescriptor &desc) {
     return llvm::hash_combine(desc.Name, desc.DC, desc.Loc,
@@ -358,6 +363,85 @@ private:
   // Evaluation.
   llvm::Expected<LookupResult> evaluate(Evaluator &evaluator,
                                         UnqualifiedLookupDescriptor desc) const;
+};
+
+using QualifiedLookupResult = SmallVector<ValueDecl *, 4>;
+
+/// Performs a lookup into a given module and its imports.
+class LookupInModuleRequest
+    : public SimpleRequest<LookupInModuleRequest,
+                           QualifiedLookupResult(
+                               const DeclContext *, DeclName, NLKind,
+                               namelookup::ResolutionKind, const DeclContext *),
+                           CacheKind::Uncached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<QualifiedLookupResult>
+  evaluate(Evaluator &evaluator, const DeclContext *moduleOrFile, DeclName name,
+           NLKind lookupKind, namelookup::ResolutionKind resolutionKind,
+           const DeclContext *moduleScopeContext) const;
+};
+
+/// Perform \c AnyObject lookup for a given member.
+class AnyObjectLookupRequest
+    : public SimpleRequest<AnyObjectLookupRequest,
+                           QualifiedLookupResult(const DeclContext *,
+                                                 DeclNameRef, NLOptions),
+                           CacheKind::Uncached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  llvm::Expected<QualifiedLookupResult> evaluate(Evaluator &evaluator,
+                                                 const DeclContext *dc,
+                                                 DeclNameRef name,
+                                                 NLOptions options) const;
+};
+
+class ModuleQualifiedLookupRequest
+    : public SimpleRequest<ModuleQualifiedLookupRequest,
+                           QualifiedLookupResult(const DeclContext *,
+                                                 ModuleDecl *, DeclNameRef,
+                                                 NLOptions),
+                           CacheKind::Uncached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<QualifiedLookupResult> evaluate(Evaluator &evaluator,
+                                                 const DeclContext *DC,
+                                                 ModuleDecl *mod, DeclNameRef name,
+                                                 NLOptions opts) const;
+};
+
+class QualifiedLookupRequest
+    : public SimpleRequest<QualifiedLookupRequest,
+                           QualifiedLookupResult(const DeclContext *,
+                                                 SmallVector<NominalTypeDecl *, 4>,
+                                                 DeclNameRef, NLOptions),
+                           CacheKind::Uncached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<QualifiedLookupResult>
+  evaluate(Evaluator &evaluator, const DeclContext *DC,
+           SmallVector<NominalTypeDecl *, 4> decls,
+           DeclNameRef name,
+           NLOptions opts) const;
 };
 
 #define SWIFT_TYPEID_ZONE NameLookup

@@ -104,6 +104,10 @@ bool ArgsToFrontendOptionsConverter::convert(
   Opts.IgnoreSwiftSourceInfo |= Args.hasArg(OPT_ignore_module_source_info);
   computeHelpOptions();
 
+  if (Args.hasArg(OPT_print_target_info)) {
+    Opts.PrintTargetInfo = true;
+  }
+
   if (const Arg *A = Args.getLastArg(OPT_verify_generic_signatures)) {
     Opts.VerifyGenericSignaturesInModule = A->getValue();
   }

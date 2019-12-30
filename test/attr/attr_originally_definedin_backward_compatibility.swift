@@ -1,6 +1,5 @@
-// REQUIRES: objc_interop
+// REQUIRES: OS=macosx
 //
-// REQUIRES: rdar57701641
 // RUN: %empty-directory(%t)
 //
 // -----------------------------------------------------------------------------
@@ -50,3 +49,27 @@ let e = Entity()
 print(e.location())
 // BEFORE_MOVE: Entity from HighLevel
 // AFTER_MOVE: Entity from LowLevel
+
+print(CandyBox(Candy()).ItemKind)
+// BEFORE_MOVE: candy
+// AFTER_MOVE: candy
+
+print(CandyBox(Candy()).shape())
+// BEFORE_MOVE: square
+// AFTER_MOVE: round
+
+print(LanguageKind.Cpp.rawValue)
+// BEFORE_MOVE: -1
+// AFTER_MOVE: 1
+
+print("\(Vehicle().currentSpeed)")
+// BEFORE_MOVE: -40
+// AFTER_MOVE: 40
+
+class Bicycle: Vehicle {}
+let bicycle = Bicycle()
+bicycle.currentSpeed = 15.0
+print("\(bicycle.currentSpeed)")
+
+// BEFORE_MOVE: 15.0
+// AFTER_MOVE: 15.0

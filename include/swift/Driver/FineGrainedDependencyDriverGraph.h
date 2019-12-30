@@ -304,8 +304,7 @@ public:
   /// 2. Jobs not previously known to need dependencies reexamined after they
   /// are recompiled. Such jobs are added to the \ref cascadingJobs set, and
   /// accessed via \ref isMarked.
-  void markTransitive(
-      SmallVectorImpl<const driver::Job *> &consequentJobsToRecompile,
+  std::vector<const driver::Job*> markTransitive(
       const driver::Job *jobToBeRecompiled, const void *ignored = nullptr);
 
   /// "Mark" this node only.
@@ -316,8 +315,7 @@ public:
 
   std::vector<StringRef> getExternalDependencies() const;
 
-  void markExternal(SmallVectorImpl<const driver::Job *> &uses,
-                    StringRef externalDependency);
+  std::vector<const driver::Job*> markExternal(StringRef externalDependency);
 
   void forEachUnmarkedJobDirectlyDependentOnExternalSwiftdeps(
       StringRef externalDependency, function_ref<void(const driver::Job *)> fn);
@@ -436,8 +434,7 @@ private:
       std::unordered_set<const ModuleDepGraphNode *> &foundDependents,
       const ModuleDepGraphNode *definition);
 
-  void computeUniqueJobsFromNodes(
-      SmallVectorImpl<const driver::Job *> &uniqueJobs,
+  std::vector<const driver::Job*> computeUniqueJobsFromNodes(
       const std::unordered_set<const ModuleDepGraphNode *> &nodes);
 
   /// Record a visit to this node for later dependency printing

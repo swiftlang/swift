@@ -159,7 +159,7 @@ static void fixupReferenceCounts(
       // insert a destroy after the apply since the leak will just cover the
       // other path.
       if (!error.getFoundOverConsume()) {
-        applySite.insertAfter([&](SILBasicBlock::iterator iter) {
+        applySite.insertAfterInvocation([&](SILBasicBlock::iterator iter) {
           if (hasOwnership) {
             SILBuilderWithScope(iter).createEndBorrow(loc, argument);
           }
@@ -199,7 +199,7 @@ static void fixupReferenceCounts(
         }
       }
 
-      applySite.insertAfter([&](SILBasicBlock::iterator iter) {
+      applySite.insertAfterInvocation([&](SILBasicBlock::iterator iter) {
         SILBuilderWithScope(iter).emitDestroyValueOperation(loc, v);
       });
       break;
@@ -246,7 +246,7 @@ static void fixupReferenceCounts(
   // Destroy the callee as the apply would have done if our function is not
   // callee guaranteed.
   if (!isCalleeGuaranteed) {
-    applySite.insertAfter([&](SILBasicBlock::iterator iter) {
+    applySite.insertAfterInvocation([&](SILBasicBlock::iterator iter) {
       SILBuilderWithScope(iter).emitDestroyValueOperation(loc, calleeValue);
     });
   }

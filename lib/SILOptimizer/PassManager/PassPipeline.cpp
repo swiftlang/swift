@@ -413,6 +413,12 @@ static void addPerfEarlyModulePassPipeline(SILPassPipelinePlan &P) {
   P.addOutliner();
 
   P.addCrossModuleSerializationSetup();
+  
+  // In case of cross-module-optimization, we need to serialize right after
+  // CrossModuleSerializationSetup. Eventually we want to serialize early
+  // anyway, but for now keep the SerializeSILPass at the later stage of the
+  // pipeline in case cross-module-optimization is not enabled.
+  P.addCMOSerializeSILPass();
 }
 
 static void addHighLevelEarlyLoopOptPipeline(SILPassPipelinePlan &P) {

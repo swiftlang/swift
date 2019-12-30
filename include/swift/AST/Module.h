@@ -629,6 +629,11 @@ inline bool DeclContext::isModuleScopeContext() const {
   return isModuleContext();
 }
 
+/// Extract the source location from the given module declaration.
+inline SourceLoc extractNearestSourceLoc(const ModuleDecl *mod) {
+  return extractNearestSourceLoc(static_cast<const Decl *>(mod));
+}
+
 } // end namespace swift
 
 namespace llvm {
