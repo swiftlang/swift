@@ -358,8 +358,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.VerifySyntaxTree = true;
   }
   
-  if (Args.hasArg(OPT_enable_fine_grained_dependencies))
-    Opts.EnableFineGrainedDependencies = true;
+  Opts.EnableFineGrainedDependencies = Args.hasFlag(options::OPT_enable_fine_grained_dependencies,
+                                                    options::OPT_disable_fine_grained_dependencies, true);
 
   if (Args.hasArg(OPT_emit_fine_grained_dependency_sourcefile_dot_files))
     Opts.EmitFineGrainedDependencySourcefileDotFiles = true;
