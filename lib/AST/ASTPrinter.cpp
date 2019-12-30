@@ -394,9 +394,9 @@ ASTPrinter &operator<<(ASTPrinter &printer, tok keyword) {
   return printer;
 }
 
-/// Determine whether to escape the given keyword in the given context.
-static bool escapeKeywordInContext(StringRef keyword, PrintNameContext context){
-
+/// Determine whether to escape the given identifier in the given context.
+static bool escapeIdentifierInContext(Identifier Name, PrintNameContext context){
+  StringRef keyword = Name.str();
   bool isKeyword = llvm::StringSwitch<bool>(keyword)
 #define KEYWORD(KW) \
       .Case(#KW, true)
@@ -406,7 +406,7 @@ static bool escapeKeywordInContext(StringRef keyword, PrintNameContext context){
   switch (context) {
   case PrintNameContext::Normal:
   case PrintNameContext::Attribute:
-    return isKeyword;
+    return isKeyword || Name.isEscapedIdentifier();
   case PrintNameContext::Keyword:
     return false;
 
@@ -435,12 +435,12 @@ void ASTPrinter::printName(Identifier Name, PrintNameContext Context) {
     return;
   }
 
-  bool shouldEscapeKeyword = escapeKeywordInContext(Name.str(), Context);
+  bool shouldEscapeIdentifier = escapeIdentifierInContext(Name, Context);
 
-  if (shouldEscapeKeyword)
+  if (shouldEscapeIdentifier)
     *this << "`";
   *this << Name.str();
-  if (shouldEscapeKeyword)
+  if (shouldEscapeIdentifier)
     *this << "`";
 
   printNamePost(Context);

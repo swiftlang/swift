@@ -228,20 +228,21 @@ static void printValueDecl(ValueDecl *Decl, raw_ostream &OS) {
   } else if (Decl->isOperator()) {
     OS << '"' << Decl->getBaseName() << '"';
   } else {
-    bool shouldEscape = !Decl->getBaseName().isSpecial() &&
-        llvm::StringSwitch<bool>(Decl->getBaseName().userFacingName())
+    bool isKeyword = llvm::StringSwitch<bool>(Decl->getBaseName().userFacingName())
             // FIXME: Represent "init" by a special name and remove this case
             .Case("init", false)
 #define KEYWORD(kw) \
             .Case(#kw, true)
 #include "swift/Syntax/TokenKinds.def"
             .Default(false);
+    bool shouldEscapeIdentifier = !Decl->getBaseName().isSpecial() &&
+      (isKeyword || Decl->getBaseName().isEscapedIdentifier());
 
-    if (shouldEscape) {
-      OS << '`' << Decl->getBaseName().userFacingName() << '`';
-    } else {
-      OS << Decl->getBaseName().userFacingName();
-    }
+    if (shouldEscapeIdentifier)
+      OS << '`';
+    OS << Decl->getBaseName().userFacingName();
+    if (shouldEscapeIdentifier)
+      OS << '`';
   }
 }
 

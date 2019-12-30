@@ -96,6 +96,9 @@ public:
   /// isOperator - Return true if this identifier is an operator, false if it is
   /// a normal identifier.
   bool isOperator() const;
+    
+  /// isEscapedIdentifier - Return true if this identifier should be escaped
+  bool isEscapedIdentifier() const;
   
   /// isOperatorStartCodePoint - Return true if the specified code point is a
   /// valid start of an operator.
@@ -174,6 +177,7 @@ public:
 
 private:
   mutable Optional<bool> cachedIsOperator;
+  mutable Optional<bool> cachedIsEscapedIdentifier;
 };
   
 class DeclName;
@@ -290,6 +294,10 @@ public:
 
   bool isOperator() const {
     return !isSpecial() && getIdentifier().isOperator();
+  }
+    
+  bool isEscapedIdentifier() const {
+      return !isSpecial() && getIdentifier().isEscapedIdentifier();
   }
 
   bool isEditorPlaceholder() const {
@@ -509,6 +517,11 @@ public:
   bool isOperator() const {
     return getBaseName().isOperator();
   }
+    
+  /// True if this name is an escaped identifier.
+  bool isEscapedIdentifier() const {
+    return getBaseName().isEscapedIdentifier();
+  }
   
   /// True if this name should be found by a decl ref or member ref under the
   /// name specified by 'refName'.
@@ -664,6 +677,10 @@ public:
 
   bool isOperator() const {
     return FullName.isOperator();
+  }
+    
+  bool isEscapedIdentifier() const {
+      return FullName.isEscapedIdentifier();
   }
 
   bool isCompoundName() const {

@@ -84,6 +84,21 @@ bool Identifier::isOperator() const {
   return cachedIsOperator.getValue();
 }
 
+bool Identifier::isEscapedIdentifier() const {
+  if (!cachedIsEscapedIdentifier.hasValue()) {
+     cachedIsEscapedIdentifier =
+       !isOperator() && !Lexer::isIdentifier(str()) &&
+       str().front() != '$'; // a property wrapper does not need to be escaped
+     
+     // dollar sign must be escaped
+     if (str().equals("$")) {
+       cachedIsEscapedIdentifier = true;
+     }
+  }
+
+  return cachedIsEscapedIdentifier.getValue();
+}
+
 int Identifier::compare(Identifier other) const {
   // Handle empty identifiers.
   if (empty() || other.empty()) {
