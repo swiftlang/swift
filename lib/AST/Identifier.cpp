@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/Identifier.h"
+#include "swift/Parse/Lexer.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/ConvertUTF.h"
@@ -75,16 +76,12 @@ raw_ostream &llvm::operator<<(raw_ostream &OS, swift::ObjCSelector S) {
   return OS;
 }
 
-bool Identifier::isOperatorSlow() const {
-  StringRef data = str();
-  auto *s = reinterpret_cast<llvm::UTF8 const *>(data.begin()),
-  *end = reinterpret_cast<llvm::UTF8 const *>(data.end());
-  llvm::UTF32 codePoint;
-  llvm::ConversionResult res =
-    llvm::convertUTF8Sequence(&s, end, &codePoint, llvm::strictConversion);
-  assert(res == llvm::conversionOK && "invalid UTF-8 in identifier?!");
-  (void)res;
-  return !empty() && isOperatorStartCodePoint(codePoint);
+bool Identifier::isOperator() const {
+  if (!cachedIsOperator.hasValue()) {
+    cachedIsOperator = Lexer::isOperator(str());
+  }
+
+  return cachedIsOperator.getValue();
 }
 
 int Identifier::compare(Identifier other) const {

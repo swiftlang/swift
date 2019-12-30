@@ -35,3 +35,5 @@ var `var with space and .:/` = `Class with space and .:/`.self
 enum `enum with space and .:/` {}
 
 typealias `Typealias with space and .:/` = Int
+
+func `+ start with operator`() {}

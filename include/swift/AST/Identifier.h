@@ -95,18 +95,7 @@ public:
   
   /// isOperator - Return true if this identifier is an operator, false if it is
   /// a normal identifier.
-  /// FIXME: We should maybe cache this.
-  bool isOperator() const {
-    if (empty())
-      return false;
-    if (isEditorPlaceholder())
-      return false;
-    if ((unsigned char)Pointer[0] < 0x80)
-      return isOperatorStartCodePoint((unsigned char)Pointer[0]);
-
-    // Handle the high unicode case out of line.
-    return isOperatorSlow();
-  }
+  bool isOperator() const;
   
   /// isOperatorStartCodePoint - Return true if the specified code point is a
   /// valid start of an operator.
@@ -184,7 +173,7 @@ public:
   }
 
 private:
-  bool isOperatorSlow() const;
+  mutable Optional<bool> cachedIsOperator;
 };
   
 class DeclName;
