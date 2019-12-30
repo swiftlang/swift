@@ -215,9 +215,16 @@ func f11295_Overload(c: Double, d: Double) -> Double { }
 _ = (f11295_Overload as (Int, Int) -> Int)(0, 0)
 _ = (f11295_Overload as (Double, Double) -> Double)(0, 0)
 
-_ = (1 - 2 / 3 * 6) as UInt
+_ = (1 - 2 / 3 * 6) as UInt // OK
 _ = 1/4 as Float > 3/2 as Float // Ok
 _ = 1/4 as Int > 3/2 as Int // Ok 
+
+// Function overload
+func f11295_overload() -> Int { 0 }
+func f11295_overload() -> Double { 0.0 }
+
+_ = f11295_overload() as Int // OK
+_ = f11295_overload() as Double // OK
 
 // Coerce tuple elements
 func f11295_Tuple(_ a: (Int, Int)){}
