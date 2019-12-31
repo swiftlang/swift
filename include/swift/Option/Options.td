@@ -143,6 +143,13 @@ def disable_fine_grained_dependencies :
 Flag<["-"], "disable-fine-grained-dependencies">, Flags<[FrontendOption, HelpHidden]>,
 HelpText<"Don't be more selective about incremental recompilation">;
 
+def enable_type_fingerprints :
+Flag<["-"], "enable-type-fingerprints">, Flags<[FrontendOption, HelpHidden]>,
+HelpText<"Enable per-nominal and extension body fingerprints">;
+
+def disable_type_fingerprints :
+Flag<["-"], "disable-type-fingerprints">, Flags<[FrontendOption, HelpHidden]>,
+HelpText<"Disable per-nominal and extension body fingerprints">;
 
 def enable_only_one_dependency_file :
 Flag<["-"], "enable-only-one-dependency-file">, Flags<[DoesNotAffectIncrementalBuild]>,

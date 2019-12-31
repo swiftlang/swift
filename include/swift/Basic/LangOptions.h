@@ -286,6 +286,12 @@ namespace swift {
     /// faster rebuilds.
     bool EnableFineGrainedDependencies = false;
 
+    /// Instead of hashing tokens inside of NominalType and ExtensionBodies into
+    /// the interface hash, hash them into per-iterable-decl-context
+    /// fingerprints. Fine-grained dependency types won't dirty every provides
+    /// in a file when the user adds a member to, e.g., a struct.
+    bool EnableTypeFingerprints = false;
+
     /// When using fine-grained dependencies, emit dot files for every swiftdeps
     /// file.
     bool EmitFineGrainedDependencySourcefileDotFiles = false;

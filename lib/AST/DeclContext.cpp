@@ -915,7 +915,7 @@ StringRef IterableDeclContext::getBodyFingerprint() const {
 }
 
 bool IterableDeclContext::areDependenciesUsingTokenHashesForTypeBodies() const {
-  return getASTContext().LangOpts.EnableFineGrainedDependencies;
+  return getASTContext().LangOpts.EnableTypeFingerprints;
 }
 
 /// Return the DeclContext to compare when checking private access in

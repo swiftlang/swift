@@ -293,6 +293,10 @@ bool swift::ide::CompletionInstance::performOperation(
   // source text. That breaks an invariant of syntax tree building.
   Invocation.getLangOptions().BuildSyntaxTree = false;
 
+  // Since caching uses the interface hash, and since per type fingerprints
+  // weaken that hash, disable them here:
+  Invocation.getLangOptions().EnableTypeFingerprints = false;
+
   // FIXME: ASTScopeLookup doesn't support code completion yet.
   Invocation.disableASTScopeLookup();
 
