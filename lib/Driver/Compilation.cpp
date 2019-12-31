@@ -1365,7 +1365,14 @@ namespace driver {
       size_t NumTasks = TQ->getNumberOfParallelTasks();
       size_t NumFiles = PendingExecution.size();
       size_t SizeLimit = Comp.getBatchSizeLimit().getValueOr(DefaultSizeLimit);
-      return std::max(NumTasks, NumFiles / SizeLimit);
+
+      // An explanation of why the partition calculation isn't simple division.
+      // Using the default limit as an example, a module of 26 files must be
+      // compiled in 2 batches. Simple division yields 26/25 = 1 batch, but a
+      // single batch of 26 would exceed the limit of 25. To round up, the
+      // calculation is: `(x - 1) / y + 1`.
+      size_t NumPartitions = (NumFiles - 1) / SizeLimit + 1;
+      return std::max(NumTasks, NumPartitions);
     }
 
     /// Select jobs that are batch-combinable from \c PendingExecution, combine
