@@ -12,4 +12,7 @@
 //
 // RUN:  %target-swift-frontend -typecheck -primary-file %t/1.swift -primary-file %t/2.swift -emit-reference-dependencies-path %t/1.swiftdeps -emit-reference-dependencies-path %t/2.swiftdeps
 //
-// RUN: cmp -s %t/1.swiftdeps %t/2.swiftdeps
+// Fine-grained dependencies includes the swiftdeps path so patch it:
+// RUN: sed 's/1.swiftdeps/2.swiftdeps/' <%t/1.swiftdeps >%t/ed.1.swiftdeps
+
+// RUN: cmp -s %t/ed.1.swiftdeps %t/2.swiftdeps
