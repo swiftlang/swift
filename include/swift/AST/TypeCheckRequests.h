@@ -41,6 +41,7 @@ class ClosureExpr;
 class GenericParamList;
 class PrecedenceGroupDecl;
 struct PropertyWrapperBackingPropertyInfo;
+struct PropertyWrapperLValueness;
 struct PropertyWrapperMutability;
 class RequirementRepr;
 class SpecializeAttr;
@@ -625,6 +626,26 @@ private:
 
   // Evaluation.
   Optional<PropertyWrapperMutability>
+  evaluate(Evaluator &evaluator, VarDecl *var) const;
+
+public:
+  // Caching
+  bool isCached() const;
+};
+
+/// Request information about the l-valueness of composed property wrappers.
+class PropertyWrapperLValuenessRequest :
+    public SimpleRequest<PropertyWrapperLValuenessRequest,
+                         Optional<PropertyWrapperLValueness> (VarDecl *),
+                         RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  Optional<PropertyWrapperLValueness>
   evaluate(Evaluator &evaluator, VarDecl *var) const;
 
 public:
