@@ -606,6 +606,15 @@ getEnclosingSelfPropertyWrapperAccess(VarDecl *property, bool forProjected) {
   return result;
 }
 
+static Optional<PropertyWrapperLValueness>
+getPropertyWrapperLValueness(VarDecl *var) {
+  auto &ctx = var->getASTContext();
+  return evaluateOrDefault(
+      ctx.evaluator,
+      PropertyWrapperLValuenessRequest{var},
+      None);
+}
+
 /// Build a reference to the storage of a declaration. Returns nullptr if there
 /// was an error. This should only occur if an invalid declaration was type
 /// checked; another diagnostic should have been emitted already.
@@ -621,9 +630,11 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
   // Local function to "finish" the expression, creating a member reference
   // to the given sequence of underlying variables.
   Optional<EnclosingSelfPropertyWrapperAccess> enclosingSelfAccess;
-  llvm::TinyPtrVector<VarDecl *> underlyingVars;
+  llvm::SmallVector<std::pair<VarDecl *, bool>, 1> underlyingVars;
   auto finish = [&](Expr *result) -> Expr * {
-    for (auto underlyingVar : underlyingVars) {
+    for (auto underlyingVarPair : underlyingVars) {
+      auto underlyingVar = underlyingVarPair.first;
+      auto isWrapperRefLValue = underlyingVarPair.second;
       auto subs = result->getType()
           ->getWithoutSpecifierType()
           ->getContextSubstitutionMap(
@@ -634,7 +645,7 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
       auto *memberRefExpr = new (ctx) MemberRefExpr(
           result, SourceLoc(), memberRef, DeclNameLoc(), /*Implicit=*/true);
       auto type = underlyingVar->getValueInterfaceType().subst(subs);
-      if (isLValue)
+      if (isWrapperRefLValue)
         type = LValueType::get(type);
       memberRefExpr->setType(type);
       
@@ -649,6 +660,8 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
   AccessSemantics semantics;
   SelfAccessorKind selfAccessKind;
   Type selfTypeForAccess = (selfDecl ? selfDecl->getType() : Type());
+
+  bool isMemberLValue = isLValue;
 
   auto *genericEnv = accessor->getGenericEnvironment();
   SubstitutionMap subs;
@@ -714,22 +727,43 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
       firstWrapperIdx = 1;
 
     // Perform accesses to the wrappedValues along the composition chain.
-    for (unsigned i : range(firstWrapperIdx, lastWrapperIdx)) {
-      auto wrapperInfo = var->getAttachedPropertyWrapperTypeInfo(i);
-      auto wrappedValue = wrapperInfo.valueVar;
+    if (firstWrapperIdx < lastWrapperIdx) {
+      if (auto lvalueness = getPropertyWrapperLValueness(var)) {
 
-      // Check for availability of wrappedValue.
-      if (accessor->getAccessorKind() == AccessorKind::Get ||
-          accessor->getAccessorKind() == AccessorKind::Read) {
-        if (auto *attr = wrappedValue->getAttrs().getUnavailable(ctx)) {
-          diagnoseExplicitUnavailability(
-              wrappedValue,
-              var->getAttachedPropertyWrappers()[i]->getRangeWithAt(),
-              var->getDeclContext(), nullptr);
+        // Figure out if the outermost wrapper instance should be an l-value
+        bool isLValueForGet = lvalueness->isLValueForGetAccess[firstWrapperIdx];
+        bool isLValueForSet = lvalueness->isLValueForSetAccess[firstWrapperIdx];
+        isMemberLValue = (isLValueForGet && isUsedForGetAccess) ||
+                         (isLValueForSet && isUsedForSetAccess);
+
+        for (unsigned i : range(firstWrapperIdx, lastWrapperIdx)) {
+          auto wrapperInfo = var->getAttachedPropertyWrapperTypeInfo(i);
+          auto wrappedValue = wrapperInfo.valueVar;
+
+          // Figure out if the wrappedValue accesses should be l-values
+          bool isWrapperRefLValue = isLValue;
+          if (i < lastWrapperIdx - 1) {
+            bool isLValueForGet = lvalueness->isLValueForGetAccess[i+1];
+            bool isLValueForSet = lvalueness->isLValueForSetAccess[i+1];
+            isWrapperRefLValue = (isLValueForGet && isUsedForGetAccess) ||
+                                 (isLValueForSet && isUsedForSetAccess);
+          }
+
+          // Check for availability of wrappedValue.
+          if (accessor->getAccessorKind() == AccessorKind::Get ||
+              accessor->getAccessorKind() == AccessorKind::Read) {
+            if (auto *attr = wrappedValue->getAttrs().getUnavailable(ctx)) {
+              diagnoseExplicitUnavailability(
+                  wrappedValue,
+                  var->getAttachedPropertyWrappers()[i]->getRangeWithAt(),
+                  var->getDeclContext(), nullptr);
+            }
+          }
+
+          underlyingVars.push_back({ wrappedValue, isWrapperRefLValue });
+
         }
       }
-
-      underlyingVars.push_back(wrappedValue);
     }
     semantics = AccessSemantics::DirectToStorage;
     selfAccessKind = SelfAccessorKind::Peer;
@@ -750,8 +784,15 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
     enclosingSelfAccess =
         getEnclosingSelfPropertyWrapperAccess(var, /*forProjected=*/true);
     if (!enclosingSelfAccess) {
+      auto projectionVar = cast<VarDecl>(accessor->getStorage());
+      if (auto lvalueness = getPropertyWrapperLValueness(projectionVar)) {
+        isMemberLValue =
+          (lvalueness->isLValueForGetAccess[0] && isUsedForGetAccess) ||
+          (lvalueness->isLValueForSetAccess[0] && isUsedForSetAccess);
+      }
       underlyingVars.push_back(
-        var->getAttachedPropertyWrapperTypeInfo(0).projectedValueVar);
+        { var->getAttachedPropertyWrapperTypeInfo(0).projectedValueVar,
+          isLValue });
     }
     semantics = AccessSemantics::DirectToStorage;
     selfAccessKind = SelfAccessorKind::Peer;
@@ -805,25 +846,6 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
   }
 
   // Build self.member or equivalent
-
-  bool isMemberLValue = isLValue;
-  if (target == TargetImpl::Wrapper || target == TargetImpl::WrapperStorage) {
-    // If the outermost property wrapper's getter / setter is mutating,
-    // then the reference to the backing storage should be an l-value.
-    auto var = cast<VarDecl>(accessor->getStorage());
-    auto varMember = (target == TargetImpl::WrapperStorage)
-      ? &PropertyWrapperTypeInfo::projectedValueVar
-      : &PropertyWrapperTypeInfo::valueVar;
-    auto wrapper = (target == TargetImpl::WrapperStorage)
-      ? var->getOriginalWrappedProperty(
-          PropertyWrapperSynthesizedPropertyKind::StorageWrapper)
-          ->getAttachedPropertyWrapperTypeInfo(0)
-      : var->getAttachedPropertyWrapperTypeInfo(0);
-    bool isWrapperGetterMutating = (wrapper.*varMember)->isGetterMutating();
-    bool isWrapperSetterMutating = (wrapper.*varMember)->isSetterMutating();
-    isMemberLValue = (isWrapperGetterMutating && isUsedForGetAccess) ||
-                     (isWrapperSetterMutating && isUsedForSetAccess);
-  }
 
   Expr *lookupExpr;
   ConcreteDeclRef memberRef(storage, subs);
@@ -2391,6 +2413,105 @@ PropertyWrapperMutabilityRequest::evaluate(Evaluator &,
   assert(result.Getter != PropertyWrapperMutability::DoesntExist
          && "getter must exist");
   return result;
+}
+
+llvm::Expected<Optional<PropertyWrapperLValueness>>
+PropertyWrapperLValuenessRequest::evaluate(Evaluator &,
+                                           VarDecl *var) const {
+    VarDecl *VD = var;
+    unsigned numWrappers = var->getAttachedPropertyWrappers().size();
+    bool isProjectedValue = false;
+    if (numWrappers < 1) {
+      VD = var->getOriginalWrappedProperty(
+        PropertyWrapperSynthesizedPropertyKind::StorageWrapper);
+      numWrappers = 1; // Can't compose projected values
+      isProjectedValue = true;
+    }
+
+    if (!VD)
+      return None;
+
+    auto varMember = isProjectedValue
+      ? &PropertyWrapperTypeInfo::projectedValueVar
+      : &PropertyWrapperTypeInfo::valueVar;
+
+    // Calling the getter (or setter) on the nth property wrapper in the chain
+    // is done as follows:
+    //  1. call the getter on the (n-1)th property wrapper instance to get the
+    //     nth property wrapper instance
+    //  2. call the getter (or setter) on the nth property wrapper instance
+    //  3. if (2) is a mutating access, call the setter on the (n-1)th property
+    //     wrapper instance to write back the mutated value
+
+    // Below, we determine which of these property wrapper instances need to be
+    // accessed mutating-ly, and therefore should be l-values.
+
+    // The variables used are:
+    //
+    //    - prevWrappersMutabilityForGet:
+    //
+    //      The mutability needed for the first (n-1) wrapper instances to be
+    //      able to call the getter on the (n-1)th instance, for step (1) above
+    //
+    //    - prevWrappersMutabilityForGetAndSet:
+    //
+    //      The mutability needed for the first (n-1) wrapper instances to be
+    //      able to call both the getter and setter on the (n-1)th instance, for
+    //      steps (1) and (3) above
+    //
+    //    - mutability:
+    //
+    //      The mutability needed for calling the getter / setter on the
+    //      nth wrapper instance, for step (2) above.
+
+    llvm::SmallVector<PropertyWrapperMutability::Value, 1>
+      prevWrappersMutabilityForGet, prevWrappersMutabilityForGetAndSet;
+    PropertyWrapperMutability mutability;
+
+    auto firstWrapperInfo = VD->getAttachedPropertyWrapperTypeInfo(0);
+    mutability.Getter = getGetterMutatingness(firstWrapperInfo.*varMember);
+    mutability.Setter = getSetterMutatingness(firstWrapperInfo.*varMember,
+                                var->getInnermostDeclContext());
+
+    for (unsigned i : range(1, numWrappers)) {
+      if (mutability.Getter == PropertyWrapperMutability::Mutating) {
+        prevWrappersMutabilityForGet = prevWrappersMutabilityForGetAndSet;
+      }
+      if (mutability.Getter != PropertyWrapperMutability::Mutating &&
+          mutability.Setter != PropertyWrapperMutability::Mutating) {
+        prevWrappersMutabilityForGetAndSet = prevWrappersMutabilityForGet;
+      }
+      prevWrappersMutabilityForGet.push_back(mutability.Getter);
+      prevWrappersMutabilityForGetAndSet.push_back(
+        std::max(mutability.Getter, mutability.Setter));
+      auto wrapperInfo = VD->getAttachedPropertyWrapperTypeInfo(i);
+      mutability.Getter = getGetterMutatingness(wrapperInfo.*varMember);
+      mutability.Setter = getSetterMutatingness(wrapperInfo.*varMember,
+                                  var->getInnermostDeclContext());
+    }
+
+    auto mutabilitySequenceForLastGet =
+      (mutability.Getter == PropertyWrapperMutability::Mutating)
+      ?  &prevWrappersMutabilityForGetAndSet
+      : &prevWrappersMutabilityForGet;
+    auto mutabilitySequenceForLastSet =
+      (mutability.Setter == PropertyWrapperMutability::Mutating)
+      ? &prevWrappersMutabilityForGetAndSet
+      : &prevWrappersMutabilityForGet;
+
+    PropertyWrapperLValueness lvalueness;
+    for (unsigned i : range(numWrappers - 1)) {
+      lvalueness.isLValueForGetAccess.push_back(
+        (*mutabilitySequenceForLastGet)[i] == PropertyWrapperMutability::Mutating);
+      lvalueness.isLValueForSetAccess.push_back(
+        (*mutabilitySequenceForLastSet)[i] == PropertyWrapperMutability::Mutating);
+    }
+    lvalueness.isLValueForGetAccess.push_back(
+      mutability.Getter == PropertyWrapperMutability::Mutating);
+    lvalueness.isLValueForSetAccess.push_back(
+      mutability.Setter == PropertyWrapperMutability::Mutating);
+
+    return lvalueness;
 }
 
 llvm::Expected<PropertyWrapperBackingPropertyInfo>

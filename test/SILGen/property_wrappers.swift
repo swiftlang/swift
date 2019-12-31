@@ -418,6 +418,131 @@ class NonObservingClassTest {
   @MutatingGetNonMutatingSet var text3: String = ""
 }
 
+// Projected value with non-default mutatingness
+struct Projection<T> {
+  var value: T
+  init(of value: T) {
+    self.value = value
+  }
+}
+
+@propertyWrapper
+struct WrapperWithStorage<T> {
+  private var fixed: T
+
+  var wrappedValue: T {
+    get { fixed }
+    set { }
+  }
+
+  var projectedValue: Projection<T> {
+    get { Projection(of: fixed) }
+    set { }
+  }
+
+  init(wrappedValue: T) {
+    fixed = wrappedValue
+  }
+}
+
+@propertyWrapper
+struct MutatingGetWithStorage<T> {
+  private var fixed: T
+
+  var wrappedValue: T {
+    mutating get { fixed }
+    set { }
+  }
+
+  var projectedValue: Projection<T> {
+    mutating get { Projection(of: fixed) }
+    set { }
+  }
+
+  init(wrappedValue: T) {
+    fixed = wrappedValue
+  }
+}
+
+@propertyWrapper
+struct NonMutatingSetWithStorage<T> {
+  private var fixed: T
+
+  var wrappedValue: T {
+    get { fixed }
+    nonmutating set { }
+  }
+
+  var projectedValue: Projection<T> {
+    get { Projection(of: fixed) }
+    nonmutating set { }
+  }
+
+  init(wrappedValue: T) {
+    fixed = wrappedValue
+  }
+}
+
+@propertyWrapper
+struct MutatingGetNonMutatingSetWithStorage<T> {
+  private var fixed: T
+
+  var wrappedValue: T {
+    mutating get { fixed }
+    nonmutating set { }
+  }
+
+  var projectedValue: Projection<T> {
+    mutating get { Projection(of: fixed) }
+    nonmutating set { }
+  }
+
+  init(wrappedValue: T) {
+    fixed = wrappedValue
+  }
+}
+
+struct ProjectedValueWithNonDefaultMutatingnessTest {
+  @WrapperWithStorage var n1: Int = 0
+  @NonMutatingSetWithStorage var n2: Int = 0
+  @MutatingGetWithStorage var n3: Int = 0
+  @MutatingGetNonMutatingSetWithStorage var n4: Int = 0
+}
+
+class ProjectedValueWithNonDefaultMutatingnessClassTest {
+  @WrapperWithStorage var n1: Int = 0
+  @NonMutatingSetWithStorage var n2: Int = 0
+  @MutatingGetWithStorage var n3: Int = 0
+  @MutatingGetNonMutatingSetWithStorage var n4: Int = 0
+}
+
+// Composition with non-default mutatingness
+struct CompositionWithNonDefaultMutatingnessTest {
+
+  // Two wrappers, all combinations
+  @WrapperA @WrapperB var n1: Int
+  @WrapperA @MutatingGet var n2: Int
+  @WrapperA @NonMutatingSet var n3: Int
+  @WrapperA @MutatingGetNonMutatingSet var n4: Int
+  @MutatingGetWithStorage @WrapperB var n5: Int
+  @MutatingGetWithStorage @MutatingGet var n6: Int
+  @MutatingGetWithStorage @NonMutatingSet var n7: Int
+  @MutatingGetWithStorage @MutatingGetNonMutatingSet var n8: Int
+  @NonMutatingSetWithStorage @WrapperB var n9: Int
+  @NonMutatingSetWithStorage @MutatingGet var n10: Int
+  @NonMutatingSetWithStorage @NonMutatingSet var n11: Int
+  @NonMutatingSetWithStorage @MutatingGetNonMutatingSet var n12: Int
+  @MutatingGetNonMutatingSetWithStorage @WrapperB var n13: Int
+  @MutatingGetNonMutatingSetWithStorage @MutatingGet var n14: Int
+  @MutatingGetNonMutatingSetWithStorage @NonMutatingSet var n15: Int
+  @MutatingGetNonMutatingSetWithStorage @MutatingGetNonMutatingSet var n16: Int
+
+  // Three wrappers, non-standard mutability in the middle
+  @WrapperA @MutatingGet @WrapperB var m1: Int
+  @WrapperA @NonMutatingSet @WrapperB var m2: Int
+  @WrapperA @MutatingGetNonMutatingSet @WrapperB var m3: Int
+}
+
 // Tuple initial values.
 struct WithTuples {
 	// CHECK-LABEL: sil hidden [ossa] @$s17property_wrappers10WithTuplesVACycfC : $@convention(method) (@thin WithTuples.Type) -> WithTuples {

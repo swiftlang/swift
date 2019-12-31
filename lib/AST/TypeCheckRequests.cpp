@@ -547,6 +547,11 @@ bool PropertyWrapperMutabilityRequest::isCached() const {
   return !var->getAttrs().isEmpty();
 }
 
+bool PropertyWrapperLValuenessRequest::isCached() const {
+  auto var = std::get<0>(getStorage());
+  return !var->getAttrs().isEmpty();
+}
+
 void swift::simple_display(
     llvm::raw_ostream &out, const PropertyWrapperTypeInfo &propertyWrapper) {
   out << "{ ";
@@ -587,6 +592,14 @@ void swift::simple_display(llvm::raw_ostream &os, PropertyWrapperMutability m) {
     {"is nonmutating", "is mutating", "doesn't exist"};
   
   os << "getter " << names[m.Getter] << ", setter " << names[m.Setter];
+}
+
+void swift::simple_display(llvm::raw_ostream &out, PropertyWrapperLValueness l) {
+  out << "is lvalue for get: {";
+  simple_display(out, l.isLValueForGetAccess);
+  out << "}, is lvalue for set: {";
+  simple_display(out, l.isLValueForSetAccess);
+  out << "}";
 }
 
 void swift::simple_display(llvm::raw_ostream &out,
