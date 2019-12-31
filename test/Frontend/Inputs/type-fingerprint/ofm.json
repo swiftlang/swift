@@ -1,0 +1,17 @@
+{
+  "./a.swift": {
+    "object": "./a.o",
+    "swift-dependencies": "./a.swiftdeps"
+  },
+  "./b.swift": {
+    "object": "./b.o",
+    "swift-dependencies": "./b.swiftdeps"
+  },
+  "./main.swift": {
+    "object": "./main.o",
+    "swift-dependencies": "./main.swiftdeps"
+  },
+  "": {
+    "swift-dependencies": "./main~buildrecord.swiftdeps"
+  }
+}
