@@ -276,20 +276,31 @@ SILInstruction *MandatoryCombiner::visitApplyInst(ApplyInst *instruction) {
 
 /// Try to remove partial applies that are no longer used
 SILInstruction *MandatoryCombiner::visitPartialApplyInst(PartialApplyInst *i) {
-  auto user = i->getSingleUse();
-  // If there are zero uses, this will be removed by dead code elimination.
-  // If there are more than one uses, we don't want to remove this.
-  if (!user)
-    return nullptr;
-  if (!isa<DeallocStackInst>(user->getUser()))
-    return nullptr;
-
-  // Remove the stack dealloc, then the partial apply, then the function ref.
-  instModCallbacks.deleteInst(user->getUser());
+  if (!i->use_empty()) {
+    SmallVector<SILInstruction *, 2> toRemove;
+    // Get all the uses and add strong_retain, strong_release, and dealloc_stack
+    // to the "toRemove" vector. If we come accross something that isn't one of
+    // those instructions, exit early.
+    for (auto *use : i->getUses()) {
+      if (isa<StrongRetainInst>(use->getUser()) ||
+          isa<StrongReleaseInst>(use->getUser()) ||
+          isa<DeallocStackInst>(use->getUser()))
+        toRemove.push_back(use->getUser());
+      else return nullptr;
+    }
+    
+    for (auto *inst : toRemove) {
+      instModCallbacks.deleteInst(inst);
+    }
+  }
+  
   instModCallbacks.deleteInst(i);
   // If the only use of the function_ref is us, then remove it.
-  if (i->getCallee()->getSingleUse()->getUser() == i)
-    instModCallbacks.deleteInst(cast<FunctionRefInst>(i->getCallee()));
+  auto funcRef = dyn_cast<FunctionRefInst>(i->getCallee());
+  if (funcRef && funcRef->getSingleUse() &&
+      funcRef->getSingleUse()->getUser() == i) {
+    instModCallbacks.deleteInst(funcRef);
+  }
   return nullptr;
 }
 
