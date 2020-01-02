@@ -50,10 +50,9 @@ static void gatherDestroysOfContainer(const DIMemoryObjectInfo &memoryInfo,
   //
   // TODO: This should really be tracked separately from other destroys so that
   // we distinguish the lifetime of the container from the value itself.
-  assert(isa<MarkUninitializedInst>(uninitMemory));
-  auto *pbi = cast<ProjectBoxInst>(uninitMemory->getOperand(0));
-  auto *abi = cast<AllocBoxInst>(pbi->getOperand());
-  for (auto *user : abi->getUsersOfType<DestroyValueInst>()) {
+  assert(isa<ProjectBoxInst>(uninitMemory));
+  auto *mui = cast<MarkUninitializedInst>(uninitMemory->getOperand(0));
+  for (auto *user : mui->getUsersOfType<DestroyValueInst>()) {
     useInfo.trackDestroy(user);
   }
 }
@@ -97,7 +96,11 @@ static std::pair<SILType, bool>
 computeMemorySILType(MarkUninitializedInst *MemoryInst) {
   // Compute the type of the memory object.
   auto *MUI = MemoryInst;
-  SILType MemorySILType = MUI->getType().getObjectType();
+  SILValue Address = MUI;
+  if (auto *PBI = Address->getSingleUserOfType<ProjectBoxInst>()) {
+    Address = PBI;
+  }
+  SILType MemorySILType = Address->getType().getObjectType();
 
   // If this is a let variable we're initializing, remember this so we don't
   // allow reassignment.
@@ -1712,9 +1715,6 @@ void ClassInitElementUseCollector::collectClassInitSelfUses() {
 
   assert(StoresOfArgumentToSelf == 1 &&
          "The 'self' argument should have been stored into the box exactly once");
-
-  // Gather the uses of the
-  gatherDestroysOfContainer(TheMemory, UseInfo);
 }
 
 void ClassInitElementUseCollector::collectClassInitSelfLoadUses(
@@ -1818,6 +1818,7 @@ void swift::ownership::collectDIElementUsesFrom(
   if (shouldPerformClassInitSelf(MemoryInfo)) {
     ClassInitElementUseCollector UseCollector(MemoryInfo, UseInfo);
     UseCollector.collectClassInitSelfUses();
+    gatherDestroysOfContainer(MemoryInfo, UseInfo);
     return;
   }
 
@@ -1829,6 +1830,7 @@ void swift::ownership::collectDIElementUsesFrom(
            "delegating inits only have 1 bit");
     collectDelegatingInitUses(MemoryInfo, UseInfo,
                               MemoryInfo.getUninitializedValue());
+    gatherDestroysOfContainer(MemoryInfo, UseInfo);
     return;
   }
 
