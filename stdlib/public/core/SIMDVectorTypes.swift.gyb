@@ -206,7 +206,8 @@ extension SIMD${n} : EuclideanDifferentiable
 extension SIMD${n}
   where Scalar : EuclideanDifferentiable & BinaryFloatingPoint,
         Scalar.TangentVector : BinaryFloatingPoint {
-  @usableFromInline
+  // NOTE(TF-1094): serialized `@derivative` for `.swiftinterface` compilation.
+  @inlinable
   @derivative(of: subscript(_:))
   internal func _vjpSubscript(index: Int)
   -> (value: Scalar, pullback: (Scalar.TangentVector) -> TangentVector) {
