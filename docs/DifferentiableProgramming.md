@@ -2030,7 +2030,7 @@ and data structures that deal with differentiable function values, including:
 
 Arbitrary higher-order functions that require arguments to be differentiable
 functions. Differential operators, e.g. `derivative(of:)`, described in the
-[differential operators and differentiation APIs](differential-operators-and-differentiation-apis)
+[differential operators and differentiation APIs](#differential-operators-1)
 section. Differentiable higher-order functions for collections, e.g.
 [`Array.differentiableReduce(_:_:)`](https://gist.github.com/rxwei/2739515f77a62d26add66947cb179911).
 Data structures that store `@differentiable` functions as a property. Neural
