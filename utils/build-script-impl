@@ -247,8 +247,6 @@ KNOWN_SETTINGS=(
     swift-cmake-options                ""        "CMake options used for all swift targets"
     xctest-cmake-options               ""        "CMake options used for all xctest targets"
     playgroundsupport-cmake-options    ""        "CMake options used for all playgroundsupport targets"
-    # TODO: Remove this some time later.
-    user-config-args            ""               "**Renamed to --extra-cmake-options**: User-supplied arguments to cmake when used to do configuration."
     only-execute                       "all"     "Only execute the named action (see implementation)"
     llvm-lit-args                      ""        "If set, override the lit args passed to LLVM"
     clang-profile-instr-use            ""        "If set, profile file to use for clang PGO while building llvm/clang"
@@ -782,12 +780,6 @@ done
 
 # TODO: Rename this argument
 LOCAL_HOST=$HOST_TARGET
-
-# TODO: Remove this some time later.
-if [[ "${USER_CONFIG_ARGS}" ]]; then
-    echo "Error: --user-config-args is renamed to --extra-cmake-options." 1>&2
-    exit 1
-fi
 
 if [[ "${CHECK_ARGS_ONLY}" ]]; then
     exit 0
