@@ -909,8 +909,20 @@ void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
     auto initialization =
         SGF.emitInitializationForVarDecl(S->getIteratorVar(), false);
     SILLocation loc = SILLocation(S->getSequence());
+
+    // Compute the reference to the Sequence's makeIterator().
+    FuncDecl *makeIteratorReq = SGF.getASTContext().getSequenceMakeIterator();
+    auto sequenceProto =
+        SGF.getASTContext().getProtocol(KnownProtocolKind::Sequence);
+    auto sequenceConformance = S->getSequenceConformance();
+    Type sequenceType = S->getSequence()->getType();
+    auto sequenceSubs = SubstitutionMap::getProtocolSubstitutions(
+        sequenceProto, sequenceType, sequenceConformance);
+    ConcreteDeclRef makeIteratorRef(makeIteratorReq, sequenceSubs);
+
+    // Call makeIterator().
     RValue result = SGF.emitApplyMethod(
-        loc, S->getMakeIterator(), ArgumentSource(S->getSequence()),
+        loc, makeIteratorRef, ArgumentSource(S->getSequence()),
         PreparedArguments(ArrayRef<AnyFunctionType::Param>({})),
         SGFContext(initialization.get()));
     if (!result.isInContext()) {

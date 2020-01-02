@@ -3013,16 +3013,7 @@ auto TypeChecker::typeCheckForEachBinding(
 
       // Perform any necessary conversions of the sequence (e.g. [T]! -> [T]).
       expr = solution.coerceToType(expr, SequenceType, Locator);
-      
       if (!expr) return nullptr;
-
-      // Convert the sequence as appropriate for the makeIterator() call.
-      auto makeIteratorOverload = solution.getOverloadChoice(ContextualLocator);
-      auto makeIteratorSelfType = solution.simplifyType(
-          makeIteratorOverload.openedFullType
-        )->castTo<AnyFunctionType>()->getParams()[0].getPlainType();
-      expr = solution.coerceToType(expr, makeIteratorSelfType,
-                                   ContextualLocator);
 
       cs.cacheExprTypes(expr);
       Stmt->setSequence(expr);
@@ -3053,14 +3044,6 @@ auto TypeChecker::typeCheckForEachBinding(
           IteratorType, IteratorProto, cs.DC,
           ConformanceCheckFlags::InExpression,
           expr->getLoc());
-
-      // Record the makeIterator declaration we used.
-      auto makeIteratorDecl = makeIteratorOverload.choice.getDecl();
-      auto makeIteratorSubs = SequenceType->getMemberSubstitutionMap(
-          cs.DC->getParentModule(), makeIteratorDecl);
-      auto makeIteratorDeclRef =
-          ConcreteDeclRef(makeIteratorDecl, makeIteratorSubs);
-      Stmt->setMakeIterator(makeIteratorDeclRef);
 
       solution.setExprTypes(expr);
       return expr;

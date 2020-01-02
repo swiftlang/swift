@@ -808,7 +808,6 @@ class ForEachStmt : public LabeledStmt {
 
   // Set by Sema:
   ProtocolConformanceRef sequenceConformance = ProtocolConformanceRef();
-  ConcreteDeclRef makeIterator;
   ConcreteDeclRef iteratorNext;
   VarDecl *iteratorVar = nullptr;
   Expr *iteratorVarRef = nullptr;
@@ -837,9 +836,6 @@ public:
 
   void setConvertElementExpr(Expr *expr) { convertElementExpr = expr; }
   Expr *getConvertElementExpr() const { return convertElementExpr; }
-
-  void setMakeIterator(ConcreteDeclRef declRef) { makeIterator = declRef; }
-  ConcreteDeclRef getMakeIterator() const { return makeIterator; }
 
   void setIteratorNext(ConcreteDeclRef declRef) { iteratorNext = declRef; }
   ConcreteDeclRef getIteratorNext() const { return iteratorNext; }
