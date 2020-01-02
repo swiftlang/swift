@@ -6998,13 +6998,13 @@ public:
     });
   }
 
-  using SuccessorBlockArgumentsListTy =
+  using SuccessorBlockArgumentListTy =
       TransformRange<ConstSuccessorListTy, function_ref<SILPhiArgumentArrayRef(
                                                const SILSuccessor &)>>;
 
   /// Return the range of Argument arrays for each successor of this
   /// block.
-  SuccessorBlockArgumentsListTy getSuccessorBlockArguments() const;
+  SuccessorBlockArgumentListTy getSuccessorBlockArgumentLists() const;
 
   using SuccessorBlockListTy =
       TransformRange<SuccessorListTy,

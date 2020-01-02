@@ -934,7 +934,7 @@ static SILInstruction *getNonPhiBlockIncomingValueDef(SILValue incomingValue,
 static bool
 terminatorHasAnyKnownPhis(TermInst *ti,
                           ArrayRef<SILPhiArgument *> insertedPhiNodesSorted) {
-  for (auto succArgList : ti->getSuccessorBlockArguments()) {
+  for (auto succArgList : ti->getSuccessorBlockArgumentLists()) {
     if (llvm::any_of(succArgList, [&](SILPhiArgument *arg) {
           return binary_search(insertedPhiNodesSorted, arg);
         })) {
