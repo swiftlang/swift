@@ -1012,7 +1012,7 @@ bb0(%0 : $C):
 // CHECK:   [[F:%.*]] = function_ref @use_c
 // CHECK:   apply [[F]]([[ARG]])
 // CHECK:   strong_release [[ARG]]
-// TODO: why is this broken?
+// CHECK:   strong_release [[ARG]]
 // CHECK:   return
 sil @test_guaranteed_closure_capture : $@convention(thin) (@guaranteed C) -> () {
 bb0(%0: $C):
@@ -1032,7 +1032,7 @@ bb0(%0: $C):
 // CHECK:   [[F:%.*]] = function_ref @use_c
 // CHECK:   apply [[F]]([[ARG]])
 // CHECK:   strong_release [[ARG]] : $C
-// TODO: also this
+// CHECK:   strong_release [[ARG]] : $C
 // CHECK:   return
 sil @test_guaranteed_closure_capture2 : $@convention(thin) (@guaranteed C) -> () {
 bb0(%0: $C):
@@ -1051,7 +1051,7 @@ bb0(%0: $C):
 // CHECK:   [[F:%.*]] = function_ref @use_c_unowned
 // CHECK:   apply [[F]]([[ARG]]) : $@convention(thin) (C) -> ()
 // CHECK:   strong_release [[ARG]]
-// TODO: also this
+// CHECK:   strong_release [[ARG]]
 // CHECK:   return
 sil @test_unowned_closure_capture2 : $@convention(thin) (@guaranteed C) -> () {
 bb0(%0: $C):

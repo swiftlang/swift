@@ -117,7 +117,7 @@ public:
     return changed;
   }
 
-  bool tryRemoveUnused(SILInstruction *i);
+  bool tryRemoveUnused(SILValue v);
 
   /// Base visitor that does not do anything.
   SILInstruction *visitSILInstruction(SILInstruction *) { return nullptr; }
@@ -287,9 +287,7 @@ template <class InstT> static FunctionRefInst *getRemovableRef(InstT *i) {
   return nullptr;
 }
 
-bool MandatoryCombiner::tryRemoveUnused(SILInstruction *i) {
-  SILValue v = SILValue::getFromOpaqueValue(i);
-
+bool MandatoryCombiner::tryRemoveUnused(SILValue v) {
   if (!v->use_empty()) {
     SmallVector<SILInstruction *, 2> toRemove;
     // Get all the uses and add strong_retain, strong_release, and dealloc_stack
@@ -310,7 +308,7 @@ bool MandatoryCombiner::tryRemoveUnused(SILInstruction *i) {
     }
   }
 
-  instModCallbacks.deleteInst(i);
+  instModCallbacks.deleteInst(v->getDefiningInstruction());
   return true;
 }
 
