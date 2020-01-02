@@ -326,14 +326,6 @@ function to_varname() {
     toupper "$(echo $1 | tr '-' '_')"
 }
 
-function set_lldb_build_mode() {
-    if [[ "${LLDB_BUILD_TYPE}" == "RelWithDebInfo" ]]; then
-      LLDB_BUILD_MODE="CustomSwift-Release"
-    else
-      LLDB_BUILD_MODE="CustomSwift-${LLDB_BUILD_TYPE}"
-    fi
-}
-
 function is_llvm_lto_enabled() {
     if [[ "${LLVM_ENABLE_LTO}" == "thin" ]] ||
        [[ "${LLVM_ENABLE_LTO}" == "full" ]]; then
