@@ -505,6 +505,8 @@ namespace driver {
             break;
           LLVM_FALLTHROUGH;
         case CoarseGrainedDependencyGraph::LoadResult::AffectsDownstream:
+        #error will mark every job dependent on this one, changes were lost during integration
+        #error result of loadDepGraphFromPath should include the changes; mark THOSE transitively
           return markTransitiveInDepGraph(FinishedCmd, forRanges,
                                    IncrementalTracer);
         }

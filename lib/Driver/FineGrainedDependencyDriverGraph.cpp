@@ -214,6 +214,11 @@ LoadResult ModuleDepGraph::integrate(const SourceFileDepGraph &g) {
     changedNodes.insert(p.second->getKey());
     removeNode(p.second);
   }
+#error need to return a LoadResult containing the changes
+  llvm::errs() << "HERE \n";
+  for (auto n: changedNodes) {
+    n.dump();
+  }
 
   // TODO: use changedKeys sometime, for instance by returning them
   // as part of return value so that the driver can only mark from them.

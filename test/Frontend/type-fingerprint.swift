@@ -27,8 +27,9 @@
 // CHECK-MAINAB-RECOMPILED:   type 'main.B2' in b.swift -> source file a.swift
 
 
+
 // =============================================================================
-// Without the fingerprints
+// With the fingerprints
 // =============================================================================
 
 // Establish status quo
@@ -39,10 +40,15 @@
 // RUN: cp %S/Inputs/type-fingerprint/b0.swift %t/b.swift
 // RUN: cd %t && %swiftc_driver  -enable-batch-mode -j2 -incremental -driver-show-incremental ./main.swift ./a.swift ./b.swift -module-name main -output-file-map ofm.json >&output3
 
+// RUN: cp %t/b.swiftdeps %t/b3.swiftdeps
+
 // Change one type, only uses of that type get recompiled
 
 // RUN: cp %S/Inputs/type-fingerprint/b1.swift %t/b.swift
+// RUN: gazorp
 // RUN: cd %t && %swiftc_driver  -enable-batch-mode -j2 -incremental -driver-show-incremental ./main.swift ./a.swift ./b.swift -module-name main -output-file-map ofm.json >&output4
+
+// RUN: cp %t/b.swiftdeps %t/b4.swiftdeps
 
 // RUN: %FileCheck -match-full-lines -check-prefix=CHECK-MAINB-RECOMPILED %s < %t/output4
 
