@@ -60,5 +60,6 @@ struct L<T>: Sequence {} // expected-error {{type 'L<T>' does not conform to pro
 
 func z(_ x: L<Int>) {
   for xx in x {}
-  // expected-error@-1{{for-in loop requires 'L<Int>' to conform to 'Sequence'}}
+  // expected-warning@-1{{immutable value 'xx' was never used; consider replacing with '_' or removing it}}
+  // expected-error@-2{{type 'L<Int>.Iterator' does not conform to protocol 'IteratorProtocol'}}
 }

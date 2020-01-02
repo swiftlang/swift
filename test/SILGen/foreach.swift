@@ -108,8 +108,8 @@ func trivialStructBreak(_ xx: [Int]) {
 // CHECK:   [[PROJECT_ITERATOR_BOX:%.*]] = project_box [[ITERATOR_BOX]]
 // CHECK:   [[BORROWED_ARRAY_STACK:%.*]] = alloc_stack $Array<Int>
 // CHECK:   store [[ARRAY_COPY:%.*]] to [init] [[BORROWED_ARRAY_STACK]]
-// CHECK:   [[MAKE_ITERATOR_FUNC:%.*]] = function_ref @$sSlss16IndexingIteratorVyxG0B0RtzrlE04makeB0ACyF
-// CHECK:   apply [[MAKE_ITERATOR_FUNC]]<Array<Int>>([[PROJECT_ITERATOR_BOX]], [[BORROWED_ARRAY_STACK]])
+// CHECK:   [[MAKE_ITERATOR_FUNC:%.*]] = witness_method $Array<Int>, #Sequence.makeIterator!1 : <Self where Self : Sequence> (__owned Self) -> () -> Self.Iterator : $@convention(witness_method: Sequence) <τ_0_0 where τ_0_0 : Sequence> (@in τ_0_0) -> @out τ_0_0.Iterator
+// CHECK:   apply [[MAKE_ITERATOR_FUNC]]<[Int]>([[PROJECT_ITERATOR_BOX]], [[BORROWED_ARRAY_STACK]])
 // CHECK:   br [[LOOP_DEST:bb[0-9]+]]
 //
 // CHECK: [[LOOP_DEST]]:
@@ -208,8 +208,8 @@ func existentialBreak(_ xx: [P]) {
 // CHECK:   [[PROJECT_ITERATOR_BOX:%.*]] = project_box [[ITERATOR_BOX]]
 // CHECK:   [[BORROWED_ARRAY_STACK:%.*]] = alloc_stack $Array<P>
 // CHECK:   store [[ARRAY_COPY:%.*]] to [init] [[BORROWED_ARRAY_STACK]]
-// CHECK:   [[MAKE_ITERATOR_FUNC:%.*]] = function_ref @$sSlss16IndexingIteratorVyxG0B0RtzrlE04makeB0ACyF
-// CHECK:   apply [[MAKE_ITERATOR_FUNC]]<Array<P>>([[PROJECT_ITERATOR_BOX]], [[BORROWED_ARRAY_STACK]])
+// CHECK:   [[MAKE_ITERATOR_FUNC:%.*]] = witness_method $Array<P>, #Sequence.makeIterator!1 : <Self where Self : Sequence> (__owned Self) -> () -> Self.Iterator : $@convention(witness_method: Sequence) <τ_0_0 where τ_0_0 : Sequence> (@in τ_0_0) -> @out τ_0_0.Iterator
+// CHECK:   apply [[MAKE_ITERATOR_FUNC]]<[P]>([[PROJECT_ITERATOR_BOX]], [[BORROWED_ARRAY_STACK]])
 // CHECK:   [[ELT_STACK:%.*]] = alloc_stack $Optional<P>
 // CHECK:   br [[LOOP_DEST:bb[0-9]+]]
 //
@@ -368,8 +368,8 @@ func genericStructBreak<T>(_ xx: [GenericStruct<T>]) {
 // CHECK:   [[PROJECT_ITERATOR_BOX:%.*]] = project_box [[ITERATOR_BOX]]
 // CHECK:   [[BORROWED_ARRAY_STACK:%.*]] = alloc_stack $Array<GenericStruct<T>>
 // CHECK:   store [[ARRAY_COPY:%.*]] to [init] [[BORROWED_ARRAY_STACK]]
-// CHECK:   [[MAKE_ITERATOR_FUNC:%.*]] = function_ref @$sSlss16IndexingIteratorVyxG0B0RtzrlE04makeB0ACyF
-// CHECK:   apply [[MAKE_ITERATOR_FUNC]]<Array<GenericStruct<T>>>([[PROJECT_ITERATOR_BOX]], [[BORROWED_ARRAY_STACK]])
+// CHECK:   [[MAKE_ITERATOR_FUNC:%.*]] = witness_method $Array<GenericStruct<T>>, #Sequence.makeIterator!1 : <Self where Self : Sequence> (__owned Self) -> () -> Self.Iterator : $@convention(witness_method: Sequence) <τ_0_0 where τ_0_0 : Sequence> (@in τ_0_0) -> @out τ_0_0.Iterator
+// CHECK:   apply [[MAKE_ITERATOR_FUNC]]<[GenericStruct<T>]>([[PROJECT_ITERATOR_BOX]], [[BORROWED_ARRAY_STACK]])
 // CHECK:   [[ELT_STACK:%.*]] = alloc_stack $Optional<GenericStruct<T>>
 // CHECK:   br [[LOOP_DEST:bb[0-9]+]]
 //

@@ -489,6 +489,9 @@ public:
   /// Get the '+' function on two String.
   FuncDecl *getPlusFunctionOnString() const;
 
+  /// Get Sequence.makeIterator().
+  FuncDecl *getSequenceMakeIterator() const;
+
   /// Check whether the standard library provides all the correct
   /// intrinsic support for Optional<T>.
   ///

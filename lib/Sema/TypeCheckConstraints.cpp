@@ -2991,14 +2991,12 @@ auto TypeChecker::typeCheckForEachBinding(
       }
 
       // Reference the makeIterator witness.
-      // FIXME: Not tied to the actual witness.
       ASTContext &ctx = cs.getASTContext();
-      DeclName makeIteratorName(ctx, ctx.Id_makeIterator,
-                                ArrayRef<Identifier>());
+      FuncDecl *makeIterator = ctx.getSequenceMakeIterator();
       MakeIteratorType = cs.createTypeVariable(Locator, TVO_CanBindToNoEscape);
-      cs.addValueMemberConstraint(
-          LValueType::get(SequenceType), DeclNameRef(makeIteratorName),
-          MakeIteratorType, cs.DC, FunctionRefKind::Compound, { },
+      cs.addValueWitnessConstraint(
+          LValueType::get(SequenceType), makeIterator,
+          MakeIteratorType, cs.DC, FunctionRefKind::Compound,
           ContextualLocator);
 
       Stmt->setSequence(expr);
