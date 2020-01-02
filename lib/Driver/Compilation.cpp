@@ -1362,10 +1362,6 @@ namespace driver {
       // be compiled in 2 batches. Integer division yields 26/25 = 1 batch, but
       // a single batch of 26 exceeds the limit. The calculation must round up,
       // which can be calculated using: `(x + y - 1) / y`
-      //
-      // Two key properties of this calculation are:
-      //   DivideUp(M*N, N) = M
-      //   DivideUp(M*N + 1, N) = M + 1
       auto DivideUp = [](size_t Num, size_t Div) -> size_t {
         return (Num + Div - 1) / Div;
       };
