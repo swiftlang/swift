@@ -1273,7 +1273,8 @@ DirectLookupRequest::evaluate(Evaluator &evaluator,
   ASTContext &ctx = decl->getASTContext();
   const bool useNamedLazyMemberLoading = (ctx.LangOpts.NamedLazyMemberLoading &&
                                           decl->hasLazyMembers());
-
+  const bool disableAdditionalExtensionLoading =
+      flags.contains(NominalTypeDecl::LookupDirectFlags::IgnoreNewExtensions);
   const bool includeAttrImplements =
       flags.contains(NominalTypeDecl::LookupDirectFlags::IncludeAttrImplements);
 
@@ -1301,10 +1302,14 @@ DirectLookupRequest::evaluate(Evaluator &evaluator,
                                         includeAttrImplements);
   };
 
-  auto updateLookupTable = [&decl](MemberLookupTable &table) {
+  auto updateLookupTable = [&decl](MemberLookupTable &table,
+                                   bool noExtensions) {
     // Make sure we have the complete list of members (in this nominal and in
     // all extensions).
     (void)decl->getMembers();
+
+    if (noExtensions)
+      return;
 
     for (auto E : decl->getExtensions())
       (void)E->getMembers();
@@ -1314,7 +1319,7 @@ DirectLookupRequest::evaluate(Evaluator &evaluator,
 
   auto &Table = *decl->LookupTable;
   if (!useNamedLazyMemberLoading) {
-    updateLookupTable(Table);
+    updateLookupTable(Table, disableAdditionalExtensionLoading);
   } else if (!Table.isLazilyComplete(name.getBaseName())) {
     // The lookup table believes it doesn't have a complete accounting of this
     // name - either because we're never seen it before, or another extension
@@ -1322,8 +1327,8 @@ DirectLookupRequest::evaluate(Evaluator &evaluator,
     // us a hand.
     DeclBaseName baseName(name.getBaseName());
     if (populateLookupTableEntryFromLazyIDCLoader(ctx, Table, baseName, decl)) {
-      updateLookupTable(Table);
-    } else {
+      updateLookupTable(Table, disableAdditionalExtensionLoading);
+    } else if (!disableAdditionalExtensionLoading) {
       populateLookupTableEntryFromExtensions(ctx, Table, decl, baseName);
     }
     Table.markLazilyComplete(baseName);

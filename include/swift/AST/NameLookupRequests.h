@@ -513,10 +513,6 @@ private:
   // Evaluation.
   llvm::Expected<TinyPtrVector<ValueDecl *>>
   evaluate(Evaluator &evaluator, DirectLookupDescriptor desc) const;
-
-public:
-  // Cycle handling
-  void diagnoseCycle(DiagnosticEngine &diags) const;
 };
 
 #define SWIFT_TYPEID_ZONE NameLookup
