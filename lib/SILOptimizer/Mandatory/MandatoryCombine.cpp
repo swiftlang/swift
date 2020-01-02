@@ -118,7 +118,7 @@ public:
   }
 
   bool tryRemoveUnused(SILInstruction *i);
-      
+
   /// Base visitor that does not do anything.
   SILInstruction *visitSILInstruction(SILInstruction *) { return nullptr; }
   SILInstruction *visitApplyInst(ApplyInst *instruction);
@@ -277,104 +277,7 @@ SILInstruction *MandatoryCombiner::visitApplyInst(ApplyInst *instruction) {
   return nullptr;
 }
 
-static SILValue cleanupLoadedCalleeValue(SILValue calleeValue, LoadInst *li,
-                                         std::function<void(SILInstruction *)> &deleteInstruction) {
-  auto *pbi = dyn_cast<ProjectBoxInst>(li->getOperand());
-  if (!pbi)
-    return SILValue();
-  auto *abi = dyn_cast<AllocBoxInst>(pbi->getOperand());
-  if (!abi)
-    return SILValue();
-
-  // The load instruction must have no more uses or a single destroy left to
-  // erase it.
-  if (li->getFunction()->hasOwnership()) {
-    // TODO: What if we have multiple destroy_value? That should be ok as well.
-    auto *dvi = li->getSingleUserOfType<DestroyValueInst>();
-    if (!dvi)
-      return SILValue();
-    deleteInstruction(dvi);
-  } else if (!li->use_empty()) {
-    return SILValue();
-  }
-  deleteInstruction(li);
-
-  // Look through uses of the alloc box the load is loading from to find up to
-  // one store and up to one strong release.
-  PointerUnion<StrongReleaseInst *, DestroyValueInst *> destroy;
-  destroy = nullptr;
-  for (Operand *use : abi->getUses()) {
-    auto *user = use->getUser();
-
-    if (destroy.isNull()) {
-      if (auto *sri = dyn_cast<StrongReleaseInst>(user)) {
-        destroy = sri;
-        continue;
-      }
-
-      if (auto *dvi = dyn_cast<DestroyValueInst>(user)) {
-        destroy = dvi;
-        continue;
-      }
-    }
-
-    if (user == pbi)
-      continue;
-
-    return SILValue();
-  }
-
-  StoreInst *si = nullptr;
-  for (Operand *use : pbi->getUses()) {
-    if (auto *useSI = dyn_cast_or_null<StoreInst>(use->getUser())) {
-      si = useSI;
-      continue;
-    }
-    return SILValue();
-  }
-
-  // If we found a store, record its source and erase it.
-  if (si) {
-    calleeValue = si->getSrc();
-    deleteInstruction(si);
-  } else {
-    calleeValue = SILValue();
-  }
-
-  // If we found a strong release, replace it with a strong release of the
-  // source of the store and erase it.
-  if (destroy) {
-    if (calleeValue) {
-      if (auto *sri = destroy.dyn_cast<StrongReleaseInst *>()) {
-        SILBuilderWithScope(sri).emitStrongReleaseAndFold(sri->getLoc(),
-                                                          calleeValue);
-        deleteInstruction(sri);
-      } else {
-        auto *dvi = destroy.get<DestroyValueInst *>();
-        SILBuilderWithScope(dvi).emitDestroyValueAndFold(dvi->getLoc(),
-                                                         calleeValue);
-        deleteInstruction(dvi);
-      }
-    }
-  }
-
-  assert(pbi->use_empty());
-  deleteInstruction(pbi);
-  assert(abi->use_empty());
-  deleteInstruction(abi);
-
-  return calleeValue;
-}
-
-static SILValue stripCopiesAndBorrows(SILValue v) {
-  while (isa<CopyValueInst>(v) || isa<BeginBorrowInst>(v)) {
-    v = cast<SingleValueInstruction>(v)->getOperand(0);
-  }
-  return v;
-}
-
-template<class InstT>
-static FunctionRefInst *getRemovableRef(InstT* i) {
+template <class InstT> static FunctionRefInst *getRemovableRef(InstT *i) {
   // If the only use of the function_ref is us, then remove it.
   auto funcRef = dyn_cast<FunctionRefInst>(i->getCallee());
   if (funcRef && funcRef->getSingleUse() &&
@@ -386,7 +289,7 @@ static FunctionRefInst *getRemovableRef(InstT* i) {
 
 bool MandatoryCombiner::tryRemoveUnused(SILInstruction *i) {
   SILValue v = SILValue::getFromOpaqueValue(i);
-  
+
   if (!v->use_empty()) {
     SmallVector<SILInstruction *, 2> toRemove;
     // Get all the uses and add strong_retain, strong_release, and dealloc_stack
@@ -398,25 +301,26 @@ bool MandatoryCombiner::tryRemoveUnused(SILInstruction *i) {
           isa<DeallocStackInst>(use->getUser()) ||
           isa<DebugValueInst>(use->getUser()))
         toRemove.push_back(use->getUser());
-      else return false;
+      else
+        return false;
     }
-    
+
     for (auto *inst : toRemove) {
       instModCallbacks.deleteInst(inst);
     }
   }
-  
+
   instModCallbacks.deleteInst(i);
   return true;
 }
 
 SILInstruction *MandatoryCombiner::visitLoadInst(LoadInst *i) {
-  auto val = cleanupLoadedCalleeValue(i, i, instModCallbacks.deleteInst);
+  auto val = cleanupLoadedCalleeValue(i, instModCallbacks.deleteInst);
   if (!val)
     return nullptr;
 
   val = stripCopiesAndBorrows(val);
-  
+
   if (auto *pa = dyn_cast<PartialApplyInst>(val)) {
     if (tryRemoveUnused(pa)) {
       if (auto *ref = getRemovableRef(pa)) {
@@ -424,7 +328,7 @@ SILInstruction *MandatoryCombiner::visitLoadInst(LoadInst *i) {
       }
     }
   }
-  
+
   if (auto *tttf = dyn_cast<ThinToThickFunctionInst>(val)) {
     if (tryRemoveUnused(tttf)) {
       if (auto *ref = getRemovableRef(tttf)) {
@@ -432,14 +336,14 @@ SILInstruction *MandatoryCombiner::visitLoadInst(LoadInst *i) {
       }
     }
   }
-  
+
   if (auto *convFunc = dyn_cast<ConvertFunctionInst>(val)) {
     if (isInstructionTriviallyDead(convFunc)) {
       // We'll let dead code elimination do the rest
       instModCallbacks.deleteInst(convFunc);
     }
   }
-  
+
   return nullptr;
 }
 

@@ -46,13 +46,6 @@ static void diagnose(ASTContext &Context, SourceLoc loc, Diag<T...> diag,
   Context.Diags.diagnose(loc, diag, std::forward<U>(args)...);
 }
 
-static SILValue stripCopiesAndBorrows(SILValue v) {
-  while (isa<CopyValueInst>(v) || isa<BeginBorrowInst>(v)) {
-    v = cast<SingleValueInstruction>(v)->getOperand(0);
-  }
-  return v;
-}
-
 /// Fixup reference counts after inlining a function call (which is a no-op
 /// unless the function is a thick function).
 ///
@@ -252,94 +245,6 @@ static void fixupReferenceCounts(
   }
 }
 
-static SILValue cleanupLoadedCalleeValue(SILValue calleeValue, LoadInst *li) {
-  auto *pbi = dyn_cast<ProjectBoxInst>(li->getOperand());
-  if (!pbi)
-    return SILValue();
-  auto *abi = dyn_cast<AllocBoxInst>(pbi->getOperand());
-  if (!abi)
-    return SILValue();
-
-  // The load instruction must have no more uses or a single destroy left to
-  // erase it.
-  if (li->getFunction()->hasOwnership()) {
-    // TODO: What if we have multiple destroy_value? That should be ok as well.
-    auto *dvi = li->getSingleUserOfType<DestroyValueInst>();
-    if (!dvi)
-      return SILValue();
-    dvi->eraseFromParent();
-  } else if (!li->use_empty()) {
-    return SILValue();
-  }
-  li->eraseFromParent();
-
-  // Look through uses of the alloc box the load is loading from to find up to
-  // one store and up to one strong release.
-  PointerUnion<StrongReleaseInst *, DestroyValueInst *> destroy;
-  destroy = nullptr;
-  for (Operand *use : abi->getUses()) {
-    auto *user = use->getUser();
-
-    if (destroy.isNull()) {
-      if (auto *sri = dyn_cast<StrongReleaseInst>(user)) {
-        destroy = sri;
-        continue;
-      }
-
-      if (auto *dvi = dyn_cast<DestroyValueInst>(user)) {
-        destroy = dvi;
-        continue;
-      }
-    }
-
-    if (user == pbi)
-      continue;
-
-    return SILValue();
-  }
-
-  StoreInst *si = nullptr;
-  for (Operand *use : pbi->getUses()) {
-    if (auto *useSI = dyn_cast_or_null<StoreInst>(use->getUser())) {
-      si = useSI;
-      continue;
-    }
-    return SILValue();
-  }
-
-  // If we found a store, record its source and erase it.
-  if (si) {
-    calleeValue = si->getSrc();
-    si->eraseFromParent();
-  } else {
-    calleeValue = SILValue();
-  }
-
-  // If we found a strong release, replace it with a strong release of the
-  // source of the store and erase it.
-  if (destroy) {
-    if (calleeValue) {
-      if (auto *sri = destroy.dyn_cast<StrongReleaseInst *>()) {
-        SILBuilderWithScope(sri).emitStrongReleaseAndFold(sri->getLoc(),
-                                                          calleeValue);
-        sri->eraseFromParent();
-      } else {
-        auto *dvi = destroy.get<DestroyValueInst *>();
-        SILBuilderWithScope(dvi).emitDestroyValueAndFold(dvi->getLoc(),
-                                                         calleeValue);
-        dvi->eraseFromParent();
-      }
-    }
-  }
-
-  assert(pbi->use_empty());
-  pbi->eraseFromParent();
-  assert(abi->use_empty());
-  abi->eraseFromParent();
-
-  return calleeValue;
-}
-
 /// Removes instructions that create the callee value if they are no
 /// longer necessary after inlining.
 static void cleanupCalleeValue(SILValue calleeValue) {
@@ -347,7 +252,8 @@ static void cleanupCalleeValue(SILValue calleeValue) {
   // fail to optimize, return. Otherwise, see if we can look through other
   // abstractions on our callee.
   if (auto *li = dyn_cast<LoadInst>(calleeValue)) {
-    calleeValue = cleanupLoadedCalleeValue(calleeValue, li);
+    calleeValue = cleanupLoadedCalleeValue(
+        li, [](SILInstruction *toDelete) { toDelete->eraseFromParent(); });
     if (!calleeValue) {
       return;
     }

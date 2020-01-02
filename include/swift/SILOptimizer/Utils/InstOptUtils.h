@@ -404,6 +404,23 @@ SILInstruction *
 tryOptimizeApplyOfPartialApply(PartialApplyInst *pai, SILBuilder &builder,
                                InstModCallbacks callbacks = InstModCallbacks());
 
+/// Follows the operand of `copy_value` and `begin_borrow` instructions until it
+/// hits an instruction that isn't one of those two.
+///
+/// \param v the instruction to start with.
+/// \returns the first instruction that isn't a `copy_value` or `begin_borrow`
+/// instruction.
+SILValue stripCopiesAndBorrows(SILValue v);
+
+/// If possible, gets the source of a loaded value. Removes the store, strong
+/// release (if found), alloc box, and project box.
+///
+/// \param li the subject load instruction (the "entry point").
+/// \param deleteInstruction a callback used to delete instructions.
+/// \returns the source value of the found store instruction.
+SILValue cleanupLoadedCalleeValue(
+    LoadInst *li, llvm::function_ref<void(SILInstruction *)> deleteInstruction);
+
 } // end namespace swift
 
 #endif
