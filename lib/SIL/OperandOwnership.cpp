@@ -142,6 +142,18 @@ SHOULD_NEVER_VISIT_INST(StrongRelease)
 #include "swift/AST/ReferenceStorage.def"
 #undef SHOULD_NEVER_VISIT_INST
 
+/// Instructions that are interior pointers into a guaranteed value.
+#define INTERIOR_POINTER_PROJECTION(INST)                                      \
+  OperandOwnershipKindMap OperandOwnershipKindClassifier::visit##INST##Inst(   \
+      INST##Inst *i) {                                                         \
+    assert(i->getNumOperands() && "Expected to have non-zero operands");       \
+    return Map::compatibilityMap(ValueOwnershipKind::Guaranteed,               \
+                                 UseLifetimeConstraint::MustBeLive);           \
+  }
+INTERIOR_POINTER_PROJECTION(RefElementAddr)
+INTERIOR_POINTER_PROJECTION(RefTailAddr)
+#undef INTERIOR_POINTER_PROJECTION
+
 /// Instructions whose arguments are always compatible with one convention.
 #define CONSTANT_OWNERSHIP_INST(OWNERSHIP, USE_LIFETIME_CONSTRAINT, INST)      \
   OperandOwnershipKindMap OperandOwnershipKindClassifier::visit##INST##Inst(   \
@@ -151,7 +163,6 @@ SHOULD_NEVER_VISIT_INST(StrongRelease)
         ValueOwnershipKind::OWNERSHIP,                                         \
         UseLifetimeConstraint::USE_LIFETIME_CONSTRAINT);                       \
   }
-CONSTANT_OWNERSHIP_INST(Guaranteed, MustBeLive, RefElementAddr)
 CONSTANT_OWNERSHIP_INST(Guaranteed, MustBeLive, OpenExistentialValue)
 CONSTANT_OWNERSHIP_INST(Guaranteed, MustBeLive, OpenExistentialBoxValue)
 CONSTANT_OWNERSHIP_INST(Owned, MustBeInvalidated, AutoreleaseValue)
@@ -271,7 +282,6 @@ ACCEPTS_ANY_OWNERSHIP_INST(BridgeObjectToWord)
 ACCEPTS_ANY_OWNERSHIP_INST(ClassifyBridgeObject)
 ACCEPTS_ANY_OWNERSHIP_INST(CopyBlock)
 ACCEPTS_ANY_OWNERSHIP_INST(OpenExistentialBox)
-ACCEPTS_ANY_OWNERSHIP_INST(RefTailAddr)
 ACCEPTS_ANY_OWNERSHIP_INST(RefToRawPointer)
 ACCEPTS_ANY_OWNERSHIP_INST(SetDeallocating)
 ACCEPTS_ANY_OWNERSHIP_INST(ProjectExistentialBox)
