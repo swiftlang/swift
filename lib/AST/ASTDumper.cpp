@@ -1593,9 +1593,6 @@ public:
   }
   void visitForEachStmt(ForEachStmt *S) {
     printCommon(S, "for_each_stmt");
-    PrintWithColorRAII(OS, LiteralValueColor) << " next=";
-    S->getIteratorNext().dump(
-        PrintWithColorRAII(OS, LiteralValueColor).getOS());
     OS << '\n';
     printRec(S->getPattern());
     OS << '\n';

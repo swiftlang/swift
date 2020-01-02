@@ -115,8 +115,8 @@ func trivialStructBreak(_ xx: [Int]) {
 // CHECK: [[LOOP_DEST]]:
 // CHECK:   [[GET_ELT_STACK:%.*]] = alloc_stack $Optional<Int>
 // CHECK:   [[WRITE:%.*]] = begin_access [modify] [unknown] [[PROJECT_ITERATOR_BOX]] : $*IndexingIterator<Array<Int>>
-// CHECK:   [[FUNC_REF:%.*]] = function_ref @$ss16IndexingIteratorV4next7ElementQzSgyF : $@convention(method)
-// CHECK:   apply [[FUNC_REF]]<Array<Int>>([[GET_ELT_STACK]], [[WRITE]])
+// CHECK:   [[FUNC_REF:%.*]] = witness_method $IndexingIterator<Array<Int>>, #IteratorProtocol.next!1 : <Self where Self : IteratorProtocol> (inout Self) -> () -> Self.Element? : $@convention(witness_method: IteratorProtocol) <τ_0_0 where τ_0_0 : IteratorProtocol> (@inout τ_0_0) -> @out Optional<τ_0_0.Element>
+// CHECK:   apply [[FUNC_REF]]<IndexingIterator<Array<Int>>>([[GET_ELT_STACK]], [[WRITE]])
 // CHECK:   [[IND_VAR:%.*]] = load [trivial] [[GET_ELT_STACK]]
 // CHECK:   switch_enum [[IND_VAR]] : $Optional<Int>, case #Optional.some!enumelt.1: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
 //
@@ -215,8 +215,8 @@ func existentialBreak(_ xx: [P]) {
 //
 // CHECK: [[LOOP_DEST]]:
 // CHECK:   [[WRITE:%.*]] = begin_access [modify] [unknown] [[PROJECT_ITERATOR_BOX]] : $*IndexingIterator<Array<P>>
-// CHECK:   [[FUNC_REF:%.*]] = function_ref @$ss16IndexingIteratorV4next7ElementQzSgyF : $@convention(method)
-// CHECK:   apply [[FUNC_REF]]<Array<P>>([[ELT_STACK]], [[WRITE]])
+// CHECK:   [[FUNC_REF:%.*]] = witness_method $IndexingIterator<Array<P>>, #IteratorProtocol.next!1 : <Self where Self : IteratorProtocol> (inout Self) -> () -> Self.Element? : $@convention(witness_method: IteratorProtocol) <τ_0_0 where τ_0_0 : IteratorProtocol> (@inout τ_0_0) -> @out Optional<τ_0_0.Element>
+// CHECK:   apply [[FUNC_REF]]<IndexingIterator<Array<P>>>([[ELT_STACK]], [[WRITE]])
 // CHECK:   switch_enum_addr [[ELT_STACK]] : $*Optional<P>, case #Optional.some!enumelt.1: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
 //
 // CHECK: [[SOME_BB]]:
@@ -375,8 +375,8 @@ func genericStructBreak<T>(_ xx: [GenericStruct<T>]) {
 //
 // CHECK: [[LOOP_DEST]]:
 // CHECK:   [[WRITE:%.*]] = begin_access [modify] [unknown] [[PROJECT_ITERATOR_BOX]] : $*IndexingIterator<Array<GenericStruct<T>>>
-// CHECK:   [[FUNC_REF:%.*]] = function_ref @$ss16IndexingIteratorV4next7ElementQzSgyF : $@convention(method)
-// CHECK:   apply [[FUNC_REF]]<Array<GenericStruct<T>>>([[ELT_STACK]], [[WRITE]])
+// CHECK:   [[FUNC_REF:%.*]] = witness_method $IndexingIterator<Array<GenericStruct<T>>>, #IteratorProtocol.next!1 : <Self where Self : IteratorProtocol> (inout Self) -> () -> Self.Element? : $@convention(witness_method: IteratorProtocol) <τ_0_0 where τ_0_0 : IteratorProtocol> (@inout τ_0_0) -> @out Optional<τ_0_0.Element>
+// CHECK:   apply [[FUNC_REF]]<IndexingIterator<Array<GenericStruct<T>>>>([[ELT_STACK]], [[WRITE]])
 // CHECK:   switch_enum_addr [[ELT_STACK]] : $*Optional<GenericStruct<T>>, case #Optional.some!enumelt.1: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
 //
 // CHECK: [[SOME_BB]]:

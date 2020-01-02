@@ -15,7 +15,6 @@ struct BadContainer2 : Sequence { // expected-error{{type 'BadContainer2' does n
 func bad_containers_2(bc: BadContainer2) {
   for e in bc { }
   // expected-warning@-1 {{immutable value 'e' was never used; consider replacing with '_' or removing it}}
-  // expected-error@-2{{type 'BadContainer2.Iterator' does not conform to protocol 'IteratorProtocol'}}
 }
 
 struct BadContainer3 : Sequence { // expected-error{{type 'BadContainer3' does not conform to protocol 'Sequence'}}
@@ -25,7 +24,6 @@ struct BadContainer3 : Sequence { // expected-error{{type 'BadContainer3' does n
 func bad_containers_3(bc: BadContainer3) {
   for e in bc { }
   // expected-warning@-1 {{immutable value 'e' was never used; consider replacing with '_' or removing it}}
-  // expected-error@-2{{type 'BadContainer3.Iterator' does not conform to protocol 'IteratorProtocol'}}
 }
 
 struct BadIterator1 {}
@@ -38,7 +36,6 @@ struct BadContainer4 : Sequence { // expected-error{{type 'BadContainer4' does n
 func bad_containers_4(bc: BadContainer4) {
   for e in bc { }
   // expected-warning@-1 {{immutable value 'e' was never used; consider replacing with '_' or removing it}}
-  // expected-error@-2{{type 'BadContainer4.Iterator' does not conform to protocol 'IteratorProtocol'}}
 }
 
 // Pattern type-checking
