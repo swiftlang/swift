@@ -2892,8 +2892,7 @@ bool TypeChecker::typeCheckPatternBinding(PatternBindingDecl *PBD,
   return hadError;
 }
 
-auto TypeChecker::typeCheckForEachBinding(
-    DeclContext *dc, ForEachStmt *stmt) -> Optional<ForEachBinding> {
+bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
   /// Type checking listener for for-each binding.
   class BindingListener : public ExprTypeCheckListener {
     /// The for-each statement.
@@ -3001,6 +3000,7 @@ auto TypeChecker::typeCheckForEachBinding(
     Expr *appliedSolution(Solution &solution, Expr *expr) override {
       // Figure out what types the constraints decided on.
       auto &cs = solution.getConstraintSystem();
+      ASTContext &ctx = cs.getASTContext();
       InitType = solution.simplifyType(InitType);
       SequenceType = solution.simplifyType(SequenceType);
       ElementType = solution.simplifyType(ElementType);
@@ -3012,6 +3012,7 @@ auto TypeChecker::typeCheckForEachBinding(
 
       cs.cacheExprTypes(expr);
       Stmt->setSequence(expr);
+      solution.setExprTypes(expr);
 
       // Apply the solution to the iteration pattern as well.
       Pattern *pattern = Stmt->getPattern();
@@ -3032,12 +3033,67 @@ auto TypeChecker::typeCheckForEachBinding(
              "Couldn't find sequence conformance");
       Stmt->setSequenceConformance(SequenceConformance);
 
-      solution.setExprTypes(expr);
-      return expr;
-    }
+      // Check the
+      // FIXME: This should be pulled into the constraint system itself.
+      if (auto *Where = Stmt->getWhere()) {
+        if (!TypeChecker::typeCheckCondition(Where, cs.DC))
+          Stmt->setWhere(Where);
+      }
 
-    ForEachBinding getBinding() const {
-      return { SequenceType, SequenceConformance, IteratorType, ElementType };
+      // Invoke iterator() to get an iterator from the sequence.
+      VarDecl *iterator;
+      Type nextResultType = OptionalType::get(ElementType);
+      {
+        // Create a local variable to capture the iterator.
+        std::string name;
+        if (auto np = dyn_cast_or_null<NamedPattern>(Stmt->getPattern()))
+          name = "$"+np->getBoundName().str().str();
+        name += "$generator";
+
+        iterator = new (ctx) VarDecl(
+            /*IsStatic*/ false, VarDecl::Introducer::Var,
+            /*IsCaptureList*/ false, Stmt->getInLoc(),
+            ctx.getIdentifier(name), cs.DC);
+        iterator->setInterfaceType(IteratorType->mapTypeOutOfContext());
+        iterator->setImplicit();
+        Stmt->setIteratorVar(iterator);
+
+        auto genPat = new (ctx) NamedPattern(iterator);
+        genPat->setImplicit();
+
+        // TODO: test/DebugInfo/iteration.swift requires this extra info to
+        // be around.
+        PatternBindingDecl::createImplicit(
+            ctx, StaticSpellingKind::None, genPat,
+            new (ctx) OpaqueValueExpr(Stmt->getInLoc(), nextResultType),
+            cs.DC, /*VarLoc*/ Stmt->getForLoc());
+      }
+
+      // Create the iterator variable.
+      auto *varRef = TypeChecker::buildCheckedRefExpr(
+          iterator, cs.DC, DeclNameLoc(Stmt->getInLoc()), /*implicit*/ true);
+      if (varRef)
+        Stmt->setIteratorVarRef(varRef);
+
+      // Convert that Optional<Element> value to the type of the pattern.
+      auto optPatternType = OptionalType::get(Stmt->getPattern()->getType());
+      if (!optPatternType->isEqual(nextResultType)) {
+        OpaqueValueExpr *elementExpr =
+            new (ctx) OpaqueValueExpr(Stmt->getInLoc(), nextResultType,
+                                      /*isPlaceholder=*/true);
+        Expr *convertElementExpr = elementExpr;
+        if (TypeChecker::typeCheckExpression(
+                convertElementExpr, cs.DC,
+                TypeLoc::withoutLoc(optPatternType),
+                CTP_CoerceOperand).isNull()) {
+          return nullptr;
+        }
+        elementExpr->setIsPlaceholder(false);
+        Stmt->setElementExpr(elementExpr);
+        Stmt->setConvertElementExpr(convertElementExpr);
+      }
+
+      return expr;
     }
   };
 
@@ -3048,8 +3104,8 @@ auto TypeChecker::typeCheckForEachBinding(
   // Type-check the for-each loop sequence and element pattern.
   auto resultTy = TypeChecker::typeCheckExpression(seq, dc, &listener);
   if (!resultTy)
-    return None;
-  return listener.getBinding();
+    return true;
+  return false;
 }
 
 bool TypeChecker::typeCheckCondition(Expr *&expr, DeclContext *dc) {
