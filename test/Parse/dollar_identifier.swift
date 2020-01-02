@@ -56,10 +56,9 @@ func escapedDollarFunc() {
 }
 
 func escapedDollarAnd() {
-  // FIXME: Bad diagnostics.
-  `$0` = 1 // expected-error {{expected expression}}
-  `$$` = 2
-  `$abc` = 3
+  `$0` = 1 // expected-error {{use of unresolved identifier '$0'}}
+  `$$` = 2 // expected-error {{use of unresolved identifier '$$'}}
+  `$abc` = 3 // expected-error {{use of unresolved identifier '$abc'}}
 }
 
 func $declareWithDollar() { // expected-error{{cannot declare entity named '$declareWithDollar'}}
@@ -70,3 +69,5 @@ func $declareWithDollar() { // expected-error{{cannot declare entity named '$dec
     $a: Int, // expected-error{{cannot declare entity named '$a'}}
     $b c: Int) { } // expected-error{{cannot declare entity named '$b'}}
 }
+
+func `$declareEscapedWithDollar`() { } // expected-error{{cannot declare entity named '$declareEscapedWithDollar'}}
