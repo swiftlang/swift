@@ -277,7 +277,8 @@ SILInstruction *MandatoryCombiner::visitApplyInst(ApplyInst *instruction) {
   return nullptr;
 }
 
-static SILValue cleanupLoadedCalleeValue(SILValue calleeValue, LoadInst *li) {
+static SILValue cleanupLoadedCalleeValue(SILValue calleeValue, LoadInst *li,
+                                         std::function<void(SILInstruction *)> &deleteInstruction) {
   auto *pbi = dyn_cast<ProjectBoxInst>(li->getOperand());
   if (!pbi)
     return SILValue();
@@ -292,11 +293,11 @@ static SILValue cleanupLoadedCalleeValue(SILValue calleeValue, LoadInst *li) {
     auto *dvi = li->getSingleUserOfType<DestroyValueInst>();
     if (!dvi)
       return SILValue();
-    dvi->eraseFromParent();
+    deleteInstruction(dvi);
   } else if (!li->use_empty()) {
     return SILValue();
   }
-  li->eraseFromParent();
+  deleteInstruction(li);
 
   // Look through uses of the alloc box the load is loading from to find up to
   // one store and up to one strong release.
@@ -335,7 +336,7 @@ static SILValue cleanupLoadedCalleeValue(SILValue calleeValue, LoadInst *li) {
   // If we found a store, record its source and erase it.
   if (si) {
     calleeValue = si->getSrc();
-    si->eraseFromParent();
+    deleteInstruction(si);
   } else {
     calleeValue = SILValue();
   }
@@ -347,20 +348,20 @@ static SILValue cleanupLoadedCalleeValue(SILValue calleeValue, LoadInst *li) {
       if (auto *sri = destroy.dyn_cast<StrongReleaseInst *>()) {
         SILBuilderWithScope(sri).emitStrongReleaseAndFold(sri->getLoc(),
                                                           calleeValue);
-        sri->eraseFromParent();
+        deleteInstruction(sri);
       } else {
         auto *dvi = destroy.get<DestroyValueInst *>();
         SILBuilderWithScope(dvi).emitDestroyValueAndFold(dvi->getLoc(),
                                                          calleeValue);
-        dvi->eraseFromParent();
+        deleteInstruction(dvi);
       }
     }
   }
 
   assert(pbi->use_empty());
-  pbi->eraseFromParent();
+  deleteInstruction(pbi);
   assert(abi->use_empty());
-  abi->eraseFromParent();
+  deleteInstruction(abi);
 
   return calleeValue;
 }
@@ -410,7 +411,7 @@ bool MandatoryCombiner::tryRemoveUnused(SILInstruction *i) {
 }
 
 SILInstruction *MandatoryCombiner::visitLoadInst(LoadInst *i) {
-  auto val = cleanupLoadedCalleeValue(i, i);
+  auto val = cleanupLoadedCalleeValue(i, i, instModCallbacks.deleteInst);
   if (!val)
     return nullptr;
 
@@ -429,6 +430,13 @@ SILInstruction *MandatoryCombiner::visitLoadInst(LoadInst *i) {
       if (auto *ref = getRemovableRef(tttf)) {
         instModCallbacks.deleteInst(ref);
       }
+    }
+  }
+  
+  if (auto *convFunc = dyn_cast<ConvertFunctionInst>(val)) {
+    if (isInstructionTriviallyDead(convFunc)) {
+      // We'll let dead code elimination do the rest
+      instModCallbacks.deleteInst(convFunc);
     }
   }
   
