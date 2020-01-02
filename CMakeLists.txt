@@ -924,14 +924,11 @@ else()
   find_package(LibXml2)
 endif()
 
-# You need libedit linked in order to check if you have el_wgets.
-cmake_push_check_state()
-list(APPEND CMAKE_REQUIRED_LIBRARIES "edit")
-check_symbol_exists(el_wgets "histedit.h" HAVE_EL_WGETS)
-if(HAVE_EL_WGETS)
-  set(HAVE_UNICODE_LIBEDIT 1)
+if(LLVM_ENABLE_LIBEDIT)
+  find_package(LibEdit REQUIRED)
+else()
+  find_package(LibEdit)
 endif()
-cmake_pop_check_state()
 
 check_symbol_exists(wait4 "sys/wait.h" HAVE_WAIT4)
 
