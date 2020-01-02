@@ -3924,6 +3924,10 @@ public:
   /// value to be specified later.
   bool isPlaceholder() const { return Bits.OpaqueValueExpr.IsPlaceholder; }
 
+  void setIsPlaceholder(bool value) {
+    Bits.OpaqueValueExpr.IsPlaceholder = value;
+  }
+
   SourceRange getSourceRange() const { return Range; }
 
   static bool classof(const Expr *E) {

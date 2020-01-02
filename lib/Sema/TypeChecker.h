@@ -1032,8 +1032,20 @@ public:
   static bool typeCheckBinding(Pattern *&P, Expr *&Init, DeclContext *DC);
   static bool typeCheckPatternBinding(PatternBindingDecl *PBD, unsigned patternNumber);
 
+  /// Information about a type-checked for-each binding.
+  struct ForEachBinding {
+    Type sequenceType;
+    ProtocolConformanceRef sequenceConformance;
+    Type iteratorType;
+    ProtocolConformanceRef iteratorConformance;
+    Type elementType;
+  };
+
   /// Type-check a for-each loop's pattern binding and sequence together.
-  static bool typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt);
+  ///
+  /// \returns the binding, if successful.
+  static Optional<ForEachBinding> typeCheckForEachBinding(
+      DeclContext *dc, ForEachStmt *stmt);
 
   /// Compute the set of captures for the given function or closure.
   static void computeCaptures(AnyFunctionRef AFR);
@@ -1100,17 +1112,6 @@ public:
   /// \returns the default type, or null if there is no default type for
   /// this protocol.
   static Type getDefaultType(ProtocolDecl *protocol, DeclContext *dc);
-
-  /// Convert the given expression to the given type.
-  ///
-  /// \param expr The expression, which will be updated in place.
-  /// \param type The type to convert to.
-  /// \param typeFromPattern Optionally, the caller can specify the pattern
-  ///   from where the toType is derived, so that we can deliver better fixit.
-  ///
-  /// \returns true if an error occurred, false otherwise.
-  static bool convertToType(Expr *&expr, Type type, DeclContext *dc,
-                            Optional<Pattern*> typeFromPattern = None);
 
   /// Coerce the given expression to materializable type, if it
   /// isn't already.
