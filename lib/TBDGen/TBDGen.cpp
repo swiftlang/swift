@@ -56,19 +56,78 @@ static bool isGlobalOrStaticVar(VarDecl *VD) {
   return VD->isStatic() || VD->getDeclContext()->isModuleScopeContext();
 }
 
+void TBDGenVisitor::addSymbolInternal(StringRef name,
+                                      llvm::MachO::SymbolKind kind,
+                                      bool isLinkerDirective) {
+  if (!isLinkerDirective && Opts.LinkerDirectivesOnly)
+    return;
+  Symbols.addSymbol(kind, name, Targets);
+  if (StringSymbols && kind == SymbolKind::GlobalSymbol) {
+    auto isNewValue = StringSymbols->insert(name).second;
+    (void)isNewValue;
+    assert(isNewValue && "symbol appears twice");
+  }
+}
+
+static Optional<llvm::VersionTuple> getDeclMoveOSVersion(Decl *D) {
+  for (auto *attr: D->getAttrs()) {
+    if (auto *ODA = dyn_cast<OriginallyDefinedInAttr>(attr)) {
+      if (ODA->isActivePlatform(D->getASTContext()))
+        return ODA->MovedVersion;
+    }
+  }
+  return None;
+}
+
+void TBDGenVisitor::addLinkerDirectiveSymbols(StringRef name,
+                                              llvm::MachO::SymbolKind kind) {
+  if (kind != llvm::MachO::SymbolKind::GlobalSymbol)
+    return;
+  if (!TopLevelDecl)
+    return;
+  auto MovedVer = getDeclMoveOSVersion(TopLevelDecl);
+  if (!MovedVer.hasValue())
+    return;
+  assert(MovedVer.hasValue());
+  unsigned Major[2];
+  unsigned Minor[2];
+  Major[1] = MovedVer->getMajor();
+  Minor[1] = MovedVer->getMinor().hasValue() ? *MovedVer->getMinor(): 0;
+  auto AvailRange = AvailabilityInference::availableRange(TopLevelDecl,
+                                TopLevelDecl->getASTContext()).getOSVersion();
+  assert(AvailRange.hasLowerEndpoint() &&
+         "cannot find the start point of availability");
+  if (!AvailRange.hasLowerEndpoint())
+    return;
+  assert(AvailRange.getLowerEndpoint() < *MovedVer);
+  if (AvailRange.getLowerEndpoint() >= *MovedVer)
+    return;
+  Major[0] = AvailRange.getLowerEndpoint().getMajor();
+  Minor[0] = AvailRange.getLowerEndpoint().getMinor().hasValue() ?
+    AvailRange.getLowerEndpoint().getMinor().getValue() : 0;
+  for (auto CurMaj = Major[0]; CurMaj <= Major[1]; ++ CurMaj) {
+    unsigned MinRange[2] = {0, 31};
+    if (CurMaj == Major[0])
+      MinRange[0] = Minor[0];
+    if (CurMaj == Major[1])
+      MinRange[1] = Minor[1];
+    for (auto CurMin = MinRange[0]; CurMin != MinRange[1]; ++ CurMin) {
+      llvm::SmallString<64> Buffer;
+      llvm::raw_svector_ostream OS(Buffer);
+      OS << "$ld$hide$os" << CurMaj << "." << CurMin << "$" << name;
+      addSymbolInternal(OS.str(), llvm::MachO::SymbolKind::GlobalSymbol,
+                        /*LinkerDirective*/true);
+    }
+  }
+}
+
 void TBDGenVisitor::addSymbol(StringRef name, SymbolKind kind) {
   // The linker expects to see mangled symbol names in TBD files, so make sure
   // to mangle before inserting the symbol.
   SmallString<32> mangled;
   llvm::Mangler::getNameWithPrefix(mangled, name, DataLayout);
-
-  Symbols.addSymbol(kind, mangled, Targets);
-
-  if (StringSymbols && kind == SymbolKind::GlobalSymbol) {
-    auto isNewValue = StringSymbols->insert(mangled).second;
-    (void)isNewValue;
-    assert(isNewValue && "symbol appears twice");
-  }
+  addSymbolInternal(mangled, kind);
+  addLinkerDirectiveSymbols(mangled, kind);
 }
 
 void TBDGenVisitor::addSymbol(SILDeclRef declRef) {
@@ -641,6 +700,10 @@ static bool isApplicationExtensionSafe(const LangOptions &LangOpts) {
          llvm::sys::Process::GetEnv("LD_APPLICATION_EXTENSION_SAFE");
 }
 
+static bool hasLinkerDirective(Decl *D) {
+  return getDeclMoveOSVersion(D).hasValue();
+}
+
 static void enumeratePublicSymbolsAndWrite(ModuleDecl *M, FileUnit *singleFile,
                                            StringSet *symbols,
                                            llvm::raw_ostream *os,
@@ -688,8 +751,13 @@ static void enumeratePublicSymbolsAndWrite(ModuleDecl *M, FileUnit *singleFile,
 
     visitor.addMainIfNecessary(file);
 
-    for (auto d : decls)
+    for (auto d : decls) {
+      if (opts.LinkerDirectivesOnly && !hasLinkerDirective(d))
+        continue;
+      visitor.TopLevelDecl = d;
+      SWIFT_DEFER { visitor.TopLevelDecl = nullptr; };
       visitor.visit(d);
+    }
   };
 
   if (singleFile) {

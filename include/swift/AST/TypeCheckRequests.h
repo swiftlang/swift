@@ -1968,6 +1968,29 @@ public:
   void cacheResult(bool result) const;
 };
 
+/// Computes whether the specified type or a super-class/super-protocol has the
+/// @dynamicMemberLookup attribute on it.
+class HasDynamicMemberLookupAttributeRequest
+    : public SimpleRequest<HasDynamicMemberLookupAttributeRequest,
+                           bool(CanType), CacheKind::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<bool> evaluate(Evaluator &evaluator, CanType ty) const;
+
+public:
+  bool isCached() const {
+    // Don't cache types containing type variables, as they must not outlive
+    // the constraint system that created them.
+    auto ty = std::get<0>(getStorage());
+    return !ty->hasTypeVariable();
+  }
+};
+
 // Allow AnyValue to compare two Type values, even though Type doesn't
 // support ==.
 template<>

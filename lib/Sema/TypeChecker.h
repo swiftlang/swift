@@ -182,10 +182,6 @@ enum class TypeCheckExprFlags {
   /// not affect type checking itself.
   IsExprStmt = 0x20,
 
-  /// If set, this expression is being re-type checked as part of diagnostics,
-  /// and so we should not visit bodies of non-single expression closures.
-  SkipMultiStmtClosures = 0x40,
-
   /// This is an inout yield.
   IsInOutYield = 0x100,
 
@@ -1593,6 +1589,19 @@ public:
   static DeclTypeCheckingSemantics
   getDeclTypeCheckingSemantics(ValueDecl *decl);
 
+  /// Creates an `IndexSubset` for the given function type, representing
+  /// all inferred differentiation parameters. Used by `@differentiable` and
+  /// `@derivative` attribute type-checking.
+  ///
+  /// The differentiation parameters are inferred to be:
+  /// - All parameters of the function type that conform to `Differentiable`.
+  /// - If the function type's result is a function type (i.e. it is a curried
+  ///   method type), then also all parameters of the function result type that
+  ///   conform to `Differentiable`.
+  static IndexSubset *
+  inferDifferentiationParameters(AbstractFunctionDecl *AFD,
+                                 GenericEnvironment *derivativeGenEnv);
+
 public:
   /// Require that the library intrinsics for working with Optional<T>
   /// exist.
@@ -1727,9 +1736,6 @@ bool areGenericRequirementsSatisfied(const DeclContext *DC,
                                      GenericSignature sig,
                                      SubstitutionMap Substitutions,
                                      bool isExtension);
-
-bool hasDynamicMemberLookupAttribute(Type type,
-  llvm::DenseMap<CanType, bool> &DynamicMemberLookupCache);
 } // end namespace swift
 
 #endif

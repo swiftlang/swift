@@ -187,7 +187,7 @@ cleanupDeadTrivialPhiArgs(SILValue initialValue,
         continue;
 
       auto *termInst = cast<TermInst>(user);
-      for (auto succBlockArgList : termInst->getSuccessorBlockArguments()) {
+      for (auto succBlockArgList : termInst->getSuccessorBlockArgumentLists()) {
         llvm::copy_if(succBlockArgList, std::back_inserter(worklist),
                       [&](SILPhiArgument *succArg) -> bool {
                         auto it = lower_bound(insertedPhis, succArg);

@@ -331,7 +331,7 @@ public:
   
   /// Emit functions, variables and tables which are needed anyway, e.g. because
   /// they are externally visible.
-  void emitGlobalTopLevel();
+  void emitGlobalTopLevel(llvm::StringSet<> *LinkerDirectives);
 
   /// Emit references to each of the protocol descriptors defined in this
   /// IR module.
@@ -510,6 +510,7 @@ public:
   ModuleDecl *ClangImporterModule = nullptr;
   SourceFile *CurSourceFile = nullptr;
 
+  llvm::StringMap<ModuleDecl*> OriginalModules;
   llvm::SmallString<128> OutputFilename;
   llvm::SmallString<128> MainInputFilenameForDebugInfo;
 
@@ -1122,7 +1123,8 @@ public:
                                          CanGenericSignature genericSig);
 
   /// Produce an associated type witness that refers to the given type.
-  llvm::Constant *getAssociatedTypeWitness(Type type, bool inProtocolContext);
+  llvm::Constant *getAssociatedTypeWitness(Type type, GenericSignature sig,
+                                           bool inProtocolContext);
 
   void emitAssociatedTypeMetadataRecord(const RootProtocolConformance *C);
   void emitFieldDescriptor(const NominalTypeDecl *Decl);
@@ -1340,6 +1342,7 @@ public:
                                       ConstantInit definition = ConstantInit());
   llvm::Constant *getAddrOfObjCModuleContextDescriptor();
   llvm::Constant *getAddrOfClangImporterModuleContextDescriptor();
+  llvm::Constant *getAddrOfOriginalModuleContextDescriptor(StringRef Name);
   ConstantReference getAddrOfParentContextDescriptor(DeclContext *from,
                                                      bool fromAnonymousContext);
   ConstantReference getAddrOfContextDescriptorForParent(DeclContext *parent,

@@ -166,6 +166,9 @@ WARNING(warn_opt_remark_disabled, none,
 WARNING(warn_ignoring_batch_mode,none,
 "ignoring '-enable-batch-mode' because '%0' was also specified", (StringRef))
 
+WARNING(warn_ignoring_wmo, none,
+        "ignoring '-wmo' because '-dump-ast' was also specified", ())
+
 WARNING(warn_ignoring_source_range_dependencies,none,
 "ignoring '-enable-source-range-dependencies' because '%0' was also specified", (StringRef))
 

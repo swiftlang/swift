@@ -243,6 +243,7 @@ SYNTAX_NODE_SERIALIZATION_CODES = {
     'FunctionDeclName': 239,
     'PoundFilePathExpr': 240,
     'DerivativeRegistrationAttributeArguments': 241,
+    'QualifiedDeclName': 242,
 }
 
 

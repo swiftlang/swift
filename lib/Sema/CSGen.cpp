@@ -2430,7 +2430,8 @@ namespace {
           CS.getConstraintLocator(expr, ConstraintLocator::ClosureResult);
 
         if (expr->hasEmptyBody()) {
-          resultTy = CS.createTypeVariable(locator, 0);
+          resultTy = CS.createTypeVariable(
+              locator, expr->hasSingleExpressionBody() ? 0 : TVO_CanBindToHole);
 
           // Closures with empty bodies should be inferred to return
           // ().
@@ -2442,7 +2443,8 @@ namespace {
         } else {
           // If no return type was specified, create a fresh type
           // variable for it.
-          resultTy = CS.createTypeVariable(locator, 0);
+          resultTy = CS.createTypeVariable(
+              locator, expr->hasSingleExpressionBody() ? 0 : TVO_CanBindToHole);
 
           if (closureHasNoResult(expr)) {
             // Allow it to default to () if there are no return statements.
@@ -3407,8 +3409,11 @@ namespace {
 
         // Restore '@autoclosure'd value.
         if (auto ACE = dyn_cast<AutoClosureExpr>(expr)) {
-          expr = ACE->getSingleExpressionBody();
-          continue;
+          // This is only valid if the closure doesn't have parameters.
+          if (ACE->getParameters()->size() == 0) {
+            expr = ACE->getSingleExpressionBody();
+            continue;
+          }
         }
 
         // Remove any semantic expression injected by typechecking.

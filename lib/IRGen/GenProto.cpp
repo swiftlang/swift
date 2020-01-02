@@ -828,6 +828,15 @@ bool IRGenModule::isResilientConformance(
       conformanceModule == conformance->getProtocol()->getParentModule())
     return false;
 
+  // If the protocol WAS from the current module (@_originallyDefinedIn), we
+  // consider the conformance non-resilient, because we used to consider it
+  // non-resilient before the symbol moved. This is to ensure ABI stability
+  // across module boundaries.
+  if (conformanceModule == getSwiftModule() &&
+      conformanceModule->getName().str() ==
+        conformance->getProtocol()->getAlternateModuleName())
+    return false;
+
   // If the protocol and the conformance are in the same module and the
   // conforming type is not generic, they're not resilient.
   //
@@ -1294,7 +1303,10 @@ public:
       auto associate =
           Conformance.getTypeWitness(requirement.getAssociation());
       llvm::Constant *witness =
-          IGM.getAssociatedTypeWitness(associate, /*inProtocolContext=*/false);
+          IGM.getAssociatedTypeWitness(
+            associate,
+            Conformance.getDeclContext()->getGenericSignatureOfContext(),
+            /*inProtocolContext=*/false);
       Table.addBitCast(witness, IGM.Int8PtrTy);
     }
 
@@ -1427,6 +1439,7 @@ void WitnessTableBuilder::build() {
 }
 
 llvm::Constant *IRGenModule::getAssociatedTypeWitness(Type type,
+                                                      GenericSignature sig,
                                                       bool inProtocolContext) {
   // FIXME: If we can directly reference constant type metadata, do so.
 
@@ -1435,7 +1448,7 @@ llvm::Constant *IRGenModule::getAssociatedTypeWitness(Type type,
   auto role = inProtocolContext
     ? MangledTypeRefRole::DefaultAssociatedTypeWitness
     : MangledTypeRefRole::Metadata;
-  auto typeRef = getTypeRef(type, /*generic signature*/nullptr, role).first;
+  auto typeRef = getTypeRef(type, sig, role).first;
 
   // Set the low bit to indicate that this is a mangled name.
   auto witness = llvm::ConstantExpr::getPtrToInt(typeRef, IntPtrTy);
@@ -1604,7 +1617,10 @@ void WitnessTableBuilder::collectResilientWitnesses(
       auto associate = conformance.getTypeWitness(assocType);
 
       llvm::Constant *witness =
-          IGM.getAssociatedTypeWitness(associate, /*inProtocolContext=*/false);
+          IGM.getAssociatedTypeWitness(
+            associate,
+            conformance.getDeclContext()->getGenericSignatureOfContext(),
+            /*inProtocolContext=*/false);
       resilientWitnesses.push_back(witness);
       continue;
     }

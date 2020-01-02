@@ -800,6 +800,11 @@ bool ClangImporter::canReadPCH(StringRef PCHFilename) {
   auto FID = clangSrcMgr.createFileID(
                         llvm::make_unique<ZeroFilledMemoryBuffer>(1, "<main>"));
   clangSrcMgr.setMainFileID(FID);
+  auto &diagConsumer = CI.getDiagnosticClient();
+  diagConsumer.BeginSourceFile(CI.getLangOpts());
+  SWIFT_DEFER {
+    diagConsumer.EndSourceFile();
+  };
 
   // Pass in TU_Complete, which is the default mode for the Preprocessor
   // constructor and the right one for reading a PCH.
@@ -1070,10 +1075,6 @@ ClangImporter::create(ASTContext &ctx, const ClangImporterOptions &importerOpts,
   // the compiler instance used to emit PCMs incompatible with the one used to
   // read them later.
   instance.getLangOpts().NeededByPCHOrCompilationUsesPCH = true;
-
-  // Make sure to not trigger extra rebuilds on identical files with mismatching
-  // timestamps.
-  instance.getHeaderSearchOpts().ValidateASTInputFilesContent = true;
 
   if (importerOpts.Mode == ClangImporterOptions::Modes::PrecompiledModule)
     return importer;
@@ -1752,18 +1753,24 @@ ModuleDecl *ClangImporter::Implementation::loadModuleClang(
   return finishLoadingClangModule(clangModule, /*preferOverlay=*/false);
 }
 
-ModuleDecl *ClangImporter::loadModule(
-    SourceLoc importLoc,
-    ArrayRef<std::pair<Identifier, SourceLoc>> path) {
-  ModuleDecl *MD = Impl.loadModuleClang(importLoc, path);
+ModuleDecl *
+ClangImporter::loadModule(SourceLoc importLoc,
+                          ArrayRef<std::pair<Identifier, SourceLoc>> path) {
+  return Impl.loadModule(importLoc, path);
+}
+
+ModuleDecl *ClangImporter::Implementation::loadModule(
+    SourceLoc importLoc, ArrayRef<std::pair<Identifier, SourceLoc>> path) {
+  ModuleDecl *MD = nullptr;
+  if (!DisableSourceImport)
+    MD = loadModuleClang(importLoc, path);
   if (!MD)
-    MD = Impl.loadModuleDWARF(importLoc, path);
+    MD = loadModuleDWARF(importLoc, path);
   return MD;
 }
 
 ModuleDecl *ClangImporter::Implementation::finishLoadingClangModule(
-    const clang::Module *clangModule,
-    bool findOverlay) {
+    const clang::Module *clangModule, bool findOverlay) {
   assert(clangModule);
 
   // Bump the generation count.
@@ -1949,6 +1956,7 @@ ClangImporter::Implementation::Implementation(
       BridgingHeaderLookupTable(new SwiftLookupTable(nullptr)),
       BuffersForDiagnostics(ctx.SourceMgr),
       platformAvailability(ctx.LangOpts), nameImporter(),
+      DisableSourceImport(opts.DisableSourceImport),
       DWARFImporter(dwarfImporterDelegate) {}
 
 ClangImporter::Implementation::~Implementation() {
@@ -2608,7 +2616,8 @@ void ClangImporter::lookupTypeDecl(
   clang::LookupResult lookupResult(sema, clangName, clang::SourceLocation(),
                                    lookupKind);
   bool foundViaClang = false;
-  if (sema.LookupName(lookupResult, /*Scope=*/nullptr)) {
+  if (!Impl.DisableSourceImport &&
+      sema.LookupName(lookupResult, /*Scope=*/nullptr)) {
     for (auto clangDecl : lookupResult) {
       if (!isa<clang::TypeDecl>(clangDecl) &&
           !isa<clang::ObjCContainerDecl>(clangDecl) &&
@@ -2962,11 +2971,35 @@ void ClangImporter::loadExtensions(NominalTypeDecl *nominal,
   // For an Objective-C class, import all of the visible categories.
   if (auto objcClass = dyn_cast_or_null<clang::ObjCInterfaceDecl>(
                          effectiveClangContext.getAsDeclContext())) {
+    SmallVector<clang::NamedDecl *, 4> DelayedCategories;
+
     // Simply importing the categories adds them to the list of extensions.
     for (auto I = objcClass->visible_categories_begin(),
            E = objcClass->visible_categories_end();
          I != E; ++I) {
+      // Delay installing categories that don't have an owning module.
+      if (!I->hasOwningModule()) {
+        DelayedCategories.push_back(*I);
+        continue;
+      }
+
       Impl.importDeclReal(*I, Impl.CurrentVersion);
+    }
+
+    // Install all the delayed categories.
+    //
+    // The very notion of a delayed category is a result of an emergent behavior
+    // of the visible categories list and the order we import modules. The list
+    // appears in deserialization order rather than some "source order", so it's
+    // possible for, say, a bridging header to import a module that defines an
+    // interface and some categories, but for the categories in the bridging
+    // header to appear *before* the categories in the module - the imported
+    // module will be deserialized on demand. We take it on faith that if there
+    // is no owning module for a given category, that it was created in such a
+    // way, and thus we install it last to try to emulate what we want
+    // "source order" to mean.
+    for (const auto *DelayedCat : DelayedCategories) {
+      Impl.importDeclReal(DelayedCat, Impl.CurrentVersion);
     }
   }
 
@@ -3690,6 +3723,21 @@ void ClangImporter::Implementation::lookupAllObjCMembers(
   }
 }
 
+// Force the members of the entire inheritance hierarchy to be loaded and
+// deserialized before loading the named member of this class. This allows the
+// decl members table to be warmed up and enables the correct identification of
+// overrides.
+static void ensureSuperclassMembersAreLoaded(const ClassDecl *CD) {
+  if (!CD)
+    return;
+
+  CD = CD->getSuperclassDecl();
+  if (!CD || !CD->hasClangNode())
+    return;
+  
+  CD->loadAllMembers();
+}
+
 Optional<TinyPtrVector<ValueDecl *>>
 ClangImporter::Implementation::loadNamedMembers(
     const IterableDeclContext *IDC, DeclBaseName N, uint64_t contextData) {
@@ -3751,6 +3799,8 @@ ClangImporter::Implementation::loadNamedMembers(
 
   assert(isa<clang::ObjCContainerDecl>(CD) || isa<clang::NamespaceDecl>(CD));
 
+  ensureSuperclassMembersAreLoaded(dyn_cast<ClassDecl>(D));
+
   TinyPtrVector<ValueDecl *> Members;
   for (auto entry : table->lookup(SerializedSwiftName(N),
                                   effectiveClangContext)) {
@@ -3770,6 +3820,16 @@ ClangImporter::Implementation::loadNamedMembers(
           Members.push_back(V);
         }
       }
+    }
+  }
+
+  if (N == DeclBaseName::createConstructor()) {
+    if (auto *classDecl = dyn_cast<ClassDecl>(D)) {
+      SmallVector<Decl *, 4> ctors;
+      importInheritedConstructors(cast<clang::ObjCInterfaceDecl>(CD),
+                                  classDecl, ctors);
+      for (auto ctor : ctors)
+        Members.push_back(cast<ValueDecl>(ctor));
     }
   }
   return Members;

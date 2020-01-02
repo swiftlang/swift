@@ -1625,6 +1625,8 @@ public:
   /// Indicates when the symbol was moved here.
   const llvm::VersionTuple MovedVersion;
 
+  /// Returns true if this attribute is active given the current platform.
+  bool isActivePlatform(const ASTContext &ctx) const;
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_OriginallyDefinedIn;
   }
@@ -1765,7 +1767,21 @@ public:
   }
 };
 
-/// Attribute that registers a function as a derivative of another function.
+/// The `@derivative(of:)` attribute registers a function as a derivative of
+/// another function-like declaration: a 'func', 'init', 'subscript', or 'var'
+/// computed property declaration.
+///
+/// The `@derivative(of:)` attribute also has an optional `wrt:` clause
+/// specifying the parameters that are differentiated "with respect to", i.e.
+/// the differentiation parameters. The differentiation parameters must conform
+/// to the `Differentiable` protocol.
+///
+/// If the `wrt:` clause is unspecified, the differentiation parameters are
+/// inferred to be all parameters that conform to `Differentiable`.
+///
+/// `@derivative(of:)` attribute type-checking verifies that the type of the
+/// derivative function declaration is consistent with the type of the
+/// referenced original declaration and the differentiation parameters.
 ///
 /// Examples:
 ///   @derivative(of: sin(_:))
@@ -1775,6 +1791,11 @@ class DerivativeAttr final
       private llvm::TrailingObjects<DerivativeAttr, ParsedAutoDiffParameter> {
   friend TrailingObjects;
 
+  /// The base type repr for the referenced original function. This field is
+  /// non-null only for parsed attributes that reference a qualified original
+  /// declaration. This field is not serialized; type-checking uses it to
+  /// resolve the original declaration, which is serialized.
+  TypeRepr *BaseTypeRepr;
   /// The original function name.
   DeclNameRefWithLoc OriginalFunctionName;
   /// The original function declaration, resolved by the type checker.
@@ -1787,23 +1808,27 @@ class DerivativeAttr final
   Optional<AutoDiffDerivativeFunctionKind> Kind = None;
 
   explicit DerivativeAttr(bool implicit, SourceLoc atLoc, SourceRange baseRange,
-                          DeclNameRefWithLoc original,
+                          TypeRepr *baseTypeRepr, DeclNameRefWithLoc original,
                           ArrayRef<ParsedAutoDiffParameter> params);
 
   explicit DerivativeAttr(bool implicit, SourceLoc atLoc, SourceRange baseRange,
-                          DeclNameRefWithLoc original, IndexSubset *indices);
+                          TypeRepr *baseTypeRepr, DeclNameRefWithLoc original,
+                          IndexSubset *parameterIndices);
 
 public:
   static DerivativeAttr *create(ASTContext &context, bool implicit,
                                 SourceLoc atLoc, SourceRange baseRange,
+                                TypeRepr *baseTypeRepr,
                                 DeclNameRefWithLoc original,
                                 ArrayRef<ParsedAutoDiffParameter> params);
 
   static DerivativeAttr *create(ASTContext &context, bool implicit,
                                 SourceLoc atLoc, SourceRange baseRange,
+                                TypeRepr *baseTypeRepr,
                                 DeclNameRefWithLoc original,
-                                IndexSubset *indices);
+                                IndexSubset *parameterIndices);
 
+  TypeRepr *getBaseTypeRepr() const { return BaseTypeRepr; }
   DeclNameRefWithLoc getOriginalFunctionName() const {
     return OriginalFunctionName;
   }
@@ -1841,6 +1866,90 @@ public:
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_Derivative;
+  }
+};
+
+/// The `@transpose(of:)` attribute registers a function as a transpose of
+/// another function-like declaration: a 'func', 'init', 'subscript', or 'var'
+/// computed property declaration.
+///
+/// The `@transpose(of:)` attribute also has a `wrt:` clause specifying the
+/// parameters that are transposed "with respect to", i.e. the transposed
+/// parameters.
+///
+/// Examples:
+///   @transpose(of: foo)
+///   @transpose(of: +, wrt: (0, 1))
+class TransposeAttr final
+    : public DeclAttribute,
+      private llvm::TrailingObjects<TransposeAttr, ParsedAutoDiffParameter> {
+  friend TrailingObjects;
+
+  /// The base type repr for the referenced original function. This field is
+  /// non-null only for parsed attributes that reference a qualified original
+  /// declaration. This field is not serialized; type-checking uses it to
+  /// resolve the original declaration, which is serialized.
+  TypeRepr *BaseTypeRepr;
+  /// The original function name.
+  DeclNameRefWithLoc OriginalFunctionName;
+  /// The original function declaration, resolved by the type checker.
+  AbstractFunctionDecl *OriginalFunction = nullptr;
+  /// The number of parsed parameters specified in 'wrt:'.
+  unsigned NumParsedParameters = 0;
+  /// The transposed parameters' indices, resolved by the type checker.
+  IndexSubset *ParameterIndices = nullptr;
+
+  explicit TransposeAttr(bool implicit, SourceLoc atLoc, SourceRange baseRange,
+                         TypeRepr *baseType, DeclNameRefWithLoc original,
+                         ArrayRef<ParsedAutoDiffParameter> params);
+
+  explicit TransposeAttr(bool implicit, SourceLoc atLoc, SourceRange baseRange,
+                         TypeRepr *baseType, DeclNameRefWithLoc original,
+                         IndexSubset *parameterIndices);
+
+public:
+  static TransposeAttr *create(ASTContext &context, bool implicit,
+                               SourceLoc atLoc, SourceRange baseRange,
+                               TypeRepr *baseType, DeclNameRefWithLoc original,
+                               ArrayRef<ParsedAutoDiffParameter> params);
+
+  static TransposeAttr *create(ASTContext &context, bool implicit,
+                               SourceLoc atLoc, SourceRange baseRange,
+                               TypeRepr *baseType, DeclNameRefWithLoc original,
+                               IndexSubset *parameterIndices);
+
+  TypeRepr *getBaseTypeRepr() const { return BaseTypeRepr; }
+  DeclNameRefWithLoc getOriginalFunctionName() const {
+    return OriginalFunctionName;
+  }
+  AbstractFunctionDecl *getOriginalFunction() const {
+    return OriginalFunction;
+  }
+  void setOriginalFunction(AbstractFunctionDecl *decl) {
+    OriginalFunction = decl;
+  }
+
+  /// The parsed transposed parameters, i.e. the list of parameters specified in
+  /// 'wrt:'.
+  ArrayRef<ParsedAutoDiffParameter> getParsedParameters() const {
+    return {getTrailingObjects<ParsedAutoDiffParameter>(), NumParsedParameters};
+  }
+  MutableArrayRef<ParsedAutoDiffParameter> getParsedParameters() {
+    return {getTrailingObjects<ParsedAutoDiffParameter>(), NumParsedParameters};
+  }
+  size_t numTrailingObjects(OverloadToken<ParsedAutoDiffParameter>) const {
+    return NumParsedParameters;
+  }
+
+  IndexSubset *getParameterIndices() const {
+    return ParameterIndices;
+  }
+  void setParameterIndices(IndexSubset *parameterIndices) {
+    ParameterIndices = parameterIndices;
+  }
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DAK_Transpose;
   }
 };
 

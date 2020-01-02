@@ -81,7 +81,7 @@ ConstraintSystem::determineBestBindings() {
           continue;
 
         bindings.addPotentialBinding(
-            {type, AllowedBindingKind::Supertypes, binding.BindingSource});
+            binding.withSameSource(type, AllowedBindingKind::Supertypes));
       }
     }
 
@@ -143,8 +143,8 @@ void ConstraintSystem::PotentialBindings::addPotentialBinding(
       !binding.BindingType->hasUnresolvedType() &&
       !binding.BindingType->hasTypeVariable() &&
       !binding.BindingType->hasUnboundGenericType() &&
-      !binding.DefaultedProtocol && !binding.isDefaultableBinding() &&
-      allowJoinMeet) {
+      !binding.hasDefaultedLiteralProtocol() &&
+      !binding.isDefaultableBinding() && allowJoinMeet) {
     if (lastSupertypeIndex) {
       auto &lastBinding = Bindings[*lastSupertypeIndex];
       auto lastType = lastBinding.BindingType->getWithoutSpecifierType();
@@ -164,7 +164,7 @@ void ConstraintSystem::PotentialBindings::addPotentialBinding(
     lastSupertypeIndex = Bindings.size();
   }
 
-  if (auto *literalProtocol = binding.DefaultedProtocol)
+  if (auto *literalProtocol = binding.getDefaultedLiteralProtocol())
     foundLiteralBinding(literalProtocol);
 
   // If the type variable can't bind to an lvalue, make sure the
@@ -371,7 +371,7 @@ ConstraintSystem::getPotentialBindingForRelationalConstraint(
     kind = AllowedBindingKind::Exact;
   }
 
-  return PotentialBinding{type, kind, constraint->getKind()};
+  return PotentialBinding{type, kind, constraint};
 }
 
 /// Retrieve the set of potential type bindings for the given
@@ -466,9 +466,8 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) const {
               path.back().getKind() == ConstraintLocator::ClosureResult &&
               binding->Kind == AllowedBindingKind::Supertypes &&
               exactTypes.insert(voidType).second) {
-            result.addPotentialBinding(
-                {voidType, binding->Kind, constraint->getKind()},
-                /*allowJoinMeet=*/false);
+            result.addPotentialBinding({voidType, binding->Kind, constraint},
+                                       /*allowJoinMeet=*/false);
           }
         }
       }
@@ -551,9 +550,8 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) const {
         if (!exactTypes.insert(defaultType->getCanonicalType()).second)
           continue;
 
-        literalBindings.push_back({defaultType, AllowedBindingKind::Subtypes,
-                                   constraint->getKind(),
-                                   constraint->getProtocol()});
+        literalBindings.push_back(
+            {defaultType, AllowedBindingKind::Subtypes, constraint});
         continue;
       }
 
@@ -578,9 +576,8 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) const {
 
       if (!matched) {
         exactTypes.insert(defaultType->getCanonicalType());
-        literalBindings.push_back({defaultType, AllowedBindingKind::Subtypes,
-                                   constraint->getKind(),
-                                   constraint->getProtocol()});
+        literalBindings.push_back(
+            {defaultType, AllowedBindingKind::Subtypes, constraint});
       }
 
       break;
@@ -677,7 +674,7 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) const {
       // might be covered by non-defaulted bindings.
       bool updatedBindingType = false;
       for (auto &literalBinding : literalBindings) {
-        auto *protocol = literalBinding.DefaultedProtocol;
+        auto *protocol = literalBinding.getDefaultedLiteralProtocol();
 
         assert(protocol);
 
@@ -716,7 +713,7 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) const {
     }
 
     for (auto &literalBinding : literalBindings) {
-      auto *protocol = literalBinding.DefaultedProtocol;
+      auto *protocol = literalBinding.getDefaultedLiteralProtocol();
       // For any literal type that has been covered, skip them.
       if (coveredLiteralProtocols.count(protocol) == 0)
         result.addPotentialBinding(std::move(literalBinding));
@@ -729,9 +726,7 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) const {
     if (!exactTypes.insert(type->getCanonicalType()).second)
       continue;
 
-    result.addPotentialBinding({type, AllowedBindingKind::Exact,
-                                constraint->getKind(), nullptr,
-                                constraint->getLocator()});
+    result.addPotentialBinding({type, AllowedBindingKind::Exact, constraint});
   }
 
   // If there are no bindings, typeVar may be a hole.
@@ -745,9 +740,8 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) const {
     if (locator->isLastElement<LocatorPathElt::MemberRefBase>())
       result.PotentiallyIncomplete = true;
 
-    result.addPotentialBinding({getASTContext().TheUnresolvedType,
-        AllowedBindingKind::Exact, ConstraintKind::Defaultable, nullptr,
-        typeVar->getImpl().getLocator()});
+    result.addPotentialBinding(
+        PotentialBinding::forHole(getASTContext(), locator));
   }
 
   // Determine if the bindings only constrain the type variable from above with
@@ -918,11 +912,11 @@ bool TypeVarBindingProducer::computeNext() {
 
     // If we have a protocol with a default type, look for alternative
     // types to the default.
-    if (NumTries == 0 && binding.DefaultedProtocol) {
-      auto knownKind = *(binding.DefaultedProtocol->getKnownProtocolKind());
+    if (NumTries == 0 && binding.hasDefaultedLiteralProtocol()) {
+      auto knownKind =
+          *(binding.getDefaultedLiteralProtocol()->getKnownProtocolKind());
       for (auto altType : CS.getAlternativeLiteralTypes(knownKind)) {
-        addNewBinding({altType, BindingKind::Subtypes, binding.BindingSource,
-                       binding.DefaultedProtocol});
+        addNewBinding(binding.withSameSource(altType, BindingKind::Subtypes));
       }
     }
 
@@ -939,10 +933,10 @@ bool TypeVarBindingProducer::computeNext() {
         if (auto otherTypeVar = objTy->getAs<TypeVariableType>()) {
           if (TypeVar->getImpl().canBindToLValue() ==
               otherTypeVar->getImpl().canBindToLValue()) {
-            addNewBinding({objTy, binding.Kind, binding.BindingSource});
+            addNewBinding(binding.withSameSource(objTy, binding.Kind));
           }
         } else {
-          addNewBinding({objTy, binding.Kind, binding.BindingSource});
+          addNewBinding(binding.withSameSource(objTy, binding.Kind));
         }
       }
     }
@@ -953,7 +947,7 @@ bool TypeVarBindingProducer::computeNext() {
     for (auto supertype : enumerateDirectSupertypes(type)) {
       // If we're not allowed to try this binding, skip it.
       if (auto simplifiedSuper = CS.checkTypeOfBinding(TypeVar, supertype))
-        addNewBinding({*simplifiedSuper, binding.Kind, binding.BindingSource});
+        addNewBinding(binding.withType(*simplifiedSuper));
     }
   }
 
@@ -968,12 +962,13 @@ bool TypeVarBindingProducer::computeNext() {
 
 bool TypeVariableBinding::attempt(ConstraintSystem &cs) const {
   auto type = Binding.BindingType;
-  auto *locator = TypeVar->getImpl().getLocator();
+  auto *srcLocator = Binding.getLocator();
+  auto *dstLocator = TypeVar->getImpl().getLocator();
 
-  if (Binding.DefaultedProtocol) {
-    type = cs.openUnboundGenericType(type, locator);
+  if (Binding.hasDefaultedLiteralProtocol()) {
+    type = cs.openUnboundGenericType(type, dstLocator);
     type = type->reconstituteSugar(/*recursive=*/false);
-  } else if (Binding.BindingSource == ConstraintKind::ArgumentConversion &&
+  } else if (srcLocator->isLastElement<LocatorPathElt::ApplyArgToParam>() &&
              !type->hasTypeVariable() && cs.isCollectionType(type)) {
     // If the type binding comes from the argument conversion, let's
     // instead of binding collection types directly, try to bind
@@ -984,27 +979,32 @@ bool TypeVariableBinding::attempt(ConstraintSystem &cs) const {
     auto UGT = UnboundGenericType::get(BGT->getDecl(), BGT->getParent(),
                                        BGT->getASTContext());
 
-    type = cs.openUnboundGenericType(UGT, locator);
+    type = cs.openUnboundGenericType(UGT, dstLocator);
     type = type->reconstituteSugar(/*recursive=*/false);
   }
 
-  // FIXME: We want the locator that indicates where the binding came
-  // from.
-  cs.addConstraint(ConstraintKind::Bind, TypeVar, type, locator);
+  cs.addConstraint(ConstraintKind::Bind, TypeVar, type, srcLocator);
 
   // If this was from a defaultable binding note that.
   if (Binding.isDefaultableBinding()) {
-    cs.DefaultedConstraints.push_back(Binding.DefaultableBinding);
+    cs.DefaultedConstraints.push_back(srcLocator);
 
-    if (locator->isForGenericParameter() && type->isHole()) {
-      // Drop `generic parameter` locator element so that all missing
-      // generic parameters related to the same path can be coalesced later.
-      auto path = locator->getPath();
-      auto genericParam = locator->getGenericParameter();
-      auto *fix = DefaultGenericArgument::create(cs, genericParam,
-          cs.getConstraintLocator(locator->getAnchor(), path.drop_back()));
-      if (cs.recordFix(fix))
-        return true;
+    if (type->isHole()) {
+      if (auto *GP = TypeVar->getImpl().getGenericParameter()) {
+        auto path = dstLocator->getPath();
+        // Drop `generic parameter` locator element so that all missing
+        // generic parameters related to the same path can be coalesced later.
+        auto *fix = DefaultGenericArgument::create(
+            cs, GP,
+            cs.getConstraintLocator(dstLocator->getAnchor(), path.drop_back()));
+        if (cs.recordFix(fix))
+          return true;
+      } else if (TypeVar->getImpl().isClosureResultType()) {
+        auto *fix = SpecifyClosureReturnType::create(
+            cs, TypeVar->getImpl().getLocator());
+        if (cs.recordFix(fix))
+          return true;
+      }
     }
   }
 

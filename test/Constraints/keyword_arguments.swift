@@ -349,14 +349,14 @@ func trailingClosure6<T>(value: Int, expression: () -> T?) { }
 trailingClosure5(file: "hello", line: 17) { // expected-error{{extraneous argument label 'file:' in call}}{{18-24=}}
 // expected-error@-1 {{generic parameter 'T' could not be inferred}}
   return Optional.Some(5)
-  // expected-error@-1 {{enum type 'Optional<Wrapped>' has no case 'Some'; did you mean 'some'}} {{19-23=some}}
+  // expected-error@-1 {{enum type 'Optional<Wrapped>' has no case 'Some'; did you mean 'some'?}} {{19-23=some}}
   // expected-error@-2 {{generic parameter 'Wrapped' could not be inferred}}
   // expected-note@-3 {{explicitly specify the generic arguments to fix this issue}}
 }
 trailingClosure6(5) { // expected-error{{missing argument label 'value:' in call}}{{18-18=value: }}
 // expected-error@-1 {{generic parameter 'T' could not be inferred}}
   return Optional.Some(5)
-  // expected-error@-1 {{enum type 'Optional<Wrapped>' has no case 'Some'; did you mean 'some'}} {{19-23=some}}
+  // expected-error@-1 {{enum type 'Optional<Wrapped>' has no case 'Some'; did you mean 'some'?}} {{19-23=some}}
   // expected-error@-2 {{generic parameter 'Wrapped' could not be inferred}}
   // expected-note@-3 {{explicitly specify the generic arguments to fix this issue}}
 }

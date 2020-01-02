@@ -14,7 +14,6 @@
 #include "swift/Basic/BlotSetVector.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/SIL/BasicBlockUtils.h"
-#include "swift/SIL/BranchPropagatedUser.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/OwnershipUtils.h"
@@ -36,10 +35,6 @@ using namespace swift;
 STATISTIC(NumEliminatedInsts, "number of removed instructions");
 STATISTIC(NumLoadCopyConvertedToLoadBorrow,
           "number of load_copy converted to load_borrow");
-
-//===----------------------------------------------------------------------===//
-//                                  Utility
-//===----------------------------------------------------------------------===//
 
 //===----------------------------------------------------------------------===//
 //                            Live Range Modeling
@@ -297,7 +292,7 @@ struct SemanticARCOptVisitor
 
 #define FORWARDING_TERM(NAME)                                                  \
   bool visit##NAME##Inst(NAME##Inst *cls) {                                    \
-    for (auto succValues : cls->getSuccessorBlockArguments()) {                \
+    for (auto succValues : cls->getSuccessorBlockArgumentLists()) {            \
       for (SILValue v : succValues) {                                          \
         worklist.insert(v);                                                    \
       }                                                                        \
@@ -577,21 +572,19 @@ bool SemanticARCOptVisitor::performGuaranteedCopyValueOptimization(CopyValueInst
   //    need to insert an end_borrow since all of our borrow introducers are
   //    non-local scopes.
   {
-    SmallVector<BranchPropagatedUser, 8> destroysForLinearLifetimeCheck;
     bool foundNonDeadEnd = false;
     for (auto *dvi : destroys) {
       foundNonDeadEnd |= !getDeadEndBlocks().isDeadEnd(dvi->getParent());
-      destroysForLinearLifetimeCheck.push_back(&dvi->getAllOperands()[0]);
     }
     if (!foundNonDeadEnd && haveAnyLocalScopes)
       return false;
-    SmallVector<BranchPropagatedUser, 8> scratchSpace;
+    SmallVector<SILInstruction *, 8> scratchSpace;
     SmallPtrSet<SILBasicBlock *, 4> visitedBlocks;
     if (llvm::any_of(borrowScopeIntroducers,
                      [&](BorrowScopeIntroducingValue borrowScope) {
                        return !borrowScope.areInstructionsWithinScope(
-                           destroysForLinearLifetimeCheck, scratchSpace,
-                           visitedBlocks, getDeadEndBlocks());
+                           destroys, scratchSpace, visitedBlocks,
+                           getDeadEndBlocks());
                      })) {
       return false;
     }
@@ -656,12 +649,14 @@ bool SemanticARCOptVisitor::eliminateDeadLiveRangeCopyValue(CopyValueInst *cvi) 
 bool SemanticARCOptVisitor::visitCopyValueInst(CopyValueInst *cvi) {
   // If our copy value inst has only destroy_value users, it is a dead live
   // range. Try to eliminate them.
-  if (eliminateDeadLiveRangeCopyValue(cvi))
+  if (eliminateDeadLiveRangeCopyValue(cvi)) {
     return true;
+  }
 
   // Then try to perform the guaranteed copy value optimization.
-  if (performGuaranteedCopyValueOptimization(cvi))
+  if (performGuaranteedCopyValueOptimization(cvi)) {
     return true;
+  }
 
   return false;
 }
@@ -670,35 +665,12 @@ bool SemanticARCOptVisitor::visitCopyValueInst(CopyValueInst *cvi) {
 //                         load [copy] Optimizations
 //===----------------------------------------------------------------------===//
 
-// A flow insensitive analysis that tells the load [copy] analysis if the
-// storage has 0, 1, >1 writes to it.
-//
-// In the case of 0 writes, we return CanOptimizeLoadCopyResult::Always.
-//
-// In the case of 1 write, we return OnlyIfStorageIsLocal. We are taking
-// advantage of definite initialization implying that an alloc_stack must be
-// written to once before any loads from the memory location. Thus if we are
-// local and see 1 write, we can still change to load_borrow if all other uses
-// check out.
-//
-// If there is 2+ writes, we can not optimize = (.
-
-bool mayFunctionMutateArgument(const AccessedStorage &storage, SILFunction &f) {
-  auto *arg = cast<SILFunctionArgument>(storage.getArgument());
-
-  // Then check if we have an in_guaranteed argument. In this case, we can
-  // always optimize load [copy] from this.
-  if (arg->hasConvention(SILArgumentConvention::Indirect_In_Guaranteed))
-    return false;
-
-  // For now just return false.
-  return true;
-}
-
-// Then find our accessed storage to determine whether it provides a guarantee
-// for the loaded value.
 namespace {
 
+/// A class that computes in a flow insensitive way if we can prove that our
+/// storage is either never written to, or is initialized exactly once and never
+/// written to again. In both cases, we can convert load [copy] -> load_borrow
+/// safely.
 class StorageGuaranteesLoadVisitor
   : public AccessUseDefChainVisitor<StorageGuaranteesLoadVisitor>
 {
@@ -736,9 +708,21 @@ public:
   }
   
   void visitArgumentAccess(SILFunctionArgument *arg) {
-    return answer(mayFunctionMutateArgument(
-                             AccessedStorage(arg, AccessedStorage::Argument),
-                             ARCOpt.F));
+    // If this load_copy is from an indirect in_guaranteed argument, then we
+    // know for sure that it will never be written to.
+    if (arg->hasConvention(SILArgumentConvention::Indirect_In_Guaranteed)) {
+      return answer(false);
+    }
+
+    // TODO: This should be extended:
+    //
+    // 1. We should be able to analyze inout arguments and see if the inout
+    //    argument is never actually written to in a flow insensitive way.
+    //
+    // 2. We should be able to analyze in arguments and see if they are only
+    //    ever destroyed at the end of the function. In such a case, we may be
+    //    able to also to promote load [copy] from such args to load_borrow.
+    return answer(true);
   }
   
   void visitGlobalAccess(SILValue global) {
@@ -786,22 +770,15 @@ public:
 
     // Use the linear lifetime checker to check whether the copied
     // value is dominated by the lifetime of the borrow it's based on.
-    SmallVector<BranchPropagatedUser, 4> baseEndBorrows;
-    for (auto *use : borrowInst->getUses()) {
-      if (isa<EndBorrowInst>(use->getUser())) {
-        baseEndBorrows.emplace_back(use);
-      }
-    }
-    
-    SmallVector<BranchPropagatedUser, 4> valueDestroys;
-    for (auto *use : Load->getUses()) {
-      if (isa<DestroyValueInst>(use->getUser())) {
-        valueDestroys.emplace_back(use);
-      }
-    }
-    
-    SmallPtrSet<SILBasicBlock *, 4> visitedBlocks;
+    SmallVector<SILInstruction *, 4> baseEndBorrows;
+    llvm::copy(borrowInst->getUsersOfType<EndBorrowInst>(),
+               std::back_inserter(baseEndBorrows));
 
+    SmallVector<SILInstruction *, 4> valueDestroys;
+    llvm::copy(Load->getUsersOfType<DestroyValueInst>(),
+               std::back_inserter(valueDestroys));
+
+    SmallPtrSet<SILBasicBlock *, 4> visitedBlocks;
     LinearLifetimeChecker checker(visitedBlocks, ARCOpt.getDeadEndBlocks());
     // Returns true on success. So we invert.
     bool foundError =

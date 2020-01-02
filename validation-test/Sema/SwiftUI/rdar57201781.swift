@@ -8,7 +8,7 @@ struct ContentView : View {
   @State var foo: [String] = Array(repeating: "", count: 5)
 
   var body: some View {
-    VStack { // expected-error {{unable to infer complex closure return type; add explicit type to disambiguate}}
+    VStack { // expected-error {{expression type 'VStack<_>' is ambiguous without more context}}
       HStack {
         Text("")
         TextFi // expected-error {{use of unresolved identifier 'TextFi'}}

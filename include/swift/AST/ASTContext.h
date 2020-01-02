@@ -62,6 +62,7 @@ namespace swift {
   class Decl;
   class DeclContext;
   class DefaultArgumentInitializer;
+  class DerivativeAttr;
   class ExtensionDecl;
   class ForeignRepresentationInfo;
   class FuncDecl;
@@ -281,6 +282,16 @@ public:
   /// The next auto-closure discriminator.  This needs to be preserved
   /// across invocations of both the parser and the type-checker.
   unsigned NextAutoClosureDiscriminator = 0;
+
+  /// Cache of `@derivative` attributes keyed by parameter indices and
+  /// derivative function kind. Used to diagnose duplicate `@derivative`
+  /// attributes for the same key.
+  // TODO(TF-1042): remove `DerivativeAttrs` from `ASTContext`. Serialize
+  // derivative function configurations per original `AbstractFunctionDecl`.
+  llvm::DenseMap<
+      std::tuple<Decl *, IndexSubset *, AutoDiffDerivativeFunctionKind>,
+      llvm::SmallPtrSet<DerivativeAttr *, 1>>
+      DerivativeAttrs;
 
 private:
   /// The current generation number, which reflects the number of

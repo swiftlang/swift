@@ -1,12 +1,13 @@
 // RUN: %target-typecheck-verify-swift
+// REQUIRES: OS=macosx
 
-@_originallyDefinedIn(module: "foo", OSX 13.13)
+@_originallyDefinedIn(module: "foo", OSX 13.13) // expected-error {{need @available attribute for @_originallyDefinedIn}}
 func foo() {}
 
 @_originallyDefinedIn(modulename: "foo", OSX 13.13) // expected-error {{expected 'module: "original"' in the first argument to @_originallyDefinedIn}}
 func foo1() {}
 
-@_originallyDefinedIn(module: "foo", OSX 13.13.3) // expected-warning {{@_originallyDefinedIn only uses major and minor version number}}
+@_originallyDefinedIn(module: "foo", OSX 13.13.3) // expected-warning {{@_originallyDefinedIn only uses major and minor version number}} expected-error {{need @available attribute for @_originallyDefinedIn}}
 class ToplevelClass {}
 
 @_originallyDefinedIn(module: "foo") // expected-error {{expected at least one platform version in @_originallyDefinedIn}}

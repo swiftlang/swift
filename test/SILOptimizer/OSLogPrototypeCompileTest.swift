@@ -460,5 +460,34 @@ if #available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *) {
       // CHECK-DAG: [[ARRAYINIT]] = function_ref @$ss27_allocateUninitializedArrayySayxG_BptBwlF
       // CHECK-DAG: [[ARRAYSIZE]] = integer_literal $Builtin.Word, 6
   }
+
+  // CHECK-LABEL: @$s25OSLogPrototypeCompileTest23testDeadCodeEliminationL_1h6number8num32bit6stringy0aB06LoggerV_Sis5Int32VSStF
+  func testDeadCodeElimination(
+    h: Logger,
+    number: Int,
+    num32bit: Int32,
+    string: String
+  ) {
+    h.log("A message with no data")
+    h.log("smallstring")
+    h.log(
+      level: .error,
+      """
+      A message with many interpolations \(number), \(num32bit), \(string), \
+      and a suffix
+      """)
+    h.log(
+      level: .info,
+      """
+      \(1) \(1) \(1) \(1) \(1) \(1) \(1) \(1) \(1) \(1) \(1) \(1) \(1) \(1) \
+      \(1) \(1) \(1) \(1) \(1) \(1) \(1) \(1) \(1) \(1) \(1) \(1) \(1) \(1) \
+      \(1) \(1) \(1) \(1) \(1) \(1) \(1) \(1) \(1) \(1) \(1) \(1) \(1) \(1) \
+      \(1) \(1) \(1) \(1) \(1) \(48) \(49)
+      """)
+    let concatString = string + ":" + String(number)
+    h.log("\(concatString)")
+      // CHECK-NOT: OSLogMessage
+      // CHECK-LABEL: end sil function '$s25OSLogPrototypeCompileTest23testDeadCodeEliminationL_1h6number8num32bit6stringy0aB06LoggerV_Sis5Int32VSStF'
+  }
 }
 

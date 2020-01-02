@@ -2124,6 +2124,21 @@ getActualReadWriteImplKind(unsigned rawKind) {
   return None;
 }
 
+/// Translate from the serialization DifferentiabilityKind enumerators, which
+/// are guaranteed to be stable, to the AST ones.
+static Optional<swift::AutoDiffDerivativeFunctionKind>
+getActualAutoDiffDerivativeFunctionKind(uint8_t raw) {
+  switch (serialization::AutoDiffDerivativeFunctionKind(raw)) {
+#define CASE(ID)                                                               \
+  case serialization::AutoDiffDerivativeFunctionKind::ID:                      \
+    return {swift::AutoDiffDerivativeFunctionKind::ID};
+  CASE(JVP)
+  CASE(VJP)
+#undef CASE
+  }
+  return None;
+}
+
 void ModuleFile::configureStorage(AbstractStorageDecl *decl,
                                   uint8_t rawOpaqueReadOwnership,
                                   uint8_t rawReadImplKind,
@@ -4164,6 +4179,38 @@ llvm::Error DeclDeserializer::deserializeDeclAttributes() {
         break;
       }
 
+      case decls_block::Derivative_DECL_ATTR: {
+        bool isImplicit;
+        uint64_t origNameId;
+        DeclID origDeclId;
+        uint64_t rawDerivativeKind;
+        ArrayRef<uint64_t> parameters;
+
+        serialization::decls_block::DerivativeDeclAttrLayout::readRecord(
+            scratch, isImplicit, origNameId, origDeclId, rawDerivativeKind,
+            parameters);
+
+        DeclNameRefWithLoc origName{
+            DeclNameRef(MF.getDeclBaseName(origNameId)), DeclNameLoc()};
+        auto *origDecl = cast<AbstractFunctionDecl>(MF.getDecl(origDeclId));
+        auto derivativeKind =
+            getActualAutoDiffDerivativeFunctionKind(rawDerivativeKind);
+        if (!derivativeKind)
+          MF.fatal();
+        llvm::SmallBitVector parametersBitVector(parameters.size());
+        for (unsigned i : indices(parameters))
+          parametersBitVector[i] = parameters[i];
+        auto *indices = IndexSubset::get(ctx, parametersBitVector);
+
+        auto *derivativeAttr =
+            DerivativeAttr::create(ctx, isImplicit, SourceLoc(), SourceRange(),
+                                   /*baseType*/ nullptr, origName, indices);
+        derivativeAttr->setOriginalFunction(origDecl);
+        derivativeAttr->setDerivativeKind(*derivativeKind);
+        Attr = derivativeAttr;
+        break;
+      }
+
       case decls_block::ImplicitlySynthesizesNestedRequirement_DECL_ATTR: {
         serialization::decls_block::ImplicitlySynthesizesNestedRequirementDeclAttrLayout
             ::readRecord(scratch);
@@ -4724,12 +4771,11 @@ public:
 
       IdentifierID labelID;
       TypeID typeID;
-      bool isVariadic, isAutoClosure, isNonEphemeral;
+      bool isVariadic, isAutoClosure, isNonEphemeral, isNoDerivative;
       unsigned rawOwnership;
-      decls_block::FunctionParamLayout::readRecord(scratch, labelID, typeID,
-                                                   isVariadic, isAutoClosure,
-                                                   isNonEphemeral,
-                                                   rawOwnership);
+      decls_block::FunctionParamLayout::readRecord(
+          scratch, labelID, typeID, isVariadic, isAutoClosure, isNonEphemeral,
+          rawOwnership, isNoDerivative);
 
       auto ownership =
           getActualValueOwnership((serialization::ValueOwnership)rawOwnership);
@@ -4740,10 +4786,10 @@ public:
       if (!paramTy)
         return paramTy.takeError();
 
-      params.emplace_back(paramTy.get(),
-                          MF.getIdentifier(labelID),
+      params.emplace_back(paramTy.get(), MF.getIdentifier(labelID),
                           ParameterTypeFlags(isVariadic, isAutoClosure,
-                                             isNonEphemeral, *ownership));
+                                             isNonEphemeral, *ownership,
+                                             isNoDerivative));
     }
 
     if (!isGeneric) {

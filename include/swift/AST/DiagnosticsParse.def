@@ -1560,9 +1560,12 @@ ERROR(expected_colon_after_label,PointsToFirstBadToken,
 ERROR(diff_params_clause_expected_parameter,PointsToFirstBadToken,
       "expected a parameter, which can be a function parameter name, "
       "parameter index, or 'self'", ())
+ERROR(diff_params_clause_expected_parameter_unnamed,PointsToFirstBadToken,
+      "expected a parameter, which can be a function parameter index or 'self'",
+      ())
 
-// derivative
-ERROR(attr_derivative_expected_original_name,PointsToFirstBadToken,
+// Automatic differentiation attributes
+ERROR(autodiff_attr_expected_original_decl_name,PointsToFirstBadToken,
       "expected an original function name", ())
 
 //------------------------------------------------------------------------------

@@ -53,9 +53,13 @@ void trySpecializeApplyOfGeneric(
 /// Specifically, it contains information which formal parameters and returns
 /// are changed from indirect values to direct values.
 class ReabstractionInfo {
-  /// A 1-bit means that this parameter/return value is converted from indirect
-  /// to direct.
+  /// A 1-bit means that this argument (= either indirect return value or
+  /// parameter) is converted from indirect to direct.
   SmallBitVector Conversions;
+
+  /// For each bit set in Conversions, there is a bit set in TrivialArgs if the
+  /// argument has a trivial type.
+  SmallBitVector TrivialArgs;
 
   /// If set, indirect to direct conversions should be performed by the generic
   /// specializer.
@@ -121,6 +125,10 @@ class ReabstractionInfo {
 
   // Is the generated specialization going to be serialized?
   IsSerialized_t Serialized;
+  
+  unsigned param2ArgIndex(unsigned ParamIdx) const  {
+    return ParamIdx + NumFormalIndirectResults;
+  }
 
   // Create a new substituted type with the updated signature.
   CanSILFunctionType createSubstitutedType(SILFunction *OrigF,
@@ -171,8 +179,7 @@ public:
   /// Returns true if the \p ParamIdx'th (non-result) formal parameter is
   /// converted from indirect to direct.
   bool isParamConverted(unsigned ParamIdx) const {
-    return ConvertIndirectToDirect &&
-           Conversions.test(ParamIdx + NumFormalIndirectResults);
+    return ConvertIndirectToDirect && isArgConverted(param2ArgIndex(ParamIdx));
   }
 
   /// Returns true if the \p ResultIdx'th formal result is converted from

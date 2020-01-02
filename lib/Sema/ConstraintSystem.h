@@ -297,6 +297,9 @@ public:
   /// Retrieve the generic parameter opened by this type variable.
   GenericTypeParamType *getGenericParameter() const;
 
+  /// Determine whether this type variable represents a closure result type.
+  bool isClosureResultType() const;
+
   /// Retrieve the representative of the equivalence class to which this
   /// type variable belongs.
   ///
@@ -471,19 +474,19 @@ enum class SolutionCompareResult {
 /// declaration was opened, which may involve type variables.
 struct SelectedOverload {
   /// The overload choice.
-  OverloadChoice choice;
+  const OverloadChoice choice;
 
   /// The opened type of the base of the reference to this overload, if
   /// we're referencing a member.
-  Type openedFullType;
+  const Type openedFullType;
 
   /// The opened type produced by referring to this overload.
-  Type openedType;
+  const Type openedType;
 
   /// The type that this overload binds. Note that this may differ from
   /// openedType, for example it will include any IUO unwrapping that has taken
   /// place.
-  Type boundType;
+  const Type boundType;
 };
 
 /// Provides information about the application of a function argument to a
@@ -1296,9 +1299,6 @@ public:
   /// A cache that stores the @dynamicCallable required methods implemented by
   /// types.
   llvm::DenseMap<CanType, DynamicCallableMethods> DynamicCallableCache;
-
-  /// A cache that stores whether types are valid @dynamicMemberLookup types.
-  llvm::DenseMap<CanType, bool> DynamicMemberLookupCache;
 
 private:
   /// Describe the candidate expression for partial solving.
@@ -3431,28 +3431,64 @@ private:
     /// The kind of bindings permitted.
     AllowedBindingKind Kind;
 
-    /// The kind of the constraint this binding came from.
-    ConstraintKind BindingSource;
-
-    /// The defaulted protocol associated with this binding.
-    ProtocolDecl *DefaultedProtocol;
-
-    /// If this is a binding that comes from a \c Defaultable constraint,
-    /// the locator of that constraint.
-    ConstraintLocator *DefaultableBinding = nullptr;
+  protected:
+    /// The source of the type information.
+    ///
+    /// Determines whether this binding represents a "hole" in
+    /// constraint system. Such bindings have no originating constraint
+    /// because they are synthetic, they have a locator instead.
+    PointerUnion<Constraint *, ConstraintLocator *> BindingSource;
 
     PotentialBinding(Type type, AllowedBindingKind kind,
-                     ConstraintKind bindingSource,
-                     ProtocolDecl *defaultedProtocol = nullptr,
-                     ConstraintLocator *defaultableBinding = nullptr)
+                     PointerUnion<Constraint *, ConstraintLocator *> source)
         : BindingType(type->getWithoutParens()), Kind(kind),
-          BindingSource(bindingSource), DefaultedProtocol(defaultedProtocol),
-          DefaultableBinding(defaultableBinding) {}
+          BindingSource(source) {}
 
-    bool isDefaultableBinding() const { return DefaultableBinding != nullptr; }
+  public:
+    PotentialBinding(Type type, AllowedBindingKind kind, Constraint *source)
+        : BindingType(type->getWithoutParens()), Kind(kind),
+          BindingSource(source) {}
+
+    bool isDefaultableBinding() const {
+      if (auto *constraint = BindingSource.dyn_cast<Constraint *>())
+        return constraint->getKind() == ConstraintKind::Defaultable;
+      // If binding source is not constraint - it's a hole, which is
+      // a last resort default binding for a type variable.
+      return true;
+    }
+
+    bool hasDefaultedLiteralProtocol() const {
+      return bool(getDefaultedLiteralProtocol());
+    }
+
+    ProtocolDecl *getDefaultedLiteralProtocol() const {
+      auto *constraint = BindingSource.dyn_cast<Constraint *>();
+      if (!constraint)
+        return nullptr;
+
+      return constraint->getKind() == ConstraintKind::LiteralConformsTo
+                 ? constraint->getProtocol()
+                 : nullptr;
+    }
+
+    ConstraintLocator *getLocator() const {
+      if (auto *constraint = BindingSource.dyn_cast<Constraint *>())
+        return constraint->getLocator();
+      return BindingSource.get<ConstraintLocator *>();
+    }
 
     PotentialBinding withType(Type type) const {
-      return {type, Kind, BindingSource, DefaultedProtocol, DefaultableBinding};
+      return {type, Kind, BindingSource};
+    }
+
+    PotentialBinding withSameSource(Type type, AllowedBindingKind kind) const {
+      return {type, kind, BindingSource};
+    }
+
+    static PotentialBinding forHole(ASTContext &ctx,
+                                    ConstraintLocator *locator) {
+      return {ctx.TheUnresolvedType, AllowedBindingKind::Exact,
+              /*source=*/locator};
     }
   };
 
@@ -3607,9 +3643,8 @@ private:
                      out << "(supertypes of) ";
                      break;
                    }
-                   if (binding.DefaultedProtocol)
-                     out << "(default from "
-                         << binding.DefaultedProtocol->getName() << ") ";
+                   if (auto *literal = binding.getDefaultedLiteralProtocol())
+                     out << "(default from " << literal->getName() << ") ";
                    out << type.getString(PO);
                  },
                  [&]() { out << "; "; });
@@ -3863,11 +3898,12 @@ public:
   /// expression should be converted, if any.
   /// \param discardedExpr if true, the result of the expression
   /// is contextually ignored.
-  /// \param skipClosures if true, don't descend into bodies of
-  /// non-single expression closures.
+  /// \param performingDiagnostics if true, don't descend into bodies of
+  /// non-single expression closures, or build curry thunks.
   Expr *applySolution(Solution &solution, Expr *expr,
-                      Type convertType, bool discardedExpr,
-                      bool skipClosures);
+                      Type convertType,
+                      bool discardedExpr,
+                      bool performingDiagnostics);
 
   /// Reorder the disjunctive clauses for a given expression to
   /// increase the likelihood that a favored constraint will be successfully
@@ -4339,7 +4375,9 @@ public:
 
   bool isDefaultable() const { return Binding.isDefaultableBinding(); }
 
-  bool hasDefaultedProtocol() const { return Binding.DefaultedProtocol; }
+  bool hasDefaultedProtocol() const {
+    return Binding.hasDefaultedLiteralProtocol();
+  }
 
   bool attempt(ConstraintSystem &cs) const;
 

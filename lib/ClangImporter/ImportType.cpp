@@ -185,7 +185,7 @@ namespace {
       llvm_unreachable("Dependent types cannot be converted");    \
     }
 #define TYPE(Class, Base)
-#include "clang/AST/TypeNodes.def"
+#include "clang/AST/TypeNodes.inc"
 
     // Given a loaded type like CInt, look through the type alias sugar that the
     // stdlib uses to show the underlying type.  We want to import the signature
@@ -421,7 +421,7 @@ namespace {
             funcTy->getExtInfo()
               .withRepresentation(
                 AnyFunctionType::Representation::CFunctionPointer)
-              .withClangFunctionType(pointeeQualType.getTypePtr())),
+              .withClangFunctionType(type)),
           ImportHint::CFunctionPointer
         };
       }

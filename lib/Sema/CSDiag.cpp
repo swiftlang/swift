@@ -201,16 +201,6 @@ public:
                                          ContextualTypePurpose CTP,
                                          Type suggestedType = Type());
 
-  /// For an expression being type checked with a CTP_CalleeResult contextual
-  /// type, try to diagnose a problem.
-  bool diagnoseCalleeResultContextualConversionError();
-
-  /// Attempt to produce a diagnostic for a mismatch between a call's
-  /// type and its assumed contextual type.
-  bool diagnoseCallContextualConversionErrors(ApplyExpr *callEpxr,
-                                              Type contextualType,
-                                              ContextualTypePurpose CTP);
-
   bool diagnoseImplicitSelfErrors(Expr *fnExpr, Expr *argExpr,
                                   CalleeCandidateInfo &CCI,
                                   ArrayRef<Identifier> argLabels);
@@ -229,11 +219,6 @@ private:
   /// if it wasn't an appropriate type to be used.
   std::pair<Type, ContextualTypePurpose>
   validateContextualType(Type contextualType, ContextualTypePurpose CTP);
-
-  /// Check the specified closure to see if it is a multi-statement closure with
-  /// an uninferred type.  If so, diagnose the problem with an error and return
-  /// true.
-  bool diagnoseAmbiguousMultiStatementClosure(ClosureExpr *closure);
 
   /// Given a result of name lookup that had no viable results, diagnose the
   /// unviable ones.
@@ -609,10 +594,6 @@ Expr *FailureDiagnosis::typeCheckChildIndependently(
   // Make sure that typechecker knows that this is an attempt
   // to diagnose a problem.
   TCEOptions |= TypeCheckExprFlags::SubExpressionDiagnostics;
-
-  // Don't walk into non-single expression closure bodies, because
-  // ExprTypeSaver and TypeNullifier skip them too.
-  TCEOptions |= TypeCheckExprFlags::SkipMultiStmtClosures;
 
   // Claim that the result is discarded to preserve the lvalue type of
   // the expression.
@@ -1675,69 +1656,6 @@ namespace {
   };
 } // end anonymous namespace
 
-static bool diagnoseClosureExplicitParameterMismatch(
-    ConstraintSystem &CS, SourceLoc loc,
-    ArrayRef<AnyFunctionType::Param> params,
-    ArrayRef<AnyFunctionType::Param> args) {
-  // We are not trying to diagnose structural problems with top-level
-  // arguments here.
-  if (params.size() != args.size())
-    return false;
-
-  for (unsigned i = 0, n = params.size(); i != n; ++i) {
-    auto paramType = params[i].getOldType();
-    auto argType = args[i].getOldType();
-
-    if (auto paramFnType = paramType->getAs<AnyFunctionType>()) {
-      if (auto argFnType = argType->getAs<AnyFunctionType>())
-        return diagnoseClosureExplicitParameterMismatch(
-            CS, loc, paramFnType->getParams(), argFnType->getParams());
-    }
-
-    if (!paramType || !argType || isUnresolvedOrTypeVarType(paramType) ||
-        isUnresolvedOrTypeVarType(argType))
-      continue;
-
-    if (!TypeChecker::isConvertibleTo(argType, paramType, CS.DC)) {
-      CS.getASTContext().Diags.diagnose(loc, diag::types_not_convertible,
-                                        false, paramType, argType);
-      return true;
-    }
-  }
-
-  return false;
-}
-
-/// Check if there failure associated with expression is related
-/// to given contextual type.
-bool FailureDiagnosis::diagnoseCallContextualConversionErrors(
-    ApplyExpr *callExpr, Type contextualType, ContextualTypePurpose CTP) {
-  if (!contextualType || contextualType->hasUnresolvedType())
-    return false;
-
-  auto typeCheckExpr = [&](Expr *expr, DeclContext *DC,
-                           SmallPtrSetImpl<TypeBase *> &types) {
-    getPossibleTypesOfExpressionWithoutApplying(
-        expr, DC, types, FreeTypeVariableBinding::Disallow);
-  };
-
-  // First let's type-check expression without contextual type, and
-  // see if that's going to produce a type, if so, let's type-check
-  // again, this time using given contextual type.
-  SmallPtrSet<TypeBase *, 4> withoutContextual;
-  typeCheckExpr(callExpr, CS.DC, withoutContextual);
-
-  // If there are no types returned, it means that problem was
-  // nothing to do with contextual information, probably parameter/argument
-  // mismatch.
-  if (withoutContextual.empty())
-    return false;
-
-  Type exprType = withoutContextual.size() == 1 ? *withoutContextual.begin() : Type();
-  return diagnoseContextualConversionError(callExpr, contextualType, CTP,
-                                           exprType);
-}
-
 // Check if there is a structural problem in the function expression
 // by performing type checking with the option to allow unresolved
 // type variables. If that is going to produce a function type with
@@ -1768,45 +1686,8 @@ static bool shouldTypeCheckFunctionExpr(FailureDiagnosis &FD, DeclContext *DC,
   return true;
 }
 
-// Check if any candidate of the overload set can accept a specified
-// number of arguments, regardless of parameter type or label information.
-static bool isViableOverloadSet(const CalleeCandidateInfo &CCI,
-                                size_t numArgs) {
-  for (unsigned i = 0; i < CCI.size(); ++i) {
-    auto &&cand = CCI[i];
-    auto funcDecl = dyn_cast_or_null<AbstractFunctionDecl>(cand.getDecl());
-
-    // If we don't have a func decl or we haven't resolved its parameters,
-    // continue. The latter case can occur with `type(of:)`, which is introduced
-    // as a type variable.
-    if (!funcDecl || !cand.hasParameters())
-      continue;
-
-    auto params = cand.getParameters();
-    bool hasVariadicParameter = false;
-    auto pairMatcher = [&](unsigned argIdx, unsigned paramIdx) {
-      hasVariadicParameter |= params[paramIdx].isVariadic();
-      return true;
-    };
-
-    auto paramInfo = cand.getParameterListInfo(params);
-    InputMatcher IM(params, paramInfo);
-    auto result = IM.match(numArgs, pairMatcher);
-    if (result == InputMatcher::IM_Succeeded)
-      return true;
-    if (result == InputMatcher::IM_HasUnclaimedInput && hasVariadicParameter)
-      return true;
-  }
-  return false;
-}
-
 bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
-  if (diagnoseCallContextualConversionErrors(callExpr, CS.getContextualType(),
-                                             CS.getContextualTypePurpose()))
-    return true;
-
   auto *fnExpr = callExpr->getFn();
-  auto originalFnType = CS.getType(callExpr->getFn());
 
   if (shouldTypeCheckFunctionExpr(*this, CS.DC, fnExpr)) {
     // Type check the function subexpression to resolve a type for it if
@@ -1829,161 +1710,11 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
 
   auto fnType = getFuncType(CS.getType(fnExpr));
 
-  // Let's see if this has to do with member vs. property error
-  // because sometimes when there is a member and a property declared
-  // on the nominal type with the same name. Type-checking function
-  // expression separately from arguments might produce solution for
-  // the property instead of the member.
-  if (!fnType->is<AnyFunctionType>() &&
-    isa<UnresolvedDotExpr>(callExpr->getFn())) {
-    fnExpr = callExpr->getFn();
-
-    SmallPtrSet<TypeBase *, 4> types;
-    getPossibleTypesOfExpressionWithoutApplying(fnExpr, CS.DC, types);
-
-    auto isFunctionType = [getFuncType](Type type) -> bool {
-      return type && getFuncType(type)->is<AnyFunctionType>();
-    };
-
-    auto fnTypes = std::find_if(types.begin(), types.end(), isFunctionType);
-    if (fnTypes != types.end()) {
-      auto funcType = getFuncType(*fnTypes);
-      // If there is only one function type, let's use it.
-      if (std::none_of(std::next(fnTypes), types.end(), isFunctionType))
-        fnType = funcType;
-    } else {
-      fnType = getFuncType(originalFnType);
-    }
-  }
-
-  // If we have a contextual type, and if we have an ambiguously typed function
-  // result from our previous check, we re-type-check it using this contextual
-  // type to inform the result type of the callee.
-  //
-  // We only do this as a second pass because the first pass we just did may
-  // return something of obviously non-function-type.  If this happens, we
-  // produce better diagnostics below by diagnosing this here rather than trying
-  // to peel apart the failed conversion to function type.
-  if (CS.getContextualType() &&
-      (isUnresolvedOrTypeVarType(fnType) ||
-       (fnType->is<AnyFunctionType>() && fnType->hasUnresolvedType()))) {
-    // FIXME: Prevent typeCheckChildIndependently from transforming expressions,
-    // because if we try to typecheck OSR expression with contextual type,
-    // it'll end up converting it into DeclRefExpr based on contextual info,
-    // instead let's try to get a type without applying and filter callee
-    // candidates later on.
-    CalleeListener listener(CS.getContextualType());
-
-    if (isa<OverloadSetRefExpr>(fnExpr)) {
-      assert(!cast<OverloadSetRefExpr>(fnExpr)->getReferencedDecl() &&
-             "unexpected declaration reference");
-
-      ConcreteDeclRef decl = nullptr;
-      Type type = TypeChecker::getTypeOfExpressionWithoutApplying(
-          fnExpr, CS.DC, decl, FreeTypeVariableBinding::UnresolvedType,
-          &listener);
-
-      if (type)
-        fnType = getFuncType(type);
-    } else {
-      fnExpr = typeCheckChildIndependently(callExpr->getFn(), Type(),
-                                           CTP_CalleeResult, TCC_ForceRecheck,
-                                           &listener);
-      if (!fnExpr)
-        return true;
-
-      fnType = getFuncType(CS.getType(fnExpr));
-    }
-  }
-
-  // If we resolved a concrete expression for the callee, and it has
-  // non-function/non-metatype type, then we cannot call it!
-  if (!isUnresolvedOrTypeVarType(fnType) &&
-      !fnType->is<AnyFunctionType>() && !fnType->is<MetatypeType>()) {
-    auto arg = callExpr->getArg();
-
-    // If the argument is a trailing ClosureExpr (i.e. {....}) and it is on
-    // the line after the callee, then it's likely the user forgot to
-    // write "do" before their brace stmt.
-    // Note that line differences of more than 1 are diagnosed during parsing.
-    if (auto *PE = dyn_cast<ParenExpr>(arg)) {
-      if (PE->hasTrailingClosure() && isa<ClosureExpr>(PE->getSubExpr())) {
-        auto *closure = cast<ClosureExpr>(PE->getSubExpr());
-        auto &SM = CS.getASTContext().SourceMgr;
-        if (closure->hasAnonymousClosureVars() &&
-            closure->getParameters()->size() == 0 &&
-            1 + SM.getLineNumber(callExpr->getFn()->getEndLoc()) ==
-                SM.getLineNumber(closure->getStartLoc())) {
-          diagnose(closure->getStartLoc(), diag::brace_stmt_suggest_do)
-              .fixItInsert(closure->getStartLoc(), "do ");
-          return true;
-        }
-      }
-    }
-
-    auto isExistentialMetatypeType = fnType->is<ExistentialMetatypeType>();
-    if (isExistentialMetatypeType) {
-      auto diag = diagnose(arg->getStartLoc(),
-                           diag::missing_init_on_metatype_initialization);
-      diag.highlight(fnExpr->getSourceRange());
-      return true;
-    } else {
-      auto diag = diagnose(arg->getStartLoc(),
-                           diag::cannot_call_non_function_value, fnType);
-      diag.highlight(fnExpr->getSourceRange());
-
-      // If the argument is an empty tuple, then offer a
-      // fix-it to remove the empty tuple and use the value
-      // directly.
-      if (auto tuple = dyn_cast<TupleExpr>(arg)) {
-        if (tuple->getNumElements() == 0) {
-          diag.fixItRemove(arg->getSourceRange());
-        }
-      }
-      return true;
-    }
-  }
-  
   bool hasTrailingClosure = callArgHasTrailingClosure(callExpr->getArg());
   
   // Collect a full candidate list of callees based on the partially type
   // checked function.
   CalleeCandidateInfo calleeInfo(fnExpr, hasTrailingClosure, CS);
-
-  // In the case that function subexpression was resolved independently in
-  // the first place, the resolved type may not provide the best diagnostic.
-  // We consider the number of arguments to decide whether we'd go with it or
-  // stay with the original one.
-  if (fnExpr != callExpr->getFn()) {
-    bool isInstanceMethodAsCurriedMemberOnType = false;
-    if (!calleeInfo.empty()) {
-      auto &&cand = calleeInfo[0];
-      auto decl = cand.getDecl();
-      if (decl && decl->isInstanceMember() && !cand.skipCurriedSelf &&
-          cand.getParameters().size() == 1)
-        isInstanceMethodAsCurriedMemberOnType = true;
-    }
-
-    // In terms of instance method as curried member on type, we should not
-    // take the number of arguments into account.
-    if (!isInstanceMethodAsCurriedMemberOnType) {
-      size_t numArgs = 1;
-      auto arg = callExpr->getArg();
-      if (auto tuple = dyn_cast<TupleExpr>(arg)) {
-        numArgs = tuple->getNumElements();
-      }
-
-      if (!isViableOverloadSet(calleeInfo, numArgs)) {
-        CalleeCandidateInfo calleeInfoOrig(callExpr->getFn(),
-                                           hasTrailingClosure, CS);
-        if (isViableOverloadSet(calleeInfoOrig, numArgs)) {
-          fnExpr = callExpr->getFn();
-          fnType = getFuncType(CS.getType(fnExpr));
-          calleeInfo = calleeInfoOrig;
-        }
-      }
-    }
-  }
 
   // Filter list of the candidates based on the known function type.
   if (auto fn = fnType->getAs<AnyFunctionType>()) {
@@ -2954,138 +2685,6 @@ FailureDiagnosis::validateContextualType(Type contextualType,
   return {contextualType, CTP};
 }
 
-/// Check the specified closure to see if it is a multi-statement closure with
-/// an uninferred type.  If so, diagnose the problem with an error and return
-/// true.
-bool FailureDiagnosis::
-diagnoseAmbiguousMultiStatementClosure(ClosureExpr *closure) {
-  if (closure->hasSingleExpressionBody() ||
-      closure->hasExplicitResultType())
-    return false;
-
-  auto closureType = CS.getType(closure)->getAs<AnyFunctionType>();
-  if (!closureType ||
-      !(closureType->getResult()->hasUnresolvedType() ||
-        closureType->getResult()->hasTypeVariable()))
-    return false;
-
-  // Okay, we have a multi-statement closure expr that has no inferred result,
-  // type, in the context of a larger expression.  The user probably expected
-  // the compiler to infer the result type of the closure from the body of the
-  // closure, which Swift doesn't do for multi-statement closures.  Try to be
-  // helpful by digging into the body of the closure, looking for a return
-  // statement, and inferring the result type from it.  If we can figure that
-  // out, we can produce a fixit hint.
-  class ReturnStmtFinder : public ASTWalker {
-    SmallVectorImpl<ReturnStmt*> &returnStmts;
-  public:
-    ReturnStmtFinder(SmallVectorImpl<ReturnStmt*> &returnStmts)
-      : returnStmts(returnStmts) {}
-
-    // Walk through statements, so we find returns hiding in if/else blocks etc.
-    std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
-      // Keep track of any return statements we find.
-      if (auto RS = dyn_cast<ReturnStmt>(S))
-        returnStmts.push_back(RS);
-      return { true, S };
-    }
-    
-    // Don't walk into anything else, since they cannot contain statements
-    // that can return from the current closure.
-    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
-      return { false, E };
-    }
-    std::pair<bool, Pattern*> walkToPatternPre(Pattern *P) override {
-      return { false, P };
-    }
-    bool walkToDeclPre(Decl *D) override { return false; }
-    bool walkToTypeLocPre(TypeLoc &TL) override { return false; }
-    bool walkToTypeReprPre(TypeRepr *T) override { return false; }
-    bool walkToParameterListPre(ParameterList *PL) override { return false; }
-  };
-  
-  SmallVector<ReturnStmt*, 4> Returns;
-  closure->getBody()->walk(ReturnStmtFinder(Returns));
-  
-  // If we found a return statement inside of the closure expression, then go
-  // ahead and type check the body to see if we can determine a type.
-  for (auto RS : Returns) {
-    llvm::SaveAndRestore<DeclContext *> SavedDC(CS.DC, closure);
-
-    // Otherwise, we're ok to type check the subexpr.
-    Type resultType;
-    if (RS->hasResult()) {
-      auto resultExpr = RS->getResult();
-      ConcreteDeclRef decl = nullptr;
-
-      // If return expression uses closure parameters, which have/are
-      // type variables, such means that we won't be able to
-      // type-check result correctly and, unfortunately,
-      // we are going to leak type variables from the parent
-      // constraint system through declaration types.
-      bool hasUnresolvedParams = false;
-      resultExpr->forEachChildExpr([&](Expr *childExpr) -> Expr *{
-        if (auto DRE = dyn_cast<DeclRefExpr>(childExpr)) {
-          if (auto param = dyn_cast<ParamDecl>(DRE->getDecl())) {
-            auto paramType =
-                param->hasInterfaceType() ? param->getType() : Type();
-            if (!paramType || paramType->hasTypeVariable()) {
-              hasUnresolvedParams = true;
-              return nullptr;
-            }
-          }
-        }
-        return childExpr;
-      });
-
-      if (hasUnresolvedParams)
-        continue;
-
-      ConstraintSystem::preCheckExpression(resultExpr, CS.DC, &CS);
-
-      // Obtain type of the result expression without applying solutions,
-      // because otherwise this might result in leaking of type variables,
-      // since we are not resetting result statement and if expression is
-      // successfully type-checked its type cleanup is going to be disabled
-      // (we are allowing unresolved types), and as a side-effect it might
-      // also be transformed e.g. OverloadedDeclRefExpr -> DeclRefExpr.
-      auto type = TypeChecker::getTypeOfExpressionWithoutApplying(
-          resultExpr, CS.DC, decl, FreeTypeVariableBinding::UnresolvedType);
-      if (type)
-        resultType = type->getRValueType();
-    }
-    
-    // If we found a type, presuppose it was the intended result and insert a
-    // fixit hint.
-    if (resultType && !isUnresolvedOrTypeVarType(resultType)) {
-      // If there is a location for an 'in' token, then the argument list was
-      // specified somehow but no return type was.  Insert a "-> ReturnType "
-      // before the in token.
-      if (closure->getInLoc().isValid()) {
-        diagnose(closure->getLoc(), diag::cannot_infer_closure_result_type)
-            .fixItInsert(closure->getInLoc(), diag::insert_closure_return_type,
-                         resultType, /*argListSpecified*/ false);
-        return true;
-      }
-      
-      // Otherwise, the closure must take zero arguments.  We know this
-      // because the if one or more argument is specified, a multi-statement
-      // closure *must* name them, or explicitly ignore them with "_ in".
-      //
-      // As such, we insert " () -> ReturnType in " right after the '{' that
-      // starts the closure body.
-      diagnose(closure->getLoc(), diag::cannot_infer_closure_result_type)
-          .fixItInsertAfter(closure->getBody()->getLBraceLoc(),
-                            diag::insert_closure_return_type, resultType,
-                            /*argListSpecified*/ true);
-      return true;
-    }
-  }
-  
-  diagnose(closure->getLoc(), diag::cannot_infer_closure_result_type);
-  return true;
-}
-
 /// Emit an ambiguity diagnostic about the specified expression.
 void FailureDiagnosis::diagnoseAmbiguity(Expr *E) {
   if (auto *assignment = dyn_cast<AssignExpr>(E)) {
@@ -3115,11 +2714,6 @@ void FailureDiagnosis::diagnoseAmbiguity(Expr *E) {
   // Unresolved/Anonymous ClosureExprs are common enough that we should give
   // them tailored diagnostics.
   if (auto CE = dyn_cast<ClosureExpr>(E->getValueProvidingExpr())) {
-    // If this is a multi-statement closure with no explicit result type, emit
-    // a note to clue the developer in.
-    if (diagnoseAmbiguousMultiStatementClosure(CE))
-      return;
-
     diagnose(E->getLoc(), diag::cannot_infer_closure_type)
       .highlight(E->getSourceRange());
     return;
@@ -3161,22 +2755,6 @@ void FailureDiagnosis::diagnoseAmbiguity(Expr *E) {
     return;
   }
 
-  // A very common cause of this diagnostic is a situation where a closure expr
-  // has no inferred type, due to being a multiline closure.  Check to see if
-  // this is the case and (if so), speculatively diagnose that as the problem.
-  bool didDiagnose = false;
-  E->forEachChildExpr([&](Expr *subExpr) -> Expr*{
-    auto closure = dyn_cast<ClosureExpr>(subExpr);
-    if (!didDiagnose && closure)
-      didDiagnose = diagnoseAmbiguousMultiStatementClosure(closure);
-    
-    return subExpr;
-  });
-  
-  if (didDiagnose) return;
-  
-
-  
   // Attempt to re-type-check the entire expression, allowing ambiguity, but
   // ignoring a contextual type.
   if (expr == E) {

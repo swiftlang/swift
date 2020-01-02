@@ -438,26 +438,6 @@ public:
   bool diagnoseAsNote() override;
 };
 
-/// Diagnose errors related to converting function type which
-/// isn't explicitly '@escaping' to some other type.
-class NoEscapeFuncToTypeConversionFailure final : public FailureDiagnostic {
-  Type ConvertTo;
-
-public:
-  NoEscapeFuncToTypeConversionFailure(ConstraintSystem &cs,
-                                      ConstraintLocator *locator,
-                                      Type toType = Type())
-      : FailureDiagnostic(cs, locator), ConvertTo(toType) {}
-
-  bool diagnoseAsError() override;
-
-private:
-  /// Emit tailored diagnostics for no-escape parameter conversions e.g.
-  /// passing such parameter as an @escaping argument, or trying to
-  /// assign it to a variable which expects @escaping function.
-  bool diagnoseParameterUse() const;
-};
-
 /// Diagnose failures related to attempting member access on optional base
 /// type without optional chaining or force-unwrapping it first.
 class MemberAccessOnOptionalBaseFailure final : public FailureDiagnostic {
@@ -547,7 +527,7 @@ private:
 /// e.g. argument/parameter, closure result, conversions etc.
 class ContextualFailure : public FailureDiagnostic {
   ContextualTypePurpose CTP;
-  Type FromType, ToType;
+  Type RawFromType, RawToType;
 
 public:
   ContextualFailure(ConstraintSystem &cs, Type lhs, Type rhs,
@@ -555,15 +535,18 @@ public:
       : ContextualFailure(cs, cs.getContextualTypePurpose(), lhs, rhs,
                           locator) {}
 
-  ContextualFailure(ConstraintSystem &cs,
-                    ContextualTypePurpose purpose, Type lhs, Type rhs,
-                    ConstraintLocator *locator)
-      : FailureDiagnostic(cs, locator), CTP(purpose),
-        FromType(resolve(lhs)), ToType(resolve(rhs)) {}
+  ContextualFailure(ConstraintSystem &cs, ContextualTypePurpose purpose,
+                    Type lhs, Type rhs, ConstraintLocator *locator)
+      : FailureDiagnostic(cs, locator), CTP(purpose), RawFromType(lhs),
+        RawToType(rhs) {}
 
-  Type getFromType() const { return FromType; }
+  Type getFromType() const { return resolve(RawFromType); }
 
-  Type getToType() const { return ToType; }
+  Type getToType() const { return resolve(RawToType); }
+
+  Type getRawFromType() const { return RawFromType; }
+
+  Type getRawToType() const { return RawToType; }
 
   bool diagnoseAsError() override;
 
@@ -644,7 +627,7 @@ protected:
                                             Type contextualType);
 
 private:
-  Type resolve(Type rawType) {
+  Type resolve(Type rawType) const {
     return resolveType(rawType)->getWithoutSpecifierType();
   }
 
@@ -667,6 +650,23 @@ protected:
 
   static Optional<Diag<Type, Type>>
   getDiagnosticFor(ContextualTypePurpose context, bool forProtocol);
+};
+
+/// Diagnose errors related to converting function type which
+/// isn't explicitly '@escaping' to some other type.
+class NoEscapeFuncToTypeConversionFailure final : public ContextualFailure {
+public:
+  NoEscapeFuncToTypeConversionFailure(ConstraintSystem &cs, Type fromType,
+                                      Type toType, ConstraintLocator *locator)
+      : ContextualFailure(cs, fromType, toType, locator) {}
+
+  bool diagnoseAsError() override;
+
+private:
+  /// Emit tailored diagnostics for no-escape parameter conversions e.g.
+  /// passing such parameter as an @escaping argument, or trying to
+  /// assign it to a variable which expects @escaping function.
+  bool diagnoseParameterUse() const;
 };
 
 /// Diagnose failures related to use of the unwrapped optional types,
@@ -1908,6 +1908,15 @@ public:
                                           DeclNameRef member,
                                           ConstraintLocator *locator)
       : FailureDiagnostic(cs, locator), MemberName(member) {}
+
+  bool diagnoseAsError();
+};
+
+class UnableToInferClosureReturnType final : public FailureDiagnostic {
+public:
+  UnableToInferClosureReturnType(ConstraintSystem &cs,
+                                 ConstraintLocator *locator)
+      : FailureDiagnostic(cs, locator) {}
 
   bool diagnoseAsError();
 };

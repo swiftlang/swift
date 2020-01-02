@@ -158,6 +158,7 @@ static void findRelatedIdents(StringRef Filename,
 
 static sourcekitd_response_t
 codeComplete(llvm::MemoryBuffer *InputBuf, int64_t Offset,
+             Optional<RequestDict> optionsDict,
              ArrayRef<const char *> Args, Optional<VFSOptions> vfsOptions);
 
 static sourcekitd_response_t codeCompleteOpen(StringRef name,
@@ -175,12 +176,14 @@ static sourcekitd_response_t codeCompleteClose(StringRef name, int64_t Offset);
 
 static sourcekitd_response_t typeContextInfo(llvm::MemoryBuffer *InputBuf,
                                              int64_t Offset,
-                                             ArrayRef<const char *> Args);
+                                             ArrayRef<const char *> Args,
+                                             Optional<VFSOptions> vfsOptions);
 
 static sourcekitd_response_t
 conformingMethodList(llvm::MemoryBuffer *InputBuf, int64_t Offset,
                      ArrayRef<const char *> Args,
-                     ArrayRef<const char *> ExpectedTypes);
+                     ArrayRef<const char *> ExpectedTypes,
+                     Optional<VFSOptions> vfsOptions);
 
 static sourcekitd_response_t
 editorOpen(StringRef Name, llvm::MemoryBuffer *Buf,
@@ -938,7 +941,9 @@ static void handleSemanticRequest(
     int64_t Offset;
     if (Req.getInt64(KeyOffset, Offset, /*isOptional=*/false))
       return Rec(createErrorRequestInvalid("missing 'key.offset'"));
-    return Rec(codeComplete(InputBuf.get(), Offset, Args, std::move(vfsOptions)));
+    Optional<RequestDict> options = Req.getDictionary(KeyCodeCompleteOptions);
+    return Rec(codeComplete(InputBuf.get(), Offset, options, Args,
+                            std::move(vfsOptions)));
   }
 
   if (ReqUID == RequestCodeCompleteOpen) {
@@ -976,7 +981,8 @@ static void handleSemanticRequest(
     int64_t Offset;
     if (Req.getInt64(KeyOffset, Offset, /*isOptional=*/false))
       return Rec(createErrorRequestInvalid("missing 'key.offset'"));
-    return Rec(typeContextInfo(InputBuf.get(), Offset, Args));
+    return Rec(typeContextInfo(InputBuf.get(), Offset, Args,
+                               std::move(vfsOptions)));
   }
 
   if (ReqUID == RequestConformingMethodList) {
@@ -991,7 +997,8 @@ static void handleSemanticRequest(
     if (Req.getStringArray(KeyExpectedTypes, ExpectedTypeNames, true))
       return Rec(createErrorRequestInvalid("invalid 'key.expectedtypes'"));
     return Rec(
-        conformingMethodList(InputBuf.get(), Offset, Args, ExpectedTypeNames));
+        conformingMethodList(InputBuf.get(), Offset, Args, ExpectedTypeNames,
+                             std::move(vfsOptions)));
   }
 
   if (!SourceFile.hasValue())
@@ -1928,12 +1935,19 @@ public:
 
 static sourcekitd_response_t
 codeComplete(llvm::MemoryBuffer *InputBuf, int64_t Offset,
+             Optional<RequestDict> optionsDict,
              ArrayRef<const char *> Args,
              Optional<VFSOptions> vfsOptions) {
   ResponseBuilder RespBuilder;
   SKCodeCompletionConsumer CCC(RespBuilder);
+
+  std::unique_ptr<SKOptionsDictionary> options;
+  if (optionsDict)
+    options = std::make_unique<SKOptionsDictionary>(*optionsDict);
+
   LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
-  Lang.codeComplete(InputBuf, Offset, CCC, Args, std::move(vfsOptions));
+  Lang.codeComplete(InputBuf, Offset, options.get(), CCC, Args,
+                    std::move(vfsOptions));
   return CCC.createResponse();
 }
 
@@ -2205,7 +2219,8 @@ void SKGroupedCodeCompletionConsumer::setNextRequestStart(unsigned offset) {
 
 static sourcekitd_response_t typeContextInfo(llvm::MemoryBuffer *InputBuf,
                                              int64_t Offset,
-                                             ArrayRef<const char *> Args) {
+                                             ArrayRef<const char *> Args,
+                                             Optional<VFSOptions> vfsOptions) {
   ResponseBuilder RespBuilder;
 
   class Consumer : public TypeContextInfoConsumer {
@@ -2242,7 +2257,8 @@ static sourcekitd_response_t typeContextInfo(llvm::MemoryBuffer *InputBuf,
   } Consumer(RespBuilder);
 
   LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
-  Lang.getExpressionContextInfo(InputBuf, Offset, Args, Consumer);
+  Lang.getExpressionContextInfo(InputBuf, Offset, Args, Consumer,
+                                std::move(vfsOptions));
 
   if (Consumer.isError())
     return createErrorRequestFailed(Consumer.getErrorDescription());
@@ -2256,7 +2272,8 @@ static sourcekitd_response_t typeContextInfo(llvm::MemoryBuffer *InputBuf,
 static sourcekitd_response_t
 conformingMethodList(llvm::MemoryBuffer *InputBuf, int64_t Offset,
                      ArrayRef<const char *> Args,
-                     ArrayRef<const char *> ExpectedTypes) {
+                     ArrayRef<const char *> ExpectedTypes,
+                     Optional<VFSOptions> vfsOptions) {
   ResponseBuilder RespBuilder;
 
   class Consumer : public ConformingMethodListConsumer {
@@ -2293,7 +2310,8 @@ conformingMethodList(llvm::MemoryBuffer *InputBuf, int64_t Offset,
   } Consumer(RespBuilder);
 
   LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
-  Lang.getConformingMethodList(InputBuf, Offset, Args, ExpectedTypes, Consumer);
+  Lang.getConformingMethodList(InputBuf, Offset, Args, ExpectedTypes, Consumer,
+                               std::move(vfsOptions));
 
   if (Consumer.isError())
     return createErrorRequestFailed(Consumer.getErrorDescription());

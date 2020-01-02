@@ -231,6 +231,10 @@ enum class FixKind : uint8_t {
   /// Base type in reference to the contextual member e.g. `.foo` couldn't be
   /// inferred and has to be specified explicitly.
   SpecifyBaseTypeForContextualMember,
+
+  /// Closure return type has to be explicitly specified because it can't be
+  /// inferred in current context e.g. because it's a multi-statement closure.
+  SpecifyClosureReturnType,
 };
 
 class ConstraintFix {
@@ -324,27 +328,6 @@ public:
 
   static TreatRValueAsLValue *create(ConstraintSystem &cs,
                                      ConstraintLocator *locator);
-};
-
-/// Mark function type as explicitly '@escaping'.
-class MarkExplicitlyEscaping final : public ConstraintFix {
-  /// Sometimes function type has to be marked as '@escaping'
-  /// to be converted to some other generic type.
-  Type ConvertTo;
-
-  MarkExplicitlyEscaping(ConstraintSystem &cs, ConstraintLocator *locator,
-                         Type convertingTo = Type())
-      : ConstraintFix(cs, FixKind::ExplicitlyEscaping, locator),
-        ConvertTo(convertingTo) {}
-
-public:
-  std::string getName() const override { return "add @escaping"; }
-
-  bool diagnose(bool asNote = false) const override;
-
-  static MarkExplicitlyEscaping *create(ConstraintSystem &cs,
-                                        ConstraintLocator *locator,
-                                        Type convertingTo = Type());
 };
 
 /// Arguments have labeling failures - missing/extraneous or incorrect
@@ -498,6 +481,22 @@ public:
 
   static ContextualMismatch *create(ConstraintSystem &cs, Type lhs, Type rhs,
                                     ConstraintLocator *locator);
+};
+
+/// Mark function type as explicitly '@escaping'.
+class MarkExplicitlyEscaping final : public ContextualMismatch {
+  MarkExplicitlyEscaping(ConstraintSystem &cs, Type lhs, Type rhs,
+                         ConstraintLocator *locator)
+      : ContextualMismatch(cs, FixKind::ExplicitlyEscaping, lhs, rhs, locator) {
+  }
+
+public:
+  std::string getName() const override { return "add @escaping"; }
+
+  bool diagnose(bool asNote = false) const override;
+
+  static MarkExplicitlyEscaping *create(ConstraintSystem &cs, Type lhs,
+                                        Type rhs, ConstraintLocator *locator);
 };
 
 /// Introduce a '!' to force an optional unwrap.
@@ -1608,6 +1607,21 @@ public:
 
   static SpecifyBaseTypeForContextualMember *
   create(ConstraintSystem &cs, DeclNameRef member, ConstraintLocator *locator);
+};
+
+class SpecifyClosureReturnType final : public ConstraintFix {
+  SpecifyClosureReturnType(ConstraintSystem &cs, ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::SpecifyClosureReturnType, locator) {}
+
+public:
+  std::string getName() const {
+    return "specify closure return type";
+  }
+
+  bool diagnose(bool asNote = false) const;
+
+  static SpecifyClosureReturnType *create(ConstraintSystem &cs,
+                                          ConstraintLocator *locator);
 };
 
 } // end namespace constraints

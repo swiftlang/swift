@@ -35,6 +35,7 @@
 #include "../SwiftShims/RuntimeShims.h"
 #include "../SwiftShims/AssertionReporting.h"
 #include "CompatibilityOverride.h"
+#include "ErrorObject.h"
 #include "Private.h"
 #include "SwiftObject.h"
 #include "WeakReference.h"
@@ -1098,6 +1099,20 @@ swift_dynamicCastObjCClassImpl(const void *object,
     return object;
   }
 
+  // For casts to NSError or NSObject, we might need to bridge via the Error
+  // protocol. Try it now.
+  if (targetType == reinterpret_cast<const ClassMetadata*>(getNSErrorClass()) ||
+      targetType == reinterpret_cast<const ClassMetadata*>([NSObject class])) {
+    auto srcType = swift_getObjCClassMetadata(
+        reinterpret_cast<const ClassMetadata*>(
+          object_getClass(id_const_cast(object))));
+    if (auto srcErrorWitness = findErrorWitness(srcType)) {
+      return dynamicCastValueToNSError((OpaqueValue*)&object, srcType,
+                                       srcErrorWitness,
+                                       DynamicCastFlags::TakeOnSuccess);
+    }
+  }
+
   return nullptr;
 }
 
@@ -1112,6 +1127,20 @@ swift_dynamicCastObjCClassUnconditionalImpl(const void *object,
 
   if ([id_const_cast(object) isKindOfClass:class_const_cast(targetType)]) {
     return object;
+  }
+
+  // For casts to NSError or NSObject, we might need to bridge via the Error
+  // protocol. Try it now.
+  if (targetType == reinterpret_cast<const ClassMetadata*>(getNSErrorClass()) ||
+      targetType == reinterpret_cast<const ClassMetadata*>([NSObject class])) {
+    auto srcType = swift_getObjCClassMetadata(
+        reinterpret_cast<const ClassMetadata*>(
+          object_getClass(id_const_cast(object))));
+    if (auto srcErrorWitness = findErrorWitness(srcType)) {
+      return dynamicCastValueToNSError((OpaqueValue*)&object, srcType,
+                                       srcErrorWitness,
+                                       DynamicCastFlags::TakeOnSuccess);
+    }
   }
 
   Class sourceType = object_getClass(id_const_cast(object));

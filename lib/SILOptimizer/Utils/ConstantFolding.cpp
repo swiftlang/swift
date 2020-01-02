@@ -1696,7 +1696,6 @@ ConstantFolder::processWorkList() {
   // This is used to avoid duplicate error reporting in case we reach the same
   // instruction from different entry points in the WorkList.
   llvm::DenseSet<SILInstruction *> ErrorSet;
-  llvm::SetVector<SILInstruction *> FoldedUsers;
   CastOptimizer CastOpt(FuncBuilder, nullptr /*SILBuilderContext*/,
                         /* replaceValueUsesAction */
                         [&](SILValue oldValue, SILValue newValue) {
@@ -1751,7 +1750,7 @@ ConstantFolder::processWorkList() {
           // Schedule users for constant folding.
           WorkList.insert(AssertConfInt);
           // Delete the call.
-          recursivelyDeleteTriviallyDeadInstructions(BI);
+          eliminateDeadInstruction(BI);
 
           InvalidateInstructions = true;
           continue;
@@ -1819,9 +1818,8 @@ ConstantFolder::processWorkList() {
       if (constantFoldGlobalStringTablePointerBuiltin(cast<BuiltinInst>(I),
                                                       EnableDiagnostics)) {
         // Here, the bulitin instruction got folded, so clean it up.
-        recursivelyDeleteTriviallyDeadInstructions(
-            I, /*force*/ true,
-            [&](SILInstruction *DeadI) { WorkList.remove(DeadI); });
+        eliminateDeadInstruction(
+            I, [&](SILInstruction *DeadI) { WorkList.remove(DeadI); });
         InvalidateInstructions = true;
       }
       continue;
@@ -1873,7 +1871,7 @@ ConstantFolder::processWorkList() {
     }
 
     // Go through all users of the constant and try to fold them.
-    FoldedUsers.clear();
+    InstructionDeleter deleter;
     for (auto Result : I->getResults()) {
       for (auto *Use : Result->getUses()) {
         SILInstruction *User = Use->getUser();
@@ -1897,7 +1895,7 @@ ConstantFolder::processWorkList() {
         // this as part of the constant folding logic, because there is no value
         // they can produce (other than empty tuple, which is wasteful).
         if (isa<CondFailInst>(User))
-          FoldedUsers.insert(User);
+          deleter.trackIfDead(User);
 
         // See if we have an instruction that is read none and has a stateless
         // inverse. If we do, add it to the worklist so we can check its users
@@ -1963,10 +1961,7 @@ ConstantFolder::processWorkList() {
           if (C->getDefiningInstruction() == User)
             continue;
 
-          // Ok, we have succeeded. Add user to the FoldedUsers list and perform
-          // the necessary cleanups, RAUWs, etc.
-          FoldedUsers.insert(User);
-          InvalidateInstructions = true;
+          // Ok, we have succeeded.
           ++NumInstFolded;
 
           // We were able to fold, so all users should use the new folded
@@ -2005,11 +2000,16 @@ ConstantFolder::processWorkList() {
           // In contrast, if we realize that RAUWing %3 does nothing and skip
           // it, we exit the worklist as expected.
           SILValue r = User->getResult(Index);
-          if (r->use_empty())
+          if (r->use_empty()) {
+            deleter.trackIfDead(User);
             continue;
+          }
 
           // Otherwise, do the RAUW.
           User->getResult(Index)->replaceAllUsesWith(C);
+          // Record the user if it is dead to perform the necessary cleanups
+          // later.
+          deleter.trackIfDead(User);
 
           // The new constant could be further folded now, add it to the
           // worklist.
@@ -2018,18 +2018,12 @@ ConstantFolder::processWorkList() {
         }
       }
     }
-
     // Eagerly DCE. We do this after visiting all users to ensure we don't
     // invalidate the uses iterator.
-    ArrayRef<SILInstruction *> UserArray = FoldedUsers.getArrayRef();
-    if (!UserArray.empty()) {
+    deleter.cleanUpDeadInstructions([&](SILInstruction *DeadI) {
+      WorkList.remove(DeadI);
       InvalidateInstructions = true;
-    }
-
-    recursivelyDeleteTriviallyDeadInstructions(UserArray, false,
-                                               [&](SILInstruction *DeadI) {
-                                                 WorkList.remove(DeadI);
-                                               });
+    });
   }
 
   // TODO: refactor this code outside of the method. Passes should not merge

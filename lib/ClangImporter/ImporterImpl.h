@@ -447,6 +447,10 @@ public:
   // Mapping from imported types to their raw value types.
   llvm::DenseMap<const NominalTypeDecl *, Type> RawTypes;
 
+  /// Keep track of all member declarations that have been imported into a nominal type.
+  llvm::DenseMap<const NominalTypeDecl *, std::vector<ValueDecl *>>
+      MembersForNominal;
+
   clang::CompilerInstance *getClangInstance() {
     return Instance.get();
   }
@@ -488,7 +492,7 @@ public:
   /// Keep track of initializer declarations that correspond to
   /// imported methods.
   llvm::DenseMap<
-      std::tuple<const clang::ObjCMethodDecl *, DeclContext *, Version>,
+      std::tuple<const clang::ObjCMethodDecl *, const DeclContext *, Version>,
       ConstructorDecl *> Constructors;
 
   /// Keep track of all initializers that have been imported into a
@@ -601,6 +605,10 @@ public:
   bool shouldIgnoreBridgeHeaderTopLevelDecl(clang::Decl *D);
 
 private:
+  /// When set, ClangImporter is disabled, and all requests go to the
+  /// DWARFImporter delegate.
+  bool DisableSourceImport;
+  
   /// The DWARF importer delegate, if installed.
   DWARFImporterDelegate *DWARFImporter = nullptr;
 public:
@@ -610,7 +618,7 @@ public:
 private:
   /// The list of Clang modules found in the debug info.
   llvm::DenseMap<Identifier, LoadedFile *> DWARFModuleUnits;
-public:
+
   /// Load a module using the clang::CompilerInstance.
   ModuleDecl *loadModuleClang(SourceLoc importLoc,
                               ArrayRef<std::pair<Identifier, SourceLoc>> path);
@@ -620,7 +628,11 @@ public:
   ModuleDecl *loadModuleDWARF(SourceLoc importLoc,
                               ArrayRef<std::pair<Identifier, SourceLoc>> path);
 
-  
+public:
+  /// Load a module using either method.
+  ModuleDecl *loadModule(SourceLoc importLoc,
+                         ArrayRef<std::pair<Identifier, SourceLoc>> path);
+
   void recordImplicitUnwrapForDecl(ValueDecl *decl, bool isIUO) {
     if (!isIUO)
       return;
@@ -800,6 +812,10 @@ public:
   Decl *importMirroredDecl(const clang::NamedDecl *decl, DeclContext *dc,
                            Version version, ProtocolDecl *proto);
 
+  void importInheritedConstructors(const clang::ObjCInterfaceDecl *curObjCClass,
+                                   const ClassDecl *classDecl,
+                                   SmallVectorImpl<Decl *> &newMembers);
+  
   /// Utility function for building simple generic signatures.
   GenericSignature buildGenericSignature(GenericParamList *genericParams,
                                           DeclContext *dc);

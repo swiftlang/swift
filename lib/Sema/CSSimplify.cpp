@@ -788,9 +788,7 @@ getCalleeDeclAndArgs(ConstraintSystem &cs,
 
   // Our remaining path can only be 'ApplyArgument'.
   auto path = callLocator->getPath();
-  if (!path.empty() &&
-      !(path.size() <= 2 &&
-        path.back().getKind() == ConstraintLocator::ApplyArgument))
+  if (!path.empty() && !path.back().is<LocatorPathElt::ApplyArgument>())
     return formUnknownCallee();
 
   // Dig out the callee information.
@@ -1548,8 +1546,8 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
     if (!shouldAttemptFixes())
       return getTypeMatchFailure(locator);
 
-    auto *fix = MarkExplicitlyEscaping::create(
-        *this, getConstraintLocator(locator), func2);
+    auto *fix = MarkExplicitlyEscaping::create(*this, func1, func2,
+                                               getConstraintLocator(locator));
 
     if (recordFix(fix))
       return getTypeMatchFailure(locator);
@@ -2084,9 +2082,8 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
       return getTypeMatchSuccess();
 
     if (shouldAttemptFixes()) {
-      auto &ctx = getASTContext();
-      auto *fix = MarkExplicitlyEscaping::create(
-          *this, getConstraintLocator(locator), ctx.TheAnyType);
+      auto *fix = MarkExplicitlyEscaping::create(*this, type1, type2,
+                                                 getConstraintLocator(locator));
       if (!recordFix(fix))
         return getTypeMatchSuccess();
     }
@@ -2348,8 +2345,8 @@ ConstraintSystem::matchTypesBindTypeVar(
   // but we still have a non-escaping type, fail.
   if (!typeVar->getImpl().canBindToNoEscape() && type->isNoEscape()) {
     if (shouldAttemptFixes()) {
-      auto *fix = MarkExplicitlyEscaping::create(
-          *this, getConstraintLocator(locator));
+      auto *fix = MarkExplicitlyEscaping::create(*this, typeVar, type,
+                                                 getConstraintLocator(locator));
       if (recordFix(fix))
         return getTypeMatchFailure(locator);
 
@@ -2841,6 +2838,13 @@ bool ConstraintSystem::repairFailures(
       auto *fnType = lhs->getAs<FunctionType>();
       if (fnType && fnType->getResult()->isEqual(rhs))
         return true;
+
+      auto lastComponentType = lhs->lookThroughAllOptionalTypes();
+      auto keyPathResultType = rhs->lookThroughAllOptionalTypes();
+
+      // Propagate contextual information from/to keypath result type.
+      (void)matchTypes(lastComponentType, keyPathResultType, matchKind,
+                       TMF_ApplyingFix, getConstraintLocator(locator));
 
       conversionsOrFixes.push_back(IgnoreContextualType::create(
           *this, lhs, rhs, getConstraintLocator(locator)));
@@ -5186,85 +5190,6 @@ ConstraintSystem::simplifyFunctionComponentConstraint(
   return SolutionKind::Solved;
 }
 
-/// Return true if the specified type or a super-class/super-protocol has the
-/// @dynamicMemberLookup attribute on it.  This implementation is not
-/// particularly fast in the face of deep class hierarchies or lots of protocol
-/// conformances, but this is fine because it doesn't get invoked in the normal
-/// name lookup path (only when lookup is about to fail).
-bool swift::hasDynamicMemberLookupAttribute(Type type,
-                    llvm::DenseMap<CanType, bool> &DynamicMemberLookupCache) {
-  auto canType = type->getCanonicalType();
-  auto it = DynamicMemberLookupCache.find(canType);
-  if (it != DynamicMemberLookupCache.end()) return it->second;
-
-  // Calculate @dynamicMemberLookup attribute for composite types with multiple
-  // components (protocol composition types and archetypes).
-  auto calculateForComponentTypes =
-      [&](ArrayRef<Type> componentTypes) -> bool {
-    for (auto componentType : componentTypes)
-      if (hasDynamicMemberLookupAttribute(componentType,
-                                          DynamicMemberLookupCache))
-        return true;
-    return false;
-  };
-
-  auto calculate = [&]() -> bool {
-    // If this is an archetype type, check if any types it conforms to
-    // (superclass or protocols) have the attribute.
-    if (auto archetype = dyn_cast<ArchetypeType>(canType)) {
-      SmallVector<Type, 2> componentTypes;
-      for (auto protocolDecl : archetype->getConformsTo())
-        componentTypes.push_back(protocolDecl->getDeclaredType());
-      if (auto superclass = archetype->getSuperclass())
-        componentTypes.push_back(superclass);
-      return calculateForComponentTypes(componentTypes);
-    }
-
-    // If this is a protocol composition, check if any of its members have the
-    // attribute.
-    if (auto protocolComp = dyn_cast<ProtocolCompositionType>(canType))
-      return calculateForComponentTypes(protocolComp->getMembers());
-
-    // Otherwise, this must be a nominal type.
-    // Dynamic member lookup doesn't work for tuples, etc.
-    auto nominal = canType->getAnyNominal();
-    if (!nominal) return false;
-
-    // If this type conforms to a protocol with the attribute, then return true.
-    for (auto p : nominal->getAllProtocols())
-      if (p->getAttrs().hasAttribute<DynamicMemberLookupAttr>())
-        return true;
-    
-    // Walk superclasses, if present.
-    llvm::SmallPtrSet<const NominalTypeDecl*, 8> visitedDecls;
-    while (1) {
-      // If we found a circular parent class chain, reject this.
-      if (!visitedDecls.insert(nominal).second)
-        return false;
-      
-      // If this type has the attribute on it, then yes!
-      if (nominal->getAttrs().hasAttribute<DynamicMemberLookupAttr>())
-        return true;
-      
-      // If this is a class with a super class, check super classes as well.
-      if (auto *cd = dyn_cast<ClassDecl>(nominal)) {
-        if (auto superClass = cd->getSuperclassDecl()) {
-          nominal = superClass;
-          continue;
-        }
-      }
-      
-      return false;
-    }
-  };
-  
-  auto result = calculate();
-  // Cache the result if the type does not contain type variables.
-  if (!type->hasTypeVariable())
-    DynamicMemberLookupCache[canType] = result;
-  return result;
-}
-
 static bool isForKeyPathSubscript(ConstraintSystem &cs,
                                   ConstraintLocator *locator) {
   if (!locator || !locator->getAnchor())
@@ -5738,9 +5663,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
     // as representing "dynamic lookup" unless it's a direct call
     // to such subscript (in that case label is expected to match).
     if (auto *subscript = dyn_cast<SubscriptDecl>(cand)) {
-      if (memberLocator &&
-          ::hasDynamicMemberLookupAttribute(instanceTy,
-                                            DynamicMemberLookupCache) &&
+      if (memberLocator && instanceTy->hasDynamicMemberLookupAttribute() &&
           isValidKeyPathDynamicMemberLookup(subscript)) {
         auto info = getArgumentInfo(memberLocator);
 
@@ -5829,7 +5752,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
   // parameter.
   if (constraintKind == ConstraintKind::ValueMember &&
       memberName.isSimpleName() && !memberName.isSpecial() &&
-      ::hasDynamicMemberLookupAttribute(instanceTy, DynamicMemberLookupCache)) {
+      instanceTy->hasDynamicMemberLookupAttribute()) {
     const auto &candidates = result.ViableCandidates;
 
     if ((candidates.empty() ||
@@ -7468,18 +7391,16 @@ ConstraintSystem::simplifyApplicableFnConstraint(
   // is true.
   if (desugar2->isCallableNominalType(DC)) {
     auto memberLoc = getConstraintLocator(
-        outerLocator.withPathElement(ConstraintLocator::Member));
+        locator.withPathElement(ConstraintLocator::ImplicitCallAsFunction));
     // Add a `callAsFunction` member constraint, binding the member type to a
     // type variable.
     auto memberTy = createTypeVariable(memberLoc, /*options=*/0);
     // TODO: Revisit this if `static func callAsFunction` is to be supported.
     // Static member constraint requires `FunctionRefKind::DoubleApply`.
-    // TODO: Use a custom locator element to identify this member constraint
-    // instead of just pointing to the function expr.
     addValueMemberConstraint(origLValueType2,
                              DeclNameRef(ctx.Id_callAsFunction),
                              memberTy, DC, FunctionRefKind::SingleApply,
-                             /*outerAlternatives*/ {}, locator);
+                             /*outerAlternatives*/ {}, memberLoc);
     // Add new applicable function constraint based on the member type
     // variable.
     addConstraint(ConstraintKind::ApplicableFunction, func1, memberTy,
@@ -7501,6 +7422,26 @@ ConstraintSystem::simplifyApplicableFnConstraint(
 
       // Track how many times we do this so that we can record a fix for each.
       ++unwrapCount;
+    }
+
+    // Let's account for optional members concept from Objective-C
+    // which forms a disjunction for member type to check whether
+    // it would be possible to use optional type directly or it has
+    // to be force unwrapped (because such types are imported as IUO).
+    if (unwrapCount > 0 && desugar2->is<TypeVariableType>()) {
+      auto *typeVar = desugar2->castTo<TypeVariableType>();
+      auto *locator = typeVar->getImpl().getLocator();
+      if (locator->isLastElement<LocatorPathElt::Member>()) {
+        auto *fix = ForceOptional::create(*this, origType2, desugar2,
+                                          getConstraintLocator(locator));
+        if (recordFix(fix, /*impact=*/unwrapCount))
+          return SolutionKind::Error;
+
+        // Since the right-hand side of the constraint has been changed
+        // we have to re-generate this constraint to use new type.
+        flags |= TMF_GenerateConstraints;
+        return formUnsolved();
+      }
     }
   }
 
@@ -7574,11 +7515,6 @@ ConstraintSystem::simplifyApplicableFnConstraint(
     if (desugar2->is<TypeVariableType>() || desugar2->is<FunctionType>() ||
         desugar2->is<AnyMetatypeType>())
       return SolutionKind::Error;
-
-    if (auto objectTy = desugar2->lookThroughAllOptionalTypes()) {
-      if (objectTy->isAny() || objectTy->isAnyObject())
-        return SolutionKind::Error;
-    }
 
     // If there are any type variables associated with arguments/result
     // they have to be marked as "holes".
@@ -8658,6 +8594,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::AllowMutatingMemberOnRValueBase:
   case FixKind::AllowTupleSplatForSingleParameter:
   case FixKind::AllowInvalidUseOfTrailingClosure:
+  case FixKind::SpecifyClosureReturnType:
     llvm_unreachable("handled elsewhere");
   }
 

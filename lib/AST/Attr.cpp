@@ -366,11 +366,25 @@ static void printShortFormAvailable(ArrayRef<const DeclAttribute *> Attrs,
   Printer.printNewline();
 }
 
-// Returns the differentiation parameters clause string for the given function,
-// parameter indices, and parsed parameters.
+/// Printing style for a differentiation parameter in a `wrt:` differentiation
+/// parameters clause. Used for printing `@differentiable`, `@derivative`, and
+/// `@transpose` attributes.
+enum class DifferentiationParameterPrintingStyle {
+  /// Print parameter by name.
+  /// Used for `@differentiable` and `@derivative` attribute.
+  Name,
+  /// Print parameter by index.
+  /// Used for `@transpose` attribute.
+  Index
+};
+
+/// Returns the differentiation parameters clause string for the given function,
+/// parameter indices, parsed parameters, . Use the parameter indices if
+/// specified; otherwise, use the parsed parameters.
 static std::string getDifferentiationParametersClauseString(
     const AbstractFunctionDecl *function, IndexSubset *paramIndices,
-    ArrayRef<ParsedAutoDiffParameter> parsedParams) {
+    ArrayRef<ParsedAutoDiffParameter> parsedParams,
+    DifferentiationParameterPrintingStyle style) {
   assert(function);
   bool isInstanceMethod = function->isInstanceMember();
   std::string result;
@@ -392,7 +406,14 @@ static std::string getDifferentiationParametersClauseString(
     }
     // Print remaining differentiation parameters.
     interleave(parameters.set_bits(), [&](unsigned index) {
-      printer << function->getParameters()->get(index)->getName().str();
+      switch (style) {
+      case DifferentiationParameterPrintingStyle::Name:
+        printer << function->getParameters()->get(index)->getName().str();
+        break;
+      case DifferentiationParameterPrintingStyle::Index:
+        printer << index;
+        break;
+      }
     }, [&] { printer << ", "; });
     if (parameterCount > 1)
       printer << ')';
@@ -425,11 +446,11 @@ static std::string getDifferentiationParametersClauseString(
   return printer.str();
 }
 
-// Print the arguments of the given `@differentiable` attribute.
-// - If `omitWrtClause` is true, omit printing the `wrt:` differentiation
-//   parameters clause.
-// - If `omitDerivativeFunctions` is true, omit printing the JVP/VJP derivative
-//   functions.
+/// Print the arguments of the given `@differentiable` attribute.
+/// - If `omitWrtClause` is true, omit printing the `wrt:` differentiation
+///   parameters clause.
+/// - If `omitDerivativeFunctions` is true, omit printing the JVP/VJP derivative
+///   functions.
 static void printDifferentiableAttrArguments(
     const DifferentiableAttr *attr, ASTPrinter &printer, PrintOptions Options,
     const Decl *D, bool omitWrtClause = false,
@@ -465,7 +486,8 @@ static void printDifferentiableAttrArguments(
   // Print differentiation parameters clause, unless it is to be omitted.
   if (!omitWrtClause) {
     auto diffParamsString = getDifferentiationParametersClauseString(
-        original, attr->getParameterIndices(), attr->getParsedParameters());
+        original, attr->getParameterIndices(), attr->getParsedParameters(),
+        DifferentiationParameterPrintingStyle::Name);
     // Check whether differentiation parameter clause is empty.
     // Handles edge case where resolved parameter indices are unset and
     // parsed parameters are empty. This case should never trigger for
@@ -897,6 +919,36 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     break;
   }
 
+  case DAK_Derivative: {
+    Printer.printAttrName("@derivative");
+    Printer << "(of: ";
+    auto *attr = cast<DerivativeAttr>(this);
+    Printer << attr->getOriginalFunctionName().Name;
+    auto *derivative = cast<AbstractFunctionDecl>(D);
+    auto diffParamsString = getDifferentiationParametersClauseString(
+        derivative, attr->getParameterIndices(), attr->getParsedParameters(),
+        DifferentiationParameterPrintingStyle::Name);
+    if (!diffParamsString.empty())
+      Printer << ", " << diffParamsString;
+    Printer << ')';
+    break;
+  }
+
+  case DAK_Transpose: {
+    Printer.printAttrName("@transpose");
+    Printer << "(of: ";
+    auto *attr = cast<TransposeAttr>(this);
+    Printer << attr->getOriginalFunctionName().Name;
+    auto *transpose = cast<AbstractFunctionDecl>(D);
+    auto transParamsString = getDifferentiationParametersClauseString(
+        transpose, attr->getParameterIndices(), attr->getParsedParameters(),
+        DifferentiationParameterPrintingStyle::Index);
+    if (!transParamsString.empty())
+      Printer << ", " << transParamsString;
+    Printer << ')';
+    break;
+  }
+
   case DAK_ImplicitlySynthesizesNestedRequirement:
     Printer.printAttrName("@_implicitly_synthesizes_nested_requirement");
     Printer << "(\"" << cast<ImplicitlySynthesizesNestedRequirementAttr>(this)->Value << "\")";
@@ -1040,6 +1092,8 @@ StringRef DeclAttribute::getAttrName() const {
     return "differentiable";
   case DAK_Derivative:
     return "derivative";
+  case DAK_Transpose:
+    return "transpose";
   }
   llvm_unreachable("bad DeclAttrKind");
 }
@@ -1227,6 +1281,10 @@ AvailableAttr::createPlatformAgnostic(ASTContext &C,
 }
 
 bool AvailableAttr::isActivePlatform(const ASTContext &ctx) const {
+  return isPlatformActive(Platform, ctx.LangOpts);
+}
+
+bool OriginallyDefinedInAttr::isActivePlatform(const ASTContext &ctx) const {
   return isPlatformActive(Platform, ctx.LangOpts);
 }
 
@@ -1460,41 +1518,83 @@ void DifferentiableAttr::print(llvm::raw_ostream &OS, const Decl *D,
 }
 
 DerivativeAttr::DerivativeAttr(bool implicit, SourceLoc atLoc,
-                               SourceRange baseRange,
+                               SourceRange baseRange, TypeRepr *baseTypeRepr,
                                DeclNameRefWithLoc originalName,
                                ArrayRef<ParsedAutoDiffParameter> params)
     : DeclAttribute(DAK_Derivative, atLoc, baseRange, implicit),
-      OriginalFunctionName(std::move(originalName)),
+      BaseTypeRepr(baseTypeRepr), OriginalFunctionName(std::move(originalName)),
       NumParsedParameters(params.size()) {
   std::copy(params.begin(), params.end(),
             getTrailingObjects<ParsedAutoDiffParameter>());
 }
 
 DerivativeAttr::DerivativeAttr(bool implicit, SourceLoc atLoc,
-                               SourceRange baseRange,
+                               SourceRange baseRange, TypeRepr *baseTypeRepr,
                                DeclNameRefWithLoc originalName,
-                               IndexSubset *indices)
+                               IndexSubset *parameterIndices)
     : DeclAttribute(DAK_Derivative, atLoc, baseRange, implicit),
-      OriginalFunctionName(std::move(originalName)), ParameterIndices(indices) {
-}
+      BaseTypeRepr(baseTypeRepr), OriginalFunctionName(std::move(originalName)),
+      ParameterIndices(parameterIndices) {}
 
 DerivativeAttr *
 DerivativeAttr::create(ASTContext &context, bool implicit, SourceLoc atLoc,
-                       SourceRange baseRange, DeclNameRefWithLoc originalName,
+                       SourceRange baseRange, TypeRepr *baseTypeRepr,
+                       DeclNameRefWithLoc originalName,
                        ArrayRef<ParsedAutoDiffParameter> params) {
   unsigned size = totalSizeToAlloc<ParsedAutoDiffParameter>(params.size());
   void *mem = context.Allocate(size, alignof(DerivativeAttr));
-  return new (mem) DerivativeAttr(implicit, atLoc, baseRange,
+  return new (mem) DerivativeAttr(implicit, atLoc, baseRange, baseTypeRepr,
                                   std::move(originalName), params);
 }
 
 DerivativeAttr *DerivativeAttr::create(ASTContext &context, bool implicit,
                                        SourceLoc atLoc, SourceRange baseRange,
+                                       TypeRepr *baseTypeRepr,
                                        DeclNameRefWithLoc originalName,
-                                       IndexSubset *indices) {
+                                       IndexSubset *parameterIndices) {
   void *mem = context.Allocate(sizeof(DerivativeAttr), alignof(DerivativeAttr));
-  return new (mem) DerivativeAttr(implicit, atLoc, baseRange,
-                                  std::move(originalName), indices);
+  return new (mem) DerivativeAttr(implicit, atLoc, baseRange, baseTypeRepr,
+                                  std::move(originalName), parameterIndices);
+}
+
+TransposeAttr::TransposeAttr(bool implicit, SourceLoc atLoc,
+                             SourceRange baseRange, TypeRepr *baseTypeRepr,
+                             DeclNameRefWithLoc originalName,
+                             ArrayRef<ParsedAutoDiffParameter> params)
+    : DeclAttribute(DAK_Transpose, atLoc, baseRange, implicit),
+      BaseTypeRepr(baseTypeRepr), OriginalFunctionName(std::move(originalName)),
+      NumParsedParameters(params.size()) {
+  std::uninitialized_copy(params.begin(), params.end(),
+                          getTrailingObjects<ParsedAutoDiffParameter>());
+}
+
+TransposeAttr::TransposeAttr(bool implicit, SourceLoc atLoc,
+                             SourceRange baseRange, TypeRepr *baseTypeRepr,
+                             DeclNameRefWithLoc originalName,
+                             IndexSubset *parameterIndices)
+    : DeclAttribute(DAK_Transpose, atLoc, baseRange, implicit),
+      BaseTypeRepr(baseTypeRepr), OriginalFunctionName(std::move(originalName)),
+      ParameterIndices(parameterIndices) {}
+
+TransposeAttr *TransposeAttr::create(ASTContext &context, bool implicit,
+                                     SourceLoc atLoc, SourceRange baseRange,
+                                     TypeRepr *baseType,
+                                     DeclNameRefWithLoc originalName,
+                                     ArrayRef<ParsedAutoDiffParameter> params) {
+  unsigned size = totalSizeToAlloc<ParsedAutoDiffParameter>(params.size());
+  void *mem = context.Allocate(size, alignof(TransposeAttr));
+  return new (mem) TransposeAttr(implicit, atLoc, baseRange, baseType,
+                                 std::move(originalName), params);
+}
+
+TransposeAttr *TransposeAttr::create(ASTContext &context, bool implicit,
+                                     SourceLoc atLoc, SourceRange baseRange,
+                                     TypeRepr *baseType,
+                                     DeclNameRefWithLoc originalName,
+                                     IndexSubset *parameterIndices) {
+  void *mem = context.Allocate(sizeof(TransposeAttr), alignof(TransposeAttr));
+  return new (mem) TransposeAttr(implicit, atLoc, baseRange, baseType,
+                                 std::move(originalName), parameterIndices);
 }
 
 ImplementsAttr::ImplementsAttr(SourceLoc atLoc, SourceRange range,

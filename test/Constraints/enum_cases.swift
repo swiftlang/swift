@@ -121,7 +121,7 @@ func rdar34583132() {
 
   func bar(_ s: S) {
     guard s.foo(1 + 2) == .timeout else {
-    // expected-error@-1 {{enum type 'E' has no case 'timeout'; did you mean 'timeOut'}}
+    // expected-error@-1 {{enum type 'E' has no case 'timeout'; did you mean 'timeOut'?}}
       fatalError()
     }
   }

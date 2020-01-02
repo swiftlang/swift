@@ -15,8 +15,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-SWIFT_REQUEST(IDETypeChecking, HasDynamicMemberLookupAttributeRequest,
-              bool(TypeBase *), Cached, NoLocationInfo)
 SWIFT_REQUEST(IDETypeChecking, IsDeclApplicableRequest,
               bool(DeclApplicabilityOwner), Cached, NoLocationInfo)
 SWIFT_REQUEST(IDETypeChecking, RootAndResultTypeOfKeypathDynamicMemberRequest,

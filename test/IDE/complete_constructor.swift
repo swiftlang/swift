@@ -338,7 +338,7 @@ struct ClosureInInit1 {
   var prop1: S = {
     return S(#^CLOSURE_IN_INIT_1^#
   }
-// CLOSURE_IN_INIT_1: Decl[Constructor]/CurrNominal{{(/TypeRelation\[Identical\])?}}:      ['(']{#Int#}[')'][#ClosureInInit1.S#];
+// CLOSURE_IN_INIT_1: Decl[Constructor]/CurrNominal{{(/TypeRelation\[Identical\])?}}:      ['(']{#Int#}[')'][#S#];
   var prop2: S = {
     return S(#^CLOSURE_IN_INIT_2^#
   }()

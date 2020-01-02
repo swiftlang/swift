@@ -573,6 +573,8 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
   case SourceKitRequest::CodeComplete:
     sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestCodeComplete);
     sourcekitd_request_dictionary_set_int64(Req, KeyOffset, ByteOffset);
+    sourcekitd_request_dictionary_set_string(Req, KeyName, SemaName.c_str());
+    addCodeCompleteOptions(Req, Opts);
     break;
 
   case SourceKitRequest::CodeCompleteOpen:
@@ -970,6 +972,8 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
   if (Opts.SourceText) {
     sourcekitd_request_dictionary_set_string(Req, KeySourceText,
                                              Opts.SourceText->c_str());
+    sourcekitd_request_dictionary_set_string(Req, KeySourceFile,
+                                             SemaName.c_str());
   }
 
   if (!Opts.CompilerArgs.empty()) {

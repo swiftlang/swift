@@ -976,8 +976,8 @@ static ManagedValue emitBuiltinProjectTailElems(SILGenFunction &SGF,
   SILType ElemType = SGF.getLoweredType(subs.getReplacementTypes()[1]->
                                         getCanonicalType()).getObjectType();
 
-  SILValue result = SGF.B.createRefTailAddr(loc, args[0].getValue(),
-                                            ElemType.getAddressType());
+  SILValue result = SGF.B.createRefTailAddr(
+      loc, args[0].borrow(SGF, loc).getValue(), ElemType.getAddressType());
   SILType rawPointerType = SILType::getRawPointerType(SGF.F.getASTContext());
   result = SGF.B.createAddressToPointer(loc, result, rawPointerType);
   return ManagedValue::forUnmanaged(result);
