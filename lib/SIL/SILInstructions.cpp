@@ -573,7 +573,7 @@ TryApplyInstBase::TryApplyInstBase(SILInstructionKind kind,
                                    SILDebugLocation loc,
                                    SILBasicBlock *normalBB,
                                    SILBasicBlock *errorBB)
-    : TermInst(kind, loc), DestBBs{{this, normalBB}, {this, errorBB}} {}
+    : TermInst(kind, loc), DestBBs{{{this, normalBB}, {this, errorBB}}} {}
 
 TryApplyInst::TryApplyInst(
     SILDebugLocation Loc, SILValue callee, SILType substCalleeTy,
@@ -1267,8 +1267,7 @@ CondBranchInst::CondBranchInst(SILDebugLocation Loc, SILValue Condition,
                                unsigned NumFalse, ProfileCounter TrueBBCount,
                                ProfileCounter FalseBBCount)
     : InstructionBaseWithTrailingOperands(Condition, Args, Loc),
-                                        DestBBs{{this, TrueBB, TrueBBCount},
-                                                {this, FalseBB, FalseBBCount}} {
+      DestBBs{{{this, TrueBB, TrueBBCount}, {this, FalseBB, FalseBBCount}}} {
   assert(Args.size() == (NumTrue + NumFalse) && "Invalid number of args");
   SILInstruction::Bits.CondBranchInst.NumTrueArgs = NumTrue;
   assert(SILInstruction::Bits.CondBranchInst.NumTrueArgs == NumTrue &&
@@ -1706,7 +1705,7 @@ DynamicMethodBranchInst::DynamicMethodBranchInst(SILDebugLocation Loc,
                                                  SILBasicBlock *NoMethodBB)
   : InstructionBase(Loc),
     Member(Member),
-    DestBBs{{this, HasMethodBB}, {this, NoMethodBB}},
+    DestBBs{{{this, HasMethodBB}, {this, NoMethodBB}}},
     Operands(this, Operand)
 {
 }
