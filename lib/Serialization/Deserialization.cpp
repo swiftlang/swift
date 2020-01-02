@@ -2221,7 +2221,8 @@ Decl *ModuleFile::getDecl(DeclID DID) {
 }
 
 /// Used to split up methods that would otherwise live in ModuleFile.
-class swift::DeclDeserializer {
+namespace swift {
+class DeclDeserializer {
   template <typename T>
   using Serialized = ModuleFile::Serialized<T>;
   using TypeID = serialization::TypeID;
@@ -3873,6 +3874,7 @@ public:
     return dtor;
   }
 };
+}
 
 Expected<Decl *>
 ModuleFile::getDeclChecked(
@@ -4513,7 +4515,8 @@ Type ModuleFile::getType(TypeID TID) {
   return deserialized.get();
 }
 
-class swift::TypeDeserializer {
+namespace swift {
+class TypeDeserializer {
   using TypeID = serialization::TypeID;
 
   ModuleFile &MF;
@@ -5290,6 +5293,7 @@ public:
     return UnboundGenericType::get(genericDecl, parentTy, ctx);
   }
 };
+}
 
 Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
   if (TID == 0)

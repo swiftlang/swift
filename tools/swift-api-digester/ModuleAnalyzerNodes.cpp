@@ -37,7 +37,7 @@ struct swift::ide::api::SDKNodeInitInfo {
 #define KEY_STRING_ARR(X, Y) std::vector<StringRef> X;
 #include "swift/IDE/DigesterEnums.def"
 
-  ReferenceOwnership ReferenceOwnership = ReferenceOwnership::Strong;
+  swift::ReferenceOwnership ReferenceOwnership = ReferenceOwnership::Strong;
   std::vector<DeclAttrKind> DeclAttrs;
   std::vector<TypeAttrKind> TypeAttrs;
 

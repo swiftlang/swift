@@ -429,7 +429,7 @@ struct PrintOptions {
   /// and constructors) will be printed by this function.
   std::function<void(const ValueDecl *, ASTPrinter &)> FunctionBody;
 
-  BracketOptions BracketOptions;
+  swift::BracketOptions BracketOptions;
 
   // This is explicit to guarantee that it can be called from LLDB.
   PrintOptions() {}

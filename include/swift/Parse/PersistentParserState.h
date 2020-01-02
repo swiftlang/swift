@@ -71,7 +71,7 @@ public:
   // and adjust the client call 'performParseOnly'.
   bool PerformConditionEvaluation = true;
 private:
-  ScopeInfo ScopeInfo;
+  swift::ScopeInfo ScopeInfo;
 
   /// Parser sets this if it stopped parsing before the buffer ended.
   ParserPosition MarkedPos;

@@ -2831,8 +2831,8 @@ struct TargetExtensionContextDescriptor final
       TrailingGenericContextObjects<TargetExtensionContextDescriptor<Runtime>>
 {
 private:
-  using TrailingGenericContextObjects
-    = TrailingGenericContextObjects<TargetExtensionContextDescriptor<Runtime>>;
+  using TrailingGenericContextObjects =
+      swift::TrailingGenericContextObjects<TargetExtensionContextDescriptor<Runtime>>;
 
 public:
   /// A mangling of the `Self` type context that the extension extends.
@@ -2872,10 +2872,10 @@ struct TargetAnonymousContextDescriptor final
                                     TargetMangledContextName<Runtime>>
 {
 private:
-  using TrailingGenericContextObjects
-    = TrailingGenericContextObjects<TargetAnonymousContextDescriptor<Runtime>,
-                                    TargetGenericContextDescriptorHeader,
-                                    TargetMangledContextName<Runtime>>;
+  using TrailingGenericContextObjects =
+      swift::TrailingGenericContextObjects<TargetAnonymousContextDescriptor<Runtime>,
+                                           TargetGenericContextDescriptorHeader,
+                                           TargetMangledContextName<Runtime>>;
   using TrailingObjects =
     typename TrailingGenericContextObjects::TrailingObjects;
   friend TrailingObjects;
@@ -3037,10 +3037,10 @@ struct TargetOpaqueTypeDescriptor final
                                   RelativeDirectPointer<const char>>
 {
 private:
-  using TrailingGenericContextObjects
-    = TrailingGenericContextObjects<TargetOpaqueTypeDescriptor<Runtime>,
-                                    TargetGenericContextDescriptorHeader,
-                                    RelativeDirectPointer<const char>>;
+  using TrailingGenericContextObjects =
+      swift::TrailingGenericContextObjects<TargetOpaqueTypeDescriptor<Runtime>,
+                                           TargetGenericContextDescriptorHeader,
+                                           RelativeDirectPointer<const char>>;
   using TrailingObjects =
     typename TrailingGenericContextObjects::TrailingObjects;
   friend TrailingObjects;
@@ -3803,16 +3803,16 @@ class TargetClassDescriptor final
                               TargetObjCResilientClassStubInfo<Runtime>> {
 private:
   using TrailingGenericContextObjects =
-    TrailingGenericContextObjects<TargetClassDescriptor<Runtime>,
-                                  TargetTypeGenericContextDescriptorHeader,
-                                  TargetResilientSuperclass<Runtime>,
-                                  TargetForeignMetadataInitialization<Runtime>,
-                                  TargetSingletonMetadataInitialization<Runtime>,
-                                  TargetVTableDescriptorHeader<Runtime>,
-                                  TargetMethodDescriptor<Runtime>,
-                                  TargetOverrideTableHeader<Runtime>,
-                                  TargetMethodOverrideDescriptor<Runtime>,
-                                  TargetObjCResilientClassStubInfo<Runtime>>;
+    swift::TrailingGenericContextObjects<TargetClassDescriptor<Runtime>,
+                                         TargetTypeGenericContextDescriptorHeader,
+                                         TargetResilientSuperclass<Runtime>,
+                                         TargetForeignMetadataInitialization<Runtime>,
+                                         TargetSingletonMetadataInitialization<Runtime>,
+                                         TargetVTableDescriptorHeader<Runtime>,
+                                         TargetMethodDescriptor<Runtime>,
+                                         TargetOverrideTableHeader<Runtime>,
+                                         TargetMethodOverrideDescriptor<Runtime>,
+                                         TargetObjCResilientClassStubInfo<Runtime>>;
 
   using TrailingObjects =
     typename TrailingGenericContextObjects::TrailingObjects;
@@ -4120,10 +4120,10 @@ public:
 
 private:
   using TrailingGenericContextObjects =
-    TrailingGenericContextObjects<TargetStructDescriptor<Runtime>,
-                                  TargetTypeGenericContextDescriptorHeader,
-                                  ForeignMetadataInitialization,
-                                  SingletonMetadataInitialization>;
+      swift::TrailingGenericContextObjects<TargetStructDescriptor<Runtime>,
+                                           TargetTypeGenericContextDescriptorHeader,
+                                           ForeignMetadataInitialization,
+                                           SingletonMetadataInitialization>;
 
   using TrailingObjects =
     typename TrailingGenericContextObjects::TrailingObjects;
@@ -4196,10 +4196,10 @@ public:
 
 private:
   using TrailingGenericContextObjects =
-    TrailingGenericContextObjects<TargetEnumDescriptor<Runtime>,
-                                  TargetTypeGenericContextDescriptorHeader,
-                                  ForeignMetadataInitialization,
-                                  SingletonMetadataInitialization>;
+    swift::TrailingGenericContextObjects<TargetEnumDescriptor<Runtime>,
+                                        TargetTypeGenericContextDescriptorHeader,
+                                        ForeignMetadataInitialization,
+                                        SingletonMetadataInitialization>;
 
   using TrailingObjects =
     typename TrailingGenericContextObjects::TrailingObjects;
