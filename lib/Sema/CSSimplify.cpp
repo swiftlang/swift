@@ -770,45 +770,25 @@ static std::tuple<ValueDecl *, bool, ArrayRef<Identifier>, bool,
                   ConstraintLocator *>
 getCalleeDeclAndArgs(ConstraintSystem &cs,
                      ConstraintLocatorBuilder callBuilder) {
-  auto formUnknownCallee =
-      []() -> std::tuple<ValueDecl *, bool, ArrayRef<Identifier>, bool,
-                         ConstraintLocator *> {
-    return std::make_tuple(/*decl*/ nullptr, /*hasAppliedSelf*/ false,
-                           /*argLabels*/ ArrayRef<Identifier>(),
-                           /*hasTrailingClosure*/ false,
-                           /*calleeLocator*/ nullptr);
-  };
-
   auto *callLocator = cs.getConstraintLocator(callBuilder);
-  auto *callExpr = callLocator->getAnchor();
+  assert(callLocator->isLastElement<LocatorPathElt::ApplyArgument>());
 
-  // Break down the call.
-  if (!callExpr)
-    return formUnknownCallee();
-
-  // Our remaining path can only be 'ApplyArgument'.
-  auto path = callLocator->getPath();
-  if (!path.empty() && !path.back().is<LocatorPathElt::ApplyArgument>())
-    return formUnknownCallee();
-
-  // Dig out the callee information.
+  // Dig out the argument information.
   auto argInfo = cs.getArgumentInfo(callLocator);
-  if (!argInfo)
-    return formUnknownCallee();
+  assert(argInfo);
 
   auto argLabels = argInfo->Labels;
   auto hasTrailingClosure = argInfo->HasTrailingClosure;
-  auto calleeLocator = cs.getCalleeLocator(callLocator);
 
   // Find the overload choice corresponding to the callee locator.
+  auto *calleeLocator = cs.getCalleeLocator(callLocator);
   auto selectedOverload = cs.findSelectedOverloadFor(calleeLocator);
 
   // If we didn't find any matching overloads, we're done. Just return the
   // argument info.
   if (!selectedOverload)
     return std::make_tuple(/*decl*/ nullptr, /*hasAppliedSelf*/ false,
-                           argLabels, hasTrailingClosure,
-                           /*calleeLocator*/ nullptr);
+                           argLabels, hasTrailingClosure, calleeLocator);
 
   // Return the found declaration, assuming there is one.
   auto choice = selectedOverload->choice;
