@@ -196,6 +196,9 @@ struct ASTContext::Implementation {
   /// The declaration of '+' function for two String.
   FuncDecl *PlusFunctionOnString = nullptr;
 
+  /// The declaration of 'Sequence.makeIterator()'.
+  FuncDecl *MakeIterator = nullptr;
+
   /// The declaration of Swift.Optional<T>.Some.
   EnumElementDecl *OptionalSomeDecl = nullptr;
 
@@ -710,6 +713,31 @@ FuncDecl *ASTContext::getPlusFunctionOnString() const {
     }
   }
   return getImpl().PlusFunctionOnString;
+}
+
+FuncDecl *ASTContext::getSequenceMakeIterator() const {
+  if (getImpl().MakeIterator) {
+    return getImpl().MakeIterator;
+  }
+
+  auto proto = getProtocol(KnownProtocolKind::Sequence);
+  if (!proto)
+    return nullptr;
+
+  for (auto result : proto->lookupDirect(Id_makeIterator)) {
+    if (result->getDeclContext() != proto)
+      continue;
+
+    if (auto func = dyn_cast<FuncDecl>(result)) {
+      if (func->getParameters()->size() != 0)
+        continue;
+
+      getImpl().MakeIterator = func;
+      return func;
+    }
+  }
+
+  return nullptr;
 }
 
 #define KNOWN_STDLIB_TYPE_DECL(NAME, DECL_CLASS, NUM_GENERIC_PARAMS) \

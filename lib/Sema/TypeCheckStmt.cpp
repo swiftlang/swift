@@ -749,7 +749,8 @@ public:
       return nullptr;
     }
 
-    if (TypeChecker::typeCheckForEachBinding(DC, S))
+    auto binding = TypeChecker::typeCheckForEachBinding(DC, S);
+    if (!binding)
       return nullptr;
 
     if (auto *Where = S->getWhere()) {
@@ -773,34 +774,10 @@ public:
       return nullptr;
     }
 
-    Expr *sequence = S->getSequence();
-
     // Invoke iterator() to get an iterator from the sequence.
-    Type iteratorTy;
+    Type iteratorTy = binding->iteratorType;
     VarDecl *iterator;
     {
-      Type sequenceType = sequence->getType();
-      auto conformance =
-        TypeChecker::conformsToProtocol(sequenceType, sequenceProto, DC,
-                                        ConformanceCheckFlags::InExpression,
-                                        sequence->getLoc());
-      if (conformance.isInvalid())
-        return nullptr;
-      S->setSequenceConformance(conformance);
-
-      iteratorTy =
-          conformance.getTypeWitnessByName(sequenceType,
-                                           getASTContext().Id_Iterator);
-      if (iteratorTy->hasError())
-        return nullptr;
-
-      auto witness =
-          conformance.getWitnessByName(sequenceType,
-                                       getASTContext().Id_makeIterator);
-      if (!witness)
-        return nullptr;
-      S->setMakeIterator(witness);
-
       // Create a local variable to capture the iterator.
       std::string name;
       if (auto np = dyn_cast_or_null<NamedPattern>(S->getPattern()))
@@ -820,23 +797,11 @@ public:
 
       // TODO: test/DebugInfo/iteration.swift requires this extra info to
       // be around.
-      auto nextResultType = OptionalType::get(conformance.getTypeWitnessByName(
-          sequenceType, getASTContext().Id_Element));
+      auto nextResultType = OptionalType::get(binding->elementType);
       PatternBindingDecl::createImplicit(
           getASTContext(), StaticSpellingKind::None, genPat,
           new (getASTContext()) OpaqueValueExpr(S->getInLoc(), nextResultType),
           DC, /*VarLoc*/ S->getForLoc());
-
-      Type newSequenceType = cast<AbstractFunctionDecl>(witness.getDecl())
-            ->getInterfaceType()
-            ->castTo<AnyFunctionType>()
-            ->getParams()[0].getPlainType().subst(witness.getSubstitutions());
-
-      // Necessary type coersion for method application.
-      if (TypeChecker::convertToType(sequence, newSequenceType, DC, None)) {
-        return nullptr;
-      }
-      S->setSequence(sequence);
     }
 
     // Working with iterators requires Optional.
@@ -847,16 +812,8 @@ public:
     // we'll use to drive the loop.
     // FIXME: Would like to customize the diagnostic emitted in
     // conformsToProtocol().
-    auto genConformance = TypeChecker::conformsToProtocol(
-        iteratorTy, iteratorProto, DC, ConformanceCheckFlags::InExpression,
-        sequence->getLoc());
+    auto genConformance = binding->iteratorConformance;
     if (genConformance.isInvalid())
-      return nullptr;
-
-    Type elementTy =
-        genConformance.getTypeWitnessByName(iteratorTy,
-                                            getASTContext().Id_Element);
-    if (elementTy->hasError())
       return nullptr;
 
     auto *varRef = TypeChecker::buildCheckedRefExpr(iterator, DC,
@@ -881,12 +838,16 @@ public:
     auto optPatternType = OptionalType::get(S->getPattern()->getType());
     if (!optPatternType->isEqual(nextResultType)) {
       OpaqueValueExpr *elementExpr =
-          new (getASTContext()) OpaqueValueExpr(S->getInLoc(), nextResultType);
+          new (getASTContext()) OpaqueValueExpr(S->getInLoc(), nextResultType,
+                                                /*isPlaceholder=*/true);
       Expr *convertElementExpr = elementExpr;
-      if (TypeChecker::convertToType(convertElementExpr, optPatternType, DC,
-                                     S->getPattern())) {
+      if (TypeChecker::typeCheckExpression(
+              convertElementExpr, DC,
+              TypeLoc::withoutLoc(optPatternType),
+              CTP_CoerceOperand).isNull()) {
         return nullptr;
       }
+      elementExpr->setIsPlaceholder(false);
       S->setElementExpr(elementExpr);
       S->setConvertElementExpr(convertElementExpr);
     }

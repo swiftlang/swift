@@ -1670,6 +1670,7 @@ void ConstraintSystem::ArgumentInfoCollector::walk(Type argType) {
 
       case ConstraintKind::BindToPointerType:
       case ConstraintKind::ValueMember:
+      case ConstraintKind::ValueWitness:
       case ConstraintKind::UnresolvedValueMember:
       case ConstraintKind::Disjunction:
       case ConstraintKind::CheckedCast:
