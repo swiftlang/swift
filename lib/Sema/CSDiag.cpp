@@ -1570,47 +1570,6 @@ bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
   return diagnoseSubscriptErrors(SE, /* inAssignmentDestination = */ false);
 }
 
-namespace {
-  /// Type checking listener for pattern binding initializers.
-  class CalleeListener : public ExprTypeCheckListener {
-    Type contextualType;
-  public:
-    explicit CalleeListener(Type contextualType)
-      : contextualType(contextualType) { }
-
-    bool builtConstraints(ConstraintSystem &cs, Expr *expr) override {
-      // If we have no contextual type, there is nothing to do.
-      if (!contextualType)
-        return false;
-
-      // If the expression is obviously something that produces a metatype,
-      // then don't put a constraint on it.
-      auto semExpr = expr->getValueProvidingExpr();
-      if (isa<TypeExpr>(semExpr))
-        return false;
-
-      auto resultLocator =
-        cs.getConstraintLocator(expr, ConstraintLocator::FunctionResult);
-      auto resultType = cs.createTypeVariable(resultLocator,
-                                              TVO_CanBindToLValue |
-                                              TVO_CanBindToNoEscape);
-
-      auto locator = cs.getConstraintLocator(expr);
-      cs.addConstraint(ConstraintKind::FunctionResult,
-                       cs.getType(expr),
-                       resultType,
-                       locator);
-
-      cs.addConstraint(ConstraintKind::Conversion,
-                       resultType,
-                       contextualType,
-                       locator);
-
-      return false;
-    }
-  };
-} // end anonymous namespace
-
 // Check if there is a structural problem in the function expression
 // by performing type checking with the option to allow unresolved
 // type variables. If that is going to produce a function type with

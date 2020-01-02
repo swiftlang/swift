@@ -870,10 +870,6 @@ function false_true() {
     fi
 }
 
-function cmake_version() {
-    "${CMAKE}" --version | grep "cmake version" | cut -f 3 -d " "
-}
-
 # Sanitize the list of cross-compilation targets.
 #
 # In the Build/Host/Target paradigm:
@@ -1006,28 +1002,6 @@ function get_stdlib_targets_for_host() {
         echo "$1"
     else
         echo "${STDLIB_DEPLOYMENT_TARGETS[@]}"
-    fi
-}
-
-function should_build_stdlib_target() {
-    local stdlib_target=$1
-    local host=$2
-    if [[ "${BUILD_STDLIB_DEPLOYMENT_TARGETS}" == "all" ]]; then
-        echo 1
-    else
-        # Only build the stdlib targets in 'build-stdlib-deployment-targets'
-        local build_list=($BUILD_STDLIB_DEPLOYMENT_TARGETS)
-        for t in "${build_list[@]}"; do
-            if [[ "${t}" == "${stdlib_target}" ]]; then
-                echo 1
-            fi
-        done
-        # As with 'stdlib-deployment-targets', 'build-stdlib-deployment-targets'
-        # only applies to the LOCAL_HOST. For cross-tools hosts, always allow
-        # their one-and-only stdlib-target to build.
-        if [[ $(is_cross_tools_host ${host}) ]] && [[ "${stdlib_target}" == "${host}" ]]; then
-            echo 1
-        fi
     fi
 }
 
