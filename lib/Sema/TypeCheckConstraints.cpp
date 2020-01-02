@@ -3040,17 +3040,15 @@ auto TypeChecker::typeCheckForEachBinding(
       Stmt->setPattern(pattern);
 
       // Get the conformance of the sequence type to the Sequence protocol.
-      // FIXME: Get this from the solution and substitute into that.
-      SequenceConformance = TypeChecker::conformsToProtocol(
-          SequenceType, SequenceProto, cs.DC,
-          ConformanceCheckFlags::InExpression,
-          expr->getLoc());
+      SequenceConformance = solution.resolveConformance(
+          ContextualLocator, SequenceProto);
       assert(!SequenceConformance.isInvalid() &&
              "Couldn't find sequence conformance");
       Stmt->setSequenceConformance(SequenceConformance);
 
       // Retrieve the conformance of the iterator type to IteratorProtocol.
-      // FIXME: Get this from the solution and substitute into that.
+      // FIXME: We probably don't even need this. If we do, get it from
+      // SequenceConformance instead.
       IteratorConformance = TypeChecker::conformsToProtocol(
           IteratorType, IteratorProto, cs.DC,
           ConformanceCheckFlags::InExpression,
