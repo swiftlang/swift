@@ -133,7 +133,7 @@ public:
 
   /// A cache of syntax nodes that can be reused when creating the syntax tree
   /// for this file.
-  SyntaxParsingCache *SyntaxParsingCache = nullptr;
+  swift::SyntaxParsingCache *SyntaxParsingCache = nullptr;
 
   /// The list of local type declarations in the source file.
   llvm::SetVector<TypeDecl *> LocalTypeDecls;
