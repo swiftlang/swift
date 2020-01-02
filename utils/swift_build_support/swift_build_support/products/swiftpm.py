@@ -30,7 +30,7 @@ class SwiftPM(product.Product):
 
     def run_bootstrap_script(self, action, host_target, additional_params=[]):
         script_path = os.path.join(
-            self.source_dir, 'Utilities', 'new-bootstrap')
+            self.source_dir, 'Utilities', 'bootstrap')
         toolchain_path = self.install_toolchain_path()
         swiftc = os.path.join(toolchain_path, "usr", "bin", "swiftc")
 
