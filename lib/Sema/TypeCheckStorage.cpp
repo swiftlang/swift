@@ -2012,22 +2012,22 @@ IsAccessorTransparentRequest::evaluate(Evaluator &evaluator,
     // Getters and setters for lazy properties are not @_transparent.
     if (storage->getAttrs().hasAttribute<LazyAttr>())
       return false;
+  }
 
-    // Getters/setters for a property with a wrapper are not @_transparent if
-    // the backing variable has more-restrictive access than the original
-    // property. The same goes for its storage wrapper.
-    if (auto var = dyn_cast<VarDecl>(storage)) {
-      if (auto backingVar = var->getPropertyWrapperBackingProperty()) {
-        if (backingVar->getFormalAccess() < var->getFormalAccess())
-          return false;
-      }
+  // Accessors for a property with a wrapper are not @_transparent if
+  // the backing variable has more-restrictive access than the original
+  // property. The same goes for its storage wrapper.
+  if (auto var = dyn_cast<VarDecl>(storage)) {
+    if (auto backingVar = var->getPropertyWrapperBackingProperty()) {
+      if (backingVar->getFormalAccess() < var->getFormalAccess())
+        return false;
+    }
 
-      if (auto original = var->getOriginalWrappedProperty(
-              PropertyWrapperSynthesizedPropertyKind::StorageWrapper)) {
-        auto backingVar = original->getPropertyWrapperBackingProperty();
-        if (backingVar->getFormalAccess() < var->getFormalAccess())
-          return false;
-      }
+    if (auto original = var->getOriginalWrappedProperty(
+            PropertyWrapperSynthesizedPropertyKind::StorageWrapper)) {
+      auto backingVar = original->getPropertyWrapperBackingProperty();
+      if (backingVar->getFormalAccess() < var->getFormalAccess())
+        return false;
     }
   }
 
