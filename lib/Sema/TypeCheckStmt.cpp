@@ -731,24 +731,6 @@ public:
   }
   
   Stmt *visitForEachStmt(ForEachStmt *S) {
-    TypeResolutionOptions options(TypeResolverContext::InExpression);
-    options |= TypeResolutionFlags::AllowUnspecifiedTypes;
-    options |= TypeResolutionFlags::AllowUnboundGenerics;
-
-    if (auto *P = TypeChecker::resolvePattern(S->getPattern(), DC,
-                                              /*isStmtCondition*/false)) {
-      S->setPattern(P);
-    } else {
-      S->getPattern()->setType(ErrorType::get(getASTContext()));
-      return nullptr;
-    }
-
-    if (TypeChecker::typeCheckPattern(S->getPattern(), DC, options)) {
-      // FIXME: Handle errors better.
-      S->getPattern()->setType(ErrorType::get(getASTContext()));
-      return nullptr;
-    }
-
     if (TypeChecker::typeCheckForEachBinding(DC, S))
       return nullptr;
 

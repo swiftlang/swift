@@ -2898,6 +2898,9 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
     /// The for-each statement.
     ForEachStmt *Stmt;
 
+    /// The declaration context in which this for-each statement resides.
+    DeclContext *DC;
+
     /// The locator we're using.
     ConstraintLocator *Locator;
 
@@ -2926,7 +2929,8 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
     Type IteratorType;
 
   public:
-    explicit BindingListener(ForEachStmt *stmt) : Stmt(stmt) { }
+    explicit BindingListener(ForEachStmt *stmt, DeclContext *dc)
+        : Stmt(stmt), DC(dc) { }
 
     bool builtConstraints(ConstraintSystem &cs, Expr *expr) override {
       // Save the locator we're using for the expression.
@@ -2956,6 +2960,25 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
       auto elementLocator = cs.getConstraintLocator(
           ContextualLocator, ConstraintLocator::SequenceElementType);
 
+      // Check the element pattern.
+      ASTContext &ctx = cs.getASTContext();
+      if (auto *P = TypeChecker::resolvePattern(Stmt->getPattern(), DC,
+                                                /*isStmtCondition*/false)) {
+        Stmt->setPattern(P);
+      } else {
+        Stmt->getPattern()->setType(ErrorType::get(ctx));
+        return true;
+      }
+
+      TypeResolutionOptions options(TypeResolverContext::InExpression);
+      options |= TypeResolutionFlags::AllowUnspecifiedTypes;
+      options |= TypeResolutionFlags::AllowUnboundGenerics;
+      if (TypeChecker::typeCheckPattern(Stmt->getPattern(), DC, options)) {
+        // FIXME: Handle errors better.
+        Stmt->getPattern()->setType(ErrorType::get(ctx));
+        return true;
+      }
+
       // Collect constraints from the element pattern.
       auto pattern = Stmt->getPattern();
       InitType = cs.generateConstraints(pattern, elementLocator);
@@ -2984,13 +3007,12 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
       }
 
       // Reference the makeIterator witness.
-      ASTContext &ctx = cs.getASTContext();
       FuncDecl *makeIterator = ctx.getSequenceMakeIterator();
       Type makeIteratorType =
           cs.createTypeVariable(Locator, TVO_CanBindToNoEscape);
       cs.addValueWitnessConstraint(
           LValueType::get(SequenceType), makeIterator,
-          makeIteratorType, cs.DC, FunctionRefKind::Compound,
+          makeIteratorType, DC, FunctionRefKind::Compound,
           ContextualLocator);
 
       Stmt->setSequence(expr);
@@ -3019,7 +3041,7 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
       TypeResolutionOptions options(TypeResolverContext::ForEachStmt);
       options |= TypeResolutionFlags::OverrideType;
       if (TypeChecker::coercePatternToType(pattern,
-                                           TypeResolution::forContextual(cs.DC),
+                                           TypeResolution::forContextual(DC),
                                            InitType, options)) {
         return nullptr;
       }
@@ -3033,10 +3055,10 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
              "Couldn't find sequence conformance");
       Stmt->setSequenceConformance(SequenceConformance);
 
-      // Check the
+      // Check the filtering condition.
       // FIXME: This should be pulled into the constraint system itself.
       if (auto *Where = Stmt->getWhere()) {
-        if (!TypeChecker::typeCheckCondition(Where, cs.DC))
+        if (!TypeChecker::typeCheckCondition(Where, DC))
           Stmt->setWhere(Where);
       }
 
@@ -3053,7 +3075,7 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
         iterator = new (ctx) VarDecl(
             /*IsStatic*/ false, VarDecl::Introducer::Var,
             /*IsCaptureList*/ false, Stmt->getInLoc(),
-            ctx.getIdentifier(name), cs.DC);
+            ctx.getIdentifier(name), DC);
         iterator->setInterfaceType(IteratorType->mapTypeOutOfContext());
         iterator->setImplicit();
         Stmt->setIteratorVar(iterator);
@@ -3066,12 +3088,12 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
         PatternBindingDecl::createImplicit(
             ctx, StaticSpellingKind::None, genPat,
             new (ctx) OpaqueValueExpr(Stmt->getInLoc(), nextResultType),
-            cs.DC, /*VarLoc*/ Stmt->getForLoc());
+            DC, /*VarLoc*/ Stmt->getForLoc());
       }
 
       // Create the iterator variable.
       auto *varRef = TypeChecker::buildCheckedRefExpr(
-          iterator, cs.DC, DeclNameLoc(Stmt->getInLoc()), /*implicit*/ true);
+          iterator, DC, DeclNameLoc(Stmt->getInLoc()), /*implicit*/ true);
       if (varRef)
         Stmt->setIteratorVarRef(varRef);
 
@@ -3083,7 +3105,7 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
                                       /*isPlaceholder=*/true);
         Expr *convertElementExpr = elementExpr;
         if (TypeChecker::typeCheckExpression(
-                convertElementExpr, cs.DC,
+                convertElementExpr, DC,
                 TypeLoc::withoutLoc(optPatternType),
                 CTP_CoerceOperand).isNull()) {
           return nullptr;
@@ -3097,7 +3119,7 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
     }
   };
 
-  BindingListener listener(stmt);
+  BindingListener listener(stmt, dc);
   Expr *seq = stmt->getSequence();
   assert(seq && "type-checking an uninitialized for-each statement?");
 
