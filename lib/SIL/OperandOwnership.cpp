@@ -455,7 +455,7 @@ OperandOwnershipKindClassifier::visitSwitchEnumInst(SwitchEnumInst *sei) {
   // Otherwise, go through the ownership constraints of our successor arguments
   // and merge them.
   auto mergedKind = ValueOwnershipKind::merge(makeTransformRange(
-      sei->getSuccessorBlockArguments(),
+      sei->getSuccessorBlockArgumentLists(),
       [&](SILPhiArgumentArrayRef array) -> ValueOwnershipKind {
         // If the array is empty, we have a non-payloaded case. Return any.
         if (array.empty())
@@ -485,7 +485,7 @@ OperandOwnershipKindClassifier::visitCheckedCastBranchInst(
     CheckedCastBranchInst *ccbi) {
   // TODO: Simplify this using ValueOwnershipKind::merge.
   Optional<OperandOwnershipKindMap> map;
-  for (auto argArray : ccbi->getSuccessorBlockArguments()) {
+  for (auto argArray : ccbi->getSuccessorBlockArgumentLists()) {
     assert(!argArray.empty());
 
     auto argOwnershipKind = argArray[getOperandIndex()]->getOwnershipKind();
