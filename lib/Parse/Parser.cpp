@@ -1054,7 +1054,7 @@ Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
   while (true) {
     while (Tok.is(tok::comma)) {
       diagnose(Tok, diag::unexpected_separator, ",")
-        .fixItRemove(SourceRange(Tok.getLoc()));
+        .fixItRemove(Tok.getLoc());
       consumeToken();
     }
     SourceLoc StartLoc = Tok.getLoc();
@@ -1084,7 +1084,7 @@ Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
         continue;
       if (!AllowSepAfterLast) {
         diagnose(Tok, diag::unexpected_separator, ",")
-          .fixItRemove(SourceRange(PreviousLoc));
+          .fixItRemove(PreviousLoc);
       }
       break;
     }
