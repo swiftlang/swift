@@ -1150,6 +1150,11 @@ bool RemoveUnnecessaryCoercion::attempt(ConstraintSystem &cs, Type fromType,
   if (ctx.LangOpts.DisableRedundantCoercionWarning)
     return false;
   
+  // Don't diagnose if this is coming from a CSDiag typecheck subExpr diagnostics.
+  // We can remove this once CSDiag is gone.
+  if (cs.Options.contains(ConstraintSystemFlags::SubExpressionDiagnostics))
+    return false;
+  
   auto last = locator.last();
   bool isExplicitCoercion =
       last && last->is<LocatorPathElt::ExplicitTypeCoercion>();
@@ -1168,10 +1173,6 @@ bool RemoveUnnecessaryCoercion::attempt(ConstraintSystem &cs, Type fromType,
   if (!fromType->isEqual(castType) && !castType->hasTypeVariable())
     return false;
 
-  // Fixed type was already applied to the subEpxr.
-  if (expr->getSubExpr()->getType())
-    return false;
-  
   auto toTypeRepr = expr->getCastTypeLoc().getTypeRepr();
   
   // Don't emit this diagnostic for Implicitly unwrapped optional types
