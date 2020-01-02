@@ -6543,7 +6543,7 @@ DeclName AbstractFunctionDecl::getEffectiveFullName() const {
     auto &ctx = getASTContext();
     auto storage = accessor->getStorage();
     auto subscript = dyn_cast<SubscriptDecl>(storage);
-    switch (auto accessorKind = accessor->getAccessorKind()) {
+    switch (accessor->getAccessorKind()) {
     // These don't have any extra implicit parameters.
     case AccessorKind::Address:
     case AccessorKind::MutableAddress:
