@@ -234,6 +234,9 @@ bool CompletionInstance::performCachedOperaitonIfPossible(
 
   auto newBufferID =
       SM.addMemBufferCopy(sourceText, completionBuffer->getBufferIdentifier());
+  SM.openVirtualFile(SM.getLocForBufferStart(newBufferID),
+                     tmpSM.getDisplayNameForLoc(startLoc),
+                     tmpSM.getLineAndColumn(startLoc).first - 1);
   SM.setCodeCompletionPoint(newBufferID, newOffset);
 
   // Construct dummy scopes. We don't need to restore the original scope
