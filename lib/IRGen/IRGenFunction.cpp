@@ -457,7 +457,7 @@ llvm::CallInst *IRBuilder::CreateNonMergeableTrap(IRGenModule &IGM,
 
   // Emit the trap instruction.
   llvm::Function *trapIntrinsic =
-      llvm::Intrinsic::getDeclaration(&IGM.Module, llvm::Intrinsic::ID::trap);
+      llvm::Intrinsic::getDeclaration(&IGM.Module, llvm::Intrinsic::trap);
   if (EnableTrapDebugInfo && IGM.DebugInfo && !failureMsg.empty()) {
     IGM.DebugInfo->addFailureMessageToCurrentLoc(*this, failureMsg);
   }

@@ -2662,10 +2662,9 @@ static void emitCoroutineExit(IRGenSILFunction &IGF) {
   // Emit the block.
   IGF.Builder.emitBlock(coroEndBB);
   auto handle = IGF.getCoroutineHandle();
-  IGF.Builder.CreateIntrinsicCall(llvm::Intrinsic::ID::coro_end, {
-    handle,
-    /*is unwind*/ IGF.Builder.getFalse()
-  });
+  IGF.Builder.CreateIntrinsicCall(llvm::Intrinsic::coro_end,
+                                  {handle,
+                                   /*is unwind*/ IGF.Builder.getFalse()});
   IGF.Builder.CreateUnreachable();
 }
 

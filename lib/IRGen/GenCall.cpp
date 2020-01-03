@@ -1617,10 +1617,9 @@ llvm::CallSite CallEmission::emitCallSite() {
     auto origCallee = call->getCalledValue();
     llvm::Value *opaqueCallee = origCallee;
     opaqueCallee =
-      IGF.Builder.CreateBitCast(opaqueCallee, IGF.IGM.Int8PtrTy);    
-    opaqueCallee =
-      IGF.Builder.CreateIntrinsicCall(llvm::Intrinsic::ID::coro_prepare_retcon,
-                                      { opaqueCallee });
+      IGF.Builder.CreateBitCast(opaqueCallee, IGF.IGM.Int8PtrTy);
+    opaqueCallee = IGF.Builder.CreateIntrinsicCall(
+        llvm::Intrinsic::coro_prepare_retcon, {opaqueCallee});
     opaqueCallee =
       IGF.Builder.CreateBitCast(opaqueCallee, origCallee->getType());
     call->setCalledFunction(fn.getFunctionType(), opaqueCallee);
@@ -2586,10 +2585,9 @@ static void emitRetconCoroutineEntry(IRGenFunction &IGF,
 
   // Call 'llvm.coro.begin', just for consistency with the normal pattern.
   // This serves as a handle that we can pass around to other intrinsics.
-  auto hdl = IGF.Builder.CreateIntrinsicCall(llvm::Intrinsic::ID::coro_begin, {
-    id,
-    llvm::ConstantPointerNull::get(IGF.IGM.Int8PtrTy)
-  });
+  auto hdl = IGF.Builder.CreateIntrinsicCall(
+      llvm::Intrinsic::coro_begin,
+      {id, llvm::ConstantPointerNull::get(IGF.IGM.Int8PtrTy)});
 
   // Set the coroutine handle; this also flags that is a coroutine so that
   // e.g. dynamic allocas use the right code generation.
@@ -2600,7 +2598,7 @@ void irgen::emitYieldOnceCoroutineEntry(IRGenFunction &IGF,
                                         CanSILFunctionType fnType,
                                         Explosion &allParamValues) {
   emitRetconCoroutineEntry(IGF, fnType, allParamValues,
-                           llvm::Intrinsic::ID::coro_id_retcon_once,
+                           llvm::Intrinsic::coro_id_retcon_once,
                            getYieldOnceCoroutineBufferSize(IGF.IGM),
                            getYieldOnceCoroutineBufferAlignment(IGF.IGM));
 }
@@ -2609,7 +2607,7 @@ void irgen::emitYieldManyCoroutineEntry(IRGenFunction &IGF,
                                         CanSILFunctionType fnType,
                                         Explosion &allParamValues) {
   emitRetconCoroutineEntry(IGF, fnType, allParamValues,
-                           llvm::Intrinsic::ID::coro_id_retcon,
+                           llvm::Intrinsic::coro_id_retcon,
                            getYieldManyCoroutineBufferSize(IGF.IGM),
                            getYieldManyCoroutineBufferAlignment(IGF.IGM));
 }
@@ -2711,10 +2709,8 @@ llvm::Value *irgen::emitYield(IRGenFunction &IGF,
   }
 
   // Perform the yield.
-  auto isUnwind =
-    IGF.Builder.CreateIntrinsicCall(llvm::Intrinsic::ID::coro_suspend_retcon,
-                                    { IGF.IGM.Int1Ty },
-                                    yieldArgs);
+  auto isUnwind = IGF.Builder.CreateIntrinsicCall(
+      llvm::Intrinsic::coro_suspend_retcon, {IGF.IGM.Int1Ty}, yieldArgs);
 
   // We're done with the indirect buffer.
   if (indirectBuffer) {

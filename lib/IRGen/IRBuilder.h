@@ -241,11 +241,11 @@ public:
   // FunctionPointer.
 
   bool isTrapIntrinsic(llvm::Value *Callee) {
-    return Callee == llvm::Intrinsic::getDeclaration(getModule(),
-                                                     llvm::Intrinsic::ID::trap);
+    return Callee ==
+           llvm::Intrinsic::getDeclaration(getModule(), llvm::Intrinsic::trap);
   }
   bool isTrapIntrinsic(llvm::Intrinsic::ID intrinsicID) {
-    return intrinsicID == llvm::Intrinsic::ID::trap;
+    return intrinsicID == llvm::Intrinsic::trap;
   }
 
   llvm::CallInst *CreateCall(llvm::Value *Callee, ArrayRef<llvm::Value *> Args,
