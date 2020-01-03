@@ -499,6 +499,7 @@ std::string ASTMangler::mangleTypeAsUSR(Type Ty) {
 
 std::string ASTMangler::mangleDeclAsUSR(const ValueDecl *Decl,
                                         StringRef USRPrefix) {
+  DWARFMangling = true;
   beginManglingWithoutPrefix();
   llvm::SaveAndRestore<bool> allowUnnamedRAII(AllowNamelessEntities, true);
   Buffer << USRPrefix;
@@ -1790,7 +1791,12 @@ void ASTMangler::appendModule(const ModuleDecl *module,
     assert(useModuleName.empty());
     return appendOperator("SC");
   }
-  if (!useModuleName.empty())
+
+  // Enabling DWARFMangling indicate the mangled names are not part of the ABI,
+  // probably used by the debugger or IDE (USR). These mangled names will not be
+  // demangled successfully if we use the original module name instead of the
+  // actual module name.
+  if (!useModuleName.empty() && !DWARFMangling)
     appendIdentifier(useModuleName);
   else
     appendIdentifier(ModName);
