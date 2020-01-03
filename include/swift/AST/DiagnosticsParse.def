@@ -207,7 +207,7 @@ ERROR(lex_conflict_marker_in_file,none,
 //------------------------------------------------------------------------------
 
 NOTE(note_in_decl_extension,none,
-     "in %select{declaration|extension}0 of %1", (bool, Identifier))
+     "in %select{declaration|extension}0 of %1", (bool, DeclNameRef))
 ERROR(line_directive_style_deprecated,none,
         "#line directive was renamed to #sourceLocation",
         ())
@@ -803,6 +803,12 @@ ERROR(sil_box_expected_r_brace,none,
 ERROR(sil_box_expected_r_angle,none,
       "expected '>' to complete SIL box generic argument list", ())
 
+// SIL function types
+ERROR(sil_function_subst_expected_l_angle,none,
+      "expected '<' to begin SIL function type substitution list after 'for'", ())
+ERROR(sil_function_subst_expected_r_angle,none,
+      "expected '>' to begin SIL function type substitution list after 'for'", ())
+
 // Opaque types
 ERROR(opaque_mid_composition,none,
       "'some' should appear at the beginning of a composition", ())
@@ -1329,6 +1335,11 @@ ERROR(attr_expected_comma,none,
 ERROR(attr_expected_string_literal,none,
 "expected string literal in '%0' attribute", (StringRef))
 
+ERROR(attr_missing_label,PointsToFirstBadToken,
+      "missing label '%0:' in '@%1' attribute", (StringRef, StringRef))
+ERROR(attr_expected_label,none,
+      "expected label '%0:' in '@%1' attribute", (StringRef, StringRef))
+
 ERROR(alignment_must_be_positive_integer,none,
       "alignment value must be a positive integer literal", ())
 
@@ -1397,6 +1408,32 @@ WARNING(attr_availability_nonspecific_platform_unexpected_version,none,
       "unexpected version number in '%0' attribute for non-specific platform "
       "'*'", (StringRef))
 
+// originallyDefinedIn
+ERROR(originally_defined_in_missing_rparen,none,
+      "expected ')' in @_originallyDefinedIn argument list", ())
+
+ERROR(originally_defined_in_unrecognized_platform,none,
+      "unrecognized platform name in @_originallyDefinedIn argument list", ())
+
+ERROR(originally_defined_in_unrecognized_property,none,
+      "unrecognized property in @_originallyDefinedIn argument list", ())
+
+ERROR(originally_defined_in_need_original_module_name,none,
+      "expected 'module: \"original\"' in the first argument to "
+      "@_originallyDefinedIn", ())
+
+ERROR(originally_defined_in_need_nonempty_module_name,none,
+      "original module name cannot be empty in @_originallyDefinedIn", ())
+
+ERROR(originally_defined_in_need_platform_version,none,
+     "expected at least one platform version in @_originallyDefinedIn", ())
+
+WARNING(originally_defined_in_major_minor_only,none,
+        "@_originallyDefinedIn only uses major and minor version number", ())
+
+WARNING(originally_defined_in_missing_platform_name,none,
+        "* as platform name has no effect", ())
+
 // convention
 ERROR(convention_attribute_expected_lparen,none,
       "expected '(' after 'convention' attribute", ())
@@ -1404,6 +1441,13 @@ ERROR(convention_attribute_expected_name,none,
       "expected convention name identifier in 'convention' attribute", ())
 ERROR(convention_attribute_expected_rparen,none,
       "expected ')' after convention name for 'convention' attribute", ())
+ERROR(convention_attribute_ctype_expected_label,none,
+      "expected 'cType' label in 'convention' attribute", ())
+ERROR(convention_attribute_ctype_expected_colon,none,
+      "expected ':' after 'cType' for 'convention' attribute", ())
+ERROR(convention_attribute_ctype_expected_string,none,
+      "expected string literal containing clang type for 'cType' in "
+      "'convention' attribute", ())
 ERROR(convention_attribute_witness_method_expected_colon,none,
       "expected ':' after 'witness_method' for 'convention' attribute", ())
 ERROR(convention_attribute_witness_method_expected_protocol,none,
@@ -1516,6 +1560,13 @@ ERROR(expected_colon_after_label,PointsToFirstBadToken,
 ERROR(diff_params_clause_expected_parameter,PointsToFirstBadToken,
       "expected a parameter, which can be a function parameter name, "
       "parameter index, or 'self'", ())
+ERROR(diff_params_clause_expected_parameter_unnamed,PointsToFirstBadToken,
+      "expected a parameter, which can be a function parameter index or 'self'",
+      ())
+
+// Automatic differentiation attributes
+ERROR(autodiff_attr_expected_original_decl_name,PointsToFirstBadToken,
+      "expected an original function name", ())
 
 //------------------------------------------------------------------------------
 // MARK: Generics parsing diagnostics

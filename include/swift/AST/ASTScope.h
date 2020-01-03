@@ -412,7 +412,7 @@ public:
 
   /// Entry point into ASTScopeImpl-land for lookups
   static llvm::SmallVector<const ASTScopeImpl *, 0>
-  unqualifiedLookup(SourceFile *, DeclName, SourceLoc,
+  unqualifiedLookup(SourceFile *, DeclNameRef, SourceLoc,
                     const DeclContext *startingContext, DeclConsumer);
 
   static Optional<bool>
@@ -422,7 +422,7 @@ public:
 #pragma mark - - lookup- starting point
 private:
   static const ASTScopeImpl *findStartingScopeForLookup(SourceFile *,
-                                                        const DeclName name,
+                                                        const DeclNameRef name,
                                                         const SourceLoc where,
                                                         const DeclContext *ctx);
 
@@ -478,6 +478,10 @@ public:
   /// A return of None indicates that the previous child (in history) should be
   /// asked.
   virtual Optional<NullablePtr<DeclContext>> computeSelfDCForParent() const;
+
+  /// Returns the context that should be used when a nested scope (e.g. a
+  /// closure) captures self explicitly.
+  virtual NullablePtr<DeclContext> capturedSelfDC() const;
 
 protected:
   /// Find either locals or members (no scope has both)
@@ -692,6 +696,15 @@ public:
     /// to compute the selfDC from the history.
     static NullablePtr<DeclContext>
     computeSelfDC(ArrayRef<const ASTScopeImpl *> history);
+    
+    /// If we find a lookup result that requires the dynamic implict self value,
+    /// we need to check the nested scopes to see if any closures explicitly
+    /// captured \c self. In that case, the appropriate selfDC is that of the
+    /// innermost closure which captures a \c self value from one of this type's
+    /// methods.
+    static NullablePtr<DeclContext>
+    checkNestedScopesForSelfCapture(ArrayRef<const ASTScopeImpl *> history,
+                                    size_t start);
 };
 
 /// Behavior specific to representing the trailing where clause of a
@@ -1449,6 +1462,13 @@ public:
   std::string getClassName() const override;
   SourceRange
   getSourceRangeOfThisASTNode(bool omitAssertions = false) const override;
+  
+  /// Since explicit captures of \c self by closures enable the use of implicit
+  /// \c self, we need to make sure that the appropriate \c self is used as the
+  /// base decl for these uses (otherwise, the capture would be marked as
+  /// unused. \c ClosureParametersScope::capturedSelfDC() checks if we have such
+  ///  a capture of self.
+  NullablePtr<DeclContext> capturedSelfDC() const override;
 
 protected:
   ASTScopeImpl *expandSpecifically(ScopeCreator &) override;

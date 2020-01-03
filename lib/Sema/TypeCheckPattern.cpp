@@ -113,8 +113,11 @@ filterForEnumElement(DeclContext *DC, SourceLoc UseLoc,
 
 /// Find an unqualified enum element.
 static EnumElementDecl *
-lookupUnqualifiedEnumMemberElement(DeclContext *DC,
-                                   Identifier name, SourceLoc UseLoc) {
+lookupUnqualifiedEnumMemberElement(DeclContext *DC, DeclNameRef name,
+                                   SourceLoc UseLoc) {
+  // FIXME: We should probably pay attention to argument labels someday.
+  name = name.withoutArgumentLabels();
+
   auto lookupOptions = defaultUnqualifiedLookupOptions;
   lookupOptions |= NameLookupFlags::KnownPrivate;
   auto lookup =
@@ -126,9 +129,12 @@ lookupUnqualifiedEnumMemberElement(DeclContext *DC,
 /// Find an enum element in an enum type.
 static EnumElementDecl *
 lookupEnumMemberElement(DeclContext *DC, Type ty,
-                        Identifier name, SourceLoc UseLoc) {
+                        DeclNameRef name, SourceLoc UseLoc) {
   if (!ty->mayHaveMembers())
     return nullptr;
+
+  // FIXME: We should probably pay attention to argument labels someday.
+  name = name.withoutArgumentLabels();
 
   // Look up the case inside the enum.
   // FIXME: We should be able to tell if this is a private lookup.
@@ -168,7 +174,7 @@ struct ExprToIdentTypeRepr : public ASTVisitor<ExprToIdentTypeRepr, bool>
     // Get the declared type.
     if (auto *td = dyn_cast<TypeDecl>(dre->getDecl())) {
       components.push_back(
-        new (C) SimpleIdentTypeRepr(dre->getLoc(), td->getName()));
+        new (C) SimpleIdentTypeRepr(dre->getNameLoc(), td->createNameRef()));
       components.back()->setValue(td, nullptr);
       return true;
     }
@@ -179,8 +185,8 @@ struct ExprToIdentTypeRepr : public ASTVisitor<ExprToIdentTypeRepr, bool>
     assert(components.empty() && "decl ref should be root element of expr");
     // Track the AST location of the component.
     components.push_back(
-      new (C) SimpleIdentTypeRepr(udre->getLoc(),
-                                  udre->getName().getBaseIdentifier()));
+      new (C) SimpleIdentTypeRepr(udre->getNameLoc(),
+                                  udre->getName()));
     return true;
   }
   
@@ -192,8 +198,8 @@ struct ExprToIdentTypeRepr : public ASTVisitor<ExprToIdentTypeRepr, bool>
 
     // Track the AST location of the new component.
     components.push_back(
-      new (C) SimpleIdentTypeRepr(ude->getLoc(),
-                                  ude->getName().getBaseIdentifier()));
+      new (C) SimpleIdentTypeRepr(ude->getNameLoc(),
+                                  ude->getName()));
     return true;
   }
   
@@ -209,8 +215,8 @@ struct ExprToIdentTypeRepr : public ASTVisitor<ExprToIdentTypeRepr, bool>
       argTypeReprs.push_back(arg.getTypeRepr());
     auto origComponent = components.back();
     components.back() =
-      GenericIdentTypeRepr::create(C, origComponent->getIdLoc(),
-                                   origComponent->getIdentifier(), argTypeReprs,
+      GenericIdentTypeRepr::create(C, origComponent->getNameLoc(),
+                                   origComponent->getNameRef(), argTypeReprs,
                                    SourceRange(use->getLAngleLoc(),
                                                use->getRAngleLoc()));
 
@@ -440,10 +446,9 @@ public:
     if (ume->getName().getBaseName().isSpecial())
       return nullptr;
 
-    // FIXME: Compound names.
     return new (Context)
-        EnumElementPattern(ume->getDotLoc(), ume->getNameLoc().getBaseNameLoc(),
-                           ume->getName().getBaseIdentifier(), subPattern, ume);
+        EnumElementPattern(ume->getDotLoc(), ume->getNameLoc(), ume->getName(),
+                           subPattern, ume);
   }
   
   // Member syntax 'T.Element' forms a pattern if 'T' is an enum and the
@@ -467,20 +472,17 @@ public:
     if (!enumDecl)
       return nullptr;
 
-    // FIXME: Argument labels?
     EnumElementDecl *referencedElement
-      = lookupEnumMemberElement(DC, ty, ude->getName().getBaseIdentifier(),
-                                ude->getLoc());
+      = lookupEnumMemberElement(DC, ty, ude->getName(), ude->getLoc());
     if (!referencedElement)
       return nullptr;
     
     // Build a TypeRepr from the head of the full path.
-    // FIXME: Compound names.
     TypeLoc loc(repr);
     loc.setType(ty);
     return new (Context) EnumElementPattern(
-        loc, ude->getDotLoc(), ude->getNameLoc().getBaseNameLoc(),
-        ude->getName().getBaseIdentifier(), referencedElement, nullptr);
+        loc, ude->getDotLoc(), ude->getNameLoc(), ude->getName(),
+        referencedElement, nullptr);
   }
   
   // A DeclRef 'E' that refers to an enum element forms an EnumElementPattern.
@@ -492,8 +494,8 @@ public:
     // Use the type of the enum from context.
     TypeLoc loc = TypeLoc::withoutLoc(
                             elt->getParentEnum()->getDeclaredTypeInContext());
-    return new (Context) EnumElementPattern(loc, SourceLoc(), de->getLoc(),
-                                            elt->getName(), elt, nullptr);
+    return new (Context) EnumElementPattern(loc, SourceLoc(), de->getNameLoc(),
+                                            elt->createNameRef(), elt, nullptr);
   }
   Pattern *visitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *ude) {
     // FIXME: This shouldn't be needed.  It is only necessary because of the
@@ -502,15 +504,14 @@ public:
     //
     // Try looking up an enum element in context.
     if (EnumElementDecl *referencedElement
-        = lookupUnqualifiedEnumMemberElement(DC,
-                                             ude->getName().getBaseIdentifier(),
+        = lookupUnqualifiedEnumMemberElement(DC, ude->getName(),
                                              ude->getLoc())) {
       auto *enumDecl = referencedElement->getParentEnum();
       auto enumTy = enumDecl->getDeclaredTypeInContext();
       TypeLoc loc = TypeLoc::withoutLoc(enumTy);
 
       return new (Context) EnumElementPattern(
-          loc, SourceLoc(), ude->getLoc(), ude->getName().getBaseIdentifier(),
+          loc, SourceLoc(), ude->getNameLoc(), ude->getName(),
           referencedElement, nullptr);
     }
       
@@ -546,8 +547,7 @@ public:
     if (components.empty()) {
       // Only one component. Try looking up an enum element in context.
       referencedElement
-        = lookupUnqualifiedEnumMemberElement(DC,
-                                             tailComponent->getIdentifier(),
+        = lookupUnqualifiedEnumMemberElement(DC, tailComponent->getNameRef(),
                                              tailComponent->getLoc());
       if (!referencedElement)
         return nullptr;
@@ -571,7 +571,7 @@ public:
 
       referencedElement
         = lookupEnumMemberElement(DC, enumTy,
-                                  tailComponent->getIdentifier(),
+                                  tailComponent->getNameRef(),
                                   tailComponent->getLoc());
       if (!referencedElement)
         return nullptr;
@@ -585,8 +585,9 @@ public:
 
     auto *subPattern = getSubExprPattern(ce->getArg());
     return new (Context) EnumElementPattern(
-        loc, SourceLoc(), tailComponent->getIdLoc(),
-        tailComponent->getIdentifier(), referencedElement, subPattern);
+        loc, SourceLoc(), tailComponent->getNameLoc(),
+        tailComponent->getNameRef(), referencedElement,
+        subPattern);
   }
 };
 
@@ -1131,8 +1132,9 @@ recur:
       if (auto *NLE = dyn_cast<NilLiteralExpr>(EP->getSubExpr())) {
         auto *NoneEnumElement = Context.getOptionalNoneDecl();
         P = new (Context) EnumElementPattern(TypeLoc::withoutLoc(type),
-                                             NLE->getLoc(), NLE->getLoc(),
-                                             NoneEnumElement->getName(),
+                                             NLE->getLoc(),
+                                             DeclNameLoc(NLE->getLoc()),
+                                             NoneEnumElement->createNameRef(),
                                              NoneEnumElement, nullptr, false);
         return TypeChecker::coercePatternToType(P, resolution, type, options);
       }
@@ -1166,8 +1168,8 @@ recur:
         auto some = Context.getOptionalDecl()->getUniqueElement(/*hasVal*/true);
         sub = new (Context) EnumElementPattern(TypeLoc(),
                                                IP->getStartLoc(),
-                                               IP->getEndLoc(),
-                                               some->getName(),
+                                               DeclNameLoc(IP->getEndLoc()),
+                                               some->createNameRef(),
                                                nullptr, sub,
                                                /*Implicit=*/true);
       }
@@ -1251,14 +1253,17 @@ recur:
           // isn't a static VarDecl, so the existing mechanics in
           // extractEnumElement won't work.
           if (type->getAnyNominal() == Context.getOptionalDecl()) {
-            if (EEP->getName().str() == "None" ||
-                EEP->getName().str() == "Some") {
+            if (EEP->getName().isSimpleName("None") ||
+                EEP->getName().isSimpleName("Some")) {
               SmallString<4> Rename;
-              camel_case::toLowercaseWord(EEP->getName().str(), Rename);
+              camel_case::toLowercaseWord(EEP->getName()
+                                               .getBaseIdentifier().str(),
+                                          Rename);
               diags.diagnose(
                   EEP->getLoc(), diag::availability_decl_unavailable_rename,
-                  /*"getter" prefix*/ 2, EEP->getName(), /*replaced*/ false,
-                  /*special kind*/ 0, Rename.str(), /*message*/ StringRef())
+                  /*"getter" prefix*/ 2, EEP->getName().getBaseName(),
+                  /*replaced*/ false, /*special kind*/ 0, Rename.str(),
+                  /*message*/ StringRef())
                   .fixItReplace(EEP->getLoc(), Rename.str());
 
               return true;
@@ -1288,7 +1293,7 @@ recur:
             } else {
               diags.diagnose(EEP->getLoc(),
                              diag::enum_element_pattern_member_not_found,
-                             EEP->getName().str(), type);
+                             EEP->getName(), type);
               return true;
             }
           }
@@ -1341,7 +1346,7 @@ recur:
       } else {
         diags.diagnose(EEP->getLoc(),
                        diag::enum_element_pattern_not_member_of_enum,
-                       EEP->getName().str(), type);
+                       EEP->getName(), type);
         return true;
       }
     }

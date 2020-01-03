@@ -113,12 +113,6 @@ void SILParserTUStateBase::anchor() { }
 void swift::performCodeCompletionSecondPass(
     PersistentParserState &ParserState,
     CodeCompletionCallbacksFactory &Factory) {
-  Parser::performCodeCompletionSecondPass(ParserState, Factory);
-}
-
-void Parser::performCodeCompletionSecondPass(
-    PersistentParserState &ParserState,
-    CodeCompletionCallbacksFactory &Factory) {
   if (!ParserState.hasCodeCompletionDelayedDeclState())
     return;
 
@@ -128,7 +122,7 @@ void Parser::performCodeCompletionSecondPass(
 
   FrontendStatsTracer tracer(Ctx.Stats, "CodeCompletionSecondPass");
 
-  auto BufferID = Ctx.SourceMgr.findBufferContainingLoc(state->BodyPos.Loc);
+  auto BufferID = Ctx.SourceMgr.getCodeCompletionBufferID();
   Parser TheParser(BufferID, SF, nullptr, &ParserState, nullptr);
 
   std::unique_ptr<CodeCompletionCallbacks> CodeCompletion(
@@ -139,28 +133,17 @@ void Parser::performCodeCompletionSecondPass(
 }
 
 void Parser::performCodeCompletionSecondPassImpl(
-    PersistentParserState::CodeCompletionDelayedDeclState &info) {
+    CodeCompletionDelayedDeclState &info) {
   // Disable libSyntax creation in the delayed parsing.
   SyntaxContext->disable();
 
-  auto BeginParserPosition = getParserPosition(info.BodyPos);
-  auto EndLexerState = L->getStateForEndOfTokenLoc(info.BodyEnd);
-
-  // ParserPositionRAII needs a primed parser to restore to.
-  if (Tok.is(tok::NUM_TOKENS))
-    consumeTokenWithoutFeedingReceiver();
-
-  // Ensure that we restore the parser state at exit.
-  ParserPositionRAII PPR(*this);
-
-  // Create a lexer that cannot go past the end state.
-  Lexer LocalLex(*L, BeginParserPosition.LS, EndLexerState);
-
-  // Temporarily swap out the parser's current lexer with our new one.
-  llvm::SaveAndRestore<Lexer *> T(L, &LocalLex);
-
-  // Rewind to the beginning of the top-level code.
-  restoreParserPosition(BeginParserPosition);
+  auto BufferID = L->getBufferID();
+  auto startLoc = SourceMgr.getLocForOffset(BufferID, info.StartOffset);
+  SourceLoc prevLoc;
+  if (info.PrevOffset != ~0U)
+    prevLoc = SourceMgr.getLocForOffset(BufferID, info.PrevOffset);
+  // Set the parser position to the start of the delayed decl or the body.
+  restoreParserPosition(getParserPosition({startLoc, prevLoc}));
 
   // Do not delay parsing in the second pass.
   llvm::SaveAndRestore<bool> DisableDelayedBody(DelayBodyParsing, false);
@@ -171,7 +154,7 @@ void Parser::performCodeCompletionSecondPassImpl(
   DeclContext *DC = info.ParentContext;
 
   switch (info.Kind) {
-  case PersistentParserState::CodeCompletionDelayedDeclKind::TopLevelCodeDecl: {
+  case CodeCompletionDelayedDeclKind::TopLevelCodeDecl: {
     // Re-enter the top-level code decl context.
     // FIXME: this can issue discriminators out-of-order?
     auto *TLCD = cast<TopLevelCodeDecl>(DC);
@@ -187,7 +170,7 @@ void Parser::performCodeCompletionSecondPassImpl(
     break;
   }
 
-  case PersistentParserState::CodeCompletionDelayedDeclKind::Decl: {
+  case CodeCompletionDelayedDeclKind::Decl: {
     assert((DC->isTypeContext() || DC->isModuleScopeContext()) &&
            "Delayed decl must be a type member or a top-level decl");
     ContextChange CC(*this, DC);
@@ -207,8 +190,13 @@ void Parser::performCodeCompletionSecondPassImpl(
     break;
   }
 
-  case PersistentParserState::CodeCompletionDelayedDeclKind::FunctionBody: {
+  case CodeCompletionDelayedDeclKind::FunctionBody: {
     auto *AFD = cast<AbstractFunctionDecl>(DC);
+
+    if (auto *P = AFD->getImplicitSelfDecl())
+      addToScope(P);
+    addParametersToScope(AFD->getParameters());
+
     ParseFunctionBody CC(*this, AFD);
     setLocalDiscriminatorToParamList(AFD->getParameters());
 
@@ -222,6 +210,8 @@ void Parser::performCodeCompletionSecondPassImpl(
          "Second pass should not set any code completion info");
 
   CodeCompletion->doneParsing();
+
+  State->restoreCodeCompletionDelayedDeclState(info);
 }
 
 swift::Parser::BacktrackingScope::~BacktrackingScope() {
@@ -447,11 +437,11 @@ class TokenRecorder: public ConsumeTokenReceiver {
   }
 
 public:
-  TokenRecorder(SourceFile &SF):
+  TokenRecorder(SourceFile &SF, unsigned BufferID):
   Ctx(SF.getASTContext()),
   SM(SF.getASTContext().SourceMgr),
   Bag(SF.getTokenVector()),
-  BufferID(SF.getBufferID().getValue()) {};
+  BufferID(BufferID) {};
 
   void finalize() override {
 
@@ -533,7 +523,7 @@ Parser::Parser(std::unique_ptr<Lexer> Lex, SourceFile &SF,
     Context(SF.getASTContext()),
     DelayBodyParsing(DelayBodyParsing),
     TokReceiver(SF.shouldCollectToken() ?
-                new TokenRecorder(SF) :
+                new TokenRecorder(SF, L->getBufferID()) :
                 new ConsumeTokenReceiver()),
     SyntaxContext(new SyntaxParsingContext(SyntaxContext, SF,
                                            L->getBufferID(),
@@ -1064,7 +1054,7 @@ Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
   while (true) {
     while (Tok.is(tok::comma)) {
       diagnose(Tok, diag::unexpected_separator, ",")
-        .fixItRemove(SourceRange(Tok.getLoc()));
+        .fixItRemove(Tok.getLoc());
       consumeToken();
     }
     SourceLoc StartLoc = Tok.getLoc();
@@ -1094,7 +1084,7 @@ Parser::parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
         continue;
       if (!AllowSepAfterLast) {
         diagnose(Tok, diag::unexpected_separator, ",")
-          .fixItRemove(SourceRange(PreviousLoc));
+          .fixItRemove(PreviousLoc);
       }
       break;
     }
@@ -1368,8 +1358,12 @@ ParsedDeclName swift::parseDeclName(StringRef name) {
 }
 
 DeclName ParsedDeclName::formDeclName(ASTContext &ctx) const {
-  return swift::formDeclName(ctx, BaseName, ArgumentLabels, IsFunctionName,
-                             /*IsInitializer=*/true);
+  return formDeclNameRef(ctx).getFullName();
+}
+
+DeclNameRef ParsedDeclName::formDeclNameRef(ASTContext &ctx) const {
+  return swift::formDeclNameRef(ctx, BaseName, ArgumentLabels, IsFunctionName,
+                                /*IsInitializer=*/true);
 }
 
 DeclName swift::formDeclName(ASTContext &ctx,
@@ -1377,11 +1371,20 @@ DeclName swift::formDeclName(ASTContext &ctx,
                              ArrayRef<StringRef> argumentLabels,
                              bool isFunctionName,
                              bool isInitializer) {
+  return formDeclNameRef(ctx, baseName, argumentLabels, isFunctionName,
+                         isInitializer).getFullName();
+}
+
+DeclNameRef swift::formDeclNameRef(ASTContext &ctx,
+                                   StringRef baseName,
+                                   ArrayRef<StringRef> argumentLabels,
+                                   bool isFunctionName,
+                                   bool isInitializer) {
   // We cannot import when the base name is not an identifier.
   if (baseName.empty())
-    return DeclName();
+    return DeclNameRef();
   if (!Lexer::isIdentifier(baseName) && !Lexer::isOperator(baseName))
-    return DeclName();
+    return DeclNameRef();
 
   // Get the identifier for the base name. Special-case `init`.
   DeclBaseName baseNameId = ((isInitializer && baseName == "init")
@@ -1389,7 +1392,7 @@ DeclName swift::formDeclName(ASTContext &ctx,
                              : ctx.getIdentifier(baseName));
 
   // For non-functions, just use the base name.
-  if (!isFunctionName) return baseNameId;
+  if (!isFunctionName) return DeclNameRef(baseNameId);
 
   // For functions, we need to form a complete name.
 
@@ -1405,7 +1408,7 @@ DeclName swift::formDeclName(ASTContext &ctx,
   }
 
   // Build the result.
-  return DeclName(ctx, baseNameId, argumentLabelIds);
+  return DeclNameRef({ ctx, baseNameId, argumentLabelIds });
 }
 
 DeclName swift::parseDeclName(ASTContext &ctx, StringRef name) {

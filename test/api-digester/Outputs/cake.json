@@ -1526,18 +1526,6 @@
         },
         {
           "kind": "Conformance",
-          "name": "MirrorPath",
-          "printedName": "MirrorPath",
-          "usr": "s:s10MirrorPathP"
-        },
-        {
-          "kind": "Conformance",
-          "name": "CVarArg",
-          "printedName": "CVarArg",
-          "usr": "s:s7CVarArgP"
-        },
-        {
-          "kind": "Conformance",
           "name": "Encodable",
           "printedName": "Encodable",
           "usr": "s:SE"
@@ -1550,6 +1538,24 @@
         },
         {
           "kind": "Conformance",
+          "name": "CustomReflectable",
+          "printedName": "CustomReflectable",
+          "usr": "s:s17CustomReflectableP"
+        },
+        {
+          "kind": "Conformance",
+          "name": "MirrorPath",
+          "printedName": "MirrorPath",
+          "usr": "s:s10MirrorPathP"
+        },
+        {
+          "kind": "Conformance",
+          "name": "CVarArg",
+          "printedName": "CVarArg",
+          "usr": "s:s7CVarArgP"
+        },
+        {
+          "kind": "Conformance",
           "name": "Hashable",
           "printedName": "Hashable",
           "usr": "s:SH"
@@ -1559,12 +1565,6 @@
           "name": "Equatable",
           "printedName": "Equatable",
           "usr": "s:SQ"
-        },
-        {
-          "kind": "Conformance",
-          "name": "CustomReflectable",
-          "printedName": "CustomReflectable",
-          "usr": "s:s17CustomReflectableP"
         },
         {
           "kind": "Conformance",

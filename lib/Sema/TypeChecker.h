@@ -182,10 +182,6 @@ enum class TypeCheckExprFlags {
   /// not affect type checking itself.
   IsExprStmt = 0x20,
 
-  /// If set, this expression is being re-type checked as part of diagnostics,
-  /// and so we should not visit bodies of non-single expression closures.
-  SkipMultiStmtClosures = 0x40,
-
   /// This is an inout yield.
   IsInOutYield = 0x100,
 
@@ -712,9 +708,7 @@ public:
   static bool typeCheckTapBody(TapExpr *expr, DeclContext *DC);
 
   static Type typeCheckParameterDefault(Expr *&defaultValue, DeclContext *DC,
-                                        Type paramType,
-                                        bool isAutoClosure = false,
-                                        bool canFail = true);
+                                        Type paramType, bool isAutoClosure);
 
   static void typeCheckTopLevelCodeDecl(TopLevelCodeDecl *TLCD);
 
@@ -725,7 +719,6 @@ public:
   static void addImplicitDynamicAttribute(Decl *D);
   static void checkDeclAttributes(Decl *D);
   static void checkParameterAttributes(ParameterList *params);
-  static ValueDecl *findReplacedDynamicFunction(const ValueDecl *d);
 
   static Type checkReferenceOwnershipAttr(VarDecl *D, Type interfaceType,
                                           ReferenceOwnershipAttr *attr);
@@ -1217,6 +1210,17 @@ public:
   static Type deriveTypeWitness(DeclContext *DC, NominalTypeDecl *nominal,
                                 AssociatedTypeDecl *assocType);
 
+  /// Derive an implicit type witness for a given "phantom" nested type
+  /// requirement that is known to the compiler but unstated as a
+  /// formal type requirement.
+  ///
+  /// This exists to support Codable and only Codable. Do not expand its
+  /// usage outside of that domain.
+  static TypeDecl *derivePhantomWitness(DeclContext *DC,
+                                        NominalTypeDecl *nominal,
+                                        ProtocolDecl *proto,
+                                        const StringRef Name);
+
   /// \name Name lookup
   ///
   /// Routines that perform name lookup.
@@ -1230,7 +1234,7 @@ public:
   /// \param name The name of the entity to look for.
   /// \param loc The source location at which name lookup occurs.
   /// \param options Options that control name lookup.
-  static LookupResult lookupUnqualified(DeclContext *dc, DeclName name,
+  static LookupResult lookupUnqualified(DeclContext *dc, DeclNameRef name,
                                         SourceLoc loc,
                                         NameLookupOptions options
                                           = defaultUnqualifiedLookupOptions);
@@ -1243,7 +1247,7 @@ public:
   /// \param loc The source location at which name lookup occurs.
   /// \param options Options that control name lookup.
   LookupResult
-  static lookupUnqualifiedType(DeclContext *dc, DeclName name, SourceLoc loc,
+  static lookupUnqualifiedType(DeclContext *dc, DeclNameRef name, SourceLoc loc,
                                NameLookupOptions options
                                  = defaultUnqualifiedLookupOptions);
 
@@ -1255,7 +1259,7 @@ public:
   /// \param options Options that control name lookup.
   ///
   /// \returns The result of name lookup.
-  static LookupResult lookupMember(DeclContext *dc, Type type, DeclName name,
+  static LookupResult lookupMember(DeclContext *dc, Type type, DeclNameRef name,
                                    NameLookupOptions options
                                      = defaultMemberLookupOptions);
 
@@ -1271,7 +1275,7 @@ public:
   ///
   /// \returns The result of name lookup.
   static LookupTypeResult lookupMemberType(DeclContext *dc, Type type,
-                                           Identifier name,
+                                           DeclNameRef name,
                                            NameLookupOptions options
                                              = defaultMemberTypeLookupOptions);
 
@@ -1558,7 +1562,7 @@ public:
   static Optional<Identifier> omitNeedlessWords(VarDecl *var);
 
   /// Calculate edit distance between declaration names.
-  static unsigned getCallEditDistance(DeclName writtenName,
+  static unsigned getCallEditDistance(DeclNameRef writtenName,
                                       DeclName correctedName,
                                       unsigned maxEditDistance);
 
@@ -1584,6 +1588,19 @@ public:
   /// special case type-checking behavior.
   static DeclTypeCheckingSemantics
   getDeclTypeCheckingSemantics(ValueDecl *decl);
+
+  /// Creates an `IndexSubset` for the given function type, representing
+  /// all inferred differentiation parameters. Used by `@differentiable` and
+  /// `@derivative` attribute type-checking.
+  ///
+  /// The differentiation parameters are inferred to be:
+  /// - All parameters of the function type that conform to `Differentiable`.
+  /// - If the function type's result is a function type (i.e. it is a curried
+  ///   method type), then also all parameters of the function result type that
+  ///   conform to `Differentiable`.
+  static IndexSubset *
+  inferDifferentiationParameters(AbstractFunctionDecl *AFD,
+                                 GenericEnvironment *derivativeGenEnv);
 
 public:
   /// Require that the library intrinsics for working with Optional<T>
@@ -1719,9 +1736,6 @@ bool areGenericRequirementsSatisfied(const DeclContext *DC,
                                      GenericSignature sig,
                                      SubstitutionMap Substitutions,
                                      bool isExtension);
-
-bool hasDynamicMemberLookupAttribute(Type type,
-  llvm::DenseMap<CanType, bool> &DynamicMemberLookupCache);
 } // end namespace swift
 
 #endif

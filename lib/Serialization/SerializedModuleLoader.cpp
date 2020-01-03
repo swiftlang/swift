@@ -747,7 +747,8 @@ void swift::serialization::diagnoseSerializedASTLoadFailure(
     auto circularDependencyIter =
         llvm::find_if(loadedModuleFile->getDependencies(),
                       [](const ModuleFile::Dependency &next) {
-                        return !next.Import.second->hasResolvedImports();
+                        return next.isLoaded() &&
+                               !next.Import.second->hasResolvedImports();
                       });
     assert(circularDependencyIter !=
                loadedModuleFile->getDependencies().end() &&
@@ -1118,6 +1119,12 @@ SerializedASTFile::getGroupNameByUSR(StringRef USR) const {
 void
 SerializedASTFile::getTopLevelDecls(SmallVectorImpl<Decl*> &results) const {
   File.getTopLevelDecls(results);
+}
+
+void SerializedASTFile::getTopLevelDeclsWhereAttributesMatch(
+              SmallVectorImpl<Decl*> &results,
+              llvm::function_ref<bool(DeclAttributes)> matchAttributes) const {
+  File.getTopLevelDecls(results, matchAttributes);
 }
 
 void SerializedASTFile::getPrecedenceGroups(

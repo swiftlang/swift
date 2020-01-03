@@ -1,0 +1,46 @@
+// RUN: %target-sil-opt -enable-sil-verify-all -O %s | %FileCheck %s
+
+sil_stage raw
+
+import Swift
+
+public class SelfCasts {
+}
+
+// CHECK-LABEL: sil @$dynamic_self_cast_1 : $@convention(method) (@guaranteed SelfCasts, @thick SelfCasts.Type) -> @owned Optional<SelfCasts>
+sil @$dynamic_self_cast_1 : $@convention(method) (@guaranteed SelfCasts, @thick SelfCasts.Type) -> @owned Optional<SelfCasts> {
+bb0(%0 : $SelfCasts, %1 : $@thick SelfCasts.Type):
+  strong_retain %0 : $SelfCasts
+  // CHECK: checked_cast_br
+  checked_cast_br %0 : $SelfCasts to @dynamic_self SelfCasts, bb1, bb2
+bb1(%7 : $SelfCasts):
+  %8 = enum $Optional<SelfCasts>, #Optional.some!enumelt.1, %7 : $SelfCasts
+  br bb3(%8 : $Optional<SelfCasts>)
+
+bb2:
+  strong_release %0 : $SelfCasts
+  %11 = enum $Optional<SelfCasts>, #Optional.none!enumelt
+  br bb3(%11 : $Optional<SelfCasts>)
+
+bb3(%13 : $Optional<SelfCasts>):
+  return %13 : $Optional<SelfCasts>
+}
+
+// CHECK-LABEL: sil @$dynamic_self_cast_2 : $@convention(method) (@guaranteed SelfCasts, @thick SelfCasts.Type) -> @owned Optional<SelfCasts>
+sil @$dynamic_self_cast_2 : $@convention(method) (@guaranteed SelfCasts, @thick SelfCasts.Type) -> @owned Optional<SelfCasts> {
+bb0(%0 : $SelfCasts, %1 : $@thick SelfCasts.Type):
+  strong_retain %0 : $SelfCasts
+  // CHECK-NOT: checked_cast_br
+  checked_cast_br %0 : $SelfCasts to SelfCasts, bb1, bb2
+bb1(%7 : $SelfCasts):
+  %8 = enum $Optional<SelfCasts>, #Optional.some!enumelt.1, %7 : $SelfCasts
+  br bb3(%8 : $Optional<SelfCasts>)
+
+bb2:
+  strong_release %0 : $SelfCasts
+  %11 = enum $Optional<SelfCasts>, #Optional.none!enumelt
+  br bb3(%11 : $Optional<SelfCasts>)
+
+bb3(%13 : $Optional<SelfCasts>):
+  return %13 : $Optional<SelfCasts>
+}

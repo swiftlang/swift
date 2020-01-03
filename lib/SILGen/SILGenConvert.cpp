@@ -827,12 +827,10 @@ ManagedValue SILGenFunction::emitExistentialErasure(
           loc, SILType::getPrimitiveObjectType(anyObjectTy), concreteFormalType,
           concreteValue, {});
     };
-    
-    auto concreteTLPtr = &concreteTL;
+
     if (this->F.getLoweredFunctionType()->isPseudogeneric()) {
       if (anyObjectTy && concreteFormalType->is<ArchetypeType>()) {
         concreteFormalType = anyObjectTy;
-        concreteTLPtr = &getTypeLowering(anyObjectTy);
         F = eraseToAnyObject;
       }
     }

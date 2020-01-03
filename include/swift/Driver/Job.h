@@ -194,6 +194,11 @@ public:
   /// first primary input.
   StringRef getAdditionalOutputForType(file_types::ID type) const;
 
+  /// Assuming (and asserting) that there are one or more input pairs, return true if there exists
+  /// an _additional_ (not primary) output of type \p type associated with the
+  /// first primary input.
+  bool hasAdditionalOutputForType(file_types::ID type) const;
+
   /// Return a vector of additional (not primary) outputs of type \p type
   /// associated with the primary inputs.
   ///
@@ -382,6 +387,10 @@ public:
   bool hasResponseFile() const { return ResponseFile.hasValue(); }
 
   bool writeArgsToResponseFile() const;
+
+  /// Assumes that, if a compile job, has one primary swift input
+  /// May return empty if none.
+  StringRef getFirstSwiftPrimaryInput() const;
 };
 
 /// A BatchJob comprises a _set_ of jobs, each of which is sufficiently similar

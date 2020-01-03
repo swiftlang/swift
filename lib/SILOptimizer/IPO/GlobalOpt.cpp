@@ -567,7 +567,7 @@ static SILFunction *genGetterFromInit(SILOptFunctionBuilder &FunctionBuilder,
   // Find the store instruction
   auto *BB = GetterF->getEntryBlock();
   SILValue Val;
-  SILInstruction *Store;
+  SILInstruction *Store = nullptr;
   for (auto II = BB->begin(), E = BB->end(); II != E;) {
     auto &I = *II++;
     if (isa<AllocGlobalInst>(&I)) {
@@ -586,6 +586,7 @@ static SILFunction *genGetterFromInit(SILOptFunctionBuilder &FunctionBuilder,
       B.createReturn(RI->getLoc(), Val);
       eraseUsesOfInstruction(RI);
       recursivelyDeleteTriviallyDeadInstructions(RI, true);
+      assert(Store && "Did not find a store?!");
       recursivelyDeleteTriviallyDeadInstructions(Store, true);
       return GetterF;
     }
@@ -666,6 +667,10 @@ replaceLoadsByKnownValue(BuiltinInst *CallToOnce, SILFunction *AddrF,
   // Replace all calls of an addressor by calls of a getter.
   for (int i = 0, e = Calls.size(); i < e; ++i) {
     auto *Call = Calls[i];
+
+    if (Call->getFunction()->isSerialized() &&
+        !GetterF->hasValidLinkageForFragileRef())
+      continue;
 
     // Make sure that we can go ahead and replace all uses of the
     // address with the value.
@@ -918,6 +923,10 @@ void SILGlobalOpt::optimizeGlobalAccess(SILGlobalVariable *SILG,
   // invocation should happen at the common dominator of all
   // loads inside this function.
   for (auto *Load : GlobalLoadMap[SILG]) {
+    if (Load->getFunction()->isSerialized() &&
+        !GetterF->hasValidLinkageForFragileRef())
+      continue;
+
     SILBuilderWithScope B(Load);
     auto *GetterRef = B.createFunctionRef(Load->getLoc(), GetterF);
     auto *Value = B.createApply(Load->getLoc(), GetterRef,

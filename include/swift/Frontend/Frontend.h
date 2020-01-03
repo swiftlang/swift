@@ -318,18 +318,9 @@ public:
     return CodeCompletionOffset != ~0U;
   }
 
-  void setCodeCompletionFactory(CodeCompletionCallbacksFactory *Factory) {
-    CodeCompletionFactory = Factory;
-    disableASTScopeLookup();
-  }
-  
   /// Called from lldb, see rdar://53971116
   void disableASTScopeLookup() {
     LangOpts.EnableASTScopeLookup = false;
-  }
-
-  CodeCompletionCallbacksFactory *getCodeCompletionFactory() const {
-    return CodeCompletionFactory;
   }
 
   /// Retrieve a module hash string that is suitable for uniquely
@@ -371,6 +362,8 @@ public:
   std::string getModuleOutputPathForAtMostOnePrimary() const;
   std::string
   getReferenceDependenciesFilePathForPrimary(StringRef filename) const;
+  std::string getSwiftRangesFilePathForPrimary(StringRef filename) const;
+  std::string getCompiledSourceFilePathForPrimary(StringRef filename) const;
   std::string getSerializedDiagnosticsPathForAtMostOnePrimary() const;
 
   /// TBDPath only makes sense in whole module compilation mode,
@@ -382,6 +375,8 @@ public:
   /// mode, so return the ModuleInterfaceOutputPath when in that mode and
   /// fail an assert if not in that mode.
   std::string getModuleInterfaceOutputPathForWholeModule() const;
+
+  std::string getLdAddCFileOutputPathForWholeModule() const;
 
   SerializationOptions
   computeSerializationOptions(const SupplementaryOutputPaths &outs,
@@ -479,6 +474,10 @@ public:
     Diagnostics.addConsumer(*DC);
   }
 
+  void removeDiagnosticConsumer(DiagnosticConsumer *DC) {
+    Diagnostics.removeConsumer(*DC);
+  }
+
   void createDependencyTracker(bool TrackSystemDeps) {
     assert(!Context && "must be called before setup()");
     DepTracker = llvm::make_unique<DependencyTracker>(TrackSystemDeps);
@@ -542,6 +541,18 @@ public:
 
   /// Returns true if there was an error during setup.
   bool setup(const CompilerInvocation &Invocation);
+
+  const CompilerInvocation &getInvocation() {
+    return Invocation;
+  }
+
+  bool hasPersistentParserState() const {
+    return bool(PersistentState);
+  }
+
+  PersistentParserState &getPersistentParserState() {
+    return *PersistentState.get();
+  }
 
 private:
   /// Set up the file system by loading and validating all VFS overlay YAML
@@ -675,6 +686,16 @@ public:
   getPrimarySpecificPathsForAtMostOnePrimary() const;
   const PrimarySpecificPaths &
   getPrimarySpecificPathsForSourceFile(const SourceFile &SF) const;
+
+  /// Write out the unparsed (delayed) source ranges
+  /// Return true for error
+  bool emitSwiftRanges(DiagnosticEngine &diags, SourceFile *primaryFile,
+                       StringRef outputPath) const;
+
+  /// Return true for error
+  bool emitCompiledSource(DiagnosticEngine &diags,
+                          const SourceFile *primaryFile,
+                          StringRef outputPath) const;
 };
 
 } // namespace swift

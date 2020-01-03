@@ -150,7 +150,7 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second, Type Third,
 }
 
 Constraint::Constraint(ConstraintKind kind, Type first, Type second,
-                       DeclName member, DeclContext *useDC,
+                       DeclNameRef member, DeclContext *useDC,
                        FunctionRefKind functionRefKind,
                        ConstraintLocator *locator,
                        ArrayRef<TypeVariableType *> typeVars)
@@ -610,7 +610,7 @@ Constraint *Constraint::create(ConstraintSystem &cs, ConstraintKind kind,
 
 Constraint *Constraint::createMemberOrOuterDisjunction(
     ConstraintSystem &cs, ConstraintKind kind, Type first, Type second,
-    DeclName member, DeclContext *useDC, FunctionRefKind functionRefKind,
+    DeclNameRef member, DeclContext *useDC, FunctionRefKind functionRefKind,
     ArrayRef<OverloadChoice> outerAlternatives, ConstraintLocator *locator) {
   auto memberConstraint = createMember(cs, kind, first, second, member,
                              useDC, functionRefKind, locator);
@@ -629,8 +629,8 @@ Constraint *Constraint::createMemberOrOuterDisjunction(
 }
 
 Constraint *Constraint::createMember(ConstraintSystem &cs, ConstraintKind kind, 
-                                     Type first, Type second, DeclName member,
-                                     DeclContext *useDC,
+                                     Type first, Type second,
+                                     DeclNameRef member, DeclContext *useDC,
                                      FunctionRefKind functionRefKind,
                                      ConstraintLocator *locator) {
   // Collect type variables.

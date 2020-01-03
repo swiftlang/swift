@@ -651,6 +651,10 @@ public:
   /// plain Tok.is(T1) check).
   bool skipUntilTokenOrEndOfLine(tok T1);
 
+  /// Skip a braced block (e.g. function body). The current token must be '{'.
+  /// Returns \c true if the parser hit the eof before finding matched '}'.
+  bool skipBracedBlock();
+
   /// If the parser is generating only a syntax tree, try loading the current
   /// node from a previously generated syntax tree.
   /// Returns \c true if the node has been loaded and inserted into the current
@@ -743,7 +747,7 @@ public:
     getScopeInfo().addToScope(D, *this, diagnoseRedefinitions);
   }
 
-  ValueDecl *lookupInScope(DeclName Name) {
+  ValueDecl *lookupInScope(DeclNameRef Name) {
     if (Context.LangOpts.DisableParserLookup)
           return nullptr;
 
@@ -853,10 +857,18 @@ public:
                            TopLevelCodeDecl *TLCD);
 
   ParserStatus parseBraceItems(SmallVectorImpl<ASTNode> &Decls,
+                               BraceItemListKind Kind,
+                               BraceItemListKind ConditionalBlockKind,
+                               bool &IsFollowingGuard);
+  ParserStatus parseBraceItems(SmallVectorImpl<ASTNode> &Decls,
                                BraceItemListKind Kind =
                                    BraceItemListKind::Brace,
                                BraceItemListKind ConditionalBlockKind =
-                                   BraceItemListKind::Brace);
+                                   BraceItemListKind::Brace) {
+    bool IsFollowingGuard = false;
+    return parseBraceItems(Decls, Kind, ConditionalBlockKind,
+                           IsFollowingGuard);
+  }
   ParserResult<BraceStmt> parseBraceItemList(Diag<> ID);
   
   //===--------------------------------------------------------------------===//
@@ -865,7 +877,7 @@ public:
   /// Return true if parser is at the start of a decl or decl-import.
   bool isStartOfDecl();
 
-  bool parseTopLevel();
+  void parseTopLevel();
 
   /// Flags that control the parsing of declarations.
   enum ParseDeclFlags {
@@ -986,12 +998,25 @@ public:
   /// Parse the arguments inside the @differentiable attribute.
   bool parseDifferentiableAttributeArguments(
       bool &linear, SmallVectorImpl<ParsedAutoDiffParameter> &params,
-      Optional<DeclNameWithLoc> &jvpSpec, Optional<DeclNameWithLoc> &vjpSpec,
+      Optional<DeclNameRefWithLoc> &jvpSpec,
+      Optional<DeclNameRefWithLoc> &vjpSpec,
       TrailingWhereClause *&whereClause);
 
-  /// Parse a differentiation parameters clause.
+  /// Parse a differentiation parameters clause, i.e. the 'wrt:' clause in
+  /// `@differentiable` and `@derivative` attributes.
+  /// If `allowNamedParameters` is false, allow only index parameters and
+  /// 'self'.
   bool parseDifferentiationParametersClause(
-      SmallVectorImpl<ParsedAutoDiffParameter> &params, StringRef attrName);
+      SmallVectorImpl<ParsedAutoDiffParameter> &params, StringRef attrName,
+      bool allowNamedParameters = true);
+
+  /// Parse the @derivative attribute.
+  ParserResult<DerivativeAttr> parseDerivativeAttribute(SourceLoc AtLoc,
+                                                        SourceLoc Loc);
+
+  /// Parse the @transpose attribute.
+  ParserResult<TransposeAttr> parseTransposeAttribute(SourceLoc AtLoc,
+                                                      SourceLoc Loc);
 
   /// Parse a specific attribute.
   ParserStatus parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc);
@@ -1017,6 +1042,10 @@ public:
   bool parseTypeAttributeListPresent(ParamDecl::Specifier &Specifier,
                                      SourceLoc &SpecifierLoc,
                                      TypeAttributes &Attributes);
+
+  bool parseConventionAttributeInternal(bool justChecking,
+                                        TypeAttributes::Convention &convention);
+
   bool parseTypeAttribute(TypeAttributes &Attributes, SourceLoc AtLoc,
                           bool justChecking = false);
   
@@ -1130,7 +1159,19 @@ public:
                                      SourceLoc &LAngleLoc,
                                      SourceLoc &RAngleLoc);
 
-  ParserResult<TypeRepr> parseTypeIdentifier();
+  /// Parses a type identifier (e.g. 'Foo' or 'Foo.Bar.Baz').
+  ///
+  /// When `isParsingQualifiedDeclBaseType` is true:
+  /// - Parses and returns the base type for a qualified declaration name,
+  ///   positioning the parser at the '.' before the final declaration name.
+  //    This position is important for parsing final declaration names like
+  //    '.init' via `parseUnqualifiedDeclName`.
+  /// - For example, 'Foo.Bar.f' parses as 'Foo.Bar' and the parser is
+  ///   positioned at '.f'.
+  /// - If there is no base type qualifier (e.g. when parsing just 'f'), returns
+  ///   an empty parser error.
+  ParserResult<TypeRepr> parseTypeIdentifier(
+      bool isParsingQualifiedDeclBaseType = false);
   ParserResult<TypeRepr> parseOldStyleProtocolComposition();
   ParserResult<TypeRepr> parseAnyType();
   ParserResult<TypeRepr> parseSILBoxType(GenericParamList *generics,
@@ -1344,6 +1385,14 @@ public:
   bool canParseAsGenericArgumentList();
 
   bool canParseType();
+
+  /// Returns true if a simple type identifier can be parsed.
+  ///
+  /// \verbatim
+  ///   simple-type-identifier: identifier generic-argument-list?
+  /// \endverbatim
+  bool canParseSimpleTypeIdentifier();
+
   bool canParseTypeIdentifier();
   bool canParseTypeIdentifierOrTypeComposition();
   bool canParseOldStyleProtocolComposition();
@@ -1352,6 +1401,13 @@ public:
   bool canParseGenericArguments();
 
   bool canParseTypedPattern();
+
+  /// Returns true if a qualified declaration name base type can be parsed.
+  ///
+  /// \verbatim
+  ///   qualified-decl-name-base-type: simple-type-identifier '.'
+  /// \endverbatim
+  bool canParseBaseTypeForQualifiedDeclName();
 
   //===--------------------------------------------------------------------===//
   // Expression Parsing
@@ -1399,23 +1455,43 @@ public:
   /// \param loc The location of the label (empty if it doesn't exist)
   void parseOptionalArgumentLabel(Identifier &name, SourceLoc &loc);
 
-  /// Parse an unqualified-decl-name.
+  enum class DeclNameFlag : uint8_t {
+    /// If passed, operator basenames are allowed.
+    AllowOperators = 1 << 0,
+
+    /// If passed, names that coincide with keywords are allowed. Used after a
+    /// dot to enable things like '.init' and '.default'.
+    AllowKeywords = 1 << 1,
+
+    /// If passed, 'deinit' and 'subscript' should be parsed as special names,
+    /// not ordinary identifiers.
+    AllowKeywordsUsingSpecialNames = AllowKeywords | 1 << 2,
+
+    /// If passed, compound names with argument lists are allowed, unless they
+    /// have empty argument lists.
+    AllowCompoundNames = 1 << 4,
+
+    /// If passed, compound names with empty argument lists are allowed.
+    AllowZeroArgCompoundNames = AllowCompoundNames | 1 << 5,
+  };
+  using DeclNameOptions = OptionSet<DeclNameFlag>;
+
+  friend DeclNameOptions operator|(DeclNameFlag flag1, DeclNameFlag flag2) {
+    return DeclNameOptions(flag1) | flag2;
+  }
+
+  /// Without \c DeclNameFlag::AllowCompoundNames, parse an
+  /// unqualified-decl-base-name.
+  ///
+  ///   unqualified-decl-base-name: identifier
+  ///
+  /// With \c DeclNameFlag::AllowCompoundNames, parse an unqualified-base-name.
   ///
   ///   unqualified-decl-name:
-  ///     identifier
-  ///     identifier '(' ((identifier | '_') ':') + ')'
-  ///
-  /// \param afterDot Whether this identifier is coming after a period, which
-  /// enables '.init' and '.default' like expressions.
-  /// \param loc Will be populated with the location of the name.
-  /// \param diag The diagnostic to emit if this is not a name.
-  /// \param allowOperators Whether to allow operator basenames too.
-  /// \param allowZeroArgCompoundNames Whether to allow empty argument lists.
-  DeclName parseUnqualifiedDeclName(bool afterDot, DeclNameLoc &loc,
-                                    const Diagnostic &diag,
-                                    bool allowOperators=false,
-                                    bool allowZeroArgCompoundNames=false,
-                                    bool allowDeinitAndSubscript=false);
+  ///     unqualified-decl-base-name
+  ///     unqualified-decl-base-name '(' ((identifier | '_') ':') + ')'
+  DeclNameRef parseDeclNameRef(DeclNameLoc &loc, const Diagnostic &diag,
+                               DeclNameOptions flags);
 
   Expr *parseExprIdentifier();
   Expr *parseExprEditorPlaceholder(Token PlaceholderTok,
@@ -1446,6 +1522,8 @@ public:
   ///     identifier (',' identifier)* func-signature-result? 'in'
   /// \endverbatim
   ///
+  /// \param bracketRange The range of the brackets enclosing a capture list, if
+  /// present. Needed to offer fix-its for inserting 'self' into a capture list.
   /// \param captureList The entries in the capture list.
   /// \param params The parsed parameter list, or null if none was provided.
   /// \param arrowLoc The location of the arrow, if present.
@@ -1454,12 +1532,14 @@ public:
   ///
   /// \returns true if an error occurred, false otherwise.
   bool parseClosureSignatureIfPresent(
-                                SmallVectorImpl<CaptureListEntry> &captureList,
-                                      ParameterList *&params,
-                                      SourceLoc &throwsLoc,
-                                      SourceLoc &arrowLoc,
-                                      TypeRepr *&explicitResultType,
-                                      SourceLoc &inLoc);
+          SourceRange &bracketRange,
+          SmallVectorImpl<CaptureListEntry> &captureList,
+          VarDecl *&capturedSelfParamDecl,
+          ParameterList *&params,
+          SourceLoc &throwsLoc,
+          SourceLoc &arrowLoc,
+          TypeRepr *&explicitResultType,
+          SourceLoc &inLoc);
 
   Expr *parseExprAnonClosureArg();
   ParserResult<Expr> parseExprList(tok LeftTok, tok RightTok,
@@ -1574,12 +1654,8 @@ public:
   //===--------------------------------------------------------------------===//
   // Code completion second pass.
 
-  static void
-  performCodeCompletionSecondPass(PersistentParserState &ParserState,
-                                  CodeCompletionCallbacksFactory &Factory);
-
   void performCodeCompletionSecondPassImpl(
-      PersistentParserState::CodeCompletionDelayedDeclState &info);
+      CodeCompletionDelayedDeclState &info);
 };
 
 /// Describes a parsed declaration name.
@@ -1634,6 +1710,9 @@ struct ParsedDeclName {
 
   /// Form a declaration name from this parsed declaration name.
   DeclName formDeclName(ASTContext &ctx) const;
+
+  /// Form a declaration name from this parsed declaration name.
+  DeclNameRef formDeclNameRef(ASTContext &ctx) const;
 };
 
 /// Parse a stringified Swift declaration name,
@@ -1646,6 +1725,13 @@ DeclName formDeclName(ASTContext &ctx,
                       ArrayRef<StringRef> argumentLabels,
                       bool isFunctionName,
                       bool isInitializer);
+
+/// Form a Swift declaration name referemce from its constituent parts.
+DeclNameRef formDeclNameRef(ASTContext &ctx,
+                            StringRef baseName,
+                            ArrayRef<StringRef> argumentLabels,
+                            bool isFunctionName,
+                            bool isInitializer);
 
 /// Parse a stringified Swift declaration name, e.g. "init(frame:)".
 DeclName parseDeclName(ASTContext &ctx, StringRef name);

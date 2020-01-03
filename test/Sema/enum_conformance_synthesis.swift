@@ -61,7 +61,7 @@ func customHashable() {
 enum InvalidCustomHashable {
   case A, B
 
-  var hashValue: String { return "" } // expected-note 2 {{previously declared here}}
+  var hashValue: String { return "" } // expected-note {{previously declared here}}
 }
 func ==(x: InvalidCustomHashable, y: InvalidCustomHashable) -> String {
   return ""
@@ -72,7 +72,7 @@ func invalidCustomHashable() {
   s = InvalidCustomHashable.A.hashValue
   _ = s
   var _: Int = InvalidCustomHashable.A.hashValue
-  InvalidCustomHashable.A.hash(into: &hasher) // expected-error {{value of type 'InvalidCustomHashable' has no member 'hash'}}
+  InvalidCustomHashable.A.hash(into: &hasher)
 }
 
 // Check use of an enum's synthesized members before the enum is actually declared.
@@ -174,7 +174,7 @@ func genericNotHashable() {
 }
 
 // An enum with no cases should also derive conformance.
-enum NoCases: Hashable {}
+enum NoCases: Hashable, Comparable {}
 
 // rdar://19773050
 private enum Bar<T> {

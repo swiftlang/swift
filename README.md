@@ -86,7 +86,7 @@ Please make sure you use Python 2.x. Python 3.x is not supported currently.
 
 #### macOS
 
-To build for macOS, you need [Xcode 11.2](https://developer.apple.com/xcode/downloads/).
+To build for macOS, you need [Xcode 11.3](https://developer.apple.com/xcode/downloads/).
 The required version of Xcode changes frequently, and is often a beta release.
 Check this document or the host information on <https://ci.swift.org> for the
 current required version.
@@ -234,7 +234,8 @@ then run the build product in Terminal.
 Swift toolchains are created using the script
 [build-toolchain](https://github.com/apple/swift/blob/master/utils/build-toolchain). This
 script is used by swift.org's CI to produce snapshots and can allow for one to
-locally reproduce such builds for development or distribution purposes. E.x.:
+locally reproduce such builds for development or distribution purposes. A typical 
+invocation looks like the following:
 
 ```
   $ ./swift/utils/build-toolchain $BUNDLE_PREFIX

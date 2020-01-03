@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/ASTContext.h"
+#include "ClangTypeConverter.h"
 #include "ForeignRepresentationInfo.h"
 #include "SubstitutionMapStorage.h"
 #include "swift/AST/ClangModuleLoader.h"
@@ -466,6 +467,8 @@ struct ASTContext::Implementation {
   RC<syntax::SyntaxArena> TheSyntaxArena;
 
   llvm::DenseMap<OverrideSignatureKey, GenericSignature> overrideSigCache;
+
+  Optional<ClangTypeConverter> Converter;
 };
 
 ASTContext::Implementation::Implementation()
@@ -833,7 +836,8 @@ DECLTYPE *ASTContext::get##NAME##Decl() const { \
       /* Note: lookupQualified() will search both the Swift overlay \
        * and the Clang module it imports. */ \
       SmallVector<ValueDecl *, 1> decls; \
-      M->lookupQualified(M, getIdentifier(#NAME), NL_OnlyTypes, decls); \
+      M->lookupQualified(M, DeclNameRef(getIdentifier(#NAME)), NL_OnlyTypes, \
+                         decls); \
       if (decls.size() == 1 && isa<DECLTYPE>(decls[0])) { \
         auto decl = cast<DECLTYPE>(decls[0]); \
         if (isa<ProtocolDecl>(decl) || decl->getGenericParams() == nullptr) { \
@@ -2898,9 +2902,10 @@ void AnyFunctionType::decomposeInput(
   }
       
   default:
-    result.emplace_back(type->getInOutObjectType(), Identifier(),
-                        ParameterTypeFlags::fromParameterType(
-                          type, false, false, false, ValueOwnership::Default));
+    result.emplace_back(
+        type->getInOutObjectType(), Identifier(),
+        ParameterTypeFlags::fromParameterType(type, false, false, false,
+                                              ValueOwnership::Default, false));
     return;
   }
 }
@@ -2984,7 +2989,9 @@ void FunctionType::Profile(llvm::FoldingSetNodeID &ID,
                            ExtInfo info) {
   profileParams(ID, params);
   ID.AddPointer(result.getPointer());
-  ID.AddInteger(info.getFuncAttrKey());
+  auto infoKey = info.getFuncAttrKey();
+  ID.AddInteger(infoKey.first);
+  ID.AddPointer(infoKey.second);
 }
 
 FunctionType *FunctionType::get(ArrayRef<AnyFunctionType::Param> params,
@@ -3004,11 +3011,21 @@ FunctionType *FunctionType::get(ArrayRef<AnyFunctionType::Param> params,
     return funcTy;
   }
 
-  void *mem = ctx.Allocate(sizeof(FunctionType) +
-                             sizeof(AnyFunctionType::Param) * params.size(),
-                           alignof(FunctionType), arena);
+  Optional<ExtInfo::Uncommon> uncommon = info.getUncommonInfo();
+
+  size_t allocSize =
+    totalSizeToAlloc<AnyFunctionType::Param, ExtInfo::Uncommon>(
+      params.size(), uncommon.hasValue() ? 1 : 0);
+  void *mem = ctx.Allocate(allocSize, alignof(FunctionType), arena);
 
   bool isCanonical = isFunctionTypeCanonical(params, result);
+  if (uncommon.hasValue()) {
+    if (ctx.LangOpts.UseClangFunctionTypes)
+      isCanonical &= uncommon->ClangFunctionType->isCanonicalUnqualified();
+    else
+      isCanonical = false;
+  }
+
   auto funcTy = new (mem) FunctionType(params, result, info,
                                        isCanonical ? &ctx : nullptr,
                                        properties);
@@ -3025,6 +3042,9 @@ FunctionType::FunctionType(ArrayRef<AnyFunctionType::Param> params,
                       output, properties, params.size(), info) {
   std::uninitialized_copy(params.begin(), params.end(),
                           getTrailingObjects<AnyFunctionType::Param>());
+  Optional<ExtInfo::Uncommon> uncommon = info.getUncommonInfo();
+  if (uncommon.hasValue())
+    *getTrailingObjects<ExtInfo::Uncommon>() = uncommon.getValue();
 }
 
 void GenericFunctionType::Profile(llvm::FoldingSetNodeID &ID,
@@ -3035,7 +3055,9 @@ void GenericFunctionType::Profile(llvm::FoldingSetNodeID &ID,
   ID.AddPointer(sig.getPointer());
   profileParams(ID, params);
   ID.AddPointer(result.getPointer());
-  ID.AddInteger(info.getFuncAttrKey());
+  auto infoKey = info.getFuncAttrKey();
+  ID.AddInteger(infoKey.first);
+  ID.AddPointer(infoKey.second);
 }
 
 GenericFunctionType *GenericFunctionType::get(GenericSignature sig,
@@ -3068,9 +3090,8 @@ GenericFunctionType *GenericFunctionType::get(GenericSignature sig,
     return funcTy;
   }
   
-  void *mem = ctx.Allocate(sizeof(GenericFunctionType) +
-                             sizeof(AnyFunctionType::Param) * params.size(),
-                           alignof(GenericFunctionType));
+  size_t allocSize = totalSizeToAlloc<AnyFunctionType::Param>(params.size());
+  void *mem = ctx.Allocate(allocSize, alignof(GenericFunctionType));
 
   auto properties = getGenericFunctionRecursiveProperties(params, result);
   auto funcTy = new (mem) GenericFunctionType(sig, params, result, info,
@@ -3130,7 +3151,9 @@ void SILFunctionType::Profile(
     bool isGenericSignatureImplied,
     SubstitutionMap substitutions) {
   id.AddPointer(genericParams.getPointer());
-  id.AddInteger(info.getFuncAttrKey());
+  auto infoKey = info.getFuncAttrKey();
+  id.AddInteger(infoKey.first);
+  id.AddPointer(infoKey.second);
   id.AddInteger(unsigned(coroutineKind));
   id.AddInteger(unsigned(calleeConvention));
   id.AddInteger(params.size());
@@ -3174,9 +3197,10 @@ SILFunctionType::SILFunctionType(
       Substitutions(substitutions) {
 
   Bits.SILFunctionType.HasErrorResult = errorResult.hasValue();
-  Bits.SILFunctionType.ExtInfo = ext.Bits;
+  Bits.SILFunctionType.ExtInfoBits = ext.Bits;
+  Bits.SILFunctionType.HasUncommonInfo = false;
   // The use of both assert() and static_assert() below is intentional.
-  assert(Bits.SILFunctionType.ExtInfo == ext.Bits && "Bits were dropped!");
+  assert(Bits.SILFunctionType.ExtInfoBits == ext.Bits && "Bits were dropped!");
   static_assert(ExtInfo::NumMaskBits == NumSILExtInfoBits,
                 "ExtInfo and SILFunctionTypeBitfields must agree on bit size");
   Bits.SILFunctionType.CoroutineKind = unsigned(coroutineKind);
@@ -3702,8 +3726,8 @@ GenericEnvironment *OpenedArchetypeType::getGenericEnvironment() const {
   auto thisType = Type(const_cast<OpenedArchetypeType*>(this));
   auto &ctx = thisType->getASTContext();
   // Create a generic environment to represent the opened type.
-  auto signature = ctx.getExistentialSignature(Opened->getCanonicalType(),
-                                               nullptr);
+  auto signature =
+      ctx.getOpenedArchetypeSignature(Opened->getCanonicalType(), nullptr);
   auto *builder = signature->getGenericSignatureBuilder();
   auto *env = GenericEnvironment::getIncomplete(signature, builder);
   env->addMapping(signature->getGenericParams()[0], thisType);
@@ -3925,18 +3949,13 @@ void DeclName::CompoundDeclName::Profile(llvm::FoldingSetNodeID &id,
 
 void DeclName::initialize(ASTContext &C, DeclBaseName baseName,
                           ArrayRef<Identifier> argumentNames) {
-  if (argumentNames.empty()) {
-    SimpleOrCompound = BaseNameAndCompound(baseName, true);
-    return;
-  }
-
   llvm::FoldingSetNodeID id;
   CompoundDeclName::Profile(id, baseName, argumentNames);
 
   void *insert = nullptr;
   if (CompoundDeclName *compoundName
         = C.getImpl().CompoundNames.FindNodeOrInsertPos(id, insert)) {
-    SimpleOrCompound = compoundName;
+    BaseNameOrCompound = compoundName;
     return;
   }
 
@@ -3946,7 +3965,7 @@ void DeclName::initialize(ASTContext &C, DeclBaseName baseName,
   auto compoundName = new (buf) CompoundDeclName(baseName,argumentNames.size());
   std::uninitialized_copy(argumentNames.begin(), argumentNames.end(),
                           compoundName->getArgumentNames().begin());
-  SimpleOrCompound = compoundName;
+  BaseNameOrCompound = compoundName;
   C.getImpl().CompoundNames.InsertNode(compoundName, insert);
 }
 
@@ -4325,6 +4344,19 @@ Type ASTContext::getBridgedToObjC(const DeclContext *dc, Type type,
   return Type();
 }
 
+const clang::Type *
+ASTContext::getClangFunctionType(ArrayRef<AnyFunctionType::Param> params,
+                                 Type resultTy,
+                                 FunctionType::ExtInfo incompleteExtInfo,
+                                 FunctionTypeRepresentation trueRep) {
+  auto &impl = getImpl();
+  if (!impl.Converter) {
+    auto *cml = getClangModuleLoader();
+    impl.Converter.emplace(*this, cml->getClangASTContext(), LangOpts.Target);
+  }
+  return impl.Converter.getValue().getFunctionType(params, resultTy, trueRep);
+}
+
 CanGenericSignature ASTContext::getSingleGenericParameterSignature() const {
   if (auto theSig = getImpl().SingleGenericParameterSignature)
     return theSig;
@@ -4336,8 +4368,15 @@ CanGenericSignature ASTContext::getSingleGenericParameterSignature() const {
   return canonicalSig;
 }
 
-CanGenericSignature ASTContext::getExistentialSignature(CanType existential,
-                                                        ModuleDecl *mod) {
+// Return the signature for an opened existential. The opened archetype may have
+// a different set of conformances from the corresponding existential. The
+// opened archetype conformances are dictated by the ABI for generic arguments,
+// while the existential value conformances are dictated by their layout (see
+// Type::getExistentialLayout()). In particular, the opened archetype signature
+// does not have requirements for conformances inherited from superclass
+// constraints while existential values do.
+CanGenericSignature ASTContext::getOpenedArchetypeSignature(CanType existential,
+                                                            ModuleDecl *mod) {
   auto found = getImpl().ExistentialSignatures.find(existential);
   if (found != getImpl().ExistentialSignatures.end())
     return found->second;

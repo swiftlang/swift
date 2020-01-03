@@ -127,7 +127,7 @@ set(SWIFT_ANALYZE_CODE_COVERAGE FALSE CACHE STRING
 # SWIFT_VERSION is deliberately /not/ cached so that an existing build directory
 # can be reused when a new version of Swift comes out (assuming the user hasn't
 # manually set it as part of their own CMake configuration).
-set(SWIFT_VERSION "5.1.1")
+set(SWIFT_VERSION "5.2")
 
 set(SWIFT_VENDOR "" CACHE STRING
     "The vendor name of the Swift compiler")
@@ -601,13 +601,7 @@ if(SWIFT_HOST_VARIANT_SDK)
   set(SWIFT_HOST_VARIANT_SDK_default "${SWIFT_HOST_VARIANT_SDK}")
 else()
   if("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
-    # CMake on an Android host sets this to Linux, so check for the ANDROID_DATA
-    # environment variable to see if we're building on Android.
-    if(NOT "$ENV{ANDROID_DATA}" STREQUAL "")
-      set(SWIFT_HOST_VARIANT_SDK_default "ANDROID")
-    else()
-      set(SWIFT_HOST_VARIANT_SDK_default "LINUX")
-    endif()
+    set(SWIFT_HOST_VARIANT_SDK_default "LINUX")
   elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "FreeBSD")
     set(SWIFT_HOST_VARIANT_SDK_default "FREEBSD")
   elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "CYGWIN")
@@ -617,7 +611,6 @@ else()
   elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Haiku")
     set(SWIFT_HOST_VARIANT_SDK_default "HAIKU")
   elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Android")
-    # CMAKE_SYSTEM_NAME might be set this way when cross-compiling to Android.
     set(SWIFT_HOST_VARIANT_SDK_default "ANDROID")
   elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
     set(SWIFT_HOST_VARIANT_SDK_default "OSX")
@@ -926,19 +919,16 @@ find_package(PythonInterp REQUIRED)
 #
 
 if(LLVM_ENABLE_LIBXML2)
-  find_package(Libxml2 REQUIRED)
+  find_package(LibXml2 REQUIRED)
 else()
   find_package(LibXml2)
 endif()
 
-# You need libedit linked in order to check if you have el_wgets.
-cmake_push_check_state()
-list(APPEND CMAKE_REQUIRED_LIBRARIES "edit")
-check_symbol_exists(el_wgets "histedit.h" HAVE_EL_WGETS)
-if(HAVE_EL_WGETS)
-  set(HAVE_UNICODE_LIBEDIT 1)
+if(LLVM_ENABLE_LIBEDIT)
+  find_package(LibEdit REQUIRED)
+else()
+  find_package(LibEdit)
 endif()
-cmake_pop_check_state()
 
 check_symbol_exists(wait4 "sys/wait.h" HAVE_WAIT4)
 
@@ -960,10 +950,16 @@ if(SWIFT_BUILD_SYNTAXPARSERLIB OR SWIFT_BUILD_SOURCEKIT)
       set(SWIFT_LIBDISPATCH_CXX_COMPILER ${CMAKE_CXX_COMPILER})
     elseif(${CMAKE_SYSTEM_NAME} STREQUAL ${CMAKE_HOST_SYSTEM_NAME})
       if(CMAKE_SYSTEM_NAME STREQUAL Windows)
-        set(SWIFT_LIBDISPATCH_C_COMPILER
-            $<TARGET_FILE_DIR:clang>/clang-cl${CMAKE_EXECUTABLE_SUFFIX})
-        set(SWIFT_LIBDISPATCH_CXX_COMPILER
-            $<TARGET_FILE_DIR:clang>/clang-cl${CMAKE_EXECUTABLE_SUFFIX})
+        if(CMAKE_SYSTEM_PROCESSOR STREQUAL CMAKE_HOST_SYSTEM_PROCESSOR AND
+            TARGET clang)
+          set(SWIFT_LIBDISPATCH_C_COMPILER
+              $<TARGET_FILE_DIR:clang>/clang-cl${CMAKE_EXECUTABLE_SUFFIX})
+          set(SWIFT_LIBDISPATCH_CXX_COMPILER
+              $<TARGET_FILE_DIR:clang>/clang-cl${CMAKE_EXECUTABLE_SUFFIX})
+        else()
+          set(SWIFT_LIBDISPATCH_C_COMPILER clang-cl${CMAKE_EXECUTABLE_SUFFIX})
+          set(SWIFT_LIBDISPATCH_CXX_COMPILER clang-cl${CMAKE_EXECUTABLE_SUFFIX})
+        endif()
       else()
         set(SWIFT_LIBDISPATCH_C_COMPILER $<TARGET_FILE_DIR:clang>/clang)
         set(SWIFT_LIBDISPATCH_CXX_COMPILER $<TARGET_FILE_DIR:clang>/clang++)

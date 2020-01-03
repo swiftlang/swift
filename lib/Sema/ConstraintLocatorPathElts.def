@@ -76,6 +76,9 @@ SIMPLE_LOCATOR_PATH_ELT(FunctionResult)
 /// FIXME: Add support for named generic arguments?
 CUSTOM_LOCATOR_PATH_ELT(GenericArgument)
 
+/// An implicit reference to a 'callAsFunction' method of a nominal type.
+SIMPLE_LOCATOR_PATH_ELT(ImplicitCallAsFunction)
+
 /// Locator for a binding from an IUO disjunction choice.
 SIMPLE_LOCATOR_PATH_ELT(ImplicitlyUnwrappedDisjunctionChoice)
 
@@ -166,6 +169,8 @@ CUSTOM_LOCATOR_PATH_ELT(Witness)
 
 /// The condition associated with 'if' expression or ternary operator.
 SIMPLE_LOCATOR_PATH_ELT(Condition)
+
+SIMPLE_LOCATOR_PATH_ELT(DynamicCallable)
 
 #undef LOCATOR_PATH_ELT
 #undef CUSTOM_LOCATOR_PATH_ELT

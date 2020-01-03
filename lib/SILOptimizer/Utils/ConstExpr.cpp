@@ -1147,8 +1147,10 @@ ConstExprFunctionState::computeCallResult(ApplyInst *apply) {
           calleeFnType->getWitnessMethodConformanceOrInvalid().getRequirement();
       // Compute a mapping that maps the Self type of the protocol given by
       // 'requirement' to the concrete type available in the substitutionMap.
-      auto protoSelfToConcreteType =
-          apply->getSubstitutionMap().subst(substitutionMap);
+      SubstitutionMap applySubstMap = apply->getSubstitutionMap();
+      auto protoSelfToConcreteType = substitutionMap.empty()
+                                         ? applySubstMap
+                                         : applySubstMap.subst(substitutionMap);
       // Get a concrete protocol conformance by using the mapping for the
       // Self type of the requirement.
       auto conf = protoSelfToConcreteType.lookupConformance(
@@ -1174,7 +1176,8 @@ ConstExprFunctionState::computeCallResult(ApplyInst *apply) {
     // or conformance, with the mapping introduced by the call itself.  This
     // ensures that the callee's substitution map can map from its type
     // namespace back to concrete types and conformances.
-    calleeSubMap = callSubMap.subst(substitutionMap);
+    calleeSubMap = substitutionMap.empty() ? callSubMap
+                                           : callSubMap.subst(substitutionMap);
   }
 
   // Now that we have successfully folded all of the parameters, we can evaluate
@@ -1606,13 +1609,14 @@ llvm::Optional<SymbolicValue> ConstExprFunctionState::evaluateClosureCreation(
       }
       captures.push_back({capturedSILValue, capturedSymbolicValue});
     }
-    callSubstMap = papply->getSubstitutionMap().subst(this->substitutionMap);
+    SubstitutionMap applySubstMap = papply->getSubstitutionMap();
+    callSubstMap = substitutionMap.empty()
+                       ? applySubstMap
+                       : applySubstMap.subst(substitutionMap);
   }
 
-  SILType closureType = closureInst->getType();
-  assert(closureType.is<SILFunctionType>());
   auto closureVal = SymbolicValue::makeClosure(
-      target, captures, callSubstMap, closureType, evaluator.getAllocator());
+      target, captures, callSubstMap, closureInst, evaluator.getAllocator());
   setValue(closureInst, closureVal);
   return None;
 }
@@ -2125,7 +2129,12 @@ bool swift::isKnownConstantEvaluableFunction(SILFunction *fun) {
   return classifyFunction(fun).hasValue();
 }
 
-bool swift::isConstantEvaluable(SILFunction *fun) {
+bool swift::hasConstantEvaluableAnnotation(SILFunction *fun) {
   assert(fun && "fun should not be nullptr");
   return fun->hasSemanticsAttr("constant_evaluable");
+}
+
+bool swift::isConstantEvaluable(SILFunction *fun) {
+  return hasConstantEvaluableAnnotation(fun) ||
+         isKnownConstantEvaluableFunction(fun);
 }

@@ -140,9 +140,13 @@ Type TypeResolution::resolveDependentMemberType(
                                           Type baseTy, DeclContext *DC,
                                           SourceRange baseRange,
                                           ComponentIdentTypeRepr *ref) const {
+  // FIXME(ModQual): Reject qualified names immediately; they cannot be
+  // dependent member types.
+  Identifier refIdentifier = ref->getNameRef().getBaseIdentifier();
+
   switch (stage) {
   case TypeResolutionStage::Structural:
-    return DependentMemberType::get(baseTy, ref->getIdentifier());
+    return DependentMemberType::get(baseTy, refIdentifier);
 
   case TypeResolutionStage::Contextual:
     llvm_unreachable("Dependent type after archetype substitution");
@@ -168,14 +172,13 @@ Type TypeResolution::resolveDependentMemberType(
 
   // Look for a nested type with the given name.
   if (auto nestedType =
-          baseEquivClass->lookupNestedType(*builder, ref->getIdentifier())) {
+          baseEquivClass->lookupNestedType(*builder, refIdentifier)) {
     // Record the type we found.
     ref->setValue(nestedType, nullptr);
   } else {
     // Resolve the base to a potential archetype.
     // Perform typo correction.
-    TypoCorrectionResults corrections(ref->getIdentifier(),
-                                      DeclNameLoc(ref->getIdLoc()));
+    TypoCorrectionResults corrections(ref->getNameRef(), ref->getNameLoc());
     TypeChecker::performTypoCorrection(DC, DeclRefKind::Ordinary,
                                        MetatypeType::get(baseTy),
                                        NameLookupFlags::ProtocolMembers,
@@ -189,8 +192,8 @@ Type TypeResolution::resolveDependentMemberType(
 
     // If we don't have a single result, complain and fail.
     if (!singleType) {
-      Identifier name = ref->getIdentifier();
-      SourceLoc nameLoc = ref->getIdLoc();
+      auto name = ref->getNameRef();
+      auto nameLoc = ref->getNameLoc();
       ctx.Diags.diagnose(nameLoc, diag::invalid_member_type, name, baseTy)
         .highlight(baseRange);
       corrections.noteAllCandidates();
@@ -199,14 +202,14 @@ Type TypeResolution::resolveDependentMemberType(
     }
 
     // We have a single type result. Suggest it.
-    ctx.Diags.diagnose(ref->getIdLoc(), diag::invalid_member_type_suggest,
-                       baseTy, ref->getIdentifier(),
-                       singleType->getBaseName().getIdentifier())
-      .fixItReplace(ref->getIdLoc(),
+    ctx.Diags.diagnose(ref->getNameLoc(), diag::invalid_member_type_suggest,
+                       baseTy, ref->getNameRef(),
+                       singleType->getBaseName())
+      .fixItReplace(ref->getNameLoc().getSourceRange(),
                     singleType->getBaseName().userFacingName());
 
     // Correct to the single type result.
-    ref->overwriteIdentifier(singleType->getBaseName().getIdentifier());
+    ref->overwriteNameRef(singleType->createNameRef());
     ref->setValue(singleType, nullptr);
   }
 
@@ -705,7 +708,7 @@ static Type applyGenericArguments(Type type,
                                   ComponentIdentTypeRepr *comp,
                                   TypeResolutionOptions options) {
   auto dc = resolution.getDeclContext();
-  auto loc = comp->getIdLoc();
+  auto loc = comp->getNameLoc().getBaseNameLoc();
 
   auto *generic = dyn_cast<GenericIdentTypeRepr>(comp);
   if (!generic) {
@@ -1012,7 +1015,8 @@ static Type resolveTypeDecl(TypeDecl *typeDecl,
     auto fromDC = resolution.getDeclContext();
     assert(fromDC && "No declaration context for type resolution?");
     maybeDiagnoseBadConformanceRef(fromDC, foundDC->getDeclaredInterfaceType(),
-                                   comp->getIdLoc(), typeDecl);
+                                   comp->getNameLoc().getBaseNameLoc(),
+                                   typeDecl);
   }
 
   return applyGenericArguments(type, resolution, comp, options);
@@ -1067,7 +1071,7 @@ static Type diagnoseUnknownType(TypeResolution resolution,
 
   // Unqualified lookup case.
   if (parentType.isNull()) {
-    if (comp->getIdentifier() == ctx.Id_Self &&
+    if (comp->getNameRef().isSimpleName(ctx.Id_Self) &&
         !isa<GenericIdentTypeRepr>(comp)) {
       DeclContext *nominalDC = nullptr;
       NominalTypeDecl *nominal = nullptr;
@@ -1079,18 +1083,18 @@ static Type diagnoseUnknownType(TypeResolution resolution,
 
         // Produce a Fix-It replacing 'Self' with the nominal type name.
         auto name = getDeclNameFromContext(dc, nominal);
-        diags.diagnose(comp->getIdLoc(), diag::dynamic_self_invalid, name)
-          .fixItReplace(comp->getIdLoc(), name);
+        diags.diagnose(comp->getNameLoc(), diag::dynamic_self_invalid, name)
+          .fixItReplace(comp->getNameLoc().getSourceRange(), name);
 
         auto type = resolution.mapTypeIntoContext(
           dc->getInnermostTypeContext()->getSelfInterfaceType());
 
-        comp->overwriteIdentifier(nominal->getName());
+        comp->overwriteNameRef(DeclNameRef(nominal->getName()));
         comp->setValue(nominal, nominalDC->getParent());
         return type;
       }
       // Attempt to refer to 'Self' from a free function.
-      diags.diagnose(comp->getIdLoc(), diag::dynamic_self_non_method,
+      diags.diagnose(comp->getNameLoc(), diag::dynamic_self_non_method,
                      dc->getParent()->isLocalContext());
 
       return ErrorType::get(ctx);
@@ -1101,13 +1105,13 @@ static Type diagnoseUnknownType(TypeResolution resolution,
     relookupOptions |= NameLookupFlags::KnownPrivate;
     relookupOptions |= NameLookupFlags::IgnoreAccessControl;
     auto inaccessibleResults =
-    TypeChecker::lookupUnqualifiedType(dc, comp->getIdentifier(),
-                                       comp->getIdLoc(), relookupOptions);
+    TypeChecker::lookupUnqualifiedType(dc, comp->getNameRef(),
+                                       comp->getLoc(), relookupOptions);
     if (!inaccessibleResults.empty()) {
       // FIXME: What if the unviable candidates have different levels of access?
       auto first = cast<TypeDecl>(inaccessibleResults.front().getValueDecl());
-      diags.diagnose(comp->getIdLoc(), diag::candidate_inaccessible,
-                     comp->getIdentifier(), first->getFormalAccess());
+      diags.diagnose(comp->getNameLoc(), diag::candidate_inaccessible,
+                     first->getBaseName(), first->getFormalAccess());
 
       // FIXME: If any of the candidates (usually just one) are in the same
       // module we could offer a fix-it.
@@ -1121,22 +1125,22 @@ static Type diagnoseUnknownType(TypeResolution resolution,
     }
 
     // Fallback.
-    SourceLoc L = comp->getIdLoc();
-    SourceRange R = SourceRange(comp->getIdLoc());
+    auto L = comp->getNameLoc();
+    SourceRange R = comp->getNameLoc().getSourceRange();
 
     // Check if the unknown type is in the type remappings.
     auto &Remapped = ctx.RemappedTypes;
-    auto TypeName = comp->getIdentifier().str();
+    auto TypeName = comp->getNameRef().getBaseIdentifier().str();
     auto I = Remapped.find(TypeName);
     if (I != Remapped.end()) {
       auto RemappedTy = I->second->getString();
       diags.diagnose(L, diag::use_undeclared_type_did_you_mean,
-                     comp->getIdentifier(), RemappedTy)
+                     comp->getNameRef(), RemappedTy)
         .highlight(R)
         .fixItReplace(R, RemappedTy);
 
       // Replace the computed type with the suggested type.
-      comp->overwriteIdentifier(ctx.getIdentifier(RemappedTy));
+      comp->overwriteNameRef(DeclNameRef(ctx.getIdentifier(RemappedTy)));
 
       // HACK: 'NSUInteger' suggests both 'UInt' and 'Int'.
       if (TypeName == ctx.getSwiftName(KnownFoundationEntity::NSUInteger)) {
@@ -1148,7 +1152,7 @@ static Type diagnoseUnknownType(TypeResolution resolution,
     }
 
     diags.diagnose(L, diag::use_undeclared_type,
-                comp->getIdentifier())
+                comp->getNameRef())
       .highlight(R);
 
     return ErrorType::get(ctx);
@@ -1156,8 +1160,8 @@ static Type diagnoseUnknownType(TypeResolution resolution,
 
   // Qualified lookup case.
   if (!parentType->mayHaveMembers()) {
-    diags.diagnose(comp->getIdLoc(), diag::invalid_member_type,
-                   comp->getIdentifier(), parentType)
+    diags.diagnose(comp->getNameLoc(), diag::invalid_member_type,
+                   comp->getNameRef(), parentType)
         .highlight(parentRange);
     return ErrorType::get(ctx);
   }
@@ -1167,13 +1171,13 @@ static Type diagnoseUnknownType(TypeResolution resolution,
   relookupOptions |= NameLookupFlags::KnownPrivate;
   relookupOptions |= NameLookupFlags::IgnoreAccessControl;
   auto inaccessibleMembers =
-    TypeChecker::lookupMemberType(dc, parentType, comp->getIdentifier(),
+    TypeChecker::lookupMemberType(dc, parentType, comp->getNameRef(),
                                   relookupOptions);
   if (inaccessibleMembers) {
     // FIXME: What if the unviable candidates have different levels of access?
     const TypeDecl *first = inaccessibleMembers.front().Member;
-    diags.diagnose(comp->getIdLoc(), diag::candidate_inaccessible,
-                   comp->getIdentifier(), first->getFormalAccess());
+    diags.diagnose(comp->getNameLoc(), diag::candidate_inaccessible,
+                   first->getBaseName(), first->getFormalAccess());
 
     // FIXME: If any of the candidates (usually just one) are in the same module
     // we could offer a fix-it.
@@ -1190,8 +1194,8 @@ static Type diagnoseUnknownType(TypeResolution resolution,
 
   // Lookup into a type.
   if (auto moduleType = parentType->getAs<ModuleType>()) {
-    diags.diagnose(comp->getIdLoc(), diag::no_module_type,
-                   comp->getIdentifier(), moduleType->getModule()->getName());
+    diags.diagnose(comp->getNameLoc(), diag::no_module_type,
+                   comp->getNameRef(), moduleType->getModule()->getName());
   } else {
     LookupResult memberLookup;
     // Let's try to lookup given identifier as a member of the parent type,
@@ -1202,19 +1206,19 @@ static Type diagnoseUnknownType(TypeResolution resolution,
     memberLookupOptions |= NameLookupFlags::KnownPrivate;
 
     memberLookup = TypeChecker::lookupMember(dc, parentType,
-                                             comp->getIdentifier(),
+                                             comp->getNameRef(),
                                              memberLookupOptions);
 
     // Looks like this is not a member type, but simply a member of parent type.
     if (!memberLookup.empty()) {
       auto member = memberLookup[0].getValueDecl();
-      diags.diagnose(comp->getIdLoc(), diag::invalid_member_reference,
-                     member->getDescriptiveKind(), comp->getIdentifier(),
+      diags.diagnose(comp->getNameLoc(), diag::invalid_member_reference,
+                     member->getDescriptiveKind(), member->getFullName(),
                      parentType)
           .highlight(parentRange);
     } else {
-      diags.diagnose(comp->getIdLoc(), diag::invalid_member_type,
-                     comp->getIdentifier(), parentType)
+      diags.diagnose(comp->getNameLoc(), diag::invalid_member_type,
+                     comp->getNameRef(), parentType)
         .highlight(parentRange);
       // Note where the type was defined, this can help diagnose if the user
       // expected name lookup to find a module when there's a conflicting type.
@@ -1297,10 +1301,10 @@ resolveTopLevelIdentTypeComponent(TypeResolution resolution,
   // Resolve the first component, which is the only one that requires
   // unqualified name lookup.
   auto DC = resolution.getDeclContext();
-  auto id = comp->getIdentifier();
+  auto id = comp->getNameRef();
 
   // Dynamic 'Self' in the result type of a function body.
-  if (id == ctx.Id_Self) {
+  if (id.isSimpleName(ctx.Id_Self)) {
     if (auto *typeDC = DC->getInnermostTypeContext()) {
       // FIXME: The passed-in TypeRepr should get 'typechecked' as well.
       // The issue is though that ComponentIdentTypeRepr only accepts a ValueDecl
@@ -1323,9 +1327,7 @@ resolveTopLevelIdentTypeComponent(TypeResolution resolution,
   NameLookupOptions lookupOptions = defaultUnqualifiedLookupOptions;
   if (options.contains(TypeResolutionFlags::KnownNonCascadingDependency))
     lookupOptions |= NameLookupFlags::KnownPrivate;
-  auto globals = TypeChecker::lookupUnqualifiedType(DC,
-                                                    id,
-                                                    comp->getIdLoc(),
+  auto globals = TypeChecker::lookupUnqualifiedType(DC, id, comp->getLoc(),
                                                     lookupOptions);
 
   // Process the names we found.
@@ -1364,9 +1366,9 @@ resolveTopLevelIdentTypeComponent(TypeResolution resolution,
   // FIXME: We could recover by looking at later components.
   if (isAmbiguous) {
     if (!options.contains(TypeResolutionFlags::SilenceErrors)) {
-      diags.diagnose(comp->getIdLoc(), diag::ambiguous_type_base,
-                     comp->getIdentifier())
-        .highlight(comp->getIdLoc());
+      diags.diagnose(comp->getNameLoc(), diag::ambiguous_type_base,
+                     comp->getNameRef())
+        .highlight(comp->getNameLoc().getSourceRange());
       for (auto entry : globals) {
         entry.getValueDecl()->diagnose(diag::found_candidate);
       }
@@ -1392,7 +1394,7 @@ resolveTopLevelIdentTypeComponent(TypeResolution resolution,
 }
 
 static void diagnoseAmbiguousMemberType(Type baseTy, SourceRange baseRange,
-                                        Identifier name, SourceLoc nameLoc,
+                                        DeclNameRef name, DeclNameLoc nameLoc,
                                         LookupTypeResult &lookup) {
   ASTContext &ctx = baseTy->getASTContext();
   auto &diags = ctx.Diags;
@@ -1431,12 +1433,12 @@ static Type resolveNestedIdentTypeComponent(
           diagnoseUnboundGenericType(parentTy, parentRange.End);
         else if (parentTy->isExistentialType() &&
                  isa<AssociatedTypeDecl>(member)) {
-          diags.diagnose(comp->getIdLoc(), diag::assoc_type_outside_of_protocol,
-                         comp->getIdentifier());
+          diags.diagnose(comp->getNameLoc(), diag::assoc_type_outside_of_protocol,
+                         comp->getNameRef());
         } else if (parentTy->isExistentialType() &&
                    isa<TypeAliasDecl>(member)) {
-          diags.diagnose(comp->getIdLoc(), diag::typealias_outside_of_protocol,
-                         comp->getIdentifier());
+          diags.diagnose(comp->getNameLoc(), diag::typealias_outside_of_protocol,
+                         comp->getNameRef());
         }
       }
 
@@ -1515,7 +1517,7 @@ static Type resolveNestedIdentTypeComponent(
   LookupTypeResult memberTypes;
   if (parentTy->mayHaveMembers())
     memberTypes = TypeChecker::lookupMemberType(DC, parentTy,
-                                                comp->getIdentifier(),
+                                                comp->getNameRef(),
                                                 lookupOptions);
 
   // Name lookup was ambiguous. Complain.
@@ -1523,8 +1525,8 @@ static Type resolveNestedIdentTypeComponent(
   // that resolves things. But do we really want that to succeed?
   if (memberTypes.size() > 1) {
     if (!options.contains(TypeResolutionFlags::SilenceErrors))
-      diagnoseAmbiguousMemberType(parentTy, parentRange, comp->getIdentifier(),
-                                  comp->getIdLoc(), memberTypes);
+      diagnoseAmbiguousMemberType(parentTy, parentRange, comp->getNameRef(),
+                                  comp->getNameLoc(), memberTypes);
     return ErrorType::get(ctx);
   }
 
@@ -1571,8 +1573,8 @@ static Type resolveIdentTypeComponent(
   Type parentTy = resolveIdentTypeComponent(resolution, parentComps, options);
   if (!parentTy || parentTy->hasError()) return parentTy;
   
-  SourceRange parentRange(parentComps.front()->getIdLoc(),
-                          parentComps.back()->getSourceRange().End);
+  SourceRange parentRange(parentComps.front()->getStartLoc(),
+                          parentComps.back()->getEndLoc());
 
   // Resolve the nested type.
   return resolveNestedIdentTypeComponent(resolution, parentTy,
@@ -1590,7 +1592,8 @@ static bool diagnoseAvailability(IdentTypeRepr *IdType,
   auto componentRange = IdType->getComponentRange();
   for (auto comp : componentRange) {
     if (auto *typeDecl = comp->getBoundDecl()) {
-      if (diagnoseDeclAvailability(typeDecl, DC, comp->getIdLoc(), flags)) {
+      if (diagnoseDeclAvailability(typeDecl, DC,
+                                   comp->getNameLoc().getSourceRange(), flags)) {
         return true;
       }
     }
@@ -1641,11 +1644,15 @@ Type TypeChecker::resolveIdentifierType(
   if (!result) return nullptr;
 
   if (auto moduleTy = result->getAs<ModuleType>()) {
+    // Allow module types only if flag is specified.
+    if (options.contains(TypeResolutionFlags::AllowModule))
+      return moduleTy;
+    // Otherwise, emit an error.
     if (!options.contains(TypeResolutionFlags::SilenceErrors)) {
       auto moduleName = moduleTy->getModule()->getName();
-      diags.diagnose(Components.back()->getIdLoc(),
-                     diag::use_undeclared_type, moduleName);
-      diags.diagnose(Components.back()->getIdLoc(),
+      diags.diagnose(Components.back()->getNameLoc(),
+                     diag::use_undeclared_type, DeclNameRef(moduleName));
+      diags.diagnose(Components.back()->getNameLoc(),
                      diag::note_module_as_type, moduleName);
     }
     Components.back()->setInvalid();
@@ -1760,7 +1767,7 @@ namespace {
 
   public:
     explicit TypeResolver(TypeResolution resolution)
-      : Context(resolution.getDeclContext()->getASTContext()),
+      : Context(resolution.getASTContext()),
         resolution(resolution),
         DC(resolution.getDeclContext())
     {
@@ -1775,18 +1782,30 @@ namespace {
       return diags.diagnose(std::forward<ArgTypes>(Args)...);
     }
 
+    template <typename... ArgTypes>
+    InFlightDiagnostic diagnoseInvalid(TypeRepr *repr,
+                                       ArgTypes &&... Args) const {
+      auto &diags = Context.Diags;
+      repr->setInvalid();
+      return diags.diagnose(std::forward<ArgTypes>(Args)...);
+    }
+
     Type resolveAttributedType(AttributedTypeRepr *repr,
                                TypeResolutionOptions options);
     Type resolveAttributedType(TypeAttributes &attrs, TypeRepr *repr,
                                TypeResolutionOptions options);
     Type resolveASTFunctionType(FunctionTypeRepr *repr,
                                 TypeResolutionOptions options,
-                                FunctionType::ExtInfo extInfo
-                                  = FunctionType::ExtInfo());
+                                AnyFunctionType::Representation representation
+                                  = AnyFunctionType::Representation::Swift,
+                                bool noescape = false,
+                                DifferentiabilityKind diffKind
+                                  = DifferentiabilityKind::NonDifferentiable);
     bool
     resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
                                  TypeResolutionOptions options,
                                  bool requiresMappingOut,
+                                 DifferentiabilityKind diffKind,
                                  SmallVectorImpl<AnyFunctionType::Param> &ps);
 
     Type resolveSILFunctionType(FunctionTypeRepr *repr,
@@ -1848,11 +1867,11 @@ namespace {
 Type TypeResolution::resolveType(TypeRepr *TyR,
                               TypeResolutionOptions options) {
   auto &ctx = getASTContext();
-
   FrontendStatsTracer StatsTracer(ctx.Stats, "resolve-type", TyR);
   PrettyStackTraceTypeRepr stackTrace(ctx, "resolving", TyR);
 
   TypeResolver typeResolver(*this);
+
   auto result = typeResolver.resolveType(TyR, options);
 
   if (result) {
@@ -2020,6 +2039,11 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
   // Remember whether this is a function parameter.
   bool isParam = options.is(TypeResolverContext::FunctionInput);
 
+  // Remember whether this is a variadic function parameter.
+  bool isVariadicFunctionParam =
+      options.is(TypeResolverContext::VariadicFunctionInput) &&
+      !options.hasBase(TypeResolverContext::EnumElementDecl);
+
   // The type we're working with, in case we want to build it differently
   // based on the attributes we see.
   Type ty;
@@ -2064,18 +2088,21 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
 
           // Check for @thick.
           if (attrs.has(TAK_thick)) {
-            if (storedRepr)
-              diagnose(repr->getStartLoc(), diag::sil_metatype_multiple_reprs);
-              
+            if (storedRepr) {
+              diagnoseInvalid(repr, repr->getStartLoc(),
+                              diag::sil_metatype_multiple_reprs);
+            }
+
             storedRepr = MetatypeRepresentation::Thick;
             attrs.clearAttribute(TAK_thick);
           }
 
           // Check for @objc_metatype.
           if (attrs.has(TAK_objc_metatype)) {
-            if (storedRepr)
-              diagnose(repr->getStartLoc(), diag::sil_metatype_multiple_reprs);
-              
+            if (storedRepr) {
+              diagnoseInvalid(repr, repr->getStartLoc(),
+                              diag::sil_metatype_multiple_reprs);
+            }
             storedRepr = MetatypeRepresentation::ObjC;
             attrs.clearAttribute(TAK_objc_metatype);
           }
@@ -2103,8 +2130,8 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
 
   auto checkUnsupportedAttr = [&](TypeAttrKind attr) {
     if (attrs.has(attr)) {
-      diagnose(attrs.getLoc(attr), diag::unknown_attribute,
-               TypeAttributes::getAttrName(attr));
+      diagnoseInvalid(repr, attrs.getLoc(attr), diag::unknown_attribute,
+                      TypeAttributes::getAttrName(attr));
       attrs.clearAttribute(attr);
     }
   };
@@ -2154,8 +2181,8 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
       auto calleeConvention = ParameterConvention::Direct_Unowned;
       if (attrs.has(TAK_callee_owned)) {
         if (attrs.has(TAK_callee_guaranteed)) {
-          diagnose(attrs.getLoc(TAK_callee_owned),
-                   diag::sil_function_repeat_convention, /*callee*/ 2);
+          diagnoseInvalid(repr, attrs.getLoc(TAK_callee_owned),
+                          diag::sil_function_repeat_convention, /*callee*/ 2);
         }
         calleeConvention = ParameterConvention::Direct_Owned;
       } else if (attrs.has(TAK_callee_guaranteed)) {
@@ -2165,7 +2192,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
       if (!attrs.hasConvention()) {
         rep = SILFunctionType::Representation::Thick;
       } else {
-        auto convention = attrs.getConvention();
+        auto convention = attrs.getConventionName();
         // SIL exposes a greater number of conventions than Swift source.
         auto parsedRep =
             llvm::StringSwitch<Optional<SILFunctionType::Representation>>(
@@ -2181,24 +2208,26 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
                       SILFunctionType::Representation::WitnessMethod)
                 .Default(None);
         if (!parsedRep) {
-          diagnose(attrs.getLoc(TAK_convention),
-                   diag::unsupported_sil_convention, attrs.getConvention());
+          diagnoseInvalid(repr, attrs.getLoc(TAK_convention),
+                          diag::unsupported_sil_convention,
+                          attrs.getConventionName());
           rep = SILFunctionType::Representation::Thin;
         } else {
           rep = *parsedRep;
         }
 
         if (rep == SILFunctionType::Representation::WitnessMethod) {
-          auto protocolName = *attrs.conventionWitnessMethodProtocol;
+          auto protocolName =
+            attrs.ConventionArguments.getValue().WitnessMethodProtocol;
           witnessMethodProtocol = new (Context) SimpleIdentTypeRepr(
-              SourceLoc(), Context.getIdentifier(protocolName));
+              DeclNameLoc(), protocolName);
         }
       }
 
       if (attrs.has(TAK_differentiable) &&
           !Context.LangOpts.EnableExperimentalDifferentiableProgramming) {
-        diagnose(attrs.getLoc(TAK_differentiable),
-                 diag::experimental_differentiable_programming_disabled);
+        diagnoseInvalid(repr, attrs.getLoc(TAK_differentiable),
+                        diag::experimental_differentiable_programming_disabled);
       }
 
       DifferentiabilityKind diffKind = DifferentiabilityKind::NonDifferentiable;
@@ -2208,8 +2237,10 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
       }
 
       // Resolve the function type directly with these attributes.
+      // TODO: [store-sil-clang-function-type]
       SILFunctionType::ExtInfo extInfo(rep, attrs.has(TAK_pseudogeneric),
-                                       attrs.has(TAK_noescape), diffKind);
+                                       attrs.has(TAK_noescape), diffKind,
+                                       nullptr);
 
       ty = resolveSILFunctionType(fnRepr, options, coroutineKind, extInfo,
                                   calleeConvention, witnessMethodProtocol);
@@ -2220,49 +2251,26 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
       if (attrs.hasConvention()) {
         auto parsedRep =
             llvm::StringSwitch<Optional<FunctionType::Representation>>(
-                attrs.getConvention())
+                attrs.getConventionName())
                 .Case("swift", FunctionType::Representation::Swift)
                 .Case("block", FunctionType::Representation::Block)
                 .Case("thin", FunctionType::Representation::Thin)
                 .Case("c", FunctionType::Representation::CFunctionPointer)
                 .Default(None);
         if (!parsedRep) {
-          diagnose(attrs.getLoc(TAK_convention), diag::unsupported_convention,
-                   attrs.getConvention());
+          diagnoseInvalid(repr, attrs.getLoc(TAK_convention),
+                          diag::unsupported_convention,
+                          attrs.getConventionName());
           rep = FunctionType::Representation::Swift;
         } else {
           rep = *parsedRep;
-          
-          if (attrs.has(TAK_autoclosure)) {
-            // @convention(c) and @convention(block) are not allowed with an @autoclosure type.
-            if (rep == FunctionType::Representation::CFunctionPointer ||
-                rep == FunctionType::Representation::Block) {
-              diagnose(attrs.getLoc(TAK_convention),
-                       diag::invalid_autoclosure_and_convention_attributes,
-                       attrs.getConvention());
-              attrs.clearAttribute(TAK_convention);
-            }
-          }
         }
-      }
-
-      // @autoclosure is only valid on parameters.
-      if (!isParam && attrs.has(TAK_autoclosure)) {
-        bool isVariadicFunctionParam =
-            options.is(TypeResolverContext::VariadicFunctionInput) &&
-            !options.hasBase(TypeResolverContext::EnumElementDecl);
-
-        diagnose(attrs.getLoc(TAK_autoclosure),
-                 isVariadicFunctionParam ? diag::attr_not_on_variadic_parameters
-                                         : diag::attr_only_on_parameters,
-                 "@autoclosure");
-        attrs.clearAttribute(TAK_autoclosure);
       }
 
       if (attrs.has(TAK_differentiable) &&
           !Context.LangOpts.EnableExperimentalDifferentiableProgramming) {
-        diagnose(attrs.getLoc(TAK_differentiable),
-                 diag::experimental_differentiable_programming_disabled);
+        diagnoseInvalid(repr, attrs.getLoc(TAK_differentiable),
+                        diag::experimental_differentiable_programming_disabled);
       }
 
       DifferentiabilityKind diffKind = DifferentiabilityKind::NonDifferentiable;
@@ -2271,13 +2279,40 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
                                 : DifferentiabilityKind::Normal;
       }
 
-      // Resolve the function type directly with these attributes.
-      FunctionType::ExtInfo extInfo(rep, /*noescape=*/false, fnRepr->throws(),
-                                    diffKind);
-
-      ty = resolveASTFunctionType(fnRepr, options, extInfo);
+      ty = resolveASTFunctionType(fnRepr, options, rep, /*noescape=*/false,
+                                  diffKind);
       if (!ty || ty->hasError())
         return ty;
+    }
+  }
+
+  // Validate use of @autoclosure
+  if (attrs.has(TAK_autoclosure)) {
+    bool didDiagnose = false;
+    if (attrs.hasConvention()) {
+      if (attrs.getConventionName() == "c" ||
+          attrs.getConventionName() == "block") {
+        diagnoseInvalid(repr, attrs.getLoc(TAK_convention),
+                        diag::invalid_autoclosure_and_convention_attributes,
+                        attrs.getConventionName());
+        attrs.clearAttribute(TAK_convention);
+        didDiagnose = true;
+      }
+    } else if (options.is(TypeResolverContext::VariadicFunctionInput) &&
+               !options.hasBase(TypeResolverContext::EnumElementDecl)) {
+      diagnoseInvalid(repr, attrs.getLoc(TAK_autoclosure),
+                      diag::attr_not_on_variadic_parameters, "@autoclosure");
+      attrs.clearAttribute(TAK_autoclosure);
+      didDiagnose = true;
+    } else if (!options.is(TypeResolverContext::FunctionInput)) {
+      diagnoseInvalid(repr, attrs.getLoc(TAK_autoclosure),
+                      diag::attr_only_on_parameters, "@autoclosure");
+      attrs.clearAttribute(TAK_autoclosure);
+      didDiagnose = true;
+    }
+
+    if (didDiagnose) {
+      ty = ErrorType::get(Context);
     }
   }
 
@@ -2306,12 +2341,13 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
         auto loc = attrs.getLoc(TAK_escaping);
         auto attrRange = getTypeAttrRangeWithAt(Context, loc);
 
-        diagnose(loc, diag::escaping_non_function_parameter)
-          .fixItRemove(attrRange);
+        diagnoseInvalid(repr, loc, diag::escaping_non_function_parameter)
+            .fixItRemove(attrRange);
 
         // Try to find a helpful note based on how the type is being used
         if (options.is(TypeResolverContext::ImmediateOptionalTypeArgument)) {
-          diagnose(repr->getLoc(), diag::escaping_optional_type_argument);
+          diagnoseInvalid(repr, repr->getLoc(),
+                          diag::escaping_optional_type_argument);
         }
       }
 
@@ -2327,6 +2363,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
       // @autoclosure is going to be diagnosed when type of
       // the parameter is validated, because that attribute
       // applies to the declaration now.
+      repr->setInvalid();
       attrs.clearAttribute(TAK_autoclosure);
     }
 
@@ -2334,9 +2371,9 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
       if (!attrs.has(i))
         continue;
 
-      auto diag = diagnose(attrs.getLoc(i),
-                           diag::attribute_requires_function_type,
-                           TypeAttributes::getAttrName(i));
+      auto diag = diagnoseInvalid(repr, attrs.getLoc(i),
+                                  diag::attribute_requires_function_type,
+                                  TypeAttributes::getAttrName(i));
 
       // If we see @escaping among the attributes on this type, because it isn't
       // a function type, we'll remove it.
@@ -2346,7 +2383,8 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
         // Specialize the diagnostic for Optionals.
         if (ty->getOptionalObjectType()) {
           diag.flush();
-          diagnose(repr->getLoc(), diag::escaping_optional_type_argument);
+          diagnoseInvalid(repr, repr->getLoc(),
+                          diag::escaping_optional_type_argument);
         }
       }
       attrs.clearAttribute(i);
@@ -2355,13 +2393,29 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
     // Remove the function attributes from the set so that we don't diagnose.
     for (auto i : FunctionAttrs)
       attrs.clearAttribute(i);
-    attrs.convention = None;
+    attrs.ConventionArguments = None;
+  }
+
+  if (attrs.has(TAK_noDerivative)) {
+    if (!Context.LangOpts.EnableExperimentalDifferentiableProgramming) {
+      diagnose(attrs.getLoc(TAK_noDerivative),
+               diag::experimental_differentiable_programming_disabled);
+    } else if (!isParam) {
+      // @noDerivative is only valid on parameters.
+      diagnose(attrs.getLoc(TAK_noDerivative),
+               (isVariadicFunctionParam
+                    ? diag::attr_not_on_variadic_parameters
+                    : diag::attr_only_on_parameters_of_differentiable),
+               "@noDerivative");
+    }
+    attrs.clearAttribute(TAK_noDerivative);
   }
 
   // In SIL, handle @opened (n), which creates an existential archetype.
   if (attrs.has(TAK_opened)) {
     if (!ty->isExistentialType()) {
-      diagnose(attrs.getLoc(TAK_opened), diag::opened_non_protocol, ty);
+      diagnoseInvalid(repr, attrs.getLoc(TAK_opened), diag::opened_non_protocol,
+                      ty);
     } else {
       ty = OpenedArchetypeType::get(ty, attrs.OpenedID);
     }
@@ -2401,16 +2455,17 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
   }
 
   for (unsigned i = 0; i != TypeAttrKind::TAK_Count; ++i)
-    if (attrs.has((TypeAttrKind)i))
-      diagnose(attrs.getLoc((TypeAttrKind)i),
-               diag::attribute_does_not_apply_to_type);
+    if (attrs.has((TypeAttrKind)i)) {
+      diagnoseInvalid(repr, attrs.getLoc((TypeAttrKind)i),
+                      diag::attribute_does_not_apply_to_type);
+    }
 
   return ty;
 }
 
 bool TypeResolver::resolveASTFunctionTypeParams(
     TupleTypeRepr *inputRepr, TypeResolutionOptions options,
-    bool requiresMappingOut,
+    bool requiresMappingOut, DifferentiabilityKind diffKind,
     SmallVectorImpl<AnyFunctionType::Param> &elements) {
   elements.reserve(inputRepr->getNumElements());
 
@@ -2474,8 +2529,24 @@ bool TypeResolver::resolveASTFunctionTypeParams(
       ownership = ValueOwnership::Default;
       break;
     }
+
+    bool noDerivative = false;
+    if (auto *attrTypeRepr = dyn_cast<AttributedTypeRepr>(eltTypeRepr)) {
+      if (attrTypeRepr->getAttrs().has(TAK_noDerivative)) {
+        if (diffKind == DifferentiabilityKind::NonDifferentiable &&
+            Context.LangOpts.EnableExperimentalDifferentiableProgramming)
+          diagnose(eltTypeRepr->getLoc(),
+                   diag::attr_only_on_parameters_of_differentiable,
+                   "@noDerivative")
+              .highlight(eltTypeRepr->getSourceRange());
+        else
+          noDerivative = true;
+      }
+    }
+
     auto paramFlags = ParameterTypeFlags::fromParameterType(
-        ty, variadic, autoclosure, /*isNonEphemeral*/ false, ownership);
+        ty, variadic, autoclosure, /*isNonEphemeral*/ false, ownership,
+        noDerivative);
     elements.emplace_back(ty, Identifier(), paramFlags);
   }
 
@@ -2519,22 +2590,23 @@ Type TypeResolver::resolveOpaqueReturnType(TypeRepr *repr,
   return ty;
 }
 
-Type TypeResolver::resolveASTFunctionType(FunctionTypeRepr *repr,
-                                          TypeResolutionOptions parentOptions,
-                                          FunctionType::ExtInfo extInfo) {
+Type TypeResolver::resolveASTFunctionType(
+    FunctionTypeRepr *repr, TypeResolutionOptions parentOptions,
+    AnyFunctionType::Representation representation, bool noescape,
+    DifferentiabilityKind diffKind) {
+
   TypeResolutionOptions options = None;
   options |= parentOptions.withoutContext().getFlags();
 
   SmallVector<AnyFunctionType::Param, 8> params;
   if (resolveASTFunctionTypeParams(repr->getArgsTypeRepr(), options,
-                         repr->getGenericEnvironment() != nullptr, params)) {
+                                   repr->getGenericEnvironment() != nullptr,
+                                   diffKind, params)) {
     return Type();
   }
 
   Type outputTy = resolveType(repr->getResultTypeRepr(), options);
   if (!outputTy || outputTy->hasError()) return outputTy;
-
-  extInfo = extInfo.withThrows(repr->throws());
 
   // If this is a function type without parens around the parameter list,
   // diagnose this and produce a fixit to add them.
@@ -2546,7 +2618,7 @@ Type TypeResolver::resolveASTFunctionType(FunctionTypeRepr *repr,
     if (args->getNumElements() == 1) {
       if (const auto Void =
           dyn_cast<SimpleIdentTypeRepr>(args->getElementType(0))) {
-        if (Void->getIdentifier().str() == "Void") {
+        if (Void->getNameRef().isSimpleName(Context.Id_Void)) {
           diagnose(args->getStartLoc(), diag::paren_void_probably_void)
             .fixItReplace(args->getSourceRange(), "()");
           repr->setWarned();
@@ -2554,6 +2626,19 @@ Type TypeResolver::resolveASTFunctionType(FunctionTypeRepr *repr,
       }
     }
   }
+
+  FunctionType::ExtInfo incompleteExtInfo(FunctionTypeRepresentation::Swift,
+                                          noescape, repr->throws(), diffKind,
+                                          /*clangFunctionType*/nullptr);
+  
+  const clang::Type *clangFnType = nullptr;
+  if (representation == AnyFunctionType::Representation::CFunctionPointer)
+    clangFnType = Context.getClangFunctionType(
+      params, outputTy, incompleteExtInfo,
+      AnyFunctionType::Representation::CFunctionPointer);
+
+  auto extInfo = incompleteExtInfo.withRepresentation(representation)
+                                  .withClangFunctionType(clangFnType);
 
   // SIL uses polymorphic function types to resolve overloaded member functions.
   if (auto genericEnv = repr->getGenericEnvironment()) {
@@ -2565,12 +2650,14 @@ Type TypeResolver::resolveASTFunctionType(FunctionTypeRepr *repr,
   auto fnTy = FunctionType::get(params, outputTy, extInfo);
   // If the type is a block or C function pointer, it must be representable in
   // ObjC.
-  switch (auto rep = extInfo.getRepresentation()) {
+  switch (representation) {
   case AnyFunctionType::Representation::Block:
   case AnyFunctionType::Representation::CFunctionPointer:
     if (!fnTy->isRepresentableIn(ForeignLanguage::ObjectiveC, DC)) {
       StringRef strName =
-        rep == AnyFunctionType::Representation::Block ? "block" : "c";
+        (representation == AnyFunctionType::Representation::Block)
+        ? "block"
+        : "c";
       auto extInfo2 =
         extInfo.withRepresentation(AnyFunctionType::Representation::Swift);
       auto simpleFnTy = FunctionType::get(params, outputTy, extInfo2);
@@ -2713,6 +2800,22 @@ Type TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
       }
     }
   } // restore generic type resolution
+  
+  // Resolve substitutions if we have them.
+  SubstitutionMap subs;
+  if (!repr->getSubstitutions().empty()) {
+    auto sig = repr->getGenericEnvironment()->getGenericSignature()
+                   ->getCanonicalSignature();
+    TypeSubstitutionMap subsMap;
+    auto params = sig->getGenericParams();
+    for (unsigned i : indices(repr->getSubstitutions())) {
+      auto resolved = resolveType(repr->getSubstitutions()[i], options);
+      subsMap.insert({params[i], resolved->getCanonicalType()});
+    }
+    subs = SubstitutionMap::get(sig, QueryTypeSubstitutionMap{subsMap},
+                                TypeChecker::LookUpConformance(DC))
+      .getCanonical();
+  }
 
   if (hasError) {
     return ErrorType::get(Context);
@@ -2785,7 +2888,8 @@ Type TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
                               callee,
                               interfaceParams, interfaceYields,
                               interfaceResults, interfaceErrorResult,
-                              SubstitutionMap(), false,
+                              subs,
+                              repr->areGenericParamsImplied(),
                               Context, witnessMethodConformance);
 }
 
@@ -2994,8 +3098,7 @@ Type TypeResolver::resolveSpecifierTypeRepr(SpecifierTypeRepr *repr,
     default:
       llvm_unreachable("unknown SpecifierTypeRepr kind");
     }
-    diagnose(repr->getSpecifierLoc(), diagID, name);
-    repr->setInvalid();
+    diagnoseInvalid(repr, repr->getSpecifierLoc(), diagID, name);
     return ErrorType::get(Context);
   }
 
@@ -3474,7 +3577,8 @@ public:
     auto comp = T->getComponentRange().back();
     if (auto *proto = dyn_cast_or_null<ProtocolDecl>(comp->getBoundDecl())) {
       if (!proto->existentialTypeSupported()) {
-        Ctx.Diags.diagnose(comp->getIdLoc(), diag::unsupported_existential_type,
+        Ctx.Diags.diagnose(comp->getNameLoc(),
+                           diag::unsupported_existential_type,
                            proto->getName());
         T->setInvalid();
       }
@@ -3491,7 +3595,7 @@ public:
             if (protoDecl->existentialTypeSupported())
               continue;
             
-            Ctx.Diags.diagnose(comp->getIdLoc(),
+            Ctx.Diags.diagnose(comp->getNameLoc(),
                                diag::unsupported_existential_type,
                                protoDecl->getName());
             T->setInvalid();

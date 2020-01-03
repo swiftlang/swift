@@ -20,6 +20,7 @@ class ASTContext;
 class CompilerInstance;
 class Preprocessor;
 class Sema;
+class TargetInfo;
 } // namespace clang
 
 namespace swift {
@@ -46,6 +47,7 @@ protected:
   using ModuleLoader::ModuleLoader;
 
 public:
+  virtual clang::TargetInfo &getTargetInfo() const = 0;
   virtual clang::ASTContext &getClangASTContext() const = 0;
   virtual clang::Preprocessor &getClangPreprocessor() const = 0;
   virtual clang::Sema &getClangSema() const = 0;

@@ -88,14 +88,14 @@ bool UnwrapOptionalBase::diagnose(bool asNote) const {
 }
 
 UnwrapOptionalBase *UnwrapOptionalBase::create(ConstraintSystem &cs,
-                                               DeclName member,
+                                               DeclNameRef member,
                                                ConstraintLocator *locator) {
   return new (cs.getAllocator())
       UnwrapOptionalBase(cs, FixKind::UnwrapOptionalBase, member, locator);
 }
 
 UnwrapOptionalBase *UnwrapOptionalBase::createWithOptionalResult(
-    ConstraintSystem &cs, DeclName member, ConstraintLocator *locator) {
+    ConstraintSystem &cs, DeclNameRef member, ConstraintLocator *locator) {
   return new (cs.getAllocator()) UnwrapOptionalBase(
       cs, FixKind::UnwrapOptionalBaseWithOptionalResult, member, locator);
 }
@@ -159,16 +159,16 @@ CoerceToCheckedCast *CoerceToCheckedCast::attempt(ConstraintSystem &cs,
 }
 
 bool MarkExplicitlyEscaping::diagnose(bool asNote) const {
-  NoEscapeFuncToTypeConversionFailure failure(getConstraintSystem(),
-                                              getLocator(), ConvertTo);
+  auto &cs = getConstraintSystem();
+  NoEscapeFuncToTypeConversionFailure failure(cs, getFromType(), getToType(),
+                                              getLocator());
   return failure.diagnose(asNote);
 }
 
 MarkExplicitlyEscaping *
-MarkExplicitlyEscaping::create(ConstraintSystem &cs, ConstraintLocator *locator,
-                               Type convertingTo) {
-  return new (cs.getAllocator())
-      MarkExplicitlyEscaping(cs, locator, convertingTo);
+MarkExplicitlyEscaping::create(ConstraintSystem &cs, Type lhs, Type rhs,
+                               ConstraintLocator *locator) {
+  return new (cs.getAllocator()) MarkExplicitlyEscaping(cs, lhs, rhs, locator);
 }
 
 bool RelabelArguments::diagnose(bool asNote) const {
@@ -255,18 +255,113 @@ ContextualMismatch *ContextualMismatch::create(ConstraintSystem &cs, Type lhs,
   return new (cs.getAllocator()) ContextualMismatch(cs, lhs, rhs, locator);
 }
 
-bool AllowTupleTypeMismatch::diagnose(bool asNote) const {
-  auto failure = TupleContextualFailure(
-      getConstraintSystem(), getFromType(), getToType(), getLocator());
+/// Computes the contextual type information for a type mismatch of a
+/// component in a structural type (tuple or function type).
+///
+/// \returns A tuple containing the contextual type purpose, the source type,
+/// and the contextual type.
+static Optional<std::tuple<ContextualTypePurpose, Type, Type>>
+getStructuralTypeContext(ConstraintSystem &cs, ConstraintLocator *locator) {
+  if (auto contextualType = cs.getContextualType()) {
+    if (auto *anchor = simplifyLocatorToAnchor(locator))
+      return std::make_tuple(cs.getContextualTypePurpose(),
+                             cs.getType(anchor),
+                             contextualType);
+  } else if (auto argApplyInfo = cs.getFunctionArgApplyInfo(locator)) {
+    return std::make_tuple(CTP_CallArgument,
+                           argApplyInfo->getArgType(),
+                           argApplyInfo->getParamType());
+  } else if (auto *coerceExpr = dyn_cast<CoerceExpr>(locator->getAnchor())) {
+    return std::make_tuple(CTP_CoerceOperand,
+                           cs.getType(coerceExpr->getSubExpr()),
+                           cs.getType(coerceExpr));
+  } else if (auto *assignExpr = dyn_cast<AssignExpr>(locator->getAnchor())) {
+    return std::make_tuple(CTP_AssignSource,
+                           cs.getType(assignExpr->getSrc()),
+                           cs.getType(assignExpr->getDest()));
+  }
+
+  return None;
+}
+
+bool AllowTupleTypeMismatch::coalesceAndDiagnose(
+    ArrayRef<ConstraintFix *> fixes, bool asNote) const {
+  llvm::SmallVector<unsigned, 4> indices;
+  if (isElementMismatch())
+    indices.push_back(*Index);
+
+  for (auto fix : fixes) {
+    auto *tupleFix = fix->getAs<AllowTupleTypeMismatch>();
+    if (!tupleFix || !tupleFix->isElementMismatch())
+      continue;
+    indices.push_back(*tupleFix->Index);
+  }
+
+  auto &cs = getConstraintSystem();
+  auto *locator = getLocator();
+  ContextualTypePurpose purpose;
+  Type fromType;
+  Type toType;
+
+  if (getFromType()->is<TupleType>() && getToType()->is<TupleType>()) {
+    purpose = cs.getContextualTypePurpose();
+    fromType = getFromType();
+    toType = getToType();
+  } else if (auto contextualTypeInfo = getStructuralTypeContext(cs, locator)) {
+    std::tie(purpose, fromType, toType) = *contextualTypeInfo;
+  } else {
+    return false;
+  }
+
+  TupleContextualFailure failure(cs, purpose, fromType, toType, indices, locator);
   return failure.diagnose(asNote);
+}
+
+bool AllowTupleTypeMismatch::diagnose(bool asNote) const {
+  return coalesceAndDiagnose({}, asNote);
 }
 
 AllowTupleTypeMismatch *
 AllowTupleTypeMismatch::create(ConstraintSystem &cs, Type lhs, Type rhs,
-                               ConstraintLocator *locator) {
-  assert(lhs->is<TupleType>() && rhs->is<TupleType>() &&
-         "lhs and rhs must be tuple types");
-  return new (cs.getAllocator()) AllowTupleTypeMismatch(cs, lhs, rhs, locator);
+                               ConstraintLocator *locator,
+                               Optional<unsigned> index) {
+  return new (cs.getAllocator())
+      AllowTupleTypeMismatch(cs, lhs, rhs, locator, index);
+}
+
+bool AllowFunctionTypeMismatch::coalesceAndDiagnose(
+    ArrayRef<ConstraintFix *> fixes, bool asNote) const {
+  llvm::SmallVector<unsigned, 4> indices{ParamIndex};
+
+  for (auto fix : fixes) {
+    if (auto *fnFix = fix->getAs<AllowFunctionTypeMismatch>())
+      indices.push_back(fnFix->ParamIndex);
+  }
+
+  auto &cs = getConstraintSystem();
+  auto *locator = getLocator();
+  ContextualTypePurpose purpose;
+  Type fromType;
+  Type toType;
+
+  auto contextualTypeInfo = getStructuralTypeContext(cs, locator);
+  if (!contextualTypeInfo)
+    return false;
+
+  std::tie(purpose, fromType, toType) = *contextualTypeInfo;
+  FunctionTypeMismatch failure(cs, purpose, fromType, toType, indices, locator);
+  return failure.diagnose(asNote);
+}
+
+bool AllowFunctionTypeMismatch::diagnose(bool asNote) const {
+  return coalesceAndDiagnose({}, asNote);
+}
+
+AllowFunctionTypeMismatch *
+AllowFunctionTypeMismatch::create(ConstraintSystem &cs, Type lhs, Type rhs,
+                                  ConstraintLocator *locator, unsigned index) {
+  return new (cs.getAllocator())
+      AllowFunctionTypeMismatch(cs, lhs, rhs, locator, index);
 }
 
 bool GenericArgumentsMismatch::diagnose(bool asNote) const {
@@ -382,14 +477,14 @@ bool DefineMemberBasedOnUse::diagnose(bool asNote) const {
 
 DefineMemberBasedOnUse *
 DefineMemberBasedOnUse::create(ConstraintSystem &cs, Type baseType,
-                               DeclName member, ConstraintLocator *locator) {
+                               DeclNameRef member, ConstraintLocator *locator) {
   return new (cs.getAllocator())
       DefineMemberBasedOnUse(cs, baseType, member, locator);
 }
 
 AllowMemberRefOnExistential *
 AllowMemberRefOnExistential::create(ConstraintSystem &cs, Type baseType,
-                                    ValueDecl *member, DeclName memberName,
+                                    ValueDecl *member, DeclNameRef memberName,
                                     ConstraintLocator *locator) {
   return new (cs.getAllocator())
       AllowMemberRefOnExistential(cs, baseType, memberName, member, locator);
@@ -411,7 +506,7 @@ bool AllowTypeOrInstanceMember::diagnose(bool asNote) const {
 
 AllowTypeOrInstanceMember *
 AllowTypeOrInstanceMember::create(ConstraintSystem &cs, Type baseType,
-                                  ValueDecl *member, DeclName usedName,
+                                  ValueDecl *member, DeclNameRef usedName,
                                   ConstraintLocator *locator) {
   return new (cs.getAllocator())
       AllowTypeOrInstanceMember(cs, baseType, member, usedName, locator);
@@ -572,7 +667,7 @@ bool AllowInaccessibleMember::diagnose(bool asNote) const {
 
 AllowInaccessibleMember *
 AllowInaccessibleMember::create(ConstraintSystem &cs, Type baseType,
-                                ValueDecl *member, DeclName name,
+                                ValueDecl *member, DeclNameRef name,
                                 ConstraintLocator *locator) {
   return new (cs.getAllocator())
       AllowInaccessibleMember(cs, baseType, member, name, locator);
@@ -747,7 +842,7 @@ bool AllowMutatingMemberOnRValueBase::diagnose(bool asNote) const {
 
 AllowMutatingMemberOnRValueBase *
 AllowMutatingMemberOnRValueBase::create(ConstraintSystem &cs, Type baseType,
-                                        ValueDecl *member, DeclName name,
+                                        ValueDecl *member, DeclNameRef name,
                                         ConstraintLocator *locator) {
   return new (cs.getAllocator())
       AllowMutatingMemberOnRValueBase(cs, baseType, member, name, locator);
@@ -929,25 +1024,29 @@ static bool isValueOfRawRepresentable(ConstraintSystem &cs,
 ExpandArrayIntoVarargs *
 ExpandArrayIntoVarargs::attempt(ConstraintSystem &cs, Type argType,
                                 Type paramType,
-                                ConstraintLocatorBuilder locator) {
-  auto constraintLocator = cs.getConstraintLocator(locator);
-  auto elementType = cs.isArrayType(argType);
-  if (elementType &&
-      constraintLocator->getLastElementAs<LocatorPathElt::ApplyArgToParam>()
-          ->getParameterFlags()
-          .isVariadic()) {
-    auto options = ConstraintSystem::TypeMatchOptions(
-        ConstraintSystem::TypeMatchFlags::TMF_ApplyingFix |
-        ConstraintSystem::TypeMatchFlags::TMF_GenerateConstraints);
-    auto result =
-        cs.matchTypes(*elementType, paramType,
-                      ConstraintKind::ArgumentConversion, options, locator);
-    if (result.isSuccess())
-      return new (cs.getAllocator())
-          ExpandArrayIntoVarargs(cs, argType, paramType, constraintLocator);
-  }
+                                ConstraintLocatorBuilder builder) {
+  auto *locator = cs.getConstraintLocator(builder);
 
-  return nullptr;
+  auto argLoc = locator->getLastElementAs<LocatorPathElt::ApplyArgToParam>();
+  if (!(argLoc && argLoc->getParameterFlags().isVariadic()))
+    return nullptr;
+
+  auto elementType = cs.isArrayType(argType);
+  if (!elementType)
+    return nullptr;
+
+  ConstraintSystem::TypeMatchOptions options;
+  options |= ConstraintSystem::TypeMatchFlags::TMF_ApplyingFix;
+  options |= ConstraintSystem::TypeMatchFlags::TMF_GenerateConstraints;
+
+  auto result = cs.matchTypes(*elementType, paramType, ConstraintKind::Subtype,
+                              options, builder);
+
+  if (result.isFailure())
+    return nullptr;
+
+  return new (cs.getAllocator())
+      ExpandArrayIntoVarargs(cs, argType, paramType, locator);
 }
 
 bool ExpandArrayIntoVarargs::diagnose(bool asNote) const {
@@ -1043,4 +1142,28 @@ std::string TreatEphemeralAsNonEphemeral::getName() const {
   name += "treat ephemeral as non-ephemeral for ";
   name += ::getName(ConversionKind);
   return name;
+}
+
+bool SpecifyBaseTypeForContextualMember::diagnose(bool asNote) const {
+  auto &cs = getConstraintSystem();
+  MissingContextualBaseInMemberRefFailure failure(cs, MemberName, getLocator());
+  return failure.diagnose(asNote);
+}
+
+SpecifyBaseTypeForContextualMember *SpecifyBaseTypeForContextualMember::create(
+    ConstraintSystem &cs, DeclNameRef member, ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      SpecifyBaseTypeForContextualMember(cs, member, locator);
+}
+
+bool SpecifyClosureReturnType::diagnose(bool asNote) const {
+  auto &cs = getConstraintSystem();
+  UnableToInferClosureReturnType failure(cs, getLocator());
+  return failure.diagnose(asNote);
+}
+
+SpecifyClosureReturnType *
+SpecifyClosureReturnType::create(ConstraintSystem &cs,
+                                 ConstraintLocator *locator) {
+  return new (cs.getAllocator()) SpecifyClosureReturnType(cs, locator);
 }

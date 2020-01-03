@@ -9,7 +9,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Basic/Diff.h"
+#include "Diff.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Migrator/ASTMigratorPass.h"
 #include "swift/Migrator/EditorAdapter.h"

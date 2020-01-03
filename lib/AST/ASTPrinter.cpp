@@ -56,6 +56,8 @@
 using namespace swift;
 
 void PrintOptions::setBaseType(Type T) {
+  if (T->is<ErrorType>())
+    return;
   TransformContext = TypeTransformContext(T);
 }
 
@@ -334,10 +336,26 @@ ASTPrinter &ASTPrinter::operator<<(UUID UU) {
   return *this;
 }
 
+ASTPrinter &ASTPrinter::operator<<(Identifier name) {
+  return *this << DeclName(name);
+}
+
+ASTPrinter &ASTPrinter::operator<<(DeclBaseName name) {
+  return *this << DeclName(name);
+}
+
 ASTPrinter &ASTPrinter::operator<<(DeclName name) {
   llvm::SmallString<32> str;
   llvm::raw_svector_ostream os(str);
   name.print(os);
+  printTextImpl(os.str());
+  return *this;
+}
+
+ASTPrinter &ASTPrinter::operator<<(DeclNameRef ref) {
+  llvm::SmallString<32> str;
+  llvm::raw_svector_ostream os(str);
+  ref.print(os);
   printTextImpl(os.str());
   return *this;
 }
@@ -654,6 +672,7 @@ class PrintAST : public ASTVisitor<PrintAST> {
       FreshOptions.ExcludeAttrList = options.ExcludeAttrList;
       FreshOptions.ExclusiveAttrList = options.ExclusiveAttrList;
       FreshOptions.PrintOptionalAsImplicitlyUnwrapped = options.PrintOptionalAsImplicitlyUnwrapped;
+      FreshOptions.TransformContext = options.TransformContext;
       T.print(Printer, FreshOptions);
       return;
     }
@@ -684,6 +703,8 @@ class PrintAST : public ASTVisitor<PrintAST> {
       }
 
       T = T.subst(subMap, SubstFlags::DesugarMemberTypes);
+
+      options.TransformContext = TypeTransformContext(CurrentType);
     }
 
     printTypeWithOptions(T, options);
@@ -1726,6 +1747,10 @@ void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
 
   auto impl = ASD->getImplInfo();
 
+  // AbstractAccessors is suppressed by FunctionDefinitions.
+  bool PrintAbstract =
+    Options.AbstractAccessors && !Options.FunctionDefinitions;
+
   // Don't print accessors for trivially stored properties...
   if (impl.isSimpleStored()) {
     // ...unless we're printing for SIL, which expects a { get set? } on
@@ -1736,22 +1761,23 @@ void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
     // ...or you're private/internal(set), at which point we'll print
     //    @_hasStorage var x: T { get }
     else if (ASD->isSettable(nullptr) && hasLessAccessibleSetter(ASD)) {
-      Printer << " {";
-      {
-        IndentRAII indentMore(*this);
+      if (PrintAbstract) {
+        Printer << " { get }";
+      } else {
+        Printer << " {";
+        {
+          IndentRAII indentMore(*this);
+          indent();
+          Printer.printNewline();
+          Printer << "get";
+        }
         indent();
         Printer.printNewline();
-        Printer << "get";
-        Printer.printNewline();
+        Printer << "}";
       }
-      Printer << "}";
     }
     return;
   }
-
-  // AbstractAccessors is suppressed by FunctionDefinitions.
-  bool PrintAbstract =
-    Options.AbstractAccessors && !Options.FunctionDefinitions;
 
   // We sometimes want to print the accessors abstractly
   // instead of listing out how they're actually implemented.
@@ -2476,6 +2502,8 @@ static void printParameterFlags(ASTPrinter &printer, PrintOptions options,
                                 ParameterTypeFlags flags, bool escaping) {
   if (!options.excludeAttrKind(TAK_autoclosure) && flags.isAutoClosure())
     printer << "@autoclosure ";
+  if (!options.excludeAttrKind(TAK_noDerivative) && flags.isNoDerivative())
+    printer << "@noDerivative ";
 
   switch (flags.getValueOwnership()) {
   case ValueOwnership::Default:
@@ -2829,7 +2857,7 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
       // TypeRepr is not getting 'typechecked'. See
       // \c resolveTopLevelIdentTypeComponent function in TypeCheckType.cpp.
       if (auto *simId = dyn_cast_or_null<SimpleIdentTypeRepr>(ResultTyLoc.getTypeRepr())) {
-        if (simId->getIdentifier() == Ctx.Id_Self)
+        if (simId->getNameRef().isSimpleName(Ctx.Id_Self))
           ResultTyLoc = TypeLoc::withoutLoc(ResultTy);
       }
       Printer << " -> ";
@@ -3570,7 +3598,6 @@ public:
     // know we're printing a type member so it escapes `Type` and `Protocol`.
     if (auto parent = Ty->getParent()) {
       visitParentType(parent);
-      Printer << ".";
       NameContext = PrintNameContext::TypeMember;
     } else if (shouldPrintFullyQualified(Ty)) {
       printModuleContext(Ty);
@@ -3710,13 +3737,32 @@ public:
   }
 
   void visitParentType(Type T) {
+    /// Don't print the parent type if it's being printed in that type context.
+    if (Options.TransformContext) {
+       if (auto currentType = Options.TransformContext->getBaseType()) {
+         auto printingType = T;
+         if (currentType->hasArchetype())
+           currentType = currentType->mapTypeOutOfContext();
+
+         if (auto errorTy = printingType->getAs<ErrorType>())
+           if (auto origTy = errorTy->getOriginalType())
+             printingType = origTy;
+
+         if (printingType->hasArchetype())
+           printingType = printingType->mapTypeOutOfContext();
+
+         if (currentType->isEqual(printingType))
+           return;
+       }
+    }
     PrintOptions innerOptions = Options;
     innerOptions.SynthesizeSugarOnTypes = false;
 
     if (auto sugarType = dyn_cast<SyntaxSugarType>(T.getPointer()))
       T = sugarType->getImplementationType();
 
-    TypePrinter(Printer, innerOptions).visit(T);
+    TypePrinter(Printer, innerOptions).printWithParensIfNotSimple(T);
+    Printer << ".";
   }
 
   void visitEnumType(EnumType *T) {
@@ -4226,8 +4272,7 @@ public:
   }
   
   void visitNestedArchetypeType(NestedArchetypeType *T) {
-    printWithParensIfNotSimple(T->getParent());
-    Printer << ".";
+    visitParentType(T->getParent());
     printArchetypeCommon(T);
   }
   
@@ -4318,7 +4363,6 @@ public:
 
   void visitDependentMemberType(DependentMemberType *T) {
     visitParentType(T->getBase());
-    Printer << ".";
     Printer.printName(T->getName());
   }
 

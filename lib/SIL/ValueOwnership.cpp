@@ -157,7 +157,8 @@ CONSTANT_OWNERSHIP_INST(Unowned, ValueToBridgeObject)
 #define CONSTANT_OR_NONE_OWNERSHIP_INST(OWNERSHIP, INST)                       \
   ValueOwnershipKind ValueOwnershipKindClassifier::visit##INST##Inst(          \
       INST##Inst *I) {                                                         \
-    if (I->getType().isTrivial(*I->getFunction())) {                           \
+    if (I->getType().isTrivial(*I->getFunction()) ||                           \
+        I->getType().isAddress()) {                                            \
       return ValueOwnershipKind::None;                                         \
     }                                                                          \
     return ValueOwnershipKind::OWNERSHIP;                                      \
@@ -173,6 +174,12 @@ CONSTANT_OR_NONE_OWNERSHIP_INST(Guaranteed, TupleExtract)
 CONSTANT_OR_NONE_OWNERSHIP_INST(Guaranteed, OpenExistentialValue)
 CONSTANT_OR_NONE_OWNERSHIP_INST(Guaranteed, OpenExistentialBoxValue)
 CONSTANT_OR_NONE_OWNERSHIP_INST(Owned, UnconditionalCheckedCastValue)
+
+// Given an owned value, mark_uninitialized always forwards an owned value since
+// we want to make sure that all destroys of that value must come through the
+// mark_uninitialized (which will happen due to mark_uninitialized consuming the
+// value).
+CONSTANT_OR_NONE_OWNERSHIP_INST(Owned, MarkUninitialized)
 
 // unchecked_bitwise_cast is a bitwise copy. It produces a trivial or unowned
 // result.
@@ -249,7 +256,6 @@ FORWARDING_OWNERSHIP_INST(Tuple)
 FORWARDING_OWNERSHIP_INST(UncheckedRefCast)
 FORWARDING_OWNERSHIP_INST(UnconditionalCheckedCast)
 FORWARDING_OWNERSHIP_INST(Upcast)
-FORWARDING_OWNERSHIP_INST(MarkUninitialized)
 FORWARDING_OWNERSHIP_INST(UncheckedEnumData)
 FORWARDING_OWNERSHIP_INST(SelectEnum)
 FORWARDING_OWNERSHIP_INST(Enum)

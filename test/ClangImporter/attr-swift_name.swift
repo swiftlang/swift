@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t.mcp)
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -I %S/Inputs/custom-modules -Xcc -w -typecheck %s -module-cache-path %t.mcp 2>&1 | %FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -I %S/Inputs/custom-modules -Xcc -w -typecheck %s -module-cache-path %t.mcp -disable-named-lazy-member-loading 2>&1 | %FileCheck %s
 
 // REQUIRES: objc_interop
 

@@ -180,7 +180,7 @@ AllocStackInst::create(SILDebugLocation Loc,
                      hasDynamicLifetime);
 }
 
-VarDecl *AllocStackInst::getDecl() const {
+VarDecl *AllocationInst::getDecl() const {
   return getLoc().getAsASTNode<VarDecl>();
 }
 
@@ -288,10 +288,6 @@ SILType AllocBoxInst::getAddressType() const {
   return getSILBoxFieldType(TypeExpansionContext(*this->getFunction()),
                             getBoxType(), getModule().Types, 0)
       .getAddressType();
-}
-
-VarDecl *AllocBoxInst::getDecl() const {
-  return getLoc().getAsASTNode<VarDecl>();
 }
 
 DebugValueInst::DebugValueInst(SILDebugLocation DebugLoc, SILValue Operand,
@@ -577,7 +573,7 @@ TryApplyInstBase::TryApplyInstBase(SILInstructionKind kind,
                                    SILDebugLocation loc,
                                    SILBasicBlock *normalBB,
                                    SILBasicBlock *errorBB)
-    : TermInst(kind, loc), DestBBs{{this, normalBB}, {this, errorBB}} {}
+    : TermInst(kind, loc), DestBBs{{{this, normalBB}, {this, errorBB}}} {}
 
 TryApplyInst::TryApplyInst(
     SILDebugLocation Loc, SILValue callee, SILType substCalleeTy,
@@ -1221,13 +1217,13 @@ bool TermInst::isProgramTerminating() const {
   llvm_unreachable("Unhandled TermKind in switch.");
 }
 
-TermInst::SuccessorBlockArgumentsListTy
-TermInst::getSuccessorBlockArguments() const {
-  function_ref<PhiArgumentArrayRef(const SILSuccessor &)> op;
-  op = [](const SILSuccessor &succ) -> PhiArgumentArrayRef {
-    return succ.getBB()->getPhiArguments();
+TermInst::SuccessorBlockArgumentListTy
+TermInst::getSuccessorBlockArgumentLists() const {
+  function_ref<SILPhiArgumentArrayRef(const SILSuccessor &)> op;
+  op = [](const SILSuccessor &succ) -> SILPhiArgumentArrayRef {
+    return succ.getBB()->getSILPhiArguments();
   };
-  return SuccessorBlockArgumentsListTy(getSuccessors(), op);
+  return SuccessorBlockArgumentListTy(getSuccessors(), op);
 }
 
 YieldInst *YieldInst::create(SILDebugLocation loc,
@@ -1271,8 +1267,7 @@ CondBranchInst::CondBranchInst(SILDebugLocation Loc, SILValue Condition,
                                unsigned NumFalse, ProfileCounter TrueBBCount,
                                ProfileCounter FalseBBCount)
     : InstructionBaseWithTrailingOperands(Condition, Args, Loc),
-                                        DestBBs{{this, TrueBB, TrueBBCount},
-                                                {this, FalseBB, FalseBBCount}} {
+      DestBBs{{{this, TrueBB, TrueBBCount}, {this, FalseBB, FalseBBCount}}} {
   assert(Args.size() == (NumTrue + NumFalse) && "Invalid number of args");
   SILInstruction::Bits.CondBranchInst.NumTrueArgs = NumTrue;
   assert(SILInstruction::Bits.CondBranchInst.NumTrueArgs == NumTrue &&
@@ -1710,7 +1705,7 @@ DynamicMethodBranchInst::DynamicMethodBranchInst(SILDebugLocation Loc,
                                                  SILBasicBlock *NoMethodBB)
   : InstructionBase(Loc),
     Member(Member),
-    DestBBs{{this, HasMethodBB}, {this, NoMethodBB}},
+    DestBBs{{{this, HasMethodBB}, {this, NoMethodBB}}},
     Operands(this, Operand)
 {
 }
@@ -2422,6 +2417,46 @@ void KeyPathInst::dropReferencedPattern() {
   }
   Pattern = nullptr;
 }
+
+void KeyPathPatternComponent::
+visitReferencedFunctionsAndMethods(
+      std::function<void (SILFunction *)> functionCallBack,
+      std::function<void (SILDeclRef)> methodCallBack) const {
+  switch (getKind()) {
+  case KeyPathPatternComponent::Kind::SettableProperty:
+    functionCallBack(getComputedPropertySetter());
+    LLVM_FALLTHROUGH;
+  case KeyPathPatternComponent::Kind::GettableProperty: {
+    functionCallBack(getComputedPropertyGetter());
+    auto id = getComputedPropertyId();
+    switch (id.getKind()) {
+    case KeyPathPatternComponent::ComputedPropertyId::DeclRef: {
+      methodCallBack(id.getDeclRef());
+      break;
+    }
+    case KeyPathPatternComponent::ComputedPropertyId::Function:
+      functionCallBack(id.getFunction());
+      break;
+    case KeyPathPatternComponent::ComputedPropertyId::Property:
+      break;
+    }
+
+    if (auto equals = getSubscriptIndexEquals())
+      functionCallBack(equals);
+    if (auto hash = getSubscriptIndexHash())
+      functionCallBack(hash);
+
+    break;
+  }
+  case KeyPathPatternComponent::Kind::StoredProperty:
+  case KeyPathPatternComponent::Kind::OptionalChain:
+  case KeyPathPatternComponent::Kind::OptionalForce:
+  case KeyPathPatternComponent::Kind::OptionalWrap:
+  case KeyPathPatternComponent::Kind::TupleElement:
+    break;
+  }
+}
+
 
 GenericSpecializationInformation::GenericSpecializationInformation(
     SILFunction *Caller, SILFunction *Parent, SubstitutionMap Subs)

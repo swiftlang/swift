@@ -374,12 +374,15 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
 
   // Parse generic parameters in SIL mode.
   GenericParamList *generics = nullptr;
+  bool isImplied = false;
   if (isInSILMode()) {
     // If this is part of a sil function decl, generic parameters are visible in
     // the function body; otherwise, they are visible when parsing the type.
     if (!IsSILFuncDecl)
       GenericsScope.emplace(this, ScopeKind::Generics);
     generics = maybeParseGenericParams().getPtrOrNull();
+    
+    isImplied = consumeIf(tok::kw_in);
   }
   
   // In SIL mode, parse box types { ... }.
@@ -459,7 +462,7 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
     } else {
       bool isVoid = false;
       if (const auto Void = dyn_cast<SimpleIdentTypeRepr>(tyR)) {
-        if (Void->getIdentifier().str() == "Void") {
+        if (Void->getNameRef().isSimpleName(Context.Id_Void)) {
           isVoid = true;
         }
       }
@@ -477,9 +480,42 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
                                         tyR->getSourceRange());
       }
     }
+    
+    // Parse substitutions for substituted SIL types.
+    SourceLoc SubsLAngleLoc, SubsRAngleLoc;
+    MutableArrayRef<TypeRepr *> SubsTypes;
+    if (isInSILMode() && consumeIf(tok::kw_for)) {
+      if (!Tok.isContextualPunctuator("<")) {
+        diagnose(Tok, diag::sil_function_subst_expected_l_angle);
+        return makeParserError();
+      }
+      
+      SubsLAngleLoc = consumeToken();
+
+      SmallVector<TypeRepr*, 4> SubsTypesVec;
+      for (;;) {
+        auto argTy = parseType();
+        if (!argTy.getPtrOrNull())
+          return makeParserError();
+        SubsTypesVec.push_back(argTy.get());
+        if (consumeIf(tok::comma))
+          continue;
+        break;
+      }
+      if (!Tok.isContextualPunctuator(">")) {
+        diagnose(Tok, diag::sil_function_subst_expected_r_angle);
+        return makeParserError();
+      }
+      
+      SubsRAngleLoc = consumeToken();
+
+      SubsTypes = Context.AllocateCopy(SubsTypesVec);
+    }
 
     tyR = new (Context) FunctionTypeRepr(generics, argsTyR, throwsLoc, arrowLoc,
-                                         SecondHalf.get());
+                                         SecondHalf.get(),
+                                         isImplied,
+                                         SubsTypes);
   } else if (generics) {
     // Only function types may be generic.
     auto brackets = generics->getSourceRange();
@@ -493,7 +529,7 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
         if (auto ident = dyn_cast<ComponentIdentTypeRepr>(T)) {
           if (auto decl = ident->getBoundDecl()) {
             if (auto genericParam = dyn_cast<GenericTypeParamDecl>(decl))
-              ident->overwriteIdentifier(genericParam->getName());
+              ident->overwriteNameRef(genericParam->createNameRef());
           }
         }
         return true;
@@ -602,7 +638,13 @@ ParserStatus Parser::parseGenericArguments(SmallVectorImpl<TypeRepr *> &Args,
 ///   type-identifier:
 ///     identifier generic-args? ('.' identifier generic-args?)*
 ///
-ParserResult<TypeRepr> Parser::parseTypeIdentifier() {
+ParserResult<TypeRepr>
+Parser::parseTypeIdentifier(bool isParsingQualifiedDeclBaseType) {
+  // If parsing a qualified declaration name, return error if base type cannot
+  // be parsed.
+  if (isParsingQualifiedDeclBaseType && !canParseBaseTypeForQualifiedDeclName())
+    return makeParserError();
+
   if (Tok.isNot(tok::identifier) && Tok.isNot(tok::kw_Self)) {
     // is this the 'Any' type
     if (Tok.is(tok::kw_Any)) {
@@ -630,17 +672,11 @@ ParserResult<TypeRepr> Parser::parseTypeIdentifier() {
   SmallVector<ComponentIdentTypeRepr *, 4> ComponentsR;
   SourceLoc EndLoc;
   while (true) {
-    SourceLoc Loc;
-    Identifier Name;
-    if (Tok.is(tok::kw_Self)) {
-      Loc = consumeIdentifier(&Name);
-    } else {
-      // FIXME: specialize diagnostic for 'Type': type cannot start with
-      // 'metatype'
-      // FIXME: offer a fixit: 'self' -> 'Self'
-      if (parseIdentifier(Name, Loc, diag::expected_identifier_in_dotted_type))
-        Status.setIsParseError();
-    }
+    DeclNameLoc Loc;
+    DeclNameRef Name =
+        parseDeclNameRef(Loc, diag::expected_identifier_in_dotted_type, {});
+    if (!Name)
+      Status.setIsParseError();
 
     if (Loc.isValid()) {
       SourceLoc LAngle, RAngle;
@@ -650,7 +686,7 @@ ParserResult<TypeRepr> Parser::parseTypeIdentifier() {
         if (genericArgsStatus.isError())
           return genericArgsStatus;
       }
-      EndLoc = Loc;
+      EndLoc = Loc.getEndLoc();
 
       ComponentIdentTypeRepr *CompT;
       if (!GenericArgs.empty())
@@ -673,6 +709,18 @@ ParserResult<TypeRepr> Parser::parseTypeIdentifier() {
       }
       if (!peekToken().isContextualKeyword("Type")
           && !peekToken().isContextualKeyword("Protocol")) {
+        // If parsing a qualified declaration name, break before parsing the
+        // period before the final declaration name component.
+        if (isParsingQualifiedDeclBaseType) {
+          // If qualified name base type cannot be parsed from the current
+          // point (i.e. the next type identifier is not followed by a '.'),
+          // then the next identifier is the final declaration name component.
+          BacktrackingScope backtrack(*this);
+          consumeStartingCharacterOfCurrentToken(tok::period);
+          if (!canParseBaseTypeForQualifiedDeclName())
+            break;
+        }
+        // Consume the period.
         consumeToken();
         continue;
       }
@@ -688,7 +736,7 @@ ParserResult<TypeRepr> Parser::parseTypeIdentifier() {
   if (!ComponentsR.empty()) {
     // Lookup element #0 through our current scope chains in case it is some
     // thing local (this returns null if nothing is found).
-    if (auto Entry = lookupInScope(ComponentsR[0]->getIdentifier()))
+    if (auto Entry = lookupInScope(ComponentsR[0]->getNameRef()))
       if (auto *TD = dyn_cast<TypeDecl>(Entry))
         ComponentsR[0]->setValue(TD, nullptr);
 
@@ -1511,19 +1559,27 @@ bool Parser::canParseTypeIdentifierOrTypeComposition() {
   }
 }
 
+bool Parser::canParseSimpleTypeIdentifier() {
+  // Parse an identifier.
+  if (!Tok.isAny(tok::identifier, tok::kw_Self, tok::kw_Any))
+    return false;
+  consumeToken();
+
+  // Parse an optional generic argument list.
+  if (startsWithLess(Tok))
+    if (!canParseGenericArguments())
+      return false;
+
+  return true;
+}
+
 bool Parser::canParseTypeIdentifier() {
   while (true) {
-    if (!Tok.isAny(tok::identifier, tok::kw_Self, tok::kw_Any))
+    if (!canParseSimpleTypeIdentifier())
       return false;
-    consumeToken();
-    
-    if (startsWithLess(Tok)) {
-      if (!canParseGenericArguments())
-        return false;
-    }
 
     // Treat 'Foo.<anything>' as an attempt to write a dotted type
-    // unless <anything> is 'Type'.
+    // unless <anything> is 'Type' or 'Protocol'.
     if ((Tok.is(tok::period) || Tok.is(tok::period_prefix)) &&
         !peekToken().isContextualKeyword("Type") &&
         !peekToken().isContextualKeyword("Protocol")) {
@@ -1534,6 +1590,17 @@ bool Parser::canParseTypeIdentifier() {
   }
 }
 
+bool Parser::canParseBaseTypeForQualifiedDeclName() {
+  BacktrackingScope backtrack(*this);
+
+  // Parse a simple type identifier.
+  if (!canParseSimpleTypeIdentifier())
+    return false;
+
+  // Qualified name base types must be followed by a period.
+  // If the next token starts with a period, return true.
+  return startsWithSymbol(Tok, '.');
+}
 
 bool Parser::canParseOldStyleProtocolComposition() {
   consumeToken(tok::kw_protocol);

@@ -296,7 +296,8 @@ struct PrintOptions {
   /// List of attribute kinds that should not be printed.
   std::vector<AnyAttrKind> ExcludeAttrList = {DAK_Transparent, DAK_Effects,
                                               DAK_FixedLayout,
-                                              DAK_ShowInInterface};
+                                              DAK_ShowInInterface,
+                                              DAK_ImplicitlySynthesizesNestedRequirement};
 
   /// List of attribute kinds that should be printed exclusively.
   /// Empty means allow all.
@@ -428,7 +429,7 @@ struct PrintOptions {
   /// and constructors) will be printed by this function.
   std::function<void(const ValueDecl *, ASTPrinter &)> FunctionBody;
 
-  BracketOptions BracketOptions;
+  swift::BracketOptions BracketOptions;
 
   // This is explicit to guarantee that it can be called from LLDB.
   PrintOptions() {}

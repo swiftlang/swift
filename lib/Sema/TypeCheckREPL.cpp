@@ -75,7 +75,7 @@ struct REPLContext {
 
     auto *stdlib = TypeChecker::getStdlibModule(&SF);
     {
-      Identifier Id(Context.getIdentifier("_replPrintLiteralString"));
+      DeclNameRef Id(Context.getIdentifier("_replPrintLiteralString"));
       auto lookup = TypeChecker::lookupUnqualified(stdlib, Id, SourceLoc());
       if (!lookup)
         return true;
@@ -83,7 +83,7 @@ struct REPLContext {
         PrintDecls.push_back(result.getValueDecl());
     }
     {
-      Identifier Id(Context.getIdentifier("_replDebugPrintln"));
+      DeclNameRef Id(Context.getIdentifier("_replDebugPrintln"));
       auto lookup = TypeChecker::lookupUnqualified(stdlib, Id, SourceLoc());
       if (!lookup)
         return true;
@@ -256,8 +256,9 @@ void REPLChecker::generatePrintOfExpression(StringRef NameStr, Expr *E) {
   unsigned discriminator = DF.getNextDiscriminator();
 
   ClosureExpr *CE =
-      new (Context) ClosureExpr(params, SourceLoc(), SourceLoc(), SourceLoc(),
-                                TypeLoc(), discriminator, newTopLevel);
+      new (Context) ClosureExpr(SourceRange(), nullptr, params, SourceLoc(),
+                                SourceLoc(), SourceLoc(), TypeLoc(),
+                                discriminator, newTopLevel);
 
   SmallVector<AnyFunctionType::Param, 1> args;
   params->getParams(args);
@@ -451,7 +452,8 @@ Identifier REPLChecker::getNextResponseVariableName(DeclContext *DC) {
     names << "r" << NextResponseVariableIndex++;
 
     ident = Context.getIdentifier(names.str());
-    nameUsed = (bool)TypeChecker::lookupUnqualified(DC, ident, SourceLoc());
+    nameUsed = (bool)TypeChecker::lookupUnqualified(DC, DeclNameRef(ident),
+                                                    SourceLoc());
   } while (nameUsed);
 
   return ident;

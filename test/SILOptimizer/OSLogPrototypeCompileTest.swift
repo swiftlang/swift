@@ -8,6 +8,7 @@
 // the size of the byte buffer etc. are literals after the mandatory pipeline.
 
 import OSLogPrototype
+import Foundation
 
 if #available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *) {
 
@@ -409,6 +410,84 @@ if #available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *) {
     // CHECK-DAG: [[ARRAYINITRES]] = apply [[ARRAYINIT:%[0-9]+]]<(inout UnsafeMutablePointer<UInt8>, inout Array<AnyObject>) -> ()>([[ARRAYSIZE:%[0-9]+]])
     // CHECK-DAG: [[ARRAYINIT]] = function_ref @$ss27_allocateUninitializedArrayySayxG_BptBwlF
     // CHECK-DAG: [[ARRAYSIZE]] = integer_literal $Builtin.Word, 6
+  }
+
+  // CHECK-LABEL: @$s25OSLogPrototypeCompileTest25testNSObjectInterpolationL_1hy0aB06LoggerV_tF
+  func testNSObjectInterpolation(h: Logger) {
+    let nsArray: NSArray = [0, 1, 2]
+    let nsDictionary: NSDictionary = [1 : ""]
+    h.log("""
+      NSArray: \(nsArray, privacy: .public) \
+      NSDictionary: \(nsDictionary, privacy: .private)
+      """)
+      // Check if there is a call to _os_log_impl with a literal format string.
+      // CHECK-DAG is used here as it is easier to perform the checks backwards
+      // from uses to the definitions.
+
+      // CHECK-DAG: [[OS_LOG_IMPL:%[0-9]+]] = function_ref @_os_log_impl : $@convention(c)
+      // CHECK-DAG: apply [[OS_LOG_IMPL]]({{%.*}}, {{%.*}}, {{%.*}}, [[CHARPTR:%[0-9]+]], {{%.*}}, {{%.*}})
+      // CHECK-DAG: [[CHARPTR]] = struct $UnsafePointer<Int8> ([[LIT:%[0-9]+]] : $Builtin.RawPointer)
+      // CHECK-DAG: [[LIT]] = string_literal utf8 "NSArray: %{public}@ NSDictionary: %{private}@"
+
+      // Check if the size of the argument buffer is a constant.
+
+      // CHECK-DAG: [[ALLOCATE:%[0-9]+]] = function_ref @$sSp8allocate8capacitySpyxGSi_tFZ
+      // CHECK-DAG: apply [[ALLOCATE]]<UInt8>([[BUFFERSIZE:%[0-9]+]], {{%.*}})
+      // CHECK-DAG: [[BUFFERSIZE]] = struct $Int ([[BUFFERSIZELIT:%[0-9]+]]
+      // CHECK-64-DAG: [[BUFFERSIZELIT]] = integer_literal $Builtin.Int64, 22
+      // CHECK-32-DAG: [[BUFFERSIZELIT]] = integer_literal $Builtin.Int32, 14
+
+      // Check whether the header bytes: premable and argument count are constants.
+
+      // CHECK-DAG: [[SERIALIZE:%[0-9]+]] = function_ref @$s14OSLogPrototype9serialize_2atys5UInt8V_SpyAEGztF
+      // CHECK-DAG: apply [[SERIALIZE]]([[PREAMBLE:%[0-9]+]], {{%.*}})
+      // CHECK-DAG: [[PREAMBLE]] =  struct $UInt8 ([[PREAMBLELIT:%[0-9]+]] : $Builtin.Int8)
+      // CHECK-DAG: [[PREAMBLELIT]] = integer_literal $Builtin.Int8, 3
+
+      // CHECK-DAG: [[SERIALIZE:%[0-9]+]] = function_ref @$s14OSLogPrototype9serialize_2atys5UInt8V_SpyAEGztF
+      // CHECK-DAG: apply [[SERIALIZE]]([[ARGCOUNT:%[0-9]+]], {{%.*}})
+      // CHECK-DAG: [[ARGCOUNT]] =  struct $UInt8 ([[ARGCOUNTLIT:%[0-9]+]] : $Builtin.Int8)
+      // CHECK-DAG: [[ARGCOUNTLIT]] = integer_literal $Builtin.Int8, 2
+
+      // Check whether argument array is folded. We need not check the contents of
+      // the array which is checked by a different test suite.
+
+      // CHECK-DAG: [[FOREACH:%[0-9]+]] = function_ref @$sSTsE7forEachyyy7ElementQzKXEKF
+      // CHECK-DAG: try_apply [[FOREACH]]<Array<(inout UnsafeMutablePointer<UInt8>, inout Array<AnyObject>) -> ()>>({{%.*}}, [[ARGSARRAYADDR:%[0-9]+]])
+      // CHECK-DAG: store [[ARGSARRAY:%[0-9]+]] to [[ARGSARRAYADDR]]
+      // CHECK-DAG: [[ARGSARRAY]] = tuple_extract [[ARRAYINITRES:%[0-9]+]] : $(Array<(inout UnsafeMutablePointer<UInt8>, inout Array<AnyObject>) -> ()>, Builtin.RawPointer), 0
+      // CHECK-DAG: [[ARRAYINITRES]] = apply [[ARRAYINIT:%[0-9]+]]<(inout UnsafeMutablePointer<UInt8>, inout Array<AnyObject>) -> ()>([[ARRAYSIZE:%[0-9]+]])
+      // CHECK-DAG: [[ARRAYINIT]] = function_ref @$ss27_allocateUninitializedArrayySayxG_BptBwlF
+      // CHECK-DAG: [[ARRAYSIZE]] = integer_literal $Builtin.Word, 6
+  }
+
+  // CHECK-LABEL: @$s25OSLogPrototypeCompileTest23testDeadCodeEliminationL_1h6number8num32bit6stringy0aB06LoggerV_Sis5Int32VSStF
+  func testDeadCodeElimination(
+    h: Logger,
+    number: Int,
+    num32bit: Int32,
+    string: String
+  ) {
+    h.log("A message with no data")
+    h.log("smallstring")
+    h.log(
+      level: .error,
+      """
+      A message with many interpolations \(number), \(num32bit), \(string), \
+      and a suffix
+      """)
+    h.log(
+      level: .info,
+      """
+      \(1) \(1) \(1) \(1) \(1) \(1) \(1) \(1) \(1) \(1) \(1) \(1) \(1) \(1) \
+      \(1) \(1) \(1) \(1) \(1) \(1) \(1) \(1) \(1) \(1) \(1) \(1) \(1) \(1) \
+      \(1) \(1) \(1) \(1) \(1) \(1) \(1) \(1) \(1) \(1) \(1) \(1) \(1) \(1) \
+      \(1) \(1) \(1) \(1) \(1) \(48) \(49)
+      """)
+    let concatString = string + ":" + String(number)
+    h.log("\(concatString)")
+      // CHECK-NOT: OSLogMessage
+      // CHECK-LABEL: end sil function '$s25OSLogPrototypeCompileTest23testDeadCodeEliminationL_1h6number8num32bit6stringy0aB06LoggerV_Sis5Int32VSStF'
   }
 }
 

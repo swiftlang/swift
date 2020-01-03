@@ -317,7 +317,7 @@ class Constraint final : public llvm::ilist_node<Constraint>,
 
       /// If non-null, the name of a member of the first type is that
       /// being related to the second type.
-      DeclName Member;
+      DeclNameRef Member;
 
       /// The DC in which the use appears.
       DeclContext *UseDC;
@@ -360,7 +360,7 @@ class Constraint final : public llvm::ilist_node<Constraint>,
              ArrayRef<TypeVariableType *> typeVars);
 
   /// Construct a new member constraint.
-  Constraint(ConstraintKind kind, Type first, Type second, DeclName member,
+  Constraint(ConstraintKind kind, Type first, Type second, DeclNameRef member,
              DeclContext *useDC, FunctionRefKind functionRefKind,
              ConstraintLocator *locator,
              ArrayRef<TypeVariableType *> typeVars);
@@ -400,12 +400,12 @@ public:
   /// alternatives.
   static Constraint *createMemberOrOuterDisjunction(
       ConstraintSystem &cs, ConstraintKind kind, Type first, Type second,
-      DeclName member, DeclContext *useDC, FunctionRefKind functionRefKind,
+      DeclNameRef member, DeclContext *useDC, FunctionRefKind functionRefKind,
       ArrayRef<OverloadChoice> outerAlternatives, ConstraintLocator *locator);
 
   /// Create a new member constraint.
   static Constraint *createMember(ConstraintSystem &cs, ConstraintKind kind,
-                                  Type first, Type second, DeclName member,
+                                  Type first, Type second, DeclNameRef member,
                                   DeclContext *useDC,
                                   FunctionRefKind functionRefKind,
                                   ConstraintLocator *locator);
@@ -586,7 +586,7 @@ public:
   ProtocolDecl *getProtocol() const;
 
   /// Retrieve the name of the member for a member constraint.
-  DeclName getMember() const {
+  DeclNameRef getMember() const {
     assert(Kind == ConstraintKind::ValueMember ||
            Kind == ConstraintKind::UnresolvedValueMember);
     return Member.Member;

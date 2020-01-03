@@ -128,6 +128,17 @@ ModuleDecl *ClangImporter::Implementation::loadModuleDWARF(
   return decl;
 }
 
+// This function exists to defeat the lazy member importing mechanism. The
+// DWARFImporter is not capable of loading individual members, so it cannot
+// benefit from this optimization yet anyhow. Besides, if you're importing a
+// type here, you more than likely want to dump it and its fields. Loading all
+// members populates lookup tables in the Clang Importer and ensures the
+// absence of cache-fill-related side effects.
+static void forceLoadAllMembers(IterableDeclContext *IDC) {
+  if (!IDC) return;
+  IDC->loadAllMembers();
+}
+
 void ClangImporter::Implementation::lookupValueDWARF(
     DeclName name, NLKind lookupKind, Identifier inModule,
     SmallVectorImpl<ValueDecl *> &results) {
@@ -150,8 +161,10 @@ void ClangImporter::Implementation::lookupValueDWARF(
       continue;
 
     if (swiftDecl->getFullName().matchesRef(name) &&
-        swiftDecl->getDeclContext()->isModuleScopeContext())
+        swiftDecl->getDeclContext()->isModuleScopeContext()) {
+      forceLoadAllMembers(dyn_cast<IterableDeclContext>(swiftDecl));
       results.push_back(swiftDecl);
+    }
   }
 }
 
@@ -174,8 +187,10 @@ void ClangImporter::Implementation::lookupTypeDeclDWARF(
     Decl *importedDecl = cast_or_null<ValueDecl>(
         importDeclReal(namedDecl->getMostRecentDecl(), CurrentVersion));
 
-    if (auto *importedType = dyn_cast_or_null<TypeDecl>(importedDecl))
+    if (auto *importedType = dyn_cast_or_null<TypeDecl>(importedDecl)) {
+      forceLoadAllMembers(dyn_cast<IterableDeclContext>(importedType));
       receiver(importedType);
+    }
   }
 }
 

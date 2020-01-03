@@ -37,6 +37,7 @@
 #include "swift/SILOptimizer/PassManager/PassPipeline.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/Subsystems.h"
+#include "../Serialization/ModuleFormat.h"
 #include "clang/Basic/TargetInfo.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Analysis/AliasAnalysis.h"
@@ -857,7 +858,8 @@ performIRGeneration(IRGenOptions &Opts, ModuleDecl *M,
                     std::unique_ptr<SILModule> SILMod, StringRef ModuleName,
                     const PrimarySpecificPaths &PSPs,
                     llvm::LLVMContext &LLVMContext, SourceFile *SF = nullptr,
-                    llvm::GlobalVariable **outModuleHash = nullptr) {
+                    llvm::GlobalVariable **outModuleHash = nullptr,
+                    llvm::StringSet<> *linkerDirectives = nullptr) {
   auto &Ctx = M->getASTContext();
   assert(!Ctx.hadError());
 
@@ -878,8 +880,9 @@ performIRGeneration(IRGenOptions &Opts, ModuleDecl *M,
   
   {
     FrontendStatsTracer tracer(Ctx.Stats, "IRGen");
+
     // Emit the module contents.
-    irgen.emitGlobalTopLevel();
+    irgen.emitGlobalTopLevel(linkerDirectives);
 
     if (SF) {
       IGM.emitSourceFile(*SF);
@@ -1067,7 +1070,8 @@ struct LLVMCodeGenThreads {
 static void performParallelIRGeneration(
     IRGenOptions &Opts, swift::ModuleDecl *M, std::unique_ptr<SILModule> SILMod,
     StringRef ModuleName, int numThreads,
-    ArrayRef<std::string> outputFilenames) {
+    ArrayRef<std::string> outputFilenames,
+    llvm::StringSet<> *linkerDirectives) {
 
   IRGenerator irgen(Opts, *SILMod);
 
@@ -1133,7 +1137,7 @@ static void performParallelIRGeneration(
   }
 
   // Emit the module contents.
-  irgen.emitGlobalTopLevel();
+  irgen.emitGlobalTopLevel(linkerDirectives);
 
   for (auto *File : M->getFiles()) {
     if (auto *SF = dyn_cast<SourceFile>(File)) {
@@ -1261,18 +1265,21 @@ std::unique_ptr<llvm::Module> swift::performIRGeneration(
     StringRef ModuleName, const PrimarySpecificPaths &PSPs,
     llvm::LLVMContext &LLVMContext,
     ArrayRef<std::string> parallelOutputFilenames,
-    llvm::GlobalVariable **outModuleHash) {
+    llvm::GlobalVariable **outModuleHash,
+    llvm::StringSet<> *LinkerDirectives) {
   if (SILMod->getOptions().shouldPerformIRGenerationInParallel() &&
       !parallelOutputFilenames.empty()) {
     auto NumThreads = SILMod->getOptions().NumThreads;
     ::performParallelIRGeneration(Opts, M, std::move(SILMod), ModuleName,
-                                  NumThreads, parallelOutputFilenames);
+                                  NumThreads, parallelOutputFilenames,
+                                  LinkerDirectives);
     // TODO: Parallel LLVM compilation cannot be used if a (single) module is
     // needed as return value.
     return nullptr;
   }
   return ::performIRGeneration(Opts, M, std::move(SILMod), ModuleName, PSPs,
-                               LLVMContext, nullptr, outModuleHash);
+                               LLVMContext, nullptr, outModuleHash,
+                               LinkerDirectives);
 }
 
 std::unique_ptr<llvm::Module> swift::
@@ -1280,10 +1287,11 @@ performIRGeneration(IRGenOptions &Opts, SourceFile &SF,
                     std::unique_ptr<SILModule> SILMod,
                     StringRef ModuleName, const PrimarySpecificPaths &PSPs,
                     llvm::LLVMContext &LLVMContext,
-                    llvm::GlobalVariable **outModuleHash) {
+                    llvm::GlobalVariable **outModuleHash,
+                    llvm::StringSet<> *LinkerDirectives) {
   return ::performIRGeneration(Opts, SF.getParentModule(), std::move(SILMod),
                                ModuleName, PSPs, LLVMContext, &SF,
-                               outModuleHash);
+                               outModuleHash, LinkerDirectives);
 }
 
 void
@@ -1330,7 +1338,7 @@ swift::createSwiftModuleObjectFile(SILModule &SILMod, StringRef Buffer,
     break;
   }
   ASTSym->setSection(Section);
-  ASTSym->setAlignment(8);
+  ASTSym->setAlignment(serialization::SWIFTMODULE_ALIGNMENT);
   ::performLLVM(Opts, &Ctx.Diags, nullptr, nullptr, IGM.getModule(),
                 IGM.TargetMachine.get(),
                 Ctx.LangOpts.EffectiveLanguageVersion,

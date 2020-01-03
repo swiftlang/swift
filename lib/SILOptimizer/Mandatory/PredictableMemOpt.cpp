@@ -934,7 +934,7 @@ static SILInstruction *getNonPhiBlockIncomingValueDef(SILValue incomingValue,
 static bool
 terminatorHasAnyKnownPhis(TermInst *ti,
                           ArrayRef<SILPhiArgument *> insertedPhiNodesSorted) {
-  for (auto succArgList : ti->getSuccessorBlockArguments()) {
+  for (auto succArgList : ti->getSuccessorBlockArgumentLists()) {
     if (llvm::any_of(succArgList, [&](SILPhiArgument *arg) {
           return binary_search(insertedPhiNodesSorted, arg);
         })) {
@@ -2118,7 +2118,7 @@ bool AllocOptimize::promoteLoadCopy(LoadInst *li) {
     SILValue addr = li->getOperand();
     li->eraseFromParent();
     if (auto *addrI = addr->getDefiningInstruction())
-      recursivelyDeleteTriviallyDeadInstructions(addrI);
+      eliminateDeadInstruction(addrI);
     return true;
   }
 
@@ -2139,7 +2139,7 @@ bool AllocOptimize::promoteLoadCopy(LoadInst *li) {
   SILValue addr = li->getOperand();
   li->eraseFromParent();
   if (auto *addrI = addr->getDefiningInstruction())
-    recursivelyDeleteTriviallyDeadInstructions(addrI);
+    eliminateDeadInstruction(addrI);
   return true;
 }
 
@@ -2242,7 +2242,7 @@ bool AllocOptimize::promoteLoadBorrow(LoadBorrowInst *lbi) {
   SILValue addr = lbi->getOperand();
   lbi->eraseFromParent();
   if (auto *addrI = addr->getDefiningInstruction())
-    recursivelyDeleteTriviallyDeadInstructions(addrI);
+    eliminateDeadInstruction(addrI);
   return true;
 }
 

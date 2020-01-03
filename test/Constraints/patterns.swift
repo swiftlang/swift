@@ -87,7 +87,7 @@ default:
 }
 
 // Raise an error if pattern productions are used in expressions.
-var b = var a // expected-error{{expected initial value after '='}} expected-error {{type annotation missing in pattern}} expected-error {{consecutive statements on a line must be separated by ';'}} {{8-8=;}}
+var b = var x // expected-error{{expected initial value after '='}} expected-error {{type annotation missing in pattern}} expected-error {{consecutive statements on a line must be separated by ';'}} {{8-8=;}}
 var c = is Int // expected-error{{expected initial value after '='}} expected-error {{expected expression}}  expected-error {{consecutive statements on a line must be separated by ';'}} {{8-8=;}}
 
 // TODO: Bad recovery in these cases. Although patterns are never valid
@@ -211,7 +211,6 @@ struct A<T> : PP {
 
 extension PP {
   func map<T>(_ f: (Self.E) -> T) -> T {}
-  // expected-note@-1 2 {{in call to function 'map'}}
 }
 
 enum EE {
@@ -231,14 +230,14 @@ func good(_ a: A<EE>) -> Int {
 }
 
 func bad(_ a: A<EE>) {
-  a.map { // expected-error {{generic parameter 'T' could not be inferred}}
+  a.map { // expected-error {{unable to infer complex closure return type; add explicit type to disambiguate}} {{none}}
     let _: EE = $0
     return 1
   }
 }
 
 func ugly(_ a: A<EE>) {
-  a.map { // expected-error {{generic parameter 'T' could not be inferred}}
+  a.map { // expected-error {{unable to infer complex closure return type; add explicit type to disambiguate}} {{none}}
     switch $0 {
     case .A:
       return 1
@@ -275,7 +274,9 @@ struct StaticMembers: Equatable {
   static var optProp: Optional = StaticMembers()
 
   static func method(_: Int) -> StaticMembers { return prop }
+  // expected-note@-1 {{found candidate with type '(Int) -> StaticMembers'}}
   static func method(withLabel: Int) -> StaticMembers { return prop }
+  // expected-note@-1 {{found candidate with type '(Int) -> StaticMembers'}}
   static func optMethod(_: Int) -> StaticMembers? { return optProp }
 
   static func ==(x: StaticMembers, y: StaticMembers) -> Bool { return true }
@@ -300,7 +301,7 @@ switch staticMembers {
   // TODO: repeated error message
   case .optProp: break // expected-error* {{not unwrapped}}
 
-  case .method: break // expected-error{{cannot match}}
+  case .method: break // expected-error{{no exact matches in call to static method 'method'}}
   case .method(0): break
   case .method(_): break // expected-error{{'_' can only appear in a pattern}}
   case .method(let x): break // expected-error{{cannot appear in an expression}}
@@ -379,10 +380,10 @@ func test8347() -> String {
       return ""
     }
 
-    func h() -> String { // expected-note {{found this candidate}}
+    func h() -> String {
       return ""
     }
-    func h() -> Double { // expected-note {{found this candidate}}
+    func h() -> Double {
       return 3.0
     }
     func h() -> Int? { //expected-note{{found this candidate}}

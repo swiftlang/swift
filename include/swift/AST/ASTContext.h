@@ -22,6 +22,7 @@
 #include "swift/AST/Identifier.h"
 #include "swift/AST/SearchPathOptions.h"
 #include "swift/AST/Type.h"
+#include "swift/AST/Types.h"
 #include "swift/AST/TypeAlignments.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/Malloc.h"
@@ -61,6 +62,7 @@ namespace swift {
   class Decl;
   class DeclContext;
   class DefaultArgumentInitializer;
+  class DerivativeAttr;
   class ExtensionDecl;
   class ForeignRepresentationInfo;
   class FuncDecl;
@@ -280,6 +282,16 @@ public:
   /// The next auto-closure discriminator.  This needs to be preserved
   /// across invocations of both the parser and the type-checker.
   unsigned NextAutoClosureDiscriminator = 0;
+
+  /// Cache of `@derivative` attributes keyed by parameter indices and
+  /// derivative function kind. Used to diagnose duplicate `@derivative`
+  /// attributes for the same key.
+  // TODO(TF-1042): remove `DerivativeAttrs` from `ASTContext`. Serialize
+  // derivative function configurations per original `AbstractFunctionDecl`.
+  llvm::DenseMap<
+      std::tuple<Decl *, IndexSubset *, AutoDiffDerivativeFunctionKind>,
+      llvm::SmallPtrSet<DerivativeAttr *, 1>>
+      DerivativeAttrs;
 
 private:
   /// The current generation number, which reflects the number of
@@ -562,6 +574,19 @@ public:
   /// which will usually by the same as \c type.
   Type getBridgedToObjC(const DeclContext *dc, Type type,
                         Type *bridgedValueType = nullptr) const;
+
+  /// Get the Clang type corresponding to a Swift function type.
+  ///
+  /// \param params The function parameters.
+  /// \param resultTy The Swift result type.
+  /// \param incompleteExtInfo Used to convey escaping and throwing
+  ///                          information, in case it is needed.
+  /// \param trueRep The actual calling convention, which must be C-compatible.
+  ///                The calling convention in \p incompleteExtInfo is ignored.
+  const clang::Type *
+  getClangFunctionType(ArrayRef<AnyFunctionType::Param> params, Type resultTy,
+                       const FunctionType::ExtInfo incompleteExtInfo,
+                       FunctionTypeRepresentation trueRep);
 
   /// Determine whether the given Swift type is representable in a
   /// given foreign language.
@@ -881,9 +906,9 @@ public:
   CanGenericSignature getSingleGenericParameterSignature() const;
 
   /// Retrieve a generic signature with a single type parameter conforming
-  /// to the given existential type.
-  CanGenericSignature getExistentialSignature(CanType existential,
-                                              ModuleDecl *mod);
+  /// to the given opened archetype.
+  CanGenericSignature getOpenedArchetypeSignature(CanType existential,
+                                                  ModuleDecl *mod);
 
   GenericSignature getOverrideGenericSignature(const ValueDecl *base,
                                                const ValueDecl *derived);

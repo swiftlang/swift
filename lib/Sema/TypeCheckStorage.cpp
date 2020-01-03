@@ -17,6 +17,7 @@
 
 #include "CodeSynthesis.h"
 #include "TypeChecker.h"
+#include "TypeCheckAvailability.h"
 #include "TypeCheckDecl.h"
 #include "TypeCheckType.h"
 #include "swift/AST/ASTContext.h"
@@ -694,7 +695,20 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
     // Perform accesses to the wrappedValues along the composition chain.
     for (unsigned i : range(firstWrapperIdx, lastWrapperIdx)) {
       auto wrapperInfo = var->getAttachedPropertyWrapperTypeInfo(i);
-      underlyingVars.push_back(wrapperInfo.valueVar);
+      auto wrappedValue = wrapperInfo.valueVar;
+
+      // Check for availability of wrappedValue.
+      if (accessor->getAccessorKind() == AccessorKind::Get ||
+          accessor->getAccessorKind() == AccessorKind::Read) {
+        if (auto *attr = wrappedValue->getAttrs().getUnavailable(ctx)) {
+          diagnoseExplicitUnavailability(
+              wrappedValue,
+              var->getAttachedPropertyWrappers()[i]->getRangeWithAt(),
+              var->getDeclContext(), nullptr);
+        }
+      }
+
+      underlyingVars.push_back(wrappedValue);
     }
     semantics = AccessSemantics::DirectToStorage;
     selfAccessKind = SelfAccessorKind::Peer;
@@ -800,18 +814,15 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
 
     // Key path referring to the property being accessed.
     Expr *propertyKeyPath = new (ctx) KeyPathDotExpr(SourceLoc());
-    propertyKeyPath = new (ctx) UnresolvedDotExpr(
-        propertyKeyPath, SourceLoc(),
-        enclosingSelfAccess->accessedProperty->getFullName(), DeclNameLoc(),
-        /*Implicit=*/true);
+    propertyKeyPath = UnresolvedDotExpr::createImplicit(ctx, propertyKeyPath,
+        enclosingSelfAccess->accessedProperty->getFullName());
     propertyKeyPath = new (ctx) KeyPathExpr(
         SourceLoc(), nullptr, propertyKeyPath);
 
     // Key path referring to the backing storage property.
     Expr *storageKeyPath = new (ctx) KeyPathDotExpr(SourceLoc());
-    storageKeyPath = new (ctx) UnresolvedDotExpr(
-        storageKeyPath, SourceLoc(), storage->getFullName(), DeclNameLoc(),
-        /*Implicit=*/true);
+    storageKeyPath = UnresolvedDotExpr::createImplicit(ctx, storageKeyPath,
+                                                       storage->getFullName());
     storageKeyPath = new (ctx) KeyPathExpr(
         SourceLoc(), nullptr, storageKeyPath);
     Expr *args[3] = {
@@ -2130,7 +2141,7 @@ static VarDecl *synthesizePropertyWrapperStorageWrapperProperty(
   // that to find the storage wrapper property.
   if (auto attr = var->getAttrs().getAttribute<ProjectedValuePropertyAttr>()){
     SmallVector<ValueDecl *, 2> declsFound;
-    auto projectionName = attr->ProjectionPropertyName;
+    DeclNameRef projectionName(attr->ProjectionPropertyName);
     auto dc = var->getDeclContext();
     if (dc->isTypeContext()) {
       dc->lookupQualified(dc->getSelfNominalTypeDecl(), projectionName,
@@ -2770,7 +2781,8 @@ StorageImplInfoRequest::evaluate(Evaluator &evaluator,
 
   // Check if we have observers.
   } else if (hasWillSet || hasDidSet) {
-    if (storage->getAttrs().hasAttribute<OverrideAttr>()) {
+    if (storage->getAttrs().hasAttribute<OverrideAttr>() &&
+        storage->getDeclContext()->isTypeContext()) {
       readImpl = ReadImplKind::Inherited;
     } else {
       readImpl = ReadImplKind::Stored;

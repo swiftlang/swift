@@ -391,6 +391,9 @@ void updateOpaqueArchetypes(SILFunction &F) {
 /// A utility pass to serialize a SILModule at any place inside the optimization
 /// pipeline.
 class SerializeSILPass : public SILModuleTransform {
+    
+  bool onlyForCrossModuleOptimization;
+    
   /// Removes [serialized] from all functions. This allows for more
   /// optimizations and for a better dead function elimination.
   void removeSerializedFlagFromAllFunctions(SILModule &M) {
@@ -405,6 +408,11 @@ class SerializeSILPass : public SILModuleTransform {
         updateOpaqueArchetypes(F);
         invalidateAnalysis(&F, SILAnalysis::InvalidationKind::Everything);
       }
+
+      // After serialization we don't need to keep @alwaysEmitIntoClient
+      // functions alive, i.e. we don't need to treat them as public functions.
+      if (F.getLinkage() == SILLinkage::PublicNonABI && M.isWholeModule())
+        F.setLinkage(SILLinkage::Shared);
     }
 
     for (auto &WT : M.getWitnessTables()) {
@@ -417,11 +425,18 @@ class SerializeSILPass : public SILModuleTransform {
   }
 
 public:
-  SerializeSILPass() {}
+  SerializeSILPass(bool onlyForCrossModuleOptimization)
+    : onlyForCrossModuleOptimization(onlyForCrossModuleOptimization)
+  { }
+  
   void run() override {
     auto &M = *getModule();
     // Nothing to do if the module was serialized already.
     if (M.isSerialized())
+      return;
+    
+    if (onlyForCrossModuleOptimization &&
+        !M.getOptions().CrossModuleOptimization)
       return;
 
     // Mark all reachable functions as "anchors" so that they are not
@@ -444,5 +459,9 @@ public:
 };
 
 SILTransform *swift::createSerializeSILPass() {
-  return new SerializeSILPass();
+  return new SerializeSILPass(/* onlyForCrossModuleOptimization */ false);
+}
+
+SILTransform *swift::createCMOSerializeSILPass() {
+  return new SerializeSILPass(/* onlyForCrossModuleOptimization */ true);
 }

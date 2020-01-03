@@ -9,9 +9,6 @@ target_link_libraries(swift
                       PRIVATE
                         swiftDriver
                         swiftFrontendTool)
-if(HAVE_UNICODE_LIBEDIT)
-  target_link_libraries(swift PRIVATE edit)
-endif()
 
 swift_create_post_build_symlink(swift
   SOURCE "swift${CMAKE_EXECUTABLE_SUFFIX}"

@@ -412,9 +412,10 @@ final class TestRunner {
   private static func getExecutedInstructions() -> UInt64 {
     if #available(OSX 10.9, iOS 7.0, *) {
       var u = rusage_info_v4()
-      let p = UnsafeMutablePointer(&u)
-      p.withMemoryRebound(to: Optional<rusage_info_t>.self, capacity: 1) { up in
-        let _ = proc_pid_rusage(getpid(), RUSAGE_INFO_V4, up)
+      withUnsafeMutablePointer(to: &u) { p in
+        p.withMemoryRebound(to: Optional<rusage_info_t>.self, capacity: 1) { up in
+          let _ = proc_pid_rusage(getpid(), RUSAGE_INFO_V4, up)
+        }
       }
       return u.ri_instructions
     } else {

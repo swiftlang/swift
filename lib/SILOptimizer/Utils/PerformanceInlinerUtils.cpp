@@ -735,9 +735,9 @@ SILFunction *swift::getEligibleFunction(FullApplySite AI,
     // Check if passed Self is the same as the Self of the caller.
     // In this case, it is safe to inline because both functions
     // use the same Self.
-    if (AI.hasSelfArgument() && Caller->hasSelfParam()) {
+    if (AI.hasSelfArgument() && Caller->hasSelfMetadataParam()) {
       auto CalleeSelf = stripCasts(AI.getSelfArgument());
-      auto CallerSelf = Caller->getSelfArgument();
+      auto CallerSelf = Caller->getSelfMetadataArgument();
       if (CalleeSelf != SILValue(CallerSelf))
         return nullptr;
     } else

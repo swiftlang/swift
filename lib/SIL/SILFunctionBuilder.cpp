@@ -76,12 +76,12 @@ void SILFunctionBuilder::addFunctionAttributes(SILFunction *F,
           SILFunctionTypeRepresentation::ObjCMethod)
     return;
 
-  auto *replacedFuncAttr = Attrs.getAttribute<DynamicReplacementAttr>();
-  if (!replacedFuncAttr)
+  // Only assign replacements when the thing being replaced is function-like and
+  // explicitly declared.  
+  auto *origDecl = decl->getDynamicallyReplacedDecl();
+  auto *replacedDecl = dyn_cast_or_null<AbstractFunctionDecl>(origDecl);
+  if (!replacedDecl)
     return;
-
-  auto *replacedDecl = replacedFuncAttr->getReplacedFunction();
-  assert(replacedDecl);
 
   if (decl->isObjC()) {
     F->setObjCReplacement(replacedDecl);

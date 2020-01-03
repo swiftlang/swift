@@ -8,6 +8,8 @@
             "remote": { "id": "apple/swift-cmark" } },
         "llbuild": {
             "remote": { "id": "apple/swift-llbuild" } },
+        "swift-tools-support-core": {
+            "remote": { "id": "apple/swift-tools-support-core" } },
         "swiftpm": {
             "remote": { "id": "apple/swift-package-manager" } },
         "swift-syntax": {
@@ -52,6 +54,7 @@
                 "swift": "master",
                 "cmark": "master",
                 "llbuild": "master",
+                "swift-tools-support-core": "master",
                 "swiftpm": "master",
                 "swift-syntax": "master",
                 "swift-stress-tester": "master",
@@ -77,6 +80,7 @@
                 "swift": "master-next",
                 "cmark": "master",
                 "llbuild": "master",
+                "swift-tools-support-core": "master",
                 "swiftpm": "master",
                 "swift-syntax": "master",
                 "swift-stress-tester": "master",
@@ -238,6 +242,30 @@
                 "icu": "release-61-1",
                 "indexstore-db": "swift-5.1-branch",
                 "sourcekit-lsp": "swift-5.1-branch",
+                "swift-format": "master"
+            }
+        },
+       "swift-5.2-branch": {
+            "aliases": ["swift-5.2-branch", "swift/swift-5.2-branch"],
+            "repos": {
+                "llvm-project": "swift/swift-5.2-branch",
+                "swift": "swift-5.2-branch",
+                "cmark": "swift-5.2-branch",
+                "llbuild": "swift-5.2-branch",
+                "swift-tools-support-core": "swift-5.2-branch",
+                "swiftpm": "swift-5.2-branch",
+                "swift-syntax": "swift-5.2-branch",
+                "swift-stress-tester": "swift-5.2-branch",
+                "swift-corelibs-xctest": "swift-5.2-branch",
+                "swift-corelibs-foundation": "swift-5.2-branch",
+                "swift-corelibs-libdispatch": "swift-5.2-branch",
+                "swift-integration-tests": "swift-5.2-branch",
+                "swift-xcode-playground-support": "swift-5.2-branch",
+                "ninja": "release",
+                "icu": "release-65-1",
+                "cmake": "v3.15.1",
+                "indexstore-db": "swift-5.2-branch",
+                "sourcekit-lsp": "swift-5.2-branch",
                 "swift-format": "master"
             }
         }

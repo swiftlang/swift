@@ -42,12 +42,13 @@ SerializedSILLoader::SerializedSILLoader(
 
 SerializedSILLoader::~SerializedSILLoader() {}
 
-SILFunction *SerializedSILLoader::lookupSILFunction(SILFunction *Callee) {
+SILFunction *SerializedSILLoader::lookupSILFunction(SILFunction *Callee,
+                                                    bool onlyUpdateLinkage) {
   // It is possible that one module has a declaration of a SILFunction, while
   // another has the full definition.
   SILFunction *retVal = nullptr;
   for (auto &Des : LoadedSILSections) {
-    if (auto Func = Des->lookupSILFunction(Callee)) {
+    if (auto Func = Des->lookupSILFunction(Callee, onlyUpdateLinkage)) {
       LLVM_DEBUG(llvm::dbgs() << "Deserialized " << Func->getName() << " from "
                  << Des->getModuleIdentifier().str() << "\n");
       if (!Func->empty())

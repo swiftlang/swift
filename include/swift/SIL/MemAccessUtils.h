@@ -488,6 +488,17 @@ AccessedStorage findAccessedStorageNonNested(SILValue sourceAddr);
 /// uninitialized.
 bool memInstMustInitialize(Operand *memOper);
 
+/// Is this an alloc_stack instruction that is:
+///
+/// 1. Only initialized once in its own def block.
+/// 2. Never written to again except by destroy_addr.
+///
+/// On return, destroyingUsers contains the list of users that destroy the
+/// alloc_stack. If the alloc_stack is destroyed in pieces, we do not guarantee
+/// that the list of destroying users is a minimal jointly post-dominating set.
+bool isSingleInitAllocStack(AllocStackInst *asi,
+                            SmallVectorImpl<SILInstruction *> &destroyingUsers);
+
 /// Return true if the given address producer may be the source of a formal
 /// access (a read or write of a potentially aliased, user visible variable).
 ///

@@ -167,10 +167,6 @@ ParserStatus Parser::parseExprOrStmt(ASTNode &Result) {
     }
   }
 
-  if (ResultExpr.hasCodeCompletion() && CodeCompletion) {
-    CodeCompletion->completeExpr();
-  }
-
   return ResultExpr;
 }
 
@@ -202,6 +198,8 @@ bool Parser::isTerminatorForBraceItemListKind(BraceItemListKind Kind,
                                               ArrayRef<ASTNode> ParsedDecls) {
   switch (Kind) {
   case BraceItemListKind::Brace:
+  case BraceItemListKind::TopLevelCode:
+  case BraceItemListKind::TopLevelLibrary:
     return false;
   case BraceItemListKind::Case: {
     if (Tok.is(tok::pound_if)) {
@@ -220,26 +218,6 @@ bool Parser::isTerminatorForBraceItemListKind(BraceItemListKind Kind,
     }
     return isAtStartOfSwitchCase(*this);
   }
-  case BraceItemListKind::TopLevelCode:
-    // When parsing the top level executable code for a module, if we parsed
-    // some executable code, then we're done.  We want to process (name bind,
-    // type check, etc) decls one at a time to make sure that there are not
-    // forward type references, etc.  There is an outer loop around the parser
-    // that will reinvoke the parser at the top level on each statement until
-    // EOF.  In contrast, it is ok to have forward references between classes,
-    // functions, etc.
-    for (auto I : ParsedDecls) {
-      if (isa<TopLevelCodeDecl>(I.get<Decl*>()))
-        // Only bail out if the next token is at the start of a line.  If we
-        // don't, then we may accidentally allow things like "a = 1 b = 4".
-        // FIXME: This is really dubious.  This will reject some things, but
-        // allow other things we don't want.
-        if (Tok.isAtStartOfLine())
-          return true;
-    }
-    return false;
-  case BraceItemListKind::TopLevelLibrary:
-    return false;
   case BraceItemListKind::ActiveConditionalBlock:
   case BraceItemListKind::InactiveConditionalBlock:
     return Tok.isNot(tok::pound_else) && Tok.isNot(tok::pound_endif) &&
@@ -257,7 +235,8 @@ void Parser::consumeTopLevelDecl(ParserPosition BeginParserPosition,
   backtrackToPosition(BeginParserPosition);
   SourceLoc BeginLoc = Tok.getLoc();
   State->setCodeCompletionDelayedDeclState(
-      PersistentParserState::CodeCompletionDelayedDeclKind::TopLevelCodeDecl,
+      SourceMgr, L->getBufferID(),
+      CodeCompletionDelayedDeclKind::TopLevelCodeDecl,
       PD_Default, TLCD, {BeginLoc, EndLoc}, BeginParserPosition.PreviousLoc);
 
   // Skip the rest of the file to prevent the parser from constructing the AST
@@ -288,7 +267,8 @@ void Parser::consumeTopLevelDecl(ParserPosition BeginParserPosition,
 ///     expr '=' expr
 ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
                                      BraceItemListKind Kind,
-                                     BraceItemListKind ConditionalBlockKind) {
+                                     BraceItemListKind ConditionalBlockKind,
+                                     bool &IsFollowingGuard) {
   bool isRootCtx = SyntaxContext->isRoot();
   SyntaxParsingContext ItemListContext(SyntaxContext,
                                        SyntaxKind::CodeBlockItemList);
@@ -381,7 +361,8 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
         [&](SmallVectorImpl<ASTNode> &Elements, bool IsActive) {
           parseBraceItems(Elements, Kind, IsActive
                             ? BraceItemListKind::ActiveConditionalBlock
-                            : BraceItemListKind::InactiveConditionalBlock);
+                            : BraceItemListKind::InactiveConditionalBlock,
+                          IsFollowingGuard);
         });
       if (IfConfigResult.hasCodeCompletion() && isCodeCompletionFirstPass()) {
         consumeDecl(BeginParserPosition, None, IsTopLevel);
@@ -418,7 +399,18 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
       ParserResult<Decl> DeclResult = 
           parseDecl(IsTopLevel ? PD_AllowTopLevel : PD_Default,
                     IsAtStartOfLineOrPreviousHadSemi,
-                    [&](Decl *D) {TmpDecls.push_back(D);});
+                    [&](Decl *D) {
+                      TmpDecls.push_back(D);
+
+                      // Any function after a 'guard' statement is marked as
+                      // possibly having local captures. This allows SILGen
+                      // to correctly determine its capture list, since
+                      // otherwise it would be skipped because it is not
+                      // defined inside a local context.
+                      if (IsFollowingGuard)
+                        if (auto *FD = dyn_cast<FuncDecl>(D))
+                          FD->setHasTopLevelLocalContextCaptures();
+                    });
       BraceItemsStatus |= DeclResult;
       if (DeclResult.isParseError()) {
         NeedParseErrorRecovery = true;
@@ -468,6 +460,14 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
                                        Result, Result.getEndLoc());
         TLCD->setBody(Brace);
         Entries.push_back(TLCD);
+
+        // A top-level 'guard' statement can introduce local bindings, so we
+        // must mark all functions following one. This makes them behave
+        // as if they were in local context for the purposes of capture
+        // emission in SILGen.
+        if (auto *stmt = Result.dyn_cast<Stmt *>())
+          if (isa<GuardStmt>(stmt))
+            IsFollowingGuard = true;
       }
     } else if (Tok.is(tok::kw_init) && isa<ConstructorDecl>(CurDeclContext)) {
       SourceLoc StartLoc = Tok.getLoc();

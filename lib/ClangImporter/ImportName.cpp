@@ -21,6 +21,7 @@
 #include "ClangDiagnosticConsumer.h"
 #include "swift/Subsystems.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ClangSwiftTypeCorrespondence.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsClangImporter.h"
 #include "swift/AST/Module.h"
@@ -170,19 +171,6 @@ static bool isIntegerType(clang::QualType clangType) {
   return false;
 }
 
-/// Whether the given Objective-C type can be imported as an optional type.
-static bool canImportAsOptional(clang::ASTContext &ctx, clang::QualType type) {
-  // Note: this mimics ImportHint::canImportAsOptional.
-
-  // Objective-C object pointers.
-  if (type->getAs<clang::ObjCObjectPointerType>()) return true;
-
-  // Block and C pointers, including CF types.
-  if (type->isBlockPointerType() || type->isPointerType()) return true;
-
-  return false;
-}
-
 static Optional<ForeignErrorConvention::Kind>
 classifyMethodErrorHandling(const clang::ObjCMethodDecl *clangDecl,
                             OptionalTypeKind resultOptionality) {
@@ -202,7 +190,8 @@ classifyMethodErrorHandling(const clang::ObjCMethodDecl *clangDecl,
     // non-optional type.
     case clang::SwiftErrorAttr::NullResult:
       if (resultOptionality != OTK_None &&
-          canImportAsOptional(clangCtx, clangDecl->getReturnType()))
+          swift::canImportAsOptional(
+            clangDecl->getReturnType().getTypePtrOrNull()))
         return ForeignErrorConvention::NilResult;
       return None;
 
@@ -235,7 +224,8 @@ classifyMethodErrorHandling(const clang::ObjCMethodDecl *clangDecl,
 
   // For optional reference results, a nil value is normally an error.
   if (resultOptionality != OTK_None &&
-      canImportAsOptional(clangCtx, clangDecl->getReturnType())) {
+      swift::canImportAsOptional(
+        clangDecl->getReturnType().getTypePtrOrNull())) {
     return ForeignErrorConvention::NilResult;
   }
 

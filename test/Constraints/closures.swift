@@ -249,10 +249,10 @@ var _: (Int,Int) -> Int = {$0+$1+$2}  // expected-error {{contextual closure typ
 // Crash when re-typechecking bodies of non-single expression closures
 
 struct CC {}
-func callCC<U>(_ f: (CC) -> U) -> () {} // expected-note {{in call to function 'callCC'}}
+func callCC<U>(_ f: (CC) -> U) -> () {}
 
 func typeCheckMultiStmtClosureCrash() {
-  callCC { // expected-error {{generic parameter 'U' could not be inferred}}
+  callCC { // expected-error {{unable to infer complex closure return type; add explicit type to disambiguate}} {{none}}
     _ = $0
     return 1
   }
@@ -313,7 +313,7 @@ struct Thing {
   init?() {}
 }
 // This throws a compiler error
-let things = Thing().map { thing in  // expected-error {{generic parameter 'U' could not be inferred}}
+let things = Thing().map { thing in  // expected-error {{unable to infer complex closure return type; add explicit type to disambiguate}} {{34-34=-> <#Result#> }}
   // Commenting out this makes it compile
   _ = thing
   return thing
@@ -322,7 +322,7 @@ let things = Thing().map { thing in  // expected-error {{generic parameter 'U' c
 
 // <rdar://problem/21675896> QoI: [Closure return type inference] Swift cannot find members for the result of inlined lambdas with branches
 func r21675896(file : String) {
-  let x: String = { // expected-error {{unable to infer complex closure return type; add explicit type to disambiguate}} {{20-20= () -> String in }}
+  let x: String = { // expected-error {{unable to infer complex closure return type; add explicit type to disambiguate}} {{20-20= () -> <#Result#> in }}
     if true {
       return "foo"
     }
@@ -360,7 +360,7 @@ func someGeneric19997471<T>(_ x: T) {
 
 
 // <rdar://problem/20921068> Swift fails to compile: [0].map() { _ in let r = (1,2).0; return r }
-[0].map {  // expected-error {{generic parameter 'T' could not be inferred}}
+[0].map {  // expected-error {{unable to infer complex closure return type; add explicit type to disambiguate}} {{5-5=-> <#Result#> }}
   _ in
   let r =  (1,2).0
   return r
@@ -408,7 +408,7 @@ func r20789423() {
   print(p.f(p)())  // expected-error {{cannot convert value of type 'C' to expected argument type 'Int'}}
   // expected-error@-1:11 {{cannot call value of non-function type '()'}}
   
-  let _f = { (v: Int) in  // expected-error {{unable to infer complex closure return type; add explicit type to disambiguate}} {{23-23=-> String }}
+  let _f = { (v: Int) in  // expected-error {{unable to infer complex closure return type; add explicit type to disambiguate}} {{23-23=-> <#Result#> }}
     print("a")
     return "hi"
   }
@@ -443,7 +443,7 @@ class C_SR_2505 : P_SR_2505 {
   func call(_ c: C_SR_2505) -> Bool {
     // Note: the diagnostic about capturing 'self', indicates that we have
     // selected test(_) rather than test(it:)
-    return c.test { o in test(o) } // expected-error{{call to method 'test' in closure requires explicit 'self.' to make capture semantics explicit}}
+    return c.test { o in test(o) } // expected-error{{call to method 'test' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note{{capture 'self' explicitly to enable implicit 'self' in this closure}} expected-note{{reference 'self.' explicitly}}
   }
 }
 
@@ -484,7 +484,7 @@ let _ = { $0 = $0 = 42 } // expected-error {{assigning a variable to itself}}
 let mismatchInClosureResultType : (String) -> ((Int) -> Void) = {
   (String) -> ((Int) -> Void) in
     return { }
-    // expected-error@-1 {{contextual type for closure argument list expects 1 argument, which cannot be implicitly ignored}}
+    // expected-error@-1 {{contextual type for closure argument list expects 1 argument, which cannot be implicitly ignored}} {{13-13= _ in}}
 }
 
 // SR-3520: Generic function taking closure with inout parameter can result in a variety of compiler errors or EXC_BAD_ACCESS
@@ -717,7 +717,7 @@ func rdar37790062() {
 }
 
 // <rdar://problem/39489003>
-typealias KeyedItem<K, T> = (key: K, value: T) // expected-note {{'T' declared as parameter to type 'KeyedItem'}}
+typealias KeyedItem<K, T> = (key: K, value: T)
 
 protocol Node {
   associatedtype T
@@ -731,7 +731,7 @@ extension Node {
   func getChild(for key:K)->(key: K, value: T) {
     return children.first(where: { (item:KeyedItem) -> Bool in
         return item.key == key
-        // expected-error@-1 {{generic parameter 'T' could not be inferred}}
+        // expected-error@-1 {{binary operator '==' cannot be applied to two 'Self.K' operands}}
       })!
   }
 }
@@ -763,6 +763,7 @@ overloaded { print("hi"); print("bye") } // multiple expression closure without 
 // expected-error@-1 {{ambiguous use of 'overloaded'}}
 
 func not_overloaded(_ handler: () -> Int) {}
+// expected-note@-1 {{'not_overloaded' declared here}}
 
 not_overloaded { } // empty body
 // expected-error@-1 {{cannot convert value of type '()' to closure result type 'Int'}}

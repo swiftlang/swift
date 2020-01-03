@@ -1207,6 +1207,12 @@ namespace {
             }
             if (!Context.LangOpts.EnableNonFrozenEnumExhaustivityDiagnostics)
               continue;
+
+            // This can occur if the switch is empty and the subject type is an
+            // enum. If decomposing the enum type yields an unknown space that
+            // is not required, don't suggest adding it in the fix-it.
+            if (flat.isAllowedButNotRequired())
+              continue;
           }
 
           process(flat, flats.size() == 1);
@@ -1445,7 +1451,9 @@ namespace {
         if (!SP) {
           // If there's no sub-pattern then there's no further recursive
           // structure here.  Yield the constructor space.
-          return Space::forConstructor(item->getType(), VP->getName(), None);
+          // FIXME: Compound names.
+          return Space::forConstructor(item->getType(),
+                                       VP->getName().getBaseIdentifier(), None);
         }
 
         SmallVector<Space, 4> conArgSpace;
@@ -1457,7 +1465,9 @@ namespace {
                          [&](TuplePatternElt pate) {
                            return projectPattern(pate.getPattern());
                          });
-          return Space::forConstructor(item->getType(), VP->getName(),
+          // FIXME: Compound names.
+          return Space::forConstructor(item->getType(),
+                                       VP->getName().getBaseIdentifier(),
                                        conArgSpace);
         }
         case PatternKind::Paren: {
@@ -1491,7 +1501,9 @@ namespace {
           } else {
             conArgSpace.push_back(projectPattern(SP));
           }
-          return Space::forConstructor(item->getType(), VP->getName(),
+          // FIXME: Compound names.
+          return Space::forConstructor(item->getType(),
+                                       VP->getName().getBaseIdentifier(),
                                        conArgSpace);
         }
         default:

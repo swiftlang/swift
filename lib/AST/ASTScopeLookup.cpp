@@ -39,7 +39,7 @@ using namespace ast_scope;
 static bool isLocWithinAnInactiveClause(const SourceLoc loc, SourceFile *SF);
 
 llvm::SmallVector<const ASTScopeImpl *, 0> ASTScopeImpl::unqualifiedLookup(
-    SourceFile *sourceFile, const DeclName name, const SourceLoc loc,
+    SourceFile *sourceFile, const DeclNameRef name, const SourceLoc loc,
     const DeclContext *const startingContext, DeclConsumer consumer) {
   SmallVector<const ASTScopeImpl *, 0> history;
   const auto *start =
@@ -50,7 +50,7 @@ llvm::SmallVector<const ASTScopeImpl *, 0> ASTScopeImpl::unqualifiedLookup(
 }
 
 const ASTScopeImpl *ASTScopeImpl::findStartingScopeForLookup(
-    SourceFile *sourceFile, const DeclName name, const SourceLoc loc,
+    SourceFile *sourceFile, const DeclNameRef name, const SourceLoc loc,
     const DeclContext *const startingContext) {
   // At present, use legacy code in unqualifiedLookup.cpp to handle module-level
   // lookups
@@ -517,10 +517,57 @@ GenericTypeOrExtensionWhereOrBodyPortion::computeSelfDC(
   while (i != 0) {
     Optional<NullablePtr<DeclContext>> maybeSelfDC =
         history[--i]->computeSelfDCForParent();
-    if (maybeSelfDC)
-      return *maybeSelfDC;
+    if (maybeSelfDC) {
+      // If we've found a selfDC, we'll definitely be returning something.
+      // However, we may have captured 'self' somewhere down the tree, so we
+      // can't return outright without checking the nested scopes.
+      NullablePtr<DeclContext> nestedCapturedSelfDC =
+          checkNestedScopesForSelfCapture(history, i);
+      return nestedCapturedSelfDC ? nestedCapturedSelfDC : *maybeSelfDC;
+    }
   }
   return nullptr;
+}
+
+#pragma mark checkNestedScopesForSelfCapture
+
+NullablePtr<DeclContext>
+GenericTypeOrExtensionWhereOrBodyPortion::checkNestedScopesForSelfCapture(
+    ArrayRef<const ASTScopeImpl *> history, size_t start) {
+  NullablePtr<DeclContext> innerCapturedSelfDC;
+  // Start with the next scope down the tree.
+  size_t j = start;
+
+  // Note: even though having this loop nested inside the while loop from
+  // GenericTypeOrExtensionWhereOrBodyPortion::computeSelfDC may appear to
+  // result in quadratic blowup, complexity actually remains linear with respect
+  // to the size of history. This relies on the fact that
+  // GenericTypeOrExtensionScope::computeSelfDCForParent returns a null pointer,
+  // which will cause this method to bail out of the search early. Thus, this
+  // method is called once per type body in the lookup history, and will not
+  // end up re-checking the bodies of nested types that have already been
+  // covered by earlier calls, so the total impact of this method across all
+  // calls in a single lookup is O(n).
+  while (j != 0) {
+      auto *entry = history[--j];
+    Optional<NullablePtr<DeclContext>> selfDCForParent =
+      entry->computeSelfDCForParent();
+
+    // If we encounter a scope that should cause us to forget the self
+    // context (such as a nested type), bail out and use whatever the
+    // the last inner captured context was.
+    if (selfDCForParent && (*selfDCForParent).isNull())
+      break;
+
+    // Otherwise, if we have a captured self context for this scope, then
+    // remember it since it is now the innermost scope we have encountered.
+    NullablePtr<DeclContext> capturedSelfDC = entry->capturedSelfDC();
+    if (!capturedSelfDC.isNull())
+      innerCapturedSelfDC = entry->capturedSelfDC();
+
+    // Continue searching in the next scope down.
+  }
+  return innerCapturedSelfDC;
 }
 
 #pragma mark compute isCascadingUse
@@ -629,6 +676,23 @@ PatternEntryInitializerScope::computeSelfDCForParent() const {
 Optional<NullablePtr<DeclContext>>
 MethodBodyScope::computeSelfDCForParent() const {
   return NullablePtr<DeclContext>(decl);
+}
+
+#pragma mark capturedSelfDC
+
+// Closures may explicitly capture the self param, in which case the lookup
+// should use the closure as the context for implicit self lookups.
+
+// By default, there is no such context to return.
+NullablePtr<DeclContext> ASTScopeImpl::capturedSelfDC() const {
+  return NullablePtr<DeclContext>();
+}
+
+// Closures track this information explicitly.
+NullablePtr<DeclContext> ClosureParametersScope::capturedSelfDC() const {
+  if (closureExpr->capturesSelfEnablingImplictSelf())
+    return NullablePtr<DeclContext>(closureExpr);
+  return NullablePtr<DeclContext>();
 }
 
 #pragma mark ifUnknownIsCascadingUseAccordingTo

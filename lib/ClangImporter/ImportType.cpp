@@ -185,7 +185,7 @@ namespace {
       llvm_unreachable("Dependent types cannot be converted");    \
     }
 #define TYPE(Class, Base)
-#include "clang/AST/TypeNodes.def"
+#include "clang/AST/TypeNodes.inc"
 
     // Given a loaded type like CInt, look through the type alias sugar that the
     // stdlib uses to show the underlying type.  We want to import the signature
@@ -418,8 +418,10 @@ namespace {
         auto funcTy = pointeeType->castTo<FunctionType>();
         return {
           FunctionType::get(funcTy->getParams(), funcTy->getResult(),
-            funcTy->getExtInfo().withRepresentation(
-                          AnyFunctionType::Representation::CFunctionPointer)),
+            funcTy->getExtInfo()
+              .withRepresentation(
+                AnyFunctionType::Representation::CFunctionPointer)
+              .withClangFunctionType(type)),
           ImportHint::CFunctionPointer
         };
       }
@@ -573,7 +575,7 @@ namespace {
       }
 
       // Form the function type.
-      return FunctionType::get(params, resultTy);
+      return FunctionType::get(params, resultTy, FunctionType::ExtInfo());
     }
 
     ImportResult

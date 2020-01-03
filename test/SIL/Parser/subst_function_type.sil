@@ -1,0 +1,17 @@
+// RUN: %target-swift-emit-silgen %s | %FileCheck %s
+
+sil_stage raw
+
+import Swift
+
+// CHECK-LABEL: sil @test : $@convention(thin) (@guaranteed @callee_guaranteed <τ_0_0, τ_0_1> in (@in τ_0_0, @in τ_0_1) -> () for <Int, String>) -> ()
+sil @test : $@convention(thin) (@guaranteed @callee_guaranteed <A, B> in (@in A, @in B) -> () for <Int, String>) -> () {
+entry(%0 : $@callee_guaranteed <C, D> in (@in C, @in D) -> () for <Int, String>):
+  return undef : $()
+}
+
+// CHECK-LABEL: sil @test_generic_context : $@convention(thin) <X, Y> (@guaranteed @callee_guaranteed <τ_0_0, τ_0_1> in (@in τ_0_0, @in τ_0_1) -> () for <X, Y>) -> ()
+sil @test_generic_context : $@convention(thin) <X, Y> (@guaranteed @callee_guaranteed <A, B> in (@in A, @in B) -> () for <X, Y>) -> () {
+entry(%0 : $@callee_guaranteed <C, D> in (@in C, @in D) -> () for <X, Y>):
+  return undef : $()
+}

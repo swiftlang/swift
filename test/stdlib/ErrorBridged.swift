@@ -684,9 +684,9 @@ ErrorBridgingTests.test("Wrapped NSError identity") {
 }
 
 extension Error {
-	func asNSError() -> NSError {
-		return self as NSError
-	}
+  func asNSError() -> NSError {
+    return self as NSError
+  }
 }
 
 func unconditionalCast<T>(_ x: Any, to: T.Type) -> T {
@@ -785,6 +785,54 @@ ErrorBridgingTests.test("error-to-NSObject casts") {
 
     // "is" check
     expectTrue(error is NSObject)
+
+    // Unconditional cast to a dictionary.
+    let dict = ["key" : NoisyError()]
+    let anyOfDict = dict as AnyObject
+    let dict2 = anyOfDict as! [String: NSObject]
+  }
+}
+
+// SR-7732: Casting CFError or NSError to Error results in a memory leak
+ErrorBridgingTests.test("NSError-to-Error casts") {
+  func should_not_leak_nserror() {
+    let something: Any? = NSError(domain: "Foo", code: 1)
+    expectTrue(something is Error)
+  }
+
+  if #available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) {
+    // TODO: Wrap some leak checking around this
+    // Until then, this is a helpful debug tool
+		should_not_leak_nserror()
+  }
+}
+
+ErrorBridgingTests.test("CFError-to-Error casts") {
+  func should_not_leak_cferror() {
+    let something: Any? = CFErrorCreate(kCFAllocatorDefault, kCFErrorDomainCocoa, 1, [:] as CFDictionary)
+    expectTrue(something is Error)
+  }
+
+  if #available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) {
+    // TODO: Wrap some leak checking around this
+    // Until then, this is a helpful debug tool
+		should_not_leak_cferror()
+  }
+}
+
+enum MyError: Error {
+  case someThing
+}
+
+ErrorBridgingTests.test("SR-9207 crash in failed cast to NSError") {
+
+  if #available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) {
+    let error = MyError.someThing
+    let foundationError = error as NSError
+
+    if let urlError = foundationError as? URLError {
+      expectUnreachable()
+    }
   }
 }
 

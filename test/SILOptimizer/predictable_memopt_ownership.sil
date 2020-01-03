@@ -428,7 +428,7 @@ bb0:
 // CHECK-LABEL: sil [ossa] @dead_allocation_1
 sil [ossa] @dead_allocation_1 : $@convention(thin) (@owned Optional<AnyObject>) -> () {
 bb0(%0 : @owned $Optional<AnyObject>):
-// CHECK: copy_value %0
+// CHECK-NOT: alloc_stack
   %1 = alloc_stack $Optional<AnyObject>
   %2 = alloc_stack $Optional<AnyObject>
   store %0 to [init] %2 : $*Optional<AnyObject>
@@ -438,6 +438,7 @@ bb0(%0 : @owned $Optional<AnyObject>):
   dealloc_stack %2 : $*Optional<AnyObject>
   destroy_addr %1 : $*Optional<AnyObject>
   dealloc_stack %1 : $*Optional<AnyObject>
+// CHECK: destroy_value %0
   %3 = tuple ()
   return %3 : $()
 }
@@ -445,7 +446,6 @@ bb0(%0 : @owned $Optional<AnyObject>):
 // CHECK-LABEL: sil [ossa] @dead_allocation_2
 sil [ossa] @dead_allocation_2 : $@convention(thin) (@owned Optional<AnyObject>) -> () {
 bb0(%0 : @owned $Optional<AnyObject>):
-// CHECK: copy_value %0
 // CHECK-NOT: alloc_stack
   %1 = alloc_stack $Optional<AnyObject>
   %2 = alloc_stack $Optional<AnyObject>
@@ -457,6 +457,7 @@ bb0(%0 : @owned $Optional<AnyObject>):
   destroy_addr %1 : $*Optional<AnyObject>
   dealloc_stack %1 : $*Optional<AnyObject>
   %3 = tuple ()
+// CHECK: destroy_value %0
   return %3 : $()
 }
 

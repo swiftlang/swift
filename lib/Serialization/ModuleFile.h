@@ -786,7 +786,15 @@ public:
   void collectLinkLibraries(ModuleDecl::LinkLibraryCallback callback) const;
 
   /// Adds all top-level decls to the given vector.
-  void getTopLevelDecls(SmallVectorImpl<Decl*> &Results);
+  ///
+  /// \param Results Vector collecting the decls.
+  ///
+  /// \param matchAttributes Optional check on the attributes of a decl to
+  /// filter which decls to fully deserialize. Only decls with accepted
+  /// attributes are deserialized and added to Results.
+  void getTopLevelDecls(
+         SmallVectorImpl<Decl*> &Results,
+         llvm::function_ref<bool(DeclAttributes)> matchAttributes = nullptr);
 
   /// Adds all precedence groups to the given vector.
   void getPrecedenceGroups(SmallVectorImpl<PrecedenceGroupDecl*> &Results);
@@ -830,6 +838,10 @@ public:
 
   virtual Type loadAssociatedTypeDefault(const AssociatedTypeDecl *ATD,
                                          uint64_t contextData) override;
+
+  virtual ValueDecl *
+  loadDynamicallyReplacedFunctionDecl(const DynamicReplacementAttr *DRA,
+                                      uint64_t contextData) override;
 
   virtual void finishNormalConformance(NormalProtocolConformance *conformance,
                                        uint64_t contextData) override;
@@ -888,8 +900,15 @@ public:
   /// Returns the decl with the given ID, deserializing it if needed.
   ///
   /// \param DID The ID for the decl within this module.
+  ///
+  /// \param matchAttributes Optional check on the attributes of the decl to
+  /// determine if it should be fully deserialized and returned. If the
+  /// attributes fail the check, the decl is not deserialized and
+  /// \c DeclAttributesDidNotMatch is returned.
   llvm::Expected<Decl *>
-  getDeclChecked(serialization::DeclID DID);
+  getDeclChecked(
+    serialization::DeclID DID,
+    llvm::function_ref<bool(DeclAttributes)> matchAttributes = nullptr);
 
   /// Returns the decl context with the given ID, deserializing it if needed.
   DeclContext *getDeclContext(serialization::DeclContextID DID);

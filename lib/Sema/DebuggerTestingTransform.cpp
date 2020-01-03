@@ -67,10 +67,15 @@ class DebuggerTestingTransform : public ASTWalker {
   ASTContext &Ctx;
   DiscriminatorFinder &DF;
   std::vector<DeclContext *> LocalDeclContextStack;
+  const DeclNameRef StringForPrintObjectName;
+  const DeclNameRef DebuggerTestingCheckExpectName;
 
 public:
   DebuggerTestingTransform(ASTContext &Ctx, DiscriminatorFinder &DF)
-      : Ctx(Ctx), DF(DF) {}
+      : Ctx(Ctx), DF(DF),
+        StringForPrintObjectName(Ctx.getIdentifier("_stringForPrintObject")),
+        DebuggerTestingCheckExpectName(
+            Ctx.getIdentifier("_debuggerTestingCheckExpect")) {}
 
   bool walkToDeclPre(Decl *D) override {
     pushLocalDeclContext(D);
@@ -200,7 +205,7 @@ private:
 
     // Create _stringForPrintObject($Varname).
     auto *PODeclRef = new (Ctx)
-        UnresolvedDeclRefExpr(Ctx.getIdentifier("_stringForPrintObject"),
+        UnresolvedDeclRefExpr(StringForPrintObjectName,
                               DeclRefKind::Ordinary, DeclNameLoc());
     Expr *POArgs[] = {DstRef};
     Identifier POLabels[] = {Identifier()};
@@ -211,7 +216,7 @@ private:
     Identifier CheckExpectLabels[] = {Identifier(), Identifier()};
     Expr *CheckExpectArgs[] = {Varname, POCall};
     UnresolvedDeclRefExpr *CheckExpectDRE = new (Ctx)
-        UnresolvedDeclRefExpr(Ctx.getIdentifier("_debuggerTestingCheckExpect"),
+        UnresolvedDeclRefExpr(DebuggerTestingCheckExpectName,
                               DeclRefKind::Ordinary, DeclNameLoc());
     auto *CheckExpectExpr = CallExpr::createImplicit(
         Ctx, CheckExpectDRE, CheckExpectArgs, CheckExpectLabels);
@@ -220,8 +225,9 @@ private:
     // Create the closure.
     auto *Params = ParameterList::createEmpty(Ctx);
     auto *Closure = new (Ctx)
-        ClosureExpr(Params, SourceLoc(), SourceLoc(), SourceLoc(), TypeLoc(),
-                    DF.getNextDiscriminator(), getCurrentDeclContext());
+        ClosureExpr(SourceRange(), nullptr, Params, SourceLoc(), SourceLoc(),
+                    SourceLoc(), TypeLoc(), DF.getNextDiscriminator(),
+                    getCurrentDeclContext());
     Closure->setImplicit(true);
 
     // TODO: Save and return the value of $OriginalExpr.

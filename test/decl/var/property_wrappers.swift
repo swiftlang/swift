@@ -9,12 +9,11 @@ struct Wrapper<T> {
   init(stored: T) {
     self._stored = stored
   }
-  
+
   var wrappedValue: T {
     get { _stored }
     set { _stored = newValue }
   }
-  
 }
 
 @propertyWrapper
@@ -216,7 +215,11 @@ struct BadCombinations {
 }
 
 struct MultipleWrappers {
-  @Wrapper(stored: 17)
+  // FIXME: The diagnostics here aren't great. The problem is that we're
+  // attempting to splice a 'wrappedValue:' argument into the call to Wrapper's
+  // init, but it doesn't have a matching init. We're then attempting to access
+  // the nested 'wrappedValue', but Wrapper's 'wrappedValue' is Int.
+  @Wrapper(stored: 17) // expected-error{{value of type 'Int' has no member 'wrappedValue'}}
   @WrapperWithInitialValue // expected-error{{extra argument 'wrappedValue' in call}}
   var x: Int = 17
 
@@ -831,6 +834,42 @@ struct UsesExplicitClosures {
 
   @WrapperAcceptingAutoclosure(body: { return 42 })
   var y: Int
+}
+
+// ---------------------------------------------------------------------------
+// Enclosing instance diagnostics
+// ---------------------------------------------------------------------------
+@propertyWrapper
+struct Observable<Value> {
+  private var stored: Value
+
+  init(wrappedValue: Value) {
+    self.stored = wrappedValue
+  }
+
+  @available(*, unavailable, message: "must be in a class")
+  var wrappedValue: Value { // expected-note{{'wrappedValue' has been explicitly marked unavailable here}}
+    get { fatalError("called wrappedValue getter") }
+    set { fatalError("called wrappedValue setter") }
+  }
+
+  static subscript<EnclosingSelf>(
+      _enclosingInstance observed: EnclosingSelf,
+      wrapped wrappedKeyPath: ReferenceWritableKeyPath<EnclosingSelf, Value>,
+      storage storageKeyPath: ReferenceWritableKeyPath<EnclosingSelf, Self>
+    ) -> Value {
+    get {
+      observed[keyPath: storageKeyPath].stored
+    }
+    set {
+      observed[keyPath: storageKeyPath].stored = newValue
+    }
+  }
+}
+
+struct MyObservedValueType {
+  @Observable // expected-error{{'wrappedValue' is unavailable: must be in a class}}
+  var observedProperty = 17
 }
 
 // ---------------------------------------------------------------------------
@@ -1808,4 +1847,26 @@ func test_rdar56350060() {
       return self[keyPath: keyPath] // Ok
     }
   }
+}
+
+// rdar://problem/57411331 - crash due to incorrectly synthesized "nil" default
+// argument.
+@propertyWrapper
+struct Blah<Value> {
+  init(blah _: Int) { }
+
+  var wrappedValue: Value {
+    let val: Value? = nil
+    return val!
+  }
+}
+
+struct UseRdar57411331 {
+  let x = Rdar57411331(other: 5)
+}
+
+struct Rdar57411331 {
+  @Blah(blah: 17) var something: Int?
+
+  var other: Int
 }

@@ -163,7 +163,6 @@ StringRef swift::getPlatformNameForTriple(const llvm::Triple &triple) {
   case llvm::Triple::AMDPAL:
   case llvm::Triple::HermitCore:
   case llvm::Triple::Hurd:
-  case llvm::Triple::WASI:
     return "";
   case llvm::Triple::Darwin:
   case llvm::Triple::MacOSX:
@@ -191,6 +190,8 @@ StringRef swift::getPlatformNameForTriple(const llvm::Triple &triple) {
     return "ps4";
   case llvm::Triple::Haiku:
     return "haiku";
+  case llvm::Triple::WASI:
+    return "wasi";
   }
   llvm_unreachable("unsupported OS");
 }
@@ -339,6 +340,20 @@ llvm::Triple swift::getTargetSpecificModuleTriple(const llvm::Triple &triple) {
 
   // Other platforms get no normalization.
   return triple;
+}
+
+llvm::Triple swift::getUnversionedTriple(const llvm::Triple &triple) {
+  StringRef unversionedOSName = triple.getOSName().take_until(llvm::isDigit);
+  if (triple.getEnvironment()) {
+    StringRef environment =
+        llvm::Triple::getEnvironmentTypeName(triple.getEnvironment());
+
+    return llvm::Triple(triple.getArchName(), triple.getVendorName(),
+                        unversionedOSName, environment);
+  }
+
+  return llvm::Triple(triple.getArchName(), triple.getVendorName(),
+                      unversionedOSName);
 }
 
 Optional<llvm::VersionTuple>

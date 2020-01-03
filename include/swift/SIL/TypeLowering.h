@@ -93,13 +93,6 @@ adjustFunctionType(CanSILFunctionType t, SILFunctionType::Representation rep,
                             witnessMethodConformance);
 }
 
-/// Flag used to place context-dependent TypeLowerings in their own arena which
-/// can be disposed when a generic context is exited.
-enum IsDependent_t : unsigned {
-  IsNotDependent = false,
-  IsDependent = true
-};
-
 /// Is a lowered SIL type trivial?  That is, are copies ultimately just
 /// bit-copies, and it takes no work to destroy a value?
 enum IsTrivial_t : bool {
@@ -182,6 +175,10 @@ public:
               (isFixedABI ? 0U : NonFixedABIFlag) |
               (isAddressOnly ? AddressOnlyFlag : 0U) |
               (isResilient ? ResilientFlag : 0U)) {}
+    
+    constexpr bool operator==(RecursiveProperties p) const {
+      return Flags == p.Flags;
+    }
 
     static constexpr RecursiveProperties forTrivial() {
       return {IsTrivial, IsFixedABI, IsNotAddressOnly, IsNotResilient};
@@ -502,10 +499,8 @@ public:
   }
 
   /// Allocate a new TypeLowering using the TypeConverter's allocator.
-  void *operator new(size_t size, TypeConverter &tc,
-                     IsDependent_t dependent);
-  void *operator new[](size_t size, TypeConverter &tc,
-                       IsDependent_t dependent);
+  void *operator new(size_t size, TypeConverter &tc);
+  void *operator new[](size_t size, TypeConverter &tc);
 
   // Forbid 'new FooTypeLowering' and try to forbid 'delete tl'.
   // The latter is made challenging because the existence of the
@@ -573,7 +568,7 @@ enum class CaptureKind {
 class TypeConverter {
   friend class TypeLowering;
 
-  llvm::BumpPtrAllocator IndependentBPA;
+  llvm::BumpPtrAllocator TypeLoweringBPA;
 
   struct CachingTypeKey {
     CanGenericSignature Sig;
@@ -617,11 +612,6 @@ class TypeConverter {
       return OrigType.hasCachingKey();
     }
     
-    IsDependent_t isDependent() const {
-      if (SubstType->hasTypeParameter())
-        return IsDependent;
-      return IsNotDependent;
-    }
     TypeKey getKeyForMinimalExpansion() const {
       return {OrigType, SubstType, TypeExpansionContext::minimal()};
     }
@@ -662,24 +652,7 @@ class TypeConverter {
 #endif
 
   /// Mapping for types independent on contextual generic parameters.
-  llvm::DenseMap<CachingTypeKey, const TypeLowering *> IndependentTypes;
-
-  struct DependentTypeState {
-    llvm::BumpPtrAllocator BPA;
-    CanGenericSignature Sig;
-    llvm::DenseMap<TypeConverter::CachingTypeKey,
-                   const TypeLowering *> Map;
-
-    explicit DependentTypeState(CanGenericSignature sig) : Sig(sig) {}
-
-    DependentTypeState(DependentTypeState &&) = default;
-
-    // No copy constructor or assignment.
-    DependentTypeState(const DependentTypeState &) = delete;
-    void operator=(const DependentTypeState &) = delete;
-  };
-
-  llvm::SmallVector<DependentTypeState, 1> DependentTypes;
+  llvm::DenseMap<CachingTypeKey, const TypeLowering *> LoweredTypes;
 
   llvm::DenseMap<std::pair<TypeExpansionContext, SILDeclRef>, SILConstantInfo *>
       ConstantTypes;
@@ -703,7 +676,8 @@ class TypeConverter {
 #include "swift/SIL/BridgedTypes.def"
 
   const TypeLowering &
-  getTypeLoweringForLoweredType(TypeKey key,
+  getTypeLoweringForLoweredType(AbstractionPattern origType,
+                                CanType loweredType,
                                 TypeExpansionContext forExpansion,
                                 bool origHadOpaqueTypeArchetype);
 
@@ -772,11 +746,14 @@ public:
     return isIndirectPlusZeroSelfParameter(T.getASTType());
   }
   
-  /// Lowers a Swift type to a SILType, and returns the SIL TypeLowering
+  /// Lowers a context-independent Swift type to a SILType, and returns the SIL TypeLowering
   /// for that type.
+  ///
+  /// If `t` contains generic parameters, then the overload that also takes an
+  /// `AbstractionPattern` must be used.
   const TypeLowering &
   getTypeLowering(Type t, TypeExpansionContext forExpansion) {
-    AbstractionPattern pattern(getCurGenericContext(), t->getCanonicalType());
+    AbstractionPattern pattern(t->getCanonicalType());
     return getTypeLowering(pattern, t, forExpansion);
   }
 
@@ -789,8 +766,18 @@ public:
   /// Returns the SIL TypeLowering for an already lowered SILType. If the
   /// SILType is an address, returns the TypeLowering for the pointed-to
   /// type.
+  ///
+  /// If `t` contains type parameters, then the generic signature for its context
+  /// must be provided.
   const TypeLowering &
-  getTypeLowering(SILType t, TypeExpansionContext forExpansion);
+  getTypeLowering(SILType t, TypeExpansionContext forExpansion,
+                  CanGenericSignature signature = nullptr);
+
+  /// Returns the SIL TypeLowering for an already lowered SILType. If the
+  /// SILType is an address, returns the TypeLowering for the pointed-to
+  /// type in the context of the given SILFunction.
+  const TypeLowering &
+  getTypeLowering(SILType t, SILFunction &F);
 
   // Returns the lowered SIL type for a Swift type.
   SILType getLoweredType(Type t, TypeExpansionContext forExpansion) {
@@ -949,26 +936,6 @@ public:
                                     AbstractStorageDecl *value,
                                     Type lvalueType);
 
-  /// Push a generic function context. See GenericContextScope for an RAII
-  /// interface to this function.
-  ///
-  /// Types containing generic parameter references must be lowered in a generic
-  /// context. There can be at most one level of generic context active at any
-  /// point in time.
-  void pushGenericContext(CanGenericSignature sig);
-
-  /// Return the current generic context.  This should only be used in
-  /// the type-conversion routines.
-  CanGenericSignature getCurGenericContext() const {
-    if (DependentTypes.empty())
-      return CanGenericSignature();
-    return DependentTypes.back().Sig;
-  }
-  
-  /// Pop a generic function context. See GenericContextScope for an RAII
-  /// interface to this function. There must be an active generic context.
-  void popGenericContext(CanGenericSignature sig);
-  
   /// Known types for bridging.
 #define BRIDGING_KNOWN_TYPE(BridgedModule,BridgedType) \
   CanType get##BridgedType##Type();
@@ -979,29 +946,32 @@ public:
   CaptureInfo getLoweredLocalCaptures(SILDeclRef fn);
   bool hasLoweredLocalCaptures(SILDeclRef fn);
 
-#ifndef NDEBUG
-  /// If \c false, \c childDC is in a context it cannot capture variables from,
-  /// so it is expected that Sema may not have computed its \c CaptureInfo.
-  ///
-  /// This call exists for use in assertions; do not use it to skip capture
-  /// processing.
-  static bool canCaptureFromParent(DeclContext *childDC) {
-    // This call was added because Sema leaves the captures of functions that
-    // cannot capture anything uncomputed.
-    // TODO: Make Sema set them to CaptureInfo::empty() instead.
-
-    if (childDC)
-      if (auto decl = childDC->getAsDecl())
-         return decl->getDeclContext()->isLocalContext();
-    return true;
-  }
-#endif
-
   enum class ABIDifference : uint8_t {
-    // No ABI differences, function can be trivially bitcast to result type.
-    Trivial,
-    // Representation difference requires thin-to-thick conversion.
-    ThinToThick,
+    // Types have compatible calling conventions and representations, so can
+    // be trivially bitcast.
+    //
+    // Furthermore, if two function types have
+    // arguments of function type that differ only in
+    // `CompatibleRepresentation`, those outer function types are transitively
+    // `CompatibleRepresentation`. (In all other cases, the outer function types
+    // would fall into the `NeedsThunk` case, because a thunk would be needed
+    // to change the representation of the function argument.)
+    CompatibleRepresentation,
+    
+    // No convention differences, but there may still be a representation
+    // difference between values of the compared function types, such as a
+    // different ptrauth discriminator. The conversion can be performed by a
+    // `convert_function` instruction.
+    CompatibleCallingConvention,
+    
+    // Representation difference requires thin-to-thick conversion with a
+    // `thin_to_thick_function` conversion.
+    CompatibleRepresentation_ThinToThick,
+    // Function types have `CompatibleCallingConvention` but additionally need
+    // a thin-to-thick conversion, so a `convert_function` followed by a
+    // `thin_to_thick_function` sequence is necessary to convert.
+    CompatibleCallingConvention_ThinToThick,
+    
     // Non-trivial difference requires thunk.
     NeedsThunk
   };
@@ -1077,26 +1047,6 @@ private:
                                CanType result,
                                Bridgeability bridging,
                                bool suppressOptional);
-};
-
-/// RAII interface to push a generic context.
-class GenericContextScope {
-  TypeConverter &TC;
-  CanGenericSignature Sig;
-public:
-  GenericContextScope(TypeConverter &TC, CanGenericSignature sig)
-    : TC(TC), Sig(sig)
-  {
-    TC.pushGenericContext(sig);
-  }
-  
-  ~GenericContextScope() {
-    TC.popGenericContext(Sig);
-  }
-  
-private:
-  GenericContextScope(const GenericContextScope&) = delete;
-  GenericContextScope &operator=(const GenericContextScope&) = delete;
 };
 
 } // namespace Lowering

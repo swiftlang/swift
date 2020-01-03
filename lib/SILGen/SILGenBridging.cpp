@@ -229,7 +229,6 @@ emitBridgeObjectiveCToNative(SILGenFunction &SGF,
   auto subs = witness.getSubstitutions();
 
   // Set up the generic signature, since formalResultTy is an interface type.
-  GenericContextScope genericContextScope(SGF.SGM.Types, genericSig);
   CalleeTypeInfo calleeTypeInfo(
       witnessFnTy,
       AbstractionPattern(genericSig, formalResultTy),

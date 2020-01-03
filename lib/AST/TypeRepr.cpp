@@ -79,11 +79,11 @@ void *TypeRepr::operator new(size_t Bytes, const ASTContext &C,
   return C.Allocate(Bytes, Alignment);
 }
 
-Identifier ComponentIdentTypeRepr::getIdentifier() const {
-  if (IdOrDecl.is<Identifier>())
-    return IdOrDecl.get<Identifier>();
+DeclNameRef ComponentIdentTypeRepr::getNameRef() const {
+  if (IdOrDecl.is<DeclNameRef>())
+    return IdOrDecl.get<DeclNameRef>();
 
-  return IdOrDecl.get<TypeDecl *>()->getName();
+  return IdOrDecl.get<TypeDecl *>()->createNameRef();
 }
 
 static void printTypeRepr(const TypeRepr *TyR, ASTPrinter &Printer,
@@ -138,7 +138,7 @@ TypeRepr *CloneVisitor::visitAttributedTypeRepr(AttributedTypeRepr *T) {
 }
 
 TypeRepr *CloneVisitor::visitSimpleIdentTypeRepr(SimpleIdentTypeRepr *T) {
-  return new (Ctx) SimpleIdentTypeRepr(T->getIdLoc(), T->getIdentifier());
+  return new (Ctx) SimpleIdentTypeRepr(T->getNameLoc(), T->getNameRef());
 }
 
 TypeRepr *CloneVisitor::visitGenericIdentTypeRepr(GenericIdentTypeRepr *T) {
@@ -148,7 +148,7 @@ TypeRepr *CloneVisitor::visitGenericIdentTypeRepr(GenericIdentTypeRepr *T) {
   for (auto &arg : T->getGenericArgs()) {
     genericArgs.push_back(visit(arg));
   }
-  return GenericIdentTypeRepr::create(Ctx, T->getIdLoc(), T->getIdentifier(),
+  return GenericIdentTypeRepr::create(Ctx, T->getNameLoc(), T->getNameRef(),
                                         genericArgs, T->getAngleBrackets());
 }
 
@@ -298,6 +298,8 @@ void AttributedTypeRepr::printAttrs(ASTPrinter &Printer,
     Printer.printSimpleAttr("@autoclosure") << " ";
   if (hasAttr(TAK_escaping))
     Printer.printSimpleAttr("@escaping") << " ";
+  if (hasAttr(TAK_noDerivative))
+    Printer.printSimpleAttr("@noDerivative") << " ";
 
   if (hasAttr(TAK_differentiable)) {
     if (Attrs.isLinear()) {
@@ -312,10 +314,12 @@ void AttributedTypeRepr::printAttrs(ASTPrinter &Printer,
   if (hasAttr(TAK_thick))
     Printer.printSimpleAttr("@thick") << " ";
 
-  if (hasAttr(TAK_convention) && Attrs.convention.hasValue()) {
+  if (hasAttr(TAK_convention) && Attrs.hasConvention()) {
     Printer.callPrintStructurePre(PrintStructureKind::BuiltinAttribute);
     Printer.printAttrName("@convention");
-    Printer << "(" << Attrs.convention.getValue() << ")";
+    SmallString<32> convention;
+    Attrs.getConventionArguments(convention);
+    Printer << "(" << convention << ")";
     Printer.printStructurePost(PrintStructureKind::BuiltinAttribute);
     Printer << " ";
   }
@@ -345,11 +349,11 @@ void ComponentIdentTypeRepr::printImpl(ASTPrinter &Printer,
                                        const PrintOptions &Opts) const {
   if (auto *TD = dyn_cast_or_null<TypeDecl>(getBoundDecl())) {
     if (auto MD = dyn_cast<ModuleDecl>(TD))
-      Printer.printModuleRef(MD, getIdentifier());
+      Printer.printModuleRef(MD, getNameRef().getBaseIdentifier());
     else
-      Printer.printTypeRef(Type(), TD, getIdentifier());
+      Printer.printTypeRef(Type(), TD, getNameRef().getBaseIdentifier());
   } else {
-    Printer.printName(getIdentifier());
+    Printer.printName(getNameRef().getBaseIdentifier());
   }
 
   if (auto GenIdT = dyn_cast<GenericIdentTypeRepr>(this))
@@ -447,8 +451,8 @@ TupleTypeRepr *TupleTypeRepr::createEmpty(const ASTContext &C,
 }
 
 GenericIdentTypeRepr *GenericIdentTypeRepr::create(const ASTContext &C,
-                                                   SourceLoc Loc,
-                                                   Identifier Id,
+                                                   DeclNameLoc Loc,
+                                                   DeclNameRef Id,
                                                 ArrayRef<TypeRepr*> GenericArgs,
                                                    SourceRange AngleBrackets) {
   auto size = totalSizeToAlloc<TypeRepr*>(GenericArgs.size());

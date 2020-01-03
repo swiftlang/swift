@@ -6,12 +6,12 @@ func conflictingAttrs(_ fn: @noescape @escaping () -> Int) {} // expected-error 
 
 func doesEscape(_ fn : @escaping () -> Int) {}
 
-func takesGenericClosure<T>(_ a : Int, _ fn : @noescape () -> T) {} // expected-error 2{{unknown attribute 'noescape'}}
+func takesGenericClosure<T>(_ a : Int, _ fn : @noescape () -> T) {} // expected-error {{unknown attribute 'noescape'}}
 
 
 var globalAny: Any = 0
 
-func assignToGlobal<T>(_ t: T) {
+func assignToGlobal<T>(_ t: T) { // expected-note {{generic parameters are always considered '@escaping'}}
   globalAny = t
 }
 
@@ -23,8 +23,8 @@ func takesVariadic(_ fns: () -> Int...) {
   doesEscape(fns[0]) // Okay - variadic-of-function parameters are escaping
 }
 
-func takesNoEscapeClosure(_ fn : () -> Int) {
-  // expected-note@-1 5{{parameter 'fn' is implicitly non-escaping}} {{34-34=@escaping }}
+func takesNoEscapeClosure(_ fn : () -> Int) { // expected-note 1 {{parameter 'fn' is implicitly non-escaping}} {{34-34=@escaping }}
+  // expected-note@-1 6{{parameter 'fn' is implicitly non-escaping}} {{34-34=@escaping }}
   takesNoEscapeClosure { 4 }  // ok
 
   _ = fn()  // ok
@@ -36,14 +36,14 @@ func takesNoEscapeClosure(_ fn : () -> Int) {
   takesGenericClosure(4, fn)       // ok
   takesGenericClosure(4) { fn() }  // ok.
 
-  _ = [fn] // expected-error {{converting non-escaping value to 'Element' may allow it to escape}}
+  _ = [fn] // expected-error {{using non-escaping parameter 'fn' in a context expecting an @escaping closure}}
   _ = [doesEscape(fn)] // expected-error {{passing non-escaping parameter 'fn' to function expecting an @escaping closure}}
-  _ = [1 : fn] // expected-error {{converting non-escaping value to 'Value' may allow it to escape}}
+  _ = [1 : fn] // expected-error {{using non-escaping parameter 'fn' in a context expecting an @escaping closure}}
   _ = [1 : doesEscape(fn)] // expected-error {{passing non-escaping parameter 'fn' to function expecting an @escaping closure}}
   _ = "\(doesEscape(fn))" // expected-error {{passing non-escaping parameter 'fn' to function expecting an @escaping closure}}
   _ = "\(takesArray([fn]))" // expected-error {{using non-escaping parameter 'fn' in a context expecting an @escaping closure}}
 
-  assignToGlobal(fn) // expected-error {{converting non-escaping value to 'T' may allow it to escape}}
+  assignToGlobal(fn) // expected-error {{converting non-escaping parameter 'fn' to generic parameter 'T' may allow it to escape}}
   assignToGlobal((fn, fn)) // expected-error {{converting non-escaping value to 'T' may allow it to escape}}
 }
 
@@ -52,7 +52,7 @@ class SomeClass {
 
   func test() {
     // This should require "self."
-    doesEscape { x }  // expected-error {{reference to property 'x' in closure requires explicit 'self.' to make capture semantics explicit}} {{18-18=self.}}
+    doesEscape { x }  // expected-error {{reference to property 'x' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note{{capture 'self' explicitly to enable implicit 'self' in this closure}} {{17-17= [self] in}} expected-note{{reference 'self.' explicitly}} {{18-18=self.}}
 
     // Since 'takesNoEscapeClosure' doesn't escape its closure, it doesn't
     // require "self." qualification of member references.
@@ -64,88 +64,89 @@ class SomeClass {
     foo()
 
     func plain() { foo() }
-    let plain2 = { foo() } // expected-error {{call to method 'foo' in closure requires explicit 'self.' to make capture semantics explicit}} {{20-20=self.}}
+    let plain2 = { foo() } // expected-error {{call to method 'foo' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note{{capture 'self' explicitly to enable implicit 'self' in this closure}} {{19-19= [self] in}} expected-note{{reference 'self.' explicitly}} {{20-20=self.}}
     _ = plain2
 
     func multi() -> Int { foo(); return 0 }
-    let mulit2: () -> Int = { foo(); return 0 } // expected-error {{call to method 'foo' in closure requires explicit 'self.' to make capture semantics explicit}} {{31-31=self.}}
-    _ = mulit2
+    let multi2: () -> Int = { foo(); return 0 } // expected-error {{call to method 'foo' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note{{capture 'self' explicitly to enable implicit 'self' in this closure}} {{30-30= [self] in}} expected-note{{reference 'self.' explicitly}} {{31-31=self.}}
+    _ = multi2
 
-    doesEscape { foo() } // expected-error {{call to method 'foo' in closure requires explicit 'self.' to make capture semantics explicit}} {{18-18=self.}}
+    doesEscape { foo() } // expected-error {{call to method 'foo' in closure requires explicit use of 'self' to make capture semantics explicit}}  expected-note{{capture 'self' explicitly to enable implicit 'self' in this closure}} {{17-17= [self] in}} expected-note{{reference 'self.' explicitly}} {{18-18=self.}}
     takesNoEscapeClosure { foo() } // okay
 
-    doesEscape { foo(); return 0 } // expected-error {{call to method 'foo' in closure requires explicit 'self.' to make capture semantics explicit}} {{18-18=self.}}
+    doesEscape { foo(); return 0 } // expected-error {{call to method 'foo' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note{{capture 'self' explicitly to enable implicit 'self' in this closure}} {{17-17= [self] in}} expected-note{{reference 'self.' explicitly}} {{18-18=self.}}
     takesNoEscapeClosure { foo(); return 0 } // okay
 
     func outer() {
       func inner() { foo() }
-      let inner2 = { foo() } // expected-error {{call to method 'foo' in closure requires explicit 'self.' to make capture semantics explicit}} {{22-22=self.}}
+      let inner2 = { foo() } // expected-error {{call to method 'foo' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note{{capture 'self' explicitly to enable implicit 'self' in this closure}} {{21-21= [self] in}} expected-note{{reference 'self.' explicitly}} {{22-22=self.}}
       _ = inner2
       func multi() -> Int { foo(); return 0 }
-      let _: () -> Int = { foo(); return 0 } // expected-error {{call to method 'foo' in closure requires explicit 'self.' to make capture semantics explicit}} {{28-28=self.}}
-      doesEscape { foo() } // expected-error {{call to method 'foo' in closure requires explicit 'self.' to make capture semantics explicit}} {{20-20=self.}}
+      let _: () -> Int = { foo(); return 0 } // expected-error {{call to method 'foo' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note{{capture 'self' explicitly to enable implicit 'self' in this closure}} {{27-27= [self] in}} expected-note{{reference 'self.' explicitly}} {{28-28=self.}}
+      doesEscape { foo() } // expected-error {{call to method 'foo' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note{{capture 'self' explicitly to enable implicit 'self' in this closure}} {{19-19= [self] in}} expected-note{{reference 'self.' explicitly}} {{20-20=self.}}
       takesNoEscapeClosure { foo() }
-      doesEscape { foo(); return 0 } // expected-error {{call to method 'foo' in closure requires explicit 'self.' to make capture semantics explicit}} {{20-20=self.}}
+      doesEscape { foo(); return 0 } // expected-error {{call to method 'foo' in closure requires explicit use of 'self' to make capture semantics explicit}}  expected-note{{capture 'self' explicitly to enable implicit 'self' in this closure}} {{19-19= [self] in}} expected-note{{reference 'self.' explicitly}} {{20-20=self.}}
       takesNoEscapeClosure { foo(); return 0 }
     }
 
-    let _: () -> Void = {
-      func inner() { foo() } // expected-error {{call to method 'foo' in closure requires explicit 'self.' to make capture semantics explicit}} {{22-22=self.}}
-      let inner2 = { foo() } // expected-error {{call to method 'foo' in closure requires explicit 'self.' to make capture semantics explicit}} {{22-22=self.}}
-      _ = inner2
-      func multi() -> Int { foo(); return 0 } // expected-error {{call to method 'foo' in closure requires explicit 'self.' to make capture semantics explicit}} {{29-29=self.}}
-      let mulit2: () -> Int = { foo(); return 0 } // expected-error {{call to method 'foo' in closure requires explicit 'self.' to make capture semantics explicit}} {{33-33=self.}}
-      _ = mulit2
-      doesEscape { foo() }  // expected-error {{call to method 'foo' in closure requires explicit 'self.' to make capture semantics explicit}} {{20-20=self.}}
-      takesNoEscapeClosure { foo() }  // expected-error {{call to method 'foo' in closure requires explicit 'self.' to make capture semantics explicit}} {{30-30=self.}}
-      doesEscape { foo(); return 0 }  // expected-error {{call to method 'foo' in closure requires explicit 'self.' to make capture semantics explicit}} {{20-20=self.}}
-      takesNoEscapeClosure { foo(); return 0 }  // expected-error {{call to method 'foo' in closure requires explicit 'self.' to make capture semantics explicit}} {{30-30=self.}}
+    let _: () -> Void = {  // expected-note{{capture 'self' explicitly to enable implicit 'self' in this closure}} {{26-26= [self] in}} expected-note{{capture 'self' explicitly to enable implicit 'self' in this closure}} {{26-26= [self] in}} expected-note{{capture 'self' explicitly to enable implicit 'self' in this closure}} {{26-26= [self] in}} expected-note{{capture 'self' explicitly to enable implicit 'self' in this closure}} {{26-26= [self] in}}
+      func inner() { foo() } // expected-error {{call to method 'foo' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note{{reference 'self.' explicitly}} {{22-22=self.}}
+      let inner2 = { foo() } // expected-error {{call to method 'foo' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note{{capture 'self' explicitly to enable implicit 'self' in this closure}} {{21-21= [self] in}} expected-note{{reference 'self.' explicitly}} {{22-22=self.}}
+      let _ = inner2
+      func multi() -> Int { foo(); return 0 } // expected-error {{call to method 'foo' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note{{reference 'self.' explicitly}} {{29-29=self.}}
+      let multi2: () -> Int = { foo(); return 0 } // expected-error {{call to method 'foo' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note{{capture 'self' explicitly to enable implicit 'self' in this closure}} {{32-32= [self] in}} expected-note{{reference 'self.' explicitly}} {{33-33=self.}}
+      let _ = multi2
+      doesEscape { foo() }  // expected-error {{call to method 'foo' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note{{capture 'self' explicitly to enable implicit 'self' in this closure}} {{19-19= [self] in}} expected-note{{reference 'self.' explicitly}} {{20-20=self.}}
+      takesNoEscapeClosure { foo() }  // expected-error {{call to method 'foo' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note{{reference 'self.' explicitly}} {{30-30=self.}}
+      doesEscape { foo(); return 0 }  // expected-error {{call to method 'foo' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note{{capture 'self' explicitly to enable implicit 'self' in this closure}} {{19-19= [self] in}} expected-note{{reference 'self.' explicitly}} {{20-20=self.}}
+      takesNoEscapeClosure { foo(); return 0 }  // expected-error {{call to method 'foo' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note{{reference 'self.' explicitly}} {{30-30=self.}}
     }
 
-    doesEscape {
-      func inner() { foo() }  // expected-error {{call to method 'foo' in closure requires explicit 'self.' to make capture semantics explicit}} {{22-22=self.}}
-      let inner2 = { foo() }  // expected-error {{call to method 'foo' in closure requires explicit 'self.' to make capture semantics explicit}} {{22-22=self.}}
+    doesEscape {  //expected-note{{capture 'self' explicitly to enable implicit 'self' in this closure}} {{17-17= [self] in}} expected-note{{capture 'self' explicitly to enable implicit 'self' in this closure}} {{17-17= [self] in}} expected-note{{capture 'self' explicitly to enable implicit 'self' in this closure}} {{17-17= [self] in}} expected-note{{capture 'self' explicitly to enable implicit 'self' in this closure}} {{17-17= [self] in}}
+      func inner() { foo() }  // expected-error {{call to method 'foo' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note{{reference 'self.' explicitly}} {{22-22=self.}}
+      let inner2 = { foo() }  // expected-error {{call to method 'foo' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note{{capture 'self' explicitly to enable implicit 'self' in this closure}} {{21-21= [self] in}} expected-note{{reference 'self.' explicitly}} {{22-22=self.}}
       _ = inner2
-      func multi() -> Int { foo(); return 0 }  // expected-error {{call to method 'foo' in closure requires explicit 'self.' to make capture semantics explicit}} {{29-29=self.}}
-      let mulit2: () -> Int = { foo(); return 0 }  // expected-error {{call to method 'foo' in closure requires explicit 'self.' to make capture semantics explicit}} {{33-33=self.}}
-      _ = mulit2
-      doesEscape { foo() }  // expected-error {{call to method 'foo' in closure requires explicit 'self.' to make capture semantics explicit}} {{20-20=self.}}
-      takesNoEscapeClosure { foo() }  // expected-error {{call to method 'foo' in closure requires explicit 'self.' to make capture semantics explicit}} {{30-30=self.}}
-      doesEscape { foo(); return 0 }  // expected-error {{call to method 'foo' in closure requires explicit 'self.' to make capture semantics explicit}} {{20-20=self.}}
-      takesNoEscapeClosure { foo(); return 0 }  // expected-error {{call to method 'foo' in closure requires explicit 'self.' to make capture semantics explicit}} {{30-30=self.}}
+      func multi() -> Int { foo(); return 0 }  // expected-error {{call to method 'foo' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note{{reference 'self.' explicitly}} {{29-29=self.}}
+      let multi2: () -> Int = { foo(); return 0 }  // expected-error {{call to method 'foo' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note{{capture 'self' explicitly to enable implicit 'self' in this closure}} {{32-32= [self] in}} expected-note{{reference 'self.' explicitly}} {{33-33=self.}}
+      _ = multi2
+      doesEscape { foo() }  // expected-error {{call to method 'foo' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note{{capture 'self' explicitly to enable implicit 'self' in this closure}} {{19-19= [self] in}} expected-note{{reference 'self.' explicitly}} {{20-20=self.}}
+      takesNoEscapeClosure { foo() }  // expected-error {{call to method 'foo' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note{{reference 'self.' explicitly}} {{30-30=self.}}
+      doesEscape { foo(); return 0 }  // expected-error {{call to method 'foo' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note{{capture 'self' explicitly to enable implicit 'self' in this closure}} {{19-19= [self] in}} expected-note{{reference 'self.' explicitly}} {{20-20=self.}}
+      takesNoEscapeClosure { foo(); return 0 }  // expected-error {{call to method 'foo' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note{{reference 'self.' explicitly}} {{30-30=self.}}
       return 0
     }
     takesNoEscapeClosure {
       func inner() { foo() }
-      let inner2 = { foo() }  // expected-error {{call to method 'foo' in closure requires explicit 'self.' to make capture semantics explicit}} {{22-22=self.}}
+      let inner2 = { foo() }  // expected-error {{call to method 'foo' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note{{capture 'self' explicitly to enable implicit 'self' in this closure}} {{21-21= [self] in}} expected-note{{reference 'self.' explicitly}} {{22-22=self.}}
       _ = inner2
       func multi() -> Int { foo(); return 0 }
-      let mulit2: () -> Int = { foo(); return 0 }  // expected-error {{call to method 'foo' in closure requires explicit 'self.' to make capture semantics explicit}} {{33-33=self.}}
-      _ = mulit2
-      doesEscape { foo() } // expected-error {{call to method 'foo' in closure requires explicit 'self.' to make capture semantics explicit}} {{20-20=self.}}
+      let multi2: () -> Int = { foo(); return 0 }  // expected-error {{call to method 'foo' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note{{capture 'self' explicitly to enable implicit 'self' in this closure}} {{32-32= [self] in}} expected-note{{reference 'self.' explicitly}} {{33-33=self.}}
+      _ = multi2
+      doesEscape { foo() } // expected-error {{call to method 'foo' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note{{capture 'self' explicitly to enable implicit 'self' in this closure}} {{19-19= [self] in}} expected-note{{reference 'self.' explicitly}} {{20-20=self.}}
       takesNoEscapeClosure { foo() } // okay
-      doesEscape { foo(); return 0 } // expected-error {{call to method 'foo' in closure requires explicit 'self.' to make capture semantics explicit}} {{20-20=self.}}
+      doesEscape { foo(); return 0 } // expected-error {{call to method 'foo' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note{{capture 'self' explicitly to enable implicit 'self' in this closure}} {{19-19= [self] in}} expected-note{{reference 'self.' explicitly}} {{20-20=self.}}
       takesNoEscapeClosure { foo(); return 0 } // okay
       return 0
     }
 
+    // Implicit 'self' should be accepted when 'self' has value semantics.
     struct Outer {
       @discardableResult
       func bar() -> Int {
         bar()
 
         func plain() { bar() }
-        let plain2 = { bar() } // expected-error {{call to method 'bar' in closure requires explicit 'self.' to make capture semantics explicit}} {{24-24=self.}}
+        let plain2 = { bar() }
         _ = plain2
 
         func multi() -> Int { bar(); return 0 }
-        let _: () -> Int = { bar(); return 0 } // expected-error {{call to method 'bar' in closure requires explicit 'self.' to make capture semantics explicit}} {{30-30=self.}}
+        let _: () -> Int = { bar(); return 0 }
 
-        doesEscape { bar() } // expected-error {{call to method 'bar' in closure requires explicit 'self.' to make capture semantics explicit}} {{22-22=self.}}
-        takesNoEscapeClosure { bar() } // okay
+        doesEscape { bar() }
+        takesNoEscapeClosure { bar() }
 
-        doesEscape { bar(); return 0 } // expected-error {{call to method 'bar' in closure requires explicit 'self.' to make capture semantics explicit}} {{22-22=self.}}
-        takesNoEscapeClosure { bar(); return 0 } // okay
+        doesEscape { bar(); return 0 }
+        takesNoEscapeClosure { bar(); return 0 }
 
         return 0
       }
@@ -158,17 +159,17 @@ class SomeClass {
           bar() // no-warning
 
           func plain() { bar() }
-          let plain2 = { bar() } // expected-error {{call to method 'bar' in closure requires explicit 'self.' to make capture semantics explicit}} {{26-26=self.}}
+          let plain2 = { bar() }
           _ = plain2
 
           func multi() -> Int { bar(); return 0 }
-          let _: () -> Int = { bar(); return 0 } // expected-error {{call to method 'bar' in closure requires explicit 'self.' to make capture semantics explicit}} {{32-32=self.}}
+          let _: () -> Int = { bar(); return 0 }
 
-          doesEscape { bar() } // expected-error {{call to method 'bar' in closure requires explicit 'self.' to make capture semantics explicit}} {{24-24=self.}}
-          takesNoEscapeClosure { bar() } // okay
+          doesEscape { bar() }
+          takesNoEscapeClosure { bar() }
 
-          doesEscape { bar(); return 0 } // expected-error {{call to method 'bar' in closure requires explicit 'self.' to make capture semantics explicit}} {{24-24=self.}}
-          takesNoEscapeClosure { bar(); return 0 } // okay
+          doesEscape { bar(); return 0 }
+          takesNoEscapeClosure { bar(); return 0 }
 
           return 0
         }
@@ -194,10 +195,7 @@ func testAutoclosure(_ a : @autoclosure () -> Int) { // expected-note{{parameter
 
 
 // <rdar://problem/19470858> QoI: @autoclosure implies @noescape, so you shouldn't be allowed to specify both
-func redundant(_ fn : @noescape
-               @autoclosure () -> Int) {
- // expected-error@-2{{unknown attribute 'noescape'}}
-}
+func redundant(_ fn : @noescape @autoclosure () -> Int) {} // expected-error {{unknown attribute 'noescape'}}
 
 
 protocol P1 {
@@ -214,9 +212,7 @@ func overloadedEach<P: P2, T>(_ source: P, _ transform: @escaping (P.Element) ->
 struct S : P2 {
   typealias Element = Int
   func each(_ transform: @noescape (Int) -> ()) { // expected-error{{unknown attribute 'noescape'}}
-                                                  // expected-note@-1 {{parameter 'transform' is implicitly non-escaping}}
     overloadedEach(self, transform, 1)
-    // expected-error@-1 {{passing non-escaping parameter 'transform' to function expecting an @escaping closure}}
   }
 }
 
@@ -260,22 +256,22 @@ public func XCTAssert(_ expression: @autoclosure () -> Bool, _ message: String =
 
 
 /// SR-770 - Currying and `noescape`/`rethrows` don't work together anymore
-func curriedFlatMap<A, B>(_ x: [A]) -> (@noescape (A) -> [B]) -> [B] { // expected-error 2{{unknown attribute 'noescape'}}
+func curriedFlatMap<A, B>(_ x: [A]) -> (@noescape (A) -> [B]) -> [B] { // expected-error 1{{unknown attribute 'noescape'}}
   return { f in
     x.flatMap(f)
   }
 }
 
-func curriedFlatMap2<A, B>(_ x: [A]) -> (@noescape (A) -> [B]) -> [B] { // expected-error 2{{unknown attribute 'noescape'}}
-  return { (f : @noescape (A) -> [B]) in // expected-error{{unknown attribute 'noescape'}}
+func curriedFlatMap2<A, B>(_ x: [A]) -> (@noescape (A) -> [B]) -> [B] { // expected-error {{unknown attribute 'noescape'}}
+  return { (f : @noescape (A) -> [B]) in
     x.flatMap(f)
   }
 }
 
 func bad(_ a : @escaping (Int)-> Int) -> Int { return 42 }
 func escapeNoEscapeResult(_ x: [Int]) -> (@noescape (Int) -> Int) -> Int { // expected-error{{unknown attribute 'noescape'}}
-  return { f in // expected-note {{parameter 'f' is implicitly non-escaping}}
-    bad(f) // expected-error {{passing non-escaping parameter 'f' to function expecting an @escaping closure}}
+  return { f in
+    bad(f)
   }
 }
 
@@ -295,16 +291,13 @@ typealias CompletionHandler = (_ success: Bool) -> ()
 var escape : CompletionHandlerNE
 var escapeOther : CompletionHandler
 func doThing1(_ completion: (_ success: Bool) -> ()) {
-  // expected-note@-1 {{parameter 'completion' is implicitly non-escaping}}
-  escape = completion // expected-error {{assigning non-escaping parameter 'completion' to an @escaping closure}}
+  escape = completion
 }
 func doThing2(_ completion: CompletionHandlerNE) {
-  // expected-note@-1 {{parameter 'completion' is implicitly non-escaping}}
-  escape = completion // expected-error {{assigning non-escaping parameter 'completion' to an @escaping closure}}
+  escape = completion
 }
 func doThing3(_ completion: CompletionHandler) {
-  // expected-note@-1 {{parameter 'completion' is implicitly non-escaping}}
-  escape = completion // expected-error {{assigning non-escaping parameter 'completion' to an @escaping closure}}
+  escape = completion
 }
 func doThing4(_ completion: @escaping CompletionHandler) {
   escapeOther = completion
@@ -312,7 +305,7 @@ func doThing4(_ completion: @escaping CompletionHandler) {
 
 // <rdar://problem/19997680> @noescape doesn't work on parameters of function type
 func apply<T, U>(_ f: @noescape (T) -> U, g: @noescape (@noescape (T) -> U) -> U) -> U { 
-  // expected-error@-1 6{{unknown attribute 'noescape'}}
+  // expected-error@-1 2{{unknown attribute 'noescape'}}
   return g(f)
 }
 
@@ -322,7 +315,7 @@ enum r19997577Type {
   case Function(() -> r19997577Type, () -> r19997577Type)
   case Sum(() -> r19997577Type, () -> r19997577Type)
 
-  func reduce<Result>(_ initial: Result, _ combine: @noescape (Result, r19997577Type) -> Result) -> Result { // expected-error 2{{unknown attribute 'noescape'}}
+  func reduce<Result>(_ initial: Result, _ combine: @noescape (Result, r19997577Type) -> Result) -> Result { // expected-error 1{{unknown attribute 'noescape'}}
     let binary: @noescape (r19997577Type, r19997577Type) -> Result = { combine(combine(combine(initial, self), $0), $1) } // expected-error{{unknown attribute 'noescape'}}
     switch self {
     case .Unit:

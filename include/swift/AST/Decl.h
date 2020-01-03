@@ -334,12 +334,15 @@ protected:
     IsStatic : 1
   );
 
-  SWIFT_INLINE_BITFIELD(VarDecl, AbstractStorageDecl, 1+1+1+1+1+1,
+  SWIFT_INLINE_BITFIELD(VarDecl, AbstractStorageDecl, 1+1+1+1+1+1+1,
     /// Encodes whether this is a 'let' binding.
     Introducer : 1,
 
     /// Whether this declaration was an element of a capture list.
     IsCaptureList : 1,
+                        
+    /// Whether this declaration captures the 'self' param under the same name.
+    IsSelfParamCapture : 1,
 
     /// Whether this vardecl has an initial value bound to it in a way
     /// that isn't represented in the AST with an initializer in the pattern
@@ -396,7 +399,7 @@ protected:
     HasSingleExpressionBody : 1
   );
 
-  SWIFT_INLINE_BITFIELD(FuncDecl, AbstractFunctionDecl, 1+1+2+1+1+2,
+  SWIFT_INLINE_BITFIELD(FuncDecl, AbstractFunctionDecl, 1+1+2+1+1+2+1,
     /// Whether we've computed the 'static' flag yet.
     IsStaticComputed : 1,
 
@@ -413,7 +416,12 @@ protected:
     SelfAccessComputed : 1,
 
     /// Backing bits for 'self' access kind.
-    SelfAccess : 2
+    SelfAccess : 2,
+
+    /// Whether this is a top-level function which should be treated
+    /// as if it were in local context for the purposes of capture
+    /// analysis.
+    HasTopLevelLocalContextCaptures : 1
   );
 
   SWIFT_INLINE_BITFIELD(AccessorDecl, FuncDecl, 4+1+1,
@@ -467,10 +475,14 @@ protected:
     IsDebuggerAlias : 1
   );
 
-  SWIFT_INLINE_BITFIELD(NominalTypeDecl, GenericTypeDecl, 1+1+1,
+  SWIFT_INLINE_BITFIELD(NominalTypeDecl, GenericTypeDecl, 1+1+1+1,
     /// Whether we have already added implicitly-defined initializers
     /// to this declaration.
     AddedImplicitInitializers : 1,
+
+    /// Whether we have already added the phantom CodingKeys
+    /// nested requirement to this declaration.
+    AddedPhantomCodingKeys : 1,
 
     /// Whether there is are lazily-loaded conformances for this nominal type.
     HasLazyConformances : 1,
@@ -897,6 +909,10 @@ public:
   /// If this returns true, the decl can be safely casted to ValueDecl.
   bool isPotentiallyOverridable() const;
 
+  /// If an alternative module name is specified for this decl, e.g. using
+  /// @_originalDefinedIn attribute, this function returns this module name.
+  StringRef getAlternateModuleName() const;
+
   /// Emit a diagnostic tied to this declaration.
   template<typename ...ArgTypes>
   InFlightDiagnostic diagnose(
@@ -911,7 +927,7 @@ public:
 
   // Make vanilla new/delete illegal for Decls.
   void *operator new(size_t Bytes) = delete;
-  void operator delete(void *Data) SWIFT_DELETE_OPERATOR_DELETED;
+  void operator delete(void *Data) = delete;
 
   // Only allow allocation of Decls using the allocator in ASTContext
   // or by doing a placement new.
@@ -1889,7 +1905,10 @@ private:
   void setPattern(Pattern *P) { PatternAndFlags.setPointer(P); }
 
   /// Whether the given pattern binding entry is initialized.
-  bool isInitialized() const;
+  ///
+  /// \param onlyExplicit Only consider explicit initializations (rather
+  /// than implicitly-generated ones).
+  bool isInitialized(bool onlyExplicit = false) const;
 
   Expr *getInit() const {
     if (PatternAndFlags.getInt().contains(Flags::Removed) ||
@@ -2382,6 +2401,7 @@ class ValueDecl : public Decl {
     unsigned isIUO : 1;
   } LazySemanticInfo = { };
 
+  friend class DynamicallyReplacedDeclRequest;
   friend class OverriddenDeclsRequest;
   friend class IsObjCRequest;
   friend class IsFinalRequest;
@@ -2446,6 +2466,12 @@ public:
   /// Retrieve the base name of the declaration, ignoring any argument
   /// names.
   DeclBaseName getBaseName() const { return Name.getBaseName(); }
+
+  /// Generates a DeclNameRef referring to this declaration with as much
+  /// specificity as possible.
+  DeclNameRef createNameRef() const {
+    return DeclNameRef(getFullName());
+  }
 
   /// Retrieve the name to use for this declaration when interoperating
   /// with the Objective-C runtime.
@@ -2687,6 +2713,10 @@ public:
   AccessSemantics getAccessSemanticsFromContext(const DeclContext *DC,
                                                 bool isAccessOnSelf) const;
 
+  /// Determines if a reference to this declaration from a nested function
+  /// should be treated like a capture of a local value.
+  bool isLocalCapture() const;
+
   /// Print a reference to the given declaration.
   std::string printRef() const;
 
@@ -2742,6 +2772,11 @@ public:
   /// Retrieve the @functionBuilder type attached to this declaration,
   /// if there is one.
   Type getFunctionBuilderType() const;
+
+  /// If this value or its backing storage is annotated
+  /// @_dynamicReplacement(for: ...), compute the original declaration
+  /// that this declaration dynamically replaces.
+  ValueDecl *getDynamicallyReplacedDecl() const;
 };
 
 /// This is a common base class for declarations which declare a type.
@@ -3255,19 +3290,11 @@ class NominalTypeDecl : public GenericTypeDecl, public IterableDeclContext {
   /// its extensions.
   ///
   /// The table itself is lazily constructed and updated when
-  /// lookupDirect() is called. The bit indicates whether the lookup
-  /// table has already added members by walking the declarations in
-  /// scope; it should be manipulated through \c isLookupTablePopulated()
-  /// and \c setLookupTablePopulated().
-  llvm::PointerIntPair<MemberLookupTable *, 1, bool> LookupTable;
+  /// lookupDirect() is called.
+  MemberLookupTable *LookupTable = nullptr;
 
   /// Prepare the lookup table to make it ready for lookups.
   void prepareLookupTable();
-
-  /// True if the entries in \c LookupTable are complete--that is, if a
-  /// name is present, it contains all members with that name.
-  bool isLookupTablePopulated() const;
-  void setLookupTablePopulated(bool value);
 
   /// Note that we have added a member into the iterable declaration context,
   /// so that it can also be added to the lookup table (if needed).
@@ -3296,7 +3323,7 @@ class NominalTypeDecl : public GenericTypeDecl, public IterableDeclContext {
   friend class DeclContext;
   friend class IterableDeclContext;
   friend ArrayRef<ValueDecl *>
-           ValueDecl::getSatisfiedProtocolRequirements(bool Sorted) const;
+  ValueDecl::getSatisfiedProtocolRequirements(bool Sorted) const;
 
 protected:
   Type DeclaredTy;
@@ -3310,6 +3337,7 @@ protected:
     IterableDeclContext(IterableDeclContextKind::NominalTypeDecl)
   {
     Bits.NominalTypeDecl.AddedImplicitInitializers = false;
+    Bits.NominalTypeDecl.AddedPhantomCodingKeys = false;
     ExtensionGeneration = 0;
     Bits.NominalTypeDecl.HasLazyConformances = false;
     Bits.NominalTypeDecl.IsComputingSemanticMembers = false;
@@ -3348,6 +3376,18 @@ public:
   /// Note that we have attempted to add implicit initializers.
   void setAddedImplicitInitializers() {
     Bits.NominalTypeDecl.AddedImplicitInitializers = true;
+  }
+
+  /// Determine whether we have already attempted to add the
+  /// phantom CodingKeys type to this declaration.
+  bool addedPhantomCodingKeys() const {
+    return Bits.NominalTypeDecl.AddedPhantomCodingKeys;
+  }
+
+  /// Note that we have attempted to add the phantom CodingKeys type
+  /// to this declaration.
+  void setAddedPhantomCodingKeys() {
+    Bits.NominalTypeDecl.AddedPhantomCodingKeys = true;
   }
 
   /// getDeclaredType - Retrieve the type declared by this entity, without
@@ -4761,8 +4801,6 @@ public:
 
   bool hasAnyNativeDynamicAccessors() const;
 
-  bool hasAnyDynamicReplacementAccessors() const;
-
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
     return D->getKind() >= DeclKind::First_AbstractStorageDecl &&
@@ -4995,6 +5033,12 @@ public:
 
   /// Is this an element in a capture list?
   bool isCaptureList() const { return Bits.VarDecl.IsCaptureList; }
+    
+  /// Is this a capture of the self param?
+  bool isSelfParamCapture() const { return Bits.VarDecl.IsSelfParamCapture; }
+  void setIsSelfParamCapture(bool IsSelfParamCapture = true) {
+      Bits.VarDecl.IsSelfParamCapture = IsSelfParamCapture;
+  }
 
   /// Return true if this vardecl has an initial value bound to it in a way
   /// that isn't represented in the AST with an initializer in the pattern
@@ -5091,16 +5135,16 @@ public:
   /// Retrieve the backing storage property for a lazy property.
   VarDecl *getLazyStorageProperty() const;
 
-  /// Whether this is a property with a property wrapper that was initialized
-  /// via a value of the original type, e.g.,
+  /// Whether the memberwise initializer parameter for a property with a
+  /// property wrapper type uses the wrapped type. This will occur, for example,
+  /// when there is an explicitly-specified initializer like:
   ///
   /// \code
   /// @Lazy var i = 17
   /// \end
-  bool isPropertyWrapperInitializedWithInitialValue() const;
-
-  /// Whether the memberwise initializer parameter for a property with a property wrapper type
-  /// uses the wrapped type.
+  ///
+  /// Or when there is no initializer but each composed property wrapper has
+  /// a suitable `init(initialValue:)`.
   bool isPropertyMemberwiseInitializedWithWrappedType() const;
 
   /// If this property is the backing storage for a property with an attached
@@ -5262,6 +5306,10 @@ public:
   /// Note that this will return false for deserialized declarations, which only
   /// have a textual representation of their default expression.
   bool hasDefaultExpr() const;
+
+  /// Whether this parameter has a caller-side default argument expression
+  /// such as the magic literal \c #function.
+  bool hasCallerSideDefaultExpr() const;
 
   /// Retrieve the fully type-checked default argument expression for this
   /// parameter, or \c nullptr if there is no default expression.
@@ -5803,13 +5851,7 @@ public:
   /// \sa hasBody()
   BraceStmt *getBody(bool canSynthesize = true) const;
 
-  void setBody(BraceStmt *S, BodyKind NewBodyKind = BodyKind::Parsed) {
-    assert(getBodyKind() != BodyKind::Skipped &&
-           "cannot set a body if it was skipped");
-
-    Body = S;
-    setBodyKind(NewBodyKind);
-  }
+  void setBody(BraceStmt *S, BodyKind NewBodyKind = BodyKind::Parsed);
 
   /// Note that the body was skipped for this function.  Function body
   /// cannot be attached after this call.
@@ -5828,7 +5870,8 @@ public:
 
   /// Note that parsing for the body was delayed.
   void setBodyDelayed(SourceRange bodyRange) {
-    assert(getBodyKind() == BodyKind::None);
+    assert(getBodyKind() == BodyKind::None ||
+           getBodyKind() == BodyKind::Skipped);
     assert(bodyRange.isValid());
     BodyRange = bodyRange;
     setBodyKind(BodyKind::Unparsed);
@@ -6048,6 +6091,7 @@ protected:
     Bits.FuncDecl.SelfAccessComputed = false;
     Bits.FuncDecl.IsStaticComputed = false;
     Bits.FuncDecl.IsStatic = false;
+    Bits.FuncDecl.HasTopLevelLocalContextCaptures = false;
   }
 
 private:
@@ -6205,6 +6249,12 @@ public:
   /// Perform basic checking to determine whether the @IBAction or
   /// @IBSegueAction attribute can be applied to this function.
   bool isPotentialIBActionTarget() const;
+
+  bool hasTopLevelLocalContextCaptures() const {
+    return Bits.FuncDecl.HasTopLevelLocalContextCaptures;
+  }
+
+  void setHasTopLevelLocalContextCaptures(bool hasCaptures=true);
 };
 
 /// This represents an accessor function, such as a getter or setter.
@@ -6619,6 +6669,9 @@ public:
   /// initializer.
   BodyInitKind getDelegatingOrChainedInitKind(DiagnosticEngine *diags,
                                               ApplyExpr **init = nullptr) const;
+  void clearCachedDelegatingOrChainedInitKind() {
+    Bits.ConstructorDecl.ComputedBodyInitKind = 0;
+  }
 
   /// Whether this constructor is required.
   bool isRequired() const {
@@ -6965,6 +7018,13 @@ public:
   SourceLoc getNameLoc() const { return NameLoc; }
   Identifier getName() const { return name; }
 
+  /// Get the list of identifiers after the colon in the operator declaration.
+  ///
+  /// This list includes the names of designated types. For infix operators, the
+  /// first item in the list is a precedence group instead.
+  ///
+  /// \todo These two purposes really ought to be in separate properties and the
+  /// designated type list should be of TypeReprs instead of Identifiers.
   ArrayRef<Identifier> getIdentifiers() const {
     return Identifiers;
   }

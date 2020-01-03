@@ -133,7 +133,7 @@ public:
 
   /// A cache of syntax nodes that can be reused when creating the syntax tree
   /// for this file.
-  SyntaxParsingCache *SyntaxParsingCache = nullptr;
+  swift::SyntaxParsingCache *SyntaxParsingCache = nullptr;
 
   /// The list of local type declarations in the source file.
   llvm::SetVector<TypeDecl *> LocalTypeDecls;
@@ -146,6 +146,11 @@ public:
 
   /// A set of synthesized declarations that need to be type checked.
   llvm::SmallVector<Decl *, 8> SynthesizedDecls;
+
+  /// We might perform type checking on the same source file more than once,
+  /// if its the main file or a REPL instance, so keep track of the last
+  /// checked synthesized declaration to avoid duplicating work.
+  unsigned LastCheckedSynthesizedDecl = 0;
 
   /// A mapping from Objective-C selectors to the methods that have
   /// those selectors.
@@ -399,9 +404,11 @@ public:
     InterfaceHash->update(a);
   }
 
-  void getInterfaceHash(llvm::SmallString<32> &str) {
+  void getInterfaceHash(llvm::SmallString<32> &str) const {
+    // Copy to preserve idempotence.
+    llvm::MD5 md5 = *InterfaceHash;
     llvm::MD5::MD5Result result;
-    InterfaceHash->final(result);
+    md5.final(result);
     llvm::MD5::stringifyResult(result, str);
   }
 
@@ -477,6 +484,11 @@ inline bool ModuleDecl::EntryPointInfoTy::markDiagnosedMainClassWithScript() {
   return !res;
 }
 
+inline void simple_display(llvm::raw_ostream &out, const SourceFile *SF) {
+  assert(SF && "Cannot display null source file!");
+
+  out << "source_file " << '\"' << SF->getFilename() << '\"';
+}
 } // end namespace swift
 
 #endif

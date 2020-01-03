@@ -49,18 +49,6 @@
 // CHECK-THIRD: {{^{$}}
 // CHECK-THIRD: "kind": "began"
 // CHECK-THIRD: "name": "compile"
-// CHECK-THIRD: ".\/other.swift"
-// CHECK-THIRD: {{^}$}}
-
-// CHECK-THIRD: {{^{$}}
-// CHECK-THIRD: "kind": "finished"
-// CHECK-THIRD: "name": "compile"
-// CHECK-THIRD: "output": "Handled other.swift{{(\\r)?}}\n"
-// CHECK-THIRD: {{^}$}}
-
-// CHECK-THIRD: {{^{$}}
-// CHECK-THIRD: "kind": "began"
-// CHECK-THIRD: "name": "compile"
 // CHECK-THIRD: ".\/main.swift"
 // CHECK-THIRD: {{^}$}}
 
@@ -68,6 +56,18 @@
 // CHECK-THIRD: "kind": "finished"
 // CHECK-THIRD: "name": "compile"
 // CHECK-THIRD: "output": "Handled main.swift{{(\\r)?}}\n"
+// CHECK-THIRD: {{^}$}}
+
+// CHECK-THIRD: {{^{$}}
+// CHECK-THIRD: "kind": "began"
+// CHECK-THIRD: "name": "compile"
+// CHECK-THIRD: ".\/other.swift"
+// CHECK-THIRD: {{^}$}}
+
+// CHECK-THIRD: {{^{$}}
+// CHECK-THIRD: "kind": "finished"
+// CHECK-THIRD: "name": "compile"
+// CHECK-THIRD: "output": "Handled other.swift{{(\\r)?}}\n"
 // CHECK-THIRD: {{^}$}}
 
 // RUN: touch -t 201401240006 %t/main.swift

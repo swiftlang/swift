@@ -279,7 +279,7 @@ void SILGenFunction::emitForeignErrorBlock(SILLocation loc,
 
   // Propagate.
   FullExpr throwScope(Cleanups, CleanupLocation::get(loc));
-  emitThrow(loc, error);
+  emitThrow(loc, error, true);
 }
 
 /// Perform a foreign error check by testing whether the call result is zero.

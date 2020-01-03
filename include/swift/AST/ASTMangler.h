@@ -192,7 +192,8 @@ public:
 
   std::string mangleAccessorEntityAsUSR(AccessorKind kind,
                                         const AbstractStorageDecl *decl,
-                                        StringRef USRPrefix);
+                                        StringRef USRPrefix,
+                                        bool IsStatic);
 
   std::string mangleLocalTypeDecl(const TypeDecl *type);
 
@@ -244,6 +245,9 @@ protected:
   unsigned appendBoundGenericArgs(DeclContext *dc,
                                   SubstitutionMap subs,
                                   bool &isFirstArgList);
+  
+  /// Append the bound generic arguments as a flat list, disregarding depth.
+  void appendFlatGenericArgs(SubstitutionMap subs);
 
   /// Append any retroactive conformances.
   void appendRetroactiveConformances(Type type);
@@ -253,9 +257,9 @@ protected:
 
   void appendContextOf(const ValueDecl *decl);
 
-  void appendContext(const DeclContext *ctx);
+  void appendContext(const DeclContext *ctx, StringRef useModuleName);
 
-  void appendModule(const ModuleDecl *module);
+  void appendModule(const ModuleDecl *module, StringRef useModuleName);
 
   void appendProtocolName(const ProtocolDecl *protocol,
                           bool allowStandardSubstitution = true);

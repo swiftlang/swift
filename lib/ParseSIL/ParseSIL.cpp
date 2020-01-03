@@ -112,13 +112,13 @@ void PrettyStackTraceParser::print(llvm::raw_ostream &out) const {
   out << '\n';
 }
 
-static bool parseIntoSourceFileImpl(SourceFile &SF,
-                                unsigned BufferID,
-                                bool *Done,
-                                SILParserState *SIL,
-                                PersistentParserState *PersistentState,
-                                bool FullParse,
-                                bool DelayBodyParsing) {
+static void parseIntoSourceFileImpl(SourceFile &SF,
+                                    unsigned BufferID,
+                                    bool *Done,
+                                    SILParserState *SIL,
+                                    PersistentParserState *PersistentState,
+                                    bool FullParse,
+                                    bool DelayBodyParsing) {
   assert((!FullParse || (SF.canBeParsedInFull() && !SIL)) &&
          "cannot parse in full with the given parameters!");
 
@@ -149,10 +149,8 @@ static bool parseIntoSourceFileImpl(SourceFile &SF,
   llvm::SaveAndRestore<bool> S(P.IsParsingInterfaceTokens,
                                SF.hasInterfaceHash());
 
-  bool FoundSideEffects = false;
   do {
-    bool hasSideEffects = P.parseTopLevel();
-    FoundSideEffects = FoundSideEffects || hasSideEffects;
+    P.parseTopLevel();
     *Done = P.Tok.is(tok::eof);
   } while (FullParse && !*Done);
 
@@ -160,29 +158,27 @@ static bool parseIntoSourceFileImpl(SourceFile &SF,
     auto rawNode = P.finalizeSyntaxTree();
     STreeCreator->acceptSyntaxRoot(rawNode, SF);
   }
-
-  return FoundSideEffects;
 }
 
-bool swift::parseIntoSourceFile(SourceFile &SF,
+void swift::parseIntoSourceFile(SourceFile &SF,
                                 unsigned BufferID,
                                 bool *Done,
                                 SILParserState *SIL,
                                 PersistentParserState *PersistentState,
                                 bool DelayBodyParsing) {
-  return parseIntoSourceFileImpl(SF, BufferID, Done, SIL,
-                                 PersistentState,
-                                 /*FullParse=*/SF.shouldBuildSyntaxTree(),
-                                 DelayBodyParsing);
+  parseIntoSourceFileImpl(SF, BufferID, Done, SIL,
+                          PersistentState,
+                          /*FullParse=*/SF.shouldBuildSyntaxTree(),
+                          DelayBodyParsing);
 }
 
-bool swift::parseIntoSourceFileFull(SourceFile &SF, unsigned BufferID,
+void swift::parseIntoSourceFileFull(SourceFile &SF, unsigned BufferID,
                                     PersistentParserState *PersistentState,
                                     bool DelayBodyParsing) {
   bool Done = false;
-  return parseIntoSourceFileImpl(SF, BufferID, &Done, /*SIL=*/nullptr,
-                                 PersistentState, /*FullParse=*/true,
-                                 DelayBodyParsing);
+  parseIntoSourceFileImpl(SF, BufferID, &Done, /*SIL=*/nullptr,
+                          PersistentState, /*FullParse=*/true,
+                          DelayBodyParsing);
 }
 
 
@@ -902,7 +898,7 @@ namespace {
     bool walkToTypeReprPre(TypeRepr *Ty) override {
       auto *T = dyn_cast_or_null<IdentTypeRepr>(Ty);
       auto Comp = T->getComponentRange().front();
-      if (auto Entry = P.lookupInScope(Comp->getIdentifier()))
+      if (auto Entry = P.lookupInScope(Comp->getNameRef()))
         if (auto *TD = dyn_cast<TypeDecl>(Entry)) {
           Comp->setValue(TD, nullptr);
           return false;
@@ -1187,7 +1183,7 @@ lookupTopDecl(Parser &P, DeclBaseName Name, bool typeLookup) {
     options |= UnqualifiedLookupFlags::TypeLookup;
 
   auto &ctx = P.SF.getASTContext();
-  auto descriptor = UnqualifiedLookupDescriptor(Name, &P.SF);
+  auto descriptor = UnqualifiedLookupDescriptor(DeclNameRef(Name), &P.SF);
   auto lookup = evaluateOrDefault(ctx.evaluator,
                                   UnqualifiedLookupRequest{descriptor}, {});
   assert(lookup.size() == 1);
@@ -1272,7 +1268,8 @@ bool SILParser::parseSILType(SILType &Result,
   if (IsFuncDecl && !attrs.has(TAK_convention)) {
     // Use a random location.
     attrs.setAttr(TAK_convention, P.PreviousLoc);
-    attrs.convention = "thin";
+    attrs.ConventionArguments =
+      TypeAttributes::Convention::makeSwiftConvention("thin");
   }
 
   ParserResult<TypeRepr> TyR = P.parseType(diag::expected_sil_type,
@@ -1702,7 +1699,7 @@ static void bindProtocolSelfInTypeRepr(TypeLoc &TL, ProtocolDecl *proto) {
       virtual bool walkToTypeReprPre(TypeRepr *T) override {
         if (auto ident = dyn_cast<IdentTypeRepr>(T)) {
           auto firstComponent = ident->getComponentRange().front();
-          if (firstComponent->getIdentifier() == selfId)
+          if (firstComponent->getNameRef().isSimpleName(selfId))
             firstComponent->setValue(selfParam, proto);
         }
 
@@ -3175,9 +3172,6 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     SmallVector<SILValue, 4> operands;
     
     if (P.consumeIf(tok::l_paren)) {
-      Lowering::GenericContextScope scope(SILMod.Types,
-        patternEnv ? patternEnv->getGenericSignature()->getCanonicalSignature()
-                   : nullptr);
       while (true) {
         SILValue v;
         

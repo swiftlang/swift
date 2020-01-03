@@ -515,8 +515,10 @@ void SILGenFunction::emitClosure(AbstractClosureExpr *ace) {
     auto *autoclosure = cast<AutoClosureExpr>(ace);
     // Closure expressions implicitly return the result of their body
     // expression.
-    emitReturnExpr(ImplicitReturnLocation(ace),
-                   autoclosure->getSingleExpressionBody());
+    if (B.hasValidInsertionPoint()) {
+      emitReturnExpr(ImplicitReturnLocation(ace),
+                     autoclosure->getSingleExpressionBody());
+    }
   }
   emitEpilog(ace);
 }
@@ -550,7 +552,7 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
     assert(UIKit && "couldn't find UIKit objc module?!");
     SmallVector<ValueDecl *, 1> results;
     UIKit->lookupQualified(UIKit,
-                           ctx.getIdentifier("UIApplicationMain"),
+                           DeclNameRef(ctx.getIdentifier("UIApplicationMain")),
                            NL_QualifiedDefault,
                            results);
     assert(results.size() == 1
@@ -698,31 +700,6 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
   }
 }
 
-#ifndef NDEBUG
-/// If \c false, \c function is either a declaration that inherently cannot
-/// capture variables, or it is in a context it cannot capture variables from.
-/// In either case, it is expected that Sema may not have computed its
-/// \c CaptureInfo.
-///
-/// This call exists for use in assertions; do not use it to skip capture
-/// processing.
-static bool canCaptureFromParent(SILDeclRef function) {
-  switch (function.kind) {
-  case SILDeclRef::Kind::StoredPropertyInitializer:
-  case SILDeclRef::Kind::PropertyWrapperBackingInitializer:
-    return false;
-
-  default:
-    if (function.hasDecl()) {
-      if (auto dc = dyn_cast<DeclContext>(function.getDecl())) {
-        return TypeConverter::canCaptureFromParent(dc);
-      }
-    }
-    return false;
-  }
-}
-#endif
-
 void SILGenFunction::emitGeneratorFunction(SILDeclRef function, Expr *value,
                                            bool EmitProfilerIncrement) {
   auto *dc = function.getDecl()->getInnermostDeclContext();
@@ -760,14 +737,7 @@ void SILGenFunction::emitGeneratorFunction(SILDeclRef function, Expr *value,
     params = ParameterList::create(ctx, SourceLoc(), {param}, SourceLoc());
   }
 
-  CaptureInfo captureInfo;
-  if (function.getAnyFunctionRef())
-    captureInfo = SGM.M.Types.getLoweredLocalCaptures(function);
-  else {
-    assert(!canCaptureFromParent(function));
-    captureInfo = CaptureInfo::empty();
-  }
-
+  auto captureInfo = SGM.M.Types.getLoweredLocalCaptures(function);
   auto interfaceType = value->getType()->mapTypeOutOfContext();
   emitProlog(captureInfo, params, /*selfParam=*/nullptr,
              dc, interfaceType, /*throws=*/false, SourceLoc());
@@ -812,7 +782,7 @@ void SILGenFunction::emitGeneratorFunction(SILDeclRef function, VarDecl *var) {
   // wrapper that was initialized with '=', the stored property initializer
   // will be in terms of the original property's type.
   if (auto originalProperty = var->getOriginalWrappedProperty()) {
-    if (originalProperty->isPropertyWrapperInitializedWithInitialValue()) {
+    if (originalProperty->isPropertyMemberwiseInitializedWithWrappedType()) {
       interfaceType = originalProperty->getValueInterfaceType();
       varType = originalProperty->getType();
     }

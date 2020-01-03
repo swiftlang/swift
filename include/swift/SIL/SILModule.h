@@ -194,6 +194,15 @@ private:
   /// The list of SILDefaultWitnessTables in the module.
   DefaultWitnessTableListType defaultWitnessTables;
 
+  /// Declarations which are externally visible.
+  ///
+  /// These are method declarations which are referenced from inlinable
+  /// functions due to cross-module-optimzation. Those declarations don't have
+  /// any attributes or linkage which mark them as externally visible by
+  /// default.
+  /// Currently this table is not serialized.
+  llvm::SetVector<ValueDecl *> externallyVisible;
+
   /// Lookup table for SIL Global Variables.
   llvm::StringMap<SILGlobalVariable *> GlobalVariableMap;
 
@@ -446,6 +455,13 @@ public:
     return {defaultWitnessTables.begin(), defaultWitnessTables.end()};
   }
 
+  void addExternallyVisibleDecl(ValueDecl *decl) {
+    externallyVisible.insert(decl);
+  }
+  bool isExternallyVisibleDecl(ValueDecl *decl) {
+    return externallyVisible.count(decl) != 0;
+  }
+
   using sil_global_iterator = GlobalListType::iterator;
   using sil_global_const_iterator = GlobalListType::const_iterator;
   GlobalListType &getSILGlobalList() { return silGlobals; }
@@ -509,6 +525,13 @@ public:
   /// Attempt to deserialize the SILFunction. Returns true if deserialization
   /// succeeded, false otherwise.
   bool loadFunction(SILFunction *F);
+
+  /// Update the linkage of the SILFunction with the linkage of the serialized
+  /// function.
+  ///
+  /// The serialized SILLinkage can differ from the linkage derived from the
+  /// AST, e.g. cross-module-optimization can change the SIL linkages.
+  void updateFunctionLinkage(SILFunction *F);
 
   /// Attempt to link the SILFunction. Returns true if linking succeeded, false
   /// otherwise.

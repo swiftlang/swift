@@ -74,7 +74,6 @@ static void addOwnershipModelEliminatorPipeline(SILPassPipelinePlan &P) {
 /// Passes for performing definite initialization. Must be run together in this
 /// order.
 static void addDefiniteInitialization(SILPassPipelinePlan &P) {
-  P.addMarkUninitializedFixup();
   P.addDefiniteInitialization();
   P.addRawSILInstLowering();
 }
@@ -258,7 +257,7 @@ void addHighLevelLoopOptPasses(SILPassPipelinePlan &P) {
   P.addCOWArrayOpts();
   // Cleanup.
   P.addDCE();
-  P.addSwiftArrayOpts();
+  P.addSwiftArrayPropertyOpt();
 }
 
 // Perform classic SSA optimizations.
@@ -397,6 +396,8 @@ static void addPerfEarlyModulePassPipeline(SILPassPipelinePlan &P) {
   // we do not spend time optimizing them.
   P.addDeadFunctionElimination();
 
+  P.addSemanticARCOpts();
+
   // Strip ownership from non-transparent functions.
   if (P.getOptions().StripOwnershipAfterSerialization)
     P.addNonTransparentFunctionOwnershipModelEliminator();
@@ -409,6 +410,14 @@ static void addPerfEarlyModulePassPipeline(SILPassPipelinePlan &P) {
 
   // Add the outliner pass (Osize).
   P.addOutliner();
+
+  P.addCrossModuleSerializationSetup();
+  
+  // In case of cross-module-optimization, we need to serialize right after
+  // CrossModuleSerializationSetup. Eventually we want to serialize early
+  // anyway, but for now keep the SerializeSILPass at the later stage of the
+  // pipeline in case cross-module-optimization is not enabled.
+  P.addCMOSerializeSILPass();
 }
 
 static void addHighLevelEarlyLoopOptPipeline(SILPassPipelinePlan &P) {

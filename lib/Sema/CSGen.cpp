@@ -917,6 +917,7 @@ namespace {
   class ConstraintGenerator : public ExprVisitor<ConstraintGenerator, Type> {
     ConstraintSystem &CS;
     DeclContext *CurDC;
+    ConstraintSystemPhase CurrPhase;
     SmallVector<DeclContext*, 4> DCStack;
 
     static const unsigned numEditorPlaceholderVariables = 2;
@@ -931,7 +932,7 @@ namespace {
 
     /// Add constraints for a reference to a named member of the given
     /// base type, and return the type of such a reference.
-    Type addMemberRefConstraints(Expr *expr, Expr *base, DeclName name,
+    Type addMemberRefConstraints(Expr *expr, Expr *base, DeclNameRef name,
                                  FunctionRefKind functionRefKind,
                                  ArrayRef<ValueDecl *> outerAlternatives) {
       // The base must have a member of the given name, such that accessing
@@ -1076,7 +1077,7 @@ namespace {
         CS.addBindOverloadConstraint(memberTy, choice, memberLocator,
                                      CurDC);
       } else {
-        CS.addValueMemberConstraint(baseTy, DeclBaseName::createSubscript(),
+        CS.addValueMemberConstraint(baseTy, DeclNameRef::createSubscript(),
                                     memberTy, CurDC,
                                     FunctionRefKind::DoubleApply,
                                     /*outerAlternatives=*/{},
@@ -1108,9 +1109,16 @@ namespace {
 
   public:
     ConstraintGenerator(ConstraintSystem &CS, DeclContext *DC)
-      : CS(CS), CurDC(DC ? DC : CS.DC) { }
+        : CS(CS), CurDC(DC ? DC : CS.DC), CurrPhase(CS.getPhase()) {
+      // Although constraint system is initialized in `constraint
+      // generation` phase, we have to set it here manually because e.g.
+      // function builders could generate constraints for its body
+      // in the middle of the solving.
+      CS.setPhase(ConstraintSystemPhase::ConstraintGeneration);
+    }
 
     virtual ~ConstraintGenerator() {
+      CS.setPhase(CurrPhase);
       // We really ought to have this assertion:
       //   assert(DCStack.empty() && CurDC == CS.DC);
       // Unfortunately, ASTWalker is really bad at letting us establish
@@ -1235,6 +1243,7 @@ namespace {
       switch (expr->getKind()) {
       case MagicIdentifierLiteralExpr::Column:
       case MagicIdentifierLiteralExpr::File:
+      case MagicIdentifierLiteralExpr::FilePath:
       case MagicIdentifierLiteralExpr::Function:
       case MagicIdentifierLiteralExpr::Line:
         return visitLiteralExpr(expr);
@@ -1499,10 +1508,13 @@ namespace {
 
       auto memberLocator
         = CS.getConstraintLocator(expr, ConstraintLocator::UnresolvedMember);
-      auto baseTy = CS.createTypeVariable(baseLocator, TVO_CanBindToNoEscape);
-      auto memberTy = CS.createTypeVariable(memberLocator,
-                                            TVO_CanBindToLValue |
-                                            TVO_CanBindToNoEscape);
+
+      // Since base type in this case is completely dependent on context it
+      // should be marked as a potential hole.
+      auto baseTy = CS.createTypeVariable(baseLocator, TVO_CanBindToNoEscape |
+                                                           TVO_CanBindToHole);
+      auto memberTy = CS.createTypeVariable(
+          memberLocator, TVO_CanBindToLValue | TVO_CanBindToNoEscape);
 
       // An unresolved member expression '.member' is modeled as a value member
       // constraint
@@ -1844,7 +1856,6 @@ namespace {
 
       // Introduce conversions from each element to the element type of the
       // array.
-      ConstraintLocatorBuilder builder(locator);
       unsigned index = 0;
       for (auto element : expr->getElements()) {
         CS.addConstraint(ConstraintKind::Conversion,
@@ -2032,8 +2043,8 @@ namespace {
 
     Type visitTupleElementExpr(TupleElementExpr *expr) {
       ASTContext &context = CS.getASTContext();
-      Identifier name
-        = context.getIdentifier(llvm::utostr(expr->getFieldNumber()));
+      DeclNameRef name(
+          context.getIdentifier(llvm::utostr(expr->getFieldNumber())));
       return addMemberRefConstraints(expr, expr->getBase(), name,
                                      FunctionRefKind::Unapplied,
                                      /*outerAlternatives=*/{});
@@ -2419,7 +2430,8 @@ namespace {
           CS.getConstraintLocator(expr, ConstraintLocator::ClosureResult);
 
         if (expr->hasEmptyBody()) {
-          resultTy = CS.createTypeVariable(locator, 0);
+          resultTy = CS.createTypeVariable(
+              locator, expr->hasSingleExpressionBody() ? 0 : TVO_CanBindToHole);
 
           // Closures with empty bodies should be inferred to return
           // ().
@@ -2431,7 +2443,8 @@ namespace {
         } else {
           // If no return type was specified, create a fresh type
           // variable for it.
-          resultTy = CS.createTypeVariable(locator, 0);
+          resultTy = CS.createTypeVariable(
+              locator, expr->hasSingleExpressionBody() ? 0 : TVO_CanBindToHole);
 
           if (closureHasNoResult(expr)) {
             // Allow it to default to () if there are no return statements.
@@ -2507,10 +2520,6 @@ namespace {
     }
 
     Type visitDefaultArgumentExpr(DefaultArgumentExpr *expr) {
-      return expr->getType();
-    }
-
-    Type visitCallerDefaultArgumentExpr(CallerDefaultArgumentExpr *expr) {
       return expr->getType();
     }
 
@@ -3046,8 +3055,8 @@ namespace {
                                                 TVO_CanBindToNoEscape);
           componentTypeVars.push_back(memberTy);
           auto lookupName = kind == KeyPathExpr::Component::Kind::UnresolvedProperty
-            ? component.getUnresolvedDeclName()
-            : component.getDeclRef().getDecl()->getFullName();
+            ? DeclNameRef(component.getUnresolvedDeclName()) // FIXME: type change needed
+            : component.getDeclRef().getDecl()->createNameRef();
           
           auto refKind = lookupName.isSimpleName()
             ? FunctionRefKind::Unapplied
@@ -3400,8 +3409,11 @@ namespace {
 
         // Restore '@autoclosure'd value.
         if (auto ACE = dyn_cast<AutoClosureExpr>(expr)) {
-          expr = ACE->getSingleExpressionBody();
-          continue;
+          // This is only valid if the closure doesn't have parameters.
+          if (ACE->getParameters()->size() == 0) {
+            expr = ACE->getSingleExpressionBody();
+            continue;
+          }
         }
 
         // Remove any semantic expression injected by typechecking.
@@ -3454,8 +3466,7 @@ namespace {
     }
 
     bool isSyntheticArgumentExpr(const Expr *expr) {
-      if (isa<DefaultArgumentExpr>(expr) ||
-          isa<CallerDefaultArgumentExpr>(expr))
+      if (isa<DefaultArgumentExpr>(expr))
         return true;
 
       if (auto *varargExpr = dyn_cast<VarargExpansionExpr>(expr))
@@ -3868,8 +3879,8 @@ swift::resolveValueMember(DeclContext &DC, Type BaseTy, DeclName Name) {
 
   // Look up all members of BaseTy with the given Name.
   MemberLookupResult LookupResult = CS.performMemberLookup(
-    ConstraintKind::ValueMember, Name, BaseTy, FunctionRefKind::SingleApply,
-    nullptr, false);
+    ConstraintKind::ValueMember, DeclNameRef(Name), BaseTy,
+    FunctionRefKind::SingleApply, nullptr, false);
 
   // Keep track of all the unviable members.
   for (auto Can : LookupResult.UnviableCandidates)
@@ -3909,8 +3920,7 @@ swift::getOriginalArgumentList(Expr *expr) {
   OriginalArgumentList result;
 
   auto add = [&](Expr *arg, Identifier label, SourceLoc labelLoc) {
-    if (isa<DefaultArgumentExpr>(arg) ||
-        isa<CallerDefaultArgumentExpr>(arg)) {
+    if (isa<DefaultArgumentExpr>(arg)) {
       return;
     }
 

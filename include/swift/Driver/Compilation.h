@@ -19,6 +19,7 @@
 
 #include "swift/Basic/ArrayRefView.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/NullablePtr.h"
 #include "swift/Basic/OutputFileMap.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Driver/Driver.h"
@@ -73,7 +74,57 @@ enum class PreserveOnSignal : bool {
   Yes
 };
 
+using CommandSet = llvm::SmallPtrSet<const Job *, 16>;
+
 class Compilation {
+public:
+  class IncrementalSchemeComparator {
+    const bool EnableIncrementalBuildWhenConstructed;
+    const bool &EnableIncrementalBuild;
+    const bool EnableSourceRangeDependencies;
+
+    /// If not empty, the path to use to log the comparision.
+    const StringRef CompareIncrementalSchemesPath;
+
+    const unsigned SwiftInputCount;
+
+  public:
+    std::string WhyIncrementalWasDisabled = "";
+
+  private:
+    DiagnosticEngine &Diags;
+
+    CommandSet JobsWithoutRanges;
+    CommandSet JobsWithRanges;
+
+    unsigned CompileStagesWithoutRanges = 0;
+    unsigned CompileStagesWithRanges = 0;
+
+  public:
+    IncrementalSchemeComparator(const bool &EnableIncrementalBuild,
+                                bool EnableSourceRangeDependencies,
+                                const StringRef CompareIncrementalSchemesPath,
+                                unsigned SwiftInputCount,
+                                DiagnosticEngine &Diags)
+        : EnableIncrementalBuildWhenConstructed(EnableIncrementalBuild),
+          EnableIncrementalBuild(EnableIncrementalBuild),
+          EnableSourceRangeDependencies(EnableSourceRangeDependencies),
+          CompareIncrementalSchemesPath(CompareIncrementalSchemesPath),
+          SwiftInputCount(SwiftInputCount), Diags(Diags) {}
+
+    /// Record scheduled jobs in support of the
+    /// -compare-incremental-schemes[-path] options
+    void update(const CommandSet &withoutRangeJobs,
+                const CommandSet &withRangeJobs);
+
+    /// Write the information for the -compare-incremental-schemes[-path]
+    /// options
+    void outputComparison() const;
+
+  private:
+    void outputComparison(llvm::raw_ostream &) const;
+  };
+
 public:
   /// The filelist threshold value to pass to ensure file lists are never used
   static const size_t NEVER_USE_FILELIST = SIZE_MAX;
@@ -206,20 +257,45 @@ private:
   /// limit filelists will be used.
   size_t FilelistThreshold;
 
+  /// Because each frontend job outputs the same info in its .d file, only do it
+  /// on the first job that actually runs. Write out dummies for the rest of the
+  /// jobs. This hack saves a lot of time in the build system when incrementally
+  /// building a project with many files. Record if a scheduled job has already
+  /// added -emit-dependency-path.
+  bool HaveAlreadyAddedDependencyPath = false;
+
+public:
+  /// When set, only the first scheduled frontend job gets the argument needed
+  /// to produce a make-style dependency file. The other jobs create dummy files
+  /// in the driver. This hack speeds up incremental compilation by reducing the
+  /// time for the build system to read each dependency file, which are all
+  /// identical. This optimization can be disabled by passing
+  /// -disable-only-one-dependency-file on the command line.
+  const bool OnlyOneDependencyFile;
+
+private:
   /// Scaffolding to permit experimentation with finer-grained dependencies and
   /// faster rebuilds.
-  const bool EnableExperimentalDependencies;
+  const bool EnableFineGrainedDependencies;
 
   /// Helpful for debugging, but slows down the driver. So, only turn on when
   /// needed.
-  const bool VerifyExperimentalDependencyGraphAfterEveryImport;
+  const bool VerifyFineGrainedDependencyGraphAfterEveryImport;
   /// Helpful for debugging, but slows down the driver. So, only turn on when
   /// needed.
-  const bool EmitExperimentalDependencyDotFileAfterEveryImport;
+  const bool EmitFineGrainedDependencyDotFileAfterEveryImport;
 
   /// Experiment with inter-file dependencies
-  const bool ExperimentalDependenciesIncludeIntrafileOnes;
+  const bool FineGrainedDependenciesIncludeIntrafileOnes;
 
+  /// Experiment with source-range-based dependencies
+  const bool EnableSourceRangeDependencies;
+
+public:
+  /// Will contain a comparator if an argument demands it.
+  Optional<IncrementalSchemeComparator> IncrementalComparator;
+
+private:
   template <typename T>
   static T *unwrap(const std::unique_ptr<T> &p) {
     return p.get();
@@ -250,10 +326,14 @@ public:
               bool SaveTemps = false,
               bool ShowDriverTimeCompilation = false,
               std::unique_ptr<UnifiedStatsReporter> Stats = nullptr,
-              bool EnableExperimentalDependencies = false,
-              bool VerifyExperimentalDependencyGraphAfterEveryImport = false,
-              bool EmitExperimentalDependencyDotFileAfterEveryImport = false,
-              bool ExperimentalDependenciesIncludeIntrafileOnes = false);
+              bool OnlyOneDependencyFile = false,
+              bool EnableFineGrainedDependencies = false,
+              bool VerifyFineGrainedDependencyGraphAfterEveryImport = false,
+              bool EmitFineGrainedDependencyDotFileAfterEveryImport = false,
+              bool FineGrainedDependenciesIncludeIntrafileOnes = false,
+              bool EnableSourceRangeDependencies = false,
+              bool CompareIncrementalSchemes = false,
+              StringRef CompareIncrementalSchemesPath = "");
   // clang-format on
   ~Compilation();
 
@@ -285,6 +365,11 @@ public:
   }
   Job *addJob(std::unique_ptr<Job> J);
 
+  /// To send job list to places that don't truck in fancy array views.
+  std::vector<const Job *> getJobsSimply() const {
+    return std::vector<const Job *>(getJobs().begin(), getJobs().end());
+  }
+
   void addTemporaryFile(StringRef file,
                         PreserveOnSignal preserve = PreserveOnSignal::No) {
     TempFilePaths[file] = preserve;
@@ -305,24 +390,26 @@ public:
   bool getIncrementalBuildEnabled() const {
     return EnableIncrementalBuild;
   }
-  void disableIncrementalBuild() {
-    EnableIncrementalBuild = false;
+  void disableIncrementalBuild(Twine why);
+
+  bool getEnableFineGrainedDependencies() const {
+    return EnableFineGrainedDependencies;
   }
 
-  bool getEnableExperimentalDependencies() const {
-    return EnableExperimentalDependencies;
+  bool getVerifyFineGrainedDependencyGraphAfterEveryImport() const {
+    return VerifyFineGrainedDependencyGraphAfterEveryImport;
   }
 
-  bool getVerifyExperimentalDependencyGraphAfterEveryImport() const {
-    return VerifyExperimentalDependencyGraphAfterEveryImport;
+  bool getEmitFineGrainedDependencyDotFileAfterEveryImport() const {
+    return EmitFineGrainedDependencyDotFileAfterEveryImport;
   }
 
-  bool getEmitExperimentalDependencyDotFileAfterEveryImport() const {
-    return EmitExperimentalDependencyDotFileAfterEveryImport;
+  bool getFineGrainedDependenciesIncludeIntrafileOnes() const {
+    return FineGrainedDependenciesIncludeIntrafileOnes;
   }
 
-  bool getExperimentalDependenciesIncludeIntrafileOnes() const {
-    return ExperimentalDependenciesIncludeIntrafileOnes;
+  bool getEnableSourceRangeDependencies() const {
+    return EnableSourceRangeDependencies;
   }
 
   bool getBatchModeEnabled() const {
@@ -357,6 +444,16 @@ public:
   size_t getFilelistThreshold() const {
     return FilelistThreshold;
   }
+
+  /// Since every make-style dependency file contains
+  /// the same information, incremental builds are sped up by only emitting one
+  /// of those files. Since the build system expects to see the files existing,
+  /// create dummy files for those jobs that don't emit real dependencies.
+  /// \param path The dependency file path
+  /// \param addDependencyPath A function to add an -emit-dependency-path
+  /// argument
+  void addDependencyPathOrCreateDummy(StringRef path,
+                                      function_ref<void()> addDependencyPath);
 
   UnifiedStatsReporter *getStatsReporter() const {
     return Stats.get();
@@ -420,6 +517,9 @@ public:
       return true;
     }
   }
+
+  /// How many .swift input files?
+  unsigned countSwiftInputs() const;
 
 private:
   /// Perform all jobs.
