@@ -1715,21 +1715,6 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
                                                 calleeInfo, TCC_ForceRecheck);
   if (!argExpr)
     return true; // already diagnosed.
-  
-  // Handle argument label mismatches when we have multiple candidates.
-  if (calleeInfo.closeness == CC_ArgumentLabelMismatch) {
-    auto args = decomposeArgType(CS.getType(argExpr), argLabels);
-
-    // If we have multiple candidates that we fail to match, just say we have
-    // the wrong labels and list the candidates out.
-    diagnose(callExpr->getLoc(), diag::wrong_argument_labels_overload,
-             getParamListAsString(args))
-      .highlight(argExpr->getSourceRange());
-
-    // Did the user intend on invoking a different overload?
-    calleeInfo.suggestPotentialOverloads(fnExpr->getLoc());
-    return true;
-  }
 
   auto overloadName = calleeInfo.declName;
 

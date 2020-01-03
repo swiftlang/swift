@@ -73,6 +73,10 @@ ERROR(no_overloads_match_exactly_in_assignment,none,
       "no exact matches in assignment to %0",
       (DeclBaseName))
 
+NOTE(candidate_partial_match,none,
+     "candidate has partially matching parameter list %0",
+     (StringRef))
+
 ERROR(ambiguous_subscript,none,
       "ambiguous subscript with base type %0 and index type %1",
       (Type, Type))
@@ -273,9 +277,6 @@ ERROR(cannot_call_with_params, none,
 
 ERROR(cannot_call_non_function_value,none,
       "cannot call value of non-function type %0", (Type))
-
-ERROR(wrong_argument_labels_overload,none,
-      "argument labels '%0' do not match any available overloads", (StringRef))
 
 ERROR(no_candidates_match_result_type,none,
       "no '%0' candidates produce the expected contextual result type %1",
