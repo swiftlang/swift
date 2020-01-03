@@ -3195,20 +3195,15 @@ static AbstractFunctionDecl *findAbstractFunctionDecl(
 
   // Perform lookup.
   LookupResult results;
+  // If `baseType` is not null but `lookupContext` is a type context, set
+  // `baseType` to the `self` type of `lookupContext` to perform member lookup.
+  if (!baseType && lookupContext->isTypeContext())
+    baseType = lookupContext->getSelfTypeInContext();
   if (baseType) {
     results = TypeChecker::lookupMember(lookupContext, baseType, funcName);
   } else {
     results = TypeChecker::lookupUnqualified(lookupContext, funcName,
                                              funcNameLoc, lookupOptions);
-
-    // If looking up an operator within a type context, look specifically within
-    // the type context.
-    // This tries to resolve unqualified operators, like `+`.
-    if (funcName.isOperator() && lookupContext->isTypeContext()) {
-      if (auto tmp = TypeChecker::lookupMember(
-              lookupContext, lookupContext->getSelfTypeInContext(), funcName))
-        results = tmp;
-    }
   }
 
   // Initialize error flags.
