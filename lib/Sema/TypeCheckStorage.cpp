@@ -214,7 +214,9 @@ PatternBindingEntryRequest::evaluate(Evaluator &eval,
     options |= TypeResolutionFlags::AllowUnboundGenerics;
   }
 
-  if (TypeChecker::typeCheckPattern(pattern, binding->getDeclContext(), options)) {
+  Type patternType = TypeChecker::typeCheckPattern(
+      pattern, binding->getDeclContext(), options);
+  if (patternType->hasError()) {
     swift::setBoundVarsTypeError(pattern, Context);
     binding->setInvalid();
     pattern->setType(ErrorType::get(Context));
@@ -225,20 +227,20 @@ PatternBindingEntryRequest::evaluate(Evaluator &eval,
   // default-initializable. If so, do it.
   if (!pbe.isInitialized() &&
       binding->isDefaultInitializable(entryNumber) &&
-      pattern->hasStorage() &&
-      !pattern->getType()->hasError()) {
-    auto type = pattern->getType();
-    if (auto defaultInit = TypeChecker::buildDefaultInitializer(type)) {
+      pattern->hasStorage()) {
+    if (auto defaultInit = TypeChecker::buildDefaultInitializer(patternType)) {
       // If we got a default initializer, install it and re-type-check it
       // to make sure it is properly coerced to the pattern type.
       binding->setInit(entryNumber, defaultInit);
     }
   }
 
-  // If the pattern didn't get a type or if it contains an unbound generic type,
-  // we'll need to check the initializer.
-  if (!pattern->hasType() || pattern->getType()->hasUnboundGenericType()) {
-    if (TypeChecker::typeCheckPatternBinding(binding, entryNumber)) {
+  // If the pattern contains some form of unresolved type, we'll need to
+  // check the initializer.
+  if (patternType->hasUnresolvedType() ||
+      patternType->hasUnboundGenericType()) {
+    if (TypeChecker::typeCheckPatternBinding(binding, entryNumber,
+                                             patternType)) {
       binding->setInvalid();
       return &pbe;
     }
@@ -255,7 +257,7 @@ PatternBindingEntryRequest::evaluate(Evaluator &eval,
     // Coerce the pattern to the computed type.
     auto resolution = TypeResolution::forContextual(binding->getDeclContext());
     if (TypeChecker::coercePatternToType(pattern, resolution,
-                                         pattern->getType(), options)) {
+                                         patternType, options)) {
       binding->setInvalid();
       pattern->setType(ErrorType::get(Context));
       return &pbe;

@@ -1003,8 +1003,11 @@ public:
   /// \param dc The context in which type checking occurs.
   /// \param options Options that control type resolution.
   ///
-  /// \returns true if any errors occurred during type checking.
-  static bool typeCheckPattern(Pattern *P, DeclContext *dc,
+  /// \returns the type of the pattern, which may be an error type if an
+  /// unrecoverable error occurred. If the options permit it, the type may
+  /// involve \c UnresolvedType (for patterns with no type information) and
+  /// unbound generic types.
+  static Type typeCheckPattern(Pattern *P, DeclContext *dc,
                                TypeResolutionOptions options);
 
   static bool typeCheckCatchPattern(CatchStmt *S, DeclContext *dc);
@@ -1029,8 +1032,11 @@ public:
                                         AnyFunctionType *FN);
   
   /// Type-check an initialized variable pattern declaration.
-  static bool typeCheckBinding(Pattern *&P, Expr *&Init, DeclContext *DC);
-  static bool typeCheckPatternBinding(PatternBindingDecl *PBD, unsigned patternNumber);
+  static bool typeCheckBinding(Pattern *&P, Expr *&Init, DeclContext *DC,
+                               Type patternType);
+  static bool typeCheckPatternBinding(PatternBindingDecl *PBD,
+                                      unsigned patternNumber,
+                                      Type patternType = Type());
 
   /// Type-check a for-each loop's pattern binding and sequence together.
   ///

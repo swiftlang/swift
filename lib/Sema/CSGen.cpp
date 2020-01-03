@@ -2158,10 +2158,11 @@ namespace {
       }
 
       case PatternKind::Typed: {
-        auto typedPattern = cast<TypedPattern>(pattern);
         // FIXME: Need a better locator for a pattern as a base.
-        Type openedType = CS.openUnboundGenericType(typedPattern->getType(),
-                                                    locator);
+        TypeResolutionOptions options(TypeResolverContext::InExpression);
+        options |= TypeResolutionFlags::AllowUnboundGenerics;
+        Type type = TypeChecker::typeCheckPattern(pattern, CurDC, options);
+        Type openedType = CS.openUnboundGenericType(type, locator);
 
         // For a typed pattern, simply return the opened type of the pattern.
         // FIXME: Error recovery if the type is an error type?

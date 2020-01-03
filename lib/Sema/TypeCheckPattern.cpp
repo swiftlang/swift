@@ -664,12 +664,9 @@ Pattern *TypeChecker::resolvePattern(Pattern *P, DeclContext *DC,
   return P;
 }
 
-static bool validateTypedPattern(TypeResolution resolution,
+static Type validateTypedPattern(TypeResolution resolution,
                                  TypedPattern *TP,
                                  TypeResolutionOptions options) {
-  if (TP->hasType())
-    return TP->getType()->hasError();
-
   TypeLoc TL = TP->getTypeLoc();
   
   bool hadError;
@@ -678,7 +675,7 @@ static bool validateTypedPattern(TypeResolution resolution,
   // variable binding, then we can bind the opaque return type from the
   // property definition.
   auto &Context = resolution.getASTContext();
-  if (auto opaqueRepr = dyn_cast<OpaqueReturnTypeRepr>(TL.getTypeRepr())) {
+  if (auto opaqueRepr = dyn_cast_or_null<OpaqueReturnTypeRepr>(TL.getTypeRepr())) {
     auto named = dyn_cast<NamedPattern>(
                            TP->getSubPattern()->getSemanticsProvidingPattern());
     if (named) {
@@ -699,18 +696,14 @@ static bool validateTypedPattern(TypeResolution resolution,
   }
 
   if (hadError) {
-    TP->setType(ErrorType::get(Context));
-    return hadError;
+    return ErrorType::get(Context);
   }
 
-  TP->setType(TL.getType());
-
   assert(!dyn_cast_or_null<SpecifierTypeRepr>(TL.getTypeRepr()));
-
-  return hadError;
+  return TL.getType();
 }
 
-bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
+Type TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
                                    TypeResolutionOptions options) {
   auto &Context = dc->getASTContext();
   switch (P->getKind()) {
@@ -723,17 +716,14 @@ bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
       SP = PP->getSubPattern();
     else
       SP = cast<VarPattern>(P)->getSubPattern();
-    if (TypeChecker::typeCheckPattern(SP, dc, options)) {
-      P->setType(ErrorType::get(Context));
-      return true;
-    }
-    if (SP->hasType()) {
-      auto type = SP->getType();
-      if (P->getKind() == PatternKind::Paren)
-        type = ParenType::get(Context, type);
-      P->setType(type);
-    }
-    return false;
+    Type subType = TypeChecker::typeCheckPattern(SP, dc, options);
+    if (subType->hasError())
+      return ErrorType::get(Context);
+
+    auto type = subType;
+    if (P->getKind() == PatternKind::Paren)
+      type = ParenType::get(Context, type);
+    return type;
   }
 
   // If we see an explicit type annotation, coerce the sub-pattern to
@@ -751,16 +741,15 @@ bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
     // If we're type checking this pattern in a context that can provide type
     // information, then the lack of type information is not an error.
     if (options & TypeResolutionFlags::AllowUnspecifiedTypes)
-      return false;
+      return Context.TheUnresolvedType;
 
     Context.Diags.diagnose(P->getLoc(), diag::cannot_infer_type_for_pattern);
-    P->setType(ErrorType::get(Context));
     if (auto named = dyn_cast<NamedPattern>(P)) {
       if (auto var = named->getDecl()) {
         var->setInvalid();
       }
     }
-    return true;
+    return ErrorType::get(Context);
 
   // A tuple pattern propagates its tuple-ness out.
   case PatternKind::Tuple: {
@@ -769,31 +758,21 @@ bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
     SmallVector<TupleTypeElt, 8> typeElts;
 
     const auto elementOptions = options.withoutContext();
-    bool missingType = false;
     for (unsigned i = 0, e = tuplePat->getNumElements(); i != e; ++i) {
       TuplePatternElt &elt = tuplePat->getElement(i);
       Pattern *pattern = elt.getPattern();
-      if (TypeChecker::typeCheckPattern(pattern, dc, elementOptions)) {
+      Type subType = TypeChecker::typeCheckPattern(pattern, dc, elementOptions);
+      if (subType->hasError())
         hadError = true;
-        continue;
-      }
-      if (!pattern->hasType()) {
-        missingType = true;
-        continue;
-      }
 
-      typeElts.push_back(TupleTypeElt(pattern->getType(), elt.getLabel()));
+      typeElts.push_back(TupleTypeElt(subType, elt.getLabel()));
     }
 
     if (hadError) {
-      P->setType(ErrorType::get(Context));
-      return true;
+      return ErrorType::get(Context);
     }
-    if (!missingType && !(options &
-                          TypeResolutionFlags::AllowUnspecifiedTypes)) {
-      P->setType(TupleType::get(typeElts, Context));
-    }
-    return false;
+
+    return TupleType::get(typeElts, Context);
   }
       
   //--- Refutable patterns.
@@ -809,11 +788,10 @@ bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
     if (!(options & TypeResolutionFlags::AllowUnspecifiedTypes)) {
       Context.Diags.diagnose(P->getLoc(),
                              diag::refutable_pattern_requires_initializer);
-      P->setType(ErrorType::get(Context));
-      return true;
+      return ErrorType::get(Context);
     }
 
-    return false;
+    return Context.TheUnresolvedType;
   }
   llvm_unreachable("bad pattern kind!");
 }
@@ -923,9 +901,10 @@ recur:
   // that type.
   case PatternKind::Typed: {
     TypedPattern *TP = cast<TypedPattern>(P);
-    bool hadError = validateTypedPattern(resolution, TP, options);
-    if (!hadError) {
-      if (!type->isEqual(TP->getType()) && !type->hasError()) {
+    Type patternType = validateTypedPattern(resolution, TP, options);
+    bool hadError = false;
+    if (!patternType->hasError()) {
+      if (!type->isEqual(patternType) && !type->hasError()) {
         if (options & TypeResolutionFlags::OverrideType) {
           TP->setType(type);
         } else {
@@ -934,10 +913,12 @@ recur:
           hadError = true;
         }
       }
+    } else {
+      hadError = true;
     }
 
     Pattern *sub = TP->getSubPattern();
-    hadError |= coercePatternToType(sub, resolution, TP->getType(),
+    hadError |= coercePatternToType(sub, resolution, type,
                     subOptions | TypeResolutionFlags::FromNonInferredPattern);
     if (!hadError) {
       TP->setSubPattern(sub);
