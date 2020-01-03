@@ -256,11 +256,6 @@ public:
   ManagedValue createUpcast(SILLocation loc, ManagedValue original,
                             SILType type);
 
-  using SILBuilder::tryCreateUncheckedRefCast;
-  ManagedValue tryCreateUncheckedRefCast(SILLocation loc,
-                                         ManagedValue op,
-                                         SILType type);
-
   using SILBuilder::createUncheckedTrivialBitCast;
   ManagedValue createUncheckedTrivialBitCast(SILLocation loc,
                                              ManagedValue original,
