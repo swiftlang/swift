@@ -3045,7 +3045,6 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
                                            InitType, options)) {
         return nullptr;
       }
-
       Stmt->setPattern(pattern);
 
       // Get the conformance of the sequence type to the Sequence protocol.

@@ -251,6 +251,15 @@ PatternBindingEntryRequest::evaluate(Evaluator &eval,
       binding->diagnose(diag::inferred_opaque_type,
                         binding->getInit(entryNumber)->getType());
     }
+  } else {
+    // Coerce the pattern to the computed type.
+    auto resolution = TypeResolution::forContextual(binding->getDeclContext());
+    if (TypeChecker::coercePatternToType(pattern, resolution,
+                                         pattern->getType(), options)) {
+      binding->setInvalid();
+      pattern->setType(ErrorType::get(Context));
+      return &pbe;
+    }
   }
 
   // If the pattern binding appears in a type or library file context, then
