@@ -83,6 +83,11 @@ _TF3foolp3barSi ---> foo.bar.nativePinningAddressor : Swift.Int
 _TF3foog3barSi ---> foo.bar.getter : Swift.Int
 _TF3foos3barSi ---> foo.bar.setter : Swift.Int
 _TFC3foo3bar3basfT3zimCS_3zim_T_ ---> foo.bar.bas(zim: foo.zim) -> ()
+_$s4test3fooyyF ---> test.foo() -> ()
+_$s4test0014foospace_ntJBbyyF ---> test.foo space() -> ()
+_$s4test0012_3times_bpJCayyF ---> test.3 times() -> ()
+_$s4test0011test_DkJtFbyyF ---> test.test +() -> ()
+_$s4test0016pathfoo_yuEHaaCiyyF ---> test.path://foo() -> ()
 _TToFC3foo3bar3basfT3zimCS_3zim_T_ ---> {T:_TFC3foo3bar3basfT3zimCS_3zim_T_,C} @objc foo.bar.bas(zim: foo.zim) -> ()
 _TTOFSC3fooFTSdSd_Sd ---> {T:_TFSC3fooFTSdSd_Sd} @nonobjc __C_Synthesized.foo(Swift.Double, Swift.Double) -> Swift.Double
 _T03foo3barC3basyAA3zimCAE_tFTo ---> {T:_T03foo3barC3basyAA3zimCAE_tF,C} @objc foo.bar.bas(zim: foo.zim) -> ()

@@ -569,6 +569,16 @@ static bool isValidIdentifierContinuationCodePoint(uint32_t c) {
     || (c >= 0xD0000 && c <= 0xDFFFD)
     || (c >= 0xE0000 && c <= 0xEFFFD);
 }
+
+static bool isValidIdentifierEscapedCodePoint(uint32_t c) {
+  // Support any unicode scalar, including whitespaces and punctuations
+  // but not the backticked escaping mark
+  if (c == '\r' || c == '\n' || c == '`')
+    return false;
+  
+  return true;
+}
+
 static bool isValidIdentifierStartCodePoint(uint32_t c) {
   if (!isValidIdentifierContinuationCodePoint(c))
     return false;
@@ -608,6 +618,11 @@ static bool advanceIfValidStartOfIdentifier(char const *&ptr,
 static bool advanceIfValidContinuationOfIdentifier(char const *&ptr,
                                                    char const *end) {
   return advanceIf(ptr, end, isValidIdentifierContinuationCodePoint);
+}
+
+static bool advanceIfValidEscapedIdentifier(char const *&ptr,
+                                                   char const *end) {
+  return advanceIf(ptr, end, isValidIdentifierEscapedCodePoint);
 }
 
 static bool advanceIfValidStartOfOperator(char const *&ptr,
@@ -1933,7 +1948,7 @@ const char *Lexer::findEndOfCurlyQuoteStringLiteral(const char *Body,
 
 
 /// lexEscapedIdentifier:
-///   identifier ::= '`' identifier '`'
+///   identifier ::= '`' escaped-identifier '`'
 ///
 /// If it doesn't match this production, the leading ` is a punctuator.
 void Lexer::lexEscapedIdentifier() {
@@ -1944,21 +1959,11 @@ void Lexer::lexEscapedIdentifier() {
   // Check whether we have an identifier followed by another backtick, in which
   // case this is an escaped identifier.
   const char *IdentifierStart = CurPtr;
-  if (advanceIfValidStartOfIdentifier(CurPtr, BufferEnd)) {
-    // Keep continuing the identifier.
-    while (advanceIfValidContinuationOfIdentifier(CurPtr, BufferEnd));
+  while (advanceIfValidEscapedIdentifier(CurPtr, BufferEnd));
 
-    // If we have the terminating "`", it's an escaped identifier.
-    if (*CurPtr == '`') {
-      ++CurPtr;
-      formEscapedIdentifierToken(Quote);
-      return;
-    }
-  }
-
-  // Special case; allow '`$`'.
-  if (Quote[1] == '$' && Quote[2] == '`') {
-    CurPtr = Quote + 3;
+  // If we have the terminating "`", it's an escaped identifier.
+  if (*CurPtr == '`') {
+    ++CurPtr;
     formEscapedIdentifierToken(Quote);
     return;
   }
