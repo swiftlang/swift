@@ -41,6 +41,25 @@ STATISTIC(NumLoadCopyConvertedToLoadBorrow,
 //                                  Utility
 //===----------------------------------------------------------------------===//
 
+static bool isConsumingOwnedUse(Operand *use) {
+  assert(use->get().getOwnershipKind() == ValueOwnershipKind::Owned);
+
+  if (use->isTypeDependent())
+    return false;
+
+  // We know that a copy_value produces an @owned value. Look through all of
+  // our uses and classify them as either invalidating or not
+  // invalidating. Make sure that all of the invalidating ones are
+  // destroy_value since otherwise the live_range is not complete.
+  auto map = use->getOwnershipKindMap();
+  auto constraint = map.getLifetimeConstraint(ValueOwnershipKind::Owned);
+  return constraint == UseLifetimeConstraint::MustBeInvalidated;
+}
+
+//===----------------------------------------------------------------------===//
+//                            Live Range Modeling
+//===----------------------------------------------------------------------===//
+
 /// Return true if v only has invalidating uses that are destroy_value. Such an
 /// owned value is said to represent a dead "live range".
 ///
@@ -757,11 +776,20 @@ public:
     
     SmallVector<BranchPropagatedUser, 4> valueDestroys;
     for (auto *use : Load->getUses()) {
-      if (isa<DestroyValueInst>(use->getUser())) {
-        valueDestroys.emplace_back(use);
+      // If this load is not consuming, skip it.
+      if (!isConsumingOwnedUse(use)) {
+        continue;
       }
+
+      // Otherwise, if this isn't a destroy_value, we have a consuming use we
+      // don't understand. Return conservatively that this memory location may
+      // not be guaranteed.
+      if (!isa<DestroyValueInst>(use->getUser())) {
+        return answer(true);
+      }
+      valueDestroys.emplace_back(use);
     }
-    
+
     SmallPtrSet<SILBasicBlock *, 4> visitedBlocks;
 
     LinearLifetimeChecker checker(visitedBlocks, ARCOpt.getDeadEndBlocks());
