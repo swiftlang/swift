@@ -2926,12 +2926,6 @@ auto TypeChecker::typeCheckForEachBinding(
     /// The type of the iterator.
     Type IteratorType;
 
-    /// The conformance of the iterator type to IteratorProtocol.
-    ProtocolConformanceRef IteratorConformance;
-
-    /// The type of makeIterator.
-    Type MakeIteratorType;
-
   public:
     explicit BindingListener(ForEachStmt *stmt) : Stmt(stmt) { }
 
@@ -2993,10 +2987,11 @@ auto TypeChecker::typeCheckForEachBinding(
       // Reference the makeIterator witness.
       ASTContext &ctx = cs.getASTContext();
       FuncDecl *makeIterator = ctx.getSequenceMakeIterator();
-      MakeIteratorType = cs.createTypeVariable(Locator, TVO_CanBindToNoEscape);
+      Type makeIteratorType =
+          cs.createTypeVariable(Locator, TVO_CanBindToNoEscape);
       cs.addValueWitnessConstraint(
           LValueType::get(SequenceType), makeIterator,
-          MakeIteratorType, cs.DC, FunctionRefKind::Compound,
+          makeIteratorType, cs.DC, FunctionRefKind::Compound,
           ContextualLocator);
 
       Stmt->setSequence(expr);
@@ -3013,16 +3008,7 @@ auto TypeChecker::typeCheckForEachBinding(
 
       // Perform any necessary conversions of the sequence (e.g. [T]! -> [T]).
       expr = solution.coerceToType(expr, SequenceType, Locator);
-      
       if (!expr) return nullptr;
-
-      // Convert the sequence as appropriate for the makeIterator() call.
-      auto makeIteratorOverload = solution.getOverloadChoice(ContextualLocator);
-      auto makeIteratorSelfType = solution.simplifyType(
-          makeIteratorOverload.openedFullType
-        )->castTo<AnyFunctionType>()->getParams()[0].getPlainType();
-      expr = solution.coerceToType(expr, makeIteratorSelfType,
-                                   ContextualLocator);
 
       cs.cacheExprTypes(expr);
       Stmt->setSequence(expr);
@@ -3040,39 +3026,18 @@ auto TypeChecker::typeCheckForEachBinding(
       Stmt->setPattern(pattern);
 
       // Get the conformance of the sequence type to the Sequence protocol.
-      // FIXME: Get this from the solution and substitute into that.
-      SequenceConformance = TypeChecker::conformsToProtocol(
-          SequenceType, SequenceProto, cs.DC,
-          ConformanceCheckFlags::InExpression,
-          expr->getLoc());
+      SequenceConformance = solution.resolveConformance(
+          ContextualLocator, SequenceProto);
       assert(!SequenceConformance.isInvalid() &&
              "Couldn't find sequence conformance");
       Stmt->setSequenceConformance(SequenceConformance);
-
-      // Retrieve the conformance of the iterator type to IteratorProtocol.
-      // FIXME: Get this from the solution and substitute into that.
-      IteratorConformance = TypeChecker::conformsToProtocol(
-          IteratorType, IteratorProto, cs.DC,
-          ConformanceCheckFlags::InExpression,
-          expr->getLoc());
-
-      // Record the makeIterator declaration we used.
-      auto makeIteratorDecl = makeIteratorOverload.choice.getDecl();
-      auto makeIteratorSubs = SequenceType->getMemberSubstitutionMap(
-          cs.DC->getParentModule(), makeIteratorDecl);
-      auto makeIteratorDeclRef =
-          ConcreteDeclRef(makeIteratorDecl, makeIteratorSubs);
-      Stmt->setMakeIterator(makeIteratorDeclRef);
 
       solution.setExprTypes(expr);
       return expr;
     }
 
     ForEachBinding getBinding() const {
-      return {
-          SequenceType, SequenceConformance, IteratorType, IteratorConformance,
-          ElementType
-      };
+      return { SequenceType, SequenceConformance, IteratorType, ElementType };
     }
   };
 
