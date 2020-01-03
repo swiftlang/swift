@@ -589,11 +589,8 @@ bb0(%x : @owned $ClassLet):
   return undef : $()
 }
 
-// We do not support this today, but we will once forwarding is ignored when
-// checking if the load [copy] is a dead live range.
-//
 // CHECK-LABEL: sil [ossa] @dont_copy_let_properties_with_borrowed_base_that_dominates_projtestcase :
-// CHECK: load [copy]
+// CHECK: load_borrow
 // CHECK: } // end sil function 'dont_copy_let_properties_with_borrowed_base_that_dominates_projtestcase'
 sil [ossa] @dont_copy_let_properties_with_borrowed_base_that_dominates_projtestcase : $@convention(thin) (@owned ClassLet) -> () {
 bb0(%x : @owned $ClassLet):
@@ -613,11 +610,8 @@ bb0(%x : @owned $ClassLet):
   return undef : $()
 }
 
-// We do not support this today, but we will once forwarding is ignored when
-// checking if the load [copy] is a dead live range.
-//
 // CHECK-LABEL: sil [ossa] @dont_copy_let_properties_with_borrowed_base_that_dominates_projtestcase_2 :
-// CHECK: load [copy]
+// CHECK: load_borrow
 // CHECK: } // end sil function 'dont_copy_let_properties_with_borrowed_base_that_dominates_projtestcase_2'
 sil [ossa] @dont_copy_let_properties_with_borrowed_base_that_dominates_projtestcase_2 : $@convention(thin) (@owned ClassLet) -> () {
 bb0(%x : @owned $ClassLet):
