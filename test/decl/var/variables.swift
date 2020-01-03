@@ -107,6 +107,7 @@ func test21057425() -> (Int, Int) {
 
 // rdar://problem/21081340
 func test21081340() {
+  func foo() { }
   let (x: a, y: b): () = foo() // expected-error{{tuple pattern has the wrong length for tuple type '()'}}
 }
 

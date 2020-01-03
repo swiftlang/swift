@@ -1032,19 +1032,10 @@ public:
   static bool typeCheckBinding(Pattern *&P, Expr *&Init, DeclContext *DC);
   static bool typeCheckPatternBinding(PatternBindingDecl *PBD, unsigned patternNumber);
 
-  /// Information about a type-checked for-each binding.
-  struct ForEachBinding {
-    Type sequenceType;
-    ProtocolConformanceRef sequenceConformance;
-    Type iteratorType;
-    Type elementType;
-  };
-
   /// Type-check a for-each loop's pattern binding and sequence together.
   ///
-  /// \returns the binding, if successful.
-  static Optional<ForEachBinding> typeCheckForEachBinding(
-      DeclContext *dc, ForEachStmt *stmt);
+  /// \returns true if a failure occurred.
+  static bool typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt);
 
   /// Compute the set of captures for the given function or closure.
   static void computeCaptures(AnyFunctionRef AFR);
