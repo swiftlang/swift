@@ -46,7 +46,7 @@ static GuardStmt *returnComparisonIfNotEqualGuard(ASTContext &C,
   // First, generate the statement for the body of the guard.
   // return lhs < rhs
   auto ltFuncExpr = new (C) UnresolvedDeclRefExpr(
-    DeclName(C.getIdentifier("<")), DeclRefKind::BinaryOperator,
+    DeclNameRef(C.Id_LessThanOperator), DeclRefKind::BinaryOperator,
     DeclNameLoc());
   auto ltArgsTuple = TupleExpr::create(C, SourceLoc(),
                                         { lhsExpr, rhsExpr },
@@ -60,7 +60,7 @@ static GuardStmt *returnComparisonIfNotEqualGuard(ASTContext &C,
   // Next, generate the condition being checked.
   // lhs == rhs
   auto cmpFuncExpr = new (C) UnresolvedDeclRefExpr(
-    DeclName(C.getIdentifier("==")), DeclRefKind::BinaryOperator,
+    DeclNameRef(C.Id_EqualsOperator), DeclRefKind::BinaryOperator,
     DeclNameLoc());
   auto cmpArgsTuple = TupleExpr::create(C, SourceLoc(),
                                         { lhsExpr, rhsExpr },
@@ -202,8 +202,8 @@ deriveBodyComparable_enum_hasAssociatedValues_lt(AbstractFunctionDecl *ltDecl, v
     auto lhsSubpattern = enumElementPayloadSubpattern(elt, 'l', ltDecl,
                                                       lhsPayloadVars);
     auto lhsElemPat = new (C) EnumElementPattern(TypeLoc::withoutLoc(enumType),
-                                                 SourceLoc(), SourceLoc(),
-                                                 Identifier(), elt,
+                                                 SourceLoc(), DeclNameLoc(),
+                                                 DeclNameRef(), elt,
                                                  lhsSubpattern);
     lhsElemPat->setImplicit();
 
@@ -212,8 +212,8 @@ deriveBodyComparable_enum_hasAssociatedValues_lt(AbstractFunctionDecl *ltDecl, v
     auto rhsSubpattern = enumElementPayloadSubpattern(elt, 'r', ltDecl,
                                                       rhsPayloadVars);
     auto rhsElemPat = new (C) EnumElementPattern(TypeLoc::withoutLoc(enumType),
-                                                 SourceLoc(), SourceLoc(),
-                                                 Identifier(), elt,
+                                                 SourceLoc(), DeclNameLoc(),
+                                                 DeclNameRef(), elt,
                                                  rhsSubpattern);
     rhsElemPat->setImplicit();
 
