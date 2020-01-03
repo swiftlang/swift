@@ -777,6 +777,7 @@ public:
     // Invoke iterator() to get an iterator from the sequence.
     Type iteratorTy = binding->iteratorType;
     VarDecl *iterator;
+    Type nextResultType = OptionalType::get(binding->elementType);
     {
       // Create a local variable to capture the iterator.
       std::string name;
@@ -797,7 +798,6 @@ public:
 
       // TODO: test/DebugInfo/iteration.swift requires this extra info to
       // be around.
-      auto nextResultType = OptionalType::get(binding->elementType);
       PatternBindingDecl::createImplicit(
           getASTContext(), StaticSpellingKind::None, genPat,
           new (getASTContext()) OpaqueValueExpr(S->getInLoc(), nextResultType),
@@ -808,33 +808,15 @@ public:
     if (TypeChecker::requireOptionalIntrinsics(getASTContext(), S->getForLoc()))
       return nullptr;
 
-    // Gather the witnesses from the Iterator protocol conformance, which
-    // we'll use to drive the loop.
-    // FIXME: Would like to customize the diagnostic emitted in
-    // conformsToProtocol().
-    auto genConformance = binding->iteratorConformance;
-    if (genConformance.isInvalid())
-      return nullptr;
-
+    // Create the iterator variable.
     auto *varRef = TypeChecker::buildCheckedRefExpr(iterator, DC,
                                                     DeclNameLoc(S->getInLoc()),
                                                     /*implicit*/ true);
     if (!varRef)
       return nullptr;
-
     S->setIteratorVarRef(varRef);
 
-    auto witness =
-        genConformance.getWitnessByName(iteratorTy, getASTContext().Id_next);
-    if (!witness)
-      return nullptr;
-    S->setIteratorNext(witness);
-
-    auto nextResultType = cast<FuncDecl>(S->getIteratorNext().getDecl())
-                              ->getResultInterfaceType()
-                              .subst(S->getIteratorNext().getSubstitutions());
-
-    // Convert that Optional<T> value to Optional<Element>.
+    // Convert that Optional<Element> value to the type of the pattern.
     auto optPatternType = OptionalType::get(S->getPattern()->getType());
     if (!optPatternType->isEqual(nextResultType)) {
       OpaqueValueExpr *elementExpr =

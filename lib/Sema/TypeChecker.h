@@ -1037,7 +1037,6 @@ public:
     Type sequenceType;
     ProtocolConformanceRef sequenceConformance;
     Type iteratorType;
-    ProtocolConformanceRef iteratorConformance;
     Type elementType;
   };
 

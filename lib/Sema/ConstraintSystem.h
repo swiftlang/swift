@@ -898,6 +898,11 @@ public:
     return None;
   }
 
+  /// Retrieve a fully-resolved protocol conformance at the given locator
+  /// and with the given protocol.
+  ProtocolConformanceRef resolveConformance(ConstraintLocator *locator,
+                                            ProtocolDecl *proto);
+
   void setExprTypes(Expr *expr) const;
 
   SWIFT_DEBUG_DUMP;
