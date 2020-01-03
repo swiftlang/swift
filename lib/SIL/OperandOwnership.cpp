@@ -466,7 +466,7 @@ OperandOwnershipKindClassifier::visitSwitchEnumInst(SwitchEnumInst *sei) {
   // and merge them.
   auto mergedKind = ValueOwnershipKind::merge(makeTransformRange(
       sei->getSuccessorBlockArgumentLists(),
-      [&](SILPhiArgumentArrayRef array) -> ValueOwnershipKind {
+      [&](ArrayRef<SILArgument *> array) -> ValueOwnershipKind {
         // If the array is empty, we have a non-payloaded case. Return any.
         if (array.empty())
           return ValueOwnershipKind::None;
@@ -474,8 +474,7 @@ OperandOwnershipKindClassifier::visitSwitchEnumInst(SwitchEnumInst *sei) {
         // Otherwise, we should have a single element since a payload is
         // a tuple.
         assert(std::distance(array.begin(), array.end()) == 1);
-        SILPhiArgument *arg = array.front();
-        return arg->getOwnershipKind();
+        return array.front()->getOwnershipKind();
       }));
 
   // If we failed to merge, return an empty map so we will fail to pattern match
