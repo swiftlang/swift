@@ -355,7 +355,6 @@ enum Publicist {
 
 func miss(_ a: Publicist, outsold b: Publicist) -> Bool {
   return b < a // expected-error{{binary operator '<' cannot be applied to two 'Publicist' operands}}
-  // expected-note @-1 {{overloads for '<' exist with these partially matching parameter lists: }}
 }
 
 // FIXME: Remove -verify-ignore-unknown.
