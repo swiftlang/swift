@@ -29,15 +29,25 @@ void IRGenModule::emitSILDifferentiabilityWitness(
     SILDifferentiabilityWitness *dw) {
   PrettyStackTraceDifferentiabilityWitness _st(
       "emitting differentiability witness for", dw->getKey());
-
+  llvm::errs() << "IRGEN SIL DIFF WITNESS, CLANG DECL? "
+               << dw->getOriginalFunction()->getClangDecl() << ", C REFERENCES: "
+               << dw->getOriginalFunction()->hasCReferences() << ", WEAK IMPORTED: "
+               << dw->getOriginalFunction()->isWeakImported() << ", IS EXTERNAL DECL: "
+               << dw->getOriginalFunction()->isExternalDeclaration() << ", IS DECL: "
+               << dw->isDeclaration()
+               << "\n";
+  dw->dump();
   // Don't emit declarations.
   if (dw->isDeclaration())
     return;
 
-  // Don't emit public_external witnesses.
-  if (hasPublicVisibility(dw->getLinkage()) &&
-      isAvailableExternally(dw->getLinkage()))
-    return;
+  // Don't emit `public_external` witnesses.
+  // Make an exception for Clang-imported functions.
+  if (!dw->getOriginalFunction()->getClangDecl()) {
+    if (hasPublicVisibility(dw->getLinkage()) &&
+        isAvailableExternally(dw->getLinkage()))
+      return;
+  }
 
   ConstantInitBuilder builder(*this);
   auto diffWitnessContents = builder.beginStruct();
@@ -52,4 +62,6 @@ void IRGenModule::emitSILDifferentiabilityWitness(
 
   getAddrOfDifferentiabilityWitness(
       dw, diffWitnessContents.finishAndCreateFuture());
+
+  llvm::errs() << "IRGEN'd DIFF WITNESS!\n";
 }

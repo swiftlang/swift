@@ -168,133 +168,217 @@ public func ldexp(_ x: ${T}, _ n : Int) -> ${T} {
 #if !(os(Windows) || os(Android)) && (arch(i386) || arch(x86_64))
 %   end
 @derivative(of: exp)
-@usableFromInline
-func _vjpExp(_ x: ${T}) -> (value: ${T}, pullback: (${T}) -> ${T}) {
+public func _vjpExp(_ x: ${T}) -> (value: ${T}, pullback: (${T}) -> ${T}) {
   let value = exp(x)
   return (value, { v in value * v })
 }
 
+@derivative(of: exp)
+public func _jvpExp(_ x: ${T}) -> (value: ${T}, differential: (${T}) -> ${T}) {
+  fatalError("Unimplemented JVP for 'exp(_:)'")
+}
+
 @derivative(of: exp2)
-@usableFromInline
-func _vjpExp2(_ x: ${T}) -> (value: ${T}, pullback: (${T}) -> ${T}) {
+public func _vjpExp2(_ x: ${T}) -> (value: ${T}, pullback: (${T}) -> ${T}) {
   let value = exp2(x)
   return (value, { v in v * ${T}(M_LN2) * value })
 }
 
+@derivative(of: exp2)
+public func _jvpExp2(_ x: ${T}) -> (value: ${T}, differential: (${T}) -> ${T}) {
+  fatalError("Unimplemented JVP for 'exp2(_:)'")
+}
+
 @derivative(of: log)
-@usableFromInline
-func _vjpLog(_ x: ${T}) -> (value: ${T}, pullback: (${T}) -> ${T}) {
+public func _vjpLog(_ x: ${T}) -> (value: ${T}, pullback: (${T}) -> ${T}) {
   return (log(x), { v in v / x })
 }
 
+@derivative(of: log)
+public func _jvpLog(_ x: ${T}) -> (value: ${T}, differential: (${T}) -> ${T}) {
+  fatalError("Unimplemented JVP for 'log(_:)'")
+}
+
 @derivative(of: log10)
-@usableFromInline
-func _vjpLog10(_ x: ${T}) -> (value: ${T}, pullback: (${T}) -> ${T}) {
+public func _vjpLog10(_ x: ${T}) -> (value: ${T}, pullback: (${T}) -> ${T}) {
   return (log10(x), { v in v * ${T}(M_LOG10E) / x })
 }
 
+@derivative(of: log10)
+public func _jvpLog10(_ x: ${T}) -> (value: ${T}, differential: (${T}) -> ${T}) {
+  fatalError("Unimplemented JVP for 'log10(_:)'")
+}
+
 @derivative(of: log2)
-@usableFromInline
-func _vjpLog2(_ x: ${T}) -> (value: ${T}, pullback: (${T}) -> ${T}) {
+public func _vjpLog2(_ x: ${T}) -> (value: ${T}, pullback: (${T}) -> ${T}) {
   return (log2(x), { v in v / (${T}(M_LN2) * x) })
 }
 
+@derivative(of: log2)
+public func _jvpLog2(_ x: ${T}) -> (value: ${T}, differential: (${T}) -> ${T}) {
+  fatalError("Unimplemented JVP for 'log2(_:)'")
+}
+
 @derivative(of: sin)
-@usableFromInline
-func _vjpSin(_ x: ${T}) -> (value: ${T}, pullback: (${T}) -> ${T}) {
+public func _vjpSin(_ x: ${T}) -> (value: ${T}, pullback: (${T}) -> ${T}) {
   return (sin(x), { v in v * cos(x) })
 }
 
+@derivative(of: sin)
+public func _jvpSin(_ x: ${T}) -> (value: ${T}, differential: (${T}) -> ${T}) {
+  fatalError("Unimplemented JVP for 'sin(_:)'")
+}
+
 @derivative(of: cos)
-@usableFromInline
-func _vjpCos(_ x: ${T}) -> (value: ${T}, pullback: (${T}) -> ${T}) {
+public func _vjpCos(_ x: ${T}) -> (value: ${T}, pullback: (${T}) -> ${T}) {
   return (cos(x), { v in -v * sin(x) })
 }
 
+@derivative(of: cos)
+public func _jvpCos(_ x: ${T}) -> (value: ${T}, differential: (${T}) -> ${T}) {
+  fatalError("Unimplemented JVP for 'cos(_:)'")
+}
+
 @derivative(of: tan)
-@usableFromInline
-func _vjpTan(_ x: ${T}) -> (value: ${T}, pullback: (${T}) -> ${T}) {
+public func _vjpTan(_ x: ${T}) -> (value: ${T}, pullback: (${T}) -> ${T}) {
   let value = tan(x)
   return (value, { v in v * (1 + value * value) })
 }
 
+@derivative(of: tan)
+public func _jvpTan(_ x: ${T}) -> (value: ${T}, differential: (${T}) -> ${T}) {
+  fatalError("Unimplemented JVP for 'tan(_:)'")
+}
+
 @derivative(of: asin)
-@usableFromInline
-func _vjpAsin(_ x: ${T}) -> (value: ${T}, pullback: (${T}) -> ${T}) {
+public func _vjpAsin(_ x: ${T}) -> (value: ${T}, pullback: (${T}) -> ${T}) {
   return (asin(x), { v in v / sqrt(1 - x * x) })
 }
 
+@derivative(of: asin)
+public func _jvpAsin(_ x: ${T}) -> (value: ${T}, differential: (${T}) -> ${T}) {
+  fatalError("Unimplemented JVP for 'asin(_:)'")
+}
+
 @derivative(of: acos)
-@usableFromInline
-func _vjpAcos(_ x: ${T}) -> (value: ${T}, pullback: (${T}) -> ${T}) {
+public func _vjpAcos(_ x: ${T}) -> (value: ${T}, pullback: (${T}) -> ${T}) {
   return (acos(x), { v in -v / sqrt(1 - x * x) })
 }
 
+@derivative(of: acos)
+public func _jvpAcos(_ x: ${T}) -> (value: ${T}, differential: (${T}) -> ${T}) {
+  fatalError("Unimplemented JVP for 'acos(_:)'")
+}
+
 @derivative(of: atan)
-@usableFromInline
-func _vjpAtan(_ x: ${T}) -> (value: ${T}, pullback: (${T}) -> ${T}) {
+public func _vjpAtan(_ x: ${T}) -> (value: ${T}, pullback: (${T}) -> ${T}) {
   return (atan(x), { v in v / (1 + x * x) })
 }
 
+@derivative(of: atan)
+public func _jvpAtan(_ x: ${T}) -> (value: ${T}, differential: (${T}) -> ${T}) {
+  fatalError("Unimplemented JVP for 'atan(_:)'")
+}
+
 @derivative(of: sinh)
-@usableFromInline
-func _vjpSinh(_ x: ${T}) -> (value: ${T}, pullback: (${T}) -> ${T}) {
+public func _vjpSinh(_ x: ${T}) -> (value: ${T}, pullback: (${T}) -> ${T}) {
   return (sinh(x), { v in v * cosh(x) })
 }
 
+@derivative(of: sinh)
+public func _jvpSinh(_ x: ${T}) -> (value: ${T}, differential: (${T}) -> ${T}) {
+  fatalError("Unimplemented JVP for 'sinh(_:)'")
+}
+
 @derivative(of: cosh)
-@usableFromInline
-func _vjpCosh(_ x: ${T}) -> (value: ${T}, pullback: (${T}) -> ${T}) {
+public func _vjpCosh(_ x: ${T}) -> (value: ${T}, pullback: (${T}) -> ${T}) {
   return (cosh(x), { v in v * sinh(x) })
 }
 
+@derivative(of: cosh)
+public func _jvpCosh(_ x: ${T}) -> (value: ${T}, differential: (${T}) -> ${T}) {
+  fatalError("Unimplemented JVP for 'cosh(_:)'")
+}
+
 @derivative(of: tanh)
-@usableFromInline
-func _vjpTanh(_ x: ${T}) -> (value: ${T}, pullback: (${T}) -> ${T}) {
+public func _vjpTanh(_ x: ${T}) -> (value: ${T}, pullback: (${T}) -> ${T}) {
   let value = tanh(x)
   return (value, { v in v * (1 - value * value) })
 }
 
+@derivative(of: tanh)
+public func _jvpTanh(_ x: ${T}) -> (value: ${T}, differential: (${T}) -> ${T}) {
+  fatalError("Unimplemented JVP for 'tanh(_:)'")
+}
+
 @derivative(of: asinh)
-@usableFromInline
-func _vjpAsinh(_ x: ${T}) -> (value: ${T}, pullback: (${T}) -> ${T}) {
+public func _vjpAsinh(_ x: ${T}) -> (value: ${T}, pullback: (${T}) -> ${T}) {
   return (asinh(x), { v in v / sqrt(1 + x * x) })
 }
 
+@derivative(of: asinh)
+public func _jvpAsinh(_ x: ${T}) -> (value: ${T}, differential: (${T}) -> ${T}) {
+  fatalError("Unimplemented JVP for 'asinh(_:)'")
+}
+
 @derivative(of: acosh)
-@usableFromInline
-func _vjpAcosh(_ x: ${T}) -> (value: ${T}, pullback: (${T}) -> ${T}) {
+public func _vjpAcosh(_ x: ${T}) -> (value: ${T}, pullback: (${T}) -> ${T}) {
   return (acosh(x), { v in v / sqrt(x * x - 1) })
 }
 
+@derivative(of: acosh)
+public func _jvpAcosh(_ x: ${T}) -> (value: ${T}, differential: (${T}) -> ${T}) {
+  fatalError("Unimplemented JVP for 'acosh(_:)'")
+}
+
 @derivative(of: atanh)
-@usableFromInline
-func _vjpAtanh(_ x: ${T}) -> (value: ${T}, pullback: (${T}) -> ${T}) {
+public func _vjpAtanh(_ x: ${T}) -> (value: ${T}, pullback: (${T}) -> ${T}) {
   return (atanh(x), { v in v / (1 - x * x) })
 }
 
+@derivative(of: atanh)
+public func _jvpAtanh(_ x: ${T}) -> (value: ${T}, differential: (${T}) -> ${T}) {
+  fatalError("Unimplemented JVP for 'atanh(_:)'")
+}
+
 @derivative(of: expm1)
-@usableFromInline
-func _vjpExpm1(_ x: ${T}) -> (value: ${T}, pullback: (${T}) -> ${T}) {
+public func _vjpExpm1(_ x: ${T}) -> (value: ${T}, pullback: (${T}) -> ${T}) {
   return (expm1(x), { v in exp(x) * v })
 }
 
+@derivative(of: expm1)
+public func _jvpExpm1(_ x: ${T}) -> (value: ${T}, differential: (${T}) -> ${T}) {
+  fatalError("Unimplemented JVP for 'expm1(_:)'")
+}
+
 @derivative(of: log1p)
-@usableFromInline
-func _vjpLog1p(_ x: ${T}) -> (value: ${T}, pullback: (${T}) -> ${T}) {
+public func _vjpLog1p(_ x: ${T}) -> (value: ${T}, pullback: (${T}) -> ${T}) {
   return (log1p(x), { v in v / (x + 1) })
 }
 
+@derivative(of: log1p)
+public func _jvpLog1p(_ x: ${T}) -> (value: ${T}, differential: (${T}) -> ${T}) {
+  fatalError("Unimplemented JVP for 'log1p(_:)'")
+}
+
 @derivative(of: erf)
-@usableFromInline
-func _vjpErf(_ x: ${T}) -> (value: ${T}, pullback: (${T}) -> ${T}) {
+public func _vjpErf(_ x: ${T}) -> (value: ${T}, pullback: (${T}) -> ${T}) {
   return (erf(x), { v in v * ${T}(M_2_SQRTPI) * exp(-x * x) })
 }
 
+@derivative(of: erf)
+public func _jvpErf(_ x: ${T}) -> (value: ${T}, differential: (${T}) -> ${T}) {
+  fatalError("Unimplemented JVP for 'erf(_:)'")
+}
+
 @derivative(of: erfc)
-@usableFromInline
-func _vjpErfc(_ x: ${T}) -> (value: ${T}, pullback: (${T}) -> ${T}) {
+public func _vjpErfc(_ x: ${T}) -> (value: ${T}, pullback: (${T}) -> ${T}) {
   return (erfc(x), { v in v * -${T}(M_2_SQRTPI) * exp(-x * x) })
+}
+
+@derivative(of: erfc)
+public func _jvpErfc(_ x: ${T}) -> (value: ${T}, differential: (${T}) -> ${T}) {
+  fatalError("Unimplemented JVP for 'erfc(_:)'")
 }
 // SWIFT_ENABLE_TENSORFLOW END
 %   if T == 'Float80':

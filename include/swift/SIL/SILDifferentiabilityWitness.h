@@ -98,6 +98,7 @@ public:
   SILDifferentiabilityWitnessKey getKey() const;
   SILModule &getModule() const { return Module; }
   SILLinkage getLinkage() const { return Linkage; }
+  void setLinkage(SILLinkage linkage) { Linkage = linkage; }
   SILFunction *getOriginalFunction() const { return OriginalFunction; }
   const AutoDiffConfig &getConfig() const { return Config; }
   IndexSubset *getParameterIndices() const {

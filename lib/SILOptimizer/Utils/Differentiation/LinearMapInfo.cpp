@@ -472,7 +472,6 @@ bool LinearMapInfo::shouldDifferentiateApplySite(FullApplySite applySite) {
 
   // TODO: Pattern match to make sure there is at least one `store` to the
   // array's active buffer.
-  // if (isArrayLiteralIntrinsic(ai) && hasActiveResults)
   if (isArrayLiteralIntrinsic(applySite) && hasActiveResults)
     return true;
 

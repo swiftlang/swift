@@ -343,21 +343,32 @@ SILDifferentiabilityWitness *getOrCreateMinimalASTDifferentiabilityWitness(
   if (!minimalConfig)
     return nullptr;
 
+  std::string originalName = original->getName();
+  // If original function requires a foreign entry point, look up the
+  // differentiability witness for the foreign function.
+  if (requiresForeignEntryPoint(originalAFD)) {
+    originalName = SILDeclRef(originalAFD).asForeign().mangle();
+    original = module.lookUpFunction(SILDeclRef(originalAFD).asForeign());
+  }
+
   auto *existingWitness = module.lookUpDifferentiabilityWitness(
-      {original->getName(), *minimalConfig});
-  if (existingWitness)
+      {originalName, *minimalConfig});
+  if (existingWitness) {
+    llvm::errs() << "FOUND EXISTING WITNESS\n";
+    existingWitness->dump();
     return existingWitness;
+  }
 
   assert(original->isExternalDeclaration() &&
          "SILGen should create differentiability witnesses for all function "
          "definitions with explicit differentiable attributes");
+  llvm::errs() << "EXTERNAL WITNESS FOR: " << original->getName() << "\n";
 
   return SILDifferentiabilityWitness::createDeclaration(
       module, SILLinkage::PublicExternal, original,
       minimalConfig->parameterIndices, minimalConfig->resultIndices,
       minimalConfig->derivativeGenericSignature);
 }
-
 
 } // end namespace autodiff
 } // end namespace swift

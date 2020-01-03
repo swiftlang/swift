@@ -12,15 +12,15 @@ import MSVCRT
 // Original SILDeclRef must have `isForeign` bit set correctly.
 
 // CHECK-LABEL: // differentiability witness for tan
-// CHECK-LABEL: sil_differentiability_witness public_external [serialized] [parameters 0] [results 0] @tan : $@convention(c) (Double) -> Double {
-// CHECK-LABEL:   jvp: @AD__tan__jvp_src_0_wrt_0 : $@convention(c) (Double) -> (Double, @owned @callee_guaranteed (Double) -> Double)
-// CHECK-LABEL:   vjp: @AD__tan__vjp_src_0_wrt_0 : $@convention(c) (Double) -> (Double, @owned @callee_guaranteed (Double) -> Double)
-// CHECK-LABEL: }
+// CHECK: sil_differentiability_witness [serialized] [parameters 0] [results 0] @tan : $@convention(c) (Double) -> Double {
+// CHECK:   jvp: @AD__tan__jvp_src_0_wrt_0 : $@convention(thin) (Double) -> (Double, @owned @callee_guaranteed (Double) -> Double)
+// CHECK:   vjp: @AD__$sSo3tanyS2dFTO__vjp_src_0_wrt_0 : $@convention(thin) (Double) -> (Double, @owned @callee_guaranteed (Double) -> Double)
+// CHECK: }
 
 // Check that original SIL function is correct.
 
-// CHECK-LABEL: sil [serializable] [readnone] [clang tan] @tan : $@convention(c) (Double) -> Double
-// CHECK-NOT: sil shared [serializable] [readnone] @$sSo3tanyS2dFTO : $@convention(thin) (Double) -> Double
+// CHECK: sil [serializable]{{( \[readnone\])?}} [clang tan] @tan : $@convention(c) (Double) -> Double
+// CHECK-NOT: sil shared [serializable] {{.*}} @$sSo3tanyS2dFTO : $@convention(thin) (Double) -> Double
 
 @derivative(of: tan)
 @inlinable

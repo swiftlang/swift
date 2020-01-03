@@ -1078,9 +1078,6 @@ void IRGenerator::emitGlobalTopLevel(llvm::StringSet<> *linkerDirectives) {
   // Emit differentiability witnesses.
   for (auto &dw :
            PrimaryIGM->getSILModule().getDifferentiabilityWitnessList()) {
-    if (dw.isDeclaration())
-      continue;
-
     // Emit into same IRGenModule as the original function.
     // NOTE(TF-894): Investigate whether `getGenModule(dw.getVJP())` is
     // significant/desirable; `getGenModule` seems relevant for multi-threaded
@@ -4487,7 +4484,7 @@ IRGenModule::getAddrOfWitnessTablePattern(const NormalProtocolConformance *conf,
 }
 
 // SWIFT_ENABLE_TENSORFLOW
-/// Look up the address of a witness table.
+/// Look up the address of a differentiability witness.
 llvm::Constant *IRGenModule::getAddrOfDifferentiabilityWitness(
     const SILDifferentiabilityWitness *witness, ConstantInit definition) {
   auto entity = LinkEntity::forDifferentiabilityWitness(witness);

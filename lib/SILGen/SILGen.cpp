@@ -755,11 +755,8 @@ void SILGenModule::postEmitFunction(SILDeclRef constant,
              F->print(llvm::dbgs()));
 
   // SWIFT_ENABLE_TENSORFLOW
-  // Visit `@differentiable` attributes and generate SIL differentiability
-  // witnesses.
-  // TODO(TF-835): Visit `@derivative` attributes when type-checking no longer
-  // generates implicit `@differentiable` attributes. See TF-835 for replacement
-  // code.
+  // Visit `@differentiable` amd `@derivative` attributes and generate SIL
+  // differentiability witnesses.
   // Skip if the SILDeclRef is a:
   // - Default argument generator function.
   // - Thunk.
@@ -782,6 +779,10 @@ void SILGenModule::postEmitFunction(SILDeclRef constant,
                "all original SIL functions with generic signatures");
         AutoDiffConfig config(diffAttr->getParameterIndices(), resultIndices,
                               diffAttr->getDerivativeGenericSignature());
+        llvm::errs() << "SILGEN DIFF ATTR, ORIGINAL: " << AFD->getEffectiveFullName()
+        << ", F2N: " << constant.isForeignToNativeThunk()
+        << ", N2F: " << constant.isNativeToForeignThunk() << "\n";
+
         emitDifferentiabilityWitness(AFD, F, config, jvp, vjp, diffAttr);
       }
       for (auto *derivAttr : Attrs.getAttributes<DerivativeAttr>()) {
@@ -798,6 +799,15 @@ void SILGenModule::postEmitFunction(SILDeclRef constant,
         auto *origAFD = derivAttr->getOriginalFunction();
         auto origConstant =
             SILDeclRef(origAFD).asForeign(requiresForeignEntryPoint(origAFD));
+#if 0
+        auto origConstant = SILDeclRef(origAFD);
+#endif
+        llvm::errs() << "SILGEN DERIV ATTR, ORIGINAL: " << origAFD->getEffectiveFullName()
+        << ", F2N: " << origConstant.isForeignToNativeThunk()
+        << ", N2F: " << origConstant.isNativeToForeignThunk()
+        << ", HAS CLANG: " << origAFD->hasClangNode()
+        << ", FOREIGN: " << requiresForeignEntryPoint(origAFD)
+        << "\n";
         auto *origFn = getFunction(origConstant, NotForDefinition);
         auto derivativeGenSig = AFD->getGenericSignature();
         auto *resultIndices = IndexSubset::get(getASTContext(), 1, {0});
@@ -863,6 +873,19 @@ void SILGenModule::emitDifferentiabilityWitness(
         /*isSerialized*/ hasPublicVisibility(originalFunction->getLinkage()),
         attr);
   }
+  llvm::errs() << "SILGEN DIFF WITNESS, ORIG LINKAGE: "
+               << (unsigned)originalFunction->getLinkage() << "\n";
+  // Strip external from linkage of Clang-imported functions.
+  if (originalFunction->hasClangNode()) {
+    llvm::errs() << "SILGEN DIFF WITNESS, STRIP EXTERNAL FROM LINKAGE\n";
+    diffWitness->setLinkage(stripExternalFromLinkage(diffWitness->getLinkage()));
+  }
+  attr->print(llvm::errs(), originalAFD);
+  llvm::errs() << "\n";
+  diffWitness->dump();
+// #if 0
+  originalFunction->dump();
+// #endif
 
   // Set derivative function in differentiability witness.
   auto setDerivativeInDifferentiabilityWitness =
