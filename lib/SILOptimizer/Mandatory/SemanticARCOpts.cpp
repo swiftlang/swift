@@ -37,6 +37,25 @@ STATISTIC(NumLoadCopyConvertedToLoadBorrow,
           "number of load_copy converted to load_borrow");
 
 //===----------------------------------------------------------------------===//
+//                                  Utility
+//===----------------------------------------------------------------------===//
+
+static bool isConsumingOwnedUse(Operand *use) {
+  assert(use->get().getOwnershipKind() == ValueOwnershipKind::Owned);
+
+  if (use->isTypeDependent())
+    return false;
+
+  // We know that a copy_value produces an @owned value. Look through all of
+  // our uses and classify them as either invalidating or not
+  // invalidating. Make sure that all of the invalidating ones are
+  // destroy_value since otherwise the live_range is not complete.
+  auto map = use->getOwnershipKindMap();
+  auto constraint = map.getLifetimeConstraint(ValueOwnershipKind::Owned);
+  return constraint == UseLifetimeConstraint::MustBeInvalidated;
+}
+
+//===----------------------------------------------------------------------===//
 //                            Live Range Modeling
 //===----------------------------------------------------------------------===//
 
@@ -775,8 +794,21 @@ public:
                std::back_inserter(baseEndBorrows));
 
     SmallVector<SILInstruction *, 4> valueDestroys;
-    llvm::copy(Load->getUsersOfType<DestroyValueInst>(),
-               std::back_inserter(valueDestroys));
+    for (auto *use : Load->getUses()) {
+      // If this load is not consuming, skip it.
+      if (!isConsumingOwnedUse(use)) {
+        continue;
+      }
+
+      // Otherwise, if this isn't a destroy_value, we have a consuming use we
+      // don't understand. Return conservatively that this memory location may
+      // not be guaranteed.
+      auto *user = use->getUser();
+      if (!isa<DestroyValueInst>(user)) {
+        return answer(true);
+      }
+      valueDestroys.emplace_back(user);
+    }
 
     SmallPtrSet<SILBasicBlock *, 4> visitedBlocks;
     LinearLifetimeChecker checker(visitedBlocks, ARCOpt.getDeadEndBlocks());
