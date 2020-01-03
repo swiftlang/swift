@@ -496,3 +496,33 @@ const UnifiedStatsReporter::TraceFormatter*
 FrontendStatsTracer::getTraceFormatter<const Pattern *>() {
   return &TF;
 }
+
+
+ContextualPattern ContextualPattern::forPatternBindingDecl(
+    PatternBindingDecl *pbd, unsigned index) {
+  return ContextualPattern(
+      pbd->getPattern(index), /*isTopLevel=*/true, pbd, index);
+}
+
+DeclContext *ContextualPattern::getDeclContext() const {
+  if (auto pbd = getPatternBindingDecl())
+    return pbd->getDeclContext();
+
+  return declOrContext.get<DeclContext *>();
+}
+
+PatternBindingDecl *ContextualPattern::getPatternBindingDecl() const {
+  return declOrContext.dyn_cast<PatternBindingDecl *>();
+}
+
+bool ContextualPattern::allowsInference() const {
+  if (auto pbd = getPatternBindingDecl())
+    return pbd->isInitialized(index);
+
+  return true;
+}
+
+void swift::simple_display(llvm::raw_ostream &out,
+                           const ContextualPattern &pattern) {
+  out << "(pattern @ " << pattern.getPattern() << ")";
+}

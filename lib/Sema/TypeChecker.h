@@ -999,16 +999,11 @@ public:
 
   /// Type check the given pattern.
   ///
-  /// \param P The pattern to type check.
-  /// \param dc The context in which type checking occurs.
-  /// \param options Options that control type resolution.
-  ///
   /// \returns the type of the pattern, which may be an error type if an
   /// unrecoverable error occurred. If the options permit it, the type may
   /// involve \c UnresolvedType (for patterns with no type information) and
   /// unbound generic types.
-  static Type typeCheckPattern(Pattern *P, DeclContext *dc,
-                               TypeResolutionOptions options);
+  static Type typeCheckPattern(ContextualPattern pattern);
 
   static bool typeCheckCatchPattern(CatchStmt *S, DeclContext *dc);
 

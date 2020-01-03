@@ -2159,9 +2159,9 @@ namespace {
 
       case PatternKind::Typed: {
         // FIXME: Need a better locator for a pattern as a base.
-        TypeResolutionOptions options(TypeResolverContext::InExpression);
-        options |= TypeResolutionFlags::AllowUnboundGenerics;
-        Type type = TypeChecker::typeCheckPattern(pattern, CurDC, options);
+        auto contextualPattern =
+            ContextualPattern::forRawPattern(pattern, CurDC);
+        Type type = TypeChecker::typeCheckPattern(contextualPattern);
         Type openedType = CS.openUnboundGenericType(type, locator);
 
         // For a typed pattern, simply return the opened type of the pattern.

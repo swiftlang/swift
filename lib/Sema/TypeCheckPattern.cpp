@@ -703,8 +703,20 @@ static Type validateTypedPattern(TypeResolution resolution,
   return TL.getType();
 }
 
-Type TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
-                                   TypeResolutionOptions options) {
+Type TypeChecker::typeCheckPattern(ContextualPattern pattern) {
+  Pattern *P = pattern.getPattern();
+  DeclContext *dc = pattern.getDeclContext();
+
+  TypeResolutionOptions options(pattern.getPatternBindingDecl()
+                                  ? TypeResolverContext::PatternBindingDecl
+                                  : TypeResolverContext::InExpression);
+  if (pattern.allowsInference()) {
+    options |= TypeResolutionFlags::AllowUnspecifiedTypes;
+    options |= TypeResolutionFlags::AllowUnboundGenerics;
+  }
+  if (!pattern.isTopLevel())
+    options = options.withoutContext();
+
   auto &Context = dc->getASTContext();
   switch (P->getKind()) {
   // Type-check paren patterns by checking the sub-pattern and
@@ -716,7 +728,8 @@ Type TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
       SP = PP->getSubPattern();
     else
       SP = cast<VarPattern>(P)->getSubPattern();
-    Type subType = TypeChecker::typeCheckPattern(SP, dc, options);
+    Type subType = TypeChecker::typeCheckPattern(
+        pattern.forSubPattern(SP, /*retainTopLevel=*/true));
     if (subType->hasError())
       return ErrorType::get(Context);
 
@@ -757,11 +770,10 @@ Type TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
     bool hadError = false;
     SmallVector<TupleTypeElt, 8> typeElts;
 
-    const auto elementOptions = options.withoutContext();
     for (unsigned i = 0, e = tuplePat->getNumElements(); i != e; ++i) {
       TuplePatternElt &elt = tuplePat->getElement(i);
-      Pattern *pattern = elt.getPattern();
-      Type subType = TypeChecker::typeCheckPattern(pattern, dc, elementOptions);
+      Type subType = TypeChecker::typeCheckPattern(
+          pattern.forSubPattern(elt.getPattern(), /*retainTopLevel=*/false));
       if (subType->hasError())
         hadError = true;
 

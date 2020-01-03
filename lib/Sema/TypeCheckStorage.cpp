@@ -206,6 +206,8 @@ PatternBindingEntryRequest::evaluate(Evaluator &eval,
   // In particular, it's /not/ correct to check the PBD's DeclContext because
   // top-level variables in a script file are accessible from other files,
   // even though the PBD is inside a TopLevelCodeDecl.
+  auto contextualPattern =
+      ContextualPattern::forPatternBindingDecl(binding, entryNumber);
   TypeResolutionOptions options(TypeResolverContext::PatternBindingDecl);
 
   if (binding->isInitialized(entryNumber)) {
@@ -214,8 +216,7 @@ PatternBindingEntryRequest::evaluate(Evaluator &eval,
     options |= TypeResolutionFlags::AllowUnboundGenerics;
   }
 
-  Type patternType = TypeChecker::typeCheckPattern(
-      pattern, binding->getDeclContext(), options);
+  Type patternType = TypeChecker::typeCheckPattern(contextualPattern);
   if (patternType->hasError()) {
     swift::setBoundVarsTypeError(pattern, Context);
     binding->setInvalid();

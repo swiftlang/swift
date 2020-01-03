@@ -2864,10 +2864,8 @@ bool TypeChecker::typeCheckPatternBinding(PatternBindingDecl *PBD,
     if (pattern->hasType())
       patternType = pattern->getType();
     else {
-      TypeResolutionOptions options(TypeResolverContext::InExpression);
-      options |= TypeResolutionFlags::AllowUnspecifiedTypes;
-      options |= TypeResolutionFlags::AllowUnboundGenerics;
-      patternType = typeCheckPattern(pattern, DC, options);
+      auto contextualPattern = ContextualPattern::forRawPattern(pattern, DC);
+      patternType = typeCheckPattern(contextualPattern);
     }
 
     if (patternType->hasError()) {
@@ -2995,11 +2993,9 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
         return true;
       }
 
-      TypeResolutionOptions options(TypeResolverContext::InExpression);
-      options |= TypeResolutionFlags::AllowUnspecifiedTypes;
-      options |= TypeResolutionFlags::AllowUnboundGenerics;
-      Type patternType = TypeChecker::typeCheckPattern(
-          Stmt->getPattern(), DC, options);
+      auto contextualPattern =
+          ContextualPattern::forRawPattern(Stmt->getPattern(), DC);
+      Type patternType = TypeChecker::typeCheckPattern(contextualPattern);
       if (patternType->hasError()) {
         // FIXME: Handle errors better.
         Stmt->getPattern()->setType(ErrorType::get(ctx));
@@ -3221,10 +3217,8 @@ bool TypeChecker::typeCheckStmtCondition(StmtCondition &cond, DeclContext *dc,
 
     // Check the pattern, it allows unspecified types because the pattern can
     // provide type information.
-    TypeResolutionOptions options(TypeResolverContext::InExpression);
-    options |= TypeResolutionFlags::AllowUnspecifiedTypes;
-    options |= TypeResolutionFlags::AllowUnboundGenerics;
-    Type patternType = TypeChecker::typeCheckPattern(pattern, dc, options);
+    auto contextualPattern = ContextualPattern::forRawPattern(pattern, dc);
+    Type patternType = TypeChecker::typeCheckPattern(contextualPattern);
     if (patternType->hasError()) {
       typeCheckPatternFailed();
       continue;
