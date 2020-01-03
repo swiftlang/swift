@@ -741,23 +741,7 @@ bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
   case PatternKind::Typed: {
     auto resolution = TypeResolution::forContextual(dc);
     TypedPattern *TP = cast<TypedPattern>(P);
-    bool hadError = validateTypedPattern(resolution, TP, options);
-
-    // If we have unbound generic types, don't apply them below; instead,
-    // the caller will call typeCheckBinding() later.
-    if (P->getType()->hasUnboundGenericType())
-      return hadError;
-
-    Pattern *subPattern = TP->getSubPattern();
-    if (TypeChecker::coercePatternToType(subPattern, resolution, P->getType(),
-                                         options|TypeResolutionFlags::FromNonInferredPattern,
-                                         TP->getTypeLoc()))
-      hadError = true;
-    else {
-      TP->setSubPattern(subPattern);
-      TP->setType(subPattern->getType());
-    }
-    return hadError;
+    return validateTypedPattern(resolution, TP, options);
   }
 
   // A wildcard or name pattern cannot appear by itself in a context
