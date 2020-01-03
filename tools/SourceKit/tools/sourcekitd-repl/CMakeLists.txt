@@ -13,9 +13,9 @@ if(NOT CMAKE_SYSTEM_NAME STREQUAL Darwin)
     BlocksRuntime)
 endif()
 target_include_directories(sourcekitd-repl PRIVATE
-  ${libedit_INCLUDE_DIRS})
+  ${LibEdit_INCLUDE_DIRS})
 target_link_libraries(sourcekitd-repl PRIVATE
-  ${libedit_LIBRARIES})
+  ${LibEdit_LIBRARIES})
 
 if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
   set_target_properties(sourcekitd-repl
