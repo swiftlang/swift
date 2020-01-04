@@ -1097,6 +1097,10 @@ namespace driver {
         const Job *const Cmd, const Job::Condition Condition,
         const bool hasDependenciesFileName, const bool forRanges) {
 
+      // When using ranges may still decide not to schedule the job.
+      const bool isTentative =
+          Comp.getEnableSourceRangeDependencies() || forRanges;
+
       switch (Condition) {
       case Job::Condition::Always:
       case Job::Condition::NewlyAdded:
@@ -1112,11 +1116,11 @@ namespace driver {
         }
         LLVM_FALLTHROUGH;
       case Job::Condition::RunWithoutCascading:
-        noteBuilding(Cmd, /*willBeBuilding=*/true, /*isTentative=*/true,
+        noteBuilding(Cmd, /*willBeBuilding=*/true, /*isTentative=*/isTentative,
                      forRanges, "(initial)");
         return true;
       case Job::Condition::CheckDependencies:
-        noteBuilding(Cmd, /*willBeBuilding=*/false, /*isTentative=*/true,
+        noteBuilding(Cmd, /*willBeBuilding=*/false, /*isTentative=*/isTentative,
                      forRanges, "file is up-to-date and output exists");
         return false;
       }

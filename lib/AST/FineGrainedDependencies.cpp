@@ -206,9 +206,8 @@ std::string DependencyKey::humanReadableName() const {
 }
 
 std::string DependencyKey::asString() const {
-  return NodeKindNames[size_t(kind)] + " " +
-         "aspect: " + DeclAspectNames[size_t(aspect)] + ", " +
-         humanReadableName();
+  return NodeKindNames[size_t(kind)] + " " + "aspect: " + aspectName().str() +
+         ", " + humanReadableName();
 }
 
 /// Needed for TwoStageMap::verify:

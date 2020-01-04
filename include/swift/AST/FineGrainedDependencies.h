@@ -505,6 +505,8 @@ public:
 
   std::string humanReadableName() const;
 
+  StringRef aspectName() const { return DeclAspectNames[size_t(aspect)]; }
+
   void dump(llvm::raw_ostream &os) const { os << asString() << "\n"; }
   SWIFT_DEBUG_DUMP { dump(llvm::errs()); }
 

@@ -624,36 +624,33 @@ StringRef ModuleDepGraph::getProvidingFilename(
 void ModuleDepGraph::printOneNodeOfPath(raw_ostream &out,
                                         const DependencyKey &key,
                                         const StringRef filename) {
-  auto typeForPrinting = [](const DependencyKey &key) {
-    SmallString<64> fixedUpType{key.getContext()};
-    if (!fixedUpType.empty() && fixedUpType.front() == 'P')
-      fixedUpType.push_back('_');
-    return swift::Demangle::demangleTypeAsString(fixedUpType.str());
-  };
   switch (key.getKind()) {
   case NodeKind::topLevel:
-    out << "top-level name '" << key.getName() << "' in " << filename;
+    out << key.aspectName() << " of top-level name '" << key.humanReadableName()
+        << "' in " << filename;
     break;
   case NodeKind::nominal:
-    out << "type '" << typeForPrinting(key) << "' in " << filename;
+    out << key.aspectName() << " of type '" << key.humanReadableName()
+        << "' in " << filename;
     break;
   case NodeKind::potentialMember:
-    out << "non-private members of type '" << typeForPrinting(key) << "' in "
-        << filename;
+    out << key.aspectName() << " of non-private members '"
+        << key.humanReadableName() << "' in " << filename;
     break;
   case NodeKind::member:
-    out << "member '" << key.getName() << "' of type '" << typeForPrinting(key)
+    out << key.aspectName() << " of member '" << key.humanReadableName()
         << "' in " << filename;
     break;
   case NodeKind::dynamicLookup:
-    out << "AnyObject member '" << key.getName() << "' in " << filename;
+    out << key.aspectName() << " of AnyObject member '"
+        << key.humanReadableName() << "' in " << filename;
     break;
   case NodeKind::externalDepend:
-    out << filename << " depends on module '"
-        << llvm::sys::path::filename(key.getName()) << "'";
+    out << filename << " depends on " << key.aspectName() << " of module '"
+        << key.humanReadableName() << "'";
     break;
   case NodeKind::sourceFileProvide:
-    out << "source file " << filename;
+    out << key.aspectName() << " of source file " << key.humanReadableName();
     break;
   default:
     llvm_unreachable("unknown NodeKind");
