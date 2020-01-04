@@ -19,6 +19,7 @@ add_swift_host_library(swiftSIL STATIC
   Projection.cpp
   SIL.cpp
   SILArgument.cpp
+  SILArgumentBuilder.cpp
   SILBasicBlock.cpp
   SILBuilder.cpp
   SILConstants.cpp

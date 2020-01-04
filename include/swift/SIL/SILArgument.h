@@ -21,6 +21,7 @@
 namespace swift {
 
 class SILBasicBlock;
+class SILArgumentBuilder;
 class SILModule;
 class SILUndef;
 
@@ -62,7 +63,7 @@ struct SILArgumentKind {
 };
 
 class SILArgument : public ValueBase {
-  friend class SILBasicBlock;
+  friend class SILArgumentBuilder;
 
   SILBasicBlock *parentBlock;
   const ValueDecl *decl;
@@ -185,7 +186,7 @@ protected:
 };
 
 class SILPhiArgument : public SILArgument {
-  friend class SILBasicBlock;
+  friend class SILArgumentBuilder;
 
   SILPhiArgument(SILBasicBlock *parentBlock, SILType type,
                  ValueOwnershipKind ownershipKind,
@@ -272,7 +273,7 @@ public:
 };
 
 class SILFunctionArgument : public SILArgument {
-  friend class SILBasicBlock;
+  friend class SILArgumentBuilder;
 
   SILFunctionArgument(SILBasicBlock *parentBlock, SILType type,
                       ValueOwnershipKind ownershipKind,
