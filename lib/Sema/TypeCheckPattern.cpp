@@ -24,6 +24,7 @@
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "llvm/Support/SaveAndRestore.h"
 #include <utility>
 using namespace swift;
@@ -704,6 +705,14 @@ static Type validateTypedPattern(TypeResolution resolution,
 }
 
 Type TypeChecker::typeCheckPattern(ContextualPattern pattern) {
+  DeclContext *dc = pattern.getDeclContext();
+  ASTContext &ctx = dc->getASTContext();
+  return evaluateOrDefault(
+      ctx.evaluator, PatternTypeRequest{pattern}, ErrorType::get(ctx));
+}
+
+llvm::Expected<Type> PatternTypeRequest::evaluate(
+    Evaluator &evaluator, ContextualPattern pattern) const {
   Pattern *P = pattern.getPattern();
   DeclContext *dc = pattern.getDeclContext();
 
