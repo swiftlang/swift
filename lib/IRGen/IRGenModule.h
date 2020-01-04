@@ -744,6 +744,8 @@ public:
   void error(SourceLoc loc, const Twine &message);
 
   bool useDllStorage();
+
+  bool shouldPrespecializeGenericMetadata();
   
   Size getAtomicBoolSize() const { return AtomicBoolSize; }
   Alignment getAtomicBoolAlignment() const { return AtomicBoolAlign; }

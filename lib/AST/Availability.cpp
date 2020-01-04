@@ -239,6 +239,14 @@ AvailabilityContext ASTContext::getSwift51Availability() {
 }
 
 AvailabilityContext ASTContext::getTypesInAbstractMetadataStateAvailability() {
+  return getSwift52Availability();
+}
+
+AvailabilityContext ASTContext::getPrespecializedGenericMetadataAvailability() {
+  return getSwift52Availability();
+}
+
+AvailabilityContext ASTContext::getSwift52Availability() {
   auto target = LangOpts.Target;
 
   if (target.isMacOSX() ) {
