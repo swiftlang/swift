@@ -1219,7 +1219,9 @@ AllowNonClassTypeToConvertToAnyObject::create(ConstraintSystem &cs, Type type,
 }
 
 bool AddQualifierToAccessTopLevelName::diagnose(bool asNote) const {
-  return false;
+  auto &cs = getConstraintSystem();
+  MissingQuialifierInMemberRefFailure failure(cs, getLocator());
+  return failure.diagnose(asNote);
 }
 
 AddQualifierToAccessTopLevelName *
