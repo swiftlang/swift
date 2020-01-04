@@ -999,27 +999,24 @@ public:
 
   /// Type check the given pattern.
   ///
-  /// \param P The pattern to type check.
-  /// \param dc The context in which type checking occurs.
-  /// \param options Options that control type resolution.
-  ///
-  /// \returns true if any errors occurred during type checking.
-  static bool typeCheckPattern(Pattern *P, DeclContext *dc,
-                               TypeResolutionOptions options);
+  /// \returns the type of the pattern, which may be an error type if an
+  /// unrecoverable error occurred. If the options permit it, the type may
+  /// involve \c UnresolvedType (for patterns with no type information) and
+  /// unbound generic types.
+  static Type typeCheckPattern(ContextualPattern pattern);
 
   static bool typeCheckCatchPattern(CatchStmt *S, DeclContext *dc);
 
   /// Coerce a pattern to the given type.
   ///
-  /// \param P The pattern, which may be modified by this coercion.
-  /// \param resolution The type resolution.
+  /// \param pattern The contextual pattern.
   /// \param type the type to coerce the pattern to.
-  /// \param options Options describing how to perform this coercion.
+  /// \param options Options that control the coercion.
   ///
-  /// \returns true if an error occurred, false otherwise.
-  static bool coercePatternToType(Pattern *&P, TypeResolution resolution, Type type,
-                                  TypeResolutionOptions options,
-                                  TypeLoc tyLoc = TypeLoc());
+  /// \returns the coerced pattern, or nullptr if the coercion failed.
+  static Pattern *coercePatternToType(ContextualPattern pattern, Type type,
+                                      TypeResolutionOptions options,
+                                      TypeLoc tyLoc = TypeLoc());
   static bool typeCheckExprPattern(ExprPattern *EP, DeclContext *DC,
                                    Type type);
 
@@ -1029,8 +1026,11 @@ public:
                                         AnyFunctionType *FN);
   
   /// Type-check an initialized variable pattern declaration.
-  static bool typeCheckBinding(Pattern *&P, Expr *&Init, DeclContext *DC);
-  static bool typeCheckPatternBinding(PatternBindingDecl *PBD, unsigned patternNumber);
+  static bool typeCheckBinding(Pattern *&P, Expr *&Init, DeclContext *DC,
+                               Type patternType);
+  static bool typeCheckPatternBinding(PatternBindingDecl *PBD,
+                                      unsigned patternNumber,
+                                      Type patternType = Type());
 
   /// Type-check a for-each loop's pattern binding and sequence together.
   ///
