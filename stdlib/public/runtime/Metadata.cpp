@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2019 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -21,6 +21,7 @@
 #include "swift/Basic/Range.h"
 #include "swift/Demangling/Demangler.h"
 #include "swift/ABI/TypeIdentity.h"
+#include "swift/Runtime/BuiltinProtocolConformances.h"
 #include "swift/Runtime/Casting.h"
 #include "swift/Runtime/ExistentialContainer.h"
 #include "swift/Runtime/HeapObject.h"
@@ -181,7 +182,7 @@ computeMetadataBoundsForSuperclass(const void *ref,
 #endif
   }
   // Type metadata type ref is unsupported here.
-  case TypeReferenceKind::DirectTypeMetadata:
+  case TypeReferenceKind::MetadataKind:
     break;
   }
   swift_runtime_unreachable("unsupported superclass reference kind");
@@ -4260,6 +4261,28 @@ static void initializeResilientWitnessTable(
   }
 }
 
+/// If this conformance is builtin, find the builtin witnesses in the runtime
+/// and use those as the witnesses for newly created witness tables.
+static void initializeBuiltinWitnessTable(
+                              const ProtocolConformanceDescriptor *conformance,
+                              const Metadata *conformingType,
+                              void **table) {
+  auto metadataKind = conformance->getMetadataKind();
+
+  switch (metadataKind) {
+    case MetadataKind::Tuple: {
+      table[WitnessTableFirstRequirementOffset] =
+        (void *)BUILTIN_PROTOCOL_WITNESS_SYM(VARIADIC_TUPLE_MANGLING,
+                                             SWIFT_EQUATABLE_MANGLING,
+                                             SWIFT_EQUAL_OPERATOR_MANGLING);
+      break;
+    }
+    default:
+      swift_runtime_unreachable(
+        "initializing witness table for unknown builtin type");
+  }
+}
+
 /// Instantiate a brand new witness table for a resilient or generic
 /// protocol conformance.
 WitnessTable *
@@ -4300,7 +4323,9 @@ WitnessTableCacheEntry::allocate(
   } else {
     // Put the conformance descriptor in place. Instantiation will fill in the
     // rest.
-    assert(numPatternWitnesses == 0);
+    if (!conformance->isBuiltin())
+      assert(numPatternWitnesses == 0);
+
     table[0] = (void *)conformance;
   }
 
@@ -4326,6 +4351,11 @@ WitnessTableCacheEntry::allocate(
 
   // Fill in any default requirements.
   initializeResilientWitnessTable(conformance, Type, genericTable, table);
+
+  // Fill in builtin conformance witnesses.
+  if (conformance->isBuiltin())
+    initializeBuiltinWitnessTable(conformance, Type, table);
+
   auto castTable = reinterpret_cast<WitnessTable*>(table);
 
   // Call the instantiation function if present.

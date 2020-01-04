@@ -1883,18 +1883,16 @@ ASTContext::getSelfConformance(ProtocolDecl *protocol) {
   return entry;
 }
 
-/// Produce the builtin-conformance for (): Equatable
+/// Produce the builtin conformance for some non-nominal to some protocol.
 BuiltinProtocolConformance *
-ASTContext::getBuiltinVoidEquatableConformance() {
-  auto key = std::make_pair(TheEmptyTupleType,
-                            getProtocol(KnownProtocolKind::Equatable));
+ASTContext::getBuiltinConformance(Type type, ProtocolDecl *protocol) {
+  auto key = std::make_pair(type, protocol);
   auto &builtinConformances =
     getImpl().getArena(AllocationArena::Permanent).BuiltinConformances;
   auto &entry = builtinConformances[key];
   if (!entry) {
     entry = new (*this, AllocationArena::Permanent)
-      BuiltinProtocolConformance(TheEmptyTupleType,
-                                 getProtocol(KnownProtocolKind::Equatable));
+      BuiltinProtocolConformance(type, protocol);
   }
   return entry;
 }

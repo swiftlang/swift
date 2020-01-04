@@ -910,15 +910,15 @@ performIRGeneration(const IRGenOptions &Opts, ModuleDecl *M,
 
     // Register our info with the runtime if needed.
     if (Opts.UseJIT) {
-      IGM.emitKnownProtocolConformances();
+      IGM.emitBuiltinProtocolConformances();
       IGM.emitBuiltinReflectionMetadata();
       IGM.emitRuntimeRegistration();
     } else {
       // Emit protocol conformances into a section we can recognize at runtime.
       // In JIT mode these are manually registered above.
       IGM.emitSwiftProtocols();
+      IGM.emitBuiltinProtocolConformances();
       IGM.emitProtocolConformances();
-      IGM.emitKnownProtocolConformances();
       IGM.emitTypeMetadataRecords();
       IGM.emitBuiltinReflectionMetadata();
       IGM.emitReflectionMetadataVersion();
@@ -1166,9 +1166,9 @@ static void performParallelIRGeneration(
 
   irgen.emitDynamicReplacements();
 
-  irgen.emitProtocolConformances();
+  irgen.emitBuiltinProtocolConformances();
 
-  irgen.emitKnownProtocolConformances();
+  irgen.emitProtocolConformances();
 
   irgen.emitTypeMetadataRecords();
 

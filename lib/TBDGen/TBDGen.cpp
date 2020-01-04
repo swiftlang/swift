@@ -984,7 +984,7 @@ static void enumeratePublicSymbolsAndWrite(ModuleDecl *M, FileUnit *singleFile,
       visitor.addFirstFileSymbols();
 
       if (M->isStdlibModule())
-        visitor.addKnownProtocolConformances();
+        visitor.addBuiltinProtocolConformances();
     }
 
     SmallVector<Decl *, 16> decls;

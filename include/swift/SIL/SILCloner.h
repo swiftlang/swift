@@ -2065,7 +2065,8 @@ SILCloner<ImplClass>::visitWitnessMethodInst(WitnessMethodInst *Inst) {
   if (conformance.isConcrete()) {
     CanType Ty = conformance.getConcrete()->getType()->getCanonicalType();
 
-    if (Ty != newLookupType) {
+    if (Ty != newLookupType &&
+        !isa<BuiltinProtocolConformance>(conformance.getConcrete())) {
       assert(
           (Ty->isExactSuperclassOf(newLookupType) ||
            getBuilder().getModule().Types.getLoweredRValueType(

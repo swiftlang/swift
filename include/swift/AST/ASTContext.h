@@ -791,8 +791,9 @@ public:
   SelfProtocolConformance *
   getSelfConformance(ProtocolDecl *protocol);
 
-  /// Produce the builtin conformance for (): Equatable
-  BuiltinProtocolConformance *getBuiltinVoidEquatableConformance();
+  /// Produce the builtin conformance for some structural type to some protocol.
+  BuiltinProtocolConformance *
+  getBuiltinConformance(Type type, ProtocolDecl *protocol);
 
   /// A callback used to produce a diagnostic for an ill-formed protocol
   /// conformance that was type-checked before we're actually walking the

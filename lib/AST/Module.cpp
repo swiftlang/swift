@@ -835,11 +835,22 @@ ProtocolConformanceRef ModuleDecl::lookupConformance(Type type,
   if (type->is<UnresolvedType>())
     return ProtocolConformanceRef(protocol);
 
-  // Void (aka ()) has builtin conformances implemented within the runtime.
+  // Tuples have builtin conformances implemented within the runtime.
   // These conformances so far consist of Equatable.
-  if (type->isVoid() &&
-      protocol == ctx.getProtocol(KnownProtocolKind::Equatable))
-    return ProtocolConformanceRef(ctx.getBuiltinVoidEquatableConformance());
+  if (auto tuple = type->getAs<TupleType>()) {
+    if (protocol == ctx.getProtocol(KnownProtocolKind::Equatable)) {
+      // Ensure that every element in this tuple conforms to Equatable.
+      for (auto eltTy : tuple->getElementTypes()) {
+        auto conformance = conformsToProtocol(eltTy, protocol);
+
+        if (conformance.isInvalid())
+          return ProtocolConformanceRef::forInvalid();
+      }
+
+      auto conformance = ctx.getBuiltinConformance(tuple, protocol);
+      return ProtocolConformanceRef(conformance);
+    }
+  }
 
   auto nominal = type->getAnyNominal();
 

@@ -120,20 +120,26 @@ public:
   /// Adds the global symbols associated with the first file.
   void addFirstFileSymbols();
 
-  void addKnownProtocolConformances() {
-    // Hack: We emit known conformance descriptors in IRGen for the stdlib
+  void addBuiltinProtocolConformances() {
+    // Hack: We emit builtin conformance descriptors in IRGen for the stdlib
     // module. Add them here too.
 
-    // As of right now, the only known conformance is equatable for ()
-    auto voidEquatable = SwiftModule->getASTContext()
-                                    .getBuiltinVoidEquatableConformance();
+    // As of right now, the only known conformance is equatable for tuples.
+    // (Just grab Void's conformance, we emit a single descriptor for all tuples
+    //  so mangling is the same.)
+    auto tuple = SwiftModule->getASTContext().TheEmptyTupleType;
+    auto equatable = SwiftModule->getASTContext()
+                                .getProtocol(KnownProtocolKind::Equatable);
 
     // If this conformance is coming from a minimal stdlib with no equatable
     // protocol, don't add it.
-    if (!voidEquatable->getProtocol())
+    if (!equatable)
       return;
 
-    auto entity = LinkEntity::forProtocolConformanceDescriptor(voidEquatable);
+    auto conformance = SwiftModule->getASTContext()
+                                   .getBuiltinConformance(tuple, equatable);
+
+    auto entity = LinkEntity::forProtocolConformanceDescriptor(conformance);
     addSymbol(entity);
   }
 

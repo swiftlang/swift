@@ -362,9 +362,9 @@ public:
   /// from this module.
   void emitBuiltinReflectionMetadata();
 
-  /// Emit the known protocol conformances that the standard library has for
+  /// Emit the builtin protocol conformances that the standard library has for
   /// non-nominal types.
-  void emitKnownProtocolConformances();
+  void emitBuiltinProtocolConformances();
 
   /// Emit a symbol identifying the reflection metadata version.
   void emitReflectionMetadataVersion();
@@ -1170,9 +1170,9 @@ public:
   /// from this module.
   void emitBuiltinReflectionMetadata();
 
-  /// Emit the known protocol conformances that the standard library has for
+  /// Emit the builtin protocol conformances that the standard library has for
   /// non-nominal types.
-  void emitKnownProtocolConformances();
+  void emitBuiltinProtocolConformances();
 
   /// Emit a symbol identifying the reflection metadata version.
   void emitReflectionMetadataVersion();
@@ -1334,6 +1334,7 @@ public:
                                         ConstantInitFuture init,
                                         llvm::StringRef section = {});
 
+  TypeEntityReference getTypeEntityReference(CanType type);
   TypeEntityReference getTypeEntityReference(GenericTypeDecl *D);
 
   llvm::Constant *getAddrOfTypeMetadata(CanType concreteType);

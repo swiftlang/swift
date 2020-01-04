@@ -549,6 +549,23 @@ ModuleFile::readConformanceChecked(llvm::BitstreamCursor &Cursor,
     return ProtocolConformanceRef(conformance);
   }
 
+  case BUILTIN_PROTOCOL_CONFORMANCE: {
+    TypeID conformingTypeID;
+    DeclID protoID;
+    BuiltinProtocolConformanceLayout::readRecord(scratch, conformingTypeID,
+                                                 protoID);
+
+    Type conformingType = getType(conformingTypeID);
+
+    auto decl = getDeclChecked(protoID);
+    if (!decl)
+      return decl.takeError();
+
+    auto proto = cast<ProtocolDecl>(decl.get());
+    auto conformance = getContext().getBuiltinConformance(conformingType, proto);
+    return ProtocolConformanceRef(conformance);
+  }
+
   case NORMAL_PROTOCOL_CONFORMANCE_ID: {
     NormalConformanceID conformanceID;
     NormalProtocolConformanceIdLayout::readRecord(scratch, conformanceID);

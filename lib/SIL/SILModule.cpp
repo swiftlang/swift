@@ -164,6 +164,11 @@ SILModule::lookUpWitnessTable(const ProtocolConformance *C,
   SILWitnessTable *wtable;
 
   auto rootC = C->getRootConformance();
+
+  // For the time being, reject all builtin conformances.
+  if (isa<BuiltinProtocolConformance>(rootC))
+    return nullptr;
+
   // Attempt to lookup the witness table from the table.
   auto found = WitnessTableMap.find(rootC);
   if (found == WitnessTableMap.end()) {

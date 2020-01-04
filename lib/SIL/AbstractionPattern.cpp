@@ -283,15 +283,14 @@ bool AbstractionPattern::matchesTuple(CanTupleType substType) {
       return tuple->getNumElements() == substType->getNumElements();
 
     // If this abstraction pattern has some opaque return type here, check for
-    // builtin conformances, notably Equatable for () at the moment.
+    // builtin conformances, notably Equatable for tuples at the moment.
     if (auto opaque = dyn_cast<OpaqueTypeArchetypeType>(getType())) {
       auto conforms = opaque->getConformsTo();
       if (conforms.size() == 1) {
         auto proto = conforms.front();
         auto equatable = opaque->getASTContext()
                                .getProtocol(KnownProtocolKind::Equatable);
-        if (proto == equatable &&
-            substType == opaque->getASTContext().TheEmptyTupleType)
+        if (proto == equatable)
           return true;
       }
     }
@@ -365,6 +364,11 @@ AbstractionPattern::getTupleElementType(unsigned index) const {
   case Kind::Type:
     if (isTypeParameter())
       return AbstractionPattern::getOpaque();
+
+    if (isa<OpaqueTypeArchetypeType>(getType())) {
+      return AbstractionPattern::getOpaque();
+    }
+
     return AbstractionPattern(getGenericSignature(),
                               getCanTupleElementType(getType(), index));
   }

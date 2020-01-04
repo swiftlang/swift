@@ -1113,8 +1113,10 @@ public:
   llvm::Value *getTable(IRGenFunction &IGF,
                         llvm::Value **typeMetadataCache) const override {
     // If we're looking up a dependent type, we can't cache the result.
+    // If we have a builtin conformance, the runtime caches the witness tables.
     if (Conformance->getType()->hasArchetype() ||
-        Conformance->getType()->hasDynamicSelfType()) {
+        Conformance->getType()->hasDynamicSelfType() ||
+        isa<BuiltinProtocolConformance>(Conformance)) {
       return emitWitnessTableAccessorCall(IGF, Conformance,
                                           typeMetadataCache);
     }
@@ -1789,24 +1791,18 @@ namespace {
     }
 
     void addConformingType() {
-      // If this is a builtin conformance, add a relative reference to the
-      // (currently) non-nominal metadata.
-      if (auto builtin = dyn_cast<BuiltinProtocolConformance>(Conformance)) {
-        auto entity = LinkEntity::forTypeMetadata(
-                                         builtin->getType()->getCanonicalType(),
-                                             TypeMetadataAddress::AddressPoint);
-        auto ref = IGM.getAddrOfLLVMVariableOrGOTEquivalent(entity);
-        B.addRelativeAddress(ref.getValue());
-        Flags = Flags.withTypeReferenceKind(
-                  TypeReferenceKind::DirectTypeMetadata);
-        return;
-      }
-
       // Add a relative reference to the type, with the type reference
       // kind stored in the flags.
       auto ref = IGM.getTypeEntityReference(
-                   Conformance->getType()->getAnyNominal());
-      B.addRelativeAddress(ref.getValue());
+                   Conformance->getType()->getCanonicalType());
+
+      // Builtin conformance type references are just MetadataKind, which
+      // require no relative reference.
+      if (isa<BuiltinProtocolConformance>(Conformance)) {
+        B.add(ref.getValue());
+      } else {
+        B.addRelativeAddress(ref.getValue());
+      }
       Flags = Flags.withTypeReferenceKind(ref.getKind());
     }
 
@@ -1817,15 +1813,6 @@ namespace {
         numConditional = normal->getConditionalRequirements().size();
       }
       Flags = Flags.withNumConditionalRequirements(numConditional);
-
-      // If this is a builtin conformance, reference the witness table in the
-      // runtime.
-      if (auto builtin = dyn_cast<BuiltinProtocolConformance>(Conformance)) {
-        auto entity = LinkEntity::forProtocolWitnessTable(Conformance);
-        auto ref = IGM.getAddrOfLLVMVariableOrGOTEquivalent(entity);
-        B.addRelativeAddress(ref);
-        return;
-      }
 
       // Relative reference to the witness table.
       B.addRelativeAddressOrNull(Description.pattern);
@@ -1933,11 +1920,10 @@ namespace {
         return;
 
       // WitnessTableSizeInWords
-      B.addInt(IGM.Int16Ty, Description.witnessTableSize);
+      B.addInt16(Description.witnessTableSize);
       // WitnessTablePrivateSizeInWordsAndRequiresInstantiation
-      B.addInt(IGM.Int16Ty,
-               (Description.witnessTablePrivateSize << 1) |
-                Description.requiresSpecialization);
+      B.addInt16((Description.witnessTablePrivateSize << 1) |
+                  Description.requiresSpecialization);
       // Instantiation function
       B.addRelativeAddressOrNull(Description.instantiationFn);
       // Private data
@@ -1960,6 +1946,14 @@ namespace {
 void IRGenModule::emitProtocolConformance(
                                 const ConformanceDescription &record) {
   auto conformance = record.conformance;
+
+  // If we're emitting a builtin conformance that's already in been defined,
+  // just nop.
+  if (isa<BuiltinProtocolConformance>(conformance)) {
+    auto entity = LinkEntity::forProtocolConformanceDescriptor(conformance);
+    if (GlobalVars[entity])
+      return;
+  }
 
   // Emit additional metadata to be used by reflection.
   emitAssociatedTypeMetadataRecord(conformance);
@@ -2100,6 +2094,10 @@ IRGenModule::getConformanceInfo(const ProtocolDecl *protocol,
       // Foreign types need to go through the accessor to unique the witness
       // table.
       isSynthesizedNonUnique(rootConformance)) {
+    info = new AccessorConformanceInfo(conformance);
+    Conformances.try_emplace(conformance, info);
+  } else if (isa<BuiltinProtocolConformance>(conformance)) {
+    // Builtin conformances always go through an accessor.
     info = new AccessorConformanceInfo(conformance);
     Conformances.try_emplace(conformance, info);
   } else {
@@ -3420,35 +3418,58 @@ llvm::Constant *IRGenModule::getAddrOfGenericEnvironment(
 }
 
 //===----------------------------------------------------------------------===//
-// Known Protocol Conformances
+// Builtin Protocol Conformances
 //==-----------------------------------------------------------------------===//
 
-void IRGenModule::emitKnownProtocolConformances() {
+void IRGenModule::emitBuiltinProtocolConformances() {
   // We only emit these for the stdlib.
   if (!getSwiftModule()->isStdlibModule())
     return;
 
-  // For now, the only known conformance is () to Equatable.
-  auto voidEquatableConf = Context.getBuiltinVoidEquatableConformance();
+  // For now, the only builtin conformance is Equatable for tuples.
+  // (Just grab Void's conformance, we emit a single conformance descriptor for
+  //  all tuples.)
+  auto tuple = Context.TheEmptyTupleType;
+  auto equatable = Context.getProtocol(KnownProtocolKind::Equatable);
+  auto conformance = Context.getBuiltinConformance(tuple, equatable);
+  auto entity = LinkEntity::forProtocolConformanceDescriptor(conformance);
+
+  // If we already defined this descriptor, just nop.
+  if (GlobalVars[entity])
+    return;
 
   // Slight edge case: If this conformance doesn't have a valid protocol decl,
   // we're compiling some module that has asked be to compiled as the stdlib
-  // and said module hasn't declared an equatable protocol. Void does not
+  // and said module hasn't declared an equatable protocol. Tuples does not
   // conform in those cases, so don't emit a conformance descriptor.
-  if (!voidEquatableConf->getProtocol())
+  if (!conformance->getProtocol())
     return;
 
-  auto description = ConformanceDescription(voidEquatableConf,
+  // Note: This conformance descriptor says 'requires specialization' to trigger
+  // the generic witness table instatiation at runtime. The table size is 2 for
+  // the conformance descriptor and the single witness for Equatable.
+  auto description = ConformanceDescription(conformance,
                                             /* witness table */ nullptr,
                                             /* pattern */ nullptr,
-                                            /* table size */ 0,
+                                            /* table size */ 2,
                                             /* private size */ 0,
-                                            /* is resilient */ false);
+                                            /* requires specialization */ true);
+
+  // This sequence of events is rather unique for builtin conformances.
+  // When we're compiling the stdlib, there will already be references to some
+  // of these conformances. In those cases, we eagerly create the conformance
+  // descriptor that way we don't have to deal with globals already created.
+  // We also add it to the list of protocol conformances to be created, which
+  // in this case we've already emitted a builtin conformance so it will
+  // essentially be a nop. It's important we add it to the list of conformances
+  // because we want these conformances to appear in the final conformances
+  // section for swift_conformsToProtocol to be able to find.
   emitProtocolConformance(description);
+  addProtocolConformance(std::move(description));
 }
 
-void IRGenerator::emitKnownProtocolConformances() {
+void IRGenerator::emitBuiltinProtocolConformances() {
   for (auto &m : *this) {
-    m.second->emitKnownProtocolConformances();
+    m.second->emitBuiltinProtocolConformances();
   }
 }

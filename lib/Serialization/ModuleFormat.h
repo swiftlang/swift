@@ -55,7 +55,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 533; // removed @_implicitly_synthesizes_nested_requirement
+const uint16_t SWIFTMODULE_VERSION_MINOR = 534; // builtin protocol conformances
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -1550,6 +1550,12 @@ namespace decls_block {
   using InheritedProtocolConformanceLayout = BCRecordLayout<
     INHERITED_PROTOCOL_CONFORMANCE,
     TypeIDField // the conforming type
+  >;
+
+  using BuiltinProtocolConformanceLayout = BCRecordLayout<
+    BUILTIN_PROTOCOL_CONFORMANCE,
+    TypeIDField, // the conforming type
+    DeclIDField // the protocol
   >;
 
   // Refers to a normal protocol conformance in the given module via its id.

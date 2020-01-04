@@ -1110,10 +1110,6 @@ public:
     return getKind() == Kind::NominalTypeDescriptor;
   }
 
-  bool isTypeMetadata(CanType type) const {
-    return getKind() == Kind::TypeMetadata && getType() == type;
-  }
-
   /// Determine whether this entity will be weak-imported.
   bool isWeakImported(ModuleDecl *module) const;
   

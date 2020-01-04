@@ -800,6 +800,8 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD_WITH_NAMESPACE(sil_block,
                               decls_block::INHERITED_PROTOCOL_CONFORMANCE);
   BLOCK_RECORD_WITH_NAMESPACE(sil_block,
+                              decls_block::BUILTIN_PROTOCOL_CONFORMANCE);
+  BLOCK_RECORD_WITH_NAMESPACE(sil_block,
                               decls_block::NORMAL_PROTOCOL_CONFORMANCE_ID);
   BLOCK_RECORD_WITH_NAMESPACE(sil_block,
                               decls_block::PROTOCOL_CONFORMANCE_XREF);
@@ -1425,7 +1427,13 @@ Serializer::writeConformance(ProtocolConformanceRef conformanceRef,
     break;
   }
   case ProtocolConformanceKind::Builtin:
-    llvm_unreachable("not yet");
+    auto builtin = cast<BuiltinProtocolConformance>(conformance);
+    unsigned abbrCode = abbrCodes[BuiltinProtocolConformanceLayout::Code];
+    auto typeID = addTypeRef(builtin->getType());
+    auto protocolID = addDeclRef(builtin->getProtocol());
+    BuiltinProtocolConformanceLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                                 typeID, protocolID);
+    break;
   }
 }
 
@@ -4311,6 +4319,7 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<SpecializedProtocolConformanceLayout>();
   registerDeclTypeAbbr<InheritedProtocolConformanceLayout>();
   registerDeclTypeAbbr<InvalidProtocolConformanceLayout>();
+  registerDeclTypeAbbr<BuiltinProtocolConformanceLayout>();
   registerDeclTypeAbbr<NormalProtocolConformanceIdLayout>();
   registerDeclTypeAbbr<ProtocolConformanceXrefLayout>();
 
