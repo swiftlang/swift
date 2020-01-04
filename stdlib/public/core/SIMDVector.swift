@@ -1676,7 +1676,7 @@ extension SIMD
         Scalar : BinaryFloatingPoint & Differentiable,
         Self.TangentVector == Self,
         Scalar.TangentVector == Scalar {
-  @usableFromInline
+  @inlinable
   @derivative(of: init(repeating:))
   static func _vjpInit(repeating value: Scalar)
     -> (value: Self, pullback: (TangentVector) -> Scalar.TangentVector) {
