@@ -1853,6 +1853,22 @@ bool ContextualFailure::diagnoseAsError() {
                      getFromType(), getToType());
       return true;
     }
+    
+    if (auto *coerceExpr = dyn_cast<CoerceExpr>(anchor)) {
+      auto fromType = getFromType();
+      auto toType = getType(coerceExpr->getCastTypeLoc());
+      auto diagnostic =
+          getDiagnosticFor(CTP_CoerceOperand,
+                           /*forProtocol=*/toType->isAnyExistentialType());
+      
+      auto diag =
+          emitDiagnostic(anchor->getLoc(), *diagnostic, fromType, toType);
+      diag.highlight(anchor->getSourceRange());
+
+      (void)tryFixIts(diag);
+      
+      return true;
+    }
 
     return false;
   }
