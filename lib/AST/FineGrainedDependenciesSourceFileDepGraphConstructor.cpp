@@ -647,10 +647,10 @@ private:
   namesForProvidersOfAGivenType(std::vector<ContentsT> &contentsVec) {
     std::vector<ContextNameFingerprint> result;
     for (const auto declOrPair : contentsVec)
-      result.push_back(
-          {DependencyKey::computeContextForProvidedEntity<kind>(declOrPair),
-           DependencyKey::computeNameForProvidedEntity<kind>(declOrPair),
-           Optional<std::string>()});
+      result.push_back(ContextNameFingerprint(
+          DependencyKey::computeContextForProvidedEntity<kind>(declOrPair),
+          DependencyKey::computeNameForProvidedEntity<kind>(declOrPair),
+          Optional<std::string>()));
     return result;
   }
 
@@ -733,11 +733,11 @@ void SourceFileDepGraphConstructor::addAllDependenciesFrom(
 void SourceFileDepGraphConstructor::addSourceFileNodesToGraph() {
   g.findExistingNodePairOrCreateAndAddIfNew(
       NodeKind::sourceFileProvide,
-      {DependencyKey::computeContextForProvidedEntity<
-           NodeKind::sourceFileProvide>(swiftDeps),
-       DependencyKey::computeNameForProvidedEntity<NodeKind::sourceFileProvide>(
-           swiftDeps),
-       getSourceFileFingerprint()});
+      ContextNameFingerprint(DependencyKey::computeContextForProvidedEntity<
+                                 NodeKind::sourceFileProvide>(swiftDeps),
+                             DependencyKey::computeNameForProvidedEntity<
+                                 NodeKind::sourceFileProvide>(swiftDeps),
+                             getSourceFileFingerprint()));
 }
 
 void SourceFileDepGraphConstructor::addProviderNodesToGraph() {
@@ -824,7 +824,7 @@ static std::vector<ContextNameFingerprint>
 getBaseNameProvides(ArrayRef<std::string> simpleNames) {
   std::vector<ContextNameFingerprint> result;
   for (StringRef n : simpleNames)
-    result.push_back({"", n.str(), None});
+    result.push_back(ContextNameFingerprint("", n.str(), None));
   return result;
 }
 
@@ -832,7 +832,7 @@ static std::vector<ContextNameFingerprint>
 getMangledHolderProvides(ArrayRef<std::string> simpleNames) {
   std::vector<ContextNameFingerprint> result;
   for (StringRef n : simpleNames)
-    result.push_back({n.str(), "", None});
+    result.push_back(ContextNameFingerprint(n.str(), "", None));
   return result;
 }
 
@@ -840,7 +840,7 @@ static std::vector<ContextNameFingerprint> getCompoundProvides(
     ArrayRef<std::pair<std::string, std::string>> compoundNames) {
   std::vector<ContextNameFingerprint> result;
   for (const auto &p : compoundNames)
-    result.push_back({p.first, p.second, None});
+    result.push_back(ContextNameFingerprint(p.first, p.second, None));
   return result;
 }
 
