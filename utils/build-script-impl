@@ -1904,6 +1904,10 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DLLVM_DIR:PATH=${llvm_build_dir}/lib/cmake/llvm
                     -DClang_DIR:PATH=${llvm_build_dir}/lib/cmake/clang
                     -DSwift_DIR:PATH=${swift_build_dir}/lib/cmake/swift
+                    -DLLDB_ENABLE_LUA=OFF
+                    -DLLDB_ENABLE_PYTHON=ON
+                    -DLLDB_ENABLE_LIBEDIT=ON
+                    -DLLDB_ENABLE_CURSES=ON
                     -DLLDB_PATH_TO_SWIFT_SOURCE:PATH="${SWIFT_SOURCE_DIR}"
                     -DLLDB_IS_BUILDBOT_BUILD:BOOL="${LLDB_IS_BUILDBOT_BUILD}"
                     -DLLDB_BUILD_DATE:STRING="\"${LLDB_BUILD_DATE}\""
