@@ -4411,7 +4411,8 @@ Parser::parseDeclList(SourceLoc LBLoc, SourceLoc &RBLoc, Diag<> ErrorDiag,
     hadError = true;
 
   llvm::SmallString<32> tokenHashString;
-  {
+  // Must return an empty string if there is really no fingerprint
+  if (Context.LangOpts.EnableTypeFingerprints) {
     llvm::MD5::MD5Result result;
     tokenHashForThisDeclList.final(result);
     llvm::MD5::stringifyResult(result, tokenHashString);
