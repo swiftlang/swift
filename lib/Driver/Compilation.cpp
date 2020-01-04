@@ -1362,7 +1362,7 @@ namespace driver {
       // be compiled in 2 batches. Integer division yields 26/25 = 1 batch, but
       // a single batch of 26 exceeds the limit. The calculation must round up,
       // which can be calculated using: `(x + y - 1) / y`
-      auto DivideUp = [](size_t Num, size_t Div) -> size_t {
+      auto DivideRoundingUp = [](size_t Num, size_t Div) -> size_t {
         return (Num + Div - 1) / Div;
       };
 
@@ -1370,7 +1370,7 @@ namespace driver {
       size_t NumTasks = TQ->getNumberOfParallelTasks();
       size_t NumFiles = PendingExecution.size();
       size_t SizeLimit = Comp.getBatchSizeLimit().getValueOr(DefaultSizeLimit);
-      return std::max(NumTasks, DivideUp(NumFiles, SizeLimit));
+      return std::max(NumTasks, DivideRoundingUp(NumFiles, SizeLimit));
     }
 
     /// Select jobs that are batch-combinable from \c PendingExecution, combine
