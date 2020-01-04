@@ -12,10 +12,11 @@
 
 #define DEBUG_TYPE "sil-memory-lifetime"
 #include "swift/SIL/MemoryLifetime.h"
+#include "swift/SIL/ApplySite.h"
+#include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILFunction.h"
-#include "swift/SIL/ApplySite.h"
 #include "swift/SIL/SILModule.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/Support/CommandLine.h"
@@ -152,16 +153,38 @@ void MemoryLocations::analyzeLocations(SILFunction *function) {
   }
   for (SILBasicBlock &BB : *function) {
     for (SILInstruction &I : BB) {
-      auto *ASI = dyn_cast<AllocStackInst>(&I);
-      if (ASI && !ASI->hasDynamicLifetime()) {
-        if (allUsesInSameBlock(ASI)) {
-          singleBlockLocations.push_back(ASI);
-        } else {
-          analyzeLocation(ASI);
+      if (auto *ASI = dyn_cast<AllocStackInst>(&I)) {
+        if (!ASI->hasDynamicLifetime()) {
+          if (allUsesInSameBlock(ASI)) {
+            singleBlockLocations.push_back(ASI);
+          } else {
+            analyzeLocation(ASI);
+          }
+        }
+        continue;
+      }
+
+      // Also validate all interior pointer uses.
+      for (auto &op : I.getAllOperands()) {
+        if (auto interiorPointer = InteriorPointerUse::get(&op)) {
+          SILValue projectedValue = interiorPointer->getProjectedValue();
+          // We do not verify anything if our projected value is an object.
+          if (projectedValue->getType().isObject())
+            continue;
+
+          // Otherwise, analyze our projectedValue location.
+          analyzeLocation(projectedValue);
+          interiorPointer->visitBaseValueScopeEndingUses([&](Operand *op) {
+            endBaseValue2ProjValue.insert(op->getUser(), projectedValue);
+          });
         }
       }
     }
   }
+
+  // Now that we have finished visiting our entire function, freeze the
+  // endBaseValue2ProjValue map so we can do map queries.
+  endBaseValue2ProjValue.setFrozen();
 }
 
 void MemoryLocations::analyzeLocation(SILValue loc) {
@@ -689,52 +712,111 @@ void MemoryLifetimeVerifier::initDataflowInBlock(BlockState &state) {
 
   for (SILInstruction &I : *state.block) {
     switch (I.getKind()) {
-      case SILInstructionKind::LoadInst: {
-        auto *LI = cast<LoadInst>(&I);
-        switch (LI->getOwnershipQualifier()) {
-          case LoadOwnershipQualifier::Take:
-            state.killBits(LI->getOperand(), locations);
-            break;
-          default:
-            break;
-        }
+    case SILInstructionKind::LoadInst: {
+      auto *LI = cast<LoadInst>(&I);
+      switch (LI->getOwnershipQualifier()) {
+      case LoadOwnershipQualifier::Take:
+        state.killBits(LI->getOperand(), locations);
         break;
-      }
-      case SILInstructionKind::StoreInst:
-        state.genBits(cast<StoreInst>(&I)->getDest(), locations);
-        break;
-      case SILInstructionKind::CopyAddrInst: {
-        auto *CAI = cast<CopyAddrInst>(&I);
-        if (CAI->isTakeOfSrc())
-          state.killBits(CAI->getSrc(), locations);
-        state.genBits(CAI->getDest(), locations);
-        break;
-      }
-      case SILInstructionKind::DestroyAddrInst:
-      case SILInstructionKind::DeallocStackInst:
-        state.killBits(I.getOperand(0), locations);
-        break;
-      case SILInstructionKind::ApplyInst:
-      case SILInstructionKind::TryApplyInst: {
-        FullApplySite FAS(&I);
-        for (Operand &op : I.getAllOperands()) {
-          if (FAS.isArgumentOperand(op)) {
-            setFuncOperandBits(state, op, FAS.getArgumentConvention(op),
-                              isa<TryApplyInst>(&I));
-          }
-        }
-        break;
-      }
-      case SILInstructionKind::YieldInst: {
-        auto *YI = cast<YieldInst>(&I);
-        for (Operand &op : YI->getAllOperands()) {
-          setFuncOperandBits(state, op, YI->getArgumentConventionForOperand(op),
-                             /*isTryApply=*/ false);
-        }
-        break;
-      }
       default:
         break;
+      }
+      continue;
+    }
+    case SILInstructionKind::StoreInst:
+      state.genBits(cast<StoreInst>(&I)->getDest(), locations);
+      continue;
+    case SILInstructionKind::CopyAddrInst: {
+      auto *CAI = cast<CopyAddrInst>(&I);
+      if (CAI->isTakeOfSrc())
+        state.killBits(CAI->getSrc(), locations);
+      state.genBits(CAI->getDest(), locations);
+      continue;
+    }
+    case SILInstructionKind::DestroyAddrInst:
+    case SILInstructionKind::DeallocStackInst:
+      state.killBits(I.getOperand(0), locations);
+      continue;
+    case SILInstructionKind::ApplyInst:
+    case SILInstructionKind::TryApplyInst: {
+      FullApplySite FAS(&I);
+      for (Operand &op : I.getAllOperands()) {
+        if (FAS.isArgumentOperand(op)) {
+          setFuncOperandBits(state, op, FAS.getArgumentConvention(op),
+                             isa<TryApplyInst>(&I));
+        }
+      }
+      continue;
+    }
+    case SILInstructionKind::YieldInst: {
+      auto *YI = cast<YieldInst>(&I);
+      for (Operand &op : YI->getAllOperands()) {
+        setFuncOperandBits(state, op, YI->getArgumentConventionForOperand(op),
+                           /*isTryApply=*/false);
+      }
+      continue;
+    }
+    case SILInstructionKind::EndBorrowInst: {
+      SmallVector<BorrowScopeIntroducingValue, 1> introducerList;
+      bool foundResult =
+          getUnderlyingBorrowIntroducingValues(I.getOperand(0), introducerList);
+      assert(foundResult);
+      (void)foundResult;
+
+      if (llvm::any_of(introducerList,
+                       [](const BorrowScopeIntroducingValue &introducer) {
+                         return !introducer.isLocalScope();
+                       }))
+        continue;
+
+      for (const auto &introducer : introducerList) {
+        bool result = introducer.visitInteriorPointerUses(
+            [&](const InteriorPointerUse &interiorPointer) {
+              auto projectedValue = interiorPointer.getProjectedValue();
+              if (!projectedValue->getType().isObject() &&
+                  !interiorPointer.isUninitialized()) {
+                state.killBits(projectedValue, locations);
+              }
+            });
+        assert(result);
+        (void)result;
+      }
+      continue;
+    }
+    default:
+      break;
+    }
+
+    // See if we have an instruction that is a interior pointer projection. If
+    // so, mark it as being gened unless it is marked as uninitialized.
+    for (auto &op : I.getAllOperands()) {
+      if (auto interiorPointer = InteriorPointerUse::get(&op)) {
+        SILValue projectedValue = interiorPointer->getProjectedValue();
+        // We do not verify anything if our projected value is an object.
+        if (projectedValue->getType().isObject() ||
+            interiorPointer->isUninitialized())
+          continue;
+        state.genBits(projectedValue, locations);
+      }
+    }
+
+    // If we do exit, first kill the bits associated with any interior pointers
+    // derived from a function argument...
+    if (auto *termInst = dyn_cast<TermInst>(&I)) {
+      for (auto *arg : I.getFunction()->front().getSILFunctionArguments()) {
+        if (arg->getOwnershipKind() != ValueOwnershipKind::Guaranteed)
+          continue;
+
+        BorrowScopeIntroducingValue introducer(arg);
+        introducer.visitInteriorPointerUses(
+            [&](const InteriorPointerUse &interiorPointer) {
+              auto projectedValue = interiorPointer.getProjectedValue();
+              if (!projectedValue->getType().isObject() &&
+                  !interiorPointer.isUninitialized()) {
+                state.killBits(projectedValue, locations);
+              }
+            });
+      }
     }
   }
 }
@@ -827,25 +909,31 @@ void MemoryLifetimeVerifier::checkFunction(MemoryDataflow &dataFlow) {
       }
     }
 
-    // Check the bits at function exit.
+    // If this block does not exit from the given function, continue, we are
+    // done.
     TermInst *term = st.block->getTerminator();
+    if (!term->isFunctionExiting()) {
+      continue;
+    }
+
+    // And then check the bits at function exit.
     assert(bits == st.exitSet || isa<TryApplyInst>(term));
     switch (term->getKind()) {
-      case SILInstructionKind::ReturnInst:
-      case SILInstructionKind::UnwindInst:
-        require(expectedReturnBits & ~st.exitSet,
-          "indirect argument is not alive at function return", term);
-        require(st.exitSet & ~expectedReturnBits & nonTrivialLocations,
-          "memory is initialized at function return but shouldn't", term);
-        break;
-      case SILInstructionKind::ThrowInst:
-        require(expectedThrowBits & ~st.exitSet,
-          "indirect argument is not alive at throw", term);
-        require(st.exitSet & ~expectedThrowBits & nonTrivialLocations,
-          "memory is initialized at throw but shouldn't", term);
-        break;
-      default:
-        break;
+    case SILInstructionKind::ReturnInst:
+    case SILInstructionKind::UnwindInst:
+      require(expectedReturnBits & ~st.exitSet,
+              "indirect argument is not alive at function return", term);
+      require(st.exitSet & ~expectedReturnBits & nonTrivialLocations,
+              "memory is initialized at function return but shouldn't", term);
+      break;
+    case SILInstructionKind::ThrowInst:
+      require(expectedThrowBits & ~st.exitSet,
+              "indirect argument is not alive at throw", term);
+      require(st.exitSet & ~expectedThrowBits & nonTrivialLocations,
+              "memory is initialized at throw but shouldn't", term);
+      break;
+    default:
+      llvm_unreachable("Unhandled function exiting terminator?!");
     }
   }
 }
@@ -869,7 +957,7 @@ void MemoryLifetimeVerifier::checkBlock(SILBasicBlock *block, Bits &bits) {
           case LoadOwnershipQualifier::Unqualified:
             llvm_unreachable("unqualified load shouldn't be in ownership SIL");
         }
-        break;
+        continue;
       }
       case SILInstructionKind::StoreInst: {
         auto *SI = cast<StoreInst>(&I);
@@ -887,7 +975,7 @@ void MemoryLifetimeVerifier::checkBlock(SILBasicBlock *block, Bits &bits) {
           case StoreOwnershipQualifier::Unqualified:
             llvm_unreachable("unqualified store shouldn't be in ownership SIL");
         }
-        break;
+        continue;
       }
       case SILInstructionKind::CopyAddrInst: {
         auto *CAI = cast<CopyAddrInst>(&I);
@@ -900,13 +988,13 @@ void MemoryLifetimeVerifier::checkBlock(SILBasicBlock *block, Bits &bits) {
           requireBitsSet(bits | ~nonTrivialLocations, CAI->getDest(), &I);
         }
         locations.setBits(bits, CAI->getDest());
-        break;
+        continue;
       }
       case SILInstructionKind::DestroyAddrInst: {
         SILValue opVal = cast<DestroyAddrInst>(&I)->getOperand();
         requireBitsSet(bits | ~nonTrivialLocations, opVal, &I);
         locations.clearBits(bits, opVal);
-        break;
+        continue;
       }
       case SILInstructionKind::EndBorrowInst: {
         if (SILValue orig = cast<EndBorrowInst>(&I)->getSingleOriginalValue())
@@ -920,7 +1008,7 @@ void MemoryLifetimeVerifier::checkBlock(SILBasicBlock *block, Bits &bits) {
           if (FAS.isArgumentOperand(op))
             checkFuncArgument(bits, op, FAS.getArgumentConvention(op), &I);
         }
-        break;
+        continue;
       }
       case SILInstructionKind::YieldInst: {
         auto *YI = cast<YieldInst>(&I);
@@ -928,21 +1016,44 @@ void MemoryLifetimeVerifier::checkBlock(SILBasicBlock *block, Bits &bits) {
           checkFuncArgument(bits, op, YI->getArgumentConventionForOperand(op),
                              &I);
         }
-        break;
+        continue;
       }
       case SILInstructionKind::DebugValueAddrInst:
         requireBitsSet(bits, cast<DebugValueAddrInst>(&I)->getOperand(), &I);
-        break;
+        continue;
       case SILInstructionKind::DeallocStackInst: {
         SILValue opVal = cast<DeallocStackInst>(&I)->getOperand();
         requireBitsClear(bits & nonTrivialLocations, opVal, &I);
         // Needed to clear any bits of trivial locations (which are not required
         // to be zero).
         locations.clearBits(bits, opVal);
-        break;
+        continue;
       }
       default:
         break;
+    }
+
+    // If we did not handle the case in the explicit switch above, see
+    // if we need to gen bits for any interior pointers.
+    for (auto &op : I.getAllOperands()) {
+      if (auto interiorPointer = InteriorPointerUse::get(&op)) {
+        SILValue projectedValue = interiorPointer->getProjectedValue();
+        // We do not verify anything if our projected value is an object.
+        if (projectedValue->getType().isObject() ||
+            interiorPointer->isUninitialized())
+          continue;
+        locations.setBits(bits, projectedValue);
+      }
+    }
+
+    // And then finally see if the instruction ends the lifetime of a
+    // base value that we derived an interior pointer from. Do that by
+    // checking if I is in endBaseValue2ProjValue.
+    if (auto addresses =
+            locations.getValuesInvalidatedByBaseValueInvalidation(&I)) {
+      for (SILValue addr : *addresses) {
+        locations.clearBits(bits, addr);
+      }
     }
   }
 }

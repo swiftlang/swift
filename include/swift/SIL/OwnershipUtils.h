@@ -357,6 +357,8 @@ struct BorrowScopeIntroducingValueKind {
 llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
                               BorrowScopeIntroducingValueKind kind);
 
+struct InteriorPointerUse;
+
 /// A higher level construct for working with values that represent the
 /// introduction of a new borrow scope.
 ///
@@ -434,6 +436,9 @@ struct BorrowScopeIntroducingValue {
                              SmallPtrSetImpl<SILBasicBlock *> &visitedBlocks,
                              DeadEndBlocks &deadEndBlocks) const;
 
+  bool visitInteriorPointerUses(
+      function_ref<void(const InteriorPointerUse &)> func) const;
+
 private:
   /// Internal constructor for failable static constructor. Please do not expand
   /// its usage since it assumes the code passed in is well formed.
@@ -449,6 +454,97 @@ private:
 /// of the borrow introducing values, we return true.
 bool getUnderlyingBorrowIntroducingValues(
     SILValue inputValue, SmallVectorImpl<BorrowScopeIntroducingValue> &out);
+
+struct InteriorPointerUseKind {
+  using UnderlyingKindTy = std::underlying_type<SILInstructionKind>::type;
+
+  enum Kind : UnderlyingKindTy {
+    RefElementAddr = UnderlyingKindTy(SILInstructionKind::RefElementAddrInst),
+    RefTailAddr = UnderlyingKindTy(SILInstructionKind::RefTailAddrInst),
+  };
+
+  Kind value;
+
+  InteriorPointerUseKind(Kind newValue) : value(newValue) {}
+  InteriorPointerUseKind(const InteriorPointerUseKind &other)
+      : value(other.value) {}
+  operator Kind() const { return value; }
+
+  static Optional<InteriorPointerUseKind> get(SILInstructionKind kind) {
+    switch (kind) {
+    default:
+      return None;
+    case SILInstructionKind::RefElementAddrInst:
+      return InteriorPointerUseKind(RefElementAddr);
+    case SILInstructionKind::RefTailAddrInst:
+      return InteriorPointerUseKind(RefTailAddr);
+    }
+  }
+
+  void print(llvm::raw_ostream &os) const;
+  SWIFT_DEBUG_DUMP;
+};
+
+/// An operand whose user instruction introduces a new borrow scope for the
+/// operand's value. The value of the operand must be considered as implicitly
+/// borrowed until the user's corresponding end scope instruction.
+struct InteriorPointerUse {
+  InteriorPointerUseKind kind;
+  Operand *op;
+
+  InteriorPointerUse(Operand *op)
+      : kind(*InteriorPointerUseKind::get(op->getUser()->getKind())), op(op) {}
+
+  /// If value is a borrow introducer return it after doing some checks.
+  static Optional<InteriorPointerUse> get(Operand *op) {
+    auto *user = op->getUser();
+    auto kind = InteriorPointerUseKind::get(user->getKind());
+    if (!kind)
+      return None;
+    return InteriorPointerUse(*kind, op);
+  }
+
+  /// Return the end scope of all borrow introducers of the parent value of this
+  /// projection. Returns true if we were able to find all borrow introducing
+  /// values.
+  bool visitBaseValueScopeEndingUses(function_ref<void(Operand *)> func) const {
+    SmallVector<BorrowScopeIntroducingValue, 2> introducers;
+    if (!getUnderlyingBorrowIntroducingValues(op->get(), introducers))
+      return false;
+    for (const auto &introducer : introducers) {
+      if (!introducer.isLocalScope())
+        continue;
+      introducer.visitLocalScopeEndingUses(func);
+    }
+    return true;
+  }
+
+  bool isUninitialized() const {
+    switch (kind) {
+    case InteriorPointerUseKind::RefElementAddr:
+      return cast<RefElementAddrInst>(op->getUser())->isUninitializedAccess();
+    // TODO: Improve this modeling.
+    case InteriorPointerUseKind::RefTailAddr:
+      return false;
+    }
+  }
+
+  SILValue getProjectedValue() const {
+    switch (kind) {
+    case InteriorPointerUseKind::RefElementAddr:
+      return cast<RefElementAddrInst>(op->getUser());
+    case InteriorPointerUseKind::RefTailAddr:
+      return cast<RefTailAddrInst>(op->getUser());
+    }
+    llvm_unreachable("Covered switch isn't covered?!");
+  }
+
+private:
+  /// Internal constructor for failable static constructor. Please do not expand
+  /// its usage since it assumes the code passed in is well formed.
+  InteriorPointerUse(InteriorPointerUseKind kind, Operand *op)
+      : kind(kind), op(op) {}
+};
 
 } // namespace swift
 

@@ -17,6 +17,7 @@
 #ifndef SWIFT_SIL_MEMORY_LIFETIME_H
 #define SWIFT_SIL_MEMORY_LIFETIME_H
 
+#include "swift/Basic/FrozenMultiMap.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILFunction.h"
 
@@ -180,6 +181,16 @@ private:
   /// The bit-set of locations for which numNonTrivialFieldsNotCovered is > 0.
   Bits nonTrivialLocations;
 
+  /// A list of (SILInstruction *, SILValue) with the value being an interior
+  /// pointer into some base object and the instruction being an instruction
+  /// that invalidates the entire base object. We just append to this all such
+  /// pairs when creating instructions. After that is done, we perform a
+  /// stable_sort of the array by the first pair. This ensures that we can map a
+  /// specific instruction to the list of SILValues that it invalidates without
+  /// needing to create another layer of indirection, while at the same time
+  /// preserving visiting the values in the list themselves in insertion order.
+  SmallFrozenMultiMap<SILInstruction *, SILValue, 16> endBaseValue2ProjValue;
+
 public:
   MemoryLocations() {}
 
@@ -247,6 +258,11 @@ public:
   /// Returns the set of locations for which have non trivial fields which are
   /// not covered by sub-fields.
   const Bits &getNonTrivialLocations();
+
+  auto getValuesInvalidatedByBaseValueInvalidation(SILInstruction *baseUser)
+      -> decltype(endBaseValue2ProjValue.find(baseUser)) {
+    return endBaseValue2ProjValue.find(baseUser);
+  }
 
   /// Debug dump the MemoryLifetime internals.
   void dump() const;
