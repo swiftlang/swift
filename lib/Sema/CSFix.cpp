@@ -1180,3 +1180,13 @@ SpecifyObjectLiteralTypeImport::create(ConstraintSystem &cs,
                                        ConstraintLocator *locator) {
   return new (cs.getAllocator()) SpecifyObjectLiteralTypeImport(cs, locator);
 }
+
+bool AddQualifierToAccessTopLevelName::diagnose(bool asNote) const {
+  return false;
+}
+
+AddQualifierToAccessTopLevelName *
+AddQualifierToAccessTopLevelName::create(ConstraintSystem &cs,
+                                         ConstraintLocator *locator) {
+  return new (cs.getAllocator()) AddQualifierToAccessTopLevelName(cs, locator);
+}

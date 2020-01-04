@@ -235,12 +235,15 @@ enum class FixKind : uint8_t {
   /// Closure return type has to be explicitly specified because it can't be
   /// inferred in current context e.g. because it's a multi-statement closure.
   SpecifyClosureReturnType,
-  
+
   /// Object literal type coudn't be infered because the module where 
   /// the default type that implements the associated literal protocol
   /// is declared was not imported.
   SpecifyObjectLiteralTypeImport,
 
+  /// Member shadows a top-level name, such a name could only be accessed by
+  /// prefixing it with a module name.
+  AddQualifierToAccessTopLevelName,
 };
 
 class ConstraintFix {
@@ -1652,7 +1655,22 @@ public:
 
   static SpecifyObjectLiteralTypeImport *create(ConstraintSystem &cs,
                                                 ConstraintLocator *locator);
+};
 
+class AddQualifierToAccessTopLevelName final : public ConstraintFix {
+  AddQualifierToAccessTopLevelName(ConstraintSystem &cs,
+                                   ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::AddQualifierToAccessTopLevelName, locator) {}
+
+public:
+  std::string getName() const {
+    return "qualify reference to access top-level function";
+  }
+
+  bool diagnose(bool asNote = false) const;
+
+  static AddQualifierToAccessTopLevelName *create(ConstraintSystem &cs,
+                                                  ConstraintLocator *locator);
 };
 
 } // end namespace constraints
