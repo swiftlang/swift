@@ -105,8 +105,7 @@ func basicSubtyping(
   let _: Derived = baseAndP2 // expected-error {{cannot convert value of type 'Base<Int> & P2' to specified type 'Derived'}}
   let _: Derived & P2 = baseAndP2 // expected-error {{value of type 'Base<Int> & P2' does not conform to specified type 'Derived & P2'}}
 
-  // TODO(diagnostics): Diagnostic regression, better message is `value of type 'Unrelated' does not conform to 'Derived & P2' in coercion`
-  let _ = Unrelated() as Derived & P2 // expected-error {{cannot convert value of type 'Unrelated' to type 'Derived' in coercion}}
+  let _ = Unrelated() as Derived & P2 // expected-error {{value of type 'Unrelated' does not conform to 'Derived & P2' in coercion}}
   let _ = Unrelated() as? Derived & P2 // expected-warning {{always fails}}
   let _ = baseAndP2 as Unrelated // expected-error {{cannot convert value of type 'Base<Int> & P2' to type 'Unrelated' in coercion}}
   let _ = baseAndP2 as? Unrelated // expected-warning {{always fails}}
