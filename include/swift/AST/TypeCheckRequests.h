@@ -20,6 +20,7 @@
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/Evaluator.h"
+#include "swift/AST/Pattern.h"
 #include "swift/AST/SimpleRequest.h"
 #include "swift/AST/TypeResolutionStage.h"
 #include "swift/Basic/AnyValue.h"
@@ -33,6 +34,7 @@ namespace swift {
 class AbstractStorageDecl;
 class AccessorDecl;
 enum class AccessorKind;
+class ContextualPattern;
 class DefaultArgumentExpr;
 class GenericParamList;
 class PrecedenceGroupDecl;
@@ -1988,6 +1990,32 @@ public:
     // the constraint system that created them.
     auto ty = std::get<0>(getStorage());
     return !ty->hasTypeVariable();
+  }
+};
+
+/// Determines the type of a given pattern.
+///
+/// Note that this returns the "raw" pattern type, which can involve
+/// unresolved types and unbound generic types where type inference is
+/// allowed.
+class PatternTypeRequest
+    : public SimpleRequest<PatternTypeRequest, Type(ContextualPattern),
+                           CacheKind::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<Type> evaluate(
+      Evaluator &evaluator, ContextualPattern pattern) const;
+
+public:
+  bool isCached() const { return true; }
+
+  SourceLoc getNearestLoc() const {
+    return std::get<0>(getStorage()).getPattern()->getLoc();
   }
 };
 

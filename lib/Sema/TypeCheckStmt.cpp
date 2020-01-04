@@ -931,12 +931,21 @@ public:
     }
 
     pattern = newPattern;
+
     // Coerce the pattern to the subject's type.
-    TypeResolutionOptions patternOptions(TypeResolverContext::InExpression);
-    if (!subjectType ||
-        TypeChecker::coercePatternToType(pattern,
-                                         TypeResolution::forContextual(DC),
-                                         subjectType, patternOptions)) {
+    bool coercionError = false;
+    if (subjectType) {
+      auto contextualPattern = ContextualPattern::forRawPattern(pattern, DC);
+      TypeResolutionOptions patternOptions(TypeResolverContext::InExpression);
+      auto coercedPattern = TypeChecker::coercePatternToType(
+          contextualPattern, subjectType, patternOptions);
+      if (coercedPattern)
+        pattern = coercedPattern;
+      else
+        coercionError = true;
+    }
+
+    if (!subjectType || coercionError) {
       limitExhaustivityChecks = true;
 
       // If that failed, mark any variables binding pieces of the pattern
@@ -1340,10 +1349,19 @@ bool TypeChecker::typeCheckCatchPattern(CatchStmt *S, DeclContext *DC) {
     pattern = newPattern;
 
     // Coerce the pattern to the exception type.
-    TypeResolutionOptions patternOptions(TypeResolverContext::InExpression);
-    if (!exnType ||
-        coercePatternToType(pattern, TypeResolution::forContextual(DC), exnType,
-                            patternOptions)) {
+    bool coercionError = false;
+    if (exnType) {
+      auto contextualPattern = ContextualPattern::forRawPattern(pattern, DC);
+      TypeResolutionOptions patternOptions(TypeResolverContext::InExpression);
+      auto coercedPattern = coercePatternToType(
+          contextualPattern, exnType, patternOptions);
+      if (coercedPattern)
+        pattern = coercedPattern;
+      else
+        coercionError = true;
+    }
+
+    if (!exnType || coercionError) {
       // If that failed, be sure to give the variables error types
       // before we type-check the guard.  (This will probably kill
       // most of the type-checking, but maybe not.)

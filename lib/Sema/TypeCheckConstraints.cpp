@@ -2566,7 +2566,8 @@ TypeChecker::getTypeOfCompletionOperator(DeclContext *DC, Expr *LHS,
 }
 
 bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
-                                   DeclContext *DC) {
+                                   DeclContext *DC,
+                                   Type patternType) {
 
   /// Type checking listener for pattern binding initializers.
   class BindingListener : public ExprTypeCheckListener {
@@ -2763,8 +2764,10 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
   // if there's an error we can use that information to inform diagnostics.
   contextualPurpose = CTP_Initialization;
 
-  if (pattern->hasType()) {
-    contextualType = TypeLoc::withoutLoc(pattern->getType());
+  if (isa<OptionalSomePattern>(pattern)) {
+    flags |= TypeCheckExprFlags::ExpressionTypeMustBeOptional;
+  } else if (patternType && !patternType->isEqual(Context.TheUnresolvedType)) {
+    contextualType = TypeLoc::withoutLoc(patternType);
 
     // If we already had an error, don't repeat the problem.
     if (contextualType.getType()->hasError())
@@ -2772,7 +2775,7 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
     
     // Allow the initializer expression to establish the underlying type of an
     // opaque type.
-    if (auto opaqueType = pattern->getType()->getAs<OpaqueTypeArchetypeType>()){
+    if (auto opaqueType = patternType->getAs<OpaqueTypeArchetypeType>()){
       flags |= TypeCheckExprFlags::ConvertTypeIsOpaqueReturnType;
       flags -= TypeCheckExprFlags::ConvertTypeIsOnlyAHint;
     }
@@ -2780,11 +2783,12 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
     // Only provide a TypeLoc if it makes sense to allow diagnostics.
     if (auto *typedPattern = dyn_cast<TypedPattern>(pattern)) {
       const Pattern *inner = typedPattern->getSemanticsProvidingPattern();
-      if (isa<NamedPattern>(inner) || isa<AnyPattern>(inner))
+      if (isa<NamedPattern>(inner) || isa<AnyPattern>(inner)) {
         contextualType = typedPattern->getTypeLoc();
+        if (!contextualType.getType())
+          contextualType.setType(patternType);
+      }
     }
-  } else if (isa<OptionalSomePattern>(pattern)) {
-    flags |= TypeCheckExprFlags::ExpressionTypeMustBeOptional;
   }
     
   // Type-check the initializer.
@@ -2806,8 +2810,12 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
       return true;
 
     // Apply the solution to the pattern as well.
-    if (coercePatternToType(pattern, TypeResolution::forContextual(DC), initTy,
-                            options, TypeLoc())) {
+    auto contextualPattern =
+        ContextualPattern::forRawPattern(pattern, DC);
+    if (auto coercedPattern = TypeChecker::coercePatternToType(
+            contextualPattern, initTy, options)) {
+      pattern = coercedPattern;
+    } else {
       return true;
     }
   }
@@ -2819,7 +2827,8 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
   // and its variables, to prevent it from being referenced by the constraint
   // system.
   if (!resultTy &&
-      (!pattern->hasType() || pattern->getType()->hasUnboundGenericType())) {
+      (patternType->hasUnresolvedType() ||
+       patternType->hasUnboundGenericType())) {
     pattern->setType(ErrorType::get(Context));
     pattern->forEachVariable([&](VarDecl *var) {
       // Don't change the type of a variable that we've been able to
@@ -2837,7 +2846,8 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
 }
 
 bool TypeChecker::typeCheckPatternBinding(PatternBindingDecl *PBD,
-                                          unsigned patternNumber) {
+                                          unsigned patternNumber,
+                                          Type patternType) {
   Pattern *pattern = PBD->getPattern(patternNumber);
   Expr *init = PBD->getInit(patternNumber);
 
@@ -2851,7 +2861,22 @@ bool TypeChecker::typeCheckPatternBinding(PatternBindingDecl *PBD,
       DC = initContext;
   }
 
-  bool hadError = TypeChecker::typeCheckBinding(pattern, init, DC);
+  // If we weren't given a pattern type, compute one now.
+  if (!patternType) {
+    if (pattern->hasType())
+      patternType = pattern->getType();
+    else {
+      auto contextualPattern = ContextualPattern::forRawPattern(pattern, DC);
+      patternType = typeCheckPattern(contextualPattern);
+    }
+
+    if (patternType->hasError()) {
+      PBD->setInvalid();
+      return true;
+    }
+  }
+
+  bool hadError = TypeChecker::typeCheckBinding(pattern, init, DC, patternType);
   if (!init) {
     PBD->setInvalid();
     return true;
@@ -2970,10 +2995,10 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
         return true;
       }
 
-      TypeResolutionOptions options(TypeResolverContext::InExpression);
-      options |= TypeResolutionFlags::AllowUnspecifiedTypes;
-      options |= TypeResolutionFlags::AllowUnboundGenerics;
-      if (TypeChecker::typeCheckPattern(Stmt->getPattern(), DC, options)) {
+      auto contextualPattern =
+          ContextualPattern::forRawPattern(Stmt->getPattern(), DC);
+      Type patternType = TypeChecker::typeCheckPattern(contextualPattern);
+      if (patternType->hasError()) {
         // FIXME: Handle errors better.
         Stmt->getPattern()->setType(ErrorType::get(ctx));
         return true;
@@ -3040,11 +3065,11 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
       Pattern *pattern = Stmt->getPattern();
       TypeResolutionOptions options(TypeResolverContext::ForEachStmt);
       options |= TypeResolutionFlags::OverrideType;
-      if (TypeChecker::coercePatternToType(pattern,
-                                           TypeResolution::forContextual(DC),
-                                           InitType, options)) {
+      auto contextualPattern = ContextualPattern::forRawPattern(pattern, DC);
+      pattern = TypeChecker::coercePatternToType(contextualPattern,
+                                                 InitType, options);
+      if (!pattern)
         return nullptr;
-      }
       Stmt->setPattern(pattern);
 
       // Get the conformance of the sequence type to the Sequence protocol.
@@ -3164,6 +3189,7 @@ bool TypeChecker::typeCheckStmtCondition(StmtCondition &cond, DeclContext *dc,
       hadAnyFalsable = true;
       continue;
     }
+    assert(elt.getKind() != StmtConditionElement::CK_Boolean);
 
     // This is cleanup goop run on the various paths where type checking of the
     // pattern binding fails.
@@ -3192,10 +3218,9 @@ bool TypeChecker::typeCheckStmtCondition(StmtCondition &cond, DeclContext *dc,
 
     // Check the pattern, it allows unspecified types because the pattern can
     // provide type information.
-    TypeResolutionOptions options(TypeResolverContext::InExpression);
-    options |= TypeResolutionFlags::AllowUnspecifiedTypes;
-    options |= TypeResolutionFlags::AllowUnboundGenerics;
-    if (TypeChecker::typeCheckPattern(pattern, dc, options)) {
+    auto contextualPattern = ContextualPattern::forRawPattern(pattern, dc);
+    Type patternType = TypeChecker::typeCheckPattern(contextualPattern);
+    if (patternType->hasError()) {
       typeCheckPatternFailed();
       continue;
     }
@@ -3203,7 +3228,7 @@ bool TypeChecker::typeCheckStmtCondition(StmtCondition &cond, DeclContext *dc,
     // If the pattern didn't get a type, it's because we ran into some
     // unknown types along the way. We'll need to check the initializer.
     auto init = elt.getInitializer();
-    hadError |= TypeChecker::typeCheckBinding(pattern, init, dc);
+    hadError |= TypeChecker::typeCheckBinding(pattern, init, dc, patternType);
     elt.setPattern(pattern);
     elt.setInitializer(init);
     hadAnyFalsable |= pattern->isRefutablePattern();
