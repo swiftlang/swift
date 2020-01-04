@@ -23,13 +23,11 @@
 
 // RUN: cp %t/b.swiftdeps %t/b2.swiftdeps
 
-// RUN: %FileCheck -match-full-lines -check-prefix=CHECK-MAINAB-RECOMPILED %s < %t/output2
+// RUN: %FileCheck -check-prefix=CHECK-MAINAB-RECOMPILED %s < %t/output2
 
+// CHECK-MAINAB-RECOMPILED: Queuing (initial): {compile: b.o <= b.swift}
 // CHECK-MAINAB-RECOMPILED: Queuing because of dependencies discovered later: {compile: main.o <= main.swift}
-// CHECK-MAINAB-RECOMPILED:   type 'main.B1' in b.swift -> source file main.swift
 // CHECK-MAINAB-RECOMPILED: Queuing because of dependencies discovered later: {compile: a.o <= a.swift}
-// CHECK-MAINAB-RECOMPILED:   type 'main.B2' in b.swift -> source file a.swift
-
 
 
 // =============================================================================
@@ -49,18 +47,13 @@
 // Change one type, only uses of that type get recompiled
 
 // RUN: cp %S/Inputs/type-fingerprint/b1.swift %t/b.swift
-// RUN: gazorp
 // RUN: cd %t && %swiftc_driver  -enable-batch-mode -j2 -incremental -driver-show-incremental ./main.swift ./a.swift ./b.swift -module-name main -output-file-map ofm.json >&output4
 
 // RUN: cp %t/b.swiftdeps %t/b4.swiftdeps
 
-// RUN: %FileCheck -match-full-lines -check-prefix=CHECK-MAINB-RECOMPILED %s < %t/output4
-
+// RUN: %FileCheck -check-prefix=CHECK-MAINB-RECOMPILED %s < %t/output4
 
 // CHECK-MAINB-RECOMPILED-NOT: Queuing because of dependencies discovered later: {compile: a.o <= a.swift}
-// CHECK-MAINB-RECOMPILED-NOT:   type 'main.B2' in b.swift -> source file a.swift
 // CHECK-MAINB-RECOMPILED: Queuing because of dependencies discovered later: {compile: main.o <= main.swift}
-// CHECK-MAINB-RECOMPILED:   type 'main.B1' in b.swift -> source file main.swift
-// CHECK-MAINB-RECOMPILED-NOT: Queuing because of dependencies discovered later: {compile: a.o <= a.swift}
-// CHECK-MAINB-RECOMPILED-NOT:   type 'main.B2' in b.swift -> source file a.swift
+// CHECK-MAINB-RECOMPILED-NOT: Queuing because of dependencies discovered later: {compile: // CHECK-MAINB-RECOMPILED: a.o <= a.swift}
 

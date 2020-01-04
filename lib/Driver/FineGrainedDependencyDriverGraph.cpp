@@ -420,14 +420,14 @@ void ModuleDepGraph::findDependentNodes(
   // Moved this out of the following loop for effieciency.
   assert(definition->getIsProvides() && "Should only call me for Decl nodes.");
 
-  forEachUseOf(definition, [&](const ModuleDepGraphNode *u) {
-    // Cycle recording and check.
-    if (!foundDependents.insert(u).second)
-      return;
-    // If this use also provides something, follow it
-    if (u->getIsProvides())
-      findDependentNodes(foundDependents, u);
-  });
+  // Cycle recording and check.
+  if (foundDependents.insert(definition).second) {
+    forEachUseOf(definition, [&](const ModuleDepGraphNode *u) {
+      // If this use also provides something, follow it
+      if (u->getIsProvides())
+        findDependentNodes(foundDependents, u);
+    });
+  }
   traceDeparture(pathLengthAfterArrival);
 }
 

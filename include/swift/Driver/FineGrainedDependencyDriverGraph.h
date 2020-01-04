@@ -474,12 +474,12 @@ private:
   void removeNode(ModuleDepGraphNode *);
 
   /// Find all defs having keys in \p keys occurring in the job creating \p
-  /// swiftDeps and return all (transitive) uses.
+  /// swiftDeps and return all (transitive) uses, including the original defs.
   std::unordered_set<const ModuleDepGraphNode *>
   findNodesTransitivelyDependingUponKeysOccurringInJob(
       const ArrayRef<DependencyKey> keys, const StringRef swiftDeps);
 
-  /// Given a definition node, and a list of already found dependents,
+  /// Given a definition node, and a list of already found defs & uses,
   /// recursively add transitive closure of dependents of the definition
   /// into the already found dependents.
   void findDependentNodes(
