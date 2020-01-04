@@ -6,55 +6,55 @@
 // REQUIRES: objc_interop
 
 // PRINT-LABEL: struct ErrorDomain : _ObjectiveCBridgeable, Hashable, Equatable, _SwiftNewtypeWrapper, RawRepresentable {
-// PRINT-NEXT:    init(_ rawValue: String)
-// PRINT-NEXT:    init(rawValue: String)
-// PRINT-NEXT:    var rawValue: String { get }
-// PRINT-NEXT:    typealias RawValue = String
-// PRINT-NEXT:    typealias _ObjectiveCType = NSString
-// PRINT-NEXT:  }
-// PRINT-NEXT:  extension ErrorDomain {
-// PRINT-NEXT:    func process()
-// PRINT-NEXT:    static let one: ErrorDomain
-// PRINT-NEXT:    static let errTwo: ErrorDomain
-// PRINT-NEXT:    static let three: ErrorDomain
-// PRINT-NEXT:    static let fourErrorDomain: ErrorDomain
-// PRINT-NEXT:    static let stillAMember: ErrorDomain
-// PRINT-NEXT:  }
-// PRINT-NEXT:  struct Food {
-// PRINT-NEXT:    init()
-// PRINT-NEXT:  }
-// PRINT-NEXT:  extension Food {
-// PRINT-NEXT:    static let err: ErrorDomain
-// PRINT-NEXT:  }
-// PRINT-NEXT:  struct ClosedEnum : _ObjectiveCBridgeable, Hashable, Equatable, _SwiftNewtypeWrapper, RawRepresentable {
-// PRINT-NEXT:    init(rawValue: String)
-// PRINT-NEXT:    var rawValue: String { get }
-// PRINT-NEXT:    typealias RawValue = String
-// PRINT-NEXT:    typealias _ObjectiveCType = NSString
-// PRINT-NEXT:  }
-// PRINT-NEXT:  extension ClosedEnum {
-// PRINT-NEXT:    static let firstClosedEntryEnum: ClosedEnum
-// PRINT-NEXT:    static let secondEntry: ClosedEnum
-// PRINT-NEXT:    static let thirdEntry: ClosedEnum
-// PRINT-NEXT:  }
-// PRINT-NEXT:  struct IUONewtype : _ObjectiveCBridgeable, Hashable, Equatable, _SwiftNewtypeWrapper, RawRepresentable {
-// PRINT-NEXT:    init(_ rawValue: String)
-// PRINT-NEXT:    init(rawValue: String)
-// PRINT-NEXT:    var rawValue: String { get }
-// PRINT-NEXT:    typealias RawValue = String
-// PRINT-NEXT:    typealias _ObjectiveCType = NSString
-// PRINT-NEXT:  }
-// PRINT-NEXT:  struct MyFloat : Hashable, Equatable, _SwiftNewtypeWrapper, RawRepresentable {
-// PRINT-NEXT:    init(_ rawValue: Float)
-// PRINT-NEXT:    init(rawValue: Float)
-// PRINT-NEXT:    let rawValue: Float
-// PRINT-NEXT:    typealias RawValue = Float
-// PRINT-NEXT:  }
-// PRINT-NEXT:  extension MyFloat {
-// PRINT-NEXT:    static let globalFloat: MyFloat{{$}}
-// PRINT-NEXT:    static let PI: MyFloat{{$}}
-// PRINT-NEXT:    static let version: MyFloat{{$}}
-// PRINT-NEXT:  }
+// PRINT-NEXT:   init(_ rawValue: String)
+// PRINT-NEXT:   init(rawValue: String)
+// PRINT-NEXT:   var rawValue: String { get }
+// PRINT-NEXT:   typealias RawValue = String
+// PRINT-NEXT:   typealias _ObjectiveCType = NSString
+// PRINT-NEXT: }
+// PRINT-NEXT: struct Food {
+// PRINT-NEXT:   init()
+// PRINT-NEXT: }
+// PRINT-NEXT: extension ErrorDomain {
+// PRINT-NEXT:   static let errTwo: ErrorDomain
+// PRINT-NEXT:   static let fourErrorDomain: ErrorDomain
+// PRINT-NEXT:   static let one: ErrorDomain
+// PRINT-NEXT:   func process()
+// PRINT-NEXT:   static let stillAMember: ErrorDomain
+// PRINT-NEXT:   static let three: ErrorDomain
+// PRINT-NEXT: }
+// PRINT-NEXT: extension Food {
+// PRINT-NEXT:   static let err: ErrorDomain
+// PRINT-NEXT: }
+// PRINT-NEXT: struct ClosedEnum : _ObjectiveCBridgeable, Hashable, Equatable, _SwiftNewtypeWrapper, RawRepresentable {
+// PRINT-NEXT:   init(rawValue: String)
+// PRINT-NEXT:   var rawValue: String { get }
+// PRINT-NEXT:   typealias RawValue = String
+// PRINT-NEXT:   typealias _ObjectiveCType = NSString
+// PRINT-NEXT: }
+// PRINT-NEXT: extension ClosedEnum {
+// PRINT-NEXT:   static let firstClosedEntryEnum: ClosedEnum
+// PRINT-NEXT:   static let secondEntry: ClosedEnum
+// PRINT-NEXT:   static let thirdEntry: ClosedEnum
+// PRINT-NEXT: }
+// PRINT-NEXT: struct IUONewtype : _ObjectiveCBridgeable, Hashable, Equatable, _SwiftNewtypeWrapper, RawRepresentable {
+// PRINT-NEXT:   init(_ rawValue: String)
+// PRINT-NEXT:   init(rawValue: String)
+// PRINT-NEXT:   var rawValue: String { get }
+// PRINT-NEXT:   typealias RawValue = String
+// PRINT-NEXT:   typealias _ObjectiveCType = NSString
+// PRINT-NEXT: }
+// PRINT-NEXT: struct MyFloat : Hashable, Equatable, _SwiftNewtypeWrapper, RawRepresentable {
+// PRINT-NEXT:   init(_ rawValue: Float)
+// PRINT-NEXT:   init(rawValue: Float)
+// PRINT-NEXT:   let rawValue: Float
+// PRINT-NEXT:   typealias RawValue = Float
+// PRINT-NEXT: }
+// PRINT-NEXT: extension MyFloat {
+// PRINT-NEXT:   static let PI: MyFloat
+// PRINT-NEXT:   static let globalFloat: MyFloat
+// PRINT-NEXT:   static let version: MyFloat
+// PRINT-NEXT: }
 //
 // PRINT-LABEL: struct MyInt : Hashable, Equatable, _SwiftNewtypeWrapper, RawRepresentable {
 // PRINT-NEXT:    init(_ rawValue: Int32)
@@ -63,21 +63,21 @@
 // PRINT-NEXT:    typealias RawValue = Int32
 // PRINT-NEXT:  }
 // PRINT-NEXT:  extension MyInt {
-// PRINT-NEXT:    static let zero: MyInt{{$}}
 // PRINT-NEXT:    static let one: MyInt{{$}}
+// PRINT-NEXT:    static let zero: MyInt{{$}}
 // PRINT-NEXT:  }
 // PRINT-NEXT:  let kRawInt: Int32
 // PRINT-NEXT:  func takesMyInt(_: MyInt)
 //
 // PRINT-LABEL: extension NSURLResourceKey {
-// PRINT-NEXT:    static let isRegularFileKey: NSURLResourceKey
 // PRINT-NEXT:    static let isDirectoryKey: NSURLResourceKey
+// PRINT-NEXT:    static let isRegularFileKey: NSURLResourceKey
 // PRINT-NEXT:    static let localizedNameKey: NSURLResourceKey
 // PRINT-NEXT:  }
 // PRINT-NEXT:  extension NSNotification.Name {
 // PRINT-NEXT:    static let Foo: NSNotification.Name
-// PRINT-NEXT:    static let bar: NSNotification.Name
 // PRINT-NEXT:    static let NSWibble: NSNotification.Name
+// PRINT-NEXT:    static let bar: NSNotification.Name
 // PRINT-NEXT:  }
 // PRINT-NEXT:  let kNotification: String
 // PRINT-NEXT:  let Notification: String
@@ -91,8 +91,8 @@
 // PRINT-NEXT:  }
 // PRINT-NEXT:  extension CFNewType {
 // PRINT-NEXT:    static let MyCFNewTypeValue: CFNewType
-// PRINT-NEXT:    static let MyCFNewTypeValueUnauditedButConst: CFNewType
 // PRINT-NEXT:    static var MyCFNewTypeValueUnaudited: Unmanaged<CFString>
+// PRINT-NEXT:    static let MyCFNewTypeValueUnauditedButConst: CFNewType
 // PRINT-NEXT:  }
 // PRINT-NEXT:  func FooAudited() -> CFNewType
 // PRINT-NEXT:  func FooUnaudited() -> Unmanaged<CFString>
@@ -162,8 +162,8 @@
 // PRINT-NEXT: func destroy_T(_: TRef!)
 // PRINT-NEXT: func destroy_ConstT(_: ConstTRef!)
 // PRINT-NEXT: extension TRef {
-// PRINT-NEXT:   func mutatePointee()
 // PRINT-NEXT:   mutating func mutate()
+// PRINT-NEXT:   func mutatePointee()
 // PRINT-NEXT: }
 // PRINT-NEXT: extension ConstTRef {
 // PRINT-NEXT:   func use()
@@ -186,8 +186,8 @@
 // PRINT-NEXT: func destroy_TRef(_: TRefRef!)
 // PRINT-NEXT: func destroy_ConstTRef(_: ConstTRefRef!)
 // PRINT-NEXT: extension TRefRef {
-// PRINT-NEXT:   func mutatePointee()
 // PRINT-NEXT:   mutating func mutate()
+// PRINT-NEXT:   func mutatePointee()
 // PRINT-NEXT: }
 // PRINT-NEXT: extension ConstTRefRef {
 // PRINT-NEXT:   func use()

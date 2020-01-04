@@ -8543,17 +8543,23 @@ void ClangImporter::Implementation::loadAllMembersIntoExtension(
   startedImportingEntity();
 
   // Load the members.
-  for (auto entry : table->lookupGlobalsAsMembers(effectiveClangContext)) {
-    auto decl = entry.get<clang::NamedDecl *>();
+  SmallPtrSet<Decl *, 32> addedMembers;
+  auto globalsAsMemberBaseNames = table->allGlobalsAsMembersBaseNames();
+  llvm::array_pod_sort(globalsAsMemberBaseNames.begin(),
+                       globalsAsMemberBaseNames.end());
+  for (auto key : globalsAsMemberBaseNames) {
+    for (auto entry : table->lookupGlobalsAsMembers(key, effectiveClangContext)) {
+      auto decl = entry.get<clang::NamedDecl *>();
 
-    // Only include members in the same submodule as this extension.
-    if (getClangSubmoduleForDecl(decl) != submodule)
-      continue;
+      // Only include members in the same submodule as this extension.
+      if (getClangSubmoduleForDecl(decl) != submodule)
+        continue;
 
-    forEachDistinctName(
-        decl, [&](ImportedName newName, ImportNameVersion nameVersion) -> bool {
-      return addMemberAndAlternatesToExtension(decl, newName, nameVersion, ext);
-    });
+      forEachDistinctName(
+          decl, [&](ImportedName newName, ImportNameVersion nameVersion) -> bool {
+        return addMemberAndAlternatesToExtension(decl, newName, nameVersion, ext, addedMembers);
+      });
+    }
   }
 }
 
@@ -8573,7 +8579,7 @@ static Decl *findMemberThatWillLandInAnExtensionContext(Decl *member) {
 
 bool ClangImporter::Implementation::addMemberAndAlternatesToExtension(
     clang::NamedDecl *decl, ImportedName newName, ImportNameVersion nameVersion,
-    ExtensionDecl *ext) {
+    ExtensionDecl *ext, SmallPtrSetImpl<Decl *> &addedMembers) {
   // Quickly check the context and bail out if it obviously doesn't
   // belong here.
   if (auto *importDC = newName.getEffectiveContext().getAsDeclContext())
@@ -8586,7 +8592,8 @@ bool ClangImporter::Implementation::addMemberAndAlternatesToExtension(
     return false;
 
   member = findMemberThatWillLandInAnExtensionContext(member);
-  if (!member || member->getDeclContext() != ext)
+  if (!member || member->getDeclContext() != ext ||
+      !addedMembers.insert(member).second)
     return true;
   if (!isa<AccessorDecl>(member))
     ext->addMember(member);

@@ -1229,7 +1229,8 @@ private:
   /// forEachDistinctName's callback.
   bool addMemberAndAlternatesToExtension(
       clang::NamedDecl *decl, importer::ImportedName newName,
-      importer::ImportNameVersion nameVersion, ExtensionDecl *ext);
+      importer::ImportNameVersion nameVersion, ExtensionDecl *ext,
+      SmallPtrSetImpl<Decl *> &addedMembers);
 
 public:
   void

@@ -41,7 +41,7 @@
 // APPKIT-NEXT: var action: Selector
 // APPKIT: {{^}}}{{$}}
 // APPKIT: extension NSNotification.Name {
-// APPKIT:   static let NSViewFrameDidChange: NSNotification.Name
 // APPKIT:   static let NSViewFocusDidChange: NSNotification.Name
+// APPKIT:   static let NSViewFrameDidChange: NSNotification.Name
 // APPKIT: }
 

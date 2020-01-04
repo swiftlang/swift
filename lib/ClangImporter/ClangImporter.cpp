@@ -2746,36 +2746,41 @@ void ClangModuleUnit::getTopLevelDecls(SmallVectorImpl<Decl*> &results) const {
     // FIXME: Since we don't represent Clang submodules as Swift
     // modules, we're getting everything.
     llvm::SmallPtrSet<ExtensionDecl *, 8> knownExtensions;
-    for (auto entry : lookupTable->allGlobalsAsMembers()) {
-      auto decl = entry.get<clang::NamedDecl *>();
-      auto importedDecl = owner.importDecl(decl, owner.CurrentVersion);
-      if (!importedDecl) continue;
+    auto globalsAsMemberBaseNames = lookupTable->allGlobalsAsMembersBaseNames();
+    llvm::array_pod_sort(globalsAsMemberBaseNames.begin(),
+                         globalsAsMemberBaseNames.end());
+    for (auto baseName : globalsAsMemberBaseNames) {
+      for (auto entry : lookupTable->lookupGlobalsAsMembers(baseName, None)) {
+        auto decl = entry.get<clang::NamedDecl *>();
+        auto importedDecl = owner.importDecl(decl, owner.CurrentVersion);
+        if (!importedDecl) continue;
 
-      // Find the enclosing extension, if there is one.
-      ExtensionDecl *ext = findEnclosingExtension(importedDecl);
-      if (ext && knownExtensions.insert(ext).second)
-        results.push_back(ext);
+        // Find the enclosing extension, if there is one.
+        ExtensionDecl *ext = findEnclosingExtension(importedDecl);
+        if (ext && knownExtensions.insert(ext).second)
+          results.push_back(ext);
 
-      // If this is a compatibility typealias, the canonical type declaration
-      // may exist in another extension.
-      auto alias = dyn_cast<TypeAliasDecl>(importedDecl);
-      if (!alias || !alias->isCompatibilityAlias()) continue;
+        // If this is a compatibility typealias, the canonical type declaration
+        // may exist in another extension.
+        auto alias = dyn_cast<TypeAliasDecl>(importedDecl);
+        if (!alias || !alias->isCompatibilityAlias()) continue;
 
-      auto aliasedTy = alias->getUnderlyingType();
-      ext = nullptr;
-      importedDecl = nullptr;
+        auto aliasedTy = alias->getUnderlyingType();
+        ext = nullptr;
+        importedDecl = nullptr;
 
-      // Note: We can't use getAnyGeneric() here because `aliasedTy`
-      // might be typealias.
-      if (auto Ty = dyn_cast<TypeAliasType>(aliasedTy.getPointer()))
-        importedDecl = Ty->getDecl();
-      else if (auto Ty = dyn_cast<AnyGenericType>(aliasedTy.getPointer()))
-        importedDecl = Ty->getDecl();
-      if (!importedDecl) continue;
+        // Note: We can't use getAnyGeneric() here because `aliasedTy`
+        // might be typealias.
+        if (auto Ty = dyn_cast<TypeAliasType>(aliasedTy.getPointer()))
+          importedDecl = Ty->getDecl();
+        else if (auto Ty = dyn_cast<AnyGenericType>(aliasedTy.getPointer()))
+          importedDecl = Ty->getDecl();
+        if (!importedDecl) continue;
 
-      ext = findEnclosingExtension(importedDecl);
-      if (ext && knownExtensions.insert(ext).second)
-        results.push_back(ext);
+        ext = findEnclosingExtension(importedDecl);
+        if (ext && knownExtensions.insert(ext).second)
+          results.push_back(ext);
+      }
     }
   }
 }
@@ -3007,10 +3012,12 @@ void ClangImporter::loadExtensions(NominalTypeDecl *nominal,
   // where needed.
   auto &clangCtx = Impl.getClangASTContext();
   (void)Impl.forEachLookupTable([&](SwiftLookupTable &table) -> bool {
-      // FIXME: If we already looked at this for this generation,
-      // skip.
+    // FIXME: If we already looked at this for this generation,
+    // skip.
 
-      for (auto entry : table.lookupGlobalsAsMembers(effectiveClangContext)) {
+    for (auto key : table.allGlobalsAsMembersBaseNames()) {
+      for (auto entry : table.lookupGlobalsAsMembers(key,
+                                                     effectiveClangContext)) {
         // If the entry is not visible, skip it.
         if (!isVisibleClangEntry(clangCtx, entry)) continue;
 
@@ -3022,9 +3029,9 @@ void ClangImporter::loadExtensions(NominalTypeDecl *nominal,
           llvm_unreachable("Macros cannot be imported as members.");
         }
       }
-
-      return false;
-    });
+    }
+    return false;
+  });
 }
 
 void ClangImporter::loadObjCMethods(
@@ -3763,17 +3770,6 @@ ClangImporter::Implementation::loadNamedMembers(
       return None;
   }
 
-  // Also bail out if there are any global-as-member mappings for this context;
-  // we can support some of them lazily but the full set of idioms seems
-  // prohibitively complex (also they're not stored in by-name lookup, for
-  // reasons unclear).
-  if (isa<ExtensionDecl>(D) && !checkedGlobalsAsMembers.insert(IDC).second) {
-    if (forEachLookupTable([&](SwiftLookupTable &table) -> bool {
-        return (!table.lookupGlobalsAsMembers(effectiveClangContext).empty());
-      }))
-      return None;
-  }
-
   // There are 3 cases:
   //
   //  - The decl is from a bridging header, CMO is Some(nullptr)
@@ -3804,6 +3800,27 @@ ClangImporter::Implementation::loadNamedMembers(
   TinyPtrVector<ValueDecl *> Members;
   for (auto entry : table->lookup(SerializedSwiftName(N),
                                   effectiveClangContext)) {
+    if (!entry.is<clang::NamedDecl *>()) continue;
+    auto member = entry.get<clang::NamedDecl *>();
+    if (!isVisibleClangEntry(clangCtx, member)) continue;
+
+    // Skip Decls from different clang::DeclContexts
+    if (member->getDeclContext() != CDC) continue;
+
+    SmallVector<Decl*, 4> tmp;
+    insertMembersAndAlternates(member, tmp);
+    for (auto *TD : tmp) {
+      if (auto *V = dyn_cast<ValueDecl>(TD)) {
+        // Skip ValueDecls if they import under different names.
+        if (V->getBaseName() == N) {
+          Members.push_back(V);
+        }
+      }
+    }
+  }
+
+  for (auto entry : table->lookupGlobalsAsMembers(SerializedSwiftName(N),
+                                                  effectiveClangContext)) {
     if (!entry.is<clang::NamedDecl *>()) continue;
     auto member = entry.get<clang::NamedDecl *>();
     if (!isVisibleClangEntry(clangCtx, member)) continue;
