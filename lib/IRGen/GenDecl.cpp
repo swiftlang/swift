@@ -2808,18 +2808,9 @@ IRGenModule::getAddrOfLLVMVariable(LinkEntity entity,
   ForDefinition_t forDefinition = (ForDefinition_t) (definitionType != nullptr);
   LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
 
-  // Clang may have defined the variable already, or we're referencing an entity
-  // which is known by IRGen, such as ().
-  if (auto existing = Module.getNamedGlobal(link.getName())) {
-    // If we're looking for ()'s type metadata, just return IRGen's already
-    // created global variable. We want the link entity to mangle for the
-    // address point, but ()'s metadata is the full metadata type, so the
-    // element bit cast is wrong for both address types.
-    if (entity.isTypeMetadata(Context.TheEmptyTupleType))
-      return existing;
-
+  // Clang may have defined the variable already.
+  if (auto existing = Module.getNamedGlobal(link.getName()))
     return getElementBitCast(existing, defaultType);
-  }
 
   // If we're not defining the object now, forward declare it with the default
   // type.
@@ -2901,7 +2892,7 @@ IRGenModule::getAddrOfLLVMVariableOrGOTEquivalent(LinkEntity entity) {
   }
   
   // Ensure the variable is at least forward-declared.
-  auto var = getAddrOfLLVMVariable(entity, ConstantInit(), DebugTypeInfo());
+  getAddrOfLLVMVariable(entity, ConstantInit(), DebugTypeInfo());
 
   auto entry = GlobalVars[entity];
   
@@ -3022,6 +3013,18 @@ getObjCClassByNameReference(IRGenModule &IGM, ClassDecl *cls) {
                                  /*willBeRelativelyAddressed=*/true);
 
   return TypeEntityReference(kind, ref);
+}
+
+TypeEntityReference IRGenModule::getTypeEntityReference(CanType type) {
+  if (auto nominal = type->getAnyNominal())
+    return getTypeEntityReference(nominal);
+
+  if (auto tuple = type->getAs<TupleType>()) {
+    auto kind = llvm::ConstantInt::get(Int32Ty, unsigned(MetadataKind::Tuple));
+    return {TypeReferenceKind::MetadataKind, kind};
+  }
+
+  llvm_unreachable("bad type entity reference type");
 }
 
 TypeEntityReference
@@ -4053,6 +4056,15 @@ llvm::GlobalValue *IRGenModule::defineBaseConformanceDescriptor(
 llvm::Constant *IRGenModule::getAddrOfProtocolConformanceDescriptor(
                                 const RootProtocolConformance *conformance,
                                 ConstantInit definition) {
+  // If we're compiling the stdlib, we might (we are) already be asking for a
+  // builtin conformance descriptor somewhere. Make sure we initialize them
+  // first.
+  if (isa<BuiltinProtocolConformance>(conformance) &&
+      getSwiftModule()->isStdlibModule() &&
+      !definition) {
+    emitBuiltinProtocolConformances();
+  }
+
   IRGen.addLazyWitnessTable(conformance);
 
   auto entity = LinkEntity::forProtocolConformanceDescriptor(conformance);

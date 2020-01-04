@@ -368,6 +368,11 @@ AbstractionPattern::getTupleElementType(unsigned index) const {
   case Kind::Type:
     if (isTypeParameter())
       return AbstractionPattern::getOpaque();
+
+    if (isa<OpaqueTypeArchetypeType>(getType())) {
+      return AbstractionPattern::getOpaque();
+    }
+
     return AbstractionPattern(getGenericSignature(),
                               getCanTupleElementType(getType(), index));
   }

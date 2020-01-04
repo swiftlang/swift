@@ -155,7 +155,21 @@ std::string IRGenMangler::mangleProtocolConformanceDescriptor(
     appendOperator("MS");
   } else {
     auto builtin = cast<BuiltinProtocolConformance>(conformance);
-    appendProtocolConformance(builtin);
+
+    // Builtin conformances are a little different. Currently we only have
+    // conformances for tuples, but we emit a single descriptor for them so
+    // mangle something like a variadic tuple.
+    if (auto tuple = builtin->getType()->getAs<TupleType>()) {
+      // This is equivalent to (A...). We don't currently have variadic generic
+      // mangling.
+      appendOperator("xd_t");
+    } else {
+      llvm_unreachable("mangling unknown builtin type");
+    }
+
+    appendProtocolName(builtin->getProtocol());
+    // Builtin conformances always come from the stdlib module.
+    appendOperator("s");
     appendOperator("Mb");
   }
   return finalize();

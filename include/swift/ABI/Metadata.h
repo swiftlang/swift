@@ -2215,7 +2215,7 @@ public:
     // in the future) are just never used in these lists.
     case TypeReferenceKind::DirectObjCClassName:
     case TypeReferenceKind::IndirectObjCClass:
-    case TypeReferenceKind::DirectTypeMetadata:
+    case TypeReferenceKind::MetadataKind:
       return nullptr;
     }
     
@@ -2306,9 +2306,8 @@ struct TargetTypeReference {
     RelativeDirectPointer<const char>
       DirectObjCClassName;
 
-    /// A direct reference to some non-nominal Metadata record.
-    RelativeDirectPointer<TargetMetadata<Runtime>>
-      DirectTypeMetadata;
+    /// A direct reference to some non-nominal Metadata access function.
+    MetadataKind MetadataKind;
   };
 
   const TargetContextDescriptor<Runtime> *
@@ -2322,16 +2321,16 @@ struct TargetTypeReference {
 
     case TypeReferenceKind::DirectObjCClassName:
     case TypeReferenceKind::IndirectObjCClass:
-    case TypeReferenceKind::DirectTypeMetadata:
+    case TypeReferenceKind::MetadataKind:
       return nullptr;
     }
 
     return nullptr;
   }
 
-  const TargetMetadata<Runtime> *getTypeMetadata(TypeReferenceKind kind) const {
-    assert(kind == TypeReferenceKind::DirectTypeMetadata);
-    return DirectTypeMetadata;
+  enum MetadataKind getMetadataKind(TypeReferenceKind kind) const {
+    assert(kind == TypeReferenceKind::MetadataKind);
+    return MetadataKind;
   }
 
 #if SWIFT_OBJC_INTEROP
@@ -2423,6 +2422,10 @@ public:
     return Flags.getTypeReferenceKind();
   }
 
+  enum MetadataKind getMetadataKind() const {
+    return TypeRef.getMetadataKind(getTypeKind());
+  }
+
   const char *getDirectObjCClassName() const {
     return TypeRef.getDirectObjCClassName(getTypeKind());
   }
@@ -2441,16 +2444,17 @@ public:
     return TypeRef.IndirectTypeDescriptor.get();
   }
 
-  const TargetMetadata<Runtime> *getTypeMetadata() const {
-    return TypeRef.getTypeMetadata(getTypeKind());
-  }
-
   /// Retrieve the context of a retroactive conformance.
   const TargetContextDescriptor<Runtime> *getRetroactiveContext() const {
     if (!Flags.isRetroactive()) return nullptr;
 
     return this->template getTrailingObjects<
         TargetRelativeContextPointer<Runtime>>();
+  }
+
+  /// Whether this conformance is builtin by the compiler + runtime.
+  bool isBuiltin() const {
+    return getTypeKind() == TypeReferenceKind::MetadataKind;
   }
 
   /// Whether this conformance is non-unique because it has been synthesized

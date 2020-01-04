@@ -229,7 +229,13 @@ std::string ASTMangler::mangleWitnessThunk(
   }
 
   if (Conformance) {
-    appendOperator(isa<SelfProtocolConformance>(Conformance) ? "TS" : "TW");
+    if (isa<SelfProtocolConformance>(Conformance)) {
+      appendOperator("TS");
+    } else if (isa<BuiltinProtocolConformance>(Conformance)) {
+      appendOperator("TB");
+    } else {
+      appendOperator("TW");
+    }
   }
   return finalize();
 }

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2019 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -17,6 +17,7 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Lazy.h"
 #include "swift/Demangling/Demangle.h"
+#include "swift/Runtime/BuiltinProtocolConformances.h"
 #include "swift/Runtime/Casting.h"
 #include "swift/Runtime/Concurrent.h"
 #include "swift/Runtime/HeapObject.h"
@@ -29,6 +30,9 @@
 #include <vector>
 
 using namespace swift;
+
+extern const ProtocolDescriptor
+PROTOCOL_DESCRIPTOR_SYM(SWIFT_EQUATABLE_MANGLING);
 
 #ifndef NDEBUG
 template <>
@@ -86,8 +90,8 @@ template<> void ProtocolConformanceDescriptor::dump() const {
   case TypeReferenceKind::IndirectTypeDescriptor:
     printf("unique nominal type descriptor %s", symbolName(getTypeDescriptor()));
     break;
-  case TypeReferenceKind::DirectTypeMetadata:
-    printf("direct non-nominal type metadata %s", symbolName(getTypeMetadata()));
+  case TypeReferenceKind::MetadataKind:
+    printf("metadata kind %i", getMetadataKind());
     break;
   }
   
@@ -121,7 +125,7 @@ const ClassMetadata *TypeReference::getObjCClass(TypeReferenceKind kind) const {
 
   case TypeReferenceKind::DirectTypeDescriptor:
   case TypeReferenceKind::IndirectTypeDescriptor:
-  case TypeReferenceKind::DirectTypeMetadata:
+  case TypeReferenceKind::MetadataKind:
     return nullptr;
   }
 
@@ -162,8 +166,8 @@ ProtocolConformanceDescriptor::getCanonicalTypeMetadata() const {
 
     return nullptr;
   }
-  case TypeReferenceKind::DirectTypeMetadata: {
-    return getTypeMetadata();
+  case TypeReferenceKind::MetadataKind: {
+    return nullptr;
   }
   }
 
@@ -486,12 +490,32 @@ recur:
     return ConformanceCacheResult::cacheMiss();
 }
 
+static bool tupleConformsToProtocol(const Metadata *type,
+                                    const ProtocolDescriptor *protocol) {
+  auto tuple = cast<TupleTypeMetadata>(type);
+
+  // At the moment, tuples can only conform to Equatable, so reject all other
+  // protocols.
+  auto equatable = &PROTOCOL_DESCRIPTOR_SYM(SWIFT_EQUATABLE_MANGLING);
+  if (protocol != equatable)
+    return false;
+
+  for (size_t i = 0; i != tuple->NumElements; i += 1) {
+    auto elt = tuple->getElement(i);
+    if (!swift_conformsToProtocol(elt.Type, protocol))
+      return false;
+  }
+
+  return true;
+}
+
 namespace {
   /// Describes a protocol conformance "candidate" that can be checked
   /// against a type metadata.
   class ConformanceCandidate {
     const void *candidate;
     bool candidateIsMetadata;
+    Optional<MetadataKind> candidateKind;
 
   public:
     ConformanceCandidate() : candidate(0), candidateIsMetadata(false) { }
@@ -502,6 +526,7 @@ namespace {
       if (auto description = conformance.getTypeDescriptor()) {
         candidate = description;
         candidateIsMetadata = false;
+        candidateKind = None;
         return;
       }
 
@@ -509,6 +534,12 @@ namespace {
         candidate = metadata;
         candidateIsMetadata = true;
         return;
+      }
+
+      if (conformance.isBuiltin()) {
+        candidate = nullptr;
+        candidateIsMetadata = false;
+        candidateKind = conformance.getMetadataKind();
       }
     }
 
@@ -555,6 +586,12 @@ namespace {
         auto candidateDescription =
           static_cast<const ContextDescriptor *>(candidate);
         if (description && equalContexts(description, candidateDescription))
+          return true;
+      }
+
+      // Check if we have a structural type match.
+      if (auto kind = candidateKind) {
+        if (kind == conformingType->getKind())
           return true;
       }
 
@@ -627,6 +664,22 @@ swift_conformsToSwiftProtocolImpl(const Metadata * const type,
         const Metadata *matchingType = candidate.getConformingTypeAsMetadata();
         if (!matchingType)
           matchingType = type;
+
+        // If the matching type is a structural type, ensure that it actually
+        // conforms to said protocol.
+        if (descriptor.isBuiltin()) {
+          switch (matchingType->getKind()) {
+            case MetadataKind::Tuple: {
+              auto conforms = tupleConformsToProtocol(matchingType, protocol);
+              if (!conforms)
+                continue;
+              break;
+            }
+            default:
+              swift_runtime_unreachable(
+                "matching unknown builtin conforming type");
+          }
+        }
 
         C.cacheSuccess(matchingType, protocol, &descriptor);
       }

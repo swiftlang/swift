@@ -1,4 +1,4 @@
-//===--- KnownProtocolWitnessTable.h ----------------------------*- C++ -*-===//
+//===--- BuiltinProtocolWitnessTable.h --------------------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// Swift runtime support for known protocol witness tables and related items.
+// Swift runtime support for builtin protocol witnesses and related items.
 //
 //===----------------------------------------------------------------------===//
 
@@ -23,6 +23,9 @@ namespace swift {
 
 // == infix(T, T) -> Swift.Bool
 #define SWIFT_EQUAL_OPERATOR_MANGLING 2eeoiySbx_xtFZ
+
+// (A...)
+#define VARIADIC_TUPLE_MANGLING xd_t
 
 #define PROTOCOL_DESCRIPTOR_MANGLING Mp
 #define BUILTIN_PROTOCOL_WITNESS_TABLE_MANGLING WB
@@ -55,24 +58,13 @@ namespace swift {
           MANGLE_SYM(MANGLING_CONCAT2(_PROTOCOL_CONFORMANCE_SYM(Ty, Proto, s), \
                               BUILTIN_PROTOCOL_CONFORMANCE_DESCRIPTOR_MANGLING))
 
-struct _WitnessTable {
-  const ProtocolConformanceDescriptor *Conformance;
-  const void *Witness;
-};
-
-/// The protocol witness table for (): Swift.Equatable in Swift.
-SWIFT_RUNTIME_EXPORT
-const _WitnessTable BUILTIN_PROTOCOL_WITNESS_TABLE_SYM(EMPTY_TUPLE_MANGLING,
-                                                       SWIFT_EQUATABLE_MANGLING);
-
 /// The protocol witness for static Swift.Equatable.== infix(A, A) -> Swift.Bool
-/// in conformance (): Swift.Equatable in Swift.
-///
-/// Note: Empty tuples are not lowered as parameters, so it's fine to exclude.
+/// in conformance (A...): Swift.Equatable in Swift.
 SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
-bool BUILTIN_PROTOCOL_WITNESS_SYM(EMPTY_TUPLE_MANGLING,
+bool BUILTIN_PROTOCOL_WITNESS_SYM(VARIADIC_TUPLE_MANGLING,
                                   SWIFT_EQUATABLE_MANGLING,
                                   SWIFT_EQUAL_OPERATOR_MANGLING)
-(Metadata *swiftSelf, Metadata *existentialSelf, void *witnessTable);
+(OpaqueValue *tuple1, OpaqueValue *tuple2, SWIFT_CONTEXT Metadata *swiftSelf,
+ Metadata *Self, void *witnessTable);
 
 } // end namespace swift
