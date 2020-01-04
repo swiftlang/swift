@@ -500,6 +500,9 @@ public:
   template <NodeKind kind>
   static DependencyKey createDependedUponKey(StringRef);
 
+  static DependencyKey
+  createTransitiveKeyForWholeSourceFile(StringRef swiftDeps);
+
   std::string humanReadableName() const;
 
   void dump(llvm::raw_ostream &os) const { os << asString() << "\n"; }

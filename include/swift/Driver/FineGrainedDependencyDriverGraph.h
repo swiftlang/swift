@@ -120,14 +120,6 @@ public:
 
 };
 
-/// A placeholder allowing the experimental system to fit into the driver
-/// without changing as much code.
-class CoarseGrainedDependencyGraphImpl {
-public:
-  /// Use the status quo LoadResult for now.
-  using LoadResult =
-      typename swift::CoarseGrainedDependencyGraphImpl::LoadResult;
-};
 
 //==============================================================================
 // MARK: ModuleDepGraph
@@ -300,19 +292,18 @@ public:
 
   ModuleDepGraph() : ModuleDepGraph(false, false, false, nullptr) {}
 
+  using Changes = Optional<std::unordered_set<DependencyKey>>;
+
   /// Unlike the standard \c CoarseGrainedDependencyGraph, returns \c
   /// CoarseGrainedDependencyGraphImpl::LoadResult::AffectsDownstream when
   /// loading a new file, i.e. when determining the initial set. Caller
   /// compensates.
-  CoarseGrainedDependencyGraphImpl::LoadResult
-  loadFromPath(const driver::Job *, StringRef, DiagnosticEngine &);
+  Changes loadFromPath(const driver::Job *, StringRef, DiagnosticEngine &);
 
-  CoarseGrainedDependencyGraphImpl::LoadResult
-  loadFromString(const driver::Job *cmd, StringRef data);
+  Changes loadFromString(const driver::Job *cmd, StringRef data);
 
-  CoarseGrainedDependencyGraphImpl::LoadResult
-  loadFromSourceFileDepGraph(const driver::Job *cmd,
-                             const SourceFileDepGraph &);
+  Changes loadFromSourceFileDepGraph(const driver::Job *cmd,
+                                     const SourceFileDepGraph &);
 
   /// For the dot file.
   std::string getGraphID() const { return "driver"; }
@@ -329,6 +320,10 @@ public:
   void
   forEachMatchingNode(const DependencyKey &key,
                       function_ref<void(const ModuleDepGraphNode *)>) const;
+
+  void forEachDefNodeInJobMatchingKeys(
+      const StringRef swiftDeps, ArrayRef<DependencyKey> keys,
+      function_ref<void(const ModuleDepGraphNode *)>);
 
 public:
   // This section contains the interface to the status quo code in the driver.
@@ -350,6 +345,16 @@ public:
   std::vector<const driver::Job*> markTransitive(
       const driver::Job *jobToBeRecompiled, const void *ignored = nullptr);
 
+  /// Given a set of changed keys. return jobs marked that were previously
+  /// unmarked that are dependent upon the keys changes in the jobBeRecompiled.
+  std::vector<const driver::Job *> getJobsToRecompileAfterWhenKeysInAJobChange(
+      ArrayRef<DependencyKey>, const driver::Job *jobToBeRecompiled);
+
+private:
+  std::vector<const driver::Job *> jobsThatNowNeedRunningBecauseTheyUse(
+      const ArrayRef<const ModuleDepGraphNode *> uses);
+
+public:
   /// "Mark" this node only.
   bool markIntransitive(const driver::Job *);
 
@@ -417,13 +422,11 @@ private:
   /// and integrate it into the ModuleDepGraph.
   /// Used both the first time, and to reload the SourceFileDepGraph.
   /// If any changes were observed, indicate same in the return vale.
-  CoarseGrainedDependencyGraphImpl::LoadResult
-  loadFromBuffer(const driver::Job *, llvm::MemoryBuffer &);
+  Changes loadFromBuffer(const driver::Job *, llvm::MemoryBuffer &);
 
   /// Integrate a SourceFileDepGraph into the receiver.
   /// Integration happens when the driver needs to read SourceFileDepGraph.
-  CoarseGrainedDependencyGraphImpl::LoadResult
-  integrate(const SourceFileDepGraph &);
+  Changes integrate(const SourceFileDepGraph &);
 
   enum class LocationOfPreexistingNode { nowhere, here, elsewhere };
 
@@ -470,6 +473,12 @@ private:
   /// ModuleDepGraphNode needs to be removed.
   void removeNode(ModuleDepGraphNode *);
 
+  /// Find all defs having keys in \p keys occurring in the job creating \p
+  /// swiftDeps and return all (transitive) uses.
+  std::unordered_set<const ModuleDepGraphNode *>
+  findNodesTransitivelyDependingUponKeysOccurringInJob(
+      const ArrayRef<DependencyKey> keys, const StringRef swiftDeps);
+
   /// Given a definition node, and a list of already found dependents,
   /// recursively add transitive closure of dependents of the definition
   /// into the already found dependents.
@@ -480,7 +489,7 @@ private:
   /// Givien a set of nodes, return the set of swiftDeps for the jobs those
   /// nodes are in.
   llvm::StringSet<> computeSwiftDepsFromInterfaceNodes(
-      const std::unordered_set<const ModuleDepGraphNode *> &nodes);
+      ArrayRef<const ModuleDepGraphNode *> nodes);
 
   /// Record a visit to this node for later dependency printing
   size_t traceArrival(const ModuleDepGraphNode *visitedNode);
