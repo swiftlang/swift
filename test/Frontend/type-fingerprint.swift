@@ -14,10 +14,14 @@
 // RUN: cp %S/Inputs/type-fingerprint/b0.swift %t/b.swift
 // RUN: cd %t && %swiftc_driver  -disable-type-fingerprints -enable-batch-mode -j2 -incremental -driver-show-incremental ./main.swift ./a.swift ./b.swift -module-name main -output-file-map ofm.json >&output1
 
+// RUN: cp %t/b.swiftdeps %t/b1.swiftdeps
+
 // Change one type, but uses of all types get recompiled
 
 // RUN: cp %S/Inputs/type-fingerprint/b1.swift %t/b.swift
 // RUN: cd %t && %swiftc_driver  -disable-type-fingerprints -enable-batch-mode -j2 -incremental -driver-show-incremental ./main.swift ./a.swift ./b.swift -module-name main -output-file-map ofm.json >&output2
+
+// RUN: cp %t/b.swiftdeps %t/b2.swiftdeps
 
 // RUN: %FileCheck -match-full-lines -check-prefix=CHECK-MAINAB-RECOMPILED %s < %t/output2
 
