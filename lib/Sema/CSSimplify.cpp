@@ -2823,6 +2823,16 @@ bool ConstraintSystem::repairFailures(
         conversionsOrFixes.push_back(coerceToCheckCastFix);
         return true;
       }
+      
+      // If it has a deep equality restriction defer the diagnostic to a
+      // GenericMismatch fix.
+      if (hasConversionOrRestriction(ConversionRestrictionKind::DeepEquality)) {
+        return false;
+      }
+      
+      auto *fix = ContextualMismatch::create(*this, lhs, rhs,
+                                             getConstraintLocator(locator));
+      conversionsOrFixes.push_back(fix);
     }
 
     // This could be:
