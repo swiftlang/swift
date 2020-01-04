@@ -1009,15 +1009,14 @@ public:
 
   /// Coerce a pattern to the given type.
   ///
-  /// \param P The pattern, which may be modified by this coercion.
-  /// \param resolution The type resolution.
+  /// \param pattern The contextual pattern.
   /// \param type the type to coerce the pattern to.
-  /// \param options Options describing how to perform this coercion.
+  /// \param options Options that control the coercion.
   ///
-  /// \returns true if an error occurred, false otherwise.
-  static bool coercePatternToType(Pattern *&P, TypeResolution resolution, Type type,
-                                  TypeResolutionOptions options,
-                                  TypeLoc tyLoc = TypeLoc());
+  /// \returns the coerced pattern, or nullptr if the coercion failed.
+  static Pattern *coercePatternToType(ContextualPattern pattern, Type type,
+                                      TypeResolutionOptions options,
+                                      TypeLoc tyLoc = TypeLoc());
   static bool typeCheckExprPattern(ExprPattern *EP, DeclContext *DC,
                                    Type type);
 

@@ -711,6 +711,17 @@ Type TypeChecker::typeCheckPattern(ContextualPattern pattern) {
       ctx.evaluator, PatternTypeRequest{pattern}, ErrorType::get(ctx));
 }
 
+/// Apply the contextual pattern's context to the type resolution options.
+static TypeResolutionOptions applyContextualPatternOptions(
+    TypeResolutionOptions options, ContextualPattern pattern) {
+  if (pattern.allowsInference()) {
+    options |= TypeResolutionFlags::AllowUnspecifiedTypes;
+    options |= TypeResolutionFlags::AllowUnboundGenerics;
+  }
+
+  return options;
+}
+
 llvm::Expected<Type> PatternTypeRequest::evaluate(
     Evaluator &evaluator, ContextualPattern pattern) const {
   Pattern *P = pattern.getPattern();
@@ -719,12 +730,10 @@ llvm::Expected<Type> PatternTypeRequest::evaluate(
   TypeResolutionOptions options(pattern.getPatternBindingDecl()
                                   ? TypeResolverContext::PatternBindingDecl
                                   : TypeResolverContext::InExpression);
-  if (pattern.allowsInference()) {
-    options |= TypeResolutionFlags::AllowUnspecifiedTypes;
-    options |= TypeResolutionFlags::AllowUnboundGenerics;
-  }
-  if (!pattern.isTopLevel())
+  options = applyContextualPatternOptions(options, pattern);
+  if (!pattern.isTopLevel()) {
     options = options.withoutContext();
+  }
 
   auto &Context = dc->getASTContext();
   switch (P->getKind()) {
@@ -858,18 +867,20 @@ void implicitlyUntuplePatternIfApplicable(DiagnosticEngine &DE,
 }
 
 /// Perform top-down type coercion on the given pattern.
-bool TypeChecker::coercePatternToType(Pattern *&P, TypeResolution resolution,
-                                      Type type,
-                                      TypeResolutionOptions options,
-                                      TypeLoc tyLoc) {
-recur:
+Pattern *TypeChecker::coercePatternToType(ContextualPattern pattern,
+                                          Type type,
+                                          TypeResolutionOptions options,
+                                          TypeLoc tyLoc) {
   if (tyLoc.isNull()) {
     tyLoc = TypeLoc::withoutLoc(type);
   }
 
-  auto dc = resolution.getDeclContext();
+  auto P = pattern.getPattern();
+  auto dc = pattern.getDeclContext();
   auto &Context = dc->getASTContext();
   auto &diags = Context.Diags;
+
+  options = applyContextualPatternOptions(options, pattern);
   auto subOptions = options;
   subOptions.setContext(None);
   switch (P->getKind()) {
@@ -887,42 +898,50 @@ recur:
         if (tupleType->getNumElements() == 1 &&
             !tupleType->getElement(0).isVararg()) {
           auto elementTy = tupleType->getElementType(0);
-          if (coercePatternToType(sub, resolution, elementTy, subOptions))
-            return true;
+          sub = coercePatternToType(
+              pattern.forSubPattern(sub, /*retainTopLevel=*/true), elementTy,
+              subOptions);
+          if (!sub)
+            return nullptr;
           TuplePatternElt elt(sub);
           P = TuplePattern::create(Context, PP->getLParenLoc(), elt,
                                    PP->getRParenLoc());
           if (PP->isImplicit())
             P->setImplicit();
           P->setType(type);
-          return false;
+          return P;
         }
       }
     }
-  
-    if (coercePatternToType(sub, resolution, type, subOptions))
-      return true;
+
+    sub = coercePatternToType(
+        pattern.forSubPattern(sub, /*retainTopLevel=*/false), type, subOptions);
+    if (!sub)
+      return nullptr;
+
     PP->setSubPattern(sub);
     PP->setType(sub->getType());
-    return false;
+    return P;
   }
   case PatternKind::Var: {
     auto VP = cast<VarPattern>(P);
     
     Pattern *sub = VP->getSubPattern();
-    if (coercePatternToType(sub, resolution, type, subOptions))
-      return true;
+    sub = coercePatternToType(
+        pattern.forSubPattern(sub, /*retainTopLevel=*/false), type, subOptions);
+    if (!sub)
+      return nullptr;
     VP->setSubPattern(sub);
     if (sub->hasType())
       VP->setType(sub->getType());
-    return false;
+    return P;
   }
 
   // If we see an explicit type annotation, coerce the sub-pattern to
   // that type.
   case PatternKind::Typed: {
     TypedPattern *TP = cast<TypedPattern>(P);
-    Type patternType = validateTypedPattern(resolution, TP, options);
+    Type patternType = TypeChecker::typeCheckPattern(pattern);
     bool hadError = false;
     if (!patternType->hasError()) {
       if (!type->isEqual(patternType) && !type->hasError()) {
@@ -939,13 +958,15 @@ recur:
     }
 
     Pattern *sub = TP->getSubPattern();
-    hadError |= coercePatternToType(sub, resolution, type,
-                    subOptions | TypeResolutionFlags::FromNonInferredPattern);
-    if (!hadError) {
-      TP->setSubPattern(sub);
-      TP->setType(sub->getType());
-    }
-    return hadError;
+    sub = coercePatternToType(
+        pattern.forSubPattern(sub, /*retainTopLevel=*/false), type,
+        subOptions | TypeResolutionFlags::FromNonInferredPattern);
+    if (!sub)
+      return nullptr;
+
+    TP->setSubPattern(sub);
+    TP->setType(sub->getType());
+    return P;
   }
 
   // For wildcard and name patterns, set the type.
@@ -1012,11 +1033,11 @@ recur:
           .fixItInsertAfter(var->getNameLoc(), ": " + type->getWithoutParens()->getString());
     }
 
-    return false;
+    return P;
   }
   case PatternKind::Any:
     P->setType(type);
-    return false;
+    return P;
 
   // We can match a tuple pattern with a tuple type.
   // TODO: permit implicit conversions?
@@ -1027,12 +1048,15 @@ recur:
     // Sometimes a paren is just a paren. If the tuple pattern has a single
     // element, we can reduce it to a paren pattern.
     bool canDecayToParen = TP->getNumElements() == 1;
-    auto decayToParen = [&]() -> bool {
+    auto decayToParen = [&]() -> Pattern * {
       assert(canDecayToParen);
       Pattern *sub = TP->getElement(0).getPattern();
-      if (TypeChecker::coercePatternToType(sub, resolution, type, subOptions))
-        return true;
-      
+      sub = TypeChecker::coercePatternToType(
+          pattern.forSubPattern(sub, /*retainTopLevel=*/false), type,
+          subOptions);
+      if (!sub)
+        return nullptr;
+
       if (TP->getLParenLoc().isValid()) {
         P = new (Context) ParenPattern(TP->getLParenLoc(), sub,
                                        TP->getRParenLoc(),
@@ -1041,7 +1065,7 @@ recur:
       } else {
         P = sub;
       }
-      return false;
+      return P;
     };
 
     // The context type must be a tuple.
@@ -1069,7 +1093,6 @@ recur:
 
     for (unsigned i = 0, e = TP->getNumElements(); i != e; ++i) {
       TuplePatternElt &elt = TP->getElement(i);
-      Pattern *pattern = elt.getPattern();
 
       Type CoercionType;
       if (hadError)
@@ -1085,14 +1108,21 @@ recur:
                        elt.getLabel(), tupleTy->getElement(i).getName());
         hadError = true;
       }
-      
-      hadError |= coercePatternToType(pattern, resolution, CoercionType,
-                                      options);
+
+      auto sub = coercePatternToType(
+          pattern.forSubPattern(elt.getPattern(), /*retainTopLevel=*/false),
+          CoercionType, subOptions);
+      if (!sub)
+        return nullptr;
+
       if (!hadError)
-        elt.setPattern(pattern);
+        elt.setPattern(sub);
     }
 
-    return hadError;
+    if (hadError)
+      return nullptr;
+
+    return P;
   }
 
   // Coerce expressions by finding a '~=' operator that can compare the
@@ -1108,7 +1138,7 @@ recur:
               EP->getSubExpr()->getSemanticsProvidingExpr())) {
         P = new (Context) BoolPattern(BLE->getLoc(), BLE->getValue());
         P->setType(type);
-        return false;
+        return P;
       }
     }
 
@@ -1122,10 +1152,15 @@ recur:
                                              DeclNameLoc(NLE->getLoc()),
                                              NoneEnumElement->createNameRef(),
                                              NoneEnumElement, nullptr, false);
-        return TypeChecker::coercePatternToType(P, resolution, type, options);
+        return TypeChecker::coercePatternToType(
+            pattern.forSubPattern(P, /*retainTopLevel=*/true), type, options);
       }
     }
-    return TypeChecker::typeCheckExprPattern(cast<ExprPattern>(P), dc, type);
+
+    if (TypeChecker::typeCheckExprPattern(cast<ExprPattern>(P), dc, type))
+      return nullptr;
+
+    return P;
   }
       
   // Coerce an 'is' pattern by determining the cast kind.
@@ -1133,9 +1168,10 @@ recur:
     auto IP = cast<IsPattern>(P);
 
     // Type-check the type parameter.
-    TypeResolutionOptions paramOptions(TypeResolverContext::InExpression); 
+    TypeResolutionOptions paramOptions(TypeResolverContext::InExpression);
+    TypeResolution resolution = TypeResolution::forContextual(dc);
     if (validateType(Context, IP->getCastTypeLoc(), resolution, paramOptions))
-      return true;
+      return nullptr;
 
     auto castType = IP->getCastTypeLoc().getType();
 
@@ -1161,7 +1197,8 @@ recur:
       }
 
       P = sub;
-      return coercePatternToType(P, resolution, type, options);
+      return coercePatternToType(
+          pattern.forSubPattern(P, /*retainTopLevle=*/true), type, options);
     }
 
 
@@ -1176,7 +1213,7 @@ recur:
                                           IP->getCastTypeLoc().getSourceRange());
     switch (castKind) {
     case CheckedCastKind::Unresolved:
-      return true;
+      return nullptr;
     case CheckedCastKind::Coercion:
     case CheckedCastKind::BridgingCoercion:
       // If this is an 'as' pattern coercing between two different types, then
@@ -1198,7 +1235,7 @@ recur:
       diags.diagnose(IP->getLoc(),
                      diag::isa_collection_downcast_pattern_value_unimplemented,
                      IP->getCastTypeLoc().getType());
-      return false;
+      return P;
     }
 
     case CheckedCastKind::ValueCast:
@@ -1209,13 +1246,17 @@ recur:
     
     // Coerce the subpattern to the destination type.
     if (Pattern *sub = IP->getSubPattern()) {
-      if (coercePatternToType(sub, resolution, IP->getCastTypeLoc().getType(),
-                        subOptions|TypeResolutionFlags::FromNonInferredPattern))
-        return true;
+      sub = coercePatternToType(
+          pattern.forSubPattern(sub, /*retainTopLevel=*/false),
+          IP->getCastTypeLoc().getType(),
+          subOptions|TypeResolutionFlags::FromNonInferredPattern);
+      if (!sub)
+        return nullptr;
+
       IP->setSubPattern(sub);
     }
     
-    return false;
+    return P;
   }
       
   case PatternKind::EnumElement: {
@@ -1252,7 +1293,7 @@ recur:
                   /*message*/ StringRef())
                   .fixItReplace(EEP->getLoc(), Rename.str());
 
-              return true;
+              return nullptr;
             }
           
           // If we have the original expression parse tree, try reinterpreting
@@ -1261,7 +1302,9 @@ recur:
           } else if (EEP->hasUnresolvedOriginalExpr()) {
             P = new (Context) ExprPattern(EEP->getUnresolvedOriginalExpr(),
                                           nullptr, nullptr);
-            goto recur;
+            return coercePatternToType(
+                pattern.forSubPattern(P, /*retainTopLevel=*/true), type,
+                options);
           }
 
           // If we have an optional type, let's try to see if the case
@@ -1275,19 +1318,21 @@ recur:
                                         EEP->getName(), EEP->getLoc())) {
               P = new (Context)
                   OptionalSomePattern(EEP, EEP->getEndLoc(), /*implicit*/true);
-              return coercePatternToType(P, resolution, type, options);
+              return coercePatternToType(
+                  pattern.forSubPattern(P, /*retainTopLevel=*/true), type,
+                  options);
             } else {
               diags.diagnose(EEP->getLoc(),
                              diag::enum_element_pattern_member_not_found,
                              EEP->getName(), type);
-              return true;
+              return nullptr;
             }
           }
         }
       }
 
       if (!elt)
-        return true;
+        return nullptr;
 
       enumTy = type;
     } else {
@@ -1309,7 +1354,7 @@ recur:
         } else {
           diags.diagnose(EEP->getLoc(), diag::ambiguous_enum_pattern_type,
                          parentTy, type);
-          return true;
+          return nullptr;
         }
       }
       // Otherwise, see if we can introduce a cast pattern to get from an
@@ -1323,7 +1368,7 @@ recur:
                                nullptr, SourceRange());
         // If the cast failed, we can't resolve the pattern.
         if (foundCastKind < CheckedCastKind::First_Resolved)
-          return true;
+          return nullptr;
         
         // Otherwise, we can type-check as the enum type, and insert a cast
         // from the outer pattern type.
@@ -1333,7 +1378,7 @@ recur:
         diags.diagnose(EEP->getLoc(),
                        diag::enum_element_pattern_not_member_of_enum,
                        EEP->getName(), type);
-        return true;
+        return nullptr;
       }
     }
 
@@ -1348,7 +1393,7 @@ recur:
         diags.diagnose(EEP->getLoc(),
                        diag::enum_element_pattern_assoc_values_remove)
           .fixItRemove(sub->getSourceRange());
-        return true;
+        return nullptr;
       }
       
       Type elementType;
@@ -1363,8 +1408,12 @@ recur:
 
       ::implicitlyUntuplePatternIfApplicable(Context.Diags, sub, elementType);
 
-      if (coercePatternToType(sub, resolution, elementType, newSubOptions))
-        return true;
+      sub = coercePatternToType(
+          pattern.forSubPattern(sub, /*retainTopLevel=*/false), elementType,
+          newSubOptions);
+      if (!sub)
+        return nullptr;
+
       EEP->setSubPattern(sub);
     } else if (argType) {
       // Else if the element pattern has no sub-pattern but the element type has
@@ -1394,8 +1443,11 @@ recur:
       auto newSubOptions = subOptions;
       newSubOptions.setContext(TypeResolverContext::EnumPatternPayload);
       newSubOptions |= TypeResolutionFlags::FromNonInferredPattern;
-      if (coercePatternToType(sub, resolution, elementType, newSubOptions))
-        return true;
+      sub = coercePatternToType(
+          pattern.forSubPattern(sub, /*retainTopLevel=*/false), elementType,
+          newSubOptions);
+      if (!sub)
+        return nullptr;
       EEP->setSubPattern(sub);
     }
 
@@ -1417,7 +1469,7 @@ recur:
       P = isPattern;
     }
     
-    return false;
+    return P;
   }
 
   case PatternKind::OptionalSome: {
@@ -1434,12 +1486,12 @@ recur:
       }
 
       diags.diagnose(loc, diagID, type);
-      return true;
+      return nullptr;
     }
 
     EnumElementDecl *elementDecl = Context.getOptionalSomeDecl();
     if (!elementDecl)
-      return true;
+      return nullptr;
 
     OP->setElementDecl(elementDecl);
 
@@ -1447,20 +1499,23 @@ recur:
     auto newSubOptions = subOptions;
     newSubOptions.setContext(TypeResolverContext::EnumPatternPayload);
     newSubOptions |= TypeResolutionFlags::FromNonInferredPattern;
-    if (coercePatternToType(sub, resolution, elementType, newSubOptions))
-      return true;
+    sub = coercePatternToType(
+        pattern.forSubPattern(sub, /*retainTopLevel=*/false), elementType,
+        newSubOptions);
+    if (!sub)
+      return nullptr;
+
     OP->setSubPattern(sub);
     OP->setType(type);
-    return false;
+    return P;
   }
 
   case PatternKind::Bool:
     P->setType(type);
-    return false;
+    return P;
   }
   llvm_unreachable("bad pattern kind!");
 }
-
 
 /// Coerce the specified parameter list of a ClosureExpr to the specified
 /// contextual type.

@@ -2801,8 +2801,6 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
         ? TypeResolverContext::EditorPlaceholderExpr
         : TypeResolverContext::InExpression;
     options |= TypeResolutionFlags::OverrideType;
-    options |= TypeResolutionFlags::AllowUnspecifiedTypes;
-    options |= TypeResolutionFlags::AllowUnboundGenerics;
 
     // FIXME: initTy should be the same as resultTy; now that typeCheckExpression()
     // returns a Type and not bool, we should be able to simplify the listener
@@ -2812,8 +2810,12 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
       return true;
 
     // Apply the solution to the pattern as well.
-    if (coercePatternToType(pattern, TypeResolution::forContextual(DC), initTy,
-                            options, TypeLoc())) {
+    auto contextualPattern =
+        ContextualPattern::forRawPattern(pattern, DC);
+    if (auto coercedPattern = TypeChecker::coercePatternToType(
+            contextualPattern, initTy, options)) {
+      pattern = coercedPattern;
+    } else {
       return true;
     }
   }
@@ -3063,13 +3065,11 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
       Pattern *pattern = Stmt->getPattern();
       TypeResolutionOptions options(TypeResolverContext::ForEachStmt);
       options |= TypeResolutionFlags::OverrideType;
-      options |= TypeResolutionFlags::AllowUnboundGenerics;
-      options |= TypeResolutionFlags::AllowUnspecifiedTypes;
-      if (TypeChecker::coercePatternToType(pattern,
-                                           TypeResolution::forContextual(DC),
-                                           InitType, options)) {
+      auto contextualPattern = ContextualPattern::forRawPattern(pattern, DC);
+      pattern = TypeChecker::coercePatternToType(contextualPattern,
+                                                 InitType, options);
+      if (!pattern)
         return nullptr;
-      }
       Stmt->setPattern(pattern);
 
       // Get the conformance of the sequence type to the Sequence protocol.
@@ -3189,6 +3189,7 @@ bool TypeChecker::typeCheckStmtCondition(StmtCondition &cond, DeclContext *dc,
       hadAnyFalsable = true;
       continue;
     }
+    assert(elt.getKind() != StmtConditionElement::CK_Boolean);
 
     // This is cleanup goop run on the various paths where type checking of the
     // pattern binding fails.

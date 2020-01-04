@@ -256,9 +256,11 @@ PatternBindingEntryRequest::evaluate(Evaluator &eval,
     }
   } else {
     // Coerce the pattern to the computed type.
-    auto resolution = TypeResolution::forContextual(binding->getDeclContext());
-    if (TypeChecker::coercePatternToType(pattern, resolution,
-                                         patternType, options)) {
+    if (auto newPattern = TypeChecker::coercePatternToType(
+            contextualPattern, patternType,
+            TypeResolverContext::PatternBindingDecl)) {
+      pattern = newPattern;
+    } else {
       binding->setInvalid();
       pattern->setType(ErrorType::get(Context));
       return &pbe;

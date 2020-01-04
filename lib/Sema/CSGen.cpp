@@ -2259,6 +2259,7 @@ namespace {
       // or exhaustive catches.
       class FindInnerThrows : public ASTWalker {
         ConstraintSystem &CS;
+        DeclContext *DC;
         bool FoundThrow = false;
         
         std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
@@ -2344,12 +2345,12 @@ namespace {
           Type exnType = CS.getASTContext().getErrorDecl()->getDeclaredType();
           if (!exnType)
             return false;
-          if (TypeChecker::coercePatternToType(pattern,
-                                        TypeResolution::forContextual(CS.DC),
-                                        exnType,
-                                        TypeResolverContext::InExpression)) {
+          auto contextualPattern =
+              ContextualPattern::forRawPattern(pattern, DC);
+          pattern = TypeChecker::coercePatternToType(
+            contextualPattern, exnType, TypeResolverContext::InExpression);
+          if (!pattern)
             return false;
-          }
 
           clause->setErrorPattern(pattern);
           return clause->isSyntacticallyExhaustive();
@@ -2385,7 +2386,8 @@ namespace {
         }
         
       public:
-        FindInnerThrows(ConstraintSystem &cs) : CS(cs) {}
+        FindInnerThrows(ConstraintSystem &cs, DeclContext *dc)
+            : CS(cs), DC(dc) {}
 
         bool foundThrow() { return FoundThrow; }
       };
@@ -2398,7 +2400,7 @@ namespace {
       if (!body)
         return false;
       
-      auto tryFinder = FindInnerThrows(CS);
+      auto tryFinder = FindInnerThrows(CS, expr);
       body->walk(tryFinder);
       return tryFinder.foundThrow();
     }
