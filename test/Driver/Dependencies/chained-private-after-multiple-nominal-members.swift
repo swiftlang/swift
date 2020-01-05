@@ -30,9 +30,9 @@
 
 // RUN: %empty-directory(%t)
 // RUN: cp %S/Inputs/chained-private-after-multiple-nominal-members/output.json %t
-// RUN: echo 'func m1() -> x {x()}; func m2() -> a {a()}; let v = x().x; func m3() {_ = a.a}; struct b{}; struct x {var x = 3}; struct a {}'  >%t/main.swift
-// RUN: echo 'extension a { func a() {} }' >%t/other.swift
-// RUN: echo 'func bar() -> b {b()} ' >%t/yet-another.swift
+// RUN: echo 'struct S1 { let aa = (a(), x(), x().x)}; func m2() {_ = a().a()}; struct x { let x = 3 }; struct b {}'  >%t/main.swift
+// RUN: echo 'struct a { func a() {} }' >%t/other.swift
+// RUN: echo 'func bar() -> b {b()}' >%t/yet-another.swift
 // RUN: touch -t 201401240005 %t/*.swift
 
 // Generate the build record...
@@ -42,9 +42,10 @@
 
 // CHECK-FINE-FIRST-NOT: Queuing{{.*}}compile:
 
+// RUN: echo 'struct S1 { let aa = (a(), x())}; struct x { let x = 3 }; struct b {}'  >%t/main.swift; touch -t 201401240005 %t/main.swift
 // RUN: touch -t 201401240006 %t/other.swift
 // RUN: cd %t && %swiftc_driver -enable-fine-grained-dependencies -c -driver-show-incremental -output-file-map %t/output.json -incremental -driver-always-rebuild-dependents ./yet-another.swift ./main.swift ./other.swift -module-name main -j1 -v 2>&1 | %FileCheck -check-prefix=CHECK-FINE-SECOND %s
 
-// CHECK-FINE-SECOND-DAG: Queuing{{.*}}compile:{{.*}}other.swift
-// CHECK-FINE-SECOND-DAG: Queuing{{.*}}compile:{{.*}}main.swift
-// CHECK-FINE-SECOND: Queuing{{.*}}compile:{{.*}}yet-another.swift
+// CHECK-FINE-SECOND-DAG: Queuing{{.*}}compile:{{.*}} other.swift
+// CHECK-FINE-SECOND-DAG: Queuing{{.*}}compile:{{.*}} main.swift
+// CHECK-FINE-SECOND-DAG: Queuing{{.*}}compile:{{.*}} yet-another.swift
