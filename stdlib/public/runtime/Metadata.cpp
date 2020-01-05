@@ -4261,20 +4261,30 @@ static void initializeResilientWitnessTable(
   }
 }
 
+extern const ProtocolDescriptor
+PROTOCOL_DESCRIPTOR_SYM(SWIFT_EQUATABLE_MANGLING);
+
 /// If this conformance is builtin, find the builtin witnesses in the runtime
 /// and use those as the witnesses for newly created witness tables.
 static void initializeBuiltinWitnessTable(
                               const ProtocolConformanceDescriptor *conformance,
                               const Metadata *conformingType,
                               void **table) {
+  auto protocol = conformance->getProtocol();
   auto metadataKind = conformance->getMetadataKind();
 
   switch (metadataKind) {
     case MetadataKind::Tuple: {
-      table[WitnessTableFirstRequirementOffset] =
-        (void *)BUILTIN_PROTOCOL_WITNESS_SYM(VARIADIC_TUPLE_MANGLING,
-                                             SWIFT_EQUATABLE_MANGLING,
-                                             SWIFT_EQUAL_OPERATOR_MANGLING);
+      if (protocol == &PROTOCOL_DESCRIPTOR_SYM(SWIFT_EQUATABLE_MANGLING)) {
+        table[WitnessTableFirstRequirementOffset] =
+          (void *)BUILTIN_PROTOCOL_WITNESS_SYM(VARIADIC_TUPLE_MANGLING,
+                                               SWIFT_EQUATABLE_MANGLING,
+                                               SWIFT_EQUAL_OPERATOR_MANGLING);
+      } else {
+        swift_runtime_unreachable(
+          "initializing builtin witness table for unknown protocol");
+      }
+
       break;
     }
     default:
