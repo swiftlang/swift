@@ -428,8 +428,9 @@ void ModuleDepGraph::traceDeparture(size_t pathLengthAfterArrival) {
   currentPath.pop_back();
 }
 
-// Emitting Dot file for ModuleDepGraph
-// ===========================================
+// =============================================================================
+// MARK: Emitting Dot file for ModuleDepGraph
+// =============================================================================
 
 void ModuleDepGraph::emitDotFileForJob(DiagnosticEngine &diags,
                                        const Job *job) {
