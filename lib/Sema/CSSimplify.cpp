@@ -2824,11 +2824,10 @@ bool ConstraintSystem::repairFailures(
         return true;
       }
       
-      // If it has a deep equality restriction defer the diagnostic to a
-      // GenericMismatch fix.
-      if (hasConversionOrRestriction(ConversionRestrictionKind::DeepEquality)) {
+      // If it has a deep equality restriction, defer the diagnostic to
+      // GenericMismatch.
+      if (hasConversionOrRestriction(ConversionRestrictionKind::DeepEquality))
         return false;
-      }
       
       auto *fix = ContextualMismatch::create(*this, lhs, rhs,
                                              getConstraintLocator(locator));
