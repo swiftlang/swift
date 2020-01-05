@@ -251,7 +251,8 @@ struct Toe {
   let toenail: Nail // expected-error {{use of undeclared type 'Nail'}}
 
   func clip() {
-    toenail.inspect { x in
+    // FIXME: We shouldn't report this because toenail.inspect is a hole
+    toenail.inspect { x in // expected-error {{unable to infer closure return type; add explicit type to disambiguate}}
       toenail.inspect { y in }
     }
   }

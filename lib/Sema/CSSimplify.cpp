@@ -6121,8 +6121,6 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
     return formUnsolved();
 
   case MemberLookupResult::ErrorAlreadyDiagnosed:
-    return SolutionKind::Error;
-
   case MemberLookupResult::HasResults:
     // Keep going!
     break;
@@ -6198,8 +6196,10 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
         return type;
       });
 
-      auto *fix =
-          DefineMemberBasedOnUse::create(*this, baseTy, member, locator);
+      bool alreadyDiagnosed = (result.OverallResult ==
+                               MemberLookupResult::ErrorAlreadyDiagnosed);
+      auto *fix = DefineMemberBasedOnUse::create(*this, baseTy, member,
+                                                 alreadyDiagnosed, locator);
       // Impact is higher if the base is expected to be inferred from context,
       // because a failure to find a member ultimately means that base type is
       // not a match in this case.
@@ -6208,9 +6208,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
       if (recordFix(fix, impact))
         return SolutionKind::Error;
 
-      // Allow member type to default to `Any` to make it possible to form
-      // solutions when contextual type of the result cannot be deduced e.g.
-      // `let _ = x.foo`.
+      // Record a hole for memberTy to make it possible to form solutions
+      // when contextual result type cannot be deduced e.g. `let _ = x.foo`.
       if (auto *memberTypeVar = memberTy->getAs<TypeVariableType>())
         recordPotentialHole(memberTypeVar);
 
@@ -7860,7 +7859,7 @@ ConstraintSystem::simplifyDynamicCallableApplicableFnConstraint(
     DeclNameRef memberName({ ctx, ctx.Id_dynamicallyCall, {argLabel} });
 
     auto *fix = DefineMemberBasedOnUse::create(
-        *this, desugar2, memberName,
+        *this, desugar2, memberName, /*alreadyDiagnosed=*/false,
         getConstraintLocator(loc, ConstraintLocator::DynamicCallable));
 
     if (recordFix(fix))
