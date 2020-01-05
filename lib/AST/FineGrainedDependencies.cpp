@@ -90,10 +90,19 @@ SourceFileDepGraph::findExistingNodePairOrCreateAndAddIfNew(
           DependencyKey(k, DeclAspect::implementation, context, name),
           fingerprint, true /* = isProvides */)};
   // if interface changes, have to rebuild implementation.
+  // This dependency used to be represented by
+  // addArc(nodePair.getInterface(), nodePair.getImplementation());
+  // However, recall that the dependency scheme as of 1/2020 chunks
+  // declarations together by base name.
+  // So if the arc were added, a dirtying of a same-based-named interface
+  // in a different file would dirty the implementation in this file,
+  // causing the needless recompilation of this file.
   // But, if an arc is added for this, then *any* change that causes
   // a same-named interface to be dirty will dirty this implementation,
   // even if that interface is in another file.
-  // So, make the interface->implementation arc implicit.
+  // Therefor no such arc is added here, and any dirtying of either
+  // the interface or implementation of this declaration will cause
+  // the driver to recompile this source file.
   return nodePair;
 }
 

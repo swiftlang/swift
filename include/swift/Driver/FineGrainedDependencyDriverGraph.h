@@ -487,7 +487,7 @@ private:
     return swiftDepsOfJobsThatNeedRunning.insert(swiftDeps).second;
   }
 
-  /// For debugging, write out the graph to a dot file.
+  /// For debugging and visualization, write out the graph to a dot file.
   /// \p diags may be null if no diagnostics are needed.
   void emitDotFileForJob(DiagnosticEngine &, const driver::Job *);
   void emitDotFile(DiagnosticEngine &, StringRef baseName);
