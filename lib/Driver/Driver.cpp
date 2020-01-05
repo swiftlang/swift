@@ -959,7 +959,7 @@ Driver::buildCompilation(const ToolChain &TC,
     // relies on the new dependency graph
     const bool EnableFineGrainedDependencies =
         ArgList->hasFlag(options::OPT_enable_fine_grained_dependencies,
-                         options::OPT_disable_fine_grained_dependencies, false);
+                         options::OPT_disable_fine_grained_dependencies, true);
 
     const bool VerifyFineGrainedDependencyGraphAfterEveryImport = ArgList->hasArg(
         options::
