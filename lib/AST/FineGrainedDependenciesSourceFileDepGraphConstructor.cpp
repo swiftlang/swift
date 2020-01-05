@@ -361,6 +361,12 @@ std::string DependencyKey::computeContextForProvidedEntity<
   return mangleTypeAsContext(holderAndMember.first);
 }
 
+// Linux compiler requires the following:
+template
+std::string
+DependencyKey::computeContextForProvidedEntity<NodeKind::sourceFileProvide,
+                                               StringRef>(StringRef);
+
 //==============================================================================
 // MARK: computeNameForProvidedEntity
 //==============================================================================
