@@ -554,6 +554,9 @@ public:
 
   /// If we're trying to convert something to `nil`.
   bool diagnoseConversionToNil() const;
+  
+  /// Diagnose failed conversion in a `CoerceExpr`.
+  bool diagnoseConversionInCoercion() const;
 
   // If we're trying to convert something of type "() -> T" to T,
   // then we probably meant to call the value.
