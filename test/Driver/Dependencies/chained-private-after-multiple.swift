@@ -40,6 +40,8 @@
 
 // CHECK-FINE-FIRST-NOT: Queuing{{.*}}compile:
 
+// RUN: echo 'struct S { let aa = a}; struct b {}' >%t/main.swift
+// RUN: touch -t 201401240005 %t/main.swift
 // RUN: touch -t 201401240006 %t/other.swift
 // RUN: cd %t && %swiftc_driver -enable-fine-grained-dependencies -driver-show-incremental -c -output-file-map %t/output.json -incremental -driver-always-rebuild-dependents ./yet-another.swift ./main.swift ./other.swift -module-name main -j1 -v 2>&1 | %FileCheck -check-prefix=CHECK-FINE-SECOND %s
 
