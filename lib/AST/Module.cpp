@@ -870,7 +870,7 @@ ProtocolConformanceRef ModuleDecl::lookupConformance(Type type,
     if (protocol == ctx.getProtocol(KnownProtocolKind::Equatable)) {
       // Ensure that every element in this tuple conforms to Equatable.
       for (auto eltTy : tuple->getElementTypes()) {
-        auto conformance = conformsToProtocol(eltTy, protocol);
+        auto conformance = lookupConformance(eltTy, protocol);
 
         if (conformance.isInvalid())
           return ProtocolConformanceRef::forInvalid();
