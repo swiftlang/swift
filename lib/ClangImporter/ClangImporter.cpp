@@ -458,10 +458,11 @@ getGlibcModuleMapPath(SearchPathOptions& Opts, llvm::Triple triple,
   return None;
 }
 
-static void
-getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
-                             ASTContext &ctx,
-                             const ClangImporterOptions &importerOpts) {
+void
+importer::getNormalInvocationArguments(
+    std::vector<std::string> &invocationArgStrs,
+    ASTContext &ctx,
+    const ClangImporterOptions &importerOpts) {
   const auto &LangOpts = ctx.LangOpts;
   const llvm::Triple &triple = LangOpts.Target;
   SearchPathOptions &searchPathOpts = ctx.SearchPathOpts;
@@ -695,10 +696,11 @@ getEmbedBitcodeInvocationArguments(std::vector<std::string> &invocationArgStrs,
   });
 }
 
-static void
-addCommonInvocationArguments(std::vector<std::string> &invocationArgStrs,
-                             ASTContext &ctx,
-                             const ClangImporterOptions &importerOpts) {
+void
+importer::addCommonInvocationArguments(
+    std::vector<std::string> &invocationArgStrs,
+    ASTContext &ctx,
+    const ClangImporterOptions &importerOpts) {
   using ImporterImpl = ClangImporter::Implementation;
   const llvm::Triple &triple = ctx.LangOpts.Target;
   SearchPathOptions &searchPathOpts = ctx.SearchPathOpts;

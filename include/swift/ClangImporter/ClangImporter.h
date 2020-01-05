@@ -369,6 +369,9 @@ public:
 
   void verifyAllModules() override;
 
+  Optional<ModuleDependencies> getModuleDependencies(
+      StringRef moduleName, ModuleDependenciesCache &cache) override;
+
   clang::TargetInfo &getTargetInfo() const override;
   clang::ASTContext &getClangASTContext() const override;
   clang::Preprocessor &getClangPreprocessor() const override;

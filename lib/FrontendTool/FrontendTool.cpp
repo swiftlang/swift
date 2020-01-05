@@ -22,6 +22,7 @@
 
 #include "swift/FrontendTool/FrontendTool.h"
 #include "ImportedModules.h"
+#include "ScanDependencies.h"
 #include "ReferenceDependencies.h"
 #include "TBD.h"
 
@@ -922,6 +923,10 @@ static Optional<bool> dumpASTIfNeeded(const CompilerInvocation &Invocation,
   case FrontendOptions::ActionType::EmitImportedModules:
     emitImportedModules(Context, Instance.getMainModule(), opts);
     break;
+
+  case FrontendOptions::ActionType::ScanDependencies:
+    scanDependencies(Context, Instance.getMainModule(), opts);
+    break;
   }
   return Context.hadError();
 }
@@ -1250,8 +1255,10 @@ static bool performCompile(CompilerInstance &Instance,
     // Disable delayed parsing of type and function bodies when we've been
     // asked to dump the resulting AST.
     bool CanDelayBodies = Action != FrontendOptions::ActionType::DumpParse;
-    Instance.performParseOnly(/*EvaluateConditionals*/
-                    Action == FrontendOptions::ActionType::EmitImportedModules,
+    bool EvaluateConditionals =
+        Action == FrontendOptions::ActionType::EmitImportedModules
+        || Action == FrontendOptions::ActionType::ScanDependencies;
+    Instance.performParseOnly(EvaluateConditionals,
                               CanDelayBodies);
   } else if (Action == FrontendOptions::ActionType::ResolveImports) {
     Instance.performParseAndResolveImportsOnly();

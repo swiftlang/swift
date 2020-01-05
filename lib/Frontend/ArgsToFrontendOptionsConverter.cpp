@@ -345,6 +345,8 @@ ArgsToFrontendOptionsConverter::determineRequestedAction(const ArgList &args) {
     return FrontendOptions::ActionType::EmitPCH;
   if (Opt.matches(OPT_emit_imported_modules))
     return FrontendOptions::ActionType::EmitImportedModules;
+  if (Opt.matches(OPT_scan_dependencies))
+    return FrontendOptions::ActionType::ScanDependencies;
   if (Opt.matches(OPT_parse))
     return FrontendOptions::ActionType::Parse;
   if (Opt.matches(OPT_resolve_imports))
