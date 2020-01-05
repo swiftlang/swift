@@ -3421,29 +3421,14 @@ llvm::Constant *IRGenModule::getAddrOfGenericEnvironment(
 // Builtin Protocol Conformances
 //==-----------------------------------------------------------------------===//
 
-void IRGenModule::emitBuiltinProtocolConformances() {
-  // We only emit these for the stdlib.
-  if (!getSwiftModule()->isStdlibModule())
-    return;
-
+static void addTupleEquatableConformance(IRGenModule &IGM,
+                        SmallVectorImpl<ConformanceDescription> &descriptions) {
   // For now, the only builtin conformance is Equatable for tuples.
   // (Just grab Void's conformance, we emit a single conformance descriptor for
   //  all tuples.)
-  auto tuple = Context.TheEmptyTupleType;
-  auto equatable = Context.getProtocol(KnownProtocolKind::Equatable);
-  auto conformance = Context.getBuiltinConformance(tuple, equatable);
-  auto entity = LinkEntity::forProtocolConformanceDescriptor(conformance);
-
-  // If we already defined this descriptor, just nop.
-  if (GlobalVars[entity])
-    return;
-
-  // Slight edge case: If this conformance doesn't have a valid protocol decl,
-  // we're compiling some module that has asked be to compiled as the stdlib
-  // and said module hasn't declared an equatable protocol. Tuples does not
-  // conform in those cases, so don't emit a conformance descriptor.
-  if (!conformance->getProtocol())
-    return;
+  auto tuple = IGM.Context.TheEmptyTupleType;
+  auto equatable = IGM.Context.getProtocol(KnownProtocolKind::Equatable);
+  auto conformance = IGM.Context.getBuiltinConformance(tuple, equatable);
 
   // Note: This conformance descriptor says 'requires specialization' to trigger
   // the generic witness table instatiation at runtime. The table size is 2 for
@@ -3455,17 +3440,46 @@ void IRGenModule::emitBuiltinProtocolConformances() {
                                             /* private size */ 0,
                                             /* requires specialization */ true);
 
-  // This sequence of events is rather unique for builtin conformances.
-  // When we're compiling the stdlib, there will already be references to some
-  // of these conformances. In those cases, we eagerly create the conformance
-  // descriptor that way we don't have to deal with globals already created.
-  // We also add it to the list of protocol conformances to be created, which
-  // in this case we've already emitted a builtin conformance so it will
-  // essentially be a nop. It's important we add it to the list of conformances
-  // because we want these conformances to appear in the final conformances
-  // section for swift_conformsToProtocol to be able to find.
-  emitProtocolConformance(description);
-  addProtocolConformance(std::move(description));
+  descriptions.push_back(description);
+}
+
+void IRGenModule::emitBuiltinProtocolConformances() {
+  // We only emit these for the stdlib.
+  if (!getSwiftModule()->isStdlibModule())
+    return;
+
+  // Collect all builtin conformances.
+  SmallVector<ConformanceDescription, 4> descriptions;
+
+  addTupleEquatableConformance(*this, descriptions);
+
+  for (auto description : descriptions) {
+    // Slight edge case: If this conformance doesn't have a valid protocol decl,
+    // we're compiling some module that has asked be to compiled as the stdlib
+    // and said module hasn't declared an Equatable protocol. Tuples does not
+    // conform in those cases, so don't emit a conformance descriptor.
+    if (!description.conformance->getProtocol())
+      return;
+
+    auto entity =
+      LinkEntity::forProtocolConformanceDescriptor(description.conformance);
+
+    // If we already defined this descriptor, just nop.
+    if (GlobalVars[entity])
+      return;
+
+    // This sequence of events is rather unique for builtin conformances.
+    // When we're compiling the stdlib, there will already be references to some
+    // of these conformances. In those cases, we eagerly create the conformance
+    // descriptor that way we don't have to deal with globals already created.
+    // We also add it to the list of protocol conformances to be created, which
+    // in this case we've already emitted a builtin conformance so it will
+    // essentially be a nop. It's important we add it to the list of conformances
+    // because we want these conformances to appear in the final conformances
+    // section for swift_conformsToProtocol to be able to find.
+    emitProtocolConformance(description);
+    addProtocolConformance(std::move(description));
+  }
 }
 
 void IRGenerator::emitBuiltinProtocolConformances() {
