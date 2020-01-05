@@ -240,7 +240,6 @@ private:
   bool visitIdentityExpr(IdentityExpr *E);
   bool visitTryExpr(TryExpr *E);
 
-  bool visitUnresolvedMemberExpr(UnresolvedMemberExpr *E);
   bool visitUnresolvedDotExpr(UnresolvedDotExpr *UDE);
   bool visitArrayExpr(ArrayExpr *E);
   bool visitDictionaryExpr(DictionaryExpr *E);
@@ -2124,65 +2123,6 @@ bool FailureDiagnosis::visitObjectLiteralExpr(ObjectLiteralExpr *E) {
                        importModule, importDefaultTypeName, plainName);
   }
   return true;
-}
-
-bool FailureDiagnosis::visitUnresolvedMemberExpr(UnresolvedMemberExpr *E) {
-  // If we have no contextual type, there is no way to resolve this.  Just
-  // diagnose this as an ambiguity.
-  if (!CS.getContextualType())
-    return false;
-
-  // OTOH, if we do have a contextual type, we can provide a more specific
-  // error.  Dig out the UnresolvedValueMember constraint for this expr node.
-  Constraint *memberConstraint = nullptr;
-  auto checkConstraint = [&](Constraint *C) {
-    if (C->getKind() == ConstraintKind::UnresolvedValueMember &&
-        simplifyLocatorToAnchor(C->getLocator()) == E)
-      memberConstraint = C;
-  };
-
-  if (CS.failedConstraint)
-    checkConstraint(CS.failedConstraint);
-  for (auto &C : CS.getConstraints()) {
-    if (memberConstraint) break;
-    checkConstraint(&C);
-  }
-  
-  // If we can't find the member constraint in question, then we failed.
-  if (!memberConstraint)
-    return false;
-
-  std::function<bool(ArrayRef<OverloadChoice>)> callback = [&](
-      ArrayRef<OverloadChoice> candidates) {
-    bool hasTrailingClosure = callArgHasTrailingClosure(E->getArgument());
-
-    // Dump all of our viable candidates into a CalleeCandidateInfo & sort it
-    // out.
-    CalleeCandidateInfo candidateInfo(Type(), candidates, hasTrailingClosure,
-                                      CS);
-
-    // Filter the candidate list based on the argument we may or may not have.
-    candidateInfo.filterContextualMemberList(E->getArgument());
-
-    // If we have multiple candidates, then we have an ambiguity.
-    if (candidateInfo.size() != 1) {
-      SourceRange argRange;
-      if (auto arg = E->getArgument())
-        argRange = arg->getSourceRange();
-      diagnose(E->getNameLoc(), diag::ambiguous_member_overload_set,
-               E->getName())
-          .highlight(argRange);
-      candidateInfo.suggestPotentialOverloads(E->getNameLoc().getBaseNameLoc());
-      return true;
-    }
-
-    return false;
-  };
-
-  return diagnoseMemberFailures(E, nullptr, memberConstraint->getKind(),
-                                memberConstraint->getMember(),
-                                memberConstraint->getFunctionRefKind(),
-                                memberConstraint->getLocator(), callback);
 }
 
 bool FailureDiagnosis::diagnoseMemberFailures(
