@@ -27,9 +27,9 @@
 
 // RUN: %empty-directory(%t)
 // RUN: cp -r %S/Inputs/chained-after/output.json %t
-// RUN: echo 'func foo() {_ = a()}; struct z {}' >%t/main.swift
+// RUN: echo 'var _ = a()' >%t/main.swift
 // RUN: echo 'struct a {}' >%t/other.swift
-// RUN: echo 'func bar() { _ = z() }' >%t/yet-another.swift
+// RUN: echo 'class z { func foo(_ x: Int) {}}' >%t/yet-another.swift
 // RUN: touch -t 201401240005 %t/*.swift
 
 // Generate the build record...
@@ -39,10 +39,12 @@
 
 // CHECK-FINE-FIRST-NOT: Queuing{{.*}}compile:
 
+// RUN: echo 'var _ = a(); extension z {func foo() {}}' >%t/main.swift
+// RUN: touch -t 201401240005 %t/main.swift
 // RUN: touch -t 201401240006 %t/other.swift
 // RUN: cd %t && %swiftc_driver -enable-fine-grained-dependencies -driver-show-incremental -c -output-file-map %t/output.json -incremental -driver-always-rebuild-dependents ./yet-another.swift ./main.swift ./other.swift -module-name main -j1 -v 2>&1 | %FileCheck -check-prefix=CHECK-FINE-THIRD %s
 
-// CHECK-FINE-THIRD-DAG: Queuing{{.*}}compile:{{.*}}main.swift
-// CHECK-FINE-THIRD-DAG: Queuing{{.*}}compile:{{.*}}other.swift
-// CHECK-FINE-THIRD-DAG: Queuing{{.*}}compile:{{.*}}yet-another.swift
+// CHECK-FINE-THIRD-DAG: Queuing{{.*}}compile:{{.*}} main.swift
+// CHECK-FINE-THIRD-DAG: Queuing{{.*}}compile:{{.*}} other.swift
+// CHECK-FINE-THIRD-DAG: Queuing{{.*}}compile:{{.*}} yet-another.swift
 
