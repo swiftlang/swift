@@ -186,6 +186,11 @@ protocol StaticMethod: Differentiable {
 }
 
 extension StaticMethod {
+  static func foo(_ x: Float) -> Float { x }
+  static func generic<T: Differentiable>(_ x: T) -> T { x }
+}
+
+extension StaticMethod {
   @derivative(of: foo)
   static func jvpFoo(x: Float) -> (value: Float, differential: (Float) -> Float)
   {
@@ -215,11 +220,16 @@ extension StaticMethod {
 // Test instance methods.
 
 protocol InstanceMethod: Differentiable {
-  // expected-note @+1 {{'foo' defined here}}
   func foo(_ x: Self) -> Self
+  func generic<T: Differentiable>(_ x: T) -> Self
+}
+
+extension InstanceMethod {
+  // expected-note @+1 {{'foo' defined here}}
+  func foo(_ x: Self) -> Self { x }
 
   // expected-note @+1 {{'generic' defined here}}
-  func generic<T: Differentiable>(_ x: T) -> Self
+  func generic<T: Differentiable>(_ x: T) -> Self { self }
 }
 
 extension InstanceMethod {
@@ -539,24 +549,14 @@ extension HasStoredProperty {
 // Test cross-file derivative registration. Currently unsupported.
 // TODO(TF-1021): Lift this restriction.
 
-extension AdditiveArithmetic where Self: Differentiable {
+extension FloatingPoint where Self: Differentiable {
   // expected-error @+1 {{derivative not in the same file as the original function}}
-  @derivative(of: +)
-  static func vjpPlus(x: Self, y: Self) -> (
+  @derivative(of: rounded)
+  func vjpRounded() -> (
     value: Self,
-    pullback: (Self.TangentVector) -> (Self.TangentVector, Self.TangentVector)
+    pullback: (Self.TangentVector) -> (Self.TangentVector)
   ) {
-    return (x + y, { v in (v, v) })
-  }
-}
-
-extension FloatingPoint where Self: Differentiable, Self == Self.TangentVector {
-  // expected-error @+1 {{derivative not in the same file as the original function}}
-  @derivative(of: +)
-  static func vjpPlus(x: Self, y: Self) -> (
-    value: Self, pullback: (Self) -> (Self, Self)
-  ) {
-    return (x + y, { v in (v, v) })
+    fatalError()
   }
 }
 
