@@ -1418,12 +1418,6 @@ bool FailureDiagnosis::diagnoseSubscriptErrors(SubscriptExpr *SE,
   if (!baseExpr) return true;
   auto baseType = CS.getType(baseExpr);
 
-  if (isa<NilLiteralExpr>(baseExpr)) {
-    diagnose(baseExpr->getLoc(), diag::cannot_subscript_nil_literal)
-      .highlight(baseExpr->getSourceRange());
-    return true;
-  }
-
   std::function<bool(ArrayRef<OverloadChoice>)> callback =
       [&](ArrayRef<OverloadChoice> candidates) -> bool {
     CalleeCandidateInfo calleeInfo(Type(), candidates, SE->hasTrailingClosure(),

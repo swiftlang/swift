@@ -1785,11 +1785,18 @@ namespace {
     }
 
     Type visitSubscriptExpr(SubscriptExpr *expr) {
+      auto &ctx = CS.getASTContext();
       ValueDecl *decl = nullptr;
       if (expr->hasDecl()) {
         decl = expr->getDecl().getDecl();
         if (decl->isInvalid())
           return Type();
+      }
+
+      if (auto nilLiteral = dyn_cast<NilLiteralExpr>(expr->getBase())) {
+        ctx.Diags.diagnose(nilLiteral->getLoc(),
+                           diag::cannot_subscript_nil_literal);
+        return nullptr;
       }
 
       return addSubscriptConstraints(expr, CS.getType(expr->getBase()),
