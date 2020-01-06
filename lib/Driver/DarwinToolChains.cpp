@@ -96,6 +96,11 @@ getDarwinLibraryNameSuffixForTriple(const llvm::Triple &triple,
   case DarwinPlatformKind::MacOS:
     return "osx";
   case DarwinPlatformKind::IPhoneOS:
+    // Here we return "osx" under the assumption that all the
+    // darwin runtime libraries are zippered and so the "osx" variants
+    // should be used for macCatalyst targets.
+    if (tripleIsMacCatalystEnvironment(triple))
+        return "osx";
     return "ios";
   case DarwinPlatformKind::IPhoneOSSimulator:
     return "iossim";
@@ -431,6 +436,9 @@ toolchains::Darwin::addArgsToLinkStdlib(ArgStringList &Arguments,
     // package isn't installed.
     Arguments.push_back("-rpath");
     Arguments.push_back(context.Args.MakeArgString("/usr/lib/swift"));
+    // We don't need an rpath for /System/iOSSupport/usr/lib/swift because...
+    assert(!tripleIsMacCatalystEnvironment(getTriple())
+           && "macCatalyst not supported without Swift-in-the-OS");
   }
 }
 
@@ -489,12 +497,23 @@ toolchains::Darwin::addDeploymentTargetArgs(ArgStringList &Arguments,
     } else {
       if (isiOSSimulator)
         Arguments.push_back("-ios_simulator_version_min");
+      else if (tripleIsMacCatalystEnvironment(Triple))
+        Arguments.push_back("-maccatalyst_version_min");
       else
         Arguments.push_back("-iphoneos_version_min");
     }
     unsigned major, minor, micro;
     Triple.getiOSVersion(major, minor, micro);
     addVersionString(context.Args, Arguments, major, minor, micro);
+
+    if (TargetVariant) {
+      assert(triplesAreValidForZippering(Triple, *TargetVariant));
+      assert(TargetVariant->isMacOSX());
+      Arguments.push_back("-macosx_version_min");
+      unsigned major, minor, micro;
+      TargetVariant->getMacOSXVersion(major, minor, micro);
+      addVersionString(context.Args, Arguments, major, minor, micro);
+    }
   } else if (Triple.isWatchOS()) {
     if (tripleIsWatchSimulator(Triple))
       Arguments.push_back("-watchos_simulator_version_min");
@@ -508,6 +527,15 @@ toolchains::Darwin::addDeploymentTargetArgs(ArgStringList &Arguments,
     unsigned major, minor, micro;
     Triple.getMacOSXVersion(major, minor, micro);
     addVersionString(context.Args, Arguments, major, minor, micro);
+
+    if (TargetVariant) {
+      assert(triplesAreValidForZippering(Triple, *TargetVariant));
+      assert(tripleIsMacCatalystEnvironment(*TargetVariant));
+      Arguments.push_back("-maccatalyst_version_min");
+      unsigned major, minor, micro;
+      TargetVariant->getiOSVersion(major, minor, micro);
+      addVersionString(context.Args, Arguments, major, minor, micro);
+    }
   }
 }
 
@@ -718,15 +746,33 @@ static void validateDeploymentTarget(const toolchains::Darwin &TC,
   }
 }
 
+static void validateTargetVariant(const toolchains::Darwin &TC,
+                                  DiagnosticEngine &diags,
+                                  const llvm::opt::ArgList &args,
+                                  StringRef defaultTarget) {
+  if (TC.getTargetVariant().hasValue()) {
+    auto target = TC.getTriple();
+    auto variant = *TC.getTargetVariant();
+
+    if (!triplesAreValidForZippering(target, variant)) {
+      diags.diagnose(SourceLoc(), diag::error_unsupported_target_variant,
+                    variant.str(),
+                    variant.isiOS());
+    }
+  }
+}
+
 void 
 toolchains::Darwin::validateArguments(DiagnosticEngine &diags,
-                                      const llvm::opt::ArgList &args) const {
+                                      const llvm::opt::ArgList &args,
+                                      StringRef defaultTarget) const {
   // Validating arclite library path when link-objc-runtime.
   validateLinkObjcRuntimeARCLiteLib(*this, diags, args);
   
   // Validating apple platforms deployment targets.
   validateDeploymentTarget(*this, diags, args);
-    
+  validateTargetVariant(*this, diags, args, defaultTarget);
+
   // Validating darwin unsupported -static-stdlib argument.
   if (args.hasArg(options::OPT_static_stdlib)) {
     diags.diagnose(SourceLoc(), diag::error_darwin_static_stdlib_not_supported);

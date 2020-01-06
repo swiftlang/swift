@@ -73,7 +73,14 @@ static void setDefaultPrebuiltCacheIfNecessary(
     return;
 
   SmallString<64> defaultPrebuiltPath{searchPathOpts.RuntimeResourcePath};
-  StringRef platform = getPlatformNameForTriple(triple);
+  StringRef platform;
+  if (tripleIsMacCatalystEnvironment(triple)) {
+    // The prebuilt cache for macCatalyst is the same as the one for macOS, not iOS
+    // or a separate location of its own.
+    platform = "macosx";
+  } else {
+    platform = getPlatformNameForTriple(triple);
+  }
   llvm::sys::path::append(defaultPrebuiltPath, platform, "prebuilt-modules");
   frontendOpts.PrebuiltModuleCachePath = defaultPrebuiltPath.str();
 }
@@ -82,7 +89,11 @@ static void updateRuntimeLibraryPaths(SearchPathOptions &SearchPathOpts,
                                       llvm::Triple &Triple) {
   llvm::SmallString<128> LibPath(SearchPathOpts.RuntimeResourcePath);
 
-  llvm::sys::path::append(LibPath, getPlatformNameForTriple(Triple));
+  StringRef LibSubDir = getPlatformNameForTriple(Triple);
+  if (tripleIsMacCatalystEnvironment(Triple))
+    LibSubDir = "maccatalyst";
+
+  llvm::sys::path::append(LibPath, LibSubDir);
   SearchPathOpts.RuntimeLibraryPaths.clear();
   SearchPathOpts.RuntimeLibraryPaths.push_back(LibPath.str());
   if (Triple.isOSDarwin())
@@ -101,6 +112,13 @@ static void updateRuntimeLibraryPaths(SearchPathOptions &SearchPathOpts,
   SearchPathOpts.RuntimeLibraryImportPaths.push_back(LibPath.str());
 
   if (!SearchPathOpts.SDKPath.empty()) {
+    if (tripleIsMacCatalystEnvironment(Triple)) {
+      LibPath = SearchPathOpts.SDKPath;
+      llvm::sys::path::append(LibPath, "System", "iOSSupport");
+      llvm::sys::path::append(LibPath, "usr", "lib", "swift");
+      SearchPathOpts.RuntimeLibraryImportPaths.push_back(LibPath.str());
+    }
+
     LibPath = SearchPathOpts.SDKPath;
     llvm::sys::path::append(LibPath, "usr", "lib", "swift");
     if (!Triple.isOSDarwin()) {
@@ -518,6 +536,10 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   if (const Arg *A = Args.getLastArg(OPT_target)) {
     Target = llvm::Triple(A->getValue());
     TargetArg = A->getValue();
+  }
+
+  if (const Arg *A = Args.getLastArg(OPT_target_variant)) {
+    Opts.TargetVariant = llvm::Triple(A->getValue());
   }
 
   Opts.EnableCXXInterop |= Args.hasArg(OPT_enable_cxx_interop);
