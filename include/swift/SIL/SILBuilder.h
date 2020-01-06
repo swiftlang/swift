@@ -1783,12 +1783,6 @@ public:
   // Unchecked cast helpers
   //===--------------------------------------------------------------------===//
 
-  // Create an UncheckedRefCast if the source and dest types are legal,
-  // otherwise return null.
-  // Unwrap or wrap optional types as needed.
-  SingleValueInstruction *tryCreateUncheckedRefCast(SILLocation Loc, SILValue Op,
-                                                    SILType ResultTy);
-
   // Create the appropriate cast instruction based on result type.
   SingleValueInstruction *createUncheckedBitCast(SILLocation Loc, SILValue Op,
                                                  SILType Ty);

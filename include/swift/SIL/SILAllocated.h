@@ -31,7 +31,7 @@ public:
   void *operator new[](size_t) = delete;
 
   /// Disable non-placement delete.
-  void operator delete(void *) SWIFT_DELETE_OPERATOR_DELETED;
+  void operator delete(void *) = delete;
   void operator delete[](void *) = delete;
 
   /// Custom version of 'new' that uses the SILModule's BumpPtrAllocator with

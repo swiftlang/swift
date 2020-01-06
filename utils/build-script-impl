@@ -247,8 +247,6 @@ KNOWN_SETTINGS=(
     swift-cmake-options                ""        "CMake options used for all swift targets"
     xctest-cmake-options               ""        "CMake options used for all xctest targets"
     playgroundsupport-cmake-options    ""        "CMake options used for all playgroundsupport targets"
-    # TODO: Remove this some time later.
-    user-config-args            ""               "**Renamed to --extra-cmake-options**: User-supplied arguments to cmake when used to do configuration."
     only-execute                       "all"     "Only execute the named action (see implementation)"
     llvm-lit-args                      ""        "If set, override the lit args passed to LLVM"
     clang-profile-instr-use            ""        "If set, profile file to use for clang PGO while building llvm/clang"
@@ -324,14 +322,6 @@ function to_varname() {
     # Uses `tr` because it is orders of magnitude faster than ${1//-/_} on long
     # strings, which happens when translating KNOWN_SETTINGS.
     toupper "$(echo $1 | tr '-' '_')"
-}
-
-function set_lldb_build_mode() {
-    if [[ "${LLDB_BUILD_TYPE}" == "RelWithDebInfo" ]]; then
-      LLDB_BUILD_MODE="CustomSwift-Release"
-    else
-      LLDB_BUILD_MODE="CustomSwift-${LLDB_BUILD_TYPE}"
-    fi
 }
 
 function is_llvm_lto_enabled() {
@@ -470,70 +460,60 @@ function set_build_options_for_host() {
             watchos-* | watchsimulator-*)
             case ${host} in
                 macosx-x86_64)
-                    xcrun_sdk_name="macosx"
                     llvm_target_arch=""
                     SWIFT_HOST_TRIPLE="x86_64-apple-macosx${DARWIN_DEPLOYMENT_VERSION_OSX}"
                     SWIFT_HOST_VARIANT_SDK="OSX"
                     cmake_osx_deployment_target="${DARWIN_DEPLOYMENT_VERSION_OSX}"
                     ;;
                 iphonesimulator-i386)
-                    xcrun_sdk_name="iphonesimulator"
                     llvm_target_arch="X86"
                     SWIFT_HOST_TRIPLE="i386-apple-ios${DARWIN_DEPLOYMENT_VERSION_IOS}"
                     SWIFT_HOST_VARIANT_SDK="IOS_SIMULATOR"
                     cmake_osx_deployment_target=""
                     ;;
                 iphonesimulator-x86_64)
-                    xcrun_sdk_name="iphonesimulator"
                     llvm_target_arch="X86"
                     SWIFT_HOST_TRIPLE="x86_64-apple-ios${DARWIN_DEPLOYMENT_VERSION_IOS}"
                     SWIFT_HOST_VARIANT_SDK="IOS_SIMULATOR"
                     cmake_osx_deployment_target=""
                     ;;
                 iphoneos-armv7)
-                    xcrun_sdk_name="iphoneos"
                     llvm_target_arch="ARM"
                     SWIFT_HOST_TRIPLE="armv7-apple-ios${DARWIN_DEPLOYMENT_VERSION_IOS}"
                     SWIFT_HOST_VARIANT_SDK="IOS"
                     cmake_osx_deployment_target=""
                     ;;
                 iphoneos-armv7s)
-                    xcrun_sdk_name="iphoneos"
                     llvm_target_arch="ARM"
                     SWIFT_HOST_TRIPLE="armv7s-apple-ios${DARWIN_DEPLOYMENT_VERSION_IOS}"
                     SWIFT_HOST_VARIANT_SDK="IOS"
                     cmake_osx_deployment_target=""
                     ;;
                 iphoneos-arm64)
-                    xcrun_sdk_name="iphoneos"
                     llvm_target_arch="AArch64"
                     SWIFT_HOST_TRIPLE="arm64-apple-ios${DARWIN_DEPLOYMENT_VERSION_IOS}"
                     SWIFT_HOST_VARIANT_SDK="IOS"
                     cmake_osx_deployment_target=""
                     ;;
                 appletvsimulator-x86_64)
-                    xcrun_sdk_name="appletvsimulator"
                     llvm_target_arch="X86"
                     SWIFT_HOST_TRIPLE="x86_64-apple-tvos${DARWIN_DEPLOYMENT_VERSION_TVOS}"
                     SWIFT_HOST_VARIANT_SDK="TVOS_SIMULATOR"
                     cmake_osx_deployment_target=""
                     ;;
                 appletvos-arm64)
-                    xcrun_sdk_name="appletvos"
                     llvm_target_arch="AArch64"
                     SWIFT_HOST_TRIPLE="arm64-apple-tvos${DARWIN_DEPLOYMENT_VERSION_TVOS}"
                     SWIFT_HOST_VARIANT_SDK="TVOS"
                     cmake_osx_deployment_target=""
                     ;;
                 watchsimulator-i386)
-                    xcrun_sdk_name="watchsimulator"
                     llvm_target_arch="X86"
                     SWIFT_HOST_TRIPLE="i386-apple-watchos${DARWIN_DEPLOYMENT_VERSION_WATCHOS}"
                     SWIFT_HOST_VARIANT_SDK="WATCHOS_SIMULATOR"
                     cmake_osx_deployment_target=""
                     ;;
                 watchos-armv7k)
-                    xcrun_sdk_name="watchos"
                     llvm_target_arch="ARM"
                     SWIFT_HOST_TRIPLE="armv7k-apple-watchos${DARWIN_DEPLOYMENT_VERSION_WATCHOS}"
                     SWIFT_HOST_VARIANT_SDK="WATCHOS"
@@ -560,12 +540,12 @@ function set_build_options_for_host() {
             cmark_cmake_options=(
                 -DCMAKE_C_FLAGS="$(cmark_c_flags ${host})"
                 -DCMAKE_CXX_FLAGS="$(cmark_c_flags ${host})"
-                -DCMAKE_OSX_SYSROOT:PATH="$(xcrun --sdk ${xcrun_sdk_name} --show-sdk-path)"
+                -DCMAKE_OSX_SYSROOT:PATH="$(xcrun --sdk ${platform} --show-sdk-path)"
                 -DCMAKE_OSX_DEPLOYMENT_TARGET="${cmake_osx_deployment_target}"
             )
             llvm_cmake_options=(
                 -DCMAKE_OSX_DEPLOYMENT_TARGET:STRING="${cmake_osx_deployment_target}"
-                -DCMAKE_OSX_SYSROOT:PATH="$(xcrun --sdk ${xcrun_sdk_name} --show-sdk-path)"
+                -DCMAKE_OSX_SYSROOT:PATH="$(xcrun --sdk ${platform} --show-sdk-path)"
                 -DCOMPILER_RT_ENABLE_IOS:BOOL=FALSE
                 -DCOMPILER_RT_ENABLE_WATCHOS:BOOL=FALSE
                 -DCOMPILER_RT_ENABLE_TVOS:BOOL=FALSE
@@ -573,26 +553,12 @@ function set_build_options_for_host() {
                 -DLLVM_ENABLE_MODULES:BOOL="$(true_false ${LLVM_ENABLE_MODULES})"
             )
             if [[ $(is_llvm_lto_enabled) == "TRUE" ]]; then
-                if [[ $(cmake_needs_to_specify_standard_computed_defaults) == "TRUE" ]]; then
-                    llvm_cmake_options+=(
-                        "-DCMAKE_C_STANDARD_COMPUTED_DEFAULT=AppleClang"
-                        "-DCMAKE_CXX_STANDARD_COMPUTED_DEFAULT=AppleClang"
-                    )
-                fi
-
                 llvm_cmake_options+=(
                     "-DLLVM_PARALLEL_LINK_JOBS=${LLVM_NUM_PARALLEL_LTO_LINK_JOBS}"
                 )
             fi
 
             if [[ $(is_swift_lto_enabled) == "TRUE" ]]; then
-                if [[ $(cmake_needs_to_specify_standard_computed_defaults) = "TRUE" ]]; then
-                    swift_cmake_options+=(
-                        "-DCMAKE_C_STANDARD_COMPUTED_DEFAULT=AppleClang"
-                        "-DCMAKE_CXX_STANDARD_COMPUTED_DEFAULT=AppleClang"
-                    )
-                fi
-
                 llvm_cmake_options+=(
                     -DLLVM_ENABLE_MODULE_DEBUGGING:BOOL=NO
                 )
@@ -815,12 +781,6 @@ done
 # TODO: Rename this argument
 LOCAL_HOST=$HOST_TARGET
 
-# TODO: Remove this some time later.
-if [[ "${USER_CONFIG_ARGS}" ]]; then
-    echo "Error: --user-config-args is renamed to --extra-cmake-options." 1>&2
-    exit 1
-fi
-
 if [[ "${CHECK_ARGS_ONLY}" ]]; then
     exit 0
 fi
@@ -907,18 +867,6 @@ function false_true() {
         echo "FALSE"
     else
         echo "TRUE"
-    fi
-}
-
-function cmake_version() {
-    "${CMAKE}" --version | grep "cmake version" | cut -f 3 -d " "
-}
-
-function cmake_needs_to_specify_standard_computed_defaults() {
-    if [[ $(cmake_version) = "3.4.0" ]]; then
-        echo "TRUE"
-    else
-        echo "FALSE"
     fi
 }
 
@@ -1054,28 +1002,6 @@ function get_stdlib_targets_for_host() {
         echo "$1"
     else
         echo "${STDLIB_DEPLOYMENT_TARGETS[@]}"
-    fi
-}
-
-function should_build_stdlib_target() {
-    local stdlib_target=$1
-    local host=$2
-    if [[ "${BUILD_STDLIB_DEPLOYMENT_TARGETS}" == "all" ]]; then
-        echo 1
-    else
-        # Only build the stdlib targets in 'build-stdlib-deployment-targets'
-        local build_list=($BUILD_STDLIB_DEPLOYMENT_TARGETS)
-        for t in "${build_list[@]}"; do
-            if [[ "${t}" == "${stdlib_target}" ]]; then
-                echo 1
-            fi
-        done
-        # As with 'stdlib-deployment-targets', 'build-stdlib-deployment-targets'
-        # only applies to the LOCAL_HOST. For cross-tools hosts, always allow
-        # their one-and-only stdlib-target to build.
-        if [[ $(is_cross_tools_host ${host}) ]] && [[ "${stdlib_target}" == "${host}" ]]; then
-            echo 1
-        fi
     fi
 }
 
@@ -2135,18 +2061,6 @@ for host in "${ALL_HOSTS[@]}"; do
                     LIBICU_BUILD_ARGS=()
                 fi
 
-                # Staging: require opt-in for building with dispatch
-                if [[ ! "${SKIP_BUILD_LIBDISPATCH}" ]] ; then
-                    LIBDISPATCH_BUILD_DIR="$(build_directory ${host} libdispatch)"
-                    LIBDISPATCH_BUILD_ARGS=(
-                      -DFOUNDATION_PATH_TO_LIBDISPATCH_SOURCE=${LIBDISPATCH_SOURCE_DIR}
-                      -DFOUNDATION_PATH_TO_LIBDISPATCH_BUILD=${LIBDISPATCH_BUILD_DIR}
-                      -Ddispatch_DIR=${LIBDISPATCH_BUILD_DIR}/cmake/modules
-                    )
-                else
-                    LIBDISPATCH_BUILD_ARGS=( -DFOUNDATION_ENABLE_LIBDISPATCH=NO )
-                fi
-
                 # FIXME: Always re-build XCTest on non-darwin platforms.
                 # The Swift project might have been changed, but CMake might
                 # not be aware and will not rebuild.
@@ -2169,7 +2083,10 @@ for host in "${ALL_HOSTS[@]}"; do
                   -DCMAKE_INSTALL_PREFIX:PATH=$(get_host_install_prefix ${host})
 
                   ${LIBICU_BUILD_ARGS[@]}
-                  ${LIBDISPATCH_BUILD_ARGS[@]}
+
+                  -DFOUNDATION_PATH_TO_LIBDISPATCH_SOURCE=${LIBDISPATCH_SOURCE_DIR}
+                  -DFOUNDATION_PATH_TO_LIBDISPATCH_BUILD=$(build_directory ${host} libdispatch)
+                  -Ddispatch_DIR=$(build_directory ${host} libdispatch)/cmake/modules
 
                   # NOTE(compnerd) we disable tests because XCTest is not ready
                   # yet, but we will reconfigure when the time comes.
@@ -2605,16 +2522,6 @@ for host in "${ALL_HOSTS[@]}"; do
                     LIBICU_BUILD_ARGS=()
                 fi
 
-                if [[ ! "${SKIP_BUILD_LIBDISPATCH}" ]] ; then
-                    LIBDISPATCH_BUILD_DIR="$(build_directory ${host} libdispatch)"
-                    LIBDISPATCH_BUILD_ARGS=(
-                      -DFOUNDATION_PATH_TO_LIBDISPATCH_SOURCE=${LIBDISPATCH_SOURCE_DIR}
-                      -DFOUNDATION_PATH_TO_LIBDISPATCH_BUILD=${LIBDISPATCH_BUILD_DIR}
-                      -Ddispatch_DIR=${LIBDISPATCH_BUILD_DIR}/cmake/modules
-                    )
-                else
-                    LIBDISPATCH_BUILD_ARGS=( -DFOUNDATION_ENABLE_LIBDISPATCH=NO )
-                fi
 
                 SWIFTC_BIN="$(build_directory_bin ${LOCAL_HOST} swift)/swiftc"
                 LLVM_BIN="$(build_directory_bin ${LOCAL_HOST} llvm)"
@@ -2629,7 +2536,10 @@ for host in "${ALL_HOSTS[@]}"; do
                   -DCMAKE_INSTALL_PREFIX:PATH=$(get_host_install_prefix ${host})
 
                   ${LIBICU_BUILD_ARGS[@]}
-                  ${LIBDISPATCH_BUILD_ARGS[@]}
+
+                  -DFOUNDATION_PATH_TO_LIBDISPATCH_SOURCE=${LIBDISPATCH_SOURCE_DIR}
+                  -DFOUNDATION_PATH_TO_LIBDISPATCH_BUILD=$(build_directory ${host} libdispatch)
+                  -Ddispatch_DIR=$(build_directory ${host} libdispatch)/cmake/modules
 
                   -DENABLE_TESTING:BOOL=YES
                   -DXCTest_DIR=$(build_directory ${host} xctest)/cmake/modules

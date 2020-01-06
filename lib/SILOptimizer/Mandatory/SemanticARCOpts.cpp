@@ -306,7 +306,7 @@ struct SemanticARCOptVisitor
   FORWARDING_TERM(CondBranch)
 #undef FORWARDING_TERM
 
-  bool isWrittenTo(LoadInst *li, ArrayRef<SILInstruction *> destroys);
+  bool isWrittenTo(LoadInst *li, const LiveRange &lr);
 
   bool processWorklist();
 
@@ -676,22 +676,20 @@ class StorageGuaranteesLoadVisitor
 {
   // The outer SemanticARCOptVisitor.
   SemanticARCOptVisitor &ARCOpt;
-  
-  // The original load instruction.
-  LoadInst *Load;
-  
+
+  // The live range of the original load.
+  const LiveRange &liveRange;
+
   // The current address being visited.
   SILValue currentAddress;
   
   Optional<bool> isWritten;
 
-  ArrayRef<SILInstruction *> destroyValues;
-
 public:
   StorageGuaranteesLoadVisitor(SemanticARCOptVisitor &arcOpt, LoadInst *load,
-                               ArrayRef<SILInstruction *> destroyValues)
-      : ARCOpt(arcOpt), Load(load), currentAddress(load->getOperand()),
-        destroyValues(destroyValues) {}
+                               const LiveRange &liveRange)
+      : ARCOpt(arcOpt), liveRange(liveRange),
+        currentAddress(load->getOperand()) {}
 
   void answer(bool written) {
     currentAddress = nullptr;
@@ -774,15 +772,11 @@ public:
     llvm::copy(borrowInst->getUsersOfType<EndBorrowInst>(),
                std::back_inserter(baseEndBorrows));
 
-    SmallVector<SILInstruction *, 4> valueDestroys;
-    llvm::copy(Load->getUsersOfType<DestroyValueInst>(),
-               std::back_inserter(valueDestroys));
-
     SmallPtrSet<SILBasicBlock *, 4> visitedBlocks;
     LinearLifetimeChecker checker(visitedBlocks, ARCOpt.getDeadEndBlocks());
     // Returns true on success. So we invert.
-    bool foundError =
-        !checker.validateLifetime(baseObject, baseEndBorrows, valueDestroys);
+    bool foundError = !checker.validateLifetime(baseObject, baseEndBorrows,
+                                                liveRange.getDestroys());
     return answer(foundError);
   }
   
@@ -818,9 +812,9 @@ public:
     SmallPtrSet<SILBasicBlock *, 4> visitedBlocks;
     LinearLifetimeChecker checker(visitedBlocks, ARCOpt.getDeadEndBlocks());
     // Returns true on success. So we invert.
-    bool foundError =
-        !checker.validateLifetime(stack, destroyAddrs /*consuming users*/,
-                                  destroyValues /*non consuming users*/);
+    bool foundError = !checker.validateLifetime(
+        stack, destroyAddrs /*consuming users*/,
+        liveRange.getDestroys() /*non consuming users*/);
     return answer(foundError);
   }
 
@@ -834,9 +828,8 @@ public:
 
 } // namespace
 
-bool SemanticARCOptVisitor::isWrittenTo(LoadInst *load,
-                                        ArrayRef<SILInstruction *> destroys) {
-  StorageGuaranteesLoadVisitor visitor(*this, load, destroys);
+bool SemanticARCOptVisitor::isWrittenTo(LoadInst *load, const LiveRange &lr) {
+  StorageGuaranteesLoadVisitor visitor(*this, load, lr);
   return visitor.doIt();
 }
 
@@ -860,8 +853,7 @@ bool SemanticARCOptVisitor::visitLoadInst(LoadInst *li) {
   // Then check if our address is ever written to. If it is, then we cannot use
   // the load_borrow because the stored value may be released during the loaded
   // value's live range.
-  auto destroyValues = lr.getDestroys();
-  if (isWrittenTo(li, destroyValues))
+  if (isWrittenTo(li, lr))
     return false;
 
   // Ok, we can perform our optimization. Convert the load [copy] into a
@@ -874,6 +866,7 @@ bool SemanticARCOptVisitor::visitLoadInst(LoadInst *li) {
   // to find the post-dominating block set of these destroy value to ensure that
   // we do not insert multiple end_borrow.
   assert(lifetimeFrontier.empty());
+  auto destroyValues = lr.getDestroys();
   ValueLifetimeAnalysis analysis(li, destroyValues);
   bool foundCriticalEdges = !analysis.computeFrontier(
       lifetimeFrontier, ValueLifetimeAnalysis::DontModifyCFG,

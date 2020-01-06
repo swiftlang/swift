@@ -1429,7 +1429,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     // two values in the list are the basic block identifiers.
     auto Ty = MF->getType(TyID);
     auto Ty2 = MF->getType(TyID2);
-    SILType FnTy = getSILType(Ty, SILValueCategory::Object, nullptr);
+    SILType FnTy = getSILType(Ty, SILValueCategory::Object, Fn);
     SILType SubstFnTy = getSILType(Ty2, SILValueCategory::Object, Fn);
 
     SILBasicBlock *errorBB = getBBForReference(Fn, ListOfValues.back());
@@ -1455,7 +1455,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   case SILInstructionKind::PartialApplyInst: {
     auto Ty = MF->getType(TyID);
     auto Ty2 = MF->getType(TyID2);
-    SILType FnTy = getSILType(Ty, SILValueCategory::Object, nullptr);
+    SILType FnTy = getSILType(Ty, SILValueCategory::Object, Fn);
     SILType closureTy = getSILType(Ty2, SILValueCategory::Object, Fn);
 
     SubstitutionMap Substitutions = MF->getSubstitutionMap(NumSubs);

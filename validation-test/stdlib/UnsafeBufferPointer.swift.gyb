@@ -63,7 +63,7 @@ ${SelfName}TestSuite.test("AssociatedTypes") {
 %   if IsRaw:
     iteratorType: ${SelfType}.Iterator.self,
 %   else:
-    iteratorType: UnsafeBufferPointerIterator<Float>.self,
+    iteratorType: UnsafeBufferPointer<Float>.Iterator.self,
 %   end
     subSequenceType: Slice<${SelfType}>.self,
     indexType: Int.self,
@@ -361,6 +361,31 @@ UnsafeMutableBufferPointerTestSuite.test("withContiguous(Mutable)StorageIfAvaila
   expectEqual(result1, result2)
 }
 
+UnsafeMutableBufferPointerTestSuite.test("Slice.withContiguousStorageIfAvailable") {
+  guard #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) else {
+    return
+  }
+
+  for test in subscriptRangeTests {
+    let c = test.collection.map { MinimalEquatableValue($0.value) }
+    let buffer = UnsafeMutableBufferPointer<MinimalEquatableValue>.allocate(
+      capacity: test.collection.count)
+    var (it, idx) = buffer.initialize(from: c)
+    expectEqual(buffer.endIndex, idx)
+    expectNil(it.next())
+
+    let expected = test.expected.map { MinimalEquatableValue($0.value) }
+    let r1: Void? = buffer[test.bounds].withContiguousStorageIfAvailable { b in
+      expectTrue(expected.elementsEqual(b))
+    }
+    expectNotNil(r1)
+    let r2: Void? = buffer[test.bounds].withContiguousMutableStorageIfAvailable { b in
+      expectTrue(expected.elementsEqual(b))
+    }
+    expectNotNil(r2)
+  }
+}
+
 UnsafeMutableBufferPointerTestSuite.test("sort") {
   var values = (0..<1000).map({ _ in Int.random(in: 0..<100) })
   let sortedValues = values.sorted()
@@ -389,7 +414,7 @@ for testIndex in (0..<bufCount) {
 % Type = 'Unsafe' + ('Mutable' if mutable else '') + ('Raw' if raw else '') + 'BufferPointer'
   ${Type}TestSuite.test("${action}Element\(testIndex)ViaSlice") {
 % if raw:
-    let allocated = UnsafeMutableRawPointer.allocate(bytes: bufCount, alignedTo: 8)
+    let allocated = UnsafeMutableRawPointer.allocate(byteCount: bufCount, alignment: 8)
     for i in 0..<bufCount {
       allocated.storeBytes(of: UInt8(i), toByteOffset: i, as: UInt8.self)
     }
@@ -400,7 +425,7 @@ for testIndex in (0..<bufCount) {
     defer { allocated.deallocate() }
 
     let buffer = ${Type}(start: allocated, count: bufCount)
-    ${'var' if mutable else 'let'} slice = buffer[sliceRange]
+    ${'var' if mutable and action <> 'read' else 'let'} slice = buffer[sliceRange]
 
     if _isDebugAssertConfiguration(),
        testIndex < sliceRange.lowerBound ||
@@ -430,7 +455,7 @@ for testRange in testRanges {
 % Type = 'Unsafe' + ('Mutable' if mutable else '') + ('Raw' if raw else '') + 'BufferPointer'
   ${Type}TestSuite.test("${action}Slice\(testRange)ViaSlice") {
 % if raw:
-    let allocated = UnsafeMutableRawPointer.allocate(bytes: bufCount+2, alignedTo: 8)
+    let allocated = UnsafeMutableRawPointer.allocate(byteCount: bufCount+2, alignment: 8)
     for i in 0..<bufCount+2 {
       allocated.storeBytes(of: UInt8(i), toByteOffset: i, as: UInt8.self)
     }
@@ -441,7 +466,7 @@ for testRange in testRanges {
     defer { allocated.deallocate() }
 
     let buffer = ${Type}(start: allocated, count: bufCount+2)
-    ${'var' if mutable else 'let'} slice = buffer[sliceRange]
+    ${'var' if mutable and action <> 'read' else 'let'} slice = buffer[sliceRange]
 
     if _isDebugAssertConfiguration(),
       testRange.lowerBound < sliceRange.lowerBound ||
@@ -937,7 +962,7 @@ UnsafeMutable${'Raw' if IsRaw else ''}BufferPointerTestSuite.test("subscript/${R
 
 UnsafeMutable${'Raw' if IsRaw else ''}BufferPointerTestSuite.test("subscript/set/overlaps") {
 % if IsRaw:
-  let buffer = UnsafeMutableRawBufferPointer.allocate(count: 4)
+  let buffer = UnsafeMutableRawBufferPointer.allocate(byteCount: 4, alignment: 1)
 % else:
   let buffer = UnsafeMutableBufferPointer<Int>.allocate(capacity: 4)
 % end
@@ -970,7 +995,7 @@ UnsafeMutable${'Raw' if IsRaw else ''}BufferPointerTestSuite.test("subscript/set
 
 UnsafeMutable${'Raw' if IsRaw else ''}BufferPointerTestSuite.test("nonmutating-swapAt") {
 % if IsRaw:
-  let allocated = UnsafeMutableRawPointer.allocate(bytes: 4, alignedTo: 8)
+  let allocated = UnsafeMutableRawPointer.allocate(byteCount: 4, alignment: 8)
   let buffer = UnsafeMutableRawBufferPointer(start: allocated, count: 3)
   allocated.storeBytes(of: UInt8.max, toByteOffset: 3, as: UInt8.self)
 % else:

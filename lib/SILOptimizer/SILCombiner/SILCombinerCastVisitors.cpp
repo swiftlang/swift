@@ -286,9 +286,12 @@ SILCombiner::visitUncheckedRefCastAddrInst(UncheckedRefCastAddrInst *URCI) {
   Builder.setCurrentDebugScope(URCI->getDebugScope());
   LoadInst *load = Builder.createLoad(Loc, URCI->getSrc(),
                                       LoadOwnershipQualifier::Unqualified);
-  auto *cast = Builder.tryCreateUncheckedRefCast(Loc, load,
-                                                 DestTy.getObjectType());
-  assert(cast && "SILBuilder cannot handle reference-castable types");
+
+  assert(SILType::canRefCast(load->getType(), DestTy.getObjectType(),
+                             Builder.getModule()) &&
+         "SILBuilder cannot handle reference-castable types");
+  auto *cast = Builder.createUncheckedRefCast(Loc, load,
+                                              DestTy.getObjectType());
   Builder.createStore(Loc, cast, URCI->getDest(),
                       StoreOwnershipQualifier::Unqualified);
 
@@ -393,11 +396,12 @@ visitUncheckedBitwiseCastInst(UncheckedBitwiseCastInst *UBCI) {
                                                  UBCI->getOperand(),
                                                  UBCI->getType());
 
-  if (auto refCast = Builder.tryCreateUncheckedRefCast(
-        UBCI->getLoc(), UBCI->getOperand(), UBCI->getType()))
-    return refCast;
+  if (!SILType::canRefCast(UBCI->getOperand()->getType(), UBCI->getType(),
+                           Builder.getModule()))
+    return nullptr;
 
-  return nullptr;
+  return Builder.createUncheckedRefCast(UBCI->getLoc(), UBCI->getOperand(),
+                                        UBCI->getType());
 }
 
 SILInstruction *

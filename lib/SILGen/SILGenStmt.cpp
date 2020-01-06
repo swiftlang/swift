@@ -903,14 +903,28 @@ void StmtEmitter::visitRepeatWhileStmt(RepeatWhileStmt *S) {
 }
 
 void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
+  // Dig out information about the sequence conformance.
+  auto sequenceConformance = S->getSequenceConformance();
+  Type sequenceType = S->getSequence()->getType();
+  auto sequenceProto =
+      SGF.getASTContext().getProtocol(KnownProtocolKind::Sequence);
+  auto sequenceSubs = SubstitutionMap::getProtocolSubstitutions(
+      sequenceProto, sequenceType, sequenceConformance);
+
   // Emit the 'iterator' variable that we'll be using for iteration.
   LexicalScope OuterForScope(SGF, CleanupLocation(S));
   {
     auto initialization =
         SGF.emitInitializationForVarDecl(S->getIteratorVar(), false);
     SILLocation loc = SILLocation(S->getSequence());
+
+    // Compute the reference to the Sequence's makeIterator().
+    FuncDecl *makeIteratorReq = SGF.getASTContext().getSequenceMakeIterator();
+    ConcreteDeclRef makeIteratorRef(makeIteratorReq, sequenceSubs);
+
+    // Call makeIterator().
     RValue result = SGF.emitApplyMethod(
-        loc, S->getMakeIterator(), ArgumentSource(S->getSequence()),
+        loc, makeIteratorRef, ArgumentSource(S->getSequence()),
         PreparedArguments(ArrayRef<AnyFunctionType::Param>({})),
         SGFContext(initialization.get()));
     if (!result.isInContext()) {
@@ -952,8 +966,26 @@ void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
   JumpDest endDest = createJumpDest(S->getBody());
   SGF.BreakContinueDestStack.push_back({ S, endDest, loopDest });
 
+  // Compute the reference to the the iterator's next().
+  auto iteratorProto =
+      SGF.getASTContext().getProtocol(KnownProtocolKind::IteratorProtocol);
+  ValueDecl *iteratorNextReq = iteratorProto->getSingleRequirement(
+      DeclName(SGF.getASTContext(), SGF.getASTContext().Id_next,
+               ArrayRef<Identifier>()));
+  auto iteratorAssocType =
+      sequenceProto->getAssociatedType(SGF.getASTContext().Id_Iterator);
+  auto iteratorMemberRef = DependentMemberType::get(
+      sequenceProto->getSelfInterfaceType(), iteratorAssocType);
+  auto iteratorType = sequenceConformance.getAssociatedType(
+      sequenceType, iteratorMemberRef);
+  auto iteratorConformance = sequenceConformance.getAssociatedConformance(
+      sequenceType, iteratorMemberRef, iteratorProto);
+  auto iteratorSubs = SubstitutionMap::getProtocolSubstitutions(
+      iteratorProto, iteratorType, iteratorConformance);
+  ConcreteDeclRef iteratorNextRef(iteratorNextReq, iteratorSubs);
+
   auto buildArgumentSource = [&]() {
-    if (cast<FuncDecl>(S->getIteratorNext().getDecl())->getSelfAccessKind() ==
+    if (cast<FuncDecl>(iteratorNextRef.getDecl())->getSelfAccessKind() ==
         SelfAccessKind::Mutating) {
       LValue lv =
           SGF.emitLValue(S->getIteratorVarRef(), SGFAccessKind::ReadWrite);
@@ -969,7 +1001,7 @@ void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
   auto buildElementRValue = [&](SILLocation loc, SGFContext ctx) {
     RValue result;
     result = SGF.emitApplyMethod(
-        loc, S->getIteratorNext(), buildArgumentSource(),
+        loc, iteratorNextRef, buildArgumentSource(),
         PreparedArguments(ArrayRef<AnyFunctionType::Param>({})),
         S->getElementExpr() ? SGFContext() : ctx);
     if (S->getElementExpr()) {

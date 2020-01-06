@@ -74,7 +74,6 @@ static void addOwnershipModelEliminatorPipeline(SILPassPipelinePlan &P) {
 /// Passes for performing definite initialization. Must be run together in this
 /// order.
 static void addDefiniteInitialization(SILPassPipelinePlan &P) {
-  P.addMarkUninitializedFixup();
   P.addDefiniteInitialization();
   P.addRawSILInstLowering();
 }

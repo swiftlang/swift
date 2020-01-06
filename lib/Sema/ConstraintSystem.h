@@ -898,6 +898,11 @@ public:
     return None;
   }
 
+  /// Retrieve a fully-resolved protocol conformance at the given locator
+  /// and with the given protocol.
+  ProtocolConformanceRef resolveConformance(ConstraintLocator *locator,
+                                            ProtocolDecl *proto);
+
   void setExprTypes(Expr *expr) const;
 
   SWIFT_DEBUG_DUMP;
@@ -2367,6 +2372,26 @@ public:
     }
   }
 
+  /// Add a value witness constraint to the constraint system.
+  void addValueWitnessConstraint(
+      Type baseTy, ValueDecl *requirement, Type memberTy, DeclContext *useDC,
+      FunctionRefKind functionRefKind, ConstraintLocatorBuilder locator) {
+    assert(baseTy);
+    assert(memberTy);
+    assert(requirement);
+    assert(useDC);
+    switch (simplifyValueWitnessConstraint(
+        ConstraintKind::ValueWitness, baseTy, requirement, memberTy, useDC,
+        functionRefKind, TMF_GenerateConstraints, locator)) {
+    case SolutionKind::Unsolved:
+      llvm_unreachable("Unsolved result when generating constraints!");
+
+    case SolutionKind::Solved:
+    case SolutionKind::Error:
+      break;
+    }
+  }
+
   /// Add an explicit conversion constraint (e.g., \c 'x as T').
   void addExplicitConversionConstraint(Type fromType, Type toType,
                                        bool allowFixes,
@@ -3267,6 +3292,12 @@ private:
       DeclContext *useDC, FunctionRefKind functionRefKind,
       ArrayRef<OverloadChoice> outerAlternatives, TypeMatchOptions flags,
       ConstraintLocatorBuilder locator);
+
+  /// Attempt to simplify the given value witness constraint.
+  SolutionKind simplifyValueWitnessConstraint(
+      ConstraintKind kind, Type baseType, ValueDecl *member, Type memberType,
+      DeclContext *useDC, FunctionRefKind functionRefKind,
+      TypeMatchOptions flags, ConstraintLocatorBuilder locator);
 
   /// Attempt to simplify the optional object constraint.
   SolutionKind simplifyOptionalObjectConstraint(

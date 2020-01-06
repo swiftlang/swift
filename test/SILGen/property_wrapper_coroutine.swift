@@ -34,7 +34,7 @@ _ = state1.someValues
 
 // >> Check that the _modify coroutine is synthesized properly
 
-// CHECK-LABEL: sil hidden [transparent] [ossa] @$s26property_wrapper_coroutine5StateV6valuesSaySSGvM : $@yield_once @convention(method) (@inout State) -> @yields @inout Array<String> {
+// CHECK-LABEL: sil hidden [ossa] @$s26property_wrapper_coroutine5StateV6valuesSaySSGvM : $@yield_once @convention(method) (@inout State) -> @yields @inout Array<String> {
 // CHECK: bb0([[STATE:%.*]] : $*State):
 // CHECK:  debug_value_addr [[STATE]] : $*State, var, name "self", argno {{.*}}
 // CHECK:  [[BEGIN_ACCESS:%.*]] = begin_access [modify] [unknown] [[STATE]] : $*State

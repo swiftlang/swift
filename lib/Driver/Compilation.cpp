@@ -244,7 +244,7 @@ namespace driver {
     /// Dependency graphs for deciding which jobs are dirty (need running)
     /// or clean (can be skipped).
     using CoarseGrainedDependencyGraph =
-        CoarseGrainedDependencyGraph<const Job *>;
+        swift::CoarseGrainedDependencyGraph<const Job *>;
     CoarseGrainedDependencyGraph CoarseGrainedDepGraph;
     CoarseGrainedDependencyGraph CoarseGrainedDepGraphForRanges;
 
@@ -1361,11 +1361,20 @@ namespace driver {
       // subprocesses than before. And significantly: it's doing so while
       // not exceeding the RAM of a typical 2-core laptop.
 
+      // An explanation of why the partition calculation isn't integer division.
+      // Using an example, a module of 26 files exceeds the limit of 25 and must
+      // be compiled in 2 batches. Integer division yields 26/25 = 1 batch, but
+      // a single batch of 26 exceeds the limit. The calculation must round up,
+      // which can be calculated using: `(x + y - 1) / y`
+      auto DivideRoundingUp = [](size_t Num, size_t Div) -> size_t {
+        return (Num + Div - 1) / Div;
+      };
+
       size_t DefaultSizeLimit = 25;
       size_t NumTasks = TQ->getNumberOfParallelTasks();
       size_t NumFiles = PendingExecution.size();
       size_t SizeLimit = Comp.getBatchSizeLimit().getValueOr(DefaultSizeLimit);
-      return std::max(NumTasks, NumFiles / SizeLimit);
+      return std::max(NumTasks, DivideRoundingUp(NumFiles, SizeLimit));
     }
 
     /// Select jobs that are batch-combinable from \c PendingExecution, combine

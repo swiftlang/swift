@@ -311,7 +311,7 @@ namespace {
 /// A row which we intend to specialize.
 struct RowToSpecialize {
   /// The pattern from this row which we are specializing upon.
-  Pattern *Pattern;
+  swift::Pattern *Pattern;
 
   /// The index of the target row.
   unsigned RowIndex;

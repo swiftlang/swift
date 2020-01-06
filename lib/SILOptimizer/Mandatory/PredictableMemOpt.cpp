@@ -935,8 +935,9 @@ static bool
 terminatorHasAnyKnownPhis(TermInst *ti,
                           ArrayRef<SILPhiArgument *> insertedPhiNodesSorted) {
   for (auto succArgList : ti->getSuccessorBlockArgumentLists()) {
-    if (llvm::any_of(succArgList, [&](SILPhiArgument *arg) {
-          return binary_search(insertedPhiNodesSorted, arg);
+    if (llvm::any_of(succArgList, [&](SILArgument *arg) {
+          return binary_search(insertedPhiNodesSorted,
+                               cast<SILPhiArgument>(arg));
         })) {
       return true;
     }
