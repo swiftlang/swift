@@ -485,10 +485,11 @@ namespace driver {
         // other recompilations. It is possible that the current code marks
         // things that do not need to be marked. Unecessary compilation would
         // result if that were the case.
-        bool wasKnownToNeedRunning = isMarkedInDepGraph(FinishedCmd, forRanges);
+        bool wasKnownToCascade = isMarkedInDepGraph(FinishedCmd, forRanges);
 
-        switch (loadDepGraphFromPath(FinishedCmd, DependenciesFile,
-                                     Comp.getDiags(), forRanges)) {
+        const auto loadResult = loadDepGraphFromPath(FinishedCmd, DependenciesFile,
+        Comp.getDiags(), forRanges);
+        switch (loadResult) {
         case CoarseGrainedDependencyGraph::LoadResult::HadError:
           if (ReturnCode != EXIT_SUCCESS)
             // let the next build handle it.
@@ -501,7 +502,7 @@ namespace driver {
           break;
 
         case CoarseGrainedDependencyGraph::LoadResult::UpToDate:
-          if (!wasKnownToNeedRunning)
+          if (!wasKnownToCascade)
             break;
           LLVM_FALLTHROUGH;
         case CoarseGrainedDependencyGraph::LoadResult::AffectsDownstream:
