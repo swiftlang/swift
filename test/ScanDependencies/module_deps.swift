@@ -44,6 +44,14 @@ import E
 // CHECK: "moduleInterfacePath"
 // CHECK-SAME: E.swiftinterface
 
+/// --------Swift module A
+// CHECK-LABEL: "modulePath": "A.swiftmodule",
+
+// CHECK: directDependencies
+// CHECK-NEXT: {
+// CHECK-NEXT: "clang": "A"
+// CHECK-NEXT: }
+
 /// --------Clang module B
 // CHECK-LABEL: "modulePath": "B.pcm"
 
@@ -62,14 +70,6 @@ import E
 // CHECK: directDependencies
 // CHECK-NEXT: {
 // CHECK-NEXT: "clang": "SwiftShims"
-
-/// --------Swift module A
-// CHECK-LABEL: "modulePath": "A.swiftmodule",
-
-// CHECK: directDependencies
-// CHECK-NEXT: {
-// CHECK-NEXT: "clang": "A"
-// CHECK-NEXT: }
 
 /// --------Clang module SwiftShims
 // CHECK-LABEL: "modulePath": "SwiftShims.pcm",

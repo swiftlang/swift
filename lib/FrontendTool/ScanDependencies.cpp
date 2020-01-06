@@ -21,16 +21,35 @@
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/STLExtras.h"
-#include "swift/ClangImporter/ClangImporter.h"
 #include "swift/Frontend/FrontendOptions.h"
 #include "clang/Basic/Module.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/ADT/StringSet.h"
 #include "llvm/Support/FileSystem.h"
 #include <set>
 
 using namespace swift;
+
+/// Find all of the imported Clang modules starting with the given module name.
+static void findAllImportedClangModules(ASTContext &ctx, StringRef moduleName,
+                                        ModuleDependenciesCache &cache,
+                                        std::vector<std::string> &allModules,
+                                        llvm::StringSet<> &knownModules) {
+  if (!knownModules.insert(moduleName).second)
+    return;
+  allModules.push_back(moduleName);
+
+  auto dependencies = cache.findDependencies(
+      moduleName, ModuleDependenciesKind::Clang);
+  if (!dependencies)
+    return;
+
+  for (const auto &dep : dependencies->getModuleDependencies()) {
+    findAllImportedClangModules(ctx, dep, cache, allModules, knownModules);
+  }
+}
 
 /// Resolve the direct dependencies of the given module.
 static std::vector<ModuleDependencyID> resolveDirectDependencies(
@@ -55,7 +74,25 @@ static std::vector<ModuleDependencyID> resolveDirectDependencies(
   // For a Swift module, look for overlays for each of the Clang modules it
   // depends on.
   if (isSwift) {
-    // FIXME: Implement this.
+    // Find all of the Clang modules this Swift module depends on.
+    std::vector<std::string> allClangModules;
+    llvm::StringSet<> knownModules;
+    for (const auto &dep : result) {
+      if (dep.second != ModuleDependenciesKind::Clang)
+        continue;
+
+      findAllImportedClangModules(ctx, dep.first, cache, allClangModules,
+                                  knownModules);
+    }
+
+    // Look for overlays for each of the Clang modules.
+    for (const auto &clangDep : allClangModules) {
+      if (auto found = ctx.getModuleDependencies(
+              clangDep, /*onlyClangModule=*/false, cache)) {
+        if (found->getKind() == ModuleDependenciesKind::Swift)
+          result.push_back({clangDep, found->getKind()});
+      }
+    }
   }
 
   return result;
@@ -317,7 +354,7 @@ bool swift::scanDependencies(ASTContext &Context, ModuleDecl *mainModule,
   writeJSON(out, Context, cache, allModules.getArrayRef());
 
   // This process succeeds regardless of whether any errors occurred.
-  // FIXME: We shouldn't need this, but it's masking bugs on our scanning
+  // FIXME: We shouldn't need this, but it's masking bugs in our scanning
   // logic where we don't create a fresh context when scanning Swift interfaces
   // that includes their own command-line flags.
   Context.Diags.resetHadAnyError();
