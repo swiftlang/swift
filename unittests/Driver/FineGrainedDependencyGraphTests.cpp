@@ -207,9 +207,9 @@ TEST(ModuleDepGraph, SimpleDependent) {
   EXPECT_EQ(simulateLoad(graph, &job1, {{dependsTopLevel, {"x", "b", "z"}}}),
             LoadResult::AffectsDownstream);
   {
-    auto marked = graph.markTransitive(&job0);
-    EXPECT_EQ(1u, marked.size());
-    EXPECT_EQ(&job1, marked.front());
+    auto found = graph.markTransitive(&job0);
+    EXPECT_EQ(1u, found.size());
+    EXPECT_TRUE(contains(found, &job1));
   }
   EXPECT_TRUE(graph.isMarked(&job0));
   EXPECT_TRUE(graph.isMarked(&job1));
@@ -228,9 +228,9 @@ TEST(ModuleDepGraph, SimpleDependentReverse) {
             LoadResult::AffectsDownstream);
 
   {
-    auto marked = graph.markTransitive(&job1);
-    EXPECT_EQ(1u, marked.size());
-    EXPECT_EQ(&job0, marked.front());
+    auto found = graph.markTransitive(&job1);
+    EXPECT_EQ(1u, found.size());
+    EXPECT_TRUE(contains(found, &job0));
   }
   EXPECT_TRUE(graph.isMarked(&job0));
   EXPECT_TRUE(graph.isMarked(&job1));
@@ -249,9 +249,9 @@ TEST(ModuleDepGraph, SimpleDependent2) {
             LoadResult::AffectsDownstream);
 
   {
-    auto marked = graph.markTransitive(&job0);
-    EXPECT_EQ(1u, marked.size());
-    EXPECT_EQ(&job1, marked.front());
+    auto found = graph.markTransitive(&job0);
+    EXPECT_EQ(1u, found.size());
+    EXPECT_TRUE(contains(found, &job1));
   }
   EXPECT_TRUE(graph.isMarked(&job0));
   EXPECT_TRUE(graph.isMarked(&job1));
@@ -271,9 +271,9 @@ TEST(ModuleDepGraph, SimpleDependent3) {
             LoadResult::AffectsDownstream);
 
   {
-    auto marked = graph.markTransitive(&job0);
-    EXPECT_EQ(1u, marked.size());
-    EXPECT_EQ(&job1, marked.front());
+    auto found = graph.markTransitive(&job0);
+    EXPECT_EQ(1u, found.size());
+    EXPECT_TRUE(contains(found, &job1));
   }
   EXPECT_TRUE(graph.isMarked(&job0));
   EXPECT_TRUE(graph.isMarked(&job1));
@@ -293,9 +293,9 @@ TEST(ModuleDepGraph, SimpleDependent4) {
             LoadResult::AffectsDownstream);
 
   {
-    auto marked = graph.markTransitive(&job0);
-    EXPECT_EQ(1u, marked.size());
-    EXPECT_EQ(&job1, marked.front());
+    auto found = graph.markTransitive(&job0);
+    EXPECT_EQ(1u, found.size());
+    EXPECT_TRUE(contains(found, &job1));
   }
   EXPECT_TRUE(graph.isMarked(&job0));
   EXPECT_TRUE(graph.isMarked(&job1));
@@ -316,14 +316,14 @@ TEST(ModuleDepGraph, SimpleDependent5) {
             LoadResult::AffectsDownstream);
 
   {
-    auto marked = graph.markTransitive(&job0);
-    EXPECT_EQ(1u, marked.size());
-    EXPECT_EQ(&job1, marked.front());
+    auto found = graph.markTransitive(&job0);
+    EXPECT_EQ(1u, found.size());
+    EXPECT_TRUE(contains(found, &job1));
   }
   EXPECT_TRUE(graph.isMarked(&job0));
   EXPECT_TRUE(graph.isMarked(&job1));
 
-  auto marked = graph.markTransitive(&job0);
+  auto found = graph.markTransitive(&job0);
   EXPECT_EQ(0u, graph.markTransitive(&job0).size());
   EXPECT_TRUE(graph.isMarked(&job0));
   EXPECT_TRUE(graph.isMarked(&job1));
@@ -339,9 +339,9 @@ TEST(ModuleDepGraph, SimpleDependent6) {
       simulateLoad(graph, &job1, {{dependsDynamicLookup, {"x", "b", "z"}}}),
       LoadResult::AffectsDownstream);
   {
-    auto marked = graph.markTransitive(&job0);
-    EXPECT_EQ(1u, marked.size());
-    EXPECT_EQ(&job1, marked.front());
+    auto found = graph.markTransitive(&job0);
+    EXPECT_EQ(1u, found.size());
+    EXPECT_TRUE(contains(found, &job1));
   }
   EXPECT_TRUE(graph.isMarked(&job0));
   EXPECT_TRUE(graph.isMarked(&job1));
@@ -364,9 +364,9 @@ TEST(ModuleDepGraph, SimpleDependentMember) {
       LoadResult::AffectsDownstream);
 
   {
-    auto marked = graph.markTransitive(&job0);
-    EXPECT_EQ(1u, marked.size());
-    EXPECT_EQ(&job1, marked.front());
+    auto found = graph.markTransitive(&job0);
+    EXPECT_EQ(1u, found.size());
+    EXPECT_TRUE(contains(found, &job1));
   }
   EXPECT_TRUE(graph.isMarked(&job0));
   EXPECT_TRUE(graph.isMarked(&job1));
@@ -387,10 +387,10 @@ TEST(ModuleDepGraph, MultipleDependentsSame) {
             LoadResult::AffectsDownstream);
 
   {
-    auto marked = graph.markTransitive(&job0);
-    EXPECT_EQ(2u, marked.size());
-    EXPECT_TRUE(contains(marked, &job1));
-    EXPECT_TRUE(contains(marked, &job2));
+    auto found = graph.markTransitive(&job0);
+    EXPECT_EQ(2u, found.size());
+    EXPECT_TRUE(contains(found, &job1));
+    EXPECT_TRUE(contains(found, &job2));
   }
   EXPECT_TRUE(graph.isMarked(&job0));
   EXPECT_TRUE(graph.isMarked(&job1));
@@ -413,10 +413,10 @@ TEST(ModuleDepGraph, MultipleDependentsDifferent) {
             LoadResult::AffectsDownstream);
 
   {
-    auto marked = graph.markTransitive(&job0);
-    EXPECT_EQ(2u, marked.size());
-    EXPECT_TRUE(contains(marked, &job1));
-    EXPECT_TRUE(contains(marked, &job2));
+    auto found = graph.markTransitive(&job0);
+    EXPECT_EQ(2u, found.size());
+    EXPECT_TRUE(contains(found, &job1));
+    EXPECT_TRUE(contains(found, &job2));
   }
   EXPECT_TRUE(graph.isMarked(&job0));
   EXPECT_TRUE(graph.isMarked(&job1));
@@ -441,10 +441,10 @@ TEST(ModuleDepGraph, ChainedDependents) {
             LoadResult::AffectsDownstream);
 
   {
-    auto marked = graph.markTransitive(&job0);
-    EXPECT_EQ(2u, marked.size());
-    EXPECT_TRUE(contains(marked, &job1));
-    EXPECT_TRUE(contains(marked, &job2));
+    auto found = graph.markTransitive(&job0);
+    EXPECT_EQ(2u, found.size());
+    EXPECT_TRUE(contains(found, &job1));
+    EXPECT_TRUE(contains(found, &job2));
   }
   EXPECT_TRUE(graph.isMarked(&job0));
   EXPECT_TRUE(graph.isMarked(&job1));
@@ -469,10 +469,10 @@ TEST(ModuleDepGraph, ChainedNoncascadingDependents) {
             LoadResult::AffectsDownstream);
 
   {
-    auto marked = graph.markTransitive(&job0);
-    EXPECT_EQ(2u, marked.size());
-    EXPECT_TRUE(contains(marked, &job1));
-    EXPECT_TRUE(contains(marked, &job2));
+    auto found = graph.markTransitive(&job0);
+    EXPECT_EQ(2u, found.size());
+    EXPECT_TRUE(contains(found, &job1));
+    EXPECT_TRUE(contains(found, &job2));
   }
   EXPECT_TRUE(graph.isMarked(&job0));
   EXPECT_TRUE(graph.isMarked(&job1));
@@ -497,9 +497,9 @@ TEST(ModuleDepGraph, ChainedNoncascadingDependents2) {
             LoadResult::AffectsDownstream);
 
   {
-    auto marked = graph.markTransitive(&job0);
-    EXPECT_EQ(1u, marked.size());
-    EXPECT_TRUE(contains(marked, &job1));
+    auto found = graph.markTransitive(&job0);
+    EXPECT_EQ(1u, found.size());
+    EXPECT_TRUE(contains(found, &job1));
   }
   EXPECT_TRUE(graph.isMarked(&job0));
   EXPECT_TRUE(graph.isMarked(&job1));
@@ -527,10 +527,10 @@ TEST(ModuleDepGraph, MarkTwoNodes) {
             LoadResult::AffectsDownstream);
 
   {
-    auto marked = graph.markTransitive(&job0);
-    EXPECT_EQ(2u, marked.size());
-    EXPECT_TRUE(contains(marked, &job1));
-    EXPECT_TRUE(contains(marked, &job2));
+    auto found = graph.markTransitive(&job0);
+    EXPECT_EQ(2u, found.size());
+    EXPECT_TRUE(contains(found, &job1));
+    EXPECT_TRUE(contains(found, &job2));
   }
   EXPECT_TRUE(graph.isMarked(&job0));
   EXPECT_TRUE(graph.isMarked(&job1));
@@ -540,9 +540,9 @@ TEST(ModuleDepGraph, MarkTwoNodes) {
   EXPECT_FALSE(graph.isMarked(&job12));
 
   {
-    auto marked = graph.markTransitive(&job10);
-    EXPECT_EQ(1u, marked.size());
-    EXPECT_EQ(&job11, marked.front());
+    auto found = graph.markTransitive(&job10);
+    EXPECT_EQ(1u, found.size());
+    EXPECT_TRUE(contains(found, &job11));
   }
   EXPECT_TRUE(graph.isMarked(&job0));
   EXPECT_TRUE(graph.isMarked(&job1));
@@ -563,9 +563,9 @@ TEST(ModuleDepGraph, MarkOneNodeTwice) {
             LoadResult::AffectsDownstream);
 
   {
-    auto marked = graph.markTransitive(&job0);
-    EXPECT_EQ(1u, marked.size());
-    EXPECT_EQ(&job1, marked.front());
+    auto found = graph.markTransitive(&job0);
+    EXPECT_EQ(1u, found.size());
+    EXPECT_TRUE(contains(found, &job1));
   }
   EXPECT_TRUE(graph.isMarked(&job0));
   EXPECT_TRUE(graph.isMarked(&job1));
@@ -576,9 +576,9 @@ TEST(ModuleDepGraph, MarkOneNodeTwice) {
             LoadResult::AffectsDownstream);
 
   {
-    auto marked = graph.markTransitive(&job0);
-    EXPECT_EQ(1u, marked.size());
-    EXPECT_EQ(&job2, marked.front());
+    auto found = graph.markTransitive(&job0);
+    EXPECT_EQ(1u, found.size());
+    EXPECT_TRUE(contains(found, &job2));
   }
   EXPECT_TRUE(graph.isMarked(&job0));
   EXPECT_TRUE(graph.isMarked(&job1));
@@ -596,9 +596,9 @@ TEST(ModuleDepGraph, MarkOneNodeTwice2) {
             LoadResult::AffectsDownstream);
 
   {
-    auto marked = graph.markTransitive(&job0);
-    EXPECT_EQ(1u, marked.size());
-    EXPECT_EQ(&job1, marked.front());
+    auto found = graph.markTransitive(&job0);
+    EXPECT_EQ(1u, found.size());
+    EXPECT_TRUE(contains(found, &job1));
   }
   EXPECT_TRUE(graph.isMarked(&job0));
   EXPECT_TRUE(graph.isMarked(&job1));
@@ -609,9 +609,9 @@ TEST(ModuleDepGraph, MarkOneNodeTwice2) {
             LoadResult::AffectsDownstream);
 
   {
-    auto marked = graph.markTransitive(&job0);
-    EXPECT_EQ(1u, marked.size());
-    EXPECT_EQ(&job2, marked.front());
+    auto found = graph.markTransitive(&job0);
+    EXPECT_EQ(1u, found.size());
+    EXPECT_TRUE(contains(found, &job2));
   }
   EXPECT_TRUE(graph.isMarked(&job0));
   EXPECT_TRUE(graph.isMarked(&job1));
@@ -639,9 +639,9 @@ TEST(ModuleDepGraph, ReloadDetectsChange) {
             LoadResult::AffectsDownstream);
 
   {
-    auto marked = graph.markTransitive(&job0);
-    EXPECT_EQ(1u, marked.size());
-    EXPECT_EQ(&job2, marked.front());
+    auto found = graph.markTransitive(&job0);
+    EXPECT_EQ(1u, found.size());
+    EXPECT_TRUE(contains(found, &job2));
   }
   EXPECT_TRUE(graph.isMarked(&job0));
   EXPECT_TRUE(graph.isMarked(&job1));
@@ -670,10 +670,10 @@ TEST(ModuleDepGraph, DependencyLoops) {
             LoadResult::AffectsDownstream);
 
   {
-    auto marked = graph.markTransitive(&job0);
-    EXPECT_EQ(2u, marked.size());
-    EXPECT_TRUE(contains(marked, &job1));
-    EXPECT_TRUE(contains(marked, &job2));
+    auto found = graph.markTransitive(&job0);
+    EXPECT_EQ(2u, found.size());
+    EXPECT_TRUE(contains(found, &job1));
+    EXPECT_TRUE(contains(found, &job2));
   }
   EXPECT_TRUE(graph.isMarked(&job0));
   EXPECT_TRUE(graph.isMarked(&job1));
@@ -698,9 +698,9 @@ TEST(ModuleDepGraph, MarkIntransitive) {
   EXPECT_FALSE(graph.isMarked(&job1));
 
   {
-    auto marked = graph.markTransitive(&job0);
-    EXPECT_EQ(1u, marked.size());
-    EXPECT_EQ(&job1, marked.front());
+    auto found = graph.markTransitive(&job0);
+    EXPECT_EQ(1u, found.size());
+    EXPECT_TRUE(contains(found, &job1));
   }
   EXPECT_TRUE(graph.isMarked(&job0));
   EXPECT_TRUE(graph.isMarked(&job1));
@@ -806,9 +806,9 @@ TEST(ModuleDepGraph, ChainedExternalReverse) {
       LoadResult::AffectsDownstream);
 
   {
-    auto marked = graph.markExternal("/bar");
-    EXPECT_EQ(1u, marked.size());
-    EXPECT_EQ(&job1, marked.front());
+    auto found = graph.markExternal("/bar");
+    EXPECT_EQ(1u, found.size());
+    EXPECT_TRUE(contains(found, &job1));
   }
   EXPECT_FALSE(graph.isMarked(&job0));
   EXPECT_TRUE(graph.isMarked(&job1));
@@ -818,9 +818,9 @@ TEST(ModuleDepGraph, ChainedExternalReverse) {
   EXPECT_TRUE(graph.isMarked(&job1));
 
   {
-    auto marked = graph.markExternal("/foo");
-    EXPECT_EQ(1u, marked.size());
-    EXPECT_EQ(&job0, marked.front());
+    auto found = graph.markExternal("/foo");
+    EXPECT_EQ(1u, found.size());
+    EXPECT_TRUE(contains(found, &job0));
   }
   EXPECT_TRUE(graph.isMarked(&job0));
   EXPECT_TRUE(graph.isMarked(&job1));
