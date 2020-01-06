@@ -338,6 +338,9 @@ def create_argument_parser():
     option('--maccatalyst', toggle_true,
            help='Enable building Swift with macCatalyst support')
 
+    option('--maccatalyst-ios-tests', toggle_true,
+           help='When building for macCatalyst run tests with iOS-like target triple')
+
     option('--android', toggle_true,
            help='also build for Android')
 
