@@ -24,7 +24,7 @@ simulateLoad(ModuleDepGraph &dg, const Job *cmd,
              llvm::StringMap<std::vector<std::string>> simpleNames,
              llvm::StringMap<std::vector<std::pair<std::string, std::string>>>
                  compoundNames = {},
-             const bool includePrivateDeps = true,
+             const bool includePrivateDeps = false,
              const bool hadCompilationError = false) {
   StringRef swiftDeps =
       cmd->getOutput().getAdditionalOutputForType(file_types::TY_SwiftDeps);
@@ -35,6 +35,17 @@ simulateLoad(ModuleDepGraph &dg, const Job *cmd,
       simpleNames, compoundNames);
 
   return dg.loadFromSourceFileDepGraph(cmd, sfdg);
+}
+
+static std::string noncascading(std::string name) {
+  std::string s{SourceFileDepGraph::noncascadingOrPrivatePrefix};
+  s += name;
+  return s;
+}
+static std::string privatize(std::string name) {
+  std::string s{SourceFileDepGraph::noncascadingOrPrivatePrefix};
+  s += name;
+  return s;
 }
 
 LLVM_ATTRIBUTE_UNUSED
@@ -450,9 +461,9 @@ TEST(ModuleDepGraph, ChainedNoncascadingDependents) {
             LoadResult::AffectsDownstream);
   EXPECT_EQ(
       simulateLoad(graph, &job1,
-                   {{dependsNominal, {"x", "b"}}, {providesNominal, {"_z"}}}),
+                   {{dependsNominal, {"x", "b"}}, {providesNominal, {"z"}}}),
       LoadResult::AffectsDownstream);
-  EXPECT_EQ(simulateLoad(graph, &job2, {{dependsNominal, {"_z"}}}),
+  EXPECT_EQ(simulateLoad(graph, &job2, {{dependsNominal, {noncascading("z")}}}),
             LoadResult::AffectsDownstream);
 
   {
@@ -474,11 +485,11 @@ TEST(ModuleDepGraph, ChainedNoncascadingDependents) {
 TEST(ModuleDepGraph, ChainedNoncascadingDependents2) {
   ModuleDepGraph graph;
 
-  EXPECT_EQ(simulateLoad(graph, &job0, {{providesTopLevel, {"a", "_b", "c"}}}),
+  EXPECT_EQ(simulateLoad(graph, &job0, {{providesTopLevel, {"a", noncascading("b"), "c"}}}),
             LoadResult::AffectsDownstream);
   EXPECT_EQ(
       simulateLoad(graph, &job1,
-                   {{dependsTopLevel, {"x", "_b"}}, {providesNominal, {"z"}}}),
+                   {{dependsTopLevel, {"x", noncascading("b")}}, {providesNominal, {"z"}}}),
       LoadResult::AffectsDownstream);
   EXPECT_EQ(simulateLoad(graph, &job2, {{dependsNominal, {"z"}}}),
             LoadResult::AffectsDownstream);

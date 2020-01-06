@@ -764,6 +764,8 @@ public:
                llvm::StringMap<std::vector<std::pair<std::string, std::string>>>
                    compoundNamesByRDK);
 
+  static constexpr char noncascadingOrPrivatePrefix = '#';
+
   /// Nodes are owned by the graph.
   ~SourceFileDepGraph() {
     forEachNode([&](SourceFileDepGraphNode *n) { delete n; });
