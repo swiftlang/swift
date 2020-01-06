@@ -990,6 +990,22 @@ void PrintAST::printAttributes(const Decl *D) {
         Printer << " ";
       }
     }
+
+    // If the declaration has designated inits that won't be visible to
+    // clients, or if it inherits superclass convenience initializers,
+    // then print those attributes specially.
+    if (auto CD = dyn_cast<ClassDecl>(D)) {
+      if (Options.PrintImplicitAttrs) {
+        if (CD->inheritsSuperclassInitializers()) {
+          Printer.printAttrName("@_inheritsConvenienceInitializers");
+          Printer << " ";
+        }
+        if (CD->hasMissingDesignatedInitializers()) {
+          Printer.printAttrName("@_hasMissingDesignatedInitializers");
+          Printer << " ";
+        }
+      }
+    }
   }
 
   D->getAttrs().print(Printer, Options, D);

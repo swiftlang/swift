@@ -3416,6 +3416,7 @@ public:
     DeclContextID contextID;
     bool isImplicit, isObjC;
     bool inheritsSuperclassInitializers;
+    bool hasMissingDesignatedInits;
     GenericSignatureID genericSigID;
     TypeID superclassID;
     uint8_t rawAccessLevel;
@@ -3424,6 +3425,7 @@ public:
     decls_block::ClassLayout::readRecord(scratch, nameID, contextID,
                                          isImplicit, isObjC,
                                          inheritsSuperclassInitializers,
+                                         hasMissingDesignatedInits,
                                          genericSigID, superclassID,
                                          rawAccessLevel, numConformances,
                                          numInheritedTypes,
@@ -3466,6 +3468,8 @@ public:
     theClass->setSuperclass(MF.getType(superclassID));
     ctx.evaluator.cacheOutput(InheritsSuperclassInitializersRequest{theClass},
                               std::move(inheritsSuperclassInitializers));
+    ctx.evaluator.cacheOutput(HasMissingDesignatedInitializersRequest{theClass},
+                              std::move(hasMissingDesignatedInits));
 
     handleInherited(theClass,
                     rawInheritedAndDependencyIDs.slice(0, numInheritedTypes));
@@ -5390,7 +5394,8 @@ Decl *handleErrorAndSupplyMissingClassMember(ASTContext &context,
   Decl *suppliedMissingMember = nullptr;
   auto handleMissingClassMember = [&](const DeclDeserializationError &error) {
     if (error.isDesignatedInitializer())
-      containingClass->setHasMissingDesignatedInitializers();
+      context.evaluator.cacheOutput(
+          HasMissingDesignatedInitializersRequest{containingClass}, true);
     if (error.getNumberOfVTableEntries() > 0)
       containingClass->setHasMissingVTableEntries();
 

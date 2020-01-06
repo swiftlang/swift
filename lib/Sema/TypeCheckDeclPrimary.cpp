@@ -1103,6 +1103,7 @@ static void maybeDiagnoseClassWithoutInitializers(ClassDecl *classDecl) {
 
   auto *superclassDecl = classDecl->getSuperclassDecl();
   if (superclassDecl &&
+      superclassDecl->getModuleContext() != classDecl->getModuleContext() &&
       superclassDecl->hasMissingDesignatedInitializers())
     return;
 
