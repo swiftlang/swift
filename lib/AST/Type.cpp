@@ -17,6 +17,7 @@
 #include "swift/AST/Types.h"
 #include "ForeignRepresentationInfo.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/ReferenceCounting.h"
 #include "swift/AST/TypeCheckRequests.h"
@@ -3237,6 +3238,11 @@ Type ProtocolCompositionType::get(const ASTContext &C,
   // TODO: Canonicalize away HasExplicitAnyObject if it is implied
   // by one of our member protocols.
   return build(C, CanTypes, HasExplicitAnyObject);
+}
+
+void AnyFunctionType::ExtInfo::Uncommon::printClangFunctionType(
+    ClangModuleLoader *cml, llvm::raw_ostream &os) {
+  cml->printClangType(ClangFunctionType, os);
 }
 
 void

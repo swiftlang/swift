@@ -3275,6 +3275,29 @@ void ClangImporter::verifyAllModules() {
 #endif
 }
 
+const clang::Type *
+ClangImporter::parseClangFunctionType(StringRef typeStr,
+                                      SourceLoc loc) const {
+  auto &sema = Impl.getClangSema();
+  StringRef filename = Impl.SwiftContext.SourceMgr.getDisplayNameForLoc(loc);
+  // TODO: Obtain a clang::SourceLocation from the swift::SourceLoc we have
+  auto parsedType = sema.ParseTypeFromStringCallback(typeStr, filename, {});
+  if (!parsedType.isUsable())
+    return nullptr;
+  clang::QualType resultType = clang::Sema::GetTypeFromParser(parsedType.get());
+  auto *typePtr = resultType.getTypePtrOrNull();
+  if (typePtr && (typePtr->isFunctionPointerType()
+                  || typePtr->isBlockPointerType()))
+      return typePtr;
+  return nullptr;
+}
+
+void ClangImporter::printClangType(const clang::Type *type,
+                                   llvm::raw_ostream &os) const {
+  auto policy = clang::PrintingPolicy(getClangASTContext().getLangOpts());
+  clang::QualType(type, 0).print(os, policy);
+}
+
 //===----------------------------------------------------------------------===//
 // ClangModule Implementation
 //===----------------------------------------------------------------------===//
