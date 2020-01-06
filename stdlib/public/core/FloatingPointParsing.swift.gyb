@@ -146,7 +146,7 @@ extension ${Self}: LosslessStringConvertible {
       let endPtr = withUnsafeMutablePointer(to: &result) {
         _swift_stdlib_strto${cFuncSuffix2[bits]}_clocale(chars, $0)
       }
-			// Verify that all the characters were consumed.
+      // Verify that all the characters were consumed.
       if endPtr == nil || endPtr![0] != 0 {
         return nil
       }
