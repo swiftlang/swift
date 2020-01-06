@@ -804,17 +804,6 @@ ManagedValue SILGenBuilder::createUncheckedAddrCast(SILLocation loc, ManagedValu
   return cloner.clone(cast);
 }
 
-ManagedValue SILGenBuilder::tryCreateUncheckedRefCast(SILLocation loc,
-                                                      ManagedValue original,
-                                                      SILType type) {
-  CleanupCloner cloner(*this, original);
-  SILValue result = tryCreateUncheckedRefCast(loc, original.getValue(), type);
-  if (!result)
-    return ManagedValue();
-  original.forward(SGF);
-  return cloner.clone(result);
-}
-
 ManagedValue SILGenBuilder::createUncheckedTrivialBitCast(SILLocation loc,
                                                           ManagedValue original,
                                                           SILType type) {
