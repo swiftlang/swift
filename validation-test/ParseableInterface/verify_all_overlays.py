@@ -7,6 +7,11 @@
 # RUN: %{python} %s %target-os %target-cpu %platform-sdk-overlay-dir %t \
 # RUN:   %target-swift-frontend -build-module-from-parseable-interface \
 # RUN:     -Fsystem %sdk/System/Library/PrivateFrameworks/ \
+# SWIFT_ENABLE_TENSORFLOW
+# NOTE(TF-1097): Remove flag when retroactive derivative registration is enabled
+# by default.
+# RUN:     -Xllvm -enable-experimental-cross-file-derivative-registration \
+# SWIFT_ENABLE_TENSORFLOW END
 # RUN:     | sort > %t/failures.txt
 # RUN: grep '# %target-os:' %s > %t/filter.txt || true
 # RUN: test ! -e %t/failures.txt || \
