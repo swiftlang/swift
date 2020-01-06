@@ -1947,9 +1947,9 @@ public:
 /// }
 /// ```
 ///
-/// Here `min` refers to a global function `min<T>(_: T, _: T)` in `Swift`
+/// Here `max` refers to a global function `max<T>(_: T, _: T)` in `Swift`
 /// module and can only be accessed by adding `Swift.` to it, because `Sequence`
-/// has a member named `min` which accepts a single argument.
+/// has a member named `max` which accepts a single argument.
 class MissingQuialifierInMemberRefFailure final : public FailureDiagnostic {
 public:
   MissingQuialifierInMemberRefFailure(ConstraintSystem &cs,
