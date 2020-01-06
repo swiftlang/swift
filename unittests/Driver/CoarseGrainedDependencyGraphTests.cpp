@@ -768,3 +768,22 @@ TEST(CoarseGrainedDependencyGraph, ChainedExternalPreMarked) {
   EXPECT_TRUE(graph.isMarked(0));
   EXPECT_FALSE(graph.isMarked(1));
 }
+
+TEST(CoarseGrainedDependencyGraph, ChainedPrivateDoesNotCascade) {
+ CoarseGrainedDependencyGraph<uintptr_t> graph;
+  EXPECT_EQ(loadFromString(graph, 0,
+                           providesNominal, "z",
+                           dependsTopLevel, "!private a"),
+                           LoadResult::UpToDate);
+  EXPECT_EQ(loadFromString(graph, 1,
+                           providesTopLevel, "a"),
+                           LoadResult::UpToDate);
+  EXPECT_EQ(loadFromString(graph, 2,
+                           dependsNominal, "z"),
+                           LoadResult::UpToDate);
+
+  const auto nodes = graph.markTransitive(1); // compiled 1
+  EXPECT_EQ(nodes.size(), 1u); // need to compile 0 but not 2
+  EXPECT_TRUE(contains(nodes, 0));
+  EXPECT_FALSE(graph.isMarked(0));
+}

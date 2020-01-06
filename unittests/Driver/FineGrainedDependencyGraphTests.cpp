@@ -842,3 +842,18 @@ TEST(ModuleDepGraph, ChainedExternalPreMarked) {
   EXPECT_TRUE(graph.isMarked(&job0));
   EXPECT_FALSE(graph.isMarked(&job1));
 }
+
+TEST(ModuleDepGraph, ChainedPrivateDoesNotCascade) {
+  ModuleDepGraph graph;
+  simulateLoad(graph, &job0, {
+    {providesNominal, {"z"}},
+    {dependsTopLevel, {noncascading("a")}}
+  });
+  simulateLoad(graph, &job1, {{providesTopLevel, {"a"}}});
+  simulateLoad(graph, &job2, {{dependsNominal, {"z"}}});
+  
+  const auto jobs1 = graph.markTransitive(&job1);
+  EXPECT_EQ(1u, jobs1.size());
+  EXPECT_TRUE(contains(jobs1, &job0));
+  EXPECT_FALSE(graph.isMarked(&job0));
+}
