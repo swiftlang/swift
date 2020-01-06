@@ -421,6 +421,18 @@ function verify_host_is_supported() {
     esac
 }
 
+function get_lldb_cmake_cache_for_host() {
+    local host="$1"
+    case ${host} in
+        macosx-*)
+            echo "Apple-lldb-macOS.cmake"
+            ;;
+        linux-*)
+            echo "Apple-lldb-Linux.cmake"
+            ;;
+    esac
+}
+
 function set_build_options_for_host() {
     llvm_cmake_options=()
     swift_cmake_options=()
@@ -1848,11 +1860,7 @@ for host in "${ALL_HOSTS[@]}"; do
                 LLDB_BUILD_DATE=$(date +%Y-%m-%d)
 
                 # Pick the right cache.
-                if [[ "$(uname -s)" == "Darwin" ]] ; then
-                  cmake_cache="Apple-lldb-macOS.cmake"
-                else
-                  cmake_cache="Apple-lldb-Linux.cmake"
-                fi
+                cmake_cache=$(get_lldb_cmake_cache_for_host ${host})
 
                 # Options to find the just-built libddispatch and Foundation.
                 if [[ "$(uname -s)" == "Darwin" || "${SKIP_BUILD_FOUNDATION}" ]] ; then
@@ -1900,7 +1908,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DLLDB_SWIFTC:PATH="$(build_directory ${LOCAL_HOST} swift)/bin/swiftc"
                     -DLLDB_SWIFT_LIBS:PATH="$(build_directory ${LOCAL_HOST} swift)/lib/swift"
                     -DCMAKE_INSTALL_PREFIX:PATH="$(get_host_install_prefix ${host})"
-                    -DLLDB_FRAMEWORK_INSTALL_DIR="$(get_host_install_prefix ${host})../System/Library/PrivateFrameworks"
+                    -DLLDB_FRAMEWORK_INSTALL_PREFIX:PATH="$(get_host_install_prefix ${host})"
                     -DLLVM_DIR:PATH=${llvm_build_dir}/lib/cmake/llvm
                     -DClang_DIR:PATH=${llvm_build_dir}/lib/cmake/clang
                     -DSwift_DIR:PATH=${swift_build_dir}/lib/cmake/swift
