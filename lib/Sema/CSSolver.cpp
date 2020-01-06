@@ -1127,7 +1127,7 @@ bool ConstraintSystem::solve(Expr *&expr,
       return true;
 
     case SolutionResult::Kind::UndiagnosedError:
-      diagnoseFailureForExpr(expr);
+      diagnoseFailureFor(expr);
       salvagedResult.markAsDiagnosed();
       return true;
 

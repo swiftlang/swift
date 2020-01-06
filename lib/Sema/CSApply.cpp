@@ -7206,10 +7206,9 @@ bool ConstraintSystem::applySolutionFixes(const Solution &solution) {
 
 /// Apply a given solution to the expression, producing a fully
 /// type-checked expression.
-Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr,
-                                      Type convertType,
-                                      bool discardedExpr,
-                                      bool performingDiagnostics) {
+llvm::PointerUnion<Expr *, Stmt *> ConstraintSystem::applySolutionImpl(
+    Solution &solution, SolutionApplicationTarget target, Type convertType,
+    bool discardedExpr, bool performingDiagnostics) {
   // If any fixes needed to be applied to arrive at this solution, resolve
   // them to specific expressions.
   if (!solution.Fixes.empty()) {
@@ -7228,7 +7227,7 @@ Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr,
 
       // If we didn't manage to diagnose anything well, so fall back to
       // diagnosing mining the system to construct a reasonable error message.
-      diagnoseFailureForExpr(expr);
+      diagnoseFailureFor(target);
       return nullptr;
     }
   }
@@ -7236,10 +7235,24 @@ Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr,
   ExprRewriter rewriter(*this, solution, shouldSuppressDiagnostics());
   ExprWalker walker(rewriter);
 
-  // Apply the solution to the expression.
-  auto result = expr->walk(walker);
-  if (!result)
-    return nullptr;
+  // Apply the solution to the target.
+  llvm::PointerUnion<Expr *, Stmt *> result;
+  if (auto expr = target.getAsExpr()) {
+    result = expr->walk(walker);
+  } else {
+    // FIXME: Implement this!
+    llvm_unreachable("Not yet implemented");
+
+#if false
+    auto fn = *target.getAsFunction();
+    auto transform = rewriter.getAppliedBuilderTransform(fn);
+    assert(transform && "Not applying builder transform?");
+    result = walker.applyFunctionBuilderBodyTransform(fn, transform);
+#endif
+  }
+
+  if (result.isNull())
+    return result;
 
   // If we're re-typechecking an expression for diagnostics, don't
   // visit closures that have non-single expression bodies.
@@ -7261,28 +7274,36 @@ Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr,
       return nullptr;
   }
 
-  // We are supposed to use contextual type only if it is present and
-  // this expression doesn't represent the implicit return of the single
-  // expression function which got deduced to be `Never`.
-  auto shouldCoerceToContextualType = [&]() {
-    return convertType && !(getType(result)->isUninhabited() &&
-                            getContextualTypePurpose() == CTP_ReturnSingleExpr);
-  };
+  if (auto resultExpr = result.dyn_cast<Expr *>()) {
+    Expr *expr = target.getAsExpr();
+    assert(expr && "Can't have expression result without expression target");
+    // We are supposed to use contextual type only if it is present and
+    // this expression doesn't represent the implicit return of the single
+    // expression function which got deduced to be `Never`.
+    auto shouldCoerceToContextualType = [&]() {
+      return convertType &&
+          !(getType(resultExpr)->isUninhabited() &&
+            getContextualTypePurpose() == CTP_ReturnSingleExpr);
+    };
 
-  // If we're supposed to convert the expression to some particular type,
-  // do so now.
-  if (shouldCoerceToContextualType()) {
-    result = rewriter.coerceToType(result, convertType,
-                                   getConstraintLocator(expr));
-    if (!result)
-      return nullptr;
-  } else if (getType(result)->hasLValueType() && !discardedExpr) {
-    // We referenced an lvalue. Load it.
-    result = rewriter.coerceToType(result, getType(result)->getRValueType(),
-                                   getConstraintLocator(expr));
+    // If we're supposed to convert the expression to some particular type,
+    // do so now.
+    if (shouldCoerceToContextualType()) {
+      result = rewriter.coerceToType(resultExpr, convertType,
+                                     getConstraintLocator(expr));
+      if (!result)
+        return nullptr;
+    } else if (getType(resultExpr)->hasLValueType() && !discardedExpr) {
+      // We referenced an lvalue. Load it.
+      result = rewriter.coerceToType(resultExpr,
+                                     getType(resultExpr)->getRValueType(),
+                                     getConstraintLocator(expr));
+    }
+
+    if (resultExpr)
+      solution.setExprTypes(resultExpr);
   }
 
-  solution.setExprTypes(result);
   rewriter.finalize();
 
   return result;
@@ -7430,4 +7451,15 @@ Solution &&SolutionResult::takeSolution() && {
 ArrayRef<Solution> SolutionResult::getAmbiguousSolutions() const {
   assert(getKind() == Ambiguous);
   return makeArrayRef(solutions, numSolutions);
+}
+
+llvm::PointerUnion<Expr *, Stmt *> SolutionApplicationTarget::walk(
+    ASTWalker &walker) {
+  switch (kind) {
+  case Kind::expression:
+    return getAsExpr()->walk(walker);
+
+  case Kind::function:
+    return getAsFunction()->getBody()->walk(walker);
+  }
 }
