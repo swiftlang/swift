@@ -42,6 +42,8 @@ static std::string noncascading(std::string name) {
   s += name;
   return s;
 }
+
+LLVM_ATTRIBUTE_UNUSED
 static std::string privatize(std::string name) {
   std::string s{SourceFileDepGraph::noncascadingOrPrivatePrefix};
   s += name;
