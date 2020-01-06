@@ -427,7 +427,7 @@ CanSILFunctionType SILFunctionType::getAutoDiffDerivativeFunctionType(
   // have `@convention(thin)`. IRGen does not support `@convention(c)` functions
   // with multiple results.
   auto extInfo = getExtInfo();
-  if (getLanguage() == SILFunctionLanguage::C)
+  if (getRepresentation() == SILFunctionTypeRepresentation::CFunctionPointer)
     extInfo = extInfo.withRepresentation(SILFunctionTypeRepresentation::Thin);
   return SILFunctionType::get(canGenSig, extInfo, getCoroutineKind(),
                               getCalleeConvention(), newParameters, getYields(),
