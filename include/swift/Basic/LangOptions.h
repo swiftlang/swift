@@ -413,7 +413,8 @@ namespace swift {
     ///
     /// \param suggestedKind Populated with suggested replacement platform condition
     /// \param suggestedValues Populated with suggested replacement values
-    /// if a match is not found.
+    /// if a match is not found, or if the value has been deprecated
+    /// in favor of a newer one.
     static bool checkPlatformConditionSupported(
       PlatformConditionKind Kind, StringRef Value,
       PlatformConditionKind &suggestedKind,
