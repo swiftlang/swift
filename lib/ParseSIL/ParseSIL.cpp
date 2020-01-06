@@ -2072,10 +2072,11 @@ static bool parseAssignOwnershipQualifier(AssignOwnershipQualifier &Result,
 }
 
 // SWIFT_ENABLE_TENSORFLOW
-// Parse an index set, prefaced with the given label. Returns true on error.
-static bool parseIndexSet(Parser &P, StringRef label,
-                          SmallVectorImpl<unsigned> &indices,
-                          const Diagnostic &parseIndexDiag) {
+// Parse a list of integer indices, prefaced with the given string label.
+// Returns true on error.
+static bool parseIndexList(Parser &P, StringRef label,
+                           SmallVectorImpl<unsigned> &indices,
+                           const Diagnostic &parseIndexDiag) {
   SourceLoc loc;
   // Parse `[<label> <integer_literal>...]`.
   if (P.parseToken(tok::l_square, diag::sil_autodiff_expected_lsquare,
@@ -2111,11 +2112,11 @@ parseSILDifferentiabilityWitnessConfigAndFunction(Parser &P, SILParser &SP,
   // Parse parameter and result indices.
   SmallVector<unsigned, 8> parameterIndices;
   SmallVector<unsigned, 8> resultIndices;
-  if (parseIndexSet(P, "parameters", parameterIndices,
-                    diag::sil_autodiff_expected_parameter_index))
+  if (parseIndexList(P, "parameters", parameterIndices,
+                     diag::sil_autodiff_expected_parameter_index))
     return {};
-  if (parseIndexSet(P, "results", resultIndices,
-                    diag::sil_autodiff_expected_result_index))
+  if (parseIndexList(P, "results", resultIndices,
+                     diag::sil_autodiff_expected_result_index))
     return {};
   // Parse witness generic parameter clause.
   GenericSignature witnessGenSig = GenericSignature();
@@ -2945,8 +2946,8 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     //       ^~ jvp   ^~ vjp
     // Parse `[parameters <integer_literal>...]`.
     SmallVector<unsigned, 8> parameterIndices;
-    if (parseIndexSet(P, "parameters", parameterIndices,
-                      diag::sil_autodiff_expected_parameter_index))
+    if (parseIndexList(P, "parameters", parameterIndices,
+                       diag::sil_autodiff_expected_parameter_index))
       return true;
     // Parse the original function value.
     SILValue original;
@@ -2992,8 +2993,8 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     // e.g. linear_function [parameters 0 1 2] %0 : $T with_transpose %1 : $T
     // Parse `[parameters <integer_literal>...]`.
     SmallVector<unsigned, 8> parameterIndices;
-    if (parseIndexSet(P, "parameters", parameterIndices,
-                      diag::sil_autodiff_expected_parameter_index))
+    if (parseIndexList(P, "parameters", parameterIndices,
+                       diag::sil_autodiff_expected_parameter_index))
       return true;
     // Parse the original function value.
     SILValue original;

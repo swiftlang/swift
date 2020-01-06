@@ -5624,8 +5624,7 @@ function. There are two derivative functions: a Jacobian-vector products (JVP)
 function and a vector-Jacobian products (VJP) function.
 
 ``[parameters ...]`` specifies parameter indices that the original function is
-differentiable with respect to. When not specified, it defaults to all
-parameters.
+differentiable with respect to.
 
 A ``with_derivative`` clause specifies the differentiation functions associated
 with the original function. When a ``with_derivative`` clause is not specified,
@@ -5656,7 +5655,7 @@ Bundles a function with its transpose function into a
 ``@differentiable(linear)`` function.
 
 ``[parameters ...]`` specifies parameter indices that the original function is
-linear with respect to. When not specified, it defaults to all parameters.
+linear with respect to.
 
 A ``with_transpose`` clause specifies the transpose function associated
 with the original function. When a ``with_transpose`` clause is not specified,
