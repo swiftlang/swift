@@ -137,6 +137,16 @@ public:
     Decls.push_back(d);
   }
 
+  /// Prepends a declaration to the top-level decls list.
+  ///
+  /// FIXME: This entrypoint exists to support LLDB. Calls to this function are
+  /// always a mistake, and additional uses should not be added.
+  ///
+  /// See rdar://58355191
+  void prependTopLevelDecl(Decl *d) {
+    Decls.insert(Decls.begin(), d);
+  }
+
   /// Retrieves an immutable view of the list of top-level decls in this file.
   ArrayRef<Decl *> getTopLevelDecls() const {
     return Decls;
