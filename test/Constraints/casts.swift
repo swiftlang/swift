@@ -222,3 +222,19 @@ func compare<T>(_: T, _: T) {} // expected-note {{'compare' declared here}}
 func compare<T>(_: T?, _: T?) {}
 
 _ = nil? as? Int?? // expected-error {{nil literal cannot be the source of a conditional cast}}
+
+func test_tuple_casts_no_warn() {
+  struct Foo {}
+
+  let arr: [(Any, Any)] = [(Foo(), Foo())]
+  let tup: (Any, Any) = (Foo(), Foo())
+
+  _ = arr as! [(Foo, Foo)] // Ok
+  _ = tup as! (Foo, Foo) // Ok
+
+  _ = arr as! [(Foo, Foo, Foo)] // expected-warning {{cast from '[(Any, Any)]' to unrelated type '[(Foo, Foo, Foo)]' always fails}}
+  _ = tup as! (Foo, Foo, Foo) // expected-warning {{cast from '(Any, Any)' to unrelated type '(Foo, Foo, Foo)' always fails}}
+
+  _ = arr as! [(a: Foo, Foo)] // expected-warning {{cast from '[(Any, Any)]' to unrelated type '[(a: Foo, Foo)]' always fails}}
+  _ = tup as! (a: Foo, Foo) // expected-warning {{cast from '(Any, Any)' to unrelated type '(a: Foo, Foo)' always fails}}
+}
