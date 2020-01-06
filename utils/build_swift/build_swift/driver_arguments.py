@@ -335,6 +335,9 @@ def create_argument_parser():
     option('--skip-watchos', store_false('watchos'),
            help='set to skip everything watchOS-related')
 
+    option('--maccatalyst', toggle_true,
+           help='Enable building Swift with macCatalyst support')
+
     option('--android', toggle_true,
            help='also build for Android')
 

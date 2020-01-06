@@ -1,3 +1,4 @@
+include(macCatalystUtils)
 include(SwiftList)
 include(SwiftXcodeSupport)
 include(SwiftWindowsSupport)
@@ -30,7 +31,7 @@ endfunction()
 # Compute the library subdirectory to use for the given sdk and
 # architecture, placing the result in 'result_var_name'.
 function(compute_library_subdir result_var_name sdk arch)
-  if(sdk IN_LIST SWIFT_APPLE_PLATFORMS)
+  if(sdk IN_LIST SWIFT_APPLE_PLATFORMS OR sdk STREQUAL "MACCATALYST")
     set("${result_var_name}" "${SWIFT_SDK_${sdk}_LIB_SUBDIR}" PARENT_SCOPE)
   else()
     set("${result_var_name}" "${SWIFT_SDK_${sdk}_LIB_SUBDIR}/${arch}" PARENT_SCOPE)
@@ -89,6 +90,7 @@ endfunction()
 #   ANALYZE_CODE_COVERAGE analyze_code_coverage
 #   RESULT_VAR_NAME result_var_name
 #   DEPLOYMENT_VERSION_OSX version # If provided, overrides the default value of the OSX deployment target set by the Swift project for this compilation only.
+#   DEPLOYMENT_VERSION_MACCATALYST version
 #   DEPLOYMENT_VERSION_IOS version
 #   DEPLOYMENT_VERSION_TVOS version
 #   DEPLOYMENT_VERSION_WATCHOS version
@@ -96,12 +98,17 @@ endfunction()
 # )
 function(_add_variant_c_compile_link_flags)
   set(oneValueArgs SDK ARCH BUILD_TYPE RESULT_VAR_NAME ENABLE_LTO ANALYZE_CODE_COVERAGE
-    DEPLOYMENT_VERSION_OSX DEPLOYMENT_VERSION_IOS DEPLOYMENT_VERSION_TVOS DEPLOYMENT_VERSION_WATCHOS)
+    DEPLOYMENT_VERSION_OSX DEPLOYMENT_VERSION_MACCATALYST DEPLOYMENT_VERSION_IOS DEPLOYMENT_VERSION_TVOS DEPLOYMENT_VERSION_WATCHOS
+    MACCATALYST_BUILD_FLAVOR
+  )
   cmake_parse_arguments(CFLAGS
     ""
     "${oneValueArgs}"
     ""
     ${ARGN})
+
+  get_maccatalyst_build_flavor(maccatalyst_build_flavor
+      "${CFLAGS_SDK}" "${CFLAGS_MACCATALYST_BUILD_FLAVOR}")
 
   set(result ${${CFLAGS_RESULT_VAR_NAME}})
 
@@ -109,7 +116,11 @@ function(_add_variant_c_compile_link_flags)
   if(IS_DARWIN)
     # Check if there's a specific OS deployment version needed for this invocation
     if("${CFLAGS_SDK}" STREQUAL "OSX")
-      set(DEPLOYMENT_VERSION ${CFLAGS_DEPLOYMENT_VERSION_OSX})
+      if(DEFINED maccatalyst_build_flavor)
+        set(DEPLOYMENT_VERSION ${CFLAGS_DEPLOYMENT_VERSION_MACCATALYST})
+      else()
+        set(DEPLOYMENT_VERSION ${CFLAGS_DEPLOYMENT_VERSION_OSX})
+      endif()
     elseif("${CFLAGS_SDK}" STREQUAL "IOS" OR "${CFLAGS_SDK}" STREQUAL "IOS_SIMULATOR")
       set(DEPLOYMENT_VERSION ${CFLAGS_DEPLOYMENT_VERSION_IOS})
     elseif("${CFLAGS_SDK}" STREQUAL "TVOS" OR "${CFLAGS_SDK}" STREQUAL "TVOS_SIMULATOR")
@@ -126,7 +137,13 @@ function(_add_variant_c_compile_link_flags)
   # MSVC, clang-cl, gcc don't understand -target.
   if(CMAKE_C_COMPILER_ID MATCHES "^Clang|AppleClang$" AND
       NOT SWIFT_COMPILER_IS_MSVC_LIKE)
-    list(APPEND result "-target" "${SWIFT_SDK_${CFLAGS_SDK}_ARCH_${CFLAGS_ARCH}_TRIPLE}${DEPLOYMENT_VERSION}")
+    get_target_triple(target target_variant "${CFLAGS_SDK}" "${CFLAGS_ARCH}"
+      MACCATALYST_BUILD_FLAVOR "${maccatalyst_build_flavor}"
+      DEPLOYMENT_VERSION "${DEPLOYMENT_VERSION}")
+    list(APPEND result "-target" "${target}")
+    if(target_variant)
+      list(APPEND result "-target-variant" "${target_variant}")
+    endif()
   endif()
 
   set(_sysroot "${SWIFT_SDK_${CFLAGS_SDK}_ARCH_${CFLAGS_ARCH}_PATH}")
@@ -148,8 +165,21 @@ function(_add_variant_c_compile_link_flags)
   if(IS_DARWIN)
     list(APPEND result
       "-arch" "${CFLAGS_ARCH}"
-      "-F" "${SWIFT_SDK_${CFLAGS_SDK}_PATH}/../../../Developer/Library/Frameworks"
-      "-m${SWIFT_SDK_${CFLAGS_SDK}_VERSION_MIN_NAME}-version-min=${DEPLOYMENT_VERSION}")
+      "-F" "${SWIFT_SDK_${CFLAGS_SDK}_PATH}/../../../Developer/Library/Frameworks")
+
+    set(add_explicit_version TRUE)
+
+    # iOS-like and zippered libraries get their deployment version from the
+    # target triple
+    if(maccatalyst_build_flavor STREQUAL "ios-like" OR
+        maccatalyst_build_flavor STREQUAL "zippered")
+      set(add_explicit_version FALSE)
+    endif()
+
+    if(add_explicit_version)
+      list(APPEND result
+        "-m${SWIFT_SDK_${CFLAGS_SDK}_VERSION_MIN_NAME}-version-min=${DEPLOYMENT_VERSION}")
+     endif()
   endif()
 
   if(CFLAGS_ANALYZE_CODE_COVERAGE)
@@ -165,10 +195,12 @@ function(_add_variant_c_compile_link_flags)
   set("${CFLAGS_RESULT_VAR_NAME}" "${result}" PARENT_SCOPE)
 endfunction()
 
+
 function(_add_variant_c_compile_flags)
   set(oneValueArgs SDK ARCH BUILD_TYPE ENABLE_ASSERTIONS ANALYZE_CODE_COVERAGE
-    DEPLOYMENT_VERSION_OSX DEPLOYMENT_VERSION_IOS DEPLOYMENT_VERSION_TVOS DEPLOYMENT_VERSION_WATCHOS
-    RESULT_VAR_NAME ENABLE_LTO)
+    DEPLOYMENT_VERSION_OSX DEPLOYMENT_VERSION_MACCATALYST DEPLOYMENT_VERSION_IOS DEPLOYMENT_VERSION_TVOS DEPLOYMENT_VERSION_WATCHOS
+    RESULT_VAR_NAME ENABLE_LTO
+    MACCATALYST_BUILD_FLAVOR)
   cmake_parse_arguments(CFLAGS
     "FORCE_BUILD_OPTIMIZED"
     "${oneValueArgs}"
@@ -185,10 +217,12 @@ function(_add_variant_c_compile_flags)
     ENABLE_LTO "${CFLAGS_ENABLE_LTO}"
     ANALYZE_CODE_COVERAGE FALSE
     DEPLOYMENT_VERSION_OSX "${CFLAGS_DEPLOYMENT_VERSION_OSX}"
+    DEPLOYMENT_VERSION_MACCATALYST "${CFLAGS_DEPLOYMENT_VERSION_MACCATALYST}"
     DEPLOYMENT_VERSION_IOS "${CFLAGS_DEPLOYMENT_VERSION_IOS}"
     DEPLOYMENT_VERSION_TVOS "${CFLAGS_DEPLOYMENT_VERSION_TVOS}"
     DEPLOYMENT_VERSION_WATCHOS "${CFLAGS_DEPLOYMENT_VERSION_WATCHOS}"
-    RESULT_VAR_NAME result)
+    RESULT_VAR_NAME result
+    MACCATALYST_BUILD_FLAVOR "${CFLAGS_MACCATALYST_BUILD_FLAVOR}")
 
   is_build_type_optimized("${CFLAGS_BUILD_TYPE}" optimized)
   if(optimized OR CFLAGS_FORCE_BUILD_OPTIMIZED)
@@ -370,6 +404,13 @@ function(_add_variant_swift_compile_flags
     sdk arch build_type enable_assertions result_var_name)
   set(result ${${result_var_name}})
 
+  cmake_parse_arguments(
+    VARIANT             # prefix
+    ""                  # options
+    "MACCATALYST_BUILD_FLAVOR"  # single-value args
+    ""                  # multi-value args
+    ${ARGN})
+
   # On Windows, we don't set SWIFT_SDK_WINDOWS_PATH_ARCH_{ARCH}_PATH, so don't include it.
   # On Android the sdk is split to two different paths for includes and libs, so these
   # need to be set manually.
@@ -379,8 +420,15 @@ function(_add_variant_swift_compile_flags
 
   is_darwin_based_sdk("${sdk}" IS_DARWIN)
   if(IS_DARWIN)
-    list(APPEND result
-        "-target" "${SWIFT_SDK_${sdk}_ARCH_${arch}_TRIPLE}${SWIFT_SDK_${sdk}_DEPLOYMENT_VERSION}")
+    set(sdk_deployment_version "${SWIFT_SDK_${sdk}_DEPLOYMENT_VERSION}")
+    get_target_triple(target target_variant "${sdk}" "${arch}"
+    MACCATALYST_BUILD_FLAVOR "${VARIANT_MACCATALYST_BUILD_FLAVOR}"
+    DEPLOYMENT_VERSION "${sdk_deployment_version}")
+
+    list(APPEND result "-target" "${target}")
+    if(target_variant)
+      list(APPEND result "-target-variant" "${target_variant}")
+    endif()
   else()
     list(APPEND result
         "-target" "${SWIFT_SDK_${sdk}_ARCH_${arch}_TRIPLE}")
@@ -431,8 +479,10 @@ endfunction()
 
 function(_add_variant_link_flags)
   set(oneValueArgs SDK ARCH BUILD_TYPE ENABLE_ASSERTIONS ANALYZE_CODE_COVERAGE
-  DEPLOYMENT_VERSION_OSX DEPLOYMENT_VERSION_IOS DEPLOYMENT_VERSION_TVOS DEPLOYMENT_VERSION_WATCHOS
-  RESULT_VAR_NAME ENABLE_LTO LTO_OBJECT_NAME LINK_LIBRARIES_VAR_NAME LIBRARY_SEARCH_DIRECTORIES_VAR_NAME)
+  DEPLOYMENT_VERSION_OSX DEPLOYMENT_VERSION_MACCATALYST DEPLOYMENT_VERSION_IOS DEPLOYMENT_VERSION_TVOS DEPLOYMENT_VERSION_WATCHOS
+  RESULT_VAR_NAME ENABLE_LTO LTO_OBJECT_NAME LINK_LIBRARIES_VAR_NAME LIBRARY_SEARCH_DIRECTORIES_VAR_NAME
+  MACCATALYST_BUILD_FLAVOR
+  )
   cmake_parse_arguments(LFLAGS
     ""
     "${oneValueArgs}"
@@ -454,11 +504,12 @@ function(_add_variant_link_flags)
     ENABLE_LTO "${LFLAGS_ENABLE_LTO}"
     ANALYZE_CODE_COVERAGE "${LFLAGS_ANALYZE_CODE_COVERAGE}"
     DEPLOYMENT_VERSION_OSX "${LFLAGS_DEPLOYMENT_VERSION_OSX}"
+    DEPLOYMENT_VERSION_MACCATALYST "${LFLAGS_DEPLOYMENT_VERSION_MACCATALYST}"
     DEPLOYMENT_VERSION_IOS "${LFLAGS_DEPLOYMENT_VERSION_IOS}"
     DEPLOYMENT_VERSION_TVOS "${LFLAGS_DEPLOYMENT_VERSION_TVOS}"
     DEPLOYMENT_VERSION_WATCHOS "${LFLAGS_DEPLOYMENT_VERSION_WATCHOS}"
-    RESULT_VAR_NAME result)
-
+    RESULT_VAR_NAME result
+    MACCATALYST_BUILD_FLAVOR  "${LFLAGS_MACCATALYST_BUILD_FLAVOR}")
   if("${LFLAGS_SDK}" STREQUAL "LINUX")
     list(APPEND link_libraries "pthread" "atomic" "dl")
   elseif("${LFLAGS_SDK}" STREQUAL "FREEBSD")
@@ -556,6 +607,9 @@ function(_add_variant_link_flags)
       list(APPEND result "-Wl,-dead_strip")
     endif()
   endif()
+
+  get_maccatalyst_build_flavor(maccatalyst_build_flavor
+    "${LFLAGS_SDK}" "${LFLAGS_MACCATALYST_BUILD_FLAVOR}")
 
   set("${LFLAGS_RESULT_VAR_NAME}" "${result}" PARENT_SCOPE)
   set("${LFLAGS_LINK_LIBRARIES_VAR_NAME}" "${link_libraries}" PARENT_SCOPE)
@@ -662,7 +716,7 @@ endfunction()
 #   _add_swift_library_single(
 #     target
 #     name
-#     [MODULE_TARGET]
+#     [MODULE_TARGETS]
 #     [SHARED]
 #     [STATIC]
 #     [SDK sdk]
@@ -682,6 +736,7 @@ endfunction()
 #     [IS_STDLIB_CORE]
 #     [IS_SDK_OVERLAY]
 #     INSTALL_IN_COMPONENT comp
+#     MACCATALYST_BUILD_FLAVOR flavor
 #     source1 [source2 source3 ...])
 #
 # target
@@ -690,8 +745,8 @@ endfunction()
 # name
 #   Name of the library (e.g., swiftParse).
 #
-# MODULE_TARGET
-#   Name of the module target (e.g., swiftParse-swiftmodule-IOS-armv7).
+# MODULE_TARGETS
+#   Names of the module target (e.g., swiftParse-swiftmodule-IOS-armv7).
 #
 # SHARED
 #   Build a shared library.
@@ -747,6 +802,9 @@ endfunction()
 # INSTALL_IN_COMPONENT comp
 #   The Swift installation component that this library belongs to.
 #
+# MACCATALYST_BUILD_FLAVOR
+#   Possible values are 'ios-like', 'macos-like', 'zippered', 'unzippered-twin'
+#
 # source1 ...
 #   Sources to add into this library
 function(_add_swift_library_single target name)
@@ -770,8 +828,9 @@ function(_add_swift_library_single target name)
         DEPLOYMENT_VERSION_WATCHOS
         INSTALL_IN_COMPONENT
         DARWIN_INSTALL_NAME_DIR
-        MODULE_TARGET
-        SDK)
+        SDK
+        DEPLOYMENT_VERSION_MACCATALYST
+        MACCATALYST_BUILD_FLAVOR)
   set(SWIFTLIB_SINGLE_multiple_parameter_options
         C_COMPILE_FLAGS
         DEPENDS
@@ -785,13 +844,19 @@ function(_add_swift_library_single target name)
         LINK_LIBRARIES
         LLVM_LINK_COMPONENTS
         PRIVATE_LINK_LIBRARIES
-        SWIFT_COMPILE_FLAGS)
+        SWIFT_COMPILE_FLAGS
+        MODULE_TARGETS)
 
   cmake_parse_arguments(SWIFTLIB_SINGLE
                         "${SWIFTLIB_SINGLE_options}"
                         "${SWIFTLIB_SINGLE_single_parameter_options}"
                         "${SWIFTLIB_SINGLE_multiple_parameter_options}"
                         ${ARGN})
+
+  # Determine macCatalyst build flavor
+  get_maccatalyst_build_flavor(maccatalyst_build_flavor
+    "${SWIFTLIB_SINGLE_SDK}" "${SWIFTLIB_SINGLE_MACCATALYST_BUILD_FLAVOR}")
+
   set(SWIFTLIB_SINGLE_SOURCES ${SWIFTLIB_SINGLE_UNPARSED_ARGUMENTS})
 
   translate_flags(SWIFTLIB_SINGLE "${SWIFTLIB_SINGLE_options}")
@@ -811,6 +876,12 @@ function(_add_swift_library_single target name)
   # Determine the subdirectory where this library will be installed.
   set(SWIFTLIB_SINGLE_SUBDIR
       "${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_LIB_SUBDIR}/${SWIFTLIB_SINGLE_ARCHITECTURE}")
+
+  # macCatalyst ios-like builds are installed in the maccatalyst/x86_64 directory
+  if(maccatalyst_build_flavor STREQUAL "ios-like")
+    set(SWIFTLIB_SINGLE_SUBDIR
+        "${SWIFT_SDK_MACCATALYST_LIB_SUBDIR}/${SWIFTLIB_SINGLE_ARCHITECTURE}")
+  endif()
 
   # Include LLVM Bitcode slices for iOS, Watch OS, and Apple TV OS device libraries.
   set(embed_bitcode_arg)
@@ -925,17 +996,24 @@ function(_add_swift_library_single target name)
       ${SWIFTLIB_SINGLE_IS_STDLIB_CORE_keyword}
       ${SWIFTLIB_SINGLE_IS_SDK_OVERLAY_keyword}
       ${embed_bitcode_arg}
-      INSTALL_IN_COMPONENT "${SWIFTLIB_SINGLE_INSTALL_IN_COMPONENT}")
+      INSTALL_IN_COMPONENT "${SWIFTLIB_SINGLE_INSTALL_IN_COMPONENT}"
+      MACCATALYST_BUILD_FLAVOR "${SWIFTLIB_SINGLE_MACCATALYST_BUILD_FLAVOR}")
   add_swift_source_group("${SWIFTLIB_SINGLE_EXTERNAL_SOURCES}")
 
   # If there were any swift sources, then a .swiftmodule may have been created.
   # If that is the case, then add a target which is an alias of the module files.
   set(VARIANT_SUFFIX "-${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_LIB_SUBDIR}-${SWIFTLIB_SINGLE_ARCHITECTURE}")
-  if(NOT "${SWIFTLIB_SINGLE_MODULE_TARGET}" STREQUAL "" AND NOT "${swift_module_dependency_target}" STREQUAL "")
-    add_custom_target("${SWIFTLIB_SINGLE_MODULE_TARGET}"
-      DEPENDS ${swift_module_dependency_target})
-    set_target_properties("${SWIFTLIB_SINGLE_MODULE_TARGET}" PROPERTIES
-      FOLDER "Swift libraries/Modules")
+  if(maccatalyst_build_flavor STREQUAL "ios-like")
+    set(VARIANT_SUFFIX "-${SWIFT_SDK_MACCATALYST_LIB_SUBDIR}-${SWIFTLIB_SINGLE_ARCHITECTURE}")
+  endif()
+
+  if(NOT "${SWIFTLIB_SINGLE_MODULE_TARGETS}" STREQUAL "" AND NOT "${swift_module_dependency_target}" STREQUAL "")
+    foreach(module_target ${SWIFTLIB_SINGLE_MODULE_TARGETS})
+      add_custom_target("${module_target}"
+        DEPENDS ${swift_module_dependency_target})
+      set_target_properties("${module_target}" PROPERTIES
+        FOLDER "Swift libraries/Modules")
+    endforeach()
   endif()
 
   # For standalone overlay builds to work
@@ -1082,6 +1160,13 @@ function(_add_swift_library_single target name)
 
     if(SWIFTLIB_SINGLE_IS_STDLIB)
       set(install_name_dir "${SWIFT_DARWIN_STDLIB_INSTALL_NAME_DIR}")
+
+      # iOS-like overlays are installed in a separate directory so that
+      # unzippered twins do not conflict.
+      if(maccatalyst_build_flavor STREQUAL "ios-like"
+          AND DEFINED SWIFT_DARWIN_MACCATALYST_STDLIB_INSTALL_NAME_DIR)
+        set(install_name_dir "${SWIFT_DARWIN_MACCATALYST_STDLIB_INSTALL_NAME_DIR}")
+      endif()
     endif()
 
     # Always use @rpath for XCTest
@@ -1295,11 +1380,13 @@ function(_add_swift_library_single target name)
     ANALYZE_CODE_COVERAGE "${analyze_code_coverage}"
     ENABLE_LTO "${lto_type}"
     DEPLOYMENT_VERSION_OSX "${SWIFTLIB_DEPLOYMENT_VERSION_OSX}"
+    DEPLOYMENT_VERSION_MACCATALYST "${SWIFTLIB_DEPLOYMENT_VERSION_MACCATALYST}"
     DEPLOYMENT_VERSION_IOS "${SWIFTLIB_DEPLOYMENT_VERSION_IOS}"
     DEPLOYMENT_VERSION_TVOS "${SWIFTLIB_DEPLOYMENT_VERSION_TVOS}"
     DEPLOYMENT_VERSION_WATCHOS "${SWIFTLIB_DEPLOYMENT_VERSION_WATCHOS}"
     "${SWIFTLIB_SINGLE_FORCE_BUILD_OPTIMIZED_keyword}"
     RESULT_VAR_NAME c_compile_flags
+    MACCATALYST_BUILD_FLAVOR "${SWIFTLIB_SINGLE_MACCATALYST_BUILD_FLAVOR}"
     )
 
   if(SWIFTLIB_IS_STDLIB)
@@ -1324,12 +1411,14 @@ function(_add_swift_library_single target name)
     ENABLE_LTO "${lto_type}"
     LTO_OBJECT_NAME "${target}-${SWIFTLIB_SINGLE_SDK}-${SWIFTLIB_SINGLE_ARCHITECTURE}"
     DEPLOYMENT_VERSION_OSX "${SWIFTLIB_DEPLOYMENT_VERSION_OSX}"
+    DEPLOYMENT_VERSION_MACCATALYST "${SWIFTLIB_DEPLOYMENT_VERSION_MACCATALYST}"
     DEPLOYMENT_VERSION_IOS "${SWIFTLIB_DEPLOYMENT_VERSION_IOS}"
     DEPLOYMENT_VERSION_TVOS "${SWIFTLIB_DEPLOYMENT_VERSION_TVOS}"
     DEPLOYMENT_VERSION_WATCHOS "${SWIFTLIB_DEPLOYMENT_VERSION_WATCHOS}"
     RESULT_VAR_NAME link_flags
     LINK_LIBRARIES_VAR_NAME link_libraries
     LIBRARY_SEARCH_DIRECTORIES_VAR_NAME library_search_directories
+    MACCATALYST_BUILD_FLAVOR "${SWIFTLIB_SINGLE_MACCATALYST_BUILD_FLAVOR}"
       )
 
   # Configure plist creation for OS X.
@@ -1565,9 +1654,11 @@ endfunction()
 #     [INSTALL_WITH_SHARED]
 #     INSTALL_IN_COMPONENT comp
 #     DEPLOYMENT_VERSION_OSX version
+#     DEPLOYMENT_VERSION_MACCATALYST version
 #     DEPLOYMENT_VERSION_IOS version
 #     DEPLOYMENT_VERSION_TVOS version
 #     DEPLOYMENT_VERSION_WATCHOS version
+#     MACCATALYST_BUILD_FLAVOR flavor
 #     source1 [source2 source3 ...])
 #
 # name
@@ -1590,6 +1681,14 @@ endfunction()
 #
 # SWIFT_MODULE_DEPENDS_OSX
 #   Swift modules this library depends on when built for OS X.
+#
+# SWIFT_MODULE_DEPENDS_MACCATALYST
+#   Zippered Swift modules this library depends on when built for macCatalyst.
+#   For example, Foundation.
+#
+# SWIFT_MODULE_DEPENDS_MACCATALYST_UNZIPPERED
+#   Unzippered Swift modules this library depends on when built for macCatalyst.
+#   For example, UIKit
 #
 # SWIFT_MODULE_DEPENDS_IOS
 #   Swift modules this library depends on when built for iOS.
@@ -1648,13 +1747,15 @@ endfunction()
 #
 # IS_SDK_OVERLAY
 #   Treat the library as a part of the Swift SDK overlay.
-#   IS_SDK_OVERLAY implies IS_STDLIB.
 #
 # INSTALL_IN_COMPONENT comp
 #   The Swift installation component that this library belongs to.
 #
 # DEPLOYMENT_VERSION_OSX
 #   The minimum deployment version to build for if this is an OSX library.
+#
+# DEPLOYMENT_VERSION_MACCATALYST
+#   The minimum deployment version to build for if this is an macCatalyst library.
 #
 # DEPLOYMENT_VERSION_IOS
 #   The minimum deployment version to build for if this is an iOS library.
@@ -1667,6 +1768,11 @@ endfunction()
 #
 # INSTALL_WITH_SHARED
 #   Install a static library target alongside shared libraries
+#
+# MACCATALYST_BUILD_FLAVOR
+#   Possible values are 'ios-like', 'macos-like', 'zippered', 'unzippered-twin'
+#   Presence of a build flavor requires SWIFT_MODULE_DEPENDS_MACCATALYST to be
+#   defined and have values.
 #
 # source1 ...
 #   Sources to add into this library.
@@ -1689,7 +1795,9 @@ function(add_swift_target_library name)
         DEPLOYMENT_VERSION_TVOS
         DEPLOYMENT_VERSION_WATCHOS
         INSTALL_IN_COMPONENT
-        DARWIN_INSTALL_NAME_DIR)
+        DARWIN_INSTALL_NAME_DIR
+        DEPLOYMENT_VERSION_MACCATALYST
+        MACCATALYST_BUILD_FLAVOR)
   set(SWIFTLIB_multiple_parameter_options
         C_COMPILE_FLAGS
         DEPENDS
@@ -1722,7 +1830,10 @@ function(add_swift_target_library name)
         SWIFT_MODULE_DEPENDS_WATCHOS
         SWIFT_MODULE_DEPENDS_WINDOWS
         SWIFT_MODULE_DEPENDS_FROM_SDK
-        TARGET_SDKS)
+        TARGET_SDKS
+        SWIFT_COMPILE_FLAGS_MACCATALYST
+        SWIFT_MODULE_DEPENDS_MACCATALYST
+        SWIFT_MODULE_DEPENDS_MACCATALYST_UNZIPPERED)
 
   cmake_parse_arguments(SWIFTLIB
                         "${SWIFTLIB_options}"
@@ -1730,6 +1841,15 @@ function(add_swift_target_library name)
                         "${SWIFTLIB_multiple_parameter_options}"
                         ${ARGN})
   set(SWIFTLIB_SOURCES ${SWIFTLIB_UNPARSED_ARGUMENTS})
+
+  # Ensure it's impossible to build for macCatalyst without module dependencies
+  if(SWIFT_ENABLE_MACCATALYST AND SWIFTLIB_MACCATALYST_BUILD_FLAVOR)
+    if((NOT SWIFTLIB_MACCATALYST_BUILD_FLAVOR STREQUAL "zippered") OR
+       SWIFTLIB_SWIFT_MODULE_DEPENDS_OSX)
+      precondition(SWIFTLIB_SWIFT_MODULE_DEPENDS_MACCATALYST
+        MESSAGE "SWIFT_MODULE_DEPENDS_MACCATALYST is required when building for macCatalyst")
+    endif()
+  endif()
 
   # Infer arguments.
 
@@ -1802,11 +1922,50 @@ function(add_swift_target_library name)
       continue()
     endif()
 
+    # Skip building library for macOS if macCatalyst support is not enabled and the
+    # library only builds for macOS when macCatalyst is enabled.
+    if(NOT SWIFT_ENABLE_MACCATALYST AND
+        sdk STREQUAL "OSX" AND
+        SWIFTLIB_MACCATALYST_BUILD_FLAVOR STREQUAL "ios-like")
+      message(STATUS "Skipping OSX SDK for module ${name}")
+      continue()
+    endif()
+
+    # Determine if/what macCatalyst build flavor we are
+    get_maccatalyst_build_flavor(maccatalyst_build_flavor
+      "${sdk}" "${SWIFTLIB_MACCATALYST_BUILD_FLAVOR}")
+
+    set(maccatalyst_build_flavors)
+    if(NOT DEFINED maccatalyst_build_flavor)
+       list(APPEND maccatalyst_build_flavors "none")
+    elseif(maccatalyst_build_flavor STREQUAL "unzippered-twin")
+      list(APPEND maccatalyst_build_flavors "macos-like" "ios-like")
+    else()
+      list(APPEND maccatalyst_build_flavors "${maccatalyst_build_flavor}")
+    endif()
+
+    # Loop over the build flavors for the this library. If it is an unzippered
+    # twin we'll build it twice: once for "macos-like" and once for "ios-like"
+    # flavors.
+    foreach(maccatalyst_build_flavor ${maccatalyst_build_flavors})
+    if(maccatalyst_build_flavor STREQUAL "none")
+      unset(maccatalyst_build_flavor)
+    endif()
+
     set(THIN_INPUT_TARGETS)
 
     # Collect architecture agnostic SDK module dependencies
     set(swiftlib_module_depends_flattened ${SWIFTLIB_SWIFT_MODULE_DEPENDS})
     if(${sdk} STREQUAL OSX)
+       if(DEFINED maccatalyst_build_flavor AND NOT maccatalyst_build_flavor STREQUAL "macos-like")
+          list(APPEND swiftlib_module_depends_flattened
+            ${SWIFTLIB_SWIFT_MODULE_DEPENDS_MACCATALYST})
+          list(APPEND swiftlib_module_depends_flattened
+            ${SWIFTLIB_SWIFT_MODULE_DEPENDS_MACCATALYST_UNZIPPERED})
+        else()
+          list(APPEND swiftlib_module_depends_flattened
+            ${SWIFTLIB_SWIFT_MODULE_DEPENDS_OSX})
+        endif()
       list(APPEND swiftlib_module_depends_flattened
            ${SWIFTLIB_SWIFT_MODULE_DEPENDS_OSX})
     elseif(${sdk} STREQUAL IOS OR ${sdk} STREQUAL IOS_SIMULATOR)
@@ -1923,6 +2082,15 @@ function(add_swift_target_library name)
       set(MODULE_VARIANT_SUFFIX "-swiftmodule${VARIANT_SUFFIX}")
       set(MODULE_VARIANT_NAME "${name}${MODULE_VARIANT_SUFFIX}")
 
+      # Configure macCatalyst flavor variables
+      if(DEFINED maccatalyst_build_flavor)
+        set(maccatalyst_variant_suffix "-${SWIFT_SDK_MACCATALYST_LIB_SUBDIR}-${arch}")
+        set(maccatalyst_variant_name "${name}${maccatalyst_variant_suffix}")
+
+        set(maccatalyst_module_variant_suffix "-swiftmodule${maccatalyst_variant_suffix}")
+        set(maccatalyst_module_variant_name "${name}${maccatalyst_module_variant_suffix}")
+      endif()
+
       # Map dependencies over to the appropriate variants.
       set(swiftlib_link_libraries)
       foreach(lib ${SWIFTLIB_LINK_LIBRARIES})
@@ -1940,6 +2108,44 @@ function(add_swift_target_library name)
 
       if(NOT BUILD_STANDALONE)
         foreach(mod ${swiftlib_module_depends_flattened})
+          if(DEFINED maccatalyst_build_flavor)
+            if(maccatalyst_build_flavor STREQUAL "zippered")
+              # Zippered libraries are dependent on both the macCatalyst and normal macOS
+              # modules of their dependencies (which themselves must be zippered).
+              list(APPEND swiftlib_module_dependency_targets
+                   "swift${mod}${maccatalyst_module_variant_suffix}")
+              list(APPEND swiftlib_module_dependency_targets
+                   "swift${mod}${MODULE_VARIANT_SUFFIX}")
+
+              # Zippered libraries link against their zippered library targets, which
+              # live (and are built in) the same location as normal macOS libraries.
+              list(APPEND swiftlib_private_link_libraries_targets
+                "swift${mod}${VARIANT_SUFFIX}")
+            elseif(maccatalyst_build_flavor STREQUAL "ios-like")
+              # iOS-like libraries depend on the macCatalyst modules of their dependencies
+              # regardless of whether the target is zippered or macCatalyst only.
+              list(APPEND swiftlib_module_dependency_targets
+                   "swift${mod}${maccatalyst_module_variant_suffix}")
+
+              # iOS-like libraries can link against either iOS-like library targets
+              # or zippered targets.
+              if(mod IN_LIST SWIFTLIB_SWIFT_MODULE_DEPENDS_MACCATALYST_UNZIPPERED)
+                list(APPEND swiftlib_private_link_libraries_targets
+                    "swift${mod}${maccatalyst_variant_suffix}")
+              else()
+                list(APPEND swiftlib_private_link_libraries_targets
+                    "swift${mod}${VARIANT_SUFFIX}")
+              endif()
+            else()
+              list(APPEND swiftlib_module_dependency_targets
+                   "swift${mod}${MODULE_VARIANT_SUFFIX}")
+
+              list(APPEND swiftlib_private_link_libraries_targets
+                 "swift${mod}${VARIANT_SUFFIX}")
+            endif()
+            continue()
+          endif()
+
           list(APPEND swiftlib_module_dependency_targets
               "swift${mod}${MODULE_VARIANT_SUFFIX}")
 
@@ -1959,6 +2165,25 @@ function(add_swift_target_library name)
 
       # Add PrivateFrameworks, rdar://28466433
       set(swiftlib_c_compile_flags_all ${SWIFTLIB_C_COMPILE_FLAGS})
+      set(swiftlib_link_flags_all ${SWIFTLIB_LINK_FLAGS})
+
+      # Add flags to prepend framework search paths for the parallel framework
+      # hierarchy rooted at /System/iOSSupport/...
+      # These paths must come before their normal counterparts so that when compiling
+      # macCatalyst-only or unzippered-twin overlays the macCatalyst version
+      # of a framework is found and not the Mac version.
+      if(maccatalyst_build_flavor STREQUAL "ios-like"
+          OR (name STREQUAL "swiftXCTest"
+            AND maccatalyst_build_flavor STREQUAL "zippered"))
+
+        # The path to find iOS-only frameworks (such as UIKit) under macCatalyst.
+        set(ios_support_frameworks_path "${SWIFT_SDK_${sdk}_PATH}/System/iOSSupport/System/Library/Frameworks/")
+
+        list(APPEND swiftlib_swift_compile_flags_all "-Fsystem" "${ios_support_frameworks_path}")
+        list(APPEND swiftlib_c_compile_flags_all "-iframework" "${ios_support_frameworks_path}")
+        list(APPEND swiftlib_link_flags_all "-F" "${ios_support_frameworks_path}")
+      endif()
+
       if(sdk IN_LIST SWIFT_APPLE_PLATFORMS AND SWIFTLIB_IS_SDK_OVERLAY)
         set(swiftlib_swift_compile_private_frameworks_flag "-Fsystem" "${SWIFT_SDK_${sdk}_ARCH_${arch}_PATH}/System/Library/PrivateFrameworks/")
         foreach(tbd_lib ${SWIFTLIB_SWIFT_MODULE_DEPENDS_FROM_SDK})
@@ -1966,11 +2191,22 @@ function(add_swift_target_library name)
         endforeach()
       endif()
 
-      list(APPEND swiftlib_c_compile_flags_all "-DSWIFT_TARGET_LIBRARY_NAME=${name}")
+      set(variant_name "${VARIANT_NAME}")
+      set(module_variant_names "${MODULE_VARIANT_NAME}")
+      if(maccatalyst_build_flavor STREQUAL "ios-like")
+        set(variant_name "${maccatalyst_variant_name}")
+        set(module_variant_names "${maccatalyst_module_variant_name}")
+      elseif(maccatalyst_build_flavor STREQUAL "zippered")
+        # Zippered libraries produce two modules: one for macCatalyst and one for macOS
+        # and so need two module targets.
+        list(APPEND module_variant_names "${maccatalyst_module_variant_name}")
+      endif()
+
+     list(APPEND swiftlib_c_compile_flags_all "-DSWIFT_TARGET_LIBRARY_NAME=${name}")
 
       # Add this library variant.
       _add_swift_library_single(
-        ${VARIANT_NAME}
+        ${variant_name}
         ${name}
         ${SWIFTLIB_SHARED_keyword}
         ${SWIFTLIB_STATIC_keyword}
@@ -1978,7 +2214,7 @@ function(add_swift_target_library name)
         ${SWIFTLIB_INSTALL_WITH_SHARED_keyword}
         ${SWIFTLIB_SOURCES}
         TARGET_LIBRARY
-        MODULE_TARGET ${MODULE_VARIANT_NAME}
+        MODULE_TARGETS ${module_variant_names}
         SDK ${sdk}
         ARCHITECTURE ${arch}
         DEPENDS ${SWIFTLIB_DEPENDS}
@@ -2002,9 +2238,12 @@ function(add_swift_target_library name)
         DARWIN_INSTALL_NAME_DIR "${SWIFTLIB_DARWIN_INSTALL_NAME_DIR}"
         INSTALL_IN_COMPONENT "${SWIFTLIB_INSTALL_IN_COMPONENT}"
         DEPLOYMENT_VERSION_OSX "${SWIFTLIB_DEPLOYMENT_VERSION_OSX}"
+        DEPLOYMENT_VERSION_MACCATALYST "${SWIFTLIB_DEPLOYMENT_VERSION_MACCATALYST}"
         DEPLOYMENT_VERSION_IOS "${SWIFTLIB_DEPLOYMENT_VERSION_IOS}"
         DEPLOYMENT_VERSION_TVOS "${SWIFTLIB_DEPLOYMENT_VERSION_TVOS}"
         DEPLOYMENT_VERSION_WATCHOS "${SWIFTLIB_DEPLOYMENT_VERSION_WATCHOS}"
+        MACCATALYST_BUILD_FLAVOR "${maccatalyst_build_flavor}"
+
         GYB_SOURCES ${SWIFTLIB_GYB_SOURCES}
       )
     if(NOT SWIFT_BUILT_STANDALONE AND NOT "${CMAKE_C_COMPILER_ID}" MATCHES "Clang")
@@ -2076,27 +2315,32 @@ function(add_swift_target_library name)
       return()
     endif()
 
+    set(library_subdir "${SWIFT_SDK_${sdk}_LIB_SUBDIR}")
+    if(maccatalyst_build_flavor STREQUAL "ios-like")
+      set(library_subdir "${SWIFT_SDK_MACCATALYST_LIB_SUBDIR}")
+    endif()
+
     if(NOT SWIFTLIB_OBJECT_LIBRARY)
       # Determine the name of the universal library.
       if(SWIFTLIB_SHARED)
         if("${sdk}" STREQUAL "WINDOWS")
           set(UNIVERSAL_LIBRARY_NAME
-            "${SWIFTLIB_DIR}/${SWIFT_SDK_${sdk}_LIB_SUBDIR}/${name}.dll")
+            "${SWIFTLIB_DIR}/${library_subdir}/${name}.dll")
         else()
           set(UNIVERSAL_LIBRARY_NAME
-            "${SWIFTLIB_DIR}/${SWIFT_SDK_${sdk}_LIB_SUBDIR}/${CMAKE_SHARED_LIBRARY_PREFIX}${name}${CMAKE_SHARED_LIBRARY_SUFFIX}")
+            "${SWIFTLIB_DIR}/${library_subdir}/${CMAKE_SHARED_LIBRARY_PREFIX}${name}${CMAKE_SHARED_LIBRARY_SUFFIX}")
         endif()
       else()
         if("${sdk}" STREQUAL "WINDOWS")
           set(UNIVERSAL_LIBRARY_NAME
-            "${SWIFTLIB_DIR}/${SWIFT_SDK_${sdk}_LIB_SUBDIR}/${name}.lib")
+            "${SWIFTLIB_DIR}/${library_subdir}/${name}.lib")
         else()
           set(UNIVERSAL_LIBRARY_NAME
-            "${SWIFTLIB_DIR}/${SWIFT_SDK_${sdk}_LIB_SUBDIR}/${CMAKE_STATIC_LIBRARY_PREFIX}${name}${CMAKE_STATIC_LIBRARY_SUFFIX}")
+            "${SWIFTLIB_DIR}/${library_subdir}/${CMAKE_STATIC_LIBRARY_PREFIX}${name}${CMAKE_STATIC_LIBRARY_SUFFIX}")
         endif()
       endif()
 
-      set(lipo_target "${name}-${SWIFT_SDK_${sdk}_LIB_SUBDIR}")
+      set(lipo_target "${name}-${library_subdir}")
       if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin" AND SWIFTLIB_SHARED)
         set(codesign_arg CODESIGN)
       endif()
@@ -2111,13 +2355,17 @@ function(add_swift_target_library name)
                              ${THIN_INPUT_TARGETS})
 
       # Cache universal libraries for dependency purposes
-      set(UNIVERSAL_LIBRARY_NAMES_${SWIFT_SDK_${sdk}_LIB_SUBDIR}
-        ${UNIVERSAL_LIBRARY_NAMES_${SWIFT_SDK_${sdk}_LIB_SUBDIR}}
+      set(UNIVERSAL_LIBRARY_NAMES_${library_subdir}
+        ${UNIVERSAL_LIBRARY_NAMES_${library_subdir}}
         ${lipo_target}
-        CACHE INTERNAL "UNIVERSAL_LIBRARY_NAMES_${SWIFT_SDK_${sdk}_LIB_SUBDIR}")
+        CACHE INTERNAL "UNIVERSAL_LIBRARY_NAMES_${library_subdir}")
 
       # Determine the subdirectory where this library will be installed.
       set(resource_dir_sdk_subdir "${SWIFT_SDK_${sdk}_LIB_SUBDIR}")
+      if(maccatalyst_build_flavor STREQUAL "ios-like")
+        set(resource_dir_sdk_subdir "${SWIFT_SDK_MACCATALYST_LIB_SUBDIR}")
+      endif()
+
       precondition(resource_dir_sdk_subdir)
 
       if(SWIFTLIB_SHARED OR SWIFTLIB_INSTALL_WITH_SHARED)
@@ -2183,6 +2431,10 @@ function(add_swift_target_library name)
       # Add the arch-specific library targets to the global exports.
       foreach(arch ${SWIFT_SDK_${sdk}_ARCHITECTURES})
         set(_variant_name "${name}-${SWIFT_SDK_${sdk}_LIB_SUBDIR}-${arch}")
+        if(maccatalyst_build_flavor STREQUAL "ios-like")
+          set(_variant_name "${name}-${SWIFT_SDK_MACCATALYST_LIB_SUBDIR}-${arch}")
+        endif()
+
         if(NOT TARGET "${_variant_name}")
           continue()
         endif()
@@ -2199,6 +2451,10 @@ function(add_swift_target_library name)
       # Add the swiftmodule-only targets to the lipo target depdencies.
       foreach(arch ${SWIFT_SDK_${sdk}_MODULE_ARCHITECTURES})
         set(_variant_name "${name}-${SWIFT_SDK_${sdk}_LIB_SUBDIR}-${arch}")
+        if(maccatalyst_build_flavor STREQUAL "ios-like")
+          set(_variant_name "${name}-${SWIFT_SDK_MACCATALYST_LIB_SUBDIR}-${arch}")
+        endif()
+
         if(NOT TARGET "${_variant_name}")
           continue()
         endif()
@@ -2224,9 +2480,9 @@ function(add_swift_target_library name)
         endif()
 
         set(lipo_target_static
-            "${name}-${SWIFT_SDK_${sdk}_LIB_SUBDIR}-static")
+            "${name}-${library_subdir}-static")
         set(UNIVERSAL_LIBRARY_NAME
-            "${universal_subdir}/${SWIFT_SDK_${sdk}_LIB_SUBDIR}/${CMAKE_STATIC_LIBRARY_PREFIX}${name}${CMAKE_STATIC_LIBRARY_SUFFIX}")
+            "${universal_subdir}/${library_subdir}/${CMAKE_STATIC_LIBRARY_PREFIX}${name}${CMAKE_STATIC_LIBRARY_SUFFIX}")
         _add_swift_lipo_target(SDK
                                  ${sdk}
                                TARGET
@@ -2266,6 +2522,7 @@ function(add_swift_target_library name)
         endif()
       endforeach()
     endif()
+  endforeach() # maccatalyst_build_flavors
   endforeach()
 endfunction()
 

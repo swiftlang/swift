@@ -147,6 +147,7 @@ KNOWN_SETTINGS=(
     skip-build-llbuild                            ""                "set to skip building llbuild"
     skip-build-lldb                               ""                "set to skip building LLDB"
     skip-build-llvm                               ""                "set to skip building LLVM/Clang"
+    skip-build-maccatalyst                        ""                "set to skip building Swift stdlibs for macCatalyst"
     skip-build-osx                                ""                "set to skip building Swift stdlibs for OS X"
     skip-build-playgroundsupport                  ""                "set to skip building PlaygroundSupport"
     skip-build-static-foundation                  ""                "set to skip building static Foundation"
