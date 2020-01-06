@@ -1854,7 +1854,7 @@ bool ContextualFailure::diagnoseAsError() {
       return true;
     }
     
-    if (diagnoseConversionInCoercion())
+    if (diagnoseCoercionToUnrelatedType())
       return true;
 
     return false;
@@ -2223,7 +2223,7 @@ bool ContextualFailure::diagnoseMissingFunctionCall() const {
   return true;
 }
 
-bool ContextualFailure::diagnoseConversionInCoercion() const {
+bool ContextualFailure::diagnoseCoercionToUnrelatedType() const {
   auto *anchor = getAnchor();
   
   if (auto *coerceExpr = dyn_cast<CoerceExpr>(anchor)) {

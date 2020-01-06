@@ -556,7 +556,7 @@ public:
   bool diagnoseConversionToNil() const;
   
   /// Diagnose failed conversion in a `CoerceExpr`.
-  bool diagnoseConversionInCoercion() const;
+  bool diagnoseCoercionToUnrelatedType() const;
 
   // If we're trying to convert something of type "() -> T" to T,
   // then we probably meant to call the value.
