@@ -560,7 +560,7 @@ struct StoredProperty: Differentiable & AdditiveArithmetic {
   }
 }
 
-// Check that the self type of the method and the result type are the same when 
+// Check that the self type of the method and the result type are the same when
 // transposing WRT self. Needed to make sure they are defined within the same
 // context.
 
