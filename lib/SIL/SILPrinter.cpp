@@ -1212,12 +1212,10 @@ public:
 
   // SWIFT_ENABLE_TENSORFLOW
   void visitDifferentiableFunctionInst(DifferentiableFunctionInst *dfi) {
-    if (!dfi->getParameterIndices()->isEmpty()) {
-      *this << "[parameters";
-      for (auto i : dfi->getParameterIndices()->getIndices())
-        *this << ' ' << i;
-      *this << "] ";
-    }
+    *this << "[parameters";
+    for (auto i : dfi->getParameterIndices()->getIndices())
+      *this << ' ' << i;
+    *this << "] ";
     *this << getIDAndType(dfi->getOriginalFunction());
     if (dfi->hasDerivativeFunctions()) {
       *this << " with_derivative ";
@@ -1227,12 +1225,10 @@ public:
   }
 
   void visitLinearFunctionInst(LinearFunctionInst *lfi) {
-    if (!lfi->getParameterIndices()->isEmpty()) {
-      *this << "[parameters";
-      for (auto i : lfi->getParameterIndices()->getIndices())
-        *this << ' ' << i;
-      *this << "] ";
-    }
+    *this << "[parameters";
+    for (auto i : lfi->getParameterIndices()->getIndices())
+      *this << ' ' << i;
+    *this << "] ";
     *this << getIDAndType(lfi->getOriginalFunction());
     if (lfi->hasTransposeFunction()) {
       *this << " with_transpose ";
