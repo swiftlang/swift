@@ -1002,13 +1002,18 @@ static void addImplicitInheritedConstructorsToClass(ClassDecl *decl) {
 llvm::Expected<bool>
 InheritsSuperclassInitializersRequest::evaluate(Evaluator &eval,
                                                 ClassDecl *decl) const {
+  // Check if we parsed the @_inheritsConvenienceInitializers attribute.
+  if (decl->getAttrs().hasAttribute<InheritsConvenienceInitializersAttr>())
+    return true;
+
   auto superclass = decl->getSuperclass();
   assert(superclass);
 
   // If the superclass has known-missing designated initializers, inheriting
   // is unsafe.
   auto *superclassDecl = superclass->getClassOrBoundGenericClass();
-  if (superclassDecl->hasMissingDesignatedInitializers())
+  if (superclassDecl->getModuleContext() != decl->getParentModule() &&
+      superclassDecl->hasMissingDesignatedInitializers())
     return false;
 
   // If we're allowed to inherit designated initializers, then we can inherit
