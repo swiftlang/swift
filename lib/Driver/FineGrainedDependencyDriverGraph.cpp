@@ -87,7 +87,11 @@ LoadResult ModuleDepGraph::loadFromSourceFileDepGraph(
 }
 
 bool ModuleDepGraph::isMarked(const Job *cmd) const {
-  return swiftDepsOfJobsThatNeedRunning.count(getSwiftDeps(cmd));
+  return isSwiftDepsMarked(getSwiftDeps(cmd));
+}
+
+bool ModuleDepGraph::isSwiftDepsMarked(const StringRef swiftDeps) const {
+  return swiftDepsOfMarkedJobs.count(swiftDeps);
 }
 
 std::vector<const Job*> ModuleDepGraph::markTransitive(
@@ -95,33 +99,34 @@ std::vector<const Job*> ModuleDepGraph::markTransitive(
   FrontendStatsTracer tracer(stats, "fine-grained-dependencies-markTransitive");
   assert(jobToBeRecompiled && "Ensure there is really a job");
 
-  std::unordered_set<const ModuleDepGraphNode *> dependentNodes;
   const StringRef swiftDepsToBeRecompiled = getSwiftDeps(jobToBeRecompiled);
   assert(!swiftDepsToBeRecompiled.empty() && "Must have a swift deps");
-  // Caller already knows to run this job, no need to return it.
-  recordJobNeedsRunning(swiftDepsToBeRecompiled);
+
 
   // Do the traversal for every node in the job to be recompiled.
+  std::unordered_set<const ModuleDepGraphNode *> dependentNodes;
   for (auto &fileAndNode : nodeMap[swiftDepsToBeRecompiled]) {
     assert(isCurrentPathForTracingEmpty());
     findDependentNodes(dependentNodes, fileAndNode.second);
   }
-  std::vector<const Job *> newJobsToCompile;
+  std::unordered_set<const Job *> newJobsToCompile;
   // The job containing the interface "cascades", in other words
   // whenever that job gets recompiled, anything depending on it
   // (since we don't have interface-specific dependency info as of Dec.
   // 2018) must be recompiled.
   std::vector<const ModuleDepGraphNode *> dependentNodesVec{
       dependentNodes.begin(), dependentNodes.end()};
+  // Caller already knows to run this job, no need to return it.
+  markJobViaSwiftDeps(swiftDepsToBeRecompiled);
   for (const auto &entry :
        computeSwiftDepsFromInterfaceNodes(dependentNodesVec)) {
     const StringRef swiftDeps = entry.getKey();
-    if (recordJobNeedsRunning(swiftDeps)) {
+    if (!isSwiftDepsMarked(swiftDeps)) {
       const Job *j = getJob(swiftDeps.str());
-      newJobsToCompile.push_back(j);
+      newJobsToCompile.insert(j);
     }
   }
-  return newJobsToCompile;
+  return std::vector<const Job*>{newJobsToCompile.begin(), newJobsToCompile.end()};
 }
 
 llvm::StringSet<> ModuleDepGraph::computeSwiftDepsFromInterfaceNodes(
@@ -143,7 +148,7 @@ llvm::StringSet<> ModuleDepGraph::computeSwiftDepsFromInterfaceNodes(
 }
 
 bool ModuleDepGraph::markIntransitive(const Job *job) {
-  return recordJobNeedsRunning(getSwiftDeps(job));
+  return markJobViaSwiftDeps(getSwiftDeps(job));
 }
 
 void ModuleDepGraph::addIndependentNode(const Job *job) {
@@ -386,7 +391,9 @@ void ModuleDepGraph::forEachArc(
 void ModuleDepGraph::findDependentNodes(
     std::unordered_set<const ModuleDepGraphNode *> &foundDependents,
     const ModuleDepGraphNode *definition) {
-
+  // FIXME: the coarse-grained dependencies use a persistent marked set
+  // so that successive calls to markTransitive don't retrace steps once
+  // one arm of the graph has been searched. Do the equivalent here.
   size_t pathLengthAfterArrival = traceArrival(definition);
 
   // Moved this out of the following loop for effieciency.

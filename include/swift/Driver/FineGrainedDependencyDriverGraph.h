@@ -164,10 +164,11 @@ class ModuleDepGraph {
   std::unordered_set<std::string> externalDependencies;
 
   /// The new version of "Marked."
-  /// Aka "isMarked". Holds the swiftDeps paths for jobs the driver has or will
-  /// schedule.
-  /// TODO: Move scheduledJobs out of the graph, ultimately.
-  std::unordered_set<std::string> swiftDepsOfJobsThatNeedRunning;
+  /// Aka "isMarked".
+  /// If  job is in here, all of its dependent jobs have already been searched for jobs that depend on them,
+  /// OR the job is about to be scheduled and we'll need to run all dependent jobs after it completes.
+  /// (See the call to \c markIntransitive in \c shouldScheduleCompileJobAccordingToCondition.)
+  std::unordered_set<std::string> swiftDepsOfMarkedJobs;
 
   /// Keyed by swiftdeps filename, so we can get back to Jobs.
   std::unordered_map<std::string, const driver::Job *> jobsBySwiftDeps;
@@ -326,6 +327,8 @@ public:
   /// Interface to status quo code in the driver.
   bool isMarked(const driver::Job *) const;
 
+  bool isSwiftDepsMarked(StringRef swiftDeps) const;
+
   /// Given a "cascading" job, that is a job whose dependents must be recompiled
   /// when this job is recompiled, Compute two sets of jobs:
   /// 1. Return value (via visited) is the set of jobs needing recompilation
@@ -334,9 +337,8 @@ public:
   /// are recompiled. Such jobs are added to the \ref scheduledJobs set, and
   /// accessed via \ref isMarked.
   ///
-  /// Only return jobs marked that were previously unmarked. Not required for
-  /// the driver because it won't run a job twice, but required for the unit
-  /// test.
+  /// Returns jobs to be run because of changes to any/ever node in the argument.
+  /// Only return jobs marked that were previously unmarked, assuming they are already scheduled.
   std::vector<const driver::Job*> markTransitive(
       const driver::Job *jobToBeRecompiled, const void *ignored = nullptr);
 
@@ -483,8 +485,8 @@ private:
       const driver::Job *dependentJob);
 
   /// Return true if job was not scheduled before
-  bool recordJobNeedsRunning(StringRef swiftDeps) {
-    return swiftDepsOfJobsThatNeedRunning.insert(swiftDeps).second;
+  bool markJobViaSwiftDeps(StringRef swiftDeps) {
+    return swiftDepsOfMarkedJobs.insert(swiftDeps).second;
   }
 
   /// For debugging and visualization, write out the graph to a dot file.

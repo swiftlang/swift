@@ -1093,6 +1093,12 @@ namespace driver {
           // using markIntransitive and having later functions call
           // markTransitive. That way markIntransitive would be an
           // implementation detail of CoarseGrainedDependencyGraph.
+          //
+          // As it stands, after this job finishes, this mark will tell the code
+          // that this job was known to be "cascading". That knowledge will
+          // any dependent jobs to be run if they haven't already been.
+          //
+          // TODO: I think this is overly tricky
           markIntransitiveInDepGraph(Cmd, forRanges);
         }
         LLVM_FALLTHROUGH;
