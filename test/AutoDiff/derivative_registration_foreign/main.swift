@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %clang -shared %S/Inputs/Foreign.c -fmodules -o %t/libCForeign.dylib
+// RUN: %clang -shared %S/Inputs/Foreign.c -fmodules -o %t/%target-library-name(CForeign)
 // RUN: %target-swift-emit-silgen -Xllvm -enable-experimental-cross-file-derivative-registration -I %S/Inputs -I %t %s | %FileCheck %s --check-prefix=CHECK-SILGEN --check-prefix=CHECK
 // RUN: %target-swift-emit-sil -Xllvm -enable-experimental-cross-file-derivative-registration -I %S/Inputs -I %t %s | %FileCheck %s --check-prefix=CHECK-SIL --check-prefix=CHECK
 // RUN: %target-build-swift -Xllvm -enable-experimental-cross-file-derivative-registration -I %S/Inputs -I %t %s -L %t -lCForeign
