@@ -823,9 +823,9 @@ public:
   std::vector<std::pair<ConstraintLocator *, ProtocolConformanceRef>>
       Conformances;
 
-  /// The set of closures that have been transformed by a function builder.
-  llvm::MapVector<ClosureExpr *, AppliedBuilderTransform>
-      builderTransformedClosures;
+  /// The set of functions that have been transformed by a function builder.
+  llvm::MapVector<AnyFunctionRef, AppliedBuilderTransform>
+      functionBuilderTransformed;
 
   /// Simplify the given type by substituting all occurrences of
   /// type variables for their fixed types.
@@ -1341,9 +1341,9 @@ private:
   std::vector<std::pair<ConstraintLocator *, ProtocolConformanceRef>>
       CheckedConformances;
 
-  /// The set of closures that have been transformed by a function builder.
-  std::vector<std::pair<ClosureExpr *, AppliedBuilderTransform>>
-      builderTransformedClosures;
+  /// The set of functions that have been transformed by a function builder.
+  std::vector<std::pair<AnyFunctionRef, AppliedBuilderTransform>>
+      functionBuilderTransformed;
 
 public:
   /// The locators of \c Defaultable constraints whose defaults were used.
@@ -1840,7 +1840,7 @@ public:
 
     unsigned numFavoredConstraints;
 
-    unsigned numBuilderTransformedClosures;
+    unsigned numFunctionBuilderTransformed;
 
     /// The length of \c ResolvedOverloads.
     unsigned numResolvedOverloads;

@@ -7041,9 +7041,8 @@ namespace {
         // If this closure had a function builder applied, rewrite it to a
         // closure with a single expression body containing the builder
         // invocations.
-        auto builder =
-            Rewriter.solution.builderTransformedClosures.find(closure);
-        if (builder != Rewriter.solution.builderTransformedClosures.end()) {
+        auto builder = Rewriter.solution.functionBuilderTransformed.find(closure);
+        if (builder != Rewriter.solution.functionBuilderTransformed.end()) {
           auto singleExpr = builder->second.singleExpr;
           auto returnStmt = new (ctx) ReturnStmt(
              singleExpr->getStartLoc(), singleExpr, /*implicit=*/true);

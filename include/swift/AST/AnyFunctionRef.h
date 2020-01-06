@@ -208,6 +208,14 @@ public:
     llvm_unreachable("unexpected AnyFunctionRef representation");
   }
 
+  friend bool operator==(AnyFunctionRef lhs, AnyFunctionRef rhs) {
+     return lhs.TheFunction == rhs.TheFunction;
+   }
+
+   friend bool operator!=(AnyFunctionRef lhs, AnyFunctionRef rhs) {
+     return lhs.TheFunction != rhs.TheFunction;
+   }
+
 private:
   ArrayRef<AnyFunctionType::Yield>
   getYieldResultsImpl(SmallVectorImpl<AnyFunctionType::Yield> &buffer,

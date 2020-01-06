@@ -171,13 +171,13 @@ Solution ConstraintSystem::finalize() {
   for (auto &e : CheckedConformances)
     solution.Conformances.push_back({e.first, e.second});
 
-  for (const auto &transformed : builderTransformedClosures) {
+  for (const auto &transformed : functionBuilderTransformed) {
     auto known =
-        solution.builderTransformedClosures.find(transformed.first);
-    if (known != solution.builderTransformedClosures.end()) {
+        solution.functionBuilderTransformed.find(transformed.first);
+    if (known != solution.functionBuilderTransformed.end()) {
       assert(known->second.singleExpr == transformed.second.singleExpr);
     }
-    solution.builderTransformedClosures.insert(transformed);
+    solution.functionBuilderTransformed.insert(transformed);
   }
 
   return solution;
@@ -241,8 +241,8 @@ void ConstraintSystem::applySolution(const Solution &solution) {
   for (auto &conformance : solution.Conformances)
     CheckedConformances.push_back(conformance);
 
-  for (const auto &transformed : solution.builderTransformedClosures) {
-    builderTransformedClosures.push_back(transformed);
+  for (const auto &transformed : solution.functionBuilderTransformed) {
+    functionBuilderTransformed.push_back(transformed);
   }
     
   // Register any fixes produced along this path.
@@ -436,7 +436,7 @@ ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
   numCheckedConformances = cs.CheckedConformances.size();
   numDisabledConstraints = cs.solverState->getNumDisabledConstraints();
   numFavoredConstraints = cs.solverState->getNumFavoredConstraints();
-  numBuilderTransformedClosures = cs.builderTransformedClosures.size();
+  numFunctionBuilderTransformed = cs.functionBuilderTransformed.size();
   numResolvedOverloads = cs.ResolvedOverloads.size();
 
   PreviousScore = cs.CurrentScore;
@@ -503,7 +503,7 @@ ConstraintSystem::SolverScope::~SolverScope() {
   truncate(cs.CheckedConformances, numCheckedConformances);
 
   /// Remove any builder transformed closures.
-  truncate(cs.builderTransformedClosures, numBuilderTransformedClosures);
+  truncate(cs.functionBuilderTransformed, numFunctionBuilderTransformed);
 
   // Reset the previous score.
   cs.CurrentScore = PreviousScore;
