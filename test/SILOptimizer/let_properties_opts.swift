@@ -50,10 +50,10 @@
 // CHECK: return
 
 // CHECK-LABEL: sil @$s19let_properties_opts3FooC{{[_0-9a-zA-Z]*}}fc : $@convention(method) (Int64, @owned Foo) -> @owned Foo
-// CHECK: ref_element_addr %{{[0-9]+}} : $Foo, #Foo.Prop0
-// CHECK: ref_element_addr %{{[0-9]+}} : $Foo, #Foo.Prop1
-// CHECK: ref_element_addr %{{[0-9]+}} : $Foo, #Foo.Prop2
-// CHECK: ref_element_addr %{{[0-9]+}} : $Foo, #Foo.Prop3
+// CHECK: ref_element_addr [uninitialized] %{{[0-9]+}} : $Foo, #Foo.Prop0
+// CHECK: ref_element_addr [uninitialized] %{{[0-9]+}} : $Foo, #Foo.Prop1
+// CHECK: ref_element_addr [uninitialized] %{{[0-9]+}} : $Foo, #Foo.Prop2
+// CHECK: ref_element_addr [uninitialized] %{{[0-9]+}} : $Foo, #Foo.Prop3
 // CHECK: return
 
 public class Foo {

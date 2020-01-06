@@ -41,7 +41,7 @@ class Cat : FakeNSObject {
   // CHECK: bb0([[ARG0:%.*]] : $Int, [[ARG1:%.*]] : $Bool, [[ARG2:%.*]] : $Cat):
     // CHECK-NEXT: [[SELF_BOX:%.*]] = alloc_stack $Cat
     // CHECK:      store [[ARG2]] to [[SELF_BOX]] : $*Cat
-    // CHECK:      [[FIELD_ADDR:%.*]] = ref_element_addr [[ARG2]] : $Cat, #Cat.x
+    // CHECK:      [[FIELD_ADDR:%.*]] = ref_element_addr [uninitialized] [[ARG2]] : $Cat, #Cat.x
     // CHECK-NEXT: store {{%.*}} to [[FIELD_ADDR]] : $*LifetimeTracked
     // CHECK-NEXT: strong_release [[ARG2]]
     // CHECK-NEXT: [[COND:%.*]] = struct_extract %1 : $Bool, #Bool._value

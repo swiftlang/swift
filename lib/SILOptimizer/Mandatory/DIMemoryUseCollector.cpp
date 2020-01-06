@@ -1404,8 +1404,16 @@ void ElementUseCollector::collectClassSelfUses(
       if (EltNumbering.count(REAI->getField()) != 0) {
         assert(EltNumbering.count(REAI->getField()) &&
                "ref_element_addr not a local field?");
-        // Recursively collect uses of the fields.  Note that fields of the class
-        // could be tuples, so they may be tracked as independent elements.
+
+        // Add the ref_element_addr as a use of the entire class so that if it
+        // is used to initialize uninitialized memory, we can mark the
+        // ref_element_addr as being uninitialized.
+        trackUse(DIMemoryUse(User, DIUseKind::InteriorPointer, 0,
+                             TheMemory.getNumElements()));
+
+        // Then, recursively collect uses of the fields.  Note that fields of
+        // the class could be tuples, so they may be tracked as independent
+        // elements.
         llvm::SaveAndRestore<bool> X(IsSelfOfNonDelegatingInitializer, false);
         collectUses(REAI, EltNumbering[REAI->getField()]);
         continue;
@@ -1625,7 +1633,6 @@ void ClassInitElementUseCollector::collectClassInitSelfUses() {
     }
     if (isa<EndAccessInst>(User))
       continue;
-
     // Stores to self.
     if (auto *SI = dyn_cast<StoreInst>(User)) {
       if (Op->getOperandNumber() == 1) {

@@ -4462,6 +4462,17 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     break;
   }
   case SILInstructionKind::RefElementAddrInst: {
+    StringRef Str;
+    bool isUninitialized = false;
+    if (parseSILOptional(Str, *this)) {
+      if (Str == "uninitialized") {
+        isUninitialized = true;
+      } else {
+        P.diagnose(P.Tok.getLoc(), diag::unknown_attribute, Str);
+        return true;
+      }
+    }
+
     ValueDecl *FieldV;
     SourceLoc NameLoc;
     if (parseTypedValueRef(Val, B) ||
@@ -4476,7 +4487,9 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     VarDecl *Field = cast<VarDecl>(FieldV);
     auto ResultTy =
         Val->getType().getFieldType(Field, SILMod, B.getTypeExpansionContext());
-    ResultVal = B.createRefElementAddr(InstLoc, Val, Field, ResultTy);
+    auto *REAI = B.createRefElementAddr(InstLoc, Val, Field, ResultTy);
+    REAI->setIsUninitializedAccess(isUninitialized);
+    ResultVal = REAI;
     break;
   }
   case SILInstructionKind::RefTailAddrInst: {

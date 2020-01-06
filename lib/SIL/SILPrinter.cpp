@@ -1656,6 +1656,9 @@ public:
     *this << EI->getField()->getName().get();
   }
   void visitRefElementAddrInst(RefElementAddrInst *EI) {
+    if (EI->isUninitializedAccess()) {
+      *this << "[uninitialized] ";
+    }
     *this << getIDAndType(EI->getOperand()) << ", #";
     printFullContext(EI->getField()->getDeclContext(), PrintState.OS);
     *this << EI->getField()->getName().get();

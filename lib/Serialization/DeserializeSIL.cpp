@@ -2242,8 +2242,9 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
                              getSILType(Ty, (SILValueCategory)TyCategory, Fn));
     auto ResultTy = Val->getType().getFieldType(
         Field, SILMod, Builder.getTypeExpansionContext());
-    ResultVal = Builder.createRefElementAddr(Loc, Val, Field,
-                                             ResultTy);
+    auto *REAI = Builder.createRefElementAddr(Loc, Val, Field, ResultTy);
+    REAI->setIsUninitializedAccess(Attr & 1);
+    ResultVal = REAI;
     break;
   }
   case SILInstructionKind::RefTailAddrInst: {

@@ -461,6 +461,7 @@ namespace {
     void handleLoadForTypeOfSelfUse(DIMemoryUse &Use);
     void handleInOutUse(const DIMemoryUse &Use);
     void handleEscapeUse(const DIMemoryUse &Use);
+    void handleInteriorPointerUse(const DIMemoryUse &Use);
 
     bool diagnoseReturnWithoutInitializingStoredProperties(
         const SILInstruction *Inst, SILLocation loc, const DIMemoryUse &Use);
@@ -530,6 +531,7 @@ LifetimeChecker::LifetimeChecker(const DIMemoryObjectInfo &TheMemory,
     case DIUseKind::Load:
     case DIUseKind::LoadForTypeOfSelf:
     case DIUseKind::Escape:
+    case DIUseKind::InteriorPointer:
       continue;
     case DIUseKind::Assign:
     case DIUseKind::IndirectIn:
@@ -784,6 +786,10 @@ void LifetimeChecker::doIt() {
       break;
     case DIUseKind::LoadForTypeOfSelf:
       handleLoadForTypeOfSelfUse(Use);
+      break;
+    case DIUseKind::InteriorPointer:
+      handleInteriorPointerUse(Use);
+      break;
     }
   }
 
@@ -823,6 +829,16 @@ void LifetimeChecker::doIt() {
   // instructions that still appear in the Uses list.
   for (unsigned UseID : NeedsUpdateForInitState)
     updateInstructionForInitState(Uses[UseID]);
+}
+
+void LifetimeChecker::handleInteriorPointerUse(const DIMemoryUse &Use) {
+  // Check if we know that our memory is initialized at the interior pointer
+  // instruction. If not, mark it as being uninitialized.
+  bool IsSuperInitComplete;
+  bool FailedSelfUse;
+  if (!isInitializedAtUse(Use, &IsSuperInitComplete, &FailedSelfUse)) {
+    cast<RefElementAddrInst>(Use.Inst)->setIsUninitializedAccess(true);
+  }
 }
 
 void LifetimeChecker::handleLoadUse(const DIMemoryUse &Use) {

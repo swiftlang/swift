@@ -5840,8 +5840,18 @@ class RefElementAddrInst
                      VarDecl *Field, SILType ResultTy)
       : UnaryInstructionBase(DebugLoc, Operand, ResultTy, Field) {}
 
+  /// Set to true is this is used to initialize an uninitialized piece of
+  /// memory. Importantly this means that the MemoryLifetime verifier can assume
+  /// that the memory the ref_element_addr gives access to can be treated as
+  /// already live.
+  bool uninitializedAccess = false;
+
 public:
   ClassDecl *getClassDecl() const { return cast<ClassDecl>(getParentDecl()); }
+  void setIsUninitializedAccess(bool newValue) {
+    uninitializedAccess = newValue;
+  }
+  bool isUninitializedAccess() const { return uninitializedAccess; }
 };
 
 /// RefTailAddrInst - Derive the address of the first element of the first

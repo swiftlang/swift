@@ -104,7 +104,7 @@ bb0(%0 : @owned $RootClassWithNontrivialStoredProperties):
 // CHECK: bb0([[SELF:%.*]] : @owned $RootClassWithNontrivialStoredProperties):
 // CHECK: [[FIELD_VALUE:%.*]] = alloc_ref
 // CHECK: [[BORROWED_SELF:%.*]] = begin_borrow [[SELF]]
-// CHECK: [[SELF_FIELD:%.*]] = ref_element_addr [[BORROWED_SELF]]
+// CHECK: [[SELF_FIELD:%.*]] = ref_element_addr [uninitialized] [[BORROWED_SELF]]
 // CHECK: store [[FIELD_VALUE]] to [init] [[SELF_FIELD]]
 // CHECK: end_borrow [[BORROWED_SELF]]
 // CHECK: [[BORROWED_SELF:%.*]] = begin_borrow [[SELF]]

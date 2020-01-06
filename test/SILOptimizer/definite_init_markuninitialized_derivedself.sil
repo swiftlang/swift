@@ -188,7 +188,7 @@ bb0(%0 : @owned $DerivedClassWithNontrivialStoredProperties):
 // Update field of self.
 // CHECK: [[FIELD_VAL:%.*]] = alloc_ref $SomeClass
 // CHECK: [[SELF:%[0-9]+]] = load_borrow [[SELFBOX]]
-// CHECK: [[SELF_FIELD:%.*]] = ref_element_addr [[SELF]]
+// CHECK: [[SELF_FIELD:%.*]] = ref_element_addr [uninitialized] [[SELF]]
 // CHECK: store [[FIELD_VAL]] to [init] [[SELF_FIELD]]
 // CHECK: end_borrow [[SELF]]
 //

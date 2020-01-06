@@ -1783,11 +1783,13 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     // where the field decl is streamed as a ValueID.
     SILValue operand;
     Decl *tDecl;
+    unsigned flags = 0; // 2 bits.
     switch (SI.getKind()) {
     default: llvm_unreachable("Out of sync with parent switch");
     case SILInstructionKind::RefElementAddrInst:
       operand = cast<RefElementAddrInst>(&SI)->getOperand();
       tDecl = cast<RefElementAddrInst>(&SI)->getField();
+      flags |= bool(cast<RefElementAddrInst>(&SI)->isUninitializedAccess());
       break;
     case SILInstructionKind::StructElementAddrInst:
       operand = cast<StructElementAddrInst>(&SI)->getOperand();
@@ -1814,12 +1816,12 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
       tDecl = cast<InjectEnumAddrInst>(&SI)->getElement();
       break;
     }
-    SILOneValueOneOperandLayout::emitRecord(Out, ScratchRecord,
-        SILAbbrCodes[SILOneValueOneOperandLayout::Code],
-        (unsigned)SI.getKind(), 0, S.addDeclRef(tDecl),
+    assert(flags < 4 && "Flags is only 2 bits!");
+    SILOneValueOneOperandLayout::emitRecord(
+        Out, ScratchRecord, SILAbbrCodes[SILOneValueOneOperandLayout::Code],
+        (unsigned)SI.getKind(), flags, S.addDeclRef(tDecl),
         S.addTypeRef(operand->getType().getASTType()),
-        (unsigned)operand->getType().getCategory(),
-        addValueRef(operand));
+        (unsigned)operand->getType().getCategory(), addValueRef(operand));
     break;
   }
   case SILInstructionKind::RefTailAddrInst: {
