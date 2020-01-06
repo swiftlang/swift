@@ -56,6 +56,15 @@ public:
   const TBDGenOptions &Opts;
   Decl* TopLevelDecl = nullptr;
 
+  // SWIFT_ENABLE_TENSORFLOW
+  /// A set of original function and derivative configuration pairs for which
+  /// derivative symbols have been emitted.
+  ///
+  /// Used to deduplicate derivative symbol emission for `@differentiable` and
+  /// `@derivative` attributes.
+  llvm::DenseSet<std::pair<AbstractFunctionDecl *, AutoDiffConfig>>
+      AddedDerivatives;
+
 private:
   void addSymbolInternal(StringRef name, llvm::MachO::SymbolKind kind,
                          bool isLinkerDirective = false);

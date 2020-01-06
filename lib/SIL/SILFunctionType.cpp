@@ -423,7 +423,13 @@ CanSILFunctionType SILFunctionType::getAutoDiffDerivativeFunctionType(
   if (getSubstGenericSignature() && derivativeFnGenSig &&
       !derivativeFnGenSig->areAllParamsConcrete())
     canGenSig = derivativeFnGenSig;
-  return SILFunctionType::get(canGenSig, getExtInfo(), getCoroutineKind(),
+  // If original function is `@convention(c)`, the derivative function should
+  // have `@convention(thin)`. IRGen does not support `@convention(c)` functions
+  // with multiple results.
+  auto extInfo = getExtInfo();
+  if (getLanguage() == SILFunctionLanguage::C)
+    extInfo = extInfo.withRepresentation(SILFunctionTypeRepresentation::Thin);
+  return SILFunctionType::get(canGenSig, extInfo, getCoroutineKind(),
                               getCalleeConvention(), newParameters, getYields(),
                               newResults, getOptionalErrorResult(),
                               getSubstitutions(), isGenericSignatureImplied(),
