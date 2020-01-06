@@ -2333,7 +2333,7 @@ CustomAttrNominalRequest::evaluate(Evaluator &evaluator,
 void swift::getDirectlyInheritedNominalTypeDecls(
     llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl,
     unsigned i,
-    llvm::SmallVectorImpl<std::pair<SourceLoc, NominalTypeDecl *>> &result,
+    llvm::SmallVectorImpl<Located<NominalTypeDecl *>> &result,
     bool &anyObject) {
   auto typeDecl = decl.dyn_cast<TypeDecl *>();
   auto extDecl = decl.dyn_cast<ExtensionDecl *>();
@@ -2362,11 +2362,11 @@ void swift::getDirectlyInheritedNominalTypeDecls(
 
   // Form the result.
   for (auto nominal : nominalTypes) {
-    result.push_back({loc, nominal});
+    result.push_back({nominal, loc});
   }
 }
 
-SmallVector<std::pair<SourceLoc, NominalTypeDecl *>, 4>
+SmallVector<Located<NominalTypeDecl *>, 4>
 swift::getDirectlyInheritedNominalTypeDecls(
                         llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl,
                         bool &anyObject) {
@@ -2376,7 +2376,7 @@ swift::getDirectlyInheritedNominalTypeDecls(
   // Gather results from all of the inherited types.
   unsigned numInherited = typeDecl ? typeDecl->getInherited().size()
                                    : extDecl->getInherited().size();
-  SmallVector<std::pair<SourceLoc, NominalTypeDecl *>, 4> result;
+  SmallVector<Located<NominalTypeDecl *>, 4> result;
   for (unsigned i : range(numInherited)) {
     getDirectlyInheritedNominalTypeDecls(decl, i, result, anyObject);
   }
@@ -2402,8 +2402,8 @@ swift::getDirectlyInheritedNominalTypeDecls(
       if (!req.getFirstType()->isEqual(protoSelfTy))
         continue;
 
-      result.emplace_back(
-          loc, req.getSecondType()->castTo<ProtocolType>()->getDecl());
+      result.emplace_back(req.getSecondType()->castTo<ProtocolType>()->getDecl(),
+                          loc);
     }
     return result;
   }
@@ -2413,7 +2413,7 @@ swift::getDirectlyInheritedNominalTypeDecls(
   anyObject |= selfBounds.anyObject;
 
   for (auto inheritedNominal : selfBounds.decls)
-    result.emplace_back(loc, inheritedNominal);
+    result.emplace_back(inheritedNominal, loc);
 
   return result;
 }

@@ -19,6 +19,7 @@
 
 #include "swift/AST/Identifier.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/Located.h"
 #include "swift/Basic/SourceLoc.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallSet.h"
@@ -100,7 +101,7 @@ public:
   ///
   /// Note that even if this check succeeds, errors may still occur if the
   /// module is loaded in full.
-  virtual bool canImportModule(std::pair<Identifier, SourceLoc> named) = 0;
+  virtual bool canImportModule(Located<Identifier> named) = 0;
 
   /// Import a module with the given module path.
   ///
@@ -113,7 +114,7 @@ public:
   /// emits a diagnostic and returns NULL.
   virtual
   ModuleDecl *loadModule(SourceLoc importLoc,
-                         ArrayRef<std::pair<Identifier, SourceLoc>> path) = 0;
+                         ArrayRef<Located<Identifier>> path) = 0;
 
   /// Load extensions to the given nominal type.
   ///

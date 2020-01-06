@@ -589,7 +589,7 @@ namespace {
       OS << " '";
       interleave(ID->getFullAccessPath(),
                  [&](const ImportDecl::AccessPathElement &Elem) {
-                   OS << Elem.first;
+                   OS << Elem.Item;
                  },
                  [&] { OS << '.'; });
       OS << "')";

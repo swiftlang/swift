@@ -5457,7 +5457,7 @@ namespace {
     bool anyObject = false;
     for (const auto &found :
             getDirectlyInheritedNominalTypeDecls(decl, anyObject)) {
-      if (auto protoDecl = dyn_cast<ProtocolDecl>(found.second))
+      if (auto protoDecl = dyn_cast<ProtocolDecl>(found.Item))
         if (protoDecl == proto || protoDecl->inheritsFrom(proto))
           return true;
     }

@@ -1585,7 +1585,7 @@ static int doInputCompletenessTest(StringRef SourceFilename) {
 //===----------------------------------------------------------------------===//
 
 static ModuleDecl *getModuleByFullName(ASTContext &Context, StringRef ModuleName) {
-  SmallVector<std::pair<Identifier, SourceLoc>, 4>
+  SmallVector<Located<Identifier>, 4>
       AccessPath;
   while (!ModuleName.empty()) {
     StringRef SubModuleName;
@@ -1600,8 +1600,7 @@ static ModuleDecl *getModuleByFullName(ASTContext &Context, StringRef ModuleName
 }
 
 static ModuleDecl *getModuleByFullName(ASTContext &Context, Identifier ModuleName) {
-  ModuleDecl *Result = Context.getModule(std::make_pair(ModuleName,
-                                                        SourceLoc()));
+  ModuleDecl *Result = Context.getModule({ Located<Identifier>(ModuleName,SourceLoc()) });
   if (!Result || Result->failedToLoad())
     return nullptr;
   return Result;
@@ -2624,7 +2623,7 @@ static int doPrintModuleImports(const CompilerInvocation &InitInvok,
       for (auto &import : scratch) {
         llvm::outs() << "\t" << import.second->getName();
         for (auto accessPathPiece : import.first) {
-          llvm::outs() << "." << accessPathPiece.first;
+          llvm::outs() << "." << accessPathPiece.Item;
         }
 
         if (import.second->isClangModule())

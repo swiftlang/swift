@@ -25,6 +25,7 @@
 #include "swift/Basic/Range.h"
 #include "swift/Basic/OptimizationMode.h"
 #include "swift/Basic/Version.h"
+#include "swift/Basic/Located.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/AttrKind.h"
 #include "swift/AST/AutoDiff.h"
@@ -69,16 +70,13 @@ public:
   struct Convention {
     StringRef Name = {};
     DeclNameRef WitnessMethodProtocol = {};
-    StringRef ClangType = {};
-    // Carry the source location for diagnostics.
-    SourceLoc ClangTypeLoc = {};
-
+    Located<StringRef> ClangType = Located<StringRef>(StringRef(), {});
     /// Convenience factory function to create a Swift convention.
     ///
     /// Don't use this function if you are creating a C convention as you
     /// probably need a ClangType field as well.
     static Convention makeSwiftConvention(StringRef name) {
-      return {name, DeclNameRef(), "", {}};
+      return {name, DeclNameRef(), Located<StringRef>("", {})};
     }
   };
 

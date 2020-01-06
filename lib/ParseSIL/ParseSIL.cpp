@@ -60,7 +60,7 @@ public:
   /// This is all of the forward referenced functions with
   /// the location for where the reference is.
   llvm::DenseMap<Identifier,
-                 std::pair<SILFunction*, SourceLoc>> ForwardRefFns;
+                 Located<SILFunction*>> ForwardRefFns;
   /// A list of all functions forward-declared by a sil_scope.
   llvm::DenseSet<SILFunction *> PotentialZombieFns;
 
@@ -85,8 +85,8 @@ public:
 SILParserTUState::~SILParserTUState() {
   if (!ForwardRefFns.empty()) {
     for (auto Entry : ForwardRefFns) {
-      if (Entry.second.second.isValid()) {
-        M.getASTContext().Diags.diagnose(Entry.second.second,
+      if (Entry.second.Loc.isValid()) {
+        M.getASTContext().Diags.diagnose(Entry.second.Loc,
                                          diag::sil_use_of_undefined_value,
                                          Entry.first.str());
       }
@@ -224,7 +224,7 @@ namespace {
     /// Data structures used to perform name lookup of basic blocks.
     llvm::DenseMap<Identifier, SILBasicBlock*> BlocksByName;
     llvm::DenseMap<SILBasicBlock*,
-                   std::pair<SourceLoc, Identifier>> UndefinedBlocks;
+                   Located<Identifier>> UndefinedBlocks;
 
     /// Data structures used to perform name lookup for local values.
     llvm::StringMap<ValueBase*> LocalValues;
@@ -580,8 +580,8 @@ bool SILParser::diagnoseProblems() {
   if (!UndefinedBlocks.empty()) {
     // FIXME: These are going to come out in nondeterministic order.
     for (auto Entry : UndefinedBlocks)
-      P.diagnose(Entry.second.first, diag::sil_undefined_basicblock_use,
-                 Entry.second.second);
+      P.diagnose(Entry.second.Loc, diag::sil_undefined_basicblock_use,
+                 Entry.second.Item);
 
     HadError = true;
   }
@@ -609,13 +609,13 @@ SILFunction *SILParser::getGlobalNameForDefinition(Identifier name,
   // complete the forward reference.
   auto iter = TUState.ForwardRefFns.find(name);
   if (iter != TUState.ForwardRefFns.end()) {
-    SILFunction *fn = iter->second.first;
+    SILFunction *fn = iter->second.Item;
 
     // Verify that the types match up.
     if (fn->getLoweredFunctionType() != ty) {
       P.diagnose(sourceLoc, diag::sil_value_use_type_mismatch, name.str(),
                  fn->getLoweredFunctionType(), ty);
-      P.diagnose(iter->second.second, diag::sil_prior_reference);
+      P.diagnose(iter->second.Loc, diag::sil_prior_reference);
       fn = builder.createFunctionForForwardReference("" /*name*/, ty, silLoc);
     }
 
@@ -713,7 +713,7 @@ SILBasicBlock *SILParser::getBBForReference(Identifier Name, SourceLoc Loc) {
   // Otherwise, create it and remember that this is a forward reference so
   // that we can diagnose use without definition problems.
   BB = F->createBasicBlock();
-  UndefinedBlocks[BB] = {Loc, Name};
+  UndefinedBlocks[BB] = {Name, Loc};
   return BB;
 }
 
@@ -2371,13 +2371,13 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     return true;
   }
 
-  SmallVector<std::pair<StringRef, SourceLoc>, 4> resultNames;
+  SmallVector<Located<StringRef>, 4> resultNames;
   SourceLoc resultClauseBegin;
 
   // If the instruction has a name '%foo =', parse it.
   if (P.Tok.is(tok::sil_local_name)) {
     resultClauseBegin = P.Tok.getLoc();
-    resultNames.push_back(std::make_pair(P.Tok.getText(), P.Tok.getLoc()));
+    resultNames.push_back({P.Tok.getText(), P.Tok.getLoc()});
     P.consumeToken(tok::sil_local_name);
 
   // If the instruction has a '(%foo, %bar) = ', parse it.
@@ -2391,7 +2391,7 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
           return true;
         }
 
-        resultNames.push_back(std::make_pair(P.Tok.getText(), P.Tok.getLoc()));
+        resultNames.push_back({P.Tok.getText(), P.Tok.getLoc()});
         P.consumeToken(tok::sil_local_name);
 
         if (P.consumeIf(tok::comma))
@@ -5080,7 +5080,7 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
                  results.size());
     } else {
       for (size_t i : indices(results)) {
-        setLocalValue(results[i], resultNames[i].first, resultNames[i].second);
+        setLocalValue(results[i], resultNames[i].Item, resultNames[i].Loc);
       }
     }
   }
