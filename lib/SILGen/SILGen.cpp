@@ -755,11 +755,8 @@ void SILGenModule::postEmitFunction(SILDeclRef constant,
              F->print(llvm::dbgs()));
 
   // SWIFT_ENABLE_TENSORFLOW
-  // Visit `@differentiable` attributes and generate SIL differentiability
-  // witnesses.
-  // TODO(TF-835): Visit `@derivative` attributes when type-checking no longer
-  // generates implicit `@differentiable` attributes. See TF-835 for replacement
-  // code.
+  // Visit `@differentiable` amd `@derivative` attributes and generate SIL
+  // differentiability witnesses.
   // Skip if the SILDeclRef is a:
   // - Default argument generator function.
   // - Thunk.
@@ -796,7 +793,9 @@ void SILGenModule::postEmitFunction(SILDeclRef constant,
           break;
         }
         auto *origAFD = derivAttr->getOriginalFunction();
-        auto *origFn = getFunction(SILDeclRef(origAFD), NotForDefinition);
+        auto origDeclRef =
+            SILDeclRef(origAFD).asForeign(requiresForeignEntryPoint(origAFD));
+        auto *origFn = getFunction(origDeclRef, NotForDefinition);
         auto derivativeGenSig = AFD->getGenericSignature();
         auto *resultIndices = IndexSubset::get(getASTContext(), 1, {0});
         AutoDiffConfig config(derivAttr->getParameterIndices(), resultIndices,
@@ -854,10 +853,13 @@ void SILGenModule::emitDifferentiabilityWitness(
   SILDifferentiabilityWitnessKey key{originalFunction->getName(), silConfig};
   auto *diffWitness = M.lookUpDifferentiabilityWitness(key);
   if (!diffWitness) {
+    // Strip external from linkage of original function.
+    // Necessary for Clang-imported functions, which have external linkage.
+    auto linkage = stripExternalFromLinkage(originalFunction->getLinkage());
     diffWitness = SILDifferentiabilityWitness::createDefinition(
-        M, originalFunction->getLinkage(), originalFunction,
-        silConfig.parameterIndices, silConfig.resultIndices,
-        config.derivativeGenericSignature, /*jvp*/ nullptr, /*vjp*/ nullptr,
+        M, linkage, originalFunction, silConfig.parameterIndices,
+        silConfig.resultIndices, config.derivativeGenericSignature,
+        /*jvp*/ nullptr, /*vjp*/ nullptr,
         /*isSerialized*/ hasPublicVisibility(originalFunction->getLinkage()),
         attr);
   }
@@ -881,8 +883,10 @@ void SILGenModule::emitDifferentiabilityWitness(
       auto *id = AutoDiffDerivativeFunctionIdentifier::get(
           kind, config.parameterIndices, config.derivativeGenericSignature,
           getASTContext());
+      auto origDeclRef = SILDeclRef(originalAFD)
+                             .asForeign(requiresForeignEntryPoint(originalAFD));
       derivativeThunk = getOrCreateAutoDiffDerivativeForwardingThunk(
-          SILDeclRef(originalAFD).asAutoDiffDerivativeFunction(id), derivative,
+          origDeclRef.asAutoDiffDerivativeFunction(id), derivative,
           expectedDerivativeType);
     }
     // Check for existing same derivative.
