@@ -1,0 +1,33 @@
+// RUN: %target-run-simple-swiftgyb
+// REQUIRES: executable_test
+
+import StdlibUnittest
+
+var FloatingPointTests = TestSuite("FloatingPoint")
+
+%for Self in ['Float', 'Double', 'Float80']:
+% if Self == 'Float80':
+#if !os(Windows) && (arch(i386) || arch(x86_64))
+% end
+
+FloatingPointTests.test("${Self}.squareRoot") {
+  expectEqual(${Self}(0.5), gradient(at: ${Self}(1), in: { $0.squareRoot() }))
+  expectEqual(${Self}(0.25), gradient(at: ${Self}(4), in: { $0.squareRoot() }))
+}
+
+FloatingPointTests.test("${Self}.addingProduct") {
+  expectEqual(
+    (${Self}(1), ${Self}(2), ${Self}(3)),
+    gradient(
+      at: ${Self}(10), ${Self}(3), ${Self}(2),
+      in: { $0.addingProduct($1, $2) }
+    )
+  )
+}
+
+%   if Self == 'Float80':
+#endif
+%   end
+% end
+
+runAllTests()

@@ -693,8 +693,6 @@ extension Array: RandomAccessCollection, MutableCollection {
   ///   bridged `NSArray` instance as its storage, in which case writing is
   ///   O(*n*), where *n* is the length of the array.
   @inlinable
-  // SWIFT_ENABLE_TENSORFLOW
-  @differentiable(wrt: self, vjp: _vjpSubscript where Element : Differentiable)
   public subscript(index: Int) -> Element {
     get {
       // This call may be hoisted or eliminated by the optimizer.  If
@@ -873,8 +871,6 @@ extension Array: RangeReplaceableCollection {
   ///     `repeating` parameter. `count` must be zero or greater.
   @inlinable
   @_semantics("array.init")
-  @differentiable(wrt: repeatedValue, vjp: _vjpInit(repeating:count:)
-                  where Element: Differentiable)
   public init(repeating repeatedValue: Element, count: Int) {
     var p: UnsafeMutablePointer<Element>
     (self, p) = Array._allocateUninitialized(count)
@@ -1330,8 +1326,6 @@ extension Array: RangeReplaceableCollection {
 // operator in the same expression.
 extension Array {
   @inlinable
-  // SWIFT_ENABLE_TENSORFLOW
-  @differentiable(vjp: _vjpPlus where Element : Differentiable)
   public static func + (lhs: Array, rhs: Array) -> Array {
     var lhs = lhs
     lhs.append(contentsOf: rhs)
@@ -1930,24 +1924,24 @@ extension Array {
 extension Array.DifferentiableView : Differentiable where Element : Differentiable {
   /// The viewed array.
   public var base: [Element] {
-    @differentiable(wrt: self, vjp: _vjpBase)
     get { return _base }
     _modify { yield &_base }
   }
 
   @usableFromInline
+  @derivative(of: base)
   func _vjpBase() ->
-    ([Element], (Array<Element>.TangentVector) -> TangentVector) {
+    (value: [Element], pullback: (Array<Element>.TangentVector) -> TangentVector) {
     return (base, { $0 })
   }
 
   /// Creates a differentiable view of the given array.
-  @differentiable(wrt: base, vjp: _vjpInit)
   public init(_ base: [Element]) { self._base = base }
 
   @usableFromInline
+  @derivative(of: init(_:))
   static func _vjpInit(_ base: [Element]) ->
-    (Array.DifferentiableView, (TangentVector) -> TangentVector) {
+    (value: Array.DifferentiableView, pullback: (TangentVector) -> TangentVector) {
     return (Array.DifferentiableView(base), { $0 })
   }
 
@@ -2088,8 +2082,9 @@ extension Array : EuclideanDifferentiable
 }
 
 extension Array where Element : Differentiable {
+  @derivative(of: subscript)
   public func _vjpSubscript(index: Int) ->
-    (Element, (Element.TangentVector) -> TangentVector)
+    (value: Element, pullback: (Element.TangentVector) -> TangentVector)
   {
     func pullback(_ gradientIn: Element.TangentVector) -> TangentVector {
       var gradientOut = Array<Element.TangentVector>(
@@ -2101,8 +2096,9 @@ extension Array where Element : Differentiable {
     return (self[index], pullback)
   }
 
+  @derivative(of: +)
   public static func _vjpPlus(_ lhs: [Element], _ rhs: [Element]) ->
-    ([Element], (TangentVector) -> (TangentVector, TangentVector)) {
+    (value: [Element], pullback: (TangentVector) -> (TangentVector, TangentVector)) {
       func pullback(_ gradientIn: TangentVector) ->
         (TangentVector, TangentVector) {
         precondition(
@@ -2122,6 +2118,7 @@ extension Array where Element : Differentiable {
 
 extension Array where Element: Differentiable {
   @usableFromInline
+  @derivative(of: init(repeating:count:))
   static func _vjpInit(repeating repeatedValue: Element, count: Int) -> (
     value: Self, pullback: (TangentVector) -> Element.TangentVector
   ) {
