@@ -1887,16 +1887,6 @@ bool FailureDiagnosis::visitCoerceExpr(CoerceExpr *CE) {
   if (!expr)
     return true;
 
-  auto ref = expr->getReferencedDecl();
-  if (auto *decl = ref.getDecl()) {
-    // Without explicit coercion we might end up
-    // type-checking sub-expression as unavaible
-    // declaration, let's try to diagnose that here.
-    if (AvailableAttr::isUnavailable(decl))
-      return diagnoseExplicitUnavailability(
-          decl, expr->getSourceRange(), CS.DC, dyn_cast<ApplyExpr>(expr));
-  }
-
   return false;
 }
 
