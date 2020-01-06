@@ -156,7 +156,8 @@ findSuitableWrapperInit(ASTContext &ctx, NominalTypeDecl *nominal,
     }
 
     // Check accessibility.
-    if (init->getFormalAccess() < nominal->getFormalAccess()) {
+    if (init->getFormalAccess() <
+        std::min(nominal->getFormalAccess(), AccessLevel::Public)) {
       nonviable.push_back(
           std::make_tuple(init, NonViableReason::Inaccessible, Type()));
       continue;
