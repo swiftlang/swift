@@ -5084,19 +5084,10 @@ AnyFunctionType *AnyFunctionType::getTransposeOriginalFunctionType(
     transposeResult = methodType->getResult();
   }
 
-  Type originalResult;
-  if (isCurried) {
-    // If it's curried, then the first parameter in the curried type, which is
-    // the 'Self' type, is the original result (no matter if we are
-    // transposing wrt self or not).
-    originalResult = getParams().front().getPlainType();
-  } else {
-    // If it's not curried, the last parameter, the tangent, is always the
-    // original result type as we require the last parameter of the transposing
-    // function to be the original result.
-    originalResult = transposeParams.back().getPlainType();
-  }
-  assert(originalResult);
+  // The last parameter, the tangent, is always the
+  // original result type as we require the last parameter of the transposing
+  // function to be the original result.
+  Type originalResult = transposeParams.back().getPlainType();
 
   SmallVector<TupleTypeElt, 4> transposeResultTypes;
   // Return type of transpose function can be a singular type or a tuple type.
@@ -5107,25 +5098,24 @@ AnyFunctionType *AnyFunctionType::getTransposeOriginalFunctionType(
     transposeResultTypes.push_back(transposeResult);
   }
   assert(!transposeResultTypes.empty());
-
   // If the function is curried and is transposing wrt 'self', then grab
   // the type from the result list (guaranteed to be the first since 'self'
   // is first in wrt list) and remove it. If it is still curried but not
-  // transposing wrt 'self', then the 'Self' type is the first parameter
-  // in the method.
+  // transposing wrt 'self', then the 'Self' type is the first parameter of
+  // the curried function.
   unsigned transposeResultTypesIndex = 0;
   Type selfType;
   if (isCurried && wrtSelf) {
     selfType = transposeResultTypes.front().getType();
     transposeResultTypesIndex++;
   } else if (isCurried) {
-    selfType = transposeParams.front().getPlainType();
-    transposeParamsIndex++;
+    selfType = getParams().front().getPlainType();
   }
 
   SmallVector<AnyFunctionType::Param, 8> originalParams;
-  unsigned originalParameterCount =
-      transposeParams.size() + wrtParamIndices->getNumIndices() - 1;
+  unsigned originalParameterCount = transposeParams.size() +
+                                    wrtParamIndices->getNumIndices() - 1 -
+                                    (unsigned)wrtSelf;
   for (auto i : range(originalParameterCount)) {
     // Need to check if it is the 'self' param since we handle it differently
     // above.

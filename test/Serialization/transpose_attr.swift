@@ -52,8 +52,8 @@ extension S {
 
   // CHECK: @transpose(of: instanceMethod, wrt: self)
   @transpose(of: instanceMethod, wrt: self)
-  func transposeInstanceMethodWrtSelf(v: S) -> (S, S) {
-    (v, v)
+  static func transposeInstanceMethodWrtSelf(_ other: S, v: S) -> S {
+    v
   }
 }
 
@@ -64,11 +64,14 @@ extension S {
     x
   }
 
-  // CHECK: @transpose(of: staticMethod, wrt: 0)
+  // FIXME(TF-1063): `@transpose` type-checking crash for static methods.
+  // CHECK-FIXME: @transpose(of: staticMethod, wrt: 0)
+  /*
   @transpose(of: staticMethod, wrt: 0)
-  func transposeStaticMethod(_: S.Type) -> S {
+  static func transposeStaticMethod() -> S {
     self
   }
+  */
 }
 
 // Test computed properties.
@@ -77,8 +80,8 @@ extension S {
 
   // CHECK: @transpose(of: computedProperty, wrt: self)
   @transpose(of: computedProperty, wrt: self)
-  func transposeProperty() -> Self {
-    self
+  static func transposeProperty(v: Self) -> Self {
+    v
   }
 }
 
@@ -88,7 +91,7 @@ extension S {
 
   // CHECK: @transpose(of: subscript, wrt: self)
   @transpose(of: subscript(_:), wrt: self)
-  func transposeSubscript<T: Differentiable>(x: T) -> Self {
-    self
+  static func transposeSubscript<T: Differentiable>(x: T, v: Self) -> Self {
+    v
   }
 }

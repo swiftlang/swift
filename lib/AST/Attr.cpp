@@ -390,9 +390,10 @@ enum class DifferentiationParameterPrintingStyle {
 static std::string getDifferentiationParametersClauseString(
     const AbstractFunctionDecl *function, IndexSubset *paramIndices,
     ArrayRef<ParsedAutoDiffParameter> parsedParams,
-    DifferentiationParameterPrintingStyle style) {
+    DifferentiationParameterPrintingStyle style, bool isTranspose = false) {
   assert(function);
   bool isInstanceMethod = function->isInstanceMember();
+  bool isStaticMethod = function->isStatic();
   std::string result;
   llvm::raw_string_ostream printer(result);
 
@@ -404,7 +405,9 @@ static std::string getDifferentiationParametersClauseString(
     if (parameterCount > 1)
       printer << '(';
     // Check if differentiating wrt `self`. If so, manually print it first.
-    if (isInstanceMethod && parameters.test(parameters.size() - 1)) {
+    // Special case that for transpose functions, they need to be 'static'.
+    if ((isInstanceMethod || (isStaticMethod && isTranspose)) &&
+        parameters.test(parameters.size() - 1)) {
       parameters.reset(parameters.size() - 1);
       printer << "self";
       if (parameters.any())
@@ -948,7 +951,7 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     auto *transpose = cast<AbstractFunctionDecl>(D);
     auto transParamsString = getDifferentiationParametersClauseString(
         transpose, attr->getParameterIndices(), attr->getParsedParameters(),
-        DifferentiationParameterPrintingStyle::Index);
+        DifferentiationParameterPrintingStyle::Index, /*isTranspose*/ true);
     if (!transParamsString.empty())
       Printer << ", " << transParamsString;
     Printer << ')';
