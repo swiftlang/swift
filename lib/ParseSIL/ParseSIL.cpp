@@ -2072,6 +2072,31 @@ static bool parseAssignOwnershipQualifier(AssignOwnershipQualifier &Result,
 }
 
 // SWIFT_ENABLE_TENSORFLOW
+// Parse an index set, prefaced with the given label. Returns true on error.
+static bool parseIndexSet(Parser &P, StringRef label,
+                          SmallVectorImpl<unsigned> &indices,
+                          const Diagnostic &parseIndexDiag) {
+  SourceLoc loc;
+  // Parse `[<label> <integer_literal>...]`.
+  if (P.parseToken(tok::l_square, diag::sil_autodiff_expected_lsquare,
+                   "index list") ||
+      P.parseSpecificIdentifier(
+          label, diag::sil_autodiff_expected_index_list_label, label))
+    return true;
+  while (P.Tok.is(tok::integer_literal)) {
+    unsigned index;
+    if (P.parseUnsignedInteger(index, loc, parseIndexDiag))
+      return true;
+    indices.push_back(index);
+  }
+  if (P.parseToken(tok::r_square, diag::sil_autodiff_expected_rsquare,
+                   "index list"))
+    return true;
+  return false;
+};
+// SWIFT_ENABLE_TENSORFLOW END
+
+// SWIFT_ENABLE_TENSORFLOW
 /// sil-differentiability-witness-config-and-function ::=
 ///   '[' 'parameters' index-subset ']'
 ///   '[' 'results' index-subset ']'
@@ -2083,34 +2108,13 @@ static bool parseAssignOwnershipQualifier(AssignOwnershipQualifier &Result,
 static Optional<std::pair<AutoDiffConfig, SILFunction *>>
 parseSILDifferentiabilityWitnessConfigAndFunction(Parser &P, SILParser &SP,
                                                   SILLocation L) {
-  SourceLoc lastLoc;
-  // Parse an index set, prefaced with the given label.
-  auto parseIndexSet = [&](StringRef label, SmallVectorImpl<unsigned> &indices,
-                           const Diagnostic &parseIndexDiag) -> bool {
-    // Parse `[<label> <integer_literal>...]`.
-    if (P.parseToken(tok::l_square, diag::sil_autodiff_expected_lsquare,
-                     "index list") ||
-        P.parseSpecificIdentifier(
-            label, diag::sil_autodiff_expected_index_list_label, label))
-      return true;
-    while (P.Tok.is(tok::integer_literal)) {
-      unsigned index;
-      if (P.parseUnsignedInteger(index, lastLoc, parseIndexDiag))
-        return true;
-      indices.push_back(index);
-    }
-    if (P.parseToken(tok::r_square, diag::sil_autodiff_expected_rsquare,
-                     "index list"))
-      return true;
-    return false;
-  };
   // Parse parameter and result indices.
   SmallVector<unsigned, 8> parameterIndices;
   SmallVector<unsigned, 8> resultIndices;
-  if (parseIndexSet("parameters", parameterIndices,
+  if (parseIndexSet(P, "parameters", parameterIndices,
                     diag::sil_autodiff_expected_parameter_index))
     return {};
-  if (parseIndexSet("results", resultIndices,
+  if (parseIndexSet(P, "results", resultIndices,
                     diag::sil_autodiff_expected_result_index))
     return {};
   // Parse witness generic parameter clause.
@@ -2938,27 +2942,12 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     //
     // e.g. differentiable_function [parameters 0 1 2] %0 : $T with_derivative
     //      {%1 : $T, %2 : $T}
-    //        ^ jvp    ^ vjp
-    SourceLoc lastLoc;
+    //       ^~ jvp   ^~ vjp
+    // Parse `[parameters <integer_literal>...]`.
     SmallVector<unsigned, 8> parameterIndices;
-    // Parse optional `[parameters <integer_literal>...]`
-    if (P.Tok.is(tok::l_square) &&
-        P.peekToken().is(tok::identifier) &&
-        P.peekToken().getText() == "parameters") {
-      P.consumeToken(tok::l_square);
-      P.consumeToken(tok::identifier);
-      // Parse indices.
-      while (P.Tok.is(tok::integer_literal)) {
-        unsigned index;
-        if (P.parseUnsignedInteger(index, lastLoc,
-              diag::sil_autodiff_expected_parameter_index))
-          return true;
-        parameterIndices.push_back(index);
-      }
-      if (P.parseToken(tok::r_square, diag::sil_autodiff_expected_rsquare,
-                       "parameter index list"))
-        return true;
-    }
+    if (parseIndexSet(P, "parameters", parameterIndices,
+                      diag::sil_autodiff_expected_parameter_index))
+      return true;
     // Parse the original function value.
     SILValue original;
     SourceLoc originalOperandLoc;
@@ -3001,26 +2990,11 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
   case SILInstructionKind::LinearFunctionInst: {
     // e.g. linear_function [parameters 0 1 2] %0 : $T
     // e.g. linear_function [parameters 0 1 2] %0 : $T with_transpose %1 : $T
-    SourceLoc lastLoc;
+    // Parse `[parameters <integer_literal>...]`.
     SmallVector<unsigned, 8> parameterIndices;
-    // Parse optional `[parameters <integer_literal>...]`
-    if (P.Tok.is(tok::l_square) &&
-        P.peekToken().is(tok::identifier) &&
-        P.peekToken().getText() == "parameters") {
-      P.consumeToken(tok::l_square);
-      P.consumeToken(tok::identifier);
-      // Parse indices.
-      while (P.Tok.is(tok::integer_literal)) {
-        unsigned index;
-        if (P.parseUnsignedInteger(index, lastLoc,
-              diag::sil_autodiff_expected_parameter_index))
-          return true;
-        parameterIndices.push_back(index);
-      }
-      if (P.parseToken(tok::r_square, diag::sil_autodiff_expected_rsquare,
-                       "parameter index list"))
-        return true;
-    }
+    if (parseIndexSet(P, "parameters", parameterIndices,
+                      diag::sil_autodiff_expected_parameter_index))
+      return true;
     // Parse the original function value.
     SILValue original;
     SourceLoc originalOperandLoc;
@@ -3117,9 +3091,8 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     SourceLoc keyStartLoc = P.Tok.getLoc();
     auto configAndFn = parseSILDifferentiabilityWitnessConfigAndFunction(
         P, *this, InstLoc);
-    if (!configAndFn) {
+    if (!configAndFn)
       return true;
-    }
     auto config = configAndFn->first;
     auto originalFn = configAndFn->second;
     auto *witness = SILMod.lookUpDifferentiabilityWitness(

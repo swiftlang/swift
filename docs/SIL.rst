@@ -5606,7 +5606,7 @@ differentiable_function
 ::
 
   sil-instruction ::= 'differentiable_function'
-                      sil-differentiable-function-parameter-indices?
+                      sil-differentiable-function-parameter-indices
                       sil-value ':' sil-type
                       sil-differentiable-function-derivative-functions-clause?
                       
@@ -5641,7 +5641,7 @@ linear_function
 ::
 
   sil-instruction ::= 'linear_function'
-                      sil-linear-function-parameter-indices?
+                      sil-linear-function-parameter-indices
                       sil-value ':' sil-type
                       sil-linear-function-transpose-function-clause?
 
