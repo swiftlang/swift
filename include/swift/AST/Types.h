@@ -3235,12 +3235,12 @@ public:
       GenericSignature whereClauseGenericSignature = GenericSignature(),
       bool makeSelfParamFirst = false);
 
-  /// Given the type of an autodiff derivative function, returns the
+  /// Given that `this` is an autodiff derivative function type, returns the
   /// corresponding original function type.
-  AnyFunctionType *getAutoDiffOriginalFunctionType();
+  AnyFunctionType *getDerivativeOriginalFunctionType();
 
-  /// Given the type of a transpose function, returns the corresponding original
-  /// function type.
+  /// Given that `this` is an autodiff transpose function type, returns the
+  /// corresponding original function type.
   AnyFunctionType *
   getTransposeOriginalFunctionType(IndexSubset *wrtParamIndices, bool wrtSelf);
 

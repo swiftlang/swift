@@ -797,7 +797,7 @@ Parser::parseImplementsAttribute(SourceLoc AtLoc, SourceLoc Loc) {
 ///
 /// \verbatim
 ///   differentiable-attribute-arguments:
-///     '(' (differentiation-params-clause ',')?
+///     '(' (differentiability-params-clause ',')?
 ///         (differentiable-attr-func-specifier ',')?
 ///         differentiable-attr-func-specifier?
 ///         where-clause?
@@ -810,7 +810,7 @@ Parser::parseDifferentiableAttribute(SourceLoc atLoc, SourceLoc loc) {
   StringRef AttrName = "differentiable";
   SourceLoc lParenLoc = loc, rParenLoc = loc;
   bool linear = false;
-  SmallVector<ParsedAutoDiffParameter, 8> params;
+  SmallVector<ParsedAutoDiffParameter, 8> parameters;
   Optional<DeclNameRefWithLoc> jvpSpec;
   Optional<DeclNameRefWithLoc> vjpSpec;
   TrailingWhereClause *whereClause = nullptr;
@@ -818,8 +818,8 @@ Parser::parseDifferentiableAttribute(SourceLoc atLoc, SourceLoc loc) {
   // Parse '('.
   if (consumeIf(tok::l_paren, lParenLoc)) {
     // Parse @differentiable attribute arguments.
-    if (parseDifferentiableAttributeArguments(linear, params, jvpSpec, vjpSpec,
-                                              whereClause))
+    if (parseDifferentiableAttributeArguments(linear, parameters, jvpSpec,
+                                              vjpSpec, whereClause))
       return makeParserError();
     // Parse ')'.
     if (!consumeIf(tok::r_paren, rParenLoc)) {
@@ -829,10 +829,9 @@ Parser::parseDifferentiableAttribute(SourceLoc atLoc, SourceLoc loc) {
     }
   }
 
-  return ParserResult<DifferentiableAttr>(
-      DifferentiableAttr::create(Context, /*implicit*/ false, atLoc,
-                                 SourceRange(loc, rParenLoc), linear,
-                                 params, jvpSpec, vjpSpec, whereClause));
+  return ParserResult<DifferentiableAttr>(DifferentiableAttr::create(
+      Context, /*implicit*/ false, atLoc, SourceRange(loc, rParenLoc), linear,
+      parameters, jvpSpec, vjpSpec, whereClause));
 }
 
 // Attribute parsing error helper.
@@ -852,19 +851,19 @@ static bool errorAndSkipUntilConsumeRightParen(Parser &P, StringRef attrName,
   return true;
 };
 
-/// Parse a differentiation parameters 'wrt:' clause, returning true on error.
+/// Parse a differentiability parameters 'wrt:' clause, returning true on error.
 /// If `allowNamedParameters` is false, allow only index parameters and 'self'.
 ///
 /// \verbatim
-///   differentiation-params-clause:
-///     'wrt' ':' (differentiation-param | differentiation-params)
-///   differentiation-params:
-///     '(' differentiation-param (',' differentiation-param)* ')'
-///   differentiation-param:
+///   differentiability-params-clause:
+///     'wrt' ':' (differentiability-param | differentiability-params)
+///   differentiability-params:
+///     '(' differentiability-param (',' differentiability-param)* ')'
+///   differentiability-param:
 ///     'self' | identifier | [0-9]+
 /// \endverbatim
-bool Parser::parseDifferentiationParametersClause(
-    SmallVectorImpl<ParsedAutoDiffParameter> &params, StringRef attrName,
+bool Parser::parseDifferentiabilityParametersClause(
+    SmallVectorImpl<ParsedAutoDiffParameter> &parameters, StringRef attrName,
     bool allowNamedParameters) {
   SyntaxParsingContext DiffParamsClauseContext(
       SyntaxContext, SyntaxKind::DifferentiationParamsClause);
@@ -874,7 +873,7 @@ bool Parser::parseDifferentiationParametersClause(
     return errorAndSkipUntilConsumeRightParen(*this, attrName);
   }
 
-  // Function that parses a parameter into `params`. Returns true if error
+  // Function that parses a parameter into `parameters`. Returns true if error
   // occurred.
   auto parseParam = [&](bool parseTrailingComma = true) -> bool {
     SyntaxParsingContext DiffParamContext(
@@ -891,8 +890,8 @@ bool Parser::parseDifferentiationParametersClause(
       if (parseIdentifier(paramName, paramLoc,
                           diag::diff_params_clause_expected_parameter))
         return true;
-      params.push_back(ParsedAutoDiffParameter::getNamedParameter(
-          paramLoc, paramName));
+      parameters.push_back(
+          ParsedAutoDiffParameter::getNamedParameter(paramLoc, paramName));
       break;
     }
     case tok::integer_literal: {
@@ -901,13 +900,13 @@ bool Parser::parseDifferentiationParametersClause(
               paramNum, paramLoc,
               diag::diff_params_clause_expected_parameter))
         return true;
-      params.push_back(ParsedAutoDiffParameter::getOrderedParameter(
-          paramLoc, paramNum));
+      parameters.push_back(
+          ParsedAutoDiffParameter::getOrderedParameter(paramLoc, paramNum));
       break;
     }
     case tok::kw_self: {
       paramLoc = consumeToken(tok::kw_self);
-      params.push_back(ParsedAutoDiffParameter::getSelfParameter(paramLoc));
+      parameters.push_back(ParsedAutoDiffParameter::getSelfParameter(paramLoc));
       break;
     }
     default:
@@ -945,10 +944,9 @@ bool Parser::parseDifferentiationParametersClause(
 }
 
 bool Parser::parseDifferentiableAttributeArguments(
-    bool &linear, SmallVectorImpl<ParsedAutoDiffParameter> &params,
+    bool &linear, SmallVectorImpl<ParsedAutoDiffParameter> &parameters,
     Optional<DeclNameRefWithLoc> &jvpSpec,
-    Optional<DeclNameRefWithLoc> &vjpSpec,
-    TrailingWhereClause *&whereClause) {
+    Optional<DeclNameRefWithLoc> &vjpSpec, TrailingWhereClause *&whereClause) {
   StringRef AttrName = "differentiable";
 
   // Parse trailing comma, if it exists, and check for errors.
@@ -973,7 +971,7 @@ bool Parser::parseDifferentiableAttributeArguments(
   SyntaxParsingContext ContentContext(
       SyntaxContext, SyntaxKind::DifferentiableAttributeArguments);
 
-  // Parse optional differentiation parameters.
+  // Parse optional differentiability parameters.
   // Parse 'linear' label (optional).
   linear = false;
   if (isIdentifier(Tok, "linear")) {
@@ -994,9 +992,9 @@ bool Parser::parseDifferentiableAttributeArguments(
         .fixItReplace(withRespectToRange, "wrt:");
     return errorAndSkipUntilConsumeRightParen(*this, AttrName);
   }
-  // Parse differentiation parameters' clause.
+  // Parse differentiability parameters' clause.
   if (isIdentifier(Tok, "wrt")) {
-    if (parseDifferentiationParametersClause(params, AttrName))
+    if (parseDifferentiabilityParametersClause(parameters, AttrName))
       return true;
     // If no trailing comma or 'where' clause, terminate parsing arguments.
     if (Tok.isNot(tok::comma, tok::kw_where))
@@ -1145,7 +1143,7 @@ static bool parseQualifiedDeclName(Parser &P, Diag<> nameParseError,
 ///
 /// \verbatim
 ///   derivative-attribute-arguments:
-///     '(' 'of' ':' qualified-decl-name (',' differentiation-params-clause)?
+///     '(' 'of' ':' qualified-decl-name (',' differentiability-params-clause)?
 ///     ')'
 /// \endverbatim
 ParserResult<DerivativeAttr> Parser::parseDerivativeAttribute(SourceLoc atLoc,
@@ -1154,7 +1152,7 @@ ParserResult<DerivativeAttr> Parser::parseDerivativeAttribute(SourceLoc atLoc,
   SourceLoc lParenLoc = loc, rParenLoc = loc;
   TypeRepr *baseType = nullptr;
   DeclNameRefWithLoc original;
-  SmallVector<ParsedAutoDiffParameter, 8> params;
+  SmallVector<ParsedAutoDiffParameter, 8> parameters;
 
   // Parse trailing comma, if it exists, and check for errors.
   auto consumeIfTrailingComma = [&]() -> bool {
@@ -1194,9 +1192,9 @@ ParserResult<DerivativeAttr> Parser::parseDerivativeAttribute(SourceLoc atLoc,
     }
     if (consumeIfTrailingComma())
       return makeParserError();
-    // Parse the optional 'wrt' differentiation parameters clause.
+    // Parse the optional 'wrt' differentiability parameters clause.
     if (isIdentifier(Tok, "wrt") &&
-        parseDifferentiationParametersClause(params, AttrName))
+        parseDifferentiabilityParametersClause(parameters, AttrName))
       return makeParserError();
   }
   // Parse ')'.
@@ -1207,7 +1205,7 @@ ParserResult<DerivativeAttr> Parser::parseDerivativeAttribute(SourceLoc atLoc,
   }
   return ParserResult<DerivativeAttr>(DerivativeAttr::create(
       Context, /*implicit*/ false, atLoc, SourceRange(loc, rParenLoc), baseType,
-      original, params));
+      original, parameters));
 }
 
 // SWIFT_ENABLE_TENSORFLOW
@@ -1217,7 +1215,7 @@ Parser::parseDifferentiatingAttribute(SourceLoc atLoc, SourceLoc loc) {
   SourceLoc lParenLoc = loc, rParenLoc = loc;
   TypeRepr *baseType = nullptr;
   DeclNameRefWithLoc original;
-  SmallVector<ParsedAutoDiffParameter, 8> params;
+  SmallVector<ParsedAutoDiffParameter, 8> parameters;
 
   // Parse trailing comma, if it exists, and check for errors.
   auto consumeIfTrailingComma = [&]() -> bool {
@@ -1253,9 +1251,9 @@ Parser::parseDifferentiatingAttribute(SourceLoc atLoc, SourceLoc loc) {
     }
     if (consumeIfTrailingComma())
       return makeParserError();
-    // Parse the optional 'wrt' differentiation parameters clause.
+    // Parse the optional 'wrt' differentiability parameters clause.
     if (isIdentifier(Tok, "wrt") &&
-        parseDifferentiationParametersClause(params, AttrName))
+        parseDifferentiabilityParametersClause(parameters, AttrName))
       return makeParserError();
   }
   // Parse ')'.
@@ -1266,14 +1264,20 @@ Parser::parseDifferentiatingAttribute(SourceLoc atLoc, SourceLoc loc) {
   }
   return ParserResult<DerivativeAttr>(DerivativeAttr::create(
       Context, /*implicit*/ false, atLoc, SourceRange(loc, rParenLoc), baseType,
-      original, params));
+      original, parameters));
 }
 
 /// Parse a `@transpose(of:)` attribute, returning true on error.
 ///
 /// \verbatim
 ///   transpose-attribute-arguments:
-///     '(' 'of' ':' qualified-decl-name (',' transposed-params-clause)? ')'
+///     '(' 'of' ':' qualified-decl-name (',' linearity-params-clause)? ')'
+///   linearity-params-clause:
+///     'wrt' ':' (linearity-param | linearity-params)
+///   linearity-params:
+///     '(' linearity-param (',' linearity-param)* ')'
+///   linearity-param:
+///     'self' | [0-9]+
 /// \endverbatim
 ParserResult<TransposeAttr> Parser::parseTransposeAttribute(SourceLoc atLoc,
                                                             SourceLoc loc) {
@@ -1281,7 +1285,7 @@ ParserResult<TransposeAttr> Parser::parseTransposeAttribute(SourceLoc atLoc,
   SourceLoc lParenLoc = loc, rParenLoc = loc;
   TypeRepr *baseType = nullptr;
   DeclNameRefWithLoc original;
-  SmallVector<ParsedAutoDiffParameter, 8> params;
+  SmallVector<ParsedAutoDiffParameter, 8> parameters;
 
   // Parse trailing comma, if it exists, and check for errors.
   auto consumeIfTrailingComma = [&]() -> bool {
@@ -1322,10 +1326,10 @@ ParserResult<TransposeAttr> Parser::parseTransposeAttribute(SourceLoc atLoc,
     }
     if (consumeIfTrailingComma())
       return makeParserError();
-    // Parse the optional 'wrt' transposed parameters clause.
+    // Parse the optional 'wrt' linearity parameters clause.
     if (Tok.is(tok::identifier) && Tok.getText() == "wrt" &&
-        parseDifferentiationParametersClause(params, AttrName,
-                                             /*allowNamedParameters*/ false))
+        parseDifferentiabilityParametersClause(parameters, AttrName,
+                                               /*allowNamedParameters*/ false))
       return makeParserError();
   }
   // Parse ')'.
@@ -1336,7 +1340,7 @@ ParserResult<TransposeAttr> Parser::parseTransposeAttribute(SourceLoc atLoc,
   }
   return ParserResult<TransposeAttr>(TransposeAttr::create(
       Context, /*implicit*/ false, atLoc, SourceRange(loc, rParenLoc), baseType,
-      original, params));
+      original, parameters));
 }
 
 // SWIFT_ENABLE_TENSORFLOW

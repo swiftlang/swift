@@ -4914,8 +4914,9 @@ AnyFunctionType *AnyFunctionType::getAutoDiffDerivativeFunctionType(
 
   auto &ctx = getASTContext();
 
-  SmallVector<Type, 8> wrtParamTypes;
-  autodiff::getSubsetParameterTypes(indices, this, wrtParamTypes,
+  // Get differentiability parameter types.
+  SmallVector<Type, 8> diffParamTypes;
+  autodiff::getSubsetParameterTypes(indices, this, diffParamTypes,
                                     /*reverseCurryLevels*/ !makeSelfParamFirst);
 
   // Unwrap curry levels. At most, two parameter lists are necessary, for
@@ -4940,11 +4941,10 @@ AnyFunctionType *AnyFunctionType::getAutoDiffDerivativeFunctionType(
     // closure is the JVP "differential":
     //   (T.TangentVector...) -> (R.TangentVector...)
     SmallVector<AnyFunctionType::Param, 8> differentialParams;
-    for (auto wrtParamType : wrtParamTypes)
-      differentialParams.push_back(
-          AnyFunctionType::Param(
-              wrtParamType->getAutoDiffAssociatedTangentSpace(lookupConformance)
-                  ->getType()));
+    for (auto diffParamType : diffParamTypes)
+      differentialParams.push_back(AnyFunctionType::Param(
+          diffParamType->getAutoDiffAssociatedTangentSpace(lookupConformance)
+              ->getType()));
 
     SmallVector<TupleTypeElt, 8> differentialResults;
     if (auto *resultTuple = originalResult->getAs<TupleType>()) {
@@ -4984,9 +4984,9 @@ AnyFunctionType *AnyFunctionType::getAutoDiffDerivativeFunctionType(
     }
 
     SmallVector<TupleTypeElt, 8> pullbackResults;
-    for (auto wrtParamType : wrtParamTypes)
-      pullbackResults.push_back(wrtParamType
-          ->getAutoDiffAssociatedTangentSpace(lookupConformance)
+    for (auto diffParamType : diffParamTypes)
+      pullbackResults.push_back(
+          diffParamType->getAutoDiffAssociatedTangentSpace(lookupConformance)
               ->getType());
     Type pullbackResult = pullbackResults.size() > 1
                               ? TupleType::get(pullbackResults, ctx)
@@ -5068,10 +5068,47 @@ makeFunctionType(ArrayRef<AnyFunctionType::Param> params, Type retTy,
   return FunctionType::get(params, retTy);
 }
 
-// Compute the original function type corresponding to the given transpose
-// function type.
+/// Given that `this` is an autodiff derivative function type, returns the
+/// corresponding original function type.
+AnyFunctionType *AnyFunctionType::getDerivativeOriginalFunctionType() {
+  // Unwrap curry levels. At most, two parameter lists are necessary, for
+  // curried method types with a `(Self)` parameter list.
+  SmallVector<AnyFunctionType *, 2> curryLevels;
+  auto *currentLevel = this;
+  for (unsigned i : range(2)) {
+    (void)i;
+    if (currentLevel == nullptr)
+      break;
+    curryLevels.push_back(currentLevel);
+    currentLevel = currentLevel->getResult()->getAs<AnyFunctionType>();
+  }
+
+  auto derivativeResult = curryLevels.back()->getResult()->getAs<TupleType>();
+  assert(derivativeResult && derivativeResult->getNumElements() == 2 &&
+         "Expected derivative result to be a two-element tuple");
+  auto originalResult = derivativeResult->getElement(0).getType();
+  auto *originalType = makeFunctionType(
+      curryLevels.back(), curryLevels.back()->getParams(), originalResult,
+      curryLevels.size() == 1 ? getOptGenericSignature() : nullptr);
+
+  // Wrap the derivative function type in additional curry levels.
+  auto curryLevelsWithoutLast =
+      ArrayRef<AnyFunctionType *>(curryLevels).drop_back(1);
+  for (auto pair : enumerate(llvm::reverse(curryLevelsWithoutLast))) {
+    unsigned i = pair.index();
+    AnyFunctionType *curryLevel = pair.value();
+    originalType = makeFunctionType(
+        curryLevel, curryLevel->getParams(), originalType,
+        i == curryLevelsWithoutLast.size() - 1 ? getOptGenericSignature()
+                                               : nullptr);
+  }
+  return originalType;
+}
+
+/// Given that `this` is an autodiff transpose function type, returns the
+/// corresponding original function type.
 AnyFunctionType *AnyFunctionType::getTransposeOriginalFunctionType(
-    IndexSubset *wrtParamIndices, bool wrtSelf) {
+    IndexSubset *linearParamIndices, bool wrtSelf) {
   unsigned transposeParamsIndex = 0;
   bool isCurried = getResult()->is<AnyFunctionType>();
 
@@ -5121,18 +5158,18 @@ AnyFunctionType *AnyFunctionType::getTransposeOriginalFunctionType(
   // - The number of original transposed parameters.
   //   - This is the number of linearity parameters.
   unsigned originalParameterCount =
-      transposeParams.size() - 1 + wrtParamIndices->getNumIndices();
+      transposeParams.size() - 1 + linearParamIndices->getNumIndices();
   // Iterate over all original parameter indices.
   for (auto i : range(originalParameterCount)) {
     // Skip `self` parameter if `self` is a linearity parameter.
     // The `self` is handled specially later to form a curried function type.
     bool isSelfParameterAndWrtSelf =
-        wrtSelf && i == wrtParamIndices->getCapacity() - 1;
+        wrtSelf && i == linearParamIndices->getCapacity() - 1;
     if (isSelfParameterAndWrtSelf)
       continue;
     // If `i` is a linearity parameter index, the next original parameter is
     // the next transpose result.
-    if (wrtParamIndices->contains(i)) {
+    if (linearParamIndices->contains(i)) {
       auto resultType =
           transposeResultTypes[transposeResultTypesIndex++].getType();
       originalParams.push_back(AnyFunctionType::Param(resultType));

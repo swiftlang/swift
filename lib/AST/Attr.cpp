@@ -372,9 +372,9 @@ static void printShortFormAvailable(ArrayRef<const DeclAttribute *> Attrs,
   Printer.printNewline();
 }
 
-/// The kind of a differentiation parameter in a `wrt:` differentiation
-/// parameters clause: differentiability or linearity. Used for printing
-/// `@differentiable`, `@derivative`, and `@transpose` attributes.
+/// The kind of a parameter in a `wrt:` differentiation parameters clause:
+/// either a differentiability parameter or a linearity parameter. Used for
+/// printing `@differentiable`, `@derivative`, and `@transpose` attributes.
 enum class DifferentiationParameterKind {
   /// A differentiability parameter, printed by name.
   /// Used for `@differentiable` and `@derivative` attribute.

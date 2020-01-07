@@ -3035,18 +3035,19 @@ NOTE(derivative_attr_duplicate_note,none,
      "other attribute declared here", ())
 
 // @transpose
-ERROR(transpose_params_clause_param_not_differentiable,none,
-      "can only transpose with respect to parameters that conform to "
-      "'Differentiable' and where '%0 == %0.TangentVector'", (StringRef))
+ERROR(transpose_attr_invalid_linearity_parameter_or_result,none,
+      "cannot transpose with respect to original %select{result|parameter}1 "
+      "'%0' that does not conform to 'Differentiable' and satisfy "
+      "'%0 == %0.TangentVector'", (StringRef, /*isParameter*/ bool))
 ERROR(transpose_attr_overload_not_found,none,
       "could not find function %0 with expected type %1", (DeclName, Type))
 ERROR(transpose_attr_cannot_use_named_wrt_params,none,
       "cannot use named 'wrt' parameters in '@transpose(of:)' attribute, found "
       "%0", (Identifier))
-ERROR(transpose_func_wrt_self_must_be_static,none,
+ERROR(transpose_attr_wrt_self_must_be_static,none,
      "the transpose of an instance method must be a 'static' method in the "
      "same type when 'self' is a linearity parameter", ())
-NOTE(transpose_func_wrt_self_self_type_mismatch_note,none,
+NOTE(transpose_attr_wrt_self_self_type_mismatch_note,none,
      "the transpose is declared in %0 but the original function is declared in "
      "%1", (Type, Type))
 
