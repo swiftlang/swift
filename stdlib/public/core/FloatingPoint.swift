@@ -1680,9 +1680,6 @@ extension FloatingPoint {
   }
 
   @_transparent
-  // SWIFT_ENABLE_TENSORFLOW
-  @differentiable(wrt: self, vjp: _vjpSquareRoot
-                  where Self : Differentiable, Self == Self.TangentVector)
   public func squareRoot( ) -> Self {
     var lhs = self
     lhs.formSquareRoot( )
@@ -1690,9 +1687,6 @@ extension FloatingPoint {
   }
 
   @_transparent
-  /// SWIFT_ENABLE_TENSORFLOW
-  @differentiable(wrt: (self, lhs, rhs), vjp: _vjpAddingProduct
-                  where Self : Differentiable, Self == Self.TangentVector)
   public func addingProduct(_ lhs: Self, _ rhs: Self) -> Self {
     var addend = self
     addend.addProduct(lhs, rhs)
@@ -1741,16 +1735,18 @@ extension FloatingPoint where Self : Differentiable,
   /// original result and pullback of `addingProduct` with respect to `self`,
   /// `lhs` and `rhs`.
   @inlinable
+  @derivative(of: addingProduct)
   func _vjpAddingProduct(
     _ lhs: Self, _ rhs: Self
-  ) -> (Self, (Self) -> (Self, Self, Self)) {
+  ) -> (value: Self, pullback: (Self) -> (Self, Self, Self)) {
     return (addingProduct(lhs, rhs), { _ in (1, rhs, lhs) })
   }
 
   /// The vector-Jacobian product function of `squareRoot`. Returns the original
   /// result and pullback of `squareRoot` with respect to `self`.
   @inlinable // FIXME(sil-serialize-all)
-  func _vjpSquareRoot() -> (Self, (Self) -> Self) {
+  @derivative(of: squareRoot)
+  func _vjpSquareRoot() -> (value: Self, pullback: (Self) -> Self) {
     let y = squareRoot()
     return (y, { v in v / (2 * y) })
   }
