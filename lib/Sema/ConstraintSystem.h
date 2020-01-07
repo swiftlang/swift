@@ -823,9 +823,9 @@ public:
   std::vector<std::pair<ConstraintLocator *, ProtocolConformanceRef>>
       Conformances;
 
-  /// The set of closures that have been transformed by a function builder.
-  llvm::MapVector<ClosureExpr *, AppliedBuilderTransform>
-      builderTransformedClosures;
+  /// The set of functions that have been transformed by a function builder.
+  llvm::MapVector<AnyFunctionRef, AppliedBuilderTransform>
+      functionBuilderTransformed;
 
   /// Simplify the given type by substituting all occurrences of
   /// type variables for their fixed types.
@@ -1100,6 +1100,54 @@ struct DynamicCallableMethods {
   }
 };
 
+/// Describes the target to which a constraint system's solution can be
+/// applied.
+class SolutionApplicationTarget {
+  enum class Kind {
+    expression,
+    function
+  } kind;
+
+  union {
+    Expr *expression;
+    AnyFunctionRef function;
+  };
+
+public:
+  SolutionApplicationTarget(Expr *expr) {
+    kind = Kind::expression;
+    expression = expr;
+  }
+
+  SolutionApplicationTarget(AnyFunctionRef fn) {
+    kind = Kind::function;
+    function = fn;
+  }
+
+  Expr *getAsExpr() const {
+    switch (kind) {
+    case Kind::expression:
+      return expression;
+
+    case Kind::function:
+      return nullptr;
+    }
+  }
+
+  Optional<AnyFunctionRef> getAsFunction() const {
+    switch (kind) {
+    case Kind::expression:
+      return None;
+
+    case Kind::function:
+      return function;
+    }
+  }
+
+  /// Walk the contents of the application target.
+  llvm::PointerUnion<Expr *, Stmt *> walk(ASTWalker &walker);
+};
+
 enum class ConstraintSystemPhase {
   ConstraintGeneration,
   Solving,
@@ -1293,9 +1341,9 @@ private:
   std::vector<std::pair<ConstraintLocator *, ProtocolConformanceRef>>
       CheckedConformances;
 
-  /// The set of closures that have been transformed by a function builder.
-  std::vector<std::pair<ClosureExpr *, AppliedBuilderTransform>>
-      builderTransformedClosures;
+  /// The set of functions that have been transformed by a function builder.
+  std::vector<std::pair<AnyFunctionRef, AppliedBuilderTransform>>
+      functionBuilderTransformed;
 
 public:
   /// The locators of \c Defaultable constraints whose defaults were used.
@@ -1792,7 +1840,7 @@ public:
 
     unsigned numFavoredConstraints;
 
-    unsigned numBuilderTransformedClosures;
+    unsigned numFunctionBuilderTransformed;
 
     /// The length of \c ResolvedOverloads.
     unsigned numResolvedOverloads;
@@ -2243,12 +2291,12 @@ public:
   /// system to generate a plausible diagnosis of why the system could not be
   /// solved.
   ///
-  /// \param expr The expression whose constraints we're investigating for a
-  /// better diagnostic.
+  /// \param target The solution target whose constraints we're investigating
+  /// for a better diagnostic.
   ///
   /// Assuming that this constraint system is actually erroneous, this *always*
   /// emits an error message.
-  void diagnoseFailureForExpr(Expr *expr);
+  void diagnoseFailureFor(SolutionApplicationTarget target);
 
   bool diagnoseAmbiguity(ArrayRef<Solution> solutions);
   bool diagnoseAmbiguityWithFixes(SmallVectorImpl<Solution> &solutions);
@@ -3922,6 +3970,12 @@ public:
   findBestSolution(SmallVectorImpl<Solution> &solutions,
                    bool minimize);
 
+private:
+  llvm::PointerUnion<Expr *, Stmt *> applySolutionImpl(
+      Solution &solution, SolutionApplicationTarget target,
+      Type convertType, bool discardedExpr, bool performingDiagnostics);
+
+public:
   /// Apply a given solution to the expression, producing a fully
   /// type-checked expression.
   ///
@@ -3934,7 +3988,10 @@ public:
   Expr *applySolution(Solution &solution, Expr *expr,
                       Type convertType,
                       bool discardedExpr,
-                      bool performingDiagnostics);
+                      bool performingDiagnostics) {
+    return applySolutionImpl(solution, expr, convertType, discardedExpr,
+                             performingDiagnostics).get<Expr *>();
+  }
 
   /// Reorder the disjunctive clauses for a given expression to
   /// increase the likelihood that a favored constraint will be successfully

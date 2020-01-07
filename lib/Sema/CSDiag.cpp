@@ -2420,30 +2420,32 @@ bool FailureDiagnosis::diagnoseExprFailure() {
 ///
 /// This is guaranteed to always emit an error message.
 ///
-void ConstraintSystem::diagnoseFailureForExpr(Expr *expr) {
+void ConstraintSystem::diagnoseFailureFor(SolutionApplicationTarget target) {
   setPhase(ConstraintSystemPhase::Diagnostics);
 
   SWIFT_DEFER { setPhase(ConstraintSystemPhase::Finalization); };
 
-  // Look through RebindSelfInConstructorExpr to avoid weird Sema issues.
-  if (auto *RB = dyn_cast<RebindSelfInConstructorExpr>(expr))
-    expr = RB->getSubExpr();
+  if (auto expr = target.getAsExpr()) {
+    // Look through RebindSelfInConstructorExpr to avoid weird Sema issues.
+    if (auto *RB = dyn_cast<RebindSelfInConstructorExpr>(expr))
+      expr = RB->getSubExpr();
 
-  FailureDiagnosis diagnosis(expr, *this);
+    FailureDiagnosis diagnosis(expr, *this);
 
-  // Now, attempt to diagnose the failure from the info we've collected.
-  if (diagnosis.diagnoseExprFailure())
-    return;
+    // Now, attempt to diagnose the failure from the info we've collected.
+    if (diagnosis.diagnoseExprFailure())
+      return;
 
-  // If this is a contextual conversion problem, dig out some information.
-  if (diagnosis.diagnoseContextualConversionError(expr, getContextualType(),
-                                                  getContextualTypePurpose()))
-    return;
+    // If this is a contextual conversion problem, dig out some information.
+    if (diagnosis.diagnoseContextualConversionError(expr, getContextualType(),
+                                                    getContextualTypePurpose()))
+      return;
 
-  // If no one could find a problem with this expression or constraint system,
-  // then it must be well-formed... but is ambiguous.  Handle this by diagnostic
-  // various cases that come up.
-  diagnosis.diagnoseAmbiguity(expr);
+    // If no one could find a problem with this expression or constraint system,
+    // then it must be well-formed... but is ambiguous.  Handle this by diagnostic
+    // various cases that come up.
+    diagnosis.diagnoseAmbiguity(expr);
+  }
 }
 
 std::pair<Type, ContextualTypePurpose>

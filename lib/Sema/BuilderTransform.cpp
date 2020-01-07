@@ -604,13 +604,13 @@ ConstraintSystem::TypeMatchResult ConstraintSystem::applyFunctionBuilder(
 
   // Record the transformation.
   assert(std::find_if(
-      builderTransformedClosures.begin(),
-      builderTransformedClosures.end(),
-      [&](const std::pair<ClosureExpr *, AppliedBuilderTransform> &elt) {
+      functionBuilderTransformed.begin(),
+      functionBuilderTransformed.end(),
+      [&](const std::pair<AnyFunctionRef, AppliedBuilderTransform> &elt) {
         return elt.first == closure;
-      }) == builderTransformedClosures.end() &&
+      }) == functionBuilderTransformed.end() &&
          "already transformed this closure along this path!?!");
-  builderTransformedClosures.push_back(
+  functionBuilderTransformed.push_back(
       std::make_pair(closure,
                      AppliedBuilderTransform{builderType, singleExpr}));
 
