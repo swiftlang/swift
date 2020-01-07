@@ -176,6 +176,10 @@ STMT_NODES = [
     # case-item-list -> case-item case-item-list?
     Node('CaseItemList', kind='SyntaxCollection',
          element='CaseItem'),
+         
+    # catch-item-list -> catch-item catch-item-list?
+    Node('CatchItemList', kind='SyntaxCollection',
+         element='CatchItem'),
 
     # condition -> expression
     #            | availability-condition
@@ -304,8 +308,19 @@ STMT_NODES = [
              Child('Colon', kind='ColonToken'),
          ]),
 
-    # case-item -> pattern? where-clause? ','?
+    # case-item -> pattern where-clause? ','?
     Node('CaseItem', kind='Syntax',
+         traits=['WithTrailingComma'],
+         children=[
+             Child('Pattern', kind='Pattern'),
+             Child('WhereClause', kind='WhereClause',
+                   is_optional=True),
+             Child('TrailingComma', kind='CommaToken',
+                   is_optional=True),
+         ]),
+         
+    # catch-item -> pattern? where-clause? ','?
+    Node('CatchItem', kind='Syntax',
          traits=['WithTrailingComma'],
          children=[
              Child('Pattern', kind='Pattern', is_optional=True),
@@ -329,8 +344,8 @@ STMT_NODES = [
          traits=['WithCodeBlock'],
          children=[
              Child('CatchKeyword', kind='CatchToken'),
-             Child('CaseItems', kind='CaseItemList',
-             collection_element_name='CaseItem', is_optional=True),
+             Child('CatchItems', kind='CatchItemList',
+             collection_element_name='CatchItem', is_optional=True),
              Child('Body', kind='CodeBlock'),
          ]),
 

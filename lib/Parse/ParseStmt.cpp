@@ -1972,12 +1972,10 @@ ParserResult<CaseStmt> Parser::parseStmtCatch() {
   SmallVector<CaseLabelItem, 1> caseLabelItems;
 
   {
-    SyntaxParsingContext ListContext(SyntaxContext, SyntaxKind::CaseItemList);
+    SyntaxParsingContext ListContext(SyntaxContext, SyntaxKind::CatchItemList);
     bool isFirst = true;
     while (true) {
-      SyntaxParsingContext ItemContext(SyntaxContext, SyntaxKind::CaseItem);
-      //if (Tok.is(tok::l_brace))
-        //ItemContext.setDiscard()
+      SyntaxParsingContext ItemContext(SyntaxContext, SyntaxKind::CatchItem);
       GuardedPattern PatternResult;
       parseGuardedPattern(*this, PatternResult, status, boundDecls,
                           GuardedPatternContext::Catch, isFirst);
