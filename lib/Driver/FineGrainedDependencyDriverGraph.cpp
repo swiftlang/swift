@@ -103,10 +103,22 @@ std::vector<const Job*> ModuleDepGraph::markTransitive(
   assert(!swiftDepsToBeRecompiled.empty() && "Must have a swift deps");
 
   // Do the traversal for every node in the job to be recompiled.
+  auto isNotMarked = [&](const ModuleDepGraphNode *n) {
+    const auto maybeSwiftDeps = n->getSwiftDeps();
+    if (!maybeSwiftDeps)
+      return true;
+    const auto swiftDeps = maybeSwiftDeps.getValue();
+    if (swiftDeps.empty())
+      return true;
+    // Since we are doing whole jobs at this point, no need to dive
+    // into a job that has already been noted for scheduling and searching.
+    return !isSwiftDepsMarked(swiftDeps);
+  };
+
   std::unordered_set<const ModuleDepGraphNode *> dependentNodesSet;
   for (auto &fileAndNode : nodeMap[swiftDepsToBeRecompiled]) {
     assert(isCurrentPathForTracingEmpty());
-    findDependentNodes(dependentNodesSet, fileAndNode.second);
+    findDependentNodes(dependentNodesSet, fileAndNode.second, isNotMarked);
   }
   std::vector<const ModuleDepGraphNode *> dependentNodes{
       dependentNodesSet.begin(), dependentNodesSet.end()};
@@ -404,22 +416,25 @@ void ModuleDepGraph::forEachArc(
 
 void ModuleDepGraph::findDependentNodes(
     std::unordered_set<const ModuleDepGraphNode *> &foundDependents,
-    const ModuleDepGraphNode *definition) {
+    const ModuleDepGraphNode *definition,
+    function_ref<bool(const ModuleDepGraphNode *use)> shouldConsiderUse) {
   // FIXME: the coarse-grained dependencies use a persistent marked set
   // so that successive calls to markTransitive don't retrace steps once
   // one arm of the graph has been searched. Do the equivalent here.
   size_t pathLengthAfterArrival = traceArrival(definition);
 
-  // Moved this out of the following loop for effieciency.
+  // Moved this out of the following loop for efficiency.
   assert(definition->getIsProvides() && "Should only call me for Decl nodes.");
 
   forEachUseOf(definition, [&](const ModuleDepGraphNode *u) {
+    if (!shouldConsiderUse(u))
+      return;
     // Cycle recording and check.
     if (!foundDependents.insert(u).second)
       return;
     // If this use also provides something, follow it
     if (u->getIsProvides())
-      findDependentNodes(foundDependents, u);
+      findDependentNodes(foundDependents, u, shouldConsiderUse);
   });
   traceDeparture(pathLengthAfterArrival);
 }

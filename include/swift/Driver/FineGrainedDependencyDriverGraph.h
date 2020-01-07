@@ -467,9 +467,14 @@ private:
   /// Given a definition node, and a list of already found dependents,
   /// recursively add transitive closure of dependents of the definition
   /// into the already found dependents.
+  ///
+  /// \param foundDependents gets filled out with all dependent nodes found
+  /// \param definition the starting definition
+  /// \param shouldConsiderUse returns true if a use should be considered
   void findDependentNodes(
       std::unordered_set<const ModuleDepGraphNode *> &foundDependents,
-      const ModuleDepGraphNode *definition);
+      const ModuleDepGraphNode *definition,
+      function_ref<bool(const ModuleDepGraphNode *use)> shouldConsiderUse);
 
   /// Givien a set of nodes, return the set of swiftDeps for the jobs those
   /// nodes are in.
