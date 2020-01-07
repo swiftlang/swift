@@ -4111,15 +4111,11 @@ GetDestructorRequest::evaluate(Evaluator &evaluator, ClassDecl *CD) const {
   return DD;
 }
 
-
 bool ClassDecl::hasMissingDesignatedInitializers() const {
-  if (!Bits.ClassDecl.ComputedHasMissingDesignatedInitializers) {
-    auto *mutableThis = const_cast<ClassDecl *>(this);
-    mutableThis->Bits.ClassDecl.ComputedHasMissingDesignatedInitializers = 1;
-    (void)mutableThis->lookupDirect(DeclBaseName::createConstructor());
-  }
-
-  return Bits.ClassDecl.HasMissingDesignatedInitializers;
+  return evaluateOrDefault(
+      getASTContext().evaluator,
+      HasMissingDesignatedInitializersRequest{const_cast<ClassDecl *>(this)},
+      false);
 }
 
 bool ClassDecl::hasMissingVTableEntries() const {
@@ -4142,7 +4138,7 @@ bool ClassDecl::isIncompatibleWithWeakReferences() const {
   return false;
 }
 
-bool ClassDecl::inheritsSuperclassInitializers() {
+bool ClassDecl::inheritsSuperclassInitializers() const {
   // If there's no superclass, there's nothing to inherit.
   if (!getSuperclass())
     return false;

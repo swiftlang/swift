@@ -98,6 +98,10 @@ ERROR(objc_name_change,none,"%0 has ObjC name change from %1 to %2", (StringRef,
 
 ERROR(desig_init_added,none,"%0 has been added as a designated initializer to an open class", (StringRef))
 
+ERROR(added_invisible_designated_init,none,"%0 has new designated initializers that are not visible to clients", (StringRef))
+
+ERROR(not_inheriting_convenience_inits,none,"%0 no longer inherits convenience inits from its superclass", (StringRef))
+
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)
 #  undef DIAG
