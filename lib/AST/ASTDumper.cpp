@@ -794,7 +794,7 @@ namespace {
       PrintWithColorRAII(OS, ASTNodeColor) << "source_file ";
       PrintWithColorRAII(OS, LocationColor) << '\"' << SF.getFilename() << '\"';
       
-      for (Decl *D : SF.Decls) {
+      for (Decl *D : SF.getTopLevelDecls()) {
         if (D->isImplicit())
           continue;
 

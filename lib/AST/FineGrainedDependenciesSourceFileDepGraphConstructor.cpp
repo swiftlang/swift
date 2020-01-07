@@ -191,7 +191,7 @@ public:
   // clang-format off
     SourceFileDeclFinder(const SourceFile *const SF, const bool includePrivateDecls)
     : includePrivateDecls(includePrivateDecls) {
-      for (const Decl *const D : SF->Decls) {
+      for (const Decl *const D : SF->getTopLevelDecls()) {
         select<ExtensionDecl, DeclKind::Extension>(D, extensions, false) ||
         select<OperatorDecl, DeclKind::InfixOperator, DeclKind::PrefixOperator,
         DeclKind::PostfixOperator>(D, operators, false) ||

@@ -230,7 +230,7 @@ void SourceLookupCache::populateMemberCache(const SourceFile &SF) {
 
   FrontendStatsTracer tracer(SF.getASTContext().Stats,
                              "populate-source-file-class-member-cache");
-  addToMemberCache(SF.Decls);
+  addToMemberCache(SF.getTopLevelDecls());
   MemberCachePopulated = true;
 }
 
@@ -243,7 +243,7 @@ void SourceLookupCache::populateMemberCache(const ModuleDecl &Mod) {
 
   for (const FileUnit *file : Mod.getFiles()) {
     auto &SF = *cast<SourceFile>(file);
-    addToMemberCache(SF.Decls);
+    addToMemberCache(SF.getTopLevelDecls());
   }
 
   MemberCachePopulated = true;
@@ -275,7 +275,7 @@ void SourceLookupCache::addToMemberCache(Range decls) {
 SourceLookupCache::SourceLookupCache(const SourceFile &SF) {
   FrontendStatsTracer tracer(SF.getASTContext().Stats,
                              "source-file-populate-cache");
-  addToUnqualifiedLookupCache(SF.Decls, false);
+  addToUnqualifiedLookupCache(SF.getTopLevelDecls(), false);
 }
 
 SourceLookupCache::SourceLookupCache(const ModuleDecl &M) {
@@ -283,7 +283,7 @@ SourceLookupCache::SourceLookupCache(const ModuleDecl &M) {
                              "module-populate-cache");
   for (const FileUnit *file : M.getFiles()) {
     auto &SF = *cast<SourceFile>(file);
-    addToUnqualifiedLookupCache(SF.Decls, false);
+    addToUnqualifiedLookupCache(SF.getTopLevelDecls(), false);
   }
 }
 
