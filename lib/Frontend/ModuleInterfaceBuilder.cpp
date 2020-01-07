@@ -348,6 +348,8 @@ bool ModuleInterfaceBuilder::buildSwiftModule(
     std::string OutPathStr = OutPath;
     SerializationOpts.OutputPath = OutPathStr.c_str();
     SerializationOpts.ModuleLinkName = FEOpts.ModuleLinkName;
+    SerializationOpts.AutolinkForceLoad =
+      !subInvocation.getIRGenOptions().ForceLoadSymbolName.empty();
 
     // Record any non-SDK module interface files for the debug info.
     StringRef SDKPath = SubInstance.getASTContext().SearchPathOpts.SDKPath;

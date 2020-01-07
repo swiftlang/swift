@@ -7,7 +7,7 @@ add_swift_target_library(swiftVision ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS
   "${SWIFT_SOURCE_DIR}/stdlib/linker-support/magic-symbols-for-install-name.c"
 
   SWIFT_COMPILE_FLAGS ${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS} ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
-  LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
+  LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}" "-L${sdk}/usr/lib/swift/"
   TARGET_SDKS OSX IOS IOS_SIMULATOR TVOS TVOS_SIMULATOR
   SWIFT_MODULE_DEPENDS_OSX Darwin CoreImage CoreGraphics Metal Dispatch IOKit simd Foundation XPC CoreFoundation ObjectiveC # auto-updated
   SWIFT_MODULE_DEPENDS_IOS Darwin CoreImage CoreGraphics Metal Dispatch simd Foundation CoreFoundation ObjectiveC # auto-updated
