@@ -113,6 +113,13 @@ func testKeypath() {
   print(useClassKeypath(0))
 }
 
+func testMisc() {
+  // CHECK-OUTPUT: 43
+  // CHECK-OUTPUT: 42
+  // CHECK-SIL-DAG: sil shared {{.*}} @$s4Test13callUnrelatedyxxlFSi_Tg5
+  print(callUnrelated(42))
+}
+
 testNestedTypes()
 testClass()
 testError()
@@ -120,3 +127,4 @@ testProtocolsAndClasses()
 testSubModule()
 testClosures()
 testKeypath()
+testMisc()
