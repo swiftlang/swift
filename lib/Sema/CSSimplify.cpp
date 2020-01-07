@@ -2203,6 +2203,15 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
           if (!(anchor && isa<AssignExpr>(anchor)))
             return getTypeMatchFailure(locator);
         }
+        
+        auto *anchor = locator.getAnchor();
+        if (isa<CoerceExpr>(anchor)) {
+          auto *fix = ContextualMismatch::create(
+              *this, type1, type2, getConstraintLocator(locator));
+          if (recordFix(fix))
+            return getTypeMatchFailure(locator);
+          break;
+        }
 
         auto *fix = MissingConformance::forContextual(
             *this, type1, proto, getConstraintLocator(locator));
@@ -4059,9 +4068,20 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
         subKind = ConstraintKind::Bind;
       }
 
-      return matchTypes(
-          instanceType1, instanceType2, subKind, subflags,
-          locator.withPathElement(ConstraintLocator::InstanceType));
+      auto result =
+          matchTypes(instanceType1, instanceType2, subKind, subflags,
+                     locator.withPathElement(ConstraintLocator::InstanceType));
+      if (shouldAttemptFixes() && result.isFailure()) {
+        auto *anchor = locator.getAnchor();
+        if (anchor && isa<CoerceExpr>(anchor)) {
+          auto *fix =
+              ContextualMismatch::create(*this, instanceType1, instanceType2,
+                                         getConstraintLocator(locator));
+          conversionsOrFixes.push_back(fix);
+          break;
+        }
+      }
+      return result;
     }
 
     case TypeKind::Function: {
