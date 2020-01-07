@@ -189,11 +189,6 @@ toolchains::GenericUnix::constructInvocation(const DynamicLinkJobAction &job,
     Arguments.push_back(context.Args.MakeArgString(A->getValue()));
   }
 
-  if (getTriple().getOS() == llvm::Triple::Linux &&
-      job.getKind() == LinkKind::Executable) {
-    Arguments.push_back("-pie");
-  }
-
   bool staticExecutable = false;
   bool staticStdlib = false;
 
@@ -203,6 +198,11 @@ toolchains::GenericUnix::constructInvocation(const DynamicLinkJobAction &job,
   } else if (context.Args.hasFlag(options::OPT_static_stdlib,
                                   options::OPT_no_static_stdlib, false)) {
     staticStdlib = true;
+  }
+
+  if (getTriple().getOS() == llvm::Triple::Linux &&
+      job.getKind() == LinkKind::Executable && !staticExecutable) {
+    Arguments.push_back("-pie");
   }
 
   SmallVector<std::string, 4> RuntimeLibPaths;
