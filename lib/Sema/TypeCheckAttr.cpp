@@ -3498,6 +3498,9 @@ static bool typeCheckDerivativeAttr(ASTContext &Ctx, Decl *D,
       };
 
   auto isValidOriginal = [&](AbstractFunctionDecl *originalCandidate) {
+    // TODO(TF-982): Allow derivatives on protocol requirements.
+    if (isa<ProtocolDecl>(originalCandidate->getDeclContext()))
+      return false;
     return checkFunctionSignature(
         cast<AnyFunctionType>(originalFnType->getCanonicalType()),
         originalCandidate->getInterfaceType()->getCanonicalType(),
