@@ -586,6 +586,48 @@ TEST(CoarseGrainedDependencyGraph, MarkOneNodeTwice2) {
   EXPECT_TRUE(graph.isMarked(2));
 }
 
+TEST(CoarseGrainedDependencyGraph, ReloadDetectsChange) {
+  CoarseGrainedDependencyGraph<uintptr_t> graph;
+
+  EXPECT_EQ(loadFromString(graph, 0, providesNominal, "a"),
+            LoadResult::UpToDate);
+  EXPECT_EQ(loadFromString(graph, 1, dependsNominal, "a"),
+            LoadResult::UpToDate);
+  EXPECT_EQ(loadFromString(graph, 2, dependsNominal, "b"),
+            LoadResult::UpToDate);
+
+  {
+    const auto found = graph.markTransitive(1);
+    EXPECT_EQ(0u, found.size());
+  }
+  EXPECT_FALSE(graph.isMarked(0));
+  EXPECT_TRUE(graph.isMarked(1));
+  EXPECT_FALSE(graph.isMarked(2));
+
+  // Reload 1.
+  EXPECT_EQ(loadFromString(graph, 1, dependsNominal, "a", providesNominal, "b"),
+            LoadResult::UpToDate);
+
+  {
+    auto found = graph.markTransitive(0);
+    EXPECT_EQ(0u, found.size());
+  }
+  EXPECT_TRUE(graph.isMarked(0));
+  EXPECT_TRUE(graph.isMarked(1));
+  EXPECT_FALSE(graph.isMarked(2));
+
+  // Re-mark 1.
+  {
+    auto found = graph.markTransitive(1);
+    EXPECT_EQ(1u, found.size());
+    EXPECT_TRUE(contains(found, 2));
+  }
+
+  EXPECT_TRUE(graph.isMarked(0));
+  EXPECT_TRUE(graph.isMarked(1));
+  EXPECT_TRUE(graph.isMarked(2));
+}
+
 TEST(CoarseGrainedDependencyGraph, NotTransitiveOnceMarked) {
   CoarseGrainedDependencyGraph<uintptr_t> graph;
 

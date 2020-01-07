@@ -628,7 +628,10 @@ TEST(ModuleDepGraph, ReloadDetectsChange) {
   EXPECT_EQ(simulateLoad(graph, &job2, {{dependsNominal, {"b"}}}),
             LoadResult::AffectsDownstream);
 
-  EXPECT_EQ(0u, graph.markTransitive(&job1).size());
+  {
+    const auto found = graph.markTransitive(&job1);
+    EXPECT_EQ(0u, found.size());
+  }
   EXPECT_FALSE(graph.isMarked(&job0));
   EXPECT_TRUE(graph.isMarked(&job1));
   EXPECT_FALSE(graph.isMarked(&job2));
@@ -640,16 +643,55 @@ TEST(ModuleDepGraph, ReloadDetectsChange) {
 
   {
     auto found = graph.markTransitive(&job0);
-    EXPECT_EQ(1u, found.size());
-    EXPECT_TRUE(contains(found, &job2));
+    EXPECT_EQ(0u, found.size());
   }
   EXPECT_TRUE(graph.isMarked(&job0));
   EXPECT_TRUE(graph.isMarked(&job1));
-  EXPECT_TRUE(graph.isMarked(&job2));
+  EXPECT_FALSE(graph.isMarked(&job2));
 
   // Re-mark 1.
-  EXPECT_EQ(0u, graph.markTransitive(&job1).size());
+  {
+    auto found = graph.markTransitive(&job1);
+    EXPECT_EQ(1u, found.size());
+    EXPECT_TRUE(contains(found, &job2));
+  }
 
+  EXPECT_TRUE(graph.isMarked(&job0));
+  EXPECT_TRUE(graph.isMarked(&job1));
+  EXPECT_TRUE(graph.isMarked(&job2));
+}
+
+TEST(ModuleDepGraph, NotTransitiveOnceMarked) {
+  ModuleDepGraph graph;
+
+  EXPECT_EQ(simulateLoad(graph, &job0, {{providesNominal, {"a"}}}),
+            LoadResult::AffectsDownstream);
+  EXPECT_EQ(simulateLoad(graph, &job1, {{dependsNominal, {"a"}}}),
+            LoadResult::AffectsDownstream);
+  EXPECT_EQ(simulateLoad(graph, &job2, {{dependsNominal, {"b"}}}),
+            LoadResult::AffectsDownstream);
+
+  EXPECT_EQ(0u, graph.markTransitive(&job1).size());
+  EXPECT_FALSE(graph.isMarked(&job0));
+  EXPECT_TRUE(graph.isMarked(&job1));
+  EXPECT_FALSE(graph.isMarked(&job2));
+
+  // Reload 1.
+  EXPECT_EQ(simulateLoad(graph, &job1,
+                         {{dependsNominal, {"a"}}, {providesNominal, {"b"}}}),
+            LoadResult::AffectsDownstream);
+
+  EXPECT_EQ(0u, graph.markTransitive(&job0).size());
+  EXPECT_TRUE(graph.isMarked(&job0));
+  EXPECT_TRUE(graph.isMarked(&job1));
+  EXPECT_FALSE(graph.isMarked(&job2));
+
+  // Re-mark 1.
+  {
+    auto found = graph.markTransitive(&job1);
+    EXPECT_EQ(1u, found.size());
+    EXPECT_TRUE(contains(found, &job2));
+  }
   EXPECT_TRUE(graph.isMarked(&job0));
   EXPECT_TRUE(graph.isMarked(&job1));
   EXPECT_TRUE(graph.isMarked(&job2));
