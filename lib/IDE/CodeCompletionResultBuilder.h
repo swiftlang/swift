@@ -400,8 +400,7 @@ public:
     if (auto AFT = Ty->getAs<AnyFunctionType>()) {
       // If this is a closure type, add ChunkKind::CallParameterClosureType.
       PrintOptions PO;
-      PO.PrintFunctionRepresentationAttrs =
-        PrintOptions::FunctionRepresentationMode::None;
+      PO.PrintFunctionRepresentationAttrs = false;
       PO.SkipAttributes = true;
       PO.OpaqueReturnTypePrinting =
           PrintOptions::OpaqueReturnTypePrintingMode::WithoutOpaqueKeyword;

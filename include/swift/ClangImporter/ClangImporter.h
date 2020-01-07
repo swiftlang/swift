@@ -40,7 +40,6 @@ namespace clang {
   class NamedDecl;
   class Sema;
   class TargetInfo;
-  class Type;
   class VisibleDeclConsumer;
   class DeclarationName;
 }
@@ -417,11 +416,6 @@ public:
   /// with -import-objc-header option.
   getPCHFilename(const ClangImporterOptions &ImporterOptions,
                  StringRef SwiftPCHHash, bool &isExplicit);
-
-  const clang::Type *parseClangFunctionType(StringRef type,
-                                            SourceLoc loc) const override;
-  void printClangType(const clang::Type *type,
-                      llvm::raw_ostream &os) const override;
 };
 
 ImportDecl *createImportDecl(ASTContext &Ctx, DeclContext *DC, ClangNode ClangN,

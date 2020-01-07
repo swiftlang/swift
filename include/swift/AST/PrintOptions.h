@@ -306,21 +306,8 @@ struct PrintOptions {
   /// List of decls that should be printed even if they are implicit and \c SkipImplicit is set to true.
   std::vector<const Decl*> TreatAsExplicitDeclList;
 
-  enum class FunctionRepresentationMode : uint8_t {
-    /// Print the entire convention, including an arguments.
-    /// For example, this will print a cType argument label if applicable.
-    Full,
-    /// Print only the name of the convention, skipping extra argument labels.
-    NameOnly,
-    /// Skip printing the @convention(..) altogether.
-    None
-  };
-
   /// Whether to print function @convention attribute on function types.
-  // FIXME: [clang-function-type-serialization] Once we start serializing Clang
-  // types, we should also start printing the full type in the swiftinterface.
-  FunctionRepresentationMode PrintFunctionRepresentationAttrs =
-    FunctionRepresentationMode::NameOnly;
+  bool PrintFunctionRepresentationAttrs = true;
 
   /// Whether to print storage representation attributes on types, e.g.
   /// '@sil_weak', '@sil_unmanaged'.
@@ -515,8 +502,7 @@ struct PrintOptions {
   /// consistent and well-formed.
   ///
   /// \see swift::emitSwiftInterface
-  static PrintOptions printSwiftInterfaceFile(bool preferTypeRepr,
-                                              bool printFullConvention);
+  static PrintOptions printSwiftInterfaceFile(bool preferTypeRepr);
 
   /// Retrieve the set of options suitable for "Generated Interfaces", which
   /// are a prettified representation of the public API of a module, to be
@@ -599,8 +585,7 @@ struct PrintOptions {
     PO.SkipUnderscoredKeywords = true;
     PO.EnumRawValues = EnumRawValueMode::Print;
     PO.PrintImplicitAttrs = false;
-    PO.PrintFunctionRepresentationAttrs =
-      PrintOptions::FunctionRepresentationMode::None;
+    PO.PrintFunctionRepresentationAttrs = false;
     PO.PrintDocumentationComments = false;
     PO.ExcludeAttrList.push_back(DAK_Available);
     PO.SkipPrivateStdlibDecls = true;

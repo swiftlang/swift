@@ -440,7 +440,7 @@ bool swift::emitSwiftInterface(raw_ostream &out,
   printImports(out, M);
 
   const PrintOptions printOptions = PrintOptions::printSwiftInterfaceFile(
-      Opts.PreserveTypesAsWritten, Opts.PrintFullConvention);
+      Opts.PreserveTypesAsWritten);
   InheritedProtocolCollector::PerTypeMap inheritedProtocolMap;
 
   SmallVector<Decl *, 16> topLevelDecls;

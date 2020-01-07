@@ -59,7 +59,6 @@ class AssociatedTypeDecl;
 class ASTContext;
 enum BufferPointerTypeKind : unsigned;
 class ClassDecl;
-class ClangModuleLoader;
 class DependentMemberType;
 class GenericTypeParamDecl;
 class GenericTypeParamType;
@@ -2951,11 +2950,6 @@ public:
 
       bool empty() const { return !ClangFunctionType; }
       Uncommon(const clang::Type *type) : ClangFunctionType(type) {}
-
-    public:
-      /// Use the ClangModuleLoader to print the Clang type as a string.
-      void printClangFunctionType(ClangModuleLoader *cml,
-                                  llvm::raw_ostream &os);
     };
 
   private:
@@ -3900,11 +3894,6 @@ public:
 
       bool empty() const { return !ClangFunctionType; }
       Uncommon(const clang::FunctionType *type) : ClangFunctionType(type) {}
-
-    public:
-      /// Analog of AnyFunctionType::ExtInfo::Uncommon::printClangFunctionType.
-      void printClangFunctionType(ClangModuleLoader *cml,
-                                  llvm::raw_ostream &os) const;
     };
 
     Uncommon Other;
@@ -3956,11 +3945,6 @@ public:
     }
     Language getLanguage() const {
       return getSILFunctionLanguage(getRepresentation());
-    }
-
-    /// Return the underlying Uncommon value if it is not the default value.
-    Optional<Uncommon> getUncommonInfo() const {
-      return Other.empty() ? Optional<Uncommon>() : Other;
     }
 
     bool hasSelfParam() const {

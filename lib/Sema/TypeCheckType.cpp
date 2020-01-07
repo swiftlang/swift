@@ -1799,8 +1799,6 @@ namespace {
                                 AnyFunctionType::Representation representation
                                   = AnyFunctionType::Representation::Swift,
                                 bool noescape = false,
-                                const clang::Type *parsedClangFunctionType
-                                  = nullptr,
                                 DifferentiabilityKind diffKind
                                   = DifferentiabilityKind::NonDifferentiable);
     bool
@@ -2168,31 +2166,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
   // Function attributes require a syntactic function type.
   auto *fnRepr = dyn_cast<FunctionTypeRepr>(repr);
 
-  auto tryParseClangType = [this](TypeAttributes::Convention &conv,
-                                  bool hasConventionCOrBlock)
-                           -> const clang::Type * {
-    if (conv.ClangType.empty())
-      return nullptr;
-    if (!hasConventionCOrBlock) {
-      diagnose(conv.ClangTypeLoc,
-               diag::unexpected_ctype_for_non_c_convention,
-               conv.Name, conv.ClangType);
-      return nullptr;
-    }
-
-    StringRef filename =
-      Context.SourceMgr.getDisplayNameForLoc(conv.ClangTypeLoc);
-    const clang::Type *type = Context.getClangModuleLoader()
-                              ->parseClangFunctionType(conv.ClangType,
-                                                       conv.ClangTypeLoc);
-    if (!type)
-      diagnose(conv.ClangTypeLoc, diag::unable_to_parse_c_function_type,
-               conv.ClangType);
-    return type;
-  };
-
   if (fnRepr && hasFunctionAttr) {
-    const clang::Type *parsedClangFunctionType = nullptr;
     if (options & TypeResolutionFlags::SILType) {
       SILFunctionType::Representation rep;
       TypeRepr *witnessMethodProtocol = nullptr;
@@ -2240,11 +2214,6 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
           rep = SILFunctionType::Representation::Thin;
         } else {
           rep = *parsedRep;
-          bool isCOrBlock =
-            rep == SILFunctionTypeRepresentation::CFunctionPointer
-            || rep == SILFunctionTypeRepresentation::Block;
-          parsedClangFunctionType =
-            tryParseClangType(attrs.ConventionArguments.getValue(), isCOrBlock);
         }
 
         if (rep == SILFunctionType::Representation::WitnessMethod) {
@@ -2295,11 +2264,6 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
           rep = FunctionType::Representation::Swift;
         } else {
           rep = *parsedRep;
-
-          bool isCOrBlock = rep == FunctionTypeRepresentation::CFunctionPointer
-                          || rep == FunctionTypeRepresentation::Block;
-          parsedClangFunctionType =
-            tryParseClangType(attrs.ConventionArguments.getValue(), isCOrBlock);
         }
       }
 
@@ -2316,7 +2280,6 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
       }
 
       ty = resolveASTFunctionType(fnRepr, options, rep, /*noescape=*/false,
-                                  parsedClangFunctionType,
                                   diffKind);
       if (!ty || ty->hasError())
         return ty;
@@ -2630,7 +2593,6 @@ Type TypeResolver::resolveOpaqueReturnType(TypeRepr *repr,
 Type TypeResolver::resolveASTFunctionType(
     FunctionTypeRepr *repr, TypeResolutionOptions parentOptions,
     AnyFunctionType::Representation representation, bool noescape,
-    const clang::Type *parsedClangFunctionType,
     DifferentiabilityKind diffKind) {
 
   TypeResolutionOptions options = None;
@@ -2669,9 +2631,8 @@ Type TypeResolver::resolveASTFunctionType(
                                           noescape, repr->throws(), diffKind,
                                           /*clangFunctionType*/nullptr);
   
-  const clang::Type *clangFnType = parsedClangFunctionType;
-  if (representation == AnyFunctionType::Representation::CFunctionPointer
-      && !clangFnType)
+  const clang::Type *clangFnType = nullptr;
+  if (representation == AnyFunctionType::Representation::CFunctionPointer)
     clangFnType = Context.getClangFunctionType(
       params, outputTy, incompleteExtInfo,
       AnyFunctionType::Representation::CFunctionPointer);
