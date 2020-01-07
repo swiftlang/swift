@@ -616,8 +616,11 @@ func rdar50679161() {
 
 func rdar_50467583_and_50909555() {
   // rdar://problem/50467583
-  let _: Set = [Int][]
-  // expected-error@-1 {{instance member 'subscript' cannot be used on type '[Int]'}}
+  let _: Set = [Int][] // expected-error {{no exact matches in call to subscript}}
+  // expected-note@-1 {{found candidate with type '(Int) -> Int'}}
+  // expected-note@-2 {{found candidate with type '(Range<Int>) -> ArraySlice<Int>'}}
+  // expected-note@-3 {{found candidate with type '((UnboundedRange_) -> ()) -> ArraySlice<Int>'}}
+  // expected-note@-4 {{found candidate with type '(Range<Array<Int>.Index>) -> Slice<[Int]>' (aka '(Range<Int>) -> Slice<Array<Int>>')}}
 
   // rdar://problem/50909555
   struct S {
