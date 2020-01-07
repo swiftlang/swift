@@ -3742,7 +3742,7 @@ void AttributeChecker::visitDerivativeAttr(DerivativeAttr *attr) {
 // SWIFT_ENABLE_TENSORFLOW
 /// Returns true if the given type's `TangentVector` is equal to itself in the
 /// given module.
-static bool tangentVectorEqualSelf(Type type, DeclContext *DC) {
+static bool tangentVectorEqualsSelf(Type type, DeclContext *DC) {
   assert(conformsToDifferentiable(type, DC));
   auto &ctx = type->getASTContext();
   auto *differentiableProto =
@@ -4246,20 +4246,22 @@ DifferentiableAttributeParameterIndicesRequest::evaluate(
 // Computes `IndexSubset` from the given parsed transposed parameters (possibly
 // empty) for the given function, then verifies that the parameter indices are
 // valid. The attribute name/location are used in diagnostics.
-static IndexSubset *computeTransposedParameters(
-    ArrayRef<ParsedAutoDiffParameter> parsedWrtParams,
-    AbstractFunctionDecl *transposeFunction, bool isCurried,
-    GenericEnvironment *derivativeGenEnv, SourceLoc attrLoc) {
+static IndexSubset *
+computeTransposedParameters(ArrayRef<ParsedAutoDiffParameter> parsedWrtParams,
+                            AbstractFunctionDecl *transposeFunction,
+                            GenericEnvironment *derivativeGenEnv,
+                            SourceLoc attrLoc) {
   auto &ctx = transposeFunction->getASTContext();
   auto &diags = ctx.Diags;
 
-  // Get function type and parameters.
+  // Get the transpose function type.
   auto *transposeFunctionType =
       transposeFunction->getInterfaceType()->castTo<AnyFunctionType>();
+  bool isCurried = transposeFunctionType->getResult()->is<AnyFunctionType>();
 
+  // Get transposed result types.
+  // The transpose function result type may be a singular type or a tuple type.
   ArrayRef<TupleTypeElt> transposeResultTypes;
-  // Return type of '@transpose' function can be a singular type or a tuple
-  // type.
   auto transposeResultType = transposeFunctionType->getResult();
   if (isCurried)
     transposeResultType =
@@ -4269,16 +4271,28 @@ static IndexSubset *computeTransposedParameters(
   } else {
     transposeResultTypes = ArrayRef<TupleTypeElt>(transposeResultType);
   }
-  auto isInstanceMethod = transposeFunction->isInstanceMember();
 
-  // Otherwise, build parameter indices from parsed differentiation parameters.
+  // If `self` is a linearity parameter, the transpose function must be static.
+  auto isStaticMethod = transposeFunction->isStatic();
+  bool wrtSelf = false;
+  if (!parsedWrtParams.empty())
+    wrtSelf = parsedWrtParams.front().getKind() ==
+              ParsedAutoDiffParameter::Kind::Self;
+  if (wrtSelf && !isStaticMethod) {
+    diags.diagnose(attrLoc, diag::transpose_func_wrt_self_must_be_static);
+    return nullptr;
+  }
+
+  // Build linearity parameter indices from parsed linearity parameters.
   auto numUncurriedParams = transposeFunctionType->getNumParams();
-  if (auto *resultFnType =
-      transposeFunctionType->getResult()->getAs<AnyFunctionType>()) {
+  if (isCurried) {
+    auto *resultFnType =
+        transposeFunctionType->getResult()->castTo<AnyFunctionType>();
     numUncurriedParams += resultFnType->getNumParams();
   }
-  auto numParams = numUncurriedParams + parsedWrtParams.size() - 1;
-  auto parameterBits = SmallBitVector(numParams);
+  auto numParams =
+      numUncurriedParams + parsedWrtParams.size() - 1 - (unsigned)wrtSelf;
+  SmallBitVector parameterBits(numParams);
   int lastIndex = -1;
   for (unsigned i : indices(parsedWrtParams)) {
     auto paramLoc = parsedWrtParams[i].getLoc();
@@ -4289,12 +4303,6 @@ static IndexSubset *computeTransposedParameters(
       return nullptr;
     }
     case ParsedAutoDiffParameter::Kind::Self: {
-      // 'self' is only applicable to instance methods.
-      if (!isInstanceMethod) {
-        diags.diagnose(
-            paramLoc, diag::diff_params_clause_self_instance_method_only);
-        return nullptr;
-      }
       // 'self' can only be the first in the list.
       if (i > 0) {
         diags.diagnose(paramLoc, diag::diff_params_clause_self_must_be_first);
@@ -4353,7 +4361,7 @@ static bool checkTransposedParameters(
     // Parameter must conform to `Differentiable` and satisfy
     // `Self == Self.TangentVector`.
     if (!conformsToDifferentiable(wrtParamType, AFD) ||
-        !tangentVectorEqualSelf(wrtParamType, AFD)) {
+        !tangentVectorEqualsSelf(wrtParamType, AFD)) {
       diags.diagnose(loc,
                      diag::transpose_params_clause_param_not_differentiable,
                      wrtParamType.getString());
@@ -4364,6 +4372,40 @@ static bool checkTransposedParameters(
 }
 
 // SWIFT_ENABLE_TENSORFLOW
+// Given a transpose function type where `self` is a linearity parameter,
+// sets `staticSelfType` and `instanceSelfType` and returns true if they are
+// equals. Otherwise, returns false.
+static bool
+doTransposeStaticAndInstanceSelfTypesMatch(AnyFunctionType *transposeType,
+                                           Type &staticSelfType,
+                                           Type &instanceSelfType) {
+  // Transpose type should have the form:
+  // `(StaticSelf) -> (...) -> (InstanceSelf, ...)`.
+  auto methodType = transposeType->getResult()->castTo<AnyFunctionType>();
+  auto transposeResult = methodType->getResult();
+
+  // Get transposed result types.
+  // The transpose function result type may be a singular type or a tuple type.
+  SmallVector<TupleTypeElt, 4> transposeResultTypes;
+  if (auto transposeResultTupleType = transposeResult->getAs<TupleType>()) {
+    transposeResultTypes.append(transposeResultTupleType->getElements().begin(),
+                                transposeResultTupleType->getElements().end());
+  } else {
+    transposeResultTypes.push_back(transposeResult);
+  }
+  assert(!transposeResultTypes.empty());
+
+  // Get the static and instance `Self` types.
+  staticSelfType = transposeType->getParams()
+                       .front()
+                       .getPlainType()
+                       ->getMetatypeInstanceType();
+  instanceSelfType = transposeResultTypes.front().getType();
+
+  // Return true if static and instance `Self` types are equal.
+  return staticSelfType->isEqual(instanceSelfType);
+}
+
 void AttributeChecker::visitTransposeAttr(TransposeAttr *attr) {
   auto *transpose = cast<FuncDecl>(D);
   auto lookupConformance =
@@ -4371,6 +4413,7 @@ void AttributeChecker::visitTransposeAttr(TransposeAttr *attr) {
   auto originalName = attr->getOriginalFunctionName();
   auto *transposeInterfaceType =
       transpose->getInterfaceType()->castTo<AnyFunctionType>();
+  bool isCurried = transposeInterfaceType->getResult()->is<AnyFunctionType>();
 
   // Get checked wrt param indices.
   auto *wrtParamIndices = attr->getParameterIndices();
@@ -4380,11 +4423,10 @@ void AttributeChecker::visitTransposeAttr(TransposeAttr *attr) {
   auto parsedWrtParams = attr->getParsedParameters();
 
   // If checked wrt param indices are not specified, compute them.
-  bool isCurried = transposeInterfaceType->getResult()->is<AnyFunctionType>();
   if (!wrtParamIndices)
     wrtParamIndices = computeTransposedParameters(
-        parsedWrtParams, transpose, isCurried,
-        transpose->getGenericEnvironment(), attr->getLocation());
+        parsedWrtParams, transpose, transpose->getGenericEnvironment(),
+        attr->getLocation());
   if (!wrtParamIndices) {
     D->getAttrs().removeAttribute(attr);
     attr->setInvalid();
@@ -4406,30 +4448,42 @@ void AttributeChecker::visitTransposeAttr(TransposeAttr *attr) {
     wrtSelf = parsedWrtParams.front().getKind() ==
         ParsedAutoDiffParameter::Kind::Self;
 
+  // If the transpose function is curried and `self` is a linearity parameter,
+  // check that the instance and static `Self` types are equal.
+  Type staticSelfType, instanceSelfType;
+  if (isCurried && wrtSelf) {
+    bool doSelfTypesMatch = doTransposeStaticAndInstanceSelfTypesMatch(
+        transposeInterfaceType, staticSelfType, instanceSelfType);
+    if (!doSelfTypesMatch) {
+      diagnose(attr->getLocation(),
+               diag::transpose_func_wrt_self_must_be_static);
+      diagnose(attr->getLocation(),
+               diag::transpose_func_wrt_self_self_type_mismatch_note,
+               staticSelfType, instanceSelfType);
+      D->getAttrs().removeAttribute(attr);
+      attr->setInvalid();
+      return;
+    }
+  }
+
   auto *expectedOriginalFnType =
       transposeInterfaceType->getTransposeOriginalFunctionType(
           wrtParamIndices, wrtSelf);
 
-  // `R` result type must conform to `Differentiable`.
+  // `R` result type must conform to `Differentiable` and satisfy
+  // `Self == Self.TangentVector`.
   auto expectedOriginalResultType = expectedOriginalFnType->getResult();
-  if (isCurried) {
-    expectedOriginalResultType = transpose->mapTypeIntoContext(
-        expectedOriginalResultType->getAs<AnyFunctionType>()->getResult());
-  }
+  if (isCurried)
+    expectedOriginalResultType =
+        expectedOriginalResultType->castTo<AnyFunctionType>()->getResult();
   if (expectedOriginalResultType->hasTypeParameter())
     expectedOriginalResultType = transpose->mapTypeIntoContext(
         expectedOriginalResultType);
-  auto diffableProto = Ctx.getProtocol(KnownProtocolKind::Differentiable);
-  auto valueResultConf = TypeChecker::conformsToProtocol(
-      expectedOriginalResultType, diffableProto, transpose->getDeclContext(),
-      None);
-
-  if (!valueResultConf) {
-    diagnose(attr->getLocation(),
-             diag::transpose_attr_result_value_not_differentiable,
-             expectedOriginalResultType);
-    D->getAttrs().removeAttribute(attr);
-    attr->setInvalid();
+  if (!conformsToDifferentiable(expectedOriginalResultType, transpose) ||
+      !tangentVectorEqualsSelf(expectedOriginalResultType, transpose)) {
+    diagnoseAndRemoveAttr(
+        attr, diag::transpose_params_clause_param_not_differentiable,
+        expectedOriginalResultType.getString());
     return;
   }
 
@@ -4527,7 +4581,7 @@ void AttributeChecker::visitTransposeAttr(TransposeAttr *attr) {
   // Get the transposed parameter types.
   SmallVector<Type, 4> wrtParamTypes;
   autodiff::getSubsetParameterTypes(wrtParamIndices, expectedOriginalFnType,
-                                    wrtParamTypes);
+                                    wrtParamTypes, /*reverseCurryLevels*/ true);
 
   // Check if transposed parameter indices are valid.
   if (checkTransposedParameters(originalAFD, wrtParamTypes,
