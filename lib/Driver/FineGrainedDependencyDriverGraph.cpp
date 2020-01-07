@@ -104,48 +104,59 @@ std::vector<const Job*> ModuleDepGraph::markTransitive(
 
 
   // Do the traversal for every node in the job to be recompiled.
-  std::unordered_set<const ModuleDepGraphNode *> dependentNodes;
+  std::unordered_set<const ModuleDepGraphNode *> dependentNodesSet;
   for (auto &fileAndNode : nodeMap[swiftDepsToBeRecompiled]) {
     assert(isCurrentPathForTracingEmpty());
-    findDependentNodes(dependentNodes, fileAndNode.second);
+    findDependentNodes(dependentNodesSet, fileAndNode.second);
   }
-  std::unordered_set<const Job *> newJobsToCompile;
-  // The job containing the interface "cascades", in other words
-  // whenever that job gets recompiled, anything depending on it
-  // (since we don't have interface-specific dependency info as of Dec.
-  // 2018) must be recompiled.
-  std::vector<const ModuleDepGraphNode *> dependentNodesVec{
-      dependentNodes.begin(), dependentNodes.end()};
-  // Caller already knows to run this job, no need to return it.
+  std::vector<const ModuleDepGraphNode *> dependentNodes{
+      dependentNodesSet.begin(), dependentNodesSet.end()};
+  std::vector<const ModuleDepGraphNode*> dependentInterfaceNodes;
+  std::copy_if(dependentNodes.begin(), dependentNodes.end(),
+               std::back_inserter(dependentInterfaceNodes),
+               [](const ModuleDepGraphNode *n)
+               { return n->getKey().getAspect() == DeclAspect::interface;});
+
+  // Assume this job has an inflowing cascading dependency, since this function
+  // was called. And also, don't return it, since caller already knows it must
+  // be scheduled.
   markJobViaSwiftDeps(swiftDepsToBeRecompiled);
-  for (const auto &entry :
-       computeSwiftDepsFromInterfaceNodes(dependentNodesVec)) {
-    const StringRef swiftDeps = entry.getKey();
-    if (!isSwiftDepsMarked(swiftDeps)) {
-      const Job *j = getJob(swiftDeps.str());
-      newJobsToCompile.insert(j);
-    }
-  }
+  auto newJobsToCompile = getUnmarkedJobsFrom(dependentNodes);
+  markJobsFrom(dependentInterfaceNodes);
+  assert(isMarked(jobToBeRecompiled) && "This job must be a cascading one for this function to be called on it");
   return std::vector<const Job*>{newJobsToCompile.begin(), newJobsToCompile.end()};
 }
 
-llvm::StringSet<> ModuleDepGraph::computeSwiftDepsFromInterfaceNodes(
-    const ArrayRef<const ModuleDepGraphNode *> nodes) {
-
+std::vector<std::string> ModuleDepGraph::computeSwiftDepsFromNodes(
+    const ArrayRef<const ModuleDepGraphNode *> nodes) const {
   llvm::StringSet<> swiftDepsOfNodes;
   for (const ModuleDepGraphNode *n : nodes) {
-    //    if (!n->doesNodeProvideAnInterface())
-    //      continue;
     if (!n->getIsProvides())
       continue;
     const std::string &swiftDeps = n->getSwiftDepsOfProvides();
-    if (swiftDepsOfNodes.insert(swiftDeps).second) {
-      assert(n->assertImplementationMustBeInAFile());
-      assert(ensureJobIsTracked(swiftDeps));
-    }
+    swiftDepsOfNodes.insert(swiftDeps);
   }
-  return swiftDepsOfNodes;
+  std::vector<std::string> swiftDepsVec;
+  for (const auto &entry: swiftDepsOfNodes)
+    swiftDepsVec.push_back(entry.getKey().str());
+  return swiftDepsVec;
 }
+
+std::vector<const Job*>ModuleDepGraph::getUnmarkedJobsFrom(
+  const ArrayRef<const ModuleDepGraphNode*> nodes) const {
+    std::vector<const Job*> jobs;
+    for (const std::string &swiftDeps: computeSwiftDepsFromNodes(nodes)) {
+      if (!isSwiftDepsMarked(swiftDeps))
+        jobs.push_back(getJob(swiftDeps));
+    }
+    return jobs;
+}
+
+void ModuleDepGraph::markJobsFrom(const ArrayRef<const ModuleDepGraphNode *> nodes) {
+  for (const std::string &swiftDeps: computeSwiftDepsFromNodes(nodes))
+    markJobViaSwiftDeps(swiftDeps);
+}
+
 
 bool ModuleDepGraph::markIntransitive(const Job *job) {
   return markJobViaSwiftDeps(getSwiftDeps(job));

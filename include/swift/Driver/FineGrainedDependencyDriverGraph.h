@@ -471,8 +471,13 @@ private:
 
   /// Givien a set of nodes, return the set of swiftDeps for the jobs those
   /// nodes are in.
-  llvm::StringSet<> computeSwiftDepsFromInterfaceNodes(
-      ArrayRef<const ModuleDepGraphNode *> nodes);
+  std::vector<std::string> computeSwiftDepsFromNodes(
+      ArrayRef<const ModuleDepGraphNode *> nodes) const;
+
+  std::vector<const driver::Job*>getUnmarkedJobsFrom(const ArrayRef<const ModuleDepGraphNode*> nodes) const;
+
+  /// Mark any jobs for these nodes
+  void markJobsFrom(ArrayRef<const ModuleDepGraphNode*>);
 
   /// Record a visit to this node for later dependency printing
   size_t traceArrival(const ModuleDepGraphNode *visitedNode);
