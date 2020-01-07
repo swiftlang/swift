@@ -195,6 +195,12 @@ namespace {
           addResult(found);
           return;
         }
+      } else if (isa<NominalTypeDecl>(found)) {
+        // Declaring nested types inside other types is currently
+        // not supported by lookup would still return such members
+        // so we have to account for that here as well.
+        addResult(found);
+        return;
       }
 
       // FIXME: the "isa<ProtocolDecl>()" check will be wrong for
