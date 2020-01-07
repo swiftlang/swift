@@ -2303,14 +2303,26 @@ SILValue LifetimeChecker::handleConditionalInitAssign() {
       B.setInsertionPoint(TrueBB->begin());
       SILValue EltPtr;
       {
-        llvm::SmallVector<std::pair<SILValue, SILValue>, 4> EndBorrowList;
-        EltPtr = TheMemory.emitElementAddress(Elt, Loc, B, EndBorrowList);
+        using EndScopeKind = DIMemoryObjectInfo::EndScopeKind;
+        SmallVector<std::pair<SILValue, EndScopeKind>, 4> EndScopeList;
+        EltPtr =
+            TheMemory.emitElementAddressForDestroy(Elt, Loc, B, EndScopeList);
         if (auto *DA = B.emitDestroyAddrAndFold(Loc, EltPtr))
           Destroys.push_back(DA);
-        while (!EndBorrowList.empty()) {
-          SILValue Borrowed, Original;
-          std::tie(Borrowed, Original) = EndBorrowList.pop_back_val();
-          B.createEndBorrow(Loc, Borrowed, Original);
+        while (!EndScopeList.empty()) {
+          SILValue value;
+          EndScopeKind kind;
+          std::tie(value, kind) = EndScopeList.pop_back_val();
+
+          switch (kind) {
+          case EndScopeKind::Borrow:
+            B.createEndBorrow(Loc, value);
+            continue;
+          case EndScopeKind::Access:
+            B.createEndAccess(Loc, value, false /*can abort*/);
+            continue;
+          }
+          llvm_unreachable("Covered switch isn't covered!");
         }
       }
       B.setInsertionPoint(ContBB->begin());
@@ -2364,15 +2376,27 @@ handleConditionalDestroys(SILValue ControlVariableAddr) {
   // Utilities.
 
   auto destroyMemoryElement = [&](SILLocation Loc, unsigned Elt) {
-    llvm::SmallVector<std::pair<SILValue, SILValue>, 4> EndBorrowList;
+    using EndScopeKind = DIMemoryObjectInfo::EndScopeKind;
+    SmallVector<std::pair<SILValue, EndScopeKind>, 4> EndScopeList;
     SILValue EltPtr =
-        TheMemory.emitElementAddress(Elt, Loc, B, EndBorrowList);
+        TheMemory.emitElementAddressForDestroy(Elt, Loc, B, EndScopeList);
     if (auto *DA = B.emitDestroyAddrAndFold(Loc, EltPtr))
       Destroys.push_back(DA);
-    while (!EndBorrowList.empty()) {
-      SILValue Borrowed, Original;
-      std::tie(Borrowed, Original) = EndBorrowList.pop_back_val();
-      B.createEndBorrow(Loc, Borrowed, Original);
+
+    while (!EndScopeList.empty()) {
+      SILValue value;
+      EndScopeKind kind;
+      std::tie(value, kind) = EndScopeList.pop_back_val();
+
+      switch (kind) {
+      case EndScopeKind::Borrow:
+        B.createEndBorrow(Loc, value);
+        continue;
+      case EndScopeKind::Access:
+        B.createEndAccess(Loc, value, false /*can abort*/);
+        continue;
+      }
+      llvm_unreachable("Covered switch isn't covered!");
     }
   };
 
