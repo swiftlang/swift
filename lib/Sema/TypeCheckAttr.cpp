@@ -3344,6 +3344,153 @@ static bool checkFunctionSignature(
   return checkFunctionSignature(requiredResultFnTy, candidateResultTy);
 };
 
+// Returns an `AnyFunctionType` from the given parameters, result type, and
+// generic signature.
+static AnyFunctionType *
+makeFunctionType(ArrayRef<AnyFunctionType::Param> parameters, Type resultType,
+                 GenericSignature genericSignature) {
+  if (genericSignature)
+    return GenericFunctionType::get(genericSignature, parameters, resultType);
+  return FunctionType::get(parameters, resultType);
+}
+
+// Computes the original function type corresponding to the given derivative
+// function type. Used for `@derivative` attribute type-checking.
+static AnyFunctionType *
+getDerivativeOriginalFunctionType(AnyFunctionType *derivativeFnTy) {
+  // Unwrap curry levels. At most, two parameter lists are necessary, for
+  // curried method types with a `(Self)` parameter list.
+  SmallVector<AnyFunctionType *, 2> curryLevels;
+  auto *currentLevel = derivativeFnTy;
+  for (unsigned i : range(2)) {
+    (void)i;
+    if (currentLevel == nullptr)
+      break;
+    curryLevels.push_back(currentLevel);
+    currentLevel = currentLevel->getResult()->getAs<AnyFunctionType>();
+  }
+
+  auto derivativeResult = curryLevels.back()->getResult()->getAs<TupleType>();
+  assert(derivativeResult && derivativeResult->getNumElements() == 2 &&
+         "Expected derivative result to be a two-element tuple");
+  auto originalResult = derivativeResult->getElement(0).getType();
+  auto *originalType = makeFunctionType(
+      curryLevels.back()->getParams(), originalResult,
+      curryLevels.size() == 1 ? derivativeFnTy->getOptGenericSignature()
+                              : nullptr);
+
+  // Wrap the derivative function type in additional curry levels.
+  auto curryLevelsWithoutLast =
+      ArrayRef<AnyFunctionType *>(curryLevels).drop_back(1);
+  for (auto pair : enumerate(llvm::reverse(curryLevelsWithoutLast))) {
+    unsigned i = pair.index();
+    AnyFunctionType *curryLevel = pair.value();
+    originalType =
+        makeFunctionType(curryLevel->getParams(), originalType,
+                         i == curryLevelsWithoutLast.size() - 1
+                             ? derivativeFnTy->getOptGenericSignature()
+                             : nullptr);
+  }
+  return originalType;
+}
+
+// Computes the original function type corresponding to the given transpose
+// function type. Used for `@transpose` attribute type-checking.
+static AnyFunctionType *
+getTransposeOriginalFunctionType(AnyFunctionType *transposeFnType,
+                                 IndexSubset *linearParamIndices,
+                                 bool wrtSelf) {
+  unsigned transposeParamsIndex = 0;
+
+  // Get the transpose function's parameters and result type.
+  auto transposeParams = transposeFnType->getParams();
+  auto transposeResult = transposeFnType->getResult();
+  bool isCurried = transposeResult->is<AnyFunctionType>();
+  if (isCurried) {
+    auto methodType = transposeResult->castTo<AnyFunctionType>();
+    transposeParams = methodType->getParams();
+    transposeResult = methodType->getResult();
+  }
+
+  // Get the original function's result type.
+  // The original result type is always equal to the type of the last
+  // parameter of the transpose function type.
+  auto originalResult = transposeParams.back().getPlainType();
+
+  // Get transposed result types.
+  // The transpose function result type may be a singular type or a tuple type.
+  SmallVector<TupleTypeElt, 4> transposeResultTypes;
+  if (auto transposeResultTupleType = transposeResult->getAs<TupleType>()) {
+    transposeResultTypes.append(transposeResultTupleType->getElements().begin(),
+                                transposeResultTupleType->getElements().end());
+  } else {
+    transposeResultTypes.push_back(transposeResult);
+  }
+
+  // Get the `Self` type, if the transpose function type is curried.
+  // - If `self` is a linearity parameter, use the first transpose result type.
+  // - Otherwise, use the first transpose parameter type.
+  unsigned transposeResultTypesIndex = 0;
+  Type selfType;
+  if (isCurried && wrtSelf) {
+    selfType = transposeResultTypes.front().getType();
+    transposeResultTypesIndex++;
+  } else if (isCurried) {
+    selfType = transposeFnType->getParams().front().getPlainType();
+  }
+
+  // Get the original function's parameters.
+  SmallVector<AnyFunctionType::Param, 8> originalParams;
+  // The number of original parameters is equal to the sum of:
+  // - The number of original non-transposed parameters.
+  //   - This is the number of transpose parameters minus one. All transpose
+  //     parameters come from the original function, except the last parameter
+  //     (the transposed original result).
+  // - The number of original transposed parameters.
+  //   - This is the number of linearity parameters.
+  unsigned originalParameterCount =
+      transposeParams.size() - 1 + linearParamIndices->getNumIndices();
+  // Iterate over all original parameter indices.
+  for (auto i : range(originalParameterCount)) {
+    // Skip `self` parameter if `self` is a linearity parameter.
+    // The `self` is handled specially later to form a curried function type.
+    bool isSelfParameterAndWrtSelf =
+        wrtSelf && i == linearParamIndices->getCapacity() - 1;
+    if (isSelfParameterAndWrtSelf)
+      continue;
+    // If `i` is a linearity parameter index, the next original parameter is
+    // the next transpose result.
+    if (linearParamIndices->contains(i)) {
+      auto resultType =
+          transposeResultTypes[transposeResultTypesIndex++].getType();
+      originalParams.push_back(AnyFunctionType::Param(resultType));
+    }
+    // Otherwise, the next original parameter is the next transpose parameter.
+    else {
+      originalParams.push_back(transposeParams[transposeParamsIndex++]);
+    }
+  }
+
+  // Compute the original function type.
+  AnyFunctionType *originalType;
+  // If the transpose type is curried, the original function type is:
+  // `(Self) -> (<original parameters>) -> <original result>`.
+  if (isCurried) {
+    assert(selfType && "`Self` type should be resolved");
+    originalType = makeFunctionType(originalParams, originalResult, nullptr);
+    originalType =
+        makeFunctionType(AnyFunctionType::Param(selfType), originalType,
+                         transposeFnType->getOptGenericSignature());
+  }
+  // Otherwise, the original function type is simply:
+  // `(<original parameters>) -> <original result>`.
+  else {
+    originalType = makeFunctionType(originalParams, originalResult,
+                                    transposeFnType->getOptGenericSignature());
+  }
+  return originalType;
+}
+
 /// Typechecks the given derivative attribute `attr` on decl `D`.
 ///
 /// Effects are:
@@ -3424,7 +3571,7 @@ static bool typeCheckDerivativeAttr(ASTContext &Ctx, Decl *D,
 
   // Compute expected original function type and look up original function.
   auto *originalFnType =
-      derivativeInterfaceType->getDerivativeOriginalFunctionType();
+      getDerivativeOriginalFunctionType(derivativeInterfaceType);
 
   // Returns true if the generic parameters in `source` satisfy the generic
   // requirements in `target`.
@@ -3457,11 +3604,12 @@ static bool typeCheckDerivativeAttr(ASTContext &Ctx, Decl *D,
 
   auto isValidOriginal = [&](AbstractFunctionDecl *originalCandidate) {
     // TODO(TF-982): Allow derivatives on protocol requirements.
-    return !isa<ProtocolDecl>(originalCandidate->getDeclContext()) &&
-           checkFunctionSignature(
-               cast<AnyFunctionType>(originalFnType->getCanonicalType()),
-               originalCandidate->getInterfaceType()->getCanonicalType(),
-               checkGenericSignatureSatisfied);
+    if (isa<ProtocolDecl>(originalCandidate->getDeclContext()))
+      return false;
+    return checkFunctionSignature(
+        cast<AnyFunctionType>(originalFnType->getCanonicalType()),
+        originalCandidate->getInterfaceType()->getCanonicalType(),
+        checkGenericSignatureSatisfied);
   };
 
   auto noneValidDiagnostic = [&]() {
@@ -4410,9 +4558,8 @@ void AttributeChecker::visitTransposeAttr(TransposeAttr *attr) {
     }
   }
 
-  auto *expectedOriginalFnType =
-      transposeInterfaceType->getTransposeOriginalFunctionType(
-          linearParamIndices, wrtSelf);
+  auto *expectedOriginalFnType = getTransposeOriginalFunctionType(
+      transposeInterfaceType, linearParamIndices, wrtSelf);
 
   // `R` result type must conform to `Differentiable` and satisfy
   // `Self == Self.TangentVector`.
