@@ -30,9 +30,8 @@ namespace swift {
 /// the ClangImporter needs to keep track of where imports were originally written.
 /// Located makes it easy to do so while making the code more readable, compared to
 /// using `std::pair`.
-template<typename T>
+template <typename T>
 struct Located {
-
   /// The main item whose source location is being tracked.
   T Item;
 
@@ -45,12 +44,12 @@ struct Located {
 
   SWIFT_DEBUG_DUMP;
   void dump(raw_ostream &os) const;
-
-  template<typename U>
-  friend bool operator ==(const Located<U> &lhs, const Located<U> &rhs) {
-    return lhs.Item == rhs.Item && lhs.Loc == rhs.Loc;
-  }
 };
+
+template <typename T>
+bool operator ==(const Located<T> &lhs, const Located<T> &rhs) {
+  return lhs.Item == rhs.Item && lhs.Loc == rhs.Loc;
+}
 
 } // end namespace swift
 
