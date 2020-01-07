@@ -283,6 +283,7 @@ static void writeJSON(llvm::raw_ostream &out,
 }
 
 bool swift::scanDependencies(ASTContext &Context, ModuleDecl *mainModule,
+                             DependencyTracker *depTracker,
                              const FrontendOptions &opts) {
 
   std::string path = opts.InputsAndOutputs.getSingleOutputFilename();
@@ -352,6 +353,29 @@ bool swift::scanDependencies(ASTContext &Context, ModuleDecl *mainModule,
 
   // Write out the JSON description.
   writeJSON(out, Context, cache, allModules.getArrayRef());
+
+  // Update the dependency tracker.
+  if (depTracker) {
+    for (auto module : allModules) {
+      auto deps = cache.findDependencies(module.first, module.second);
+      if (!deps)
+        continue;
+
+      if (auto swiftDeps = deps->getAsSwiftModule()) {
+        if (auto swiftInterfaceFile = swiftDeps->swiftInterfaceFile)
+          depTracker->addDependency(*swiftInterfaceFile, /*IsSystem=*/false);
+        for (const auto &sourceFile : swiftDeps->sourceFiles)
+          depTracker->addDependency(sourceFile, /*IsSystem=*/false);
+        for (const auto &bridgingSourceFile : swiftDeps->bridgingSourceFiles)
+          depTracker->addDependency(bridgingSourceFile, /*IsSystem=*/false);
+      } else {
+        auto clangDeps = deps->getAsClangModule();
+        depTracker->addDependency(clangDeps->moduleMapFile, /*IsSystem=*/false);
+        for (const auto &sourceFile : clangDeps->fileDependencies)
+          depTracker->addDependency(sourceFile, /*IsSystem=*/false);
+      }
+    }
+  }
 
   // This process succeeds regardless of whether any errors occurred.
   // FIXME: We shouldn't need this, but it's masking bugs in our scanning

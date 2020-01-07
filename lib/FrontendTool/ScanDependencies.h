@@ -16,11 +16,13 @@
 namespace swift {
 
 class ASTContext;
+class DependencyTracker;
 class FrontendOptions;
 class ModuleDecl;
 
 /// Scans the dependencies of \c mainModule.
 bool scanDependencies(ASTContext &Context, ModuleDecl *mainModule,
+                      DependencyTracker *depTracker,
                       const FrontendOptions &opts);
 
 } // end namespace swift

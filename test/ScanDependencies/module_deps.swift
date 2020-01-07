@@ -1,7 +1,9 @@
 // RUN: %empty-directory(%t)
 // RUN: mkdir -p %t/clang-module-cache
-// RUN: %target-swift-frontend -scan-dependencies -module-cache-path %t/clang-module-cache %s -o %t/deps.json -I %S/Inputs/CHeaders -I %S/Inputs/Swift
+// RUN: %target-swift-frontend -scan-dependencies -module-cache-path %t/clang-module-cache %s -o %t/deps.json -I %S/Inputs/CHeaders -I %S/Inputs/Swift -emit-dependencies -emit-dependencies-path %t/deps.d
+
 // RUN: %FileCheck %s < %t/deps.json
+// RUN: %FileCheck %s -check-prefix CHECK-MAKE-DEPS < %t/deps.d
 
 import C
 import E
@@ -73,3 +75,11 @@ import E
 
 /// --------Clang module SwiftShims
 // CHECK-LABEL: "modulePath": "SwiftShims.pcm",
+
+
+// Check make-style dependencies
+// CHECK-MAKE-DEPS: module_deps.swift
+// CHECK-MAKE-DEPS-SAME: Swift.swiftmodule
+// CHECK-MAKE-DEPS-SAME: A.swiftinterface
+// CHECK-MAKE-DEPS-SAME: B.h
+// CHECK-MAKE-DEPS-SAME: module.modulemap

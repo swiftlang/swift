@@ -923,10 +923,6 @@ static Optional<bool> dumpASTIfNeeded(const CompilerInvocation &Invocation,
   case FrontendOptions::ActionType::EmitImportedModules:
     emitImportedModules(Context, Instance.getMainModule(), opts);
     break;
-
-  case FrontendOptions::ActionType::ScanDependencies:
-    scanDependencies(Context, Instance.getMainModule(), opts);
-    break;
   }
   return Context.hadError();
 }
@@ -1270,10 +1266,16 @@ static bool performCompile(CompilerInstance &Instance,
   if (Action == FrontendOptions::ActionType::Parse)
     return Context.hadError();
 
+  if (Action == FrontendOptions::ActionType::ScanDependencies) {
+    scanDependencies(Context, Instance.getMainModule(),
+                     Instance.getDependencyTracker(), opts);
+  }
+
   (void)emitMakeDependenciesIfNeeded(Context.Diags,
                                      Instance.getDependencyTracker(), opts);
 
-  if (Action == FrontendOptions::ActionType::ResolveImports)
+  if (Action == FrontendOptions::ActionType::ResolveImports ||
+      Action == FrontendOptions::ActionType::ScanDependencies)
     return Context.hadError();
 
   if (observer)
