@@ -2842,8 +2842,8 @@ bool ConstraintSystem::repairFailures(
       
       // If it has a deep equality restriction, defer the diagnostic to
       // GenericMismatch.
-      if (hasConversionOrRestriction(ConversionRestrictionKind::DeepEquality)) {
-        if (!lhs->getOptionalObjectType() && !rhs->getOptionalObjectType())
+      if (hasConversionOrRestriction(ConversionRestrictionKind::DeepEquality) &&
+          !lhs->getOptionalObjectType() && !rhs->getOptionalObjectType()) {
           return false;
       }
       
@@ -3502,6 +3502,13 @@ bool ConstraintSystem::repairFailures(
             IgnoreContextualType::create(*this, lhs, rhs, locator));
         break;
       }
+    }
+    // Handle function result coerce expression wrong type conversion.
+    if (isa<CoerceExpr>(anchor)) {
+      auto *fix =
+          ContextualMismatch::create(*this, lhs, rhs, loc);
+      conversionsOrFixes.push_back(fix);
+      break;
     }
     LLVM_FALLTHROUGH;
   }
