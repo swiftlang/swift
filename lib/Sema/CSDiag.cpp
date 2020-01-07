@@ -247,7 +247,6 @@ private:
 
   bool visitSubscriptExpr(SubscriptExpr *SE);
   bool visitApplyExpr(ApplyExpr *AE);
-  bool visitCoerceExpr(CoerceExpr *CE);
   bool visitRebindSelfInConstructorExpr(RebindSelfInConstructorExpr *E);
 };
 } // end anonymous namespace
@@ -1878,6 +1877,7 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
   return true;
 }
 
+<<<<<<< HEAD
 bool FailureDiagnosis::visitCoerceExpr(CoerceExpr *CE) {
   // Coerce the input to whatever type is specified by the CoerceExpr.
   auto expr = typeCheckChildIndependently(CE->getSubExpr(),
