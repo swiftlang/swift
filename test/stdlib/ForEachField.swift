@@ -14,7 +14,6 @@
 // REQUIRES: executable_test
 
 import StdlibUnittest
-import SwiftPrivate
 
 struct TestStruct {
   var int = 0
@@ -72,12 +71,12 @@ class GenericSubclass<V, W>: GenericClass<V, Bool> {
 
 func checkFields<T>(
   of type: T.Type,
-  options: FieldOptions = [],
+  options: _EachFieldOptions = [],
   fields: [String: (Int, Any.Type)]
 ) {
   var count = 0
   
-  forEachField(of: T.self, options: options) {
+  _forEachField(of: T.self, options: options) {
     charPtr, offset, type in
     count += 1
     
@@ -103,7 +102,7 @@ extension GenericSubclass: ExistentialProtocol {}
 
 extension ExistentialProtocol {
   static func doCheckFields(
-    options: FieldOptions = [],
+    options: _EachFieldOptions = [],
     fields: [String: (Int, Any.Type)]
   ) {
     checkFields(of: Self.self, options: options, fields: fields)
@@ -112,7 +111,7 @@ extension ExistentialProtocol {
 
 func checkFieldsAsExistential(
   of type: ExistentialProtocol.Type,
-  options: FieldOptions = [],
+  options: _EachFieldOptions = [],
   fields: [String: (Int, Any.Type)]
 ) {
   type.doCheckFields(options: options, fields: fields)
@@ -154,7 +153,7 @@ tests.test("TestStruct") {
   ])
   
   // Applying to struct type with .classType option fails
-  expectFalse(forEachField(of: TestStruct.self, options: .classType) {
+  expectFalse(_forEachField(of: TestStruct.self, options: .classType) {
     _, _, _ in true
   })
 }
@@ -231,7 +230,7 @@ tests.test("TestClass") {
   ])
 
   // Applying to class type without .classType option fails
-  expectFalse(forEachField(of: TestClass.self) { _, _, _ in true })
+  expectFalse(_forEachField(of: TestClass.self) { _, _, _ in true })
 }
 
 runAllTests()

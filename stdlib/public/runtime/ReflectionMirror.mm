@@ -301,8 +301,6 @@ struct TupleImpl : ReflectionMirrorImpl {
 
     // Get the nth element.
     auto &elt = Tuple->getElement(i);
-    auto *bytes = reinterpret_cast<const char *>(value);
-    auto *eltData = reinterpret_cast<const OpaqueValue *>(bytes + elt.Offset);
 
     return FieldType(elt.Type);
   }
