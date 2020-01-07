@@ -1722,7 +1722,7 @@ class DifferentiableAttr final
   // SWIFT_ENABLE_TENSORFLOW END
   /// Whether this function is linear (optional).
   bool Linear;
-  /// The number of parsed parameters specified in 'wrt:'.
+  /// The number of parsed differentiability parameters specified in 'wrt:'.
   unsigned NumParsedParameters = 0;
   /// The JVP function.
   Optional<DeclNameRefWithLoc> JVP;
@@ -1737,7 +1737,7 @@ class DifferentiableAttr final
   // SWIFT_ENABLE_TENSORFLOW
   // NOTE: Parameter indices requestification is done on `tensorflow` branch but
   // has not yet been upstreamed to `master` branch.
-  /// The differentiation parameters' indices, resolved by the type checker.
+  /// The differentiability parameter indices, resolved by the type checker.
   /// The bit stores whether the parameter indices have been computed.
   llvm::PointerIntPair<IndexSubset *, 1, bool> ParameterIndicesAndBit;
   // SWIFT_ENABLE_TENSORFLOW END
@@ -1801,7 +1801,7 @@ public:
   void setParameterIndices(IndexSubset *paramIndices);
   // SWIFT_ENABLE_TENSORFLOW END
 
-  /// The parsed differentiation parameters, i.e. the list of parameters
+  /// The parsed differentiability parameters, i.e. the list of parameters
   /// specified in 'wrt:'.
   ArrayRef<ParsedAutoDiffParameter> getParsedParameters() const {
     return {getTrailingObjects<ParsedAutoDiffParameter>(), NumParsedParameters};
@@ -1852,15 +1852,15 @@ public:
 ///
 /// The `@derivative(of:)` attribute also has an optional `wrt:` clause
 /// specifying the parameters that are differentiated "with respect to", i.e.
-/// the differentiation parameters. The differentiation parameters must conform
-/// to the `Differentiable` protocol.
+/// the differentiability parameters. The differentiability parameters must
+/// conform to the `Differentiable` protocol.
 ///
-/// If the `wrt:` clause is unspecified, the differentiation parameters are
+/// If the `wrt:` clause is unspecified, the differentiability parameters are
 /// inferred to be all parameters that conform to `Differentiable`.
 ///
 /// `@derivative(of:)` attribute type-checking verifies that the type of the
 /// derivative function declaration is consistent with the type of the
-/// referenced original declaration and the differentiation parameters.
+/// referenced original declaration and the differentiability parameters.
 ///
 /// Examples:
 ///   @derivative(of: sin(_:))
@@ -1879,9 +1879,9 @@ class DerivativeAttr final
   DeclNameRefWithLoc OriginalFunctionName;
   /// The original function declaration, resolved by the type checker.
   AbstractFunctionDecl *OriginalFunction = nullptr;
-  /// The number of parsed parameters specified in 'wrt:'.
+  /// The number of parsed differentiability parameters specified in 'wrt:'.
   unsigned NumParsedParameters = 0;
-  /// The differentiation parameters' indices, resolved by the type checker.
+  /// The differentiability parameter indices, resolved by the type checker.
   IndexSubset *ParameterIndices = nullptr;
   /// The derivative function kind (JVP or VJP), resolved by the type checker.
   Optional<AutoDiffDerivativeFunctionKind> Kind = None;
@@ -1924,7 +1924,7 @@ public:
   }
   void setDerivativeKind(AutoDiffDerivativeFunctionKind kind) { Kind = kind; }
 
-  /// The parsed differentiation parameters, i.e. the list of parameters
+  /// The parsed differentiability parameters, i.e. the list of parameters
   /// specified in 'wrt:'.
   ArrayRef<ParsedAutoDiffParameter> getParsedParameters() const {
     return {getTrailingObjects<ParsedAutoDiffParameter>(), NumParsedParameters};
@@ -1958,7 +1958,7 @@ using DifferentiatingAttr = DerivativeAttr;
 /// computed property declaration.
 ///
 /// The `@transpose(of:)` attribute also has a `wrt:` clause specifying the
-/// parameters that are transposed "with respect to", i.e. the transposed
+/// parameters that are transposed "with respect to", i.e. the linearity
 /// parameters.
 ///
 /// Examples:
@@ -1978,9 +1978,9 @@ class TransposeAttr final
   DeclNameRefWithLoc OriginalFunctionName;
   /// The original function declaration, resolved by the type checker.
   AbstractFunctionDecl *OriginalFunction = nullptr;
-  /// The number of parsed parameters specified in 'wrt:'.
+  /// The number of parsed linearity parameters specified in 'wrt:'.
   unsigned NumParsedParameters = 0;
-  /// The transposed parameters' indices, resolved by the type checker.
+  /// The linearity parameter indices, resolved by the type checker.
   IndexSubset *ParameterIndices = nullptr;
 
   explicit TransposeAttr(bool implicit, SourceLoc atLoc, SourceRange baseRange,
@@ -2013,7 +2013,7 @@ public:
     OriginalFunction = decl;
   }
 
-  /// The parsed transposed parameters, i.e. the list of parameters specified in
+  /// The parsed linearity parameters, i.e. the list of parameters specified in
   /// 'wrt:'.
   ArrayRef<ParsedAutoDiffParameter> getParsedParameters() const {
     return {getTrailingObjects<ParsedAutoDiffParameter>(), NumParsedParameters};

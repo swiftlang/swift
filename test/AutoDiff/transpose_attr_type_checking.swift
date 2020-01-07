@@ -155,25 +155,22 @@ func missingDiffSelfRequirement<T: AdditiveArithmetic>(x: T) -> T {
   return x
 }
 
-// expected-error @+1 {{can only transpose with respect to parameters that conform to 'Differentiable' and where 'T == T.TangentVector'}}
+// expected-error @+1 {{cannot transpose with respect to original result 'T' that does not conform to 'Differentiable' and satisfy 'T == T.TangentVector'}}
 @transpose(of: missingDiffSelfRequirement, wrt: 0)
 func missingDiffSelfRequirementT<T: AdditiveArithmetic>(x: T) -> T {
   return x
 }
 
-// TODO: error should be "can only transpose with respect to parameters that conform to 'Differentiable' and where 'Int == Int.TangentVector'"
-// but currently there is an assertion failure.
-/*
 func missingSelfRequirement<T: Differentiable>(x: T)
   -> T where T.TangentVector == T {
   return x
 }
 
+// expected-error @+1 {{cannot transpose with respect to original result 'T' that does not conform to 'Differentiable' and satisfy 'T == T.TangentVector'}}
 @transpose(of: missingSelfRequirement, wrt: 0)
 func missingSelfRequirementT<T: Differentiable>(x: T) -> T {
   return x
 }
-*/
 
 func differentGenericConstraint<T: Differentiable & BinaryFloatingPoint>(x: T)
 -> T where T == T.TangentVector {
@@ -195,7 +192,7 @@ func transposingInt(x: Float, y: Int) -> Float {
   }
 }
 
-// expected-error @+1 {{can only transpose with respect to parameters that conform to 'Differentiable' and where 'Int == Int.TangentVector'}}
+// expected-error @+1 {{cannot transpose with respect to original parameter 'Int' that does not conform to 'Differentiable' and satisfy 'Int == Int.TangentVector'}}
 @transpose(of: transposingInt, wrt: 1)
 func transposingIntT1(x: Float, t: Float) -> Int {
   return Int(x)
@@ -253,7 +250,7 @@ extension Int {
     return Double(t)
   }
 
-  // expected-error @+1 {{can only transpose with respect to parameters that conform to 'Differentiable' and where 'Int == Int.TangentVector'}}
+  // expected-error @+1 {{cannot transpose with respect to original parameter 'Int' that does not conform to 'Differentiable' and satisfy 'Int == Int.TangentVector'}}
   @transpose(of: Int.myAdding, wrt: (self, 0))
   static func addingT3(v: Float) -> (Int, Double) {
     return (Int(v), Double(v))
@@ -421,7 +418,7 @@ extension level1.level2 {
 }
 
 extension level1.level2_nondiff {
-  // expected-error @+1 {{can only transpose with respect to parameters that conform to 'Differentiable' and where 'level1.level2_nondiff == level1.level2_nondiff.TangentVector'}}
+  // expected-error @+1 {{cannot transpose with respect to original parameter 'level1.level2_nondiff' that does not conform to 'Differentiable' and satisfy 'level1.level2_nondiff == level1.level2_nondiff.TangentVector'}}
   @transpose(of: level1.level2_nondiff.foo, wrt: (self, 0))
   static func trans(t: Float) -> (self: level1.level2_nondiff, x: Float) {
     return (level1.level2_nondiff(), t)
@@ -492,20 +489,20 @@ extension Struct {
 
 extension Struct where T: Differentiable, T == T.TangentVector {
   @transpose(of: init, wrt: 0)
-  static func vjpInit(_ x: Self) -> Float {
+  static func vjpInitX(_ x: Self) -> Float {
     fatalError()
   }
-
-  // TODO(TF-1015): throw an error since the initializer needs to be static
-/*
-  @transpose(of: init, wrt: 0)
-  func vjpInit2(_ x: Self) -> Float {
-    fatalError()
-  }
-*/
 
   @transpose(of: init(_:y:), wrt: (0, 1))
-  static func vjpInit3(_ x: Self) -> (T, Float) {
+  static func vjpInitXY(_ x: Self) -> (T, Float) {
+    fatalError()
+  }
+
+  // Test instance transpose for static original intializer.
+  // TODO(TF-1015): Add improved instance/static member mismatch error.
+  // expected-error @+1 {{could not find function 'init' with expected type '<T where T : Differentiable, T == T.TangentVector> (Struct<T>) -> (Float) -> Struct<T>'}}
+  @transpose(of: init, wrt: 0)
+  func vjpInitStaticMismatch(_ x: Self) -> Float {
     fatalError()
   }
 }

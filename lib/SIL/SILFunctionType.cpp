@@ -272,10 +272,10 @@ CanSILFunctionType SILFunctionType::getAutoDiffDerivativeFunctionType(
   };
 
   // Calculate differentiation parameter infos.
-  SmallVector<SILParameterInfo, 4> wrtParams;
+  SmallVector<SILParameterInfo, 4> diffParams;
   for (auto valueAndIndex : enumerate(getParameters()))
     if (isWrtIndex(valueAndIndex.index()))
-      wrtParams.push_back(valueAndIndex.value());
+      diffParams.push_back(valueAndIndex.value());
 
   // Get the canonical derivative function generic signature.
   if (!derivativeFnGenSig)
@@ -338,7 +338,7 @@ CanSILFunctionType SILFunctionType::getAutoDiffDerivativeFunctionType(
   switch (kind) {
   case AutoDiffDerivativeFunctionKind::JVP: {
     SmallVector<SILParameterInfo, 8> differentialParams;
-    for (auto &param : wrtParams) {
+    for (auto &param : diffParams) {
       auto paramTan =
           param.getInterfaceType()->getAutoDiffAssociatedTangentSpace(
               lookupConformance);
@@ -372,7 +372,7 @@ CanSILFunctionType SILFunctionType::getAutoDiffDerivativeFunctionType(
         getTangentParameterInfoForOriginalResult(resultTan->getCanonicalType(),
                                                  origRes.getConvention()));
     SmallVector<SILResultInfo, 8> pullbackResults;
-    for (auto &param : wrtParams) {
+    for (auto &param : diffParams) {
       auto paramTan =
           param.getInterfaceType()->getAutoDiffAssociatedTangentSpace(
               lookupConformance);

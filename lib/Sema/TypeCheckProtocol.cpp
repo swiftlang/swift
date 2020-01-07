@@ -2304,7 +2304,7 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
     auto *original = cast<AbstractFunctionDecl>(match.Witness);
     auto *whereClauseGenEnv =
         reqAttr->getDerivativeGenericEnvironment(original);
-    auto *inferredParameters = TypeChecker::inferDifferentiationParameters(
+    auto *inferredParameters = TypeChecker::inferDifferentiabilityParameters(
         original, whereClauseGenEnv);
     bool omitWrtClause = reqAttr->getParameterIndices()->getNumIndices() ==
                          inferredParameters->getNumIndices();
