@@ -129,7 +129,7 @@ static SourceKit::Context &getGlobalContext() {
 }
 
 namespace SourceKit {
-void setGlobalInMemoryOutputFileSystem(IntrusiveRefCntPtr<clang::InMemoryOutputFileSystem> FS) {
+void SOURCEKITD_PUBLIC setGlobalInMemoryOutputFileSystem(IntrusiveRefCntPtr<clang::InMemoryOutputFileSystem> FS) {
   getGlobalContext().getSwiftLangSupport().setInMemoryOutputFileSystem(std::move(FS));
 }
 } // namespace SourceKit
