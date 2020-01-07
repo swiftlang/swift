@@ -32,9 +32,9 @@
 
 // RUN: %empty-directory(%t)
 // RUN: cp %S/Inputs/chained-additional-kinds/output.json %t
-// RUN: echo 'func foo() { a; }; struct z {}' >%t/main.swift
-// RUN: echo 'let a = 3' >%t/other.swift
-// RUN: echo 'func bar() { z() }' >%t/yet-another.swift
+// RUN: echo 'struct S { let q = a() }; class C { func z() -> Int {3} }' >%t/main.swift
+// RUN: echo 'func a() {}' >%t/other.swift
+// RUN: echo ' var qqq = C().z()' >%t/yet-another.swift
 // RUN: touch -t 201401240005 %t/{added,main,other,yet-another}.swift
 
 // RUN: cd %t && %swiftc_driver -enable-fine-grained-dependencies -driver-show-incremental -c -output-file-map %t/output.json -incremental -driver-always-rebuild-dependents ./main.swift ./other.swift ./yet-another.swift -module-name main -j1 2>&1 | %FileCheck -check-prefix=CHECK-FINE-FIRST %s
