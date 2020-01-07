@@ -640,7 +640,7 @@ ModuleDecl *CompilerInstance::getMainModule() const {
   return MainModule;
 }
 
-static void addAdditionalInitialImportsTo(
+void CompilerInstance::addAdditionalInitialImportsTo(
     SourceFile *SF, const CompilerInstance::ImplicitImports &implicitImports) {
   SmallVector<SourceFile::ImportedModuleDesc, 4> additionalImports;
 
