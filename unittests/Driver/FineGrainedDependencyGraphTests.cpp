@@ -476,18 +476,18 @@ TEST(ModuleDepGraph, ChainedNoncascadingDependents) {
   }
   EXPECT_TRUE(graph.isMarked(&job0));
   EXPECT_TRUE(graph.isMarked(&job1));
-  EXPECT_TRUE(graph.isMarked(&job2));
+  EXPECT_FALSE(graph.isMarked(&job2));
 
   EXPECT_EQ(0u, graph.markTransitive(&job0).size());
   EXPECT_TRUE(graph.isMarked(&job0));
   EXPECT_TRUE(graph.isMarked(&job1));
-  EXPECT_TRUE(graph.isMarked(&job2));
+  EXPECT_FALSE(graph.isMarked(&job2));
 }
 
 TEST(ModuleDepGraph, ChainedNoncascadingDependents2) {
   ModuleDepGraph graph;
 
-  EXPECT_EQ(simulateLoad(graph, &job0, {{providesTopLevel, {"a", noncascading("b"), "c"}}}),
+  EXPECT_EQ(simulateLoad(graph, &job0, {{providesTopLevel, {"a", "b", "c"}}}),
             LoadResult::AffectsDownstream);
   EXPECT_EQ(
       simulateLoad(graph, &job1,
@@ -502,7 +502,7 @@ TEST(ModuleDepGraph, ChainedNoncascadingDependents2) {
     EXPECT_TRUE(contains(found, &job1));
   }
   EXPECT_TRUE(graph.isMarked(&job0));
-  EXPECT_TRUE(graph.isMarked(&job1));
+  EXPECT_FALSE(graph.isMarked(&job1));
   EXPECT_FALSE(graph.isMarked(&job2));
 }
 

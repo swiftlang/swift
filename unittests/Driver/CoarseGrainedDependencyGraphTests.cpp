@@ -425,6 +425,58 @@ TEST(CoarseGrainedDependencyGraph, ChainedDependents) {
   EXPECT_TRUE(graph.isMarked(2));
 }
 
+TEST(CoarseGrainedDependencyGraph, ChainedNoncascadingDependents) {
+  CoarseGrainedDependencyGraph<uintptr_t> graph;
+
+  EXPECT_EQ(loadFromString(graph, 0,
+                           providesNominal, "a, b, c"),
+            LoadResult::UpToDate);
+  EXPECT_EQ(loadFromString(graph, 1,
+                           dependsNominal, "x, b",
+                           providesNominal, "z"),
+            LoadResult::UpToDate);
+  EXPECT_EQ(loadFromString(graph, 2,
+                           dependsNominal, "!private z"),
+            LoadResult::UpToDate);
+  {
+    auto found = graph.markTransitive(0);
+    EXPECT_EQ(2u, found.size());
+    EXPECT_TRUE(contains(found, 1));
+    EXPECT_TRUE(contains(found, 2));
+  }
+  EXPECT_TRUE(graph.isMarked(0));
+  EXPECT_TRUE(graph.isMarked(1));
+  EXPECT_FALSE(graph.isMarked(2));
+
+  EXPECT_EQ(0u, graph.markTransitive(0).size());
+  EXPECT_TRUE(graph.isMarked(0));
+  EXPECT_TRUE(graph.isMarked(1));
+  EXPECT_FALSE(graph.isMarked(2));
+}
+
+TEST(CoarseGrainedDependencyGraph, ChainedNoncascadingDependents2) {
+  CoarseGrainedDependencyGraph<uintptr_t> graph;
+
+  EXPECT_EQ(loadFromString(graph, 0,
+                           providesTopLevel, "a, b, c"),
+            LoadResult::UpToDate);
+  EXPECT_EQ(loadFromString(graph, 1,
+                           dependsTopLevel, "x, !private b",
+                           providesNominal, "z"),
+            LoadResult::UpToDate);
+  EXPECT_EQ(loadFromString(graph, 2,
+                           dependsNominal, "z"),
+            LoadResult::UpToDate);
+  {
+    auto found = graph.markTransitive(0);
+    EXPECT_EQ(1u, found.size());
+    EXPECT_TRUE(contains(found, 1));
+  }
+  EXPECT_TRUE(graph.isMarked(0));
+  EXPECT_FALSE(graph.isMarked(1));
+  EXPECT_FALSE(graph.isMarked(2));
+}
+
 TEST(CoarseGrainedDependencyGraph, MarkTwoNodes) {
   CoarseGrainedDependencyGraph<uintptr_t> graph;
 
