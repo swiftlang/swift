@@ -2842,8 +2842,10 @@ bool ConstraintSystem::repairFailures(
       
       // If it has a deep equality restriction, defer the diagnostic to
       // GenericMismatch.
-      if (hasConversionOrRestriction(ConversionRestrictionKind::DeepEquality))
-        return false;
+      if (hasConversionOrRestriction(ConversionRestrictionKind::DeepEquality)) {
+        if (!lhs->getOptionalObjectType() && !rhs->getOptionalObjectType())
+          return false;
+      }
       
       auto *fix = ContextualMismatch::create(*this, lhs, rhs,
                                              getConstraintLocator(locator));
