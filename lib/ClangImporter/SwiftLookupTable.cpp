@@ -504,18 +504,6 @@ void SwiftLookupTable::addEntry(DeclName name, SingleEntry newEntry,
     return;
   }
 
-  // Populate cache from reader if necessary.
-  findOrCreate(LookupTable, name.getBaseName(),
-               [](auto &results, auto &Reader, auto Name) {
-    return (void)Reader.lookup(Name, results);
-  });
-  findOrCreate(GlobalsAsMembers, name.getBaseName(),
-               [](auto &results, auto &Reader, auto Name) {
-    return (void)Reader.lookupGlobalsAsMembers(Name, results);
-  });
-
-  auto context = *contextOpt;
-
   auto updateTableWithEntry = [this](SingleEntry newEntry, StoredContext context,
                                      TableType::value_type::second_type &entries){
     for (auto &entry : entries) {
@@ -546,13 +534,26 @@ void SwiftLookupTable::addEntry(DeclName name, SingleEntry newEntry,
   };
 
   // If this is a global imported as a member, record is as such.
+  auto context = *contextOpt;
   if (isGlobalAsMember(newEntry, context)) {
+    // Populate cache from reader if necessary.
+    findOrCreate(GlobalsAsMembers, name.getBaseName(),
+                 [](auto &results, auto &Reader, auto Name) {
+      return (void)Reader.lookupGlobalsAsMembers(Name, results);
+    });
     updateTableWithEntry(newEntry, context,
                          GlobalsAsMembers[name.getBaseName()]);
+
+    // Populate the index as well.
     auto &entries = GlobalsAsMembersIndex[context];
     (void)addLocalEntry(newEntry, entries);
   }
 
+  // Populate cache from reader if necessary.
+  findOrCreate(LookupTable, name.getBaseName(),
+               [](auto &results, auto &Reader, auto Name) {
+    return (void)Reader.lookup(Name, results);
+  });
   updateTableWithEntry(newEntry, context, LookupTable[name.getBaseName()]);
 }
 
