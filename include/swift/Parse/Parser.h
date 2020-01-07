@@ -120,7 +120,7 @@ public:
   DeclContext *CurDeclContext;
   ASTContext &Context;
   CodeCompletionCallbacks *CodeCompletion = nullptr;
-  std::vector<std::pair<SourceLoc, std::vector<ParamDecl*>>> AnonClosureVars;
+  std::vector<Located<std::vector<ParamDecl*>>> AnonClosureVars;
 
   bool IsParsingInterfaceTokens = false;
   

@@ -25,6 +25,7 @@
 #include "swift/AST/Types.h"
 #include "swift/AST/TypeAlignments.h"
 #include "swift/Basic/LangOptions.h"
+#include "swift/Basic/Located.h"
 #include "swift/Basic/Malloc.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMap.h"
@@ -541,6 +542,9 @@ public:
   /// Get the '+' function on two String.
   FuncDecl *getPlusFunctionOnString() const;
 
+  /// Get Sequence.makeIterator().
+  FuncDecl *getSequenceMakeIterator() const;
+
   /// Check whether the standard library provides all the correct
   /// intrinsic support for Optional<T>.
   ///
@@ -785,12 +789,12 @@ public:
   ///
   /// Note that even if this check succeeds, errors may still occur if the
   /// module is loaded in full.
-  bool canImportModule(std::pair<Identifier, SourceLoc> ModulePath);
+  bool canImportModule(Located<Identifier> ModulePath);
 
   /// \returns a module with a given name that was already loaded.  If the
   /// module was not loaded, returns nullptr.
   ModuleDecl *getLoadedModule(
-      ArrayRef<std::pair<Identifier, SourceLoc>> ModulePath) const;
+      ArrayRef<Located<Identifier>> ModulePath) const;
 
   ModuleDecl *getLoadedModule(Identifier ModuleName) const;
 
@@ -800,7 +804,7 @@ public:
   /// be returned.
   ///
   /// \returns The requested module, or NULL if the module cannot be found.
-  ModuleDecl *getModule(ArrayRef<std::pair<Identifier, SourceLoc>> ModulePath);
+  ModuleDecl *getModule(ArrayRef<Located<Identifier>> ModulePath);
 
   ModuleDecl *getModuleByName(StringRef ModuleName);
 

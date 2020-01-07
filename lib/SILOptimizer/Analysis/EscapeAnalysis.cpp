@@ -110,18 +110,10 @@ EscapeAnalysis::findCachedPointerKind(SILType Ty, const SILFunction &F) const {
   return pointerKind;
 }
 
-static bool isExtractOfArrayUninitializedPointer(TupleExtractInst *TEI) {
-  if (auto apply = dyn_cast<ApplyInst>(TEI->getOperand()))
-    if (ArraySemanticsCall(apply, "array.uninitialized", false))
-      return true;
-
-  return false;
-}
-
 // If EscapeAnalysis should consider the given value to be a derived address or
 // pointer based on one of its address or pointer operands, then return that
 // operand value. Otherwise, return an invalid value.
-SILValue EscapeAnalysis::getPointerBase(SILValue value) const {
+SILValue EscapeAnalysis::getPointerBase(SILValue value) {
   switch (value->getKind()) {
   case ValueKind::IndexAddrInst:
   case ValueKind::IndexRawPointerInst:
@@ -156,10 +148,8 @@ SILValue EscapeAnalysis::getPointerBase(SILValue value) const {
   case ValueKind::TupleExtractInst: {
     auto *TEI = cast<TupleExtractInst>(value);
     // Special handling for extracting the pointer-result from an
-    // array construction. We handle this like a ref_element_addr
-    // rather than a projection. See the handling of tuple_extract
-    // in analyzeInstruction().
-    if (isExtractOfArrayUninitializedPointer(TEI))
+    // array construction. See createArrayUninitializedSubgraph.
+    if (canOptimizeArrayUninitializedResult(TEI))
       return SILValue();
     return TEI->getOperand();
   }
@@ -188,7 +178,7 @@ SILValue EscapeAnalysis::getPointerBase(SILValue value) const {
 // Recursively find the given value's pointer base. If the value cannot be
 // represented in EscapeAnalysis as one of its operands, then return the same
 // value.
-SILValue EscapeAnalysis::getPointerRoot(SILValue value) const {
+SILValue EscapeAnalysis::getPointerRoot(SILValue value) {
   while (true) {
     if (SILValue v2 = getPointerBase(value))
       value = v2;
@@ -1721,28 +1711,6 @@ void EscapeAnalysis::buildConnectionGraph(FunctionInfo *FInfo,
                           << FInfo->Graph.F->getName() << '\n');
 }
 
-/// Returns the tuple extract for the first two fields if all uses of \p I are
-/// tuple_extract instructions.
-static std::pair<TupleExtractInst *, TupleExtractInst *>
-onlyUsedInTupleExtract(SILValue V) {
-  TupleExtractInst *field0 = nullptr;
-  TupleExtractInst *field1 = nullptr;
-  for (Operand *Use : getNonDebugUses(V)) {
-    if (auto *TEI = dyn_cast<TupleExtractInst>(Use->getUser())) {
-      if (TEI->getFieldNo() == 0) {
-        field0 = TEI;
-        continue;
-      }
-      if (TEI->getFieldNo() == 1) {
-        field1 = TEI;
-        continue;
-      }
-    }
-    return std::make_pair(nullptr, nullptr);
-  }
-  return std::make_pair(field0, field1);
-}
-
 bool EscapeAnalysis::buildConnectionGraphForCallees(
     SILInstruction *Caller, CalleeList Callees, FunctionInfo *FInfo,
     FunctionOrder &BottomUpOrder, int RecursionDepth) {
@@ -1799,38 +1767,79 @@ bool EscapeAnalysis::buildConnectionGraphForDestructor(
                                         RecursionDepth);
 }
 
-// Handle array.uninitialized
-bool EscapeAnalysis::createArrayUninitializedSubgraph(
-    FullApplySite apply, ConnectionGraph *conGraph) {
+EscapeAnalysis::ArrayUninitCall
+EscapeAnalysis::canOptimizeArrayUninitializedCall(ApplyInst *ai,
+                                                  ConnectionGraph *conGraph) {
+  ArrayUninitCall call;
+  // This must be an exact match so we don't accidentally optimize
+  // "array.uninitialized_intrinsic".
+  if (!ArraySemanticsCall(ai, "array.uninitialized", false))
+    return call;
 
   // Check if the result is used in the usual way: extracting the
   // array and the element pointer with tuple_extract.
-  TupleExtractInst *arrayStruct;
-  TupleExtractInst *arrayElementPtr;
-  std::tie(arrayStruct, arrayElementPtr) =
-      onlyUsedInTupleExtract(cast<ApplyInst>(apply.getInstruction()));
-  if (!arrayStruct || !arrayElementPtr)
+  for (Operand *use : getNonDebugUses(ai)) {
+    if (auto *tei = dyn_cast<TupleExtractInst>(use->getUser())) {
+      if (tei->getFieldNo() == 0) {
+        call.arrayStruct = tei;
+        continue;
+      }
+      if (tei->getFieldNo() == 1) {
+        call.arrayElementPtr = tei;
+        continue;
+      }
+    }
+    // If there are any other uses, such as a release_value, erase the previous
+    // call info and bail out.
+    call.arrayStruct = nullptr;
+    call.arrayElementPtr = nullptr;
+    break;
+  }
+  // An "array.uninitialized" call may have a first argument which is the
+  // allocated array buffer. Make sure the call's argument is recognized by
+  // EscapeAnalysis as a pointer, otherwise createArrayUninitializedSubgraph
+  // won't be able to map the result nodes onto it. There is a variant of
+  // @_semantics("array.uninitialized") that does not take the storage as input,
+  // so it will effectively bail out here.
+  if (isPointer(ai->getArgument(0)))
+    call.arrayStorageRef = ai->getArgument(0);
+  return call;
+}
+
+bool EscapeAnalysis::canOptimizeArrayUninitializedResult(
+    TupleExtractInst *tei) {
+  ApplyInst *ai = dyn_cast<ApplyInst>(tei->getOperand());
+  if (!ai)
     return false;
 
-  // array.uninitialized may have a first argument which is the
-  // allocated array buffer. The call is like a struct(buffer)
-  // instruction.
-  CGNode *arrayRefNode = conGraph->getNode(apply.getArgument(0));
-  if (!arrayRefNode)
-    return false;
+  auto *conGraph = getConnectionGraph(ai->getFunction());
+  return canOptimizeArrayUninitializedCall(ai, conGraph).isValid();
+}
 
-  CGNode *arrayStructNode = conGraph->getNode(arrayStruct);
+// Handle @_semantics("array.uninitialized")
+//
+// This call is analagous to a 'struct(storageRef)' instruction--we want a defer
+// edge from the returned Array struct to the storage Reference that it
+// contains.
+//
+// The returned unsafe pointer is handled simply by mapping the pointer value
+// onto the object node that the storage argument points to.
+void EscapeAnalysis::createArrayUninitializedSubgraph(
+    ArrayUninitCall call, ConnectionGraph *conGraph) {
+  CGNode *arrayStructNode = conGraph->getNode(call.arrayStruct);
   assert(arrayStructNode && "Array struct must have a node");
 
-  CGNode *arrayObjNode = conGraph->getValueContent(apply.getArgument(0));
+  CGNode *arrayRefNode = conGraph->getNode(call.arrayStorageRef);
+  assert(arrayRefNode && "canOptimizeArrayUninitializedCall checks isPointer");
+  // If the arrayRefNode != null then arrayObjNode must be valid.
+  CGNode *arrayObjNode = conGraph->getValueContent(call.arrayStorageRef);
 
   // The reference argument is effectively stored inside the returned
-  // array struct.
+  // array struct. This is like struct(arrayRefNode).
   conGraph->defer(arrayStructNode, arrayRefNode);
 
   // Map the returned element pointer to the array object's field pointer.
-  conGraph->setNode(arrayElementPtr, arrayObjNode);
-  return true;
+  conGraph->setNode(call.arrayElementPtr, arrayObjNode);
 }
 
 void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
@@ -1852,10 +1861,15 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
       case ArrayCallKind::kMakeMutable:
         // These array semantics calls do not capture anything.
         return;
-      case ArrayCallKind::kArrayUninitialized:
-        if (createArrayUninitializedSubgraph(FAS, ConGraph))
+      case ArrayCallKind::kArrayUninitialized: {
+        ArrayUninitCall call = canOptimizeArrayUninitializedCall(
+            cast<ApplyInst>(FAS.getInstruction()), ConGraph);
+        if (call.isValid()) {
+          createArrayUninitializedSubgraph(call, ConGraph);
           return;
+        }
         break;
+      }
       case ArrayCallKind::kGetElement:
         if (CGNode *ArrayObjNode = ConGraph->getValueContent(ASC.getSelf())) {
           CGNode *LoadedElement = nullptr;
@@ -2204,13 +2218,9 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
     case SILInstructionKind::TupleExtractInst: {
       // This is a tuple_extract which extracts the second result of an
       // array.uninitialized call (otherwise getPointerBase should have already
-      // looked through it). The first result is the array itself.  The second
-      // result (which is a pointer to the array elements) must be the content
-      // node of the first result. It's just like a ref_element_addr
-      // instruction. It is mapped to a node when processing
-      // array.uninitialized.
+      // looked through it).
       auto *TEI = cast<TupleExtractInst>(I);
-      assert(isExtractOfArrayUninitializedPointer(TEI)
+      assert(canOptimizeArrayUninitializedResult(TEI)
              && "tuple_extract should be handled as projection");
       return;
     }

@@ -9,5 +9,4 @@ class Foo {
 
 func foo() -> Foo {
   return Foo(lhs: 2, rhs: 2)
-  // expected-error@-1 {{cannot convert value of type 'Int' to expected argument type '<<error type>>'}}
 }

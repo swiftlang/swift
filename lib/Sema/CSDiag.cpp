@@ -240,7 +240,6 @@ private:
   bool visitIdentityExpr(IdentityExpr *E);
   bool visitTryExpr(TryExpr *E);
 
-  bool visitUnresolvedMemberExpr(UnresolvedMemberExpr *E);
   bool visitUnresolvedDotExpr(UnresolvedDotExpr *UDE);
   bool visitArrayExpr(ArrayExpr *E);
   bool visitDictionaryExpr(DictionaryExpr *E);
@@ -381,7 +380,6 @@ namespace {
     llvm::DenseMap<Expr*, Type> ExprTypes;
     llvm::DenseMap<TypeLoc*, Type> TypeLocTypes;
     llvm::DenseMap<Pattern*, Type> PatternTypes;
-    llvm::DenseMap<ParamDecl*, Type> ParamDeclInterfaceTypes;
     ExprTypeSaverAndEraser(const ExprTypeSaverAndEraser&) = delete;
     void operator=(const ExprTypeSaverAndEraser&) = delete;
   public:
@@ -420,17 +418,6 @@ namespace {
           if (isa<LiteralExpr>(expr) && !isa<InterpolatedStringLiteralExpr>(expr) &&
               !(expr->getType() && expr->getType()->hasError()))
             return { false, expr };
-
-          // If a ClosureExpr's parameter list has types on the decls, then
-          // remove them so that they'll get regenerated from the
-          // associated TypeLocs or resynthesized as fresh typevars.
-          if (auto *CE = dyn_cast<ClosureExpr>(expr))
-            for (auto P : *CE->getParameters()) {
-              if (P->hasInterfaceType()) {
-                TS->ParamDeclInterfaceTypes[P] = P->getInterfaceType();
-                P->setInterfaceType(Type());
-              }
-            }
           
           expr->setType(nullptr);
 
@@ -473,12 +460,6 @@ namespace {
       
       for (auto patternElt : PatternTypes)
         patternElt.first->setType(patternElt.second);
-
-      for (auto paramDeclIfaceElt : ParamDeclInterfaceTypes) {
-        assert(!paramDeclIfaceElt.first->isImmutable() ||
-               !paramDeclIfaceElt.second->is<InOutType>());
-        paramDeclIfaceElt.first->setInterfaceType(paramDeclIfaceElt.second->getInOutObjectType());
-      }
       
       // Done, don't do redundant work on destruction.
       ExprTypes.clear();
@@ -505,33 +486,6 @@ namespace {
       for (auto patternElt : PatternTypes)
         if (!patternElt.first->hasType())
           patternElt.first->setType(patternElt.second);
-
-      for (auto paramDeclIfaceElt : ParamDeclInterfaceTypes)
-        if (!paramDeclIfaceElt.first->hasInterfaceType()) {
-          paramDeclIfaceElt.first->setInterfaceType(
-              getParamBaseType(paramDeclIfaceElt));
-        }
-    }
-
-  private:
-    static Type getParamBaseType(std::pair<ParamDecl *, Type> &storedParam) {
-      ParamDecl *param;
-      Type storedType;
-
-      std::tie(param, storedType) = storedParam;
-
-      // FIXME: We are currently in process of removing `InOutType`
-      //        so `VarDecl::get{Interface}Type` is going to wrap base
-      //        type into `InOutType` if its flag indicates that it's
-      //        an `inout` parameter declaration. But such type can't
-      //        be restored directly using `VarDecl::set{Interface}Type`
-      //        caller needs additional logic to extract base type.
-      if (auto *IOT = storedType->getAs<InOutType>()) {
-        assert(param->isInOut());
-        return IOT->getObjectType();
-      }
-
-      return storedType;
     }
   };
 } // end anonymous namespace
@@ -1618,47 +1572,6 @@ bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
   return diagnoseSubscriptErrors(SE, /* inAssignmentDestination = */ false);
 }
 
-namespace {
-  /// Type checking listener for pattern binding initializers.
-  class CalleeListener : public ExprTypeCheckListener {
-    Type contextualType;
-  public:
-    explicit CalleeListener(Type contextualType)
-      : contextualType(contextualType) { }
-
-    bool builtConstraints(ConstraintSystem &cs, Expr *expr) override {
-      // If we have no contextual type, there is nothing to do.
-      if (!contextualType)
-        return false;
-
-      // If the expression is obviously something that produces a metatype,
-      // then don't put a constraint on it.
-      auto semExpr = expr->getValueProvidingExpr();
-      if (isa<TypeExpr>(semExpr))
-        return false;
-
-      auto resultLocator =
-        cs.getConstraintLocator(expr, ConstraintLocator::FunctionResult);
-      auto resultType = cs.createTypeVariable(resultLocator,
-                                              TVO_CanBindToLValue |
-                                              TVO_CanBindToNoEscape);
-
-      auto locator = cs.getConstraintLocator(expr);
-      cs.addConstraint(ConstraintKind::FunctionResult,
-                       cs.getType(expr),
-                       resultType,
-                       locator);
-
-      cs.addConstraint(ConstraintKind::Conversion,
-                       resultType,
-                       contextualType,
-                       locator);
-
-      return false;
-    }
-  };
-} // end anonymous namespace
-
 // Check if there is a structural problem in the function expression
 // by performing type checking with the option to allow unresolved
 // type variables. If that is going to produce a function type with
@@ -1804,21 +1717,6 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
                                                 calleeInfo, TCC_ForceRecheck);
   if (!argExpr)
     return true; // already diagnosed.
-  
-  // Handle argument label mismatches when we have multiple candidates.
-  if (calleeInfo.closeness == CC_ArgumentLabelMismatch) {
-    auto args = decomposeArgType(CS.getType(argExpr), argLabels);
-
-    // If we have multiple candidates that we fail to match, just say we have
-    // the wrong labels and list the candidates out.
-    diagnose(callExpr->getLoc(), diag::wrong_argument_labels_overload,
-             getParamListAsString(args))
-      .highlight(argExpr->getSourceRange());
-
-    // Did the user intend on invoking a different overload?
-    calleeInfo.suggestPotentialOverloads(fnExpr->getLoc());
-    return true;
-  }
 
   auto overloadName = calleeInfo.declName;
 
@@ -1991,16 +1889,6 @@ bool FailureDiagnosis::visitCoerceExpr(CoerceExpr *CE) {
                                           CTP_CoerceOperand);
   if (!expr)
     return true;
-
-  auto ref = expr->getReferencedDecl();
-  if (auto *decl = ref.getDecl()) {
-    // Without explicit coercion we might end up
-    // type-checking sub-expression as unavaible
-    // declaration, let's try to diagnose that here.
-    if (AvailableAttr::isUnavailable(decl))
-      return diagnoseExplicitUnavailability(
-          decl, expr->getSourceRange(), CS.DC, dyn_cast<ApplyExpr>(expr));
-  }
 
   return false;
 }
@@ -2240,65 +2128,6 @@ bool FailureDiagnosis::visitUnquoteExpr(UnquoteExpr *E) { return false; }
 
 // No need to do additional diagnostics for decl quotes.
 bool FailureDiagnosis::visitDeclQuoteExpr(DeclQuoteExpr *E) { return false; }
-
-bool FailureDiagnosis::visitUnresolvedMemberExpr(UnresolvedMemberExpr *E) {
-  // If we have no contextual type, there is no way to resolve this.  Just
-  // diagnose this as an ambiguity.
-  if (!CS.getContextualType())
-    return false;
-
-  // OTOH, if we do have a contextual type, we can provide a more specific
-  // error.  Dig out the UnresolvedValueMember constraint for this expr node.
-  Constraint *memberConstraint = nullptr;
-  auto checkConstraint = [&](Constraint *C) {
-    if (C->getKind() == ConstraintKind::UnresolvedValueMember &&
-        simplifyLocatorToAnchor(C->getLocator()) == E)
-      memberConstraint = C;
-  };
-
-  if (CS.failedConstraint)
-    checkConstraint(CS.failedConstraint);
-  for (auto &C : CS.getConstraints()) {
-    if (memberConstraint) break;
-    checkConstraint(&C);
-  }
-  
-  // If we can't find the member constraint in question, then we failed.
-  if (!memberConstraint)
-    return false;
-
-  std::function<bool(ArrayRef<OverloadChoice>)> callback = [&](
-      ArrayRef<OverloadChoice> candidates) {
-    bool hasTrailingClosure = callArgHasTrailingClosure(E->getArgument());
-
-    // Dump all of our viable candidates into a CalleeCandidateInfo & sort it
-    // out.
-    CalleeCandidateInfo candidateInfo(Type(), candidates, hasTrailingClosure,
-                                      CS);
-
-    // Filter the candidate list based on the argument we may or may not have.
-    candidateInfo.filterContextualMemberList(E->getArgument());
-
-    // If we have multiple candidates, then we have an ambiguity.
-    if (candidateInfo.size() != 1) {
-      SourceRange argRange;
-      if (auto arg = E->getArgument())
-        argRange = arg->getSourceRange();
-      diagnose(E->getNameLoc(), diag::ambiguous_member_overload_set,
-               E->getName())
-          .highlight(argRange);
-      candidateInfo.suggestPotentialOverloads(E->getNameLoc().getBaseNameLoc());
-      return true;
-    }
-
-    return false;
-  };
-
-  return diagnoseMemberFailures(E, nullptr, memberConstraint->getKind(),
-                                memberConstraint->getMember(),
-                                memberConstraint->getFunctionRefKind(),
-                                memberConstraint->getLocator(), callback);
-}
 
 bool FailureDiagnosis::diagnoseMemberFailures(
     Expr *E, Expr *baseExpr, ConstraintKind lookupKind, DeclNameRef memberName,

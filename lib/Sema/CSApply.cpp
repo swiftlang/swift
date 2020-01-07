@@ -87,6 +87,7 @@ Solution::computeSubstitutions(GenericSignature sig,
       return ProtocolConformanceRef(protoType);
     }
 
+    // FIXME: Retrieve the conformance from the solution itself.
     return TypeChecker::conformsToProtocol(replacement, protoType,
                                            getConstraintSystem().DC,
                                            ConformanceCheckFlags::InExpression);
@@ -7537,6 +7538,37 @@ public:
   /// Ignore declarations.
   bool walkToDeclPre(Decl *decl) override { return false; }
 };
+}
+
+ProtocolConformanceRef Solution::resolveConformance(
+    ConstraintLocator *locator, ProtocolDecl *proto) {
+  for (const auto &conformance : Conformances) {
+    if (conformance.first != locator)
+      continue;
+    if (conformance.second.getRequirement() != proto)
+      continue;
+
+    // If the conformance doesn't require substitution, return it immediately.
+    auto conformanceRef = conformance.second;
+    if (conformanceRef.isAbstract())
+      return conformanceRef;
+
+    auto concrete = conformanceRef.getConcrete();
+    auto conformingType = concrete->getType();
+    if (!conformingType->hasTypeVariable())
+      return conformanceRef;
+
+    // Substitute into the conformance type, then look for a conformance
+    // again.
+    // FIXME: Should be able to perform the substitution using the Solution
+    // itself rather than another conforms-to-protocol check.
+    Type substConformingType = simplifyType(conformingType);
+    return TypeChecker::conformsToProtocol(
+        substConformingType, proto, constraintSystem->DC,
+        ConformanceCheckFlags::InExpression);
+  }
+
+  return ProtocolConformanceRef::forInvalid();
 }
 
 void Solution::setExprTypes(Expr *expr) const {

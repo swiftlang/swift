@@ -1197,7 +1197,7 @@ constructClonedFunction(SILOptFunctionBuilder &FuncBuilder,
 /// 2. We only see a mark_uninitialized when paired with an (alloc_box,
 ///    project_box). e.x.:
 ///
-///       (mark_uninitialized (project_box (alloc_box)))
+///       (project_box (mark_uninitialized (alloc_box)))
 ///
 /// The asserts are to make sure that if the initial safety condition check
 /// is changed, this code is changed as well.
@@ -1209,15 +1209,16 @@ static SILValue getOrCreateProjectBoxHelper(SILValue PartialOperand) {
   }
 
   // Otherwise, handle the alloc_box case. If we have a mark_uninitialized on
-  // the box, we create the project value through that.
+  // the box, we know that we will have a project_box of that value due to SIL
+  // verifier invariants.
   SingleValueInstruction *Box = cast<AllocBoxInst>(PartialOperand);
-  if (auto *Op = Box->getSingleUse()) {
-    if (auto *MUI = dyn_cast<MarkUninitializedInst>(Op->getUser())) {
-      Box = MUI;
+  if (auto *MUI = Box->getSingleUserOfType<MarkUninitializedInst>()) {
+    if (auto *PBI = MUI->getSingleUserOfType<ProjectBoxInst>()) {
+      return PBI;
     }
   }
 
-  // Just return a project_box.
+  // Otherwise, create a new project_box.
   SILBuilderWithScope B(std::next(Box->getIterator()));
   return B.createProjectBox(Box->getLoc(), Box, 0);
 }

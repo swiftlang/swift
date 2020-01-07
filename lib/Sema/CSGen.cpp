@@ -2172,10 +2172,11 @@ namespace {
       }
 
       case PatternKind::Typed: {
-        auto typedPattern = cast<TypedPattern>(pattern);
         // FIXME: Need a better locator for a pattern as a base.
-        Type openedType = CS.openUnboundGenericType(typedPattern->getType(),
-                                                    locator);
+        auto contextualPattern =
+            ContextualPattern::forRawPattern(pattern, CurDC);
+        Type type = TypeChecker::typeCheckPattern(contextualPattern);
+        Type openedType = CS.openUnboundGenericType(type, locator);
 
         // For a typed pattern, simply return the opened type of the pattern.
         // FIXME: Error recovery if the type is an error type?
@@ -2272,6 +2273,7 @@ namespace {
       // or exhaustive catches.
       class FindInnerThrows : public ASTWalker {
         ConstraintSystem &CS;
+        DeclContext *DC;
         bool FoundThrow = false;
         
         std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
@@ -2357,12 +2359,12 @@ namespace {
           Type exnType = CS.getASTContext().getErrorDecl()->getDeclaredType();
           if (!exnType)
             return false;
-          if (TypeChecker::coercePatternToType(pattern,
-                                        TypeResolution::forContextual(CS.DC),
-                                        exnType,
-                                        TypeResolverContext::InExpression)) {
+          auto contextualPattern =
+              ContextualPattern::forRawPattern(pattern, DC);
+          pattern = TypeChecker::coercePatternToType(
+            contextualPattern, exnType, TypeResolverContext::InExpression);
+          if (!pattern)
             return false;
-          }
 
           clause->setErrorPattern(pattern);
           return clause->isSyntacticallyExhaustive();
@@ -2398,7 +2400,8 @@ namespace {
         }
         
       public:
-        FindInnerThrows(ConstraintSystem &cs) : CS(cs) {}
+        FindInnerThrows(ConstraintSystem &cs, DeclContext *dc)
+            : CS(cs), DC(dc) {}
 
         bool foundThrow() { return FoundThrow; }
       };
@@ -2411,7 +2414,7 @@ namespace {
       if (!body)
         return false;
       
-      auto tryFinder = FindInnerThrows(CS);
+      auto tryFinder = FindInnerThrows(CS, expr);
       body->walk(tryFinder);
       return tryFinder.foundThrow();
     }

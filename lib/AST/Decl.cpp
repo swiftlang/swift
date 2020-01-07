@@ -2951,6 +2951,7 @@ Type ValueDecl::getInterfaceType() const {
 }
 
 void ValueDecl::setInterfaceType(Type type) {
+  assert(!type.isNull() && "Resetting the interface type to null is forbidden");
   getASTContext().evaluator.cacheOutput(InterfaceTypeRequest{this},
                                         std::move(type));
 }
@@ -3675,12 +3676,16 @@ void NominalTypeDecl::addExtension(ExtensionDecl *extension) {
   if (!FirstExtension) {
     FirstExtension = extension;
     LastExtension = extension;
+
+    addedExtension(extension);
     return;
   }
 
   // Add to the end of the list.
   LastExtension->NextExtension.setPointer(extension);
   LastExtension = extension;
+
+  addedExtension(extension);
 }
 
 ArrayRef<VarDecl *> NominalTypeDecl::getStoredProperties() const {
@@ -4206,15 +4211,11 @@ GetDestructorRequest::evaluate(Evaluator &evaluator, ClassDecl *CD) const {
   return DD;
 }
 
-
 bool ClassDecl::hasMissingDesignatedInitializers() const {
-  if (!Bits.ClassDecl.ComputedHasMissingDesignatedInitializers) {
-    auto *mutableThis = const_cast<ClassDecl *>(this);
-    mutableThis->Bits.ClassDecl.ComputedHasMissingDesignatedInitializers = 1;
-    (void)mutableThis->lookupDirect(DeclBaseName::createConstructor());
-  }
-
-  return Bits.ClassDecl.HasMissingDesignatedInitializers;
+  return evaluateOrDefault(
+      getASTContext().evaluator,
+      HasMissingDesignatedInitializersRequest{const_cast<ClassDecl *>(this)},
+      false);
 }
 
 bool ClassDecl::hasMissingVTableEntries() const {
@@ -4237,7 +4238,7 @@ bool ClassDecl::isIncompatibleWithWeakReferences() const {
   return false;
 }
 
-bool ClassDecl::inheritsSuperclassInitializers() {
+bool ClassDecl::inheritsSuperclassInitializers() const {
   // If there's no superclass, there's nothing to inherit.
   if (!getSuperclass())
     return false;
@@ -4632,7 +4633,7 @@ ProtocolDecl::getInheritedProtocolsSlow() {
   for (const auto found :
            getDirectlyInheritedNominalTypeDecls(
              const_cast<ProtocolDecl *>(this), anyObject)) {
-    if (auto proto = dyn_cast<ProtocolDecl>(found.second)) {
+    if (auto proto = dyn_cast<ProtocolDecl>(found.Item)) {
       if (known.insert(proto).second)
         result.push_back(proto);
     }
@@ -6624,7 +6625,7 @@ DeclName AbstractFunctionDecl::getEffectiveFullName() const {
     auto &ctx = getASTContext();
     auto storage = accessor->getStorage();
     auto subscript = dyn_cast<SubscriptDecl>(storage);
-    switch (auto accessorKind = accessor->getAccessorKind()) {
+    switch (accessor->getAccessorKind()) {
     // These don't have any extra implicit parameters.
     case AccessorKind::Address:
     case AccessorKind::MutableAddress:

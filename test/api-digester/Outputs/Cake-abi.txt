@@ -60,6 +60,8 @@ cake: Class C0 is a new API without @available attribute
 cake: Class C5 is now without @objc
 cake: Class C8 is a new API without @available attribute
 cake: Constructor C1.init(_:) is a new API without @available attribute
+cake: Constructor ClassWithMissingDesignatedInits.init() is a new API without @available attribute
+cake: Constructor SubclassWithMissingDesignatedInits.init() is a new API without @available attribute
 cake: Enum IceKind is now without @frozen
 cake: EnumElement FrozenKind.AddedCase is a new API without @available attribute
 cake: Func C1.foo1() is now not static
@@ -102,10 +104,10 @@ cake: Struct fixedLayoutStruct has added a conformance to an existing protocol P
 cake: Struct fixedLayoutStruct has removed conformance to P1
 
 /* Protocol Requirement Change */
-cake: Accessor HasMutatingMethodClone.bar.Get() now requires  new witness table entry
+cake: Accessor HasMutatingMethodClone.bar.Get() now requires new witness table entry
 cake: AssociatedType AssociatedTypePro.T1 has removed default type Swift.Int
 cake: AssociatedType RequiementChanges.addedTypeWithoutDefault has been added as a protocol requirement
-cake: Func HasMutatingMethodClone.foo() now requires  new witness table entry
+cake: Func HasMutatingMethodClone.foo() now requires new witness table entry
 cake: Func RequiementChanges.addedFunc() has been added as a protocol requirement
 cake: Var RequiementChanges.addedVar has been added as a protocol requirement
 
@@ -113,4 +115,6 @@ cake: Var RequiementChanges.addedVar has been added as a protocol requirement
 cake: Class C4 has changed its super class from APINotesTest.OldType to APINotesTest.NewType
 cake: Class SubGenericClass has changed its super class from cake.GenericClass<cake.P1> to cake.GenericClass<cake.P2>
 cake: Class SuperClassRemoval has removed its super class cake.C3
+cake: Class SuperClassRemoval no longer inherits convenience inits from its superclass
 cake: Constructor AddingNewDesignatedInit.init(_:) has been added as a designated initializer to an open class
+cake: Constructor ClassWithMissingDesignatedInits.init() has been added as a designated initializer to an open class
