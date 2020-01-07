@@ -487,8 +487,8 @@ namespace driver {
         // result if that were the case.
         bool wasKnownToCascade = isMarkedInDepGraph(FinishedCmd, forRanges);
 
-        const auto loadResult = loadDepGraphFromPath(FinishedCmd, DependenciesFile,
-        Comp.getDiags(), forRanges);
+        const auto loadResult = loadDepGraphFromPath(
+            FinishedCmd, DependenciesFile, Comp.getDiags(), forRanges);
         switch (loadResult) {
         case CoarseGrainedDependencyGraph::LoadResult::HadError:
           if (ReturnCode != EXIT_SUCCESS)

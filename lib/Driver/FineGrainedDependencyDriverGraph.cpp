@@ -102,7 +102,6 @@ std::vector<const Job*> ModuleDepGraph::markTransitive(
   const StringRef swiftDepsToBeRecompiled = getSwiftDeps(jobToBeRecompiled);
   assert(!swiftDepsToBeRecompiled.empty() && "Must have a swift deps");
 
-
   // Do the traversal for every node in the job to be recompiled.
   std::unordered_set<const ModuleDepGraphNode *> dependentNodesSet;
   for (auto &fileAndNode : nodeMap[swiftDepsToBeRecompiled]) {
@@ -111,11 +110,12 @@ std::vector<const Job*> ModuleDepGraph::markTransitive(
   }
   std::vector<const ModuleDepGraphNode *> dependentNodes{
       dependentNodesSet.begin(), dependentNodesSet.end()};
-  std::vector<const ModuleDepGraphNode*> dependentInterfaceNodes;
+  std::vector<const ModuleDepGraphNode *> dependentInterfaceNodes;
   std::copy_if(dependentNodes.begin(), dependentNodes.end(),
                std::back_inserter(dependentInterfaceNodes),
-               [](const ModuleDepGraphNode *n)
-               { return n->getKey().getAspect() == DeclAspect::interface;});
+               [](const ModuleDepGraphNode *n) {
+                 return n->getKey().getAspect() == DeclAspect::interface;
+               });
 
   // Assume this job has an inflowing cascading dependency, since this function
   // was called. And also, don't return it, since caller already knows it must
@@ -123,8 +123,11 @@ std::vector<const Job*> ModuleDepGraph::markTransitive(
   markJobViaSwiftDeps(swiftDepsToBeRecompiled);
   auto newJobsToCompile = getUnmarkedJobsFrom(dependentNodes);
   markJobsFrom(dependentInterfaceNodes);
-  assert(isMarked(jobToBeRecompiled) && "This job must be a cascading one for this function to be called on it");
-  return std::vector<const Job*>{newJobsToCompile.begin(), newJobsToCompile.end()};
+  assert(
+      isMarked(jobToBeRecompiled) &&
+      "This job must be a cascading one for this function to be called on it");
+  return std::vector<const Job *>{newJobsToCompile.begin(),
+                                  newJobsToCompile.end()};
 }
 
 std::vector<std::string> ModuleDepGraph::computeSwiftDepsFromNodes(
@@ -137,26 +140,26 @@ std::vector<std::string> ModuleDepGraph::computeSwiftDepsFromNodes(
     swiftDepsOfNodes.insert(swiftDeps);
   }
   std::vector<std::string> swiftDepsVec;
-  for (const auto &entry: swiftDepsOfNodes)
+  for (const auto &entry : swiftDepsOfNodes)
     swiftDepsVec.push_back(entry.getKey().str());
   return swiftDepsVec;
 }
 
-std::vector<const Job*>ModuleDepGraph::getUnmarkedJobsFrom(
-  const ArrayRef<const ModuleDepGraphNode*> nodes) const {
-    std::vector<const Job*> jobs;
-    for (const std::string &swiftDeps: computeSwiftDepsFromNodes(nodes)) {
-      if (!isSwiftDepsMarked(swiftDeps))
-        jobs.push_back(getJob(swiftDeps));
-    }
-    return jobs;
+std::vector<const Job *> ModuleDepGraph::getUnmarkedJobsFrom(
+    const ArrayRef<const ModuleDepGraphNode *> nodes) const {
+  std::vector<const Job *> jobs;
+  for (const std::string &swiftDeps : computeSwiftDepsFromNodes(nodes)) {
+    if (!isSwiftDepsMarked(swiftDeps))
+      jobs.push_back(getJob(swiftDeps));
+  }
+  return jobs;
 }
 
-void ModuleDepGraph::markJobsFrom(const ArrayRef<const ModuleDepGraphNode *> nodes) {
-  for (const std::string &swiftDeps: computeSwiftDepsFromNodes(nodes))
+void ModuleDepGraph::markJobsFrom(
+    const ArrayRef<const ModuleDepGraphNode *> nodes) {
+  for (const std::string &swiftDeps : computeSwiftDepsFromNodes(nodes))
     markJobViaSwiftDeps(swiftDeps);
 }
-
 
 bool ModuleDepGraph::markIntransitive(const Job *job) {
   return markJobViaSwiftDeps(getSwiftDeps(job));

@@ -165,9 +165,10 @@ class ModuleDepGraph {
 
   /// The new version of "Marked."
   /// Aka "isMarked".
-  /// If  job is in here, all of its dependent jobs have already been searched for jobs that depend on them,
-  /// OR the job is about to be scheduled and we'll need to run all dependent jobs after it completes.
-  /// (See the call to \c markIntransitive in \c shouldScheduleCompileJobAccordingToCondition.)
+  /// If  job is in here, all of its dependent jobs have already been searched
+  /// for jobs that depend on them, OR the job is about to be scheduled and
+  /// we'll need to run all dependent jobs after it completes. (See the call to
+  /// \c markIntransitive in \c shouldScheduleCompileJobAccordingToCondition.)
   std::unordered_set<std::string> swiftDepsOfMarkedJobs;
 
   /// Keyed by swiftdeps filename, so we can get back to Jobs.
@@ -337,8 +338,9 @@ public:
   /// are recompiled. Such jobs are added to the \ref scheduledJobs set, and
   /// accessed via \ref isMarked.
   ///
-  /// Returns jobs to be run because of changes to any/ever node in the argument.
-  /// Only return jobs marked that were previously unmarked, assuming they are already scheduled.
+  /// Returns jobs to be run because of changes to any/ever node in the
+  /// argument. Only return jobs marked that were previously unmarked, assuming
+  /// they are already scheduled.
   std::vector<const driver::Job*> markTransitive(
       const driver::Job *jobToBeRecompiled, const void *ignored = nullptr);
 
@@ -471,13 +473,14 @@ private:
 
   /// Givien a set of nodes, return the set of swiftDeps for the jobs those
   /// nodes are in.
-  std::vector<std::string> computeSwiftDepsFromNodes(
-      ArrayRef<const ModuleDepGraphNode *> nodes) const;
+  std::vector<std::string>
+  computeSwiftDepsFromNodes(ArrayRef<const ModuleDepGraphNode *> nodes) const;
 
-  std::vector<const driver::Job*>getUnmarkedJobsFrom(const ArrayRef<const ModuleDepGraphNode*> nodes) const;
+  std::vector<const driver::Job *>
+  getUnmarkedJobsFrom(const ArrayRef<const ModuleDepGraphNode *> nodes) const;
 
   /// Mark any jobs for these nodes
-  void markJobsFrom(ArrayRef<const ModuleDepGraphNode*>);
+  void markJobsFrom(ArrayRef<const ModuleDepGraphNode *>);
 
   /// Record a visit to this node for later dependency printing
   size_t traceArrival(const ModuleDepGraphNode *visitedNode);
