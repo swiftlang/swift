@@ -546,6 +546,23 @@ extension HasStoredProperty {
   }
 }
 
+// Test derivative registration for protocol requirements. Currently unsupported.
+// TODO(TF-982): Lift this restriction and add proper support.
+
+protocol ProtocolRequirementDerivative {
+  func requirement(_ x: Float) -> Float
+}
+extension ProtocolRequirementDerivative {
+  // NOTE: the error is misleading because `findAbstractFunctionDecl` in
+  // TypeCheckAttr.cpp is not setup to show customized error messages for
+  // invalid original function candidates.
+  // expected-error @+1 {{could not find function 'requirement' with expected type '<Self where Self : ProtocolRequirementDerivative> (Self) -> (Float) -> Float'}}
+  @derivative(of: requirement)
+  func vjpRequirement(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
+    fatalError()
+  }
+}
+
 // Test cross-file derivative registration. Currently unsupported.
 // TODO(TF-1021): Lift this restriction.
 
