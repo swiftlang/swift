@@ -26,9 +26,9 @@ public protocol _KeyPathIterableBase {
 }
 
 /// A type whose values provides custom key paths to properties or elements.
-public protocol KeyPathIterable : _KeyPathIterableBase {
+public protocol KeyPathIterable: _KeyPathIterableBase {
   /// A type that can represent a collection of all key paths of this type.
-  associatedtype AllKeyPaths : Collection
+  associatedtype AllKeyPaths: Collection
     where AllKeyPaths.Element == PartialKeyPath<Self>
 
   /// A collection of all custom key paths of this value.
@@ -97,30 +97,55 @@ public extension KeyPathIterable {
 // Collection conformances
 //===----------------------------------------------------------------------===//
 
-extension Array : KeyPathIterable {
+/// Returns `true` if all of the given key paths are instances of
+/// `WritableKeyPath<Root, Value>`.
+private func areWritable<Root, Value>(
+  _ keyPaths: [PartialKeyPath<Root>], valueType: Value.Type
+) -> Bool {
+  return !keyPaths.contains(
+    where: { kp in !(kp is WritableKeyPath<Root, Value>) }
+  )
+}
+
+extension Array: KeyPathIterable {
   public typealias AllKeyPaths = [PartialKeyPath<Array>]
   public var allKeyPaths: [PartialKeyPath<Array>] {
-    return indices.map { \Array[$0] }
+    let result = indices.map { \Array[$0] }
+    _internalInvariant(areWritable(result, valueType: Element.self))
+    return result
   }
 }
 
-// TODO(TF-938): Remove 'Element : Differentiable' constraint.
-extension Array.DifferentiableView : KeyPathIterable where Element : Differentiable {
+// TODO(TF-938): Remove this conformance after removing
+// `Element: Differentiable` requirement.
+//
+// Currently necessary to avoid error:
+//
+//   error: conditional conformance of type 'Array<Element>.DifferentiableView'
+//   to protocol 'KeyPathIterable' does not imply conformance to inherited
+//   protocol '_KeyPathIterableBase'.
+extension Array.DifferentiableView: _KeyPathIterableBase
+where Element: Differentiable {}
+
+// TODO(TF-938): Remove `Element: Differentiable` requirement.
+extension Array.DifferentiableView: KeyPathIterable
+where Element: Differentiable {
   public typealias AllKeyPaths = [PartialKeyPath<Array.DifferentiableView>]
   public var allKeyPaths: [PartialKeyPath<Array.DifferentiableView>] {
-    return [\Array.DifferentiableView.base]
+    let result = [\Array.DifferentiableView.base]
+    _internalInvariant(areWritable(result, valueType: Array.self))
+    return result
   }
 }
 
-// TODO(TF-938): Remove this.
-// This is neccessary now because otherwise the compiler complains:
-//   error: conditional conformance of type 'Array<Element>.DifferentiableView' to protocol
-//   'KeyPathIterable' does not imply conformance to inherited protocol '_KeyPathIterableBase'
-extension Array.DifferentiableView : _KeyPathIterableBase where Element : Differentiable {}
-
-extension Dictionary : KeyPathIterable {
+extension Dictionary: KeyPathIterable {
   public typealias AllKeyPaths = [PartialKeyPath<Dictionary>]
   public var allKeyPaths: [PartialKeyPath<Dictionary>] {
-    return values.indices.map { \Dictionary[$0].value }
+    // Note: `Dictionary.subscript(_: Key)` returns `Value?` and can be used to
+    // form `WritableKeyPath<Self, Value>` key paths.
+    // Force-unwrapping the result is necessary.
+    let result = keys.map { \Dictionary[$0]! }
+    _internalInvariant(areWritable(result, valueType: Value.self))
+    return result
   }
 }
