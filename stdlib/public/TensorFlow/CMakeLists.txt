@@ -35,24 +35,20 @@ set(SOURCES "")
 
 # Copy TensorFlow high-level API sources, if they exist.
 if (TENSORFLOW_SWIFT_APIS)
+  message(STATUS "Using TensorFlow high-level APIs library.")
+
   file(GLOB_RECURSE TENSORFLOW_SWIFT_API_SOURCES
     "${TENSORFLOW_SWIFT_APIS}/Sources/*.swift")
-  message(STATUS "Using TensorFlow high-level APIs library.")
-  list(APPEND SOURCES "${TENSORFLOW_SWIFT_API_SOURCES}")
-endif()
-
-# When Python exists, PythonConversion.swift imports it, so it must be
-# available at link time.
-set(TENSORFLOW_DEPENDS_PYTHON)
-if (SWIFT_PYTHON_EXISTS)
-  list(APPEND TENSORFLOW_DEPENDS_PYTHON SWIFT_MODULE_DEPENDS Python)
+  foreach(_TENSORFLOW_SWIFT_APIS_SOURCE ${TENSORFLOW_SWIFT_API_SOURCES})
+    file(TO_CMAKE_PATH ${_TENSORFLOW_SWIFT_APIS_SOURCE} _TENSORFLOW_SWIFT_APIS_SOURCE)
+    list(APPEND SOURCES ${_TENSORFLOW_SWIFT_APIS_SOURCE})
+  endforeach()
 endif()
 
 add_swift_target_library(swiftTensorFlow ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
   "${SOURCES}"
 
   INCORPORATE_OBJECT_LIBRARIES swiftCTensorFlow
-  TARGET_SDKS OSX LINUX
   PRIVATE_LINK_LIBRARIES "${TF_LIBRARIES}"
   SWIFT_MODULE_DEPENDS SwiftOnoneSupport
   SWIFT_MODULE_DEPENDS_IOS Darwin
@@ -63,7 +59,8 @@ add_swift_target_library(swiftTensorFlow ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_
   SWIFT_MODULE_DEPENDS_FREEBSD Glibc
   SWIFT_MODULE_DEPENDS_CYGWIN Glibc
   SWIFT_MODULE_DEPENDS_HAIKU Glibc
-  ${TENSORFLOW_DEPENDS_PYTHON}
+  SWIFT_MODULE_DEPENDS_WINDOWS MSVCRT
+  SWIFT_MODULE_DEPENDS Python
   SWIFT_COMPILE_FLAGS "${swift_stdlib_compile_flags}"
   LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
   INSTALL_IN_COMPONENT stdlib

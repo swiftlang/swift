@@ -15,6 +15,7 @@
 
 #include "clang/Basic/InMemoryOutputFileSystem.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
+#include "sourcekitd.h"
 
 namespace SourceKit {
 
@@ -25,7 +26,7 @@ namespace SourceKit {
 ///
 /// \param FS may be null, which makes subsequent requests start writing
 /// temporary output files to the real filesystem again.
-void setGlobalInMemoryOutputFileSystem(
+void SOURCEKITD_PUBLIC setGlobalInMemoryOutputFileSystem(
     llvm::IntrusiveRefCntPtr<clang::InMemoryOutputFileSystem> FS);
 
 } // namespace SourceKit

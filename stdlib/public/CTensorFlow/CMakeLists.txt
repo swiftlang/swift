@@ -29,7 +29,7 @@ endif()
 include_directories(BEFORE "${TF_INCLUDE_DIR}")
 
 # Get target SDKs.
-set(TARGET_SDKS "OSX" "LINUX")
+set(TARGET_SDKS "OSX" "LINUX" "WINDOWS")
 list_intersect("${TARGET_SDKS}" "${SWIFT_SDKS}" TARGET_SDKS)
 
 set(ctensorflow_modulemap_target_list)
@@ -104,7 +104,6 @@ add_custom_target(ctensorflow_modulemap DEPENDS ${ctensorflow_modulemap_target_l
 add_swift_target_library(swiftCTensorFlow OBJECT_LIBRARY TARGET_LIBRARY
   ctensorflow_init.cpp
   DEPENDS ctensorflow_modulemap
-  TARGET_SDKS OSX LINUX
   C_COMPILE_FLAGS "${SWIFT_RUNTIME_CXX_FLAGS}"
   LINK_FLAGS "${SWIFT_RUNTIME_LINK_FLAGS}"
   INTERFACE_LINK_LIBRARIES "${TF_LIBRARIES}"

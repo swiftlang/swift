@@ -2052,7 +2052,7 @@ struct OperandToInoutArgument {
       : paramInfos(paramInfos), arguments(arguments) {
     assert(paramInfos.size() == arguments.size());
   }
-  Optional<SILValue> operator()(unsigned long i) const {
+  Optional<SILValue> operator()(size_t i) const {
     if (paramInfos[i].isIndirectMutating())
       return arguments[i];
     return None;
@@ -2060,7 +2060,7 @@ struct OperandToInoutArgument {
 };
 
 using InoutArgumentRange =
-    OptionalTransformRange<IntRange<unsigned long>, OperandToInoutArgument>;
+    OptionalTransformRange<IntRange<size_t>, OperandToInoutArgument>;
 // SWIFT_ENABLE_TENSORFLOW END
 
 /// The partial specialization of ApplyInstBase for full applications.
