@@ -36,7 +36,7 @@ using namespace swift;
 // Only allow allocation of Stmts using the allocator in ASTContext.
 void *Stmt::operator new(size_t Bytes, ASTContext &C,
                          unsigned Alignment) {
-  return C.Allocate(Bytes, Alignment);
+  return C.Allocate(Bytes, Alignment, AllocationArena::Declarations);
 }
 
 StringRef Stmt::getKindName(StmtKind K) {

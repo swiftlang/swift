@@ -28,6 +28,7 @@
 #ifndef SWIFT_AST_AST_SCOPE_H
 #define SWIFT_AST_AST_SCOPE_H
 
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTNode.h"
 #include "swift/AST/NameLookup.h" // for DeclVisibilityKind
 #include "swift/AST/SimpleRequest.h"
@@ -180,7 +181,8 @@ public:
   // Only allow allocation of scopes using the allocator of a particular source
   // file.
   void *operator new(size_t bytes, const ASTContext &ctx,
-                     unsigned alignment = alignof(ASTScopeImpl));
+                     unsigned alignment = alignof(ASTScopeImpl),
+                     AllocationArena arena = AllocationArena::Permanent);
   void *operator new(size_t Bytes, void *Mem) {
     ASTScopeAssert(Mem, "Allocation failed");
     return Mem;

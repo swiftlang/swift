@@ -150,6 +150,7 @@ struct ASTContext::Implementation {
   ~Implementation();
 
   llvm::BumpPtrAllocator Allocator; // used in later initializations
+  llvm::BumpPtrAllocator DeclarationsAllocator; // used in later initializations
 
   /// The set of cleanups to be called when the ASTContext is destroyed.
   std::vector<std::function<void(void)>> Cleanups;
@@ -458,6 +459,9 @@ struct ASTContext::Implementation {
     case AllocationArena::ConstraintSolver:
       assert(CurrentConstraintSolverArena && "No constraint solver active?");
       return *CurrentConstraintSolverArena;
+
+    default: 
+      llvm_unreachable("bad AllocationArena");
     }
     llvm_unreachable("bad AllocationArena");
   }
@@ -603,6 +607,9 @@ llvm::BumpPtrAllocator &ASTContext::getAllocator(AllocationArena arena) const {
   case AllocationArena::ConstraintSolver:
     assert(getImpl().CurrentConstraintSolverArena != nullptr);
     return getImpl().CurrentConstraintSolverArena->Allocator;
+
+  case AllocationArena::Declarations:
+    return getImpl().DeclarationsAllocator;
   }
   llvm_unreachable("bad AllocationArena");
 }

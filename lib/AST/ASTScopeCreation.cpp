@@ -1755,8 +1755,9 @@ void *Portion::operator new(size_t bytes, const ASTContext &ctx,
   return ctx.Allocate(bytes, alignment);
 }
 void *ASTScope::operator new(size_t bytes, const ASTContext &ctx,
-                             unsigned alignment) {
-  return ctx.Allocate(bytes, alignment);
+                             unsigned alignment,
+                             AllocationArena arena) {
+  return ctx.Allocate(bytes, alignment, arena);
 }
 void *ScopeCreator::operator new(size_t bytes, const ASTContext &ctx,
                                  unsigned alignment) {
