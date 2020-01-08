@@ -99,8 +99,8 @@ public extension KeyPathIterable {
 
 /// Returns `true` if all of the given key paths are instances of
 /// `WritableKeyPath<Root, Value>`.
-private func areAllKeyPathsWritable<Root, Value>(
-  _ keyPaths: [PartialKeyPath<Root>], toValueType valueType: Value.Type
+private func areWritable<Root, Value>(
+  _ keyPaths: [PartialKeyPath<Root>], valueType: Value.Type
 ) -> Bool {
   return !keyPaths.contains(
     where: { kp in !(kp is WritableKeyPath<Root, Value>) }
@@ -111,8 +111,7 @@ extension Array: KeyPathIterable {
   public typealias AllKeyPaths = [PartialKeyPath<Array>]
   public var allKeyPaths: [PartialKeyPath<Array>] {
     let result = indices.map { \Array[$0] }
-    _internalInvariant(
-      areAllKeyPathsWritable(result, toValueType: Element.self))
+    _internalInvariant(areWritable(result, valueType: Element.self))
     return result
   }
 }
@@ -134,7 +133,7 @@ where Element: Differentiable {
   public typealias AllKeyPaths = [PartialKeyPath<Array.DifferentiableView>]
   public var allKeyPaths: [PartialKeyPath<Array.DifferentiableView>] {
     let result = [\Array.DifferentiableView.base]
-    _internalInvariant(areAllKeyPathsWritable(result, toValueType: Array.self))
+    _internalInvariant(areWritable(result, valueType: Array.self))
     return result
   }
 }
@@ -146,7 +145,7 @@ extension Dictionary: KeyPathIterable {
     // form `WritableKeyPath<Self, Value>` key paths.
     // Force-unwrapping the result is necessary.
     let result = keys.map { \Dictionary[$0]! }
-    _internalInvariant(areAllKeyPathsWritable(result, toValueType: Value.self))
+    _internalInvariant(areWritable(result, valueType: Value.self))
     return result
   }
 }
