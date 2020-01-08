@@ -901,3 +901,20 @@ TEST(ModuleDepGraph, ChainedPrivateDoesNotCascade) {
   EXPECT_TRUE(contains(jobs1, &job0));
   EXPECT_FALSE(graph.isMarked(&job0));
 }
+
+TEST(ModuleDepGraph, CrashSimple) {
+  ModuleDepGraph graph;
+  simulateLoad(graph, &job0, {
+    {providesTopLevel, {"a"}}
+  });
+  simulateLoad(graph, &job1, {{dependsTopLevel, {"a"}}});
+  simulateLoad(graph, &job2, {{dependsTopLevel, {privatize("a")}}});
+
+  const auto nodes = graph.markTransitive(&job0);
+  EXPECT_EQ(nodes.size(), 2u); // need to compile 0 but not 2
+  EXPECT_TRUE(contains(nodes, &job1));
+  EXPECT_TRUE(contains(nodes, &job2));
+  EXPECT_TRUE(graph.isMarked(&job0));
+  EXPECT_TRUE(graph.isMarked(&job1));
+  EXPECT_FALSE(graph.isMarked(&job2));
+}
