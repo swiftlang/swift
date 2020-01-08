@@ -346,7 +346,8 @@ extension Array {
   @_semantics("array.make_mutable")
   internal mutating func _makeMutableAndUnique() {
     if _slowPath(!_buffer.isMutableAndUniquelyReferenced()) {
-      _buffer = _Buffer(copying: _buffer)
+      _createNewBuffer(bufferIsUnique: false, minimumCapacity: count,
+                       growForAppend: false)
     }
   }
 
@@ -1023,19 +1024,65 @@ extension Array: RangeReplaceableCollection {
   @inlinable
   @_semantics("array.mutate_unknown")
   public mutating func reserveCapacity(_ minimumCapacity: Int) {
-    if _buffer.requestUniqueMutableBackingBuffer(
-      minimumCapacity: minimumCapacity) == nil {
+    _reserveCapacityImpl(minimumCapacity: minimumCapacity,
+                         growForAppend: false)
+  }
 
-      let newBuffer = _ContiguousArrayBuffer<Element>(
-        _uninitializedCount: count, minimumCapacity: minimumCapacity)
-
-      _buffer._copyContents(
-        subRange: _buffer.indices,
-        initializing: newBuffer.firstElementAddress)
-      _buffer = _Buffer(
-        _buffer: newBuffer, shiftedToStartIndex: _buffer.startIndex)
+  /// Reserves enough space to store `minimumCapacity` elements.
+  /// If a new buffer needs to be allocated and `growForAppend` is true,
+  /// the new capacity is calculated using `_growArrayCapacity`, but at least
+  /// kept at `minimumCapacity`.
+  @_alwaysEmitIntoClient
+  internal mutating func _reserveCapacityImpl(
+    minimumCapacity: Int, growForAppend: Bool
+  ) {
+    let isUnique = _buffer.isUniquelyReferenced()
+    if _slowPath(!isUnique || _getCapacity() < minimumCapacity) {
+      _createNewBuffer(bufferIsUnique: isUnique,
+                       minimumCapacity: Swift.max(minimumCapacity, count),
+                       growForAppend: growForAppend)
     }
     _internalInvariant(capacity >= minimumCapacity)
+    _internalInvariant(capacity == 0 || _buffer.isUniquelyReferenced())
+  }
+
+  /// Creates a new buffer, replacing the current buffer.
+  ///
+  /// If `bufferIsUnique` is true, the buffer is assumed to be uniquely
+  /// referenced by this array and the elements are moved - instead of copied -
+  /// to the new buffer.
+  /// The `minimumCapacity` is the lower bound for the new capacity.
+  /// If `growForAppend` is true, the new capacity is calculated using
+  /// `_growArrayCapacity`, but at least kept at `minimumCapacity`.
+  @_alwaysEmitIntoClient
+  @inline(never)
+  internal mutating func _createNewBuffer(
+    bufferIsUnique: Bool, minimumCapacity: Int, growForAppend: Bool
+  ) {
+    let newCapacity = _growArrayCapacity(oldCapacity: _getCapacity(),
+                                         minimumCapacity: minimumCapacity,
+                                         growForAppend: growForAppend)
+    let count = _getCount()
+    _internalInvariant(newCapacity >= count)
+    
+    let newBuffer = _ContiguousArrayBuffer<Element>(
+      _uninitializedCount: count, minimumCapacity: newCapacity)
+
+    if bufferIsUnique {
+      _internalInvariant(_buffer.isUniquelyReferenced())
+
+      // As an optimization, if the original buffer is unique, we can just move
+      // the elements instead of copying.
+      let dest = newBuffer.firstElementAddress
+      dest.moveInitialize(from: _buffer.firstElementAddress,
+                          count: count)
+      _buffer.count = 0
+    } else {
+      _buffer._copyContents(
+        subRange: 0..<count,
+        initializing: newBuffer.firstElementAddress)
+    }
+    _buffer = _Buffer(_buffer: newBuffer, shiftedToStartIndex: 0)
   }
 
   /// Copy the contents of the current buffer to a new unique mutable buffer.
@@ -1054,7 +1101,9 @@ extension Array: RangeReplaceableCollection {
   @_semantics("array.make_mutable")
   internal mutating func _makeUniqueAndReserveCapacityIfNotUnique() {
     if _slowPath(!_buffer.isMutableAndUniquelyReferenced()) {
-      _copyToNewBuffer(oldCount: _buffer.count)
+      _createNewBuffer(bufferIsUnique: false,
+                       minimumCapacity: count + 1,
+                       growForAppend: true)
     }
   }
 
@@ -1083,7 +1132,9 @@ extension Array: RangeReplaceableCollection {
                  _buffer.isMutableAndUniquelyReferenced())
 
     if _slowPath(oldCount + 1 > _buffer.capacity) {
-      _copyToNewBuffer(oldCount: oldCount)
+      _createNewBuffer(bufferIsUnique: true,
+                       minimumCapacity: oldCount + 1,
+                       growForAppend: true)
     }
   }
 
@@ -1124,6 +1175,8 @@ extension Array: RangeReplaceableCollection {
   @inlinable
   @_semantics("array.append_element")
   public mutating func append(_ newElement: __owned Element) {
+    // Separating uniqueness check and capacity check allows hoisting the
+    // uniqueness check out of a loop.
     _makeUniqueAndReserveCapacityIfNotUnique()
     let oldCount = _getCount()
     _reserveCapacityAssumingUniqueBuffer(oldCount: oldCount)
@@ -1183,16 +1236,10 @@ extension Array: RangeReplaceableCollection {
   @inlinable
   @_semantics("array.reserve_capacity_for_append")
   internal mutating func reserveCapacityForAppend(newElementsCount: Int) {
-    let oldCount = self.count
-    let oldCapacity = self.capacity
-    let newCount = oldCount + newElementsCount
-
     // Ensure uniqueness, mutability, and sufficient storage.  Note that
     // for consistency, we need unique self even if newElements is empty.
-    self.reserveCapacity(
-      newCount > oldCapacity ?
-      Swift.max(newCount, _growArrayCapacity(oldCapacity))
-      : newCount)
+    _reserveCapacityImpl(minimumCapacity: self.count + newElementsCount,
+                         growForAppend: true)
   }
 
   @inlinable
