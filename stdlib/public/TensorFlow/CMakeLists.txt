@@ -45,13 +45,6 @@ if (TENSORFLOW_SWIFT_APIS)
   endforeach()
 endif()
 
-# When Python exists, PythonConversion.swift imports it, so it must be
-# available at link time.
-set(TENSORFLOW_DEPENDS_PYTHON)
-if (SWIFT_PYTHON_EXISTS)
-  list(APPEND TENSORFLOW_DEPENDS_PYTHON SWIFT_MODULE_DEPENDS Python)
-endif()
-
 add_swift_target_library(swiftTensorFlow ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
   "${SOURCES}"
 
@@ -67,7 +60,7 @@ add_swift_target_library(swiftTensorFlow ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_
   SWIFT_MODULE_DEPENDS_CYGWIN Glibc
   SWIFT_MODULE_DEPENDS_HAIKU Glibc
   SWIFT_MODULE_DEPENDS_WINDOWS MSVCRT
-  ${TENSORFLOW_DEPENDS_PYTHON}
+  SWIFT_MODULE_DEPENDS Python
   SWIFT_COMPILE_FLAGS "${swift_stdlib_compile_flags}"
   LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
   INSTALL_IN_COMPONENT stdlib

@@ -14,8 +14,6 @@
 #
 #===----------------------------------------------------------------------===#
 
-set(SWIFT_PYTHON_EXISTS TRUE PARENT_SCOPE)
-
 set(SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES)
 if(SWIFT_BUILD_DYNAMIC_SDK_OVERLAY)
   list(APPEND SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES SHARED)
