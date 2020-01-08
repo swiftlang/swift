@@ -1877,18 +1877,6 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
   return true;
 }
 
-<<<<<<< HEAD
-bool FailureDiagnosis::visitCoerceExpr(CoerceExpr *CE) {
-  // Coerce the input to whatever type is specified by the CoerceExpr.
-  auto expr = typeCheckChildIndependently(CE->getSubExpr(),
-                                          CS.getType(CE->getCastTypeLoc()),
-                                          CTP_CoerceOperand);
-  if (!expr)
-    return true;
-
-  return false;
-}
-
 bool FailureDiagnosis::
 visitRebindSelfInConstructorExpr(RebindSelfInConstructorExpr *E) {
   // Don't walk the children for this node, it leads to multiple diagnostics

@@ -4779,13 +4779,6 @@ bool MissingContextualConformanceFailure::diagnoseAsError() {
       break;
     }
 
-    case ConstraintLocator::InstanceType: {
-      // If the missing conformance involves a coercion of metatypes
-      if (diagnoseCoercionToUnrelatedType())
-        return true;
-      break;
-    }
-
     default:
       break;
     }
