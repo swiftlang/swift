@@ -1,6 +1,6 @@
- # Fine-grained v0
- ---
- allNodes:
+# Fine-grained v0
+---
+allNodes:
    - key:
        kind:            sourceFileProvide
        aspect:          interface
@@ -67,4 +67,4 @@
      sequenceNumber:  7
      defsIDependUpon: [  ]
      isProvides:      false
- ...
+...
