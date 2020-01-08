@@ -2200,8 +2200,18 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
           }
         } else { // There are no elements in the path
           auto *anchor = locator.getAnchor();
-          if (!(anchor && isa<AssignExpr>(anchor)))
+          if (!(anchor &&
+               (isa<AssignExpr>(anchor) || isa<CoerceExpr>(anchor))))
             return getTypeMatchFailure(locator);
+        }
+        
+        auto *anchor = locator.getAnchor();
+        if (isa<CoerceExpr>(anchor)) {
+          auto *fix = ContextualMismatch::create(
+              *this, type1, type2, getConstraintLocator(locator));
+          if (recordFix(fix))
+            return getTypeMatchFailure(locator);
+          break;
         }
 
         auto *fix = MissingConformance::forContextual(
@@ -2830,10 +2840,16 @@ bool ConstraintSystem::repairFailures(
         conversionsOrFixes.push_back(coerceToCheckCastFix);
         return true;
       }
-      
+
       // If it has a deep equality restriction, defer the diagnostic to
       // GenericMismatch.
-      if (hasConversionOrRestriction(ConversionRestrictionKind::DeepEquality))
+      if (hasConversionOrRestriction(ConversionRestrictionKind::DeepEquality) &&
+          !hasConversionOrRestriction(
+              ConversionRestrictionKind::OptionalToOptional)) {
+        return false;
+      }
+
+      if (hasConversionOrRestriction(ConversionRestrictionKind::Existential))
         return false;
       
       auto *fix = ContextualMismatch::create(*this, lhs, rhs,
@@ -3492,6 +3508,13 @@ bool ConstraintSystem::repairFailures(
         break;
       }
     }
+    // Handle function result coerce expression wrong type conversion.
+    if (isa<CoerceExpr>(anchor)) {
+      auto *fix =
+          ContextualMismatch::create(*this, lhs, rhs, loc);
+      conversionsOrFixes.push_back(fix);
+      break;
+    }
     LLVM_FALLTHROUGH;
   }
 
@@ -4059,9 +4082,20 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
         subKind = ConstraintKind::Bind;
       }
 
-      return matchTypes(
-          instanceType1, instanceType2, subKind, subflags,
-          locator.withPathElement(ConstraintLocator::InstanceType));
+      auto result =
+          matchTypes(instanceType1, instanceType2, subKind, subflags,
+                     locator.withPathElement(ConstraintLocator::InstanceType));
+      if (shouldAttemptFixes() && result.isFailure()) {
+        auto *anchor = locator.getAnchor();
+        if (anchor && isa<CoerceExpr>(anchor)) {
+          auto *fix =
+              ContextualMismatch::create(*this, instanceType1, instanceType2,
+                                         getConstraintLocator(locator));
+          conversionsOrFixes.push_back(fix);
+          break;
+        }
+      }
+      return result;
     }
 
     case TypeKind::Function: {

@@ -247,7 +247,6 @@ private:
 
   bool visitSubscriptExpr(SubscriptExpr *SE);
   bool visitApplyExpr(ApplyExpr *AE);
-  bool visitCoerceExpr(CoerceExpr *CE);
   bool visitRebindSelfInConstructorExpr(RebindSelfInConstructorExpr *E);
 };
 } // end anonymous namespace
@@ -1876,17 +1875,6 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
   // Did the user intend on invoking a different overload?
   calleeInfo.suggestPotentialOverloads(fnExpr->getLoc());
   return true;
-}
-
-bool FailureDiagnosis::visitCoerceExpr(CoerceExpr *CE) {
-  // Coerce the input to whatever type is specified by the CoerceExpr.
-  auto expr = typeCheckChildIndependently(CE->getSubExpr(),
-                                          CS.getType(CE->getCastTypeLoc()),
-                                          CTP_CoerceOperand);
-  if (!expr)
-    return true;
-
-  return false;
 }
 
 bool FailureDiagnosis::

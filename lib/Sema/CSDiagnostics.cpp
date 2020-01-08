@@ -1905,6 +1905,12 @@ bool ContextualFailure::diagnoseAsError() {
     diagnostic = diag::cannot_convert_condition_value;
     break;
   }
+      
+  case ConstraintLocator::InstanceType: {
+    if (diagnoseCoercionToUnrelatedType())
+      return true;
+    break;
+  }
 
   case ConstraintLocator::TernaryBranch: {
     auto *ifExpr = cast<IfExpr>(getRawAnchor());
@@ -2235,11 +2241,12 @@ bool ContextualFailure::diagnoseCoercionToUnrelatedType() const {
   auto *anchor = getAnchor();
   
   if (auto *coerceExpr = dyn_cast<CoerceExpr>(anchor)) {
-    auto fromType = getFromType();
+    auto fromType = getType(coerceExpr->getSubExpr());
     auto toType = getType(coerceExpr->getCastTypeLoc());
+    
     auto diagnostic =
         getDiagnosticFor(CTP_CoerceOperand,
-                         /*forProtocol=*/toType->isAnyExistentialType());
+                         /*forProtocol=*/toType->isExistentialType());
     
     auto diag =
         emitDiagnostic(anchor->getLoc(), *diagnostic, fromType, toType);
