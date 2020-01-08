@@ -2200,7 +2200,8 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
           }
         } else { // There are no elements in the path
           auto *anchor = locator.getAnchor();
-          if (!(anchor && isa<AssignExpr>(anchor)))
+          if (!(anchor &&
+               (isa<AssignExpr>(anchor) || isa<CoerceExpr>(anchor))))
             return getTypeMatchFailure(locator);
         }
         
@@ -2839,13 +2840,17 @@ bool ConstraintSystem::repairFailures(
         conversionsOrFixes.push_back(coerceToCheckCastFix);
         return true;
       }
-      
+
       // If it has a deep equality restriction, defer the diagnostic to
       // GenericMismatch.
       if (hasConversionOrRestriction(ConversionRestrictionKind::DeepEquality) &&
-          !lhs->getOptionalObjectType() && !rhs->getOptionalObjectType()) {
-          return false;
+          !hasConversionOrRestriction(
+              ConversionRestrictionKind::OptionalToOptional)) {
+        return false;
       }
+
+      if (hasConversionOrRestriction(ConversionRestrictionKind::Existential))
+        return false;
       
       auto *fix = ContextualMismatch::create(*this, lhs, rhs,
                                              getConstraintLocator(locator));
