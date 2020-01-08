@@ -29,7 +29,7 @@ endif()
 include_directories(BEFORE "${TF_INCLUDE_DIR}")
 
 # Get target SDKs.
-set(TARGET_SDKS "OSX" "LINUX")
+set(TARGET_SDKS "OSX" "LINUX" "WINDOWS")
 list_intersect("${TARGET_SDKS}" "${SWIFT_SDKS}" TARGET_SDKS)
 
 set(ctensorflow_modulemap_target_list)
