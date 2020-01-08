@@ -1,4 +1,5 @@
 // RUN: %target-swift-emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-emit-ir %s
 
 protocol P {}
 protocol Q : P {}
@@ -27,13 +28,22 @@ class GenericDerivedFromGenericBase<T> : GenericBase<(T) -> Int> {
   override func f<U : P>(_: U) {}
 }
 
+// Make sure we call these methods with the correct substitution map.
+func call<T, U : P>(_ t: T, _ u: U) {
+  ConcreteDerivedFromConcreteBase().f(u)
+  GenericDerivedFromConcreteBase<T>().f(u)
+
+  ConcreteDerivedFromGenericBase().f(u)
+  GenericDerivedFromGenericBase<T>().f(u)
+}
+
 // All the vtable thunks should traffic in <U where U : Q>, because that's
 // what the base method declares.
 
-// CHECK-LABEL: sil private [thunk] [ossa] @$s24vtable_generic_signature019ConcreteDerivedFromD4BaseC1fyyxAA1PRzlFAA0dG0CADyyxAA1QRzlFTV : $@convention(method) <U where U : Q> (@in_guaranteed U, @guaranteed ConcreteDerivedFromConcreteBase) -> ()
-// CHECK-LABEL: sil private [thunk] [ossa] @$s24vtable_generic_signature30GenericDerivedFromConcreteBaseC1fyyqd__AA1PRd__lFAA0gH0CADyyxAA1QRzlFTV : $@convention(method) <T><U where U : Q> (@in_guaranteed U, @guaranteed GenericDerivedFromConcreteBase<T>) -> ()
-// CHECK-LABEL: sil private [thunk] [ossa] @$s24vtable_generic_signature30ConcreteDerivedFromGenericBaseC1fyyxAA1PRzlFAA0gH0CADyyqd__AA1QRd__lFTV : $@convention(method) <U where U : Q> (@in_guaranteed U, @guaranteed ConcreteDerivedFromGenericBase) -> ()
-// CHECK-LABEL: sil private [thunk] [ossa] @$s24vtable_generic_signature018GenericDerivedFromD4BaseC1fyyqd__AA1PRd__lFAA0dG0CADyyqd__AA1QRd__lFTV : $@convention(method) <T><U where U : Q> (@in_guaranteed U, @guaranteed GenericDerivedFromGenericBase<T>) -> ()
+// CHECK-LABEL: sil private [thunk] [ossa] @$s24vtable_generic_signature019ConcreteDerivedFromD4BaseC1fyyxAA1PRzlFAA0dG0CADyyxAA1QRzlFTV : $@convention(method) <τ_0_0 where τ_0_0 : Q> (@in_guaranteed τ_0_0, @guaranteed ConcreteDerivedFromConcreteBase) -> ()
+// CHECK-LABEL: sil private [thunk] [ossa] @$s24vtable_generic_signature30GenericDerivedFromConcreteBaseC1fyyqd__AA1PRd__lFAA0gH0CADyyxAA1QRzlFTV : $@convention(method) <τ_0_0><τ_1_0 where τ_1_0 : Q> (@in_guaranteed τ_1_0, @guaranteed GenericDerivedFromConcreteBase<τ_0_0>) -> ()
+// CHECK-LABEL: sil private [thunk] [ossa] @$s24vtable_generic_signature30ConcreteDerivedFromGenericBaseC1fyyxAA1PRzlFAA0gH0CADyyqd__AA1QRd__lFTV : $@convention(method) <τ_0_0 where τ_0_0 : Q> (@in_guaranteed τ_0_0, @guaranteed ConcreteDerivedFromGenericBase) -> ()
+// CHECK-LABEL: sil private [thunk] [ossa] @$s24vtable_generic_signature018GenericDerivedFromD4BaseC1fyyqd__AA1PRd__lFAA0dG0CADyyqd__AA1QRd__lFTV : $@convention(method) <τ_0_0><τ_1_0 where τ_1_0 : Q> (@in_guaranteed τ_1_0, @guaranteed GenericDerivedFromGenericBase<τ_0_0>) -> ()
 
 // CHECK-LABEL: sil_vtable ConcreteBase {
 // CHECK-NEXT:   #ConcreteBase.f!1: <U where U : Q> (ConcreteBase) -> (U) -> () : @$s24vtable_generic_signature12ConcreteBaseC1fyyxAA1QRzlF
