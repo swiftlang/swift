@@ -70,7 +70,7 @@ class DTraceBenchmarkDriver(perf_test_driver.BenchmarkDriver):
     def __init__(self, binary, xfail_list, csv_output):
         perf_test_driver.BenchmarkDriver.__init__(
             self, binary, xfail_list,
-            enable_parallel=False,
+            enable_parallel=True,
             opt_levels=['O'])
         self.csv_output = csv_output
 
