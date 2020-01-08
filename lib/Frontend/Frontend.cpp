@@ -1095,19 +1095,25 @@ void CompilerInstance::performParseOnly(bool EvaluateConditionals,
   PersistentState = llvm::make_unique<PersistentParserState>();
   PersistentState->PerformConditionEvaluation = EvaluateConditionals;
 
+  auto shouldDelayBodies = [&](unsigned bufferID) -> bool {
+    if (!CanDelayBodies)
+      return false;
+
+    // Don't delay bodies in whole module mode or for primary files.
+    return !(isWholeModuleCompilation() || isPrimaryInput(bufferID));
+  };
+
   // Parse all the library files.
   for (auto BufferID : InputSourceCodeBufferIDs) {
     if (BufferID == MainBufferID)
       continue;
-
-    auto IsPrimary = isWholeModuleCompilation() || isPrimaryInput(BufferID);
 
     SourceFile *NextInput = createSourceFileForMainModule(
         SourceFileKind::Library, SourceFile::ImplicitModuleImportKind::None,
         BufferID);
 
     parseIntoSourceFileFull(*NextInput, BufferID, PersistentState.get(),
-                            /*DelayBodyParsing=*/!IsPrimary && CanDelayBodies);
+                            shouldDelayBodies(BufferID));
   }
 
   // Now parse the main file.
@@ -1115,10 +1121,10 @@ void CompilerInstance::performParseOnly(bool EvaluateConditionals,
     SourceFile &MainFile =
         MainModule->getMainSourceFile(Invocation.getSourceFileKind());
     MainFile.SyntaxParsingCache = Invocation.getMainFileSyntaxParsingCache();
+    assert(MainBufferID == MainFile.getBufferID());
 
-    parseIntoSourceFileFull(MainFile, MainFile.getBufferID().getValue(),
-                            PersistentState.get(),
-                            /*DelayBodyParsing=*/false);
+    parseIntoSourceFileFull(MainFile, MainBufferID, PersistentState.get(),
+                            shouldDelayBodies(MainBufferID));
   }
 
   assert(Context->LoadedModules.size() == 1 &&
