@@ -3924,6 +3924,13 @@ ERROR(unsupported_convention,none,
       "convention '%0' not supported", (StringRef))
 ERROR(unreferenced_generic_parameter,none,
       "generic parameter '%0' is not used in function signature", (StringRef))
+ERROR(unexpected_ctype_for_non_c_convention,none,
+      "convention '%0' does not support the 'cType' argument label, did you "
+      "mean @convention(c, cType: \"%1\") or @convention(block, cType: \"%1\") "
+      "instead?", (StringRef, StringRef))
+ERROR(unable_to_parse_c_function_type,none,
+      "unable to parse '%0'; it should be a C function pointer type or a "
+      "block pointer type", (StringRef))
 
 // Opaque types
 ERROR(unsupported_opaque_type,none,

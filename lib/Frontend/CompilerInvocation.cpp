@@ -227,6 +227,8 @@ static void ParseModuleInterfaceArgs(ModuleInterfaceOptions &Opts,
 
   Opts.PreserveTypesAsWritten |=
     Args.hasArg(OPT_module_interface_preserve_types_as_written);
+  Opts.PrintFullConvention |=
+    Args.hasArg(OPT_experimental_print_full_convention);
 }
 
 /// Save a copy of any flags marked as ModuleInterfaceOption, if running

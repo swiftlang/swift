@@ -205,6 +205,8 @@ typedef int (*fptr)(int);
 fptr getFunctionPointer(void);
 void useFunctionPointer(fptr);
 
+int (*getFunctionPointer_(void))(int);
+
 struct FunctionPointerWrapper {
   fptr a;
   fptr b;
@@ -213,6 +215,14 @@ struct FunctionPointerWrapper {
 typedef void (*fptr2)(int, long, void *);
 fptr2 getFunctionPointer2(void);
 void useFunctionPointer2(fptr2);
+
+int (*(*getHigherOrderFunctionPointer(void))(int (*)(int)))(int);
+
+typedef struct Dummy {
+    int x;
+} Dummy;
+
+Dummy * (*getFunctionPointer3(void))(Dummy *);
 
 //===---
 // Unions
