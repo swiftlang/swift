@@ -1648,6 +1648,10 @@ class DifferentiableAttr final
                                     ParsedAutoDiffParameter> {
   friend TrailingObjects;
 
+  /// The declaration on which the `@differentiable` attribute is declared.
+  /// May not be a valid declaration for `@differentiable` attributes.
+  /// Resolved during parsing and deserialization.
+  Decl *OriginalDeclaration = nullptr;
   /// Whether this function is linear (optional).
   bool Linear;
   /// The number of parsed differentiability parameters specified in 'wrt:'.
@@ -1703,6 +1707,12 @@ public:
                                     Optional<DeclNameRefWithLoc> vjp,
                                     GenericSignature derivativeGenSig);
 
+  Decl *getOriginalDeclaration() const { return OriginalDeclaration; }
+
+  /// Sets the original declaration on which this attribute is declared.
+  /// Should only be used by parsing and deserialization.
+  void setOriginalDeclaration(Decl *originalDeclaration);
+
   /// Get the optional 'jvp:' function name and location.
   /// Use this instead of `getJVPFunction` to check whether the attribute has a
   /// registered JVP.
@@ -1755,10 +1765,9 @@ public:
 
   // Print the attribute to the given stream.
   // If `omitWrtClause` is true, omit printing the `wrt:` clause.
-  // If `omitAssociatedFunctions` is true, omit printing associated functions.
-  void print(llvm::raw_ostream &OS, const Decl *D,
-             bool omitWrtClause = false,
-             bool omitAssociatedFunctions = false) const;
+  // If `omitDerivativeFunctions` is true, omit printing derivative functions.
+  void print(llvm::raw_ostream &OS, const Decl *D, bool omitWrtClause = false,
+             bool omitDerivativeFunctions = false) const;
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_Differentiable;
