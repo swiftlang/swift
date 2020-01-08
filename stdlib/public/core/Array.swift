@@ -1213,7 +1213,7 @@ extension Array: RangeReplaceableCollection {
                 start: startNewElements, 
                 count: self.capacity - oldCount)
 
-    let (remainder,writtenUpTo) = buf.initialize(from: newElements)
+    var (remainder,writtenUpTo) = buf.initialize(from: newElements)
     
     // trap on underflow from the sequence's underestimate:
     let writtenCount = buf.distance(from: buf.startIndex, to: writtenUpTo)
@@ -1229,7 +1229,22 @@ extension Array: RangeReplaceableCollection {
     if writtenUpTo == buf.endIndex {
       // there may be elements that didn't fit in the existing buffer,
       // append them in slow sequence-only mode
-      _buffer._arrayAppendSequence(IteratorSequence(remainder))
+      var newCount = _getCount()
+      var nextItem = remainder.next()
+      while nextItem != nil {
+        reserveCapacityForAppend(newElementsCount: 1)
+
+        let currentCapacity = _getCapacity()
+        let base = _buffer.firstElementAddress
+
+        // fill while there is another item and spare capacity
+        while let next = nextItem, newCount < currentCapacity {
+          (base + newCount).initialize(to: next)
+          newCount += 1
+          nextItem = remainder.next()
+        }
+        _buffer.count = newCount
+      }
     }
   }
 
