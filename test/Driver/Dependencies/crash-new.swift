@@ -1,4 +1,5 @@
 /// crash ==> main | crash --> other
+/// coarse, fine
 
 // RUN: %empty-directory(%t)
 // RUN: cp -r %S/Inputs/crash-simple-with-swiftdeps/* %t
@@ -74,3 +75,58 @@
 // RUN: touch -t 201401240006 %t/other.swift
 // RUN: rm %t/other.swiftdeps
 // RUN: cd %t && not %swiftc_driver -disable-fine-grained-dependencies -c -driver-use-frontend-path "%{python};%S/Inputs/update-dependencies-bad.py" -output-file-map %t/output.json -incremental -driver-always-rebuild-dependents ./main.swift ./crash.swift ./other.swift -module-name main -j1 -v 2>&1 | %FileCheck %s
+
+
+
+// RUN: %empty-directory(%t)
+// RUN: cp -r %S/Inputs/crash-simple-with-swiftdeps-fine* %t
+// RUN: touch -t 201401240005 %t/*
+
+// Initially compile all inputs, crash will fail.
+
+// RUN: cd %t && not %swiftc_driver -enable-fine-grained-dependencies -c -driver-use-frontend-path "%{python};%S/Inputs/update-dependencies-bad.py" -output-file-map %t/output.json -incremental -driver-always-rebuild-dependents ./main.swift ./crash.swift ./other.swift -module-name main -j1 -v 2>&1 | %FileCheck %s
+
+// Put crash.swift first to assure it gets scheduled first.
+// The others get queued, but not dispatched because crash crashes.
+
+// RUN: cd %t && not %swiftc_driver -enable-fine-grained-dependencies -c -driver-use-frontend-path "%{python};%S/Inputs/update-dependencies-bad.py" -output-file-map %t/output.json -incremental -driver-always-rebuild-dependents ./crash.swift ./main.swift ./other.swift -module-name main -j1 -v 2>&1 | %FileCheck -check-prefix=CHECK-BAD-ONLY %s
+
+
+// Make crash succeed and all get compiled, exactly once.
+
+// RUN: cd %t && %swiftc_driver -enable-fine-grained-dependencies -c -driver-use-frontend-path "%{python};%S/Inputs/update-dependencies.py" -output-file-map %t/output.json -incremental -driver-always-rebuild-dependents ./main.swift ./crash.swift ./other.swift -module-name main -j1 -v 2>&1 | %FileCheck -check-prefix=CHECK-OKAY %s
+
+// Make crash crash again:
+
+// RUN: touch -t 201401240006 %t/crash.swift
+// RUN: rm %t/crash.swiftdeps
+// RUN: cd %t && not %swiftc_driver -enable-fine-grained-dependencies -c -driver-use-frontend-path "%{python};%S/Inputs/update-dependencies-bad.py" -output-file-map %t/output.json -incremental -driver-always-rebuild-dependents ./main.swift ./crash.swift ./other.swift -module-name main -j1 -v 2>&1 | %FileCheck %s
+
+// And repair crash:
+
+
+// RUN: touch -t 201401240005 %t/*
+// RUN: cd %t && %swiftc_driver -enable-fine-grained-dependencies -c -driver-use-frontend-path "%{python};%S/Inputs/update-dependencies.py" -output-file-map %t/output.json -incremental -driver-always-rebuild-dependents ./main.swift ./crash.swift ./other.swift -module-name main -j1 -v 2>&1 | %FileCheck -check-prefix=CHECK-OKAY-2 %s
+
+
+// Touch main so its newer, remove main.swiftdeps and make crash crash:
+// Driver will fall back to non-incremental, will compile main,
+// will compile crash, and then stop.
+
+// RUN: touch -t 201401240006 %t/main.swift
+// RUN: rm %t/main.swiftdeps
+// RUN: cd %t && not %swiftc_driver -enable-fine-grained-dependencies -c -driver-use-frontend-path "%{python};%S/Inputs/update-dependencies-bad.py" -output-file-map %t/output.json -incremental -driver-always-rebuild-dependents ./main.swift ./crash.swift ./other.swift -module-name main -j1 -v 2>&1 | %FileCheck -check-prefix=CHECK-NO-MAIN-SWIFTDEPS %s
+
+
+
+// Touch all files earlier than last compiled date in the build record.
+
+// RUN: touch -t 201401240005 %t/*
+// RUN: cd %t && %swiftc_driver -enable-fine-grained-dependencies -c -driver-use-frontend-path "%{python};%S/Inputs/update-dependencies.py" -output-file-map %t/output.json -incremental -driver-always-rebuild-dependents ./main.swift ./crash.swift ./other.swift -module-name main -j1 -v 2>&1 -driver-show-incremental |tee /tmp/out1 | %FileCheck -check-prefix=CHECK-CURRENT-WITH-CRASH %s
+
+
+// Touch other, but remove its swiftdeps. Should compile everything.
+
+// RUN: touch -t 201401240006 %t/other.swift
+// RUN: rm %t/other.swiftdeps
+// RUN: cd %t && not %swiftc_driver -enable-fine-grained-dependencies -c -driver-use-frontend-path "%{python};%S/Inputs/update-dependencies-bad.py" -output-file-map %t/output.json -incremental -driver-always-rebuild-dependents ./main.swift ./crash.swift ./other.swift -module-name main -j1 -v 2>&1 | %FileCheck %s
