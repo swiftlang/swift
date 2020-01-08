@@ -1168,9 +1168,8 @@ extension ContiguousArray {
   public mutating func withUnsafeMutableBufferPointer<R>(
     _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R {
+    _makeMutableAndUnique()
     let count = self.count
-    // Ensure unique storage
-    _buffer._outlinedMakeUniqueBuffer(bufferCount: count)
 
     // Ensure that body can't invalidate the storage or its bounds by
     // moving self into a temporary working array.
@@ -1283,19 +1282,12 @@ extension ContiguousArray {
     _precondition(subrange.upperBound <= _buffer.endIndex,
       "ContiguousArray replace: subrange extends past the end")
 
-    let oldCount = _buffer.count
     let eraseCount = subrange.count
     let insertCount = newElements.count
     let growth = insertCount - eraseCount
 
-    if _buffer.requestUniqueMutableBackingBuffer(
-      minimumCapacity: oldCount + growth) != nil {
-
-      _buffer.replaceSubrange(
-        subrange, with: insertCount, elementsOf: newElements)
-    } else {
-      _buffer._arrayOutOfPlaceReplace(subrange, with: newElements, count: insertCount)
-    }
+    reserveCapacityForAppend(newElementsCount: growth)
+    _buffer.replaceSubrange(subrange, with: insertCount, elementsOf: newElements)
   }
 }
 
