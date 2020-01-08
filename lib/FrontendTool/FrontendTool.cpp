@@ -1263,8 +1263,7 @@ static bool performCompile(CompilerInstance &Instance,
 
   if (FrontendOptions::shouldActionOnlyParse(Action)) {
     bool ParseDelayedDeclListsOnEnd =
-      Action == FrontendOptions::ActionType::DumpParse ||
-      Invocation.getDiagnosticOptions().VerifyMode != DiagnosticOptions::NoVerify;
+      Action == FrontendOptions::ActionType::DumpParse;
     Instance.performParseOnly(/*EvaluateConditionals*/
                     Action == FrontendOptions::ActionType::EmitImportedModules,
                               ParseDelayedDeclListsOnEnd);
