@@ -1071,7 +1071,7 @@ SourceFile *CompilerInstance::createSourceFileForMainModule(
 }
 
 void CompilerInstance::performParseOnly(bool EvaluateConditionals,
-                                        bool ParseDelayedBodyOnEnd) {
+                                        bool CanDelayBodies) {
   const InputFileKind Kind = Invocation.getInputKind();
   ModuleDecl *const MainModule = getMainModule();
   Context->LoadedModules[MainModule->getName()] = MainModule;
@@ -1093,12 +1093,8 @@ void CompilerInstance::performParseOnly(bool EvaluateConditionals,
   }
 
   PersistentState = llvm::make_unique<PersistentParserState>();
-
-  SWIFT_DEFER {
-    if (ParseDelayedBodyOnEnd)
-      PersistentState->parseAllDelayedDeclLists();
-  };
   PersistentState->PerformConditionEvaluation = EvaluateConditionals;
+
   // Parse all the library files.
   for (auto BufferID : InputSourceCodeBufferIDs) {
     if (BufferID == MainBufferID)
@@ -1111,7 +1107,7 @@ void CompilerInstance::performParseOnly(bool EvaluateConditionals,
         BufferID);
 
     parseIntoSourceFileFull(*NextInput, BufferID, PersistentState.get(),
-                            /*DelayBodyParsing=*/!IsPrimary);
+                            /*DelayBodyParsing=*/!IsPrimary && CanDelayBodies);
   }
 
   // Now parse the main file.

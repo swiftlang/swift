@@ -1262,11 +1262,12 @@ static bool performCompile(CompilerInstance &Instance,
     return compileLLVMIR(Invocation, Instance, Stats);
 
   if (FrontendOptions::shouldActionOnlyParse(Action)) {
-    bool ParseDelayedDeclListsOnEnd =
-      Action == FrontendOptions::ActionType::DumpParse;
+    // Disable delayed parsing of type and function bodies when we've been
+    // asked to dump the resulting AST.
+    bool CanDelayBodies = Action != FrontendOptions::ActionType::DumpParse;
     Instance.performParseOnly(/*EvaluateConditionals*/
                     Action == FrontendOptions::ActionType::EmitImportedModules,
-                              ParseDelayedDeclListsOnEnd);
+                              CanDelayBodies);
   } else if (Action == FrontendOptions::ActionType::ResolveImports) {
     Instance.performParseAndResolveImportsOnly();
   } else {
