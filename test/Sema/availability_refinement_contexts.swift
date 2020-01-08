@@ -27,7 +27,7 @@ class SomeClass {
       func innerClassMethod() { }
     }
   }
-  
+
   func someUnrefinedMethod() { }
 
   @available(OSX 10.52, *)
@@ -190,5 +190,30 @@ func functionWithWhile() {
         let x = (nil as Int?) {
     @available(OSX 10.54, *)
     func funcInWhileBody() { }
+  }
+}
+
+// CHECK-NEXT: {{^}}  (decl versions=[10.51,+Inf) decl=SomeEnum
+// CHECK-NEXT: {{^}}    (decl versions=[10.52,+Inf) decl=availableOn1052
+// CHECK-NEXT: {{^}}    (decl versions=[10.53,+Inf) decl=availableOn1053
+// CHECK-NEXT: {{^}}    (case_body versions=[10.52,+Inf)
+// CHECK-NEXT: {{^}}    (case_body versions=[10.53,+Inf)
+@available(OSX 10.51, *)
+enum SomeEnum {
+  case unrestricted
+  @available(OSX 10.52, *)
+  case availableOn1052
+  @available(OSX 10.53, *)
+  case availableOn1053
+
+  var availableVersion: Int? {
+    switch self {
+    case .unrestricted:
+      return nil
+    case .availableOn1052:
+      return 1052
+    case .availableOn1053:
+      return 1053
+    }
   }
 }

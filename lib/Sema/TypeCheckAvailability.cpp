@@ -120,6 +120,8 @@ public:
     (void)StackHeight;
   }
 
+  void buildCaseStmtRefinementContext(CaseStmt *CS);
+
 private:
   bool walkToDeclPre(Decl *D) override {
     TypeRefinementContext *DeclTRC = getNewContextForWalkOfDecl(D);
@@ -263,6 +265,12 @@ private:
 
     if (auto *WS = dyn_cast<WhileStmt>(S)) {
       buildWhileStmtRefinementContext(WS);
+      return std::make_pair(false, S);
+    }
+
+    if (auto *CS = dyn_cast<CaseStmt>(S)) {
+      // HACK: Refinement context will be built after type checking case labels
+      // via direct call to buildCaseStmtRefinementContext
       return std::make_pair(false, S);
     }
 
@@ -579,6 +587,41 @@ private:
     return E;
   }
 };
+
+void TypeRefinementContextBuilder::buildCaseStmtRefinementContext(CaseStmt *CS) {
+  Optional<AvailabilityContext> BodyRange = None;
+  for (const auto &caseItem : CS->getCaseLabelItems()) {
+    auto *elementPattern = dyn_cast<EnumElementPattern>(caseItem.getPattern());
+    if (!elementPattern)
+      continue;
+
+    auto *elementDecl = elementPattern->getElementDecl();
+    Decl *D = elementDecl;
+    // If enum element has available attribute then infer context from it
+    // Otherwise inherit context from enum decl
+    if (!hasActiveAvailableAttribute(D, Context)) {
+      D = elementDecl->getParentEnum();
+    }
+
+    AvailabilityContext ElementInfo = swift::AvailabilityInference::availableRange(D, Context);
+    if (BodyRange.hasValue()) {
+      // If case stmt has multiple labels we unite their contexts
+      BodyRange.getValue().unionWith(ElementInfo);
+    } else {
+      BodyRange = ElementInfo;
+    }
+  }
+  // Do not introduce new refinement context if the current TRC is completely contained in the body range
+  if (BodyRange.hasValue() && !getCurrentTRC()->getAvailabilityInfo().isContainedIn(BodyRange.getValue())) {
+    // Create a new context for the body and traverse it in the new
+    // context.
+    auto *BodyTRC = TypeRefinementContext::createForCaseStmtBody(
+        Context, CS, getCurrentTRC(), BodyRange.getValue());
+    TypeRefinementContextBuilder(BodyTRC, Context).build(CS->getBody());
+  } else {
+    build(CS->getBody());
+  }
+}
   
 } // end anonymous namespace
 
@@ -607,6 +650,17 @@ void TypeChecker::buildTypeRefinementContextHierarchy(SourceFile &SF,
   for (auto D : SF.getTopLevelDecls().slice(StartElem)) {
     Builder.build(D);
   }
+}
+
+void TypeChecker::buildTypeRefinementContextForCaseStmt(SourceFile *SF, CaseStmt *S) {
+  if (!SF || S->getStartLoc().isInvalid()) {
+    return;
+  }
+  TypeRefinementContext *rootTRC = getOrBuildTypeRefinementContext(SF);
+  SourceManager &SM = SF->getASTContext().SourceMgr;
+  TypeRefinementContext *TRC = rootTRC->findMostRefinedSubContext(S->getStartLoc(), SM);
+  TypeRefinementContextBuilder Builder(TRC, SF->getASTContext());
+  Builder.buildCaseStmtRefinementContext(S);
 }
 
 TypeRefinementContext *

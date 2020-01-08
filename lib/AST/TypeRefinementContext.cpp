@@ -131,6 +131,16 @@ TypeRefinementContext::createForWhileStmtBody(ASTContext &Ctx, WhileStmt *S,
       Ctx, S, Parent, S->getBody()->getSourceRange(), Info);
 }
 
+TypeRefinementContext *
+TypeRefinementContext::createForCaseStmtBody(ASTContext &Ctx, CaseStmt *S,
+                                             TypeRefinementContext *Parent,
+                                             const AvailabilityContext &Info) {
+  assert(S);
+  assert(Parent);
+  return new (Ctx) TypeRefinementContext(
+      Ctx, S, Parent, S->getBody()->getSourceRange(), Info);
+}
+
 // Only allow allocation of TypeRefinementContext using the allocator in
 // ASTContext.
 void *TypeRefinementContext::operator new(size_t Bytes, ASTContext &C,
@@ -187,6 +197,9 @@ SourceLoc TypeRefinementContext::getIntroductionLoc() const {
 
   case Reason::WhileStmtBody:
     return Node.getAsWhileStmt()->getStartLoc();
+
+  case Reason::CaseStmtBody:
+    return Node.getAsCaseStmt()->getStartLoc();
 
   case Reason::Root:
     return SourceLoc();
@@ -283,6 +296,9 @@ TypeRefinementContext::getAvailabilityConditionVersionSourceRange(
     return ::getAvailabilityConditionVersionSourceRange(
       Node.getAsWhileStmt()->getCond(), Platform, Version);
 
+  case Reason::CaseStmtBody:
+    return SourceRange();
+
   case Reason::Root:
     return SourceRange();
   }
@@ -350,6 +366,9 @@ StringRef TypeRefinementContext::getReasonName(Reason R) {
 
   case Reason::WhileStmtBody:
     return "while_body";
+
+  case Reason::CaseStmtBody:
+    return "case_body";
   }
 
   llvm_unreachable("Unhandled Reason in switch.");

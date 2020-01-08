@@ -1432,6 +1432,11 @@ public:
   static void buildTypeRefinementContextHierarchy(SourceFile &SF,
                                                   unsigned StartElem);
 
+  /// Build TypeRefinementContext for CaseStmt and append it to the root
+  /// context for the source file. This cannot be done before type checking
+  /// case statement.
+  static void buildTypeRefinementContextForCaseStmt(SourceFile *SF, CaseStmt *S);
+
   /// Build the hierarchy of TypeRefinementContexts for the entire
   /// source file, if it has not already been built. Returns the root
   /// TypeRefinementContext for the source file.

@@ -17,6 +17,9 @@ func globalFuncAvailableOn10_51() -> Int { return 10 }
 @available(OSX, introduced: 10.52)
 func globalFuncAvailableOn10_52() -> Int { return 11 }
 
+@available(OSX, introduced: 10.53)
+func globalFuncAvailableOn10_53() -> Int { return 12 }
+
 // Top level should reflect the minimum deployment target.
 let ignored1: Int = globalFuncAvailableOn10_9()
 
@@ -547,7 +550,7 @@ enum CompassPoint {
   case WithUnavailablePayload(p : EnumIntroducedOn10_52) // expected-error {{'EnumIntroducedOn10_52' is only available in macOS 10.52 or newer}}
       // expected-note@-1 {{add @available attribute to enclosing case}}
 
-    case WithUnavailablePayload1(p : EnumIntroducedOn10_52), WithUnavailablePayload2(p : EnumIntroducedOn10_52) // expected-error 2{{'EnumIntroducedOn10_52' is only available in macOS 10.52 or newer}}
+  case WithUnavailablePayload1(p : EnumIntroducedOn10_52), WithUnavailablePayload2(p : EnumIntroducedOn10_52) // expected-error 2{{'EnumIntroducedOn10_52' is only available in macOS 10.52 or newer}}
       // expected-note@-1 2{{add @available attribute to enclosing case}}
 }
 
@@ -555,7 +558,7 @@ enum CompassPoint {
 func functionTakingEnumIntroducedOn10_52(_ e: EnumIntroducedOn10_52) { }
 
 func useEnums() {
-      // expected-note@-1 3{{add @available attribute to enclosing global function}}
+      // expected-note@-1 4{{add @available attribute to enclosing global function}}
   let _: CompassPoint = .North // expected-error {{'CompassPoint' is only available in macOS 10.51 or newer}}
       // expected-note@-1 {{add 'if #available' version check}}
 
@@ -578,7 +581,8 @@ func useEnums() {
         markUsed("NSE")
       case .West: // We do not expect an error here
         markUsed("W")
-
+        // We incorporate enum element availability into TRC construction
+        let _: Int = globalFuncAvailableOn10_52()
       case .WithUnavailablePayload(_):
         markUsed("WithUnavailablePayload")
       case .WithUnavailablePayload1(_):
@@ -595,11 +599,24 @@ func useEnums() {
       case .WithAvailableByEnumElementPayload(let p):
         markUsed("WithAvailableByEnumElementPayload")
 
-        // For the moment, we do not incorporate enum element availability into 
-        // TRC construction. Perhaps we should?
-        functionTakingEnumIntroducedOn10_52(p)  // expected-error {{'functionTakingEnumIntroducedOn10_52' is only available in macOS 10.52 or newer}}
-          
-          // expected-note@-2 {{add 'if #available' version check}}
+        functionTakingEnumIntroducedOn10_52(p)
+
+        if #available(OSX 10.53, *) {
+          let _: Int = globalFuncAvailableOn10_53()
+        }
+
+        let _: Int = globalFuncAvailableOn10_53() // expected-error {{'globalFuncAvailableOn10_53()' is only available in macOS 10.53 or newer}}
+        // expected-note@-1 {{add 'if #available' version check}}
+    }
+
+    switch point {
+      // If case stmt has multiple labels we unite their ranges
+      case .North, .South, .East, .West:
+        let _: Int = globalFuncAvailableOn10_51()
+        let _: Int = globalFuncAvailableOn10_52() // expected-error {{'globalFuncAvailableOn10_52()' is only available in macOS 10.52 or newer}}
+        // expected-note@-1 {{add 'if #available' version check}}
+      default:
+        break
     }
   }
 }

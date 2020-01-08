@@ -1268,6 +1268,12 @@ public:
         checkFallthroughPatternBindingsAndTypes(caseBlock, previousBlock);
       }
 
+      // Build type refinement context after type checking case labels
+      if (!Ctx.LangOpts.DisableAvailabilityChecking) {
+        auto *SF = DC->getParentSourceFile();
+        TypeChecker::buildTypeRefinementContextForCaseStmt(SF, caseBlock);
+      }
+
       // Type-check the body statements.
       PreviousFallthrough = nullptr;
       Stmt *body = caseBlock->getBody();

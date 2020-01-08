@@ -82,8 +82,11 @@ public:
     /// statement.
     GuardStmtElseBranch,
 
-    // The context was introduced for the body of a while statement.
-    WhileStmtBody
+    /// The context was introduced for the body of a while statement.
+    WhileStmtBody,
+
+    /// The context was introduced for the body of a switch case statement
+    CaseStmtBody
   };
 
 private:
@@ -98,6 +101,7 @@ private:
       PoundAvailableInfo *PAI;
       GuardStmt *GS;
       WhileStmt *WS;
+      CaseStmt *CS;
     };
 
   public:
@@ -113,6 +117,7 @@ private:
                                     : Reason::GuardStmtElseBranch),
           GS(GS) {}
     IntroNode(WhileStmt *WS) : IntroReason(Reason::WhileStmtBody), WS(WS) {}
+    IntroNode(CaseStmt *CS) : IntroReason(Reason::CaseStmtBody), CS(CS) {}
 
     Reason getReason() const { return IntroReason; }
 
@@ -146,6 +151,11 @@ private:
     WhileStmt *getAsWhileStmt() const {
       assert(IntroReason == Reason::WhileStmtBody);
       return WS;
+    }
+
+    CaseStmt *getAsCaseStmt() const {
+      assert(IntroReason == Reason::CaseStmtBody);
+      return CS;
     }
   };
 
@@ -209,6 +219,12 @@ public:
   /// Create a refinement context for the body of a WhileStmt.
   static TypeRefinementContext *
   createForWhileStmtBody(ASTContext &Ctx, WhileStmt *WS,
+                         TypeRefinementContext *Parent,
+                         const AvailabilityContext &Info);
+
+  /// Create a refinement context for the body of a CaseStmt.
+  static TypeRefinementContext *
+  createForCaseStmtBody(ASTContext &Ctx, CaseStmt *CS,
                          TypeRefinementContext *Parent,
                          const AvailabilityContext &Info);
 
