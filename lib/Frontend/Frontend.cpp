@@ -778,7 +778,7 @@ ModuleDecl *CompilerInstance::importUnderlyingModule() {
   ModuleDecl *objCModuleUnderlyingMixedFramework =
       static_cast<ClangImporter *>(Context->getClangModuleLoader())
           ->loadModule(SourceLoc(),
-                       std::make_pair(MainModule->getName(), SourceLoc()));
+                       { Located<Identifier>(MainModule->getName(), SourceLoc()) });
   if (objCModuleUnderlyingMixedFramework)
     return objCModuleUnderlyingMixedFramework;
   Diagnostics.diagnose(SourceLoc(), diag::error_underlying_module_not_found,
@@ -808,7 +808,7 @@ void CompilerInstance::getImplicitlyImportedModules(
     if (Lexer::isIdentifier(ImplicitImportModuleName)) {
       auto moduleID = Context->getIdentifier(ImplicitImportModuleName);
       ModuleDecl *importModule =
-          Context->getModule(std::make_pair(moduleID, SourceLoc()));
+        Context->getModule({ Located<Identifier>(moduleID, SourceLoc()) });
       if (importModule) {
         importModules.push_back(importModule);
       } else {
@@ -984,13 +984,13 @@ void CompilerInstance::parseAndTypeCheckMainFileUpTo(
     // For SIL we actually have to interleave parsing and type checking
     // because the SIL parser expects to see fully type checked declarations.
     if (TheSILModule) {
-      if (Done || CurTUElem < MainFile.Decls.size()) {
+      if (Done || CurTUElem < MainFile.getTopLevelDecls().size()) {
         assert(mainIsPrimary);
         performTypeChecking(MainFile, CurTUElem);
       }
     }
 
-    CurTUElem = MainFile.Decls.size();
+    CurTUElem = MainFile.getTopLevelDecls().size();
   } while (!Done);
 
   if (!TheSILModule) {

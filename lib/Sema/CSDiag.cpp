@@ -248,7 +248,6 @@ private:
   bool visitSubscriptExpr(SubscriptExpr *SE);
   bool visitApplyExpr(ApplyExpr *AE);
   bool visitCoerceExpr(CoerceExpr *CE);
-  bool visitIfExpr(IfExpr *IE);
   bool visitRebindSelfInConstructorExpr(RebindSelfInConstructorExpr *E);
 };
 } // end anonymous namespace
@@ -1890,37 +1889,6 @@ bool FailureDiagnosis::visitCoerceExpr(CoerceExpr *CE) {
   return false;
 }
 
-bool FailureDiagnosis::visitIfExpr(IfExpr *IE) {
-  auto typeCheckClauseExpr = [&](Expr *clause, Type contextType = Type(),
-                                 ContextualTypePurpose convertPurpose =
-                                     CTP_Unused) -> Expr * {
-    // Provide proper contextual type when type conversion is specified.
-    return typeCheckChildIndependently(clause, contextType, convertPurpose,
-                                       TCCOptions(), nullptr, false);
-  };
-  // Check all of the subexpressions independently.
-  auto condExpr = typeCheckClauseExpr(IE->getCondExpr());
-  if (!condExpr) return true;
-  auto trueExpr = typeCheckClauseExpr(IE->getThenExpr(), CS.getContextualType(),
-                                      CS.getContextualTypePurpose());
-  if (!trueExpr) return true;
-  auto falseExpr = typeCheckClauseExpr(
-      IE->getElseExpr(), CS.getContextualType(), CS.getContextualTypePurpose());
-  if (!falseExpr) return true;
-
-  // If the true/false values already match, it must be a contextual problem.
-  if (CS.getType(trueExpr)->isEqual(CS.getType(falseExpr)))
-    return false;
-  
-  // Otherwise, the true/false result types must not be matching.
-  diagnose(IE->getColonLoc(), diag::if_expr_cases_mismatch,
-           CS.getType(trueExpr), CS.getType(falseExpr))
-      .highlight(trueExpr->getSourceRange())
-      .highlight(falseExpr->getSourceRange());
-  return true;
-}
-
-
 bool FailureDiagnosis::
 visitRebindSelfInConstructorExpr(RebindSelfInConstructorExpr *E) {
   // Don't walk the children for this node, it leads to multiple diagnostics
@@ -2420,30 +2388,32 @@ bool FailureDiagnosis::diagnoseExprFailure() {
 ///
 /// This is guaranteed to always emit an error message.
 ///
-void ConstraintSystem::diagnoseFailureForExpr(Expr *expr) {
+void ConstraintSystem::diagnoseFailureFor(SolutionApplicationTarget target) {
   setPhase(ConstraintSystemPhase::Diagnostics);
 
   SWIFT_DEFER { setPhase(ConstraintSystemPhase::Finalization); };
 
-  // Look through RebindSelfInConstructorExpr to avoid weird Sema issues.
-  if (auto *RB = dyn_cast<RebindSelfInConstructorExpr>(expr))
-    expr = RB->getSubExpr();
+  if (auto expr = target.getAsExpr()) {
+    // Look through RebindSelfInConstructorExpr to avoid weird Sema issues.
+    if (auto *RB = dyn_cast<RebindSelfInConstructorExpr>(expr))
+      expr = RB->getSubExpr();
 
-  FailureDiagnosis diagnosis(expr, *this);
+    FailureDiagnosis diagnosis(expr, *this);
 
-  // Now, attempt to diagnose the failure from the info we've collected.
-  if (diagnosis.diagnoseExprFailure())
-    return;
+    // Now, attempt to diagnose the failure from the info we've collected.
+    if (diagnosis.diagnoseExprFailure())
+      return;
 
-  // If this is a contextual conversion problem, dig out some information.
-  if (diagnosis.diagnoseContextualConversionError(expr, getContextualType(),
-                                                  getContextualTypePurpose()))
-    return;
+    // If this is a contextual conversion problem, dig out some information.
+    if (diagnosis.diagnoseContextualConversionError(expr, getContextualType(),
+                                                    getContextualTypePurpose()))
+      return;
 
-  // If no one could find a problem with this expression or constraint system,
-  // then it must be well-formed... but is ambiguous.  Handle this by diagnostic
-  // various cases that come up.
-  diagnosis.diagnoseAmbiguity(expr);
+    // If no one could find a problem with this expression or constraint system,
+    // then it must be well-formed... but is ambiguous.  Handle this by diagnostic
+    // various cases that come up.
+    diagnosis.diagnoseAmbiguity(expr);
+  }
 }
 
 std::pair<Type, ContextualTypePurpose>

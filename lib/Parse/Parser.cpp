@@ -182,7 +182,7 @@ void Parser::performCodeCompletionSecondPassImpl(
                 } else if (auto *ED = dyn_cast<ExtensionDecl>(DC)) {
                   ED->addMember(D);
                 } else if (auto *SF = dyn_cast<SourceFile>(DC)) {
-                  SF->Decls.push_back(D);
+                  SF->addTopLevelDecl(D);
                 } else {
                   llvm_unreachable("invalid decl context kind");
                 }

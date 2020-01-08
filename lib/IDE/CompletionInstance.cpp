@@ -88,7 +88,7 @@ static DeclContext *getEquivalentDeclContextFromSourceFile(DeclContext *DC,
     auto *parentDC = newDC->getParent();
     unsigned N;
     if (auto parentSF = dyn_cast<SourceFile>(parentDC))
-      N = findIndexInRange(D, parentSF->Decls);
+      N = findIndexInRange(D, parentSF->getTopLevelDecls());
     else if (auto parentIDC =
                  dyn_cast<IterableDeclContext>(parentDC->getAsDecl()))
       N = findIndexInRange(D, parentIDC->getMembers());
@@ -114,7 +114,7 @@ static DeclContext *getEquivalentDeclContextFromSourceFile(DeclContext *DC,
     auto N = IndexStack.pop_back_val();
     Decl *D;
     if (auto parentSF = dyn_cast<SourceFile>(newDC))
-      D = getElementAt(parentSF->Decls, N);
+      D = getElementAt(parentSF->getTopLevelDecls(), N);
     else if (auto parentIDC = dyn_cast<IterableDeclContext>(newDC->getAsDecl()))
       D = getElementAt(parentIDC->getMembers(), N);
     else

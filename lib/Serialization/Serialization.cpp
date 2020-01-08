@@ -915,7 +915,7 @@ static void flattenImportPath(const ModuleDecl::ImportedModule &import,
   outStream << '\0';
   assert(import.first.size() == 1 && "can only handle top-level decl imports");
   auto accessPathElem = import.first.front();
-  outStream << accessPathElem.first.str();
+  outStream << accessPathElem.Item.str();
 }
 
 uint64_t getRawModTimeOrHash(const SerializationOptions::FileDependency &dep) {

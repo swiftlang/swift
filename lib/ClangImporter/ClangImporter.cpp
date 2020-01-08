@@ -1621,19 +1621,19 @@ void ClangImporter::collectVisibleTopLevelModuleNames(
 }
 
 void ClangImporter::collectSubModuleNames(
-    ArrayRef<std::pair<Identifier, SourceLoc>> path,
+    ArrayRef<Located<Identifier>> path,
     std::vector<std::string> &names) const {
   auto &clangHeaderSearch = Impl.getClangPreprocessor().getHeaderSearchInfo();
 
   // Look up the top-level module first.
   clang::Module *clangModule = clangHeaderSearch.lookupModule(
-      path.front().first.str(), /*AllowSearch=*/true,
+      path.front().Item.str(), /*AllowSearch=*/true,
       /*AllowExtraModuleMapSearch=*/true);
   if (!clangModule)
     return;
   clang::Module *submodule = clangModule;
   for (auto component : path.slice(1)) {
-    submodule = submodule->findSubmodule(component.first.str());
+    submodule = submodule->findSubmodule(component.Item.str());
     if (!submodule)
       return;
   }
@@ -1645,12 +1645,12 @@ bool ClangImporter::isModuleImported(const clang::Module *M) {
   return M->NameVisibility == clang::Module::NameVisibilityKind::AllVisible;
 }
 
-bool ClangImporter::canImportModule(std::pair<Identifier, SourceLoc> moduleID) {
+bool ClangImporter::canImportModule(Located<Identifier> moduleID) {
   // Look up the top-level module to see if it exists.
   // FIXME: This only works with top-level modules.
   auto &clangHeaderSearch = Impl.getClangPreprocessor().getHeaderSearchInfo();
   clang::Module *clangModule =
-      clangHeaderSearch.lookupModule(moduleID.first.str(), /*AllowSearch=*/true,
+      clangHeaderSearch.lookupModule(moduleID.Item.str(), /*AllowSearch=*/true,
                                      /*AllowExtraModuleMapSearch=*/true);
   if (!clangModule) {
     return false;
@@ -1664,13 +1664,13 @@ bool ClangImporter::canImportModule(std::pair<Identifier, SourceLoc> moduleID) {
 }
 
 ModuleDecl *ClangImporter::Implementation::loadModuleClang(
-    SourceLoc importLoc, ArrayRef<std::pair<Identifier, SourceLoc>> path) {
+    SourceLoc importLoc, ArrayRef<Located<Identifier>> path) {
   auto &clangContext = getClangASTContext();
   auto &clangHeaderSearch = getClangPreprocessor().getHeaderSearchInfo();
 
   // Look up the top-level module first, to see if it exists at all.
   clang::Module *clangModule = clangHeaderSearch.lookupModule(
-      path.front().first.str(), /*AllowSearch=*/true,
+      path.front().Item.str(), /*AllowSearch=*/true,
       /*AllowExtraModuleMapSearch=*/true);
   if (!clangModule)
     return nullptr;
@@ -1679,8 +1679,8 @@ ModuleDecl *ClangImporter::Implementation::loadModuleClang(
   SmallVector<std::pair<clang::IdentifierInfo *, clang::SourceLocation>, 4>
       clangPath;
   for (auto component : path) {
-    clangPath.push_back({&clangContext.Idents.get(component.first.str()),
-                         exportSourceLoc(component.second)});
+    clangPath.push_back({&clangContext.Idents.get(component.Item.str()),
+                         exportSourceLoc(component.Loc)});
   }
 
   auto &rawDiagClient = Instance->getDiagnosticClient();
@@ -1730,13 +1730,13 @@ ModuleDecl *ClangImporter::Implementation::loadModuleClang(
   // Verify that the submodule exists.
   clang::Module *submodule = clangModule;
   for (auto &component : path.slice(1)) {
-    submodule = submodule->findSubmodule(component.first.str());
+    submodule = submodule->findSubmodule(component.Item.str());
 
     // Special case: a submodule named "Foo.Private" can be moved to a top-level
     // module named "Foo_Private". Clang has special support for this.
     // We're limiting this to just submodules named "Private" because this will
     // put the Clang AST in a fatal error state if it /doesn't/ exist.
-    if (!submodule && component.first.str() == "Private" &&
+    if (!submodule && component.Item.str() == "Private" &&
         (&component) == (&path[1])) {
       submodule = loadModule(llvm::makeArrayRef(clangPath).slice(0, 2), false);
     }
@@ -1757,12 +1757,12 @@ ModuleDecl *ClangImporter::Implementation::loadModuleClang(
 
 ModuleDecl *
 ClangImporter::loadModule(SourceLoc importLoc,
-                          ArrayRef<std::pair<Identifier, SourceLoc>> path) {
+                          ArrayRef<Located<Identifier>> path) {
   return Impl.loadModule(importLoc, path);
 }
 
 ModuleDecl *ClangImporter::Implementation::loadModule(
-    SourceLoc importLoc, ArrayRef<std::pair<Identifier, SourceLoc>> path) {
+    SourceLoc importLoc, ArrayRef<Located<Identifier>> path) {
   ModuleDecl *MD = nullptr;
   if (!DisableSourceImport)
     MD = loadModuleClang(importLoc, path);
@@ -2788,7 +2788,7 @@ ImportDecl *swift::createImportDecl(ASTContext &Ctx,
                                     ArrayRef<clang::Module *> Exported) {
   auto *ImportedMod = ClangN.getClangModule();
   assert(ImportedMod);
-  SmallVector<std::pair<swift::Identifier, swift::SourceLoc>, 4> AccessPath;
+  SmallVector<Located<Identifier>, 4> AccessPath;
   auto *TmpMod = ImportedMod;
   while (TmpMod) {
     AccessPath.push_back({ Ctx.getIdentifier(TmpMod->Name), SourceLoc() });

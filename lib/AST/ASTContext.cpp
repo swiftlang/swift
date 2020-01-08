@@ -1498,12 +1498,12 @@ ClangModuleLoader *ASTContext::getDWARFModuleLoader() const {
 }
 
 ModuleDecl *ASTContext::getLoadedModule(
-    ArrayRef<std::pair<Identifier, SourceLoc>> ModulePath) const {
+    ArrayRef<Located<Identifier>> ModulePath) const {
   assert(!ModulePath.empty());
 
   // TODO: Swift submodules.
   if (ModulePath.size() == 1) {
-    return getLoadedModule(ModulePath[0].first);
+    return getLoadedModule(ModulePath[0].Item);
   }
   return nullptr;
 }
@@ -1753,13 +1753,13 @@ bool ASTContext::shouldPerformTypoCorrection() {
   return NumTypoCorrections <= LangOpts.TypoCorrectionLimit;
 }
 
-bool ASTContext::canImportModule(std::pair<Identifier, SourceLoc> ModulePath) {
+bool ASTContext::canImportModule(Located<Identifier> ModulePath) {
   // If this module has already been successfully imported, it is importable.
   if (getLoadedModule(ModulePath) != nullptr)
     return true;
 
   // If we've failed loading this module before, don't look for it again.
-  if (FailedModuleImportNames.count(ModulePath.first))
+  if (FailedModuleImportNames.count(ModulePath.Item))
     return false;
 
   // Otherwise, ask the module loaders.
@@ -1769,12 +1769,12 @@ bool ASTContext::canImportModule(std::pair<Identifier, SourceLoc> ModulePath) {
     }
   }
 
-  FailedModuleImportNames.insert(ModulePath.first);
+  FailedModuleImportNames.insert(ModulePath.Item);
   return false;
 }
 
 ModuleDecl *
-ASTContext::getModule(ArrayRef<std::pair<Identifier, SourceLoc>> ModulePath) {
+ASTContext::getModule(ArrayRef<Located<Identifier>> ModulePath) {
   assert(!ModulePath.empty());
 
   if (auto *M = getLoadedModule(ModulePath))
@@ -1782,7 +1782,7 @@ ASTContext::getModule(ArrayRef<std::pair<Identifier, SourceLoc>> ModulePath) {
 
   auto moduleID = ModulePath[0];
   for (auto &importer : getImpl().ModuleLoaders) {
-    if (ModuleDecl *M = importer->loadModule(moduleID.second, ModulePath)) {
+    if (ModuleDecl *M = importer->loadModule(moduleID.Loc, ModulePath)) {
       return M;
     }
   }
@@ -1791,7 +1791,7 @@ ASTContext::getModule(ArrayRef<std::pair<Identifier, SourceLoc>> ModulePath) {
 }
 
 ModuleDecl *ASTContext::getModuleByName(StringRef ModuleName) {
-  SmallVector<std::pair<Identifier, SourceLoc>, 4>
+  SmallVector<Located<Identifier>, 4>
   AccessPath;
   while (!ModuleName.empty()) {
     StringRef SubModuleName;
@@ -1808,7 +1808,7 @@ ModuleDecl *ASTContext::getStdlibModule(bool loadIfAbsent) {
   if (loadIfAbsent) {
     auto mutableThis = const_cast<ASTContext*>(this);
     TheStdlibModule =
-      mutableThis->getModule({ std::make_pair(StdlibModuleName, SourceLoc()) });
+      mutableThis->getModule({ Located<Identifier>(StdlibModuleName, SourceLoc()) });
   } else {
     TheStdlibModule = getLoadedModule(StdlibModuleName);
   }

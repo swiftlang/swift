@@ -92,8 +92,8 @@ void TypeAttributes::getConventionArguments(SmallVectorImpl<char> &buf) const {
     stream << ": " << convention.WitnessMethodProtocol;
     return;
   }
-  if (!convention.ClangType.empty())
-    stream << ", cType: " << QuotedString(convention.ClangType);
+  if (!convention.ClangType.Item.empty())
+    stream << ", cType: " << QuotedString(convention.ClangType.Item);
 }
 
 /// Given a name like "autoclosure", return the type attribute ID that
@@ -366,39 +366,46 @@ static void printShortFormAvailable(ArrayRef<const DeclAttribute *> Attrs,
   Printer.printNewline();
 }
 
-/// Printing style for a differentiation parameter in a `wrt:` differentiation
-/// parameters clause. Used for printing `@differentiable`, `@derivative`, and
-/// `@transpose` attributes.
-enum class DifferentiationParameterPrintingStyle {
-  /// Print parameter by name.
+/// The kind of a parameter in a `wrt:` differentiation parameters clause:
+/// either a differentiability parameter or a linearity parameter. Used for
+/// printing `@differentiable`, `@derivative`, and `@transpose` attributes.
+enum class DifferentiationParameterKind {
+  /// A differentiability parameter, printed by name.
   /// Used for `@differentiable` and `@derivative` attribute.
-  Name,
-  /// Print parameter by index.
+  Differentiability,
+  /// A linearity parameter, printed by index.
   /// Used for `@transpose` attribute.
-  Index
+  Linearity
 };
 
 /// Returns the differentiation parameters clause string for the given function,
-/// parameter indices, parsed parameters, . Use the parameter indices if
-/// specified; otherwise, use the parsed parameters.
+/// parameter indices, parsed parameters, and differentiation parameter kind.
+/// Use the parameter indices if specified; otherwise, use the parsed
+/// parameters.
 static std::string getDifferentiationParametersClauseString(
-    const AbstractFunctionDecl *function, IndexSubset *paramIndices,
+    const AbstractFunctionDecl *function, IndexSubset *parameterIndices,
     ArrayRef<ParsedAutoDiffParameter> parsedParams,
-    DifferentiationParameterPrintingStyle style) {
+    DifferentiationParameterKind parameterKind) {
   assert(function);
   bool isInstanceMethod = function->isInstanceMember();
+  bool isStaticMethod = function->isStatic();
   std::string result;
   llvm::raw_string_ostream printer(result);
 
   // Use the parameter indices, if specified.
-  if (paramIndices) {
-    auto parameters = paramIndices->getBitVector();
+  if (parameterIndices) {
+    auto parameters = parameterIndices->getBitVector();
     auto parameterCount = parameters.count();
     printer << "wrt: ";
     if (parameterCount > 1)
       printer << '(';
     // Check if differentiating wrt `self`. If so, manually print it first.
-    if (isInstanceMethod && parameters.test(parameters.size() - 1)) {
+    bool isWrtSelf =
+        (isInstanceMethod ||
+         (isStaticMethod &&
+          parameterKind == DifferentiationParameterKind::Linearity)) &&
+        parameters.test(parameters.size() - 1);
+    if (isWrtSelf) {
       parameters.reset(parameters.size() - 1);
       printer << "self";
       if (parameters.any())
@@ -406,11 +413,13 @@ static std::string getDifferentiationParametersClauseString(
     }
     // Print remaining differentiation parameters.
     interleave(parameters.set_bits(), [&](unsigned index) {
-      switch (style) {
-      case DifferentiationParameterPrintingStyle::Name:
+      switch (parameterKind) {
+      // Print differentiability parameters by name.
+      case DifferentiationParameterKind::Differentiability:
         printer << function->getParameters()->get(index)->getName().str();
         break;
-      case DifferentiationParameterPrintingStyle::Index:
+      // Print linearity parameters by index.
+      case DifferentiationParameterKind::Linearity:
         printer << index;
         break;
       }
@@ -487,7 +496,7 @@ static void printDifferentiableAttrArguments(
   if (!omitWrtClause) {
     auto diffParamsString = getDifferentiationParametersClauseString(
         original, attr->getParameterIndices(), attr->getParsedParameters(),
-        DifferentiationParameterPrintingStyle::Name);
+        DifferentiationParameterKind::Differentiability);
     // Check whether differentiation parameter clause is empty.
     // Handles edge case where resolved parameter indices are unset and
     // parsed parameters are empty. This case should never trigger for
@@ -927,7 +936,7 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     auto *derivative = cast<AbstractFunctionDecl>(D);
     auto diffParamsString = getDifferentiationParametersClauseString(
         derivative, attr->getParameterIndices(), attr->getParsedParameters(),
-        DifferentiationParameterPrintingStyle::Name);
+        DifferentiationParameterKind::Differentiability);
     if (!diffParamsString.empty())
       Printer << ", " << diffParamsString;
     Printer << ')';
@@ -942,7 +951,7 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     auto *transpose = cast<AbstractFunctionDecl>(D);
     auto transParamsString = getDifferentiationParametersClauseString(
         transpose, attr->getParameterIndices(), attr->getParsedParameters(),
-        DifferentiationParameterPrintingStyle::Index);
+        DifferentiationParameterKind::Linearity);
     if (!transParamsString.empty())
       Printer << ", " << transParamsString;
     Printer << ')';
@@ -1510,11 +1519,11 @@ GenericEnvironment *DifferentiableAttr::getDerivativeGenericEnvironment(
 
 void DifferentiableAttr::print(llvm::raw_ostream &OS, const Decl *D,
                                bool omitWrtClause,
-                               bool omitAssociatedFunctions) const {
+                               bool omitDerivativeFunctions) const {
   StreamPrinter P(OS);
   P << "@" << getAttrName();
   printDifferentiableAttrArguments(this, P, PrintOptions(), D, omitWrtClause,
-                                   omitAssociatedFunctions);
+                                   omitDerivativeFunctions);
 }
 
 DerivativeAttr::DerivativeAttr(bool implicit, SourceLoc atLoc,

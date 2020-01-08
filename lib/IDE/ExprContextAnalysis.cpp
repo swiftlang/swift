@@ -111,7 +111,7 @@ void swift::ide::typeCheckContextUntil(DeclContext *DC, SourceLoc Loc) {
     // Here, 'value' is '<error type>' unless we explicitly typecheck the
     // 'guard' statement.
     SourceFile *SF = DC->getParentSourceFile();
-    for (auto *D : SF->Decls) {
+    for (auto *D : SF->getTopLevelDecls()) {
       if (auto Code = dyn_cast<TopLevelCodeDecl>(D)) {
         typeCheckTopLevelCodeDecl(Code);
         if (Code == TLCD)

@@ -667,7 +667,7 @@ static void countStatsOfSourceFile(UnifiedStatsReporter &Stats,
                                    SourceFile *SF) {
   auto &C = Stats.getFrontendCounters();
   auto &SM = Instance.getSourceMgr();
-  C.NumDecls += SF->Decls.size();
+  C.NumDecls += SF->getTopLevelDecls().size();
   C.NumLocalTypeDecls += SF->LocalTypeDecls.size();
   C.NumObjCMethods += SF->ObjCMethods.size();
   C.NumInfixOperators += SF->InfixOperators.size();

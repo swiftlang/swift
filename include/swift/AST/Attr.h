@@ -25,6 +25,7 @@
 #include "swift/Basic/Range.h"
 #include "swift/Basic/OptimizationMode.h"
 #include "swift/Basic/Version.h"
+#include "swift/Basic/Located.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/AttrKind.h"
 #include "swift/AST/AutoDiff.h"
@@ -69,16 +70,13 @@ public:
   struct Convention {
     StringRef Name = {};
     DeclNameRef WitnessMethodProtocol = {};
-    StringRef ClangType = {};
-    // Carry the source location for diagnostics.
-    SourceLoc ClangTypeLoc = {};
-
+    Located<StringRef> ClangType = Located<StringRef>(StringRef(), {});
     /// Convenience factory function to create a Swift convention.
     ///
     /// Don't use this function if you are creating a C convention as you
     /// probably need a ClangType field as well.
     static Convention makeSwiftConvention(StringRef name) {
-      return {name, DeclNameRef(), "", {}};
+      return {name, DeclNameRef(), Located<StringRef>("", {})};
     }
   };
 
@@ -1652,7 +1650,7 @@ class DifferentiableAttr final
 
   /// Whether this function is linear (optional).
   bool Linear;
-  /// The number of parsed parameters specified in 'wrt:'.
+  /// The number of parsed differentiability parameters specified in 'wrt:'.
   unsigned NumParsedParameters = 0;
   /// The JVP function.
   Optional<DeclNameRefWithLoc> JVP;
@@ -1664,7 +1662,7 @@ class DifferentiableAttr final
   /// The VJP function (optional), resolved by the type checker if VJP name is
   /// specified.
   FuncDecl *VJPFunction = nullptr;
-  /// The differentiation parameters' indices, resolved by the type checker.
+  /// The differentiability parameter indices, resolved by the type checker.
   IndexSubset *ParameterIndices = nullptr;
   /// The trailing where clause (optional).
   TrailingWhereClause *WhereClause = nullptr;
@@ -1722,7 +1720,7 @@ public:
     ParameterIndices = parameterIndices;
   }
 
-  /// The parsed differentiation parameters, i.e. the list of parameters
+  /// The parsed differentiability parameters, i.e. the list of parameters
   /// specified in 'wrt:'.
   ArrayRef<ParsedAutoDiffParameter> getParsedParameters() const {
     return {getTrailingObjects<ParsedAutoDiffParameter>(), NumParsedParameters};
@@ -1773,15 +1771,15 @@ public:
 ///
 /// The `@derivative(of:)` attribute also has an optional `wrt:` clause
 /// specifying the parameters that are differentiated "with respect to", i.e.
-/// the differentiation parameters. The differentiation parameters must conform
-/// to the `Differentiable` protocol.
+/// the differentiability parameters. The differentiability parameters must
+/// conform to the `Differentiable` protocol.
 ///
-/// If the `wrt:` clause is unspecified, the differentiation parameters are
+/// If the `wrt:` clause is unspecified, the differentiability parameters are
 /// inferred to be all parameters that conform to `Differentiable`.
 ///
 /// `@derivative(of:)` attribute type-checking verifies that the type of the
 /// derivative function declaration is consistent with the type of the
-/// referenced original declaration and the differentiation parameters.
+/// referenced original declaration and the differentiability parameters.
 ///
 /// Examples:
 ///   @derivative(of: sin(_:))
@@ -1800,9 +1798,9 @@ class DerivativeAttr final
   DeclNameRefWithLoc OriginalFunctionName;
   /// The original function declaration, resolved by the type checker.
   AbstractFunctionDecl *OriginalFunction = nullptr;
-  /// The number of parsed parameters specified in 'wrt:'.
+  /// The number of parsed differentiability parameters specified in 'wrt:'.
   unsigned NumParsedParameters = 0;
-  /// The differentiation parameters' indices, resolved by the type checker.
+  /// The differentiability parameter indices, resolved by the type checker.
   IndexSubset *ParameterIndices = nullptr;
   /// The derivative function kind (JVP or VJP), resolved by the type checker.
   Optional<AutoDiffDerivativeFunctionKind> Kind = None;
@@ -1845,7 +1843,7 @@ public:
   }
   void setDerivativeKind(AutoDiffDerivativeFunctionKind kind) { Kind = kind; }
 
-  /// The parsed differentiation parameters, i.e. the list of parameters
+  /// The parsed differentiability parameters, i.e. the list of parameters
   /// specified in 'wrt:'.
   ArrayRef<ParsedAutoDiffParameter> getParsedParameters() const {
     return {getTrailingObjects<ParsedAutoDiffParameter>(), NumParsedParameters};
@@ -1874,7 +1872,7 @@ public:
 /// computed property declaration.
 ///
 /// The `@transpose(of:)` attribute also has a `wrt:` clause specifying the
-/// parameters that are transposed "with respect to", i.e. the transposed
+/// parameters that are transposed "with respect to", i.e. the linearity
 /// parameters.
 ///
 /// Examples:
@@ -1894,9 +1892,9 @@ class TransposeAttr final
   DeclNameRefWithLoc OriginalFunctionName;
   /// The original function declaration, resolved by the type checker.
   AbstractFunctionDecl *OriginalFunction = nullptr;
-  /// The number of parsed parameters specified in 'wrt:'.
+  /// The number of parsed linearity parameters specified in 'wrt:'.
   unsigned NumParsedParameters = 0;
-  /// The transposed parameters' indices, resolved by the type checker.
+  /// The linearity parameter indices, resolved by the type checker.
   IndexSubset *ParameterIndices = nullptr;
 
   explicit TransposeAttr(bool implicit, SourceLoc atLoc, SourceRange baseRange,
@@ -1929,7 +1927,7 @@ public:
     OriginalFunction = decl;
   }
 
-  /// The parsed transposed parameters, i.e. the list of parameters specified in
+  /// The parsed linearity parameters, i.e. the list of parameters specified in
   /// 'wrt:'.
   ArrayRef<ParsedAutoDiffParameter> getParsedParameters() const {
     return {getTrailingObjects<ParsedAutoDiffParameter>(), NumParsedParameters};

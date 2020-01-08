@@ -194,10 +194,10 @@ public:
     return alias(V1, V2, TBAAType1, TBAAType2) == AliasResult::MayAlias;
   }
 
-  /// \returns True if the release of the \p Ptr can access memory accessed by
-  /// \p User.
+  /// \returns True if the release of the \p releasedReference can access or
+  /// free memory accessed by \p User.
   bool mayValueReleaseInterfereWithInstruction(SILInstruction *User,
-                                               SILValue Ptr);
+                                               SILValue releasedReference);
 
   /// Use the alias analysis to determine the memory behavior of Inst with
   /// respect to V.

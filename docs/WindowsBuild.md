@@ -1,19 +1,25 @@
 # Building Swift on Windows
 
-Visual Studio 2017 or newer is needed to build swift on Windows.  The following must take place in the developer command prompt (provided by Visual Studio).  This shows up as "x64 Native Tools Command Prompt for VS2017" (or VS2019, VS2019 Preview depending on the Visual Studio that you are using) in the Start Menu.
+Visual Studio 2017 or newer is needed to build swift on Windows.
+
+The following must take place in the **developer command prompt** (provided by Visual Studio). This shows up as "x64 Native Tools Command Prompt for VS2017" (or VS2019, VS2019 Preview depending on the Visual Studio that you are using) in the Start Menu.
 
 ## Install dependencies
+
 - Install the latest version of [Visual Studio](https://www.visualstudio.com/downloads/)
-- Make sure to include "Programming Languages|Visual C++" and "Windows and Web Development|Universal Windows App Development|Windows SDK" in your installation.  The following components are required:
+- Make sure to include "Programming Languages|Visual C++" and "Windows and Web Development|Universal Windows App Development|Windows SDK" in your installation. The following components are required:
 
 1. Microsoft.VisualStudio.Component.Windows10SDK
-1. Microsoft.VisualStudio.Component.Windows10SDK.17763
-1. Microsoft.VisualStudio.Component.VC.Tools.x86.x64 
+2. Microsoft.VisualStudio.Component.Windows10SDK.17763
+3. Microsoft.VisualStudio.Component.VC.Tools.x86.x64
+
+The following [link](https://docs.microsoft.com/visualstudio/install/workload-component-id-vs-build-tools?view=vs-2019)) helps in finding the component name given its ID for Visual Studio 2019.
 
 ## Clone the repositories
+
 1. Clone `apple/llvm-project` into a directory for the toolchain
-1. Clone `apple/swift-cmark`, `apple/swift`, `apple/swift-corelibs-libdispatch`, `apple/swift-corelibs-foundation`, `apple/swift-corelibs-xctest`, `apple/swift-llbuild`, `apple/swift-package-manager` into the toolchain directory
-1. Clone `compnerd/windows-swift` as a peer of the toolchain directory
+2. Clone `apple/swift-cmark`, `apple/swift`, `apple/swift-corelibs-libdispatch`, `apple/swift-corelibs-foundation`, `apple/swift-corelibs-xctest`, `apple/swift-llbuild`, `apple/swift-package-manager` into the toolchain directory
+3. Clone `compnerd/windows-swift` as a peer of the toolchain directory
 
 - Currently, other repositories in the Swift project have not been tested and may not be supported.
 
@@ -37,8 +43,17 @@ git clone -c core.autocrlf=input https://github.com/apple/swift-package-manager 
 git clone https://github.com/compnerd/windows-swift windows-swift
 ```
 
-## Acquire ICU, SQLite3, curl, libxml2, zlib
-1. Go to https://dev.azure.com/compnerd/windows-swift and scroll down to "Dependencies" where you'll see bots (hopefully green) for icu, SQLite, curl, and libxml2. Download each of the zip files and copy their contents into S:/Library. The directory structure should resemble:
+## Acquire ICU, SQLite3, curl, libxml2 and zlib
+
+Go to [compnerd's windows-swift azure page](https://dev.azure.com/compnerd/windows-swift/_build) and open [Pipelines](https://dev.azure.com/compnerd/windows-swift/_build) where you'll see bots (hopefully green) for:
+
+- [ICU](https://dev.azure.com/compnerd/windows-swift/_build?definitionId=9)
+- [SQLite](https://dev.azure.com/compnerd/windows-swift/_build?definitionId=12&_a=summary)
+- [curl](https://dev.azure.com/compnerd/windows-swift/_build?definitionId=11&_a=summary)
+- [libxml2](https://dev.azure.com/compnerd/windows-swift/_build?definitionId=10&_a=summary)
+- [zlib](https://dev.azure.com/compnerd/windows-swift/_build?definitionId=16&_a=summary)
+
+Download each of the zip files and copy their contents into S:/Library. The directory structure should resemble:
 
 ```
 /Library
@@ -55,9 +70,14 @@ git clone https://github.com/compnerd/windows-swift windows-swift
 ```
 
 ## One-time Setup (re-run on Visual Studio upgrades)
-- Set up the `ucrt`, `visualc`, and `WinSDK` modules by copying  `ucrt.modulemap` located at
-  `swift/stdlib/public/Platform/ucrt.modulemap` into
-  `${UniversalCRTSdkDir}/Include/${UCRTVersion}/ucrt` as `module.modulemap`, copying `visualc.modulemap` located at `swift/stdlib/public/Platform/visualc.modulemap` into `${VCToolsInstallDir}/include` as `module.modulemap`, and copying `winsdk.modulemap` located at `swift/stdlib/public/Platform/winsdk.modulemap` into `${UniversalCRTSdkDir}/Include/${UCRTVersion}/um` and setup the `visualc.apinotes` located at `swift/stdlib/public/Platform/visualc.apinotes` into `${VCToolsInstallDir}/include` as `visualc.apinotes`
+
+Set up the `ucrt`, `visualc`, and `WinSDK` modules by:
+
+- copying `ucrt.modulemap` located at `swift/stdlib/public/Platform/ucrt.modulemap` into
+  `${UniversalCRTSdkDir}/Include/${UCRTVersion}/ucrt` as `module.modulemap`
+- copying `visualc.modulemap` located at `swift/stdlib/public/Platform/visualc.modulemap` into `${VCToolsInstallDir}/include` as `module.modulemap`
+- copying `winsdk.modulemap` located at `swift/stdlib/public/Platform/winsdk.modulemap` into `${UniversalCRTSdkDir}/Include/${UCRTVersion}/um`
+- and setup the `visualc.apinotes` located at `swift/stdlib/public/Platform/visualc.apinotes` into `${VCToolsInstallDir}/include` as `visualc.apinotes`
 
 ```cmd
 mklink "%UniversalCRTSdkDir%\Include\%UCRTVersion%\ucrt\module.modulemap" S:\toolchain\swift\stdlib\public\Platform\ucrt.modulemap
@@ -104,6 +124,7 @@ ninja -C S:\b\foundation
 ```
 
 - Add Foundation to your path:
+
 ```cmd
 path S:\b\foundation\Foundation;%PATH%
 ```
@@ -116,6 +137,7 @@ ninja -C S:\b\xctest
 ```
 
 - Add XCTest to your path:
+
 ```cmd
 path S:\b\xctest;%PATH%
 ```
@@ -137,7 +159,7 @@ ninja -C S:\b\foundation
 
 ```cmd
 cmake --build S:\b\foundation
-ninja -C S:\b\foundation test 
+ninja -C S:\b\foundation test
 ```
 
 ## Build llbuild
@@ -148,7 +170,8 @@ cmake -B S:\b\llbuild -G Ninja -S S:\toolchain\llbuild -DCMAKE_BUILD_TYPE=RelWit
 ninja -C S:\b\llbuild
 ```
 
- - Add llbuild to your path:
+- Add llbuild to your path:
+
 ```cmd
 path S:\b\llbuild\bin;%PATH%
 ```
@@ -171,8 +194,8 @@ ninja -C S:\b\spm
 
 - Run ninja install:
 
-```cmd 
+```cmd
 ninja -C S:\b\toolchain install
 ```
 
-- Add the Swift on Windows binaries path (`C:\Library\Developer\Toolchains\unknown-Asserts-development.xctoolchain\usr\bin`)  to the `PATH` environment variable.
+- Add the Swift on Windows binaries path (`C:\Library\Developer\Toolchains\unknown-Asserts-development.xctoolchain\usr\bin`) to the `PATH` environment variable.

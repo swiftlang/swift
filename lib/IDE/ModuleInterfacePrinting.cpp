@@ -448,7 +448,7 @@ void swift::ide::printSubmoduleInterface(
     auto RHSPath = RHS->getFullAccessPath();
     for (unsigned i = 0, e = std::min(LHSPath.size(), RHSPath.size()); i != e;
          i++) {
-      if (int Ret = LHSPath[i].first.str().compare(RHSPath[i].first.str()))
+      if (int Ret = LHSPath[i].Item.str().compare(RHSPath[i].Item.str()))
         return Ret < 0;
     }
     return false;
@@ -667,7 +667,7 @@ static SourceLoc getDeclStartPosition(SourceFile &File) {
     return false;
   };
 
-  for (auto D : File.Decls) {
+  for (auto D : File.getTopLevelDecls()) {
     if (tryUpdateStart(D->getStartLoc())) {
       tryUpdateStart(D->getAttrs().getStartLoc());
       auto RawComment = D->getRawComment();
