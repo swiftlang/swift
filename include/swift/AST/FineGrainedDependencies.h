@@ -774,7 +774,7 @@ public:
   /// Goes at the start of an emitted YAML file to help tools recognize it.
   /// May vary in the future according to version, etc.
   std::string yamlProlog(const bool hadCompilationError) const {
-    return std::string("# Experimental\n") +
+    return std::string("# Fine-grained v0\n") +
            (!hadCompilationError ? ""
                                  : "# Dependencies are unknown because a "
                                    "compilation error occurred.\n");
