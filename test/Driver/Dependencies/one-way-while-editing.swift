@@ -32,3 +32,18 @@
 // CHECK-REVERSED-RECOVER-NOT: Handled other.swift
 // CHECK-REVERSED-RECOVER: Handled main.swift
 // CHECK-REVERSED-RECOVER-NOT: Handled other.swift
+
+
+
+// RUN: %empty-directory(%t)
+// RUN: cp -r %S/Inputs/one-way-fine/* %t
+// RUN: touch -t 201401240005 %t/*
+
+// RUN: cd %t && not %swiftc_driver -enable-fine-grained-dependencies -c -driver-use-frontend-path "%{python};%S/Inputs/modify-non-primary-files.py" -output-file-map %t/output.json -incremental -driver-always-rebuild-dependents ./main.swift ./other.swift -module-name main -j1 -v 2>&1 | %FileCheck %s
+
+// RUN: cd %t && %swiftc_driver -enable-fine-grained-dependencies -c -driver-use-frontend-path "%{python};%S/Inputs/update-dependencies.py" -output-file-map %t/output.json -incremental -driver-always-rebuild-dependents ./main.swift ./other.swift -module-name main -j1 -v 2>&1 | %FileCheck -check-prefix=CHECK-RECOVER %s
+
+// RUN: touch -t 201401240005 %t/*
+// RUN: cd %t && not %swiftc_driver -enable-fine-grained-dependencies -c -driver-use-frontend-path "%{python};%S/Inputs/modify-non-primary-files.py" -output-file-map %t/output.json -incremental -driver-always-rebuild-dependents ./other.swift ./main.swift -module-name main -j1 -v 2>&1 | %FileCheck -check-prefix=CHECK-REVERSED %s
+
+// RUN: cd %t && %swiftc_driver -enable-fine-grained-dependencies -c -driver-use-frontend-path "%{python};%S/Inputs/update-dependencies.py" -output-file-map %t/output.json -incremental -driver-always-rebuild-dependents ./main.swift ./other.swift -module-name main -j1 -v 2>&1 | %FileCheck -check-prefix=CHECK-REVERSED-RECOVER %s
