@@ -4441,8 +4441,6 @@ bool Parser::delayParsingDeclList(SourceLoc LBLoc, SourceLoc &RBLoc,
     RBLoc = Tok.getLoc();
     error = true;
   }
-
-  State->delayDeclList(IDC);
   return error;
 }
 
