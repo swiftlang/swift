@@ -903,9 +903,10 @@ extension ContiguousArray: RangeReplaceableCollection {
   @inlinable
   @discardableResult
   public mutating func remove(at index: Int) -> Element {
-    _precondition(index < endIndex, "Index out of range")
-    _precondition(index >= startIndex, "Index out of range")
-    _makeUniqueAndReserveCapacityIfNotUnique()
+    _makeMutableAndUnique()
+    let currentCount = _getCount()
+    _precondition(index < currentCount, "Index out of range")
+    _precondition(index >= 0, "Index out of range")
     let newCount = _getCount() - 1
     let pointer = (_buffer.firstElementAddress + index)
     let result = pointer.move()

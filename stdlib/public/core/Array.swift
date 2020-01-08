@@ -1244,9 +1244,9 @@ extension Array: RangeReplaceableCollection {
 
   @inlinable
   public mutating func _customRemoveLast() -> Element? {
+    _makeMutableAndUnique()
     let newCount = _getCount() - 1
     _precondition(newCount >= 0, "Can't removeLast from an empty Array")
-    _makeUniqueAndReserveCapacityIfNotUnique()
     let pointer = (_buffer.firstElementAddress + newCount)
     let element = pointer.move()
     _buffer.count = newCount
@@ -1271,10 +1271,11 @@ extension Array: RangeReplaceableCollection {
   @inlinable
   @discardableResult
   public mutating func remove(at index: Int) -> Element {
-    _precondition(index < endIndex, "Index out of range")
-    _precondition(index >= startIndex, "Index out of range")
-    _makeUniqueAndReserveCapacityIfNotUnique()
-    let newCount = _getCount() - 1
+    _makeMutableAndUnique()
+    let currentCount = _getCount()
+    _precondition(index < currentCount, "Index out of range")
+    _precondition(index >= 0, "Index out of range")
+    let newCount = currentCount - 1
     let pointer = (_buffer.firstElementAddress + index)
     let result = pointer.move()
     pointer.moveInitialize(from: pointer + 1, count: newCount - index)
