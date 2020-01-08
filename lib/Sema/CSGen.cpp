@@ -2616,18 +2616,18 @@ namespace {
       CS.addConstraint(
           ConstraintKind::Conversion, CS.getType(expr->getCondExpr()),
           boolDecl->getDeclaredType(),
-          CS.getConstraintLocator(expr, LocatorPathElt::Condition()));
+          CS.getConstraintLocator(expr, ConstraintLocator::Condition));
 
       // The branches must be convertible to a common type.
-      return CS.addJoinConstraint(CS.getConstraintLocator(expr),
-          {
-            { CS.getType(expr->getThenExpr()),
-              CS.getConstraintLocator(expr->getThenExpr()) },
-            { CS.getType(expr->getElseExpr()),
-              CS.getConstraintLocator(expr->getElseExpr()) }
-          });
+      return CS.addJoinConstraint(
+          CS.getConstraintLocator(expr),
+          {{CS.getType(expr->getThenExpr()),
+            CS.getConstraintLocator(expr, LocatorPathElt::TernaryBranch(true))},
+           {CS.getType(expr->getElseExpr()),
+            CS.getConstraintLocator(expr,
+                                    LocatorPathElt::TernaryBranch(false))}});
     }
-    
+
     virtual Type visitImplicitConversionExpr(ImplicitConversionExpr *expr) {
       llvm_unreachable("Already type-checked");
     }

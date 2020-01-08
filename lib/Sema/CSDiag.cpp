@@ -248,7 +248,6 @@ private:
   bool visitSubscriptExpr(SubscriptExpr *SE);
   bool visitApplyExpr(ApplyExpr *AE);
   bool visitCoerceExpr(CoerceExpr *CE);
-  bool visitIfExpr(IfExpr *IE);
   bool visitRebindSelfInConstructorExpr(RebindSelfInConstructorExpr *E);
 };
 } // end anonymous namespace
@@ -1889,37 +1888,6 @@ bool FailureDiagnosis::visitCoerceExpr(CoerceExpr *CE) {
 
   return false;
 }
-
-bool FailureDiagnosis::visitIfExpr(IfExpr *IE) {
-  auto typeCheckClauseExpr = [&](Expr *clause, Type contextType = Type(),
-                                 ContextualTypePurpose convertPurpose =
-                                     CTP_Unused) -> Expr * {
-    // Provide proper contextual type when type conversion is specified.
-    return typeCheckChildIndependently(clause, contextType, convertPurpose,
-                                       TCCOptions(), nullptr, false);
-  };
-  // Check all of the subexpressions independently.
-  auto condExpr = typeCheckClauseExpr(IE->getCondExpr());
-  if (!condExpr) return true;
-  auto trueExpr = typeCheckClauseExpr(IE->getThenExpr(), CS.getContextualType(),
-                                      CS.getContextualTypePurpose());
-  if (!trueExpr) return true;
-  auto falseExpr = typeCheckClauseExpr(
-      IE->getElseExpr(), CS.getContextualType(), CS.getContextualTypePurpose());
-  if (!falseExpr) return true;
-
-  // If the true/false values already match, it must be a contextual problem.
-  if (CS.getType(trueExpr)->isEqual(CS.getType(falseExpr)))
-    return false;
-  
-  // Otherwise, the true/false result types must not be matching.
-  diagnose(IE->getColonLoc(), diag::if_expr_cases_mismatch,
-           CS.getType(trueExpr), CS.getType(falseExpr))
-      .highlight(trueExpr->getSourceRange())
-      .highlight(falseExpr->getSourceRange());
-  return true;
-}
-
 
 bool FailureDiagnosis::
 visitRebindSelfInConstructorExpr(RebindSelfInConstructorExpr *E) {
