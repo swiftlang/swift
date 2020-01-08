@@ -35,10 +35,14 @@ set(SOURCES "")
 
 # Copy TensorFlow high-level API sources, if they exist.
 if (TENSORFLOW_SWIFT_APIS)
+  message(STATUS "Using TensorFlow high-level APIs library.")
+
   file(GLOB_RECURSE TENSORFLOW_SWIFT_API_SOURCES
     "${TENSORFLOW_SWIFT_APIS}/Sources/*.swift")
-  message(STATUS "Using TensorFlow high-level APIs library.")
-  list(APPEND SOURCES "${TENSORFLOW_SWIFT_API_SOURCES}")
+  foreach(_TENSORFLOW_SWIFT_APIS_SOURCE ${TENSORFLOW_SWIFT_API_SOURCES})
+    file(TO_CMAKE_PATH ${_TENSORFLOW_SWIFT_APIS_SOURCE} _TENSORFLOW_SWIFT_APIS_SOURCE)
+    list(APPEND SOURCES ${_TENSORFLOW_SWIFT_APIS_SOURCE})
+  endforeach()
 endif()
 
 # When Python exists, PythonConversion.swift imports it, so it must be
