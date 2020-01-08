@@ -90,8 +90,9 @@ class DTraceBenchmarkDriver(perf_test_driver.BenchmarkDriver):
             e['SWIFT_DETERMINISTIC_HASHING'] = '1'
             p = subprocess.Popen([
                 'sudo', 'dtrace', '-s', DTRACE_PATH,
-                '-c', '%s %s %s' % (data['path'], data['test_name'],
-                                    '--num-iters=%d' % iters)
+                '-c', '%s %s %s %s' % (data['path'], data['test_name'],
+                                       '--num-iters=%d' % iters,
+                                       '--num-samples=2')
             ], stdout=subprocess.PIPE, stderr=open('/dev/null', 'w'), env=e)
             results = [x for x in p.communicate()[0].split("\n") if len(x) > 0]
             return [
