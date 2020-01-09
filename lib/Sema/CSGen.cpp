@@ -2061,8 +2061,7 @@ namespace {
 
           Type externalType;
           if (param->getTypeRepr()) {
-            auto declaredTy =
-                closure->mapTypeIntoContext(param->getInterfaceType());
+            auto declaredTy = param->getType();
             externalType = CS.openUnboundGenericType(declaredTy, paramLoc);
           } else {
             externalType = CS.createTypeVariable(
