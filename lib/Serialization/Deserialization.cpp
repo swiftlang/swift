@@ -430,7 +430,7 @@ SILLayout *ModuleFile::readSILLayout(llvm::BitstreamCursor &Cursor) {
     
     CanGenericSignature canSig;
     if (auto sig = getGenericSignature(rawGenericSig))
-      canSig = sig->getCanonicalSignature();
+      canSig = sig.getCanonicalSignature();
     return SILLayout::get(getContext(), canSig, fields);
   }
   default:
@@ -1175,7 +1175,7 @@ static void filterValues(Type expectedTy, ModuleDecl *expectedModule,
     // particular generic signature, match that signature.
     if (expectedGenericSig &&
         value->getDeclContext()->getGenericSignatureOfContext()
-          ->getCanonicalSignature() != expectedGenericSig)
+          .getCanonicalSignature() != expectedGenericSig)
       return true;
 
     // If we don't expect a specific generic signature, ignore anything from a
@@ -1631,14 +1631,14 @@ giveUpFastPath:
 
       ValueDecl *base = values.front();
 
-      GenericSignature currentSig = GenericSignature();
+      GenericSignature currentSig;
       if (auto nominal = dyn_cast<NominalTypeDecl>(base)) {
         if (genericSig) {
           // Find an extension in the requested module that has the
           // correct generic signature.
           for (auto ext : nominal->getExtensions()) {
             if (ext->getModuleContext() == M &&
-                ext->getGenericSignature()->getCanonicalSignature()
+                ext->getGenericSignature().getCanonicalSignature()
                   == genericSig) {
               currentSig = ext->getGenericSignature();
               break;
@@ -4746,7 +4746,7 @@ public:
     TypeID resultID;
     uint8_t rawRepresentation, rawDiffKind;
     bool noescape = false, throws;
-    GenericSignature genericSig = GenericSignature();
+    GenericSignature genericSig;
     clang::Type *clangFunctionType = nullptr;
 
     // FIXME: [clang-function-type-serialization] Deserialize a clang::Type out

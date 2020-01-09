@@ -105,7 +105,7 @@ mapTypeOutOfOpenedExistentialContext(CanType t) {
     MakeAbstractConformanceForGenericType());
 
   return std::make_tuple(mappedTy->getCanonicalType(mappedSig),
-                         mappedSig->getCanonicalSignature(),
+                         mappedSig.getCanonicalSignature(),
                          mappedSubs);
 }
 
@@ -151,7 +151,7 @@ public:
       = mapTypeOutOfOpenedExistentialContext(resultTy);
     
     auto boxLayout = SILLayout::get(SGF.getASTContext(),
-      layoutSig->getCanonicalSignature(),
+      layoutSig.getCanonicalSignature(),
       SILField(layoutTy->getCanonicalType(layoutSig), true));
     
     resultBox = SGF.B.createAllocBox(loc,

@@ -2736,7 +2736,7 @@ Type TypeResolver::resolveSILBoxType(SILBoxTypeRepr *repr,
   // Substitute out parsed context types into interface types.
   CanGenericSignature genericSig;
   if (auto *genericEnv = repr->getGenericEnvironment()) {
-    genericSig = genericEnv->getGenericSignature()->getCanonicalSignature();
+    genericSig = genericEnv->getGenericSignature().getCanonicalSignature();
     
     for (auto &field : fields) {
       auto transTy = field.getLoweredType()->mapTypeOutOfContext();
@@ -2842,7 +2842,7 @@ Type TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
   SubstitutionMap subs;
   if (!repr->getSubstitutions().empty()) {
     auto sig = repr->getGenericEnvironment()->getGenericSignature()
-                   ->getCanonicalSignature();
+                   .getCanonicalSignature();
     TypeSubstitutionMap subsMap;
     auto params = sig->getGenericParams();
     for (unsigned i : indices(repr->getSubstitutions())) {
@@ -2865,7 +2865,7 @@ Type TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
   SmallVector<SILResultInfo, 4> interfaceResults;
   Optional<SILResultInfo> interfaceErrorResult;
   if (auto *genericEnv = repr->getGenericEnvironment()) {
-    genericSig = genericEnv->getGenericSignature()->getCanonicalSignature();
+    genericSig = genericEnv->getGenericSignature().getCanonicalSignature();
  
     for (auto &param : params) {
       auto transParamType = param.getInterfaceType()->mapTypeOutOfContext()

@@ -1759,7 +1759,7 @@ static Type getTypeForDisplay(ModuleDecl *module, ValueDecl *decl) {
   if (!decl->getDeclContext()->isTypeContext())
     return type;
 
-  GenericSignature sigWithoutReqts = GenericSignature();
+  GenericSignature sigWithoutReqts;
   if (auto genericFn = type->getAs<GenericFunctionType>()) {
     // For generic functions, build a new generic function... but strip off
     // the requirements. They don't add value.
@@ -4962,8 +4962,8 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
     auto currentSig = dc->getGenericSignatureOfContext();
     auto existingSig = diag.ExistingDC->getGenericSignatureOfContext();
     auto differentlyConditional = currentSig && existingSig &&
-                                  currentSig->getCanonicalSignature() !=
-                                      existingSig->getCanonicalSignature();
+                                  currentSig.getCanonicalSignature() !=
+                                      existingSig.getCanonicalSignature();
 
     // If we've redundantly stated a conformance for which the original
     // conformance came from the module of the type or the module of the

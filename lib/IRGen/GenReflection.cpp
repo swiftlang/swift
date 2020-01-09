@@ -322,8 +322,7 @@ std::pair<llvm::Constant *, unsigned>
 IRGenModule::getTypeRef(Type type, GenericSignature genericSig,
                         MangledTypeRefRole role) {
   return getTypeRef(type->getCanonicalType(genericSig),
-      genericSig ? genericSig->getCanonicalSignature() : CanGenericSignature(),
-      role);
+                    genericSig.getCanonicalSignature(), role);
 }
 
 std::pair<llvm::Constant *, unsigned>
@@ -359,7 +358,7 @@ IRGenModule::emitWitnessTableRefString(CanType type,
   GenericEnvironment *genericEnv = nullptr;
 
   if (origGenericSig) {
-    genericSig = origGenericSig->getCanonicalSignature();
+    genericSig = origGenericSig.getCanonicalSignature();
     enumerateGenericSignatureRequirements(genericSig,
                 [&](GenericRequirement reqt) { requirements.push_back(reqt); });
     genericEnv = genericSig->getGenericEnvironment();
@@ -523,9 +522,7 @@ protected:
                   MangledTypeRefRole role =
                       MangledTypeRefRole::Reflection) {
     addTypeRef(type->getCanonicalType(genericSig),
-               genericSig ? genericSig->getCanonicalSignature()
-                          : CanGenericSignature(),
-               role);
+               genericSig.getCanonicalSignature(), role);
   }
 
   /// Add a 32-bit relative offset to a mangled typeref string
@@ -647,9 +644,7 @@ class AssociatedTypeMetadataBuilder : public ReflectionMetadataBuilder {
       auto NameGlobal = IGM.getAddrOfFieldName(AssocTy.first);
       B.addRelativeAddress(NameGlobal);
       addTypeRef(AssocTy.second,
-                 Nominal->getGenericSignature()
-                   ? Nominal->getGenericSignature()->getCanonicalSignature()
-                   : CanGenericSignature());
+                 Nominal->getGenericSignature().getCanonicalSignature());
     }
   }
 
@@ -1148,12 +1143,10 @@ public:
     B.addInt32(CaptureTypes.size());
     B.addInt32(MetadataSources.size());
     B.addInt32(Layout.getBindings().size());
-    
-    auto sig = OrigCalleeType->getSubstGenericSignature()
-              ? OrigCalleeType->getSubstGenericSignature()
-                              ->getCanonicalSignature()
-              : CanGenericSignature();
-    
+
+    auto sig =
+        OrigCalleeType->getSubstGenericSignature().getCanonicalSignature();
+
     // Now add typerefs of all of the captures.
     for (auto CaptureType : CaptureTypes) {
       addLoweredTypeRef(CaptureType, sig);

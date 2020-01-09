@@ -189,7 +189,7 @@ llvm::Value *irgen::emitArchetypeWitnessTableRef(IRGenFunction &IGF,
   // concretely available; we really ought to be comparing the full paths
   // to this conformance from concrete sources.
 
-  auto signature = environment->getGenericSignature()->getCanonicalSignature();
+  auto signature = environment->getGenericSignature().getCanonicalSignature();
   auto archetypeDepType = archetype->getInterfaceType();
 
   auto astPath = signature->getConformanceAccessPath(archetypeDepType,
@@ -416,7 +416,7 @@ withOpaqueTypeGenericArgs(IRGenFunction &IGF,
     SmallVector<llvm::Type *, 4> types;
     
     enumerateGenericSignatureRequirements(
-      opaqueDecl->getGenericSignature()->getCanonicalSignature(),
+      opaqueDecl->getGenericSignature().getCanonicalSignature(),
       [&](GenericRequirement reqt) {
         auto ty = reqt.TypeParameter.subst(archetype->getSubstitutions())
           ->getCanonicalType(opaqueDecl->getGenericSignature());

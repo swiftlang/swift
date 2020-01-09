@@ -699,7 +699,7 @@ emitKeyPathComponent(IRGenModule &IGM,
                                      baseTy->getWithoutSpecifierType());
   // TODO: Eliminate GenericContextScope entirely
   GenericContextScope scope(IGM,
-         genericEnv ? genericEnv->getGenericSignature()->getCanonicalSignature()
+         genericEnv ? genericEnv->getGenericSignature().getCanonicalSignature()
                     : nullptr);
   switch (auto kind = component.getKind()) {
   case KeyPathPatternComponent::Kind::StoredProperty: {
@@ -839,13 +839,11 @@ emitKeyPathComponent(IRGenModule &IGM,
       auto componentSig = externalDecl->getInnermostDeclContext()
         ->getGenericSignatureOfContext();
       
-      auto componentCanSig = componentSig
-        ? componentSig->getCanonicalSignature()
-        : CanGenericSignature();
+      auto componentCanSig = componentSig.getCanonicalSignature();
       auto subs = component.getExternalSubstitutions();
       if (!subs.empty()) {
         enumerateGenericSignatureRequirements(
-          componentSig->getCanonicalSignature(),
+          componentCanSig,
           [&](GenericRequirement reqt) {
             auto substType = reqt.TypeParameter.subst(subs)
               ->getCanonicalType();
@@ -1335,7 +1333,7 @@ void IRGenModule::emitSILProperty(SILProperty *prop) {
   if (genericEnv) {
     genericSig = prop->getDecl()->getInnermostDeclContext()
                                 ->getGenericSignatureOfContext()
-                                ->getCanonicalSignature();
+                                .getCanonicalSignature();
     enumerateGenericSignatureRequirements(genericSig,
       [&](GenericRequirement reqt) { requirements.push_back(reqt); });
   }
