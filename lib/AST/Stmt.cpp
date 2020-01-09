@@ -172,7 +172,8 @@ BraceStmt *BraceStmt::create(ASTContext &ctx, SourceLoc lbloc,
   //  }
 
   void *Buffer = ctx.Allocate(totalSizeToAlloc<ASTNode>(elts.size()),
-                              alignof(BraceStmt));
+                              alignof(BraceStmt),
+                              AllocationArena::Declarations);
   return ::new(Buffer) BraceStmt(lbloc, elts, rbloc, implicit);
 }
 
@@ -191,7 +192,8 @@ YieldStmt *YieldStmt::create(const ASTContext &ctx, SourceLoc yieldLoc,
                              SourceLoc lpLoc, ArrayRef<Expr*> yields,
                              SourceLoc rpLoc, Optional<bool> implicit) {
   void *buffer = ctx.Allocate(totalSizeToAlloc<Expr*>(yields.size()),
-                              alignof(YieldStmt));
+                              alignof(YieldStmt),
+                              AllocationArena::Declarations);
   return ::new(buffer) YieldStmt(yieldLoc, lpLoc, yields, rpLoc, implicit);
 }
 
@@ -273,7 +275,8 @@ DoCatchStmt *DoCatchStmt::create(ASTContext &ctx, LabeledStmtInfo labelInfo,
                                  ArrayRef<CatchStmt*> catches,
                                  Optional<bool> implicit) {
   void *mem = ctx.Allocate(totalSizeToAlloc<CatchStmt*>(catches.size()),
-                           alignof(DoCatchStmt));
+                           alignof(DoCatchStmt),
+                           AllocationArena::Declarations);
   return ::new (mem) DoCatchStmt(labelInfo, doLoc, body, catches, implicit);
 }
 
@@ -308,7 +311,7 @@ PoundAvailableInfo *PoundAvailableInfo::create(ASTContext &ctx,
                                        ArrayRef<AvailabilitySpec *> queries,
                                                      SourceLoc RParenLoc) {
   unsigned size = totalSizeToAlloc<AvailabilitySpec *>(queries.size());
-  void *Buffer = ctx.Allocate(size, alignof(PoundAvailableInfo));
+  void *Buffer = ctx.Allocate(size, alignof(PoundAvailableInfo), AllocationArena::Declarations);
   return ::new (Buffer) PoundAvailableInfo(PoundLoc, queries, RParenLoc);
 }
 
@@ -449,7 +452,8 @@ CaseStmt *CaseStmt::create(ASTContext &ctx, SourceLoc caseLoc,
   void *mem =
       ctx.Allocate(totalSizeToAlloc<FallthroughStmt *, CaseLabelItem>(
                        fallthroughStmt.isNonNull(), caseLabelItems.size()),
-                   alignof(CaseStmt));
+                   alignof(CaseStmt),
+                   AllocationArena::Declarations);
   return ::new (mem) CaseStmt(caseLoc, caseLabelItems, unknownAttrLoc, colonLoc,
                               body, caseVarDecls, implicit, fallthroughStmt);
 }
@@ -468,7 +472,8 @@ SwitchStmt *SwitchStmt::create(LabeledStmtInfo LabelInfo, SourceLoc SwitchLoc,
 #endif
 
   void *p = C.Allocate(totalSizeToAlloc<ASTNode>(Cases.size()),
-                       alignof(SwitchStmt));
+                       alignof(SwitchStmt),
+                       AllocationArena::Declarations);
   SwitchStmt *theSwitch = ::new (p) SwitchStmt(LabelInfo, SwitchLoc,
                                                SubjectExpr, LBraceLoc,
                                                Cases.size(), RBraceLoc);

@@ -1581,7 +1581,7 @@ ParserStatus Parser::parseStmtCondition(StmtCondition &Condition,
     break;
   }; 
   
-  Condition = Context.AllocateCopy(result);
+  Condition = Context.AllocateCopy(result, AllocationArena::Declarations);
   return Status;
 }
 
@@ -1617,7 +1617,7 @@ ParserResult<Stmt> Parser::parseStmtIf(LabeledStmtInfo LabelInfo,
       if (Condition.empty()) {
         SmallVector<StmtConditionElement, 1> ConditionElems;
         ConditionElems.emplace_back(new (Context) ErrorExpr(IfLoc));
-        Condition = Context.AllocateCopy(ConditionElems);
+        Condition = Context.AllocateCopy(ConditionElems, AllocationArena::Declarations);
       }
       auto EndLoc = Condition.back().getEndLoc();
       return makeParserResult(
@@ -1634,7 +1634,7 @@ ParserResult<Stmt> Parser::parseStmtIf(LabeledStmtInfo LabelInfo,
         .highlight(SourceRange(IfLoc, LBraceLoc));
       SmallVector<StmtConditionElement, 1> ConditionElems;
       ConditionElems.emplace_back(new (Context) ErrorExpr(LBraceLoc));
-      Condition = Context.AllocateCopy(ConditionElems);
+      Condition = Context.AllocateCopy(ConditionElems, AllocationArena::Declarations);
     } else {
       Status |= parseStmtCondition(Condition, diag::expected_condition_if,
                                    StmtKind::If);
@@ -1716,7 +1716,7 @@ ParserResult<Stmt> Parser::parseStmtGuard() {
     if (Condition.empty()) {
       SmallVector<StmtConditionElement, 1> ConditionElems;
       ConditionElems.emplace_back(new (Context) ErrorExpr(GuardLoc));
-      Condition = Context.AllocateCopy(ConditionElems);
+      Condition = Context.AllocateCopy(ConditionElems, AllocationArena::Declarations);
     }
     auto EndLoc = Condition.back().getEndLoc();
     return makeParserResult(
@@ -1732,7 +1732,7 @@ ParserResult<Stmt> Parser::parseStmtGuard() {
       .highlight(SourceRange(GuardLoc, LBraceLoc));
     SmallVector<StmtConditionElement, 1> ConditionElems;
     ConditionElems.emplace_back(new (Context) ErrorExpr(LBraceLoc));
-    Condition = Context.AllocateCopy(ConditionElems);
+    Condition = Context.AllocateCopy(ConditionElems, AllocationArena::Declarations);
   } else {
     Status |= parseStmtCondition(Condition, diag::expected_condition_guard,
                                  StmtKind::Guard);
@@ -1793,7 +1793,7 @@ ParserResult<Stmt> Parser::parseStmtWhile(LabeledStmtInfo LabelInfo) {
     if (Condition.empty()) {
       SmallVector<StmtConditionElement, 1> ConditionElems;
       ConditionElems.emplace_back(new (Context) ErrorExpr(WhileLoc));
-      Condition = Context.AllocateCopy(ConditionElems);
+      Condition = Context.AllocateCopy(ConditionElems, AllocationArena::Declarations);
     }
     auto EndLoc = Condition.back().getEndLoc();
     return makeParserResult(
@@ -1809,7 +1809,7 @@ ParserResult<Stmt> Parser::parseStmtWhile(LabeledStmtInfo LabelInfo) {
       .highlight(SourceRange(WhileLoc, LBraceLoc));
     SmallVector<StmtConditionElement, 1> ConditionElems;
     ConditionElems.emplace_back(new (Context) ErrorExpr(LBraceLoc));
-    Condition = Context.AllocateCopy(ConditionElems);
+    Condition = Context.AllocateCopy(ConditionElems, AllocationArena::Declarations);
   } else {
     Status |= parseStmtCondition(Condition, diag::expected_condition_while,
                                  StmtKind::While);
@@ -2293,7 +2293,7 @@ parseStmtCase(Parser &P, SourceLoc &CaseLoc,
     // body var decls.
     SmallVector<VarDecl *, 4> tmp;
     LabelItems.front().getPattern()->collectVariables(tmp);
-    auto Result = P.Context.AllocateUninitialized<VarDecl *>(tmp.size());
+    auto Result = P.Context.AllocateUninitialized<VarDecl *>(tmp.size(), AllocationArena::Declarations);
     for (unsigned i : indices(tmp)) {
       auto *vOld = tmp[i];
       auto *vNew = new (P.Context) VarDecl(
