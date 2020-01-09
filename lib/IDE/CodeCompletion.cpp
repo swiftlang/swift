@@ -4159,8 +4159,8 @@ public:
 
   /// Return type if the result type if \p VD should be represented as opaque
   /// result type.
-  TypeLoc getOpaqueResultTypeLoc(const ValueDecl *VD, DeclVisibilityKind Reason,
-                                 DynamicLookupInfo dynamicLookupInfo) {
+  Type getOpaqueResultType(const ValueDecl *VD, DeclVisibilityKind Reason,
+                           DynamicLookupInfo dynamicLookupInfo) {
     if (Reason !=
         DeclVisibilityKind::MemberOfProtocolImplementedByCurrentNominal)
       return nullptr;
@@ -4179,26 +4179,50 @@ public:
     else
       return nullptr;
 
-    if (!ResultT->is<DependentMemberType>())
-      // The result is not associatedtype.
-      return nullptr;
-
-    // If associatedtype doesn't have conformance/superclass constraint, we
-    // can't use opaque type.
-    auto assocTyD = ResultT->castTo<DependentMemberType>()->getAssocType();
-    if (!assocTyD->getInherited().size())
+    if (!ResultT->is<DependentMemberType>() ||
+        !ResultT->castTo<DependentMemberType>()->getAssocType())
+      // The result is not a valid associatedtype.
       return nullptr;
 
     // Try substitution to see if the associated type is resolved to concrete
     // type.
     auto substMap = currTy->getMemberSubstitutionMap(
         CurrDeclContext->getParentModule(), VD);
-    ResultT = ResultT.subst(substMap);
-    if (!ResultT || !ResultT->is<DependentMemberType>())
+    if (!ResultT.subst(substMap)->is<DependentMemberType>())
       // If resolved print it.
       return nullptr;
 
-    return assocTyD->getInherited()[0];
+    // Collect requirements on the associatedtype.
+    ProtocolDecl *protoD =
+        ResultT->castTo<DependentMemberType>()->getAssocType()->getProtocol();
+
+    SmallVector<Type, 2> opaqueTypes;
+    bool hasExplicitAnyObject = false;
+    for (auto req : protoD->getRequirementSignature()) {
+      if (!req.getFirstType()->isEqual(ResultT))
+        continue;
+
+      switch (req.getKind()) {
+      case RequirementKind::Conformance:
+      case RequirementKind::Superclass:
+        opaqueTypes.push_back(req.getSecondType());
+        break;
+      case RequirementKind::Layout:
+        hasExplicitAnyObject |= req.getLayoutConstraint()->isClass();
+        break;
+      case RequirementKind::SameType:
+        return nullptr;
+      }
+    }
+
+    if (!hasExplicitAnyObject) {
+      if (opaqueTypes.empty())
+        return nullptr;
+      if (opaqueTypes.size() == 1)
+        return opaqueTypes.front();
+    }
+    return ProtocolCompositionType::get(
+        VD->getASTContext(), opaqueTypes, hasExplicitAnyObject);
   }
 
   void addValueOverride(const ValueDecl *VD, DeclVisibilityKind Reason,
@@ -4206,14 +4230,14 @@ public:
                         CodeCompletionResultBuilder &Builder,
                         bool hasDeclIntroducer) {
     class DeclPrinter : public StreamPrinter {
-      TypeLoc OpaqueBaseTy;
+      Type OpaqueBaseTy;
 
     public:
       using StreamPrinter::StreamPrinter;
 
       Optional<unsigned> NameOffset;
 
-      DeclPrinter(raw_ostream &OS, TypeLoc OpaqueBaseTy)
+      DeclPrinter(raw_ostream &OS, Type OpaqueBaseTy)
           : StreamPrinter(OS), OpaqueBaseTy(OpaqueBaseTy) {}
 
       void printDeclLoc(const Decl *D) override {
@@ -4225,7 +4249,7 @@ public:
       void printDeclResultTypePre(ValueDecl *VD, TypeLoc &TL) override {
         if (!OpaqueBaseTy.isNull()) {
           OS << "some ";
-          TL = OpaqueBaseTy;
+          TL = TypeLoc::withoutLoc(OpaqueBaseTy);
         }
       }
     };
@@ -4235,7 +4259,7 @@ public:
     {
       llvm::raw_svector_ostream OS(DeclStr);
       DeclPrinter Printer(
-          OS, getOpaqueResultTypeLoc(VD, Reason, dynamicLookupInfo));
+          OS, getOpaqueResultType(VD, Reason, dynamicLookupInfo));
       PrintOptions Options;
       if (auto transformType = CurrDeclContext->getDeclaredTypeInContext())
         Options.setBaseType(transformType);
