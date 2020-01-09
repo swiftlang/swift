@@ -58,6 +58,9 @@ LoadResult ModuleDepGraph::loadFromPath(const Job *Cmd, StringRef path,
   if (!buffer)
     return LoadResult::HadError;
   auto r = loadFromBuffer(Cmd, *buffer.get());
+  assert(path == getSwiftDeps(Cmd) && "Should be reading the job's swiftdeps");
+  assert(r == LoadResult::HadError || !nodeMap[path].empty() &&
+         "Must have a node for the whole file");
   if (emitFineGrainedDependencyDotFileAfterEveryImport)
     emitDotFileForJob(diags, Cmd);
   if (verifyFineGrainedDependencyGraphAfterEveryImport)
@@ -83,7 +86,7 @@ LoadResult ModuleDepGraph::loadFromBuffer(const Job *job,
 LoadResult ModuleDepGraph::loadFromSourceFileDepGraph(
     const Job *job, const SourceFileDepGraph &sourceFileDepGraph) {
   addIndependentNode(job);
-  return integrate(sourceFileDepGraph);
+  return integrate(sourceFileDepGraph, getSwiftDeps(job));
 }
 
 bool ModuleDepGraph::isMarked(const Job *cmd) const {
@@ -221,24 +224,24 @@ void ModuleDepGraph::forEachUnmarkedJobDirectlyDependentOnExternalSwiftdeps(
 // MARK: Integrating SourceFileDepGraph into ModuleDepGraph
 //==============================================================================
 
-LoadResult ModuleDepGraph::integrate(const SourceFileDepGraph &g) {
+LoadResult ModuleDepGraph::integrate(const SourceFileDepGraph &g,
+                                     StringRef swiftDepsOfJob) {
   FrontendStatsTracer tracer(stats, "fine-grained-dependencies-integrate");
 
-  StringRef swiftDeps = g.getSwiftDepsOfJobThatProducedThisGraph();
   // When done, disappearedNodes contains the nodes which no longer exist.
-  auto disappearedNodes = nodeMap[swiftDeps];
+  auto disappearedNodes = nodeMap[swiftDepsOfJob];
   // When done, changeDependencyKeys contains a list of keys that changed
   // as a result of this integration.
   auto changedNodes = std::unordered_set<DependencyKey>();
 
   g.forEachNode([&](const SourceFileDepGraphNode *integrand) {
     const auto &key = integrand->getKey();
-    auto preexistingMatch = findPreexistingMatch(swiftDeps, integrand);
+    auto preexistingMatch = findPreexistingMatch(swiftDepsOfJob, integrand);
     if (preexistingMatch.hasValue() &&
         preexistingMatch.getValue().first == LocationOfPreexistingNode::here)
       disappearedNodes.erase(key); // Node was and still is. Do not erase it.
-    const bool changed =
-        integrateSourceFileDepGraphNode(g, integrand, preexistingMatch);
+    const bool changed = integrateSourceFileDepGraphNode(
+        g, integrand, preexistingMatch, swiftDepsOfJob);
     if (changed)
       changedNodes.insert(key);
   });
@@ -280,7 +283,8 @@ ModuleDepGraph::PreexistingNodeIfAny ModuleDepGraph::findPreexistingMatch(
 
 bool ModuleDepGraph::integrateSourceFileDepGraphNode(
     const SourceFileDepGraph &g, const SourceFileDepGraphNode *integrand,
-    const PreexistingNodeIfAny preexistingMatch) {
+    const PreexistingNodeIfAny preexistingMatch,
+    const StringRef swiftDepsOfJob) {
 
   // Track externalDependencies so Compilation can check them.
   if (integrand->getKey().getKind() == NodeKind::externalDepend)
@@ -292,23 +296,22 @@ bool ModuleDepGraph::integrateSourceFileDepGraphNode(
   if (integrand->isDepends())
     return false;
 
-  StringRef swiftDepsOfSourceFileGraph =
-      g.getSwiftDepsOfJobThatProducedThisGraph();
-  auto changedAndUseNode = integrateSourceFileDeclNode(
-      integrand, swiftDepsOfSourceFileGraph, preexistingMatch);
+  auto changedAndUseNode =
+      integrateSourceFileDeclNode(integrand, swiftDepsOfJob, preexistingMatch);
   recordWhatUseDependsUpon(g, integrand, changedAndUseNode.second);
   return changedAndUseNode.first;
 }
 
 std::pair<bool, ModuleDepGraphNode *>
 ModuleDepGraph::integrateSourceFileDeclNode(
-    const SourceFileDepGraphNode *integrand,
-    StringRef swiftDepsOfSourceFileGraph,
+    const SourceFileDepGraphNode *integrand, StringRef swiftDepsOfJob,
     const PreexistingNodeIfAny preexistingMatch) {
 
   if (!preexistingMatch.hasValue()) {
-    auto *newNode = integrateByCreatingANewNode(
-        integrand, swiftDepsOfSourceFileGraph.str());
+    // The driver will be accessing nodes by the swiftDeps of the job,
+    // so pass that in.
+    auto *newNode =
+        integrateByCreatingANewNode(integrand, swiftDepsOfJob.str());
     return std::make_pair(true, newNode); // New node
   }
   const auto where = preexistingMatch.getValue().first;
@@ -319,13 +322,13 @@ ModuleDepGraph::integrateSourceFileDeclNode(
 
   case LocationOfPreexistingNode::nowhere:
     // Some other file depended on this, but didn't know where it was.
-    moveNodeToDifferentFile(match, swiftDepsOfSourceFileGraph.str());
+    moveNodeToDifferentFile(match, swiftDepsOfJob.str());
     match->integrateFingerprintFrom(integrand);
     return std::make_pair(true, match); // New Decl, assume changed
 
   case LocationOfPreexistingNode::elsewhere:
-    auto *newNode = integrateByCreatingANewNode(
-        integrand, swiftDepsOfSourceFileGraph.str());
+    auto *newNode =
+        integrateByCreatingANewNode(integrand, swiftDepsOfJob.str());
     return std::make_pair(true, newNode); // New node;
   }
   llvm_unreachable("impossible");

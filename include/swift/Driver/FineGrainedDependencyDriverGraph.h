@@ -417,7 +417,7 @@ private:
   /// Integrate a SourceFileDepGraph into the receiver.
   /// Integration happens when the driver needs to read SourceFileDepGraph.
   CoarseGrainedDependencyGraphImpl::LoadResult
-  integrate(const SourceFileDepGraph &);
+  integrate(const SourceFileDepGraph &, StringRef swiftDepsOfJob);
 
   enum class LocationOfPreexistingNode { nowhere, here, elsewhere };
 
@@ -435,7 +435,8 @@ private:
   bool
   integrateSourceFileDepGraphNode(const SourceFileDepGraph &g,
                                   const SourceFileDepGraphNode *integrand,
-                                  const PreexistingNodeIfAny preexistingMatch);
+                                  const PreexistingNodeIfAny preexistingMatch,
+                                  StringRef swiftDepsOfJob);
 
   /// Integrate the \p integrand, a node that represents a Decl in the swiftDeps
   /// file being integrated. \p preexistingNodeInPlace holds the node
@@ -446,7 +447,7 @@ private:
   /// ModuleDepGraphNode.
   std::pair<bool, ModuleDepGraphNode *>
   integrateSourceFileDeclNode(const SourceFileDepGraphNode *integrand,
-                              StringRef swiftDepsOfSourceFileGraph,
+                              StringRef swiftDepsOfJob,
                               const PreexistingNodeIfAny preexistingMatch);
 
   /// Create a brand-new ModuleDepGraphNode to integrate \p integrand.
