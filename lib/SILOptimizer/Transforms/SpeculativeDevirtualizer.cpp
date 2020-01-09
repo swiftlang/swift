@@ -594,6 +594,7 @@ namespace {
     ~SpeculativeDevirtualization() override {}
 
     void run() override {
+			return;
 
       auto &CurFn = *getFunction();
       // Don't perform speculative devirtualization at -Os.
