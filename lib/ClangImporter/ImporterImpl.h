@@ -1180,12 +1180,22 @@ public:
   ///
   /// FIXME: This is all a hack; we should have lazier deserialization
   /// of protocols separate from their conformances.
-  void recordImportedProtocols(const Decl *decl,
+  void recordImportedProtocols(Decl *decl,
                                ArrayRef<ProtocolDecl *> protocols) {
+    // Nothing to do for protocols.
+    if (isa<ProtocolDecl>(decl)) return;
+
     if (protocols.empty())
       return;
 
     ImportedProtocols[decl] = SwiftContext.AllocateCopy(protocols);
+
+    if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
+      nominal->setConformanceLoader(this, 0);
+    } else {
+      auto ext = cast<ExtensionDecl>(decl);
+      ext->setConformanceLoader(this, 0);
+    }
   }
 
   /// Retrieve the imported protocols for the given declaration.
