@@ -372,13 +372,10 @@ private struct EscapedTransforme<T>: WriteProt {
 // TESTSIL-NEXT: [[B1:%.*]] = begin_access [modify] [dynamic] [no_nested_conflict] [[REFADDR]]
 // TESTSIL: end_access [[B1]]
 // TESTSIL: [[BCONF:%.*]] = begin_access [modify] [dynamic] [[REFADDR]]
-// TESTSIL: apply {{.*}} : $@convention(method) (Int, @inout Array<UInt8>) -> ()
 // TESTSIL: end_access [[BCONF]]
 // TESTSIL: [[BCONF:%.*]] = begin_access [modify] [dynamic] [[REFADDR]]
-// TESTSIL: apply {{.*}} : $@convention(method) (Int, @inout Array<UInt8>) -> ()
 // TESTSIL: end_access [[BCONF]]
 // TESTSIL: [[BCONF:%.*]] = begin_access [modify] [dynamic] [[REFADDR]]
-// TESTSIL: apply {{.*}} : $@convention(method) (Int, @inout Array<UInt8>) -> ()
 // TESTSIL: end_access [[BCONF]]
 // TESTSIL-LABEL: } // end sil function '$s17merge_exclusivity14run_MergeTest9yySiF'
 @inline(never)

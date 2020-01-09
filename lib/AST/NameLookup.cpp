@@ -2507,7 +2507,8 @@ void FindLocalVal::visitGuardStmt(GuardStmt *S) {
     return;
 
   // Names in the guard aren't visible until after the body.
-  if (!isReferencePointInRange(S->getBody()->getSourceRange()))
+  if (S->getBody()->isImplicit() ||
+      !isReferencePointInRange(S->getBody()->getSourceRange()))
     checkStmtCondition(S->getCond());
 
   visit(S->getBody());
