@@ -3477,9 +3477,9 @@ public:
   void simplifyDisjunctionChoice(Constraint *choice);
 
   /// Apply the given function builder to the closure expression.
-  TypeMatchResult applyFunctionBuilder(ClosureExpr *closure, Type builderType,
-                                       ConstraintLocator *calleeLocator,
-                                       ConstraintLocatorBuilder locator);
+  TypeMatchResult matchFunctionBuilder(
+      AnyFunctionRef fn, Type builderType, Type bodyResultType,
+      ConstraintLocator *calleeLocator, ConstraintLocatorBuilder locator);
 
 private:
   /// The kind of bindings that are permitted.
