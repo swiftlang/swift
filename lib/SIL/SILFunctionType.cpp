@@ -1278,7 +1278,7 @@ static CanSILFunctionType getSILFunctionType(
     if (!subst.substGenericParams.empty()) {
       genericSig = GenericSignature::get(subst.substGenericParams,
                                          subst.substRequirements)
-        .getCanonicalSignature();
+                       .getCanonicalSignature();
       substitutions = SubstitutionMap::get(genericSig,
                                            subst.substReplacements,
                                            ArrayRef<ProtocolConformanceRef>());

@@ -3030,7 +3030,7 @@ void GenericTypeRequirements::emitInitOfBuffer(IRGenFunction &IGF,
   if (Requirements.empty()) return;
 
   auto generics =
-    TheDecl->getGenericSignatureOfContext().getCanonicalSignature();
+      TheDecl->getGenericSignatureOfContext().getCanonicalSignature();
   auto &module = *TheDecl->getParentModule();
   emitInitOfGenericRequirementsBuffer(IGF, Requirements, buffer,
                                       [&](GenericRequirement requirement) {

@@ -1686,7 +1686,7 @@ namespace {
       auto underlyingType = Type(O->getUnderlyingInterfaceType())
         .subst(*O->getUnderlyingTypeSubstitutions())
         ->getCanonicalType(sig);
-      
+
       auto contextSig = O->getGenericSignature().getCanonicalSignature();
 
       B.addRelativeAddress(IGM.getTypeRef(underlyingType, contextSig,

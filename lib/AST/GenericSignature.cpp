@@ -171,7 +171,7 @@ bool GenericSignatureImpl::isEqual(GenericSignature Other) {
 }
 
 bool GenericSignatureImpl::isCanonical() const {
-  if (CanonicalSignatureOrASTContext.is<ASTContext*>())
+  if (CanonicalSignatureOrASTContext.is<ASTContext *>())
     return true;
   return getCanonicalSignature().getPointer() == this;
 }

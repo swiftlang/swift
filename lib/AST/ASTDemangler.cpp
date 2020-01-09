@@ -865,12 +865,13 @@ CanGenericSignature ASTBuilder::demangleGenericSignature(
     }
   }
 
-  return evaluateOrDefault(
-      Ctx.evaluator,
-      AbstractGenericSignatureRequest{
-        nominalDecl->getGenericSignature().getPointer(), { },
-        std::move(requirements)},
-      GenericSignature()).getCanonicalSignature();
+  return evaluateOrDefault(Ctx.evaluator,
+                           AbstractGenericSignatureRequest{
+                               nominalDecl->getGenericSignature().getPointer(),
+                               {},
+                               std::move(requirements)},
+                           GenericSignature())
+      .getCanonicalSignature();
 }
 
 DeclContext *
@@ -980,8 +981,7 @@ ASTBuilder::findDeclContext(NodePointer node) {
         continue;
       }
 
-      if (ext->getGenericSignature().getCanonicalSignature()
-          == genericSig) {
+      if (ext->getGenericSignature().getCanonicalSignature() == genericSig) {
         return ext;
       }
     }

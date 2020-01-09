@@ -3277,9 +3277,9 @@ SILFunctionType::SILFunctionType(
             "types and substitutions");
         
   if (substitutions) {
-    assert(substitutions.getGenericSignature().getCanonicalSignature()
-             == genericSig.getCanonicalSignature()
-           && "substitutions must match generic signature");
+    assert(substitutions.getGenericSignature().getCanonicalSignature() ==
+               genericSig.getCanonicalSignature() &&
+           "substitutions must match generic signature");
   }
         
   if (genericSig) {
