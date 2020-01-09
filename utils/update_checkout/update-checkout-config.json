@@ -228,7 +228,7 @@
             "repos": {
                 "llvm-project": "swift/swift-5.1-branch",
                 "swift": "swift-5.1-branch",
-                "cmark": "master",
+                "cmark": "swift-5.1-branch",
                 "llbuild": "swift-5.1-branch",
                 "swiftpm": "swift-5.1-branch",
                 "swift-syntax": "swift-5.1-branch",
