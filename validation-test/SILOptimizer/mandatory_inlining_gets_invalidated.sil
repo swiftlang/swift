@@ -1,0 +1,35 @@
+// RUN: %target-sil-opt -compute-dominance-info -mandatory-inlining -enable-sil-verify-all %s
+
+// This test ensures that functions which are inlined into also get invalidated
+// with invalidateAnalysis.
+
+import Builtin
+import Swift
+
+sil @f : $@convention(thin) () -> () {
+bb0:
+  // function_ref g()
+  %0 = function_ref @g : $@convention(thin) () -> ()
+  %1 = apply %0() : $@convention(thin) () -> ()
+  %2 = tuple ()
+  return %2 : $()
+}
+
+sil [transparent] @h : $@convention(thin) () -> Builtin.Int1 {
+bb0:
+  %0 = integer_literal $Builtin.Int1, 0
+  br bb2
+bb1:
+  return %0 : $Builtin.Int1
+bb2:
+  br bb1
+}
+
+sil [transparent] @g : $@convention(thin) () -> () {
+bb0:
+  // function_ref h()
+  %0 = function_ref @h : $@convention(thin) () -> Builtin.Int1
+  %1 = apply %0() : $@convention(thin) () -> Builtin.Int1
+  %2 = tuple ()
+  return %2 : $()
+}

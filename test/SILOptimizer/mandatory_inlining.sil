@@ -960,9 +960,7 @@ bb0(%0 : $Builtin.Int8):
   return %5 : $Builtin.Int8
 }
 
-// We delete this now.
-//
-// CHECK-NOT: sil shared [transparent] @identity_closure
+// This isn't removed in Onone anymore.
 sil shared [transparent] @identity_closure : $@convention(thin) (Builtin.Int8) -> Builtin.Int8 {
 bb0(%0 : $Builtin.Int8):
   return %0 : $Builtin.Int8
