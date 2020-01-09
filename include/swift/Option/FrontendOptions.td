@@ -246,8 +246,10 @@ def debug_forbid_typecheck_prefix : Separate<["-"], "debug-forbid-typecheck-pref
 
 def debug_cycles : Flag<["-"], "debug-cycles">,
   HelpText<"Print out debug dumps when cycles are detected in evaluation">;
+def build_request_dependency_graph : Flag<["-"], "build-request-dependency-graph">,
+  HelpText<"Build request dependency graph">;
 def output_request_graphviz : Separate<["-"], "output-request-graphviz">,
-  HelpText<"Emit GraphViz output visualizing the request graph">;
+  HelpText<"Emit GraphViz output visualizing the request dependency graph">;
 
 def debug_time_compilation : Flag<["-"], "debug-time-compilation">,
   HelpText<"Prints the time taken by each compilation phase">;
