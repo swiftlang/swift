@@ -3836,6 +3836,53 @@ class TestData : TestDataSuper {
             }
         }
     }
+
+    func test_increaseCount() {
+        guard #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) else { return }
+        let initials: [Range<UInt8>] = [
+            0..<0,
+            0..<2,
+            0..<4,
+            0..<8,
+            0..<16,
+            0..<32,
+            0..<64
+        ]
+        let diffs = [0, 1, 2, 4, 8, 16, 32]
+        for initial in initials {
+            for diff in diffs {
+                var data = Data(initial)
+                data.count += diff
+                expectEqualSequence(
+                    Array(initial) + Array(repeating: 0, count: diff),
+                    data)
+            }
+        }
+    }
+
+    func test_decreaseCount() {
+        guard #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) else { return }
+        let initials: [Range<UInt8>] = [
+            0..<0,
+            0..<2,
+            0..<4,
+            0..<8,
+            0..<16,
+            0..<32,
+            0..<64
+        ]
+        let diffs = [0, 1, 2, 4, 8, 16, 32]
+        for initial in initials {
+            for diff in diffs {
+                guard initial.count >= diff else { continue }
+                var data = Data(initial)
+                data.count -= diff
+                expectEqualSequence(
+                    initial.dropLast(diff),
+                    data)
+            }
+        }
+    }
 }
 
 #if !FOUNDATION_XCTEST
@@ -4159,6 +4206,9 @@ if #available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *) {
     DataTests.test("test_nsdataSequence") { TestData().test_nsdataSequence() }
     DataTests.test("test_dispatchSequence") { TestData().test_dispatchSequence() }
 }
+DataTests.test("test_increaseCount") { TestData().test_increaseCount() }
+DataTests.test("test_decreaseCount") { TestData().test_decreaseCount() }
+
 
 // XCTest does not have a crash detection, whereas lit does
 DataTests.test("bounding failure subdata") {
