@@ -8544,7 +8544,7 @@ void ClangImporter::Implementation::loadAllMembersIntoExtension(
   startedImportingEntity();
 
   // Load the members.
-  for (auto entry : table->lookupGlobalsAsMembers(effectiveClangContext)) {
+  for (auto entry : table->allGlobalsAsMembersInContext(effectiveClangContext)) {
     auto decl = entry.get<clang::NamedDecl *>();
 
     // Only include members in the same submodule as this extension.
