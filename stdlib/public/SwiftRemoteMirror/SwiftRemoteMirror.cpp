@@ -413,6 +413,27 @@ int swift_reflection_projectExistential(SwiftReflectionContextRef ContextRef,
   return Success;
 }
 
+int swift_reflection_projectEnum(SwiftReflectionContextRef ContextRef,
+                                 swift_addr_t EnumAddress,
+                                 swift_typeref_t EnumTypeRef,
+                                 unsigned *CaseIndex,
+                                 swift_addr_t *PayloadAddr) {
+  auto Context = ContextRef->nativeContext;
+  auto EnumTR = reinterpret_cast<const TypeRef *>(EnumTypeRef);
+  auto RemoteEnumAddress = RemoteAddress(EnumAddress);
+  RemoteAddress RemotePayloadAddr(nullptr);
+  auto Success = Context->projectEnum(RemoteEnumAddress,
+                                      EnumTR,
+                                      CaseIndex,
+                                      &RemotePayloadAddr);
+
+  if (Success) {
+    *PayloadAddr = RemotePayloadAddr.getAddressData();
+  }
+
+  return Success;
+}
+
 void swift_reflection_dumpTypeRef(swift_typeref_t OpaqueTypeRef) {
   auto TR = reinterpret_cast<const TypeRef *>(OpaqueTypeRef);
   if (TR == nullptr) {

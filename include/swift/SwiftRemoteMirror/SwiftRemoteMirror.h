@@ -227,6 +227,13 @@ int swift_reflection_projectExistential(SwiftReflectionContextRef ContextRef,
                                         swift_typeref_t *OutInstanceTypeRef,
                                         swift_addr_t *OutStartOfInstanceData);
 
+SWIFT_REMOTE_MIRROR_LINKAGE
+int swift_reflection_projectEnum(SwiftReflectionContextRef ContextRef,
+                                 swift_addr_t EnumAddress,
+                                 swift_typeref_t EnumTypeRef,
+                                 unsigned *CaseIndex,
+                                 swift_addr_t *PayloadAddr);
+
 /// Dump a brief description of the typeref as a tree to stderr.
 SWIFT_REMOTE_MIRROR_LINKAGE
 void swift_reflection_dumpTypeRef(swift_typeref_t OpaqueTypeRef);

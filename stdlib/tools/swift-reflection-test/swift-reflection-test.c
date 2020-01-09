@@ -474,6 +474,22 @@ int reflectExistential(SwiftReflectionContextRef RC,
   swift_reflection_dumpInfoForTypeRef(RC, InstanceTypeRef);
   printf("\n");
 
+  swift_typeinfo_t InstanceTypeinfo =
+    swift_reflection_infoForTypeRef(RC, InstanceTypeRef);
+  if (InstanceTypeinfo.Kind == SWIFT_NO_PAYLOAD_ENUM ||
+      InstanceTypeinfo.Kind == SWIFT_SINGLE_PAYLOAD_ENUM ||
+      InstanceTypeinfo.Kind == SWIFT_MULTI_PAYLOAD_ENUM) {
+    unsigned CaseIndex;
+    swift_addr_t PayloadAddr;
+    if (!swift_reflection_projectEnum(RC, StartOfInstanceData, InstanceTypeRef,
+                                      &CaseIndex, &PayloadAddr)) {
+      printf("swift_reflection_projectEnum failed.\n");
+      PipeMemoryReader_sendDoneMessage(&Pipe);
+      return 0;
+    }
+    printf("Type info for case %u payload 0x%llx:\n", CaseIndex, PayloadAddr);
+  }
+
   PipeMemoryReader_sendDoneMessage(&Pipe);
   return 1;
 }
