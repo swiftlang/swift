@@ -4492,11 +4492,6 @@ namespace {
                              const clang::ObjCProtocolList &clangProtocols,
                              SmallVectorImpl<TypeLoc> &inheritedTypes);
 
-    /// Add conformances to the given Objective-C protocols to the
-    /// given declaration.
-    void addObjCProtocolConformances(Decl *decl,
-                                     ArrayRef<ProtocolDecl*> protocols);
-
     // Returns None on error. Returns nullptr if there is no type param list to
     // import or we suppress its import, as in the case of NSArray, NSSet, and
     // NSDictionary.
@@ -4517,7 +4512,6 @@ namespace {
     /// methods become class methods on NSObject).
     void importMirroredProtocolMembers(const clang::ObjCContainerDecl *decl,
                                        DeclContext *dc,
-                                       ArrayRef<ProtocolDecl *> protocols,
                                        SmallVectorImpl<Decl *> &members);
 
     void importNonOverriddenMirroredMethods(DeclContext *dc,
@@ -6860,22 +6854,7 @@ void SwiftDeclConverter::importObjCProtocols(
     }
   }
 
-  addObjCProtocolConformances(decl, protocols);
-}
-
-void SwiftDeclConverter::addObjCProtocolConformances(
-    Decl *decl, ArrayRef<ProtocolDecl *> protocols) {
-  // Nothing to do for protocols.
-  if (isa<ProtocolDecl>(decl)) return;
-
   Impl.recordImportedProtocols(decl, protocols);
-
-  if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
-    nominal->setConformanceLoader(&Impl, 0);
-  } else {
-    auto ext = cast<ExtensionDecl>(decl);
-    ext->setConformanceLoader(&Impl, 0);
-  }
 }
 
 Optional<GenericParamList *> SwiftDeclConverter::importObjCGenericParams(
@@ -6940,22 +6919,18 @@ Optional<GenericParamList *> SwiftDeclConverter::importObjCGenericParams(
 
 void SwiftDeclConverter::importMirroredProtocolMembers(
     const clang::ObjCContainerDecl *decl, DeclContext *dc,
-    ArrayRef<ProtocolDecl *> protocols, SmallVectorImpl<Decl *> &members) {
+    SmallVectorImpl<Decl *> &members) {
   assert(dc);
   const clang::ObjCInterfaceDecl *interfaceDecl = nullptr;
   const ClangModuleUnit *declModule;
   const ClangModuleUnit *interfaceModule;
-
-  // 'protocols' is, for some reason, the full recursive expansion of
-  // the protocol hierarchy, so there's no need to recursively descend
-  // into inherited protocols.
 
   // Try to import only the most specific methods with a particular name.
   // We use a MapVector to get deterministic iteration order later.
   llvm::MapVector<clang::Selector, std::vector<MirroredMethodEntry>>
     methodsByName;
 
-  for (auto proto : protocols) {
+  for (auto proto : Impl.getImportedProtocols(dc->getAsDecl())) {
     auto clangProto =
         cast_or_null<clang::ObjCProtocolDecl>(proto->getClangDecl());
     if (!clangProto)
@@ -8600,20 +8575,6 @@ bool ClangImporter::Implementation::addMemberAndAlternatesToExtension(
   return true;
 }
 
-static ExtensionDecl *
-figureOutTheDeclarationContextToImportInto(Decl *D, DeclContext *&DC,
-                                           IterableDeclContext *&IDC) {
-  if (auto *nominal = dyn_cast<NominalTypeDecl>(D)) {
-    DC = nominal;
-    IDC = nominal;
-    return nullptr;
-  }
-  ExtensionDecl *ext = cast<ExtensionDecl>(D);
-  DC = ext;
-  IDC = ext;
-  return ext;
-}
-
 static void loadMembersOfBaseImportedFromClang(ExtensionDecl *ext) {
   const NominalTypeDecl *base = ext->getExtendedNominal();
   auto *clangBase = base->getClangDecl();
@@ -8635,19 +8596,18 @@ void ClangImporter::Implementation::loadAllMembersOfObjcContainer(
                                     Instance->getSourceManager(),
                                     "loading members for");
 
-  DeclContext *DC;
-  IterableDeclContext *IDC;
-  if (ExtensionDecl *ext =
-          figureOutTheDeclarationContextToImportInto(D, DC, IDC)) {
-    // If the base is also imported from Clang, load its members first.
+  assert(isa<ExtensionDecl>(D) || isa<NominalTypeDecl>(D));
+  if (auto *ext = dyn_cast<ExtensionDecl>(D)) {
+    // If the extended type is also imported from Clang, load its members first.
     loadMembersOfBaseImportedFromClang(ext);
   }
 
   startedImportingEntity();
 
   SmallVector<Decl *, 16> members;
-  collectMembersToAdd(objcContainer, D, DC, members);
+  collectMembersToAdd(objcContainer, D, cast<DeclContext>(D), members);
 
+  auto *IDC = cast<IterableDeclContext>(D);
   for (auto member : members) {
     if (!isa<AccessorDecl>(member))
       IDC->addMember(member);
@@ -8701,8 +8661,6 @@ void ClangImporter::Implementation::collectMembersToAdd(
   }
 
   SwiftDeclConverter converter(*this, CurrentVersion);
-
-  auto protos = getImportedProtocols(D);
   if (auto clangClass = dyn_cast<clang::ObjCInterfaceDecl>(objcContainer)) {
     objcContainer = clangClass = clangClass->getDefinition();
     importInheritedConstructors(clangClass, cast<ClassDecl>(D), members);
@@ -8713,7 +8671,7 @@ void ClangImporter::Implementation::collectMembersToAdd(
   // Import mirrored declarations for protocols to which this category
   // or extension conforms.
   // FIXME: This is supposed to be a short-term hack.
-  converter.importMirroredProtocolMembers(objcContainer, DC, protos, members);
+  converter.importMirroredProtocolMembers(objcContainer, DC, members);
 }
 
 void ClangImporter::Implementation::loadAllConformances(
