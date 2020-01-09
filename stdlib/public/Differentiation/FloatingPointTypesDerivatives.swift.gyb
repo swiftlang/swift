@@ -1,0 +1,149 @@
+//===--- FloatingPointTypesDerivatives.swift.gyb --------------*- swift -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2020 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+import SwiftShims
+
+% from SwiftFloatingPointTypes import all_floating_point_types
+% for self_type in all_floating_point_types():
+% Self = self_type.stdlib_name
+
+/// Derivatives of standard unary operators.
+extension ${Self} {
+  @usableFromInline
+  @_transparent
+  @derivative(of: -)
+  static func _vjpNegate(x: ${Self})
+    -> (value: ${Self}, pullback: (${Self}) -> ${Self}) {
+    return (-x, { v in -v })
+  }
+
+  @usableFromInline
+  @_transparent
+  @derivative(of: -)
+  static func _jvpNegate(x: ${Self})
+  -> (value: ${Self}, differential: (${Self}) -> ${Self}) {
+    return (-x, { dx in -dx })
+  }
+}
+
+/// Derivatives of standard binary operators.
+extension ${Self} {
+  @inlinable // FIXME(sil-serialize-all)
+  @_transparent
+  @derivative(of: +)
+  static func _vjpAdd(
+    lhs: ${Self}, rhs: ${Self}
+  ) -> (value: ${Self}, pullback: (${Self}) -> (${Self}, ${Self})) {
+    return (lhs + rhs, { v in (v, v) })
+  }
+
+  @inlinable // FIXME(sil-serialize-all)
+  @_transparent
+  @derivative(of: +)
+  static func _jvpAdd(
+    lhs: ${Self}, rhs: ${Self}
+  ) -> (value: ${Self}, differential: (${Self}, ${Self}) -> ${Self}) {
+    return (lhs + rhs, { (dlhs, drhs) in dlhs + drhs })
+  }
+
+  @inlinable // FIXME(sil-serialize-all)
+  @_transparent
+  @derivative(of: -)
+  static func _vjpSubtract(
+    lhs: ${Self}, rhs: ${Self}
+  ) -> (value: ${Self}, pullback: (${Self}) -> (${Self}, ${Self})) {
+    return (lhs - rhs, { v in (v, -v) })
+  }
+
+  @inlinable // FIXME(sil-serialize-all)
+  @_transparent
+  @derivative(of: -)
+  static func _jvpSubtract(
+    lhs: ${Self}, rhs: ${Self}
+  ) -> (value: ${Self}, differential: (${Self}, ${Self}) -> ${Self}) {
+    return (lhs - rhs, { (dlhs, drhs) in dlhs - drhs })
+  }
+
+  @inlinable // FIXME(sil-serialize-all)
+  @_transparent
+  @derivative(of: *)
+  static func _vjpMultiply(
+    lhs: ${Self}, rhs: ${Self}
+  ) -> (value: ${Self}, pullback: (${Self}) -> (${Self}, ${Self})) {
+    return (lhs * rhs, { v in (rhs * v, lhs * v) })
+  }
+
+  @inlinable // FIXME(sil-serialize-all)
+  @_transparent
+  @derivative(of: *)
+  static func _jvpMultiply(
+    lhs: ${Self}, rhs: ${Self}
+  ) -> (value: ${Self}, differential: (${Self}, ${Self}) -> ${Self}) {
+    return (lhs * rhs, { (dlhs, drhs) in lhs * drhs + rhs * dlhs })
+  }
+
+  @inlinable // FIXME(sil-serialize-all)
+  @_transparent
+  @derivative(of: /)
+  static func _vjpDivide(
+    lhs: ${Self}, rhs: ${Self}
+  ) -> (value: ${Self}, pullback: (${Self}) -> (${Self}, ${Self})) {
+    return (lhs / rhs, { v in (v / rhs, -lhs / (rhs * rhs) * v) })
+  }
+
+  @inlinable // FIXME(sil-serialize-all)
+  @_transparent
+  @derivative(of: /)
+  static func _jvpDivide(
+    lhs: ${Self}, rhs: ${Self}
+  ) -> (value: ${Self}, differential: (${Self}, ${Self}) -> ${Self}) {
+    return (lhs / rhs, { (dlhs, drhs) in dlhs / rhs - lhs / (rhs * rhs) * drhs })
+  }
+}
+
+extension ${Self} : EuclideanDifferentiable {
+  public typealias TangentVector = ${Self}
+
+  public mutating func move(along direction: TangentVector) {
+    self += direction
+  }
+}
+
+extension ${Self} : VectorProtocol {
+  public typealias VectorSpaceScalar = ${Self}
+
+  public func adding(_ x: ${Self}) -> ${Self} {
+    self + x
+  }
+
+  public mutating func add(_ x: ${Self}) {
+    self += x
+  }
+
+  public func subtracting(_ x: ${Self}) -> ${Self} {
+    self - x
+  }
+
+  public mutating func subtract(_ x: ${Self}) {
+    self -= x
+  }
+
+  public func scaled(by scalar: ${Self}) -> ${Self} {
+    self * scalar
+  }
+
+  public mutating func scale(by scalar: ${Self}) {
+    self *= scalar
+  }
+}
+
+% end

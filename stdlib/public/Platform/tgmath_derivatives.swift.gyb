@@ -1,0 +1,221 @@
+// SWIFT_ENABLE_TENSORFLOW
+
+//===--- tgmath_derivatives.swift.gyb -------------------------*- swift -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2020 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+@usableFromInline
+@derivative(of: sqrt)
+func _vjpSqrt<T: FloatingPoint & Differentiable> (
+  _ x: T
+) -> (value: T, pullback: (T) -> T) where T == T.TangentVector {
+  let value = sqrt(x)
+  return (value, { v in v / (2 * value) })
+}
+
+@usableFromInline
+@derivative(of: fma)
+func _vjpFma<T: FloatingPoint & Differentiable> (
+  _ x: T,
+  _ y: T,
+  _ z: T
+) -> (value: T, pullback: (T) -> (T, T, T)) where T == T.TangentVector {
+  return (fma(x, y, z), { v in (v * y, v * x, v) })
+}
+
+@usableFromInline
+@derivative(of: remainder)
+func _vjpRemainder<T: FloatingPoint & Differentiable> (
+  _ x: T,
+  _ y: T
+) -> (value: T, pullback: (T) -> (T, T)) where T == T.TangentVector {
+  return (remainder(x, y), { v in (v, -v * ((x / y).rounded(.toNearestOrEven))) })
+}
+
+@usableFromInline
+@derivative(of: fmod)
+func _vjpFmod<T: FloatingPoint & Differentiable> (
+  _ x: T,
+  _ y: T
+) -> (value: T, pullback: (T) -> (T, T)) where T == T.TangentVector {
+  return (fmod(x, y), { v in (v, -v * ((x / y).rounded(.towardZero))) })
+}
+
+@usableFromInline
+@derivative(of: ceil)
+func _vjpCeil<T: FloatingPoint & Differentiable> (
+  _ x: T
+) -> (value: T, pullback: (T) -> T) where T == T.TangentVector {
+  return (ceil(x), { v in 0 })
+}
+
+@usableFromInline
+@derivative(of: floor)
+func _vjpFloor<T: FloatingPoint & Differentiable> (
+  _ x: T
+) -> (value: T, pullback: (T) -> T) where T == T.TangentVector {
+  return (floor(x), { v in 0 })
+}
+
+@usableFromInline
+@derivative(of: round)
+func _vjpRound<T: FloatingPoint & Differentiable> (
+  _ x: T
+) -> (value: T, pullback: (T) -> T) where T == T.TangentVector {
+  return (round(x), { v in 0 })
+}
+
+@usableFromInline
+@derivative(of: trunc)
+func _vjpTrunc<T: FloatingPoint & Differentiable> (
+  _ x: T
+) -> (value: T, pullback: (T) -> T) where T == T.TangentVector {
+  return (trunc(x), { v in 0 })
+}
+
+%for T in ['Float', 'Double', 'Float80']:
+%   if T == 'Float80':
+#if !(os(Windows) || os(Android)) && (arch(i386) || arch(x86_64))
+%   end
+@inlinable
+@derivative(of: exp)
+func _vjpExp(_ x: ${T}) -> (value: ${T}, pullback: (${T}) -> ${T}) {
+  let value = exp(x)
+  return (value, { v in value * v })
+}
+
+@inlinable
+@derivative(of: exp2)
+func _vjpExp2(_ x: ${T}) -> (value: ${T}, pullback: (${T}) -> ${T}) {
+  let value = exp2(x)
+  return (value, { v in v * ${T}(M_LN2) * value })
+}
+
+@inlinable
+@derivative(of: log)
+func _vjpLog(_ x: ${T}) -> (value: ${T}, pullback: (${T}) -> ${T}) {
+  return (log(x), { v in v / x })
+}
+
+@inlinable
+@derivative(of: log10)
+func _vjpLog10(_ x: ${T}) -> (value: ${T}, pullback: (${T}) -> ${T}) {
+  return (log10(x), { v in v * ${T}(M_LOG10E) / x })
+}
+
+@inlinable
+@derivative(of: log2)
+func _vjpLog2(_ x: ${T}) -> (value: ${T}, pullback: (${T}) -> ${T}) {
+  return (log2(x), { v in v / (${T}(M_LN2) * x) })
+}
+
+@inlinable
+@derivative(of: sin)
+func _vjpSin(_ x: ${T}) -> (value: ${T}, pullback: (${T}) -> ${T}) {
+  return (sin(x), { v in v * cos(x) })
+}
+
+@inlinable
+@derivative(of: cos)
+func _vjpCos(_ x: ${T}) -> (value: ${T}, pullback: (${T}) -> ${T}) {
+  return (cos(x), { v in -v * sin(x) })
+}
+
+@inlinable
+@derivative(of: tan)
+func _vjpTan(_ x: ${T}) -> (value: ${T}, pullback: (${T}) -> ${T}) {
+  let value = tan(x)
+  return (value, { v in v * (1 + value * value) })
+}
+
+@inlinable
+@derivative(of: asin)
+func _vjpAsin(_ x: ${T}) -> (value: ${T}, pullback: (${T}) -> ${T}) {
+  return (asin(x), { v in v / sqrt(1 - x * x) })
+}
+
+@inlinable
+@derivative(of: acos)
+func _vjpAcos(_ x: ${T}) -> (value: ${T}, pullback: (${T}) -> ${T}) {
+  return (acos(x), { v in -v / sqrt(1 - x * x) })
+}
+
+@inlinable
+@derivative(of: atan)
+func _vjpAtan(_ x: ${T}) -> (value: ${T}, pullback: (${T}) -> ${T}) {
+  return (atan(x), { v in v / (1 + x * x) })
+}
+
+@inlinable
+@derivative(of: sinh)
+func _vjpSinh(_ x: ${T}) -> (value: ${T}, pullback: (${T}) -> ${T}) {
+  return (sinh(x), { v in v * cosh(x) })
+}
+
+@inlinable
+@derivative(of: cosh)
+func _vjpCosh(_ x: ${T}) -> (value: ${T}, pullback: (${T}) -> ${T}) {
+  return (cosh(x), { v in v * sinh(x) })
+}
+
+@inlinable
+@derivative(of: tanh)
+func _vjpTanh(_ x: ${T}) -> (value: ${T}, pullback: (${T}) -> ${T}) {
+  let value = tanh(x)
+  return (value, { v in v * (1 - value * value) })
+}
+
+@inlinable
+@derivative(of: asinh)
+func _vjpAsinh(_ x: ${T}) -> (value: ${T}, pullback: (${T}) -> ${T}) {
+  return (asinh(x), { v in v / sqrt(1 + x * x) })
+}
+
+@inlinable
+@derivative(of: acosh)
+func _vjpAcosh(_ x: ${T}) -> (value: ${T}, pullback: (${T}) -> ${T}) {
+  return (acosh(x), { v in v / sqrt(x * x - 1) })
+}
+
+@inlinable
+@derivative(of: atanh)
+func _vjpAtanh(_ x: ${T}) -> (value: ${T}, pullback: (${T}) -> ${T}) {
+  return (atanh(x), { v in v / (1 - x * x) })
+}
+
+@inlinable
+@derivative(of: expm1)
+func _vjpExpm1(_ x: ${T}) -> (value: ${T}, pullback: (${T}) -> ${T}) {
+  return (expm1(x), { v in exp(x) * v })
+}
+
+@inlinable
+@derivative(of: log1p)
+func _vjpLog1p(_ x: ${T}) -> (value: ${T}, pullback: (${T}) -> ${T}) {
+  return (log1p(x), { v in v / (x + 1) })
+}
+
+@inlinable
+@derivative(of: erf)
+func _vjpErf(_ x: ${T}) -> (value: ${T}, pullback: (${T}) -> ${T}) {
+  return (erf(x), { v in v * ${T}(M_2_SQRTPI) * exp(-x * x) })
+}
+
+@inlinable
+@derivative(of: erfc)
+func _vjpErfc(_ x: ${T}) -> (value: ${T}, pullback: (${T}) -> ${T}) {
+  return (erfc(x), { v in v * -${T}(M_2_SQRTPI) * exp(-x * x) })
+}
+
+%   if T == 'Float80':
+#endif
+%   end
+%end
