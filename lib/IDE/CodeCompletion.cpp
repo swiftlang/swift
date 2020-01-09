@@ -4207,14 +4207,23 @@ public:
       return nullptr;
 
     Type ResultT;
-    if (auto *FD = dyn_cast<FuncDecl>(VD))
+    if (auto *FD = dyn_cast<FuncDecl>(VD)) {
+      if (FD->getGenericParams()) {
+        // Generic function cannot have opaque result type.
+        return nullptr;
+      }
       ResultT = FD->getResultInterfaceType();
-    else if (auto *SD = dyn_cast<SubscriptDecl>(VD))
+    } else if (auto *SD = dyn_cast<SubscriptDecl>(VD)) {
+      if (SD->getGenericParams()) {
+        // Generic subscript cannot have opaque result type.
+        return nullptr;
+      }
       ResultT = SD->getElementInterfaceType();
-    else if (auto *VarD = dyn_cast<VarDecl>(VD))
+    } else if (auto *VarD = dyn_cast<VarDecl>(VD)) {
       ResultT = VarD->getInterfaceType();
-    else
+    } else {
       return nullptr;
+    }
 
     if (!ResultT->is<DependentMemberType>() ||
         !ResultT->castTo<DependentMemberType>()->getAssocType())
