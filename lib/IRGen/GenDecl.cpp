@@ -4056,15 +4056,6 @@ llvm::GlobalValue *IRGenModule::defineBaseConformanceDescriptor(
 llvm::Constant *IRGenModule::getAddrOfProtocolConformanceDescriptor(
                                 const RootProtocolConformance *conformance,
                                 ConstantInit definition) {
-  // If we're compiling the stdlib, we might (we are) already be asking for a
-  // builtin conformance descriptor somewhere. Make sure we initialize them
-  // first.
-  if (isa<BuiltinProtocolConformance>(conformance) &&
-      getSwiftModule()->isStdlibModule() &&
-      !definition) {
-    emitBuiltinProtocolConformances();
-  }
-
   IRGen.addLazyWitnessTable(conformance);
 
   auto entity = LinkEntity::forProtocolConformanceDescriptor(conformance);
