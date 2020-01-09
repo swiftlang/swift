@@ -28,6 +28,7 @@
 namespace swift {
 
 class AnyFunctionType;
+class TupleType;
 
 /// A function type differentiability kind.
 enum class DifferentiabilityKind : uint8_t {
@@ -131,6 +132,74 @@ public:
       return getName() == other.getName();
     return getKind() == Kind::Self;
   }
+};
+
+/// The tangent space of a type.
+///
+/// For `Differentiable`-conforming types:
+/// - The tangent space is the `TangentVector` associated type.
+///
+/// For tuple types:
+/// - The tangent space is a tuple of the elements' tangent space types, for the
+///   elements that have a tangent space.
+///
+/// Other types have no tangent space.
+class TangentSpace {
+public:
+  /// A tangent space kind.
+  enum class Kind {
+    /// The `TangentVector` associated type of a `Differentiable`-conforming
+    /// type.
+    TangentVector,
+    /// A product of tangent spaces as a tuple.
+    Tuple
+  };
+
+private:
+  Kind kind;
+  union Value {
+    // TangentVector
+    Type tangentVectorType;
+    // Tuple
+    TupleType *tupleType;
+
+    Value(Type tangentVectorType) : tangentVectorType(tangentVectorType) {}
+    Value(TupleType *tupleType) : tupleType(tupleType) {}
+  } value;
+
+  TangentSpace(Kind kind, Value value) : kind(kind), value(value) {}
+
+public:
+  TangentSpace() = delete;
+
+  static TangentSpace getTangentVector(Type tangentVectorType) {
+    return {Kind::TangentVector, tangentVectorType};
+  }
+  static TangentSpace getTuple(TupleType *tupleTy) {
+    return {Kind::Tuple, tupleTy};
+  }
+
+  bool isTangentVector() const { return kind == Kind::TangentVector; }
+  bool isTuple() const { return kind == Kind::Tuple; }
+
+  Kind getKind() const { return kind; }
+  Type getTangentVector() const {
+    assert(kind == Kind::TangentVector);
+    return value.tangentVectorType;
+  }
+  TupleType *getTuple() const {
+    assert(kind == Kind::Tuple);
+    return value.tupleType;
+  }
+
+  /// Get the tangent space type.
+  Type getType() const;
+
+  /// Get the tangent space canonical type.
+  CanType getCanonicalType() const;
+
+  /// Get the underlying nominal type declaration of the tangent space type.
+  NominalTypeDecl *getNominal() const;
 };
 
 /// Automatic differentiation utility namespace.

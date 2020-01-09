@@ -284,6 +284,9 @@ public:
   /// across invocations of both the parser and the type-checker.
   unsigned NextAutoClosureDiscriminator = 0;
 
+  /// Cached mapping from types to their associated tangent spaces.
+  llvm::DenseMap<Type, Optional<TangentSpace>> AutoDiffTangentSpaces;
+
   /// Cache of `@derivative` attributes keyed by parameter indices and
   /// derivative function kind. Used to diagnose duplicate `@derivative`
   /// attributes for the same key.
