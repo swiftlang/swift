@@ -4432,10 +4432,12 @@ ASTContext::getOverrideGenericSignature(const ValueDecl *base,
                                         const ValueDecl *derived) {
   auto baseGenericCtx = base->getAsGenericContext();
   auto derivedGenericCtx = derived->getAsGenericContext();
-  auto &ctx = base->getASTContext();
 
   if (!baseGenericCtx || !derivedGenericCtx)
     return nullptr;
+
+  if (base == derived)
+    return derivedGenericCtx->getGenericSignature();
 
   auto baseClass = base->getDeclContext()->getSelfClassDecl();
   if (!baseClass)
@@ -4492,7 +4494,7 @@ ASTContext::getOverrideGenericSignature(const ValueDecl *base,
     }
 
     return CanGenericTypeParamType::get(
-        gp->getDepth() - baseDepth + derivedDepth, gp->getIndex(), ctx);
+        gp->getDepth() - baseDepth + derivedDepth, gp->getIndex(), *this);
   };
 
   auto lookupConformanceFn =
@@ -4512,7 +4514,7 @@ ASTContext::getOverrideGenericSignature(const ValueDecl *base,
   }
 
   auto genericSig = evaluateOrDefault(
-      ctx.evaluator,
+      evaluator,
       AbstractGenericSignatureRequest{
         derivedClass->getGenericSignature().getPointer(),
         std::move(addedGenericParams),
