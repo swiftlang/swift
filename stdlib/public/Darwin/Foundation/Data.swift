@@ -1415,6 +1415,66 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
             }
         }
 
+        @inlinable
+        @usableFromInline
+        @_alwaysEmitIntoClient
+        internal mutating func _truncateOrZeroExtend(toCount newCount: Int) {
+            switch self {
+            case .empty:
+                if newCount == 0 {
+                    return
+                } else if InlineData.canStore(count: newCount) {
+                    self = .inline(InlineData(count: newCount))
+                } else if InlineSlice.canStore(count: newCount) {
+                    self = .slice(InlineSlice(count: newCount))
+                } else {
+                    self = .large(LargeSlice(count: newCount))
+                }
+            case .inline(var inline):
+                if newCount == 0 {
+                    self = .empty
+                } else if InlineData.canStore(count: newCount) {
+                    guard inline.count != newCount else { return }
+                    inline.count = newCount
+                    self = .inline(inline)
+                } else if InlineSlice.canStore(count: newCount) {
+                    var slice = InlineSlice(inline)
+                    slice.count = newCount
+                    self = .slice(slice)
+                } else {
+                    var slice = LargeSlice(inline)
+                    slice.count = newCount
+                    self = .large(slice)
+                }
+            case .slice(var slice):
+                if newCount == 0 && slice.startIndex == 0 {
+                    self = .empty
+                } else if slice.startIndex == 0 && InlineData.canStore(count: newCount) {
+                    self = .inline(InlineData(slice, count: newCount))
+                } else if InlineSlice.canStore(count: newCount + slice.startIndex) {
+                    guard slice.count != newCount else { return }
+                    self = .empty // TODO: remove this when mgottesman lands optimizations
+                    slice.count = newCount
+                    self = .slice(slice)
+                } else {
+                    var newSlice = LargeSlice(slice)
+                    newSlice.count = newCount
+                    self = .large(newSlice)
+                }
+            case .large(var slice):
+                if newCount == 0 && slice.startIndex == 0 {
+                    self = .empty
+                } else if slice.startIndex == 0 && InlineData.canStore(count: newCount) {
+                    self = .inline(InlineData(slice, count: newCount))
+                } else {
+                    guard slice.count != newCount else { return }
+                    self = .empty // TODO: remove this when mgottesman lands optimizations
+                    slice.count = newCount
+                    self = .large(slice)
+                }
+            }
+        }
+
         @inlinable // This is @inlinable as reasonably small.
         var count: Int {
             get {
@@ -1426,69 +1486,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
                 }
             }
             set(newValue) {
-                // HACK: The definition of this inline function takes an inout reference to self, giving the optimizer a unique referencing guarantee.
-                //       This allows us to avoid excessive retain-release traffic around modifying enum values, and inlining the function then avoids the additional frame.
-                @inline(__always)
-                func apply(_ representation: inout _Representation, _ newValue: Int) -> _Representation? {
-                    switch representation {
-                    case .empty:
-                        if newValue == 0 {
-                            return nil
-                        } else if InlineData.canStore(count: newValue) {
-                            return .inline(InlineData(count: newValue))
-                        } else if InlineSlice.canStore(count: newValue) {
-                            return .slice(InlineSlice(count: newValue))
-                        } else {
-                            return .large(LargeSlice(count: newValue))
-                        }
-                    case .inline(var inline):
-                        if newValue == 0 {
-                            return .empty
-                        } else if InlineData.canStore(count: newValue) {
-                            guard inline.count != newValue else { return nil }
-                            inline.count = newValue
-                            return .inline(inline)
-                        } else if InlineSlice.canStore(count: newValue) {
-                            var slice = InlineSlice(inline)
-                            slice.count = newValue
-                            return .slice(slice)
-                        } else {
-                            var slice = LargeSlice(inline)
-                            slice.count = newValue
-                            return .large(slice)
-                        }
-                    case .slice(var slice):
-                        if newValue == 0 && slice.startIndex == 0 {
-                            return .empty
-                        } else if slice.startIndex == 0 && InlineData.canStore(count: newValue) {
-                            return .inline(InlineData(slice, count: newValue))
-                        } else if InlineSlice.canStore(count: newValue + slice.startIndex) {
-                            guard slice.count != newValue else { return nil }
-                            representation = .empty // TODO: remove this when mgottesman lands optimizations
-                            slice.count = newValue
-                            return .slice(slice)
-                        } else {
-                            var newSlice = LargeSlice(slice)
-                            newSlice.count = newValue
-                            return .large(newSlice)
-                        }
-                    case .large(var slice):
-                        if newValue == 0 && slice.startIndex == 0 {
-                            return .empty
-                        } else if slice.startIndex == 0 && InlineData.canStore(count: newValue) {
-                            return .inline(InlineData(slice, count: newValue))
-                        } else {
-                            guard slice.count != newValue else { return nil}
-                            representation = .empty // TODO: remove this when mgottesman lands optimizations
-                            slice.count = newValue
-                            return .large(slice)
-                        }
-                    }
-                }
-
-                if let rep = apply(&self, newValue) {
-                    self = rep
-                }
+                _truncateOrZeroExtend(toCount: newValue)
             }
         }
 
@@ -2388,16 +2386,16 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
         // Copy as much as we can in one shot.
         let underestimatedCount = elements.underestimatedCount
         let originalCount = _representation.count
-        _representation.count += underestimatedCount
-        var (iter, endIndex): (S.Iterator, Int) = _representation.withUnsafeMutableBytes { buffer in
+        _representation._truncateOrZeroExtend(toCount: originalCount + underestimatedCount)
+        var (iter, copiedCount): (S.Iterator, Int) = _representation.withUnsafeMutableBytes { buffer in
             let start = buffer.baseAddress!.assumingMemoryBound(to: UInt8.self) + originalCount
             let b = UnsafeMutableBufferPointer(start: start, count: buffer.count - originalCount)
             return elements._copyContents(initializing: b)
         }
-        guard endIndex == underestimatedCount else {
+        guard copiedCount == underestimatedCount else {
             // We can't trap here. We have to allow an underfilled buffer
             // to emulate the previous implementation.
-            _representation.replaceSubrange(originalCount + endIndex ..< _representation.endIndex, with: nil, count: 0)
+            _representation._truncateOrZeroExtend(toCount: originalCount + copiedCount)
             return
         }
 
