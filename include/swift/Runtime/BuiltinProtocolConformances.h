@@ -58,6 +58,15 @@ namespace swift {
           MANGLE_SYM(MANGLING_CONCAT2(_PROTOCOL_CONFORMANCE_SYM(Ty, Proto, s), \
                               BUILTIN_PROTOCOL_CONFORMANCE_DESCRIPTOR_MANGLING))
 
+struct _WitnessTable1 {
+  const ProtocolConformanceDescriptor *Conformance;
+  const void *Witness;
+};
+
+SWIFT_RUNTIME_EXPORT
+const _WitnessTable1 BUILTIN_PROTOCOL_WITNESS_TABLE_SYM(VARIADIC_TUPLE_MANGLING,
+                                                      SWIFT_EQUATABLE_MANGLING);
+
 /// The protocol witness for static Swift.Equatable.== infix(A, A) -> Swift.Bool
 /// in conformance (A...): Swift.Equatable in Swift.
 SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)

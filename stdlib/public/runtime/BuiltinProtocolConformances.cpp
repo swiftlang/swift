@@ -24,6 +24,21 @@ using namespace swift;
 extern const ProtocolDescriptor
 PROTOCOL_DESCRIPTOR_SYM(SWIFT_EQUATABLE_MANGLING);
 
+extern const ProtocolConformanceDescriptor
+BUILTIN_PROTOCOL_CONFORMANCE_DESCRIPTOR_SYM(VARIADIC_TUPLE_MANGLING,
+                                            SWIFT_EQUATABLE_MANGLING);
+
+SWIFT_RUNTIME_EXPORT
+const _WitnessTable1 swift::
+BUILTIN_PROTOCOL_WITNESS_TABLE_SYM(VARIADIC_TUPLE_MANGLING,
+                                   SWIFT_EQUATABLE_MANGLING) = {
+  &BUILTIN_PROTOCOL_CONFORMANCE_DESCRIPTOR_SYM(VARIADIC_TUPLE_MANGLING,
+                                               SWIFT_EQUATABLE_MANGLING),
+  reinterpret_cast<void *>(BUILTIN_PROTOCOL_WITNESS_SYM(VARIADIC_TUPLE_MANGLING,
+                                                       SWIFT_EQUATABLE_MANGLING,
+                                                 SWIFT_EQUAL_OPERATOR_MANGLING))
+};
+
 SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
 bool swift::
 BUILTIN_PROTOCOL_WITNESS_SYM(VARIADIC_TUPLE_MANGLING,
@@ -54,7 +69,7 @@ BUILTIN_PROTOCOL_WITNESS_SYM(VARIADIC_TUPLE_MANGLING,
                   reinterpret_cast<char *>(tuple2) + elt.Offset);
 
     // Grab the specific witness for this element type.
-    auto table = reinterpret_cast<void *const *>(conformance);
+    auto table = reinterpret_cast<void * const *>(conformance);
     auto witness = table[WitnessTableFirstRequirementOffset];
     using Fn = SWIFT_CC(swift) bool(OpaqueValue *, OpaqueValue *,
                                     SWIFT_CONTEXT const Metadata *,

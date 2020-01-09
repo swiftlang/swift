@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend -emit-ir %s | %FileCheck %s
 
-// CHECK-LABEL: @"$sxd_tSQsMb" = external global %swift.protocol_conformance_descriptor
+// CHECK-LABEL: @"$sxd_tSQsWB" = external global i8*
 
 struct Wrapper<T> {
   let value: T
@@ -19,19 +19,17 @@ public func use<T: Equatable>(_ thing: T) -> Bool {
 
   // CHECK: [[GENERIC_TUPLE_RESPONSE:%.*]] = call swiftcc %swift.metadata_response @swift_getTupleTypeMetadata2(i64 0, %swift.type* %T, %swift.type* %T, i8* null, i8** null)
   // CHECK-NEXT: [[GENERIC_TUPLE_TYPE:%.*]] = extractvalue %swift.metadata_response [[GENERIC_TUPLE_RESPONSE]], 0
-  // CHECK-NEXT: [[GENERIC_TUPLE_WITNESS_TABLE:%.*]] = call i8** @swift_getWitnessTable(%swift.protocol_conformance_descriptor* @"$sxd_tSQsMb", %swift.type* [[GENERIC_TUPLE_TYPE]], i8*** undef)
-  // CHECK-NEXT: {{%.*}} = call swiftcc i1 {{.*}}(%swift.opaque* noalias nocapture {{%.*}}, %swift.opaque* noalias nocapture {{%.*}}, %swift.type* [[GENERIC_TUPLE_TYPE]], i8** [[GENERIC_TUPLE_WITNESS_TABLE]])
+  // CHECK-NEXT: {{%.*}} = call swiftcc i1 {{.*}}(%swift.opaque* noalias nocapture {{%.*}}, %swift.opaque* noalias nocapture {{%.*}}, %swift.type* [[GENERIC_TUPLE_TYPE]], i8** @"$sxd_tSQsWB")
 
   equals((thing, thing), (thing, thing))
 }
 
 public func test() {
-  // CHECK: [[VOID_WITNESS_TABLE_0:%.*]] = call i8** @swift_getWitnessTable(%swift.protocol_conformance_descriptor* @"$sxd_tSQsMb", %swift.type* {{.*}}, i8*** undef)
-  // CHECK-NEXT: {{%.*}} = call swiftcc i1 {{.*}}(%swift.opaque* noalias nocapture undef, %swift.opaque* noalias nocapture undef, %swift.type* getelementptr inbounds (%swift.full_type, %swift.full_type* @"$sytN", i32 0, i32 1), i8** [[VOID_WITNESS_TABLE_0]])
+  // CHECK: {{%.*}} = call swiftcc i1 {{.*}}(%swift.opaque* noalias nocapture undef, %swift.opaque* noalias nocapture undef, %swift.type* getelementptr inbounds (%swift.full_type, %swift.full_type* @"$sytN", i32 0, i32 1), i8** @"$sxd_tSQsWB")
 
   let _ = equals((), ())
 
-  // CHECK: {{%.*}} = call swiftcc i1 {{.*}}({{%.*}}.0* noalias nocapture undef, {{%.*}}.0* noalias nocapture undef, %swift.type* getelementptr inbounds (%swift.full_type, %swift.full_type* @"$sytN", i32 0, i32 1), i8** [[VOID_WITNESS_TABLE_0]])
+  // CHECK: {{%.*}} = call swiftcc i1 {{.*}}({{%.*}}.0* noalias nocapture undef, {{%.*}}.0* noalias nocapture undef, %swift.type* getelementptr inbounds (%swift.full_type, %swift.full_type* @"$sytN", i32 0, i32 1), i8** @"$sxd_tSQsWB")
 
   let _ = Wrapper(value: ()) == Wrapper(value: ())
 }

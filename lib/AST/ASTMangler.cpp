@@ -202,7 +202,20 @@ std::string ASTMangler::mangleWitnessTable(const RootProtocolConformance *C) {
     appendProtocolName(cast<SelfProtocolConformance>(C)->getProtocol());
     appendOperator("WS");
   } else if (isa<BuiltinProtocolConformance>(C)) {
-    appendProtocolConformance(C);
+
+    // Builtin conformances are a little different. Currently we only have
+    // conformances for tuples, but we emit a single witness table for them so
+    // mangle something like a variadic tuple.
+    if (C->getType()->is<TupleType>()) {
+      // This is equivalent to (A...). We don't currently have variadic generic
+      // mangling.
+      appendOperator("xd_t");
+    } else {
+      llvm_unreachable("unknown builtin type");
+    }
+
+    appendProtocolName(C->getProtocol());
+    appendOperator("s");
     appendOperator("WB");
   } else {
     llvm_unreachable("mangling unknown conformance kind");

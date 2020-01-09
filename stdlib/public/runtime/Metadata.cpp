@@ -4264,32 +4264,30 @@ static void initializeResilientWitnessTable(
 extern const ProtocolDescriptor
 PROTOCOL_DESCRIPTOR_SYM(SWIFT_EQUATABLE_MANGLING);
 
-/// If this conformance is builtin, find the builtin witnesses in the runtime
-/// and use those as the witnesses for newly created witness tables.
-static void initializeBuiltinWitnessTable(
-                              const ProtocolConformanceDescriptor *conformance,
-                              const Metadata *conformingType,
-                              void **table) {
+/// If this conformance is builtin, find the builtin witness table in the
+/// runtime and return that.
+static const WitnessTable *findBuiltinWitnessTable(
+                             const ProtocolConformanceDescriptor *conformance) {
   auto protocol = conformance->getProtocol();
   auto metadataKind = conformance->getMetadataKind();
 
   switch (metadataKind) {
     case MetadataKind::Tuple: {
       if (protocol == &PROTOCOL_DESCRIPTOR_SYM(SWIFT_EQUATABLE_MANGLING)) {
-        table[WitnessTableFirstRequirementOffset] =
-          (void *)BUILTIN_PROTOCOL_WITNESS_SYM(VARIADIC_TUPLE_MANGLING,
-                                               SWIFT_EQUATABLE_MANGLING,
-                                               SWIFT_EQUAL_OPERATOR_MANGLING);
+        auto table = &BUILTIN_PROTOCOL_WITNESS_TABLE_SYM(
+                                                      VARIADIC_TUPLE_MANGLING,
+                                                      SWIFT_EQUATABLE_MANGLING);
+        return reinterpret_cast<const WitnessTable *>(table);
       } else {
         swift_runtime_unreachable(
-          "initializing builtin witness table for unknown protocol");
+          "finding witness table for unknown protocol for tuple conformance");
       }
 
       break;
     }
     default:
       swift_runtime_unreachable(
-        "initializing witness table for unknown builtin type");
+        "finding witness table for unknown builtin type");
   }
 }
 
@@ -4362,10 +4360,6 @@ WitnessTableCacheEntry::allocate(
   // Fill in any default requirements.
   initializeResilientWitnessTable(conformance, Type, genericTable, table);
 
-  // Fill in builtin conformance witnesses.
-  if (conformance->isBuiltin())
-    initializeBuiltinWitnessTable(conformance, Type, table);
-
   auto castTable = reinterpret_cast<WitnessTable*>(table);
 
   // Call the instantiation function if present.
@@ -4399,6 +4393,10 @@ swift::swift_getWitnessTable(const ProtocolConformanceDescriptor *conformance,
   // accessor directly.
   auto genericTable = conformance->getGenericWitnessTable();
   if (!genericTable || doesNotRequireInstantiation(conformance, genericTable)) {
+    if (conformance->isBuiltin()) {
+      return findBuiltinWitnessTable(conformance);
+    }
+
     return uniqueForeignWitnessTableRef(conformance->getWitnessTablePattern());
   }
 

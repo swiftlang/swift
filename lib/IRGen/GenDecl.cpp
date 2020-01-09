@@ -2889,7 +2889,7 @@ IRGenModule::getAddrOfLLVMVariableOrGOTEquivalent(LinkEntity entity,
   
   // Retrieve the variable entry.
   auto entry = GlobalVars[entity];
-
+  
   /// Returns a direct reference.
   auto direct = [&]() -> ConstantReference {
     // FIXME: Relative references to aliases break MC on 32-bit Mach-O
@@ -2906,7 +2906,7 @@ IRGenModule::getAddrOfLLVMVariableOrGOTEquivalent(LinkEntity entity,
       cast<llvm::GlobalValue>(entry), entity);
     return {gotEquivalent, ConstantReference::Indirect};
   };
-
+  
   // Return the GOT entry if we were asked to.
   if (forceIndirectness == ConstantReference::Indirect)
     return indirect();
@@ -4029,15 +4029,6 @@ llvm::GlobalValue *IRGenModule::defineBaseConformanceDescriptor(
 llvm::Constant *IRGenModule::getAddrOfProtocolConformanceDescriptor(
                                 const RootProtocolConformance *conformance,
                                 ConstantInit definition) {
-  // If we're compiling the stdlib, we might (we are) already be asking for a
-  // builtin conformance descriptor somewhere. Make sure we initialize them
-  // first.
-  if (isa<BuiltinProtocolConformance>(conformance) &&
-      getSwiftModule()->isStdlibModule() &&
-      !definition) {
-    emitBuiltinProtocolConformances();
-  }
-
   IRGen.addLazyWitnessTable(conformance);
 
   auto entity = LinkEntity::forProtocolConformanceDescriptor(conformance);
