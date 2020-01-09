@@ -918,3 +918,19 @@ TEST(ModuleDepGraph, CrashSimple) {
   EXPECT_TRUE(graph.isMarked(&job1));
   EXPECT_FALSE(graph.isMarked(&job2));
 }
+
+
+TEST(ModuleDepGraph, MutualInterfaceHash) {
+  ModuleDepGraph graph;
+  simulateLoad(graph, &job0, {
+    {providesTopLevel, {"a"}},
+    {dependsTopLevel, {"b"}}
+  });
+  simulateLoad(graph, &job1, {
+    {dependsTopLevel, {"a"}},
+    {providesTopLevel, {"b"}}
+  });
+
+  const auto nodes = graph.markTransitive(&job0);
+  EXPECT_TRUE(contains(nodes, &job1));
+}

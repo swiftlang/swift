@@ -896,3 +896,17 @@ TEST(CoarseGrainedDependencyGraph, CrashSimple) {
   EXPECT_TRUE(graph.isMarked(1));
   EXPECT_FALSE(graph.isMarked(2));
 }
+
+
+TEST(CoarseGrainedDependencyGraph, MutualInterfaceHash) {
+ CoarseGrainedDependencyGraph<uintptr_t> graph;
+  loadFromString(graph, 0,
+                 providesTopLevel, "a",
+                 dependsTopLevel, "b");
+  loadFromString(graph, 1,
+                 dependsTopLevel, "a",
+                 providesTopLevel, "b");
+
+  const auto nodes = graph.markTransitive(0);
+  EXPECT_TRUE(contains(nodes, 1));
+}
