@@ -92,7 +92,7 @@ protocol HasAssocWithSuperClassConstraint {
 }
 protocol HasAssocWithCompositionConstraint {
   associatedtype AssocWithCompositionConstraint: MyClass & MyProtocol
-  subscript<T>(idx: T) -> AssocWithCompositionConstraint where T: Comparable { get }
+  subscript(idx: Int) -> AssocWithCompositionConstraint { get }
 }
 protocol HasAssocWithDefault {
   associatedtype AssocWithDefault = MyEnum
@@ -114,6 +114,10 @@ protocol HasAssocWithSameTypeConstraint where Self.AssocWithSameTypeConstraint =
   associatedtype AssocWithSameTypeConstraint
   func returnAssocWithSameTypeConstraint() -> AssocWithSameTypeConstraint
 }
+protocol HasAssocWithConformanceConstraintGeneric {
+  associatedtype AssocWithConformanceConstraintGeneric: MyProtocol
+  func returnAssocWithConformanceConstraintGeneric<T>(arg: T) -> AssocWithConformanceConstraintGeneric
+}
 
 class TestClass :
     HasAssocPlain,
@@ -124,18 +128,20 @@ class TestClass :
     HasAssocWithConstraintAndDefault,
     HasAssocWithAnyObjectConstraint,
     HasAssocWithConstraintOnProto,
-    HasAssocWithSameTypeConstraint {
+    HasAssocWithSameTypeConstraint,
+    HasAssocWithConformanceConstraintGeneric {
   #^OVERRIDE_TestClass^#
 // OVERRIDE: Begin completions
 // OVERRIDE-DAG: Decl[InstanceMethod]/Super:         func returnAssocPlain() -> AssocPlain {|};
 // OVERRIDE-DAG: Decl[InstanceMethod]/Super:         func returnAssocWithConformanceConstraint(fn: (Int) -> Int) -> some MyProtocol {|};
 // OVERRIDE-DAG: Decl[InstanceVar]/Super:            var valAssocWithSuperClassConstraint: some MyClass;
-// OVERRIDE-DAG: Decl[Subscript]/Super:              subscript<T>(idx: T) -> some MyClass & MyProtocol where T : Comparable {|};
+// OVERRIDE-DAG: Decl[Subscript]/Super:              subscript(idx: Int) -> some MyClass & MyProtocol {|};
 // OVERRIDE-DAG: Decl[InstanceMethod]/Super:         func returnAssocWithDefault() -> MyEnum {|};
 // OVERRIDE-DAG: Decl[InstanceMethod]/Super:         func returnAssocWithConstraintAndDefault() -> ConcreteMyProtocol {|};
 // OVERRIDE-DAG: Decl[InstanceMethod]/Super:         func returnAssocWithAnyObjectConstraint() -> some MyProtocol & AnyObject {|}
 // OVERRIDE-DAG: Decl[InstanceMethod]/Super:         func returnAssocWithConstraintOnProto() -> some MyProtocol {|}
 // OVERRIDE-DAG: Decl[InstanceMethod]/Super:         func returnAssocWithSameTypeConstraint() -> AssocWithSameTypeConstraint {|}
+// OVERRIDE-DAG: Decl[InstanceMethod]/Super:         func returnAssocWithConformanceConstraintGeneric<T>(arg: T) -> AssocWithConformanceConstraintGeneric {|}
 // OVERRIDE: End completions
 }
 
@@ -148,7 +154,8 @@ struct TestStruct :
     HasAssocWithConstraintAndDefault,
     HasAssocWithAnyObjectConstraint,
     HasAssocWithConstraintOnProto,
-    HasAssocWithSameTypeConstraint {
+    HasAssocWithSameTypeConstraint,
+    HasAssocWithConformanceConstraintGeneric {
   #^OVERRIDE_TestStruct^#
 }
 
