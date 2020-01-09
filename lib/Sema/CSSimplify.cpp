@@ -1149,7 +1149,7 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
           auto result = cs.matchFunctionBuilder(
               closure, functionBuilderType,
               closureType->castTo<FunctionType>()->getResult(),
-              calleeLocator, loc);
+              ConstraintKind::Conversion, calleeLocator, loc);
           if (result.isFailure())
             return result;
         }
@@ -6468,6 +6468,16 @@ ConstraintSystem::simplifyOneWayConstraint(
     return SolutionKind::Unsolved;
   }
 
+  // Propagate holes through one-way constraints.
+  if (secondSimplified->isHole()) {
+    first.visit([&](Type subType) {
+      if (auto *typeVar = subType->getAs<TypeVariableType>())
+        recordPotentialHole(typeVar);
+    });
+
+    return SolutionKind::Solved;
+  }
+
   // Translate this constraint into a one-way binding constraint.
   return matchTypes(first, secondSimplified, ConstraintKind::Equal, flags,
                     locator);
@@ -7447,8 +7457,9 @@ ConstraintSystem::simplifyApplicableFnConstraint(
   }
 
   // If right-hand side is a type variable, the constraint is unsolved.
-  if (desugar2->isTypeVariableOrMember())
+  if (desugar2->isTypeVariableOrMember()) {
     return formUnsolved();
+  }
 
   // Strip the 'ApplyFunction' off the locator.
   // FIXME: Perhaps ApplyFunction can go away entirely?

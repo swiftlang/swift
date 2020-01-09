@@ -668,6 +668,10 @@ struct AppliedBuilderTransform {
 
   /// The single expression to which the closure was transformed.
   Expr *singleExpr;
+
+  /// The result type of the body, to which the returned expression will be
+  /// converted.
+  Type bodyResultType;
 };
 
 /// Describes the fixed score of a solution to the constraint system.
@@ -3479,6 +3483,7 @@ public:
   /// Apply the given function builder to the closure expression.
   TypeMatchResult matchFunctionBuilder(
       AnyFunctionRef fn, Type builderType, Type bodyResultType,
+      ConstraintKind bodyResultConstraintKind,
       ConstraintLocator *calleeLocator, ConstraintLocatorBuilder locator);
 
 private:
@@ -3991,6 +3996,13 @@ public:
                       bool performingDiagnostics) {
     return applySolutionImpl(solution, expr, convertType, discardedExpr,
                              performingDiagnostics).get<Expr *>();
+  }
+
+  /// Apply a given solution to the body of the given function.
+  BraceStmt *applySolutionToBody(Solution &solution, AnyFunctionRef fn) {
+    return cast_or_null<BraceStmt>(
+        applySolutionImpl(solution, fn, Type(), false, false)
+      .dyn_cast<Stmt *>());
   }
 
   /// Reorder the disjunctive clauses for a given expression to
