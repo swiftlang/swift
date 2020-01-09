@@ -398,12 +398,13 @@ func testSubscript1(_ s1 : SubscriptTest1) {
 struct SubscriptTest2 {
   subscript(a : String, b : Int) -> Int { return 0 } // expected-note {{candidate expects value of type 'Int' for parameter #2}}
   // expected-note@-1 {{declared here}}
+  // expected-note@-2 {{candidate has partially matching parameter list (String, Int)}}
     subscript(a : String, b : String) -> Int { return 0 } // expected-note {{candidate expects value of type 'String' for parameter #2}}
+  // expected-note@-1 {{candidate has partially matching parameter list (String, String)}}
 }
 
 func testSubscript1(_ s2 : SubscriptTest2) {
-  _ = s2["foo"] // expected-error {{cannot subscript a value of type 'SubscriptTest2' with an argument of type 'String'}}
-  // expected-note @-1 {{overloads for 'subscript' exist with these partially matching parameter lists: (String, Int), (String, String)}}
+  _ = s2["foo"] // expected-error {{no exact matches in call to subscript}}
 
   let a = s2["foo", 1.0] // expected-error {{no exact matches in call to subscript}}
 

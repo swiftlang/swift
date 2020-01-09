@@ -234,8 +234,6 @@ private:
       Optional<std::function<bool(ArrayRef<OverloadChoice>)>> callback = None,
       bool includeInaccessibleMembers = true);
 
-  bool diagnoseSubscriptErrors(SubscriptExpr *SE, bool performingSet);
-
   bool visitExpr(Expr *E);
   bool visitIdentityExpr(IdentityExpr *E);
   bool visitTryExpr(TryExpr *E);
@@ -245,7 +243,6 @@ private:
   bool visitDictionaryExpr(DictionaryExpr *E);
   bool visitObjectLiteralExpr(ObjectLiteralExpr *E);
 
-  bool visitSubscriptExpr(SubscriptExpr *SE);
   bool visitApplyExpr(ApplyExpr *AE);
   bool visitRebindSelfInConstructorExpr(RebindSelfInConstructorExpr *E);
 };
@@ -1408,163 +1405,6 @@ bool FailureDiagnosis::diagnoseParameterErrors(CalleeCandidateInfo &CCI,
   }
   
   return false;
-}
-
-bool FailureDiagnosis::diagnoseSubscriptErrors(SubscriptExpr *SE,
-                                               bool inAssignmentDestination) {
-  auto baseExpr = typeCheckChildIndependently(SE->getBase());
-  if (!baseExpr) return true;
-  auto baseType = CS.getType(baseExpr);
-
-  if (isa<NilLiteralExpr>(baseExpr)) {
-    diagnose(baseExpr->getLoc(), diag::cannot_subscript_nil_literal)
-      .highlight(baseExpr->getSourceRange());
-    return true;
-  }
-
-  std::function<bool(ArrayRef<OverloadChoice>)> callback =
-      [&](ArrayRef<OverloadChoice> candidates) -> bool {
-    CalleeCandidateInfo calleeInfo(Type(), candidates, SE->hasTrailingClosure(),
-                                   CS, /*selfAlreadyApplied*/ false);
-
-    // We're about to typecheck the index list, which needs to be processed with
-    // self already applied.
-    for (unsigned i = 0, e = calleeInfo.size(); i != e; ++i)
-      calleeInfo.candidates[i].skipCurriedSelf = true;
-
-    auto indexExpr =
-        typeCheckArgumentChildIndependently(SE->getIndex(), Type(), calleeInfo);
-    if (!indexExpr)
-      return true;
-
-    // Back to analyzing the candidate list with self applied.
-    for (unsigned i = 0, e = calleeInfo.size(); i != e; ++i)
-      calleeInfo.candidates[i].skipCurriedSelf = false;
-
-    ArrayRef<Identifier> argLabels = SE->getArgumentLabels();
-    if (diagnoseParameterErrors(calleeInfo, SE, indexExpr, argLabels))
-      return true;
-
-    auto indexType = CS.getType(indexExpr);
-
-    auto decomposedBaseType = decomposeArgType(baseType, {Identifier()});
-    auto decomposedIndexType = decomposeArgType(indexType, argLabels);
-    calleeInfo.filterList(
-        [&](OverloadCandidate cand) -> CalleeCandidateInfo::ClosenessResultTy {
-          // Classify how close this match is.  Non-subscript decls don't match.
-          auto subscriptDecl = dyn_cast_or_null<SubscriptDecl>(cand.getDecl());
-          if (!subscriptDecl ||
-              (inAssignmentDestination && !subscriptDecl->supportsMutation()))
-            return {CC_GeneralMismatch, {}};
-
-          // Check whether the self type matches.
-          auto selfConstraint = CC_ExactMatch;
-          if (calleeInfo.evaluateCloseness(cand, decomposedBaseType).first !=
-              CC_ExactMatch)
-            selfConstraint = CC_SelfMismatch;
-
-          // Set a flag to look past the self argument to the indices.
-          cand.skipCurriedSelf = true;
-
-          // Explode out multi-index subscripts to find the best match.
-          auto indexResult =
-              calleeInfo.evaluateCloseness(cand, decomposedIndexType);
-          if (selfConstraint > indexResult.first)
-            return {selfConstraint, {}};
-          return indexResult;
-        });
-
-    // If the closest matches all mismatch on self, we either have something
-    // that cannot be subscripted, or an ambiguity.
-    if (calleeInfo.closeness == CC_SelfMismatch) {
-      diagnose(SE->getLoc(), diag::cannot_subscript_base, baseType)
-          .highlight(SE->getBase()->getSourceRange());
-      // FIXME: Should suggest overload set, but we're not ready for that until
-      // it points to candidates and identifies the self type in the diagnostic.
-      // calleeInfo.suggestPotentialOverloads(SE->getLoc());
-      return true;
-    }
-
-    // Any other failures relate to the index list.
-    for (unsigned i = 0, e = calleeInfo.size(); i != e; ++i)
-      calleeInfo.candidates[i].skipCurriedSelf = true;
-
-    // TODO: Is there any reason to check for CC_NonLValueInOut here?
-
-    if (calleeInfo.closeness == CC_ExactMatch) {
-      auto message = diag::ambiguous_subscript;
-
-      // If there is an exact match on the argument with
-      // a single candidate, let's type-check subscript
-      // as a whole to figure out if there is any structural
-      // problem after all.
-      if (calleeInfo.size() == 1) {
-        Expr *expr = SE;
-        ConcreteDeclRef decl = nullptr;
-        message = diag::cannot_subscript_with_index;
-
-        if (TypeChecker::getTypeOfExpressionWithoutApplying(expr, CS.DC, decl))
-          return false;
-
-        // If we are down to a single candidate but with an unresolved
-        // index type, we can substitute in the base type to get a simpler
-        // and more concrete expected type for this subscript decl, in order
-        // to diagnose a better error.
-        if (baseType && indexType->hasUnresolvedType()) {
-          auto cand = calleeInfo.candidates[0];
-          auto candType = baseType->getTypeOfMember(CS.DC->getParentModule(),
-                                                    cand.getDecl(), nullptr);
-          if (auto *candFunc = candType->getAs<FunctionType>()) {
-            auto paramsType = FunctionType::composeInput(CS.getASTContext(),
-                                                         candFunc->getParams(),
-                                                         false);
-            if (!typeCheckChildIndependently(
-                    indexExpr, paramsType, CTP_CallArgument, TCC_ForceRecheck))
-              return true;
-          }
-        }
-      }
-
-      diagnose(SE->getLoc(), message, baseType, indexType)
-          .highlight(indexExpr->getSourceRange())
-          .highlight(baseExpr->getSourceRange());
-
-      // FIXME: suggestPotentialOverloads should do this.
-      // calleeInfo.suggestPotentialOverloads(SE->getLoc());
-      for (auto candidate : calleeInfo.candidates)
-        if (auto decl = candidate.getDecl())
-          diagnose(decl, diag::found_candidate);
-        else
-          diagnose(candidate.getExpr()->getLoc(), diag::found_candidate);
-
-      return true;
-    }
-
-    if (diagnoseParameterErrors(calleeInfo, SE, indexExpr, argLabels))
-      return true;
-
-    // Diagnose some simple and common errors.
-    if (calleeInfo.diagnoseSimpleErrors(SE))
-      return true;
-
-    diagnose(SE->getLoc(), diag::cannot_subscript_with_index, baseType,
-             indexType);
-
-    calleeInfo.suggestPotentialOverloads(SE->getLoc());
-    return true;
-  };
-
-  auto locator =
-      CS.getConstraintLocator(SE, ConstraintLocator::SubscriptMember);
-
-  return diagnoseMemberFailures(SE, baseExpr, ConstraintKind::ValueMember,
-                                DeclNameRef::createSubscript(),
-                                FunctionRefKind::DoubleApply, locator,
-                                callback);
-}
-
-bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
-  return diagnoseSubscriptErrors(SE, /* inAssignmentDestination = */ false);
 }
 
 // Check if there is a structural problem in the function expression
