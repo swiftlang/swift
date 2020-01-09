@@ -110,8 +110,8 @@ protocol HasAssocWithConstraintOnProto where Self.AssocWithConstraintOnProto : M
   associatedtype AssocWithConstraintOnProto
   func returnAssocWithConstraintOnProto() -> AssocWithConstraintOnProto
 }
-protocol HasAssocWithSameTypeConstraint where Self.AssocWithSameTypeConstraint == MyClass {
-  associatedtype AssocWithSameTypeConstraint
+protocol HasAssocWithSameTypeConstraint where Self.AssocWithSameTypeConstraint == ConcreteMyProtocol {
+  associatedtype AssocWithSameTypeConstraint : MyProtocol
   func returnAssocWithSameTypeConstraint() -> AssocWithSameTypeConstraint
 }
 protocol HasAssocWithConformanceConstraintGeneric {
