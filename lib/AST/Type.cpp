@@ -848,19 +848,14 @@ ParameterListInfo::ParameterListInfo(
     return;
   }
 
-  switch (params.size()) {
-  case 0:
+  if (params.empty())
     return;
 
-  default:
-    // Arguments and parameters are not guaranteed to always line-up
-    // perfectly, e.g. failure diagnostics tries to match argument type
-    // to different "candidate" parameters.
-    if (params.size() != paramList->size())
-      return;
-
-    break;
-  }
+  // Arguments and parameters are not guaranteed to always line-up
+  // perfectly, e.g. failure diagnostics tries to match argument type
+  // to different "candidate" parameters.
+  if (params.size() != paramList->size())
+    return;
 
   // Note which parameters have default arguments and/or function builders.
   for (auto i : range(0, params.size())) {
