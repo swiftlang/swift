@@ -359,9 +359,13 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.BuildSyntaxTree = true;
     Opts.VerifySyntaxTree = true;
   }
-  
-  if (Args.hasArg(OPT_enable_fine_grained_dependencies))
-    Opts.EnableFineGrainedDependencies = true;
+
+  Opts.EnableFineGrainedDependencies =
+      Args.hasFlag(options::OPT_enable_fine_grained_dependencies,
+                   options::OPT_disable_fine_grained_dependencies, false);
+
+  if (Args.hasArg(OPT_emit_fine_grained_dependency_sourcefile_dot_files))
+    Opts.EmitFineGrainedDependencySourcefileDotFiles = true;
 
   if (Args.hasArg(OPT_fine_grained_dependency_include_intrafile))
     Opts.FineGrainedDependenciesIncludeIntrafileOnes = true;
@@ -391,6 +395,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   
   if (Args.getLastArg(OPT_debug_cycles))
     Opts.DebugDumpCycles = true;
+
+  if (Args.getLastArg(OPT_build_request_dependency_graph))
+    Opts.BuildRequestDependencyGraph = true;
 
   if (const Arg *A = Args.getLastArg(OPT_output_request_graphviz)) {
     Opts.RequestEvaluatorGraphVizPath = A->getValue();

@@ -1,7 +1,7 @@
 // RUN: rm -rf %t/stats-dir
 // RUN: mkdir -p %t/stats-dir
 // RUN: %target-typecheck-verify-swift
-// RUN: not %target-swift-frontend -typecheck -debug-cycles %s -output-request-graphviz %t.dot -stats-output-dir %t/stats-dir 2> %t.cycles
+// RUN: not %target-swift-frontend -typecheck -debug-cycles %s -build-request-dependency-graph -output-request-graphviz %t.dot -stats-output-dir %t/stats-dir 2> %t.cycles
 // RUN: %FileCheck %s < %t.cycles
 // RUN: %FileCheck -check-prefix CHECK-DOT %s  < %t.dot
 

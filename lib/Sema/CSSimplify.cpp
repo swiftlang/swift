@@ -3509,7 +3509,7 @@ bool ConstraintSystem::repairFailures(
       }
     }
     // Handle function result coerce expression wrong type conversion.
-    if (isa<CoerceExpr>(anchor)) {
+    if (anchor && isa<CoerceExpr>(anchor)) {
       auto *fix =
           ContextualMismatch::create(*this, lhs, rhs, loc);
       conversionsOrFixes.push_back(fix);

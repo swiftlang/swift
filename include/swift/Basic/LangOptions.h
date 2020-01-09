@@ -173,7 +173,10 @@ namespace swift {
     
     /// Whether to dump debug info for request evaluator cycles.
     bool DebugDumpCycles = false;
-    
+
+    /// Whether to build a request dependency graph for debugging.
+    bool BuildRequestDependencyGraph = false;
+
     /// Enable SIL type lowering
     bool EnableSubstSILFunctionTypesForFunctionValues = false;
 
@@ -282,10 +285,14 @@ namespace swift {
     /// Whether to verify the parsed syntax tree and emit related diagnostics.
     bool VerifySyntaxTree = false;
 
-    /// Scaffolding to permit experimentation with finer-grained dependencies
-    /// and faster rebuilds.
+    /// Emit the newer, finer-grained swiftdeps file. Eventually will support
+    /// faster rebuilds.
     bool EnableFineGrainedDependencies = false;
-    
+
+    /// When using fine-grained dependencies, emit dot files for every swiftdeps
+    /// file.
+    bool EmitFineGrainedDependencySourcefileDotFiles = false;
+
     /// To mimic existing system, set to false.
     /// To experiment with including file-private and private dependency info,
     /// set to true.
