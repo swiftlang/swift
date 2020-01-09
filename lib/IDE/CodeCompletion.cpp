@@ -4238,28 +4238,21 @@ public:
       // If resolved print it.
       return nullptr;
 
-    // Collect requirements on the associatedtype.
-    ProtocolDecl *protoD =
-        ResultT->castTo<DependentMemberType>()->getAssocType()->getProtocol();
+    auto genericSig = VD->getDeclContext()->getGenericSignatureOfContext();
 
+    if (genericSig->isConcreteType(ResultT))
+      // If it has same type requrement, we will emit the concrete type.
+      return nullptr;
+
+    // Collect requirements on the associatedtype.
     SmallVector<Type, 2> opaqueTypes;
     bool hasExplicitAnyObject = false;
-    for (auto req : protoD->getRequirementSignature()) {
-      if (!req.getFirstType()->isEqual(ResultT))
-        continue;
-
-      switch (req.getKind()) {
-      case RequirementKind::Conformance:
-      case RequirementKind::Superclass:
-        opaqueTypes.push_back(req.getSecondType());
-        break;
-      case RequirementKind::Layout:
-        hasExplicitAnyObject |= req.getLayoutConstraint()->isClass();
-        break;
-      case RequirementKind::SameType:
-        return nullptr;
-      }
-    }
+    if (auto superTy = genericSig->getSuperclassBound(ResultT))
+      opaqueTypes.push_back(superTy);
+    for (auto proto : genericSig->getConformsTo(ResultT))
+      opaqueTypes.push_back(proto->getDeclaredInterfaceType());
+    if (auto layout = genericSig->getLayoutConstraint(ResultT))
+      hasExplicitAnyObject = layout->isClass();
 
     if (!hasExplicitAnyObject) {
       if (opaqueTypes.empty())
