@@ -209,6 +209,10 @@ enum class MatchKind : uint8_t {
 
   /// The witness is explicitly @nonobjc but the requirement is @objc.
   NonObjC,
+
+  /// The witness does not have a `@differentiable` attribute satisfying one
+  /// from the requirement.
+  DifferentiableConflict,
 };
 
 /// Describes the kind of optional adjustment performed when
@@ -355,6 +359,14 @@ struct RequirementMatch {
   }
 
   RequirementMatch(ValueDecl *witness, MatchKind kind,
+                   const DeclAttribute *attr)
+      : Witness(witness), Kind(kind), WitnessType(), UnmetAttribute(attr),
+        ReqEnv(None) {
+    assert(!hasWitnessType() && "Should have witness type");
+    assert(UnmetAttribute);
+  }
+
+  RequirementMatch(ValueDecl *witness, MatchKind kind,
                    Type witnessType,
                    Optional<RequirementEnvironment> env = None,
                    ArrayRef<OptionalAdjustment> optionalAdjustments = {})
@@ -390,6 +402,9 @@ struct RequirementMatch {
   /// Requirement not met.
   Optional<Requirement> MissingRequirement;
 
+  /// Unmet attribute from the requirement.
+  const DeclAttribute *UnmetAttribute = nullptr;
+
   /// The requirement environment to use for the witness thunk.
   Optional<RequirementEnvironment> ReqEnv;
 
@@ -423,6 +438,7 @@ struct RequirementMatch {
     case MatchKind::RethrowsConflict:
     case MatchKind::ThrowsConflict:
     case MatchKind::NonObjC:
+    case MatchKind::DifferentiableConflict:
       return false;
     }
 
@@ -452,6 +468,7 @@ struct RequirementMatch {
     case MatchKind::RethrowsConflict:
     case MatchKind::ThrowsConflict:
     case MatchKind::NonObjC:
+    case MatchKind::DifferentiableConflict:
       return false;
     }
 
@@ -460,6 +477,9 @@ struct RequirementMatch {
 
   /// Determine whether this requirement match has a requirement.
   bool hasRequirement() { return Kind == MatchKind::MissingRequirement; }
+
+  /// Determine whether this requirement match has an unmet attribute.
+  bool hasUnmetAttribute() { return Kind == MatchKind::DifferentiableConflict; }
 
   swift::Witness getWitness(ASTContext &ctx) const;
 };

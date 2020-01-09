@@ -4860,6 +4860,211 @@ CanType swift::substOpaqueTypesWithUnderlyingTypes(CanType ty,
   return ty.subst(replacer, replacer, flags)->getCanonicalType();
 }
 
+// Creates an `AnyFunctionType` from the given parameters, result type,
+// generic signature, and `ExtInfo`.
+static AnyFunctionType *
+makeFunctionType(ArrayRef<AnyFunctionType::Param> parameters, Type resultType,
+                 GenericSignature genericSignature,
+                 AnyFunctionType::ExtInfo extInfo) {
+  if (genericSignature)
+    return GenericFunctionType::get(genericSignature, parameters, resultType,
+                                    extInfo);
+  return FunctionType::get(parameters, resultType, extInfo);
+}
+
+Optional<TangentSpace>
+TypeBase::getAutoDiffTangentSpace(LookupConformanceFn lookupConformance) {
+  assert(lookupConformance);
+  auto &ctx = getASTContext();
+
+  Type cacheKey = this;
+  auto lookup = ctx.AutoDiffTangentSpaces.find(cacheKey);
+  if (lookup != ctx.AutoDiffTangentSpaces.end())
+    return lookup->getSecond();
+  auto cache = [&](Optional<TangentSpace> tangentSpace) {
+    ctx.AutoDiffTangentSpaces.insert({cacheKey, tangentSpace});
+    return tangentSpace;
+  };
+
+  // Functions' tangent is the same function, except the innermost result type
+  // is replaced by its tangent.
+  if (auto *fnTy = getAs<AnyFunctionType>()) {
+    auto resultSpace =
+        fnTy->getResult()->getAutoDiffTangentSpace(lookupConformance);
+    if (!resultSpace)
+      return cache(None);
+    return cache(TangentSpace::getFunction(
+        makeFunctionType(fnTy->getParams(), resultSpace->getType(),
+                         fnTy->getOptGenericSignature(), fnTy->getExtInfo())));
+  }
+
+  // Tuples' tangent is a tuple of each element's tangent.
+  if (auto *tupleTy = getAs<TupleType>()) {
+    SmallVector<TupleTypeElt, 8> newElts;
+    for (auto elt : tupleTy->getElements()) {
+      auto eltSpace = elt.getType()->getAutoDiffTangentSpace(lookupConformance);
+      if (!eltSpace)
+        continue;
+      newElts.push_back(elt.getWithType(eltSpace->getType()));
+    }
+    if (newElts.empty())
+      return cache(
+          TangentSpace::getTuple(ctx.TheEmptyTupleType->castTo<TupleType>()));
+    if (newElts.size() == 1)
+      return cache(TangentSpace::getTangentVector(newElts.front().getType()));
+    auto *tupleType = TupleType::get(newElts, ctx)->castTo<TupleType>();
+    return cache(TangentSpace::getTuple(tupleType));
+  }
+
+  // Get the `Differentiable` protocol `TangentVector` associated type.
+  auto *differentiableProtocol =
+      ctx.getProtocol(KnownProtocolKind::Differentiable);
+  assert(differentiableProtocol && "Could not find Differentiable protocol");
+  auto associatedTypeLookup =
+      differentiableProtocol->lookupDirect(ctx.Id_TangentVector);
+  assert(associatedTypeLookup.size() == 1);
+  auto *dependentType = DependentMemberType::get(
+      differentiableProtocol->getDeclaredInterfaceType(),
+      cast<AssociatedTypeDecl>(associatedTypeLookup[0]));
+
+  // Try to get the `TangentVector` associated type of `base`.
+  // Return the associated type if valid.
+  auto assocTy = dependentType->substBaseType(this, lookupConformance);
+  if (!assocTy->hasError())
+    return cache(TangentSpace::getTangentVector(assocTy));
+
+  // Otherwise, there is no associated tangent space.
+  return cache(None);
+}
+
+AnyFunctionType *AnyFunctionType::getAutoDiffDerivativeFunctionType(
+    IndexSubset *indices, unsigned resultIndex,
+    AutoDiffDerivativeFunctionKind kind, LookupConformanceFn lookupConformance,
+    GenericSignature whereClauseGenSig, bool makeSelfParamFirst) {
+  // JVP: (T...) -> ((R...),
+  //                 (T.TangentVector...) -> (R.TangentVector...))
+  // VJP: (T...) -> ((R...),
+  //                 (R.TangentVector...) -> (T.TangentVector...))
+  //
+  // Note that both can be written as "(T...) -> ((R...), Closure)", so we build
+  // "Closure" and then use common code to wrap "Closure" in the outer function
+  // type.
+
+  // If `whereClauseGenSig` is not defined, use the current function's type
+  // generic signature.
+  if (!whereClauseGenSig)
+    whereClauseGenSig = getOptGenericSignature();
+
+  assert(!indices->isEmpty() && "there must be at least one wrt index");
+
+  auto &ctx = getASTContext();
+
+  // Get differentiability parameter types.
+  SmallVector<Type, 8> diffParamTypes;
+  autodiff::getSubsetParameterTypes(indices, this, diffParamTypes,
+                                    /*reverseCurryLevels*/ !makeSelfParamFirst);
+
+  // Unwrap curry levels. At most, two parameter lists are necessary, for
+  // curried method types with a `(Self)` parameter list.
+  SmallVector<AnyFunctionType *, 2> curryLevels;
+  auto *currentLevel = castTo<AnyFunctionType>();
+  for (unsigned i : range(2)) {
+    (void)i;
+    if (currentLevel == nullptr)
+      break;
+    curryLevels.push_back(currentLevel);
+    currentLevel = currentLevel->getResult()->getAs<AnyFunctionType>();
+  }
+
+  Type originalResult = curryLevels.back()->getResult();
+
+  // Build the closure type, which is different depending on whether this is a
+  // JVP or VJP.
+  Type closure;
+  switch (kind) {
+  case AutoDiffDerivativeFunctionKind::JVP: {
+    // closure is the JVP "differential":
+    //   (T.TangentVector...) -> (R.TangentVector...)
+    SmallVector<AnyFunctionType::Param, 8> differentialParams;
+    for (auto diffParamType : diffParamTypes)
+      differentialParams.push_back(AnyFunctionType::Param(
+          diffParamType->getAutoDiffTangentSpace(lookupConformance)
+              ->getType()));
+
+    SmallVector<TupleTypeElt, 8> differentialResults;
+    if (auto *resultTuple = originalResult->getAs<TupleType>()) {
+      auto resultTupleEltType = resultTuple->getElementType(resultIndex);
+      differentialResults.push_back(
+          resultTupleEltType->getAutoDiffTangentSpace(lookupConformance)
+              ->getType());
+    } else {
+      assert(resultIndex == 0 && "resultIndex out of bounds");
+      differentialResults.push_back(
+          originalResult->getAutoDiffTangentSpace(lookupConformance)
+              ->getType());
+    }
+    Type differentialResult = differentialResults.size() > 1
+                                  ? TupleType::get(differentialResults, ctx)
+                                  : differentialResults[0].getType();
+
+    closure = FunctionType::get(differentialParams, differentialResult);
+    break;
+  }
+  case AutoDiffDerivativeFunctionKind::VJP: {
+    // closure is the VJP "pullback":
+    //   (R.TangentVector...) -> (T.TangentVector...)
+    SmallVector<AnyFunctionType::Param, 8> pullbackParams;
+    if (auto *resultTuple = originalResult->getAs<TupleType>()) {
+      auto resultTupleEltType = resultTuple->getElementType(resultIndex);
+      pullbackParams.push_back(AnyFunctionType::Param(
+          resultTupleEltType->getAutoDiffTangentSpace(lookupConformance)
+              ->getType()));
+    } else {
+      assert(resultIndex == 0 && "resultIndex out of bounds");
+      pullbackParams.push_back(AnyFunctionType::Param(
+          originalResult->getAutoDiffTangentSpace(lookupConformance)
+              ->getType()));
+    }
+
+    SmallVector<TupleTypeElt, 8> pullbackResults;
+    for (auto diffParamType : diffParamTypes)
+      pullbackResults.push_back(
+          diffParamType->getAutoDiffTangentSpace(lookupConformance)->getType());
+    Type pullbackResult = pullbackResults.size() > 1
+                              ? TupleType::get(pullbackResults, ctx)
+                              : pullbackResults[0].getType();
+
+    closure = FunctionType::get(pullbackParams, pullbackResult);
+    break;
+  }
+  }
+  assert(closure && "should have built a closure");
+
+  // Build "(T...) -> ((R...), Closure)".
+  SmallVector<TupleTypeElt, 2> retElts;
+  retElts.push_back(originalResult);
+  retElts.push_back(closure);
+  auto retTy = TupleType::get(retElts, ctx);
+  auto *derivativeFunction =
+      makeFunctionType(curryLevels.back()->getParams(), retTy,
+                       curryLevels.size() == 1 ? whereClauseGenSig : nullptr,
+                       curryLevels.back()->getExtInfo());
+
+  // Wrap the derivative function type in additional curry levels.
+  auto curryLevelsWithoutLast =
+      ArrayRef<AnyFunctionType *>(curryLevels).drop_back(1);
+  for (auto pair : enumerate(llvm::reverse(curryLevelsWithoutLast))) {
+    unsigned i = pair.index();
+    AnyFunctionType *curryLevel = pair.value();
+    derivativeFunction = makeFunctionType(
+        curryLevel->getParams(), derivativeFunction,
+        i == curryLevelsWithoutLast.size() - 1 ? whereClauseGenSig : nullptr,
+        curryLevel->getExtInfo());
+  }
+
+  return derivativeFunction;
+}
+
 CanSILFunctionType
 SILFunctionType::withSubstitutions(SubstitutionMap subs) const {
   return SILFunctionType::get(getSubstGenericSignature(),

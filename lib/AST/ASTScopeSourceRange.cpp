@@ -193,6 +193,11 @@ SourceRange SpecializeAttributeScope::getSourceRangeOfThisASTNode(
   return specializeAttr->getRange();
 }
 
+SourceRange DifferentiableAttributeScope::getSourceRangeOfThisASTNode(
+    const bool omitAssertions) const {
+  return differentiableAttr->getRange();
+}
+
 SourceRange AbstractFunctionBodyScope::getSourceRangeOfThisASTNode(
     const bool omitAssertions) const {
   return decl->getBodySourceRange();

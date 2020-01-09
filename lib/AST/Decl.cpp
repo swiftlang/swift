@@ -6959,6 +6959,45 @@ StringRef AbstractFunctionDecl::getInlinableBodyText(
   return extractInlinableText(getASTContext().SourceMgr, body, scratch);
 }
 
+/// A uniqued list of derivative function configurations.
+struct AbstractFunctionDecl::DerivativeFunctionConfigurationList
+    : public llvm::SetVector<AutoDiffConfig> {
+  // Necessary for `ASTContext` allocation.
+  void *operator new(
+      size_t bytes, ASTContext &ctx,
+      unsigned alignment = alignof(DerivativeFunctionConfigurationList)) {
+    return ctx.Allocate(bytes, alignment);
+  }
+};
+
+void AbstractFunctionDecl::prepareDerivativeFunctionConfigurations() {
+  if (DerivativeFunctionConfigs)
+    return;
+  auto &ctx = getASTContext();
+  DerivativeFunctionConfigs = new (ctx) DerivativeFunctionConfigurationList();
+  // Register an `ASTContext` cleanup calling the list destructor.
+  ctx.addCleanup([this]() {
+    this->DerivativeFunctionConfigs->~DerivativeFunctionConfigurationList();
+  });
+}
+
+ArrayRef<AutoDiffConfig>
+AbstractFunctionDecl::getDerivativeFunctionConfigurations() {
+  prepareDerivativeFunctionConfigurations();
+  auto &ctx = getASTContext();
+  if (ctx.getCurrentGeneration() > DerivativeFunctionConfigGeneration) {
+    // TODO(TF-1100): Upstream derivative function configuration serialization
+    // logic.
+  }
+  return DerivativeFunctionConfigs->getArrayRef();
+}
+
+void AbstractFunctionDecl::addDerivativeFunctionConfiguration(
+    AutoDiffConfig config) {
+  prepareDerivativeFunctionConfigurations();
+  DerivativeFunctionConfigs->insert(config);
+}
+
 FuncDecl *FuncDecl::createImpl(ASTContext &Context,
                                SourceLoc StaticLoc,
                                StaticSpellingKind StaticSpelling,

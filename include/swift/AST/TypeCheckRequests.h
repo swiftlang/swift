@@ -374,7 +374,9 @@ struct WhereClauseOwner {
 
   /// The source of the where clause, which can be a generic parameter list
   /// or a declaration that can have a where clause.
-  llvm::PointerUnion<GenericParamList *, TrailingWhereClause *, SpecializeAttr *> source;
+  llvm::PointerUnion<GenericParamList *, TrailingWhereClause *,
+                     SpecializeAttr *, DifferentiableAttr *>
+      source;
 
   WhereClauseOwner(GenericContext *genCtx);
   WhereClauseOwner(AssociatedTypeDecl *atd);
@@ -383,6 +385,9 @@ struct WhereClauseOwner {
       : dc(dc), source(genericParams) {}
 
   WhereClauseOwner(DeclContext *dc, SpecializeAttr *attr)
+      : dc(dc), source(attr) {}
+
+  WhereClauseOwner(DeclContext *dc, DifferentiableAttr *attr)
       : dc(dc), source(attr) {}
 
   SourceLoc getLoc() const;
@@ -2017,6 +2022,35 @@ public:
   SourceLoc getNearestLoc() const {
     return std::get<0>(getStorage()).getPattern()->getLoc();
   }
+};
+
+/// Type-checks a `@differentiable` attribute and returns the resolved parameter
+/// indices on success. On failure, emits diagnostics and returns `nullptr`.
+///
+/// Currently, this request resolves other `@differentiable` attribute
+/// components but mutates them in place:
+/// - `JVPFunction`
+/// - `VJPFunction`
+/// - `DerivativeGenericSignature`
+class DifferentiableAttributeTypeCheckRequest
+    : public SimpleRequest<DifferentiableAttributeTypeCheckRequest,
+                           IndexSubset *(DifferentiableAttr *),
+                           CacheKind::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<IndexSubset *> evaluate(Evaluator &evaluator,
+                                         DifferentiableAttr *attr) const;
+
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+  Optional<IndexSubset *> getCachedResult() const;
+  void cacheResult(IndexSubset *value) const;
 };
 
 // Allow AnyValue to compare two Type values, even though Type doesn't

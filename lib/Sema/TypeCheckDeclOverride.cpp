@@ -595,6 +595,106 @@ static bool parameterTypesMatch(const ValueDecl *derivedDecl,
   return true;
 }
 
+/// Returns true if `derivedDecl` has a `@differentiable` attribute that
+/// overrides one from `baseDecl`.
+static bool hasOverridingDifferentiableAttribute(ValueDecl *derivedDecl,
+                                                 ValueDecl *baseDecl) {
+  ASTContext &ctx = derivedDecl->getASTContext();
+  auto &diags = ctx.Diags;
+
+  auto *derivedAFD = dyn_cast<AbstractFunctionDecl>(derivedDecl);
+  auto *baseAFD = dyn_cast<AbstractFunctionDecl>(baseDecl);
+
+  if (!derivedAFD || !baseAFD)
+    return false;
+
+  auto derivedDAs =
+      derivedAFD->getAttrs()
+          .getAttributes<DifferentiableAttr, /*AllowInvalid*/ true>();
+  auto baseDAs = baseAFD->getAttrs().getAttributes<DifferentiableAttr>();
+
+  // Make sure all the `@differentiable` attributes in `baseDecl` are
+  // also declared in `derivedDecl`.
+  bool diagnosed = false;
+  for (auto *baseDA : baseDAs) {
+    auto baseParameters = baseDA->getParameterIndices();
+    auto defined = false;
+    for (auto derivedDA : derivedDAs) {
+      auto derivedParameters = derivedDA->getParameterIndices();
+      // If base and derived parameter indices are both defined, check whether
+      // base parameter indices are a subset of derived parameter indices.
+      if (derivedParameters && baseParameters &&
+          baseParameters->isSubsetOf(derivedParameters)) {
+        defined = true;
+        break;
+      }
+      // Parameter indices may not be resolved because override matching happens
+      // before attribute checking for declaration type-checking.
+      // If parameter indices have not been resolved, avoid emitting diagnostic.
+      // Assume that attributes are valid.
+      if (!derivedParameters || !baseParameters) {
+        defined = true;
+        break;
+      }
+    }
+    if (defined)
+      continue;
+    diagnosed = true;
+    // Omit printing wrt clause if attribute differentiation parameters match
+    // inferred differentiation parameters.
+    auto *inferredParameters =
+        TypeChecker::inferDifferentiabilityParameters(derivedAFD, nullptr);
+    bool omitWrtClause =
+        !baseParameters ||
+        baseParameters->getNumIndices() == inferredParameters->getNumIndices();
+    // Get `@differentiable` attribute description.
+    std::string baseDAString;
+    llvm::raw_string_ostream stream(baseDAString);
+    baseDA->print(stream, derivedDecl, omitWrtClause,
+                  /*omitDerivativeFunctions*/ true);
+    diags.diagnose(derivedDecl,
+                   diag::overriding_decl_missing_differentiable_attr,
+                   StringRef(stream.str()).trim());
+    diags.diagnose(baseDecl, diag::overridden_here);
+  }
+  // If a diagnostic was produced, return false.
+  if (diagnosed)
+    return false;
+
+  // If there is no `@differentiable` attribute in `derivedDecl`, then
+  // overriding is not allowed.
+  auto *derivedDC = derivedDecl->getDeclContext();
+  auto *baseDC = baseDecl->getDeclContext();
+  if (derivedDC->getSelfClassDecl() && baseDC->getSelfClassDecl())
+    return false;
+
+  // Finally, go through all `@differentiable` attributes in `derivedDecl` and
+  // check if they subsume any of the `@differentiable` attributes in
+  // `baseDecl`.
+  for (auto derivedDA : derivedDAs) {
+    auto derivedParameters = derivedDA->getParameterIndices();
+    auto overrides = true;
+    for (auto baseDA : baseDAs) {
+      auto baseParameters = baseDA->getParameterIndices();
+      // If the parameter indices of `derivedDA` are a subset of those of
+      // `baseDA`, then `baseDA` subsumes `derivedDA` and the function is
+      // marked as overridden.
+      if (derivedParameters && baseParameters &&
+          derivedParameters->isSubsetOf(baseParameters)) {
+        overrides = false;
+        break;
+      }
+      if (!derivedParameters && !baseParameters) {
+        assert(false);
+      }
+    }
+    if (overrides)
+      return true;
+  }
+
+  return false;
+}
+
 /// Returns true if the given declaration is for the `NSObject.hashValue`
 /// property.
 static bool isNSObjectHashValue(ValueDecl *baseDecl) {
@@ -755,6 +855,11 @@ SmallVector<OverrideMatch, 2> OverrideMatcher::match(
     // Check whether there are any obvious reasons why the two given
     // declarations do not have an overriding relationship.
     if (!areOverrideCompatibleSimple(decl, parentDecl))
+      continue;
+
+    // Check whether the derived declaration has a `@differentiable` attribute
+    // that overrides one from the parent declaration.
+    if (hasOverridingDifferentiableAttribute(decl, parentDecl))
       continue;
 
     auto parentMethod = dyn_cast<AbstractFunctionDecl>(parentDecl);

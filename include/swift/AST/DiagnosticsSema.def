@@ -2904,6 +2904,62 @@ ERROR(implements_attr_protocol_not_conformed_to,none,
       "containing type %0 does not conform to protocol %1",
       (DeclName, DeclName))
 
+// @differentiable
+ERROR(differentiable_attr_void_result,none,
+      "cannot differentiate void function %0", (DeclName))
+ERROR(differentiable_attr_no_vjp_or_jvp_when_linear,none,
+      "cannot specify 'vjp:' or 'jvp:' for linear functions; use '@transpose' "
+      "attribute for transpose registration instead", ())
+ERROR(differentiable_attr_overload_not_found,none,
+      "%0 does not have expected type %1", (DeclNameRef, Type))
+// TODO(TF-482): Change duplicate `@differentiable` attribute diagnostic to also
+// mention "same generic requirements".
+ERROR(differentiable_attr_duplicate,none,
+      "duplicate '@differentiable' attribute with same parameters", ())
+NOTE(differentiable_attr_duplicate_note,none,
+     "other attribute declared here", ())
+ERROR(differentiable_attr_function_not_same_type_context,none,
+      "%0 is not defined in the current type context", (DeclNameRef))
+ERROR(differentiable_attr_derivative_not_function,none,
+      "registered derivative %0 must be a 'func' declaration", (DeclNameRef))
+ERROR(differentiable_attr_class_derivative_not_final,none,
+      "class member derivative must be final", ())
+ERROR(differentiable_attr_invalid_access,none,
+      "derivative function %0 is required to either be public or "
+      "'@usableFromInline' because the original function %1 is public or "
+      "'@usableFromInline'", (DeclNameRef, DeclName))
+ERROR(differentiable_attr_result_not_differentiable,none,
+      "can only differentiate functions with results that conform to "
+      "'Differentiable', but %0 does not conform to 'Differentiable'", (Type))
+ERROR(differentiable_attr_protocol_req_where_clause,none,
+      "'@differentiable' attribute on protocol requirement cannot specify "
+      "'where' clause", ())
+ERROR(differentiable_attr_protocol_req_assoc_func,none,
+      "'@differentiable' attribute on protocol requirement cannot specify "
+      "'jvp:' or 'vjp:'", ())
+ERROR(differentiable_attr_stored_property_variable_unsupported,none,
+      "'@differentiable' attribute on stored property cannot specify "
+      "'jvp:' or 'vjp:'", ())
+ERROR(differentiable_attr_class_member_no_dynamic_self,none,
+      "'@differentiable' attribute cannot be declared on class methods "
+      "returning 'Self'", ())
+// TODO(TF-654): Remove when differentiation supports class initializers.
+ERROR(differentiable_attr_class_init_not_yet_supported,none,
+      "'@differentiable' attribute does not yet support class initializers",
+      ())
+ERROR(differentiable_attr_empty_where_clause,none,
+      "empty 'where' clause in '@differentiable' attribute", ())
+ERROR(differentiable_attr_where_clause_for_nongeneric_original,none,
+      "'where' clause is valid only when original function is generic %0",
+      (DeclName))
+ERROR(differentiable_attr_layout_req_unsupported,none,
+      "'@differentiable' attribute does not yet support layout requirements",
+      ())
+ERROR(overriding_decl_missing_differentiable_attr,none,
+      "overriding declaration is missing attribute '%0'", (StringRef))
+NOTE(protocol_witness_missing_differentiable_attr,none,
+     "candidate is missing attribute '%0'", (StringRef))
+
 // @derivative
 ERROR(derivative_attr_expected_result_tuple,none,
       "'@derivative(of:)' attribute requires function to return a two-element "

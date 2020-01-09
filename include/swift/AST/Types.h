@@ -1161,6 +1161,11 @@ public:
   /// object type.
   TypeTraitResult canBeClass();
 
+  /// Return the tangent space of the given type, if it exists. Otherwise,
+  /// return `None`.
+  Optional<TangentSpace>
+  getAutoDiffTangentSpace(LookupConformanceFn lookupConformance);
+
 private:
   // Make vanilla new/delete illegal for Types.
   void *operator new(size_t Bytes) throw() = delete;
@@ -3184,6 +3189,29 @@ public:
   Representation getRepresentation() const {
     return getExtInfo().getRepresentation();
   }
+
+  /// Given `parameterIndices` and `kind`, calculates the type of the
+  /// corresponding autodiff derivative function.
+  ///
+  /// By default, if the original type has a self parameter list and parameter
+  /// indices include self, the computed derivative function type will return a
+  /// linear map taking/returning self's tangent *last* instead of first, for
+  /// consistency with SIL.
+  ///
+  /// If `makeSelfParamFirst` is true, self's tangent is reordered to appear
+  /// first. `makeSelfParamFirst` should be true when working with user-facing
+  /// derivative function types, e.g. when type-checking `@differentiable` and
+  /// `@derivative` attributes.
+  ///
+  /// \note The original function type (`self`) need not be `@differentiable`.
+  /// The resulting function will preserve all `ExtInfo` of the original
+  /// function, including `@differentiable`.
+  AnyFunctionType *getAutoDiffDerivativeFunctionType(
+      IndexSubset *parameterIndices, unsigned resultIndex,
+      AutoDiffDerivativeFunctionKind kind,
+      LookupConformanceFn lookupConformance,
+      GenericSignature whereClauseGenericSignature = GenericSignature(),
+      bool makeSelfParamFirst = false);
 
   /// True if the parameter declaration it is attached to is guaranteed
   /// to not persist the closure for longer than the duration of the call.
