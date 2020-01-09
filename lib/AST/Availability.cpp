@@ -243,7 +243,7 @@ AvailabilityContext ASTContext::getTypesInAbstractMetadataStateAvailability() {
 }
 
 AvailabilityContext ASTContext::getPrespecializedGenericMetadataAvailability() {
-  return getSwiftFutureAvailability();
+  return AvailabilityContext::alwaysAvailable();
 }
 
 AvailabilityContext ASTContext::getSwift52Availability() {
