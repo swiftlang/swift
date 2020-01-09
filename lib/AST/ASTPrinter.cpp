@@ -3008,10 +3008,10 @@ void PrintAST::visitSubscriptDecl(SubscriptDecl *decl) {
   Printer << " -> ";
 
   TypeLoc elementTy = decl->getElementTypeLoc();
-  Printer.printDeclResultTypePre(decl, elementTy);
-  Printer.callPrintStructurePre(PrintStructureKind::FunctionReturnType);
   if (!elementTy.getTypeRepr())
     elementTy = TypeLoc::withoutLoc(decl->getElementInterfaceType());
+  Printer.printDeclResultTypePre(decl, elementTy);
+  Printer.callPrintStructurePre(PrintStructureKind::FunctionReturnType);
 
   // HACK: When printing result types for subscripts with opaque result types,
   //       always print them using the `some` keyword instead of printing

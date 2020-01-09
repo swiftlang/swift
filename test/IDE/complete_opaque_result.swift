@@ -102,6 +102,18 @@ protocol HasAssocWithConstraintAndDefault {
   associatedtype AssocWithConstraintAndDefault: MyProtocol = ConcreteMyProtocol
   func returnAssocWithConstraintAndDefault() -> AssocWithConstraintAndDefault
 }
+protocol HasAssocWithAnyObjectConstraint {
+  associatedtype AssocWithAnyObjectConstraint: AnyObject & MyProtocol 
+  func returnAssocWithAnyObjectConstraint() -> AssocWithAnyObjectConstraint
+}
+protocol HasAssocWithConstraintOnProto where Self.AssocWithConstraintOnProto : MyProtocol {
+  associatedtype AssocWithConstraintOnProto
+  func returnAssocWithConstraintOnProto() -> AssocWithConstraintOnProto
+}
+protocol HasAssocWithSameTypeConstraint where Self.AssocWithSameTypeConstraint == MyClass {
+  associatedtype AssocWithSameTypeConstraint
+  func returnAssocWithSameTypeConstraint() -> AssocWithSameTypeConstraint
+}
 
 class TestClass :
     HasAssocPlain,
@@ -109,7 +121,10 @@ class TestClass :
     HasAssocWithSuperClassConstraint,
     HasAssocWithCompositionConstraint,
     HasAssocWithDefault,
-    HasAssocWithConstraintAndDefault {
+    HasAssocWithConstraintAndDefault,
+    HasAssocWithAnyObjectConstraint,
+    HasAssocWithConstraintOnProto,
+    HasAssocWithSameTypeConstraint {
   #^OVERRIDE_TestClass^#
 // OVERRIDE: Begin completions
 // OVERRIDE-DAG: Decl[InstanceMethod]/Super:         func returnAssocPlain() -> AssocPlain {|};
@@ -118,6 +133,9 @@ class TestClass :
 // OVERRIDE-DAG: Decl[Subscript]/Super:              subscript<T>(idx: T) -> some MyClass & MyProtocol where T : Comparable {|};
 // OVERRIDE-DAG: Decl[InstanceMethod]/Super:         func returnAssocWithDefault() -> MyEnum {|};
 // OVERRIDE-DAG: Decl[InstanceMethod]/Super:         func returnAssocWithConstraintAndDefault() -> ConcreteMyProtocol {|};
+// OVERRIDE-DAG: Decl[InstanceMethod]/Super:         func returnAssocWithAnyObjectConstraint() -> some MyProtocol & AnyObject {|}
+// OVERRIDE-DAG: Decl[InstanceMethod]/Super:         func returnAssocWithConstraintOnProto() -> some MyProtocol {|}
+// OVERRIDE-DAG: Decl[InstanceMethod]/Super:         func returnAssocWithSameTypeConstraint() -> AssocWithSameTypeConstraint {|}
 // OVERRIDE: End completions
 }
 
@@ -127,7 +145,10 @@ struct TestStruct :
     HasAssocWithSuperClassConstraint,
     HasAssocWithCompositionConstraint,
     HasAssocWithDefault,
-    HasAssocWithConstraintAndDefault {
+    HasAssocWithConstraintAndDefault,
+    HasAssocWithAnyObjectConstraint,
+    HasAssocWithConstraintOnProto,
+    HasAssocWithSameTypeConstraint {
   #^OVERRIDE_TestStruct^#
 }
 
