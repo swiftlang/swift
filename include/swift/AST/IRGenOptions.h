@@ -303,6 +303,16 @@ public:
     return OptMode == OptimizationMode::ForSize;
   }
 
+  std::string getDebugFlags(StringRef PrivateDiscriminator) const {
+    std::string Flags = DebugFlags;
+    if (!PrivateDiscriminator.empty()) {
+      if (!Flags.empty())
+        Flags += " ";
+      Flags += ("-private-discriminator " + PrivateDiscriminator).str();
+    }
+    return Flags;
+  }
+
   /// Return a hash code of any components from these options that should
   /// contribute to a Swift Bridging PCH hash.
   llvm::hash_code getPCHHashComponents() const {

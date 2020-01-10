@@ -808,6 +808,7 @@ static void initLLVMModule(const IRGenModule &IGM, ModuleDecl &M) {
 std::pair<IRGenerator *, IRGenModule *>
 swift::irgen::createIRGenModule(SILModule *SILMod, StringRef OutputFilename,
                                 StringRef MainInputFilenameForDebugInfo,
+                                StringRef PrivateDiscriminator,
                                 llvm::LLVMContext &LLVMContext) {
 
   IRGenOptions Opts;
@@ -819,7 +820,8 @@ swift::irgen::createIRGenModule(SILModule *SILMod, StringRef OutputFilename,
   // Create the IR emitter.
   IRGenModule *IGM =
       new IRGenModule(*irgen, std::move(targetMachine), nullptr, LLVMContext,
-                      "", OutputFilename, MainInputFilenameForDebugInfo);
+                      "", OutputFilename, MainInputFilenameForDebugInfo,
+                      PrivateDiscriminator);
 
   initLLVMModule(*IGM, *SILMod->getSwiftModule());
 
@@ -858,6 +860,7 @@ static std::unique_ptr<llvm::Module>
 performIRGeneration(IRGenOptions &Opts, ModuleDecl *M,
                     std::unique_ptr<SILModule> SILMod, StringRef ModuleName,
                     const PrimarySpecificPaths &PSPs,
+                    StringRef PrivateDiscriminator,
                     llvm::LLVMContext &LLVMContext, SourceFile *SF = nullptr,
                     llvm::GlobalVariable **outModuleHash = nullptr,
                     llvm::StringSet<> *linkerDirectives = nullptr) {
@@ -872,7 +875,8 @@ performIRGeneration(IRGenOptions &Opts, ModuleDecl *M,
   // Create the IR emitter.
   IRGenModule IGM(irgen, std::move(targetMachine), nullptr, LLVMContext,
                   ModuleName, PSPs.OutputFilename,
-                  PSPs.MainInputFilenameForDebugInfo);
+                  PSPs.MainInputFilenameForDebugInfo,
+                  PrivateDiscriminator);
 
   initLLVMModule(IGM, *SILMod->getSwiftModule());
 
@@ -1119,7 +1123,8 @@ static void performParallelIRGeneration(
     // Create the IR emitter.
     IRGenModule *IGM =
         new IRGenModule(irgen, std::move(targetMachine), nextSF, *Context,
-                        ModuleName, *OutputIter++, nextSF->getFilename());
+                        ModuleName, *OutputIter++, nextSF->getFilename(),
+                        nextSF->getPrivateDiscriminator().str());
     IGMcreated = true;
 
     initLLVMModule(*IGM, *SILMod->getSwiftModule());
@@ -1279,19 +1284,21 @@ std::unique_ptr<llvm::Module> swift::performIRGeneration(
     return nullptr;
   }
   return ::performIRGeneration(Opts, M, std::move(SILMod), ModuleName, PSPs,
-                               LLVMContext, nullptr, outModuleHash,
-                               LinkerDirectives);
+                               "", LLVMContext, nullptr,
+                               outModuleHash, LinkerDirectives);
 }
 
 std::unique_ptr<llvm::Module> swift::
 performIRGeneration(IRGenOptions &Opts, SourceFile &SF,
                     std::unique_ptr<SILModule> SILMod,
                     StringRef ModuleName, const PrimarySpecificPaths &PSPs,
+                    StringRef PrivateDiscriminator,
                     llvm::LLVMContext &LLVMContext,
                     llvm::GlobalVariable **outModuleHash,
                     llvm::StringSet<> *LinkerDirectives) {
   return ::performIRGeneration(Opts, SF.getParentModule(), std::move(SILMod),
-                               ModuleName, PSPs, LLVMContext, &SF,
+                               ModuleName, PSPs, PrivateDiscriminator,
+                               LLVMContext, &SF,
                                outModuleHash, LinkerDirectives);
 }
 
@@ -1311,7 +1318,7 @@ swift::createSwiftModuleObjectFile(SILModule &SILMod, StringRef Buffer,
   if (!targetMachine) return;
 
   IRGenModule IGM(irgen, std::move(targetMachine), nullptr, VMContext,
-                  OutputPath, OutputPath, "");
+                  OutputPath, OutputPath, "", "");
   initLLVMModule(IGM, *SILMod.getSwiftModule());
   auto *Ty = llvm::ArrayType::get(IGM.Int8Ty, Buffer.size());
   auto *Data =

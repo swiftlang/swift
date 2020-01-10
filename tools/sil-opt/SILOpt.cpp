@@ -450,7 +450,7 @@ int main(int argc, char **argv) {
       auto T = irgen::createIRGenModule(
           SILMod, Invocation.getOutputFilenameForAtMostOnePrimary(),
           Invocation.getMainInputFilenameForDebugInfoForAtMostOnePrimary(),
-          getGlobalLLVMContext());
+          "", getGlobalLLVMContext());
       runCommandLineSelectedPasses(SILMod, T.second);
       irgen::deleteIRGenModule(T);
     }

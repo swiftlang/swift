@@ -1371,21 +1371,6 @@ static bool performCompile(CompilerInstance &Instance,
                                      ReturnValue, observer, Stats);
 }
 
-/// Get the main source file's private discriminator and attach it to
-/// the compile unit's flags.
-static void setPrivateDiscriminatorIfNeeded(IRGenOptions &IRGenOpts,
-                                            ModuleOrSourceFile MSF) {
-  if (IRGenOpts.DebugInfoLevel == IRGenDebugInfoLevel::None ||
-      !MSF.is<SourceFile *>())
-    return;
-  Identifier PD = MSF.get<SourceFile *>()->getPrivateDiscriminator();
-  if (!PD.empty()) {
-    if (!IRGenOpts.DebugFlags.empty())
-      IRGenOpts.DebugFlags += " ";
-    IRGenOpts.DebugFlags += ("-private-discriminator " + PD.str()).str();
-  }
-}
-
 static bool serializeSIB(SILModule *SM, const PrimarySpecificPaths &PSPs,
                          ASTContext &Context, ModuleOrSourceFile MSF) {
   const std::string &moduleOutputPath =
@@ -1414,6 +1399,7 @@ static void generateIR(IRGenOptions &IRGenOpts, std::unique_ptr<SILModule> SM,
   IRModule = MSF.is<SourceFile *>()
                  ? performIRGeneration(IRGenOpts, *MSF.get<SourceFile *>(),
                                        std::move(SM), OutputFilename, PSPs,
+                                       MSF.get<SourceFile *>()->getPrivateDiscriminator().str(),
                                        LLVMContext, &HashGlobal,
                                        &LinkerDirectives)
                  : performIRGeneration(IRGenOpts, MSF.get<ModuleDecl *>(),
@@ -1600,8 +1586,6 @@ static bool performCompileStepsPostSILGen(
 
   emitAnyWholeModulePostTypeCheckSupplementaryOutputs(Instance, Invocation,
                                                       moduleIsPublic);
-
-  setPrivateDiscriminatorIfNeeded(IRGenOpts, MSF);
 
   if (Action == FrontendOptions::ActionType::EmitSIB)
     return serializeSIB(SM.get(), PSPs, Instance.getASTContext(), MSF);

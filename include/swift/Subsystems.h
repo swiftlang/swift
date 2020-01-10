@@ -284,6 +284,7 @@ namespace swift {
   performIRGeneration(IRGenOptions &Opts, SourceFile &SF,
                       std::unique_ptr<SILModule> SILMod,
                       StringRef ModuleName, const PrimarySpecificPaths &PSPs,
+                      StringRef PrivateDiscriminator,
                       llvm::LLVMContext &LLVMContext,
                       llvm::GlobalVariable **outModuleHash = nullptr,
                       llvm::StringSet<> *LinkerDirectives = nullptr);

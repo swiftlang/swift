@@ -1225,14 +1225,15 @@ public:
   IRGenModule(IRGenerator &irgen, std::unique_ptr<llvm::TargetMachine> &&target,
               SourceFile *SF, llvm::LLVMContext &LLVMContext,
               StringRef ModuleName, StringRef OutputFilename,
-              StringRef MainInputFilenameForDebugInfo);
+              StringRef MainInputFilenameForDebugInfo,
+              StringRef PrivateDiscriminator);
 
   /// The constructor used when we just need an IRGenModule for type lowering.
   IRGenModule(IRGenerator &irgen, std::unique_ptr<llvm::TargetMachine> &&target,
               llvm::LLVMContext &LLVMContext)
     : IRGenModule(irgen, std::move(target), /*SF=*/nullptr, LLVMContext,
                   "<fake module name>", "<fake output filename>",
-                  "<fake main input filename>") {}
+                  "<fake main input filename>", "") {}
 
   ~IRGenModule();
 

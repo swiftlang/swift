@@ -88,7 +88,8 @@ static llvm::PointerType *createStructPointerType(IRGenModule &IGM,
 static clang::CodeGenerator *createClangCodeGenerator(ASTContext &Context,
                                                  llvm::LLVMContext &LLVMContext,
                                                       IRGenOptions &Opts,
-                                                      StringRef ModuleName) {
+                                                      StringRef ModuleName,
+                                                      StringRef PD) {
   auto Loader = Context.getClangModuleLoader();
   auto *Importer = static_cast<ClangImporter*>(&*Loader);
   assert(Importer && "No clang module loader!");
@@ -119,13 +120,13 @@ static clang::CodeGenerator *createClangCodeGenerator(ASTContext &Context,
   case IRGenDebugInfoFormat::DWARF:
     CGO.DebugCompilationDir = Opts.DebugCompilationDir;
     CGO.DwarfVersion = Opts.DWARFVersion;
-    CGO.DwarfDebugFlags = Opts.DebugFlags;
+    CGO.DwarfDebugFlags = Opts.getDebugFlags(PD);
     break;
   case IRGenDebugInfoFormat::CodeView:
     CGO.EmitCodeView = true;
     CGO.DebugCompilationDir = Opts.DebugCompilationDir;
     // This actually contains the debug flags for codeview.
-    CGO.DwarfDebugFlags = Opts.DebugFlags;
+    CGO.DwarfDebugFlags = Opts.getDebugFlags(PD);
     break;
   }
 
@@ -144,10 +145,11 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
                          std::unique_ptr<llvm::TargetMachine> &&target,
                          SourceFile *SF, llvm::LLVMContext &LLVMContext,
                          StringRef ModuleName, StringRef OutputFilename,
-                         StringRef MainInputFilenameForDebugInfo)
+                         StringRef MainInputFilenameForDebugInfo,
+                         StringRef PrivateDiscriminator)
     : IRGen(irgen), Context(irgen.SIL.getASTContext()),
       ClangCodeGen(createClangCodeGenerator(Context, LLVMContext, irgen.Opts,
-                                            ModuleName)),
+                                            ModuleName, PrivateDiscriminator)),
       Module(*ClangCodeGen->GetModule()), LLVMContext(Module.getContext()),
       DataLayout(irgen.getClangDataLayout()),
       Triple(irgen.getEffectiveClangTriple()), TargetMachine(std::move(target)),
@@ -491,7 +493,8 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   if (opts.DebugInfoLevel > IRGenDebugInfoLevel::None)
     DebugInfo = IRGenDebugInfo::createIRGenDebugInfo(IRGen.Opts, *CI, *this,
                                                      Module,
-                                                 MainInputFilenameForDebugInfo);
+                                                 MainInputFilenameForDebugInfo,
+                                                     PrivateDiscriminator);
 
   initClangTypeConverter();
 
