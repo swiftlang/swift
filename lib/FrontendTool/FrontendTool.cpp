@@ -510,7 +510,7 @@ static bool writeSIL(SILModule &SM, ModuleDecl *M, bool EmitVerboseSIL,
 
 static bool writeSIL(SILModule &SM, const PrimarySpecificPaths &PSPs,
                      CompilerInstance &Instance,
-                     CompilerInvocation &Invocation) {
+                     const CompilerInvocation &Invocation) {
   const FrontendOptions &opts = Invocation.getFrontendOptions();
   return writeSIL(SM, Instance.getMainModule(), opts.EmitVerboseSIL,
                   PSPs.OutputFilename, opts.EmitSortedSIL);
@@ -723,7 +723,7 @@ createOptRecordFile(StringRef Filename, DiagnosticEngine &DE) {
   return File;
 }
 
-static bool precompileBridgingHeader(CompilerInvocation &Invocation,
+static bool precompileBridgingHeader(const CompilerInvocation &Invocation,
                                      CompilerInstance &Instance) {
   auto clangImporter = static_cast<ClangImporter *>(
       Instance.getASTContext().getClangModuleLoader());
@@ -742,7 +742,7 @@ static bool precompileBridgingHeader(CompilerInvocation &Invocation,
           .InputsAndOutputs.getSingleOutputFilename());
 }
 
-static bool precompileClangModule(CompilerInvocation &Invocation,
+static bool precompileClangModule(const CompilerInvocation &Invocation,
                                   CompilerInstance &Instance) {
   auto clangImporter = static_cast<ClangImporter *>(
       Instance.getASTContext().getClangModuleLoader());
@@ -754,7 +754,7 @@ static bool precompileClangModule(CompilerInvocation &Invocation,
           .InputsAndOutputs.getSingleOutputFilename());
 }
 
-static bool dumpPrecompiledClangModule(CompilerInvocation &Invocation,
+static bool dumpPrecompiledClangModule(const CompilerInvocation &Invocation,
                                        CompilerInstance &Instance) {
   auto clangImporter = static_cast<ClangImporter *>(
       Instance.getASTContext().getClangModuleLoader());
@@ -765,7 +765,7 @@ static bool dumpPrecompiledClangModule(CompilerInvocation &Invocation,
           .InputsAndOutputs.getSingleOutputFilename());
 }
 
-static bool buildModuleFromInterface(CompilerInvocation &Invocation,
+static bool buildModuleFromInterface(const CompilerInvocation &Invocation,
                                      CompilerInstance &Instance) {
   const FrontendOptions &FEOpts = Invocation.getFrontendOptions();
   assert(FEOpts.InputsAndOutputs.hasSingleInput());
@@ -781,7 +781,7 @@ static bool buildModuleFromInterface(CompilerInvocation &Invocation,
       FEOpts.TrackSystemDeps, FEOpts.RemarkOnRebuildFromModuleInterface);
 }
 
-static bool compileLLVMIR(CompilerInvocation &Invocation,
+static bool compileLLVMIR(const CompilerInvocation &Invocation,
                           CompilerInstance &Instance,
                           UnifiedStatsReporter *Stats) {
   auto &LLVMContext = getGlobalLLVMContext();
@@ -824,7 +824,7 @@ static bool compileLLVMIR(CompilerInvocation &Invocation,
                      Stats);
 }
 
-static void verifyGenericSignaturesIfNeeded(CompilerInvocation &Invocation,
+static void verifyGenericSignaturesIfNeeded(const CompilerInvocation &Invocation,
                                             ASTContext &Context) {
   auto verifyGenericSignaturesInModule =
       Invocation.getFrontendOptions().VerifyGenericSignaturesInModule;
@@ -834,7 +834,7 @@ static void verifyGenericSignaturesIfNeeded(CompilerInvocation &Invocation,
     GenericSignatureBuilder::verifyGenericSignaturesInModule(module);
 }
 
-static void dumpAndPrintScopeMap(CompilerInvocation &Invocation,
+static void dumpAndPrintScopeMap(const CompilerInvocation &Invocation,
                                  CompilerInstance &Instance, SourceFile *SF) {
   // Not const because may require reexpansion
   ASTScope &scope = SF->getScope();
@@ -853,7 +853,7 @@ static void dumpAndPrintScopeMap(CompilerInvocation &Invocation,
   }
 }
 
-static SourceFile *getPrimaryOrMainSourceFile(CompilerInvocation &Invocation,
+static SourceFile *getPrimaryOrMainSourceFile(const CompilerInvocation &Invocation,
                                               CompilerInstance &Instance) {
   SourceFile *SF = Instance.getPrimarySourceFile();
   if (!SF) {
@@ -865,7 +865,7 @@ static SourceFile *getPrimaryOrMainSourceFile(CompilerInvocation &Invocation,
 
 /// Dumps the AST of all available primary source files. If corresponding output
 /// files were specified, use them; otherwise, dump the AST to stdout.
-static void dumpAST(CompilerInvocation &Invocation,
+static void dumpAST(const CompilerInvocation &Invocation,
                     CompilerInstance &Instance) {
   auto primaryFiles = Instance.getPrimarySourceFiles();
   if (!primaryFiles.empty()) {
@@ -887,10 +887,10 @@ static void dumpAST(CompilerInvocation &Invocation,
 /// CompilerInstance::performSema()), so dump or print the main source file and
 /// return.
 
-static Optional<bool> dumpASTIfNeeded(CompilerInvocation &Invocation,
+static Optional<bool> dumpASTIfNeeded(const CompilerInvocation &Invocation,
                                       CompilerInstance &Instance) {
-  FrontendOptions &opts = Invocation.getFrontendOptions();
-  FrontendOptions::ActionType Action = opts.RequestedAction;
+  const FrontendOptions &opts = Invocation.getFrontendOptions();
+  const FrontendOptions::ActionType Action = opts.RequestedAction;
   ASTContext &Context = Instance.getASTContext();
   switch (Action) {
   default:
@@ -935,7 +935,7 @@ static Optional<bool> dumpASTIfNeeded(CompilerInvocation &Invocation,
 }
 
 static void emitReferenceDependenciesForAllPrimaryInputsIfNeeded(
-    CompilerInvocation &Invocation, CompilerInstance &Instance) {
+    const CompilerInvocation &Invocation, CompilerInstance &Instance) {
   if (Invocation.getFrontendOptions()
           .InputsAndOutputs.hasReferenceDependenciesPath() &&
       Instance.getPrimarySourceFiles().empty()) {
@@ -962,7 +962,7 @@ static void emitReferenceDependenciesForAllPrimaryInputsIfNeeded(
   }
 }
 static void
-emitSwiftRangesForAllPrimaryInputsIfNeeded(CompilerInvocation &Invocation,
+emitSwiftRangesForAllPrimaryInputsIfNeeded(const CompilerInvocation &Invocation,
                                            CompilerInstance &Instance) {
   if (Invocation.getFrontendOptions().InputsAndOutputs.hasSwiftRangesPath() &&
       Instance.getPrimarySourceFiles().empty()) {
@@ -980,7 +980,7 @@ emitSwiftRangesForAllPrimaryInputsIfNeeded(CompilerInvocation &Invocation,
   }
 }
 static void
-emitCompiledSourceForAllPrimaryInputsIfNeeded(CompilerInvocation &Invocation,
+emitCompiledSourceForAllPrimaryInputsIfNeeded(const CompilerInvocation &Invocation,
                                               CompilerInstance &Instance) {
   if (Invocation.getFrontendOptions()
           .InputsAndOutputs.hasCompiledSourcePath() &&
@@ -999,7 +999,7 @@ emitCompiledSourceForAllPrimaryInputsIfNeeded(CompilerInvocation &Invocation,
   }
 }
 
-static bool writeTBDIfNeeded(CompilerInvocation &Invocation,
+static bool writeTBDIfNeeded(const CompilerInvocation &Invocation,
                              CompilerInstance &Instance) {
   const auto &frontendOpts = Invocation.getFrontendOptions();
   const auto &tbdOpts = Invocation.getTBDGenOptions();
@@ -1027,7 +1027,7 @@ static std::string changeToLdAdd(StringRef ldHide) {
   return OS.str().str();
 }
 
-static bool writeLdAddCFileIfNeeded(CompilerInvocation &Invocation,
+static bool writeLdAddCFileIfNeeded(const CompilerInvocation &Invocation,
                                     CompilerInstance &Instance) {
   auto frontendOpts = Invocation.getFrontendOptions();
   if (!frontendOpts.InputsAndOutputs.isWholeModule())
@@ -1076,14 +1076,14 @@ static bool writeLdAddCFileIfNeeded(CompilerInvocation &Invocation,
 }
 
 static bool performCompileStepsPostSILGen(
-    CompilerInstance &Instance, CompilerInvocation &Invocation,
+    CompilerInstance &Instance, const CompilerInvocation &Invocation,
     std::unique_ptr<SILModule> SM, bool astGuaranteedToCorrespondToSIL,
     ModuleOrSourceFile MSF, const PrimarySpecificPaths &PSPs,
     bool moduleIsPublic, int &ReturnValue, FrontendObserver *observer,
     UnifiedStatsReporter *Stats);
 
 static bool
-performCompileStepsPostSema(CompilerInvocation &Invocation,
+performCompileStepsPostSema(const CompilerInvocation &Invocation,
                             CompilerInstance &Instance,
                             bool moduleIsPublic, int &ReturnValue,
                             FrontendObserver *observer,
@@ -1098,8 +1098,8 @@ performCompileStepsPostSema(CompilerInvocation &Invocation,
                                          ReturnValue, observer, Stats);
   }
 
-  SILOptions &SILOpts = Invocation.getSILOptions();
-  FrontendOptions &opts = Invocation.getFrontendOptions();
+  const SILOptions &SILOpts = Invocation.getSILOptions();
+  const FrontendOptions &opts = Invocation.getFrontendOptions();
   auto fileIsSIB = [](const FileUnit *File) -> bool {
     auto SASTF = dyn_cast<SerializedASTFile>(File);
     return SASTF && SASTF->isSIB();
@@ -1158,7 +1158,7 @@ performCompileStepsPostSema(CompilerInvocation &Invocation,
 
 /// Emits index data for all primary inputs, or the main module.
 static bool
-emitIndexData(CompilerInvocation &Invocation, CompilerInstance &Instance) {
+emitIndexData(const CompilerInvocation &Invocation, CompilerInstance &Instance) {
   bool hadEmitIndexDataError = false;
   if (Instance.getPrimarySourceFiles().empty())
     return emitIndexDataIfNeeded(nullptr, Invocation, Instance);
@@ -1175,7 +1175,7 @@ emitIndexData(CompilerInvocation &Invocation, CompilerInstance &Instance) {
 /// `-typecheck`, but skipped for any mode that runs SIL diagnostics if there's
 /// an error found there (to get those diagnostics back to the user faster).
 static bool emitAnyWholeModulePostTypeCheckSupplementaryOutputs(
-    CompilerInstance &Instance, CompilerInvocation &Invocation,
+    CompilerInstance &Instance, const CompilerInvocation &Invocation,
     bool moduleIsPublic) {
   const FrontendOptions &opts = Invocation.getFrontendOptions();
 
@@ -1212,7 +1212,7 @@ static bool emitAnyWholeModulePostTypeCheckSupplementaryOutputs(
 ///                 mode is NoVerify and there were no errors.
 /// \returns true on error
 static bool performCompile(CompilerInstance &Instance,
-                           CompilerInvocation &Invocation,
+                           const CompilerInvocation &Invocation,
                            ArrayRef<const char *> Args,
                            int &ReturnValue,
                            FrontendObserver *observer,
@@ -1358,7 +1358,8 @@ static bool serializeSIB(SILModule *SM, const PrimarySpecificPaths &PSPs,
   return Context.hadError();
 }
 
-static void generateIR(IRGenOptions &IRGenOpts, std::unique_ptr<SILModule> SM,
+static void generateIR(const IRGenOptions &IRGenOpts,
+                       std::unique_ptr<SILModule> SM,
                        const PrimarySpecificPaths &PSPs,
                        StringRef OutputFilename, ModuleOrSourceFile MSF,
                        std::unique_ptr<llvm::Module> &IRModule,
@@ -1380,7 +1381,7 @@ static void generateIR(IRGenOptions &IRGenOpts, std::unique_ptr<SILModule> SM,
                                        &HashGlobal, &LinkerDirectives);
 }
 
-static bool processCommandLineAndRunImmediately(CompilerInvocation &Invocation,
+static bool processCommandLineAndRunImmediately(const CompilerInvocation &Invocation,
                                                 CompilerInstance &Instance,
                                                 std::unique_ptr<SILModule> SM,
                                                 ModuleOrSourceFile MSF,
@@ -1404,7 +1405,7 @@ static bool processCommandLineAndRunImmediately(CompilerInvocation &Invocation,
   return Instance.getASTContext().hadError();
 }
 
-static bool validateTBDIfNeeded(CompilerInvocation &Invocation,
+static bool validateTBDIfNeeded(const CompilerInvocation &Invocation,
                                 ModuleOrSourceFile MSF,
                                 bool astGuaranteedToCorrespondToSIL,
                                 llvm::Module &IRModule) {
@@ -1443,7 +1444,7 @@ static bool validateTBDIfNeeded(CompilerInvocation &Invocation,
                            Invocation.getTBDGenOptions(), allSymbols);
 }
 
-static bool generateCode(CompilerInvocation &Invocation,
+static bool generateCode(const CompilerInvocation &Invocation,
                          CompilerInstance &Instance, StringRef OutputFilename,
                          llvm::Module *IRModule,
                          llvm::GlobalVariable *HashGlobal,
@@ -1473,7 +1474,7 @@ static bool generateCode(CompilerInvocation &Invocation,
                      EffectiveLanguageVersion, OutputFilename, Stats);
 }
 
-static void collectLinkerDirectives(CompilerInvocation &Invocation,
+static void collectLinkerDirectives(const CompilerInvocation &Invocation,
                                     ModuleOrSourceFile MSF,
                                     llvm::StringSet<> &Symbols) {
   auto tbdOpts = Invocation.getTBDGenOptions();
@@ -1485,7 +1486,7 @@ static void collectLinkerDirectives(CompilerInvocation &Invocation,
 }
 
 static bool performCompileStepsPostSILGen(
-    CompilerInstance &Instance, CompilerInvocation &Invocation,
+    CompilerInstance &Instance, const CompilerInvocation &Invocation,
     std::unique_ptr<SILModule> SM, bool astGuaranteedToCorrespondToSIL,
     ModuleOrSourceFile MSF, const PrimarySpecificPaths &PSPs,
     bool moduleIsPublic, int &ReturnValue, FrontendObserver *observer,
@@ -1494,8 +1495,8 @@ static bool performCompileStepsPostSILGen(
   FrontendOptions opts = Invocation.getFrontendOptions();
   FrontendOptions::ActionType Action = opts.RequestedAction;
   ASTContext &Context = Instance.getASTContext();
-  SILOptions &SILOpts = Invocation.getSILOptions();
-  IRGenOptions &IRGenOpts = Invocation.getIRGenOptions();
+  const SILOptions &SILOpts = Invocation.getSILOptions();
+  const IRGenOptions &IRGenOpts = Invocation.getIRGenOptions();
 
   Optional<BufferIndirectlyCausingDiagnosticRAII> ricd;
   if (auto *SF = MSF.dyn_cast<SourceFile *>())
@@ -1604,8 +1605,6 @@ static bool performCompileStepsPostSILGen(
   if (Action == FrontendOptions::ActionType::DumpTypeInfo)
     return performDumpTypeInfo(IRGenOpts, *SM, getGlobalLLVMContext());
 
-  // TODO: remove once the frontend understands what action it should perform
-  IRGenOpts.OutputKind = getOutputKind(Action);
   if (Action == FrontendOptions::ActionType::Immediate)
     return processCommandLineAndRunImmediately(
         Invocation, Instance, std::move(SM), MSF, observer, ReturnValue);
@@ -1895,7 +1894,7 @@ createJSONFixItDiagnosticConsumerIfNeeded(
 }
 
 /// Print information about the selected target in JSON.
-static void printTargetInfo(CompilerInvocation &invocation,
+static void printTargetInfo(const CompilerInvocation &invocation,
                             llvm::raw_ostream &out) {
   out << "{\n";
 

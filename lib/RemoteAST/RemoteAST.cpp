@@ -59,7 +59,7 @@ namespace {
 
 /// A "minimal" class for querying IRGen.
 struct IRGenContext {
-  IRGenOptions IROpts;
+  const IRGenOptions IROpts;
   SILOptions SILOpts;
   Lowering::TypeConverter TC;
   std::unique_ptr<SILModule> SILMod;

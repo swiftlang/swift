@@ -37,7 +37,7 @@ namespace swift {
   ///
   /// \return the result returned from main(), if execution succeeded
   int RunImmediately(CompilerInstance &CI, const ProcessCmdLine &CmdLine,
-                     IRGenOptions &IRGenOpts, const SILOptions &SILOpts);
+                     const IRGenOptions &IRGenOpts, const SILOptions &SILOpts);
 
   void runREPL(CompilerInstance &CI, const ProcessCmdLine &CmdLine,
                bool ParseStdlib);

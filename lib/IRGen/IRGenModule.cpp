@@ -87,7 +87,7 @@ static llvm::PointerType *createStructPointerType(IRGenModule &IGM,
 
 static clang::CodeGenerator *createClangCodeGenerator(ASTContext &Context,
                                                  llvm::LLVMContext &LLVMContext,
-                                                      IRGenOptions &Opts,
+                                                      const IRGenOptions &Opts,
                                                       StringRef ModuleName,
                                                       StringRef PD) {
   auto Loader = Context.getClangModuleLoader();

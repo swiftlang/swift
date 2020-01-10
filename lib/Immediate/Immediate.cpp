@@ -220,7 +220,7 @@ bool swift::immediate::linkLLVMModules(llvm::Module *Module,
 }
 
 bool swift::immediate::autolinkImportedModules(ModuleDecl *M,
-                                               IRGenOptions &IRGenOpts) {
+                                               const IRGenOptions &IRGenOpts) {
   // Perform autolinking.
   SmallVector<LinkLibrary, 4> AllLinkLibraries(IRGenOpts.LinkLibraries);
   auto addLinkLibrary = [&](LinkLibrary linkLib) {
@@ -234,8 +234,10 @@ bool swift::immediate::autolinkImportedModules(ModuleDecl *M,
   return false;
 }
 
-int swift::RunImmediately(CompilerInstance &CI, const ProcessCmdLine &CmdLine,
-                          IRGenOptions &IRGenOpts, const SILOptions &SILOpts) {
+int swift::RunImmediately(CompilerInstance &CI,
+                          const ProcessCmdLine &CmdLine,
+                          const IRGenOptions &IRGenOpts,
+                          const SILOptions &SILOpts) {
   ASTContext &Context = CI.getASTContext();
   
   // IRGen the main module.

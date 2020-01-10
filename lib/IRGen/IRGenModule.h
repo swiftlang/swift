@@ -194,7 +194,7 @@ enum RequireMetadata_t : bool {
 /// IRGenModules - one for each LLVM module (= one for each input/output file).
 class IRGenerator {
 public:
-  IRGenOptions &Opts;
+  const IRGenOptions &Opts;
 
   SILModule &SIL;
 
@@ -298,7 +298,7 @@ private:
   
   friend class CurrentIGMPtr;  
 public:
-  explicit IRGenerator(IRGenOptions &opts, SILModule &module);
+  explicit IRGenerator(const IRGenOptions &opts, SILModule &module);
 
   /// Attempt to create an llvm::TargetMachine for the current target.
   std::unique_ptr<llvm::TargetMachine> createTargetMachine();

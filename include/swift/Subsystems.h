@@ -234,12 +234,12 @@ namespace swift {
   /// SIL of all files in the module is present in the SILModule.
   std::unique_ptr<SILModule>
   performSILGeneration(ModuleDecl *M, Lowering::TypeConverter &TC,
-                       SILOptions &options);
+                       const SILOptions &options);
 
   /// Turn a source file into SIL IR.
   std::unique_ptr<SILModule>
   performSILGeneration(FileUnit &SF, Lowering::TypeConverter &TC,
-                       SILOptions &options);
+                       const SILOptions &options);
 
   using ModuleOrSourceFile = PointerUnion<ModuleDecl *, SourceFile *>;
 
@@ -269,7 +269,7 @@ namespace swift {
   /// and return the generated LLVM IR module.
   /// If you set an outModuleHash, then you need to call performLLVM.
   std::unique_ptr<llvm::Module>
-  performIRGeneration(IRGenOptions &Opts, ModuleDecl *M,
+  performIRGeneration(const IRGenOptions &Opts, ModuleDecl *M,
                       std::unique_ptr<SILModule> SILMod,
                       StringRef ModuleName, const PrimarySpecificPaths &PSPs,
                       llvm::LLVMContext &LLVMContext,
@@ -281,7 +281,7 @@ namespace swift {
   /// and return the generated LLVM IR module.
   /// If you set an outModuleHash, then you need to call performLLVM.
   std::unique_ptr<llvm::Module>
-  performIRGeneration(IRGenOptions &Opts, SourceFile &SF,
+  performIRGeneration(const IRGenOptions &Opts, SourceFile &SF,
                       std::unique_ptr<SILModule> SILMod,
                       StringRef ModuleName, const PrimarySpecificPaths &PSPs,
                       StringRef PrivateDiscriminator,
@@ -292,7 +292,7 @@ namespace swift {
   /// Given an already created LLVM module, construct a pass pipeline and run
   /// the Swift LLVM Pipeline upon it. This does not cause the module to be
   /// printed, only to be optimized.
-  void performLLVMOptimizations(IRGenOptions &Opts, llvm::Module *Module,
+  void performLLVMOptimizations(const IRGenOptions &Opts, llvm::Module *Module,
                                 llvm::TargetMachine *TargetMachine);
 
   /// Wrap a serialized module inside a swift AST section in an object file.
@@ -300,7 +300,7 @@ namespace swift {
                                    StringRef OutputPath);
 
   /// Turn the given LLVM module into native code and return true on error.
-  bool performLLVM(IRGenOptions &Opts, ASTContext &Ctx, llvm::Module *Module,
+  bool performLLVM(const IRGenOptions &Opts, ASTContext &Ctx, llvm::Module *Module,
                    StringRef OutputFilename,
                    UnifiedStatsReporter *Stats=nullptr);
 
@@ -315,7 +315,7 @@ namespace swift {
   /// \param TargetMachine target of code gen, required.
   /// \param effectiveLanguageVersion version of the language, effectively.
   /// \param OutputFilename Filename for output.
-  bool performLLVM(IRGenOptions &Opts, DiagnosticEngine *Diags,
+  bool performLLVM(const IRGenOptions &Opts, DiagnosticEngine *Diags,
                    llvm::sys::Mutex *DiagMutex,
                    llvm::GlobalVariable *HashGlobal,
                    llvm::Module *Module,
@@ -325,13 +325,13 @@ namespace swift {
                    UnifiedStatsReporter *Stats=nullptr);
 
   /// Dump YAML describing all fixed-size types imported from the given module.
-  bool performDumpTypeInfo(IRGenOptions &Opts,
+  bool performDumpTypeInfo(const IRGenOptions &Opts,
                            SILModule &SILMod,
                            llvm::LLVMContext &LLVMContext);
 
   /// Creates a TargetMachine from the IRGen opts and AST Context.
   std::unique_ptr<llvm::TargetMachine>
-  createTargetMachine(IRGenOptions &Opts, ASTContext &Ctx);
+  createTargetMachine(const IRGenOptions &Opts, ASTContext &Ctx);
 
   /// A convenience wrapper for Parser functionality.
   class ParserUnit {
