@@ -644,6 +644,10 @@ def disable_verify_exclusivity : Flag<["-"], "disable-verify-exclusivity">,
 def disable_legacy_type_info : Flag<["-"], "disable-legacy-type-info">,
   HelpText<"Completely disable legacy type layout">;
 
+def prespecialize_generic_metadata : Flag<["-"], "prespecialize-generic-metadata">,
+  HelpText<"Statically specialize metadata for generic types at types that "
+           "are known to be used in source.">;
+
 def read_legacy_type_info_path_EQ : Joined<["-"], "read-legacy-type-info-path=">,
   HelpText<"Read legacy type layout from the given path instead of default path">;
 

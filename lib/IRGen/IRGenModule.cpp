@@ -1329,6 +1329,15 @@ void IRGenModule::error(SourceLoc loc, const Twine &message) {
 
 bool IRGenModule::useDllStorage() { return ::useDllStorage(Triple); }
 
+bool IRGenModule::shouldPrespecializeGenericMetadata() {
+  auto &context = getSwiftModule()->getASTContext();
+  auto deploymentAvailability =
+      AvailabilityContext::forDeploymentTarget(context);
+  return IRGen.Opts.PrespecializeGenericMetadata && 
+    deploymentAvailability.isContainedIn(
+      context.getPrespecializedGenericMetadataAvailability());
+}
+
 void IRGenerator::addGenModule(SourceFile *SF, IRGenModule *IGM) {
   assert(GenModules.count(SF) == 0);
   GenModules[SF] = IGM;
