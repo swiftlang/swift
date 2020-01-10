@@ -629,12 +629,12 @@ ConstraintSystem::TypeMatchResult ConstraintSystem::matchFunctionBuilder(
     return getTypeMatchFailure(locator);
 
   case FunctionBuilderBodyPreCheck::HasReturnStmt:
-    // If the closure has a return statement, suppress the transform but
+    // If the body has a return statement, suppress the transform but
     // continue solving the constraint system.
     return getTypeMatchSuccess();
   }
 
-  // Check the form of this closure to see if we can apply the
+  // Check the form of this body to see if we can apply the
   // function-builder translation at all.
   {
     // Check whether we can apply this specific function builder.
@@ -703,7 +703,7 @@ ConstraintSystem::TypeMatchResult ConstraintSystem::matchFunctionBuilder(
       [&](const std::pair<AnyFunctionRef, AppliedBuilderTransform> &elt) {
         return elt.first == fn;
       }) == functionBuilderTransformed.end() &&
-         "already transformed this closure along this path!?!");
+         "already transformed this body along this path!?!");
   functionBuilderTransformed.push_back(
       std::make_pair(
         fn,
@@ -723,7 +723,7 @@ ConstraintSystem::TypeMatchResult ConstraintSystem::matchFunctionBuilder(
 
 namespace {
 
-/// Pre-check all the expressions in the closure body.
+/// Pre-check all the expressions in the body.
 class PreCheckFunctionBuilderApplication : public ASTWalker {
   AnyFunctionRef Fn;
   bool SkipPrecheck = false;
