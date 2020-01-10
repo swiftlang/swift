@@ -88,7 +88,7 @@ SILValue stripBorrow(SILValue V);
 
 /// If there is only one use that is not an incidental use (end_access, etc.)
 /// return it. Otherwise, return nullptr.
-SILValue getSingleNonIncidentalUse(SILValue V);
+Operand *getSingleNonIncidentalUse(SILValue V);
 
 //===----------------------------------------------------------------------===//
 //                         Instruction Properties

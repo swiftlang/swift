@@ -277,14 +277,14 @@ SILValue swift::stripBorrow(SILValue V) {
   return V;
 }
 
-SILValue swift::getSingleNonIncidentalUse(SILValue V) {
-  SILValue singleUse;
+Operand *swift::getSingleNonIncidentalUse(SILValue V) {
+  Operand *singleUse = nullptr;
   for (auto *use : V->getUses()) {
     if (isIncidentalUse(use->getUser()))
       continue;
     if (singleUse)
       return nullptr;
-    singleUse = SILValue::getFromOpaqueValue(use->getUser());
+    singleUse = use;
   }
   return singleUse;
 }

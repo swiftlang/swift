@@ -822,18 +822,12 @@ static LoadInst *getValidLoad(SILInstruction *I, SILValue V) {
       return LI;
   }
 
-  if (isa<StructElementAddrInst>(I) || isa<TupleElementAddrInst>(I)) {
+  if (isa<StructElementAddrInst>(I) || isa<TupleElementAddrInst>(I) ||
+      isa<BeginAccessInst>(I)) {
     auto singleValue = cast<SingleValueInstruction>(I);
-    if (singleValue->getOperand(0) == V && singleValue->hasOneUse())
-      return getValidLoad(singleValue->use_begin()->getUser(), singleValue);
-  }
-
-  if (auto beginAccess = dyn_cast<BeginAccessInst>(I)) {
-    auto singleUse =
-        getSingleNonIncidentalUse(beginAccess)->getDefiningInstruction();
-    if (singleUse && beginAccess->getOperand() == V) {
-      return getValidLoad(singleUse, beginAccess);
-    }
+    auto singleUse = getSingleNonIncidentalUse(singleValue);
+    if (singleUse && singleValue->getOperand(0) == V)
+      return getValidLoad(singleUse->getUser(), singleValue);
   }
 
   return nullptr;
