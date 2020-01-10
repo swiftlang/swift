@@ -390,6 +390,17 @@ public:
 
   InterfaceAndImplementationPair(NodeT *interface, NodeT *implementation)
       : interface(interface), implementation(implementation) {
+
+    if (!interface->getKey().isInterface()) {
+      llvm::errs() << "interface key is wrong: \n";
+      interface->dump();
+    }
+    if (!implementation->getKey().isImplementation()) {
+        llvm::errs() << "implementation key is wrong: \n";
+        implementation->dump();
+    }
+
+
     assert(
         interface->getKey().isInterface() &&
         implementation->getKey().isImplementation() &&
