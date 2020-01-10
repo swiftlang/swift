@@ -116,12 +116,14 @@ ${Suite}.test("${ArrayType}/appendNonUnique")
 %   if ArrayType != 'ArraySlice':
 ${Suite}.test("${ArrayType}/removeNonUnique")
   .code {
-  var x = ${ArrayType}<Int>(repeating: 27, count: 200)
-  x.reserveCapacity(10002)
-  for _ in 1...100 {
-    let y = x
-    x.remove(at: 0)
-    expectTrue(x.capacity < 1000)
+  if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
+    var x = ${ArrayType}<Int>(repeating: 27, count: 200)
+    x.reserveCapacity(10002)
+    for _ in 1...100 {
+      let y = x
+      x.remove(at: 0)
+      expectTrue(x.capacity < 1000)
+    }
   }
 }
 %   end
