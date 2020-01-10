@@ -2241,6 +2241,10 @@ void ConstraintSystem::diagnoseFailureFor(SolutionApplicationTarget target) {
     // then it must be well-formed... but is ambiguous.  Handle this by diagnostic
     // various cases that come up.
     diagnosis.diagnoseAmbiguity(expr);
+  } else {
+    // Emit a poor fallback message.
+    getASTContext().Diags.diagnose(
+         target.getAsFunction()->getLoc(), diag::failed_to_produce_diagnostic);
   }
 }
 
