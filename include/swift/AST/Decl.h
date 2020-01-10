@@ -875,6 +875,8 @@ public:
   LLVM_READONLY
   const GenericContext *getAsGenericContext() const;
 
+  bool hasUnderscoredNaming() const;
+
   bool isPrivateStdlibDecl(bool treatNonBuiltinProtocolsAsPublic = true) const;
 
   AvailabilityContext getAvailabilityForLinkage() const;
