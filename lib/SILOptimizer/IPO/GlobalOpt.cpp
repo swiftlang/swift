@@ -17,6 +17,7 @@
 #include "swift/Demangling/ManglingMacros.h"
 #include "swift/SIL/CFG.h"
 #include "swift/SIL/DebugUtils.h"
+#include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILCloner.h"
 #include "swift/SIL/SILGlobalVariable.h"
 #include "swift/SIL/SILInstruction.h"
@@ -828,10 +829,10 @@ static LoadInst *getValidLoad(SILInstruction *I, SILValue V) {
   }
 
   if (auto beginAccess = dyn_cast<BeginAccessInst>(I)) {
-    if (beginAccess->getOperand() == V &&
-        std::distance(beginAccess->use_begin(), beginAccess->use_end()) == 2) {
-      assert(isa<EndAccessInst>((++beginAccess->use_begin())->getUser()));
-      return getValidLoad(beginAccess->use_begin()->getUser(), beginAccess);
+    auto singleUse =
+        getSingleNonIncidentalUse(beginAccess)->getDefiningInstruction();
+    if (singleUse && beginAccess->getOperand() == V) {
+      return getValidLoad(singleUse, beginAccess);
     }
   }
 

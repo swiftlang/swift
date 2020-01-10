@@ -277,6 +277,18 @@ SILValue swift::stripBorrow(SILValue V) {
   return V;
 }
 
+SILValue swift::getSingleNonIncidentalUse(SILValue V) {
+  SILValue singleUse;
+  for (auto *use : V->getUses()) {
+    if (isIncidentalUse(use->getUser()))
+      continue;
+    if (singleUse)
+      return nullptr;
+    singleUse = SILValue::getFromOpaqueValue(use->getUser());
+  }
+  return singleUse;
+}
+
 // All instructions handled here must propagate their first operand into their
 // single result.
 //
