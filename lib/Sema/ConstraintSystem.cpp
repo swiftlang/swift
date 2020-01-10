@@ -938,8 +938,8 @@ Type ConstraintSystem::getUnopenedTypeOfReference(VarDecl *value, Type baseType,
   return TypeChecker::getUnopenedTypeOfReference(
       value, baseType, UseDC,
       [&](VarDecl *var) -> Type {
-        if (auto *param = dyn_cast<ParamDecl>(var))
-          return getType(param);
+        if (Type type = getTypeIfAvailable(var))
+          return type;
 
         if (!var->hasInterfaceType()) {
           return ErrorType::get(getASTContext());
