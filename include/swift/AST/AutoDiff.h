@@ -19,6 +19,7 @@
 
 #include <cstdint>
 
+#include "swift/AST/GenericSignature.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/IndexSubset.h"
 #include "swift/AST/Type.h"
@@ -68,6 +69,25 @@ struct AutoDiffDerivativeFunctionKind {
   AutoDiffLinearMapKind getLinearMapKind() {
     return (AutoDiffLinearMapKind::innerty)rawValue;
   }
+};
+
+/// Identifies an autodiff derivative function configuration:
+/// - Parameter indices.
+/// - Result indices.
+/// - Derivative generic signature (optional).
+struct AutoDiffConfig {
+  IndexSubset *parameterIndices;
+  IndexSubset *resultIndices;
+  GenericSignature derivativeGenericSignature;
+
+  /*implicit*/ AutoDiffConfig(IndexSubset *parameterIndices,
+                              IndexSubset *resultIndices,
+                              GenericSignature derivativeGenericSignature)
+      : parameterIndices(parameterIndices), resultIndices(resultIndices),
+        derivativeGenericSignature(derivativeGenericSignature) {}
+
+  void print(llvm::raw_ostream &s = llvm::outs()) const;
+  SWIFT_DEBUG_DUMP;
 };
 
 class ParsedAutoDiffParameter {
@@ -148,9 +168,58 @@ void getSubsetParameterTypes(IndexSubset *indices, AnyFunctionType *type,
 
 namespace llvm {
 
+using swift::AutoDiffConfig;
 using swift::AutoDiffDerivativeFunctionKind;
+using swift::GenericSignature;
+using swift::IndexSubset;
 
 template <typename T> struct DenseMapInfo;
+
+template <> struct DenseMapInfo<AutoDiffConfig> {
+  static AutoDiffConfig getEmptyKey() {
+    auto *ptr = llvm::DenseMapInfo<void *>::getEmptyKey();
+    // The `derivativeGenericSignature` component must be `nullptr` so that
+    // `getHashValue` and `isEqual` do not try to call
+    // `GenericSignatureImpl::getCanonicalSignature()` on an invalid pointer.
+    return {static_cast<IndexSubset *>(ptr), static_cast<IndexSubset *>(ptr),
+            nullptr};
+  }
+
+  static AutoDiffConfig getTombstoneKey() {
+    auto *ptr = llvm::DenseMapInfo<void *>::getTombstoneKey();
+    // The `derivativeGenericSignature` component must be `nullptr` so that
+    // `getHashValue` and `isEqual` do not try to call
+    // `GenericSignatureImpl::getCanonicalSignature()` on an invalid pointer.
+    return {static_cast<IndexSubset *>(ptr), static_cast<IndexSubset *>(ptr),
+            nullptr};
+  }
+
+  static unsigned getHashValue(const AutoDiffConfig &Val) {
+    auto canGenSig =
+        Val.derivativeGenericSignature
+            ? Val.derivativeGenericSignature->getCanonicalSignature()
+            : nullptr;
+    unsigned combinedHash = hash_combine(
+        ~1U, DenseMapInfo<void *>::getHashValue(Val.parameterIndices),
+        DenseMapInfo<void *>::getHashValue(Val.resultIndices),
+        DenseMapInfo<GenericSignature>::getHashValue(canGenSig));
+    return combinedHash;
+  }
+
+  static bool isEqual(const AutoDiffConfig &LHS, const AutoDiffConfig &RHS) {
+    auto lhsCanGenSig =
+        LHS.derivativeGenericSignature
+            ? LHS.derivativeGenericSignature->getCanonicalSignature()
+            : nullptr;
+    auto rhsCanGenSig =
+        RHS.derivativeGenericSignature
+            ? RHS.derivativeGenericSignature->getCanonicalSignature()
+            : nullptr;
+    return LHS.parameterIndices == RHS.parameterIndices &&
+           LHS.resultIndices == RHS.resultIndices &&
+           DenseMapInfo<GenericSignature>::isEqual(lhsCanGenSig, rhsCanGenSig);
+  }
+};
 
 template <> struct DenseMapInfo<AutoDiffDerivativeFunctionKind> {
   static AutoDiffDerivativeFunctionKind getEmptyKey() {
