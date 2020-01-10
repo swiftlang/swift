@@ -7261,7 +7261,7 @@ llvm::PointerUnion<Expr *, Stmt *> ConstraintSystem::applySolutionImpl(
        singleExpr->getStartLoc(), singleExpr, /*implicit=*/true);
     auto braceStmt = BraceStmt::create(
         ctx, returnStmt->getStartLoc(), ASTNode(returnStmt),
-        returnStmt->getEndLoc(), /*implicit=*/true);
+        returnStmt->getEndLoc(), /*implicit=*/false);
     result = braceStmt;
   }
 
