@@ -7239,15 +7239,30 @@ llvm::PointerUnion<Expr *, Stmt *> ConstraintSystem::applySolutionImpl(
   if (auto expr = target.getAsExpr()) {
     result = expr->walk(walker);
   } else {
-    // FIXME: Implement this!
-    llvm_unreachable("Not yet implemented");
-
-#if false
     auto fn = *target.getAsFunction();
-    auto transform = rewriter.getAppliedBuilderTransform(fn);
-    assert(transform && "Not applying builder transform?");
-    result = walker.applyFunctionBuilderBodyTransform(fn, transform);
-#endif
+
+    // Dig out the function builder transformation we applied.
+    auto transformed = solution.functionBuilderTransformed.find(fn);
+    assert(transformed != solution.functionBuilderTransformed.end());
+
+    auto singleExpr = transformed->second.singleExpr;
+    singleExpr = singleExpr->walk(walker);
+    if (!singleExpr)
+      return result;
+
+    singleExpr = rewriter.coerceToType(singleExpr,
+                                       transformed->second.bodyResultType,
+                                       getConstraintLocator(singleExpr));
+    if (!singleExpr)
+      return result;
+
+    ASTContext &ctx = getASTContext();
+    auto returnStmt = new (ctx) ReturnStmt(
+       singleExpr->getStartLoc(), singleExpr, /*implicit=*/true);
+    auto braceStmt = BraceStmt::create(
+        ctx, returnStmt->getStartLoc(), ASTNode(returnStmt),
+        returnStmt->getEndLoc(), /*implicit=*/false);
+    result = braceStmt;
   }
 
   if (result.isNull())

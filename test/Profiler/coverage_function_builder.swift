@@ -13,7 +13,7 @@ struct Summer {
 // CHECK-LABEL: sil_coverage_map {{.*}} "$s24coverage_functon_builder5test0SiyF"
 @Summer
 func test0() -> Int {
-  // CHECK: [[@LINE-1]]:21 -> [[@LINE+3]]:2 : 0
+  // CHECK: [[@LINE-1]]:21 -> [[@LINE+2]]:5 : 0
   18
   12
 }
@@ -21,7 +21,7 @@ func test0() -> Int {
 // CHECK-LABEL: sil_coverage_map {{.*}} "$s24coverage_functon_builder5test1SiyF"
 @Summer
 func test1() -> Int {
-  // CHECK: [[@LINE-1]]:21 -> [[@LINE+7]]:2 : 0
+  // CHECK: [[@LINE-1]]:21 -> [[@LINE+6]]:4 : 0
   18
   12
   if 7 < 23 {
