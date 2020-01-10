@@ -1129,6 +1129,7 @@ void IRGenerator::emitTypeMetadataRecords() {
 /// else) that we require.
 void IRGenerator::emitLazyDefinitions() {
   while (!LazyTypeMetadata.empty() ||
+         !LazySpecializedTypeMetadataRecords.empty() ||
          !LazyTypeContextDescriptors.empty() ||
          !LazyOpaqueTypeDescriptors.empty() ||
          !LazyFieldDescriptors.empty() ||
@@ -1144,6 +1145,12 @@ void IRGenerator::emitLazyDefinitions() {
       entry.IsMetadataEmitted = true;
       CurrentIGMPtr IGM = getGenModule(type->getDeclContext());
       emitLazyTypeMetadata(*IGM.get(), type);
+    }
+    while (!LazySpecializedTypeMetadataRecords.empty()) {
+      CanType type = LazySpecializedTypeMetadataRecords.pop_back_val();
+      auto *nominal = type->getNominalOrBoundGenericNominal();
+      CurrentIGMPtr IGM = getGenModule(nominal->getDeclContext());
+      emitLazySpecializedGenericTypeMetadata(*IGM.get(), type);
     }
     while (!LazyTypeContextDescriptors.empty()) {
       NominalTypeDecl *type = LazyTypeContextDescriptors.pop_back_val();
@@ -1183,6 +1190,12 @@ void IRGenerator::emitLazyDefinitions() {
              && "function with externally-visible linkage emitted lazily?");
       IGM->emitSILFunction(f);
     }
+  }
+
+  while (!LazyMetadataAccessors.empty()) {
+    NominalTypeDecl *nominal = LazyMetadataAccessors.pop_back_val();
+    CurrentIGMPtr IGM = getGenModule(nominal->getDeclContext());
+    emitLazyMetadataAccessor(*IGM.get(), nominal);
   }
 
   FinishedEmittingLazyDefinitions = true;
@@ -1360,6 +1373,18 @@ void IRGenerator::noteUseOfFieldDescriptor(NominalTypeDecl *type) {
 
   assert(!FinishedEmittingLazyDefinitions);
   LazyFieldDescriptors.push_back(type);
+}
+
+void IRGenerator::noteUseOfSpecializedGenericTypeMetadata(CanType type) {
+  auto key = type->getAnyNominal();
+  assert(key);
+  auto &enqueuedSpecializedTypes = this->SpecializationsForGenericTypes[key];
+  if (llvm::all_of(enqueuedSpecializedTypes,
+                   [&](CanType enqueued) { return enqueued != type; })) {
+    assert(!FinishedEmittingLazyDefinitions);
+    this->LazySpecializedTypeMetadataRecords.push_back(type);
+    enqueuedSpecializedTypes.push_back(type);
+  }
 }
 
 void IRGenerator::noteUseOfOpaqueTypeDescriptor(OpaqueTypeDecl *opaque) {
@@ -3646,8 +3671,11 @@ llvm::GlobalValue *IRGenModule::defineTypeMetadata(CanType concreteType,
   if (nominal)
     addRuntimeResolvableType(nominal);
 
-  // Don't define the alias for foreign type metadata, since it's not ABI.
-  if (nominal && requiresForeignTypeMetadata(nominal))
+  // Don't define the alias for foreign type metadata or prespecialized generic
+  // metadata, since neither is ABI.
+  if ((nominal && requiresForeignTypeMetadata(nominal)) ||
+      (concreteType->getAnyGeneric() &&
+       concreteType->getAnyGeneric()->isGenericContext()))
     return var;
 
   // For concrete metadata, declare the alias to its address point.
@@ -3682,9 +3710,13 @@ ConstantReference IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
 
   llvm::Type *defaultVarTy;
   unsigned adjustmentIndex;
-  
+
+  bool fullMetadata = (nominal && requiresForeignTypeMetadata(nominal)) ||
+                      (concreteType->getAnyGeneric() &&
+                       concreteType->getAnyGeneric()->isGenericContext());
+
   // Foreign classes reference the full metadata with a GEP.
-  if (nominal && requiresForeignTypeMetadata(nominal)) {
+  if (fullMetadata) {
     defaultVarTy = FullTypeMetadataStructTy;
     adjustmentIndex = MetadataAdjustmentIndex::ValueType;
   // The symbol for other nominal type metadata is generated at the address
@@ -3709,10 +3741,18 @@ ConstantReference IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
     IRGen.noteUseOfTypeMetadata(nominal);
   }
 
+  if (shouldPrespecializeGenericMetadata()) {
+    if (auto nominal = concreteType->getAnyNominal()) {
+      if (nominal->isGenericContext()) {
+        IRGen.noteUseOfSpecializedGenericTypeMetadata(concreteType);
+      }
+    }
+  }
+
   Optional<LinkEntity> entity;
   DebugTypeInfo DbgTy;
 
-  if (nominal && requiresForeignTypeMetadata(nominal)) {
+  if (fullMetadata) {
     entity = LinkEntity::forTypeMetadata(concreteType,
                                          TypeMetadataAddress::FullMetadata);
     DbgTy = DebugTypeInfo::getMetadata(MetatypeType::get(concreteType),
@@ -4029,10 +4069,6 @@ Optional<llvm::Function*> IRGenModule::getAddrOfIVarInitDestroy(
 llvm::Function *IRGenModule::getAddrOfValueWitness(CanType abstractType,
                                                    ValueWitness index,
                                                 ForDefinition_t forDefinition) {
-  // We shouldn't emit value witness symbols for generic type instances.
-  assert(!isa<BoundGenericType>(abstractType) &&
-         "emitting value witness for generic type instance?!");
-  
   LinkEntity entity = LinkEntity::forValueWitness(abstractType, index);
 
   llvm::Function *&entry = GlobalFuncs[entity];
