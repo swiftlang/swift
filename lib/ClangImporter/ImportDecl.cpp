@@ -2149,45 +2149,46 @@ namespace {
     }
   };
 
-  /// Search the member tables for this class and its superclasses and try to identify the nearest VarDecl
-  /// that serves as a base for an override.  We have to do this ourselves because Objective-C has no
-  /// semantic notion of overrides, and freely allows users to refine the type of any member property in a
-  /// derived class.
+  /// Search the member tables for this class and its superclasses and try to
+  /// identify the nearest VarDecl that serves as a base for an override.  We
+  /// have to do this ourselves because Objective-C has no semantic notion of
+  /// overrides, and freely allows users to refine the type of any member
+  /// property in a derived class.
   ///
-  /// The override must be the nearest possible one so there are not breaks in the override chain. That is,
-  /// suppose C refines B refines A and each successively redeclares a member with a different type.  It
-  /// should be the case that the nearest override from C is B and from B is A.  If the override point from
-  /// C were A, then B would record an override on A as well and we would introduce a semantic ambiguity.
+  /// The override must be the nearest possible one so there are not breaks
+  /// in the override chain. That is, suppose C refines B refines A and each
+  /// successively redeclares a member with a different type.  It should be
+  /// the case that the nearest override from C is B and from B is A. If the
+  /// override point from C were A, then B would record an override on A as
+  /// well and we would introduce a semantic ambiguity.
   ///
-  /// There is also a special case for finding a method that stomps over a getter.  If this is the case and no
-  /// override point is identified, we will not import the property to force users to explicitly call the method.
+  /// There is also a special case for finding a method that stomps over a
+  /// getter.  If this is the case and no override point is identified, we will
+  /// not import the property to force users to explicitly call the method.
   static std::pair<VarDecl *, bool>
-  identifyNearestOverridenDecl(ClangImporter::Implementation &Impl,
-                               DeclContext *dc,
-                               const clang::ObjCPropertyDecl *decl,
-                               Identifier name,
-                               ClassDecl *subject) {
+  identifyNearestOverriddenDecl(ClangImporter::Implementation &Impl,
+                                DeclContext *dc,
+                                const clang::ObjCPropertyDecl *decl,
+                                Identifier name,
+                                ClassDecl *subject) {
     bool foundMethod = false;
     for (; subject; (subject = subject->getSuperclassDecl())) {
       llvm::SmallVector<ValueDecl *, 8> lookup;
-      auto found = Impl.MembersForNominal.find(subject);
-      if (found != Impl.MembersForNominal.end()) {
-        lookup.append(found->second.begin(), found->second.end());
-        namelookup::pruneLookupResultSet(dc, NL_QualifiedDefault, lookup);
+      auto foundNames = Impl.MembersForNominal.find(subject);
+      if (foundNames != Impl.MembersForNominal.end()) {
+        auto foundDecls = foundNames->second.find(name);
+        if (foundDecls != foundNames->second.end()) {
+          lookup.append(foundDecls->second.begin(), foundDecls->second.end());
+        }
       }
 
       for (auto *&result : lookup) {
-        // Skip declarations that don't match the name we're looking for.
-        if (result->getBaseName() != name)
-          continue;
-
         if (auto *fd = dyn_cast<FuncDecl>(result)) {
           if (fd->isInstanceMember() != decl->isInstanceProperty())
             continue;
 
-          if (fd->getFullName().getArgumentNames().empty()) {
-            foundMethod = true;
-          }
+          assert(fd->getFullName().getArgumentNames().empty());
+          foundMethod = true;
         } else {
           auto *var = cast<VarDecl>(result);
           if (var->isInstanceMember() != decl->isInstanceProperty())
@@ -2231,11 +2232,11 @@ namespace {
       return getVersion() == getActiveSwiftVersion();
     }
 
-    template <typename T>
-    T *recordMemberInContext(DeclContext *dc, T *member) {
+    void recordMemberInContext(DeclContext *dc, ValueDecl *member) {
       assert(member && "Attempted to record null member!");
-      Impl.MembersForNominal[dc->getSelfNominalTypeDecl()].push_back(member);
-      return member;
+      auto *nominal = dc->getSelfNominalTypeDecl();
+      auto name = member->getBaseName();
+      Impl.MembersForNominal[nominal][name].push_back(member);
     }
 
     /// Import the name of the given entity.
@@ -3798,7 +3799,7 @@ namespace {
       if (correctSwiftName)
         markAsVariant(result, *correctSwiftName);
 
-      return recordMemberInContext(dc, result);
+      return result;
     }
 
     void finishFuncDecl(const clang::FunctionDecl *decl,
@@ -4408,7 +4409,14 @@ namespace {
         }
       }
 
-      return recordMemberInContext(dc, result);
+      // We only care about recording methods with no arguments here, because
+      // they can shadow imported properties.
+      if (!isa<AccessorDecl>(result) &&
+          result->getFullName().getArgumentNames().empty()) {
+        recordMemberInContext(dc, result);
+      }
+
+      return result;
     }
 
   public:
@@ -5070,7 +5078,7 @@ namespace {
 
         bool foundMethod = false;
         std::tie(overridden, foundMethod)
-          = identifyNearestOverridenDecl(Impl, dc, decl, name, subject);
+          = identifyNearestOverriddenDecl(Impl, dc, decl, name, subject);
 
         if (foundMethod && !overridden)
           return nullptr;
@@ -5165,7 +5173,8 @@ namespace {
       if (correctSwiftName)
         markAsVariant(result, *correctSwiftName);
 
-      return recordMemberInContext(dc, result);
+      recordMemberInContext(dc, result);
+      return result;
     }
 
     Decl *
