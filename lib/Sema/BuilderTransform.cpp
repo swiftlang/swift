@@ -709,6 +709,12 @@ ConstraintSystem::TypeMatchResult ConstraintSystem::matchFunctionBuilder(
         fn,
         AppliedBuilderTransform{builderType, singleExpr, bodyResultType}));
 
+  // If builder is applied to the closure expression then
+  // `closure body` to `closure result` matching should
+  // use special locator.
+  if (auto *closure = fn.getAbstractClosureExpr())
+    locator = getConstraintLocator(closure, ConstraintLocator::ClosureResult);
+
   // Bind the body result type to the type of the transformed expression.
   addConstraint(bodyResultConstraintKind, transformedType, bodyResultType,
                 locator);
