@@ -152,7 +152,7 @@ static void addSanitizerCoveragePass(const PassManagerBuilder &Builder,
 
 std::tuple<llvm::TargetOptions, std::string, std::vector<std::string>,
            std::string>
-swift::getIRTargetOptions(IRGenOptions &Opts, ASTContext &Ctx) {
+swift::getIRTargetOptions(ASTContext &Ctx) {
   // Things that maybe we should collect from the command line:
   //   - relocation model
   //   - code model
@@ -656,7 +656,7 @@ swift::createTargetMachine(IRGenOptions &Opts, ASTContext &Ctx) {
   std::string EffectiveClangTriple;
   std::vector<std::string> targetFeaturesArray;
   std::tie(TargetOpts, CPU, targetFeaturesArray, EffectiveClangTriple)
-    = getIRTargetOptions(Opts, Ctx);
+    = getIRTargetOptions(Ctx);
   const llvm::Triple &EffectiveTriple = llvm::Triple(EffectiveClangTriple);
   std::string targetFeatures;
   if (!targetFeaturesArray.empty()) {

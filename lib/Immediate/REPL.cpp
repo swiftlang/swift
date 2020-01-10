@@ -984,7 +984,7 @@ public:
     std::string Triple;
     std::vector<std::string> Features;
     std::tie(TargetOpt, CPU, Features, Triple)
-      = getIRTargetOptions(IRGenOpts, CI.getASTContext());
+      = getIRTargetOptions(CI.getASTContext());
     
     builder.setRelocationModel(llvm::Reloc::PIC_);
     builder.setTargetOptions(TargetOpt);
