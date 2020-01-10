@@ -104,6 +104,9 @@ public:
   bool run();
 
 protected:
+  /// Checks if a given global variable is assigned only once.
+  bool isAssignedOnlyOnceInInitializer(SILGlobalVariable *SILG);
+
   /// If this is a call to a global initializer, map it.
   void collectGlobalInitCall(ApplyInst *AI);
 
@@ -595,15 +598,18 @@ static SILFunction *genGetterFromInit(SILOptFunctionBuilder &FunctionBuilder,
   return GetterF;
 }
 
-/// Checks if a given global variable is assigned only once.
-static bool isAssignedOnlyOnceInInitializer(SILGlobalVariable *SILG) {
+bool SILGlobalOpt::isAssignedOnlyOnceInInitializer(SILGlobalVariable *SILG) {
   if (SILG->isLet())
     return true;
-  // TODO: If we can prove that a given global variable
-  // is assigned only once, during initialization, then
-  // we can treat it as if it is a let.
-  // If this global is internal or private, it should be
-  return false;
+
+  // If we should skip this, it is probably because there are multiple stores.
+  // Return false if there are multiple stores or no stores.
+  if (GlobalVarSkipProcessing.count(SILG) || !GlobalVarStore.count(SILG))
+    return false;
+
+  // Otherwise, return true if this can't be used externally (false, otherwise).
+  return !isPossiblyUsedExternally(SILG->getLinkage(),
+                                   SILG->getModule().isWholeModule());
 }
 
 /// Replace load sequence which may contain
