@@ -636,6 +636,10 @@ static SILValue convertLoadSequence(SILValue oldSequence,
     return newValue;
   }
 
+  if (auto *beginAccess = dyn_cast<BeginAccessInst>(oldSequence)) {
+    return convertLoadSequence(beginAccess->getOperand(), newRootValue, B);
+  }
+
   llvm_unreachable("Unknown instruction sequence for reading from a global");
   return nullptr;
 }
@@ -817,14 +821,19 @@ static LoadInst *getValidLoad(SILInstruction *I, SILValue V) {
       return LI;
   }
 
-  if (auto *SEAI = dyn_cast<StructElementAddrInst>(I)) {
-    if (SEAI->getOperand() == V && SEAI->hasOneUse())
-      return getValidLoad(SEAI->use_begin()->getUser(), SEAI);
+  if (isa<StructElementAddrInst>(I) || isa<TupleElementAddrInst>(I) ||
+      isa<BeginAccessInst>(I)) {
+    auto singleValue = cast<SingleValueInstruction>(I);
+    if (singleValue->getOperand(0) == V && singleValue->hasOneUse())
+      return getValidLoad(singleValue->use_begin()->getUser(), singleValue);
   }
 
-  if (auto *TEAI = dyn_cast<TupleElementAddrInst>(I)) {
-    if (TEAI->getOperand() == V && TEAI->hasOneUse())
-      return getValidLoad(TEAI->use_begin()->getUser(), TEAI);
+  if (auto beginAccess = dyn_cast<BeginAccessInst>(I)) {
+    if (beginAccess->getOperand() == V &&
+        std::distance(beginAccess->use_begin(), beginAccess->use_end()) == 2) {
+      assert(isa<EndAccessInst>((++beginAccess->use_begin())->getUser()));
+      return getValidLoad(beginAccess->use_begin()->getUser(), beginAccess);
+    }
   }
 
   return nullptr;
