@@ -227,3 +227,43 @@ let IT2 = (100, 200, 300)
 public func test_let_tuple_wrapped_ints() -> Int {
   return IT1.0.0 + IT2.1
 }
+
+// Check that we optimize the global access of x in WMO only
+// CHECK-LABEL: sil [noinline] @$s28globalopt_global_propagation22fold_with_begin_accessSiyF
+// CHECK: bb0:
+// CHECK: begin_access
+
+// CHECK-WMO-LABEL: sil [noinline] @$s28globalopt_global_propagation22fold_with_begin_accessSiyF
+// CHECK-WMO: bb0:
+// CHECK-WMO-NEXT: integer_literal $Builtin.Int64, 20
+// CHECK-WMO-NEXT: struct
+// CHECK-WMO-NEXT: return
+var x = 10
+@inline(never)
+public func fold_with_begin_access() -> Int {
+  return x + 10
+}
+
+// Check that we always optimize the global access of privateX
+// CHECK-LABEL: sil [noinline] @$s28globalopt_global_propagation30fold_with_begin_access_privateSiyF
+// CHECK: bb0:
+// CHECK-NEXT: integer_literal $Builtin.Int64, 20
+// CHECK-NEXT: struct
+// CHECK-NEXT: return
+private var privateX = 10
+@inline(never)
+public func fold_with_begin_access_private() -> Int {
+  return privateX + 10
+}
+
+// Check that we never optimize the global access of publicX
+// CHECK-LABEL: sil [noinline] @$s28globalopt_global_propagation29fold_with_begin_access_publicSiyF
+// CHECK: begin_access
+
+// CHECK-WMO-LABEL: sil [noinline] @$s28globalopt_global_propagation29fold_with_begin_access_publicSiyF
+// CHECK-WMO: begin_access
+var publicX = 10
+@inline(never)
+public func fold_with_begin_access_public() -> Int {
+  return publicX + 10
+}
