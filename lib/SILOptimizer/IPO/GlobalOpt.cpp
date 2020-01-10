@@ -821,8 +821,7 @@ static LoadInst *getValidLoad(SILInstruction *I, SILValue V) {
       return LI;
   }
 
-  if (isa<StructElementAddrInst>(I) || isa<TupleElementAddrInst>(I) ||
-      isa<BeginAccessInst>(I)) {
+  if (isa<StructElementAddrInst>(I) || isa<TupleElementAddrInst>(I)) {
     auto singleValue = cast<SingleValueInstruction>(I);
     if (singleValue->getOperand(0) == V && singleValue->hasOneUse())
       return getValidLoad(singleValue->use_begin()->getUser(), singleValue);
