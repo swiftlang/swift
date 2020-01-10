@@ -569,25 +569,6 @@ printModuleInterfaceIfNeeded(StringRef outputPath,
   });
 }
 
-/// Returns the OutputKind for the given Action.
-static IRGenOutputKind getOutputKind(FrontendOptions::ActionType Action) {
-  switch (Action) {
-  case FrontendOptions::ActionType::EmitIR:
-    return IRGenOutputKind::LLVMAssembly;
-  case FrontendOptions::ActionType::EmitBC:
-    return IRGenOutputKind::LLVMBitcode;
-  case FrontendOptions::ActionType::EmitAssembly:
-    return IRGenOutputKind::NativeAssembly;
-  case FrontendOptions::ActionType::EmitObject:
-    return IRGenOutputKind::ObjectFile;
-  case FrontendOptions::ActionType::Immediate:
-    return IRGenOutputKind::Module;
-  default:
-    llvm_unreachable("Unknown ActionType which requires IRGen");
-    return IRGenOutputKind::ObjectFile;
-  }
-}
-
 namespace {
 
 /// If there is an error with fixits it writes the fixits as edits in json
@@ -750,9 +731,6 @@ static bool precompileBridgingHeader(CompilerInvocation &Invocation,
   auto &ImporterOpts = Invocation.getClangImporterOptions();
   auto &PCHOutDir = ImporterOpts.PrecompiledHeaderOutputDir;
   if (!PCHOutDir.empty()) {
-    ImporterOpts.BridgingHeader =
-        Invocation.getFrontendOptions()
-            .InputsAndOutputs.getFilenameOfFirstInput();
     // Create or validate a persistent PCH.
     auto SwiftPCHHash = Invocation.getPCHHash();
     auto PCH = clangImporter->getOrCreatePCH(ImporterOpts, SwiftPCHHash);
@@ -840,12 +818,8 @@ static bool compileLLVMIR(CompilerInvocation &Invocation,
         Err.getMessage());
     return true;
   }
-  IRGenOptions &IRGenOpts = Invocation.getIRGenOptions();
-  // TODO: remove once the frontend understands what action it should perform
-  IRGenOpts.OutputKind =
-      getOutputKind(Invocation.getFrontendOptions().RequestedAction);
-
-  return performLLVM(IRGenOpts, Instance.getASTContext(), Module.get(),
+  return performLLVM(Invocation.getIRGenOptions(),
+                     Instance.getASTContext(), Module.get(),
                      Invocation.getFrontendOptions()
                          .InputsAndOutputs.getSingleOutputFilename(),
                      Stats);
@@ -1414,12 +1388,9 @@ static bool processCommandLineAndRunImmediately(CompilerInvocation &Invocation,
                                                 ModuleOrSourceFile MSF,
                                                 FrontendObserver *observer,
                                                 int &ReturnValue) {
-  FrontendOptions &opts = Invocation.getFrontendOptions();
+  const FrontendOptions &opts = Invocation.getFrontendOptions();
   assert(!MSF.is<SourceFile *>() && "-i doesn't work in -primary-file mode");
-  IRGenOptions &IRGenOpts = Invocation.getIRGenOptions();
-  IRGenOpts.UseJIT = true;
-  IRGenOpts.DebugInfoLevel = IRGenDebugInfoLevel::Normal;
-  IRGenOpts.DebugInfoFormat = IRGenDebugInfoFormat::DWARF;
+  const IRGenOptions &IRGenOpts = Invocation.getIRGenOptions();
   const ProcessCmdLine &CmdLine =
       ProcessCmdLine(opts.ImmediateArgv.begin(), opts.ImmediateArgv.end());
   Instance.setSILModule(std::move(SM));
