@@ -1040,19 +1040,37 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
   }
 
   // Compare the type variable bindings.
-  for (auto &binding : diff.typeBindings) {
+  llvm::DenseMap<TypeVariableType *, std::pair<Type, Type>> typeDiff;
+
+  const auto &bindings1 = solutions[idx1].typeBindings;
+  const auto &bindings2 = solutions[idx2].typeBindings;
+
+  for (const auto &binding1 : bindings1) {
+    auto *typeVar = binding1.first;
+
     // If the type variable isn't one for which we should be looking at the
     // bindings, don't.
-    if (!binding.typeVar->getImpl().prefersSubtypeBinding())
+    if (!typeVar->getImpl().prefersSubtypeBinding())
       continue;
 
-    auto type1 = binding.bindings[idx1];
-    auto type2 = binding.bindings[idx2];
-
-    // If the types are equivalent, there's nothing more to do.
-    if (type1->isEqual(type2))
+    // If both solutions have a binding for this type variable
+    // let's consider it.
+    auto binding2 = bindings2.find(typeVar);
+    if (binding2 == bindings2.end())
       continue;
-    
+
+    auto concreteType1 = binding1.second;
+    auto concreteType2 = binding2->second;
+
+    if (!concreteType1->isEqual(concreteType2)) {
+      typeDiff.insert({typeVar, {concreteType1, concreteType2}});
+    }
+  }
+
+  for (auto &binding : typeDiff) {
+    auto type1 = binding.second.first;
+    auto type2 = binding.second.second;
+
     // If either of the types still contains type variables, we can't
     // compare them.
     // FIXME: This is really unfortunate. More type variable sharing
@@ -1128,7 +1146,7 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
       }
     }
   }
-  
+
   // All other things considered equal, if any overload choice is more
   // more constrained than the other, increment the score.
   if (score1 == score2) {
@@ -1315,12 +1333,6 @@ SolutionDiff::SolutionDiff(ArrayRef<Solution> solutions) {
   if (solutions.size() <= 1)
     return;
 
-  // Populate the type bindings with the first solution.
-  llvm::DenseMap<TypeVariableType *, SmallVector<Type, 2>> typeBindings;
-  for (auto binding : solutions[0].typeBindings) {
-    typeBindings[binding.first].push_back(binding.second);
-  }
-
   // Populate the overload choices with the first solution.
   llvm::DenseMap<ConstraintLocator *, SmallVector<OverloadChoice, 2>>
     overloadChoices;
@@ -1331,27 +1343,6 @@ SolutionDiff::SolutionDiff(ArrayRef<Solution> solutions) {
   // Find the type variables and overload locators common to all of the
   // solutions.
   for (auto &solution : solutions.slice(1)) {
-    // For each type variable bound in all of the previous solutions, check
-    // whether we have a binding for this type variable in this solution.
-    SmallVector<TypeVariableType *, 4> removeTypeBindings;
-    for (auto &binding : typeBindings) {
-      auto known = solution.typeBindings.find(binding.first);
-      if (known == solution.typeBindings.end()) {
-        removeTypeBindings.push_back(binding.first);
-        continue;
-      }
-
-      // Add this solution's binding to the results.
-      binding.second.push_back(known->second);
-    }
-
-    // Remove those type variables for which this solution did not have a
-    // binding.
-    for (auto typeVar : removeTypeBindings) {
-      typeBindings.erase(typeVar);
-    }
-    removeTypeBindings.clear();
-
     // For each overload locator for which we have an overload choice in
     // all of the previous solutions. Check whether we have an overload choice
     // in this solution.
@@ -1371,26 +1362,6 @@ SolutionDiff::SolutionDiff(ArrayRef<Solution> solutions) {
     // an overload choice.
     for (auto overloadChoice : removeOverloadChoices) {
       overloadChoices.erase(overloadChoice);
-    }
-  }
-
-  // Look through the type variables that have bindings in all of the
-  // solutions, and add those that have differences to the diff.
-  for (auto &binding : typeBindings) {
-    Type singleType;
-    for (auto type : binding.second) {
-      if (!singleType)
-        singleType = type;
-      else if (!singleType->isEqual(type)) {
-        // We have a difference. Add this binding to the diff.
-        this->typeBindings.push_back(
-          SolutionDiff::TypeBindingDiff{
-            binding.first,
-            std::move(binding.second)
-          });
-
-        break;
-      }
     }
   }
 
