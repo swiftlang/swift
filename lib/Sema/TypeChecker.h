@@ -700,9 +700,16 @@ public:
                                                  SourceLoc EndTypeCheckLoc);
   static bool typeCheckAbstractFunctionBody(AbstractFunctionDecl *AFD);
 
-  static BraceStmt *applyFunctionBuilderBodyTransform(FuncDecl *FD,
-                                                      BraceStmt *body,
-                                                      Type builderType);
+  /// Try to apply the function builder transform of the given builder type
+  /// to the body of the function.
+  ///
+  /// \returns \c None if the builder transformation cannot be applied at all,
+  /// e.g., because of a \c return statement. Otherwise, returns either the
+  /// fully type-checked body of the function (on success) or a \c nullptr
+  /// value if an error occurred while type checking the transformed body.
+  static Optional<BraceStmt *> applyFunctionBuilderBodyTransform(
+      FuncDecl *func, Type builderType);
+
   static bool typeCheckClosureBody(ClosureExpr *closure);
 
   static bool typeCheckTapBody(TapExpr *expr, DeclContext *DC);

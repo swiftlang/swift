@@ -51,14 +51,14 @@ let globalStringVal: String = ""
 func testAcceptColorTagged(paramIntVal: Int, paramStringVal: String) {
 
   let taggedValue = paramIntVal.tag(Color.red)
-  
+
   acceptColorTagged { color in
     #^IN_CLOSURE_TOP^#
 // IN_CLOSURE_TOP_CONTEXT: Begin completions
-// IN_CLOSURE_TOP-DAG: Decl[LocalVar]/Local:               taggedValue[#Tagged<Color, Int>#]; name=taggedValue
+// IN_CLOSURE_TOP-DAG: Decl[LocalVar]/Local{{.*}}:               taggedValue[#Tagged<Color, Int>#]; name=taggedValue
 // IN_CLOSURE_TOP-DAG: Decl[GlobalVar]/CurrModule:         globalIntVal[#Int#]; name=globalIntVal
 // IN_CLOSURE_TOP-DAG: Decl[GlobalVar]/CurrModule:         globalStringVal[#String#]; name=globalStringVal
-// IN_CLOSURE_TOP-DAG: Decl[LocalVar]/Local:               color; name=color
+// IN_CLOSURE_TOP-DAG: Decl[LocalVar]/Local:               color{{.*}}; name=color
 // IN_CLOSURE_TOP-DAG: Decl[LocalVar]/Local:               paramIntVal[#Int#]; name=paramIntVal
 // IN_CLOSURE_TOP-DAG: Decl[LocalVar]/Local:               paramStringVal[#String#]; name=paramStringVal
 // IN_CLOSURE_TOP: End completions

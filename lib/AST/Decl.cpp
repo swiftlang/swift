@@ -7903,3 +7903,10 @@ void ParseAbstractFunctionBodyRequest::cacheResult(BraceStmt *value) const {
   }
 
 }
+
+void swift::simple_display(llvm::raw_ostream &out, AnyFunctionRef fn) {
+  if (auto func = fn.getAbstractFunctionDecl())
+    simple_display(out, func);
+  else
+    out << "closure";
+}

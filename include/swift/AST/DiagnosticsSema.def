@@ -4815,6 +4815,13 @@ NOTE(previous_function_builder_here, none,
      "previous function builder specified here", ())
 ERROR(function_builder_arguments, none,
       "function builder attributes cannot have arguments", ())
+WARNING(function_builder_disabled_by_return, none,
+        "application of function builder %0 disabled by explicit 'return' "
+        "statement", (Type))
+NOTE(function_builder_remove_attr, none,
+     "remove the attribute to explicitly disable the function builder", ())
+NOTE(function_builder_remove_returns, none,
+     "remove 'return' statements to apply the function builder", ())
 
 //------------------------------------------------------------------------------
 // MARK: differentiable programming diagnostics
