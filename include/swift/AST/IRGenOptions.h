@@ -272,7 +272,7 @@ public:
   /// Appends to \p os an arbitrary string representing all options which
   /// influence the llvm compilation but are not reflected in the llvm module
   /// itself.
-  void writeLLVMCodeGenOptionsTo(llvm::raw_ostream &os) {
+  void writeLLVMCodeGenOptionsTo(llvm::raw_ostream &os) const {
     // We put a letter between each value simply to keep them from running into
     // one another. There might be a vague correspondence between meaning and
     // letter, but don't sweat it.

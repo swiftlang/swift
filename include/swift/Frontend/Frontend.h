@@ -380,7 +380,7 @@ public:
 
   SerializationOptions
   computeSerializationOptions(const SupplementaryOutputPaths &outs,
-                              bool moduleIsPublic);
+                              bool moduleIsPublic) const;
 };
 
 /// A class which manages the state and execution of the compiler.
