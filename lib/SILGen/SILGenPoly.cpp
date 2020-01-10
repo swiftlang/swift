@@ -3715,66 +3715,65 @@ SILGenFunction::getThunkedAutoDiffLinearMap(
 }
 
 // SWIFT_ENABLE_TENSORFLOW
-SILFunction *SILGenModule::getOrCreateAutoDiffDerivativeReabstractionThunk(
-    SILFunction *original, AutoDiffConfig config, SILFunction *derivativeFn,
-    AutoDiffDerivativeFunctionKind derivativeFnKind, bool reorderSelf) {
-  auto derivativeFnType = derivativeFn->getLoweredFunctionType();
+SILFunction *SILGenModule::getOrCreateCustomDerivativeThunk(
+    SILFunction *customDerivativeFn, SILFunction *originalFn,
+    const AutoDiffConfig &config, AutoDiffDerivativeFunctionKind kind) {
+  auto indices = config.getSILAutoDiffIndices();
+
+  auto customDerivativeFnTy = customDerivativeFn->getLoweredFunctionType();
+  auto *thunkGenericEnv = customDerivativeFnTy->getSubstGenericSignature()
+      ? customDerivativeFnTy->getSubstGenericSignature()->getGenericEnvironment()
+      : nullptr;
+
+  auto origFnTy = originalFn->getLoweredFunctionType();
+  CanGenericSignature derivativeCanGenSig;
+  if (auto derivativeGenSig = config.derivativeGenericSignature)
+    derivativeCanGenSig = derivativeGenSig->getCanonicalSignature();
+  auto thunkFnTy = origFnTy->getAutoDiffDerivativeFunctionType(
+      indices.parameters, indices.source,
+      kind, Types, LookUpConformanceInModule(M.getSwiftModule()),
+      derivativeCanGenSig);
+  assert(!thunkFnTy->getExtInfo().hasContext());
 
   // TODO(TF-685): Use principled thunk mangling.
   // Do not simply reuse reabstraction thunk mangling.
   Mangle::ASTMangler mangler;
-  auto name = getASTContext()
-                  .getIdentifier(mangler.mangleAutoDiffDerivativeFunctionHelper(
-                      original->getName(), derivativeFnKind, config))
-                  .str();
-  auto *thunkGenericEnv = derivativeFnType->getSubstGenericSignature()
-      ? derivativeFnType->getSubstGenericSignature()->getGenericEnvironment()
-      : nullptr;
+  auto name = getASTContext().getIdentifier(
+      mangler.mangleAutoDiffDerivativeFunctionHelper(
+          originalFn->getName(), kind, config)).str();
 
-  auto origFnType = original->getLoweredFunctionType();
-  assert(config.resultIndices->getNumIndices() == 1 &&
-         "Only single result index is currently supported");
-  CanGenericSignature derivativeCanGenSig;
-  if (auto derivativeGenSig = config.derivativeGenericSignature)
-    derivativeCanGenSig = derivativeGenSig->getCanonicalSignature();
-  auto origDerivativeFnType = origFnType->getAutoDiffDerivativeFunctionType(
-      config.parameterIndices, *config.resultIndices->getIndices().begin(),
-      derivativeFnKind, Types, LookUpConformanceInModule(M.getSwiftModule()),
-      derivativeCanGenSig);
-  assert(!origDerivativeFnType->getExtInfo().hasContext());
-
-  auto loc = derivativeFn->getLocation();
+  auto loc = customDerivativeFn->getLocation();
   SILGenFunctionBuilder fb(*this);
   // This thunk is publicly exposed and cannot be transparent.
   // Instead, mark it as "always inline" for optimization.
   auto *thunk = fb.getOrCreateFunction(
-      loc, name, original->getLinkage(), origDerivativeFnType, IsBare,
-      IsNotTransparent, derivativeFn->isSerialized(),
-      derivativeFn->isDynamicallyReplaceable(), derivativeFn->getEntryCount(),
-      derivativeFn->isThunk(), derivativeFn->getClassSubclassScope());
+      loc, name, customDerivativeFn->getLinkage(), thunkFnTy, IsBare,
+      IsNotTransparent, customDerivativeFn->isSerialized(),
+      customDerivativeFn->isDynamicallyReplaceable(), customDerivativeFn->getEntryCount(),
+      IsThunk, customDerivativeFn->getClassSubclassScope());
   thunk->setInlineStrategy(AlwaysInline);
   if (!thunk->empty())
     return thunk;
   thunk->setGenericEnvironment(thunkGenericEnv);
 
-  SILGenFunction thunkSGF(*this, *thunk, derivativeFn->getDeclContext());
+  SILGenFunction thunkSGF(*this, *thunk, customDerivativeFn->getDeclContext());
   SmallVector<ManagedValue, 4> params;
   SmallVector<SILArgument *, 4> indirectResults;
   thunkSGF.collectThunkParams(loc, params, &indirectResults);
 
-  auto *derivativeFnRef = thunkSGF.B.createFunctionRef(loc, derivativeFn);
-  auto derivativeFnRefType =
-      derivativeFnRef->getType().castTo<SILFunctionType>();
+  auto *fnRef = thunkSGF.B.createFunctionRef(loc, customDerivativeFn);
+  auto fnRefType =
+      fnRef->getType().castTo<SILFunctionType>();
 
   // Collect thunk arguments, converting ownership.
   SmallVector<SILValue, 8> arguments;
   for (auto *indRes : indirectResults)
     arguments.push_back(indRes);
-  forwardFunctionArguments(thunkSGF, loc, derivativeFnRefType, params,
+  forwardFunctionArguments(thunkSGF, loc, fnRefType, params,
                            arguments);
   // Apply function argument.
   auto apply = thunkSGF.emitApplyWithRethrow(
-      loc, derivativeFnRef, /*substFnType*/ derivativeFnRef->getType(),
+      loc, fnRef, /*substFnType*/ fnRef->getType(),
       thunk->getForwardingSubstitutionMap(), arguments);
 
   // Create return instruction in the thunk, first deallocating local
@@ -3787,15 +3786,27 @@ SILFunction *SILGenModule::getOrCreateAutoDiffDerivativeReabstractionThunk(
     thunkSGF.B.createReturn(loc, retValue);
   };
 
+  // Self reordering thunk is necessary if wrt at least two parameters,
+  // including self.
+  auto shouldReorderSelf = [&]() {
+    if (!originalFn->hasSelfParam())
+      return false;
+    auto selfParamIndex = origFnTy->getNumParameters() - 1;
+    if (!indices.isWrtParameter(selfParamIndex))
+      return false;
+    return indices.parameters->getNumIndices() > 1;
+  };
+  bool reorderSelf = shouldReorderSelf();
+
   // If self ordering is not necessary and linear map types are unchanged,
   // return the `apply` instruction.
   auto linearMapFnType = cast<SILFunctionType>(
       thunk
           ->mapTypeIntoContext(
-              derivativeFnRefType->getResults().back().getInterfaceType())
+              fnRefType->getResults().back().getInterfaceType())
           ->getCanonicalType());
   auto targetLinearMapFnType = thunk->mapTypeIntoContext(
-      origDerivativeFnType->getResults().back().getSILStorageInterfaceType())
+      thunkFnTy->getResults().back().getSILStorageInterfaceType())
           .castTo<SILFunctionType>();
   if (!reorderSelf && linearMapFnType == targetLinearMapFnType) {
     createReturn(apply);
@@ -3807,7 +3818,7 @@ SILFunction *SILGenModule::getOrCreateAutoDiffDerivativeReabstractionThunk(
   extractAllElements(apply, loc, thunkSGF.B, directResults);
   auto linearMap = thunkSGF.emitManagedRValueWithCleanup(directResults.back());
   assert(linearMap.getType().castTo<SILFunctionType>() == linearMapFnType);
-  auto linearMapKind = derivativeFnKind.getLinearMapKind();
+  auto linearMapKind = kind.getLinearMapKind();
   linearMap = thunkSGF.getThunkedAutoDiffLinearMap(
       linearMap, linearMapKind, linearMapFnType, targetLinearMapFnType,
       reorderSelf);

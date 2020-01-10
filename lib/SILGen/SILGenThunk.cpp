@@ -71,47 +71,6 @@ SILFunction *SILGenModule::getDynamicThunk(SILDeclRef constant,
 }
 
 // SWIFT_ENABLE_TENSORFLOW
-SILFunction *
-SILGenModule::getOrCreateAutoDiffDerivativeForwardingThunk(
-    SILDeclRef derivativeFnDeclRef, SILFunction *derivativeFn,
-    CanSILFunctionType derivativeFnTy) {
-  auto *autoDiffFuncId =
-      derivativeFnDeclRef.autoDiffDerivativeFunctionIdentifier;
-  assert(autoDiffFuncId);
-  auto *derivativeFnDecl = derivativeFnDeclRef.getDecl();
-
-  SILGenFunctionBuilder builder(*this);
-  auto originalFn = derivativeFnDeclRef.asAutoDiffOriginalFunction();
-  auto name = derivativeFnDeclRef.mangle();
-  // This thunk is publicly exposed and cannot be transparent.
-  // Instead, mark it as "always inline" for optimization.
-  auto *thunk = builder.getOrCreateFunction(
-      derivativeFnDecl, name, originalFn.getLinkage(ForDefinition),
-      derivativeFnTy, IsBare, IsNotTransparent,
-      derivativeFnDeclRef.isSerialized(), IsNotDynamic, ProfileCounter(),
-      IsThunk);
-  thunk->setInlineStrategy(AlwaysInline);
-  if (!thunk->empty())
-    return thunk;
-
-  if (auto genSig = derivativeFnTy->getSubstGenericSignature())
-    thunk->setGenericEnvironment(genSig->getGenericEnvironment());
-  SILGenFunction SGF(*this, *thunk, SwiftModule);
-  SmallVector<ManagedValue, 4> params;
-  auto loc = derivativeFnDeclRef.getAsRegularLocation();
-  SGF.collectThunkParams(loc, params);
-  auto derivativeFnRef = SGF.B.createFunctionRef(loc, derivativeFn);
-  auto autoDiffDerivativeFnSILTy = SILType::getPrimitiveObjectType(derivativeFnTy);
-  SmallVector<SILValue, 4> args(thunk->getArguments().begin(),
-                                thunk->getArguments().end());
-  auto apply = SGF.emitApplyWithRethrow(
-      loc, derivativeFnRef, autoDiffDerivativeFnSILTy,
-      SGF.getForwardingSubstitutionMap(), args);
-  SGF.B.createReturn(loc, apply);
-  return thunk;
-}
-
-// SWIFT_ENABLE_TENSORFLOW
 SILFunction *SILGenModule::getOrCreateAutoDiffClassMethodThunk(
     SILDeclRef derivativeFnDeclRef, CanSILFunctionType constantTy) {
   auto *autoDiffFuncId =
