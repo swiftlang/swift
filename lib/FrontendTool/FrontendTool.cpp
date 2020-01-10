@@ -979,9 +979,7 @@ static void emitReferenceDependenciesForAllPrimaryInputsIfNeeded(
       if (Invocation.getLangOptions().EnableFineGrainedDependencies)
         (void)fine_grained_dependencies::emitReferenceDependencies(
             Instance.getASTContext().Diags, SF,
-            *Instance.getDependencyTracker(), referenceDependenciesFilePath,
-            Invocation.getLangOptions()
-                .EmitFineGrainedDependencySourcefileDotFiles);
+            *Instance.getDependencyTracker(), referenceDependenciesFilePath);
       else
         (void)emitReferenceDependencies(Instance.getASTContext().Diags, SF,
                                         *Instance.getDependencyTracker(),
