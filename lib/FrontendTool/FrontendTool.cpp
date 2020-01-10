@@ -482,8 +482,7 @@ getFileOutputStream(StringRef OutputFilename, ASTContext &Ctx) {
 }
 
 /// Writes the Syntax tree to the given file
-static bool emitSyntax(SourceFile *SF, LangOptions &LangOpts,
-                       SourceManager &SM, StringRef OutputFilename) {
+static bool emitSyntax(SourceFile *SF, StringRef OutputFilename) {
   auto bufferID = SF->getBufferID();
   assert(bufferID && "frontend should have a buffer ID "
          "for the main source file");
@@ -920,7 +919,6 @@ static Optional<bool> dumpASTIfNeeded(CompilerInvocation &Invocation,
 
   case FrontendOptions::ActionType::EmitSyntax:
     emitSyntax(getPrimaryOrMainSourceFile(Invocation, Instance),
-               Invocation.getLangOptions(), Instance.getSourceMgr(),
                opts.InputsAndOutputs.getSingleOutputFilename());
     break;
 
