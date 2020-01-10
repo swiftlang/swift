@@ -70,6 +70,10 @@ extern int modulewrap_main(ArrayRef<const char *> Args, const char *Argv0,
 extern int swift_indent_main(ArrayRef<const char *> Args, const char *Argv0,
                              void *MainAddr);
 
+/// Run 'swift-symbolgraph-extract'
+extern int swift_symbolgraph_extract_main(ArrayRef<const char *> Args, const char *Argv0,
+void *MainAddr);
+
 /// Determine if the given invocation should run as a subcommand.
 ///
 /// \param ExecName The name of the argv[0] we were invoked as.
@@ -152,6 +156,8 @@ static int run_driver(StringRef ExecName,
     return swift_indent_main(
       TheDriver.getArgsWithoutProgramNameAndDriverMode(argv),
       argv[0], (void *)(intptr_t)getExecutablePath);
+  case Driver::DriverKind::SymbolGraph:
+      return swift_symbolgraph_extract_main(TheDriver.getArgsWithoutProgramNameAndDriverMode(argv), argv[0], (void *)(intptr_t)getExecutablePath);
   default:
     break;
   }
