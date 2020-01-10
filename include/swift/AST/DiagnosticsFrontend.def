@@ -343,12 +343,6 @@ ERROR(unknown_forced_module_loading_mode,none,
       "unknown value for SWIFT_FORCE_MODULE_LOADING variable: '%0'",
       (StringRef))
 
-REMARK(interface_file_lock_failure,none,
-      "could not acquire lock file for module interface '%0'", (StringRef))
-
-REMARK(interface_file_lock_timed_out,none,
-      "timed out waiting to acquire lock file for module interface '%0'", (StringRef))
-
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)
 #  undef DIAG
