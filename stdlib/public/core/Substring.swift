@@ -389,6 +389,13 @@ extension Substring.UTF8View: BidirectionalCollection {
     return _slice.distance(from: start, to: end)
   }
 
+  @_alwaysEmitIntoClient
+  public func withContiguousStorageIfAvailable<R>(
+    _ body: (UnsafeBufferPointer<Element>) throws -> R
+  ) rethrows -> R? {
+    return try _slice.withContiguousStorageIfAvailable(body)
+  }
+
   @inlinable
   public func _failEarlyRangeCheck(_ index: Index, bounds: Range<Index>) {
     _slice._failEarlyRangeCheck(index, bounds: bounds)
