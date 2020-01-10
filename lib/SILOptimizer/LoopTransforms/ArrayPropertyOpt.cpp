@@ -82,14 +82,57 @@ class ArrayPropertiesAnalysis {
   SILBasicBlock *Preheader;
   DominanceInfo *DomTree;
 
+  llvm::DenseMap<SILFunction *, uint32_t> InstCountCache;
   llvm::SmallSet<SILValue, 16> HoistableArray;
 
   SmallPtrSet<SILBasicBlock *, 16> ReachingBlocks;
   SmallPtrSet<SILBasicBlock *, 16> CachedExitingBlocks;
+
+  // This controls the max permissible instruction count of the loop for
+  // specialization
+  const uint32_t MaxInstThreshold = 5000;
+
 public:
   ArrayPropertiesAnalysis(SILLoop *L, DominanceAnalysis *DA)
       : Fun(L->getHeader()->getParent()), Loop(L), Preheader(nullptr),
         DomTree(DA->get(Fun)) {}
+
+  /// Check if it is profitable to specialize a loop when you see an apply
+  /// instruction. We consider it is not profitable to specialize the loop when:
+  /// 1. The callee is not found in the module, or cannot be determined
+  /// 2. The InstCount of the callee exceeds a predefined threshold
+  uint32_t checkProfitabilityRecursively(SILFunction *Callee) {
+    if (!Callee) {
+      return MaxInstThreshold;
+    }
+
+    auto CacheEntry = InstCountCache.find(Callee);
+    if (CacheEntry != InstCountCache.end()) {
+      return CacheEntry->second;
+    }
+
+    InstCountCache.insert(std::make_pair(Callee, 0));
+
+    uint32_t InstCount = 0;
+
+    for (auto &BB : *Callee) {
+      for (auto &I : BB) {
+        if (InstCount++ > MaxInstThreshold) {
+          InstCountCache[Callee] = MaxInstThreshold;
+          return MaxInstThreshold;
+        }
+        if (auto Apply = FullApplySite::isa(&I)) {
+          const auto CalleeInstCount = checkProfitabilityRecursively(
+              Apply.getReferencedFunctionOrNull());
+          InstCount += CalleeInstCount;
+        }
+      }
+    }
+
+    InstCountCache[Callee] = InstCount;
+
+    return InstCount;
+  }
 
   bool run() {
     Preheader = Loop->getLoopPreheader();
@@ -107,26 +150,55 @@ public:
     // beneficial. This heuristic also simplifies which regions we want to
     // specialize on. We will specialize the outermost loopnest that has
     // 'array.props' instructions in its preheader.
+
     bool FoundHoistable = false;
     for (auto *BB : Loop->getBlocks()) {
       for (auto &Inst : *BB) {
-
         // Can't clone alloc_stack instructions whose dealloc_stack is outside
         // the loop.
-        if (!Loop->canDuplicate(&Inst))
+        if (!Loop->canDuplicate(&Inst)) {
           return false;
+        }
 
         ArraySemanticsCall ArrayPropsInst(&Inst, "array.props", true);
         if (!ArrayPropsInst)
           continue;
 
-        if (!canHoistArrayPropsInst(ArrayPropsInst))
+        if (!canHoistArrayPropsInst(ArrayPropsInst)) {
           return false;
+        }
+
         FoundHoistable = true;
       }
     }
 
-    return FoundHoistable;
+    if (!FoundHoistable) {
+      return false;
+    }
+
+    // Additionally, we don't specialize the loop if the InstCount exceeds a
+    // predefined threshold or we find opaque calls.
+    // Since only few loops qualify as hoistable, and the profitability check
+    // can run long in cases of large thresholds, these checks are not folded
+    // along with the legality checks above.
+
+    uint32_t InstCount = 0;
+
+    for (auto *BB : Loop->getBlocks()) {
+      for (auto &Inst : *BB) {
+        if (InstCount++ > MaxInstThreshold) {
+          return false;
+        }
+
+        if (auto Apply = FullApplySite::isa(&Inst)) {
+          const auto Callee = Apply.getReferencedFunctionOrNull();
+          auto CalleeInstCount = checkProfitabilityRecursively(Callee);
+          InstCount += CalleeInstCount;
+        }
+      }
+    }
+
+    return true;
   }
 
 private:
