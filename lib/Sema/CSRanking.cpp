@@ -708,6 +708,35 @@ static Type getUnlabeledType(Type type, ASTContext &ctx) {
   });
 }
 
+static void addKeyPathDynamicMemberOverloads(
+    ArrayRef<Solution> solutions, unsigned idx1, unsigned idx2,
+    SmallVectorImpl<SolutionDiff::OverloadDiff> &overloadDiff) {
+  const auto &overloads1 = solutions[idx1].overloadChoices;
+  const auto &overloads2 = solutions[idx2].overloadChoices;
+
+  for (auto &entry : overloads1) {
+    auto *locator = entry.first;
+    if (!locator->isForKeyPathDynamicMemberLookup())
+      continue;
+
+    auto overload2 = overloads2.find(locator);
+    if (overload2 == overloads2.end())
+      continue;
+
+    auto &overloadChoice1 = entry.second.choice;
+    auto &overloadChoice2 = overload2->second.choice;
+
+    SmallVector<OverloadChoice, 4> choices;
+    choices.resize(solutions.size());
+
+    choices[idx1] = overloadChoice1;
+    choices[idx2] = overloadChoice2;
+
+    overloadDiff.push_back(
+        SolutionDiff::OverloadDiff{locator, std::move(choices)});
+  }
+}
+
 SolutionCompareResult ConstraintSystem::compareSolutions(
     ConstraintSystem &cs, ArrayRef<Solution> solutions,
     const SolutionDiff &diff, unsigned idx1, unsigned idx2) {
@@ -750,8 +779,17 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
     return 1;
   };
 
+  SmallVector<SolutionDiff::OverloadDiff, 4> overloadDiff(diff.overloads);
+  // Single type of keypath dynamic member lookup could refer to different
+  // member overlaods, we have to do a pair-wise comparison in such cases
+  // otherwise ranking would miss some viable information e.g.
+  // `_ = arr[0..<3]` could refer to subscript through writable or read-only
+  // key path and each of them could also pick overload which returns `Slice<T>`
+  // or `ArraySlice<T>` (assuming that `arr` is something like `Box<[Int]>`).
+  addKeyPathDynamicMemberOverloads(solutions, idx1, idx2, overloadDiff);
+
   // Compare overload sets.
-  for (auto &overload : diff.overloads) {
+  for (auto &overload : overloadDiff) {
     unsigned weight = getWeight(overload.locator);
 
     auto choice1 = overload.choices[idx1];
