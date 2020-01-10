@@ -139,6 +139,16 @@ def enable_fine_grained_dependencies :
 Flag<["-"], "enable-fine-grained-dependencies">, Flags<[FrontendOption, HelpHidden]>,
 HelpText<"Experimental work-in-progress to be more selective about incremental recompilation">;
 
+
+def enable_only_one_dependency_file :
+Flag<["-"], "enable-only-one-dependency-file">, Flags<[DoesNotAffectIncrementalBuild]>,
+ HelpText<"Enables incremental build optimization that only produces one dependencies file">;
+
+def disable_only_one_dependency_file :
+Flag<["-"], "disable-only-one-dependency-file">, Flags<[DoesNotAffectIncrementalBuild]>,
+ HelpText<"Disables incremental build optimization that only produces one dependencies file">;
+ 
+
 def enable_source_range_dependencies :
 Flag<["-"], "enable-source-range-dependencies">, Flags<[]>,
 HelpText<"Try using source range information">;
