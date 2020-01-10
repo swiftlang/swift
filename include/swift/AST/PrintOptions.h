@@ -380,6 +380,13 @@ struct PrintOptions {
   ArgAndParamPrintingMode ArgAndParamPrinting =
       ArgAndParamPrintingMode::MatchSource;
 
+  /// Whether to print the default argument value string
+  /// representation.
+  bool PrintDefaultArgumentValue = true;
+
+  /// Whether to print "_" placeholders for empty arguments.
+  bool PrintEmptyArgumentNames = true;
+
   /// Whether to print documentation comments attached to declarations.
   /// Note that this may print documentation comments from related declarations
   /// (e.g. the overridden method in the superclass) if such comment is found.
