@@ -85,7 +85,7 @@ func foo(_ a: Int64, _ b: Int64) -> Int64 {
 // CHECK-DAG: ![[MAINMODULE]] = !DIModule({{.*}}, name: "basic"
 
 // DWARF Version
-// DWARF-CHECK-DAG:  i32 2, !"Dwarf Version", i32 4}
+// DWARF-CHECK-DAG:  i32 7, !"Dwarf Version", i32 4}
 // CV-CHECK-DAG: i32 2, !"CodeView", i32 1}
 
 // Debug Info Version
