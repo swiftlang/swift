@@ -890,6 +890,7 @@ extension ContiguousArray: RangeReplaceableCollection {
   }
 
   @inlinable
+  @_semantics("array.mutate_unknown")
   public mutating func _customRemoveLast() -> Element? {
     _makeMutableAndUnique()
     let newCount = _getCount() - 1
@@ -917,6 +918,7 @@ extension ContiguousArray: RangeReplaceableCollection {
   /// - Complexity: O(*n*), where *n* is the length of the array.
   @inlinable
   @discardableResult
+  @_semantics("array.mutate_unknown")
   public mutating func remove(at index: Int) -> Element {
     _makeMutableAndUnique()
     let currentCount = _getCount()
