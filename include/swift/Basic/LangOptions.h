@@ -285,14 +285,10 @@ namespace swift {
     /// Whether to verify the parsed syntax tree and emit related diagnostics.
     bool VerifySyntaxTree = false;
 
-    /// Emit the newer, finer-grained swiftdeps file. Eventually will support
-    /// faster rebuilds.
+    /// Scaffolding to permit experimentation with finer-grained dependencies
+    /// and faster rebuilds.
     bool EnableFineGrainedDependencies = false;
-
-    /// When using fine-grained dependencies, emit dot files for every swiftdeps
-    /// file.
-    bool EmitFineGrainedDependencySourcefileDotFiles = false;
-
+    
     /// To mimic existing system, set to false.
     /// To experiment with including file-private and private dependency info,
     /// set to true.
