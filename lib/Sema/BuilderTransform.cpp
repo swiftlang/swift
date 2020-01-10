@@ -502,15 +502,15 @@ Optional<BraceStmt *> TypeChecker::applyFunctionBuilderBodyTransform(
   auto &ctx = func->getASTContext();
   auto request = PreCheckFunctionBuilderRequest{func};
   switch (evaluateOrDefault(
-              ctx.evaluator, request, FunctionBuilderClosurePreCheck::Error)) {
-  case FunctionBuilderClosurePreCheck::Okay:
+              ctx.evaluator, request, FunctionBuilderBodyPreCheck::Error)) {
+  case FunctionBuilderBodyPreCheck::Okay:
     // If the pre-check was okay, apply the function-builder transform.
     break;
 
-  case FunctionBuilderClosurePreCheck::Error:
+  case FunctionBuilderBodyPreCheck::Error:
     return nullptr;
 
-  case FunctionBuilderClosurePreCheck::HasReturnStmt: {
+  case FunctionBuilderBodyPreCheck::HasReturnStmt: {
     // One or more explicit 'return' statements were encountered, which
     // disables the function builder transform. Warn when we do this.
     auto returnStmts = findReturnStatements(func);
@@ -527,7 +527,7 @@ Optional<BraceStmt *> TypeChecker::applyFunctionBuilderBodyTransform(
         attr = accessor->getStorage()->getAttachedFunctionBuilder();
       }
     }
-    
+
     if (attr) {
       ctx.Diags.diagnose(
           attr->getLocation(), diag::function_builder_remove_attr)
@@ -619,16 +619,16 @@ ConstraintSystem::TypeMatchResult ConstraintSystem::matchFunctionBuilder(
   // for return statements.
   auto request = PreCheckFunctionBuilderRequest{fn};
   switch (evaluateOrDefault(getASTContext().evaluator, request,
-                            FunctionBuilderClosurePreCheck::Error)) {
-  case FunctionBuilderClosurePreCheck::Okay:
+                            FunctionBuilderBodyPreCheck::Error)) {
+  case FunctionBuilderBodyPreCheck::Okay:
     // If the pre-check was okay, apply the function-builder transform.
     break;
 
-  case FunctionBuilderClosurePreCheck::Error:
+  case FunctionBuilderBodyPreCheck::Error:
     // If the pre-check had an error, flag that.
     return getTypeMatchFailure(locator);
 
-  case FunctionBuilderClosurePreCheck::HasReturnStmt:
+  case FunctionBuilderBodyPreCheck::HasReturnStmt:
     // If the closure has a return statement, suppress the transform but
     // continue solving the constraint system.
     return getTypeMatchSuccess();
@@ -738,7 +738,7 @@ public:
 
   const std::vector<ReturnStmt *> getReturnStmts() const { return ReturnStmts; }
 
-  FunctionBuilderClosurePreCheck run() {
+  FunctionBuilderBodyPreCheck run() {
     Stmt *oldBody = Fn.getBody();
 
     Stmt *newBody = oldBody->walk(*this);
@@ -747,14 +747,14 @@ public:
     assert((newBody == nullptr) == HasError &&
            "unexpected short-circuit while walking body");
     if (HasError)
-      return FunctionBuilderClosurePreCheck::Error;
+      return FunctionBuilderBodyPreCheck::Error;
 
     if (hasReturnStmt())
-      return FunctionBuilderClosurePreCheck::HasReturnStmt;
+      return FunctionBuilderBodyPreCheck::HasReturnStmt;
 
     assert(oldBody == newBody && "pre-check walk wasn't in-place?");
 
-    return FunctionBuilderClosurePreCheck::Okay;
+    return FunctionBuilderBodyPreCheck::Okay;
   }
 
   std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
@@ -786,13 +786,13 @@ public:
 
 }
 
-llvm::Expected<FunctionBuilderClosurePreCheck>
+llvm::Expected<FunctionBuilderBodyPreCheck>
 PreCheckFunctionBuilderRequest::evaluate(Evaluator &eval,
                                          AnyFunctionRef fn) const {
   // Single-expression closures should already have been pre-checked.
   if (auto closure = fn.getAbstractClosureExpr()) {
     if (closure->hasSingleExpressionBody())
-      return FunctionBuilderClosurePreCheck::Okay;
+      return FunctionBuilderBodyPreCheck::Okay;
   }
 
   return PreCheckFunctionBuilderApplication(fn, false).run();
