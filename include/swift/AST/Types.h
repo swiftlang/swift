@@ -3854,7 +3854,7 @@ namespace Lowering {
 /// function parameter and result types.
 class SILFunctionType final : public TypeBase, public llvm::FoldingSetNode,
     private llvm::TrailingObjects<SILFunctionType, SILParameterInfo,
-                                  SILResultInfo> {
+                                  SILResultInfo, SILYieldInfo, CanType> {
   friend TrailingObjects;
 
   size_t numTrailingObjects(OverloadToken<SILParameterInfo>) const {
@@ -3862,7 +3862,15 @@ class SILFunctionType final : public TypeBase, public llvm::FoldingSetNode,
   }
 
   size_t numTrailingObjects(OverloadToken<SILResultInfo>) const {
-    return hasErrorResult() ? 1 : 0;
+    return getNumResults() + (hasErrorResult() ? 1 : 0);
+  }
+
+  size_t numTrailingObjects(OverloadToken<SILYieldInfo>) const {
+    return getNumYields();
+  }
+
+  size_t numTrailingObjects(OverloadToken<CanType>) const {
+    return hasResultCache() ? 2 : 0;
   }
 
 public:
@@ -4035,12 +4043,13 @@ private:
   unsigned NumAnyResults : 16;         // Not including the ErrorResult.
   unsigned NumAnyIndirectFormalResults : 16; // Subset of NumAnyResults.
 
+  // [SILFunctionType-layout]
   // The layout of a SILFunctionType in memory is:
   //   SILFunctionType
   //   SILParameterInfo[NumParameters]
   //   SILResultInfo[isCoroutine() ? 0 : NumAnyResults]
-  //   SILYieldInfo[isCoroutine() ? NumAnyResults : 0]
   //   SILResultInfo?    // if hasErrorResult()
+  //   SILYieldInfo[isCoroutine() ? NumAnyResults : 0]
   //   CanType?          // if !isCoro && NumAnyResults > 1, formal result cache
   //   CanType?          // if !isCoro && NumAnyResults > 1, all result cache
 
@@ -4053,34 +4062,16 @@ private:
   }
 
   MutableArrayRef<SILResultInfo> getMutableResults() {
-    auto *ptr = reinterpret_cast<SILResultInfo *>(getMutableParameters().end());
-    return {ptr, getNumResults()};
+    return {getTrailingObjects<SILResultInfo>(), getNumResults()};
   }
 
   MutableArrayRef<SILYieldInfo> getMutableYields() {
-    auto *ptr = reinterpret_cast<SILYieldInfo *>(getMutableParameters().end());
-    return {ptr, getNumYields()};
-  }
-
-  /// Return a pointer past the end of the formal results, whether they
-  /// are yield-results or normal results.
-  void *getEndOfFormalResults() {
-    return isCoroutine() ? static_cast<void*>(getMutableYields().end())
-                         : static_cast<void*>(getMutableResults().end());
+    return {getTrailingObjects<SILYieldInfo>(), getNumYields()};
   }
 
   SILResultInfo &getMutableErrorResult() {
     assert(hasErrorResult());
-    return *reinterpret_cast<SILResultInfo*>(getEndOfFormalResults());
-  }
-
-  /// Return a pointer past the end of all of the results, including the
-  /// error result if one is present.
-  void *getEndOfAllResults() {
-    void *end = getEndOfFormalResults();
-    if (hasErrorResult())
-      end = reinterpret_cast<char*>(end) + sizeof(SILResultInfo);
-    return end;
+    return *(getTrailingObjects<SILResultInfo>() + getNumResults());
   }
 
   /// Do we have slots for caches of the normal-result tuple type?
@@ -4090,14 +4081,13 @@ private:
 
   CanType &getMutableFormalResultsCache() const {
     assert(hasResultCache());
-    auto *ptr = const_cast<SILFunctionType *>(this)->getEndOfAllResults();
-    return *reinterpret_cast<CanType*>(ptr);
+    return *const_cast<SILFunctionType *>(this)->getTrailingObjects<CanType>();
   }
 
   CanType &getMutableAllResultsCache() const {
     assert(hasResultCache());
-    auto *ptr = const_cast<SILFunctionType *>(this)->getEndOfAllResults();
-    return *(reinterpret_cast<CanType *>(ptr) + 1);
+    return *(const_cast<SILFunctionType *>(this)->getTrailingObjects<CanType>()
+             + 1);
   }
 
   SILFunctionType(GenericSignature genericSig, ExtInfo ext,
