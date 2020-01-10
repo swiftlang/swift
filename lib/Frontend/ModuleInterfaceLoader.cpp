@@ -950,11 +950,13 @@ class ModuleInterfaceLoaderImpl {
     std::unique_ptr<llvm::MemoryBuffer> moduleBuffer;
 
     // We didn't discover a module corresponding to this interface.
+
     // Diagnose that we didn't find a loadable module, if we were asked to.
-    auto remarkRebuild = [&]() {
+    if (remarkOnRebuildFromInterface) {
       rebuildInfo.diagnose(ctx, diagnosticLoc, moduleName,
                            interfacePath);
-    };
+    }
+
     // If we found an out-of-date .swiftmodule, we still want to add it as
     // a dependency of the .swiftinterface. That way if it's updated, but
     // the .swiftinterface remains the same, we invalidate the cache and
@@ -964,9 +966,7 @@ class ModuleInterfaceLoaderImpl {
       builder.addExtraDependency(modulePath);
 
     if (builder.buildSwiftModule(cachedOutputPath, /*shouldSerializeDeps*/true,
-                                 &moduleBuffer,
-                                 remarkOnRebuildFromInterface ? remarkRebuild:
-                                   llvm::function_ref<void()>()))
+                                 &moduleBuffer))
       return std::make_error_code(std::errc::invalid_argument);
 
     assert(moduleBuffer &&
