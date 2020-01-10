@@ -228,7 +228,7 @@
             "repos": {
                 "llvm-project": "swift/swift-5.1-branch",
                 "swift": "swift-5.1-branch",
-                "cmark": "master",
+                "cmark": "swift-5.1-branch",
                 "llbuild": "swift-5.1-branch",
                 "swiftpm": "swift-5.1-branch",
                 "swift-syntax": "swift-5.1-branch",
@@ -266,6 +266,30 @@
                 "cmake": "v3.15.1",
                 "indexstore-db": "swift-5.2-branch",
                 "sourcekit-lsp": "swift-5.2-branch",
+                "swift-format": "master"
+            }
+        },
+       "master-rebranch": {
+            "aliases": ["master-rebranch", "swift/master-rebranch"],
+            "repos": {
+                "llvm-project": "swift/master-rebranch",
+                "swift": "master-rebranch",
+                "cmark": "master",
+                "llbuild": "master",
+                "swift-tools-support-core": "master",
+                "swiftpm": "master",
+                "swift-syntax": "master",
+                "swift-stress-tester": "master",
+                "swift-corelibs-xctest": "master",
+                "swift-corelibs-foundation": "master",
+                "swift-corelibs-libdispatch": "master",
+                "swift-integration-tests": "master",
+                "swift-xcode-playground-support": "master",
+                "ninja": "release",
+                "icu": "release-65-1",
+                "cmake": "v3.15.1",
+                "indexstore-db": "master",
+                "sourcekit-lsp": "master",
                 "swift-format": "master"
             }
         }

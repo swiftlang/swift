@@ -1462,7 +1462,8 @@ DifferentiableAttr::DifferentiableAttr(Decl *original, bool implicit,
                                        Optional<DeclNameRefWithLoc> vjp,
                                        GenericSignature derivativeGenSig)
     : DeclAttribute(DAK_Differentiable, atLoc, baseRange, implicit),
-      Linear(linear), JVP(std::move(jvp)), VJP(std::move(vjp)) {
+      OriginalDeclaration(original), Linear(linear), JVP(std::move(jvp)),
+      VJP(std::move(vjp)) {
   setParameterIndices(parameterIndices);
   setDerivativeGenericSignature(derivativeGenSig);
 }
@@ -1495,6 +1496,13 @@ DifferentiableAttr::create(AbstractFunctionDecl *original, bool implicit,
   return new (mem) DifferentiableAttr(original, implicit, atLoc, baseRange,
                                       linear, parameterIndices, std::move(jvp),
                                       std::move(vjp), derivativeGenSig);
+}
+
+void DifferentiableAttr::setOriginalDeclaration(Decl *originalDeclaration) {
+  assert(originalDeclaration && "Original declaration must be non-null");
+  assert(!OriginalDeclaration &&
+         "Original declaration cannot have already been set");
+  OriginalDeclaration = originalDeclaration;
 }
 
 void DifferentiableAttr::setJVPFunction(FuncDecl *decl) {

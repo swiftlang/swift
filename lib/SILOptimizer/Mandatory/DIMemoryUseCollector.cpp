@@ -212,11 +212,11 @@ SILType DIMemoryObjectInfo::getElementType(unsigned EltNo) const {
                            Module, MemorySILType, EltNo, isNonDelegatingInit());
 }
 
-/// computeTupleElementAddress - Given a tuple element number (in the flattened
-/// sense) return a pointer to a leaf element of the specified number.
-SILValue DIMemoryObjectInfo::emitElementAddress(
+/// Given a tuple element number (in the flattened sense) return a pointer to a
+/// leaf element of the specified number, so we can insert destroys for it.
+SILValue DIMemoryObjectInfo::emitElementAddressForDestroy(
     unsigned EltNo, SILLocation Loc, SILBuilder &B,
-    llvm::SmallVectorImpl<std::pair<SILValue, SILValue>> &EndBorrowList) const {
+    SmallVectorImpl<std::pair<SILValue, EndScopeKind>> &EndScopeList) const {
   SILValue Ptr = getUninitializedValue();
   bool IsSelf = isNonDelegatingInit();
   auto &Module = MemoryInst->getModule();
@@ -260,7 +260,7 @@ SILValue DIMemoryObjectInfo::emitElementAddress(
             if (isa<ClassDecl>(NTD) && Ptr->getType().isAddress()) {
               SILValue Original = Ptr;
               SILValue Borrowed = Ptr = B.createLoadBorrow(Loc, Ptr);
-              EndBorrowList.emplace_back(Borrowed, Original);
+              EndScopeList.emplace_back(Borrowed, EndScopeKind::Borrow);
             }
           }
           auto expansionContext = TypeExpansionContext(B.getFunction());
@@ -277,12 +277,13 @@ SILValue DIMemoryObjectInfo::emitElementAddress(
               if (Ptr.getOwnershipKind() != ValueOwnershipKind::Guaranteed) {
                 Original = Ptr;
                 Borrowed = Ptr = B.createBeginBorrow(Loc, Ptr);
+                EndScopeList.emplace_back(Borrowed, EndScopeKind::Borrow);
               }
               Ptr = B.createRefElementAddr(Loc, Ptr, VD);
-              if (Original) {
-                assert(Borrowed);
-                EndBorrowList.emplace_back(Borrowed, Original);
-              }
+              Ptr = B.createBeginAccess(
+                  Loc, Ptr, SILAccessKind::Deinit, SILAccessEnforcement::Static,
+                  false /*noNestedConflict*/, false /*fromBuiltin*/);
+              EndScopeList.emplace_back(Ptr, EndScopeKind::Access);
             }
 
             PointeeType = FieldType;

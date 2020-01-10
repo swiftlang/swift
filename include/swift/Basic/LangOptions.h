@@ -173,7 +173,10 @@ namespace swift {
     
     /// Whether to dump debug info for request evaluator cycles.
     bool DebugDumpCycles = false;
-    
+
+    /// Whether to build a request dependency graph for debugging.
+    bool BuildRequestDependencyGraph = false;
+
     /// Enable SIL type lowering
     bool EnableSubstSILFunctionTypesForFunctionValues = false;
 

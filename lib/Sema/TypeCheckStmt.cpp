@@ -1980,12 +1980,17 @@ TypeCheckFunctionBodyUntilRequest::evaluate(Evaluator &evaluator,
   if (!body || AFD->isBodyTypeChecked())
     return false;
 
+  bool alreadyTypeChecked = false;
   if (auto *func = dyn_cast<FuncDecl>(AFD)) {
     if (Type builderType = getFunctionBuilderType(func)) {
-      body = TypeChecker::applyFunctionBuilderBodyTransform(func, body,
-                                                            builderType);
-      if (!body)
-        return true;
+      if (auto optBody =
+            TypeChecker::applyFunctionBuilderBodyTransform(func, builderType)) {
+        if (!*optBody)
+          return true;
+
+        body = *optBody;
+        alreadyTypeChecked = true;
+      }
     } else if (func->hasSingleExpressionBody() &&
                func->getResultInterfaceType()->isVoid()) {
       // The function returns void.  We don't need an explicit return, no matter
@@ -2013,9 +2018,13 @@ TypeCheckFunctionBodyUntilRequest::evaluate(Evaluator &evaluator,
   if (ctx.LangOpts.EnableASTScopeLookup)
     ASTScope::expandFunctionBody(AFD);
 
-  StmtChecker SC(AFD);
-  SC.EndTypeCheckLoc = endTypeCheckLoc;
-  bool hadError = SC.typeCheckBody(body);
+  // Type check the function body if needed.
+  bool hadError = false;
+  if (!alreadyTypeChecked) {
+    StmtChecker SC(AFD);
+    SC.EndTypeCheckLoc = endTypeCheckLoc;
+    hadError = SC.typeCheckBody(body);
+  }
 
   // If this was a function with a single expression body, let's see
   // if implicit return statement came out to be `Never` which means
