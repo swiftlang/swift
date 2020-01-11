@@ -4,8 +4,23 @@
 // UNSUPPORTED: CPU=armv7 && OS=ios
 // UNSUPPORTED: CPU=armv7s && OS=ios
 
-// CHECK: @"$sB[[INT]]_WV" = external global i8*, align [[ALIGNMENT]]
-// CHECK: @"$s4main5Value[[UNIQUE_ID_1:[0-9A-Z_]+]]VySiGMf" = internal constant <{ i8**, [[INT]], %swift.type_descriptor*, %swift.type*, i32{{(, \[4 x i8\])?}}, i64 }> <{ i8** @"$sB[[INT]]_WV", [[INT]] 512, %swift.type_descriptor* bitcast (<{ i32, i32, i32, i32, i32, i32, i32, i32, i32, i16, i16, i16, i16, i8, i8, i8, i8 }>* @"$s4main5Value[[UNIQUE_ID_1:[0-9A-Z_]+]]VMn" to %swift.type_descriptor*), %swift.type* @"$sSiN", i32 0{{(, \[4 x i8\] zeroinitializer)?}}, i64 3 }>, align [[ALIGNMENT]]
+// CHECK: @"$s4main5Value[[UNIQUE_ID_1:[0-9A-Z_]+]]VySiGMf" = internal constant <{
+// CHECK-SAME:    i8**,
+// CHECK-SAME:    [[INT]],
+// CHECK-SAME:    %swift.type_descriptor*,
+// CHECK-SAME:    %swift.type*,
+// CHECK-SAME:    i32{{(, \[4 x i8\])?}},
+// CHECK-SAME:    i64
+// CHECK-SAME: }> <{
+//                i8** @"$sB[[INT]]_WV",
+//                i8** getelementptr inbounds (%swift.vwtable, %swift.vwtable* @"$s4main5Value33_BD97D79156BC586FAA2AE8FB32F3D812LLVySiGWV", i32 0, i32 0),
+// CHECK-SAME:    [[INT]] 512,
+// CHECK-SAME:    %swift.type_descriptor* bitcast (<{ i32, i32, i32, i32, i32, i32, i32, i32, i32, i16, i16, i16, i16, i8, i8, i8, i8 }>* @"$s4main5Value[[UNIQUE_ID_1:[0-9A-Z_]+]]VMn" to %swift.type_descriptor*),
+// CHECK-SAME:    %swift.type* @"$sSiN",
+// CHECK-SAME:    i32 0{{(, \[4 x i8\] zeroinitializer)?}},
+// CHECK-SAME:    i64 3
+// CHECK-SAME: }>, align [[ALIGNMENT]]
+
 fileprivate struct Value<First> {
   let first: First
 }
