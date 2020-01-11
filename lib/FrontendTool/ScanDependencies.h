@@ -15,15 +15,10 @@
 
 namespace swift {
 
-class ASTContext;
-class DependencyTracker;
-class FrontendOptions;
-class ModuleDecl;
+class CompilerInstance;
 
-/// Scans the dependencies of \c mainModule.
-bool scanDependencies(ASTContext &Context, ModuleDecl *mainModule,
-                      DependencyTracker *depTracker,
-                      const FrontendOptions &opts);
+/// Scans the dependencies of the main module of \c instance.
+bool scanDependencies(CompilerInstance &instance);
 
 } // end namespace swift
 

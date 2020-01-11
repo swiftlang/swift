@@ -104,8 +104,7 @@ ErrorOr<ModuleDependencies> ModuleDependencyScanner::scanInterfaceFile(
   unsigned bufferID = Ctx.SourceMgr.addNewSourceBuffer(std::move(interfaceBuf.get()));
   auto moduleDecl = ModuleDecl::create(moduleName, Ctx);
   auto sourceFile = new (Ctx) SourceFile(
-      *moduleDecl, SourceFileKind::Interface, bufferID,
-      SourceFile::ImplicitModuleImportKind::None);
+      *moduleDecl, SourceFileKind::Interface, bufferID);
 
   // Create a module filename.
   // FIXME: Query the module interface loader to determine an appropriate

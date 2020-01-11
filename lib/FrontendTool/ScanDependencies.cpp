@@ -22,7 +22,9 @@
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/STLExtras.h"
+#include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/FrontendOptions.h"
+#include "swift/Strings.h"
 #include "clang/Basic/Module.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/StringMap.h"
@@ -316,9 +318,11 @@ static void writeJSON(llvm::raw_ostream &out,
   }
 }
 
-bool swift::scanDependencies(ASTContext &Context, ModuleDecl *mainModule,
-                             DependencyTracker *depTracker,
-                             const FrontendOptions &opts) {
+bool swift::scanDependencies(CompilerInstance &instance) {
+  ASTContext &Context = instance.getASTContext();
+  ModuleDecl *mainModule = instance.getMainModule();
+  const CompilerInvocation &invocation = instance.getInvocation();
+  const FrontendOptions &opts = invocation.getFrontendOptions();
 
   std::string path = opts.InputsAndOutputs.getSingleOutputFilename();
   std::error_code EC;
@@ -349,15 +353,43 @@ bool swift::scanDependencies(ASTContext &Context, ModuleDecl *mainModule,
       mainDependencies.addModuleDependencies(*sf, alreadyAddedModules);
     }
 
+    const auto &importInfo = mainModule->getImplicitImportInfo();
+
+    // Swift standard library.
+    switch (importInfo.StdlibKind) {
+    case ImplicitStdlibKind::None:
+    case ImplicitStdlibKind::Builtin:
+      break;
+
+    case ImplicitStdlibKind::Stdlib:
+      mainDependencies.addModuleDependency("Swift", alreadyAddedModules);
+      break;
+    }
+
+    // Swift -Onone support library.
+    if (invocation.shouldImportSwiftONoneSupport()) {
+      mainDependencies.addModuleDependency(
+          SWIFT_ONONE_SUPPORT, alreadyAddedModules);
+    }
+
+    // Add any implicit module names.
+    for (const auto &moduleName : importInfo.ModuleNames) {
+      mainDependencies.addModuleDependency(moduleName.str(), alreadyAddedModules);
+    }
+
+    // Already-loaded, implicitly imported module names.
+    for (const auto &module : importInfo.AdditionalModules) {
+      mainDependencies.addModuleDependency(module.first->getNameStr(), alreadyAddedModules);
+    }
+
     // Add the bridging header.
-    StringRef implicitHeaderPath = opts.ImplicitObjCHeaderPath;
-    if (!implicitHeaderPath.empty()) {
-      mainDependencies.addBridgingHeader(implicitHeaderPath);
+    if (!importInfo.BridgingHeaderPath.empty()) {
+      mainDependencies.addBridgingHeader(importInfo.BridgingHeaderPath);
     }
 
     // If we are to import the underlying Clang module of the same name,
     // add a dependency with the same name to trigger the search.
-    if (opts.ImportUnderlyingModule) {
+    if (importInfo.ShouldImportUnderlyingModule) {
       mainDependencies.addModuleDependency(mainModule->getName().str(),
                                            alreadyAddedModules);
     }
@@ -389,7 +421,7 @@ bool swift::scanDependencies(ASTContext &Context, ModuleDecl *mainModule,
   writeJSON(out, Context, cache, allModules.getArrayRef());
 
   // Update the dependency tracker.
-  if (depTracker) {
+  if (auto depTracker = instance.getDependencyTracker()) {
     for (auto module : allModules) {
       auto deps = cache.findDependencies(module.first, module.second);
       if (!deps)

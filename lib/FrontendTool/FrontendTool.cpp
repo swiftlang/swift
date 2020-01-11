@@ -1267,8 +1267,7 @@ static bool performCompile(CompilerInstance &Instance,
     return Context.hadError();
 
   if (Action == FrontendOptions::ActionType::ScanDependencies) {
-    scanDependencies(Context, Instance.getMainModule(),
-                     Instance.getDependencyTracker(), opts);
+    scanDependencies(Instance);
   }
 
   (void)emitMakeDependenciesIfNeeded(Context.Diags,

@@ -83,6 +83,12 @@ bool ArgsToFrontendOptionsConverter::convert(
 
   Opts.TrackSystemDeps |= Args.hasArg(OPT_track_system_dependencies);
 
+  // Always track system dependencies when scanning dependencies.
+  if (const Arg *ModeArg = Args.getLastArg(OPT_modes_Group)) {
+    if (ModeArg->getOption().matches(OPT_scan_dependencies))
+      Opts.TrackSystemDeps = true;
+  }
+
   Opts.SerializeModuleInterfaceDependencyHashes |=
     Args.hasArg(OPT_serialize_module_interface_dependency_hashes);
 

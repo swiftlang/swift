@@ -36,6 +36,12 @@ import E
 // CHECK-NEXT: "swift": "E"
 // CHECK-NEXT: }
 // CHECK-NEXT: {
+// CHECK-NEXT: "swift": "Swift"
+// CHECK-NEXT: }
+// CHECK-NEXT: {
+// CHECK-NEXT: "swift": "SwiftOnoneSupport"
+// CHECK-NEXT: }
+// CHECK-NEXT: {
 // CHECK-NEXT: "swift": "F"
 // CHECK-NEXT: }
 // CHECK-NEXT: {
@@ -78,6 +84,13 @@ import E
 // CHECK: "moduleInterfacePath"
 // CHECK-SAME: E.swiftinterface
 
+/// --------Swift module Swift
+// CHECK-LABEL: "modulePath": "Swift.swiftmodule",
+
+// CHECK: directDependencies
+// CHECK-NEXT: {
+// CHECK-NEXT: "clang": "SwiftShims"
+
 /// --------Swift module A
 // CHECK-LABEL: "modulePath": "A.swiftmodule",
 
@@ -97,13 +110,6 @@ import E
 // CHECK-NEXT: {
 // CHECK-NEXT: "clang": "A"
 // CHECK-NEXT: }
-
-/// --------Swift module Swift
-// CHECK-LABEL: "modulePath": "Swift.swiftmodule",
-
-// CHECK: directDependencies
-// CHECK-NEXT: {
-// CHECK-NEXT: "clang": "SwiftShims"
 
 /// --------Clang module SwiftShims
 // CHECK-LABEL: "modulePath": "SwiftShims.pcm",
