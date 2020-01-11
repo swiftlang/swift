@@ -4,8 +4,25 @@
 // UNSUPPORTED: CPU=armv7 && OS=ios
 // UNSUPPORTED: CPU=armv7s && OS=ios
 
-// CHECK: @"$sB[[INT]]_WV" = external global i8*, align [[ALIGNMENT]]
-// CHECK: @"$s4main9NamespaceV5ValueVySS_SiGMf" = internal constant <{ i8**, [[INT]], %swift.type_descriptor*, %swift.type*, %swift.type*, i32{{(, \[4 x i8\])?}}, i64 }> <{ i8** @"$sB[[INT]]_WV", [[INT]] 512, %swift.type_descriptor* bitcast (<{ i32, i32, i32, i32, i32, i32, i32, i32, i32, i16, i16, i16, i16, i8, i8, i8, i8 }>* @"$s4main9NamespaceV5ValueVMn" to %swift.type_descriptor*), %swift.type* @"$sSSN", %swift.type* @"$sSiN", i32 0{{(, \[4 x i8\] zeroinitializer)?}}, i64 3 }>, align [[ALIGNMENT]]
+// CHECK: @"$s4main9NamespaceV5ValueVySS_SiGMf" = internal constant <{
+// CHECK-SAME:    i8**,
+// CHECK-SAME:    [[INT]],
+// CHECK-SAME:    %swift.type_descriptor*,
+// CHECK-SAME:    %swift.type*,
+// CHECK-SAME:    %swift.type*,
+// CHECK-SAME:    i32{{(, \[4 x i8\])?}},
+// CHECK-SAME:    i64
+// CHECK-SAME: }> <{
+//                i8** @"$sB[[INT]]_WV",
+//                i8** getelementptr inbounds (%swift.vwtable, %swift.vwtable* @"$s4main9NamespaceV5ValueVySS_SiGWV", i32 0, i32 0),
+// CHECK-SAME:    [[INT]] 512,
+// CHECK-SAME:    %swift.type_descriptor* bitcast (<{ i32, i32, i32, i32, i32, i32, i32, i32, i32, i16, i16, i16, i16, i8, i8, i8, i8 }>* @"$s4main9NamespaceV5ValueVMn" to %swift.type_descriptor*),
+// CHECK-SAME:    %swift.type* @"$sSSN",
+// CHECK-SAME:    %swift.type* @"$sSiN",
+// CHECK-SAME:    i32 0{{(, \[4 x i8\] zeroinitializer)?}},
+// CHECK-SAME:    i64 3
+// CHECK-SAME: }>, align [[ALIGNMENT]]
+
 struct Namespace<Arg> {
   struct Value<First> {
     let first: First
