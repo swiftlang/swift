@@ -212,6 +212,55 @@ static void insertEndAccess(BeginAccessInst *&beginAccess, bool isModify,
   }
 }
 
+static SILValue createKeypathStoredPropertyProjections(SILValue addr,
+                                                       SILLocation loc,
+                                                       BeginAccessInst *&beginAccess,
+                                                       SILBuilder &builder,
+                                                       const KeyPathPatternComponent& comp) {
+  assert(comp.getKind() == KeyPathPatternComponent::Kind::StoredProperty);
+  VarDecl *storedProperty = comp.getStoredPropertyDecl();
+  SILValue elementAddr;
+  if (addr->getType().getStructOrBoundGenericStruct()) {
+    addr = builder.createStructElementAddr(loc, addr, storedProperty);
+  } else if (addr->getType().getClassOrBoundGenericClass()) {
+    SingleValueInstruction *Ref = builder.createLoad(loc, addr,
+                                       LoadOwnershipQualifier::Unqualified);
+    insertEndAccess(beginAccess, /*isModify*/ false, builder);
+
+    // Handle the case where the storedProperty is in a super class.
+    while (Ref->getType().getClassOrBoundGenericClass() !=
+           storedProperty->getDeclContext()) {
+      SILType superCl = Ref->getType().getSuperclass();
+      if (!superCl) {
+        // This should never happen, because the property should be in the
+        // decl or in a superclass of it. Just handle this to be on the safe
+        // side.
+        return SILValue();
+      }
+      Ref = builder.createUpcast(loc, Ref, superCl);
+    }
+
+    addr = builder.createRefElementAddr(loc, Ref, storedProperty);
+
+    // Class members need access enforcement.
+    if (builder.getModule().getOptions().EnforceExclusivityDynamic) {
+      beginAccess = builder.createBeginAccess(loc, addr, SILAccessKind::Read,
+                                              SILAccessEnforcement::Dynamic,
+                                              /*noNestedConflict*/ false,
+                                              /*fromBuiltin*/ false);
+      addr = beginAccess;
+    }
+  } else {
+    // This should never happen, as a stored-property pattern can only be
+    // applied to classes and structs. But to be safe - and future prove -
+    // let's handle this case and bail.
+    insertEndAccess(beginAccess, /*isModify*/ false, builder);
+    return SILValue();
+  }
+  
+  return addr;
+}
+
 /// Creates the projection pattern for a keypath instruction.
 ///
 /// Currently only the StoredProperty pattern is handled.
@@ -233,55 +282,19 @@ static SILValue createKeypathProjections(SILValue keyPath, SILValue root,
 
   auto components = kpInst->getPattern()->getComponents();
 
+  SILValue addr = root;
   // Check if the keypath only contains patterns which we support.
   for (const KeyPathPatternComponent &comp : components) {
-    if (comp.getKind() != KeyPathPatternComponent::Kind::StoredProperty)
-      return SILValue();
-  }
-
-  SILValue addr = root;
-  for (const KeyPathPatternComponent &comp : components) {
-    assert(comp.getKind() == KeyPathPatternComponent::Kind::StoredProperty);
-    VarDecl *storedProperty = comp.getStoredPropertyDecl();
-    SILValue elementAddr;
-    if (addr->getType().getStructOrBoundGenericStruct()) {
-      addr = builder.createStructElementAddr(loc, addr, storedProperty);
-    } else if (addr->getType().getClassOrBoundGenericClass()) {
-      SingleValueInstruction *Ref = builder.createLoad(loc, addr,
-                                         LoadOwnershipQualifier::Unqualified);
-      insertEndAccess(beginAccess, /*isModify*/ false, builder);
-
-      // Handle the case where the storedProperty is in a super class.
-      while (Ref->getType().getClassOrBoundGenericClass() !=
-             storedProperty->getDeclContext()) {
-        SILType superCl = Ref->getType().getSuperclass();
-        if (!superCl) {
-          // This should never happen, because the property should be in the
-          // decl or in a superclass of it. Just handle this to be on the safe
-          // side.
-          return SILValue();
-        }
-        Ref = builder.createUpcast(loc, Ref, superCl);
-      }
-
-      addr = builder.createRefElementAddr(loc, Ref, storedProperty);
-
-      // Class members need access enforcement.
-      if (builder.getModule().getOptions().EnforceExclusivityDynamic) {
-        beginAccess = builder.createBeginAccess(loc, addr, SILAccessKind::Read,
-                                                SILAccessEnforcement::Dynamic,
-                                                /*noNestedConflict*/ false,
-                                                /*fromBuiltin*/ false);
-        addr = beginAccess;
-      }
-    } else {
-      // This should never happen, as a stored-property pattern can only be
-      // applied to classes and structs. But to be safe - and future prove -
-      // let's handle this case and bail.
-      insertEndAccess(beginAccess, /*isModify*/ false, builder);
-      return SILValue();
+    switch (comp.getKind()) {
+      case KeyPathPatternComponent::Kind::StoredProperty:
+        addr = createKeypathStoredPropertyProjections(addr, loc, beginAccess,
+                                                      builder, comp);
+        break;
+      default:
+        return SILValue();
     }
   }
+
   return addr;
 }
 
