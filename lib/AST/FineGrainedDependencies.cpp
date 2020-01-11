@@ -49,12 +49,11 @@ SourceFileDepGraph::getNode(size_t sequenceNumber) const {
 
 InterfaceAndImplementationPair<SourceFileDepGraphNode>
 SourceFileDepGraph::getSourceFileNodePair() const {
-  assert(getNode(0)->getKey().getKind() == NodeKind::sourceFileProvide &&
-         "First node must be sourceFileProvide.");
-  assert(getNode(1)->getKey().getKind() == NodeKind::sourceFileProvide &&
-         "Second node must be sourceFileProvide.");
-  return InterfaceAndImplementationPair<SourceFileDepGraphNode>(getNode(0),
-                                                                getNode(1));
+  return InterfaceAndImplementationPair<SourceFileDepGraphNode>(
+      getNode(
+          SourceFileDepGraphNode::sourceFileProvidesInterfaceSequenceNumber),
+      getNode(SourceFileDepGraphNode::
+                  sourceFileProvidesImplementationSequenceNumber));
 }
 
 StringRef SourceFileDepGraph::getSwiftDepsOfJobThatProducedThisGraph() const {
@@ -82,13 +81,16 @@ SourceFileDepGraph::findExistingNodePairOrCreateAndAddIfNew(
   const std::string &name = std::get<1>(contextNameFingerprint);
   const Optional<std::string> &fingerprint =
       std::get<2>(contextNameFingerprint);
+  auto *interfaceNode = findExistingNodeOrCreateIfNew(
+      DependencyKey(k, DeclAspect::interface, context, name), fingerprint,
+      true /* = isProvides */);
+  auto *implementationNode = findExistingNodeOrCreateIfNew(
+      DependencyKey(k, DeclAspect::implementation, context, name), fingerprint,
+      true /* = isProvides */);
+
   InterfaceAndImplementationPair<SourceFileDepGraphNode> nodePair{
-      findExistingNodeOrCreateIfNew(
-          DependencyKey(k, DeclAspect::interface, context, name), fingerprint,
-          true /* = isProvides */),
-      findExistingNodeOrCreateIfNew(
-          DependencyKey(k, DeclAspect::implementation, context, name),
-          fingerprint, true /* = isProvides */)};
+      interfaceNode, implementationNode};
+
   // if interface changes, have to rebuild implementation.
   // This dependency used to be represented by
   // addArc(nodePair.getInterface(), nodePair.getImplementation());

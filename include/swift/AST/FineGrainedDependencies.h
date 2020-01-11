@@ -390,17 +390,6 @@ public:
 
   InterfaceAndImplementationPair(NodeT *interface, NodeT *implementation)
       : interface(interface), implementation(implementation) {
-
-    if (!interface->getKey().isInterface()) {
-      llvm::errs() << "interface key is wrong: \n";
-      interface->dump();
-    }
-    if (!implementation->getKey().isImplementation()) {
-        llvm::errs() << "implementation key is wrong: \n";
-        implementation->dump();
-    }
-
-
     assert(
         interface->getKey().isInterface() &&
         implementation->getKey().isImplementation() &&
@@ -725,8 +714,29 @@ public:
   bool verify() const {
     DepGraphNode::verify();
     assert(getIsProvides() || isDepends());
+    assert(verifySequenceNumber());
     return true;
   }
+
+  bool verifySequenceNumber() const {
+    const auto &k = getKey();
+    if (k.getKind() != NodeKind::sourceFileProvide)
+      return true;
+    switch (k.getAspect()) {
+    case DeclAspect::interface:
+      assert(getSequenceNumber() == sourceFileProvidesInterfaceSequenceNumber);
+      return true;
+    case DeclAspect::implementation:
+      assert(getSequenceNumber() ==
+             sourceFileProvidesImplementationSequenceNumber);
+      return true;
+    default:
+      llvm_unreachable("neither interface nor implementation");
+    }
+  }
+  static constexpr const size_t sourceFileProvidesInterfaceSequenceNumber = 0;
+  static constexpr const size_t sourceFileProvidesImplementationSequenceNumber =
+      1;
 };
 
 //==============================================================================
@@ -849,14 +859,14 @@ public:
   /// Ensure that when read, the graph is the same as what was written.
   bool verifyReadsWhatIsWritten(StringRef path) const;
 
+  bool verifySequenceNumber() const;
+
 private:
   void addNode(SourceFileDepGraphNode *n) {
     n->setSequenceNumber(allNodes.size());
-    assert(allNodes.size() < 2 ==
-               (n->getKey().getKind() == NodeKind::sourceFileProvide) &&
-           "First two and only first two nodes should be sourceFileProvide "
-           "nodes.");
     allNodes.push_back(n);
+    assert(n->verifySequenceNumber() &&
+           "Certain nodes must be in certain places");
   }
 };
 
