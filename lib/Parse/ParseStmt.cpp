@@ -345,9 +345,15 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
         PreviousHadSemi || Tok.isAtStartOfLine();
     if (!IsAtStartOfLineOrPreviousHadSemi) {
       SourceLoc EndOfPreviousLoc = getEndOfPreviousLoc();
-      diagnose(EndOfPreviousLoc, diag::statement_same_line_without_semi)
-        .fixItInsert(EndOfPreviousLoc, ";");
-      // FIXME: Add semicolon to the AST?
+      if (Tok.getKind() == tok::colon && peekToken().getKind() == tok::l_brace) {
+        diagnose(EndOfPreviousLoc, diag::labeled_block_needs_do)
+          .fixItInsert(EndOfPreviousLoc, "do");
+        skipUntilDeclStmtRBrace(tok::r_brace);
+      } else {
+        diagnose(EndOfPreviousLoc, diag::statement_same_line_without_semi)
+          .fixItInsert(EndOfPreviousLoc, ";");
+        // FIXME: Add semicolon to the AST?
+      }
     }
 
     ParserPosition BeginParserPosition;
