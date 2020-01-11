@@ -27,9 +27,7 @@
 // PRIMARY-LABEL: } // end sil function '$s10access_wmo10readGlobalSiyF'
 //
 // WMO-LABEL: sil @$s10access_wmo10readGlobalSiyF : $@convention(thin) () -> Int {
-// WMO: [[G1:%.*]] = global_addr @$s10access_wmo14internalGlobalSivp : $*Int
-// WMO: [[A1:%.*]] = begin_access [read] [static] [no_nested_conflict] [[G1]] : $*Int
-// WMO: end_access [[A1]] : $*Int
+// WMO-NOT: global_addr
 // WMO: [[G2:%.*]] = global_addr @$s10access_wmo12publicGlobalSivp : $*Int
 // WMO: [[A2:%.*]] = begin_access [read] [dynamic] [no_nested_conflict] [[G2]] : $*Int
 // WMO: end_access [[A2]] : $*Int
