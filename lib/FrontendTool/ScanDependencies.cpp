@@ -18,6 +18,7 @@
 #include "swift/AST/ModuleDependencies.h"
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/ClangImporter/ClangImporter.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/STLExtras.h"
@@ -31,6 +32,10 @@
 #include <set>
 
 using namespace swift;
+
+namespace {
+
+}
 
 /// Find all of the imported Clang modules starting with the given module name.
 static void findAllImportedClangModules(ASTContext &ctx, StringRef moduleName,
@@ -71,12 +76,31 @@ static std::vector<ModuleDependencyID> resolveDirectDependencies(
     }
   }
 
-  // For a Swift module, look for overlays for each of the Clang modules it
-  // depends on.
   if (isSwift) {
-    // Find all of the Clang modules this Swift module depends on.
+    // A record of all of the Clang modules referenced from this Swift module.
     std::vector<std::string> allClangModules;
     llvm::StringSet<> knownModules;
+
+    // If the Swift module has a bridging header, add those dependencies.
+    if (knownDependencies.getBridgingHeader()) {
+      auto clangImporter =
+          static_cast<ClangImporter *>(ctx.getClangModuleLoader());
+      if (!clangImporter->addBridgingHeaderDependencies(module.first, cache)) {
+        // Grab the updated module dependencies.
+        // FIXME: This is such a hack.
+        knownDependencies = *cache.findDependencies(module.first, module.second);
+
+        // Add the Clang modules referenced from the bridging header to the
+        // set of Clang modules we know about.
+        auto swiftDeps = knownDependencies.getAsSwiftModule();
+        for (const auto &clangDep : swiftDeps->bridgingModuleDependencies) {
+          findAllImportedClangModules(ctx, clangDep, cache, allClangModules,
+                                      knownModules);
+        }
+      }
+    }
+
+    // Find all of the Clang modules this Swift module depends on.
     for (const auto &dep : result) {
       if (dep.second != ModuleDependenciesKind::Clang)
         continue;
@@ -85,7 +109,8 @@ static std::vector<ModuleDependencyID> resolveDirectDependencies(
                                   knownModules);
     }
 
-    // Look for overlays for each of the Clang modules.
+    // Look for overlays for each of the Clang modules. The Swift module
+    // directly depends on these.
     for (const auto &clangDep : allClangModules) {
       if (auto found = ctx.getModuleDependencies(
               clangDep, /*onlyClangModule=*/false, cache)) {
@@ -201,6 +226,10 @@ static void writeJSON(llvm::raw_ostream &out,
     out << "  ]\n";
   };
   for (const auto &module : allModules) {
+    auto directDependencies = resolveDirectDependencies(
+        ctx, ModuleDependencyID(module.first, module.second), cache);
+
+    // Grab the completed module dependencies.
     auto moduleDeps = *cache.findDependencies(module.first, module.second);
 
     // The module we are describing.
@@ -230,8 +259,6 @@ static void writeJSON(llvm::raw_ostream &out,
     }
 
     // Direct dependencies.
-    auto directDependencies = resolveDirectDependencies(
-        ctx, ModuleDependencyID(module.first, module.second), cache);
     writeJSONSingleField(out, "directDependencies", directDependencies,
                          3, /*trailingComma=*/true);
 
@@ -247,18 +274,25 @@ static void writeJSON(llvm::raw_ostream &out,
         writeJSONSingleField(
             out, "moduleInterfacePath",
             *swiftDeps->swiftInterfaceFile, 5,
-            /*trailingComma=*/true);
+            /*trailingComma=*/swiftDeps->bridgingHeaderFile.hasValue());
       }
 
       /// Bridging header and its source file dependencies, if any.
       if (swiftDeps->bridgingHeaderFile) {
-        writeJSONSingleField(out, "bridgingHeaderPath",
-                             *swiftDeps->bridgingHeaderFile, 5,
+        out.indent(5 * 2);
+        out << "\"bridgingHeader\": {\n";
+        writeJSONSingleField(out, "path",
+                             *swiftDeps->bridgingHeaderFile, 6,
                              /*trailingComma=*/true);
+        writeJSONSingleField(out, "sourceFiles",
+                             swiftDeps->bridgingSourceFiles, 6,
+                             /*trailingComma=*/true);
+        writeJSONSingleField(out, "moduleDependencies",
+                             swiftDeps->bridgingModuleDependencies, 6,
+                             /*trailingComma=*/false);
+        out.indent(5 * 2);
+        out << "}\n";
       }
-      writeJSONSingleField(out, "bridgingSourceFiles",
-                           swiftDeps->bridgingSourceFiles, 5,
-                           /*trailingComma=*/false);
     } else {
       out << "\"clang\": {\n";
 

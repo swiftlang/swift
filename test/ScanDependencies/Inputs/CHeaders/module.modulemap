@@ -17,3 +17,8 @@ module D {
   header "D.h"
   export *
 }
+
+module F {
+  header "F.h"
+  export *
+}

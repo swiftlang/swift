@@ -72,10 +72,29 @@ void ModuleDependencies::addModuleDependencies(
   swiftStorage->sourceFiles.push_back(fileName);
 }
 
+Optional<std::string> ModuleDependencies::getBridgingHeader() const {
+  auto swiftStorage = cast<SwiftModuleDependenciesStorage>(storage.get());
+  return swiftStorage->bridgingHeaderFile;
+}
+
 void ModuleDependencies::addBridgingHeader(StringRef bridgingHeader) {
   auto swiftStorage = cast<SwiftModuleDependenciesStorage>(storage.get());
   assert(!swiftStorage->bridgingHeaderFile);
   swiftStorage->bridgingHeaderFile = bridgingHeader;
+}
+
+/// Add source files that the bridging header depends on.
+void ModuleDependencies::addBridgingSourceFile(StringRef bridgingSourceFile) {
+  auto swiftStorage = cast<SwiftModuleDependenciesStorage>(storage.get());
+  swiftStorage->bridgingSourceFiles.push_back(bridgingSourceFile);
+}
+
+/// Add (Clang) module on which the bridging header depends.
+void ModuleDependencies::addBridgingModuleDependency(
+    StringRef module, llvm::StringSet<> &alreadyAddedModules) {
+  auto swiftStorage = cast<SwiftModuleDependenciesStorage>(storage.get());
+  if (alreadyAddedModules.insert(module).second)
+    swiftStorage->bridgingModuleDependencies.push_back(module);
 }
 
 llvm::StringMap<ModuleDependencies> &
@@ -140,4 +159,12 @@ void ModuleDependenciesCache::recordDependencies(
   map.insert({moduleName, std::move(dependencies)});
 
   AllModules.push_back({moduleName, kind});
+}
+
+void ModuleDependenciesCache::updateDependencies(
+    ModuleDependencyID moduleID, ModuleDependencies dependencies) {
+  auto &map = getDependenciesMap(moduleID.second);
+  auto known = map.find(moduleID.first);
+  assert(known != map.end() && "Not yet added to map");
+  known->second = std::move(dependencies);
 }

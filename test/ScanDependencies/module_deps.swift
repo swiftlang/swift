@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: mkdir -p %t/clang-module-cache
-// RUN: %target-swift-frontend -scan-dependencies -module-cache-path %t/clang-module-cache %s -o %t/deps.json -I %S/Inputs/CHeaders -I %S/Inputs/Swift -emit-dependencies -emit-dependencies-path %t/deps.d
+// RUN: %target-swift-frontend -scan-dependencies -module-cache-path %t/clang-module-cache %s -o %t/deps.json -I %S/Inputs/CHeaders -I %S/Inputs/Swift -emit-dependencies -emit-dependencies-path %t/deps.d -import-objc-header %S/Inputs/CHeaders/Bridging.h
 
 // RUN: %FileCheck %s < %t/deps.json
 // RUN: %FileCheck %s -check-prefix CHECK-MAKE-DEPS < %t/deps.d
@@ -21,6 +21,25 @@ import E
 // CHECK-NEXT: }
 // CHECK-NEXT: {
 // CHECK-NEXT: "swift": "E"
+// CHECK-NEXT: }
+// CHECK-NEXT: {
+// CHECK-NEXT: "swift": "F"
+// CHECK-NEXT: }
+// CHECK-NEXT: {
+// CHECK-NEXT: "swift": "A"
+// CHECK-NEXT: }
+
+// CHECK: "bridgingHeader":
+// CHECK-NEXT: "path":
+// CHECK-SAME: Bridging.h
+
+// CHECK-NEXT: "sourceFiles":
+// CHECK-NEXT: Bridging.h
+// CHECK-NEXT: BridgingOther.h
+
+// CHECK: "moduleDependencies": [
+// CHECK-NEXT: "F"
+// CHECK-NEXT: ]
 
 /// --------Clang module C
 // CHECK-LABEL: "modulePath": "C.pcm",
@@ -82,4 +101,7 @@ import E
 // CHECK-MAKE-DEPS-SAME: Swift.swiftmodule
 // CHECK-MAKE-DEPS-SAME: A.swiftinterface
 // CHECK-MAKE-DEPS-SAME: B.h
+// CHECK-MAKE-DEPS-SAME: F.h
+// CHECK-MAKE-DEPS-SAME: Bridging.h
+// CHECK-MAKE-DEPS-SAME: BridgingOther.h
 // CHECK-MAKE-DEPS-SAME: module.modulemap

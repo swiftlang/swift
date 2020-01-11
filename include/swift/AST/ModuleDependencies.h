@@ -71,6 +71,9 @@ public:
   /// Source files on which the bridging header depends.
   std::vector<std::string> bridgingSourceFiles;
 
+  /// (Clang) modules on which the bridging header depends.
+  std::vector<std::string> bridgingModuleDependencies;
+
   SwiftModuleDependenciesStorage(
       const std::string &compiledModulePath,
       const Optional<std::string> &swiftInterfaceFile
@@ -194,8 +197,18 @@ public:
   void addModuleDependencies(const SourceFile &sf,
                              llvm::StringSet<> &alreadyAddedModules);
 
+  /// Get the bridging header.
+  Optional<std::string> getBridgingHeader() const;
+
   /// Add a bridging header to a Swift module's dependencies.
   void addBridgingHeader(StringRef bridgingHeader);
+
+  /// Add source files that the bridging header depends on.
+  void addBridgingSourceFile(StringRef bridgingSourceFile);
+
+  /// Add (Clang) module on which the bridging header depends.
+  void addBridgingModuleDependency(StringRef module,
+                                   llvm::StringSet<> &alreadyAddedModules);
 };
 
 using ModuleDependencyID = std::pair<std::string, ModuleDependenciesKind>;
@@ -272,6 +285,10 @@ public:
   void recordDependencies(StringRef moduleName,
                           ModuleDependencies dependencies,
                           ModuleDependenciesKind kind);
+
+  /// Update stored dependencies for the given module.
+  void updateDependencies(ModuleDependencyID moduleID,
+                          ModuleDependencies dependencies);
 
   /// Reference the list of all module dependencies.
   const std::vector<ModuleDependencyID> &getAllModules() const {

@@ -97,61 +97,44 @@ namespace {
   };
 }
 
-Optional<ModuleDependencies> ClangImporter::getModuleDependencies(
-    StringRef moduleName, ModuleDependenciesCache &cache) {
-  // Check whether there is already a cached result.
-  if (auto found = cache.findDependencies(
-          moduleName, ModuleDependenciesKind::Clang))
-    return found;
-
-  // Retrieve or create the shared state.
-  auto clangImpl = cache.getClangImpl();
-  if (!clangImpl) {
-    clangImpl = new ClangModuleDependenciesCacheImpl();
-    cache.setClangImpl(clangImpl,
-                       [](ClangModuleDependenciesCacheImpl *ptr) {
-      delete ptr;
-    });
-  }
-
-  // Reform the Clang importer options.
-  // FIXME: Just save a reference or copy so we can get this back.
-  ClangImporterOptions importerOpts;
-
-  // Determine the command-line arguments for dependency scanning.
-  auto &ctx = Impl.SwiftContext;
-  std::vector<std::string> commandLineArgs;
-  commandLineArgs.push_back("clang");
-  importer::getNormalInvocationArguments(commandLineArgs, ctx, importerOpts);
-  importer::addCommonInvocationArguments(commandLineArgs, ctx, importerOpts);
-
-  // Add search paths.
-  // Note: This is handled differently for the Clang importer itself, which
-  // adds search paths to Clang's data structures rather than to its
-  // command line.
+// Add search paths.
+// Note: This is handled differently for the Clang importer itself, which
+// adds search paths to Clang's data structures rather than to its
+// command line.
+static void addSearchPathInvocationArguments(
+    std::vector<std::string> &invocationArgStrs,
+    ASTContext &ctx,
+    const ClangImporterOptions &importerOpts) {
   SearchPathOptions &searchPathOpts = ctx.SearchPathOpts;
   for (const auto &framepath : searchPathOpts.FrameworkSearchPaths) {
-    commandLineArgs.push_back(framepath.IsSystem ? "-iframework" : "-F");
-    commandLineArgs.push_back(framepath.Path);
+    invocationArgStrs.push_back(framepath.IsSystem ? "-iframework" : "-F");
+    invocationArgStrs.push_back(framepath.Path);
   }
 
   for (auto path : searchPathOpts.ImportSearchPaths) {
-    commandLineArgs.push_back("-I");
-    commandLineArgs.push_back(path);
+    invocationArgStrs.push_back("-I");
+    invocationArgStrs.push_back(path);
   }
+}
 
-  // HACK! Replace the module import buffer name with the source file hack.
-  auto importHackFile = clangImpl->getImportHackFile();
-  if (!importHackFile) {
-    // FIXME: Emit a diagnostic here.
-    return None;
-  }
+/// Create the command line for Clang dependency scanning.
+static std::vector<std::string> getClangDepScanningInvocationArguments(
+    ASTContext &ctx,
+    const ClangImporterOptions &importerOpts,
+    StringRef sourceFileName) {
+  std::vector<std::string> commandLineArgs;
+
+  // Form the basic command line.
+  commandLineArgs.push_back("clang");
+  importer::getNormalInvocationArguments(commandLineArgs, ctx, importerOpts);
+  importer::addCommonInvocationArguments(commandLineArgs, ctx, importerOpts);
+  addSearchPathInvocationArguments(commandLineArgs, ctx, importerOpts);
 
   auto sourceFilePos = std::find(
       commandLineArgs.begin(), commandLineArgs.end(),
       "<swift-imported-modules>");
   assert(sourceFilePos != commandLineArgs.end());
-  *sourceFilePos = *importHackFile;
+  *sourceFilePos = sourceFileName;
 
   // HACK! Drop the -fmodule-format= argument and the one that
   // precedes it.
@@ -187,6 +170,88 @@ Optional<ModuleDependencies> ClangImporter::getModuleDependencies(
   commandLineArgs.push_back("-sys-header-deps");
   commandLineArgs.push_back("-Wno-error");
 
+  return commandLineArgs;
+}
+
+/// Get or create the Clang-specific
+static ClangModuleDependenciesCacheImpl *getOrCreateClangImpl(
+    ModuleDependenciesCache &cache) {
+  auto clangImpl = cache.getClangImpl();
+  if (!clangImpl) {
+    clangImpl = new ClangModuleDependenciesCacheImpl();
+    cache.setClangImpl(clangImpl,
+                       [](ClangModuleDependenciesCacheImpl *ptr) {
+      delete ptr;
+    });
+  }
+
+  return clangImpl;
+}
+
+/// Record the module dependencies we found by scanning Clang modules into
+/// the module dependencies cache.
+static void recordModuleDependencies(
+    ModuleDependenciesCache &cache,
+    const FullDependenciesResult &clangDependencies) {
+  for (const auto &clangModuleDep : clangDependencies.DiscoveredModules) {
+    // If we've already cached this information, we're done.
+    if (cache.hasDependencies(clangModuleDep.ModuleName,
+                              ModuleDependenciesKind::Clang))
+      continue;
+
+    // File dependencies for this module.
+    std::vector<std::string> fileDeps;
+    for (const auto &fileDep : clangModuleDep.FileDeps) {
+      fileDeps.push_back(fileDep.getKey());
+    }
+
+    // Create a module filename.
+    // FIXME: Query Clang to determine an appropriate hashed name for the
+    // module file.
+    llvm::SmallString<32> modulePath(clangModuleDep.ModuleName);
+    llvm::sys::path::replace_extension(modulePath, "pcm");
+
+    // Module-level dependencies.
+    llvm::StringSet<> alreadyAddedModules;
+    auto dependencies = ModuleDependencies::forClangModule(
+        modulePath.str(), clangModuleDep.ClangModuleMapFile, fileDeps);
+    for (const auto &moduleName : clangModuleDep.ClangModuleDeps) {
+      dependencies.addModuleDependency(moduleName.ModuleName, alreadyAddedModules);
+    }
+
+    cache.recordDependencies(clangModuleDep.ModuleName,
+                             std::move(dependencies),
+                             ModuleDependenciesKind::Clang);
+  }
+}
+
+Optional<ModuleDependencies> ClangImporter::getModuleDependencies(
+    StringRef moduleName, ModuleDependenciesCache &cache) {
+  // Check whether there is already a cached result.
+  if (auto found = cache.findDependencies(
+          moduleName, ModuleDependenciesKind::Clang))
+    return found;
+
+  // Retrieve or create the shared state.
+  auto clangImpl = getOrCreateClangImpl(cache);
+
+  // HACK! Replace the module import buffer name with the source file hack.
+  auto importHackFile = clangImpl->getImportHackFile();
+  if (!importHackFile) {
+    // FIXME: Emit a diagnostic here.
+    return None;
+  }
+
+  // Reform the Clang importer options.
+  // FIXME: Just save a reference or copy so we can get this back.
+  ClangImporterOptions importerOpts;
+
+  // Determine the command-line arguments for dependency scanning.
+  auto &ctx = Impl.SwiftContext;
+  std::vector<std::string> commandLineArgs =
+    getClangDepScanningInvocationArguments(
+      ctx, importerOpts, *importHackFile);
+
   // HACK! Trick out a .m file to use to import the module we name.
   std::string moduleNameHackDefine =
       ("-DHACK_MODULE_NAME=" + moduleName).str();
@@ -208,34 +273,71 @@ Optional<ModuleDependencies> ClangImporter::getModuleDependencies(
   }
 
   // Record module dependencies for each module we found.
-  llvm::StringSet<> alreadyAddedModules;
-  for (const auto &clangModuleDep : clangDependencies->DiscoveredModules) {
-    // If we've already cached this information, we're done.
-    if (cache.hasDependencies(clangModuleDep.ModuleName,
-                              ModuleDependenciesKind::Clang))
-      continue;
-
-    std::vector<std::string> fileDeps;
-    for (const auto &fileDep : clangModuleDep.FileDeps) {
-      fileDeps.push_back(fileDep.getKey());
-    }
-
-    // Create a module filename.
-    // FIXME: Query Clang to determine an appropriate hashed name for the
-    // module file.
-    llvm::SmallString<32> modulePath = moduleName;
-    llvm::sys::path::replace_extension(modulePath, "pcm");
-
-    auto dependencies = ModuleDependencies::forClangModule(
-        modulePath.str(), clangModuleDep.ClangModuleMapFile, fileDeps);
-    for (const auto &moduleName : clangModuleDep.ClangModuleDeps) {
-      dependencies.addModuleDependency(moduleName.ModuleName, alreadyAddedModules);
-    }
-
-    cache.recordDependencies(clangModuleDep.ModuleName,
-                             std::move(dependencies),
-                             ModuleDependenciesKind::Clang);
-  }
+  recordModuleDependencies(cache, *clangDependencies);
 
   return cache.findDependencies(moduleName, ModuleDependenciesKind::Clang);
+}
+
+bool ClangImporter::addBridgingHeaderDependencies(
+    StringRef moduleName,
+    ModuleDependenciesCache &cache) {
+  auto targetModule = *cache.findDependencies(
+      moduleName, ModuleDependenciesKind::Swift);
+
+  // If we've already recorded bridging header dependencies, we're done.
+  auto swiftDeps = targetModule.getAsSwiftModule();
+  if (!swiftDeps->bridgingSourceFiles.empty() ||
+      !swiftDeps->bridgingModuleDependencies.empty())
+    return false;
+
+  // Retrieve or create the shared state.
+  auto clangImpl = getOrCreateClangImpl(cache);
+
+  // Reform the Clang importer options.
+  // FIXME: Just save a reference or copy so we can get this back.
+  ClangImporterOptions importerOpts;
+
+  // Retrieve the bridging header.
+  std::string bridgingHeader = *targetModule.getBridgingHeader();
+
+  // Determine the command-line arguments for dependency scanning.
+  auto &ctx = Impl.SwiftContext;
+  std::vector<std::string> commandLineArgs =
+    getClangDepScanningInvocationArguments(
+      ctx, importerOpts, bridgingHeader);
+
+  std::string workingDir =
+      ctx.SourceMgr.getFileSystem()->getCurrentWorkingDirectory().get();
+  CompileCommand command(workingDir, bridgingHeader, commandLineArgs, "-");
+  SingleCommandCompilationDatabase database(command);
+
+  auto clangDependencies = clangImpl->tool.getFullDependencies(
+      database, workingDir, clangImpl->alreadySeen);
+
+  if (!clangDependencies) {
+    // FIXME: Route this to a normal diagnostic.
+    llvm::logAllUnhandledErrors(clangDependencies.takeError(), llvm::errs());
+    return true;
+  }
+
+  // Record module dependencies for each module we found.
+  recordModuleDependencies(cache, *clangDependencies);
+
+  // Record dependencies for the source files the bridging header includes.
+  for (const auto &fileDep : clangDependencies->FullDeps.FileDeps)
+    targetModule.addBridgingSourceFile(fileDep);
+
+  // ... and all module dependencies.
+  llvm::StringSet<> alreadyAddedModules;
+  for (const auto &moduleDep : clangDependencies->FullDeps.ClangModuleDeps) {
+    targetModule.addBridgingModuleDependency(
+        moduleDep.ModuleName, alreadyAddedModules);
+  }
+  
+  // Update the cache with the new information for the module.
+  cache.updateDependencies(
+     {moduleName, ModuleDependenciesKind::Swift},
+     std::move(targetModule));
+
+  return false;
 }
