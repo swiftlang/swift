@@ -12,19 +12,6 @@ func checkMatch<S: Collection, T: Collection>(_ x: S, _ y: T, _ i: S.Index)
   expectEqual(x[i], y[i])
 }
 
-func checkMatchContiguousStorage<S: Collection, T: Collection>(_ x: S, _ y: T)
-  where S.Element == T.Element, S.Element: Equatable
-{
-  let xElement = x.withContiguousStorageIfAvailable { $0.first }
-  let yElement = y.withContiguousStorageIfAvailable { $0.first }
-  expectEqual(xElement, yElement)
-}
-
-func checkHasContiguousStorage<S: Collection>(_ x: S) {
-  let hasStorage = x.withContiguousStorageIfAvailable { _ in true } ?? false
-  expectTrue(hasStorage)
-}
-
 SubstringTests.test("Equality") {
   let s = "abcdefg"
   let s1 = s[s.index(s.startIndex, offsetBy: 2) ..<
@@ -241,13 +228,6 @@ SubstringTests.test("UTF8View") {
     expectEqual("", String(t.dropLast(100))!)
     expectEqual("", String(u.dropFirst(100))!)
     expectEqual("", String(u.dropLast(100))!)
-
-    checkHasContiguousStorage(s.utf8)
-    checkHasContiguousStorage(t)
-    checkHasContiguousStorage(u)
-    checkMatchContiguousStorage(Array(s.utf8), s.utf8)
-    checkMatchContiguousStorage(Array(t), t)
-    checkMatchContiguousStorage(Array(u), u)
   }
 }
 

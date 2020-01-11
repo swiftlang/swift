@@ -50,6 +50,7 @@
 #include "llvm/Support/MD5.h"
 
 #include "ConformanceDescription.h"
+#include "GenDecl.h"
 #include "GenEnum.h"
 #include "GenIntegerLiteral.h"
 #include "GenType.h"
@@ -1190,6 +1191,7 @@ void IRGenModule::emitAutolinkInfo() {
     var->setSection(".swift1_autolink_entries");
     var->setAlignment(getPointerAlignment().getValue());
 
+    disableAddressSanitizer(*this, var);
     addUsedGlobal(var);
   }
 
