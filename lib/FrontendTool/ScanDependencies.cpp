@@ -436,7 +436,8 @@ bool swift::scanDependencies(CompilerInstance &instance) {
           depTracker->addDependency(bridgingSourceFile, /*IsSystem=*/false);
       } else {
         auto clangDeps = deps->getAsClangModule();
-        depTracker->addDependency(clangDeps->moduleMapFile, /*IsSystem=*/false);
+        if (!clangDeps->moduleMapFile.empty())
+          depTracker->addDependency(clangDeps->moduleMapFile, /*IsSystem=*/false);
         for (const auto &sourceFile : clangDeps->fileDependencies)
           depTracker->addDependency(sourceFile, /*IsSystem=*/false);
       }
