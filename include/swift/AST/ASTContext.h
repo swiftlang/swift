@@ -614,14 +614,6 @@ public:
   /// swift_getTypeByMangledNameInContextInMetadataState.
   AvailabilityContext getTypesInAbstractMetadataStateAvailability();
 
-  /// Get the runtime availability of support for prespecialized generic 
-  /// metadata.
-  AvailabilityContext getPrespecializedGenericMetadataAvailability();
-
-  /// Get the runtime availability of features introduced in the Swift 5.2
-  /// compiler for the target platform.
-  AvailabilityContext getSwift52Availability();
-
 
   //===--------------------------------------------------------------------===//
   // Diagnostics Helper functions

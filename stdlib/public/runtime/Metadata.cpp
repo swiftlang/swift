@@ -4630,14 +4630,6 @@ const WitnessTable *swift::swift_getAssociatedConformanceWitness(
 template <class Result, class Callbacks>
 static Result performOnMetadataCache(const Metadata *metadata,
                                      Callbacks &&callbacks) {
-  // TODO: Once more than just structs have canonical statically specialized
-  //       metadata, calling an updated
-  //       isCanonicalStaticallySpecializedGenericMetadata would entail
-  //       dyn_casting to the same type more than once.  Avoid that by combining
-  //       that function's implementation with the dyn_casts below.
-  if (metadata->isCanonicalStaticallySpecializedGenericMetadata())
-    return std::move(callbacks).forOtherMetadata(metadata);
-
   // Handle different kinds of type that can delay their metadata.
   const TypeContextDescriptor *description;
   if (auto classMetadata = dyn_cast<ClassMetadata>(metadata)) {
@@ -5217,14 +5209,6 @@ bool Metadata::satisfiesClassConstraint() const {
 
   // or it's a class.
   return isAnyClass();
-}
-
-template <>
-bool Metadata::isCanonicalStaticallySpecializedGenericMetadata() const {
-  if (auto *metadata = dyn_cast<StructMetadata>(this))
-    return metadata->isCanonicalStaticallySpecializedGenericMetadata();
-
-  return false;
 }
 
 #if !NDEBUG

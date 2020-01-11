@@ -190,10 +190,6 @@ public:
   /// Passing this flag completely disables this behavior.
   unsigned DisableLegacyTypeInfo : 1;
 
-  /// Create metadata specializations for generic types at statically known type
-  /// arguments.
-  unsigned PrespecializeGenericMetadata : 1;
-
   /// The path to load legacy type layouts from.
   StringRef ReadLegacyTypeInfoPath;
 
@@ -259,9 +255,8 @@ public:
         EnableAnonymousContextMangledNames(false), ForcePublicLinkage(false),
         LazyInitializeClassMetadata(false),
         LazyInitializeProtocolConformances(false), DisableLegacyTypeInfo(false),
-        PrespecializeGenericMetadata(false), UseIncrementalLLVMCodeGen(true),
-        UseSwiftCall(false), GenerateProfile(false),
-        EnableDynamicReplacementChaining(false),
+        UseIncrementalLLVMCodeGen(true), UseSwiftCall(false),
+        GenerateProfile(false), EnableDynamicReplacementChaining(false),
         DisableRoundTripDebugTypes(false), DisableDebuggerShadowCopies(false),
         CmdArgs(), SanitizeCoverage(llvm::SanitizerCoverageOptions()),
         TypeInfoFilter(TypeInfoDumpFilter::All) {}

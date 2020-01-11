@@ -34,7 +34,6 @@ enum ForDefinition_t : bool;
 namespace irgen {
 class ConstantReference;
 class Explosion;
-struct GenericArguments;
 class IRGenFunction;
 class IRGenModule;
 class MetadataDependencyCollector;
@@ -504,10 +503,6 @@ static inline bool isAccessorLazilyGenerated(MetadataAccessStrategy strategy) {
 /// need a cache variable in its accessor.
 bool isTypeMetadataAccessTrivial(IRGenModule &IGM, CanType type);
 
-bool isNominalGenericContextTypeMetadataAccessTrivial(IRGenModule &IGM,
-                                                      NominalTypeDecl &nominal,
-                                                      CanType type);
-
 /// Determine how the given type metadata should be accessed.
 MetadataAccessStrategy getTypeMetadataAccessStrategy(CanType type);
 
@@ -588,10 +583,6 @@ void emitCacheAccessFunction(IRGenModule &IGM,
                              CacheStrategy cacheStrategy,
                              CacheEmitter getValue,
                              bool isReadNone = true);
-MetadataResponse
-emitGenericTypeMetadataAccessFunction(IRGenFunction &IGF, Explosion &params,
-                                      NominalTypeDecl *nominal,
-                                      GenericArguments &genericArgs);
 
 /// Emit a declaration reference to a metatype object.
 void emitMetatypeRef(IRGenFunction &IGF, CanMetatypeType type,

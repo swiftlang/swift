@@ -82,8 +82,8 @@ public:
   void addMetadataFlags() { addPointer(); }
   void addValueWitnessTable() { addPointer(); }
   void addNominalTypeDescriptor() { addPointer(); }
-  void addGenericArgument(GenericRequirement requirement) { addPointer(); }
-  void addGenericWitnessTable(GenericRequirement requirement) { addPointer(); }
+  void addGenericArgument() { addPointer(); }
+  void addGenericWitnessTable() { addPointer(); }
   void addPayloadSize() { addPointer(); }
   void noteStartOfTypeSpecificMembers() {}
 
