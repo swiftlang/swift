@@ -3,6 +3,7 @@
 // UNSUPPORTED: CPU=i386 && OS=ios
 // UNSUPPORTED: CPU=armv7 && OS=ios
 // UNSUPPORTED: CPU=armv7s && OS=ios
+// UNSUPPORTED: windows
 
 // CHECK-NOT: @"$s4main5ValueVyAA7IntegerVGMf"
 struct Value<First : Hashable> {

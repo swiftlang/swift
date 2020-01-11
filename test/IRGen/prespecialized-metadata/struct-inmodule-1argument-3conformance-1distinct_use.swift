@@ -3,6 +3,7 @@
 // UNSUPPORTED: CPU=i386 && OS=ios
 // UNSUPPORTED: CPU=armv7 && OS=ios
 // UNSUPPORTED: CPU=armv7s && OS=ios
+// UNSUPPORTED: windows
 
 // CHECK: @"$sytN" = external global %swift.full_type
 // CHECK: @"$sB[[INT]]_WV" = external global i8*, align [[ALIGNMENT]]
