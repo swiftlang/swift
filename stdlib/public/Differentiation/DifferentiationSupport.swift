@@ -1028,6 +1028,227 @@ public struct AnyDerivative: EuclideanDifferentiable & AdditiveArithmetic {
 }
 
 //===----------------------------------------------------------------------===//
+// Array differentiation
+//===----------------------------------------------------------------------===//
+
+// TODO(TF-938): Add 'Element : Differentiable' constraint.
+extension Array {
+  /// The view of an array as the differentiable product manifold of `Element`
+  /// multiplied with itself `count` times.
+  @frozen
+  public struct DifferentiableView {
+    var _base: [Element]
+  }
+}
+
+extension Array.DifferentiableView : Differentiable where Element : Differentiable {
+  /// The viewed array.
+  public var base: [Element] {
+    get { return _base }
+    _modify { yield &_base }
+  }
+
+  @usableFromInline
+  @derivative(of: base)
+  func _vjpBase() ->
+    (value: [Element], pullback: (Array<Element>.TangentVector) -> TangentVector) {
+    return (base, { $0 })
+  }
+
+  /// Creates a differentiable view of the given array.
+  public init(_ base: [Element]) { self._base = base }
+
+  @usableFromInline
+  @derivative(of: init(_:))
+  static func _vjpInit(_ base: [Element]) ->
+    (value: Array.DifferentiableView, pullback: (TangentVector) -> TangentVector) {
+    return (Array.DifferentiableView(base), { $0 })
+  }
+
+  public typealias TangentVector =
+    Array<Element.TangentVector>.DifferentiableView
+
+  public mutating func move(along direction: TangentVector) {
+    precondition(
+      base.count == direction.base.count,
+      "cannot move Array.DifferentiableView with count \(base.count) along " +
+        "direction with different count \(direction.base.count)")
+    for i in base.indices {
+      base[i].move(along: direction.base[i])
+    }
+  }
+}
+
+extension Array.DifferentiableView : EuclideanDifferentiable
+  where Element : EuclideanDifferentiable {
+  public var differentiableVectorView: Array.DifferentiableView.TangentVector {
+    Array.DifferentiableView.TangentVector(
+      base.map { $0.differentiableVectorView })
+  }
+}
+
+extension Array.DifferentiableView : Equatable
+  where Element : Differentiable & Equatable {
+  public static func == (
+    lhs: Array.DifferentiableView,
+    rhs: Array.DifferentiableView
+  ) -> Bool {
+    return lhs.base == rhs.base
+  }
+}
+
+extension Array.DifferentiableView : ExpressibleByArrayLiteral
+  where Element : Differentiable {
+  public init(arrayLiteral elements: Element...) {
+    self.init(elements)
+  }
+}
+
+extension Array.DifferentiableView : CustomStringConvertible
+  where Element : Differentiable {
+  public var description: String {
+    return base.description
+  }
+}
+
+/// Makes `Array.DifferentiableView` additive as the product space.
+///
+/// Note that `Array.DifferentiableView([])` is the zero in the product spaces
+/// of all counts.
+extension Array.DifferentiableView : AdditiveArithmetic
+  where Element : AdditiveArithmetic & Differentiable {
+
+  public static var zero: Array.DifferentiableView {
+    return Array.DifferentiableView([])
+  }
+
+  public static func + (
+    lhs: Array.DifferentiableView,
+    rhs: Array.DifferentiableView
+  ) -> Array.DifferentiableView {
+    precondition(
+      lhs.base.count == 0 || rhs.base.count == 0 ||
+        lhs.base.count == rhs.base.count,
+      "cannot add Array.DifferentiableViews with different counts: " +
+        "\(lhs.base.count) and \(rhs.base.count)")
+    if lhs.base.count == 0 {
+      return rhs
+    }
+    if rhs.base.count == 0 {
+      return lhs
+    }
+    return Array.DifferentiableView(zip(lhs.base, rhs.base).map(+))
+  }
+
+  public static func - (
+    lhs: Array.DifferentiableView,
+    rhs: Array.DifferentiableView
+  ) -> Array.DifferentiableView {
+    precondition(
+      lhs.base.count == 0 || rhs.base.count == 0 ||
+        lhs.base.count == rhs.base.count,
+      "cannot subtract Array.DifferentiableViews with different counts: " +
+        "\(lhs.base.count) and \(rhs.base.count)")
+    if lhs.base.count == 0 {
+      return rhs
+    }
+    if rhs.base.count == 0 {
+      return lhs
+    }
+    return Array.DifferentiableView(zip(lhs.base, rhs.base).map(-))
+  }
+
+  @inlinable
+  public subscript(_ index: Int) -> Element {
+    if index < base.count {
+      return base[index]
+    } else {
+      return Element.zero
+    }
+  }
+}
+
+/// Makes `Array` differentiable as the product manifold of `Element`
+/// multiplied with itself `count` times.
+extension Array : Differentiable where Element : Differentiable {
+  // In an ideal world, `TangentVector` would be `[Element.TangentVector]`.
+  // Unfortunately, we cannot conform `Array` to `AdditiveArithmetic` for
+  // `TangentVector` because `Array` already has a static `+` method with
+  // different semantics from `AdditiveArithmetic.+`. So we use
+  // `Array.DifferentiableView` for all these associated types.
+  public typealias TangentVector =
+    Array<Element.TangentVector>.DifferentiableView
+
+  public mutating func move(along direction: TangentVector) {
+    var view = DifferentiableView(self)
+    view.move(along: direction)
+    self = view.base
+  }
+
+  /// A closure that produces a `TangentVector` of zeros with the same
+  /// `count` as `self`.
+  public var zeroTangentVectorInitializer: () -> TangentVector {
+    { [count = self.count] in
+      TangentVector(.init(repeating: .zero, count: count))
+    }
+  }
+}
+
+extension Array : EuclideanDifferentiable
+  where Element : EuclideanDifferentiable {
+  public var differentiableVectorView: TangentVector {
+    TangentVector(map { $0.differentiableVectorView })
+  }
+}
+
+extension Array where Element : Differentiable {
+  @derivative(of: subscript)
+  public func _vjpSubscript(index: Int) ->
+    (value: Element, pullback: (Element.TangentVector) -> TangentVector)
+  {
+    func pullback(_ gradientIn: Element.TangentVector) -> TangentVector {
+      var gradientOut = Array<Element.TangentVector>(
+        repeating: .zero,
+        count: count)
+      gradientOut[index] = gradientIn
+      return TangentVector(gradientOut)
+    }
+    return (self[index], pullback)
+  }
+
+  @derivative(of: +)
+  public static func _vjpPlus(_ lhs: [Element], _ rhs: [Element]) ->
+    (value: [Element], pullback: (TangentVector) -> (TangentVector, TangentVector)) {
+      func pullback(_ gradientIn: TangentVector) ->
+        (TangentVector, TangentVector) {
+        precondition(
+          gradientIn.base.count == lhs.count + rhs.count,
+          "+ should receive gradient with count equal to sum of operand " +
+            "counts, but counts are: gradient \(gradientIn.base.count), " +
+            "lhs \(lhs.count), rhs \(rhs.count)")
+        return (
+          TangentVector(Array<Element.TangentVector>(
+            gradientIn.base[0..<lhs.count])),
+          TangentVector(Array<Element.TangentVector>(
+            gradientIn.base[lhs.count...])))
+      }
+      return (lhs + rhs, pullback)
+  }
+}
+
+extension Array where Element: Differentiable {
+  @usableFromInline
+  @derivative(of: init(repeating:count:))
+  static func _vjpInit(repeating repeatedValue: Element, count: Int) -> (
+    value: Self, pullback: (TangentVector) -> Element.TangentVector
+  ) {
+    (value: Self(repeating: repeatedValue, count: count), pullback: { v in
+      v.base.reduce(.zero, +)
+    })
+  }
+}
+
+//===----------------------------------------------------------------------===//
 // Differentiable higher order functions for collections
 //===----------------------------------------------------------------------===//
 
@@ -1112,4 +1333,205 @@ public func _printJVPErrorAndExit() -> Never {
         JVP does not exist. Differential-first differentiation APIs are \
         experimental and should not be used.
         """)
+}
+
+//===----------------------------------------------------------------------===//
+// FloatingPoint differentiation
+//===----------------------------------------------------------------------===//
+
+extension FloatingPoint where Self : Differentiable,
+                              Self == Self.TangentVector {
+  /// The vector-Jacobian product function of `addingProduct`. Returns the
+  /// original result and pullback of `addingProduct` with respect to `self`,
+  /// `lhs` and `rhs`.
+  @inlinable
+  @derivative(of: addingProduct)
+  func _vjpAddingProduct(
+    _ lhs: Self, _ rhs: Self
+  ) -> (value: Self, pullback: (Self) -> (Self, Self, Self)) {
+    return (addingProduct(lhs, rhs), { _ in (1, rhs, lhs) })
+  }
+
+  /// The vector-Jacobian product function of `squareRoot`. Returns the original
+  /// result and pullback of `squareRoot` with respect to `self`.
+  @inlinable // FIXME(sil-serialize-all)
+  @derivative(of: squareRoot)
+  func _vjpSquareRoot() -> (value: Self, pullback: (Self) -> Self) {
+    let y = squareRoot()
+    return (y, { v in v / (2 * y) })
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// SIMD differentiation
+//===----------------------------------------------------------------------===//
+
+extension SIMD
+  where Self : Differentiable,
+        TangentVector : SIMD,
+        Scalar : BinaryFloatingPoint,
+        TangentVector.Scalar : BinaryFloatingPoint {
+  @inlinable
+  @derivative(of: +)
+  static func _vjpAdd(lhs: Self, rhs: Self)
+    -> (value: Self, pullback: (TangentVector) -> (TangentVector, TangentVector)) {
+    return (lhs + rhs, { v in
+      return (v, v)
+    })
+  }
+
+  @inlinable
+  @derivative(of: -)
+  static func _vjpSubtract(lhs: Self, rhs: Self)
+    -> (value: Self, pullback: (TangentVector) -> (TangentVector, TangentVector)) {
+    return (lhs - rhs, { v in
+      return (v, -v)
+    })
+  }
+
+  @inlinable
+  @derivative(of: -)
+  static func _vjpNegate(rhs: Self)
+    -> (value: Self, pullback: (TangentVector) -> (TangentVector)) {
+    return (-rhs, { v in
+      return -v
+    })
+  }
+}
+
+extension SIMD
+  where Self : Differentiable,
+        TangentVector : SIMD,
+        Scalar : BinaryFloatingPoint,
+        Self.TangentVector == Self {
+  @inlinable
+  @derivative(of: *)
+  static func _vjpMultiply(lhs: Self, rhs: Self)
+    -> (value: Self, pullback: (TangentVector) -> (TangentVector, TangentVector)) {
+    return (lhs * rhs, { v in
+      return (v * rhs, v * lhs)
+    })
+  }
+
+  @inlinable
+  @derivative(of: /)
+  static func _vjpDivide(lhs: Self, rhs: Self)
+    -> (value: Self, pullback: (TangentVector) -> (TangentVector, TangentVector)) {
+    return (lhs / rhs, { v in
+      (v / rhs, -lhs / (rhs * rhs) * v)
+    })
+  }
+}
+
+extension SIMD
+  where Self : Differentiable,
+        TangentVector : SIMD,
+        Scalar : BinaryFloatingPoint & Differentiable,
+        Scalar.TangentVector : BinaryFloatingPoint,
+        TangentVector.Scalar == Scalar.TangentVector {
+  @inlinable
+  @derivative(of: +)
+  static func _vjpAdd(lhs: Scalar, rhs: Self)
+    -> (value: Self, pullback: (TangentVector) -> (Scalar.TangentVector, TangentVector)) {
+    return (lhs + rhs, { v in
+      return (v.sum(), v)
+    })
+  }
+
+  @inlinable
+  @derivative(of: -)
+  static func _vjpSubtract(lhs: Scalar, rhs: Self)
+    -> (value: Self, pullback: (TangentVector) -> (Scalar.TangentVector, TangentVector)) {
+    return (lhs - rhs, { v in
+      return (v.sum(), -v)
+    })
+  }
+
+  @inlinable
+  @derivative(of: +)
+  static func _vjpAdd(lhs: Self, rhs: Scalar)
+    -> (value: Self, pullback: (TangentVector) -> (TangentVector, Scalar.TangentVector)) {
+    return (lhs + rhs, { v in
+      return (v, v.sum())
+    })
+  }
+
+  @inlinable
+  @derivative(of: -)
+  static func _vjpSubtract(lhs: Self, rhs: Scalar)
+    -> (value: Self, pullback: (TangentVector) -> (TangentVector, Scalar.TangentVector)) {
+    return (lhs - rhs, { v in
+      return (v, -v.sum())
+    })
+  }
+}
+
+extension SIMD
+  where Self : Differentiable,
+        TangentVector : SIMD,
+        Scalar : BinaryFloatingPoint & Differentiable,
+        Self.TangentVector == Self,
+        Scalar.TangentVector == Scalar {
+  @inlinable
+  @derivative(of: *)
+  static func _vjpMultiply(lhs: Self, rhs: Scalar)
+    -> (value: Self, pullback: (TangentVector) -> (TangentVector, Scalar.TangentVector)) {
+    return (lhs * rhs, { v in
+      return (v * rhs, (v * lhs).sum())
+    })
+  }
+
+  @inlinable
+  @derivative(of: /)
+  static func _vjpDivide(lhs: Self, rhs: Scalar)
+    -> (value: Self, pullback: (TangentVector) -> (TangentVector, Scalar.TangentVector)) {
+    return (lhs / rhs, { v in
+      (v / rhs, (-lhs / (rhs * rhs) * v).sum())
+    })
+  }
+
+  @inlinable
+  @derivative(of: *)
+  static func _vjpMultiply(lhs: Scalar, rhs: Self)
+    -> (value: Self, pullback: (TangentVector) -> (Scalar.TangentVector, TangentVector)) {
+    return (lhs * rhs, { v in
+      return ((v * rhs).sum(), v * lhs)
+    })
+  }
+
+  @inlinable
+  @derivative(of: /)
+  static func _vjpDivide(lhs: Scalar, rhs: Self)
+    -> (value: Self, pullback: (TangentVector) -> (Scalar.TangentVector, TangentVector)) {
+    return (lhs / rhs, { v in
+      ((v / rhs).sum(), -lhs / (rhs * rhs) * v)
+    })
+  }
+}
+
+extension SIMD
+  where Self : Differentiable,
+        TangentVector : SIMD,
+        Scalar : BinaryFloatingPoint & Differentiable,
+        Scalar.TangentVector : BinaryFloatingPoint,
+        TangentVector == Self {
+  @inlinable
+  @derivative(of: sum)
+  func _vjpSum() -> (value: Scalar, pullback: (Scalar.TangentVector) -> TangentVector) {
+    return (sum(), { v in Self(repeating: Scalar(v)) })
+  }
+}
+
+extension SIMD
+  where Self : Differentiable,
+        Self.TangentVector : SIMD,
+        Scalar : BinaryFloatingPoint & Differentiable,
+        Self.TangentVector == Self,
+        Scalar.TangentVector == Scalar {
+  @inlinable
+  @derivative(of: init(repeating:))
+  static func _vjpInit(repeating value: Scalar)
+    -> (value: Self, pullback: (TangentVector) -> Scalar.TangentVector) {
+      return (Self(repeating: value), { v in v.sum() })
+  }
 }

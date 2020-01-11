@@ -203,10 +203,13 @@ set(SWIFTLIB_ESSENTIAL_GYB_SOURCES
 # SWIFT_ENABLE_TENSORFLOW
 # Compile differentiable programming sources only if enabled.
 set(SWIFTLIB_DIFFERENTIABLE_PROGRAMMING_SOURCES)
+set(SWIFTLIB_DIFFERENTIABLE_PROGRAMMING_GYB_SOURCES)
 if(SWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING)
   list(APPEND SWIFTLIB_DIFFERENTIABLE_PROGRAMMING_SOURCES
     ../Differentiation/Differentiable.swift
     ../Differentiation/DifferentiationSupport.swift)
+  list(APPEND SWIFTLIB_DIFFERENTIABLE_PROGRAMMING_GYB_SOURCES
+    ../Differentiation/FloatingPointTypesDerivatives.swift.gyb)
   message(STATUS "Differentiable programming standard library additions enabled.")
 endif()
 # SWIFT_ENABLE_TENSORFLOW END
@@ -238,6 +241,7 @@ set(SWIFTLIB_GYB_SOURCES
   ${SWIFTLIB_ESSENTIAL_GYB_SOURCES}
   # SWIFT_ENABLE_TENSORFLOW
   MathFunctions.swift.gyb
+  ${SWIFTLIB_DIFFERENTIABLE_PROGRAMMING_GYB_SOURCES}
   # SWIFT_ENABLE_TENSORFLOW END
   SIMDVectorTypes.swift.gyb
   Tuple.swift.gyb
