@@ -10,6 +10,76 @@
 //
 //===----------------------------------------------------------------------===//
 
+/// Instrumentation helpers
+import SwiftShims
+private func report<S: CustomStringConvertible>(
+  _ s: S,
+  file: String = #file,
+  line: UInt = #line
+) {
+  var err = _Stderr()
+  err.write("<report ")
+  err.write(file)
+  err.write(":")
+  err.write(String(line))
+  err.write("> ")
+  err.write(s.description)
+  err.write("\n")
+}
+extension String {
+  // DO NOT PUSH: Just for gathering stats
+  public struct _AllocationStats {
+    public var totalAllocationSize: Int
+
+    public var headerSize: Int
+    public var usedCodeUnitSize: Int
+    public var terminatorSize: Int { 1 }
+    public var spareCodeUnitCapacity: Int
+    public var breadcrumbPointerSize: Int { MemoryLayout<Int>.size }
+
+    public var unclaimedCapacity: Int {
+      totalAllocationSize - headerSize - usedCodeUnitSize - terminatorSize
+        - spareCodeUnitCapacity - breadcrumbPointerSize
+    }
+
+    internal init(_ storage: __StringStorage) {
+      let storageAddr = UnsafeMutableRawPointer(
+        Builtin.bridgeToRawPointer(storage))
+
+      let codeUnitAddr = UnsafeMutableRawPointer(storage.mutableStart)
+      let terminatorAddr = UnsafeMutableRawPointer(storage.terminator)
+      let breadcrumbAddr = UnsafeMutableRawPointer(storage._breadcrumbsAddress)
+
+      self.totalAllocationSize = _swift_stdlib_malloc_size(storageAddr)
+      self.headerSize = codeUnitAddr - storageAddr
+      self.usedCodeUnitSize = terminatorAddr - codeUnitAddr
+      self.spareCodeUnitCapacity =
+        breadcrumbAddr - terminatorAddr - 1 /* self.terminatorSize */
+
+      // Some sanity checks
+      assert(headerSize == _StringObject.nativeBias)
+      assert(usedCodeUnitSize == storage.count)
+      assert(spareCodeUnitCapacity == storage.unusedCapacity)
+      assert(unclaimedCapacity >= 0)
+    }
+  }
+
+  public static func _allocationStats(
+    forCount count: Int, requestingCapacity: Int? = nil
+  ) -> _AllocationStats {
+    let capacity = requestingCapacity ?? count
+
+    return _AllocationStats(__StringStorage.create(
+      count: count, capacity: capacity))
+  }
+
+  public var _allocationStats: _AllocationStats? {
+    guard _guts._object.hasNativeStorage else { return nil }
+    return _AllocationStats(_guts._object.nativeStorage)
+  }
+}
+
+
 // Having @objc stuff in an extension creates an ObjC category, which we don't
 // want.
 #if _runtime(_ObjC)
@@ -165,8 +235,18 @@ extension __StringStorage {
 
     let realCapacity = determineCodeUnitCapacity(capacity)
     _internalInvariant(realCapacity > capacity)
-    return __StringStorage.create(
+
+    let storage = __StringStorage.create(
       realCodeUnitCapacity: realCapacity, countAndFlags: countAndFlags)
+
+    return storage
+  }
+
+  // DO NOT PUSH: For stats gathering only...
+  internal static func create(count: Int, capacity: Int) -> __StringStorage {
+    __StringStorage.create(
+      capacity: capacity,
+      countAndFlags: CountAndFlags(count: count, flags: 0))
   }
 
   // The caller is expected to check UTF8 validity and ASCII-ness and update
@@ -226,7 +306,7 @@ extension __StringStorage {
 // Usage
 extension __StringStorage {
   @inline(__always)
-  private var mutableStart: UnsafeMutablePointer<UInt8> {
+  internal var mutableStart: UnsafeMutablePointer<UInt8> {
     return UnsafeMutablePointer(Builtin.projectTailElems(self, UInt8.self))
   }
   @inline(__always)
@@ -246,7 +326,7 @@ extension __StringStorage {
 
   // Point to the nul-terminator.
   @inline(__always)
-  private final var terminator: UnsafeMutablePointer<UInt8> {
+  internal final var terminator: UnsafeMutablePointer<UInt8> {
     return mutableEnd
   }
 
