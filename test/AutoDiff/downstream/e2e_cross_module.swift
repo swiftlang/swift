@@ -1,7 +1,8 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -c -parse-as-library -emit-module -module-name e2e_cross_module_external_module -emit-module-path %t/e2e_cross_module_external_module.swiftmodule -o %t/e2e_cross_module_external_module.o %S/Inputs/e2e_cross_module_external_module.swift
-// RUN: %target-build-swift -I%t %s %t/e2e_cross_module_external_module.o -o %t/a.out -lm
+// RUN: %target-build-swift -parse-as-library -emit-module -module-name e2e_cross_module_external_module -emit-module-path %t/e2e_cross_module_external_module.swiftmodule -emit-library -o %t/%target-library-name(e2e_cross_module_external_module) %S/Inputs/e2e_cross_module_external_module.swift
+// RUN: %target-build-swift -I%t -L%t %s -o %t/a.out -lm -le2e_cross_module_external_module  %target-rpath(%t)
 // RUN: %target-run %t/a.out
+// REQUIRES: executable_test
 
 import e2e_cross_module_external_module
 import StdlibUnittest
