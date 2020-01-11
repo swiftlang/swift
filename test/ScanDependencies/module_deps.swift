@@ -2,8 +2,21 @@
 // RUN: mkdir -p %t/clang-module-cache
 // RUN: %target-swift-frontend -scan-dependencies -module-cache-path %t/clang-module-cache %s -o %t/deps.json -I %S/Inputs/CHeaders -I %S/Inputs/Swift -emit-dependencies -emit-dependencies-path %t/deps.d -import-objc-header %S/Inputs/CHeaders/Bridging.h
 
+// Check the contents of the JSON output
 // RUN: %FileCheck %s < %t/deps.json
+
+// Check the make-style dependencies file
 // RUN: %FileCheck %s -check-prefix CHECK-MAKE-DEPS < %t/deps.d
+
+// Check that the JSON parses correctly into the canonical Swift data
+// structures.
+
+// RUN: %target-build-swift %S/Inputs/ModuleDependencyGraph.swift -o %t/main
+// RUN: %target-codesign %t/main
+// RUN: %target-run %t/main %t/deps.json
+
+// REQUIRES: executable_test
+// REQUIRES: objc_interop
 
 import C
 import E
