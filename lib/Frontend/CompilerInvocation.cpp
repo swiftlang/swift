@@ -238,6 +238,15 @@ static void SaveModuleInterfaceArgs(ModuleInterfaceOptions &Opts,
     return;
   ArgStringList RenderedArgs;
   for (auto A : Args) {
+    // SWIFT_ENABLE_TENSORFLOW: Copy
+    // `-Xllvm -enable-experimental-cross-file-derivative-registration` into the
+    // .swiftinterface file.
+    if (A->getOption().matches(options::OPT_Xllvm) &&
+        StringRef(A->getValue()) ==
+            "-enable-experimental-cross-file-derivative-registration") {
+      A->render(Args, RenderedArgs);
+      continue;
+    }
     if (A->getOption().hasFlag(options::ModuleInterfaceOption))
       A->render(Args, RenderedArgs);
   }
