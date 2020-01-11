@@ -17,4 +17,5 @@ AlwaysEmitIntoClientTests.test("registration") {
 
 runAllTests()
 
-// CHECK: error: undefined reference to 'AD__$s16SingleFileModule1fyS2fF_PSRS'
+// CHECK: {{[Uu]}}ndefined
+// CHECK: AD__$s16SingleFileModule1fyS2fF_PSRS
