@@ -158,8 +158,7 @@ public:
     Interactive,     // swift
     Batch,           // swiftc
     AutolinkExtract, // swift-autolink-extract
-    SwiftIndent,     // swift-indent
-    SymbolGraph      // swift-symbolgraph
+    SwiftIndent      // swift-indent
   };
 
   class InputInfoMap;

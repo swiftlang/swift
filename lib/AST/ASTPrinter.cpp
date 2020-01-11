@@ -2632,9 +2632,6 @@ void PrintAST::printOneParameter(const ParamDecl *param,
       // Else, print the argument only.
       LLVM_FALLTHROUGH;
     case PrintOptions::ArgAndParamPrintingMode::ArgumentOnly:
-      if (ArgName.empty() && !Options.PrintEmptyArgumentNames) {
-        return;
-      }
       Printer.printName(ArgName, PrintNameContext::FunctionParameterExternal);
 
       if (!ArgNameIsAPIByDefault && !ArgName.empty())
@@ -2689,7 +2686,7 @@ void PrintAST::printOneParameter(const ParamDecl *param,
   if (param->isVariadic())
     Printer << "...";
 
-  if (param->isDefaultArgument() && Options.PrintDefaultArgumentValue) {
+  if (param->isDefaultArgument()) {
     SmallString<128> scratch;
     auto defaultArgStr = param->getDefaultValueStringRepresentation(scratch);
 
