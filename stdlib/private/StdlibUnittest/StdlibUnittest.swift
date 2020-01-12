@@ -1449,7 +1449,12 @@ public func runAllTests() {
   if _isChildProcess {
     _childProcess()
   } else {
+    #if os(WASI)
+    // WASI doesn't support child process
+    var runTestsInProcess: Bool = true
+    #else
     var runTestsInProcess: Bool = false
+    #endif
     var filter: String?
     var args = [String]()
     var i = 0
