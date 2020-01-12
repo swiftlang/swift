@@ -111,8 +111,9 @@ static void updateRuntimeLibraryPaths(SearchPathOptions &SearchPathOpts,
   }
 }
 
-static void setIRGenOutputOptsFromFrontendOptions(IRGenOptions &IRGenOpts,
-                                                  const FrontendOptions &FrontendOpts) {
+static void
+setIRGenOutputOptsFromFrontendOptions(IRGenOptions &IRGenOpts,
+                                      const FrontendOptions &FrontendOpts) {
   // Set the OutputKind for the given Action.
   IRGenOpts.OutputKind = [](FrontendOptions::ActionType Action) {
     switch (Action) {
@@ -140,8 +141,12 @@ static void setIRGenOutputOptsFromFrontendOptions(IRGenOptions &IRGenOpts,
   }
 }
 
-static void setBridgingHeaderFromFrontendOptions(ClangImporterOptions &ImporterOpts,
-                                                 const FrontendOptions &FrontendOpts) {
+static void
+setBridgingHeaderFromFrontendOptions(ClangImporterOptions &ImporterOpts,
+                                     const FrontendOptions &FrontendOpts) {
+  if (FrontendOpts.RequestedAction != FrontendOptions::ActionType::EmitPCH)
+    return;
+
   // If there aren't any inputs, there's nothing to do.
   if (!FrontendOpts.InputsAndOutputs.hasInputs())
     return;
@@ -1352,7 +1357,6 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     Opts.AutolinkRuntimeCompatibilityDynamicReplacementLibraryVersion =
         getRuntimeCompatVersion();
   }
-
   return false;
 }
 

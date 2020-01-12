@@ -304,7 +304,7 @@ int swift::RunImmediately(CompilerInstance &CI,
   std::string Triple;
   std::vector<std::string> Features;
   std::tie(TargetOpt, CPU, Features, Triple)
-    = getIRTargetOptions(swiftModule->getASTContext());
+    = getIRTargetOptions(IRGenOpts, swiftModule->getASTContext());
   builder.setRelocationModel(llvm::Reloc::PIC_);
   builder.setTargetOptions(TargetOpt);
   builder.setMCPU(CPU);

@@ -509,7 +509,7 @@ static bool writeSIL(SILModule &SM, ModuleDecl *M, bool EmitVerboseSIL,
 }
 
 static bool writeSIL(SILModule &SM, const PrimarySpecificPaths &PSPs,
-                     CompilerInstance &Instance,
+                     const CompilerInstance &Instance,
                      const CompilerInvocation &Invocation) {
   const FrontendOptions &opts = Invocation.getFrontendOptions();
   return writeSIL(SM, Instance.getMainModule(), opts.EmitVerboseSIL,
@@ -640,10 +640,10 @@ static void debugFailWithCrash() {
 /// \return true on error.
 static bool emitIndexDataIfNeeded(SourceFile *PrimarySourceFile,
                                   const CompilerInvocation &Invocation,
-                                  CompilerInstance &Instance);
+                                  const CompilerInstance &Instance);
 
 static void countStatsOfSourceFile(UnifiedStatsReporter &Stats,
-                                   CompilerInstance &Instance,
+                                   const CompilerInstance &Instance,
                                    SourceFile *SF) {
   auto &C = Stats.getFrontendCounters();
   auto &SM = Instance.getSourceMgr();
@@ -724,7 +724,7 @@ createOptRecordFile(StringRef Filename, DiagnosticEngine &DE) {
 }
 
 static bool precompileBridgingHeader(const CompilerInvocation &Invocation,
-                                     CompilerInstance &Instance) {
+                                     const CompilerInstance &Instance) {
   auto clangImporter = static_cast<ClangImporter *>(
       Instance.getASTContext().getClangModuleLoader());
   auto &ImporterOpts = Invocation.getClangImporterOptions();
@@ -743,7 +743,7 @@ static bool precompileBridgingHeader(const CompilerInvocation &Invocation,
 }
 
 static bool precompileClangModule(const CompilerInvocation &Invocation,
-                                  CompilerInstance &Instance) {
+                                  const CompilerInstance &Instance) {
   auto clangImporter = static_cast<ClangImporter *>(
       Instance.getASTContext().getClangModuleLoader());
   return clangImporter->emitPrecompiledModule(
@@ -755,7 +755,7 @@ static bool precompileClangModule(const CompilerInvocation &Invocation,
 }
 
 static bool dumpPrecompiledClangModule(const CompilerInvocation &Invocation,
-                                       CompilerInstance &Instance) {
+                                       const CompilerInstance &Instance) {
   auto clangImporter = static_cast<ClangImporter *>(
       Instance.getASTContext().getClangModuleLoader());
   return clangImporter->dumpPrecompiledModule(
@@ -835,7 +835,7 @@ static void verifyGenericSignaturesIfNeeded(const CompilerInvocation &Invocation
 }
 
 static void dumpAndPrintScopeMap(const CompilerInvocation &Invocation,
-                                 CompilerInstance &Instance, SourceFile *SF) {
+                                 const CompilerInstance &Instance, SourceFile *SF) {
   // Not const because may require reexpansion
   ASTScope &scope = SF->getScope();
 
@@ -854,7 +854,7 @@ static void dumpAndPrintScopeMap(const CompilerInvocation &Invocation,
 }
 
 static SourceFile *getPrimaryOrMainSourceFile(const CompilerInvocation &Invocation,
-                                              CompilerInstance &Instance) {
+                                              const CompilerInstance &Instance) {
   SourceFile *SF = Instance.getPrimarySourceFile();
   if (!SF) {
     SourceFileKind Kind = Invocation.getSourceFileKind();
@@ -963,7 +963,7 @@ static void emitReferenceDependenciesForAllPrimaryInputsIfNeeded(
 }
 static void
 emitSwiftRangesForAllPrimaryInputsIfNeeded(const CompilerInvocation &Invocation,
-                                           CompilerInstance &Instance) {
+                                           const CompilerInstance &Instance) {
   if (Invocation.getFrontendOptions().InputsAndOutputs.hasSwiftRangesPath() &&
       Instance.getPrimarySourceFiles().empty()) {
     Instance.getASTContext().Diags.diagnose(
@@ -981,7 +981,7 @@ emitSwiftRangesForAllPrimaryInputsIfNeeded(const CompilerInvocation &Invocation,
 }
 static void
 emitCompiledSourceForAllPrimaryInputsIfNeeded(const CompilerInvocation &Invocation,
-                                              CompilerInstance &Instance) {
+                                              const CompilerInstance &Instance) {
   if (Invocation.getFrontendOptions()
           .InputsAndOutputs.hasCompiledSourcePath() &&
       Instance.getPrimarySourceFiles().empty()) {
@@ -1158,7 +1158,7 @@ performCompileStepsPostSema(const CompilerInvocation &Invocation,
 
 /// Emits index data for all primary inputs, or the main module.
 static bool
-emitIndexData(const CompilerInvocation &Invocation, CompilerInstance &Instance) {
+emitIndexData(const CompilerInvocation &Invocation, const CompilerInstance &Instance) {
   bool hadEmitIndexDataError = false;
   if (Instance.getPrimarySourceFiles().empty())
     return emitIndexDataIfNeeded(nullptr, Invocation, Instance);
@@ -1344,7 +1344,7 @@ static bool performCompile(CompilerInstance &Instance,
 }
 
 static bool serializeSIB(SILModule *SM, const PrimarySpecificPaths &PSPs,
-                         ASTContext &Context, ModuleOrSourceFile MSF) {
+                         const ASTContext &Context, ModuleOrSourceFile MSF) {
   const std::string &moduleOutputPath =
       PSPs.SupplementaryOutputs.ModuleOutputPath;
   assert(!moduleOutputPath.empty() && "must have an output path");
@@ -1399,7 +1399,8 @@ static bool processCommandLineAndRunImmediately(const CompilerInvocation &Invoca
                      : MSF.get<ModuleDecl *>()->getModuleFilename());
 
   ReturnValue =
-      RunImmediately(Instance, CmdLine, IRGenOpts, Invocation.getSILOptions());
+      RunImmediately(Instance, CmdLine, IRGenOpts, Invocation.getSILOptions(),
+                     std::move(SM));
   return Instance.getASTContext().hadError();
 }
 
@@ -1492,7 +1493,7 @@ static bool performCompileStepsPostSILGen(
 
   FrontendOptions opts = Invocation.getFrontendOptions();
   FrontendOptions::ActionType Action = opts.RequestedAction;
-  ASTContext &Context = Instance.getASTContext();
+  const ASTContext &Context = Instance.getASTContext();
   const SILOptions &SILOpts = Invocation.getSILOptions();
   const IRGenOptions &IRGenOpts = Invocation.getIRGenOptions();
 
@@ -1512,7 +1513,7 @@ static bool performCompileStepsPostSILGen(
   }
 
   if (Action == FrontendOptions::ActionType::EmitSIBGen) {
-    serializeSIB(SM.get(), PSPs, Instance.getASTContext(), MSF);
+    serializeSIB(SM.get(), PSPs, Context, MSF);
     return Context.hadError();
   }
 
@@ -1556,7 +1557,7 @@ static bool performCompileStepsPostSILGen(
                                                       moduleIsPublic);
 
   if (Action == FrontendOptions::ActionType::EmitSIB)
-    return serializeSIB(SM.get(), PSPs, Instance.getASTContext(), MSF);
+    return serializeSIB(SM.get(), PSPs, Context, MSF);
 
   {
     if (PSPs.haveModuleOrModuleDocOutputPaths()) {
@@ -1643,7 +1644,7 @@ static bool performCompileStepsPostSILGen(
 
 static bool emitIndexDataIfNeeded(SourceFile *PrimarySourceFile,
                                   const CompilerInvocation &Invocation,
-                                  CompilerInstance &Instance) {
+                                  const CompilerInstance &Instance) {
   const FrontendOptions &opts = Invocation.getFrontendOptions();
 
   if (opts.IndexStorePath.empty())

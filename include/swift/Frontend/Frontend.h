@@ -328,7 +328,7 @@ public:
   /// in generating a cached PCH file for the bridging header.
   std::string getPCHHash() const;
 
-  SourceFile::ImplicitModuleImportKind getImplicitModuleImportKind() {
+  SourceFile::ImplicitModuleImportKind getImplicitModuleImportKind() const {
     if (getInputKind() == InputFileKind::SIL) {
       return SourceFile::ImplicitModuleImportKind::None;
     }
@@ -404,7 +404,7 @@ class CompilerInstance {
   /// Null if no tracker.
   std::unique_ptr<DependencyTracker> DepTracker;
 
-  ModuleDecl *MainModule = nullptr;
+  mutable ModuleDecl *MainModule = nullptr;
   SerializedModuleLoader *SML = nullptr;
   MemoryBufferSerializedModuleLoader *MemoryBufferLoader = nullptr;
 
@@ -453,14 +453,16 @@ public:
   void operator=(CompilerInstance &&) = delete;
 
   SourceManager &getSourceMgr() { return SourceMgr; }
+  const SourceManager &getSourceMgr() const { return SourceMgr; }
 
   DiagnosticEngine &getDiags() { return Diagnostics; }
+  const DiagnosticEngine &getDiags() const { return Diagnostics; }
 
   llvm::vfs::FileSystem &getFileSystem() { return *SourceMgr.getFileSystem(); }
 
-  ASTContext &getASTContext() {
-    return *Context;
-  }
+  ASTContext &getASTContext() { return *Context; }
+  const ASTContext &getASTContext() const { return *Context; }
+
   bool hasASTContext() const { return Context != nullptr; }
 
   SILOptions &getSILOptions() { return Invocation.getSILOptions(); }
@@ -483,6 +485,7 @@ public:
     DepTracker = llvm::make_unique<DependencyTracker>(TrackSystemDeps);
   }
   DependencyTracker *getDependencyTracker() { return DepTracker.get(); }
+  const DependencyTracker *getDependencyTracker() const { return DepTracker.get(); }
 
   SILModule *getSILModule() {
     return TheSILModule.get();
@@ -494,7 +497,7 @@ public:
     return static_cast<bool>(TheSILModule);
   }
 
-  ModuleDecl *getMainModule();
+  ModuleDecl *getMainModule() const;
 
   MemoryBufferSerializedModuleLoader *
   getMemoryBufferSerializedModuleLoader() const {
@@ -515,7 +518,7 @@ public:
 
   /// Gets the set of SourceFiles which are the primary inputs for this
   /// CompilerInstance.
-  ArrayRef<SourceFile *> getPrimarySourceFiles() {
+  ArrayRef<SourceFile *> getPrimarySourceFiles() const {
     return PrimarySourceFiles;
   }
 
@@ -525,7 +528,7 @@ public:
   ///
   /// FIXME: This should be removed eventually, once there are no longer any
   /// codepaths that rely on a single primary file.
-  SourceFile *getPrimarySourceFile() {
+  SourceFile *getPrimarySourceFile() const {
     if (PrimarySourceFiles.empty()) {
       return nullptr;
     } else {
