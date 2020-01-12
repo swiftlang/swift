@@ -237,7 +237,8 @@ bool swift::immediate::autolinkImportedModules(ModuleDecl *M,
 int swift::RunImmediately(CompilerInstance &CI,
                           const ProcessCmdLine &CmdLine,
                           const IRGenOptions &IRGenOpts,
-                          const SILOptions &SILOpts) {
+                          const SILOptions &SILOpts,
+                          std::unique_ptr<SILModule> &&SM) {
   ASTContext &Context = CI.getASTContext();
   
   // IRGen the main module.
@@ -246,7 +247,7 @@ int swift::RunImmediately(CompilerInstance &CI,
   // FIXME: We shouldn't need to use the global context here, but
   // something is persisting across calls to performIRGeneration.
   auto ModuleOwner = performIRGeneration(
-      IRGenOpts, swiftModule, CI.takeSILModule(), swiftModule->getName().str(),
+      IRGenOpts, swiftModule, std::move(SM), swiftModule->getName().str(),
       PSPs, getGlobalLLVMContext(), ArrayRef<std::string>());
   auto *Module = ModuleOwner.get();
 

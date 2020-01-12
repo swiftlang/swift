@@ -484,11 +484,6 @@ public:
   }
   DependencyTracker *getDependencyTracker() { return DepTracker.get(); }
 
-  /// Set the SIL module for this compilation instance.
-  ///
-  /// The CompilerInstance takes ownership of the given SILModule object.
-  void setSILModule(std::unique_ptr<SILModule> M);
-
   SILModule *getSILModule() {
     return TheSILModule.get();
   }

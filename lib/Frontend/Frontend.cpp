@@ -185,10 +185,6 @@ void CompilerInstance::createSILModule() {
       Invocation.getFrontendOptions().InputsAndOutputs.isWholeModule());
 }
 
-void CompilerInstance::setSILModule(std::unique_ptr<SILModule> M) {
-  TheSILModule = std::move(M);
-}
-
 void CompilerInstance::recordPrimaryInputBuffer(unsigned BufID) {
   PrimaryBufferIDs.insert(BufID);
 }
@@ -618,7 +614,7 @@ std::unique_ptr<SILModule> CompilerInstance::takeSILModule() {
   return std::move(TheSILModule);
 }
 
-ModuleDecl *CompilerInstance::getMainModule() {
+ModuleDecl *CompilerInstance::getMainModule() const {
   if (!MainModule) {
     Identifier ID = Context->getIdentifier(Invocation.getModuleName());
     MainModule = ModuleDecl::create(ID, *Context);

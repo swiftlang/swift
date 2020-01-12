@@ -1383,7 +1383,7 @@ static void generateIR(const IRGenOptions &IRGenOpts,
 
 static bool processCommandLineAndRunImmediately(const CompilerInvocation &Invocation,
                                                 CompilerInstance &Instance,
-                                                std::unique_ptr<SILModule> SM,
+                                                std::unique_ptr<SILModule> &&SM,
                                                 ModuleOrSourceFile MSF,
                                                 FrontendObserver *observer,
                                                 int &ReturnValue) {
@@ -1392,8 +1392,6 @@ static bool processCommandLineAndRunImmediately(const CompilerInvocation &Invoca
   const IRGenOptions &IRGenOpts = Invocation.getIRGenOptions();
   const ProcessCmdLine &CmdLine =
       ProcessCmdLine(opts.ImmediateArgv.begin(), opts.ImmediateArgv.end());
-  Instance.setSILModule(std::move(SM));
-
 
   PrettyStackTraceStringAction trace(
       "running user code",
