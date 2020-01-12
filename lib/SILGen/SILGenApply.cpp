@@ -4470,8 +4470,8 @@ RValue SILGenFunction::emitApply(ResultPlanPtr &&resultPlan,
 
   // Otherwise, the substitutions should match the generic signature.
   } else {
-    assert(genericSig->getCanonicalSignature() ==
-           subs.getGenericSignature()->getCanonicalSignature());
+    assert(genericSig.getCanonicalSignature() ==
+           subs.getGenericSignature().getCanonicalSignature());
   }
 
   auto rawDirectResult = [&] {

@@ -327,7 +327,7 @@ namespace {
     void addGenericParameters() {
       GenericSignature sig = asImpl().getGenericSignature();
       assert(sig);
-      auto canSig = sig->getCanonicalSignature();
+      auto canSig = sig.getCanonicalSignature();
 
       canSig->forEachParam([&](GenericTypeParamType *param, bool canonical) {
         // Currently, there are only type parameters. The parameter is a key
@@ -1688,10 +1688,8 @@ namespace {
       auto underlyingType = Type(O->getUnderlyingInterfaceType())
         .subst(*O->getUnderlyingTypeSubstitutions())
         ->getCanonicalType(sig);
-      
-      auto contextSig = O->getGenericSignature()
-        ? O->getGenericSignature()->getCanonicalSignature()
-        : CanGenericSignature();
+
+      auto contextSig = O->getGenericSignature().getCanonicalSignature();
 
       B.addRelativeAddress(IGM.getTypeRef(underlyingType, contextSig,
                                           MangledTypeRefRole::Metadata).first);
