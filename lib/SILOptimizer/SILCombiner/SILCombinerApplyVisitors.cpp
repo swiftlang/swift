@@ -261,6 +261,41 @@ static SILValue createKeypathStoredPropertyProjections(SILValue addr,
   return addr;
 }
 
+static SILValue createKeypathGettablePropertyProjections(KeyPathInst *keyPath,
+                                                         SILValue addr,
+                                                         SILValue valueAddr,
+                                                       SILLocation loc,
+                                                       BeginAccessInst *&beginAccess,
+                                                       SILBuilder &builder,
+                                                       const KeyPathPatternComponent& comp) {
+  assert(comp.getKind() == KeyPathPatternComponent::Kind::GettableProperty);
+  
+  if (!addr->getType().getStructOrBoundGenericStruct() &&
+      !addr->getType().getClassOrBoundGenericClass()) {
+    // This should never happen, as a stored-property pattern can only be
+    // applied to classes and structs. But to be safe - and future prove -
+    // let's handle this case and bail.
+    insertEndAccess(beginAccess, /*isModify*/ false, builder);
+    return SILValue();
+  }
+  
+  SingleValueInstruction *ref = builder.createLoad(loc, addr,
+                                     LoadOwnershipQualifier::Unqualified);
+  
+  insertEndAccess(beginAccess, /*isModify*/ false, builder);
+
+  SmallVector<SILValue, 4> args;
+  args.reserve(keyPath->getNumOperands());
+  for (auto &op : keyPath->getAllOperands()) {
+    args.push_back(op.get());
+  }
+  args.push_back(ref);
+  
+  auto *getter = comp.getComputedPropertyId().getFunction();
+  auto *getterFuncRef = builder.createFunctionRef(loc, getter);
+  return builder.createApply(loc, getterFuncRef, SubstitutionMap{}, args);
+}
+
 /// Creates the projection pattern for a keypath instruction.
 ///
 /// Currently only the StoredProperty pattern is handled.
@@ -269,6 +304,7 @@ static SILValue createKeypathStoredPropertyProjections(SILValue addr,
 /// Returns false if \p keyPath is not a keypath instruction or if there is any
 /// other reason why the optimization cannot be done.
 static SILValue createKeypathProjections(SILValue keyPath, SILValue root,
+                                         SILValue valueAddr,
                                          SILLocation loc,
                                          BeginAccessInst *&beginAccess,
                                          SILBuilder &builder) {
@@ -289,6 +325,12 @@ static SILValue createKeypathProjections(SILValue keyPath, SILValue root,
       case KeyPathPatternComponent::Kind::StoredProperty:
         addr = createKeypathStoredPropertyProjections(addr, loc, beginAccess,
                                                       builder, comp);
+        break;
+      case KeyPathPatternComponent::Kind::GettableProperty:
+        addr = createKeypathGettablePropertyProjections(cast<KeyPathInst>(keyPath),
+                                                        addr, valueAddr,
+                                                        loc, beginAccess,
+                                                        builder, comp);
         break;
       default:
         return SILValue();
@@ -332,19 +374,26 @@ bool SILCombiner::tryOptimizeKeypath(ApplyInst *AI) {
   }
 
   BeginAccessInst *beginAccess = nullptr;
-  SILValue projectedAddr = createKeypathProjections(keyPath, rootAddr,
+  SILValue projectedAddr = createKeypathProjections(keyPath, rootAddr, valueAddr,
                                                     AI->getLoc(), beginAccess,
                                                     Builder);
   if (!projectedAddr)
     return false;
 
-  if (isModify) {
-    Builder.createCopyAddr(AI->getLoc(), valueAddr, projectedAddr,
-                           IsTake, IsNotInitialization);
+  if (projectedAddr->getType().isAddress()) {
+    if (isModify) {
+      Builder.createCopyAddr(AI->getLoc(), valueAddr, projectedAddr,
+                             IsTake, IsNotInitialization);
+    } else {
+      Builder.createCopyAddr(AI->getLoc(), projectedAddr, valueAddr,
+                             IsNotTake, IsInitialization);
+    }
   } else {
-    Builder.createCopyAddr(AI->getLoc(), projectedAddr, valueAddr,
-                           IsNotTake, IsInitialization);
+    assert(valueAddr->getType().isAddress());
+    Builder.createStore(AI->getLoc(), projectedAddr, valueAddr,
+                        StoreOwnershipQualifier::Unqualified);
   }
+
   insertEndAccess(beginAccess, isModify, Builder);
   eraseInstFromFunction(*AI);
   ++NumOptimizedKeypaths;
@@ -392,7 +441,7 @@ bool SILCombiner::tryOptimizeInoutKeypath(BeginApplyInst *AI) {
     return false;
 
   BeginAccessInst *beginAccess = nullptr;
-  SILValue projectedAddr = createKeypathProjections(keyPath, rootAddr,
+  SILValue projectedAddr = createKeypathProjections(keyPath, rootAddr, nullptr,
                                                     AI->getLoc(), beginAccess,
                                                     Builder);
   if (!projectedAddr)
