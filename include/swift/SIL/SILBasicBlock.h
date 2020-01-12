@@ -20,6 +20,7 @@
 #include "swift/Basic/Compiler.h"
 #include "swift/Basic/Range.h"
 #include "swift/SIL/SILArgumentArrayRef.h"
+#include "swift/SIL/SILArgumentKind.h"
 #include "swift/SIL/SILInstruction.h"
 
 namespace swift {
@@ -205,60 +206,56 @@ public:
   /// Erase a specific argument from the arg list.
   void eraseArgument(int Index);
 
-  /// Allocate a new argument of type \p Ty and append it to the argument
-  /// list. Optionally you can pass in a value decl parameter.
-  SILFunctionArgument *createFunctionArgument(SILType Ty,
-                                              const ValueDecl *D = nullptr,
-                                              bool disableEntryBlockVerification = false);
+  SILFunctionArgument *
+  createFunctionArgument(SILType type, const ValueDecl *decl = nullptr,
+                         bool disableEntryBlockVerification = false);
 
-  SILFunctionArgument *insertFunctionArgument(unsigned Index, SILType Ty,
-                                              ValueOwnershipKind OwnershipKind,
-                                              const ValueDecl *D = nullptr) {
-    arg_iterator Pos = ArgumentList.begin();
-    std::advance(Pos, Index);
-    return insertFunctionArgument(Pos, Ty, OwnershipKind, D);
+  // Base creation routines for arguments.
+#define ARGUMENT_BOILERPLATE(CLASSNAME, PRETTYNAME)                            \
+  CLASSNAME *replace##PRETTYNAME(unsigned i, SILType type,                     \
+                                 ValueOwnershipKind kind,                      \
+                                 const ValueDecl *decl = nullptr) {            \
+    validateEntryBlock(SILArgumentKind::CLASSNAME);                            \
+    auto *newArg =                                                             \
+        replaceArgument(SILArgumentKind::CLASSNAME, i, type, kind, decl);      \
+    return reinterpret_cast<CLASSNAME *>(newArg);                              \
+  }                                                                            \
+  CLASSNAME *replace##PRETTYNAME##AndReplaceAllUses(                           \
+      unsigned i, SILType type, ValueOwnershipKind kind,                       \
+      const ValueDecl *decl = nullptr) {                                       \
+    validateEntryBlock(SILArgumentKind::CLASSNAME);                            \
+    auto *newArg = replaceArgumentAndReplaceAllUses(                           \
+        SILArgumentKind::CLASSNAME, i, type, kind, decl);                      \
+    return reinterpret_cast<CLASSNAME *>(newArg);                              \
+  }                                                                            \
+  CLASSNAME *create##PRETTYNAME(SILType type,                                  \
+                                ValueOwnershipKind ownershipKind,              \
+                                const ValueDecl *decl = nullptr,               \
+                                bool disableEntryBlockVerification = false) {  \
+    validateEntryBlock(SILArgumentKind::CLASSNAME,                             \
+                       disableEntryBlockVerification);                         \
+    auto *newArg =                                                             \
+        createArgument(SILArgumentKind::CLASSNAME, type, ownershipKind, decl); \
+    return reinterpret_cast<CLASSNAME *>(newArg);                              \
+  }                                                                            \
+  CLASSNAME *insert##PRETTYNAME(arg_iterator insertPt, SILType type,           \
+                                ValueOwnershipKind ownershipKind,              \
+                                const ValueDecl *decl = nullptr) {             \
+    validateEntryBlock(SILArgumentKind::CLASSNAME);                            \
+    auto *newArg = insertArgument(SILArgumentKind::CLASSNAME, insertPt, type,  \
+                                  ownershipKind, decl);                        \
+    return reinterpret_cast<CLASSNAME *>(newArg);                              \
+  }                                                                            \
+  CLASSNAME *insert##PRETTYNAME(unsigned index, SILType type,                  \
+                                ValueOwnershipKind ownershipKind,              \
+                                const ValueDecl *decl = nullptr) {             \
+    validateEntryBlock(SILArgumentKind::CLASSNAME);                            \
+    arg_iterator insertPt = std::next(args_begin(), index);                    \
+    return insert##PRETTYNAME(insertPt, type, ownershipKind, decl);            \
   }
-
-  /// Replace the \p{i}th Function arg with a new Function arg with SILType \p
-  /// Ty and ValueDecl \p D.
-  SILFunctionArgument *replaceFunctionArgument(unsigned i, SILType Ty,
-                                               ValueOwnershipKind Kind,
-                                               const ValueDecl *D = nullptr);
-
-  /// Replace the \p{i}th BB arg with a new BBArg with SILType \p Ty and
-  /// ValueDecl \p D.
-  ///
-  /// NOTE: This assumes that the current argument in position \p i has had its
-  /// uses eliminated. To replace/replace all uses with, use
-  /// replacePhiArgumentAndRAUW.
-  SILPhiArgument *replacePhiArgument(unsigned i, SILType type,
-                                     ValueOwnershipKind kind,
-                                     const ValueDecl *decl = nullptr);
-
-  /// Replace phi argument \p i and RAUW all uses.
-  SILPhiArgument *
-  replacePhiArgumentAndReplaceAllUses(unsigned i, SILType type,
-                                      ValueOwnershipKind kind,
-                                      const ValueDecl *decl = nullptr);
-
-  /// Allocate a new argument of type \p Ty and append it to the argument
-  /// list. Optionally you can pass in a value decl parameter.
-  SILPhiArgument *createPhiArgument(SILType Ty, ValueOwnershipKind Kind,
-                                    const ValueDecl *D = nullptr);
-
-  /// Insert a new SILPhiArgument with type \p Ty and \p Decl at position \p
-  /// Pos.
-  SILPhiArgument *insertPhiArgument(arg_iterator Pos, SILType Ty,
-                                    ValueOwnershipKind Kind,
-                                    const ValueDecl *D = nullptr);
-
-  SILPhiArgument *insertPhiArgument(unsigned Index, SILType Ty,
-                                    ValueOwnershipKind Kind,
-                                    const ValueDecl *D = nullptr) {
-    arg_iterator Pos = ArgumentList.begin();
-    std::advance(Pos, Index);
-    return insertPhiArgument(Pos, Ty, Kind, D);
-  }
+  ARGUMENT_BOILERPLATE(SILFunctionArgument, FunctionArgument)
+  ARGUMENT_BOILERPLATE(SILPhiArgument, PhiArgument)
+#undef ARGUMENT_BOILERPLATE
 
   /// Remove all block arguments.
   void dropAllArguments() { ArgumentList.clear(); }
@@ -423,11 +420,44 @@ private:
     ArgumentList.insert(Iter, Arg);
   }
 
-  /// Insert a new SILFunctionArgument with type \p Ty and \p Decl at position
-  /// \p Pos.
-  SILFunctionArgument *insertFunctionArgument(arg_iterator Pos, SILType Ty,
-                                              ValueOwnershipKind OwnershipKind,
-                                              const ValueDecl *D = nullptr);
+  //===---
+  // PImpl Declarations for creating arguments.
+  //
+
+  /// Replace the \p{i}th BB arg with a new BBArg with SILType \p Ty and
+  /// ValueDecl \p D.
+  ///
+  /// NOTE: This assumes that the current argument in position \p i has had its
+  /// uses eliminated. To replace/replace all uses with, use
+  /// replaceArgumentAndRAUW.
+  SILArgument *replaceArgument(SILArgumentKind argKind, unsigned i,
+                               SILType type, ValueOwnershipKind kind,
+                               const ValueDecl *decl = nullptr);
+
+  /// Replace phi argument \p i and RAUW all uses.
+  SILArgument *
+  replaceArgumentAndReplaceAllUses(SILArgumentKind argKind, unsigned i,
+                                   SILType type, ValueOwnershipKind kind,
+                                   const ValueDecl *decl = nullptr);
+
+  /// Allocate a new argument of type \p Ty and append it to the argument
+  /// list. Optionally you can pass in a value decl parameter.
+  SILArgument *createArgument(SILArgumentKind argKind, SILType type,
+                              ValueOwnershipKind ownershipKind,
+                              const ValueDecl *decl = nullptr);
+
+  /// Insert a new SILArgument with type \p Ty and \p Decl at
+  /// position \p Pos.
+  SILArgument *insertArgument(SILArgumentKind argKind, arg_iterator insertPt,
+                              SILType type, ValueOwnershipKind ownershipKind,
+                              const ValueDecl *decl = nullptr);
+
+  template <typename... ArgTys>
+  SILArgument *constructArgumentInternal(SILArgumentKind argKind,
+                                         ArgTys &&... argTys);
+
+  void validateEntryBlock(SILArgumentKind kind,
+                          bool disableEntryBlockVerification = false) const;
 };
 
 inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,

@@ -15,6 +15,7 @@
 
 #include "swift/Basic/Compiler.h"
 #include "swift/SIL/SILArgumentConvention.h"
+#include "swift/SIL/SILArgumentKind.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILValue.h"
 
@@ -36,30 +37,6 @@ SILFunctionConventions::getSILArgumentConvention(unsigned index) const {
     return SILArgumentConvention(param.getConvention());
   }
 }
-
-struct SILArgumentKind {
-  enum innerty : std::underlying_type<ValueKind>::type {
-#define ARGUMENT(ID, PARENT) ID = unsigned(SILNodeKind::ID),
-#define ARGUMENT_RANGE(ID, FIRST, LAST) First_##ID = FIRST, Last_##ID = LAST,
-#include "swift/SIL/SILNodes.def"
-  } value;
-
-  explicit SILArgumentKind(ValueKind kind)
-      : value(*SILArgumentKind::fromValueKind(kind)) {}
-  SILArgumentKind(innerty value) : value(value) {}
-  operator innerty() const { return value; }
-
-  static Optional<SILArgumentKind> fromValueKind(ValueKind kind) {
-    switch (kind) {
-#define ARGUMENT(ID, PARENT)                                                   \
-  case ValueKind::ID:                                                          \
-    return SILArgumentKind(ID);
-#include "swift/SIL/SILNodes.def"
-    default:
-      return None;
-    }
-  }
-};
 
 class SILArgument : public ValueBase {
   friend class SILBasicBlock;
