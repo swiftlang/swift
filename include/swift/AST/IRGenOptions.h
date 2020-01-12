@@ -255,7 +255,7 @@ public:
         DisableClangModuleSkeletonCUs(false), UseJIT(false),
         IntegratedREPL(false), DisableLLVMOptzns(false),
         DisableSwiftSpecificLLVMOptzns(false), DisableLLVMSLPVectorizer(false),
-        DisableFPElim(true), Playground(false), EmitStackPromotionChecks(false),
+        DisableFPElim(false), Playground(false), EmitStackPromotionChecks(false),
         FunctionSections(false), PrintInlineTree(false), EmbedMode(IRGenEmbedMode::None),
         HasValueNamesSetting(false), ValueNames(false),
         EnableReflectionMetadata(true), EnableReflectionNames(true),

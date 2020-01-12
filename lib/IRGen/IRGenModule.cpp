@@ -99,7 +99,7 @@ static clang::CodeGenerator *createClangCodeGenerator(ASTContext &Context,
   CGO.OptimizationLevel = Opts.shouldOptimize() ? 3 : 0;
   CGO.setFramePointer(Opts.DisableFPElim
                           ? clang::CodeGenOptions::FramePointerKind::All
-                          : clang::CodeGenOptions::FramePointerKind::None);
+                          : clang::CodeGenOptions::FramePointerKind::NonLeaf);
   CGO.DiscardValueNames = !Opts.shouldProvideValueNames();
   switch (Opts.DebugInfoLevel) {
   case IRGenDebugInfoLevel::None:
@@ -916,7 +916,7 @@ bool swift::irgen::shouldRemoveTargetFeature(StringRef feature) {
 
 void IRGenModule::setHasFramePointer(llvm::AttrBuilder &Attrs,
                                      bool HasFramePointer) {
-  Attrs.addAttribute("frame-pointer", HasFramePointer ? "all" : "none");
+  Attrs.addAttribute("frame-pointer", HasFramePointer ? "all" : "non-leaf");
 }
 
 void IRGenModule::setHasFramePointer(llvm::Function *F,
