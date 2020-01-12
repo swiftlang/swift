@@ -4855,6 +4855,61 @@ CanType swift::substOpaqueTypesWithUnderlyingTypes(CanType ty,
   return ty.subst(replacer, replacer, flags)->getCanonicalType();
 }
 
+Optional<TangentSpace>
+TypeBase::getAutoDiffTangentSpace(LookupConformanceFn lookupConformance) {
+  assert(lookupConformance);
+  auto &ctx = getASTContext();
+
+  Type cacheKey = this;
+  auto lookup = ctx.AutoDiffTangentSpaces.find(cacheKey);
+  if (lookup != ctx.AutoDiffTangentSpaces.end())
+    return lookup->getSecond();
+  auto cache = [&](Optional<TangentSpace> tangentSpace) {
+    ctx.AutoDiffTangentSpaces.insert({cacheKey, tangentSpace});
+    return tangentSpace;
+  };
+
+  // For tuple types: the tangent space is a tuple of the elements'  tangent
+  // space types, for the elements that have a tangent space.
+  if (auto *tupleTy = getAs<TupleType>()) {
+    SmallVector<TupleTypeElt, 8> newElts;
+    for (auto elt : tupleTy->getElements()) {
+      auto eltSpace = elt.getType()->getAutoDiffTangentSpace(lookupConformance);
+      if (!eltSpace)
+        continue;
+      newElts.push_back(elt.getWithType(eltSpace->getType()));
+    }
+    if (newElts.empty())
+      return cache(
+          TangentSpace::getTuple(ctx.TheEmptyTupleType->castTo<TupleType>()));
+    if (newElts.size() == 1)
+      return cache(TangentSpace::getTangentVector(newElts.front().getType()));
+    auto *tupleType = TupleType::get(newElts, ctx)->castTo<TupleType>();
+    return cache(TangentSpace::getTuple(tupleType));
+  }
+
+  // For `Differentiable`-conforming types: the tangent space is the
+  // `TangentVector` associated type.
+  auto *differentiableProtocol =
+      ctx.getProtocol(KnownProtocolKind::Differentiable);
+  assert(differentiableProtocol && "`Differentiable` protocol not found");
+  auto associatedTypeLookup =
+      differentiableProtocol->lookupDirect(ctx.Id_TangentVector);
+  assert(associatedTypeLookup.size() == 1);
+  auto *dependentType = DependentMemberType::get(
+      differentiableProtocol->getDeclaredInterfaceType(),
+      cast<AssociatedTypeDecl>(associatedTypeLookup[0]));
+
+  // Try to get the `TangentVector` associated type of `base`.
+  // Return the associated type if it is valid.
+  auto assocTy = dependentType->substBaseType(this, lookupConformance);
+  if (!assocTy->hasError())
+    return cache(TangentSpace::getTangentVector(assocTy));
+
+  // Otherwise, there is no associated tangent space. Return `None`.
+  return cache(None);
+}
+
 CanSILFunctionType
 SILFunctionType::withSubstitutions(SubstitutionMap subs) const {
   return SILFunctionType::get(getSubstGenericSignature(),

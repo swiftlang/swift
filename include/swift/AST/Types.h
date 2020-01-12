@@ -1161,6 +1161,11 @@ public:
   /// object type.
   TypeTraitResult canBeClass();
 
+  /// Return the tangent space of the given type, if it exists. Otherwise,
+  /// return `None`.
+  Optional<TangentSpace>
+  getAutoDiffTangentSpace(LookupConformanceFn lookupConformance);
+
 private:
   // Make vanilla new/delete illegal for Types.
   void *operator new(size_t Bytes) throw() = delete;
