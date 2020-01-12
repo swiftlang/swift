@@ -89,7 +89,7 @@ protected:
 
 public:
   void operator=(const SILArgument &) = delete;
-  void operator delete(void *, size_t) SWIFT_DELETE_OPERATOR_DELETED;
+  void operator delete(void *, size_t) = delete;
 
   ValueOwnershipKind getOwnershipKind() const {
     return static_cast<ValueOwnershipKind>(Bits.SILArgument.VOKind);

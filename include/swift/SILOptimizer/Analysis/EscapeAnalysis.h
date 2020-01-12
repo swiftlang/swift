@@ -1009,12 +1009,12 @@ private:
   /// If EscapeAnalysis should consider the given value to be a derived address
   /// or pointer based on one of its address or pointer operands, then return
   /// that operand value. Otherwise, return an invalid value.
-  SILValue getPointerBase(SILValue value) const;
+  SILValue getPointerBase(SILValue value);
 
   /// Recursively find the given value's pointer base. If the value cannot be
   /// represented in EscapeAnalysis as one of its operands, then return the same
   /// value.
-  SILValue getPointerRoot(SILValue value) const;
+  SILValue getPointerRoot(SILValue value);
 
   PointerKind findRecursivePointerKind(SILType Ty, const SILFunction &F) const;
 
@@ -1055,7 +1055,31 @@ private:
   void buildConnectionGraph(FunctionInfo *FInfo, FunctionOrder &BottomUpOrder,
                             int RecursionDepth);
 
-  bool createArrayUninitializedSubgraph(FullApplySite apply,
+  // @_semantics("array.uninitialized") takes a reference to the storage and
+  // returns an instantiated array struct and unsafe pointer to the elements.
+  struct ArrayUninitCall {
+    SILValue arrayStorageRef;
+    TupleExtractInst *arrayStruct = nullptr;
+    TupleExtractInst *arrayElementPtr = nullptr;
+
+    bool isValid() const {
+      return arrayStorageRef && arrayStruct && arrayElementPtr;
+    }
+  };
+
+  /// If \p ai is an optimizable @_semantics("array.uninitialized") call, return
+  /// valid call information.
+  ArrayUninitCall canOptimizeArrayUninitializedCall(ApplyInst *ai,
+                                                    ConnectionGraph *conGraph);
+
+  /// Return true of this tuple_extract is the result of an optimizable
+  /// @_semantics("array.uninitialized") call.
+  bool canOptimizeArrayUninitializedResult(TupleExtractInst *tei);
+
+  /// Handle a call to "@_semantics(array.uninitialized") precisely by mapping
+  /// each call result to a separate graph node and relating them to the
+  /// argument.
+  void createArrayUninitializedSubgraph(ArrayUninitCall call,
                                         ConnectionGraph *conGraph);
 
   /// Updates the graph by analyzing instruction \p I.

@@ -2818,7 +2818,7 @@ ParserResult<Expr> Parser::parseExprClosure() {
     // FIXME: We could do this all the time, and then provide Fix-Its
     // to map $i -> the appropriately-named argument. This might help
     // users who are refactoring code by adding names.
-    AnonClosureVars.push_back({ leftBrace, {}});
+    AnonClosureVars.push_back({{}, leftBrace});
   }
   
   // Add capture list variables to scope.
@@ -2842,7 +2842,7 @@ ParserResult<Expr> Parser::parseExprClosure() {
   // anonymous closure arguments.
   if (!params) {
     // Create a parameter pattern containing the anonymous variables.
-    auto &anonVars = AnonClosureVars.back().second;
+    auto &anonVars = AnonClosureVars.back().Item;
     SmallVector<ParamDecl*, 4> elements;
     for (auto anonVar : anonVars)
       elements.push_back(anonVar);
@@ -2955,8 +2955,8 @@ Expr *Parser::parseExprAnonClosureArg() {
     }
   }
 
-  auto leftBraceLoc = AnonClosureVars.back().first;
-  auto &decls = AnonClosureVars.back().second;
+  auto leftBraceLoc = AnonClosureVars.back().Loc;
+  auto &decls = AnonClosureVars.back().Item;
   while (ArgNo >= decls.size()) {
     unsigned nextIdx = decls.size();
     SmallVector<char, 4> StrBuf;

@@ -340,7 +340,7 @@ struct ModuleRebuildInfo {
 /// normal cache, the prebuilt cache, a module adjacent to the interface, or
 /// a module that we'll build from a module interface.
 class ModuleInterfaceLoaderImpl {
-  using AccessPathElem = std::pair<Identifier, SourceLoc>;
+  using AccessPathElem = Located<Identifier>;
   friend class swift::ModuleInterfaceLoader;
   ASTContext &ctx;
   llvm::vfs::FileSystem &fs;
@@ -1020,10 +1020,10 @@ std::error_code ModuleInterfaceLoader::findModuleFilesInDirectory(
   }
 
   // Create an instance of the Impl to do the heavy lifting.
-  auto ModuleName = ModuleID.first.str();
+  auto ModuleName = ModuleID.Item.str();
   ModuleInterfaceLoaderImpl Impl(
                 Ctx, ModPath, InPath, ModuleName,
-                CacheDir, PrebuiltCacheDir, ModuleID.second,
+                CacheDir, PrebuiltCacheDir, ModuleID.Loc,
                 RemarkOnRebuildFromInterface, dependencyTracker,
                 llvm::is_contained(PreferInterfaceForModules,
                                    ModuleName) ?

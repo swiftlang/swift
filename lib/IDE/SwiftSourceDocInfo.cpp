@@ -177,7 +177,7 @@ bool NameMatcher::handleCustomAttrs(Decl *D) {
       // CustomAttr's type, e.g. on `Wrapper` in `@Wrapper(wrappedValue: 10)`.
       SWIFT_DEFER { CustomAttrArg = None; };
       if (Arg && !Arg->isImplicit())
-        CustomAttrArg = {Repr->getLoc(), Arg};
+        CustomAttrArg = Located<Expr*>(Arg, Repr->getLoc());
       if (!Repr->walk(*this))
         return false;
     }
@@ -246,7 +246,7 @@ bool NameMatcher::walkToDeclPre(Decl *D) {
     }
   } else if (ImportDecl *ID = dyn_cast<ImportDecl>(D)) {
     for(const ImportDecl::AccessPathElement &Element: ID->getFullAccessPath()) {
-      tryResolve(ASTWalker::ParentTy(D), Element.second);
+      tryResolve(ASTWalker::ParentTy(D), Element.Loc);
       if (isDone())
         break;
     }
@@ -416,9 +416,9 @@ bool NameMatcher::walkToTypeReprPre(TypeRepr *T) {
   if (isa<ComponentIdentTypeRepr>(T)) {
     // If we're walking a CustomAttr's type we may have an associated call
     // argument to resolve with from its semantic initializer.
-    if (CustomAttrArg.hasValue() && CustomAttrArg->first == T->getLoc()) {
+    if (CustomAttrArg.hasValue() && CustomAttrArg->Loc == T->getLoc()) {
       tryResolve(ASTWalker::ParentTy(T), T->getLoc(), LabelRangeType::CallArg,
-                 getCallArgLabelRanges(getSourceMgr(), CustomAttrArg->second, LabelRangeEndAt::BeforeElemStart));
+                 getCallArgLabelRanges(getSourceMgr(), CustomAttrArg->Item, LabelRangeEndAt::BeforeElemStart));
     } else {
       tryResolve(ASTWalker::ParentTy(T), T->getLoc());
     }

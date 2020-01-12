@@ -18,7 +18,7 @@ extension P {
 extension P where Self: FloatingPoint {
   @differentiable
   func hello(_ x: Float) -> Self {
-    .init(x)
+    .init(x: x)
   }
 }
 

@@ -1855,6 +1855,9 @@ bool ContextualFailure::diagnoseAsError() {
                      getFromType(), getToType());
       return true;
     }
+    
+    if (diagnoseCoercionToUnrelatedType())
+      return true;
 
     return false;
   }
@@ -2222,6 +2225,28 @@ bool ContextualFailure::diagnoseMissingFunctionCall() const {
   return true;
 }
 
+bool ContextualFailure::diagnoseCoercionToUnrelatedType() const {
+  auto *anchor = getAnchor();
+  
+  if (auto *coerceExpr = dyn_cast<CoerceExpr>(anchor)) {
+    auto fromType = getFromType();
+    auto toType = getType(coerceExpr->getCastTypeLoc());
+    auto diagnostic =
+        getDiagnosticFor(CTP_CoerceOperand,
+                         /*forProtocol=*/toType->isAnyExistentialType());
+    
+    auto diag =
+        emitDiagnostic(anchor->getLoc(), *diagnostic, fromType, toType);
+    diag.highlight(anchor->getSourceRange());
+
+    (void)tryFixIts(diag);
+    
+    return true;
+  }
+
+  return false;
+}
+
 bool ContextualFailure::diagnoseConversionToBool() const {
   auto toType = getToType();
   if (!toType->isBool())
@@ -2567,6 +2592,10 @@ bool ContextualFailure::trySequenceSubsequenceFixIts(
   if (getFromType()->isEqual(Substring)) {
     if (getToType()->isEqual(String)) {
       auto *anchor = getAnchor()->getSemanticsProvidingExpr();
+      if (auto *CE = dyn_cast<CoerceExpr>(anchor)) {
+        anchor = CE->getSubExpr();
+      }
+      
       auto range = anchor->getSourceRange();
       diagnostic.fixItInsert(range.Start, "String(");
       diagnostic.fixItInsertAfter(range.End, ")");

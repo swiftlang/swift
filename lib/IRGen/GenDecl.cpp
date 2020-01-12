@@ -1107,7 +1107,7 @@ void IRGenModule::finishEmitAfterTopLevel() {
   if (DebugInfo) {
     if (ModuleDecl *TheStdlib = Context.getStdlibModule()) {
       if (TheStdlib != getSwiftModule()) {
-        std::pair<swift::Identifier, swift::SourceLoc> AccessPath[] = {
+        Located<swift::Identifier> AccessPath[] = {
           { Context.StdlibModuleName, swift::SourceLoc() }
         };
 

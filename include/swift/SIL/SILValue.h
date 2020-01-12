@@ -591,6 +591,9 @@ public:
   Operand(const Operand &use) = delete;
   Operand &operator=(const Operand &use) = delete;
 
+  Operand(Operand &&) = default;
+  Operand &operator=(Operand &&) = default;
+
   /// Return the current value being used by this operand.
   SILValue get() const { return TheValue; }
 

@@ -1889,14 +1889,25 @@ DeclContext *ModuleFile::getLocalDeclContext(LocalDeclContextID DCID) {
 }
 
 DeclContext *ModuleFile::getDeclContext(DeclContextID DCID) {
+  auto deserialized = getDeclContextChecked(DCID);
+  if (!deserialized) {
+    fatal(deserialized.takeError());
+  }
+  return deserialized.get();
+}
+
+Expected<DeclContext *> ModuleFile::getDeclContextChecked(DeclContextID DCID) {
   if (!DCID)
     return FileContext;
 
   if (Optional<LocalDeclContextID> contextID = DCID.getAsLocalDeclContextID())
     return getLocalDeclContext(contextID.getValue());
 
-  auto D = getDecl(DCID.getAsDeclID().getValue());
+  auto deserialized = getDeclChecked(DCID.getAsDeclID().getValue());
+  if (!deserialized)
+    return deserialized.takeError();
 
+  auto D = deserialized.get();
   if (auto GTD = dyn_cast<GenericTypeDecl>(D))
     return GTD;
   if (auto ED = dyn_cast<ExtensionDecl>(D))
@@ -2245,7 +2256,8 @@ Decl *ModuleFile::getDecl(DeclID DID) {
 }
 
 /// Used to split up methods that would otherwise live in ModuleFile.
-class swift::DeclDeserializer {
+namespace swift {
+class DeclDeserializer {
   template <typename T>
   using Serialized = ModuleFile::Serialized<T>;
   using TypeID = serialization::TypeID;
@@ -3441,6 +3453,7 @@ public:
     DeclContextID contextID;
     bool isImplicit, isObjC;
     bool inheritsSuperclassInitializers;
+    bool hasMissingDesignatedInits;
     GenericSignatureID genericSigID;
     TypeID superclassID;
     uint8_t rawAccessLevel;
@@ -3449,6 +3462,7 @@ public:
     decls_block::ClassLayout::readRecord(scratch, nameID, contextID,
                                          isImplicit, isObjC,
                                          inheritsSuperclassInitializers,
+                                         hasMissingDesignatedInits,
                                          genericSigID, superclassID,
                                          rawAccessLevel, numConformances,
                                          numInheritedTypes,
@@ -3491,6 +3505,8 @@ public:
     theClass->setSuperclass(MF.getType(superclassID));
     ctx.evaluator.cacheOutput(InheritsSuperclassInitializersRequest{theClass},
                               std::move(inheritsSuperclassInitializers));
+    ctx.evaluator.cacheOutput(HasMissingDesignatedInitializersRequest{theClass},
+                              std::move(hasMissingDesignatedInits));
 
     handleInherited(theClass,
                     rawInheritedAndDependencyIDs.slice(0, numInheritedTypes));
@@ -3522,7 +3538,6 @@ public:
                                         numConformances, numInherited,
                                         rawInheritedAndDependencyIDs);
 
-    auto DC = MF.getDeclContext(contextID);
     if (declOrOffset.isComplete())
       return declOrOffset;
 
@@ -3535,6 +3550,11 @@ public:
             name, takeErrorInfo(dependency.takeError()));
       }
     }
+
+    auto DCOrError = MF.getDeclContextChecked(contextID);
+    if (!DCOrError)
+      return DCOrError.takeError();
+    auto DC = DCOrError.get();
 
     auto genericParams = MF.maybeReadGenericParams(DC);
     if (declOrOffset.isComplete())
@@ -3899,6 +3919,7 @@ public:
     return dtor;
   }
 };
+}
 
 Expected<Decl *>
 ModuleFile::getDeclChecked(
@@ -4654,7 +4675,8 @@ Type ModuleFile::getType(TypeID TID) {
   return deserialized.get();
 }
 
-class swift::TypeDeserializer {
+namespace swift {
+class TypeDeserializer {
   using TypeID = serialization::TypeID;
 
   ModuleFile &MF;
@@ -5454,6 +5476,7 @@ public:
     return UnboundGenericType::get(genericDecl, parentTy, ctx);
   }
 };
+}
 
 Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
   if (TID == 0)
@@ -5550,7 +5573,8 @@ Decl *handleErrorAndSupplyMissingClassMember(ASTContext &context,
   Decl *suppliedMissingMember = nullptr;
   auto handleMissingClassMember = [&](const DeclDeserializationError &error) {
     if (error.isDesignatedInitializer())
-      containingClass->setHasMissingDesignatedInitializers();
+      context.evaluator.cacheOutput(
+          HasMissingDesignatedInitializersRequest{containingClass}, true);
     if (error.getNumberOfVTableEntries() > 0)
       containingClass->setHasMissingVTableEntries();
 

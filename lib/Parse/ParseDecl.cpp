@@ -2806,8 +2806,7 @@ bool Parser::parseConventionAttributeInternal(
       return true;
     }
     if (auto ty = getStringLiteralIfNotInterpolated(Tok.getLoc(), "(C type)")) {
-      convention.ClangType = ty.getValue();
-      convention.ClangTypeLoc = Tok.getLoc();
+      convention.ClangType = { ty.getValue(), Tok.getLoc() };
     }
     consumeToken(tok::string_literal);
   }
@@ -4226,7 +4225,7 @@ ParserResult<ImportDecl> Parser::parseDeclImport(ParseDeclOptions Flags,
     KindLoc = consumeToken();
   }
 
-  std::vector<std::pair<Identifier, SourceLoc>> ImportPath;
+  std::vector<Located<Identifier>> ImportPath;
   bool HasNext;
   do {
     SyntaxParsingContext AccessCompCtx(SyntaxContext,
@@ -4238,8 +4237,8 @@ ParserResult<ImportDecl> Parser::parseDeclImport(ParseDeclOptions Flags,
       }
       return makeParserCodeCompletionStatus();
     }
-    ImportPath.push_back(std::make_pair(Identifier(), Tok.getLoc()));
-    if (parseAnyIdentifier(ImportPath.back().first,
+    ImportPath.push_back({Identifier(), Tok.getLoc()});
+    if (parseAnyIdentifier(ImportPath.back().Item,
                            diag::expected_identifier_in_decl, "import"))
       return nullptr;
     HasNext = consumeIf(tok::period);
@@ -4252,8 +4251,8 @@ ParserResult<ImportDecl> Parser::parseDeclImport(ParseDeclOptions Flags,
     // We omit the code completion token if it immediately follows the module
     // identifiers.
     auto BufferId = SourceMgr.getCodeCompletionBufferID();
-    auto IdEndOffset = SourceMgr.getLocOffsetInBuffer(ImportPath.back().second,
-      BufferId) + ImportPath.back().first.str().size();
+    auto IdEndOffset = SourceMgr.getLocOffsetInBuffer(ImportPath.back().Loc,
+      BufferId) + ImportPath.back().Item.str().size();
     auto CCTokenOffset = SourceMgr.getLocOffsetInBuffer(SourceMgr.
       getCodeCompletionLoc(), BufferId);
     if (IdEndOffset == CCTokenOffset) {
@@ -4262,7 +4261,7 @@ ParserResult<ImportDecl> Parser::parseDeclImport(ParseDeclOptions Flags,
   }
 
   if (Kind != ImportKind::Module && ImportPath.size() == 1) {
-    diagnose(ImportPath.front().second, diag::decl_expected_module_name);
+    diagnose(ImportPath.front().Loc, diag::decl_expected_module_name);
     return nullptr;
   }
 

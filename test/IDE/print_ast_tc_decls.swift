@@ -452,7 +452,7 @@ class d0120_TestClassBase {
 }
 
 class d0121_TestClassDerived : d0120_TestClassBase {
-// PASS_COMMON-LABEL: {{^}}class d0121_TestClassDerived : d0120_TestClassBase {{{$}}
+// PASS_COMMON-LABEL: {{^}}@_inheritsConvenienceInitializers {{()?}}class d0121_TestClassDerived : d0120_TestClassBase {{{$}}
 
   required init() { super.init() }
 // PASS_COMMON-NEXT: {{^}}  required init(){{$}}
@@ -611,8 +611,8 @@ struct d0200_EscapedIdentifiers {
 // PASS_ONE_LINE_TYPEREPR-DAG: {{^}}  typealias `protocol` = `class`{{$}}
 
   class `extension` : `class` {}
-// PASS_ONE_LINE_TYPE-DAG: {{^}}  class `extension` : d0200_EscapedIdentifiers.`class` {{{$}}
-// PASS_ONE_LINE_TYPEREPR-DAG: {{^}}  class `extension` : `class` {{{$}}
+// PASS_ONE_LINE_TYPE-DAG: {{^}}  @_inheritsConvenienceInitializers class `extension` : d0200_EscapedIdentifiers.`class` {{{$}}
+// PASS_ONE_LINE_TYPEREPR-DAG: {{^}}  @_inheritsConvenienceInitializers class `extension` : `class` {{{$}}
 // PASS_COMMON:      {{^}}    @objc deinit{{$}}
 // PASS_COMMON-NEXT: {{^}}    {{(override )?}}init(){{$}}
 // PASS_COMMON-NEXT: {{^}}  }{{$}}
@@ -748,7 +748,7 @@ class d0260_ExplodePattern_TestClassBase {
 }
 
 class d0261_ExplodePattern_TestClassDerived : d0260_ExplodePattern_TestClassBase {
-// PASS_EXPLODE_PATTERN-LABEL: {{^}}class d0261_ExplodePattern_TestClassDerived : d0260_ExplodePattern_TestClassBase {{{$}}
+// PASS_EXPLODE_PATTERN-LABEL: {{^}}@_inheritsConvenienceInitializers class d0261_ExplodePattern_TestClassDerived : d0260_ExplodePattern_TestClassBase {{{$}}
 
   override final var baseProp2: Int {
     get {
@@ -791,13 +791,13 @@ class ClassWithInheritance2 : FooProtocol, BarProtocol {}
 // PASS_ONE_LINE-DAG: {{^}}class ClassWithInheritance2 : FooProtocol, BarProtocol {{{$}}
 
 class ClassWithInheritance3 : FooClass {}
-// PASS_ONE_LINE-DAG: {{^}}class ClassWithInheritance3 : FooClass {{{$}}
+// PASS_ONE_LINE-DAG: {{^}}@_inheritsConvenienceInitializers class ClassWithInheritance3 : FooClass {{{$}}
 
 class ClassWithInheritance4 : FooClass, FooProtocol {}
-// PASS_ONE_LINE-DAG: {{^}}class ClassWithInheritance4 : FooClass, FooProtocol {{{$}}
+// PASS_ONE_LINE-DAG: {{^}}@_inheritsConvenienceInitializers class ClassWithInheritance4 : FooClass, FooProtocol {{{$}}
 
 class ClassWithInheritance5 : FooClass, FooProtocol, BarProtocol {}
-// PASS_ONE_LINE-DAG: {{^}}class ClassWithInheritance5 : FooClass, FooProtocol, BarProtocol {{{$}}
+// PASS_ONE_LINE-DAG: {{^}}@_inheritsConvenienceInitializers class ClassWithInheritance5 : FooClass, FooProtocol, BarProtocol {{{$}}
 
 class ClassWithInheritance6 : QuxProtocol, SubFooProtocol {
   typealias Qux = Int

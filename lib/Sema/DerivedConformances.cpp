@@ -221,17 +221,18 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
     }
 
     // Retrieve the requirement.
-    auto results = proto->lookupDirect(name);
     // SWIFT_ENABLE_TENSORFLOW
     // Filter requirements, if `filter` function is specified.
     if (filter) {
+      auto results = proto->lookupDirect(name);
       llvm::erase_if(results, [&](ValueDecl *v) {
         return !isa<ProtocolDecl>(v->getDeclContext()) ||
                !v->isProtocolRequirement() || !filter(v);
       });
+      return results.empty() ? nullptr : results.front();
     }
-    return results.empty() ? nullptr : results.front();
     // SWIFT_ENABLE_TENSORFLOW END
+    return proto->getSingleRequirement(name);
   };
 
   // Properties.

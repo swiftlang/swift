@@ -583,6 +583,8 @@ void swift::typeCheckPatternBinding(PatternBindingDecl *PBD,
   auto &Ctx = PBD->getASTContext();
   DiagnosticSuppression suppression(Ctx.Diags);
   (void)createTypeChecker(Ctx);
+  (void)evaluateOrDefault(
+      Ctx.evaluator, PatternBindingEntryRequest{PBD, bindingIndex}, nullptr);
   TypeChecker::typeCheckPatternBinding(PBD, bindingIndex);
 }
 

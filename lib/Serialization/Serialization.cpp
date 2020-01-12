@@ -930,7 +930,7 @@ static void flattenImportPath(const ModuleDecl::ImportedModule &import,
   outStream << '\0';
   assert(import.first.size() == 1 && "can only handle top-level decl imports");
   auto accessPathElem = import.first.front();
-  outStream << accessPathElem.first.str();
+  outStream << accessPathElem.Item.str();
 }
 
 uint64_t getRawModTimeOrHash(const SerializationOptions::FileDependency &dep) {
@@ -3178,9 +3178,7 @@ public:
     uint8_t rawAccessLevel =
       getRawStableAccessLevel(theClass->getFormalAccess());
 
-    bool inheritsSuperclassInitializers =
-        const_cast<ClassDecl *>(theClass)->
-          inheritsSuperclassInitializers();
+    auto mutableClass = const_cast<ClassDecl *>(theClass);
 
     unsigned abbrCode = S.DeclTypeAbbrCodes[ClassLayout::Code];
     ClassLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
@@ -3188,7 +3186,8 @@ public:
                             contextID.getOpaqueValue(),
                             theClass->isImplicit(),
                             theClass->isObjC(),
-                            inheritsSuperclassInitializers,
+                            mutableClass->inheritsSuperclassInitializers(),
+                            mutableClass->hasMissingDesignatedInitializers(),
                             S.addGenericSignatureRef(
                                              theClass->getGenericSignature()),
                             S.addTypeRef(theClass->getSuperclass()),
