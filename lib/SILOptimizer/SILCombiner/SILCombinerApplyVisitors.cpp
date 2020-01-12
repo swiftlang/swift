@@ -263,7 +263,6 @@ static SILValue createKeypathStoredPropertyProjections(SILValue addr,
 
 static SILValue createKeypathGettablePropertyProjections(KeyPathInst *keyPath,
                                                          SILValue addr,
-                                                         SILValue valueAddr,
                                                        SILLocation loc,
                                                        BeginAccessInst *&beginAccess,
                                                        SILBuilder &builder,
@@ -304,7 +303,6 @@ static SILValue createKeypathGettablePropertyProjections(KeyPathInst *keyPath,
 /// Returns false if \p keyPath is not a keypath instruction or if there is any
 /// other reason why the optimization cannot be done.
 static SILValue createKeypathProjections(SILValue keyPath, SILValue root,
-                                         SILValue valueAddr,
                                          SILLocation loc,
                                          BeginAccessInst *&beginAccess,
                                          SILBuilder &builder) {
@@ -328,8 +326,7 @@ static SILValue createKeypathProjections(SILValue keyPath, SILValue root,
         break;
       case KeyPathPatternComponent::Kind::GettableProperty:
         addr = createKeypathGettablePropertyProjections(cast<KeyPathInst>(keyPath),
-                                                        addr, valueAddr,
-                                                        loc, beginAccess,
+                                                        addr, loc, beginAccess,
                                                         builder, comp);
         break;
       default:
@@ -374,7 +371,7 @@ bool SILCombiner::tryOptimizeKeypath(ApplyInst *AI) {
   }
 
   BeginAccessInst *beginAccess = nullptr;
-  SILValue projectedAddr = createKeypathProjections(keyPath, rootAddr, valueAddr,
+  SILValue projectedAddr = createKeypathProjections(keyPath, rootAddr,
                                                     AI->getLoc(), beginAccess,
                                                     Builder);
   if (!projectedAddr)

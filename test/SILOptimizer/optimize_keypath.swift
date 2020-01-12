@@ -309,4 +309,45 @@ print("SimpleClass obj count: \(SimpleClass.numObjs)")
 // CHECK-OUTPUT: GenClass obj count: 0
 print("GenClass obj count: \(numGenClassObjs)")
 
+// Optimize subscript getter
+
+struct Sub {
+  public let x : Int
+  public subscript(y: Int, z: Int) -> Int { return x + y + z }
+  public subscript(y: Int) -> Int { return x + y }
+  public subscript() -> Int { return x }
+}
+
+// CHECK-LABEL: sil {{.*}}test_subscript_1
+// CHECK: bb0:
+// CHECK-NEXT: integer_literal $Builtin.Int64, 42
+// CHECK-NEXT: struct
+// CHECK-NEXT: return
+public func test_subscript_1() -> Int {
+  let v = Sub(x: 40)
+  let xKeyPath = \Sub.[1, 1]
+  return v[keyPath: xKeyPath]
+}
+
+// CHECK-LABEL: sil {{.*}}test_subscript_2
+// CHECK: bb0:
+// CHECK-NEXT: integer_literal $Builtin.Int64, 42
+// CHECK-NEXT: struct
+// CHECK-NEXT: return
+public func test_subscript_2() -> Int {
+  let v = Sub(x: 40)
+  let xKeyPath = \Sub.[2]
+  return v[keyPath: xKeyPath]
+}
+
+// CHECK-LABEL: sil {{.*}}test_subscript_3
+// CHECK: bb0:
+// CHECK-NEXT: integer_literal $Builtin.Int64, 42
+// CHECK-NEXT: struct
+// CHECK-NEXT: return
+public func test_subscript_3() -> Int {
+  let v = Sub(x: 42)
+  let xKeyPath = \Sub.[]
+  return v[keyPath: xKeyPath]
+}
 
