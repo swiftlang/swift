@@ -22,7 +22,7 @@ func consume<T>(_ t: T) {
 // TODO: Once prespecialization is done for generic arguments which are 
 //       themselves generic (Outer<Inner<Int>>, here), a direct reference to
 //       the prespecialized metadata should be emitted here.
-// CHECK:  [[TYPE:%[0-9]+]] = call %swift.type* @__swift_instantiateConcreteTypeFromMangledName({ i32, i32 }* @"$s4main5OuterVyAA5InnerVySiGGMD") #11
+// CHECK:  [[TYPE:%[0-9]+]] = call %swift.type* @__swift_instantiateConcreteTypeFromMangledName({ i32, i32 }* @"$s4main5OuterVyAA5InnerVySiGGMD")
 // CHECK:   call swiftcc void @"$s4main7consumeyyxlF"(%swift.opaque* noalias nocapture %{{[0-9]+}}, %swift.type* [[TYPE]])
 // CHECK: }
 func doit() {
