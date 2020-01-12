@@ -265,10 +265,6 @@ elseif(SWIFT_PRIMARY_VARIANT_SDK STREQUAL FREEBSD)
   # workaround for libatomic needing to be after object files for swiftCore.so
   list(APPEND swift_core_private_link_libraries
     ${SWIFTLIB_DIR}/clang/lib/freebsd/libclang_rt.builtins-${SWIFT_PRIMARY_VARIANT_ARCH}.a)
-elseif(SWIFT_PRIMARY_VARIANT_SDK STREQUAL LINUX)
-  if(SWIFT_BUILD_STATIC_STDLIB)
-    list(APPEND swift_core_private_link_libraries swiftImageInspectionShared)
-  endif()
 elseif(SWIFT_PRIMARY_VARIANT_SDK STREQUAL WINDOWS)
   list(APPEND swift_core_private_link_libraries shell32;DbgHelp)
 endif()
