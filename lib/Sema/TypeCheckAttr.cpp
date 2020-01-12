@@ -43,7 +43,7 @@ using namespace swift;
 // SWIFT_ENABLE_TENSORFLOW
 static llvm::cl::opt<bool> EnableExperimentalCrossFileDerivativeRegistration(
     "enable-experimental-cross-file-derivative-registration",
-    llvm::cl::init(false));
+    llvm::cl::init(false), llvm::cl::ZeroOrMore);
 
 namespace {
   /// This emits a diagnostic with a fixit to remove the attribute.
