@@ -675,10 +675,6 @@ void ReabstractionInfo::createSubstitutedAndSpecializedTypes() {
   Conversions.resize(NumArgs);
   TrivialArgs.resize(NumArgs);
 
-  CanGenericSignature CanSig;
-  if (SpecializedGenericSig)
-    CanSig = SpecializedGenericSig->getCanonicalSignature();
-
   SILFunctionConventions substConv(SubstitutedType, M);
 
   if (SubstitutedType->getNumDirectFormalResults() == 0) {
@@ -757,9 +753,7 @@ ReabstractionInfo::createSubstitutedType(SILFunction *OrigF,
     SpecializedGenericEnv = nullptr;
   }
 
-  CanGenericSignature CanSpecializedGenericSig;
-  if (SpecializedGenericSig)
-    CanSpecializedGenericSig = SpecializedGenericSig->getCanonicalSignature();
+  auto CanSpecializedGenericSig = SpecializedGenericSig.getCanonicalSignature();
 
   // First substitute concrete types into the existing function type.
   CanSILFunctionType FnTy;
@@ -1605,7 +1599,7 @@ void FunctionSignaturePartialSpecializer::
       CalleeGenericSig, CalleeGenericEnv, Requirements, M);
 
   if (GenPair.second) {
-    SpecializedGenericSig = GenPair.second->getCanonicalSignature();
+    SpecializedGenericSig = GenPair.second.getCanonicalSignature();
     SpecializedGenericEnv = GenPair.first;
   }
 
@@ -1646,7 +1640,7 @@ void FunctionSignaturePartialSpecializer::createSpecializedGenericSignature(
 
   auto GenPair = getSpecializedGenericEnvironmentAndSignature();
   if (GenPair.second) {
-    SpecializedGenericSig = GenPair.second->getCanonicalSignature();
+    SpecializedGenericSig = GenPair.second.getCanonicalSignature();
     SpecializedGenericEnv = GenPair.first;
     computeSpecializedInterfaceToCallerArchetypeMap();
   }

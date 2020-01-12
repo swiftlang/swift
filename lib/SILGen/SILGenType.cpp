@@ -623,7 +623,7 @@ SILFunction *SILGenModule::emitProtocolWitness(
   auto *genericEnv = witness.getSyntheticEnvironment();
   CanGenericSignature genericSig;
   if (genericEnv)
-    genericSig = genericEnv->getGenericSignature()->getCanonicalSignature();
+    genericSig = genericEnv->getGenericSignature().getCanonicalSignature();
 
   // The type of the witness thunk.
   auto reqtSubstTy = cast<AnyFunctionType>(
