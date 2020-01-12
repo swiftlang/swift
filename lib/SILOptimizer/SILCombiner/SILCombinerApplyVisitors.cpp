@@ -434,7 +434,7 @@ bool SILCombiner::tryOptimizeInoutKeypath(BeginApplyInst *AI) {
 
   BeginAccessInst *beginAccess = nullptr;
   SILValue projectedAddr = createKeypathProjections(
-      keyPath, rootAddr, nullptr, AI->getLoc(), beginAccess, Builder);
+      keyPath, rootAddr, AI->getLoc(), beginAccess, Builder);
   if (!projectedAddr)
     return false;
 
