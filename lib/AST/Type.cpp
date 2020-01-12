@@ -1193,7 +1193,7 @@ CanType TypeBase::computeCanonicalType() {
 
     CanGenericSignature genericSig;
     if (auto *genericFnTy = dyn_cast<GenericFunctionType>(this))
-      genericSig = genericFnTy->getGenericSignature()->getCanonicalSignature();
+      genericSig = genericFnTy->getGenericSignature().getCanonicalSignature();
 
     // Transform the parameter and result types.
     SmallVector<AnyFunctionType::Param, 8> canParams;
@@ -2570,8 +2570,8 @@ static bool matches(CanType t1, CanType t2, TypeMatchOptions matchMode,
   if (matchMode.contains(TypeMatchFlags::AllowCompatibleOpaqueTypeArchetypes))
     if (auto opaque1 = t1->getAs<OpaqueTypeArchetypeType>())
       if (auto opaque2 = t2->getAs<OpaqueTypeArchetypeType>())
-        return opaque1->getBoundSignature()->getCanonicalSignature() ==
-                   opaque2->getBoundSignature()->getCanonicalSignature() &&
+        return opaque1->getBoundSignature().getCanonicalSignature() ==
+                   opaque2->getBoundSignature().getCanonicalSignature() &&
                opaque1->getInterfaceType()->getCanonicalType()->matches(
                    opaque2->getInterfaceType()->getCanonicalType(), matchMode);
 
@@ -3526,7 +3526,7 @@ static Type substGenericFunctionType(GenericFunctionType *genericFnType,
     requirements.push_back(*substReqt);
   }
 
-  GenericSignature genericSig = GenericSignature();
+  GenericSignature genericSig;
   if (anySemanticChanges) {
     // If there were semantic changes, we need to build a new generic
     // signature.

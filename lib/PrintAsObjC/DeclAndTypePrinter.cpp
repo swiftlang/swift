@@ -1881,8 +1881,8 @@ private:
       assert(extension->getGenericParams()->size() ==
              extendedClass->getGenericParams()->size() &&
              "extensions with custom generic parameters?");
-      assert(extension->getGenericSignature()->getCanonicalSignature() ==
-             extendedClass->getGenericSignature()->getCanonicalSignature() &&
+      assert(extension->getGenericSignature().getCanonicalSignature() ==
+                 extendedClass->getGenericSignature().getCanonicalSignature() &&
              "constrained extensions or custom generic parameters?");
       type = extendedClass->getGenericEnvironment()->getSugaredType(type);
       decl = type->getDecl();

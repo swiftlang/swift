@@ -1828,9 +1828,8 @@ getEffectiveGenericSignature(AnyFunctionRef fn,
 static CanGenericSignature
 getCanonicalSignatureOrNull(GenericSignature sig) {
   if (!sig || sig->areAllParamsConcrete())
-      return nullptr;
-
-  return sig->getCanonicalSignature();
+    return nullptr;
+  return sig.getCanonicalSignature();
 }
 
 /// Get the type of a global variable accessor function, () -> RawPointer.

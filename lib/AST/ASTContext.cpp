@@ -1527,7 +1527,7 @@ static AllocationArena getArena(GenericSignature genericSig) {
 void ASTContext::registerGenericSignatureBuilder(
                                        GenericSignature sig,
                                        GenericSignatureBuilder &&builder) {
-  auto canSig = sig->getCanonicalSignature();
+  auto canSig = sig.getCanonicalSignature();
   auto arena = getArena(sig);
   auto &genericSignatureBuilders =
       getImpl().getArena(arena).GenericSignatureBuilders;
@@ -1566,12 +1566,12 @@ GenericSignatureBuilder *ASTContext::getOrCreateGenericSignatureBuilder(
   auto builderSig =
     builder->computeGenericSignature(SourceLoc(),
                                      /*allowConcreteGenericParams=*/true);
-  if (builderSig->getCanonicalSignature() != sig) {
+  if (builderSig.getCanonicalSignature() != sig) {
     llvm::errs() << "ERROR: generic signature builder is not idempotent.\n";
     llvm::errs() << "Original generic signature   : ";
     sig->print(llvm::errs());
     llvm::errs() << "\nReprocessed generic signature: ";
-    auto reprocessedSig = builderSig->getCanonicalSignature();
+    auto reprocessedSig = builderSig.getCanonicalSignature();
 
     reprocessedSig->print(llvm::errs());
     llvm::errs() << "\n";
@@ -3279,9 +3279,9 @@ SILFunctionType::SILFunctionType(
             "types and substitutions");
         
   if (substitutions) {
-    assert(substitutions.getGenericSignature()->getCanonicalSignature()
-             == genericSig->getCanonicalSignature()
-           && "substitutions must match generic signature");
+    assert(substitutions.getGenericSignature().getCanonicalSignature() ==
+               genericSig.getCanonicalSignature() &&
+           "substitutions must match generic signature");
   }
         
   if (genericSig) {

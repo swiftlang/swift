@@ -1460,7 +1460,7 @@ public:
 
     auto boxDescriptor = IGF.IGM.getAddrOfBoxDescriptor(
         boxedInterfaceType,
-        env ? env->getGenericSignature()->getCanonicalSignature()
+        env ? env->getGenericSignature().getCanonicalSignature()
             : CanGenericSignature());
     llvm::Value *allocation = IGF.emitUnmanagedAlloc(layout, name,
                                                      boxDescriptor);
