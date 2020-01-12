@@ -349,6 +349,7 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
         diagnose(EndOfPreviousLoc, diag::labeled_block_needs_do)
           .fixItInsert(EndOfPreviousLoc, "do");
         skipUntilDeclStmtRBrace(tok::r_brace);
+        continue;
       } else {
         diagnose(EndOfPreviousLoc, diag::statement_same_line_without_semi)
           .fixItInsert(EndOfPreviousLoc, ";");
