@@ -212,19 +212,17 @@ static void insertEndAccess(BeginAccessInst *&beginAccess, bool isModify,
   }
 }
 
-static SILValue createKeypathStoredPropertyProjections(SILValue addr,
-                                                       SILLocation loc,
-                                                       BeginAccessInst *&beginAccess,
-                                                       SILBuilder &builder,
-                                                       const KeyPathPatternComponent& comp) {
+static SILValue createKeypathStoredPropertyProjections(
+    SILValue addr, SILLocation loc, BeginAccessInst *&beginAccess,
+    SILBuilder &builder, const KeyPathPatternComponent &comp) {
   assert(comp.getKind() == KeyPathPatternComponent::Kind::StoredProperty);
   VarDecl *storedProperty = comp.getStoredPropertyDecl();
   SILValue elementAddr;
   if (addr->getType().getStructOrBoundGenericStruct()) {
     addr = builder.createStructElementAddr(loc, addr, storedProperty);
   } else if (addr->getType().getClassOrBoundGenericClass()) {
-    SingleValueInstruction *Ref = builder.createLoad(loc, addr,
-                                       LoadOwnershipQualifier::Unqualified);
+    SingleValueInstruction *Ref =
+        builder.createLoad(loc, addr, LoadOwnershipQualifier::Unqualified);
     insertEndAccess(beginAccess, /*isModify*/ false, builder);
 
     // Handle the case where the storedProperty is in a super class.
@@ -257,18 +255,16 @@ static SILValue createKeypathStoredPropertyProjections(SILValue addr,
     insertEndAccess(beginAccess, /*isModify*/ false, builder);
     return SILValue();
   }
-  
+
   return addr;
 }
 
-static SILValue createKeypathGettablePropertyProjections(KeyPathInst *keyPath,
-                                                         SILValue addr,
-                                                       SILLocation loc,
-                                                       BeginAccessInst *&beginAccess,
-                                                       SILBuilder &builder,
-                                                       const KeyPathPatternComponent& comp) {
+static SILValue createKeypathGettablePropertyProjections(
+    KeyPathInst *keyPath, SILValue addr, SILLocation loc,
+    BeginAccessInst *&beginAccess, SILBuilder &builder,
+    const KeyPathPatternComponent &comp) {
   assert(comp.getKind() == KeyPathPatternComponent::Kind::GettableProperty);
-  
+
   if (!addr->getType().getStructOrBoundGenericStruct() &&
       !addr->getType().getClassOrBoundGenericClass()) {
     // This should never happen, as a stored-property pattern can only be
@@ -277,10 +273,10 @@ static SILValue createKeypathGettablePropertyProjections(KeyPathInst *keyPath,
     insertEndAccess(beginAccess, /*isModify*/ false, builder);
     return SILValue();
   }
-  
-  SingleValueInstruction *ref = builder.createLoad(loc, addr,
-                                     LoadOwnershipQualifier::Unqualified);
-  
+
+  SingleValueInstruction *ref =
+      builder.createLoad(loc, addr, LoadOwnershipQualifier::Unqualified);
+
   insertEndAccess(beginAccess, /*isModify*/ false, builder);
 
   SmallVector<SILValue, 4> args;
@@ -289,7 +285,7 @@ static SILValue createKeypathGettablePropertyProjections(KeyPathInst *keyPath,
     args.push_back(op.get());
   }
   args.push_back(ref);
-  
+
   auto *getter = comp.getComputedPropertyId().getFunction();
   auto *getterFuncRef = builder.createFunctionRef(loc, getter);
   return builder.createApply(loc, getterFuncRef, SubstitutionMap{}, args);
@@ -320,17 +316,16 @@ static SILValue createKeypathProjections(SILValue keyPath, SILValue root,
   // Check if the keypath only contains patterns which we support.
   for (const KeyPathPatternComponent &comp : components) {
     switch (comp.getKind()) {
-      case KeyPathPatternComponent::Kind::StoredProperty:
-        addr = createKeypathStoredPropertyProjections(addr, loc, beginAccess,
-                                                      builder, comp);
-        break;
-      case KeyPathPatternComponent::Kind::GettableProperty:
-        addr = createKeypathGettablePropertyProjections(cast<KeyPathInst>(keyPath),
-                                                        addr, loc, beginAccess,
-                                                        builder, comp);
-        break;
-      default:
-        return SILValue();
+    case KeyPathPatternComponent::Kind::StoredProperty:
+      addr = createKeypathStoredPropertyProjections(addr, loc, beginAccess,
+                                                    builder, comp);
+      break;
+    case KeyPathPatternComponent::Kind::GettableProperty:
+      addr = createKeypathGettablePropertyProjections(
+          cast<KeyPathInst>(keyPath), addr, loc, beginAccess, builder, comp);
+      break;
+    default:
+      return SILValue();
     }
   }
 
@@ -379,11 +374,11 @@ bool SILCombiner::tryOptimizeKeypath(ApplyInst *AI) {
 
   if (projectedAddr->getType().isAddress()) {
     if (isModify) {
-      Builder.createCopyAddr(AI->getLoc(), valueAddr, projectedAddr,
-                             IsTake, IsNotInitialization);
+      Builder.createCopyAddr(AI->getLoc(), valueAddr, projectedAddr, IsTake,
+                             IsNotInitialization);
     } else {
-      Builder.createCopyAddr(AI->getLoc(), projectedAddr, valueAddr,
-                             IsNotTake, IsInitialization);
+      Builder.createCopyAddr(AI->getLoc(), projectedAddr, valueAddr, IsNotTake,
+                             IsInitialization);
     }
   } else {
     assert(valueAddr->getType().isAddress());
@@ -438,9 +433,8 @@ bool SILCombiner::tryOptimizeInoutKeypath(BeginApplyInst *AI) {
     return false;
 
   BeginAccessInst *beginAccess = nullptr;
-  SILValue projectedAddr = createKeypathProjections(keyPath, rootAddr, nullptr,
-                                                    AI->getLoc(), beginAccess,
-                                                    Builder);
+  SILValue projectedAddr = createKeypathProjections(
+      keyPath, rootAddr, nullptr, AI->getLoc(), beginAccess, Builder);
   if (!projectedAddr)
     return false;
 
