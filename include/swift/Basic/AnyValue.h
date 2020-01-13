@@ -170,8 +170,9 @@ namespace llvm {
   void simple_display(raw_ostream &out, const Optional<T> &opt) {
     if (opt) {
       simple_display(out, *opt);
+    } else {
+      out << "None";
     }
-    out << "None";
   }
 } // end namespace llvm
 
