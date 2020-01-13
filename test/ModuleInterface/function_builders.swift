@@ -2,6 +2,7 @@
 // RUN: %target-swift-frontend -typecheck -module-name FunctionBuilders -emit-module-interface-path %t/FunctionBuilders.swiftinterface %s
 // RUN: %FileCheck %s < %t/FunctionBuilders.swiftinterface
 // RUN: %target-swift-frontend -I %t -typecheck -verify %S/Inputs/function_builders_client.swift
+// RUN: %target-swift-frontend -compile-module-from-interface %t/FunctionBuilders.swiftinterface -o %t/FunctionBuilders.swiftmodule
 
 @_functionBuilder
 public struct TupleBuilder {
@@ -32,4 +33,14 @@ public struct TupleBuilder {
 // CHECK-LABEL: public func tuplify<T>(_ cond: Swift.Bool, @FunctionBuilders.TupleBuilder body: (Swift.Bool) -> T)
 public func tuplify<T>(_ cond: Bool, @TupleBuilder body: (Bool) -> T) {
   print(body(cond))
+}
+
+public struct UsesBuilderProperty {
+  // CHECK: @FunctionBuilders.TupleBuilder public var myVar: (Swift.String, Swift.String) {
+  // CHECK-NEXT: get
+  // CHECK-NEXT: }
+  @TupleBuilder public var myVar: (String, String) {
+    "hello"
+    "goodbye"
+  }
 }
