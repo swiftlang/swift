@@ -892,3 +892,22 @@ func testArrayOfClosures(_ byte: @escaping () -> Int) -> [(Int) -> Int] {
 func interpretArrayOfClosures() -> [(Int) -> Int] {
   return testArrayOfClosures({ 10 })
 }
+
+// Test checked casts.
+
+// CHECK-LABEL: @testMetaTypeCast
+// CHECK-NOT: error:
+@_semantics("constant_evaluable")
+func testMetaTypeCast<T>(_ x: T.Type) -> Bool {
+  return (x is Int.Type)
+}
+
+@_semantics("test_driver")
+func interpretMetaTypeCast() -> Bool {
+  return testMetaTypeCast(Int.self)
+}
+
+// FIXME: this cast is not found to be false by the classifyDynamicCast utility.
+func interpretMetaTypeCast2() -> Bool {
+  return testMetaTypeCast(((Int) -> Int).self)
+}

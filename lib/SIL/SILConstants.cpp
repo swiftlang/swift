@@ -1000,6 +1000,13 @@ void SymbolicValue::emitUnknownDiagnosticNotes(SILLocation fallbackLoc) {
       diagnose(ctx, triggerLoc, diag::constexpr_untracked_sil_value_used_here,
                triggerLocSkipsInternalLocs);
     return;
+  case UnknownReason::UnknownCastResult: {
+    diagnose(ctx, diagLoc, diag::constexpr_unevaluable_cast_found);
+    if (emitTriggerLocInDiag)
+      diagnose(ctx, triggerLoc, diag::constexpr_unevaluable_cast_used_here,
+               triggerLocSkipsInternalLocs);
+    return;
+  }
   case UnknownReason::UnknownWitnessMethodConformance: {
     SmallString<8> witnessMethodName;
     getWitnessMethodName(dyn_cast<WitnessMethodInst>(unknownNode),
