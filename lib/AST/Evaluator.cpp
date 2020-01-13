@@ -24,8 +24,6 @@
 
 using namespace swift;
 
-AnyRequest::HolderBase::~HolderBase() { }
-
 std::string AnyRequest::getAsString() const {
   std::string result;
   {

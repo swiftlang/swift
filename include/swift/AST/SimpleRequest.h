@@ -183,7 +183,10 @@ class SimpleRequest;
 template<typename Derived, CacheKind Caching, typename Output,
          typename ...Inputs>
 class SimpleRequest<Derived, Output(Inputs...), Caching> {
-  std::tuple<Inputs...> storage;
+  using Storage = std::tuple<Inputs...>;
+  static_assert(alignof(Storage) <= alignof(void *),
+                "AnyRequest doesn't handle aligns greater than a word");
+  Storage storage;
 
   Derived &asDerived() {
     return *static_cast<Derived *>(this);
@@ -202,7 +205,7 @@ class SimpleRequest<Derived, Output(Inputs...), Caching> {
 
 protected:
   /// Retrieve the storage value directly.
-  const std::tuple<Inputs...> &getStorage() const { return storage; }
+  const Storage &getStorage() const { return storage; }
 
 public:
   static const bool isEverCached = (Caching != CacheKind::Uncached);

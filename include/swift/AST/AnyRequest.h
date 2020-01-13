@@ -17,11 +17,11 @@
 #ifndef SWIFT_AST_ANYREQUEST_H
 #define SWIFT_AST_ANYREQUEST_H
 
+#include "swift/AST/SmallHolder.h"
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/TypeID.h"
 #include "llvm/ADT/DenseMapInfo.h"
 #include "llvm/ADT/Hashing.h"
-#include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include <string>
 
 namespace llvm {
@@ -34,6 +34,62 @@ using llvm::hash_code;
 using llvm::hash_value;
 
 class DiagnosticEngine;
+
+struct AnyRequestVTable {
+  template<typename Request>
+  struct Impl {
+    static void copy(AnyHolder input, void *output) {
+      new (output) Request(input.get<Request>());
+    }
+    static hash_code getHash(AnyHolder holder) {
+      return hash_value(holder.get<Request>());
+    }
+    static void deleter(AnyHolder holder) {
+      holder.getMutable<Request>().~Request();
+    }
+    static bool isEqual(AnyHolder lhs, AnyHolder rhs) {
+      return lhs.get<Request>() == rhs.get<Request>();
+    }
+    static void simpleDisplay(AnyHolder holder, llvm::raw_ostream &out) {
+      simple_display(out, holder.get<Request>());
+    }
+    static void diagnoseCycle(AnyHolder holder, DiagnosticEngine &diags) {
+      holder.get<Request>().diagnoseCycle(diags);
+    }
+    static void noteCycleStep(AnyHolder holder, DiagnosticEngine &diags) {
+      holder.get<Request>().noteCycleStep(diags);
+    }
+    static SourceLoc getNearestLoc(AnyHolder holder) {
+      return holder.get<Request>().getNearestLoc();
+    }
+  };
+
+  const uint64_t typeID;
+  const std::function<void(AnyHolder, void *)> copy;
+  const std::function<hash_code(AnyHolder)> getHash;
+  const std::function<void(AnyHolder)> deleter;
+  const std::function<bool(AnyHolder, const AnyHolder &)> isEqual;
+  const std::function<void(AnyHolder, llvm::raw_ostream &)> simpleDisplay;
+  const std::function<void(AnyHolder, DiagnosticEngine &)> diagnoseCycle;
+  const std::function<void(AnyHolder, DiagnosticEngine &)> noteCycleStep;
+  const std::function<SourceLoc(AnyHolder)> getNearestLoc;
+
+  template <typename Request>
+  static const AnyRequestVTable *get() {
+    static const AnyRequestVTable vtable = {
+        TypeID<Request>::value,
+        &Impl<Request>::copy,
+        &Impl<Request>::getHash,
+        &Impl<Request>::deleter,
+        &Impl<Request>::isEqual,
+        &Impl<Request>::simpleDisplay,
+        &Impl<Request>::diagnoseCycle,
+        &Impl<Request>::noteCycleStep,
+        &Impl<Request>::getNearestLoc,
+    };
+    return &vtable;
+  }
+};
 
 /// Stores a request (for the \c Evaluator class) of any kind.
 ///
@@ -51,121 +107,19 @@ class DiagnosticEngine;
 ///       void noteCycleStep(DiagnosticEngine &diags) const;
 ///
 class AnyRequest {
-  friend llvm::DenseMapInfo<swift::AnyRequest>;
-
-  static hash_code hashForHolder(uint64_t typeID, hash_code requestHash) {
-    return hash_combine(typeID, requestHash);
-  }
-
-  /// Abstract base class used to hold the specific request kind.
-  class HolderBase : public llvm::RefCountedBase<HolderBase> {
-  public:
-    /// The type ID of the request being stored.
-    const uint64_t typeID;
-
-    /// Hash value for the request itself.
-    const hash_code hash;
-
-  protected:
-    /// Initialize base with type ID and hash code.
-    HolderBase(uint64_t typeID, hash_code hash)
-      : typeID(typeID), hash(AnyRequest::hashForHolder(typeID, hash)) { }
-
-  public:
-    virtual ~HolderBase();
-
-    /// Determine whether this request is equivalent to the \c other
-    /// request.
-    virtual bool equals(const HolderBase &other) const = 0;
-
-    /// Display.
-    virtual void display(llvm::raw_ostream &out) const = 0;
-
-    /// Diagnose a cycle detected for this request.
-    virtual void diagnoseCycle(DiagnosticEngine &diags) const = 0;
-
-    /// Note that this request is part of a cycle.
-    virtual void noteCycleStep(DiagnosticEngine &diags) const = 0;
-
-    /// Retrieve the nearest source location to which this request applies.
-    virtual SourceLoc getNearestLoc() const = 0;
-  };
-
-  /// Holds a value that can be used as a request input/output.
-  template<typename Request>
-  class Holder final : public HolderBase {
-  public:
-    const Request request;
-
-    Holder(const Request &request)
-      : HolderBase(TypeID<Request>::value, hash_value(request)),
-        request(request) { }
-
-    Holder(Request &&request)
-      : HolderBase(TypeID<Request>::value, hash_value(request)),
-        request(std::move(request)) { }
-
-    virtual ~Holder() { }
-
-    /// Determine whether this request is equivalent to another.
-    ///
-    /// The caller guarantees that the typeIDs are the same.
-    virtual bool equals(const HolderBase &other) const override {
-      assert(typeID == other.typeID && "Caller should match typeIDs");
-      return request == static_cast<const Holder<Request> &>(other).request;
-    }
-
-    /// Display.
-    virtual void display(llvm::raw_ostream &out) const override {
-      simple_display(out, request);
-    }
-
-    /// Diagnose a cycle detected for this request.
-    virtual void diagnoseCycle(DiagnosticEngine &diags) const override {
-      request.diagnoseCycle(diags);
-    }
-
-    /// Note that this request is part of a cycle.
-    virtual void noteCycleStep(DiagnosticEngine &diags) const override {
-      request.noteCycleStep(diags);
-    }
-
-    /// Retrieve the nearest source location to which this request applies.
-    virtual SourceLoc getNearestLoc() const override {
-      return request.getNearestLoc();
-    }
-  };
-
-  /// FIXME: Inefficient. Use the low bits.
-  enum class StorageKind {
-    Normal,
-    Empty,
-    Tombstone,
-  } storageKind = StorageKind::Normal;
+  friend llvm::DenseMapInfo<AnyRequest>;
 
   /// The data stored in this value.
-  llvm::IntrusiveRefCntPtr<HolderBase> stored;
+  using Storage = SmallHolder<8, alignof(void *), AnyRequestVTable>;
+  Storage stored;
 
-  AnyRequest(StorageKind storageKind) : storageKind(storageKind) {
-    assert(storageKind != StorageKind::Normal);
-  }
+  explicit AnyRequest(Storage stored) : stored(stored) {}
 
 public:
   AnyRequest(const AnyRequest &other) = default;
   AnyRequest &operator=(const AnyRequest &other) = default;
-
-  AnyRequest(AnyRequest &&other)
-      : storageKind(other.storageKind), stored(std::move(other.stored)) {
-    other.storageKind = StorageKind::Empty;
-  }
-
-  AnyRequest &operator=(AnyRequest &&other) {
-    storageKind = other.storageKind;
-    stored = std::move(other.stored);
-    other.storageKind = StorageKind::Empty;
-    other.stored = nullptr;
-    return *this;
-  }
+  AnyRequest(AnyRequest &&other) = default;
+  AnyRequest &operator=(AnyRequest &&other) = default;
 
   // Create a local template typename `ValueType` in the template specialization
   // so that we can refer to it in the SFINAE condition as well as the body of
@@ -174,88 +128,58 @@ public:
   // instance of `AnyRequest`.  If we do not do so, we will find ourselves with
   // ambiguity with this constructor and the defined move constructor above.
   /// Construct a new instance with the given value.
-  template <typename T,
-            typename ValueType = typename std::remove_cv<
-                typename std::remove_reference<T>::type>::type,
+  template <typename T, typename ValueType = std::decay_t<T>,
             typename = typename std::enable_if<
                 !std::is_same<ValueType, AnyRequest>::value>::type>
-  explicit AnyRequest(T &&value) : storageKind(StorageKind::Normal) {
-    stored = llvm::IntrusiveRefCntPtr<HolderBase>(
-        new Holder<ValueType>(std::forward<T>(value)));
-  }
+  explicit AnyRequest(T &&value) : stored(Storage(std::forward<T>(value))) {}
 
   /// Cast to a specific (known) type.
   template<typename Request>
   const Request &castTo() const {
-    assert(stored->typeID == TypeID<Request>::value && "wrong type in cast");
-    return static_cast<const Holder<Request> *>(stored.get())->request;
+    return *stored.get<Request>();
   }
 
   /// Try casting to a specific (known) type, returning \c nullptr on
   /// failure.
   template<typename Request>
   const Request *getAs() const {
-    if (stored->typeID != TypeID<Request>::value)
-      return nullptr;
-
-    return &static_cast<const Holder<Request> *>(stored.get())->request;
+    return stored.getAs<Request>();
   }
 
   /// Diagnose a cycle detected for this request.
   void diagnoseCycle(DiagnosticEngine &diags) const {
-    stored->diagnoseCycle(diags);
+    stored.getVTable()->diagnoseCycle(stored, diags);
   }
 
   /// Note that this request is part of a cycle.
   void noteCycleStep(DiagnosticEngine &diags) const {
-    stored->noteCycleStep(diags);
+    stored.getVTable()->noteCycleStep(stored, diags);
   }
 
   /// Retrieve the nearest source location to which this request applies.
   SourceLoc getNearestLoc() const {
-    return stored->getNearestLoc();
+    return stored.getVTable()->getNearestLoc(stored);
   }
 
   /// Compare two instances for equality.
   friend bool operator==(const AnyRequest &lhs, const AnyRequest &rhs) {
-    if (lhs.storageKind != rhs.storageKind) {
-      return false;
-    }
-
-    if (lhs.storageKind != StorageKind::Normal)
-      return true;
-
-    if (lhs.stored->typeID != rhs.stored->typeID)
-      return false;
-
-    return lhs.stored->equals(*rhs.stored);
+    return lhs.stored == rhs.stored;
   }
 
   friend bool operator!=(const AnyRequest &lhs, const AnyRequest &rhs) {
     return !(lhs == rhs);
   }
 
-  friend hash_code hash_value(const AnyRequest &any) {
-    if (any.storageKind != StorageKind::Normal)
-      return 1;
-
-    return any.stored->hash;
+  friend hash_code hash_value(const AnyRequest &req) {
+    return hash_value(req.stored);
   }
 
-  friend void simple_display(llvm::raw_ostream &out, const AnyRequest &any) {
-    any.stored->display(out);
+  friend void simple_display(llvm::raw_ostream &out, const AnyRequest &req) {
+    req.stored.getVTable()->simpleDisplay(req.stored, out);
   }
 
   /// Return the result of calling simple_display as a string.
   std::string getAsString() const;
-
-  static AnyRequest getEmptyKey() {
-    return AnyRequest(StorageKind::Empty);
-  }
-
-  static AnyRequest getTombstoneKey() {
-    return AnyRequest(StorageKind::Tombstone);
-  }
 };
 
 } // end namespace swift
@@ -263,33 +187,26 @@ public:
 namespace llvm {
   template<>
   struct DenseMapInfo<swift::AnyRequest> {
-    static inline swift::AnyRequest getEmptyKey() {
-      return swift::AnyRequest::getEmptyKey();
+    using AnyRequest = swift::AnyRequest;
+    static inline AnyRequest getEmptyKey() {
+      return AnyRequest(AnyRequest::Storage::getEmptyKey());
     }
-    static inline swift::AnyRequest getTombstoneKey() {
-      return swift::AnyRequest::getTombstoneKey();
+    static inline AnyRequest getTombstoneKey() {
+      return AnyRequest(AnyRequest::Storage::getTombstoneKey());
     }
-    static unsigned getHashValue(const swift::AnyRequest &request) {
+    static unsigned getHashValue(const AnyRequest &request) {
       return hash_value(request);
     }
     template <typename Request>
     static unsigned getHashValue(const Request &request) {
-      return swift::AnyRequest::hashForHolder(swift::TypeID<Request>::value,
-                                              hash_value(request));
+      return DenseMapInfo<AnyRequest::Storage>::getHashValue(request);
     }
-    static bool isEqual(const swift::AnyRequest &lhs,
-                        const swift::AnyRequest &rhs) {
+    static bool isEqual(const AnyRequest &lhs, const AnyRequest &rhs) {
       return lhs == rhs;
     }
     template <typename Request>
-    static bool isEqual(const Request &lhs,
-                        const swift::AnyRequest &rhs) {
-      if (rhs == getEmptyKey() || rhs == getTombstoneKey())
-        return false;
-      const Request *rhsRequest = rhs.getAs<Request>();
-      if (!rhsRequest)
-        return false;
-      return lhs == *rhsRequest;
+    static bool isEqual(const Request &lhs, const AnyRequest &rhs) {
+      return DenseMapInfo<AnyRequest::Storage>::isEqual(lhs, rhs.stored);
     }
   };
 

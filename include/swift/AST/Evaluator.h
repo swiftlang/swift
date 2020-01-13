@@ -330,7 +330,11 @@ private:
     auto iter = dependencies.find_as(request);
     if (iter != dependencies.end())
       return iter->first;
-    auto insertResult = dependencies.insert({AnyRequest(request), {}});
+
+    // Note it's important to use std::make_pair here to ensure the AnyRequest
+    // is moved into the DenseMap.
+    auto insertResult = dependencies.insert(
+        std::make_pair(AnyRequest(request), std::vector<AnyRequest>()));
     assert(insertResult.second && "just checked if the key was already there");
     return insertResult.first->first;
   }
