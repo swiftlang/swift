@@ -18,6 +18,7 @@
 #ifndef SWIFT_BASIC_ANYVALUE_H
 #define SWIFT_BASIC_ANYVALUE_H
 
+#include "swift/AST/SmallHolder.h"
 #include "swift/Basic/SimpleDisplay.h"
 #include "swift/Basic/TypeID.h"
 #include "llvm/ADT/PointerUnion.h"  // to define hash_value
@@ -33,6 +34,42 @@ namespace llvm {
 
 namespace swift {
 
+struct AnyValueVTable {
+  template<typename Value>
+  struct Impl {
+    static void copy(AnyHolder input, void *output) {
+      new (output) Value(input.get<Value>());
+    }
+    static void deleter(AnyHolder holder) {
+      holder.getMutable<Value>().~Value();
+    }
+    static bool isEqual(AnyHolder lhs, AnyHolder rhs) {
+      return lhs.get<Value>() == rhs.get<Value>();
+    }
+    static void display(AnyHolder holder, llvm::raw_ostream &out) {
+      simple_display(out, holder.get<Value>());
+    }
+  };
+
+  const uint64_t typeID;
+  const std::function<void(AnyHolder, void *)> copy;
+  const std::function<void(AnyHolder)> deleter;
+  const std::function<bool(AnyHolder, AnyHolder)> isEqual;
+  const std::function<void(AnyHolder, llvm::raw_ostream &)> display;
+
+  template <typename Value>
+  static const AnyValueVTable *get() {
+    static const AnyValueVTable vtable = {
+        TypeID<Value>::value,
+        &Impl<Value>::copy,
+        &Impl<Value>::deleter,
+        &Impl<Value>::isEqual,
+        &Impl<Value>::display,
+    };
+    return &vtable;
+  }
+};
+
 /// Stores a value of any type that satisfies a small set of requirements.
 ///
 /// Requirements on the values stored within an AnyValue:
@@ -43,94 +80,31 @@ namespace swift {
 ///   - Display support (free function):
 ///       void simple_display(llvm::raw_ostream &, const T &);
 class AnyValue {
-  /// Abstract base class used to hold on to a value.
-  class HolderBase {
-  public:
-    /// Type ID number.
-    const uint64_t typeID;
-
-    HolderBase() = delete;
-    HolderBase(const HolderBase &) = delete;
-    HolderBase(HolderBase &&) = delete;
-    HolderBase &operator=(const HolderBase &) = delete;
-    HolderBase &operator=(HolderBase &&) = delete;
-
-    /// Initialize base with type ID.
-    HolderBase(uint64_t typeID) : typeID(typeID) { }
-
-    virtual ~HolderBase();
-
-    /// Determine whether this value is equivalent to another.
-    ///
-    /// The caller guarantees that the type IDs are the same.
-    virtual bool equals(const HolderBase &other) const = 0;
-
-    /// Display.
-    virtual void display(llvm::raw_ostream &out) const = 0;
-  };
-
-  /// Holds a value that can be used as a request input/output.
-  template<typename T>
-  class Holder final : public HolderBase {
-  public:
-    const T value;
-
-    Holder(T &&value)
-      : HolderBase(TypeID<T>::value),
-        value(std::move(value)) { }
-
-    Holder(const T &value) : HolderBase(TypeID<T>::value), value(value) { }
-
-    virtual ~Holder() { }
-
-    /// Determine whether this value is equivalent to another.
-    ///
-    /// The caller guarantees that the type IDs are the same.
-    virtual bool equals(const HolderBase &other) const override {
-      assert(typeID == other.typeID && "Caller should match type IDs");
-      return value == static_cast<const Holder<T> &>(other).value;
-    }
-
-    /// Display.
-    virtual void display(llvm::raw_ostream &out) const override {
-      simple_display(out, value);
-    }
-  };
-
   /// The data stored in this value.
-  std::shared_ptr<HolderBase> stored;
+  using Storage = SmallHolder<8, alignof(void *), AnyValueVTable>;
+  Storage stored;
 
 public:
   /// Construct a new instance with the given value.
-  template<typename T>
-  AnyValue(T&& value) {
-    using ValueType = typename std::remove_reference<T>::type;
-    stored.reset(new Holder<ValueType>(std::forward<T>(value)));
-  }
+  template <typename T>
+  AnyValue(T &&value) : stored(Storage(std::forward<T>(value))) {}
 
   /// Cast to a specific (known) type.
   template<typename T>
   const T &castTo() const {
-    assert(stored->typeID == TypeID<T>::value);
-    return static_cast<const Holder<T> *>(stored.get())->value;
+    return *stored.get<T>();
   }
 
   /// Try casting to a specific (known) type, returning \c nullptr on
   /// failure.
   template<typename T>
   const T *getAs() const {
-    if (stored->typeID != TypeID<T>::value)
-      return nullptr;
-
-    return &static_cast<const Holder<T> *>(stored.get())->value;
+    return stored.getAs<T>();
   }
 
   /// Compare two instances for equality.
   friend bool operator==(const AnyValue &lhs, const AnyValue &rhs) {
-    if (lhs.stored->typeID != rhs.stored->typeID)
-      return false;
-
-    return lhs.stored->equals(*rhs.stored);
+    return lhs.stored == rhs.stored;
   }
 
   friend bool operator!=(const AnyValue &lhs, const AnyValue &rhs) {
@@ -138,7 +112,7 @@ public:
   }
 
   friend void simple_display(llvm::raw_ostream &out, const AnyValue &value) {
-    value.stored->display(out);
+    value.stored.getVTable()->display(value.stored, out);
   }
 
   /// Return the result of calling simple_display as a string.

@@ -212,9 +212,11 @@ public:
   static const bool hasExternalCache = (Caching == CacheKind::SeparatelyCached);
 
   using OutputType = Output;
-  
-  explicit SimpleRequest(const Inputs& ...inputs)
-    : storage(inputs...) { }
+
+  explicit SimpleRequest(const Inputs &... inputs) : storage(inputs...) {
+    static_assert(alignof(OutputType) <= alignof(void *),
+                  "AnyValue doesn't handle aligns greater than a word");
+  }
 
   /// Request evaluation function that will be registered with the evaluator.
   static llvm::Expected<OutputType>

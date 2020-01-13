@@ -2024,21 +2024,17 @@ public:
 
 // Allow AnyValue to compare two Type values, even though Type doesn't
 // support ==.
-template<>
-inline bool AnyValue::Holder<Type>::equals(const HolderBase &other) const {
-  assert(typeID == other.typeID && "Caller should match type IDs");
-  return value.getPointer() ==
-      static_cast<const Holder<Type> &>(other).value.getPointer();
+template <>
+inline bool AnyValueVTable::Impl<Type>::isEqual(AnyHolder lhs, AnyHolder rhs) {
+  return lhs.get<Type>().getPointer() == rhs.get<Type>().getPointer();
 }
 
 // Allow AnyValue to compare two GenericSignature values.
 template <>
-inline bool
-AnyValue::Holder<GenericSignature>::equals(const HolderBase &other) const {
-  assert(typeID == other.typeID && "Caller should match type IDs");
-  return value.getPointer() ==
-         static_cast<const Holder<GenericSignature> &>(other)
-             .value.getPointer();
+inline bool AnyValueVTable::Impl<GenericSignature>::isEqual(AnyHolder lhs,
+                                                            AnyHolder rhs) {
+  return lhs.get<GenericSignature>().getPointer() ==
+         rhs.get<GenericSignature>().getPointer();
 }
 
 void simple_display(llvm::raw_ostream &out, Type value);
