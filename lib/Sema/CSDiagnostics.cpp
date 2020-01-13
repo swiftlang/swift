@@ -670,6 +670,12 @@ bool GenericArgumentsMismatchFailure::diagnoseAsError() {
       break;
     }
 
+    case ConstraintLocator::TupleElement: {
+      if (auto *array = dyn_cast<ArrayExpr>(getRawAnchor()))
+        diagnostic = getDiagnosticFor(CTP_ArrayElement);
+      break;
+    }
+
     default:
       return false;
     }

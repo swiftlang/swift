@@ -239,7 +239,6 @@ private:
   bool visitTryExpr(TryExpr *E);
 
   bool visitUnresolvedDotExpr(UnresolvedDotExpr *UDE);
-  bool visitArrayExpr(ArrayExpr *E);
   bool visitDictionaryExpr(DictionaryExpr *E);
   bool visitObjectLiteralExpr(ObjectLiteralExpr *E);
 
@@ -1721,60 +1720,6 @@ bool FailureDiagnosis::
 visitRebindSelfInConstructorExpr(RebindSelfInConstructorExpr *E) {
   // Don't walk the children for this node, it leads to multiple diagnostics
   // because of how sema injects this node into the type checker.
-  return false;
-}
-
-bool FailureDiagnosis::visitArrayExpr(ArrayExpr *E) {
-  // If we had a contextual type, then it either conforms to
-  // ExpressibleByArrayLiteral or it is an invalid contextual type.
-  auto contextualType = CS.getContextualType();
-  if (!contextualType) {
-    return false;
-  }
-
-  // If our contextual type is an optional, look through them, because we're
-  // surely initializing whatever is inside.
-  contextualType = contextualType->lookThroughAllOptionalTypes();
-
-  // Validate that the contextual type conforms to ExpressibleByArrayLiteral and
-  // figure out what the contextual element type is in place.
-  auto ALC =
-      TypeChecker::getProtocol(CS.getASTContext(), E->getLoc(),
-                               KnownProtocolKind::ExpressibleByArrayLiteral);
-  if (!ALC)
-    return visitExpr(E);
-
-  // Check to see if the contextual type conforms.
-  auto Conformance = TypeChecker::conformsToProtocol(
-      contextualType, ALC, CS.DC, ConformanceCheckFlags::InExpression);
-  if (Conformance) {
-    Type contextualElementType =
-        Conformance
-            .getTypeWitnessByName(contextualType,
-                                  CS.getASTContext().Id_ArrayLiteralElement)
-            ->getDesugaredType();
-
-    // Type check each of the subexpressions in place, passing down the contextual
-    // type information if we have it.
-    for (auto elt : E->getElements()) {
-      if (typeCheckChildIndependently(elt, contextualElementType,
-                                      CTP_ArrayElement) == nullptr) {
-        return true;
-      }
-    }
-
-    return false;
-  }
-
-  ContextualFailure failure(CS, CS.getType(E), contextualType,
-                            CS.getConstraintLocator(E));
-  if (failure.diagnoseConversionToDictionary())
-    return true;
-
-  // If that didn't turn up an issue, then we don't know what to do.
-  // TODO: When a contextual type is missing, we could try to diagnose cases
-  // where the element types mismatch... but theoretically they should type
-  // unify to Any, so that could never happen?
   return false;
 }
 
