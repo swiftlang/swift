@@ -4302,6 +4302,7 @@ public:
       PrintOptions Options;
       if (auto transformType = CurrDeclContext->getDeclaredTypeInContext())
         Options.setBaseType(transformType);
+      Options.SkipUnderscoredKeywords = true;
       Options.PrintImplicitAttrs = false;
       Options.ExclusiveAttrList.push_back(TAK_escaping);
       Options.ExclusiveAttrList.push_back(TAK_autoclosure);
