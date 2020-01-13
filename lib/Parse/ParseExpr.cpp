@@ -3513,6 +3513,11 @@ Parser::parseExprCollectionElement(Optional<bool> &isDictionary) {
 
   // Parse the ':'.
   if (!consumeIf(tok::colon)) {
+    if (Element.hasCodeCompletion()) {
+      // Return the completion expression itself so we can analyze the type
+      // later.
+      return Element;
+    }
     diagnose(Tok, diag::expected_colon_in_dictionary_literal);
     return ParserStatus(Element) | makeParserError();
   }
