@@ -673,6 +673,12 @@ bool GenericArgumentsMismatchFailure::diagnoseAsError() {
     case ConstraintLocator::TupleElement: {
       if (auto *array = dyn_cast<ArrayExpr>(getRawAnchor()))
         diagnostic = getDiagnosticFor(CTP_ArrayElement);
+
+      if (auto *dict = dyn_cast<DictionaryExpr>(getRawAnchor())) {
+        auto eltLoc = last.castTo<LocatorPathElt::TupleElement>();
+        diagnostic = getDiagnosticFor(
+            eltLoc.getIndex() == 0 ? CTP_DictionaryKey : CTP_DictionaryValue);
+      }
       break;
     }
 

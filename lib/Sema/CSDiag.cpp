@@ -239,7 +239,6 @@ private:
   bool visitTryExpr(TryExpr *E);
 
   bool visitUnresolvedDotExpr(UnresolvedDotExpr *UDE);
-  bool visitDictionaryExpr(DictionaryExpr *E);
   bool visitObjectLiteralExpr(ObjectLiteralExpr *E);
 
   bool visitApplyExpr(ApplyExpr *AE);
@@ -1720,71 +1719,6 @@ bool FailureDiagnosis::
 visitRebindSelfInConstructorExpr(RebindSelfInConstructorExpr *E) {
   // Don't walk the children for this node, it leads to multiple diagnostics
   // because of how sema injects this node into the type checker.
-  return false;
-}
-
-bool FailureDiagnosis::visitDictionaryExpr(DictionaryExpr *E) {
-  Type contextualKeyType, contextualValueType;
-  auto keyTypePurpose = CTP_Unused, valueTypePurpose = CTP_Unused;
-
-  // If we had a contextual type, then it either conforms to
-  // ExpressibleByDictionaryLiteral or it is an invalid contextual type.
-  if (auto contextualType = CS.getContextualType()) {
-    // If our contextual type is an optional, look through them, because we're
-    // surely initializing whatever is inside.
-    contextualType = contextualType->lookThroughAllOptionalTypes();
-
-    auto DLC = TypeChecker::getProtocol(
-        CS.getASTContext(), E->getLoc(),
-        KnownProtocolKind::ExpressibleByDictionaryLiteral);
-    if (!DLC) return visitExpr(E);
-
-    // Validate the contextual type conforms to ExpressibleByDictionaryLiteral
-    // and figure out what the contextual Key/Value types are in place.
-    auto Conformance = TypeChecker::conformsToProtocol(
-        contextualType, DLC, CS.DC, ConformanceCheckFlags::InExpression);
-    if (Conformance.isInvalid()) {
-      diagnose(E->getStartLoc(), diag::type_is_not_dictionary, contextualType)
-        .highlight(E->getSourceRange());
-      return true;
-    }
-
-    contextualKeyType =
-        Conformance
-            .getTypeWitnessByName(contextualType, CS.getASTContext().Id_Key)
-            ->getDesugaredType();
-
-    contextualValueType =
-        Conformance
-            .getTypeWitnessByName(contextualType, CS.getASTContext().Id_Value)
-            ->getDesugaredType();
-
-    assert(contextualKeyType && contextualValueType &&
-           "Could not find Key/Value DictionaryLiteral associated types from"
-           " contextual type conformance");
-    
-    keyTypePurpose = CTP_DictionaryKey;
-    valueTypePurpose = CTP_DictionaryValue;
-  }
-  
-  // Type check each of the subexpressions in place, passing down the contextual
-  // type information if we have it.
-  for (auto elt : E->getElements()) {
-    auto TE = dyn_cast<TupleExpr>(elt);
-    if (!TE || TE->getNumElements() != 2) continue;
-
-    if (!typeCheckChildIndependently(TE->getElement(0),
-                                     contextualKeyType, keyTypePurpose))
-      return true;
-    if (!typeCheckChildIndependently(TE->getElement(1),
-                                     contextualValueType, valueTypePurpose))
-      return true;
-  }
-
-  // If that didn't turn up an issue, then we don't know what to do.
-  // TODO: When a contextual type is missing, we could try to diagnose cases
-  // where the element types mismatch.  There is no Any equivalent since they
-  // keys need to be hashable.
   return false;
 }
 
