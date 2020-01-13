@@ -40,18 +40,6 @@ using elfType = object::ELFType<support::native, (__POINTER_WIDTH__ == 64)>;
 
 extern const elfType::Ehdr elfHeader asm("__ehdr_start");
 
-// Create strong linkage to pthread_self, pthread_once and pthread_key_create
-// as they are normally weak-linked and used to detect the presence of pthreads.
-// Without this the calls just jump to 0x0.
-__attribute__((__visibility__("hidden")))
- pthread_t (*__strong_pthread_self)(void) = pthread_self;
-
-__attribute__((__visibility__("hidden")))
-int (*__strong_pthread_once)(pthread_once_t *, void (*)(void)) = pthread_once;
-
-__attribute__((__visibility__("hidden")))
-int (*__strong_pthread_key_create)(pthread_key_t *, void (*)(void *)) = pthread_key_create;
-
 class StaticBinaryELF {
 private:
   // mmap a section of a file that might not be page aligned.
