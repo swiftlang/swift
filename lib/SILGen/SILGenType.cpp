@@ -408,7 +408,8 @@ public:
 
     // An enum case can witness a static get-only Self property requirement
     if (auto EED = dyn_cast<EnumElementDecl>(witness.getDecl())) {
-      assert(!EED->hasAssociatedValues() && "cases with payload not supported");
+      // assert(!EED->hasAssociatedValues() && "cases with payload not
+      // supported");
       return addMethodImplementation(
           requirementRef,
           SILDeclRef(witness.getDecl(), SILDeclRef::Kind::EnumElement),

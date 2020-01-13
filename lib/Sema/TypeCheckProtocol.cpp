@@ -483,7 +483,8 @@ swift::matchWitness(
     // A static get-only property with Self type can be satisfied by an
     // enum case with no associated values. If there are any discrepencies,
     // we'll diagnose it later. For now, let's assume the match is valid.
-    if (!(isa<VarDecl>(req) && isa<EnumElementDecl>(witness)))
+    if (!((isa<VarDecl>(req) || isa<FuncDecl>(req)) &&
+          isa<EnumElementDecl>(witness)))
       return RequirementMatch(witness, MatchKind::KindConflict);
   }
 
@@ -503,13 +504,13 @@ swift::matchWitness(
   bool decomposeFunctionType = false;
   bool ignoreReturnType = false;
   if (auto funcReq = dyn_cast<FuncDecl>(req)) {
-    auto funcWitness = cast<FuncDecl>(witness);
+    // auto funcWitness = cast<FuncDecl>(witness);
 
     // Either both must be 'static' or neither.
-    if (funcReq->isStatic() != funcWitness->isStatic() &&
+    /*if (funcReq->isStatic() != funcWitness->isStatic() &&
         !(funcReq->isOperator() &&
           !funcWitness->getDeclContext()->isTypeContext()))
-      return RequirementMatch(witness, MatchKind::StaticNonStaticConflict);
+      return RequirementMatch(witness, MatchKind::StaticNonStaticConflict);*/
 
     // If we require a prefix operator and the witness is not a prefix operator,
     // these don't match.
@@ -524,8 +525,8 @@ swift::matchWitness(
       return RequirementMatch(witness, MatchKind::PostfixNonPostfixConflict);
 
     // Check that the mutating bit is ok.
-    if (!funcReq->isMutating() && funcWitness->isMutating())
-      return RequirementMatch(witness, MatchKind::MutatingConflict);
+    /*if (!funcReq->isMutating() && funcWitness->isMutating())
+      return RequirementMatch(witness, MatchKind::MutatingConflict);*/
 
     // If the requirement is rethrows, the witness must either be
     // rethrows or be non-throwing.
@@ -565,15 +566,17 @@ swift::matchWitness(
     decomposeFunctionType = true;
     ignoreReturnType = true;
   } else if (isa<EnumElementDecl>(witness)) {
-    auto enumCase = cast<EnumElementDecl>(witness);
+    /*auto enumCase = cast<EnumElementDecl>(witness);
     if (enumCase->hasAssociatedValues())
-      return RequirementMatch(witness, MatchKind::EnumCaseWithAssociatedValues);
-    auto var = dyn_cast<VarDecl>(req);
-    if (!var)
+      return RequirementMatch(witness,
+    MatchKind::EnumCaseWithAssociatedValues);*/
+    auto isValid = isa<VarDecl>(req) || isa<FuncDecl>(req);
+    if (!isValid)
       return RequirementMatch(witness, MatchKind::KindConflict);
-    if (!var->isStatic())
+    if (!dyn_cast<ValueDecl>(req)->isStatic())
       return RequirementMatch(witness, MatchKind::StaticNonStaticConflict);
-    if (var->getParsedAccessor(AccessorKind::Set))
+    if (isa<VarDecl>(req) &&
+        cast<VarDecl>(req)->getParsedAccessor(AccessorKind::Set))
       return RequirementMatch(witness, MatchKind::SettableConflict);
   }
 
@@ -3342,12 +3345,10 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
           auto &diags = proto->getASTContext().Diags;
           {
             SourceLoc diagLoc = getLocForDiagnosingWitness(conformance,witness);
-            auto diag = diags.diagnose(diagLoc,
-                                       diag::witness_argument_name_mismatch,
-                                       isa<ConstructorDecl>(witness),
-                                       witness->getFullName(),
-                                       proto->getDeclaredType(),
-                                       requirement->getFullName());
+            auto diag = diags.diagnose(
+                diagLoc, diag::witness_argument_name_mismatch,
+                witness->getDescriptiveKind(), witness->getFullName(),
+                proto->getDeclaredType(), requirement->getFullName());
             if (diagLoc == witness->getLoc()) {
               fixDeclarationName(diag, witness, requirement->getFullName());
             } else {
