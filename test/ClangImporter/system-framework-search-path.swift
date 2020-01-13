@@ -7,6 +7,6 @@
 // RUN: %FileCheck -input-file=%t/stderr-as-user.txt %s -check-prefix=CHECK-USER
 // RUN: %FileCheck -input-file=%t/stderr-as-system.txt %s -check-prefix=CHECK-SYSTEM --allow-empty
 
-// CHECK-USER: control reaches end of non-void function
-// CHECK-SYSTEM-NOT: control reaches end of non-void function
+// CHECK-USER: non-void function does not return a value
+// CHECK-SYSTEM-NOT: non-void function does not return a value
 import Module
