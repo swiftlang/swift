@@ -579,9 +579,6 @@ def create_argument_parser():
            help='build SourceKitLSP')
     option('--install-swiftsyntax', toggle_true('install_swiftsyntax'),
            help='install SwiftSyntax')
-    option('--skip-install-swiftsyntax-module',
-           toggle_true('skip_install_swiftsyntax_module'),
-           help='skip installing the SwiftSyntax modules')
     option('--swiftsyntax-verify-generated-files',
            toggle_true('swiftsyntax_verify_generated_files'),
            help='set to verify that the generated files in the source tree '
