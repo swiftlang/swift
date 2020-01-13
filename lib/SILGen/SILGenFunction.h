@@ -557,6 +557,9 @@ public:
   Optional<SILAccessEnforcement> getUnknownEnforcement(VarDecl *var = nullptr);
 
   SourceManager &getSourceManager() { return SGM.M.getASTContext().SourceMgr; }
+  std::string getMagicFileString(SourceLoc loc);
+  StringRef getMagicFilePathString(SourceLoc loc);
+  StringRef getMagicFunctionString();
 
   /// Push a new debug scope and set its parent pointer.
   void enterDebugScope(SILLocation Loc) {
