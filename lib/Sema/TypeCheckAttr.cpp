@@ -2483,8 +2483,24 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
       decl = func;
     } else if (auto storage = dyn_cast<AbstractStorageDecl>(D)) {
       decl = storage;
-      auto getter = storage->getParsedAccessor(AccessorKind::Get);
-      if (!getter || !getter->hasBody()) {
+
+      // Check whether this is a property without an explicit getter.
+      auto shouldDiagnose = [&]() -> bool {
+        auto getter = storage->getParsedAccessor(AccessorKind::Get);
+        if (!getter)
+          return true;
+
+        // Module interfaces don't print bodies for all getters, so allow getters
+        // that don't have a body if we're compiling a module interface.
+        SourceFile *parent = storage->getDeclContext()->getParentSourceFile();
+        bool isInInterface = parent && parent->Kind == SourceFileKind::Interface;
+        if (!isInInterface && !getter->hasBody())
+          return true;
+
+        return false;
+      };
+
+      if (shouldDiagnose()) {
         diagnose(attr->getLocation(),
                  diag::function_builder_attribute_on_storage_without_getter,
                  nominal->getFullName(),
