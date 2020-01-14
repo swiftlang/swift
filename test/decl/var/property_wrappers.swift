@@ -1870,3 +1870,13 @@ struct Rdar57411331 {
 
   var other: Int
 }
+
+// SR-11994
+@propertyWrapper
+open class OpenPropertyWrapperWithPublicInit {
+  public init(wrappedValue: String) { // Okay
+    self.wrappedValue = wrappedValue
+  }
+  
+  open var wrappedValue: String = "Hello, world"
+}
