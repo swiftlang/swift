@@ -3302,6 +3302,8 @@ int main(int argc, char *argv[]) {
     options::DebugForbidTypecheckPrefix;
   InitInvok.getTypeCheckerOptions().DebugConstraintSolver =
       options::DebugConstraintSolver;
+  InitInvok.getSearchPathOptions().DisableModulesValidateSystemDependencies =
+      true;
 
   for (auto ConfigName : options::BuildConfigs)
     InitInvok.getLangOptions().addCustomConditionalCompilationFlag(ConfigName);
