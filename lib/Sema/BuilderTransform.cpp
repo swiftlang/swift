@@ -148,7 +148,8 @@ class BuilderClosureVisitor
   }
 
   /// Capture the given expression into an implicitly-generated variable.
-  VarDecl *captureExpr(Expr *expr, bool oneWay, Stmt* forStmt = nullptr) {
+  VarDecl *captureExpr(Expr *expr, bool oneWay,
+                       llvm::PointerUnion<Stmt *, Expr *> forEntity = nullptr) {
     if (!cs)
       return nullptr;
 
@@ -170,10 +171,14 @@ class BuilderClosureVisitor
     auto var = buildVar(expr->getStartLoc());
 
     // Record the new variable and its corresponding expression & statement.
-    if (forStmt)
+    if (auto forStmt = forEntity.dyn_cast<Stmt *>()) {
       applied.capturedStmts.insert({forStmt, { var, { expr } }});
-    else
+    } else {
+      if (auto forExpr = forEntity.dyn_cast<Expr *>())
+        origExpr = forExpr;
+
       applied.capturedExprs.insert({origExpr, {var, expr}});
+    }
 
     cs->setType(var, cs->getType(expr));
     return var;
@@ -251,9 +256,8 @@ protected:
         if (isa<IfConfigDecl>(decl))
           continue;
 
-        // Emit #warning/#error but don't build anything for it.
+        // Skip #warning/#error; we'll handle them when applying the builder.
         if (auto poundDiag = dyn_cast<PoundDiagnosticDecl>(decl)) {
-          TypeChecker::typeCheckDecl(poundDiag);
           continue;
         }
 
@@ -269,7 +273,7 @@ protected:
                                  { expr }, { Identifier() });
       }
 
-      addChild(captureExpr(expr, /*oneWay=*/true));
+      addChild(captureExpr(expr, /*oneWay=*/true, node.get<Expr *>()));
     }
 
     if (!cs)
@@ -693,14 +697,12 @@ private:
     case FunctionBuilderTarget::ReturnValue: {
       // Return the expression.
       ConstraintSystem &cs = solution.getConstraintSystem();
+      Type bodyResultType =
+          solution.simplifyType(builderTransform.bodyResultType);
       finalCapturedExpr = coerceToType(
           finalCapturedExpr,
-          builderTransform.bodyResultType,
+          bodyResultType,
           cs.getConstraintLocator(capturedExpr));
-#if false
-      // FIXME: Delete this?
-      finalCapturedExpr = cs.addImplicitLoadExpr(finalCapturedExpr);
-#endif
       return new (ctx) ReturnStmt(implicitLoc, finalCapturedExpr);
     }
 
@@ -799,6 +801,18 @@ public:
             FunctionBuilderTarget{FunctionBuilderTarget::TemporaryVar,
                                   std::move(captured)});
         newElements.push_back(finalStmt);
+        continue;
+      }
+
+      auto decl = node.get<Decl *>();
+
+      // Skip #if declarations.
+      if (isa<IfConfigDecl>(decl))
+        continue;
+
+      // Diagnose #warning / #error during application.
+      if (auto poundDiag = dyn_cast<PoundDiagnosticDecl>(decl)) {
+        TypeChecker::typeCheckDecl(poundDiag);
         continue;
       }
 
@@ -1096,7 +1110,7 @@ ConstraintSystem::TypeMatchResult ConstraintSystem::matchFunctionBuilder(
   auto dc = fn.getAsDeclContext();
   {
     // Check whether we can apply this specific function builder.
-    BuilderClosureVisitor visitor(getASTContext(), this, dc, builderType,
+    BuilderClosureVisitor visitor(getASTContext(), nullptr, dc, builderType,
                                   bodyResultType);
 
     // If we saw a control-flow statement or declaration that the builder
