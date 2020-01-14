@@ -3677,6 +3677,13 @@ private:
     /// A set of all constraints which contribute to pontential bindings.
     llvm::SmallPtrSet<Constraint *, 8> Sources;
 
+    /// A set of all not-yet-resolved type variables this type variable
+    /// is a subtype of. This is used to determine ordering inside a
+    /// chain of subtypes because binding inference algorithm can't,
+    /// at the moment, determine bindings transitively through supertype
+    /// type variables.
+    llvm::SmallPtrSet<TypeVariableType *, 4> SubtypeOf;
+
     PotentialBindings(TypeVariableType *typeVar)
         : TypeVar(typeVar), PotentiallyIncomplete(isGenericParameter()) {}
 
@@ -3712,6 +3719,20 @@ private:
       // prioritize bindings with fewer of them.
       if (x.NumDefaultableBindings != y.NumDefaultableBindings)
         return x.NumDefaultableBindings < y.NumDefaultableBindings;
+
+      // If neither type variable is a "hole" let's check whether
+      // there is a subtype relationship between them and prefer
+      // type variable which represents superclass first in order
+      // for "subtype" type variable to attempt more bindings later.
+      // This is required because algorithm can't currently infer
+      // bindings for subtype transitively through superclass ones.
+      if (!(x.IsHole && y.IsHole)) {
+        if (x.SubtypeOf.count(y.TypeVar))
+          return false;
+
+        if (y.SubtypeOf.count(x.TypeVar))
+          return true;
+      }
 
       // As a last resort, let's check if the bindings are
       // potentially incomplete, and if so, let's de-prioritize them.

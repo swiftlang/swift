@@ -347,6 +347,11 @@ ConstraintSystem::getPotentialBindingForRelationalConstraint(
 
     result.InvolvesTypeVariables = true;
 
+    if (constraint->getKind() == ConstraintKind::Subtype &&
+        kind == AllowedBindingKind::Subtypes) {
+      result.SubtypeOf.insert(bindingTypeVar);
+    }
+
     // If we've already set addOptionalSupertypeBindings, or we aren't
     // allowing supertype bindings, we're done.
     if (addOptionalSupertypeBindings || kind != AllowedBindingKind::Supertypes)
