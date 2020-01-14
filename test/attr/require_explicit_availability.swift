@@ -1,5 +1,5 @@
-// RUN: %swift -typecheck -parse-stdlib -target x86_64-apple-macosx10.10 -verify -require-explicit-availability -require-explicit-availability-target "macOS 10.10"  %s
-// RUN: %swift -typecheck -parse-stdlib -target x86_64-apple-macosx10.10 -warnings-as-errors %s
+// RUN: %swiftc_driver -typecheck -parse-stdlib -target x86_64-apple-macosx10.10 -Xfrontend -verify -require-explicit-availability -require-explicit-availability-target "macOS 10.10"  %s
+// RUN: %swiftc_driver -typecheck -parse-stdlib -target x86_64-apple-macosx10.10 -warnings-as-errors %s
 
 public struct S { // expected-warning {{public declarations should have an availability attribute when building with -require-explicit-availability}}
   public func method() { }
