@@ -462,6 +462,7 @@ extension String {
         // and bridge that instead. Also avoids CF deleting any BOM that may be
         // present
         var copy = self
+        // TODO: small capacity minimum is lifted, just need to make native
         copy._guts.grow(_SmallString.capacity + 1)
         _internalInvariant(!copy._guts.isSmall)
         return copy._bridgeToObjectiveCImpl()

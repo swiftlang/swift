@@ -188,7 +188,7 @@ private func determineCodeUnitCapacity(_ desiredCapacity: Int) -> Int {
   return capacity
 #else
   // Bigger than _SmallString, and we need 1 extra for nul-terminator.
-  let minCap = 1 + Swift.max(desiredCapacity, _SmallString.capacity)
+  let minCap = 1 + desiredCapacity// Swift.max(desiredCapacity, _SmallString.capacity)
   _internalInvariant(minCap < 0x1_0000_0000_0000, "max 48-bit length")
 
   // Round up to the nearest multiple of 8 that isn't also a multiple of 16.
