@@ -12,7 +12,7 @@ import resilient_struct
 // Note that these are all mutable to allow for the runtime to slide them.
 // CHECK: @"$s21class_resilience_objc27ClassWithEmptyThenResilientC9resilient0I7_struct0H3IntVvpWvd" = hidden global [[INT]] 0,
 // CHECK: @"$s21class_resilience_objc27ClassWithResilientThenEmptyC9resilient0I7_struct0F3IntVvpWvd" = hidden global [[INT]] 0,
-// CHECK: @"$s21class_resilience_objc27ClassWithEmptyThenResilientC5emptyAA0F0VvpWvd" = hidden global [[INT]] 0,
+// CHECK: @"$s21class_resilience_objc27ClassWithEmptyThenResilientC5emptyAA0F0VvpWvd" = hidden global [[INT]] {{(8|4)}},
 // CHECK: @"$s21class_resilience_objc27ClassWithResilientThenEmptyC5emptyAA0H0VvpWvd" = hidden global [[INT]] 0,
 
 public class FixedLayoutObjCSubclass : NSObject {
