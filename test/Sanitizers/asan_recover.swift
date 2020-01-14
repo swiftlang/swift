@@ -12,14 +12,14 @@
 // RUN: %FileCheck --check-prefixes=CHECK-COMMON-STDOUT,CHECK-RECOVER-STDOUT -input-file=%t_asan_recover.stdout %s
 
 // Check with recovery instrumentation but without runtime option to continue execution.
-// RUN: not env %env-ASAN_OPTIONS=abort_on_error=0,halt_on_error=1 %target-run %t_asan_recover > %t_asan_no_runtime_recover.stdout 2> %t_asan_no_runtime_recover.stderr
+// RUN: env %env-ASAN_OPTIONS=abort_on_error=0,halt_on_error=1 not %target-run %t_asan_recover > %t_asan_no_runtime_recover.stdout 2> %t_asan_no_runtime_recover.stderr
 // RUN: %FileCheck --check-prefixes=CHECK-COMMON-STDERR -input-file=%t_asan_no_runtime_recover.stderr %s
 // RUN: %FileCheck --check-prefixes=CHECK-COMMON-STDOUT,CHECK-NO-RECOVER-STDOUT -input-file=%t_asan_no_runtime_recover.stdout %s
 
 // Check that without recovery instrumentation and runtime option to continue execution that error recovery does not happen.
 // RUN: %target-swiftc_driver %s -target %sanitizers-target-triple -g -sanitize=address -import-objc-header %S/asan_interface.h -o %t_asan_no_recover
 // RUN: %target-codesign %t_asan_no_recover
-// RUN: not env %env-ASAN_OPTIONS=abort_on_error=0,halt_on_error=0 %target-run %t_asan_no_recover > %t_asan_no_recover.stdout 2> %t_asan_no_recover.stderr
+// RUN: env %env-ASAN_OPTIONS=abort_on_error=0,halt_on_error=0 not %target-run %t_asan_no_recover > %t_asan_no_recover.stdout 2> %t_asan_no_recover.stderr
 // RUN: %FileCheck --check-prefixes=CHECK-COMMON-STDERR -input-file=%t_asan_no_recover.stderr %s
 // RUN: %FileCheck --check-prefixes=CHECK-COMMON-STDOUT,CHECK-NO-RECOVER-STDOUT -input-file=%t_asan_no_recover.stdout %s
 
