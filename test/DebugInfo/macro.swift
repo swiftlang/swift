@@ -6,7 +6,7 @@
 
 // CHECK: !DICompositeType(tag: DW_TAG_structure_type, name: "macro_enum",
 // CHECK-SAME:             file: ![[MACRO_H:[0-9]+]]
-// CHECK: ![[MACRO_H]] = !DIFile(filename: "{{.*}}{{(/|\\5C)}}Inputs{{(/|\\5C)}}Macro.h",
+// CHECK: ![[MACRO_H]] = !DIFile(filename: "{{.*}}{{(/|\\\\)}}Inputs{{(/|\\\\)}}Macro.h",
 
 import Macro
 
