@@ -1,7 +1,7 @@
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 //
-// REQUIRES-ANY: OS=macosx, OS=ios, OS=tvos, OS=watchos, OS=linux-androideabi, OS=linux-android, OS=linux-gnu
+// REQUIRES: OS=macosx || OS=ios || OS=tvos || OS=watchos || OS=linux-androideabi || OS=linux-android || OS=linux-gnu
 
 import Swift
 import StdlibUnittest
