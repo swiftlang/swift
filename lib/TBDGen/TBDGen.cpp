@@ -36,10 +36,12 @@
 #include "swift/SIL/TypeLowering.h"
 #include "clang/Basic/TargetInfo.h"
 #include "llvm/ADT/StringSet.h"
+#include "llvm/ADT/StringSwitch.h"
 #include "llvm/IR/Mangler.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/Process.h"
 #include "llvm/Support/YAMLTraits.h"
+#include "llvm/Support/YAMLParser.h"
 #include "llvm/TextAPI/MachO/InterfaceFile.h"
 #include "llvm/TextAPI/MachO/TextAPIReader.h"
 #include "llvm/TextAPI/MachO/TextAPIWriter.h"
@@ -49,6 +51,7 @@
 using namespace swift;
 using namespace swift::irgen;
 using namespace swift::tbdgen;
+using namespace llvm::yaml;
 using StringSet = llvm::StringSet<>;
 using SymbolKind = llvm::MachO::SymbolKind;
 
@@ -77,6 +80,152 @@ static Optional<llvm::VersionTuple> getDeclMoveOSVersion(Decl *D) {
     }
   }
   return None;
+}
+
+enum class LinkerPlatformId: uint8_t {
+#define LD_PLATFORM(Name, Id) Name = Id,
+#include "ldPlatformKinds.def"
+};
+
+static StringRef getLinkerPlatformName(uint8_t Id) {
+  switch (Id) {
+#define LD_PLATFORM(Name, Id) case Id: return #Name;
+#include "ldPlatformKinds.def"
+  default:
+    llvm_unreachable("unrecognized platform id");
+  }
+}
+
+static Optional<uint8_t> getLinkerPlatformId(StringRef Platform) {
+  return llvm::StringSwitch<Optional<uint8_t>>(Platform)
+#define LD_PLATFORM(Name, Id) .Case(#Name, Id)
+#include "ldPlatformKinds.def"
+    .Default(None);
+}
+
+struct InstallNameStore {
+  // The default install name to use when no specific install name is specified.
+  std::string InstallName;
+  // The install name specific to the platform id. This takes precedence over
+  // the default install name.
+  std::map<uint8_t, std::string> PlatformInstallName;
+  StringRef getInstallName(LinkerPlatformId Id) const {
+    auto It = PlatformInstallName.find((uint8_t)Id);
+    if (It == PlatformInstallName.end())
+      return InstallName;
+    else
+      return It->second;
+  }
+  void remark(ASTContext &Ctx, StringRef ModuleName) const {
+    Ctx.Diags.diagnose(SourceLoc(), diag::default_previous_install_name,
+                       ModuleName, InstallName);
+    for (auto Pair: PlatformInstallName) {
+      Ctx.Diags.diagnose(SourceLoc(), diag::platform_previous_install_name,
+                         ModuleName, getLinkerPlatformName(Pair.first),
+                         Pair.second);
+    }
+  }
+};
+
+static std::string getScalaNodeText(Node *N) {
+  SmallString<32> Buffer;
+  return cast<ScalarNode>(N)->getValue(Buffer).str();
+}
+
+static std::set<int8_t> getSequenceNodePlatformList(ASTContext &Ctx, Node *N) {
+  std::set<int8_t> Results;
+  for (auto &E: *cast<SequenceNode>(N)) {
+    auto Platform = getScalaNodeText(&E);
+    auto Id = getLinkerPlatformId(Platform);
+    if (Id.hasValue()) {
+      Results.insert(*Id);
+    } else {
+      // Diagnose unrecognized platform name.
+      Ctx.Diags.diagnose(SourceLoc(), diag::unknown_platform_name, Platform);
+    }
+  }
+  return Results;
+}
+
+/// Parse an entry like this, where the "platforms" key-value pair is optional:
+///  {
+///     "module": "Foo",
+///     "platforms": ["macOS"],
+///     "install_name": "/System/MacOS"
+///  },
+static int
+parseEntry(ASTContext &Ctx,
+           Node *Node, std::map<std::string, InstallNameStore> &Stores) {
+  if (auto *SN = cast<SequenceNode>(Node)) {
+    for (auto It = SN->begin(); It != SN->end(); ++It) {
+      auto *MN = cast<MappingNode>(&*It);
+      std::string ModuleName;
+      std::string InstallName;
+      Optional<std::set<int8_t>> Platforms;
+      for (auto &Pair: *MN) {
+        auto Key = getScalaNodeText(Pair.getKey());
+        auto* Value = Pair.getValue();
+        if (Key == "module") {
+          ModuleName = getScalaNodeText(Value);
+        } else if (Key == "platforms") {
+          Platforms = getSequenceNodePlatformList(Ctx, Value);
+        } else if (Key == "install_name") {
+          InstallName = getScalaNodeText(Value);
+        } else {
+          return 1;
+        }
+      }
+      if (ModuleName.empty() || InstallName.empty())
+        return 1;
+      auto &Store = Stores.insert(std::make_pair(ModuleName,
+        InstallNameStore())).first->second;
+      if (Platforms.hasValue()) {
+        // This install name is platform-specific.
+        for (auto Id: Platforms.getValue()) {
+          Store.PlatformInstallName[Id] = InstallName;
+        }
+      } else {
+        // The install name is the default one.
+        Store.InstallName = InstallName;
+      }
+    }
+  } else {
+    return 1;
+  }
+  return 0;
+}
+
+static std::map<std::string, InstallNameStore>
+parsePreviousModuleInstallNameMap(ASTContext &Ctx, StringRef FileName) {
+  namespace yaml = llvm::yaml;
+  std::map<std::string, InstallNameStore> AllInstallNames;
+  SWIFT_DEFER {
+    for (auto Pair: AllInstallNames) {
+      Pair.second.remark(Ctx, Pair.first);
+    }
+  };
+  // Load the input file.
+  llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
+    vfs::getFileOrSTDIN(*Ctx.SourceMgr.getFileSystem(), FileName);
+  if (!FileBufOrErr) {
+    Ctx.Diags.diagnose(SourceLoc(), diag::previous_installname_map_missing,
+                       FileName);
+    return AllInstallNames;
+  }
+  StringRef Buffer = FileBufOrErr->get()->getBuffer();
+  yaml::Stream Stream(llvm::MemoryBufferRef(Buffer, FileName),
+                      Ctx.SourceMgr.getLLVMSourceMgr());
+  for (auto DI = Stream.begin(); DI != Stream.end(); ++ DI) {
+    assert(DI != Stream.end() && "Failed to read a document");
+    yaml::Node *N = DI->getRoot();
+    assert(N && "Failed to find a root");
+    if (parseEntry(Ctx, N, AllInstallNames)) {
+      Ctx.Diags.diagnose(SourceLoc(), diag::previous_installname_map_corrupted,
+                         FileName);
+      return AllInstallNames;
+    }
+  }
+  return AllInstallNames;
 }
 
 void TBDGenVisitor::addLinkerDirectiveSymbols(StringRef name,
@@ -731,6 +880,10 @@ static void enumeratePublicSymbolsAndWrite(ModuleDecl *M, FileUnit *singleFile,
   if (auto packed = parsePackedVersion(CompatibilityVersion,
                                        opts.CompatibilityVersion, ctx)) {
     file.setCompatibilityVersion(*packed);
+  }
+
+  if (!opts.ModuleInstallNameMapPath.empty()) {
+    parsePreviousModuleInstallNameMap(ctx, opts.ModuleInstallNameMapPath);
   }
 
   llvm::MachO::Target target(triple);
