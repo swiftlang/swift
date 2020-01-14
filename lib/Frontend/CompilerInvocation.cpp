@@ -1018,6 +1018,9 @@ static bool ParseTBDGenArgs(TBDGenOptions &Opts, ArgList &Args,
   if (const Arg *A = Args.getLastArg(OPT_tbd_current_version)) {
     Opts.CurrentVersion = A->getValue();
   }
+  if (const Arg *A = Args.getLastArg(OPT_previous_module_installname_map_file)) {
+    Opts.ModuleInstallNameMapPath = A->getValue();
+  }
   return false;
 }
 
