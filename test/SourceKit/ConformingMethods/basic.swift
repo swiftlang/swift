@@ -27,4 +27,4 @@ func testing(obj: C) {
 }
 
 // RUN: %sourcekitd-test -req=conformingmethods -pos=26:14 %s -req-opts=expectedtypes='$s8MyModule7Target2PD;$s8MyModule7Target1PD' -- -module-name MyModule %s > %t.response
-// RUN: diff -u %s.response %t.response
+// RUN: diff --strip-trailing-cr -u %s.response %t.response
