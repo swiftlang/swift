@@ -51,7 +51,8 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_40 | %FileCheck %s -check-prefix=UNRESOLVED_3
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_41 | %FileCheck %s -check-prefix=UNRESOLVED_3
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_42 | %FileCheck %s -check-prefix=UNRESOLVED_3
-// RUN-FIXME: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_43 | %FileCheck %s -check-prefix=UNRESOLVED_3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_43 | %FileCheck %s -check-prefix=UNRESOLVED_3
+// RUN-FIXME: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNRESOLVED_44 | %FileCheck %s -check-prefix=UNRESOLVED_3
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_AVAIL_1 | %FileCheck %s -check-prefix=ENUM_AVAIL_1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OPTIONS_AVAIL_1 | %FileCheck %s -check-prefix=OPTIONS_AVAIL_1
@@ -397,7 +398,8 @@ let _: [SomeEnum1:SomeOptions1] = [.#^UNRESOLVED_39^#]
 let _: [SomeEnum1:SomeOptions1] = [.#^UNRESOLVED_40^#:]
 let _: [SomeEnum1:SomeEnum3] = [.South:.Payload(.South), .South: .Payload(.#^UNRESOLVED_41^#)]
 let _: [SomeEnum3:SomeEnum1] = [.Payload(.South):.South, .Payload(.#^UNRESOLVED_42^#):.South]
-let _: [SomeEnum3:SomeEnum1] = [.Payload(.South):.South, .Payload(.#^UNRESOLVED_43^#)]
+let _: [SomeEnum3:SomeEnum1] = [.Payload(.South):.South, .Payload(.#^UNRESOLVED_43^#):]
+let _: [SomeEnum3:SomeEnum1] = [.Payload(.South):.South, .Payload(.#^UNRESOLVED_44^#)]
 
 func testAvail1(_ x: EnumAvail1) {
   testAvail1(.#^ENUM_AVAIL_1^#)

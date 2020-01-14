@@ -3483,8 +3483,14 @@ Parser::parseExprCollectionElement(Optional<bool> &isDictionary) {
   // Parse the value.
   auto Value = parseExpr(diag::expected_value_in_dictionary_literal);
 
-  if (Value.isNull())
-    Value = makeParserResult(Value, new (Context) ErrorExpr(PreviousLoc));
+  if (Value.isNull()) {
+    if (!Element.hasCodeCompletion()) {
+      Value = makeParserResult(Value, new (Context) ErrorExpr(PreviousLoc));
+    } else {
+      Value = makeParserResult(Value,
+                               new (Context) CodeCompletionExpr(PreviousLoc));
+    }
+  }
 
   // Make a tuple of Key Value pair.
   return makeParserResult(
