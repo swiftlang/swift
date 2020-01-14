@@ -21,6 +21,7 @@
 #include "swift/Basic/SourceManager.h"
 #include "swift/Driver/FrontendUtil.h"
 #include "swift/Frontend/Frontend.h"
+#include "swift/Parse/Lexer.h"
 #include "swift/Parse/PersistentParserState.h"
 #include "swift/Subsystems.h"
 #include "llvm/ADT/Hashing.h"
@@ -159,27 +160,27 @@ bool CompletionInstance::performCachedOperaitonIfPossible(
   if (oldInfo.Kind != CodeCompletionDelayedDeclKind::FunctionBody)
     return false;
 
-  auto newBufferID = SM.addMemBufferCopy(completionBuffer);
-  SM.setCodeCompletionPoint(newBufferID, Offset);
-
   // Parse the new buffer into temporary SourceFile.
+  SourceManager tmpSM;
+  auto tmpBufferID = tmpSM.addMemBufferCopy(completionBuffer);
+  tmpSM.setCodeCompletionPoint(tmpBufferID, Offset);
+
   LangOptions langOpts;
   langOpts.DisableParserLookup = true;
   TypeCheckerOptions typeckOpts;
   SearchPathOptions searchPathOpts;
-  DiagnosticEngine Diags(SM);
+  DiagnosticEngine tmpDiags(tmpSM);
   std::unique_ptr<ASTContext> Ctx(
-      ASTContext::get(langOpts, typeckOpts, searchPathOpts, SM, Diags));
+      ASTContext::get(langOpts, typeckOpts, searchPathOpts, tmpSM, tmpDiags));
   registerIDERequestFunctions(Ctx->evaluator);
   registerTypeCheckerRequestFunctions(Ctx->evaluator);
   ModuleDecl *M = ModuleDecl::create(Identifier(), *Ctx);
-  unsigned BufferID = SM.getCodeCompletionBufferID();
   PersistentParserState newState;
   SourceFile *newSF =
-      new (*Ctx) SourceFile(*M, SourceFileKind::Library, BufferID,
+      new (*Ctx) SourceFile(*M, SourceFileKind::Library, tmpBufferID,
                             SourceFile::ImplicitModuleImportKind::None);
   newSF->enableInterfaceHash();
-  parseIntoSourceFileFull(*newSF, BufferID, &newState);
+  parseIntoSourceFileFull(*newSF, tmpBufferID, &newState);
   // Couldn't find any completion token?
   if (!newState.hasCodeCompletionDelayedDeclState())
     return false;
@@ -208,6 +209,36 @@ bool CompletionInstance::performCachedOperaitonIfPossible(
   // OK, we can perform fast completion for this. Update the orignal delayed
   // decl state.
 
+  // Fast completion keeps the buffer in memory for multiple completions.
+  // To reduce the consumption, slice the source buffer so it only holds
+  // the portion that is needed for the second pass.
+  auto startOffset = newInfo.StartOffset;
+  if (newInfo.PrevOffset != ~0u)
+    startOffset = newInfo.PrevOffset;
+  auto startLoc = tmpSM.getLocForOffset(tmpBufferID, startOffset);
+  startLoc = Lexer::getLocForStartOfLine(tmpSM, startLoc);
+  startOffset = tmpSM.getLocOffsetInBuffer(startLoc, tmpBufferID);
+
+  auto endOffset = newInfo.EndOffset;
+  auto endLoc = tmpSM.getLocForOffset(tmpBufferID, endOffset);
+  endLoc = Lexer::getLocForEndOfToken(tmpSM, endLoc);
+  endOffset = tmpSM.getLocOffsetInBuffer(endLoc, tmpBufferID);
+
+  newInfo.StartOffset -= startOffset;
+  newInfo.EndOffset -= startOffset;
+  if (newInfo.PrevOffset != ~0u)
+    newInfo.PrevOffset -= startOffset;
+
+  auto sourceText = completionBuffer->getBuffer().slice(startOffset, endOffset);
+  auto newOffset = Offset - startOffset;
+
+  auto newBufferID =
+      SM.addMemBufferCopy(sourceText, completionBuffer->getBufferIdentifier());
+  SM.openVirtualFile(SM.getLocForBufferStart(newBufferID),
+                     tmpSM.getDisplayNameForLoc(startLoc),
+                     tmpSM.getLineAndColumn(startLoc).first - 1);
+  SM.setCodeCompletionPoint(newBufferID, newOffset);
+
   // Construct dummy scopes. We don't need to restore the original scope
   // because they are probably not 'isResolvable()' anyway.
   auto &SI = oldState.getScopeInfo();
@@ -227,8 +258,8 @@ bool CompletionInstance::performCachedOperaitonIfPossible(
   if (DiagC)
     CI.addDiagnosticConsumer(DiagC);
 
-  CI.getDiags().diagnose(SM.getLocForOffset(BufferID, newInfo.StartOffset),
-                          diag::completion_reusing_astcontext);
+  CI.getDiags().diagnose(SM.getLocForOffset(newBufferID, newInfo.StartOffset),
+                         diag::completion_reusing_astcontext);
 
   Callback(CI);
 
