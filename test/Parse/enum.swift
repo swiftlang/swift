@@ -549,8 +549,8 @@ enum switch {} // expected-error {{keyword 'switch' cannot be used as an identif
 
 enum SE0155 {
   case emptyArgs() // expected-warning {{enum element with associated values must have at least one associated value}}
-  // expected-note@-1 {{did you mean to remove the empty associated value list?}} {{17-18=}}
-  // expected-note@-2 {{did you mean to explicitly add a 'Void' associated value?}} {{17-17=Void}}
+  // expected-note@-1 {{did you mean to remove the empty associated value list?}} {{17-19=}}
+  // expected-note@-2 {{did you mean to explicitly add a 'Void' associated value?}} {{18-18=Void}}
 }
 
 // SR-11261
