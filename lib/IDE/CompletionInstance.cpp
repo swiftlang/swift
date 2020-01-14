@@ -293,6 +293,11 @@ bool swift::ide::CompletionInstance::performOperation(
   // source text. That breaks an invariant of syntax tree building.
   Invocation.getLangOptions().BuildSyntaxTree = false;
 
+  // This validation may call stat(2) many times. Disable it to prevent
+  // performance regression.
+  Invocation.getSearchPathOptions().DisableModulesValidateSystemDependencies =
+      true;
+
   // FIXME: ASTScopeLookup doesn't support code completion yet.
   Invocation.disableASTScopeLookup();
 
