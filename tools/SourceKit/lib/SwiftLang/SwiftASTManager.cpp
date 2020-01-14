@@ -539,6 +539,11 @@ bool SwiftASTManager::initCompilerInvocation(
   // We don't care about LLVMArgs
   FrontendOpts.LLVMArgs.clear();
 
+  // This validation may call stat(2) many times. Disable it to prevent
+  // performance issues.
+  Invocation.getSearchPathOptions().DisableModulesValidateSystemDependencies =
+      true;
+
   // SwiftSourceInfo files provide source location information for decls coming
   // from loaded modules. For most IDE use cases it either has an undesirable
   // impact on performance with no benefit (code completion), results in stale
