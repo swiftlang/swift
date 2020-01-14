@@ -12,5 +12,5 @@ func test() -> Foo {
 }
 
 // RUN: %sourcekitd-test -req=complete -pos=11:11 %s -- %s > %t.response
-// RUN: diff -u %s.response %t.response
+// RUN: diff --strip-trailing-cr -u %s.response %t.response
 
