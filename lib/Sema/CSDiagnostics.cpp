@@ -670,6 +670,19 @@ bool GenericArgumentsMismatchFailure::diagnoseAsError() {
       break;
     }
 
+    case ConstraintLocator::TupleElement: {
+      auto *anchor = getRawAnchor();
+
+      if (isa<ArrayExpr>(anchor)) {
+        diagnostic = getDiagnosticFor(CTP_ArrayElement);
+      } else if (isa<DictionaryExpr>(anchor)) {
+        auto eltLoc = last.castTo<LocatorPathElt::TupleElement>();
+        diagnostic = getDiagnosticFor(
+            eltLoc.getIndex() == 0 ? CTP_DictionaryKey : CTP_DictionaryValue);
+      }
+      break;
+    }
+
     default:
       return false;
     }
