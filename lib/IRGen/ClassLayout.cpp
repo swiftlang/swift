@@ -46,7 +46,9 @@ Size ClassLayout::getInstanceStart() const {
     elements = elements.drop_front();
 
     // Ignore empty elements.
-    if (element.isEmpty()) {
+    if (element.isEmptyWithOffset()) {
+      return element.getByteOffset();
+    } if (element.isEmpty()) {
       continue;
     } else if (element.hasByteOffset()) {
       // FIXME: assumes layout is always sequential!

@@ -81,8 +81,11 @@ class ElementLayout {
 public:
   enum class Kind {
     /// The element is known to require no storage in the aggregate.
-    /// Its offset in the aggregate is always statically zero.
     Empty,
+
+    /// The element is known to require no storage in the aggregate.
+    /// Its offset in the aggregate is always statically zero.
+    EmptyNonFixed,
 
     /// The element is known to require no storage in the aggregate.
     /// But it has an offset in the aggregate. This is to support getting the
@@ -145,8 +148,15 @@ public:
     Index = other.Index;
   }
 
-  void completeEmpty(IsPOD_t isPOD) {
+  void completeEmpty(IsPOD_t isPOD, Size byteOffset) {
     TheKind = unsigned(Kind::Empty);
+    IsPOD = unsigned(isPOD);
+    ByteOffset = byteOffset.getValue();
+    Index = 0; // make a complete write of the bitfield
+    assert(getByteOffset() == byteOffset);
+  }
+  void completeEmptyNonFixed(IsPOD_t isPOD) {
+    TheKind = unsigned(Kind::EmptyNonFixed);
     IsPOD = unsigned(isPOD);
     ByteOffset = 0;
     Index = 0; // make a complete write of the bitfield
@@ -195,9 +205,11 @@ public:
 
   /// Is this element known to be empty?
   bool isEmpty() const {
-    return getKind() == Kind::Empty ||
+    return getKind() == Kind::Empty || getKind() == Kind::EmptyNonFixed ||
            getKind() == Kind::EmptyTailAllocatedCType;
   }
+
+  bool isEmptyWithOffset() const { return getKind() == Kind::Empty; }
 
   /// Is this element known to be POD?
   IsPOD_t isPOD() const {
@@ -209,6 +221,7 @@ public:
   bool hasByteOffset() const {
     switch (getKind()) {
     case Kind::Empty:
+    case Kind::EmptyNonFixed:
     case Kind::EmptyTailAllocatedCType:
     case Kind::Fixed:
       return true;
@@ -329,7 +342,8 @@ public:
 private:
   void addFixedSizeElement(ElementLayout &elt);
   void addNonFixedSizeElement(ElementLayout &elt);
-  void addEmptyElement(ElementLayout &elt);
+  void addEmptyElementAtFixedOffset(ElementLayout &elt);
+  void addEmptyElementAtNonFixedOffset(ElementLayout &elt);
 
   void addElementAtFixedOffset(ElementLayout &elt);
   void addElementAtNonFixedOffset(ElementLayout &elt);

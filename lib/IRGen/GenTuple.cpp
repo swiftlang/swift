@@ -149,6 +149,7 @@ namespace {
       const TupleFieldInfo &field = asImpl().getFields()[fieldNo];
       switch (field.getKind()) {
       case ElementLayout::Kind::Empty:
+      case ElementLayout::Kind::EmptyNonFixed:
       case ElementLayout::Kind::EmptyTailAllocatedCType:
       case ElementLayout::Kind::Fixed:
         return field.getFixedByteOffset();
@@ -195,6 +196,7 @@ namespace {
         }
         
         case ElementLayout::Kind::Empty:
+        case ElementLayout::Kind::EmptyNonFixed:
         case ElementLayout::Kind::EmptyTailAllocatedCType:
         case ElementLayout::Kind::InitialNonFixedSize:
         case ElementLayout::Kind::NonFixed:

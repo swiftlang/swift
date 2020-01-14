@@ -156,6 +156,7 @@ Address ElementLayout::project(IRGenFunction &IGF, Address baseAddr,
                                const llvm::Twine &suffix) const {
   switch (getKind()) {
   case Kind::Empty:
+  case Kind::EmptyNonFixed:
   case Kind::EmptyTailAllocatedCType:
     return getType().getUndefAddress();
 
@@ -217,7 +218,10 @@ bool StructLayoutBuilder::addField(ElementLayout &elt,
   IsKnownAlwaysFixedSize &= eltTI.isFixedSize(ResilienceExpansion::Minimal);
 
   if (eltTI.isKnownEmpty(ResilienceExpansion::Maximal)) {
-    addEmptyElement(elt);
+    if (isFixedLayout())
+      addEmptyElementAtFixedOffset(elt);
+    else
+      addEmptyElementAtNonFixedOffset(elt);
     // If the element type is empty, it adds nothing.
     NextNonFixedOffsetIndex++;
     return false;
@@ -307,10 +311,12 @@ void StructLayoutBuilder::addNonFixedSizeElement(ElementLayout &elt) {
 }
 
 /// Add an empty element to the aggregate.
-void StructLayoutBuilder::addEmptyElement(ElementLayout &elt) {
-  elt.completeEmpty(elt.getType().isPOD(ResilienceExpansion::Maximal));
+void StructLayoutBuilder::addEmptyElementAtNonFixedOffset(ElementLayout &elt) {
+  elt.completeEmptyNonFixed(elt.getType().isPOD(ResilienceExpansion::Maximal));
 }
-
+void StructLayoutBuilder::addEmptyElementAtFixedOffset(ElementLayout &elt) {
+  elt.completeEmpty(elt.getType().isPOD(ResilienceExpansion::Maximal), CurSize);
+}
 /// Add an element at the fixed offset of the current end of the
 /// aggregate.
 void StructLayoutBuilder::addElementAtFixedOffset(ElementLayout &elt) {
