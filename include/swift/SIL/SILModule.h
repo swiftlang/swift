@@ -254,7 +254,7 @@ private:
   bool wholeModule;
 
   /// The options passed into this SILModule.
-  SILOptions &Options;
+  const SILOptions &Options;
 
   /// Set if the SILModule was serialized already. It is used
   /// to ensure that the module is serialized only once.
@@ -270,7 +270,7 @@ private:
   // Intentionally marked private so that we need to use 'constructSIL()'
   // to construct a SILModule.
   SILModule(ModuleDecl *M, Lowering::TypeConverter &TC,
-            SILOptions &Options, const DeclContext *associatedDC,
+            const SILOptions &Options, const DeclContext *associatedDC,
             bool wholeModule);
 
   SILModule(const SILModule&) = delete;
@@ -351,13 +351,13 @@ public:
   /// source file.
   static std::unique_ptr<SILModule>
   constructSIL(ModuleDecl *M, Lowering::TypeConverter &TC,
-               SILOptions &Options, FileUnit *sf = nullptr);
+               const SILOptions &Options, FileUnit *sf = nullptr);
 
   /// Create and return an empty SIL module that we can
   /// later parse SIL bodies directly into, without converting from an AST.
   static std::unique_ptr<SILModule>
   createEmptyModule(ModuleDecl *M, Lowering::TypeConverter &TC,
-                    SILOptions &Options,
+                    const SILOptions &Options,
                     bool WholeModule = false);
 
   /// Get the Swift module associated with this SIL module.
@@ -390,7 +390,7 @@ public:
   /// Returns true if it is the optimized OnoneSupport module.
   bool isOptimizedOnoneSupportModule() const;
 
-  SILOptions &getOptions() const { return Options; }
+  const SILOptions &getOptions() const { return Options; }
 
   using iterator = FunctionListType::iterator;
   using const_iterator = FunctionListType::const_iterator;
