@@ -1068,6 +1068,11 @@ static bool writeLdAddCFileIfNeeded(CompilerInvocation &Invocation,
                                  diag::tbd_only_supported_in_whole_module);
     return true;
   }
+  if (!Invocation.getTBDGenOptions().ModuleInstallNameMapPath.empty()) {
+    Instance.getDiags().diagnose(SourceLoc(),
+                                 diag::linker_directives_choice_confusion);
+    return true;
+  }
   auto tbdOpts = Invocation.getTBDGenOptions();
   tbdOpts.LinkerDirectivesOnly = true;
   llvm::StringSet<> ldSymbols;
