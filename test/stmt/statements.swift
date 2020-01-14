@@ -254,7 +254,6 @@ func DoWhileStmt2() {
 
 func LabeledDoStmt() {
   LABEL: { // expected-error {{labeled block needs 'do'}} {{8-8=do}}
-  // expected-error@-1 {{use of unresolved identifier 'LABEL'}}
   }
 }
 

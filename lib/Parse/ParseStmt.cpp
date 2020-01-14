@@ -93,6 +93,10 @@ bool Parser::isStartOfStmt() {
     Parser::BacktrackingScope backtrack(*this);
     consumeToken(tok::identifier);
     consumeToken(tok::colon);
+
+    if (Tok.is(tok::l_brace)) {
+      return true;
+    }
     // For better recovery, we just accept a label on any statement.  We reject
     // putting a label on something inappropriate in parseStmt().
     return isStartOfStmt();
@@ -345,16 +349,9 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
         PreviousHadSemi || Tok.isAtStartOfLine();
     if (!IsAtStartOfLineOrPreviousHadSemi) {
       SourceLoc EndOfPreviousLoc = getEndOfPreviousLoc();
-      if (Tok.getKind() == tok::colon && peekToken().getKind() == tok::l_brace) {
-        diagnose(EndOfPreviousLoc, diag::labeled_block_needs_do)
-          .fixItInsert(EndOfPreviousLoc, "do");
-        skipUntilDeclStmtRBrace(tok::r_brace);
-        continue;
-      } else {
-        diagnose(EndOfPreviousLoc, diag::statement_same_line_without_semi)
-          .fixItInsert(EndOfPreviousLoc, ";");
-        // FIXME: Add semicolon to the AST?
-      }
+      diagnose(EndOfPreviousLoc, diag::statement_same_line_without_semi)
+        .fixItInsert(EndOfPreviousLoc, ";");
+      // FIXME: Add semicolon to the AST?
     }
 
     ParserPosition BeginParserPosition;
@@ -644,6 +641,12 @@ ParserResult<Stmt> Parser::parseStmt() {
     if (LabelInfo) diagnose(LabelInfo.Loc, diag::invalid_label_on_stmt);
     if (tryLoc.isValid()) diagnose(tryLoc, diag::try_on_stmt, Tok.getText());
     return parseStmtPoundAssert();
+  case tok::l_brace:
+    if (tryLoc.isValid()) diagnose(tryLoc, diag::try_on_stmt, Tok.getText());
+    SourceLoc colonLoc = Lexer::getTokenAtLocation(SourceMgr, PreviousLoc).getLoc();
+    diagnose(colonLoc, diag::labeled_block_needs_do)
+      .fixItInsert(colonLoc, "do");
+    return parseStmtDo(LabelInfo, /*shouldSkipDoTokenConsume*/ true);
   }
 }
 
@@ -1882,9 +1885,9 @@ ParserResult<Stmt> Parser::parseStmtRepeat(LabeledStmtInfo labelInfo) {
 ///   stmt-do:
 ///     (identifier ':')? 'do' stmt-brace
 ///     (identifier ':')? 'do' stmt-brace stmt-catch+
-ParserResult<Stmt> Parser::parseStmtDo(LabeledStmtInfo labelInfo) {
+ParserResult<Stmt> Parser::parseStmtDo(LabeledStmtInfo labelInfo, bool shouldSkipDoTokenConsume) {
   SyntaxContext->setCreateSyntax(SyntaxKind::DoStmt);
-  SourceLoc doLoc = consumeToken(tok::kw_do);
+  SourceLoc doLoc = shouldSkipDoTokenConsume ? Tok.getLoc() : consumeToken(tok::kw_do);
 
   ParserStatus status;
 
