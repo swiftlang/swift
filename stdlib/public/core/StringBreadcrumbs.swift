@@ -111,7 +111,7 @@ extension _StringBreadcrumbs {
 extension _StringGuts {
   @_effects(releasenone)
   internal func getBreadcrumbsPtr() -> UnsafePointer<_StringBreadcrumbs> {
-    _internalInvariant(hasBreadcrumbs)
+    _internalInvariant(mayHaveBreadcrumbs)
 
     let mutPtr: UnsafeMutablePointer<_StringBreadcrumbs?>
     if hasNativeStorage {

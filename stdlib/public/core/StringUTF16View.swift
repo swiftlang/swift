@@ -509,11 +509,14 @@ extension String.Index {
 }
 
 // Breadcrumb-aware acceleration
-extension String.UTF16View {
-  // A simple heuristic we can always tweak later. Not needed for correctness
-  @inlinable @inline(__always)
-  internal var _shortHeuristic: Int { return 32 }
+extension _StringGuts {
+  @inline(__always)
+  fileprivate func _useBreadcrumbs(forEncodedOffset offset: Int) -> Bool {
+    return mayHaveBreadcrumbs && offset >= _StringBreadcrumbs.breadcrumbStride
+  }
+}
 
+extension String.UTF16View {
   @usableFromInline
   @_effects(releasenone)
   internal func _nativeGetOffset(for idx: Index) -> Int {
@@ -526,7 +529,8 @@ extension String.UTF16View {
     }
 
     let idx = _utf16AlignNativeIndex(idx)
-    if idx._encodedOffset < _shortHeuristic || !_guts.hasBreadcrumbs {
+
+    guard _guts._useBreadcrumbs(forEncodedOffset: idx._encodedOffset) else {
       return _distance(from: startIndex, to: idx)
     }
 
@@ -548,7 +552,7 @@ extension String.UTF16View {
 
     if _guts.isASCII { return Index(_encodedOffset: offset) }
 
-    if offset < _shortHeuristic || !_guts.hasBreadcrumbs {
+    guard _guts._useBreadcrumbs(forEncodedOffset: offset) else {
       return _index(startIndex, offsetBy: offset)
     }
 

@@ -29,13 +29,15 @@ private func report<S: CustomStringConvertible>(
 extension String {
   // DO NOT PUSH: Just for gathering stats
   public struct _AllocationStats {
+    // Size of the entire allocation, as determined by malloc_size
     public var totalAllocationSize: Int
 
+    // Each of the components of that allocation
     public var headerSize: Int
     public var usedCodeUnitSize: Int
     public var terminatorSize: Int { 1 }
     public var spareCodeUnitCapacity: Int
-    public var breadcrumbPointerSize: Int { MemoryLayout<Int>.size }
+    public var breadcrumbPointerSize: Int
 
     public var unclaimedCapacity: Int {
       totalAllocationSize - headerSize - usedCodeUnitSize - terminatorSize
@@ -43,18 +45,20 @@ extension String {
     }
 
     internal init(_ storage: __StringStorage) {
-      let storageAddr = UnsafeMutableRawPointer(
+      let storageAddr = UnsafeRawPointer(
         Builtin.bridgeToRawPointer(storage))
 
-      let codeUnitAddr = UnsafeMutableRawPointer(storage.mutableStart)
-      let terminatorAddr = UnsafeMutableRawPointer(storage.terminator)
-      let breadcrumbAddr = UnsafeMutableRawPointer(storage._breadcrumbsAddress)
+      let codeUnitAddr = UnsafeRawPointer(storage.mutableStart)
+      let terminatorAddr = UnsafeRawPointer(storage.terminator)
+      let capacityEndAddr = UnsafeRawPointer(storage._realCapacityEnd)
 
       self.totalAllocationSize = _swift_stdlib_malloc_size(storageAddr)
       self.headerSize = codeUnitAddr - storageAddr
       self.usedCodeUnitSize = terminatorAddr - codeUnitAddr
       self.spareCodeUnitCapacity =
-        breadcrumbAddr - terminatorAddr - 1 /* self.terminatorSize */
+        capacityEndAddr - terminatorAddr - 1 /* self.terminatorSize */
+      self.breadcrumbPointerSize =
+        storage.hasBreadcrumbs ? MemoryLayout<Int>.size : 0
 
       // Some sanity checks
       assert(headerSize == _StringObject.nativeBias)
@@ -163,9 +167,14 @@ final internal class __StringStorage
   }
 
   deinit {
-    _breadcrumbsAddress.deinitialize(count: 1)
+    if hasBreadcrumbs {
+      _breadcrumbsAddress.deinitialize(count: 1)
+    }
   }
 }
+
+
+
 
 // Determine the actual number of code unit capacity to request from malloc. We
 // round up the nearest multiple of 8 that isn't a mulitple of 16, to fully
@@ -175,7 +184,11 @@ final internal class __StringStorage
 // NOTE: We may still under-utilize the spare bytes from the actual allocation
 // for Strings ~1KB or larger, though at this point we're well into our growth
 // curve.
-private func determineCodeUnitCapacity(_ desiredCapacity: Int) -> Int {
+//
+// TODO: Further comment, or refactor logic, incorporating breadcrumbs decision
+private func determineCodeUnitCapacity(
+  _ desiredCapacity: Int
+) -> (realCodeUnitCapacity: Int, includeBreadcrumbs: Bool) {
 #if arch(i386) || arch(arm) || arch(wasm32)
   // FIXME: Adapt to actual 32-bit allocator. For now, let's arrange things so
   // that the instance size will be a multiple of 4.
@@ -190,12 +203,31 @@ private func determineCodeUnitCapacity(_ desiredCapacity: Int) -> Int {
   // Bigger than _SmallString, and we need 1 extra for nul-terminator.
   let minCap = 1 + desiredCapacity// Swift.max(desiredCapacity, _SmallString.capacity)
   _internalInvariant(minCap < 0x1_0000_0000_0000, "max 48-bit length")
+  _internalInvariant(minCap > 0)
 
-  // Round up to the nearest multiple of 8 that isn't also a multiple of 16.
-  let capacity = ((minCap + 7) & -16) + 8
-  _internalInvariant(
-    capacity > desiredCapacity && capacity % 8 == 0 && capacity % 16 != 0)
-  return capacity
+  // If the resultant code unit capacity is less than the breadcrumbs stride,
+  // don't allocate a breadcrumb pointer. We determine this by checking if we
+  // are within a bucket (estimated to be 16 bytes) of that stride by
+  // overestimating the result.
+  let (capacity, includeBreadcrumbs): (Int, Bool)
+
+  // Round up to the nearest multiple of 16 (bucket estimate)
+  let crumblessCapacity = (minCap + 15) & -16
+
+  // We over-allocate by 1 for the nul-terminator, which should not participate
+  // in the breadcrumb stride
+  if crumblessCapacity - 1 < _StringBreadcrumbs.breadcrumbStride {
+    (capacity, includeBreadcrumbs) = (crumblessCapacity, false)
+  } else {
+    // Round up to the nearest multiple of 8 that isn't also a multiple of 16.
+    capacity = ((minCap + 7) & -16) + 8
+    _internalInvariant(
+      capacity > desiredCapacity && capacity % 8 == 0 && capacity % 16 != 0)
+    includeBreadcrumbs = true
+  }
+
+  _internalInvariant(capacity <= minCap + 15, "We exceeded the nearest bucket")
+  return (capacity, includeBreadcrumbs)
 #endif
 }
 
@@ -203,12 +235,23 @@ private func determineCodeUnitCapacity(_ desiredCapacity: Int) -> Int {
 extension __StringStorage {
   @_effects(releasenone)
   private static func create(
-    realCodeUnitCapacity: Int, countAndFlags: CountAndFlags
+    realCodeUnitCapacity: Int,
+    countAndFlags: CountAndFlags,
+    includeBreadcrumbs: Bool
   ) -> __StringStorage {
-    let storage = Builtin.allocWithTailElems_2(
-      __StringStorage.self,
-      realCodeUnitCapacity._builtinWordValue, UInt8.self,
-      1._builtinWordValue, Optional<_StringBreadcrumbs>.self)
+
+    let storage: __StringStorage
+    if includeBreadcrumbs {
+      storage = Builtin.allocWithTailElems_2(
+        __StringStorage.self,
+        realCodeUnitCapacity._builtinWordValue, UInt8.self,
+        1._builtinWordValue, Optional<_StringBreadcrumbs>.self)
+    } else {
+      storage = Builtin.allocWithTailElems_1(
+        __StringStorage.self,
+        realCodeUnitCapacity._builtinWordValue, UInt8.self)
+    }
+
 #if arch(i386) || arch(arm) || arch(wasm32)
     storage._realCapacity = realCodeUnitCapacity
     storage._count = countAndFlags.count
@@ -219,7 +262,12 @@ extension __StringStorage {
     storage._countAndFlags = countAndFlags
 #endif
 
-    storage._breadcrumbsAddress.initialize(to: nil)
+    // FIXME TODO: Add a bit on the storage class that tracks breadcrumb-ness
+    // and guard all access on that bit, likely through a hard precondition
+    if storage.hasBreadcrumbs {
+      storage._breadcrumbsAddress.initialize(to: nil)
+    }
+
     storage.terminator.pointee = 0 // nul-terminated
 
     // NOTE: We can't _invariantCheck() now, because code units have not been
@@ -233,11 +281,13 @@ extension __StringStorage {
   ) -> __StringStorage {
     _internalInvariant(capacity >= countAndFlags.count)
 
-    let realCapacity = determineCodeUnitCapacity(capacity)
+    let (realCapacity, includeBreadcrumbs) = determineCodeUnitCapacity(capacity)
     _internalInvariant(realCapacity > capacity)
 
     let storage = __StringStorage.create(
-      realCodeUnitCapacity: realCapacity, countAndFlags: countAndFlags)
+      realCodeUnitCapacity: realCapacity,
+      countAndFlags: countAndFlags,
+      includeBreadcrumbs: includeBreadcrumbs)
 
     return storage
   }
@@ -305,6 +355,11 @@ extension __StringStorage {
 
 // Usage
 extension __StringStorage {
+  internal var hasBreadcrumbs: Bool {
+    // FIXME: Record and rely on a bit on capacityAndFlags instead
+    (_realCapacity - 1) >= _StringBreadcrumbs.breadcrumbStride
+  }
+
   @inline(__always)
   internal var mutableStart: UnsafeMutablePointer<UInt8> {
     return UnsafeMutablePointer(Builtin.projectTailElems(self, UInt8.self))
@@ -335,14 +390,24 @@ extension __StringStorage {
     return UnsafeBufferPointer(start: start, count: count)
   }
 
-  // @opaque
-  internal var _breadcrumbsAddress: UnsafeMutablePointer<_StringBreadcrumbs?> {
-    let raw = Builtin.getTailAddr_Word(
+  // The address after the last bytes of capacity
+  //
+  // If breadcrumbs are present, this will point to them, otherwise it will
+  // point to the end of the allocation (as far as Swift is concerned).
+  internal var _realCapacityEnd: Builtin.RawPointer {
+    Builtin.getTailAddr_Word(
       start._rawValue,
       _realCapacity._builtinWordValue,
       UInt8.self,
       Optional<_StringBreadcrumbs>.self)
-    return UnsafeMutablePointer(raw)
+  }
+
+  // @opaque
+  internal var _breadcrumbsAddress: UnsafeMutablePointer<_StringBreadcrumbs?> {
+    // TODO: better message
+    precondition(
+      hasBreadcrumbs, "Internal error: string breadcrumbs not present")
+    return UnsafeMutablePointer(_realCapacityEnd)
   }
 
   // The total capacity available for code units. Note that this excludes the
@@ -383,11 +448,15 @@ extension __StringStorage {
     if isASCII {
       _internalInvariant(_allASCII(self.codeUnits))
     }
-    if let crumbs = _breadcrumbsAddress.pointee {
+    if hasBreadcrumbs, let crumbs = _breadcrumbsAddress.pointee {
       crumbs._invariantCheck(for: self.asString)
     }
     _internalInvariant(_countAndFlags.isNativelyStored)
     _internalInvariant(_countAndFlags.isTailAllocated)
+
+    // Capacity end
+    _internalInvariant(UnsafeMutablePointer<UInt8>(_realCapacityEnd)
+      == unusedStorage.baseAddress! + (unusedStorage.count + 1))
   }
   #endif // INTERNAL_CHECKS_ENABLED
 }
@@ -408,7 +477,9 @@ extension __StringStorage {
     self.terminator.pointee = 0
 
     // TODO(String performance): Consider updating breadcrumbs when feasible.
-    self._breadcrumbsAddress.pointee = nil
+    if hasBreadcrumbs {
+      self._breadcrumbsAddress.pointee = nil
+    }
     _invariantCheck()
   }
 
