@@ -157,34 +157,29 @@ struct ComplexDynamic<U, V> {
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @explode_complex_dynamic
 sil @explode_complex_dynamic : $<A, B> (@in ComplexDynamic<A, B>, @inout Byteful, @inout A, @inout B, @inout Chareth) -> () {
 entry(%0 : $*ComplexDynamic<A, B>, %1 : $*Byteful, %2 : $*A, %3 : $*B, %4 : $*Chareth):
+  // CHECK: [[A:%.*]] = getelementptr inbounds %T15generic_structs14ComplexDynamicV, %T15generic_structs14ComplexDynamicV* %0
+  // CHECK: [[PTR1:%.*]] = bitcast %T15generic_structs14ComplexDynamicV* %0
+  // CHECK-NEXT: [[EL:%.*]] = getelementptr inbounds i8, i8* [[PTR1]]
+  // CHECK-NEXT: [[B:%.*]] = bitcast i8* [[EL]] to %swift.opaque*
+
   %a = struct_element_addr %0 : $*ComplexDynamic<A, B>, #ComplexDynamic.a2
-
-  // CHECK: [[METADATA:%.*]] = bitcast %swift.type* {{%.*}} to i32*
-  // CHECK: [[FIELD_OFFSET_VECTOR:%.*]] = getelementptr inbounds i32, i32* [[METADATA]], i64 8
-  // CHECK: [[FIELD_OFFSET_ADDR:%.*]] = getelementptr inbounds i32, i32* [[FIELD_OFFSET_VECTOR]], i32 2
-  // CHECK: [[FIELD_OFFSET:%.*]] = load i32, i32* [[FIELD_OFFSET_ADDR]], align 8
-  // CHECK: [[BYTES:%.*]] = bitcast %T15generic_structs14ComplexDynamicV* %0 to i8*
-  // CHECK: [[BYTE_OFFSET:%.*]] = getelementptr inbounds i8, i8* [[BYTES]], i32 [[FIELD_OFFSET]]
-  // CHECK: bitcast i8* [[BYTE_OFFSET]] to %swift.opaque*
   %b = struct_element_addr %0 : $*ComplexDynamic<A, B>, #ComplexDynamic.b
-
-  // CHECK: [[METADATA:%.*]] = bitcast %swift.type* {{%.*}} to i32*
-  // CHECK: [[FIELD_OFFSET_VECTOR:%.*]] = getelementptr inbounds i32, i32* [[METADATA]], i64 8
-  // CHECK: [[FIELD_OFFSET_ADDR:%.*]] = getelementptr inbounds i32, i32* [[FIELD_OFFSET_VECTOR]], i32 3
-  // CHECK: [[FIELD_OFFSET:%.*]] = load i32, i32* [[FIELD_OFFSET_ADDR]], align 8
-  // CHECK: [[BYTES:%.*]] = bitcast %T15generic_structs14ComplexDynamicV* %0 to i8*
-  // CHECK: [[BYTE_OFFSET:%.*]] = getelementptr inbounds i8, i8* [[BYTES]], i32 [[FIELD_OFFSET]]
-  // CHECK: bitcast i8* [[BYTE_OFFSET]] to %T15generic_structs13SingleDynamicV
+  
+  // CHECK: [[PTR2:%.*]] = bitcast %T15generic_structs14ComplexDynamicV* %0
+  // CHECK-NEXT: [[C_PTR:%.*]] = getelementptr inbounds i8, i8* [[PTR2]], i64 35
+  // CHECK-NEXT: [[C:%.*]] = bitcast i8* [[C_PTR]] to %T15generic_structs13SingleDynamicV*
+  // CHECK-NEXT: [[C_X:%.*]] = bitcast %T15generic_structs13SingleDynamicV* [[C]] to %swift.opaque*
+  
+  // CHECK: [[PTR3:%.*]] = bitcast %T15generic_structs14ComplexDynamicV* %0
+  // CHECK-NEXT: [[D_PTR:%.*]] = getelementptr inbounds i8, i8* [[PTR3]], i64 36
+  // CHECK-NEXT: [[D:%.*]] = bitcast i8* [[D_PTR]] to %T15generic_structs7CharethV*
+  
+  // CHECK: call %T15generic_structs7BytefulV* @"$s15generic_structs7BytefulVWOf"(%T15generic_structs7BytefulV* [[A]], %T15generic_structs7BytefulV* %1)
+  // CHECK: call %swift.opaque* %assignWithCopy(%swift.opaque* %2, %swift.opaque* [[B]], %swift.type* %A)
+  // CHECK: call %swift.opaque* %assignWithCopy3(%swift.opaque* %3, %swift.opaque* [[C_X]], %swift.type* %B)
+  // CHECK: call %T15generic_structs7CharethV* @"$s15generic_structs7CharethVWOf"(%T15generic_structs7CharethV* [[D]], %T15generic_structs7CharethV* %4)
   %5 = struct_element_addr %0 : $*ComplexDynamic<A, B>, #ComplexDynamic.c
   %c = struct_element_addr %5 : $*SingleDynamic<B>, #SingleDynamic.x
-
-  // CHECK: [[METADATA:%.*]] = bitcast %swift.type* {{%.*}} to i32*
-  // CHECK: [[FIELD_OFFSET_VECTOR:%.*]] = getelementptr inbounds i32, i32* [[METADATA]], i64 8
-  // CHECK: [[FIELD_OFFSET_ADDR:%.*]] = getelementptr inbounds i32, i32* [[FIELD_OFFSET_VECTOR]], i32 4
-  // CHECK: [[FIELD_OFFSET:%.*]] = load i32, i32* [[FIELD_OFFSET_ADDR]], align 8
-  // CHECK: [[BYTES:%.*]] = bitcast %T15generic_structs14ComplexDynamicV* %0 to i8*
-  // CHECK: [[BYTE_OFFSET:%.*]] = getelementptr inbounds i8, i8* [[BYTES]], i32 [[FIELD_OFFSET]]
-  // CHECK: bitcast i8* [[BYTE_OFFSET]] to %T15generic_structs7CharethV
   %d = struct_element_addr %0 : $*ComplexDynamic<A, B>, #ComplexDynamic.d
   copy_addr %a to %1 : $*Byteful
   copy_addr %b to %2 : $*A

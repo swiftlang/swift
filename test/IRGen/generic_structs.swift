@@ -39,12 +39,19 @@ public struct GenericStruct<T : Proto> {
 }
 
 // CHECK-LABEL: define{{.*}} swiftcc void @"$s15generic_structs13GenericStructVACyxGycfC"
-// CHECK:  [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s15generic_structs13GenericStructVMa"([[INT]] 0, %swift.type* %T, i8** %T.Proto)
-// CHECK:  [[TYPE:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
-// CHECK:  [[PTR:%.*]] = bitcast %swift.type* [[TYPE]] to [[INT_32]]*
-// CHECK:  [[FIELDOFFSETS:%.*]] = getelementptr inbounds [[INT_32]], [[INT_32]]* [[PTR]], [[INT]] [[IDX:4|8]]
-// CHECK:  [[FIELDOFFSET:%.*]] = getelementptr inbounds [[INT_32]], [[INT_32]]* [[FIELDOFFSETS]], i32 2
-// CHECK:  [[OFFSET:%.*]] = load [[INT_32]], [[INT_32]]* [[FIELDOFFSET]]
-// CHECK:  [[ADDROFOPT:%.*]] = getelementptr inbounds i8, i8* {{.*}}, [[INT_32]] [[OFFSET]]
-// CHECK:  [[OPTPTR:%.*]] = bitcast i8* [[ADDROFOPT]] to %TSq*
-// CHECK:  call %TSq* @"$sxSg15generic_structs5ProtoRzlWOb"(%TSq* {{.*}}, %TSq* [[OPTPTR]]
+// CHECK: [[VTABLE:%.*]] = bitcast i8** %.valueWitnesses to %swift.vwtable*
+// CHECK-NEXT: [[SIZE_PTR:%.*]] = getelementptr inbounds %swift.vwtable, %swift.vwtable* [[VTABLE]]
+// CHECK-NEXT: [[SIZE:%.*]] = load i64, i64* [[SIZE_PTR]]
+// CHECK-NEXT: [[EMPTY_PTR:%.*]] = alloca i8, i64 [[SIZE]]
+// CHECK-NEXT: call void @llvm.lifetime.start.p0i8({{.*}} [[EMPTY_PTR]])
+// CHECK-NEXT: [[EMPTY:%.*]] = bitcast i8* [[EMPTY_PTR]]  to %TSq*
+
+// CHECK: [[SELF_PTR:%.*]] = bitcast i8* %self to %T15generic_structs13GenericStructV*
+
+// CHECK: [[SELF_RAW_PTR:%.*]] = bitcast %T15generic_structs13GenericStructV* [[SELF_PTR]] to i8*
+// CHECK-NEXT: [[OPT_PTR:%.*]] = getelementptr inbounds i8, i8* [[SELF_RAW_PTR]]
+// CHECK-NEXT: [[OPTIONAL:%.*]] = bitcast i8* [[OPT_PTR]] to %TSq*
+// CHECK-NEXT: [[METADATA:%.*]] = call swiftcc %swift.metadata_response @"$sSqMa"(i64 0, %swift.type* %T)
+// CHECK-NEXT: [[META_VAL:%.*]] = extractvalue %swift.metadata_response [[METADATA]], 0
+// CHECK: %26 = call %TSq* @"$sxSg15generic_structs5ProtoRzlWOb"(%TSq* [[EMPTY]], %TSq* [[OPTIONAL]]
+// CHECK: %27 = call %T15generic_structs13GenericStructV* @"$s15generic_structs13GenericStructVyxGAA5ProtoRzlWOb"(%T15generic_structs13GenericStructV* [[SELF_PTR]], %T15generic_structs13GenericStructV* %0
