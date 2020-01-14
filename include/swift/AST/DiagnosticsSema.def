@@ -4348,21 +4348,23 @@ NOTE(availability_protocol_requirement_here, none,
      "protocol requirement here", ())
 
 WARNING(public_decl_needs_availability, none,
-     "public declarations should have an availability attribute with -require-explicit-availability", ())
+        "public declarations should have an availability attribute when building "
+        "with -require-explicit-availability", ())
 
 // This doesn't display as an availability diagnostic, but it's
 // implemented there and fires when these subscripts are marked
 // unavailable, so it seems appropriate to put it here.
 ERROR(availabilty_string_subscript_migration, none,
-      "subscripts returning String were obsoleted in Swift 4; explicitly construct a String from subscripted result", ())
+      "subscripts returning String were obsoleted in Swift 4; explicitly "
+      "construct a String from subscripted result", ())
 
 //------------------------------------------------------------------------------
 // MARK: @discardableResult
 //------------------------------------------------------------------------------
 
 WARNING(discardable_result_on_void_never_function, none,
-        "@discardableResult declared on a function returning %select{Never|Void}0 is unnecessary",
-        (bool))
+        "@discardableResult declared on a function returning %select{Never|Void}0 "
+        "is unnecessary", (bool))
 
 //------------------------------------------------------------------------------
 // MARK: Resilience diagnostics
