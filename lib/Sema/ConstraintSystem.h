@@ -3761,6 +3761,22 @@ private:
       bool &addOptionalSupertypeBindings) const;
   PotentialBindings getPotentialBindings(TypeVariableType *typeVar) const;
 
+  /// Detect `subtype` relationship between two type variables and
+  /// attempt to infer supertype bindings transitively e.g.
+  ///
+  /// Given A <: T1 <: T2 transitively A <: T2
+  ///
+  /// Which gives us a new (superclass A) binding for T2 as well as T1.
+  ///
+  /// \param inferredBindings The set of all bindings inferred for type
+  /// variables in the workset.
+  /// \param bindings The type variable we aim to infer new supertype
+  /// bindings for.
+  void inferTransitiveSupertypeBindings(
+      const llvm::SmallDenseMap<TypeVariableType *, PotentialBindings>
+          &inferredBindings,
+      PotentialBindings &bindings);
+
 private:
   /// Add a constraint to the constraint system.
   SolutionKind addConstraintImpl(ConstraintKind kind, Type first, Type second,

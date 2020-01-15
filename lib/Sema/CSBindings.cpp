@@ -21,6 +21,66 @@
 using namespace swift;
 using namespace constraints;
 
+void ConstraintSystem::inferTransitiveSupertypeBindings(
+    const llvm::SmallDenseMap<TypeVariableType *, PotentialBindings>
+        &inferredBindings,
+    PotentialBindings &bindings) {
+  auto *typeVar = bindings.TypeVar;
+
+  llvm::SmallVector<Constraint *, 4> subtypeOf;
+  // First, let's collect all of the `subtype` constraints associated
+  // with this type variable.
+  llvm::copy_if(bindings.Sources, std::back_inserter(subtypeOf),
+                [&](const Constraint *constraint) -> bool {
+                  if (constraint->getKind() != ConstraintKind::Subtype)
+                    return false;
+
+                  auto rhs = simplifyType(constraint->getSecondType());
+                  return rhs->getAs<TypeVariableType>() == typeVar;
+                });
+
+  if (subtypeOf.empty())
+    return;
+
+  // We need to make sure that there are no duplicate bindings in the
+  // set, other we'll produce multiple identical solutions.
+  llvm::SmallPtrSet<CanType, 4> existingTypes;
+  for (const auto &binding : bindings.Bindings)
+    existingTypes.insert(binding.BindingType->getCanonicalType());
+
+  for (auto *constraint : subtypeOf) {
+    auto *tv =
+        simplifyType(constraint->getFirstType())->getAs<TypeVariableType>();
+    if (!tv)
+      continue;
+
+    auto relatedBindings = inferredBindings.find(tv);
+    if (relatedBindings == inferredBindings.end())
+      continue;
+
+    for (auto &binding : relatedBindings->getSecond().Bindings) {
+      // We need the binding kind for the potential binding to
+      // either be Exact or Supertypes in order for it to make sense
+      // to add Supertype bindings based on the relationship between
+      // our type variables.
+      if (binding.Kind != AllowedBindingKind::Exact &&
+          binding.Kind != AllowedBindingKind::Supertypes)
+        continue;
+
+      auto type = binding.BindingType;
+
+      if (!existingTypes.insert(type->getCanonicalType()).second)
+        continue;
+
+      if (ConstraintSystem::typeVarOccursInType(typeVar, type))
+        continue;
+
+      bindings.addPotentialBinding(
+          binding.withSameSource(type, AllowedBindingKind::Supertypes));
+    }
+  }
+}
+
 Optional<ConstraintSystem::PotentialBindings>
 ConstraintSystem::determineBestBindings() {
   // Look for potential type variable bindings.
@@ -44,46 +104,8 @@ ConstraintSystem::determineBestBindings() {
       continue;
 
     auto &bindings = cachedBindings->getSecond();
-    // All of the relevant relational constraints associated with
-    // current type variable should be recored by its potential bindings.
-    for (auto *constraint : bindings.Sources) {
-      if (constraint->getKind() != ConstraintKind::Subtype)
-        continue;
 
-      auto lhs = simplifyType(constraint->getFirstType());
-      auto rhs = simplifyType(constraint->getSecondType());
-
-      // We are only interested in 'subtype' constraints which have
-      // type variable on the left-hand side.
-      if (rhs->getAs<TypeVariableType>() != typeVar)
-        continue;
-
-      auto *tv = lhs->getAs<TypeVariableType>();
-      if (!tv)
-        continue;
-
-      auto relatedBindings = cache.find(tv);
-      if (relatedBindings == cache.end())
-        continue;
-
-      for (auto &binding : relatedBindings->getSecond().Bindings) {
-        // We need the binding kind for the potential binding to
-        // either be Exact or Supertypes in order for it to make sense
-        // to add Supertype bindings based on the relationship between
-        // our type variables.
-        if (binding.Kind != AllowedBindingKind::Exact &&
-            binding.Kind != AllowedBindingKind::Supertypes)
-          continue;
-
-        auto type = binding.BindingType;
-
-        if (ConstraintSystem::typeVarOccursInType(typeVar, type))
-          continue;
-
-        bindings.addPotentialBinding(
-            binding.withSameSource(type, AllowedBindingKind::Supertypes));
-      }
-    }
+    inferTransitiveSupertypeBindings(cache, bindings);
 
     if (getASTContext().TypeCheckerOpts.DebugConstraintSolver) {
       auto &log = getASTContext().TypeCheckerDebug->getStream();
