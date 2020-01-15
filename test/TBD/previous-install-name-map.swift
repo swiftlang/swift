@@ -11,3 +11,5 @@
 // CHECK: remark: previous install name for Foo in iOS is /System/Others
 // CHECK: remark: previous install name for Foo in tvOS is /System/Others
 // CHECK: remark: previous install name for Foo in watchOS is /System/Others
+
+// REQUIRES: rdar58569201
