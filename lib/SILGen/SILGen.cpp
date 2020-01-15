@@ -17,6 +17,7 @@
 #include "SILGenFunctionBuilder.h"
 #include "Scope.h"
 #include "swift/AST/DiagnosticsSIL.h"
+#include "swift/AST/Evaluator.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/NameLookup.h"
@@ -34,6 +35,7 @@
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILProfiler.h"
+#include "swift/AST/SILGenRequests.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Serialization/SerializedSILLoader.h"
 #include "swift/Strings.h"
@@ -1752,11 +1754,30 @@ SILModule::constructSIL(ModuleDecl *mod, TypeConverter &tc,
 std::unique_ptr<SILModule>
 swift::performSILGeneration(ModuleDecl *mod, Lowering::TypeConverter &tc,
                             const SILOptions &options) {
-  return SILModule::constructSIL(mod, tc, options, nullptr);
+  auto desc = SILGenDescriptor::forWholeModule(mod, tc, options);
+  return std::unique_ptr<SILModule>(
+             evaluateOrDefault(mod->getASTContext().evaluator,
+                               GenerateSILRequest{desc},
+                               nullptr));
 }
 
 std::unique_ptr<SILModule>
 swift::performSILGeneration(FileUnit &sf, Lowering::TypeConverter &tc,
                             const SILOptions &options) {
-  return SILModule::constructSIL(sf.getParentModule(), tc, options, &sf);
+  auto desc = SILGenDescriptor::forFile(sf, tc, options);
+  return std::unique_ptr<SILModule>(
+             evaluateOrDefault(sf.getASTContext().evaluator,
+                               GenerateSILRequest{desc},
+                               nullptr));
+}
+
+llvm::Expected<SILModule *>
+GenerateSILRequest::evaluate(Evaluator &evaluator, SILGenDescriptor sgd) const {
+  if (auto *MD = sgd.context.dyn_cast<ModuleDecl *>()) {
+    return SILModule::constructSIL(MD, sgd.conv, sgd.opts, nullptr).release();
+  } else {
+    auto *SF = sgd.context.get<FileUnit *>();
+    return SILModule::constructSIL(SF->getParentModule(),
+                                   sgd.conv, sgd.opts, SF).release();
+  }
 }
