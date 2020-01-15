@@ -114,6 +114,9 @@ class ClassLayout {
   /// The LLVM type for instances of this class.
   llvm::Type *Ty;
 
+  /// The header size of this class.
+  Size HeaderSize;
+
   /// Lazily-initialized array of all fragile stored properties directly defined
   /// in the class itself.
   ArrayRef<VarDecl *> AllStoredProperties;
@@ -131,7 +134,8 @@ public:
               llvm::Type *classTy,
               ArrayRef<VarDecl *> allStoredProps,
               ArrayRef<FieldAccess> allFieldAccesses,
-              ArrayRef<ElementLayout> allElements);
+              ArrayRef<ElementLayout> allElements,
+              Size headerSize);
 
   Size getInstanceStart() const;
 
