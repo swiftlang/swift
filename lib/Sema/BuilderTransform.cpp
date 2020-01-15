@@ -776,6 +776,10 @@ public:
       }
 
       if (auto expr = node.dyn_cast<Expr *>()) {
+        // Skip error expressions.
+        if (isa<ErrorExpr>(expr))
+          continue;
+
         // Each expression turns into a 'let' that captures the value of
         // the expression.
         auto recorded = takeCapturedExpr(expr);
