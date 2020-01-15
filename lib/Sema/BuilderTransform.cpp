@@ -240,7 +240,7 @@ protected:
       if (!childVar)
         return;
 
-      expressions.push_back(buildVarRef(childVar, braceStmt->getEndLoc()));
+      expressions.push_back(buildVarRef(childVar, childVar->getLoc()));
     };
 
     for (const auto &node : braceStmt->getElements()) {
@@ -712,6 +712,12 @@ private:
       auto declRef = new (ctx) DeclRefExpr(
           temporaryVar, DeclNameLoc(implicitLoc), /*implicit=*/true);
       declRef->setType(LValueType::get(temporaryVar->getType()));
+
+      // Load the right-hand side if needed.
+      if (finalCapturedExpr->getType()->is<LValueType>()) {
+        auto &cs = solution.getConstraintSystem();
+        finalCapturedExpr = cs.addImplicitLoadExpr(finalCapturedExpr);
+      }
 
       auto assign = new (ctx) AssignExpr(
           declRef, implicitLoc, finalCapturedExpr, /*implicit=*/true);
