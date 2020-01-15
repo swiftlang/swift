@@ -3190,6 +3190,76 @@ public:
     return getExtInfo().getRepresentation();
   }
 
+  /// Returns the derivative function type for the given parameter indices,
+  /// result index, derivative function kind, derivative function generic
+  /// signature (optional), and other auxiliary parameters.
+  ///
+  /// Preconditions:
+  /// - Parameters corresponding to parameter indices must conform to
+  ///   `Differentiable`.
+  /// - The result corresponding to the result index must conform to
+  ///   `Differentiable`.
+  ///
+  /// Typing rules, given:
+  /// - Original function type. Three cases:
+  ///   - Top-level function: `(T0, T1, ...) -> R`
+  ///   - Static method: `(Self.Type) -> (T0, T1, ...) -> R`
+  ///   - Instance method: `(Self) -> (T0, T1, ...) -> R`
+  ///
+  /// Terminology:
+  /// - The derivative of a `Differentiable`-conforming type has the
+  ///   `TangentVector` associated type. `TangentVector` is abbreviated as `Tan`
+  ///   below.
+  /// - "wrt" parameters refers to differentiability parameters, identified by
+  ///   the parameter indices.
+  /// - "wrt" result refers to the result identified by the result index.
+  ///
+  /// JVP derivative type:
+  /// - Takes original parameters.
+  /// - Returns original result, followed by a differential function, which
+  ///   takes "wrt" parameter derivatives and returns a "wrt" result derivative.
+  ///
+  /// \verbatim
+  ///   (T0, T1, ...) -> (R,       (T0.Tan, T1.Tan, ...) -> R.Tan)
+  ///                     ^         ^~~~~~~~~~~~~~~~~~~     ^~~~~
+  ///           original result | derivatives wrt params | derivative wrt result
+  ///
+  ///   (Self) -> (T0, ...) -> (R, (Self.Tan, T0.Tan, ...) -> R.Tan)
+  ///                           ^   ^~~~~~~~~~~~~~~~~~~~~     ^~~~~
+  ///             original result  |  deriv. wrt params  |  deriv. wrt result
+  /// \endverbatim
+  ///
+  /// VJP derivative type:
+  /// - Takes original parameters.
+  /// - Returns original result, followed by a pullback function, which
+  ///   takes a "wrt" result derivative and returns "wrt" parameter derivatives.
+  ///
+  /// \verbatim
+  ///   (T0, T1, ...) -> (R,           (R.Tan)    ->     (T0.Tan, T1.Tan, ...))
+  ///                     ^             ^~~~~             ^~~~~~~~~~~~~~~~~~~
+  ///          original result | derivative wrt result | derivatives wrt params
+  ///
+  ///   (Self) -> (T0, ...) -> (R,     (R.Tan)    ->    (Self.Tan, T0.Tan, ...))
+  ///                           ^       ^~~~~            ^~~~~~~~~~~~~~~~~~~~~
+  ///              original result | deriv. wrt result | deriv. wrt params
+  /// \endverbatim
+  ///
+  /// By default, if the original type has a `self` parameter list and parameter
+  /// indices include `self`, the computed derivative function type will return
+  /// a linear map taking/returning self's tangent *last* instead of first, for
+  /// consistency with SIL.
+  ///
+  /// If `makeSelfParamFirst` is true, `self`'s tangent is reordered to appear
+  /// first. `makeSelfParamFirst` should be true when working with user-facing
+  /// derivative function types, e.g. when type-checking `@differentiable` and
+  /// `@derivative` attributes.
+  AnyFunctionType *getAutoDiffDerivativeFunctionType(
+      IndexSubset *parameterIndices, unsigned resultIndex,
+      AutoDiffDerivativeFunctionKind kind,
+      LookupConformanceFn lookupConformance,
+      GenericSignature derivativeGenericSignature = GenericSignature(),
+      bool makeSelfParamFirst = false);
+
   /// True if the parameter declaration it is attached to is guaranteed
   /// to not persist the closure for longer than the duration of the call.
   bool isNoEscape() const {
