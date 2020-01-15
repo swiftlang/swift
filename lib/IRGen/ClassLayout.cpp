@@ -48,9 +48,7 @@ Size ClassLayout::getInstanceStart() const {
     elements = elements.drop_front();
 
     // Ignore empty elements.
-    bool haveSeenEmpty = false;
     if (element.isEmpty()) {
-      haveSeenEmpty = true;
       continue;
     } else if (element.hasByteOffset()) {
       // FIXME: assumes layout is always sequential!
@@ -74,8 +72,7 @@ Size ClassLayout::getInstanceStart() const {
       // This can be avoided by correctly computing the instanceStart for such a
       // class to be 16 such that the shared cache builder does not update the
       // value of the empty field.
-      if (haveSeenEmpty &&
-          !Options.contains(ClassMetadataFlags::ClassHasObjCAncestry))
+      if (!Options.contains(ClassMetadataFlags::ClassHasObjCAncestry))
         return HeaderSize;
       return Size(0);
     }
