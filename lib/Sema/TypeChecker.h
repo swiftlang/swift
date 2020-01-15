@@ -1208,17 +1208,6 @@ public:
   static Type deriveTypeWitness(DeclContext *DC, NominalTypeDecl *nominal,
                                 AssociatedTypeDecl *assocType);
 
-  /// Derive an implicit type witness for a given "phantom" nested type
-  /// requirement that is known to the compiler but unstated as a
-  /// formal type requirement.
-  ///
-  /// This exists to support Codable and only Codable. Do not expand its
-  /// usage outside of that domain.
-  static TypeDecl *derivePhantomWitness(DeclContext *DC,
-                                        NominalTypeDecl *nominal,
-                                        ProtocolDecl *proto,
-                                        const StringRef Name);
-
   /// \name Name lookup
   ///
   /// Routines that perform name lookup.

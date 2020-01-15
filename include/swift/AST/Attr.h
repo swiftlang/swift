@@ -685,23 +685,6 @@ public:
   }
 };
 
-/// Defines the @_implicitly_synthesizes_nested_requirement attribute.
-class ImplicitlySynthesizesNestedRequirementAttr : public DeclAttribute {
-public:
-  ImplicitlySynthesizesNestedRequirementAttr(StringRef Value, SourceLoc AtLoc,
-                                             SourceRange Range)
-    : DeclAttribute(DAK_ImplicitlySynthesizesNestedRequirement,
-                    AtLoc, Range, /*Implicit*/false),
-      Value(Value) {}
-
-  /// The name of the phantom requirement.
-  const StringRef Value;
-
-  static bool classof(const DeclAttribute *DA) {
-    return DA->getKind() == DAK_ImplicitlySynthesizesNestedRequirement;
-  }
-};
-
 /// Determine the result of comparing an availability attribute to a specific
 /// platform or language version.
 enum class AvailableVersionComparison {
