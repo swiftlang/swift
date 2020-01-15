@@ -14,10 +14,6 @@
 #
 #===----------------------------------------------------------------------===#
 
-if(NOT SWIFT_ENABLE_TENSORFLOW)
-  return()
-endif()
-
 find_package(TensorFlow REQUIRED)
 message(STATUS "Building TensorFlow.")
 
