@@ -1022,7 +1022,7 @@ bool EscapeAnalysis::ConnectionGraph::mergeFrom(ConnectionGraph *SourceGraph,
       // Just set global escaping in the caller node and that's it.
       Changed |= DestNd->mergeEscapeState(EscapeState::Global);
       // If DestNd is an interior node, its content still needs to be created.
-      if (!DestNd->isInterior())
+      if (!DestNd->isInterior() || DestNd->pointsTo)
         continue;
     }
 
