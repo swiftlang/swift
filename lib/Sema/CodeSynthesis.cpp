@@ -1012,7 +1012,7 @@ InheritsSuperclassInitializersRequest::evaluate(Evaluator &eval,
   // If the superclass has known-missing designated initializers, inheriting
   // is unsafe.
   auto *superclassDecl = superclass->getClassOrBoundGenericClass();
-  if (superclassDecl->getModuleContext() != decl->getParentModule() &&
+  if (superclassDecl->getModuleContext() != decl->getModuleContext() &&
       superclassDecl->hasMissingDesignatedInitializers())
     return false;
 
