@@ -510,8 +510,7 @@ static bool writeSIL(SILModule &SM, ModuleDecl *M, bool EmitVerboseSIL,
 
 static bool writeSIL(SILModule &SM, const PrimarySpecificPaths &PSPs,
                      const CompilerInstance &Instance,
-                     const CompilerInvocation &Invocation) {
-  const FrontendOptions &opts = Invocation.getFrontendOptions();
+                     const SILOptions &opts) {
   return writeSIL(SM, Instance.getMainModule(), opts.EmitVerboseSIL,
                   PSPs.OutputFilename, opts.EmitSortedSIL);
 }
@@ -1509,7 +1508,7 @@ static bool performCompileStepsPostSILGen(
 
   // We've been told to emit SIL after SILGen, so write it now.
   if (Action == FrontendOptions::ActionType::EmitSILGen) {
-    return writeSIL(*SM, PSPs, Instance, Invocation);
+    return writeSIL(*SM, PSPs, Instance, Invocation.getSILOptions());
   }
 
   if (Action == FrontendOptions::ActionType::EmitSIBGen) {
@@ -1578,7 +1577,7 @@ static bool performCompileStepsPostSILGen(
 
   // We've been told to write canonical SIL, so write it now.
   if (Action == FrontendOptions::ActionType::EmitSIL)
-    return writeSIL(*SM, PSPs, Instance, Invocation);
+    return writeSIL(*SM, PSPs, Instance, Invocation.getSILOptions());
 
   assert(Action >= FrontendOptions::ActionType::Immediate &&
          "All actions not requiring IRGen must have been handled!");
