@@ -329,7 +329,8 @@ struct vDSP_FFTFunctions {
     }
 }
 
-@available(swift, deprecated: 5.2, message: "Use the `withUnsafeMutableBufferPointer` method on the real and imaginary arrays to create `DSPSplitComplex` for a defined scope.")
+
+@available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
 extension DSPSplitComplex {
     
     /// Creates a new `DSPSplitComplex` structure from a real array not in even-odd split configuration.
@@ -352,7 +353,7 @@ extension DSPSplitComplex {
     }
 }
 
-@available(swift, deprecated: 5.2, message: "Use the `withUnsafeMutableBufferPointer` method on the real and imaginary arrays to create `DSPDoubleSplitComplex` for a defined scope.")
+@available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
 extension DSPDoubleSplitComplex {
     
     /// Creates a new `DSPDoubleSplitComplex` structure from a real array not in even-odd split configuration.
