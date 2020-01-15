@@ -2955,9 +2955,8 @@ sil @closure_with_in_guaranteed_owned_in_args : $@convention(method) (@in CC2, @
 // CHECK: apply [[CLOSURE]]({{.*}}, [[TMP]])
 // Check that the peephole inserted a release the guaranteed argument
 // CHECK: strong_release %{{[0-9]+}} : $CC1
-// Release the @owned CC4 argument of the function
-// CHECK: load {{%[0-9]+}} : $*CC4
-// CHECK: strong_release {{%[0-9]+}} : $CC4
+// Do not release the @owned CC4 argument of the function
+// CHECK-NOT: load {{%[0-9]+}} : $*CC4
 // CHECK: br bb3
 
 // CHECK: bb2:
@@ -2969,9 +2968,8 @@ sil @closure_with_in_guaranteed_owned_in_args : $@convention(method) (@in CC2, @
 // CHECK: apply [[CLOSURE]]({{.*}}, [[TMP]])
 // Check that the peephole inserted a release the closure's guaranteed argument
 // CHECK: strong_release %{{[0-9]+}} : $CC1
-// Release the @owned CC4 argument of the function
-// CHECK: load {{%[0-9]+}} : $*CC4
-// CHECK: strong_release {{%[0-9]+}} : $CC4
+// Make sure we do not reload/release the @owned CC4 argument of the function
+// CHECK-NOT: load {{%[0-9]+}} : $*CC4
 // CHECK: br bb3
 
 // bb3:
@@ -3089,7 +3087,6 @@ bb2:
 // CHECK-NEXT: copy_addr [[ARG1]] to [initialization] [[TMP]] : $*T
 // CHECK-NEXT: destroy_addr [[ARG1]]
 // CHECK-NEXT: apply [[FN]]<T, T>([[ARG0]], [[TMP]])
-// CHECK-NEXT: destroy_addr [[TMP]]
 // CHECK-NEXT: tuple
 // CHECK-NEXT: dealloc_stack [[TMP]]
 // CHECK-NEXT: return

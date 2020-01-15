@@ -29,7 +29,7 @@ class PartialApplyCombiner {
 
   // Temporaries created as copies of alloc_stack arguments of
   // the partial_apply.
-  SmallVector<SILValue, 8> tmpCopies;
+  SmallVector<std::pair<SILValue, bool>, 8> tmpCopies;
 
   // Mapping from the original argument of partial_apply to
   // the temporary containing its copy.
@@ -86,20 +86,25 @@ bool PartialApplyCombiner::allocateTemporaries() {
   auto argList = pai->getArguments();
   paramList = paramList.drop_front(paramList.size() - argList.size());
 
-  llvm::SmallVector<std::pair<SILValue, uint16_t>, 8> argsToHandle;
+  struct ArgState {
+    SILValue value;
+    unsigned index;
+    bool needsDestroy;
+
+    ArgState(SILValue value, unsigned index, bool needsDestroy)
+        : value(value), index(index), needsDestroy(needsDestroy) {}
+  };
+  SmallVector<ArgState, 8> argsToHandle;
   for (unsigned i : indices(argList)) {
     SILValue arg = argList[i];
     SILParameterInfo param = paramList[i];
+
     if (param.isIndirectMutating())
       continue;
 
-    // Create a temporary and copy the argument into it, if:
-    // - the argument stems from an alloc_stack
-    // - the argument is consumed by the callee and is indirect
-    //   (e.g. it is an @in argument)
-    if (isa<AllocStackInst>(arg) ||
-        (param.isConsumed() &&
-         pai->getSubstCalleeConv().isSILIndirect(param))) {
+    // Always create a temporary and copy the argument into it if we have an
+    // indirect argument.
+    if (pai->getSubstCalleeConv().isSILIndirect(param)) {
       // If the argument has a dependent type, then we can not create a
       // temporary for it at the beginning of the function, so we must bail.
       //
@@ -108,10 +113,13 @@ bool PartialApplyCombiner::allocateTemporaries() {
       if (arg->getType().hasOpenedExistential())
         return false;
 
-      // If the temporary is non-trivial, we need to destroy it later.
-      if (!arg->getType().isTrivial(*pai->getFunction()))
+      bool argNeedsDestroy = false;
+      if (!param.isConsumed() &&
+          !arg->getType().isTrivial(*pai->getFunction())) {
+        argNeedsDestroy = true;
         needsDestroys = true;
-      argsToHandle.push_back(std::make_pair(arg, i));
+      }
+      argsToHandle.emplace_back(arg, i, argNeedsDestroy /*needs destroy*/);
     }
   }
 
@@ -125,20 +133,21 @@ bool PartialApplyCombiner::allocateTemporaries() {
       return false;
   }
 
-  for (auto argWithIdx : argsToHandle) {
-    SILValue Arg = argWithIdx.first;
+  for (auto argState : argsToHandle) {
+    SILValue Arg = argState.value;
     builder.setInsertionPoint(pai->getFunction()->begin()->begin());
     // Create a new temporary at the beginning of a function.
-    SILDebugVariable dbgVar(/*Constant*/ true, argWithIdx.second);
+    SILDebugVariable dbgVar(/*Constant*/ true, argState.index);
     auto *tmp = builder.createAllocStack(pai->getLoc(), Arg->getType(), dbgVar);
     builder.setInsertionPoint(pai);
     // Copy argument into this temporary.
     builder.createCopyAddr(pai->getLoc(), Arg, tmp, IsTake_t::IsNotTake,
                            IsInitialization_t::IsInitialization);
 
-    tmpCopies.push_back(tmp);
+    tmpCopies.emplace_back(tmp, argState.needsDestroy);
     argToTmpCopy.insert(std::make_pair(Arg, tmp));
   }
+
   return true;
 }
 
@@ -152,22 +161,26 @@ void PartialApplyCombiner::deallocateTemporaries() {
 
     for (auto copy : tmpCopies) {
       builder.setInsertionPoint(term);
-      builder.createDeallocStack(pai->getLoc(), copy);
+      builder.createDeallocStack(pai->getLoc(), copy.first);
     }
   }
 }
 
 /// Emit code to release/destroy temporaries.
 void PartialApplyCombiner::destroyTemporaries() {
-  // Insert releases and destroy_addrs as early as possible,
-  // because we don't want to keep objects alive longer than
-  // its really needed.
-  for (auto op : tmpCopies) {
+  // Insert releases and destroy_addrs as early as possible, because we don't
+  // want to keep objects alive longer than its really needed.
+  for (auto pair : tmpCopies) {
+    bool needsDestroy = pair.second;
+    if (!needsDestroy)
+      continue;
+    auto op = pair.first;
     auto tmpType = op->getType().getObjectType();
     if (tmpType.isTrivial(*pai->getFunction()))
       continue;
     for (auto *endPoint : partialApplyFrontier) {
-      builder.setInsertionPoint(endPoint);
+      SILBuilderWithScope builder(endPoint);
+
       if (!tmpType.isAddressOnly(*pai->getFunction())) {
         SILValue load = builder.emitLoadValueOperation(
             pai->getLoc(), op, LoadOwnershipQualifier::Take);
@@ -179,8 +192,7 @@ void PartialApplyCombiner::destroyTemporaries() {
   }
 }
 
-/// Process an apply instruction which uses a partial_apply
-/// as its callee.
+/// Process an apply instruction which uses a partial_apply as its callee.
 /// Returns true on success.
 bool PartialApplyCombiner::processSingleApply(FullApplySite paiAI) {
   builder.setInsertionPoint(paiAI.getInstruction());
@@ -232,6 +244,7 @@ bool PartialApplyCombiner::processSingleApply(FullApplySite paiAI) {
       arg = builder.emitCopyValueOperation(pai->getLoc(), arg);
       // For non consumed parameters (e.g. guaranteed), we also need to
       // insert destroys after each apply instruction that we create.
+
       if (!paramInfo[paramInfo.size() - partialApplyArgs.size() + i]
                .isConsumed())
         toBeDestroyedArgs.push_back(arg);

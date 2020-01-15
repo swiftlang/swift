@@ -14,9 +14,9 @@
 #include "SILCombiner.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/SemanticAttrs.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/Basic/Range.h"
-#include "swift/AST/SemanticAttrs.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/InstructionUtils.h"
@@ -33,11 +33,16 @@
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Statistic.h"
+#include "llvm/Support/CommandLine.h"
 
 using namespace swift;
 using namespace swift::PatternMatch;
 
 STATISTIC(NumOptimizedKeypaths, "Number of optimized keypath instructions");
+
+static llvm::cl::opt<bool>
+    DisableDeletingDeadClosures("sil-combine-disable-dead-closure-elim",
+                                llvm::cl::init(false));
 
 /// Remove pointless reabstraction thunk closures.
 ///   partial_apply %reabstraction_thunk_typeAtoB(
@@ -106,8 +111,11 @@ SILInstruction *SILCombiner::visitPartialApplyInst(PartialApplyInst *PAI) {
 
   tryOptimizeApplyOfPartialApply(PAI, Builder, getInstModCallbacks());
 
-  // Try to delete dead closures.
-  tryDeleteDeadClosure(PAI, getInstModCallbacks());
+  // Try to delete dead closures unless we are testing and we were asked to not
+  // do so.
+  if (!DisableDeletingDeadClosures) {
+    tryDeleteDeadClosure(PAI, getInstModCallbacks());
+  }
   return nullptr;
 }
 

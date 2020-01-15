@@ -276,7 +276,6 @@ bb0:
 // CHECK-NEXT: copy_addr [take] [[ARG1]] to [initialization] [[PA_TMP]]
 // CHECK-NEXT: apply [[FN]]<T, T>([[ARG0]], [[APPLY_TMP]])
 // CHECK-NEXT: destroy_addr [[PA_TMP]]
-// CHECK-NEXT: destroy_addr [[APPLY_TMP]]
 // CHECK-NEXT: tuple
 // CHECK-NEXT: dealloc_stack [[APPLY_TMP]]
 // CHECK-NEXT: dealloc_stack [[PA_TMP]]

@@ -1,0 +1,92 @@
+// RUN: %target-sil-opt -enable-objc-interop -sil-combine-disable-dead-closure-elim=true -enable-sil-verify-all %s -sil-combine | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+
+sil @in_argument_func : $@convention(thin) (@in Builtin.NativeObject) -> ()
+sil @inguaranteed_argument_func : $@convention(thin) (@in_guaranteed Builtin.NativeObject) -> ()
+
+// CHECK-LABEL: sil @test_in_argument_func : $@convention(thin) (@in Builtin.NativeObject) -> () {
+// CHECK: bb0([[ARG:%.*]] : $*Builtin.NativeObject):
+// CHECK:   [[ALLOC:%.*]] = alloc_stack $Builtin.NativeObject
+// CHECK:   copy_addr [[ARG]] to [initialization] [[ALLOC]]
+// CHECK-NEXT:   [[PAI:%.*]] = partial_apply [callee_guaranteed] {{%.*}}([[ARG]])
+// CHECK-NEXT:   apply {{%.*}}([[ALLOC]])
+// CHECK-NEXT:   strong_release [[PAI]]
+// CHECK-NOT: strong_release
+// CHECK: } // end sil function 'test_in_argument_func'
+sil @test_in_argument_func : $@convention(thin) (@in Builtin.NativeObject) -> () {
+bb0(%0 : $*Builtin.NativeObject):
+  %f = function_ref @in_argument_func : $@convention(thin) (@in Builtin.NativeObject) -> ()
+  %1 = partial_apply [callee_guaranteed] %f(%0) : $@convention(thin) (@in Builtin.NativeObject) -> ()
+  apply %1() : $@callee_guaranteed () -> ()
+  strong_release %1 : $@callee_guaranteed () -> ()
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil @test_in_guaranteed_argument_func : $@convention(thin) (@in Builtin.NativeObject) -> () {
+// CHECK: bb0([[ARG:%.*]] :
+// CHECK:   [[ASI:%.*]] = alloc_stack
+// CHECK:   copy_addr [[ARG]] to [initialization] [[ASI]]
+// CHECK:   [[PAI:%.*]] = partial_apply [callee_guaranteed] {{%.*}}([[ARG]])
+// CHECK:   apply {{%.*}}([[ASI]])
+// CHECK:   strong_release [[PAI]]
+// CHECK:   [[RELOAD_VALUE:%.*]] = load [[ASI]]
+// CHECK:   strong_release [[RELOAD_VALUE]]
+// CHECK: } // end sil function 'test_in_guaranteed_argument_func'
+sil @test_in_guaranteed_argument_func : $@convention(thin) (@in Builtin.NativeObject) -> () {
+bb0(%0 : $*Builtin.NativeObject):
+  %f = function_ref @inguaranteed_argument_func : $@convention(thin) (@in_guaranteed Builtin.NativeObject) -> ()
+  %1 = partial_apply [callee_guaranteed] %f(%0) : $@convention(thin) (@in_guaranteed Builtin.NativeObject) -> ()
+  apply %1() : $@callee_guaranteed () -> ()
+  strong_release %1 : $@callee_guaranteed () -> ()
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil @test_in_argument_func_allocstack : $@convention(thin) (@in Builtin.NativeObject) -> () {
+// CHECK: bb0([[ARG:%.*]] :
+// CHECK:   [[STACK_1:%.*]] = alloc_stack $Builtin.NativeObject
+// CHECK:   [[STACK_2:%.*]] = alloc_stack $Builtin.NativeObject
+// CHECK:   copy_addr [take] [[ARG]] to [initialization] [[STACK_2]]
+// CHECK:   copy_addr [[STACK_2]] to [initialization] [[STACK_1]]
+// CHECK-NEXT:   [[PAI:%.*]] = partial_apply [callee_guaranteed] {{%.*}}([[STACK_2]])
+// CHECK-NEXT:   apply {{%.*}}([[STACK_1]])
+// CHECK-NEXT:   strong_release [[PAI]]
+// CHECK-NEXT:   dealloc_stack [[STACK_2]]
+// CHECK-NEXT:   tuple
+// CHECK-NEXT:   dealloc_stack [[STACK_1]]
+// CHECK: } // end sil function 'test_in_argument_func_allocstack'
+sil @test_in_argument_func_allocstack : $@convention(thin) (@in Builtin.NativeObject) -> () {
+bb0(%0 : $*Builtin.NativeObject):
+  %alloc = alloc_stack $Builtin.NativeObject
+  copy_addr [take] %0 to [initialization] %alloc : $*Builtin.NativeObject
+
+  %f = function_ref @in_argument_func : $@convention(thin) (@in Builtin.NativeObject) -> ()
+  %1 = partial_apply [callee_guaranteed] %f(%alloc) : $@convention(thin) (@in Builtin.NativeObject) -> ()
+  apply %1() : $@callee_guaranteed () -> ()
+  strong_release %1 : $@callee_guaranteed () -> ()
+  dealloc_stack %alloc : $*Builtin.NativeObject
+
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil @test_in_guaranteed_argument_func_allocstack : $@convention(thin) (@in Builtin.NativeObject) -> () {
+sil @test_in_guaranteed_argument_func_allocstack : $@convention(thin) (@in Builtin.NativeObject) -> () {
+bb0(%0 : $*Builtin.NativeObject):
+  %alloc = alloc_stack $Builtin.NativeObject
+  copy_addr [take] %0 to [initialization] %alloc : $*Builtin.NativeObject
+
+  %f = function_ref @inguaranteed_argument_func : $@convention(thin) (@in_guaranteed Builtin.NativeObject) -> ()
+  %1 = partial_apply [callee_guaranteed] %f(%alloc) : $@convention(thin) (@in_guaranteed Builtin.NativeObject) -> ()
+  apply %1() : $@callee_guaranteed () -> ()
+  strong_release %1 : $@callee_guaranteed () -> ()
+
+  dealloc_stack %alloc : $*Builtin.NativeObject
+
+  %9999 = tuple()
+  return %9999 : $()
+}
