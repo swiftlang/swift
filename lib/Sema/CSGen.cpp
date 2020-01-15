@@ -1328,7 +1328,11 @@ namespace {
       Type knownType;
       if (auto *VD = dyn_cast<VarDecl>(E->getDecl())) {
         knownType = CS.getTypeIfAvailable(VD);
-        if (!knownType && VD->hasInterfaceType())
+        if (!knownType &&
+            !(isa<ParamDecl>(VD) &&
+              isa<ClosureExpr>(VD->getDeclContext()) &&
+              CS.Options.contains(
+                ConstraintSystemFlags::SubExpressionDiagnostics)))
           knownType = VD->getInterfaceType();
 
         if (knownType) {
@@ -1344,8 +1348,11 @@ namespace {
           }
 
           // If the known type has an error, bail out.
-          if (knownType->hasError())
+          if (knownType->hasError()) {
+            if (!CS.hasType(E))
+              CS.setType(E, knownType);
             return nullptr;
+          }
 
           // Set the favored type for this expression to the known type.
           if (knownType->hasTypeParameter())
@@ -1353,7 +1360,7 @@ namespace {
           CS.setFavoredType(E, knownType.getPointer());
         }
 
-        // This can only happen when failure diangostics is trying
+        // This can only happen when failure diagnostics is trying
         // to type-check expressions inside of a single-statement
         // closure which refer to anonymous parameters, in this case
         // let's either use type as written or allocate a fresh type
