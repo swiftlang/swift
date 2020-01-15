@@ -407,6 +407,7 @@ ConstraintSystem::SolverState::~SolverState() {
   #define CS_STATISTIC(Name, Description) JOIN2(Overall,Name) += Name;
   #include "ConstraintSolverStats.def"
 
+#if LLVM_ENABLE_STATS
   // Update the "largest" statistics if this system is larger than the
   // previous one.  
   // FIXME: This is not at all thread-safe.
@@ -418,6 +419,7 @@ ConstraintSystem::SolverState::~SolverState() {
       ++JOIN2(Largest,Name);
     #include "ConstraintSolverStats.def"
   }
+#endif
 }
 
 ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
