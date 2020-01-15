@@ -1,0 +1,16 @@
+// RUN: %target-swift-frontend -enable-fine-grained-dependencies -emit-silgen -primary-file %s %S/Inputs/InterestingType.swift -DOLD -emit-reference-dependencies-path %t.swiftdeps -module-name main | %FileCheck %s -check-prefix=CHECK-OLD
+
+// RUN: awk '/kind:/ {k = $2}; /aspect:/ {a = $2}; /context:/ {c = $2}; /name/ {n = $2}; /sequenceNumber/ {s = $2}; /isProvides:/ {print k, a, c, n, $2}' <%t.swiftdeps   | sort  >%t-processed.swiftdeps
+
+// RUN: %FileCheck -check-prefix=CHECK-DEPS %s < %t-processed.swiftdeps
+
+// RUN: %target-swift-frontend -enable-fine-grained-dependencies -emit-silgen -primary-file %s %S/Inputs/InterestingType.swift -DNEW -emit-reference-dependencies-path %t.swiftdeps -module-name main | %FileCheck %s -check-prefix=CHECK-NEW
+// RUN: %FileCheck -check-prefix=CHECK-DEPS %s < %t-processed.swiftdeps
+
+private var privateVar: InterestingType { fatalError() }
+
+// CHECK-OLD: sil_global @$s4main1x{{[^ ]+}} : $Int
+// CHECK-NEW: sil_global @$s4main1x{{[^ ]+}} : $Double
+public var x = privateVar + 0
+
+// CHECK-DEPS: topLevel interface '' InterestingType false
