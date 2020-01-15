@@ -13,6 +13,7 @@
 #define DEBUG_TYPE "sil-escape"
 #include "swift/SILOptimizer/Analysis/EscapeAnalysis.h"
 #include "swift/SIL/DebugUtils.h"
+#include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SILOptimizer/Analysis/ArraySemantic.h"
 #include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
@@ -2345,6 +2346,8 @@ void EscapeAnalysis::recompute(FunctionInfo *Initial) {
         LLVM_DEBUG(llvm::dbgs() << "  create summary graph for "
                                 << FInfo->Graph.F->getName() << '\n');
 
+        PrettyStackTraceSILFunction
+          callerTraceRAII("merging escape summary", FInfo->Graph.F);
         FInfo->Graph.propagateEscapeStates();
 
         // Derive the summary graph of the current function. Even if the
@@ -2365,7 +2368,11 @@ void EscapeAnalysis::recompute(FunctionInfo *Initial) {
 
             // Only include callers which we are actually recomputing.
             if (BottomUpOrder.wasRecomputedWithCurrentUpdateID(E.Caller)) {
-              LLVM_DEBUG(llvm::dbgs() << "  merge  "
+              PrettyStackTraceSILFunction
+                calleeTraceRAII("merging escape graph", FInfo->Graph.F);
+              PrettyStackTraceSILFunction
+                callerTraceRAII("...into", E.Caller->Graph.F);
+              LLVM_DEBUG(llvm::dbgs() << "  merge "
                                       << FInfo->Graph.F->getName()
                                       << " into "
                                       << E.Caller->Graph.F->getName() << '\n');
