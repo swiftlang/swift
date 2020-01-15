@@ -1410,9 +1410,6 @@ enum SR11212Tests {
   // rdar://problem/58578342
   func sr11212_content_generic_pattern_untupled3(b: Box<((Int, Int), Int)>) -> (Int, Int, Int) {
     switch b {
-    // expected-note@-1 {{add missing case: '.box((_, _))'}}
-    // expected-error@-2 {{switch must be exhaustive}}
-    // FIXME: This should not be an error, analogous to the test cases above.
     case let .box((x, y), z): return (x, y, z)
     // expected-warning@-1 {{the enum case has a single tuple as an associated value, but there are several patterns here, implicitly tupling the patterns and trying to match that instead}}
     }
