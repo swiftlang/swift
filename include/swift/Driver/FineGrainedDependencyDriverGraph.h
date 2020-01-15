@@ -472,14 +472,25 @@ private:
   /// Given a definition node, and a list of already found dependents,
   /// recursively add transitive closure of dependents of the definition
   /// into the already found dependents.
+  ///
+  /// \param foundDependents gets filled out with all dependent nodes found
+  /// \param definition the starting definition
+  /// \param shouldConsiderUse returns true if a use should be considered
   void findDependentNodes(
       std::unordered_set<const ModuleDepGraphNode *> &foundDependents,
-      const ModuleDepGraphNode *definition);
+      const ModuleDepGraphNode *definition,
+      function_ref<bool(const ModuleDepGraphNode *use)> shouldConsiderUse);
 
   /// Givien a set of nodes, return the set of swiftDeps for the jobs those
   /// nodes are in.
-  llvm::StringSet<> computeSwiftDepsFromInterfaceNodes(
-      ArrayRef<const ModuleDepGraphNode *> nodes);
+  std::vector<std::string>
+  computeSwiftDepsFromNodes(ArrayRef<const ModuleDepGraphNode *> nodes) const;
+
+  std::vector<const driver::Job *>
+  getUnmarkedJobsFrom(const ArrayRef<const ModuleDepGraphNode *> nodes) const;
+
+  /// Mark any jobs for these nodes
+  void markJobsFrom(ArrayRef<const ModuleDepGraphNode *>);
 
   /// Record a visit to this node for later dependency printing
   size_t traceArrival(const ModuleDepGraphNode *visitedNode);
@@ -492,8 +503,8 @@ private:
       const driver::Job *dependentJob);
 
   /// Return true if job was not scheduled before
-  bool recordJobNeedsRunning(StringRef swiftDeps) {
-    return swiftDepsOfJobsThatNeedRunning.insert(swiftDeps).second;
+  bool markJobViaSwiftDeps(StringRef swiftDeps) {
+    return swiftDepsOfMarkedJobs.insert(swiftDeps).second;
   }
 
   /// For debugging and visualization, write out the graph to a dot file.

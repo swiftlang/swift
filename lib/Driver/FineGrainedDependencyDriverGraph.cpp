@@ -228,7 +228,6 @@ LoadResult ModuleDepGraph::integrate(const SourceFileDepGraph &g,
                                      StringRef swiftDepsOfJob) {
   FrontendStatsTracer tracer(stats, "fine-grained-dependencies-integrate");
 
-  StringRef swiftDeps = g.getSwiftDepsOfJobThatProducedThisGraph();
   // When done, disappearedNodes contains the nodes which no longer exist.
   auto disappearedNodes = nodeMap[swiftDepsOfJob];
   // When done, changeDependencyKeys contains a list of keys that changed
@@ -297,10 +296,8 @@ bool ModuleDepGraph::integrateSourceFileDepGraphNode(
   if (integrand->isDepends())
     return false;
 
-  StringRef swiftDepsOfSourceFileGraph =
-      g.getSwiftDepsOfJobThatProducedThisGraph();
-  auto changedAndUseNode = integrateSourceFileDeclNode(
-      integrand, swiftDepsOfSourceFileGraph, preexistingMatch);
+  auto changedAndUseNode =
+      integrateSourceFileDeclNode(integrand, swiftDepsOfJob, preexistingMatch);
   recordWhatUseDependsUpon(g, integrand, changedAndUseNode.second);
   return changedAndUseNode.first;
 }
@@ -379,14 +376,22 @@ void ModuleDepGraph::forEachUseOf(
   for (const ModuleDepGraphNode *useNode : iter->second)
     fn(useNode);
   // Add in implicit interface->implementation dependency
-  if (def->getKey().isInterface() && def->getSwiftDeps()) {
-    const auto &dk = def->getKey();
-    const DependencyKey key(dk.getKind(), DeclAspect::interface,
-                            dk.getContext(), dk.getName());
-    if (const auto interfaceNode =
-            nodeMap.find(def->getSwiftDeps().getValue(), dk))
-      fn(interfaceNode.getValue());
-  }
+  forCorrespondingImplementationOfProvidedInterface(def, fn);
+}
+
+void ModuleDepGraph::forCorrespondingImplementationOfProvidedInterface(
+    const ModuleDepGraphNode *interfaceNode,
+    function_ref<void(ModuleDepGraphNode *)> fn) const {
+  if (!interfaceNode->getKey().isInterface() || !interfaceNode->getIsProvides())
+    return;
+  const auto swiftDeps = interfaceNode->getSwiftDeps().getValue();
+  const auto &interfaceKey = interfaceNode->getKey();
+  const DependencyKey implementationKey(
+      interfaceKey.getKind(), DeclAspect::implementation,
+      interfaceKey.getContext(), interfaceKey.getName());
+  if (const auto implementationNode =
+          nodeMap.find(swiftDeps, implementationKey))
+    fn(implementationNode.getValue());
 }
 
 void ModuleDepGraph::forEachNode(
@@ -422,11 +427,14 @@ void ModuleDepGraph::forEachArc(
 
 void ModuleDepGraph::findDependentNodes(
     std::unordered_set<const ModuleDepGraphNode *> &foundDependents,
-    const ModuleDepGraphNode *definition) {
-
+    const ModuleDepGraphNode *definition,
+    function_ref<bool(const ModuleDepGraphNode *use)> shouldConsiderUse) {
+  // FIXME: the coarse-grained dependencies use a persistent marked set
+  // so that successive calls to markTransitive don't retrace steps once
+  // one arm of the graph has been searched. Do the equivalent here.
   size_t pathLengthAfterArrival = traceArrival(definition);
 
-  // Moved this out of the following loop for effieciency.
+  // Moved this out of the following loop for efficiency.
   assert(definition->getIsProvides() && "Should only call me for Decl nodes.");
 
   forEachUseOf(definition, [&](const ModuleDepGraphNode *u) {
@@ -437,7 +445,7 @@ void ModuleDepGraph::findDependentNodes(
       return;
     // If this use also provides something, follow it
     if (u->getIsProvides())
-      findDependentNodes(foundDependents, u);
+      findDependentNodes(foundDependents, u, shouldConsiderUse);
   });
   traceDeparture(pathLengthAfterArrival);
 }
