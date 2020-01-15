@@ -355,6 +355,15 @@ namespace driver {
       PendingExecution.insert(Cmd);
     }
 
+    // Sort for ease of testing
+    template <typename Jobs>
+    void scheduleCommandsInSortedOrder(const Jobs &jobs) {
+      llvm::SmallVector<const Job *, 16> sortedJobs;
+      Comp.sortJobsToMatchCompilationInputs(jobs, sortedJobs);
+      for (const Job *Cmd : sortedJobs)
+        scheduleCommandIfNecessaryAndPossible(Cmd);
+    }
+
     void addPendingJobToTaskQueue(const Job *Cmd) {
       // FIXME: Failing here should not take down the whole process.
       bool success =
@@ -393,8 +402,7 @@ namespace driver {
                        << LogJobArray(AllBlocked) << "\n";
         }
         BlockingCommands.erase(BlockedIter);
-        for (auto *Blocked : AllBlocked)
-          scheduleCommandIfNecessaryAndPossible(Blocked);
+        scheduleCommandsInSortedOrder(AllBlocked);
       }
     }
 
@@ -496,8 +504,7 @@ namespace driver {
             break;
           dependencyLoadFailed(DependenciesFile);
           // Better try compiling whatever was waiting on more info.
-          for (const Job *Cmd : DeferredCommands)
-            scheduleCommandIfNecessaryAndPossible(Cmd);
+          scheduleCommandsInSortedOrder(DeferredCommands);
           DeferredCommands.clear();
           break;
 
@@ -696,18 +703,9 @@ namespace driver {
       noteBuildingJobs(DependentsInEffect, useRangesForScheduling,
                        "because of dependencies discovered later");
 
-      // Sort dependents for more deterministic behavior
-      llvm::SmallVector<const Job *, 16> UnsortedDependents;
-      for (const Job *j : DependentsInEffect)
-        UnsortedDependents.push_back(j);
-      llvm::SmallVector<const Job *, 16> SortedDependents;
-      Comp.sortJobsToMatchCompilationInputs(UnsortedDependents,
-                                            SortedDependents);
-
-      for (const Job *Cmd : SortedDependents) {
+      scheduleCommandsInSortedOrder(DependentsInEffect);
+      for (const Job *Cmd : DependentsInEffect)
         DeferredCommands.erase(Cmd);
-        scheduleCommandIfNecessaryAndPossible(Cmd);
-      }
       return TaskFinishedResponse::ContinueExecution;
     }
 
@@ -2087,17 +2085,22 @@ void Compilation::addDependencyPathOrCreateDummy(
   }
 }
 
+template <typename JobCollection>
 void Compilation::sortJobsToMatchCompilationInputs(
-    const ArrayRef<const Job *> unsortedJobs,
+    const JobCollection &unsortedJobs,
     SmallVectorImpl<const Job *> &sortedJobs) const {
   llvm::DenseMap<StringRef, const Job *> jobsByInput;
   for (const Job *J : unsortedJobs) {
-    const CompileJobAction *CJA = cast<CompileJobAction>(&J->getSource());
-    const InputAction *IA = CJA->findSingleSwiftInput();
-    auto R =
-        jobsByInput.insert(std::make_pair(IA->getInputArg().getValue(), J));
-    assert(R.second);
-    (void)R;
+    // Only worry about sorting compilation jobs
+    if (const CompileJobAction *CJA =
+            dyn_cast<CompileJobAction>(&J->getSource())) {
+      const InputAction *IA = CJA->findSingleSwiftInput();
+      auto R =
+          jobsByInput.insert(std::make_pair(IA->getInputArg().getValue(), J));
+      assert(R.second);
+      (void)R;
+    } else
+      sortedJobs.push_back(J);
   }
   for (const InputPair &P : getInputFiles()) {
     auto I = jobsByInput.find(P.second->getValue());
@@ -2106,3 +2109,8 @@ void Compilation::sortJobsToMatchCompilationInputs(
     }
   }
 }
+
+template void
+Compilation::sortJobsToMatchCompilationInputs<ArrayRef<const Job *>>(
+    const ArrayRef<const Job *> &,
+    SmallVectorImpl<const Job *> &sortedJobs) const;
