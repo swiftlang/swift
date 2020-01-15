@@ -363,7 +363,10 @@ bool EscapeAnalysis::CGNode::visitSuccessors(Visitor &&visitor) const {
 
 template <typename Visitor>
 bool EscapeAnalysis::CGNode::visitDefers(Visitor &&visitor) const {
-  for (Predecessor pred : Preds) {
+  // Save predecessors before calling `visitor` which may assign pointsTo edges
+  // which invalidates the predecessor iterator.
+  SmallVector<Predecessor, 4> predVector(Preds.begin(), Preds.end());
+  for (Predecessor pred : predVector) {
     if (!pred.is(EdgeType::Defer))
       continue;
     if (!visitor(pred.getPredNode(), false))
