@@ -38,8 +38,7 @@ class DTraceResult(perf_test_driver.Result):
     @classmethod
     def data_headers(cls):
         return [
-            'Name', 'Result', 'strong_retain', 'strong_retain/iter',
-            'strong_release', 'strong_release/iter']
+            'Name', 'Result', 'Total RR Opts', 'Total RR Opts/Iter']
 
     @classmethod
     def data_format(cls, max_test_len):
