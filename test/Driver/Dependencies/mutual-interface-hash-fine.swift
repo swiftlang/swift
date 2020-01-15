@@ -14,12 +14,12 @@
 
 // CHECK-CLEAN-NOT: Handled
 
-
 // RUN: touch -t 201401240006 %t/does-change.swift
 // RUN: cd %t && %swiftc_driver -enable-fine-grained-dependencies -c -driver-use-frontend-path "%{python};%S/Inputs/update-dependencies.py" -output-file-map %t/output.json -incremental ./does-change.swift ./does-not-change.swift -module-name main -j1 -v  2>&1 | %FileCheck -check-prefix=CHECK-CHANGE %s
 
 // CHECK-CHANGE-DAG: Handled does-change.swift
 // CHECK-CHANGE-DAG: Handled does-not-change.swift
+
 
 // RUN: cp -r %S/Inputs/mutual-interface-hash-fine/*.swiftdeps %t
 
@@ -29,7 +29,6 @@
 // CHECK-NO-CHANGE-NOT: Handled
 // CHECK-NO-CHANGE: Handled does-not-change.swift
 // CHECK-NO-CHANGE-NOT: Handled
-
 
 
 // RUN: cp -r %S/Inputs/mutual-interface-hash-fine/*.swiftdeps %t
