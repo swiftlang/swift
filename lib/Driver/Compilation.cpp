@@ -449,7 +449,7 @@ namespace driver {
                                  diag::warn_unable_to_load_dependencies,
                                  DependenciesFile);
       Comp.disableIncrementalBuild(
-          Twine("malformed swift dependencies file ' ") + DependenciesFile +
+          Twine("malformed swift dependencies file '") + DependenciesFile +
           "'");
     }
 
@@ -485,10 +485,11 @@ namespace driver {
         // other recompilations. It is possible that the current code marks
         // things that do not need to be marked. Unecessary compilation would
         // result if that were the case.
-        bool wasKnownToNeedRunning = isMarkedInDepGraph(FinishedCmd, forRanges);
+        bool wasKnownToCascade = isMarkedInDepGraph(FinishedCmd, forRanges);
 
-        switch (loadDepGraphFromPath(FinishedCmd, DependenciesFile,
-                                     Comp.getDiags(), forRanges)) {
+        const auto loadResult = loadDepGraphFromPath(
+            FinishedCmd, DependenciesFile, Comp.getDiags(), forRanges);
+        switch (loadResult) {
         case CoarseGrainedDependencyGraph::LoadResult::HadError:
           if (ReturnCode != EXIT_SUCCESS)
             // let the next build handle it.
@@ -501,7 +502,7 @@ namespace driver {
           break;
 
         case CoarseGrainedDependencyGraph::LoadResult::UpToDate:
-          if (!wasKnownToNeedRunning)
+          if (!wasKnownToCascade)
             break;
           LLVM_FALLTHROUGH;
         case CoarseGrainedDependencyGraph::LoadResult::AffectsDownstream:
@@ -1092,6 +1093,12 @@ namespace driver {
           // using markIntransitive and having later functions call
           // markTransitive. That way markIntransitive would be an
           // implementation detail of CoarseGrainedDependencyGraph.
+          //
+          // As it stands, after this job finishes, this mark will tell the code
+          // that this job was known to be "cascading". That knowledge will
+          // any dependent jobs to be run if they haven't already been.
+          //
+          // TODO: I think this is overly tricky
           markIntransitiveInDepGraph(Cmd, forRanges);
         }
         LLVM_FALLTHROUGH;
