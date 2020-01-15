@@ -3662,20 +3662,16 @@ namespace {
         }
       }
 
-      // For closures containing only a single expression, the body participates
-      // in type checking.
+      // Both multi- and single-statement closures now behave the same way
+      // when it comes to constraint generation.
       if (auto closure = dyn_cast<ClosureExpr>(expr)) {
         auto &CS = CG.getConstraintSystem();
-        if (closure->hasSingleExpressionBody()) {
-          auto closureType = CG.visitClosureExpr(closure);
-          if (!closureType)
-            return {false, nullptr};
+        auto closureType = CG.visitClosureExpr(closure);
+        if (!closureType)
+          return {false, nullptr};
 
-          CS.setType(expr, closureType);
-          return {false, expr};
-        }
-
-        return { true, expr };
+        CS.setType(expr, closureType);
+        return {false, expr};
       }
 
       // Don't visit CoerceExpr with an empty sub expression. They may occur
@@ -3733,12 +3729,6 @@ namespace {
 
             return DSE;
           }
-        }
-      }
-
-      if (auto closure = dyn_cast<ClosureExpr>(expr)) {
-        if (closure->hasSingleExpressionBody()) {
-          return expr;
         }
       }
 
