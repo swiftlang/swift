@@ -558,7 +558,8 @@ void EscapeAnalysis::ConnectionGraph::initializePointsTo(CGNode *initialNode,
 
         CGNode *predNode = pred.getPredNode();
         if (predNode->pointsTo) {
-          assert(predNode->pointsTo->getMergeTarget() == newPointsTo);
+          assert(predNode->pointsTo->getMergeTarget()
+                 == newPointsTo->getMergeTarget());
           return Traversal::Backtrack;
         }
         predNode->pointsTo = newPointsTo;
@@ -761,6 +762,11 @@ void EscapeAnalysis::ConnectionGraph::mergePointsTo(CGNode *initialNode,
                                                     CGNode *newPointsTo) {
   CGNode *oldPointsTo = initialNode->pointsTo;
   assert(oldPointsTo && "merging content should not initialize any pointsTo");
+
+  // newPointsTo may already be scheduled for a merge. Only create new edges to
+  // unmerged nodes. This may create a temporary pointsTo mismatch in the defer
+  // web, but Graph verification takes merged nodes into consideration.
+  newPointsTo = newPointsTo->getMergeTarget();
   if (oldPointsTo == newPointsTo)
     return;
 
@@ -870,8 +876,6 @@ CGNode *EscapeAnalysis::ConnectionGraph::createContentNode(
   CGNode *newContent =
       allocNode(nullptr, NodeType::Content, isInterior, hasReferenceOnly);
   initializePointsToEdge(addrNode, newContent);
-  assert(ToMerge.empty()
-         && "Initially setting pointsTo should not require any node merges");
   return newContent;
 }
 
@@ -1002,57 +1006,58 @@ bool EscapeAnalysis::ConnectionGraph::mergeFrom(ConnectionGraph *SourceGraph,
                                                 CGNodeMap &Mapping) {
   // The main point of the merging algorithm is to map each content node in the
   // source graph to a content node in this (destination) graph. This may
-  // require to create new nodes or to merge existing nodes in this graph.
+  // require creating new nodes or merging existing nodes in this graph.
 
   // First step: replicate the points-to edges and the content nodes of the
   // source graph in this graph.
   bool Changed = false;
-  bool NodesMerged;
-  do {
-    NodesMerged = false;
-    for (unsigned Idx = 0; Idx < Mapping.getMappedNodes().size(); ++Idx) {
-      CGNode *SourceNd = Mapping.getMappedNodes()[Idx];
-      CGNode *DestNd = Mapping.get(SourceNd);
-      assert(DestNd);
-      
-      if (SourceNd->getEscapeState() >= EscapeState::Global) {
-        // We don't need to merge the source subgraph of nodes which have the
-        // global escaping state set.
-        // Just set global escaping in the caller node and that's it.
-        Changed |= DestNd->mergeEscapeState(EscapeState::Global);
-        // If DestNd is an interior node, its content still needs to be created.
-        if (!DestNd->isInterior())
-          continue;
-      }
+  for (unsigned Idx = 0; Idx < Mapping.getMappedNodes().size(); ++Idx) {
+    CGNode *SourceNd = Mapping.getMappedNodes()[Idx];
+    CGNode *DestNd = Mapping.get(SourceNd);
+    assert(DestNd);
 
-      CGNode *SourcePT = SourceNd->pointsTo;
-      if (!SourcePT)
+    if (SourceNd->getEscapeState() >= EscapeState::Global) {
+      // We don't need to merge the source subgraph of nodes which have the
+      // global escaping state set.
+      // Just set global escaping in the caller node and that's it.
+      Changed |= DestNd->mergeEscapeState(EscapeState::Global);
+      // If DestNd is an interior node, its content still needs to be created.
+      if (!DestNd->isInterior())
         continue;
+    }
 
-      CGNode *DestPT = DestNd->pointsTo;
+    CGNode *SourcePT = SourceNd->pointsTo;
+    if (!SourcePT)
+      continue;
+
+    CGNode *MappedDestPT = Mapping.get(SourcePT);
+    CGNode *DestPT = DestNd->pointsTo;
+    if (!MappedDestPT) {
       if (!DestPT) {
         DestPT = createMergedContent(DestNd, SourcePT);
         Changed = true;
       }
-      CGNode *MappedDestPT = Mapping.get(SourcePT);
-      if (!MappedDestPT) {
-        // This is the first time the dest node is seen; just add the mapping.
-        Mapping.add(SourcePT, DestPT);
-        continue;
-      }
-      // We already found the destination node through another path.
-      assert(Mapping.getMappedNodes().contains(SourcePT));
-      if (DestPT == MappedDestPT)
-        continue;
-
-      // There are two content nodes in this graph which map to the same
-      // content node in the source graph -> we have to merge them.
-      scheduleToMerge(DestPT, MappedDestPT);
-      mergeAllScheduledNodes();
-      Changed = true;
-      NodesMerged = true;
+      // This is the first time the dest node is seen; just add the mapping.
+      Mapping.add(SourcePT, DestPT);
+      continue;
     }
-  } while (NodesMerged);
+    if (DestPT == MappedDestPT)
+      continue;
+
+    // We already found the destination node through another path.
+    assert(Mapping.getMappedNodes().contains(SourcePT));
+    Changed = true;
+    if (!DestPT) {
+      initializePointsToEdge(DestNd, MappedDestPT);
+      continue;
+    }
+    // There are two content nodes in this graph which map to the same
+    // content node in the source graph -> we have to merge them.
+    // Defer merging the nodes until all mapped nodes are created so that the
+    // graph is structurally valid before merging.
+    scheduleToMerge(DestPT, MappedDestPT);
+  }
+  mergeAllScheduledNodes();
   Mapping.getMappedNodes().reset(); // Make way for a different worklist.
 
   // Second step: add the source graph's defer edges to this graph.

@@ -688,7 +688,6 @@ public:
       CGNode *FromMergeTarget = From->getMergeTarget();
       CGNode *ToMergeTarget = To->getMergeTarget();
       if (FromMergeTarget != ToMergeTarget) {
-        ToMergeTarget->mergeProperties(FromMergeTarget);
         FromMergeTarget->mergeTo = ToMergeTarget;
         ToMerge.push_back(FromMergeTarget);
       }
