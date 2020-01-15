@@ -529,8 +529,9 @@ public:
   /// sequence of inputs the driver was initially invoked with.
   ///
   /// Also use to write out information in a consistent order.
+  template <typename JobCollection>
   void sortJobsToMatchCompilationInputs(
-      ArrayRef<const Job *> unsortedJobs,
+      const JobCollection &unsortedJobs,
       SmallVectorImpl<const Job *> &sortedJobs) const;
 
 private:
