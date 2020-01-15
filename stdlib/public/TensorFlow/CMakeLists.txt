@@ -41,10 +41,10 @@ if (TENSORFLOW_SWIFT_APIS)
   endforeach()
 endif()
 
+get_filename_component(TensorFlow_LIBRARY_DIR ${TF_LIBRARY} DIRECTORY)
 add_swift_target_library(swiftTensorFlow ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
   "${SOURCES}"
 
-  INCORPORATE_OBJECT_LIBRARIES swiftCTensorFlow
   PRIVATE_LINK_LIBRARIES "${TF_LIBRARIES}"
   SWIFT_MODULE_DEPENDS SwiftOnoneSupport
   SWIFT_MODULE_DEPENDS_IOS Darwin
@@ -57,10 +57,31 @@ add_swift_target_library(swiftTensorFlow ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_
   SWIFT_MODULE_DEPENDS_HAIKU Glibc
   SWIFT_MODULE_DEPENDS_WINDOWS MSVCRT
   SWIFT_MODULE_DEPENDS Python
-  SWIFT_COMPILE_FLAGS "${swift_stdlib_compile_flags}"
-  LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
+  SWIFT_COMPILE_FLAGS
+    ${swift_stdlib_compile_flags}
+    -Xcc -I${CMAKE_CURRENT_SOURCE_DIR}
+    -Xcc -I${TF_INCLUDE_DIR}
+  LINK_FLAGS
+    ${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}
+    -L${TensorFlow_LIBRARY_DIR}
   INSTALL_IN_COMPONENT stdlib
   EXTRA_RPATHS "${SWIFT_TENSORFLOW_TARGET_LIB_DIR}"
   # NOTE: This is a workaround for https://github.com/apple/swift/pull/24382,
   # which changed the default install_name_dir to `/usr/bin/swift`.
   DARWIN_INSTALL_NAME_DIR "@rpath")
+
+
+swift_install_in_component(DIRECTORY ${TF_INCLUDE_DIR}/tensorflow/c/
+  DESTINATION lib/swift/tensorflow/tensorflow/c
+  COMPONENT stdlib
+  FILES_MATCHING
+    PATTERN c_api.h
+    PATTERN c_api_experimental.h
+    PATTERN tf_attrtype.h
+    PATTERN tf_datatype.h
+    PATTERN tf_status.h
+    PATTERN tf_tensor.h
+    PATTERN eager/c_api.h)
+swift_install_in_component(FILES module.modulemap CTensorFlow.h
+  DESTINATION lib/swift/tensorflow
+  COMPONENT stdlib)
