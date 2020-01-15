@@ -119,7 +119,7 @@ def parse_args():
         default=None,
         help='Filter out any test that does not match the given regex')
     parser.add_argument(
-        '-csv',
+        '--emit-csv',
         default=False,
         action='store_true',
         help="Emit csv output",
