@@ -1,9 +1,9 @@
 // RUN: %empty-directory(%t)
 // RUN: cp %s %t/main.swift
-// RUN: %target-swift-frontend -typecheck -primary-file %t/main.swift %S/Inputs/reference-dependencies-members-helper.swift -emit-reference-dependencies-path - > %t.swiftdeps
+// RUN: %target-swift-frontend -disable-fine-grained-dependencies -typecheck -primary-file %t/main.swift %S/Inputs/reference-dependencies-members-helper.swift -emit-reference-dependencies-path - > %t.swiftdeps
 
 // Check that the output is deterministic.
-// RUN: %target-swift-frontend -typecheck -primary-file %t/main.swift %S/Inputs/reference-dependencies-members-helper.swift -emit-reference-dependencies-path - > %t-2.swiftdeps
+// RUN: %target-swift-frontend -disable-fine-grained-dependencies -typecheck -primary-file %t/main.swift %S/Inputs/reference-dependencies-members-helper.swift -emit-reference-dependencies-path - > %t-2.swiftdeps
 // RUN: diff %t.swiftdeps %t-2.swiftdeps
 
 // RUN: %FileCheck -check-prefix=PROVIDES-NOMINAL %s < %t.swiftdeps
