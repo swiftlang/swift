@@ -2470,7 +2470,7 @@ void FindLocalVal::checkGenericParams(GenericParamList *Params) {
 }
 
 void FindLocalVal::checkSourceFile(const SourceFile &SF) {
-  for (Decl *D : SF.Decls)
+  for (Decl *D : SF.getTopLevelDecls())
     if (auto *TLCD = dyn_cast<TopLevelCodeDecl>(D))
       visitBraceStmt(TLCD->getBody(), /*isTopLevel=*/true);
 }
@@ -2507,7 +2507,8 @@ void FindLocalVal::visitGuardStmt(GuardStmt *S) {
     return;
 
   // Names in the guard aren't visible until after the body.
-  if (!isReferencePointInRange(S->getBody()->getSourceRange()))
+  if (S->getBody()->isImplicit() ||
+      !isReferencePointInRange(S->getBody()->getSourceRange()))
     checkStmtCondition(S->getCond());
 
   visit(S->getBody());

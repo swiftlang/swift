@@ -334,7 +334,7 @@ static bool isProtocolExtensionAsSpecializedAs(DeclContext *dc1,
   // as the other.
   GenericSignature sig1 = dc1->getGenericSignatureOfContext();
   GenericSignature sig2 = dc2->getGenericSignatureOfContext();
-  if (sig1->getCanonicalSignature() == sig2->getCanonicalSignature())
+  if (sig1.getCanonicalSignature() == sig2.getCanonicalSignature())
     return false;
 
   // Form a constraint system where we've opened up all of the requirements of

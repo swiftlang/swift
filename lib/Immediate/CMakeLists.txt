@@ -12,7 +12,7 @@ target_link_libraries(swiftImmediate PRIVATE
   swiftIRGen
   swiftSILGen
   swiftSILOptimizer)
-if(LibEdit_FOUND)
+if(LibEdit_FOUND AND LibEdit_HAS_UNICODE)
   target_compile_definitions(swiftImmediate PRIVATE
     HAVE_LIBEDIT)
   target_link_libraries(swiftImmediate PRIVATE

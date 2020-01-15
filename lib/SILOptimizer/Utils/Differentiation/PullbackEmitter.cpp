@@ -162,7 +162,7 @@ SILType PullbackEmitter::remapType(SILType ty) {
   return getPullback().mapTypeIntoContext(ty);
 }
 
-Optional<VectorSpace> PullbackEmitter::getTangentSpace(CanType type) {
+Optional<TangentSpace> PullbackEmitter::getTangentSpace(CanType type) {
   // Use witness generic signature to remap types.
   if (auto witnessGenSig = getWitness()->getDerivativeGenericSignature())
     type = witnessGenSig->getCanonicalTypeInContext(type);
@@ -1679,10 +1679,10 @@ void PullbackEmitter::emitZeroIndirect(CanType type, SILValue bufferAccess,
   auto tangentSpace = getTangentSpace(type);
   assert(tangentSpace && "No tangent space for this type");
   switch (tangentSpace->getKind()) {
-  case VectorSpace::Kind::Vector:
+  case TangentSpace::Kind::Vector:
     emitZeroIntoBuffer(builder, type, bufferAccess, loc);
     return;
-  case VectorSpace::Kind::Tuple: {
+  case TangentSpace::Kind::Tuple: {
     auto tupleType = tangentSpace->getTuple();
     SmallVector<SILValue, 8> zeroElements;
     for (unsigned i : range(tupleType->getNumElements())) {
@@ -1691,10 +1691,6 @@ void PullbackEmitter::emitZeroIndirect(CanType type, SILValue bufferAccess,
                        eltAddr, loc);
     }
     return;
-  }
-  case VectorSpace::Kind::Function: {
-    llvm_unreachable(
-      "Unimplemented: Emit thunks for abstracting zero initialization");
   }
   }
 }
@@ -1805,7 +1801,7 @@ SILValue PullbackEmitter::accumulateDirect(SILValue lhs, SILValue rhs,
   auto rhsCopy = builder.emitCopyValueOperation(loc, rhs);
   assert(tangentSpace && "No tangent space for this type");
   switch (tangentSpace->getKind()) {
-  case VectorSpace::Kind::Vector: {
+  case TangentSpace::Kind::Vector: {
     // Allocate buffers for inputs and output.
     auto *resultBuf = builder.createAllocStack(loc, adjointTy);
     auto *lhsBuf = builder.createAllocStack(loc, adjointTy);
@@ -1827,7 +1823,7 @@ SILValue PullbackEmitter::accumulateDirect(SILValue lhs, SILValue rhs,
     builder.createDeallocStack(loc, resultBuf);
     return val;
   }
-  case VectorSpace::Kind::Tuple: {
+  case TangentSpace::Kind::Tuple: {
     SmallVector<SILValue, 8> adjElements;
     auto lhsElts = builder.createDestructureTuple(loc, lhsCopy)->getResults();
     auto rhsElts = builder.createDestructureTuple(loc, rhsCopy)->getResults();
@@ -1835,10 +1831,6 @@ SILValue PullbackEmitter::accumulateDirect(SILValue lhs, SILValue rhs,
       adjElements.push_back(
           accumulateDirect(std::get<0>(zipped), std::get<1>(zipped), loc));
     return builder.createTuple(loc, adjointTy, adjElements);
-  }
-  case VectorSpace::Kind::Function: {
-    llvm_unreachable(
-        "Unimplemented: Emit thunks for abstracting adjoint accumulation");
   }
   }
 }
@@ -1859,7 +1851,7 @@ void PullbackEmitter::accumulateIndirect(
       LookUpConformanceInModule(swiftMod));
   assert(tangentSpace && "No tangent space for this type");
   switch (tangentSpace->getKind()) {
-  case VectorSpace::Kind::Vector: {
+  case TangentSpace::Kind::Vector: {
     auto *proto = getContext().getAdditiveArithmeticProtocol();
     auto *combinerFuncDecl = getContext().getPlusDecl();
     // Call the combiner function and return.
@@ -1891,7 +1883,7 @@ void PullbackEmitter::accumulateIndirect(
     builder.emitDestroyValueOperation(loc, witnessMethod);
     return;
   }
-  case VectorSpace::Kind::Tuple: {
+  case TangentSpace::Kind::Tuple: {
     auto tupleType = tangentSpace->getTuple();
     for (unsigned i : range(tupleType->getNumElements())) {
       auto *destAddr = builder.createTupleElementAddr(loc, resultBufAccess, i);
@@ -1900,11 +1892,6 @@ void PullbackEmitter::accumulateIndirect(
       accumulateIndirect(destAddr, eltAddrLHS, eltAddrRHS, loc);
     }
     return;
-  }
-  case VectorSpace::Kind::Function: {
-    llvm_unreachable(
-        "Unimplemented: Emit thunks for abstracting adjoint value "
-        "accumulation");
   }
   }
 }
@@ -1922,7 +1909,7 @@ void PullbackEmitter::accumulateIndirect(SILValue lhsDestAccess,
       LookUpConformanceInModule(swiftMod));
   assert(tangentSpace && "No tangent space for this type");
   switch (tangentSpace->getKind()) {
-  case VectorSpace::Kind::Vector: {
+  case TangentSpace::Kind::Vector: {
     auto *proto = getContext().getAdditiveArithmeticProtocol();
     auto *accumulatorFuncDecl = getContext().getPlusEqualDecl();
     // Call the combiner function and return.
@@ -1949,7 +1936,7 @@ void PullbackEmitter::accumulateIndirect(SILValue lhsDestAccess,
     builder.emitDestroyValueOperation(loc, witnessMethod);
     return;
   }
-  case VectorSpace::Kind::Tuple: {
+  case TangentSpace::Kind::Tuple: {
     auto tupleType = tangentSpace->getTuple();
     for (unsigned i : range(tupleType->getNumElements())) {
       auto *destAddr = builder.createTupleElementAddr(loc, lhsDestAccess, i);
@@ -1957,11 +1944,6 @@ void PullbackEmitter::accumulateIndirect(SILValue lhsDestAccess,
       accumulateIndirect(destAddr, eltAddrRHS, loc);
     }
     return;
-  }
-  case VectorSpace::Kind::Function: {
-    llvm_unreachable(
-        "Unimplemented: Emit thunks for abstracting adjoint value "
-        "accumulation");
   }
   }
 }

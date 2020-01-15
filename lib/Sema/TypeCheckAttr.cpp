@@ -3002,9 +3002,10 @@ IndexSubset *TypeChecker::inferDifferentiabilityParameters(
   return IndexSubset::get(ctx, parameterBits);
 }
 
-// Computes `IndexSubset` from the given parsed differentiation parameters
-// (possibly empty) for the given function and derivative generic environment,
-// then verifies that the parameter indices are valid.
+// Computes the differentiability parameter indices from the given parsed
+// differentiability parameters for the given original or derivative
+// `AbstractFunctionDecl` and derivative generic environment. On error, emits
+// diagnostics and returns `nullptr`.
 // - If parsed parameters are empty, infer parameter indices.
 // - Otherwise, build parameter indices from parsed parameters.
 // The attribute name/location are used in diagnostics.
@@ -3049,13 +3050,14 @@ static IndexSubset *computeDifferentiabilityParameters(
     }
   }
 
-  // If parsed differentiation parameters are empty, infer parameter indices
+  // If parsed differentiability parameters are empty, infer parameter indices
   // from the function type.
   if (parsedDiffParams.empty())
     return TypeChecker::inferDifferentiabilityParameters(function,
                                                          derivativeGenEnv);
 
-  // Otherwise, build parameter indices from parsed differentiation parameters.
+  // Otherwise, build parameter indices from parsed differentiability
+  // parameters.
   auto numUncurriedParams = functionType->getNumParams();
   if (auto *resultFnType =
           functionType->getResult()->getAs<AnyFunctionType>()) {
@@ -3124,30 +3126,32 @@ static IndexSubset *computeDifferentiabilityParameters(
   return IndexSubset::get(ctx, parameterBits);
 }
 
-// Checks if the given `IndexSubset` instance is valid for the given function
+// Checks if the given differentiability parameter indices are valid for the
+// given original or derivative `AbstractFunctionDecl` and original function
 // type in the given derivative generic environment and module context. Returns
 // true on error.
-// The parsed differentiation parameters and attribute location are used in
+//
+// The parsed differentiability parameters and attribute location are used in
 // diagnostics.
 static bool checkDifferentiabilityParameters(
-    AbstractFunctionDecl *AFD, IndexSubset *indices,
+    AbstractFunctionDecl *AFD, IndexSubset *diffParamIndices,
     AnyFunctionType *functionType, GenericEnvironment *derivativeGenEnv,
     ModuleDecl *module, ArrayRef<ParsedAutoDiffParameter> parsedDiffParams,
     SourceLoc attrLoc) {
   auto &ctx = AFD->getASTContext();
   auto &diags = ctx.Diags;
 
-  // Diagnose empty differentiability parameter indices. This occurs when no
-  // `wrt:` clause is declared and no differentiability parameters can be
-  // inferred.
-  if (indices->isEmpty()) {
+  // Diagnose empty differentiability indices. No differentiability parameters
+  // were resolved or inferred.
+  if (diffParamIndices->isEmpty()) {
     diags.diagnose(attrLoc, diag::diff_params_clause_no_inferred_parameters);
     return true;
   }
 
   // Check that differentiability parameters have allowed types.
   SmallVector<Type, 4> diffParamTypes;
-  autodiff::getSubsetParameterTypes(indices, functionType, diffParamTypes);
+  autodiff::getSubsetParameterTypes(diffParamIndices, functionType,
+                                    diffParamTypes);
   for (unsigned i : range(diffParamTypes.size())) {
     SourceLoc loc =
         parsedDiffParams.empty() ? attrLoc : parsedDiffParams[i].getLoc();

@@ -1600,7 +1600,7 @@ void Serializer::writeCrossReference(const DeclContext *DC, uint32_t pathLen) {
     abbrCode = DeclTypeAbbrCodes[XRefExtensionPathPieceLayout::Code];
     CanGenericSignature genericSig(nullptr);
     if (ext->isConstrainedExtension()) {
-      genericSig = ext->getGenericSignature()->getCanonicalSignature();
+      genericSig = ext->getGenericSignature().getCanonicalSignature();
     }
     XRefExtensionPathPieceLayout::emitRecord(
         Out, ScratchRecord, abbrCode, addContainingModuleRef(DC),

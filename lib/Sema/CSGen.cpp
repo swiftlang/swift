@@ -930,6 +930,16 @@ namespace {
       = { nullptr, nullptr };
     unsigned currentEditorPlaceholderVariable = 0;
 
+    /// Returns false and emits the specified diagnostic if the member reference
+    /// base is a nil literal. Returns true otherwise.
+    bool isValidBaseOfMemberRef(Expr *base, Diag<> diagnostic) {
+      if (auto nilLiteral = dyn_cast<NilLiteralExpr>(base)) {
+        CS.getASTContext().Diags.diagnose(nilLiteral->getLoc(), diagnostic);
+        return false;
+      }
+      return true;
+    }
+
     /// Add constraints for a reference to a named member of the given
     /// base type, and return the type of such a reference.
     Type addMemberRefConstraints(Expr *expr, Expr *base, DeclNameRef name,
@@ -1806,7 +1816,11 @@ namespace {
           return Type();
       }
 
-      return addSubscriptConstraints(expr, CS.getType(expr->getBase()),
+      auto *base = expr->getBase();
+      if (!isValidBaseOfMemberRef(base, diag::cannot_subscript_nil_literal))
+        return nullptr;
+
+      return addSubscriptConstraints(expr, CS.getType(base),
                                      expr->getIndex(),
                                      decl, expr->getArgumentLabels(),
                                      expr->hasTrailingClosure());
@@ -2630,18 +2644,18 @@ namespace {
       CS.addConstraint(
           ConstraintKind::Conversion, CS.getType(expr->getCondExpr()),
           boolDecl->getDeclaredType(),
-          CS.getConstraintLocator(expr, LocatorPathElt::Condition()));
+          CS.getConstraintLocator(expr, ConstraintLocator::Condition));
 
       // The branches must be convertible to a common type.
-      return CS.addJoinConstraint(CS.getConstraintLocator(expr),
-          {
-            { CS.getType(expr->getThenExpr()),
-              CS.getConstraintLocator(expr->getThenExpr()) },
-            { CS.getType(expr->getElseExpr()),
-              CS.getConstraintLocator(expr->getElseExpr()) }
-          });
+      return CS.addJoinConstraint(
+          CS.getConstraintLocator(expr),
+          {{CS.getType(expr->getThenExpr()),
+            CS.getConstraintLocator(expr, LocatorPathElt::TernaryBranch(true))},
+           {CS.getType(expr->getElseExpr()),
+            CS.getConstraintLocator(expr,
+                                    LocatorPathElt::TernaryBranch(false))}});
     }
-    
+
     virtual Type visitImplicitConversionExpr(ImplicitConversionExpr *expr) {
       llvm_unreachable("Already type-checked");
     }

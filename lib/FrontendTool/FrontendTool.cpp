@@ -667,7 +667,7 @@ static void countStatsOfSourceFile(UnifiedStatsReporter &Stats,
                                    SourceFile *SF) {
   auto &C = Stats.getFrontendCounters();
   auto &SM = Instance.getSourceMgr();
-  C.NumDecls += SF->Decls.size();
+  C.NumDecls += SF->getTopLevelDecls().size();
   C.NumLocalTypeDecls += SF->LocalTypeDecls.size();
   C.NumObjCMethods += SF->ObjCMethods.size();
   C.NumInfixOperators += SF->InfixOperators.size();
@@ -979,7 +979,9 @@ static void emitReferenceDependenciesForAllPrimaryInputsIfNeeded(
       if (Invocation.getLangOptions().EnableFineGrainedDependencies)
         (void)fine_grained_dependencies::emitReferenceDependencies(
             Instance.getASTContext().Diags, SF,
-            *Instance.getDependencyTracker(), referenceDependenciesFilePath);
+            *Instance.getDependencyTracker(), referenceDependenciesFilePath,
+            Invocation.getLangOptions()
+                .EmitFineGrainedDependencySourcefileDotFiles);
       else
         (void)emitReferenceDependencies(Instance.getASTContext().Diags, SF,
                                         *Instance.getDependencyTracker(),
@@ -1262,12 +1264,12 @@ static bool performCompile(CompilerInstance &Instance,
     return compileLLVMIR(Invocation, Instance, Stats);
 
   if (FrontendOptions::shouldActionOnlyParse(Action)) {
-    bool ParseDelayedDeclListsOnEnd =
-      Action == FrontendOptions::ActionType::DumpParse ||
-      Invocation.getDiagnosticOptions().VerifyMode != DiagnosticOptions::NoVerify;
+    // Disable delayed parsing of type and function bodies when we've been
+    // asked to dump the resulting AST.
+    bool CanDelayBodies = Action != FrontendOptions::ActionType::DumpParse;
     Instance.performParseOnly(/*EvaluateConditionals*/
                     Action == FrontendOptions::ActionType::EmitImportedModules,
-                              ParseDelayedDeclListsOnEnd);
+                              CanDelayBodies);
   } else if (Action == FrontendOptions::ActionType::ResolveImports) {
     Instance.performParseAndResolveImportsOnly();
   } else {

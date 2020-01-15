@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -O -sil-verify-all -emit-sil -enforce-exclusivity=unchecked  %s | %FileCheck %s
+// RUN: %target-swift-frontend -O -sil-verify-all -emit-sil %s | %FileCheck %s
 // REQUIRES: swift_stdlib_no_asserts,optimized_stdlib
 
 // This is an end-to-end test of the array(contentsOf) -> array(Element) optimization
@@ -14,18 +14,15 @@ public func testInt(_ a: inout [Int]) {
   a += [1]
 }
 
-// CHECK-LABEL: sil @{{.*}}testThreeInt
-// CHECK-NOT: apply
-// CHECK:        [[FR:%[0-9]+]] = function_ref @$sSa15reserveCapacityyySiFSi_Tg5
-// CHECK-NEXT:   apply [[FR]]
-// CHECK-NOT: apply
-// CHECK:        [[F:%[0-9]+]] = function_ref @$sSa6appendyyxnFSi_Tg5
-// CHECK-NOT: apply
-// CHECK:        apply [[F]]
-// CHECK-NEXT:   apply [[F]]
-// CHECK-NEXT:   apply [[F]]
-// CHECK-NEXT:   tuple
-// CHECK-NEXT:   return
+// CHECK-LABEL: sil @{{.*}}testThreeInts
+// CHECK-DAG:    [[FR:%[0-9]+]] = function_ref @${{(sSa15reserveCapacityyySiFSi_Tg5|sSa16_createNewBuffer)}}
+// CHECK-DAG:    apply [[FR]]
+// CHECK-DAG:    [[F:%[0-9]+]] = function_ref @$sSa6appendyyxnFSi_Tg5
+// CHECK-DAG:    apply [[F]]
+// CHECK-DAG:    apply [[F]]
+// CHECK-DAG:    apply [[F]]
+// CHECK:      } // end sil function '{{.*}}testThreeInts{{.*}}'
+
 public func testThreeInts(_ a: inout [Int]) {
   a += [1, 2, 3]
 }

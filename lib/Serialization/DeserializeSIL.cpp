@@ -2672,8 +2672,8 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     CanGenericSignature sig = CanGenericSignature();
     if (!genericParams.empty() || !requirements.empty())
       sig = GenericSignature::get(genericParams, requirements)
-         ->getCanonicalSignature();
-    
+                .getCanonicalSignature();
+
     auto pattern = KeyPathPattern::get(SILMod, sig,
                                        rootTy->getCanonicalType(),
                                        valueTy->getCanonicalType(),

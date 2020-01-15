@@ -234,3 +234,16 @@ tuplify(true) { x in
   #warning("oops")  // expected-warning{{oops}}
   3.14159
 }
+
+struct MyTuplifiedStruct {
+  var condition: Bool
+
+  @TupleBuilder var computed: some Any { // expected-note{{remove the attribute to explicitly disable the function builder}}{{3-17=}}
+    if condition {
+      return 17 // expected-warning{{application of function builder 'TupleBuilder' disabled by explicit 'return' statement}}
+      // expected-note@-1{{remove 'return' statements to apply the function builder}}{{7-14=}}{{12-19=}}
+    } else {
+           return 42
+    }
+  }
+}

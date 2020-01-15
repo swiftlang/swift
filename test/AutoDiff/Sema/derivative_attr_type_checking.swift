@@ -221,8 +221,15 @@ extension StaticMethod {
 
 protocol InstanceMethod: Differentiable {
   func foo(_ x: Self) -> Self
-
   func generic<T: Differentiable>(_ x: T) -> Self
+}
+
+extension InstanceMethod {
+  // expected-note @+1 {{'foo' defined here}}
+  func foo(_ x: Self) -> Self { x }
+
+  // expected-note @+1 {{'generic' defined here}}
+  func generic<T: Differentiable>(_ x: T) -> Self { self }
 }
 
 extension InstanceMethod {
@@ -547,17 +554,36 @@ extension HasStoredProperty {
   }
 }
 
-// Test cross-file derivative registration. Currently unsupported.
-// TODO(TF-1021): Lift this restriction.
-extension FloatingPoint where Self: Differentiable {
-  // expected-error @+1 {{derivative not in the same file as the original function}}
-  @derivative(of: rounded)
-  func vjpRounded() -> (value: Self, pullback: (TangentVector) -> TangentVector) {
+// Test derivative registration for protocol requirements. Currently unsupported.
+// TODO(TF-982): Lift this restriction and add proper support.
+
+protocol ProtocolRequirementDerivative {
+  func requirement(_ x: Float) -> Float
+}
+extension ProtocolRequirementDerivative {
+  // NOTE: the error is misleading because `findAbstractFunctionDecl` in
+  // TypeCheckAttr.cpp is not setup to show customized error messages for
+  // invalid original function candidates.
+  // expected-error @+1 {{could not find function 'requirement' with expected type '<Self where Self : ProtocolRequirementDerivative> (Self) -> (Float) -> Float'}}
+  @derivative(of: requirement)
+  func vjpRequirement(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
     fatalError()
   }
 }
 
-// Test static methods.
+// Test cross-file derivative registration. Currently unsupported.
+// TODO(TF-1021): Lift this restriction.
+
+extension FloatingPoint where Self: Differentiable {
+  // expected-error @+1 {{derivative not in the same file as the original function}}
+  @derivative(of: rounded)
+  func vjpRounded() -> (
+    value: Self,
+    pullback: (Self.TangentVector) -> (Self.TangentVector)
+  ) {
+    fatalError()
+  }
+}
 
 extension Differentiable where Self: AdditiveArithmetic {
   // expected-error @+1 {{'+' is not defined in the current type context}}

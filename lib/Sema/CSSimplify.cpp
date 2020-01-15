@@ -764,58 +764,6 @@ matchCallArguments(SmallVectorImpl<AnyFunctionType::Param> &args,
   return listener.relabelArguments(actualArgNames);
 }
 
-/// Find the callee declaration and uncurry level for a given call
-/// locator.
-static std::tuple<ValueDecl *, bool, ArrayRef<Identifier>, bool,
-                  ConstraintLocator *>
-getCalleeDeclAndArgs(ConstraintSystem &cs,
-                     ConstraintLocatorBuilder callBuilder) {
-  auto formUnknownCallee =
-      []() -> std::tuple<ValueDecl *, bool, ArrayRef<Identifier>, bool,
-                         ConstraintLocator *> {
-    return std::make_tuple(/*decl*/ nullptr, /*hasAppliedSelf*/ false,
-                           /*argLabels*/ ArrayRef<Identifier>(),
-                           /*hasTrailingClosure*/ false,
-                           /*calleeLocator*/ nullptr);
-  };
-
-  auto *callLocator = cs.getConstraintLocator(callBuilder);
-  auto *callExpr = callLocator->getAnchor();
-
-  // Break down the call.
-  if (!callExpr)
-    return formUnknownCallee();
-
-  // Our remaining path can only be 'ApplyArgument'.
-  auto path = callLocator->getPath();
-  if (!path.empty() && !path.back().is<LocatorPathElt::ApplyArgument>())
-    return formUnknownCallee();
-
-  // Dig out the callee information.
-  auto argInfo = cs.getArgumentInfo(callLocator);
-  if (!argInfo)
-    return formUnknownCallee();
-
-  auto argLabels = argInfo->Labels;
-  auto hasTrailingClosure = argInfo->HasTrailingClosure;
-  auto calleeLocator = cs.getCalleeLocator(callLocator);
-
-  // Find the overload choice corresponding to the callee locator.
-  auto selectedOverload = cs.findSelectedOverloadFor(calleeLocator);
-
-  // If we didn't find any matching overloads, we're done. Just return the
-  // argument info.
-  if (!selectedOverload)
-    return std::make_tuple(/*decl*/ nullptr, /*hasAppliedSelf*/ false,
-                           argLabels, hasTrailingClosure,
-                           /*calleeLocator*/ nullptr);
-
-  // Return the found declaration, assuming there is one.
-  auto choice = selectedOverload->choice;
-  return std::make_tuple(choice.getDeclOrNull(), hasAppliedSelf(cs, choice),
-                         argLabels, hasTrailingClosure, calleeLocator);
-}
-
 class ArgumentFailureTracker : public MatchCallArgumentListener {
   ConstraintSystem &CS;
   SmallVectorImpl<AnyFunctionType::Param> &Arguments;
@@ -1002,22 +950,29 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
     ArrayRef<AnyFunctionType::Param> args,
     ArrayRef<AnyFunctionType::Param> params, ConstraintKind subKind,
     ConstraintLocatorBuilder locator) {
-  // Extract the parameters.
-  ValueDecl *callee;
-  bool hasAppliedSelf;
-  ArrayRef<Identifier> argLabels;
-  bool hasTrailingClosure = false;
-  ConstraintLocator *calleeLocator;
-  std::tie(callee, hasAppliedSelf, argLabels, hasTrailingClosure,
-           calleeLocator) =
-    getCalleeDeclAndArgs(cs, locator);
+  auto *loc = cs.getConstraintLocator(locator);
+  assert(loc->isLastElement<LocatorPathElt::ApplyArgument>());
 
-  ParameterListInfo paramInfo(params, callee, hasAppliedSelf);
+  ValueDecl *callee = nullptr;
+  bool appliedSelf = false;
+
+  // Resolve the callee for the application.
+  auto *calleeLocator = cs.getCalleeLocator(loc);
+  if (auto overload = cs.findSelectedOverloadFor(calleeLocator)) {
+    callee = overload->choice.getDeclOrNull();
+    appliedSelf = hasAppliedSelf(cs, overload->choice);
+  }
+
+  ParameterListInfo paramInfo(params, callee, appliedSelf);
+
+  // Dig out the argument information.
+  auto argInfo = cs.getArgumentInfo(loc);
+  assert(argInfo);
 
   // Apply labels to arguments.
   SmallVector<AnyFunctionType::Param, 8> argsWithLabels;
   argsWithLabels.append(args.begin(), args.end());
-  AnyFunctionType::relabelParams(argsWithLabels, argLabels);
+  AnyFunctionType::relabelParams(argsWithLabels, argInfo->Labels);
 
   // Special case when a single tuple argument if used
   // instead of N distinct arguments e.g.:
@@ -1059,7 +1014,7 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
     ArgumentFailureTracker listener(cs, argsWithLabels, params,
                                     parameterBindings, locator);
     if (constraints::matchCallArguments(
-            argsWithLabels, params, paramInfo, hasTrailingClosure,
+            argsWithLabels, params, paramInfo, argInfo->HasTrailingClosure,
             cs.shouldAttemptFixes(), listener, parameterBindings))
       return cs.getTypeMatchFailure(locator);
 
@@ -1145,9 +1100,11 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
               = paramInfo.getFunctionBuilderType(paramIdx)) {
         Expr *arg = getArgumentExpr(locator.getAnchor(), argIdx);
         if (auto closure = dyn_cast_or_null<ClosureExpr>(arg)) {
-          auto result =
-              cs.applyFunctionBuilder(closure, functionBuilderType,
-                                      calleeLocator, loc);
+          auto closureType = cs.getType(closure);
+          auto result = cs.matchFunctionBuilder(
+              closure, functionBuilderType,
+              closureType->castTo<FunctionType>()->getResult(),
+              ConstraintKind::Conversion, calleeLocator, loc);
           if (result.isFailure())
             return result;
         }
@@ -2200,8 +2157,18 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
           }
         } else { // There are no elements in the path
           auto *anchor = locator.getAnchor();
-          if (!(anchor && isa<AssignExpr>(anchor)))
+          if (!(anchor &&
+               (isa<AssignExpr>(anchor) || isa<CoerceExpr>(anchor))))
             return getTypeMatchFailure(locator);
+        }
+        
+        auto *anchor = locator.getAnchor();
+        if (isa<CoerceExpr>(anchor)) {
+          auto *fix = ContextualMismatch::create(
+              *this, type1, type2, getConstraintLocator(locator));
+          if (recordFix(fix))
+            return getTypeMatchFailure(locator);
+          break;
         }
 
         auto *fix = MissingConformance::forContextual(
@@ -2804,6 +2771,13 @@ bool ConstraintSystem::repairFailures(
                         });
   };
 
+  auto markAnyTypeVarsAsPotentialHoles = [&](Type type) {
+    type.visit([&](Type subType) {
+      if (auto *typeVar = subType->getAs<TypeVariableType>())
+        recordPotentialHole(typeVar);
+    });
+  };
+
   if (path.empty()) {
     if (!anchor)
       return false;
@@ -2823,10 +2797,16 @@ bool ConstraintSystem::repairFailures(
         conversionsOrFixes.push_back(coerceToCheckCastFix);
         return true;
       }
-      
+
       // If it has a deep equality restriction, defer the diagnostic to
       // GenericMismatch.
-      if (hasConversionOrRestriction(ConversionRestrictionKind::DeepEquality))
+      if (hasConversionOrRestriction(ConversionRestrictionKind::DeepEquality) &&
+          !hasConversionOrRestriction(
+              ConversionRestrictionKind::OptionalToOptional)) {
+        return false;
+      }
+
+      if (hasConversionOrRestriction(ConversionRestrictionKind::Existential))
         return false;
       
       auto *fix = ContextualMismatch::create(*this, lhs, rhs,
@@ -3485,6 +3465,13 @@ bool ConstraintSystem::repairFailures(
         break;
       }
     }
+    // Handle function result coerce expression wrong type conversion.
+    if (anchor && isa<CoerceExpr>(anchor)) {
+      auto *fix =
+          ContextualMismatch::create(*this, lhs, rhs, loc);
+      conversionsOrFixes.push_back(fix);
+      break;
+    }
     LLVM_FALLTHROUGH;
   }
 
@@ -3660,6 +3647,33 @@ bool ConstraintSystem::repairFailures(
                                 locator))
       return true;
 
+    break;
+  }
+
+  case ConstraintLocator::TernaryBranch: {
+    markAnyTypeVarsAsPotentialHoles(lhs);
+    markAnyTypeVarsAsPotentialHoles(rhs);
+
+    // If `if` expression has a contextual type, let's consider it a source of
+    // truth and produce a contextual mismatch instead of  per-branch failure,
+    // because it's a better pointer than potential then-to-else type mismatch.
+    if (auto contextualType = getContextualType(anchor)) {
+      if (contextualType->isEqual(rhs)) {
+        auto *loc =
+            getConstraintLocator(anchor, LocatorPathElt::ContextualType());
+        if (hasFixFor(loc, FixKind::ContextualMismatch))
+          return true;
+
+        conversionsOrFixes.push_back(
+            ContextualMismatch::create(*this, lhs, rhs, loc));
+        break;
+      }
+    }
+
+    // If there is no contextual type, this is most likely a contextual type
+    // mismatch between then/else branches of ternary operator.
+    conversionsOrFixes.push_back(ContextualMismatch::create(
+        *this, lhs, rhs, getConstraintLocator(locator)));
     break;
   }
 
@@ -4025,9 +4039,20 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
         subKind = ConstraintKind::Bind;
       }
 
-      return matchTypes(
-          instanceType1, instanceType2, subKind, subflags,
-          locator.withPathElement(ConstraintLocator::InstanceType));
+      auto result =
+          matchTypes(instanceType1, instanceType2, subKind, subflags,
+                     locator.withPathElement(ConstraintLocator::InstanceType));
+      if (shouldAttemptFixes() && result.isFailure()) {
+        auto *anchor = locator.getAnchor();
+        if (anchor && isa<CoerceExpr>(anchor)) {
+          auto *fix =
+              ContextualMismatch::create(*this, instanceType1, instanceType2,
+                                         getConstraintLocator(locator));
+          conversionsOrFixes.push_back(fix);
+          break;
+        }
+      }
+      return result;
     }
 
     case TypeKind::Function: {
@@ -6475,6 +6500,16 @@ ConstraintSystem::simplifyOneWayConstraint(
     return SolutionKind::Unsolved;
   }
 
+  // Propagate holes through one-way constraints.
+  if (secondSimplified->isHole()) {
+    first.visit([&](Type subType) {
+      if (auto *typeVar = subType->getAs<TypeVariableType>())
+        recordPotentialHole(typeVar);
+    });
+
+    return SolutionKind::Solved;
+  }
+
   // Translate this constraint into a one-way binding constraint.
   return matchTypes(first, secondSimplified, ConstraintKind::Equal, flags,
                     locator);
@@ -7454,8 +7489,9 @@ ConstraintSystem::simplifyApplicableFnConstraint(
   }
 
   // If right-hand side is a type variable, the constraint is unsolved.
-  if (desugar2->isTypeVariableOrMember())
+  if (desugar2->isTypeVariableOrMember()) {
     return formUnsolved();
+  }
 
   // Strip the 'ApplyFunction' off the locator.
   // FIXME: Perhaps ApplyFunction can go away entirely?
@@ -8626,7 +8662,24 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   }
 
   case FixKind::ContextualMismatch: {
-    if (recordFix(fix))
+    auto impact = 1;
+
+    auto locator = fix->getLocator();
+    if (auto branchElt =
+            locator->getLastElementAs<LocatorPathElt::TernaryBranch>()) {
+      // If this is `else` branch of a ternary operator, let's
+      // increase its impact to eliminate the chance of ambiguity.
+      //
+      // Branches are connected through two `subtype` constraints
+      // to a common type variable with represents their join, which
+      // means that result would attempt a type from each side if
+      // one is available and that would result in two fixes - one for
+      // each mismatched branch.
+      if (branchElt->forElse())
+        impact = 10;
+    }
+
+    if (recordFix(fix, impact))
       return SolutionKind::Error;
 
     if (auto *fnType1 = type1->getAs<FunctionType>()) {

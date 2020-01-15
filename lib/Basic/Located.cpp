@@ -20,5 +20,9 @@ void Located<T>::dump() const {
 
 template<typename T>
 void Located<T>::dump(raw_ostream &os) const {
-  os << Loc << " " << Item;
+  // FIXME: The following does not compile on newer clangs because operator<<
+  // does not exist for SourceLoc. More so, the operator does not exist because
+  // one needs a SourceManager reference and buffer ID to convert any given
+  // SourceLoc into line and column information.
+  //os << Loc << " " << Item;
 }

@@ -2865,7 +2865,7 @@ void SILProperty::print(SILPrintContext &Ctx) const {
   printValueDecl(getDecl(), OS);
   if (auto sig = getDecl()->getInnermostDeclContext()
                           ->getGenericSignatureOfContext()) {
-    sig->getCanonicalSignature()->print(OS, Options);
+    sig.getCanonicalSignature()->print(OS, Options);
   }
   OS << " (";
   if (auto component = getComponent())

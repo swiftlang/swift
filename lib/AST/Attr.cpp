@@ -1474,8 +1474,8 @@ DifferentiableAttr::DifferentiableAttr(Decl *original, bool implicit,
                                        Optional<DeclNameRefWithLoc> vjp,
                                        GenericSignature derivativeGenSig)
     : DeclAttribute(DAK_Differentiable, atLoc, baseRange, implicit),
-      Linear(linear), JVP(std::move(jvp)), VJP(std::move(vjp)) {
-  setOriginalDeclaration(original);
+      OriginalDeclaration(original), Linear(linear), JVP(std::move(jvp)),
+      VJP(std::move(vjp)) {
   setParameterIndices(parameterIndices);
   setDerivativeGenericSignature(derivativeGenSig);
 }
@@ -1520,13 +1520,6 @@ DifferentiableAttr::create(AbstractFunctionDecl *original, bool implicit,
 }
 
 // SWIFT_ENABLE_TENSORFLOW
-void DifferentiableAttr::setOriginalDeclaration(Decl *decl) {
-  assert(decl && "Original declaration must be non-null");
-  assert(!OriginalDeclaration &&
-         "Original declaration cannot have already been set");
-  OriginalDeclaration = decl;
-}
-
 bool DifferentiableAttr::hasComputedParameterIndices() const {
   return ParameterIndicesAndBit.getInt();
 }
@@ -1552,6 +1545,13 @@ void DifferentiableAttr::setParameterIndices(IndexSubset *paramIndices) {
       std::move(paramIndices));
 }
 // SWIFT_ENABLE_TENSORFLOW END
+
+void DifferentiableAttr::setOriginalDeclaration(Decl *originalDeclaration) {
+  assert(originalDeclaration && "Original declaration must be non-null");
+  assert(!OriginalDeclaration &&
+         "Original declaration cannot have already been set");
+  OriginalDeclaration = originalDeclaration;
+}
 
 void DifferentiableAttr::setJVPFunction(FuncDecl *decl) {
   JVPFunction = decl;

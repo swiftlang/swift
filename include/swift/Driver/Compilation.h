@@ -521,6 +521,18 @@ public:
   /// How many .swift input files?
   unsigned countSwiftInputs() const;
 
+  /// Unfortunately the success or failure of a Swift compilation is currently
+  /// sensitive to the order in which files are processed, at least in terms of
+  /// the order of processing extensions (and likely other ways we haven't
+  /// discovered yet). So long as this is true, we need to make sure any batch
+  /// job we build names its inputs in an order that's a subsequence of the
+  /// sequence of inputs the driver was initially invoked with.
+  ///
+  /// Also use to write out information in a consistent order.
+  void sortJobsToMatchCompilationInputs(
+      ArrayRef<const Job *> unsortedJobs,
+      SmallVectorImpl<const Job *> &sortedJobs) const;
+
 private:
   /// Perform all jobs.
   ///

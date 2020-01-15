@@ -212,11 +212,13 @@ public:
     return MemoryInst->isDelegatingSelfAllocated();
   }
 
+  enum class EndScopeKind { Borrow, Access };
+
   /// Given an element number (in the flattened sense) return a pointer to a
   /// leaf element of the specified number.
-  SILValue emitElementAddress(
+  SILValue emitElementAddressForDestroy(
       unsigned TupleEltNo, SILLocation Loc, SILBuilder &B,
-      SmallVectorImpl<std::pair<SILValue, SILValue>> &EndBorrowList) const;
+      SmallVectorImpl<std::pair<SILValue, EndScopeKind>> &EndScopeList) const;
 
   /// Return the swift type of the specified element.
   SILType getElementType(unsigned EltNo) const;

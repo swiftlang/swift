@@ -1210,6 +1210,8 @@ public:
 
   bool diagnoseAsError() override;
 
+  bool diagnoseAsNote() override;
+
   bool diagnoseSingleMissingArgument() const;
 
 private:

@@ -1709,15 +1709,15 @@ class DifferentiableAttr final
       private llvm::TrailingObjects<DifferentiableAttr,
                                     ParsedAutoDiffParameter> {
   friend TrailingObjects;
+
   // SWIFT_ENABLE_TENSORFLOW
   friend class DifferentiableAttributeParameterIndicesRequest;
   // SWIFT_ENABLE_TENSORFLOW END
 
-  // SWIFT_ENABLE_TENSORFLOW
   /// The declaration on which the `@differentiable` attribute is declared.
+  /// May not be a valid declaration for `@differentiable` attributes.
   /// Resolved during parsing and deserialization.
   Decl *OriginalDeclaration = nullptr;
-  // SWIFT_ENABLE_TENSORFLOW END
   /// Whether this function is linear (optional).
   bool Linear;
   /// The number of parsed differentiability parameters specified in 'wrt:'.
@@ -1732,6 +1732,7 @@ class DifferentiableAttr final
   /// The VJP function (optional), resolved by the type checker if VJP name is
   /// specified.
   FuncDecl *VJPFunction = nullptr;
+
   // SWIFT_ENABLE_TENSORFLOW
   // NOTE: Parameter indices requestification is done on `tensorflow` branch but
   // has not yet been upstreamed to `master` branch.
@@ -1739,6 +1740,10 @@ class DifferentiableAttr final
   /// The bit stores whether the parameter indices have been computed.
   llvm::PointerIntPair<IndexSubset *, 1, bool> ParameterIndicesAndBit;
   // SWIFT_ENABLE_TENSORFLOW END
+
+  /// The differentiability parameter indices, resolved by the type checker.
+  IndexSubset *ParameterIndices = nullptr;
+
   /// The trailing where clause (optional).
   TrailingWhereClause *WhereClause = nullptr;
   /// The generic signature for autodiff associated functions. Resolved by the
@@ -1779,7 +1784,10 @@ public:
                                     GenericSignature derivativeGenSig);
 
   Decl *getOriginalDeclaration() const { return OriginalDeclaration; }
-  void setOriginalDeclaration(Decl *decl);
+
+  /// Sets the original declaration on which this attribute is declared.
+  /// Should only be used by parsing and deserialization.
+  void setOriginalDeclaration(Decl *originalDeclaration);
 
   /// Get the optional 'jvp:' function name and location.
   /// Use this instead of `getJVPFunction` to check whether the attribute has a
@@ -1834,10 +1842,9 @@ public:
 
   // Print the attribute to the given stream.
   // If `omitWrtClause` is true, omit printing the `wrt:` clause.
-  // If `omitAssociatedFunctions` is true, omit printing associated functions.
-  void print(llvm::raw_ostream &OS, const Decl *D,
-             bool omitWrtClause = false,
-             bool omitAssociatedFunctions = false) const;
+  // If `omitDerivativeFunctions` is true, omit printing derivative functions.
+  void print(llvm::raw_ostream &OS, const Decl *D, bool omitWrtClause = false,
+             bool omitDerivativeFunctions = false) const;
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_Differentiable;
@@ -1868,7 +1875,7 @@ class DerivativeAttr final
       private llvm::TrailingObjects<DerivativeAttr, ParsedAutoDiffParameter> {
   friend TrailingObjects;
 
-  /// The base type repr for the referenced original function. This field is
+  /// The base type for the referenced original declaration. This field is
   /// non-null only for parsed attributes that reference a qualified original
   /// declaration. This field is not serialized; type-checking uses it to
   /// resolve the original declaration, which is serialized.

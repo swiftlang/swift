@@ -42,14 +42,18 @@ class Cat : FakeNSObject {
     // CHECK-NEXT: [[SELF_BOX:%.*]] = alloc_stack $Cat
     // CHECK:      store [[ARG2]] to [[SELF_BOX]] : $*Cat
     // CHECK:      [[FIELD_ADDR:%.*]] = ref_element_addr [[ARG2]] : $Cat, #Cat.x
-    // CHECK-NEXT: store {{%.*}} to [[FIELD_ADDR]] : $*LifetimeTracked
+    // CHECK-NEXT: [[FIELD_ADDR_ACCESS:%.*]] = begin_access [modify] [unsafe] [[FIELD_ADDR]]
+    // CHECK-NEXT: store {{%.*}} to [[FIELD_ADDR_ACCESS]] : $*LifetimeTracked
+    // CHECK-NEXT: end_access [[FIELD_ADDR_ACCESS]]
     // CHECK-NEXT: strong_release [[ARG2]]
     // CHECK-NEXT: [[COND:%.*]] = struct_extract %1 : $Bool, #Bool._value
     // CHECK-NEXT: cond_br [[COND]], bb1, bb2
 
   // CHECK: bb1:
     // CHECK-NEXT: [[FIELD_ADDR:%.*]] = ref_element_addr [[ARG2]] : $Cat, #Cat.x
-    // CHECK-NEXT: destroy_addr [[FIELD_ADDR]] : $*LifetimeTracked
+    // CHECK-NEXT: [[FIELD_ADDR_ACCESS:%.*]] = begin_access [deinit] [static] [[FIELD_ADDR]]
+    // CHECK-NEXT: destroy_addr [[FIELD_ADDR_ACCESS]] : $*LifetimeTracked
+    // CHECK-NEXT: end_access [[FIELD_ADDR_ACCESS]]
     // CHECK-NEXT: strong_release [[ARG2]]
     // CHECK-NEXT: [[RELOAD_FROM_BOX:%.*]] = load [[SELF_BOX]]
     // CHECK-NEXT: [[METATYPE:%.*]] = metatype $@thick Cat.Type

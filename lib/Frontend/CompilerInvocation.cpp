@@ -227,6 +227,8 @@ static void ParseModuleInterfaceArgs(ModuleInterfaceOptions &Opts,
 
   Opts.PreserveTypesAsWritten |=
     Args.hasArg(OPT_module_interface_preserve_types_as_written);
+  Opts.PrintFullConvention |=
+    Args.hasArg(OPT_experimental_print_full_convention);
 }
 
 /// Save a copy of any flags marked as ModuleInterfaceOption, if running
@@ -366,9 +368,13 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.BuildSyntaxTree = true;
     Opts.VerifySyntaxTree = true;
   }
-  
-  if (Args.hasArg(OPT_enable_fine_grained_dependencies))
-    Opts.EnableFineGrainedDependencies = true;
+
+  Opts.EnableFineGrainedDependencies =
+      Args.hasFlag(options::OPT_enable_fine_grained_dependencies,
+                   options::OPT_disable_fine_grained_dependencies, false);
+
+  if (Args.hasArg(OPT_emit_fine_grained_dependency_sourcefile_dot_files))
+    Opts.EmitFineGrainedDependencySourcefileDotFiles = true;
 
   if (Args.hasArg(OPT_fine_grained_dependency_include_intrafile))
     Opts.FineGrainedDependenciesIncludeIntrafileOnes = true;
@@ -404,6 +410,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   
   if (Args.getLastArg(OPT_debug_cycles))
     Opts.DebugDumpCycles = true;
+
+  if (Args.getLastArg(OPT_build_request_dependency_graph))
+    Opts.BuildRequestDependencyGraph = true;
 
   if (const Arg *A = Args.getLastArg(OPT_output_request_graphviz)) {
     Opts.RequestEvaluatorGraphVizPath = A->getValue();
@@ -1256,6 +1265,10 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
 
   if (Args.hasArg(OPT_disable_legacy_type_info)) {
     Opts.DisableLegacyTypeInfo = true;
+  }
+
+  if (Args.hasArg(OPT_prespecialize_generic_metadata)) {
+    Opts.PrespecializeGenericMetadata = true;
   }
 
   if (const Arg *A = Args.getLastArg(OPT_read_legacy_type_info_path_EQ)) {

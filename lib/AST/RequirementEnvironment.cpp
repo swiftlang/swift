@@ -140,7 +140,7 @@ RequirementEnvironment::RequirementEnvironment(
       reqSig->getRequirements().size() == 1) {
     syntheticSignature = conformanceDC->getGenericSignatureOfContext();
     if (syntheticSignature) {
-      syntheticSignature = syntheticSignature->getCanonicalSignature();
+      syntheticSignature = syntheticSignature.getCanonicalSignature();
       syntheticEnvironment =
         syntheticSignature->getGenericEnvironment();
     }

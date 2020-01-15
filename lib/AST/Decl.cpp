@@ -708,6 +708,56 @@ bool ParameterList::hasInternalParameter(StringRef Prefix) const {
   return false;
 }
 
+bool Decl::hasUnderscoredNaming() const {
+  const Decl *D = this;
+  if (const auto AFD = dyn_cast<AbstractFunctionDecl>(D)) {
+    // If it's a function with a parameter with leading underscore, it's a
+    // private function.
+    if (AFD->getParameters()->hasInternalParameter("_")) {
+      return true;
+    }
+  }
+
+  if (const auto SubscriptD = dyn_cast<SubscriptDecl>(D)) {
+    if (SubscriptD->getIndices()->hasInternalParameter("_")) {
+      return true;
+    }
+  }
+
+  if (const auto PD = dyn_cast<ProtocolDecl>(D)) {
+    if (PD->getAttrs().hasAttribute<ShowInInterfaceAttr>()) {
+      return false;
+    }
+    StringRef NameStr = PD->getNameStr();
+    if (NameStr.startswith("_Builtin")) {
+      return true;
+    }
+    if (NameStr.startswith("_ExpressibleBy")) {
+      return true;
+    }
+  }
+
+  if (const auto ImportD = dyn_cast<ImportDecl>(D)) {
+    if (const auto *Mod = ImportD->getModule()) {
+      if (Mod->isSwiftShimsModule()) {
+        return true;
+      }
+    }
+  }
+
+  const auto VD = dyn_cast<ValueDecl>(D);
+  if (!VD || !VD->hasName()) {
+    return false;
+  }
+
+  if (!VD->getBaseName().isSpecial() &&
+      VD->getBaseName().getIdentifier().str().startswith("_")) {
+    return true;
+  }
+
+  return false;
+}
+
 bool Decl::isPrivateStdlibDecl(bool treatNonBuiltinProtocolsAsPublic) const {
   const Decl *D = this;
   if (auto ExtD = dyn_cast<ExtensionDecl>(D)) {
@@ -729,47 +779,12 @@ bool Decl::isPrivateStdlibDecl(bool treatNonBuiltinProtocolsAsPublic) const {
       FU->getKind() != FileUnitKind::SerializedAST)
     return false;
 
-  if (auto AFD = dyn_cast<AbstractFunctionDecl>(D)) {
-    // If it's a function with a parameter with leading underscore, it's a
-    // private function.
-    if (AFD->getParameters()->hasInternalParameter("_"))
-      return true;
-  }
-
-  if (auto SubscriptD = dyn_cast<SubscriptDecl>(D)) {
-    if (SubscriptD->getIndices()->hasInternalParameter("_"))
-      return true;
-  }
-
   if (auto PD = dyn_cast<ProtocolDecl>(D)) {
-    if (PD->getAttrs().hasAttribute<ShowInInterfaceAttr>())
-      return false;
-    StringRef NameStr = PD->getNameStr();
-    if (NameStr.startswith("_Builtin"))
-      return true;
-    if (NameStr.startswith("_ExpressibleBy"))
-      return true;
     if (treatNonBuiltinProtocolsAsPublic)
       return false;
   }
 
-  if (auto ImportD = dyn_cast<ImportDecl>(D)) {
-    if (auto *Mod = ImportD->getModule()) {
-      if (Mod->isSwiftShimsModule())
-        return true;
-    }
-  }
-
-  auto VD = dyn_cast<ValueDecl>(D);
-  if (!VD || !VD->hasName())
-    return false;
-
-  // If the name has leading underscore then it's a private symbol.
-  if (!VD->getBaseName().isSpecial() &&
-      VD->getBaseName().getIdentifier().str().startswith("_"))
-    return true;
-
-  return false;
+  return hasUnderscoredNaming();
 }
 
 AvailabilityContext Decl::getAvailabilityForLinkage() const {
@@ -8031,4 +8046,11 @@ void ParseAbstractFunctionBodyRequest::cacheResult(BraceStmt *value) const {
     return;
   }
 
+}
+
+void swift::simple_display(llvm::raw_ostream &out, AnyFunctionRef fn) {
+  if (auto func = fn.getAbstractFunctionDecl())
+    simple_display(out, func);
+  else
+    out << "closure";
 }

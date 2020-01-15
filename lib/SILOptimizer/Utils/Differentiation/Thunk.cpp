@@ -487,7 +487,7 @@ getOrCreateSubsetParametersThunkForLinearMap(
       LookUpConformanceInModule(swiftMod));
     assert(tangentSpace && "No tangent space for this type");
     switch (tangentSpace->getKind()) {
-    case VectorSpace::Kind::Vector: {
+    case TangentSpace::Kind::Vector: {
       auto *buf = builder.createAllocStack(loc, zeroSILObjType);
       localAllocations.push_back(buf);
       emitZeroIntoBuffer(builder, zeroType, buf, loc);
@@ -500,13 +500,9 @@ getOrCreateSubsetParametersThunkForLinearMap(
       }
       break;
     }
-    case VectorSpace::Kind::Tuple: {
+    case TangentSpace::Kind::Tuple: {
       llvm_unreachable(
           "Unimplemented: Handle zero initialization for tuples");
-    }
-    case VectorSpace::Kind::Function:
-      llvm_unreachable(
-          "Unimplemented: Emit thunks for abstracting zero initialization");
     }
   };
 

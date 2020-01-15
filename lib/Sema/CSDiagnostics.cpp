@@ -1907,6 +1907,20 @@ bool ContextualFailure::diagnoseAsError() {
     diagnostic = diag::cannot_convert_condition_value;
     break;
   }
+      
+  case ConstraintLocator::InstanceType: {
+    if (diagnoseCoercionToUnrelatedType())
+      return true;
+    break;
+  }
+
+  case ConstraintLocator::TernaryBranch: {
+    auto *ifExpr = cast<IfExpr>(getRawAnchor());
+    fromType = getType(ifExpr->getThenExpr());
+    toType = getType(ifExpr->getElseExpr());
+    diagnostic = diag::if_expr_cases_mismatch;
+    break;
+  }
 
   case ConstraintLocator::ContextualType: {
     if (diagnoseConversionToBool())
@@ -2229,11 +2243,12 @@ bool ContextualFailure::diagnoseCoercionToUnrelatedType() const {
   auto *anchor = getAnchor();
   
   if (auto *coerceExpr = dyn_cast<CoerceExpr>(anchor)) {
-    auto fromType = getFromType();
+    auto fromType = getType(coerceExpr->getSubExpr());
     auto toType = getType(coerceExpr->getCastTypeLoc());
+    
     auto diagnostic =
         getDiagnosticFor(CTP_CoerceOperand,
-                         /*forProtocol=*/toType->isAnyExistentialType());
+                         /*forProtocol=*/toType->isExistentialType());
     
     auto diag =
         emitDiagnostic(anchor->getLoc(), *diagnostic, fromType, toType);
@@ -3809,6 +3824,21 @@ bool MissingArgumentsFailure::diagnoseAsError() {
   }
 
   return true;
+}
+
+bool MissingArgumentsFailure::diagnoseAsNote() {
+  auto *locator = getLocator();
+  if (auto overload = getChoiceFor(locator)) {
+    auto *fn = resolveType(overload->openedType)->getAs<AnyFunctionType>();
+    auto loc = overload->choice.getDecl()->getLoc();
+    if (loc.isInvalid())
+      loc = getAnchor()->getLoc();
+    emitDiagnostic(loc, diag::candidate_partial_match,
+                   fn->getParamListAsString(fn->getParams()));
+    return true;
+  }
+
+  return false;
 }
 
 bool MissingArgumentsFailure::diagnoseSingleMissingArgument() const {

@@ -969,7 +969,8 @@ bool TypeVariableBinding::attempt(ConstraintSystem &cs) const {
   if (Binding.hasDefaultedLiteralProtocol()) {
     type = cs.openUnboundGenericType(type, dstLocator);
     type = type->reconstituteSugar(/*recursive=*/false);
-  } else if (srcLocator->isLastElement<LocatorPathElt::ApplyArgToParam>() &&
+  } else if (srcLocator &&
+             srcLocator->isLastElement<LocatorPathElt::ApplyArgToParam>() &&
              !type->hasTypeVariable() && cs.isCollectionType(type)) {
     // If the type binding comes from the argument conversion, let's
     // instead of binding collection types directly, try to bind

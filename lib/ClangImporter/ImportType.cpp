@@ -608,7 +608,7 @@ namespace {
     importObjCTypeParamDecl(const clang::ObjCTypeParamDecl *objcTypeParamDecl) {
       // Pull the corresponding generic type parameter from the imported class.
       const auto *typeParamContext = objcTypeParamDecl->getDeclContext();
-      GenericSignature genericSig = GenericSignature();
+      GenericSignature genericSig;
       if (auto *category =
             dyn_cast<clang::ObjCCategoryDecl>(typeParamContext)) {
         auto ext = cast_or_null<ExtensionDecl>(

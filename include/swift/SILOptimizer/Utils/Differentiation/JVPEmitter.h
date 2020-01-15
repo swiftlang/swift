@@ -210,7 +210,7 @@ private:
   SILType remapSILTypeInDifferential(SILType ty);
 
   /// Find the tangent space of a given canonical type.
-  Optional<VectorSpace> getTangentSpace(CanType type);
+  Optional<TangentSpace> getTangentSpace(CanType type);
 
   /// Assuming the given type conforms to `Differentiable` after remapping,
   /// returns the associated tangent space SIL type.

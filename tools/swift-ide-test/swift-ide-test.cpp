@@ -86,6 +86,7 @@ enum class ActionType {
   PrintASTNotTypeChecked,
   PrintASTTypeChecked,
   PrintModule,
+  PrintModuleMetadata,
   PrintHeader,
   PrintSwiftFileInterface,
   PrintDecl,
@@ -181,6 +182,8 @@ Action(llvm::cl::desc("Mode:"), llvm::cl::init(ActionType::None),
                       "print-ast-typechecked", "Print the typechecked AST"),
            clEnumValN(ActionType::PrintModule,
                       "print-module", "Print visible declarations in a module"),
+           clEnumValN(ActionType::PrintModuleMetadata,
+                      "print-module-metadata", "Print meta-data in a module"),
            clEnumValN(ActionType::PrintHeader,
                       "print-header", "Print visible declarations in a header file"),
            clEnumValN(ActionType::PrintSwiftFileInterface,
@@ -2037,6 +2040,76 @@ static int doPrintModuleGroups(const CompilerInvocation &InitInvok,
   return ExitCode;
 }
 
+static void printModuleMetadata(ModuleDecl *MD) {
+  auto &OS = llvm::outs();
+  MD->collectLinkLibraries([&](LinkLibrary lib) {
+    OS << "link library: " << lib.getName()
+       << ", force load: " << (lib.shouldForceLoad() ? "true" : "false") << "\n";
+  });
+}
+
+static int doPrintModuleMetaData(const CompilerInvocation &InitInvok,
+                                 const std::vector<std::string> ModulesToPrint) {
+  CompilerInvocation Invocation(InitInvok);
+
+  CompilerInstance CI;
+  // Display diagnostics to stderr.
+  PrintingDiagnosticConsumer PrintDiags;
+  CI.addDiagnosticConsumer(&PrintDiags);
+  if (CI.setup(Invocation))
+    return 1;
+  registerIDERequestFunctions(CI.getASTContext().evaluator);
+  auto &Context = CI.getASTContext();
+
+  // Load standard library so that Clang importer can use it.
+  auto *Stdlib = getModuleByFullName(Context, Context.StdlibModuleName);
+  if (!Stdlib) {
+    llvm::errs() << "Failed loading stdlib\n";
+    return 1;
+  }
+  int ExitCode = 0;
+  for (StringRef ModuleToPrint : ModulesToPrint) {
+    if (ModuleToPrint.empty()) {
+      ExitCode = 1;
+      continue;
+    }
+
+    // Get the (sub)module to print.
+    auto *M = getModuleByFullName(Context, ModuleToPrint);
+    if (!M) {
+      llvm::errs() << "error: could not find module '" << ModuleToPrint
+                   << "'\n";
+      ExitCode = 1;
+      continue;
+    }
+
+    // Split the module path.
+    std::vector<StringRef> ModuleName;
+    while (!ModuleToPrint.empty()) {
+      StringRef SubModuleName;
+      std::tie(SubModuleName, ModuleToPrint) = ModuleToPrint.split('.');
+      ModuleName.push_back(SubModuleName);
+    }
+    assert(!ModuleName.empty());
+
+    // FIXME: If ModuleToPrint is a submodule, get its top-level module, which
+    // will be the DeclContext for all of its Decls since we don't have first-
+    // class submodules.
+    if (ModuleName.size() > 1) {
+      M = getModuleByFullName(Context, ModuleName[0]);
+      if (!M) {
+        llvm::errs() << "error: could not find module '" << ModuleName[0]
+                     << "'\n";
+        ExitCode = 1;
+        continue;
+      }
+    }
+    printModuleMetadata(M);
+  }
+
+  return ExitCode;
+}
+
 static int doPrintModules(const CompilerInvocation &InitInvok,
                           const std::vector<std::string> ModulesToPrint,
                           const std::vector<std::string> GroupsToPrint,
@@ -3543,7 +3616,10 @@ int main(int argc, char *argv[]) {
     }
     break;
   }
-
+  case ActionType::PrintModuleMetadata: {
+    ExitCode = doPrintModuleMetaData(InitInvok, options::ModuleToPrint);
+    break;
+  }
   case ActionType::PrintHeader: {
     ExitCode = doPrintHeaders(
         InitInvok, options::HeaderToPrint, PrintOpts,
