@@ -27,12 +27,10 @@ class Box<T> {
 // CHECK:   [[CALL:%.*]] = apply [[INIT_F]]<(Int, () -> ())>(%{{.*}}, %{{.*}}) : $@convention(method) <τ_0_0> (@in τ_0_0, @thick Box<τ_0_0>.Type) -> @owned Box<τ_0_0>
 // CHECK:   [[BORROW_CALL:%.*]] = begin_borrow [[CALL]] : $Box<(Int, () -> ())> 
 // CHECK:   [[REF:%.*]] = ref_element_addr [[BORROW_CALL]] : $Box<(Int, () -> ())>, #Box.value
-// CHECK:   [[REF_ACCESS:%.*]] = begin_access [read] [unsafe] [[REF]]
-// CHECK:   [[TUPLEC:%.*]] = load [copy] [[REF_ACCESS]] : $*(Int, @callee_guaranteed () -> @out ())
+// CHECK:   [[TUPLEC:%.*]] = load [copy] [[REF]] : $*(Int, @callee_guaranteed () -> @out ())
 // CHECK:   ([[TUPLEC_0:%.*]], [[TUPLEC_1:%.*]]) = destructure_tuple [[TUPLEC]]
 // CHECK:   [[THUNK2:%.*]] = function_ref @$sytIegr_Ieg_TR : $@convention(thin) (@guaranteed @callee_guaranteed () -> @out ()) -> ()
 // CHECK:   [[PA2:%.*]] = partial_apply [callee_guaranteed] [[THUNK2]]([[TUPLEC_1]]) : $@convention(thin) (@guaranteed @callee_guaranteed () -> @out ()) -> ()
-// CHECK:   end_access [[REF_ACCESS]]
 // CHECK:   destroy_value [[PA2]] : $@callee_guaranteed () -> ()    
 // CHECK:   end_borrow [[BORROW_CALL]] : $Box<(Int, () -> ())>
 // CHECK-LABEL: } // end sil function '$s4main7testBoxyyF'
