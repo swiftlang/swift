@@ -166,7 +166,7 @@ Optional<TangentSpace> PullbackEmitter::getTangentSpace(CanType type) {
   // Use witness generic signature to remap types.
   if (auto witnessGenSig = getWitness()->getDerivativeGenericSignature())
     type = witnessGenSig->getCanonicalTypeInContext(type);
-  return type->getAutoDiffAssociatedTangentSpace(
+  return type->getAutoDiffTangentSpace(
       LookUpConformanceInModule(getModule().getSwiftModule()));
 }
 
@@ -1679,7 +1679,7 @@ void PullbackEmitter::emitZeroIndirect(CanType type, SILValue bufferAccess,
   auto tangentSpace = getTangentSpace(type);
   assert(tangentSpace && "No tangent space for this type");
   switch (tangentSpace->getKind()) {
-  case TangentSpace::Kind::Vector:
+  case TangentSpace::Kind::TangentVector:
     emitZeroIntoBuffer(builder, type, bufferAccess, loc);
     return;
   case TangentSpace::Kind::Tuple: {
@@ -1801,7 +1801,7 @@ SILValue PullbackEmitter::accumulateDirect(SILValue lhs, SILValue rhs,
   auto rhsCopy = builder.emitCopyValueOperation(loc, rhs);
   assert(tangentSpace && "No tangent space for this type");
   switch (tangentSpace->getKind()) {
-  case TangentSpace::Kind::Vector: {
+  case TangentSpace::Kind::TangentVector: {
     // Allocate buffers for inputs and output.
     auto *resultBuf = builder.createAllocStack(loc, adjointTy);
     auto *lhsBuf = builder.createAllocStack(loc, adjointTy);
@@ -1847,11 +1847,11 @@ void PullbackEmitter::accumulateIndirect(
   auto adjointTy = lhsBufAccess->getType();
   auto adjointASTTy = adjointTy.getASTType();
   auto *swiftMod = getModule().getSwiftModule();
-  auto tangentSpace = adjointASTTy->getAutoDiffAssociatedTangentSpace(
+  auto tangentSpace = adjointASTTy->getAutoDiffTangentSpace(
       LookUpConformanceInModule(swiftMod));
   assert(tangentSpace && "No tangent space for this type");
   switch (tangentSpace->getKind()) {
-  case TangentSpace::Kind::Vector: {
+  case TangentSpace::Kind::TangentVector: {
     auto *proto = getContext().getAdditiveArithmeticProtocol();
     auto *combinerFuncDecl = getContext().getPlusDecl();
     // Call the combiner function and return.
@@ -1905,11 +1905,11 @@ void PullbackEmitter::accumulateIndirect(SILValue lhsDestAccess,
   auto type = lhsDestAccess->getType();
   auto astType = type.getASTType();
   auto *swiftMod = getModule().getSwiftModule();
-  auto tangentSpace = astType->getAutoDiffAssociatedTangentSpace(
+  auto tangentSpace = astType->getAutoDiffTangentSpace(
       LookUpConformanceInModule(swiftMod));
   assert(tangentSpace && "No tangent space for this type");
   switch (tangentSpace->getKind()) {
-  case TangentSpace::Kind::Vector: {
+  case TangentSpace::Kind::TangentVector: {
     auto *proto = getContext().getAdditiveArithmeticProtocol();
     auto *accumulatorFuncDecl = getContext().getPlusEqualDecl();
     // Call the combiner function and return.

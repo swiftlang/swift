@@ -4038,8 +4038,7 @@ Parser::parseDecl(ParseDeclOptions Flags,
       }
       // SWIFT_ENABLE_TENSORFLOW END
     }
-    if (!declWasHandledAlready(D))
-      Handler(D);
+
     setOriginalDeclarationForDifferentiableAttributes(D->getAttrs(), D);
   }
 
@@ -6007,10 +6006,7 @@ Parser::parseDeclVar(ParseDeclOptions Flags,
     pattern->forEachVariable([&](VarDecl *VD) {
       VD->setStatic(StaticLoc.isValid());
       VD->getAttrs() = Attributes;
-      // SWIFT_ENABLE_TENSORFLOW
-      // Set original declaration in `@differentiable` attributes.
-      setOriginalFunctionInDifferentiableAttributes(Attributes, VD);
-      // SWIFT_ENABLE_TENSORFLOW END
+
       setLocalDiscriminator(VD);
 
       // Set original declaration in `@differentiable` attributes.

@@ -2803,7 +2803,7 @@ Type TypeResolver::resolveASTFunctionType(
 bool TypeResolver::isDifferentiable(Type type, bool tangentVectorEqualsSelf) {
   if (resolution.getStage() != TypeResolutionStage::Contextual)
     type = DC->mapTypeIntoContext(type);
-  auto tanSpace = type->getAutoDiffAssociatedTangentSpace(
+  auto tanSpace = type->getAutoDiffTangentSpace(
       LookUpConformanceInModule(DC->getParentModule()));
   if (!tanSpace)
     return false;

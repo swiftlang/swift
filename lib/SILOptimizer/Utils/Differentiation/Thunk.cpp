@@ -483,11 +483,11 @@ getOrCreateSubsetParametersThunkForLinearMap(
     auto zeroSILObjType = zeroSILType.getObjectType();
     auto zeroType = zeroSILType.getASTType();
     auto *swiftMod = parentThunk->getModule().getSwiftModule();
-    auto tangentSpace = zeroType->getAutoDiffAssociatedTangentSpace(
+    auto tangentSpace = zeroType->getAutoDiffTangentSpace(
       LookUpConformanceInModule(swiftMod));
     assert(tangentSpace && "No tangent space for this type");
     switch (tangentSpace->getKind()) {
-    case TangentSpace::Kind::Vector: {
+    case TangentSpace::Kind::TangentVector: {
       auto *buf = builder.createAllocStack(loc, zeroSILObjType);
       localAllocations.push_back(buf);
       emitZeroIntoBuffer(builder, zeroType, buf, loc);
@@ -503,6 +503,7 @@ getOrCreateSubsetParametersThunkForLinearMap(
     case TangentSpace::Kind::Tuple: {
       llvm_unreachable(
           "Unimplemented: Handle zero initialization for tuples");
+    }
     }
   };
 

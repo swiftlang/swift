@@ -30,6 +30,8 @@ namespace swift {
 
 class AnyFunctionType;
 class TupleType;
+struct SILAutoDiffIndices;
+
 
 /// A function type differentiability kind.
 enum class DifferentiabilityKind : uint8_t {
@@ -86,6 +88,13 @@ struct AutoDiffConfig {
                               GenericSignature derivativeGenericSignature)
       : parameterIndices(parameterIndices), resultIndices(resultIndices),
         derivativeGenericSignature(derivativeGenericSignature) {}
+
+  // SWIFT_ENABLE_TENSORFLOW
+  /// Returns the `SILAutoDiffIndices` corresponding to this config's indices.
+  // TODO(TF-893): This is a temporary shim for incremental removal of
+  // `SILAutoDiffIndices`. Eventually remove this.
+  SILAutoDiffIndices getSILAutoDiffIndices() const;
+  // SWIFT_ENABLE_TENSORFLOW END
 
   void print(llvm::raw_ostream &s = llvm::outs()) const;
   SWIFT_DEBUG_DUMP;
@@ -456,31 +465,6 @@ inline llvm::raw_ostream &operator<<(llvm::raw_ostream &s,
   return s;
 }
 
-/// Identifies an autodiff derivative function configuration:
-/// - Parameter indices.
-/// - Result indices.
-/// - Derivative generic signature (optional).
-struct AutoDiffConfig {
-  IndexSubset *parameterIndices;
-  IndexSubset *resultIndices;
-  GenericSignature derivativeGenericSignature;
-
-  /*implicit*/ AutoDiffConfig(IndexSubset *parameterIndices,
-                              IndexSubset *resultIndices,
-                              GenericSignature derivativeGenericSignature)
-      : parameterIndices(parameterIndices), resultIndices(resultIndices),
-        derivativeGenericSignature(derivativeGenericSignature) {}
-
-  /// Returns the `SILAutoDiffIndices` corresponding to this config's indices.
-  // TODO(TF-893): This is a temporary shim for incremental removal of
-  // `SILAutoDiffIndices`. Eventually remove this.
-  SILAutoDiffIndices getSILAutoDiffIndices() const;
-
-  void print(llvm::raw_ostream &s = llvm::outs()) const;
-  LLVM_ATTRIBUTE_DEPRECATED(void dump() const LLVM_ATTRIBUTE_USED,
-                            "only for use within the debugger");
-};
-
 /// In conjunction with the original function declaration, identifies an
 /// autodiff derivative function.
 ///
@@ -590,58 +574,7 @@ class NominalOrBoundGenericNominalType;
 
 namespace llvm {
 
-using swift::AutoDiffConfig;
-using swift::GenericSignature;
-using swift::IndexSubset;
 using swift::SILAutoDiffIndices;
-
-template <typename T> struct DenseMapInfo;
-
-template <> struct DenseMapInfo<AutoDiffConfig> {
-  static AutoDiffConfig getEmptyKey() {
-    auto *ptr = llvm::DenseMapInfo<void *>::getEmptyKey();
-    // The `derivativeGenericSignature` component must be `nullptr` so that
-    // `getHashValue` and `isEqual` do not try to `getCanonicalSignature()` on
-    // an invalid pointer.
-    return {static_cast<IndexSubset *>(ptr), static_cast<IndexSubset *>(ptr),
-            nullptr};
-  }
-
-  static AutoDiffConfig getTombstoneKey() {
-    auto *ptr = llvm::DenseMapInfo<void *>::getTombstoneKey();
-    // The `derivativeGenericSignature` component must be `nullptr` so that
-    // `getHashValue` and `isEqual` do not try to `getCanonicalSignature()` on
-    // an invalid pointer.
-    return {static_cast<IndexSubset *>(ptr), static_cast<IndexSubset *>(ptr),
-            nullptr};
-  }
-
-  static unsigned getHashValue(const AutoDiffConfig &Val) {
-    auto canGenSig =
-        Val.derivativeGenericSignature
-            ? Val.derivativeGenericSignature->getCanonicalSignature()
-            : nullptr;
-    unsigned combinedHash = hash_combine(
-        ~1U, DenseMapInfo<void *>::getHashValue(Val.parameterIndices),
-        DenseMapInfo<void *>::getHashValue(Val.resultIndices),
-        DenseMapInfo<GenericSignature>::getHashValue(canGenSig));
-    return combinedHash;
-  }
-
-  static bool isEqual(const AutoDiffConfig &LHS, const AutoDiffConfig &RHS) {
-    auto lhsCanGenSig =
-        LHS.derivativeGenericSignature
-            ? LHS.derivativeGenericSignature->getCanonicalSignature()
-            : nullptr;
-    auto rhsCanGenSig =
-        RHS.derivativeGenericSignature
-            ? RHS.derivativeGenericSignature->getCanonicalSignature()
-            : nullptr;
-    return LHS.parameterIndices == RHS.parameterIndices &&
-           LHS.resultIndices == RHS.resultIndices &&
-           DenseMapInfo<GenericSignature>::isEqual(lhsCanGenSig, rhsCanGenSig);
-  }
-};
 
 template <> struct DenseMapInfo<SILAutoDiffIndices> {
   static SILAutoDiffIndices getEmptyKey() {

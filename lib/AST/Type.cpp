@@ -4878,18 +4878,18 @@ AnyFunctionType *AnyFunctionType::getAutoDiffDerivativeFunctionType(
     SmallVector<AnyFunctionType::Param, 8> differentialParams;
     for (auto diffParamType : diffParamTypes)
       differentialParams.push_back(AnyFunctionType::Param(
-          diffParamType->getAutoDiffAssociatedTangentSpace(lookupConformance)
+          diffParamType->getAutoDiffTangentSpace(lookupConformance)
               ->getType()));
 
     SmallVector<TupleTypeElt, 8> differentialResults;
     if (auto *resultTuple = originalResult->getAs<TupleType>()) {
       auto resultTupleEltType = resultTuple->getElementType(resultIndex);
       differentialResults.push_back(resultTupleEltType
-          ->getAutoDiffAssociatedTangentSpace(lookupConformance)->getType());
+          ->getAutoDiffTangentSpace(lookupConformance)->getType());
     } else {
       assert(resultIndex == 0 && "resultIndex out of bounds");
       differentialResults.push_back(
-          originalResult->getAutoDiffAssociatedTangentSpace(lookupConformance)
+          originalResult->getAutoDiffTangentSpace(lookupConformance)
               ->getType());
     }
     Type differentialResult =
@@ -4908,20 +4908,20 @@ AnyFunctionType *AnyFunctionType::getAutoDiffDerivativeFunctionType(
       auto resultTupleEltType = resultTuple->getElementType(resultIndex);
       pullbackParams.push_back(
           AnyFunctionType::Param(resultTupleEltType
-              ->getAutoDiffAssociatedTangentSpace(lookupConformance)
+              ->getAutoDiffTangentSpace(lookupConformance)
                   ->getType()));
     } else {
       assert(resultIndex == 0 && "resultIndex out of bounds");
       pullbackParams.push_back(
           AnyFunctionType::Param(originalResult
-              ->getAutoDiffAssociatedTangentSpace(lookupConformance)
+              ->getAutoDiffTangentSpace(lookupConformance)
                   ->getType()));
     }
 
     SmallVector<TupleTypeElt, 8> pullbackResults;
     for (auto diffParamType : diffParamTypes)
       pullbackResults.push_back(
-          diffParamType->getAutoDiffAssociatedTangentSpace(lookupConformance)
+          diffParamType->getAutoDiffTangentSpace(lookupConformance)
               ->getType());
     Type pullbackResult = pullbackResults.size() > 1
                               ? TupleType::get(pullbackResults, ctx)

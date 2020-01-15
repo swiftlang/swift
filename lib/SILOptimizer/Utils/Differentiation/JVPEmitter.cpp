@@ -178,7 +178,7 @@ void JVPEmitter::emitZeroIndirect(CanType type, SILValue bufferAccess,
   auto tangentSpace = getTangentSpace(type);
   assert(tangentSpace && "No tangent space for this type");
   switch (tangentSpace->getKind()) {
-  case TangentSpace::Kind::Vector:
+  case TangentSpace::Kind::TangentVector:
     emitZeroIntoBuffer(builder, type, bufferAccess, loc);
     return;
   case TangentSpace::Kind::Tuple: {
@@ -285,7 +285,7 @@ Optional<TangentSpace> JVPEmitter::getTangentSpace(CanType type) {
   // Use witness generic signature to remap types.
   if (auto witnessGenSig = witness->getDerivativeGenericSignature())
     type = witnessGenSig->getCanonicalTypeInContext(type);
-  return type->getAutoDiffAssociatedTangentSpace(
+  return type->getAutoDiffTangentSpace(
       LookUpConformanceInModule(getModule().getSwiftModule()));
 }
 
@@ -1041,7 +1041,7 @@ JVPEmitter::createEmptyDifferential(ADContext &context,
       origResult.getInterfaceType()->getCanonicalType(witnessCanGenSig));
   dfResults.push_back(
       SILResultInfo(origResult.getInterfaceType()
-                        ->getAutoDiffAssociatedTangentSpace(lookupConformance)
+                        ->getAutoDiffTangentSpace(lookupConformance)
                         ->getCanonicalType(),
                     origResult.getConvention()));
 
@@ -1052,7 +1052,7 @@ JVPEmitter::createEmptyDifferential(ADContext &context,
         origParam.getInterfaceType()->getCanonicalType(witnessCanGenSig));
     dfParams.push_back(SILParameterInfo(
         origParam.getInterfaceType()
-            ->getAutoDiffAssociatedTangentSpace(lookupConformance)
+            ->getAutoDiffTangentSpace(lookupConformance)
             ->getCanonicalType(),
         origParam.getConvention()));
   }

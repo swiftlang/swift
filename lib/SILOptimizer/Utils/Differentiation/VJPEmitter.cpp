@@ -151,7 +151,7 @@ SILFunction *VJPEmitter::createEmptyPullback() {
       origResult.getInterfaceType()->getCanonicalType(witnessCanGenSig));
   pbParams.push_back(getTangentParameterInfoForOriginalResult(
       origResult.getInterfaceType()
-          ->getAutoDiffAssociatedTangentSpace(lookupConformance)
+          ->getAutoDiffTangentSpace(lookupConformance)
           ->getCanonicalType(),
       origResult.getConvention()));
 
@@ -169,7 +169,7 @@ SILFunction *VJPEmitter::createEmptyPullback() {
         origParam.getInterfaceType()->getCanonicalType(witnessCanGenSig));
     adjResults.push_back(getTangentResultInfoForOriginalParameter(
         origParam.getInterfaceType()
-            ->getAutoDiffAssociatedTangentSpace(lookupConformance)
+            ->getAutoDiffTangentSpace(lookupConformance)
             ->getCanonicalType(),
         origParam.getConvention()));
   }
