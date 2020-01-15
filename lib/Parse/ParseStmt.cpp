@@ -383,11 +383,13 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
           stmtTokMatch = closestMatchingStmtTokenForIdentifier(previousToken.getText());
         }
       }
-      if (stmtTokMatch && Tok.isAny(tok::kw_let, tok::kw_var)) {
+      if (stmtTokMatch) {
         StringRef stmtTokenText = getTokenText(*stmtTokMatch);
         diagnose(PreviousLoc, diag::statement_misspell, stmtTokenText)
           .fixItReplace(PreviousLoc, stmtTokenText);
-        consumeToken();
+        if (Tok.isAny(tok::kw_let, tok::kw_var)) {
+          consumeToken();
+        }
         skipUntilDeclStmtRBrace(tok::r_brace);
         continue;
       }
