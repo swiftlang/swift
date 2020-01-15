@@ -160,9 +160,9 @@ struct Text : P {
   init(_: T) {}
 }
 
-struct Label<L> : P where L : P { // expected-note {{'L' declared as parameter to type 'Label'}}
+struct Label<L> : P where L : P { // expected-note 2 {{'L' declared as parameter to type 'Label'}}
   typealias T = L
-  init(@Builder _: () -> L) {}
+  init(@Builder _: () -> L) {} // expected-note {{'init(_:)' declared here}}
 }
 
 func test_51167632() -> some P {
@@ -170,6 +170,15 @@ func test_51167632() -> some P {
     Text("hello")
     Label  // expected-error {{generic parameter 'L' could not be inferred}}
     // expected-note@-1 {{explicitly specify the generic arguments to fix this issue}} {{10-10=<<#L: P#>>}}
+  })
+}
+
+func test_56221372() -> some P {
+  AnyP(G {
+    Text("hello")
+    Label() // expected-error {{generic parameter 'L' could not be inferred}}
+    // expected-error@-1 {{missing argument for parameter #1 in call}}
+    // expected-note@-2 {{explicitly specify the generic arguments to fix this issue}} {{10-10=<<#L: P#>>}}
   })
 }
 
