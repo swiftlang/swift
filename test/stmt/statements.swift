@@ -253,7 +253,7 @@ func DoWhileStmt2() {
 }
 
 func LabeledDoStmt() {
-  LABEL: { // expected-error {{labeled block needs 'do'}} {{10-10=do}}
+  LABEL: { // expected-error {{labeled block needs 'do'}} {{10-10=do }}
   }
 }
 

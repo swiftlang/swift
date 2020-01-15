@@ -647,7 +647,7 @@ ParserResult<Stmt> Parser::parseStmt() {
     if (tryLoc.isValid()) diagnose(tryLoc, diag::try_on_stmt, Tok.getText());
     SourceLoc colonLoc = Tok.getLoc();
     diagnose(colonLoc, diag::labeled_block_needs_do)
-      .fixItInsert(colonLoc, "do");
+      .fixItInsert(colonLoc, "do ");
     return parseStmtDo(LabelInfo, /*shouldSkipDoTokenConsume*/ true);
   }
 }
