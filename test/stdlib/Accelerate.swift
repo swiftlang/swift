@@ -209,7 +209,7 @@ if #available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *) {
             var controlVector = [Float](repeating: 0, count: 1024)
             
             vDSP_vgen([0],
-                      [Float(shortSignal.count)],
+                      [Float(shortSignal.count) - 2],
                       &controlVector, 1,
                       vDSP_Length(n))
             
@@ -276,7 +276,7 @@ if #available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *) {
             var controlVector = [Double](repeating: 0, count: 1024)
             
             vDSP_vgenD([0],
-                       [Double(shortSignal.count)],
+                       [Double(shortSignal.count) - 2],
                        &controlVector, 1,
                        vDSP_Length(n))
             
