@@ -126,7 +126,29 @@ extension ${Self}: LosslessStringConvertible {
   ///   is `nil`.
   @inlinable
   public init?<S: StringProtocol>(_ text: S) {
-    self.init(Substring(text))
+    if #available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) {
+      self.init(Substring(text))
+    } else {
+      self = 0.0
+      let success = withUnsafeMutablePointer(to: &self) { p -> Bool in
+        text.withCString { chars -> Bool in
+          switch chars[0] {
+          case 9, 10, 11, 12, 13, 32:
+            return false // Reject leading whitespace
+          case 0:
+            return false // Reject empty string
+          default:
+            break
+          }
+          let endPtr = _swift_stdlib_strto${cFuncSuffix2[bits]}_clocale(chars, p)
+          // Succeed only if endPtr points to end of C string
+          return endPtr != nil && endPtr![0] == 0
+        }
+      }
+      if !success {
+        return nil
+      }
+    }
   }
 
   // Caveat:  This implementation used to be inlineable.
