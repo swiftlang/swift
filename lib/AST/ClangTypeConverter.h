@@ -73,6 +73,10 @@ public:
     ArrayRef<AnyFunctionType::Param> params, Type resultTy,
     AnyFunctionType::Representation repr);
 
+  const clang::Type *getFunctionType(
+    ArrayRef<SILParameterInfo> params, Optional<SILResultInfo> result,
+    SILFunctionType::Representation repr);
+
 private:
   clang::QualType convert(Type type);
   clang::QualType convertMemberType(NominalTypeDecl *DC,

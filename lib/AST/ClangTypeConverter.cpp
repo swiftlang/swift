@@ -156,6 +156,57 @@ const clang::Type *ClangTypeConverter::getFunctionType(
   }
 }
 
+const clang::Type *ClangTypeConverter::getFunctionType(
+    ArrayRef<SILParameterInfo> params, Optional<SILResultInfo> result,
+    SILFunctionType::Representation repr) {
+
+  // Using the interface type is sufficient as Swift does not allow abstracting
+  // over @convention(c) functions, hence we don't need any substitutions.
+  auto resultClangTy = result.hasValue()
+                     ? convert(result.getValue().getInterfaceType())
+                     : ClangASTContext.VoidTy;
+
+  if (resultClangTy.isNull())
+    return nullptr;
+
+  SmallVector<clang::FunctionProtoType::ExtParameterInfo, 4> extParamInfos;
+  SmallVector<clang::QualType, 4> paramsClangTy;
+  bool someParamIsConsumed = false;
+  for (auto &p : params) {
+    auto pc = convert(p.getInterfaceType());
+    if (pc.isNull())
+      return nullptr;
+    clang::FunctionProtoType::ExtParameterInfo extParamInfo;
+    if (p.isConsumed()) {
+      someParamIsConsumed = true;
+      extParamInfo = extParamInfo.withIsConsumed(true);
+    }
+    extParamInfos.push_back(extParamInfo);
+    paramsClangTy.push_back(pc);
+  }
+
+  clang::FunctionProtoType::ExtProtoInfo info(clang::CallingConv::CC_C);
+  if (someParamIsConsumed)
+    info.ExtParameterInfos = extParamInfos.begin();
+  auto fn = ClangASTContext.getFunctionType(resultClangTy, paramsClangTy, info);
+  if (fn.isNull())
+    return nullptr;
+
+  switch (repr) {
+  case SILFunctionType::Representation::CFunctionPointer:
+    return ClangASTContext.getPointerType(fn).getTypePtr();
+  case SILFunctionType::Representation::Block:
+    return ClangASTContext.getBlockPointerType(fn).getTypePtr();
+  case SILFunctionType::Representation::Thick:
+  case SILFunctionType::Representation::Thin:
+  case SILFunctionType::Representation::Method:
+  case SILFunctionType::Representation::ObjCMethod:
+  case SILFunctionType::Representation::WitnessMethod:
+  case SILFunctionType::Representation::Closure:
+    llvm_unreachable("Expected a C-compatible representation.");
+  }
+}
+
 clang::QualType ClangTypeConverter::convertMemberType(NominalTypeDecl *DC,
                                                       StringRef memberName) {
   auto memberTypeDecl = cast<TypeDecl>(
