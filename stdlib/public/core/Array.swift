@@ -765,12 +765,6 @@ extension Array: RandomAccessCollection, MutableCollection {
   public var count: Int {
     return _getCount()
   }
-  
-  @inlinable
-  @_alwaysEmitIntoClient
-  public var first: Element? {
-    _getCount() == 0 ? nil : _buffer[0]
-  }
 }
 
 extension Array: ExpressibleByArrayLiteral {
