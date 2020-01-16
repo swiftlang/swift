@@ -7,3 +7,10 @@
 @interface MyColor ()
 + (MyColor * _Null_unspecified) systemRedColor;
 @end
+
+@protocol MyPrivateProtocol
+- (SomeStruct) myStructure;
+@end
+
+@interface MyBaseClass () <MyPrivateProtocol>
+@end
