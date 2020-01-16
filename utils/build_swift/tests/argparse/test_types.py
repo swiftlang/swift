@@ -1,6 +1,6 @@
 # This source file is part of the Swift.org open source project
 #
-# Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+# Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 # Licensed under Apache License v2.0 with Runtime Library Exception
 #
 # See https://swift.org/LICENSE.txt for license information
@@ -11,7 +11,7 @@ import os.path
 import platform
 
 from ..utils import TestCase
-from ...argparse import ArgumentTypeError, types
+from ...build_swift.argparse import ArgumentTypeError, types
 
 
 # -----------------------------------------------------------------------------

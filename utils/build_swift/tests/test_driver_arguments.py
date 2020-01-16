@@ -1,6 +1,6 @@
 # This source file is part of the Swift.org open source project
 #
-# Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+# Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
 # Licensed under Apache License v2.0 with Runtime Library Exception
 #
 # See https://swift.org/LICENSE.txt for license information
@@ -16,13 +16,11 @@ from io import StringIO
 
 from swift_build_support.swift_build_support import migration
 from swift_build_support.swift_build_support.SwiftBuildSupport import (
-    get_all_preset_names,
-    get_preset_options,
-)
+    get_all_preset_names, get_preset_options)
 
 from . import expected_options as eo
-from .. import argparse
-from .. import driver_arguments
+from ..build_swift import argparse
+from ..build_swift import driver_arguments
 
 
 FILE_PATH = os.path.abspath(__file__)
