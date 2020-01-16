@@ -12,6 +12,8 @@ Default option value definitions.
 """
 
 
+from __future__ import absolute_import, unicode_literals
+
 from .argparse import CompilerVersion
 
 

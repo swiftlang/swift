@@ -13,8 +13,12 @@ default actions provided by the standard argparse.
 """
 
 
+from __future__ import absolute_import, unicode_literals
+
 import argparse
 import copy
+
+import six
 
 from .types import BoolType, PathType
 
@@ -77,7 +81,7 @@ class Action(argparse.Action):
         if dests == argparse.SUPPRESS:
             dests = []
             metavar = metavar or ''
-        elif isinstance(dests, str):
+        elif isinstance(dests, six.string_types):
             dests = [dests]
             metavar = metavar or dests[0].upper()
 
@@ -134,7 +138,7 @@ class AppendAction(Action):
             **kwargs)
 
     def __call__(self, parser, namespace, values, option_string=None):
-        if isinstance(values, str):
+        if isinstance(values, six.string_types):
             values = [values]
 
         for dest in self.dests:
@@ -339,5 +343,5 @@ class UnsupportedAction(Action):
         if self.message is not None:
             parser.error(self.message)
 
-        arg = option_string or str(values)
+        arg = option_string or six.text_type(values)
         parser.error('unsupported argument: {}'.format(arg))

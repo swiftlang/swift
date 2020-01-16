@@ -7,9 +7,13 @@
 # See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
 
+from __future__ import absolute_import, unicode_literals
+
 import os
 import platform
 import sys
+
+import six
 
 from . import expected_options as eo
 from . import utils
@@ -58,19 +62,19 @@ class TestDriverArgumentParserMeta(type):
     def __new__(cls, name, bases, attrs):
         # Generate tests for each default value
         for dest, value in eo.EXPECTED_DEFAULTS.items():
-            test_name = 'test_default_value_' + dest
+            test_name = 'test_default_value_{}'.format(dest)
             attrs[test_name] = cls.generate_default_value_test(dest, value)
 
         # Generate tests for each expected option
         for option in eo.EXPECTED_OPTIONS:
-            test_name = 'test_option_' + option.sanitized_string()
+            test_name = 'test_option_{}'.format(option.sanitized_string())
             attrs[test_name] = cls.generate_option_test(option)
 
         # Generate tests for each preset
         presets = _load_all_presets(PRESETS_FILES)
 
         for name, args in presets.items():
-            test_name = 'test_preset_' + name
+            test_name = 'test_preset_{}'.format(name)
             attrs[test_name] = cls.generate_preset_test(name, args)
 
         return super(TestDriverArgumentParserMeta, cls).__new__(
@@ -82,8 +86,8 @@ class TestDriverArgumentParserMeta(type):
             parsed_values = self.parse_default_args([])
 
             parsed_value = getattr(parsed_values, dest)
-            if default_value.__class__ is str:
-                parsed_value = str(parsed_value)
+            if default_value.__class__ in six.string_types:
+                parsed_value = six.text_type(parsed_value)
 
             self.assertEqual(default_value, parsed_value,
                              'Invalid default value for "{}": {} != {}'
@@ -204,7 +208,7 @@ class TestDriverArgumentParserMeta(type):
         def test(self):
             for choice in option.choices:
                 namespace = self.parse_args(
-                    [option.option_string, str(choice)])
+                    [option.option_string, six.text_type(choice)])
                 self.assertEqual(getattr(namespace, option.dest), choice)
 
             with self.assertRaises(ParserError):
@@ -216,13 +220,14 @@ class TestDriverArgumentParserMeta(type):
     def _generate_int_option_test(cls, option):
         def test(self):
             for i in [0, 1, 42]:
-                namespace = self.parse_args([option.option_string, str(i)])
+                namespace = self.parse_args(
+                    [option.option_string, six.text_type(i)])
                 self.assertEqual(int(getattr(namespace, option.dest)), i)
 
             # FIXME: int-type options should not accept non-int strings
-            # self.parse_args([option.option_string, str(0.0)])
-            # self.parse_args([option.option_string, str(1.0)])
-            # self.parse_args([option.option_string, str(3.14)])
+            # self.parse_args([option.option_string, six.text_type(0.0)])
+            # self.parse_args([option.option_string, six.text_type(1.0)])
+            # self.parse_args([option.option_string, six.text_type(3.14)])
             # self.parse_args([option.option_string, 'NaN'])
 
         return test
@@ -330,8 +335,8 @@ class TestDriverArgumentParser(TestCase):
         try:
             return migration.parse_args(self.parser, args)
         except (SystemExit, ValueError) as e:
-            raise ParserError('failed to parse arguments: ' +
-                              str(args), e)
+            raise ParserError('failed to parse arguments: {}'.format(
+                six.text_type(args), e))
 
     def _check_impl_args(self, namespace):
         assert hasattr(namespace, 'build_script_impl_args')
@@ -341,8 +346,8 @@ class TestDriverArgumentParser(TestCase):
                 utils.BUILD_SCRIPT_IMPL_PATH,
                 namespace.build_script_impl_args)
         except (SystemExit, ValueError) as e:
-            raise ParserError('failed to parse impl arguments: ' +
-                              str(namespace.build_script_impl_args), e)
+            raise ParserError('failed to parse impl arguments: {}'.format(
+                six.text_type(namespace.build_script_impl_args), e))
 
     def parse_args_and_unknown_args(self, args, namespace=None):
         if namespace is None:
@@ -357,7 +362,8 @@ class TestDriverArgumentParser(TestCase):
                     migration._process_disambiguation_arguments(
                         namespace, unknown_args))
             except (SystemExit, argparse.ArgumentError) as e:
-                raise ParserError('failed to parse arguments: ' + str(args), e)
+                raise ParserError('failed to parse arguments: {}'.format(
+                    six.text_type(args), e))
 
         return namespace, unknown_args
 
@@ -366,7 +372,8 @@ class TestDriverArgumentParser(TestCase):
             args, namespace)
 
         if unknown_args:
-            raise ParserError('unknown arguments: ' + str(unknown_args))
+            raise ParserError('unknown arguments: {}'.format(
+                six.text_type(unknown_args)))
 
         return namespace
 

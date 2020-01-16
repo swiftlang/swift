@@ -11,15 +11,11 @@ from __future__ import unicode_literals
 
 import os
 
+from six.moves import configparser
+
 from .utils import TestCase, UTILS_PATH, add_metaclass
 from ..build_swift import presets
 from ..build_swift.presets import Preset, PresetParser
-
-try:
-    # Python 2
-    import ConfigParser as configparser
-except ImportError:
-    import configparser
 
 
 PRESET_FILES = [

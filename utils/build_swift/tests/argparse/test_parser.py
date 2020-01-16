@@ -7,6 +7,8 @@
 # See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
 
+from __future__ import absolute_import, unicode_literals
+
 from argparse import _ArgumentGroup, _MutuallyExclusiveGroup
 
 from ..utils import TestCase
