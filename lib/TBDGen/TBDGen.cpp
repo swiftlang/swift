@@ -72,20 +72,31 @@ void TBDGenVisitor::addSymbolInternal(StringRef name,
   }
 }
 
-static Optional<llvm::VersionTuple> getDeclMoveOSVersion(Decl *D) {
+static std::vector<OriginallyDefinedInAttr::ActiveVersion>
+getAllMovedPlatformVersions(Decl *D) {
+  std::vector<OriginallyDefinedInAttr::ActiveVersion> Results;
   for (auto *attr: D->getAttrs()) {
     if (auto *ODA = dyn_cast<OriginallyDefinedInAttr>(attr)) {
-      if (ODA->isActivePlatform(D->getASTContext()))
-        return ODA->MovedVersion;
+      auto Active = ODA->isActivePlatform(D->getASTContext());
+      if (Active.hasValue()) {
+        Results.push_back(*Active);
+      }
+    }
+  }
+  return Results;
+}
+
+static Optional<llvm::VersionTuple>
+getIntroducedOSVersion(Decl *D, PlatformKind Kind) {
+  for (auto *attr: D->getAttrs()) {
+    if (auto *ava = dyn_cast<AvailableAttr>(attr)) {
+      if (ava->Platform == Kind && ava->Introduced) {
+        return ava->Introduced;
+      }
     }
   }
   return None;
 }
-
-enum class LinkerPlatformId: uint8_t {
-#define LD_PLATFORM(Name, Id) Name = Id,
-#include "ldPlatformKinds.def"
-};
 
 static StringRef getLinkerPlatformName(uint8_t Id) {
   switch (Id) {
@@ -103,29 +114,23 @@ static Optional<uint8_t> getLinkerPlatformId(StringRef Platform) {
     .Default(None);
 }
 
-struct InstallNameStore {
-  // The default install name to use when no specific install name is specified.
-  std::string InstallName;
-  // The install name specific to the platform id. This takes precedence over
-  // the default install name.
-  std::map<uint8_t, std::string> PlatformInstallName;
-  StringRef getInstallName(LinkerPlatformId Id) const {
-    auto It = PlatformInstallName.find((uint8_t)Id);
-    if (It == PlatformInstallName.end())
-      return InstallName;
-    else
-      return It->second;
+StringRef InstallNameStore::getInstallName(LinkerPlatformId Id) const {
+  auto It = PlatformInstallName.find((uint8_t)Id);
+  if (It == PlatformInstallName.end())
+    return InstallName;
+  else
+    return It->second;
+}
+
+void InstallNameStore::remark(ASTContext &Ctx, StringRef ModuleName) const {
+  Ctx.Diags.diagnose(SourceLoc(), diag::default_previous_install_name,
+                     ModuleName, InstallName);
+  for (auto Pair: PlatformInstallName) {
+    Ctx.Diags.diagnose(SourceLoc(), diag::platform_previous_install_name,
+                       ModuleName, getLinkerPlatformName(Pair.first),
+                       Pair.second);
   }
-  void remark(ASTContext &Ctx, StringRef ModuleName) const {
-    Ctx.Diags.diagnose(SourceLoc(), diag::default_previous_install_name,
-                       ModuleName, InstallName);
-    for (auto Pair: PlatformInstallName) {
-      Ctx.Diags.diagnose(SourceLoc(), diag::platform_previous_install_name,
-                         ModuleName, getLinkerPlatformName(Pair.first),
-                         Pair.second);
-    }
-  }
-};
+}
 
 static std::string getScalaNodeText(Node *N) {
   SmallString<32> Buffer;
@@ -195,26 +200,38 @@ parseEntry(ASTContext &Ctx,
   return 0;
 }
 
-static std::map<std::string, InstallNameStore>
-parsePreviousModuleInstallNameMap(ASTContext &Ctx, StringRef FileName) {
+std::unique_ptr<std::map<std::string, InstallNameStore>>
+TBDGenVisitor::parsePreviousModuleInstallNameMap() {
+  StringRef FileName = Opts.ModuleInstallNameMapPath;
+  // Nothing to parse.
+  if (FileName.empty())
+    return nullptr;
   namespace yaml = llvm::yaml;
-  std::map<std::string, InstallNameStore> AllInstallNames;
+  ASTContext &Ctx = SwiftModule->getASTContext();
+  std::unique_ptr<std::map<std::string, InstallNameStore>> pResult(
+    new std::map<std::string, InstallNameStore>());
+  auto &AllInstallNames = *pResult;
   SWIFT_DEFER {
     for (auto Pair: AllInstallNames) {
       Pair.second.remark(Ctx, Pair.first);
     }
   };
+
   // Load the input file.
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
-    vfs::getFileOrSTDIN(*Ctx.SourceMgr.getFileSystem(), FileName);
+    llvm::MemoryBuffer::getFile(FileName);
   if (!FileBufOrErr) {
     Ctx.Diags.diagnose(SourceLoc(), diag::previous_installname_map_missing,
                        FileName);
-    return AllInstallNames;
+    return nullptr;
   }
   StringRef Buffer = FileBufOrErr->get()->getBuffer();
+
+  // Use a new source manager instead of the one from ASTContext because we
+  // don't want the Json file to be persistent.
+  SourceManager SM;
   yaml::Stream Stream(llvm::MemoryBufferRef(Buffer, FileName),
-                      Ctx.SourceMgr.getLLVMSourceMgr());
+                      SM.getLLVMSourceMgr());
   for (auto DI = Stream.begin(); DI != Stream.end(); ++ DI) {
     assert(DI != Stream.end() && "Failed to read a document");
     yaml::Node *N = DI->getRoot();
@@ -222,10 +239,10 @@ parsePreviousModuleInstallNameMap(ASTContext &Ctx, StringRef FileName) {
     if (parseEntry(Ctx, N, AllInstallNames)) {
       Ctx.Diags.diagnose(SourceLoc(), diag::previous_installname_map_corrupted,
                          FileName);
-      return AllInstallNames;
+      return nullptr;
     }
   }
-  return AllInstallNames;
+  return pResult;
 }
 
 void TBDGenVisitor::addLinkerDirectiveSymbols(StringRef name,
@@ -234,26 +251,29 @@ void TBDGenVisitor::addLinkerDirectiveSymbols(StringRef name,
     return;
   if (!TopLevelDecl)
     return;
-  auto MovedVer = getDeclMoveOSVersion(TopLevelDecl);
-  if (!MovedVer.hasValue())
+  auto MovedVers = getAllMovedPlatformVersions(TopLevelDecl);
+  if (MovedVers.empty())
     return;
-  assert(MovedVer.hasValue());
+  assert(!MovedVers.empty());
+
+  // Using $ld$add and $ld$hide cannot encode platform name in the version number,
+  // so we can only handle one version.
+  // FIXME: use $ld$previous instead
+  auto MovedVer = MovedVers.front().Version;
+  auto Platform = MovedVers.front().Platform;
   unsigned Major[2];
   unsigned Minor[2];
-  Major[1] = MovedVer->getMajor();
-  Minor[1] = MovedVer->getMinor().hasValue() ? *MovedVer->getMinor(): 0;
-  auto AvailRange = AvailabilityInference::availableRange(TopLevelDecl,
-                                TopLevelDecl->getASTContext()).getOSVersion();
-  assert(AvailRange.hasLowerEndpoint() &&
-         "cannot find the start point of availability");
-  if (!AvailRange.hasLowerEndpoint())
+  Major[1] = MovedVer.getMajor();
+  Minor[1] = MovedVer.getMinor().hasValue() ? *MovedVer.getMinor(): 0;
+  auto IntroVer = getIntroducedOSVersion(TopLevelDecl, Platform);
+  assert(IntroVer && "cannot find the start point of availability");
+  if (!IntroVer.hasValue())
     return;
-  assert(AvailRange.getLowerEndpoint() < *MovedVer);
-  if (AvailRange.getLowerEndpoint() >= *MovedVer)
+  assert(*IntroVer < MovedVer);
+  if (*IntroVer >= MovedVer)
     return;
-  Major[0] = AvailRange.getLowerEndpoint().getMajor();
-  Minor[0] = AvailRange.getLowerEndpoint().getMinor().hasValue() ?
-    AvailRange.getLowerEndpoint().getMinor().getValue() : 0;
+  Major[0] = IntroVer->getMajor();
+  Minor[0] = IntroVer->getMinor().hasValue() ? IntroVer->getMinor().getValue() : 0;
   for (auto CurMaj = Major[0]; CurMaj <= Major[1]; ++ CurMaj) {
     unsigned MinRange[2] = {0, 31};
     if (CurMaj == Major[0])
@@ -850,7 +870,7 @@ static bool isApplicationExtensionSafe(const LangOptions &LangOpts) {
 }
 
 static bool hasLinkerDirective(Decl *D) {
-  return getDeclMoveOSVersion(D).hasValue();
+  return !getAllMovedPlatformVersions(D).empty();
 }
 
 static void enumeratePublicSymbolsAndWrite(ModuleDecl *M, FileUnit *singleFile,
@@ -880,10 +900,6 @@ static void enumeratePublicSymbolsAndWrite(ModuleDecl *M, FileUnit *singleFile,
   if (auto packed = parsePackedVersion(CompatibilityVersion,
                                        opts.CompatibilityVersion, ctx)) {
     file.setCompatibilityVersion(*packed);
-  }
-
-  if (!opts.ModuleInstallNameMapPath.empty()) {
-    parsePreviousModuleInstallNameMap(ctx, opts.ModuleInstallNameMapPath);
   }
 
   llvm::MachO::Target target(triple);
