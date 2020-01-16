@@ -7074,6 +7074,7 @@ namespace {
                 return Rewriter.coerceToType(expr, toType, locator);
               });
           closure->setBody(newBody, /*isSingleExpression=*/false);
+          closure->setAppliedFunctionBuilder();
 
           Rewriter.solution.setExprTypes(closure);
         } else if (closure->hasSingleExpressionBody()) {
