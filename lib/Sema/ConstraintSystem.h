@@ -752,8 +752,8 @@ struct Score {
 
 /// An AST node that can gain type information while solving.
 using TypedNode =
-    llvm::PointerUnion3<const Expr *, const TypeLoc *,
-                        const VarDecl *>;
+    llvm::PointerUnion<const Expr *, const TypeLoc *,
+                       const VarDecl *>;
 
 /// Display a score.
 llvm::raw_ostream &operator<<(llvm::raw_ostream &out, const Score &score);
