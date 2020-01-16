@@ -220,7 +220,7 @@ func erroneousSR11350(x: Int) {
       if b {
         acceptInt(0) { }
       }
-    }).domap(0) // expected-error{{value of type 'Optional<()>' has no member 'domap'}}
+    }).domap(0) // expected-error{{value of type '()?' has no member 'domap'}}
   }
 }
 
