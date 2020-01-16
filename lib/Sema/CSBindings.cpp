@@ -228,6 +228,22 @@ bool ConstraintSystem::PotentialBindings::isViable(
   return true;
 }
 
+bool ConstraintSystem::PotentialBindings::favoredOverDisjunction() const {
+  if (IsHole || FullyBound)
+    return false;
+
+  // If this bindings are for a closure and there are no holes,
+  // it shouldn't matter whether it there are any type variables
+  // or not because e.g. parameter type can have type variables,
+  // but we still want to resolve closure body early (instead of
+  // attempting any disjunction) to gain additional contextual
+  // information.
+  if (TypeVar->getImpl().isClosureType())
+    return true;
+
+  return !InvolvesTypeVariables;
+}
+
 static bool hasNilLiteralConstraint(TypeVariableType *typeVar,
                                     const ConstraintSystem &CS) {
   // Look for a literal-conformance constraint on the type variable.
@@ -352,6 +368,11 @@ ConstraintSystem::getPotentialBindingForRelationalConstraint(
       return None;
 
     result.InvolvesTypeVariables = true;
+
+    if (constraint->getKind() == ConstraintKind::Subtype &&
+        kind == AllowedBindingKind::Subtypes) {
+      result.SubtypeOf.insert(bindingTypeVar);
+    }
 
     // If we've already set addOptionalSupertypeBindings, or we aren't
     // allowing supertype bindings, we're done.
@@ -525,6 +546,7 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) const {
     }
 
     case ConstraintKind::Defaultable:
+    case ConstraintKind::DefaultClosureType:
       // Do these in a separate pass.
       if (getFixedTypeRecursive(constraint->getFirstType(), true)
               ->getAs<TypeVariableType>() == typeVar) {
@@ -748,6 +770,15 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) const {
     Type type = constraint->getSecondType();
     if (!exactTypes.insert(type->getCanonicalType()).second)
       continue;
+
+    if (constraint->getKind() == ConstraintKind::DefaultClosureType) {
+      // If there are no other possible bindings for this closure
+      // let's default it to the type inferred from its parameters/body,
+      // otherwise we should only attempt contextual types as a
+      // top-level closure type.
+      if (!result.Bindings.empty())
+        continue;
+    }
 
     result.addPotentialBinding({type, AllowedBindingKind::Exact, constraint});
   }
