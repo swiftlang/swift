@@ -1054,11 +1054,33 @@ Optional<BraceStmt *> TypeChecker::applyFunctionBuilderBodyTransform(
   // Build a constraint system in which we can check the body of the function.
   ConstraintSystem cs(func, options);
 
+  // Find an expression... any expression... to use for a locator.
+  // FIXME: This is a hack because we don't have the notion of locators that
+  // refer to statements.
+  Expr *fakeAnchor = nullptr;
+  {
+    class FindExprWalker : public ASTWalker {
+      Expr *&fakeAnchor;
+
+    public:
+      explicit FindExprWalker(Expr *&fakeAnchor) : fakeAnchor(fakeAnchor) { }
+
+      std::pair<bool, Expr *> walkToExprPre(Expr *E) {
+        if (!fakeAnchor)
+          fakeAnchor = E;
+
+        return { false, nullptr };
+      }
+    } walker(fakeAnchor);
+
+    func->getBody()->walk(walker);
+  }
+
   // FIXME: check the result
   cs.matchFunctionBuilder(func, builderType, resultContextType,
                           resultConstraintKind,
-                          /*calleeLocator=*/nullptr,
-                          /*FIXME:*/ConstraintLocatorBuilder(nullptr));
+                          /*calleeLocator=*/cs.getConstraintLocator(fakeAnchor),
+                          /*FIXME:*/cs.getConstraintLocator(fakeAnchor));
 
   // Solve the constraint system.
   SmallVector<Solution, 4> solutions;
