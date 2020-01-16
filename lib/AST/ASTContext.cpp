@@ -3158,7 +3158,13 @@ ArrayRef<Requirement> GenericFunctionType::getRequirements() const {
   return Signature->getRequirements();
 }
 
-void SILFunctionType::ExtInfo::Uncommon::printClangFunctionType(
+SILUncommonInfo::SILUncommonInfo(AnyFunctionType::ExtInfo::Uncommon uncommon) {
+  auto *ty = uncommon.ClangFunctionType;
+  ClangFunctionType = ty ? ty->getCanonicalTypeInternal().getTypePtr()
+                         : nullptr;
+}
+
+void SILUncommonInfo::printClangFunctionType(
     ClangModuleLoader *cml, llvm::raw_ostream &os) const {
   cml->printClangType(ClangFunctionType, os);
 }
@@ -3224,11 +3230,11 @@ SILFunctionType::SILFunctionType(
 
   Bits.SILFunctionType.HasErrorResult = errorResult.hasValue();
   Bits.SILFunctionType.ExtInfoBits = ext.Bits;
-  Bits.SILFunctionType.HasUncommonInfo = false;
   // The use of both assert() and static_assert() below is intentional.
   assert(Bits.SILFunctionType.ExtInfoBits == ext.Bits && "Bits were dropped!");
   static_assert(ExtInfo::NumMaskBits == NumSILExtInfoBits,
                 "ExtInfo and SILFunctionTypeBitfields must agree on bit size");
+  Bits.SILFunctionType.HasUncommonInfo = ext.getUncommonInfo().hasValue();
   Bits.SILFunctionType.CoroutineKind = unsigned(coroutineKind);
   NumParameters = params.size();
   if (coroutineKind == SILCoroutineKind::None) {
@@ -3261,6 +3267,9 @@ SILFunctionType::SILFunctionType(
     getMutableFormalResultsCache() = CanType();
     getMutableAllResultsCache() = CanType();
   }
+  if (auto uncommon = ext.getUncommonInfo())
+    *getTrailingObjects<ExtInfo::Uncommon>() = uncommon.getValue();
+
 #ifndef NDEBUG
   if (ext.getRepresentation() == Representation::WitnessMethod)
     assert(!WitnessMethodConformance.isInvalid() &&
@@ -3360,6 +3369,10 @@ CanSILFunctionType SILFunctionType::get(
   assert(coroutineKind != SILCoroutineKind::None || yields.empty());
   assert(!ext.isPseudogeneric() || genericSig);
 
+  // FIXME: [clang-function-type-serialization] Don't drop the Clang type...
+  if (!ctx.LangOpts.UseClangFunctionTypes)
+    ext = ext.withClangFunctionType(nullptr);
+
   llvm::FoldingSetNodeID id;
   SILFunctionType::Profile(id, genericSig, ext, coroutineKind, callee, params,
                            yields, normalResults, errorResult,
@@ -3376,10 +3389,11 @@ CanSILFunctionType SILFunctionType::get(
 
   // See [SILFunctionType-layout]
   bool hasResultCache = normalResults.size() > 1;
-  size_t bytes =
-    totalSizeToAlloc<SILParameterInfo, SILResultInfo, SILYieldInfo, CanType>(
+  size_t bytes = totalSizeToAlloc<SILParameterInfo, SILResultInfo, SILYieldInfo,
+                                  CanType, SILFunctionType::ExtInfo::Uncommon>(
       params.size(), normalResults.size() + (errorResult ? 1 : 0),
-      yields.size(), hasResultCache ? 2 : 0);
+      yields.size(), hasResultCache ? 2 : 0,
+      ext.getUncommonInfo().hasValue() ? 1 : 0);
 
   void *mem = ctx.Allocate(bytes, alignof(SILFunctionType));
 
