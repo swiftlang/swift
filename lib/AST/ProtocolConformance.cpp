@@ -1221,9 +1221,9 @@ ProtocolConformance::getInheritedConformance(ProtocolDecl *protocol) const {
 }
 
 #pragma mark Protocol conformance lookup
-void NominalTypeDecl::prepareConformanceTable() const {
+ConformanceLookupTable *NominalTypeDecl::prepareConformanceTable() const {
   if (ConformanceTable)
-    return;
+    return ConformanceTable;
 
   auto mutableThis = const_cast<NominalTypeDecl *>(this);
   ASTContext &ctx = getASTContext();
@@ -1236,7 +1236,7 @@ void NominalTypeDecl::prepareConformanceTable() const {
   if (file->getKind() != FileUnitKind::Source &&
       file->getKind() != FileUnitKind::ClangModule &&
       file->getKind() != FileUnitKind::DWARFModule) {
-    return;
+    return ConformanceTable;
   }
 
   SmallPtrSet<ProtocolDecl *, 2> protocols;
@@ -1270,6 +1270,8 @@ void NominalTypeDecl::prepareConformanceTable() const {
       addSynthesized(KnownProtocolKind::RawRepresentable);
     }
   }
+
+  return ConformanceTable;
 }
 
 bool NominalTypeDecl::lookupConformance(

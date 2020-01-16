@@ -308,6 +308,9 @@ public:
       llvm::SmallPtrSet<DerivativeAttr *, 1>>
       DerivativeAttrs;
 
+  /// Track protocol extensions that inherit to determine witness tables to emit.
+  mutable SmallVector<ExtensionDecl *, 2> ProtocolExtsWithConformances;
+
 private:
   /// The current generation number, which reflects the number of
   /// times that external modules have been loaded.
@@ -715,6 +718,11 @@ public:
   /// contains extensions loaded from any generation up to and including this
   /// one.
   void loadExtensions(NominalTypeDecl *nominal, unsigned previousGeneration);
+
+  /// Returns the current list of protocol extensions with conformances
+  SmallVector<ExtensionDecl *, 2> &getProtocolExtsWithConformances() const {
+    return ProtocolExtsWithConformances;
+  }
 
   /// Load the methods within the given class that produce
   /// Objective-C class or instance methods with the given selector.

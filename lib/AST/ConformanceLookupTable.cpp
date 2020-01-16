@@ -25,6 +25,7 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/ProtocolConformanceRef.h"
 #include "llvm/Support/SaveAndRestore.h"
+#include "../Sema/TypeCheckProtocol.h"
 
 using namespace swift;
 
@@ -475,11 +476,60 @@ void ConformanceLookupTable::addInheritedProtocols(
   }
 }
 
+void ConformanceLookupTable::addImpliedProtocols(
+                          NominalTypeDecl *nominal,
+                          llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl,
+                          ConformanceSource source,
+                          llvm::DenseMap<NominalTypeDecl *, NominalTypeDecl *> &Seen,
+                          Propagator *propagator) {
+  bool anyObject = false;
+  ExtensionDecl *extension = decl.dyn_cast<ExtensionDecl *>();
+  NominalTypeDecl *extending = extension ? extension->getExtendedNominal() :
+    dyn_cast<NominalTypeDecl>(decl.dyn_cast<TypeDecl *>());
+
+  // Closure to register inherited protocols against extending.
+  Propagator registerWitness = [&](ProtocolDecl *inheritedProto) {
+    if (extension && extending) {
+      auto *table = extending->prepareConformanceTable();
+      table->NominalConformancesFromExtension[extension][nominal][inheritedProto] = true;
+    }
+    // Continue propagating up stack.
+    if (propagator)
+      (*propagator)(inheritedProto);
+  };
+
+  // Find all of the protocols in the inheritance list.
+  unsigned count = 0, expected = extension ? extension->getInherited().size() : 0;
+  for (const auto &found :
+       getDirectlyInheritedNominalTypeDecls(decl, anyObject)) {
+    if (Seen.find(found.Item) == Seen.end()) {
+      Seen[found.Item] = extending; // prevent circularity (diagnose somewhere?)
+      addImpliedProtocols(nominal, found.Item, source, Seen, &registerWitness);
+    }
+    count++;
+  }
+  assert(!(count < expected));
+
+  if (!extension && extending) {
+    for (ExtensionDecl *ext : extending->getExtensions())
+      addImpliedProtocols(nominal, ext, source, Seen, &registerWitness);
+
+    if (auto proto = dyn_cast<ProtocolDecl>(extending)) {
+      addProtocol(proto, extension ? extension->getLoc() : extending->getLoc(), source);
+      if (propagator)
+        (*propagator)(/*inheritedProto*/proto);
+    }
+  }
+}
+
 void ConformanceLookupTable::expandImpliedConformances(NominalTypeDecl *nominal,
                                                        DeclContext *dc) {
   // Note: recursive type-checking implies that AllConformances
   // may be reallocated during this traversal, so pay the lookup cost
   // during each iteration.
+  llvm::DenseMap<NominalTypeDecl *, NominalTypeDecl *> Seen;
+  unsigned topLevel = AllConformances[dc].size();
+
   for (unsigned i = 0; i != AllConformances[dc].size(); ++i) {
     /// FIXME: Avoid the possibility of an infinite loop by fixing the root
     ///        cause instead (incomplete circularity detection).
@@ -504,8 +554,9 @@ void ConformanceLookupTable::expandImpliedConformances(NominalTypeDecl *nominal,
       }
     }
 
-    addInheritedProtocols(conformingProtocol,
-                          ConformanceSource::forImplied(conformanceEntry));
+    if (i < topLevel)
+      addImpliedProtocols(nominal, conformingProtocol,
+                          ConformanceSource::forImplied(conformanceEntry), Seen);
   }
 }
 
@@ -1183,3 +1234,70 @@ void ConformanceLookupTable::dump(raw_ostream &os) const {
   }
 }
 
+// Miscellaneous code added to implement conforming protocol extensions
+
+void ConformanceLookupTable::addExtendedConformances(const ExtensionDecl *ext,
+                 SmallVectorImpl<ProtocolConformance *> &conformances) {
+  MultiConformanceChecker groupChecker(ext->getASTContext());
+  for (auto &ext : NominalConformancesFromExtension)
+    for (auto &nominalPair : ext.second) {
+      NominalTypeDecl *nominal = nominalPair.first;
+      if (nominal->getSelfProtocolDecl())
+        continue;
+      for (auto &protocolPair : nominalPair.second) {
+        ProtocolDecl *proto = protocolPair.first;
+        auto table = nominal->prepareConformanceTable();
+        auto entry = table->Conformances.find(proto);
+        if (entry == table->Conformances.end())
+          continue;
+
+        auto conformance = table->getConformance(nominal, entry->second.back());
+        if (auto normal = dyn_cast<NormalProtocolConformance>(conformance)) {
+          conformances.push_back(conformance);
+          groupChecker.addConformance(normal);
+        }
+      }
+    }
+
+  if (groupChecker.checkAllConformances())
+    exit(EXIT_FAILURE);
+}
+
+void ConformanceLookupTable::invalidate(NominalTypeDecl *nomimal) {
+  for (auto &extInfo : NominalConformancesFromExtension)
+    for (auto &toInvalidate : extInfo.second)
+      toInvalidate.first->prepareConformanceTable()->invalidate(toInvalidate.first);
+
+  LastProcessed.clear();
+}
+
+void ProtocolDecl::inheritedProtocolsChanged() {
+  Bits.ProtocolDecl.InheritedProtocolsValid = false;
+  prepareConformanceTable()->invalidate(this);
+}
+
+void ExtensionDecl::setInherited(MutableArrayRef<TypeLoc> i) {
+  Inherited = i;
+  if (!Inherited.empty()) {
+    getASTContext().ProtocolExtsWithConformances.emplace_back(this);
+
+    if (hasBeenBound())
+      if (auto *proto = getExtendedProtocolDecl())
+        proto->inheritedProtocolsChanged();
+  }
+}
+
+void ConformanceLookupTable::forEachExtendedConformance(ASTContext &ctx,
+                std::function<void (NormalProtocolConformance *)> emitWitness) {
+  for (ExtensionDecl *ext : ctx.getProtocolExtsWithConformances())
+    if (ext->hasBeenBound())
+      if (ProtocolDecl *proto = ext->getExtendedProtocolDecl()) {
+        SmallVector<ProtocolConformance *, 2> result;
+        proto->prepareConformanceTable()->addExtendedConformances(ext, result);
+        for (auto conformance : result)
+            if (auto *normal = dyn_cast<NormalProtocolConformance>(conformance))
+              if (!conformance->getType()->getCanonicalType()
+                    ->getAnyNominal()->getSelfProtocolDecl())
+                emitWitness(normal);
+      }
+}

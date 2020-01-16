@@ -85,11 +85,14 @@ static void checkInheritanceClause(
     // Protocol extensions cannot have inheritance clauses.
     if (auto proto = ext->getExtendedProtocolDecl()) {
       if (!inheritedClause.empty()) {
-        ext->diagnose(diag::extension_protocol_inheritance,
-                 proto->getName())
-          .highlight(SourceRange(inheritedClause.front().getSourceRange().Start,
-                                 inheritedClause.back().getSourceRange().End));
-        return;
+        // Force recalculation conformance table
+        ext->setInherited(inheritedClause);
+
+        // Warning(eventaully error?) here is now gated
+        if (!ext->getASTContext().LangOpts.EnableConformingExtensions)
+          ext->diagnose(diag::extension_protocol_inheritance, proto->getName())
+            .highlight(SourceRange(inheritedClause.front().getSourceRange().Start,
+                                   inheritedClause.back().getSourceRange().End));
       }
     }
   } else {

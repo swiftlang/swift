@@ -1231,12 +1231,12 @@ ExtensionDecl::ExtensionDecl(SourceLoc extensionLoc,
     Decl(DeclKind::Extension, parent),
     IterableDeclContext(IterableDeclContextKind::ExtensionDecl),
     ExtensionLoc(extensionLoc),
-    ExtendedTypeRepr(extendedType),
-    Inherited(inherited)
+    ExtendedTypeRepr(extendedType)
 {
   Bits.ExtensionDecl.DefaultAndMaxAccessLevel = 0;
   Bits.ExtensionDecl.HasLazyConformances = false;
   setTrailingWhereClause(trailingWhereClause);
+  setInherited(inherited);
 }
 
 ExtensionDecl *ExtensionDecl::create(ASTContext &ctx, SourceLoc extensionLoc,
@@ -4635,14 +4635,18 @@ ProtocolDecl::getInheritedProtocolsSlow() {
   SmallPtrSet<const ProtocolDecl *, 2> known;
   known.insert(this);
   bool anyObject = false;
-  for (const auto found :
-           getDirectlyInheritedNominalTypeDecls(
-             const_cast<ProtocolDecl *>(this), anyObject)) {
-    if (auto proto = dyn_cast<ProtocolDecl>(found.Item)) {
-      if (known.insert(proto).second)
-        result.push_back(proto);
-    }
-  }
+  auto enumerateInherited = [&] (llvm::PointerUnion<TypeDecl *,
+                                 ExtensionDecl *> decl) {
+    for (const auto found :
+             getDirectlyInheritedNominalTypeDecls(decl, anyObject))
+      if (auto proto = dyn_cast<ProtocolDecl>(found.Item))
+        if (known.insert(proto).second)
+          result.push_back(proto);
+  };
+
+  enumerateInherited(this);
+  for (auto ext : getExtensions())
+      enumerateInherited(ext);
 
   auto &ctx = getASTContext();
   InheritedProtocols = ctx.AllocateCopy(result);

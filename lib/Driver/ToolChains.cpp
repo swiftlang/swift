@@ -256,6 +256,8 @@ static void addCommonFrontendArgs(const ToolChain &TC, const OutputInfo &OI,
                        options::OPT_enable_experimental_concise_pound_file);
   inputArgs.AddLastArg(arguments,
                        options::OPT_verify_incremental_dependencies);
+  inputArgs.AddLastArg(arguments,
+                       options::OPT_enable_conforming_protocol_extensions);
   
   // Pass on any build config options
   inputArgs.AddAllArgs(arguments, options::OPT_D);

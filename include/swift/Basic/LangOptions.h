@@ -112,6 +112,9 @@ namespace swift {
     /// Detect and automatically import modules' cross-import overlays.
     bool EnableCrossImportOverlays = false;
 
+    /// Gate for conforming protocol extensions code.
+    bool EnableConformingExtensions = false;
+
     ///
     /// Support for alternate usage modes
     ///

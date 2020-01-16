@@ -319,6 +319,12 @@ class ConformanceLookupTable {
   llvm::DenseMap<const ValueDecl *, llvm::TinyPtrVector<ValueDecl *>>
     ConformingDeclMap;
 
+  /// Tracks nominals that have an implied conformance from inheriting protocol extension
+  /// Used to know nominals that need to refresh their conformances and which witnesses to emit.
+  llvm::DenseMap<const ExtensionDecl *, llvm::DenseMap<NominalTypeDecl *,
+    llvm::DenseMap<ProtocolDecl *, bool>>> NominalConformancesFromExtension;
+
+
   /// Indicates whether we are visiting the superclass.
   bool VisitingSuperclass = false;
 
@@ -330,6 +336,16 @@ class ConformanceLookupTable {
   void addInheritedProtocols(
                          llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl,
                          ConformanceSource source);
+
+ /// Used to propagate conformances up to protocols being extended (by conformances).
+ using Propagator = std::function<void (ProtocolDecl *inheritedProto)>;
+
+ /// Recursively add inherited protocols, register conformance infered from protocol extension.
+ void addImpliedProtocols(NominalTypeDecl *nominal,
+                          llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl,
+                          ConformanceSource source,
+                          llvm::DenseMap<NominalTypeDecl *, NominalTypeDecl *> &Seen,
+                          Propagator *propagator = nullptr);
 
   /// Expand the implied conformances for the given DeclContext.
   void expandImpliedConformances(NominalTypeDecl *nominal, DeclContext *dc);
@@ -413,6 +429,9 @@ public:
   /// Create a new conformance lookup table.
   ConformanceLookupTable(ASTContext &ctx);
 
+  /// Force subseqent recalulation of conformances
+  void invalidate(NominalTypeDecl *nomimal);
+
   /// Destroy the conformance table.
   void destroy();
 
@@ -443,6 +462,10 @@ public:
                           SmallVectorImpl<ProtocolConformance *> *conformances,
                           SmallVectorImpl<ConformanceDiagnostic> *diagnostics);
 
+  /// Add conformances implied by an inheriting protocol extension
+  void addExtendedConformances(const ExtensionDecl *ext,
+                       SmallVectorImpl<ProtocolConformance *> &conformances);
+
   /// Retrieve the complete set of protocols to which this nominal
   /// type conforms.
   void getAllProtocols(NominalTypeDecl *nominal,
@@ -466,6 +489,10 @@ public:
   getSatisfiedProtocolRequirementsForMember(const ValueDecl *member,
                                             NominalTypeDecl *nominal,
                                             bool sorted);
+
+  /// Enumate conformances inferred from protocol extensions with new conformances
+  static void forEachExtendedConformance(ASTContext &ctx,
+                 std::function<void (NormalProtocolConformance *)> emitWitness);
 
   // Only allow allocation of conformance lookup tables using the
   // allocator in ASTContext or by doing a placement new.

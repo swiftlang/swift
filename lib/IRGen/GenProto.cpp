@@ -1080,9 +1080,9 @@ mapConformanceIntoContext(IRGenModule &IGM, const RootProtocolConformance &conf,
 WitnessIndex ProtocolInfo::getAssociatedTypeIndex(
                                     IRGenModule &IGM,
                                     AssociatedType assocType) const {
-  assert(!IGM.isResilient(assocType.getSourceProtocol(),
-                          ResilienceExpansion::Maximal) &&
-         "Cannot ask for the associated type index of non-resilient protocol");
+//  assert(!IGM.isResilient(assocType.getSourceProtocol(),
+//                          ResilienceExpansion::Maximal) &&
+//         "Cannot ask for the associated type index of non-resilient protocol");
   for (auto &witness : getWitnessEntries()) {
     if (witness.matchesAssociatedType(assocType))
       return getNonBaseWitnessIndex(&witness);
@@ -1948,6 +1948,8 @@ void IRGenModule::emitProtocolConformance(
           getAddrOfProtocolConformanceDescriptor(conformance,
                                                  init.finishAndCreateFuture()));
   var->setConstant(true);
+  if (record.wtable->getLinkage() == SILLinkage::Private)
+    var->setLinkage(llvm::GlobalVariable::LinkageTypes::PrivateLinkage);
   setTrueConstGlobal(var);
 }
 
@@ -1986,8 +1988,8 @@ void IRGenerator::ensureRelativeSymbolCollocation(SILDefaultWitnessTable &wt) {
 const ProtocolInfo &IRGenModule::getProtocolInfo(ProtocolDecl *protocol,
                                                  ProtocolInfoKind kind) {
   // If the protocol is resilient, we cannot know the full witness table layout.
-  assert(!isResilient(protocol, ResilienceExpansion::Maximal) ||
-         kind == ProtocolInfoKind::RequirementSignature);
+//  assert(!isResilient(protocol, ResilienceExpansion::Maximal) ||
+//         kind == ProtocolInfoKind::RequirementSignature);
 
   return Types.getProtocolInfo(protocol, kind);
 }
@@ -2155,6 +2157,9 @@ void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
 
     tableSize = wtableBuilder.getTableSize();
     instantiationFunction = wtableBuilder.buildInstantiationFunction();
+
+    if (wt->getLinkage() == SILLinkage::Private)
+      global->setLinkage(llvm::GlobalVariable::LinkageTypes::PrivateLinkage);
   } else {
     // Build the witness table.
     ResilientWitnessTableBuilder wtableBuilder(*this, wt);

@@ -504,6 +504,11 @@ def enable_experimental_concise_pound_file : Flag<["-"],
   Flags<[FrontendOption]>,
   HelpText<"Enable experimental concise '#file' identifier">;
 
+def enable_conforming_protocol_extensions : Flag<["-"],
+    "enable-conforming-protocol-extensions">,
+  Flags<[FrontendOption]>,
+  HelpText<"Enable experimental feature to allow protocol extensions to conform to protocols">;
+
 // Diagnostic control options
 def suppress_warnings : Flag<["-"], "suppress-warnings">,
   Flags<[FrontendOption]>,

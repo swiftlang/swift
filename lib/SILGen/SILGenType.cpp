@@ -615,13 +615,17 @@ public:
 } // end anonymous namespace
 
 SILWitnessTable *
-SILGenModule::getWitnessTable(NormalProtocolConformance *conformance) {
+SILGenModule::getWitnessTable(NormalProtocolConformance *conformance,
+                            bool emitAsPrivate) {
   // If we've already emitted this witness table, return it.
   auto found = emittedWitnessTables.find(conformance);
   if (found != emittedWitnessTables.end())
     return found->second;
 
-  SILWitnessTable *table = SILGenConformance(*this, conformance).emit();
+  SILGenConformance conf(*this, conformance);
+  if (emitAsPrivate)
+    conf.Linkage = SILLinkage::Private;
+  SILWitnessTable *table = conf.emit();
   emittedWitnessTables.insert({conformance, table});
 
   return table;

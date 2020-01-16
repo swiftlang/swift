@@ -42,6 +42,9 @@
 #include "swift/Subsystems.h"
 #include "llvm/ProfileData/InstrProfReader.h"
 #include "llvm/Support/Debug.h"
+
+#include "../AST/ConformanceLookupTable.h"
+
 using namespace swift;
 using namespace Lowering;
 
@@ -1831,7 +1834,16 @@ public:
         continue;
       SGM.visit(TD);
     }
+
+    ConformanceLookupTable::forEachExtendedConformance(getASTContext(),
+                                   [&](NormalProtocolConformance *normal) {
+      getWitnessTable(normal, /*emitAsPrivate*/true);
+    });
   }
+
+//===----------------------------------------------------------------------===//
+// SILModule::constructSIL method implementation
+//===----------------------------------------------------------------------===//
 
   SILGenModuleRAII(SILModule &M, ModuleDecl *SM) : SGM{M, SM} {}
 

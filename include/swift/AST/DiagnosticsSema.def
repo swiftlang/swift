@@ -1711,6 +1711,8 @@ NOTE(composition_in_extended_type_alternative,none,
 ERROR(extension_access_with_conformances,none,
       "%0 modifier cannot be used with extensions that declare "
       "protocol conformances", (DeclAttribute))
+ERROR(protocol_extension_access_with_conformances,none,
+      "protocol extensions with conformances must currently be public", ())
 ERROR(extension_metatype,none,
       "cannot extend a metatype %0", (Type))
 ERROR(extension_specialization,none,
@@ -1723,8 +1725,10 @@ NOTE(extension_stored_property_fixit,none,
 ERROR(extension_nongeneric_trailing_where,none,
       "trailing 'where' clause for extension of non-generic type %0",
       (DeclName))
-ERROR(extension_protocol_inheritance,none,
-      "extension of protocol %0 cannot have an inheritance clause", (DeclName))
+WARNING(extension_protocol_inheritance,none,
+      "inheritance clause in extension of protocol %0. "
+      "use -enable-conforming-protocol-extensions to remove this warning",
+      (DeclName))
 ERROR(objc_generic_extension_using_type_parameter,none,
       "extension of a generic Objective-C class cannot access the class's "
       "generic parameters at runtime", ())
