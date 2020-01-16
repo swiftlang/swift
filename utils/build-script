@@ -19,10 +19,10 @@ import platform
 import sys
 import time
 
-from build_swift import defaults
-from build_swift import driver_arguments
-from build_swift import presets
-from build_swift.migration import migrate_swift_sdks
+from build_swift.build_swift import defaults
+from build_swift.build_swift import driver_arguments
+from build_swift.build_swift import presets
+from build_swift.build_swift.migration import migrate_swift_sdks
 
 from swift_build_support.swift_build_support import (
     arguments,
