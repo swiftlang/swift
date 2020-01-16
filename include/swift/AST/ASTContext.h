@@ -576,6 +576,10 @@ public:
   Type getBridgedToObjC(const DeclContext *dc, Type type,
                         Type *bridgedValueType = nullptr) const;
 
+private:
+  void initializeClangTypeConverter();
+
+public:
   /// Get the Clang type corresponding to a Swift function type.
   ///
   /// \param params The function parameters.
@@ -588,6 +592,15 @@ public:
   getClangFunctionType(ArrayRef<AnyFunctionType::Param> params, Type resultTy,
                        const FunctionType::ExtInfo incompleteExtInfo,
                        FunctionTypeRepresentation trueRep);
+
+  /// Get the canonical Clang type corresponding to a SIL function type.
+  ///
+  /// SIL analog of \c ASTContext::getClangFunctionType .
+  const clang::Type *
+  getCanonicalClangFunctionType(
+    ArrayRef<SILParameterInfo> params, Optional<SILResultInfo> result,
+    const SILFunctionType::ExtInfo incompleteExtInfo,
+    SILFunctionType::Representation trueRep);
 
   /// Determine whether the given Swift type is representable in a
   /// given foreign language.

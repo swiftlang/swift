@@ -4372,17 +4372,35 @@ Type ASTContext::getBridgedToObjC(const DeclContext *dc, Type type,
   return Type();
 }
 
-const clang::Type *
-ASTContext::getClangFunctionType(ArrayRef<AnyFunctionType::Param> params,
-                                 Type resultTy,
-                                 FunctionType::ExtInfo incompleteExtInfo,
-                                 FunctionTypeRepresentation trueRep) {
+void
+ASTContext::initializeClangTypeConverter() {
   auto &impl = getImpl();
   if (!impl.Converter) {
     auto *cml = getClangModuleLoader();
     impl.Converter.emplace(*this, cml->getClangASTContext(), LangOpts.Target);
   }
-  return impl.Converter.getValue().getFunctionType(params, resultTy, trueRep);
+}
+
+const clang::Type *
+ASTContext::getClangFunctionType(ArrayRef<AnyFunctionType::Param> params,
+                                 Type resultTy,
+                                 FunctionType::ExtInfo incompleteExtInfo,
+                                 FunctionTypeRepresentation trueRep) {
+  initializeClangTypeConverter();
+  return getImpl().Converter.getValue().getFunctionType(params, resultTy,
+                                                        trueRep);
+}
+
+const clang::Type *
+ASTContext::getCanonicalClangFunctionType(
+    ArrayRef<SILParameterInfo> params,
+    Optional<SILResultInfo> result,
+    SILFunctionType::ExtInfo incompleteExtInfo,
+    SILFunctionType::Representation trueRep) {
+  initializeClangTypeConverter();
+  auto *ty = getImpl().Converter.getValue().getFunctionType(params, result,
+                                                            trueRep);
+  return ty ? ty->getCanonicalTypeInternal().getTypePtr() : nullptr;
 }
 
 CanGenericSignature ASTContext::getSingleGenericParameterSignature() const {
